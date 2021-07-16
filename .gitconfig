@@ -1,5 +1,5 @@
 [user]
-	name = esh2n
+	name = Shunya Endo
 	email = shunyaendoh.bz@gmail.com
 [core]
 	excludesfile = ~/.gitignore_global
@@ -27,3 +27,5 @@
 	rebase = true
 [init]
 	defaultBranch = main
+[core]
+	commentChar = ";"

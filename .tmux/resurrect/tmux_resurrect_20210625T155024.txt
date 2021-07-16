@@ -1,0 +1,8 @@
+pane	0	1	:fix/add-analytics	1	:*	1	:/Users/esh2n/src/bitbucket.org/cnt_develop/pvt_port-app/App/portlife/ios	1	zsh	:
+pane	0	1	:fix/add-analytics	1	:*	2	:/Users/esh2n/src/bitbucket.org/cnt_develop/pvt_port-app/App/portlife	0	zsh	:
+pane	1	1	:esh2n	1	:*	1	:/Users/esh2n	1	zsh	:
+pane	2	1	:esh2n	1	:*	1	:/Users/esh2n	1	zsh	:
+window	0	1	1	:*	ba86,173x91,0,0{86x91,0,0,1,86x91,87,0,8}
+window	1	1	1	:*	c01f,283x54,0,0,2
+window	2	1	1	:*	c021,283x54,0,0,4
+state	0	2

@@ -1,5 +1,8 @@
 # PATHs
 
+# homebrew
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
 # bash
 export PATH=$HOME/bin:/usr/local/bin:$PATH
 
@@ -66,8 +69,9 @@ export PATH="$HOME/geth:$PATH"
 
 # java
 export PATH="$HOME/.jenv/bin:$PATH"
-# eval "$(jenv init -)"
-export JAVA_HOME=$(/usr/libexec/java_home -v 11)
+eval "$(jenv init -)"
+
+# export JAVA_HOME=$(/usr/libexec/java_home -v 11)
 
 # deno
 export DENO_INSTALL="~/.deno"

@@ -1,0 +1,8 @@
+pane	0	1	:Xflutter-architecture	1	:*	1	:/Users/esh2n/src/bitbucket.org/cnt_develop/pvt_port-app/App/portlife	0	zsh	:
+pane	0	1	:Xflutter-architecture	1	:*	2	:/Users/esh2n/src/github.com/esh2n/Xflutter-architecture	1	zsh	:
+pane	1	1	:esh2n	1	:*	1	:/Users/esh2n	1	zsh	:
+pane	2	1	:esh2n	1	:*	1	:/Users/esh2n	1	zsh	:
+window	0	1	1	:*	815a,348x91,0,0{174x91,0,0,1,173x91,175,0,8}
+window	1	1	1	:*	c01f,283x54,0,0,2
+window	2	1	1	:*	c021,283x54,0,0,4
+state	0	2
