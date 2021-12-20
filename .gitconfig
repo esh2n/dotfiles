@@ -1,9 +1,6 @@
-[user]
-	name = Shunya Endo
-	email = shunyaendoh.bz@gmail.com
 [core]
 	excludesfile = ~/.gitignore_global
-	editor = nvim
+	editor = /opt/homebrew/bin/nvim
 [difftool "sourcetree"]
 	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
 	path =
@@ -18,14 +15,38 @@
 [commit]
   template = ~/.gitmessage
 [ghq]
-  root = ~/src
+	root = /Users/esh2n/go
 [pager]
-  log = diff-highlight | less
-  show = diff-highlight | less
-  diff = diff-highlight | less
+    diff = delta
+    log = delta
+    reflog = delta
+    show = delta
+
+[interactive]
+    diffFilter = delta --color-only --features=interactive
+
+[delta]
+    features = decorations
+
+[delta "interactive"]
+    keep-plus-minus-markers = false
+
+[delta "decorations"]
+    commit-decoration-style = blue ol
+    commit-style = raw
+    file-style = omit
+    hunk-header-decoration-style = blue box
+    hunk-header-file-style = red
+    hunk-header-line-number-style = "#067a00"
+    hunk-header-style = file line-number syntax
 [pull]
 	rebase = true
 [init]
 	defaultBranch = main
 [core]
 	commentChar = ";"
+[user]
+	name = esh2n
+	email = shunyaendoh.bz@gmail.com
+[includeIf "gitdir:~/go/github.com/4sobiba/"]
+	path = ./.gitconfig_sub

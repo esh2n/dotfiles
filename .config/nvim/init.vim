@@ -64,3 +64,4 @@ endif
 " }}}
 
 runtime init/setting.init.vim
+runtime init/treesitter.vim

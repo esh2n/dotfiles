@@ -104,10 +104,11 @@ repo = 'SirVer/ultisnips'
 repo = 'honza/vim-snippets'
 
 [[plugins]]
-build = './install.sh nightly'
-if = '''executable('node') && executable('yarn')'''
+repo = 'neoclid/coc.nvim'
+rev = 'release'
+on_i = 1
 merged = '0'
-repo = 'neoclide/coc.nvim'
+hook_source = 'call coil398#init#coc#hook_source()'
 
 [[plugins]]
 repo = 'kassio/neoterm'
@@ -129,6 +130,9 @@ repo = 'tpope/vim-repeat'
 
 [[plugins]]
 repo = 'jiangmiao/auto-pairs'
+
+[[plugins]]
+repo = 'nvim-treesitter/nvim-treesitter'
 
 [[plugins]]
 repo = 'junegunn/vim-emoji'

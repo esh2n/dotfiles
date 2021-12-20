@@ -1,0 +1,61 @@
+pane	atgame	1	:Cultya	0	:##-	1	:/Users/esh2n/temp/golang/src/github.com/AtGame-Inc/Cultya/functions	1	zsh	:
+pane	atgame	1	:Cultya	0	:##-	2	:/Users/esh2n/Desktop	0	zsh	:
+pane	atgame	1	:Cultya	0	:##-	3	:/Users/esh2n/temp/golang/src/github.com/esh2n/flutil	0	zsh	:
+pane	atgame	2	:feature/change-setting-page	1	:*	1	:/Users/esh2n/temp/golang/src/github.com/AtGame-Inc/Cultya	1	zsh	:
+pane	pivot	1	:feature/migrate-api-key	0	:	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_jshare/app/jshare	0	zsh	:
+pane	pivot	1	:feature/migrate-api-key	0	:	2	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/test/text_field_test	1	zsh	:
+pane	pivot	1	:feature/migrate-api-key	0	:	3	:/Users/esh2n/dotfiles	0	zsh	:
+pane	pivot	2	:t	0	:	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/test/pvt_thg-lhiot-poc-app	0	zsh	:
+pane	pivot	2	:t	0	:	2	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_thg-lhiot-poc-server	1	zsh	:
+pane	pivot	2	:t	0	:	3	:/Users/esh2n/go/github.com/esh2n/test/t	0	zsh	:
+pane	pivot	3	:markup	0	:-	1	:/Users/esh2n/go/github.com/esh2n/test/markup	1	zsh	:
+pane	pivot	4	:	0	:##	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_mel-fa-app-android	1	zsh	:
+pane	pivot	5	:master	0	:	1	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/tmp/autofill_example	1	zsh	:
+pane	pivot	5	:master	0	:	2	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/tmp/autofill_example/build/ios/iphoneos	0	zsh	:
+pane	pivot	5	:master	0	:	3	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/tmp/autofill_example/build/app/outputs/flutter-apk	0	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	0	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:	2	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	0	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:	3	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	1	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:	4	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	0	zsh	:
+pane	pivot	7	:cnt_develop	1	:*	1	:/Users/esh2n/go/bitbucket.org/cnt_develop	1	zsh	:
+pane	pivot	7	:cnt_develop	1	:*	2	:/Users/esh2n/go/github.com/esh2n/test/report	0	zsh	:
+pane	playground	1	:xblockchain-ts	0	:-	1	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	0	zsh	:
+pane	playground	1	:xblockchain-ts	0	:-	2	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	0	zsh	:
+pane	playground	1	:xblockchain-ts	0	:-	3	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	0	zsh	:
+pane	playground	1	:xblockchain-ts	0	:-	4	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	1	zsh	:
+pane	playground	2	:main	0	:	1	:/Users/esh2n/go/github.com/esh2n/gg/app/script/flavor	0	zsh	:
+pane	playground	2	:main	0	:	2	:/Users/esh2n/go/github.com/esh2n/xyew-taskboard	1	zsh	:
+pane	playground	2	:main	0	:	3	:/Users/esh2n/go/github.com/yewstack/yew/examples	0	zsh	:
+pane	playground	2	:main	0	:	4	:/Users/esh2n/go/github.com/esh2n/xyew	0	zsh	:
+pane	playground	3	:esh2n.playground	0	:	1	:/Users/esh2n/go/github.com/esh2n/xastro	1	zsh	:
+pane	playground	3	:esh2n.playground	0	:	2	:/Users/esh2n/go/github.com/snowpackjs/astro/examples/framework-react	0	zsh	:
+pane	playground	4	:esh2n	0	:	1	:/Users/esh2n/go/github.com/esh2n	1	zsh	:
+pane	playground	4	:esh2n	0	:	2	:/Users/esh2n/go/github.com/esh2n/esh2n.playground	0	zsh	:
+pane	playground	4	:esh2n	0	:	3	:/Users/esh2n/go/github.com/esh2n/esh2n	0	zsh	:
+pane	playground	4	:esh2n	0	:	4	:/Users/esh2n/go/github.com/esh2n/cached-og	0	zsh	:
+pane	playground	5	:esh2n	0	:	1	:/Users/esh2n/go/github.com/esh2n/esh2n.dev/backend	0	zsh	:
+pane	playground	5	:esh2n	0	:	2	:/Users/esh2n/go/github.com/esh2n/esh2n.dev/frontend	1	zsh	:
+pane	playground	5	:esh2n	0	:	3	:/Users/esh2n/dotfiles	0	zsh	:
+pane	playground	6	:main	0	:	1	:/Users/esh2n/go/github.com/esh2n/Xflow-next	1	zsh	:
+pane	playground	6	:main	0	:	2	:/Users/esh2n/go/github.com/esh2n/Xflow-next	0	zsh	:
+pane	playground	7	:main	0	:	1	:/Users/esh2n/go/github.com/esh2n/elm-fullstack/implement/example-apps/rich-chat-room	1	zsh	:
+pane	playground	8	:master	1	:##*	1	:/Users/esh2n/go/github.com/esh2n/xblockchain-ts	0	zsh	:
+pane	playground	8	:master	1	:##*	2	:/Users/esh2n/go/github.com/craftzdog/craftzdog-homepage	1	zsh	:
+window	atgame	1	0	:##-	1651,283x74,0,0{141x74,0,0,1,141x74,142,0[141x38,142,0,2,141x35,142,39,3]}
+window	atgame	2	1	:*	c421,283x74,0,0,4
+window	pivot	1	0	:	1cbb,283x74,0,0{136x74,0,0[136x38,0,0,5,136x35,0,39,6],146x74,137,0,7}
+window	pivot	2	0	:	5ae6,283x74,0,0{140x74,0,0[140x35,0,0,10,140x38,0,36,11],142x74,141,0,12}
+window	pivot	3	0	:-	6242,283x55,0,0,13
+window	pivot	4	0	:##	6245,283x74,0,0,16
+window	pivot	5	0	:	1288,283x74,0,0{140x74,0,0,17,142x74,141,0[142x36,141,0,18,142x37,141,37,19]}
+window	pivot	6	0	:	c826,283x74,0,0{141x74,0,0[141x36,0,0{70x36,0,0,20,70x36,71,0,21},141x37,0,37,22],141x74,142,0,23}
+window	pivot	7	1	:*	8739,283x55,0,0{141x55,0,0,24,141x55,142,0,25}
+window	playground	1	0	:-	1756,283x74,0,0[283x37,0,0{140x37,0,0,26,142x37,141,0,27},283x36,0,38{140x36,0,38,28,142x36,141,38,29}]
+window	playground	2	0	:	75c0,141x40,0,0{70x40,0,0[70x22,0,0,30,70x17,0,23,31],70x40,71,0[70x22,71,0,32,70x17,71,23,33]}
+window	playground	3	0	:	5beb,141x40,0,0{70x40,0,0,34,70x40,71,0,35}
+window	playground	4	0	:	0b16,283x74,0,0{142x74,0,0[142x38,0,0,36,142x35,0,39,37],140x74,143,0[140x38,143,0,38,140x35,143,39,39]}
+window	playground	5	0	:	15dc,283x74,0,0[283x38,0,0,40,283x35,0,39{141x35,0,39,41,141x35,142,39,42}]
+window	playground	6	0	:	8739,283x74,0,0{141x74,0,0,43,141x74,142,0,44}
+window	playground	7	0	:	e245,283x74,0,0,45
+window	playground	8	1	:##*	873c,283x74,0,0{141x74,0,0,46,141x74,142,0,47}
+state	pivot	playground

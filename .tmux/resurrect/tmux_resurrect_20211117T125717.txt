@@ -1,0 +1,63 @@
+pane	atgame	1	:Desktop	1	:##*	1	:/Users/esh2n/temp/golang/src/github.com/AtGame-Inc/Cultya/functions	0	zsh	:
+pane	atgame	1	:Desktop	1	:##*	2	:/Users/esh2n/Desktop	0	zsh	:
+pane	atgame	1	:Desktop	1	:##*	3	:/Users/esh2n/temp/golang/src/github.com/esh2n/flutil	1	zsh	:
+pane	atgame	2	:feature/change-setting-page	0	:##	1	:/Users/esh2n/temp/golang/src/github.com/AtGame-Inc/Cultya	1	zsh	:
+pane	pivot	1	:main	0	:	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_jshare/app/jshare	0	zsh	:
+pane	pivot	1	:main	0	:	2	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/test/text_field_test	0	zsh	:
+pane	pivot	1	:main	0	:	3	:/Users/esh2n/go/github.com/bannzai/Pilll	1	zsh	:
+pane	pivot	2	:t	0	:-	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/test/pvt_thg-lhiot-poc-app	0	zsh	:
+pane	pivot	2	:t	0	:-	2	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_thg-lhiot-poc-server	1	zsh	:
+pane	pivot	2	:t	0	:-	3	:/Users/esh2n/go/github.com/esh2n/test/t	0	zsh	:
+pane	pivot	3	:fix/login-ui	1	:*	1	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/pvt_port-app/App/portlife	0	zsh	:
+pane	pivot	3	:fix/login-ui	1	:*	2	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/pvt_port-app/App/portlife/build/ios/iphoneos	0	zsh	:
+pane	pivot	3	:fix/login-ui	1	:*	3	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/pvt_port-app/App/portlife/build/app/outputs/bundle/devRelease	1	zsh	:
+pane	pivot	3	:fix/login-ui	1	:*	4	:/Users/esh2n/Library/MobileDevice/Provisioning\ Profiles	0	zsh	:
+pane	pivot	4	:	0	:##	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_mel-fa-app-android	1	zsh	:
+pane	pivot	5	:master	0	:##	1	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/tmp/autofill_example	0	zsh	:
+pane	pivot	5	:master	0	:##	2	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/tmp/autofill_example/build/ios/iphoneos	0	zsh	:
+pane	pivot	5	:master	0	:##	3	:/Users/esh2n/temp/golang/src/bitbucket.org/cnt_develop/tmp/autofill_example/build/app/outputs/flutter-apk	1	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:##	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	0	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:##	2	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	0	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:##	3	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	0	zsh	:
+pane	pivot	6	: (git)-[feature/add-notification-ui|merge]-	0	:##	4	:/Users/esh2n/go/bitbucket.org/cnt_develop/pvt_fuji-film-photo-app/frontend/PhotoShareService	1	zsh	:
+pane	pivot	7	:associate-domains	0	:##	1	:/Users/esh2n/go/bitbucket.org/cnt_develop/associate-domains	0	zsh	:
+pane	pivot	7	:associate-domains	0	:##	2	:/Users/esh2n/go/github.com/esh2n/test/report	1	zsh	:
+pane	playground	1	:xblockchain-ts	1	:##*	1	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	1	zsh	:
+pane	playground	1	:xblockchain-ts	1	:##*	2	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	0	zsh	:
+pane	playground	1	:xblockchain-ts	1	:##*	3	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	0	zsh	:
+pane	playground	1	:xblockchain-ts	1	:##*	4	:/Users/esh2n/go/github.com/zat2a-code/Xmysql-go-nginx	0	zsh	:
+pane	playground	2	:main	0	:##	1	:/Users/esh2n/go/github.com/esh2n/gg/app/script/flavor	0	zsh	:
+pane	playground	2	:main	0	:##	2	:/Users/esh2n/go/github.com/esh2n/xyew-taskboard	0	zsh	:
+pane	playground	2	:main	0	:##	3	:/Users/esh2n/go/github.com/yewstack/yew/examples	0	zsh	:
+pane	playground	2	:main	0	:##	4	:/Users/esh2n/go/github.com/esh2n/xyew	1	zsh	:
+pane	playground	3	:esh2n.playground	0	:##	1	:/Users/esh2n/go/github.com/esh2n/xastro	0	zsh	:
+pane	playground	3	:esh2n.playground	0	:##	2	:/Users/esh2n/go/github.com/snowpackjs/astro/examples/framework-react	1	zsh	:
+pane	playground	4	:esh2n	0	:##	1	:/Users/esh2n/go/github.com/esh2n	0	zsh	:
+pane	playground	4	:esh2n	0	:##	2	:/Users/esh2n/go/github.com/esh2n/esh2n.playground	0	zsh	:
+pane	playground	4	:esh2n	0	:##	3	:/Users/esh2n/go/github.com/esh2n/esh2n	0	zsh	:
+pane	playground	4	:esh2n	0	:##	4	:/Users/esh2n/go/github.com/esh2n/cached-og	1	zsh	:
+pane	playground	5	:esh2n	0	:##	1	:/Users/esh2n/go/github.com/esh2n/esh2n.dev/backend	0	zsh	:
+pane	playground	5	:esh2n	0	:##	2	:/Users/esh2n/go/github.com/esh2n/esh2n.dev/frontend	0	zsh	:
+pane	playground	5	:esh2n	0	:##	3	:/Users/esh2n/dotfiles	1	zsh	:
+pane	playground	6	:main	0	:##	1	:/Users/esh2n/go/github.com/esh2n/Xflow-next	0	zsh	:
+pane	playground	6	:main	0	:##	2	:/Users/esh2n/go/github.com/esh2n/Xflow-next	1	zsh	:
+pane	playground	7	:main	0	:##	1	:/Users/esh2n/go/github.com/esh2n/elm-fullstack/implement/example-apps/rich-chat-room	1	zsh	:
+pane	playground	8	:reduce	0	:##	1	:/Users/esh2n/go/github.com/esh2n/test/reduce	1	zsh	:
+window	atgame	1	1	:##*	964c,283x74,0,0{141x74,0,0,0,141x74,142,0[141x38,142,0,1,141x35,142,39,2]}
+window	atgame	2	0	:##	c420,283x74,0,0,3
+window	pivot	1	0	:	0938,283x55,0,0{136x55,0,0[136x28,0,0,4,136x26,0,29,5],146x55,137,0,6}
+window	pivot	2	0	:-	b1cf,283x55,0,0{140x55,0,0[140x25,0,0,7,140x29,0,26,8],142x55,141,0,9}
+window	pivot	3	1	:*	1286,283x55,0,0{88x55,0,0,10,91x55,89,0[91x27,89,0,11,91x27,89,28,12],102x55,181,0,13}
+window	pivot	4	0	:##	6243,283x55,0,0,14
+window	pivot	5	0	:##	4e45,283x55,0,0{140x55,0,0,15,142x55,141,0[142x26,141,0,16,142x28,141,27,17]}
+window	pivot	6	0	:##	632e,283x55,0,0{141x55,0,0[141x26,0,0{70x26,0,0,18,70x26,71,0,19},141x28,0,27,20],141x55,142,0,21}
+window	pivot	7	0	:##	8737,283x55,0,0{141x55,0,0,22,141x55,142,0,23}
+window	playground	1	1	:##*	efe4,283x55,0,0[283x27,0,0{140x27,0,0,24,142x27,141,0,25},283x27,0,28{140x27,0,28,26,142x27,141,28,27}]
+window	playground	2	0	:##	fa6e,141x40,0,0{70x40,0,0[70x22,0,0,28,70x17,0,23,29],70x40,71,0[70x22,71,0,30,70x17,71,23,31]}
+window	playground	3	0	:##	5be6,141x40,0,0{70x40,0,0,32,70x40,71,0,33}
+window	playground	4	0	:##	4b12,283x74,0,0{142x74,0,0[142x38,0,0,34,142x35,0,39,35],140x74,143,0[140x38,143,0,36,140x35,143,39,37]}
+window	playground	5	0	:##	85fa,283x74,0,0[283x38,0,0,38,283x35,0,39{141x35,0,39,39,141x35,142,39,40}]
+window	playground	6	0	:##	8737,283x74,0,0{141x74,0,0,41,141x74,142,0,42}
+window	playground	7	0	:##	e243,283x74,0,0,43
+window	playground	8	0	:##	e244,283x55,0,0,44
+state	pivot	playground
