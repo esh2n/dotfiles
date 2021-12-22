@@ -1,6 +1,5 @@
 # zmodload zsh/zprof && zprof
 
-# divide zsh config file
 export ZSHHOME="${HOME}/.zsh"
 if [ -d $ZSHHOME -a -r $ZSHHOME -a -x $ZSHHOME ]; then
   source $ZSHHOME/init/brew_init.zsh
