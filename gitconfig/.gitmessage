@@ -1,4 +1,4 @@
-; <type>[optional scope]: <description>
+; <type(!)>(scope?): <desc>
 ; feat:
 ; chore:
 ; fix:
@@ -8,9 +8,9 @@
 ; style:
 ; test:
 
-; [optional body]
+; [body?]: details of subject
 
-; [optional footer(s)] : BREAKING CHANGE or issue number
+; [footer?]: BREAKING CHANGE or issue number
 ; BREAKING CHANGE:
 ; Refs #
 ; Reviewed-by:
@@ -22,4 +22,3 @@
 ; BREAKING CHANGE: refactor to use JavaScript features not available in Node 6.
 ; ==============================================================================
 ; https://www.conventionalcommits.org/ja/v1.0.0/
-; # |  |

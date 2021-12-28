@@ -12,10 +12,10 @@ autoload -Uz chpwd_recent_dirs
 
 # plugins: genaral load {{{
 zinit light-mode for \
-    zinit-zsh/z-a-rust \
-    zinit-zsh/z-a-as-monitor \
-    zinit-zsh/z-a-patch-dl \
-    zinit-zsh/z-a-bin-gem-node
+    zdharma-continuum/zinit-annex-as-monitor \
+    zdharma-continuum/zinit-annex-bin-gem-node \
+    zdharma-continuum/zinit-annex-patch-dl \
+    zdharma-continuum/zinit-annex-rust
 # 利用可能なエイリアスを使わずにコマンドを実行した際に通知するプラグインです。
 zinit light 'djui/alias-tips'
 export ZSH_PLUGINS_ALIAS_TIPS_TEXT='🗒 : '
@@ -54,7 +54,6 @@ zinit snippet 'OMZ::plugins/github/github.plugin.zsh'
 # 非GNU系OSにインストールしたGNU系ツールをプリフィックスなしで使えるようにするプラグインです。
 zinit snippet 'OMZ::plugins/gnu-utils/gnu-utils.plugin.zsh'
 # .zshrc を zcompile してロードしてくれる src コマンドを定義するプラグインです。
-zinit snippet 'OMZ::plugins/zsh_reload/zsh_reload.plugin.zsh'
 # }}}
 
 
@@ -73,7 +72,7 @@ zinit light 'zsh-users/zsh-completions'
 # }}}
 zinit wait lucid for \
     atinit"ZINIT[COMPINIT_OPTS]=-C; zicompinit; zicdreplay" \
-        zdharma/fast-syntax-highlighting \
+        zdharma-continuum/fast-syntax-highlighting \
     blockf \
     zsh-users/zsh-completions \
     atload"!_zsh_autosuggest_start" \

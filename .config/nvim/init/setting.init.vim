@@ -58,10 +58,10 @@ set relativenumber      "相対行番号表示 ex. 3j ( numberで絶対行数 )
 set cursorline          "カーソルラインを表示
 set cursorcolumn        "カーソルカラムを表示
 
-let g:python_host_prog = $HOME . '/.pyenv/versions/neovim2/bin/python'
-let g:python3_host_prog = $HOME . '/.pyenv/versions/neovim3/bin/python'
+let g:python_host_prog = $HOME . '/.pyenv/versions/py2neovim/bin/python'
+let g:python3_host_prog = $HOME . '/.pyenv/versions/py3neovim/bin/python'
 let g:ruby_host_prog = $HOME . '/.rbenv/versions/2.6.3/bin/neovim-ruby-host'
-let g:node_host_prog = $HOME . '/.nodebrew/node/v12.16.0/lib/node_modules/neovim/bin/cli.js'
+let g:node_host_prog = '/opt/homebrew/bin/neovim-node-host'
 
 nmap <C-b> :NERDTreeToggle<CR>
 nmap <F8> :TagbarToggle<CR>

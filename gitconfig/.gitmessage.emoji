@@ -1,0 +1,24 @@
+; <type(!)>(scope?): <desc>
+; ✨ feat:
+; 👍 chore:
+; 🔧 fix:
+; 📚 doc:
+; 🐎 perf:
+; ♻️ refactor:
+; 🖍 style:
+; 💚 test:
+
+; [body?]: details of subject
+
+; [footer?]: details of BREAKING CHANGE or issue number
+; ⚠️ BREAKING CHANGE:
+; Refs #
+; Reviewed-by:
+
+; =============================================================================
+; [example]
+; ♻️ refactor(runtime)!: drop support for Node 6
+;
+; ⚠️ BREAKING CHANGE: refactor to use JavaScript features not available in Node 6.
+; ==============================================================================
+; https://www.conventionalcommits.org/ja/v1.0.0/

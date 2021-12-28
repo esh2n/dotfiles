@@ -36,6 +36,9 @@ eval "$(pyenv init - zsh)"
 eval "$(pyenv virtualenv-init -)"
 fi
 
+# perl
+if which plenv > /dev/null; then eval "$(plenv init - zsh)"; fi
+
 # PHP@7.2
 export PATH="/usr/local/opt/php@7.2/bin:$PATH"
 export PATH="/usr/local/opt/php@7.2/sbin:$PATH"
@@ -51,9 +54,10 @@ export PATH="~/.rbenv/shims:/usr/local/bin:$PATH"
 eval "$(rbenv init -)"
 
 # Flutter
-export PATH=$PATH:~/flutter/flutter/bin
+# export PATH=$PATH:~/flutter/flutter/bin
 export PATH="$PATH":"$HOME/.pub-cache/bin"
 # export PATH="$PATH":"$HOME/flutter/flutter/.pub-cache/bin"
+export PATH="$PATH":"$HOME/fvm/default/bin"
 # asdf
 # . $(brew --prefix asdf)/asdf.sh
 

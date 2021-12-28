@@ -1,4 +1,6 @@
 ---
+session:
+  name: "esh2n"
 template:
   direction: Horizontal
   parts:
@@ -11,31 +13,104 @@ template:
           location: "zellij:tab-bar"
     - direction: Vertical
       body: true
-    - direction: Vertical
-      borderless: true
-      split_size:
-        Fixed: 2
-      run:
-        plugin:
-          location: "zellij:status-bar"
 tabs:
-  - direction: Vertical
+  - name: "MN"
+    direction: Vertical
     parts:
       - direction: Vertical
         parts:
           - direction: Vertical
-          - direction: Vertical
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: htop}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
       - direction: Vertical
         parts:
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: spt}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
           - direction: Vertical
-          - direction: Vertical
-  - direction: Vertical
+  - name: "GC"
+    direction: Vertical
     parts:
       - direction: Vertical
         parts:
           - direction: Vertical
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: htop}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
+      - direction: Vertical
+        parts:
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: spt}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
           - direction: Vertical
+  - name: "PF"
+    direction: Vertical
+    parts:
       - direction: Vertical
         parts:
           - direction: Vertical
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: htop}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
+      - direction: Vertical
+        parts:
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: spt}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
+          - direction: Vertical
+  - name: "PV"
+    direction: Vertical
+    parts:
+      - direction: Vertical
+        parts:
+          - direction: Vertical
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: htop}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
+      - direction: Vertical
+        parts:
+          - direction: Horizontal
+            parts:
+              - direction: Vertical
+                run:
+                  command: {cmd: spt}
+                split_size:
+                  Percent: 30
+              - direction: Vertical
           - direction: Vertical

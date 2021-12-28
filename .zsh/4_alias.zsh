@@ -42,11 +42,9 @@ alias chrhe="chrome --headless --disable-gpu --screenshot --disk-cache-dir=/tmp 
 # }}}
 
 # Extend Terminal CLI {{{
-  alias ls="exa"
-  alias ls="ls -p -G"
-  alias la="ls -A"
-  alias ll="ls -l"
-  alias lla="ll -A"
+  alias ls="exa --icons"
+  alias la="exa -a --icons"
+  alias ll="exa -l --icons"
   alias llt="exa --tree --level=2 -a"
   alias rm='trash'
   alias Rm='rm -rf'
@@ -225,4 +223,8 @@ alias cdd="cd $DOTFILES_PATH"
 
 # Curl {{
 alias curl_header='curl -D - -s -o /dev/null'
+# }}
+
+# Zellij {{
+alias zeinit='zellij --layout ~/.config/zellij/layout_file.yaml'
 # }}

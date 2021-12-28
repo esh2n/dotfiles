@@ -1,3 +1,4 @@
+lua <<EOF
 require'nvim-treesitter.configs'.setup {
   highlight = {
     enable = true,
@@ -8,8 +9,6 @@ require'nvim-treesitter.configs'.setup {
       'c_sharp',
       'vue',
     }
-  },
-  indent = {
-    enable = true,
   }
 }
+EOF

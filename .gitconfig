@@ -1,52 +1,6 @@
-[core]
-	excludesfile = ~/.gitignore_global
-	editor = /opt/homebrew/bin/nvim
-[difftool "sourcetree"]
-	cmd = opendiff \"$LOCAL\" \"$REMOTE\"
-	path =
-[mergetool "sourcetree"]
-	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
-	trustExitCode = true
-[filter "lfs"]
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
-[commit]
-  template = ~/.gitmessage
-[ghq]
-	root = /Users/esh2n/go
-[pager]
-    diff = delta
-    log = delta
-    reflog = delta
-    show = delta
-
-[interactive]
-    diffFilter = delta --color-only --features=interactive
-
-[delta]
-    features = decorations
-
-[delta "interactive"]
-    keep-plus-minus-markers = false
-
-[delta "decorations"]
-    commit-decoration-style = blue ol
-    commit-style = raw
-    file-style = omit
-    hunk-header-decoration-style = blue box
-    hunk-header-file-style = red
-    hunk-header-line-number-style = "#067a00"
-    hunk-header-style = file line-number syntax
-[pull]
-	rebase = true
-[init]
-	defaultBranch = main
-[core]
-	commentChar = ";"
-[user]
-	name = esh2n
-	email = shunyaendoh.bz@gmail.com
+[include]
+    path = ~/gitconfig/.gitconfig.local
 [includeIf "gitdir:~/go/github.com/4sobiba/"]
-	path = ./.gitconfig_sub
+	path = ./.gitconfig.sub
+[includeIf "gitdir:~/go/github.com/GincoInc/"]
+	path = ./.gitconfig.ginco
