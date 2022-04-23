@@ -1,0 +1,150 @@
+2022-04-20 12:27:39,439 DEBUG    root            Loaded Command Group: ['gcloud', 'run']
+2022-04-20 12:27:39,474 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'deploy']
+2022-04-20 12:27:39,481 DEBUG    root            Running [gcloud.run.deploy] with arguments: [--allow-unauthenticated: "True", --max-instances: "<googlecloudsdk.command_lib.run.flags._ScaleValue object at 0x10359e460>", --memory: "512Mi", --platform: "managed", --set-env-vars: "OrderedDict([('TOKEN', 'OTY2MTczNjUwODc1MTg3MjQw.Yl95VQ.j7cOWcZ7WGPsDkDoet5RwJ2jBSU')])", --source: ".", SERVICE: "flower-bot"]
+2022-04-20 12:27:39,500 DEBUG    google.auth.transport.requests Making request: POST https://oauth2.googleapis.com/token
+2022-04-20 12:27:39,519 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): oauth2.googleapis.com:443
+2022-04-20 12:27:39,742 DEBUG    urllib3.connectionpool https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+2022-04-20 12:27:39,811 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): run.googleapis.com:443
+2022-04-20 12:27:40,062 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations?alt=json&pageSize=100 HTTP/1.1" 200 None
+2022-04-20 12:27:45,280 INFO     ___FILE_ONLY___ To make this the default region, run `gcloud config set run/region asia-northeast1`.
+
+
+2022-04-20 12:27:45,348 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): artifactregistry.googleapis.com:443
+2022-04-20 12:27:45,766 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1/projects/disbots/locations/asia-northeast1/repositories/cloud-run-source-deploy?alt=json HTTP/1.1" 200 None
+2022-04-20 12:27:45,770 INFO     ___FILE_ONLY___ This command is equivalent to running `gcloud builds submit --tag [IMAGE] .` and `gcloud run deploy flower-bot --image [IMAGE]`
+
+
+2022-04-20 12:27:45,833 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): asia-northeast1-run.googleapis.com:443
+2022-04-20 12:27:46,274 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 404 None
+2022-04-20 12:27:46,274 INFO     ___FILE_ONLY___ Building using Dockerfile and deploying container to Cloud Run service [[1mflower-bot[m] in project [[1mdisbots[m] region [[1masia-northeast1[m]
+
+2022-04-20 12:27:46,275 INFO     ___FILE_ONLY___ Building and deploying new service...
+2022-04-20 12:27:46,306 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-04-20 12:27:46,609 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b/disbots_cloudbuild?alt=json HTTP/1.1" 200 628
+2022-04-20 12:27:46,976 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b?alt=json&maxResults=1000&prefix=disbots_cloudbuild&project=disbots HTTP/1.1" 200 774
+2022-04-20 12:27:46,979 INFO     root            Using default gcloudignore file:
+--------------------------------------------------
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+#
+# For more information, run:
+#   $ gcloud topic gcloudignore
+#
+.gcloudignore
+# If you would like to upload your .git directory, .gitignore file or files
+# from your .gitignore file, remove the corresponding line
+# below:
+.git
+.gitignore
+#!include:.gitignore
+
+--------------------------------------------------
+2022-04-20 12:27:46,984 DEBUG    root            Skipping file [.gitignore]
+2022-04-20 12:27:46,984 DEBUG    root            Skipping file [.env]
+2022-04-20 12:27:46,985 DEBUG    root            Skipping file [.git]
+2022-04-20 12:27:46,991 DEBUG    root            Added dir [src]
+2022-04-20 12:27:46,991 DEBUG    root            Added dir [src/util]
+2022-04-20 12:27:46,991 DEBUG    root            Added dir [src/funcs]
+2022-04-20 12:27:46,992 DEBUG    root            Added [Dockerfile]
+2022-04-20 12:27:46,992 DEBUG    root            Added [README.md]
+2022-04-20 12:27:46,995 DEBUG    root            Added [yarn.lock]
+2022-04-20 12:27:46,996 DEBUG    root            Added [package.json]
+2022-04-20 12:27:46,996 DEBUG    root            Added [tsconfig.json]
+2022-04-20 12:27:46,997 DEBUG    root            Added [deploy.sh]
+2022-04-20 12:27:46,997 DEBUG    root            Added [Procfile]
+2022-04-20 12:27:46,998 DEBUG    root            Added [.env.example]
+2022-04-20 12:27:46,998 DEBUG    root            Added [.eslintrc.json]
+2022-04-20 12:27:46,998 DEBUG    root            Added [src/index.ts]
+2022-04-20 12:27:46,999 DEBUG    root            Added [src/util/hanakotoba.ts]
+2022-04-20 12:27:46,999 DEBUG    root            Added [src/funcs/echoHanakotoba.ts]
+2022-04-20 12:27:47,004 INFO     root            Uploading [/var/folders/2b/s8mymn417x38kb14nwl_453h0000gn/T/tmp4o2ym7yw/file.tgz] to [disbots_cloudbuild/source/1650425266.289534-6c50c1a0a6464f118709a4e48150c88e.tgz]
+2022-04-20 12:27:47,274 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "POST /upload/storage/v1/b/disbots_cloudbuild/o?alt=json&name=source%2F1650425266.289534-6c50c1a0a6464f118709a4e48150c88e.tgz&uploadType=multipart HTTP/1.1" 200 971
+2022-04-20 12:27:47,286 DEBUG    root            submitting build: <Build
+ images: ['asia-northeast1-docker.pkg.dev/disbots/cloud-run-source-deploy/flower-bot']
+ secrets: []
+ source: <Source
+ storageSource: <StorageSource
+ bucket: 'disbots_cloudbuild'
+ generation: 1650425267253614
+ object: 'source/1650425266.289534-6c50c1a0a6464f118709a4e48150c88e.tgz'>>
+ steps: [<BuildStep
+ args: ['build', '--network', 'cloudbuild', '--no-cache', '-t', 'asia-northeast1-docker.pkg.dev/disbots/cloud-run-source-deploy/flower-bot', '.']
+ env: []
+ name: 'gcr.io/cloud-builders/docker'
+ secretEnv: []
+ volumes: []
+ waitFor: []>]
+ tags: []
+ warnings: []>
+2022-04-20 12:27:47,339 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-04-20 12:27:48,601 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "POST /v1/projects/disbots/locations/global/builds?alt=json HTTP/1.1" 200 None
+2022-04-20 12:27:48,618 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-04-20 12:27:49,042 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:27:51,465 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:27:55,243 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:27:59,549 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:28:06,851 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:28:15,618 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:28:27,358 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:28:43,388 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:29:05,392 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:29:35,727 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:17,454 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/NDBkOGQ2NmQtZTE2My00MTc1LTg1MTUtZGNhYTk5MzNlMGRm?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:18,100 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "POST /apis/serving.knative.dev/v1/namespaces/disbots/services?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:18,105 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): run.googleapis.com:443
+2022-04-20 12:30:18,719 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations/asia-northeast1/services/flower-bot:getIamPolicy?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:19,263 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "POST /v1/projects/disbots/locations/asia-northeast1/services/flower-bot:setIamPolicy?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:19,588 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:20,929 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:22,274 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:23,607 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:24,941 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:26,282 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:27,608 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:28,946 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:30,283 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:31,554 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:32,829 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:34,178 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:35,467 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:36,748 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:38,098 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:39,420 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/flower-bot?alt=json HTTP/1.1" 200 None
+2022-04-20 12:30:39,467 DEBUG    root            (gcloud.run.deploy) Cloud Run error: The user-provided container failed to start and listen on the port defined provided by the PORT=8080 environment variable. Logs for this revision might contain more information.
+
+Logs URL: https://console.cloud.google.com/logs/viewer?project=disbots&resource=cloud_run_revision/service_name/flower-bot/revision_name/flower-bot-00001-vay&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22flower-bot%22%0Aresource.labels.revision_name%3D%22flower-bot-00001-vay%22
+For more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start
+Traceback (most recent call last):
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/cli.py", line 987, in Execute
+    resources = calliope_command.Run(cli=self, args=args)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/backend.py", line 809, in Run
+    resources = command_instance.Run(args)
+  File "/Users/esh2n/google-cloud-sdk/lib/surface/run/deploy.py", line 265, in Run
+    service = operations.ReleaseService(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/run/serverless_operations.py", line 1171, in ReleaseService
+    self.WaitForCondition(poller)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/run/serverless_operations.py", line 627, in WaitForCondition
+    return waiter.PollUntilDone(poller, None, wait_ceiling_ms=1000)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/api_lib/util/waiter.py", line 322, in PollUntilDone
+    operation = retryer.RetryOnResult(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/core/util/retry.py", line 239, in RetryOnResult
+    result = func(*args, **kwargs)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/run/serverless_operations.py", line 248, in Poll
+    self._PollTerminalSubconditions(conditions, conditions_message)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/run/serverless_operations.py", line 228, in _PollTerminalSubconditions
+    self._PossiblyFailStage(condition, message)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/run/serverless_operations.py", line 345, in _PossiblyFailStage
+    self._tracker.FailStage(condition, self._resource_fail_type(message),
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/core/console/progress_tracker.py", line 940, in FailStage
+    raise failure_exception  # pylint: disable=raising-bad-type
+googlecloudsdk.command_lib.run.exceptions.DeploymentFailedError: Cloud Run error: The user-provided container failed to start and listen on the port defined provided by the PORT=8080 environment variable. Logs for this revision might contain more information.
+
+Logs URL: https://console.cloud.google.com/logs/viewer?project=disbots&resource=cloud_run_revision/service_name/flower-bot/revision_name/flower-bot-00001-vay&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22flower-bot%22%0Aresource.labels.revision_name%3D%22flower-bot-00001-vay%22
+For more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start
+2022-04-20 12:30:39,471 ERROR    root            (gcloud.run.deploy) Cloud Run error: The user-provided container failed to start and listen on the port defined provided by the PORT=8080 environment variable. Logs for this revision might contain more information.
+
+Logs URL: https://console.cloud.google.com/logs/viewer?project=disbots&resource=cloud_run_revision/service_name/flower-bot/revision_name/flower-bot-00001-vay&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22flower-bot%22%0Aresource.labels.revision_name%3D%22flower-bot-00001-vay%22
+For more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start
+2022-04-20 12:30:39,479 DEBUG    root            Metrics reporting process started...

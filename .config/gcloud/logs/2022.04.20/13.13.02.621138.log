@@ -1,0 +1,14 @@
+2022-04-20 13:13:02,621 DEBUG    root            Loaded Command Group: ['gcloud', 'run']
+2022-04-20 13:13:02,631 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'services']
+2022-04-20 13:13:02,647 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'services', 'list']
+2022-04-20 13:13:02,650 DEBUG    root            Running [gcloud.run.services.list] with arguments: [--format: "value(status.address.url)", --platform: "managed"]
+2022-04-20 13:13:02,711 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): run.googleapis.com:443
+2022-04-20 13:13:03,321 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations/-/services?alt=json HTTP/1.1" 200 None
+2022-04-20 13:13:03,334 INFO     root            Display format: "table(ready_symbol.color(red="[xX]",green="[✓✔]",yellow="[-!…]"):label="",firstof(id,metadata.name):label=SERVICE,region:label=REGION,domain:label=URL,last_modifier:label="LAST DEPLOYED BY",last_transition_time:label="LAST DEPLOYED AT") value(status.address.url)"
+2022-04-20 13:13:03,340 INFO     ___FILE_ONLY___ https://flower-bot-akbh3dd2eq-an.a.run.app
+
+2022-04-20 13:13:03,345 INFO     ___FILE_ONLY___ https://lol-bot-akbh3dd2eq-an.a.run.app
+
+2022-04-20 13:13:03,350 INFO     ___FILE_ONLY___ https://pochi-akbh3dd2eq-an.a.run.app
+
+2022-04-20 13:13:03,376 DEBUG    root            Metrics reporting process started...

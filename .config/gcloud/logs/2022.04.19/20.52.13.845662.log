@@ -1,0 +1,45 @@
+2022-04-19 20:52:13,846 DEBUG    root            Loaded Command Group: ['gcloud', 'spanner']
+2022-04-19 20:52:13,847 DEBUG    root            Loaded Command Group: ['gcloud', 'spanner', 'instances']
+2022-04-19 20:52:13,850 DEBUG    root            Loaded Command Group: ['gcloud', 'spanner', 'instances', 'list']
+2022-04-19 20:52:13,850 DEBUG    root            Running [gcloud.spanner.instances.list] with arguments: []
+2022-04-19 20:52:13,875 DEBUG    google.auth.transport.requests Making request: POST https://oauth2.googleapis.com/token
+2022-04-19 20:52:13,938 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): oauth2.googleapis.com:443
+2022-04-19 20:52:14,095 DEBUG    urllib3.connectionpool https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+2022-04-19 20:52:14,116 INFO     root            Display format: "
+          table(
+            name.basename(),
+            displayName,
+            config.basename(),
+            nodeCount,
+            state
+          )
+        "
+2022-04-19 20:52:14,164 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): spanner.googleapis.com:443
+2022-04-19 20:52:14,341 DEBUG    urllib3.connectionpool https://spanner.googleapis.com:443 "GET /v1/projects/disbots/instances?alt=json&instanceDeadline=2022-04-19T11%3A52%3A34.115814Z&pageSize=100 HTTP/1.1" 403 None
+2022-04-19 20:52:31,586 INFO     ___FILE_ONLY___ Enabling service [spanner.googleapis.com] on project [821897932748]...
+
+2022-04-19 20:52:31,641 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-04-19 20:52:32,795 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "POST /v1/projects/821897932748/services/spanner.googleapis.com:enable?alt=json HTTP/1.1" 200 None
+2022-04-19 20:52:32,799 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-04-19 20:52:33,737 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acat.p2-821897932748-7f97e9f2-905b-45fa-b2a4-c8cdf47c03db?alt=json HTTP/1.1" 200 None
+2022-04-19 20:52:33,738 INFO     ___FILE_ONLY___ Operation "operations/acat.p2-821897932748-7f97e9f2-905b-45fa-b2a4-c8cdf47c03db" finished successfully.
+
+2022-04-19 20:52:33,738 DEBUG    root            Request returned no response, retrying
+2022-04-19 20:52:33,738 DEBUG    root            Retrying request to url https://spanner.googleapis.com/v1/projects/disbots/instances?alt=json&instanceDeadline=2022-04-19T11%3A52%3A34.115814Z&pageSize=100 after exception Retry
+2022-04-19 20:52:35,880 DEBUG    urllib3.connectionpool https://spanner.googleapis.com:443 "GET /v1/projects/disbots/instances?alt=json&instanceDeadline=2022-04-19T11%3A52%3A34.115814Z&pageSize=100 HTTP/1.1" 403 None
+2022-04-19 20:52:35,880 DEBUG    root            Request returned no response, retrying
+2022-04-19 20:52:35,880 DEBUG    root            Retrying request to url https://spanner.googleapis.com/v1/projects/disbots/instances?alt=json&instanceDeadline=2022-04-19T11%3A52%3A34.115814Z&pageSize=100 after exception Retry
+2022-04-19 20:52:40,281 DEBUG    urllib3.connectionpool https://spanner.googleapis.com:443 "GET /v1/projects/disbots/instances?alt=json&instanceDeadline=2022-04-19T11%3A52%3A34.115814Z&pageSize=100 HTTP/1.1" 200 None
+2022-04-19 20:52:40,285 INFO     ___FILE_ONLY___ Listed 0 items.
+
+2022-04-19 20:52:40,288 DEBUG    root            Checking for updates...
+2022-04-19 20:52:40,339 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): dl.google.com:443
+2022-04-19 20:52:40,520 DEBUG    urllib3.connectionpool https://dl.google.com:443 "GET /dl/cloudsdk/channels/rapid/components-2.json HTTP/1.1" 200 187078
+2022-04-19 20:52:40,563 INFO     ___FILE_ONLY___ 
+
+Updates are available for some Google Cloud CLI components.  To install them,
+please run:
+  $ gcloud components update
+
+
+2022-04-19 20:52:40,570 DEBUG    root            Metrics reporting process started...

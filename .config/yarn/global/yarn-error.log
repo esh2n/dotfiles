@@ -1,0 +1,36 @@
+Arguments: 
+  /Users/esh2n/.volta/tools/image/node/17.6.0/bin/node /opt/homebrew/bin/yarn create auth0-poc --typescript
+
+PATH: 
+  /Users/esh2n/.volta/tools/image/yarn/1.22.17/bin:/Users/esh2n/.volta/tools/image/node/17.6.0/bin:/opt/homebrew/bin:/usr/local/opt/make/libexec/gnubin:/Users/esh2n/google-cloud-sdk/bin:/Users/esh2n:/Users/esh2n/elm:/Users/esh2n/.cargo/bin:/Users/esh2n/.deno/bin:~/.deno/bin:/Users/esh2n/.jenv/shims:/Users/esh2n/.jenv/bin:/Users/esh2n/geth:/bin:/Users/esh2n/.goenv/bin:/Users/esh2n/.rbenv/shims:~/.rbenv/shims:/usr/local/bin:/usr/local/opt/mysql@5.7/bin:/Users/esh2n/.composer/vendor/bin:/usr/local/opt/php@7.2/sbin:/usr/local/opt/php@7.2/bin:/Users/esh2n/.plenv/shims:/Users/esh2n/bin:/opt/homebrew/opt/libpq/bin:/Users/esh2n/.volta/bin:/Users/esh2n/Library/pnpm:/opt/homebrew/sbin:/opt/brew_x86/bin:/opt/brew_x86/sbin:/opt/homebrew/Cellar/pyenv-virtualenv/1.1.5/shims:/usr/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin:/Users/esh2n/.goenv/shims:/Users/esh2n/.local/share/zinit/polaris/bin:/Users/esh2n/.pub-cache/bin:/Users/esh2n/fvm/default/bin:/Users/esh2n/Library/Android/sdk/platform-tools:/Users/esh2n/Library/Android/sdk/emulator:/Users/esh2n/go/bin:./node_modules/.bin:/Users/esh2n/.cache/dein/repos/github.com/junegunn/fzf/bin
+
+Yarn version: 
+  1.22.17
+
+Node version: 
+  17.6.0
+
+Platform: 
+  darwin arm64
+
+Trace: 
+  Error: https://registry.yarnpkg.com/create-auth0-poc: Not found
+      at Request.params.callback [as _callback] (/opt/homebrew/lib/node_modules/yarn/lib/cli.js:67029:18)
+      at Request.self.callback (/opt/homebrew/lib/node_modules/yarn/lib/cli.js:140883:22)
+      at Request.emit (node:events:527:28)
+      at Request.<anonymous> (/opt/homebrew/lib/node_modules/yarn/lib/cli.js:141855:10)
+      at Request.emit (node:events:527:28)
+      at IncomingMessage.<anonymous> (/opt/homebrew/lib/node_modules/yarn/lib/cli.js:141777:12)
+      at Object.onceWrapper (node:events:641:28)
+      at IncomingMessage.emit (node:events:539:35)
+      at endReadableNT (node:internal/streams/readable:1342:12)
+      at processTicksAndRejections (node:internal/process/task_queues:83:21)
+
+npm manifest: 
+  No manifest
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

@@ -1,0 +1,11 @@
+2022-04-22 11:05:22,714 DEBUG    root            Loaded Command Group: ['gcloud', 'config']
+2022-04-22 11:05:22,726 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'set']
+2022-04-22 11:05:22,727 DEBUG    root            Running [gcloud.config.set] with arguments: [SECTION/PROPERTY: "project", VALUE: "ginco-mura-dev"]
+2022-04-22 11:05:22,732 DEBUG    google.auth.transport.requests Making request: POST https://oauth2.googleapis.com/token
+2022-04-22 11:05:22,781 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): oauth2.googleapis.com:443
+2022-04-22 11:05:22,968 DEBUG    urllib3.connectionpool https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+2022-04-22 11:05:23,024 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudresourcemanager.googleapis.com:443
+2022-04-22 11:05:23,759 DEBUG    urllib3.connectionpool https://cloudresourcemanager.googleapis.com:443 "GET /v1/projects/ginco-mura-dev?alt=json HTTP/1.1" 200 None
+2022-04-22 11:05:23,761 INFO     ___FILE_ONLY___ Updated property [core/project].
+
+2022-04-22 11:05:23,761 INFO     root            Display format: "default"

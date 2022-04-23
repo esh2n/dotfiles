@@ -1,0 +1,10 @@
+color = ""
+
+[default]
+  account_id = "acct_1KbhLSDHj6pWyZU8"
+  device_name = "mac.local"
+  display_name = "esh2n.dev"
+  live_mode_api_key = "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"
+  live_mode_publishable_key = "pk_live_51KbhLSDHj6pWyZU8m20Pr8ouYEabO168UaO97D5EWDPvhHTSw4YfbxgDmp388tCKkrGsamiDhKwMZwfjxrS3uO0A00coiptJtk"
+  test_mode_api_key = "rk_test_51KbhLSDHj6pWyZU8VQ8S7qNtgjQhhZEZyYFNZx0tVDSZ9J7oC4DP2npfy4eASGLqf0nKPlTOveN4MRQtfiF6nUzm00VNMJjVCj"
+  test_mode_publishable_key = "pk_test_51KbhLSDHj6pWyZU8IsZ5eieA3vdT92BiIC25cq0uZbHPQFAdGW2yJalwir91BZS2OgUoY86R9TIa5W4YrW5i3WEl00iSxTJEdT"

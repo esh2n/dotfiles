@@ -1,0 +1,194 @@
+2022-03-26 13:59:24,515 DEBUG    root            Loaded Command Group: ['gcloud', 'builds']
+2022-03-26 13:59:24,523 DEBUG    root            Loaded Command Group: ['gcloud', 'builds', 'submit']
+2022-03-26 13:59:24,530 DEBUG    root            Running [gcloud.builds.submit] with arguments: [--project: "disbots", --tag: "gcr.io/disbots/lol-bot"]
+2022-03-26 13:59:24,544 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-03-26 13:59:25,158 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b/disbots_cloudbuild?alt=json HTTP/1.1" 404 247
+2022-03-26 13:59:25,947 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "POST /storage/v1/b?alt=json&project=disbots HTTP/1.1" 200 628
+2022-03-26 13:59:25,953 INFO     root            Using default gcloudignore file:
+--------------------------------------------------
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+#
+# For more information, run:
+#   $ gcloud topic gcloudignore
+#
+.gcloudignore
+# If you would like to upload your .git directory, .gitignore file or files
+# from your .gitignore file, remove the corresponding line
+# below:
+.git
+.gitignore
+#!include:.gitignore
+
+--------------------------------------------------
+2022-03-26 13:59:25,958 DEBUG    root            Skipping file [.gitignore]
+2022-03-26 13:59:25,959 DEBUG    root            Skipping file [.env]
+2022-03-26 13:59:25,960 DEBUG    root            Skipping file [dist]
+2022-03-26 13:59:25,960 DEBUG    root            Skipping file [node_modules]
+2022-03-26 13:59:25,960 DEBUG    root            Skipping file [.git]
+2022-03-26 13:59:25,974 INFO     ___FILE_ONLY___ Creating temporary tarball archive of 33 file(s) totalling 1.6 MiB before compression.
+
+2022-03-26 13:59:25,976 DEBUG    root            Added dir [assets]
+2022-03-26 13:59:25,977 DEBUG    root            Added dir [src]
+2022-03-26 13:59:25,977 DEBUG    root            Added dir [assets/voice]
+2022-03-26 13:59:25,977 DEBUG    root            Added dir [assets/voice/rikko]
+2022-03-26 13:59:25,977 DEBUG    root            Added dir [assets/voice/fei]
+2022-03-26 13:59:25,977 DEBUG    root            Added dir [assets/voice/eyes]
+2022-03-26 13:59:25,977 DEBUG    root            Added dir [src/util]
+2022-03-26 13:59:25,978 DEBUG    root            Added dir [src/funcs]
+2022-03-26 13:59:25,978 DEBUG    root            Added [Dockerfile]
+2022-03-26 13:59:25,979 DEBUG    root            Added [README.md]
+2022-03-26 13:59:25,981 DEBUG    root            Added [yarn.lock]
+2022-03-26 13:59:25,982 DEBUG    root            Added [.dockerignore]
+2022-03-26 13:59:25,988 DEBUG    root            Added [package-lock.json]
+2022-03-26 13:59:25,989 DEBUG    root            Added [package.json]
+2022-03-26 13:59:25,990 DEBUG    root            Added [tsconfig.json]
+2022-03-26 13:59:25,990 DEBUG    root            Added [docker-compose.yml]
+2022-03-26 13:59:25,991 DEBUG    root            Added [.env.example]
+2022-03-26 13:59:25,991 DEBUG    root            Added [.eslintrc.json]
+2022-03-26 13:59:25,998 DEBUG    root            Added [assets/voice/rikko/tinpo_1.mp3]
+2022-03-26 13:59:26,002 DEBUG    root            Added [assets/voice/rikko/rikko_1.mp3]
+2022-03-26 13:59:26,004 DEBUG    root            Added [assets/voice/fei/fei_4.mp3]
+2022-03-26 13:59:26,007 DEBUG    root            Added [assets/voice/fei/fei_5.mp3]
+2022-03-26 13:59:26,010 DEBUG    root            Added [assets/voice/fei/fei_1.mp3]
+2022-03-26 13:59:26,012 DEBUG    root            Added [assets/voice/fei/fei_2.mp3]
+2022-03-26 13:59:26,015 DEBUG    root            Added [assets/voice/fei/fei_3.mp3]
+2022-03-26 13:59:26,032 DEBUG    root            Added [assets/voice/eyes/eyes_6.mp3]
+2022-03-26 13:59:26,034 DEBUG    root            Added [assets/voice/eyes/eyes_5.mp3]
+2022-03-26 13:59:26,037 DEBUG    root            Added [assets/voice/eyes/eyes_4.mp3]
+2022-03-26 13:59:26,039 DEBUG    root            Added [assets/voice/eyes/eyes_1.mp3]
+2022-03-26 13:59:26,042 DEBUG    root            Added [assets/voice/eyes/eyes_3.mp3]
+2022-03-26 13:59:26,044 DEBUG    root            Added [assets/voice/eyes/eyes_2.mp3]
+2022-03-26 13:59:26,044 DEBUG    root            Added [src/index.ts]
+2022-03-26 13:59:26,044 DEBUG    root            Added [src/util/scraping.ts]
+2022-03-26 13:59:26,044 DEBUG    root            Added [src/util/getSkinName.ts]
+2022-03-26 13:59:26,045 DEBUG    root            Added [src/util/getChampName.ts]
+2022-03-26 13:59:26,045 DEBUG    root            Added [src/funcs/playVoice.ts]
+2022-03-26 13:59:26,045 DEBUG    root            Added [src/funcs/echoBio.ts]
+2022-03-26 13:59:26,045 DEBUG    root            Added [src/funcs/help.ts]
+2022-03-26 13:59:26,046 DEBUG    root            Added [src/funcs/echoCounter.ts]
+2022-03-26 13:59:26,046 DEBUG    root            Added [src/funcs/callEveryone.ts]
+2022-03-26 13:59:26,046 DEBUG    root            Added [src/funcs/services.ts]
+2022-03-26 13:59:26,046 INFO     ___FILE_ONLY___ Some files were not included in the source upload.
+
+Check the gcloud log [/Users/esh2n/.config/gcloud/logs/2022.03.26/13.59.24.514060.log] to see which files and the contents of the
+default gcloudignore file used (see `$ gcloud topic gcloudignore` to learn
+more).
+
+
+2022-03-26 13:59:26,046 INFO     ___FILE_ONLY___ Uploading tarball of [.] to [gs://disbots_cloudbuild/source/1648270764.539003-103260f8b3d44771bfe695f77cd712cd.tgz]
+
+2022-03-26 13:59:26,050 INFO     root            Uploading [/var/folders/2b/s8mymn417x38kb14nwl_453h0000gn/T/tmp6oyjamzx/file.tgz] to [disbots_cloudbuild/source/1648270764.539003-103260f8b3d44771bfe695f77cd712cd.tgz]
+2022-03-26 13:59:26,633 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "POST /upload/storage/v1/b/disbots_cloudbuild/o?alt=json&name=source%2F1648270764.539003-103260f8b3d44771bfe695f77cd712cd.tgz&uploadType=multipart HTTP/1.1" 200 973
+2022-03-26 13:59:26,634 DEBUG    root            submitting build: <Build
+ images: ['gcr.io/disbots/lol-bot']
+ secrets: []
+ source: <Source
+ storageSource: <StorageSource
+ bucket: 'disbots_cloudbuild'
+ generation: 1648270766613679
+ object: 'source/1648270764.539003-103260f8b3d44771bfe695f77cd712cd.tgz'>>
+ steps: [<BuildStep
+ args: ['build', '--network', 'cloudbuild', '--no-cache', '-t', 'gcr.io/disbots/lol-bot', '.']
+ env: []
+ name: 'gcr.io/cloud-builders/docker'
+ secretEnv: []
+ volumes: []
+ waitFor: []>]
+ tags: []
+ warnings: []>
+2022-03-26 13:59:26,748 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-03-26 13:59:27,091 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "POST /v1/projects/disbots/locations/global/builds?alt=json HTTP/1.1" 403 None
+2022-03-26 14:00:18,429 INFO     ___FILE_ONLY___ Enabling service [cloudbuild.googleapis.com] on project [821897932748]...
+
+2022-03-26 14:00:18,481 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:00:19,678 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "POST /v1/projects/821897932748/services/cloudbuild.googleapis.com:enable?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:19,687 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:00:20,684 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acf.p2-821897932748-87616bc9-57da-47c8-9bb9-ab29d0b3d4f7?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:23,495 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:00:24,420 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acf.p2-821897932748-87616bc9-57da-47c8-9bb9-ab29d0b3d4f7?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:27,598 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:00:28,521 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acf.p2-821897932748-87616bc9-57da-47c8-9bb9-ab29d0b3d4f7?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:31,338 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:00:32,246 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acf.p2-821897932748-87616bc9-57da-47c8-9bb9-ab29d0b3d4f7?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:35,618 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:00:36,508 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acf.p2-821897932748-87616bc9-57da-47c8-9bb9-ab29d0b3d4f7?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:36,509 INFO     ___FILE_ONLY___ Operation "operations/acf.p2-821897932748-87616bc9-57da-47c8-9bb9-ab29d0b3d4f7" finished successfully.
+
+2022-03-26 14:00:36,509 DEBUG    root            Request returned no response, retrying
+2022-03-26 14:00:36,509 DEBUG    root            Retrying request to url https://cloudbuild.googleapis.com/v1/projects/disbots/locations/global/builds?alt=json after exception Retry
+2022-03-26 14:00:41,215 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "POST /v1/projects/disbots/locations/global/builds?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:41,238 INFO     ___FILE_ONLY___ Created [https://cloudbuild.googleapis.com/v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed].
+
+2022-03-26 14:00:41,238 INFO     ___FILE_ONLY___ Logs are available at [https://console.cloud.google.com/cloud-build/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?project=821897932748].
+
+2022-03-26 14:00:42,300 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:42,304 DEBUG    root            GCS logfile url is https://storage.googleapis.com/821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt
+2022-03-26 14:00:42,308 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-03-26 14:00:42,638 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 404 257
+2022-03-26 14:00:42,639 DEBUG    root            Reading GCS logfile: 404 (no log yet; keep polling)
+2022-03-26 14:00:42,701 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:43,955 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 404 257
+2022-03-26 14:00:43,957 DEBUG    root            Reading GCS logfile: 404 (no log yet; keep polling)
+2022-03-26 14:00:43,980 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:45,245 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 416 164
+2022-03-26 14:00:45,246 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 14:00:45,261 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:46,505 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:46,757 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 206 195
+2022-03-26 14:00:46,757 DEBUG    root            Reading GCS logfile: 206 (read 195 bytes)
+2022-03-26 14:00:46,757 INFO     ___FILE_ONLY___ ---------------------------------------------------------------------------- REMOTE BUILD OUTPUT ----------------------------------------------------------------------------
+
+2022-03-26 14:00:46,757 INFO     ___FILE_ONLY___ starting build "862eac74-785a-4a86-bc7b-63b92912c1ed"
+
+FETCHSOURCE
+Fetching storage object: gs://disbots_cloudbuild/source/1648270764.539003-103260f8b3d44771bfe695f77cd712cd.tgz#1648270766613679
+
+2022-03-26 14:00:47,772 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:48,031 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 416 166
+2022-03-26 14:00:48,033 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 14:00:49,028 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:49,585 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 206 277
+2022-03-26 14:00:49,586 DEBUG    root            Reading GCS logfile: 206 (read 277 bytes)
+2022-03-26 14:00:49,586 INFO     ___FILE_ONLY___ AccessDeniedException: 403 821897932748@cloudbuild.gserviceaccount.com does not have storage.objects.list access to the Google Cloud Storage bucket.
+Fetching storage object: gs://disbots_cloudbuild/source/1648270764.539003-103260f8b3d44771bfe695f77cd712cd.tgz#1648270766613679
+
+2022-03-26 14:00:50,324 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:51,162 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 206 149
+2022-03-26 14:00:51,164 DEBUG    root            Reading GCS logfile: 206 (read 149 bytes)
+2022-03-26 14:00:51,165 INFO     ___FILE_ONLY___ AccessDeniedException: 403 821897932748@cloudbuild.gserviceaccount.com does not have storage.objects.list access to the Google Cloud Storage bucket.
+
+2022-03-26 14:00:51,560 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:52,731 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 206 128
+2022-03-26 14:00:52,732 DEBUG    root            Reading GCS logfile: 206 (read 128 bytes)
+2022-03-26 14:00:52,732 INFO     ___FILE_ONLY___ Fetching storage object: gs://disbots_cloudbuild/source/1648270764.539003-103260f8b3d44771bfe695f77cd712cd.tgz#1648270766613679
+
+2022-03-26 14:00:52,790 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:54,032 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:54,263 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 206 349
+2022-03-26 14:00:54,264 DEBUG    root            Reading GCS logfile: 206 (read 349 bytes)
+2022-03-26 14:00:54,264 INFO     ___FILE_ONLY___ AccessDeniedException: 403 821897932748@cloudbuild.gserviceaccount.com does not have storage.objects.list access to the Google Cloud Storage bucket.
+ERROR
+ERROR: error fetching storage source: generic::unknown: retry budget exhausted (3 attempts): fetching gcs source: fetching object from gcs: source fetch container exited with non-zero status: 1
+
+2022-03-26 14:00:55,483 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/862eac74-785a-4a86-bc7b-63b92912c1ed?alt=json HTTP/1.1" 200 None
+2022-03-26 14:00:55,518 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 416 167
+2022-03-26 14:00:55,519 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 14:00:56,818 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-862eac74-785a-4a86-bc7b-63b92912c1ed.txt HTTP/1.1" 416 167
+2022-03-26 14:00:56,821 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 14:00:56,822 INFO     ___FILE_ONLY___ -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+2022-03-26 14:00:56,826 DEBUG    root            (gcloud.builds.submit) build 862eac74-785a-4a86-bc7b-63b92912c1ed completed with status "FAILURE"
+Traceback (most recent call last):
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/cli.py", line 987, in Execute
+    resources = calliope_command.Run(cli=self, args=args)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/backend.py", line 809, in Run
+    resources = command_instance.Run(args)
+  File "/Users/esh2n/google-cloud-sdk/lib/surface/builds/submit.py", line 164, in Run
+    build, _ = submit_util.Build(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/builds/submit_util.py", line 630, in Build
+    raise FailedBuildException(build)
+googlecloudsdk.command_lib.builds.submit_util.FailedBuildException: build 862eac74-785a-4a86-bc7b-63b92912c1ed completed with status "FAILURE"
+2022-03-26 14:00:56,830 ERROR    root            (gcloud.builds.submit) build 862eac74-785a-4a86-bc7b-63b92912c1ed completed with status "FAILURE"

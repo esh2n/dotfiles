@@ -1,0 +1,10 @@
+2022-04-22 11:04:37,716 DEBUG    root            Loaded Command Group: ['gcloud', 'config']
+2022-04-22 11:04:37,717 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'configurations']
+2022-04-22 11:04:37,717 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'configurations', 'create']
+2022-04-22 11:04:37,718 DEBUG    root            Running [gcloud.config.configurations.create] with arguments: [CONFIGURATION_NAME: "ginco"]
+2022-04-22 11:04:37,718 INFO     ___FILE_ONLY___ Created [ginco].
+
+2022-04-22 11:04:37,720 INFO     ___FILE_ONLY___ Activated [ginco].
+
+2022-04-22 11:04:37,720 INFO     root            Display format: "none"
+2022-04-22 11:04:37,725 DEBUG    root            Metrics reporting process started...

@@ -1,3 +1,19 @@
+
+; ==== Emojis ====
+; 🍉 Add:
+; 🔧 Fix:
+; 🐛 BugFix:
+; 👍 Update:
+; 🗑️ Remove:
+; 💚 Test:
+; ⛔ Temoprary:
+; ♻️ Refactoring:
+; 🤖 CI:
+; 📚 Writing docs:
+; 🐣 Initial Commit:
+
+; ------------------------------
+
 ; <type(!)>(scope?): <desc>
 ; ✨ feat:
 ; 👍 chore:

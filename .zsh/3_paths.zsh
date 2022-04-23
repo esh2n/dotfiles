@@ -72,9 +72,16 @@ export PATH="$GOENV_ROOT/bin:$PATH"
 eval "$(goenv init -)"
 export PATH="$GOROOT/bin:$PATH"
 export PATH="$PATH:$GOPATH/bin"
+GOENV_DISABLE_GOPATH=1
 
 # geth
 export PATH="$HOME/geth:$PATH"
+
+# solana
+export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
+# mona
+export PATH="$HOME/monacoin-0.20.2/bin:$PATH"
 
 # java
 export PATH="$HOME/.jenv/bin:$PATH"
@@ -89,6 +96,7 @@ export PATH="/Users/esh2n/.deno/bin:$PATH"
 # rust
 export PATH="$HOME/.cargo/bin:$PATH"
 export LIBRARY_PATH="$LIBRARY_PATH:/usr/local/lib"
+. "$HOME/.cargo/env"
 
 # prettier
 export PATH=$PATH:./node_modules/.bin

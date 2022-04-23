@@ -1,0 +1,277 @@
+2022-03-26 14:10:46,085 DEBUG    root            Loaded Command Group: ['gcloud', 'run']
+2022-03-26 14:10:46,101 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'deploy']
+2022-03-26 14:10:46,107 DEBUG    root            Running [gcloud.run.deploy] with arguments: [--source: ".", SERVICE: "lol-bot"]
+2022-03-26 14:10:46,228 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): run.googleapis.com:443
+2022-03-26 14:10:46,401 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations?alt=json&pageSize=100 HTTP/1.1" 403 None
+2022-03-26 14:10:53,078 INFO     ___FILE_ONLY___ Enabling service [run.googleapis.com] on project [821897932748]...
+
+2022-03-26 14:10:53,250 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:10:54,620 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "POST /v1/projects/821897932748/services/run.googleapis.com:enable?alt=json HTTP/1.1" 200 None
+2022-03-26 14:10:54,634 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:10:55,542 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acf.p2-821897932748-b3588d9c-6e9e-462e-9339-76f36526e1b9?alt=json HTTP/1.1" 200 None
+2022-03-26 14:10:58,407 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:10:59,339 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acf.p2-821897932748-b3588d9c-6e9e-462e-9339-76f36526e1b9?alt=json HTTP/1.1" 200 None
+2022-03-26 14:10:59,343 INFO     ___FILE_ONLY___ Operation "operations/acf.p2-821897932748-b3588d9c-6e9e-462e-9339-76f36526e1b9" finished successfully.
+
+2022-03-26 14:10:59,343 DEBUG    root            Request returned no response, retrying
+2022-03-26 14:10:59,343 DEBUG    root            Retrying request to url https://run.googleapis.com/v1/projects/disbots/locations?alt=json&pageSize=100 after exception Retry
+2022-03-26 14:11:01,569 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations?alt=json&pageSize=100 HTTP/1.1" 200 None
+2022-03-26 14:11:05,492 INFO     ___FILE_ONLY___ To make this the default region, run `gcloud config set run/region asia-northeast1`.
+
+
+2022-03-26 14:11:05,555 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): artifactregistry.googleapis.com:443
+2022-03-26 14:11:06,055 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1beta2/projects/disbots/locations/asia-northeast1/repositories/cloud-run-source-deploy?alt=json HTTP/1.1" 403 None
+2022-03-26 14:11:14,394 INFO     ___FILE_ONLY___ Enabling service [artifactregistry.googleapis.com] on project [821897932748]...
+
+2022-03-26 14:11:14,403 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:11:15,591 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "POST /v1/projects/821897932748/services/artifactregistry.googleapis.com:enable?alt=json HTTP/1.1" 200 None
+2022-03-26 14:11:15,604 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:11:16,508 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acat.p2-821897932748-e3c551b4-cd1c-428d-85a6-5a7fc1a99e29?alt=json HTTP/1.1" 200 None
+2022-03-26 14:11:19,003 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): serviceusage.googleapis.com:443
+2022-03-26 14:11:19,856 DEBUG    urllib3.connectionpool https://serviceusage.googleapis.com:443 "GET /v1/operations/acat.p2-821897932748-e3c551b4-cd1c-428d-85a6-5a7fc1a99e29?alt=json HTTP/1.1" 200 None
+2022-03-26 14:11:19,860 INFO     ___FILE_ONLY___ Operation "operations/acat.p2-821897932748-e3c551b4-cd1c-428d-85a6-5a7fc1a99e29" finished successfully.
+
+2022-03-26 14:11:19,861 DEBUG    root            Request returned no response, retrying
+2022-03-26 14:11:19,861 DEBUG    root            Retrying request to url https://artifactregistry.googleapis.com/v1beta2/projects/disbots/locations/asia-northeast1/repositories/cloud-run-source-deploy?alt=json after exception Retry
+2022-03-26 14:11:21,892 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1beta2/projects/disbots/locations/asia-northeast1/repositories/cloud-run-source-deploy?alt=json HTTP/1.1" 404 None
+2022-03-26 14:12:02,165 INFO     ___FILE_ONLY___ This command is equivalent to running `gcloud builds submit --tag [IMAGE] .` and `gcloud run deploy lol-bot --image [IMAGE]`
+
+
+2022-03-26 14:12:02,214 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): asia-northeast1-run.googleapis.com:443
+2022-03-26 14:12:02,794 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 404 None
+2022-03-26 14:12:03,120 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "POST /v1/projects/disbots/locations/asia-northeast1/services/lol-bot:testIamPermissions?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:15,294 INFO     ___FILE_ONLY___ Building using Dockerfile and deploying container to Cloud Run service [[1mlol-bot[m] in project [[1mdisbots[m] region [[1masia-northeast1[m]
+
+2022-03-26 14:12:15,294 INFO     ___FILE_ONLY___ Building and deploying new service...
+2022-03-26 14:12:15,299 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): artifactregistry.googleapis.com:443
+2022-03-26 14:12:15,744 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "POST /v1beta2/projects/disbots/locations/asia-northeast1/repositories?alt=json&repositoryId=cloud-run-source-deploy HTTP/1.1" 200 None
+2022-03-26 14:12:15,748 INFO     ___FILE_ONLY___ 
+2022-03-26 14:12:16,754 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): artifactregistry.googleapis.com:443
+2022-03-26 14:12:17,110 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1beta2/projects/disbots/locations/asia-northeast1/operations/5e4ee3a5-2862-44c0-8d12-ca99765c022f?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:20,208 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1beta2/projects/disbots/locations/asia-northeast1/operations/5e4ee3a5-2862-44c0-8d12-ca99765c022f?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:24,212 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1beta2/projects/disbots/locations/asia-northeast1/operations/5e4ee3a5-2862-44c0-8d12-ca99765c022f?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:28,597 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1beta2/projects/disbots/locations/asia-northeast1/operations/5e4ee3a5-2862-44c0-8d12-ca99765c022f?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:29,109 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1beta2/projects/disbots/locations/asia-northeast1/repositories/cloud-run-source-deploy?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:29,140 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-03-26 14:12:29,465 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b/disbots_cloudbuild?alt=json HTTP/1.1" 200 628
+2022-03-26 14:12:29,804 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b?alt=json&maxResults=1000&prefix=disbots_cloudbuild&project=disbots HTTP/1.1" 200 774
+2022-03-26 14:12:29,805 INFO     root            Using default gcloudignore file:
+--------------------------------------------------
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+#
+# For more information, run:
+#   $ gcloud topic gcloudignore
+#
+.gcloudignore
+# If you would like to upload your .git directory, .gitignore file or files
+# from your .gitignore file, remove the corresponding line
+# below:
+.git
+.gitignore
+#!include:.gitignore
+
+--------------------------------------------------
+2022-03-26 14:12:29,808 DEBUG    root            Skipping file [.gitignore]
+2022-03-26 14:12:29,808 DEBUG    root            Skipping file [.env]
+2022-03-26 14:12:29,809 DEBUG    root            Skipping file [dist]
+2022-03-26 14:12:29,809 DEBUG    root            Skipping file [node_modules]
+2022-03-26 14:12:29,809 DEBUG    root            Skipping file [.git]
+2022-03-26 14:12:29,819 DEBUG    root            Added dir [assets]
+2022-03-26 14:12:29,819 DEBUG    root            Added dir [src]
+2022-03-26 14:12:29,819 DEBUG    root            Added dir [assets/voice]
+2022-03-26 14:12:29,819 DEBUG    root            Added dir [assets/voice/rikko]
+2022-03-26 14:12:29,819 DEBUG    root            Added dir [assets/voice/fei]
+2022-03-26 14:12:29,820 DEBUG    root            Added dir [assets/voice/eyes]
+2022-03-26 14:12:29,820 DEBUG    root            Added dir [src/util]
+2022-03-26 14:12:29,820 DEBUG    root            Added dir [src/funcs]
+2022-03-26 14:12:29,820 DEBUG    root            Added [Dockerfile]
+2022-03-26 14:12:29,821 DEBUG    root            Added [README.md]
+2022-03-26 14:12:29,822 DEBUG    root            Added [yarn.lock]
+2022-03-26 14:12:29,822 DEBUG    root            Added [.dockerignore]
+2022-03-26 14:12:29,827 DEBUG    root            Added [package-lock.json]
+2022-03-26 14:12:29,827 DEBUG    root            Added [package.json]
+2022-03-26 14:12:29,828 DEBUG    root            Added [tsconfig.json]
+2022-03-26 14:12:29,828 DEBUG    root            Added [docker-compose.yml]
+2022-03-26 14:12:29,828 DEBUG    root            Added [.env.example]
+2022-03-26 14:12:29,828 DEBUG    root            Added [.eslintrc.json]
+2022-03-26 14:12:29,833 DEBUG    root            Added [assets/voice/rikko/tinpo_1.mp3]
+2022-03-26 14:12:29,837 DEBUG    root            Added [assets/voice/rikko/rikko_1.mp3]
+2022-03-26 14:12:29,839 DEBUG    root            Added [assets/voice/fei/fei_4.mp3]
+2022-03-26 14:12:29,841 DEBUG    root            Added [assets/voice/fei/fei_5.mp3]
+2022-03-26 14:12:29,844 DEBUG    root            Added [assets/voice/fei/fei_1.mp3]
+2022-03-26 14:12:29,845 DEBUG    root            Added [assets/voice/fei/fei_2.mp3]
+2022-03-26 14:12:29,848 DEBUG    root            Added [assets/voice/fei/fei_3.mp3]
+2022-03-26 14:12:29,864 DEBUG    root            Added [assets/voice/eyes/eyes_6.mp3]
+2022-03-26 14:12:29,866 DEBUG    root            Added [assets/voice/eyes/eyes_5.mp3]
+2022-03-26 14:12:29,868 DEBUG    root            Added [assets/voice/eyes/eyes_4.mp3]
+2022-03-26 14:12:29,870 DEBUG    root            Added [assets/voice/eyes/eyes_1.mp3]
+2022-03-26 14:12:29,873 DEBUG    root            Added [assets/voice/eyes/eyes_3.mp3]
+2022-03-26 14:12:29,874 DEBUG    root            Added [assets/voice/eyes/eyes_2.mp3]
+2022-03-26 14:12:29,874 DEBUG    root            Added [src/index.ts]
+2022-03-26 14:12:29,875 DEBUG    root            Added [src/util/scraping.ts]
+2022-03-26 14:12:29,875 DEBUG    root            Added [src/util/getSkinName.ts]
+2022-03-26 14:12:29,875 DEBUG    root            Added [src/util/getChampName.ts]
+2022-03-26 14:12:29,876 DEBUG    root            Added [src/funcs/playVoice.ts]
+2022-03-26 14:12:29,876 DEBUG    root            Added [src/funcs/echoBio.ts]
+2022-03-26 14:12:29,876 DEBUG    root            Added [src/funcs/help.ts]
+2022-03-26 14:12:29,876 DEBUG    root            Added [src/funcs/echoCounter.ts]
+2022-03-26 14:12:29,876 DEBUG    root            Added [src/funcs/callEveryone.ts]
+2022-03-26 14:12:29,876 DEBUG    root            Added [src/funcs/services.ts]
+2022-03-26 14:12:29,879 INFO     root            Uploading [/var/folders/2b/s8mymn417x38kb14nwl_453h0000gn/T/tmpi6icwy85/file.tgz] to [disbots_cloudbuild/source/1648271549.126451-1b4e2241c2594aec97798457759072a1.tgz]
+2022-03-26 14:12:30,421 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "POST /upload/storage/v1/b/disbots_cloudbuild/o?alt=json&name=source%2F1648271549.126451-1b4e2241c2594aec97798457759072a1.tgz&uploadType=multipart HTTP/1.1" 200 973
+2022-03-26 14:12:30,423 DEBUG    root            submitting build: <Build
+ images: ['asia-northeast1-docker.pkg.dev/disbots/cloud-run-source-deploy/lol-bot']
+ secrets: []
+ source: <Source
+ storageSource: <StorageSource
+ bucket: 'disbots_cloudbuild'
+ generation: 1648271550409329
+ object: 'source/1648271549.126451-1b4e2241c2594aec97798457759072a1.tgz'>>
+ steps: [<BuildStep
+ args: ['build', '--network', 'cloudbuild', '--no-cache', '-t', 'asia-northeast1-docker.pkg.dev/disbots/cloud-run-source-deploy/lol-bot', '.']
+ env: []
+ name: 'gcr.io/cloud-builders/docker'
+ secretEnv: []
+ volumes: []
+ waitFor: []>]
+ tags: []
+ warnings: []>
+2022-03-26 14:12:30,487 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-03-26 14:12:32,135 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "POST /v1/projects/disbots/locations/global/builds?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:32,142 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-03-26 14:12:32,498 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:36,520 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:41,281 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:46,554 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:12:53,292 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:13:02,150 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:13:14,456 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:13:31,071 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:13:52,481 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:14:22,974 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:15:04,834 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:04,705 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/YzZiNGI3NjgtNjdjMi00Yjc0LTg4YzYtOGEyMTIyYjcyNDM3?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:04,718 DEBUG    urllib3.connectionpool Resetting dropped connection: asia-northeast1-run.googleapis.com
+2022-03-26 14:16:06,701 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "POST /apis/serving.knative.dev/v1/namespaces/disbots/services?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:06,706 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): run.googleapis.com:443
+2022-03-26 14:16:07,308 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations/asia-northeast1/services/lol-bot:getIamPolicy?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:07,847 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "POST /v1/projects/disbots/locations/asia-northeast1/services/lol-bot:setIamPolicy?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:08,175 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:09,505 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:10,894 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:12,336 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:13,688 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:15,089 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:16,531 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:17,884 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:19,166 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:20,331 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:21,521 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:22,836 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:24,022 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:25,127 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:26,450 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:27,766 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:29,113 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:30,471 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:31,740 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:32,913 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:34,228 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:35,496 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:36,765 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:38,159 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:39,600 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:40,799 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:42,070 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:43,401 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:44,706 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:45,973 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:47,293 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:48,445 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:49,715 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:51,134 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:52,487 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:53,762 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:55,029 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:56,377 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:57,517 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:16:58,790 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:00,067 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:01,343 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:02,492 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:03,596 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:04,872 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:06,135 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:07,239 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:08,570 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:09,874 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:11,143 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:12,294 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:13,396 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:14,503 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:15,607 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:16,956 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:18,272 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:19,591 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:20,867 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:22,201 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:23,640 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:24,952 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:26,229 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:27,539 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:28,883 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:30,190 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:31,462 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:32,774 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:34,125 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:35,434 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:36,712 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:37,927 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:39,233 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:40,557 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:41,834 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:42,942 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:44,095 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:45,365 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:46,524 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:47,799 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:49,119 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:50,509 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:51,816 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:53,094 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:54,363 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:55,754 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:57,063 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:58,383 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:17:59,692 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:00,995 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:02,141 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:03,486 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:04,831 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:06,139 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:07,287 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:08,480 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:09,781 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:10,918 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:12,064 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:13,206 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:14,476 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:15,675 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:16,858 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:18,166 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:19,310 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:20,632 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:21,967 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:23,271 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:24,629 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:25,911 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:27,209 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:27,354 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:27,487 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/lol-bot?alt=json HTTP/1.1" 200 None
+2022-03-26 14:18:27,489 INFO     ___FILE_ONLY___ Service [[1mlol-bot[m] revision [[1mlol-bot-00001-yez[m] has been deployed and is serving [1m100[m percent of traffic.
+Service URL: [1mhttps://lol-bot-akbh3dd2eq-an.a.run.app[m
+
+2022-03-26 14:18:27,489 INFO     root            Display format: "none"

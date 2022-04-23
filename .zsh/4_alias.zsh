@@ -76,6 +76,7 @@ alias chrhe="chrome --headless --disable-gpu --screenshot --disk-cache-dir=/tmp 
   alias gbd='peco_select_local_branch_except_current | xargs -t git branch -D'
   # Push Branch W/ Peco
   alias gpuso='peco_select_branch_all | xargs -t git push origin'
+  alias gPuso='peco_select_branch_all | xargs -t git push -f origin'
   # Pull Branch W/ Peco
   alias gpulo='peco_select_branch_all | xargs -t git pull origin'
   # Merge Branch W/ Peco
@@ -113,6 +114,8 @@ alias chrhe="chrome --headless --disable-gpu --screenshot --disk-cache-dir=/tmp 
   alias gres3='git reset --hard HEAD~3'
   alias gres4='git reset --hard HEAD~4'
   alias gres5='git reset --hard HEAD~5'
+  alias gcf='git commit --amend'
+  alias gcn='git rebase --continue'
 
 # Restore
   alias grest='git restore'
@@ -205,6 +208,7 @@ alias den='denon'
 
 # GCP {{
 alias gsu='gsutil'
+alias gcp='gcloud'
 # }}
 
 # Intel chip {{
@@ -227,4 +231,8 @@ alias curl_header='curl -D - -s -o /dev/null'
 
 # Zellij {{
 alias zeinit='zellij --layout ~/.config/zellij/layout_file.yaml'
+# }}
+
+# Monacoin {{
+alias mc='monacoin-cli'
 # }}

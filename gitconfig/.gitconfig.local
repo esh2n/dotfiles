@@ -7,7 +7,7 @@
 	process = git-lfs filter-process
 	required = true
 [commit]
-	template = ~/gitconfig/.gitmessage.emoji
+	template = ~/dotfiles/gitconfig/.gitmessage.emoji
 [ghq]
 	root = /Users/esh2n/go
 [pager]

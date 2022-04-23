@@ -1,0 +1,9 @@
+2022-03-28 11:13:46,949 DEBUG    root            Loaded Command Group: ['gcloud', 'scheduler']
+2022-03-28 11:13:46,950 DEBUG    root            Loaded Command Group: ['gcloud', 'scheduler', 'jobs']
+2022-03-28 11:13:46,951 DEBUG    root            Loaded Command Group: ['gcloud', 'scheduler', 'jobs', 'create']
+2022-03-28 11:13:46,995 DEBUG    root            Loaded Command Group: ['gcloud', 'scheduler', 'jobs', 'create', 'http']
+2022-03-28 11:13:46,997 DEBUG    root            Running [gcloud.scheduler.jobs.create.http] with arguments: [--http-method: "get", --location: "asia-northeast1", --schedule: "* * * * *", --uri: "https://pochi-akbh3dd2eq-an.a.run.app", JOB: "GET-pochi"]
+2022-03-28 11:13:47,159 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudscheduler.googleapis.com:443
+2022-03-28 11:13:47,604 DEBUG    urllib3.connectionpool https://cloudscheduler.googleapis.com:443 "POST /v1/projects/disbots/locations/asia-northeast1/jobs?alt=json HTTP/1.1" 200 None
+2022-03-28 11:13:47,606 INFO     root            Display format: "value(.)"
+2022-03-28 11:13:47,618 DEBUG    root            Metrics reporting process started...

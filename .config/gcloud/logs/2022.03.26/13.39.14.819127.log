@@ -1,0 +1,8 @@
+2022-03-26 13:39:14,820 DEBUG    root            Loaded Command Group: ['gcloud', 'beta', 'run']
+2022-03-26 13:39:14,865 DEBUG    root            Loaded Command Group: ['gcloud', 'beta', 'run', 'deploy']
+2022-03-26 13:39:14,871 DEBUG    root            Loaded Command Group: ['gcloud', 'run']
+2022-03-26 13:39:14,872 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'deploy']
+2022-03-26 13:39:14,875 ERROR    root            (gcloud.beta.run.deploy) unrecognized arguments: --no-cpu- (did you mean '--cpu'?) 
+
+To search the help text of gcloud commands, run:
+  gcloud help -- SEARCH_TERMS

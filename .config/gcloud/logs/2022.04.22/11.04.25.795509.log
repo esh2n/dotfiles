@@ -1,0 +1,5 @@
+2022-04-22 11:04:25,796 DEBUG    root            Loaded Command Group: ['gcloud', 'config']
+2022-04-22 11:04:25,796 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'configurations']
+2022-04-22 11:04:25,799 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'configurations', 'create']
+2022-04-22 11:04:25,800 ERROR    root            (gcloud.config.configurations.create) argument CONFIGURATION_NAME: Must be specified.
+2022-04-22 11:04:25,803 DEBUG    root            Metrics reporting process started...

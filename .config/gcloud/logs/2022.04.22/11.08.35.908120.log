@@ -1,0 +1,7 @@
+2022-04-22 11:08:35,908 DEBUG    root            Loaded Command Group: ['gcloud', 'config']
+2022-04-22 11:08:35,909 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'configurations']
+2022-04-22 11:08:35,910 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'configurations', 'activate']
+2022-04-22 11:08:35,911 DEBUG    root            Running [gcloud.config.configurations.activate] with arguments: [CONFIGURATION_NAME: "ginco"]
+2022-04-22 11:08:35,911 INFO     ___FILE_ONLY___ Activated [ginco].
+
+2022-04-22 11:08:35,911 INFO     root            Display format: "none"

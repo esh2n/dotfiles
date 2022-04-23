@@ -1,0 +1,321 @@
+2022-03-26 23:24:36,165 DEBUG    root            Loaded Command Group: ['gcloud', 'builds']
+2022-03-26 23:24:36,180 DEBUG    root            Loaded Command Group: ['gcloud', 'builds', 'submit']
+2022-03-26 23:24:36,188 DEBUG    root            Running [gcloud.builds.submit] with arguments: [--project: "disbots", --tag: "gcr.io/disbots/pochi"]
+2022-03-26 23:24:36,257 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-03-26 23:24:36,524 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b/disbots_cloudbuild?alt=json HTTP/1.1" 200 628
+2022-03-26 23:24:36,829 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b?alt=json&maxResults=1000&prefix=disbots_cloudbuild&project=disbots HTTP/1.1" 200 774
+2022-03-26 23:24:36,834 INFO     root            Using default gcloudignore file:
+--------------------------------------------------
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+#
+# For more information, run:
+#   $ gcloud topic gcloudignore
+#
+.gcloudignore
+# If you would like to upload your .git directory, .gitignore file or files
+# from your .gitignore file, remove the corresponding line
+# below:
+.git
+.gitignore
+#!include:.gitignore
+
+--------------------------------------------------
+2022-03-26 23:24:36,835 DEBUG    root            Skipping file [.gitignore]
+2022-03-26 23:24:36,835 DEBUG    root            Skipping file [.env]
+2022-03-26 23:24:36,835 DEBUG    root            Skipping file [target]
+2022-03-26 23:24:36,835 DEBUG    root            Skipping file [.git]
+2022-03-26 23:24:36,836 INFO     ___FILE_ONLY___ Creating temporary tarball archive of 8 file(s) totalling 36.0 KiB before compression.
+
+2022-03-26 23:24:36,838 DEBUG    root            Added dir [src]
+2022-03-26 23:24:36,839 DEBUG    root            Added dir [src/commands]
+2022-03-26 23:24:36,839 DEBUG    root            Added [Cargo.toml]
+2022-03-26 23:24:36,840 DEBUG    root            Added [Dockerfile]
+2022-03-26 23:24:36,841 DEBUG    root            Added [cloudbuild.yaml]
+2022-03-26 23:24:36,843 DEBUG    root            Added [Cargo.lock]
+2022-03-26 23:24:36,844 DEBUG    root            Added [src/main.rs]
+2022-03-26 23:24:36,844 DEBUG    root            Added [src/commands/neko.rs]
+2022-03-26 23:24:36,845 DEBUG    root            Added [src/commands/mod.rs]
+2022-03-26 23:24:36,845 DEBUG    root            Added [src/commands/channels.rs]
+2022-03-26 23:24:36,846 INFO     ___FILE_ONLY___ Some files were not included in the source upload.
+
+Check the gcloud log [/Users/esh2n/.config/gcloud/logs/2022.03.26/23.24.36.163847.log] to see which files and the contents of the
+default gcloudignore file used (see `$ gcloud topic gcloudignore` to learn
+more).
+
+
+2022-03-26 23:24:36,846 INFO     ___FILE_ONLY___ Uploading tarball of [.] to [gs://disbots_cloudbuild/source/1648304676.205948-a1d3b9a253a8498781c05fed908602a4.tgz]
+
+2022-03-26 23:24:36,848 INFO     root            Uploading [/var/folders/2b/s8mymn417x38kb14nwl_453h0000gn/T/tmpoamt48ml/file.tgz] to [disbots_cloudbuild/source/1648304676.205948-a1d3b9a253a8498781c05fed908602a4.tgz]
+2022-03-26 23:24:37,218 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "POST /upload/storage/v1/b/disbots_cloudbuild/o?alt=json&name=source%2F1648304676.205948-a1d3b9a253a8498781c05fed908602a4.tgz&uploadType=multipart HTTP/1.1" 200 971
+2022-03-26 23:24:37,223 DEBUG    root            submitting build: <Build
+ images: ['gcr.io/disbots/pochi']
+ secrets: []
+ source: <Source
+ storageSource: <StorageSource
+ bucket: 'disbots_cloudbuild'
+ generation: 1648304677132623
+ object: 'source/1648304676.205948-a1d3b9a253a8498781c05fed908602a4.tgz'>>
+ steps: [<BuildStep
+ args: ['build', '--network', 'cloudbuild', '--no-cache', '-t', 'gcr.io/disbots/pochi', '.']
+ env: []
+ name: 'gcr.io/cloud-builders/docker'
+ secretEnv: []
+ volumes: []
+ waitFor: []>]
+ tags: []
+ warnings: []>
+2022-03-26 23:24:37,273 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-03-26 23:24:38,921 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "POST /v1/projects/disbots/locations/global/builds?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:38,927 INFO     ___FILE_ONLY___ Created [https://cloudbuild.googleapis.com/v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4].
+
+2022-03-26 23:24:38,927 INFO     ___FILE_ONLY___ Logs are available at [https://console.cloud.google.com/cloud-build/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?project=821897932748].
+
+2022-03-26 23:24:39,969 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:39,976 DEBUG    root            GCS logfile url is https://storage.googleapis.com/821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt
+2022-03-26 23:24:39,980 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-03-26 23:24:40,187 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 164
+2022-03-26 23:24:40,188 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:24:40,229 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:41,576 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 195
+2022-03-26 23:24:41,576 DEBUG    root            Reading GCS logfile: 206 (read 195 bytes)
+2022-03-26 23:24:41,577 INFO     ___FILE_ONLY___ ------------------------------------------------------------------------------------- REMOTE BUILD OUTPUT --------------------------------------------------------------------------------------
+
+2022-03-26 23:24:41,577 INFO     ___FILE_ONLY___ starting build "055f063d-a299-4985-b3ae-4fcc0cf7ead4"
+
+FETCHSOURCE
+Fetching storage object: gs://disbots_cloudbuild/source/1648304676.205948-a1d3b9a253a8498781c05fed908602a4.tgz#1648304677132623
+
+2022-03-26 23:24:42,242 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:42,793 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 166
+2022-03-26 23:24:42,795 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:24:44,195 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 359
+2022-03-26 23:24:44,195 DEBUG    root            Reading GCS logfile: 206 (read 359 bytes)
+2022-03-26 23:24:44,195 INFO     ___FILE_ONLY___ Copying gs://disbots_cloudbuild/source/1648304676.205948-a1d3b9a253a8498781c05fed908602a4.tgz#1648304677132623...
+/ [0 files][    0.0 B/ 11.0 KiB]                                                / [1 files][ 11.0 KiB/ 11.0 KiB]                                                
+Operation completed over 1 objects/11.0 KiB.
+
+2022-03-26 23:24:44,252 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:45,606 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 69
+2022-03-26 23:24:45,608 DEBUG    root            Reading GCS logfile: 206 (read 69 bytes)
+2022-03-26 23:24:45,608 INFO     ___FILE_ONLY___ BUILD
+Already have image (with digest): gcr.io/cloud-builders/docker
+
+2022-03-26 23:24:45,649 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:47,102 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 422
+2022-03-26 23:24:47,102 DEBUG    root            Reading GCS logfile: 206 (read 422 bytes)
+2022-03-26 23:24:47,103 INFO     ___FILE_ONLY___ Sending build context to Docker daemon  45.57kB
+Step 1/6 : FROM rust
+latest: Pulling from library/rust
+5492f66d2700: Pulling fs layer
+540ff8c0841d: Pulling fs layer
+a0bf850a0df0: Pulling fs layer
+d751dc38ae51: Pulling fs layer
+9720a112e886: Pulling fs layer
+4188f0e746b0: Pulling fs layer
+d751dc38ae51: Waiting
+9720a112e886: Waiting
+4188f0e746b0: Waiting
+540ff8c0841d: Verifying Checksum
+540ff8c0841d: Download complete
+
+2022-03-26 23:24:47,702 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:48,487 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 195
+2022-03-26 23:24:48,487 DEBUG    root            Reading GCS logfile: 206 (read 195 bytes)
+2022-03-26 23:24:48,487 INFO     ___FILE_ONLY___ a0bf850a0df0: Verifying Checksum
+a0bf850a0df0: Download complete
+5492f66d2700: Verifying Checksum
+5492f66d2700: Download complete
+d751dc38ae51: Verifying Checksum
+d751dc38ae51: Download complete
+
+2022-03-26 23:24:49,013 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:50,080 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 130
+2022-03-26 23:24:50,080 DEBUG    root            Reading GCS logfile: 206 (read 130 bytes)
+2022-03-26 23:24:50,080 INFO     ___FILE_ONLY___ 4188f0e746b0: Verifying Checksum
+4188f0e746b0: Download complete
+9720a112e886: Verifying Checksum
+9720a112e886: Download complete
+
+2022-03-26 23:24:51,028 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:51,239 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:24:51,239 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:24:52,630 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 56
+2022-03-26 23:24:52,631 DEBUG    root            Reading GCS logfile: 206 (read 56 bytes)
+2022-03-26 23:24:52,631 INFO     ___FILE_ONLY___ 5492f66d2700: Pull complete
+540ff8c0841d: Pull complete
+
+2022-03-26 23:24:53,042 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:54,043 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 28
+2022-03-26 23:24:54,043 DEBUG    root            Reading GCS logfile: 206 (read 28 bytes)
+2022-03-26 23:24:54,043 INFO     ___FILE_ONLY___ a0bf850a0df0: Pull complete
+
+2022-03-26 23:24:54,445 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:55,205 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:24:55,206 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:24:56,459 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:56,598 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 28
+2022-03-26 23:24:56,599 DEBUG    root            Reading GCS logfile: 206 (read 28 bytes)
+2022-03-26 23:24:56,599 INFO     ___FILE_ONLY___ d751dc38ae51: Pull complete
+
+2022-03-26 23:24:57,797 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:24:57,798 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:24:58,484 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:24:58,999 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:24:59,000 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:00,162 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:00,163 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:00,492 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:01,333 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:01,339 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:02,531 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:02,532 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:02,561 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:03,698 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:03,699 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:04,588 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:05,134 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 28
+2022-03-26 23:25:05,135 DEBUG    root            Reading GCS logfile: 206 (read 28 bytes)
+2022-03-26 23:25:05,135 INFO     ___FILE_ONLY___ 9720a112e886: Pull complete
+
+2022-03-26 23:25:06,336 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:06,336 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:06,607 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:07,499 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:07,499 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:08,013 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:08,674 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:08,676 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:10,037 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:10,091 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 206
+2022-03-26 23:25:10,091 DEBUG    root            Reading GCS logfile: 206 (read 206 bytes)
+2022-03-26 23:25:10,091 INFO     ___FILE_ONLY___ 4188f0e746b0: Pull complete
+Digest: sha256:fea232803139b909ba783c334b2b634caa10d70f0bf46ed2106233459dd032f4
+Status: Downloaded newer image for rust:latest
+ ---> aa2a8ea5632c
+Step 2/6 : WORKDIR /usr/src/app
+
+2022-03-26 23:25:11,257 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:11,257 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:11,303 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:12,526 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:12,659 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 200
+2022-03-26 23:25:12,660 DEBUG    root            Reading GCS logfile: 206 (read 200 bytes)
+2022-03-26 23:25:12,660 INFO     ___FILE_ONLY___  ---> Running in 9f4611bed13e
+Removing intermediate container 9f4611bed13e
+ ---> 5bebe99ec90e
+Step 3/6 : COPY . .
+ ---> 394d6dc5f106
+Step 4/6 : RUN cargo build --release
+ ---> Running in 24bc687e15fb
+
+2022-03-26 23:25:14,059 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 34
+2022-03-26 23:25:14,059 DEBUG    root            Reading GCS logfile: 206 (read 34 bytes)
+2022-03-26 23:25:14,059 INFO     ___FILE_ONLY___ [91m    Updating crates.io index
+
+2022-03-26 23:25:14,570 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:15,219 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:15,219 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:15,840 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:16,429 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:16,430 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:17,592 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:17,593 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:17,857 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:18,764 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:18,765 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:19,158 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:19,980 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:19,981 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:20,426 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:21,141 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:21,141 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:21,649 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:22,305 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:22,306 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:22,961 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:23,505 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:23,506 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:24,672 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:24,673 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:25,058 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:25,837 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:25,839 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:26,327 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:27,007 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:27,008 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:28,204 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:28,204 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:28,339 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:29,406 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:29,406 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:30,359 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:30,560 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:30,560 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:31,599 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:31,742 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:31,743 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:32,944 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:32,945 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:33,610 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:34,108 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:34,108 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:35,275 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:35,275 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:35,643 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:36,437 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:36,437 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:37,640 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:37,641 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:37,662 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:38,838 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:38,839 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:38,914 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:40,019 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:40,021 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:40,153 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:41,195 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:41,195 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:41,413 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:42,377 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:42,378 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:42,648 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:43,536 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:43,536 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:43,931 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:44,980 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 206 435
+2022-03-26 23:25:44,981 DEBUG    root            Reading GCS logfile: 206 (read 435 bytes)
+2022-03-26 23:25:44,982 INFO     ___FILE_ONLY___ [0m[91m Downloading crates ...
+[0m[91merror: failed to download from `https://crates.io/api/v1/crates/futures-io/0.3.21/download`
+
+Caused by:
+  failed to get 200 response from `https://crates.io/api/v1/crates/futures-io/0.3.21/download`, got 403
+The command '/bin/sh -c cargo build --release' returned a non-zero code: 101
+ERROR
+ERROR: build step 0 "gcr.io/cloud-builders/docker" failed: step exited with non-zero status: 101
+[0m
+
+2022-03-26 23:25:46,029 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/projects/disbots/locations/global/builds/055f063d-a299-4985-b3ae-4fcc0cf7ead4?alt=json HTTP/1.1" 200 None
+2022-03-26 23:25:46,178 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:46,179 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:47,338 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /821897932748.cloudbuild-logs.googleusercontent.com/log-055f063d-a299-4985-b3ae-4fcc0cf7ead4.txt HTTP/1.1" 416 167
+2022-03-26 23:25:47,339 DEBUG    root            Reading GCS logfile: 416 (no new content; keep polling)
+2022-03-26 23:25:47,339 INFO     ___FILE_ONLY___ ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+2022-03-26 23:25:47,339 INFO     ___FILE_ONLY___ 
+BUILD FAILURE: Build step failure: build step 0 "gcr.io/cloud-builders/docker" failed: step exited with non-zero status: 101
+
+2022-03-26 23:25:47,339 DEBUG    root            (gcloud.builds.submit) build 055f063d-a299-4985-b3ae-4fcc0cf7ead4 completed with status "FAILURE"
+Traceback (most recent call last):
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/cli.py", line 987, in Execute
+    resources = calliope_command.Run(cli=self, args=args)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/backend.py", line 809, in Run
+    resources = command_instance.Run(args)
+  File "/Users/esh2n/google-cloud-sdk/lib/surface/builds/submit.py", line 164, in Run
+    build, _ = submit_util.Build(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/builds/submit_util.py", line 630, in Build
+    raise FailedBuildException(build)
+googlecloudsdk.command_lib.builds.submit_util.FailedBuildException: build 055f063d-a299-4985-b3ae-4fcc0cf7ead4 completed with status "FAILURE"
+2022-03-26 23:25:47,341 ERROR    root            (gcloud.builds.submit) build 055f063d-a299-4985-b3ae-4fcc0cf7ead4 completed with status "FAILURE"

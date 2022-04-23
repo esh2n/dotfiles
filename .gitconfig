@@ -1,6 +1,6 @@
 [include]
-    path = ~/gitconfig/.gitconfig.local
+    path = ~/dotfiles/gitconfig/.gitconfig.local
 [includeIf "gitdir:~/go/github.com/4sobiba/"]
-	path = ./.gitconfig.sub
+	path = ~/dotfiles/gitconfig/.gitconfig.sub
 [includeIf "gitdir:~/go/github.com/GincoInc/"]
-	path = ./.gitconfig.ginco
+	path = ~/dotfiles/gitconfig/.gitconfig.ginco

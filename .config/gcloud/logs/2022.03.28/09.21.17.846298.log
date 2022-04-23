@@ -1,0 +1,116 @@
+2022-03-28 09:21:17,846 DEBUG    root            Loaded Command Group: ['gcloud', 'run']
+2022-03-28 09:21:17,870 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'deploy']
+2022-03-28 09:21:17,877 DEBUG    root            Running [gcloud.run.deploy] with arguments: [--allow-unauthenticated: "True", --max-instances: "<googlecloudsdk.command_lib.run.flags._ScaleValue object at 0x1057de520>", --memory: "512Mi", --platform: "managed", --set-env-vars: "OrderedDict([('SECRET_TOKEN', 'OTU3MjQ0MDU2MjEwMTM3MTUw.Yj78_w.DLyOJHDF1pXD8uWUGinHaCq9Ocs')])", --source: ".", SERVICE: "pochi"]
+2022-03-28 09:21:17,946 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): run.googleapis.com:443
+2022-03-28 09:21:18,178 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations?alt=json&pageSize=100 HTTP/1.1" 200 None
+2022-03-28 09:21:23,230 INFO     ___FILE_ONLY___ To make this the default region, run `gcloud config set run/region asia-northeast1`.
+
+
+2022-03-28 09:21:23,288 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): artifactregistry.googleapis.com:443
+2022-03-28 09:21:23,679 DEBUG    urllib3.connectionpool https://artifactregistry.googleapis.com:443 "GET /v1/projects/disbots/locations/asia-northeast1/repositories/cloud-run-source-deploy?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:23,680 INFO     ___FILE_ONLY___ This command is equivalent to running `gcloud builds submit --tag [IMAGE] .` and `gcloud run deploy pochi --image [IMAGE]`
+
+
+2022-03-28 09:21:23,742 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): asia-northeast1-run.googleapis.com:443
+2022-03-28 09:21:24,356 DEBUG    urllib3.connectionpool https://asia-northeast1-run.googleapis.com:443 "GET /apis/serving.knative.dev/v1/namespaces/disbots/services/pochi?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:24,361 INFO     ___FILE_ONLY___ Building using Dockerfile and deploying container to Cloud Run service [[1mpochi[m] in project [[1mdisbots[m] region [[1masia-northeast1[m]
+
+2022-03-28 09:21:24,361 INFO     ___FILE_ONLY___ Building and deploying...
+2022-03-28 09:21:24,386 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-03-28 09:21:24,660 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b/disbots_cloudbuild?alt=json HTTP/1.1" 200 628
+2022-03-28 09:21:25,070 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b?alt=json&maxResults=1000&prefix=disbots_cloudbuild&project=disbots HTTP/1.1" 200 774
+2022-03-28 09:21:25,072 INFO     root            Using default gcloudignore file:
+--------------------------------------------------
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+#
+# For more information, run:
+#   $ gcloud topic gcloudignore
+#
+.gcloudignore
+# If you would like to upload your .git directory, .gitignore file or files
+# from your .gitignore file, remove the corresponding line
+# below:
+.git
+.gitignore
+#!include:.gitignore
+
+--------------------------------------------------
+2022-03-28 09:21:25,072 DEBUG    root            Skipping file [.gitignore]
+2022-03-28 09:21:25,072 DEBUG    root            Skipping file [.env]
+2022-03-28 09:21:25,073 DEBUG    root            Skipping file [target]
+2022-03-28 09:21:25,073 DEBUG    root            Skipping file [.git]
+2022-03-28 09:21:25,074 DEBUG    root            Added dir [src]
+2022-03-28 09:21:25,075 DEBUG    root            Added dir [src/commands]
+2022-03-28 09:21:25,075 DEBUG    root            Added [Cargo.toml]
+2022-03-28 09:21:25,075 DEBUG    root            Added [Dockerfile]
+2022-03-28 09:21:25,075 DEBUG    root            Added [cloudbuild.yaml]
+2022-03-28 09:21:25,076 DEBUG    root            Added [Cargo.lock]
+2022-03-28 09:21:25,076 DEBUG    root            Added [src/main.rs]
+2022-03-28 09:21:25,076 DEBUG    root            Added [src/commands/neko.rs]
+2022-03-28 09:21:25,076 DEBUG    root            Added [src/commands/mod.rs]
+2022-03-28 09:21:25,076 DEBUG    root            Added [src/commands/channels.rs]
+2022-03-28 09:21:25,079 INFO     root            Uploading [/var/folders/2b/s8mymn417x38kb14nwl_453h0000gn/T/tmp4wj_n75f/file.tgz] to [disbots_cloudbuild/source/1648426884.382684-dfe3752125f348659e78e2c9cb38f086.tgz]
+2022-03-28 09:21:25,428 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "POST /upload/storage/v1/b/disbots_cloudbuild/o?alt=json&name=source%2F1648426884.382684-dfe3752125f348659e78e2c9cb38f086.tgz&uploadType=multipart HTTP/1.1" 200 971
+2022-03-28 09:21:25,429 DEBUG    root            submitting build: <Build
+ images: ['asia-northeast1-docker.pkg.dev/disbots/cloud-run-source-deploy/pochi']
+ secrets: []
+ source: <Source
+ storageSource: <StorageSource
+ bucket: 'disbots_cloudbuild'
+ generation: 1648426885317417
+ object: 'source/1648426884.382684-dfe3752125f348659e78e2c9cb38f086.tgz'>>
+ steps: [<BuildStep
+ args: ['build', '--network', 'cloudbuild', '--no-cache', '-t', 'asia-northeast1-docker.pkg.dev/disbots/cloud-run-source-deploy/pochi', '.']
+ env: []
+ name: 'gcr.io/cloud-builders/docker'
+ secretEnv: []
+ volumes: []
+ waitFor: []>]
+ tags: []
+ warnings: []>
+2022-03-28 09:21:25,434 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-03-28 09:21:27,076 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "POST /v1/projects/disbots/locations/global/builds?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:27,085 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-03-28 09:21:28,181 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:32,343 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:37,194 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:41,443 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:48,727 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:21:58,557 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:22:11,115 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:22:28,047 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:22:49,590 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:23:20,210 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:24:02,922 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:25:02,275 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:26:25,311 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:28:20,275 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:30:59,433 DEBUG    google.auth.transport.requests Making request: POST https://oauth2.googleapis.com/token
+2022-03-28 09:30:59,492 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): oauth2.googleapis.com:443
+2022-03-28 09:30:59,730 DEBUG    urllib3.connectionpool https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+2022-03-28 09:31:00,780 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:34:01,075 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "GET /v1/operations/build/disbots/N2FlZmY3NTUtNzExZi00NzJjLWE2MDMtZDYwNGJkMDczYmM0?alt=json HTTP/1.1" 200 None
+2022-03-28 09:34:01,086 DEBUG    root            (gcloud.run.deploy) DEADLINE_EXCEEDED
+Traceback (most recent call last):
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/cli.py", line 987, in Execute
+    resources = calliope_command.Run(cli=self, args=args)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/backend.py", line 809, in Run
+    resources = command_instance.Run(args)
+  File "/Users/esh2n/google-cloud-sdk/lib/surface/run/deploy.py", line 265, in Run
+    service = operations.ReleaseService(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/run/serverless_operations.py", line 1109, in ReleaseService
+    operation = waiter.PollUntilDone(poller, build_op_ref)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/api_lib/util/waiter.py", line 322, in PollUntilDone
+    operation = retryer.RetryOnResult(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/core/util/retry.py", line 249, in RetryOnResult
+    if not should_retry(result, state):
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/api_lib/util/waiter.py", line 320, in _IsNotDone
+    return not poller.IsDone(operation)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/api_lib/util/waiter.py", line 122, in IsDone
+    raise OperationError(operation.error.message)
+googlecloudsdk.api_lib.util.waiter.OperationError: DEADLINE_EXCEEDED
+2022-03-28 09:34:01,088 ERROR    root            (gcloud.run.deploy) DEADLINE_EXCEEDED
+2022-03-28 09:34:01,099 DEBUG    root            Metrics reporting process started...

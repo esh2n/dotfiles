@@ -1,0 +1,116 @@
+2022-03-28 10:17:40,774 DEBUG    root            Loaded Command Group: ['gcloud', 'builds']
+2022-03-28 10:17:40,782 DEBUG    root            Loaded Command Group: ['gcloud', 'builds', 'submit']
+2022-03-28 10:17:40,788 DEBUG    root            Running [gcloud.builds.submit] with arguments: [--substitutions: "OrderedDict([('_SECRET_TOKEN', 'OTU3MjQ0MDU2MjEwMTM3MTUw.Yj78_w.DLyOJHDF1pXD8uWUGinHaCq9Ocs')])"]
+2022-03-28 10:17:40,805 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): storage.googleapis.com:443
+2022-03-28 10:17:41,072 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b/disbots_cloudbuild?alt=json HTTP/1.1" 200 628
+2022-03-28 10:17:41,418 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "GET /storage/v1/b?alt=json&maxResults=1000&prefix=disbots_cloudbuild&project=disbots HTTP/1.1" 200 774
+2022-03-28 10:17:41,420 INFO     root            Using default gcloudignore file:
+--------------------------------------------------
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+#
+# For more information, run:
+#   $ gcloud topic gcloudignore
+#
+.gcloudignore
+# If you would like to upload your .git directory, .gitignore file or files
+# from your .gitignore file, remove the corresponding line
+# below:
+.git
+.gitignore
+#!include:.gitignore
+
+--------------------------------------------------
+2022-03-28 10:17:41,421 DEBUG    root            Skipping file [.gitignore]
+2022-03-28 10:17:41,421 DEBUG    root            Skipping file [.env]
+2022-03-28 10:17:41,421 DEBUG    root            Skipping file [target]
+2022-03-28 10:17:41,421 DEBUG    root            Skipping file [.git]
+2022-03-28 10:17:41,422 INFO     ___FILE_ONLY___ Creating temporary tarball archive of 8 file(s) totalling 50.2 KiB before compression.
+
+2022-03-28 10:17:41,424 DEBUG    root            Added dir [src]
+2022-03-28 10:17:41,424 DEBUG    root            Added dir [src/commands]
+2022-03-28 10:17:41,424 DEBUG    root            Added [Cargo.toml]
+2022-03-28 10:17:41,424 DEBUG    root            Added [Dockerfile]
+2022-03-28 10:17:41,425 DEBUG    root            Added [cloudbuild.yaml]
+2022-03-28 10:17:41,426 DEBUG    root            Added [Cargo.lock]
+2022-03-28 10:17:41,426 DEBUG    root            Added [src/main.rs]
+2022-03-28 10:17:41,427 DEBUG    root            Added [src/commands/neko.rs]
+2022-03-28 10:17:41,427 DEBUG    root            Added [src/commands/mod.rs]
+2022-03-28 10:17:41,427 DEBUG    root            Added [src/commands/channels.rs]
+2022-03-28 10:17:41,428 INFO     ___FILE_ONLY___ Some files were not included in the source upload.
+
+Check the gcloud log [/Users/esh2n/.config/gcloud/logs/2022.03.28/10.17.40.774092.log] to see which files and the contents of the
+default gcloudignore file used (see `$ gcloud topic gcloudignore` to learn
+more).
+
+
+2022-03-28 10:17:41,428 INFO     ___FILE_ONLY___ Uploading tarball of [.] to [gs://disbots_cloudbuild/source/1648430260.798901-9dc040958fa945be815b9dd0aaf00aea.tgz]
+
+2022-03-28 10:17:41,430 INFO     root            Uploading [/var/folders/2b/s8mymn417x38kb14nwl_453h0000gn/T/tmpms8f232k/file.tgz] to [disbots_cloudbuild/source/1648430260.798901-9dc040958fa945be815b9dd0aaf00aea.tgz]
+2022-03-28 10:17:41,669 DEBUG    urllib3.connectionpool https://storage.googleapis.com:443 "POST /upload/storage/v1/b/disbots_cloudbuild/o?alt=json&name=source%2F1648430260.798901-9dc040958fa945be815b9dd0aaf00aea.tgz&uploadType=multipart HTTP/1.1" 200 971
+2022-03-28 10:17:41,670 DEBUG    root            submitting build: <Build
+ images: []
+ secrets: []
+ source: <Source
+ storageSource: <StorageSource
+ bucket: 'disbots_cloudbuild'
+ generation: 1648430261612635
+ object: 'source/1648430260.798901-9dc040958fa945be815b9dd0aaf00aea.tgz'>>
+ steps: [<BuildStep
+ args: ['build', '-t', 'gcr.io/$PROJECT_ID/pochi:${SHORT_SHA}', '.']
+ env: []
+ name: 'gcr.io/cloud-builders/docker'
+ secretEnv: []
+ volumes: []
+ waitFor: []>, <BuildStep
+ args: ['push', 'gcr.io/$PROJECT_ID/pochi']
+ env: []
+ name: 'gcr.io/cloud-builders/docker'
+ secretEnv: []
+ volumes: []
+ waitFor: []>, <BuildStep
+ args: ['beta', 'run', 'deploy', 'pochi', '--image', 'gcr.io/$PROJECT_ID/pochi:${SHORT_SHA}', '--region', 'asia-northeast1']
+ env: []
+ name: 'gcr.io/cloud-builders/gcloud'
+ secretEnv: []
+ volumes: []
+ waitFor: []>]
+ substitutions: <SubstitutionsValue
+ additionalProperties: [<AdditionalProperty
+ key: '_SECRET_TOKEN'
+ value: 'OTU3MjQ0MDU2MjEwMTM3MTUw.Yj78_w.DLyOJHDF1pXD8uWUGinHaCq9Ocs'>]>
+ tags: []
+ timeout: '1200s'
+ warnings: []>
+2022-03-28 10:17:41,675 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): cloudbuild.googleapis.com:443
+2022-03-28 10:17:42,037 DEBUG    urllib3.connectionpool https://cloudbuild.googleapis.com:443 "POST /v1/projects/disbots/locations/global/builds?alt=json HTTP/1.1" 400 None
+2022-03-28 10:17:42,041 DEBUG    root            (gcloud.builds.submit) INVALID_ARGUMENT: generic::invalid_argument: key "_SECRET_TOKEN" in the substitution data is not matched in the template
+Traceback (most recent call last):
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/cli.py", line 987, in Execute
+    resources = calliope_command.Run(cli=self, args=args)
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/calliope/backend.py", line 809, in Run
+    resources = command_instance.Run(args)
+  File "/Users/esh2n/google-cloud-sdk/lib/surface/builds/submit.py", line 164, in Run
+    build, _ = submit_util.Build(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/command_lib/builds/submit_util.py", line 566, in Build
+    op = client.projects_locations_builds.Create(
+  File "/Users/esh2n/google-cloud-sdk/lib/googlecloudsdk/third_party/apis/cloudbuild/v1/cloudbuild_v1_client.py", line 1297, in Create
+    return self._RunMethod(
+  File "/Users/esh2n/google-cloud-sdk/lib/third_party/apitools/base/py/base_api.py", line 737, in _RunMethod
+    return self.ProcessHttpResponse(method_config, http_response, request)
+  File "/Users/esh2n/google-cloud-sdk/lib/third_party/apitools/base/py/base_api.py", line 743, in ProcessHttpResponse
+    self.__ProcessHttpResponse(method_config, http_response, request))
+  File "/Users/esh2n/google-cloud-sdk/lib/third_party/apitools/base/py/base_api.py", line 609, in __ProcessHttpResponse
+    raise exceptions.HttpError.FromResponse(
+apitools.base.py.exceptions.HttpBadRequestError: HttpError accessing <https://cloudbuild.googleapis.com/v1/projects/disbots/locations/global/builds?alt=json>: response: <{'vary': 'Origin, X-Origin, Referer', 'content-type': 'application/json; charset=UTF-8', 'content-encoding': 'gzip', 'date': 'Mon, 28 Mar 2022 01:17:41 GMT', 'server': 'ESF', 'cache-control': 'private', 'x-xss-protection': '0', 'x-frame-options': 'SAMEORIGIN', 'x-content-type-options': 'nosniff', 'alt-svc': 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000,h3-Q050=":443"; ma=2592000,h3-Q046=":443"; ma=2592000,h3-Q043=":443"; ma=2592000,quic=":443"; ma=2592000; v="46,43"', 'transfer-encoding': 'chunked', 'status': 400}>, content <{
+  "error": {
+    "code": 400,
+    "message": "generic::invalid_argument: key \"_SECRET_TOKEN\" in the substitution data is not matched in the template",
+    "status": "INVALID_ARGUMENT"
+  }
+}
+>
+2022-03-28 10:17:42,045 ERROR    root            (gcloud.builds.submit) INVALID_ARGUMENT: generic::invalid_argument: key "_SECRET_TOKEN" in the substitution data is not matched in the template
+2022-03-28 10:17:42,078 DEBUG    root            Metrics reporting process started...
