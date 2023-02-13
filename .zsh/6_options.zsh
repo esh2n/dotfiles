@@ -40,6 +40,10 @@ zstyle ':completion:*:default' menu select=1
 export LS_COLORS='di=34:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
 zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
 
-export PACIFICA_PATH="/Users/esh2n/go"
+export PACIFICA_PATH="/Users/es/go"
+
+if [ -f '/Users/es/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/es/google-cloud-sdk/path.zsh.inc'; fi
+if [ -f '/Users/es/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/es/google-cloud-sdk/completion.zsh.inc'; fi
+export PATH="/Users/es/.rd/bin:$PATH"
 
 TIMEFMT=$'\n\n========================\nProgram : %J\nCPU     : %P\nuser    : %*Us\nsystem  : %*Ss\ntotal   : %*Es\n========================\n'

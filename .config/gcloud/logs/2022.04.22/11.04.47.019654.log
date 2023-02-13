@@ -1,6 +1,0 @@
-2022-04-22 11:04:47,020 DEBUG    root            Loaded Command Group: ['gcloud', 'config']
-2022-04-22 11:04:47,031 DEBUG    root            Loaded Command Group: ['gcloud', 'config', 'set']
-2022-04-22 11:04:47,032 DEBUG    root            Running [gcloud.config.set] with arguments: [SECTION/PROPERTY: "account", VALUE: "shunya.endo@ginco.co.jp"]
-2022-04-22 11:04:47,033 INFO     ___FILE_ONLY___ Updated property [core/account].
-
-2022-04-22 11:04:47,033 INFO     root            Display format: "default"

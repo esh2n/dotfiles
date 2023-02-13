@@ -1,8 +1,8 @@
 # PATHs
 
-export GROOT=/Users/esh2n/go/github.com/esh2n
-export AROOT=/Users/esh2n/go/github.com/4sobiba
-export DOTFILES_PATH=/Users/esh2n/dotfiles
+export GROOT=~/go/github.com/esh2n
+export AROOT=~/go/github.com/4sobiba
+export DOTFILES_PATH=~/dotfiles
 
 # bash
 export PATH=$HOME/bin:/usr/local/bin:$PATH
@@ -11,7 +11,7 @@ export PATH=$HOME/bin:/usr/local/bin:$PATH
 export XDG_CONFIG_HOME="$HOME/.config"
 
 # docker
-export DOCKER_CONTENT_TRUST=1
+export DOCKER_CONTENT_TRUST=0
 
 # gh
 export VISUAL='nvim'
@@ -26,16 +26,6 @@ export DOTFILES_PATH="$HOME/dotfiles"
 # [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 # export PATH=/opt/local/bin:$PATH
 
-# python
-export PYENV_ROOT="$HOME/.pyenv"
-if [ -x "${PYENV_ROOT}/bin" ]; then
-  export PATH=${PYENV_ROOT}/bin:${PATH}
-fi
-if [ -x "$(which pyenv)" ]; then
-eval "$(pyenv init - zsh)"
-eval "$(pyenv virtualenv-init -)"
-fi
-
 # perl
 if which plenv > /dev/null; then eval "$(plenv init - zsh)"; fi
 
@@ -48,6 +38,16 @@ export PATH=~/.composer/vendor/bin:$PATH
 
 # MySQL
 export PATH="/usr/local/opt/mysql@5.7/bin:$PATH"
+
+# python
+export PYENV_ROOT="$HOME/.pyenv"
+if [ -x "${PYENV_ROOT}/bin" ]; then
+  export PATH=${PYENV_ROOT}/bin:${PATH}
+fi
+if [ -x "$(which pyenv)" ]; then
+eval "$(pyenv init - zsh)"
+eval "$(pyenv virtualenv-init -)"
+fi
 
 # Ruby
 export PATH="~/.rbenv/shims:/usr/local/bin:$PATH"
@@ -73,7 +73,8 @@ eval "$(goenv init -)"
 export PATH="$GOROOT/bin:$PATH"
 export PATH="$PATH:$GOPATH/bin"
 GOENV_DISABLE_GOPATH=1
-
+export GOPRIVATE=*.corp.example.com,github.com/GincoInc/*
+# export GOPATH=$HOME/go
 # geth
 export PATH="$HOME/geth:$PATH"
 
@@ -91,7 +92,7 @@ eval "$(jenv init -)"
 # deno
 export DENO_INSTALL="~/.deno"
 export PATH="$DENO_INSTALL/bin:$PATH"
-export PATH="/Users/esh2n/.deno/bin:$PATH"
+export PATH="~/.deno/bin:$PATH"
 
 # rust
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -104,12 +105,6 @@ export PATH=$PATH:./node_modules/.bin
 # elm-format
 export PATH=$HOME:~/elm:$PATH
 
-# The next line updates PATH for the Google Cloud SDK.
-if [ -f '/Users/esh2n/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/esh2n/google-cloud-sdk/path.zsh.inc'; fi
-
-# The next line enables shell command completion for gcloud.
-if [ -f '/Users/esh2n/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/esh2n/google-cloud-sdk/completion.zsh.inc'; fi
-
 export LDFLAGS="-L/usr/local/opt/zlib/lib"
 export CPPFLAGS="-I/usr/local/opt/zlib/include"
 export PKG_CONFIG_PATH="/usr/local/opt/zlib/lib/pkgconfig"
@@ -119,3 +114,14 @@ export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
 export PATH="/opt/homebrew/bin:$PATH"
 # eval "$(/opt/homebrew/bin/brew shellenv)"
 # export PATH="/opt/homebrew/bin:$PATH"
+
+#
+export LDFLAGS="-L/opt/homebrew/opt/bzip2/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/bzip2/include"
+export PATH="/opt/homebrew/opt/bzip2/bin:$PATH"
+export PKG_CONFIG_PATH="/opt/homebrew/opt/zlib/lib/pkgconfig"
+export LDFLAGS="-L/opt/homebrew/opt/zlib/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/zlib/include"
+
+# ken
+export PATH="$HOME/ken/ken-darwin-10.10-amd64/bin:$PATH"

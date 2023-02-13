@@ -1,9 +1,0 @@
-2022-03-26 15:25:15,007 DEBUG    root            Loaded Command Group: ['gcloud', 'run']
-2022-03-26 15:25:15,014 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'services']
-2022-03-26 15:25:15,026 DEBUG    root            Loaded Command Group: ['gcloud', 'run', 'services', 'list']
-2022-03-26 15:25:15,028 DEBUG    root            Running [gcloud.run.services.list] with arguments: [--format: "value(status.address.url)", --platform: "managed"]
-2022-03-26 15:25:15,044 DEBUG    urllib3.connectionpool Starting new HTTPS connection (1): run.googleapis.com:443
-2022-03-26 15:25:15,554 DEBUG    urllib3.connectionpool https://run.googleapis.com:443 "GET /v1/projects/disbots/locations/-/services?alt=json HTTP/1.1" 200 None
-2022-03-26 15:25:15,557 INFO     root            Display format: "table(ready_symbol.color(red="[xX]",green="[✓✔]",yellow="[-!…]"):label="",firstof(id,metadata.name):label=SERVICE,region:label=REGION,domain:label=URL,last_modifier:label="LAST DEPLOYED BY",last_transition_time:label="LAST DEPLOYED AT") value(status.address.url)"
-2022-03-26 15:25:15,560 INFO     ___FILE_ONLY___ https://lol-bot-akbh3dd2eq-an.a.run.app
-

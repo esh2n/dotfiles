@@ -9,7 +9,7 @@
 [commit]
 	template = ~/dotfiles/gitconfig/.gitmessage.emoji
 [ghq]
-	root = /Users/esh2n/go
+	root = /Users/es/go
 [pager]
     diff = delta
     log = delta
@@ -38,3 +38,6 @@
 [user]
 	name = esh2n
 	email = shunyaendoh.bz@gmail.com
+
+[url "git@github.com:"]
+    insteadOf = https://github.com/

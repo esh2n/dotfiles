@@ -152,7 +152,7 @@ alias chrhe="chrome --headless --disable-gpu --screenshot --disk-cache-dir=/tmp 
   alias d='docker'
   alias dco='docker compose'
   alias dps='docker ps'
-  alias dau='export DOCKER_CONTENT_TRUST=0'
+  # alias dau='export DOCKER_CONTENT_TRUST=0'
 # }}}
 
 # Kubernetes {{{
@@ -236,3 +236,9 @@ alias zeinit='zellij --layout ~/.config/zellij/layout_file.yaml'
 # Monacoin {{
 alias mc='monacoin-cli'
 # }}
+
+# GCP {{
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/application_default_credentials.json"
+# }}
+
+alias gla='goland'
