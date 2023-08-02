@@ -38,6 +38,17 @@
 [user]
 	name = esh2n
 	email = shunyaendoh.bz@gmail.com
-
-[url "git@github.com:"]
-    insteadOf = https://github.com/
+[color]
+    ui = true
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge --skip -- %f
+	process = git-lfs filter-process --skip
+	required = true
+[url "https://esh2n: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@github.com/"]
+    InsteadOf = https://github.com/
+    InsteadOf = git@github.com:
+	InsteadOf = github:
+	InsteadOf = git://github.com/
+[core]
+	excludesFile = /Users/es/dotfiles/gitconfig/.gitignore.grobal

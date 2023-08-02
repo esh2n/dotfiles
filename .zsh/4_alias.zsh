@@ -89,7 +89,7 @@ alias chrhe="chrome --headless --disable-gpu --screenshot --disk-cache-dir=/tmp 
   alias gg='git grep'
   alias glo="peco_select_branch_all | xargs -t -I {} git log {}.. --graph --abbrev-commit --decorate --date=relative --format=format:'%C(red)%h%C(r) —— %C(bold blue)%an%C(r): %C(white)%s%C(r) %C(dim white) %C(bold green)(%ar)%C(r) %C(bold yellow)%d%C(r)'"
   alias gtr="git log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(red)%h%C(r) —— %C(bold blue)%an%C(r): %C(white)%s%C(r) %C(dim white) %C(bold green)(%ar)%C(r) %C(bold yellow)%d%C(r)' --all"
-  alias gs='git status'
+  alias gs='git status -sb'
 
 # Remote
   alias grao='git remote add origin'
@@ -122,6 +122,9 @@ alias chrhe="chrome --headless --disable-gpu --screenshot --disk-cache-dir=/tmp 
 
 # Stash
   alias gst='git stash'
+
+# Branch Rename
+  alias grn='git branch -m'
 
 # On Error
   alias grmi='rm -rf .git/index.lock .git/COMMIT_EDITMSG'
@@ -209,6 +212,7 @@ alias den='denon'
 # GCP {{
 alias gsu='gsutil'
 alias gcp='gcloud'
+alias sci='spanner_cli_connect'
 # }}
 
 # Intel chip {{

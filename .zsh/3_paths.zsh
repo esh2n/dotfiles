@@ -73,7 +73,8 @@ eval "$(goenv init -)"
 export PATH="$GOROOT/bin:$PATH"
 export PATH="$PATH:$GOPATH/bin"
 GOENV_DISABLE_GOPATH=1
-export GOPRIVATE=*.corp.example.com,github.com/GincoInc/*
+export GOPRIVATE="github.com/GincoInc"
+export GOPROXY=direct
 # export GOPATH=$HOME/go
 # geth
 export PATH="$HOME/geth:$PATH"

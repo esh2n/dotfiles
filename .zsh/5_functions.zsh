@@ -229,3 +229,57 @@ function gx() {
   gcloud-activate "${name}" "${project}"
 }
 compdef gx-complete gx
+
+
+function spanner_cli_connect() {
+sdb=(
+    "auditlogger-mainnet-prod"
+    "auditlogger-mainnet-qa"
+    "auditlogger-test"
+    "auditlogger-testnet-dev"
+    "auditlogger-testnet-prod"
+    "auditlogger-testnet-qa"
+    "authenticator-mainnet-prod"
+    "authenticator-mainnet-qa"
+    "authenticator-test"
+    "authenticator-testnet-dev"
+    "authenticator-testnet-prod"
+    "authenticator-testnet-qa"
+    "explorer-prod"
+    "explorer-qa"
+    "explorer-test"
+    "gatekeeper-mainnet-prod"
+    "gatekeeper-mainnet-qa"
+    "gatekeeper-test"
+    "gatekeeper-testnet-dev"
+    "gatekeeper-testnet-prod"
+    "gatekeeper-testnet-qa"
+    "mailer-mainnet-prod"
+    "mailer-mainnet-qa"
+    "mailer-test"
+    "mailer-testnet-dev"
+    "mailer-testnet-prod"
+    "mailer-testnet-qa"
+    "postman-mainnet-prod"
+    "postman-mainnet-qa"
+    "postman-test"
+    "postman-testnet-dev"
+    "postman-testnet-prod"
+    "postman-testnet-qa"
+    "treasurer-mainnet-prod"
+    "treasurer-mainnet-qa"
+    "treasurer-test"
+    "treasurer-testnet-dev"
+    "treasurer-testnet-prod"
+    "treasurer-testnet-qa"
+  )
+
+  selected_option=$(printf '%s\n' "${sdb[@]}" | peco)
+
+  if [ -n "$selected_option" ]; then
+    spanner-cli -p ginco-cluster -i multi-tenancy-cluster -d "${selected_option}"
+  else
+    echo "No option was selected."
+  fi
+}
+

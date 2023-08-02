@@ -4,11 +4,14 @@
 	path = ~/dotfiles/gitconfig/.gitconfig.sub
 [includeIf "gitdir:~/go/github.com/GincoInc/"]
 	path = ~/dotfiles/gitconfig/.gitconfig.ginco
-[url "git@github.com:"]
-	insteadOf = https://github.com
-	insteadOf = https://github.com
-[filter "lfs"]
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
+# [url "git@github.com:"]
+# 	insteadOf = https://github.com
+# [url "https://github.com/"]
+# 	insteadOf = git://github.com/
+# [url "https://esh2n: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@github.com/"]
+# 	insteadOf = https://github.com/
+
+# [url "github:"]
+#     InsteadOf = https://github.com/
+#     InsteadOf = git@github.com:
+
