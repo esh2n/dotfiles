@@ -1,0 +1,129 @@
+# プロンプトのフォーマット
+format = """
+$directory\
+$git_branch\
+$git_status\
+$nodejs\
+$rust\
+$golang\
+$python\
+$docker_context\
+$time\
+$line_break\
+$character"""
+
+# 右側のプロンプトフォーマット
+right_format = """
+$cmd_duration\
+$status\
+$container\
+"""
+
+# プロンプトの前に空行を入れる
+add_newline = true
+
+[custom.separator]
+command = "echo ' '"
+when = """test "$STARSHIP_NAME" != "" """
+style = ""
+format = "[$output]($style)"
+
+[directory]
+style = "bold fg:#74c7ec"
+format = '[$path](bold $style)'
+truncation_length = 3
+truncation_symbol = "…/"
+read_only = " "
+home_symbol = "🏠"
+
+[directory.substitutions]
+"Documents" = " "
+"Downloads" = " "
+"Music" = " "
+"Pictures" = " "
+"Developer" = " "
+".config" = " "
+"Desktop" = " "
+"Movies" = " "
+"Applications" = " "
+
+[git_branch]
+symbol = " "
+style = "bold fg:#a6e3a1"
+format = '[$symbol$branch ](bold $style)'
+truncation_length = 20
+truncation_symbol = "…"
+
+[git_status]
+style = "bold fg:#f9e2af"
+format = '[$all_status$ahead_behind ](bold $style)'
+conflicted = "✖"
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕${ahead_count}⇣${behind_count}"
+up_to_date = "✓"
+untracked = "+${count}"
+stashed = "⚑"
+modified = "!${count}"
+staged = "●${count}"
+renamed = "»${count}"
+deleted = "✘${count}"
+
+[nodejs]
+symbol = "⬢"
+style = "bold fg:#f5c2e7"
+format = '[${symbol}${version} ](bold $style)'
+
+[rust]
+symbol = "🦀"
+style = "bold fg:#f38ba8"
+format = '[${symbol}${version} ](bold $style)'
+
+[golang]
+symbol = "🐹"
+style = "bold fg:#89dceb"
+format = '[${symbol}${version} ](bold $style)'
+
+[python]
+symbol = "🐍"
+style = "bold fg:#f9e2af"
+format = '[${symbol}${version} ](bold $style)'
+
+[docker_context]
+symbol = "🐳"
+style = "bold fg:#89b4fa"
+format = '[${symbol}${context} ](bold $style)'
+
+[time]
+disabled = false
+time_format = "%R"
+style = "bold fg:#9399b2"
+format = '[$time](bold $style)'
+
+[line_break]
+disabled = false
+
+[character]
+success_symbol = "[❯](bold fg:#a6e3a1)"
+error_symbol = "[❯](bold fg:#f38ba8)"
+vimcmd_symbol = "[❮](bold fg:#f9e2af)"
+vimcmd_replace_one_symbol = "[❮](bold fg:#f38ba8)"
+vimcmd_replace_symbol = "[❮](bold fg:#f38ba8)"
+vimcmd_visual_symbol = "[❮](bold fg:#89b4fa)"
+
+[status]
+style = "bold fg:#f38ba8"
+symbol = "💫 "
+format = '[$symbol$status ](bold $style)'
+map_symbol = true
+disabled = false
+
+[cmd_duration]
+min_time = 500
+format = '[$duration ](bold $style)'
+style = "bold fg:#f5c2e7"
+
+[container]
+symbol = "󰡨 "
+style = "bold fg:#fab387"
+format = '[$symbol[$name] ](bold $style)'

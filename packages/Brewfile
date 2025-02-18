@@ -1,0 +1,159 @@
+# Taps
+tap "homebrew/bundle"
+tap "homebrew/cask-drivers"
+tap "homebrew/cask-fonts"
+tap "github/gh"
+tap "oven-sh/bun"    # For bun installation
+
+# Core utilities
+brew "coreutils"      # GNU core utilities
+brew "moreutils"      # Additional Unix utilities
+brew "findutils"      # GNU find, locate, updatedb and xargs
+brew "gnu-sed"        # GNU sed
+brew "grep"           # GNU grep
+brew "less"           # Terminal pager
+brew "wget"           # File retrieval utility
+brew "curl"           # HTTP client
+brew "openssh"        # OpenSSH client
+brew "reattach-to-user-namespace"  # Utility for tmux
+brew "gmp"            # GNU Multiple Precision Arithmetic Library
+
+# Shell and terminal
+brew "zsh"            # Modern shell
+brew "zsh-completions"  # Additional completions for zsh
+brew "tmux"           # Terminal multiplexer
+brew "starship"       # Cross-shell prompt
+brew "zellij"         # Modern terminal multiplexer
+
+# CLI tools
+brew "skim"           # Fuzzy finder (Rust alternative to peco)
+brew "fzf"            # Fuzzy finder
+brew "ghq"            # Remote repository management
+brew "eza"            # Modern replacement for ls
+brew "fd"             # Simple, fast alternative to find
+brew "bat"            # Cat clone with syntax highlighting
+brew "ripgrep"        # Fast search tool
+brew "zoxide"         # Smarter cd command
+brew "jq"             # JSON processor
+brew "tree"           # Directory listing as tree
+brew "colordiff"      # Colorized diff
+brew "htop"           # Process viewer
+brew "git-delta"      # Syntax-highlighting pager for git
+
+# Development tools
+brew "git"            # Version control
+brew "git-lfs"        # Git Large File Storage
+brew "gh"             # GitHub CLI
+brew "neovim"         # Modern vim
+brew "tig"            # Text-mode interface for git
+brew "helix"          # Modern text editor
+brew "ctags"          # Source code tagging
+brew "gnupg"          # GPG suite for signing
+
+# Languages and package managers
+brew "asdf"           # Multiple runtime version manager
+brew "go"             # Go language
+brew "rust"           # Rust language
+brew "node"           # Node.js
+brew "bun"            # JavaScript runtime and toolkit
+brew "deno"           # JavaScript/TypeScript runtime
+brew "python@3.12"    # Python (latest)
+brew "ruby"           # Ruby language
+brew "lua"            # Lua language
+
+# Container and cloud tools
+brew "docker"         # Container platform
+brew "kubernetes-cli" # Kubernetes CLI
+brew "k9s"            # Kubernetes TUI
+brew "argocd"         # GitOps tool
+brew "awscli"         # AWS CLI
+
+# Database tools
+brew "mysql"          # MySQL database
+brew "redis"          # Redis database
+
+# Build tools and dependencies
+brew "cmake"          # Build system
+brew "autoconf"       # Automatic configure script builder
+brew "sccache"        # Compiler cache
+brew "protobuf"       # Protocol buffers
+brew "protoc-gen-go"  # Go protobuf generator
+brew "protoc-gen-go-grpc" # Go gRPC generator
+
+# Image and document processing
+brew "imagemagick"    # Image manipulation
+brew "ffmpeg"         # Multimedia framework
+brew "plantuml"       # Diagram tool
+
+# Font tools
+tap "bramstein/webfonttools"
+brew "sfnt2woff"
+brew "sfnt2woff-zopfli"
+brew "woff2"
+brew "font-jetbrains-mono-nerd-font"
+brew "font-hack-nerd-font"
+
+# Casks
+cask "font-hackgen"           # 白源フォント
+cask "font-hackgen-nerd"      # 白源フォント（Nerd Fonts版）
+cask "font-jetbrains-mono"
+cask "font-jetbrains-mono-nerd-font"
+cask "ngrok"          # Tunnel tool
+
+# Development Tools
+cask "visual-studio-code"
+cask "cursor"
+cask "wezterm"        # Modern GPU-accelerated terminal
+cask "docker"
+cask "postman"
+cask "android-studio"
+cask "orbstack"
+cask "devtoys"
+cask "unity-hub"      # Unity開発環境
+cask "epic-games"     # Unreal Engine用
+
+# AI/ML Tools
+cask "ollama"    # Local AI models
+
+# Browsers
+cask "arc"
+cask "google-chrome"
+cask "firefox"
+cask "brave-browser"  # Privacy-focused browser
+
+# Communication & Productivity
+cask "slack"
+cask "discord"
+cask "notion"
+cask "obsidian"
+cask "raycast"
+cask "1password"
+cask "alt-tab"
+cask "magnet"
+cask "onedrive"
+cask "line"          # コミュニケーション
+cask "paste"         # クリップボード管理
+cask "nebo"          # ノートアプリ
+
+# Design Tools
+cask "figma"
+cask "blender"       # 3Dモデリング
+cask "davinci-resolve" # 動画編集
+
+# Media
+cask "vlc"
+cask "obs"
+cask "spotify"
+
+# System Tools
+cask "karabiner-elements"
+cask "utm"
+cask "displaylink"    # 外部ディスプレイ管理
+cask "cloudflare-warp"    # Fast & secure VPN with 1.1.1.1 DNS
+
+# Optional
+cask "kindle"
+cask "zoom"
+
+# Remove outdated versions
+brew "cleanup" 

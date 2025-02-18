@@ -1,0 +1,34 @@
+# <type>[(scope)]: <description>
+#
+# type:
+#   feat     : 新機能
+#   fix      : バグ修正
+#   docs     : ドキュメントのみの変更
+#   style    : コードの意味に影響を与えない変更（空白、フォーマット、セミコロンなど）
+#   refactor : バグ修正でも機能追加でもないコードの変更
+#   perf     : パフォーマンスを向上させるコードの変更
+#   test     : テストの追加・修正
+#   chore    : ビルドプロセスやドキュメント生成などの補助ツールやライブラリの変更
+#
+# scope:
+#   任意の名前空間（例: component, config, model, view, etc.）
+#
+# description:
+#   変更内容の要約を命令形で記述
+#
+# オプション:
+# - Breaking Changes がある場合は "!" を type の後に付加
+# - 本文に詳細な説明を記述
+# - フッターに Breaking Changes の詳細や Issue への参照を記述
+#
+# 例:
+# feat(auth)!: implement OAuth2 authentication
+#
+# - Add OAuth2 authentication flow
+# - Implement token refresh mechanism
+# - Add user session management
+#
+# BREAKING CHANGE: New authentication flow requires client registration
+# Fixes #123
+#
+# Conventional Commits: https://www.conventionalcommits.org/ja/v1.0.0/ 

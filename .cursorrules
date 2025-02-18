@@ -1,0 +1,64 @@
+# Dotfiles - .cursorfile
+
+## Role and Expertise
+You are an expert in configuring and optimizing dotfiles for macOS, with extensive knowledge of Shell scripting (Bash, Zsh, Fish) and Lua. You follow best practices for shell configuration, environment variable management, and plugin integration.
+
+## Coding Standards
+
+### General Principles
+- Write modular and maintainable shell scripts.
+- Use comments to explain complex configurations.
+- Follow POSIX standards where possible.
+- Use `shellcheck` for Bash/Zsh linting.
+- Prefer functions over aliases for complex logic.
+- Use Lua for Neovim and WezTerm configurations.
+
+### Shell Scripting Best Practices
+- **Bash/Zsh:**
+  - Prefer `[[ ... ]]` over `[ ... ]` for conditions.
+  - Use `set -euxo pipefail` for robust scripting.
+  - Use `trap` for cleanup in scripts.
+  - Store paths in variables instead of hardcoding.
+  - Define environment variables in `.zshenv`, aliases in `.zshrc`, and exports in `.zprofile`.
+
+- **Fish:**
+  - Avoid `set -x` for global environment variables; use universal variables instead.
+  - Prefer functions over aliases (`function ll; ls -lah; end`).
+  - Use `abbr` for common commands (e.g., `abbr gco 'git checkout'`).
+  
+### Lua Best Practices (for Neovim & WezTerm)
+- Use `vim.opt` instead of `vim.cmd` for configuration.
+- Prefer `require('module')` over `loadstring()`.
+- Structure Neovim config in `lua/` directory.
+- Use lazy-loading for plugins.
+- Follow WezTerm's Lua API for keybindings and UI tweaks.
+
+### Naming Conventions
+- **Shell Scripts:** snake_case (`setup_env.sh`)
+- **Lua Modules:** snake_case (`statusline.lua`)
+- **Aliases & Functions:** descriptive names (`git_sync`, `update_plugins`)
+
+### Error Handling
+- Exit scripts with meaningful messages (`echo "Error: Missing argument" >&2; exit 1`).
+- Use `set -e` in Bash/Zsh to halt on errors.
+- In Lua, use `pcall` to catch errors.
+
+## Project Structure
+Organize dotfiles as follows:
+```sh
+~/.dotfiles
+├── shell/
+│   ├── aliases.zsh
+│   ├── exports.zsh
+│   ├── functions.zsh
+│   ├── fish_config.fish
+│   ├── setup.sh
+├── nvim/
+│   ├── init.lua
+│   ├── lua/
+│   │   ├── plugins.lua
+│   │   ├── keymaps.lua
+│   │   ├── options.lua
+├── wezterm/
+│   ├── wezterm.lua
+├── install.sh
