@@ -161,7 +161,18 @@ install_packages() {
     # Rust packages
     if [ -f "$DOTFILES_DIR/packages/cargo.txt" ]; then
         echo "Installing Rust packages..."
-        cat "$DOTFILES_DIR/packages/cargo.txt" | xargs -n 1 cargo install
+        while IFS= read -r line || [ -n "$line" ]; do
+            # コメント行をスキップ
+            [[ $line =~ ^#.*$ ]] && continue
+            # 空行をスキップ
+            [[ -z $line ]] && continue
+            
+            if [[ $line == "pacifica" ]]; then
+                cargo install --git https://github.com/serinuntius/pacifica.git
+            else
+                cargo install "$line"
+            fi
+        done < "$DOTFILES_DIR/packages/cargo.txt"
     fi
     
     # Go packages
