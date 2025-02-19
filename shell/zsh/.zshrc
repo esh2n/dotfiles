@@ -1,3 +1,10 @@
+# Load environment variables
+if [ -f "$HOME/go/github.com/esh2n/dotfiles/.env" ]; then
+    set -a
+    source "$HOME/go/github.com/esh2n/dotfiles/.env"
+    set +a
+fi
+
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
@@ -35,13 +42,6 @@ eval "$(starship init zsh)"
 
 # Load local config if exists
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
-
-# Load environment variables
-if [ -f "$HOME/.dotfiles/.env" ]; then
-  set -a
-  source "$HOME/.dotfiles/.env"
-  set +a
-fi
 
 # Initialize mise
 eval "$(mise activate zsh)" 

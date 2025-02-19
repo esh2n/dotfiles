@@ -2,8 +2,33 @@ local wezterm = require('wezterm')
 
 local M = {}
 
--- OpenWeatherMap APIキー (要設定)
-local WEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
+-- OpenWeatherMap APIキー
+local function get_api_key()
+    -- 1. まず環境変数から取得を試みる
+    local key = os.getenv('OPENWEATHER_API_KEY')
+    if key and key ~= '' then
+        return key
+    end
+    
+    -- 2. 環境変数が設定されていない場合は.envファイルから直接読み込む
+    local home = os.getenv('HOME')
+    local env_file = home .. '/go/github.com/esh2n/dotfiles/.env'
+    local f = io.open(env_file, 'r')
+    if f then
+        for line in f:lines() do
+            local api_key = line:match('^OPENWEATHER_API_KEY=(.+)$')
+            if api_key then
+                f:close()
+                -- 値から引用符を削除
+                return api_key:gsub('^["\'](.+)["\']$', '%1')
+            end
+        end
+        f:close()
+    end
+    return nil
+end
+
+local WEATHER_API_KEY = get_api_key()
 -- 地点情報 (東京)
 local CITY_ID = '1850147'
 
