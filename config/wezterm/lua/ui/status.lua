@@ -3,6 +3,7 @@ local weather = require('lua.ui.weather')
 local earthquake = require('lua.ui.earthquake')
 local network = require('lua.ui.network')
 local colors = require('lua.ui.colors')
+local spotify = require('lua.ui.spotify')
 
 local M = {}
 
@@ -14,61 +15,128 @@ local COLORS = {
     mauve = "#cba6f7",   -- 時刻
     yellow = "#f9e2af",  -- ネットワーク
     peach = "#fab387",   -- 気圧
+    lavender = "#b4befe", -- Spotify
     surface0 = "#313244",
     base = "#1e1e2e",
 }
 
 -- ウィンドウ幅に基づいて表示する要素を決定
-local function get_elements_by_width(window, weather_info, pressure_info, earthquake_info, network_info, battery, time)
+local function get_elements_by_width(window, weather_info, pressure_info, condition_info, sun_info, earthquake_info, network_info, battery, time, spotify_info)
     local width = window:get_dimensions().pixel_width
     local separator = "   "
     local C = colors.get_colors()
     local elements = {}
+    
+    -- タブの数を取得
+    local tabs = window:mux_window():tabs()
+    local tab_count = #tabs
 
     -- 左パディング
     table.insert(elements, {Background = {Color = C.base}})
     table.insert(elements, {Text = " "})
 
-    if width > 1200 then
-        -- フル表示
-        table.insert(elements, {Background = {Color = C.base}})
-        table.insert(elements, {Foreground = {Color = C.blue}})
-        table.insert(elements, {Attribute = {Intensity = "Bold"}})
-        table.insert(elements, {Text = weather_info .. separator})
-
-        table.insert(elements, {Background = {Color = C.base}})
-        table.insert(elements, {Foreground = {Color = C.peach}})
-        table.insert(elements, {Attribute = {Intensity = "Bold"}})
-        table.insert(elements, {Text = pressure_info .. separator})
-
-        table.insert(elements, {Background = {Color = C.base}})
-        table.insert(elements, {Foreground = {Color = C.red}})
-        table.insert(elements, {Attribute = {Intensity = "Bold"}})
-        table.insert(elements, {Text = earthquake_info .. separator})
-
-        table.insert(elements, {Background = {Color = C.base}})
-        table.insert(elements, {Foreground = {Color = C.yellow}})
-        table.insert(elements, {Attribute = {Intensity = "Bold"}})
-        table.insert(elements, {Text = network_info .. separator})
-
+    -- タブが3つ以上ある場合は最小限の情報のみ表示
+    if tab_count >= 3 then
+        -- 最小表示（時刻とバッテリーのみ）
         table.insert(elements, {Background = {Color = C.base}})
         table.insert(elements, {Foreground = {Color = C.green}})
         table.insert(elements, {Text = battery .. separator})
-    elseif width > 800 then
-        -- 中程度の表示（天気、気圧、バッテリー、時計）
-        table.insert(elements, {Background = {Color = C.base}})
-        table.insert(elements, {Foreground = {Color = C.blue}})
-        table.insert(elements, {Attribute = {Intensity = "Bold"}})
-        table.insert(elements, {Text = weather_info .. separator})
+    else
+        if width > 1500 then
+            -- Spotify情報（もし再生中なら）
+            if spotify_info then
+                table.insert(elements, {Background = {Color = C.base}})
+                table.insert(elements, {Foreground = {Color = COLORS.lavender}})
+                table.insert(elements, {Attribute = {Intensity = "Bold"}})
+                table.insert(elements, {Text = spotify_info .. separator})
+            end
 
-        table.insert(elements, {Background = {Color = C.base}})
-        table.insert(elements, {Foreground = {Color = C.peach}})
-        table.insert(elements, {Attribute = {Intensity = "Bold"}})
-        table.insert(elements, {Text = pressure_info .. separator})
+            -- フル表示（全ての情報）
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.blue}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = weather_info .. separator})
 
-        table.insert(elements, {Background = {Color = C.base}})
-        table.insert(elements, {Foreground = {Color = C.green}})
-        table.insert(elements, {Text = battery .. separator})
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.peach}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = pressure_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.mauve}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = condition_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.yellow}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = sun_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.red}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = earthquake_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.yellow}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = network_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.green}})
+            table.insert(elements, {Text = battery .. separator})
+        elseif width > 1200 then
+            -- Spotify情報（もし再生中なら）
+            if spotify_info then
+                table.insert(elements, {Background = {Color = C.base}})
+                table.insert(elements, {Foreground = {Color = COLORS.lavender}})
+                table.insert(elements, {Attribute = {Intensity = "Bold"}})
+                table.insert(elements, {Text = spotify_info .. separator})
+            end
+
+            -- 中程度の表示（天気、気圧、コンディション、バッテリー）
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.blue}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = weather_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.peach}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = pressure_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.mauve}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = condition_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.green}})
+            table.insert(elements, {Text = battery .. separator})
+        elseif width > 800 then
+            -- Spotify情報（もし再生中なら）
+            if spotify_info then
+                table.insert(elements, {Background = {Color = C.base}})
+                table.insert(elements, {Foreground = {Color = COLORS.lavender}})
+                table.insert(elements, {Attribute = {Intensity = "Bold"}})
+                table.insert(elements, {Text = spotify_info .. separator})
+            end
+
+            -- 最小表示（天気、気圧、バッテリー）
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.blue}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = weather_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.peach}})
+            table.insert(elements, {Attribute = {Intensity = "Bold"}})
+            table.insert(elements, {Text = pressure_info .. separator})
+
+            table.insert(elements, {Background = {Color = C.base}})
+            table.insert(elements, {Foreground = {Color = C.green}})
+            table.insert(elements, {Text = battery .. separator})
+        end
     end
 
     -- 時刻（常に表示）
@@ -105,7 +173,7 @@ function M.apply_to_config(config)
         end
 
         -- 天気情報と気圧情報
-        local weather_info, pressure_info = weather.get_weather()
+        local weather_info, pressure_info, condition_info, sun_info = weather.get_weather()
         
         -- 地震情報
         local earthquake_info = earthquake.get_earthquake()
@@ -113,8 +181,22 @@ function M.apply_to_config(config)
         -- ネットワーク情報
         local network_info = network.get_network_info()
 
+        -- Spotify情報
+        local spotify_info = spotify.get_spotify()
+
         -- ウィンドウ幅に基づいて要素を取得
-        local elements = get_elements_by_width(window, weather_info, pressure_info or "気圧N/A", earthquake_info, network_info, battery, time)
+        local elements = get_elements_by_width(
+            window,
+            weather_info,
+            pressure_info or "気圧N/A",
+            condition_info or "湿度N/A",
+            sun_info or "日の出N/A",
+            earthquake_info,
+            network_info,
+            battery,
+            time,
+            spotify_info
+        )
 
         -- ステータスバーを更新
         window:set_right_status(wezterm.format(elements))

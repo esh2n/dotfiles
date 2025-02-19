@@ -39,6 +39,7 @@ brew "tree"           # Directory listing as tree
 brew "colordiff"      # Colorized diff
 brew "htop"           # Process viewer
 brew "git-delta"      # Syntax-highlighting pager for git
+brew "ical-buddy"     # Calendar command line tool
 
 # Development tools
 brew "git"            # Version control
