@@ -1,0 +1,22 @@
+[tools]
+python = "3.12"
+ruby = "latest"
+node = "latest"
+go = "latest"
+rust = "latest"
+bun = "latest"
+deno = "latest"
+
+[settings]
+experimental = false
+verbose = false
+
+[env]
+PYTHONPATH = "${PYTHONPATH:-}:${PWD}"
+GEM_HOME = "${HOME}/.gem"
+GOPATH = "${HOME}/go"
+GOBIN = "${GOPATH}/bin"
+CARGO_HOME = "${HOME}/.cargo"
+RUSTUP_HOME = "${HOME}/.rustup"
+DENO_INSTALL_ROOT = "${HOME}/.deno"
+BUN_INSTALL = "${HOME}/.bun" 

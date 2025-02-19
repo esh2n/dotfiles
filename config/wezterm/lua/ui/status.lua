@@ -1,6 +1,7 @@
 local wezterm = require('wezterm')
 local weather = require('lua.ui.weather')
 local earthquake = require('lua.ui.earthquake')
+local network = require('lua.ui.network')
 local colors = require('lua.ui.colors')
 
 local M = {}
@@ -11,6 +12,7 @@ local COLORS = {
     red = "#f38ba8",     -- 地震
     green = "#a6e3a1",   -- バッテリー
     mauve = "#cba6f7",   -- 時刻
+    yellow = "#f9e2af",  -- ネットワーク
     surface0 = "#313244",
     base = "#1e1e2e",
 }
@@ -41,6 +43,9 @@ function M.apply_to_config(config)
         -- 地震情報
         local earthquake_info = earthquake.get_earthquake()
 
+        -- ネットワーク情報
+        local network_info = network.get_network_info()
+
         -- セパレータ
         local separator = "   "  -- スペースを広めに
         local C = colors.get_colors()
@@ -62,6 +67,12 @@ function M.apply_to_config(config)
             {Foreground = {Color = C.red}},
             {Attribute = {Intensity = "Bold"}},
             {Text = earthquake_info .. separator},
+
+            -- ネットワーク情報
+            {Background = {Color = C.base}},
+            {Foreground = {Color = C.yellow}},
+            {Attribute = {Intensity = "Bold"}},
+            {Text = network_info .. separator},
 
             -- バッテリー情報
             {Background = {Color = C.base}},

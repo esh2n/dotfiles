@@ -4,6 +4,7 @@ tap "homebrew/cask-drivers"
 tap "homebrew/cask-fonts"
 tap "github/gh"
 tap "oven-sh/bun"    # For bun installation
+tap "mise-en-place/mise"  # For mise installation
 
 # Core utilities
 brew "coreutils"      # GNU core utilities
@@ -51,7 +52,7 @@ brew "ctags"          # Source code tagging
 brew "gnupg"          # GPG suite for signing
 
 # Languages and package managers
-brew "asdf"           # Multiple runtime version manager
+brew "mise"          # Multi-language version manager
 brew "go"             # Go language
 brew "rust"           # Rust language
 brew "node"           # Node.js
@@ -156,4 +157,3 @@ cask "kindle"
 cask "zoom"
 
 # Remove outdated versions
-brew "cleanup" 

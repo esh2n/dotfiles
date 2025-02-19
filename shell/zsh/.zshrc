@@ -19,23 +19,23 @@ autoload -Uz add-zsh-hook
 autoload -Uz cdr
 autoload -Uz chpwd_recent_dirs
 
+# Initialize zoxide with better matching and no command aliases
+eval "$(zoxide init zsh --cmd cd --hook pwd)"
+
 # Source plugins configuration
-source $ZDOTDIR/plugins.zsh
+source "$ZDOTDIR/plugins.zsh"
 
 # Source aliases
-source $ZDOTDIR/aliases.zsh
+source "$ZDOTDIR/aliases.zsh"
 
 # Source functions
-source $ZDOTDIR/functions.zsh
+source "$ZDOTDIR/functions.zsh"
 
 # Source options
-source $ZDOTDIR/options.zsh
+source "$ZDOTDIR/options.zsh"
 
 # Initialize starship prompt
 eval "$(starship init zsh)"
-
-# Initialize zoxide
-eval "$(zoxide init zsh)"
 
 # Load local config if exists
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
@@ -45,4 +45,15 @@ if [ -f "$HOME/.dotfiles/.env" ]; then
   set -a
   source "$HOME/.dotfiles/.env"
   set +a
-fi 
+fi
+
+# Load configurations
+source "$ZDOTDIR/options.zsh"
+source "$ZDOTDIR/plugins.zsh"
+source "$ZDOTDIR/prompt.zsh"
+source "$ZDOTDIR/aliases.zsh"
+source "$ZDOTDIR/functions.zsh"
+source "$ZDOTDIR/brew.zsh"
+
+# Initialize mise
+eval "$(mise activate zsh)" 

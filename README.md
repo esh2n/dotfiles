@@ -1,7 +1,8 @@
 # dotfiles
 
+My personal dotfiles for macOS development environment. This repository contains configuration files for various tools and applications I use daily.
 
-## インストール
+## Installation
 
 ```bash
 git clone https://github.com/esh2n/dotfiles.git ~/.dotfiles
@@ -10,27 +11,27 @@ chmod +x install.sh
 ./install.sh
 ```
 
-## 環境変数の設定
+## Environment Variables
 
-1. `.env.example`をコピーして`.env`ファイルを作成
+1. Create `.env` file by copying `.env.example`
 ```bash
 cp .env.example .env
 ```
 
-2. `.env`ファイルを編集して必要な環境変数を設定
+2. Edit `.env` file with your environment variables
 ```bash
 # WeatherAPI (WezTerm)
-OPENWEATHER_API_KEY=your_api_key_here  # OpenWeatherMap APIキーを設定
+OPENWEATHER_API_KEY=your_api_key_here  # Set your OpenWeatherMap API key
 ```
 
-3. 環境変数を反映するために以下のコマンドを実行
+3. Apply environment variables by running
 ```bash
 source ~/.zshrc
 ```
 
-> 注意: 環境変数は`.zshrc`を通じて読み込まれます。新しい環境変数を追加した場合は、`source ~/.zshrc`を実行するか、ターミナルを再起動してください。
+> Note: Environment variables are loaded through `.zshrc`. When adding new environment variables, run `source ~/.zshrc` or restart your terminal.
 
-## 構成
+## Components
 
 - Shell (Zsh)
 - Neovim
@@ -46,9 +47,9 @@ source ~/.zshrc
 - Proto Tools
 - Starship
 
-## パッケージマネージャー
+## Package Managers
 
-以下のパッケージマネージャーを使用しています：
+The following package managers are used:
 
 - Homebrew
 - Go
@@ -56,24 +57,35 @@ source ~/.zshrc
 - RubyGems
 - npm
 
-## ディレクトリ構造
+## Directory Structure
 
 ```
 .
 ├── README.md
 ├── install.sh
-├── shell/
-│   └── zsh/
-├── config/
-│   ├── nvim/
-│   ├── wezterm/
-│   ├── helix/
+├── shell/          # Shell configurations
+│   └── zsh/        # Zsh specific configurations
+├── config/         # Application configurations
+│   ├── nvim/       # Neovim configuration
+│   ├── wezterm/    # WezTerm configuration
+│   ├── helix/      # Helix editor configuration
 │   └── ...
-├── git/
-└── packages/
+├── git/            # Git configurations
+└── packages/       # Package management files
 ```
 
-## ライセンス
+## Features
+
+- Modern terminal setup with WezTerm and Tmux
+- Powerful text editing with Neovim, Helix, and VSCode
+- Efficient shell environment with Zsh and Starship prompt
+- Comprehensive Git configuration and aliases
+- Productivity tools integration (Raycast, etc.)
+- Automated setup and installation process
+- Environment variable management
+- Cross-platform compatibility (primarily macOS focused)
+
+## License
 
 MIT
 

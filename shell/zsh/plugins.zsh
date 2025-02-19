@@ -40,4 +40,8 @@ zinit wait lucid for \
 # Additional completion settings
 fpath=(~/.zsh/completion $fpath)
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
-zinit cdreplay -q 
+zinit cdreplay -q
+
+# Skim settings
+export SKIM_DEFAULT_COMMAND="fd --type f"
+export SKIM_DEFAULT_OPTIONS="--height 50% --reverse --ansi" 

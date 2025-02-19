@@ -45,19 +45,13 @@ function zle-line-init zle-keymap-select {
 
 # Fuzzy finder functions
 function sk_select_history() {
-  local tac
-  if which tac > /dev/null; then
-    tac="tac"
-  else
-    tac="tail -r"
-  fi
-  BUFFER=$(fc -l -n 1 | eval $tac | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+  BUFFER=$(history -n -r 1 | sk --ansi --reverse --height '50%' --query "$LBUFFER")
   CURSOR=$#BUFFER
   zle clear-screen
 }
 
 function sk_select_src () {
-  local selected_dir=$(pacifica | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+  local selected_dir=$(ghq list -p | sk --ansi --reverse --height '50%' --query "$LBUFFER")
   if [ -n "$selected_dir" ]; then
     BUFFER="cd ${selected_dir}"
     zle accept-line
@@ -192,3 +186,41 @@ function gx() {
   gcloud-activate "${name}" "${project}"
 }
 compdef gx-complete gx
+
+# Bind keys for fuzzy finder
+zle -N sk_select_history
+bindkey '^r' sk_select_history
+zle -N sk_select_src
+bindkey '^]' sk_select_src
+zle -N sk_change_directory
+bindkey '^g' sk_change_directory
+
+# Enhanced search functions
+function search_in_files() {
+  local query="$1"
+  if [ -z "$query" ]; then
+    echo "Usage: search_in_files <query>"
+    return 1
+  fi
+  rg --color=always --line-number --no-heading --smart-case "$query" | \
+    sk --ansi --reverse --height '50%' --preview 'echo {}' \
+    --preview-window 'up,60%,border-bottom,+{2}+3/3,~3'
+}
+
+function preview_file() {
+  local file="$1"
+  if [ -z "$file" ]; then
+    echo "Usage: preview_file <file>"
+    return 1
+  fi
+  bat --style=numbers --color=always "$file"
+}
+
+function search_and_edit() {
+  local result=$(search_in_files "$1")
+  if [ -n "$result" ]; then
+    local file=$(echo "$result" | cut -d':' -f1)
+    local line=$(echo "$result" | cut -d':' -f2)
+    nvim "+$line" "$file"
+  fi
+}

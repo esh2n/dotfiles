@@ -141,3 +141,9 @@ alias cdd="cd $DOTFILES_PATH"
 alias curl_header='curl -D - -s -o /dev/null'
 alias date='gdate'
 alias zeinit='zellij --layout ~/.config/zellij/layout_file.yaml'
+
+# Enhanced grep and cat
+alias rg='rg --smart-case'
+alias rgf='rg --files | rg'
+alias cat='bat --style=plain --paging=never'
+alias less='bat --style=plain'
