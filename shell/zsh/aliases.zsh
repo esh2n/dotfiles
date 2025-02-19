@@ -1,6 +1,6 @@
 # Shell
 alias rs='exec $SHELL -l && source ~/.zshrc'
-alias sz='source ~/.zshrc'
+alias sz='source ~/.zshenv && source ~/.zshrc && echo "🔄 Reloaded shell configurations"'
 alias tc='tmux source ~/.tmux.conf'
 
 # Editors

@@ -21,6 +21,7 @@ path=(
     /opt/homebrew/sbin
     /opt/homebrew/opt/libpq/bin
     /Applications/WezTerm.app/Contents/MacOS
+    $HOME/.cargo/bin
     $PNPM_HOME
     $path
 )
