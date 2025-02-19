@@ -30,7 +30,7 @@ function M.apply_to_config(config)
                 source = {
                     File = bg_image,
                 },
-                opacity = 0.2,
+                opacity = 0.1,
                 hsb = {
                     brightness = 0.1,
                 },
