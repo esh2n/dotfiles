@@ -3,8 +3,8 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# Source all zsh config files
-for config_file ($ZDOTDIR/*.zsh) source $config_file
+# Set ZDOTDIR to the dotfiles directory
+ZDOTDIR="$HOME/.zsh"
 
 # Initialize zinit
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
@@ -22,17 +22,13 @@ autoload -Uz chpwd_recent_dirs
 # Initialize zoxide with better matching and no command aliases
 eval "$(zoxide init zsh --cmd cd --hook pwd)"
 
-# Source plugins configuration
-source "$ZDOTDIR/plugins.zsh"
-
-# Source aliases
-source "$ZDOTDIR/aliases.zsh"
-
-# Source functions
-source "$ZDOTDIR/functions.zsh"
-
-# Source options
+# Load configurations
 source "$ZDOTDIR/options.zsh"
+source "$ZDOTDIR/plugins.zsh"
+source "$ZDOTDIR/prompt.zsh"
+source "$ZDOTDIR/aliases.zsh"
+source "$ZDOTDIR/functions.zsh"
+source "$ZDOTDIR/brew.zsh"
 
 # Initialize starship prompt
 eval "$(starship init zsh)"
@@ -46,14 +42,6 @@ if [ -f "$HOME/.dotfiles/.env" ]; then
   source "$HOME/.dotfiles/.env"
   set +a
 fi
-
-# Load configurations
-source "$ZDOTDIR/options.zsh"
-source "$ZDOTDIR/plugins.zsh"
-source "$ZDOTDIR/prompt.zsh"
-source "$ZDOTDIR/aliases.zsh"
-source "$ZDOTDIR/functions.zsh"
-source "$ZDOTDIR/brew.zsh"
 
 # Initialize mise
 eval "$(mise activate zsh)" 

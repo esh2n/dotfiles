@@ -4,7 +4,6 @@ tap "homebrew/cask-drivers"
 tap "homebrew/cask-fonts"
 tap "github/gh"
 tap "oven-sh/bun"    # For bun installation
-tap "mise-en-place/mise"  # For mise installation
 
 # Core utilities
 brew "coreutils"      # GNU core utilities
@@ -27,7 +26,7 @@ brew "starship"       # Cross-shell prompt
 brew "zellij"         # Modern terminal multiplexer
 
 # CLI tools
-brew "skim"           # Fuzzy finder (Rust alternative to peco)
+brew "sk"             # Fuzzy finder (Rust alternative to peco)
 brew "fzf"            # Fuzzy finder
 brew "ghq"            # Remote repository management
 brew "eza"            # Modern replacement for ls
@@ -52,15 +51,6 @@ brew "ctags"          # Source code tagging
 brew "gnupg"          # GPG suite for signing
 
 # Languages and package managers
-brew "mise"          # Multi-language version manager
-brew "go"             # Go language
-brew "rust"           # Rust language
-brew "node"           # Node.js
-brew "bun"            # JavaScript runtime and toolkit
-brew "deno"           # JavaScript/TypeScript runtime
-brew "python@3.12"    # Python (latest)
-brew "ruby"           # Ruby language
-brew "lua"            # Lua language
 
 # Container and cloud tools
 brew "docker"         # Container platform
@@ -87,18 +77,14 @@ brew "ffmpeg"         # Multimedia framework
 brew "plantuml"       # Diagram tool
 
 # Font tools
-tap "bramstein/webfonttools"
-brew "sfnt2woff"
-brew "sfnt2woff-zopfli"
-brew "woff2"
-brew "font-jetbrains-mono-nerd-font"
-brew "font-hack-nerd-font"
-
-# Casks
+tap "homebrew/cask-fonts"  # フォント用のtapを明示的に追加
+cask "font-jetbrains-mono-nerd-font"  # brewではなくcaskとして指定
+cask "font-hack-nerd-font"            # brewではなくcaskとして指定
 cask "font-hackgen"           # 白源フォント
 cask "font-hackgen-nerd"      # 白源フォント（Nerd Fonts版）
+
+# Casks
 cask "font-jetbrains-mono"
-cask "font-jetbrains-mono-nerd-font"
 cask "ngrok"          # Tunnel tool
 
 # Development Tools
@@ -153,7 +139,6 @@ cask "displaylink"    # 外部ディスプレイ管理
 cask "cloudflare-warp"    # Fast & secure VPN with 1.1.1.1 DNS
 
 # Optional
-cask "kindle"
 cask "zoom"
 
 # Remove outdated versions

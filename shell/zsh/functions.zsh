@@ -51,7 +51,7 @@ function sk_select_history() {
 }
 
 function sk_select_src () {
-  local selected_dir=$(ghq list -p | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+  local selected_dir=$(pacifica | sk --ansi --reverse --height '50%' --query "$LBUFFER")
   if [ -n "$selected_dir" ]; then
     BUFFER="cd ${selected_dir}"
     zle accept-line
@@ -82,7 +82,7 @@ function sk_select_file_below_pwd() {
 }
 
 function sk_select_file_within_project() {
-  local base_path=$(pwd | grep -o "$(ghq list -p)")
+  local base_path=$(pwd | grep -o "$(pacifica)")
   if [ -z $base_path ]; then
     echo "you are not in ghq project"
     zle accept-line

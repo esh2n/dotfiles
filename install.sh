@@ -45,7 +45,15 @@ create_symlinks() {
     backup_existing_config "$HOME/.config/fish/completions"
     
     # Zsh
+    if [ -L "$HOME/.zsh" ]; then
+        rm "$HOME/.zsh"
+    fi
     mkdir -p "$HOME/.zsh"
+    # Ensure the directory exists before creating symlinks
+    if [ ! -d "$HOME/.zsh" ]; then
+        echo "Failed to create .zsh directory. Please check permissions."
+        exit 1
+    fi
     ln -sf "$DOTFILES_DIR/shell/zsh/.zshrc" "$HOME/.zshrc"
     ln -sf "$DOTFILES_DIR/shell/zsh/.zshenv" "$HOME/.zshenv"
     ln -sf "$DOTFILES_DIR/shell/zsh/.zprofile" "$HOME/.zprofile"
