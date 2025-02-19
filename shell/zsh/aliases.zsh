@@ -34,19 +34,19 @@ alias ac='aicommits'
 alias gb='git branch'
 alias gsw='git switch'
 alias gchb='git checkout -b'
-alias gch='peco_select_branch_except_current | xargs -t git checkout'
-alias gbd='peco_select_local_branch_except_current | xargs -t git branch -D'
-alias gpuso='peco_select_branch_all | xargs -t git push origin'
-alias gPuso='peco_select_branch_all | xargs -t git push -f origin'
-alias gpulo='peco_select_branch_all | xargs -t git pull origin'
-alias gme='peco_select_branch_except_current  | xargs -t git merge --no-ff --edit'
-alias gmesq='peco_select_branch_except_current  | xargs -t git merge --squash'
+alias gch='sk_select_branch_except_current | xargs -t git checkout'
+alias gbd='sk_select_local_branch_except_current | xargs -t git branch -D'
+alias gpuso='sk_select_branch_all | xargs -t git push origin'
+alias gPuso='sk_select_branch_all | xargs -t git push -f origin'
+alias gpulo='sk_select_branch_all | xargs -t git pull origin'
+alias gme='sk_select_branch_except_current  | xargs -t git merge --no-ff --edit'
+alias gmesq='sk_select_branch_except_current  | xargs -t git merge --squash'
 alias gmeabo='git merge --abort'
-alias gpr='peco_select_branch_except_current | xargs -t gh pr create -w -B'
+alias gpr='sk_select_branch_except_current | xargs -t gh pr create -w -B'
 
 # Git status and log
 alias gg='git grep'
-alias glo="peco_select_branch_all | xargs -t -I {} git log {}.. --graph --abbrev-commit --decorate --date=relative --format=format:'%C(red)%h%C(r) —— %C(bold blue)%an%C(r): %C(white)%s%C(r) %C(dim white) %C(bold green)(%ar)%C(r) %C(bold yellow)%d%C(r)'"
+alias glo="sk_select_branch_all | xargs -t -I {} git log {}.. --graph --abbrev-commit --decorate --date=relative --format=format:'%C(red)%h%C(r) —— %C(bold blue)%an%C(r): %C(white)%s%C(r) %C(dim white) %C(bold green)(%ar)%C(r) %C(bold yellow)%d%C(r)'"
 alias gtr="git log --graph --abbrev-commit --decorate --date=relative --format=format:'%C(red)%h%C(r) —— %C(bold blue)%an%C(r): %C(white)%s%C(r) %C(dim white) %C(bold green)(%ar)%C(r) %C(bold yellow)%d%C(r)' --all"
 alias gs='git status -sb'
 
@@ -80,12 +80,12 @@ alias gst='git stash'
 alias grn='git branch -m'
 alias grmi='rm -rf .git/index.lock .git/COMMIT_EDITMSG'
 
-# Peco & Ghq
+# Skim & Ghq
 alias fast_ghl='find $(ghq root)/*/*/* -type d -prune | sed -e "s#"$(ghq root)"/##"'
-alias vv='peco_edit_file'
-alias c='peco_change_directory'
-alias b='peco_select_file_below_pwd'
-alias ghl='cd $(ghq root)/$(fast_ghl | peco)'
+alias vv='sk_edit_file'
+alias c='sk_change_directory'
+alias b='sk_select_file_below_pwd'
+alias ghl='cd $(ghq root)/$(fast_ghl | sk)'
 alias memo='vim $(ghq root)/github.com/esh2n/playground/notes/$(date "+%Y_%m_%d").md'
 
 # Fasd
