@@ -82,18 +82,18 @@ function sk_select_file_below_pwd() {
 }
 
 function sk_select_file_within_project() {
-  local base_path=$(pwd | grep -o "$(pacifica)")
-  if [ -z $base_path ]; then
+  local base_path=$(pwd | grep -o "$(ghq root)/[^/]*/[^/]*/[^/]*")
+  if [ -z "$base_path" ]; then
     echo "you are not in ghq project"
     zle accept-line
     return 0
   fi
   local paths="\
     $(fd --type f --hidden --exclude .git --exclude node_modules --exclude vendor . "$base_path")"
-  local selected_path="$(echo "(root)\n$paths" | sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {}')"
+  local selected_path="$(echo "(root)\n$paths" | sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {} 2>/dev/null || echo "Preview not available"')"
   if [ -n "$selected_path" ]; then
     if [[ "$selected_path" = "(root)" ]]; then
-      go_to $base_path
+      go_to "$base_path"
       return 0
     fi
     go_to "$selected_path"
