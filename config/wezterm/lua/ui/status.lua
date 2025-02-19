@@ -13,9 +13,76 @@ local COLORS = {
     green = "#a6e3a1",   -- バッテリー
     mauve = "#cba6f7",   -- 時刻
     yellow = "#f9e2af",  -- ネットワーク
+    peach = "#fab387",   -- 気圧
     surface0 = "#313244",
     base = "#1e1e2e",
 }
+
+-- ウィンドウ幅に基づいて表示する要素を決定
+local function get_elements_by_width(window, weather_info, pressure_info, earthquake_info, network_info, battery, time)
+    local width = window:get_dimensions().pixel_width
+    local separator = "   "
+    local C = colors.get_colors()
+    local elements = {}
+
+    -- 左パディング
+    table.insert(elements, {Background = {Color = C.base}})
+    table.insert(elements, {Text = " "})
+
+    if width > 1200 then
+        -- フル表示
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.blue}})
+        table.insert(elements, {Attribute = {Intensity = "Bold"}})
+        table.insert(elements, {Text = weather_info .. separator})
+
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.peach}})
+        table.insert(elements, {Attribute = {Intensity = "Bold"}})
+        table.insert(elements, {Text = pressure_info .. separator})
+
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.red}})
+        table.insert(elements, {Attribute = {Intensity = "Bold"}})
+        table.insert(elements, {Text = earthquake_info .. separator})
+
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.yellow}})
+        table.insert(elements, {Attribute = {Intensity = "Bold"}})
+        table.insert(elements, {Text = network_info .. separator})
+
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.green}})
+        table.insert(elements, {Text = battery .. separator})
+    elseif width > 800 then
+        -- 中程度の表示（天気、気圧、バッテリー、時計）
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.blue}})
+        table.insert(elements, {Attribute = {Intensity = "Bold"}})
+        table.insert(elements, {Text = weather_info .. separator})
+
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.peach}})
+        table.insert(elements, {Attribute = {Intensity = "Bold"}})
+        table.insert(elements, {Text = pressure_info .. separator})
+
+        table.insert(elements, {Background = {Color = C.base}})
+        table.insert(elements, {Foreground = {Color = C.green}})
+        table.insert(elements, {Text = battery .. separator})
+    end
+
+    -- 時刻（常に表示）
+    table.insert(elements, {Background = {Color = C.base}})
+    table.insert(elements, {Foreground = {Color = C.mauve}})
+    table.insert(elements, {Attribute = {Intensity = "Bold"}})
+    table.insert(elements, {Text = time})
+
+    -- 右パディング
+    table.insert(elements, {Background = {Color = C.base}})
+    table.insert(elements, {Text = " "})
+
+    return elements
+end
 
 function M.apply_to_config(config)
     -- ステータスバーの更新間隔（秒）
@@ -37,8 +104,8 @@ function M.apply_to_config(config)
             battery = string.format('%s %d%%', battery_icon, b.state_of_charge * 100)
         end
 
-        -- 天気情報
-        local weather_info = weather.get_weather()
+        -- 天気情報と気圧情報
+        local weather_info, pressure_info = weather.get_weather()
         
         -- 地震情報
         local earthquake_info = earthquake.get_earthquake()
@@ -46,49 +113,8 @@ function M.apply_to_config(config)
         -- ネットワーク情報
         local network_info = network.get_network_info()
 
-        -- セパレータ
-        local separator = "   "  -- スペースを広めに
-        local C = colors.get_colors()
-
-        -- ステータスバーのスタイル
-        local elements = {
-            -- 左パディング
-            {Background = {Color = C.base}},
-            {Text = " "},
-
-            -- 天気情報
-            {Background = {Color = C.base}},
-            {Foreground = {Color = C.blue}},
-            {Attribute = {Intensity = "Bold"}},
-            {Text = weather_info .. separator},
-
-            -- 地震情報
-            {Background = {Color = C.base}},
-            {Foreground = {Color = C.red}},
-            {Attribute = {Intensity = "Bold"}},
-            {Text = earthquake_info .. separator},
-
-            -- ネットワーク情報
-            {Background = {Color = C.base}},
-            {Foreground = {Color = C.yellow}},
-            {Attribute = {Intensity = "Bold"}},
-            {Text = network_info .. separator},
-
-            -- バッテリー情報
-            {Background = {Color = C.base}},
-            {Foreground = {Color = C.green}},
-            {Text = battery .. separator},
-
-            -- 時刻
-            {Background = {Color = C.base}},
-            {Foreground = {Color = C.mauve}},
-            {Attribute = {Intensity = "Bold"}},
-            {Text = time},
-
-            -- 右パディング
-            {Background = {Color = C.base}},
-            {Text = " "},
-        }
+        -- ウィンドウ幅に基づいて要素を取得
+        local elements = get_elements_by_width(window, weather_info, pressure_info or "気圧N/A", earthquake_info, network_info, battery, time)
 
         -- ステータスバーを更新
         window:set_right_status(wezterm.format(elements))
