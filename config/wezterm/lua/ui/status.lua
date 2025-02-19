@@ -4,6 +4,7 @@ local earthquake = require('lua.ui.earthquake')
 local network = require('lua.ui.network')
 local colors = require('lua.ui.colors')
 local spotify = require('lua.ui.spotify')
+local calendar = require('lua.ui.calendar')
 
 local M = {}
 
@@ -16,12 +17,13 @@ local COLORS = {
     yellow = "#f9e2af",  -- ネットワーク
     peach = "#fab387",   -- 気圧
     lavender = "#b4befe", -- Spotify
+    teal = "#94e2d5",    -- カレンダー
     surface0 = "#313244",
     base = "#1e1e2e",
 }
 
 -- ウィンドウ幅に基づいて表示する要素を決定
-local function get_elements_by_width(window, weather_info, pressure_info, condition_info, sun_info, earthquake_info, network_info, battery, time, spotify_info)
+local function get_elements_by_width(window, weather_info, pressure_info, condition_info, sun_info, earthquake_info, network_info, battery, time, spotify_info, calendar_info)
     local width = window:get_dimensions().pixel_width
     local separator = "   "
     local C = colors.get_colors()
@@ -43,6 +45,14 @@ local function get_elements_by_width(window, weather_info, pressure_info, condit
         table.insert(elements, {Text = battery .. separator})
     else
         if width > 1500 then
+            -- カレンダー情報（もし次の予定があれば）
+            if calendar_info then
+                table.insert(elements, {Background = {Color = C.base}})
+                table.insert(elements, {Foreground = {Color = COLORS.teal}})
+                table.insert(elements, {Attribute = {Intensity = "Bold"}})
+                table.insert(elements, {Text = calendar_info .. separator})
+            end
+
             -- Spotify情報（もし再生中なら）
             if spotify_info then
                 table.insert(elements, {Background = {Color = C.base}})
@@ -86,6 +96,14 @@ local function get_elements_by_width(window, weather_info, pressure_info, condit
             table.insert(elements, {Foreground = {Color = C.green}})
             table.insert(elements, {Text = battery .. separator})
         elseif width > 1200 then
+            -- カレンダー情報（もし次の予定があれば）
+            if calendar_info then
+                table.insert(elements, {Background = {Color = C.base}})
+                table.insert(elements, {Foreground = {Color = COLORS.teal}})
+                table.insert(elements, {Attribute = {Intensity = "Bold"}})
+                table.insert(elements, {Text = calendar_info .. separator})
+            end
+
             -- Spotify情報（もし再生中なら）
             if spotify_info then
                 table.insert(elements, {Background = {Color = C.base}})
@@ -184,6 +202,9 @@ function M.apply_to_config(config)
         -- Spotify情報
         local spotify_info = spotify.get_spotify()
 
+        -- カレンダー情報
+        local calendar_info = calendar.get_next_event()
+
         -- ウィンドウ幅に基づいて要素を取得
         local elements = get_elements_by_width(
             window,
@@ -195,7 +216,8 @@ function M.apply_to_config(config)
             network_info,
             battery,
             time,
-            spotify_info
+            spotify_info,
+            calendar_info
         )
 
         -- ステータスバーを更新
