@@ -46,7 +46,7 @@ function M.apply_to_config(config)
         selection_fg = COLORS.base,
         selection_bg = COLORS.rosewater,
         scrollbar_thumb = COLORS.surface2,
-        split = COLORS.overlay0,
+        split = COLORS.mantle,
         ansi = {
             COLORS.surface1,
             COLORS.red,

@@ -25,6 +25,38 @@ config.webgpu_power_preference = "HighPerformance"
 config.animation_fps = 60
 config.max_fps = 60
 
+-- ウィンドウフレームの設定
+config.window_background_opacity = 0.95
+config.window_decorations = "RESIZE"
+config.window_frame = {
+    font = wezterm.font { family = 'Hack Nerd Font', weight = 'Bold' },
+    font_size = 12.0,
+    active_titlebar_bg = colors.get_colors().mantle,
+    inactive_titlebar_bg = colors.get_colors().surface0,
+    border_left_width = '2cell',
+    border_right_width = '2cell',
+    border_bottom_height = '0cell',
+    border_top_height = '1cell',
+    border_left_color = colors.get_colors().mantle,
+    border_right_color = colors.get_colors().mantle,
+    border_bottom_color = colors.get_colors().mantle,
+    border_top_color = colors.get_colors().mantle,
+}
+
+-- 外側のパディング設定
+config.window_padding = {
+    left = "2.5cell",
+    right = "2.5cell",
+    top = "0",
+    bottom = "0",
+}
+
+-- パネルボーダーの設定
+config.inactive_pane_hsb = {
+    saturation = 0.9,
+    brightness = 0.8,
+}
+
 -- デバッグ設定
 config.debug_key_events = false
 

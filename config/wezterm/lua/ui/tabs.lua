@@ -57,6 +57,11 @@ function M.apply_to_config(config)
         
         -- タブのフォーマット
         return {
+            -- 左パディング
+            { Background = { Color = edge_background } },
+            { Text = "     " },  -- 約1.25cellに相当する空白
+
+            -- タブの内容
             { Background = { Color = edge_background } },
             { Foreground = { Color = edge_foreground } },
             { Text = edge_char },
