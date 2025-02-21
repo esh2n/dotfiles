@@ -19,4 +19,28 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 -- プラグインの読み込み
-require('plugins') 
+require("lazy").setup("plugins", {
+  defaults = {
+    lazy = false,
+  },
+  install = {
+    colorscheme = { "catppuccin" },
+  },
+  change_detection = {
+    notify = false,
+  },
+  performance = {
+    rtp = {
+      disabled_plugins = {
+        "gzip",
+        "matchit",
+        "matchparen",
+        "netrwPlugin",
+        "tarPlugin",
+        "tohtml",
+        "tutor",
+        "zipPlugin",
+      },
+    },
+  },
+}) 

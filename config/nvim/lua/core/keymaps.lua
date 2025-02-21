@@ -1,35 +1,72 @@
-local keymap = vim.keymap
+-- キーマップのエイリアス設定
+local keymap = vim.keymap.set
+local opts = { noremap = true, silent = true }
 
 -- Leader keyの設定
 vim.g.mapleader = " "
 
 -- 一般的なキーマップ
-keymap.set('n', '<leader>w', ':w<CR>', { desc = 'Save file' })
-keymap.set('n', '<leader>q', ':q<CR>', { desc = 'Quit' })
-keymap.set('n', '<leader>h', ':nohlsearch<CR>', { desc = 'Clear search highlight' })
+keymap("n", "<leader>w", ":w<CR>", opts)
+keymap("n", "<leader>q", ":q<CR>", opts)
+keymap("n", "<leader>h", ":nohlsearch<CR>", opts)
 
 -- ウィンドウ操作
-keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Move to left window' })
-keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Move to bottom window' })
-keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Move to top window' })
-keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Move to right window' })
+keymap("n", "<C-h>", "<C-w>h", opts)
+keymap("n", "<C-j>", "<C-w>j", opts)
+keymap("n", "<C-k>", "<C-w>k", opts)
+keymap("n", "<C-l>", "<C-w>l", opts)
 
 -- バッファ操作
-keymap.set('n', '<S-h>', ':bprevious<CR>', { desc = 'Previous buffer' })
-keymap.set('n', '<S-l>', ':bnext<CR>', { desc = 'Next buffer' })
-keymap.set('n', '<leader>c', ':bdelete<CR>', { desc = 'Close buffer' })
+keymap("n", "<S-h>", ":bprevious<CR>", opts)
+keymap("n", "<S-l>", ":bnext<CR>", opts)
+keymap("n", "<leader>c", ":bdelete<CR>", opts)
 
 -- インデント操作
-keymap.set('v', '<', '<gv', { desc = 'Unindent line' })
-keymap.set('v', '>', '>gv', { desc = 'Indent line' })
+keymap("v", "<", "<gv", opts)
+keymap("v", ">", ">gv", opts)
 
 -- 行移動
-keymap.set('n', '<A-j>', ':m .+1<CR>==', { desc = 'Move line down' })
-keymap.set('n', '<A-k>', ':m .-2<CR>==', { desc = 'Move line up' })
-keymap.set('i', '<A-j>', '<Esc>:m .+1<CR>==gi', { desc = 'Move line down' })
-keymap.set('i', '<A-k>', '<Esc>:m .-2<CR>==gi', { desc = 'Move line up' })
-keymap.set('v', '<A-j>', ":m '>+1<CR>gv=gv", { desc = 'Move line down' })
-keymap.set('v', '<A-k>', ":m '<-2<CR>gv=gv", { desc = 'Move line up' })
+keymap("n", "<A-j>", ":m .+1<CR>==", opts)
+keymap("n", "<A-k>", ":m .-2<CR>==", opts)
+keymap("i", "<A-j>", "<Esc>:m .+1<CR>==gi", opts)
+keymap("i", "<A-k>", "<Esc>:m .-2<CR>==gi", opts)
+keymap("v", "<A-j>", ":m '>+1<CR>gv=gv", opts)
+keymap("v", "<A-k>", ":m '<-2<CR>gv=gv", opts)
 
 -- ターミナルモード
-keymap.set('t', '<Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' }) 
+keymap("t", "<Esc>", "<C-\\><C-n>", opts)
+
+-- Telescope
+keymap("n", "<leader>ff", "<cmd>Telescope find_files<CR>", opts)
+keymap("n", "<leader>fg", "<cmd>Telescope live_grep<CR>", opts)
+keymap("n", "<leader>fb", "<cmd>Telescope buffers<CR>", opts)
+keymap("n", "<leader>fh", "<cmd>Telescope help_tags<CR>", opts)
+
+-- NvimTree
+keymap("n", "<leader>e", ":NvimTreeToggle<CR>", opts)
+
+-- LSP
+keymap("n", "gd", vim.lsp.buf.definition, opts)
+keymap("n", "K", vim.lsp.buf.hover, opts)
+keymap("n", "<leader>rn", vim.lsp.buf.rename, opts)
+keymap("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+keymap("n", "gr", vim.lsp.buf.references, opts)
+keymap("n", "[d", vim.diagnostic.goto_prev, opts)
+keymap("n", "]d", vim.diagnostic.goto_next, opts)
+
+-- Todo Comments
+keymap("n", "<leader>td", ":TodoTelescope<CR>", opts)
+
+-- Spectre (検索・置換)
+keymap("n", "<leader>S", "<cmd>lua require('spectre').open()<CR>", opts)
+
+-- Hop (モーション)
+keymap("n", "<leader>hw", "<cmd>HopWord<CR>", opts)
+keymap("n", "<leader>hl", "<cmd>HopLine<CR>", opts)
+
+-- CodeWindow (ミニマップ)
+keymap("n", "<leader>mm", ":lua require('codewindow').toggle_minimap()<CR>", opts)
+
+-- BufferLine
+keymap("n", "<leader>bp", ":BufferLinePick<CR>", opts)
+keymap("n", "<leader>bc", ":BufferLinePickClose<CR>", opts) 
