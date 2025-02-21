@@ -40,8 +40,14 @@ source "$ZDOTDIR/brew.zsh"
 # Initialize starship prompt
 eval "$(starship init zsh)"
 
+# Enable window borders
+$HOME/.config/borders/bordersrc &>/dev/null &
+
 # Load local config if exists
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # Initialize mise
-eval "$(mise activate zsh)" 
+eval "$(mise activate zsh)"
+
+# Load sketchybar config
+source "${ZDOTDIR}/sketchybar.zsh" 

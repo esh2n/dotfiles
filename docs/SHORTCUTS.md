@@ -120,3 +120,68 @@
 - macOSのショートカットキーに準拠（`Cmd`キーを使用）
 - Vimライクなキーバインド（hjkl移動など）
 - コピーモードでVimライクな操作が可能 
+
+# AeroSpace ショートカット一覧
+
+## 基本ウィンドウ操作
+
+| キー | 説明 | コマンド |
+|------|------|----------|
+| `Alt + h` | 左のウィンドウにフォーカス | `focus left` |
+| `Alt + j` | 下のウィンドウにフォーカス | `focus down` |
+| `Alt + k` | 上のウィンドウにフォーカス | `focus up` |
+| `Alt + l` | 右のウィンドウにフォーカス | `focus right` |
+
+## ウィンドウ移動
+
+| キー | 説明 | コマンド |
+|------|------|----------|
+| `Alt + Shift + h` | ウィンドウを左に移動 | `move left` |
+| `Alt + Shift + j` | ウィンドウを下に移動 | `move down` |
+| `Alt + Shift + k` | ウィンドウを上に移動 | `move up` |
+| `Alt + Shift + l` | ウィンドウを右に移動 | `move right` |
+
+## レイアウト管理
+
+| キー | 説明 | コマンド |
+|------|------|----------|
+| `Alt + /` | タイル型レイアウト | `layout tiles horizontal vertical` |
+| `Alt + ,` | アコーディオン型レイアウト | `layout accordion horizontal vertical` |
+
+## ウィンドウサイズ調整
+
+| キー | 説明 | コマンド |
+|------|------|----------|
+| `Alt + Shift + -` | ウィンドウサイズを縮小 | `resize smart -50` |
+| `Alt + Shift + =` | ウィンドウサイズを拡大 | `resize smart +50` |
+
+## ワークスペース管理
+
+| キー | 説明 | コマンド |
+|------|------|----------|
+| `Alt + Tab` | 前のワークスペースに戻る | `workspace-back-and-forth` |
+| `Alt + Shift + Tab` | ワークスペースを次のモニターに移動 | `move-workspace-to-monitor --wrap-around next` |
+
+## サービスモード
+
+| キー | 説明 | コマンド |
+|------|------|----------|
+| `Alt + Shift + ;` | サービスモードに入る | `mode service` |
+| `Esc` | 設定を再読み込みしてメインモードに戻る | `reload-config, mode main` |
+| `r` | レイアウトをリセットしてメインモードに戻る | `flatten-workspace-tree, mode main` |
+| `f` | フローティング/タイリングレイアウトを切り替え | `layout floating tiling, mode main` |
+| `backspace` | 現在のウィンドウ以外を閉じる | `close-all-windows-but-current, mode main` |
+
+## アプリケーション固有の設定
+
+| アプリケーション | 動作 | コマンド |
+|-----------------|------|----------|
+| Slack | ワークスペース'S'に自動移動 | `move-node-to-workspace S` |
+| Notion | ワークスペース'N'に自動移動 | `move-node-to-workspace N` |
+
+## 特徴
+- Vimライクなキーバインド（hjkl移動）
+- タイル型とアコーディオン型のレイアウトをサポート
+- マルチモニター対応
+- アプリケーション固有のワークスペース割り当て
+- サービスモードによる高度な操作 

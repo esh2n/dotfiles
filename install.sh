@@ -88,8 +88,11 @@ create_symlinks() {
     backup_existing_config "$HOME/.config/helix"
     backup_existing_config "$HOME/.config/starship.toml"
     backup_existing_config "$HOME/.config/mise/config.toml"
-    backup_existing_config "$HOME/.tmux.conf"
+    backup_existing_config "$HOME/.config/tmux.conf"
     backup_existing_config "$HOME/.tigrc"
+    backup_existing_config "$HOME/.config/aerospace"
+    backup_existing_config "$HOME/.config/borders"
+    backup_existing_config "$HOME/.config/sketchybar"
     
     ln -sf "$DOTFILES_DIR/config/nvim" "$HOME/.config/nvim"
     ln -sf "$DOTFILES_DIR/config/wezterm" "$HOME/.config/wezterm"
@@ -98,6 +101,9 @@ create_symlinks() {
     ln -sf "$DOTFILES_DIR/config/mise" "$HOME/.config/mise"
     ln -sf "$DOTFILES_DIR/config/tmux/tmux.conf" "$HOME/.tmux.conf"
     ln -sf "$DOTFILES_DIR/config/tig/.tigrc" "$HOME/.tigrc"
+    ln -sf "$DOTFILES_DIR/config/aerospace" "$HOME/.config/aerospace"
+    ln -sf "$DOTFILES_DIR/config/borders" "$HOME/.config/borders"
+    ln -sf "$DOTFILES_DIR/config/sketchybar" "$HOME/.config/sketchybar"
     
     # VSCode
     backup_existing_config "$HOME/Library/Application Support/Code/User/settings.json"
@@ -224,6 +230,49 @@ install_cursor_extensions() {
     fi
 }
 
+# Setup sketchybar
+setup_sketchybar() {
+    echo "Setting up sketchybar..."
+    
+    # Check if sketchybar is installed
+    if ! command -v sketchybar >/dev/null 2>&1; then
+        echo "Error: sketchybar is not installed. Please run brew bundle first."
+        return 1
+    fi
+    
+    # Install SbarLua
+    if [ ! -d "$HOME/.local/share/sketchybar_lua" ]; then
+        echo "Installing SbarLua..."
+        (git clone https://github.com/FelixKratz/SbarLua.git /tmp/SbarLua && cd /tmp/SbarLua/ && make install && rm -rf /tmp/SbarLua/) || {
+            echo "Error: Failed to install SbarLua"
+            return 1
+        }
+    fi
+
+    # Install sketchybar app font
+    if [ ! -f "$HOME/Library/Fonts/sketchybar-app-font.ttf" ]; then
+        echo "Installing sketchybar app font..."
+        curl -L https://github.com/kvndrsslr/sketchybar-app-font/releases/download/v2.0.28/sketchybar-app-font.ttf -o "$HOME/Library/Fonts/sketchybar-app-font.ttf" || {
+            echo "Error: Failed to download sketchybar app font"
+            return 1
+        }
+    fi
+
+    # Check screen recording permission
+    if ! tccutil query ScreenCapture com.felixkratz.sketchybar >/dev/null 2>&1; then
+        echo "Warning: sketchybar needs screen recording permission"
+        echo "Please enable it in System Settings > Privacy & Security > Screen Recording"
+        echo "After enabling the permission, run: brew services restart sketchybar"
+    else
+        # Restart sketchybar
+        echo "Restarting sketchybar..."
+        brew services restart sketchybar || {
+            echo "Error: Failed to restart sketchybar"
+            return 1
+        }
+    fi
+}
+
 main() {
     echo "This script will backup existing configurations and create new symlinks."
     echo "Your existing configurations will be backed up to ~/.dotfiles_backup/"
@@ -232,6 +281,7 @@ main() {
     echo "2. Install mise and required languages"
     echo "3. Install/update packages (Homebrew, Rust, Go, Ruby, NPM)"
     echo "4. Install VSCode/Cursor extensions"
+    echo "5. Setup sketchybar"
     
     read -p "Do you want to continue? (y/N) " -n 1 -r
     echo
@@ -246,8 +296,10 @@ main() {
     install_packages
     install_vscode_extensions
     install_cursor_extensions
+    setup_sketchybar
     echo "Done! Please restart your shell to apply all changes."
     echo "Your old configurations have been backed up to ~/.dotfiles_backup/"
+    echo "Important: Don't forget to enable screen recording permission for sketchybar!"
 }
 
 main 

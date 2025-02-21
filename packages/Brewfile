@@ -4,6 +4,8 @@ tap "homebrew/cask-drivers"
 tap "homebrew/cask-fonts"
 tap "github/gh"
 tap "oven-sh/bun"    # For bun installation
+tap "nikitabobko/tap"    # For aerospace installation
+tap "FelixKratz/formulae"    # For borders and sketchybar installation
 
 # Core utilities
 brew "coreutils"      # GNU core utilities
@@ -40,6 +42,7 @@ brew "colordiff"      # Colorized diff
 brew "htop"           # Process viewer
 brew "git-delta"      # Syntax-highlighting pager for git
 brew "ical-buddy"     # Calendar command line tool
+brew "loop"           # UNIX's missing loop command
 
 # Development tools
 brew "git"            # Version control
@@ -50,6 +53,9 @@ brew "tig"            # Text-mode interface for git
 brew "helix"          # Modern text editor
 brew "ctags"          # Source code tagging
 brew "gnupg"          # GPG suite for signing
+brew "lua"            # Lua programming language
+brew "switchaudio-osx" # Audio device switcher
+brew "nowplaying-cli" # Now Playing CLI
 
 # Languages and package managers
 
@@ -83,6 +89,9 @@ cask "font-jetbrains-mono-nerd-font"  # brewではなくcaskとして指定
 cask "font-hack-nerd-font"            # brewではなくcaskとして指定
 cask "font-hackgen"           # 白源フォント
 cask "font-hackgen-nerd"      # 白源フォント（Nerd Fonts版）
+cask "sf-symbols"             # SF Symbols
+cask "font-sf-mono"           # SF Mono
+cask "font-sf-pro"            # SF Pro
 
 # Casks
 cask "font-jetbrains-mono"
@@ -118,6 +127,7 @@ cask "raycast"
 cask "1password"
 cask "alt-tab"
 cask "magnet"
+cask "aerospace"         # Tiling window manager (alternative to Magnet)
 cask "onedrive"
 cask "line"          # コミュニケーション
 cask "paste"         # クリップボード管理
@@ -136,6 +146,8 @@ cask "spotify"
 # System Tools
 cask "karabiner-elements"
 cask "utm"
+brew "borders"        # Window borders for macOS
+brew "sketchybar"     # Customizable menu bar replacement
 cask "displaylink"    # 外部ディスプレイ管理
 cask "cloudflare-warp"    # Fast & secure VPN with 1.1.1.1 DNS
 
