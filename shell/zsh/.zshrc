@@ -50,4 +50,4 @@ $HOME/.config/borders/bordersrc &>/dev/null &
 eval "$(mise activate zsh)"
 
 # Load sketchybar config
-source "${ZDOTDIR}/sketchybar.zsh" 
+source "$ZDOTDIR/sketchybar.zsh" 

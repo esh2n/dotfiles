@@ -63,6 +63,7 @@ create_symlinks() {
     ln -sf "$DOTFILES_DIR/shell/zsh/brew.zsh" "$HOME/.zsh/brew.zsh"
     ln -sf "$DOTFILES_DIR/shell/zsh/options.zsh" "$HOME/.zsh/options.zsh"
     ln -sf "$DOTFILES_DIR/shell/zsh/plugins.zsh" "$HOME/.zsh/plugins.zsh"
+    ln -sf "$DOTFILES_DIR/shell/zsh/sketchybar.zsh" "$HOME/.zsh/sketchybar.zsh"
     
     # Fish shell
     mkdir -p "$HOME/.config/fish"
