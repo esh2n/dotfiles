@@ -6,6 +6,7 @@ go = "latest"
 rust = "latest"
 bun = "latest"
 deno = "latest"
+dotnet = "8.0.406"
 
 [settings]
 experimental = false
@@ -19,4 +20,5 @@ GOBIN = "${GOPATH}/bin"
 CARGO_HOME = "${HOME}/.cargo"
 RUSTUP_HOME = "${HOME}/.rustup"
 DENO_INSTALL_ROOT = "${HOME}/.deno"
-BUN_INSTALL = "${HOME}/.bun" 
+DOTNET_ROOT = "${HOME}/.local/share/mise/installs/dotnet/8.0.406"
+BUN_INSTALL = "${HOME}/.bun"

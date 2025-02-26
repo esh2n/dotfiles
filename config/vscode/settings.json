@@ -3,9 +3,9 @@
   "editor.fontFamily": "Fira Code, Menlo, Monaco, 'Courier New', monospace",
   "editor.fontSize": 14,
   "editor.fontLigatures": true,
-  "editor.formatOnSave": false,
-  "editor.formatOnPaste": false,
-  "editor.formatOnType": false,
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
   "editor.guides.bracketPairs": true,
   "editor.suggestSelection": "first",
   "editor.wordWrap": "off",
@@ -152,5 +152,19 @@
     "**/.project": true,
     "**/.settings": true,
     "**/.factorypath": true
-  }
+  },
+  "roo-cline.allowedCommands": [
+    "npm test",
+    "npm install",
+    "tsc",
+    "git log",
+    "git diff",
+    "git show",
+    "npx",
+    "git",
+    "cd",
+    "mkdir",
+    "cat",
+    "gh"
+  ]
 } 
