@@ -91,6 +91,10 @@
     "editor.tabCompletion": "onlySnippets",
     "editor.wordBasedSuggestions": "off"
   },
+  "[csharp]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
 
   // 言語サーバー設定
   "go.formatTool": "goimports",
@@ -98,6 +102,14 @@
   "go.useLanguageServer": true,
   "rust-analyzer.checkOnSave": true,
   "rust-analyzer.check.command": "clippy",
+  // .NET/C#の言語サーバー設定
+  "dotnetAcquisitionExtension.existingDotnetPath": [
+    "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.406/dotnet"
+  ],
+  "omnisharp.useModernNet": true,
+  "omnisharp.path": "latest",
+  "dotnet.server.useOmnisharp": true,
+  "dotnet.server.path": "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.406/dotnet",
 
   // ESLint設定
   "eslint.validate": [
