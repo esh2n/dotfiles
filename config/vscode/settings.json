@@ -104,12 +104,18 @@
   "rust-analyzer.check.command": "clippy",
   // .NET/C#の言語サーバー設定
   "dotnetAcquisitionExtension.existingDotnetPath": [
-    "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.406/dotnet"
+    "/Users/esh2n/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14/dotnet"
   ],
-  "omnisharp.useModernNet": true,
-  "omnisharp.path": "latest",
-  "dotnet.server.useOmnisharp": true,
-  "dotnet.server.path": "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.406/dotnet",
+  "dotnet.server.useOmnisharp": false,
+  "csharp.semanticHighlighting.enabled": true,
+  "csharp.suppressDotnetRestoreNotification": false,
+  "csharp.suppressDotnetInstallWarning": false,
+  "csharp.suppressProjectJsonWarning": false,
+  "csharp.suppressBuildAssetsNotification": false,
+  "csharp.maxProjectFileCountForDiagnosticAnalysis": 1000,
+  "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "openFiles",
+  "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "openFiles",
+  "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
 
   // ESLint設定
   "eslint.validate": [

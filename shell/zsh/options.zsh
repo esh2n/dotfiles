@@ -88,3 +88,7 @@ fi
 # Additional paths
 export PACIFICA_PATH="/Users/esh2n/go"
 export PATH="/Users/esh2n/.rd/bin:$PATH" 
+
+# .NET SDK Path
+export DOTNET_ROOT="$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14"
+export PATH="$DOTNET_ROOT:$PATH" 
