@@ -163,31 +163,66 @@ function M.apply_to_config(config)
         local time = wezterm.strftime("%H:%M")
         
         -- バッテリー情報
-        local battery = ''
-        for _, b in ipairs(wezterm.battery_info()) do
+        local battery = '● N/A'  -- デフォルト値
+        local battery_info = wezterm.battery_info()
+        if battery_info and #battery_info > 0 then
+            local b = battery_info[1]  -- 最初のバッテリー情報を使用
             local battery_icon = '●'  -- シンプルな丸アイコン
             if b.state == 'Charging' then
                 battery_icon = '↑'  -- 充電中
             elseif b.state == 'Empty' then
                 battery_icon = '○'  -- 要充電
             end
-            battery = string.format('%s %d%%', battery_icon, b.state_of_charge * 100)
+            battery = string.format('%s %d%%', battery_icon, math.floor(b.state_of_charge * 100))
         end
 
         -- 天気情報と気圧情報
-        local weather_info, pressure_info, condition_info, sun_info = weather.get_weather()
+        local weather_info, pressure_info, condition_info, sun_info
+        local success_weather = pcall(function()
+            weather_info, pressure_info, condition_info, sun_info = weather.get_weather()
+        end)
+        if not success_weather then
+            weather_info = '🌡️ Error'
+            pressure_info = nil
+            condition_info = nil
+            sun_info = nil
+        end
         
         -- 地震情報
-        local earthquake_info = earthquake.get_earthquake()
+        local earthquake_info
+        local success_earthquake = pcall(function()
+            earthquake_info = earthquake.get_earthquake()
+        end)
+        if not success_earthquake then
+            earthquake_info = '◈ Error'
+        end
 
         -- ネットワーク情報
-        local network_info = network.get_network_info()
+        local network_info
+        local success_network = pcall(function()
+            network_info = network.get_network_info()
+        end)
+        if not success_network then
+            network_info = 'ⓛ Error'
+        end
 
         -- Spotify情報
-        local spotify_info = spotify.get_spotify()
+        local spotify_info
+        local success_spotify = pcall(function()
+            spotify_info = spotify.get_spotify()
+        end)
+        if not success_spotify then
+            spotify_info = nil
+        end
 
         -- カレンダー情報
-        local calendar_info = calendar.get_next_event()
+        local calendar_info
+        local success_calendar = pcall(function()
+            calendar_info = calendar.get_next_event()
+        end)
+        if not success_calendar then
+            calendar_info = nil
+        end
 
         -- ウィンドウ幅に基づいて要素を取得
         local elements = get_elements_by_width(
