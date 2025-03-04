@@ -224,3 +224,25 @@ function search_and_edit() {
     nvim "+$line" "$file"
   fi
 }
+
+# Zen Mode - Toggle sketchybar and borders
+ZEN_MODE_ACTIVE=0
+
+function toggle_zen_mode() {
+  if [ $ZEN_MODE_ACTIVE -eq 0 ]; then
+    # Turn on Zen mode (disable sketchybar and borders)
+    brew services stop sketchybar
+    brew services stop borders
+    ZEN_MODE_ACTIVE=1
+    echo "🧘 Zen Mode: ON - sketchybar and borders disabled"
+  else
+    # Turn off Zen mode (enable sketchybar and borders)
+    brew services start sketchybar
+    brew services start borders
+    ZEN_MODE_ACTIVE=0
+    echo "🖥️ Zen Mode: OFF - sketchybar and borders enabled"
+  fi
+}
+
+# Create alias for Zen mode
+alias zen='toggle_zen_mode'
