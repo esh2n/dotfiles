@@ -1,3 +1,6 @@
+# Amazon Q pre block. Keep at the top of this file.
+[[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh"
+
 # Load environment variables
 if [ -f "$HOME/go/github.com/esh2n/dotfiles/.env" ]; then
     set -a
@@ -50,4 +53,7 @@ $HOME/.config/borders/bordersrc &>/dev/null &
 eval "$(mise activate zsh)"
 
 # Load sketchybar config
-source "$ZDOTDIR/sketchybar.zsh" 
+source "$ZDOTDIR/sketchybar.zsh"
+
+# Amazon Q post block. Keep at the bottom of this file.
+[[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh"

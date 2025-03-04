@@ -186,5 +186,8 @@
     "mkdir",
     "cat",
     "gh"
-  ]
-} 
+  ],
+  "terminal.integrated.env.osx": {
+    "Q_NEW_SESSION": "1"
+  }
+}

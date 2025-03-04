@@ -50,6 +50,7 @@ brew "git-lfs"        # Git Large File Storage
 brew "gh"             # GitHub CLI
 brew "neovim"         # Modern vim
 brew "tig"            # Text-mode interface for git
+brew "lazygit"        # Simple terminal UI for git commands
 brew "helix"          # Modern text editor
 brew "ctags"          # Source code tagging
 brew "gnupg"          # GPG suite for signing
