@@ -1,19 +1,19 @@
 # <type>[(scope)]: <description>
 #
-# type:
-#   feat: 新機能
-#   fix: バグ修正
-#   docs: ドキュメントのみの変更
-#   style: コードの意味に影響を与えない変更（空白、フォーマット、セミコロンなど）
-#   refactor: バグ修正でも機能追加でもないコードの変更
-#   perf: パフォーマンスを向上させるコードの変更
-#   test: テストの追加・修正
-#   chore: ビルドプロセスやドキュメント生成などの補助ツールやライブラリの変更
+# 1. type:
+# feat:
+# fix:
+# docs:
+# style:
+# refactor:
+# perf:
+# test:
+# chore:
 #
-# scope:
+# 2. scope:
 #   任意の名前空間（例: component, config, model, view, etc.）
 #
-# description:
+# 3. description:
 #   変更内容の要約を命令形で記述
 #
 # オプション:

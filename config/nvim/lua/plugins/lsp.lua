@@ -11,21 +11,17 @@ return {
       require("mason-lspconfig").setup({
         ensure_installed = {
           -- Web
-          "typescript-language-server",  -- TypeScript
-          -- Go
-          "gopls",             -- Go
+          "ts_ls",  -- TypeScript
           -- Rust
           "rust_analyzer",      -- Rust
           -- Dart/Flutter
-          "dartls",            -- Dart
+          "ast_grep",          -- Dart
           -- C#
           "omnisharp",         -- C#
           -- C++
           "clangd",            -- C/C++
           -- Kotlin
           "kotlin_language_server", -- Kotlin
-          -- Swift
-          "sourcekit",         -- Swift
           -- Lua
           "lua_ls",            -- Lua
           -- Python
@@ -37,7 +33,7 @@ return {
       local lspconfig = require("lspconfig")
 
       -- TypeScript
-      lspconfig.typescript.setup({
+      lspconfig.ts_ls.setup({
         capabilities = capabilities,
         settings = {
           typescript = {
@@ -91,11 +87,6 @@ return {
         },
       })
 
-      -- Dart
-      lspconfig.dartls.setup({
-        capabilities = capabilities,
-      })
-
       -- C#
       lspconfig.omnisharp.setup({
         capabilities = capabilities,
@@ -111,8 +102,8 @@ return {
         capabilities = capabilities,
       })
 
-      -- Swift
-      lspconfig.sourcekit.setup({
+      -- Dart
+      lspconfig.ast_grep.setup({
         capabilities = capabilities,
       })
 
