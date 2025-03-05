@@ -43,6 +43,7 @@ brew "htop"           # Process viewer
 brew "git-delta"      # Syntax-highlighting pager for git
 brew "ical-buddy"     # Calendar command line tool
 brew "loop"           # UNIX's missing loop command
+brew "superfile"      # CLI file manager
 
 # Development tools
 brew "git"            # Version control
@@ -151,6 +152,7 @@ brew "borders"        # Window borders for macOS
 brew "sketchybar"     # Customizable menu bar replacement
 cask "displaylink"    # 外部ディスプレイ管理
 cask "cloudflare-warp"    # Fast & secure VPN with 1.1.1.1 DNS
+cask "marta"          # Native macOS file manager with Lua customization
 
 # Optional
 cask "zoom"
