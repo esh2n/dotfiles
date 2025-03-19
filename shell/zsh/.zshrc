@@ -43,8 +43,13 @@ source "$ZDOTDIR/brew.zsh"
 # Initialize starship prompt
 eval "$(starship init zsh)"
 
+# MARK: - Local Config
+
 # Enable window borders
-$HOME/.config/borders/bordersrc &>/dev/null &
+# $HOME/.config/borders/bordersrc &>/dev/null &
+
+# Load sketchybar config
+# source "$ZDOTDIR/sketchybar.zsh"
 
 # Load local config if exists
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
@@ -52,8 +57,11 @@ $HOME/.config/borders/bordersrc &>/dev/null &
 # Initialize mise
 eval "$(mise activate zsh)"
 
-# Load sketchybar config
-source "$ZDOTDIR/sketchybar.zsh"
-
 # Amazon Q post block. Keep at the bottom of this file.
 [[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh"
+
+# Initialize vscode shell integration
+[[ "$TERM_PROGRAM" == "vscode" ]] && . "$(code --locate-shell-integration-path zsh)"
+
+# Initialize cursor shell integration
+[[ "$TERM_PROGRAM" == "cursor" ]] && . "$(cursor --locate-shell-integration-path zsh)"

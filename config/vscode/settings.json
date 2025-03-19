@@ -189,5 +189,8 @@
   ],
   "terminal.integrated.env.osx": {
     "Q_NEW_SESSION": "1"
-  }
+  },
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "editor.accessibilitySupport": "on",
+  "editor.minimap.enabled": true
 }
