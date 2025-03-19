@@ -1,92 +1,122 @@
-# dotfiles
+# Cross-Platform Dotfiles
 
-My personal dotfiles for macOS development environment. This repository contains configuration files for various tools and applications I use daily.
-
-## Installation
-
-```bash
-git clone https://github.com/esh2n/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles
-chmod +x install.sh
-./install.sh
-```
-
-## Environment Variables
-
-1. Create `.env` file by copying `.env.example`
-```bash
-cp .env.example .env
-```
-
-2. Edit `.env` file with your environment variables
-```bash
-# WeatherAPI (WezTerm)
-OPENWEATHER_API_KEY=your_api_key_here  # Set your OpenWeatherMap API key
-```
-
-3. Apply environment variables by running
-```bash
-source ~/.zshrc
-```
-
-> Note: Environment variables are loaded through `.zshrc`. When adding new environment variables, run `source ~/.zshrc` or restart your terminal.
-
-## Components
-
-- Shell (Zsh)
-- Neovim
-- WezTerm
-- iTerm2
-- Git
-- Raycast
-- Helix
-- VSCode
-- Zed
-- Tmux
-- Tig
-- Proto Tools
-- Starship
-
-## Package Managers
-
-The following package managers are used:
-
-- Homebrew
-- Go
-- Cargo (Rust)
-- RubyGems
-- npm
-
-## Directory Structure
-
-```
-.
-├── README.md
-├── install.sh
-├── shell/          # Shell configurations
-│   └── zsh/        # Zsh specific configurations
-├── config/         # Application configurations
-│   ├── nvim/       # Neovim configuration
-│   ├── wezterm/    # WezTerm configuration
-│   ├── helix/      # Helix editor configuration
-│   └── ...
-├── git/            # Git configurations
-└── packages/       # Package management files
-```
+This repository contains my personal dotfiles configuration that works across macOS and Windows (via WSL2).
 
 ## Features
 
-- Modern terminal setup with WezTerm and Tmux
-- Powerful text editing with Neovim, Helix, and VSCode
-- Efficient shell environment with Zsh and Starship prompt
-- Comprehensive Git configuration and aliases
-- Productivity tools integration (Raycast, etc.)
-- Automated setup and installation process
-- Environment variable management
-- Cross-platform compatibility (primarily macOS focused)
+- Shell configurations (Zsh, Fish)
+- Neovim, WezTerm, and Helix configurations
+- Git configuration
+- Package management for various languages
+- VSCode/Cursor settings
+- Cross-platform compatibility (macOS, Linux, WSL)
+- Platform-specific optimizations (sketchybar for macOS, etc.)
 
-## License
+## Installation
 
-MIT
+### macOS
 
-[esh2n](https://github.com/esh2n) 
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/esh2n/dotfiles.git
+   cd dotfiles
+   ```
+
+2. Run the install script:
+   ```bash
+   ./install.sh
+   ```
+
+### Windows (via WSL2)
+
+1. Clone this repository to your Windows machine
+
+2. Run the Windows installation script as Administrator:
+   - Right-click on `install-windows.ps1`
+   - Select "Run with PowerShell as Administrator"
+   
+   This script will:
+   - Install WSL2
+   - Install Ubuntu distribution
+   - Set up your dotfiles inside WSL
+
+3. After installation, you can access your Linux environment by running "Ubuntu" from the Start menu
+
+## Components
+
+### Shell Setup
+
+- **Zsh**: Modern shell with plugins and customizations
+- **Fish**: User-friendly alternative shell with syntax highlighting and autosuggestions
+
+### Development Tools
+
+- **Neovim**: Modern, highly extensible text editor
+- **WezTerm**: GPU-accelerated cross-platform terminal emulator
+- **Helix**: Modal text editor with modern features
+- **Git**: Customized Git configuration with useful aliases and settings
+- **Tmux**: Terminal multiplexer configuration
+- **Tig**: Text-mode interface for Git
+
+### Language Support
+
+Uses [mise](https://github.com/jdx/mise) (formerly rtx) for managing:
+- Python
+- Ruby
+- Node.js
+- Go
+- Rust
+- Bun
+- Deno
+
+### macOS Specific
+
+- **sketchybar**: Highly customizable macOS status bar
+- **borders**: Window border enhancement
+- **aerospace**: Window management
+
+### Package Management
+
+- Homebrew packages (macOS/Linux)
+- Cargo (Rust) packages
+- Go packages
+- Gem (Ruby) packages
+- NPM packages
+
+## Platform-Specific Considerations
+
+### macOS
+
+- Includes configurations for macOS-specific tools like sketchybar
+- Uses Homebrew for package management
+- Configures macOS-specific paths for applications
+
+### Windows/WSL
+
+- Automatically sets up WSL2 environment
+- Installs essential Linux packages using apt
+- Configures proper paths for cross-platform compatibility
+- Skips macOS-specific configurations
+
+## Updating
+
+To update your dotfiles, pull the latest changes and run the install script again:
+
+```bash
+cd path/to/dotfiles
+git pull
+./install.sh
+```
+
+## Structure
+
+```
+dotfiles/
+├── config/            # Application configurations
+├── git/               # Git configuration
+├── packages/          # Package lists for various package managers
+├── shell/             # Shell configurations
+│   ├── fish/          # Fish shell config
+│   └── zsh/           # Zsh shell config
+├── install.sh         # Main installation script
+└── install-windows.ps1 # Windows/WSL installation script

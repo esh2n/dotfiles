@@ -1,0 +1,79 @@
+# Taps
+tap "homebrew/bundle"
+tap "github/gh"
+tap "oven-sh/bun"    # For bun installation
+
+# Core utilities
+brew "coreutils"      # GNU core utilities
+brew "moreutils"      # Additional Unix utilities
+brew "findutils"      # GNU find, locate, updatedb and xargs
+brew "gnu-sed"        # GNU sed
+brew "grep"           # GNU grep
+brew "less"           # Terminal pager
+brew "wget"           # File retrieval utility
+brew "curl"           # HTTP client
+brew "openssh"        # OpenSSH client
+brew "gmp"            # GNU Multiple Precision Arithmetic Library
+
+# Shell and terminal
+brew "zsh"            # Modern shell
+brew "zsh-completions"  # Additional completions for zsh
+brew "tmux"           # Terminal multiplexer
+brew "starship"       # Cross-shell prompt
+brew "zellij"         # Modern terminal multiplexer
+
+# CLI tools
+brew "sk"             # Fuzzy finder (Rust alternative to peco)
+brew "fzf"            # Fuzzy finder
+brew "ghq"            # Remote repository management
+brew "eza"            # Modern replacement for ls
+brew "fd"             # Simple, fast alternative to find
+brew "bat"            # Cat clone with syntax highlighting
+brew "ripgrep"        # Fast search tool
+brew "zoxide"         # Smarter cd command
+brew "jq"             # JSON processor
+brew "tree"           # Directory listing as tree
+brew "colordiff"      # Colorized diff
+brew "htop"           # Process viewer
+brew "git-delta"      # Syntax-highlighting pager for git
+brew "loop"           # UNIX's missing loop command
+
+# Development tools
+brew "git"            # Version control
+brew "git-lfs"        # Git Large File Storage
+brew "gh"             # GitHub CLI
+brew "neovim"         # Modern vim
+brew "tig"            # Text-mode interface for git
+brew "lazygit"        # Simple terminal UI for git commands
+brew "helix"          # Modern text editor
+brew "ctags"          # Source code tagging
+brew "gnupg"          # GPG suite for signing
+brew "lua"            # Lua programming language
+
+# Languages and package managers
+
+# Container and cloud tools
+brew "docker"         # Container platform
+brew "kubernetes-cli" # Kubernetes CLI
+brew "k9s"            # Kubernetes TUI
+brew "argocd"         # GitOps tool
+brew "awscli"         # AWS CLI
+
+# Database tools
+brew "mysql"          # MySQL database
+brew "redis"          # Redis database
+
+# Build tools and dependencies
+brew "cmake"          # Build system
+brew "autoconf"       # Automatic configure script builder
+brew "sccache"        # Compiler cache
+brew "protobuf"       # Protocol buffers
+brew "protoc-gen-go"  # Go protobuf generator
+brew "protoc-gen-go-grpc" # Go gRPC generator
+
+# Image and document processing
+brew "imagemagick"    # Image manipulation
+brew "ffmpeg"         # Multimedia framework
+brew "plantuml"       # Diagram tool
+
+# Remove outdated versions
