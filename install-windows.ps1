@@ -105,11 +105,73 @@ function Setup-Dotfiles {
     wsl -d Ubuntu bash -c "cd '$wslPath' && ./install.sh"
 }
 
+# Setup Windows native configurations
+function Setup-WindowsNativeConfig {
+    Write-Host "Setting up Windows native configurations..." -ForegroundColor Cyan
+    
+    $repoPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+    
+    # Create .config directory if it doesn't exist
+    $configDir = "$env:USERPROFILE\.config"
+    if (-not (Test-Path $configDir)) {
+        New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+        Write-Host "Created $configDir directory"
+    }
+    
+    # WezTerm configuration
+    $weztermDir = "$configDir\wezterm"
+    if (-not (Test-Path $weztermDir)) {
+        New-Item -Path $weztermDir -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item -Path "$repoPath\config\wezterm\*" -Destination $weztermDir -Recurse -Force
+    Write-Host "Configured WezTerm for Windows"
+    
+    # Neovim configuration
+    $nvimDir = "$configDir\nvim"
+    if (-not (Test-Path $nvimDir)) {
+        New-Item -Path $nvimDir -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item -Path "$repoPath\config\nvim\*" -Destination $nvimDir -Recurse -Force
+    Write-Host "Configured Neovim for Windows"
+    
+    # Starship configuration
+    Copy-Item -Path "$repoPath\config\starship\starship.toml" -Destination "$configDir\starship.toml" -Force
+    Write-Host "Configured Starship for Windows"
+    
+    # Git configuration
+    Copy-Item -Path "$repoPath\git\.gitconfig" -Destination "$env:USERPROFILE\.gitconfig" -Force
+    
+    $gitConfigDir = "$configDir\git"
+    if (-not (Test-Path $gitConfigDir)) {
+        New-Item -Path $gitConfigDir -ItemType Directory -Force | Out-Null
+    }
+    Copy-Item -Path "$repoPath\git\.gitignore_global" -Destination "$gitConfigDir\ignore" -Force
+    Copy-Item -Path "$repoPath\git\.gitmessage" -Destination "$gitConfigDir\message" -Force
+    Copy-Item -Path "$repoPath\git\.gitmessage.emoji" -Destination "$gitConfigDir\message.emoji" -Force
+    Copy-Item -Path "$repoPath\git\config.local" -Destination "$gitConfigDir\config.local" -Force
+    Copy-Item -Path "$repoPath\git\config.sub" -Destination "$gitConfigDir\config.sub" -Force
+    Write-Host "Configured Git for Windows"
+    
+    # VSCode/Cursor config if installed
+    $vscodePath = "$env:APPDATA\Code\User"
+    if (Test-Path $vscodePath) {
+        Copy-Item -Path "$repoPath\config\vscode\settings.json" -Destination "$vscodePath\settings.json" -Force
+        Write-Host "Configured VSCode for Windows"
+    }
+    
+    $cursorPath = "$env:APPDATA\Cursor\User"
+    if (Test-Path $cursorPath) {
+        Copy-Item -Path "$repoPath\config\vscode\settings.json" -Destination "$cursorPath\settings.json" -Force
+        Write-Host "Configured Cursor for Windows"
+    }
+}
+
 # Main execution
 Install-WSL
 Install-Ubuntu
 Setup-Dotfiles
+Setup-WindowsNativeConfig
 
 Write-Host "Windows dotfiles installation complete!" -ForegroundColor Green
-Write-Host "Your dotfiles have been configured in WSL."
-Write-Host "You can now use your dotfiles environment by launching WSL Ubuntu."
+Write-Host "Your dotfiles have been configured in WSL and Windows native environment."
+Write-Host "You can now use your dotfiles environment by launching WSL Ubuntu or directly using Windows applications."
