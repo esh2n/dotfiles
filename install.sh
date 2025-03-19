@@ -274,7 +274,6 @@ install_packages() {
             fd-find \
             fzf
     fi
-    fi
     
     # Cross-platform packages
     

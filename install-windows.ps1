@@ -12,6 +12,7 @@ Write-Host "This script will:"
 Write-Host "1. Install WSL2"
 Write-Host "2. Install Ubuntu distribution"
 Write-Host "3. Configure your dotfiles in WSL"
+Write-Host "4. Configure your dotfiles in Windows native environment"
 Write-Host ""
 
 $continue = Read-Host "Do you want to continue? (y/N)"
@@ -65,8 +66,8 @@ function Install-Ubuntu {
     Write-Host "Installing Ubuntu..." -ForegroundColor Cyan
     
     # Check if Ubuntu is already installed
-    $ubuntuCheck = wsl -l | Select-String "Ubuntu"
-    if ($ubuntuCheck) {
+    $wslList = wsl --list
+    if ($wslList -match "Ubuntu") {
         Write-Host "Ubuntu is already installed."
     } else {
         try {
