@@ -435,7 +435,19 @@ install_packages() {
     # Go packages
     if command -v go >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/packages/go.txt" ]; then
         echo "Installing Go packages..."
-        cat "$DOTFILES_DIR/packages/go.txt" | xargs -n 1 go install
+        # Make sure GOPATH is set with absolute path
+        export GOPATH="$HOME/go"
+        mkdir -p "$GOPATH"
+        echo "Using GOPATH: $GOPATH"
+        
+        while IFS= read -r line || [ -n "$line" ]; do
+            # Skip comment lines and empty lines
+            [[ $line =~ ^#.*$ ]] && continue
+            [[ -z $line ]] && continue
+            
+            echo "Installing Go package: $line"
+            go install "$line" || echo "Warning: Failed to install Go package: $line"
+        done < "$DOTFILES_DIR/packages/go.txt"
     fi
     
     # Ruby gems
