@@ -178,11 +178,22 @@ function M.apply_to_config(config)
 
         -- 天気情報と気圧情報
         local weather_info, pressure_info, condition_info, sun_info
-        local success_weather = pcall(function()
-            weather_info, pressure_info, condition_info, sun_info = weather.get_weather()
-        end)
-        if not success_weather then
-            weather_info = '🌡️ Error'
+        
+        -- Windowsでの互換性問題を回避するための対策
+        local weather_module_exists = pcall(function() return weather and type(weather.get_weather) == 'function' end)
+        
+        if weather_module_exists then
+            local success_weather = pcall(function()
+                weather_info, pressure_info, condition_info, sun_info = weather.get_weather()
+            end)
+            if not success_weather then
+                weather_info = '🌡️ 無効'
+                pressure_info = nil
+                condition_info = nil
+                sun_info = nil
+            end
+        else
+            weather_info = '🌡️ モジュール未対応'
             pressure_info = nil
             condition_info = nil
             sun_info = nil
