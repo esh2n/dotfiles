@@ -66,8 +66,10 @@ function Install-Ubuntu {
     Write-Host "Installing Ubuntu..." -ForegroundColor Cyan
     
     # Check if Ubuntu is already installed
-    $wslList = wsl --list
-    if ($wslList -match "Ubuntu") {
+    $wslOutput = (wsl --list) -join "`n"
+    Write-Host "Detected WSL distributions: $wslOutput" -ForegroundColor Yellow
+    
+    if ($wslOutput -like "*Ubuntu*") {
         Write-Host "Ubuntu is already installed."
     } else {
         try {
@@ -95,14 +97,28 @@ function Install-Ubuntu {
 function Setup-Dotfiles {
     Write-Host "Setting up dotfiles in WSL..." -ForegroundColor Cyan
     
-    $repoPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $repoName = Split-Path -Leaf $repoPath
+    # Get the current script directory more reliably
+    $scriptPath = $PSScriptRoot
+    if (-not $scriptPath) {
+        $scriptPath = Get-Location
+        Write-Host "Using current directory: $scriptPath" -ForegroundColor Yellow
+    }
+    
+    $repoName = Split-Path -Leaf $scriptPath
     
     # Create the WSL path to the dotfiles repository
-    $wslPath = "/mnt/c" + $repoPath.Substring(2).Replace("\", "/")
+    if ($scriptPath -match "^([A-Z]):(.*)$") {
+        $driveLetter = $matches[1].ToLower()
+        $restOfPath = $matches[2].Replace("\", "/")
+        $wslPath = "/mnt/$driveLetter$restOfPath"
+    } else {
+        Write-Error "Cannot determine WSL path from: $scriptPath"
+        return
+    }
     
     # Run commands in WSL
     Write-Host "Running dotfiles install script in WSL..."
+    Write-Host "WSL Path: $wslPath" -ForegroundColor Yellow
     wsl -d Ubuntu bash -c "cd '$wslPath' && ./install.sh"
 }
 
@@ -110,7 +126,12 @@ function Setup-Dotfiles {
 function Setup-WindowsNativeConfig {
     Write-Host "Setting up Windows native configurations..." -ForegroundColor Cyan
     
-    $repoPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+    # Get the current script directory more reliably
+    $scriptPath = $PSScriptRoot
+    if (-not $scriptPath) {
+        $scriptPath = Get-Location
+        Write-Host "Using current directory: $scriptPath" -ForegroundColor Yellow
+    }
     
     # Create .config directory if it doesn't exist
     $configDir = "$env:USERPROFILE\.config"
@@ -124,45 +145,85 @@ function Setup-WindowsNativeConfig {
     if (-not (Test-Path $weztermDir)) {
         New-Item -Path $weztermDir -ItemType Directory -Force | Out-Null
     }
-    Copy-Item -Path "$repoPath\config\wezterm\*" -Destination $weztermDir -Recurse -Force
-    Write-Host "Configured WezTerm for Windows"
+    $weztermSource = "$scriptPath\config\wezterm"
+    if (Test-Path $weztermSource) {
+        Copy-Item -Path "$weztermSource\*" -Destination $weztermDir -Recurse -Force
+        Write-Host "Configured WezTerm for Windows"
+    } else {
+        Write-Host "WezTerm configuration source not found at: $weztermSource" -ForegroundColor Yellow
+    }
     
     # Neovim configuration
     $nvimDir = "$configDir\nvim"
     if (-not (Test-Path $nvimDir)) {
         New-Item -Path $nvimDir -ItemType Directory -Force | Out-Null
     }
-    Copy-Item -Path "$repoPath\config\nvim\*" -Destination $nvimDir -Recurse -Force
-    Write-Host "Configured Neovim for Windows"
+    $nvimSource = "$scriptPath\config\nvim"
+    if (Test-Path $nvimSource) {
+        Copy-Item -Path "$nvimSource\*" -Destination $nvimDir -Recurse -Force
+        Write-Host "Configured Neovim for Windows"
+    } else {
+        Write-Host "Neovim configuration source not found at: $nvimSource" -ForegroundColor Yellow
+    }
     
     # Starship configuration
-    Copy-Item -Path "$repoPath\config\starship\starship.toml" -Destination "$configDir\starship.toml" -Force
-    Write-Host "Configured Starship for Windows"
+    $starshipSource = "$scriptPath\config\starship\starship.toml"
+    if (Test-Path $starshipSource) {
+        Copy-Item -Path $starshipSource -Destination "$configDir\starship.toml" -Force
+        Write-Host "Configured Starship for Windows"
+    } else {
+        Write-Host "Starship configuration source not found at: $starshipSource" -ForegroundColor Yellow
+    }
     
     # Git configuration
-    Copy-Item -Path "$repoPath\git\.gitconfig" -Destination "$env:USERPROFILE\.gitconfig" -Force
+    $gitConfigSource = "$scriptPath\git\.gitconfig"
+    if (Test-Path $gitConfigSource) {
+        Copy-Item -Path $gitConfigSource -Destination "$env:USERPROFILE\.gitconfig" -Force
+    } else {
+        Write-Host "Git configuration source not found at: $gitConfigSource" -ForegroundColor Yellow
+    }
     
     $gitConfigDir = "$configDir\git"
     if (-not (Test-Path $gitConfigDir)) {
         New-Item -Path $gitConfigDir -ItemType Directory -Force | Out-Null
     }
-    Copy-Item -Path "$repoPath\git\.gitignore_global" -Destination "$gitConfigDir\ignore" -Force
-    Copy-Item -Path "$repoPath\git\.gitmessage" -Destination "$gitConfigDir\message" -Force
-    Copy-Item -Path "$repoPath\git\.gitmessage.emoji" -Destination "$gitConfigDir\message.emoji" -Force
-    Copy-Item -Path "$repoPath\git\config.local" -Destination "$gitConfigDir\config.local" -Force
-    Copy-Item -Path "$repoPath\git\config.sub" -Destination "$gitConfigDir\config.sub" -Force
-    Write-Host "Configured Git for Windows"
+    
+    $gitFiles = @{
+        "$scriptPath\git\.gitignore_global" = "$gitConfigDir\ignore";
+        "$scriptPath\git\.gitmessage" = "$gitConfigDir\message";
+        "$scriptPath\git\.gitmessage.emoji" = "$gitConfigDir\message.emoji";
+        "$scriptPath\git\config.local" = "$gitConfigDir\config.local";
+        "$scriptPath\git\config.sub" = "$gitConfigDir\config.sub"
+    }
+    
+    $gitConfigSuccess = $true
+    foreach ($source in $gitFiles.Keys) {
+        $destination = $gitFiles[$source]
+        if (Test-Path $source) {
+            Copy-Item -Path $source -Destination $destination -Force
+        } else {
+            $gitConfigSuccess = $false
+            Write-Host "Git file not found: $source" -ForegroundColor Yellow
+        }
+    }
+    
+    if ($gitConfigSuccess) {
+        Write-Host "Configured Git for Windows"
+    } else {
+        Write-Host "Git configuration was partially completed" -ForegroundColor Yellow
+    }
     
     # VSCode/Cursor config if installed
+    $vscodeSettingsSource = "$scriptPath\config\vscode\settings.json"
     $vscodePath = "$env:APPDATA\Code\User"
-    if (Test-Path $vscodePath) {
-        Copy-Item -Path "$repoPath\config\vscode\settings.json" -Destination "$vscodePath\settings.json" -Force
+    if ((Test-Path $vscodePath) -and (Test-Path $vscodeSettingsSource)) {
+        Copy-Item -Path $vscodeSettingsSource -Destination "$vscodePath\settings.json" -Force
         Write-Host "Configured VSCode for Windows"
     }
     
     $cursorPath = "$env:APPDATA\Cursor\User"
-    if (Test-Path $cursorPath) {
-        Copy-Item -Path "$repoPath\config\vscode\settings.json" -Destination "$cursorPath\settings.json" -Force
+    if ((Test-Path $cursorPath) -and (Test-Path $vscodeSettingsSource)) {
+        Copy-Item -Path $vscodeSettingsSource -Destination "$cursorPath\settings.json" -Force
         Write-Host "Configured Cursor for Windows"
     }
 }

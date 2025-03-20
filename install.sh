@@ -206,19 +206,38 @@ install_languages() {
         fi
     fi
 
+    # Install Ruby build dependencies for Linux/WSL
+    if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
+        echo "Installing Ruby build dependencies..."
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev libreadline-dev zlib1g-dev autoconf bison \
+            build-essential libyaml-dev libreadline-dev libncurses5-dev libffi-dev libgdbm-dev
+    fi
+
     # Initialize mise
     echo "Initializing mise..."
     mise install
 
-    # Install languages
+    # Install languages with error handling
     echo "Installing languages..."
-    mise use --global python@3.12
-    mise use --global ruby@latest
-    mise use --global node@latest
-    mise use --global go@latest
-    mise use --global rust@latest
-    mise use --global bun@latest
-    mise use --global deno@latest
+    
+    # Python
+    mise use --global python@3.12 || echo "Warning: Failed to install Python"
+    
+    # Ruby - use specific version for better stability
+    if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
+        echo "Installing stable Ruby version for Linux/WSL..."
+        mise use --global ruby@3.2.2 || echo "Warning: Failed to install Ruby"
+    else
+        mise use --global ruby@latest || echo "Warning: Failed to install Ruby"
+    fi
+    
+    # Other languages
+    mise use --global node@latest || echo "Warning: Failed to install Node.js"
+    mise use --global go@latest || echo "Warning: Failed to install Go"
+    mise use --global rust@latest || echo "Warning: Failed to install Rust"
+    mise use --global bun@latest || echo "Warning: Failed to install Bun"
+    mise use --global deno@latest || echo "Warning: Failed to install Deno"
 
     # Verify installations
     echo "Verifying installations..."
