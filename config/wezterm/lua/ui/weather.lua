@@ -11,8 +11,22 @@ local function get_api_key()
     end
     
     -- 2. 環境変数が設定されていない場合は.envファイルから直接読み込む
-    local home = os.getenv('HOME')
-    local env_file = home .. '/go/github.com/esh2n/dotfiles/.env'
+    local home = os.getenv('HOME') or os.getenv('USERPROFILE')
+    if not home then
+        return nil -- ホームディレクトリが見つからない場合はAPIキーなしで続行
+    end
+    
+    -- リポジトリのルートディレクトリを特定する (dotfilesディレクトリ)
+    -- 現在のファイルからの相対パスを使用
+    local repo_path = wezterm.config_dir:gsub([[\]], '/') -- Windowsのパスを統一
+    repo_path = repo_path:match('(.+)/config/wezterm') -- config/weztermの親ディレクトリを取得
+    
+    if not repo_path then
+        -- フォールバック: 従来のパスを試す
+        repo_path = home .. '/go/github.com/esh2n/dotfiles'
+    end
+    
+    local env_file = repo_path .. '/.env'
     local f = io.open(env_file, 'r')
     if f then
         for line in f:lines() do
