@@ -144,10 +144,71 @@ function Setup-Dotfiles {
         return
     }
     
-    # Run commands in WSL
-    Write-Host "Running dotfiles install script in WSL..."
-    Write-Host "WSL Path: $wslPath" -ForegroundColor Yellow
-    wsl -d Ubuntu bash -c "cd '$wslPath' && ./install.sh"
+    # Verify Ubuntu is installed and running
+    try {
+        $ubuntuCheck = wsl -l -v | Where-Object { $_ -match "Ubuntu" }
+        if (-not $ubuntuCheck) {
+            Write-Error "Ubuntu distribution not found in WSL. Please install Ubuntu first."
+            return
+        }
+        
+        Write-Host "Found Ubuntu in WSL: $ubuntuCheck" -ForegroundColor Green
+        
+        # Ensure the install script is executable
+        Write-Host "Setting executable permissions on install.sh..."
+        wsl -d Ubuntu bash -c "chmod +x '$wslPath/install.sh'"
+        
+        # Create Linux Brewfile if it doesn't exist
+        $brewfileLinuxPath = Join-Path $scriptPath "packages\Brewfile.linux"
+        if (-not (Test-Path $brewfileLinuxPath)) {
+            Write-Host "Creating Brewfile.linux for WSL environment..." -ForegroundColor Yellow
+            
+            # Create a basic Brewfile.linux
+            @"
+# WSL/Linux Brewfile
+# Core utilities
+brew "git"
+brew "wget"
+brew "curl"
+brew "jq"
+brew "ripgrep"
+brew "fd"
+
+# Shell utilities
+brew "zsh"
+brew "tmux"
+brew "starship"
+brew "fzf"
+
+# Development tools
+brew "neovim"
+brew "helix"
+"@ | Out-File -FilePath $brewfileLinuxPath -Encoding utf8
+            
+            Write-Host "Created $brewfileLinuxPath with basic Linux packages" -ForegroundColor Green
+        }
+        
+        # Run commands in WSL with interactive mode
+        Write-Host "Running dotfiles install script in WSL..." -ForegroundColor Cyan
+        Write-Host "WSL Path: $wslPath" -ForegroundColor Yellow
+        Write-Host "Starting WSL installation - follow the prompts in the Ubuntu window" -ForegroundColor Green
+        Write-Host "Note: You may need to provide your password for sudo commands" -ForegroundColor Yellow
+        
+        # Launch Ubuntu in interactive mode to run the install script
+        wsl -d Ubuntu --cd "$wslPath" --exec bash -c "./install.sh"
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "WSL dotfiles installation completed successfully" -ForegroundColor Green
+        } else {
+            Write-Host "WSL dotfiles installation encountered issues (exit code: $LASTEXITCODE)" -ForegroundColor Yellow
+            Write-Host "You may want to manually run the installation in WSL by:"
+            Write-Host "1. Opening Ubuntu from the Start menu"
+            Write-Host "2. Running: cd $wslPath && ./install.sh"
+        }
+    }
+    catch {
+        Write-Error "Error during WSL setup: $_"
+    }
 }
 
 # Setup Windows native configurations

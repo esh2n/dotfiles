@@ -48,6 +48,15 @@ ensure_homebrew() {
         return 1
     fi
 
+    # Check if running as root in Linux/WSL
+    if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
+        if [ "$(id -u)" = "0" ]; then
+            echo "Error: Homebrew should not be installed as root. Please run this script as a regular user."
+            echo "If you're in WSL, make sure to start WSL with a non-root user or create a new user first."
+            return 1
+        fi
+    fi
+
     if ! command -v brew >/dev/null 2>&1; then
         echo "Homebrew is not installed. Would you like to install it? (y/N)"
         read -r response
@@ -56,17 +65,48 @@ ensure_homebrew() {
             
             # Setup Homebrew environment for Linux
             if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
-                test -d ~/.linuxbrew && eval "$(~/.linuxbrew/bin/brew shellenv)"
-                test -d /home/linuxbrew/.linuxbrew && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-                echo "Remember to add Homebrew to your PATH in your shell profile:"
-                echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
+                # Try to find the Homebrew installation
+                if [ -d ~/.linuxbrew ]; then
+                    eval "$(~/.linuxbrew/bin/brew shellenv)"
+                elif [ -d /home/linuxbrew/.linuxbrew ]; then
+                    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+                fi
+                
+                # Verify brew is in PATH now
+                if ! command -v brew >/dev/null 2>&1; then
+                    echo "Homebrew was installed but 'brew' command is not available in PATH"
+                    echo "Please add this to your ~/.profile or ~/.bash_profile:"
+                    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
+                    echo "And run 'source ~/.profile' or start a new terminal session"
+                    
+                    # Try to set PATH for current session
+                    export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+                    
+                    # Add to profile automatically if user agrees
+                    echo "Would you like to add Homebrew to your PATH automatically? (y/N)"
+                    read -r add_path
+                    if [[ "$add_path" =~ ^[Yy]$ ]]; then
+                        echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.profile
+                        # Source it for current session
+                        . ~/.profile
+                        echo "Added Homebrew to PATH and sourced ~/.profile"
+                    fi
+                fi
             fi
         else
             echo "Skipping Homebrew installation"
             return 1
         fi
     fi
-    return 0
+    
+    # Double check brew command is available
+    if command -v brew >/dev/null 2>&1; then
+        echo "Homebrew is properly installed and in PATH"
+        return 0
+    else
+        echo "Failed to make Homebrew available in current session"
+        return 1
+    fi
 }
 
 # Create symbolic links
@@ -258,40 +298,52 @@ select_brewfile() {
 install_packages() {
     echo "Installing packages..."
     
-    # OS-specific package installations
+    # Install Linux essential packages first (may be required for Homebrew)
+    if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
+        echo "Installing essential Linux packages with apt..."
+        sudo apt update
+        # Use separate apt install commands for better error handling
+        sudo apt install -y build-essential || echo "Warning: Failed to install build-essential"
+        sudo apt install -y curl file git unzip wget || echo "Warning: Failed to install core utilities"
+        sudo apt install -y zsh tmux || echo "Warning: Failed to install zsh/tmux"
+        sudo apt install -y ripgrep fd-find fzf || echo "Warning: Failed to install search utilities"
+    fi
+    
+    # OS-specific package installations via Homebrew
     if [ "$OS_TYPE" = "macos" ] || [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
         # Install packages using Homebrew
         if ! ensure_homebrew; then
             echo "Homebrew is required to install packages. Skipping Homebrew package installation."
             # Continue with other package managers
         else
-            # Get the appropriate Brewfile
-            BREWFILE=$(select_brewfile)
+            # Make sure brew is in the PATH for the current session
+            if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
+                # Try all possible Homebrew paths
+                if [ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
+                    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+                    echo "Sourced Homebrew environment from /home/linuxbrew/.linuxbrew"
+                elif [ -f "$HOME/.linuxbrew/bin/brew" ]; then
+                    eval "$($HOME/.linuxbrew/bin/brew shellenv)"
+                    echo "Sourced Homebrew environment from $HOME/.linuxbrew"
+                fi
+            fi
             
-            if [ -n "$BREWFILE" ] && [ -f "$BREWFILE" ]; then
-                echo "Installing Homebrew packages using $BREWFILE..."
-                brew bundle --file="$BREWFILE"
+            # Verify brew is available
+            if ! command -v brew >/dev/null 2>&1; then
+                echo "Warning: brew command not found in PATH. Skipping Homebrew package installation."
+                echo "Current PATH: $PATH"
             else
-                echo "No appropriate Brewfile found for $OS_TYPE."
+                # Get the appropriate Brewfile
+                BREWFILE=$(select_brewfile)
+                
+                if [ -n "$BREWFILE" ] && [ -f "$BREWFILE" ]; then
+                    echo "Installing Homebrew packages using $BREWFILE..."
+                    brew bundle --file="$BREWFILE" || echo "Warning: brew bundle failed"
+                else
+                    echo "No appropriate Brewfile found for $OS_TYPE."
+                fi
             fi
         fi
-    fi
-    
-    # Linux-specific apt packages
-    if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
-        echo "Installing essential Linux packages with apt..."
-        sudo apt update && sudo apt install -y \
-            build-essential \
-            curl \
-            file \
-            git \
-            unzip \
-            wget \
-            zsh \
-            tmux \
-            ripgrep \
-            fd-find \
-            fzf
     fi
     
     # Cross-platform packages
