@@ -65,32 +65,41 @@ ensure_homebrew() {
             
             # Setup Homebrew environment for Linux
             if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
+                echo "Setting up Homebrew environment for Linux/WSL..."
+                
                 # Try to find the Homebrew installation
-                if [ -d ~/.linuxbrew ]; then
-                    eval "$(~/.linuxbrew/bin/brew shellenv)"
-                elif [ -d /home/linuxbrew/.linuxbrew ]; then
-                    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+                BREW_PATH=""
+                if [ -f ~/.linuxbrew/bin/brew ]; then
+                    BREW_PATH=~/.linuxbrew/bin/brew
+                elif [ -f /home/linuxbrew/.linuxbrew/bin/brew ]; then
+                    BREW_PATH=/home/linuxbrew/.linuxbrew/bin/brew
                 fi
                 
-                # Verify brew is in PATH now
-                if ! command -v brew >/dev/null 2>&1; then
-                    echo "Homebrew was installed but 'brew' command is not available in PATH"
-                    echo "Please add this to your ~/.profile or ~/.bash_profile:"
-                    echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
-                    echo "And run 'source ~/.profile' or start a new terminal session"
+                if [ -n "$BREW_PATH" ]; then
+                    # Add to shell configuration files
+                    for shell_rc in ~/.bashrc ~/.zshrc; do
+                        if [ -f "$shell_rc" ]; then
+                            if ! grep -q "brew shellenv" "$shell_rc"; then
+                                echo "Adding Homebrew to $shell_rc..."
+                                echo "" >> "$shell_rc"
+                                echo "# Homebrew" >> "$shell_rc"
+                                echo "eval \"\$($BREW_PATH shellenv)\"" >> "$shell_rc"
+                            else
+                                echo "Homebrew already configured in $shell_rc"
+                            fi
+                        else
+                            echo "Creating $shell_rc with Homebrew configuration..."
+                            echo "# Homebrew" > "$shell_rc"
+                            echo "eval \"\$($BREW_PATH shellenv)\"" >> "$shell_rc"
+                        fi
+                    done
                     
-                    # Try to set PATH for current session
-                    export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-                    
-                    # Add to profile automatically if user agrees
-                    echo "Would you like to add Homebrew to your PATH automatically? (y/N)"
-                    read -r add_path
-                    if [[ "$add_path" =~ ^[Yy]$ ]]; then
-                        echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.profile
-                        # Source it for current session
-                        . ~/.profile
-                        echo "Added Homebrew to PATH and sourced ~/.profile"
-                    fi
+                    # Set up for current session
+                    eval "$($BREW_PATH shellenv)"
+                    echo "Homebrew environment configured for Linux/WSL"
+                else
+                    echo "Homebrew was installed but brew executable not found in expected locations"
+                    echo "You may need to manually configure Homebrew in your shell configuration"
                 fi
             fi
         else
@@ -294,19 +303,46 @@ select_brewfile() {
     fi
 }
 
+# Install essential Linux packages
+install_linux_essentials() {
+    if [ "$OS_TYPE" != "linux" ] && [ "$OS_TYPE" != "wsl" ]; then
+        return 0
+    fi
+    
+    echo "Installing essential Linux packages with apt..."
+    sudo apt update
+    
+    # Install absolute essentials first
+    echo "Installing build essentials and core utilities..."
+    sudo apt install -y build-essential || echo "Warning: Failed to install build-essential"
+    sudo apt install -y curl file git unzip wget || echo "Warning: Failed to install core utilities"
+    
+    # Install zsh and shell utilities
+    echo "Installing shell utilities..."
+    sudo apt install -y zsh || echo "Warning: Failed to install zsh"
+    sudo apt install -y tmux || echo "Warning: Failed to install tmux"
+    
+    # Install search utilities
+    echo "Installing search utilities..."
+    sudo apt install -y ripgrep fd-find fzf || echo "Warning: Failed to install search utilities"
+    
+    # Create symlinks for common tools
+    if [ -f /usr/bin/fdfind ] && [ ! -f /usr/local/bin/fd ]; then
+        sudo mkdir -p /usr/local/bin
+        sudo ln -sf /usr/bin/fdfind /usr/local/bin/fd
+        echo "Created symlink for fd command"
+    fi
+
+    echo "Linux essential packages installed."
+}
+
 # Install packages
 install_packages() {
     echo "Installing packages..."
     
-    # Install Linux essential packages first (may be required for Homebrew)
+    # Install Linux essential packages first (required for Homebrew)
     if [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
-        echo "Installing essential Linux packages with apt..."
-        sudo apt update
-        # Use separate apt install commands for better error handling
-        sudo apt install -y build-essential || echo "Warning: Failed to install build-essential"
-        sudo apt install -y curl file git unzip wget || echo "Warning: Failed to install core utilities"
-        sudo apt install -y zsh tmux || echo "Warning: Failed to install zsh/tmux"
-        sudo apt install -y ripgrep fd-find fzf || echo "Warning: Failed to install search utilities"
+        install_linux_essentials
     fi
     
     # OS-specific package installations via Homebrew

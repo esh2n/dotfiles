@@ -45,6 +45,20 @@
   # このユーザーでインストールスクリプトを実行
   ```
 
+- **Homebrewのパス設定**: インストール後に次のコマンドを実行してHomebrewをPATHに追加してください:
+  ```bash
+  # Homebrewのパスを追加
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  
+  # 一時的なパス設定だけでなく永続的に設定する場合
+  echo '# Homebrew' >> ~/.bashrc
+  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+  
+  # zshを使用している場合は.zshrcにも追加
+  echo '# Homebrew' >> ~/.zshrc
+  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.zshrc
+  ```
+
 - **WSL内での設定**: WSL環境では必ず `install.sh` を使用してください（PowerShellスクリプトは使用しないでください）
 - **初回セットアップ**: Windows側で先に `install-windows.ps1` を実行して、WSL2とUbuntuをセットアップしてから、WSL内で `install.sh` を実行することをお勧めします
 - **Linuxアプリケーション**: WSLでより良い環境を構築するには、追加のLinuxネイティブパッケージをインストールしてください:
