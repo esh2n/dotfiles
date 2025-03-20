@@ -1,328 +1,290 @@
-# Windows dotfiles installer script
-# This script will install WSL2, setup Ubuntu, and configure dotfiles
+#Requires -RunAsAdministrator
+# Cross-platform dotfiles installer for Windows
+# This script will:
+# 1. Install WSL2 and Ubuntu
+# 2. Install essential Windows developer tools
+# 3. Setup fonts and configurations
 
-# Run as administrator check
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Warning "Please run this script as Administrator!"
-    break
-}
+# Stop on first error
+$ErrorActionPreference = "Stop"
 
-Write-Host "Windows dotfiles installer" -ForegroundColor Green
-Write-Host "This script will:"
-Write-Host "1. Install WSL2"
-Write-Host "2. Install Ubuntu distribution"
-Write-Host "3. Configure your dotfiles in WSL"
-Write-Host "4. Configure your dotfiles in Windows native environment"
+# Display banner
+Write-Host "=========================================================" -ForegroundColor Cyan
+Write-Host "         Cross-Platform Dotfiles - Windows Setup         " -ForegroundColor Cyan
+Write-Host "=========================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "This script will set up your Windows environment with:"
+Write-Host "- WSL2 with Ubuntu"
+Write-Host "- Development tools (Git, VS Code, Windows Terminal)"
+Write-Host "- Programming fonts"
+Write-Host "- Configuration files"
+Write-Host ""
+Write-Host "After this script completes, you'll need to run the install.sh"
+Write-Host "script inside WSL to complete the setup."
 Write-Host ""
 
-$continue = Read-Host "Do you want to continue? (y/N)"
-if ($continue -ne "y" -and $continue -ne "Y") {
-    Write-Host "Installation cancelled."
-    exit
+# Confirm execution
+$confirmation = Read-Host "Do you want to continue? (y/N)"
+if ($confirmation -ne "y" -and $confirmation -ne "Y") {
+    Write-Host "Installation cancelled." -ForegroundColor Yellow
+    exit 1
+}
+
+# Get script directory
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Check if running as administrator
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "Error: This script must be run as Administrator" -ForegroundColor Red
+    Write-Host "Please restart PowerShell as Administrator and try again." -ForegroundColor Yellow
+    exit 1
+}
+
+# Function to check if command exists
+function Test-CommandExists {
+    param ($command)
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'stop'
+    try {
+        if (Get-Command $command) { return $true }
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $oldPreference
+    }
+}
+
+# Function to check if WSL is installed
+function Test-WSLInstalled {
+    $wsl = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
+    return $wsl.State -eq "Enabled"
+}
+
+# Function to check if VirtualMachinePlatform is installed
+function Test-VMPlatformInstalled {
+    $vmp = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform
+    return $vmp.State -eq "Enabled"
+}
+
+# Function to check if WSL2 is set as default
+function Test-WSL2Default {
+    $wslVersion = wsl --status | Select-String "Default Version"
+    return $wslVersion -match "2"
+}
+
+# Function to check if Ubuntu is installed
+function Test-UbuntuInstalled {
+    $distributions = wsl --list
+    return $distributions -match "Ubuntu"
 }
 
 # Install WSL
 function Install-WSL {
-    Write-Host "Installing WSL2..." -ForegroundColor Cyan
+    Write-Host "Installing Windows Subsystem for Linux..." -ForegroundColor Cyan
     
-    # Check if WSL is already installed
-    $wslCheck = wsl --status 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "WSL is already installed."
+    if (-not (Test-WSLInstalled)) {
+        Write-Host "Enabling WSL feature..." -ForegroundColor Yellow
+        Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
+        Write-Host "WSL feature enabled." -ForegroundColor Green
     } else {
-        Write-Host "Installing WSL..."
-        try {
-            # Enable WSL feature
-            dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
-            
-            # Enable Virtual Machine Platform
-            dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
-            
-            # Set WSL2 as default
-            Write-Host "Downloading WSL2 kernel update..."
-            $wslUpdateUrl = "https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi"
-            $wslUpdateFile = "$env:TEMP\wsl_update_x64.msi"
-            Invoke-WebRequest -Uri $wslUpdateUrl -OutFile $wslUpdateFile
-            Start-Process -FilePath $wslUpdateFile -ArgumentList "/quiet" -Wait
-            
-            # Set WSL2 as default
-            wsl --set-default-version 2
-            
-            Write-Host "WSL2 installed successfully. System restart may be required." -ForegroundColor Green
-            $restart = Read-Host "Do you want to restart now? (y/N)"
-            if ($restart -eq "y" -or $restart -eq "Y") {
-                Restart-Computer
-                exit
-            }
-        } catch {
-            Write-Error "Failed to install WSL: $_"
+        Write-Host "WSL feature is already enabled." -ForegroundColor Green
+    }
+    
+    if (-not (Test-VMPlatformInstalled)) {
+        Write-Host "Enabling Virtual Machine Platform feature..." -ForegroundColor Yellow
+        Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
+        Write-Host "Virtual Machine Platform feature enabled." -ForegroundColor Green
+        
+        Write-Host "A system restart may be required to complete WSL installation." -ForegroundColor Yellow
+        $restart = Read-Host "Would you like to restart now? (y/N)"
+        if ($restart -eq "y" -or $restart -eq "Y") {
+            Restart-Computer
+            exit
+        } else {
+            Write-Host "Please restart your computer before continuing with the installation." -ForegroundColor Yellow
             exit
         }
+    } else {
+        Write-Host "Virtual Machine Platform feature is already enabled." -ForegroundColor Green
+    }
+    
+    # Set WSL2 as default
+    if (-not (Test-WSL2Default)) {
+        Write-Host "Setting WSL2 as default version..." -ForegroundColor Yellow
+        wsl --set-default-version 2
+        Write-Host "WSL2 set as default." -ForegroundColor Green
+    } else {
+        Write-Host "WSL2 is already set as default." -ForegroundColor Green
     }
 }
 
 # Install Ubuntu
 function Install-Ubuntu {
-    Write-Host "Installing Ubuntu..." -ForegroundColor Cyan
+    Write-Host "Installing Ubuntu on WSL..." -ForegroundColor Cyan
     
-    # Check if Ubuntu is already installed using more reliable method
-    $ubuntuInstalled = $false
-    
-    # Try multiple methods to detect Ubuntu
-    try {
-        # Method 1: Direct distribution check
-        $wslResult = wsl -l -v 2>&1
-        Write-Host "WSL distributions:" -ForegroundColor Yellow
-        $wslResult | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+    if (-not (Test-UbuntuInstalled)) {
+        Write-Host "Installing Ubuntu from Microsoft Store..." -ForegroundColor Yellow
+        # Use wsl --install -d Ubuntu which is the modern way to install Ubuntu on WSL
+        wsl --install -d Ubuntu
         
-        # Check if there's a line containing Ubuntu in the distribution list
-        foreach ($line in $wslResult) {
-            if ($line -match "Ubuntu") {
-                $ubuntuInstalled = $true
-                break
-            }
-        }
-        
-        # Method 2: Try running a command in Ubuntu as a fallback
-        if (-not $ubuntuInstalled) {
-            $testResult = wsl -d Ubuntu -- echo "Ubuntu test" 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                $ubuntuInstalled = $true
-                Write-Host "Ubuntu detected through command test." -ForegroundColor Yellow
-            }
-        }
-    }
-    catch {
-        Write-Host "Error checking WSL distributions: $_" -ForegroundColor Yellow
-        # Continue to installation if detection fails
-    }
-    
-    if ($ubuntuInstalled) {
-        Write-Host "Ubuntu is already installed." -ForegroundColor Green
+        Write-Host "Ubuntu installed. Please complete the setup by:" -ForegroundColor Green
+        Write-Host "1. Wait for Ubuntu to start and create your user account when prompted" -ForegroundColor Yellow
+        Write-Host "2. After setup, run the following commands in Ubuntu:" -ForegroundColor Yellow
+        Write-Host "   cd ~ && git clone https://github.com/esh2n/dotfiles.git && cd dotfiles && ./install.sh" -ForegroundColor White
     } else {
-        try {
-            # Install Ubuntu from Microsoft Store
-            Write-Host "Installing Ubuntu from Microsoft Store..."
-            Invoke-WebRequest -Uri "https://aka.ms/wslubuntu" -OutFile "Ubuntu.appx" -UseBasicParsing
-            Add-AppxPackage .\Ubuntu.appx
-            Remove-Item .\Ubuntu.appx
-            
-            # Launch Ubuntu to complete installation
-            Write-Host "Launching Ubuntu for the first time."
-            Write-Host "Please set up your username and password when prompted." -ForegroundColor Yellow
-            Start-Process ubuntu
-            
-            # Wait for user to complete setup
-            Read-Host "Press Enter after completing the Ubuntu setup..."
-        } catch {
-            Write-Error "Failed to install Ubuntu: $_"
-            exit
-        }
+        Write-Host "Ubuntu is already installed." -ForegroundColor Green
     }
 }
 
-# Setup dotfiles in WSL
-function Setup-Dotfiles {
-    Write-Host "Setting up dotfiles in WSL..." -ForegroundColor Cyan
+# Install Chocolatey
+function Install-Chocolatey {
+    Write-Host "Installing Chocolatey package manager..." -ForegroundColor Cyan
     
-    # Get the current script directory more reliably
-    $scriptPath = $PSScriptRoot
-    if (-not $scriptPath) {
-        $scriptPath = Get-Location
-        Write-Host "Using current directory: $scriptPath" -ForegroundColor Yellow
+    if (-not (Test-CommandExists choco)) {
+        Write-Host "Installing Chocolatey..." -ForegroundColor Yellow
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+        
+        # Refresh environment to include choco in PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        Write-Host "Chocolatey installed." -ForegroundColor Green
+    } else {
+        Write-Host "Chocolatey is already installed." -ForegroundColor Green
+    }
+}
+
+# Install Windows developer tools
+function Install-DeveloperTools {
+    Write-Host "Installing Windows developer tools..." -ForegroundColor Cyan
+    
+    # Install Git, VS Code, Windows Terminal, etc.
+    $packages = @(
+        "git",
+        "vscode",
+        "microsoft-windows-terminal",
+        "powershell-core",
+        "firacode",
+        "cascadiacode",
+        "nodejs-lts",
+        "python",
+        "7zip"
+    )
+    
+    foreach ($package in $packages) {
+        Write-Host "Installing $package..." -ForegroundColor Yellow
+        choco install $package -y
     }
     
-    $repoName = Split-Path -Leaf $scriptPath
+    Write-Host "Developer tools installed." -ForegroundColor Green
+}
+
+# Configure Windows Terminal
+function Configure-WindowsTerminal {
+    Write-Host "Configuring Windows Terminal..." -ForegroundColor Cyan
     
-    # Create the WSL path to the dotfiles repository
-    if ($scriptPath -match "^([A-Z]):(.*)$") {
-        $driveLetter = $matches[1].ToLower()
-        $restOfPath = $matches[2].Replace("\", "/")
-        $wslPath = "/mnt/$driveLetter$restOfPath"
-    } else {
-        Write-Error "Cannot determine WSL path from: $scriptPath"
+    $terminalSettingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
+    
+    # Check if Windows Terminal settings directory exists
+    if (-not (Test-Path (Split-Path -Parent $terminalSettingsPath))) {
+        Write-Host "Windows Terminal settings directory not found. Skipping configuration." -ForegroundColor Yellow
         return
     }
     
-    # Verify Ubuntu is installed and running
+    # Backup existing settings if they exist
+    if (Test-Path $terminalSettingsPath) {
+        $backupPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.backup.json"
+        Copy-Item -Path $terminalSettingsPath -Destination $backupPath -Force
+        Write-Host "Backed up existing Windows Terminal settings to $backupPath" -ForegroundColor Green
+    }
+    
+    # Create new settings file
+    $terminalSettings = @{
+        "$schema" = "https://aka.ms/terminal-profiles-schema"
+        "defaultProfile" = "{2c4de342-38b7-51cf-b940-2309a097f518}" # Ubuntu
+        "profiles" = @{
+            "defaults" = @{
+                "fontFace" = "CascadiaCode"
+                "fontSize" = 12
+                "colorScheme" = "One Half Dark"
+                "cursorShape" = "filledBox"
+                "useAcrylic" = $true
+                "acrylicOpacity" = 0.8
+            }
+            "list" = @()
+        }
+        "schemes" = @()
+        "keybindings" = @()
+    }
+    
+    # Convert to JSON and save
+    $terminalSettings | ConvertTo-Json -Depth 10 | Set-Content $terminalSettingsPath
+    
+    Write-Host "Windows Terminal configured." -ForegroundColor Green
+}
+
+# Setup Git
+function Configure-Git {
+    Write-Host "Configuring Git..." -ForegroundColor Cyan
+    
+    # Set Git defaults
+    git config --global core.editor "code --wait"
+    git config --global init.defaultBranch main
+    
+    # Ask for Git user information
+    $gitName = Read-Host "Enter your Git user name"
+    $gitEmail = Read-Host "Enter your Git email address"
+    
+    if ($gitName -and $gitEmail) {
+        git config --global user.name $gitName
+        git config --global user.email $gitEmail
+        Write-Host "Git configured with name: $gitName and email: $gitEmail" -ForegroundColor Green
+    } else {
+        Write-Host "Skipping Git user configuration." -ForegroundColor Yellow
+    }
+}
+
+# Main installation process
+function Start-Installation {
     try {
-        $ubuntuCheck = wsl -l -v | Where-Object { $_ -match "Ubuntu" }
-        if (-not $ubuntuCheck) {
-            Write-Error "Ubuntu distribution not found in WSL. Please install Ubuntu first."
-            return
-        }
+        # Install Chocolatey first as we need it for other installations
+        Install-Chocolatey
         
-        Write-Host "Found Ubuntu in WSL: $ubuntuCheck" -ForegroundColor Green
+        # Install developer tools
+        Install-DeveloperTools
         
-        # Ensure the install script is executable
-        Write-Host "Setting executable permissions on install.sh..."
-        wsl -d Ubuntu bash -c "chmod +x '$wslPath/install.sh'"
+        # Configure Git
+        Configure-Git
         
-        # Create Linux Brewfile if it doesn't exist
-        $brewfileLinuxPath = Join-Path $scriptPath "packages\Brewfile.linux"
-        if (-not (Test-Path $brewfileLinuxPath)) {
-            Write-Host "Creating Brewfile.linux for WSL environment..." -ForegroundColor Yellow
-            
-            # Create a basic Brewfile.linux
-            @"
-# WSL/Linux Brewfile
-# Core utilities
-brew "git"
-brew "wget"
-brew "curl"
-brew "jq"
-brew "ripgrep"
-brew "fd"
-
-# Shell utilities
-brew "zsh"
-brew "tmux"
-brew "starship"
-brew "fzf"
-
-# Development tools
-brew "neovim"
-brew "helix"
-"@ | Out-File -FilePath $brewfileLinuxPath -Encoding utf8
-            
-            Write-Host "Created $brewfileLinuxPath with basic Linux packages" -ForegroundColor Green
-        }
+        # Configure Windows Terminal
+        Configure-WindowsTerminal
         
-        # Run commands in WSL with interactive mode
-        Write-Host "Running dotfiles install script in WSL..." -ForegroundColor Cyan
-        Write-Host "WSL Path: $wslPath" -ForegroundColor Yellow
-        Write-Host "Starting WSL installation - follow the prompts in the Ubuntu window" -ForegroundColor Green
-        Write-Host "Note: You may need to provide your password for sudo commands" -ForegroundColor Yellow
+        # Install WSL2
+        Install-WSL
         
-        # Launch Ubuntu in interactive mode to run the install script
-        wsl -d Ubuntu --cd "$wslPath" --exec bash -c "./install.sh"
+        # Install Ubuntu
+        Install-Ubuntu
         
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "WSL dotfiles installation completed successfully" -ForegroundColor Green
-        } else {
-            Write-Host "WSL dotfiles installation encountered issues (exit code: $LASTEXITCODE)" -ForegroundColor Yellow
-            Write-Host "You may want to manually run the installation in WSL by:"
-            Write-Host "1. Opening Ubuntu from the Start menu"
-            Write-Host "2. Running: cd $wslPath && ./install.sh"
-        }
-    }
-    catch {
-        Write-Error "Error during WSL setup: $_"
+        Write-Host ""
+        Write-Host "=========================================================" -ForegroundColor Cyan
+        Write-Host "                   Installation Complete                  " -ForegroundColor Cyan
+        Write-Host "=========================================================" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Next steps:" -ForegroundColor Yellow
+        Write-Host "1. If prompted, restart your computer to complete WSL installation" -ForegroundColor White
+        Write-Host "2. Start Ubuntu from the Start menu or by typing 'wsl' in PowerShell" -ForegroundColor White
+        Write-Host "3. Complete the Ubuntu setup by creating a username and password" -ForegroundColor White
+        Write-Host "4. In Ubuntu, run the following commands:" -ForegroundColor White
+        Write-Host "   cd ~ && git clone https://github.com/esh2n/dotfiles.git && cd dotfiles && ./install.sh" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Note: Some changes might require a system restart to take effect." -ForegroundColor Yellow
+        
+    } catch {
+        Write-Host "An error occurred during installation: $_" -ForegroundColor Red
+        Write-Host "Installation failed. Please check the error message above." -ForegroundColor Red
     }
 }
 
-# Setup Windows native configurations
-function Setup-WindowsNativeConfig {
-    Write-Host "Setting up Windows native configurations..." -ForegroundColor Cyan
-    
-    # Get the current script directory more reliably
-    $scriptPath = $PSScriptRoot
-    if (-not $scriptPath) {
-        $scriptPath = Get-Location
-        Write-Host "Using current directory: $scriptPath" -ForegroundColor Yellow
-    }
-    
-    # Create .config directory if it doesn't exist
-    $configDir = "$env:USERPROFILE\.config"
-    if (-not (Test-Path $configDir)) {
-        New-Item -Path $configDir -ItemType Directory -Force | Out-Null
-        Write-Host "Created $configDir directory"
-    }
-    
-    # WezTerm configuration
-    $weztermDir = "$configDir\wezterm"
-    if (-not (Test-Path $weztermDir)) {
-        New-Item -Path $weztermDir -ItemType Directory -Force | Out-Null
-    }
-    $weztermSource = "$scriptPath\config\wezterm"
-    if (Test-Path $weztermSource) {
-        Copy-Item -Path "$weztermSource\*" -Destination $weztermDir -Recurse -Force
-        Write-Host "Configured WezTerm for Windows"
-    } else {
-        Write-Host "WezTerm configuration source not found at: $weztermSource" -ForegroundColor Yellow
-    }
-    
-    # Neovim configuration
-    $nvimDir = "$configDir\nvim"
-    if (-not (Test-Path $nvimDir)) {
-        New-Item -Path $nvimDir -ItemType Directory -Force | Out-Null
-    }
-    $nvimSource = "$scriptPath\config\nvim"
-    if (Test-Path $nvimSource) {
-        Copy-Item -Path "$nvimSource\*" -Destination $nvimDir -Recurse -Force
-        Write-Host "Configured Neovim for Windows"
-    } else {
-        Write-Host "Neovim configuration source not found at: $nvimSource" -ForegroundColor Yellow
-    }
-    
-    # Starship configuration
-    $starshipSource = "$scriptPath\config\starship\starship.toml"
-    if (Test-Path $starshipSource) {
-        Copy-Item -Path $starshipSource -Destination "$configDir\starship.toml" -Force
-        Write-Host "Configured Starship for Windows"
-    } else {
-        Write-Host "Starship configuration source not found at: $starshipSource" -ForegroundColor Yellow
-    }
-    
-    # Git configuration
-    $gitConfigSource = "$scriptPath\git\.gitconfig"
-    if (Test-Path $gitConfigSource) {
-        Copy-Item -Path $gitConfigSource -Destination "$env:USERPROFILE\.gitconfig" -Force
-    } else {
-        Write-Host "Git configuration source not found at: $gitConfigSource" -ForegroundColor Yellow
-    }
-    
-    $gitConfigDir = "$configDir\git"
-    if (-not (Test-Path $gitConfigDir)) {
-        New-Item -Path $gitConfigDir -ItemType Directory -Force | Out-Null
-    }
-    
-    $gitFiles = @{
-        "$scriptPath\git\.gitignore_global" = "$gitConfigDir\ignore";
-        "$scriptPath\git\.gitmessage" = "$gitConfigDir\message";
-        "$scriptPath\git\.gitmessage.emoji" = "$gitConfigDir\message.emoji";
-        "$scriptPath\git\config.local" = "$gitConfigDir\config.local";
-        "$scriptPath\git\config.sub" = "$gitConfigDir\config.sub"
-    }
-    
-    $gitConfigSuccess = $true
-    foreach ($source in $gitFiles.Keys) {
-        $destination = $gitFiles[$source]
-        if (Test-Path $source) {
-            Copy-Item -Path $source -Destination $destination -Force
-        } else {
-            $gitConfigSuccess = $false
-            Write-Host "Git file not found: $source" -ForegroundColor Yellow
-        }
-    }
-    
-    if ($gitConfigSuccess) {
-        Write-Host "Configured Git for Windows"
-    } else {
-        Write-Host "Git configuration was partially completed" -ForegroundColor Yellow
-    }
-    
-    # VSCode/Cursor config if installed
-    $vscodeSettingsSource = "$scriptPath\config\vscode\settings.json"
-    $vscodePath = "$env:APPDATA\Code\User"
-    if ((Test-Path $vscodePath) -and (Test-Path $vscodeSettingsSource)) {
-        Copy-Item -Path $vscodeSettingsSource -Destination "$vscodePath\settings.json" -Force
-        Write-Host "Configured VSCode for Windows"
-    }
-    
-    $cursorPath = "$env:APPDATA\Cursor\User"
-    if ((Test-Path $cursorPath) -and (Test-Path $vscodeSettingsSource)) {
-        Copy-Item -Path $vscodeSettingsSource -Destination "$cursorPath\settings.json" -Force
-        Write-Host "Configured Cursor for Windows"
-    }
-}
-
-# Main execution
-Install-WSL
-Install-Ubuntu
-Setup-Dotfiles
-Setup-WindowsNativeConfig
-
-Write-Host "Windows dotfiles installation complete!" -ForegroundColor Green
-Write-Host "Your dotfiles have been configured in WSL and Windows native environment."
-Write-Host "You can now use your dotfiles environment by launching WSL Ubuntu or directly using Windows applications."
+# Start the installation
+Start-Installation

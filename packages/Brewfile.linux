@@ -1,5 +1,9 @@
+# Brewfile for Linux and WSL environments
+# This file contains packages appropriate for Linux/WSL installation
+
 # Taps
 tap "homebrew/bundle"
+tap "homebrew/core"
 tap "github/gh"
 tap "oven-sh/bun"    # For bun installation
 
@@ -7,9 +11,6 @@ tap "oven-sh/bun"    # For bun installation
 brew "coreutils"      # GNU core utilities
 brew "moreutils"      # Additional Unix utilities
 brew "findutils"      # GNU find, locate, updatedb and xargs
-brew "gnu-sed"        # GNU sed
-brew "grep"           # GNU grep
-brew "less"           # Terminal pager
 brew "wget"           # File retrieval utility
 brew "curl"           # HTTP client
 brew "openssh"        # OpenSSH client
@@ -23,7 +24,6 @@ brew "starship"       # Cross-shell prompt
 brew "zellij"         # Modern terminal multiplexer
 
 # CLI tools
-brew "sk"             # Fuzzy finder (Rust alternative to peco)
 brew "fzf"            # Fuzzy finder
 brew "ghq"            # Remote repository management
 brew "eza"            # Modern replacement for ls
@@ -50,17 +50,15 @@ brew "ctags"          # Source code tagging
 brew "gnupg"          # GPG suite for signing
 brew "lua"            # Lua programming language
 
-# Languages and package managers
-
 # Container and cloud tools
-brew "docker"         # Container platform
+# Note: On Linux, Docker is better installed via apt/snap
 brew "kubernetes-cli" # Kubernetes CLI
 brew "k9s"            # Kubernetes TUI
 brew "argocd"         # GitOps tool
 brew "awscli"         # AWS CLI
 
-# Database tools
-brew "mysql"          # MySQL database
+# Database tools (CLI only, no services)
+brew "mysql-client"   # MySQL client only (not server)
 brew "redis"          # Redis database
 
 # Build tools and dependencies
@@ -68,12 +66,13 @@ brew "cmake"          # Build system
 brew "autoconf"       # Automatic configure script builder
 brew "sccache"        # Compiler cache
 brew "protobuf"       # Protocol buffers
-brew "protoc-gen-go"  # Go protobuf generator
-brew "protoc-gen-go-grpc" # Go gRPC generator
 
-# Image and document processing
-brew "imagemagick"    # Image manipulation
-brew "ffmpeg"         # Multimedia framework
-brew "plantuml"       # Diagram tool
+# Compatibility with Linux system
+brew "gcc"            # GNU compiler collection
+brew "make"           # GNU make utility
+brew "pkg-config"     # Helper tool for compiling applications
+brew "openssl"        # SSL/TLS toolkit
 
-# Remove outdated versions
+# Font tools are not included for Linux as they would be installed differently
+
+# No casks on Linux - these would be installed via apt, snap, or flatpak
