@@ -65,12 +65,40 @@ function Install-WSL {
 function Install-Ubuntu {
     Write-Host "Installing Ubuntu..." -ForegroundColor Cyan
     
-    # Check if Ubuntu is already installed
-    $wslOutput = (wsl --list) -join "`n"
-    Write-Host "Detected WSL distributions: $wslOutput" -ForegroundColor Yellow
+    # Check if Ubuntu is already installed using more reliable method
+    $ubuntuInstalled = $false
     
-    if ($wslOutput -like "*Ubuntu*") {
-        Write-Host "Ubuntu is already installed."
+    # Try multiple methods to detect Ubuntu
+    try {
+        # Method 1: Direct distribution check
+        $wslResult = wsl -l -v 2>&1
+        Write-Host "WSL distributions:" -ForegroundColor Yellow
+        $wslResult | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+        
+        # Check if there's a line containing Ubuntu in the distribution list
+        foreach ($line in $wslResult) {
+            if ($line -match "Ubuntu") {
+                $ubuntuInstalled = $true
+                break
+            }
+        }
+        
+        # Method 2: Try running a command in Ubuntu as a fallback
+        if (-not $ubuntuInstalled) {
+            $testResult = wsl -d Ubuntu -- echo "Ubuntu test" 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                $ubuntuInstalled = $true
+                Write-Host "Ubuntu detected through command test." -ForegroundColor Yellow
+            }
+        }
+    }
+    catch {
+        Write-Host "Error checking WSL distributions: $_" -ForegroundColor Yellow
+        # Continue to installation if detection fails
+    }
+    
+    if ($ubuntuInstalled) {
+        Write-Host "Ubuntu is already installed." -ForegroundColor Green
     } else {
         try {
             # Install Ubuntu from Microsoft Store
