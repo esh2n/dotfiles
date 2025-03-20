@@ -424,10 +424,13 @@ install_packages() {
             # Skip empty lines
             [[ -z $line ]] && continue
             
-            if [[ $line == "pacifica" ]]; then
+            # Extract package name (remove any inline comments)
+            package_name=$(echo "$line" | sed 's/\s*#.*$//')
+            
+            if [[ $package_name == "pacifica" ]]; then
                 cargo install --git https://github.com/serinuntius/pacifica.git
             else
-                cargo install "$line"
+                cargo install "$package_name"
             fi
         done < "$DOTFILES_DIR/packages/cargo.txt"
     fi
@@ -453,13 +456,31 @@ install_packages() {
     # Ruby gems
     if command -v gem >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/packages/gem.txt" ]; then
         echo "Installing Ruby gems..."
-        cat "$DOTFILES_DIR/packages/gem.txt" | xargs gem install
+        while IFS= read -r line || [ -n "$line" ]; do
+            # Skip comment lines and empty lines
+            [[ $line =~ ^#.*$ ]] && continue
+            [[ -z $line ]] && continue
+            
+            # Extract package name (remove any inline comments)
+            package_name=$(echo "$line" | sed 's/\s*#.*$//')
+            echo "Installing Ruby gem: $package_name"
+            gem install "$package_name" || echo "Warning: Failed to install Ruby gem: $package_name"
+        done < "$DOTFILES_DIR/packages/gem.txt"
     fi
     
     # NPM packages
     if command -v npm >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/packages/npm.txt" ]; then
         echo "Installing NPM packages..."
-        cat "$DOTFILES_DIR/packages/npm.txt" | xargs npm install -g
+        while IFS= read -r line || [ -n "$line" ]; do
+            # Skip comment lines and empty lines
+            [[ $line =~ ^#.*$ ]] && continue
+            [[ -z $line ]] && continue
+            
+            # Extract package name (remove any inline comments)
+            package_name=$(echo "$line" | sed 's/\s*#.*$//')
+            echo "Installing NPM package: $package_name"
+            npm install -g "$package_name" || echo "Warning: Failed to install NPM package: $package_name"
+        done < "$DOTFILES_DIR/packages/npm.txt"
     fi
 }
 
