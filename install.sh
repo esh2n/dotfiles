@@ -118,9 +118,40 @@ ensure_homebrew() {
     fi
 }
 
+# Install Zinit plugin manager for Zsh
+install_zinit() {
+    echo "Installing Zinit plugin manager for Zsh..."
+    
+    # Check if Zinit is already installed
+    ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+    if [ -f "$ZINIT_HOME/zinit.zsh" ]; then
+        echo "Zinit is already installed at $ZINIT_HOME"
+        return 0
+    fi
+    
+    # Execute the Zinit installation script
+    if [ -f "$DOTFILES_DIR/shell/install_zinit.sh" ]; then
+        bash "$DOTFILES_DIR/shell/install_zinit.sh"
+    else
+        echo "Installing Zinit from GitHub..."
+        mkdir -p "$(dirname $ZINIT_HOME)"
+        git clone https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+    fi
+    
+    # Verify installation
+    if [ -f "$ZINIT_HOME/zinit.zsh" ]; then
+        echo "Zinit installed successfully"
+    else
+        echo "Warning: Failed to install Zinit. Some Zsh features may not work."
+    fi
+}
+
 # Create symbolic links
 create_symlinks() {
     echo "Creating symbolic links..."
+    
+    # Install Zinit first (required for Zsh plugins)
+    install_zinit
     
     # Shell
     backup_existing_config "$HOME/.zshrc"
