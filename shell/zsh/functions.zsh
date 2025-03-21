@@ -162,6 +162,50 @@ function nerd_fonts() {
   rm -rf nerd-fonts
 }
 
+# Cross-platform open command (works in macOS, Linux, and WSL)
+function open() {
+  # Check if arguments were provided
+  if [[ $# -eq 0 ]]; then
+    echo "❌ Error: Missing argument"
+    echo "Usage: open <file or URL>"
+    return 1
+  fi
+
+  local target="$1"
+  
+  # Detect platform and use appropriate command
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS - use native open command
+    command open "$@"
+  elif grep -q Microsoft /proc/version 2>/dev/null; then
+    # WSL - try wslview, then explorer.exe as fallback
+    if command -v wslview >/dev/null 2>&1; then
+      wslview "$target"
+    else
+      # Convert path to Windows format if it's a file path
+      if [[ -e "$target" ]]; then
+        local winpath=$(wslpath -w "$target")
+        explorer.exe "$winpath"
+      else
+        # If it's a URL or doesn't exist as a file, pass directly
+        explorer.exe "$target"
+      fi
+      echo "💡 Tip: Install wslu package for better Windows integration:"
+      echo "    sudo apt install wslu"
+    fi
+  else
+    # Regular Linux - use xdg-open
+    if command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$target"
+    else
+      echo "❌ Error: No suitable 'open' command found"
+      echo "💡 Install xdg-utils package:"
+      echo "    sudo apt install xdg-utils"
+      return 1
+    fi
+  fi
+}
+
 # GCloud functions
 function gcloud-activate() {
   name="$1"

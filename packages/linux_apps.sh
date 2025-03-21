@@ -66,6 +66,16 @@ install_shell_tools() {
         ripgrep \
         fd-find \
         bat
+    
+    # Install WSL utilities if in WSL environment
+    if is_wsl; then
+        echo "Installing WSL utilities (wslu)..."
+        sudo apt install -y wslu
+    else
+        # Install xdg-utils for Linux open command
+        echo "Installing xdg-utils..."
+        sudo apt install -y xdg-utils
+    fi
         
     # Create symlinks for tools with different names on Ubuntu/Debian
     if [ ! -f /usr/local/bin/batcat ] && [ -f /usr/bin/batcat ]; then
