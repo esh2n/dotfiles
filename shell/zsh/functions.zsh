@@ -178,29 +178,74 @@ function open() {
     # macOS - use native open command
     command open "$@"
   elif grep -q Microsoft /proc/version 2>/dev/null; then
-    # WSL - try wslview, then explorer.exe as fallback
-    if command -v wslview >/dev/null 2>&1; then
-      wslview "$target"
-    else
-      # Convert path to Windows format if it's a file path
-      if [[ -e "$target" ]]; then
+    # WSL - handle with special care
+    
+    # Check for directory specifically
+    if [[ -d "$target" ]]; then
+      # Directory handling in WSL
+      if command -v wslview >/dev/null 2>&1; then
+        # Use wslview for directories (best option)
+        wslview "$target"
+      elif command -v wslpath >/dev/null 2>&1; then
+        # Convert path to Windows and use explorer directly
         local winpath=$(wslpath -w "$target")
         explorer.exe "$winpath"
       else
-        # If it's a URL or doesn't exist as a file, pass directly
+        # Last resort - just try explorer with path
         explorer.exe "$target"
+        echo "⚠️ Warning: For better directory handling, install wslu:"
+        echo "    sudo apt install -y wslu"
       fi
-      echo "💡 Tip: Install wslu package for better Windows integration:"
-      echo "    sudo apt install wslu"
+    else
+      # Files and URLs handling
+      if command -v wslview >/dev/null 2>&1; then
+        wslview "$target"
+      else
+        # Convert path to Windows format if it's a file path
+        if [[ -e "$target" ]]; then
+          local winpath=$(wslpath -w "$target")
+          explorer.exe "$winpath"
+        else
+          # If it's a URL or doesn't exist as a file, pass directly
+          explorer.exe "$target"
+        fi
+        echo "💡 Tip: Install wslu package for better Windows integration:"
+        echo "    sudo apt install -y wslu"
+      fi
+    fi
+    
+    # Check for locale issues and provide helpful message
+    if grep -q "warning: Setting locale failed" <<< "$(locale 2>&1)"; then
+      echo ""
+      echo "⚠️ Locale Warning: You have locale issues in your WSL environment."
+      echo "📝 Run the utility setup script to resolve these warnings:"
+      echo "    sh ~/go/github.com/esh2n/dotfiles/wsl-utils-setup.sh"
     fi
   else
     # Regular Linux - use xdg-open
     if command -v xdg-open >/dev/null 2>&1; then
       xdg-open "$target"
+      
+      # Check for specific directory error
+      if [[ $? -ne 0 && -d "$target" ]]; then
+        echo "⚠️ Warning: xdg-open failed to open directory."
+        echo "💡 Install desktop-file-utils and required applications:"
+        echo "    sudo apt install -y desktop-file-utils xdg-utils"
+        echo "    sudo update-desktop-database"
+        
+        # Try to fall back to a file manager if available
+        for fm in nautilus thunar dolphin pcmanfm caja nemo; do
+          if command -v $fm >/dev/null 2>&1; then
+            echo "🔄 Trying to open with $fm instead..."
+            $fm "$target"
+            return $?
+          fi
+        done
+      fi
     else
       echo "❌ Error: No suitable 'open' command found"
       echo "💡 Install xdg-utils package:"
-      echo "    sudo apt install xdg-utils"
+      echo "    sudo apt install -y xdg-utils"
       return 1
     fi
   fi
