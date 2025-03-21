@@ -3,8 +3,10 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CACHE_HOME="$HOME/.cache"
 
-# Load Cargo environment
-[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+# Initialize mise early to ensure all tools are available
+if command -v mise >/dev/null 2>&1; then
+    eval "$(mise activate zsh)"
+fi
 
 # Load profile if exists
 [ -f "$HOME/.profile" ] && source "$HOME/.profile"
@@ -21,6 +23,7 @@ path=(
     /opt/homebrew/sbin
     /opt/homebrew/opt/libpq/bin
     /Applications/WezTerm.app/Contents/MacOS
+    $HOME/.local/share/mise/shims
     $HOME/.cargo/bin
     $PNPM_HOME
     $path

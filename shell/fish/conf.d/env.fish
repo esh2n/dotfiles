@@ -1,5 +1,11 @@
+# Initialize mise
+if command -v mise >/dev/null 2>&1
+    mise activate fish | source
+end
+
 # Path
 fish_add_path /opt/homebrew/bin
+fish_add_path $HOME/.local/share/mise/shims
 fish_add_path $HOME/.cargo/bin
 fish_add_path $HOME/go/bin
 

@@ -54,9 +54,6 @@ eval "$(starship init zsh)"
 # Load local config if exists
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
-# Initialize mise
-eval "$(mise activate zsh)"
-
 # Amazon Q post block. Keep at the bottom of this file.
 [[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh"
 
