@@ -230,6 +230,37 @@ configure_default_shell() {
     fi
 }
 
+# Configure locale for WSL environments
+configure_wsl_locale() {
+    echo "Configuring locale for WSL environment..."
+    
+    # Install locales package
+    sudo apt install -y locales
+    
+    # Uncomment en_US.UTF-8 locale in /etc/locale.gen
+    sudo sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
+    
+    # Generate the locale
+    sudo locale-gen en_US.UTF-8
+    
+    # Set system-wide locale
+    sudo update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+    
+    # Add locale settings to .bashrc, .zshrc if they don't exist
+    for rcfile in ~/.bashrc ~/.zshrc; do
+        if [ -f "$rcfile" ]; then
+            if ! grep -q "export LANG=en_US.UTF-8" "$rcfile"; then
+                echo "" >> "$rcfile"
+                echo "# Locale settings for WSL" >> "$rcfile"
+                echo "export LANG=en_US.UTF-8" >> "$rcfile"
+                echo "export LC_ALL=en_US.UTF-8" >> "$rcfile"
+            fi
+        fi
+    done
+    
+    echo "Locale configuration complete. You may need to restart your WSL session for changes to take effect."
+}
+
 # Main function
 main() {
     echo "==================================================="
@@ -241,11 +272,16 @@ main() {
     check_not_root
     
     # Detect environment
-    if is_wsl; then
-        echo "WSL environment detected."
-    else
-        echo "Native Linux environment detected."
-    fi
+        if is_wsl; then
+            echo "WSL environment detected."
+        else
+            echo "Native Linux environment detected."
+        fi
+        
+        # Configure locale for WSL if needed
+        if is_wsl; then
+            configure_wsl_locale
+        fi
     
     echo ""
     echo "This script will install native Linux packages and"

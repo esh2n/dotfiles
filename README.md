@@ -62,3 +62,19 @@ WSLをまだインストールしていない場合は、Windowsの管理者Powe
 ## カスタマイズ
 
 個人用の調整が必要な場合は、各設定ファイルを直接編集するか、該当するディレクトリに新しいファイルを追加してください。
+## WSL固有の設定
+
+WSLで「warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)」というエラーが表示される場合、以下のスクリプトを実行して修正できます：
+
+```bash
+# WSLコンソール内で実行
+./wsl-locale-fix.sh
+```
+
+適用後はWSLセッションを再起動してください（ターミナルを閉じて再度開くか、PowerShellから`wsl --shutdown`を実行）。
+
+## 開発ツールとバージョン管理
+
+このリポジトリでは様々なプログラミング言語やツールのバージョン管理に [mise](https://github.com/jdx/mise) を使用しています。
+
+インストールスクリプト実行時に`config/mise/config.toml`で設定された言語やツールが自動的にインストールされます。
