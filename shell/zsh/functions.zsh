@@ -217,9 +217,9 @@ function open() {
     # Check for locale issues and provide helpful message
     if grep -q "warning: Setting locale failed" <<< "$(locale 2>&1)"; then
       echo ""
-      echo "⚠️ Locale Warning: You have locale issues in your WSL environment."
+      echo "⚠️ Locale Warning: You have locale issues in your environment."
       echo "📝 Run the utility setup script to resolve these warnings:"
-      echo "    sh ~/go/github.com/esh2n/dotfiles/wsl-utils-setup.sh"
+      echo "    sh ~/go/github.com/esh2n/dotfiles/linux-utils-setup.sh"
     fi
   else
     # Regular Linux - use xdg-open

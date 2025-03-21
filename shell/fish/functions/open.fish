@@ -55,9 +55,9 @@ function open --description 'Cross-platform open command (works in macOS, Linux,
                 # Check for locale issues and provide helpful message
                 if locale 2>&1 | grep -q "warning: Setting locale failed"
                     echo ""
-                    echo "⚠️ Locale Warning: You have locale issues in your WSL environment."
+                    echo "⚠️ Locale Warning: You have locale issues in your environment."
                     echo "📝 Run the utility setup script to resolve these warnings:"
-                    echo "    sh ~/go/github.com/esh2n/dotfiles/wsl-utils-setup.sh"
+                    echo "    sh ~/go/github.com/esh2n/dotfiles/linux-utils-setup.sh"
                 end
             else
                 # Regular Linux - use xdg-open
