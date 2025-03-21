@@ -87,6 +87,6 @@ fi
 # Final message
 echo -e "\n${GREEN}${BOLD}If all tests passed, your 'open' command is working correctly!${NC}"
 echo -e "${YELLOW}If you encountered any issues, please review the error messages and consider:${NC}"
-echo -e "  1. Running the utilities setup script again: ${BOLD}./wsl-utils-setup.sh${NC}"
+echo -e "  1. Running the utilities setup script again: ${BOLD}./linux-utils-setup.sh${NC}"
 echo -e "  2. Checking your shell configuration for any conflicts"
 echo -e "  3. Ensuring you have the required packages installed\n"
