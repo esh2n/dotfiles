@@ -192,5 +192,6 @@
   },
   "terminal.integrated.defaultProfile.osx": "zsh",
   "editor.accessibilitySupport": "on",
-  "editor.minimap.enabled": true
+  "editor.minimap.enabled": true,
+  "update.releaseTrack": "prerelease"
 }

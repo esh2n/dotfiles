@@ -240,8 +240,10 @@ create_symlinks() {
 
         # Cursor for macOS
         backup_existing_config "$HOME/Library/Application Support/Cursor/User/settings.json"
+        backup_existing_config "$HOME/Library/Application Support/Cursor/User/mcp.json"
         mkdir -p "$HOME/Library/Application Support/Cursor/User"
         ln -sf "$DOTFILES_DIR/config/vscode/settings.json" "$HOME/Library/Application Support/Cursor/User/settings.json"
+        ln -sf "$DOTFILES_DIR/config/cursor/mcp.json" "$HOME/Library/Application Support/Cursor/User/mcp.json"
     elif [ "$OS_TYPE" = "linux" ] || [ "$OS_TYPE" = "wsl" ]; then
         # VSCode for Linux
         backup_existing_config "$HOME/.config/Code/User/settings.json"
@@ -250,8 +252,10 @@ create_symlinks() {
         
         # Cursor for Linux
         backup_existing_config "$HOME/.config/Cursor/User/settings.json"
+        backup_existing_config "$HOME/.config/Cursor/User/mcp.json"
         mkdir -p "$HOME/.config/Cursor/User"
         ln -sf "$DOTFILES_DIR/config/vscode/settings.json" "$HOME/.config/Cursor/User/settings.json"
+        ln -sf "$DOTFILES_DIR/config/cursor/mcp.json" "$HOME/.config/Cursor/User/mcp.json"
         
         # WSL specific configurations (if any)
         if [ "$OS_TYPE" = "wsl" ]; then
