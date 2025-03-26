@@ -36,8 +36,9 @@ eval "$(zoxide init zsh --cmd cd --hook pwd)"
 source "$ZDOTDIR/options.zsh"
 source "$ZDOTDIR/plugins.zsh"
 source "$ZDOTDIR/prompt.zsh"
-source "$ZDOTDIR/aliases.zsh"
+source "$ZDOTDIR/trash.zsh"
 source "$ZDOTDIR/functions.zsh"
+source "$ZDOTDIR/aliases.zsh"
 source "$ZDOTDIR/brew.zsh"
 
 # Initialize starship prompt

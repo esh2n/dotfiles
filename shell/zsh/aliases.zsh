@@ -14,8 +14,61 @@ alias ls="eza --icons"
 alias la="eza -a --icons"
 alias ll="eza -l --icons"
 alias llt="eza --tree --level=2 -a"
-alias rm='trash'
-alias Rm='rm -rf'
+
+# rmコマンドをtrash関数で置き換え
+if type trash-put > /dev/null 2>&1 || type trash > /dev/null 2>&1; then
+  # aliasではなく関数として実装してフラグを正しく渡す
+  function rm() {
+    trash "$@"
+  }
+else
+  echo "⚠️ trash-putまたはtrash関数が見つかりません。rmは標準の削除コマンドのままです。"
+  echo "💡 trash-cliをインストールするには: sudo apt install trash-cli"
+fi
+
+# 完全に削除するためのコマンド（安全対策あり）
+function Rm() {
+  local protected_dirs=("$HOME" "/" "/home" "/usr" "/etc" "/var" "/bin" "/sbin" "/lib" "/lib64" "/boot" "/dev" "/proc" "/sys" "/tmp" "/opt" "/root")
+  
+  for arg in "$@"; do
+    # 絶対パスに変換
+    local abs_path
+    if [[ "$arg" = /* ]]; then
+      abs_path="$arg"
+    else
+      abs_path="$(pwd)/$arg"
+    fi
+    
+    # パスの正規化（シンボリックリンクを解決し、重複するスラッシュを削除）
+    abs_path=$(readlink -f "$abs_path" 2>/dev/null || echo "$abs_path")
+    
+    # 保護対象のディレクトリかチェック
+    for protected in "${protected_dirs[@]}"; do
+      if [[ "$abs_path" == "$protected" || "$abs_path" == "${protected}/" ]]; then
+        echo "🛑 危険: '$arg' は重要なシステムディレクトリです。削除できません。"
+        return 1
+      fi
+    done
+    
+    # ホームディレクトリのサブディレクトリでも、直接のサブディレクトリは保護
+    if [[ "$abs_path" == "$HOME"/* ]]; then
+      local rel_to_home=${abs_path#$HOME/}
+      if [[ ! "$rel_to_home" =~ / ]]; then
+        echo "⚠️ 注意: '$arg' はホームディレクトリの直下のディレクトリです。"
+        echo "本当に削除しますか？ [y/N]: "
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+          echo "❌ 削除をキャンセルしました"
+          return 1
+        fi
+      fi
+    fi
+  done
+  
+  # 全てのチェックに通ったら削除実行
+  \rm -rf "$@"
+}
+
 alias mkcd='mkdir_and_change_directory'
 
 # Git

@@ -182,6 +182,7 @@ create_symlinks() {
     ln -sf "$DOTFILES_DIR/shell/zsh/brew.zsh" "$HOME/.zsh/brew.zsh"
     ln -sf "$DOTFILES_DIR/shell/zsh/options.zsh" "$HOME/.zsh/options.zsh"
     ln -sf "$DOTFILES_DIR/shell/zsh/plugins.zsh" "$HOME/.zsh/plugins.zsh"
+    ln -sf "$DOTFILES_DIR/shell/zsh/trash.zsh" "$HOME/.zsh/trash.zsh"
     
     # Only link sketchybar config on macOS
     if [ "$OS_TYPE" = "macos" ]; then

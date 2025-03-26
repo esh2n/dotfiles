@@ -364,7 +364,15 @@ function trash() {
       # Windows (WSL) - use PowerShell
       if command -v powershell.exe >/dev/null 2>&1; then
         local winpath=$(wslpath -w "$item")
-        powershell.exe -Command "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('$winpath', 'OnlyErrorDialogs', 'SendToRecycleBin')"
+        # 修正：フォルダとファイルの両方に対応
+        if [[ -d "$item" ]]; then
+          # ディレクトリの場合
+          powershell.exe -Command "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory('$winpath', 'OnlyErrorDialogs', 'SendToRecycleBin', 'RecurseSubdirectories')"
+        else
+          # ファイルの場合
+          powershell.exe -Command "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('$winpath', 'OnlyErrorDialogs', 'SendToRecycleBin')"
+        fi
+        echo "🗑️ '$item' をゴミ箱に移動しました"
       else
         echo "❌ Error: PowerShell not found"
         return 1
