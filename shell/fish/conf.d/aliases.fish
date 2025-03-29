@@ -38,7 +38,7 @@ alias path='echo $PATH | tr " " "\n"'
 alias ports='netstat -tulanp'
 alias weather='curl wttr.in'
 alias rm='trash'          # Safer file deletion
-alias Rm='rm -rf'         # Force removal (original rm command)
+alias Rm='trash -r -f'      # Force removal with trash
 
 # ghq + fzf integration
 function ghq_fzf_repo

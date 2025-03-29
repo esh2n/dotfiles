@@ -423,6 +423,9 @@ install_packages() {
     # Rust packages
     if command -v cargo >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/packages/cargo.txt" ]; then
         echo "Installing Rust packages..."
+        # Set default toolchain to stable
+        rustup default stable || echo "Warning: Failed to set default Rust toolchain"
+        
         while IFS= read -r line || [ -n "$line" ]; do
             # Skip comment lines
             [[ $line =~ ^#.*$ ]] && continue

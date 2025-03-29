@@ -200,3 +200,6 @@ alias rg='rg --smart-case'
 alias rgf='rg --files | rg'
 alias cat='bat --style=plain --paging=never'
 alias less='bat --style=plain'
+
+# Editor
+alias code='cursor'
