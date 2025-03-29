@@ -16,22 +16,27 @@ if [ -f "/opt/homebrew/bin/brew" ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
+# PNPM
+export PNPM_HOME="$HOME/Library/pnpm"
+
 # Path
 typeset -U path PATH
 path=(
     /opt/homebrew/bin
     /opt/homebrew/sbin
+    /usr/local/bin
+    /usr/bin
+    /bin
+    /usr/sbin
+    /sbin
     /opt/homebrew/opt/libpq/bin
     /Applications/WezTerm.app/Contents/MacOS
-    $HOME/.local/share/mise/shims
-    $HOME/.cargo/bin
-    $PNPM_HOME
+    "$HOME/.local/share/mise/shims"
+    "$HOME/.cargo/bin"
+    "$PNPM_HOME"
     $path
 )
 export PATH
-
-# PNPM
-export PNPM_HOME="$HOME/Library/pnpm"
 
 # FNM (Fast Node Manager)
 export FNM_VERSION_FILE_STRATEGY="local"
