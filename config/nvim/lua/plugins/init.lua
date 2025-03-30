@@ -194,7 +194,7 @@ return {
     'nvim-telescope/telescope.nvim',
     dependencies = {
       'nvim-lua/plenary.nvim',
-      { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+      { 'nvim-telescope/telescope-fzf-native.nvim', build = 'MACOSX_DEPLOYMENT_TARGET=11.0 ARCHFLAGS="-arch arm64" make clean && MACOSX_DEPLOYMENT_TARGET=11.0 ARCHFLAGS="-arch arm64" make' },
     },
     config = function()
       require('telescope').setup({
@@ -207,7 +207,11 @@ return {
           },
         },
       })
-      require('telescope').load_extension('fzf')
+      -- Safely load fzf extension
+      local status_ok, _ = pcall(require('telescope').load_extension, 'fzf')
+      if not status_ok then
+        vim.notify("FZF extension not loaded - will be available after rebuild", vim.log.levels.WARN)
+      end
     end,
   },
 
