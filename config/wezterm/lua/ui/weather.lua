@@ -1,4 +1,5 @@
 local wezterm = require('wezterm')
+local os_utils = require('lua.utils.os') -- OSユーティリティをインポート
 
 local M = {}
 
@@ -30,7 +31,7 @@ local function get_api_key()
         end
         
         -- ホームディレクトリを使用する場合のパス
-        local home = os.getenv('HOME') or os.getenv('USERPROFILE')
+        local home = os_utils.get_home_dir() -- OSに応じたホームディレクトリを取得
         if home then
             table.insert(paths, home .. '/dotfiles/.env')
             table.insert(paths, home .. '/go/github.com/esh2n/dotfiles/.env')

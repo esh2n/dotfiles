@@ -6,6 +6,7 @@ local keybinds = require('lua.core.keybinds')
 local colors = require('lua.ui.colors')
 local status = require('lua.ui.status')
 local tabs = require('lua.ui.tabs')
+local os_utils = require('lua.utils.os') -- OSユーティリティをインポート
 
 local config = {}
 if wezterm.config_builder then
@@ -61,7 +62,7 @@ config.inactive_pane_hsb = {
 config.debug_key_events = false
 
 -- デフォルトの作業ディレクトリとシェルを設定
-config.default_cwd = os.getenv("HOME")
+config.default_cwd = os_utils.get_home_dir() -- OSに応じたホームディレクトリを取得
 config.default_prog = { '/bin/zsh', '-l' }
 
 -- タブタイトルの設定
@@ -69,9 +70,14 @@ wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_wid
     local title = tab.active_pane.title
     local cwd = tab.active_pane.current_working_dir
     if cwd then
+        local home_dir = os_utils.get_home_dir() -- OSに応じたホームディレクトリを取得
+        local display_path = cwd.file_path
+        if home_dir then
+            display_path = display_path:gsub(home_dir, '~') -- ホームディレクトリをチルダに置換
+        end
         title = wezterm.format({
             { Text = wezterm.nerdfonts.md_folder .. ' ' },
-            { Text = cwd.file_path:gsub(os.getenv("HOME"), '~') },
+            { Text = display_path },
         })
     end
     return title
