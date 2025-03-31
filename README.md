@@ -88,7 +88,64 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ## 環境別セットアップの詳細
 
-### WSL + Windows環境での注意点
+### Windows用スクリプト説明
+
+#### 1. `setup-windows-paths.ps1`
+
+このスクリプトはWindows環境用の設定ファイルのパスを設定します。
+
+**用途**: WSL環境とWindows環境の間で設定ファイルを同期します。
+
+**実行方法**:
+
+- **Windows PowerShellから直接実行（推奨）**:
+   ```powershell
+   .\setup-windows-paths.ps1
+   ```
+
+- **WSLから実行**:
+   ```bash
+   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/setup-windows-paths.ps1"
+   ```
+
+#### 2. `install-vscode-extensions.ps1`
+
+このスクリプトはVS CodeとCursorの拡張機能をインストールします。
+
+**パラメータ**:
+- `-VSCodeOnly`: VS Code拡張機能のみをインストール
+- `-CursorOnly`: Cursor拡張機能のみをインストール
+- パラメータなし: 両方の拡張機能をインストール
+
+**実行方法**:
+
+- **Windows PowerShellから直接実行（推奨）**:
+   ```powershell
+   # 両方の拡張機能をインストール
+   .\install-vscode-extensions.ps1
+   
+   # VS Code拡張機能のみをインストール
+   .\install-vscode-extensions.ps1 -VSCodeOnly
+   
+   # Cursor拡張機能のみをインストール
+   .\install-vscode-extensions.ps1 -CursorOnly
+   ```
+
+- **WSLから実行**:
+   ```bash
+   # 両方の拡張機能をインストール
+   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/install-vscode-extensions.ps1"
+   
+   # VS Code拡張機能のみをインストール
+   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/install-vscode-extensions.ps1" -VSCodeOnly
+   
+   # Cursor拡張機能のみをインストール
+   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/install-vscode-extensions.ps1" -CursorOnly
+   ```
+
+**注意**: WSLから実行する場合は、文字エンコーディングのパラメータ（`-InputFormat utf8 -OutputFormat utf8`）を必ず指定してください。これにより文字化けやスクリプトエラーを防ぎます。
+
+### WSL + Windows環境での設定ファイルパスの違い
 
 Windows環境でWSLを使用する場合、以下の設定ファイルのパスが異なります：
 
