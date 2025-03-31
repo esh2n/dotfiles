@@ -388,6 +388,83 @@ create_symlinks() {
     fi
 }
 
+# Install Starship prompt
+install_starship() {
+    echo "Installing starship prompt..."
+    
+    # すでにインストールされているか確認
+    if command -v starship >/dev/null 2>&1; then
+        echo "Starship is already installed."
+    else
+        echo "Installing starship from the official installer..."
+        curl -sS https://starship.rs/install.sh | sh -s -- --yes
+        
+        if [ $? -ne 0 ]; then
+            echo "Failed to install starship. Please install it manually from https://starship.rs"
+            return 1
+        fi
+    fi
+    
+    # starship設定ファイルをコピー
+    echo "Setting up starship configuration..."
+    mkdir -p "$HOME/.config"
+    cp "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
+    
+    # WSL環境の場合、Windows側にも設定をコピー
+    if [ "$OS_TYPE" = "wsl" ]; then
+        echo "Detected WSL environment, configuring starship for Windows side as well..."
+        
+        # Windows環境変数の取得を試みる
+        if command -v powershell.exe >/dev/null 2>&1; then
+            windows_username=$(powershell.exe '$env:USERNAME' 2>/dev/null | tr -d '\r')
+            
+            if [ -n "$windows_username" ]; then
+                # Windows側のユーザープロファイルパスを取得
+                windows_userprofile=$(wslpath "$(powershell.exe '$env:USERPROFILE' 2>/dev/null | tr -d '\r')")
+                
+                if [ -d "$windows_userprofile" ]; then
+                    echo "Setting up starship for Windows PowerShell..."
+                    
+                    # PowerShellのプロファイルディレクトリを確認
+                    windows_powershell_dir="$windows_userprofile/Documents/PowerShell"
+                    if [ ! -d "$windows_powershell_dir" ]; then
+                        mkdir -p "$windows_powershell_dir"
+                    fi
+                    
+                    # PowerShellプロファイルにstarship初期化を追加
+                    powershell_profile="$windows_powershell_dir/Microsoft.PowerShell_profile.ps1"
+                    
+                    # プロファイルにstarship initがすでにあるか確認
+                    if [ -f "$powershell_profile" ]; then
+                        if ! grep -q "starship init" "$powershell_profile"; then
+                            echo "Adding starship init to PowerShell profile..."
+                            echo "" >> "$powershell_profile"
+                            echo "# Initialize Starship prompt" >> "$powershell_profile"
+                            echo "Invoke-Expression (&starship init powershell)" >> "$powershell_profile"
+                        else
+                            echo "Starship already configured in PowerShell profile"
+                        fi
+                    else
+                        echo "Creating PowerShell profile with starship configuration..."
+                        echo "# PowerShell profile created by dotfiles installer" > "$powershell_profile"
+                        echo "# Initialize Starship prompt" >> "$powershell_profile"
+                        echo "Invoke-Expression (&starship init powershell)" >> "$powershell_profile"
+                    fi
+                    
+                    # Windows側にstarship設定をコピー
+                    windows_starship_config="$windows_userprofile/.config"
+                    mkdir -p "$windows_starship_config"
+                    cp "$DOTFILES_DIR/config/starship/starship.toml" "$windows_starship_config/starship.toml"
+                    echo "Copied starship configuration to Windows user profile"
+                fi
+            fi
+        fi
+    fi
+    
+    echo "Starship installation and configuration complete."
+    return 0
+}
+
 # Install languages with mise
 install_languages() {
     echo "Installing languages with mise..."
@@ -633,7 +710,6 @@ install_vscode_extensions() {
         done
     fi
 }
-
 # Install Cursor extensions
 install_cursor_extensions() {
     if ! command -v cursor >/dev/null 2>&1; then
@@ -647,6 +723,75 @@ install_cursor_extensions() {
             [ -n "$extension" ] && cursor --install-extension "$extension" --force
         done
     fi
+}
+
+# Install starship prompt
+install_starship() {
+    echo "Checking for starship installation..."
+    
+    if command -v starship >/dev/null 2>&1; then
+        echo "Starship is already installed"
+        return 0
+    fi
+    
+    echo "Installing starship prompt..."
+    curl -sS https://starship.rs/install.sh | sh
+    
+    if command -v starship >/dev/null 2>&1; then
+        echo "Starship installed successfully"
+        
+        # Setup WSL specific configuration if needed
+        if [ "$OS_TYPE" = "wsl" ]; then
+            echo "Configuring starship for Windows PowerShell..."
+            
+            # Get Windows username
+            if command -v powershell.exe >/dev/null 2>&1; then
+                windows_username=$(powershell.exe -Command "\$env:USERNAME" 2>/dev/null | tr -d '\r')
+                
+                if [ -n "$windows_username" ]; then
+                    windows_userprofile="/mnt/c/Users/$windows_username"
+                    
+                    if [ -d "$windows_userprofile" ]; then
+                        # Create PowerShell profile directory if it doesn't exist
+                        windows_powershell_dir="$windows_userprofile/Documents/PowerShell"
+                        
+                        if [ ! -d "$windows_powershell_dir" ]; then
+                            mkdir -p "$windows_powershell_dir"
+                        fi
+                        
+                        # Add starship init to PowerShell profile
+                        powershell_profile="$windows_powershell_dir/Microsoft.PowerShell_profile.ps1"
+                        
+                        # Check if starship init is already in the profile
+                        if [ -f "$powershell_profile" ]; then
+                            if ! grep -q "starship init" "$powershell_profile"; then
+                                echo "Adding starship init to PowerShell profile..."
+                                echo "" >> "$powershell_profile"
+                                echo "# Initialize Starship prompt" >> "$powershell_profile"
+                                echo "Invoke-Expression (&starship init powershell)" >> "$powershell_profile"
+                            else
+                                echo "Starship already configured in PowerShell profile"
+                            fi
+                        else
+                            echo "Creating PowerShell profile with starship configuration..."
+                            echo "# PowerShell profile created by dotfiles installer" > "$powershell_profile"
+                            echo "# Initialize Starship prompt" >> "$powershell_profile"
+                            echo "Invoke-Expression (&starship init powershell)" >> "$powershell_profile"
+                        fi
+                        
+                        # Copy starship configuration to Windows side
+                        windows_starship_config="$windows_userprofile/.config"
+                        mkdir -p "$windows_starship_config"
+                        cp "$DOTFILES_DIR/config/starship/starship.toml" "$windows_starship_config/starship.toml"
+                        echo "Copied starship configuration to Windows user profile"
+                    fi
+                fi
+            fi
+        fi
+    else
+        echo "Failed to install starship. Please install it manually from https://starship.rs"
+    fi
+}
 }
 
 # Setup sketchybar (macOS only)
@@ -704,15 +849,16 @@ main() {
     echo "Detected OS: $OS_TYPE"
     echo "The following operations will be performed:"
     echo "1. Backup and create symbolic links for configuration files"
-    echo "2. Install mise and required languages"
-    echo "3. Install OS-appropriate packages"
-    echo "4. Install VSCode/Cursor extensions"
+    echo "2. Install starship prompt"
+    echo "3. Install mise and required languages"
+    echo "4. Install OS-appropriate packages"
+    echo "5. Install VSCode/Cursor extensions"
     
     # Show OS-specific operations
     if [ "$OS_TYPE" = "macos" ]; then
-        echo "5. Setup macOS-specific tools (sketchybar, etc.)"
+        echo "6. Setup macOS-specific tools (sketchybar, etc.)"
     elif [ "$OS_TYPE" = "wsl" ]; then
-        echo "5. Configure WSL-specific settings"
+        echo "6. Configure WSL-specific settings"
     fi
     
     read -p "Do you want to continue? (y/N) " -n 1 -r
@@ -724,6 +870,7 @@ main() {
 
     echo "Setting up dotfiles for $OS_TYPE..."
     create_symlinks
+    install_starship
     install_languages
     install_packages
     install_vscode_extensions

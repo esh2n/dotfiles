@@ -3,6 +3,11 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CACHE_HOME="$HOME/.cache"
 
+# XDG Base Directory
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CACHE_HOME="$HOME/.cache"
+
 # OS判定
 OSTYPE=$(uname -s)
 IS_WSL=0
@@ -24,11 +29,6 @@ fi
 if [ "$OSTYPE" = "Darwin" ]; then
     # === macOS固有の設定 ===
     
-    # Homebrew
-    if [ -f "/opt/homebrew/bin/brew" ]; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-    fi
-    
     # PNPM (macOS)
     export PNPM_HOME="$HOME/Library/pnpm"
     
@@ -43,8 +43,6 @@ if [ "$OSTYPE" = "Darwin" ]; then
     # macOS固有のパス
     typeset -U path PATH
     path=(
-        /opt/homebrew/bin
-        /opt/homebrew/sbin
         /usr/local/bin
         /usr/bin
         /bin
