@@ -16,7 +16,10 @@ detect_os() {
     unameOut="$(uname -s)"
     case "${unameOut}" in
         Linux*)
-            if grep -q Microsoft /proc/version 2>/dev/null; then
+            # Check multiple indicators for WSL, case-insensitive
+            if grep -qi Microsoft /proc/version 2>/dev/null || \
+               grep -qi WSL /proc/sys/kernel/osrelease 2>/dev/null || \
+               grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
                 echo "wsl"
             else
                 echo "linux"
@@ -239,92 +242,106 @@ create_symlinks() {
         
         # WSL specific configurations (if any)
         if [ "$OS_TYPE" = "wsl" ]; then
-            echo "Setting up WSL specific configurations..."
+            echo "[DEBUG] Running WSL specific configurations..." # デバッグ追加
             # Any WSL specific configurations can go here
 
             # Create symlink for WezTerm config on Windows side
-            echo "Attempting to create WezTerm symlink on Windows side..."
+            echo "[DEBUG] Attempting to create WezTerm symlink on Windows side..." # デバッグ追加
             
             # Get Windows username and construct the profile path
             # Ensure powershell.exe is available before attempting to run it
             if command -v powershell.exe >/dev/null 2>&1; then
+                echo "[DEBUG] powershell.exe found." # デバッグ追加
                 windows_username=$(powershell.exe -Command "\$env:USERNAME" 2>/dev/null | tr -d '\r')
+                echo "[DEBUG] Windows Username obtained: '$windows_username'" # デバッグ追加
                 if [ -n "$windows_username" ]; then
                     windows_userprofile="/mnt/c/Users/$windows_username"
+                    echo "[DEBUG] Windows User Profile Path: '$windows_userprofile'" # デバッグ追加
                     
                     if [ -d "$windows_userprofile" ]; then
-                        echo "Windows user profile found: $windows_userprofile"
+                        echo "[DEBUG] Windows user profile directory exists." # デバッグ追加
                         windows_config_dir="$windows_userprofile/.config"
                         windows_wezterm_dir="$windows_config_dir/wezterm"
+                        echo "[DEBUG] Target WezTerm Dir: '$windows_wezterm_dir'" # デバッグ追加
                         
                         # Create .config directory on Windows side if it doesn't exist
                         if [ ! -d "$windows_config_dir" ]; then
-                            echo "Creating $windows_config_dir on Windows side..."
+                            echo "[DEBUG] Creating Windows .config directory: '$windows_config_dir'" # デバッグ追加
                             mkdir -p "$windows_config_dir"
+                            if [ $? -ne 0 ]; then echo "[ERROR] Failed to create directory: $windows_config_dir"; fi # エラーチェック追加
                         fi
                         
-                        # Backup existing WezTerm config on Windows side
-                        if [ -e "$windows_wezterm_dir" ]; then
-                            backup_date=$(date +%Y%m%d_%H%M%S)
-                            echo "Backing up existing WezTerm config at $windows_wezterm_dir to $windows_wezterm_dir.backup.$backup_date"
-                            mv "$windows_wezterm_dir" "$windows_wezterm_dir.backup.$backup_date"
-                        fi
-                        
+                        # Backup existing WezTerm config on Windows side (using backup_existing_config)
+                        echo "[DEBUG] Checking for existing config at '$windows_wezterm_dir' for backup..." # デバッグ追加
+                        backup_existing_config "$windows_wezterm_dir"
+
                         # Create the symlink for WezTerm using safe_link function
-                        echo "Creating symlink for WezTerm config at $windows_wezterm_dir"
+                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/wezterm' -> '$windows_wezterm_dir'" # デバッグ追加
                         safe_link "$DOTFILES_DIR/config/wezterm" "$windows_wezterm_dir"
-                        echo "WezTerm symlink created on Windows side."
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create WezTerm symlink."; fi # エラーチェック追加
+                        echo "[DEBUG] WezTerm symlink creation attempted." # デバッグ追加
 
                         # --- VSCode ---
-                        echo "Attempting to create VSCode symlink on Windows side..."
+                        echo "[DEBUG] Attempting to create VSCode symlink on Windows side..." # デバッグ追加
                         windows_vscode_user_dir="$windows_userprofile/AppData/Roaming/Code/User"
                         windows_vscode_settings="$windows_vscode_user_dir/settings.json"
+                        echo "[DEBUG] Target VSCode Settings: '$windows_vscode_settings'" # デバッグ追加
                         
                         # Create VSCode User directory on Windows side if it doesn't exist
                         if [ ! -d "$windows_vscode_user_dir" ]; then
-                            echo "Creating $windows_vscode_user_dir on Windows side..."
+                            echo "[DEBUG] Creating Windows VSCode User directory: '$windows_vscode_user_dir'" # デバッグ追加
                             mkdir -p "$windows_vscode_user_dir"
+                            if [ $? -ne 0 ]; then echo "[ERROR] Failed to create directory: $windows_vscode_user_dir"; fi # エラーチェック追加
                         fi
 
                         # Backup existing VSCode settings on Windows side (using backup_existing_config)
+                        echo "[DEBUG] Checking for existing config at '$windows_vscode_settings' for backup..." # デバッグ追加
                         backup_existing_config "$windows_vscode_settings"
 
                         # Create the symlink for VSCode settings using safe_link
-                        echo "Creating symlink for VSCode settings at $windows_vscode_settings"
+                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_vscode_settings'" # デバッグ追加
                         safe_link "$DOTFILES_DIR/config/vscode/settings.json" "$windows_vscode_settings"
-                        echo "VSCode settings symlink created on Windows side."
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create VSCode settings symlink."; fi # エラーチェック追加
+                        echo "[DEBUG] VSCode settings symlink creation attempted." # デバッグ追加
 
                         # --- Cursor ---
-                        echo "Attempting to create Cursor symlinks on Windows side..."
+                        echo "[DEBUG] Attempting to create Cursor symlinks on Windows side..." # デバッグ追加
                         windows_cursor_user_dir="$windows_userprofile/.cursor/User"
                         windows_cursor_settings="$windows_cursor_user_dir/settings.json"
                         windows_cursor_mcp="$windows_cursor_user_dir/mcp.json"
+                        echo "[DEBUG] Target Cursor Settings: '$windows_cursor_settings'" # デバッグ追加
+                        echo "[DEBUG] Target Cursor MCP: '$windows_cursor_mcp'" # デバッグ追加
 
                         # Create Cursor User directory on Windows side if it doesn't exist
                         if [ ! -d "$windows_cursor_user_dir" ]; then
-                            echo "Creating $windows_cursor_user_dir on Windows side..."
+                            echo "[DEBUG] Creating Windows Cursor User directory: '$windows_cursor_user_dir'" # デバッグ追加
                             mkdir -p "$windows_cursor_user_dir"
+                            if [ $? -ne 0 ]; then echo "[ERROR] Failed to create directory: $windows_cursor_user_dir"; fi # エラーチェック追加
                         fi
 
                         # Backup existing Cursor settings on Windows side (using backup_existing_config)
+                        echo "[DEBUG] Checking for existing config at '$windows_cursor_settings' for backup..." # デバッグ追加
                         backup_existing_config "$windows_cursor_settings"
+                        echo "[DEBUG] Checking for existing config at '$windows_cursor_mcp' for backup..." # デバッグ追加
                         backup_existing_config "$windows_cursor_mcp"
 
                         # Create the symlinks for Cursor using safe_link
-                        echo "Creating symlink for Cursor settings at $windows_cursor_settings"
+                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_cursor_settings'" # デバッグ追加
                         safe_link "$DOTFILES_DIR/config/vscode/settings.json" "$windows_cursor_settings" # Use vscode settings for cursor
-                        echo "Creating symlink for Cursor mcp.json at $windows_cursor_mcp"
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create Cursor settings symlink."; fi # エラーチェック追加
+                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/cursor/mcp.json' -> '$windows_cursor_mcp'" # デバッグ追加
                         safe_link "$DOTFILES_DIR/config/cursor/mcp.json" "$windows_cursor_mcp"
-                        echo "Cursor symlinks created on Windows side."
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create Cursor mcp.json symlink."; fi # エラーチェック追加
+                        echo "[DEBUG] Cursor symlinks creation attempted." # デバッグ追加
 
                     else
-                        echo "Warning: Windows user profile directory not found at $windows_userprofile. Skipping WezTerm, VSCode, and Cursor symlink creation on Windows side."
+                        echo "[ERROR] Windows user profile directory not found at '$windows_userprofile'. Skipping Windows side symlink creation." # エラーメッセージ変更
                     fi
                 else
-                    echo "Warning: Could not retrieve Windows username via PowerShell. Skipping WezTerm, VSCode, and Cursor symlink creation on Windows side."
+                    echo "[ERROR] Could not retrieve Windows username via PowerShell. Skipping Windows side symlink creation." # エラーメッセージ変更
                 fi
             else
-                echo "Warning: powershell.exe not found in PATH. Cannot determine Windows username. Skipping WezTerm, VSCode, and Cursor symlink creation on Windows side."
+                echo "[ERROR] powershell.exe not found in PATH. Cannot determine Windows username. Skipping Windows side symlink creation." # エラーメッセージ変更
             fi
         fi
     fi
