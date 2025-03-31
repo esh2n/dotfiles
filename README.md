@@ -130,6 +130,12 @@ WSL環境とWindows環境の両方で設定を同期するには、`setup-window
    - **パス変換の問題**
       - WSLパスとWindowsパスの変換に失敗する場合は、直接Windows PowerShellから実行してください
 
+   - **文字エンコーディングの問題**
+      - WSLからPowerShellスクリプトを実行する際に文字化けや構文エラーが発生する場合：
+      - 解決策1: Windows PowerShellから直接実行する（最も確実な方法）
+      - 解決策2: `-InputFormat utf8 -OutputFormat utf8`パラメータを追加
+      - 例: `powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/setup-windows-paths.ps1"`
+
 3. **個別機能のインストール**
    - 必要な設定のみを選択してインストールできます
    - スクリプトのメニューから希望のオプションを選択してください

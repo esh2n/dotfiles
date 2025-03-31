@@ -1,66 +1,70 @@
-# Windows環境用設定ファイル配置スクリプト
-# このスクリプトはWindows環境でWSLのdotfilesリポジトリから設定ファイルをWindows側に適切に配置します
-# 管理者権限で実行することを推奨します
+# Windows Environment Configuration Setup Script
+# This script places configuration files from the WSL dotfiles repository to the Windows side
+# It is recommended to run with administrator privileges
 #
-# 実行方法:
-# 1. Windows PowerShellから直接実行（推奨）: .\setup-windows-paths.ps1
-# 2. WSL内からWindows PowerShellを呼び出し: powershell.exe -ExecutionPolicy Bypass -File "$PWD/setup-windows-paths.ps1"
-# 3. WSL内のPowerShell Core (pwsh)から実行: pwsh -File ./setup-windows-paths.ps1
+# How to run:
+# 1. Directly from Windows PowerShell (recommended): .\setup-windows-paths.ps1
+# 2. From WSL calling Windows PowerShell: powershell.exe -ExecutionPolicy Bypass -File "$PWD/setup-windows-paths.ps1"
+# 3. From PowerShell Core (pwsh) in WSL: pwsh -File ./setup-windows-paths.ps1
+#
+# Note: This script is saved in UTF-8 encoding.
+# If running from WSL, it is strongly recommended to run directly from Windows PowerShell
+# to avoid encoding issues.
 
-# 実行環境がWSLかどうかを判定
+# Determine if running in WSL environment
 $isRunningInWSL = $false
 try {
-    # WSL環境では$env:WSL_DISTROが定義されているか、/proc/versionに特定の文字列が含まれる
+    # In WSL environment, $env:WSL_DISTRO is defined or /proc/version contains specific strings
     if ($env:WSL_DISTRO -or (Test-Path "/proc/version")) {
         if (Test-Path "/proc/version") {
             $procVersion = Get-Content "/proc/version" -ErrorAction SilentlyContinue
             if ($procVersion -match "Microsoft|WSL") {
                 $isRunningInWSL = $true
-                Write-Host "WSL環境で実行されていることを検出しました" -ForegroundColor Cyan
+                Write-Host "Detected running in WSL environment" -ForegroundColor Cyan
             }
         } else {
             $isRunningInWSL = $true
-            Write-Host "WSL環境変数を検出しました" -ForegroundColor Cyan
+            Write-Host "Detected WSL environment variables" -ForegroundColor Cyan
         }
     }
 } catch {
-    # エラーが発生した場合はWSLではないと判断
+    # If an error occurs, assume not running in WSL
     $isRunningInWSL = $false
 }
 
-# 自身のスクリプトパスを取得してdotfilesディレクトリを特定
+# Get script path and determine dotfiles directory
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dotfilesDir = $scriptPath
 
-# WSL環境から実行されている場合のパス変換を行う
+# Perform path conversion if running from WSL environment
 if ($isRunningInWSL) {
     try {
-        # WindowsユーザープロファイルへのパスをWSLパスから特定
+        # Determine Windows user profile path from WSL path
         $winUserProfile = [System.Environment]::GetFolderPath('UserProfile')
         
         if (-not $winUserProfile) {
-            # バックアッププラン: WSLからWindows側のユーザープロファイルを特定する
+            # Backup plan: Determine Windows user profile from WSL
             $winUserProfile = "$env:USERPROFILE"
             if (-not $winUserProfile) {
-                # さらにバックアップ: 典型的なWindows側のパスを推測
+                # Additional backup: Guess typical Windows path
                 if ($env:USERNAME) {
                     $winUserProfile = "C:\Users\$env:USERNAME"
                 } else {
-                    Write-Host "警告: Windows側のユーザープロファイルパスを特定できませんでした。" -ForegroundColor Yellow
-                    Write-Host "C:\Users\[ユーザー名] を使用します。必要に応じて手動で設定を配置してください。" -ForegroundColor Yellow
+                    Write-Host "Warning: Could not determine Windows user profile path." -ForegroundColor Yellow
+                    Write-Host "Using C:\Users\[username]. Please place configurations manually if needed." -ForegroundColor Yellow
                     $winUserProfile = "C:\Users\$env:USER"
                 }
             }
         }
         
-        # スクリプトの実行がWSLからの場合の追加情報を表示
-        Write-Host "WSL環境から実行されています。Windows側のユーザープロファイルパス: $winUserProfile" -ForegroundColor Cyan
+        # Display additional information if script is running from WSL
+        Write-Host "Running from WSL environment. Windows user profile path: $winUserProfile" -ForegroundColor Cyan
     } catch {
-        Write-Host "WSLパス変換中にエラーが発生しました: $_" -ForegroundColor Red
+        Write-Host "Error during WSL path conversion: $_" -ForegroundColor Red
     }
 }
 
-# バックアップ用関数
+# Backup function
 function Backup-Config {
     param (
         [string]$Path
@@ -75,82 +79,82 @@ function Backup-Config {
         $fileName = Split-Path -Leaf $Path
         $backupPath = Join-Path $backupDir $fileName
         
-        Write-Host "バックアップ作成中: $Path -> $backupPath"
+        Write-Host "Creating backup: $Path -> $backupPath"
         Copy-Item -Path $Path -Destination $backupPath -Force -Recurse
     }
 }
 
-# ディレクトリがなければ作成する関数
+# Function to create directory if it doesn't exist
 function Ensure-Directory {
     param (
         [string]$Path
     )
     
     if (-not (Test-Path $Path)) {
-        Write-Host "ディレクトリを作成: $Path"
+        Write-Host "Creating directory: $Path"
         New-Item -ItemType Directory -Path $Path -Force | Out-Null
     }
 }
 
-# 設定選択メニューを表示
+# Display configuration selection menu
 function Show-Menu {
-    Write-Host "`n==== Windows環境設定セットアップ ====" -ForegroundColor Cyan
-    Write-Host "このスクリプトは、WSLのdotfilesからWindows側の設定ファイルを配置します" -ForegroundColor Yellow
-    Write-Host "インストールする設定を選択してください:" -ForegroundColor Yellow
-    Write-Host "1. すべての設定をインストール"
-    Write-Host "2. WezTerm設定のみインストール"
-    Write-Host "3. VSCode設定のみインストール"
-    Write-Host "4. Cursor設定のみインストール"
-    Write-Host "5. Starship設定のみインストール"
-    Write-Host "0. 終了"
+    Write-Host "`n==== Windows Environment Configuration Setup ====" -ForegroundColor Cyan
+    Write-Host "This script places configuration files from WSL dotfiles to the Windows side" -ForegroundColor Yellow
+    Write-Host "Select which configurations to install:" -ForegroundColor Yellow
+    Write-Host "1. Install all configurations"
+    Write-Host "2. Install WezTerm configuration only"
+    Write-Host "3. Install VSCode configuration only"
+    Write-Host "4. Install Cursor configuration only"
+    Write-Host "5. Install Starship configuration only"
+    Write-Host "0. Exit"
     
-    $choice = Read-Host "選択してください (0-5)"
+    $choice = Read-Host "Please select (0-5)"
     return $choice
 }
 
-# WezTerm設定をコピー
+# Copy WezTerm configuration
 function Install-WezTermConfig {
-    Write-Host "`n==== WezTerm設定のインストール ====" -ForegroundColor Green
+    Write-Host "`n==== Installing WezTerm Configuration ====" -ForegroundColor Green
     
-    # 設定ファイルのパス
+    # Configuration file path
     $weztermConfigDir = Join-Path $env:USERPROFILE ".config\wezterm"
     Ensure-Directory $weztermConfigDir
     
-    # バックアップを作成
+    # Create backup
     Backup-Config $weztermConfigDir
     
-    # dotfilesからWezTerm設定をコピー
+    # Copy WezTerm configuration from dotfiles
     $sourceWeztermDir = Join-Path $dotfilesDir "config\wezterm"
     
-    # メインの設定ファイルをコピー
-    Write-Host "WezTerm設定ファイルをコピー中..."
+    # Copy main configuration file
+    Write-Host "Copying WezTerm configuration file..."
     Copy-Item -Path (Join-Path $sourceWeztermDir "wezterm.lua") -Destination $weztermConfigDir -Force
     
-    # サブディレクトリをコピー
+    # Copy subdirectories
     $subDirs = @("lua", "lua\core", "lua\ui", "lua\utils")
     foreach ($subDir in $subDirs) {
         $targetDir = Join-Path $weztermConfigDir $subDir
         Ensure-Directory $targetDir
         
-        # サブディレクトリ内のLuaファイルをコピー
+        # Copy Lua files in subdirectories
         $sourceDir = Join-Path $sourceWeztermDir $subDir
         if (Test-Path $sourceDir) {
             Get-ChildItem -Path $sourceDir -Filter "*.lua" | ForEach-Object {
                 $targetFile = Join-Path $targetDir $_.Name
-                Write-Host "コピー中: $($_.FullName) -> $targetFile"
+                Write-Host "Copying: $($_.FullName) -> $targetFile"
                 Copy-Item -Path $_.FullName -Destination $targetFile -Force
             }
         }
     }
     
-    Write-Host "WezTerm設定のインストールが完了しました" -ForegroundColor Green
+    Write-Host "WezTerm configuration installation completed" -ForegroundColor Green
 }
 
-# VSCode設定をコピー
+# Copy VSCode configuration
 function Install-VSCodeConfig {
-    Write-Host "`n==== VSCode設定のインストール ====" -ForegroundColor Green
+    Write-Host "`n==== Installing VSCode Configuration ====" -ForegroundColor Green
     
-    # VSCodeの設定ディレクトリ（複数の可能性をチェック）
+    # VSCode configuration directories (check multiple possibilities)
     $possiblePaths = @(
         (Join-Path $env:APPDATA "Code\User"),
         (Join-Path $env:LOCALAPPDATA "Code\User"),
@@ -163,32 +167,32 @@ function Install-VSCodeConfig {
         if (Test-Path (Split-Path -Parent $vscodePath)) {
             Ensure-Directory $vscodePath
             
-            # 設定ファイルのパス
+            # Configuration file path
             $settingsPath = Join-Path $vscodePath "settings.json"
             
-            # バックアップを作成
+            # Create backup
             Backup-Config $settingsPath
             
-            # 設定ファイルをコピー
+            # Copy configuration file
             $sourceSettingsPath = Join-Path $dotfilesDir "config\vscode\settings.json"
-            Write-Host "VSCode設定ファイルをコピー中: $sourceSettingsPath -> $settingsPath"
+            Write-Host "Copying VSCode configuration file: $sourceSettingsPath -> $settingsPath"
             Copy-Item -Path $sourceSettingsPath -Destination $settingsPath -Force
             
             $installed = $true
-            Write-Host "VSCode設定ファイルを $vscodePath にインストールしました" -ForegroundColor Green
+            Write-Host "VSCode configuration file installed to $vscodePath" -ForegroundColor Green
         }
     }
     
     if (-not $installed) {
-        Write-Host "VSCodeの設定ディレクトリが見つかりませんでした。VSCodeがインストールされているか確認してください。" -ForegroundColor Yellow
+        Write-Host "VSCode configuration directory not found. Please check if VSCode is installed." -ForegroundColor Yellow
     }
 }
 
-# Cursor設定をコピー
+# Copy Cursor configuration
 function Install-CursorConfig {
-    Write-Host "`n==== Cursor設定のインストール ====" -ForegroundColor Green
+    Write-Host "`n==== Installing Cursor Configuration ====" -ForegroundColor Green
     
-    # Cursorの設定ディレクトリ（複数の可能性をチェック）
+    # Cursor configuration directories (check multiple possibilities)
     $possiblePaths = @(
         (Join-Path $env:USERPROFILE ".cursor\User"),
         (Join-Path $env:APPDATA "Cursor\User"),
@@ -201,65 +205,65 @@ function Install-CursorConfig {
         if (Test-Path (Split-Path -Parent (Split-Path -Parent $cursorPath))) {
             Ensure-Directory $cursorPath
             
-            # 設定ファイルのパス
+            # Configuration file paths
             $settingsPath = Join-Path $cursorPath "settings.json"
             $mcpPath = Join-Path $cursorPath "mcp.json"
             
-            # バックアップを作成
+            # Create backups
             Backup-Config $settingsPath
             Backup-Config $mcpPath
             
-            # 設定ファイルをコピー
+            # Copy configuration files
             $sourceSettingsPath = Join-Path $dotfilesDir "config\vscode\settings.json"
             $sourceMcpPath = Join-Path $dotfilesDir "config\cursor\mcp.json"
             
-            Write-Host "Cursor設定ファイルをコピー中: $sourceSettingsPath -> $settingsPath"
+            Write-Host "Copying Cursor configuration file: $sourceSettingsPath -> $settingsPath"
             Copy-Item -Path $sourceSettingsPath -Destination $settingsPath -Force
             
-            Write-Host "Cursor MCP設定ファイルをコピー中: $sourceMcpPath -> $mcpPath"
+            Write-Host "Copying Cursor MCP configuration file: $sourceMcpPath -> $mcpPath"
             Copy-Item -Path $sourceMcpPath -Destination $mcpPath -Force
             
             $installed = $true
-            Write-Host "Cursor設定ファイルを $cursorPath にインストールしました" -ForegroundColor Green
+            Write-Host "Cursor configuration files installed to $cursorPath" -ForegroundColor Green
         }
     }
     
     if (-not $installed) {
-        Write-Host "Cursorの設定ディレクトリが見つかりませんでした。Cursorがインストールされているか確認してください。" -ForegroundColor Yellow
+        Write-Host "Cursor configuration directory not found. Please check if Cursor is installed." -ForegroundColor Yellow
     }
 }
 
-# Starship設定をコピー
+# Copy Starship configuration
 function Install-StarshipConfig {
-    Write-Host "`n==== Starship設定のインストール ====" -ForegroundColor Green
+    Write-Host "`n==== Installing Starship Configuration ====" -ForegroundColor Green
     
-    # Starshipの設定ディレクトリ
+    # Starship configuration directory
     $starshipConfigDir = Join-Path $env:USERPROFILE ".config"
     Ensure-Directory $starshipConfigDir
     
-    # 設定ファイルのパス
+    # Configuration file path
     $starshipConfigPath = Join-Path $starshipConfigDir "starship.toml"
     
-    # バックアップを作成
+    # Create backup
     Backup-Config $starshipConfigPath
     
-    # 設定ファイルをコピー
+    # Copy configuration file
     $sourceStarshipPath = Join-Path $dotfilesDir "config\starship\starship.toml"
-    Write-Host "Starship設定ファイルをコピー中: $sourceStarshipPath -> $starshipConfigPath"
+    Write-Host "Copying Starship configuration file: $sourceStarshipPath -> $starshipConfigPath"
     Copy-Item -Path $sourceStarshipPath -Destination $starshipConfigPath -Force
     
-    Write-Host "Starship設定ファイルをインストールしました" -ForegroundColor Green
+    Write-Host "Starship configuration file installed" -ForegroundColor Green
 }
 
-# メイン処理
+# Main processing
 function Main {
-    Write-Host "Windows用dotfiles設定スクリプトを開始します..." -ForegroundColor Cyan
+    Write-Host "Starting Windows dotfiles configuration script..." -ForegroundColor Cyan
     
     $choice = Show-Menu
     
     switch ($choice) {
         "0" {
-            Write-Host "スクリプトを終了します" -ForegroundColor Yellow
+            Write-Host "Exiting script" -ForegroundColor Yellow
             return
         }
         "1" {
@@ -268,7 +272,7 @@ function Main {
             Install-CursorConfig
             Install-StarshipConfig
             
-            Write-Host "`n==== 全ての設定のインストールが完了しました ====" -ForegroundColor Green
+            Write-Host "`n==== All configurations have been installed ====" -ForegroundColor Green
         }
         "2" {
             Install-WezTermConfig
@@ -283,14 +287,14 @@ function Main {
             Install-StarshipConfig
         }
         default {
-            Write-Host "無効な選択です。スクリプトを終了します。" -ForegroundColor Red
+            Write-Host "Invalid selection. Exiting script." -ForegroundColor Red
             return
         }
     }
     
-    Write-Host "`n設定ファイルのインストールが完了しました" -ForegroundColor Cyan
-    Write-Host "バックアップは $env:USERPROFILE\.dotfiles_backup に保存されています" -ForegroundColor Cyan
+    Write-Host "`nConfiguration file installation completed" -ForegroundColor Cyan
+    Write-Host "Backups are saved in $env:USERPROFILE\.dotfiles_backup" -ForegroundColor Cyan
 }
 
-# スクリプトを実行
+# Execute script
 Main
