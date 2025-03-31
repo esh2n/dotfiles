@@ -398,7 +398,9 @@ function Install-VSCodeExtensions {
                     } catch {
                         $errorMessage = "Unknown error"
                     }
-                    Write-Host "Error installing extension $extension: $errorMessage" -ForegroundColor Red
+                    # エラーメッセージをフォーマット文字列で構築（WSLパス対応）
+                    $message = "Error installing extension {0}: {1}" -f $extension, $errorMessage
+                    Write-Host $message -ForegroundColor Red
                 }
             }
             
@@ -466,7 +468,9 @@ function Install-CursorExtensions {
                     } catch {
                         $errorMessage = "Unknown error"
                     }
-                    Write-Host "Error installing Cursor extension $extension: $errorMessage" -ForegroundColor Red
+                    # エラーメッセージをフォーマット文字列で構築（WSLパス対応）
+                    $message = "Error installing Cursor extension {0}: {1}" -f $extension, $errorMessage
+                    Write-Host $message -ForegroundColor Red
                 }
             }
             

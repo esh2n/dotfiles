@@ -79,7 +79,9 @@ function Install-Extensions {
             } catch {
                 $errorMessage = "不明なエラー"
             }
-            Write-Host " [エラー] $errorMessage" -ForegroundColor Red
+            # エラーメッセージをフォーマット文字列で構築（WSLパス対応）
+            $message = " [エラー] {0}" -f $errorMessage
+            Write-Host $message -ForegroundColor Red
             $failCount++
         }
     }
