@@ -20,4 +20,22 @@ function M.get_home_dir()
   -- もしどちらも見つからない場合は nil を返す (エラーハンドリングは呼び出し元で行う想定)
 end
 
+-- OSに応じたデフォルトシェルを取得する
+function M.get_default_shell()
+  if M.is_windows() then
+    -- Windowsの場合、WSLのデフォルトディストリビューションのZshを起動
+    -- WSL内のシェルに接続するため wsl.exe を使用
+    return { 'wsl.exe', '--', 'zsh', '-l' }
+    
+    -- PowerShellをデフォルトにしたい場合は以下を使用:
+    -- return { 'powershell.exe', '-NoLogo' }
+    
+    -- cmdをデフォルトにしたい場合は以下を使用:
+    -- return { 'cmd.exe' }
+  else
+    -- macOS/Linuxの場合は zsh を使用
+    return { '/bin/zsh', '-l' }
+  end
+end
+
 return M

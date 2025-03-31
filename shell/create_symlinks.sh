@@ -195,7 +195,42 @@ create_symlinks() {
     safe_link "$DOTFILES_DIR/config/nvim" "$HOME/.config/nvim"
     safe_link "$DOTFILES_DIR/config/wezterm" "$HOME/.config/wezterm"
     safe_link "$DOTFILES_DIR/config/helix" "$HOME/.config/helix"
-    safe_link "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
+    # Starship設定 (OSに応じて異なるパスに配置)
+    if [ "$OS_TYPE" = "wsl" ]; then
+        # WSLの場合、Linux側とWindows側の両方に設定を配置する
+        # Linux側
+        safe_link "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
+        
+        # Windows側（ユーザープロファイルが見つかっている場合）
+        if [ -n "$windows_username" ] && [ -d "$windows_userprofile" ]; then
+            echo "Setting up Starship config for Windows..."
+            
+            # Windows側の.configディレクトリを作成
+            win_starship_dir="$windows_userprofile/.config"
+            win_starship_file="$win_starship_dir/starship.toml"
+            
+            # ディレクトリ作成
+            if [ ! -d "$win_starship_dir" ]; then
+                echo "Creating Windows .config directory for Starship: $win_starship_dir"
+                mkdir -p "$win_starship_dir"
+            fi
+            
+            # バックアップ
+            backup_existing_config "$win_starship_file"
+            
+            # 設定ファイルをコピー
+            echo "Copying Starship config to: $win_starship_file"
+            cp "$DOTFILES_DIR/config/starship/starship.toml" "$win_starship_file"
+            if [ $? -eq 0 ]; then
+                echo "Successfully copied Starship config to Windows"
+            else
+                echo "Failed to copy Starship config to Windows"
+            fi
+        fi
+    else
+        # macOSまたは通常のLinuxの場合
+        safe_link "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
+    fi
     safe_link "$DOTFILES_DIR/config/mise" "$HOME/.config/mise"
     safe_link "$DOTFILES_DIR/config/tmux/tmux.conf" "$HOME/.tmux.conf"
     safe_link "$DOTFILES_DIR/config/tig/.tigrc" "$HOME/.tigrc"
@@ -271,68 +306,126 @@ create_symlinks() {
                             if [ $? -ne 0 ]; then echo "[ERROR] Failed to create directory: $windows_config_dir"; fi # エラーチェック追加
                         fi
                         
-                        # Backup existing WezTerm config on Windows side (using backup_existing_config)
-                        echo "[DEBUG] Checking for existing config at '$windows_wezterm_dir' for backup..." # デバッグ追加
-                        backup_existing_config "$windows_wezterm_dir"
-
-                        # Copy WezTerm config directory
-                        echo "[DEBUG] Copying WezTerm config: '$DOTFILES_DIR/config/wezterm' -> '$windows_wezterm_dir'" # デバッグ変更
-                        cp -R "$DOTFILES_DIR/config/wezterm" "$windows_wezterm_dir"
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy WezTerm config."; fi # エラーチェック変更
-                        echo "[DEBUG] WezTerm config copy attempted." # デバッグ変更
+                        # Try multiple potential WezTerm config locations
+                        echo "Attempting to set up WezTerm config for Windows..."
+                        
+                        # 候補1: %USERPROFILE%\.config\wezterm (デフォルト)
+                        windows_wezterm_dir="$windows_config_dir/wezterm"
+                        
+                        # 候補2: %USERPROFILE%\AppData\Local\wezterm (代替パス)
+                        windows_wezterm_dir_alt="$windows_userprofile/AppData/Local/wezterm"
+                        
+                        # 両方の場所にコピーする (存在しない場合はディレクトリを作成)
+                        for wezterm_target in "$windows_wezterm_dir" "$windows_wezterm_dir_alt"; do
+                            # Backup existing WezTerm config if exists
+                            backup_existing_config "$wezterm_target"
+                            
+                            # Create directory if it doesn't exist
+                            if [ ! -d "$wezterm_target" ]; then
+                                echo "Creating WezTerm directory: $wezterm_target"
+                                mkdir -p "$wezterm_target"
+                            fi
+                            
+                            # Copy WezTerm config directory
+                            echo "Copying WezTerm config to: $wezterm_target"
+                            cp -R "$DOTFILES_DIR/config/wezterm/"* "$wezterm_target/"
+                            if [ $? -ne 0 ]; then
+                                echo "[ERROR] Failed to copy WezTerm config to $wezterm_target"
+                            else
+                                echo "Successfully copied WezTerm config to $wezterm_target"
+                            fi
+                        done
 
                         # --- VSCode ---
-                        echo "[DEBUG] Attempting to copy VSCode settings on Windows side..." # デバッグ変更
-                        windows_vscode_user_dir="$windows_userprofile/AppData/Roaming/Code/User"
-                        windows_vscode_settings="$windows_vscode_user_dir/settings.json"
-                        echo "[DEBUG] Target VSCode Settings: '$windows_vscode_settings'" # デバッグ追加
+                        echo "Attempting to set up VSCode config for Windows..."
                         
-                        # Create VSCode User directory on Windows side if it doesn't exist
-                        if [ ! -d "$windows_vscode_user_dir" ]; then
-                            echo "[DEBUG] Creating Windows VSCode User directory: '$windows_vscode_user_dir'" # デバッグ追加
-                            mkdir -p "$windows_vscode_user_dir"
-                            if [ $? -ne 0 ]; then echo "[ERROR] Failed to create directory: $windows_vscode_user_dir"; fi # エラーチェック追加
-                        fi
-
-                        # Backup existing VSCode settings on Windows side (using backup_existing_config)
-                        echo "[DEBUG] Checking for existing config at '$windows_vscode_settings' for backup..." # デバッグ追加
-                        backup_existing_config "$windows_vscode_settings"
-
-                        # Copy VSCode settings file
-                        echo "[DEBUG] Copying VSCode settings: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_vscode_settings'" # デバッグ変更
-                        cp "$DOTFILES_DIR/config/vscode/settings.json" "$windows_vscode_settings"
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy VSCode settings."; fi # エラーチェック変更
-                        echo "[DEBUG] VSCode settings copy attempted." # デバッグ変更
+                        # VSCodeの設定ファイルパスの候補 (複数のインストール方法に対応)
+                        vscode_paths=(
+                            "$windows_userprofile/AppData/Roaming/Code/User"  # 通常のインストール
+                            "$windows_userprofile/AppData/Local/Code/User"    # 代替パス
+                            "$windows_userprofile/.vscode"                    # 旧バージョンや特殊なインストール
+                        )
+                        
+                        # 各候補パスに対して設定ファイルをコピー
+                        for vscode_user_dir in "${vscode_paths[@]}"; do
+                            vscode_settings="$vscode_user_dir/settings.json"
+                            
+                            echo "Checking VSCode path: $vscode_user_dir"
+                            
+                            # Create directory if it doesn't exist
+                            if [ ! -d "$vscode_user_dir" ]; then
+                                echo "Creating VSCode User directory: $vscode_user_dir"
+                                mkdir -p "$vscode_user_dir"
+                                # ディレクトリの作成に失敗した場合は次の候補へ
+                                if [ $? -ne 0 ]; then
+                                    echo "Failed to create directory: $vscode_user_dir, trying next path..."
+                                    continue
+                                fi
+                            fi
+                            
+                            # Backup existing settings
+                            backup_existing_config "$vscode_settings"
+                            
+                            # Copy settings file
+                            echo "Copying VSCode settings to: $vscode_settings"
+                            cp "$DOTFILES_DIR/config/vscode/settings.json" "$vscode_settings"
+                            if [ $? -eq 0 ]; then
+                                echo "Successfully copied VSCode settings to $vscode_settings"
+                            else
+                                echo "Failed to copy VSCode settings to $vscode_settings"
+                            fi
+                        done
 
                         # --- Cursor ---
-                        echo "[DEBUG] Attempting to copy Cursor files on Windows side..." # デバッグ変更
-                        windows_cursor_user_dir="$windows_userprofile/.cursor/User"
-                        windows_cursor_settings="$windows_cursor_user_dir/settings.json"
-                        windows_cursor_mcp="$windows_cursor_user_dir/mcp.json"
-                        echo "[DEBUG] Target Cursor Settings: '$windows_cursor_settings'" # デバッグ追加
-                        echo "[DEBUG] Target Cursor MCP: '$windows_cursor_mcp'" # デバッグ追加
-
-                        # Create Cursor User directory on Windows side if it doesn't exist
-                        if [ ! -d "$windows_cursor_user_dir" ]; then
-                            echo "[DEBUG] Creating Windows Cursor User directory: '$windows_cursor_user_dir'" # デバッグ追加
-                            mkdir -p "$windows_cursor_user_dir"
-                            if [ $? -ne 0 ]; then echo "[ERROR] Failed to create directory: $windows_cursor_user_dir"; fi # エラーチェック追加
-                        fi
-
-                        # Backup existing Cursor settings on Windows side (using backup_existing_config)
-                        echo "[DEBUG] Checking for existing config at '$windows_cursor_settings' for backup..." # デバッグ追加
-                        backup_existing_config "$windows_cursor_settings"
-                        echo "[DEBUG] Checking for existing config at '$windows_cursor_mcp' for backup..." # デバッグ追加
-                        backup_existing_config "$windows_cursor_mcp"
-
-                        # Copy Cursor files
-                        echo "[DEBUG] Copying Cursor settings: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_cursor_settings'" # デバッグ変更
-                        cp "$DOTFILES_DIR/config/vscode/settings.json" "$windows_cursor_settings" # Use vscode settings for cursor
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy Cursor settings."; fi # エラーチェック変更
-                        echo "[DEBUG] Copying Cursor mcp.json: '$DOTFILES_DIR/config/cursor/mcp.json' -> '$windows_cursor_mcp'" # デバッグ変更
-                        cp "$DOTFILES_DIR/config/cursor/mcp.json" "$windows_cursor_mcp"
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy Cursor mcp.json."; fi # エラーチェック変更
-                        echo "[DEBUG] Cursor files copy attempted." # デバッグ変更
+                        echo "Attempting to set up Cursor config for Windows..."
+                        
+                        # 複数のCursor設定パスの候補
+                        cursor_paths=(
+                            "$windows_userprofile/.cursor"
+                            "$windows_userprofile/AppData/Roaming/Cursor"
+                            "$windows_userprofile/AppData/Local/Cursor"
+                        )
+                        
+                        # 各候補パスに対して設定ファイルをコピー
+                        for cursor_base in "${cursor_paths[@]}"; do
+                            cursor_user_dir="$cursor_base/User"
+                            cursor_settings="$cursor_user_dir/settings.json"
+                            cursor_mcp="$cursor_user_dir/mcp.json"
+                            
+                            echo "Checking Cursor path: $cursor_user_dir"
+                            
+                            # Create Cursor User directory if it doesn't exist
+                            if [ ! -d "$cursor_user_dir" ]; then
+                                echo "Creating Cursor User directory: $cursor_user_dir"
+                                mkdir -p "$cursor_user_dir"
+                                # ディレクトリの作成に失敗した場合は次の候補へ
+                                if [ $? -ne 0 ]; then
+                                    echo "Failed to create directory: $cursor_user_dir, trying next path..."
+                                    continue
+                                fi
+                            fi
+                            
+                            # Backup existing Cursor settings
+                            backup_existing_config "$cursor_settings"
+                            backup_existing_config "$cursor_mcp"
+                            
+                            # Copy Cursor files
+                            echo "Copying Cursor settings to: $cursor_settings"
+                            cp "$DOTFILES_DIR/config/vscode/settings.json" "$cursor_settings"
+                            if [ $? -eq 0 ]; then
+                                echo "Successfully copied Cursor settings to $cursor_settings"
+                            else
+                                echo "Failed to copy Cursor settings to $cursor_settings"
+                            fi
+                            
+                            echo "Copying Cursor MCP config to: $cursor_mcp"
+                            cp "$DOTFILES_DIR/config/cursor/mcp.json" "$cursor_mcp"
+                            if [ $? -eq 0 ]; then
+                                echo "Successfully copied Cursor MCP config to $cursor_mcp"
+                            else
+                                echo "Failed to copy Cursor MCP config to $cursor_mcp"
+                            fi
+                        done
 
                     else
                         echo "[ERROR] Windows user profile directory not found at '$windows_userprofile'. Skipping Windows side config copy." # エラーメッセージ変更

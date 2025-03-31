@@ -557,10 +557,11 @@ install_packages() {
             # Extract package name (remove any inline comments)
             package_name=$(echo "$line" | sed 's/\s*#.*$//')
             
+            echo "Installing Rust package: $package_name" # デバッグ追加
             if [[ $package_name == "pacifica" ]]; then
-                cargo install --git https://github.com/serinuntius/pacifica.git
+                cargo install --git https://github.com/serinuntius/pacifica.git || echo "Warning: Failed to install Rust package: $package_name (from git)" # エラーチェック追加
             else
-                cargo install "$package_name"
+                cargo install "$package_name" || echo "Warning: Failed to install Rust package: $package_name" # エラーチェック追加
             fi
         done < "$DOTFILES_DIR/packages/cargo.txt"
     fi

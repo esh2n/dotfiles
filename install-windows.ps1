@@ -244,6 +244,7 @@ function Install-DevTools {
     Install-WingetPackage -Id "Microsoft.PowerShell" -Name "PowerShell"
     Install-WingetPackage -Id "Microsoft.PowerToys" -Name "PowerToys"
     Install-WingetPackage -Id "wez.wezterm" -Name "WezTerm"
+    Install-WingetPackage -Id "Cursor.Cursor" -Name "Cursor" # Cursorエディタを追加
     
     # Optional tools - uncomment to install
     # Install-WingetPackage -Id "Microsoft.VisualStudio.2022.Community" -Name "Visual Studio 2022 Community"
@@ -320,6 +321,35 @@ function Install-VSCodeExtensions {
     }
 }
 
+# Function to install Cursor extensions
+function Install-CursorExtensions {
+    Write-Host "Installing Cursor extensions..."
+    
+    # Check if Cursor is installed and cursor command is available
+    if (-not (Test-Command cursor)) {
+        Write-Host "Cursor not found in PATH. Extensions will not be installed."
+        return
+    }
+    
+    # Path to extensions file - use same file as VSCode
+    $extensionsFile = "$dotfilesDir\config\vscode\extensions.txt"
+    
+    if (Test-Path $extensionsFile) {
+        $extensions = Get-Content -Path $extensionsFile
+        
+        foreach ($extension in $extensions) {
+            if ([string]::IsNullOrWhiteSpace($extension)) { continue }
+            
+            Write-Host "Installing Cursor extension: $extension"
+            cursor --install-extension $extension --force
+        }
+        
+        Write-Host "Cursor extensions installed successfully."
+    } else {
+        Write-Host "Extensions file not found: $extensionsFile"
+    }
+}
+
 # Main installation function
 function Install-Dotfiles {
     Write-Host "=============================================="
@@ -368,6 +398,7 @@ function Install-Dotfiles {
     Install-DevTools
     Configure-WindowsTerminal
     Install-VSCodeExtensions
+    Install-CursorExtensions
     Setup-WslDotfiles
     
     Write-Host ""

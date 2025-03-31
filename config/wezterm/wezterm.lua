@@ -63,7 +63,7 @@ config.debug_key_events = false
 
 -- デフォルトの作業ディレクトリとシェルを設定
 config.default_cwd = os_utils.get_home_dir() -- OSに応じたホームディレクトリを取得
-config.default_prog = { '/bin/zsh', '-l' }
+config.default_prog = os_utils.get_default_shell() -- OSに応じたデフォルトシェルを取得
 
 -- タブタイトルの設定
 wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_width)
