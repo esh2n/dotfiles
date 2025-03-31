@@ -72,7 +72,14 @@ function Install-Extensions {
             }
         }
         catch {
-            Write-Host " [エラー] $($_.Exception.Message)" -ForegroundColor Red
+            # 例外オブジェクトを一時変数に格納してから参照（WSLパス問題対策）
+            $errorMessage = ""
+            try {
+                $errorMessage = $_.Exception.Message
+            } catch {
+                $errorMessage = "不明なエラー"
+            }
+            Write-Host " [エラー] $errorMessage" -ForegroundColor Red
             $failCount++
         }
     }

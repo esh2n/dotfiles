@@ -391,7 +391,14 @@ function Install-VSCodeExtensions {
                     }
                 }
                 catch {
-                    Write-Host "Error installing extension $extension: $($_.Exception.Message)" -ForegroundColor Red
+                    # 例外オブジェクトを一時変数に格納してから参照（WSLパス問題対策）
+                    $errorMessage = ""
+                    try {
+                        $errorMessage = $_.Exception.Message
+                    } catch {
+                        $errorMessage = "Unknown error"
+                    }
+                    Write-Host "Error installing extension $extension: $errorMessage" -ForegroundColor Red
                 }
             }
             
@@ -452,7 +459,14 @@ function Install-CursorExtensions {
                     }
                 }
                 catch {
-                    Write-Host "Error installing Cursor extension $extension: $($_.Exception.Message)" -ForegroundColor Red
+                    # 例外オブジェクトを一時変数に格納してから参照（WSLパス問題対策）
+                    $errorMessage = ""
+                    try {
+                        $errorMessage = $_.Exception.Message
+                    } catch {
+                        $errorMessage = "Unknown error"
+                    }
+                    Write-Host "Error installing Cursor extension $extension: $errorMessage" -ForegroundColor Red
                 }
             }
             
