@@ -105,7 +105,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 - **WSLから実行**:
    ```bash
-   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/setup-windows-paths.ps1"
+   powershell.exe -ExecutionPolicy Bypass -File "$PWD/setup-windows-paths.ps1"
    ```
 
 #### 2. `install-vscode-extensions.ps1`
@@ -134,16 +134,16 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - **WSLから実行**:
    ```bash
    # 両方の拡張機能をインストール
-   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/install-vscode-extensions.ps1"
+   powershell.exe -ExecutionPolicy Bypass -File "$PWD/install-vscode-extensions.ps1"
    
    # VS Code拡張機能のみをインストール
-   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/install-vscode-extensions.ps1" -VSCodeOnly
+   powershell.exe -ExecutionPolicy Bypass -File "$PWD/install-vscode-extensions.ps1" -VSCodeOnly
    
    # Cursor拡張機能のみをインストール
-   powershell.exe -ExecutionPolicy Bypass -InputFormat utf8 -OutputFormat utf8 -File "$PWD/install-vscode-extensions.ps1" -CursorOnly
+   powershell.exe -ExecutionPolicy Bypass -File "$PWD/install-vscode-extensions.ps1" -CursorOnly
    ```
 
-**注意**: WSLから実行する場合は、文字エンコーディングのパラメータ（`-InputFormat utf8 -OutputFormat utf8`）を必ず指定してください。これにより文字化けやスクリプトエラーを防ぎます。
+**注意**: WSLからPowerShellスクリプトを実行する場合、文字エンコーディングの問題が発生することがあります。エラーが発生した場合は、スクリプトを直接Windowsから実行することをお勧めします。
 
 ### WSL + Windows環境での設定ファイルパスの違い
 
