@@ -270,18 +270,61 @@ create_symlinks() {
                             mv "$windows_wezterm_dir" "$windows_wezterm_dir.backup.$backup_date"
                         fi
                         
-                        # Create the symlink using safe_link function
+                        # Create the symlink for WezTerm using safe_link function
                         echo "Creating symlink for WezTerm config at $windows_wezterm_dir"
                         safe_link "$DOTFILES_DIR/config/wezterm" "$windows_wezterm_dir"
                         echo "WezTerm symlink created on Windows side."
+
+                        # --- VSCode ---
+                        echo "Attempting to create VSCode symlink on Windows side..."
+                        windows_vscode_user_dir="$windows_userprofile/AppData/Roaming/Code/User"
+                        windows_vscode_settings="$windows_vscode_user_dir/settings.json"
+                        
+                        # Create VSCode User directory on Windows side if it doesn't exist
+                        if [ ! -d "$windows_vscode_user_dir" ]; then
+                            echo "Creating $windows_vscode_user_dir on Windows side..."
+                            mkdir -p "$windows_vscode_user_dir"
+                        fi
+
+                        # Backup existing VSCode settings on Windows side (using backup_existing_config)
+                        backup_existing_config "$windows_vscode_settings"
+
+                        # Create the symlink for VSCode settings using safe_link
+                        echo "Creating symlink for VSCode settings at $windows_vscode_settings"
+                        safe_link "$DOTFILES_DIR/config/vscode/settings.json" "$windows_vscode_settings"
+                        echo "VSCode settings symlink created on Windows side."
+
+                        # --- Cursor ---
+                        echo "Attempting to create Cursor symlinks on Windows side..."
+                        windows_cursor_user_dir="$windows_userprofile/.cursor/User"
+                        windows_cursor_settings="$windows_cursor_user_dir/settings.json"
+                        windows_cursor_mcp="$windows_cursor_user_dir/mcp.json"
+
+                        # Create Cursor User directory on Windows side if it doesn't exist
+                        if [ ! -d "$windows_cursor_user_dir" ]; then
+                            echo "Creating $windows_cursor_user_dir on Windows side..."
+                            mkdir -p "$windows_cursor_user_dir"
+                        fi
+
+                        # Backup existing Cursor settings on Windows side (using backup_existing_config)
+                        backup_existing_config "$windows_cursor_settings"
+                        backup_existing_config "$windows_cursor_mcp"
+
+                        # Create the symlinks for Cursor using safe_link
+                        echo "Creating symlink for Cursor settings at $windows_cursor_settings"
+                        safe_link "$DOTFILES_DIR/config/vscode/settings.json" "$windows_cursor_settings" # Use vscode settings for cursor
+                        echo "Creating symlink for Cursor mcp.json at $windows_cursor_mcp"
+                        safe_link "$DOTFILES_DIR/config/cursor/mcp.json" "$windows_cursor_mcp"
+                        echo "Cursor symlinks created on Windows side."
+
                     else
-                        echo "Warning: Windows user profile directory not found at $windows_userprofile. Skipping WezTerm symlink creation on Windows side."
+                        echo "Warning: Windows user profile directory not found at $windows_userprofile. Skipping WezTerm, VSCode, and Cursor symlink creation on Windows side."
                     fi
                 else
-                    echo "Warning: Could not retrieve Windows username via PowerShell. Skipping WezTerm symlink creation on Windows side."
+                    echo "Warning: Could not retrieve Windows username via PowerShell. Skipping WezTerm, VSCode, and Cursor symlink creation on Windows side."
                 fi
             else
-                echo "Warning: powershell.exe not found in PATH. Cannot determine Windows username. Skipping WezTerm symlink creation on Windows side."
+                echo "Warning: powershell.exe not found in PATH. Cannot determine Windows username. Skipping WezTerm, VSCode, and Cursor symlink creation on Windows side."
             fi
         fi
     fi
