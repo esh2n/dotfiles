@@ -51,15 +51,43 @@ function sk_select_history() {
 }
 
 function sk_select_src () {
-  local selected_dir=$(pacifica | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+  # ZLEが有効かどうかをチェック
+  if [[ ! -o zle ]]; then
+    echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
+    return 1
+  fi
+
+  # pacificaコマンドが存在するかチェック
+  if ! command -v pacifica &>/dev/null; then
+    # WSL環境などpacificaがない場合は代替としてfdを使用
+    local selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+  else
+    local selected_dir=$(pacifica | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+  fi
+
   if [ -n "$selected_dir" ]; then
     BUFFER="cd ${selected_dir}"
     zle accept-line
+  else
+    zle clear-screen
   fi
-  zle clear-screen
 }
 
 function sk_change_directory() {
+  # ZLEが有効かどうかをチェック
+  if [[ ! -o zle ]]; then
+    echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
+    return 1
+  fi
+
+  # zoxideコマンドが存在するかチェック
+  if ! command -v zoxide &>/dev/null; then
+    echo "エラー: zoxideがインストールされていません。"
+    echo "install-wsl-packages.shを実行するか、以下のコマンドでインストールしてください："
+    echo "sudo apt install zoxide"
+    return 1
+  fi
+
   local selected_dir=$(zoxide query -l | sk --ansi --reverse --height '50%')
   if [ -n "$selected_dir" ]; then
     BUFFER="cd ${selected_dir}"
@@ -276,13 +304,26 @@ function gx() {
 }
 compdef gx-complete gx
 
-# Bind keys for fuzzy finder
-zle -N sk_select_history
-bindkey '^r' sk_select_history
-zle -N sk_select_src
-bindkey '^]' sk_select_src
-zle -N sk_change_directory
-bindkey '^g' sk_change_directory
+# Bind keys for fuzzy finder (エラーチェック付き)
+if [[ $- == *i* ]]; then
+  # インタラクティブシェルの場合のみキーバインドを設定
+  # sk関連の関数をウィジェットとして登録
+  zle -N sk_select_history
+  bindkey '^r' sk_select_history
+  
+  zle -N sk_select_src
+  bindkey '^]' sk_select_src
+  
+  zle -N sk_change_directory
+  bindkey '^g' sk_change_directory
+else
+  # 非インタラクティブシェルの場合は警告（ログイン時に一度だけ）
+  [[ -z "$WSL_KEYBINDS_WARNING" ]] && {
+    echo "警告: 非インタラクティブシェルのため、キーバインド（Ctrl+]など）が登録できません。"
+    echo "対処法: ターミナルを再起動するか、exec zshで新しいセッションを開始してください。"
+    export WSL_KEYBINDS_WARNING=1
+  }
+fi
 
 # Enhanced search functions
 function search_in_files() {
