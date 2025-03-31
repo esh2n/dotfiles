@@ -378,8 +378,10 @@ function sz_debug() {
   sz
 }
 
-# Load sketchybar config
-source "$ZDOTDIR/sketchybar.zsh"
+# Load sketchybar config (macOSのみ)
+if [[ "$(uname)" == "Darwin" ]]; then
+  source "$ZDOTDIR/sketchybar.zsh"
+fi
 
 # Load local config if exists
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
