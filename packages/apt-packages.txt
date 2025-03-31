@@ -1,0 +1,49 @@
+# WSL環境向けのaptパッケージリスト
+# Homebrew（Brewfile.linux）の代わりにこちらを優先して使用
+
+# Core utilities
+coreutils
+moreutils
+findutils
+wget
+curl
+openssh-client
+libgmp-dev
+
+# Shell and terminal
+zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
+tmux
+
+# CLI tools
+fzf
+fd-find
+bat
+ripgrep
+zoxide
+jq
+tree
+colordiff
+htop
+trash-cli
+
+# Development tools
+git
+git-lfs
+neovim
+tig
+exuberant-ctags
+gnupg
+lua5.3
+
+# Build tools
+cmake
+autoconf
+protobuf-compiler
+
+# System compatibility
+gcc
+make
+pkg-config
+libssl-dev
