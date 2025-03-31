@@ -1,16 +1,16 @@
 # Development Tools
-golang.org/x/tools/cmd/goimports     # Import manager
-golang.org/x/tools/cmd/gopls         # Go language server
-github.com/golang/mock/mockgen       # Mock generator
-github.com/go-delve/delve/cmd/dlv    # Debugger
+golang.org/x/tools/cmd/goimports
+golang.org/x/tools/cmd/gopls
+github.com/golang/mock/mockgen
+github.com/go-delve/delve/cmd/dlv
 
 # Code Analysis
-honnef.co/go/tools/cmd/staticcheck   # Static analysis tool
+honnef.co/go/tools/cmd/staticcheck
 
 # Database Tools
-cloud.google.com/go/spanner/spanner-cli    # Cloud Spanner CLI
-github.com/cloudspannerecosystem/spanner-dump  # Spanner dump tool
+cloud.google.com/go/spanner/spanner-cli
+github.com/cloudspannerecosystem/spanner-dump
 
 # Protobuf Tools
-google.golang.org/protobuf/cmd/protoc-gen-go     # Protobuf Go generator
-google.golang.org/grpc/cmd/protoc-gen-go-grpc    # gRPC Go generator
+google.golang.org/protobuf/cmd/protoc-gen-go
+google.golang.org/grpc/cmd/protoc-gen-go-grpc
