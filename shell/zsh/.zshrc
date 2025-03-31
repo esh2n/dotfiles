@@ -33,7 +33,15 @@ autoload -Uz cdr
 autoload -Uz chpwd_recent_dirs
 
 # Initialize zoxide with better matching and no command aliases
-eval "$(zoxide init zsh --cmd cd --hook pwd)"
+if type zoxide > /dev/null 2>&1; then
+  if [ "$IS_WSL" = "1" ]; then
+    # WSL環境用のシンプルな初期化（オプションなし）
+    eval "$(zoxide init zsh)"
+  else
+    # 通常環境用の高度な初期化
+    eval "$(zoxide init zsh --cmd cd --hook pwd)"
+  fi
+fi
 
 # Load configurations
 source "$ZDOTDIR/options.zsh"
