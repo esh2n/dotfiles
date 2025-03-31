@@ -1,5 +1,24 @@
 # Windows Installation Script for Dotfiles
-# Run this script with Administrator privileges in PowerShell
+# Purpose: Setup Windows native environment and tools for development with WSL
+#
+# IMPORTANT: This script should be run in Windows PowerShell, NOT in WSL.
+# It sets up Windows-specific tools and configures WSL for development.
+#
+# Setup Process:
+# 1. Ensures WSL is properly installed and configured
+# 2. Installs development fonts (JetBrains Mono, Hack Nerd Font)
+# 3. Installs Windows dev tools (WezTerm, VS Code, Cursor, etc.)
+# 4. Configures Windows Terminal
+# 5. Installs VS Code & Cursor extensions
+# 6. Sets up dotfiles in WSL environment
+#
+# How to use:
+# 1. Open PowerShell as Administrator
+# 2. Run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+# 3. Run: .\install-windows.ps1
+#
+# After running this script:
+# - Open WSL and run the Linux setup script: ./install.sh
 
 # Ensure we're running with Administrator privileges
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {

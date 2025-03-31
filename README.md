@@ -22,6 +22,24 @@
 
 ### Windows (WSL)
 
+#### Windows環境のスクリプト使い分け（重要）
+
+Windows環境では、`.ps1`スクリプトと`.sh`スクリプトを使い分ける必要があります：
+
+- **install-windows.ps1**（PowerShellスクリプト）
+  - **目的**: Windowsネイティブ環境（WSL外）用のセットアップ
+  - **実行環境**: Windows PowerShell または Windows Terminal内のPowerShell
+  - **機能**:
+    - WezTerm、VSCode、Cursorなどのツールをインストール
+    - Windows固有の設定を構成
+
+- **install.sh**（Bashスクリプト）
+  - **目的**: WSL (Windows Subsystem for Linux)内の環境設定
+  - **実行環境**: WSL内のLinux環境（Ubuntu等）
+  - **機能**:
+    - WSL内の設定ファイルをセットアップ
+    - WSL経由でWindowsの設定ファイルも配置
+
 #### 方法1: WSL内からのセットアップ (推奨)
 
 既にWSLがインストールされている場合は、WSLセッション内から`install.sh`を実行します：
@@ -37,10 +55,55 @@ WSLをまだインストールしていない場合は、Windowsの管理者Powe
 
 ```powershell
 # Windows PowerShellから実行（管理者権限が必要）
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 .\install-windows.ps1
 ```
 
 **注意**: `install-windows.ps1`はWSL内部から実行しないでください。このスクリプトはWindowsネイティブのPowerShell環境用です。
+
+#### 推奨セットアップ手順（完全版）
+
+Windows環境で最適な結果を得るには、次の順序でセットアップすることをお勧めします：
+
+1. **まずWindows側の設定**
+   ```powershell
+   # 管理者権限でPowerShellを開いて実行
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   .\install-windows.ps1
+   ```
+   これにより、WezTerm、VSCode、Cursorなどの必要なアプリケーションがインストールされます。
+
+2. **次にWSL内の設定**
+   ```bash
+   # WezTermやWindows Terminalなどを使ってWSLを起動し、実行
+   cd ~/go/github.com/esh2n/dotfiles
+   ./install.sh
+   ```
+   これにより、WSL内の設定と、Windows側の設定ファイルが適切に配置されます。
+
+#### 設定更新時の使い分け（重要）
+
+- **Windows側のアプリケーションをインストール/更新する場合**:
+  ```powershell
+  # Windows PowerShellから実行（WSLがあってもなくても）
+  .\install-windows.ps1
+  ```
+  これは、WSLが既にある場合でも、Windows側のアプリケーション（WezTerm、VSCode、Cursorなど）を
+  インストールまたは更新したい場合に使用します。
+
+- **WSL内の設定と関連するWindows設定を更新する場合**:
+  ```bash
+  # WSLコンソール内で実行
+  ./install.sh
+  ```
+  これは、WSL内の環境設定と、WSLからアクセス可能なWindows側の設定ファイルを更新します。
+
+- **設定ファイルだけを更新したい場合**:
+  ```bash
+  # WSLコンソール内で実行
+  ./shell/create_symlinks.sh
+  ```
+  これは、主に設定ファイルのシンボリックリンクや配置のみを更新します。
 
 ### Linux/WSL環境の追加セットアップ
 
