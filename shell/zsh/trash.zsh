@@ -74,11 +74,37 @@ function trash() {
 
       # PowerShellを使用してゴミ箱に移動
       local windows_path
-      windows_path=$(wslpath -w "$item")
-      if powershell.exe -Command "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('$windows_path', 'OnlyErrorDialogs', 'SendToRecycleBin')" 2>/dev/null; then
+      windows_path=$(wslpath -w "$item" 2>/dev/null)
+      
+      # パス変換エラーチェック
+      if [[ -z "$windows_path" ]]; then
+        echo "❌ '$item' のWindowsパス変換に失敗しました"
+        return 1
+      fi
+      
+      echo "📂 変換: $item -> $windows_path"
+      
+      # ファイルかディレクトリかで適切なメソッドを使用
+      local ps_command
+      if [[ -d "$item" ]]; then
+        ps_command="Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory('$windows_path', 'OnlyErrorDialogs', 'SendToRecycleBin')"
+      else
+        ps_command="Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('$windows_path', 'OnlyErrorDialogs', 'SendToRecycleBin')"
+      fi
+      
+      # エラー出力をキャプチャ
+      local error_output
+      error_output=$(powershell.exe -Command "$ps_command" 2>&1)
+      
+      if [[ $? -eq 0 && -z "$error_output" ]]; then
         echo "🗑️ '$item' をゴミ箱に移動しました"
       else
         echo "❌ '$item' をゴミ箱に移動できませんでした"
+        if [[ -n "$error_output" ]]; then
+          echo "エラー: $error_output"
+        fi
+        
+        # 強制フラグがない場合は終了
         if [[ "$force" == false ]]; then
           return 1
         fi
