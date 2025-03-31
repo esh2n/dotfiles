@@ -57,22 +57,50 @@ function sk_select_src () {
     return 1
   fi
 
+  # SIGINT（Ctrl+C）ハンドラを設定（中断時のゴミファイル処理を防止）
+  # originalのハンドラを保存
+  local original_sigint_handler=$(trap -p INT)
+  
+  # 関数終了時にSIGINTハンドラを元に戻す関数
+  function cleanup() {
+    # 元のSIGINTハンドラを復元（存在する場合）
+    if [[ -n "$original_sigint_handler" ]]; then
+      eval "$original_sigint_handler"
+    else
+      trap - INT
+    fi
+    # デバッグ用メッセージを無効化（必要に応じてコメント解除）
+    # echo "sk_select_src: クリーンアップ完了"
+  }
+  
+  # 終了時に必ずクリーンアップを実行
+  trap cleanup EXIT
+  
+  # Ctrl+C押下時の独自処理（中断をきれいに処理）
+  trap "cleanup; return 130" INT
+
   local selected_dir=""
   
-  # pacificaを優先的に使用
+  # pacificaを優先的に使用（WSL環境でも）
   if command -v pacifica &>/dev/null; then
-    # 一時ファイルを使用してエラーを捕捉
-    pacifica 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null > /tmp/pacifica_result.$$ || true
+    # skコマンドの存在確認
+    if ! command -v sk &>/dev/null; then
+      echo "エラー: skコマンドがインストールされていません"
+      echo "WSL環境では: sudo apt install skim"
+      zle reset-prompt
+      return 1
+    fi
     
-    # 結果が存在し空でなければ使用
-    if [ -s /tmp/pacifica_result.$$ ]; then
-      selected_dir=$(cat /tmp/pacifica_result.$$)
-      rm -f /tmp/pacifica_result.$$
+    # 静かに実行（余計なメッセージを表示しない）
+    local output
+    output=$(pacifica 2>/dev/null)
+    
+    # 出力が空でないことを確認
+    if [[ -n "$output" ]]; then
+      # skに渡して選択
+      selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
     else
-      # pacificaが失敗したか結果が空の場合
-      rm -f /tmp/pacifica_result.$$ 2>/dev/null
-      
-      # メッセージ表示は省略してシームレスに代替手段を使用
+      # 静かにフォールバック
       if command -v fd &>/dev/null; then
         selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules . "$HOME" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
       elif command -v find &>/dev/null; then
@@ -80,14 +108,16 @@ function sk_select_src () {
       fi
     fi
   else
-    # pacificaがインストールされていない場合はfdまたはfindを使用
+    # pacificaがインストールされていない場合はfdまたはfindを使用（静かに）
     if command -v fd &>/dev/null; then
       selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules . "$HOME" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
     elif command -v find &>/dev/null; then
       selected_dir=$(find "$HOME" -type d -not -path "*/\.*" -not -path "*/node_modules/*" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
     else
       echo "エラー: pacifica、fd、findのいずれもインストールされていません"
-      return 1
+      zle reset-prompt
+        return 1
+      fi
     fi
   fi
 
@@ -96,7 +126,7 @@ function sk_select_src () {
     BUFFER="cd ${selected_dir}"
     zle accept-line
   else
-    zle clear-screen
+    zle reset-prompt
   fi
 }
 
@@ -107,6 +137,24 @@ function sk_change_directory() {
     return 1
   fi
 
+  # SIGINT（Ctrl+C）ハンドラを設定
+  local original_sigint_handler=$(trap -p INT)
+  
+  # 関数終了時にSIGINTハンドラを元に戻す関数
+  function cleanup() {
+    if [[ -n "$original_sigint_handler" ]]; then
+      eval "$original_sigint_handler"
+    else
+      trap - INT
+    fi
+  }
+  
+  # 終了時に必ずクリーンアップを実行
+  trap cleanup EXIT
+  
+  # Ctrl+C押下時の独自処理
+  trap "cleanup; return 130" INT
+
   # zoxideコマンドが存在するかチェック
   if ! command -v zoxide &>/dev/null; then
     echo "エラー: zoxideがインストールされていません。"
@@ -115,7 +163,13 @@ function sk_change_directory() {
     return 1
   fi
 
-  local selected_dir=$(zoxide query -l | sk --ansi --reverse --height '50%')
+  local output=$(zoxide query -l)
+  local selected_dir=""
+  
+  if [[ -n "$output" ]]; then
+    selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' 2>/dev/null)
+  fi
+  
   if [ -n "$selected_dir" ]; then
     BUFFER="cd ${selected_dir}"
     zle accept-line
@@ -123,35 +177,99 @@ function sk_change_directory() {
 }
 
 function sk_select_file_below_pwd() {
+  # ZLEが有効かどうかをチェック
+  if [[ ! -o zle ]]; then
+    echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
+    return 1
+  fi
+
+  # SIGINT（Ctrl+C）ハンドラを設定
+  local original_sigint_handler=$(trap -p INT)
+  
+  # 関数終了時にSIGINTハンドラを元に戻す関数
+  function cleanup() {
+    if [[ -n "$original_sigint_handler" ]]; then
+      eval "$original_sigint_handler"
+    else
+      trap - INT
+    fi
+  }
+  
+  # 終了時に必ずクリーンアップを実行
+  trap cleanup EXIT
+  
+  # Ctrl+C押下時の独自処理
+  trap "cleanup; return 130" INT
+
   if [ ! `pwd | grep "$(ghq root)"` ]; then
     echo "you are not in ghq path"
     zle accept-line
     return 0
   fi
-  local selected_path="\
-    $(fd --type f --hidden --exclude .git --exclude node_modules --exclude vendor | \
-    sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {}')"
+  
+  local selected_path=""
+  
+  # fdコマンドの出力を変数に保存してからskに渡す
+  local files_list=$(fd --type f --hidden --exclude .git --exclude node_modules --exclude vendor 2>/dev/null)
+  
+  if [[ -n "$files_list" ]]; then
+    selected_path=$(echo "$files_list" | sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {}' 2>/dev/null)
+  fi
+  
   if [ -n "$selected_path" ]; then
     go_to "$selected_path"
   fi
 }
 
 function sk_select_file_within_project() {
+  # ZLEが有効かどうかをチェック
+  if [[ ! -o zle ]]; then
+    echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
+    return 1
+  fi
+
+  # SIGINT（Ctrl+C）ハンドラを設定
+  local original_sigint_handler=$(trap -p INT)
+  
+  # 関数終了時にSIGINTハンドラを元に戻す関数
+  function cleanup() {
+    if [[ -n "$original_sigint_handler" ]]; then
+      eval "$original_sigint_handler"
+    else
+      trap - INT
+    fi
+  }
+  
+  # 終了時に必ずクリーンアップを実行
+  trap cleanup EXIT
+  
+  # Ctrl+C押下時の独自処理
+  trap "cleanup; return 130" INT
+
   local base_path=$(pwd | grep -o "$(ghq root)/[^/]*/[^/]*/[^/]*")
   if [ -z "$base_path" ]; then
     echo "you are not in ghq project"
     zle accept-line
     return 0
   fi
-  local paths="\
-    $(fd --type f --hidden --exclude .git --exclude node_modules --exclude vendor . "$base_path")"
-  local selected_path="$(echo "(root)\n$paths" | sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {} 2>/dev/null || echo "Preview not available"')"
-  if [ -n "$selected_path" ]; then
-    if [[ "$selected_path" = "(root)" ]]; then
-      go_to "$base_path"
-      return 0
+  
+  # fdコマンドの出力を変数に保存
+  local paths=$(fd --type f --hidden --exclude .git --exclude node_modules --exclude vendor . "$base_path" 2>/dev/null)
+  
+  # fdコマンドの出力が空でない場合のみskに渡す
+  if [[ -n "$paths" ]]; then
+    local selected_path="$(echo "(root)"$'\n'"$paths" | sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {} 2>/dev/null || echo "Preview not available"' 2>/dev/null)"
+    
+    if [ -n "$selected_path" ]; then
+      if [[ "$selected_path" = "(root)" ]]; then
+        go_to "$base_path"
+        return 0
+      fi
+      go_to "$selected_path"
     fi
-    go_to "$selected_path"
+  else
+    echo "プロジェクト内にファイルが見つかりません"
+    zle reset-prompt
   fi
 }
 

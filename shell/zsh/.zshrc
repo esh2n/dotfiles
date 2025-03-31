@@ -31,16 +31,32 @@ compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/zcompdump-$ZSH_VERSION"
 autoload -Uz add-zsh-hook
 autoload -Uz cdr
 autoload -Uz chpwd_recent_dirs
+# WSL環境の検出
+if grep -q -E "microsoft|wsl" /proc/version 2>/dev/null; then
+  export IS_WSL=1
+else
+  export IS_WSL=0
+fi
 
 # Initialize zoxide with better matching and no command aliases
 if type zoxide > /dev/null 2>&1; then
   if [ "$IS_WSL" = "1" ]; then
-    # WSL環境用のシンプルな初期化（オプションなし）
-    eval "$(zoxide init zsh)"
+    # WSL環境用のシンプルな初期化（補完の問題を回避）
+    eval "$(zoxide init zsh --no-cmd)"
+    
+    # z、ziコマンドを手動で定義（補完なしバージョン）
+    function z() {
+      __zoxide_z "$@"
+    }
+    
+    function zi() {
+      __zoxide_zi "$@"
+    }
   else
     # 通常環境用の高度な初期化
     eval "$(zoxide init zsh --cmd cd --hook pwd)"
   fi
+fi
 fi
 
 # Load configurations
