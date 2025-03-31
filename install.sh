@@ -301,14 +301,14 @@ create_symlinks() {
                             if [ $? -ne 0 ]; then echo "[ERROR] Failed to backup WezTerm config."; fi # エラーチェック追加
                         fi
                         
-                        # Create the symlink for WezTerm
-                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/wezterm' -> '$windows_wezterm_dir'" # デバッグ追加
-                        ln -sf "$DOTFILES_DIR/config/wezterm" "$windows_wezterm_dir"
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create WezTerm symlink."; fi # エラーチェック追加
-                        echo "[DEBUG] WezTerm symlink creation attempted." # デバッグ追加
+                        # Copy WezTerm config directory
+                        echo "[DEBUG] Copying WezTerm config: '$DOTFILES_DIR/config/wezterm' -> '$windows_wezterm_dir'" # デバッグ変更
+                        cp -R "$DOTFILES_DIR/config/wezterm" "$windows_wezterm_dir"
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy WezTerm config."; fi # エラーチェック変更
+                        echo "[DEBUG] WezTerm config copy attempted." # デバッグ変更
 
                         # --- VSCode ---
-                        echo "[DEBUG] Attempting to create VSCode symlink on Windows side..." # デバッグ追加
+                        echo "[DEBUG] Attempting to copy VSCode settings on Windows side..." # デバッグ変更
                         windows_vscode_user_dir="$windows_userprofile/AppData/Roaming/Code/User"
                         windows_vscode_settings="$windows_vscode_user_dir/settings.json"
                         echo "[DEBUG] Target VSCode Settings: '$windows_vscode_settings'" # デバッグ追加
@@ -329,14 +329,14 @@ create_symlinks() {
                              if [ $? -ne 0 ]; then echo "[ERROR] Failed to backup VSCode settings."; fi # エラーチェック追加
                         fi
 
-                        # Create the symlink for VSCode settings
-                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_vscode_settings'" # デバッグ追加
-                        ln -sf "$DOTFILES_DIR/config/vscode/settings.json" "$windows_vscode_settings"
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create VSCode settings symlink."; fi # エラーチェック追加
-                        echo "[DEBUG] VSCode settings symlink creation attempted." # デバッグ追加
+                        # Copy VSCode settings file
+                        echo "[DEBUG] Copying VSCode settings: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_vscode_settings'" # デバッグ変更
+                        cp "$DOTFILES_DIR/config/vscode/settings.json" "$windows_vscode_settings"
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy VSCode settings."; fi # エラーチェック変更
+                        echo "[DEBUG] VSCode settings copy attempted." # デバッグ変更
 
                         # --- Cursor ---
-                        echo "[DEBUG] Attempting to create Cursor symlinks on Windows side..." # デバッグ追加
+                        echo "[DEBUG] Attempting to copy Cursor files on Windows side..." # デバッグ変更
                         windows_cursor_user_dir="$windows_userprofile/.cursor/User"
                         windows_cursor_settings="$windows_cursor_user_dir/settings.json"
                         windows_cursor_mcp="$windows_cursor_user_dir/mcp.json"
@@ -366,23 +366,23 @@ create_symlinks() {
                              if [ $? -ne 0 ]; then echo "[ERROR] Failed to backup Cursor mcp.json."; fi # エラーチェック追加
                         fi
 
-                        # Create the symlinks for Cursor
-                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_cursor_settings'" # デバッグ追加
-                        ln -sf "$DOTFILES_DIR/config/vscode/settings.json" "$windows_cursor_settings" # Use vscode settings for cursor
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create Cursor settings symlink."; fi # エラーチェック追加
-                        echo "[DEBUG] Creating symlink: '$DOTFILES_DIR/config/cursor/mcp.json' -> '$windows_cursor_mcp'" # デバッグ追加
-                        ln -sf "$DOTFILES_DIR/config/cursor/mcp.json" "$windows_cursor_mcp"
-                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to create Cursor mcp.json symlink."; fi # エラーチェック追加
-                        echo "[DEBUG] Cursor symlinks creation attempted." # デバッグ追加
+                        # Copy Cursor files
+                        echo "[DEBUG] Copying Cursor settings: '$DOTFILES_DIR/config/vscode/settings.json' -> '$windows_cursor_settings'" # デバッグ変更
+                        cp "$DOTFILES_DIR/config/vscode/settings.json" "$windows_cursor_settings" # Use vscode settings for cursor
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy Cursor settings."; fi # エラーチェック変更
+                        echo "[DEBUG] Copying Cursor mcp.json: '$DOTFILES_DIR/config/cursor/mcp.json' -> '$windows_cursor_mcp'" # デバッグ変更
+                        cp "$DOTFILES_DIR/config/cursor/mcp.json" "$windows_cursor_mcp"
+                        if [ $? -ne 0 ]; then echo "[ERROR] Failed to copy Cursor mcp.json."; fi # エラーチェック変更
+                        echo "[DEBUG] Cursor files copy attempted." # デバッグ変更
 
                     else
-                        echo "[ERROR] Windows user profile directory not found at '$windows_userprofile'. Skipping Windows side symlink creation." # エラーメッセージ変更
+                        echo "[ERROR] Windows user profile directory not found at '$windows_userprofile'. Skipping Windows side config copy." # エラーメッセージ変更
                     fi
                 else
-                    echo "[ERROR] Could not retrieve Windows username via PowerShell. Skipping Windows side symlink creation." # エラーメッセージ変更
+                    echo "[ERROR] Could not retrieve Windows username via PowerShell. Skipping Windows side config copy." # エラーメッセージ変更
                 fi
             else
-                echo "[ERROR] powershell.exe not found in PATH. Cannot determine Windows username. Skipping Windows side symlink creation." # エラーメッセージ変更
+                echo "[ERROR] powershell.exe not found in PATH. Cannot determine Windows username. Skipping Windows side config copy." # エラーメッセージ変更
             fi
         fi
     fi
@@ -578,12 +578,12 @@ install_packages() {
             [[ $line =~ ^#.*$ ]] && continue
             [[ -z $line ]] && continue
             
-            echo "Installing Go package: $line"
-            go install "$line" || echo "Warning: Failed to install Go package: $line"
+            
+            echo "Installing Go package: ${line}@latest" # バージョン指定を追加
+            go install "${line}@latest" || echo "Warning: Failed to install Go package: ${line}@latest"
         done < "$DOTFILES_DIR/packages/go.txt"
     fi
     
-    # Ruby gems
     if command -v gem >/dev/null 2>&1 && [ -f "$DOTFILES_DIR/packages/gem.txt" ]; then
         echo "Installing Ruby gems..."
         while IFS= read -r line || [ -n "$line" ]; do
