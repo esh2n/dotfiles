@@ -99,18 +99,35 @@ function Install-WSL {
         exit 0
     }
     
-    # Check if the specified distribution is installed
-    $distroInstalled = wsl -l | Select-String $wslDistro
+    # Check if the specified distribution is installed - improved detection
+    $distroList = wsl --list --verbose | Out-String
     
-    if (-not $distroInstalled) {
-        Write-Host "Installing $wslDistro distribution..."
-        wsl --install -d $wslDistro
-        
-        Write-Host "WSL distribution setup complete. You'll need to set up a user account for the distribution."
-        Write-Host "After setting up your user account, please run this script again to continue."
-        exit 0
+    if ($distroList -match $wslDistro) {
+        Write-Host "$wslDistro distribution is already installed."
     } else {
-        Write-Host "$wslDistro distribution is installed."
+        Write-Host "Installing $wslDistro distribution..."
+        
+        # Try to install the distribution
+        try {
+            wsl --install -d $wslDistro
+            
+            Write-Host "WSL distribution setup complete. You'll need to set up a user account for the distribution."
+            Write-Host "After setting up your user account, please run this script again to continue."
+            exit 0
+        } catch {
+            # Check if the error is because it already exists
+            if ($_.Exception.Message -match "ERROR_ALREADY_EXISTS") {
+                Write-Host "$wslDistro distribution already exists but may be corrupted. Consider running 'wsl --unregister $wslDistro' and then running this script again."
+            } else {
+                Write-Host "Error installing $wslDistro: $_"
+            }
+            
+            # Ask if the user wants to continue anyway
+            $continue = Read-Host "Do you want to continue with the rest of the setup? (y/N)"
+            if ($continue -ne 'y' -and $continue -ne 'Y') {
+                exit 1
+            }
+        }
     }
     
     return $true
