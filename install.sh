@@ -792,7 +792,6 @@ install_starship() {
         echo "Failed to install starship. Please install it manually from https://starship.rs"
     fi
 }
-}
 
 # Setup sketchybar (macOS only)
 setup_sketchybar() {
