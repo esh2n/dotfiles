@@ -66,7 +66,16 @@ function Rm() {
   done
   
   # 全てのチェックに通ったら削除実行
-  \rm -rf "$@"
+  echo "💥 削除実行中: $@"
+  
+  # WSL環境での問題に対応するため、両方の方法を試す
+  if grep -q -E "microsoft|wsl" /proc/version 2>/dev/null; then
+    echo "WSL環境を検出しました - rmと/bin/rmの両方を試行"
+    \rm -rf "$@" || /bin/rm -rf "$@"
+  else
+    # 通常環境
+    \rm -rf "$@"
+  fi
 }
 
 alias mkcd='mkdir_and_change_directory'

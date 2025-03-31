@@ -1,13 +1,22 @@
 # Cross-platform trash function
 function trash() {
+  echo "🗑️ trash実行: $@"
   # macOSの場合は標準のtrashコマンドを使用
   if [[ "$OSTYPE" == "darwin"* ]]; then
     command trash "$@"
     return $?
   fi
 
-  # Windows (WSL)の場合のみ独自の処理
-  if grep -q Microsoft /proc/version 2>/dev/null; then
+  # Linux環境の場合
+  # trash-cli（trash-put）があればそちらを使用
+  if command -v trash-put &> /dev/null; then
+    echo "trash-putを使用します"
+    trash-put "$@"
+    return $?
+  fi
+
+  # Windows (WSL)の場合の処理
+  if grep -q -E "microsoft|wsl" /proc/version 2>/dev/null; then
     local recursive=false
     local force=false
     local args=()
@@ -72,7 +81,7 @@ function trash() {
         continue
       fi
 
-      # PowerShellを使用してゴミ箱に移動
+      # より単純な方法でPowerShellを使用してゴミ箱に移動
       local windows_path
       windows_path=$(wslpath -w "$item" 2>/dev/null)
       
@@ -84,25 +93,41 @@ function trash() {
       
       echo "📂 変換: $item -> $windows_path"
       
-      # ファイルかディレクトリかで適切なメソッドを使用
-      local ps_command
-      if [[ -d "$item" ]]; then
-        ps_command="Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory('$windows_path', 'OnlyErrorDialogs', 'SendToRecycleBin')"
-      else
-        ps_command="Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('$windows_path', 'OnlyErrorDialogs', 'SendToRecycleBin')"
-      fi
+      # 単純なPowerShellスクリプトを使用（recycle.exe使用）
+      local ps_script='
+      $path = "'$windows_path'"
+      $shell = New-Object -ComObject "Shell.Application"
+      $item = $shell.Namespace(0).ParseName($path)
+      if ($item -ne $null) {
+          $item.InvokeVerb("delete")
+          "Success"
+      } else {
+          "Failed: Item not found"
+      }
+      '
       
-      # エラー出力をキャプチャ
-      local error_output
-      error_output=$(powershell.exe -Command "$ps_command" 2>&1)
+      # PowerShellスクリプトを一時ファイルに保存して実行
+      local temp_script="/tmp/trash_script_$$.ps1"
+      echo "$ps_script" > "$temp_script"
       
-      if [[ $? -eq 0 && -z "$error_output" ]]; then
+      # デバッグ情報
+      echo "🔍 実行するPowerShellスクリプト:"
+      cat "$temp_script"
+      
+      # スクリプト実行
+      local result
+      result=$(powershell.exe -ExecutionPolicy Bypass -File "$temp_script" 2>&1)
+      local exit_code=$?
+      
+      # 一時ファイル削除
+      rm -f "$temp_script"
+      
+      # 結果確認
+      if [[ $exit_code -eq 0 && "$result" == *"Success"* ]]; then
         echo "🗑️ '$item' をゴミ箱に移動しました"
       else
         echo "❌ '$item' をゴミ箱に移動できませんでした"
-        if [[ -n "$error_output" ]]; then
-          echo "エラー: $error_output"
-        fi
+        echo "結果: $result"
         
         # 強制フラグがない場合は終了
         if [[ "$force" == false ]]; then
