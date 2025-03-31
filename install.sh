@@ -571,7 +571,11 @@ install_packages() {
         # Make sure GOPATH is set with absolute path
         export GOPATH="$HOME/go"
         mkdir -p "$GOPATH"
+        # Explicitly set GOBIN to an absolute path and export it
+        export GOBIN="$GOPATH/bin"
+        mkdir -p "$GOBIN"
         echo "Using GOPATH: $GOPATH"
+        echo "Using GOBIN: $GOBIN" # デバッグ追加
         
         while IFS= read -r line || [ -n "$line" ]; do
             # Skip comment lines and empty lines
