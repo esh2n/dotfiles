@@ -79,8 +79,55 @@ function Install-WSL {
             Write-Host "Setting WSL 2 as the default version..."
             wsl --set-default-version 2
         }
+        
+        # List available distributions
+        Write-Host "Checking for installed WSL distributions..."
+        $distroList = wsl --list --verbose | Out-String
+        
+        # Check if our distribution is already installed
+        if ($distroList -match $wslDistro) {
+            Write-Host "$wslDistro distribution is already installed."
+            return $true
+        }
+        
+        # If we get here, WSL is installed but our distribution is not
+        Write-Host "WSL is installed but $wslDistro distribution is not. Installing it now..."
+        
+        # Instead of wsl --install -d which can cause issues when WSL is already installed
+        # We'll try an alternative approach
+        $confirmation = Read-Host "Install $wslDistro distribution? (y/N)"
+        if ($confirmation -ne 'y' -and $confirmation -ne 'Y') {
+            Write-Host "Skipping distribution installation."
+            return $true
+        }
+        
+        # Try to install the distribution directly with wsl --import
+        # First check if the Microsoft Store package is available
+        if (Get-AppxPackage -Name CanonicalGroupLimited.Ubuntu) {
+            Write-Host "$wslDistro package is already installed, attempting to launch it..."
+            try {
+                # Just start the distribution - this will set it up if it's not already set up
+                Start-Process "ubuntu" -ArgumentList "install" -NoNewWindow -Wait
+                return $true
+            } catch {
+                Write-Host "Could not start $wslDistro. We'll continue with the setup anyway."
+                return $true
+            }
+        } else {
+            # Try to install via Microsoft Store
+            Write-Host "Please install $wslDistro from the Microsoft Store manually."
+            Write-Host "After installation, run this script again."
+            
+            # Ask if we should continue anyway
+            $continue = Read-Host "Do you want to continue with the setup without installing $wslDistro? (y/N)"
+            if ($continue -ne 'y' -and $continue -ne 'Y') {
+                exit 1
+            }
+            return $true
+        }
     } else {
-        Write-Host "Installing WSL..."
+        # WSL is not installed at all
+        Write-Host "WSL is not installed. Installing it now..."
         
         # First ensure Windows features are enabled
         Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
@@ -90,43 +137,17 @@ function Install-WSL {
         Write-Host "Setting WSL 2 as the default version..."
         wsl --set-default-version 2
         
-        # Install default distribution
-        Write-Host "Installing $wslDistro distribution..."
-        wsl --install -d $wslDistro
-        
-        Write-Host "WSL setup complete. You may need to restart your computer to finish the installation."
-        Write-Host "After restart, please run this script again to continue setup."
-        exit 0
-    }
-    
-    # Check if the specified distribution is installed - improved detection
-    $distroList = wsl --list --verbose | Out-String
-    
-    if ($distroList -match $wslDistro) {
-        Write-Host "$wslDistro distribution is already installed."
-    } else {
-        Write-Host "Installing $wslDistro distribution..."
-        
-        # Try to install the distribution
+        # Install WSL with default distribution
+        Write-Host "Installing WSL with $wslDistro distribution..."
         try {
             wsl --install -d $wslDistro
-            
-            Write-Host "WSL distribution setup complete. You'll need to set up a user account for the distribution."
-            Write-Host "After setting up your user account, please run this script again to continue."
+            Write-Host "WSL setup started. You may need to restart your computer to finish the installation."
+            Write-Host "After restart, please run this script again to continue setup."
             exit 0
         } catch {
-            # Check if the error is because it already exists
-            if ($_.Exception.Message -match "ERROR_ALREADY_EXISTS") {
-                Write-Host "$wslDistro distribution already exists but may be corrupted. Consider running 'wsl --unregister $wslDistro' and then running this script again."
-            } else {
-                Write-Host ("Error installing " + $wslDistro + ": " + $_.Exception.Message)
-            }
-            
-            # Ask if the user wants to continue anyway
-            $continue = Read-Host "Do you want to continue with the rest of the setup? (y/N)"
-            if ($continue -ne 'y' -and $continue -ne 'Y') {
-                exit 1
-            }
+            Write-Host "Error installing WSL: $($_.Exception.Message)"
+            Write-Host "Please try installing WSL manually using 'wsl --install' in PowerShell as Administrator."
+            exit 1
         }
     }
     

@@ -326,14 +326,45 @@ create_symlinks() {
                                 mkdir -p "$wezterm_target"
                             fi
                             
-                            # Copy WezTerm config directory
+                            # WezTermのファイルを個別にコピー（アクセス権限の問題を回避）
                             echo "Copying WezTerm config to: $wezterm_target"
-                            cp -R "$DOTFILES_DIR/config/wezterm/"* "$wezterm_target/"
+                            
+                            # まず基本設定ファイルをコピー
+                            cp "$DOTFILES_DIR/config/wezterm/wezterm.lua" "$wezterm_target/"
                             if [ $? -ne 0 ]; then
-                                echo "[ERROR] Failed to copy WezTerm config to $wezterm_target"
+                                echo "[ERROR] Failed to copy WezTerm main config to $wezterm_target"
                             else
-                                echo "Successfully copied WezTerm config to $wezterm_target"
+                                echo "Successfully copied WezTerm main config to $wezterm_target"
                             fi
+                            
+                            # サブディレクトリを作成
+                            mkdir -p "$wezterm_target/lua/core"
+                            mkdir -p "$wezterm_target/lua/ui"
+                            mkdir -p "$wezterm_target/lua/utils"
+                            
+                            # 各サブディレクトリのファイルをコピー
+                            # core
+                            for f in "$DOTFILES_DIR/config/wezterm/lua/core/"*.lua; do
+                                base=$(basename "$f")
+                                cp "$f" "$wezterm_target/lua/core/$base"
+                                echo "Copied $base to lua/core/"
+                            done
+                            
+                            # ui
+                            for f in "$DOTFILES_DIR/config/wezterm/lua/ui/"*.lua; do
+                                base=$(basename "$f")
+                                cp "$f" "$wezterm_target/lua/ui/$base"
+                                echo "Copied $base to lua/ui/"
+                            done
+                            
+                            # utils
+                            for f in "$DOTFILES_DIR/config/wezterm/lua/utils/"*.lua; do
+                                base=$(basename "$f")
+                                cp "$f" "$wezterm_target/lua/utils/$base"
+                                echo "Copied $base to lua/utils/"
+                            done
+                            
+                            echo "Finished copying WezTerm config to $wezterm_target"
                         done
 
                         # --- VSCode ---
