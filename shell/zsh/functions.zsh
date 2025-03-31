@@ -331,18 +331,55 @@ function gx() {
 }
 compdef gx-complete gx
 
-# Bind keys for fuzzy finder (エラーチェック付き)
+# Bind keys for fuzzy finder (環境適応型)
 if [[ $- == *i* ]]; then
   # インタラクティブシェルの場合のみキーバインドを設定
-  # sk関連の関数をウィジェットとして登録
+  # 全てのsk関連の関数をウィジェットとして登録
   zle -N sk_select_history
-  bindkey '^r' sk_select_history
-  
   zle -N sk_select_src
-  bindkey '^]' sk_select_src
-  
   zle -N sk_change_directory
-  bindkey '^g' sk_change_directory
+  zle -N sk_select_file_within_project
+  zle -N sk_select_file_below_pwd
+  
+  # WSL環境ではCtrl+]が動作しない場合があるため、
+  # 複数の代替キーバインドを設定
+  if [ "$IS_WSL" = "1" ]; then
+    echo "WSL環境用キーバインドを設定しています..."
+    
+    # 基本のキーバインド
+    bindkey '^r' sk_select_history   # Ctrl+R: 履歴検索
+    bindkey '^g' sk_change_directory # Ctrl+G: ディレクトリ変更
+    
+    # sk_select_srcに複数のキーバインド（いずれかが動くように）
+    bindkey '^]' sk_select_src       # Ctrl+]
+    bindkey '^\' sk_select_src       # Ctrl+\
+    bindkey '^p' sk_select_src       # Ctrl+P
+    bindkey '\e]' sk_select_src      # Alt+]
+    
+    # 追加のキーバインド
+    bindkey '^v' sk_select_file_within_project  # Ctrl+V
+    bindkey '^b' sk_select_file_below_pwd       # Ctrl+B
+    
+    # WSL環境でのキーバインド一覧を表示
+    cat <<EOF
+
+======= WSL環境用キーバインド =======
+Ctrl+R : 履歴検索
+Ctrl+G : ディレクトリ変更
+Ctrl+] : ソースディレクトリ選択 (代替: Ctrl+\\, Ctrl+P, Alt+])
+Ctrl+V : プロジェクト内ファイル選択
+Ctrl+B : 現在ディレクトリ以下のファイル選択
+================================
+
+EOF
+  else
+    # macOS / 通常Linux環境用のキーバインド
+    bindkey '^r' sk_select_history
+    bindkey '^]' sk_select_src
+    bindkey '^g' sk_change_directory
+    bindkey '^v' sk_select_file_within_project
+    bindkey '^b' sk_select_file_below_pwd
+  fi
 else
   # 非インタラクティブシェルの場合は警告（ログイン時に一度だけ）
   [[ -z "$WSL_KEYBINDS_WARNING" ]] && {
@@ -351,6 +388,21 @@ else
     export WSL_KEYBINDS_WARNING=1
   }
 fi
+
+# キーバインドをテストするヘルパー関数
+function test_keybindings() {
+  echo "キーバインドテストモードを開始します。キーを押して確認してください。"
+  echo "終了するには Ctrl+D を2回押してください。"
+  cat <<EOF
+テストする主なキーバインド:
+- Ctrl+]
+- Ctrl+\\
+- Ctrl+P
+- Alt+]
+EOF
+
+  cat -v
+}
 
 # Enhanced search functions
 function search_in_files() {

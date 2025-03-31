@@ -3,12 +3,9 @@ bindkey -v  # Vim mode
 bindkey -M vicmd 'gg' beginning-of-line
 bindkey -M vicmd 'G'  end-of-line
 
-# Skim bindings
-bindkey "^h" sk_select_history
-bindkey "^]" sk_select_src
-bindkey "^v" sk_select_file_within_project
-bindkey "^b" sk_select_file_below_pwd
-bindkey "^e" sk_change_directory
+# Skim bindings - 削除（functions.zshで管理するため）
+# WSL環境ではCtrl+]が機能しない場合があるため、functions.zshで
+# 環境に応じたキーバインディングを設定します
 
 # History search
 bindkey "^P" history-beginning-search-backward-end
