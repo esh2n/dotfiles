@@ -1,28 +1,32 @@
-# VS Code および Cursor 拡張機能インストールスクリプト
-# このスクリプトは dotfiles リポジトリ内の拡張機能リストからVS CodeとCursorの拡張機能を一括インストールします
+# VS Code and Cursor Extensions Installation Script
+# This script installs VS Code and Cursor extensions from the extension list in the dotfiles repository
+#
+# Note: This script is saved in UTF-8 encoding.
+# If running from WSL, it is strongly recommended to run directly from Windows PowerShell
+# to avoid encoding issues.
 
 param(
-    [switch]$CursorOnly,    # Cursorの拡張機能のみをインストール
-    [switch]$VSCodeOnly     # VS Codeの拡張機能のみをインストール
+    [switch]$CursorOnly,    # Install only Cursor extensions
+    [switch]$VSCodeOnly     # Install only VS Code extensions
 )
 
-# スクリプトのあるディレクトリを取得
+# Get the directory where the script is located
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $extensionsFile = "$scriptDir\config\vscode\extensions.txt"
 
-# 管理者権限チェック（必須ではないが推奨）
+# Check for administrator privileges (not required but recommended)
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 if (-not $isAdmin) {
-    Write-Host "注意: 管理者権限なしで実行しています。一部の拡張機能のインストールが失敗する可能性があります。" -ForegroundColor Yellow
+    Write-Host "Note: Running without administrator privileges. Some extensions may fail to install." -ForegroundColor Yellow
 }
 
-# コマンドが存在するか確認する関数
+# Function to check if a command exists
 function Test-Command {
     param ($command)
     return (Get-Command $command -ErrorAction SilentlyContinue)
 }
 
-# 拡張機能をインストールする関数
+# Function to install extensions
 function Install-Extensions {
     param (
         [string]$CommandName,
@@ -30,30 +34,30 @@ function Install-Extensions {
     )
     
     if (-not (Test-Command $CommandName)) {
-        Write-Host "$DisplayName が見つかりません。拡張機能はインストールされません。" -ForegroundColor Red
+        Write-Host "$DisplayName not found. Extensions will not be installed." -ForegroundColor Red
         return $false
     }
     
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "$DisplayName 拡張機能のインストールを開始します..." -ForegroundColor Cyan
+    Write-Host "Starting installation of $DisplayName extensions..." -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     
-    # 一時ファイルを作成
+    # Create temporary file
     $tempExtFile = "$env:TEMP\${CommandName}_extensions_temp.txt"
     
-    # コンテンツを一時ファイルにコピー
+    # Copy content to temporary file
     Copy-Item -Path $extensionsFile -Destination $tempExtFile -Force
     
     if (-not (Test-Path $tempExtFile)) {
-        Write-Host "一時ファイルの作成に失敗しました: $tempExtFile" -ForegroundColor Red
+        Write-Host "Failed to create temporary file: $tempExtFile" -ForegroundColor Red
         return $false
     }
     
     $extensions = Get-Content -Path $tempExtFile
     
-    # カレントディレクトリを保存
+    # Save current directory
     $currentDir = Get-Location
-    # ユーザーホームディレクトリに移動（UNCパスの問題を回避）
+    # Move to user home directory (to avoid UNC path issues)
     Set-Location $env:USERPROFILE
     
     $successCount = 0
@@ -63,95 +67,95 @@ function Install-Extensions {
     foreach ($extension in $extensions) {
         if ([string]::IsNullOrWhiteSpace($extension)) { continue }
         
-        Write-Host "インストール中: $extension" -NoNewline
+        Write-Host "Installing: $extension" -NoNewline
         
         try {
             $process = Start-Process -FilePath $CommandName -ArgumentList "--install-extension", "$extension", "--force" -NoNewWindow -Wait -PassThru
             
             if ($process.ExitCode -eq 0) {
-                Write-Host " [成功]" -ForegroundColor Green
+                Write-Host " [SUCCESS]" -ForegroundColor Green
                 $successCount++
             } else {
-                Write-Host " [失敗] (終了コード: $($process.ExitCode))" -ForegroundColor Red
+                Write-Host " [FAILED] (Exit code: $($process.ExitCode))" -ForegroundColor Red
                 $failCount++
             }
         }
         catch {
-            # 例外オブジェクトを一時変数に格納してから参照（WSLパス問題対策）
+            # Store exception object in temporary variable before referencing (WSL path issue workaround)
             $errorMessage = ""
             try {
                 $errorMessage = $_.Exception.Message
             } catch {
-                $errorMessage = "不明なエラー"
+                $errorMessage = "Unknown error"
             }
-            # エラーメッセージをフォーマット文字列で構築（WSLパス対応）
-            $message = " [エラー] {0}" -f $errorMessage
+            # Build error message with format string (WSL path compatible)
+            $message = " [ERROR] {0}" -f $errorMessage
             Write-Host $message -ForegroundColor Red
             $failCount++
         }
     }
     
-    # 元のディレクトリに戻る
+    # Return to original directory
     Set-Location $currentDir
     
-    # 一時ファイルを削除
+    # Remove temporary file
     Remove-Item -Path $tempExtFile -Force
     
     $endTime = Get-Date
     $duration = $endTime - $startTime
     
     Write-Host "----------------------------------------" -ForegroundColor Cyan
-    Write-Host "$DisplayName 拡張機能のインストール完了" -ForegroundColor Cyan
-    Write-Host "成功: $successCount, 失敗: $failCount" -ForegroundColor $(if ($failCount -eq 0) { "Green" } else { "Yellow" })
-    Write-Host "所要時間: $($duration.Minutes)分 $($duration.Seconds)秒" -ForegroundColor Cyan
+    Write-Host "$DisplayName extensions installation completed" -ForegroundColor Cyan
+    Write-Host "Success: $successCount, Failed: $failCount" -ForegroundColor $(if ($failCount -eq 0) { "Green" } else { "Yellow" })
+    Write-Host "Time taken: $($duration.Minutes)m $($duration.Seconds)s" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
     
     return $true
 }
 
-# メイン処理
+# Main process
 if (-not (Test-Path $extensionsFile)) {
-    Write-Host "拡張機能リストファイルが見つかりません: $extensionsFile" -ForegroundColor Red
+    Write-Host "Extensions list file not found: $extensionsFile" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "拡張機能リストファイルを読み込みました: $extensionsFile" -ForegroundColor Green
+Write-Host "Loaded extensions list file: $extensionsFile" -ForegroundColor Green
 $extensionCount = (Get-Content $extensionsFile | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Measure-Object).Count
-Write-Host "インストール予定の拡張機能数: $extensionCount" -ForegroundColor Cyan
+Write-Host "Number of extensions to install: $extensionCount" -ForegroundColor Cyan
 Write-Host ""
 
-# パラメータに基づいてインストール処理を制御
+# Control installation process based on parameters
 $vsCodeResult = $false
 $cursorResult = $false
 
 if (-not $CursorOnly) {
-    # VS Code 拡張機能のインストール
+    # Install VS Code extensions
     $vsCodeResult = Install-Extensions -CommandName "code" -DisplayName "Visual Studio Code"
 }
 
 if (-not $VSCodeOnly) {
-    # Cursor 拡張機能のインストール
+    # Install Cursor extensions
     $cursorResult = Install-Extensions -CommandName "cursor" -DisplayName "Cursor"
 }
 
-# 結果サマリー
+# Results summary
 Write-Host "========================================" -ForegroundColor Green
-Write-Host "拡張機能インストール完了" -ForegroundColor Green
+Write-Host "Extensions Installation Complete" -ForegroundColor Green
 Write-Host "----------------------------------------" -ForegroundColor Green
 
 if ($vsCodeResult) {
-    Write-Host "VS Code: インストール完了" -ForegroundColor Green
+    Write-Host "VS Code: Installation completed" -ForegroundColor Green
 } else {
-    Write-Host "VS Code: インストールスキップ（未インストールまたはPATHに存在しない）" -ForegroundColor Yellow
+    Write-Host "VS Code: Installation skipped (not installed or not in PATH)" -ForegroundColor Yellow
 }
 
 if ($cursorResult) {
-    Write-Host "Cursor: インストール完了" -ForegroundColor Green
+    Write-Host "Cursor: Installation completed" -ForegroundColor Green
 } else {
-    Write-Host "Cursor: インストールスキップ（未インストールまたはPATHに存在しない）" -ForegroundColor Yellow
+    Write-Host "Cursor: Installation skipped (not installed or not in PATH)" -ForegroundColor Yellow
 }
 
 Write-Host "========================================" -ForegroundColor Green
-Write-Host "拡張機能の再インストールが必要な場合は、このスクリプトを再度実行してください。" -ForegroundColor Cyan
-Write-Host "問題が解決しない場合は、READMEの「Windows環境での拡張機能インストールの問題解決」セクションを参照してください。" -ForegroundColor Cyan
+Write-Host "If you need to reinstall extensions, run this script again." -ForegroundColor Cyan
+Write-Host "If problems persist, refer to the 'Windows Extension Installation Troubleshooting' section in the README." -ForegroundColor Cyan

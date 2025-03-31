@@ -204,7 +204,7 @@ function Install-DevFonts {
             
             Write-Host "Installed $fontName" -ForegroundColor Green
         } catch {
-            # フォントがすでに使用中やインストール済みの場合はスキップ
+            # Skip if font is already in use or installed
             Write-Host "Skipped $fontName (already in use or installed)" -ForegroundColor Yellow
         }
     }
@@ -223,7 +223,7 @@ function Install-DevFonts {
             
             Write-Host "Installed $fontName" -ForegroundColor Green
         } catch {
-            # フォントがすでに使用中やインストール済みの場合はスキップ
+            # Skip if font is already in use or installed
             Write-Host "Skipped $fontName (already in use or installed)" -ForegroundColor Yellow
         }
     }
@@ -325,14 +325,14 @@ function Install-DevTools {
 function Setup-WslDotfiles {
     Write-Host "Setting up dotfiles in WSL environment..."
     
-    # WSLパスを確実に取得（wslpathコマンドを使用）
+    # Get WSL path reliably using wslpath command
     $wslPathCommand = "wsl.exe --exec wslpath '$dotfilesDir'"
     $wslDotfilesPath = Invoke-Expression $wslPathCommand
 
-    # エラーハンドリングを追加
+    # Add error handling
     if (-not $wslDotfilesPath) {
         Write-Host "Failed to convert Windows path to WSL path. Using fallback method..." -ForegroundColor Yellow
-        # フォールバック：単純な置換による変換
+        # Fallback: Simple replacement conversion
         $wslDotfilesPath = "/mnt/c" + $dotfilesDir.Replace("\", "/").Replace("C:", "")
     }
     
@@ -377,9 +377,9 @@ echo "Dotfiles setup in WSL complete!"
 function Install-VSCodeExtensions {
     Write-Host "Installing Visual Studio Code extensions..."
     
-    # 専用のインストールスクリプトを使用（より安定したインストール）
+    # Use dedicated installation script (more stable installation)
     try {
-        # スクリプトを同じディレクトリから呼び出す
+        # Call script from the same directory
         $extensionsScript = Join-Path $PSScriptRoot "install-vscode-extensions.ps1"
         if (Test-Path $extensionsScript) {
             Write-Host "Running dedicated VS Code extensions installation script..." -ForegroundColor Cyan
@@ -390,27 +390,27 @@ function Install-VSCodeExtensions {
         Write-Host "Failed to run dedicated extensions script. Falling back to built-in method." -ForegroundColor Yellow
     }
     
-    # フォールバック: 内蔵メソッドで拡張機能をインストール
+    # Fallback: Install extensions using built-in method
     # Check if VSCode is installed
     if (-not (Test-Command code)) {
         Write-Host "Visual Studio Code not found in PATH. Extensions will not be installed."
         return
     }
     
-    # 一時ファイルを作成
+    # Create temporary file
     $tempExtFile = "$env:TEMP\vscode_extensions_temp.txt"
     
     # Path to extensions file - make sure we're using Windows path format
     $extensionsFile = "$dotfilesDir\config\vscode\extensions.txt"
     
     if (Test-Path $extensionsFile) {
-        # コンテンツを一時ファイルにコピー
+        # Copy content to temporary file
         Copy-Item -Path $extensionsFile -Destination $tempExtFile -Force
         
         if (Test-Path $tempExtFile) {
             $extensions = Get-Content -Path $tempExtFile
             
-            # PowerShell プロセス内でコマンドを実行（現在のディレクトリに関係なく）
+            # Execute commands in PowerShell process (regardless of current directory)
             $currentDir = Get-Location
             Set-Location $env:USERPROFILE
             
@@ -419,7 +419,7 @@ function Install-VSCodeExtensions {
                 
                 Write-Host "Installing extension: $extension"
                 try {
-                    # パラメータを別々に指定してコマンドを構築
+                    # Build command with parameters specified separately
                     $process = Start-Process -FilePath "code" -ArgumentList "--install-extension", "$extension", "--force" -NoNewWindow -Wait -PassThru
                     
                     if ($process.ExitCode -eq 0) {
@@ -429,23 +429,23 @@ function Install-VSCodeExtensions {
                     }
                 }
                 catch {
-                    # 例外オブジェクトを一時変数に格納してから参照（WSLパス問題対策）
+                    # Store exception object in temporary variable before referencing (WSL path issue workaround)
                     $errorMessage = ""
                     try {
                         $errorMessage = $_.Exception.Message
                     } catch {
                         $errorMessage = "Unknown error"
                     }
-                    # エラーメッセージをフォーマット文字列で構築（WSLパス対応）
+                    # Build error message with format string (WSL path compatible)
                     $message = "Error installing extension {0}: {1}" -f $extension, $errorMessage
                     Write-Host $message -ForegroundColor Red
                 }
             }
             
-            # 元のディレクトリに戻る
+            # Return to original directory
             Set-Location $currentDir
             
-            # 一時ファイルを削除
+            # Remove temporary file
             Remove-Item -Path $tempExtFile -Force
             
             Write-Host "VS Code extensions installation completed."
@@ -461,13 +461,13 @@ function Install-VSCodeExtensions {
 function Install-CursorExtensions {
     Write-Host "Installing Cursor extensions..."
     
-    # 専用のインストールスクリプトを使用（より安定したインストール）
+    # Use dedicated installation script (more stable installation)
     try {
-        # スクリプトを同じディレクトリから呼び出す
+        # Call script from the same directory
         $extensionsScript = Join-Path $PSScriptRoot "install-vscode-extensions.ps1"
         if (Test-Path $extensionsScript) {
             Write-Host "Running dedicated Cursor extensions installation script..." -ForegroundColor Cyan
-            # Cursorのみインストールするパラメータを追加
+            # Add parameter to install only Cursor extensions
             & $extensionsScript -CursorOnly
             return
         }
@@ -475,27 +475,27 @@ function Install-CursorExtensions {
         Write-Host "Failed to run dedicated extensions script. Falling back to built-in method." -ForegroundColor Yellow
     }
     
-    # フォールバック: 内蔵メソッドで拡張機能をインストール
+    # Fallback: Install extensions using built-in method
     # Check if Cursor is installed and cursor command is available
     if (-not (Test-Command cursor)) {
         Write-Host "Cursor not found in PATH. Extensions will not be installed."
         return
     }
     
-    # 一時ファイルを作成
+    # Create temporary file
     $tempExtFile = "$env:TEMP\cursor_extensions_temp.txt"
     
     # Path to extensions file - use same file as VSCode
     $extensionsFile = "$dotfilesDir\config\vscode\extensions.txt"
     
     if (Test-Path $extensionsFile) {
-        # コンテンツを一時ファイルにコピー
+        # Copy content to temporary file
         Copy-Item -Path $extensionsFile -Destination $tempExtFile -Force
         
         if (Test-Path $tempExtFile) {
             $extensions = Get-Content -Path $tempExtFile
             
-            # PowerShell プロセス内でコマンドを実行（現在のディレクトリに関係なく）
+            # Execute commands in PowerShell process (regardless of current directory)
             $currentDir = Get-Location
             Set-Location $env:USERPROFILE
             
@@ -504,7 +504,7 @@ function Install-CursorExtensions {
                 
                 Write-Host "Installing Cursor extension: $extension"
                 try {
-                    # パラメータを別々に指定してコマンドを構築
+                    # Build command with parameters specified separately
                     $process = Start-Process -FilePath "cursor" -ArgumentList "--install-extension", "$extension", "--force" -NoNewWindow -Wait -PassThru
                     
                     if ($process.ExitCode -eq 0) {
@@ -514,23 +514,23 @@ function Install-CursorExtensions {
                     }
                 }
                 catch {
-                    # 例外オブジェクトを一時変数に格納してから参照（WSLパス問題対策）
+                    # Store exception object in temporary variable before referencing (WSL path issue workaround)
                     $errorMessage = ""
                     try {
                         $errorMessage = $_.Exception.Message
                     } catch {
                         $errorMessage = "Unknown error"
                     }
-                    # エラーメッセージをフォーマット文字列で構築（WSLパス対応）
+                    # Build error message with format string (WSL path compatible)
                     $message = "Error installing Cursor extension {0}: {1}" -f $extension, $errorMessage
                     Write-Host $message -ForegroundColor Red
                 }
             }
             
-            # 元のディレクトリに戻る
+            # Return to original directory
             Set-Location $currentDir
             
-            # 一時ファイルを削除
+            # Remove temporary file
             Remove-Item -Path $tempExtFile -Force
             
             Write-Host "Cursor extensions installation completed."

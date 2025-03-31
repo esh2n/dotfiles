@@ -2,38 +2,38 @@
 local wezterm = require('wezterm')
 local M = {}
 
--- 現在のOSがWindows系か判定する
+-- Determine if the current OS is Windows-based
 function M.is_windows()
-  -- wezterm.target_triple に "windows" が含まれるかで判定
+  -- Check if "windows" is included in wezterm.target_triple
   return wezterm.target_triple and string.find(wezterm.target_triple, "windows") ~= nil
 end
 
--- OSに応じたホームディレクトリを取得する
+-- Get the home directory according to the OS
 function M.get_home_dir()
   if M.is_windows() then
-    -- Windowsの場合は USERPROFILE を優先
+    -- For Windows, prioritize USERPROFILE
     return os.getenv('USERPROFILE')
   else
-    -- それ以外 (macOS, Linuxなど) は HOME を使用
+    -- For others (macOS, Linux, etc.), use HOME
     return os.getenv('HOME')
   end
-  -- もしどちらも見つからない場合は nil を返す (エラーハンドリングは呼び出し元で行う想定)
+  -- If neither is found, return nil (error handling is expected to be done by the caller)
 end
 
--- OSに応じたデフォルトシェルを取得する
+-- Get the default shell according to the OS
 function M.get_default_shell()
   if M.is_windows() then
-    -- Windowsの場合、WSLのデフォルトディストリビューションのZshを起動
-    -- WSL内のシェルに接続するため wsl.exe を使用
+    -- For Windows, launch Zsh in the default WSL distribution
+    -- Using wsl.exe to connect to the shell in WSL
     return { 'wsl.exe', '--', 'zsh', '-l' }
     
-    -- PowerShellをデフォルトにしたい場合は以下を使用:
+    -- To use PowerShell as the default:
     -- return { 'powershell.exe', '-NoLogo' }
     
-    -- cmdをデフォルトにしたい場合は以下を使用:
+    -- To use cmd as the default:
     -- return { 'cmd.exe' }
   else
-    -- macOS/Linuxの場合は zsh を使用
+    -- For macOS/Linux, use zsh
     return { '/bin/zsh', '-l' }
   end
 end
