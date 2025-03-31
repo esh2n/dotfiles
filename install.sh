@@ -262,6 +262,43 @@ create_symlinks() {
         if [ "$OS_TYPE" = "wsl" ]; then
             echo "Setting up WSL specific configurations..."
             # Any WSL specific configurations can go here
+
+            # Create symlink for WezTerm config on Windows side
+            echo "Attempting to create WezTerm symlink on Windows side..."
+            
+            # Get Windows username and construct the profile path
+            windows_username=$(powershell.exe -Command "\$env:USERNAME" 2>/dev/null | tr -d '\r')
+            if [ -n "$windows_username" ]; then
+                windows_userprofile="/mnt/c/Users/$windows_username"
+                
+                if [ -d "$windows_userprofile" ]; then
+                    echo "Windows user profile found: $windows_userprofile"
+                    windows_config_dir="$windows_userprofile/.config"
+                    windows_wezterm_dir="$windows_config_dir/wezterm"
+                    
+                    # Create .config directory on Windows side if it doesn't exist
+                    if [ ! -d "$windows_config_dir" ]; then
+                        echo "Creating $windows_config_dir on Windows side..."
+                        mkdir -p "$windows_config_dir"
+                    fi
+                    
+                    # Backup existing WezTerm config on Windows side
+                    if [ -e "$windows_wezterm_dir" ]; then
+                        backup_date=$(date +%Y%m%d_%H%M%S)
+                        echo "Backing up existing WezTerm config at $windows_wezterm_dir to $windows_wezterm_dir.backup.$backup_date"
+                        mv "$windows_wezterm_dir" "$windows_wezterm_dir.backup.$backup_date"
+                    fi
+                    
+                    # Create the symlink
+                    echo "Creating symlink for WezTerm config at $windows_wezterm_dir"
+                    ln -sf "$DOTFILES_DIR/config/wezterm" "$windows_wezterm_dir"
+                    echo "WezTerm symlink created on Windows side."
+                else
+                    echo "Warning: Windows user profile directory not found at $windows_userprofile. Skipping WezTerm symlink creation on Windows side."
+                fi
+            else
+                echo "Warning: Could not retrieve Windows username. Skipping WezTerm symlink creation on Windows side."
+            fi
         fi
     fi
 }
