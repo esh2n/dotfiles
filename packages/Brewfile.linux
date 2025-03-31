@@ -35,7 +35,6 @@ brew "tree"           # Directory listing as tree
 brew "colordiff"      # Colorized diff
 brew "htop"           # Process viewer
 brew "git-delta"      # Syntax-highlighting pager for git
-brew "loop"           # UNIX's missing loop command
 brew "trash"          # CLI utility to move files to the trash
 
 # Development tools
