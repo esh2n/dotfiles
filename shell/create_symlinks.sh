@@ -36,6 +36,21 @@ if [[ -z "${OS_TYPE:-}" ]]; then
     echo "Detected OS: $OS_TYPE"
 fi
 
+# WSL環境の場合、Windows側のユーザープロファイルを早期に取得
+windows_username=""
+windows_userprofile=""
+if [ "$OS_TYPE" = "wsl" ]; then
+    # Windows側のユーザー名とプロファイルパスを取得
+    if command -v powershell.exe >/dev/null 2>&1; then
+        windows_username=$(powershell.exe -Command "\$env:USERNAME" 2>/dev/null | tr -d '\r')
+        if [ -n "$windows_username" ]; then
+            windows_userprofile="/mnt/c/Users/$windows_username"
+            echo "Detected Windows username: $windows_username"
+            echo "Windows user profile path: $windows_userprofile"
+        fi
+    fi
+fi
+
 # Backup function
 backup_existing_config() {
     local file="$1"
@@ -201,31 +216,73 @@ create_symlinks() {
         # Linux側
         safe_link "$DOTFILES_DIR/config/starship/starship.toml" "$HOME/.config/starship.toml"
         
-        # Windows側（ユーザープロファイルが見つかっている場合）
+        # Windows側（複数の可能性のある場所を試す）
+        echo "Setting up Starship config for Windows..."
+        
+        # Windows側の設定ファイルパスを確認
         if [ -n "$windows_username" ] && [ -d "$windows_userprofile" ]; then
-            echo "Setting up Starship config for Windows..."
+            # 候補となる複数の設定パス
+            win_config_paths=(
+                "$windows_userprofile/.config"                    # 新しい標準的な場所
+                "$windows_userprofile/AppData/Local/starship"     # 代替の場所1
+                "$windows_userprofile/AppData/Roaming/starship"   # 代替の場所2
+            )
             
-            # Windows側の.configディレクトリを作成
-            win_starship_dir="$windows_userprofile/.config"
-            win_starship_file="$win_starship_dir/starship.toml"
+            for win_config_dir in "${win_config_paths[@]}"; do
+                win_starship_file="$win_config_dir/starship.toml"
+                
+                # ディレクトリを確実に作成
+                echo "Creating Windows starship config directory: $win_config_dir"
+                mkdir -p "$win_config_dir"
+                
+                if [ $? -eq 0 ]; then
+                    # バックアップ
+                    backup_existing_config "$win_starship_file"
+                    
+                    # 設定ファイルをコピー
+                    echo "Copying Starship config to: $win_starship_file"
+                    cp "$DOTFILES_DIR/config/starship/starship.toml" "$win_starship_file"
+                    
+                    if [ $? -eq 0 ]; then
+                        echo "Successfully copied Starship config to Windows at $win_starship_file"
+                        # 権限を確認して適切に設定
+                        chmod 644 "$win_starship_file" 2>/dev/null
+                        echo "Starship config permissions updated"
+                    else
+                        echo "Failed to copy Starship config to $win_starship_file - continuing with next location"
+                    fi
+                else
+                    echo "Failed to create directory $win_config_dir - continuing with next location"
+                fi
+            done
             
-            # ディレクトリ作成
-            if [ ! -d "$win_starship_dir" ]; then
-                echo "Creating Windows .config directory for Starship: $win_starship_dir"
-                mkdir -p "$win_starship_dir"
-            fi
+            # PowerShell起動スクリプトにstarship初期化を追加する
+            powershell_path="$windows_userprofile/Documents/PowerShell/Microsoft.PowerShell_profile.ps1"
+            powershell_dir="$windows_userprofile/Documents/PowerShell"
             
-            # バックアップ
-            backup_existing_config "$win_starship_file"
+            echo "Checking for PowerShell profile at $powershell_path"
             
-            # 設定ファイルをコピー
-            echo "Copying Starship config to: $win_starship_file"
-            cp "$DOTFILES_DIR/config/starship/starship.toml" "$win_starship_file"
-            if [ $? -eq 0 ]; then
-                echo "Successfully copied Starship config to Windows"
+            # PowerShellディレクトリを作成
+            mkdir -p "$powershell_dir"
+            
+            # プロファイルが存在するか確認
+            if [ -f "$powershell_path" ]; then
+                # starship初期化が含まれているか確認
+                if ! grep -q "starship init" "$powershell_path"; then
+                    echo "Adding Starship initialization to PowerShell profile"
+                    echo -e "\n# Starship プロンプト初期化\nInvoke-Expression (&starship init powershell)" >> "$powershell_path"
+                    echo "Starship initialization added to PowerShell profile"
+                else
+                    echo "Starship initialization already exists in PowerShell profile"
+                fi
             else
-                echo "Failed to copy Starship config to Windows"
+                # プロファイルがなければ新規作成
+                echo "Creating new PowerShell profile with Starship initialization"
+                echo -e "# PowerShell Profile\n\n# Starship プロンプト初期化\nInvoke-Expression (&starship init powershell)" > "$powershell_path"
+                echo "Created new PowerShell profile with Starship initialization"
             fi
+        else
+            echo "Windows user profile not found. Skipping Windows Starship config setup."
         fi
     else
         # macOSまたは通常のLinuxの場合

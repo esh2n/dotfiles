@@ -142,7 +142,15 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
    # Cursor拡張機能のみをインストール
    powershell.exe -ExecutionPolicy Bypass -File "$PWD/install-vscode-extensions.ps1" -CursorOnly
    ```
+**注意**: WSLからPowerShellスクリプトを実行する場合、以下の問題が発生することがあります：
 
+1. **文字エンコーディングの問題**: 日本語などの非ASCII文字を含むスクリプトが正しく解釈されない場合があります。
+
+2. **署名検証エラー**: VS Code拡張機能のインストール時に「Signature verification was not executed.」エラーが発生する場合があります。これはWSLからWindowsアプリケーションを制御する際のセキュリティ制限によるものです。
+
+**解決策**:
+- PowerShellスクリプトは直接Windows環境から実行することを強く推奨します
+- VS Code/Cursor拡張機能は、各アプリケーションの拡張機能マーケットプレイスから手動でインストールすることもできます
 **注意**: WSLからPowerShellスクリプトを実行する場合、文字エンコーディングの問題が発生することがあります。エラーが発生した場合は、スクリプトを直接Windowsから実行することをお勧めします。
 
 ### WSL + Windows環境での設定ファイルパスの違い
