@@ -22,6 +22,64 @@
 
 ### Windows (WSL)
 
+#### WSLとPowerShell間の切り替え
+
+- **PowerShellからWSLに入る方法**:
+  ```powershell
+  # PowerShellからWSLに入る
+  wsl
+  ```
+
+- **WSLからPowerShellに戻る方法**:
+  ```bash
+  # WSLからPowerShellに戻る（WSLを終了）
+  exit
+  ```
+  
+  または、WSLを終了せずに新しいPowerShellウィンドウを開く場合:
+  ```bash
+  # WSL内から新しいPowerShellウィンドウを開く
+  powershell.exe
+  ```
+
+- **Windows Terminalを使用している場合**:
+  - Ctrl+Shift+T または "+" ボタンで新しいタブを開き、ドロップダウンメニューからPowerShellを選択
+
+#### WSL環境からPowerShellスクリプト（.ps1）を実行する方法
+
+WSL環境から直接PowerShellスクリプトを実行することはできませんが、以下の方法でWindows側のPowerShellを呼び出して実行できます：
+
+1. **WSL内から一時的にPowerShellを呼び出して実行する**:
+   ```bash
+   # WSL内から実行（カレントディレクトリのスクリプトを実行）
+   powershell.exe -ExecutionPolicy Bypass -File ./install-windows.ps1
+   
+   # または絶対パスを指定する場合（例：C:\Users\username\dotfiles\install-windows.ps1）
+   powershell.exe -ExecutionPolicy Bypass -File $(wslpath -w ./install-windows.ps1)
+   ```
+   
+   `wslpath -w`は、WSLパスをWindowsパスに変換するコマンドです。
+
+2. **管理者権限が必要な場合**:
+   WSL内から管理者権限のPowerShellを直接起動することはできないため、以下の手順を使用します：
+   
+   a. まず新しいPowerShellウィンドウを開く:
+   ```bash
+   powershell.exe
+   ```
+   
+   b. 開いたPowerShellウィンドウで、以下を実行して管理者権限で新しいPowerShellウィンドウを起動:
+   ```powershell
+   Start-Process powershell -Verb RunAs
+   ```
+   
+   c. 管理者権限のウィンドウでスクリプトに移動して実行:
+   ```powershell
+   cd C:\path\to\dotfiles
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   .\install-windows.ps1
+   ```
+
 #### Windows環境のスクリプト使い分け（重要）
 
 Windows環境では、`.ps1`スクリプトと`.sh`スクリプトを使い分ける必要があります：
