@@ -195,13 +195,18 @@ function Install-DevFonts {
         $fontPath = $_.FullName
         $fontName = $_.Name
         
-        # Copy to local fonts folder
-        Copy-Item -Path $fontPath -Destination "$fontsFolder\$fontName" -Force
-        
-        # Add registry entry
-        New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $fontName -Value "$fontsFolder\$fontName" -PropertyType String -Force | Out-Null
-        
-        Write-Host "Installed $fontName"
+        # Copy to local fonts folder with error handling
+        try {
+            Copy-Item -Path $fontPath -Destination "$fontsFolder\$fontName" -Force -ErrorAction Stop
+            
+            # Add registry entry
+            New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $fontName -Value "$fontsFolder\$fontName" -PropertyType String -Force | Out-Null
+            
+            Write-Host "Installed $fontName" -ForegroundColor Green
+        } catch {
+            # フォントがすでに使用中やインストール済みの場合はスキップ
+            Write-Host "Skipped $fontName (already in use or installed)" -ForegroundColor Yellow
+        }
     }
     
     # Hack Nerd Font
@@ -209,13 +214,18 @@ function Install-DevFonts {
         $fontPath = $_.FullName
         $fontName = $_.Name
         
-        # Copy to local fonts folder
-        Copy-Item -Path $fontPath -Destination "$fontsFolder\$fontName" -Force
-        
-        # Add registry entry
-        New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $fontName -Value "$fontsFolder\$fontName" -PropertyType String -Force | Out-Null
-        
-        Write-Host "Installed $fontName"
+        # Copy to local fonts folder with error handling
+        try {
+            Copy-Item -Path $fontPath -Destination "$fontsFolder\$fontName" -Force -ErrorAction Stop
+            
+            # Add registry entry
+            New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $fontName -Value "$fontsFolder\$fontName" -PropertyType String -Force | Out-Null
+            
+            Write-Host "Installed $fontName" -ForegroundColor Green
+        } catch {
+            # フォントがすでに使用中やインストール済みの場合はスキップ
+            Write-Host "Skipped $fontName (already in use or installed)" -ForegroundColor Yellow
+        }
     }
     
     # Clean up
@@ -315,16 +325,30 @@ function Install-DevTools {
 function Setup-WslDotfiles {
     Write-Host "Setting up dotfiles in WSL environment..."
     
-    # Path to dotfiles directory in WSL
-    $wslDotfilesPath = "/mnt/c" + $dotfilesDir.Replace("\", "/").Replace("C:", "")
+    # WSLパスを確実に取得（wslpathコマンドを使用）
+    $wslPathCommand = "wsl.exe --exec wslpath '$dotfilesDir'"
+    $wslDotfilesPath = Invoke-Expression $wslPathCommand
+
+    # エラーハンドリングを追加
+    if (-not $wslDotfilesPath) {
+        Write-Host "Failed to convert Windows path to WSL path. Using fallback method..." -ForegroundColor Yellow
+        # フォールバック：単純な置換による変換
+        $wslDotfilesPath = "/mnt/c" + $dotfilesDir.Replace("\", "/").Replace("C:", "")
+    }
     
-    # Create the command to run in WSL
+    # Create the command to run in WSL with improved error handling
     $setupCommand = @"
 #!/bin/bash
 set -e
 echo "Setting up dotfiles in WSL..."
+if [ ! -d "$wslDotfilesPath" ]; then
+    echo "Error: Dotfiles directory not found at $wslDotfilesPath"
+    exit 1
+fi
+
 mkdir -p ~/dotfiles
-cp -r $wslDotfilesPath/* ~/dotfiles/
+echo "Copying files from $wslDotfilesPath to ~/dotfiles/"
+cp -r "$wslDotfilesPath"/* ~/dotfiles/ || { echo "Copy failed"; exit 1; }
 cd ~/dotfiles
 chmod +x install.sh
 ./install.sh
@@ -353,6 +377,20 @@ echo "Dotfiles setup in WSL complete!"
 function Install-VSCodeExtensions {
     Write-Host "Installing Visual Studio Code extensions..."
     
+    # 専用のインストールスクリプトを使用（より安定したインストール）
+    try {
+        # スクリプトを同じディレクトリから呼び出す
+        $extensionsScript = Join-Path $PSScriptRoot "install-vscode-extensions.ps1"
+        if (Test-Path $extensionsScript) {
+            Write-Host "Running dedicated VS Code extensions installation script..." -ForegroundColor Cyan
+            & $extensionsScript
+            return
+        }
+    } catch {
+        Write-Host "Failed to run dedicated extensions script. Falling back to built-in method." -ForegroundColor Yellow
+    }
+    
+    # フォールバック: 内蔵メソッドで拡張機能をインストール
     # Check if VSCode is installed
     if (-not (Test-Command code)) {
         Write-Host "Visual Studio Code not found in PATH. Extensions will not be installed."
@@ -423,6 +461,21 @@ function Install-VSCodeExtensions {
 function Install-CursorExtensions {
     Write-Host "Installing Cursor extensions..."
     
+    # 専用のインストールスクリプトを使用（より安定したインストール）
+    try {
+        # スクリプトを同じディレクトリから呼び出す
+        $extensionsScript = Join-Path $PSScriptRoot "install-vscode-extensions.ps1"
+        if (Test-Path $extensionsScript) {
+            Write-Host "Running dedicated Cursor extensions installation script..." -ForegroundColor Cyan
+            # Cursorのみインストールするパラメータを追加
+            & $extensionsScript -CursorOnly
+            return
+        }
+    } catch {
+        Write-Host "Failed to run dedicated extensions script. Falling back to built-in method." -ForegroundColor Yellow
+    }
+    
+    # フォールバック: 内蔵メソッドで拡張機能をインストール
     # Check if Cursor is installed and cursor command is available
     if (-not (Test-Command cursor)) {
         Write-Host "Cursor not found in PATH. Extensions will not be installed."

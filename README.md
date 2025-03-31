@@ -1,506 +1,144 @@
 # dotfiles
 
-クロスプラットフォームで動作する開発環境設定ファイル管理リポジトリです。macOS、Linux、Windows(WSL)をサポートしています。
-
-## サポート環境
-
-- **macOS**: macOS固有の機能（sketchybar、bordersなど）を含む完全サポート
-- **Linux**: 主要な開発ツールとシェル設定をサポート
-- **Windows (WSL)**: Windows Terminal、VSCode、Windows側のセットアップと、WSL内部での開発環境構築をサポート
+これは@esh2nのdotfilesリポジトリです。macOS、Linux、およびWindows（WSL）環境向けの設定ファイルが含まれています。
 
 ## インストール方法
 
 ### macOS / Linux
 
-ネイティブのmacOSまたはLinux環境では、シンプルにインストールスクリプトを実行します：
-
 ```bash
+# リポジトリをクローン
+git clone https://github.com/esh2n/dotfiles.git
+cd dotfiles
+
+# インストールスクリプトを実行
 ./install.sh
 ```
-
-このスクリプトは自動的にOSを検出し、適切なセットアップを実行します。
 
 ### Windows (WSL)
 
-#### WSLとPowerShell間の切り替え
+WSL環境では、2つのステップでインストールする必要があります：
 
-- **PowerShellからWSLに入る方法**:
-  ```powershell
-  # PowerShellからWSLに入る
-  wsl
-  ```
-
-- **WSLからPowerShellに戻る方法**:
-  ```bash
-  # WSLからPowerShellに戻る（WSLを終了）
-  exit
-  ```
-  
-  または、WSLを終了せずに新しいPowerShellウィンドウを開く場合:
-  ```bash
-  # WSL内から新しいPowerShellウィンドウを開く
-  powershell.exe
-  ```
-
-- **Windows Terminalを使用している場合**:
-  - Ctrl+Shift+T または "+" ボタンで新しいタブを開き、ドロップダウンメニューからPowerShellを選択
-
-#### WSL環境からPowerShellスクリプト（.ps1）を実行する方法
-
-WSL環境から直接PowerShellスクリプトを実行することはできませんが、以下の方法でWindows側のPowerShellを呼び出して実行できます：
-
-1. **WSL内から一時的にPowerShellを呼び出して実行する**:
-   ```bash
-   # WSL内から実行（カレントディレクトリのスクリプトを実行）
-   powershell.exe -ExecutionPolicy Bypass -File ./install-windows.ps1
-   
-   # または絶対パスを指定する場合（例：C:\Users\username\dotfiles\install-windows.ps1）
-   powershell.exe -ExecutionPolicy Bypass -File $(wslpath -w ./install-windows.ps1)
-   ```
-   
-   `wslpath -w`は、WSLパスをWindowsパスに変換するコマンドです。
-
-2. **管理者権限が必要な場合**:
-   WSL内から管理者権限のPowerShellを直接起動することはできないため、以下の手順を使用します：
-   
-   a. まず新しいPowerShellウィンドウを開く:
-   ```bash
-   powershell.exe
-   ```
-   
-   b. 開いたPowerShellウィンドウで、以下を実行して管理者権限で新しいPowerShellウィンドウを起動:
-   ```powershell
-   Start-Process powershell -Verb RunAs
-   ```
-   
-   c. 管理者権限のウィンドウでスクリプトに移動して実行:
-   ```powershell
-   cd C:\path\to\dotfiles
-   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-   .\install-windows.ps1
-   ```
-
-#### WSLから実行する際のトラブルシューティング
-
-WSL内部から`powershell.exe`を使用して`install-windows.ps1`を実行する際に、いくつかの問題が発生することがあります：
-
-1. **Ubuntu/WSLディストリビューションの検出エラー**:
-   ```
-   Error: Installing Ubuntu distribution...
-   Wsl/InstallDistro/Service/RegisterDistro/ERROR_ALREADY_EXISTS
-   ```
-   
-   **解決策**:
-   - このエラーはWSLディストリビューションが既に存在する場合に発生します
-   - スクリプトが「Y」と入力するように促した場合、続行してください
-   - または、Windows PowerShellから直接実行することをお勧めします
-
-2. **日本語文字化けの問題**:
-   WSLからPowerShellスクリプトを実行すると、出力がUTF-8で適切に処理されず文字化けすることがあります。
-   
-   **解決策**:
-   - Windows側のPowerShellから直接実行する
-   - または、以下の方法で出力エンコーディングを指定：
-     ```bash
-     powershell.exe -ExecutionPolicy Bypass -Command "& { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & $(wslpath -w ./install-windows.ps1) }"
-     ```
-
-3. **Go関連のエラー**:
-   ```
-   go: GOMODCACHE entry is relative; must be absolute path: "${HOME}/go/pkg/mod"
-   ```
-   
-   **解決策**:
-   - このエラーは無視しても問題ありません（スクリプトの後半で自動的に修正されます）
-   - または、手動で環境変数を修正する場合：
-     ```bash
-     echo 'export GOMODCACHE="$HOME/go/pkg/mod"' >> ~/.zshrc
-     source ~/.zshrc
-     ```
-
-**注意**: 最も確実な方法は、WSLを起動せずにWindows側のPowerShellから直接`install-windows.ps1`を実行し、その後WSL内で`install.sh`を実行することです。
-
-#### Windows環境のスクリプト使い分け（重要）
-
-Windows環境では、`.ps1`スクリプトと`.sh`スクリプトを使い分ける必要があります：
-
-- **install-windows.ps1**（PowerShellスクリプト）
-  - **目的**: Windowsネイティブ環境（WSL外）用のセットアップ
-  - **実行環境**: Windows PowerShell または Windows Terminal内のPowerShell
-  - **機能**:
-    - WezTerm、VSCode、Cursorなどのツールをインストール
-    - Windows固有の設定を構成
-
-- **install.sh**（Bashスクリプト）
-  - **目的**: WSL (Windows Subsystem for Linux)内の環境設定
-  - **実行環境**: WSL内のLinux環境（Ubuntu等）
-  - **機能**:
-    - WSL内の設定ファイルをセットアップ
-    - WSL経由でWindowsの設定ファイルも配置
-
-#### 方法1: WSL内からのセットアップ (推奨)
-
-既にWSLがインストールされている場合は、WSLセッション内から`install.sh`を実行します：
+1. WSL内でLinux用の設定をインストール：
 
 ```bash
-# WSLコンソール内で実行
+# リポジトリをクローン
+git clone https://github.com/esh2n/dotfiles.git
+cd dotfiles
+
+# WSL内の設定をインストール
 ./install.sh
 ```
 
-#### 方法2: Windowsホストからのセットアップ (WSLがまだ無い場合)
+2. Windows側の設定をインストール：
 
-WSLをまだインストールしていない場合は、Windowsの管理者PowerShellから以下を実行します：
+**方法A: Windows PowerShellから直接実行（推奨）:**
 
 ```powershell
-# Windows PowerShellから実行（管理者権限が必要）
+# 管理者権限でPowerShellを開き、以下を実行
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# dotfilesディレクトリに移動して以下を実行
+.\setup-windows-paths.ps1
+```
+
+**方法B: WSL内からWindows PowerShellを呼び出す:**
+
+```bash
+# WSL内から実行
+powershell.exe -ExecutionPolicy Bypass -File "$PWD/setup-windows-paths.ps1"
+```
+
+**方法C: WSL内でPowerShell Coreを使用（事前にインストールが必要）:**
+
+```bash
+# PowerShell Coreのインストール（初回のみ）
+sudo apt-get update
+sudo apt-get install -y wget apt-transport-https software-properties-common
+wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+sudo dpkg -i packages-microsoft-prod.deb
+sudo apt-get update
+sudo apt-get install -y powershell
+
+# スクリプト実行
+pwsh -File ./setup-windows-paths.ps1
+```
+
+もしくは、Windowsネイティブ環境のセットアップを行う場合：
+
+```powershell
+# 管理者権限でPowerShellを開き、以下を実行
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# dotfilesディレクトリに移動して以下を実行
 .\install-windows.ps1
 ```
 
-**注意**: `install-windows.ps1`はWSL内部から実行しないでください。このスクリプトはWindowsネイティブのPowerShell環境用です。
+## 含まれる設定
 
-#### 推奨セットアップ手順（完全版）
-
-Windows環境で最適な結果を得るには、次の順序でセットアップすることをお勧めします：
-
-1. **まずWindows側の設定**
-   ```powershell
-   # 管理者権限でPowerShellを開いて実行
-   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-   .\install-windows.ps1
-   ```
-   これにより、WezTerm、VSCode、Cursorなどの必要なアプリケーションがインストールされます。
-
-2. **次にWSL内の設定**
-   ```bash
-   # WezTermやWindows Terminalなどを使ってWSLを起動し、実行
-   cd ~/go/github.com/esh2n/dotfiles
-   ./install.sh
-   ```
-   これにより、WSL内の設定と、Windows側の設定ファイルが適切に配置されます。
-
-#### 設定更新時の使い分け（重要）
-
-- **Windows側のアプリケーションをインストール/更新する場合**:
-  ```powershell
-  # Windows PowerShellから実行（WSLがあってもなくても）
-  .\install-windows.ps1
-  ```
-  これは、WSLが既にある場合でも、Windows側のアプリケーション（WezTerm、VSCode、Cursorなど）を
-  インストールまたは更新したい場合に使用します。
-
-- **WSL内の設定と関連するWindows設定を更新する場合**:
-  ```bash
-  # WSLコンソール内で実行
-  ./install.sh
-  ```
-  これは、WSL内の環境設定と、WSLからアクセス可能なWindows側の設定ファイルを更新します。
-
-- **設定ファイルだけを更新したい場合**:
-  ```bash
-  # WSLコンソール内で実行
-  ./shell/create_symlinks.sh
-  ```
-  これは、主に設定ファイルのシンボリックリンクや配置のみを更新します。
-
-### Linux/WSL環境の追加セットアップ
-
-Linux/WSL環境では、Homebrewでインストールされるパッケージに加えて、ネイティブのLinuxパッケージを`apt`でインストールすることができます。この追加セットアップを行うには：
-
-```bash
-# install.sh実行後に実行してください
-./packages/linux_apps.sh
-```
-
-このスクリプトは以下の機能を提供します：
-- 基本的なビルドツールと開発ライブラリのインストール
-- シェルツール（zsh, fish, tmux）のインストール
-- Dockerの適切な設定（オプション）
-- WSL用のロケール設定
-- 開発用フォントのインストール（通常のLinux環境のみ）
-
-## Windows環境での拡張機能インストールの問題解決
-
-### VS Code/Cursor拡張機能のインストール失敗
-
-WSL環境から`install-windows.ps1`を実行すると、以下のような問題が発生することがあります：
-
-1. **UNCパスエラー**:
-   ```
-   '\\wsl.localhost\Ubuntu\home\username\go\github.com\esh2n\dotfiles'
-   上記の現在のディレクトリで CMD.EXE を開始しました。
-   UNC パスはサポートされません。Windows ディレクトリを既定で使用します。
-   ```
-
-2. **署名検証エラー**:
-   ```
-   Error while installing extension: Signature verification was not executed.
-   ```
-
-### 解決方法
-
-#### 方法1: 専用インストールスクリプトを使用（推奨）
-
-VS CodeとCursorの拡張機能を一括でインストールするための専用スクリプトを用意しています：
-
-1. Windows PowerShellを管理者権限で起動
-2. スクリプトを実行:
-   ```powershell
-   # dotfilesディレクトリ内で
-   .\install-vscode-extensions.ps1
-   ```
-
-このスクリプトは以下の特徴があります：
-- `config/vscode/extensions.txt`から拡張機能リストを自動的に読み込む
-- VS CodeとCursorの両方に対応
-- UNCパスの問題を回避する処理を内蔵
-- 詳細なインストール結果を表示（成功数/失敗数）
-- 一時ファイルを使用してパスの問題を解決
-
-#### 方法2: WSL内からPowerShellスクリプトを実行
-
-WSL環境からも拡張機能インストールスクリプトを実行できます：
-
-1. WSLターミナル内で以下を実行：
-   ```bash
-   # WSL内から PowerShell スクリプトを実行
-   powershell.exe -ExecutionPolicy Bypass -File $(wslpath -w ./install-vscode-extensions.ps1)
-   ```
-
-2. または、以下のようにWSLパス変換を使用：
-   ```bash
-   # 現在のディレクトリを Windows パスに変換して実行
-   DOTFILES_WIN_PATH=$(wslpath -w .)
-   powershell.exe -ExecutionPolicy Bypass -Command "& {Set-Location '$DOTFILES_WIN_PATH'; .\install-vscode-extensions.ps1}"
-   ```
-
-**注意**: WSLから実行する際の一般的な問題と対処法：
-
-1. **文字化けの問題**:
-   ```bash
-   # UTF-8エンコーディングを指定する
-   powershell.exe -ExecutionPolicy Bypass -Command "& { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & $(wslpath -w ./install-vscode-extensions.ps1) }"
-   ```
-
-2. **変数参照エラー**:
-   ```
-   変数参照が無効です。':' が有効な変数名の文字の後に指定されませんでした。
-   ```
-   このエラーはWSLからPowerShellスクリプトを実行する際によく発生します。`install-windows.ps1`と`install-vscode-extensions.ps1`はこのエラーに対応済みです。
-   自分でスクリプトを作成する場合は、以下のように対応してください：
-   
-   ```powershell
-   # 悪い例（エラーになる可能性あり）
-   Write-Host "Error for $name: $message"
-   
-   # 良い例（安全なフォーマット）
-   $output = "Error for {0}: {1}" -f $name, $message
-   Write-Host $output
-   ```
-
-#### 方法3: 手動でコマンドを実行
-
-個々の拡張機能を手動でインストールする場合：
-
-1. Windows PowerShellを管理者権限で起動
-2. VS Code拡張機能をインストール:
-   ```powershell
-   code --install-extension ms-vscode-remote.remote-wsl --force
-   # 他の拡張機能も同様に
-   ```
-
-3. Cursor拡張機能をインストール:
-   ```powershell
-   cursor --install-extension ms-vscode-remote.remote-wsl --force
-   # 他の拡張機能も同様に
-   ```
-
-#### 方法2: 拡張機能ファイルを直接編集
-
-VS CodeとCursorはJSON形式の設定ファイルで拡張機能を管理しています：
-
-1. VS Code:
-   ```
-   %USERPROFILE%\.vscode\extensions\extensions.json
-   ```
-
-2. Cursor:
-   ```
-   %USERPROFILE%\.cursor\extensions\extensions.json
-   ```
-
-これらのファイルに直接拡張機能IDを追加することもできます。
-
-## Windows環境でインストールすべきアプリケーション
-
-WSL環境では、GUIアプリケーションは通常Windows側にインストールして使用します。以下のアプリケーションはBrewfileに含まれているものから、Windows環境で手動インストールが推奨されるものです：
-
-### 開発ツール
-- [Visual Studio Code](https://code.visualstudio.com/download) または [Cursor](https://cursor.sh/)
-- [WezTerm](https://wezfurlong.org/wezterm/install/windows.html)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Postman](https://www.postman.com/downloads/)
-- [Android Studio](https://developer.android.com/studio)
-- [DevToys](https://devtoys.app/)
-- [Unity Hub](https://unity.com/download)
-- [Epic Games Launcher](https://store.epicgames.com/en-US/download) (Unreal Engine用)
-
-### AI/MLツール
-- [Ollama](https://ollama.ai/download)
-
-### ブラウザ
-- [Google Chrome](https://www.google.com/chrome/)
-- [Firefox](https://www.mozilla.org/firefox/new/)
-- [Brave Browser](https://brave.com/download/)
-
-### コミュニケーション＆生産性
-- [Slack](https://slack.com/downloads/windows)
-- [Discord](https://discord.com/download)
-- [Notion](https://www.notion.so/desktop)
-- [Obsidian](https://obsidian.md/download)
-- [PowerToys](https://learn.microsoft.com/ja-jp/windows/powertoys/install) (Raycastの代替)
-- [1Password](https://1password.com/downloads/)
-- [FancyWM](https://apps.microsoft.com/detail/9p1741lkhbf4) (Magnetの代替)
-- [OneDrive](https://www.microsoft.com/microsoft-365/onedrive/download)
-- [LINE](https://line.me/ja/download)
-- [Nebo](https://www.nebo.app/download)
-
-### デザインツール
-- [Figma](https://www.figma.com/downloads/)
-- [Blender](https://www.blender.org/download/)
-- [DaVinci Resolve](https://www.blackmagicdesign.com/products/davinciresolve/)
-
-### メディア
-- [VLC](https://www.videolan.org/vlc/download-windows.html)
-- [OBS Studio](https://obsproject.com/download)
-- [Spotify](https://www.spotify.com/download/windows/)
-
-### システムツール
-- [Windows Terminal](https://aka.ms/terminal)
-- [Cloudflare WARP](https://1.1.1.1/download)
-
-## 構成内容
-
-- Shell設定 (Zsh, Fish)
-- エディタ設定 (Neovim, VS Code, Helix)
-- ターミナル設定 (WezTerm, tmux)
+- Zsh設定（`.zshrc`, `.zshenv`など）
+- Fish Shell設定
+- Neovim設定
+- WezTerm設定
 - Git設定
-- 各種開発ツール
+- Starship（クロスプラットフォームのプロンプト）
+- VSCode/Cursor設定と拡張機能
+- tmux設定
+- その他各種ツール設定
 
-## ファイル構造
+## 環境別セットアップの詳細
 
-- `install.sh` - メインインストールスクリプト（macOS, Linux, WSL用）
-- `install-windows.ps1` - Windowsホスト用セットアップスクリプト（WSLを設定）
-- `config/` - 各種アプリケーション設定
-- `shell/` - シェル関連設定
-- `packages/` - パッケージ管理リスト
-- `git/` - Git設定
+### WSL + Windows環境での注意点
 
-## カスタマイズ
+Windows環境でWSLを使用する場合、以下の設定ファイルのパスが異なります：
 
-個人用の調整が必要な場合は、各設定ファイルを直接編集するか、該当するディレクトリに新しいファイルを追加してください。
-## Linux/WSL環境のユーティリティ設定
+1. **WezTerm**:
+   - Windows: `%USERPROFILE%\.config\wezterm\wezterm.lua`
+   - WSL: `$HOME/.config/wezterm/wezterm.lua`
 
-### ロケール問題の修正とユーティリティーのインストール
+2. **VSCode**:
+   - Windows: `%APPDATA%\Code\User\settings.json`
+   - WSL: `$HOME/.config/Code/User/settings.json`
 
-Linux/WSLで以下のような問題が発生した場合は、ユーティリティーセットアップスクリプトを実行してください：
+3. **Cursor**:
+   - Windows: `%USERPROFILE%\.cursor\User\settings.json`
+   - WSL: `$HOME/.config/Cursor/User/settings.json`
 
-- ロケールの警告（「warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)」）
-- `open` コマンドでディレクトリやファイルが開けない問題
-- WSL環境ではWindowsとの統合機能の問題
+4. **Starship**:
+   - Windows: `%USERPROFILE%\.config\starship.toml`
+   - WSL: `$HOME/.config/starship.toml`
 
-```bash
-# Linux/WSLコンソール内で実行（包括的なセットアップ）
-./linux-utils-setup.sh
-```
+WSL環境とWindows環境の両方で設定を同期するには、`setup-windows-paths.ps1`スクリプトを使用してください。
 
-このスクリプトはWSLと標準Linuxの両方をサポートしており、環境を自動検出して以下を行います：
-1. ロケール設定の修正（en_US.UTF-8）
-2. WSL環境のみ：WSL統合ユーティリティー（wslu）のインストール
-3. xdg-utilsとdesktop-file-utilsのインストール
-4. Linux環境のみ：ファイルブラウザが存在しない場合はインストール
-5. デスクトップデータベースの更新
-旧式のスクリプトは引き続き利用可能です（WSLのロケールのみ修正）：
+### トラブルシューティング
 
-```bash
-# WSLコンソール内で実行（ロケールのみ修正）
-./wsl-locale-fix.sh
-```
+#### WSL環境でWindowsとの設定同期に問題がある場合
 
-適用後はシェルセッションを再起動してください（ターミナルを閉じて再度開くか、WSLの場合はPowerShellから`wsl --shutdown`を実行）。
+1. **管理者権限で実行**
+   - `setup-windows-paths.ps1`をWindows側から管理者権限で実行してください
+   - コマンド: `powershell -Command "Start-Process PowerShell -Verb RunAs -ArgumentList '-File setup-windows-paths.ps1'"`
 
-### クロスプラットフォームな `open` コマンド
+2. **WSLからPowerShellスクリプトを実行する際の問題**
+   - **エラー: `powershell.exe: command not found`**
+      - 解決策: Windowsの`PATH`環境変数にPowerShellのディレクトリが含まれていることを確認
+      - 例: `export PATH=$PATH:/mnt/c/Windows/System32/WindowsPowerShell/v1.0/`を`.bashrc`に追加
 
-このdotfilesには、macOS、Linux、WSLで同じように動作する改良された `open` コマンドが含まれています。このコマンドは自動的にプラットフォームを検出し、適切な方法でファイルやディレクトリを開きます：
+   - **実行ポリシーの問題**
+      - 解決策: `-ExecutionPolicy Bypass`パラメータを使用
+      - 例: `powershell.exe -ExecutionPolicy Bypass -File ./setup-windows-paths.ps1`
 
-```bash
-# ファイルを開く
-open filename.txt
+   - **パス変換の問題**
+      - WSLパスとWindowsパスの変換に失敗する場合は、直接Windows PowerShellから実行してください
 
-# 現在のディレクトリを開く
-open .
+3. **個別機能のインストール**
+   - 必要な設定のみを選択してインストールできます
+   - スクリプトのメニューから希望のオプションを選択してください
 
-# URLを開く
-open https://github.com
-```
+4. **バックアップと復元**
+   - 設定ファイルのインストール前に自動的にバックアップが作成されます
+   - バックアップパス: `%USERPROFILE%\.dotfiles_backup\[日時]`
+   - 問題が発生した場合は、このディレクトリから元の設定を復元できます
 
-各環境では以下のように動作します：
-- **macOS**: ネイティブの `open` コマンドを使用
-- **WSL**: Windowsのエクスプローラーまたはデフォルトアプリを使用
-- **Linux**: `xdg-open` を使用、ファイルマネージャーにフォールバック
-
-問題が発生した場合は `linux-utils-setup.sh` を実行して必要なユーティリティーをインストールしてください。
-
-#### 拡張セットアップスクリプト
-
-最小限のLinux環境や特殊なWSL設定で問題が発生する場合は、拡張版のセットアップスクリプトを使用できます：
-
-```bash
-# より包括的なセットアップ
-./linux-utils-setup-enhanced.sh
-```
-
-拡張版スクリプトは以下の追加機能を提供します：
-- ブラウザが存在しない場合は自動インストール
-- ファイルマネージャーが存在しない場合は自動インストール
-- MIME関連付けの明示的な設定（ディレクトリとHTML用）
-- WSL環境用のバックアップスクリプトの作成
-- HTMLファイルがVimで開く問題の修正ガイダンス
-
-#### よくある問題の解決方法
-
-1. **ディレクトリが開けない場合**：
-   ```
-   No applications found for mimetype: inode/directory
-   ```
-   拡張セットアップスクリプトを実行すると、ファイルマネージャーをインストールし、適切なMIME関連付けを設定します。
-
-2. **HTMLファイルがVimで開く場合**：
-   ```
-   Opening "/path/to/file.html" with Vim (text/html)
-   ```
-   以下を`.zshrc`または`.bashrc`に追加してください：
-   ```bash
-   export BROWSER=firefox  # または使用しているブラウザ
-   ```
-
-#### openコマンドのテスト
-
-`open` コマンドの機能をインタラクティブにテストするには、以下のスクリプトを実行できます：
-
-```bash
-# openコマンドの機能をテスト
-./test-open-command.sh
-```
-
-このテストスクリプトは以下を確認します：
-- ディレクトリを開く機能
-- HTMLファイルを開く機能
-- URLを開く機能
-```
-
-## 開発ツールとバージョン管理
-
-このリポジトリでは様々なプログラミング言語やツールのバージョン管理に [mise](https://github.com/jdx/mise) を使用しています。
-
-インストールスクリプト実行時に`config/mise/config.toml`で設定された言語やツールが自動的にインストールされます。
+5. **手動での設定配置**
+   - 各種設定ファイルの手動配置場所については、上記の「WSL + Windows環境での注意点」セクションを参照してください
+   - スクリプトが失敗する場合は手動でファイルをコピーすることも可能です

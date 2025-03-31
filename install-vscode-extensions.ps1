@@ -1,6 +1,11 @@
 # VS Code および Cursor 拡張機能インストールスクリプト
 # このスクリプトは dotfiles リポジトリ内の拡張機能リストからVS CodeとCursorの拡張機能を一括インストールします
 
+param(
+    [switch]$CursorOnly,    # Cursorの拡張機能のみをインストール
+    [switch]$VSCodeOnly     # VS Codeの拡張機能のみをインストール
+)
+
 # スクリプトのあるディレクトリを取得
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $extensionsFile = "$scriptDir\config\vscode\extensions.txt"
@@ -116,11 +121,19 @@ $extensionCount = (Get-Content $extensionsFile | Where-Object { -not [string]::I
 Write-Host "インストール予定の拡張機能数: $extensionCount" -ForegroundColor Cyan
 Write-Host ""
 
-# VS Code 拡張機能のインストール
-$vsCodeResult = Install-Extensions -CommandName "code" -DisplayName "Visual Studio Code"
+# パラメータに基づいてインストール処理を制御
+$vsCodeResult = $false
+$cursorResult = $false
 
-# Cursor 拡張機能のインストール
-$cursorResult = Install-Extensions -CommandName "cursor" -DisplayName "Cursor"
+if (-not $CursorOnly) {
+    # VS Code 拡張機能のインストール
+    $vsCodeResult = Install-Extensions -CommandName "code" -DisplayName "Visual Studio Code"
+}
+
+if (-not $VSCodeOnly) {
+    # Cursor 拡張機能のインストール
+    $cursorResult = Install-Extensions -CommandName "cursor" -DisplayName "Cursor"
+}
 
 # 結果サマリー
 Write-Host "========================================" -ForegroundColor Green
