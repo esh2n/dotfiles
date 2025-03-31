@@ -86,9 +86,34 @@ if [ -f '/Users/esh2n/google-cloud-sdk/completion.zsh.inc' ]; then
 fi
 
 # Additional paths
-export PACIFICA_PATH="/Users/esh2n/go"
-export PATH="/Users/esh2n/.rd/bin:$PATH" 
+# OS検出とWSL環境に応じてPACIFICA_PATHを設定
+if [ "$IS_WSL" = "1" ]; then
+  # WSL環境ではホームディレクトリ直下のgoディレクトリを使用
+  export PACIFICA_PATH="$HOME/go"
+elif [ "$OSTYPE" = "Darwin" ]; then
+  # macOS環境ではオリジナルのパスを使用
+  export PACIFICA_PATH="/Users/esh2n/go"
+else
+  # 通常のLinux環境でもホームディレクトリ直下を使用
+  export PACIFICA_PATH="$HOME/go"
+fi
+
+# パスの存在確認と警告
+if [ ! -d "$PACIFICA_PATH" ]; then
+  echo "警告: PACIFICA_PATH ($PACIFICA_PATH) が存在しません"
+  echo "goディレクトリを作成するか、パスを修正してください"
+  # 存在しない場合は一時的に$HOMEを設定
+  export PACIFICA_PATH="$HOME"
+fi
+
+# RD (RundownInc) のバイナリパスをOSに応じて設定
+if [ "$OSTYPE" = "Darwin" ]; then
+  # macOS固有の設定
+  export PATH="/Users/esh2n/.rd/bin:$PATH"
+fi
 
 # .NET SDK Path
-export DOTNET_ROOT="$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14"
-export PATH="$DOTNET_ROOT:$PATH" 
+if [ -d "$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14" ]; then
+  export DOTNET_ROOT="$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14"
+  export PATH="$DOTNET_ROOT:$PATH"
+fi

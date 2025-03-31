@@ -57,14 +57,41 @@ function sk_select_src () {
     return 1
   fi
 
-  # pacificaコマンドが存在するかチェック
-  if ! command -v pacifica &>/dev/null; then
-    # WSL環境などpacificaがない場合は代替としてfdを使用
-    local selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+  local selected_dir=""
+  
+  # pacificaを優先的に使用
+  if command -v pacifica &>/dev/null; then
+    # 一時ファイルを使用してエラーを捕捉
+    pacifica 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null > /tmp/pacifica_result.$$ || true
+    
+    # 結果が存在し空でなければ使用
+    if [ -s /tmp/pacifica_result.$$ ]; then
+      selected_dir=$(cat /tmp/pacifica_result.$$)
+      rm -f /tmp/pacifica_result.$$
+    else
+      # pacificaが失敗したか結果が空の場合
+      rm -f /tmp/pacifica_result.$$ 2>/dev/null
+      
+      # メッセージ表示は省略してシームレスに代替手段を使用
+      if command -v fd &>/dev/null; then
+        selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules . "$HOME" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
+      elif command -v find &>/dev/null; then
+        selected_dir=$(find "$HOME" -type d -not -path "*/\.*" -not -path "*/node_modules/*" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
+      fi
+    fi
   else
-    local selected_dir=$(pacifica | sk --ansi --reverse --height '50%' --query "$LBUFFER")
+    # pacificaがインストールされていない場合はfdまたはfindを使用
+    if command -v fd &>/dev/null; then
+      selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules . "$HOME" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
+    elif command -v find &>/dev/null; then
+      selected_dir=$(find "$HOME" -type d -not -path "*/\.*" -not -path "*/node_modules/*" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
+    else
+      echo "エラー: pacifica、fd、findのいずれもインストールされていません"
+      return 1
+    fi
   fi
 
+  # 選択したディレクトリが存在すれば移動
   if [ -n "$selected_dir" ]; then
     BUFFER="cd ${selected_dir}"
     zle accept-line
