@@ -119,7 +119,7 @@ function Install-WSL {
             if ($_.Exception.Message -match "ERROR_ALREADY_EXISTS") {
                 Write-Host "$wslDistro distribution already exists but may be corrupted. Consider running 'wsl --unregister $wslDistro' and then running this script again."
             } else {
-                Write-Host "Error installing $wslDistro: $_"
+                Write-Host ("Error installing " + $wslDistro + ": " + $_.Exception.Message)
             }
             
             # Ask if the user wants to continue anyway
