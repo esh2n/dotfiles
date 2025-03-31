@@ -359,22 +359,54 @@ function Install-VSCodeExtensions {
         return
     }
     
-    # Path to extensions file
+    # 一時ファイルを作成
+    $tempExtFile = "$env:TEMP\vscode_extensions_temp.txt"
+    
+    # Path to extensions file - make sure we're using Windows path format
     $extensionsFile = "$dotfilesDir\config\vscode\extensions.txt"
     
     if (Test-Path $extensionsFile) {
-        $extensions = Get-Content -Path $extensionsFile
+        # コンテンツを一時ファイルにコピー
+        Copy-Item -Path $extensionsFile -Destination $tempExtFile -Force
         
-        foreach ($extension in $extensions) {
-            if ([string]::IsNullOrWhiteSpace($extension)) { continue }
+        if (Test-Path $tempExtFile) {
+            $extensions = Get-Content -Path $tempExtFile
             
-            Write-Host "Installing extension: $extension"
-            code --install-extension $extension --force
+            # PowerShell プロセス内でコマンドを実行（現在のディレクトリに関係なく）
+            $currentDir = Get-Location
+            Set-Location $env:USERPROFILE
+            
+            foreach ($extension in $extensions) {
+                if ([string]::IsNullOrWhiteSpace($extension)) { continue }
+                
+                Write-Host "Installing extension: $extension"
+                try {
+                    # パラメータを別々に指定してコマンドを構築
+                    $process = Start-Process -FilePath "code" -ArgumentList "--install-extension", "$extension", "--force" -NoNewWindow -Wait -PassThru
+                    
+                    if ($process.ExitCode -eq 0) {
+                        Write-Host "Successfully installed extension: $extension" -ForegroundColor Green
+                    } else {
+                        Write-Host "Failed to install extension: $extension (Exit code: $($process.ExitCode))" -ForegroundColor Yellow
+                    }
+                }
+                catch {
+                    Write-Host "Error installing extension $extension: $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+            
+            # 元のディレクトリに戻る
+            Set-Location $currentDir
+            
+            # 一時ファイルを削除
+            Remove-Item -Path $tempExtFile -Force
+            
+            Write-Host "VS Code extensions installation completed."
+        } else {
+            Write-Host "Failed to create temporary extensions file" -ForegroundColor Red
         }
-        
-        Write-Host "VS Code extensions installed successfully."
     } else {
-        Write-Host "Extensions file not found: $extensionsFile"
+        Write-Host "Extensions file not found: $extensionsFile" -ForegroundColor Red
     }
 }
 
@@ -388,22 +420,54 @@ function Install-CursorExtensions {
         return
     }
     
+    # 一時ファイルを作成
+    $tempExtFile = "$env:TEMP\cursor_extensions_temp.txt"
+    
     # Path to extensions file - use same file as VSCode
     $extensionsFile = "$dotfilesDir\config\vscode\extensions.txt"
     
     if (Test-Path $extensionsFile) {
-        $extensions = Get-Content -Path $extensionsFile
+        # コンテンツを一時ファイルにコピー
+        Copy-Item -Path $extensionsFile -Destination $tempExtFile -Force
         
-        foreach ($extension in $extensions) {
-            if ([string]::IsNullOrWhiteSpace($extension)) { continue }
+        if (Test-Path $tempExtFile) {
+            $extensions = Get-Content -Path $tempExtFile
             
-            Write-Host "Installing Cursor extension: $extension"
-            cursor --install-extension $extension --force
+            # PowerShell プロセス内でコマンドを実行（現在のディレクトリに関係なく）
+            $currentDir = Get-Location
+            Set-Location $env:USERPROFILE
+            
+            foreach ($extension in $extensions) {
+                if ([string]::IsNullOrWhiteSpace($extension)) { continue }
+                
+                Write-Host "Installing Cursor extension: $extension"
+                try {
+                    # パラメータを別々に指定してコマンドを構築
+                    $process = Start-Process -FilePath "cursor" -ArgumentList "--install-extension", "$extension", "--force" -NoNewWindow -Wait -PassThru
+                    
+                    if ($process.ExitCode -eq 0) {
+                        Write-Host "Successfully installed Cursor extension: $extension" -ForegroundColor Green
+                    } else {
+                        Write-Host "Failed to install Cursor extension: $extension (Exit code: $($process.ExitCode))" -ForegroundColor Yellow
+                    }
+                }
+                catch {
+                    Write-Host "Error installing Cursor extension $extension: $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+            
+            # 元のディレクトリに戻る
+            Set-Location $currentDir
+            
+            # 一時ファイルを削除
+            Remove-Item -Path $tempExtFile -Force
+            
+            Write-Host "Cursor extensions installation completed."
+        } else {
+            Write-Host "Failed to create temporary extensions file" -ForegroundColor Red
         }
-        
-        Write-Host "Cursor extensions installed successfully."
     } else {
-        Write-Host "Extensions file not found: $extensionsFile"
+        Write-Host "Extensions file not found: $extensionsFile" -ForegroundColor Red
     }
 }
 

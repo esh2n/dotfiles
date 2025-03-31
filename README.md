@@ -219,6 +219,99 @@ Linux/WSL環境では、Homebrewでインストールされるパッケージに
 - WSL用のロケール設定
 - 開発用フォントのインストール（通常のLinux環境のみ）
 
+## Windows環境での拡張機能インストールの問題解決
+
+### VS Code/Cursor拡張機能のインストール失敗
+
+WSL環境から`install-windows.ps1`を実行すると、以下のような問題が発生することがあります：
+
+1. **UNCパスエラー**:
+   ```
+   '\\wsl.localhost\Ubuntu\home\username\go\github.com\esh2n\dotfiles'
+   上記の現在のディレクトリで CMD.EXE を開始しました。
+   UNC パスはサポートされません。Windows ディレクトリを既定で使用します。
+   ```
+
+2. **署名検証エラー**:
+   ```
+   Error while installing extension: Signature verification was not executed.
+   ```
+
+### 解決方法
+
+#### 方法1: 専用インストールスクリプトを使用（推奨）
+
+VS CodeとCursorの拡張機能を一括でインストールするための専用スクリプトを用意しています：
+
+1. Windows PowerShellを管理者権限で起動
+2. スクリプトを実行:
+   ```powershell
+   # dotfilesディレクトリ内で
+   .\install-vscode-extensions.ps1
+   ```
+
+このスクリプトは以下の特徴があります：
+- `config/vscode/extensions.txt`から拡張機能リストを自動的に読み込む
+- VS CodeとCursorの両方に対応
+- UNCパスの問題を回避する処理を内蔵
+- 詳細なインストール結果を表示（成功数/失敗数）
+- 一時ファイルを使用してパスの問題を解決
+
+#### 方法2: WSL内からPowerShellスクリプトを実行
+
+WSL環境からも拡張機能インストールスクリプトを実行できます：
+
+1. WSLターミナル内で以下を実行：
+   ```bash
+   # WSL内から PowerShell スクリプトを実行
+   powershell.exe -ExecutionPolicy Bypass -File $(wslpath -w ./install-vscode-extensions.ps1)
+   ```
+
+2. または、以下のようにWSLパス変換を使用：
+   ```bash
+   # 現在のディレクトリを Windows パスに変換して実行
+   DOTFILES_WIN_PATH=$(wslpath -w .)
+   powershell.exe -ExecutionPolicy Bypass -Command "& {Set-Location '$DOTFILES_WIN_PATH'; .\install-vscode-extensions.ps1}"
+   ```
+
+**注意**: WSLから実行すると文字化けする場合は、以下のコマンドを使用してUTF-8エンコーディングを指定してください：
+```bash
+powershell.exe -ExecutionPolicy Bypass -Command "& { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; & $(wslpath -w ./install-vscode-extensions.ps1) }"
+```
+
+#### 方法3: 手動でコマンドを実行
+
+個々の拡張機能を手動でインストールする場合：
+
+1. Windows PowerShellを管理者権限で起動
+2. VS Code拡張機能をインストール:
+   ```powershell
+   code --install-extension ms-vscode-remote.remote-wsl --force
+   # 他の拡張機能も同様に
+   ```
+
+3. Cursor拡張機能をインストール:
+   ```powershell
+   cursor --install-extension ms-vscode-remote.remote-wsl --force
+   # 他の拡張機能も同様に
+   ```
+
+#### 方法2: 拡張機能ファイルを直接編集
+
+VS CodeとCursorはJSON形式の設定ファイルで拡張機能を管理しています：
+
+1. VS Code:
+   ```
+   %USERPROFILE%\.vscode\extensions\extensions.json
+   ```
+
+2. Cursor:
+   ```
+   %USERPROFILE%\.cursor\extensions\extensions.json
+   ```
+
+これらのファイルに直接拡張機能IDを追加することもできます。
+
 ## Windows環境でインストールすべきアプリケーション
 
 WSL環境では、GUIアプリケーションは通常Windows側にインストールして使用します。以下のアプリケーションはBrewfileに含まれているものから、Windows環境で手動インストールが推奨されるものです：
