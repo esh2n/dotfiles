@@ -192,7 +192,11 @@ alias cdd="cd $DOTFILES_PATH"
 
 # Utilities
 alias curl_header='curl -D - -s -o /dev/null'
-alias date='gdate'
+# OSタイプに応じてdateエイリアスを設定
+if [[ "$(uname)" == "Darwin" ]]; then
+  # macOSでのみgdateエイリアスを設定
+  alias date='gdate'
+fi
 alias zeinit='zellij --layout ~/.config/zellij/layout_file.yaml'
 
 # Enhanced grep and cat

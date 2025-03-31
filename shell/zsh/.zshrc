@@ -69,6 +69,22 @@ function sz() {
   # 現在のPATHを保存
   local OLD_PATH="$PATH"
   
+  # OS検出（date用）
+  local IS_MACOS=0
+  if [[ "$(uname)" == "Darwin" ]]; then
+    IS_MACOS=1
+  fi
+  
+  # 時間を取得する関数（OS間の互換性を確保）
+  function get_timestamp() {
+    if [[ $IS_MACOS -eq 1 ]] && command -v gdate >/dev/null 2>&1; then
+      gdate +%s.%N
+    else
+      # Linux/WSLではdateコマンドが%Nをサポート
+      date +%s.%N
+    fi
+  }
+  
   # ファイルのトレースとパフォーマンス計測をセットアップ
   local debug=${SZ_DEBUG:-0}
   local start_time end_time duration
@@ -80,7 +96,6 @@ function sz() {
   /bin/rm -f /tmp/sz_loading_* /tmp/sz_times_* 2>/dev/null
   
   # パフォーマンス計測用の一時ディレクトリを作成
-  mkdir -p /tmp/sz_times
   mkdir -p /tmp/sz_times
   
   # ロードアニメーション関数
@@ -99,7 +114,7 @@ function sz() {
   function time_source() {
     local file=$1
     local file_name="${file##*/}"  # basename の代わりに zsh のパラメータ展開を使用
-    local start=$(date +%s.%N)
+    local start=$(get_timestamp)
     
     # ファイル名が空でないか確認
     if [[ -z "$file" || "$file" == "-" ]]; then
@@ -110,14 +125,17 @@ function sz() {
     # 元のsource関数を使用してファイルを読み込み
     builtin source "$file" 2>/dev/null
     
-    local end=$(date +%s.%N)
+    local end=$(get_timestamp)
     
     # bc を使わずに計算（zsh の算術展開を使用）
-    local time_diff=$(( end - start ))
-    
-    # 時間を記録（ファイル名が妥当な場合のみ）
-    if [[ -n "$file" && "$file" != "-" && "$file" != ":" ]]; then
-      printf "%s:%.6f\n" "$file" $time_diff >> /tmp/sz_times/all_files.txt
+    # end/startが数値でなければ計算しない
+    if [[ "$end" =~ ^[0-9]+(\.[0-9]+)?$ && "$start" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+      local time_diff=$(( end - start ))
+      
+      # 時間を記録（ファイル名が妥当な場合のみ）
+      if [[ -n "$file" && "$file" != "-" && "$file" != ":" ]]; then
+        printf "%s:%.6f\n" "$file" $time_diff >> /tmp/sz_times/all_files.txt
+      fi
     fi
   }
   
@@ -137,7 +155,7 @@ function sz() {
   spin "zshenv" &
   local SPIN_PID=$!
   
-  start_time=$(date +%s.%N)
+  start_time=$(get_timestamp)
   if [ -f ~/.zshenv ]; then
     if [ "$debug" = "1" ]; then
       time_source ~/.zshenv
@@ -145,9 +163,13 @@ function sz() {
       source ~/.zshenv 2>/dev/null
     fi
   fi
-  end_time=$(date +%s.%N)
-  # bcを使わずに計算（zshの算術展開を使用）
-  local zshenv_time=$(( end_time - start_time ))
+  end_time=$(get_timestamp)
+  
+  # 時間計算（数値チェック）
+  local zshenv_time=0
+  if [[ "$end_time" =~ ^[0-9]+(\.[0-9]+)?$ && "$start_time" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    zshenv_time=$(( end_time - start_time ))
+  fi
   
   /bin/rm -f /tmp/sz_loading_zshenv
   wait $SPIN_PID 2>/dev/null
@@ -162,14 +184,18 @@ function sz() {
     "$ZDOTDIR/functions.zsh"
     "$ZDOTDIR/aliases.zsh"
     "$ZDOTDIR/brew.zsh"
-    "$ZDOTDIR/sketchybar.zsh"
   )
+  
+  # OS固有の設定ファイルを追加
+  if [[ $IS_MACOS -eq 1 ]]; then
+    config_files+=("$ZDOTDIR/sketchybar.zsh")
+  fi
   
   touch /tmp/sz_loading_zshrc
   spin "zshrc" &
   SPIN_PID=$!
   
-  start_time=$(date +%s.%N)
+  start_time=$(get_timestamp)
   if [ -f ~/.zshrc ]; then
     if [ "$debug" = "1" ]; then
       time_source ~/.zshrc
@@ -177,9 +203,13 @@ function sz() {
       source ~/.zshrc 2>/dev/null
     fi
   fi
-  end_time=$(date +%s.%N)
-  # bcを使わずに計算（zshの算術展開を使用）
-  local zshrc_time=$(( end_time - start_time ))
+  end_time=$(get_timestamp)
+  
+  # 時間計算（数値チェック）
+  local zshrc_time=0
+  if [[ "$end_time" =~ ^[0-9]+(\.[0-9]+)?$ && "$start_time" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    zshrc_time=$(( end_time - start_time ))
+  fi
   
   /bin/rm -f /tmp/sz_loading_zshrc
   wait $SPIN_PID 2>/dev/null
