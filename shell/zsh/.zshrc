@@ -13,8 +13,11 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# Set ZDOTDIR to the dotfiles directory
-ZDOTDIR="$HOME/.zsh"
+# ZSH設定ディレクトリの設定
+# 既にZDOTDIRが設定されていない場合のみ設定
+if [[ -z "${ZDOTDIR}" ]]; then
+  ZDOTDIR="$HOME/.zsh"
+fi
 
 # Initialize zinit
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
