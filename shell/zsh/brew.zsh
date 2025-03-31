@@ -48,22 +48,25 @@ else
     BREW_PATH=""
     if [ -f "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
         BREW_PATH="/home/linuxbrew/.linuxbrew/bin/brew"
+        export BREW_BASE="/home/linuxbrew/.linuxbrew"
     elif [ -f "$HOME/.linuxbrew/bin/brew" ]; then
         BREW_PATH="$HOME/.linuxbrew/bin/brew"
+        export BREW_BASE="$HOME/.linuxbrew"
     fi
     
     # Homebrewが見つかった場合は初期化
     if [ -n "$BREW_PATH" ]; then
-        # Linux向けHomebrew環境の設定
+        # Linux向けHomebrew環境の設定（明示的にexport）
         eval "$($BREW_PATH shellenv)"
+        
+        # 環境変数を明示的に設定 (macOSと同様の方法で)
+        export PATH="${BREW_BASE}/bin:${BREW_BASE}/sbin${PATH:+:${PATH}}"
         
         # PATHにLinuxbrewのディレクトリを追加
         typeset -U path PATH
         path=(
-            /home/linuxbrew/.linuxbrew/bin(N-/)
-            /home/linuxbrew/.linuxbrew/sbin(N-/)
-            $HOME/.linuxbrew/bin(N-/)
-            $HOME/.linuxbrew/sbin(N-/)
+            ${BREW_BASE}/bin(N-/)
+            ${BREW_BASE}/sbin(N-/)
             $path
         )
     fi
