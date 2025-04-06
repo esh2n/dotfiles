@@ -313,10 +313,20 @@ function Install-DevTools {
     Install-WingetPackage -Id "wez.wezterm" -Name "WezTerm"
     Install-WingetPackage -Id "Cursor.Cursor" -Name "Cursor" # Cursorエディタを追加
     
+    # Raycast代替とその他の便利なツール
+    Install-WingetPackage -Id "Notion.Notion" -Name "Notion" # ノート・知識管理
+    Install-WingetPackage -Id "ShareX.ShareX" -Name "ShareX" # 高度なスクリーンショットと画面キャプチャ
+
     # Optional tools - uncomment to install
+    # Install-WingetPackage -Id "9P7KNL5RWT25" -Name "DevToys" # デベロッパー向けユーティリティツール
+    # Install-WingetPackage -Id "voidtools.Everything" -Name "Everything" # 高速ファイル検索
+    # Install-WingetPackage -Id "Lexikos.AutoHotkey" -Name "AutoHotkey" # キーボードショートカットとオートメーション
+    # Install-WingetPackage -Id "OBSProject.OBSStudio" -Name "OBS Studio" # 画面録画・配信
     # Install-WingetPackage -Id "Microsoft.VisualStudio.2022.Community" -Name "Visual Studio 2022 Community"
     # Install-WingetPackage -Id "JetBrains.IntelliJIDEA.Community" -Name "IntelliJ IDEA Community"
     # Install-WingetPackage -Id "Docker.DockerDesktop" -Name "Docker Desktop"
+    # Install-WingetPackage -Id "XSplit.VCam" -Name "XSplit VCam" # バーチャルカメラ
+    # Install-WingetPackage -Id "Figma.Figma" -Name "Figma" # デザインツール
     
     Write-Host "Development tools installation complete."
 }
@@ -573,7 +583,7 @@ function Install-Dotfiles {
     Write-Host ""
     Write-Host "The following operations will be performed:"
     Write-Host "1. Install development fonts (JetBrains Mono, Hack Nerd Font)"
-    Write-Host "2. Install Windows development tools (VS Code, Windows Terminal, Git, etc.)"
+    Write-Host "2. Install Windows development tools (VS Code, Windows Terminal, Git, Ueli, DevToys, etc.)"
     Write-Host "3. Configure Windows Terminal"
     Write-Host "4. Install VS Code extensions"
     Write-Host "5. Set up dotfiles in WSL environment"
