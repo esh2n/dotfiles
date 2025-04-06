@@ -121,17 +121,15 @@ wezterm.on('gui-startup', function(cmd)
   
   -- OSに応じた起動処理
   if os_utils.is_windows() then
-    -- Windows環境では安定性のために単純に初期化
+    -- Windows環境では安定性のために単純に初期化（最大化なし）
     local mux = wezterm.mux
     local tab, pane, window = mux.spawn_window(cmd or {})
     
-    -- 少し遅延させてから最大化（安定性向上）
-    wezterm.sleep_ms(500)
-    window:gui_window():maximize()
+    -- Windows環境では最大化しない
   else
-    -- macOS/Linux環境では通常のレイアウト処理
+    -- macOS環境では通常のレイアウト処理
     local tab, pane, window = layout.default(cmd)
-    -- 起動時に最大化
+    -- macOSでのみ起動時に最大化
     window:gui_window():maximize()
   end
 end)
