@@ -116,11 +116,9 @@ function sk_select_src () {
     else
       echo "エラー: pacifica、fd、findのいずれもインストールされていません"
       zle reset-prompt
-        return 1
-      fi
+      return 1
     fi
   fi
-fi
 
   # 選択したディレクトリが存在すれば移動
   if [ -n "$selected_dir" ]; then
