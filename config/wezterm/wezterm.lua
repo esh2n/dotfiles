@@ -13,11 +13,17 @@ if wezterm.config_builder then
     config = wezterm.config_builder()
 end
 
--- 各モジュールの設定を適用
+-- 各モジュールの設定を適用（Windows環境では選択的に適用）
 appearance.apply_to_config(config)
 keybinds.apply_to_config(config)
 colors.apply_to_config(config)
-status.apply_to_config(config)
+
+-- Windows環境では標準のステータスバーを無効化し、シンプルな独自実装に置き換え
+if not os_utils.is_windows() then
+  -- macOS/Linux環境では通常のステータスバー
+  status.apply_to_config(config)
+end
+
 tabs.apply_to_config(config)
 
 -- パフォーマンス設定
@@ -35,6 +41,44 @@ if os_utils.is_windows() then
     config.exit_behavior = "Close"  -- 終了時に即座に閉じる
     config.check_for_updates = false -- 更新確認を無効化（パフォーマンス向上）
     config.adjust_window_size_when_changing_font_size = false -- フォントサイズ変更時のリサイズを無効化
+    
+    -- Windows環境向けの簡易ステータスバー設定
+    config.status_update_interval = 5000  -- 5秒ごとの更新（低頻度）
+    
+    -- Windows環境では外部プロセスを起動しないシンプルなステータスバー
+    wezterm.on("update-status", function(window, pane)
+        -- 現在時刻のみを表示
+        local time = wezterm.strftime("%H:%M")
+        
+        -- バッテリー情報（外部コマンドを使用せず内部APIのみ）
+        local battery = '● N/A'
+        local battery_info = wezterm.battery_info()
+        if battery_info and #battery_info > 0 then
+            local b = battery_info[1]
+            local icon = '●'
+            if b.state == 'Charging' then
+                icon = '↑'
+            elseif b.state == 'Empty' then
+                icon = '○'
+            end
+            battery = string.format('%s %d%%', icon, math.floor(b.state_of_charge * 100))
+        end
+        
+        -- シンプルなステータスバー（時刻とバッテリーのみ）
+        local elements = {
+            {Background = {Color = "#1e1e2e"}},
+            {Text = "     "},
+            {Foreground = {Color = "#94e2d5"}},
+            {Text = battery .. "   "},
+            {Foreground = {Color = "#cba6f7"}},
+            {Attribute = {Intensity = "Bold"}},
+            {Text = time},
+            {Background = {Color = "#1e1e2e"}},
+            {Text = "     "},
+        }
+        
+        window:set_right_status(wezterm.format(elements))
+    end)
 else
     -- macOS/Linux環境ではWebGpuを使用
     config.front_end = "WebGpu"
@@ -113,7 +157,15 @@ end
 
 -- デフォルトの作業ディレクトリとシェルを設定
 config.default_cwd = os_utils.get_home_dir() -- OSに応じたホームディレクトリを取得
-config.default_prog = os_utils.get_default_shell() -- OSに応じたデフォルトシェルを取得
+
+-- WSL起動方法を最適化
+if os_utils.is_windows() then
+  -- WSL直接起動（簡素化、効率化）
+  config.default_prog = { 'wsl.exe', '-d', 'Ubuntu' }  -- Ubuntuディストリビューションを直接指定
+else
+  -- macOS/Linux環境では通常のシェル
+  config.default_prog = os_utils.get_default_shell()
+end
 
 -- タブタイトルの設定
 wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_width)
