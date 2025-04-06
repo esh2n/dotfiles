@@ -62,8 +62,8 @@ function M.apply_to_config(config)
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) })
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL', action = act.ActivateTabRelative(1) })
         -- Ctrl+]を明示的にシェルにパススルーする（WSL環境でのsk_select_src用）
-        -- キーをそのままパススルーする方法を使用（SendString方式より信頼性が高い）
-        table.insert(base_keys, { key = ']', mods = 'CTRL', action = act.PassThrough() })
+        -- キーをそのままパススルーする方法を使用
+        table.insert(base_keys, { key = ']', mods = 'CTRL', action = act.SendKey{ key = ']', mods = 'CTRL' } })
     end
     
     config.keys = base_keys
