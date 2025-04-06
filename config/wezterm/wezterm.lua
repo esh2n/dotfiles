@@ -151,12 +151,15 @@ if os_utils.is_windows() then
   config.disable_default_key_bindings = false
   config.key_map_preference = "Physical"
   
-  -- Ctrl+]を明示的にパススルー対象に指定
-  config.bypass_mouse_reporting_modifiers = 'NONE'
-  config.keys_that_should_pass_thru = {
-    -- Ctrl+]（ZSH用のsk_select_src関数のトリガー）
-    { key = ']', mods = 'CTRL' },
-  }
+  -- Ctrl+]を明示的にパススルー対象に指定（Escape Sequenceを直接送信）
+  local act = wezterm.action
+  local ctrl_bracket_key = { key = ']', mods = 'CTRL', action = act.SendString('\x1d') }
+  
+  -- カスタムキーを設定
+  if config.keys == nil then
+    config.keys = {}
+  end
+  table.insert(config.keys, ctrl_bracket_key)
 end
 
 -- Windows環境での追加パフォーマンス最適化
