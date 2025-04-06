@@ -8,6 +8,7 @@ local status = require('lua.ui.status')
 local tabs = require('lua.ui.tabs')
 local os_utils = require('lua.utils.os') -- OSユーティリティをインポート
 
+-- Windows環境でCtrl+]を直接ターミナルに渡すための設定
 local config = {}
 if wezterm.config_builder then
     config = wezterm.config_builder()
@@ -143,6 +144,20 @@ config.inactive_pane_hsb = {
 }
 -- デバッグ設定
 config.debug_key_events = false
+
+-- Windows環境でCtrl+]を直接ターミナルに渡すための明示的な設定
+if os_utils.is_windows() then
+  -- 特定のキーの処理をWeztermで捕捉せず、直接ターミナルアプリケーションに渡す
+  config.disable_default_key_bindings = false
+  config.key_map_preference = "Physical"
+  
+  -- Ctrl+]を明示的にパススルー対象に指定
+  config.bypass_mouse_reporting_modifiers = 'NONE'
+  config.keys_that_should_pass_thru = {
+    -- Ctrl+]（ZSH用のsk_select_src関数のトリガー）
+    { key = ']', mods = 'CTRL' },
+  }
+end
 
 -- Windows環境での追加パフォーマンス最適化
 if os_utils.is_windows() then

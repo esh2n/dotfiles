@@ -6,9 +6,9 @@ local os_utils = require('lua.utils.os')
 function M.apply_to_config(config)
     -- リーダーキーの設定
     config.leader = { key = 'q', mods = 'CTRL', timeout_milliseconds = 1000 }
+    -- デフォルトのキーバインドを選択的に有効化（Windows環境ではCtrl+]などのキーを通すため）
+    config.disable_default_key_bindings = false
     
-    -- デフォルトのキーバインドを無効化
-    config.disable_default_key_bindings = true
     
     -- OS別のモディファイアキー選択
     local is_win = os_utils.is_windows()
@@ -31,6 +31,8 @@ function M.apply_to_config(config)
         -- タブ操作
         { key = 't', mods = mod_cmd, action = act.SpawnTab 'CurrentPaneDomain' },
         { key = 'w', mods = mod_cmd, action = act.CloseCurrentTab { confirm = true } },
+        
+        -- タブ切り替え（macOSは⌘+[]、WindowsはCtrl+Tab/Shift+Tabを使用）
         { key = '[', mods = mod_cmd, action = act.ActivateTabRelative(-1) },
         { key = ']', mods = mod_cmd, action = act.ActivateTabRelative(1) },
         
@@ -53,12 +55,15 @@ function M.apply_to_config(config)
         { key = 'm', mods = mod_cmd, action = act.Hide },
     }
     
-    -- Windows環境向けの追加キーバインド
+    -- Windows環境向けの追加キーバインドとシェルへのキーパススルー設定
     if is_win then
         -- Windows環境では、Windows標準のショートカットキーとの競合を避けるために
         -- 一部キーバインドを別の組み合わせでも使用可能にする
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) })
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL', action = act.ActivateTabRelative(1) })
+        
+        -- Windows環境ではCtrl+]はwezterm.luaでのパススルー設定を使用するため
+        -- ここでのバインディングは不要（競合を避けるため）
     end
     
     config.keys = base_keys
