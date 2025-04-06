@@ -1,6 +1,7 @@
 local wezterm = require('wezterm')
 local act = wezterm.action
 local M = {}
+local os_utils = require('lua.utils.os')
 
 function M.apply_to_config(config)
     -- リーダーキーの設定
@@ -9,8 +10,14 @@ function M.apply_to_config(config)
     -- デフォルトのキーバインドを無効化
     config.disable_default_key_bindings = true
     
-    -- キーバインドの設定
-    config.keys = {
+    -- OS別のモディファイアキー選択
+    local is_win = os_utils.is_windows()
+    
+    -- macOSとWindowsでモディファイアキーを切り替え
+    local mod_cmd = is_win and 'CTRL' or 'SUPER'
+    
+    -- ベースとなるキーバインドの設定（OS共通）
+    local base_keys = {
         -- ペイン操作
         { key = '-', mods = 'LEADER', action = act.SplitVertical { domain = 'CurrentPaneDomain' } },
         { key = '\\', mods = 'LEADER', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
@@ -22,29 +29,39 @@ function M.apply_to_config(config)
         { key = 'x', mods = 'LEADER', action = act.CloseCurrentPane { confirm = true } },
         
         -- タブ操作
-        { key = 't', mods = 'SUPER', action = act.SpawnTab 'CurrentPaneDomain' },
-        { key = 'w', mods = 'SUPER', action = act.CloseCurrentTab { confirm = true } },
-        { key = '[', mods = 'SUPER', action = act.ActivateTabRelative(-1) },
-        { key = ']', mods = 'SUPER', action = act.ActivateTabRelative(1) },
+        { key = 't', mods = mod_cmd, action = act.SpawnTab 'CurrentPaneDomain' },
+        { key = 'w', mods = mod_cmd, action = act.CloseCurrentTab { confirm = true } },
+        { key = '[', mods = mod_cmd, action = act.ActivateTabRelative(-1) },
+        { key = ']', mods = mod_cmd, action = act.ActivateTabRelative(1) },
         
         -- フォントサイズ
-        { key = '=', mods = 'SUPER', action = act.IncreaseFontSize },
-        { key = '-', mods = 'SUPER', action = act.DecreaseFontSize },
-        { key = '0', mods = 'SUPER', action = act.ResetFontSize },
+        { key = '=', mods = mod_cmd, action = act.IncreaseFontSize },
+        { key = '-', mods = mod_cmd, action = act.DecreaseFontSize },
+        { key = '0', mods = mod_cmd, action = act.ResetFontSize },
         
         -- コピー＆ペースト
-        { key = 'c', mods = 'SUPER', action = act.CopyTo 'Clipboard' },
-        { key = 'v', mods = 'SUPER', action = act.PasteFrom 'Clipboard' },
+        { key = 'c', mods = mod_cmd, action = act.CopyTo 'Clipboard' },
+        { key = 'v', mods = mod_cmd, action = act.PasteFrom 'Clipboard' },
         
         -- 検索
-        { key = 'f', mods = 'SUPER', action = act.Search 'CurrentSelectionOrEmptyString' },
+        { key = 'f', mods = mod_cmd, action = act.Search 'CurrentSelectionOrEmptyString' },
         
         -- その他
-        { key = 'q', mods = 'SUPER', action = act.QuitApplication },
-        { key = 'r', mods = 'SUPER', action = act.ReloadConfiguration },
-        { key = 'n', mods = 'SUPER', action = act.SpawnWindow },
-        { key = 'm', mods = 'SUPER', action = act.Hide },
+        { key = 'q', mods = mod_cmd, action = act.QuitApplication },
+        { key = 'r', mods = mod_cmd, action = act.ReloadConfiguration },
+        { key = 'n', mods = mod_cmd, action = act.SpawnWindow },
+        { key = 'm', mods = mod_cmd, action = act.Hide },
     }
+    
+    -- Windows環境向けの追加キーバインド
+    if is_win then
+        -- Windows環境では、Windows標準のショートカットキーとの競合を避けるために
+        -- 一部キーバインドを別の組み合わせでも使用可能にする
+        table.insert(base_keys, { key = 'Tab', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) })
+        table.insert(base_keys, { key = 'Tab', mods = 'CTRL', action = act.ActivateTabRelative(1) })
+    end
+    
+    config.keys = base_keys
     
     -- コピーモードのキーバインド
     config.key_tables = {
