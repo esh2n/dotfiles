@@ -51,10 +51,15 @@ function sk_select_history() {
 }
 
 function sk_select_src () {
-  # ZLEが有効かどうかをチェック
-  if [[ ! -o zle ]]; then
-    echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
-    return 1
+  # 直接実行とウィジェット呼び出しの両方に対応
+  if [[ "$1" = "--direct" ]]; then
+    # 直接コマンドとして実行（ZLE非依存）
+    local direct_mode=1
+  elif [[ ! -o zle ]]; then
+    # ZLEが無効で、かつ直接コマンドとしても実行されていない場合
+    echo "sk_select_srcを直接実行します（ZLEが無効なため）"
+    sk_select_src --direct
+    return $?
   fi
 
   # SIGINT（Ctrl+C）ハンドラを設定（中断時のゴミファイル処理を防止）
@@ -122,10 +127,21 @@ function sk_select_src () {
 
   # 選択したディレクトリが存在すれば移動
   if [ -n "$selected_dir" ]; then
-    BUFFER="cd ${selected_dir}"
-    zle accept-line
+    if [[ "$direct_mode" = "1" ]]; then
+      # 直接モード: コマンドとして実行
+      cd "${selected_dir}"
+      echo "✓ 移動先: ${selected_dir}"
+    else
+      # ZLEモード: ウィジェットとして実行
+      BUFFER="cd ${selected_dir}"
+      zle accept-line
+    fi
   else
-    zle reset-prompt
+    if [[ "$direct_mode" != "1" && -o zle ]]; then
+      zle reset-prompt
+    else
+      echo "ディレクトリが選択されませんでした"
+    fi
   fi
 }
 
@@ -449,45 +465,47 @@ function gx() {
 compdef gx-complete gx
 
 # Bind keys for fuzzy finder (環境適応型)
-if [[ $- == *i* ]] && [[ -o zle ]]; then
-  # インタラクティブシェルかつZLEがアクティブな場合のみキーバインドを設定
-  # 全てのsk関連の関数をウィジェットとして登録
-  zle -N sk_select_history
-  zle -N sk_select_src
-  zle -N sk_change_directory
-  zle -N sk_select_file_within_project
-  zle -N sk_select_file_below_pwd
+if [[ $- == *i* ]]; then
+  # インタラクティブシェルの場合のみキーバインドを設定
+  # インタラクティブシェルでもZLEが無効な場合のために、コマンドエイリアスも設定
   
-  # WSL環境でのキーバインド設定
-  if [ "$IS_WSL" = "1" ]; then
-    echo "WSL環境用キーバインドを設定しています..."
+  # ZLEが有効な場合のみ、ウィジェット登録とキーバインド設定を行う
+  if [[ -o zle ]]; then
+    # 全てのsk関連の関数をウィジェットとして登録
+    zle -N sk_select_history 2>/dev/null
+    zle -N sk_select_src 2>/dev/null
+    zle -N sk_change_directory 2>/dev/null
+    zle -N sk_select_file_within_project 2>/dev/null
+    zle -N sk_select_file_below_pwd 2>/dev/null
     
-    # 遅延キーバインド設定用の関数を定義
-    function __setup_wsl_keybinds() {
-      # 基本のキーバインド
-      bindkey '^r' sk_select_history   # Ctrl+R: 履歴検索
-      bindkey '^g' sk_change_directory # Ctrl+G: ディレクトリ変更
+    # WSL環境でのキーバインド設定
+    if [ "$IS_WSL" = "1" ]; then
+      echo "WSL環境用キーバインドを設定しています..."
       
-      # 代替キーバインド（Ctrl+]はnormalモードの切替に使用されるため）
-      bindkey '^\' sk_select_src       # Ctrl+\
-      bindkey '^p' sk_select_src       # Ctrl+P
-      bindkey '\e]' sk_select_src      # Alt+]
-      
-      # 可能であれば、vimモードのinsertモードでもCtrl+]を設定
-      if [[ -o zle ]]; then
+      # 遅延キーバインド設定用の関数を定義
+      function __setup_wsl_keybinds() {
+        # 基本のキーバインド
+        bindkey '^r' sk_select_history   # Ctrl+R: 履歴検索
+        bindkey '^g' sk_change_directory # Ctrl+G: ディレクトリ変更
+        
+        # 代替キーバインド（Ctrl+]はnormalモードの切替に使用されるため）
+        bindkey '^\' sk_select_src       # Ctrl+\
+        bindkey '^p' sk_select_src       # Ctrl+P
+        bindkey '\e]' sk_select_src      # Alt+]
+        
+        # 可能であれば、vimモードのinsertモードでもCtrl+]を設定
         bindkey -M viins '^]' sk_select_src 2>/dev/null || true
-      fi
-    }
-    
-    # 安全に初期設定を実行
-    __setup_wsl_keybinds
-    
-    # 追加のキーバインド
-    bindkey '^v' sk_select_file_within_project  # Ctrl+V
-    bindkey '^b' sk_select_file_below_pwd       # Ctrl+B
-    
-    # WSL環境でのキーバインド一覧を表示
-    cat <<EOF
+      }
+      
+      # 安全に初期設定を実行
+      __setup_wsl_keybinds
+      
+      # 追加のキーバインド
+      bindkey '^v' sk_select_file_within_project  # Ctrl+V
+      bindkey '^b' sk_select_file_below_pwd       # Ctrl+B
+      
+      # WSL環境でのキーバインド一覧を表示
+      cat <<EOF
 
 ======= WSL環境用キーバインド =======
 Ctrl+R : 履歴検索
@@ -497,55 +515,86 @@ Alt+] : ソースディレクトリ選択
 Ctrl+P : ソースディレクトリ選択
 Ctrl+V : プロジェクト内ファイル選択
 Ctrl+B : 現在ディレクトリ以下のファイル選択
+
+コマンド: src → プロジェクトディレクトリ選択（ZLEエラー時）
+コマンド: pd → カレントディレクトリ以下のファイル選択（ZLEエラー時）
 ================================
 
 EOF
-  else
-    # macOS / 通常Linux環境用のキーバインド設定関数
-    function __setup_macos_keybinds() {
-      bindkey '^r' sk_select_history
-      bindkey '^]' sk_select_src
-      bindkey '^g' sk_change_directory
-      bindkey '^v' sk_select_file_within_project
-      bindkey '^b' sk_select_file_below_pwd
-      
-      # 可能であれば、vimモードでもCtrl+]を設定
-      if [[ -o zle ]]; then
-        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
-      fi
-    }
-    
-    # 安全に初期設定を実行
-    __setup_macos_keybinds
-  fi
-  
-  # 端末起動時に実行する関数を追加（遅延初期化）
-  function precmd_setup_keybinds() {
-    # この関数はプロンプト表示前に毎回実行される
-    # 必要に応じてキーバインドを再設定可能
-    
-    # ZLEがアクティブであれば、Vimモードでのキーバインドを試行
-    if [[ -o zle ]]; then
-      if [ "$IS_WSL" = "1" ]; then
-        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
-      else
+    else
+      # macOS / 通常Linux環境用のキーバインド設定関数
+      function __setup_macos_keybinds() {
+        bindkey '^r' sk_select_history
+        bindkey '^]' sk_select_src
+        bindkey '^g' sk_change_directory
+        bindkey '^v' sk_select_file_within_project
+        bindkey '^b' sk_select_file_below_pwd
+        
+        # vimモードでもキーバインドを設定
         bindkey -M viins '^]' sk_select_src 2>/dev/null || true
         bindkey -M vicmd '^]' sk_select_src 2>/dev/null || true
-      fi
+      }
+      
+      # 安全に初期設定を実行
+      __setup_macos_keybinds
+      
+      cat <<EOF
+
+======= 標準キーバインド =======
+Ctrl+R : 履歴検索
+Ctrl+] : ソースディレクトリ選択
+Ctrl+G : ディレクトリ変更
+Ctrl+V : プロジェクト内ファイル選択
+Ctrl+B : 現在ディレクトリ以下のファイル選択
+
+コマンド: src → プロジェクトディレクトリ選択（ZLEエラー時）
+コマンド: pd → カレントディレクトリ以下のファイル選択（ZLEエラー時）
+================================
+
+EOF
     fi
     
-    # 一度実行したら、この関数をprecmdフックから削除
-    add-zsh-hook -d precmd precmd_setup_keybinds
-  }
+    # 端末起動時に実行する関数を追加（遅延初期化）
+    function precmd_setup_keybinds() {
+      # この関数はプロンプト表示前に毎回実行される
+      # 必要に応じてキーバインドを再設定可能
+      
+      # ZLEがアクティブであれば、Vimモードでのキーバインドを試行
+      if [[ -o zle ]]; then
+        if [ "$IS_WSL" = "1" ]; then
+          bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+        else
+          bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+          bindkey -M vicmd '^]' sk_select_src 2>/dev/null || true
+        fi
+      fi
+      
+      # 一度実行したら、この関数をprecmdフックから削除
+      add-zsh-hook -d precmd precmd_setup_keybinds
+    }
+    
+    # プロンプト表示前に実行するフックを追加
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd precmd_setup_keybinds
+  else
+    # ZLEが無効な場合は警告
+    [[ -z "$WSL_KEYBINDS_WARNING" ]] && {
+      echo "警告: ZLEが非アクティブなため、キーバインド設定の代わりにコマンドエイリアスを使用します:"
+      echo "- src: プロジェクトディレクトリ選択"
+      echo "- pd: カレントディレクトリ以下のファイル選択"
+      export WSL_KEYBINDS_WARNING=1
+    }
+  fi
   
-  # プロンプト表示前に実行するフックを追加
-  autoload -Uz add-zsh-hook
-  add-zsh-hook precmd precmd_setup_keybinds
+  # ZLEの状態に関わらず、コマンドとして実行できるようにエイリアスを設定
+  alias src="sk_select_src --direct"
+  alias pd="sk_select_file_below_pwd --direct"
+  alias project="sk_select_src --direct"
+  alias dirfind="sk_change_directory --direct"
 else
-  # 非インタラクティブシェルまたはZLEが非アクティブな場合は警告
+  # 非インタラクティブシェルの場合は警告
   [[ -z "$WSL_KEYBINDS_WARNING" ]] && {
-    echo "警告: インタラクティブシェルでないか、ZLEが非アクティブのため、キーバインド設定をスキップします。"
-    echo "対処法: ターミナルを再起動するか、exec zshで新しいセッションを開始してください。"
+    echo "警告: 非インタラクティブシェルのため、キーバインドが使用できません。"
     export WSL_KEYBINDS_WARNING=1
   }
 fi
