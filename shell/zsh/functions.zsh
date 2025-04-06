@@ -493,8 +493,14 @@ if [[ $- == *i* ]]; then
         bindkey '^p' sk_select_src       # Ctrl+P
         bindkey '\e]' sk_select_src      # Alt+]
         
-        # 可能であれば、vimモードのinsertモードでもCtrl+]を設定
-        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+        # vimモードの各モードにもキーバインドを設定
+        bindkey -M viins '^]' sk_select_src 2>/dev/null || true  # insertモード
+        bindkey -M vicmd '^]' sk_select_src 2>/dev/null || true  # normalモード（コマンドモード）
+        
+        # normalモードでも代替キーを使えるようにする
+        bindkey -M vicmd '^\' sk_select_src 2>/dev/null || true  # Ctrl+\
+        bindkey -M vicmd '^p' sk_select_src 2>/dev/null || true  # Ctrl+P
+        bindkey -M vicmd '\e]' sk_select_src 2>/dev/null || true # Alt+]
       }
       
       # 安全に初期設定を実行

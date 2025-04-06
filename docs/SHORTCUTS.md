@@ -10,47 +10,64 @@
 | `Ctrl + v` | プロジェクト内のファイルを選択 | `sk_select_file_within_project` | |
 | `Ctrl + b` | カレントディレクトリ以下のファイルを選択 | `sk_select_file_below_pwd` | |
 | `Ctrl + e` | ディレクトリを変更 | `sk_change_directory` | |
-| `Ctrl + g` | zoxideを使用してディレクトリを変更 | `sk_change_directory` |
+| `Ctrl + g` | zoxideを使用してディレクトリを変更 | `sk_change_directory` | |
 
 ## 履歴系
 
-| キー | 説明 | コマンド |
-|------|------|----------|
-| `Ctrl + r` | コマンド履歴を検索 | `sk_select_history` |
-| `Ctrl + p` | 履歴の前方検索 | `history-beginning-search-backward-end` |
-| `Ctrl + n` | 履歴の後方検索 | `history-beginning-search-forward-end` |
+| キー | 説明 | コマンド | 備考 |
+|------|------|----------|------|
+| `Ctrl + r` | コマンド履歴を検索 | `sk_select_history` | |
+| `Ctrl + p` | 履歴の前方検索 | `history-beginning-search-backward-end` | WSL環境では代わりにプロジェクトディレクトリ選択(`sk_select_src`)に使用 |
+| `Ctrl + n` | 履歴の後方検索 | `history-beginning-search-forward-end` | |
 
 ## 移動系
 
-| キー | 説明 | コマンド |
-|------|------|----------|
-| `Alt + →` | 単語単位で前に移動 | `forward-word` |
-| `Alt + ←` | 単語単位で後ろに移動 | `backward-word` |
+| キー | 説明 | コマンド | 備考 |
+|------|------|----------|------|
+| `Alt + →` | 単語単位で前に移動 | `forward-word` | |
+| `Alt + ←` | 単語単位で後ろに移動 | `backward-word` | |
 
 ## Vimモード
 
-| キー | 説明 | コマンド |
-|------|------|----------|
-| `gg` | 行頭に移動（Vimモード時） | `beginning-of-line` |
-| `G` | 行末に移動（Vimモード時） | `end-of-line` |
+| キー | 説明 | コマンド | 備考 |
+|------|------|----------|------|
+| `gg` | 行頭に移動（Vimモード時） | `beginning-of-line` | |
+| `G` | 行末に移動（Vimモード時） | `end-of-line` | |
 
 ## エイリアス
 
 よく使用するエイリアスも合わせて記載します：
 
-| エイリアス | 説明 | コマンド |
-|------------|------|----------|
-| `vv` | ファイルを選択してVimで開く | `sk_edit_file` |
-| `c` | ディレクトリを変更 | `sk_change_directory` |
-| `b` | カレントディレクトリ以下のファイルを選択 | `sk_select_file_below_pwd` |
-| `ghl` | ghqで管理しているリポジトリに移動 | `cd $(ghq root)/$(fast_ghl | sk)` |
+| エイリアス | 説明 | コマンド | 備考 |
+|------------|------|----------|------|
+| `vv` | ファイルを選択してVimで開く | `sk_edit_file` | |
+| `c` | ディレクトリを変更 | `sk_change_directory` | |
+| `b` | カレントディレクトリ以下のファイルを選択 | `sk_select_file_below_pwd` | |
+| `ghl` | ghqで管理しているリポジトリに移動 | `cd $(ghq root)/$(fast_ghl | sk)` | |
+| `src` | プロジェクトディレクトリに移動 | `sk_select_src --direct` | ZLEが無効な場合に使用 |
+| `pd` | カレントディレクトリ以下のファイルを選択 | `sk_select_file_below_pwd --direct` | ZLEが無効な場合に使用 |
+| `project` | プロジェクトディレクトリに移動 | `sk_select_src --direct` | `src`の別名 |
+| `dirfind` | ディレクトリを変更 | `sk_change_directory --direct` | ZLEが無効な場合に使用 |
 
 ## 注意事項
 
 - これらのショートカットの多くは`sk`（skim）というファジーファインダーを利用しています
 - Vimモードが有効になっているため、`ESC`キーでコマンドモードに切り替えることができます
 - モードの状態は右プロンプトに表示されます（`INSERT`/`NORMAL`）
-- **WSL環境での注意**: Zshのvimモードにより`Ctrl + ]`が通常モード切替に使われることがあるため、代わりに`Ctrl + \`または`Alt + ]`を使用することを推奨します
+
+### WSL環境での重要な注意点
+- **WSL環境では**, `Ctrl + ]`はVimのnormalモードに切り替わるため機能しません
+- 代わりに以下の代替キーバインドを使用してください：
+  - `Ctrl + \` - プロジェクトディレクトリ選択（推奨）
+  - `Alt + ]` - プロジェクトディレクトリ選択（代替）
+  - `Ctrl + p` - プロジェクトディレクトリ選択（代替、通常環境では履歴前方検索）
+
+### ZLEが無効な場合の代替コマンド
+- ZLEが無効な状態では、以下のコマンドを直接実行できます：
+  - `src` - プロジェクトディレクトリに移動
+  - `pd` - カレントディレクトリ以下のファイルを選択
+  - `project` - プロジェクトディレクトリに移動（srcの別名）
+  - `dirfind` - ディレクトリを変更
 
 # WezTerm ショートカット一覧
 
@@ -187,4 +204,4 @@
 - タイル型とアコーディオン型のレイアウトをサポート
 - マルチモニター対応
 - アプリケーション固有のワークスペース割り当て
-- サービスモードによる高度な操作 
+- サービスモードによる高度な操作
