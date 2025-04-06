@@ -20,23 +20,46 @@ function M.apply_to_config(config)
         }
     end
 
-    -- フォント設定
-    config.font = wezterm.font_with_fallback({
-        {
-            -- fc-listで確認した正確なフォント名を使用
-            family = "HackGen35 Console NF",
-            weight = "Regular",
-        },
-        {
-            family = "HackGen Console NF",
-            weight = "Regular",
-        },
-        {
-            family = "HackGen35 Console",
-            weight = "Regular",
-        },
-        "Apple Color Emoji",  -- 絵文字フォント
-    })
+    -- OS別のフォント設定
+    if os_utils.is_windows() then
+        -- Windows環境用フォント設定
+        config.font = wezterm.font_with_fallback({
+            {
+                -- Windowsで確実に使えるフォントを優先
+                family = "Consolas",
+                weight = "Regular",
+            },
+            {
+                -- インストールされている場合はHackGenも使用
+                family = "HackGen35 Console NF",
+                weight = "Regular",
+            },
+            {
+                -- バックアップフォント
+                family = "Cascadia Code",
+                weight = "Regular",
+            },
+            "Segoe UI Emoji", -- Windows用絵文字フォント
+        })
+    else
+        -- macOS/Linux環境用フォント設定
+        config.font = wezterm.font_with_fallback({
+            {
+                -- fc-listで確認した正確なフォント名を使用
+                family = "HackGen35 Console NF",
+                weight = "Regular",
+            },
+            {
+                family = "HackGen Console NF",
+                weight = "Regular",
+            },
+            {
+                family = "HackGen35 Console",
+                weight = "Regular",
+            },
+            "Apple Color Emoji",  -- 絵文字フォント
+        })
+    end
     config.font_size = 14.0  -- 白源は少し大きめが見やすい
     config.line_height = 1.3  -- 行間を広げて日本語を見やすく
     config.cell_width = 1.0
@@ -47,8 +70,18 @@ function M.apply_to_config(config)
 
     -- ウィンドウ設定
     config.window_background_opacity = 0.95
-    config.macos_window_background_blur = 30  -- ブラーを強めに
-    config.window_decorations = "INTEGRATED_BUTTONS|RESIZE"
+    
+    -- OS別ウィンドウ設定
+    if os_utils.is_windows() then
+        -- Windows用ウィンドウ設定
+        config.window_decorations = "RESIZE"  -- シンプルな装飾にする
+        config.front_end = "Software" -- Windowsでは安定性のためにソフトウェアレンダリングを使用
+        config.animation_fps = 30     -- アニメーションを少し軽くする
+    else
+        -- macOS用ウィンドウ設定
+        config.macos_window_background_blur = 30  -- ブラーを強めに
+        config.window_decorations = "INTEGRATED_BUTTONS|RESIZE"
+    end
     config.window_close_confirmation = "AlwaysPrompt"
     config.window_padding = {
         left = 15,

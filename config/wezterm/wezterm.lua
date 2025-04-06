@@ -21,28 +21,60 @@ status.apply_to_config(config)
 tabs.apply_to_config(config)
 
 -- パフォーマンス設定
-config.front_end = "WebGpu"
-config.webgpu_power_preference = "HighPerformance"
-config.animation_fps = 60
-config.max_fps = 60
+local os_utils = require('lua.utils.os')
+if os_utils.is_windows() then
+    -- Windows(WSL)環境ではSoftwareレンダラーを使用して安定性を確保
+    config.front_end = "Software"
+    config.animation_fps = 30
+    config.max_fps = 30
+else
+    -- macOS/Linux環境ではWebGpuを使用
+    config.front_end = "WebGpu"
+    config.webgpu_power_preference = "HighPerformance"
+    config.animation_fps = 60
+    config.max_fps = 60
+end
 
 -- ウィンドウフレームの設定
 config.window_background_opacity = 0.95
-config.window_decorations = "RESIZE"
-config.window_frame = {
-    font = wezterm.font { family = 'Hack Nerd Font', weight = 'Bold' },
-    font_size = 12.0,
-    active_titlebar_bg = colors.get_colors().mantle,
-    inactive_titlebar_bg = colors.get_colors().surface0,
-    border_left_width = '2cell',
-    border_right_width = '2cell',
-    border_bottom_height = '1cell',
-    border_top_height = '0cell',
-    border_left_color = colors.get_colors().mantle,
-    border_right_color = colors.get_colors().mantle,
-    border_bottom_color = colors.get_colors().mantle,
-    border_top_color = colors.get_colors().mantle,
-}
+
+-- OS別のウィンドウフレーム設定
+if os_utils.is_windows() then
+    -- Windows用のシンプルなフレーム設定
+    config.window_decorations = "RESIZE"
+    config.window_frame = {
+        font = wezterm.font { family = 'Consolas', weight = 'Bold' },
+        font_size = 12.0,
+        active_titlebar_bg = colors.get_colors().mantle,
+        inactive_titlebar_bg = colors.get_colors().surface0,
+        -- Windowsではシンプルなフレームにして安定性を高める
+        border_left_width = '0.5cell',
+        border_right_width = '0.5cell',
+        border_bottom_height = '0.5cell',
+        border_top_height = '0cell',
+        border_left_color = colors.get_colors().mantle,
+        border_right_color = colors.get_colors().mantle,
+        border_bottom_color = colors.get_colors().mantle,
+        border_top_color = colors.get_colors().mantle,
+    }
+else
+    -- macOS用の装飾的なフレーム設定
+    config.window_decorations = "RESIZE"
+    config.window_frame = {
+        font = wezterm.font { family = 'Hack Nerd Font', weight = 'Bold' },
+        font_size = 12.0,
+        active_titlebar_bg = colors.get_colors().mantle,
+        inactive_titlebar_bg = colors.get_colors().surface0,
+        border_left_width = '2cell',
+        border_right_width = '2cell',
+        border_bottom_height = '1cell',
+        border_top_height = '0cell',
+        border_left_color = colors.get_colors().mantle,
+        border_right_color = colors.get_colors().mantle,
+        border_bottom_color = colors.get_colors().mantle,
+        border_top_color = colors.get_colors().mantle,
+    }
+end
 
 -- 外側のパディング設定
 config.window_padding = {
@@ -86,9 +118,22 @@ end)
 -- レイアウトの設定
 wezterm.on('gui-startup', function(cmd)
   local layout = require('lua.core.layout')
-  local tab, pane, window = layout.default(cmd)
-  -- 起動時に最大化
-  window:gui_window():maximize()
+  
+  -- OSに応じた起動処理
+  if os_utils.is_windows() then
+    -- Windows環境では安定性のために単純に初期化
+    local mux = wezterm.mux
+    local tab, pane, window = mux.spawn_window(cmd or {})
+    
+    -- 少し遅延させてから最大化（安定性向上）
+    wezterm.sleep_ms(500)
+    window:gui_window():maximize()
+  else
+    -- macOS/Linux環境では通常のレイアウト処理
+    local tab, pane, window = layout.default(cmd)
+    -- 起動時に最大化
+    window:gui_window():maximize()
+  end
 end)
 
 return config 
