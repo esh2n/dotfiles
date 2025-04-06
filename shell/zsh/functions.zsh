@@ -467,8 +467,11 @@ if [[ $- == *i* ]]; then
     bindkey '^r' sk_select_history   # Ctrl+R: 履歴検索
     bindkey '^g' sk_change_directory # Ctrl+G: ディレクトリ変更
     
-    # sk_select_srcに複数のキーバインド（いずれかが動くように）
-    bindkey '^]' sk_select_src       # Ctrl+]
+    # vimモードのキーマップも明示的に設定（normalモードでも機能するように）
+    bindkey -M viins '^]' sk_select_src  # insertモードでCtrl+]
+    bindkey -M vicmd '^]' sk_select_src  # normalモードでCtrl+]
+    
+    # sk_select_srcの代替キーバインド（複数のオプションを提供）
     bindkey '^\' sk_select_src       # Ctrl+\
     bindkey '^p' sk_select_src       # Ctrl+P
     bindkey '\e]' sk_select_src      # Alt+]
@@ -492,7 +495,9 @@ EOF
   else
     # macOS / 通常Linux環境用のキーバインド
     bindkey '^r' sk_select_history
-    bindkey '^]' sk_select_src
+    # vimモードの両方のモードでキーバインドを設定
+    bindkey -M viins '^]' sk_select_src
+    bindkey -M vicmd '^]' sk_select_src
     bindkey '^g' sk_change_directory
     bindkey '^v' sk_select_file_within_project
     bindkey '^b' sk_select_file_below_pwd

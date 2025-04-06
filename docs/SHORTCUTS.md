@@ -2,12 +2,12 @@
 
 ## ファイル操作系
 
-| キー | 説明 | コマンド |
-|------|------|----------|
-| `Ctrl + ]` | プロジェクトディレクトリに移動 | `sk_select_src` |
-| `Ctrl + v` | プロジェクト内のファイルを選択 | `sk_select_file_within_project` |
-| `Ctrl + b` | カレントディレクトリ以下のファイルを選択 | `sk_select_file_below_pwd` |
-| `Ctrl + e` | ディレクトリを変更 | `sk_change_directory` |
+| キー | 説明 | コマンド | 備考 |
+|------|------|----------|------|
+| `Ctrl + ]` | プロジェクトディレクトリに移動 | `sk_select_src` | WSL環境では代替として`Ctrl + \`や`Alt + ]`も使用可 |
+| `Ctrl + v` | プロジェクト内のファイルを選択 | `sk_select_file_within_project` | |
+| `Ctrl + b` | カレントディレクトリ以下のファイルを選択 | `sk_select_file_below_pwd` | |
+| `Ctrl + e` | ディレクトリを変更 | `sk_change_directory` | |
 | `Ctrl + g` | zoxideを使用してディレクトリを変更 | `sk_change_directory` |
 
 ## 履歴系
