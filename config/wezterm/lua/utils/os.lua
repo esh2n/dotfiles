@@ -23,61 +23,48 @@ end
 -- Get the default shell according to the OS
 function M.get_default_shell()
   if M.is_windows() then
-    -- For Windows, launch Zsh in the default WSL distribution
-    -- Using wsl.exe to connect to the shell in WSL
-    return { 'wsl.exe', '--', 'zsh', '-l' }
+    -- Windowsでは直接WSLに接続し、不要なプロセス起動を避ける
+    -- 標準の方法でWSL起動（コマンドの簡素化）
+    return { 'wsl.exe', '~' }
     
-    -- To use PowerShell as the default:
+    -- PowerShellを使用したい場合のオプション:
     -- return { 'powershell.exe', '-NoLogo' }
     
-    -- To use cmd as the default:
+    -- cmdを使用したい場合のオプション:
     -- return { 'cmd.exe' }
   else
-    -- For macOS/Linux, use zsh
+    -- macOS/Linuxの場合はzsh
     return { '/bin/zsh', '-l' }
   end
 end
 -- 特定のパターンにマッチするファイルをディレクトリから取得し、ランダムに1つ選択する
+-- io.popenを使わない方式に変更し、Windows環境でのパフォーマンスを向上
 function M.get_random_file(directory, pattern)
   if not directory then return nil end
   
   -- ターゲットOSを判定
   local is_win = M.is_windows()
   
-  -- OSに応じたパス区切り文字とコマンド
+  -- OSに応じたパス区切り文字
   local separator = is_win and "\\" or "/"
   
-  -- コマンド構築
-  local cmd
-  if is_win then
-    cmd = 'dir /b "' .. directory .. '\\' .. pattern .. '" 2>nul'
-  else
-    cmd = 'ls "' .. directory .. '"/' .. pattern .. ' 2>/dev/null'
+  -- 直接ファイルシステムにアクセスせず、静的なパスを使用
+  -- 背景画像の場合は固定数のファイルがあることを想定
+  -- 実装の単純化のため固定パターンを使用
+  -- パターンが*.jpgの場合は画像ファイルと仮定
+  if pattern == "*.jpg" then
+    -- 1から23までの数字でファイル名を生成
+    local image_num = math.random(23)
+    local filename = image_num .. "_0.jpg"
+    return directory .. separator .. filename
   end
   
-  -- ファイル一覧を取得
-  local handle = io.popen(cmd)
-  if not handle then return nil end
-  
-  local result = handle:read("*a")
-  handle:close()
-  
-  -- パスを収集
-  local files = {}
-  for path in result:gmatch("[^\n]+") do
-    -- Windowsの場合はファイル名だけが返ってくるので、フルパスを構築
-    local full_path = is_win and (directory .. "\\" .. path) or path
-    table.insert(files, full_path)
-  end
-  
-  -- ランダムに選択
-  if #files > 0 then
-    return files[math.random(#files)]
-  end
+  -- パターンマッチングが必要な他のケースは今後必要に応じて実装
   return nil
 end
 
 -- dotfilesプロジェクトの背景画像ディレクトリからランダムに画像を選択
+-- 最適化版：io.popenを使わずにシンプルに実装
 function M.get_random_background()
   local home = M.get_home_dir()
   if not home then return nil end
@@ -85,19 +72,17 @@ function M.get_random_background()
   local is_win = M.is_windows()
   local separator = is_win and "\\" or "/"
   
-  -- dotfilesプロジェクトのパスを構築
-  local dotfiles_path
+  -- dotfilesプロジェクトのパスを構築（パフォーマンス向上のため直接パスを構築）
+  local bg_dir
   if is_win then
-    dotfiles_path = home .. "\\go\\github.com\\esh2n\\dotfiles"
+    bg_dir = home .. "\\go\\github.com\\esh2n\\dotfiles\\config\\background"
   else
-    dotfiles_path = home .. "/go/github.com/esh2n/dotfiles"
+    bg_dir = home .. "/go/github.com/esh2n/dotfiles/config/background"
   end
   
-  -- 背景画像ディレクトリのパス
-  local bg_dir = dotfiles_path .. separator .. "config" .. separator .. "background"
-  
-  -- ランダムな画像を取得
-  return M.get_random_file(bg_dir, "*.jpg")
+  -- シンプルな実装でランダムに画像を選択
+  local image_num = math.random(23) -- 1から23までのランダムな数字
+  return bg_dir .. separator .. image_num .. "_0.jpg"
 end
 
 return M

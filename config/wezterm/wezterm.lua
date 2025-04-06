@@ -23,10 +23,18 @@ tabs.apply_to_config(config)
 -- パフォーマンス設定
 local os_utils = require('lua.utils.os')
 if os_utils.is_windows() then
-    -- Windows(WSL)環境ではSoftwareレンダラーを使用して安定性を確保
-    config.front_end = "Software"
-    config.animation_fps = 30
-    config.max_fps = 30
+    -- Windows(WSL)環境での最適化パフォーマンス設定
+    config.front_end = "Software"  -- 安定性のためソフトウェアレンダリングを使用
+    config.animation_fps = 15      -- アニメーションフレームレート削減
+    config.max_fps = 30            -- 最大FPS維持
+    
+    -- Windows環境での追加最適化
+    config.enable_tab_bar = true    -- 必要に応じてタブバーを表示
+    config.use_fancy_tab_bar = false -- シンプルなタブバー
+    config.window_close_confirmation = "NeverPrompt" -- 閉じる確認を表示しない
+    config.exit_behavior = "Close"  -- 終了時に即座に閉じる
+    config.check_for_updates = false -- 更新確認を無効化（パフォーマンス向上）
+    config.adjust_window_size_when_changing_font_size = false -- フォントサイズ変更時のリサイズを無効化
 else
     -- macOS/Linux環境ではWebGpuを使用
     config.front_end = "WebGpu"
@@ -89,9 +97,19 @@ config.inactive_pane_hsb = {
     saturation = 0.9,
     brightness = 0.8,
 }
-
 -- デバッグ設定
 config.debug_key_events = false
+
+-- Windows環境での追加パフォーマンス最適化
+if os_utils.is_windows() then
+  -- Windows環境ではファイル監視を無効化（パフォーマンス向上）
+  config.automatically_reload_config = false
+  
+  -- WSL向け設定最適化
+  config.enable_wayland = false
+  config.term = "wezterm"
+end
+
 
 -- デフォルトの作業ディレクトリとシェルを設定
 config.default_cwd = os_utils.get_home_dir() -- OSに応じたホームディレクトリを取得
@@ -121,11 +139,12 @@ wezterm.on('gui-startup', function(cmd)
   
   -- OSに応じた起動処理
   if os_utils.is_windows() then
-    -- Windows環境では安定性のために単純に初期化（最大化なし）
+    -- Windows環境では最小限の初期化（パフォーマンス重視）
     local mux = wezterm.mux
     local tab, pane, window = mux.spawn_window(cmd or {})
     
-    -- Windows環境では最大化しない
+    -- Windows環境ではシンプルに初期化するのみ（レイアウト処理なし）
+    -- 不要なレイアウト操作をスキップしてパフォーマンス向上
   else
     -- macOS環境では通常のレイアウト処理
     local tab, pane, window = layout.default(cmd)
