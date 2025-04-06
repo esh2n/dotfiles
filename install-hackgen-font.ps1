@@ -25,51 +25,60 @@ $hackGenZip = "$tempFolder\HackGen_NF.zip"
 function Install-HackGenFont {
     Write-Host "HackGen Nerd Fontをダウンロード中..." -ForegroundColor Cyan
     
+    # ダウンロード
     try {
-        # ダウンロード
         Invoke-WebRequest -Uri $hackGenUrl -OutFile $hackGenZip
-        
-        # 解凍
-        Write-Host "HackGen Nerd Fontを解凍中..." -ForegroundColor Cyan
+    }
+    catch {
+        Write-Host "ダウンロード中にエラーが発生しました: $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
+    
+    # 解凍
+    Write-Host "HackGen Nerd Fontを解凍中..." -ForegroundColor Cyan
+    try {
         Expand-Archive -Path $hackGenZip -DestinationPath $tempFolder -Force
+    }
+    catch {
+        Write-Host "解凍中にエラーが発生しました: $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
+    
+    # フォントファイルを探す
+    $fontFiles = Get-ChildItem -Path $tempFolder -Recurse -Filter "*.ttf"
+    
+    if ($fontFiles.Count -eq 0) {
+        Write-Host "フォントファイルが見つかりませんでした。" -ForegroundColor Red
+        return
+    }
+    
+    Write-Host "$($fontFiles.Count)個のフォントファイルが見つかりました。インストールを開始します..." -ForegroundColor Green
+    
+    # フォントのインストール
+    foreach ($fontFile in $fontFiles) {
+        $fontPath = $fontFile.FullName
+        $fontName = $fontFile.Name
         
-        # フォントファイルを探す
-        $fontFiles = Get-ChildItem -Path $tempFolder -Recurse -Filter "*.ttf"
-        
-        if ($fontFiles.Count -eq 0) {
-            Write-Host "フォントファイルが見つかりませんでした。" -ForegroundColor Red
-            return
-        }
-        
-        Write-Host "$($fontFiles.Count)個のフォントファイルが見つかりました。インストールを開始します..." -ForegroundColor Green
-        
-        foreach ($fontFile in $fontFiles) {
-            $fontPath = $fontFile.FullName
-            $fontName = $fontFile.Name
+        # ローカルフォントフォルダにコピー
+        try {
+            Copy-Item -Path $fontPath -Destination "$fontsFolder\$fontName" -Force -ErrorAction Stop
             
-            # ローカルフォントフォルダにコピー
-            try {
-                Copy-Item -Path $fontPath -Destination "$fontsFolder\$fontName" -Force -ErrorAction Stop
-                
-                # レジストリに追加
-                New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $fontName -Value "$fontsFolder\$fontName" -PropertyType String -Force | Out-Null
-                
-                Write-Host "インストール成功: $fontName" -ForegroundColor Green
-            } catch {
-                Write-Host "インストールスキップ: $fontName (すでに使用中またはインストール済み)" -ForegroundColor Yellow
-            }
+            # レジストリに追加
+            New-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $fontName -Value "$fontsFolder\$fontName" -PropertyType String -Force | Out-Null
+            
+            Write-Host "インストール成功: $fontName" -ForegroundColor Green
+        } 
+        catch {
+            Write-Host "インストールスキップ: $fontName (すでに使用中またはインストール済み)" -ForegroundColor Yellow
         }
-        
-        Write-Host "HackGen Nerd Fontのインストールが完了しました。" -ForegroundColor Green
-        Write-Host "WezTermや他のアプリケーションを再起動して、新しいフォントを認識させてください。" -ForegroundColor Cyan
-        
-    } catch {
-        Write-Host "エラーが発生しました: $($_.Exception.Message)" -ForegroundColor Red
-    } finally {
-        # クリーンアップ
-        if (Test-Path $hackGenZip) {
-            Remove-Item -Path $hackGenZip -Force
-        }
+    }
+    
+    Write-Host "HackGen Nerd Fontのインストールが完了しました。" -ForegroundColor Green
+    Write-Host "WezTermや他のアプリケーションを再起動して、新しいフォントを認識させてください。" -ForegroundColor Cyan
+    
+    # クリーンアップ
+    if (Test-Path $hackGenZip) {
+        Remove-Item -Path $hackGenZip -Force
     }
 }
 
