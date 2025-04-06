@@ -61,8 +61,9 @@ function M.apply_to_config(config)
         -- 一部キーバインドを別の組み合わせでも使用可能にする
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) })
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL', action = act.ActivateTabRelative(1) })
-        -- Ctrl+]はzsh側で処理するため、Weztermでは設定しない
-        -- Windows環境での追加キーバインド設定の終わり
+        -- Ctrl+]を明示的にシェルにパススルーする（WSL環境でのsk_select_src用）
+        -- パススルー用の制御コードを送信（\x1d = GS - Group Separator）
+        table.insert(base_keys, { key = ']', mods = 'CTRL', action = act.SendString('\x1d') })
     end
     
     config.keys = base_keys
