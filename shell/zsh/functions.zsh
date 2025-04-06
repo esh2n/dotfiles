@@ -449,8 +449,8 @@ function gx() {
 compdef gx-complete gx
 
 # Bind keys for fuzzy finder (環境適応型)
-if [[ $- == *i* ]]; then
-  # インタラクティブシェルの場合のみキーバインドを設定
+if [[ $- == *i* ]] && [[ -o zle ]]; then
+  # インタラクティブシェルかつZLEがアクティブな場合のみキーバインドを設定
   # 全てのsk関連の関数をウィジェットとして登録
   zle -N sk_select_history
   zle -N sk_select_src
@@ -458,23 +458,29 @@ if [[ $- == *i* ]]; then
   zle -N sk_select_file_within_project
   zle -N sk_select_file_below_pwd
   
-  # WSL環境ではCtrl+]が動作しない場合があるため、
-  # 複数の代替キーバインドを設定
+  # WSL環境でのキーバインド設定
   if [ "$IS_WSL" = "1" ]; then
     echo "WSL環境用キーバインドを設定しています..."
     
-    # 基本のキーバインド
-    bindkey '^r' sk_select_history   # Ctrl+R: 履歴検索
-    bindkey '^g' sk_change_directory # Ctrl+G: ディレクトリ変更
+    # 遅延キーバインド設定用の関数を定義
+    function __setup_wsl_keybinds() {
+      # 基本のキーバインド
+      bindkey '^r' sk_select_history   # Ctrl+R: 履歴検索
+      bindkey '^g' sk_change_directory # Ctrl+G: ディレクトリ変更
+      
+      # 代替キーバインド（Ctrl+]はnormalモードの切替に使用されるため）
+      bindkey '^\' sk_select_src       # Ctrl+\
+      bindkey '^p' sk_select_src       # Ctrl+P
+      bindkey '\e]' sk_select_src      # Alt+]
+      
+      # 可能であれば、vimモードのinsertモードでもCtrl+]を設定
+      if [[ -o zle ]]; then
+        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+      fi
+    }
     
-    # vimモードのキーマップも明示的に設定（normalモードでも機能するように）
-    bindkey -M viins '^]' sk_select_src  # insertモードでCtrl+]
-    bindkey -M vicmd '^]' sk_select_src  # normalモードでCtrl+]
-    
-    # sk_select_srcの代替キーバインド（複数のオプションを提供）
-    bindkey '^\' sk_select_src       # Ctrl+\
-    bindkey '^p' sk_select_src       # Ctrl+P
-    bindkey '\e]' sk_select_src      # Alt+]
+    # 安全に初期設定を実行
+    __setup_wsl_keybinds
     
     # 追加のキーバインド
     bindkey '^v' sk_select_file_within_project  # Ctrl+V
@@ -486,26 +492,59 @@ if [[ $- == *i* ]]; then
 ======= WSL環境用キーバインド =======
 Ctrl+R : 履歴検索
 Ctrl+G : ディレクトリ変更
-Ctrl+] : ソースディレクトリ選択 (代替: Ctrl+\\, Ctrl+P, Alt+])
+Ctrl+\\ : ソースディレクトリ選択
+Alt+] : ソースディレクトリ選択
+Ctrl+P : ソースディレクトリ選択
 Ctrl+V : プロジェクト内ファイル選択
 Ctrl+B : 現在ディレクトリ以下のファイル選択
 ================================
 
 EOF
   else
-    # macOS / 通常Linux環境用のキーバインド
-    bindkey '^r' sk_select_history
-    # vimモードの両方のモードでキーバインドを設定
-    bindkey -M viins '^]' sk_select_src
-    bindkey -M vicmd '^]' sk_select_src
-    bindkey '^g' sk_change_directory
-    bindkey '^v' sk_select_file_within_project
-    bindkey '^b' sk_select_file_below_pwd
+    # macOS / 通常Linux環境用のキーバインド設定関数
+    function __setup_macos_keybinds() {
+      bindkey '^r' sk_select_history
+      bindkey '^]' sk_select_src
+      bindkey '^g' sk_change_directory
+      bindkey '^v' sk_select_file_within_project
+      bindkey '^b' sk_select_file_below_pwd
+      
+      # 可能であれば、vimモードでもCtrl+]を設定
+      if [[ -o zle ]]; then
+        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+      fi
+    }
+    
+    # 安全に初期設定を実行
+    __setup_macos_keybinds
   fi
+  
+  # 端末起動時に実行する関数を追加（遅延初期化）
+  function precmd_setup_keybinds() {
+    # この関数はプロンプト表示前に毎回実行される
+    # 必要に応じてキーバインドを再設定可能
+    
+    # ZLEがアクティブであれば、Vimモードでのキーバインドを試行
+    if [[ -o zle ]]; then
+      if [ "$IS_WSL" = "1" ]; then
+        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+      else
+        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+        bindkey -M vicmd '^]' sk_select_src 2>/dev/null || true
+      fi
+    fi
+    
+    # 一度実行したら、この関数をprecmdフックから削除
+    add-zsh-hook -d precmd precmd_setup_keybinds
+  }
+  
+  # プロンプト表示前に実行するフックを追加
+  autoload -Uz add-zsh-hook
+  add-zsh-hook precmd precmd_setup_keybinds
 else
-  # 非インタラクティブシェルの場合は警告（ログイン時に一度だけ）
+  # 非インタラクティブシェルまたはZLEが非アクティブな場合は警告
   [[ -z "$WSL_KEYBINDS_WARNING" ]] && {
-    echo "警告: 非インタラクティブシェルのため、キーバインド（Ctrl+]など）が登録できません。"
+    echo "警告: インタラクティブシェルでないか、ZLEが非アクティブのため、キーバインド設定をスキップします。"
     echo "対処法: ターミナルを再起動するか、exec zshで新しいセッションを開始してください。"
     export WSL_KEYBINDS_WARNING=1
   }
