@@ -37,5 +37,67 @@ function M.get_default_shell()
     return { '/bin/zsh', '-l' }
   end
 end
+-- 特定のパターンにマッチするファイルをディレクトリから取得し、ランダムに1つ選択する
+function M.get_random_file(directory, pattern)
+  if not directory then return nil end
+  
+  -- ターゲットOSを判定
+  local is_win = M.is_windows()
+  
+  -- OSに応じたパス区切り文字とコマンド
+  local separator = is_win and "\\" or "/"
+  
+  -- コマンド構築
+  local cmd
+  if is_win then
+    cmd = 'dir /b "' .. directory .. '\\' .. pattern .. '" 2>nul'
+  else
+    cmd = 'ls "' .. directory .. '"/' .. pattern .. ' 2>/dev/null'
+  end
+  
+  -- ファイル一覧を取得
+  local handle = io.popen(cmd)
+  if not handle then return nil end
+  
+  local result = handle:read("*a")
+  handle:close()
+  
+  -- パスを収集
+  local files = {}
+  for path in result:gmatch("[^\n]+") do
+    -- Windowsの場合はファイル名だけが返ってくるので、フルパスを構築
+    local full_path = is_win and (directory .. "\\" .. path) or path
+    table.insert(files, full_path)
+  end
+  
+  -- ランダムに選択
+  if #files > 0 then
+    return files[math.random(#files)]
+  end
+  return nil
+end
+
+-- dotfilesプロジェクトの背景画像ディレクトリからランダムに画像を選択
+function M.get_random_background()
+  local home = M.get_home_dir()
+  if not home then return nil end
+  
+  local is_win = M.is_windows()
+  local separator = is_win and "\\" or "/"
+  
+  -- dotfilesプロジェクトのパスを構築
+  local dotfiles_path
+  if is_win then
+    dotfiles_path = home .. "\\go\\github.com\\esh2n\\dotfiles"
+  else
+    dotfiles_path = home .. "/go/github.com/esh2n/dotfiles"
+  end
+  
+  -- 背景画像ディレクトリのパス
+  local bg_dir = dotfiles_path .. separator .. "config" .. separator .. "background"
+  
+  -- ランダムな画像を取得
+  return M.get_random_file(bg_dir, "*.jpg")
+end
 
 return M

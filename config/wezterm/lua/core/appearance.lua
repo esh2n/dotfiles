@@ -1,29 +1,11 @@
 local wezterm = require('wezterm')
 local colors = require('lua.ui.colors')
+local os_utils = require('lua.utils.os')
 local M = {}
-
--- 背景画像をランダムに選択する関数
-local function get_random_background()
-    local home = os.getenv("HOME")
-    local bg_dir = home .. "/go/github.com/esh2n/dotfiles/config/background"
-    local handle = io.popen('ls "' .. bg_dir .. '"/*.jpg 2>/dev/null')
-    local result = handle:read("*a")
-    handle:close()
-    
-    local images = {}
-    for path in result:gmatch("[^\n]+") do
-        table.insert(images, path)
-    end
-    
-    if #images > 0 then
-        return images[math.random(#images)]
-    end
-    return nil
-end
 
 function M.apply_to_config(config)
     -- 背景画像の設定
-    local bg_image = get_random_background()
+    local bg_image = os_utils.get_random_background()
     if bg_image then
         config.background = {
             {
