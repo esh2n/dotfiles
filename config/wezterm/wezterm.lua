@@ -145,23 +145,6 @@ config.inactive_pane_hsb = {
 -- デバッグ設定
 config.debug_key_events = false
 
--- Windows環境でCtrl+]を直接ターミナルに渡すための明示的な設定
-if os_utils.is_windows() then
-  -- 特定のキーの処理をWeztermで捕捉せず、直接ターミナルアプリケーションに渡す
-  config.disable_default_key_bindings = false
-  config.key_map_preference = "Physical"
-  
-  -- Ctrl+]を明示的にパススルー対象に指定（Escape Sequenceを直接送信）
-  local act = wezterm.action
-  local ctrl_bracket_key = { key = ']', mods = 'CTRL', action = act.SendString('\x1d') }
-  
-  -- カスタムキーを設定
-  if config.keys == nil then
-    config.keys = {}
-  end
-  table.insert(config.keys, ctrl_bracket_key)
-end
-
 -- Windows環境での追加パフォーマンス最適化
 if os_utils.is_windows() then
   -- Windows環境ではファイル監視を無効化（パフォーマンス向上）

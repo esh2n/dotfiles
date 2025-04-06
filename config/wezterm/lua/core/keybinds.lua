@@ -61,9 +61,8 @@ function M.apply_to_config(config)
         -- 一部キーバインドを別の組み合わせでも使用可能にする
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) })
         table.insert(base_keys, { key = 'Tab', mods = 'CTRL', action = act.ActivateTabRelative(1) })
-        
-        -- Windows環境ではCtrl+]はwezterm.luaでのパススルー設定を使用するため
-        -- ここでのバインディングは不要（競合を避けるため）
+        -- Ctrl+]はzsh側で処理するため、Weztermでは設定しない
+        -- Windows環境での追加キーバインド設定の終わり
     end
     
     config.keys = base_keys
