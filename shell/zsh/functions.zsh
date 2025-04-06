@@ -120,6 +120,7 @@ function sk_select_src () {
       fi
     fi
   fi
+fi
 
   # 選択したディレクトリが存在すれば移動
   if [ -n "$selected_dir" ]; then
