@@ -2,17 +2,18 @@
 function trash() {
   echo "🗑️ trash実行: $@"
   # macOSの場合は標準のtrashコマンドを使用
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    command trash "$@"
+  if [[ "$OSTYPE" == "Darwin"* ]]; then
+    /opt/homebrew/bin/trash "$@"
     return $?
   fi
 
-  # Linux環境の場合
-  # trash-cli（trash-put）があればそちらを使用
-  if command -v trash-put &> /dev/null; then
-    echo "trash-putを使用します"
-    trash-put "$@"
-    return $?
+  # Linuxの場合はtrash-cliを使用
+  if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    if command -v trash-put &> /dev/null; then
+      echo "trash-putを使用します"
+      trash-put "$@"
+      return $?
+    fi
   fi
 
   # Windows (WSL)の場合の処理
@@ -135,8 +136,10 @@ function trash() {
         fi
       fi
     done
+    return 0
   fi
-}
 
-# trash関数が定義されたので、rmコマンドのエイリアスを設定
-# alias rm='trash'  # このエイリアスはaliases.zshで設定します 
+  # どちらも利用できない場合は警告を表示
+  echo "Error: trash command not found. Please install trash-cli or use macOS's built-in trash command." >&2
+  return 1
+}

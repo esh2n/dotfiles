@@ -110,4 +110,6 @@ export LESS="-R"
 export LESSHISTFILE="-"
 
 # OrbStack integration
-[ -f "$HOME/.orbstack/shell/init.zsh" ] && source "$HOME/.orbstack/shell/init.zsh" 2>/dev/null || : 
+[ -f "$HOME/.orbstack/shell/init.zsh" ] && source "$HOME/.orbstack/shell/init.zsh" 2>/dev/null || :
+
+export ZDOTDIR="$HOME/go/github.com/esh2n/dotfiles/shell/zsh" 

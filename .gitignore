@@ -1,2 +1,4 @@
 .env
 /${HOME}
+# Zsh completion cache
+.zcompdump*
