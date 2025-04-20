@@ -511,22 +511,6 @@ if [[ $- == *i* ]]; then
       bindkey '^b' sk_select_file_below_pwd       # Ctrl+B
       
       # WSL環境でのキーバインド一覧を表示
-      cat <<EOF
-
-======= WSL環境用キーバインド =======
-Ctrl+R : 履歴検索
-Ctrl+G : ディレクトリ変更
-Ctrl+\\ : ソースディレクトリ選択
-Alt+] : ソースディレクトリ選択
-Ctrl+P : ソースディレクトリ選択
-Ctrl+V : プロジェクト内ファイル選択
-Ctrl+B : 現在ディレクトリ以下のファイル選択
-
-コマンド: src → プロジェクトディレクトリ選択（ZLEエラー時）
-コマンド: pd → カレントディレクトリ以下のファイル選択（ZLEエラー時）
-================================
-
-EOF
     else
       # macOS / 通常Linux環境用のキーバインド設定関数
       function __setup_macos_keybinds() {
