@@ -110,7 +110,7 @@ if [ "$OSTYPE" = "Darwin" ]; then
 fi
 
 # .NET SDK Path
-if [ -d "$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14" ]; then
-  export DOTNET_ROOT="$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14"
+if [ -d "$HOME/.local/share/mise/installs/dotnet/8.0.408" ]; then
+  export DOTNET_ROOT="$HOME/.local/share/mise/installs/dotnet/8.0.408"
   export PATH="$DOTNET_ROOT:$PATH"
 fi
