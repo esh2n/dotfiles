@@ -6,7 +6,6 @@ go = "latest"
 rust = "latest"
 bun = "latest"
 deno = "latest"
-dotnet = "9.0.100-preview.2.24157.14"
 
 [settings]
 experimental = false
@@ -14,11 +13,10 @@ verbose = false
 
 [env]
 PYTHONPATH = "${PYTHONPATH:-}:${PWD}"
-GEM_HOME = "${HOME}/.gem"
-GOPATH = "${HOME}/go"
-GOBIN = "${GOPATH}/bin"
-CARGO_HOME = "${HOME}/.cargo"
-RUSTUP_HOME = "${HOME}/.rustup"
-DENO_INSTALL_ROOT = "${HOME}/.deno"
-DOTNET_ROOT = "${HOME}/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14"
-BUN_INSTALL = "${HOME}/.bun"
+GEM_HOME = "/Users/shunya.endo/.gem"
+GOPATH = "/Users/shunya.endo/go"
+GOBIN = "/Users/shunya.endo/go/bin"
+CARGO_HOME = "/Users/shunya.endo/.cargo"
+RUSTUP_HOME = "/Users/shunya.endo/.rustup"
+DENO_INSTALL_ROOT = "/Users/shunya.endo/.deno"
+BUN_INSTALL = "/Users/shunya.endo/.bun"

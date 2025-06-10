@@ -3,7 +3,6 @@
   "editor.fontFamily": "Fira Code, Menlo, Monaco, 'Courier New', monospace",
   "editor.fontSize": 14,
   "editor.fontLigatures": true,
-  "editor.formatOnSave": true,
   "editor.formatOnPaste": true,
   "editor.formatOnType": true,
   "editor.guides.bracketPairs": true,
@@ -104,7 +103,7 @@
   "rust-analyzer.check.command": "clippy",
   // .NET/C#の言語サーバー設定
   "dotnetAcquisitionExtension.existingDotnetPath": [
-    "/Users/esh2n/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14/dotnet"
+    "/Users/shunya.endo/.local/share/mise/installs/dotnet/8.0.408/dotnet"
   ],
   "dotnet.server.useOmnisharp": false,
   "csharp.semanticHighlighting.enabled": true,
@@ -116,8 +115,8 @@
   "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "openFiles",
   "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "openFiles",
   "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
-  "omnisharp.dotNetPath": "/Users/esh2n/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14/dotnet",
-  "ms-dotnettools.csharp.dotnetPath": "/Users/esh2n/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14/dotnet",
+  "omnisharp.dotNetPath": "/Users/shunya.endo/.local/share/mise/installs/dotnet/8.0.408/dotnet",
+  "ms-dotnettools.csharp.dotnetPath": "/Users/shunya.endo/.local/share/mise/installs/dotnet/8.0.408/dotnet",
 
   // ESLint設定
   "eslint.validate": [
@@ -193,5 +192,17 @@
   "terminal.integrated.defaultProfile.osx": "zsh",
   "editor.accessibilitySupport": "on",
   "editor.minimap.enabled": true,
-  "update.releaseTrack": "prerelease"
+  "update.releaseTrack": "prerelease",
+  "window.commandCenter": 1,
+  "cursor.cpp.disabledLanguages": [
+    "plaintext",
+    "markdown",
+    "scminput",
+    "yaml",
+    "dart"
+  ],
+  "accessibility.signalOptions.volume": 1,
+  "githubPullRequests.pullBranch": "never",
+  "editor.formatOnSave": true,
+  "files.trimTrailingWhitespaceInRegexAndStrings": false,
 }

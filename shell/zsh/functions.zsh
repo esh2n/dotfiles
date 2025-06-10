@@ -359,13 +359,16 @@ function open() {
     return 1
   fi
 
+  # macOS - use native open command
+  if [[ "$OSTYPE" == "Darwin"* ]]; then
+    command open "$@"
+    return $?
+  fi
+
   local target="$1"
   
   # Detect platform and use appropriate command
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS - use native open command
-    command open "$@"
-  elif grep -q Microsoft /proc/version 2>/dev/null; then
+  if grep -q Microsoft /proc/version 2>/dev/null; then
     # WSL - handle with special care
     
     # Check for directory specifically

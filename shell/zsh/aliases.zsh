@@ -90,7 +90,7 @@ alias gA='git add --all'
 alias gc='git commit'
 alias gpul='git pull'
 alias gpus='git push'
-alias ac='aicommits'
+alias aic='aicommits --generate 5 --type conventional'
 
 # Git branch operations
 alias gb='git branch'
@@ -215,4 +215,4 @@ alias cat='bat --style=plain --paging=never'
 alias less='bat --style=plain'
 
 # Editor
-alias code='cursor'
+alias code='code'

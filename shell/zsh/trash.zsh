@@ -3,7 +3,7 @@ function trash() {
   echo "🗑️ trash実行: $@"
   # macOSの場合は標準のtrashコマンドを使用
   if [[ "$OSTYPE" == "Darwin"* ]]; then
-    /opt/homebrew/bin/trash "$@"
+    /opt/homebrew/Cellar/trash/0.9.2/bin/trash "$@"
     return $?
   fi
 

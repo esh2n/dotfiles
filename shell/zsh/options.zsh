@@ -75,11 +75,11 @@ setopt prompt_subst
 TIMEFMT=$'\n\n========================\nProgram : %J\nCPU     : %P\nuser    : %*Us\nsystem  : %*Ss\ntotal   : %*Es\n========================\n'
 
 # External tools integration
-if [ -f '/Users/esh2n/google-cloud-sdk/path.zsh.inc' ]; then 
-    source '/Users/esh2n/google-cloud-sdk/path.zsh.inc'
+if [ -f '/Users/shunya.endo/google-cloud-sdk/path.zsh.inc' ]; then 
+    source '/Users/shunya.endo/google-cloud-sdk/path.zsh.inc'
 fi
-if [ -f '/Users/esh2n/google-cloud-sdk/completion.zsh.inc' ]; then 
-    source '/Users/esh2n/google-cloud-sdk/completion.zsh.inc'
+if [ -f '/Users/shunya.endo/google-cloud-sdk/completion.zsh.inc' ]; then 
+    source '/Users/shunya.endo/google-cloud-sdk/completion.zsh.inc'
 fi
 
 # Additional paths
@@ -89,7 +89,7 @@ if [ "$IS_WSL" = "1" ]; then
   export PACIFICA_PATH="$HOME/go"
 elif [ "$OSTYPE" = "Darwin" ]; then
   # macOS環境ではオリジナルのパスを使用
-  export PACIFICA_PATH="/Users/esh2n/go"
+  export PACIFICA_PATH="/Users/shunya.endo/go"
 else
   # 通常のLinux環境でもホームディレクトリ直下を使用
   export PACIFICA_PATH="$HOME/go"
@@ -106,11 +106,15 @@ fi
 # RD (RundownInc) のバイナリパスをOSに応じて設定
 if [ "$OSTYPE" = "Darwin" ]; then
   # macOS固有の設定
-  export PATH="/Users/esh2n/.rd/bin:$PATH"
+  export PATH="/Users/shunya.endo/.rd/bin:$PATH"
 fi
 
-# .NET SDK Path
-if [ -d "$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14" ]; then
-  export DOTNET_ROOT="$HOME/.local/share/mise/installs/dotnet/9.0.100-preview.2.24157.14"
-  export PATH="$DOTNET_ROOT:$PATH"
-fi
+# # .NET SDK Path
+# if [ -d "$HOME/.local/share/mise/installs/dotnet/8.0.408" ]; then
+#   export DOTNET_ROOT="$HOME/.local/share/mise/installs/dotnet/8.0.408"
+#   export PATH="$DOTNET_ROOT:$PATH"
+# fi
+export PATH="/usr/local/share/dotnet/x64:$PATH"
+
+# Rider Path
+export PATH="/Applications/Rider.app/Contents/MacOS:$PATH"
