@@ -70,6 +70,13 @@ fi
 
 # Sketchybar is now loaded from external/ui/sketchybar.zsh
 
+# Debug mode for terminal issues
+if [[ "${ZSH_DEBUG_TERMINAL}" == "1" ]]; then
+  echo "Terminal: $TERM_PROGRAM"
+  echo "Current keybindings for Enter:"
+  bindkey | grep -E "(\^M|\^J|accept-line)"
+fi
+
 # Load local config if exists
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 

@@ -36,12 +36,6 @@ function mkdir_and_change_directory() {
   done
 }
 
-# Vim mode indicator
-function zle-line-init zle-keymap-select {
-  RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
-  RPS2=${RPS1}
-  zle reset-prompt
-}
 
 # Fuzzy finder functions
 function sk_select_history() {

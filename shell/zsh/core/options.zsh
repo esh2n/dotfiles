@@ -1,7 +1,5 @@
 # Key bindings
-bindkey -v  # Vim mode
-bindkey -M vicmd 'gg' beginning-of-line
-bindkey -M vicmd 'G'  end-of-line
+bindkey -e  # Emacs mode (デフォルト)
 
 # Skim bindings - 削除（functions.zshで管理するため）
 # WSL環境ではCtrl+]が機能しない場合があるため、functions.zshで
@@ -18,8 +16,6 @@ bindkey '^[[1;3D' backward-word
 # Register widgets
 zle -N history-beginning-search-backward-end history-search-end
 zle -N history-beginning-search-forward-end history-search-end
-zle -N zle-line-init
-zle -N zle-keymap-select
 zle -N sk_select_history
 zle -N sk_select_src
 zle -N sk_select_file_below_pwd
