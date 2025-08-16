@@ -186,7 +186,7 @@ alias dpc='deployctl'
 alias de='deno'
 
 # GCP
-alias gsu='gsutil'
+# alias gsu='gsutil'
 alias gcp='gcloud'
 
 # Architecture
@@ -216,3 +216,8 @@ alias less='bat --style=plain'
 
 # Editor
 alias code='code'
+
+# Mac
+alias disp='open "x-apple.systempreferences:com.apple.Displays-Settings.extension"'
+
+alias ce='SHELL=/bin/bash claude'

@@ -1,7 +1,7 @@
 [tools]
 python = "3.12"
 ruby = "latest"
-node = "23.8.0"
+node = "24.0.1"
 go = "latest"
 rust = "latest"
 bun = "latest"

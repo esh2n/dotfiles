@@ -1,5 +1,8 @@
 # Amazon Q pre block. Keep at the top of this file.
 [[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh"
+
+# Go binaries path
+export PATH="$HOME/go/bin:$PATH"
 # Load environment variables
 if [ -f "$HOME/go/github.com/esh2n/dotfiles/.env" ]; then
     set -a
@@ -32,31 +35,31 @@ autoload -Uz add-zsh-hook
 autoload -Uz cdr
 autoload -Uz chpwd_recent_dirs
 # WSL環境の検出
-if grep -q -E "microsoft|wsl" /proc/version 2>/dev/null; then
+if [[ -f /proc/version ]] && grep -q -E "microsoft|wsl" /proc/version 2>/dev/null; then
   export IS_WSL=1
 else
   export IS_WSL=0
 fi
 
 # Initialize zoxide with better matching and no command aliases
-if type zoxide > /dev/null 2>&1; then
-  if [ "$IS_WSL" = "1" ]; then
-    # WSL環境用のシンプルな初期化（補完の問題を回避）
-    eval "$(zoxide init zsh --no-cmd)"
+# if type zoxide > /dev/null 2>&1; then
+#   if [ "$IS_WSL" = "1" ]; then
+#     # WSL環境用のシンプルな初期化（補完の問題を回避）
+#     eval "$(zoxide init zsh --no-cmd)"
     
-    # z、ziコマンドを手動で定義（補完なしバージョン）
-    function z() {
-      __zoxide_z "$@"
-    }
+#     # z、ziコマンドを手動で定義（補完なしバージョン）
+#     function z() {
+#       __zoxide_z "$@"
+#     }
     
-    function zi() {
-      __zoxide_zi "$@"
-    }
-  else
-    # 通常環境用の高度な初期化
-    eval "$(zoxide init zsh --cmd cd --hook pwd)"
-  fi
-fi
+#     function zi() {
+#       __zoxide_zi "$@"
+#     }
+#   else
+#     # 通常環境用の高度な初期化
+#     eval "$(zoxide init zsh --cmd cd --hook pwd)"
+#   fi
+# fi
 
 # Load configurations
 source "$ZDOTDIR/options.zsh"
@@ -93,3 +96,30 @@ fi
 
 # Amazon Q post block. Keep at the bottom of this file.
 [[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh"
+alias claude="/Users/shunya.endo/.claude/local/claude"
+
+export CLAUDE_CODE_USE_BEDROCK=
+export AWS_REGION=us-east-1
+# opus
+# export ANTHROPIC_MODEL='arn:aws:bedrock:us-east-1:067079833497:application-inference-profile/yyzkigl6f11i'
+# sonnet
+# export ANTHROPIC_MODEL='arn:aws:bedrock:us-east-1:067079833497:application-inference-profile/01xyeak8m4yy'
+
+[[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
+export PATH="$(aqua root-dir)/bin:$PATH"
+
+if [ -z "$DISABLE_ZOXIDE" ] && [ -z "$CLAUDECODE" ]; then
+    eval "$(zoxide init --cmd cd zsh)"
+fi
+
+. "$HOME/.local/share/../bin/env"
+export PATH=$PATH:$HOME/go/bin
+export PATH=$HOME/go/bin:$PATH
+
+# Docker GitHub Container Registry login alias
+# 必要な時だけトークンを取得（キャッシュしない）
+alias docker-ghcr-login='echo "$(gh auth token --active)" | docker login ghcr.io -u "$(git config user.name)" --password-stdin'
+
+# 特定のアカウントでログインしたい場合のエイリアス
+alias docker-ghcr-login-eightcard='echo "$(gh auth token -u esh3n)" | docker login ghcr.io -u esh3n --password-stdin'
+alias docker-ghcr-login-sansan='echo "$(gh auth token -u shunya-endo_sansan)" | docker login ghcr.io -u shunya-endo_sansan --password-stdin'

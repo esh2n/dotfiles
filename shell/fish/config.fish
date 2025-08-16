@@ -38,3 +38,5 @@ if status is-interactive
     alias find='fd'
     alias top='htop'
 end 
+
+string match -q "$TERM_PROGRAM" "kiro" and . (kiro --locate-shell-integration-path fish)

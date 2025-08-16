@@ -145,6 +145,9 @@ config.inactive_pane_hsb = {
 -- デバッグ設定
 config.debug_key_events = false
 
+-- ベル音設定
+config.audible_bell = 'SystemBeep'
+
 -- Windows環境での追加パフォーマンス最適化
 if os_utils.is_windows() then
   -- Windows環境ではファイル監視を無効化（パフォーマンス向上）
@@ -184,6 +187,27 @@ wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_wid
         })
     end
     return title
+end)
+
+-- ベル通知の設定（Claudeが実行中の場合のみ）
+local function is_claude(pane)
+  local process = pane:get_foreground_process_info()
+  if not process or not process.argv then
+    return false
+  end
+  -- 引数に"claude"が含まれているかチェック
+  for _, arg in ipairs(process.argv) do
+    if arg:find("claude") then
+      return true
+    end
+  end
+  return false
+end
+
+wezterm.on("bell", function(window, pane)
+  if is_claude(pane) then
+    window:toast_notification("Claude Code", "Task completed", nil, 4000)
+  end
 end)
 
 -- レイアウトの設定

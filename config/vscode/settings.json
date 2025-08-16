@@ -184,7 +184,9 @@
     "gh"
   ],
   "terminal.integrated.env.osx": {
-    "Q_NEW_SESSION": "1"
+    "Q_NEW_SESSION": "1",
+    "AQUA_GLOBAL_CONFIG": "${workspaceFolder}/aqua.yaml",
+    "PATH": "${workspaceFolder}/.aqua/bin:${env:PATH}"
   },
   "terminal.integrated.defaultProfile.osx": "zsh",
   "editor.accessibilitySupport": "on",
@@ -309,4 +311,9 @@
   },
   "leetcode.workspaceFolder": "/Users/esh2n/go/github.com/esh2n/leetcode",
   "bracket-pair-colorizer-2.depreciation-notice": false,
+  "files.insertFinalNewline": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "docker.extension.enableComposeLanguageServer": false,
+  "database-client.autoSync": true,
+  "remote.autoForwardPortsSource": "hybrid"
 }
