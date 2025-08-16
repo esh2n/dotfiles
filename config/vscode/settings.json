@@ -44,7 +44,7 @@
     "scminput": false,
     "yaml": false,
     "dart": false,
-    "go": true
+    "go": false
   },
   "github.copilot.editor.enableAutoCompletions": true,
 
@@ -298,4 +298,5 @@
   },
   "leetcode.workspaceFolder": "/Users/esh2n/go/github.com/esh2n/leetcode",
   "bracket-pair-colorizer-2.depreciation-notice": false,
+  "editor.unicodeHighlight.invisibleCharacters": false,
 }

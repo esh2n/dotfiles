@@ -2,3 +2,6 @@
 /${HOME}
 # Zsh completion cache
 .zcompdump*
+.zsh_sessions
+
+.claude
