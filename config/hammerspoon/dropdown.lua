@@ -1,4 +1,18 @@
 -- 汎用ドロップダウンアニメーション（専用ウィンドウ管理版）
+--
+-- 重要: 仮想デスクトップ（Spaces）で正しく動作させるための設定
+-- IMPORTANT: Configuration for proper virtual desktop (Spaces) support
+--
+-- 各アプリケーションを「すべてのデスクトップ」に割り当てる必要があります：
+-- You need to assign each application to "All Desktops":
+--
+-- 1. Dockでアプリケーションアイコンを右クリック
+--    Right-click the application icon in the Dock
+-- 2. オプション > 割り当て先 > すべてのデスクトップ
+--    Options > Assign To > All Desktops
+--
+-- これにより、どの仮想デスクトップからでもドロップダウンが正しく表示されます
+-- This ensures the dropdown works correctly from any virtual desktop
 
 local dropdowns = {}
 local windowMapping = {}  -- appName -> windowID のマッピング
@@ -26,6 +40,10 @@ local defaultStrategies = {
   -- コミュニケーション系も専用
   ["Discord"] = "dedicated",
   ["Slack"] = "dedicated",
+  
+  -- AI/チャット系も専用
+  ["Claude"] = "dedicated",
+  ["Dia"] = "dedicated",
   
   -- ブラウザも専用ウィンドウ
   ["Safari"] = "dedicated",
@@ -284,12 +302,14 @@ function createDropdown(hotkey, config)
           app:unhide()
         end
         
+        
         hs.timer.doAfter(0.001, function()
           win:setFrame(hiddenFrame)
           
           hs.timer.doAfter(0.01, function()
             app:activate()
             win:focus()
+            
             
             local duration = config.duration
             local startTime = hs.timer.secondsSinceEpoch()
@@ -321,6 +341,7 @@ function createDropdown(hotkey, config)
         win:setFrame(hiddenFrame)
         app:activate()
         win:focus()
+        
         
         hs.timer.doAfter(0.01, function()
           local duration = config.duration
@@ -354,54 +375,48 @@ function createDropdown(hotkey, config)
   dropdowns[config.appName] = state
 end
 
--- 使用例
--- 下から中央に表示（デフォルトでdedicated）
-createDropdown({{"cmd", "alt"}, "1"}, {
+-- アプリケーション設定
+-- Notion: 下から
+createDropdown({{"cmd", "alt"}, "n"}, {
   appName = "Notion",
-  width = 0.8,
-  height = 0.6
+  width = 1.0,
+  height = 0.5,
+  position = "center",
+  direction = "bottom"
 })
 
--- 左からスライド（左寄せ、dedicated）
-createDropdown({{"cmd", "alt"}, "2"}, {
-  appName = "Alacritty",
-  width = 0.5,
-  height = 0.8,
-  position = "left",
-  direction = "left"
-})
-
--- 右からスライド（右寄せ、dedicated）
-createDropdown({{"cmd", "alt"}, "3"}, {
+-- Discord: 下から
+createDropdown({{"cmd", "alt"}, "d"}, {
   appName = "Discord",
-  width = 0.4,
-  height = 0.9,
-  position = "right",
-  direction = "right"
+  width = 1.0,
+  height = 0.5,
+  position = "center",
+  direction = "bottom"
 })
 
--- 下から左寄せで表示（dedicated）
-createDropdown({{"cmd", "alt"}, "4"}, {
-  appName = "Code",
-  width = 0.6,
-  height = 0.7,
-  position = "left",
-  direction = "bottom",
-  duration = 0.2  -- より高速
-})
-
--- Safariは最後に使用したウィンドウ（デフォルト設定を使用）
-createDropdown({{"cmd", "alt"}, "5"}, {
-  appName = "Safari",
-  width = 0.9,
-  height = 0.8
-})
-
--- Warpターミナル（dedicated）
-createDropdown({{"cmd", "alt"}, "6"}, {
+-- Warp: 下から
+createDropdown({{"cmd", "alt"}, "w"}, {
   appName = "Warp",
-  width = 0.7,
-  height = 0.8,
+  width = 1.0,
+  height = 0.5,
+  position = "center",
+  direction = "bottom"
+})
+
+-- Dia: 下から
+createDropdown({{"cmd", "alt"}, "b"}, {
+  appName = "Dia",
+  width = 1.0,
+  height = 0.5,
+  position = "center",
+  direction = "bottom"
+})
+
+-- Claude: 下から
+createDropdown({{"cmd", "alt"}, "c"}, {
+  appName = "Claude",
+  width = 1.0,
+  height = 0.5,
   position = "center",
   direction = "bottom"
 })

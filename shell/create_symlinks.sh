@@ -297,16 +297,19 @@ create_symlinks() {
         backup_existing_config "$HOME/.config/aerospace"
         backup_existing_config "$HOME/.config/borders"
         backup_existing_config "$HOME/.config/sketchybar"
+        backup_existing_config "$HOME/.hammerspoon"
         
         # Remove existing symlinks or directories before creating new ones
         [ -e "$HOME/.config/aerospace" ] && rm -rf "$HOME/.config/aerospace"
         [ -e "$HOME/.config/borders" ] && rm -rf "$HOME/.config/borders"
         [ -e "$HOME/.config/sketchybar" ] && rm -rf "$HOME/.config/sketchybar"
+        [ -e "$HOME/.hammerspoon" ] && rm -rf "$HOME/.hammerspoon"
         
         # Create new symlinks for macOS specific configs
         safe_link "$DOTFILES_DIR/config/aerospace" "$HOME/.config/aerospace"
         safe_link "$DOTFILES_DIR/config/borders" "$HOME/.config/borders"
         safe_link "$DOTFILES_DIR/config/sketchybar" "$HOME/.config/sketchybar"
+        safe_link "$DOTFILES_DIR/config/hammerspoon" "$HOME/.hammerspoon"
         
         # VSCode for macOS
         backup_existing_config "$HOME/Library/Application Support/Code/User/settings.json"
