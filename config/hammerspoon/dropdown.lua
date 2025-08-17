@@ -305,10 +305,9 @@ function createDropdown(hotkey, config)
         end
         
         
-        hs.timer.doAfter(0.001, function()
-          win:setFrame(hiddenFrame)
-          
-          hs.timer.doAfter(0.01, function()
+        win:setFrame(hiddenFrame)
+        
+        hs.timer.doAfter(0.01, function()
             app:activate()
             win:focus()
             
@@ -335,7 +334,6 @@ function createDropdown(hotkey, config)
                 state.animating = false
               end
             end)
-          end)
         end)
       else
         -- 既に表示されている場合
