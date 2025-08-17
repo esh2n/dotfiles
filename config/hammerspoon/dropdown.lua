@@ -154,7 +154,6 @@ end
 --   createWindow: 新規ウィンドウ作成関数（オプション）
 --   selectWindow: カスタムウィンドウ選択関数（windowStrategy="custom"の場合）
 --   bottomOffset: 下部オフセット（ピクセル、オプション、デフォルト0）
---   debug: デバッグモード（オプション、デフォルトfalse）
 -- }
 function createDropdown(hotkey, config)
   -- デフォルト値を設定
@@ -164,7 +163,6 @@ function createDropdown(hotkey, config)
   config.direction = config.direction or "bottom"
   config.duration = config.duration or 0.3
   config.bottomOffset = config.bottomOffset or 0
-  config.debug = config.debug or false
   
   -- 状態管理
   local state = {
@@ -200,15 +198,6 @@ function createDropdown(hotkey, config)
     
     local screen = win:screen()
     local screenFrame = screen:frame()
-    
-    -- デバッグ情報を出力
-    if config.debug then
-      print(string.format("App: %s", config.appName))
-      print(string.format("Window frame: x=%.0f, y=%.0f, w=%.0f, h=%.0f", 
-        win:frame().x, win:frame().y, win:frame().w, win:frame().h))
-      print(string.format("Screen frame: x=%.0f, y=%.0f, w=%.0f, h=%.0f", 
-        screenFrame.x, screenFrame.y, screenFrame.w, screenFrame.h))
-    end
     
     -- ウィンドウサイズを計算
     local winSize = {
@@ -323,7 +312,6 @@ function createDropdown(hotkey, config)
             app:activate()
             win:focus()
             
-            
             local duration = config.duration
             local startTime = hs.timer.secondsSinceEpoch()
             
@@ -378,6 +366,14 @@ function createDropdown(hotkey, config)
               timer:stop()
               state.visible = true
               state.animating = false
+              -- デバッグ: アニメーション完了後の位置
+              if config.debug then
+                local finalFrame = win:frame()
+                print(string.format("Animation complete - Final frame: x=%.0f, y=%.0f, w=%.0f, h=%.0f", 
+                  finalFrame.x, finalFrame.y, finalFrame.w, finalFrame.h))
+                print(string.format("Bottom edge: %.0f (screen height: %.0f)", 
+                  finalFrame.y + finalFrame.h, screenFrame.y + screenFrame.h))
+              end
             end
           end)
         end)
@@ -395,17 +391,18 @@ createDropdown({{"cmd", "alt"}, "n"}, {
   width = 1.0,
   height = 0.5,
   position = "center",
-  direction = "bottom"
+  direction = "bottom",
+  duration = 0.15  -- アニメーション高速化
 })
 
 -- Discord: 下から
-createDropdown({{"cmd", "alt"}, "d"}, {
+createDropdown({{"cmd", "alt"}, "i"}, {  -- dからiに変更（Dock切り替えショートカット回避）
   appName = "Discord",
   width = 1.0,
   height = 0.5,
   position = "center",
   direction = "bottom",
-  bottomOffset = 50  -- Discord特有の下部隙間を修正
+  duration = 0.15  -- アニメーション高速化
 })
 
 -- Warp: 下から
@@ -414,7 +411,8 @@ createDropdown({{"cmd", "alt"}, "w"}, {
   width = 1.0,
   height = 0.5,
   position = "center",
-  direction = "bottom"
+  direction = "bottom",
+  duration = 0.15  -- アニメーション高速化
 })
 
 -- Dia: 下から
@@ -423,7 +421,8 @@ createDropdown({{"cmd", "alt"}, "b"}, {
   width = 1.0,
   height = 0.5,
   position = "center",
-  direction = "bottom"
+  direction = "bottom",
+  duration = 0.15  -- アニメーション高速化
 })
 
 -- Claude: 下から
@@ -432,7 +431,8 @@ createDropdown({{"cmd", "alt"}, "c"}, {
   width = 1.0,
   height = 0.5,
   position = "center",
-  direction = "bottom"
+  direction = "bottom",
+  duration = 0.15  -- アニメーション高速化
 })
 
 -- Dropdown system loaded
