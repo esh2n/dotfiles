@@ -153,6 +153,8 @@ end
 --   windowStrategy: ウィンドウ選択戦略 "dedicated", "first", "last", "minimized", "custom"
 --   createWindow: 新規ウィンドウ作成関数（オプション）
 --   selectWindow: カスタムウィンドウ選択関数（windowStrategy="custom"の場合）
+--   bottomOffset: 下部オフセット（ピクセル、オプション、デフォルト0）
+--   debug: デバッグモード（オプション、デフォルトfalse）
 -- }
 function createDropdown(hotkey, config)
   -- デフォルト値を設定
@@ -161,6 +163,8 @@ function createDropdown(hotkey, config)
   config.position = config.position or "center"
   config.direction = config.direction or "bottom"
   config.duration = config.duration or 0.3
+  config.bottomOffset = config.bottomOffset or 0
+  config.debug = config.debug or false
   
   -- 状態管理
   local state = {
@@ -197,6 +201,15 @@ function createDropdown(hotkey, config)
     local screen = win:screen()
     local screenFrame = screen:frame()
     
+    -- デバッグ情報を出力
+    if config.debug then
+      print(string.format("App: %s", config.appName))
+      print(string.format("Window frame: x=%.0f, y=%.0f, w=%.0f, h=%.0f", 
+        win:frame().x, win:frame().y, win:frame().w, win:frame().h))
+      print(string.format("Screen frame: x=%.0f, y=%.0f, w=%.0f, h=%.0f", 
+        screenFrame.x, screenFrame.y, screenFrame.w, screenFrame.h))
+    end
+    
     -- ウィンドウサイズを計算
     local winSize = {
       w = screenFrame.w * config.width,
@@ -217,7 +230,7 @@ function createDropdown(hotkey, config)
     
     -- Y座標とサイズ
     if config.direction == "bottom" then
-      visibleFrame.y = screenFrame.y + screenFrame.h - winSize.h
+      visibleFrame.y = screenFrame.y + screenFrame.h - winSize.h + config.bottomOffset
     elseif config.direction == "left" or config.direction == "right" then
       visibleFrame.y = screenFrame.y + (screenFrame.h - winSize.h) / 2  -- 縦中央
     end
@@ -391,7 +404,8 @@ createDropdown({{"cmd", "alt"}, "d"}, {
   width = 1.0,
   height = 0.5,
   position = "center",
-  direction = "bottom"
+  direction = "bottom",
+  bottomOffset = 50  -- Discord特有の下部隙間を修正
 })
 
 -- Warp: 下から
