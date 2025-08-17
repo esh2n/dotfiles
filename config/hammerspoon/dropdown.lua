@@ -315,7 +315,7 @@ function createDropdown(hotkey, config)
             local startTime = hs.timer.secondsSinceEpoch()
             
             local timer
-            timer = hs.timer.doEvery(0.016, function()
+            timer = hs.timer.doEvery(0.020, function()  -- 50fps for better performance
               local elapsed = hs.timer.secondsSinceEpoch() - startTime
               local progress = math.min(elapsed / duration, 1.0)
               local easedProgress = 1 - math.pow(1 - progress, 3)
@@ -347,7 +347,7 @@ function createDropdown(hotkey, config)
           local startTime = hs.timer.secondsSinceEpoch()
           
           local timer
-          timer = hs.timer.doEvery(0.016, function()
+          timer = hs.timer.doEvery(0.020, function()  -- 50fps for better performance
             local elapsed = hs.timer.secondsSinceEpoch() - startTime
             local progress = math.min(elapsed / duration, 1.0)
             local easedProgress = 1 - math.pow(1 - progress, 3)
