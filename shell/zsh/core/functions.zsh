@@ -1,3 +1,8 @@
+# Warp terminal detection
+function is_warp_terminal() {
+  [[ -n "$WARP_SESSION_ID" ]] || [[ "$TERM_PROGRAM" = "WarpTerminal" ]]
+}
+
 # Directory management
 function mkdir_and_change_directory() {
   if [ $# -eq 0 ]; then
@@ -39,12 +44,28 @@ function mkdir_and_change_directory() {
 
 # Fuzzy finder functions
 function sk_select_history() {
+  # Warpターミナルの場合はZLEが使えないため、直接実行モードにフォールバック
+  if is_warp_terminal; then
+    local selected=$(history -n -r 1 | sk --ansi --reverse --height '50%')
+    if [ -n "$selected" ]; then
+      echo "Selected: $selected"
+      echo "Run this command manually or copy it to your clipboard"
+    fi
+    return
+  fi
+  
   BUFFER=$(history -n -r 1 | sk --ansi --reverse --height '50%' --query "$LBUFFER")
   CURSOR=$#BUFFER
   zle clear-screen
 }
 
 function sk_select_src () {
+  # Warpターミナルの場合は直接実行モードを強制
+  if is_warp_terminal; then
+    sk_select_src --direct
+    return $?
+  fi
+  
   # 直接実行とウィジェット呼び出しの両方に対応
   if [[ "$1" = "--direct" ]]; then
     # 直接コマンドとして実行（ZLE非依存）
@@ -140,6 +161,28 @@ function sk_select_src () {
 }
 
 function sk_change_directory() {
+  # Warpターミナルの場合は直接実行モード
+  if is_warp_terminal; then
+    # zoxideコマンドが存在するかチェック
+    if ! command -v zoxide &>/dev/null; then
+      echo "エラー: zoxideがインストールされていません。"
+      return 1
+    fi
+    
+    local output=$(zoxide query -l)
+    local selected_dir=""
+    
+    if [[ -n "$output" ]]; then
+      selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' 2>/dev/null)
+    fi
+    
+    if [ -n "$selected_dir" ]; then
+      cd "${selected_dir}"
+      echo "✓ 移動先: ${selected_dir}"
+    fi
+    return
+  fi
+  
   # ZLEが有効かどうかをチェック
   if [[ ! -o zle ]]; then
     echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
@@ -186,6 +229,31 @@ function sk_change_directory() {
 }
 
 function sk_select_file_below_pwd() {
+  # Warpターミナルの場合は別の処理
+  if is_warp_terminal; then
+    if [ ! `pwd | grep "$(ghq root)"` ]; then
+      echo "you are not in ghq path"
+      return 0
+    fi
+    
+    local selected_path=""
+    local files_list=$(fd --type f --hidden --exclude .git --exclude node_modules --exclude vendor 2>/dev/null)
+    
+    if [[ -n "$files_list" ]]; then
+      selected_path=$(echo "$files_list" | sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {}' 2>/dev/null)
+    fi
+    
+    if [ -n "$selected_path" ]; then
+      if [ -f "$selected_path" ]; then
+        nvim "$selected_path"
+        dir_path=$(dirname "$selected_path")
+        cd "$dir_path"
+        echo "✓ 移動先: $dir_path"
+      fi
+    fi
+    return
+  fi
+  
   # ZLEが有効かどうかをチェック
   if [[ ! -o zle ]]; then
     echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
@@ -231,6 +299,41 @@ function sk_select_file_below_pwd() {
 }
 
 function sk_select_file_within_project() {
+  # Warpターミナルの場合は別の処理
+  if is_warp_terminal; then
+    local base_path=$(pwd | grep -o "$(ghq root)/[^/]*/[^/]*/[^/]*")
+    if [ -z "$base_path" ]; then
+      echo "you are not in ghq project"
+      return 0
+    fi
+    
+    local paths=$(fd --type f --hidden --exclude .git --exclude node_modules --exclude vendor . "$base_path" 2>/dev/null)
+    
+    if [[ -n "$paths" ]]; then
+      local selected_path="$(echo "(root)"$'\n'"$paths" | sk --ansi --reverse --height '50%' --preview 'bat --style=numbers --color=always {} 2>/dev/null || echo "Preview not available"' 2>/dev/null)"
+      
+      if [ -n "$selected_path" ]; then
+        if [[ "$selected_path" = "(root)" ]]; then
+          cd "$base_path"
+          echo "✓ 移動先: $base_path"
+          return 0
+        fi
+        if [ -f "$selected_path" ]; then
+          nvim "$selected_path"
+          dir_path=$(dirname "$selected_path")
+          cd "$dir_path"
+          echo "✓ 移動先: $dir_path"
+        elif [ -d "$selected_path" ]; then
+          cd "$selected_path"
+          echo "✓ 移動先: $selected_path"
+        fi
+      fi
+    else
+      echo "プロジェクト内にファイルが見つかりません"
+    fi
+    return
+  fi
+  
   # ZLEが有効かどうかをチェック
   if [[ ! -o zle ]]; then
     echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
@@ -375,8 +478,8 @@ if [[ $- == *i* ]]; then
   # インタラクティブシェルの場合のみキーバインドを設定
   # インタラクティブシェルでもZLEが無効な場合のために、コマンドエイリアスも設定
   
-  # ZLEが有効な場合のみ、ウィジェット登録とキーバインド設定を行う
-  if [[ -o zle ]]; then
+  # ZLEが有効かつWarpでない場合のみ、ウィジェット登録とキーバインド設定を行う
+  if [[ -o zle ]] && ! is_warp_terminal; then
     # 全てのsk関連の関数をウィジェットとして登録
     zle -N sk_select_history 2>/dev/null
     zle -N sk_select_src 2>/dev/null
@@ -441,8 +544,8 @@ if [[ $- == *i* ]]; then
       # この関数はプロンプト表示前に毎回実行される
       # 必要に応じてキーバインドを再設定可能
       
-      # ZLEがアクティブであれば、Vimモードでのキーバインドを試行
-      if [[ -o zle ]]; then
+      # ZLEがアクティブかつWarpでなければ、Vimモードでのキーバインドを試行
+      if [[ -o zle ]] && ! is_warp_terminal; then
         if [ "$IS_WSL" = "1" ]; then
           bindkey -M viins '^]' sk_select_src 2>/dev/null || true
         else
@@ -458,6 +561,18 @@ if [[ $- == *i* ]]; then
     # プロンプト表示前に実行するフックを追加
     autoload -Uz add-zsh-hook
     add-zsh-hook precmd precmd_setup_keybinds
+  elif is_warp_terminal; then
+    # Warpターミナルの場合のヘルプメッセージ
+    [[ -z "$WARP_HELP_SHOWN" ]] && {
+      echo "📝 Warp terminal detected. Use these commands instead of keybindings:"
+      echo "  src  - Select project directory (Ctrl+] alternative)"
+      echo "  c    - Change directory with zoxide (Ctrl+G alternative)"
+      echo "  b    - Browse files below current directory (Ctrl+B alternative)"
+      echo "  v    - Browse files within project (Ctrl+V alternative)"
+      echo ""
+      echo "Note: Warp doesn't support ZLE widgets, so keybindings are disabled."
+      export WARP_HELP_SHOWN=1
+    }
   else
     # ZLEが無効な場合は警告
     [[ -z "$WSL_KEYBINDS_WARNING" ]] && {

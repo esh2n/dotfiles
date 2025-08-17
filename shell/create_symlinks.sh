@@ -292,6 +292,11 @@ create_symlinks() {
     safe_link "$DOTFILES_DIR/config/tmux/tmux.conf" "$HOME/.tmux.conf"
     safe_link "$DOTFILES_DIR/config/tig/.tigrc" "$HOME/.tigrc"
     
+    # Warp terminal
+    backup_existing_config "$HOME/.warp/themes"
+    mkdir -p "$HOME/.warp"
+    safe_link "$DOTFILES_DIR/config/warp/themes" "$HOME/.warp/themes"
+    
     # MacOS specific configs
     if [ "$OS_TYPE" = "macos" ]; then
         backup_existing_config "$HOME/.config/aerospace"
