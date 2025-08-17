@@ -366,14 +366,6 @@ function createDropdown(hotkey, config)
               timer:stop()
               state.visible = true
               state.animating = false
-              -- デバッグ: アニメーション完了後の位置
-              if config.debug then
-                local finalFrame = win:frame()
-                print(string.format("Animation complete - Final frame: x=%.0f, y=%.0f, w=%.0f, h=%.0f", 
-                  finalFrame.x, finalFrame.y, finalFrame.w, finalFrame.h))
-                print(string.format("Bottom edge: %.0f (screen height: %.0f)", 
-                  finalFrame.y + finalFrame.h, screenFrame.y + screenFrame.h))
-              end
             end
           end)
         end)
