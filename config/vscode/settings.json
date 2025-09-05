@@ -315,5 +315,33 @@
   "github.copilot.nextEditSuggestions.enabled": true,
   "docker.extension.enableComposeLanguageServer": false,
   "database-client.autoSync": true,
-  "remote.autoForwardPortsSource": "hybrid"
+  "remote.autoForwardPortsSource": "hybrid",
+  "mssql.connectionGroups": [
+    {
+      "name": "ROOT",
+      "id": "7C02FF35-8CBB-4542-9BAB-A132A40E1064"
+    }
+  ],
+  "mssql.connections": [
+    {
+      "authenticationType": "AzureMFA",
+      "connectTimeout": 30,
+      "applicationName": "vscode-mssql",
+      "applicationIntent": "ReadWrite",
+      "profileName": "",
+      "server": "sci-prod-sql.database.windows.net",
+      "user": "Shunya Endo - shunya.endo@sansan.com",
+      "accountId": "37d6eb45-c286-4263-945d-60d1b94e5058.cdfd3161-dc25-4973-8837-93fbe2bca681",
+      "database": "",
+      "encrypt": "Mandatory",
+      "email": "shunya.endo@sansan.com",
+      "azureAccountToken": "",
+      "expiresOn": 1756108194,
+      "groupId": "7C02FF35-8CBB-4542-9BAB-A132A40E1064",
+      "id": "D6C0387C-5DDC-4424-BB81-B650442E4550",
+      "password": "",
+      "commandTimeout": 30,
+      "profileSource": 0
+    }
+  ]
 }

@@ -199,6 +199,8 @@ create_symlinks() {
     backup_existing_config "$HOME/.config/mise/config.toml"
     backup_existing_config "$HOME/.config/tmux.conf"
     backup_existing_config "$HOME/.tigrc"
+    backup_existing_config "$HOME/.claude"
+    backup_existing_config "$HOME/.codex"
     
     # Remove existing symlinks or directories before creating new ones
     [ -e "$HOME/.config/nvim" ] && rm -rf "$HOME/.config/nvim"
@@ -291,22 +293,32 @@ create_symlinks() {
     safe_link "$DOTFILES_DIR/config/mise" "$HOME/.config/mise"
     safe_link "$DOTFILES_DIR/config/tmux/tmux.conf" "$HOME/.tmux.conf"
     safe_link "$DOTFILES_DIR/config/tig/.tigrc" "$HOME/.tigrc"
+    safe_link "$DOTFILES_DIR/config/claude" "$HOME/.claude"
+    safe_link "$DOTFILES_DIR/config/codex" "$HOME/.codex"
+    
+    # Warp terminal
+    backup_existing_config "$HOME/.warp/themes"
+    mkdir -p "$HOME/.warp"
+    safe_link "$DOTFILES_DIR/config/warp/themes" "$HOME/.warp/themes"
     
     # MacOS specific configs
     if [ "$OS_TYPE" = "macos" ]; then
         backup_existing_config "$HOME/.config/aerospace"
         backup_existing_config "$HOME/.config/borders"
         backup_existing_config "$HOME/.config/sketchybar"
+        backup_existing_config "$HOME/.hammerspoon"
         
         # Remove existing symlinks or directories before creating new ones
         [ -e "$HOME/.config/aerospace" ] && rm -rf "$HOME/.config/aerospace"
         [ -e "$HOME/.config/borders" ] && rm -rf "$HOME/.config/borders"
         [ -e "$HOME/.config/sketchybar" ] && rm -rf "$HOME/.config/sketchybar"
+        [ -e "$HOME/.hammerspoon" ] && rm -rf "$HOME/.hammerspoon"
         
         # Create new symlinks for macOS specific configs
         safe_link "$DOTFILES_DIR/config/aerospace" "$HOME/.config/aerospace"
         safe_link "$DOTFILES_DIR/config/borders" "$HOME/.config/borders"
         safe_link "$DOTFILES_DIR/config/sketchybar" "$HOME/.config/sketchybar"
+        safe_link "$DOTFILES_DIR/config/hammerspoon" "$HOME/.hammerspoon"
         
         # VSCode for macOS
         backup_existing_config "$HOME/Library/Application Support/Code/User/settings.json"

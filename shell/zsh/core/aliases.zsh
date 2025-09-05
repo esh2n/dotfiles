@@ -89,8 +89,20 @@ alias grmi='rm -rf .git/index.lock .git/COMMIT_EDITMSG'
 # Skim & Ghq
 alias fast_ghl='find $(ghq root)/*/*/* -type d -prune | sed -e "s#"$(ghq root)"/##"'
 alias vv='sk_edit_file'
-alias c='sk_change_directory'
-alias b='sk_select_file_below_pwd'
+
+# Warp terminal compatibility
+if command -v is_warp_terminal &>/dev/null && is_warp_terminal; then
+  # Warp用：関数を直接実行
+  alias c='sk_change_directory'
+  alias b='sk_select_file_below_pwd'
+  alias src='sk_select_src'
+  alias v='sk_select_file_within_project'
+else
+  # 通常のターミナル用：ZLEウィジェット
+  alias c='sk_change_directory'
+  alias b='sk_select_file_below_pwd'
+fi
+
 alias ghl='cd $(ghq root)/$(fast_ghl | sk)'
 alias memo='vim $(ghq root)/github.com/esh2n/playground/notes/$(date "+%Y_%m_%d").md'
 

@@ -3,3 +3,9 @@
 # Zsh completion cache
 .zcompdump*
 .claude/
+.zsh_sessions
+
+.claude
+
+# Hammerspoon window ID mappings
+config/hammerspoon/dropdown_windows.json
