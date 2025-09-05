@@ -199,6 +199,8 @@ create_symlinks() {
     backup_existing_config "$HOME/.config/mise/config.toml"
     backup_existing_config "$HOME/.config/tmux.conf"
     backup_existing_config "$HOME/.tigrc"
+    backup_existing_config "$HOME/.claude"
+    backup_existing_config "$HOME/.codex"
     
     # Remove existing symlinks or directories before creating new ones
     [ -e "$HOME/.config/nvim" ] && rm -rf "$HOME/.config/nvim"
@@ -291,6 +293,8 @@ create_symlinks() {
     safe_link "$DOTFILES_DIR/config/mise" "$HOME/.config/mise"
     safe_link "$DOTFILES_DIR/config/tmux/tmux.conf" "$HOME/.tmux.conf"
     safe_link "$DOTFILES_DIR/config/tig/.tigrc" "$HOME/.tigrc"
+    safe_link "$DOTFILES_DIR/config/claude" "$HOME/.claude"
+    safe_link "$DOTFILES_DIR/config/codex" "$HOME/.codex"
     
     # Warp terminal
     backup_existing_config "$HOME/.warp/themes"

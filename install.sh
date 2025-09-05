@@ -219,6 +219,7 @@ create_symlinks() {
     backup_existing_config "$HOME/.config/tmux.conf"
     backup_existing_config "$HOME/.tigrc"
     backup_existing_config "$HOME/.claude"
+    backup_existing_config "$HOME/.codex"
     
     ln -sf "$DOTFILES_DIR/config/nvim" "$HOME/.config/nvim"
     ln -sf "$DOTFILES_DIR/config/wezterm" "$HOME/.config/wezterm"
@@ -228,6 +229,7 @@ create_symlinks() {
     ln -sf "$DOTFILES_DIR/config/tmux/tmux.conf" "$HOME/.tmux.conf"
     ln -sf "$DOTFILES_DIR/config/tig/.tigrc" "$HOME/.tigrc"
     ln -sf "$DOTFILES_DIR/config/claude" "$HOME/.claude"
+    ln -sf "$DOTFILES_DIR/config/codex" "$HOME/.codex"
     
     # MacOS specific configs
     if [ "$OS_TYPE" = "macos" ]; then
