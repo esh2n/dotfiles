@@ -9,3 +9,18 @@
 
 # Hammerspoon window ID mappings
 config/hammerspoon/dropdown_windows.json
+
+# Claude関連の一時ファイル・ログ
+config/claude/projects/
+config/claude/todos/
+config/claude/plugins/
+config/claude/statsig/
+config/claude/ide/
+config/claude/local/package-lock.json
+config/claude/local/node_modules/
+
+# Codex関連の一時ファイル
+config/codex/auth.json
+config/codex/sessions/
+config/codex/internal_storage.json
+config/codex/history.jsonl

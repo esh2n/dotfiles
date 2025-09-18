@@ -1,3 +1,6 @@
+# Gitコマンドのタイムアウトを増やす (デフォルト: 500ms)
+command_timeout = 2000
+
 # プロンプトのフォーマット
 format = """
 $directory\

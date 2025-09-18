@@ -1,11 +1,9 @@
-## Codex CLI configuration (symlinked to ~/.codex/config.toml)
-
-model_reasoning_effort = "high"
 hide_agent_reasoning = true
 network_access = true
 
 # macOS notification when a task completes
 notify = ["bash", "-lc", "afplay /System/Library/Sounds/Ping.aiff"]
+model = "gpt-5-codex"
 
 [tools]
 web_search = true

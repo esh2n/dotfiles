@@ -98,13 +98,19 @@ if command -v is_warp_terminal &>/dev/null && is_warp_terminal; then
   alias src='sk_select_src'
   alias v='sk_select_file_within_project'
 else
-  # 通常のターミナル用：ZLEウィジェット
-  alias c='sk_change_directory'
+  # 通常のターミナル用：dirfindを使用（ZLEが無効な環境でも動作）
+  alias c='dirfind'
   alias b='sk_select_file_below_pwd'
+  alias src='sk_select_src'
+  alias v='sk_select_file_within_project'
 fi
 
 alias ghl='cd $(ghq root)/$(fast_ghl | sk)'
 alias memo='vim $(ghq root)/github.com/esh2n/playground/notes/$(date "+%Y_%m_%d").md'
+
+# Zoxide管理
+alias zclean='zoxide_cleanup'
+alias zlist='zoxide query -l | grep -v -E "$DOTFILES_EXCLUDE_PATTERN"'
 
 # Fasd
 alias a='fasd -a'
@@ -164,6 +170,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
 fi
 alias zeinit='zellij --layout ~/.config/zellij/layout_file.yaml'
 
+
 # Enhanced grep and cat
 alias rg='rg --smart-case'
 alias rgf='rg --files | rg'
@@ -174,3 +181,7 @@ alias less='bat --style=plain'
 alias disp='open "x-apple.systempreferences:com.apple.Displays-Settings.extension"'
 
 alias ce='SHELL=/bin/bash claude'
+
+# DevPodチートシート表示
+alias devpod-help='cat $DOTFILES_PATH/docs/DEVPOD.md'
+alias dph='devpod-help'

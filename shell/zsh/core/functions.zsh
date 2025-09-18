@@ -1,7 +1,19 @@
-# Warp terminal detection
+# Terminal detection functions
 function is_warp_terminal() {
   [[ -n "$WARP_SESSION_ID" ]] || [[ "$TERM_PROGRAM" = "WarpTerminal" ]]
 }
+
+function is_vscode_terminal() {
+  [[ "$TERM_PROGRAM" = "vscode" ]]
+}
+
+function is_wezterm() {
+  [[ "$TERM_PROGRAM" = "WezTerm" ]]
+}
+
+# 共通の除外パターン定義（zoxide用）
+# 隠しディレクトリ（.で始まる）も除外
+export DOTFILES_EXCLUDE_PATTERN='(^\.|/\.|\.Trash|OrbStack|\.cache|\.aws|\.devin|config/claude|\.vscode|__pycache__|node_modules|vendor|\.idea|build|dist|target|\.next|\.nuxt|coverage|\.pytest_cache|\.mypy_cache|venv|\.venv|Library/Caches|Library/Logs|\.npm|\.yarn|\.pnpm)'
 
 # Directory management
 function mkdir_and_change_directory() {
@@ -60,6 +72,7 @@ function sk_select_history() {
 }
 
 function sk_select_src () {
+  # ghqで管理されているプロジェクトディレクトリを選択して移動
   # Warpターミナルの場合は直接実行モードを強制
   if is_warp_terminal; then
     sk_select_src --direct
@@ -101,44 +114,28 @@ function sk_select_src () {
 
   local selected_dir=""
   
-  # pacificaを優先的に使用（WSL環境でも）
-  if command -v pacifica &>/dev/null; then
-    # skコマンドの存在確認
-    if ! command -v sk &>/dev/null; then
-      echo "エラー: skコマンドがインストールされていません"
-      echo "WSL環境では: sudo apt install skim"
+  # ghqコマンドの存在確認
+  if ! command -v ghq &>/dev/null; then
+    echo "エラー: ghqコマンドがインストールされていません"
+    echo "インストール: brew install ghq"
+    if [[ "$direct_mode" != "1" && -o zle ]]; then
       zle reset-prompt
-      return 1
     fi
-    
-    # 静かに実行（余計なメッセージを表示しない）
-    local output
-    output=$(pacifica 2>/dev/null)
-    
-    # 出力が空でないことを確認
-    if [[ -n "$output" ]]; then
-      # skに渡して選択
-      selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
-    else
-      # 静かにフォールバック
-      if command -v fd &>/dev/null; then
-        selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules . "$HOME" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
-      elif command -v find &>/dev/null; then
-        selected_dir=$(find "$HOME" -type d -not -path "*/\.*" -not -path "*/node_modules/*" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
-      fi
-    fi
-  else
-    # pacificaがインストールされていない場合はfdまたはfindを使用（静かに）
-    if command -v fd &>/dev/null; then
-      selected_dir=$(fd --type d --hidden --exclude .git --exclude node_modules . "$HOME" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
-    elif command -v find &>/dev/null; then
-      selected_dir=$(find "$HOME" -type d -not -path "*/\.*" -not -path "*/node_modules/*" 2>/dev/null | sk --ansi --reverse --height '50%' --query "$LBUFFER" 2>/dev/null)
-    else
-      echo "エラー: pacifica、fd、findのいずれもインストールされていません"
-      zle reset-prompt
-      return 1
-    fi
+    return 1
   fi
+  
+  # skコマンドの存在確認
+  if ! command -v sk &>/dev/null; then
+    echo "エラー: skコマンドがインストールされていません"
+    echo "インストール: brew install skim"
+    if [[ "$direct_mode" != "1" && -o zle ]]; then
+      zle reset-prompt
+    fi
+    return 1
+  fi
+  
+  # ghqで管理されているリポジトリ一覧を取得
+  selected_dir=$(ghq list -p | sk --ansi --reverse --height '50%' --preview 'ls -la {}' --preview-window=right:50% --query "$LBUFFER" 2>/dev/null)
 
   # 選択したディレクトリが存在すれば移動
   if [ -n "$selected_dir" ]; then
@@ -161,32 +158,35 @@ function sk_select_src () {
 }
 
 function sk_change_directory() {
-  # Warpターミナルの場合は直接実行モード
-  if is_warp_terminal; then
-    # zoxideコマンドが存在するかチェック
-    if ! command -v zoxide &>/dev/null; then
-      echo "エラー: zoxideがインストールされていません。"
-      return 1
-    fi
-    
-    local output=$(zoxide query -l)
+  # 引数で--directが指定された場合、またはWarpターミナルの場合は直接実行モード
+  local direct_mode=0
+  if [[ "$1" = "--direct" ]] || is_warp_terminal; then
+    direct_mode=1
+  fi
+  
+  # zoxideコマンドが存在するかチェック
+  if ! command -v zoxide &>/dev/null; then
+    echo "エラー: zoxideがインストールされていません。"
+    return 1
+  fi
+  
+  # 直接実行モード、またはZLEが無効な場合
+  if [[ "$direct_mode" = "1" ]] || [[ ! -o zle ]]; then
+    # zoxideから履歴を取得し、不要なパスをフィルタリング
+    local output=$(zoxide query -l | grep -v -E "$DOTFILES_EXCLUDE_PATTERN")
     local selected_dir=""
     
     if [[ -n "$output" ]]; then
-      selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' 2>/dev/null)
+      selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' --preview 'ls -la {}' --preview-window=right:50% 2>/dev/null)
     fi
     
     if [ -n "$selected_dir" ]; then
       cd "${selected_dir}"
       echo "✓ 移動先: ${selected_dir}"
+    else
+      echo "ディレクトリが選択されませんでした"
     fi
     return
-  fi
-  
-  # ZLEが有効かどうかをチェック
-  if [[ ! -o zle ]]; then
-    echo "エラー: ライン編集が有効ではありません。インタラクティブシェルで実行してください。"
-    return 1
   fi
 
   # SIGINT（Ctrl+C）ハンドラを設定
@@ -215,11 +215,12 @@ function sk_change_directory() {
     return 1
   fi
 
-  local output=$(zoxide query -l)
+  # zoxideから履歴を取得し、不要なパスをフィルタリング
+  local output=$(zoxide query -l | grep -v -E "$DOTFILES_EXCLUDE_PATTERN")
   local selected_dir=""
   
   if [[ -n "$output" ]]; then
-    selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' 2>/dev/null)
+    selected_dir=$(echo "$output" | sk --ansi --reverse --height '50%' --preview 'ls -la {}' --preview-window=right:50% 2>/dev/null)
   fi
   
   if [ -n "$selected_dir" ]; then
@@ -524,14 +525,20 @@ if [[ $- == *i* ]]; then
       # macOS / 通常Linux環境用のキーバインド設定関数
       function __setup_macos_keybinds() {
         bindkey '^r' sk_select_history
-        bindkey '^]' sk_select_src
         bindkey '^g' sk_change_directory
         bindkey '^v' sk_select_file_within_project
         bindkey '^b' sk_select_file_below_pwd
         
-        # vimモードでもキーバインドを設定
-        bindkey -M viins '^]' sk_select_src 2>/dev/null || true
-        bindkey -M vicmd '^]' sk_select_src 2>/dev/null || true
+        # VSCodeターミナルではCtrl+]が使えないため、代替キーを提供
+        if is_vscode_terminal; then
+          bindkey '^\' sk_select_src       # Ctrl+\
+          bindkey '^p' sk_select_src       # Ctrl+P
+        else
+          bindkey '^]' sk_select_src
+          # vimモードでもキーバインドを設定
+          bindkey -M viins '^]' sk_select_src 2>/dev/null || true
+          bindkey -M vicmd '^]' sk_select_src 2>/dev/null || true
+        fi
       }
       
       # 安全に初期設定を実行
@@ -572,6 +579,18 @@ if [[ $- == *i* ]]; then
       echo ""
       echo "Note: Warp doesn't support ZLE widgets, so keybindings are disabled."
       export WARP_HELP_SHOWN=1
+    }
+  elif is_vscode_terminal; then
+    # VSCodeターミナルの場合のヘルプメッセージ
+    [[ -z "$VSCODE_HELP_SHOWN" ]] && {
+      echo "📝 VSCode terminal detected. Alternative keybindings:"
+      echo "  Ctrl+\\ or Ctrl+P - Select project directory (Ctrl+] alternative)"
+      echo "  Ctrl+G - Change directory with zoxide"
+      echo "  Ctrl+B - Browse files below current directory"
+      echo "  Ctrl+V - Browse files within project"
+      echo ""
+      echo "Alternatively, use command aliases: src, c, b, v"
+      export VSCODE_HELP_SHOWN=1
     }
   else
     # ZLEが無効な場合は警告
@@ -998,3 +1017,50 @@ function sz_debug() {
   export SZ_DEBUG=1
   sz
 }
+
+# Zoxideデータベースのクリーンアップ
+function zoxide_cleanup() {
+  echo "🧹 Zoxideデータベースをクリーンアップしています..."
+  
+  # 除外パターンに該当するディレクトリを削除
+  local patterns=(
+    "\.Trash"
+    "\.cache"
+    "\.aws"
+    "\.devin"
+    "config/claude"
+    "\.vscode"
+    "__pycache__"
+    "node_modules"
+    "vendor"
+    "\.idea"
+    "build"
+    "dist"
+    "target"
+    "\.next"
+    "\.nuxt"
+    "coverage"
+    "\.pytest_cache"
+    "\.mypy_cache"
+    "venv"
+    "\.venv"
+  )
+  
+  local removed_count=0
+  for pattern in "${patterns[@]}"; do
+    # zoxide query -lでリストを取得し、パターンにマッチするものを削除
+    local dirs_to_remove=$(zoxide query -l | grep -E "$pattern" || true)
+    if [[ -n "$dirs_to_remove" ]]; then
+      echo "$dirs_to_remove" | while read -r dir; do
+        zoxide remove "$dir" 2>/dev/null && {
+          echo "  ✓ 削除: $dir"
+          ((removed_count++))
+        }
+      done
+    fi
+  done
+  
+  echo "🎉 完了: ${removed_count}個のディレクトリを削除しました"
+  echo "💡 ヒント: 今後これらのディレクトリは自動的に除外されます"
+}
+
