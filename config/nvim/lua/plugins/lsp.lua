@@ -30,6 +30,9 @@ return {
       })
 
       local capabilities = require("cmp_nvim_lsp").default_capabilities()
+      
+      -- Deprecation warningを抑制
+      ---@diagnostic disable-next-line: deprecated
       local lspconfig = require("lspconfig")
 
       -- TypeScript
