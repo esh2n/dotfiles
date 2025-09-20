@@ -215,13 +215,47 @@ return {
     end,
   },
 
-  -- ミニマップ
+  -- ミニマップ (satellite.nvimを使用 - 新しいAPIに対応)
   {
-    'gorbit99/codewindow.nvim',
+    'lewis6991/satellite.nvim',
     config = function()
-      local codewindow = require('codewindow')
-      codewindow.setup()
-      codewindow.apply_default_keybinds()
+      require('satellite').setup({
+        current_only = false,
+        winblend = 50,
+        zindex = 40,
+        excluded_filetypes = {},
+        width = 2,
+        handlers = {
+          cursor = {
+            enable = true,
+            overlap = true,
+            priority = 100,
+            -- Cursor symbol
+            symbols = { '⎺', '⎻', '⎼', '⎽' }
+          },
+          search = {
+            enable = true,
+            overlap = false,
+            priority = 70,
+          },
+          diagnostic = {
+            enable = true,
+            overlap = false,
+            priority = 50,
+          },
+          gitsigns = {
+            enable = true,
+            overlap = false,
+            priority = 60,
+          },
+          marks = {
+            enable = true,
+            overlap = false,
+            priority = 80,
+            key = 'm',
+          },
+        },
+      })
     end,
   },
 

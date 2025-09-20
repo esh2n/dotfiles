@@ -51,8 +51,8 @@ args = [
   "ide-assistant",
 ]
 
-[projects."/Users/shunya.endo/go/github.com/esh2n/dotfiles"]
+[projects."/Users/esh2n/go/github.com/esh2n/dotfiles"]
 trust_level = "trusted"
 
-[projects."/Users/shunya.endo/go/github.com/sansaninc/sdi-core"]
+[projects."/Users/esh2n/go/github.com/sansaninc/sdi-core"]
 trust_level = "trusted"

@@ -19,6 +19,14 @@ config/claude/shell-snapshots/
 config/claude/local/package-lock.json
 config/claude/local/package.json
 
+# Neovim kickstart.nvim related files
+config/nvim/.github/
+config/nvim/.gitignore
+config/nvim/.stylua.toml
+config/nvim/LICENSE.md
+config/nvim/README.md
+config/nvim/doc/
+
 # Codex関連
 config/codex/sessions/
 config/claude/projects/

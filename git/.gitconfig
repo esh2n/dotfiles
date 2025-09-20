@@ -1,9 +1,9 @@
 # 外部設定ファイルのインクルード
 [include]
     path = ~/.config/git/config.local
-[includeIf "gitdir:/Users/shunya.endo/go/github.com/eightcard/"]
+[includeIf "gitdir:/Users/esh2n/go/github.com/eightcard/"]
     path = ~/.config/git/config.eightcard
-[includeIf "gitdir:/Users/shunya.endo/go/github.com/sansaninc/"]
+[includeIf "gitdir:/Users/esh2n/go/github.com/sansaninc/"]
     path = ~/.config/git/config.sansaninc
 
 
