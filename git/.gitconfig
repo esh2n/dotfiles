@@ -1,8 +1,11 @@
 # 外部設定ファイルのインクルード
 [include]
     path = ~/.config/git/config.local
-[includeIf "gitdir:~/go/github.com/c2pug/"]
-    path = ~/.config/git/config.c2pug
+[includeIf "gitdir:/Users/shunya.endo/go/github.com/eightcard/"]
+    path = ~/.config/git/config.eightcard
+[includeIf "gitdir:/Users/shunya.endo/go/github.com/sansaninc/"]
+    path = ~/.config/git/config.sansaninc
+
 
 # 明らかにGitを改善する設定
 [column]
@@ -74,13 +77,13 @@
     # diffやlogの表示に使用するツール
     pager = delta
 
-# GitHub認証情報の管理
-[credential "https://github.com"]
-    helper =
-    helper = !/opt/homebrew/bin/gh auth git-credential
-[credential "https://gist.github.com"]
-    helper =
-    helper = !/opt/homebrew/bin/gh auth git-credential
+# GitHub認証情報の管理（includeIfで設定を上書きするため、グローバルでは無効化）
+# [credential "https://github.com"]
+#     helper =
+#     helper = !/opt/homebrew/bin/gh auth git-credential
+# [credential "https://gist.github.com"]
+#     helper =
+#     helper = !/opt/homebrew/bin/gh auth git-credential
 
 # deltaの設定（高機能なdiff表示ツール）
 [delta]

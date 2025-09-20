@@ -1,6 +1,8 @@
 # Amazon Q pre block. Keep at the top of this file.
 [[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.pre.zsh"
 
+# Go binaries path
+export PATH="$HOME/go/bin:$PATH"
 # Load environment variables
 if [ -f "$HOME/go/github.com/esh2n/dotfiles/.env" ]; then
     set -a

@@ -34,7 +34,7 @@ alias gA='git add --all'
 alias gc='git commit'
 alias gpul='git pull'
 alias gpus='git push'
-alias ac='aicommits'
+alias aic='aicommits --generate 5 --type conventional'
 
 # Git branch operations
 alias gb='git branch'
@@ -142,7 +142,7 @@ alias dpc='deployctl'
 alias de='deno'
 
 # GCP
-alias gsu='gsutil'
+# alias gsu='gsutil'
 alias gcp='gcloud'
 
 # Architecture
@@ -170,7 +170,7 @@ alias rgf='rg --files | rg'
 alias cat='bat --style=plain --paging=never'
 alias less='bat --style=plain'
 
-# Editor
-alias code='code'
+# Mac
+alias disp='open "x-apple.systempreferences:com.apple.Displays-Settings.extension"'
 
 alias ce='SHELL=/bin/bash claude'
