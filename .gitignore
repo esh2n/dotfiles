@@ -21,3 +21,14 @@ config/claude/local/package.json
 
 # Codex関連
 config/codex/sessions/
+config/claude/projects/
+config/claude/todos/
+config/claude/plugins/
+config/claude/statsig/
+config/claude/ide/
+config/claude/local/package-lock.json
+config/claude/local/node_modules/
+config/codex/auth.json
+config/codex/sessions/
+config/codex/internal_storage.json
+config/codex/history.jsonl

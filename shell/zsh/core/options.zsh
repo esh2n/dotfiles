@@ -23,7 +23,6 @@ zle -N sk_select_file_within_project
 zle -N sk_select_branch_except_current
 zle -N sk_select_local_branch_except_current
 zle -N sk_select_branch_all
-zle -N sk_change_directory
 
 # Completion options
 setopt auto_list

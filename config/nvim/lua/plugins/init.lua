@@ -276,4 +276,38 @@ return {
       require('hop').setup()
     end,
   },
+
+  -- DevPod対応のリモート開発プラグイン
+  {
+    "amitds1997/remote-nvim.nvim",
+    version = "*",
+    lazy = false,  -- 起動時に必ずロード
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "MunifTanjim/nui.nvim",
+      "nvim-telescope/telescope.nvim",
+    },
+    config = function()
+      require("remote-nvim").setup({
+        devpod = {
+          binary = "devpod",
+          docker_binary = "docker",
+        },
+        ssh_config = {
+          ssh_binary = "ssh", 
+          scp_binary = "scp",
+        },
+        remote = {
+          app_name = "nvim",
+          config_dir = vim.fn.stdpath("config"),
+        },
+      })
+    end,
+    keys = {
+      { "<leader>rc", "<cmd>RemoteStart<cr>", desc = "リモート接続開始" },
+      { "<leader>rs", "<cmd>RemoteStop<cr>", desc = "リモート接続終了" },
+      { "<leader>ri", "<cmd>RemoteInfo<cr>", desc = "リモート接続情報" },
+      { "<leader>rd", "<cmd>RemoteConfigDel<cr>", desc = "リモート設定削除" },
+    },
+  },
 } 
