@@ -301,6 +301,11 @@ create_symlinks() {
     mkdir -p "$HOME/.warp"
     safe_link "$DOTFILES_DIR/config/warp/themes" "$HOME/.warp/themes"
     
+    # Ghostty terminal
+    backup_existing_config "$HOME/.config/ghostty"
+    mkdir -p "$HOME/.config"
+    safe_link "$DOTFILES_DIR/config/ghostty" "$HOME/.config/ghostty"
+    
     # MacOS specific configs
     if [ "$OS_TYPE" = "macos" ]; then
         backup_existing_config "$HOME/.config/aerospace"

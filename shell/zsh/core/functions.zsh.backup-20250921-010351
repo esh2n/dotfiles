@@ -134,66 +134,8 @@ function sk_select_src () {
     return 1
   fi
   
-  # キャッシュファイルのパス
-  local cache_file="$HOME/.cache/ghq_list_cache"
-  local cache_age=3600  # 1時間（秒）
-  local use_cache=0
-  
-  # キャッシュディレクトリが存在しない場合は作成
-  mkdir -p "$HOME/.cache"
-  
-  # キャッシュファイルの有効性をチェック
-  if [[ -f "$cache_file" ]]; then
-    local cache_modified=$(stat -f "%m" "$cache_file" 2>/dev/null || stat -c "%Y" "$cache_file" 2>/dev/null)
-    local current_time=$(date +%s)
-    local cache_diff=$((current_time - cache_modified))
-    
-    if [[ $cache_diff -lt $cache_age ]]; then
-      use_cache=1
-    fi
-  fi
-  
-  # zoxideから最近使用したプロジェクトを取得（上位20件）
-  local recent_projects=""
-  if command -v zoxide &>/dev/null; then
-    recent_projects=$(zoxide query -l | head -20)
-  fi
-  
-  # ghqで管理されているリポジトリ一覧を取得（非同期対応）
-  if [[ $use_cache -eq 1 ]]; then
-    # キャッシュから読み込み
-    if [[ -n "$recent_projects" ]]; then
-      # 最近使用したプロジェクトを上に、重複を除外してマージ
-      selected_dir=$(
-        {
-          echo "$recent_projects"
-          cat "$cache_file" | grep -v -F -f <(echo "$recent_projects")
-        } | sk --ansi --reverse --height '50%' \
-            --preview 'ls -la {} 2>/dev/null || echo "Not a directory"' \
-            --preview-window=right:50% \
-            --header="Recently used projects are shown first" \
-            --query "$LBUFFER" 2>/dev/null
-      )
-    else
-      selected_dir=$(cat "$cache_file" | sk --ansi --reverse --height '50%' --preview 'ls -la {}' --preview-window=right:50% --query "$LBUFFER" 2>/dev/null)
-    fi
-  else
-    # リアルタイムでリストを取得し、同時にキャッシュを更新
-    if [[ -n "$recent_projects" ]]; then
-      selected_dir=$(
-        {
-          echo "$recent_projects"
-          ghq list -p | tee "$cache_file" | grep -v -F -f <(echo "$recent_projects")
-        } | sk --ansi --reverse --height '50%' \
-            --preview 'ls -la {} 2>/dev/null || echo "Not a directory"' \
-            --preview-window=right:50% \
-            --header="Recently used projects are shown first" \
-            --query "$LBUFFER" 2>/dev/null
-      )
-    else
-      selected_dir=$(ghq list -p | tee "$cache_file" | sk --ansi --reverse --height '50%' --preview 'ls -la {}' --preview-window=right:50% --query "$LBUFFER" 2>/dev/null)
-    fi
-  fi
+  # ghqで管理されているリポジトリ一覧を取得
+  selected_dir=$(ghq list -p | sk --ansi --reverse --height '50%' --preview 'ls -la {}' --preview-window=right:50% --query "$LBUFFER" 2>/dev/null)
 
   # 選択したディレクトリが存在すれば移動
   if [ -n "$selected_dir" ]; then
@@ -1121,22 +1063,4 @@ function zoxide_cleanup() {
   echo "🎉 完了: ${removed_count}個のディレクトリを削除しました"
   echo "💡 ヒント: 今後これらのディレクトリは自動的に除外されます"
 }
-
-# ghqリストのキャッシュを更新する関数
-function update_ghq_cache() {
-  local cache_file="$HOME/.cache/ghq_list_cache"
-  echo "ghqプロジェクトリストのキャッシュを更新中..."
-  
-  # キャッシュディレクトリが存在しない場合は作成
-  mkdir -p "$HOME/.cache"
-  
-  # バックグラウンドで更新
-  (ghq list -p > "$cache_file.tmp" && mv "$cache_file.tmp" "$cache_file" && echo "✓ キャッシュ更新完了") &
-  
-  echo "バックグラウンドで更新を開始しました"
-}
-
-# エイリアス
-alias ghq-update='update_ghq_cache'
-alias ghq-cache-update='update_ghq_cache'
 
