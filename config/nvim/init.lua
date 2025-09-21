@@ -93,6 +93,20 @@ vim.g.maplocalleader = ' '
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = true
 
+-- Font settings for GUI (Neovide, VimR, etc.)
+if vim.fn.has('gui_running') == 1 or vim.g.neovide then
+  -- プログラミング向けの読みやすいフォント設定
+  vim.o.guifont = 'JetBrainsMono Nerd Font:h14'
+  -- 他のおすすめフォント:
+  -- vim.o.guifont = 'Hack Nerd Font:h14'
+  -- vim.o.guifont = 'FiraCode Nerd Font:h14'
+  -- vim.o.guifont = 'CaskaydiaCove Nerd Font:h14'
+  -- vim.o.guifont = 'SauceCodePro Nerd Font:h14'
+  
+  -- 日本語フォント設定（必要に応じて）
+  vim.o.guifontwide = 'Noto Sans CJK JP:h14'
+end
+
 -- [[ Setting options ]]
 -- See `:help vim.o`
 -- NOTE: You can change these options as you wish!
@@ -165,6 +179,15 @@ vim.o.cursorline = true
 
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.o.scrolloff = 10
+
+-- 相対行番号の色を薄くする（オプション）
+vim.api.nvim_create_autocmd('ColorScheme', {
+  pattern = '*',
+  callback = function()
+    vim.api.nvim_set_hl(0, 'LineNr', { fg = '#5c6370' })      -- 絶対行番号の色
+    vim.api.nvim_set_hl(0, 'CursorLineNr', { fg = '#abb2bf', bold = true }) -- 現在行の色
+  end,
+})
 
 -- if performing an operation that would fail due to unsaved changes in the buffer (like `:q`),
 -- instead raise a dialog asking if you wish to save the current file(s)
@@ -937,12 +960,13 @@ require('lazy').setup({
           -- `friendly-snippets` contains a variety of premade snippets.
           --    See the README about individual language/framework/plugin snippets:
           --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip.loaders.from_vscode').lazy_load()
+              require('luasnip').filetype_extend('ruby', { 'rails' })
+            end,
+          },
         },
         opts = {},
       },

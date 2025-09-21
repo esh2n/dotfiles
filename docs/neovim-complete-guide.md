@@ -355,3 +355,86 @@ Neo-tree内での操作：
 5. **エラーが出た場合**
    - `:checkhealth`で環境診断
    - `:messages`でエラーメッセージ確認
+
+---
+
+## 🎨 追加プラグイン
+
+### render-markdown.nvim
+Markdownファイルの表示を大幅に強化します。
+- ヘッダーにアイコンと背景色
+- コードブロックの強調表示
+- チェックボックスのアイコン化
+- リンクのアイコン表示
+
+### octo.nvim (GitHub統合)
+NeovimからGitHubのIssueやPRを操作できます。
+
+- `<Space>gi` - GitHub Issueの一覧表示
+- `<Space>gp` - GitHub PRの一覧表示
+- `<Space>gr` - PRレビューを開始
+- `:Octo pr create` - 新しいPRを作成
+- `:Octo issue create` - 新しいIssueを作成
+
+### copilot.lua (GitHub Copilot)
+AIによるコード補完を提供します。
+
+**インサートモード**：
+- `<M-l>` または `<Alt-l>` - 提案を受け入れる
+- `<M-]>` または `<Alt-]>` - 次の提案
+- `<M-[>` または `<Alt-[>` - 前の提案
+- `<C-]>` - 提案を却下
+- `<M-CR>` または `<Alt-Enter>` - Copilotパネルを開く
+
+### vim-fugitive (Git統合)
+Gitコマンドを直接Neovim内で実行できます。
+
+- `<Space>gs` - Git status
+- `<Space>gb` - Git blame
+- `<Space>gd` - Git diff split
+- `<Space>ge` - Git edit
+- `<Space>gr` - Git read
+- `<Space>gw` - Git write
+- `<Space>gl` - Git log
+- `<Space>gp` - Git push (注意: octo.nvimのPRリストと競合)
+- `<Space>gP` - Git pull
+- `<Space>gc` - Git commit
+
+### vim-kensaku (日本語検索)
+日本語の曖昧検索が可能になります。
+
+- `<Space>sk` - Kensaku検索開始
+- コマンドモードで `<CR>` - 検索語句を自動変換
+
+### vim-asterisk (検索拡張)
+より賢い`*`検索を提供します。
+
+- `*` / `#` - 通常の検索（カーソル位置を保持）
+- `g*` / `g#` - 部分一致検索
+- `z*` / `z#` - カーソル位置を画面中央に
+
+### marks.nvim (マーク可視化)
+マークが左側に表示され、管理しやすくなります。
+
+- `mx` - マークxを設定
+- `'x` - マークxへジャンプ
+- `dmx` - マークxを削除
+- `m,` - 次の利用可能なマークを設定
+- `m;` - 次のマークへトグル
+
+### hlargs.nvim (引数ハイライト)
+関数の引数が自動的にハイライトされます（設定不要）。
+
+### nvim_context_vt (コンテキスト表示)
+長い関数やブロックで、現在のコンテキストを仮想テキストで表示します。
+
+### jumpcursor.vim (カーソル復元)
+ファイルを再度開いた時、前回のカーソル位置を自動復元します。
+
+### nvim-ts-context-commentstring (コメント強化)
+JSX、TSX、Vue等でコンテキストに応じた正しいコメント形式を使用します。
+
+### Denopsプラグイン (要Deno)
+Denoがインストールされている場合：
+- **denops-popup-preview.vim** - 補完時のポップアッププレビュー
+- **denops-signature_help** - 関数シグネチャのヘルプ表示
