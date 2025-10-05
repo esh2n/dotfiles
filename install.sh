@@ -202,6 +202,19 @@ create_symlinks() {
     # Git
     backup_existing_config "$HOME/.config/git"
     mkdir -p "$HOME/.config/git"
+
+    # Copy .gitconfig from template if it doesn't exist
+    if [ ! -f "$DOTFILES_DIR/git/.gitconfig" ] && [ -f "$DOTFILES_DIR/git/.gitconfig.template" ]; then
+        echo "Creating .gitconfig from template..."
+        cp "$DOTFILES_DIR/git/.gitconfig.template" "$DOTFILES_DIR/git/.gitconfig"
+    fi
+
+    # Copy codex config from template if it doesn't exist
+    if [ ! -f "$DOTFILES_DIR/config/codex/config.toml" ] && [ -f "$DOTFILES_DIR/config/codex/config.toml.template" ]; then
+        echo "Creating codex config.toml from template..."
+        sed "s|{{HOME}}|$HOME|g" "$DOTFILES_DIR/config/codex/config.toml.template" > "$DOTFILES_DIR/config/codex/config.toml"
+    fi
+
     ln -sf "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
     ln -sf "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.config/git/ignore"
     ln -sf "$DOTFILES_DIR/git/.gitmessage" "$HOME/.config/git/message"

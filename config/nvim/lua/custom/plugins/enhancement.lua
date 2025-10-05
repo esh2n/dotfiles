@@ -72,22 +72,10 @@ return {
       highlight = 'Comment',
       min_rows = 1,
       min_rows_ft = {},
-      disable_ft = { 'markdown' },
+      disable_ft = { 'markdown', 'neo-tree' },
       disable_virtual_lines = false,
       disable_virtual_lines_ft = { 'yaml' },
-      custom_parser = function(node, ft, opts)
-        local utils = require('nvim_context_vt.utils')
-        if ft == 'python' and node:type() == 'function_definition' then
-          return nil
-        end
-        return utils.get_node_text(node)
-      end,
-      custom_resolver = function(nodes, ft, opts)
-        if ft == 'yaml' then
-          return nodes[#nodes]
-        end
-        return nil
-      end,
+      -- custom_parserとcustom_resolverを削除してデフォルトの動作を使用
     }
   },
   

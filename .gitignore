@@ -40,3 +40,17 @@ config/codex/auth.json
 config/codex/sessions/
 config/codex/internal_storage.json
 config/codex/history.jsonl
+config/codex/version.json
+config/codex/config.toml
+
+# Claude Code history
+config/claude/file-history/
+config/claude/history.jsonl
+
+# Neovim plugin lock
+config/nvim/lazy-lock.json
+
+# Git config (local with company-specific settings)
+git/.gitconfig
+# Git config (company-specific)
+git/config.*

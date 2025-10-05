@@ -70,11 +70,11 @@ setopt prompt_subst
 TIMEFMT=$'\n\n========================\nProgram : %J\nCPU     : %P\nuser    : %*Us\nsystem  : %*Ss\ntotal   : %*Es\n========================\n'
 
 # External tools integration
-if [ -f '/Users/esh2n/google-cloud-sdk/path.zsh.inc' ]; then 
-    source '/Users/esh2n/google-cloud-sdk/path.zsh.inc'
+if [ -f "$HOME/google-cloud-sdk/path.zsh.inc" ]; then
+    source "$HOME/google-cloud-sdk/path.zsh.inc"
 fi
-if [ -f '/Users/esh2n/google-cloud-sdk/completion.zsh.inc' ]; then 
-    source '/Users/esh2n/google-cloud-sdk/completion.zsh.inc'
+if [ -f "$HOME/google-cloud-sdk/completion.zsh.inc" ]; then
+    source "$HOME/google-cloud-sdk/completion.zsh.inc"
 fi
 
 # Additional paths
@@ -83,8 +83,8 @@ if [ "$IS_WSL" = "1" ]; then
   # WSL環境ではホームディレクトリ直下のgoディレクトリを使用
   export PACIFICA_PATH="$HOME/go"
 elif [ "$OSTYPE" = "Darwin" ]; then
-  # macOS環境ではオリジナルのパスを使用
-  export PACIFICA_PATH="/Users/esh2n/go"
+  # macOS環境ではホームディレクトリ直下のgoディレクトリを使用
+  export PACIFICA_PATH="$HOME/go"
 else
   # 通常のLinux環境でもホームディレクトリ直下を使用
   export PACIFICA_PATH="$HOME/go"
@@ -101,7 +101,7 @@ fi
 # RD (RundownInc) のバイナリパスをOSに応じて設定
 if [ "$OSTYPE" = "Darwin" ]; then
   # macOS固有の設定
-  export PATH="/Users/esh2n/.rd/bin:$PATH"
+  export PATH="$HOME/.rd/bin:$PATH"
 fi
 
 # # .NET SDK Path

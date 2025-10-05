@@ -12,6 +12,21 @@ return {
           separator_style = "slant",
           show_buffer_close_icons = true,
           show_close_icon = false,
+          close_command = function(bufnr)
+            -- バッファーが1つしかない場合は新しい空のバッファーを作成してから削除
+            if #vim.fn.getbufinfo({buflisted = true}) <= 1 then
+              vim.cmd('enew')
+            end
+            vim.cmd('bdelete! ' .. bufnr)
+          end,
+          right_mouse_command = function(bufnr)
+            -- 右クリックでも同じ動作
+            if #vim.fn.getbufinfo({buflisted = true}) <= 1 then
+              vim.cmd('enew')
+            end
+            vim.cmd('bdelete! ' .. bufnr)
+          end,
+          middle_mouse_command = nil, -- ミドルクリックは無効化
           diagnostics = "nvim_lsp",
           always_show_bufferline = true,
           diagnostics_indicator = function(count, level)
@@ -179,7 +194,7 @@ return {
         
         indent = {
           enable = true,
-          use_treesitter = true,
+          use_treesitter = false,
           chars = {
             "│",
           },
@@ -193,7 +208,7 @@ return {
         
         line_num = {
           enable = true,
-          use_treesitter = true,
+          use_treesitter = false,
           style = "#806d9c",
         },
         

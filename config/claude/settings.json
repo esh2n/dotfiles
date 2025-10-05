@@ -1,5 +1,5 @@
 {
-  "model": "opus",
+  "model": "sonnet",
   "theme": "dark",
   "cleanupPeriodDays": 30,
   "permissions": {

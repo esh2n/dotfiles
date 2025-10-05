@@ -872,11 +872,15 @@ require('lazy').setup({
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
         'gopls', -- Explicitly ensure gopls is installed
+        'gofumpt', -- Go formatter (stricter than gofmt)
+        'golangci-lint', -- Go linter
         'prettier', -- JS/TS/HTML/CSS formatter
         'black', -- Python formatter
         'isort', -- Python import sorter
         'rustfmt', -- Rust formatter
         'shfmt', -- Shell formatter
+        'terraform-ls', -- Terraform LSP
+        'tflint', -- Terraform linter
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 

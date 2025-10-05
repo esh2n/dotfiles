@@ -1,9 +1,8 @@
 # 外部設定ファイルのインクルード
 [include]
     path = ~/.config/git/config.local
-[includeIf "gitdir:/Users/shunya.endo/go/github.com/sansaninc/"]
-    path = ~/.config/git/config.sansaninc
-
+# [includeIf "gitdir:/path/to/your/company/repos/"]
+#     path = ~/.config/git/config.company
 
 # 明らかにGitを改善する設定
 [column]

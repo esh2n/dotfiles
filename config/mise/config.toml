@@ -13,10 +13,10 @@ verbose = false
 
 [env]
 PYTHONPATH = "${PYTHONPATH:-}:${PWD}"
-GEM_HOME = "/Users/esh2n/.gem"
-GOPATH = "/Users/esh2n/go"
-GOBIN = "/Users/esh2n/go/bin"
-CARGO_HOME = "/Users/esh2n/.cargo"
-RUSTUP_HOME = "/Users/esh2n/.rustup"
-DENO_INSTALL_ROOT = "/Users/esh2n/.deno"
-BUN_INSTALL = "/Users/esh2n/.bun"
+GEM_HOME = "{{ env.HOME }}/.gem"
+GOPATH = "{{ env.HOME }}/go"
+GOBIN = "{{ env.HOME }}/go/bin"
+CARGO_HOME = "{{ env.HOME }}/.cargo"
+RUSTUP_HOME = "{{ env.HOME }}/.rustup"
+DENO_INSTALL_ROOT = "{{ env.HOME }}/.deno"
+BUN_INSTALL = "{{ env.HOME }}/.bun"

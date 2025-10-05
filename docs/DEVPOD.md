@@ -12,6 +12,11 @@ devpod up . --ide zed
 ### Neovimで開く
 1. 通常のNeovimを起動
    ```bash
+   npm install -g @devcontainers/cli
+   devcontainer build --workspace-folder .
+   devcontainer up --workspace-folder .
+   devcontainer exec --workspace-folder . bash
+
    nvim
    ```
 
