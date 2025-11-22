@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Load colors
+source "$(dirname "$0")/colors.sh"
+
+options=(
+    style=round
+    width=7.0
+    hidpi=on
+    active_color="$active_color"
+    inactive_color="$inactive_color"
+)
+
+borders "${options[@]}" 

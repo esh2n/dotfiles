@@ -1,0 +1,18 @@
+# Network Domain Brewfile
+
+# Browsers
+cask "google-chrome"
+# dia might not be in brew yet, or under a different name.
+# Assuming cask "dia" for now, or user might need manual install.
+
+# Tools
+brew "curl"
+brew "wget"
+brew "openssh"
+cask "ngrok"
+
+# Security Domain Brewfile
+
+brew "gnupg"
+# 1password cask is in productivity, but CLI might be useful here
+brew "1password-cli"

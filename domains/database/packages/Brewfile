@@ -1,4 +1,0 @@
-# Database Domain Brewfile
-
-brew "mysql"
-brew "redis"

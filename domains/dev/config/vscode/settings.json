@@ -1,0 +1,343 @@
+{
+  // エディタの基本設定
+  "editor.fontFamily": "Fira Code, Menlo, Monaco, 'Courier New', monospace",
+  "editor.fontSize": 14,
+  "editor.fontLigatures": true,
+  "editor.formatOnPaste": true,
+  "editor.formatOnType": true,
+  "editor.guides.bracketPairs": true,
+  "editor.suggestSelection": "first",
+  "editor.wordWrap": "off",
+  "editor.inlineSuggest.enabled": true,
+  "editor.inlineSuggest.suppressSuggestions": true,
+  "editor.linkedEditing": true,
+  "editor.cursorStyle": "block-outline",
+  "workbench.iconTheme": "material-icon-theme",
+  "workbench.startupEditor": "newUntitledFile",
+  "workbench.editor.tabSizing": "shrink",
+  "workbench.commandCenter": false,
+  // エクスプローラーの設定
+  "explorer.confirmDelete": false,
+  "explorer.confirmDragAndDrop": false,
+  "explorer.compactFolders": false,
+  // ターミナルの設定
+  "terminal.integrated.fontSize": 12,
+  "terminal.integrated.tabs.enabled": true,
+  "terminal.integrated.defaultLocation": "editor",
+  "terminal.external.osxExec": "iTerm.app",
+  // 検索の設定
+  "search.showLineNumbers": true,
+  // Git関連の設定
+  "git.autofetch": true,
+  "git.openRepositoryInParentFolders": "always",
+  // GitHub Copilotの設定
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": false,
+    "scminput": false,
+    "yaml": false,
+    "dart": false,
+    "go": false
+  },
+  "github.copilot.editor.enableAutoCompletions": true,
+  // 言語別設定
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[vue]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": [
+      "source.organizeImports",
+      "source.fixAll.eslint"
+    ]
+  },
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
+  },
+  "[rust]": {
+    "editor.formatOnSave": true
+  },
+  "[python]": {
+    "editor.formatOnType": true
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "[dart]": {
+    "editor.defaultFormatter": "Dart-Code.dart-code",
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.rulers": [
+      80
+    ],
+    "editor.selectionHighlight": false,
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.suggestSelection": "first",
+    "editor.tabCompletion": "onlySnippets",
+    "editor.wordBasedSuggestions": "off"
+  },
+  "[csharp]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true
+  },
+  // 言語サーバー設定
+  "go.formatTool": "goimports",
+  "go.toolsManagement.autoUpdate": true,
+  "go.useLanguageServer": true,
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "clippy",
+  // .NET/C#の言語サーバー設定
+  "dotnetAcquisitionExtension.existingDotnetPath": [
+    "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.408/dotnet"
+  ],
+  "dotnet.server.useOmnisharp": false,
+  "csharp.semanticHighlighting.enabled": true,
+  "csharp.suppressDotnetRestoreNotification": false,
+  "csharp.suppressDotnetInstallWarning": false,
+  "csharp.suppressProjectJsonWarning": false,
+  "csharp.suppressBuildAssetsNotification": false,
+  "csharp.maxProjectFileCountForDiagnosticAnalysis": 1000,
+  "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "openFiles",
+  "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "openFiles",
+  "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+  "omnisharp.dotNetPath": "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.408/dotnet",
+  "ms-dotnettools.csharp.dotnetPath": "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.408/dotnet",
+  // ESLint設定
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "vue",
+    "react",
+    "html",
+    "typescript",
+    "typescriptreact"
+  ],
+  // Better Comments設定
+  "better-comments.multilineComments": true,
+  "better-comments.highlightPlainText": false,
+  "better-comments.tags": [
+    {
+      "tag": "!",
+      "color": "#FF2D00",
+      "strikethrough": false,
+      "backgroundColor": "transparent"
+    },
+    {
+      "tag": "?",
+      "color": "#3498DB",
+      "strikethrough": false,
+      "backgroundColor": "transparent"
+    },
+    {
+      "tag": "//",
+      "color": "#474747",
+      "strikethrough": true,
+      "backgroundColor": "transparent"
+    },
+    {
+      "tag": "todo",
+      "color": "#FF8C00",
+      "strikethrough": false,
+      "backgroundColor": "transparent"
+    },
+    {
+      "tag": "*",
+      "color": "#98C379",
+      "strikethrough": false,
+      "backgroundColor": "transparent"
+    }
+  ],
+  // その他の設定
+  "files.exclude": {
+    "**/.classpath": true,
+    "**/.project": true,
+    "**/.settings": true,
+    "**/.factorypath": true
+  },
+  "roo-cline.allowedCommands": [
+    "npm test",
+    "npm install",
+    "tsc",
+    "git log",
+    "git diff",
+    "git show",
+    "npx",
+    "git",
+    "cd",
+    "mkdir",
+    "cat",
+    "gh"
+  ],
+  "terminal.integrated.env.osx": {
+    "Q_NEW_SESSION": "1",
+    "AQUA_GLOBAL_CONFIG": "${workspaceFolder}/aqua.yaml",
+    "PATH": "${workspaceFolder}/.aqua/bin:${env:PATH}"
+  },
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "editor.accessibilitySupport": "on",
+  "editor.minimap.enabled": true,
+  "update.releaseTrack": "prerelease",
+  "window.commandCenter": 1,
+  "cursor.cpp.disabledLanguages": [
+    "plaintext",
+    "markdown",
+    "scminput",
+    "yaml",
+    "dart"
+  ],
+  "accessibility.signalOptions.volume": 1,
+  "githubPullRequests.pullBranch": "never",
+  "editor.formatOnSave": true,
+  "files.trimTrailingWhitespaceInRegexAndStrings": false,
+  "workbench.colorTheme": "Catppuccin Mocha",
+  "azureResourceGroups.selectedSubscriptions": [],
+  "accessibility.signals.lineHasBreakpoint": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.chatRequestSent": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.chatResponseReceived": {
+    "sound": "off"
+  },
+  "accessibility.signals.clear": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.codeActionApplied": {
+    "sound": "off"
+  },
+  "accessibility.signals.codeActionTriggered": {
+    "sound": "off"
+  },
+  "accessibility.signals.onDebugBreak": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.diffLineDeleted": {
+    "sound": "off"
+  },
+  "accessibility.signals.diffLineInserted": {
+    "sound": "off"
+  },
+  "accessibility.signals.diffLineModified": {
+    "sound": "off"
+  },
+  "accessibility.signals.positionHasError": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.lineHasError": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.lineHasFoldedArea": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.lineHasInlineSuggestion": {
+    "sound": "off"
+  },
+  "accessibility.signals.noInlayHints": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.notebookCellCompleted": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.notebookCellFailed": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.progress": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.taskCompleted": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.taskFailed": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.terminalBell": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.terminalCommandFailed": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.terminalCommandSucceeded": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.terminalQuickFix": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.voiceRecordingStarted": {
+    "sound": "off"
+  },
+  "accessibility.signals.voiceRecordingStopped": {
+    "sound": "off"
+  },
+  "accessibility.signals.positionHasWarning": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "accessibility.signals.lineHasWarning": {
+    "sound": "off",
+    "announcement": "auto"
+  },
+  "leetcode.workspaceFolder": "/Users/esh2n/go/github.com/esh2n/leetcode",
+  "bracket-pair-colorizer-2.depreciation-notice": false,
+  "files.insertFinalNewline": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "docker.extension.enableComposeLanguageServer": false,
+  "database-client.autoSync": true,
+  "remote.autoForwardPortsSource": "hybrid",
+  "mssql.connectionGroups": [
+    {
+      "name": "ROOT",
+      "id": "7C02FF35-8CBB-4542-9BAB-A132A40E1064"
+    }
+  ],
+  "mssql.connections": [
+    {
+      "authenticationType": "AzureMFA",
+      "connectTimeout": 30,
+      "applicationName": "vscode-mssql",
+      "applicationIntent": "ReadWrite",
+      "profileName": "",
+      "server": "sci-prod-sql.database.windows.net",
+      "user": "Your Name - your@email.com",
+      "accountId": "37d6eb45-c286-4263-945d-60d1b94e5058.cdfd3161-dc25-4973-8837-93fbe2bca681",
+      "database": "",
+      "encrypt": "Mandatory",
+      "email": "your@email.com",
+      "azureAccountToken": "",
+      "expiresOn": 1756108194,
+      "groupId": "7C02FF35-8CBB-4542-9BAB-A132A40E1064",
+      "id": "D6C0387C-5DDC-4424-BB81-B650442E4550",
+      "password": "",
+      "commandTimeout": 30,
+      "profileSource": 0
+    }
+  ],
+  "mdb.mcp.server": "enabled",
+  "remote.SSH.remotePlatform": {
+    "sdi-core.devpod": "linux"
+  }
+}

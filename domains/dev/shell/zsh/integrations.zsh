@@ -1,0 +1,17 @@
+# Tool Integrations
+
+# Zoxide (Smart Directory Jumper)
+if command -v zoxide &>/dev/null; then
+  export _ZO_EXCLUDE_DIRS="$HOME/.Trash:$HOME/Library:$HOME/.cache:$HOME/.aws:*/.git:*/node_modules:*/vendor:*/.venv"
+  eval "$(zoxide init --cmd cd zsh)"
+fi
+
+# Starship (Prompt)
+if command -v starship &>/dev/null; then
+  eval "$(starship init zsh)"
+fi
+
+# Mise (Version Manager)
+if command -v mise &>/dev/null; then
+  eval "$(mise activate zsh)"
+fi

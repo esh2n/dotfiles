@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Wallhaven Wallpaper Downloader
+# Wallhaven.cc から壁紙をダウンロードするスクリプト
+# -----------------------------------------------------------------------------
+
+set -e
+
+# Configuration
+WALLHAVEN_API="https://wallhaven.cc/api/v1"
+# Use DOTFILES_ROOT if available, otherwise fallback to relative path from script
+if [[ -n "$DOTFILES_ROOT" ]]; then
+    DOWNLOAD_DIR="$DOTFILES_ROOT/domains/workspace/assets/background"
+else
+    # Fallback: assume script is in domains/creative/bin, so go up 3 levels to root, then to workspace
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    DOWNLOAD_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")/domains/workspace/assets/background"
+fi
+CURRENT_WALLPAPER="$HOME/.current_wallpaper"
+
+# Ensure download directory exists
+mkdir -p "$DOWNLOAD_DIR"
+
+# Helper: Show usage
+usage() {
+    echo "Usage: $(basename "$0") [command] [options]"
+    echo ""
+    echo "Commands:"
+    echo "  search <query>   Search and download a random wallpaper for query"
+    echo "  random           Download a random wallpaper"
+    echo "  set <path>       Set wallpaper from local path"
+    echo ""
+    echo "Options:"
+    echo "  --purity <100/110/111>  Purity (SFW/Sketchy/NSFW) - Default: 100 (SFW)"
+    echo "  --category <111>        Category (General/Anime/People) - Default: 111"
+    echo "  --sorting <random>      Sorting (date_added, relevance, random, views, favorites, toplist)"
+    echo ""
+    echo "Examples:"
+    echo "  wallpaper search 'cyberpunk'"
+    echo "  wallpaper search 'anime scenery' --purity 100"
+    echo "  wallpaper random"
+}
+
+# Helper: Set wallpaper (macOS)
+set_wallpaper() {
+    local file_path="$1"
+    if [[ ! -f "$file_path" ]]; then
+        echo "Error: File not found: $file_path"
+        return 1
+    fi
+
+    echo "Setting wallpaper to: $file_path"
+    
+    # Use osascript to set wallpaper on all desktops
+    osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"$file_path\""
+    
+    # Update current wallpaper link
+    ln -sf "$file_path" "$CURRENT_WALLPAPER"
+    
+    echo "✨ Wallpaper updated!"
+}
+
+# Helper: Fetch and download
+fetch_wallpaper() {
+    local query="$1"
+    local purity="${PURITY:-100}"
+    local category="${CATEGORY:-111}"
+    local sorting="${SORTING:-random}"
+    local api_url="$WALLHAVEN_API/search?purity=$purity&categories=$category&sorting=$sorting"
+    
+    if [[ -n "$query" ]]; then
+        # URL encode query
+        local encoded_query=$(echo "$query" | jq -sRr @uri)
+        api_url="$api_url&q=$encoded_query"
+    fi
+    
+    echo "🔍 Searching Wallhaven for: ${query:-random}..."
+    
+    # Fetch JSON
+    local response=$(curl -s "$api_url")
+    
+    # Check for errors
+    if echo "$response" | grep -q "error"; then
+        echo "Error fetching from Wallhaven API"
+        return 1
+    fi
+    
+    # Get random image URL from results
+    # If sorting is random, the API returns a list, we pick the first one or random one from page
+    local image_url=$(echo "$response" | jq -r '.data[0].path')
+    local image_id=$(echo "$response" | jq -r '.data[0].id')
+    
+    if [[ "$image_url" == "null" || -z "$image_url" ]]; then
+        echo "❌ No wallpapers found for query: $query"
+        return 1
+    fi
+    
+    echo "Found wallpaper: $image_id"
+    
+    # Download
+    local ext="${image_url##*.}"
+    local filename="wallhaven-${image_id}.${ext}"
+    local filepath="$DOWNLOAD_DIR/$filename"
+    
+    if [[ ! -f "$filepath" ]]; then
+        echo "⬇️  Downloading..."
+        curl -s -o "$filepath" "$image_url"
+    else
+        echo "ℹ️  File already exists, skipping download."
+    fi
+    
+    set_wallpaper "$filepath"
+}
+
+# Main logic
+COMMAND="$1"
+shift || true
+
+# Parse options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --purity)
+            PURITY="$2"
+            shift 2
+            ;;
+        --category)
+            CATEGORY="$2"
+            shift 2
+            ;;
+        --sorting)
+            SORTING="$2"
+            shift 2
+            ;;
+        *)
+            ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+case "$COMMAND" in
+    search)
+        fetch_wallpaper "${ARGS[*]}"
+        ;;
+    random)
+        fetch_wallpaper ""
+        ;;
+    set)
+        set_wallpaper "${ARGS[0]}"
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

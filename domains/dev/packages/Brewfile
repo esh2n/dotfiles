@@ -1,0 +1,78 @@
+# Terminal Domain Brewfile
+
+# Shell
+brew "zsh"
+brew "starship"
+
+# Multiplexers
+brew "tmux"
+brew "zellij"
+
+# Terminals
+cask "wezterm"
+cask "ghostty"
+cask "warp"
+
+# Tools
+brew "bat"
+brew "eza"
+brew "fd"
+brew "ripgrep"
+brew "zoxide"
+brew "sk" # Fuzzy Finder
+brew "tree"
+
+# Development Domain Brewfile
+
+# Version Management
+brew "mise"
+
+# Git Ecosystem
+brew "git"
+brew "gh"
+brew "git-delta"
+brew "git-lfs"
+brew "ghq"
+brew "lazygit"
+
+# Cloud/DevOps
+brew "docker"
+brew "kubernetes-cli"
+brew "helm"
+brew "k9s"
+brew "terraform"
+brew "awscli"
+
+# Tools
+brew "jq"
+brew "yq"
+brew "yaak" # API Testing
+
+# AI Coding
+cask "cursor"
+# claude is usually a cask or npm, assuming cask for desktop
+cask "claude"
+
+# Editor Domain Brewfile
+
+# Neovim
+brew "neovim"
+
+# GUI Editors
+cask "visual-studio-code"
+cask "zed"
+# cursor is in development domain but could be here too.
+# keeping it in development as it's AI coding focused.
+
+# Support Tools
+brew "tree-sitter"
+brew "ctags"
+
+# Database Domain Brewfile
+
+brew "mysql"
+brew "redis"
+
+# AI/ML Domain Brewfile
+
+brew "ollama"

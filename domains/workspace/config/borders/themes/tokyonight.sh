@@ -1,0 +1,2 @@
+active_color="0xff7aa2f7"
+inactive_color="0xff565f89"

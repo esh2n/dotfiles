@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 # -----------------------------------------------------------------------------
-# Lazy Loader (loader.sh)
-# 遅延読み込みローダー (loader.sh)
+# Lazy Loader (loader.sh) / 遅延読み込みローダー
 # -----------------------------------------------------------------------------
 # Provides mechanisms to lazy load heavy commands and source shell fragments.
 # 重いコマンドの遅延読み込みとシェル設定の読み込み機能を提供します。
@@ -42,21 +41,27 @@ lazy_load_command() {
 # Domain Shell Loading
 # -----------------------------------------------------------------------------
 
-# Load all shell fragments from domains
+# Load all shell fragments from domains / ドメインからシェル設定を読み込む
 load_domain_shell_configs() {
     local dotfiles_root="$1"
-    local type="$2" # aliases, exports, functions
+    local shell_name="$2" # zsh or fish
     
-    log_debug "Loading domain ${type}..."
+    log_debug "Loading domain configs for ${shell_name}..."
     
-    # Find all matching files in domains/*/shell/
-    # Using globbing instead of find for speed in zsh, but here we use loop for portability
     for domain_dir in "${dotfiles_root}/domains/"*; do
         if [[ -d "$domain_dir" ]]; then
-            local shell_file="${domain_dir}/shell/${type}.zsh"
-            if [[ -f "$shell_file" ]]; then
-                log_debug "Sourcing ${shell_file}"
-                source "$shell_file"
+            # Load init file / 初期化ファイルを読み込む
+            local init_file=""
+            if [[ "$shell_name" == "zsh" ]]; then
+                init_file="${domain_dir}/shell/zsh/init.zsh"
+            elif [[ "$shell_name" == "fish" ]]; then
+                # Fish loader logic should be handled by fish itself, but keeping placeholder
+                :
+            fi
+            
+            if [[ -n "$init_file" && -f "$init_file" ]]; then
+                log_debug "Sourcing ${init_file}"
+                source "$init_file"
             fi
         fi
     done
@@ -66,7 +71,7 @@ load_domain_shell_configs() {
 # Async Initialization
 # -----------------------------------------------------------------------------
 
-# Run a command in the background and silence output
+# Run command in background silently / コマンドをバックグラウンドで静かに実行
 async_run() {
     local cmd="$1"
     (eval "$cmd") >/dev/null 2>&1 &

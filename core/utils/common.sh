@@ -139,3 +139,93 @@ require_command() {
         exit 1
     fi
 }
+
+# -----------------------------------------------------------------------------
+# Spinner & Progress Utilities
+# -----------------------------------------------------------------------------
+
+show_spinner() {
+    local pid="$1"
+    local message="${2:-Processing}"
+    local spinner_chars="⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    local delay=0.1
+    local i=0
+
+    while kill -0 "$pid" 2>/dev/null; do
+        local char="${spinner_chars:$((i % ${#spinner_chars})):1}"
+        printf "\r%s %s..." "$char" "$message"
+        sleep "$delay"
+        ((i++))
+    done
+
+    printf "\r"
+}
+
+show_progress_bar() {
+    local current="$1"
+    local total="$2"
+    local message="${3:-Progress}"
+    local width=50
+    local percentage=$((current * 100 / total))
+    local filled=$((current * width / total))
+    local bar=""
+
+    for ((i=0; i<width; i++)); do
+        if [[ $i -lt $filled ]]; then
+            bar+="█"
+        else
+            bar+="░"
+        fi
+    done
+
+    printf "\r%s [%s] %d%% (%d/%d)" "$message" "$bar" "$percentage" "$current" "$total"
+
+    if [[ $current -eq $total ]]; then
+        printf "\n"
+    fi
+}
+
+run_with_spinner() {
+    local message="$1"
+    shift
+    local temp_file="/tmp/dotfiles-spinner-$$"
+
+    "$@" > "$temp_file" 2>&1 &
+    local cmd_pid=$!
+
+    show_spinner "$cmd_pid" "$message"
+
+    wait "$cmd_pid"
+    local exit_code=$?
+
+    if [[ $exit_code -eq 0 ]]; then
+        printf "\r${COLOR_GREEN}✓${COLOR_RESET} %s\n" "$message"
+    else
+        printf "\r${COLOR_RED}✗${COLOR_RESET} %s\n" "$message"
+        cat "$temp_file" >&2
+    fi
+
+    rm -f "$temp_file"
+    return $exit_code
+}
+
+# -----------------------------------------------------------------------------
+# Interactive Utilities
+# -----------------------------------------------------------------------------
+
+ask_yes_no() {
+    local prompt="$1"
+    local default="${2:-n}"
+    local response
+
+    while true; do
+        read -p "$prompt [y/N]: " response
+        response=${response:-$default}
+
+        case "$response" in
+            [yY]|[yY][eE][sS]) return 0 ;;
+            [nN]|[nN][oO]) return 1 ;;
+            *) echo "Please answer yes or no." ;;
+        esac
+    done
+}

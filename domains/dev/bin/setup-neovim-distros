@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -e
+
+# -----------------------------------------------------------------------------
+# Neovim Distro Setup
+# Neovimディストリビューションのセットアップ
+# -----------------------------------------------------------------------------
+
+# Determine the directory of this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Go up to domains/dev/config
+TARGET_BASE_DIR="$(dirname "$SCRIPT_DIR")/config"
+
+# Helper: Clone if not exists
+setup_distro() {
+    local name="$1"
+    local repo="$2"
+    local target="$TARGET_BASE_DIR/nvim-$name"
+    
+    echo "Setup $name..."
+    if [[ -d "$target" ]]; then
+        echo "  ✅ $target already exists"
+    else
+        echo "  ⬇️  Cloning $name from $repo to $target..."
+        git clone "$repo" "$target"
+        rm -rf "$target/.git"
+        echo "  ✨ Installed $name (and removed .git)"
+    fi
+}
+
+# 1. LazyVim
+setup_distro "lazyvim" "https://github.com/LazyVim/starter"
+
+# 2. NvChad
+setup_distro "nvchad" "https://github.com/NvChad/NvChad"
+
+# 3. AstroVim
+setup_distro "astrovim" "https://github.com/AstroNvim/AstroNvim"
+
+echo ""
+echo "🎉 All distributions setup!"
+echo "Use 'nvim-switch <distro>' to switch."

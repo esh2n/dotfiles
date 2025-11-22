@@ -39,3 +39,5 @@ log/
 domains/editor/config/vscode/settings.json
 domains/development/config/mise/config.toml
 
+.zsh_history
+.zsh_sessions

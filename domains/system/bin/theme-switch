@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Theme Switcher
+# テーマ切り替えスクリプト
+# -----------------------------------------------------------------------------
+
+set -e
+
+# Paths
+if [[ -n "$DOTFILES_ROOT" ]]; then
+    CONFIG_DIR="$DOTFILES_ROOT/domains/system/config"
+else
+    # Fallback
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    CONFIG_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")/config"
+fi
+
+THEMES_DIR="$CONFIG_DIR/themes"
+TARGET_LINK="$CONFIG_DIR/colors.lua"
+
+# Helper: Show usage
+usage() {
+    echo "Usage: $(basename "$0") [theme]"
+    echo ""
+    echo "Available themes:"
+    if [[ -d "$THEMES_DIR" ]]; then
+        for theme in "$THEMES_DIR"/*.lua; do
+            echo "  - $(basename "$theme" .lua)"
+        done
+    fi
+    echo ""
+    echo "Example:"
+    echo "  theme-switch nord"
+}
+
+# Main
+THEME="$1"
+
+if [[ -z "$THEME" ]]; then
+    usage
+    exit 1
+fi
+
+THEME_FILE="$THEMES_DIR/$THEME.lua"
+
+if [[ ! -f "$THEME_FILE" ]]; then
+    echo "Error: Theme '$THEME' not found."
+    usage
+    exit 1
+fi
+
+echo "Switching theme to: $THEME"
+
+# Update symlink (System Colors)
+ln -sf "$THEME_FILE" "$TARGET_LINK"
+echo "✅ Updated system config symlink"
+
+# Update Ghostty Theme
+GHOSTTY_CONFIG_DIR="$DOTFILES_ROOT/domains/dev/config/ghostty"
+if [[ ! -d "$GHOSTTY_CONFIG_DIR" ]]; then
+    # Fallback
+    GHOSTTY_CONFIG_DIR="$HOME/dotfiles/domains/dev/config/ghostty"
+fi
+
+if [[ -d "$GHOSTTY_CONFIG_DIR" ]]; then
+    GHOSTTY_THEME="$GHOSTTY_CONFIG_DIR/themes/$THEME"
+    if [[ -f "$GHOSTTY_THEME" ]]; then
+        ln -sf "$GHOSTTY_THEME" "$GHOSTTY_CONFIG_DIR/theme"
+        echo "✅ Updated Ghostty theme symlink"
+        # Ghostty auto-reloads on config change
+    else
+        echo "⚠️  Ghostty theme '$THEME' not found"
+    end
+fi
+
+# Update Borders Theme
+BORDERS_CONFIG_DIR="$DOTFILES_ROOT/domains/workspace/config/borders"
+if [[ ! -d "$BORDERS_CONFIG_DIR" ]]; then
+    # Fallback
+    BORDERS_CONFIG_DIR="$HOME/dotfiles/domains/workspace/config/borders"
+fi
+
+if [[ -d "$BORDERS_CONFIG_DIR" ]]; then
+    BORDERS_THEME="$BORDERS_CONFIG_DIR/themes/$THEME.sh"
+    if [[ -f "$BORDERS_THEME" ]]; then
+        ln -sf "$BORDERS_THEME" "$BORDERS_CONFIG_DIR/colors.sh"
+        echo "✅ Updated Borders theme symlink"
+        
+        # Reload Borders
+        if command -v borders >/dev/null 2>&1; then
+            echo "🔄 Reloading Borders..."
+            # Re-run bordersrc to apply new colors
+            "$BORDERS_CONFIG_DIR/bordersrc"
+        fi
+    else
+        echo "⚠️  Borders theme '$THEME' not found"
+    fi
+fi
+
+# Reload Sketchybar
+if command -v sketchybar >/dev/null 2>&1; then
+    echo "🔄 Reloading Sketchybar..."
+    sketchybar --reload
+fi
+
+# Reload WezTerm (usually automatic, but we can touch config to force)
+# We assume wezterm config is at ~/.config/wezterm/wezterm.lua
+WEZTERM_CONFIG="$HOME/.config/wezterm/wezterm.lua"
+if [[ -f "$WEZTERM_CONFIG" ]]; then
+    echo "🔄 Reloading WezTerm..."
+    touch "$WEZTERM_CONFIG"
+fi
+
+echo "✨ Theme switched successfully!"
