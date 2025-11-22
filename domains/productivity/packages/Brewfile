@@ -1,0 +1,23 @@
+# Productivity Domain Brewfile
+
+# Knowledge
+cask "notion"
+cask "obsidian"
+
+# Communication
+cask "slack"
+cask "discord"
+cask "zoom"
+
+# System
+cask "raycast"
+cask "1password"
+cask "karabiner-elements"
+cask "aerospace"
+cask "hammerspoon"
+
+# Utilities
+cask "dropover"
+cask "paste"
+# nebo might be iPad app, checking if mac app exists or mas
+# aquavoice might be cask

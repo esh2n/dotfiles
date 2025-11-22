@@ -1,0 +1,65 @@
+# AeroSpace Configuration
+
+# Start AeroSpace at login
+start-at-login = true
+
+# Start borders
+after-startup-command = ['exec-and-forget borders']
+
+# Default to floating mode
+default-layout = 'floating'
+
+[gaps]
+inner.horizontal = 10
+inner.vertical = 10
+outer.left = 10
+outer.bottom = 10
+outer.top = 10
+outer.right = 10
+
+[mode.main.binding]
+# Basic window management (focus only)
+alt-h = 'focus left'
+alt-j = 'focus down'
+alt-k = 'focus up'
+alt-l = 'focus right'
+
+# Workspace management
+alt-1 = 'workspace 1'
+alt-2 = 'workspace 2'
+alt-3 = 'workspace 3'
+alt-4 = 'workspace 4'
+alt-5 = 'workspace 5'
+alt-n = 'workspace N'  # Notion用ワークスペース
+alt-s = 'workspace S'  # Slack用ワークスペース
+alt-d = 'workspace D'  # Discord用ワークスペース
+alt-tab = 'workspace-back-and-forth'
+alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
+
+# Move windows to workspaces
+alt-shift-1 = ['move-node-to-workspace 1', 'workspace 1']
+alt-shift-2 = ['move-node-to-workspace 2', 'workspace 2']
+alt-shift-3 = ['move-node-to-workspace 3', 'workspace 3']
+alt-shift-4 = ['move-node-to-workspace 4', 'workspace 4']
+alt-shift-5 = ['move-node-to-workspace 5', 'workspace 5']
+alt-shift-n = ['move-node-to-workspace N', 'workspace N']
+alt-shift-s = ['move-node-to-workspace S', 'workspace S']
+alt-shift-d = ['move-node-to-workspace D', 'workspace D']
+
+# App-specific workspace assignments
+[[on-window-detected]]
+if.app-id = 'com.tinyspeck.slackmacgap'
+run = 'move-node-to-workspace S'
+
+[[on-window-detected]]
+if.app-id = 'notion.id'
+run = 'move-node-to-workspace N'
+
+[[on-window-detected]]
+if.app-id = 'com.hnc.Discord'
+run = 'move-node-to-workspace D'
+
+# Simple service mode
+[mode.service.binding]
+esc = ['reload-config', 'mode main']
+backspace = ['close-all-windows-but-current', 'mode main'] 

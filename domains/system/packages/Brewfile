@@ -1,0 +1,24 @@
+# System Domain Brewfile
+
+# Core
+brew "coreutils"
+brew "moreutils"
+brew "findutils"
+brew "gnu-sed"
+brew "grep"
+
+# Mac Tools
+brew "mas"
+brew "trash"
+cask "displaylink"
+cask "marta"
+
+# UI Customization
+brew "sketchybar"
+brew "borders"
+cask "klack"
+
+# Fonts
+cask "font-jetbrains-mono-nerd-font"
+cask "font-hack-nerd-font"
+cask "font-sf-mono"

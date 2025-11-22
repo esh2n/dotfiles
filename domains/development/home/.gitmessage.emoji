@@ -1,0 +1,89 @@
+# <type>[(scope)]!: <description>
+#
+# ==== Emojis ====
+# 🍉 Add:
+# 🔧 Fix:
+# 🐛 BugFix:
+# 👍 Update:
+# 🗑️ Remove:
+# 💚 Test:
+# ⛔ Temoprary:
+# ♻️ Refactoring:
+# 🤖 CI:
+# 📚 Writing docs:
+# 🎉 Initial Commit:
+#
+# ==== Format ====
+# :emoji: type[(scope)]!: Subject
+#
+# Body
+#
+# Footer(optional)
+#
+# ==== Type ====
+# feat     : 新機能
+# fix      : バグ修正
+# docs     : ドキュメントのみの変更
+# style    : コードの意味に影響を与えない変更
+# refactor : バグ修正でも機能追加でもないコードの変更
+# perf     : パフォーマンスを向上させるコードの変更
+# test     : テストの追加・修正
+# chore    : ビルドプロセスやドキュメント生成などの補助ツールの変更
+#
+# ==== Subject ====
+# - 命令形で、現在形で記述（"変更した"ではなく"変更する"）
+# - 最初は大文字で始める
+# - 末尾にピリオドを付けない
+#
+# ==== Body ====
+# - なぜ" その変更を行ったのか
+# - どのように" 問題を解決したのか
+# - この変更によってどのような影響が発生するのか
+#
+# ==== Footer ====
+# - Breaking Changes
+# - Issue や PR への参照
+#
+# ==== Examples ====
+# ✨ feat(auth)!: Implement OAuth2 authentication
+#
+# - Add OAuth2 authentication flow
+# - Implement token refresh mechanism
+# - Add user session management
+#
+# BREAKING CHANGE: New authentication flow requires client registration
+# Fixes #123
+#
+# 🔧 fix(api): Fix rate limiting algorithm
+#
+# - Update token bucket implementation
+# - Add retry mechanism for failed requests
+#
+# Closes #456
+#
+# ------------------------------
+#
+# <type(!)>(scope?): <desc>
+# ✨ feat:
+# 👍 chore:
+# 🔧 fix:
+# 📚 doc:
+# 🐎 perf:
+# ♻️ refactor:
+# 🖍 style:
+# 💚 test:
+#
+# [body?]: details of subject
+#
+# [footer?]: details of BREAKING CHANGE or issue number
+# ⚠️ BREAKING CHANGE:
+# Refs #
+# Reviewed-by:
+#
+# =============================================================================
+# [example]
+# ♻️ refactor(runtime)!: drop support for Node 6
+#
+# ⚠️ BREAKING CHANGE: refactor to use JavaScript features not available in Node 6.
+# ==============================================================================
+# https://www.conventionalcommits.org/ja/v1.0.0/ 

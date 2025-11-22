@@ -1,0 +1,14 @@
+# Development Tools
+bundler           # Dependency manager
+cocoapods         # iOS/macOS dependency manager
+xcodeproj         # Xcode project manager
+
+# Testing Tools
+test-unit         # Unit testing framework
+
+# Documentation
+rdoc              # Documentation generator
+
+# Utility Tools
+activesupport     # Ruby on Rails utilities
+i18n              # Internationalization framework 

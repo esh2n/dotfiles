@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Configuration Manager (manager.sh)
+# 設定マネージャー (manager.sh)
+# -----------------------------------------------------------------------------
+# Manages symlinks for dotfiles, handling XDG configs and home directory files.
+# ドットファイルのシンボリックリンクを管理し、XDG設定とホームディレクトリファイルを扱います。
+# -----------------------------------------------------------------------------
+
+# Source common utilities
+# 共通ユーティリティの読み込み
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${DOTFILES_ROOT}/core/utils/common.sh"
+
+# -----------------------------------------------------------------------------
+# Template Processing
+# テンプレート処理
+# -----------------------------------------------------------------------------
+
+process_template() {
+    local template_file="$1"
+    local output_file="${template_file%.template}"
+    
+    if [[ ! -f "$template_file" ]]; then
+        log_error "Template not found: $template_file"
+        return 1
+    fi
+    
+    log_info "Processing template: $(basename "$template_file")"
+    
+    # Replace {{HOME}} with actual home directory
+    sed "s|{{HOME}}|${HOME}|g" "$template_file" > "$output_file"
+    
+    log_success "Generated: $(basename "$output_file")"
+}
+
+process_all_templates() {
+    log_info "Processing all templates..."
+    
+    # Find all .template files
+    while IFS= read -r -d '' template; do
+        process_template "$template"
+    done < <(find "${DOTFILES_ROOT}/domains" -name "*.template" -print0)
+    
+    log_success "All templates processed."
+}
+
+
+# -----------------------------------------------------------------------------
+# Symlink Logic
+# -----------------------------------------------------------------------------
+
+# Link all files in a domain
+link_domain() {
+    local domain="$1"
+    local domain_path="${DOTFILES_ROOT}/domains/${domain}"
+    
+    if [[ ! -d "$domain_path" ]]; then
+        log_error "Domain not found: $domain"
+        return 1
+    fi
+    
+    log_info "Linking domain: $domain"
+    
+    # 1. Link Configs (~/.config)
+    if [[ -d "${domain_path}/config" ]]; then
+        for config_dir in "${domain_path}/config/"*; do
+            if [[ -e "$config_dir" ]]; then
+                local dirname=$(basename "$config_dir")
+                local target="${HOME}/.config/${dirname}"
+                link_file "$config_dir" "$target"
+            fi
+        done
+    fi
+    
+    # 2. Link Home Files (~)
+    if [[ -d "${domain_path}/home" ]]; then
+        for home_file in "${domain_path}/home/"*; do
+            if [[ -e "$home_file" ]]; then
+                local filename=$(basename "$home_file")
+                local target="${HOME}/${filename}"
+                link_file "$home_file" "$target"
+            fi
+        done
+    fi
+    
+    # 3. Link Binaries (~/bin)
+    if [[ -d "${domain_path}/bin" ]]; then
+        ensure_dir "${HOME}/bin"
+        for bin_file in "${domain_path}/bin/"*; do
+            if [[ -e "$bin_file" ]]; then
+                local filename=$(basename "$bin_file")
+                local target="${HOME}/bin/${filename}"
+                link_file "$bin_file" "$target"
+            fi
+        done
+    fi
+    
+    # 4. Link Assets (Optional, e.g. to ~/.local/share or specific locations)
+    # This is more complex and might need custom logic per domain, 
+    # but for now we can define a standard if needed.
+    # For now, we leave assets to be handled by install.sh or manual linking if special.
+}
+
+# Link all domains
+link_all() {
+    log_info "Linking all domains..."
+    for domain_dir in "${DOTFILES_ROOT}/domains/"*; do
+        if [[ -d "$domain_dir" ]]; then
+            local domain=$(basename "$domain_dir")
+            link_domain "$domain"
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------------
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    case "${1:-}" in
+        "template")
+            process_all_templates
+            ;;
+        "link")
+            if [[ -n "${2:-}" ]]; then
+                link_domain "$2"
+            else
+                link_all
+            fi
+            ;;
+        *)
+            echo "Usage: $0 {template|link} [domain]"
+            exit 1
+            ;;
+    esac
+fi

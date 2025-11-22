@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# Neovim Switcher
+# Neovim設定切り替えスクリプト
+# -----------------------------------------------------------------------------
+
+NVIM_CONFIGS=(
+    "custom"
+    "nvchad"
+    "lazyvim"
+    "astrovim"
+)
+
+current_config() {
+    if [[ -L ~/.config/nvim ]]; then
+        basename "$(readlink ~/.config/nvim)" | sed 's/nvim-//'
+    else
+        echo "custom"
+    fi
+}
+
+switch_config() {
+    local config="$1"
+    local target="$HOME/.config/nvim-$config"
+    
+    # Handle custom config which might be the default dir if not symlinked
+    if [[ "$config" == "custom" ]]; then
+        # Assuming custom config is stored in dotfiles and linked to ~/.config/nvim-custom
+        # or managed as the default if no link exists.
+        # For this switcher, we assume ~/.config/nvim-custom exists.
+        target="$HOME/.config/nvim-custom"
+    fi
+
+    if [[ ! -d "$target" ]]; then
+        echo "Error: $target does not exist"
+        exit 1
+    fi
+
+    # Backup existing config if it's a real directory and not a link
+    if [[ -e ~/.config/nvim && ! -L ~/.config/nvim ]]; then
+        echo "Backing up existing nvim config..."
+        mv ~/.config/nvim ~/.config/nvim.backup.$(date +%Y%m%d-%H%M%S)
+    fi
+
+    # Switch
+    rm -f ~/.config/nvim
+    ln -sf "$target" ~/.config/nvim
+
+    echo "Switched to nvim-$config"
+}
+
+case "${1:-}" in
+    "custom"|"nvchad"|"lazyvim"|"astrovim")
+        switch_config "$1"
+        ;;
+    "current")
+        echo "Current: $(current_config)"
+        ;;
+    "list")
+        echo "Available configurations:"
+        for config in "${NVIM_CONFIGS[@]}"; do
+            if [[ "$config" == "$(current_config)" ]]; then
+                echo "* $config (active)"
+            else
+                echo "  $config"
+            fi
+        done
+        ;;
+    *)
+        echo "Usage: $0 {custom|nvchad|lazyvim|astrovim|current|list}"
+        exit 1
+        ;;
+esac

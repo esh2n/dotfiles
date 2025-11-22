@@ -1,0 +1,41 @@
+.DS_Store
+*.backup.*
+*.swp
+*.log
+tmp/
+log/
+
+# Security - Never commit these
+**/auth.json
+**/credentials.json
+**/*secret*.json
+**/*token*.json
+**/*.pem
+**/*.key
+**/.env.local
+**/.env.*.local
+
+# Application state - Never commit
+**/sessions/
+**/session*
+**/*history*.jsonl
+**/*history*.json
+**/node_modules/
+
+# Claude specific
+**/claude/ide/
+**/claude/local/
+**/claude/plugins/
+**/claude/projects/
+**/claude/shell-snapshots/
+**/claude/statsig/
+**/claude/todos/
+
+# Codex specific
+**/codex/sessions/
+**/codex/history.jsonl
+
+# Generated from templates (do not commit)
+domains/editor/config/vscode/settings.json
+domains/development/config/mise/config.toml
+

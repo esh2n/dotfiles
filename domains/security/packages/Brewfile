@@ -1,0 +1,5 @@
+# Security Domain Brewfile
+
+brew "gnupg"
+# 1password cask is in productivity, but CLI might be useful here
+brew "1password-cli"

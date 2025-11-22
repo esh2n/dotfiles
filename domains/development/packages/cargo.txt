@@ -1,0 +1,6 @@
+# Development Tools
+cargo-compete      # Competitive programming helper
+cargo-generate     # Project template generator
+
+# Custom Tools
+pacifica          # Custom tool from GitHub 

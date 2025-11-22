@@ -1,0 +1,23 @@
+# Terminal Domain Brewfile
+
+# Shell
+brew "zsh"
+brew "starship"
+
+# Multiplexers
+brew "tmux"
+brew "zellij"
+
+# Terminals
+cask "wezterm"
+cask "ghostty"
+cask "warp"
+
+# Tools
+brew "bat"
+brew "eza"
+brew "fd"
+brew "ripgrep"
+brew "zoxide"
+brew "sk" # Fuzzy Finder
+brew "tree"
