@@ -85,7 +85,22 @@ backup_file() {
     if [[ -e "$file" ]]; then
         local backup_path="${file}.backup.$(date +%Y%m%d_%H%M%S)"
         log_warn "Backing up $file to $backup_path"
-        mv "$file" "$backup_path"
+
+        if [[ -L "$file" ]]; then
+            # symlinkの場合は実体をコピーしてからオリジナルを削除
+            local target="$(readlink "$file")"
+            if [[ -e "$target" ]]; then
+                cp -r "$target" "$backup_path"
+                rm "$file"
+                log_info "Copied symlink target to backup: $target -> $backup_path"
+            else
+                log_warn "Symlink target not found: $target, moving symlink as-is"
+                mv "$file" "$backup_path"
+            fi
+        else
+            # 実ファイル/ディレクトリの場合は移動
+            mv "$file" "$backup_path"
+        fi
     fi
 }
 

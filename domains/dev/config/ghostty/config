@@ -129,9 +129,6 @@ keybind = cmd+end=scroll_to_bottom
 keybind = shift+page_up=scroll_page_up
 keybind = shift+page_down=scroll_page_down
 
-# Prompt-based scrolling
-keybind = ctrl+shift+up=scroll_to_prompt:-1
-keybind = ctrl+shift+down=scroll_to_prompt:1
 
 # Copy/Paste and Selection
 keybind = cmd+c=copy_to_clipboard

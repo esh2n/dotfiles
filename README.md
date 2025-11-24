@@ -175,11 +175,25 @@ export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
 - `Alt+1-5` - Switch to workspace 1-5
 - `Alt+Tab` - Previous workspace
 - `Alt+Shift+1-5` - Move window to workspace
-- `Alt+n/s/d` - Notion/Slack/Discord workspace
+
+**Dedicated Workspaces:**
+- `Alt+w` - Development workspace (VSCode, Cursor, Terminal)
+- `Alt+m` - Music workspace (Spotify, Apple Music)
+- `Alt+b` - Browser workspace (Chrome, Safari, Firefox)
+- `Alt+n` - Notion workspace
+- `Alt+s` - Slack workspace
+- `Alt+d` - Discord workspace
+
+**Move to Dedicated Workspaces:**
+- `Alt+Shift+w/m/b/n/s/d` - Move current window to respective workspace
 
 **Window Resizing:**
 - `Alt+-` - Decrease size
 - `Alt+=` - Increase size
+
+**Layout:**
+- Default: Accordion layout (single windows use full space)
+- Auto-assignment: Apps automatically move to their dedicated workspaces
 
 #### Workspace Services Management
 **Individual Services:**
