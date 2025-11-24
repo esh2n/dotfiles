@@ -1,1 +1,1 @@
-themes/catppuccin.lua
+/Users/esh2n/go/github.com/esh2n/dotfiles/dotfiles/domains/system/config/themes/catppuccin.lua

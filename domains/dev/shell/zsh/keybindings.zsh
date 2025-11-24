@@ -16,6 +16,7 @@ if [[ $- == *i* ]]; then
     # Register widgets
     zle -N sk_select_history
     zle -N sk_select_src
+    zle -N sk_select_project_file
     zle -N sk_change_directory
     zle -N sk_select_file_within_project
     zle -N sk_select_file_below_pwd
@@ -23,9 +24,10 @@ if [[ $- == *i* ]]; then
     # Standard bindings
     bindkey '^r' sk_select_history
     bindkey '^g' sk_change_directory
-    bindkey '^v' sk_select_file_within_project
+    bindkey '^f' sk_select_file_within_project
     bindkey '^b' sk_select_file_below_pwd
-    
+    bindkey '^o' sk_select_project_file
+
     # Project selection (Ctrl+])
     bindkey '^]' sk_select_src
     

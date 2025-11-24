@@ -118,10 +118,18 @@ link_file() {
     fi
     
     if [[ -e "$dest" ]]; then
-        backup_file "$dest"
+        # If dest is a directory and not a symlink, backup and remove it
+        if [[ -d "$dest" && ! -L "$dest" ]]; then
+            backup_file "$dest"
+            rm -rf "$dest"
+        elif [[ -e "$dest" && ! -L "$dest" ]]; then
+             backup_file "$dest"
+             rm -f "$dest"
+        fi
     fi
     
-    ln -sf "$src" "$dest"
+    # Use -n (no-dereference) to treat dest as a normal file if it is a symlink to a directory
+    ln -sfn "$src" "$dest"
     log_success "Linked $src -> $dest"
 }
 
@@ -138,6 +146,107 @@ require_command() {
         log_error "Required command not found: $1"
         exit 1
     fi
+}
+
+# -----------------------------------------------------------------------------
+# Homebrew Utilities
+# -----------------------------------------------------------------------------
+
+# Check if a brew formula is installed
+is_brew_formula_installed() {
+    local formula="$1"
+    brew list --formula "$formula" >/dev/null 2>&1
+}
+
+# Check if a brew cask is installed
+is_brew_cask_installed() {
+    local cask="$1"
+    brew list --cask "$cask" >/dev/null 2>&1
+}
+
+# Install brew packages from Brewfile with smart checking
+install_brewfile() {
+    local brewfile="$1"
+    
+    if [[ ! -f "$brewfile" ]]; then
+        log_error "Brewfile not found: $brewfile"
+        return 1
+    fi
+    
+    if ! has_command "brew"; then
+        log_error "Homebrew not found. Skipping Brewfile."
+        return 1
+    fi
+    
+    log_info "Processing Brewfile: $(basename "$brewfile")"
+    
+    local installed_count=0
+    local skipped_count=0
+    local failed_count=0
+    
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip comments and empty lines
+        [[ $line =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line// }" ]] && continue
+        
+        # Parse brew/cask lines
+        if [[ $line =~ ^[[:space:]]*brew[[:space:]]+\"([^\"]+)\" ]]; then
+            local formula="${BASH_REMATCH[1]}"
+            
+            if is_brew_formula_installed "$formula"; then
+                log_debug "Formula already installed: $formula"
+                ((skipped_count++))
+            else
+                log_info "Installing formula: $formula"
+                # Capture error output to check for "already an App" message
+                # エラー出力をキャプチャして「既にアプリが存在する」メッセージを確認
+                local install_output
+                install_output=$(brew install "$formula" 2>&1)
+                local install_exit=$?
+                
+                if [[ $install_exit -eq 0 ]]; then
+                    ((installed_count++))
+                elif echo "$install_output" | grep -q "already an App"; then
+                    # App already exists but not managed by brew - treat as skipped
+                    # アプリは既に存在するがbrewで管理されていない - スキップとして扱う
+                    log_debug "Formula already exists (not managed by brew): $formula"
+                    ((skipped_count++))
+                else
+                    log_warn "Failed to install formula: $formula"
+                    ((failed_count++))
+                fi
+            fi
+            
+        elif [[ $line =~ ^[[:space:]]*cask[[:space:]]+\"([^\"]+)\" ]]; then
+            local cask="${BASH_REMATCH[1]}"
+            
+            if is_brew_cask_installed "$cask"; then
+                log_debug "Cask already installed: $cask"
+                ((skipped_count++))
+            else
+                log_info "Installing cask: $cask"
+                # Capture error output to check for "already an App" message
+                # エラー出力をキャプチャして「既にアプリが存在する」メッセージを確認
+                local install_output
+                install_output=$(brew install --cask "$cask" 2>&1)
+                local install_exit=$?
+                
+                if [[ $install_exit -eq 0 ]]; then
+                    ((installed_count++))
+                elif echo "$install_output" | grep -q "already an App"; then
+                    # App already exists but not managed by brew - treat as skipped
+                    # アプリは既に存在するがbrewで管理されていない - スキップとして扱う
+                    log_debug "Cask already exists (not managed by brew): $cask"
+                    ((skipped_count++))
+                else
+                    log_warn "Failed to install cask: $cask"
+                    ((failed_count++))
+                fi
+            fi
+        fi
+    done < "$brewfile"
+    
+    log_success "Brewfile processing complete: ${installed_count} installed, ${skipped_count} skipped, ${failed_count} failed"
 }
 
 # -----------------------------------------------------------------------------

@@ -23,6 +23,62 @@ zle -N sk_select_branch_except_current
 zle -N sk_select_local_branch_except_current
 zle -N sk_select_branch_all
 
+# Initialize completion system
+if type brew &>/dev/null; then
+    FPATH="$(brew --prefix)/share/zsh-completions:${FPATH}"
+fi
+
+autoload -U compinit
+if [[ $UID -eq 0 ]]; then
+  compinit
+else
+  compinit -u
+fi
+
+# Ensure compdef is available
+autoload -U compdef
+
+# Initialize zsh-autosuggestions
+if [[ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+    source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+elif [[ -f /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+    source /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+fi
+
+# Initialize zsh-syntax-highlighting
+if [[ -f /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+    source /opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+elif [[ -f /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+    source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
+
+# Initialize atuin
+if command -v atuin &> /dev/null; then
+    eval "$(atuin init zsh)"
+fi
+
+# Initialize yazi
+if command -v yazi &> /dev/null; then
+    function y() {
+        local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+        yazi "$@" --cwd-file="$tmp"
+        if cwd="$(cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+            cd -- "$cwd"
+        fi
+        rm -f -- "$tmp"
+    }
+fi
+
+# Initialize vivid
+if command -v vivid &> /dev/null; then
+    export LS_COLORS="$(vivid generate molokai)"
+fi
+
+# Initialize thefuck
+if command -v thefuck &> /dev/null; then
+    eval $(thefuck --alias)
+fi
+
 # Completion options
 setopt auto_list
 setopt auto_menu
@@ -30,8 +86,8 @@ zstyle ':completion:*:default' menu select=1
 export LS_COLORS='di=34:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
 zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
 
-# History options
-HISTFILE=~/.zsh_history
+# History
+HISTFILE="$HOME/.zsh_history"
 HISTSIZE=10000
 SAVEHIST=10000
 setopt append_history

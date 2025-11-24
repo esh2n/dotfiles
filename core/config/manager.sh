@@ -77,25 +77,25 @@ link_domain() {
     
     # 2. Link Home Files (~)
     if [[ -d "${domain_path}/home" ]]; then
-        for home_file in "${domain_path}/home/"*; do
-            if [[ -e "$home_file" ]]; then
-                local filename=$(basename "$home_file")
-                local target="${HOME}/${filename}"
-                link_file "$home_file" "$target"
-            fi
-        done
+        # Use find to handle hidden files and avoid glob expansion issues
+        # 隠しファイルを処理し、glob展開の問題を回避するためにfindを使用
+        while IFS= read -r -d '' home_file; do
+            local filename=$(basename "$home_file")
+            local target="${HOME}/${filename}"
+            link_file "$home_file" "$target"
+        done < <(find "${domain_path}/home" -mindepth 1 -maxdepth 1 -type f -print0)
     fi
     
     # 3. Link Binaries (~/bin)
     if [[ -d "${domain_path}/bin" ]]; then
         ensure_dir "${HOME}/bin"
-        for bin_file in "${domain_path}/bin/"*; do
-            if [[ -e "$bin_file" ]]; then
-                local filename=$(basename "$bin_file")
-                local target="${HOME}/bin/${filename}"
-                link_file "$bin_file" "$target"
-            fi
-        done
+        # Use find to handle all files and avoid glob expansion issues
+        # すべてのファイルを処理し、glob展開の問題を回避するためにfindを使用
+        while IFS= read -r -d '' bin_file; do
+            local filename=$(basename "$bin_file")
+            local target="${HOME}/bin/${filename}"
+            link_file "$bin_file" "$target"
+        done < <(find "${domain_path}/bin" -mindepth 1 -maxdepth 1 -type f -print0)
     fi
     
     # 4. Link Assets (Optional, e.g. to ~/.local/share or specific locations)

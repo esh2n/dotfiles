@@ -98,10 +98,50 @@ if [[ -d "$BORDERS_CONFIG_DIR" ]]; then
     fi
 fi
 
-# Reload Sketchybar
-if command -v sketchybar >/dev/null 2>&1; then
-    echo "🔄 Reloading Sketchybar..."
-    sketchybar --reload
+# Update Zellij Theme
+ZELLIJ_CONFIG_DIR="$HOME/.config/zellij"
+if [[ -d "$ZELLIJ_CONFIG_DIR" ]]; then
+    ZELLIJ_LAYOUT="$ZELLIJ_CONFIG_DIR/layouts/$THEME.kdl"
+    if [[ -f "$ZELLIJ_LAYOUT" ]]; then
+        # Update config to use the theme layout
+        if [[ -f "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
+            if [[ -w "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
+                sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                echo "✅ Updated Zellij theme layout"
+            else
+                chmod 666 "$ZELLIJ_CONFIG_DIR/config.kdl"
+                sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                chmod 444 "$ZELLIJ_CONFIG_DIR/config.kdl"
+                echo "✅ Updated Zellij theme layout"
+            fi
+        fi
+    else
+        echo "⚠️  Zellij layout '$THEME' not found"
+    fi
+fi
+
+# Update and Reload Sketchybar
+SKETCHYBAR_CONFIG_DIR="$DOTFILES_ROOT/domains/workspace/config/sketchybar"
+if [[ ! -d "$SKETCHYBAR_CONFIG_DIR" ]]; then
+    # Fallback
+    SKETCHYBAR_CONFIG_DIR="$HOME/dotfiles/domains/workspace/config/sketchybar"
+fi
+
+if [[ -d "$SKETCHYBAR_CONFIG_DIR" ]] && command -v sketchybar >/dev/null 2>&1; then
+    echo "🔄 Updating and reloading Sketchybar..."
+
+    # Touch configuration files to trigger theme reload
+    touch "$SKETCHYBAR_CONFIG_DIR/colors.lua"
+    touch "$SKETCHYBAR_CONFIG_DIR/bar.lua" 2>/dev/null || true
+    touch "$SKETCHYBAR_CONFIG_DIR/init.lua" 2>/dev/null || true
+
+    # Force sketchybar to exit and restart (more reliable than --reload)
+    pkill -f sketchybar 2>/dev/null || true
+    sleep 0.5
+
+    # Start sketchybar again (it should auto-start, but let's be explicit)
+    nohup sketchybar > /dev/null 2>&1 &
+    echo "✅ Restarted Sketchybar with new theme"
 fi
 
 # Reload WezTerm (usually automatic, but we can touch config to force)

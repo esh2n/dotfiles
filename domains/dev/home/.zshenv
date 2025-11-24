@@ -3,14 +3,42 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CACHE_HOME="$HOME/.cache"
 
+# Minimal PATH bootstrap so core utilities are always reachable
+typeset -U path PATH
+typeset -a _inherited_path=("${path[@]}")
+path=(
+    /opt/homebrew/bin
+    /opt/homebrew/sbin
+    /usr/local/bin
+    /usr/bin
+    /bin
+    /usr/sbin
+    /sbin
+)
+if (( ${#_inherited_path[@]} )); then
+    path+=("${_inherited_path[@]}")
+fi
+unset _inherited_path
+
 # OS Detection / OS判定
-OSTYPE=$(uname -s)
+if [ -x /usr/bin/uname ]; then
+    OSTYPE=$(/usr/bin/uname -s)
+elif [ -x /bin/uname ]; then
+    OSTYPE=$(/bin/uname -s)
+else
+    OSTYPE=${OSTYPE:-unknown}
+fi
 IS_WSL=0
 if [ "$OSTYPE" = "Linux" ]; then
   if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
     IS_WSL=1
   fi
 fi
+
+# Go/GHQ paths
+export GOPATH="$HOME/go"
+export GOBIN="$GOPATH/bin"
+export GHQ_ROOT="$GOPATH"
 
 # Load profile if exists
 [ -f "$HOME/.profile" ] && source "$HOME/.profile"
@@ -36,19 +64,14 @@ if [ "$OSTYPE" = "Darwin" ]; then
     export FNM_MULTISHELL_PATH="$HOME/Library/Caches/fnm_multishells/64317_1686306935786"
     
     # macOS Paths
-    typeset -U path PATH
     path=(
-        /usr/local/bin
-        /usr/bin
-        /bin
-        /usr/sbin
-        /sbin
+        "$HOME/bin"
         /opt/homebrew/opt/libpq/bin
         /Applications/WezTerm.app/Contents/MacOS
         "$HOME/.local/share/mise/shims"
         "$HOME/.cargo/bin"
         "$PNPM_HOME"
-        $path
+        "${path[@]}"
     )
 elif [ "$IS_WSL" = "1" ]; then
     # === WSL ===
@@ -57,17 +80,11 @@ elif [ "$IS_WSL" = "1" ]; then
     export PNPM_HOME="$HOME/.local/share/pnpm"
 
     # WSL Paths
-    typeset -U path PATH
     path=(
-        /usr/local/bin
-        /usr/bin
-        /bin
-        /usr/sbin
-        /sbin
         "$HOME/.local/bin"
         "$HOME/.cargo/bin"
         "$PNPM_HOME"
-        $path
+        "${path[@]}"
     )
 else
     # === Linux ===
@@ -76,17 +93,11 @@ else
     export PNPM_HOME="$HOME/.local/share/pnpm"
     
     # Linux Paths
-    typeset -U path PATH
     path=(
-        /usr/local/bin
-        /usr/bin
-        /bin
-        /usr/sbin
-        /sbin
         "$HOME/.local/bin"
         "$HOME/.cargo/bin"
         "$PNPM_HOME"
-        $path
+        "${path[@]}"
     )
 fi
 

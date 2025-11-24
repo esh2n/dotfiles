@@ -2,6 +2,9 @@
 
 # Shell
 brew "zsh"
+brew "zsh-autosuggestions"
+brew "zsh-completions"
+brew "zsh-syntax-highlighting"
 brew "starship"
 
 # Multiplexers
@@ -19,8 +22,13 @@ brew "eza"
 brew "fd"
 brew "ripgrep"
 brew "zoxide"
-brew "sk" # Fuzzy Finder
+brew "sk"
 brew "tree"
+brew "atuin"
+brew "yazi"
+brew "vivid"
+brew "btop"
+brew "thefuck"
 
 # Development Domain Brewfile
 
@@ -46,7 +54,7 @@ brew "awscli"
 # Tools
 brew "jq"
 brew "yq"
-brew "yaak" # API Testing
+cask "yaak" # API Testing
 
 # AI Coding
 cask "cursor"

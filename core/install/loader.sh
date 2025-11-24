@@ -7,11 +7,39 @@
 # 重いコマンドの遅延読み込みとシェル設定の読み込み機能を提供します。
 # -----------------------------------------------------------------------------
 
+# Ensure logging helpers exist even if common utilities aren't ready yet
+if ! typeset -f log_debug >/dev/null 2>&1; then
+    log_debug() { :; }
+fi
+
+# Resolve dotfiles root when invoked from non-Bash shells
+__loader_dir=""
+if [[ -n "${DOTFILES_ROOT:-}" ]]; then
+    __loader_dir="${DOTFILES_ROOT}/core/install"
+else
+    if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+        __loader_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        DOTFILES_ROOT="$(cd "${__loader_dir}/../.." && pwd)"
+    else
+        __loader_dir="$(cd "$(dirname "${0}")" && pwd)"
+        DOTFILES_ROOT="$(cd "${__loader_dir}/../.." && pwd)"
+    fi
+fi
+
 # Source common utilities if not already sourced
 # 共通ユーティリティが読み込まれていない場合は読み込む
 if [[ -z "${COLOR_RED:-}" ]]; then
-    source "$(dirname "${BASH_SOURCE[0]}")/../utils/common.sh"
+    if [[ -f "${DOTFILES_ROOT}/core/utils/common.sh" ]]; then
+        source "${DOTFILES_ROOT}/core/utils/common.sh"
+    else
+        log_info()  { echo "$*"; }
+        log_success(){ echo "$*"; }
+        log_warn()  { echo "$*"; }
+        log_error() { echo "$*" >&2; }
+        log_debug() { :; }
+    fi
 fi
+unset __loader_dir
 
 # -----------------------------------------------------------------------------
 # Lazy Loading Mechanism

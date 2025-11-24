@@ -1,1 +1,1 @@
-themes/catppuccin.sh
+/Users/esh2n/go/github.com/esh2n/dotfiles/dotfiles/domains/workspace/config/borders/themes/catppuccin.sh

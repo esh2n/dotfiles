@@ -54,11 +54,12 @@ cursor-style-blink = true
 # Performance and behavior
 gtk-single-instance = false
 shell-integration = fish
-shell-integration-features = no-cursor
+shell-integration-features = cursor,title,sudo
 confirm-close-surface = false
 
 # Scrollback
 scrollback-limit = 50000
+mouse-scroll-multiplier = 3
 
 # macOS specific settings
 macos-titlebar-style = hidden
@@ -127,6 +128,10 @@ keybind = cmd+home=scroll_to_top
 keybind = cmd+end=scroll_to_bottom
 keybind = shift+page_up=scroll_page_up
 keybind = shift+page_down=scroll_page_down
+
+# Prompt-based scrolling
+keybind = ctrl+shift+up=scroll_to_prompt:-1
+keybind = ctrl+shift+down=scroll_to_prompt:1
 
 # Copy/Paste and Selection
 keybind = cmd+c=copy_to_clipboard

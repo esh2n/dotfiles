@@ -1,5 +1,6 @@
 .DS_Store
 *.backup.*
+*.bak*
 *.swp
 *.log
 tmp/
@@ -12,6 +13,7 @@ log/
 **/*token*.json
 **/*.pem
 **/*.key
+**/.env
 **/.env.local
 **/.env.*.local
 
@@ -39,5 +41,32 @@ log/
 domains/editor/config/vscode/settings.json
 domains/development/config/mise/config.toml
 
+# Lock files and generated state files
+**/lazy-lock.json
+**/lazyvim.json
+
+# Runtime state files (auto-generated)
+**/dropdown_windows.json
+**/sessions/
+**/session*
+
+# Tmux plugins and generated files
+**/tmux/plugins/
+**/tmux/resurrect/
+
+# Neovim auto-managed directories
+**/nvim*/.lazy/
+**/nvim*/spell/
+
+# Shell history and sessions
 .zsh_history
 .zsh_sessions
+**/.zcompdump*
+
+# Backup directories
+**/*.backup/
+**/backup/
+
+# User-specific git config (should be local only)
+**/git/config.local
+**/.gitconfig

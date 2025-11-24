@@ -19,7 +19,6 @@ $character"""
 right_format = """
 $cmd_duration\
 $status\
-$container\
 """
 
 # プロンプトの前に空行を入れる
@@ -109,10 +108,7 @@ disabled = false
 [character]
 success_symbol = "[❯](bold fg:#a6e3a1)"
 error_symbol = "[❯](bold fg:#f38ba8)"
-vimcmd_symbol = "[❮](bold fg:#f9e2af)"
-vimcmd_replace_one_symbol = "[❮](bold fg:#f38ba8)"
-vimcmd_replace_symbol = "[❮](bold fg:#f38ba8)"
-vimcmd_visual_symbol = "[❮](bold fg:#89b4fa)"
+vicmd_symbol = "[❮](bold fg:#f9e2af)"
 
 [status]
 style = "bold fg:#f38ba8"
@@ -125,8 +121,3 @@ disabled = false
 min_time = 500
 format = '[$duration ](bold $style)'
 style = "bold fg:#f5c2e7"
-
-[container]
-symbol = "󰡨 "
-style = "bold fg:#fab387"
-format = '[$symbol[$name] ](bold $style)'

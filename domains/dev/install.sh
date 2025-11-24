@@ -20,8 +20,7 @@ source "${DOTFILES_ROOT}/core/utils/common.sh"
 log_info "Installing Dev Domain tools..."
 
 if has_command "brew"; then
-    log_info "Running brew bundle..."
-    brew bundle --file="${SCRIPT_DIR}/packages/Brewfile"
+    install_brewfile "${SCRIPT_DIR}/packages/Brewfile"
 else
     log_error "Homebrew not found. Skipping Brewfile."
 fi
@@ -32,8 +31,30 @@ fi
 # -----------------------------------------------------------------------------
 
 if has_command "mise"; then
-    log_info "Setting up mise..."
-    mise install
+    log_info "Installing language runtimes via mise..."
+    
+    # Activate mise to make runtimes available in PATH
+    # miseをアクティベートしてランタイムをPATHに追加
+    eval "$(mise activate bash)" 2>/dev/null || true
+    
+    # Install runtimes defined in mise config
+    # mise設定で定義されたランタイムをインストール
+    # Use config file from dev domain (will be symlinked in phase_config)
+    # devドメインの設定ファイルを使用（phase_configでsymlinkされる）
+    if [[ -f "${HOME}/.config/mise/config.toml" ]]; then
+        mise install
+    elif [[ -f "${SCRIPT_DIR}/config/mise/config.toml" ]]; then
+        # If symlink not created yet, use source file directly
+        # symlinkがまだ作成されていない場合、ソースファイルを直接使用
+        log_info "Using mise config from source: ${SCRIPT_DIR}/config/mise/config.toml"
+        MISE_CONFIG_DIR="${SCRIPT_DIR}/config/mise" mise install
+    else
+        log_warn "mise config.toml not found. Skipping runtime installation."
+    fi
+    
+    # Ensure mise runtimes are in PATH for subsequent commands
+    # 後続のコマンドでmiseランタイムがPATHに含まれるようにする
+    eval "$(mise activate bash)" 2>/dev/null || true
 else
     log_warn "mise not found. Skipping runtime setup."
 fi
@@ -43,14 +64,17 @@ fi
 # パッケージマネージャーインストール
 # -----------------------------------------------------------------------------
 
-# Cargo packages (Rust)
+# Cargo packages (Rust) - requires rust runtime from mise
+# Cargoパッケージ（Rust）- miseのrustランタイムが必要
 if has_command "cargo" && [[ -f "${SCRIPT_DIR}/packages/cargo.txt" ]]; then
     log_info "Installing Cargo packages..."
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ $line =~ ^#.*$ ]] && continue
         [[ -z $line ]] && continue
         
-        package_name=$(echo "$line" | sed 's/\s*#.*$//')
+        # Remove comments and trim whitespace
+        # コメントを削除し、空白をトリム
+        package_name=$(echo "$line" | sed 's/\s*#.*$//' | xargs)
         log_info "Installing: $package_name"
         
         if [[ $package_name == "pacifica" ]]; then
@@ -61,7 +85,8 @@ if has_command "cargo" && [[ -f "${SCRIPT_DIR}/packages/cargo.txt" ]]; then
     done < "${SCRIPT_DIR}/packages/cargo.txt"
 fi
 
-# Go packages
+# Go packages - requires go runtime from mise
+# Goパッケージ - miseのgoランタイムが必要
 if has_command "go" && [[ -f "${SCRIPT_DIR}/packages/go.txt" ]]; then
     log_info "Installing Go packages..."
     export GOPATH="${HOME}/go"
@@ -72,32 +97,41 @@ if has_command "go" && [[ -f "${SCRIPT_DIR}/packages/go.txt" ]]; then
         [[ $line =~ ^#.*$ ]] && continue
         [[ -z $line ]] && continue
         
-        log_info "Installing: ${line}@latest"
-        go install "${line}@latest" || log_warn "Failed to install: ${line}@latest"
+        # Remove comments and trim whitespace
+        # コメントを削除し、空白をトリム
+        package_name=$(echo "$line" | sed 's/\s*#.*$//' | xargs)
+        log_info "Installing: ${package_name}@latest"
+        go install "${package_name}@latest" || log_warn "Failed to install: ${package_name}@latest"
     done < "${SCRIPT_DIR}/packages/go.txt"
 fi
 
-# Bun packages
+# Bun packages - requires bun runtime from mise
+# Bunパッケージ - miseのbunランタイムが必要
 if has_command "bun" && [[ -f "${SCRIPT_DIR}/packages/bun.txt" ]]; then
     log_info "Installing Bun packages..."
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ $line =~ ^#.*$ ]] && continue
         [[ -z $line ]] && continue
         
-        package_name=$(echo "$line" | sed 's/\s*#.*$//')
+        # Remove comments and trim whitespace
+        # コメントを削除し、空白をトリム
+        package_name=$(echo "$line" | sed 's/\s*#.*$//' | xargs)
         log_info "Installing: $package_name"
         bun install -g "$package_name" || log_warn "Failed to install: $package_name"
     done < "${SCRIPT_DIR}/packages/bun.txt"
 fi
 
-# Gem packages (Ruby)
+# Gem packages (Ruby) - requires ruby runtime from mise
+# Gemパッケージ（Ruby）- miseのrubyランタイムが必要
 if has_command "gem" && [[ -f "${SCRIPT_DIR}/packages/gem.txt" ]]; then
     log_info "Installing Ruby gems..."
     while IFS= read -r line || [[ -n "$line" ]]; do
         [[ $line =~ ^#.*$ ]] && continue
         [[ -z $line ]] && continue
         
-        package_name=$(echo "$line" | sed 's/\s*#.*$//')
+        # Remove comments and trim whitespace
+        # コメントを削除し、空白をトリム
+        package_name=$(echo "$line" | sed 's/\s*#.*$//' | xargs)
         log_info "Installing: $package_name"
         gem install "$package_name" || log_warn "Failed to install: $package_name"
     done < "${SCRIPT_DIR}/packages/gem.txt"

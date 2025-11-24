@@ -17,8 +17,7 @@ log_info "Installing Infra Domain tools..."
 # -----------------------------------------------------------------------------
 
 if has_command "brew"; then
-    log_info "Running brew bundle..."
-    brew bundle --file="${SCRIPT_DIR}/packages/Brewfile"
+    install_brewfile "${SCRIPT_DIR}/packages/Brewfile"
 else
     log_error "Homebrew not found. Skipping Brewfile."
 fi
