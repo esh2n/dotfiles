@@ -25,6 +25,8 @@ log/
 **/node_modules/
 
 # Claude specific
+**/claude/debug/
+**/claude/file-history/
 **/claude/ide/
 **/claude/local/
 **/claude/plugins/

@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# GitHub Account Switcher
+# GitHubアカウント切り替えツール
+# -----------------------------------------------------------------------------
+
+# Load utilities
+if [[ -n "${DOTFILES_ROOT:-}" ]]; then
+    source "$DOTFILES_ROOT/core/utils/common.sh"
+elif [[ -f "$HOME/dotfiles/core/utils/common.sh" ]]; then
+    source "$HOME/dotfiles/core/utils/common.sh"
+else
+    echo "Error: Cannot find common.sh"
+    exit 1
+fi
+
+# Parse gh auth status output
+auth_output=$(gh auth status 2>&1)
+
+# Extract accounts with their active status
+accounts=()
+account_names=()
+current_account=""
+
+log_info "GitHub Accounts"
+echo ""
+
+i=1
+while read -r line; do
+    if [[ "$line" =~ "Logged in to github.com account" ]]; then
+        # Extract account name: "✓ Logged in to github.com account NAME (keyring)"
+        account=$(echo "$line" | sed 's/.*account \([^ ]*\) .*/\1/')
+        account_names+=("$account")
+
+        # Read next line to check if active
+        read -r next_line
+        if [[ "$next_line" =~ "Active account: true" ]]; then
+            echo "$i) $account (current)"
+            current_account="$account"
+        else
+            echo "$i) $account"
+        fi
+        ((i++))
+    fi
+done <<< "$auth_output"
+
+if [ ${#account_names[@]} -eq 0 ]; then
+    log_error "No authenticated GitHub accounts found"
+    log_info "Run 'gh auth login' to add an account"
+    exit 1
+fi
+
+echo ""
+read -p "Select account number: " selection
+
+if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#account_names[@]}" ]; then
+    log_error "Invalid selection"
+    exit 1
+fi
+
+selected_account="${account_names[$((selection-1))]}"
+
+if [ "$selected_account" = "$current_account" ]; then
+    log_success "Already using $selected_account"
+    exit 0
+fi
+
+log_info "Switching to: $selected_account"
+gh auth switch -u "$selected_account"
+
+log_success "Successfully switched to $selected_account"
