@@ -156,51 +156,113 @@ export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
 - `fuck` - Fix previous command (thefuck)
 - Auto-suggestions appear in gray text (zsh-autosuggestions)
 
-#### Zellij Multiplexer
-- `Alt+f` - File finder (Monocle plugin)
-- `Alt+h` - Pane bookmarks (Harpoon plugin)
-- `Alt+n` - New pane
-- `Alt+t` - New tab
-- Rich status bar with Git branch, time, system info
+#### tmux / WezTerm / Zellij (Prefix: Ctrl+q)
+
+Keybindings unified across tmux, WezTerm, and Zellij.
+
+| Operation | Keybind | Note |
+|-----------|---------|------|
+| Split horizontal | `Prefix + \` | |
+| Split vertical | `Prefix + -` | |
+| Navigate panes | `Prefix + h/j/k/l` | |
+| Resize panes | `Prefix + H/J/K/L` | |
+| Zoom pane | `Prefix + z` | |
+| Close pane | `Prefix + x` | |
+| Previous tab | `Ctrl+h` | No prefix |
+| Next tab | `Ctrl+l` | No prefix |
+| Go to tab 1-5 | `Ctrl+1-5` | No prefix, Zellij only |
+| New tab | `Prefix + t` | Zellij only |
+| Last tab | `Prefix + Tab` | tmux only |
+| Copy/scroll mode | `Prefix + [` | |
+| Begin selection | `v` | In copy mode |
+| Copy and exit | `y` | tmux only |
+| Detach session | `Prefix + d` | |
+| Monocle plugin | `Prefix + f` | Zellij only (file finder) |
+| Harpoon plugin | `Prefix + h` | Zellij only (bookmarks) |
+
+**tmux Session Restore (tmux-resurrect + tmux-continuum):**
+- Auto-save every 15 minutes
+- Auto-restore on tmux startup
+- Manual save: `Prefix + Ctrl+s`
+- Manual restore: `Prefix + Ctrl+r`
+- Restores: windows, panes, working dirs, running programs (vim, nvim, ssh, etc.)
+- Session files: `~/.tmux/resurrect/`
+
+**Zellij Session Management:**
+- List sessions: `zellij list-sessions`
+- Attach to session: `zellij attach <session-name>`
+- Detach: `Prefix + d`
+- Sessions persist until explicitly deleted: `zellij delete-session <session-name>`
+- Plugins are accessible via prefix mode (see keybindings table above)
 
 #### AeroSpace Window Manager
-**Window Navigation:**
-- `Alt+h/j/k/l` - Focus window (left/down/up/right)
+
+**Workspace Design:**
+- W (Work): Cursor, VSCode, Ghostty - Development
+- B (Browser): Chrome, Safari, Firefox
+- C (Communication): Slack, Gather - Recommended for sub-monitor
+- M (Music): Spotify, Apple Music
+- N (Notion): Documentation
+- D (Diagram/Discord): Dia, Discord
+- 1-5: General purpose
+- S: Reserved
+
+**Main Mode:**
+
+Window Navigation:
+- `Alt+h/j/k/l` - Focus window (crosses monitor boundaries)
 - `Alt+Shift+h/j/k/l` - Move window
-- `Alt+f` - Fullscreen toggle
-- `Alt+r` - Rotate layout (horizontal/vertical)
+
+Layout:
+- `Alt+r` - Cycle layout (tiles horizontal/vertical)
 - `Alt+t` - Toggle floating/tiling
+- `Alt+f` - Fullscreen
 
-**Workspaces:**
+Resize:
+- `Alt+-` - Decrease size by 50
+- `Alt+=` - Increase size by 50
+
+Workspaces:
 - `Alt+1-5` - Switch to workspace 1-5
+- `Alt+w/b/c/m/n/s/d` - Switch to named workspace
 - `Alt+Tab` - Previous workspace
-- `Alt+Shift+1-5` - Move window to workspace
+- `Alt+Shift+Tab` - Move workspace to next monitor
 
-**Dedicated Workspaces:**
-- `Alt+w` - Development workspace (VSCode, Cursor, Terminal)
-- `Alt+m` - Music workspace (Spotify, Apple Music)
-- `Alt+b` - Browser workspace (Chrome, Safari, Firefox)
-- `Alt+n` - Notion workspace
-- `Alt+s` - Slack workspace
-- `Alt+d` - Discord workspace
+Move Window to Workspace:
+- `Alt+Shift+1-5` - Move to workspace and follow
+- `Alt+Shift+w/b/c/m/n/s/d` - Move to named workspace and follow
 
-**Move to Dedicated Workspaces:**
-- `Alt+Shift+w/m/b/n/s/d` - Move current window to respective workspace
+**Service Mode** (`Alt+Shift+;`):
+- `Esc` - Reload config and return to main mode
+- `r` - Reset workspace tree layout
+- `f` - Toggle floating/tiling
+- `Backspace` - Close all windows except current
 
-**Window Resizing:**
-- `Alt+-` - Decrease size
-- `Alt+=` - Increase size
+**Configuration:**
+- Default layout: Accordion (single windows use full space)
+- Apps auto-assign to dedicated workspaces
+- Padding: Top 52px (sketchybar 40px + 12px), Horizontal 12px, Vertical 8px
 
-**Layout:**
-- Default: Accordion layout (single windows use full space)
-- Auto-assignment: Apps automatically move to their dedicated workspaces
+**Multi-Monitor:**
+Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across monitors, then use workspace shortcuts on the focused monitor.
 
-#### Workspace Services Management
-**Individual Services:**
+#### Workspace Management CLI
+
+**Interactive CLI:**
+- `ws` - Launch interactive workspace manager
+- `ws service` - Service management menu
+- `ws layout` - Layout management menu
+- `ws info` - Information menu
+
+**Features:**
+- Service Management: Start, stop, restart workspace services
+- Layout Save/Restore: Save current window layout and restore to any monitor
+- Presets: Quick setup for common layouts (Communication, etc.)
+- Information: View windows, workspaces, monitors, apps
+
+**Legacy Commands:**
 - `brdr/brds/brdk` - Borders restart/start/stop
 - `sbr/sbs/sbk` - Sketchybar restart/start/stop
-
-**All Services:**
 - `wsls` - List all workspace services status
 - `wsrestart` - Restart all (Sketchybar, Borders, AeroSpace)
 - `wsstart` - Start all services

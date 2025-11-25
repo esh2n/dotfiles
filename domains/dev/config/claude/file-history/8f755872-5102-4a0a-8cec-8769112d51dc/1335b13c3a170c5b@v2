@@ -1,0 +1,301 @@
+# Dotfiles Configuration
+
+Domain-driven dotfiles with multi-shell support and theme switching.
+
+## Features
+
+### Multi-Shell Support
+- **Zsh & Fish**: Full support for both shells
+- **Shared configs**: Centralized aliases and environment variables
+- **Modern tools**: skim, eza, bat, zoxide, atuin, yazi
+
+### Neovim Distribution Switcher
+Switch between multiple Neovim distributions:
+
+| Distribution | Description |
+|--------------|-------------|
+| Custom | Personal configuration |
+| LazyVim | Fast and minimal |
+| NvChad | Beautiful UI |
+| AstroVim | Feature-rich |
+
+```bash
+nvim-switch lazyvim
+nvim-switch custom
+```
+
+### Theme Switcher
+Quick theme switching for all tools:
+
+| Theme | Base Colors |
+|-------|-------------|
+| Catppuccin Mocha | Warm, soft pastels |
+| Nord | Cool, arctic palette |
+| Tokyo Night | Dark, vibrant |
+
+Applies to: WezTerm, Ghostty, Sketchybar, Borders, Zellij
+
+```bash
+theme-switch nord
+theme-switch catppuccin
+```
+
+### Wallpaper Integration
+Download and set wallpapers from Wallhaven.cc:
+
+```bash
+wallpaper search "cyberpunk"
+```
+
+## Directory Structure
+
+```
+dotfiles/
+├── core/          # Installer, config manager, utilities
+├── domains/       # Domain-specific configurations
+│   ├── creative/  # Media tools, wallpaper scripts
+│   ├── dev/       # Neovim, terminals, shells, languages
+│   ├── infra/     # Network, security
+│   ├── system/    # Fonts, colors, themes
+│   └── workspace/ # Window managers, status bars
+└── specs/         # Architecture documentation
+```
+
+## Installation
+
+```bash
+cd dotfiles
+./core/install/installer.sh
+```
+
+The installer will:
+1. Install Homebrew (if needed)
+2. Install packages from Brewfiles
+3. Setup language runtimes (mise)
+4. Create symlinks to configurations
+5. Backup existing files
+
+## Configuration
+
+### Package Management
+
+| Location | Purpose |
+|----------|---------|
+| `domains/*/packages/Brewfile` | Homebrew packages |
+| `domains/dev/packages/cargo.txt` | Rust packages |
+| `domains/dev/packages/go.txt` | Go packages |
+| `domains/dev/packages/bun.txt` | Bun packages |
+
+### Symlink Management
+
+```bash
+# Re-apply symlinks
+./core/config/manager.sh link
+
+# Process templates
+./core/config/manager.sh template
+```
+
+### Template System
+
+Some config files (VSCode `settings.json`, Mise `config.toml`) cannot use environment variables. Use `.template` files with `{{HOME}}` placeholders:
+
+```bash
+# Generate config files from templates
+./core/config/manager.sh template
+```
+
+This replaces `{{HOME}}` with your actual home directory. Generated files are ignored by git; only `.template` files are tracked.
+
+### Environment Variables
+
+WezTerm weather widget requires OpenWeather API key. Set it via:
+
+
+**`.env` file**
+Create `.env` in dotfiles root:
+```bash
+OPENWEATHER_API_KEY=your-api-key
+```
+
+The widget checks `OPENWEATHER_API_KEY` env var first, then looks for `.env` in:
+- `$DOTFILES_ROOT/.env`
+- `~/dotfiles/.env`
+- Config directory relative paths
+
+For Lua-based configs (WezTerm), set `DOTFILES_ROOT` in your shell config:
+```bash
+export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
+```
+
+## Included Tools
+
+### Terminal & Shell
+- WezTerm, Ghostty, Warp
+- Zellij (terminal multiplexer with rich plugins)
+- Zsh, Fish
+- Starship prompt
+
+### CLI Tools
+- **eza** - Modern `ls` with colors and icons
+- **bat** - Syntax-highlighted `cat`
+- **sk** - Fuzzy finder (skim)
+- **zoxide** - Smart `cd`
+- **atuin** - Shell history search with sync
+- **yazi** - Terminal file manager
+- **vivid** - LS_COLORS generator
+- **btop** - Modern system monitor
+- **thefuck** - Command correction
+
+#### Usage
+- `Ctrl+R` - History search (atuin)
+- `y` - File manager with auto-cd (yazi)
+- `z <dir>` - Smart directory jumping (zoxide)
+- `zi` - Interactive directory selection (zoxide)
+- `btop` - Interactive system monitor
+- `fuck` - Fix previous command (thefuck)
+- Auto-suggestions appear in gray text (zsh-autosuggestions)
+
+#### tmux / WezTerm / Zellij (Prefix: Ctrl+q)
+
+Keybindings unified across tmux, WezTerm, and Zellij.
+
+| Operation | Keybind | Note |
+|-----------|---------|------|
+| Split horizontal | `Prefix + \` | |
+| Split vertical | `Prefix + -` | |
+| Navigate panes | `Prefix + h/j/k/l` | |
+| Resize panes | `Prefix + H/J/K/L` | |
+| Zoom pane | `Prefix + z` | |
+| Close pane | `Prefix + x` | |
+| Previous tab | `Ctrl+h` | No prefix |
+| Next tab | `Ctrl+l` | No prefix |
+| New tab | `Prefix + t` | Zellij only |
+| Last tab | `Prefix + Tab` | tmux only |
+| Copy/scroll mode | `Prefix + [` | |
+| Begin selection | `v` | In copy mode |
+| Copy and exit | `y` | tmux only |
+| Detach session | `Prefix + d` | |
+
+**tmux Session Restore (tmux-resurrect + tmux-continuum):**
+- Auto-save every 15 minutes
+- Auto-restore on tmux startup
+- Manual save: `Prefix + Ctrl+s`
+- Manual restore: `Prefix + Ctrl+r`
+- Restores: windows, panes, working dirs, running programs (vim, nvim, ssh, etc.)
+- Session files: `~/.tmux/resurrect/`
+
+**Zellij Session Management:**
+- List sessions: `zellij list-sessions`
+- Attach to session: `zellij attach <session-name>`
+- Detach: `Prefix + d`
+- Sessions persist until explicitly deleted: `zellij delete-session <session-name>`
+
+Zellij plugins: `Alt+f` (file finder), `Alt+h` (harpoon bookmarks)
+
+#### AeroSpace Window Manager
+
+**Workspace Design:**
+- W (Work): Cursor, VSCode, Ghostty - Development
+- B (Browser): Chrome, Safari, Firefox
+- C (Communication): Slack, Gather - Recommended for sub-monitor
+- M (Music): Spotify, Apple Music
+- N (Notion): Documentation
+- D (Diagram/Discord): Dia, Discord
+- 1-5: General purpose
+- S: Reserved
+
+**Main Mode:**
+
+Window Navigation:
+- `Alt+h/j/k/l` - Focus window (crosses monitor boundaries)
+- `Alt+Shift+h/j/k/l` - Move window
+
+Layout:
+- `Alt+r` - Cycle layout (tiles horizontal/vertical)
+- `Alt+t` - Toggle floating/tiling
+- `Alt+f` - Fullscreen
+
+Resize:
+- `Alt+-` - Decrease size by 50
+- `Alt+=` - Increase size by 50
+
+Workspaces:
+- `Alt+1-5` - Switch to workspace 1-5
+- `Alt+w/b/c/m/n/s/d` - Switch to named workspace
+- `Alt+Tab` - Previous workspace
+- `Alt+Shift+Tab` - Move workspace to next monitor
+
+Move Window to Workspace:
+- `Alt+Shift+1-5` - Move to workspace and follow
+- `Alt+Shift+w/b/c/m/n/s/d` - Move to named workspace and follow
+
+**Service Mode** (`Alt+Shift+;`):
+- `Esc` - Reload config and return to main mode
+- `r` - Reset workspace tree layout
+- `f` - Toggle floating/tiling
+- `Backspace` - Close all windows except current
+
+**Configuration:**
+- Default layout: Accordion (single windows use full space)
+- Apps auto-assign to dedicated workspaces
+- Padding: Top 52px (sketchybar 40px + 12px), Horizontal 12px, Vertical 8px
+
+**Multi-Monitor:**
+Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across monitors, then use workspace shortcuts on the focused monitor.
+
+#### Workspace Management CLI
+
+**Interactive CLI:**
+- `ws` - Launch interactive workspace manager
+- `ws service` - Service management menu
+- `ws layout` - Layout management menu
+- `ws info` - Information menu
+
+**Features:**
+- Service Management: Start, stop, restart workspace services
+- Layout Save/Restore: Save current window layout and restore to any monitor
+- Presets: Quick setup for common layouts (Communication, etc.)
+- Information: View windows, workspaces, monitors, apps
+
+**Legacy Commands:**
+- `brdr/brds/brdk` - Borders restart/start/stop
+- `sbr/sbs/sbk` - Sketchybar restart/start/stop
+- `wsls` - List all workspace services status
+- `wsrestart` - Restart all (Sketchybar, Borders, AeroSpace)
+- `wsstart` - Start all services
+- `wsstop` - Stop all services
+
+#### Known Issues
+When prompted "Ignore insecure directories and continue [y] or abort compinit [n]?", choose `y`. This is a permissions warning for brew-installed completions.
+
+### Editor
+- Neovim (4 distributions)
+- VSCode, Cursor
+
+### Window Management
+- AeroSpace
+- Borders
+- Sketchybar
+- Raycast
+
+### Development
+- Git, Docker
+- mise (version manager)
+- Language toolchains (Rust, Go, Node, Python)
+
+## Safety
+
+All existing configurations are backed up:
+- Format: `{filename}.backup.{timestamp}`
+- Example: `.zshrc.backup.20250123_012345`
+
+## Custom Configuration
+
+User-specific settings go in:
+- `~/.config/git/config.local` - Git settings
+- Shell environment: Modify `domains/dev/home/.zshenv`
+
+## License
+
+MIT

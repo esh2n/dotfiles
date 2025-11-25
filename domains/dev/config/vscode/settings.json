@@ -107,8 +107,8 @@
   "dotnet.backgroundAnalysis.analyzerDiagnosticsScope": "openFiles",
   "dotnet.backgroundAnalysis.compilerDiagnosticsScope": "openFiles",
   "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
-  "omnisharp.dotNetPath": "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.408/dotnet",
-  "ms-dotnettools.csharp.dotnetPath": "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.408/dotnet",
+  "omnisharp.dotNetPath": "/Users/shunya.endo/.local/share/mise/installs/dotnet/8.0.408/dotnet",
+  "ms-dotnettools.csharp.dotnetPath": "/Users/shunya.endo/.local/share/mise/installs/dotnet/8.0.408/dotnet",
   // ESLint設定
   "eslint.validate": [
     "javascript",
@@ -301,7 +301,7 @@
     "sound": "off",
     "announcement": "auto"
   },
-  "leetcode.workspaceFolder": "/Users/esh2n/go/github.com/esh2n/leetcode",
+  "leetcode.workspaceFolder": "/Users/shunya.endo/go/github.com/esh2n/leetcode",
   "bracket-pair-colorizer-2.depreciation-notice": false,
   "files.insertFinalNewline": true,
   "github.copilot.nextEditSuggestions.enabled": true,

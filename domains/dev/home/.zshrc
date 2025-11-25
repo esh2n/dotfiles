@@ -1,3 +1,5 @@
+# Kiro CLI pre block. Keep at the top of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh"
 # .zshrc - Dotfiles Entry Point
 
 # 1. Define Dotfiles Root / ドットファイルルートの定義
@@ -35,4 +37,6 @@ load_domain_shell_configs "$DOTFILES_ROOT" "zsh"
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # 6. Amazon Q / Other Integrations
-[[ -f "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/amazon-q/shell/zshrc.post.zsh"
+
+# Kiro CLI post block. Keep at the bottom of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"

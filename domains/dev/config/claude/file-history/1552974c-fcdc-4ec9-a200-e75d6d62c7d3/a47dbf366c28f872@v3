@@ -1,0 +1,391 @@
+package statistics_computation_initiation_test
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"connectrpc.com/connect"
+	app_proto "github.com/sansaninc/sdi-contracts/integrated_data/enriched_data/statistics_computation_initiation/v1"
+	app_connect "github.com/sansaninc/sdi-contracts/integrated_data/enriched_data/statistics_computation_initiation/v1/statistics_computation_initiationv1connect"
+	app_fixture "github.com/sansaninc/sdi-contracts/integrated_data/enriched_data/statistics_computation_initiation/v1/statistics_computation_initiationv1fixture"
+	"github.com/sansaninc/sdi-contracts/shared/http_fixture"
+	tenant_proto "github.com/sansaninc/sdi-contracts/tenant/tenant/tenant/v1"
+	tenant_connect "github.com/sansaninc/sdi-contracts/tenant/tenant/tenant/v1/tenantv1connect"
+	tenant_fixture "github.com/sansaninc/sdi-contracts/tenant/tenant/tenant/v1/tenantv1fixture"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/app_env"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/app_testing"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/statistics_computation_initiation/internal/core"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/assertx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/common_vo"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/contextx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/fixture/common_vo_fixture"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/httpx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/pubsubx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/sqlxx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/stdx"
+)
+
+func TestAddV1(t *testing.T) {
+	type fixture struct {
+		client               app_connect.StatisticsComputationInitiationServiceClient
+		conn                 sqlxx.Connection
+		spyPublisher         *pubsubx.SpyPublisher
+		env                  app_env.Environment
+		stubClock            *stdx.StubClock
+		tenantHandlerFixture http_fixture.HandlerFixture
+	}
+
+	newFixture := func(t *testing.T, ctx context.Context, tenantIDs []string) (context.Context, *fixture) {
+		t.Helper()
+		t.Parallel()
+
+		spannerConnectionBuilder := instanceConnectionParameter.CreateSpannerConnectionBuilder()
+		spannerConnectionBuilder.CreateDatabaseForTest(t, ctx, app_testing.GetSchema(t))
+		sqlProvider, err := sqlxx.NewProvider(spannerConnectionBuilder)
+		assertx.FatalIfError(t, err)
+
+		stubClock := stdx.NewStubClock(t)
+		// Set clock to match the fixture's CreatedAt time for consistent testing
+		stubClock.SetNow(time.Date(2025, 8, 27, 12, 0, 0, 0, time.UTC))
+
+		// Setup mock TenantService server
+		tenantHandlerFixture := tenant_fixture.HandlerFixture(httpx.GetRegisterFuncFixture[tenant_connect.TenantServiceHandler](t,
+			httpx.NewProcedureAuthorizers(
+				tenant_connect.TenantServiceListProcedure,
+				httpx.AllowAllAuthorizer(), httpx.AllowsAnyOfCallSites(common_vo.CallSiteInternal),
+			)))
+		tenantServer := httpx.PrepareServer(t, tenantHandlerFixture)
+
+		// Setup TenantService/List response
+		tenants := make([]*tenant_proto.Tenant, len(tenantIDs))
+		for i, tenantID := range tenantIDs {
+			tenants[i] = &tenant_proto.Tenant{ //nolint:exhaustruct
+				TenantId: tenantID,
+			}
+		}
+		tenantListResponse := &tenant_proto.TenantServiceListResponse{
+			Tenants: tenants,
+		}
+		tenantHandlerFixture.AddResponseWithError(tenant_connect.TenantServiceListProcedure, &http_fixture.ResponseWithError{
+			Response: tenantListResponse,
+			Error:    nil,
+		})
+
+		ctx, env := app_env.NewTest(t).
+			WithSQLProvider(t, sqlProvider).
+			WithCustomClock(t, stubClock).
+			WithTenantBaseURL(t, tenantServer.URL()).
+			Setup(t, ctx)
+		testAPP := app_testing.PrepareAPP(t, ctx)
+
+		client := app_connect.NewStatisticsComputationInitiationServiceClient(testAPP.Server.ClientForContextCallSite(ctx), testAPP.Server.URL(), connect.WithProtoJSON())
+
+		conn := sqlProvider.Connect()
+		return ctx, &fixture{
+			client:               client,
+			conn:                 conn,
+			spyPublisher:         env.SpyPublisher,
+			env:                  env,
+			stubClock:            stubClock,
+			tenantHandlerFixture: tenantHandlerFixture,
+		}
+	}
+
+	t.Run("テナントが1件の場合、正常に initiation が作成されイベントが発行されること", func(t *testing.T) {
+		// arrange
+		tenantID := common_vo_fixture.GetTenantIDFixture()
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)), []string{tenantID.String()})
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		// 以下のコマンドでアクセス可能です。
+		// You can access by using the following command.
+		// curl -X POST ${INTEGRATED_DATA_ENRICHED_DATA_BASE_URL}/integrated_data.enriched_data.statistics_computation_initiation.v1.StatisticsComputationInitiationService/Add -H "X-Tenant-Id: $(uuidgen)" -H "Content-Type: application/json" -d '{}'
+		actual, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		assertx.FatalIfError(t, err)
+		assertx.Equal(t, 1, len(actual.Msg.GetTenantIds()))
+		assertx.Equal(t, tenantID.String(), actual.Msg.GetTenantIds()[0])
+
+		// Verify event is published
+		fixture.spyPublisher.AssertPublished(t, core.AddedEventTopic, &app_proto.AddedEventPayload{
+			TenantId: tenantID.String(),
+		})
+
+		// Verify DB record is created
+		count := countInitiationsByTenantID(t, ctx, fixture.conn, tenantID.String())
+		assertx.Equal(t, int64(1), count)
+	})
+
+	t.Run("テナントが複数件の場合、各テナントに対して initiation が作成されイベントが発行されること", func(t *testing.T) {
+		// arrange
+		tenantID1 := common_vo_fixture.GetTenantIDFixture()
+		tenantID2, err := common_vo.NewTenantID("123e4567-e89b-12d3-a456-426614174001")
+		assertx.FatalIfError(t, err)
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)), []string{tenantID1.String(), tenantID2.String()})
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		actual, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		assertx.FatalIfError(t, err)
+		assertx.Equal(t, 2, len(actual.Msg.GetTenantIds()))
+
+		// Verify events are published for both tenants
+		fixture.spyPublisher.AssertMultiplePublished(t,
+			pubsubx.NewExpectedPublishedParameters(core.AddedEventTopic, &app_proto.AddedEventPayload{
+				TenantId: tenantID1.String(),
+			}),
+			pubsubx.NewExpectedPublishedParameters(core.AddedEventTopic, &app_proto.AddedEventPayload{
+				TenantId: tenantID2.String(),
+			}),
+		)
+	})
+
+	t.Run("initiation 未実行のテナントは initiation 対象になること", func(t *testing.T) {
+		// arrange
+		tenantID := common_vo_fixture.GetTenantIDFixture()
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)), []string{tenantID.String()})
+
+		// Setup: データベースにはまだ initiation レコードが存在しない状態（latest が nil）
+		// この状態で initiation が作成されることを確認する
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		actual, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		assertx.FatalIfError(t, err)
+		assertx.Equal(t, 1, len(actual.Msg.GetTenantIds()))
+		assertx.Equal(t, tenantID.String(), actual.Msg.GetTenantIds()[0])
+
+		// Verify event is published
+		fixture.spyPublisher.AssertPublished(t, core.AddedEventTopic, &app_proto.AddedEventPayload{
+			TenantId: tenantID.String(),
+		})
+	})
+
+	t.Run("24時間以内に initiation 済みのテナントはスキップされること", func(t *testing.T) {
+		// arrange
+		tenantID := common_vo_fixture.GetTenantIDFixture()
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)), []string{tenantID.String()})
+
+		// Setup: Create an initiation record 12 hours ago (within 24 hours)
+		fixture.stubClock.SetNow(time.Date(2025, 8, 27, 12, 0, 0, 0, time.UTC))
+		dataFixture := core.NewDataFixture(t).
+			WithTenantID(t, tenantID.String()).
+			WithCreatedAt(t, time.Date(2025, 8, 27, 0, 0, 0, 0, time.UTC)) // 12 hours ago
+		tx, err := fixture.conn.Begin(ctx)
+		assertx.FatalIfError(t, err)
+		ctx = contextx.ImpersonateTenant(ctx, tenantID)
+		dataFixture.Setup(t, ctx, tx)
+		assertx.FatalIfError(t, tx.Commit(ctx))
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		actual, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		assertx.FatalIfError(t, err)
+		assertx.Equal(t, 0, len(actual.Msg.GetTenantIds()))
+		fixture.spyPublisher.AssertNeverPublished(t)
+	})
+
+	t.Run("25時間前に initiation 済みのテナントは再実行されること", func(t *testing.T) {
+		// arrange
+		tenantID := common_vo_fixture.GetTenantIDFixture()
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)), []string{tenantID.String()})
+
+		// Setup: Create an initiation record 25 hours ago (outside 24 hours)
+		fixture.stubClock.SetNow(time.Date(2025, 8, 27, 12, 0, 0, 0, time.UTC))
+		dataFixture := core.NewDataFixture(t).
+			WithTenantID(t, tenantID.String()).
+			WithCreatedAt(t, time.Date(2025, 8, 26, 11, 0, 0, 0, time.UTC)) // 25 hours ago
+		tx, err := fixture.conn.Begin(ctx)
+		assertx.FatalIfError(t, err)
+		ctx = contextx.ImpersonateTenant(ctx, tenantID)
+		dataFixture.Setup(t, ctx, tx)
+		assertx.FatalIfError(t, tx.Commit(ctx))
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		actual, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		assertx.FatalIfError(t, err)
+		assertx.Equal(t, 1, len(actual.Msg.GetTenantIds()))
+		fixture.spyPublisher.AssertPublished(t, core.AddedEventTopic, &app_proto.AddedEventPayload{
+			TenantId: tenantID.String(),
+		})
+	})
+
+	t.Run("TenantService が非200ステータスを返す場合、エラーが返されること", func(t *testing.T) {
+		// arrange
+		ctx := contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t))
+		spannerConnectionBuilder := instanceConnectionParameter.CreateSpannerConnectionBuilder()
+		spannerConnectionBuilder.CreateDatabaseForTest(t, ctx, app_testing.GetSchema(t))
+		sqlProvider, err := sqlxx.NewProvider(spannerConnectionBuilder)
+		assertx.FatalIfError(t, err)
+
+		stubClock := stdx.NewStubClock(t)
+		stubClock.SetNow(time.Date(2025, 8, 27, 12, 0, 0, 0, time.UTC))
+
+		// Setup mock TenantService server to return error
+		tenantHandlerFixture := tenant_fixture.HandlerFixture(httpx.GetRegisterFuncFixture[tenant_connect.TenantServiceHandler](t,
+			httpx.NewProcedureAuthorizers(
+				tenant_connect.TenantServiceListProcedure,
+				httpx.AllowAllAuthorizer(), httpx.AllowsAnyOfCallSites(common_vo.CallSiteInternal),
+			)))
+		tenantHandlerFixture.AddResponseWithError(tenant_connect.TenantServiceListProcedure, &http_fixture.ResponseWithError{
+			Response: nil,
+			Error:    connect.NewError(connect.CodeUnavailable, errors.New("service unavailable")),
+		})
+		tenantServer := httpx.PrepareServer(t, tenantHandlerFixture)
+
+		ctx, env := app_env.NewTest(t).
+			WithSQLProvider(t, sqlProvider).
+			WithCustomClock(t, stubClock).
+			WithTenantBaseURL(t, tenantServer.URL()).
+			Setup(t, ctx)
+		testAPP := app_testing.PrepareAPP(t, ctx)
+
+		client := app_connect.NewStatisticsComputationInitiationServiceClient(testAPP.Server.ClientForContextCallSite(ctx), testAPP.Server.URL(), connect.WithProtoJSON())
+		spyPublisher := env.SpyPublisher
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		_, err = client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var connectErr *connect.Error
+		if !errors.As(err, &connectErr) {
+			t.Fatalf("expected connect.Error, got: %v", err)
+		}
+		assertx.Equal(t, connect.CodeUnavailable, connectErr.Code())
+		spyPublisher.AssertNeverPublished(t)
+	})
+
+	t.Run("複数テナントのうち一部だけが24時間以内に initiation 済みの場合、該当テナントのみスキップされること", func(t *testing.T) {
+		// arrange
+		tenantID1 := common_vo_fixture.GetTenantIDFixture()
+		tenantID2, err := common_vo.NewTenantID("123e4567-e89b-12d3-a456-426614174001")
+		assertx.FatalIfError(t, err)
+		tenantID3, err := common_vo.NewTenantID("123e4567-e89b-12d3-a456-426614174002")
+		assertx.FatalIfError(t, err)
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)), []string{tenantID1.String(), tenantID2.String(), tenantID3.String()})
+
+		// Setup: tenantID1 は12時間前に initiation 済み（スキップされる）
+		// tenantID2 は25時間前に initiation 済み（再実行される）
+		// tenantID3 は initiation 未実行（実行される）
+		fixture.stubClock.SetNow(time.Date(2025, 8, 27, 12, 0, 0, 0, time.UTC))
+
+		// tenantID1: 12 hours ago (within 24 hours - should be skipped)
+		dataFixture1 := core.NewDataFixture(t).
+			WithTenantID(t, tenantID1.String()).
+			WithCreatedAt(t, time.Date(2025, 8, 27, 0, 0, 0, 0, time.UTC))
+		dataFixture1.RootRow.ID = common_vo.RandomID().String()
+		tx1, err := fixture.conn.Begin(ctx)
+		assertx.FatalIfError(t, err)
+		ctx1 := contextx.ImpersonateTenant(ctx, tenantID1)
+		dataFixture1.Setup(t, ctx1, tx1)
+		assertx.FatalIfError(t, tx1.Commit(ctx1))
+
+		// tenantID2: 25 hours ago (outside 24 hours - should be executed)
+		dataFixture2 := core.NewDataFixture(t).
+			WithTenantID(t, tenantID2.String()).
+			WithCreatedAt(t, time.Date(2025, 8, 26, 11, 0, 0, 0, time.UTC))
+		dataFixture2.RootRow.ID = common_vo.RandomID().String()
+		tx2, err := fixture.conn.Begin(ctx)
+		assertx.FatalIfError(t, err)
+		ctx2 := contextx.ImpersonateTenant(ctx, tenantID2)
+		dataFixture2.Setup(t, ctx2, tx2)
+		assertx.FatalIfError(t, tx2.Commit(ctx2))
+
+		// tenantID3: no initiation record (should be executed)
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		actual, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		assertx.FatalIfError(t, err)
+		// tenantID1 はスキップされ、tenantID2 と tenantID3 は実行される
+		assertx.Equal(t, 2, len(actual.Msg.GetTenantIds()))
+		// 順序は保証されないので、含まれているかどうかを確認
+		tenantIDs := make(map[string]bool)
+		for _, id := range actual.Msg.GetTenantIds() {
+			tenantIDs[id] = true
+		}
+		assertx.Equal(t, true, tenantIDs[tenantID2.String()])
+		assertx.Equal(t, true, tenantIDs[tenantID3.String()])
+		assertx.Equal(t, false, tenantIDs[tenantID1.String()])
+
+		// Verify events are published for tenantID2 and tenantID3 only
+		fixture.spyPublisher.AssertMultiplePublished(t,
+			pubsubx.NewExpectedPublishedParameters(core.AddedEventTopic, &app_proto.AddedEventPayload{
+				TenantId: tenantID2.String(),
+			}),
+			pubsubx.NewExpectedPublishedParameters(core.AddedEventTopic, &app_proto.AddedEventPayload{
+				TenantId: tenantID3.String(),
+			}),
+		)
+	})
+
+	t.Run("TenantService が不正な tenant_id を返す場合、エラーが返されること", func(t *testing.T) {
+		// arrange
+		// tenant ID は最大255文字まで。256文字の文字列は無効
+		invalidTenantID := strings.Repeat("a", 256)
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)), []string{invalidTenantID})
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		_, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		var connectErr *connect.Error
+		if !errors.As(err, &connectErr) {
+			t.Fatalf("expected connect.Error, got: %v", err)
+		}
+		assertx.Equal(t, connect.CodeInternal, connectErr.Code())
+		fixture.spyPublisher.AssertNeverPublished(t)
+	})
+}
+
+// countInitiationsByTenantID は指定されたテナントIDの initiation レコード数を取得する
+func countInitiationsByTenantID(tb testing.TB, ctx context.Context, accessor sqlxx.Accessor, tenantID string) int64 {
+	tb.Helper()
+
+	const query = `-- countInitiationsByTenantID
+SELECT COUNT(*) as count
+FROM enriched_data_statistics_computation_initiation
+WHERE tenant_id = @tenant_id`
+
+	rows, err := sqlxx.TypedAccessor[struct {
+		Count int64 `db:"count"`
+	}](accessor).SelectList(
+		ctx,
+		query,
+		struct {
+			TenantID string `db:"tenant_id"`
+		}{
+			TenantID: tenantID,
+		},
+		sqlxx.WithSkipAuthenticatedTenantIDCheckSelectOption(),
+	)
+	assertx.FatalIfError(tb, err)
+	if len(rows) == 0 {
+		return 0
+	}
+	return rows[0].Count
+}

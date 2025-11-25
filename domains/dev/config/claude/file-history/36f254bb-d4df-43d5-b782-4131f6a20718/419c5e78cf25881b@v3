@@ -1,0 +1,77 @@
+"use client";
+
+import { LinkButton } from "../../../../../components/ui/button";
+import { PageTitle } from "../../../../../components/ui/page-title/PageTitle";
+import { formatDateTime } from "../../../../../lib/format";
+import styles from "./DataQualityManagementSection.module.css";
+import { DataQualityManagementTab } from "./DataQualityManagementTab";
+import { Funnel } from "./Funnel";
+import type { DataQualityStatistics } from "./types";
+
+type Props = {
+  dataQualityStatistics: DataQualityStatistics;
+};
+
+export const DataQualityManagementSection = ({
+  dataQualityStatistics,
+}: Props) => {
+  const { tenantStatistics, integratedSystemStatistics, calculatedAt } =
+    dataQualityStatistics;
+
+  const updatedAt = calculatedAt ?? new Date();
+
+  const tabs = [
+    {
+      value: "すべて",
+      label: "すべて",
+      panelContent: <Funnel statistics={tenantStatistics} />,
+    },
+    ...integratedSystemStatistics
+      .filter((systemStat) => systemStat.integratedSystemName != null)
+      .map((systemStat) => ({
+        value: systemStat.integratedSystemId,
+        label: systemStat.integratedSystemName!,
+        panelContent: (
+          <Funnel
+            statistics={{
+              totalCount: systemStat.totalCount,
+              socV2IdentifiedCount: systemStat.socV2IdentifiedCount,
+              socV2UnidentifiedCount: systemStat.socV2UnidentifiedCount,
+              socV2UniqueCount: systemStat.socV2UniqueCount,
+              enterpriseSocV2UniqueCount: systemStat.enterpriseSocV2UniqueCount,
+              establishmentSocV2UniqueCount:
+                systemStat.establishmentSocV2UniqueCount,
+              duplicateCount: systemStat.duplicateCount,
+            }}
+          />
+        ),
+      })),
+  ];
+  return (
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <PageTitle
+          title={`データクオリティーマネジメント`}
+          description={`更新日時：${formatDateTime(updatedAt)}`}
+        />
+        <div className={styles.buttonGroup}>
+          <LinkButton
+            variant="secondary"
+            size="medium"
+            href="/enriched-data/import-histories"
+          >
+            CSVインポート履歴
+          </LinkButton>
+          <LinkButton
+            variant="primary"
+            size="medium"
+            href="/enriched-data/import"
+          >
+            CSVインポート
+          </LinkButton>
+        </div>
+      </div>
+      <DataQualityManagementTab tabs={tabs} />
+    </div>
+  );
+};

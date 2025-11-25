@@ -1,0 +1,17 @@
+import { SummaryCard } from "./SummaryCard";
+import styles from "./SummaryCardList.module.css";
+import type { DataSummaryStatistics } from "./types";
+
+type Props = {
+  summaryStatistics: DataSummaryStatistics[];
+};
+
+export const SummaryCardList = ({ summaryStatistics }: Props) => {
+  return (
+    <div className={styles.cardList}>
+      {summaryStatistics.map((data) => (
+        <SummaryCard key={data.entityType} {...data} />
+      ))}
+    </div>
+  );
+};

@@ -1,10 +1,6 @@
 # 外部設定ファイルのインクルード
-[include]
-    path = ~/.config/git/config.local
-
-# 会社/プロジェクト別の設定例（必要に応じてコメント解除して使用）
-# [includeIf "gitdir:{{HOME}}/path/to/work/repos/"]
-#     path = ~/.config/git/config.work
+# Note: These are auto-generated from ~/.config/git/conditional/*.conf
+{{CONDITIONAL_INCLUDES}}
 
 
 # 明らかにGitを改善する設定
@@ -77,13 +73,13 @@
     # diffやlogの表示に使用するツール
     pager = delta
 
-# GitHub認証情報の管理（includeIfで設定を上書きするため、グローバルでは無効化）
-# [credential "https://github.com"]
-#     helper =
-#     helper = !/opt/homebrew/bin/gh auth git-credential
-# [credential "https://gist.github.com"]
-#     helper =
-#     helper = !/opt/homebrew/bin/gh auth git-credential
+# GitHub認証情報の管理
+[credential "https://github.com"]
+    helper =
+    helper = !/opt/homebrew/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+    helper =
+    helper = !/opt/homebrew/bin/gh auth git-credential
 
 # deltaの設定（高機能なdiff表示ツール）
 [delta]

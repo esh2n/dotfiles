@@ -1,0 +1,30 @@
+package statistics_computation_initiation
+
+import (
+	"context"
+
+	"connectrpc.com/connect"
+	app_proto "github.com/sansaninc/sdi-contracts/integrated_data/enriched_data/statistics_computation_initiation/v1"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/app_env"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/statistics_computation_initiation/internal/core"
+)
+
+func (h *handlerV1) Add(ctx context.Context, req *connect.Request[app_proto.StatisticsComputationInitiationServiceAddRequest]) (*connect.Response[app_proto.StatisticsComputationInitiationServiceAddResponse], error) {
+	env, err := app_env.GetEnv(ctx)
+	if err != nil {
+		return nil, err
+	}
+	appService := &addApplicationServiceV1{
+		connection: env.ServiceLocator().GetDBConnection(),
+		repos:      core.NewRepository(),
+		publisher:  env.ServiceLocator().GetPublisher(),
+		clock:      env.ServiceLocator().GetClock(),
+	}
+
+	res, err := appService.execute(ctx, &addV1Args{msg: req.Msg})
+	if err != nil {
+		return nil, err
+	}
+
+	return connect.NewResponse(res.toResponse()), nil
+}

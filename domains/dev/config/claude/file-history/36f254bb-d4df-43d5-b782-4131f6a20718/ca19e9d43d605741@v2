@@ -1,0 +1,90 @@
+import { describe, expect, it } from "vitest";
+import type { DataQualityTenantStatistics } from "./types";
+import { toDataSummaryStatistics } from "./types";
+
+describe("toDataSummaryStatistics", () => {
+  const mockTenantStatistics: DataQualityTenantStatistics = {
+    totalCount: 1000,
+    socV2IdentifiedCount: 800,
+    socV2UnidentifiedCount: 200,
+    socV2UniqueCount: 750,
+    enterpriseSocV2UniqueCount: 400,
+    establishmentSocV2UniqueCount: 350,
+    duplicateCount: 50,
+  };
+
+  it("corporation と establishment の両方のデータを正しく変換する", () => {
+    const result = toDataSummaryStatistics(
+      mockTenantStatistics,
+      5016410,
+      6117457,
+      "2024-01-15T10:00:00.000Z",
+    );
+
+    expect(result).toHaveLength(2);
+
+    expect(result[0]).toEqual({
+      entityType: "corporation",
+      totalCount: 5016410,
+      importedDataCount: 400,
+      whitespaceCount: 5016010,
+      updatedAt: "2024-01-15T10:00:00.000Z",
+    });
+
+    expect(result[1]).toEqual({
+      entityType: "establishment",
+      totalCount: 6117457,
+      importedDataCount: 350,
+      whitespaceCount: 6117107,
+      updatedAt: "2024-01-15T10:00:00.000Z",
+    });
+  });
+
+  it("calculatedAtISOString が undefined の場合、updatedAt も undefined になる", () => {
+    const result = toDataSummaryStatistics(
+      mockTenantStatistics,
+      5016410,
+      6117457,
+      undefined,
+    );
+
+    expect(result[0].updatedAt).toBeUndefined();
+    expect(result[1].updatedAt).toBeUndefined();
+  });
+
+  it("whitespaceCount の計算が正しい（totalCount - importedDataCount）", () => {
+    const result = toDataSummaryStatistics(
+      mockTenantStatistics,
+      1000,
+      2000,
+      "2024-01-15T10:00:00.000Z",
+    );
+
+    expect(result[0].whitespaceCount).toBe(600);
+    expect(result[1].whitespaceCount).toBe(1650);
+  });
+
+  it("importedDataCount が 0 の場合でも正しく計算される", () => {
+    const emptyStatistics: DataQualityTenantStatistics = {
+      totalCount: 0,
+      socV2IdentifiedCount: 0,
+      socV2UnidentifiedCount: 0,
+      socV2UniqueCount: 0,
+      enterpriseSocV2UniqueCount: 0,
+      establishmentSocV2UniqueCount: 0,
+      duplicateCount: 0,
+    };
+
+    const result = toDataSummaryStatistics(
+      emptyStatistics,
+      5016410,
+      6117457,
+      "2024-01-15T10:00:00.000Z",
+    );
+
+    expect(result[0].importedDataCount).toBe(0);
+    expect(result[0].whitespaceCount).toBe(5016410);
+    expect(result[1].importedDataCount).toBe(0);
+    expect(result[1].whitespaceCount).toBe(6117457);
+  });
+});

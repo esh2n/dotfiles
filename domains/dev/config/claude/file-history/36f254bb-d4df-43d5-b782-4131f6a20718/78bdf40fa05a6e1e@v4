@@ -1,0 +1,121 @@
+import type {
+  StatisticsServiceGetForSdiAppResponse_IntegratedSystemStatistics,
+  StatisticsServiceGetForSdiAppResponse_TenantStatistics,
+} from "@sansaninc/sdi-contracts/integrated_data/enriched_data/statistics/v1/get_for_sdi_app_message_pb";
+import type { IntegratedSystem as IntegratedSystemProto } from "@sansaninc/sdi-contracts/tenant/tenant_configuration/integrated_system/v1/model_pb";
+import type { DatabaseType } from "../../(database)/types";
+
+export type DataSummaryStatistics = {
+  entityType: DatabaseType;
+  totalCount: number;
+  importedDataCount: number;
+  whitespaceCount: number;
+  updatedAt: string | undefined;
+};
+
+export type DataQualityTenantStatistics = {
+  totalCount: number;
+  socV2IdentifiedCount: number;
+  socV2UnidentifiedCount: number;
+  socV2UniqueCount: number;
+  enterpriseSocV2UniqueCount: number;
+  establishmentSocV2UniqueCount: number;
+  duplicateCount: number;
+};
+
+export type DataQualityIntegratedSystemStatistics = {
+  integratedSystemId: string;
+  integratedSystemName: string | undefined;
+  totalCount: number;
+  socV2IdentifiedCount: number;
+  socV2UnidentifiedCount: number;
+  socV2UniqueCount: number;
+  enterpriseSocV2UniqueCount: number;
+  establishmentSocV2UniqueCount: number;
+  duplicateCount: number;
+};
+
+export type DataQualityStatistics = {
+  tenantStatistics: DataQualityTenantStatistics;
+  integratedSystemStatistics: DataQualityIntegratedSystemStatistics[];
+  calculatedAt: Date | undefined;
+};
+
+export const toDataQualityTenantStatistics = (
+  item: StatisticsServiceGetForSdiAppResponse_TenantStatistics | undefined,
+): DataQualityTenantStatistics => {
+  if (!item) {
+    return {
+      totalCount: 0,
+      socV2IdentifiedCount: 0,
+      socV2UnidentifiedCount: 0,
+      socV2UniqueCount: 0,
+      enterpriseSocV2UniqueCount: 0,
+      establishmentSocV2UniqueCount: 0,
+      duplicateCount: 0,
+    };
+  }
+
+  return {
+    totalCount: Number(item.totalCount ?? BigInt(0)),
+    socV2IdentifiedCount: Number(item.socV2IdentifiedCount ?? BigInt(0)),
+    socV2UnidentifiedCount: Number(item.socV2UnidentifiedCount ?? BigInt(0)),
+    socV2UniqueCount: Number(item.socV2UniqueCount ?? BigInt(0)),
+    enterpriseSocV2UniqueCount: Number(
+      item.enterpriseSocV2UniqueCount ?? BigInt(0),
+    ),
+    establishmentSocV2UniqueCount: Number(
+      item.establishmentSocV2UniqueCount ?? BigInt(0),
+    ),
+    duplicateCount: Number(item.duplicateCount ?? BigInt(0)),
+  };
+};
+
+export const toDataQualityIntegratedSystemStatistics = (
+  item: StatisticsServiceGetForSdiAppResponse_IntegratedSystemStatistics,
+  integratedSystemMap: Map<string, IntegratedSystemProto>,
+): DataQualityIntegratedSystemStatistics => {
+  const integratedSystem = integratedSystemMap.get(item.integratedSystemId);
+
+  return {
+    integratedSystemId: item.integratedSystemId,
+    integratedSystemName: integratedSystem?.displayName,
+    totalCount: Number(item.totalCount ?? BigInt(0)),
+    socV2IdentifiedCount: Number(item.socV2IdentifiedCount ?? BigInt(0)),
+    socV2UnidentifiedCount: Number(item.socV2UnidentifiedCount ?? BigInt(0)),
+    socV2UniqueCount: Number(item.socV2UniqueCount ?? BigInt(0)),
+    enterpriseSocV2UniqueCount: Number(
+      item.enterpriseSocV2UniqueCount ?? BigInt(0),
+    ),
+    establishmentSocV2UniqueCount: Number(
+      item.establishmentSocV2UniqueCount ?? BigInt(0),
+    ),
+    duplicateCount: Number(item.duplicateCount ?? BigInt(0)),
+  };
+};
+
+export const toDataSummaryStatistics = (
+  tenantStatistics: DataQualityTenantStatistics,
+  corporationTotalCount: number,
+  establishmentTotalCount: number,
+  calculatedAtISOString: string | undefined,
+): [DataSummaryStatistics, DataSummaryStatistics] => {
+  return [
+    {
+      entityType: "corporation",
+      totalCount: corporationTotalCount,
+      importedDataCount: tenantStatistics.enterpriseSocV2UniqueCount,
+      whitespaceCount:
+        corporationTotalCount - tenantStatistics.enterpriseSocV2UniqueCount,
+      updatedAt: calculatedAtISOString,
+    },
+    {
+      entityType: "establishment",
+      totalCount: establishmentTotalCount,
+      importedDataCount: tenantStatistics.establishmentSocV2UniqueCount,
+      whitespaceCount:
+        establishmentTotalCount - tenantStatistics.establishmentSocV2UniqueCount,
+      updatedAt: calculatedAtISOString,
+    },
+  ];
+};

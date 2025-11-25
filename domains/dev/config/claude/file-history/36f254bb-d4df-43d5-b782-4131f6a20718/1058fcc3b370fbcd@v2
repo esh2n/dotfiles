@@ -1,0 +1,37 @@
+export type FunnelPercentages = {
+  socAssignedPercentage: string | null;
+  socUnassignedPercentage: string | null;
+  duplicatesPercentage: string | null;
+  totalImportedPercentage: string | null;
+};
+
+export const calculateFunnelPercentages = (
+  totalImported: number,
+  socAssignedCount: number,
+  socUnassignedCount: number,
+  duplicatesCount: number,
+): FunnelPercentages => {
+  const socAssignedPercentage =
+    totalImported > 0
+      ? ((socAssignedCount / totalImported) * 100).toFixed(1)
+      : null;
+
+  const socUnassignedPercentage =
+    totalImported > 0
+      ? ((socUnassignedCount / totalImported) * 100).toFixed(1)
+      : null;
+
+  const duplicatesPercentage =
+    socAssignedCount > 0
+      ? ((duplicatesCount / socAssignedCount) * 100).toFixed(1)
+      : null;
+
+  const totalImportedPercentage = totalImported > 0 ? "100.0" : null;
+
+  return {
+    socAssignedPercentage,
+    socUnassignedPercentage,
+    duplicatesPercentage,
+    totalImportedPercentage,
+  };
+};

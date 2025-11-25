@@ -1,0 +1,93 @@
+package core
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/sansaninc/sdi-core/integrated_data/shared/bc_db"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/common_vo"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/contextx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/ex"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/sqlxx"
+)
+
+type Repository struct {
+}
+
+func NewRepository() *Repository {
+	return &Repository{}
+}
+
+var ErrNotFound = errors.New("not found")
+
+func (r *Repository) LatestForTenants(ctx context.Context, accessor sqlxx.Accessor, tenantIDs []common_vo.TenantID) (map[common_vo.TenantID]*time.Time, error) {
+	if len(tenantIDs) == 0 {
+		return make(map[common_vo.TenantID]*time.Time), nil
+	}
+
+	tenantIDStrs := make([]string, len(tenantIDs))
+	for i, tenantID := range tenantIDs {
+		tenantIDStrs[i] = tenantID.String()
+	}
+
+	const query = `-- statistics_computation_initiation.LatestForTenants
+SELECT
+  tenant_id,
+  MAX(created_at) as created_at
+FROM
+  enriched_data_statistics_computation_initiation
+WHERE
+  tenant_id IN UNNEST(@tenant_ids)
+GROUP BY
+  tenant_id
+`
+
+	rows, err := sqlxx.TypedAccessor[struct {
+		TenantID  string    `db:"tenant_id"`
+		CreatedAt time.Time `db:"created_at"`
+	}](accessor).SelectList(
+		ctx,
+		query,
+		struct {
+			TenantIDs []string `db:"tenant_ids"`
+		}{
+			TenantIDs: tenantIDStrs,
+		},
+		sqlxx.WithSkipAuthenticatedTenantIDCheckSelectOption(),
+	)
+	if err != nil {
+		return nil, ex.Wrap(err)
+	}
+
+	result := make(map[common_vo.TenantID]*time.Time, len(rows))
+	for _, row := range rows {
+		tenantID, err := common_vo.NewTenantID(row.TenantID)
+		if err != nil {
+			return nil, ex.Wrap(err)
+		}
+		createdAt := row.CreatedAt
+		result[tenantID] = &createdAt
+	}
+
+	return result, nil
+}
+
+func (r *Repository) Insert(ctx context.Context, tx sqlxx.Transaction, rootEntity *RootEntity) error {
+	tenantID, err := contextx.GetTenantID(ctx)
+	if err != nil {
+		return ex.Wrap(err)
+	}
+
+	row := &bc_db.EnrichedDataStatisticsComputationInitiation{
+		ID:             rootEntity.id.value.String(),
+		TenantID:       tenantID.String(),
+		CreatedAt:      rootEntity.createdAt.value,
+		RetentionUntil: rootEntity.retentionUntil.value,
+	}
+	if _, err := row.Insert(ctx, tx); err != nil {
+		return ex.Wrap(err)
+	}
+
+	return nil
+}

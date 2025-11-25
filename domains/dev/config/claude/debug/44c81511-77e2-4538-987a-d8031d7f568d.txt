@@ -1,0 +1,387 @@
+2025-11-25T06:38:34.322Z [DEBUG] Watching for changes in setting files /Users/shunya.endo/.claude/settings.json...
+2025-11-25T06:38:34.372Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2025-11-25T06:38:34.372Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2025-11-25T06:38:34.372Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2025-11-25T06:38:34.372Z [DEBUG] [LSP SERVER MANAGER] initialize() called
+2025-11-25T06:38:34.372Z [DEBUG] [LSP SERVER MANAGER] Calling getAllLspServers()
+2025-11-25T06:38:34.378Z [DEBUG] Found 0 plugins (0 enabled, 0 disabled)
+2025-11-25T06:38:34.381Z [DEBUG] Total LSP servers loaded: 0
+2025-11-25T06:38:34.385Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2025-11-25T06:38:34.385Z [DEBUG] LSP manager initialized with 0 servers
+2025-11-25T06:38:34.386Z [DEBUG] LSP server manager initialized successfully
+2025-11-25T06:38:34.386Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2025-11-25T06:38:34.389Z [DEBUG] Loading skills from directories: managed=/Library/Application Support/ClaudeCode/.claude/skills, user=/Users/shunya.endo/.claude/skills, project=/Users/shunya.endo/go/github.com/esh2n/dotfiles/.claude/skills
+2025-11-25T06:38:34.389Z [DEBUG] >>>>> getPluginSkills CALLED <<<<<
+2025-11-25T06:38:34.419Z [DEBUG] Creating shell snapshot for zsh (/bin/zsh)
+2025-11-25T06:38:34.419Z [DEBUG] Looking for shell config file: /Users/shunya.endo/.zshrc
+2025-11-25T06:38:34.419Z [DEBUG] Snapshots directory: /Users/shunya.endo/.claude/shell-snapshots
+2025-11-25T06:38:34.419Z [DEBUG] Creating snapshot at: /Users/shunya.endo/.claude/shell-snapshots/snapshot-zsh-1764052714419-ol39b6.sh
+2025-11-25T06:38:34.419Z [DEBUG] Shell binary exists: true
+2025-11-25T06:38:34.419Z [DEBUG] Execution timeout: 10000ms
+2025-11-25T06:38:34.420Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052714420
+2025-11-25T06:38:34.427Z [DEBUG] Temp file written successfully, size: 2 bytes
+2025-11-25T06:38:34.427Z [DEBUG] Renaming /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052714420 to /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json
+2025-11-25T06:38:34.431Z [DEBUG] File /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json written atomically
+2025-11-25T06:38:34.439Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052714439
+2025-11-25T06:38:34.439Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:34.444Z [DEBUG] Temp file written successfully, size: 76806 bytes
+2025-11-25T06:38:34.444Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:34.444Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052714439 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:34.445Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:34.448Z [DEBUG] getPluginSkills: Processing 0 enabled plugins
+2025-11-25T06:38:34.448Z [DEBUG] Total plugin skills loaded: 0
+2025-11-25T06:38:34.448Z [DEBUG] Total plugin commands loaded: 0
+2025-11-25T06:38:34.448Z [DEBUG] Registered 0 hooks from 0 plugins
+2025-11-25T06:38:34.449Z [DEBUG] Loaded 0 unique skills (managed: 0, user: 0, project: 0, duplicates removed: 0)
+2025-11-25T06:38:34.449Z [DEBUG] getSkills returning: 0 skill dir commands, 0 plugin skills
+2025-11-25T06:38:34.449Z [DEBUG] Total plugin agents loaded: 0
+2025-11-25T06:38:34.473Z [DEBUG] Git remote URL: https://github.com/esh2n/dotfiles.git
+2025-11-25T06:38:34.473Z [DEBUG] Parsed repository: esh2n/dotfiles from https://github.com/esh2n/dotfiles.git
+2025-11-25T06:38:34.473Z [DEBUG] Parsed repository: esh2n/dotfiles from URL: https://github.com/esh2n/dotfiles.git
+2025-11-25T06:38:34.473Z [DEBUG] Path /Users/shunya.endo/go/github.com/esh2n/dotfiles already tracked for repo esh2n/dotfiles
+2025-11-25T06:38:34.491Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052714491
+2025-11-25T06:38:34.491Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:34.497Z [DEBUG] Temp file written successfully, size: 76806 bytes
+2025-11-25T06:38:34.497Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:34.497Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052714491 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:34.497Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:34.504Z [DEBUG] Getting matching hook commands for SessionStart with query: startup
+2025-11-25T06:38:34.504Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:38:34.504Z [DEBUG] Matched 0 unique hooks for query "startup" (0 before deduplication)
+2025-11-25T06:38:34.520Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052714520
+2025-11-25T06:38:34.520Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:34.524Z [DEBUG] Temp file written successfully, size: 76701 bytes
+2025-11-25T06:38:34.524Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:34.524Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052714520 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:34.525Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:34.530Z [DEBUG] performStartupChecks called
+2025-11-25T06:38:34.530Z [DEBUG] Starting background plugin installations
+2025-11-25T06:38:34.530Z [DEBUG] performBackgroundPluginInstallations called
+2025-11-25T06:38:34.539Z [DEBUG] Setting installation status: 0 marketplaces, 0 installable plugins, 0 uninstallable plugins
+2025-11-25T06:38:34.540Z [DEBUG] Loaded plugins - Enabled: 0, Disabled: 0, Commands: 0, Agents: 0, Errors: 0
+2025-11-25T06:38:34.545Z [DEBUG] Ripgrep first use test: PASSED (mode=builtin, path=/Users/shunya.endo/.bun/install/global/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg)
+2025-11-25T06:38:34.546Z [DEBUG] Getting matching hook commands for SubagentStart with query: Explore
+2025-11-25T06:38:34.546Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:38:34.546Z [DEBUG] Matched 0 unique hooks for query "Explore" (0 before deduplication)
+2025-11-25T06:38:34.547Z [DEBUG] Getting matching hook commands for SubagentStart with query: Plan
+2025-11-25T06:38:34.547Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:38:34.547Z [DEBUG] Matched 0 unique hooks for query "Plan" (0 before deduplication)
+2025-11-25T06:38:34.551Z [DEBUG] Skills and commands included in Skill tool:
+2025-11-25T06:38:34.551Z [DEBUG] Slash commands included in SlashCommand tool:
+2025-11-25T06:38:34.559Z [DEBUG] Summarizing all 26 messages (~6302 tokens)
+2025-11-25T06:38:34.719Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052714719
+2025-11-25T06:38:34.719Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:34.724Z [DEBUG] Temp file written successfully, size: 76701 bytes
+2025-11-25T06:38:34.725Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:34.725Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052714719 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:34.725Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:34.727Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052714727
+2025-11-25T06:38:34.727Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:34.732Z [DEBUG] Temp file written successfully, size: 76701 bytes
+2025-11-25T06:38:34.732Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:34.732Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052714727 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:34.732Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:34.734Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052714734
+2025-11-25T06:38:34.734Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:34.739Z [DEBUG] Temp file written successfully, size: 76806 bytes
+2025-11-25T06:38:34.739Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:34.739Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052714734 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:34.739Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:34.768Z [DEBUG] AutoUpdaterWrapper: Installation type: unknown
+2025-11-25T06:38:35.031Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052715031
+2025-11-25T06:38:35.031Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:35.038Z [DEBUG] Temp file written successfully, size: 76806 bytes
+2025-11-25T06:38:35.038Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:35.038Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052715031 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:35.038Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:35.062Z [DEBUG] Shell snapshot created successfully (32798 bytes)
+2025-11-25T06:38:35.110Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.41556.1764052715110
+2025-11-25T06:38:35.110Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:38:35.115Z [DEBUG] Temp file written successfully, size: 76806 bytes
+2025-11-25T06:38:35.116Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:38:35.116Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.41556.1764052715110 to /Users/shunya.endo/.claude.json
+2025-11-25T06:38:35.116Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:38:35.920Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:38:36.382Z [DEBUG] Summarizing all 443 messages (~106637 tokens)
+2025-11-25T06:38:36.552Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:38:37.467Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:38:37.846Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:38:38.331Z [DEBUG] Summarizing all 515 messages (~138943 tokens)
+2025-11-25T06:38:40.061Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:38:40.103Z [DEBUG] Getting matching hook commands for SubagentStop with query: undefined
+2025-11-25T06:38:40.103Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:38:40.103Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:38:40.579Z [DEBUG] Summarizing all 280 messages (~46133 tokens)
+2025-11-25T06:38:42.819Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:38:45.521Z [DEBUG] Getting matching hook commands for SubagentStop with query: undefined
+2025-11-25T06:38:45.521Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:38:45.521Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:38:57.470Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:38:57.470Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:38:57.475Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:38:57.475Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:38:57.491Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2025-11-25T06:38:57.491Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:38:57.491Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:38:57.492Z [DEBUG] FileHistory: Added snapshot for a889e6a8-935d-42f7-8eb6-fbf7803dfbbd, tracking 0 files
+2025-11-25T06:38:57.504Z [DEBUG] Total plugin output styles loaded: 0
+2025-11-25T06:38:59.051Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:39:01.059Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:39:08.349Z [DEBUG] executePreToolHooks called for tool: Read
+2025-11-25T06:39:08.352Z [DEBUG] executePreToolHooks called for tool: Read
+2025-11-25T06:39:08.355Z [DEBUG] executePreToolHooks called for tool: Read
+2025-11-25T06:39:08.357Z [DEBUG] Getting matching hook commands for PreToolUse with query: Read
+2025-11-25T06:39:08.358Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:08.358Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:39:08.358Z [DEBUG] Getting matching hook commands for PreToolUse with query: Read
+2025-11-25T06:39:08.358Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:08.358Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:39:08.358Z [DEBUG] Getting matching hook commands for PreToolUse with query: Read
+2025-11-25T06:39:08.358Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:08.358Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:39:08.400Z [DEBUG] Getting matching hook commands for PostToolUse with query: Read
+2025-11-25T06:39:08.400Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:08.400Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:39:08.400Z [DEBUG] Getting matching hook commands for PostToolUse with query: Read
+2025-11-25T06:39:08.400Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:08.400Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:39:08.400Z [DEBUG] Getting matching hook commands for PostToolUse with query: Read
+2025-11-25T06:39:08.400Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:08.400Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:39:08.428Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:39:08.428Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:39:08.431Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:39:08.431Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:39:11.239Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:39:25.415Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2025-11-25T06:39:25.415Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:25.415Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:39:42.501Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:39:42.501Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:39:42.505Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:39:42.505Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:39:42.519Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2025-11-25T06:39:42.519Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:42.519Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:39:42.520Z [DEBUG] FileHistory: Making snapshot for message 2266b345-2e02-4f4b-ba61-3ff883468a8b
+2025-11-25T06:39:42.520Z [DEBUG] FileHistory: Added snapshot for 2266b345-2e02-4f4b-ba61-3ff883468a8b, tracking 0 files
+2025-11-25T06:39:43.159Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:39:47.109Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:39:56.884Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2025-11-25T06:39:56.884Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:39:56.884Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:40:41.163Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:40:41.163Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:40:41.168Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:40:41.168Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:40:41.182Z [DEBUG] Getting matching hook commands for UserPromptSubmit with query: undefined
+2025-11-25T06:40:41.182Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:40:41.182Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:40:41.183Z [DEBUG] FileHistory: Making snapshot for message f2763e67-24b6-41a2-8986-5987d7ac1ce3
+2025-11-25T06:40:41.183Z [DEBUG] FileHistory: Added snapshot for f2763e67-24b6-41a2-8986-5987d7ac1ce3, tracking 0 files
+2025-11-25T06:40:43.021Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:40:44.645Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:40:48.912Z [DEBUG] executePreToolHooks called for tool: TodoWrite
+2025-11-25T06:40:48.914Z [DEBUG] Getting matching hook commands for PreToolUse with query: TodoWrite
+2025-11-25T06:40:48.914Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:40:48.914Z [DEBUG] Matched 0 unique hooks for query "TodoWrite" (0 before deduplication)
+2025-11-25T06:40:48.922Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052848922
+2025-11-25T06:40:48.922Z [DEBUG] Preserving file permissions: 100600
+2025-11-25T06:40:48.928Z [DEBUG] Temp file written successfully, size: 330 bytes
+2025-11-25T06:40:48.928Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:40:48.928Z [DEBUG] Renaming /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052848922 to /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json
+2025-11-25T06:40:48.929Z [DEBUG] File /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json written atomically
+2025-11-25T06:40:48.938Z [DEBUG] Getting matching hook commands for PostToolUse with query: TodoWrite
+2025-11-25T06:40:48.938Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:40:48.938Z [DEBUG] Matched 0 unique hooks for query "TodoWrite" (0 before deduplication)
+2025-11-25T06:40:48.954Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:40:48.954Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:40:48.958Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:40:48.958Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:40:52.125Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:40:59.942Z [DEBUG] executePreToolHooks called for tool: Edit
+2025-11-25T06:40:59.945Z [DEBUG] Getting matching hook commands for PreToolUse with query: Edit
+2025-11-25T06:40:59.945Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:40:59.945Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:40:59.954Z [DEBUG] Permission suggestions for Edit: [
+  {
+    "type": "setMode",
+    "mode": "acceptEdits",
+    "destination": "session"
+  }
+]
+2025-11-25T06:40:59.982Z [DEBUG] executePermissionRequestHooks called for tool: Edit
+2025-11-25T06:40:59.989Z [DEBUG] Getting matching hook commands for PermissionRequest with query: Edit
+2025-11-25T06:40:59.989Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:40:59.989Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:41:05.976Z [DEBUG] Getting matching hook commands for Notification with query: permission_prompt
+2025-11-25T06:41:05.976Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:05.976Z [DEBUG] Matched 0 unique hooks for query "permission_prompt" (0 before deduplication)
+2025-11-25T06:41:20.772Z [DEBUG] FileHistory: Tracked file modification for /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl
+2025-11-25T06:41:20.774Z [DEBUG] Writing to temp file: /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl.tmp.41556.1764052880774
+2025-11-25T06:41:20.774Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:41:20.778Z [DEBUG] Temp file written successfully, size: 2830 bytes
+2025-11-25T06:41:20.779Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:41:20.779Z [DEBUG] Renaming /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl.tmp.41556.1764052880774 to /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl
+2025-11-25T06:41:20.779Z [DEBUG] File /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl written atomically
+2025-11-25T06:41:20.791Z [DEBUG] Getting matching hook commands for PostToolUse with query: Edit
+2025-11-25T06:41:20.791Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:20.791Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:41:20.827Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:41:20.827Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:41:20.831Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:41:20.831Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:41:20.939Z [DEBUG] AutoUpdaterWrapper: Installation type: unknown
+2025-11-25T06:41:24.129Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:41:28.822Z [DEBUG] executePreToolHooks called for tool: Edit
+2025-11-25T06:41:28.824Z [DEBUG] Getting matching hook commands for PreToolUse with query: Edit
+2025-11-25T06:41:28.824Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:28.824Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:41:28.831Z [DEBUG] Permission suggestions for Edit: [
+  {
+    "type": "setMode",
+    "mode": "acceptEdits",
+    "destination": "session"
+  }
+]
+2025-11-25T06:41:28.849Z [DEBUG] executePermissionRequestHooks called for tool: Edit
+2025-11-25T06:41:28.854Z [DEBUG] Getting matching hook commands for PermissionRequest with query: Edit
+2025-11-25T06:41:28.854Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:28.854Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:41:33.891Z [DEBUG] Writing to temp file: /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl.tmp.41556.1764052893891
+2025-11-25T06:41:33.891Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:41:33.897Z [DEBUG] Temp file written successfully, size: 3308 bytes
+2025-11-25T06:41:33.897Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:41:33.897Z [DEBUG] Renaming /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl.tmp.41556.1764052893891 to /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl
+2025-11-25T06:41:33.898Z [DEBUG] File /Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/dev/config/zellij/config.kdl written atomically
+2025-11-25T06:41:33.909Z [DEBUG] Getting matching hook commands for PostToolUse with query: Edit
+2025-11-25T06:41:33.909Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:33.909Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:41:33.935Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:41:33.935Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:41:33.939Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:41:33.939Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:41:34.071Z [DEBUG] AutoUpdaterWrapper: Installation type: unknown
+2025-11-25T06:41:37.193Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:41:39.663Z [DEBUG] executePreToolHooks called for tool: TodoWrite
+2025-11-25T06:41:39.668Z [DEBUG] Getting matching hook commands for PreToolUse with query: TodoWrite
+2025-11-25T06:41:39.668Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:39.668Z [DEBUG] Matched 0 unique hooks for query "TodoWrite" (0 before deduplication)
+2025-11-25T06:41:39.677Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052899677
+2025-11-25T06:41:39.677Z [DEBUG] Preserving file permissions: 100600
+2025-11-25T06:41:39.685Z [DEBUG] Temp file written successfully, size: 332 bytes
+2025-11-25T06:41:39.685Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:41:39.685Z [DEBUG] Renaming /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052899677 to /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json
+2025-11-25T06:41:39.686Z [DEBUG] File /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json written atomically
+2025-11-25T06:41:39.696Z [DEBUG] Getting matching hook commands for PostToolUse with query: TodoWrite
+2025-11-25T06:41:39.696Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:39.696Z [DEBUG] Matched 0 unique hooks for query "TodoWrite" (0 before deduplication)
+2025-11-25T06:41:39.709Z [DEBUG] executePreToolHooks called for tool: Read
+2025-11-25T06:41:39.712Z [DEBUG] Getting matching hook commands for PreToolUse with query: Read
+2025-11-25T06:41:39.712Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:39.712Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:41:39.726Z [DEBUG] Getting matching hook commands for PostToolUse with query: Read
+2025-11-25T06:41:39.726Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:39.726Z [DEBUG] Matched 0 unique hooks for query "Read" (0 before deduplication)
+2025-11-25T06:41:39.739Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:41:39.739Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:41:39.743Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:41:39.743Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:41:43.284Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:41:55.339Z [DEBUG] executePreToolHooks called for tool: Edit
+2025-11-25T06:41:55.342Z [DEBUG] Getting matching hook commands for PreToolUse with query: Edit
+2025-11-25T06:41:55.342Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:55.342Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:41:55.349Z [DEBUG] Permission suggestions for Edit: [
+  {
+    "type": "setMode",
+    "mode": "acceptEdits",
+    "destination": "session"
+  }
+]
+2025-11-25T06:41:55.366Z [DEBUG] executePermissionRequestHooks called for tool: Edit
+2025-11-25T06:41:55.370Z [DEBUG] Getting matching hook commands for PermissionRequest with query: Edit
+2025-11-25T06:41:55.370Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:41:55.370Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:42:01.364Z [DEBUG] Getting matching hook commands for Notification with query: permission_prompt
+2025-11-25T06:42:01.364Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:01.364Z [DEBUG] Matched 0 unique hooks for query "permission_prompt" (0 before deduplication)
+2025-11-25T06:42:06.376Z [DEBUG] FileHistory: Tracked file modification for /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md
+2025-11-25T06:42:06.378Z [DEBUG] Writing to temp file: /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md.tmp.41556.1764052926378
+2025-11-25T06:42:06.378Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:42:06.382Z [DEBUG] Temp file written successfully, size: 8426 bytes
+2025-11-25T06:42:06.382Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:42:06.382Z [DEBUG] Renaming /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md.tmp.41556.1764052926378 to /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md
+2025-11-25T06:42:06.383Z [DEBUG] File /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md written atomically
+2025-11-25T06:42:06.394Z [DEBUG] Getting matching hook commands for PostToolUse with query: Edit
+2025-11-25T06:42:06.394Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:06.394Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:42:06.421Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:42:06.421Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:42:06.425Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:42:06.425Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:42:06.573Z [DEBUG] AutoUpdaterWrapper: Installation type: unknown
+2025-11-25T06:42:09.167Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:42:12.778Z [DEBUG] executePreToolHooks called for tool: Edit
+2025-11-25T06:42:12.781Z [DEBUG] Getting matching hook commands for PreToolUse with query: Edit
+2025-11-25T06:42:12.781Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:12.781Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:42:12.790Z [DEBUG] Permission suggestions for Edit: [
+  {
+    "type": "setMode",
+    "mode": "acceptEdits",
+    "destination": "session"
+  }
+]
+2025-11-25T06:42:12.805Z [DEBUG] executePermissionRequestHooks called for tool: Edit
+2025-11-25T06:42:12.809Z [DEBUG] Getting matching hook commands for PermissionRequest with query: Edit
+2025-11-25T06:42:12.809Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:12.809Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:42:18.804Z [DEBUG] Getting matching hook commands for Notification with query: permission_prompt
+2025-11-25T06:42:18.804Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:18.804Z [DEBUG] Matched 0 unique hooks for query "permission_prompt" (0 before deduplication)
+2025-11-25T06:42:42.334Z [DEBUG] Writing to temp file: /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md.tmp.41556.1764052962334
+2025-11-25T06:42:42.334Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:42:42.340Z [DEBUG] Temp file written successfully, size: 8429 bytes
+2025-11-25T06:42:42.340Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:42:42.340Z [DEBUG] Renaming /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md.tmp.41556.1764052962334 to /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md
+2025-11-25T06:42:42.340Z [DEBUG] File /Users/shunya.endo/go/github.com/esh2n/dotfiles/README.md written atomically
+2025-11-25T06:42:42.352Z [DEBUG] Getting matching hook commands for PostToolUse with query: Edit
+2025-11-25T06:42:42.352Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:42.352Z [DEBUG] Matched 0 unique hooks for query "Edit" (0 before deduplication)
+2025-11-25T06:42:42.377Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:42:42.377Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:42:42.382Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:42:42.382Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:42:42.542Z [DEBUG] AutoUpdaterWrapper: Installation type: unknown
+2025-11-25T06:42:47.825Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:42:52.214Z [DEBUG] executePreToolHooks called for tool: TodoWrite
+2025-11-25T06:42:52.218Z [DEBUG] Getting matching hook commands for PreToolUse with query: TodoWrite
+2025-11-25T06:42:52.218Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:52.218Z [DEBUG] Matched 0 unique hooks for query "TodoWrite" (0 before deduplication)
+2025-11-25T06:42:52.226Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052972226
+2025-11-25T06:42:52.226Z [DEBUG] Preserving file permissions: 100600
+2025-11-25T06:42:52.234Z [DEBUG] Temp file written successfully, size: 2 bytes
+2025-11-25T06:42:52.234Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:42:52.234Z [DEBUG] Renaming /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json.tmp.41556.1764052972226 to /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json
+2025-11-25T06:42:52.235Z [DEBUG] File /Users/shunya.endo/.claude/todos/44c81511-77e2-4538-987a-d8031d7f568d-agent-44c81511-77e2-4538-987a-d8031d7f568d.json written atomically
+2025-11-25T06:42:52.243Z [DEBUG] Getting matching hook commands for PostToolUse with query: TodoWrite
+2025-11-25T06:42:52.243Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:42:52.243Z [DEBUG] Matched 0 unique hooks for query "TodoWrite" (0 before deduplication)
+2025-11-25T06:42:52.254Z [DEBUG] LSP Diagnostics: getLSPDiagnosticAttachments called
+2025-11-25T06:42:52.254Z [DEBUG] LSP Diagnostics: Checking registry - 0 pending
+2025-11-25T06:42:52.257Z [DEBUG] Hooks: Found 0 total hooks in registry
+2025-11-25T06:42:52.257Z [DEBUG] Hooks: checkForNewResponses returning 0 responses
+2025-11-25T06:42:56.369Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:43:05.950Z [DEBUG] Getting matching hook commands for Stop with query: undefined
+2025-11-25T06:43:05.950Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:43:05.950Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)
+2025-11-25T06:43:34.715Z [DEBUG] Metrics opt-out API response: enabled=true, vcsLinking=false
+2025-11-25T06:43:35.637Z [DEBUG] BigQuery metrics exported successfully
+2025-11-25T06:43:35.637Z [DEBUG] BigQuery API Response: {
+  "accepted_count": 17,
+  "rejected_count": 0
+}
+2025-11-25T06:44:05.956Z [DEBUG] Getting matching hook commands for Notification with query: idle_prompt
+2025-11-25T06:44:05.956Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:44:05.956Z [DEBUG] Matched 0 unique hooks for query "idle_prompt" (0 before deduplication)

@@ -1,0 +1,492 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# Workspace Manager CLI
+# ワークスペース管理CLI
+# -----------------------------------------------------------------------------
+
+# Load utilities
+if [[ -n "${DOTFILES_ROOT:-}" ]]; then
+    source "$DOTFILES_ROOT/core/utils/common.sh"
+elif [[ -f "$HOME/dotfiles/core/utils/common.sh" ]]; then
+    source "$HOME/dotfiles/core/utils/common.sh"
+else
+    echo "Error: Cannot find common.sh"
+    exit 1
+fi
+
+# Layout storage directory
+LAYOUT_DIR="$HOME/.config/aerospace/layouts"
+mkdir -p "$LAYOUT_DIR"
+
+# -----------------------------------------------------------------------------
+# Service Management
+# -----------------------------------------------------------------------------
+
+service_status() {
+    log_info "Workspace Services Status"
+    brew services list | grep -E "sketchybar|borders"
+    echo ""
+    if pgrep -x AeroSpace > /dev/null; then
+        log_success "AeroSpace: Running"
+    else
+        log_warn "AeroSpace: Not running"
+    fi
+}
+
+service_restart_all() {
+    log_info "Restarting all workspace services"
+    brew services restart sketchybar
+    brew services restart borders
+    killall AeroSpace 2>/dev/null || true
+    sleep 2
+    open -a AeroSpace
+    log_success "All workspace services restarted"
+}
+
+service_start_all() {
+    log_info "Starting all workspace services"
+    brew services start sketchybar
+    brew services start borders
+    open -a AeroSpace
+    log_success "All workspace services started"
+}
+
+service_stop_all() {
+    log_info "Stopping all workspace services"
+    brew services stop sketchybar
+    brew services stop borders
+    killall AeroSpace 2>/dev/null || true
+    log_success "All workspace services stopped"
+}
+
+service_restart_borders() {
+    log_info "Restarting Borders"
+    brew services restart borders
+    log_success "Borders restarted"
+}
+
+service_restart_sketchybar() {
+    log_info "Restarting Sketchybar"
+    brew services restart sketchybar
+    log_success "Sketchybar restarted"
+}
+
+service_restart_aerospace() {
+    log_info "Restarting AeroSpace"
+    killall AeroSpace 2>/dev/null || true
+    sleep 2
+    open -a AeroSpace
+    log_success "AeroSpace restarted"
+}
+
+service_menu() {
+    while true; do
+        echo ""
+        echo "Service Management"
+        echo "──────────────────"
+        echo "1) Status"
+        echo "2) Restart All"
+        echo "3) Start All"
+        echo "4) Stop All"
+        echo "5) Restart Borders"
+        echo "6) Restart Sketchybar"
+        echo "7) Restart AeroSpace"
+        echo "8) Back"
+        echo ""
+        read -p "Select option: " choice
+
+        case $choice in
+            1) service_status ;;
+            2) service_restart_all ;;
+            3) service_start_all ;;
+            4) service_stop_all ;;
+            5) service_restart_borders ;;
+            6) service_restart_sketchybar ;;
+            7) service_restart_aerospace ;;
+            8) break ;;
+            *) log_error "Invalid option" ;;
+        esac
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Layout Management
+# -----------------------------------------------------------------------------
+
+layout_save() {
+    local layout_name
+    read -p "Enter layout name: " layout_name
+
+    if [[ -z "$layout_name" ]]; then
+        log_error "Layout name cannot be empty"
+        return 1
+    fi
+
+    local layout_file="$LAYOUT_DIR/${layout_name}.json"
+
+    if [[ -f "$layout_file" ]]; then
+        read -p "Layout '$layout_name' already exists. Overwrite? [y/N]: " confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            log_info "Cancelled"
+            return 0
+        fi
+    fi
+
+    log_info "Saving current layout as '$layout_name'"
+
+    # Get current workspace
+    local current_workspace
+    current_workspace=$(aerospace list-workspaces --focused)
+
+    # Get all windows in current workspace
+    local windows_json="[]"
+    while IFS='|' read -r window_id app_name window_title; do
+        # Trim whitespace
+        window_id=$(echo "$window_id" | xargs)
+        app_name=$(echo "$app_name" | xargs)
+        window_title=$(echo "$window_title" | xargs)
+
+        # Get app-id from app name
+        local app_id
+        app_id=$(aerospace list-apps | grep -F "$app_name" | awk '{print $2}' | head -1)
+
+        if [[ -n "$app_id" ]]; then
+            windows_json=$(echo "$windows_json" | jq --arg id "$window_id" --arg app "$app_name" --arg appid "$app_id" --arg title "$window_title" '. += [{"window_id": $id, "app_name": $app, "app_id": $appid, "window_title": $title}]')
+        fi
+    done < <(aerospace list-windows --workspace focused --format '%{window-id}|%{app-name}|%{window-title}')
+
+    # Create layout JSON
+    local layout_json
+    layout_json=$(jq -n \
+        --arg name "$layout_name" \
+        --arg workspace "$current_workspace" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --argjson windows "$windows_json" \
+        '{name: $name, workspace: $workspace, timestamp: $timestamp, windows: $windows}')
+
+    echo "$layout_json" > "$layout_file"
+    log_success "Layout '$layout_name' saved to $layout_file"
+}
+
+layout_list() {
+    log_info "Saved Layouts"
+
+    if [[ ! -d "$LAYOUT_DIR" ]] || [[ -z "$(ls -A "$LAYOUT_DIR" 2>/dev/null)" ]]; then
+        log_warn "No saved layouts found"
+        return 0
+    fi
+
+    local i=1
+    for layout_file in "$LAYOUT_DIR"/*.json; do
+        if [[ -f "$layout_file" ]]; then
+            local name=$(basename "$layout_file" .json)
+            local timestamp=$(jq -r '.timestamp // "Unknown"' "$layout_file")
+            local window_count=$(jq '.windows | length' "$layout_file")
+            echo "$i) $name - $window_count windows (saved: $timestamp)"
+            ((i++))
+        fi
+    done
+}
+
+layout_restore() {
+    if [[ ! -d "$LAYOUT_DIR" ]] || [[ -z "$(ls -A "$LAYOUT_DIR" 2>/dev/null)" ]]; then
+        log_warn "No saved layouts found"
+        return 0
+    fi
+
+    # List layouts
+    echo ""
+    log_info "Select layout to restore"
+    local layouts=()
+    local i=1
+    for layout_file in "$LAYOUT_DIR"/*.json; do
+        if [[ -f "$layout_file" ]]; then
+            local name=$(basename "$layout_file" .json)
+            layouts+=("$layout_file")
+            echo "$i) $name"
+            ((i++))
+        fi
+    done
+    echo ""
+
+    read -p "Select layout number: " layout_num
+
+    if [[ ! "$layout_num" =~ ^[0-9]+$ ]] || [[ "$layout_num" -lt 1 ]] || [[ "$layout_num" -gt "${#layouts[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_layout="${layouts[$((layout_num - 1))]}"
+    local layout_name=$(basename "$selected_layout" .json)
+
+    # Select monitor
+    echo ""
+    log_info "Select monitor"
+    local monitors=()
+    local i=1
+    while IFS='|' read -r monitor_id monitor_name; do
+        monitor_id=$(echo "$monitor_id" | xargs)
+        monitor_name=$(echo "$monitor_name" | xargs)
+        monitors+=("$monitor_id")
+        echo "$i) $monitor_name"
+        ((i++))
+    done < <(aerospace list-monitors --format '%{monitor-id}|%{monitor-name}')
+    echo ""
+
+    read -p "Select monitor number: " monitor_num
+
+    if [[ ! "$monitor_num" =~ ^[0-9]+$ ]] || [[ "$monitor_num" -lt 1 ]] || [[ "$monitor_num" -gt "${#monitors[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_monitor="${monitors[$((monitor_num - 1))]}"
+
+    # Select workspace
+    echo ""
+    read -p "Enter target workspace (e.g., C, W, 1): " target_workspace
+
+    if [[ -z "$target_workspace" ]]; then
+        log_error "Workspace cannot be empty"
+        return 1
+    fi
+
+    log_info "Restoring layout '$layout_name' to monitor $selected_monitor, workspace $target_workspace"
+
+    # Launch apps
+    local app_ids=$(jq -r '.windows[].app_id' "$selected_layout" | sort -u)
+    for app_id in $app_ids; do
+        local app_name=$(jq -r ".windows[] | select(.app_id == \"$app_id\") | .app_name" "$selected_layout" | head -1)
+
+        if ! pgrep -f "$app_id" > /dev/null; then
+            log_info "Launching $app_name"
+            open -a "$app_name" 2>/dev/null || log_warn "Could not launch $app_name"
+            sleep 2
+        fi
+    done
+
+    # Wait for windows to appear
+    sleep 3
+
+    # Move windows to target workspace
+    log_info "Moving windows to workspace $target_workspace"
+    local window_ids=$(jq -r '.windows[].app_id' "$selected_layout")
+    for app_id in $window_ids; do
+        aerospace list-windows --all | grep "$app_id" | while read -r line; do
+            local wid=$(echo "$line" | awk '{print $1}')
+            aerospace move-node-to-workspace --window-id "$wid" "$target_workspace" 2>/dev/null || true
+        done
+    done
+
+    log_success "Layout restored"
+}
+
+layout_delete() {
+    if [[ ! -d "$LAYOUT_DIR" ]] || [[ -z "$(ls -A "$LAYOUT_DIR" 2>/dev/null)" ]]; then
+        log_warn "No saved layouts found"
+        return 0
+    fi
+
+    echo ""
+    log_info "Select layout to delete"
+    local layouts=()
+    local i=1
+    for layout_file in "$LAYOUT_DIR"/*.json; do
+        if [[ -f "$layout_file" ]]; then
+            local name=$(basename "$layout_file" .json)
+            layouts+=("$layout_file")
+            echo "$i) $name"
+            ((i++))
+        fi
+    done
+    echo ""
+
+    read -p "Select layout number: " layout_num
+
+    if [[ ! "$layout_num" =~ ^[0-9]+$ ]] || [[ "$layout_num" -lt 1 ]] || [[ "$layout_num" -gt "${#layouts[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_layout="${layouts[$((layout_num - 1))]}"
+    local layout_name=$(basename "$selected_layout" .json)
+
+    read -p "Delete layout '$layout_name'? [y/N]: " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        rm "$selected_layout"
+        log_success "Layout '$layout_name' deleted"
+    else
+        log_info "Cancelled"
+    fi
+}
+
+layout_preset_communication() {
+    log_info "Setting up Communication preset (Slack + Gather)"
+
+    # Select monitor
+    echo ""
+    log_info "Select monitor"
+    local monitors=()
+    local i=1
+    while IFS='|' read -r monitor_id monitor_name; do
+        monitor_id=$(echo "$monitor_id" | xargs)
+        monitor_name=$(echo "$monitor_name" | xargs)
+        monitors+=("$monitor_id")
+        echo "$i) $monitor_name"
+        ((i++))
+    done < <(aerospace list-monitors --format '%{monitor-id}|%{monitor-name}')
+    echo ""
+
+    read -p "Select monitor number: " monitor_num
+
+    if [[ ! "$monitor_num" =~ ^[0-9]+$ ]] || [[ "$monitor_num" -lt 1 ]] || [[ "$monitor_num" -gt "${#monitors[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_monitor="${monitors[$((monitor_num - 1))]}"
+
+    # Launch apps
+    if ! pgrep -x "Slack" > /dev/null; then
+        log_info "Launching Slack"
+        open -a Slack
+        sleep 3
+    fi
+
+    if ! pgrep -x "Gather" > /dev/null; then
+        log_info "Launching Gather"
+        open -a Gather
+        sleep 3
+    fi
+
+    # Move to workspace C
+    log_info "Moving windows to workspace C on monitor $selected_monitor"
+    aerospace list-windows --all | grep -E "Slack|Gather" | while read -r line; do
+        window_id=$(echo "$line" | awk '{print $1}')
+        aerospace move-node-to-workspace --window-id "$window_id" C 2>/dev/null || true
+    done
+
+    log_success "Communication preset ready on monitor $selected_monitor"
+    log_info "Tip: Use Alt+- to resize windows if needed"
+}
+
+layout_menu() {
+    while true; do
+        echo ""
+        echo "Layout Management"
+        echo "─────────────────"
+        echo "1) Save Current Layout"
+        echo "2) Restore Layout"
+        echo "3) List Saved Layouts"
+        echo "4) Delete Layout"
+        echo "5) Preset: Communication (Slack + Gather)"
+        echo "6) Back"
+        echo ""
+        read -p "Select option: " choice
+
+        case $choice in
+            1) layout_save ;;
+            2) layout_restore ;;
+            3) layout_list ;;
+            4) layout_delete ;;
+            5) layout_preset_communication ;;
+            6) break ;;
+            *) log_error "Invalid option" ;;
+        esac
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Information
+# -----------------------------------------------------------------------------
+
+info_windows() {
+    log_info "Windows"
+    aerospace list-windows --all
+}
+
+info_workspaces() {
+    log_info "Workspaces"
+    aerospace list-workspaces --all
+}
+
+info_monitors() {
+    log_info "Monitors"
+    aerospace list-monitors
+}
+
+info_apps() {
+    log_info "Applications"
+    aerospace list-apps
+}
+
+info_menu() {
+    while true; do
+        echo ""
+        echo "Information"
+        echo "───────────"
+        echo "1) List Windows"
+        echo "2) List Workspaces"
+        echo "3) List Monitors"
+        echo "4) List Apps"
+        echo "5) Back"
+        echo ""
+        read -p "Select option: " choice
+
+        case $choice in
+            1) info_windows ;;
+            2) info_workspaces ;;
+            3) info_monitors ;;
+            4) info_apps ;;
+            5) break ;;
+            *) log_error "Invalid option" ;;
+        esac
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Main Menu
+# -----------------------------------------------------------------------------
+
+main_menu() {
+    while true; do
+        echo ""
+        echo "Workspace Manager"
+        echo "─────────────────"
+        echo "1) Service Management"
+        echo "2) Layout Management"
+        echo "3) Information"
+        echo "4) Quit"
+        echo ""
+        read -p "Select option: " choice
+
+        case $choice in
+            1) service_menu ;;
+            2) layout_menu ;;
+            3) info_menu ;;
+            4) log_info "Goodbye"; exit 0 ;;
+            *) log_error "Invalid option" ;;
+        esac
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Command Line Interface
+# -----------------------------------------------------------------------------
+
+case "${1:-}" in
+    service)
+        service_menu
+        ;;
+    layout)
+        layout_menu
+        ;;
+    info)
+        info_menu
+        ;;
+    *)
+        main_menu
+        ;;
+esac

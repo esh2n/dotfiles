@@ -1,0 +1,173 @@
+# tmux configuration
+
+# -- general -------------------------------------------------------------------
+set -g default-terminal "tmux-256color"
+set -ag terminal-overrides ",xterm-256color:RGB"
+set -g history-limit 50000
+set -g buffer-limit 20
+set -g display-time 1500
+set -g remain-on-exit off
+set -g repeat-time 300
+setw -g allow-rename off
+setw -g automatic-rename off
+setw -g aggressive-resize on
+
+# -- mouse support -------------------------------------------------------------
+set -g mouse on
+
+# -- shell --------------------------------------------------------------------
+set-option -g default-shell /opt/homebrew/bin/zsh
+set-option -g default-command /opt/homebrew/bin/zsh
+if-shell 'test ! -x /opt/homebrew/bin/zsh' 'set-option -g default-shell /bin/zsh'
+
+# -- prefix -------------------------------------------------------------------
+unbind C-b
+set -g prefix C-a
+bind C-a send-prefix
+
+# -- display -------------------------------------------------------------------
+set -g base-index 1
+setw -g pane-base-index 1
+setw -g automatic-rename on
+set -g renumber-windows on
+set -g set-titles on
+set -g display-panes-time 800
+set -g display-time 1000
+set -g status-interval 10
+
+# -- navigation ---------------------------------------------------------------
+# create session
+bind C-c new-session
+
+# window navigation
+unbind n
+unbind p
+bind -r C-h previous-window
+bind -r C-l next-window
+bind Tab last-window
+
+# split panes
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+
+# pane navigation
+bind -r h select-pane -L
+bind -r j select-pane -D
+bind -r k select-pane -U
+bind -r l select-pane -R
+
+# pane resizing
+bind -r H resize-pane -L 2
+bind -r J resize-pane -D 2
+bind -r K resize-pane -U 2
+bind -r L resize-pane -R 2
+
+# -- copy mode ----------------------------------------------------------------
+setw -g mode-keys vi
+bind Enter copy-mode
+bind -T copy-mode-vi v send -X begin-selection
+bind -T copy-mode-vi y send -X copy-pipe-and-cancel "pbcopy"
+bind -T copy-mode-vi Escape send -X cancel
+bind -T copy-mode-vi H send -X start-of-line
+bind -T copy-mode-vi L send -X end-of-line
+
+# -- spotify controls ----------------------------------------------------------
+bind s run-shell "~/.config/tmux/scripts/spotify.sh toggle"
+bind n run-shell "~/.config/tmux/scripts/spotify.sh next"
+bind N run-shell "~/.config/tmux/scripts/spotify.sh prev"
+
+# Key bindings for Spotify controls
+bind P run-shell '~/.config/tmux/scripts/spotify.sh prev'
+bind p run-shell '~/.config/tmux/scripts/spotify.sh toggle'
+bind ] run-shell '~/.config/tmux/scripts/spotify.sh next'
+
+# -- plugins -----------------------------------------------------------------
+# Set TPM plugin manager path
+# TPMプラグインマネージャーのパスを設定
+set-environment -g TMUX_PLUGIN_MANAGER_PATH '~/.tmux/plugins'
+
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+set -g @plugin 'tmux-plugins/tmux-yank'
+set -g @plugin 'tmux-plugins/tmux-battery'
+set -g @plugin 'tmux-plugins/tmux-cpu'
+set -g @plugin 'xamut/tmux-weather'
+set -g @plugin 'tmux-plugins/tmux-net-speed'
+set -g @plugin 'catppuccin/tmux#v2.1.0' # Use specific version
+
+# -- theme -------------------------------------------------------------------
+set -g @catppuccin_flavour 'mocha'
+
+# Unix Porn Status Bar
+set -g @catppuccin_window_left_separator ""
+set -g @catppuccin_window_right_separator " "
+set -g @catppuccin_window_middle_separator " █"
+set -g @catppuccin_window_number_position "right"
+
+set -g @catppuccin_window_default_fill "number"
+set -g @catppuccin_window_default_text "#W"
+
+set -g @catppuccin_window_current_fill "number"
+set -g @catppuccin_window_current_text "#W"
+
+# WezTerm-inspired status bar configuration
+# WezTerm風の洗練されたステータスバー設定
+
+# Status bar positioning and basic settings
+set -g status-position bottom
+set -g status-justify left
+set -g status-left-length 150
+set -g status-right-length 300
+set -g status-interval 2
+
+# Status bar with proper order: session | windows | hints on left, Spotify mixed in right
+set -g status-left "#[fg=#11111b,bg=#cba6f7,bold] 👻 #S #[fg=#cba6f7,bg=#181825]#[default]"
+# Full status bar - all info displayed
+set -g status-right "#[fg=#fab387]#(~/.config/tmux/scripts/spotify.sh) #[fg=#313244]▏#[fg=#6c7086,dim]#(~/.config/tmux/scripts/keybinds.sh all) #[fg=#313244]▏#[fg=#89b4fa]#(~/.config/tmux/scripts/weather.sh full) #[fg=#313244]▏#[fg=#f9e2af]#(~/.config/tmux/scripts/weather.sh pressure_full) #[fg=#313244]▏#[fg=#89dceb]☔#(~/.config/tmux/scripts/weather.sh rain) #[fg=#313244]▏#[fg=#94e2d5]#(~/.config/tmux/scripts/network.sh) #[fg=#313244]▏#[fg=#f38ba8]#(~/.config/tmux/scripts/earthquake.sh) #[fg=#313244]▏#[fg=#a6e3a1]#{battery_percentage} #[fg=#313244]▏#[fg=#f9e2af]💻#{cpu_percentage} #[fg=#313244]▏#[fg=#cba6f7,bold]%H:%M#[default]"
+
+# Alternative responsive status bars (uncomment to use instead of full)
+# Large screens (>120 chars): Full display
+# set -g status-right "#{?#{>:#{window_width},120},#[fg=#fab387]#(~/.config/tmux/scripts/spotify.sh) #[fg=#313244]▏#[fg=#6c7086\\,dim]#(~/.config/tmux/scripts/keybinds.sh all) #[fg=#313244]▏#[fg=#89b4fa]#(~/.config/tmux/scripts/weather.sh full) #[fg=#313244]▏#[fg=#f9e2af]#(~/.config/tmux/scripts/weather.sh pressure_full) #[fg=#313244]▏#[fg=#89dceb]☔#(~/.config/tmux/scripts/weather.sh rain) #[fg=#313244]▏#[fg=#94e2d5]#(~/.config/tmux/scripts/network.sh) #[fg=#313244]▏#[fg=#f38ba8]#(~/.config/tmux/scripts/earthquake.sh) #[fg=#313244]▏#[fg=#a6e3a1]#{battery_percentage} #[fg=#313244]▏#[fg=#f9e2af]💻#{cpu_percentage} #[fg=#313244]▏,#{?#{>:#{window_width},80},#[fg=#89b4fa]#(~/.config/tmux/scripts/weather.sh full) #[fg=#313244]▏#[fg=#a6e3a1]#{battery_percentage} #[fg=#313244]▏,#{?#{>:#{window_width},40},#[fg=#a6e3a1]#{battery_percentage} #[fg=#313244]▏,}}}#[fg=#cba6f7\\,bold]%H:%M#[default]"
+
+# Medium screens (80-120 chars): Weather, battery, time only
+# set -g status-right "#[fg=#89b4fa]#(~/.config/tmux/scripts/weather.sh full) #[fg=#313244]▏#[fg=#a6e3a1]#{battery_percentage} #[fg=#313244]▏#[fg=#cba6f7,bold]%H:%M#[default]"
+
+# Small screens (<40 chars): Time only
+# set -g status-right "#[fg=#cba6f7,bold]%H:%M#[default]"
+
+# Remove default catppuccin status modules to use custom ones
+set -g @catppuccin_status_modules_right ""
+set -g @catppuccin_status_left_separator  " "
+set -g @catppuccin_status_right_separator ""
+set -g @catppuccin_status_right_separator_inverse "no"
+set -g @catppuccin_status_fill "icon"
+set -g @catppuccin_status_connect_separator "no"
+
+# Status bar styling and colors
+# ステータスバーのスタイリングと色設定
+set -g status-style "bg=#181825,fg=#cdd6f4"
+
+# Beautiful window tabs with hints after
+set -g window-status-format "#[fg=#6c7086,bg=#181825] ◦#I #W "
+set -g window-status-current-format "#[fg=#11111b,bg=#89b4fa,bold] ●#I #W #[fg=#89b4fa,bg=#181825]"
+set -g window-status-separator ""
+set -g window-status-activity-style "fg=#f38ba8,bg=#313244"
+set -g window-status-bell-style "fg=#fab387,bg=#313244"
+
+# Restore default status format by not overriding it
+
+# Enhanced window status with hints after windows
+set -g window-status-format "#[fg=#6c7086,bg=#181825] ◦#I #W "
+set -g window-status-current-format "#[fg=#11111b,bg=#89b4fa,bold] ●#I #W #[fg=#89b4fa,bg=#181825]"
+set -g window-status-separator ""
+
+# Pane border colors
+set -g pane-border-style "fg=#313244"
+set -g pane-active-border-style "fg=#cba6f7"
+
+# Message styling
+set -g message-style "bg=#cba6f7,fg=#11111b"
+set -g message-command-style "bg=#f38ba8,fg=#11111b"
+
+# Initialize TMUX plugin manager
+run '~/.tmux/plugins/tpm/tpm'

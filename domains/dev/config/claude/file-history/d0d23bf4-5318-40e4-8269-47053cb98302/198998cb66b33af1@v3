@@ -1,0 +1,7 @@
+# GITDIR: {{HOME}}/go/github.com/sansaninc/
+[user]
+    name = shunya-endo_sansan
+    email = shunya.endo@sansan.com
+
+# GitHub authentication is handled by gh CLI globally
+# See main .gitconfig or use: gh auth login 

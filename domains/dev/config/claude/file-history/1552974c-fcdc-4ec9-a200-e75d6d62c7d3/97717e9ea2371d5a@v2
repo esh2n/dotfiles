@@ -1,0 +1,48 @@
+package core
+
+import (
+	"time"
+
+	common_vo "github.com/sansaninc/sdi-core/shared/golang_lib/common_vo"
+)
+
+type ID struct {
+	value common_vo.ID
+}
+
+func randomID() ID {
+	return ID{value: common_vo.RandomID()}
+}
+
+func NewParseID(id string) (ID, error) {
+	parsedID, err := common_vo.ParseID(id)
+	if err != nil {
+		return ID{}, err
+	}
+	return ID{value: parsedID}, nil
+}
+
+func mustParseID(id string) common_vo.ID {
+	parsedID, err := common_vo.ParseID(id)
+	if err != nil {
+		panic(err)
+	}
+	return parsedID
+}
+
+type createdAt struct {
+	value time.Time
+}
+
+func NewCreatedAt(t time.Time) createdAt {
+	return createdAt{value: t}
+}
+
+type retentionUntil struct {
+	value time.Time
+}
+
+func newRetentionUntil(createdAt createdAt) retentionUntil {
+	// 90日後に削除
+	return retentionUntil{value: createdAt.value.AddDate(0, 0, 90)}
+}

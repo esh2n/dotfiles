@@ -1,12 +1,12 @@
 layout {
     default_tab_template {
-        children
+        // Top status bar
         pane size=1 borderless=true {
-            plugin location="file:/Users/esh2n/.config/zellij/plugins/zjstatus.wasm" {
-                // Format with rich information - adapts to Zellij theme
-                format_left   "#[fg=blue,bold]󰣇 {mode}#[fg=white] │ #[fg=yellow,bold] {session}#[fg=white] │ #[fg=green]{command_git_branch}"
+            plugin location="file:/Users/shunya.endo/.config/zellij/plugins/zjstatus.wasm" {
+                // Format with rich information
+                format_left   "#[fg=blue,bold]󰣇 {mode}#[fg=white] │ #[fg=yellow,bold] {session}#[fg=white] │ #[fg=green]{command_git_branch}#[fg=white] │ #[fg=magenta]{command_git_status}"
                 format_center "{tabs}"
-                format_right  "#[fg=red]{notifications}#[fg=white] │ #[fg=cyan] {datetime}"
+                format_right  "#[fg=cyan]{command_cpu}#[fg=white] │ #[fg=yellow]{command_mem}#[fg=white] │ #[fg=magenta]{command_load}#[fg=white] │ #[fg=red]{notifications}#[fg=white] │ #[fg=cyan] {datetime}"
 
                 // Mode styling with icons
                 mode_normal        "#[bg=#89b4fa,fg=#1e1e2e,bold] NORMAL "
@@ -24,16 +24,35 @@ layout {
                 mode_prompt        "#[bg=#cba6f7,fg=#1e1e2e,bold] PROMPT "
                 mode_tmux          "#[bg=#fab387,fg=#1e1e2e,bold] TMUX "
 
-                // Tab styling with enhanced formatting
+                // Tab styling
                 tab_normal   "#[fg=#6c7086]  {name}#{index} "
                 tab_active   "#[fg=#89b4fa,bold,bg=#313244]  {name}#{index} "
 
-                // Commands for git and system info
+                // Commands
                 command_git_branch_command    "git branch --show-current 2>/dev/null || echo ''"
                 command_git_branch_format     "#[fg=#a6e3a1] {stdout}"
                 command_git_branch_interval   "10"
 
-                // Enhanced datetime
+                command_git_status_command    "git status -s 2>/dev/null | wc -l"
+                command_git_status_format     "#[fg=#f9e2af] {stdout}"
+                command_git_status_interval   "10"
+
+                command_cpu_command          "ps -A -o %cpu | tail -n +2 | paste -sd+ - | bc"
+                command_cpu_format           "#[fg=#89b4fa] {stdout}%"
+                command_cpu_interval         "5"
+                command_cpu_rendermode       "static"
+
+                command_mem_command          "ps -A -o %mem | tail -n +2 | paste -sd+ - | bc"
+                command_mem_format           "#[fg=#f9e2af] {stdout}%"
+                command_mem_interval         "5"
+                command_mem_rendermode       "static"
+
+                command_load_command         "sysctl -n vm.loadavg | tr -d {}"
+                command_load_format          "#[fg=#cba6f7] {stdout}"
+                command_load_interval        "10"
+                command_load_rendermode      "static"
+
+                // Datetime
                 datetime_format "%a %m/%d %H:%M"
                 datetime_timezone "Asia/Tokyo"
 
@@ -41,7 +60,24 @@ layout {
                 notification_format_unread    "#[fg=#f38ba8,blink]󱅫 #[noblink]{message} "
                 notification_format_no_notifications ""
 
-                // Border characters
+                // Border
+                border_enabled  "true"
+                border_char     "─"
+                border_format   "#[fg=#6c7086]{char}"
+                border_position "top"
+            }
+        }
+
+        // Main content
+        children
+
+        // Bottom hint bar
+        pane size=2 borderless=true {
+            plugin location="file:/Users/shunya.endo/.config/zellij/plugins/zjstatus.wasm" {
+                format_left   "#[fg=#6c7086]Prefix: #[fg=#89b4fa,bold]Ctrl+q#[fg=#6c7086] │ Split: #[fg=#89b4fa]\\#[fg=#6c7086],#[fg=#89b4fa]-#[fg=#6c7086] │ Navigate: #[fg=#89b4fa]hjkl#[fg=#6c7086] │ Zoom: #[fg=#89b4fa]z#[fg=#6c7086] │ New Tab: #[fg=#89b4fa]t"
+                format_center "#[fg=#6c7086]Scroll: #[fg=#89b4fa][#[fg=#6c7086] │ Close: #[fg=#89b4fa]x#[fg=#6c7086] │ Detach: #[fg=#89b4fa]d"
+                format_right  "#[fg=#6c7086]Tab Nav: #[fg=#89b4fa]Ctrl+h/l#[fg=#6c7086] │ Tab Select: #[fg=#89b4fa]Ctrl+1-5"
+
                 border_enabled  "true"
                 border_char     "─"
                 border_format   "#[fg=#6c7086]{char}"

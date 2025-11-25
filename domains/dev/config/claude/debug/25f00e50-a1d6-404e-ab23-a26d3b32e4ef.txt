@@ -1,0 +1,428 @@
+2025-11-25T06:59:09.060Z [DEBUG] Watching for changes in setting files /Users/shunya.endo/.claude/settings.json, /Users/shunya.endo/go/github.com/sansaninc/sdi-core/.claude/settings.json, /Users/shunya.endo/go/github.com/sansaninc/sdi-core/.claude/settings.local.json...
+2025-11-25T06:59:09.130Z [DEBUG] [LSP MANAGER] initializeLspServerManager() called
+2025-11-25T06:59:09.130Z [DEBUG] [LSP MANAGER] Created manager instance, state=pending
+2025-11-25T06:59:09.130Z [DEBUG] [LSP MANAGER] Starting async initialization (generation 1)
+2025-11-25T06:59:09.130Z [DEBUG] [LSP SERVER MANAGER] initialize() called
+2025-11-25T06:59:09.130Z [DEBUG] [LSP SERVER MANAGER] Calling getAllLspServers()
+2025-11-25T06:59:09.139Z [DEBUG] Applying permission update: Adding 24 allow rule(s) to destination 'localSettings': ["Bash(gh pr view:*)","Bash(gh pr diff:*)","Bash(gh api:*)","Bash(go test:*)","Bash(find:*)","Bash(timeout 30 go test:*)","Bash(go build:*)","Bash(git checkout:*)","mcp__figma__get_design_context","mcp__figma__get_screenshot","mcp__figma__get_variable_defs","mcp__figma__get_metadata","mcp__serena__search_for_pattern","mcp__serena__list_dir","mcp__serena__find_file","Skill(project-structure)","Bash(xargs cat:*)","Skill(fuzzy-find)","Bash(fzf:*)","Bash(sci --help:*)","Bash(sci infra --help:*)","Bash(sci infra deploy --help:*)","Bash(sci infra workspace --help:*)","mcp__figma__get_figjam"]
+2025-11-25T06:59:09.143Z [DEBUG] Loading plugin example-skills from source: "./"
+2025-11-25T06:59:09.143Z [DEBUG] Processing 11 skill paths for plugin example-skills
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./algorithmic-art -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/algorithmic-art (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./brand-guidelines -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/brand-guidelines (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./canvas-design -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/canvas-design (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./frontend-design -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/frontend-design (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./internal-comms -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/internal-comms (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./mcp-builder -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/mcp-builder (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./skill-creator -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/skill-creator (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./slack-gif-creator -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/slack-gif-creator (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./theme-factory -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/theme-factory (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./web-artifacts-builder -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/web-artifacts-builder (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Checking skill path: ./webapp-testing -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/webapp-testing (exists: true)
+2025-11-25T06:59:09.143Z [DEBUG] Found 11 valid skill paths for plugin example-skills, setting skillsPaths
+2025-11-25T06:59:09.144Z [DEBUG] Loading plugin document-skills from source: "./"
+2025-11-25T06:59:09.144Z [DEBUG] Processing 4 skill paths for plugin document-skills
+2025-11-25T06:59:09.144Z [DEBUG] Checking skill path: ./document-skills/xlsx -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/document-skills/xlsx (exists: true)
+2025-11-25T06:59:09.144Z [DEBUG] Checking skill path: ./document-skills/docx -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/document-skills/docx (exists: true)
+2025-11-25T06:59:09.144Z [DEBUG] Checking skill path: ./document-skills/pptx -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/document-skills/pptx (exists: true)
+2025-11-25T06:59:09.144Z [DEBUG] Checking skill path: ./document-skills/pdf -> /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/document-skills/pdf (exists: true)
+2025-11-25T06:59:09.144Z [DEBUG] Found 4 valid skill paths for plugin document-skills, setting skillsPaths
+2025-11-25T06:59:09.144Z [DEBUG] Found 2 plugins (1 enabled, 1 disabled)
+2025-11-25T06:59:09.153Z [DEBUG] Loading skills from directories: managed=/Library/Application Support/ClaudeCode/.claude/skills, user=/Users/shunya.endo/.claude/skills, project=/Users/shunya.endo/go/github.com/sansaninc/sdi-core/.claude/skills
+2025-11-25T06:59:09.156Z [DEBUG] >>>>> getPluginSkills CALLED <<<<<
+2025-11-25T06:59:09.312Z [DEBUG] Creating shell snapshot for zsh (/bin/zsh)
+2025-11-25T06:59:09.312Z [DEBUG] Looking for shell config file: /Users/shunya.endo/.zshrc
+2025-11-25T06:59:09.312Z [DEBUG] Snapshots directory: /Users/shunya.endo/.claude/shell-snapshots
+2025-11-25T06:59:09.313Z [DEBUG] Creating snapshot at: /Users/shunya.endo/.claude/shell-snapshots/snapshot-zsh-1764053949312-pn57i0.sh
+2025-11-25T06:59:09.313Z [DEBUG] Shell binary exists: true
+2025-11-25T06:59:09.313Z [DEBUG] Execution timeout: 10000ms
+2025-11-25T06:59:09.313Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude/todos/25f00e50-a1d6-404e-ab23-a26d3b32e4ef-agent-25f00e50-a1d6-404e-ab23-a26d3b32e4ef.json.tmp.68155.1764053949313
+2025-11-25T06:59:09.319Z [DEBUG] Temp file written successfully, size: 2 bytes
+2025-11-25T06:59:09.319Z [DEBUG] Renaming /Users/shunya.endo/.claude/todos/25f00e50-a1d6-404e-ab23-a26d3b32e4ef-agent-25f00e50-a1d6-404e-ab23-a26d3b32e4ef.json.tmp.68155.1764053949313 to /Users/shunya.endo/.claude/todos/25f00e50-a1d6-404e-ab23-a26d3b32e4ef-agent-25f00e50-a1d6-404e-ab23-a26d3b32e4ef.json
+2025-11-25T06:59:09.320Z [DEBUG] File /Users/shunya.endo/.claude/todos/25f00e50-a1d6-404e-ab23-a26d3b32e4ef-agent-25f00e50-a1d6-404e-ab23-a26d3b32e4ef.json written atomically
+2025-11-25T06:59:09.321Z [DEBUG] getPluginSkills: Processing 1 enabled plugins
+2025-11-25T06:59:09.321Z [DEBUG] Checking plugin example-skills: skillsPath=none, skillsPaths=11 paths
+2025-11-25T06:59:09.321Z [DEBUG] Attempting to load skills from plugin example-skills skillsPaths: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/algorithmic-art, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/brand-guidelines, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/canvas-design, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/frontend-design, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/internal-comms, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/mcp-builder, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/skill-creator, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/slack-gif-creator, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/theme-factory, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/web-artifacts-builder, /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/webapp-testing
+2025-11-25T06:59:09.321Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/algorithmic-art for plugin example-skills
+2025-11-25T06:59:09.322Z [DEBUG] Total plugin commands loaded: 0
+2025-11-25T06:59:09.322Z [DEBUG] Registered 0 hooks from 1 plugins
+2025-11-25T06:59:09.324Z [DEBUG] Loaded 18 unique skills (managed: 0, user: 0, project: 18, duplicates removed: 0)
+2025-11-25T06:59:09.324Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/algorithmic-art
+2025-11-25T06:59:09.324Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/brand-guidelines for plugin example-skills
+2025-11-25T06:59:09.325Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/brand-guidelines
+2025-11-25T06:59:09.325Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/canvas-design for plugin example-skills
+2025-11-25T06:59:09.326Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/canvas-design
+2025-11-25T06:59:09.326Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/frontend-design for plugin example-skills
+2025-11-25T06:59:09.326Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/frontend-design
+2025-11-25T06:59:09.326Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/internal-comms for plugin example-skills
+2025-11-25T06:59:09.327Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/internal-comms
+2025-11-25T06:59:09.327Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/mcp-builder for plugin example-skills
+2025-11-25T06:59:09.327Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/mcp-builder
+2025-11-25T06:59:09.327Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/skill-creator for plugin example-skills
+2025-11-25T06:59:09.327Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/skill-creator
+2025-11-25T06:59:09.327Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/slack-gif-creator for plugin example-skills
+2025-11-25T06:59:09.328Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/slack-gif-creator
+2025-11-25T06:59:09.328Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/theme-factory for plugin example-skills
+2025-11-25T06:59:09.328Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/theme-factory
+2025-11-25T06:59:09.328Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/web-artifacts-builder for plugin example-skills
+2025-11-25T06:59:09.328Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/web-artifacts-builder
+2025-11-25T06:59:09.328Z [DEBUG] Loading from skillPath: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/webapp-testing for plugin example-skills
+2025-11-25T06:59:09.329Z [DEBUG] Loaded 1 skills from plugin example-skills custom path: /Users/shunya.endo/.claude/plugins/marketplaces/anthropic-agent-skills/webapp-testing
+2025-11-25T06:59:09.329Z [DEBUG] Total plugin skills loaded: 11
+2025-11-25T06:59:09.329Z [DEBUG] getSkills returning: 18 skill dir commands, 11 plugin skills
+2025-11-25T06:59:09.340Z [DEBUG] Total LSP servers loaded: 0
+2025-11-25T06:59:09.340Z [DEBUG] [LSP SERVER MANAGER] getAllLspServers returned 0 server(s)
+2025-11-25T06:59:09.340Z [DEBUG] LSP manager initialized with 0 servers
+2025-11-25T06:59:09.340Z [DEBUG] LSP server manager initialized successfully
+2025-11-25T06:59:09.340Z [DEBUG] LSP notification handlers registered successfully for all 0 server(s)
+2025-11-25T06:59:09.343Z [DEBUG] Git remote URL: https://github.com/sansaninc/sdi-core.git
+2025-11-25T06:59:09.343Z [DEBUG] Parsed repository: sansaninc/sdi-core from https://github.com/sansaninc/sdi-core.git
+2025-11-25T06:59:09.343Z [DEBUG] Parsed repository: sansaninc/sdi-core from URL: https://github.com/sansaninc/sdi-core.git
+2025-11-25T06:59:09.343Z [DEBUG] Path /Users/shunya.endo/go/github.com/sansaninc/sdi-core already tracked for repo sansaninc/sdi-core
+2025-11-25T06:59:09.360Z [DEBUG] Ripgrep first use test: PASSED (mode=builtin, path=/Users/shunya.endo/.bun/install/global/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg)
+2025-11-25T06:59:09.367Z [DEBUG] Total plugin agents loaded: 0
+2025-11-25T06:59:09.407Z [DEBUG] MCP server "figma": Initializing HTTP transport to https://mcp.figma.com/mcp
+2025-11-25T06:59:09.409Z [DEBUG] MCP server "figma": Node version: v20.11.0, Platform: darwin
+2025-11-25T06:59:09.409Z [DEBUG] MCP server "figma": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2025-11-25T06:59:09.410Z [DEBUG] MCP server "notion-mcp": Initializing HTTP transport to https://mcp.notion.com/mcp
+2025-11-25T06:59:09.410Z [DEBUG] MCP server "notion-mcp": Node version: v20.11.0, Platform: darwin
+2025-11-25T06:59:09.411Z [DEBUG] MCP server "notion-mcp": Environment: {"NODE_OPTIONS":"not set","UV_THREADPOOL_SIZE":"default","HTTP_PROXY":"not set","HTTPS_PROXY":"not set","NO_PROXY":"not set"}
+2025-11-25T06:59:09.422Z [DEBUG] MCP server "container-use": Starting connection with timeout of 30000ms
+2025-11-25T06:59:09.432Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.68155.1764053949432
+2025-11-25T06:59:09.432Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:59:09.438Z [DEBUG] Temp file written successfully, size: 76833 bytes
+2025-11-25T06:59:09.438Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:59:09.438Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.68155.1764053949432 to /Users/shunya.endo/.claude.json
+2025-11-25T06:59:09.440Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:59:09.451Z [DEBUG] Getting matching hook commands for SessionStart with query: startup
+2025-11-25T06:59:09.451Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:59:09.451Z [DEBUG] Matched 0 unique hooks for query "startup" (0 before deduplication)
+2025-11-25T06:59:09.452Z [DEBUG] MCP server "figma": Proxy options: default
+2025-11-25T06:59:09.452Z [DEBUG] MCP server "figma": HTTP transport options: {"url":"https://mcp.figma.com/mcp","headers":{"User-Agent":"claude-code/2.0.53"},"hasAuthProvider":true,"timeoutMs":60000}
+2025-11-25T06:59:09.454Z [DEBUG] MCP server "figma": HTTP transport created successfully
+2025-11-25T06:59:09.457Z [DEBUG] MCP server "figma": Client created, setting up request handler
+2025-11-25T06:59:09.457Z [DEBUG] MCP server "figma": Starting connection with timeout of 30000ms
+2025-11-25T06:59:09.458Z [DEBUG] MCP server "figma": Testing basic HTTP connectivity to https://mcp.figma.com/mcp
+2025-11-25T06:59:09.458Z [DEBUG] MCP server "figma": Parsed URL: host=mcp.figma.com, port=default, protocol=https:
+2025-11-25T06:59:09.458Z [DEBUG] MCP server "notion-mcp": Proxy options: default
+2025-11-25T06:59:09.459Z [DEBUG] MCP server "notion-mcp": HTTP transport options: {"url":"https://mcp.notion.com/mcp","headers":{"User-Agent":"claude-code/2.0.53"},"hasAuthProvider":true,"timeoutMs":60000}
+2025-11-25T06:59:09.459Z [DEBUG] MCP server "notion-mcp": HTTP transport created successfully
+2025-11-25T06:59:09.460Z [DEBUG] MCP server "notion-mcp": Client created, setting up request handler
+2025-11-25T06:59:09.460Z [DEBUG] MCP server "notion-mcp": Starting connection with timeout of 30000ms
+2025-11-25T06:59:09.461Z [DEBUG] MCP server "notion-mcp": Testing basic HTTP connectivity to https://mcp.notion.com/mcp
+2025-11-25T06:59:09.461Z [DEBUG] MCP server "notion-mcp": Parsed URL: host=mcp.notion.com, port=default, protocol=https:
+2025-11-25T06:59:09.484Z [DEBUG] MCP server "figma": Returning tokens
+2025-11-25T06:59:09.485Z [DEBUG] MCP server "figma": Token length: 45
+2025-11-25T06:59:09.485Z [DEBUG] MCP server "figma": Has refresh token: true
+2025-11-25T06:59:09.485Z [DEBUG] MCP server "figma": Expires in: 6376263s
+2025-11-25T06:59:09.505Z [DEBUG] MCP server "notion-mcp": Token expired without refresh token
+2025-11-25T06:59:09.524Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.68155.1764053949524
+2025-11-25T06:59:09.524Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:59:09.529Z [DEBUG] Temp file written successfully, size: 76728 bytes
+2025-11-25T06:59:09.529Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:59:09.529Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.68155.1764053949524 to /Users/shunya.endo/.claude.json
+2025-11-25T06:59:09.530Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:59:09.537Z [DEBUG] performStartupChecks called
+2025-11-25T06:59:09.537Z [DEBUG] Starting background plugin installations
+2025-11-25T06:59:09.537Z [DEBUG] performBackgroundPluginInstallations called
+2025-11-25T06:59:09.544Z [DEBUG] Found 1 extra marketplaces in settings
+2025-11-25T06:59:09.550Z [DEBUG] Loaded plugins - Enabled: 1, Disabled: 1, Commands: 0, Agents: 0, Errors: 0
+2025-11-25T06:59:09.550Z [DEBUG] Found 1 enabled plugins
+2025-11-25T06:59:09.550Z [DEBUG] Schema version mismatch (current: 0, expected: 1), syncing installed_plugins.json
+2025-11-25T06:59:09.551Z [DEBUG] Loaded 0 installed plugins from /Users/shunya.endo/.claude/plugins/installed_plugins.json (schema version 1)
+2025-11-25T06:59:09.551Z [DEBUG] Found 0 installed plugins
+2025-11-25T06:59:09.552Z [DEBUG] Found 1 missing plugins (not installed): example-skills@anthropic-agent-skills
+2025-11-25T06:59:09.552Z [DEBUG] Installing 1 plugins automatically
+2025-11-25T06:59:09.552Z [DEBUG] Setting installation status: 0 marketplaces, 1 installable plugins, 0 uninstallable plugins
+2025-11-25T06:59:09.561Z [DEBUG] MCP server "container-use": Connection failed after 150ms: spawn container-use ENOENT
+2025-11-25T06:59:09.562Z [ERROR] MCP server "container-use" Connection failed: spawn container-use ENOENT
+2025-11-25T06:59:09.576Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.68155.1764053949576
+2025-11-25T06:59:09.576Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:59:09.581Z [DEBUG] Temp file written successfully, size: 76728 bytes
+2025-11-25T06:59:09.582Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:59:09.582Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.68155.1764053949576 to /Users/shunya.endo/.claude.json
+2025-11-25T06:59:09.582Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:59:09.585Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.68155.1764053949585
+2025-11-25T06:59:09.585Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:59:09.590Z [DEBUG] Temp file written successfully, size: 76728 bytes
+2025-11-25T06:59:09.590Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:59:09.590Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.68155.1764053949585 to /Users/shunya.endo/.claude.json
+2025-11-25T06:59:09.591Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:59:09.594Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.68155.1764053949594
+2025-11-25T06:59:09.594Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:59:09.600Z [DEBUG] Temp file written successfully, size: 76833 bytes
+2025-11-25T06:59:09.600Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:59:09.600Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.68155.1764053949594 to /Users/shunya.endo/.claude.json
+2025-11-25T06:59:09.600Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:59:09.632Z [DEBUG] Added example-skills@anthropic-agent-skills to installed_plugins.json
+2025-11-25T06:59:09.636Z [DEBUG] Summarizing all 31 messages (~6306 tokens)
+2025-11-25T06:59:09.649Z [DEBUG] Added document-skills@anthropic-agent-skills to installed_plugins.json
+2025-11-25T06:59:09.654Z [DEBUG] Saved 2 installed plugins to /Users/shunya.endo/.claude/plugins/installed_plugins.json (schema version 1)
+2025-11-25T06:59:09.654Z [DEBUG] Updated installed_plugins.json to schema version 1 (2 plugins added, 0 skipped)
+2025-11-25T06:59:09.876Z [DEBUG] MCP server "notion-mcp": Found client info
+2025-11-25T06:59:09.906Z [DEBUG] MCP server "notion-mcp": Token expired without refresh token
+2025-11-25T06:59:09.907Z [DEBUG] MCP server "notion-mcp": Generated new OAuth state
+2025-11-25T06:59:09.915Z [DEBUG] MCP server "notion-mcp": Saving code verifier
+2025-11-25T06:59:09.916Z [DEBUG] MCP server "notion-mcp": Authorization URL: https://mcp.notion.com/authorize?response_type=code&client_id=KjKE9KB2XUEEZq4H&code_challenge=caXs2Ia3EEhCLKM-sojbxfgVxe3m8j6gyjik8tpt5lw&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A3118%2Fcallback&state=nwoY9aQsqcltDpBtHftwwblAUeKTbu6wnjJi7RT0Rhk&resource=https%3A%2F%2Fmcp.notion.com%2F
+2025-11-25T06:59:09.917Z [DEBUG] MCP server "notion-mcp": Scopes in URL: NOT FOUND
+2025-11-25T06:59:09.918Z [DEBUG] MCP server "notion-mcp": No scopes available from URL or metadata
+2025-11-25T06:59:09.919Z [DEBUG] MCP server "notion-mcp": Redirection handling is disabled, skipping redirect
+2025-11-25T06:59:09.921Z [DEBUG] MCP server "notion-mcp": HTTP Connection failed after 511ms: Unauthorized (code: none, errno: none)
+2025-11-25T06:59:09.922Z [ERROR] MCP server "notion-mcp" Error: Unauthorized
+2025-11-25T06:59:09.923Z [DEBUG] MCP server "notion-mcp": Authentication required for HTTP server
+2025-11-25T06:59:09.933Z [DEBUG] AutoUpdaterWrapper: Installation type: unknown
+2025-11-25T06:59:09.969Z [DEBUG] Shell snapshot created successfully (32827 bytes)
+2025-11-25T06:59:10.117Z [DEBUG] MCP server "figma": Returning tokens
+2025-11-25T06:59:10.117Z [DEBUG] MCP server "figma": Token length: 45
+2025-11-25T06:59:10.118Z [DEBUG] MCP server "figma": Has refresh token: true
+2025-11-25T06:59:10.118Z [DEBUG] MCP server "figma": Expires in: 6376262s
+2025-11-25T06:59:10.318Z [DEBUG] MCP server "figma": Returning tokens
+2025-11-25T06:59:10.319Z [DEBUG] MCP server "figma": Token length: 45
+2025-11-25T06:59:10.319Z [DEBUG] MCP server "figma": Has refresh token: true
+2025-11-25T06:59:10.319Z [DEBUG] MCP server "figma": Expires in: 6376262s
+2025-11-25T06:59:10.320Z [DEBUG] MCP server "figma": Successfully connected to http server in 913ms
+2025-11-25T06:59:10.321Z [DEBUG] MCP server "figma": Connection established with capabilities: {"hasTools":true,"hasPrompts":true,"hasResources":true,"serverVersion":{"name":"Figma MCP Server","version":"1.0.0","icons":[{"src":"data:image/png;base64,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","mimeType":"image/png"},{"src":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACgCAYAAADEkmT9AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAhGVYSWZNTQAqAAAACAAFARIAAwAAAAEAAQAAARoABQAAAAEAAABKARsABQAAAAEAAABSASgAAwAAAAEAAgAAh2kABAAAAAEAAABaAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAABAAAAgKADAAQAAAABAAAAoAAAAAB6dUZwAAAACXBIWXMAAAsTAAALEwEAmpwYAAABWWlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNi4wLjAiPgogICA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgogICAgICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgICAgICAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyI+CiAgICAgICAgIDx0aWZmOk9yaWVudGF0aW9uPjE8L3RpZmY6T3JpZW50YXRpb24+CiAgICAgIDwvcmRmOkRlc2NyaXB0aW9uPgogICA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgoZXuEHAAAOs0lEQVR4Ae2bW6xdVRWGi5cqbUG0GBHEYqtcClW8gIlR8NQUtWIpUeIlJF4emqg86osGjCXRxBcfiDGpDxBTUWgwXEoTgikQVGIBxVDQolWJrXihAgLiXf/v7PmHyere55y9z+4588A/kn/Ny5pzrLH+MeZlzX3OokWRMBAGwkAYCANhIAyEgTAQBsJAGAgDYSAMhIEwEAbCQBgIA2EgDISBMBAGwkAYCANhIAyEgTAQBsJAGAgDYSAMhIEwEAbCQBgIA2EgDISBMBAGwkAYCANhIAyEgTAQBsJAGAgDYSAMhIEwEAbCQBgIA2EgDISBMBAGwkAYCANhoBUGDmvFkFnY8Tz15T3m+l3+p2eC/wqROWYAZ79AwPnzLdiALXMdgGN574VoNGT/u3r745RfI6wSXiYc6qBgxD8i7BXuFfYJlq5trk86BgY86lEF0R8TbhH+Jng6nuv0KT37VuETwgsF5PnCQhxYk8a3eqlH9fkyktFXO5sZ4Z8F/6jyrqtT3/+X2gHuOfW9un2dr+/zzNqG36j8QcFS2+y6pCMwUBP5TfU36XacHen6uUodNE793Murd2Q2aFpan6pwvnfZ31f+XQKEQyyEc79+hydKvZKBQj+WkCWdFiwljOpaX6fJZJH7yzo3/qMy9aQsBbcJawVsr99BxbZkupedb2uxD4ddK5wnMAW/SMBROBG5Xtgm/FQ4IEC6+yn7DCFwHhPeI1wj4DCE+g8J24WjBPR3xTpx6HLhdIEpf6OA2CbbuEN17xPcjzaRIRiwgz+vPgQBxJIyA5DeIbxBGEXeoU7owGmA/IQwivAF8gOhtu3vpfzFotDvUopJpmOAUYacKEAsYGTb+Zcrb4FcQB/AiBsE79RZStBZB8A5KiO0GdSfej/Hz6UPskVAJzZiK6C8WkD8Tr1SrlMy4BGzVa0g0Rs+8kzdFrdzebqUqR6ZENBVB8A6bkjcplea/lrb8F01Ry9B4GC9uqio25WqJP0Y8EhZoZs4HkJZq0kfEpYKyLCOqvuMMwBqvexP9gm1zQTZShpJ/G69UgPX5gyqSGIDxXTsKRW6LhWeFBYL3sApO++CLdjKPuVLxRovWQTqhlLXHN/NGVSIImGUWpg+HxWYYhGCojVhpCNM+X8R6in/nSojzAxNSYsBYCJPKUyZtDtVhlhGlOtKkyYSbMI2PjN/XCyynSerfJjQ0qw1aWJrAQBJCActR0/mnr7sKVm3efpOOznbZlttGecGR5aC2/jevKatBYDJYD1lna/l8brQeP6vHft4H9CctBoArPF8AdRyRF1oPN+1lfdpcd/S3GeJ10zO9B/uOJlDIcRteqW2rrbtpI5ZB1T2rOA2nSbzU2xxBvDu2euo18wzRRF/8MFGynXzw1r/p2ITtrHWv7U0sZ0PqIzj2SQ2JS0GgAm6xRmlfBnwI80Fpc5BUopNJLYJG9n0+WsG4/wuDgjqIgMYcFCu0H2fBEImI2i/cLiAjDKa3GdC/dGHXutepzziNr3SzK62mY3eg4J1kzIrrBIQt+uVGrg2Z5A44QSN0QSRPvc3oceq7goBgViPusmKebpgA/YhVwivFhxUyi76nrBXILB4t8gMGHBgcoACucBHq+S3CBYcAOjDFDsVGKHIWgE99Qww018D0c+zeKb1Kbvo6wI62e3bXtLTBGSUmaXX8zl6hWDkYgEi/Ru7Cb5ddacKo8hZ6oTOOgAIilGEE8vbBPTZNtu6uSj0u5RiO0mzhokinMNou1RgV82PQ/zYwi9u3Hu7sFtgmdgm3CNwVIwjBgmjkN8U+JroCnXoZrPJ8jJIsIm2/DEKGz7+KgjBJvi0jTcpf4lA+6n06fb8Cca1LEy1TP2kO4WzBQuk1tMqjue0cKoAoC/3mbqXUqjkSeUZwdNxwn0Oeup2tgXd1DM7TQjU+x2UjYzCgJ0Msd8QIBWiAcGB0zz1un4uUj8XG/w88uxPbLNTVUVmwwBTM7JS4FTNzjfxBAWfjIApeBB8v1/A4Lx+QDft3dfP6QYitrC8+MTSNqsqMhsGvNN+v5TUDiePY+oR6PszSafrx/1+gVLrrtvUAcE/ryC2vVdq8FqvYw2aN0kgTjhXuKEYCOnYjSNYXxE2g/xZ+H7Bm0fud4X27NAZpRcKtOnHAc709I2+XQLP+HOpP1bpG4U1AoJNFtu0URXXCQQB7xAZkgE7gM8sjy6cATwK+QuhNwvDCn3QUeuyTo967n1FOEEYJG/SjW8L7tu1L2cAg5gbov7uQjCOscP4Lx6WBAujmE+w6fDi0mGd0n4BYOffp/tey+nCqO7qrmeO9br/hGCd1nOP6ix1e9clHcAAZCObBEhl48U0Sx7n+x9CmF49Uyg7rbjthFraWaSgdpo3cItV7yld2YMEfdiArBYcBNjKRhS9FwmI36lXynUgAx4ppL8Q7CiPfo98O2mgoj43BgWAlxj+nu+Y0s+O7aPmoCrb8l7dwV70WeevlPdz/W6qigxiwGTV07RH51Wl0zDOqZ9j3d0ZwPo/VRoz8ocV99mqjp5RHLQEBuLn90q59mXAU+XXdBcimf49ms4oPUYl0v3qALDufdLtPcIoI9W6+TrAbpYBbCd/mYD43XqlBq5TrW/zZZ4/qd5SGYCd9wt3CjgHp41L/LwdUsgnIk7CacMKNmEbn6M/K3nr8bv4WbrdhrQWABAISUynxxeKTOJPStkjrRTHlvCtP1uxbQRBLa9S4XCBdxtldql1jTXfWgD45ZYos8yFkv6+Ux5X0Q55qCh0wM1Gf9dW3oV3ak5aDYB+RNlR/e61VjeOIJqTd2o1APjW55u6Fo5fD4XYWf78G0egHdcxlHfhnZqT1gIAZ2ATu+ffFbbskNNLeZwbwKJyMvGfctd1w+ZtG18CtfCF8ZTAuzng6vvzlm8tACDCNt1VscLm6VSBz0AI9GZL2VmLn7demjjQ4dvdQTeMcmzCNgKVk0ry1sNxNuJn9UoNXJszSJx4hNxY+MFGfz59tqor2Vkn6MfpTNufLNpGOWhyUNpGZgPz63fxu5XHJOnHgEcN6R4B0nAQhJJfKEfB2Iy9ewUHh99NVZGpGPCJ2SY1gkT2BMwC5NlMMcUijFSTO1kxzcVtJ9QOXXYSeR8H8wuez/Y5j/AoVvYgQZ9ni9XKs9lDF7b6x6DPKI/4nXqlXKdlwKOFvYAdZIcRBOdWGmgLwdPBR73r1LYbAH4G6X3C6wQLQdDVbftow1m/nY+NDiZOBC11e9clnYIBj9aT1cbTP+Q6CHDUd4Rx/UGI9dp5pF8WThAGCX8QcqWALaBr32mqQ/wuvVJD19ajkukVRzDabyi8Mb1iN4R7et6tPMev+wWc4PvKPkNoz3n/icKFAjrc1qmdaaehb5dwr/CwQD1nEnzqrREQb1JJPdWfr/y1gt9B2cgoDEAgskGwczwjEBzO+95MU5xVt72pKrPnQK9ng7pdnUeHbfCaz/3zBMS290q5jsyAN2UrpcH//VM7EGfhNIAjBsH3a8cywnEaB0FrhUdKmTrauU8/ndxzf9qzgfS0H+eLjHGIp2Kmb/4xpHa8R2DtUBwxDOxA/9HGcvX/qsB0P1M9v1TbTwuWBeN81r2WBafjZNKdwtkCTsFuRr2DQ9nJ+sdLSnmQ0B8HLS0NrOcclW8udSQvEdYL7xZeL/BbAT/p0p8d/z7hLoFDHvphJ4JN6IyMgQEH6Hbpgng2cKT1iL9G5Q8LfC28XDh6CrxC91hONgroYfR7BlinPEJweCM3WVEuBAz/FPpSwZ+T5dZkQh/bW9cnPyIDdsLF6o+zvMmy829XndfbYR9xVtHZLwA8q+BMbBjkWGYl7tE+jhcJ4xTIRU4RcD5girXztyhvsZPogyOmgtfmtWo3aAZwAFi/065e1y/oFPJaFJyJwy8pxuF4HIC9VwubBIQyo3imgk4E5w8ro/QZ9hlpLwY8+lcoz2eWRyrpfsHr76CRqiYDxX0m1MJ6u3sAtxmo5Nl0w2S39E62iV/9mLI97WPjZoGNIPXZaYuE2YrJnq2eQ9GfUWphqn9U2FYqhpn2rSNpHwZaDAA796RiL1M1skvgFJAp2nXKjiTsJyJioLUAsGOWyTa+52t5oBTcpr6X/IgMtBYAfg3W+MUulJRTvsiYGWg1ANj4cfBTy5F1YcS8Z4+jSn+WEtexuXzOSWsB4LWds/YDHW909wSd20MVfYLI8+CA84E/FA22oRSTzDUDPpxix48zfBbwmPLeF3jUDmubv/F/2NH9W5W95Iyqe1hbmmjf2gxQk7KzKvBlwBLwkVLHHmFYIbA4OzhTeJvAqLezf6Q8gUabzAAiYT7FQXm8jPCvfzgOx/xJOEJAPJp7pamvONrtb1UeXQSVD5k2KI949umVcp03BuyIb8kCLwN21vWVVW5XVR2UxfFut1l59KHLQcVfAEcaY8CzwCrZZUcxZTsItlb24lxAH8BoJ6WuXiq+oDLOtz7vLT6gOoT2kYYYsEM+J5twXPfvAe5W3RkzsPc1anOdUDvfuq4q/b08zEBdmswlA54J+AkYB3pP4JmAuh3Cx4U1wiuFYwT+OugC4UrBbZ3a+ffrHn8dhPg5vVKuzTDgXToGbRdwOI5kAwdYFqgzOD/w3wW6zn2Y+u38PcovF5CM/h4PzV7r0XmZrLRjWcMJBqMbDNS7jdd7+t4oLBEQLzO9Uq7NMlAHwXpZ+XPBgUDKbICTa1BXt/mjypsES0a+mVggKctBPWI/qvLNQr8p345nyr9DuEjgF0aEYKoDarLyuXqp19iFwgFBwOi2sOljA/hagaNi3on/7vm1sFt4ULB0+7o+6QJjwLPBTKZxRjuOX4jBfsjd8mwghXfAyf3ehY0hiISBMBAGwkAYCANhIAyEgTAQBsJAGAgDYSAMhIEwEAbCQBgIA2EgDISBMBAGwkAYCANhIAyEgTAQBsJAGAgDYSAMhIEwEAbCQBgIA2EgDISBMBAGwkAYCANhIAyEgTAQBsJAGAgDYSAMhIEwEAbCQBgIA2EgDISBMBAGwkAYCANhoHkG/g+d/2aZzZYP3gAAAABJRU5ErkJggg==","mimeType":"image/png"},{"src":"data:image/png;base64,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","mimeType":"image/png"}],"websiteUrl":"https://developers.figma.com/docs/figma-mcp-server/"}}
+2025-11-25T06:59:10.344Z [DEBUG] MCP server "figma": Returning tokens
+2025-11-25T06:59:10.345Z [DEBUG] MCP server "figma": Token length: 45
+2025-11-25T06:59:10.345Z [DEBUG] MCP server "figma": Has refresh token: true
+2025-11-25T06:59:10.346Z [DEBUG] MCP server "figma": Expires in: 6376262s
+2025-11-25T06:59:10.369Z [DEBUG] MCP server "figma": Returning tokens
+2025-11-25T06:59:10.370Z [DEBUG] MCP server "figma": Token length: 45
+2025-11-25T06:59:10.370Z [DEBUG] MCP server "figma": Has refresh token: true
+2025-11-25T06:59:10.371Z [DEBUG] MCP server "figma": Expires in: 6376262s
+2025-11-25T06:59:10.394Z [DEBUG] MCP server "figma": Returning tokens
+2025-11-25T06:59:10.395Z [DEBUG] MCP server "figma": Token length: 45
+2025-11-25T06:59:10.395Z [DEBUG] MCP server "figma": Has refresh token: true
+2025-11-25T06:59:10.396Z [DEBUG] MCP server "figma": Expires in: 6376262s
+2025-11-25T06:59:10.426Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:59:10.608Z [DEBUG] MCP server "terraform": Starting connection with timeout of 30000ms
+2025-11-25T06:59:10.610Z [DEBUG] MCP server "context7": Starting connection with timeout of 30000ms
+2025-11-25T06:59:10.613Z [DEBUG] MCP server "playwright": Starting connection with timeout of 30000ms
+2025-11-25T06:59:10.616Z [DEBUG] MCP server "terraform": Connection failed after 8ms: spawn /go/bin/terraform-mcp-server ENOENT
+2025-11-25T06:59:10.617Z [ERROR] MCP server "terraform" Connection failed: spawn /go/bin/terraform-mcp-server ENOENT
+2025-11-25T06:59:10.713Z [DEBUG] Writing to temp file: /Users/shunya.endo/.claude.json.tmp.68155.1764053950713
+2025-11-25T06:59:10.713Z [DEBUG] Preserving file permissions: 100644
+2025-11-25T06:59:10.720Z [DEBUG] Temp file written successfully, size: 76833 bytes
+2025-11-25T06:59:10.720Z [DEBUG] Applied original permissions to temp file
+2025-11-25T06:59:10.720Z [DEBUG] Renaming /Users/shunya.endo/.claude.json.tmp.68155.1764053950713 to /Users/shunya.endo/.claude.json
+2025-11-25T06:59:10.721Z [DEBUG] File /Users/shunya.endo/.claude.json written atomically
+2025-11-25T06:59:11.009Z [DEBUG] Getting matching hook commands for SubagentStart with query: Explore
+2025-11-25T06:59:11.009Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:59:11.009Z [DEBUG] Matched 0 unique hooks for query "Explore" (0 before deduplication)
+2025-11-25T06:59:11.009Z [DEBUG] Getting matching hook commands for SubagentStart with query: Plan
+2025-11-25T06:59:11.009Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:59:11.009Z [DEBUG] Matched 0 unique hooks for query "Plan" (0 before deduplication)
+2025-11-25T06:59:11.412Z [ERROR] MCP server "context7" Server stderr: Context7 Documentation MCP Server running on stdio
+2025-11-25T06:59:11.415Z [DEBUG] MCP server "context7": Successfully connected to stdio server in 806ms
+2025-11-25T06:59:11.415Z [DEBUG] MCP server "context7": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"Context7","version":"1.0.26"}}
+2025-11-25T06:59:11.502Z [DEBUG] MCP server "playwright": Successfully connected to stdio server in 890ms
+2025-11-25T06:59:11.503Z [DEBUG] MCP server "playwright": Connection established with capabilities: {"hasTools":true,"hasPrompts":false,"hasResources":false,"serverVersion":{"name":"Playwright","version":"0.0.44"}}
+2025-11-25T06:59:11.511Z [DEBUG] MCP server "serena": Starting connection with timeout of 30000ms
+2025-11-25T06:59:12.390Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:59:12.548Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,548 [MainThread] serena.cli:start_mcp_server:174 - Initializing Serena MCP server
+2025-11-25T06:59:12.548Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,548 [MainThread] serena.cli:start_mcp_server:175 - Storing logs in /Users/shunya.endo/.serena/logs/2025-11-25/mcp_20251125-155912.txt
+2025-11-25T06:59:12.550Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,549 [MainThread] serena.config.serena_config:from_config_file:425 - Loading Serena configuration from /Users/shunya.endo/.serena/serena_config.yml
+2025-11-25T06:59:12.563Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,563 [MainThread] serena.agent:__init__:222 - Will record tool usage statistics with token count estimator: TIKTOKEN_GPT4O.
+2025-11-25T06:59:12.567Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,567 [MainThread] serena.analytics:__init__:39 - Loading tiktoken encoding for model gpt-4o, this may take a while on the first run.
+2025-11-25T06:59:12.886Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,886 [MainThread] serena.agent:__init__:226 - Starting Serena server (version=0.1.4-e6a34116-dirty, process id=68671, parent process id=68670)
+2025-11-25T06:59:12.886Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,886 [MainThread] serena.agent:__init__:227 - Configuration file: /Users/shunya.endo/.serena/serena_config.yml
+INFO  2025-11-25 15:59:12,886 [MainThread] serena.agent:__init__:228 - Available projects: project-o, sdi-app, sdi-core, zatta
+INFO  2025-11-25 15:59:12,886 [MainThread] serena.agent:__init__:229 - Loaded tools (38): read_file, create_text_file, list_dir, find_file, replace_content, delete_lines, replace_lines, insert_at_line, search_for_pattern, restart_language_server, get_symbols_overview, find_symbol, find_referencing_symbols, replace_symbol_body, insert_after_symbol, insert_before_symbol, rename_symbol, write_memory, read_memory, list_memories, delete_memory, edit_memory, execute_shell_command, activate_project, remove_project, switch_modes, get_current_config, check_onboarding_performed, onboarding, think_about_collected_information, think_about_task_adherence, think_about_whether_you_are_done, summarize_changes, prepare_for_new_conversation, initial_instructions, jet_brains_find_symbol, jet_brains_find_referencing_symbols, jet_brains_get_symbols_overview
+2025-11-25T06:59:12.887Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,887 [MainThread] serena.config.serena_config:start:360 - Loading project instance for RegisteredProject[project_root=/Users/shunya.endo/go/github.com/sansaninc/sdi-core, project_config=ProjectConfig[project_name=sdi-core]] starting ...
+2025-11-25T06:59:12.887Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,887 [MainThread] serena.util.file_system:start:360 - Loading of .gitignore files starting ...
+INFO  2025-11-25 15:59:12,887 [MainThread] serena.util.file_system:_load_gitignore_files:148 - Processing .gitignore file: /Users/shunya.endo/go/github.com/sansaninc/sdi-core/.gitignore
+2025-11-25T06:59:12.894Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,894 [MainThread] serena.util.file_system:_load_gitignore_files:148 - Processing .gitignore file: /Users/shunya.endo/go/github.com/sansaninc/sdi-core/tools/oo/.gitignore
+2025-11-25T06:59:12.895Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,895 [MainThread] serena.util.file_system:_load_gitignore_files:148 - Processing .gitignore file: /Users/shunya.endo/go/github.com/sansaninc/sdi-core/tools/event_visualizer/.gitignore
+2025-11-25T06:59:12.896Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:12,896 [MainThread] serena.util.file_system:_load_gitignore_files:148 - Processing .gitignore file: /Users/shunya.endo/go/github.com/sansaninc/sdi-core/frontend/sdi_app/.gitignore
+2025-11-25T06:59:13.070Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,070 [MainThread] serena.util.file_system:stop:367 - Loading of .gitignore files completed in 0.183 seconds
+2025-11-25T06:59:13.071Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,071 [MainThread] serena.config.serena_config:stop:367 - Loading project instance for RegisteredProject[project_root=/Users/shunya.endo/go/github.com/sansaninc/sdi-core, project_config=ProjectConfig[project_name=sdi-core]] completed in 0.184 seconds
+2025-11-25T06:59:13.071Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,071 [MainThread] serena.agent:load_project_from_path_or_name:541 - Found registered project 'sdi-core' at path /Users/shunya.endo/go/github.com/sansaninc/sdi-core
+INFO  2025-11-25 15:59:13,071 [MainThread] serena.agent:_single_project_context_tool_inclusion_definitions:353 - Applying tool inclusion/exclusion definitions for single-project context based on project 'sdi-core'
+2025-11-25T06:59:13.071Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,071 [MainThread] serena.agent:apply:128 - SerenaAgentContext[name='ide-assistant'] excluded 5 tools: create_text_file, read_file, execute_shell_command, prepare_for_new_conversation, replace_content
+INFO  2025-11-25 15:59:13,071 [MainThread] serena.agent:apply:128 - ToolInclusionDefinition(excluded_tools=['activate_project', 'get_current_config'], included_optional_tools=()) excluded 2 tools: activate_project, get_current_config
+2025-11-25T06:59:13.071Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,071 [MainThread] serena.agent:__init__:243 - Number of exposed tools: 21
+2025-11-25T06:59:13.080Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,080 [MainThread] serena.agent:_update_active_tools:477 - Active tools (21): check_onboarding_performed, delete_memory, edit_memory, find_file, find_referencing_symbols, find_symbol, get_symbols_overview, initial_instructions, insert_after_symbol, insert_before_symbol, list_dir, list_memories, onboarding, read_memory, rename_symbol, replace_symbol_body, search_for_pattern, think_about_collected_information, think_about_task_adherence, think_about_whether_you_are_done, write_memory
+2025-11-25T06:59:13.080Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,080 [MainThread] serena.agent:load_project_from_path_or_name:541 - Found registered project 'sdi-core' at path /Users/shunya.endo/go/github.com/sansaninc/sdi-core
+INFO  2025-11-25 15:59:13,080 [MainThread] serena.agent:_activate_project:514 - Activating sdi-core at /Users/shunya.endo/go/github.com/sansaninc/sdi-core
+2025-11-25T06:59:13.081Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,080 [MainThread] serena.agent:_update_active_tools:477 - Active tools (21): check_onboarding_performed, delete_memory, edit_memory, find_file, find_referencing_symbols, find_symbol, get_symbols_overview, initial_instructions, insert_after_symbol, insert_before_symbol, list_dir, list_memories, onboarding, read_memory, rename_symbol, replace_symbol_body, search_for_pattern, think_about_collected_information, think_about_task_adherence, think_about_whether_you_are_done, write_memory
+INFO  2025-11-25 15:59:13,080 [MainThread] serena.task_executor:issue_task:192 - Scheduling Task-1:init_language_server_manager
+2025-11-25T06:59:13.083Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,083 [MainThread] serena.agent:__init__:276 - Serena web dashboard started at http://127.0.0.1:24285/dashboard/index.html
+2025-11-25T06:59:13.174Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,174 [SerenaAgentTaskExecutor] serena.task_executor:_process_task_queue:123 - Starting execution of Task-1:init_language_server_manager
+2025-11-25T06:59:13.175Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,174 [Task-1:init_language_server_manager] serena.task_executor:start:360 - Task-1:init_language_server_manager starting ...
+INFO  2025-11-25 15:59:13,175 [Task-1:init_language_server_manager] serena.agent:start:360 - Language server initialization starting ...
+2025-11-25T06:59:13.175Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,175 [Task-1:init_language_server_manager] serena.project:create_language_server_manager:384 - Creating language server manager for /Users/shunya.endo/go/github.com/sansaninc/sdi-core
+INFO  2025-11-25 15:59:13,175 [StartLS:go] sensai.util.logging:start:360 - Language server startup (language=go) starting ...
+2025-11-25T06:59:13.175Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,175 [StartLS:go] serena.ls_manager:create_language_server:44 - Creating language server instance for /Users/shunya.endo/go/github.com/sansaninc/sdi-core, language=go.
+2025-11-25T06:59:13.316Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,315 [StartLS:go] solidlsp.ls:_load_raw_document_symbols_cache:1771 - Loading document symbols cache from /Users/shunya.endo/go/github.com/sansaninc/sdi-core/.serena/cache/go/raw_document_symbols.pkl
+2025-11-25T06:59:13.351Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,351 [StartLS:go] solidlsp:_load_raw_document_symbols_cache:1776 - Loaded 532 entries from raw document symbols cache.
+2025-11-25T06:59:13.352Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,352 [StartLS:go] solidlsp:start:1905 - Starting language server with language go for /Users/shunya.endo/go/github.com/sansaninc/sdi-core
+2025-11-25T06:59:13.352Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,352 [StartLS:go] solidlsp:_start_server:158 - Starting gopls server process
+2025-11-25T06:59:13.353Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,352 [StartLS:go] solidlsp.ls_handler:start:194 - Starting language server process via command: gopls
+2025-11-25T06:59:13.357Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,357 [StartLS:go] solidlsp:_start_server:162 - Sending initialize request from LSP client to LSP server and awaiting response
+2025-11-25T06:59:13.400Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,399 [StartLS:go] sensai.util.logging:stop:367 - Language server startup (language=go) completed in 0.225 seconds
+2025-11-25T06:59:13.400Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,400 [Task-1:init_language_server_manager] serena.agent:stop:367 - Language server initialization completed in 0.225 seconds
+INFO  2025-11-25 15:59:13,400 [Task-1:init_language_server_manager] serena.task_executor:stop:367 - Task-1:init_language_server_manager completed in 0.225 seconds
+2025-11-25T06:59:13.426Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,426 [LSP-stdout-reader:go] solidlsp:window_log_message:148 - LSP: window/logMessage: {"type": 3, "message": "2025/11/25 15:59:13 Created View (#1)\n\tdirectory=/Users/shunya.endo/go/github.com/sansaninc/sdi-core\n\tview_type="AdHoc"\n\troot_dir="file:///Users/shunya.endo/go/github.com/sansaninc/sdi-core"\n\tgo_version="go version go1.24.3 darwin/arm64"\n\tbuild_flags=[]\n\tenv={GOOS:darwin GOARCH:arm64 GOCACHE:/Users/shunya.endo/Library/Caches/go-build GOMODCACHE:/Users/shunya.endo/go/pkg/mod GOPATH:/Users/shunya.endo/go GOPRIVATE: GOFLAGS: GO111MODULE: GOTOOLCHAIN:auto GOROOT:/Users/shunya.endo/.local/share/mise/installs/go/1.24.3 GoVersion:24 GoVersionOutput:go version go1.24.3 darwin/arm64\n ExplicitGOWORK: EffectiveGOPACKAGESDRIVER:}\n\tenv_overlay=[]\n"}
+2025-11-25T06:59:13.481Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,480 [LSP-stdout-reader:go] solidlsp:window_log_message:148 - LSP: window/logMessage: {"type": 3, "message": "2025/11/25 15:59:13 go/packages.Load #1\n\tview_id="1"\n\tsnapshot=0\n\tdirectory=/Users/shunya.endo/go/github.com/sansaninc/sdi-core\n\tquery=[./ builtin]\n\tpackages=2\n\tduration=55.400291ms\n"}
+2025-11-25T06:59:13.631Z [DEBUG] AutoUpdaterWrapper: Installation type: unknown
+2025-11-25T06:59:13.837Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,837 [MainThread] serena.agent:create_system_prompt:444 - Generating system prompt with available_tools=(see exposed tools), available_markers={'InsertBeforeSymbolTool', 'InitialInstructionsTool', 'ToolMarkerDoesNotRequireActiveProject', 'FindReferencingSymbolsTool', 'ToolMarkerCanEdit', 'ReplaceSymbolBodyTool', 'RenameSymbolTool', 'FindSymbolTool', 'GetSymbolsOverviewTool', 'ToolMarkerSymbolicEdit', 'ToolMarkerSymbolicRead', 'InsertAfterSymbolTool'}
+2025-11-25T06:59:13.842Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,842 [MainThread] serena.agent:create_system_prompt:456 - System prompt:
+You are a professional coding agent concerned with one particular codebase. You have 
+access to semantic coding tools on which you rely heavily for all your work, as well as collection of memory 
+files containing general information about the codebase. You operate in a resource-efficient and intelligent manner, always
+keeping in mind to not read or generate content that is not needed for the task at hand.
+
+When reading code in order to answer a user question or task, you should try reading only the necessary code. 
+Some tasks may require you to understand the architecture of large parts of the codebase, while for others,
+it may be enough to read a small set of symbols or a single file.
+Generally, you should avoid reading entire files unless it is absolutely necessary, instead relying on
+intelligent step-by-step acquisition of information. However, if you already read a file, it does not make
+sense to further analyse it with the symbolic tools (except for the `find_referencing_symbols` tool), 
+as you already have the information.
+
+I WILL BE SERIOUSLY UPSET IF YOU READ ENTIRE FILES WITHOUT NEED!
+
+CONSIDER INSTEAD USING THE OVERVIEW TOOL AND SYMBOLIC TOOLS TO READ ONLY THE NECESSARY CODE FIRST!
+I WILL BE EVEN MORE UPSET IF AFTER HAVING READ AN ENTIRE FILE YOU KEEP READING THE SAME CONTENT WITH THE SYMBOLIC TOOLS!
+THE PURPOSE OF THE SYMBOLIC TOOLS IS TO HAVE TO READ LESS CODE, NOT READ THE SAME CONTENT MULTIPLE TIMES!
+
+
+You can achieve the intelligent reading of code by using the symbolic tools for getting an overview of symbols and
+the relations between them, and then only reading the bodies of symbols that are necessary to answer the question 
+or complete the task. 
+You can use the standard tools like list_dir, find_file and search_for_pattern if you need to.
+When tools allow it, you pass the `relative_path` parameter to restrict the search to a specific file or directory.
+For some tools, `relative_path` can only be a file path, so make sure to properly read the tool descriptions.
+
+If you are unsure about a symbol's name or location (to the extent that substring_matching for the symbol name is not enough), you can use the `search_for_pattern` tool, which allows fast
+and flexible search for patterns in the codebase.This way you can first find candidates for symbols or files,
+and then proceed with the symbolic tools.
+
+
+
+Symbols are identified by their `name_path and `relative_path`, see the description of the `find_symbol` tool for more details
+on how the `name_path` matches symbols.
+You can get information about available symbols by using the `get_symbols_overview` tool for finding top-level symbols in a file,
+or by using `find_symbol` if you already know the symbol's name path. You generally try to read as little code as possible
+while still solving your task, meaning you only read the bodies when you need to, and after you have found the symbol you want to edit.
+For example, if you are working with python code and already know that you need to read the body of the constructor of the class Foo, you can directly
+use `find_symbol` with the name path `Foo/__init__` and `include_body=True`. If you don't know yet which methods in `Foo` you need to read or edit,
+you can use `find_symbol` with the name path `Foo`, `include_body=False` and `depth=1` to get all (top-level) methods of `Foo` before proceeding
+to read the desired methods with `include_body=True`
+You can understand relationships between symbols by using the `find_referencing_symbols` tool.
+
+
+
+You generally have access to memories and it may be useful for you to read them, but also only if they help you
+to answer the question or complete the task. You can infer which memories are relevant to the current task by reading
+the memory names and descriptions.
+
+
+The context and modes of operation are described below. From them you can infer how to interact with your user
+and which tasks and kinds of interactions are expected of you.
+
+Context description:
+You are running in IDE assistant context where file operations, basic (line-based) edits and reads, 
+and shell commands are handled by your own, internal tools.
+The initial instructions and the current config inform you on which tools are available to you,
+and how to use them.
+Don't attempt to use any excluded tools, instead rely on your own internal tools
+for achieving the basic file or shell operations.
+
+If serena's tools can be used for achieving your task, 
+you should prioritize them. In particular, it is important that you avoid reading entire source code files,
+unless it is strictly necessary! Instead, for exploring and reading code in a token-efficient manner, 
+you should use serena's overview and symbolic search tools. 
+Before reading a full file, it is usually best to first explore the file using the symbol_overview tool, 
+and then make targeted reads using find_symbol and other symbolic tools.
+For non-code files or for reads where you don't know the symbol's name path, you can use the pattern searching tool,
+and read full files only as a last resort.
+
+Modes descriptions:
+
+- You are operating in interactive mode. You should engage with the user throughout the task, asking for clarification
+whenever anything is unclear, insufficiently specified, or ambiguous.
+
+Break down complex tasks into smaller steps and explain your thinking at each stage. When you're uncertain about
+a decision, present options to the user and ask for guidance rather than making assumptions.
+
+Focus on providing informative results for intermediate steps so the user can follow along with your progress and
+provide feedback as needed.
+
+- You are operating in editing mode. You can edit files with the provided tools
+to implement the requested changes to the code base while adhering to the project's code style and patterns.
+Use symbolic editing tools whenever possible for precise code modifications.
+If no editing task has yet been provided, wait for the user to provide one.
+
+When writing new code, think about where it belongs best. Don't generate new files if you don't plan on actually
+integrating them into the codebase, instead use the editing tools to insert the code directly into the existing files in that case.
+
+You have two main approaches for editing code - editing at the symbol level and more file-based editing.
+The symbol-based approach is appropriate if you need to adjust an entire symbol, e.g. a method, a class, a function, etc.
+But it is not appropriate if you need to adjust just a few lines of code within a symbol.
+
+Let us first discuss the symbol-based approach.
+Symbols are identified by their name path and relative file path (description of the `find_symbol` tool).
+You can get information about available symbols by using the `get_symbols_overview` tool for finding top-level symbols in a file,
+or by using `find_symbol` if you already know the symbol's name path. You generally try to read as little code as possible
+while still solving your task, meaning you only read the bodies when you need to, and after you have found the symbol you want to edit.
+Before calling symbolic reading tools, you should have a basic understanding of the repository structure that you can get from memories
+or by using the `list_dir` and `find_file` tools (or similar).
+For example, if you are working with python code and already know that you need to read the body of the constructor of the class Foo, you can directly
+use `find_symbol` with the name path `Foo/__init__` and `include_body=True`. If you don't know yet which methods in `Foo` you need to read or edit,
+you can use `find_symbol` with the name path `Foo`, `include_body=False` and `depth=1` to get all (top-level) methods of `Foo` before proceeding
+to read the desired methods with `include_body=True`.
+In particular, keep in mind the description of the `replace_symbol_body` tool. If you want to add some new code at the end of the file, you should
+use the `insert_after_symbol` tool with the last top-level symbol in the file. If you want to add an import, often a good strategy is to use
+`insert_before_symbol` with the first top-level
+2025-11-25T06:59:13.846Z [ERROR] MCP server "serena" Server stderr: symbol in the file.
+You can understand relationships between symbols by using the `find_referencing_symbols` tool. If not explicitly requested otherwise by a user,
+you make sure that when you edit a symbol, it is either done in a backward-compatible way, or you find and adjust the references as needed.
+The `find_referencing_symbols` tool will give you code snippets around the references, as well as symbolic information.
+You will generally be able to use the info from the snippets and the regex-based approach to adjust the references as well.
+You can assume that all symbol editing tools are reliable, so you don't need to verify the results if the tool returns without error.
+
+
+
+
+You have hereby read the 'Serena Instructions Manual' and do not need to read it again.
+
+The project with name 'sdi-core' at /Users/shunya.endo/go/github.com/sansaninc/sdi-core is activated.
+Programming languages: go; file encoding: utf-8
+Available project memories: ["project_overview"]
+Use the `read_memory` tool to read these memories later if they are relevant to the task.
+INFO  2025-11-25 15:59:13,844 [MainThread] serena.cli:start_mcp_server:193 - Starting MCP server …
+2025-11-25T06:59:13.876Z [DEBUG] Stream started - received first chunk
+2025-11-25T06:59:13.877Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,877 [MainThread] serena.mcp:_set_mcp_tools:240 - Starting MCP server with 21 tools: ['list_dir', 'find_file', 'search_for_pattern', 'get_symbols_overview', 'find_symbol', 'find_referencing_symbols', 'replace_symbol_body', 'insert_after_symbol', 'insert_before_symbol', 'rename_symbol', 'write_memory', 'read_memory', 'list_memories', 'delete_memory', 'edit_memory', 'check_onboarding_performed', 'onboarding', 'think_about_collected_information', 'think_about_task_adherence', 'think_about_whether_you_are_done', 'initial_instructions']
+INFO  2025-11-25 15:59:13,877 [MainThread] serena.mcp:server_lifespan:347 - MCP server lifetime setup complete
+2025-11-25T06:59:13.881Z [DEBUG] MCP server "serena": Successfully connected to stdio server in 2370ms
+2025-11-25T06:59:13.882Z [DEBUG] MCP server "serena": Connection established with capabilities: {"hasTools":true,"hasPrompts":true,"hasResources":true,"serverVersion":{"name":"FastMCP","version":"1.12.3"}}
+2025-11-25T06:59:13.886Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,885 [MainThread] mcp.server.lowlevel.server:_handle_request:625 - Processing request of type ListToolsRequest
+2025-11-25T06:59:13.887Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,887 [MainThread] mcp.server.lowlevel.server:_handle_request:625 - Processing request of type ListPromptsRequest
+2025-11-25T06:59:13.889Z [ERROR] MCP server "serena" Server stderr: INFO  2025-11-25 15:59:13,888 [MainThread] mcp.server.lowlevel.server:_handle_request:625 - Processing request of type ListResourcesRequest
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:algorithmic-art" (userFacingName="algorithmic-art")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:brand-guidelines" (userFacingName="brand-guidelines")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:canvas-design" (userFacingName="canvas-design")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:frontend-design" (userFacingName="frontend-design")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:internal-comms" (userFacingName="internal-comms")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:mcp-builder" (userFacingName="mcp-builder")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:skill-creator" (userFacingName="skill-creator")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:slack-gif-creator" (userFacingName="slack-gif-creator")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:theme-factory" (userFacingName="theme-factory")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:web-artifacts-builder" (userFacingName="web-artifacts-builder")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:webapp-testing" (userFacingName="webapp-testing")
+2025-11-25T06:59:14.772Z [DEBUG] Skills and commands included in Skill tool: adr-checker, ci-like-check, fuzzy-find, gh-issue-integration, gh-pr-integration, go-aggregate-design-reference, go-model-developer, go-repository-developer, go-service-test-developer, go-test-assertions, k8s-manifest-developer, mcp-tools-guide, plan, pr-feedback-addresser, pr-feedback-breakdown, project-structure, protobuf-developer, terraform-developer, algorithmic-art, brand-guidelines, canvas-design, frontend-design, internal-comms, mcp-builder, skill-creator, slack-gif-creator, theme-factory, web-artifacts-builder, webapp-testing
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:algorithmic-art" (userFacingName="algorithmic-art")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:brand-guidelines" (userFacingName="brand-guidelines")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:canvas-design" (userFacingName="canvas-design")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:frontend-design" (userFacingName="frontend-design")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:internal-comms" (userFacingName="internal-comms")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:mcp-builder" (userFacingName="mcp-builder")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:skill-creator" (userFacingName="skill-creator")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:slack-gif-creator" (userFacingName="slack-gif-creator")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:theme-factory" (userFacingName="theme-factory")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:web-artifacts-builder" (userFacingName="web-artifacts-builder")
+2025-11-25T06:59:14.772Z [DEBUG] Skill prompt: showing "example-skills:webapp-testing" (userFacingName="webapp-testing")
+2025-11-25T06:59:14.772Z [DEBUG] Slash commands included in SlashCommand tool: /impl-query, /brainstorm, /output-for-devin, /container-use, /impl-service-test, /review-node, /translate-pr-files, /impl-model, /review-pr, /impl-repository, /impl-command
+2025-11-25T06:59:15.593Z [DEBUG] Getting matching hook commands for SubagentStop with query: undefined
+2025-11-25T06:59:15.593Z [DEBUG] Found 0 hook matchers in settings
+2025-11-25T06:59:15.593Z [DEBUG] Matched 0 unique hooks for query "no match query" (0 before deduplication)

@@ -1,0 +1,70 @@
+package statistics_computation_initiation
+
+import (
+	"context"
+	"time"
+
+	"github.com/sansaninc/sdi-core/shared/golang_lib/common_vo"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/ex"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/sqlxx"
+)
+
+type listTenantLatestInitiationQueryServiceV1 struct {
+	connection sqlxx.Connection
+}
+
+type listTenantLatestInitiationV1Args struct {
+	tenantIDs []common_vo.TenantID
+}
+
+type listTenantLatestInitiationV1ResultItem struct {
+	TenantID  string     `db:"tenant_id"`
+	CreatedAt *time.Time `db:"created_at"`
+}
+
+type listTenantLatestInitiationQueryServiceV1Result struct {
+	Items []*listTenantLatestInitiationV1ResultItem
+}
+
+func (s *listTenantLatestInitiationQueryServiceV1) query(ctx context.Context, args *listTenantLatestInitiationV1Args) (*listTenantLatestInitiationQueryServiceV1Result, error) {
+	if len(args.tenantIDs) == 0 {
+		return &listTenantLatestInitiationQueryServiceV1Result{
+			Items: []*listTenantLatestInitiationV1ResultItem{},
+		}, nil
+	}
+
+	tenantIDStrs := make([]string, len(args.tenantIDs))
+	for i, tenantID := range args.tenantIDs {
+		tenantIDStrs[i] = tenantID.String()
+	}
+
+	const query = `-- statistics_computation_initiation.listTenantLatestInitiation
+SELECT
+  tenant_id,
+  MAX(created_at) as created_at
+FROM
+  enriched_data_statistics_computation_initiation
+WHERE
+  tenant_id IN UNNEST(@tenant_ids)
+GROUP BY
+  tenant_id
+`
+
+	rows, err := sqlxx.TypedAccessor[listTenantLatestInitiationV1ResultItem](s.connection).SelectList(
+		ctx,
+		query,
+		struct {
+			TenantIDs []string `db:"tenant_ids"`
+		}{
+			TenantIDs: tenantIDStrs,
+		},
+		sqlxx.WithSkipAuthenticatedTenantIDCheckSelectOption(),
+	)
+	if err != nil {
+		return nil, ex.Wrap(err)
+	}
+
+	return &listTenantLatestInitiationQueryServiceV1Result{
+		Items: rows,
+	}, nil
+}

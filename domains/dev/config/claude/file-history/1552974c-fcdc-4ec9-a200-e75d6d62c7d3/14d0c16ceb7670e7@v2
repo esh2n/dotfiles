@@ -1,0 +1,44 @@
+package core
+
+import (
+	"time"
+
+	"github.com/sansaninc/sdi-core/shared/golang_lib/stdx"
+)
+
+type RootEntity struct {
+	id             ID
+	createdAt      createdAt
+	retentionUntil retentionUntil
+}
+
+func NewRootEntity(clock stdx.Clock) *RootEntity {
+	createdAt := NewCreatedAt(clock.Now())
+	return &RootEntity{
+		id:             randomID(),
+		createdAt:      createdAt,
+		retentionUntil: newRetentionUntil(createdAt),
+	}
+}
+
+func RestoreRootEntity(id ID, createdAt createdAt, retentionUntil retentionUntil) *RootEntity {
+	return &RootEntity{
+		id:             id,
+		createdAt:      createdAt,
+		retentionUntil: retentionUntil,
+	}
+}
+
+func (r *RootEntity) CreatedAt() time.Time {
+	return r.createdAt.value
+}
+
+const skipInitiationWithinDuration = 24 * time.Hour
+
+func ShouldInitiate(latestCreatedAt *time.Time, clock stdx.Clock) bool {
+	if latestCreatedAt == nil {
+		return true
+	}
+	threshold := clock.Now().Add(-skipInitiationWithinDuration)
+	return latestCreatedAt.Before(threshold)
+}

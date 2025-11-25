@@ -1,0 +1,11 @@
+# GITDIR: {{HOME}}/go/github.com/sansaninc/
+[user]
+    name = shunya-endo_sansan
+    email = shunya.endo@sansan.com
+
+[credential "https://github.com"]
+    helper =
+    helper = !~/.config/git/git-credential-helper.sh shunya-endo_sansan
+[credential "https://gist.github.com"]
+    helper =
+    helper = !~/.config/git/git-credential-helper.sh shunya-endo_sansan 

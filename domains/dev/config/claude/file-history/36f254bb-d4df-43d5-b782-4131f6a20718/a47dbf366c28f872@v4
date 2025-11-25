@@ -1,0 +1,113 @@
+package statistics_computation_initiation_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"connectrpc.com/connect"
+	app_proto "github.com/sansaninc/sdi-contracts/integrated_data/enriched_data/statistics_computation_initiation/v1"
+	app_connect "github.com/sansaninc/sdi-contracts/integrated_data/enriched_data/statistics_computation_initiation/v1/statistics_computation_initiationv1connect"
+	app_fixture "github.com/sansaninc/sdi-contracts/integrated_data/enriched_data/statistics_computation_initiation/v1/statistics_computation_initiationv1fixture"
+	"github.com/sansaninc/sdi-contracts/shared/http_fixture"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/app_env"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/app_testing"
+	"github.com/sansaninc/sdi-core/integrated_data/enriched_data/internal/statistics_computation_initiation/internal/core"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/assertx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/contextx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/fixture/common_vo_fixture"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/pubsubx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/sqlxx"
+	"github.com/sansaninc/sdi-core/shared/golang_lib/stdx"
+	"google.golang.org/protobuf/testing/protocmp"
+)
+
+// TODO: Application Service のテストを実装してください。
+// Application Service の振る舞いのテストにフォーカスするために internal/core の関数呼び出しはできる限り避けてください。
+// TODO: Implement tests for the Application Service.
+// For the purpose of focusing on the behavior of the Application Service, please avoid calling functions in internal/core as much as possible.
+// Please refer to the following document for more information.
+// https://github.com/sansaninc/sdi-core/blob/main/docs/adr/application/APP_015_quality_assurance.md
+// https://github.com/sansaninc/sdi-core/blob/main/docs/adr/application/APP_016_service_test.md
+// https://github.com/sansaninc/sdi-core/blob/main/docs/adr/application/APP_017_golang_test.md
+//
+// テストデータは get_template_v1_fixture_test.go を作成して静的に定義するか、contracts やライブラリで用意されている fixture を用いてインスタンス生成してください。
+// 各テストケースで fixture の値をカスタマイズしてテストを行うことは許容されます。
+// Please create a get_template_v1_fixture_test.go file and define the test data statically or use the fixture provided by the contracts or library to generate the instance.
+// You can customize the values of the fixture for each test case.
+// Please refer to the following document for more information.
+// https://github.com/sansaninc/sdi-core/blob/main/docs/adr/application/APP_010_fixture.md
+//
+// assert は github.com/stretchr/testify/assert または github.com/sansaninc/sdi-core/shared/golang_lib/assertx を使用してください。
+// Please use github.com/stretchr/testify/assert or github.com/sansaninc/sdi-core/shared/golang_lib/assertx for assert.
+// Please refer to the following document for more information.
+// https://github.com/sansaninc/sdi-core/blob/main/docs/adr/application/APP_014_assertx_package.md
+func TestAddV1(t *testing.T) {
+	type fixture struct {
+		client       app_connect.StatisticsComputationInitiationServiceClient
+		conn         sqlxx.Connection
+		spyPublisher *pubsubx.SpyPublisher
+		env          app_env.Environment
+		stubClock    *stdx.StubClock
+	}
+
+	newFixture := func(t *testing.T, ctx context.Context) (context.Context, *fixture) {
+		t.Helper()
+		t.Parallel()
+
+		spannerConnectionBuilder := instanceConnectionParameter.CreateSpannerConnectionBuilder()
+		spannerConnectionBuilder.CreateDatabaseForTest(t, ctx, app_testing.GetSchema(t))
+		sqlProvider, err := sqlxx.NewProvider(spannerConnectionBuilder)
+		assertx.FatalIfError(t, err)
+
+		stubClock := stdx.NewStubClock(t)
+		// Set clock to match the fixture's CreatedAt time for consistent testing
+		stubClock.SetNow(time.Date(2025, 8, 27, 0, 0, 0, 0, time.UTC))
+
+		ctx, env := app_env.NewTest(t).
+			WithSQLProvider(t, sqlProvider).
+			WithCustomClock(t, stubClock).
+			Setup(t, ctx)
+		testAPP := app_testing.PrepareAPP(t, ctx)
+
+		client := app_connect.NewStatisticsComputationInitiationServiceClient(testAPP.Server.ClientForContextCallSite(ctx), testAPP.Server.URL(), connect.WithProtoJSON())
+
+		conn := sqlProvider.Connect()
+		return ctx, &fixture{
+			client:       client,
+			conn:         conn,
+			spyPublisher: env.SpyPublisher,
+			env:          env,
+			stubClock:    stubClock,
+		}
+	}
+
+	t.Run("集約のルートエンティティが正常に作成されること", func(t *testing.T) {
+		// TODO: 実際の実装が完了したらコメントアウトを解除してください
+		// TODO: Uncomment when the actual implementation is completed
+		t.Skip("TODO: 実際の実装が完了したらコメントアウトを解除してください")
+
+		// arrange
+		ctx, fixture := newFixture(t, contextx.WithAuthenticatedInfoAndCallSiteFixture(common_vo_fixture.GetTenantPubSubAuthenticationInfoFixture(t)))
+
+		// act
+		request := app_fixture.StatisticsComputationInitiationServiceAddRequestFixture()
+		// 以下のコマンドでアクセス可能です。
+		// You can access by using the following command.
+		// curl -X POST ${INTEGRATED_DATA_ENRICHED_DATA_BASE_URL}/integrated_data.enriched_data.statistics_computation_initiation.v1.StatisticsComputationInitiationService/Add -H "X-Tenant-Id: $(uuidgen)" -H "Content-Type: application/json" -d '{}'
+		actual, err := fixture.client.Add(ctx, http_fixture.WithHeaderFixture(t, ctx, request))
+
+		// assert
+		assertx.FatalIfError(t, err)
+
+		expected := app_fixture.StatisticsComputationInitiationServiceAddResponseFixture()
+		assertx.Equal(t, expected.Msg, actual.Msg, protocmp.IgnoreFields(&app_proto.StatisticsComputationInitiationServiceAddResponse{}, "id")) //nolint:exhaustruct
+
+		expectedData := core.NewDataFixture(t)
+		expectedData.AssertEqualToStored(t, ctx, fixture.conn)
+
+		fixture.spyPublisher.AssertPublished(t, core.AddedEventTopic, &app_proto.AddedEventPayload{
+			TenantId: "123z4567-e89b-12d3-a456-426614174000",
+		})
+	})
+}
