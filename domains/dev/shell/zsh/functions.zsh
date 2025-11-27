@@ -654,15 +654,61 @@ function sk_edit_file() {
 # Git Helpers
 # -----------------------------------------------------------------------------
 function sk_select_branch_except_current() {
-  git branch | grep -v "^\*" | sk --ansi --reverse --height '50%' | xargs
+  git branch | grep -v "^[*+]" | sed 's/^[[:space:]]*//' | sk --prompt="Branch> " --ansi --reverse | xargs
 }
 
 function sk_select_local_branch_except_current() {
-  git branch | grep -v "^\*" | sk --ansi --reverse --height '50%' | xargs
+  git branch | grep -v "^[*+]" | sed 's/^[[:space:]]*//' | sk --prompt="Local Branch> " --ansi --reverse | xargs
 }
 
 function sk_select_branch_all() {
-  git branch -a | grep -v "^\*" | sed 's/remotes\/origin\///' | sort -u | sk --ansi --reverse --height '50%' | xargs
+  local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+  {
+    # Show current branch first
+    [[ -n "$current_branch" ]] && echo "$current_branch"
+
+    # Then show all other branches sorted by commit date (newest first)
+    git for-each-ref --sort=-committerdate --format='%(refname:short)' refs/heads/ refs/remotes/origin/ 2>/dev/null | \
+      sed 's|^origin/||' | \
+      grep -v -E "^HEAD$|^origin$|^${current_branch}$"
+  } | awk '!seen[$0]++' | sk --prompt="Branch (All)> " --ansi --reverse | xargs
+}
+
+# Git wrapper functions (interactive if no args, normal if args provided)
+function gsw() {
+  if [ $# -eq 0 ]; then
+    # No arguments: interactive branch selection (including remote branches)
+    local selected_branch=$(sk_select_branch_all)
+    if [ -n "$selected_branch" ]; then
+      # Remove 'origin/' prefix if present
+      local branch_name="${selected_branch#origin/}"
+      git switch "$branch_name"
+    fi
+  else
+    # With arguments: normal git switch
+    git switch "$@"
+  fi
+}
+
+function gpso() {
+  if [ $# -eq 0 ]; then
+    # No arguments: interactive branch selection
+    sk_select_branch_all | xargs -t git push origin
+  else
+    # With arguments: push specified branch
+    git push origin "$@"
+  fi
+}
+
+function gPso() {
+  if [ $# -eq 0 ]; then
+    # No arguments: interactive branch selection
+    sk_select_branch_all | xargs -t git push -f origin
+  else
+    # With arguments: force push specified branch
+    git push -f origin "$@"
+  fi
 }
 
 # -----------------------------------------------------------------------------

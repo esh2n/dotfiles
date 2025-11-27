@@ -156,6 +156,123 @@ export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
 - `fuck` - Fix previous command (thefuck)
 - Auto-suggestions appear in gray text (zsh-autosuggestions)
 
+### Git Aliases
+
+Minimal keystrokes for common git operations. Pattern: lowercase for normal, uppercase for powerful/destructive operations.
+
+#### Basic Operations
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `ga` | `git add` | |
+| `gA` | `git add --all` | |
+| `gc` | `git commit` | |
+| `gC` | `git commit --amend` | |
+| `gcm` | `git commit -m` | |
+| `gCm` | `git commit --amend -m` | |
+
+#### Push/Pull/Fetch
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `gpso [branch]` | `git push origin` | Interactive if no args, normal if branch specified |
+| `gPso [branch]` | `git push --force origin` | Interactive if no args, force push if branch specified |
+| `gpl` | `git pull` | Pull current branch |
+| `gf` | `git fetch` | Fetch all remotes |
+
+#### Branch
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `gb` | `git branch` | List branches |
+| `gsw [branch]` | `git switch` | Interactive if no args, normal if branch specified |
+| `gswc` | `git switch -c` | Create new branch |
+| `grn` | `git branch -m` | Rename branch |
+
+#### Merge
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `gm` | `git merge` | |
+| `gM` | `git merge --no-ff` | Preserve history |
+| `gma` | `git merge --abort` | |
+
+#### Diff
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `gd` | `git diff` | |
+| `gD` | `git diff --cached` | Staged changes |
+| `gds` | `git diff --stat` | |
+
+#### Rebase
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `gr` | `git rebase` | |
+| `gR` | `git rebase -i` | Interactive |
+| `grc` | `git rebase --continue` | |
+| `gra` | `git rebase --abort` | |
+
+#### Reset
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `grs` | `git reset` | |
+| `grs1` | `git reset --hard HEAD~1` | |
+| `grs2` | `git reset --hard HEAD~2` | |
+| `grs3` | `git reset --hard HEAD~3` | |
+
+#### Restore
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `grt` | `git restore` | |
+| `gRt` | `git restore --staged` | Unstage |
+
+#### Stash
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `gst` | `git stash` | |
+| `gSt` | `git stash pop` | |
+| `gsta` | `git stash apply` | |
+| `gstl` | `git stash list` | |
+| `gstd` | `git stash drop` | |
+
+#### Interactive (skim-based)
+
+Functions that support both interactive and argument modes:
+
+| Alias | Usage | Description |
+|-------|-------|-------------|
+| `gsw` | No args: interactive | Select branch and switch |
+| `gsw <branch>` | With args: normal | Switch to specified branch |
+| `gpso` | No args: interactive | Select branch and push origin |
+| `gpso <branch>` | With args: normal | Push specified branch to origin |
+| `gPso` | No args: interactive | Select branch and force push origin |
+| `gPso <branch>` | With args: normal | Force push specified branch to origin |
+
+Pure interactive aliases (no argument support):
+
+| Alias | Description |
+|-------|-------------|
+| `gbd` | Select local branch to delete |
+| `gme` | Select branch to merge with --no-ff --edit |
+| `gmesq` | Select branch to merge with --squash |
+| `gpr` | Select base branch for pull request |
+| `glo` | Select branch and show log graph |
+| `gtr` | Show all branches log graph (non-interactive) |
+
+#### Other
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `gs` | `git status -sb` | Short format |
+| `gg` | `git grep` | |
+| `gi` | `git init` | |
+| `gcl` | `git clone` | |
+
 #### tmux / WezTerm / Zellij (Prefix: Ctrl+q)
 
 Keybindings unified across tmux, WezTerm, and Zellij.
@@ -214,7 +331,8 @@ Window Navigation:
 - `Alt+Shift+h/j/k/l` - Move window
 
 Layout:
-- `Alt+r` - Cycle layout (tiles horizontal/vertical)
+- `Alt+r` - Tiles layout (windows side by side)
+- `Alt+Shift+r` - Accordion layout (windows stacked, navigate with Alt+h/l)
 - `Alt+t` - Toggle floating/tiling
 - `Alt+f` - Fullscreen
 

@@ -79,3 +79,12 @@ domains/dev/config/codex/config.toml
 **/git/config.local
 **/git/conditional/
 **/.gitconfig
+
+# Company-specific configurations (never commit)
+**/workspace/config/qlink/
+
+# Raycast (auto-generated configs and extensions)
+**/raycast/
+
+# Serena logs
+**/serena/logs/

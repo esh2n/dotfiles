@@ -29,6 +29,7 @@ alt-shift-l = 'move right'
 
 # Layout management
 alt-r = 'layout tiles horizontal vertical'
+alt-shift-r = 'layout accordion horizontal vertical'
 alt-t = 'layout floating tiling'
 alt-f = 'fullscreen'
 

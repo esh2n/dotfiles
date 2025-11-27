@@ -129,6 +129,11 @@ link_domain() {
                 if [[ "$dirname" == "claude" ]]; then
                     local target="${HOME}/.claude"
                     link_file "$config_dir" "$target"
+                # serena directory should be linked to ~/.serena instead of ~/.config/serena
+                # serenaディレクトリは特別に~/.serenaにリンクする
+                elif [[ "$dirname" == "serena" ]]; then
+                    local target="${HOME}/.serena"
+                    link_file "$config_dir" "$target"
                 # cursor directory - link settings.json to Application Support on macOS
                 # cursorディレクトリ - macOSではsettings.jsonをApplication Supportにリンク
                 elif [[ "$dirname" == "cursor" ]]; then

@@ -13,56 +13,77 @@ alias ll="eza -l --icons"
 alias llt="eza --tree --level=2 -a"
 
 # rm replacement (trash)
-alias Rm='trash -rf'
+alias rm='trash'
+alias Rm='command rm -rf'
 
 # Git
+# Pattern: lowercase=normal, UPPERCASE=powerful/force/all
 alias g='git'
 alias gi='git init'
 alias gcl='git clone'
+
+# Add
 alias ga='git add'
 alias gA='git add --all'
+
+# Commit
 alias gc='git commit'
-alias gpul='git pull'
-alias gpus='git push'
+alias gC='git commit --amend'
+alias gcm='git commit -m'
+alias gCm='git commit --amend -m'
 
-# Git branch operations
+# Pull/Fetch
+alias gpl='git pull'
+alias gf='git fetch'
+
+# Branch operations
 alias gb='git branch'
-alias gsw='git switch'
+alias gswc='git switch -c'
 alias gchb='git checkout -b'
-alias gmeabo='git merge --abort'
+alias grn='git branch -m'
 
-# Git status and log
-alias gg='git grep'
+# Merge
+alias gm='git merge'
+alias gM='git merge --no-ff'
+alias gma='git merge --abort'
+
+# Diff
+alias gd='git diff'
+alias gD='git diff --cached'
+alias gds='git diff --stat'
+
+# Status/Grep/Log
 alias gs='git status -sb'
+alias gg='git grep'
 
-# Git remote
+# Rebase
+alias gr='git rebase'
+alias gR='git rebase -i'
+alias grc='git rebase --continue'
+alias gra='git rebase --abort'
+
+# Reset
+alias grs='git reset'
+alias grs1='git reset --hard HEAD~1'
+alias grs2='git reset --hard HEAD~2'
+alias grs3='git reset --hard HEAD~3'
+
+# Restore
+alias grt='git restore'
+alias gRt='git restore --staged'
+
+# Stash
+alias gst='git stash'
+alias gSt='git stash pop'
+alias gsta='git stash apply'
+alias gstl='git stash list'
+alias gstd='git stash drop'
+
+# Remote
 alias grao='git remote add origin'
 alias gra='git remote add'
 alias grro='git remote remove origin'
 alias grr='git remote remove'
-
-# Git rebase
-alias greb='git rebase'
-alias greb1='git rebase -i HEAD~1'
-alias greb2='git rebase -i HEAD~2'
-alias greb3='git rebase -i HEAD~3'
-alias greb4='git rebase -i HEAD~4'
-alias greb5='git rebase -i HEAD~5'
-
-# Git reset
-alias grese='git reset'
-alias gres1='git reset --hard HEAD~1'
-alias gres2='git reset --hard HEAD~2'
-alias gres3='git reset --hard HEAD~3'
-alias gres4='git reset --hard HEAD~4'
-alias gres5='git reset --hard HEAD~5'
-alias gcf='git commit --amend'
-alias gcn='git rebase --continue'
-
-# Git misc
-alias grest='git restore'
-alias gst='git stash'
-alias grn='git branch -m'
 
 # LazyGit
 alias lg='lazygit'

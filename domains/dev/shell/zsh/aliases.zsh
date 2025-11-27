@@ -4,12 +4,8 @@
 alias rs='exec zsh'
 alias vz='nvim ~/.zshrc'
 
-# Git with Fuzzy Finder
-alias gch='sk_select_branch_except_current | xargs -t git checkout'
+# Git with Fuzzy Finder (skim-based interactive selection)
 alias gbd='sk_select_local_branch_except_current | xargs -t git branch -D'
-alias gpuso='sk_select_branch_all | xargs -t git push origin'
-alias gPuso='sk_select_branch_all | xargs -t git push -f origin'
-alias gpulo='sk_select_branch_all | xargs -t git pull origin'
 alias gme='sk_select_branch_except_current  | xargs -t git merge --no-ff --edit'
 alias gmesq='sk_select_branch_except_current  | xargs -t git merge --squash'
 alias gpr='sk_select_branch_except_current | xargs -t gh pr create -w -B'

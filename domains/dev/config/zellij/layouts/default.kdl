@@ -4,9 +4,9 @@ layout {
         pane size=1 borderless=true {
             plugin location="file:/Users/shunya.endo/.config/zellij/plugins/zjstatus.wasm" {
                 // Format with rich information
-                format_left   "#[fg=blue,bold]󰣇 {mode}#[fg=white] │ #[fg=yellow,bold] {session}#[fg=white] │ #[fg=green]{command_git_branch}#[fg=white] │ #[fg=magenta]{command_git_status}"
+                format_left   "#[fg=blue,bold]󰣇 {mode}#[fg=white] │ #[fg=yellow,bold] {session}"
                 format_center "{tabs}"
-                format_right  "#[fg=cyan]{command_cpu}#[fg=white] │ #[fg=yellow]{command_mem}#[fg=white] │ #[fg=magenta]{command_load}#[fg=white] │ #[fg=red]{notifications}#[fg=white] │ #[fg=cyan] {datetime}"
+                format_right  "#[fg=cyan]{command_whoami}#[fg=white]@#[fg=green]{command_hostname}"
 
                 // Mode styling with icons
                 mode_normal        "#[bg=#89b4fa,fg=#1e1e2e,bold] NORMAL "
@@ -29,36 +29,13 @@ layout {
                 tab_active   "#[fg=#89b4fa,bold,bg=#313244]  {name}#{index} "
 
                 // Commands
-                command_git_branch_command    "git branch --show-current 2>/dev/null || echo ''"
-                command_git_branch_format     "#[fg=#a6e3a1] {stdout}"
-                command_git_branch_interval   "10"
+                command_whoami_command     "whoami"
+                command_whoami_format      "{stdout}"
+                command_whoami_interval    "0"
 
-                command_git_status_command    "git status -s 2>/dev/null | wc -l"
-                command_git_status_format     "#[fg=#f9e2af] {stdout}"
-                command_git_status_interval   "10"
-
-                command_cpu_command          "ps -A -o %cpu | tail -n +2 | paste -sd+ - | bc"
-                command_cpu_format           "#[fg=#89b4fa] {stdout}%"
-                command_cpu_interval         "5"
-                command_cpu_rendermode       "static"
-
-                command_mem_command          "ps -A -o %mem | tail -n +2 | paste -sd+ - | bc"
-                command_mem_format           "#[fg=#f9e2af] {stdout}%"
-                command_mem_interval         "5"
-                command_mem_rendermode       "static"
-
-                command_load_command         "sysctl -n vm.loadavg | tr -d {}"
-                command_load_format          "#[fg=#cba6f7] {stdout}"
-                command_load_interval        "10"
-                command_load_rendermode      "static"
-
-                // Datetime
-                datetime_format "%a %m/%d %H:%M"
-                datetime_timezone "Asia/Tokyo"
-
-                // Notifications
-                notification_format_unread    "#[fg=#f38ba8,blink]󱅫 #[noblink]{message} "
-                notification_format_no_notifications ""
+                command_hostname_command   "hostname"
+                command_hostname_format    "{stdout}"
+                command_hostname_interval  "0"
 
                 // Border
                 border_enabled  "true"
