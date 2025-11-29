@@ -70,8 +70,8 @@ in {
     # Rust Tools (from cargo.txt)
     # ===========================================
     cargo-generate
-    # cargo-compete - not in nixpkgs, use: cargo install cargo-compete
-    # pacifica - custom tool, use: cargo install --git https://github.com/serinuntius/pacifica.git
+    cargo-compete  # via overlay
+    pacifica       # via overlay
 
     # ===========================================
     # Go Tools (from go.txt)
@@ -83,8 +83,8 @@ in {
     go-staticcheck # staticcheck
     protoc-gen-go
     protoc-gen-go-grpc
-    # spanner-cli - not in nixpkgs, use: go install cloud.google.com/go/spanner/spanner-cli@latest
-    # spanner-dump - not in nixpkgs, use: go install github.com/cloudspannerecosystem/spanner-dump@latest
+    spanner-cli    # via overlay
+    spanner-dump   # via overlay
 
     # ===========================================
     # Ruby Tools (from gem.txt)
