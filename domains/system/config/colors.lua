@@ -1,1 +1,0 @@
-/Users/shunya.endo/go/github.com/esh2n/dotfiles/domains/system/config/themes/catppuccin.lua

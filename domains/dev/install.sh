@@ -180,7 +180,56 @@ if [[ ! -d "${HOME}/.config/nvim-astrovim" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# 5. Additional Setup
+# 5. Zellij Plugin Setup
+# Zellijプラグインセットアップ
+# -----------------------------------------------------------------------------
+
+# Download Zellij plugins
+log_info "Setting up Zellij plugins..."
+ZELLIJ_PLUGIN_DIR="${HOME}/.config/zellij/plugins"
+if [[ ! -d "$ZELLIJ_PLUGIN_DIR" ]]; then
+    mkdir -p "$ZELLIJ_PLUGIN_DIR"
+fi
+
+# Download zjstatus plugin
+if [[ ! -f "$ZELLIJ_PLUGIN_DIR/zjstatus.wasm" ]]; then
+    log_info "Downloading zjstatus plugin..."
+    curl -L -o "$ZELLIJ_PLUGIN_DIR/zjstatus.wasm" \
+        "https://github.com/dj95/zjstatus/releases/latest/download/zjstatus.wasm" || \
+        log_warn "Failed to download zjstatus plugin"
+fi
+
+# Download harpoon plugin
+if [[ ! -f "$ZELLIJ_PLUGIN_DIR/harpoon.wasm" ]]; then
+    log_info "Downloading harpoon plugin..."
+    curl -L -o "$ZELLIJ_PLUGIN_DIR/harpoon.wasm" \
+        "https://github.com/Nacho114/harpoon/releases/latest/download/harpoon.wasm" || \
+        log_warn "Failed to download harpoon plugin"
+fi
+
+# Download monocle plugin
+if [[ ! -f "$ZELLIJ_PLUGIN_DIR/monocle.wasm" ]]; then
+    log_info "Downloading monocle plugin..."
+    curl -L -o "$ZELLIJ_PLUGIN_DIR/monocle.wasm" \
+        "https://github.com/imsnif/monocle/releases/latest/download/monocle.wasm" || \
+        log_warn "Failed to download monocle plugin"
+fi
+
+# -----------------------------------------------------------------------------
+# 6. Theme Setup
+# テーマセットアップ
+# -----------------------------------------------------------------------------
+
+# Setup initial theme using theme-switcher
+if has_command "theme-switcher" && [[ ! -f "${HOME}/.config/colors.lua" ]]; then
+    log_info "Setting up initial theme (tokyonight)..."
+    theme-switcher tokyonight || log_warn "Failed to set initial theme"
+elif [[ ! -f "${HOME}/.config/colors.lua" ]]; then
+    log_warn "theme-switcher not found. Skipping theme setup."
+fi
+
+# -----------------------------------------------------------------------------
+# 7. Additional Setup
 # 追加セットアップ
 # -----------------------------------------------------------------------------
 
