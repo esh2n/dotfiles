@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# VS Code Extensions Installer
+# VS Code拡張機能インストーラー
+# -----------------------------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+source "${DOTFILES_ROOT}/core/utils/common.sh"
+
+EXTENSIONS_FILE="${SCRIPT_DIR}/../config/vscode/extensions.txt"
+
+# Check if VS Code is installed
+if ! has_command "code"; then
+    log_error "VS Code is not installed or not in PATH"
+    exit 1
+fi
+
+# Check if extensions file exists
+if [[ ! -f "$EXTENSIONS_FILE" ]]; then
+    log_error "Extensions file not found: $EXTENSIONS_FILE"
+    exit 1
+fi
+
+log_info "Installing VS Code extensions from $EXTENSIONS_FILE..."
+
+# Read extensions file and install each extension
+while IFS= read -r line || [[ -n "$line" ]]; do
+    # Skip empty lines and comments
+    [[ -z "$line" || "$line" =~ ^#.*$ ]] && continue
+
+    # Remove any trailing whitespace/comments
+    extension=$(echo "$line" | sed 's/\s*#.*$//' | xargs)
+
+    if [[ -n "$extension" ]]; then
+        log_info "Installing extension: $extension"
+        if ! code --install-extension "$extension" > /dev/null 2>&1; then
+            log_warn "Failed to install extension: $extension"
+        fi
+    fi
+done < "$EXTENSIONS_FILE"
+
+# Get final count
+installed_count=$(code --list-extensions 2>/dev/null | wc -l | xargs)
+log_success "VS Code extensions installation complete. Total installed: $installed_count"
