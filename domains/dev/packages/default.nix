@@ -1,4 +1,9 @@
-{ pkgs, ... }: {
+{ pkgs, ... }:
+let
+  # Node.js packages via node2nix
+  # Generate with: cd node2nix && npm install --package-lock-only && nix-shell -p node2nix --run 'node2nix -l package-lock.json'
+  node2nixPackages = import ./node2nix { inherit pkgs; };
+in {
   home.packages = with pkgs; [
     # Shell
     zsh
@@ -60,7 +65,48 @@
 
     # AI/ML
     ollama
-  ];
+
+    # ===========================================
+    # Rust Tools (from cargo.txt)
+    # ===========================================
+    cargo-generate
+    # cargo-compete - not in nixpkgs, use: cargo install cargo-compete
+    # pacifica - custom tool, use: cargo install --git https://github.com/serinuntius/pacifica.git
+
+    # ===========================================
+    # Go Tools (from go.txt)
+    # ===========================================
+    gotools        # includes goimports
+    gopls
+    go-mockgen     # mockgen
+    delve          # dlv
+    go-staticcheck # staticcheck
+    protoc-gen-go
+    protoc-gen-go-grpc
+    # spanner-cli - not in nixpkgs, use: go install cloud.google.com/go/spanner/spanner-cli@latest
+    # spanner-dump - not in nixpkgs, use: go install github.com/cloudspannerecosystem/spanner-dump@latest
+
+    # ===========================================
+    # Ruby Tools (from gem.txt)
+    # ===========================================
+    bundler
+    cocoapods
+    # xcodeproj - not in nixpkgs, use: gem install xcodeproj
+    # test-unit - not in nixpkgs, use: gem install test-unit
+    # rdoc - not in nixpkgs, use: gem install rdoc
+    # activesupport - not in nixpkgs, use: gem install activesupport
+    # i18n - not in nixpkgs, use: gem install i18n
+  ] ++ (with node2nixPackages; [
+    # ===========================================
+    # Node.js Tools (via node2nix)
+    # ===========================================
+    pnpm
+    yarn
+    firebase-tools
+    wrangler
+    aicommits
+    neovim
+  ]);
 
   # GUI Apps (Homebrew casks)
   homebrew.casks = [
@@ -81,4 +127,3 @@
     "yaak"
   ];
 }
-

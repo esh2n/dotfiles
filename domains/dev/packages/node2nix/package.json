@@ -1,0 +1,14 @@
+{
+  "name": "dev-node-packages",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pnpm": "latest",
+    "yarn": "latest",
+    "firebase-tools": "latest",
+    "wrangler": "latest",
+    "aicommits": "latest",
+    "neovim": "latest"
+  }
+}
+

@@ -1,0 +1,10 @@
+{
+  "name": "creative-node-packages",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ytdl": "latest",
+    "ytdl-mp3": "latest"
+  }
+}
+
