@@ -1,0 +1,29 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on Monday"],
+  "timezone": "Asia/Tokyo",
+  "packageRules": [
+    {
+      "description": "Nix flake inputs - auto merge",
+      "matchManagers": ["nix"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Node.js packages via node2nix",
+      "matchFileNames": ["domains/*/packages/node2nix/package.json"],
+      "postUpgradeTasks": {
+        "commands": [
+          "cd $(dirname {{{packageFile}}}) && npm install --package-lock-only",
+          "cd $(dirname {{{packageFile}}}) && nix-shell -p node2nix --run 'node2nix -l package-lock.json'"
+        ],
+        "fileFilters": [
+          "domains/*/packages/node2nix/**"
+        ],
+        "executionMode": "update"
+      }
+    }
+  ]
+}
+
