@@ -71,7 +71,7 @@ if [[ -d "$GHOSTTY_CONFIG_DIR" ]]; then
         # Ghostty auto-reloads on config change
     else
         echo "⚠️  Ghostty theme '$THEME' not found"
-    end
+    fi
 fi
 
 # Update Borders Theme
