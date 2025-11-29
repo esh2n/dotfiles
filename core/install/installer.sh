@@ -41,7 +41,7 @@ phase_bootstrap() {
     fi
     
     # Ensure brew is in PATH for this session (required for subsequent phases)
-    # このセッションでbrewをPATHに確実に追加（後続フェーズで必要）
+    # このセッションでbrewをPATHに追加
     if ! has_command "brew"; then
         if [[ -f "/opt/homebrew/bin/brew" ]]; then
             eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -64,6 +64,37 @@ phase_bootstrap() {
     if ! has_command "git"; then
         log_info "Installing Git..."
         brew install git
+    fi
+    
+    # -------------------------------------------------------------------------
+    # Install Nix
+    # Nixのインストール
+    # -------------------------------------------------------------------------
+    if ! has_command "nix"; then
+        log_info "Installing Nix..."
+        curl -L https://nixos.org/nix/install | sh -s -- --daemon
+        
+        # Source nix profile for this session
+        # このセッションでnixプロファイルを読み込み
+        if [[ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]]; then
+            source "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+        fi
+    else
+        log_success "Nix already installed."
+    fi
+    
+    if ! has_command "nix"; then
+        if [[ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]]; then
+            source "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+        fi
+    fi
+    
+    # Verify nix is available
+    # nixが利用可能であることを確認
+    if has_command "nix"; then
+        log_success "Nix is available: $(nix --version)"
+    else
+        log_warn "Nix is not available in PATH. You may need to restart your shell."
     fi
 }
 

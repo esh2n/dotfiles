@@ -95,3 +95,15 @@ domains/system/config/colors.lua
 
 # Serena logs
 **/serena/logs/
+
+# Nix
+result
+result-*
+
+# node2nix generated (Renovate will regenerate)
+domains/*/packages/node2nix/node_modules/
+domains/*/packages/node2nix/node-packages.nix
+domains/*/packages/node2nix/node-env.nix
+
+# Personal docs
+.personal/
