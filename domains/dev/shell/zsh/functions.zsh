@@ -233,7 +233,8 @@ function _mx_list_sessions() {
       ;;
     "zellij")
       if has_command zellij; then
-        zellij list-sessions 2>/dev/null | tail -n +2 | awk '{print "zellij\t" $1 "\t" $0}'
+        # Strip ANSI color codes from zellij output
+        zellij list-sessions 2>/dev/null | tail -n +2 | sed 's/\x1b\[[0-9;]*m//g' | awk '{print "zellij\t" $1 "\t" $0}'
       fi
       ;;
   esac

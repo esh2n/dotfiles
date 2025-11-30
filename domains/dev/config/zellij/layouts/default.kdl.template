@@ -50,7 +50,7 @@ layout {
             plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
                 format_space  "#[bg=#313244]"
 
-                format_left   "#[bg=#313244,fg=#6c7086] Split: #[bg=#313244,fg=#89b4fa]\\#[bg=#313244,fg=#6c7086],#[bg=#313244,fg=#89b4fa]-#[bg=#313244,fg=#6c7086] │ Nav: #[bg=#313244,fg=#89b4fa]hjkl#[bg=#313244,fg=#6c7086] │ Float: #[bg=#313244,fg=#89b4fa]w,e#[bg=#313244,fg=#6c7086] │ Zoom: #[bg=#313244,fg=#89b4fa]z#[bg=#313244,fg=#6c7086] │ Close: #[bg=#313244,fg=#89b4fa]x "
+                format_left   "#[bg=#313244,fg=#6c7086] Split: #[bg=#313244,fg=#89b4fa]\\#[bg=#313244,fg=#6c7086],#[bg=#313244,fg=#89b4fa]-#[bg=#313244,fg=#6c7086] │ Nav: #[bg=#313244,fg=#89b4fa]hjkl#[bg=#313244,fg=#89b4fa] │ Resize: #[bg=#313244,fg=#89b4fa]H/J/K/L#[bg=#313244,fg=#6c7086] │ Float: #[bg=#313244,fg=#89b4fa]w,e#[bg=#313244,fg=#6c7086] │ Zoom: #[bg=#313244,fg=#89b4fa]z#[bg=#313244,fg=#6c7086] │ Close: #[bg=#313244,fg=#89b4fa]x "
                 format_center "#[bg=#313244,fg=#6c7086]Scroll: #[bg=#313244,fg=#89b4fa][#[bg=#313244,fg=#6c7086] │ Find: #[bg=#313244,fg=#89b4fa]f#[bg=#313244,fg=#6c7086] │ Harpoon: #[bg=#313244,fg=#89b4fa]h#[bg=#313244,fg=#6c7086] │ Detach: #[bg=#313244,fg=#89b4fa]d "
                 format_right  "#[bg=#313244,fg=#6c7086]Tab: #[bg=#313244,fg=#89b4fa]t#[bg=#313244,fg=#6c7086] │ Nav: #[bg=#313244,fg=#89b4fa]Ctrl+h/l "
 
