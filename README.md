@@ -415,6 +415,87 @@ Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across 
 #### Known Issues
 When prompted "Ignore insecure directories and continue [y] or abort compinit [n]?", choose `y`. This is a permissions warning for brew-installed completions.
 
+#### Neovim Distributions
+
+All distributions use `<Space>` as the leader key. Press `<Space>` and wait to see keybind hints via which-key.
+
+**LazyVim:**
+
+| Operation | Keybind | Note |
+|-----------|---------|------|
+| Show hints | `<Space>` | Wait for which-key popup |
+| Search files | `<Space> + s + f` | |
+| Search word | `<Space> + s + w` | |
+| Search grep | `<Space> + s + g` | |
+| Toggle options | `<Space> + t` | |
+| Git operations | `<Space> + g` | |
+| Buffer operations | `<Space> + b` | |
+| LSP operations | `<Space> + l` | |
+| Terminal | `<Space> + f + t` | |
+| Window navigation | `Ctrl+h/j/k/l` | |
+| Save | `<Space> + w` | |
+| Quit | `<Space> + q` | |
+
+**NvChad:**
+
+| Operation | Keybind | Note |
+|-----------|---------|------|
+| Show hints | `<Space>` | Wait for which-key popup |
+| Find files | `<Space> + ff` | |
+| Find all files | `<Space> + fa` | |
+| Live grep | `<Space> + fw` | |
+| Find buffers | `<Space> + fb` | |
+| NvimTree toggle | `Ctrl+n` | |
+| NvimTree focus | `<Space> + e` | |
+| Format file | `<Space> + fm` | |
+| New buffer | `<Space> + b` | |
+| Next buffer | `<Tab>` | |
+| Prev buffer | `Shift+Tab` | |
+| Close buffer | `<Space> + x` | |
+| Terminal horizontal | `<Space> + h` | |
+| Terminal vertical | `<Space> + v` | |
+| Toggle terminal | `Alt+h/v/i` | h=horizontal, v=vertical, i=float |
+| Window navigation | `Ctrl+h/j/k/l` | |
+| Save | `Ctrl+s` | |
+| Toggle line number | `<Space> + n` | |
+| Toggle relative number | `<Space> + rn` | |
+| Comment | `<Space> + /` | |
+
+**AstroVim:**
+
+| Operation | Keybind | Note |
+|-----------|---------|------|
+| Show hints | `<Space>` | Wait for which-key popup |
+| Find files | `<Space> + f` | |
+| Language tools | `<Space> + l` | |
+| Buffers | `<Space> + b` | |
+| Terminal | `<Space> + t` | |
+| Git | `<Space> + g` | |
+| Packages | `<Space> + p` | |
+| UI/UX | `<Space> + u` | |
+| Window navigation | `Ctrl+h/j/k/l` | |
+| Resize window | `Ctrl+Arrow` | |
+| Save | `<Space> + w` | |
+| Quit | `<Space> + q` | |
+| Comment | `<Space> + /` | |
+
+**Custom (Kickstart-based):**
+
+| Operation | Keybind | Note |
+|-----------|---------|------|
+| Show hints | `<Space>` | Wait for which-key popup |
+| Search help | `<Space> + s + h` | |
+| Search files | `<Space> + s + f` | |
+| Search grep | `<Space> + s + g` | |
+| Search word | `<Space> + s + w` | |
+| Search keymaps | `<Space> + s + k` | |
+| Find buffers | `<Space><Space>` | |
+| Window navigation | `Ctrl+h/j/k/l` | |
+| Next buffer | `Shift+l` | |
+| Prev buffer | `Shift+h` | |
+| Close buffer | `<Space> + c` | |
+| Save | `<Space> + w` | |
+
 ### Editor
 - Neovim (4 distributions)
 - VSCode, Cursor
