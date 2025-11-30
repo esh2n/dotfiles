@@ -53,6 +53,9 @@ function M.apply_to_config(config)
         { key = 'r', mods = mod_cmd, action = act.ReloadConfiguration },
         { key = 'n', mods = mod_cmd, action = act.SpawnWindow },
         { key = 'm', mods = mod_cmd, action = act.Hide },
+        
+        -- 透過度トグル (Leader + o)
+        { key = 'o', mods = 'LEADER', action = act.EmitEvent 'toggle-opacity' },
     }
     
     -- Windows環境向けの追加キーバインドとシェルへのキーパススルー設定

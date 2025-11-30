@@ -7,19 +7,22 @@
 
 set -e
 
-# VSCode/Cursor theme mapping
-declare -A VSCODE_THEMES=(
-    ["catppuccin"]="Catppuccin Mocha"
-    ["dracula"]="Dracula"
-    ["everforest"]="Everforest Dark"
-    ["gruvbox"]="Gruvbox Dark Medium"
-    ["kanagawa"]="Kanagawa"
-    ["nord"]="Nord"
-    ["onedark"]="One Dark Pro"
-    ["rosepine"]="Rosé Pine"
-    ["solarized"]="Solarized Dark"
-    ["tokyonight"]="Tokyo Night"
-)
+# VSCode/Cursor theme mapping (POSIX compatible)
+get_vscode_theme() {
+    case "$1" in
+        catppuccin) echo "Catppuccin Mocha" ;;
+        dracula) echo "Dracula" ;;
+        everforest) echo "Everforest Dark" ;;
+        gruvbox) echo "Gruvbox Dark Medium" ;;
+        kanagawa) echo "Kanagawa" ;;
+        nord) echo "Nord" ;;
+        onedark) echo "One Dark Pro" ;;
+        rosepine) echo "Rosé Pine" ;;
+        solarized) echo "Solarized Dark" ;;
+        tokyonight) echo "Tokyo Night" ;;
+        *) echo "" ;;
+    esac
+}
 
 # Paths
 if [[ -n "$DOTFILES_ROOT" ]]; then
@@ -201,7 +204,7 @@ if [[ -f "$STARSHIP_CONFIG" ]]; then
 fi
 
 # Update VSCode/Cursor Theme (local config, not dotfiles)
-VSCODE_THEME="${VSCODE_THEMES[$THEME]}"
+VSCODE_THEME="$(get_vscode_theme "$THEME")"
 if [[ -n "$VSCODE_THEME" ]] && command -v jq >/dev/null 2>&1; then
     for settings_file in \
         "$HOME/Library/Application Support/Code/User/settings.json" \
@@ -238,9 +241,12 @@ if [[ -d "$WALLPAPER_DIR" ]]; then
     done
     
     if [[ -n "$WALLPAPER" ]]; then
-        echo "🖼️  Setting wallpaper..."
-        osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"$WALLPAPER\""
-        echo "✅ Updated wallpaper to $THEME"
+        if command -v desktoppr >/dev/null 2>&1; then
+            desktoppr "$WALLPAPER"
+            echo "✅ Updated wallpaper"
+        else
+            echo "⚠️  desktoppr not found"
+        fi
     else
         echo "⚠️  Wallpaper for '$THEME' not found"
     fi

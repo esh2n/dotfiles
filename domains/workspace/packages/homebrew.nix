@@ -8,6 +8,7 @@
     "karabiner-elements"
     "aerospace"
     "displaylink"
+    "desktoppr"
     "font-jetbrains-mono-nerd-font"
     "font-hack-nerd-font"
     "font-sf-mono"

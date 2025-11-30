@@ -37,7 +37,7 @@ font-feature = +ss04
 font-feature = +ss05
 
 # Theme and appearance
-background-opacity = 0.92
+background-opacity = 0.6
 background-blur-radius = 30
 unfocused-split-opacity = 0.80
 unfocused-split-fill = #1f2335

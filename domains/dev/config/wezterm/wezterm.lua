@@ -89,7 +89,7 @@ else
 end
 
 -- ウィンドウフレームの設定
-config.window_background_opacity = 0.95
+config.window_background_opacity = 0.6
 
 -- OS別のウィンドウフレーム設定
 if os_utils.is_windows() then
@@ -230,6 +230,19 @@ wezterm.on('gui-startup', function(cmd)
     -- macOSでも起動時に最大化
     window:gui_window():maximize()
   end
+end)
+
+-- 透過度トグル (0.6 <-> 1.0)
+local opacity_toggle = true
+wezterm.on('toggle-opacity', function(window, pane)
+  local overrides = window:get_config_overrides() or {}
+  if opacity_toggle then
+    overrides.window_background_opacity = 1.0
+  else
+    overrides.window_background_opacity = 0.6
+  end
+  opacity_toggle = not opacity_toggle
+  window:set_config_overrides(overrides)
 end)
 
 return config 
