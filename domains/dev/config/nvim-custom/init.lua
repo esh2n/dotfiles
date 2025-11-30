@@ -1076,7 +1076,7 @@ require('lazy').setup({
       })
 
       -- Load the colorscheme here
-      vim.cmd.colorscheme 'catppuccin'
+      vim.cmd.colorscheme 'kanagawa'
     end,
   },
 
