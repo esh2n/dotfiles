@@ -47,6 +47,13 @@ domains/dev/config/zellij/layouts/default.kdl
 domains/dev/config/zellij/layouts/nord.kdl
 domains/dev/config/zellij/layouts/tokyonight.kdl
 domains/dev/config/zellij/layouts/catppuccin.kdl
+domains/dev/config/zellij/layouts/kanagawa.kdl
+domains/dev/config/zellij/layouts/gruvbox.kdl
+domains/dev/config/zellij/layouts/dracula.kdl
+domains/dev/config/zellij/layouts/rosepine.kdl
+domains/dev/config/zellij/layouts/everforest.kdl
+domains/dev/config/zellij/layouts/onedark.kdl
+domains/dev/config/zellij/layouts/solarized.kdl
 domains/dev/config/cursor/settings.json
 domains/dev/config/codex/config.toml
 

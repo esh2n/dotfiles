@@ -7,6 +7,20 @@
 
 set -e
 
+# VSCode/Cursor theme mapping
+declare -A VSCODE_THEMES=(
+    ["catppuccin"]="Catppuccin Mocha"
+    ["dracula"]="Dracula"
+    ["everforest"]="Everforest Dark"
+    ["gruvbox"]="Gruvbox Dark Medium"
+    ["kanagawa"]="Kanagawa"
+    ["nord"]="Nord"
+    ["onedark"]="One Dark Pro"
+    ["rosepine"]="Rosé Pine"
+    ["solarized"]="Solarized Dark"
+    ["tokyonight"]="Tokyo Night"
+)
+
 # Paths
 if [[ -n "$DOTFILES_ROOT" ]]; then
     CONFIG_DIR="$DOTFILES_ROOT/domains/system/config"
@@ -120,6 +134,25 @@ if [[ -d "$ZELLIJ_CONFIG_DIR" ]]; then
     fi
 fi
 
+# Update tmux Theme
+TMUX_THEMES_DIR="$HOME/.config/tmux/themes"
+if [[ -d "$TMUX_THEMES_DIR" ]]; then
+    TMUX_THEME="$TMUX_THEMES_DIR/$THEME.conf"
+    if [[ -f "$TMUX_THEME" ]]; then
+        ln -sf "$TMUX_THEME" "$TMUX_THEMES_DIR/current.conf"
+        echo "✅ Updated tmux theme symlink"
+        
+        # Reload tmux if running
+        if command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; then
+            echo "🔄 Reloading tmux..."
+            tmux source-file ~/.config/tmux/tmux.conf 2>/dev/null || true
+            echo "✅ Reloaded tmux with new theme"
+        fi
+    else
+        echo "⚠️  tmux theme '$THEME' not found"
+    fi
+fi
+
 # Update and Reload Sketchybar
 SKETCHYBAR_CONFIG_DIR="$DOTFILES_ROOT/domains/workspace/config/sketchybar"
 if [[ ! -d "$SKETCHYBAR_CONFIG_DIR" ]]; then
@@ -150,6 +183,52 @@ WEZTERM_CONFIG="$HOME/.config/wezterm/wezterm.lua"
 if [[ -f "$WEZTERM_CONFIG" ]]; then
     echo "🔄 Reloading WezTerm..."
     touch "$WEZTERM_CONFIG"
+fi
+
+# Update VSCode/Cursor Theme
+VSCODE_THEME="${VSCODE_THEMES[$THEME]}"
+if [[ -n "$VSCODE_THEME" ]] && command -v jq >/dev/null 2>&1; then
+    for settings_file in \
+        "$DOTFILES_ROOT/domains/dev/config/vscode/settings.json" \
+        "$DOTFILES_ROOT/domains/dev/config/cursor/settings.json"; do
+        if [[ -f "$settings_file" ]]; then
+            jq --arg t "$VSCODE_THEME" '.["workbench.colorTheme"]=$t' \
+               "$settings_file" > "${settings_file}.tmp" && \
+            mv "${settings_file}.tmp" "$settings_file"
+            echo "✅ Updated $(basename "$(dirname "$settings_file")")/settings.json"
+        fi
+    done
+else
+    if [[ -z "$VSCODE_THEME" ]]; then
+        echo "⚠️  VSCode theme mapping not found for '$THEME'"
+    elif ! command -v jq >/dev/null 2>&1; then
+        echo "⚠️  jq not found, skipping VSCode/Cursor theme update"
+    fi
+fi
+
+# Update macOS Wallpaper
+WALLPAPER_DIR="$DOTFILES_ROOT/domains/workspace/assets/background"
+if [[ ! -d "$WALLPAPER_DIR" ]]; then
+    WALLPAPER_DIR="$HOME/dotfiles/domains/workspace/assets/background"
+fi
+
+if [[ -d "$WALLPAPER_DIR" ]]; then
+    # Check for theme wallpaper (jpg, png, or heic)
+    WALLPAPER=""
+    for ext in jpg jpeg png heic; do
+        if [[ -f "$WALLPAPER_DIR/$THEME.$ext" ]]; then
+            WALLPAPER="$WALLPAPER_DIR/$THEME.$ext"
+            break
+        fi
+    done
+    
+    if [[ -n "$WALLPAPER" ]]; then
+        echo "🖼️  Setting wallpaper..."
+        osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"$WALLPAPER\""
+        echo "✅ Updated wallpaper to $THEME"
+    else
+        echo "⚠️  Wallpaper for '$THEME' not found"
+    fi
 fi
 
 echo "✨ Theme switched successfully!"

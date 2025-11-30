@@ -1,0 +1,53 @@
+layout {
+    default_tab_template {
+        children
+        pane size=1 borderless=true {
+            plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
+                // Gruvbox colors
+                format_left   "#[fg=#83a598,bold]󰣇 {mode}#[fg=#ebdbb2] │ #[fg=#fabd2f,bold] {session}#[fg=#ebdbb2] │ #[fg=#b8bb26]{command_git_branch}"
+                format_center "{tabs}"
+                format_right  "#[fg=#fb4934]{notifications}#[fg=#ebdbb2] │ #[fg=#8ec07c] {datetime}"
+
+                // Mode styling - Gruvbox
+                mode_normal        "#[bg=#83a598,fg=#282828,bold] NORMAL "
+                mode_locked        "#[bg=#fb4934,fg=#282828,bold] LOCKED "
+                mode_resize        "#[bg=#fe8019,fg=#282828,bold] RESIZE "
+                mode_pane          "#[bg=#b8bb26,fg=#282828,bold] PANE "
+                mode_tab           "#[bg=#fabd2f,fg=#282828,bold] TAB "
+                mode_scroll        "#[bg=#d3869b,fg=#282828,bold] SCROLL "
+                mode_enter_search  "#[bg=#8ec07c,fg=#282828,bold] SEARCH "
+                mode_search        "#[bg=#8ec07c,fg=#282828,bold] SEARCH "
+                mode_rename_tab    "#[bg=#fabd2f,fg=#282828,bold] RENAME "
+                mode_rename_pane   "#[bg=#b8bb26,fg=#282828,bold] RENAME "
+                mode_session       "#[bg=#fb4934,fg=#282828,bold] SESSION "
+                mode_move          "#[bg=#fe8019,fg=#282828,bold] MOVE "
+                mode_prompt        "#[bg=#d3869b,fg=#282828,bold] PROMPT "
+                mode_tmux          "#[bg=#fe8019,fg=#282828,bold] TMUX "
+
+                // Tab styling - Gruvbox
+                tab_normal   "#[fg=#665c54]  {name}#{index} "
+                tab_active   "#[fg=#83a598,bold,bg=#3c3836]  {name}#{index} "
+
+                // Git command
+                command_git_branch_command    "git branch --show-current 2>/dev/null || echo ''"
+                command_git_branch_format     "#[fg=#b8bb26] {stdout}"
+                command_git_branch_interval   "10"
+
+                // DateTime
+                datetime_format "%a %m/%d %H:%M"
+                datetime_timezone "Asia/Tokyo"
+
+                // Notifications
+                notification_format_unread    "#[fg=#fb4934,blink]󱅫 #[noblink]{message} "
+                notification_format_no_notifications ""
+
+                // Border
+                border_enabled  "true"
+                border_char     "─"
+                border_format   "#[fg=#665c54]{char}"
+                border_position "top"
+            }
+        }
+    }
+}
+

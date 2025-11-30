@@ -182,9 +182,9 @@ phase_domains() {
     for d in "${DOTFILES_ROOT}/domains/"*; do
         if [[ -d "$d" ]]; then
             local install_script="${d}/install.sh"
-            if [[ -f "$install_script" ]]; then
+        if [[ -f "$install_script" ]]; then
                 log_info "Installing domain: $(basename "$d")"
-                bash "$install_script"
+            bash "$install_script"
             fi
         fi
     done

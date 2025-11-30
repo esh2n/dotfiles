@@ -56,7 +56,7 @@ fi
 
 log_info "Setting up Zellij plugins..."
 ZELLIJ_PLUGIN_DIR="${HOME}/.config/zellij/plugins"
-mkdir -p "$ZELLIJ_PLUGIN_DIR"
+    mkdir -p "$ZELLIJ_PLUGIN_DIR"
 
 if [[ ! -f "$ZELLIJ_PLUGIN_DIR/zjstatus.wasm" ]]; then
     curl -L -o "$ZELLIJ_PLUGIN_DIR/zjstatus.wasm" \

@@ -10,7 +10,14 @@ bradgashler.htmltagwrap
 bradlc.vscode-tailwindcss
 bung87.vscode-gemfile
 burkeholland.simple-react-snippets
+arcticicestudio.nord-visual-studio-code
 catppuccin.catppuccin-vsc
+dracula-theme.theme-dracula
+enkia.tokyo-night
+jdinhlife.gruvbox
+mvllow.rose-pine
+sainnhe.everforest
+zhuangtongfa.material-theme
 cesium.gltf-vscode
 christian-kohler.path-intellisense
 coenraads.bracket-pair-colorizer-2
