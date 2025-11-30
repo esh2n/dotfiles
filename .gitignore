@@ -44,6 +44,7 @@ log/
 domains/dev/config/vscode/settings.json
 domains/dev/config/starship/starship.toml
 domains/dev/config/mise/config.toml
+domains/dev/config/zellij/config.kdl
 domains/dev/config/zellij/layouts/default.kdl
 domains/dev/config/zellij/layouts/nord.kdl
 domains/dev/config/zellij/layouts/tokyonight.kdl

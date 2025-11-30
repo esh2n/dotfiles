@@ -138,15 +138,38 @@ if [[ -d "$ZELLIJ_CONFIG_DIR" ]]; then
     ZELLIJ_LAYOUT="$ZELLIJ_CONFIG_DIR/layouts/$THEME.kdl"
     if [[ -f "$ZELLIJ_LAYOUT" ]]; then
         # Update config to use the theme layout
+        # Check if config.kdl is a symlink to dotfiles
         if [[ -f "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
-            if [[ -w "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
-                sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
-                echo "✅ Updated Zellij theme layout"
+            if [[ -L "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
+                # It's a symlink, regenerate from template
+                if [[ -n "$DOTFILES_ROOT" ]]; then
+                    ZELLIJ_TEMPLATE="$DOTFILES_ROOT/domains/dev/config/zellij/config.kdl.template"
+                else
+                    ZELLIJ_TEMPLATE="$HOME/dotfiles/domains/dev/config/zellij/config.kdl.template"
+                fi
+                if [[ -f "$ZELLIJ_TEMPLATE" ]]; then
+                    # Regenerate config.kdl with new theme
+                    sed "s|{{HOME}}|${HOME}|g" "$ZELLIJ_TEMPLATE" | sed "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" > "$ZELLIJ_CONFIG_DIR/config.kdl.tmp"
+                    mv "$ZELLIJ_CONFIG_DIR/config.kdl.tmp" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                    echo "✅ Updated Zellij theme layout"
+                else
+                    # Fallback: direct edit
+                    if [[ -w "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
+                        sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                        echo "✅ Updated Zellij theme layout"
+                    fi
+                fi
             else
-                chmod 666 "$ZELLIJ_CONFIG_DIR/config.kdl"
-                sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
-                chmod 444 "$ZELLIJ_CONFIG_DIR/config.kdl"
-                echo "✅ Updated Zellij theme layout"
+                # Not a symlink, edit directly
+                if [[ -w "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
+                    sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                    echo "✅ Updated Zellij theme layout"
+                else
+                    chmod 666 "$ZELLIJ_CONFIG_DIR/config.kdl"
+                    sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                    chmod 444 "$ZELLIJ_CONFIG_DIR/config.kdl"
+                    echo "✅ Updated Zellij theme layout"
+                fi
             fi
         fi
     else
