@@ -221,25 +221,37 @@ if [[ -f "$STARSHIP_CONFIG" ]]; then
     fi
 fi
 
-# Update VSCode/Cursor Theme (local config, not dotfiles)
+# Update VSCode/Cursor Theme
 VSCODE_THEME="$(get_vscode_theme "$THEME")"
-if [[ -n "$VSCODE_THEME" ]] && command -v jq >/dev/null 2>&1; then
+if [[ -n "$VSCODE_THEME" ]]; then
     for settings_file in \
         "$HOME/Library/Application Support/Code/User/settings.json" \
         "$HOME/Library/Application Support/Cursor/User/settings.json"; do
-        if [[ -f "$settings_file" ]]; then
-            jq --arg t "$VSCODE_THEME" '.["workbench.colorTheme"]=$t' \
-               "$settings_file" > "${settings_file}.tmp" && \
-            mv "${settings_file}.tmp" "$settings_file"
-            echo "✅ Updated $(basename "$(dirname "$settings_file")")/settings.json"
+        if [[ -f "$settings_file" ]] || [[ -L "$settings_file" ]]; then
+            # Resolve symlink if exists
+            if [[ -L "$settings_file" ]]; then
+                real_file=$(readlink "$settings_file")
+                # Handle relative symlinks
+                if [[ ! "$real_file" = /* ]]; then
+                    real_file="$(dirname "$settings_file")/$real_file"
+                fi
+            else
+                real_file="$settings_file"
+            fi
+            
+            if [[ -f "$real_file" ]] && [[ ! -L "$real_file" ]]; then
+                # Use sed for JSONC (JSON with comments) compatibility
+                if grep -q '"workbench.colorTheme"' "$real_file"; then
+                    sed -i '' "s/\"workbench.colorTheme\": *\"[^\"]*\"/\"workbench.colorTheme\": \"$VSCODE_THEME\"/" "$real_file"
+                    echo "Updated $(basename "$(dirname "$settings_file")")/settings.json"
+                else
+                    echo "workbench.colorTheme not found in $settings_file"
+                fi
+            fi
         fi
     done
 else
-    if [[ -z "$VSCODE_THEME" ]]; then
-        echo "⚠️  VSCode theme mapping not found for '$THEME'"
-    elif ! command -v jq >/dev/null 2>&1; then
-        echo "⚠️  jq not found, skipping VSCode/Cursor theme update"
-    fi
+    echo "VSCode theme mapping not found for '$THEME'"
 fi
 
 # Update Neovim Themes (all distributions)

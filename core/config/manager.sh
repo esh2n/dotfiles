@@ -134,17 +134,24 @@ link_domain() {
                 elif [[ "$dirname" == "serena" ]]; then
                     local target="${HOME}/.serena"
                     link_file "$config_dir" "$target"
-                # cursor directory - link settings.json to Application Support on macOS
-                # cursorディレクトリ - macOSではsettings.jsonをApplication Supportにリンク
-                elif [[ "$dirname" == "cursor" ]]; then
-                    # Link cursor directory to ~/.config/cursor for other files
-                    # 他のファイル用にcursorディレクトリを~/.config/cursorにリンク
+                # vscode directory - link settings.json to Application Support on macOS
+                elif [[ "$dirname" == "vscode" ]]; then
                     local target="${HOME}/.config/${dirname}"
                     link_file "$config_dir" "$target"
                     
                     # On macOS, also link settings.json to Application Support
-                    # macOSでは、settings.jsonもApplication Supportにリンク
                     if [[ "$(uname)" == "Darwin" ]] && [[ -f "${config_dir}/settings.json" ]]; then
+                        ensure_dir "${HOME}/Library/Application Support/Code/User"
+                        link_file "${config_dir}/settings.json" "${HOME}/Library/Application Support/Code/User/settings.json"
+                    fi
+                # cursor directory - link to Application Support on macOS
+                elif [[ "$dirname" == "cursor" ]]; then
+                    local target="${HOME}/.config/${dirname}"
+                    link_file "$config_dir" "$target"
+                    
+                    # On macOS, also link settings.json to Application Support
+                    # Note: cursor/settings.json may be a symlink to vscode/settings.json
+                    if [[ "$(uname)" == "Darwin" ]] && [[ -e "${config_dir}/settings.json" ]]; then
                         ensure_dir "${HOME}/Library/Application Support/Cursor/User"
                         link_file "${config_dir}/settings.json" "${HOME}/Library/Application Support/Cursor/User/settings.json"
                     fi
