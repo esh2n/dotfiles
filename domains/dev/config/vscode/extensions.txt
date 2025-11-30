@@ -39,6 +39,7 @@ hediet.vscode-drawio
 ibm.output-colorizer
 jebbs.plantuml
 jeroen-meijer.pubspec-assist
+jnoortheen.nix-ide
 johnpapa.vscode-peacock
 jumail.headwind
 knisterpeter.vscode-github
@@ -48,6 +49,7 @@ lkrms.inifmt
 luanpotter.dart-import
 markosth09.color-picker
 mechatroner.rainbow-csv
+metaphore.kanagawa-vscode-color-theme
 mikestead.dotenv
 mosapride.zenkaku
 ms-azuretools.vscode-containers

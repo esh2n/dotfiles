@@ -16,6 +16,12 @@
     # borders  # May need to use homebrew
   ];
 
+  # Homebrew formulas (not in nixpkgs or need macOS specific version)
+  homebrew.brews = [
+    "sketchybar"
+    "borders"
+  ];
+
   # GUI Apps (Homebrew casks)
   homebrew.casks = [
     # Knowledge
@@ -40,19 +46,10 @@
     "displaylink"
     "marta"
     "klack"
-  ];
 
-  # Homebrew formulas (not in nixpkgs or need macOS specific version)
-  homebrew.brews = [
-    "sketchybar"
-    "borders"
-  ];
-
-  # Fonts
-  homebrew.casks = [
+    # Fonts
     "font-jetbrains-mono-nerd-font"
     "font-hack-nerd-font"
     "font-sf-mono"
   ];
 }
-

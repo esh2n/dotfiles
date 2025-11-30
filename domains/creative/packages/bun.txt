@@ -1,3 +1,0 @@
-# Media Tools
-ytdl              # YouTube downloader
-ytdl-mp3          # YouTube to MP3 converter

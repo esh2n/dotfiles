@@ -100,10 +100,5 @@ domains/system/config/colors.lua
 result
 result-*
 
-# node2nix generated (Renovate will regenerate)
+# node2nix
 domains/*/packages/node2nix/node_modules/
-domains/*/packages/node2nix/node-packages.nix
-domains/*/packages/node2nix/node-env.nix
-
-# Personal docs
-.personal/

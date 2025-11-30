@@ -82,24 +82,29 @@ check_macos_version() {
 
 backup_file() {
     local file="$1"
+    local max_backups=7
+    
     if [[ -e "$file" ]]; then
         local backup_path="${file}.backup.$(date +%Y%m%d_%H%M%S)"
         log_warn "Backing up $file to $backup_path"
 
         if [[ -L "$file" ]]; then
-            # symlinkの場合は実体をコピーしてからオリジナルを削除
             local target="$(readlink "$file")"
             if [[ -e "$target" ]]; then
                 cp -r "$target" "$backup_path"
                 rm "$file"
-                log_info "Copied symlink target to backup: $target -> $backup_path"
             else
-                log_warn "Symlink target not found: $target, moving symlink as-is"
                 mv "$file" "$backup_path"
             fi
         else
-            # 実ファイル/ディレクトリの場合は移動
             mv "$file" "$backup_path"
+        fi
+        
+        # Keep only latest N backups
+        local backup_pattern="${file}.backup.*"
+        local backup_count=$(ls -1d ${backup_pattern} 2>/dev/null | wc -l)
+        if (( backup_count > max_backups )); then
+            ls -1dt ${backup_pattern} 2>/dev/null | tail -n +$((max_backups + 1)) | xargs rm -rf
         fi
     fi
 }

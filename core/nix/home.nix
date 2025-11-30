@@ -1,8 +1,6 @@
-{ ... }: {
-  # Home Manager state version
+{ pkgs, username, ... }: {
   home.stateVersion = "24.05";
-
-  # Let Home Manager manage itself
+  home.username = username;
+  home.homeDirectory = pkgs.lib.mkForce "/Users/${username}";
   programs.home-manager.enable = true;
 }
-

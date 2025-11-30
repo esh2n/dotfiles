@@ -93,60 +93,79 @@ phase_bootstrap() {
     # nixが利用可能であることを確認
     if has_command "nix"; then
         log_success "Nix is available: $(nix --version)"
+        
+        # Enable experimental features (required for flakes)
+        # 実験的機能を有効化（flakesに必要）
+        local nix_conf_dir="${HOME}/.config/nix"
+        local nix_conf="${nix_conf_dir}/nix.conf"
+        if [[ ! -f "$nix_conf" ]] || ! grep -q "experimental-features" "$nix_conf"; then
+            log_info "Enabling Nix experimental features..."
+            mkdir -p "$nix_conf_dir"
+            echo "experimental-features = nix-command flakes" >> "$nix_conf"
+        fi
     else
         log_warn "Nix is not available in PATH. You may need to restart your shell."
     fi
+    
 }
 
 phase_core() {
     log_info "Phase 3: Core Setup"
     
-    # Install critical tools via brew if missing
-    # 重要なツールをbrew経由でインストール（不足している場合）
-    
-    # Install zsh
-    if ! has_command "zsh"; then
-        brew install zsh
+    # -------------------------------------------------------------------------
+    # Apply nix-darwin configuration (installs all packages via Nix)
+    # nix-darwin設定を適用（Nixで全パッケージをインストール）
+    # -------------------------------------------------------------------------
+    if has_command "nix"; then
+        log_info "Building and applying nix-darwin configuration..."
+        local nix_dir="${DOTFILES_ROOT}/core/nix"
+        
+        if [[ -f "${nix_dir}/flake.nix" ]]; then
+            # Backup files that nix-darwin will manage
+            for f in /etc/bashrc /etc/zshrc; do
+                if [[ -f "$f" ]] && [[ ! -f "$f.before-nix-darwin" ]]; then
+                    log_info "Backing up $f..."
+                    sudo mv "$f" "$f.before-nix-darwin"
+                fi
+            done
+            
+            # Build the darwin configuration
+            local hostname="${USER}-mac"
+            if nix build "${nix_dir}#darwinConfigurations.${hostname}.system" --impure -o "${nix_dir}/result"; then
+                log_info "Applying nix-darwin configuration..."
+                # Fix Homebrew symlink conflicts before activation
+                if has_command "brew"; then
+                    brew unlink ollama 2>/dev/null || true
+                fi
+                if sudo "${nix_dir}/result/activate"; then
+                    log_success "nix-darwin configuration applied."
+                else
+                    log_error "nix-darwin activation failed."
+                fi
+            else
+                log_warn "nix-darwin build failed."
+            fi
+        fi
+    else
+        log_warn "Nix not available. Skipping nix-darwin setup."
     fi
     
-    # Setup zsh as default shell
+    # Setup zsh as default shell (if not already)
     if [[ "$SHELL" != */zsh ]]; then
         log_info "Changing default shell to zsh..."
         chsh -s "$(which zsh)"
     fi
     
-    # Install mise (prerequisite for language runtimes used across domains)
-    # miseをインストール（複数ドメインで使用される言語ランタイムの前提条件）
-    if ! has_command "mise" && ! is_brew_formula_installed "mise"; then
-        log_info "Installing mise (prerequisite for language runtimes)..."
-        brew install mise
-    fi
-    
-    # Ensure mise is in PATH after installation
-    # インストール後、miseをPATHに追加
-    if ! has_command "mise"; then
-        if [[ -f "/opt/homebrew/bin/mise" ]]; then
-            export PATH="/opt/homebrew/bin:$PATH"
-        elif [[ -f "/usr/local/bin/mise" ]]; then
-            export PATH="/usr/local/bin:$PATH"
-        fi
-    fi
-    
-    # Verify mise is available
-    # miseが利用可能であることを確認
-    if ! has_command "mise"; then
-        log_warn "mise is not available in PATH. Language runtime setup may fail."
+    if has_command "cargo" && ! has_command "pacifica"; then
+        cargo install --git https://github.com/serinuntius/pacifica
     fi
 
     # Install Tmux Plugin Manager (TPM)
-    # Install Tmux Plugin Manager (TPM)
-    # Check for broken symlink at ~/.tmux
     if [[ -L "$HOME/.tmux" ]] && [[ ! -e "$HOME/.tmux" ]]; then
         log_warn "Removing broken symlink at $HOME/.tmux"
         rm "$HOME/.tmux"
     fi
 
-    # Ensure directory exists
     if [[ ! -d "$HOME/.tmux/plugins" ]]; then
         mkdir -p "$HOME/.tmux/plugins"
     fi
@@ -158,26 +177,15 @@ phase_core() {
 }
 
 phase_domains() {
-    log_info "Phase 4: Domain Installation"
+    log_info "Phase 4: Domain Setup"
     
-    # List available domains
-    local domains=()
     for d in "${DOTFILES_ROOT}/domains/"*; do
         if [[ -d "$d" ]]; then
-            domains+=("$(basename "$d")")
-        fi
-    done
-    
-    # TODO: Interactive selection or all
-    # For now, install all
-    for domain in "${domains[@]}"; do
-        local install_script="${DOTFILES_ROOT}/domains/${domain}/install.sh"
-        if [[ -f "$install_script" ]]; then
-            log_info "Installing domain: ${domain}"
-            # Execute domain installer
-            bash "$install_script"
-        else
-            log_debug "No install script for domain: ${domain}"
+            local install_script="${d}/install.sh"
+            if [[ -f "$install_script" ]]; then
+                log_info "Installing domain: $(basename "$d")"
+                bash "$install_script"
+            fi
         fi
     done
 }

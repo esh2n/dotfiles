@@ -1,14 +1,7 @@
 {
-  "name": "dev-node-packages",
-  "private": true,
-  "type": "module",
+  "name": "dotfiles-node-packages",
+  "version": "1.0.0",
   "dependencies": {
-    "pnpm": "latest",
-    "yarn": "latest",
-    "firebase-tools": "latest",
-    "wrangler": "latest",
-    "aicommits": "latest",
-    "neovim": "latest"
+    "aicommits": "^1.0.0"
   }
 }
-

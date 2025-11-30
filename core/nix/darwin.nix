@@ -1,8 +1,10 @@
-{ pkgs, ... }: {
-  # Nix settings
+{ pkgs, username, ... }: {
+  system.primaryUser = username;
+
+  ids.gids.nixbld = 350;
+
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  # macOS system defaults
   system.defaults = {
     dock = {
       autohide = true;
@@ -21,7 +23,6 @@
     };
   };
 
-  # Homebrew integration (for GUI apps that aren't in nixpkgs)
   homebrew = {
     enable = true;
     onActivation = {
@@ -29,11 +30,9 @@
       cleanup = "zap";
     };
     taps = [
-      "homebrew/cask-fonts"
+      "felixkratz/formulae"
     ];
   };
 
-  # System state version
   system.stateVersion = 4;
 }
-
