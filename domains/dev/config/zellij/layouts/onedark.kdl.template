@@ -1,12 +1,14 @@
 layout {
     default_tab_template {
-        children
+        // Top status bar
         pane size=1 borderless=true {
             plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
-                // One Dark colors
-                format_left   "#[fg=#61afef,bold]󰣇 {mode}#[fg=#abb2bf] │ #[fg=#e5c07b,bold] {session}#[fg=#abb2bf] │ #[fg=#98c379]{command_git_branch}"
-                format_center "{tabs}"
-                format_right  "#[fg=#e06c75]{notifications}#[fg=#abb2bf] │ #[fg=#56b6c2] {datetime}"
+                // One Dark colors - bar background
+                format_space  "#[bg=#3e4452]"
+
+                format_left   "#[bg=#3e4452,fg=#61afef,bold] 󰣇 {mode} #[bg=#3e4452,fg=#abb2bf]│ #[bg=#3e4452,fg=#e5c07b,bold]{session} "
+                format_center "#[bg=#3e4452]{tabs}"
+                format_right  "#[bg=#3e4452,fg=#56b6c2]{command_whoami}#[bg=#3e4452,fg=#abb2bf]@#[bg=#3e4452,fg=#98c379]{command_hostname} "
 
                 // Mode styling - One Dark
                 mode_normal        "#[bg=#61afef,fg=#282c34,bold] NORMAL "
@@ -25,29 +27,35 @@ layout {
                 mode_tmux          "#[bg=#d19a66,fg=#282c34,bold] TMUX "
 
                 // Tab styling - One Dark
-                tab_normal   "#[fg=#5c6370]  {name}#{index} "
-                tab_active   "#[fg=#61afef,bold,bg=#3e4452]  {name}#{index} "
+                tab_normal   "#[bg=#3e4452,fg=#5c6370]  {name}#{index} "
+                tab_active   "#[bg=#4b5263,fg=#61afef,bold]  {name}#{index} "
 
-                // Git command
-                command_git_branch_command    "git branch --show-current 2>/dev/null || echo ''"
-                command_git_branch_format     "#[fg=#98c379] {stdout}"
-                command_git_branch_interval   "10"
+                // Commands
+                command_whoami_command     "whoami"
+                command_whoami_format      "{stdout}"
+                command_whoami_interval    "0"
+                command_hostname_command   "hostname"
+                command_hostname_format    "{stdout}"
+                command_hostname_interval  "0"
 
-                // DateTime
-                datetime_format "%a %m/%d %H:%M"
-                datetime_timezone "Asia/Tokyo"
+                border_enabled  "false"
+            }
+        }
 
-                // Notifications
-                notification_format_unread    "#[fg=#e06c75,blink]󱅫 #[noblink]{message} "
-                notification_format_no_notifications ""
+        // Main content
+        children
 
-                // Border
-                border_enabled  "true"
-                border_char     "─"
-                border_format   "#[fg=#5c6370]{char}"
-                border_position "top"
+        // Bottom hint bar
+        pane size=1 borderless=true {
+            plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
+                format_space  "#[bg=#3e4452]"
+
+                format_left   "#[bg=#3e4452,fg=#5c6370] Prefix: #[bg=#3e4452,fg=#61afef,bold]Ctrl+q#[bg=#3e4452,fg=#5c6370] │ Split: #[bg=#3e4452,fg=#61afef]\\#[bg=#3e4452,fg=#5c6370],#[bg=#3e4452,fg=#61afef]-#[bg=#3e4452,fg=#5c6370] │ Navigate: #[bg=#3e4452,fg=#61afef]hjkl#[bg=#3e4452,fg=#5c6370] │ Zoom: #[bg=#3e4452,fg=#61afef]z#[bg=#3e4452,fg=#5c6370] │ Tab: #[bg=#3e4452,fg=#61afef]t "
+                format_center "#[bg=#3e4452,fg=#5c6370]Scroll: #[bg=#3e4452,fg=#61afef][#[bg=#3e4452,fg=#5c6370] │ Close: #[bg=#3e4452,fg=#61afef]x#[bg=#3e4452,fg=#5c6370] │ Detach: #[bg=#3e4452,fg=#61afef]d "
+                format_right  "#[bg=#3e4452,fg=#5c6370]Tab Nav: #[bg=#3e4452,fg=#61afef]Ctrl+h/l#[bg=#3e4452,fg=#5c6370] │ Select: #[bg=#3e4452,fg=#61afef]Ctrl+1-5 "
+
+                border_enabled  "false"
             }
         }
     }
 }
-
