@@ -44,6 +44,9 @@ log/
 domains/dev/config/vscode/settings.json
 domains/dev/config/mise/config.toml
 domains/dev/config/zellij/layouts/default.kdl
+domains/dev/config/zellij/layouts/nord.kdl
+domains/dev/config/zellij/layouts/tokyonight.kdl
+domains/dev/config/zellij/layouts/catppuccin.kdl
 domains/dev/config/cursor/settings.json
 domains/dev/config/codex/config.toml
 

@@ -1,5 +1,8 @@
 # 外部設定ファイルのインクルード
-# Note: These are auto-generated from ~/.config/git/conditional/*.conf
+[include]
+    path = ~/.config/git/config.local
+
+# Conditional includes (auto-generated from ~/.config/git/conditional/*.conf)
 {{CONDITIONAL_INCLUDES}}
 
 
