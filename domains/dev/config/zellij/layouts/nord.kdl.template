@@ -38,7 +38,6 @@ layout {
                 command_hostname_format    "{stdout}"
                 command_hostname_interval  "0"
 
-                // Border
                 border_enabled  "false"
             }
         }
@@ -51,9 +50,9 @@ layout {
             plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
                 format_space  "#[bg=#3b4252]"
 
-                format_left   "#[bg=#3b4252,fg=#4c566a] Prefix: #[bg=#3b4252,fg=#81a1c1,bold]Ctrl+q#[bg=#3b4252,fg=#4c566a] │ Split: #[bg=#3b4252,fg=#81a1c1]\\#[bg=#3b4252,fg=#4c566a],#[bg=#3b4252,fg=#81a1c1]-#[bg=#3b4252,fg=#4c566a] │ Navigate: #[bg=#3b4252,fg=#81a1c1]hjkl#[bg=#3b4252,fg=#4c566a] │ Zoom: #[bg=#3b4252,fg=#81a1c1]z#[bg=#3b4252,fg=#4c566a] │ Tab: #[bg=#3b4252,fg=#81a1c1]t "
+                format_left   "#[bg=#3b4252,fg=#4c566a] Prefix: #[bg=#3b4252,fg=#81a1c1,bold]Ctrl+q#[bg=#3b4252,fg=#4c566a] │ Split: #[bg=#3b4252,fg=#81a1c1]\\#[bg=#3b4252,fg=#4c566a],#[bg=#3b4252,fg=#81a1c1]-#[bg=#3b4252,fg=#4c566a] │ Nav: #[bg=#3b4252,fg=#81a1c1]hjkl#[bg=#3b4252,fg=#4c566a] │ Float: #[bg=#3b4252,fg=#81a1c1]w,e#[bg=#3b4252,fg=#4c566a] │ Zoom: #[bg=#3b4252,fg=#81a1c1]z "
                 format_center "#[bg=#3b4252,fg=#4c566a]Scroll: #[bg=#3b4252,fg=#81a1c1][#[bg=#3b4252,fg=#4c566a] │ Close: #[bg=#3b4252,fg=#81a1c1]x#[bg=#3b4252,fg=#4c566a] │ Detach: #[bg=#3b4252,fg=#81a1c1]d "
-                format_right  "#[bg=#3b4252,fg=#4c566a]Tab Nav: #[bg=#3b4252,fg=#81a1c1]Ctrl+h/l#[bg=#3b4252,fg=#4c566a] │ Select: #[bg=#3b4252,fg=#81a1c1]Ctrl+1-5 "
+                format_right  "#[bg=#3b4252,fg=#4c566a]Tab: #[bg=#3b4252,fg=#81a1c1]t#[bg=#3b4252,fg=#4c566a] │ Nav: #[bg=#3b4252,fg=#81a1c1]Ctrl+h/l "
 
                 border_enabled  "false"
             }

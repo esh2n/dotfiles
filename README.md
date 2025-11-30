@@ -308,6 +308,8 @@ Keybindings unified across tmux, WezTerm, and Zellij.
 | Navigate panes | `Prefix + h/j/k/l` | |
 | Resize panes | `Prefix + H/J/K/L` | |
 | Zoom pane | `Prefix + z` | |
+| Floating panes toggle | `Prefix + w` | Zellij only |
+| Embed/float current pane | `Prefix + e` | Zellij only |
 | Close pane | `Prefix + x` | |
 | Previous tab | `Ctrl+h` | No prefix |
 | Next tab | `Ctrl+l` | No prefix |
