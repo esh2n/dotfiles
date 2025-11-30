@@ -2,7 +2,7 @@ layout {
     default_tab_template {
         children
         pane size=1 borderless=true {
-            plugin location="file:/Users/esh2n/.config/zellij/plugins/zjstatus.wasm" {
+            plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
                 // Catppuccin Mocha colors
                 format_left   "#[fg=#89b4fa,bold]󰣇 {mode}#[fg=#cdd6f4] │ #[fg=#fab387,bold] {session}#[fg=#cdd6f4] │ #[fg=#a6e3a1]{command_git_branch}"
                 format_center "{tabs}"

@@ -193,13 +193,39 @@ phase_domains() {
 phase_config() {
     log_info "Phase 5: Configuration (Symlinking)"
     
+    # Detect stale symlinks pointing to other dotfiles
+    log_info "Checking for stale symlinks..."
+    local stale_links=()
+    while IFS= read -r -d '' link; do
+        local target
+        target=$(readlink "$link" 2>/dev/null)
+        # Skip if pointing to current dotfiles or not a dotfiles path
+        if [[ -n "$target" ]] && [[ "$target" != "${DOTFILES_ROOT}"* ]] && [[ "$target" == *"dotfiles"* ]]; then
+            stale_links+=("$link -> $target")
+        fi
+    done < <(find "${HOME}/.config" "${HOME}" -maxdepth 1 -type l -print0 2>/dev/null)
+    
+    if [[ ${#stale_links[@]} -gt 0 ]]; then
+        log_warn "Found stale symlinks pointing to other dotfiles:"
+        for sl in "${stale_links[@]}"; do
+            log_warn "  $sl"
+        done
+        if [[ "$FORCE_CLEAN" == "true" ]]; then
+            log_info "Removing stale symlinks (--force enabled)..."
+            for sl in "${stale_links[@]}"; do
+                local link_path="${sl%% ->*}"
+                rm -f "$link_path" && log_info "Removed: $link_path"
+            done
+        else
+            log_warn "Run with --force to remove these automatically."
+        fi
+    fi
+    
     # Process templates first (e.g., mise config.toml.template, vscode settings.json.template)
-    # テンプレートを先に処理（例: mise config.toml.template, vscode settings.json.template）
     log_info "Processing templates..."
     "${DOTFILES_ROOT}/core/config/manager.sh" template
     
     # Then create symlinks
-    # その後、symlinkを作成
     log_info "Creating symlinks..."
     "${DOTFILES_ROOT}/core/config/manager.sh" link
 }
@@ -212,6 +238,16 @@ phase_verify() {
 # -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
+
+FORCE_CLEAN=false
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --force    Remove stale symlinks pointing to other dotfiles before linking"
+    echo "  -h, --help Show this help message"
+}
 
 main() {
     log_info "Starting Dotfiles Installation..."
@@ -228,5 +264,22 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --force)
+                FORCE_CLEAN=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+    main
 fi

@@ -2,7 +2,7 @@ layout {
     default_tab_template {
         children
         pane size=1 borderless=true {
-            plugin location="file:/Users/esh2n/.config/zellij/plugins/zjstatus.wasm" {
+            plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
                 // Nord colors
                 format_left   "#[fg=#81a1c1,bold]󰣇 {mode}#[fg=#d8dee9] │ #[fg=#ebcb8b,bold] {session}#[fg=#d8dee9] │ #[fg=#a3be8c]{command_git_branch}"
                 format_center "{tabs}"

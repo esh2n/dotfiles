@@ -68,23 +68,47 @@ cd dotfiles
 ./core/install/installer.sh
 ```
 
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--force` | Remove stale symlinks pointing to other dotfiles before linking |
+| `-h, --help` | Show help message |
+
+```bash
+# Normal installation
+./core/install/installer.sh
+
+# Clean install (removes old dotfiles symlinks)
+./core/install/installer.sh --force
+```
+
 The installer will:
-1. Install Homebrew (if needed)
-2. Install packages from Brewfiles
+1. Install Homebrew & Nix (if needed)
+2. Apply nix-darwin configuration (installs all packages via Nix)
 3. Setup language runtimes (mise)
-4. Create symlinks to configurations
-5. Backup existing files
+4. Detect stale symlinks from other dotfiles
+5. Create symlinks to configurations
+6. Backup existing files (keeps 7 most recent)
 
 ## Configuration
 
-### Package Management
+### Package Management (Nix)
+
+All packages are managed via Nix flake. Priority order:
+1. **nixpkgs** - Primary source
+2. **overlays** - Custom packages not in nixpkgs
+3. **brew-nix** - GUI apps that work with brew-nix
+4. **nix-darwin homebrew** - Fallback for problematic GUI apps / Homebrew-only CLI
+5. **cargo install** - Rust tools not available elsewhere
 
 | Location | Purpose |
 |----------|---------|
-| `domains/*/packages/Brewfile` | Homebrew packages |
-| `domains/dev/packages/cargo.txt` | Rust packages |
-| `domains/dev/packages/go.txt` | Go packages |
-| `domains/dev/packages/bun.txt` | Bun packages |
+| `core/nix/flake.nix` | Main Nix flake entry point |
+| `core/nix/darwin.nix` | System-wide macOS settings |
+| `core/nix/overlays.nix` | Custom package definitions |
+| `domains/*/packages/home.nix` | User packages per domain |
+| `domains/*/packages/homebrew.nix` | Homebrew fallbacks per domain |
 
 ### Symlink Management
 

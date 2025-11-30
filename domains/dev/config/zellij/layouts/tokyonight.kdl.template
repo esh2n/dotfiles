@@ -2,7 +2,7 @@ layout {
     default_tab_template {
         children
         pane size=1 borderless=true {
-            plugin location="file:/Users/esh2n/.config/zellij/plugins/zjstatus.wasm" {
+            plugin location="file:{{HOME}}/.config/zellij/plugins/zjstatus.wasm" {
                 // Tokyo Night colors
                 format_left   "#[fg=#7aa2f7,bold]󰣇 {mode}#[fg=#c0caf5] │ #[fg=#e0af68,bold] {session}#[fg=#c0caf5] │ #[fg=#9ece6a]{command_git_branch}"
                 format_center "{tabs}"
