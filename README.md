@@ -424,6 +424,8 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 | Operation | Keybind | Note |
 |-----------|---------|------|
 | Show hints | `<Space>` | Wait for which-key popup |
+| File tree toggle | `<Space> + e` | |
+| File tree focus | `<Space> + o` | |
 | Search files | `<Space> + s + f` | |
 | Search word | `<Space> + s + w` | |
 | Search grep | `<Space> + s + g` | |
@@ -466,6 +468,8 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 | Operation | Keybind | Note |
 |-----------|---------|------|
 | Show hints | `<Space>` | Wait for which-key popup |
+| File tree toggle | `<Space> + e` | |
+| File tree focus | `<Space> + o` | |
 | Find files | `<Space> + f` | |
 | Language tools | `<Space> + l` | |
 | Buffers | `<Space> + b` | |
@@ -484,6 +488,7 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 | Operation | Keybind | Note |
 |-----------|---------|------|
 | Show hints | `<Space>` | Wait for which-key popup |
+| File tree reveal | `\` | |
 | Search help | `<Space> + s + h` | |
 | Search files | `<Space> + s + f` | |
 | Search grep | `<Space> + s + g` | |
