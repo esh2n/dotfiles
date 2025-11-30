@@ -185,12 +185,24 @@ if [[ -f "$WEZTERM_CONFIG" ]]; then
     touch "$WEZTERM_CONFIG"
 fi
 
-# Update VSCode/Cursor Theme
+# Update Starship Palette (local config, not dotfiles)
+STARSHIP_CONFIG="$HOME/.config/starship.toml"
+
+if [[ -f "$STARSHIP_CONFIG" ]]; then
+    if grep -q "^\[palettes\.$THEME\]" "$STARSHIP_CONFIG"; then
+        sed -i '' "s/^palette = \"[^\"]*\"/palette = \"$THEME\"/" "$STARSHIP_CONFIG"
+        echo "✅ Updated Starship palette"
+    else
+        echo "⚠️  Starship palette '$THEME' not found"
+    fi
+fi
+
+# Update VSCode/Cursor Theme (local config, not dotfiles)
 VSCODE_THEME="${VSCODE_THEMES[$THEME]}"
 if [[ -n "$VSCODE_THEME" ]] && command -v jq >/dev/null 2>&1; then
     for settings_file in \
-        "$DOTFILES_ROOT/domains/dev/config/vscode/settings.json" \
-        "$DOTFILES_ROOT/domains/dev/config/cursor/settings.json"; do
+        "$HOME/Library/Application Support/Code/User/settings.json" \
+        "$HOME/Library/Application Support/Cursor/User/settings.json"; do
         if [[ -f "$settings_file" ]]; then
             jq --arg t "$VSCODE_THEME" '.["workbench.colorTheme"]=$t' \
                "$settings_file" > "${settings_file}.tmp" && \

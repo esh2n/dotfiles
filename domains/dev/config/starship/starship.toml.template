@@ -1,0 +1,230 @@
+# Gitコマンドのタイムアウトを増やす (デフォルト: 500ms)
+command_timeout = 2000
+
+# Active palette
+palette = "catppuccin"
+
+# プロンプトのフォーマット
+format = """
+$directory\
+$git_branch\
+$git_status\
+$nodejs\
+$rust\
+$golang\
+$python\
+$docker_context\
+$time\
+$line_break\
+$character"""
+
+# 右側のプロンプトフォーマット
+right_format = """
+$cmd_duration\
+$status\
+"""
+
+# プロンプトの前に空行を入れる
+add_newline = true
+
+[custom.separator]
+command = "echo ' '"
+when = """test "$STARSHIP_NAME" != "" """
+style = ""
+format = "[$output]($style)"
+
+[directory]
+style = "bold sapphire"
+format = '[$path](bold $style)'
+truncation_length = 3
+truncation_symbol = "…/"
+read_only = " "
+home_symbol = "🏠"
+
+[directory.substitutions]
+"Documents" = " "
+"Downloads" = " "
+"Music" = " "
+"Pictures" = " "
+"Developer" = " "
+".config" = " "
+"Desktop" = " "
+"Movies" = " "
+"Applications" = " "
+
+[git_branch]
+symbol = " "
+style = "bold green"
+format = '[$symbol$branch ](bold $style)'
+truncation_length = 20
+truncation_symbol = "…"
+
+[git_status]
+style = "bold yellow"
+format = '[$all_status$ahead_behind ](bold $style)'
+conflicted = "✖"
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕${ahead_count}⇣${behind_count}"
+up_to_date = "✓"
+untracked = "+${count}"
+stashed = "⚑"
+modified = "!${count}"
+staged = "●${count}"
+renamed = "»${count}"
+deleted = "✘${count}"
+
+[nodejs]
+symbol = "⬢"
+style = "bold pink"
+format = '[${symbol}${version} ](bold $style)'
+
+[rust]
+symbol = "🦀"
+style = "bold red"
+format = '[${symbol}${version} ](bold $style)'
+
+[golang]
+symbol = "🐹"
+style = "bold sky"
+format = '[${symbol}${version} ](bold $style)'
+
+[python]
+symbol = "🐍"
+style = "bold yellow"
+format = '[${symbol}${version} ](bold $style)'
+
+[docker_context]
+symbol = "🐳"
+style = "bold blue"
+format = '[${symbol}${context} ](bold $style)'
+
+[time]
+disabled = false
+time_format = "%R"
+style = "bold overlay2"
+format = '[$time](bold $style)'
+
+[line_break]
+disabled = false
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+vicmd_symbol = "[❮](bold yellow)"
+
+[status]
+style = "bold red"
+symbol = "💫 "
+format = '[$symbol$status ](bold $style)'
+map_symbol = true
+disabled = false
+
+[cmd_duration]
+min_time = 500
+format = '[$duration ](bold $style)'
+style = "bold pink"
+
+# =============================================================================
+# Theme Palettes
+# =============================================================================
+
+[palettes.catppuccin]
+pink = "#f5c2e7"
+red = "#f38ba8"
+yellow = "#f9e2af"
+green = "#a6e3a1"
+sky = "#89dceb"
+sapphire = "#74c7ec"
+blue = "#89b4fa"
+overlay2 = "#9399b2"
+
+[palettes.nord]
+pink = "#b48ead"
+red = "#bf616a"
+yellow = "#ebcb8b"
+green = "#a3be8c"
+sky = "#88c0d0"
+sapphire = "#81a1c1"
+blue = "#5e81ac"
+overlay2 = "#4c566a"
+
+[palettes.dracula]
+pink = "#ff79c6"
+red = "#ff5555"
+yellow = "#f1fa8c"
+green = "#50fa7b"
+sky = "#8be9fd"
+sapphire = "#6272a4"
+blue = "#bd93f9"
+overlay2 = "#6272a4"
+
+[palettes.tokyonight]
+pink = "#bb9af7"
+red = "#f7768e"
+yellow = "#e0af68"
+green = "#9ece6a"
+sky = "#7dcfff"
+sapphire = "#7aa2f7"
+blue = "#7aa2f7"
+overlay2 = "#565f89"
+
+[palettes.gruvbox]
+pink = "#d3869b"
+red = "#cc241d"
+yellow = "#fabd2f"
+green = "#b8bb26"
+sky = "#83a598"
+sapphire = "#458588"
+blue = "#83a598"
+overlay2 = "#665c54"
+
+[palettes.everforest]
+pink = "#d699b6"
+red = "#e67e80"
+yellow = "#dbbc7f"
+green = "#a7c080"
+sky = "#7fbbb3"
+sapphire = "#7fbbb3"
+blue = "#7fbbb3"
+overlay2 = "#859289"
+
+[palettes.onedark]
+pink = "#c678dd"
+red = "#e06c75"
+yellow = "#e5c07b"
+green = "#98c379"
+sky = "#56b6c2"
+sapphire = "#61afef"
+blue = "#61afef"
+overlay2 = "#5c6370"
+
+[palettes.rosepine]
+pink = "#ebbcba"
+red = "#eb6f92"
+yellow = "#f6c177"
+green = "#31748f"
+sky = "#9ccfd8"
+sapphire = "#31748f"
+blue = "#31748f"
+overlay2 = "#524f67"
+
+[palettes.solarized]
+pink = "#d33682"
+red = "#dc322f"
+yellow = "#b58900"
+green = "#859900"
+sky = "#2aa198"
+sapphire = "#268bd2"
+blue = "#268bd2"
+overlay2 = "#586e75"
+
+[palettes.kanagawa]
+pink = "#d27e99"
+red = "#c34043"
+yellow = "#c0a36e"
+green = "#76946a"
+sky = "#7fb4ca"
+sapphire = "#7e9cd8"
+blue = "#7e9cd8"
+overlay2 = "#54546d"

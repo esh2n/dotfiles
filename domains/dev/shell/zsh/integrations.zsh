@@ -8,13 +8,15 @@ fi
 
 # Starship (Prompt)
 if command -v starship &>/dev/null; then
-  if [[ -z "${STARSHIP_CONFIG:-}" ]]; then
-    starship_config_path="${DOTFILES_ROOT:-${HOME}}/domains/dev/config/starship/starship.toml"
-    if [[ -f "$starship_config_path" ]]; then
-      export STARSHIP_CONFIG="$starship_config_path"
-    fi
-    unset starship_config_path
+  # Copy template to local config if not exists
+  starship_local="$HOME/.config/starship.toml"
+  starship_template="${DOTFILES_ROOT:-${HOME}}/domains/dev/config/starship/starship.toml.template"
+  if [[ ! -f "$starship_local" ]] && [[ -f "$starship_template" ]]; then
+    mkdir -p "$HOME/.config"
+    cp "$starship_template" "$starship_local"
   fi
+  unset starship_local starship_template
+  # Use default config path (~/.config/starship.toml)
   eval "$(starship init zsh)"
 fi
 

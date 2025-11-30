@@ -42,6 +42,7 @@ log/
 
 # Generated from templates (do not commit)
 domains/dev/config/vscode/settings.json
+domains/dev/config/starship/starship.toml
 domains/dev/config/mise/config.toml
 domains/dev/config/zellij/layouts/default.kdl
 domains/dev/config/zellij/layouts/nord.kdl
