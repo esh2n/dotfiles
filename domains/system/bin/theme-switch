@@ -185,8 +185,11 @@ if [[ -f "$WEZTERM_CONFIG" ]]; then
     touch "$WEZTERM_CONFIG"
 fi
 
-# Update Starship Palette (local config, not dotfiles)
-STARSHIP_CONFIG="$HOME/.config/starship.toml"
+# Update Starship Palette (generated from template, gitignored)
+STARSHIP_CONFIG="$DOTFILES_ROOT/domains/dev/config/starship/starship.toml"
+if [[ ! -f "$STARSHIP_CONFIG" ]]; then
+    STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
+fi
 
 if [[ -f "$STARSHIP_CONFIG" ]]; then
     if grep -q "^\[palettes\.$THEME\]" "$STARSHIP_CONFIG"; then
