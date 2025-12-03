@@ -1,0 +1,455 @@
+/* ==UserStyle==
+@name GitHub {{THEME_NAME}}
+@namespace github.com/esh2n/dotfiles
+@version 1.0.0
+@description {{THEME_NAME}} theme for GitHub
+@author esh2n
+@license MIT
+==/UserStyle== */
+
+@-moz-document regexp("https://github\\.com(?!(/home$|/features($|/.*)|/organizations/plan)).*$"),
+  domain("gist.github.com"),
+  domain("docs.github.com"),
+  domain("viewscreen.githubusercontent.com") {
+
+  [data-color-mode][data-color-mode="auto"][data-dark-theme="dark"],
+  [data-color-mode="dark"][data-dark-theme="dark"] {
+    /* Color Palette Variables */
+    --theme-base: @base;
+    --theme-mantle: @mantle;
+    --theme-crust: @crust;
+    --theme-text: @text;
+    --theme-subtext1: @subtext1;
+    --theme-subtext0: @subtext0;
+    --theme-overlay2: @overlay2;
+    --theme-overlay1: @overlay1;
+    --theme-overlay0: @overlay0;
+    --theme-surface2: @surface2;
+    --theme-surface1: @surface1;
+    --theme-surface0: @surface0;
+    --theme-red: @red;
+    --theme-green: @green;
+    --theme-blue: @blue;
+    --theme-yellow: @yellow;
+    --theme-peach: @peach;
+    --theme-mauve: @mauve;
+    --theme-pink: @pink;
+    --theme-teal: @teal;
+    --theme-sky: @sky;
+    --theme-sapphire: @sapphire;
+    --theme-lavender: @lavender;
+    --theme-accent: @accent;
+
+    /* Accent color */
+    accent-color: var(--theme-accent);
+    color: var(--theme-text);
+
+    /* Calendar & Contribution Graph */
+    --color-calendar-graph-day-bg: var(--theme-surface0) !important;
+    --color-calendar-graph-day-border: transparent !important;
+    --color-calendar-graph-day-L1-bg: color-mix(in srgb, var(--theme-accent) 40%, transparent) !important;
+    --color-calendar-graph-day-L2-bg: color-mix(in srgb, var(--theme-accent) 60%, transparent) !important;
+    --color-calendar-graph-day-L3-bg: color-mix(in srgb, var(--theme-accent) 80%, transparent) !important;
+    --color-calendar-graph-day-L4-bg: var(--theme-accent) !important;
+    --color-calendar-halloween-graph-day-L1-bg: color-mix(in srgb, var(--theme-accent) 40%, transparent) !important;
+    --color-calendar-halloween-graph-day-L2-bg: color-mix(in srgb, var(--theme-accent) 60%, transparent) !important;
+    --color-calendar-halloween-graph-day-L3-bg: color-mix(in srgb, var(--theme-accent) 80%, transparent) !important;
+    --color-calendar-halloween-graph-day-L4-bg: var(--theme-accent) !important;
+    --color-calendar-winter-graph-day-L1-bg: color-mix(in srgb, var(--theme-accent) 40%, transparent) !important;
+    --color-calendar-winter-graph-day-L2-bg: color-mix(in srgb, var(--theme-accent) 60%, transparent) !important;
+    --color-calendar-winter-graph-day-L3-bg: color-mix(in srgb, var(--theme-accent) 80%, transparent) !important;
+    --color-calendar-winter-graph-day-L4-bg: var(--theme-accent) !important;
+    --contribution-default-bgColor-0: color-mix(in srgb, var(--theme-accent) 10%, transparent) !important;
+    --contribution-default-bgColor-1: color-mix(in srgb, var(--theme-accent) 40%, transparent) !important;
+    --contribution-default-bgColor-2: color-mix(in srgb, var(--theme-accent) 60%, transparent) !important;
+    --contribution-default-bgColor-3: color-mix(in srgb, var(--theme-accent) 80%, transparent) !important;
+    --contribution-default-bgColor-4: var(--theme-accent) !important;
+
+    /* Header */
+    --page-header-bgColor: var(--theme-crust);
+    --header-fgColor-default: var(--theme-text);
+    --header-fgColor-logo: var(--theme-text);
+    --header-bgColor: var(--theme-crust);
+    --header-borderColor-divider: var(--theme-surface2);
+    --headerSearch-bgColor: var(--theme-mantle);
+    --headerSearch-borderColor: var(--theme-surface0);
+
+    /* Diff Colors */
+    --diffBlob-additionNum-bgColor: color-mix(in srgb, var(--theme-green) 30%, transparent);
+    --diffBlob-additionNum-fgColor: var(--theme-text);
+    --diffBlob-additionLine-bgColor: color-mix(in srgb, var(--theme-green) 15%, transparent);
+    --diffBlob-additionWord-bgColor: color-mix(in srgb, var(--theme-green) 30%, transparent);
+    --diffBlob-additionWord-fgColor: var(--theme-text);
+    --diffBlob-deletionNum-bgColor: color-mix(in srgb, var(--theme-red) 30%, transparent);
+    --diffBlob-deletionNum-fgColor: var(--theme-text);
+    --diffBlob-deletionLine-bgColor: color-mix(in srgb, var(--theme-red) 15%, transparent);
+    --diffBlob-deletionWord-bgColor: color-mix(in srgb, var(--theme-red) 30%, transparent);
+    --diffBlob-deletionWord-fgColor: var(--theme-text);
+    --diffBlob-hunkNum-bgColor-rest: color-mix(in srgb, var(--theme-accent) 40%, transparent);
+    --diffBlob-hunkNum-bgColor-hover: color-mix(in srgb, var(--theme-accent) 75%, transparent);
+    --diffBlob-hunkLine-bgColor: color-mix(in srgb, var(--theme-accent) 25%, transparent);
+    --diffBlob-expander-iconColor: var(--theme-subtext0);
+    --diffBlob-emptyNum-bgColor: var(--theme-mantle);
+    --diffBlob-emptyLine-bgColor: var(--theme-mantle);
+
+    /* Code Mirror */
+    --codeMirror-fgColor: var(--theme-text);
+    --codeMirror-bgColor: var(--theme-base);
+    --codeMirror-gutters-bgColor: var(--theme-base);
+    --codeMirror-gutterMarker-fgColor-default: var(--theme-base);
+    --codeMirror-gutterMarker-fgColor-muted: var(--theme-overlay0);
+    --codeMirror-lineNumber-fgColor: var(--theme-overlay1);
+    --codeMirror-cursor-fgColor: var(--theme-text);
+    --codeMirror-selection-bgColor: color-mix(in srgb, var(--theme-blue) 40%, transparent);
+    --codeMirror-activeline-bgColor: color-mix(in srgb, var(--theme-overlay1) 40%, transparent);
+    --codeMirror-matchingBracket-fgColor: var(--theme-text);
+    --codeMirror-lines-bgColor: var(--theme-base);
+    --codeMirror-syntax-fgColor-comment: var(--theme-overlay2);
+    --codeMirror-syntax-fgColor-constant: var(--theme-blue);
+    --codeMirror-syntax-fgColor-entity: var(--theme-blue);
+    --codeMirror-syntax-fgColor-keyword: var(--theme-mauve);
+    --codeMirror-syntax-fgColor-storage: var(--theme-peach);
+    --codeMirror-syntax-fgColor-string: var(--theme-green);
+    --codeMirror-syntax-fgColor-variable: var(--theme-peach);
+
+    /* Avatar */
+    --avatar-bgColor: color-mix(in srgb, var(--theme-text) 26%, transparent);
+    --avatar-borderColor: var(--theme-surface0);
+    --avatarStack-fade-bgColor-default: var(--theme-surface1);
+
+    /* Controls */
+    --control-bgColor-rest: var(--theme-surface0);
+    --control-bgColor-hover: var(--theme-surface1);
+    --control-bgColor-active: var(--theme-surface1);
+    --control-bgColor-disabled: color-mix(in srgb, var(--theme-mantle) 60%, transparent);
+    --control-bgColor-selected: var(--theme-surface2);
+    --control-fgColor-rest: var(--theme-text);
+    --control-fgColor-placeholder: var(--theme-overlay0);
+    --control-fgColor-disabled: color-mix(in srgb, var(--theme-subtext0) 70%, transparent);
+    --control-borderColor-rest: var(--theme-surface1);
+    --control-borderColor-emphasis: var(--theme-surface2);
+    --control-borderColor-disabled: color-mix(in srgb, var(--theme-surface1) 75%, transparent);
+    --control-borderColor-selected: var(--theme-text);
+    --control-borderColor-success: var(--theme-green);
+    --control-borderColor-danger: var(--theme-red);
+    --control-borderColor-warning: var(--theme-yellow);
+    --control-iconColor-rest: var(--theme-subtext0);
+    --control-transparent-bgColor-rest: transparent;
+    --control-transparent-bgColor-hover: color-mix(in srgb, var(--theme-surface2) 20%, transparent);
+    --control-transparent-bgColor-active: color-mix(in srgb, var(--theme-overlay0) 50%, transparent);
+    --control-transparent-borderColor-rest: transparent;
+    --control-transparent-borderColor-hover: transparent;
+    --control-transparent-borderColor-active: transparent;
+    --control-danger-fgColor-rest: var(--theme-red);
+    --control-danger-fgColor-hover: var(--theme-crust);
+    --control-danger-bgColor-hover: color-mix(in srgb, var(--theme-red) 80%, transparent);
+    --control-danger-bgColor-active: var(--theme-red);
+    --control-checked-bgColor-rest: var(--theme-accent);
+    --control-checked-bgColor-hover: var(--theme-accent);
+    --control-checked-bgColor-active: var(--theme-accent);
+    --control-checked-fgColor-rest: var(--theme-crust);
+    --control-checked-borderColor-rest: var(--theme-accent);
+    --control-checked-borderColor-hover: var(--theme-accent);
+    --control-checked-borderColor-active: var(--theme-accent);
+
+    /* Control Track (for toggle switches) */
+    --controlTrack-bgColor-rest: var(--theme-surface0);
+    --controlTrack-bgColor-hover: var(--theme-surface1);
+    --controlTrack-bgColor-active: var(--theme-surface2);
+    --controlTrack-fgColor-rest: var(--theme-subtext0);
+    --controlTrack-borderColor-rest: transparent;
+    --controlKnob-bgColor-rest: var(--theme-base);
+    --controlKnob-bgColor-checked: var(--theme-text);
+    --controlKnob-borderColor-rest: var(--theme-surface2);
+    --controlKnob-borderColor-checked: var(--theme-blue);
+
+    /* Buttons */
+    --button-default-fgColor-rest: var(--theme-text);
+    --button-default-bgColor-rest: var(--theme-surface0);
+    --button-default-bgColor-hover: var(--theme-surface1);
+    --button-default-bgColor-active: var(--theme-surface2);
+    --button-default-bgColor-selected: var(--theme-surface2);
+    --button-default-bgColor-disabled: color-mix(in srgb, var(--theme-surface0) 70%, transparent);
+    --button-default-borderColor-rest: var(--theme-surface1);
+    --button-default-borderColor-hover: var(--theme-surface1);
+    --button-default-borderColor-active: var(--theme-surface1);
+    --button-default-borderColor-disabled: color-mix(in srgb, var(--theme-surface0) 70%, transparent);
+    --button-default-shadow-resting: 0px 0px 0px 0px #000;
+    --button-primary-fgColor-rest: var(--theme-base);
+    --button-primary-fgColor-disabled: color-mix(in srgb, var(--theme-base) 60%, transparent);
+    --button-primary-iconColor-rest: var(--theme-base);
+    --button-primary-bgColor-rest: var(--theme-green);
+    --button-primary-bgColor-hover: var(--theme-green);
+    --button-primary-bgColor-active: var(--theme-green);
+    --button-primary-bgColor-disabled: color-mix(in srgb, var(--theme-green) 70%, transparent);
+    --button-primary-borderColor-rest: var(--theme-green);
+    --button-primary-borderColor-hover: var(--theme-green);
+    --button-primary-borderColor-active: var(--theme-green);
+    --button-primary-borderColor-disabled: color-mix(in srgb, var(--theme-green) 70%, transparent);
+    --button-invisible-fgColor-rest: var(--theme-text);
+    --button-invisible-fgColor-hover: var(--theme-accent);
+    --button-invisible-iconColor-rest: var(--theme-overlay2);
+    --button-invisible-bgColor-rest: transparent;
+    --button-invisible-bgColor-hover: color-mix(in srgb, var(--theme-surface1) 50%, transparent);
+    --button-invisible-bgColor-active: color-mix(in srgb, var(--theme-surface1) 70%, transparent);
+    --button-invisible-borderColor-rest: transparent;
+    --button-invisible-borderColor-hover: transparent;
+    --button-danger-fgColor-rest: var(--theme-red);
+    --button-danger-fgColor-hover: var(--theme-base);
+    --button-danger-fgColor-active: var(--theme-base);
+    --button-danger-fgColor-disabled: color-mix(in srgb, var(--theme-red) 50%, transparent);
+    --button-danger-iconColor-rest: var(--theme-red);
+    --button-danger-iconColor-hover: var(--theme-crust);
+    --button-danger-bgColor-rest: var(--theme-surface0);
+    --button-danger-bgColor-hover: var(--theme-red);
+    --button-danger-bgColor-active: var(--theme-red);
+    --button-danger-borderColor-rest: var(--theme-surface1);
+    --button-danger-borderColor-hover: var(--theme-red);
+    --button-danger-borderColor-active: var(--theme-red);
+    --button-star-iconColor: var(--theme-yellow);
+
+    /* Button Counters */
+    --buttonCounter-default-bgColor-rest: var(--theme-surface1);
+    --buttonCounter-invisible-bgColor-rest: var(--theme-surface1);
+    --buttonCounter-danger-bgColor-rest: color-mix(in srgb, var(--theme-red) 20%, transparent);
+    --buttonCounter-danger-fgColor-rest: var(--theme-red);
+    --buttonCounter-danger-fgColor-hover: var(--theme-text);
+
+    /* Focus */
+    --focus-outlineColor: var(--theme-accent);
+
+    /* Menu */
+    --menu-bgColor-active: var(--theme-mantle);
+
+    /* Overlay */
+    --overlay-bgColor: var(--theme-base);
+    --overlay-borderColor: var(--theme-surface0);
+    --overlay-backdrop-bgColor: color-mix(in srgb, var(--theme-base) 40%, transparent);
+
+    /* Navigation */
+    --underlineNav-borderColor-active: var(--theme-accent);
+    --underlineNav-borderColor-hover: color-mix(in srgb, var(--theme-overlay1) 40%, transparent);
+    --underlineNav-iconColor-rest: var(--theme-subtext0);
+
+    /* Selection */
+    --selection-bgColor: color-mix(in srgb, var(--theme-accent) 30%, transparent);
+
+    /* Reaction Buttons */
+    --reactionButton-selected-bgColor-rest: color-mix(in srgb, var(--theme-accent) 20%, transparent);
+    --reactionButton-selected-bgColor-hover: color-mix(in srgb, var(--theme-accent) 35%, transparent);
+    --reactionButton-selected-fgColor-rest: var(--theme-accent);
+    --reactionButton-selected-fgColor-hover: var(--theme-accent);
+
+    /* Foreground Colors */
+    --fgColor-default: var(--theme-text);
+    --fgColor-muted: var(--theme-subtext1);
+    --fgColor-onEmphasis: var(--theme-base);
+    --fgColor-disabled: var(--theme-surface2);
+    --fgColor-link: var(--theme-accent);
+    --fgColor-neutral: var(--theme-subtext1);
+    --fgColor-accent: var(--theme-accent);
+    --fgColor-success: var(--theme-green);
+    --fgColor-attention: var(--theme-yellow);
+    --fgColor-severe: var(--theme-peach);
+    --fgColor-danger: var(--theme-red);
+    --fgColor-open: var(--theme-green);
+    --fgColor-closed: var(--theme-red);
+    --fgColor-done: var(--theme-mauve);
+    --fgColor-sponsors: var(--theme-pink);
+
+    /* Background Colors */
+    --bgColor-default: var(--theme-base);
+    --bgColor-muted: var(--theme-mantle);
+    --bgColor-inset: var(--theme-crust);
+    --bgColor-emphasis: var(--theme-overlay2);
+    --bgColor-inverse: var(--theme-text);
+    --bgColor-disabled: color-mix(in srgb, var(--theme-mantle) 70%, transparent);
+    --bgColor-transparent: transparent;
+    --bgColor-neutral-muted: color-mix(in srgb, var(--theme-surface0) 40%, transparent);
+    --bgColor-neutral-emphasis: var(--theme-subtext0);
+    --bgColor-accent-muted: color-mix(in srgb, var(--theme-accent) 20%, transparent);
+    --bgColor-accent-emphasis: var(--theme-accent);
+    --bgColor-success-muted: color-mix(in srgb, var(--theme-green) 15%, transparent);
+    --bgColor-success-emphasis: var(--theme-green);
+    --bgColor-attention-muted: color-mix(in srgb, var(--theme-yellow) 15%, transparent);
+    --bgColor-attention-emphasis: var(--theme-yellow);
+    --bgColor-severe-muted: color-mix(in srgb, var(--theme-peach) 26%, transparent);
+    --bgColor-severe-emphasis: var(--theme-peach);
+    --bgColor-danger-muted: color-mix(in srgb, var(--theme-red) 26%, transparent);
+    --bgColor-danger-emphasis: var(--theme-red);
+    --bgColor-open-muted: color-mix(in srgb, var(--theme-green) 10%, transparent);
+    --bgColor-open-emphasis: var(--theme-green);
+    --bgColor-closed-muted: color-mix(in srgb, var(--theme-red) 15%, transparent);
+    --bgColor-closed-emphasis: var(--theme-red);
+    --bgColor-done-muted: color-mix(in srgb, var(--theme-mauve) 15%, transparent);
+    --bgColor-done-emphasis: var(--theme-mauve);
+    --bgColor-sponsors-muted: color-mix(in srgb, var(--theme-pink) 10%, transparent);
+    --bgColor-sponsors-emphasis: var(--theme-pink);
+
+    /* Border Colors */
+    --borderColor-default: var(--theme-surface1);
+    --borderColor-muted: var(--theme-surface0);
+    --borderColor-emphasis: var(--theme-surface2);
+    --borderColor-disabled: color-mix(in srgb, var(--theme-mantle) 70%, transparent);
+    --borderColor-transparent: transparent;
+    --borderColor-neutral-muted: color-mix(in srgb, var(--theme-overlay1) 40%, transparent);
+    --borderColor-neutral-emphasis: var(--theme-overlay1);
+    --borderColor-accent-muted: color-mix(in srgb, var(--theme-accent) 50%, transparent);
+    --borderColor-accent-emphasis: var(--theme-accent);
+    --borderColor-success-muted: var(--theme-green);
+    --borderColor-success-emphasis: var(--theme-green);
+    --borderColor-attention-muted: color-mix(in srgb, var(--theme-yellow) 30%, transparent);
+    --borderColor-attention-emphasis: var(--theme-yellow);
+    --borderColor-severe-muted: var(--theme-peach);
+    --borderColor-severe-emphasis: var(--theme-peach);
+    --borderColor-danger-muted: var(--theme-red);
+    --borderColor-danger-emphasis: var(--theme-red);
+    --borderColor-open-muted: var(--theme-green);
+    --borderColor-open-emphasis: var(--theme-green);
+    --borderColor-closed-muted: var(--theme-red);
+    --borderColor-closed-emphasis: var(--theme-red);
+    --borderColor-done-muted: var(--theme-lavender);
+    --borderColor-done-emphasis: var(--theme-mauve);
+    --borderColor-sponsors-muted: color-mix(in srgb, var(--theme-pink) 40%, transparent);
+    --borderColor-sponsors-emphasis: var(--theme-pink);
+
+    /* ANSI Colors */
+    --color-ansi-black: var(--theme-surface1);
+    --color-ansi-black-bright: var(--theme-surface2);
+    --color-ansi-gray: var(--theme-surface2);
+    --color-ansi-white: var(--theme-subtext1);
+    --color-ansi-white-bright: var(--theme-subtext0);
+    --color-ansi-red: var(--theme-red);
+    --color-ansi-red-bright: var(--theme-red);
+    --color-ansi-green: var(--theme-green);
+    --color-ansi-green-bright: var(--theme-green);
+    --color-ansi-yellow: var(--theme-yellow);
+    --color-ansi-yellow-bright: var(--theme-yellow);
+    --color-ansi-blue: var(--theme-blue);
+    --color-ansi-blue-bright: var(--theme-blue);
+    --color-ansi-magenta: var(--theme-pink);
+    --color-ansi-magenta-bright: var(--theme-pink);
+    --color-ansi-cyan: var(--theme-teal);
+    --color-ansi-cyan-bright: var(--theme-teal);
+
+    /* Prettylights Syntax (Code Highlighting) */
+    --color-prettylights-syntax-comment: var(--theme-overlay2);
+    --color-prettylights-syntax-constant: var(--theme-blue);
+    --color-prettylights-syntax-constant-other-reference-link: var(--theme-blue);
+    --color-prettylights-syntax-entity: var(--theme-blue);
+    --color-prettylights-syntax-storage-modifier-import: var(--theme-peach);
+    --color-prettylights-syntax-entity-tag: var(--theme-blue);
+    --color-prettylights-syntax-keyword: var(--theme-mauve);
+    --color-prettylights-syntax-string: var(--theme-green);
+    --color-prettylights-syntax-variable: var(--theme-peach);
+    --color-prettylights-syntax-invalid-illegal-text: var(--theme-red);
+    --color-prettylights-syntax-invalid-illegal-bg: color-mix(in srgb, var(--theme-red) 15%, transparent);
+    --color-prettylights-syntax-markup-heading: var(--theme-red);
+    --color-prettylights-syntax-markup-italic: var(--theme-yellow);
+    --color-prettylights-syntax-markup-bold: var(--theme-yellow);
+    --color-prettylights-syntax-markup-deleted-text: var(--theme-text);
+    --color-prettylights-syntax-markup-deleted-bg: color-mix(in srgb, var(--theme-red) 40%, transparent);
+    --color-prettylights-syntax-markup-inserted-text: var(--theme-text);
+    --color-prettylights-syntax-markup-inserted-bg: color-mix(in srgb, var(--theme-green) 40%, transparent);
+    --color-prettylights-syntax-markup-changed-text: var(--theme-text);
+    --color-prettylights-syntax-markup-changed-bg: color-mix(in srgb, var(--theme-yellow) 40%, transparent);
+    --color-prettylights-syntax-markup-ignored-text: var(--theme-text);
+
+    /* Additional Colors */
+    --bgColor-white: var(--theme-base);
+    --color-scale-white: var(--theme-base);
+    --color-scale-gray-3: var(--theme-overlay2);
+    --color-scale-gray-5: var(--theme-overlay0);
+    --color-scale-gray-6: var(--theme-surface1);
+    --color-scale-gray-7: var(--theme-surface1);
+    --color-scale-gray-8: var(--theme-mantle);
+    --color-scale-gray-9: var(--theme-base);
+    --color-scale-blue-2: var(--theme-sky);
+    --color-scale-blue-5: var(--theme-blue);
+    --color-scale-green-3: var(--theme-green);
+    --color-scale-green-4: var(--theme-green);
+    --color-scale-yellow-3: var(--theme-peach);
+    --color-scale-orange-4: var(--theme-peach);
+    --color-scale-red-4: var(--theme-red);
+
+    /* Shadows */
+    --shadow-inset: inset 0px 1px 0px 0px var(--theme-crust);
+    --shadow-resting-xsmall: 0px 1px 0px 0px var(--theme-crust);
+    --shadow-resting-small: 0px 1px 0px 0px var(--theme-crust), 0px 1px 3px 0px var(--theme-crust);
+    --shadow-resting-medium: 0px 3px 6px 0px var(--theme-crust);
+    --shadow-floating-small: 0px 0px 0px 1px var(--theme-base), 0px 6px 12px -3px var(--theme-crust), 0px 6px 18px 0px var(--theme-crust);
+    --shadow-floating-medium: 0px 0px 0px 1px var(--theme-surface0), 0px 8px 16px -4px var(--theme-crust), 0px 4px 32px -4px var(--theme-crust), 0px 24px 48px -12px var(--theme-crust), 0px 48px 96px -24px var(--theme-crust);
+    --shadow-floating-large: 0px 0px 0px 1px var(--theme-surface0), 0px 24px 48px 0px var(--theme-crust);
+    --shadow-floating-xlarge: 0px 0px 0px 1px var(--theme-surface0), 0px 32px 64px 0px var(--theme-crust);
+    --shadow-floating-legacy: 0px 6px 12px -3px var(--theme-crust), 0px 6px 18px 0px var(--theme-crust);
+
+    /* Other UI Elements */
+    --topicTag-borderColor: transparent;
+    --highlight-neutral-bgColor: color-mix(in srgb, var(--theme-yellow) 30%, transparent);
+    --timelineBadge-bgColor: var(--theme-mantle);
+    --treeViewItem-leadingVisual-iconColor-rest: var(--theme-subtext0);
+    --skeletonLoader-bgColor: var(--theme-mantle);
+    --sideNav-bgColor-selected: var(--theme-mantle);
+    --selectMenu-borderColor: var(--theme-surface2);
+    --selectMenu-bgColor-active: var(--theme-surface2);
+    --color-user-mention-fg: var(--theme-accent);
+    --color-user-mention-bg: color-mix(in srgb, var(--theme-accent) 30%, transparent);
+
+    /* Docs.github.com */
+    --color-fg-default: var(--theme-text);
+    --color-canvas-default: var(--theme-base);
+    --color-canvas-subtle: var(--theme-mantle);
+
+    /* Tooltips */
+    --tooltip-fgColor: var(--theme-base);
+    --tooltip-bgColor: var(--theme-overlay2);
+
+    /* Refined GitHub Extension */
+    --rgh-heat-color: var(--theme-peach);
+
+    /* Progress Bar */
+    .turbo-progress-bar {
+      background-color: var(--theme-accent);
+    }
+
+    /* Header when logged out */
+    .HeaderMenu-link {
+      color: var(--theme-text);
+      &:hover {
+        color: var(--theme-text);
+      }
+    }
+    .header-search-button {
+      &.placeholder {
+        color: var(--theme-subtext0);
+      }
+      svg {
+        fill: var(--theme-text) !important;
+      }
+    }
+    .HeaderMenu-toggle-bar {
+      background-color: var(--theme-text);
+    }
+    .notification-indicator .mail-status {
+      background-image: linear-gradient(var(--theme-accent), var(--theme-accent));
+    }
+
+    /* Activity Graph */
+    .js-activity-overview-graph .js-highlight-blob {
+      fill: var(--theme-accent);
+      stroke: var(--theme-accent);
+    }
+
+    .subnav-link.selected {
+      border-bottom-color: var(--theme-accent);
+    }
+
+    /* PR Check in Progress */
+    [stroke="#DBAB0A" i] {
+      stroke: color-mix(in srgb, var(--theme-yellow) 70%, transparent) !important;
+    }
+    [fill="#DBAB0A" i] {
+      fill: var(--theme-yellow) !important;
+    }
+  }
+}

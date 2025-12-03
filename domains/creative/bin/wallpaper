@@ -7,6 +7,13 @@
 
 set -e
 
+# Load utilities
+if [[ -n "$DOTFILES_ROOT" ]]; then
+    source "$DOTFILES_ROOT/core/utils/common.sh"
+elif [[ -f "$HOME/dotfiles/core/utils/common.sh" ]]; then
+    source "$HOME/dotfiles/core/utils/common.sh"
+fi
+
 # Configuration
 WALLHAVEN_API="https://wallhaven.cc/api/v1"
 # Use DOTFILES_ROOT if available, otherwise fallback to relative path from script
@@ -46,19 +53,19 @@ usage() {
 set_wallpaper() {
     local file_path="$1"
     if [[ ! -f "$file_path" ]]; then
-        echo "Error: File not found: $file_path"
+        log_error "File not found: $file_path"
         return 1
     fi
 
-    echo "Setting wallpaper to: $file_path"
-    
+    log_info "Setting wallpaper to: $file_path"
+
     # Use osascript to set wallpaper on all desktops
     osascript -e "tell application \"System Events\" to tell every desktop to set picture to \"$file_path\""
-    
+
     # Update current wallpaper link
     ln -sf "$file_path" "$CURRENT_WALLPAPER"
-    
-    echo "✨ Wallpaper updated!"
+
+    log_success "Wallpaper updated!"
 }
 
 # Helper: Fetch and download
@@ -74,40 +81,40 @@ fetch_wallpaper() {
         local encoded_query=$(echo "$query" | jq -sRr @uri)
         api_url="$api_url&q=$encoded_query"
     fi
-    
-    echo "🔍 Searching Wallhaven for: ${query:-random}..."
-    
+
+    log_info "Searching Wallhaven for: ${query:-random}..."
+
     # Fetch JSON
     local response=$(curl -s "$api_url")
-    
+
     # Check for errors
     if echo "$response" | grep -q "error"; then
-        echo "Error fetching from Wallhaven API"
+        log_error "Error fetching from Wallhaven API"
         return 1
     fi
-    
+
     # Get random image URL from results
     # If sorting is random, the API returns a list, we pick the first one or random one from page
     local image_url=$(echo "$response" | jq -r '.data[0].path')
     local image_id=$(echo "$response" | jq -r '.data[0].id')
-    
+
     if [[ "$image_url" == "null" || -z "$image_url" ]]; then
-        echo "❌ No wallpapers found for query: $query"
+        log_error "No wallpapers found for query: $query"
         return 1
     fi
-    
-    echo "Found wallpaper: $image_id"
-    
+
+    log_info "Found wallpaper: $image_id"
+
     # Download
     local ext="${image_url##*.}"
     local filename="wallhaven-${image_id}.${ext}"
     local filepath="$DOWNLOAD_DIR/$filename"
-    
+
     if [[ ! -f "$filepath" ]]; then
-        echo "⬇️  Downloading..."
+        log_info "Downloading..."
         curl -s -o "$filepath" "$image_url"
     else
-        echo "ℹ️  File already exists, skipping download."
+        log_info "File already exists, skipping download."
     fi
     
     set_wallpaper "$filepath"

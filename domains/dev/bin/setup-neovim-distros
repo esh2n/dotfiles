@@ -6,6 +6,13 @@ set -e
 # Neovimディストリビューションのセットアップ
 # -----------------------------------------------------------------------------
 
+# Load utilities
+if [[ -n "${DOTFILES_ROOT:-}" ]]; then
+    source "$DOTFILES_ROOT/core/utils/common.sh"
+elif [[ -f "$HOME/dotfiles/core/utils/common.sh" ]]; then
+    source "$HOME/dotfiles/core/utils/common.sh"
+fi
+
 # Determine the directory of this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Go up to domains/dev/config
@@ -16,15 +23,15 @@ setup_distro() {
     local name="$1"
     local repo="$2"
     local target="$TARGET_BASE_DIR/nvim-$name"
-    
-    echo "Setup $name..."
+
+    log_info "Setup $name..."
     if [[ -d "$target" ]]; then
-        echo "  ✅ $target already exists"
+        log_success "$target already exists"
     else
-        echo "  ⬇️  Cloning $name from $repo to $target..."
+        log_info "Cloning $name from $repo to $target..."
         git clone "$repo" "$target"
         rm -rf "$target/.git"
-        echo "  ✨ Installed $name (and removed .git)"
+        log_success "Installed $name (and removed .git)"
     fi
 }
 
@@ -38,5 +45,5 @@ setup_distro "nvchad" "https://github.com/NvChad/NvChad"
 setup_distro "astrovim" "https://github.com/AstroNvim/AstroNvim"
 
 echo ""
-echo "🎉 All distributions setup!"
-echo "Use 'nvim-switch <distro>' to switch."
+log_success "All distributions setup!"
+log_info "Use 'nvim-switch <distro>' to switch."

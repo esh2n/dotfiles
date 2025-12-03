@@ -1,0 +1,58 @@
+{
+  "extensions": [
+    {
+      "id": "aeblfdkhhhdcdjpifhhbdiojplfjncoa",
+      "name": "1Password",
+      "category": "security",
+      "description": "Password manager"
+    },
+    {
+      "id": "anlikcnbgdeidpacdbdljnabclhahhmd",
+      "name": "Enhanced GitHub",
+      "category": "development",
+      "description": "Display repo size, file sizes, download links"
+    },
+    {
+      "id": "bcjindcccaagfpapjjmafapmmgkkhgoa",
+      "name": "JSON Formatter",
+      "category": "development",
+      "description": "Format and syntax highlight JSON"
+    },
+    {
+      "id": "bggfcpfjbdkhfhfmkjpbhnkhnpjjeomc",
+      "name": "Material Icons for GitHub",
+      "category": "development",
+      "description": "Material design icons for GitHub files"
+    },
+    {
+      "id": "clngdbkpkpeebahjckkjfobafhncgmne",
+      "name": "Stylus",
+      "category": "customization",
+      "description": "User styles manager for custom CSS"
+    },
+    {
+      "id": "dbepggeogbaibhgnhhndojpepiihcmeb",
+      "name": "Vimium",
+      "category": "navigation",
+      "description": "Vim-style keyboard navigation"
+    },
+    {
+      "id": "hlepfoohegkhhmjieoechaddaejaokhf",
+      "name": "Refined GitHub",
+      "category": "development",
+      "description": "Simplify GitHub interface with 200+ features"
+    },
+    {
+      "id": "idgadaccgipmpannjkmfddolnnhmeklj",
+      "name": "Text Blaze",
+      "category": "productivity",
+      "description": "Text expander for templates and snippets"
+    },
+    {
+      "id": "kohnpgjnebgngobifoimegihoblapbnl",
+      "name": "Easy Grouping for Google Calendar",
+      "category": "productivity",
+      "description": "Group and switch between calendars"
+    }
+  ]
+}

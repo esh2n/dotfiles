@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# Editor Extensions Installer
+# VSCode/Cursor 拡張機能インストーラー
+# -----------------------------------------------------------------------------
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+source "${DOTFILES_ROOT}/core/utils/common.sh"
+
+EXTENSIONS_FILE="${SCRIPT_DIR}/../config/vscode/extensions.txt"
+
+# Check if extensions file exists
+if [[ ! -f "$EXTENSIONS_FILE" ]]; then
+    log_error "Extensions file not found: $EXTENSIONS_FILE"
+    exit 1
+fi
+
+# Function to install extensions for a given editor
+install_for_editor() {
+    local editor_cmd="$1"
+    local editor_name="$2"
+
+    if ! has_command "$editor_cmd"; then
+        log_warn "$editor_name is not installed or not in PATH, skipping..."
+        return
+    fi
+
+    log_info "Installing $editor_name extensions from $EXTENSIONS_FILE..."
+
+    local installed=0
+    local failed=0
+
+    # Read extensions file and install each extension
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" =~ ^#.*$ ]] && continue
+
+        # Remove any trailing whitespace/comments
+        extension=$(echo "$line" | sed 's/\s*#.*$//' | xargs)
+
+        if [[ -n "$extension" ]]; then
+            if $editor_cmd --install-extension "$extension" > /dev/null 2>&1; then
+                ((installed++))
+            else
+                log_warn "Failed to install: $extension"
+                ((failed++))
+            fi
+        fi
+    done < "$EXTENSIONS_FILE"
+
+    # Get final count
+    local total_count=$($editor_cmd --list-extensions 2>/dev/null | wc -l | xargs)
+    log_success "$editor_name: $installed installed, $failed failed. Total: $total_count extensions"
+}
+
+# Install for both editors
+install_for_editor "code" "VSCode"
+install_for_editor "cursor" "Cursor"
+
+log_success "Extensions installation complete!"

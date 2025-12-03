@@ -21,11 +21,19 @@ alt-j = 'focus --boundaries all-monitors-outer-frame down'
 alt-k = 'focus --boundaries all-monitors-outer-frame up'
 alt-l = 'focus --boundaries all-monitors-outer-frame right'
 
-# Window movement
+# Window movement (within workspace)
 alt-shift-h = 'move left'
 alt-shift-j = 'move down'
 alt-shift-k = 'move up'
 alt-shift-l = 'move right'
+
+# Move window to different monitor (with focus following)
+alt-ctrl-h = 'move-node-to-monitor --focus-follows-window left'
+alt-ctrl-j = 'move-node-to-monitor --focus-follows-window down'
+alt-ctrl-k = 'move-node-to-monitor --focus-follows-window up'
+alt-ctrl-l = 'move-node-to-monitor --focus-follows-window right'
+alt-ctrl-n = 'move-node-to-monitor --focus-follows-window --wrap-around next'
+alt-ctrl-p = 'move-node-to-monitor --focus-follows-window --wrap-around prev'
 
 # Layout management
 alt-r = 'layout tiles horizontal vertical'
@@ -47,6 +55,7 @@ alt-w = 'workspace W'
 alt-m = 'workspace M'
 alt-b = 'workspace B'
 alt-c = 'workspace C'
+alt-g = 'workspace G'
 alt-n = 'workspace N'
 alt-s = 'workspace S'
 alt-d = 'workspace D'
@@ -63,6 +72,7 @@ alt-shift-w = ['move-node-to-workspace W', 'workspace W']
 alt-shift-m = ['move-node-to-workspace M', 'workspace M']
 alt-shift-b = ['move-node-to-workspace B', 'workspace B']
 alt-shift-c = ['move-node-to-workspace C', 'workspace C']
+alt-shift-g = ['move-node-to-workspace G', 'workspace G']
 alt-shift-n = ['move-node-to-workspace N', 'workspace N']
 alt-shift-s = ['move-node-to-workspace S', 'workspace S']
 alt-shift-d = ['move-node-to-workspace D', 'workspace D']
@@ -106,11 +116,19 @@ run = 'move-node-to-workspace C'
 
 [[on-window-detected]]
 if.app-id = 'com.gather.Gather'
-run = 'move-node-to-workspace C'
+run = 'layout floating'
 
 [[on-window-detected]]
 if.app-id = 'com.mitchellh.ghostty'
-run = 'move-node-to-workspace W'
+run = 'move-node-to-workspace S'
+
+[[on-window-detected]]
+if.app-id = 'dev.warp.Warp-Stable'
+run = 'move-node-to-workspace S'
+
+[[on-window-detected]]
+if.app-id = 'com.github.wez.wezterm'
+run = 'move-node-to-workspace S'
 
 [[on-window-detected]]
 if.app-id = 'notion.id'
@@ -118,7 +136,7 @@ run = 'move-node-to-workspace N'
 
 [[on-window-detected]]
 if.app-id = 'company.thebrowser.dia'
-run = 'move-node-to-workspace D'
+run = 'move-node-to-workspace B'
 
 [[on-window-detected]]
 if.app-id = 'com.hnc.Discord'

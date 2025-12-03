@@ -341,20 +341,32 @@ Keybindings unified across tmux, WezTerm, and Zellij.
 #### AeroSpace Window Manager
 
 **Workspace Design:**
-- W (Work): Cursor, VSCode, Ghostty - Development
-- B (Browser): Chrome, Safari, Firefox
-- C (Communication): Slack, Gather - Recommended for sub-monitor
+- W (Work): Cursor, VSCode - Development
+- S (Shell/Terminal): Ghostty, Warp, WezTerm
+- B (Browser): Chrome, Safari, Firefox, Dia
+- C (Communication): Slack - Recommended for sub-monitor
 - M (Music): Spotify, Apple Music
 - N (Notion): Documentation
-- D (Diagram/Discord): Dia, Discord
+- D (Discord): Discord
+- G (Gather): Reserved (Gather uses floating mode)
 - 1-5: General purpose
-- S: Reserved
+
+**Floating Windows:**
+The following apps use floating mode (not bound to workspaces):
+- Gather: Can be freely moved between monitors
+
+Floating windows appear on top and can be moved to any monitor using the keybinds below.
 
 **Main Mode:**
 
 Window Navigation:
 - `Alt+h/j/k/l` - Focus window (crosses monitor boundaries)
-- `Alt+Shift+h/j/k/l` - Move window
+- `Alt+Shift+h/j/k/l` - Move window within workspace
+
+Multi-Monitor Window Movement:
+- `Alt+Ctrl+h/j/k/l` - Move window to monitor (left/down/up/right)
+- `Alt+Ctrl+n` - Move window to next monitor (wrap-around)
+- `Alt+Ctrl+p` - Move window to previous monitor (wrap-around)
 
 Layout:
 - `Alt+r` - Tiles layout (windows side by side)
@@ -368,13 +380,13 @@ Resize:
 
 Workspaces:
 - `Alt+1-5` - Switch to workspace 1-5
-- `Alt+w/b/c/m/n/s/d` - Switch to named workspace
+- `Alt+w/b/c/g/m/n/s/d` - Switch to named workspace
 - `Alt+Tab` - Previous workspace
 - `Alt+Shift+Tab` - Move workspace to next monitor
 
 Move Window to Workspace:
 - `Alt+Shift+1-5` - Move to workspace and follow
-- `Alt+Shift+w/b/c/m/n/s/d` - Move to named workspace and follow
+- `Alt+Shift+w/b/c/g/m/n/s/d` - Move to named workspace and follow
 
 **Service Mode** (`Alt+Shift+;`):
 - `Esc` - Reload config and return to main mode
@@ -386,6 +398,9 @@ Move Window to Workspace:
 - Default layout: Accordion (single windows use full space)
 - Apps auto-assign to dedicated workspaces
 - Padding: Top 52px (sketchybar 40px + 12px), Horizontal 12px, Vertical 8px
+- Terminals are in Workspace S - use `Alt+s` to access
+- Gather uses floating mode for flexibility across monitors
+- Use `Alt+f` for fullscreen with padding, or `Alt+t` to toggle between floating/tiling
 
 **Multi-Monitor:**
 Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across monitors, then use workspace shortcuts on the focused monitor.
@@ -515,6 +530,12 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 - Git, Docker
 - mise (version manager)
 - Language toolchains (Rust, Go, Node, Python)
+
+### Browser Extensions
+
+9 essential extensions are automatically configured (1Password, Vimium, Stylus, JSON Formatter, Enhanced GitHub, Refined GitHub, Material Icons for GitHub, Text Blaze, Easy Grouping for Google Calendar).
+
+Runs automatically with `./core/install/installer.sh`. Restart Chrome/Dia to install.
 
 ## Safety
 

@@ -59,6 +59,9 @@ domains/dev/config/zellij/layouts/solarized.kdl
 domains/dev/config/cursor/settings.json
 domains/dev/config/codex/config.toml
 
+# Userstyles (generated from templates)
+domains/system/userstyles/gen/
+
 # Lock files and generated state files
 **/lazy-lock.json
 **/lazyvim.json
