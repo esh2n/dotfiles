@@ -1,0 +1,296 @@
+// =============================================================================
+// Shared Theme Palette Library
+// =============================================================================
+// This file contains color definitions for all themes in LESS mixin format.
+// Usage: .palette(@theme); where @theme is the theme name (catppuccin, nord, etc.)
+// =============================================================================
+
+.palette(@theme) when (@theme = catppuccin) {
+  @base: #1e1e2e;
+  @mantle: #181825;
+  @crust: #11111b;
+  @text: #cdd6f4;
+  @subtext1: #bac2de;
+  @subtext0: #a6adc8;
+  @overlay2: #9399b2;
+  @overlay1: #7f849c;
+  @overlay0: #6c7086;
+  @surface2: #585b70;
+  @surface1: #45475a;
+  @surface0: #313244;
+  @red: #f38ba8;
+  @maroon: #eba0ac;
+  @flamingo: #f2cdcd;
+  @green: #a6e3a1;
+  @blue: #89b4fa;
+  @yellow: #f9e2af;
+  @peach: #fab387;
+  @mauve: #cba6f7;
+  @pink: #f5c2e7;
+  @teal: #94e2d5;
+  @sky: #89dceb;
+  @sapphire: #74c7ec;
+  @lavender: #b4befe;
+  @accent: #cba6f7;
+}
+
+.palette(@theme) when (@theme = nord) {
+  @base: #2e3440;
+  @mantle: #2e3440;
+  @crust: #2e3440;
+  @text: #eceff4;
+  @subtext1: #e5e9f0;
+  @subtext0: #d8dee9;
+  @overlay2: #8fbcbb;
+  @overlay1: #81a1c1;
+  @overlay0: #5e81ac;
+  @surface2: #434c5e;
+  @surface1: #3b4252;
+  @surface0: #363d4a;
+  @red: #bf616a;
+  @maroon: #b48ead;
+  @flamingo: #d08770;
+  @green: #a3be8c;
+  @blue: #81a1c1;
+  @yellow: #ebcb8b;
+  @peach: #d08770;
+  @mauve: #b48ead;
+  @pink: #b48ead;
+  @teal: #8fbcbb;
+  @sky: #88c0d0;
+  @sapphire: #81a1c1;
+  @lavender: #5e81ac;
+  @accent: #88c0d0;
+}
+
+.palette(@theme) when (@theme = tokyonight) {
+  @base: #1a1b26;
+  @mantle: #16161e;
+  @crust: #16161e;
+  @text: #c0caf5;
+  @subtext1: #a9b1d6;
+  @subtext0: #9aa5ce;
+  @overlay2: #565f89;
+  @overlay1: #414868;
+  @overlay0: #24283b;
+  @surface2: #414868;
+  @surface1: #24283b;
+  @surface0: #21222d;
+  @red: #f7768e;
+  @maroon: #db4b4b;
+  @flamingo: #ff9e64;
+  @green: #9ece6a;
+  @blue: #7aa2f7;
+  @yellow: #e0af68;
+  @peach: #ff9e64;
+  @mauve: #9d7cd8;
+  @pink: #bb9af7;
+  @teal: #73daca;
+  @sky: #7dcfff;
+  @sapphire: #7aa2f7;
+  @lavender: #b4f9f8;
+  @accent: #7aa2f7;
+}
+
+.palette(@theme) when (@theme = dracula) {
+  @base: #282a36;
+  @mantle: #21222c;
+  @crust: #191a21;
+  @text: #f8f8f2;
+  @subtext1: #e0e0e0;
+  @subtext0: #bfbfbf;
+  @overlay2: #6272a4;
+  @overlay1: #44475a;
+  @overlay0: #383a59;
+  @surface2: #44475a;
+  @surface1: #383a59;
+  @surface0: #2f3241;
+  @red: #ff5555;
+  @maroon: #ff6e67;
+  @flamingo: #ffb86c;
+  @green: #50fa7b;
+  @blue: #bd93f9;
+  @yellow: #f1fa8c;
+  @peach: #ffb86c;
+  @mauve: #bd93f9;
+  @pink: #ff79c6;
+  @teal: #8be9fd;
+  @sky: #8be9fd;
+  @sapphire: #6272a4;
+  @lavender: #ff79c6;
+  @accent: #bd93f9;
+}
+
+.palette(@theme) when (@theme = everforest) {
+  @base: #2e383c;
+  @mantle: #272e33;
+  @crust: #1e2326;
+  @text: #d3c6aa;
+  @subtext1: #c9c0a8;
+  @subtext0: #9da9a0;
+  @overlay2: #859289;
+  @overlay1: #5c6a72;
+  @overlay0: #4f5b58;
+  @surface2: #4f5b58;
+  @surface1: #3d484d;
+  @surface0: #343f43;
+  @red: #e67e80;
+  @maroon: #d3434e;
+  @flamingo: #e69875;
+  @green: #a7c080;
+  @blue: #7fbbb3;
+  @yellow: #dbbc7f;
+  @peach: #e69875;
+  @mauve: #d699b6;
+  @pink: #d699b6;
+  @teal: #83c092;
+  @sky: #7fbbb3;
+  @sapphire: #7fbbb3;
+  @lavender: #d699b6;
+  @accent: #a7c080;
+}
+
+.palette(@theme) when (@theme = gruvbox) {
+  @base: #282828;
+  @mantle: #1d2021;
+  @crust: #1d2021;
+  @text: #ebdbb2;
+  @subtext1: #d5c4a1;
+  @subtext0: #bdae93;
+  @overlay2: #665c54;
+  @overlay1: #504945;
+  @overlay0: #3c3836;
+  @surface2: #504945;
+  @surface1: #3c3836;
+  @surface0: #32302f;
+  @red: #cc241d;
+  @maroon: #9d0006;
+  @flamingo: #fe8019;
+  @green: #b8bb26;
+  @blue: #83a598;
+  @yellow: #fabd2f;
+  @peach: #fe8019;
+  @mauve: #d3869b;
+  @pink: #d3869b;
+  @teal: #8ec07c;
+  @sky: #83a598;
+  @sapphire: #458588;
+  @lavender: #b16286;
+  @accent: #d79921;
+}
+
+.palette(@theme) when (@theme = kanagawa) {
+  @base: #1f1f28;
+  @mantle: #16161d;
+  @crust: #16161d;
+  @text: #dcd7ba;
+  @subtext1: #c8c093;
+  @subtext0: #a6a69c;
+  @overlay2: #727169;
+  @overlay1: #54546d;
+  @overlay0: #2a2a37;
+  @surface2: #54546d;
+  @surface1: #2a2a37;
+  @surface0: #252535;
+  @red: #c34043;
+  @maroon: #e46876;
+  @flamingo: #ff5d62;
+  @green: #76946a;
+  @blue: #7e9cd8;
+  @yellow: #c0a36e;
+  @peach: #ffa066;
+  @mauve: #957fb8;
+  @pink: #d27e99;
+  @teal: #7aa89f;
+  @sky: #7fb4ca;
+  @sapphire: #7e9cd8;
+  @lavender: #938aa9;
+  @accent: #7e9cd8;
+}
+
+.palette(@theme) when (@theme = onedark) {
+  @base: #282c34;
+  @mantle: #21252b;
+  @crust: #1c1f24;
+  @text: #abb2bf;
+  @subtext1: #b6bdca;
+  @subtext0: #828997;
+  @overlay2: #5c6370;
+  @overlay1: #4b5263;
+  @overlay0: #3e4452;
+  @surface2: #4b5263;
+  @surface1: #3e4452;
+  @surface0: #2f333d;
+  @red: #e06c75;
+  @maroon: #be5046;
+  @flamingo: #e5c07b;
+  @green: #98c379;
+  @blue: #61afef;
+  @yellow: #e5c07b;
+  @peach: #d19a66;
+  @mauve: #c678dd;
+  @pink: #c678dd;
+  @teal: #56b6c2;
+  @sky: #56b6c2;
+  @sapphire: #61afef;
+  @lavender: #c678dd;
+  @accent: #61afef;
+}
+
+.palette(@theme) when (@theme = rosepine) {
+  @base: #191724;
+  @mantle: #1f1d2e;
+  @crust: #191724;
+  @text: #e0def4;
+  @subtext1: #908caa;
+  @subtext0: #6e6a86;
+  @overlay2: #524f67;
+  @overlay1: #403d52;
+  @overlay0: #26233a;
+  @surface2: #403d52;
+  @surface1: #26233a;
+  @surface0: #1f1d2e;
+  @red: #eb6f92;
+  @maroon: #b4637a;
+  @flamingo: #ebbcba;
+  @green: #31748f;
+  @blue: #31748f;
+  @yellow: #f6c177;
+  @peach: #f6c177;
+  @mauve: #c4a7e7;
+  @pink: #ebbcba;
+  @teal: #9ccfd8;
+  @sky: #9ccfd8;
+  @sapphire: #31748f;
+  @lavender: #c4a7e7;
+  @accent: #c4a7e7;
+}
+
+.palette(@theme) when (@theme = solarized) {
+  @base: #002b36;
+  @mantle: #001e26;
+  @crust: #00141a;
+  @text: #839496;
+  @subtext1: #93a1a1;
+  @subtext0: #657b83;
+  @overlay2: #586e75;
+  @overlay1: #073642;
+  @overlay0: #002b36;
+  @surface2: #073642;
+  @surface1: #002b36;
+  @surface0: #04303b;
+  @red: #dc322f;
+  @maroon: #cb4b16;
+  @flamingo: #d33682;
+  @green: #859900;
+  @blue: #268bd2;
+  @yellow: #b58900;
+  @peach: #cb4b16;
+  @mauve: #6c71c4;
+  @pink: #d33682;
+  @teal: #2aa198;
+  @sky: #2aa198;
+  @sapphire: #268bd2;
+  @lavender: #6c71c4;
+  @accent: #268bd2;
+}

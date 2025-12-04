@@ -29,6 +29,7 @@ log/
 **/claude/file-history/
 **/claude/ide/
 **/claude/local/
+**/claude/plans/
 **/claude/plugins/
 **/claude/projects/
 **/claude/shell-snapshots/
