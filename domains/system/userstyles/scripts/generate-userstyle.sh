@@ -14,6 +14,9 @@ DOTFILES_ROOT="$(cd "$USERSTYLES_DIR/../../.." && pwd)"
 
 source "$DOTFILES_ROOT/core/utils/common.sh"
 
+# Ensure gen directory exists
+mkdir -p "$GEN_DIR"
+
 # Service selection (default: github for backwards compatibility)
 SERVICE="${1:-github}"
 

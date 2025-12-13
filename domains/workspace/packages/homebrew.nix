@@ -5,6 +5,7 @@
   ];
 
   homebrew.casks = [
+    "azookey"
     "karabiner-elements"
     "aerospace"
     "displaylink"

@@ -15,6 +15,9 @@ DOTFILES_ROOT="$(cd "$USERSTYLES_DIR/../../.." && pwd)"
 
 source "$DOTFILES_ROOT/core/utils/common.sh"
 
+# Ensure gen directory exists
+mkdir -p "$GEN_DIR"
+
 # Extract metadata from UserCSS file
 extract_metadata() {
   local file="$1"

@@ -82,7 +82,7 @@ install_userstyles() {
     fi
 
     # Generate userstyles
-    local script="${SCRIPT_DIR}/userstyles/scripts/generate-userstyles.sh"
+    local script="${SCRIPT_DIR}/userstyles/scripts/generate-userstyle.sh"
 
     if [[ ! -f "$script" ]]; then
         log_warn "Userstyles generation script not found: $script"
@@ -90,7 +90,7 @@ install_userstyles() {
     fi
 
     # Generate userstyles for all themes
-    if bash "$script" --all; then
+    if bash "$script" all; then
         log_success "Userstyles generated for all themes"
     else
         log_warn "Userstyles generation failed (non-critical)"
