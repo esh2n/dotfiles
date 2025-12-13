@@ -1,0 +1,92 @@
+    #session input,
+    #session button {
+      background: @surface0;
+      color: @subtext0;
+    }
+
+    #session .user-menu {
+      a:focus,
+      a:hover,
+      button:focus,
+      button:hover,
+      input:focus,
+      input:hover {
+        color: @crust;
+        background-color: @accent;
+      }
+    }
+
+    .notice,
+    .notice p,
+    h2 {
+      color: @subtext1;
+    }
+
+    .notice.error {
+      background: fade(@red, 20%);
+      border-color: fade(@red, 25%);
+    }
+
+    // report page? why isn't this themed
+    .ResponsiveLayout--Night .PageContainer {
+      background-color: @base;
+    }
+
+    .list-explanation {
+      color: @subtext0;
+    }
+
+    .ResponsiveLayout--Night .list-btn {
+      &:first-of-type {
+        border-top-color: @mantle;
+      }
+
+      &:hover {
+        background-color: @mantle;
+      }
+    }
+
+    .submit-btn {
+      background-color: @accent;
+      color: @crust;
+      border-color: darken(@accent, 10%);
+    }
+
+    .submit-btn:hover,
+    .redirect-btn:hover {
+      background-color: darken(@accent, 10%);
+    }
+
+    .block-btn {
+      color: @maroon;
+      border-color: @maroon;
+    }
+
+    .mute-btn,
+    .unfollow-btn,
+    .email-report-btn {
+      color: @accent;
+      border-color: @accent;
+    }
+
+    .list-btn {
+      border-color: @surface1;
+
+      &:first-of-type {
+        border-top-color: @surface1;
+      }
+
+      &:hover {
+        background-color: @surface0;
+      }
+    }
+
+    // authorize page
+    .js #session .user-menu {
+      background-color: @surface0;
+    }
+
+    .dropdown-caret .caret-outer,
+    .dropdown-caret .caret-inner {
+      border-bottom-color: @surface0;
+    }

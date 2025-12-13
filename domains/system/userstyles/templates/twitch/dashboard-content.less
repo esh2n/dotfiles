@@ -1,0 +1,224 @@
+    & {
+      --color-background-float: @base;
+    }
+
+    .simplebar-content {
+      background-color: @mantle;
+    }
+
+    .scrollable-area--suppress-scroll-x > .simplebar-scroll-content,
+    .scrollable-area--suppress-scroll-x
+      > .simplebar-scroll-content
+      > .simplebar-content {
+      background-color: @base;
+    }
+
+    .sunlight-page .simplebar-scroll-content .simplebar-content {
+      background-color: @base;
+    }
+    .info_box_row {
+      background: @crust;
+    }
+    .info_box_row_label {
+      color: @text;
+    }
+    .video-card-thumbnail__video-state-overlay {
+      color: @text !important;
+      background: fade(@mantle, 80%) !important;
+    }
+
+    /* Twitch alerts */
+
+    .alerts-home-main-wrapper {
+      color: @text !important;
+    }
+
+    .alerts-home-scrollable-area,
+    .alert-boxes-section-border-container {
+      color: @text !important;
+      .simplebar-content {
+        background: @mantle !important;
+      }
+      .alert-set-card {
+        background: @crust !important;
+      }
+    }
+
+    /* Analytics */
+
+    .top-stats-tab--active {
+      color: @accent !important;
+      box-shadow: 0 calc(var(--border-width-default) * -3) 0 @accent inset;
+      .top-stats-tab__title {
+        color: @accent !important;
+      }
+    }
+
+    .top-stats-tab:hover {
+      box-shadow: inset 0 -2px 0 @accent, 0 4px 6px -4px @accent;
+      background: @base !important;
+    }
+
+    /* Stream Manager */
+
+    .stream-manager--page-view {
+      .mosaic-tile .simplebar-content,
+      .stream-manager-edit-mode-item,
+      .stream-manager-edit-mode-stat-item {
+        background: @mantle !important;
+      }
+    }
+
+    /* Autohost / managed channels list */
+
+    .dashboard-centered-page {
+      --color-background-alt: @base;
+      .simplebar-scroll-content,
+      .simplebar-content {
+        background: transparent !important;
+      }
+
+      .autohost-list-item--hovered {
+        color: @text;
+        background: @base;
+
+        button svg path {
+          fill: @text !important;
+        }
+      }
+    }
+
+    /* Research */
+
+    .time-to-stream-tab--active {
+      box-shadow: 0 calc(var(--border-width-default) * -3) 0 @accent inset;
+    }
+
+    /* Collection thumbnails */
+
+    .collection-preview-image__wrapper {
+      color: @text !important;
+      background: linear-gradient(
+        90deg,
+        fade(@mantle, 0%),
+        fade(@mantle, 100%) 75%
+      );
+    }
+
+    /* AutoMod shadow */
+
+    .automod-level-controls__categories--bottom::after {
+      background-image: linear-gradient(fade(@mantle, 0%), @mantle);
+    }
+
+    /* Tables */
+
+    .tw-table,
+    .tw-table-heading {
+      border-color: @surface0;
+      background: @crust;
+    }
+
+    /* Achievements & activity page */
+
+    .ach-sb,
+    .activity-page__scrollable .simplebar-content {
+      background: @mantle !important;
+    }
+
+    /* Clips player background */
+
+    .clips-player-container {
+      background: @crust;
+    }
+
+    .clmgr-table__row {
+      &:hover {
+        background: @surface0 !important;
+      }
+    }
+
+    /* Announcements button */
+
+    .announcements-icon--green svg {
+      fill: @green !important;
+    }
+
+    /* Achievements */
+
+    .ach-q-item {
+      &.ach-q-item--expanded {
+        box-shadow: 0 0 0 1px @accent;
+      }
+
+      [data-test-selector="is-affiliate-banner"] {
+        span,
+        a {
+          color: @base !important;
+        }
+      }
+
+      .quest-progress-bars__incomplete {
+        background-color: @surface0 !important;
+      }
+    }
+
+    [data-target="video-card"] {
+      background: @mantle !important;
+    }
+
+    /* Stream Manager quick actions */
+
+    .quick-action,
+    .quick-actions-store-card-layout--top {
+      color: @base;
+
+      &.quick-action--purple,
+      &.quick-actions-store-card-layout--purple {
+        background-color: @mauve;
+      }
+
+      &.quick-action--blue,
+      &.quick-actions-store-card-layout--blue {
+        background-color: @blue;
+      }
+
+      &.quick-action--magenta,
+      &.quick-actions-store-card-layout--magenta {
+        background-color: @pink;
+      }
+
+      &.quick-action--green,
+      &.quick-actions-store-card-layout--green {
+        background-color: @green;
+      }
+
+      &.quick-action--red,
+      &.quick-actions-store-card-layout--red {
+        background-color: @red;
+      }
+
+      &.quick-action-layout--disabled {
+        color: @subtext0;
+        background-color: @surface0;
+      }
+    }
+
+    /* Stream Manager statistics */
+    .sunlight-tile {
+      background-color: @crust;
+    }
+
+    .creator-home-card__icon-background--yellow {
+      background-color: @yellow;
+    }
+
+    .stream-manager--page-view .mosaic-window-body,
+    .sunlight-expanded-nav-drop-down-menu-layout__scrollable-area,
+    .sunlight-collapsed-nav-drop-down-menu__scrollable-area {
+      background-color: @mantle;
+    }
+
+    [class*="progressContainer--"] {
+      background-color: @surface0;
+    }

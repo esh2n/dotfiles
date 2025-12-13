@@ -1,0 +1,75 @@
+      background: @mantle;
+
+    #header {
+      color: @subtext0;
+      background: @base;
+      border-bottom-color: @surface1;
+
+      .logo a {
+        border-bottom-color: transparent;
+      }
+
+      #session {
+        a {
+          background: transparent;
+          color: @subtext0;
+        }
+
+        h2 img {
+          border-color: @surface1;
+        }
+      }
+    }
+
+    .footer {
+      background: @mantle;
+      border-top-color: @surface1;
+    }
+
+    .auth h2 {
+      color: @subtext1;
+    }
+
+    .oauth #bd {
+      border-color: @surface1;
+    }
+
+    .app-info h3 img {
+      border-color: @base;
+    }
+
+    .permissions.allow strong {
+      color: @green;
+    }
+
+    .button {
+      background: @overlay0;
+      color: @text;
+      border-color: @surface1;
+
+      &:hover {
+        color: @text;
+        border-color: @surface1;
+        background: darken(@surface2, 10%);
+      }
+    }
+
+    .button.selected,
+    .follow-button .unfollow .button {
+      background-color: @accent;
+      color: @crust;
+      border-color: darken(@accent, 10%);
+
+      &:hover {
+        background-color: darken(@accent, 10%);
+      }
+
+      .app-info,
+      #bd h3 {
+        color: @subtext0;
+      }
+
+      #ft {
+        color: @overlay0;
+      }
+    }

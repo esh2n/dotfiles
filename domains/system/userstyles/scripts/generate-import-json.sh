@@ -4,7 +4,7 @@ set -euo pipefail
 # =============================================================================
 # Import JSON Generator for Multi-Service Userstyles
 # =============================================================================
-# Generates import.json containing all service userstyles (GitHub, YouTube)
+# Generates import.json containing all service userstyles (32 services)
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -184,7 +184,11 @@ EOF
 
   # Generate entries for each service
   local entry_id=1
-  for service in github youtube; do
+  for service in github youtube chatgpt \
+    nixos-search devdocs startpage brave-search mdn claude crates.io docs.rs \
+    react.dev perplexity mastodon reddit pypi stackoverflow spotify-web \
+    linkedin bsky npm whatsapp-web google gmail google-drive google-photos \
+    google-gemini instagram twitter twitch go.dev duckduckgo; do
     local file="$GEN_DIR/${service}.user.less"
 
     if [[ -f "$file" ]]; then

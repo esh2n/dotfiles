@@ -1,0 +1,166 @@
+    @accentContent: @crust;
+
+    @emphasize: 10%;
+    @deemphasize: 30%;
+    @bubble-surface-deemp: 20%;
+
+    @scrim: 30%;
+    @pressed: 20%;
+
+    #WDS(accent, @accent);
+    #WDS(accent-deemphasized, fade(@accent, @deemphasize));
+    #WDS(accent-emphasized, lighten(@accent, @emphasize));
+
+    #WDS(secondary-negative, @red);
+    #WDS(secondary-negative-deemphasized, fade(@red, @deemphasize));
+    #WDS(secondary-negative-emphasized, @red);
+
+    #WDS(secondary-positive, @green);
+    #WDS(secondary-positive-deemphasized, fade(@green, @deemphasize));
+
+    #WDS(secondary-warning, @yellow);
+    #WDS(secondary-warning-deemphasized, fade(@yellow, @deemphasize));
+
+    #WDS(content-default, @text);
+    #WDS(content-deemphasized, @overlay2);
+    #WDS(content-disabled, fade(@text, 50%));
+
+    #WDS(content-on-accent, @accentContent);
+    #WDS(content-action-default, @accent);
+    #WDS(content-action-emphasized, lighten(@accent, @emphasize));
+    #WDS(content-external-link, @blue);
+    #WDS(content-inverse, @crust);
+    #WDS(content-read, @blue);
+
+    #WDS(background-wash-inset, @crust);
+    #WDS(background-wash-plain, @crust);
+    #WDS(background-elevated-wash-plain, @crust);
+    #WDS(background-elevated-wash-inset, @crust);
+    #WDS(background-dimmer, fade(#000, @scrim));
+
+    #WDS(surface-default, @mantle);
+    #WDS(surface-emphasized, @base);
+    #WDS(surface-elevated-default, @base);
+    #WDS(surface-elevated-emphasized, mix(@text, @base, @emphasize));
+    #WDS(surface-highlight, fade(@text, @pressed));
+    #WDS(surface-inverse, @text);
+    #WDS(surface-pressed, fade(@text, @pressed));
+
+    #WDS(lines-divider, fade(@text, 10%));
+    #WDS(lines-outline-default, @overlay0);
+    #WDS(lines-outline-deemphasized, fade(@text, @deemphasize));
+
+    #WDS(persistent-activity-indicator, fade(@green, 90%));
+    #WDS(persistent-always-black, #000);
+    #WDS(persistent-always-white, #fff);
+    #WDS(persistent-always-branded, @accent);
+
+    #WDS(
+      systems-bubble-surface-incoming,
+      @base,
+    );
+
+    #WDS(
+      systems-bubble-surface-outgoing,
+      mix(@accent, @base, @bubble-surface-deemp),
+    );
+    #WDS(systems-bubble-content-deemphasized, fade(@text, 50%));
+
+    #WDS(systems-bubble-surface-overlay, @mantle);
+    #WDS(systems-bubble-surface-system, @mantle);
+
+    #WDS(
+      systems-bubble-surface-e2e,
+      mix(@yellow, @mantle, @bubble-surface-deemp),
+    );
+    #WDS(systems-bubble-content-e2e, @yellow);
+
+    #WDS(
+      systems-bubble-surface-business,
+      mix(@teal, @mantle, @bubble-surface-deemp),
+    );
+
+    #WDS(systems-chat-surface-composer, @base);
+    #WDS(systems-chat-background-wallpaper, @crust);
+    #WDS(systems-chat-foreground-wallpaper, @mantle);
+    #WDS(systems-chat-surface-tray, @base);
+    #WDS(systems-status-seen, fade(@text, 50%));
+
+    #WDS(components-platform-gesture-bar, fade(@crust, 50%));
+    #WDS(components-platform-status-bar, fade(@crust, 80%));
+    #WDS(components-surface-nav-bar, @base);
+
+    #WDS(app-wash, @surface0);
+
+    #WDS(white, @crust);
+    #RGB(white, @crust);
+
+    #RGB(attachment-type-stickers-color, @green);
+    #RGB(attachment-type-polls-color, @yellow);
+    #RGB(attachment-type-contacts-color, @sky);
+    #RGB(attachment-type-camera-color, @pink);
+    #RGB(attachment-type-photos-color, @blue);
+    #RGB(attachment-type-documents-color, @mauve);
+    #RGB(attachment-type-audio-color, @peach);
+    /* \/ Note: Seems to be overwritten by a generated
+    CSS variable, so has no effect :( */
+    #RGB(attachment-type-event-color, @pink);
+
+    #RGB(toast-background, @surface1);
+    #RGB(toast-text, @text);
+
+    #RGB(picker-background, @surface1);
+
+    #RGB(butterbar-blue-nux-background, @sky);
+    #RGB(butterbar-blue-nux-icon-background, darken(@sky, 30%));
+    #RGB(blue-light, @blue);
+
+    #RGB(gray-500, @overlay2);
+
+    #RGB(focus-animation, mix(@accent, @base, 40%));
+    #RGB(focus-animation-deeper, mix(@accent, @base, 30%));
+
+    #RGB(startup-icon, @surface1);
+    #RGB(startup-background, @crust);
+
+    #RGB(progress-background, @surface0);
+
+    /* "About AI messages" icon */
+    .st0 {
+      fill: @accent !important;
+      stroke: @surface0;
+    }
+
+    /* TODO: Meta AI/other bot colours */
+
+    input[type="time"]::-webkit-datetime-edit-hour-field:focus,
+    input[type="time"]::-webkit-datetime-edit-minute-field:focus,
+    input[type="time"]::-webkit-datetime-edit-second-field:focus,
+    input[type="time"]::-webkit-datetime-edit-ampm-field:focus,
+    input[type="date"]::-webkit-datetime-edit-year-field:focus,
+    input[type="date"]::-webkit-datetime-edit-month-field:focus,
+    input[type="date"]::-webkit-datetime-edit-day-field:focus {
+      background-color: @accent;
+      color: @accentContent;
+    }
+
+    [data-icon="wa-wordmark-refreshed"] path {
+      fill: currentcolor;
+    }
+
+    /* Toasts */
+    #wa-popovers-bucket
+      + span
+      > div
+      button:nth-of-type(1):not(:has(> [data-icon="x-alt"])) {
+      color: var(--WDS-accent-emphasized);
+    }
+
+    /* Date picker */
+    #RGB(date-picker-text-color, @text);
+    .react-calendar__tile:disabled {
+      color: @subtext0;
+    }
+    .react-calendar__month-view__days__day--neighboringMonth {
+      color: @overlay2;
+    }

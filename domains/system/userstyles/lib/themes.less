@@ -21,6 +21,7 @@
   @red: #f38ba8;
   @maroon: #eba0ac;
   @flamingo: #f2cdcd;
+  @rosewater: #f5e0dc;
   @green: #a6e3a1;
   @blue: #89b4fa;
   @yellow: #f9e2af;
@@ -32,6 +33,12 @@
   @sapphire: #74c7ec;
   @lavender: #b4befe;
   @accent: #cba6f7;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @red-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
 }
 
 .palette(@theme) when (@theme = nord) {
@@ -50,6 +57,7 @@
   @red: #bf616a;
   @maroon: #b48ead;
   @flamingo: #d08770;
+  @rosewater: #d08770;
   @green: #a3be8c;
   @blue: #81a1c1;
   @yellow: #ebcb8b;
@@ -61,6 +69,12 @@
   @sapphire: #81a1c1;
   @lavender: #5e81ac;
   @accent: #88c0d0;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = tokyonight) {
@@ -79,6 +93,7 @@
   @red: #f7768e;
   @maroon: #db4b4b;
   @flamingo: #ff9e64;
+  @rosewater: #ff9e64;
   @green: #9ece6a;
   @blue: #7aa2f7;
   @yellow: #e0af68;
@@ -90,6 +105,12 @@
   @sapphire: #7aa2f7;
   @lavender: #b4f9f8;
   @accent: #7aa2f7;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = dracula) {
@@ -108,6 +129,7 @@
   @red: #ff5555;
   @maroon: #ff6e67;
   @flamingo: #ffb86c;
+  @rosewater: #ffb86c;
   @green: #50fa7b;
   @blue: #bd93f9;
   @yellow: #f1fa8c;
@@ -119,6 +141,12 @@
   @sapphire: #6272a4;
   @lavender: #ff79c6;
   @accent: #bd93f9;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = everforest) {
@@ -148,6 +176,12 @@
   @sapphire: #7fbbb3;
   @lavender: #d699b6;
   @accent: #a7c080;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = gruvbox) {
@@ -166,6 +200,7 @@
   @red: #cc241d;
   @maroon: #9d0006;
   @flamingo: #fe8019;
+  @rosewater: #fe8019;
   @green: #b8bb26;
   @blue: #83a598;
   @yellow: #fabd2f;
@@ -177,6 +212,12 @@
   @sapphire: #458588;
   @lavender: #b16286;
   @accent: #d79921;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = kanagawa) {
@@ -206,6 +247,12 @@
   @sapphire: #7e9cd8;
   @lavender: #938aa9;
   @accent: #7e9cd8;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = onedark) {
@@ -235,6 +282,12 @@
   @sapphire: #61afef;
   @lavender: #c678dd;
   @accent: #61afef;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = rosepine) {
@@ -253,6 +306,7 @@
   @red: #eb6f92;
   @maroon: #b4637a;
   @flamingo: #ebbcba;
+  @rosewater: #ebbcba;
   @green: #31748f;
   @blue: #31748f;
   @yellow: #f6c177;
@@ -264,6 +318,12 @@
   @sapphire: #31748f;
   @lavender: #c4a7e7;
   @accent: #c4a7e7;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
 }
 
 .palette(@theme) when (@theme = solarized) {
@@ -282,6 +342,7 @@
   @red: #dc322f;
   @maroon: #cb4b16;
   @flamingo: #d33682;
+  @rosewater: #d33682;
   @green: #859900;
   @blue: #268bd2;
   @yellow: #b58900;
@@ -293,4 +354,82 @@
   @sapphire: #268bd2;
   @lavender: #6c71c4;
   @accent: #268bd2;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
+}
+
+.palette(@theme) when (@theme = everforest) {
+  @base: #2b3339;
+  @mantle: #232a2e;
+  @crust: #1e2326;
+  @text: #d3c6aa;
+  @subtext1: #d3c6aa;
+  @subtext0: #a7c080;
+  @overlay2: #859289;
+  @overlay1: #7a8478;
+  @overlay0: #56635f;
+  @surface2: #4f585e;
+  @surface1: #3d484d;
+  @surface0: #343f44;
+  @red: #e67e80;
+  @maroon: #d699b6;
+  @flamingo: #dbbc7f;
+  @green: #a7c080;
+  @blue: #7fbbb3;
+  @yellow: #dbbc7f;
+  @peach: #e69875;
+  @mauve: #d699b6;
+  @pink: #d699b6;
+  @teal: #83c092;
+  @sky: #7fbbb3;
+  @sapphire: #7fbbb3;
+  @lavender: #a7c080;
+  @accent: #a7c080;
+  @rosewater: #d699b6;
+  @text-filter: invert(1);
+  @crust-filter: invert(1);
+  @yellow-filter: invert(1);
+  @darkenShadows: 1;
+  @colorizeLogo: 1;
+  @red-filter: invert(1);
+}
+
+// Helper functions
+#lib {
+  .rgbify(@color) {
+    @result: red(@color), green(@color), blue(@color);
+  }
+
+  .css-variables() {
+    --theme-base: @base;
+    --theme-mantle: @mantle;
+    --theme-crust: @crust;
+    --theme-text: @text;
+    --theme-subtext1: @subtext1;
+    --theme-subtext0: @subtext0;
+    --theme-overlay2: @overlay2;
+    --theme-overlay1: @overlay1;
+    --theme-overlay0: @overlay0;
+    --theme-surface2: @surface2;
+    --theme-surface1: @surface1;
+    --theme-surface0: @surface0;
+    --theme-red: @red;
+    --theme-maroon: @maroon;
+    --theme-flamingo: @flamingo;
+    --theme-green: @green;
+    --theme-blue: @blue;
+    --theme-yellow: @yellow;
+    --theme-peach: @peach;
+    --theme-mauve: @mauve;
+    --theme-pink: @pink;
+    --theme-teal: @teal;
+    --theme-sky: @sky;
+    --theme-sapphire: @sapphire;
+    --theme-lavender: @lavender;
+    --theme-accent: @accent;
+  }
 }

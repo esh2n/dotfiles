@@ -1,0 +1,174 @@
+      #left-side {
+        .slide-content {
+          background-color: @base;
+
+          a {
+            color: @accent;
+          }
+
+          code {
+            background-color: @accent !important;
+            color: @crust;
+          }
+
+          h2,
+          li,
+          p {
+            color: @text;
+          }
+
+          pre {
+            background-color: @mantle;
+            color: @text;
+          }
+        }
+
+        .module-bar {
+          background-color: @mantle;
+          color: @text;
+
+          a {
+            color: @accent;
+          }
+        }
+      }
+
+      #right-side {
+        background-color: @base;
+
+        #explorer {
+          background-color: @mantle;
+        }
+
+        #file-editor {
+          .CodeMirror {
+            background-color: @base;
+
+            .CodeMirror-lines {
+              background-color: @base;
+              color: @text;
+
+              .CodeMirror-linenumber {
+                color: @overlay1;
+              }
+
+              span.cm-atom {
+                color: @blue;
+              }
+
+              span.cm-comment {
+                color: @peach;
+              }
+
+              span.cm-keyword {
+                color: @mauve;
+              }
+
+              span.cm-number {
+                color: @green;
+              }
+
+              span.cm-string {
+                color: @red;
+              }
+
+              span.cm-variable {
+                color: @text;
+              }
+            }
+          }
+
+          .CodeMirror-gutters {
+            background-color: @mantle;
+            border-right-color: @surface2;
+          }
+        }
+
+        #file-menu {
+          background-color: @mantle;
+        }
+
+        .output {
+          background-color: @base;
+
+          span.stdout {
+            color: @subtext0;
+          }
+
+          span.system {
+            color: @text;
+          }
+        }
+
+        a {
+          background-color: @text;
+          color: @crust;
+        }
+
+        a#run {
+          background-color: @accent;
+        }
+
+        pre.info {
+          background-color: @surface0 !important;
+        }
+      }
+
+      div[vertical-slide],
+      div[horizontal-slide] {
+        background-color: @surface2;
+      }
+    }
+
+    .toc {
+      background-color: @base;
+
+      .toc-page.ng-scope {
+        background-color: @mantle;
+        color: @text;
+      }
+
+      .toc-module.ng-scope {
+        background-color: @mantle;
+        span.ng-binding {
+          background-color: @base;
+          color: @accent;
+        }
+
+        .toc-lesson span.ng-binding {
+          background-color: @mantle;
+          color: @text;
+        }
+      }
+    }
+
+    .top-bar {
+      background-color: @crust;
+      color: @text;
+
+      span.nav {
+        svg {
+          fill: @text;
+        }
+      }
+    }
+
+    .wrapper.ng-scope {
+      background-color: @base;
+
+      .container {
+        background-color: @base;
+
+        .lesson.ng-scope {
+          background-color: @mantle;
+        }
+
+        h1,
+        p {
+          color: @text;
+        }
+
+        a {
+          color: @accent;
+        }
+      }

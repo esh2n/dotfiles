@@ -1,0 +1,306 @@
+    &,
+    body {
+      color: @text !important;
+      background: @base;
+      --primary-medium: @text;
+      --primary-low: @surface0;
+      scrollbar-color: @surface0 @mantle;
+    }
+
+    a.btn,
+    button.btn {
+      border-color: @accent;
+      background: @accent !important;
+      color: @base !important;
+    }
+
+    a.btn:hover,
+    button.btn:hover {
+      background: fade(@accent, 80%) !important;
+    }
+
+    /* Recent announcements */
+    .topics-list .topic-list-item .main-link a {
+      color: @accent;
+    }
+
+    .topic-created-at,
+    .topic-last-posted-at,
+    .topic-like-count,
+    .topic-post-count {
+      color: @subtext0 !important;
+    }
+
+    /* Header */
+    .nav__container,
+    .dev-top-nav {
+      background: @crust !important;
+
+      .tw-link,
+      .dev-top-nav__nav-items-container {
+        color: @text !important;
+        background: @crust !important;
+      }
+      .online {
+        border-color: @crust !important;
+      }
+      a.btn.light {
+        background: fade(@accent, 10%) !important;
+        color: @text !important;
+      }
+      .nav__links a {
+        color: @text;
+
+        &:hover {
+          color: @subtext0;
+        }
+        &.active {
+          color: @accent;
+          border-color: @accent;
+        }
+      }
+      .nav__logo svg path {
+        fill: @text;
+      }
+    }
+
+    /* Footers */
+    .footer,
+    .dev-footer,
+    .subscribe-footer {
+      h5,
+      p,
+      a,
+      div {
+        color: @text !important;
+      }
+      a:hover {
+        color: @accent !important;
+      }
+
+      svg path {
+        fill: @text !important;
+      }
+
+      background: @crust;
+    }
+
+    .bright-cta {
+      * {
+        color: @mantle !important;
+      }
+      background: @accent;
+    }
+    .content-alternate-2 {
+      background: @base;
+    }
+
+    .sandbox-tab {
+      color: @text !important;
+    }
+
+    .why-twitch ul li {
+      background: @base;
+      border-color: @surface0 !important;
+    }
+
+    .sandbox-tab.active {
+      color: @accent !important;
+      border-color: @accent !important;
+    }
+
+    .hero,
+    .extension-cta,
+    .subscribe-footer {
+      background: @mantle;
+    }
+
+    thead tr th {
+      border-color: @surface0;
+      background: @mantle;
+    }
+
+    tbody tr td {
+      border-color: @surface0;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: @base !important;
+    }
+    tbody tr:nth-child(even) {
+      background: @mantle !important;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    hr {
+      color: @text !important;
+      border-color: @surface0 !important;
+    }
+
+    .right-code {
+      p {
+        color: @subtext0;
+      }
+      background-color: @base !important;
+    }
+
+    blockquote {
+      border-color: @accent;
+      background: @mantle;
+    }
+
+    .content,
+    .main,
+    .topics-list,
+    .doc-content {
+      background: @base;
+      border-color: @base !important;
+      a {
+        color: @accent;
+      }
+      border-bottom-color: @surface0 !important;
+      border-image: none;
+      -webkit-border-image: none;
+    }
+
+    code {
+      border-color: @accent !important;
+      background: fade(@accent, 5%) !important;
+      color: @text !important;
+    }
+
+    /* Code */
+    .right-code pre,
+    pre.highlight,
+    pre {
+      border-color: @mantle !important;
+      background: @mantle !important;
+      code {
+        background: transparent !important;
+        color: @text !important;
+      }
+    }
+
+    /* Pills */
+    .pill-new {
+      color: @base !important;
+      background: @accent !important;
+    }
+    .pill-beta {
+      color: @base !important;
+      background: @yellow !important;
+    }
+
+    /* Navbar */
+    .sidebar {
+      background: @mantle !important;
+      dl {
+        border-color: @base !important;
+      }
+      dt a,
+      dl dd a {
+        color: @text !important;
+      }
+      dl dd a.active-highlight {
+        color: @accent !important;
+      }
+      dl dd a.active-highlight::before {
+        border-left-color: @accent !important;
+      }
+      dt a:hover {
+        background: @base !important;
+      }
+
+      /* Search */
+
+      input {
+        color: @text;
+        &::placeholder {
+          color: @subtext0;
+        }
+        &:focus {
+          background: @crust !important;
+          box-shadow: 0 0 3px 1px fade(@accent, 70%);
+          color: @text;
+        }
+      }
+
+      .search-icon svg path {
+        fill: @text !important;
+      }
+
+      .algolia-autocomplete {
+        .algolia-docsearch-suggestion--category-header {
+          color: @text !important;
+          background: @mantle !important;
+          border-color: @base !important;
+        }
+
+        .algolia-docsearch-suggestion--highlight {
+          background: @accent !important;
+          color: @base !important;
+        }
+
+        .algolia-docsearch-suggestion--content {
+          background: @mantle !important;
+        }
+
+        .algolia-docsearch-suggestion--title {
+          color: @text !important;
+        }
+
+        .algolia-docsearch-suggestion--text {
+          color: @subtext0 !important;
+        }
+
+        .ds-suggestion.ds-cursor .algolia-docsearch-suggestion--content {
+          .algolia-docsearch-suggestion--title,
+          .algolia-docsearch-suggestion--text {
+            background: @crust !important;
+            .algolia-docsearch-suggestion--highlight {
+              background: @base !important;
+            }
+          }
+        }
+      }
+    }
+
+    ul.grid li.story {
+      h4 a,
+      a.btn {
+        color: @text !important;
+      }
+      a {
+        color: @accent !important;
+      }
+      .story__links a {
+        color: @base !important;
+      }
+
+      border-color: @surface0;
+    }
+
+    .submission .relative .outer {
+      background: @mantle;
+
+      svg path {
+        fill: @text;
+      }
+      button {
+        border-color: @accent !important;
+      }
+
+      .tag button {
+        background: @accent !important;
+        border-color: @accent !important;
+      }
+
+      .author {
+        color: @subtext0 !important;
+      }
+    }

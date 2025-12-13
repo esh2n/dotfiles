@@ -1,0 +1,847 @@
+        code.hljs {
+          background: none !important;
+        }
+        pre {
+          .bg-token-main-surface-secondary {
+            background-color: @surface0;
+          }
+          .bg-gray-950 {
+            background-color: @crust;
+          }
+          .text-token-text-secondary {
+            color: @subtext0;
+          }
+        }
+    
+        code[class*="language-"] {
+          color: @text;
+        }
+    
+        .dark\:bg-token-main-surface-secondary:is(.dark *) {
+          background-color: @surface0;
+        }
+    
+        .dark\:bg-gray-950:is(.dark *) {
+          background-color: @mantle;
+        }
+    
+        color: @text;
+    
+        @white: @text;
+        @black: @crust;
+        --white: @white;
+        --black: @black;
+    
+        --gray-50: lighten(mix(@text, @subtext0), 5%);
+        --gray-100: @text;
+        --gray-200: @subtext1;
+        --gray-300: @overlay2;
+        --gray-400: @overlay0;
+        --gray-500: @surface2;
+        --gray-600: @surface1;
+        --gray-700: @surface0;
+        --gray-750: @surface0;
+        --gray-800: @base;
+        --gray-900: @mantle;
+        --gray-950: @crust;
+        --brand-purple: @accent;
+        --bg-primary: var(--gray-800) !important;
+        --text-primary: var(--gray-100) !important;
+        --text-secondary: var(--gray-200) !important;
+        --text-tertiary: var(--gray-300) !important;
+        --text-quaternary: var(--gray-500) !important;
+        --main-surface-primary: var(--gray-800) !important;
+        --main-surface-secondary: var(--gray-700) !important;
+        --main-surface-tertiary: var(--gray-600) !important;
+        --message-surface: var(--gray-700) !important;
+        --sidebar-surface-primary: var(--gray-900);
+        --sidebar-surface-secondary: var(--gray-800);
+        --sidebar-surface-tertiary: var(--gray-700);
+        --bg-elevated-secondary: var(--gray-900);
+        .popover,
+        .dark,
+        .dark .popover,
+        .dark.popover,
+        .popover .dark {
+          --main-surface-primary: var(--gray-700) !important;
+          --main-surface-secondary: var(--gray-600) !important;
+          --main-surface-tertiary: var(--gray-500) !important;
+          --text-primary: var(--white) !important;
+          --text-secondary: var(--gray-200) !important;
+          --text-tertiary: var(--gray-300) !important;
+        }
+        --border-light: fade(@text, 10%);
+        --border-medium: fade(@text, 15%);
+        --border-heavy: fade(@text, 20%);
+        --border-xheavy: fade(@text, 25%);
+        --link: @accent;
+        --link-hover: darken(@accent, 10%);
+    
+        *:focus {
+          --tw-ring-offset-color: @base;
+          --tw-ring-color: @accent;
+        }
+    
+        /* ChatGPT logo */
+        [style*="background-color: rgb(25, 195, 125);"] {
+          background-color: @green !important;
+          color: @base !important;
+        }
+    
+        /* Input */
+    
+        select {
+          @svg: escape(
+            '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20"><path stroke="@{overlay2}" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m6 8 4 4 4-4"/></svg>'
+          );
+          background-image: url("data:image/svg+xml;@{svg}");
+        }
+    
+        [multiple],
+        [type="date"],
+        [type="datetime-local"],
+        [type="email"],
+        [type="month"],
+        [type="number"],
+        [type="password"],
+        [type="search"],
+        [type="tel"],
+        [type="text"],
+        [type="time"],
+        [type="url"],
+        [type="week"],
+        select,
+        textarea {
+          background-color: @base;
+          border-color: @overlay2;
+        }
+    
+        [type="checkbox"],
+        [type="radio"] {
+          background-color: @base;
+          border-color: @overlay2;
+          color: @accent;
+        }
+    
+        .form-input,
+        .form-multiselect,
+        .form-select,
+        .form-textarea {
+          background-color: @base;
+          border-color: @overlay2;
+        }
+    
+        .form-input:focus,
+        .form-multiselect:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+          border-color: @accent;
+        }
+    
+        .form-input::placeholder,
+        .form-textarea::placeholder {
+          color: @overlay2;
+        }
+    
+        /* Buttons */
+    
+        .btn-primary,
+        .btn-green {
+          background-color: @accent;
+          color: @base;
+    
+          &:hover {
+            background-color: darken(@accent, 10%);
+          }
+    
+          &:focus-visible {
+            --tw-ring-color: darken(@accent, 10%) !important;
+          }
+        }
+    
+        .btn-danger {
+          background-color: @red;
+          color: @base;
+    
+          &:hover:not(:disabled) {
+            background-color: darken(@red, 10%);
+          }
+    
+          &.focus-visible,
+          &:focus-visible {
+            --tw-ring-color: darken(@red, 10%) !important;
+          }
+        }
+    
+        .btn-danger-outline {
+          border-color: @red;
+          color: @red;
+    
+          &.focus-visible,
+          &:focus-visible {
+            --tw-ring-color: lighten(@red, 10%) !important;
+          }
+        }
+    
+        .btn-neutral {
+          &.focus-visible,
+          &:focus-visible {
+            --tw-ring-color: @overlay0 !important;
+          }
+        }
+    
+        .btn-dark {
+          background-color: @surface0;
+          border-color: @overlay0;
+          color: @text;
+    
+          &:hover {
+            background-color: @surface1;
+          }
+        }
+    
+        .btn-light {
+          background-color: @overlay1;
+          color: @black;
+    
+          &:hover {
+            background-color: @overlay0;
+          }
+        }
+    
+        .btn-disabled,
+        .btn-disabled:hover {
+          background-color: @text;
+        }
+    
+        /* Borders */
+    
+        .border-black,
+        .border-black\/10,
+        .border-black\/20,
+        .border-black\/30,
+        .border-black\/5 {
+          border-color: var(--border-light);
+        }
+    
+        .border-gray-100 {
+          border-color: var(--gray-100);
+        }
+    
+        .border-gray-200 {
+          border-color: var(--gray-200);
+        }
+    
+        .border-gray-300 {
+          border-color: var(--gray-300);
+        }
+    
+        .border-gray-400 {
+          border-color: var(--gray-400);
+        }
+    
+        .border-gray-500 {
+          border-color: var(--gray-500);
+        }
+    
+        .border-gray-700 {
+          border-color: var(--gray-700);
+        }
+    
+        .border-gray-950 {
+          border-color: var(--gray-950);
+        }
+    
+        .border-green-500 {
+          border-color: lighten(@green, 10%);
+        }
+    
+        .border-green-600 {
+          border-color: @accent;
+        }
+    
+        .border-orange-400 {
+          border-color: lighten(mix(@red, @yellow), 10%);
+        }
+    
+        .border-orange-500 {
+          border-color: mix(@red, @yellow);
+        }
+    
+        .border-red-500 {
+          border-color: darken(@red, 10%);
+        }
+    
+        .border-white {
+          border-color: @white;
+        }
+    
+        .border-white\/20 {
+          border-color: fade(@white, 20%);
+        }
+    
+        .border-t-[\#0077FF] {
+          border-top-color: @blue;
+        }
+    
+        /* Backgrounds */
+        .\!bg-brand-purple {
+          background-color: @accent !important;
+        }
+    
+        .\!bg-gray-200 {
+          background-color: var(--gray-200) !important;
+        }
+    
+        .btn-blue {
+          background-color: @blue;
+          color: @crust;
+    
+          &:hover {
+            background-color: darken(@blue, 5%);
+          }
+        }
+    
+        /* Main message input box, popup menus, and dropdowns */
+        .bg-\[\#303030\],
+        .dark\:bg-\[\#303030\],
+        .dark\:bg-\[\#353535\] {
+          background-color: @surface0;
+        }
+    
+        .bg-[\#0077FF],
+        .bg-\[\#3C46FF\],
+        .bg-[\#3C46FF],
+        .bg-[\#4046EC] {
+          background-color: @blue;
+        }
+    
+        .hover\:bg-\[\#0000FF\]:hover {
+          background-color: darken(@blue, 5%);
+        }
+    
+        .bg-[\#10A37F] {
+          background-color: @green;
+        }
+    
+        .bg-[\#B161FD] {
+          background-color: @accent;
+        }
+    
+        .bg-[\#F8CA27] {
+          background-color: @yellow;
+        }
+    
+        .bg-[\#FF5588] {
+          background-color: mix(@red, @pink);
+        }
+    
+        .bg-[\#FF6E3C] {
+          background-color: saturate(mix(@red, @yellow), 10%);
+        }
+        .dark\:radix-highlighted\:bg-\[\#2E2F33\][data-highlighted] {
+          background-color: @surface0;
+        }
+    
+        .bg-black {
+          background-color: @black;
+        }
+    
+        .bg-black\/20 {
+          background-color: fade(@black, 20%);
+        }
+    
+        .bg-black\/5 {
+          background-color: fade(@black, 5%);
+        }
+    
+        .bg-black\/50 {
+          background-color: fade(@black, 50%);
+        }
+    
+        .bg-black\/90 {
+          background-color: fade(@black, 90%);
+        }
+    
+        .bg-black\/\[\.04\] {
+          background-color: fade(@black, 4%);
+        }
+    
+        .bg-black\/\[\.08\] {
+          background-color: fade(@black, 8%);
+        }
+    
+        .bg-black\/\[\.12\] {
+          background-color: fade(@black, 12%);
+        }
+    
+        .bg-blue-100 {
+          background-color: lighten(@blue, 30%);
+        }
+    
+        .bg-blue-200 {
+          background-color: lighten(@blue, 20%);
+        }
+    
+        .bg-blue-300 {
+          background-color: lighten(@blue, 10%);
+        }
+    
+        .bg-blue-400 {
+          background-color: @blue;
+        }
+    
+        .bg-blue-500 {
+          background-color: darken(@blue, 5%);
+        }
+    
+        .bg-blue-700 {
+          background-color: darken(@blue, 10%);
+        }
+    
+        .hover\:bg-blue-700:hover {
+          background-color: darken(@blue, 15%);
+        }
+    
+        .bg-brand-blue-800 {
+          background-color: darken(@blue, 10%);
+        }
+    
+        .bg-blue-950 {
+          background-color: darken(@blue, 30%);
+        }
+    
+        .checked\:bg-blue-600:checked {
+          background-color: @accent;
+        }
+    
+        .bg-brand-green {
+          background-color: lighten(@green, 10%);
+        }
+    
+        .bg-brand-green\/20 {
+          background-color: fade(lighten(@green, 10%), 20%);
+        }
+    
+        .bg-brand-green\/40 {
+          background-color: fade(lighten(@green, 10%), 40%);
+        }
+    
+        .bg-brand-purple {
+          background-color: @accent;
+        }
+    
+        .bg-gray-100 {
+          background-color: var(--gray-100);
+        }
+    
+        .bg-gray-200 {
+          background-color: var(--gray-200);
+        }
+    
+        .bg-gray-300 {
+          background-color: var(--gray-300);
+        }
+    
+        .bg-gray-400 {
+          background-color: var(--gray-400);
+        }
+    
+        .bg-gray-50 {
+          background-color: var(--gray-50);
+        }
+    
+        .bg-gray-500 {
+          background-color: var(--gray-500);
+        }
+    
+        .bg-gray-600 {
+          background-color: var(--gray-600);
+        }
+    
+        .bg-gray-700 {
+          background-color: var(--gray-700);
+        }
+    
+        .bg-gray-900 {
+          background-color: var(--gray-900);
+        }
+    
+        .bg-gray-950 {
+          background-color: var(--gray-950);
+        }
+    
+        .bg-green-100 {
+          background-color: lighten(@green, 30%);
+        }
+    
+        .bg-green-200 {
+          background-color: lighten(@green, 20%);
+        }
+    
+        .bg-green-500 {
+          background-color: lighten(@green, 10%);
+        }
+    
+        .bg-green-500\/10 {
+          background-color: fade(lighten(@green, 10%), 10%);
+        }
+    
+        .bg-green-600 {
+          background-color: fade(@accent, 10%);
+        }
+    
+        .bg-orange-500 {
+          background-color: mix(@yellow, @red);
+        }
+    
+        .bg-orange-500\/10 {
+          background-color: fade(mix(@yellow, @red), 10%);
+        }
+    
+        .bg-red-100 {
+          background-color: fade(lighten(@red, 10%), 30%);
+        }
+    
+        .bg-red-200 {
+          background-color: lighten(@red, 20%);
+        }
+    
+        .bg-red-500 {
+          background-color: @red;
+        }
+    
+        .bg-red-500\/10 {
+          background-color: fade(@red, 10%);
+        }
+    
+        .bg-red-600 {
+          background-color: lighten(@red, 10%);
+        }
+    
+        .bg-white {
+          background-color: @white;
+        }
+    
+        .bg-white\/20 {
+          background-color: fade(@white, 20%);
+        }
+    
+        .bg-white\/25 {
+          background-color: fade(@white, 25%);
+        }
+    
+        .bg-yellow-100 {
+          background-color: lighten(@yellow, 20%);
+        }
+    
+        .bg-yellow-200 {
+          background-color: lighten(@yellow, 10%);
+        }
+    
+        .bg-yellow-400 {
+          background-color: @yellow;
+        }
+    
+        .bg-yellow-500 {
+          background-color: darken(@yellow, 10%);
+        }
+    
+        .radix-state-checked\:\!bg-green-600[data-state="checked"] {
+          background-color: @accent !important;
+        }
+    
+        .dark\:radix-state-checked\:border-green-600[data-state="checked"]:is(
+          .dark *
+        ) {
+          border-color: @accent;
+        }
+    
+        [class*="bg-transparent"] {
+          background-color: transparent;
+        }
+    
+        /* Gradients */
+    
+        .from-white {
+          --tw-gradient-from: @base var(--tw-gradient-from-position);
+        }
+    
+        /* Fill/stroke */
+    
+        .fill-yellow-500 {
+          fill: @yellow;
+        }
+    
+        .stroke-black {
+          stroke: @black;
+        }
+    
+        .stroke-brand-purple\/25 {
+          stroke: fade(@accent, 25%);
+        }
+    
+        .stroke-gray-400 {
+          stroke: @subtext0;
+        }
+    
+        /* Text */
+    
+        .\!text-black {
+          color: @black !important;
+        }
+    
+        .text-\[\#FE7600\] {
+          color: mix(@yellow, @red);
+        }
+    
+        .text-\[\#fff\] {
+          color: @base;
+        }
+    
+        .text-black {
+          color: @black;
+        }
+    
+        .text-black\/60 {
+          color: fade(@black, 60%);
+        }
+    
+        .text-black\/70 {
+          color: fade(@black, 70%);
+        }
+    
+        .text-blue-500 {
+          color: lighten(@blue, 10%);
+        }
+    
+        .text-blue-600 {
+          color: @blue;
+        }
+    
+        .text-brand-blue-800 {
+          color: @blue;
+        }
+    
+        .text-brand-purple {
+          color: @accent;
+        }
+    
+        .text-gray-100 {
+          color: var(--gray-100);
+        }
+    
+        .text-gray-300 {
+          color: var(--gray-300);
+        }
+    
+        .text-gray-400 {
+          color: var(--gray-400);
+        }
+    
+        .text-gray-500 {
+          color: var(--gray-500);
+        }
+    
+        .text-gray-600 {
+          color: var(--gray-600);
+        }
+    
+        .text-gray-700 {
+          color: var(--gray-700);
+        }
+    
+        .text-gray-800 {
+          color: var(--gray-800);
+        }
+    
+        .text-gray-900 {
+          color: var(--gray-900);
+        }
+    
+        .text-green-500 {
+          color: lighten(@green, 10%);
+        }
+    
+        .text-green-600 {
+          color: @accent;
+        }
+    
+        .text-green-700 {
+          color: darken(@green, 10%);
+        }
+    
+        .text-green-800 {
+          color: darken(@green, 20%);
+        }
+    
+        .text-green-900 {
+          color: darken(@green, 30%);
+        }
+    
+        .text-orange-300 {
+          color: lighten(mix(@yellow, @red), 15%);
+        }
+    
+        .text-orange-400 {
+          color: lighten(mix(@yellow, @red), 10%);
+        }
+    
+        .text-orange-500 {
+          color: mix(@yellow, @red);
+        }
+    
+        .text-red-500 {
+          color: @red;
+        }
+    
+        .text-red-600 {
+          color: lighten(@red, 10%);
+        }
+    
+        .text-red-700 {
+          color: @red;
+        }
+    
+        .text-red-800 {
+          color: darken(@red, 10%);
+        }
+    
+        .text-token-text-error {
+          --text-error: @red;
+        }
+    
+        .text-white {
+          color: @white;
+        }
+    
+        .text-white\/25 {
+          color: fade(@white, 25%);
+        }
+    
+        .text-white\/50 {
+          color: fade(@white, 50%);
+        }
+    
+        .text-white\/80 {
+          color: fade(@white, 80%);
+        }
+    
+        .text-yellow-500 {
+          color: @yellow;
+        }
+    
+        .text-yellow-700 {
+          color: darken(@yellow, 10%);
+        }
+    
+        .text-yellow-800 {
+          color: darken(@yellow, 20%);
+        }
+    
+        .text-yellow-900 {
+          color: darken(@yellow, 30%);
+        }
+    
+        /* Dark mode overrides */
+        /* stylelint-disable-next-line no-duplicate-selectors */
+        .dark\:bg-black {
+            background-color: @black;
+          }
+    
+          .dark\:bg-white {
+            background-color: @white;
+          }
+    
+          .dark\:bg-gray-700 {
+            background-color: var(--gray-700);
+          }
+    
+          /* "Was this response better or worse" dialog button hover */
+          .dark\:hover\:bg-gray-800:hover {
+            background-color: transparent;
+          }
+    
+          .dark\:text-white {
+            color: @white;
+          }
+    
+          .dark\:text-black {
+            color: @black;
+          }
+    
+          /* Chat suggestions on new chat page */
+          .dark\:text-gray-500 {
+            color: var(--gray-300);
+          }
+    
+          .dark\:text-\[\#D292FF\] {
+            color: @mauve;
+          }
+    
+          .dark\:focus\:border-white:focus {
+            border-color: @text;
+          }
+    
+          .dark\:border-gray-700 {
+            border-color: var(--gray-700);
+          }
+    
+          /* Up arrow send message button */
+          .disabled\:dark\:bg-token-text-quaternary:is(.dark *):disabled {
+            background-color: var(--text-quaternary);
+          }
+          .dark\:disabled\:text-token-main-surface-secondary:disabled:is(.dark *) {
+            color: var(--main-surface-secondary);
+          }
+
+        /* Other */
+    
+        .ring-black {
+          --tw-ring-color: @black;
+        }
+    
+        .ring-black\/10 {
+          --tw-ring-color: fade(@black, 10%);
+        }
+    
+        .ring-white {
+          --tw-ring-color: @base;
+        }
+    
+        .ring-offset-black {
+          --tw-ring-offset-color: @base;
+        }
+    
+        /* Invalid LaTeX expressions */
+        [style*="color: rgb(204, 0, 0)"] {
+          color: @red;
+        }
+    
+        /* Circle around OpenAI logo in center of chat */
+        .gizmo-shadow-stroke::after {
+          --tw-shadow: inset 0 0 0 1px @surface0;
+        }
+    
+        .katex-error {
+          color: @red !important;
+        }
+    
+        [style="background-color: rgb(0, 0, 46);"],
+        [style="background-color: rgb(255, 255, 219);"] {
+          background-color: @crust !important;
+        }
+    
+        /* Icon colors for chat suggestion icons on new chat page */
+        svg[style="color: rgb(203, 139, 208);"] {
+          color: @pink !important;
+        }
+        svg[style="color: rgb(226, 197, 65);"] {
+          color: @yellow !important;
+        }
+        svg[style="color: rgb(118, 208, 235);"] {
+          color: @teal !important;
+        }
+        svg[style="color: rgb(237, 98, 98);"] {
+          color: @red !important;
+        }
