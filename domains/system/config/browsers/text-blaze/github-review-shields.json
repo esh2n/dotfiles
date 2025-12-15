@@ -1,0 +1,75 @@
+{
+  "version": 7,
+  "folders": [
+    {
+      "name": "GitHub Review Badges",
+      "info": "",
+      "app": "TEXT",
+      "snippets": [
+        {
+          "name": "IMO Badge",
+          "shortcut": "/imo",
+          "type": "text",
+          "text": "![IMO](https://img.shields.io/badge/💭-IMO-blue?style=flat-square)",
+          "html": "![IMO](https://img.shields.io/badge/💭-IMO-blue?style=flat-square)"
+        },
+        {
+          "name": "Tweet Badge",
+          "shortcut": "/tweet",
+          "type": "text",
+          "text": "![Tweet](https://img.shields.io/badge/🐦-Tweet_worthy-1DA1F2?style=flat-square)",
+          "html": "![Tweet](https://img.shields.io/badge/🐦-Tweet_worthy-1DA1F2?style=flat-square)"
+        },
+        {
+          "name": "Question Badge",
+          "shortcut": "/ask",
+          "type": "text",
+          "text": "![Question](https://img.shields.io/badge/❓-Question-orange?style=flat-square)",
+          "html": "![Question](https://img.shields.io/badge/❓-Question-orange?style=flat-square)"
+        },
+        {
+          "name": "Nits Badge",
+          "shortcut": "/nits",
+          "type": "text",
+          "text": "![Nits](https://img.shields.io/badge/🔍-Nits-yellow?style=flat-square)",
+          "html": "![Nits](https://img.shields.io/badge/🔍-Nits-yellow?style=flat-square)"
+        },
+        {
+          "name": "LGTM GIF",
+          "shortcut": "/lgtm",
+          "type": "text",
+          "text": "![LGTM](https://media3.giphy.com/media/v1.Y2lkPTQ3MDI4ZmE4ODluaG1wOXFrcWxuYmIyeWZoN2Z4dXU1OGpmbDloeTVhMjY3bmZ5dyZlcD12MV9naWZzJmN0PWc/wypXxlLUpzp7O/giphy.gif)",
+          "html": "![LGTM](https://media3.giphy.com/media/v1.Y2lkPTQ3MDI4ZmE4ODluaG1wOXFrcWxuYmIyeWZoN2Z4dXU1OGpmbDloeTVhMjY3bmZ5dyZlcD12MV9naWZzJmN0PWc/wypXxlLUpzp7O/giphy.gif)"
+        },
+        {
+          "name": "Must Badge",
+          "shortcut": "/must",
+          "type": "text",
+          "text": "![Must](https://img.shields.io/badge/🚨-MUST-critical?style=flat-square)",
+          "html": "![Must](https://img.shields.io/badge/🚨-MUST-critical?style=flat-square)"
+        },
+        {
+          "name": "Concern Badge",
+          "shortcut": "/concern",
+          "type": "text",
+          "text": "![Concern](https://img.shields.io/badge/⚠️-Concern-red?style=flat-square)",
+          "html": "![Concern](https://img.shields.io/badge/⚠️-Concern-red?style=flat-square)"
+        },
+        {
+          "name": "Suggestion Badge",
+          "shortcut": "/suggestion",
+          "type": "text",
+          "text": "![Suggestion](https://img.shields.io/badge/💡-Suggestion-lightblue?style=flat-square)",
+          "html": "![Suggestion](https://img.shields.io/badge/💡-Suggestion-lightblue?style=flat-square)"
+        },
+        {
+          "name": "Nice Badge",
+          "shortcut": "/nice",
+          "type": "text",
+          "text": "![Nice](https://img.shields.io/badge/👍-Nice-green?style=flat-square)",
+          "html": "![Nice](https://img.shields.io/badge/👍-Nice-green?style=flat-square)"
+        }
+      ]
+    }
+  ]
+}
