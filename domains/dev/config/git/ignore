@@ -30,6 +30,7 @@ Thumbs.db
 .env
 .env.local
 .envrc
+.wtp.local.yml
 
 # Dependencies
 node_modules/

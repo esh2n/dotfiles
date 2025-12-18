@@ -65,9 +65,9 @@ process_template() {
     local temp_includes=$(mktemp)
     generate_conditional_includes > "$temp_includes"
 
-    # Replace {{HOME}} with actual home directory first
+    # Replace {{HOME}} and {{USER}} with actual values first
     local temp_file=$(mktemp)
-    sed "s|{{HOME}}|${HOME}|g" "$template_file" > "$temp_file"
+    sed -e "s|{{HOME}}|${HOME}|g" -e "s|{{USER}}|${USER}|g" "$template_file" > "$temp_file"
 
     # Replace {{CONDITIONAL_INCLUDES}} with generated includes
     if grep -q "{{CONDITIONAL_INCLUDES}}" "$temp_file"; then

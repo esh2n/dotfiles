@@ -31,6 +31,7 @@
     };
     taps = [
       "felixkratz/formulae"
+      "satococoa/tap"
     ];
   };
 

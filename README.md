@@ -297,6 +297,211 @@ Pure interactive aliases (no argument support):
 | `gi` | `git init` | |
 | `gcl` | `git clone` | |
 
+### Git Worktree Management (wtp)
+
+**wtp** is a CLI tool for managing git worktrees, enabling parallel development on multiple branches without switching contexts.
+
+#### Why Git Worktrees?
+- Work on multiple branches simultaneously without stashing
+- Each worktree is an independent working directory
+- Useful for comparing implementations, testing fixes, and working on features in parallel
+
+#### Basic Usage
+
+```bash
+# List all worktrees
+wtp list
+
+# Add new worktree for feature development
+wtp add feature/user-auth
+
+# Add worktree with custom path
+wtp add feature/api-refactor ../project-api-refactor
+
+# Remove worktree after merging
+wtp remove feature/user-auth
+
+# Switch to a worktree
+wtp switch feature/user-auth
+
+# Clean up stale worktrees
+wtp prune
+```
+
+#### Worktree Naming Convention
+
+```
+../project-<type>-<description>
+```
+
+Types: feature, bugfix, hotfix, experiment, refactor
+
+#### Configuration
+
+Create `.wtp.local.yml` for personal overrides (already in `.gitignore`):
+
+```yaml
+default_path: "../worktrees"
+auto_cleanup: true
+```
+
+#### Real-World Scenarios
+
+**Scenario 1: Bug Fix While Working on Feature**
+```bash
+# Currently working on feature branch
+cd ~/project-feature-auth
+
+# Critical bug reported - need immediate fix
+wtp add hotfix/critical-bug
+cd ../project-hotfix-critical-bug
+
+# Fix bug, test, commit, push
+# Return to feature work
+cd ~/project-feature-auth
+
+# After hotfix merged, cleanup
+wtp remove hotfix/critical-bug
+```
+
+**Scenario 2: Comparing Two Implementations**
+```bash
+# Implementation A in worktree
+wtp add experiment/approach-a
+cd ../project-experiment-approach-a
+# Write code for approach A
+
+# Implementation B in another worktree
+wtp add experiment/approach-b
+cd ../project-experiment-approach-b
+# Write code for approach B
+
+# Compare side-by-side with diff or IDE
+# Keep the better approach, remove the other
+```
+
+**Scenario 3: Review Pull Request Locally**
+```bash
+# Add worktree from PR branch
+wtp add review/pr-123 origin/pull/123
+
+# Test and review code
+cd ../project-review-pr-123
+
+# After review, cleanup
+wtp remove review/pr-123
+```
+
+### Environment Management (direnv)
+
+**direnv** automatically loads and unloads environment variables when entering/exiting directories, enabling per-project configuration.
+
+#### Basic Usage
+
+Create `.envrc` in project root:
+
+```bash
+# Load environment variables
+export DATABASE_URL="postgresql://localhost/mydb"
+export API_KEY="development-key"
+
+# Load .env file if it exists
+dotenv_if_exists .env
+
+# Add project bin to PATH
+PATH_add ./bin
+
+# Use specific Node.js version (with mise)
+use mise
+```
+
+Allow the `.envrc` file (required once per file change):
+```bash
+direnv allow
+```
+
+#### Integration with Mise
+
+Mise (version manager) integrates with direnv for automatic runtime switching:
+
+```bash
+# .envrc
+use mise
+```
+
+Create `.mise.toml` for version specification:
+```toml
+[tools]
+node = "20.10.0"
+python = "3.12"
+go = "1.21"
+```
+
+When you `cd` into the directory, direnv + mise automatically activates the specified versions.
+
+#### Common Patterns
+
+**Pattern 1: Database Credentials**
+```bash
+# .envrc
+export DATABASE_URL="postgresql://localhost/dev_db"
+export REDIS_URL="redis://localhost:6379"
+```
+
+**Pattern 2: AWS Profile Selection**
+```bash
+# .envrc
+export AWS_PROFILE="development"
+export AWS_REGION="us-west-2"
+```
+
+**Pattern 3: Project-Specific PATH**
+```bash
+# .envrc
+PATH_add ./scripts
+PATH_add ./node_modules/.bin
+```
+
+**Pattern 4: Secret Loading**
+```bash
+# .envrc (committed to git)
+# Load secrets from .env.local (gitignored)
+dotenv_if_exists .env.local
+
+# .env.local (never commit)
+OPENAI_API_KEY="sk-..."
+STRIPE_SECRET_KEY="sk_test_..."
+```
+
+#### Security Best Practices
+
+- **Always gitignore `.envrc.local`** for machine-specific secrets
+- **Never commit `.envrc` with actual secrets** - use placeholders
+- Use `direnv allow` to explicitly trust each directory
+- Review `.envrc` changes carefully in PRs
+
+#### Direnv + WTP Workflow
+
+Combined workflow for isolated project environments:
+
+```bash
+# Create feature worktree
+wtp add feature/new-api
+cd ../project-feature-new-api
+
+# Create environment for this worktree
+cat > .envrc << EOF
+export FEATURE_FLAG_NEW_API=true
+export API_VERSION=v2
+use mise
+EOF
+
+direnv allow
+
+# Now this worktree has isolated environment
+# Main worktree remains unaffected
+```
+
 #### tmux / WezTerm / Zellij (Prefix: Ctrl+q)
 
 Keybindings unified across tmux, WezTerm, and Zellij.
