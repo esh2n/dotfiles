@@ -297,6 +297,39 @@ Pure interactive aliases (no argument support):
 | `gi` | `git init` | |
 | `gcl` | `git clone` | |
 
+#### Code Review (difit + skim)
+
+Interactive commit range selection with beautiful diff viewer.
+
+| Command | Description |
+|---------|-------------|
+| `gifit` | Select 2 commits interactively and view diff with difit |
+| `gdif [N]` | Quick diff for last N commits (default: 1) |
+
+**Usage:**
+```bash
+# Interactive commit range selection
+gifit
+# 1. Select FROM commit (older)
+# 2. Select TO commit (newer)
+# 3. View beautiful diff in difit
+
+# Quick review last commit
+gdif
+
+# Review last 3 commits
+gdif 3
+```
+
+**Installation:**
+```bash
+# Global install
+npm install -g difit
+
+# Or use without installation
+bunx difit <commit-range>
+```
+
 ### Git Worktree Management (wtp)
 
 **wtp** is a CLI tool for managing git worktrees, enabling parallel development on multiple branches without switching contexts.

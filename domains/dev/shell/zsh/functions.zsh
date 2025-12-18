@@ -654,6 +654,96 @@ function sk_edit_file() {
 # -----------------------------------------------------------------------------
 # Git Helpers
 # -----------------------------------------------------------------------------
+
+# Select commit from git log
+function sk_select_commit() {
+  local prompt="${1:-Commit> }"
+  local limit="${2:-100}"
+
+  git log --oneline --decorate --color=always -n "$limit" | \
+    sk --prompt="$prompt" --ansi --reverse \
+       --preview 'git show --color=always {1}' \
+       --preview-window 'right:60%' | \
+    awk '{print $1}'
+}
+
+# Select commit range and show diff with difit
+function gifit() {
+  if ! has_command git; then
+    log_error "git is not installed"
+    return 1
+  fi
+
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    log_error "Not in a git repository"
+    return 1
+  fi
+
+  # Check if difit is available (bunx or globally installed)
+  local difit_cmd=""
+  if has_command difit; then
+    difit_cmd="difit"
+  elif has_command bunx; then
+    difit_cmd="bunx difit"
+  elif has_command npx; then
+    difit_cmd="npx difit"
+  else
+    log_error "difit is not available. Install with: npm install -g difit"
+    log_info "Or use bunx/npx to run it without installation"
+    return 1
+  fi
+
+  log_info "Select FROM commit (older)"
+  local from_commit=$(sk_select_commit "FROM (older)> " 100)
+
+  if [[ -z "$from_commit" ]]; then
+    log_warn "No FROM commit selected"
+    return 1
+  fi
+
+  log_info "Selected FROM: $from_commit"
+  log_info "Select TO commit (newer)"
+
+  local to_commit=$(sk_select_commit "TO (newer)> " 100)
+
+  if [[ -z "$to_commit" ]]; then
+    log_warn "No TO commit selected"
+    return 1
+  fi
+
+  log_info "Selected TO: $to_commit"
+  log_info "Running: $difit_cmd $to_commit $from_commit"
+
+  # Run difit with the selected range
+  # difit takes two arguments: newer_commit older_commit
+  eval "$difit_cmd $to_commit $from_commit"
+}
+
+# Quick diff with difit (last N commits)
+function gdif() {
+  local n="${1:-1}"
+
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    log_error "Not in a git repository"
+    return 1
+  fi
+
+  local difit_cmd=""
+  if has_command difit; then
+    difit_cmd="difit"
+  elif has_command bunx; then
+    difit_cmd="bunx difit"
+  elif has_command npx; then
+    difit_cmd="npx difit"
+  else
+    log_error "difit is not available. Install with: npm install -g difit"
+    return 1
+  fi
+
+  # difit takes two arguments: newer_commit older_commit
+  eval "$difit_cmd HEAD HEAD~$n"
+}
+
 function sk_select_branch_except_current() {
   git branch | grep -v "^[*+]" | sed 's/^[[:space:]]*//' | sk --prompt="Branch> " --ansi --reverse | xargs
 }
