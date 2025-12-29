@@ -20,6 +20,7 @@ if [[ $- == *i* ]]; then
     zle -N sk_change_directory
     zle -N sk_select_file_within_project
     zle -N sk_select_file_below_pwd
+    zle -N sk_worktree_menu
 
     # Standard bindings
     bindkey '^r' sk_select_history
@@ -30,7 +31,10 @@ if [[ $- == *i* ]]; then
 
     # Project selection (Ctrl+])
     bindkey '^]' sk_select_src
-    
+
+    # Worktree menu (Alt+W)
+    bindkey '\ew' sk_worktree_menu
+
     # VSCode specific
     if [[ "$TERM_PROGRAM" == "vscode" ]]; then
       bindkey '^\' sk_select_src

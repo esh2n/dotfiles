@@ -865,7 +865,7 @@ function zoxide_cleanup() {
     log_error "zoxide is not installed"
     return 1
   fi
-  
+
   log_info "Cleaning up zoxide database..."
   zoxide query -l | while read -r path; do
     if [[ ! -d "$path" ]]; then
@@ -875,4 +875,275 @@ function zoxide_cleanup() {
     fi
   done
   log_success "Zoxide cleanup complete"
+}
+
+# -----------------------------------------------------------------------------
+# Worktree Management (wtp + skim)
+# -----------------------------------------------------------------------------
+
+# Internal helper: Select worktree using skim
+# Returns: worktree identifier (for use with wtp cd)
+function _wt_select_worktree() {
+  if ! has_command wtp; then
+    log_error "wtp is not installed"
+    return 1
+  fi
+
+  # Get worktree identifiers, filter out cursor, detached, and special entries
+  local worktrees=$(wtp list --quiet 2>/dev/null | \
+    grep -v "\.cursor" | \
+    grep -v "detached" | \
+    grep -v "^@$")
+
+  if [[ -z "$worktrees" ]]; then
+    echo "No worktrees found" >&2
+    return 1
+  fi
+
+  # Show worktree identifiers with preview
+  # Preview uses wtp cd to get the actual path
+  # Note: Use full path to git for preview subshell
+  local git_cmd="${commands[git]:-/usr/bin/git}"
+  echo "$worktrees" | sk --prompt="Worktree> " --ansi --reverse \
+    --preview "path=\$(wtp cd {} 2>/dev/null); if [[ -n \"\$path\" ]]; then cd \"\$path\" && echo \"Path: \$path\" && echo \"Branch: \$($git_cmd rev-parse --abbrev-ref HEAD)\" && echo && $git_cmd log --oneline -5 --color=always && echo && $git_cmd status -sb; fi" \
+    --preview-window 'right:50%'
+}
+
+# Change to worktree directory
+function wtcd() {
+  if ! has_command wtp; then
+    log_error "wtp is not installed"
+    return 1
+  fi
+
+  if [[ $# -gt 0 ]]; then
+    # With arguments: use wtp cd directly
+    local target_path=$(wtp cd "$@" 2>/dev/null)
+    if [[ -n "$target_path" ]]; then
+      cd "$target_path"
+    else
+      log_error "Worktree not found: $*"
+      return 1
+    fi
+  else
+    # No arguments: interactive selection
+    local selected=$(_wt_select_worktree)
+    if [[ -n "$selected" ]]; then
+      # Convert identifier to path using wtp cd
+      local target_path=$(wtp cd "$selected" 2>/dev/null)
+      if [[ -n "$target_path" ]]; then
+        cd "$target_path"
+      else
+        log_error "Worktree not found: $selected"
+        return 1
+      fi
+    fi
+  fi
+}
+
+# Remove worktree interactively
+function wtrm() {
+  if ! has_command wtp; then
+    log_error "wtp is not installed"
+    return 1
+  fi
+
+  local selected=$(_wt_select_worktree)
+  if [[ -z "$selected" ]]; then
+    return 0
+  fi
+
+  # Convert identifier to path using wtp cd
+  local target_path=$(wtp cd "$selected" 2>/dev/null)
+  local branch=$(cd "$target_path" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+  echo "Worktree: $target_path"
+  echo "Branch: $branch"
+  echo "Identifier: $selected"
+  echo
+  echo "1) Remove worktree only (keep branch)"
+  echo "2) Remove worktree AND branch"
+  echo "3) Cancel"
+  printf "Select [1-3]: "
+  read choice
+
+  case "$choice" in
+    1)
+      wtp remove "$selected"
+      if [[ $? -eq 0 ]]; then
+        log_success "Removed worktree: $selected (branch kept)"
+      else
+        log_error "Failed to remove worktree"
+      fi
+      ;;
+    2)
+      wtp remove --with-branch "$selected"
+      if [[ $? -eq 0 ]]; then
+        log_success "Removed worktree and branch: $selected"
+      else
+        log_error "Failed to remove worktree"
+      fi
+      ;;
+    *)
+      log_info "Cancelled"
+      ;;
+  esac
+}
+
+# Prune stale worktree references
+function wtprune() {
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    log_error "Not in a git repository"
+    return 1
+  fi
+
+  echo "Pruning stale worktree references..."
+  git worktree prune -v
+  log_success "Prune completed"
+}
+
+# Add worktree interactively
+function wtadd() {
+  if ! has_command wtp; then
+    log_error "wtp is not installed"
+    return 1
+  fi
+
+  if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    log_error "Not in a git repository"
+    return 1
+  fi
+
+  local choice=$(cat <<EOF | sk --prompt="Create worktree> " --ansi --reverse
+📦 Existing branch
+🌱 New from here
+🪴 New from...
+EOF
+)
+
+  case "$choice" in
+    "📦 Existing branch")
+      # Select from existing branches (run 'git fetch' manually if needed)
+      # Sorted by commit date (newest first), filter out Cursor-generated branches
+      local branch=$(git for-each-ref --sort=-committerdate --format='%(refname:short)' refs/heads/ refs/remotes/origin/ | \
+        sed 's|^origin/||' | \
+        awk '!seen[$0]++' | \
+        grep -v "^HEAD$" | \
+        awk '{ if (match($0, /-[A-Za-z0-9]{5}$/)) { s=substr($0,RSTART+1,5); if(s~/[A-Z]/) next } print }' | \
+        sk --prompt="Branch> " --ansi --reverse \
+           --preview 'git log --oneline -10 --color=always {} 2>/dev/null || git log --oneline -10 --color=always origin/{} 2>/dev/null || echo "No local commits yet"')
+
+      if [[ -n "$branch" ]]; then
+        wtp add "$branch" && wtcd "$branch"
+      fi
+      ;;
+    "🌱 New from here")
+      printf "New branch name: "
+      read new_branch
+      if [[ -n "$new_branch" ]]; then
+        wtp add -b "$new_branch" && wtcd "$new_branch"
+      fi
+      ;;
+    "🪴 New from...")
+      # First select base branch (run 'git fetch' manually if needed)
+      # Sorted by commit date (newest first), filter out Cursor-generated branches
+      log_info "Select base branch:"
+      local base_branch=$(git for-each-ref --sort=-committerdate --format='%(refname:short)' refs/heads/ refs/remotes/origin/ | \
+        sed 's|^origin/||' | \
+        awk '!seen[$0]++' | \
+        grep -v "^HEAD$" | \
+        awk '{ if (match($0, /-[A-Za-z0-9]{5}$/)) { s=substr($0,RSTART+1,5); if(s~/[A-Z]/) next } print }' | \
+        sk --prompt="Base branch> " --ansi --reverse \
+           --preview 'git log --oneline -10 --color=always {} 2>/dev/null || git log --oneline -10 --color=always origin/{} 2>/dev/null || echo "No local commits yet"')
+
+      if [[ -z "$base_branch" ]]; then
+        log_info "Cancelled"
+        return 0
+      fi
+
+      printf "New branch name: "
+      read new_branch
+      if [[ -n "$new_branch" ]]; then
+        wtp add -b "$new_branch" "$base_branch" && wtcd "$new_branch"
+      fi
+      ;;
+    *)
+      log_info "Cancelled"
+      ;;
+  esac
+}
+
+# List worktrees
+function wtls() {
+  if ! has_command wtp; then
+    log_error "wtp is not installed"
+    return 1
+  fi
+  # Filter out cursor and detached worktrees (use 'wtp list' for all)
+  wtp list | grep -v "\.cursor" | grep -v "detached"
+}
+
+# Worktree main menu
+function _wt_help() {
+  cat <<EOF
+Worktree Manager (wt) - Interactive worktree management with skim
+
+Commands:
+  wt              Interactive menu
+  wt list         List all worktrees
+  wt cd [name]    Switch to worktree (interactive if no args)
+  wt add          Create new worktree (interactive)
+  wt rm           Remove worktree (interactive)
+  wt prune        Clean up stale worktree references
+  wt help         Show this help
+
+Aliases:
+  wtcd            Same as 'wt cd'
+  wtadd           Same as 'wt add'
+  wtrm            Same as 'wt rm'
+  wtls            Same as 'wt list'
+  wtprune         Same as 'wt prune'
+EOF
+}
+
+function _wt_main_menu() {
+  local choice=$(cat <<EOF | sk --prompt="Worktree> " --ansi --reverse
+📋 List all worktrees
+🔄 Switch to worktree
+➕ Create worktree
+❌ Remove worktree
+🧹 Prune stale references
+❓ Help
+EOF
+)
+
+  case "$choice" in
+    "📋 List all worktrees") echo; wtls ;;
+    "🔄 Switch to worktree") wtcd ;;
+    "➕ Create worktree") wtadd ;;
+    "❌ Remove worktree") wtrm ;;
+    "🧹 Prune stale references") echo; wtprune ;;
+    "❓ Help") echo; _wt_help ;;
+    *) ;;
+  esac
+}
+
+# Main wt command
+function wt() {
+  case "${1:-}" in
+    "list"|"ls")     wtls ;;
+    "cd"|"switch")   shift; wtcd "$@" ;;
+    "add"|"new")     wtadd ;;
+    "rm"|"remove")   wtrm ;;
+    "prune")         wtprune ;;
+    "help"|"h")      _wt_help ;;
+    "")              _wt_main_menu ;;
+    *)               _wt_help ;;
+  esac
+}
+
+# Zsh widget for wt menu
+function sk_worktree_menu() {
+  _wt_main_menu
+  zle reset-prompt
 }

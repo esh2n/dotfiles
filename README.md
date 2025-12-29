@@ -425,6 +425,31 @@ cd ../project-review-pr-123
 wtp remove review/pr-123
 ```
 
+#### Interactive Worktree Management (wt + skim)
+
+Enhanced worktree management with interactive fuzzy finder selection.
+
+| Command | Description |
+|---------|-------------|
+| `wt` | Interactive menu (or `Alt+W`) |
+| `wt list` | List all worktrees |
+| `wt cd` | Switch to worktree (interactive) |
+| `wt add` | Create worktree (from branch or new) |
+| `wt rm` | Remove worktree (with confirmation) |
+
+**Aliases:**
+- `wtcd` - Switch to worktree
+- `wtadd` - Create worktree
+- `wtrm` - Remove worktree
+- `wtls` - List worktrees
+
+**Keybinding:** `Alt+W` opens worktree menu
+
+**Features:**
+- Preview shows recent commits and git status
+- Branch selection with commit history preview
+- Confirmation prompt before deletion
+
 ### Environment Management (direnv)
 
 **direnv** automatically loads and unloads environment variables when entering/exiting directories, enabling per-project configuration.

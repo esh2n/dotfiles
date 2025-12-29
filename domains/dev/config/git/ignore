@@ -31,12 +31,24 @@ Thumbs.db
 .env.local
 .envrc
 .wtp.local.yml
+.wtp.yml
+
+# Local configuration files
+makefile.local
+Makefile.local
+docker-compose.local.yml
+config.local.*
+*.local.json
+*.local.yaml
+*.local.yml
+*.local.toml
 
 # Dependencies
 node_modules/
 vendor/
 .bundle/
 **/.claude/settings.local.json
+**/.claude/telemetry/
 
 # Personal directories
 .personal/

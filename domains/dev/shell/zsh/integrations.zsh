@@ -17,3 +17,8 @@ fi
 if command -v mise &>/dev/null; then
   eval "$(mise activate zsh)"
 fi
+
+# Direnv (Environment Switcher)
+if command -v direnv &>/dev/null; then
+  eval "$(direnv hook zsh)"
+fi
