@@ -25,8 +25,8 @@
 
   outputs = { nixpkgs, nix-darwin, home-manager, brew-nix, ... }:
     let
-      # Import username from external file (updated by installer)
-      username = import ./username.nix;
+      # Get username from environment or use default
+      username = builtins.getEnv "USER";
       hostname = "${username}-mac";
       system = "aarch64-darwin";
     in {

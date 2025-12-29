@@ -121,12 +121,6 @@ phase_core() {
         local nix_dir="${DOTFILES_ROOT}/core/nix"
 
         if [[ -f "${nix_dir}/flake.nix" ]]; then
-            # Update username.nix with actual username
-            if [[ ! -f "${nix_dir}/username.nix" ]] || grep -q "PLACEHOLDER_USERNAME" "${nix_dir}/username.nix" 2>/dev/null; then
-                log_info "Updating username.nix with current user..."
-                echo "\"${USER}\"" > "${nix_dir}/username.nix"
-            fi
-
             # Backup files that nix-darwin will manage
             for f in /etc/bashrc /etc/zshrc; do
                 if [[ -f "$f" ]] && [[ ! -f "$f.before-nix-darwin" ]]; then

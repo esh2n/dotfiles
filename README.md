@@ -110,6 +110,37 @@ All packages are managed via Nix flake. Priority order:
 | `domains/*/packages/home.nix` | User packages per domain |
 | `domains/*/packages/homebrew.nix` | Homebrew fallbacks per domain |
 
+### Updating Packages
+
+After modifying package configurations, apply changes with:
+
+```bash
+# Quick update after package changes
+./core/nix/update.sh
+
+# Complete rebuild (slower but thorough)
+./core/nix/update.sh --rebuild
+
+# Update after adding npm packages
+./core/nix/update.sh --node2nix
+```
+
+#### Adding NPM Packages via node2nix
+
+1. Edit `domains/dev/packages/node2nix/package.json`
+2. Run update script: `./core/nix/update.sh --node2nix`
+3. The script will regenerate and apply changes
+
+Example adding a package:
+```json
+{
+  "dependencies": {
+    "@anthropic-ai/claude-code": "*",
+    "aicommits": "^1.0.0"
+  }
+}
+```
+
 ### Symlink Management
 
 ```bash

@@ -72,14 +72,15 @@
     spanner-cli
     spanner-dump
 
-    # node2nix (firebase-tools, wrangler, aicommits)
-    node2nix-packages
+    # node2nix packages
+    claude-code
+    aicommits
   ]
   ++ (with pkgs.brewCasks; [
     wezterm
     ghostty
     cursor
-    claude
+    claude  # GUI version - CLI is available as 'claude-cli'
     visual-studio-code
     zed
     yaak
