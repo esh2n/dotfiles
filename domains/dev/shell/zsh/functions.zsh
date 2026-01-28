@@ -367,15 +367,21 @@ function _mx_kill_interactive() {
     local mux=$(echo "$selected" | cut -d: -f1)
     local session=$(echo "$selected" | cut -d: -f2 | cut -d' ' -f1)
 
+    local exit_code=0
     case "$mux" in
-      "tmux") tmux kill-session -t "$session" ;;
+      "tmux")
+        tmux kill-session -t "$session"
+        exit_code=$?
+        ;;
       "zellij")
-        # Use --force flag to kill and delete in one command
-        zellij delete-session --force "$session"
+        # Two-step process: kill then delete
+        zellij kill-session "$session" 2>/dev/null || true
+        zellij delete-session "$session" 2>/dev/null
+        exit_code=$?
         ;;
     esac
 
-    if [[ $? -eq 0 ]]; then
+    if [[ $exit_code -eq 0 ]]; then
       log_info "Killed $mux session: $session"
     else
       log_error "Failed to kill $mux session: $session"

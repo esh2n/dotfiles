@@ -162,18 +162,21 @@ if [[ -d "$ZELLIJ_CONFIG_DIR" ]]; then
                 else
                     # Fallback: direct edit
                     if [[ -w "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
-                        sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                        sed "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl" > "$ZELLIJ_CONFIG_DIR/config.kdl.tmp"
+                        mv "$ZELLIJ_CONFIG_DIR/config.kdl.tmp" "$ZELLIJ_CONFIG_DIR/config.kdl"
                         log_success "Updated Zellij theme layout"
                     fi
                 fi
             else
                 # Not a symlink, edit directly
                 if [[ -w "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
-                    sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                    sed "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl" > "$ZELLIJ_CONFIG_DIR/config.kdl.tmp"
+                    mv "$ZELLIJ_CONFIG_DIR/config.kdl.tmp" "$ZELLIJ_CONFIG_DIR/config.kdl"
                     log_success "Updated Zellij theme layout"
                 else
                     chmod 666 "$ZELLIJ_CONFIG_DIR/config.kdl"
-                    sed -i '' "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl"
+                    sed "s/default_layout \"[^\"]*\"/default_layout \"$THEME\"/" "$ZELLIJ_CONFIG_DIR/config.kdl" > "$ZELLIJ_CONFIG_DIR/config.kdl.tmp"
+                    mv "$ZELLIJ_CONFIG_DIR/config.kdl.tmp" "$ZELLIJ_CONFIG_DIR/config.kdl"
                     chmod 444 "$ZELLIJ_CONFIG_DIR/config.kdl"
                     log_success "Updated Zellij theme layout"
                 fi
@@ -244,7 +247,8 @@ fi
 
 if [[ -f "$STARSHIP_CONFIG" ]]; then
     if grep -q "^\[palettes\.$THEME\]" "$STARSHIP_CONFIG"; then
-        sed -i '' "s/^palette = \"[^\"]*\"/palette = \"$THEME\"/" "$STARSHIP_CONFIG"
+        sed "s/^palette = \"[^\"]*\"/palette = \"$THEME\"/" "$STARSHIP_CONFIG" > "$STARSHIP_CONFIG.tmp"
+        mv "$STARSHIP_CONFIG.tmp" "$STARSHIP_CONFIG"
         log_success "Updated Starship palette"
     else
         log_warn "Starship palette '$THEME' not found"
@@ -272,7 +276,8 @@ if [[ -n "$VSCODE_THEME" ]]; then
             if [[ -f "$real_file" ]] && [[ ! -L "$real_file" ]]; then
                 # Use sed for JSONC (JSON with comments) compatibility
                 if grep -q '"workbench.colorTheme"' "$real_file"; then
-                    sed -i '' "s/\"workbench.colorTheme\": *\"[^\"]*\"/\"workbench.colorTheme\": \"$VSCODE_THEME\"/" "$real_file"
+                    sed "s/\"workbench.colorTheme\": *\"[^\"]*\"/\"workbench.colorTheme\": \"$VSCODE_THEME\"/" "$real_file" > "$real_file.tmp"
+                    mv "$real_file.tmp" "$real_file"
                     log_success "Updated $(basename "$(dirname "$settings_file")")/settings.json"
                 else
                     log_warn "workbench.colorTheme not found in $settings_file"
@@ -293,7 +298,8 @@ fi
 # LazyVim
 LAZYVIM_COLORSCHEME="$NVIM_CONFIG_DIR/nvim-lazyvim/lua/plugins/colorscheme.lua"
 if [[ -f "$LAZYVIM_COLORSCHEME" ]]; then
-    sed -i '' "s/colorscheme = \"[^\"]*\"/colorscheme = \"$THEME\"/" "$LAZYVIM_COLORSCHEME"
+    sed "s/colorscheme = \"[^\"]*\"/colorscheme = \"$THEME\"/" "$LAZYVIM_COLORSCHEME" > "$LAZYVIM_COLORSCHEME.tmp"
+    mv "$LAZYVIM_COLORSCHEME.tmp" "$LAZYVIM_COLORSCHEME"
     log_success "Updated LazyVim colorscheme"
 elif [[ -d "$NVIM_CONFIG_DIR/nvim-lazyvim/lua/plugins" ]]; then
     cat > "$LAZYVIM_COLORSCHEME" << EOF
@@ -324,7 +330,8 @@ fi
 NVCHAD_THEME="$(get_nvchad_theme "$THEME")"
 NVCHAD_CHADRC="$NVIM_CONFIG_DIR/nvim-nvchad/lua/chadrc.lua"
 if [[ -f "$NVCHAD_CHADRC" ]]; then
-    sed -i '' "s/theme = \"[^\"]*\"/theme = \"$NVCHAD_THEME\"/" "$NVCHAD_CHADRC"
+    sed "s/theme = \"[^\"]*\"/theme = \"$NVCHAD_THEME\"/" "$NVCHAD_CHADRC" > "$NVCHAD_CHADRC.tmp"
+    mv "$NVCHAD_CHADRC.tmp" "$NVCHAD_CHADRC"
     log_success "Updated NvChad theme"
 elif [[ -d "$NVIM_CONFIG_DIR/nvim-nvchad" ]]; then
     # Create chadrc.lua if it doesn't exist
@@ -345,7 +352,8 @@ fi
 # AstroVim (user colorscheme plugin)
 ASTROVIM_USER="$NVIM_CONFIG_DIR/nvim-astrovim/lua/plugins/colorscheme.lua"
 if [[ -f "$ASTROVIM_USER" ]]; then
-    sed -i '' "s/colorscheme = \"[^\"]*\"/colorscheme = \"$THEME\"/" "$ASTROVIM_USER"
+    sed "s/colorscheme = \"[^\"]*\"/colorscheme = \"$THEME\"/" "$ASTROVIM_USER" > "$ASTROVIM_USER.tmp"
+    mv "$ASTROVIM_USER.tmp" "$ASTROVIM_USER"
     log_success "Updated AstroVim colorscheme"
 elif [[ -d "$NVIM_CONFIG_DIR/nvim-astrovim/lua/plugins" ]]; then
     cat > "$ASTROVIM_USER" << EOF
@@ -375,7 +383,8 @@ fi
 # Custom nvim (kickstart-based)
 CUSTOM_COLORSCHEME="$NVIM_CONFIG_DIR/nvim-custom/lua/custom/plugins/colorscheme.lua"
 if [[ -f "$CUSTOM_COLORSCHEME" ]]; then
-    sed -i '' "s/vim.cmd.colorscheme '[^']*'/vim.cmd.colorscheme '$THEME'/" "$CUSTOM_COLORSCHEME"
+    sed "s/vim.cmd.colorscheme '[^']*'/vim.cmd.colorscheme '$THEME'/" "$CUSTOM_COLORSCHEME" > "$CUSTOM_COLORSCHEME.tmp"
+    mv "$CUSTOM_COLORSCHEME.tmp" "$CUSTOM_COLORSCHEME"
     log_success "Updated Custom nvim colorscheme"
 elif [[ -d "$NVIM_CONFIG_DIR/nvim-custom/lua/custom/plugins" ]]; then
     cat > "$CUSTOM_COLORSCHEME" << EOF

@@ -127,3 +127,7 @@ result-*
 
 # node2nix
 domains/*/packages/node2nix/node_modules/
+domains/dev/config/claude/cache/
+domains/dev/config/claude/paste-cache/
+domains/dev/config/claude/tasks/
+domains/dev/config/claude/image-cache/

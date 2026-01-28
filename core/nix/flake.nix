@@ -25,7 +25,7 @@
 
   outputs = { nixpkgs, nix-darwin, home-manager, brew-nix, ... }:
     let
-      # Get username from environment or use default
+      # Get username from environment
       username = builtins.getEnv "USER";
       hostname = "${username}-mac";
       system = "aarch64-darwin";

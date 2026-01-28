@@ -126,12 +126,14 @@ build_configuration() {
     # Build the configuration
     log_info "Building configuration for ${USER}-mac..."
 
-    if nix build ".#darwinConfigurations.${USER}-mac.system" --impure; then
+    # Use --expr with builtins.getFlake to ensure --impure works for builtins.getEnv
+    local flake_uri="git+file://${DOTFILES_ROOT}?dir=core/nix"
+    if nix build --impure --no-eval-cache --expr "(builtins.getFlake \"${flake_uri}\").darwinConfigurations.\"${USER}-mac\".system"; then
         log_success "Configuration built successfully"
         return 0
     else
         log_error "Build failed. Trying with more verbose output..."
-        nix build ".#darwinConfigurations.${USER}-mac.system" --impure --show-trace
+        nix build --impure --no-eval-cache --show-trace --expr "(builtins.getFlake \"${flake_uri}\").darwinConfigurations.\"${USER}-mac\".system"
         return 1
     fi
 }
