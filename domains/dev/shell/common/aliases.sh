@@ -139,3 +139,48 @@ alias less='bat --style=plain'
 
 # Mac
 alias disp='open "x-apple.systempreferences:com.apple.Displays-Settings.extension"'
+
+# Jujutsu (jj) — mirrors git aliases with j prefix
+alias j='jj'
+# Log
+alias jl='jj log'
+alias jll='jj log --template builtin_log_oneline'
+alias jla='jj log -r "all()"'
+# Status/Diff
+alias js='jj status'
+alias jd='jj diff'
+alias jds='jj diff --stat'
+alias jD='jj diff -r @-'
+# Commit/New/Edit/Describe
+alias jc='jj commit'
+alias jci='jj commit --interactive'
+alias jn='jj new'
+alias je='jj edit'
+alias jde='jj describe'
+# Modify history
+alias ja='jj abandon'
+alias ju='jj undo'
+alias jsq='jj squash'
+alias jsi='jj squash --interactive'
+alias jsp='jj split'
+alias jr='jj rebase'
+# Restore/Show (= git restore/show)
+alias jrt='jj restore'
+alias jsh='jj show'
+# Bookmark (= git branch)
+alias jb='jj bookmark list'
+alias jbc='jj bookmark create'
+alias jbd='jj bookmark delete'
+alias jbm='jj bookmark move'
+alias jbrn='jj bookmark rename'
+# Git operations
+alias jf='jj git fetch'
+alias jp='jj git push'
+alias jfr='jj git fetch && jj rebase -d "trunk()"'
+# File operations
+alias jbl='jj file annotate'
+alias jfl='jj file list'
+# Operation log (= git reflog)
+alias jop='jj operation log'
+# LazyJJ
+alias lj='lazyjj'

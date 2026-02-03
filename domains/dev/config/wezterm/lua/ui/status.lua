@@ -159,6 +159,26 @@ function M.apply_to_config(config)
     config.status_update_interval = 1000
 
     wezterm.on("update-status", function(window, pane)
+        -- アクティブなキーテーブル（コピーモード等）の表示
+        local key_table = window:active_key_table()
+        local C = colors.get_colors()
+        if key_table then
+            local mode_label = ({
+                copy_mode = " COPY ",
+                search_mode = " SEARCH ",
+            })[key_table] or (" " .. key_table:upper() .. " ")
+            window:set_left_status(wezterm.format({
+                {Background = {Color = C.base}},
+                {Text = "  "},
+                {Background = {Color = COLORS.red}},
+                {Foreground = {Color = C.base}},
+                {Attribute = {Intensity = "Bold"}},
+                {Text = mode_label},
+            }))
+        else
+            window:set_left_status("")
+        end
+
         -- 現在時刻
         local time = wezterm.strftime("%H:%M")
         

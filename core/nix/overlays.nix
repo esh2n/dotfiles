@@ -86,7 +86,7 @@ final: prev: {
   # Claude Code CLI - properly wrapped
   claude-code = prev.stdenv.mkDerivation rec {
     pname = "claude-code";
-    version = "2.0.76";
+    version = "2.1.29";
 
     nativeBuildInputs = [ prev.makeWrapper ];
     buildInputs = [ prev.nodejs_20 ];

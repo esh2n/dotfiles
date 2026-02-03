@@ -11,28 +11,48 @@ Rich, modern terminal multiplexer configuration with theme integration and power
 
 ### 🔌 Plugins
 - **Zjstatus** - Rich status bar with Git info, time, mode display
-- **Monocle** - Fuzzy file finder (Alt+f)
-- **Harpoon** - Favorite panes management (Alt+h)
+- **Monocle** - Fuzzy file finder (`Ctrl+q` → `f`)
+- **Harpoon** - Favorite panes management (`Ctrl+q` → `b`)
 
 ### ⌨️ Keybindings
 
-**Basic Navigation:**
-- `Ctrl+h/j/k/l` - Move focus between panes
-- `Alt+n` - New pane
-- `Alt+w` - Close pane
-- `Alt+t` - New tab
-- `Alt+1-5` - Switch to tab 1-5
+Prefix key: `Ctrl+q` (enters locked/prefix mode)
 
-**Plugins:**
-- `Alt+f` - **Monocle** fuzzy finder
-- `Alt+h` - **Harpoon** pane bookmarks
+**Normal Mode (no prefix):**
+- `Ctrl+1-5` - Switch to tab 1-5
+
+**Prefix Mode (`Ctrl+q` →):**
+
+| Key | Action |
+|-----|--------|
+| `h`/`j`/`k`/`l` | Move focus between panes |
+| `H`/`J`/`K`/`L` | Resize pane |
+| `Tab` / `Shift+Tab` | Next / Previous tab |
+| `t` | New tab |
+| `\` | Split pane right |
+| `-` | Split pane down |
+| `x` | Close pane |
+| `z` | Toggle pane fullscreen |
+| `w` | Toggle floating panes |
+| `e` | Toggle pane embed/float |
+| `[` | Enter scroll/copy mode |
+| `d` | Detach session |
+
+**Plugins (prefix mode):**
+- `f` - **Monocle** - zellij内のファジーファインダー。開いているpane/tabをインクリメンタル検索してジャンプ
+- `b` - **Harpoon** - よく使うpaneをブックマークして即座に切り替え。paneが多い時に便利
 
 **Harpoon Commands:**
-- `a` - Add current pane to favorites
-- `j/k` or `↑/↓` - Navigate pane list
-- `Enter` - Jump to selected pane
-- `d` - Remove from favorites
-- `Esc` - Exit Harpoon
+
+| Key | Action |
+|-----|--------|
+| `a` | 現在のpaneをブックマークに追加 |
+| `j`/`k` or `↑`/`↓` | リスト内を移動 |
+| `Enter` | 選択したpaneにジャンプ |
+| `d` | ブックマークから削除 |
+| `Esc` | 閉じる |
+
+> **Tip:** paneが2〜3個なら `Ctrl+q` → `h/j/k/l` のpane移動で十分。paneが5個以上になる運用でHarpoonが真価を発揮する。
 
 ## 🚀 Installation
 

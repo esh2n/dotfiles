@@ -89,6 +89,10 @@ quick-terminal-autohide = true
 # Image protocol
 image-storage-limit = 320
 
+# Fix: Shift+Enter sends escape sequence instead of newline in Claude Code
+# See: https://github.com/anthropics/claude-code/issues/5757
+keybind = shift+enter=text:\n
+
 # Key bindings - Tabs and Windows
 keybind = cmd+t=new_tab
 keybind = cmd+shift+t=new_window
@@ -150,3 +154,8 @@ keybind = cmd+shift+space=toggle_quick_terminal
 
 # Reload config
 keybind = cmd+shift+comma=reload_config
+
+# Fix: Unbind Alt keybinds that conflict with Zellij
+# See: https://github.com/ghostty-org/ghostty/discussions/3483
+keybind = alt+left=unbind
+keybind = alt+right=unbind

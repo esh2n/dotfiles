@@ -1,0 +1,70 @@
+# Jujutsu (jj) Configuration
+# User-specific settings go in conf.d/user.toml (gitignored)
+
+[ui]
+default-command = "log"
+pager = "less -FRX"
+diff-editor = ":builtin"
+merge-editor = ":builtin"
+
+[git]
+auto-local-bookmark = false
+
+[aliases]
+# Basic
+c = ["commit"]
+ci = ["commit", "--interactive"]
+d = ["describe"]
+e = ["edit"]
+n = ["new"]
+a = ["abandon"]
+u = ["undo"]
+
+# History manipulation
+s = ["split"]
+sq = ["squash"]
+si = ["squash", "--interactive"]
+rs = ["restore"]
+sh = ["show"]
+mg = ["new"]
+
+# Git interop
+f = ["git", "fetch"]
+p = ["git", "push"]
+i = ["git", "init", "--colocate"]
+cl = ["git", "clone", "--colocate"]
+
+# Log
+l = ["log", "-r", "::@"]
+la = ["log", "-r", "all()"]
+ll = ["log", "--template", "builtin_log_oneline"]
+
+# Bookmark (= git branch)
+b = ["bookmark", "list"]
+bc = ["bookmark", "create"]
+bd = ["bookmark", "delete"]
+bm = ["bookmark", "move"]
+br = ["bookmark", "rename"]
+
+# Other
+r = ["rebase"]
+st = ["status"]
+di = ["diff"]
+dis = ["diff", "--stat"]
+fa = ["file", "annotate"]
+fl = ["file", "list"]
+opl = ["operation", "log"]
+
+# Workspace
+ws = ["workspace", "list"]
+wsa = ["workspace", "add"]
+wsf = ["workspace", "forget"]
+
+[revset-aliases]
+"trunk()" = "trunk()"
+"wip" = 'description(regex:"^\\[(wip|WIP|todo|TODO)\\]")'
+"recent" = 'committer_date(after:"1 month ago")'
+"today" = 'committer_date(after:"today 00:00")'
+"unpushed" = "mine() & mutable()"
+"ready" = 'mutable() & ~description(regex:"^\\[(wip|WIP)\\]") & ~empty()'
+"immutable_heads()" = "trunk() | tags()"

@@ -361,6 +361,125 @@ npm install -g difit
 bunx difit <commit-range>
 ```
 
+### Jujutsu (jj) Aliases
+
+Next-generation VCS coexisting with git. Pattern: `j` prefix mirrors `g` prefix for git.
+
+#### git -> jj Cheat Sheet
+
+| Concept | git | jj |
+|---------|-----|-----|
+| Branch | `git branch` | `jj bookmark` |
+| Checkout/Switch | `git switch` | `jj edit` / `jj new` |
+| Staging area | `git add` | (automatic, working copy = staging) |
+| Stash | `git stash` | (not needed, just `jj new`) |
+| Commit amend | `git commit --amend` | `jj describe` / `jj squash` |
+| Revert | `git revert` | `jj backout` |
+| Reflog | `git reflog` | `jj operation log` |
+| Worktree | `git worktree` | `jj workspace` |
+| Blame | `git blame` | `jj file annotate` |
+| Remote ops | `git push/fetch` | `jj git push/fetch` |
+
+#### Basic Operations
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `j` | `jj` | Base command |
+| `jl` | `jj log` | Log |
+| `jll` | `jj log --template builtin_log_oneline` | Compact log |
+| `jla` | `jj log -r "all()"` | All revisions |
+| `js` | `jj status` | Status |
+| `jd` | `jj diff` | Diff working copy |
+| `jds` | `jj diff --stat` | Diff stat |
+| `jD` | `jj diff -r @-` | Diff parent |
+
+#### Commit/Edit/Describe
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `jc` | `jj commit` | Commit (= finalize current change) |
+| `jci` | `jj commit --interactive` | Interactive commit |
+| `jn` | `jj new` | New empty change |
+| `je` | `jj edit` | Edit existing change |
+| `jde` | `jj describe` | Edit description (= amend message) |
+
+#### History Modification
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `ja` | `jj abandon` | Abandon change |
+| `ju` | `jj undo` | Undo last operation |
+| `jsq` | `jj squash` | Squash into parent |
+| `jsi` | `jj squash --interactive` | Interactive squash |
+| `jsp` | `jj split` | Split change |
+| `jr` | `jj rebase` | Rebase |
+
+#### Restore/Show
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `jrt` | `jj restore` | = `git restore` |
+| `jsh` | `jj show` | = `git show` |
+
+#### Bookmark (= git branch)
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `jb` | `jj bookmark list` | List bookmarks |
+| `jbc` | `jj bookmark create` | Create bookmark |
+| `jbd` | `jj bookmark delete` | Delete bookmark |
+| `jbm` | `jj bookmark move` | Move bookmark |
+| `jbrn` | `jj bookmark rename` | Rename bookmark |
+
+#### Git Operations
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `jf` | `jj git fetch` | Fetch from remote |
+| `jp` | `jj git push` | Push to remote |
+| `jfr` | `jj git fetch && jj rebase -d "trunk()"` | Fetch and rebase |
+
+#### File/Operation
+
+| Alias | Command | Note |
+|-------|---------|------|
+| `jbl` | `jj file annotate` | = `git blame` |
+| `jfl` | `jj file list` | = `git ls-files` |
+| `jop` | `jj operation log` | = `git reflog` |
+| `lj` | `lazyjj` | LazyJJ TUI |
+
+#### Interactive (skim-based)
+
+| Command | Description |
+|---------|-------------|
+| `jsw [change]` | Select change and edit (= `gsw`) |
+| `jpso [bookmark]` | Select bookmark and push (= `gpso`) |
+| `jPso [bookmark]` | Select bookmark and force push (= `gPso`) |
+| `jifit` | Select 2 changes and view diff |
+| `jdif [N]` | Diff from N ancestors back |
+| `jswc [name]` | Create bookmark at @ |
+| `jrn [old] [new]` | Rename bookmark |
+| `jnew [change]` | New change from selected |
+| `jedit [change]` | Edit selected change |
+| `jrb` | Interactive rebase (source + dest selection) |
+| `jsquash [target]` | Squash into selected target |
+| `jbd_sk` | Delete bookmark (fuzzy select) |
+| `jbm_sk` | Move bookmark to @ (fuzzy select) |
+
+#### Workspace Management (jwt)
+
+| Command | Description |
+|---------|-------------|
+| `jwt` | Interactive menu |
+| `jwt list` | List all workspaces |
+| `jwt cd [name]` | Switch to workspace (interactive if no args) |
+| `jwt add` | Create workspace (interactive) |
+| `jwt rm` | Remove workspace (interactive) |
+| `jwtcd` | Same as `jwt cd` |
+| `jwtadd` | Same as `jwt add` |
+| `jwtrm` | Same as `jwt rm` |
+| `jwtls` | Same as `jwt list` |
+
 ### Git Worktree Management (wtp)
 
 **wtp** is a CLI tool for managing git worktrees, enabling parallel development on multiple branches without switching contexts.
@@ -610,9 +729,13 @@ Keybindings unified across tmux, WezTerm, and Zellij.
 | Go to tab 1-5 | `Ctrl+1-5` | No prefix, Zellij only |
 | New tab | `Prefix + t` | Zellij only |
 | Last tab | `Prefix + Tab` | tmux only |
-| Copy/scroll mode | `Prefix + [` | |
-| Begin selection | `v` | In copy mode |
-| Copy and exit | `y` | tmux only |
+| Copy/scroll mode | `Prefix + [` | WezTerm: `Prefix + c` |
+| Move (copy mode) | `h/j/k/l`, `w/b/e`, `0/$` | Vim-style navigation |
+| Page scroll (copy mode) | `Ctrl+u/d` (half), `Ctrl+b/f` (full) | |
+| Search (copy mode) | `/` → `n/N` | `Ctrl+r` to cycle match type |
+| Begin selection | `v` / `V` / `Ctrl+v` | Cell / Line / Block |
+| Copy and exit | `y` | Copies to clipboard |
+| Exit copy mode | `Esc` or `q` | |
 | Detach session | `Prefix + d` | |
 | Monocle plugin | `Prefix + f` | Zellij only (file finder) |
 | Harpoon plugin | `Prefix + h` | Zellij only (bookmarks) |
@@ -841,6 +964,7 @@ All existing configurations are backed up:
 
 User-specific settings go in:
 - `~/.config/git/config.local` - Git settings
+- `~/.config/jj/conf.d/user.toml` - Jujutsu user settings (name, email)
 - Shell environment: Modify `domains/dev/home/.zshenv`
 
 ## License

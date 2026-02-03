@@ -38,6 +38,11 @@ fi
 # Ensure compdef is available
 autoload -U compdef
 
+# Jujutsu (jj) completion
+if command -v jj &> /dev/null; then
+  source <(COMPLETE=zsh jj 2>/dev/null || true)
+fi
+
 # Initialize zsh-autosuggestions
 if [[ -f /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
     source /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh

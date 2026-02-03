@@ -112,6 +112,9 @@ domains/dev/config/nvim-custom/lua/custom/plugins/colorscheme.lua
 **/git/conditional/
 **/.gitconfig
 
+# User-specific jj config (should be local only)
+**/jj/conf.d/user.toml
+
 # Company-specific configurations (never commit)
 **/workspace/config/qlink/
 
@@ -131,3 +134,7 @@ domains/dev/config/claude/cache/
 domains/dev/config/claude/paste-cache/
 domains/dev/config/claude/tasks/
 domains/dev/config/claude/image-cache/
+**/claude/security_warnings_state_*.json
+
+# Python cache
+**/__pycache__/

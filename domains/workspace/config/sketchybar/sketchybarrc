@@ -1,4 +1,4 @@
-#!/usr/bin/env lua
+#!/Users/esh2n/.local/share/mise/shims/lua
 
 -- Load the sketchybar-package and prepare the helper binaries
 require("helpers")

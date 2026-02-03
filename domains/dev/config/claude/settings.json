@@ -283,7 +283,8 @@
       "NotebookEdit(./**)",
       "TodoRead(**)",
       "TodoWrite(**)",
-      "Task(**)"
+      "Task(**)",
+      "mcp__pencil"
     ],
     "deny": [
       "Bash(rm -rf /)",
@@ -412,5 +413,6 @@
     "Notion@claude-plugins-official": true
   },
   "theme": "dark",
-  "preferredNotifChannel": "terminal_bell"
+  "preferredNotifChannel": "terminal_bell",
+  "language": "Japanese"
 }

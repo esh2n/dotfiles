@@ -189,21 +189,26 @@ function sk_change_directory() {
 # Multiplexer Management (mx)
 # -----------------------------------------------------------------------------
 
-# Detect current multiplexer
+# Detect current multiplexer (or terminal emulator with mux capability)
 function _mx_detect_current() {
-  if [[ -n "$ZELLIJ_SESSION_NAME" ]]; then
+  if [[ -n "${ZELLIJ_SESSION_NAME:-}" ]] || [[ -n "${ZELLIJ:-}" ]]; then
     echo "zellij"
-  elif [[ -n "$TMUX" ]]; then
+  elif [[ -n "${TMUX:-}" ]]; then
     echo "tmux"
+  elif [[ -n "${WEZTERM_PANE:-}" ]]; then
+    echo "wezterm"
   else
     echo ""
   fi
 }
 
 # Detect available multiplexer (preference: current > active sessions > installed)
+# Note: WezTerm is treated as "no multiplexer" here because it doesn't manage
+# sessions like tmux/zellij. Use --mux wezterm explicitly for workspace command.
 function _mx_detect_available() {
   local current=$(_mx_detect_current)
-  if [[ -n "$current" ]]; then
+  # Only return early for real multiplexers (not wezterm)
+  if [[ -n "$current" ]] && [[ "$current" != "wezterm" ]]; then
     echo "$current"
     return
   fi
@@ -234,7 +239,7 @@ function _mx_list_sessions() {
     "zellij")
       if has_command zellij; then
         # Strip ANSI color codes from zellij output
-        zellij list-sessions 2>/dev/null | tail -n +2 | sed 's/\x1b\[[0-9;]*m//g' | awk '{print "zellij\t" $1 "\t" $0}'
+        zellij list-sessions 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | awk '{print "zellij\t" $1 "\t" $0}'
       fi
       ;;
   esac
@@ -290,11 +295,21 @@ function _mx_attach_session() {
   local session="$2"
   local current=$(_mx_detect_current)
 
+  # WezTerm is not a session-based mux, treat as "outside"
+  if [[ "$current" == "wezterm" ]]; then
+    current=""
+  fi
+
   if [[ "$current" == "$mux" ]]; then
     # Same multiplexer - switch session
     case "$mux" in
       "tmux") tmux switch-client -t "$session" ;;
-      "zellij") zellij action switch-mode normal; zellij action go-to-tab-name "$session" ;;
+      "zellij")
+        # No direct CLI action for session switching in zellij
+        # Launch the built-in session-manager plugin
+        log_info "Opening session manager (select '$session')"
+        zellij action launch-or-focus-plugin --floating "zellij:session-manager"
+        ;;
     esac
   else
     # Different multiplexer or from outside - attach
@@ -395,7 +410,7 @@ function _mx_new_session() {
   local mux=$(_mx_detect_available)
 
   if [[ -z "$mux" ]]; then
-    log_error "No multiplexer available"
+    log_error "No multiplexer available (install zellij or tmux)"
     return 1
   fi
 
@@ -416,6 +431,10 @@ function _mx_new_session() {
       ;;
     "zellij")
       zellij -s "$session_name"
+      ;;
+    *)
+      log_error "Unsupported multiplexer for session creation: $mux"
+      return 1
       ;;
   esac
 }
@@ -809,6 +828,387 @@ function gPso() {
 }
 
 # -----------------------------------------------------------------------------
+# Jujutsu (jj) Helpers
+# -----------------------------------------------------------------------------
+
+# Select change from jj log (= sk_select_commit for git)
+function sk_select_jj_change() {
+  local prompt="${1:-Change> }"
+  local limit="${2:-100}"
+
+  jj log -r "::@ | trunk()..@" --no-graph --color=always -n "$limit" \
+    --template 'change_id.shortest(8) ++ " " ++ if(description, description.first_line(), "(no description)") ++ "\n"' 2>/dev/null | \
+    sk --prompt="$prompt" --ansi --reverse \
+       --preview 'jj show --color=always {1} 2>/dev/null' \
+       --preview-window 'right:60%' | \
+    awk '{print $1}'
+}
+
+# Select bookmark from jj bookmark list (= sk_select_branch_all for git)
+function sk_select_jj_bookmark() {
+  local prompt="${1:-Bookmark> }"
+
+  jj bookmark list --template 'name ++ "\n"' 2>/dev/null | \
+    sk --prompt="$prompt" --ansi --reverse
+}
+
+# Select bookmark except current working copy's bookmark
+function sk_select_jj_bookmark_except_current() {
+  local prompt="${1:-Bookmark> }"
+  local current_bookmarks=$(jj log -r @ --no-graph \
+    --template 'self.bookmarks().map(|b| b.name()).join("\n")' 2>/dev/null)
+
+  jj bookmark list --template 'name ++ "\n"' 2>/dev/null | \
+    grep -v -F "$current_bookmarks" | \
+    sk --prompt="$prompt" --ansi --reverse
+}
+
+# Switch to change (= gsw for git)
+function jsw() {
+  if [ $# -eq 0 ]; then
+    local selected=$(sk_select_jj_change "Edit> ")
+    if [ -n "$selected" ]; then
+      jj edit "$selected"
+    fi
+  else
+    jj edit "$@"
+  fi
+}
+
+# Push bookmark (= gpso for git)
+function jpso() {
+  if [ $# -eq 0 ]; then
+    local selected=$(sk_select_jj_bookmark "Push bookmark> ")
+    if [ -n "$selected" ]; then
+      jj git push -b "$selected"
+    fi
+  else
+    jj git push -b "$@"
+  fi
+}
+
+# Force push bookmark (= gPso for git)
+function jPso() {
+  if [ $# -eq 0 ]; then
+    local selected=$(sk_select_jj_bookmark "Force push bookmark> ")
+    if [ -n "$selected" ]; then
+      jj git push --allow-new -b "$selected"
+    fi
+  else
+    jj git push --allow-new -b "$@"
+  fi
+}
+
+# Select 2 changes and diff with difit (= gifit for git)
+function jifit() {
+  if ! jj root &>/dev/null; then
+    log_error "Not in a jj repository"
+    return 1
+  fi
+
+  local difit_cmd=""
+  if has_command difit; then
+    difit_cmd="difit"
+  elif has_command bunx; then
+    difit_cmd="bunx difit"
+  elif has_command npx; then
+    difit_cmd="npx difit"
+  else
+    log_error "difit is not available. Install with: npm install -g difit"
+    return 1
+  fi
+
+  log_info "Select FROM change (older)"
+  local from_change=$(sk_select_jj_change "FROM (older)> " 100)
+  if [[ -z "$from_change" ]]; then
+    log_warn "No FROM change selected"
+    return 1
+  fi
+
+  log_info "Selected FROM: $from_change"
+  log_info "Select TO change (newer)"
+  local to_change=$(sk_select_jj_change "TO (newer)> " 100)
+  if [[ -z "$to_change" ]]; then
+    log_warn "No TO change selected"
+    return 1
+  fi
+
+  log_info "Selected TO: $to_change"
+  log_info "Running diff between $from_change and $to_change"
+  jj diff --from "$from_change" --to "$to_change"
+}
+
+# Quick diff from @ ancestors (= gdif for git)
+function jdif() {
+  local n="${1:-1}"
+
+  if ! jj root &>/dev/null; then
+    log_error "Not in a jj repository"
+    return 1
+  fi
+
+  jj diff --from "@-${n}" --to "@"
+}
+
+# Create bookmark (= gswc for git)
+function jswc() {
+  if [ $# -eq 0 ]; then
+    printf "Bookmark name: "
+    read bookmark_name
+    if [[ -n "$bookmark_name" ]]; then
+      jj bookmark create "$bookmark_name" -r @
+    fi
+  else
+    jj bookmark create "$@" -r @
+  fi
+}
+
+# Rename bookmark (= grn for git)
+function jrn() {
+  if [ $# -eq 0 ]; then
+    local selected=$(sk_select_jj_bookmark "Rename bookmark> ")
+    if [[ -n "$selected" ]]; then
+      printf "New name: "
+      read new_name
+      if [[ -n "$new_name" ]]; then
+        jj bookmark rename "$selected" "$new_name"
+      fi
+    fi
+  else
+    jj bookmark rename "$@"
+  fi
+}
+
+# New change from selected (jj-specific)
+function jnew() {
+  if [ $# -eq 0 ]; then
+    local selected=$(sk_select_jj_change "New from> ")
+    if [ -n "$selected" ]; then
+      jj new "$selected"
+    fi
+  else
+    jj new "$@"
+  fi
+}
+
+# Edit change interactively (jj-specific)
+function jedit() {
+  if [ $# -eq 0 ]; then
+    local selected=$(sk_select_jj_change "Edit> ")
+    if [ -n "$selected" ]; then
+      jj edit "$selected"
+    fi
+  else
+    jj edit "$@"
+  fi
+}
+
+# Rebase interactively (jj-specific)
+function jrb() {
+  log_info "Select source (change to rebase)"
+  local source=$(sk_select_jj_change "Source> ")
+  if [[ -z "$source" ]]; then
+    return 0
+  fi
+
+  log_info "Select destination (rebase onto)"
+  local dest=$(sk_select_jj_change "Destination> ")
+  if [[ -z "$dest" ]]; then
+    return 0
+  fi
+
+  jj rebase -r "$source" -d "$dest"
+}
+
+# Squash into target (jj-specific)
+function jsquash() {
+  if [ $# -eq 0 ]; then
+    log_info "Select target (squash into)"
+    local target=$(sk_select_jj_change "Squash into> ")
+    if [ -n "$target" ]; then
+      jj squash --into "$target"
+    fi
+  else
+    jj squash --into "$@"
+  fi
+}
+
+# -----------------------------------------------------------------------------
+# Jujutsu Workspace Management (jwt — mirrors wt for git worktrees)
+# -----------------------------------------------------------------------------
+
+# Internal helper: Select workspace using skim
+function _jwt_select_workspace() {
+  local workspaces=$(jj workspace list 2>/dev/null | awk '{print $1}')
+
+  if [[ -z "$workspaces" ]]; then
+    echo "No workspaces found" >&2
+    return 1
+  fi
+
+  echo "$workspaces" | sk --prompt="Workspace> " --ansi --reverse
+}
+
+# Change to workspace directory
+function jwtcd() {
+  if [[ $# -gt 0 ]]; then
+    # With arguments: find workspace path and cd
+    local ws_name="$1"
+    local root=$(jj workspace root 2>/dev/null)
+    if [[ -z "$root" ]]; then
+      log_error "Not in a jj repository"
+      return 1
+    fi
+    # Default workspace lives at root, others at ../<ws_name>
+    if [[ "$ws_name" == "default" ]]; then
+      cd "$root"
+    else
+      local ws_path="${root}/../${ws_name}"
+      if [[ -d "$ws_path" ]]; then
+        cd "$ws_path"
+      else
+        log_error "Workspace directory not found: $ws_path"
+        return 1
+      fi
+    fi
+  else
+    # No arguments: interactive selection
+    local selected=$(_jwt_select_workspace)
+    if [[ -n "$selected" ]]; then
+      jwtcd "$selected"
+    fi
+  fi
+}
+
+# Add workspace interactively
+function jwtadd() {
+  if ! jj root &>/dev/null; then
+    log_error "Not in a jj repository"
+    return 1
+  fi
+
+  printf "Workspace path: "
+  read ws_path
+  if [[ -z "$ws_path" ]]; then
+    log_info "Cancelled"
+    return 0
+  fi
+
+  local choice=$(cat <<EOF | sk --prompt="Options> " --ansi --reverse
+At current change (@)
+At specific revision
+EOF
+)
+
+  case "$choice" in
+    "At current change"*)
+      jj workspace add "$ws_path"
+      ;;
+    "At specific revision"*)
+      local rev=$(sk_select_jj_change "Revision> ")
+      if [[ -n "$rev" ]]; then
+        jj workspace add "$ws_path" -r "$rev"
+      else
+        log_info "Cancelled"
+      fi
+      ;;
+    *)
+      log_info "Cancelled"
+      ;;
+  esac
+}
+
+# Remove workspace interactively
+function jwtrm() {
+  local selected=$(_jwt_select_workspace)
+  if [[ -z "$selected" ]]; then
+    return 0
+  fi
+
+  if [[ "$selected" == "default" ]]; then
+    log_error "Cannot remove the default workspace"
+    return 1
+  fi
+
+  printf "Remove workspace '$selected'? (y/N): "
+  read confirmation
+  if [[ "$confirmation" =~ ^[Yy]$ ]]; then
+    jj workspace forget "$selected"
+    if [[ $? -eq 0 ]]; then
+      log_success "Removed workspace: $selected"
+    else
+      log_error "Failed to remove workspace"
+    fi
+  else
+    log_info "Cancelled"
+  fi
+}
+
+# List workspaces
+function jwtls() {
+  if ! jj root &>/dev/null; then
+    log_error "Not in a jj repository"
+    return 1
+  fi
+  jj workspace list
+}
+
+# Help function
+function _jwt_help() {
+  cat <<EOF
+Jujutsu Workspace Manager (jwt) - Interactive workspace management with skim
+
+Commands:
+  jwt              Interactive menu
+  jwt list         List all workspaces
+  jwt cd [name]    Switch to workspace (interactive if no args)
+  jwt add          Create new workspace (interactive)
+  jwt rm           Remove workspace (interactive)
+  jwt help         Show this help
+
+Aliases:
+  jwtcd            Same as 'jwt cd'
+  jwtadd           Same as 'jwt add'
+  jwtrm            Same as 'jwt rm'
+  jwtls            Same as 'jwt list'
+EOF
+}
+
+# Interactive main menu
+function _jwt_main_menu() {
+  local choice=$(cat <<EOF | sk --prompt="jj Workspace> " --ansi --reverse
+List all workspaces
+Switch to workspace
+Create workspace
+Remove workspace
+Help
+EOF
+)
+
+  case "$choice" in
+    "List all workspaces") echo; jwtls ;;
+    "Switch to workspace") jwtcd ;;
+    "Create workspace") jwtadd ;;
+    "Remove workspace") jwtrm ;;
+    "Help") echo; _jwt_help ;;
+    *) ;;
+  esac
+}
+
+# Main jwt command
+function jwt() {
+  case "${1:-}" in
+    "list"|"ls")     jwtls ;;
+    "cd"|"switch")   shift; jwtcd "$@" ;;
+    "add"|"new")     jwtadd ;;
+    "rm"|"remove")   jwtrm ;;
+    "help"|"h")      _jwt_help ;;
+    "")              _jwt_main_menu ;;
+    *)               _jwt_help ;;
+  esac
+}
+
+# -----------------------------------------------------------------------------
 # Utilities
 # -----------------------------------------------------------------------------
 
@@ -1153,3 +1553,869 @@ function sk_worktree_menu() {
   _wt_main_menu
   zle reset-prompt
 }
+
+# -----------------------------------------------------------------------------
+# Workspace Layout Manager (workspace)
+# -----------------------------------------------------------------------------
+
+# Available presets
+typeset -gA _WS_PRESETS=(
+  [coding]="editor + terminal"
+  [full]="yazi + editor + lazygit + terminal"
+  [review]="lazygit + editor"
+  [explore]="yazi + editor"
+  [llm]="claude x<N> + shell (grid adjustable)"
+)
+
+# Parse LLM grid spec (e.g., "3x2", "9") into "cols rows"
+function _ws_llm_parse_grid() {
+  local spec="${1:-3x2}"
+  local cols rows
+
+  if [[ "$spec" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+    cols="${match[1]}"
+    rows="${match[2]}"
+  elif [[ "$spec" =~ ^[0-9]+$ ]]; then
+    local n="$spec"
+    # Auto-calculate: near-square grid, wider than tall
+    cols=1
+    while (( cols * cols < n )); do
+      (( cols++ ))
+    done
+    rows=$(( (n + cols - 1) / cols ))
+  else
+    cols=3
+    rows=2
+  fi
+
+  echo "$cols $rows"
+}
+
+# Generate zellij KDL pane nodes for LLM grid
+# Shell pane is placed at the bottom, so row sizes are based on grid_pct (default 80%)
+function _ws_llm_gen_panes() {
+  local cols="$1"
+  local rows="$2"
+  local indent="$3"
+  local grid_pct="${4:-80}"
+  local n=1
+
+  for ((r = 1; r <= rows; r++)); do
+    local row_pct=$(( grid_pct / rows ))
+    (( r == rows )) && row_pct=$(( grid_pct - (rows - 1) * (grid_pct / rows) ))
+
+    echo "${indent}pane split_direction=\"vertical\" size=\"${row_pct}%\" {"
+    for ((c = 1; c <= cols; c++)); do
+      local col_pct=$(( 100 / cols ))
+      (( c == cols )) && col_pct=$(( 100 - (cols - 1) * (100 / cols) ))
+      echo "${indent}    pane name=\"claude-${n}\" size=\"${col_pct}%\" command=\"claude\""
+      (( n++ ))
+    done
+    echo "${indent}}"
+  done
+}
+
+# Resolve editor command
+function _ws_resolve_editor() {
+  local editor="${EDITOR:-nvim}"
+  # Ensure we have an absolute path or a known command
+  if has_command "$editor"; then
+    echo "$editor"
+  else
+    echo "nvim"
+  fi
+}
+
+# Generate zellij layout KDL for a preset
+function _ws_zellij_layout() {
+  local preset="$1"
+  local dir="$2"
+  local grid_spec="${3:-3x2}"
+  local editor=$(_ws_resolve_editor)
+  local zjstatus_path="$HOME/.config/zellij/plugins/zjstatus.wasm"
+
+  # zjstatus top bar
+  local top_bar
+  read -r -d '' top_bar <<'TOPBAR' || true
+        pane size=1 borderless=true {
+            plugin location="file:__ZJSTATUS__" {
+                format_space  "#[bg=#313244]"
+                format_left   "#[bg=#313244,fg=#89b4fa,bold] 󰣇 {mode} #[bg=#313244,fg=#cdd6f4]│ #[bg=#313244,fg=#fab387,bold]{session} "
+                format_center "#[bg=#313244]{tabs}"
+                format_right  "#[bg=#313244,fg=#94e2d5]{command_whoami}#[bg=#313244,fg=#cdd6f4]@#[bg=#313244,fg=#a6e3a1]{command_hostname} "
+                mode_normal        "#[bg=#89b4fa,fg=#1e1e2e,bold] NORMAL "
+                mode_locked        "#[bg=#f38ba8,fg=#1e1e2e,bold] LOCKED "
+                mode_resize        "#[bg=#fab387,fg=#1e1e2e,bold] RESIZE "
+                mode_pane          "#[bg=#a6e3a1,fg=#1e1e2e,bold] PANE "
+                mode_tab           "#[bg=#f9e2af,fg=#1e1e2e,bold] TAB "
+                mode_scroll        "#[bg=#cba6f7,fg=#1e1e2e,bold] SCROLL "
+                mode_enter_search  "#[bg=#94e2d5,fg=#1e1e2e,bold] SEARCH "
+                mode_search        "#[bg=#94e2d5,fg=#1e1e2e,bold] SEARCH "
+                mode_rename_tab    "#[bg=#f9e2af,fg=#1e1e2e,bold] RENAME "
+                mode_rename_pane   "#[bg=#a6e3a1,fg=#1e1e2e,bold] RENAME "
+                mode_session       "#[bg=#f38ba8,fg=#1e1e2e,bold] SESSION "
+                mode_move          "#[bg=#fab387,fg=#1e1e2e,bold] MOVE "
+                mode_prompt        "#[bg=#cba6f7,fg=#1e1e2e,bold] PROMPT "
+                mode_tmux          "#[bg=#fab387,fg=#1e1e2e,bold] TMUX "
+                tab_normal   "#[bg=#313244,fg=#6c7086]  {name}#{index} "
+                tab_active   "#[bg=#45475a,fg=#89b4fa,bold]  {name}#{index} "
+                command_whoami_command     "whoami"
+                command_whoami_format      "{stdout}"
+                command_whoami_interval    "0"
+                command_hostname_command   "hostname"
+                command_hostname_format    "{stdout}"
+                command_hostname_interval  "0"
+                border_enabled  "false"
+            }
+        }
+TOPBAR
+  top_bar="${top_bar//__ZJSTATUS__/$zjstatus_path}"
+
+  # zjstatus bottom bar
+  local bottom_bar
+  read -r -d '' bottom_bar <<'BOTTOMBAR' || true
+        pane size=1 borderless=true {
+            plugin location="file:__ZJSTATUS__" {
+                format_space  "#[bg=#313244]"
+                format_left   "#[bg=#313244,fg=#6c7086] Split: #[bg=#313244,fg=#89b4fa]\\#[bg=#313244,fg=#6c7086],#[bg=#313244,fg=#89b4fa]-#[bg=#313244,fg=#6c7086] │ Nav: #[bg=#313244,fg=#89b4fa]hjkl#[bg=#313244,fg=#89b4fa] │ Resize: #[bg=#313244,fg=#89b4fa]H/J/K/L#[bg=#313244,fg=#6c7086] │ Float: #[bg=#313244,fg=#89b4fa]w,e#[bg=#313244,fg=#6c7086] │ Zoom: #[bg=#313244,fg=#89b4fa]z#[bg=#313244,fg=#6c7086] │ Close: #[bg=#313244,fg=#89b4fa]x "
+                format_center "#[bg=#313244,fg=#6c7086]Scroll: #[bg=#313244,fg=#89b4fa][#[bg=#313244,fg=#6c7086] │ Find: #[bg=#313244,fg=#89b4fa]f#[bg=#313244,fg=#6c7086] │ Harpoon: #[bg=#313244,fg=#89b4fa]h#[bg=#313244,fg=#6c7086] │ Detach: #[bg=#313244,fg=#89b4fa]d "
+                format_right  "#[bg=#313244,fg=#6c7086]Tab: #[bg=#313244,fg=#89b4fa]t#[bg=#313244,fg=#6c7086] │ Nav: #[bg=#313244,fg=#89b4fa]Ctrl+h/l "
+                border_enabled  "false"
+            }
+        }
+BOTTOMBAR
+  bottom_bar="${bottom_bar//__ZJSTATUS__/$zjstatus_path}"
+
+  # Generate pane layout based on preset
+  local pane_layout=""
+  case "$preset" in
+    "coding")
+      read -r -d '' pane_layout <<PANES || true
+    tab name="coding" focus=true {
+        pane split_direction="horizontal" {
+            pane name="editor" size="75%" command="$editor" {
+                args "."
+            }
+            pane name="terminal" size="25%"
+        }
+    }
+PANES
+      ;;
+    "full")
+      read -r -d '' pane_layout <<PANES || true
+    tab name="full" focus=true {
+        pane split_direction="vertical" {
+            pane name="yazi" size="20%" command="yazi" {
+                args "."
+            }
+            pane name="editor" size="50%" command="$editor" {
+                args "."
+            }
+            pane split_direction="horizontal" size="30%" {
+                pane name="lazygit" size="60%" command="lazygit"
+                pane name="terminal" size="40%"
+            }
+        }
+    }
+PANES
+      ;;
+    "review")
+      read -r -d '' pane_layout <<PANES || true
+    tab name="review" focus=true {
+        pane split_direction="vertical" {
+            pane name="lazygit" size="40%" command="lazygit"
+            pane name="editor" size="60%" command="$editor" {
+                args "."
+            }
+        }
+    }
+PANES
+      ;;
+    "explore")
+      read -r -d '' pane_layout <<PANES || true
+    tab name="explore" focus=true {
+        pane split_direction="vertical" {
+            pane name="yazi" size="30%" command="yazi" {
+                args "."
+            }
+            pane name="editor" size="70%" command="$editor" {
+                args "."
+            }
+        }
+    }
+PANES
+      ;;
+    "llm")
+      local grid=( ${(s: :)"$(_ws_llm_parse_grid "$grid_spec")"} )
+      local cols=${grid[1]}
+      local rows=${grid[2]}
+      local inner=$(_ws_llm_gen_panes "$cols" "$rows" "            " 80)
+      pane_layout="    tab name=\"llm\" focus=true {
+        pane split_direction=\"horizontal\" {
+${inner}
+            pane name=\"shell\" size=\"20%\"
+        }
+    }"
+      ;;
+  esac
+
+  # Assemble full layout
+  cat <<EOF
+layout {
+    cwd "$dir"
+    default_tab_template {
+$top_bar
+        children
+$bottom_bar
+    }
+
+$pane_layout
+}
+EOF
+}
+
+# Generate zellij tab-only layout KDL (for use inside existing session)
+# NOTE: zellij new-tab --layout requires layout{} wrapper but NOT tab{} wrapper.
+# - layout{tab{...}} → redefines entire session (destroys existing tabs)
+# - layout{pane...}  → adds as new tab (correct)
+# - bare pane...     → "No layout found" error in zellij v3.12+
+function _ws_zellij_tab_layout() {
+  local preset="$1"
+  local grid_spec="${2:-3x2}"
+  local editor=$(_ws_resolve_editor)
+
+  local pane_layout=""
+  case "$preset" in
+    "coding")
+      read -r -d '' pane_layout <<PANES || true
+    pane split_direction="horizontal" {
+        pane name="editor" size="75%" command="$editor" {
+            args "."
+        }
+        pane name="terminal" size="25%"
+    }
+PANES
+      ;;
+    "full")
+      read -r -d '' pane_layout <<PANES || true
+    pane split_direction="vertical" {
+        pane name="yazi" size="20%" command="yazi"
+        pane name="editor" size="50%" command="$editor" {
+            args "."
+        }
+        pane split_direction="horizontal" size="30%" {
+            pane name="lazygit" size="60%" command="lazygit"
+            pane name="terminal" size="40%"
+        }
+    }
+PANES
+      ;;
+    "review")
+      read -r -d '' pane_layout <<PANES || true
+    pane split_direction="vertical" {
+        pane name="lazygit" size="40%" command="lazygit"
+        pane name="editor" size="60%" command="$editor" {
+            args "."
+        }
+    }
+PANES
+      ;;
+    "explore")
+      read -r -d '' pane_layout <<PANES || true
+    pane split_direction="vertical" {
+        pane name="yazi" size="30%" command="yazi"
+        pane name="editor" size="70%" command="$editor" {
+            args "."
+        }
+    }
+PANES
+      ;;
+    "llm")
+      local grid=( ${(s: :)"$(_ws_llm_parse_grid "$grid_spec")"} )
+      local cols=${grid[1]}
+      local rows=${grid[2]}
+      local inner=$(_ws_llm_gen_panes "$cols" "$rows" "            " 80)
+      pane_layout="    pane split_direction=\"horizontal\" {
+${inner}
+            pane name=\"shell\" size=\"20%\"
+    }"
+      ;;
+  esac
+
+  # Build top/bottom bar (same as full layout)
+  local zjstatus_path="$HOME/.config/zellij/plugins/zjstatus.wasm"
+
+  local top_bar
+  read -r -d '' top_bar <<'TOPBAR' || true
+        pane size=1 borderless=true {
+            plugin location="file:__ZJSTATUS__" {
+                format_space  "#[bg=#313244]"
+                format_left   "#[bg=#313244,fg=#89b4fa,bold] 󰣇 {mode} #[bg=#313244,fg=#cdd6f4]│ #[bg=#313244,fg=#fab387,bold]{session} "
+                format_center "#[bg=#313244]{tabs}"
+                format_right  "#[bg=#313244,fg=#94e2d5]{command_whoami}#[bg=#313244,fg=#cdd6f4]@#[bg=#313244,fg=#a6e3a1]{command_hostname} "
+                mode_normal        "#[bg=#89b4fa,fg=#1e1e2e,bold] NORMAL "
+                mode_locked        "#[bg=#f38ba8,fg=#1e1e2e,bold] LOCKED "
+                mode_resize        "#[bg=#fab387,fg=#1e1e2e,bold] RESIZE "
+                mode_pane          "#[bg=#a6e3a1,fg=#1e1e2e,bold] PANE "
+                mode_tab           "#[bg=#f9e2af,fg=#1e1e2e,bold] TAB "
+                mode_scroll        "#[bg=#cba6f7,fg=#1e1e2e,bold] SCROLL "
+                mode_enter_search  "#[bg=#94e2d5,fg=#1e1e2e,bold] SEARCH "
+                mode_search        "#[bg=#94e2d5,fg=#1e1e2e,bold] SEARCH "
+                mode_rename_tab    "#[bg=#f9e2af,fg=#1e1e2e,bold] RENAME "
+                mode_rename_pane   "#[bg=#a6e3a1,fg=#1e1e2e,bold] RENAME "
+                mode_session       "#[bg=#f38ba8,fg=#1e1e2e,bold] SESSION "
+                mode_move          "#[bg=#fab387,fg=#1e1e2e,bold] MOVE "
+                mode_prompt        "#[bg=#cba6f7,fg=#1e1e2e,bold] PROMPT "
+                mode_tmux          "#[bg=#fab387,fg=#1e1e2e,bold] TMUX "
+                tab_normal   "#[bg=#313244,fg=#6c7086]  {name}#{index} "
+                tab_active   "#[bg=#45475a,fg=#89b4fa,bold]  {name}#{index} "
+                command_whoami_command     "whoami"
+                command_whoami_format      "{stdout}"
+                command_whoami_interval    "0"
+                command_hostname_command   "hostname"
+                command_hostname_format    "{stdout}"
+                command_hostname_interval  "0"
+                border_enabled  "false"
+            }
+        }
+TOPBAR
+  top_bar="${top_bar//__ZJSTATUS__/$zjstatus_path}"
+
+  local bottom_bar
+  read -r -d '' bottom_bar <<'BOTTOMBAR' || true
+        pane size=1 borderless=true {
+            plugin location="file:__ZJSTATUS__" {
+                format_space  "#[bg=#313244]"
+                format_left   "#[bg=#313244,fg=#6c7086] Split: #[bg=#313244,fg=#89b4fa]\\#[bg=#313244,fg=#6c7086],#[bg=#313244,fg=#89b4fa]-#[bg=#313244,fg=#6c7086] │ Nav: #[bg=#313244,fg=#89b4fa]hjkl#[bg=#313244,fg=#89b4fa] │ Resize: #[bg=#313244,fg=#89b4fa]H/J/K/L#[bg=#313244,fg=#6c7086] │ Float: #[bg=#313244,fg=#89b4fa]w,e#[bg=#313244,fg=#6c7086] │ Zoom: #[bg=#313244,fg=#89b4fa]z#[bg=#313244,fg=#6c7086] │ Close: #[bg=#313244,fg=#89b4fa]x "
+                format_center "#[bg=#313244,fg=#6c7086]Scroll: #[bg=#313244,fg=#89b4fa][#[bg=#313244,fg=#6c7086] │ Find: #[bg=#313244,fg=#89b4fa]f#[bg=#313244,fg=#6c7086] │ Harpoon: #[bg=#313244,fg=#89b4fa]h#[bg=#313244,fg=#6c7086] │ Detach: #[bg=#313244,fg=#89b4fa]d "
+                format_right  "#[bg=#313244,fg=#6c7086]Tab: #[bg=#313244,fg=#89b4fa]t#[bg=#313244,fg=#6c7086] │ Nav: #[bg=#313244,fg=#89b4fa]Ctrl+h/l "
+                border_enabled  "false"
+            }
+        }
+BOTTOMBAR
+  bottom_bar="${bottom_bar//__ZJSTATUS__/$zjstatus_path}"
+
+  # Wrap in layout{} with bars directly embedded (approach C)
+  # default_tab_template doesn't work with new-tab --layout,
+  # so we embed top/bottom bars as sibling panes
+  cat <<EOF
+layout {
+$top_bar
+$pane_layout
+$bottom_bar
+}
+EOF
+}
+
+# Launch workspace with zellij
+function _ws_launch_zellij() {
+  local preset="$1"
+  local dir="$2"
+  local grid_spec="${3:-3x2}"
+  local session_name="ws-${preset}-$(basename "$dir")"
+
+  local current=$(_mx_detect_current)
+  local tmpdir=$(mktemp -d)
+  trap "rm -rf '$tmpdir'" EXIT
+
+  if [[ "$current" == "zellij" ]]; then
+    # Already inside zellij - add as new tab in current session
+    local tmpfile="${tmpdir}/ws-tab-layout.kdl"
+    _ws_zellij_tab_layout "$preset" "$grid_spec" > "$tmpfile"
+    log_info "Adding '$preset' tab to current session ($dir)"
+    zellij action new-tab --layout "$tmpfile" --cwd "$dir"
+  else
+    # Guard: prevent nested zellij (double check with $ZELLIJ)
+    if [[ -n "${ZELLIJ:-}" ]] || [[ -n "${ZELLIJ_SESSION_NAME:-}" ]]; then
+      log_error "Already inside zellij but detection failed. Aborting to prevent nested session."
+      return 1
+    fi
+    # Outside zellij - create new session with full layout
+    local tmpfile="${tmpdir}/ws-layout.kdl"
+    _ws_zellij_layout "$preset" "$dir" "$grid_spec" > "$tmpfile"
+    (cd "$dir" && zellij -n "$tmpfile" -s "$session_name")
+  fi
+}
+
+# Launch workspace with tmux
+function _ws_launch_tmux() {
+  local preset="$1"
+  local dir="$2"
+  local grid_spec="${3:-3x2}"
+  local editor=$(_ws_resolve_editor)
+  local session_name="ws-${preset}-$(basename "$dir")"
+
+  # Create session
+  tmux new-session -d -s "$session_name" -c "$dir"
+
+  case "$preset" in
+    "coding")
+      # Main pane: editor, bottom: terminal
+      tmux send-keys -t "$session_name" "$editor ." C-m
+      tmux split-window -t "$session_name" -v -p 25 -c "$dir"
+      tmux select-pane -t "$session_name:.0"
+      ;;
+    "full")
+      # Left: yazi, Center: editor, Right top: lazygit, Right bottom: terminal
+      tmux send-keys -t "$session_name" "$editor ." C-m
+      tmux split-window -t "$session_name" -h -p 30 -c "$dir"
+      tmux split-window -t "$session_name" -v -p 40 -c "$dir"
+      tmux select-pane -t "$session_name:.0"
+      tmux split-window -t "$session_name" -h -b -p 25 -c "$dir"
+      tmux send-keys -t "$session_name:.0" "yazi ." C-m
+      tmux send-keys -t "$session_name:.2" "lazygit" C-m
+      tmux select-pane -t "$session_name:.1"
+      ;;
+    "review")
+      # Left: lazygit, Right: editor
+      tmux send-keys -t "$session_name" "lazygit" C-m
+      tmux split-window -t "$session_name" -h -p 60 -c "$dir"
+      tmux send-keys -t "$session_name" "$editor ." C-m
+      ;;
+    "explore")
+      # Left: yazi, Right: editor
+      tmux send-keys -t "$session_name" "yazi ." C-m
+      tmux split-window -t "$session_name" -h -p 70 -c "$dir"
+      tmux send-keys -t "$session_name" "$editor ." C-m
+      ;;
+    "llm")
+      local grid=( ${(s: :)"$(_ws_llm_parse_grid "$grid_spec")"} )
+      local cols=${grid[1]}
+      local rows=${grid[2]}
+      local total=$(( cols * rows ))
+
+      # Split bottom 20% for shell (pane 0 = grid, pane 1 = shell)
+      tmux split-window -t "$session_name" -v -p 20 -c "$dir"
+      tmux select-pane -t "$session_name:.0"
+
+      # Split grid area into rows
+      for (( r = 1; r < rows; r++ )); do
+        local target=$(( r - 1 ))
+        local remaining=$(( rows - r + 1 ))
+        local vpct=$(( (remaining - 1) * 100 / remaining ))
+        tmux split-window -t "$session_name:.${target}" -v -p ${vpct} -c "$dir"
+      done
+
+      # Split each row into columns
+      for (( r = 0; r < rows; r++ )); do
+        local base=$(( r * cols ))
+        for (( c = 1; c < cols; c++ )); do
+          local target=$(( base + c - 1 ))
+          local remaining=$(( cols - c + 1 ))
+          local hpct=$(( (remaining - 1) * 100 / remaining ))
+          tmux split-window -t "$session_name:.${target}" -h -p ${hpct} -c "$dir"
+        done
+      done
+
+      # Launch claude in all grid panes (0..total-1, shell is at total)
+      for (( i = 0; i < total; i++ )); do
+        tmux send-keys -t "$session_name:.${i}" "claude" C-m
+      done
+      tmux select-pane -t "$session_name:.0"
+      ;;
+  esac
+
+  # Attach to session
+  _mx_attach_session "tmux" "$session_name"
+}
+
+# Launch workspace with WezTerm native panes
+function _ws_launch_wezterm() {
+  local preset="$1"
+  local dir="$2"
+  local grid_spec="${3:-3x2}"
+  local editor=$(_ws_resolve_editor)
+
+  if ! has_command wezterm; then
+    log_error "wezterm is not installed"
+    return 1
+  fi
+
+  # Determine starting pane
+  local base_pane="${WEZTERM_PANE:-}"
+  if [[ -z "$base_pane" ]]; then
+    # Not inside WezTerm - spawn a new window
+    log_info "Spawning new WezTerm window"
+    base_pane=$(wezterm cli spawn --new-window --cwd "$dir" 2>/dev/null)
+    if [[ -z "$base_pane" ]]; then
+      log_error "Failed to spawn WezTerm window. Is WezTerm running?"
+      return 1
+    fi
+  fi
+
+  case "$preset" in
+    "coding")
+      # editor (top 75%) + terminal (bottom 25%)
+      local terminal_pane=$(wezterm cli split-pane --pane-id "$base_pane" --bottom --percent 25 --cwd "$dir")
+      wezterm cli send-text --pane-id "$base_pane" --no-paste "$editor .\n"
+      ;;
+    "full")
+      # yazi (left 20%) | editor (center 62.5%) | lazygit (right top 60%) / terminal (right bottom 40%)
+      local yazi_pane=$(wezterm cli split-pane --pane-id "$base_pane" --left --percent 20 --cwd "$dir")
+      wezterm cli send-text --pane-id "$yazi_pane" --no-paste "yazi .\n"
+      local right_pane=$(wezterm cli split-pane --pane-id "$base_pane" --right --percent 37 --cwd "$dir")
+      local terminal_pane=$(wezterm cli split-pane --pane-id "$right_pane" --bottom --percent 40 --cwd "$dir")
+      wezterm cli send-text --pane-id "$right_pane" --no-paste "lazygit\n"
+      wezterm cli send-text --pane-id "$base_pane" --no-paste "$editor .\n"
+      ;;
+    "review")
+      # lazygit (left 40%) | editor (right 60%)
+      local lazygit_pane=$(wezterm cli split-pane --pane-id "$base_pane" --left --percent 40 --cwd "$dir")
+      wezterm cli send-text --pane-id "$lazygit_pane" --no-paste "lazygit\n"
+      wezterm cli send-text --pane-id "$base_pane" --no-paste "$editor .\n"
+      ;;
+    "explore")
+      # yazi (left 30%) | editor (right 70%)
+      local yazi_pane=$(wezterm cli split-pane --pane-id "$base_pane" --left --percent 30 --cwd "$dir")
+      wezterm cli send-text --pane-id "$yazi_pane" --no-paste "yazi .\n"
+      wezterm cli send-text --pane-id "$base_pane" --no-paste "$editor .\n"
+      ;;
+    "llm")
+      local grid=( ${(s: :)"$(_ws_llm_parse_grid "$grid_spec")"} )
+      local cols=${grid[1]}
+      local rows=${grid[2]}
+      local total=$(( cols * rows ))
+
+      # Split bottom 20% for shell
+      local shell_pane=$(wezterm cli split-pane --pane-id "$base_pane" --bottom --percent 20 --cwd "$dir")
+
+      # Build grid: split top area into rows, then each row into columns
+      # Track pane IDs for each grid cell
+      local -a row_panes=()
+      local -a all_panes=()
+
+      # First row uses the base_pane
+      row_panes+=("$base_pane")
+
+      # Create additional rows by splitting from the base pane
+      for (( r = 1; r < rows; r++ )); do
+        local remaining=$(( rows - r ))
+        local pct=$(( 100 * remaining / (remaining + 1) ))
+        local new_pane=$(wezterm cli split-pane --pane-id "$base_pane" --bottom --percent "$pct" --cwd "$dir")
+        row_panes+=("$new_pane")
+      done
+
+      # Split each row into columns
+      for (( r = 0; r < rows; r++ )); do
+        local row_pane="${row_panes[$((r + 1))]}"
+        all_panes+=("$row_pane")
+
+        for (( c = 1; c < cols; c++ )); do
+          local remaining=$(( cols - c ))
+          local pct=$(( 100 * remaining / (remaining + 1) ))
+          local col_pane=$(wezterm cli split-pane --pane-id "$row_pane" --right --percent "$pct" --cwd "$dir")
+          all_panes+=("$col_pane")
+        done
+      done
+
+      # Launch claude in all grid panes
+      for pane_id in "${all_panes[@]}"; do
+        wezterm cli send-text --pane-id "$pane_id" --no-paste "claude\n"
+      done
+
+      # Focus the first pane
+      wezterm cli activate-pane --pane-id "${all_panes[1]}"
+      ;;
+  esac
+}
+
+# Launch workspace with detected or specified multiplexer
+function _ws_launch() {
+  local preset="$1"
+  local dir="$2"
+  local grid_spec="${3:-3x2}"
+  local mux="${4:-}"
+
+  # Fall back to auto-detection if no explicit mux specified
+  if [[ -z "$mux" ]]; then
+    mux=$(_mx_detect_available)
+  fi
+
+  # Validate mux choice
+  case "$mux" in
+    "zellij"|"tmux"|"wezterm") ;;
+    "")
+      log_error "No multiplexer available (install zellij, tmux, or use WezTerm)"
+      return 1
+      ;;
+    *)
+      log_error "Unknown multiplexer: $mux (supported: zellij, tmux, wezterm)"
+      return 1
+      ;;
+  esac
+
+  if [[ "$preset" == "llm" ]]; then
+    local grid=( ${(s: :)"$(_ws_llm_parse_grid "$grid_spec")"} )
+    local total=$(( grid[1] * grid[2] ))
+    log_info "Launching '$preset' workspace (${grid[1]}x${grid[2]} = ${total} panes + shell) in $dir ($mux)"
+  else
+    log_info "Launching '$preset' workspace in $dir ($mux)"
+  fi
+
+  case "$mux" in
+    "zellij")  _ws_launch_zellij "$preset" "$dir" "$grid_spec" ;;
+    "tmux")    _ws_launch_tmux "$preset" "$dir" "$grid_spec" ;;
+    "wezterm") _ws_launch_wezterm "$preset" "$dir" "$grid_spec" ;;
+  esac
+}
+
+# Interactive preset selection
+function _ws_select_preset() {
+  local choice=$(cat <<EOF | sk --prompt="Workspace> " --ansi --reverse
+🖥️  coding      editor + terminal
+🚀  full        yazi + editor + lazygit + terminal
+👀  review      lazygit + editor
+🔍  explore     yazi + editor
+🤖  llm         claude x<N> + shell (grid adjustable)
+EOF
+)
+  if [[ -n "$choice" ]]; then
+    echo "$choice" | awk '{print $2}'
+  fi
+}
+
+# Interactive grid selection for llm preset
+function _ws_select_grid() {
+  local choice=$(cat <<EOF | sk --prompt="Grid> " --ansi --reverse
+📐  3x2         6 panes (default)
+📐  3x3         9 panes
+📐  4x3         12 panes
+📐  4x4         16 panes
+📐  2x2         4 panes (compact)
+✏️  custom      enter custom NxM
+EOF
+)
+  if [[ -z "$choice" ]]; then
+    echo ""
+    return
+  fi
+
+  local selected=$(echo "$choice" | awk '{print $2}')
+  if [[ "$selected" == "custom" ]]; then
+    echo ""
+    read -r "grid?Grid (e.g. 3x3, 5x2): "
+    if [[ "$grid" =~ ^[0-9]+x[0-9]+$ ]]; then
+      echo "$grid"
+    else
+      log_error "Invalid grid format: $grid"
+      echo ""
+    fi
+  else
+    echo "$selected"
+  fi
+}
+
+# Interactive directory selection
+function _ws_select_dir() {
+  local choice=$(cat <<EOF | sk --prompt="Directory> " --ansi --reverse
+📂  Current directory ($(pwd))
+🎯  Select project
+EOF
+)
+  case "$choice" in
+    *"Current directory"*)
+      echo "$(pwd)"
+      ;;
+    *"Select project"*)
+      _sk_select_project_internal "Project> "
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+# List available presets
+function _ws_list_presets() {
+  echo "Available workspace presets:"
+  echo "─────────────────────────────────────────────"
+  echo "  🖥️  coding      editor + terminal"
+  echo "  🚀  full        yazi + editor + lazygit + terminal"
+  echo "  👀  review      lazygit + editor"
+  echo "  🔍  explore     yazi + editor"
+  echo "  🤖  llm         claude x<N> + shell (grid adjustable)"
+}
+
+# Help function
+function _ws_help() {
+  cat <<EOF
+Workspace Layout Manager - Dev environment presets for zellij/tmux/wezterm
+
+Commands:
+  workspace                                  Interactive menu
+  workspace [--mux TYPE] <preset>            Launch preset in current directory
+  workspace [--mux TYPE] <preset> <dir>      Launch preset in specified directory
+  workspace [--mux TYPE] llm [grid] [dir]    Launch LLM preset with custom grid
+  workspace list                             List available presets
+  workspace help                             Show this help
+
+Options:
+  --mux TYPE    Multiplexer to use: zellij, tmux, wezterm
+                If omitted, auto-detects (zellij > tmux priority)
+                wezterm uses native pane splitting via wezterm cli
+
+Presets:
+  coding      editor + terminal
+  full        yazi + editor + lazygit + terminal
+  review      lazygit + editor
+  explore     yazi + editor
+  llm         claude x<N> + shell (grid adjustable)
+
+Grid format (llm only):
+  NxM         Explicit cols x rows (e.g. 3x2, 4x3, 5x2)
+  N           Total panes, auto-grid (e.g. 9 -> 3x3, 12 -> 4x3)
+  (omit)      Default 3x2
+
+Examples:
+  workspace                                  # Interactive preset & directory selection
+  workspace coding                           # Launch coding layout in current dir
+  workspace --mux wezterm coding             # Use WezTerm native panes
+  workspace --mux tmux full ~/projects/app   # Force tmux for full layout
+  workspace llm                              # Default 3x2 grid (6 claude + shell)
+  workspace llm 3x3                          # 3x3 grid (9 claude + shell)
+  workspace --mux wezterm llm 4x3            # WezTerm with 4x3 grid
+EOF
+}
+
+# Interactive mux selection
+function _ws_select_mux() {
+  local current=$(_mx_detect_current)
+  local auto_label="auto"
+  [[ -n "$current" ]] && auto_label="auto ($current)"
+
+  local choice=$(cat <<EOF | sk --prompt="Multiplexer> " --ansi --reverse
+🔄  $auto_label       auto-detect (default)
+🟢  zellij            Zellij multiplexer
+🟡  tmux              tmux multiplexer
+🔵  wezterm           WezTerm native panes
+EOF
+)
+  if [[ -z "$choice" ]]; then
+    echo ""
+    return
+  fi
+
+  local selected=$(echo "$choice" | awk '{print $2}')
+  case "$selected" in
+    "$auto_label"|"auto") echo "" ;;  # empty = auto-detect
+    *) echo "$selected" ;;
+  esac
+}
+
+# Interactive main menu
+function _ws_main_menu() {
+  local preset=$(_ws_select_preset)
+  if [[ -z "$preset" ]]; then
+    return 0
+  fi
+
+  local grid_spec="3x2"
+  if [[ "$preset" == "llm" ]]; then
+    grid_spec=$(_ws_select_grid)
+    if [[ -z "$grid_spec" ]]; then
+      return 0
+    fi
+  fi
+
+  local dir=$(_ws_select_dir)
+  if [[ -z "$dir" ]]; then
+    return 0
+  fi
+
+  local mux=$(_ws_select_mux)
+  # mux="" means auto-detect (handled by _ws_launch)
+
+  _ws_launch "$preset" "$dir" "$grid_spec" "$mux"
+}
+
+# Main workspace command
+function workspace() {
+  # Parse --mux flag
+  local explicit_mux=""
+  if [[ "${1:-}" == "--mux" ]]; then
+    explicit_mux="${2:-}"
+    if [[ -z "$explicit_mux" ]]; then
+      log_error "--mux requires an argument: zellij, tmux, or wezterm"
+      return 1
+    fi
+    shift 2
+  fi
+
+  case "${1:-}" in
+    "list"|"ls")   _ws_list_presets ;;
+    "help"|"h")    _ws_help ;;
+    "coding"|"full"|"review"|"explore")
+      local preset="$1"
+      local dir="${2:-$(pwd)}"
+      dir=$(cd "$dir" 2>/dev/null && pwd)
+      if [[ ! -d "$dir" ]]; then
+        log_error "Directory not found: $dir"
+        return 1
+      fi
+      _ws_launch "$preset" "$dir" "3x2" "$explicit_mux"
+      ;;
+    "llm")
+      local grid_spec="3x2"
+      local dir=""
+      # Parse optional grid and dir args
+      if [[ -n "${2:-}" ]]; then
+        if [[ "$2" =~ ^[0-9]+x[0-9]+$ || "$2" =~ ^[0-9]+$ ]]; then
+          grid_spec="$2"
+          dir="${3:-$(pwd)}"
+        else
+          dir="$2"
+        fi
+      else
+        dir="$(pwd)"
+      fi
+      dir=$(cd "$dir" 2>/dev/null && pwd)
+      if [[ ! -d "$dir" ]]; then
+        log_error "Directory not found: $dir"
+        return 1
+      fi
+      _ws_launch "llm" "$dir" "$grid_spec" "$explicit_mux"
+      ;;
+    "")            _ws_main_menu ;;
+    *)             _ws_help ;;
+  esac
+}
+
+# -----------------------------------------------------------------------------
+# Long-Running Command Notification (preexec/precmd hooks)
+# 長時間コマンド完了通知 (preexec/precmd フック)
+# -----------------------------------------------------------------------------
+# Sends macOS desktop notification + bell when a command takes longer than
+# the threshold. Editors/interactive tools are excluded.
+
+_NOTIFY_THRESHOLD=10
+
+# Commands that should never trigger notifications
+_NOTIFY_EXCLUDE_PATTERN="^(nvim|vim|vi|less|more|man|ssh|top|htop|btm|btop|zellij|tmux|wezterm|claude|yazi|lazygit|lazydocker|watch|tail -f)"
+
+function _notify_preexec() {
+  _CMD_START_TIME=$EPOCHSECONDS
+  _CMD_NAME="$1"
+}
+
+function _notify_precmd() {
+  local elapsed=$(( EPOCHSECONDS - ${_CMD_START_TIME:-$EPOCHSECONDS} ))
+
+  if (( elapsed >= _NOTIFY_THRESHOLD )) && [[ -n "${_CMD_NAME:-}" ]]; then
+    # Skip excluded interactive commands
+    if [[ ! "$_CMD_NAME" =~ $_NOTIFY_EXCLUDE_PATTERN ]]; then
+      # macOS desktop notification
+      if has_command osascript; then
+        local subtitle="${_CMD_NAME:0:50}"
+        osascript -e "display notification \"${elapsed}s で完了\" with title \"Command Finished\" subtitle \"${subtitle}\"" &>/dev/null &!
+      fi
+      # Bell for terminal handlers (WezTerm bell → toast notification)
+      printf '\a'
+    fi
+  fi
+
+  unset _CMD_START_TIME _CMD_NAME
+}
+
+autoload -Uz add-zsh-hook
+add-zsh-hook preexec _notify_preexec
+add-zsh-hook precmd _notify_precmd

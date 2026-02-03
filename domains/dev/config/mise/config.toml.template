@@ -6,6 +6,8 @@ go = "latest"
 rust = "latest"
 bun = "latest"
 deno = "latest"
+flutter = "latest"
+lua = "5.4"
 
 [settings]
 experimental = false

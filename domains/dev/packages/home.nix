@@ -18,6 +18,7 @@
     ripgrep
     zoxide
     skim
+    fzf
     tree
     atuin
     yazi
@@ -26,6 +27,11 @@
     mise
     jq
     yq
+    less
+    coreutils
+    findutils
+    gnused
+    gnugrep
 
     # Git
     git
@@ -35,6 +41,9 @@
     ghq
     lazygit
     tig
+    jujutsu
+    lazyjj
+    gnupg
 
     # DevOps
     docker
@@ -48,6 +57,15 @@
     neovim
     tree-sitter
     universal-ctags
+
+    # Media / Graphics
+    ffmpeg
+    imagemagick
+    graphviz
+
+    # System
+    mas
+    nowplaying-cli
 
     # Database
     mysql84
