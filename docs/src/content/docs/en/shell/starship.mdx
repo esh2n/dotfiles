@@ -1,0 +1,93 @@
+---
+title: Starship
+description: Cross-shell prompt with 10 theme palettes.
+---
+
+Starship is a cross-shell prompt. Displays git status, language versions, command duration, and more. Supports 10 switchable theme palettes.
+
+## Prompt format
+
+<figure class="prompt-window" role="figure">
+<figcaption class="prompt-window-header">Terminal</figcaption>
+<div class="prompt-demo">
+<div class="pd-line"><span><span class="pd-dir">~/projects/myapp</span>  <span class="pd-git"> main ✓</span> <span class="pd-node">⬢20.10.0</span> <span class="pd-go">🐹1.21</span></span><span class="pd-dur">3s</span></div>
+<div><span class="pd-char">❯</span></div>
+</div>
+</figure>
+
+Left to right: directory, git branch, git status, language versions. Right side shows duration and exit status.
+
+## Modules
+
+| Module | Display |
+|--------|---------|
+| Directory | Path (3 segments, icon substitutions) |
+| Git branch | Branch name (truncated at 20 chars) |
+| Git status | Ahead/behind, modified, staged, untracked, conflicts |
+| Node.js | `⬢` + version |
+| Rust | `🦀` + version |
+| Go | `🐹` + version |
+| Python | `🐍` + version |
+| Docker | `🐳` + context |
+| Time | HH:MM |
+| Duration | Commands over 500ms only |
+| Status | Non-zero exit codes |
+
+## Git status icons
+
+| Icon | Meaning |
+|------|---------|
+| `✓` | Up to date |
+| `✖` | Conflicts |
+| `⇡N` | N commits ahead |
+| `⇣N` | N commits behind |
+| `+N` | N untracked files |
+| `!N` | N modified files |
+| `●N` | N staged files |
+| `»N` | N renamed files |
+| `✘N` | N deleted files |
+| `⚑` | Has stash |
+
+## Directory icon substitutions
+
+Certain directory names are replaced with icons for brevity.
+
+| Directory | Icon |
+|-----------|------|
+| Documents | `` |
+| Downloads | `` |
+| Music | `` |
+| Pictures | `` |
+| Developer | `` |
+| .config | `` |
+
+## Theme palettes
+
+Set `palette = "catppuccin"` to switch the active palette. 10 palettes are predefined.
+
+| Palette | Vibe |
+|---------|------|
+| Catppuccin | Warm pastels |
+| Nord | Cool arctic |
+| Dracula | Dark purple |
+| Tokyo Night | Deep blue, vibrant |
+| Gruvbox | Earthy warm tones |
+| Everforest | Soft greens |
+| One Dark | VS Code inspired |
+| Rosé Pine | Muted pink and blue |
+| Solarized | Classic dual-tone |
+| Kanagawa | Japanese art inspired muted colors |
+
+Each palette defines 8 colors: `pink`, `red`, `yellow`, `green`, `sky`, `sapphire`, `blue`, `overlay2`. Module styles reference these color names.
+
+## Theme integration
+
+`theme-switch` changes the palette name. Starship auto-detects config changes, so opening a new prompt reflects the update.
+
+## Config file
+
+```bash
+~/.config/starship/starship.toml
+```
+
+`command_timeout` is set to 2000ms (the 500ms default tends to timeout on git operations).

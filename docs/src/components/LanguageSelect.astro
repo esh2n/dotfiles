@@ -1,0 +1,141 @@
+---
+import config from 'virtual:starlight/user-config';
+
+const currentLocale = Astro.locals.starlightRoute?.locale;
+
+type LocaleEntry = { label: string; lang: string; code: string; isCurrent: boolean; href: string };
+
+function getLocalizedPath(code: string): string {
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const url = new URL(Astro.url);
+  let pathname = url.pathname;
+
+  // Remove base prefix
+  if (pathname.startsWith(base)) {
+    pathname = pathname.slice(base.length) || '/';
+  }
+
+  // Determine current locale segment from the path
+  const segments = pathname.split('/').filter(Boolean);
+  const localeKeys = Object.keys(config.locales ?? {}).filter((k) => k !== 'root');
+  const hasLocalePrefix = segments.length > 0 && localeKeys.includes(segments[0]!);
+
+  // Strip current locale prefix to get the bare path
+  const barePath = hasLocalePrefix ? '/' + segments.slice(1).join('/') : pathname;
+  const normalizedBare = barePath === '' ? '/' : barePath;
+
+  if (code === 'root') {
+    // Root locale has no prefix
+    const result = base + normalizedBare;
+    return result.endsWith('/') ? result : result + '/';
+  }
+  // Non-root locale gets a prefix
+  const result = base + '/' + code + normalizedBare;
+  return result.endsWith('/') ? result : result + '/';
+}
+
+const localeEntries: LocaleEntry[] = config.isMultilingual
+  ? Object.entries(config.locales ?? {}).map(([code, locale]) => ({
+      label: locale!.label,
+      lang: locale!.lang ?? code,
+      code,
+      isCurrent: code === (currentLocale ?? 'root'),
+      href: getLocalizedPath(code),
+    }))
+  : [];
+
+const isSecondActive = localeEntries.length > 1 && localeEntries[1]?.isCurrent;
+---
+
+{localeEntries.length > 1 && (
+  <starlight-lang-select>
+    <label>
+      <span class="sr-only">{Astro.locals.t('languageSelect.accessibleLabel')}</span>
+      <div class:list={['lang-toggle', { 'slide-right': isSecondActive }]} role="group" aria-label="Language">
+        {localeEntries.map((l) => (
+          <a
+            href={l.href}
+            class:list={['lang-option', { active: l.isCurrent }]}
+            lang={l.lang}
+            aria-current={l.isCurrent ? 'true' : undefined}
+          >
+            {l.lang === 'ja' ? 'JA' : 'EN'}
+          </a>
+        ))}
+      </div>
+    </label>
+  </starlight-lang-select>
+)}
+
+<style>
+  .lang-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    background: var(--sl-color-gray-6);
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 6px;
+    padding: 2px;
+    font-size: var(--sl-text-xs);
+    position: relative;
+  }
+
+  .lang-toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(50% - 2px);
+    height: calc(100% - 4px);
+    background: var(--sl-color-accent-low);
+    border-radius: 4px;
+    transition: transform 0.15s ease-out;
+  }
+
+  .lang-toggle.slide-right::before {
+    transform: translateX(100%);
+  }
+
+  .lang-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem 0.625rem;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    color: var(--sl-color-gray-2);
+    transition: color 0.1s ease-out;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .lang-option:not(.active):hover {
+    color: var(--sl-color-white);
+  }
+
+  .lang-option.active {
+    color: var(--sl-color-accent-high);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lang-toggle::before,
+    .lang-option {
+      transition: none;
+    }
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+</style>

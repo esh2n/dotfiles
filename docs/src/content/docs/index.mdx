@@ -1,0 +1,69 @@
+---
+title: esh2n/dotfiles
+description: Domain-driven dotfiles with multi-shell support and unified theme switching.
+template: splash
+hero:
+  tagline: Domain-driven dotfiles. Multi-shell, Nix package management, one-command theme switching.
+  actions:
+    - text: Getting Started
+      link: /dotfiles/getting-started/installation/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/esh2n/dotfiles
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid stagger>
+  <Card title="Multi-shell" icon="terminal">
+    Zsh / Fish dual support. Shared aliases and env vars with modern CLI tools — skim, eza, bat, zoxide, atuin, yazi.
+  </Card>
+  <Card title="Neovim Switch" icon="pencil">
+    Switch between Custom / LazyVim / NvChad / AstroVim instantly with `nvim-switch`.
+  </Card>
+  <Card title="Theme Sync" icon="sun">
+    `theme-switch` applies Catppuccin / Nord / Tokyo Night across WezTerm, Ghostty, Sketchybar, Borders, Zellij.
+  </Card>
+  <Card title="Nix Managed" icon="setting">
+    All packages declared via Nix flake. Reproducible build environment.
+  </Card>
+</CardGrid>
+
+## Structure
+
+```text
+dotfiles/
+├── core/          # installer, config manager, utilities
+├── domains/       # domain-separated configs
+│   ├── creative/  # media tools, wallpaper
+│   ├── dev/       # Neovim, terminal, shell, languages
+│   ├── infra/     # network, security
+│   ├── system/    # fonts, colors, themes
+│   └── workspace/ # window manager, status bar
+└── specs/         # architecture docs
+```
+
+## Quick Start
+
+```bash
+cd dotfiles
+./core/install/installer.sh
+```
+
+Runs Homebrew + Nix setup and creates symlinks. See [Installation](/dotfiles/getting-started/installation/) for details.
+
+## Included Tools
+
+| Category | Tools |
+|----------|-------|
+| Terminal | WezTerm, Ghostty |
+| Multiplexer | Zellij, tmux |
+| Shell | Zsh, Fish, Starship |
+| CLI | eza, bat, skim, zoxide, atuin, yazi, btop |
+| Editor | Neovim (4 distributions), VSCode, Cursor |
+| Window Manager | AeroSpace, Borders, Sketchybar |
+| VCS | Git, Jujutsu |

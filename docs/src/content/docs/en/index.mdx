@@ -1,0 +1,69 @@
+---
+title: esh2n dotfiles
+description: Domain-driven dotfiles with multi-shell support and theme switching.
+template: splash
+hero:
+  tagline: Domain-driven dotfiles. Multi-shell support, declarative package management with Nix, one-command theme switching.
+  actions:
+    - text: Get Started
+      link: /dotfiles/en/getting-started/installation/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/esh2n/dotfiles
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What's in the box
+
+<CardGrid stagger>
+  <Card title="Multi-Shell" icon="terminal">
+    Both Zsh and Fish with shared aliases and env vars. Bundled with skim, eza, bat, zoxide, atuin, yazi, and more.
+  </Card>
+  <Card title="Neovim Switching" icon="pencil">
+    Four distributions — Custom, LazyVim, NvChad, AstroVim — switchable instantly with `nvim-switch`.
+  </Card>
+  <Card title="Unified Theming" icon="sun">
+    One `theme-switch` command applies Catppuccin, Nord, or Tokyo Night across WezTerm, Ghostty, Sketchybar, Borders, and Zellij.
+  </Card>
+  <Card title="Nix Package Management" icon="setting">
+    Every package is declared in a Nix flake. Reproducible builds, always.
+  </Card>
+</CardGrid>
+
+## Directory layout
+
+```text
+dotfiles/
+├── core/          # Installer, config manager, utilities
+├── domains/       # Domain-specific configurations
+│   ├── creative/  # Media tools, wallpapers
+│   ├── dev/       # Neovim, terminals, shells, languages
+│   ├── infra/     # Network, security
+│   ├── system/    # Fonts, colors, themes
+│   └── workspace/ # Window managers, status bars
+└── specs/         # Architecture docs
+```
+
+## Quick start
+
+```bash
+cd dotfiles
+./core/install/installer.sh
+```
+
+The installer handles everything from Homebrew and Nix setup to symlink creation. See [Installation](/dotfiles/en/getting-started/installation/) for details.
+
+## Included tools
+
+| Category | Tools |
+|----------|-------|
+| Terminal | WezTerm, Ghostty, Warp |
+| Multiplexer | Zellij |
+| Shell | Zsh, Fish, Starship |
+| CLI | eza, bat, skim, zoxide, atuin, yazi, btop |
+| Editor | Neovim (4 distributions), VSCode, Cursor |
+| Window Manager | AeroSpace, Borders, Sketchybar |
+| VCS | Git, Jujutsu |

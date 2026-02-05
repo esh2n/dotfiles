@@ -1,0 +1,171 @@
+---
+---
+
+<starlight-theme-select>
+  <div class="theme-toggle" role="group" aria-label="Theme">
+    <button
+      class="theme-option"
+      data-theme-value="light"
+      aria-label="Light"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </svg>
+    </button>
+    <button
+      class="theme-option"
+      data-theme-value="dark"
+      aria-label="Dark"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+  </div>
+</starlight-theme-select>
+
+{/* Inlined to avoid FOUC. Uses global scope from ThemeProvider.astro */}
+<script is:inline>
+  StarlightThemeProvider.updatePickers();
+  (function() {
+    var t = document.documentElement.dataset.theme;
+    document.querySelectorAll('.theme-toggle').forEach(function(el) {
+      el.classList.toggle('slide-right', t === 'dark');
+    });
+  })();
+</script>
+
+<script>
+  type Theme = 'auto' | 'dark' | 'light';
+
+  const storageKey = 'starlight-theme';
+
+  const parseTheme = (theme: unknown): Theme =>
+    theme === 'auto' || theme === 'dark' || theme === 'light' ? theme : 'auto';
+
+  const loadTheme = (): Theme =>
+    parseTheme(typeof localStorage !== 'undefined' && localStorage.getItem(storageKey));
+
+  function storeTheme(theme: Theme): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(storageKey, theme === 'light' || theme === 'dark' ? theme : '');
+    }
+  }
+
+  const getPreferredColorScheme = (): Theme =>
+    matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+
+  function getEffectiveTheme(theme: Theme): 'light' | 'dark' {
+    return theme === 'auto' ? getPreferredColorScheme() : theme;
+  }
+
+  function updateToggleUI(theme: Theme): void {
+    const effective = getEffectiveTheme(theme);
+    document.querySelectorAll('starlight-theme-select').forEach((el) => {
+      const toggle = el.querySelector('.theme-toggle');
+      toggle?.classList.toggle('slide-right', effective === 'dark');
+      el.querySelectorAll('.theme-option').forEach((btn) => {
+        const val = (btn as HTMLElement).dataset.themeValue;
+        btn.classList.toggle('active', val === effective);
+      });
+    });
+  }
+
+  function onThemeChange(theme: Theme): void {
+    StarlightThemeProvider.updatePickers(theme);
+    document.documentElement.dataset.theme = getEffectiveTheme(theme);
+    storeTheme(theme);
+    updateToggleUI(theme);
+  }
+
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (loadTheme() === 'auto') onThemeChange('auto');
+  });
+
+  class StarlightThemeSelect extends HTMLElement {
+    constructor() {
+      super();
+      const current = loadTheme();
+      onThemeChange(current);
+      this.querySelectorAll('.theme-option').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const value = (btn as HTMLElement).dataset.themeValue as Theme;
+          onThemeChange(value);
+        });
+      });
+    }
+  }
+  customElements.define('starlight-theme-select', StarlightThemeSelect);
+</script>
+
+<style>
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    background: var(--sl-color-gray-6);
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 6px;
+    padding: 2px;
+    position: relative;
+  }
+
+  .theme-toggle::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(50% - 2px);
+    height: calc(100% - 4px);
+    background: var(--sl-color-accent-low);
+    border-radius: 4px;
+    transition: transform 0.15s ease-out;
+  }
+
+  .theme-toggle.slide-right::before {
+    transform: translateX(100%);
+  }
+
+  .theme-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--sl-color-gray-2);
+    cursor: pointer;
+    transition: color 0.1s ease-out;
+    line-height: 1;
+    position: relative;
+    z-index: 1;
+  }
+
+  .theme-option:not(.active):hover {
+    color: var(--sl-color-white);
+  }
+
+  .theme-option.active {
+    color: var(--sl-color-accent-high);
+  }
+
+  .theme-option svg {
+    display: block;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .theme-toggle::before,
+    .theme-option {
+      transition: none;
+    }
+  }
+</style>

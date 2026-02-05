@@ -1,0 +1,186 @@
+/* ===== Font: Inter + JetBrains Mono ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* ===== Tokyo Night color scheme ===== */
+
+:root {
+	--sl-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--sl-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+	--sl-color-accent-low: #1a1b2e;
+	--sl-color-accent: #7aa2f7;
+	--sl-color-accent-high: #c0caf5;
+
+	--sl-color-white: #c0caf5;
+	--sl-color-gray-1: #a9b1d6;
+	--sl-color-gray-2: #787c99;
+	--sl-color-gray-3: #545c7e;
+	--sl-color-gray-4: #3b4261;
+	--sl-color-gray-5: #292e42;
+	--sl-color-gray-6: #1f2335;
+	--sl-color-black: #1a1b26;
+
+	/* Softer shadows for Tokyo Night */
+	--sl-shadow-sm: 0 1px 2px hsla(230, 20%, 5%, 0.15);
+	--sl-shadow-md: 0 2px 8px hsla(230, 20%, 5%, 0.12);
+	--sl-shadow-lg: 0 4px 16px hsla(230, 20%, 5%, 0.1);
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: #d5daf0;
+	--sl-color-accent: #3d59a1;
+	--sl-color-accent-high: #1a1b2e;
+
+	--sl-color-white: #1a1b26;
+	--sl-color-gray-1: #3b4261;
+	--sl-color-gray-2: #545c7e;
+	--sl-color-gray-3: #787c99;
+	--sl-color-gray-4: #a9b1d6;
+	--sl-color-gray-5: #d5daf0;
+	--sl-color-gray-6: #e9ecf5;
+	--sl-color-black: #f0f2f8;
+
+	--sl-shadow-sm: 0 1px 2px hsla(230, 15%, 50%, 0.08);
+	--sl-shadow-md: 0 2px 8px hsla(230, 15%, 50%, 0.06);
+	--sl-shadow-lg: 0 4px 16px hsla(230, 15%, 50%, 0.05);
+}
+
+/* ===== Consistent header across splash & detail pages ===== */
+/* Splash page (no sidebar) has no --sl-content-inline-start,
+   causing the search bar to shift left. Force the same grid
+   proportions as detail pages by giving it a virtual sidebar width. */
+@media (min-width: 50rem) {
+	:root[data-has-hero]:not([data-has-sidebar]) .header {
+		--sl-content-inline-start: var(--sl-sidebar-width);
+	}
+}
+
+/* ===== Pagination card refinement ===== */
+.pagination-links a {
+	box-shadow: var(--sl-shadow-sm);
+	transition: box-shadow 0.2s ease-out, border-color 0.2s ease-out;
+}
+.pagination-links a:hover {
+	box-shadow: var(--sl-shadow-md);
+}
+
+/* ===== Table styling ===== */
+.sl-markdown-content table {
+	display: table;
+	border-collapse: separate;
+	border-spacing: 0;
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 8px;
+	overflow: hidden;
+	width: 100%;
+}
+.sl-markdown-content th {
+	background: var(--sl-color-gray-6);
+	color: var(--sl-color-white);
+	font-weight: 600;
+	font-size: var(--sl-text-sm);
+	text-align: left;
+	padding: 0.625rem 1rem;
+	border-bottom: 1px solid var(--sl-color-gray-5);
+}
+.sl-markdown-content td {
+	padding: 0.5rem 1rem;
+	font-size: var(--sl-text-sm);
+	border-bottom: 1px solid var(--sl-color-gray-5);
+}
+.sl-markdown-content tr:last-child td {
+	border-bottom: none;
+}
+.sl-markdown-content tbody tr:hover {
+	background: var(--sl-color-gray-6);
+}
+
+/* ===== Sidebar accordion: click-only smooth expand/collapse ===== */
+@supports (interpolate-size: allow-keywords) {
+	:root {
+		interpolate-size: allow-keywords;
+	}
+
+	.sidebar-content details > ul {
+		overflow: clip;
+		block-size: 0;
+		opacity: 0;
+	}
+
+	.sidebar-content details[open] > ul {
+		block-size: auto;
+		opacity: 1;
+	}
+
+	/* Transitions enabled only after JS marks sidebar as ready.
+	   This prevents animation on page load / navigation. */
+	.sidebar-content.sidebar-ready details > ul {
+		transition: block-size 0.2s ease-out, opacity 0.15s ease-out;
+	}
+}
+
+/* ===== Prompt demo (Starship page) – EC terminal frame style ===== */
+.prompt-window {
+	border: 1px solid color-mix(in srgb, var(--sl-color-gray-5), transparent 25%);
+	border-radius: 8px;
+	overflow: hidden;
+	margin: 1rem 0;
+}
+.prompt-window-header {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.25rem 1rem;
+	background: var(--sl-color-black);
+	border-bottom: 1px solid color-mix(in srgb, var(--sl-color-gray-5), transparent 25%);
+	font-family: var(--sl-font);
+	font-size: var(--sl-text-xs);
+	font-weight: 500;
+	letter-spacing: 0.025ch;
+	color: var(--sl-color-gray-1);
+	position: relative;
+}
+.prompt-window-header::before {
+	content: '';
+	position: absolute;
+	left: 1rem;
+	width: 2.1rem;
+	height: 0.56rem;
+	background-color: var(--sl-color-gray-3);
+	opacity: 0.75;
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 16' preserveAspectRatio='xMidYMid meet'%3E%3Ccircle cx='8' cy='8' r='8'/%3E%3Ccircle cx='30' cy='8' r='8'/%3E%3Ccircle cx='52' cy='8' r='8'/%3E%3C/svg%3E");
+	-webkit-mask-repeat: no-repeat;
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 16' preserveAspectRatio='xMidYMid meet'%3E%3Ccircle cx='8' cy='8' r='8'/%3E%3Ccircle cx='30' cy='8' r='8'/%3E%3Ccircle cx='52' cy='8' r='8'/%3E%3C/svg%3E");
+	mask-repeat: no-repeat;
+}
+.prompt-demo {
+	background: var(--sl-color-gray-6);
+	padding: 1rem 1.25rem;
+	font-family: var(--sl-font-mono);
+	font-size: 0.875em;
+	line-height: 1.8;
+	overflow-x: auto;
+	white-space: pre;
+	color: var(--sl-color-gray-1);
+}
+.prompt-demo .pd-line {
+	display: flex;
+	justify-content: space-between;
+}
+.pd-dir { color: #7aa2f7; }
+.pd-git { color: #9ece6a; }
+.pd-node { color: #41a6b5; }
+.pd-go { color: #7dcfff; }
+.pd-dur { color: #e0af68; }
+.pd-char { color: #7aa2f7; }
+
+/* ===== Respect reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

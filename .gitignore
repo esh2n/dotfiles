@@ -138,3 +138,10 @@ domains/dev/config/claude/image-cache/
 
 # Python cache
 **/__pycache__/
+
+# Playwright MCP (browser testing screenshots)
+.playwright-mcp/
+
+# Docs build artifacts
+docs/dist/
+docs/.astro/
