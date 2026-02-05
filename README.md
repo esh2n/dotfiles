@@ -2,6 +2,8 @@
 
 Domain-driven dotfiles with multi-shell support and theme switching.
 
+> **More info**: https://esh2n.github.io/dotfiles/
+
 ## Features
 
 ### Multi-Shell Support
