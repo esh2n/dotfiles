@@ -8,6 +8,7 @@
   ];
 
   homebrew.casks = [
+    "android-studio"
     "warp"
   ];
 }

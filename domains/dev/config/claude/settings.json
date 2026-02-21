@@ -110,6 +110,8 @@
       "Bash(rtx:*)",
       "Bash(git:*)",
       "Bash(gh:*)",
+      "Bash(xcrun:*)",
+      "Bash(swiftc:*)",
       "Bash(glab:*)",
       "Bash(hub:*)",
       "Bash(lazygit:*)",
