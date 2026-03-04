@@ -7,7 +7,7 @@ ITEM_NAME="${1:-widgets.earthquake}"
 EQ_API_URL="https://api.p2pquake.net/v2/history?codes=551&limit=1"
 
 # Fetch earthquake data
-EQ_JSON=$(curl -s "$EQ_API_URL")
+EQ_JSON=$(curl -s --connect-timeout 3 --max-time 5 "$EQ_API_URL")
 
 if [[ -z "$EQ_JSON" ]] || [[ "$EQ_JSON" == "[]" ]]; then
     sketchybar --set "$ITEM_NAME" label="--"

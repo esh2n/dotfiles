@@ -285,8 +285,7 @@
       "NotebookEdit(./**)",
       "TodoRead(**)",
       "TodoWrite(**)",
-      "Task(**)",
-      "mcp__pencil"
+      "Task(**)"
     ],
     "deny": [
       "Bash(rm -rf /)",

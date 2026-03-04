@@ -40,7 +40,7 @@ if [[ -z "$API_KEY" ]]; then
 fi
 
 # Fetch weather data
-WEATHER_JSON=$(curl -s "http://api.openweathermap.org/data/2.5/weather?id=${CITY_ID}&appid=${API_KEY}&units=metric")
+WEATHER_JSON=$(curl -s --connect-timeout 3 --max-time 5 "http://api.openweathermap.org/data/2.5/weather?id=${CITY_ID}&appid=${API_KEY}&units=metric")
 
 if [[ -z "$WEATHER_JSON" ]]; then
     sketchybar --set "$ITEM_NAME" label="N/A"
@@ -81,7 +81,7 @@ else
 fi
 
 # Fetch forecast for precipitation probability
-FORECAST_JSON=$(curl -s "http://api.openweathermap.org/data/2.5/forecast?id=${CITY_ID}&appid=${API_KEY}&units=metric&cnt=1")
+FORECAST_JSON=$(curl -s --connect-timeout 3 --max-time 5 "http://api.openweathermap.org/data/2.5/forecast?id=${CITY_ID}&appid=${API_KEY}&units=metric&cnt=1")
 POP=$(echo "$FORECAST_JSON" | jq -r '.list[0].pop // 0' 2>/dev/null)
 POP_PCT=$(echo "$POP * 100" | bc 2>/dev/null | cut -d. -f1)
 [[ -z "$POP_PCT" ]] && POP_PCT="0"

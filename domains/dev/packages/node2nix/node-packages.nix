@@ -4,13 +4,13 @@
 
 let
   sources = {
-    "@anthropic-ai/claude-code-2.1.29" = {
+    "@anthropic-ai/claude-code-2.1.68" = {
       name = "_at_anthropic-ai_slash_claude-code";
       packageName = "@anthropic-ai/claude-code";
-      version = "2.1.29";
+      version = "2.1.68";
       src = fetchurl {
-        url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.29.tgz";
-        sha512 = "vMHTOXrYdnreGtKUsWdd3Bwx5fKprTyNG7shrvbx3L2/jU9jexkOJrEKmN5loeR5jrE54LSB38QpaIj8pVM6eQ==";
+        url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.68.tgz";
+        sha512 = "JfUAZSl7YM94uXBze2Kl5xgo/3mVjPIZQg+cOoQThIA16VLsb53FguiUJtt9WOcC3kgaHshvV/bFTrFFuKWqVQ==";
       };
     };
     "@dqbd/tiktoken-1.0.22" = {
@@ -38,7 +38,7 @@ let
     version = "1.0.0";
     src = ./.;
     dependencies = [
-      sources."@anthropic-ai/claude-code-2.1.29"
+      sources."@anthropic-ai/claude-code-2.1.68"
       sources."@dqbd/tiktoken-1.0.22"
       sources."aicommits-1.11.0"
     ];
