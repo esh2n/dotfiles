@@ -145,3 +145,7 @@ domains/dev/config/claude/image-cache/
 # Docs build artifacts
 docs/dist/
 docs/.astro/
+
+# Claude Code cache files
+domains/dev/config/claude/mcp-needs-auth-cache.json
+domains/dev/config/claude/policy-limits.json

@@ -64,10 +64,36 @@ if [[ ! -f "$ZELLIJ_PLUGIN_DIR/zjstatus.wasm" ]]; then
         log_warn "Failed to download zjstatus plugin"
 fi
 
+# Harpoon: build from source with matching zellij-tile version
 if [[ ! -f "$ZELLIJ_PLUGIN_DIR/harpoon.wasm" ]]; then
-    curl -L -o "$ZELLIJ_PLUGIN_DIR/harpoon.wasm" \
-        "https://github.com/Nacho114/harpoon/releases/latest/download/harpoon.wasm" || \
-        log_warn "Failed to download harpoon plugin"
+    if has_command "zellij" && has_command "cargo"; then
+        ZELLIJ_VERSION=$(zellij --version | awk '{print $2}')
+        log_info "Building harpoon plugin for Zellij ${ZELLIJ_VERSION}..."
+
+        HARPOON_TMP="/tmp/harpoon-build-$$"
+        git clone --depth 1 https://github.com/Nacho114/harpoon.git "$HARPOON_TMP" 2>/dev/null
+
+        if [[ -d "$HARPOON_TMP" ]]; then
+            cd "$HARPOON_TMP"
+            # Update zellij-tile version to match installed zellij
+            sed -i '' "s/zellij-tile = \".*\"/zellij-tile = \"${ZELLIJ_VERSION}\"/" Cargo.toml
+
+            # Ensure wasm target is installed
+            rustup target add wasm32-wasip1 2>/dev/null
+
+            if cargo build --release --target wasm32-wasip1 2>/dev/null; then
+                cp target/wasm32-wasip1/release/harpoon.wasm "$ZELLIJ_PLUGIN_DIR/"
+                log_success "Harpoon plugin built successfully"
+            else
+                log_warn "Failed to build harpoon plugin"
+            fi
+
+            cd - > /dev/null
+            rm -rf "$HARPOON_TMP"
+        fi
+    else
+        log_warn "Skipping harpoon: zellij or cargo not installed"
+    fi
 fi
 
 if [[ ! -f "$ZELLIJ_PLUGIN_DIR/monocle.wasm" ]]; then
