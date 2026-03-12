@@ -391,9 +391,14 @@
       "Write(**/*_rsa)",
       "Write(**/*_ecdsa)",
       "Write(**/*_ed25519)"
-    ]
+    ],
+    "ask": []
   },
-  "model": "opus",
+  "model": "opus[1m]",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/scripts/statusline.sh"
+  },
   "enabledPlugins": {
     "typescript-lsp@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true,
@@ -413,6 +418,7 @@
     "playwright@claude-plugins-official": true,
     "Notion@claude-plugins-official": true
   },
+  "language": "Japanese",
   "mcpServers": {
     "pencil": {
       "command": "/Applications/Pencil.app/Contents/Resources/app.asar.unpacked/out/mcp-server-darwin-arm64",
@@ -422,6 +428,5 @@
     }
   },
   "theme": "dark",
-  "preferredNotifChannel": "terminal_bell",
-  "language": "Japanese"
+  "preferredNotifChannel": "terminal_bell"
 }

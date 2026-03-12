@@ -89,6 +89,9 @@ quick-terminal-autohide = true
 # Image protocol
 image-storage-limit = 320
 
+# URL/Hyperlink handling (cmd+click to open)
+link-url = true
+
 # Fix: Shift+Enter sends escape sequence instead of newline in Claude Code
 # See: https://github.com/anthropics/claude-code/issues/5757
 keybind = shift+enter=text:\n

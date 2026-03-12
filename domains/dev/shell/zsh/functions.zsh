@@ -1408,6 +1408,19 @@ function wtprune() {
   log_success "Prune completed"
 }
 
+# Copy .claude/settings.local.json to new worktree if gitignored
+function _wt_copy_claude_local_settings() {
+  local src_root=$(git rev-parse --show-toplevel 2>/dev/null)
+  local dst_path=$1
+
+  if [[ -f "$src_root/.claude/settings.local.json" ]] && \
+     git -C "$dst_path" check-ignore -q ".claude/settings.local.json" 2>/dev/null; then
+    mkdir -p "$dst_path/.claude"
+    cp "$src_root/.claude/settings.local.json" "$dst_path/.claude/"
+    log_info "Copied .claude/settings.local.json to worktree"
+  fi
+}
+
 # Add worktree interactively
 function wtadd() {
   if ! has_command wtp; then
@@ -1440,14 +1453,22 @@ EOF
            --preview 'git log --oneline -10 --color=always {} 2>/dev/null || git log --oneline -10 --color=always origin/{} 2>/dev/null || echo "No local commits yet"')
 
       if [[ -n "$branch" ]]; then
-        wtp add "$branch" && wtcd "$branch"
+        if wtp add "$branch"; then
+          local new_path=$(wtp cd "$branch" 2>/dev/null)
+          [[ -n "$new_path" ]] && _wt_copy_claude_local_settings "$new_path"
+          wtcd "$branch"
+        fi
       fi
       ;;
     "🌱 New from here")
       printf "New branch name: "
       read new_branch
       if [[ -n "$new_branch" ]]; then
-        wtp add -b "$new_branch" && wtcd "$new_branch"
+        if wtp add -b "$new_branch"; then
+          local new_path=$(wtp cd "$new_branch" 2>/dev/null)
+          [[ -n "$new_path" ]] && _wt_copy_claude_local_settings "$new_path"
+          wtcd "$new_branch"
+        fi
       fi
       ;;
     "🪴 New from...")
@@ -1470,7 +1491,11 @@ EOF
       printf "New branch name: "
       read new_branch
       if [[ -n "$new_branch" ]]; then
-        wtp add -b "$new_branch" "$base_branch" && wtcd "$new_branch"
+        if wtp add -b "$new_branch" "$base_branch"; then
+          local new_path=$(wtp cd "$new_branch" 2>/dev/null)
+          [[ -n "$new_path" ]] && _wt_copy_claude_local_settings "$new_path"
+          wtcd "$new_branch"
+        fi
       fi
       ;;
     *)
