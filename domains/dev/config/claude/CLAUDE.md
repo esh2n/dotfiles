@@ -41,11 +41,17 @@ Key rules:
 - Naming: `../project-<type>-<description>` (types: feature, bugfix, hotfix, experiment, refactor)
 - Use `using-git-worktrees` skill for setup
 
-### Commits
-- Format: `<type>(<scope>): <subject>` (feat, fix, docs, perf, refactor)
-- Use trailers: `Github-Issue: #123`, `Reported-by: Name`
+### Commits — IMPORTANT
+- NEVER commit or push without explicit user instruction
+- Format: `<type>(<scope>): <subject>` — 1行、英語、簡潔
+- NEVER add `Co-Authored-By` or any trailer mentioning AI/Claude
+- NEVER use grandiose language ("revolutionize", "dramatically", "comprehensive overhaul")
+- Subject is lowercase, no period, max 50 chars
+- Use trailers only when user specifies: `Github-Issue: #123`
+- Use `/gitmsg` skill or `/commit` for proper formatting
 
 ### PRs
+- NEVER create a PR without explicit user instruction
 - Focus on high-level problem and solution
 - Never mention tools used (no co-authored-by)
 - Include performance impact if relevant
