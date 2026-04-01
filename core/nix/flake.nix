@@ -25,8 +25,9 @@
 
   outputs = { nixpkgs, nix-darwin, home-manager, brew-nix, ... }:
     let
-      # Get username from environment
-      username = builtins.getEnv "USER";
+      # Get username from environment (requires --impure)
+      # Falls back to "ci" in pure evaluation (e.g., CI without --impure)
+      username = let u = builtins.getEnv "USER"; in if u == "" then "ci" else u;
       hostname = "${username}-mac";
       system = "aarch64-darwin";
     in {

@@ -119,8 +119,12 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         "post")
             run_validation
             ;;
+        "portability")
+            source "${SCRIPT_DIR}/portability.sh"
+            run_portability_checks
+            ;;
         *)
-            echo "Usage: $0 {pre|post}"
+            echo "Usage: $0 {pre|post|portability}"
             exit 1
             ;;
     esac

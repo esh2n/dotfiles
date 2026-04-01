@@ -13,7 +13,14 @@ if [[ -z "$DOTFILES_ROOT" ]]; then
         # .zshrc is in domains/dev/home/.zshrc -> root is ../../../
         DOTFILES_ROOT=$(dirname $(dirname $(dirname $(dirname "$link_target"))))
     else
-        DOTFILES_ROOT="${HOME}/go/github.com/esh2n/dotfiles/dotfiles"
+        # Fallback: resolve via ghq root + git remote
+        local ghq_root="${GHQ_ROOT:-${HOME}/go}"
+        local gh_user="${GITHUB_USER:-$(git config github.user 2>/dev/null || echo "")}"
+        if [[ -n "$gh_user" ]]; then
+            DOTFILES_ROOT="${ghq_root}/github.com/${gh_user}/dotfiles"
+        else
+            DOTFILES_ROOT="${HOME}/dotfiles"
+        fi
     fi
 fi
 
@@ -40,3 +47,16 @@ load_domain_shell_configs "$DOTFILES_ROOT" "zsh"
 
 # Kiro CLI post block. Keep at the bottom of this file.
 [[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"
+
+# claude-mem: resolve latest installed version dynamically
+claude-mem() {
+    local base="$HOME/.claude/plugins/cache/thedotmack/claude-mem"
+    local latest
+    latest=$(ls -v "$base" 2>/dev/null | tail -1)
+    if [[ -n "$latest" && -f "$base/$latest/scripts/worker-service.cjs" ]]; then
+        bun "$base/$latest/scripts/worker-service.cjs" "$@"
+    else
+        echo "claude-mem not found. Install via claude plugin." >&2
+        return 1
+    fi
+}

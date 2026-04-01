@@ -95,7 +95,7 @@
   "rust-analyzer.check.command": "clippy",
   // .NET/C#の言語サーバー設定
   "dotnetAcquisitionExtension.existingDotnetPath": [
-    "/Users/esh2n/.local/share/mise/installs/dotnet/8.0.408/dotnet"
+    "{{HOME}}/.local/share/mise/installs/dotnet/8.0.408/dotnet"
   ],
   "dotnet.server.useOmnisharp": false,
   "csharp.semanticHighlighting.enabled": true,

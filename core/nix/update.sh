@@ -248,6 +248,17 @@ main() {
         exit 1
     fi
 
+    # Re-merge Claude Code profile (source settings may have changed)
+    local claude_switch="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
+    if [[ -x "$claude_switch" ]]; then
+        local current_profile
+        current_profile=$("$claude_switch" current 2>/dev/null | sed 's/Current: //')
+        if [[ -n "$current_profile" && "$current_profile" != "unknown" ]]; then
+            log_info "Re-merging Claude Code profile: $current_profile"
+            bash "$claude_switch" "$current_profile"
+        fi
+    fi
+
     echo ""
     log_success "Update complete!"
     log_info "Your system configuration is now up to date."

@@ -29,6 +29,9 @@ jobs:
             - name: Build darwin configuration
               run: |
                   cd core/nix
-                  nix build .#darwinConfigurations.esh2n-mac.system \
+                  nix build .#darwinConfigurations.ci-mac.system \
+                    --impure \
                     --print-build-logs \
                     --show-trace
+              env:
+                  USER: ci

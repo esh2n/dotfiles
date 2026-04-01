@@ -15,8 +15,7 @@ get_api_key() {
     
     # Try to find .env file
     local env_files=(
-        "$DOTFILES_ROOT/.env"
-        "$HOME/go/github.com/esh2n/dotfiles/.env"
+        "${DOTFILES_ROOT:+${DOTFILES_ROOT}/.env}"
         "$HOME/dotfiles/.env"
         "$HOME/.env"
     )

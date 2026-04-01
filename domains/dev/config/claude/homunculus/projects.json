@@ -1,0 +1,26 @@
+{
+  "d0ef84976eb1": {
+    "id": "d0ef84976eb1",
+    "name": "dotfiles",
+    "root": "/Users/shunya.endo/go/github.com/esh2n/dotfiles",
+    "remote": "https://github.com/esh2n/dotfiles.git",
+    "created_at": "2026-04-01T07:43:28.338636Z",
+    "last_seen": "2026-04-01T07:52:40.653601Z"
+  },
+  "073674bb99e6": {
+    "id": "073674bb99e6",
+    "name": "cobo",
+    "root": "/Users/shunya.endo/go/github.com/esh2n/cobo",
+    "remote": "",
+    "created_at": "2026-04-01T07:43:36.040980Z",
+    "last_seen": "2026-04-01T07:53:21.276731Z"
+  },
+  "d91e009b6dc2": {
+    "id": "d91e009b6dc2",
+    "name": "nix",
+    "root": "/Users/shunya.endo/go/github.com/esh2n/dotfiles/core/nix",
+    "remote": "",
+    "created_at": "2026-04-01T07:50:07.438571Z",
+    "last_seen": "2026-04-01T07:52:56.156531Z"
+  }
+}

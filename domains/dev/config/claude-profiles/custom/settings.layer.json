@@ -1,0 +1,142 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Grep(**)",
+      "Glob(**)",
+      "LS(**)",
+      "TodoRead(**)",
+      "TodoWrite(**)",
+      "Task(**)",
+      "WebSearch",
+      "NotebookRead(**)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(git stash list *)",
+      "Bash(git worktree list *)",
+      "Bash(git rev-parse *)",
+      "Bash(git merge-base *)",
+      "Bash(git ls-files *)",
+      "Bash(git blame *)",
+      "Bash(git shortlog *)",
+      "Bash(git describe *)",
+      "Bash(git config --get *)",
+      "Bash(git tag -l *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list *)",
+      "Bash(gh repo view *)",
+      "Bash(gh api *)",
+      "Bash(gh run view *)",
+      "Bash(gh run list *)",
+      "Bash(ls *)",
+      "Bash(eza *)",
+      "Bash(cat *)",
+      "Bash(bat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(which *)",
+      "Bash(pwd)",
+      "Bash(whoami)",
+      "Bash(env)",
+      "Bash(tree *)",
+      "Bash(find *)",
+      "Bash(fd *)",
+      "Bash(rg *)",
+      "Bash(grep *)",
+      "Bash(jq *)",
+      "Bash(yq *)",
+      "Bash(date *)",
+      "Bash(mkdir *)",
+      "Bash(echo *)",
+      "Bash(sort *)",
+      "Bash(readlink *)",
+      "Bash(basename *)",
+      "Bash(dirname *)",
+      "Bash(realpath *)",
+      "Bash(* --version)",
+      "Bash(* --help)",
+      "Edit(./**)",
+      "Edit(~/.claude/**)",
+      "Edit(~/.config/**)",
+      "Write(./**)",
+      "Write(~/.claude/**)",
+      "Write(~/.config/**)",
+      "MultiEdit(./**)",
+      "MultiEdit(~/.claude/**)",
+      "MultiEdit(~/.config/**)",
+      "NotebookEdit(./**)",
+      "WebFetch(domain:*)",
+      "mcp__pencil"
+    ]
+  },
+  "enabledPlugins": {
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
+  "mcpServers": {
+    "pencil": {
+      "command": "/Applications/Pencil.app/Contents/Resources/app.asar.unpacked/out/mcp-server-darwin-arm64",
+      "args": [],
+      "env": {},
+      "type": "stdio"
+    },
+    "figma-remote": {
+      "url": "https://mcp.figma.com/mcp",
+      "type": "http"
+    },
+    "figma-desktop": {
+      "url": "http://127.0.0.1:3845/mcp",
+      "type": "http"
+    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/auto-format.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/auto-test.sh",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/session-info.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/compact-context.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": []
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "apiKeyHelper": "",
+  "cleanupPeriodDays": 30,
+  "env": {
+    "CLAUDECODE": "1",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "DISABLE_COST_WARNINGS": "0",
+    "BASH_DEFAULT_TIMEOUT_MS": "300000",
+    "BASH_MAX_TIMEOUT_MS": "1200000",
+    "SHELL": "/opt/homebrew/bin/fish",
+    "UV_CACHE_DIR": "~/.cache/uv",
+    "UV_PYTHON_PREFERENCE": "managed",
+    "DENO_DIR": "~/.cache/deno",
+    "CARGO_HOME": "~/.cargo",
+    "RUSTUP_HOME": "~/.rustup",
+    "GOPATH": "~/go",
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+  "permissions": {
+    "deny": [
+      "Read(**.env)",
+      "Read(**.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(~/.aws/credentials)",
+      "Read(~/.aws/config)",
+      "Read(~/.azure/**)",
+      "Read(~/.gcp/**)",
+      "Read(~/.ssh/id_*)",
+      "Read(~/.ssh/*_rsa)",
+      "Read(~/.ssh/*_ecdsa)",
+      "Read(~/.ssh/*_ed25519)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~/*)",
+      "Bash(sudo rm *)",
+      "Bash(sudo dd *)",
+      "Bash(sudo mkfs *)",
+      "Bash(sudo fdisk *)",
+      "Bash(sudo mount *)",
+      "Bash(sudo umount *)",
+      "Bash(dd *)",
+      "Bash(mkfs *)",
+      "Bash(fdisk *)",
+      "Bash(> /dev/*)",
+      "Bash(>> /dev/*)",
+      "Bash(sudo passwd *)",
+      "Bash(sudo -i *)",
+      "Bash(sudo su *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "Bash(git checkout -- .)",
+      "Bash(git clean -fd *)",
+      "Bash(git clean -f *)",
+      "Bash(rm -rf .git)",
+      "Bash(terraform destroy *)",
+      "Bash(terragrunt destroy *)",
+      "Bash(az account clear *)",
+      "Bash(az logout *)",
+      "Bash(az group delete *)",
+      "Bash(az vm delete *)",
+      "Bash(az storage account delete *)",
+      "Bash(gcloud auth revoke *)",
+      "Bash(gcloud projects delete *)",
+      "Bash(gcloud compute instances delete *)",
+      "Bash(gcloud sql instances delete *)",
+      "Bash(kubectl delete namespace *)",
+      "Bash(kubectl delete all *)",
+      "Bash(helm uninstall *)",
+      "Bash(az keyvault secret show *)",
+      "Bash(gcloud secrets versions access *)",
+      "Bash(kubectl get secrets *)",
+      "Bash(npm publish *)",
+      "Bash(cargo publish *)",
+      "Bash(deno publish *)",
+      "Bash(dotnet nuget push *)",
+      "Bash(docker system prune *)",
+      "Bash(kill -9 *)",
+      "Edit(/etc/**)",
+      "Edit(/usr/**)",
+      "Edit(/var/**)",
+      "Edit(/opt/**)",
+      "Edit(/bin/**)",
+      "Edit(/sbin/**)",
+      "Edit(/lib/**)",
+      "Edit(/boot/**)",
+      "Edit(/proc/**)",
+      "Edit(/sys/**)",
+      "Edit(/dev/**)",
+      "Edit(~/.ssh/id_*)",
+      "Edit(~/.ssh/*_rsa)",
+      "Edit(~/.ssh/*_ecdsa)",
+      "Edit(~/.ssh/*_ed25519)",
+      "Edit(~/.aws/credentials)",
+      "Edit(~/.azure/**)",
+      "Edit(~/.gcp/**)",
+      "Edit(**/*.pem)",
+      "Edit(**/*.key)",
+      "Write(/etc/**)",
+      "Write(/usr/**)",
+      "Write(/var/**)",
+      "Write(/opt/**)",
+      "Write(/bin/**)",
+      "Write(/sbin/**)",
+      "Write(/lib/**)",
+      "Write(/boot/**)",
+      "Write(/proc/**)",
+      "Write(/sys/**)",
+      "Write(/dev/**)",
+      "Write(~/.ssh/id_*)",
+      "Write(~/.ssh/*_rsa)",
+      "Write(~/.ssh/*_ecdsa)",
+      "Write(~/.ssh/*_ed25519)",
+      "Write(~/.aws/credentials)",
+      "Write(~/.azure/**)",
+      "Write(~/.gcp/**)",
+      "Write(**/*.pem)",
+      "Write(**/*.key)"
+    ]
+  },
+  "model": "opus[1m]",
+  "language": "Japanese",
+  "theme": "dark",
+  "effortLevel": "high",
+  "preferredNotifChannel": "ghostty",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/scripts/statusline.sh"
+  },
+  "enabledPlugins": {
+    "claude-mem@thedotmack": true
+  },
+  "extraKnownMarketplaces": {
+    "thedotmack": {
+      "source": {
+        "source": "github",
+        "repo": "thedotmack/claude-mem"
+      }
+    },
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/git-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/audit-log.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/mcp-audit.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"承認が必要です\" with title \"Claude Code\" sound name \"Ping\"'"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"タスク完了\" with title \"Claude Code\" sound name \"Glass\"'"
+          }
+        ]
+      }
+    ]
+  }
+}

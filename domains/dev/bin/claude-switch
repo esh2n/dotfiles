@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# Claude Code / Cursor Profile Switcher
+# -----------------------------------------------------------------------------
+# Merges base layer (always applied) + profile layer for each component.
+# Components using merge: skills, hooks, scripts, commands
+# Components using simple swap: agents, rules
+# Files composed via jq/cat: settings.json, CLAUDE.md
+# -----------------------------------------------------------------------------
+
+# Resolve DOTFILES_ROOT from script's own location (works via symlink)
+if [[ -z "${DOTFILES_ROOT:-}" ]]; then
+    SCRIPT_REALPATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c "import os; print(os.path.realpath('${BASH_SOURCE[0]}'))" 2>/dev/null || echo "")"
+    if [[ -n "$SCRIPT_REALPATH" ]]; then
+        # Script is at $DOTFILES_ROOT/domains/dev/bin/claude-switch
+        DOTFILES_ROOT="$(cd "$(dirname "$SCRIPT_REALPATH")/../../.." && pwd)"
+    fi
+fi
+
+# Load utilities
+if [[ -n "${DOTFILES_ROOT:-}" && -f "$DOTFILES_ROOT/core/utils/common.sh" ]]; then
+    source "$DOTFILES_ROOT/core/utils/common.sh"
+elif [[ -f "$HOME/dotfiles/core/utils/common.sh" ]]; then
+    source "$HOME/dotfiles/core/utils/common.sh"
+fi
+
+# Resolve profiles directory
+PROFILES_DIR=""
+GHQ_ROOT="${GHQ_ROOT:-${HOME}/go}"
+
+for candidate in \
+    "${DOTFILES_ROOT:-}/domains/dev/config/claude-profiles" \
+    "$HOME/dotfiles/domains/dev/config/claude-profiles"; do
+    if [[ -d "$candidate" ]]; then
+        PROFILES_DIR="$candidate"
+        break
+    fi
+done
+
+if [[ -z "$PROFILES_DIR" ]]; then
+    log_error "claude-profiles directory not found"
+    exit 1
+fi
+
+CLAUDE_DIR="$HOME/.claude"
+CURSOR_DIR="$HOME/.cursor"
+BASE_DIR="$PROFILES_DIR/base"
+
+# Directories merged: base/* + profile/* → staging dir with symlinks
+MERGE_DIRS=(skills hooks scripts commands)
+# Directories swapped: profile only (no base layer)
+SWAP_DIRS=(agents rules)
+
+PROFILES=(custom ecc)
+
+# -----------------------------------------------------------------------------
+# detect current profile
+# -----------------------------------------------------------------------------
+current_profile() {
+    if [[ -f "$CLAUDE_DIR/.claude-profile" ]]; then
+        cat "$CLAUDE_DIR/.claude-profile"
+        return
+    fi
+    echo "unknown"
+}
+
+# -----------------------------------------------------------------------------
+# merge settings.json (base + layer → output)
+# -----------------------------------------------------------------------------
+merge_settings() {
+    local profile="$1"
+    local base="$BASE_DIR/settings.base.json"
+    local layer="$PROFILES_DIR/$profile/settings.layer.json"
+    local output="$CLAUDE_DIR/settings.json"
+
+    if [[ ! -f "$base" ]]; then
+        log_error "Base settings not found: $base"
+        exit 1
+    fi
+    if [[ ! -f "$layer" ]]; then
+        log_error "Layer settings not found: $layer"
+        exit 1
+    fi
+
+    # Resolve dotfiles parent (e.g., ~/go/github.com/esh2n) for sibling repo paths
+    local dotfiles_parent
+    dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
+
+    jq -s '
+      .[0] as $base | .[1] as $layer |
+      ($base * $layer) |
+      .permissions.allow = (
+        ($base.permissions.allow // []) + ($layer.permissions.allow // []) | unique
+      ) |
+      .permissions.deny = ($base.permissions.deny // []) |
+      .hooks = (
+        ($base.hooks // {}) as $bh | ($layer.hooks // {}) as $lh |
+        ($bh | keys) + ($lh | keys) | unique |
+        map(. as $k | {($k): (($bh[$k] // []) + ($lh[$k] // []))}) |
+        add // {}
+      ) |
+      .mcpServers = (($base.mcpServers // {}) + ($layer.mcpServers // {})) |
+      .enabledPlugins = (($base.enabledPlugins // {}) + ($layer.enabledPlugins // {})) |
+      .extraKnownMarketplaces = (
+        ($base.extraKnownMarketplaces // {}) + ($layer.extraKnownMarketplaces // {})
+      ) |
+      .env = (($base.env // {}) + ($layer.env // {}))
+    ' "$base" "$layer" \
+      | sed "s|{{DOTFILES_PARENT}}|${dotfiles_parent}|g" \
+      > "$output"
+}
+
+# -----------------------------------------------------------------------------
+# merge CLAUDE.md (base + layer → output)
+# -----------------------------------------------------------------------------
+merge_claude_md() {
+    local profile="$1"
+    local base="$BASE_DIR/CLAUDE.base.md"
+    local layer="$PROFILES_DIR/$profile/CLAUDE.layer.md"
+    local output="$CLAUDE_DIR/CLAUDE.md"
+
+    if [[ -f "$base" && -f "$layer" ]]; then
+        cat "$base" > "$output"
+        printf "\n\n" >> "$output"
+        cat "$layer" >> "$output"
+    elif [[ -f "$base" ]]; then
+        cp "$base" "$output"
+    elif [[ -f "$layer" ]]; then
+        cp "$layer" "$output"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# merge_dir: base/{dir}/* + profile/{dir}/* → staging dir with symlinks
+# Works for skills, hooks, scripts, commands
+# -----------------------------------------------------------------------------
+merge_dir() {
+    local dir_name="$1"
+    local profile="$2"
+    local base_src="$BASE_DIR/$dir_name"
+    local profile_src="$PROFILES_DIR/$profile/$dir_name"
+    local stage="$CLAUDE_DIR/.${dir_name}-merged"
+    local link="$CLAUDE_DIR/$dir_name"
+
+    # Clean/create staging dir
+    if [[ -d "$stage" ]]; then
+        find "$stage" -mindepth 1 -delete
+    else
+        mkdir -p "$stage"
+    fi
+
+    local count=0
+    local base_count=0
+
+    # Symlink base items (always applied)
+    if [[ -d "$base_src" ]]; then
+        for item in "$base_src"/*; do
+            [[ -e "$item" ]] || continue
+            local name
+            name="$(basename "$item")"
+            ln -sfn "$item" "$stage/$name"
+            ((count++))
+        done
+    fi
+    base_count=$count
+
+    # Symlink profile items (profile overrides base if same name)
+    if [[ -d "$profile_src" ]]; then
+        for item in "$profile_src"/*; do
+            [[ -e "$item" ]] || continue
+            local name
+            name="$(basename "$item")"
+            ln -sfn "$item" "$stage/$name"
+            ((count++))
+        done
+    fi
+
+    local profile_count=$((count - base_count))
+
+    # Point ~/.claude/{dir} → staging dir
+    if [[ -d "$link" && ! -L "$link" ]]; then
+        mv "$link" "$link.backup.$(date +%Y%m%d-%H%M%S)"
+    fi
+    [[ -L "$link" ]] && rm "$link"
+    ln -sfn "$stage" "$link"
+
+    log_success "Merged $dir_name: $base_count base + $profile_count $profile = $count total"
+}
+
+# -----------------------------------------------------------------------------
+# swap_dir: simple symlink to profile dir (no base merge)
+# -----------------------------------------------------------------------------
+swap_dir() {
+    local dir_name="$1"
+    local profile="$2"
+    local target="$PROFILES_DIR/$profile/$dir_name"
+    local link="$CLAUDE_DIR/$dir_name"
+
+    if [[ ! -d "$target" ]]; then
+        [[ -L "$link" ]] && rm "$link" || true
+        return 0
+    fi
+
+    if [[ -d "$link" && ! -L "$link" ]]; then
+        mv "$link" "$link.backup.$(date +%Y%m%d-%H%M%S)"
+    fi
+    [[ -L "$link" ]] && rm "$link"
+    ln -sfn "$target" "$link"
+    log_success "Linked $dir_name → $profile"
+}
+
+# -----------------------------------------------------------------------------
+# switch_cursor: install ECC cursor rules or clear them
+# -----------------------------------------------------------------------------
+switch_cursor() {
+    local profile="$1"
+    # Resolve ECC repo as sibling of dotfiles (same GitHub user directory)
+    local dotfiles_parent
+    dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
+    local ecc_repo="${ECC_ROOT:-${dotfiles_parent}/everything-claude-code}"
+    local cursor_rules="$CURSOR_DIR/rules"
+
+    if [[ "$profile" == "ecc" ]]; then
+        if [[ -d "$ecc_repo/.cursor/rules" ]]; then
+            mkdir -p "$cursor_rules"
+            # Symlink ECC cursor rules
+            for rule in "$ecc_repo/.cursor/rules"/*; do
+                [[ -e "$rule" ]] || continue
+                local name
+                name="$(basename "$rule")"
+                ln -sfn "$rule" "$cursor_rules/$name"
+            done
+            local count
+            count=$(ls "$ecc_repo/.cursor/rules" | wc -l | tr -d ' ')
+            log_success "Cursor: linked $count ECC rules → ~/.cursor/rules/"
+        else
+            log_warn "Cursor: ECC .cursor/rules not found at $ecc_repo"
+        fi
+    elif [[ "$profile" == "custom" ]]; then
+        # Remove ECC cursor rules (only symlinks, preserve real files)
+        if [[ -d "$cursor_rules" ]]; then
+            local removed=0
+            for rule in "$cursor_rules"/*; do
+                [[ -L "$rule" ]] && rm "$rule" && ((removed++))
+            done
+            if [[ $removed -gt 0 ]]; then
+                log_success "Cursor: removed $removed ECC rule symlinks"
+            fi
+        fi
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Main: switch profile
+# -----------------------------------------------------------------------------
+switch_profile() {
+    local profile="$1"
+    local profile_dir="$PROFILES_DIR/$profile"
+
+    if [[ ! -d "$profile_dir" ]]; then
+        log_error "Profile not found: $profile_dir"
+        exit 1
+    fi
+
+    log_info "Switching to profile: $profile"
+
+    # 1. Merge files
+    merge_settings "$profile"
+    log_success "Merged settings.json (base + $profile)"
+
+    merge_claude_md "$profile"
+    log_success "Merged CLAUDE.md (base + $profile)"
+
+    # 2. Merge directories (base + profile)
+    for dir in "${MERGE_DIRS[@]}"; do
+        merge_dir "$dir" "$profile"
+    done
+
+    # 3. Swap directories (profile only)
+    for dir in "${SWAP_DIRS[@]}"; do
+        swap_dir "$dir" "$profile"
+    done
+
+    # 4. Cursor rules
+    switch_cursor "$profile"
+
+    # 5. Write marker
+    echo "$profile" > "$CLAUDE_DIR/.claude-profile"
+
+    echo ""
+    log_success "Switched to: $profile"
+    log_info "Restart claude-cli to apply changes"
+}
+
+# -----------------------------------------------------------------------------
+# Entry point
+# -----------------------------------------------------------------------------
+case "${1:-}" in
+    custom|ecc)
+        switch_profile "$1"
+        ;;
+    current)
+        echo "Current: $(current_profile)"
+        ;;
+    list)
+        local_current="$(current_profile)"
+        echo "Available profiles:"
+        for p in "${PROFILES[@]}"; do
+            if [[ "$p" == "$local_current" ]]; then
+                echo "  * $p (active)"
+            else
+                echo "    $p"
+            fi
+        done
+        ;;
+    *)
+        echo "Usage: claude-switch {custom|ecc|current|list}"
+        echo ""
+        echo "Profiles (base layer always included):"
+        echo "  custom  — Personal config + base (skills, hooks, scripts, commands)"
+        echo "  ecc     — Everything Claude Code + base (agents, rules, 46 skills, 62 commands)"
+        echo ""
+        echo "Affects: ~/.claude/ (settings, CLAUDE.md, skills, hooks, scripts, commands, agents, rules)"
+        echo "         ~/.cursor/rules/ (ECC cursor rules when ecc profile)"
+        echo ""
+        echo "Commands:"
+        echo "  current — Show active profile"
+        echo "  list    — List available profiles"
+        exit 1
+        ;;
+esac
