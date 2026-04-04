@@ -2554,6 +2554,14 @@ claude-cli() {
     # Warn if outdated
     _claude_version_warn
 
-    # Run the real claude-cli
-    command claude-cli "$@"
+    # Default flags (auto mode)
+    local -a extra_flags=()
+    local has_permission_mode=false
+    for arg in "$@"; do
+        [[ "$arg" == "--permission-mode" ]] && has_permission_mode=true
+    done
+    $has_permission_mode || extra_flags+=(--permission-mode auto)
+
+    # Run the real claude-cli with no-flicker mode
+    CLAUDE_CODE_NO_FLICKER=1 command claude-cli "${extra_flags[@]}" "$@"
 }
