@@ -35,6 +35,8 @@ log/
 **/claude/projects/
 **/claude/shell-snapshots/
 **/claude/stats-cache.json
+**/claude/version-cache.json
+**/claude/homunculus/
 **/claude/statsig/
 **/claude/todos/
 .claude/
@@ -152,3 +154,5 @@ docs/.astro/
 # Claude Code cache files
 domains/dev/config/claude/mcp-needs-auth-cache.json
 domains/dev/config/claude/policy-limits.json
+domains/dev/config/claude/metrics/
+domains/dev/config/claude/chrome/chrome-native-host
