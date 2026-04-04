@@ -60,3 +60,4 @@ claude-mem() {
         return 1
     fi
 }
+# alias claude-mem= — managed by function above; do not remove this comment
