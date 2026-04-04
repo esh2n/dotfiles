@@ -2444,3 +2444,116 @@ function _notify_precmd() {
 autoload -Uz add-zsh-hook
 add-zsh-hook preexec _notify_preexec
 add-zsh-hook precmd _notify_precmd
+
+# -----------------------------------------------------------------------------
+# claude-cli version check wrapper
+# -----------------------------------------------------------------------------
+# Wraps claude-cli to check for newer versions (cached, once per day).
+# nix manages the installed version; this just warns when outdated.
+
+_CLAUDE_VERSION_CACHE="${HOME}/.claude/version-cache.json"
+_CLAUDE_CHECK_INTERVAL=86400  # 24 hours
+
+_claude_version_check_bg() {
+    local cache="$_CLAUDE_VERSION_CACHE"
+    local latest
+    latest=$(npm view @anthropic-ai/claude-code version 2>/dev/null)
+    [[ -z "$latest" ]] && return
+
+    local current
+    current=$(command claude-cli --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+    [[ -z "$current" ]] && return
+
+    python3 -c "
+import json, datetime
+d = {'current': '$current', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat()}
+with open('$cache', 'w') as f:
+    json.dump(d, f)
+" 2>/dev/null
+}
+
+_claude_version_warn() {
+    local cache="$_CLAUDE_VERSION_CACHE"
+    [[ ! -f "$cache" ]] && return
+
+    local current latest
+    eval $(python3 -c "
+import json, sys
+try:
+    d = json.load(open('$cache'))
+    print(f'current={d[\"current\"]}')
+    print(f'latest={d[\"latest\"]}')
+except:
+    pass
+" 2>/dev/null)
+
+    [[ -z "$current" || -z "$latest" ]] && return
+    [[ "$current" == "$latest" ]] && return
+
+    echo "\033[33m⚠ Claude Code v${latest} が利用可能です（現在 v${current}）\033[0m"
+
+    # Ask to update now
+    echo -n "  今すぐ更新しますか？ [y/N] "
+    read -r answer
+    if [[ "$answer" =~ ^[yY]$ ]]; then
+        local dotfiles_root="${DOTFILES_ROOT:-${HOME}/go/github.com/esh2n/dotfiles}"
+        local node2nix_dir="${dotfiles_root}/domains/dev/packages/node2nix"
+        local nix_dir="${dotfiles_root}/core/nix"
+
+        echo "  node2nix を再生成中..."
+        if command -v node2nix &>/dev/null; then
+            (cd "$node2nix_dir" && node2nix -i package.json) 2>/dev/null
+        else
+            (cd "$node2nix_dir" && nix-shell -p nodePackages.node2nix --run "node2nix -i package.json") 2>/dev/null
+        fi
+
+        echo "  nix-darwin をビルド中... (数分かかります)"
+        local hostname="${USER}-mac"
+        local flake_uri="git+file://${dotfiles_root}?dir=core/nix"
+        if nix build --impure --no-eval-cache --expr "(builtins.getFlake \"${flake_uri}\").darwinConfigurations.\"${hostname}\".system" -o "${nix_dir}/result" 2>/dev/null; then
+            echo "  ビルド完了。適用にはパスワードが必要です。"
+            sudo "${nix_dir}/result/activate"
+            # Update cache
+            python3 -c "
+import json, datetime
+d = {'current': '$latest', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat()}
+with open('$cache', 'w') as f:
+    json.dump(d, f)
+" 2>/dev/null
+            echo "\033[32m  ✅ Claude Code v${latest} に更新しました\033[0m"
+        else
+            echo "\033[31m  ❌ ビルドに失敗しました。手動で core/nix/update.sh を実行してください\033[0m"
+        fi
+    fi
+}
+
+_claude_should_check() {
+    local cache="$_CLAUDE_VERSION_CACHE"
+    [[ ! -f "$cache" ]] && return 0
+
+    python3 -c "
+import json, datetime, sys
+try:
+    d = json.load(open('$cache'))
+    checked = datetime.datetime.fromisoformat(d['checked_at'])
+    if (datetime.datetime.now() - checked).total_seconds() > $_CLAUDE_CHECK_INTERVAL:
+        sys.exit(0)
+    else:
+        sys.exit(1)
+except:
+    sys.exit(0)
+" 2>/dev/null
+}
+
+claude-cli() {
+    # Background version check (non-blocking, once per day)
+    if _claude_should_check; then
+        (_claude_version_check_bg &) 2>/dev/null
+    fi
+
+    # Warn if outdated
+    _claude_version_warn
+
+    # Run the real claude-cli
+    command claude-cli "$@"
+}
