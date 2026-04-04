@@ -1,5 +1,5 @@
-#!/usr/bin/env lua
-
--- Load the sketchybar-package and prepare the helper binaries
-require("helpers")
-require("init")
+#!/bin/bash
+# Activate mise to make mise-managed tools (lua) available in launchd context
+eval "$(~/.local/bin/mise env -s bash 2>/dev/null)" || true
+cd "$(dirname "$0")"
+exec lua -e 'require("helpers"); require("init")'
