@@ -2458,138 +2458,15 @@ add-zsh-hook preexec _notify_preexec
 add-zsh-hook precmd _notify_precmd
 
 # -----------------------------------------------------------------------------
-# claude-cli version check wrapper
+# claude wrapper (native install at ~/.local/bin, auto-updates)
 # -----------------------------------------------------------------------------
-# Wraps claude-cli to check for newer versions (cached, once per day).
-# nix manages the installed version; this just warns when outdated.
+# brew-nix の claude (GUI) が PATH で先にいるため、CLI はフルパスで指定する。
 
-_CLAUDE_VERSION_CACHE="${HOME}/.claude/version-cache.json"
-_CLAUDE_CHECK_INTERVAL=86400  # 24 hours
-
-_claude_version_check_bg() {
-    local cache="$_CLAUDE_VERSION_CACHE"
-
-    local latest
-    latest=$(npm view @anthropic-ai/claude-code version 2>/dev/null)
-    [[ -z "$latest" ]] && return
-
-    local current
-    current=$(command claude-cli --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-    [[ -z "$current" ]] && return
-
-    python3 -c "
-import json, datetime
-try:
-    old = json.load(open('$cache'))
-except:
-    old = {}
-d = {'current': '$current', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat()}
-if 'rebuild_attempted_at' in old:
-    d['rebuild_attempted_at'] = old['rebuild_attempted_at']
-with open('$cache', 'w') as f:
-    json.dump(d, f)
-" 2>/dev/null
-}
-
-_claude_version_warn() {
-    local cache="$_CLAUDE_VERSION_CACHE"
-    [[ ! -f "$cache" ]] && return
-
-    local current latest rebuild_at
-    eval $(python3 -c "
-import json, sys
-try:
-    d = json.load(open('$cache'))
-    print(f'current={d[\"current\"]}')
-    print(f'latest={d[\"latest\"]}')
-    print(f'rebuild_at={d.get(\"rebuild_attempted_at\", \"\")}')
-except:
-    pass
-" 2>/dev/null)
-
-    [[ -z "$current" || -z "$latest" ]] && return
-    [[ "$current" == "$latest" ]] && return
-
-    # Skip if rebuild was already attempted within the check interval
-    if [[ -n "$rebuild_at" ]]; then
-        local should_retry
-        should_retry=$(python3 -c "
-import datetime, sys
-try:
-    attempted = datetime.datetime.fromisoformat('$rebuild_at')
-    if (datetime.datetime.now() - attempted).total_seconds() > $_CLAUDE_CHECK_INTERVAL:
-        print('yes')
-    else:
-        print('no')
-except:
-    print('yes')
-" 2>/dev/null)
-        if [[ "$should_retry" == "no" ]]; then
-            echo "\033[33m⚠ Claude Code v${latest} が利用可能（現在 v${current}、次回チェックで再試行）\033[0m"
-            return
-        fi
-    fi
-
-    local dotfiles_root="${DOTFILES_ROOT:-${HOME}/go/github.com/esh2n/dotfiles}"
-    local nix_dir="${dotfiles_root}/core/nix"
-
-    echo "\033[33m⚠ Claude Code v${latest} が利用可能です（現在 v${current}）→ 自動更新します\033[0m"
-    echo "  flake lock を更新中..."
-    nix flake update --flake "${dotfiles_root}/core/nix" 2>/dev/null
-
-    echo "  nix-darwin をビルド中... (数分かかります)"
-    if bash "${nix_dir}/update.sh" 2>/dev/null; then
-        # Re-check actual binary version (nixpkgs may lag behind npm)
-        local actual
-        actual=$(command claude-cli --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-        [[ -z "$actual" ]] && actual="$current"
-        python3 -c "
-import json, datetime
-d = {'current': '$actual', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat(), 'rebuild_attempted_at': datetime.datetime.now().isoformat()}
-with open('$cache', 'w') as f:
-    json.dump(d, f)
-" 2>/dev/null
-        if [[ "$actual" == "$latest" ]]; then
-            echo "\033[32m  ✅ Claude Code v${latest} に更新しました\033[0m"
-        else
-            echo "\033[32m  ✅ ビルド完了（v${actual}、nixpkgs が v${latest} に追いつくまで待機）\033[0m"
-        fi
-    else
-        python3 -c "
-import json, datetime
-d = {'current': '$current', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat(), 'rebuild_attempted_at': datetime.datetime.now().isoformat()}
-with open('$cache', 'w') as f:
-    json.dump(d, f)
-" 2>/dev/null
-        echo "\033[31m  ❌ ビルドに失敗しました。手動で core/nix/update.sh を実行してください\033[0m"
-    fi
-}
-
-_claude_should_check() {
-    local cache="$_CLAUDE_VERSION_CACHE"
-    [[ ! -f "$cache" ]] && return 0
-
-    python3 -c "
-import json, datetime, sys
-try:
-    d = json.load(open('$cache'))
-    checked = datetime.datetime.fromisoformat(d['checked_at'])
-    if (datetime.datetime.now() - checked).total_seconds() > $_CLAUDE_CHECK_INTERVAL:
-        sys.exit(0)
-    else:
-        sys.exit(1)
-except:
-    sys.exit(0)
-" 2>/dev/null
-}
-
-claude-cli() {
-    # Warn if outdated (and auto-rebuild, rate-limited to once per day)
-    _claude_version_warn
-
-    # Background version check (non-blocking, once per day)
-    if _claude_should_check; then
-        (_claude_version_check_bg &) 2>/dev/null
+claude() {
+    local claude_bin="${HOME}/.local/bin/claude"
+    if [[ ! -x "$claude_bin" ]]; then
+        echo "\033[31mclaude-code not found at ${claude_bin}. Run: curl -fsSL https://claude.ai/install.sh | bash\033[0m" >&2
+        return 1
     fi
 
     # Auto mode: inject --permission-mode auto when persisted flag is on
@@ -2603,11 +2480,10 @@ claude-cli() {
         $has_permission_mode || extra_flags+=(--permission-mode auto)
     fi
 
-    # Run the real claude-cli with no-flicker mode
-    CLAUDE_CODE_NO_FLICKER=1 command claude-cli "${extra_flags[@]}" "$@"
+    CLAUDE_CODE_NO_FLICKER=1 "$claude_bin" "${extra_flags[@]}" "$@"
 }
 
-# Toggle auto mode for claude-cli (persisted to ~/.claude/.auto-mode)
+# Toggle auto mode for claude (persisted to ~/.claude/.auto-mode)
 claude-auto() {
     local flag="$HOME/.claude/.auto-mode"
     case "${1:-}" in

@@ -12,6 +12,7 @@ lua = "5.4"
 [settings]
 experimental = false
 verbose = false
+env_shell_expand = true
 
 [env]
 PYTHONPATH = "{{ env.PYTHONPATH | default(value='') }}:{{ cwd }}"
