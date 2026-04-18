@@ -88,14 +88,11 @@
     spanner-cli
     spanner-dump
 
-    # Node.js CLI (nixpkgs native, overlay renames to claude-cli)
-    claude-cli
   ]
   ++ (with pkgs.brewCasks; [
     wezterm
     ghostty
     cursor
-    claude  # GUI version - CLI is available as 'claude-cli'
     visual-studio-code
     zed
     yaak

@@ -2,6 +2,7 @@ final: prev: {
   gotools = prev.gotools.overrideAttrs (old: {
     postInstall = (old.postInstall or "") + ''
       rm -f $out/bin/bundle
+      rm -f $out/bin/modernize
     '';
   });
 
@@ -77,12 +78,6 @@ final: prev: {
     doCheck = false;
   };
 
-  # Node.js CLI — claude-code is now in nixpkgs (buildNpmPackage).
-  # Rename to claude-cli: GUI app (brewCasks.claude) occupies "claude".
-  # Shell function wrapper calls `command claude-cli` so this name is required.
-  claude-cli = prev.runCommand "claude-cli" {} ''
-    mkdir -p $out/bin
-    ln -s ${prev.claude-code}/bin/claude $out/bin/claude-cli
-  '';
+  # claude-code: managed by native installer (auto-updates), not nix.
   # aicommits: managed by mise, not nix.
 }

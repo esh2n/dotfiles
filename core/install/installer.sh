@@ -156,7 +156,16 @@ phase_core() {
         log_info "Changing default shell to zsh..."
         chsh -s "$(which zsh)"
     fi
-    
+
+    # Install Claude Code CLI (native installer, auto-updates)
+    local claude_bin="${HOME}/.local/bin/claude"
+    if [[ ! -x "$claude_bin" ]]; then
+        log_info "Installing Claude Code CLI (native)..."
+        curl -fsSL https://claude.ai/install.sh | bash
+    else
+        log_success "Claude Code CLI already installed: $("$claude_bin" --version 2>/dev/null || echo 'unknown')"
+    fi
+
     if has_command "cargo" && ! has_command "pacifica"; then
         cargo install --git https://github.com/serinuntius/pacifica
     fi
