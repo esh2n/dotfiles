@@ -77,50 +77,12 @@ final: prev: {
     doCheck = false;
   };
 
-  # Node.js packages via node2nix
-  node2nix-generated = import ../../domains/dev/packages/node2nix {
-    pkgs = prev;
-    nodejs = prev.nodejs_20;
-  };
-
-  # Claude Code CLI - properly wrapped
-  claude-code = prev.stdenv.mkDerivation rec {
-    pname = "claude-code";
-    version = "latest";
-
-    nativeBuildInputs = [ prev.makeWrapper ];
-    buildInputs = [ prev.nodejs_20 ];
-
-    dontUnpack = true;
-
-    installPhase = ''
-      mkdir -p $out/bin
-
-      # Create wrapper script that sets up NODE_PATH and runs claude
-      # Named claude-cli to avoid conflict with Homebrew Cask claude GUI app
-      makeWrapper ${prev.nodejs_20}/bin/node $out/bin/claude-cli \
-        --add-flags "${final.node2nix-generated.nodeDependencies}/lib/node_modules/@anthropic-ai/claude-code/cli.js" \
-        --set NODE_PATH "${final.node2nix-generated.nodeDependencies}/lib/node_modules"
-    '';
-  };
-
-  # aicommits CLI - properly wrapped
-  aicommits = prev.stdenv.mkDerivation rec {
-    pname = "aicommits";
-    version = "1.11.0";
-
-    nativeBuildInputs = [ prev.makeWrapper ];
-    buildInputs = [ prev.nodejs_20 ];
-
-    dontUnpack = true;
-
-    installPhase = ''
-      mkdir -p $out/bin
-
-      # Create wrapper script that sets up NODE_PATH and runs aicommits
-      makeWrapper ${prev.nodejs_20}/bin/node $out/bin/aicommits \
-        --add-flags "${final.node2nix-generated.nodeDependencies}/lib/node_modules/aicommits/dist/cli.mjs" \
-        --set NODE_PATH "${final.node2nix-generated.nodeDependencies}/lib/node_modules"
-    '';
-  };
+  # Node.js CLI — claude-code is now in nixpkgs (buildNpmPackage).
+  # Rename to claude-cli: GUI app (brewCasks.claude) occupies "claude".
+  # Shell function wrapper calls `command claude-cli` so this name is required.
+  claude-cli = prev.runCommand "claude-cli" {} ''
+    mkdir -p $out/bin
+    ln -s ${prev.claude-code}/bin/claude $out/bin/claude-cli
+  '';
+  # aicommits: managed by mise, not nix.
 }

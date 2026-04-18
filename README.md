@@ -35,11 +35,14 @@ Quick theme switching for all tools:
 | Nord | Cool, arctic palette |
 | Tokyo Night | Dark, vibrant |
 
-Applies to: WezTerm, Ghostty, Sketchybar, Borders, Zellij
+Applies to: WezTerm, Ghostty, Sketchybar, Borders, Zellij, tmux, Starship, VSCode/Cursor, Neovim, fzf, bat, ripgrep, delta, Wallpaper
 
 ```bash
-theme-switch nord
-theme-switch catppuccin
+theme-switch catppuccin       # Dark
+theme-switch catppuccin-latte  # Light
+theme-switch tokyonight
+theme-switch tokyonight-day    # Light
+theme-switch everforest-light  # Light
 ```
 
 ### Wallpaper Integration
@@ -203,6 +206,9 @@ export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
 - **vivid** - LS_COLORS generator
 - **btop** - Modern system monitor
 - **thefuck** - Command correction
+- **mo** - Markdown viewer (browser, live-reload, Mermaid/KaTeX)
+- **diffnav** - File-tree git diff pager (delta-based, GitHub-style)
+- **ov** - Feature-rich terminal pager (section jump, column mode, filter)
 
 #### Usage
 - `Ctrl+R` - History search (atuin)
@@ -320,6 +326,41 @@ Pure interactive aliases (no argument support):
 | `gpr` | Select base branch for pull request |
 | `glo` | Select branch and show log graph |
 | `gtr` | Show all branches log graph (non-interactive) |
+
+#### Smart Git Commands
+
+| Command | Description |
+|---------|-------------|
+| `git uncommit` | Undo last commit (changes stay staged) |
+| `git unpushed` | List local commits not yet pushed |
+| `git gone` | Delete local branches whose remote was deleted |
+| `git quicksave` | Snapshot all changes to reflog, then reset (safety net) |
+| `git home` | Switch to default branch (main/master) |
+| `gabort` | Auto-detect in-progress operation (rebase/merge/cherry-pick/revert/bisect) and abort |
+| `gcont` | Auto-detect and continue |
+| `gpush` | Push with wip-branch/commit detection, `--force` → `--force-with-lease --force-if-includes` |
+| `gpull` | Pull with dependency change detection (package.json, go.mod, Cargo.toml, etc.) |
+| `fpull` | fetch → stash → pull → stash pop (all automatic) |
+| `gstore` | Interactive stash management (skim: Enter=apply, Ctrl-x=drop) |
+
+#### ECC Hook Manager (`chooks`)
+
+Toggle Claude Code hooks on/off interactively. Changes are temporary — `claude-switch ecc` resets to defaults.
+
+| Command | Description |
+|---------|-------------|
+| `chooks` | skim checklist to toggle hooks on/off |
+| `chooks status` | Show all hooks with current on/off state |
+| `chooks reset` | Re-enable all hooks |
+| `chooks profile` | Switch ECC_HOOK_PROFILE (minimal/standard/strict) |
+
+#### Git Pagers
+
+| Command | Pager | Description |
+|---------|-------|-------------|
+| `git diff` | diffnav | GitHub-style file tree + diff |
+| `git log` | ov | Section jump, filter, follow mode |
+| `git show` | delta \| ov | Syntax highlight + rich pager |
 
 #### Other
 
@@ -742,6 +783,20 @@ Keybindings unified across tmux, WezTerm, and Zellij.
 | Monocle plugin | `Prefix + f` | Zellij only (file finder) |
 | Harpoon plugin | `Prefix + h` | Zellij only (bookmarks) |
 
+**opensessions (AI Agent Sidebar):**
+
+Monitors Claude Code / Codex / Amp / OpenCode across all tmux sessions.
+
+| Keybind | Action |
+|---------|--------|
+| `Prefix a` | Toggle sidebar (current window) |
+| `Prefix A` | Toggle sidebar (all windows) |
+| `j/k` in sidebar | Navigate sessions |
+| `Enter` in sidebar | Switch to session |
+| `Tab` in sidebar | Detail panel (branch, cwd, ports) |
+
+Agent states (Running/Waiting/Idle/Error) auto-detected. Subagent tree, task progress, activity log (Read/Edit/Bash), git branch/PR info displayed. Rust binary — lightweight.
+
 **tmux Session Restore (tmux-resurrect + tmux-continuum):**
 - Auto-save every 15 minutes
 - Auto-restore on tmux startup
@@ -757,7 +812,41 @@ Keybindings unified across tmux, WezTerm, and Zellij.
 - Sessions persist until explicitly deleted: `zellij delete-session <session-name>`
 - Plugins are accessible via prefix mode (see keybindings table above)
 
-#### AeroSpace Window Manager
+#### Paneru Window Manager (Sliding Tiling)
+
+Niri-inspired sliding strip tiling WM. Windows are arranged on an infinite horizontal strip — adding windows never resizes existing ones. Use instead of AeroSpace for multi-task workflows.
+
+**Startup:** Only one WM at a time. AeroSpace auto-start is disabled; paneru starts manually.
+
+```bash
+paneru                  # Start
+pkill paneru            # Stop
+paneru send-cmd window focus east   # CLI control
+```
+
+| Operation | Keybind | Note |
+|-----------|---------|------|
+| Focus | `Alt+h/j/k/l` | Left/down/up/right |
+| Jump to start/end | `Alt+u` / `Alt+i` | |
+| Swap windows | `Alt+Shift+h/j/k/l` | |
+| Grow width | `Alt+r` | Cycles: 1/3 → 1/2 → 2/3 → 3/4 |
+| Shrink width | `Alt+Shift+r` | |
+| Full width | `Alt+f` | |
+| Center | `Alt+c` | |
+| Float/tile toggle | `Alt+t` | |
+| Stack (vertical) | `Alt+s` | Stack into left column |
+| Unstack | `Alt+Shift+s` | |
+| Equalize stack | `Alt+e` | |
+| Next monitor | `Alt+Ctrl+n` | |
+| Virtual WS up/down | `Alt+Ctrl+k/j` | Multiple strips stacked |
+| Move to VS up/down | `Alt+Ctrl+Shift+k/j` | |
+| Trackpad slide | `Alt+scroll` | Horizontal strip scroll |
+| Trackpad VS switch | `Alt+Shift+scroll` | Vertical workspace |
+| Quit | `Alt+Ctrl+Shift+q` | |
+
+#### AeroSpace Window Manager (Fixed Grid Tiling)
+
+> AeroSpace auto-start is disabled by default. Start manually with `open -a AeroSpace` when needed.
 
 **Workspace Design:**
 - W (Work): Cursor, VSCode - Development
@@ -940,7 +1029,8 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 - VSCode, Cursor
 
 ### Window Management
-- AeroSpace
+- AeroSpace (fixed grid tiling)
+- Paneru (sliding strip tiling, Niri-inspired)
 - Borders
 - Sketchybar
 - Raycast

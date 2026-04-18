@@ -2,6 +2,9 @@
 # PreToolUse hook: block git commit/push/reset without user approval
 # Catches all bypass methods: pipes, &&, ;, ||, option insertion
 
+# Skip if disabled via chooks or environment variable
+[ "${GIT_GUARD_DISABLED:-}" = "1" ] && exit 0
+
 INPUT=$(cat)
 TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty')
 [ "$TOOL" != "Bash" ] && exit 0

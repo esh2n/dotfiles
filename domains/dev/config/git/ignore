@@ -49,6 +49,7 @@ vendor/
 .bundle/
 **/.claude/settings.local.json
 **/.claude/telemetry/
+**/.claude/skills/local-*/
 
 # Personal directories
 .personal/

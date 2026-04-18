@@ -1,0 +1,44 @@
+local M = {}
+
+-- Catppuccin Latte (Light variant)
+M.variant = "light"
+
+M.palette = {
+    rosewater = 0xffdc8a78,
+    flamingo = 0xffdd7878,
+    pink = 0xffea76cb,
+    mauve = 0xff8839ef,
+    red = 0xffd20f39,
+    maroon = 0xffe64553,
+    peach = 0xfffe640b,
+    yellow = 0xffdf8e1d,
+    green = 0xff40a02b,
+    teal = 0xff179299,
+    sky = 0xff04a5e5,
+    sapphire = 0xff209fb5,
+    blue = 0xff1e66f5,
+    lavender = 0xff7287fd,
+    text = 0xff4c4f69,
+    subtext1 = 0xff5c5f77,
+    subtext0 = 0xff6c6f85,
+    overlay2 = 0xff7c7f93,
+    overlay1 = 0xff8c8fa1,
+    overlay0 = 0xff9ca0b0,
+    surface2 = 0xffacb0be,
+    surface1 = 0xffbcc0cc,
+    surface0 = 0xffccd0da,
+    base = 0xffeff1f5,
+    mantle = 0xffe6e9ef,
+    crust = 0xffdce0e8,
+
+    transparent = 0x00000000,
+    white = 0xffffffff,
+    black = 0xff000000,
+}
+
+function M.with_alpha(color, alpha)
+    if alpha > 1.0 or alpha < 0.0 then return color end
+    return (color & 0x00ffffff) | (math.floor(alpha * 255.0) << 24)
+end
+
+return M

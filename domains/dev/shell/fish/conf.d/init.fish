@@ -1,5 +1,12 @@
 # Fish Init for Dev Domain
 
+# Theme environment (fzf/bat/ripgrep colors)
+set -l theme_env "$DOTFILES_ROOT/domains/system/config/theme-env/current.fish"
+if test -z "$DOTFILES_ROOT"
+    set theme_env "$HOME/dotfiles/domains/system/config/theme-env/current.fish"
+end
+test -f $theme_env; and source $theme_env
+
 # Source common aliases
 source (dirname (status filename))/../common/aliases.sh
 

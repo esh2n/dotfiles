@@ -1,46 +1,54 @@
 #!/usr/bin/env bash
 
 # Key bindings help script for tmux status bar
-# Prefix: Ctrl+q (unified with WezTerm/Zellij)
+# Prefix: Ctrl+q
 
-# Show info icon for status bar (click to show help popup)
 get_icon() {
     echo "ℹ"
 }
 
-# Show full keybindings help (for popup display)
 get_help() {
     cat << 'EOF'
-┌─────────────────────────────────────────┐
-│  tmux Keybindings (Prefix: Ctrl+q)      │
-├─────────────────────────────────────────┤
-│  Pane                                   │
-│    Prefix + \     Split horizontal      │
-│    Prefix + -     Split vertical        │
-│    Prefix + h/j/k/l  Navigate           │
-│    Prefix + H/J/K/L  Resize             │
-│    Prefix + z     Zoom toggle           │
-│    Prefix + x     Close pane            │
-├─────────────────────────────────────────┤
-│  Window/Tab                             │
-│    Ctrl+h         Previous window       │
-│    Ctrl+l         Next window           │
-│    Prefix + Tab   Last window           │
-├─────────────────────────────────────────┤
-│  Session                                │
-│    Prefix + d     Detach                │
-│    Prefix + Ctrl+c  New session         │
-├─────────────────────────────────────────┤
-│  Copy Mode                              │
-│    Prefix + [     Enter copy mode       │
-│    v              Begin selection       │
-│    y              Copy and exit         │
-├─────────────────────────────────────────┤
-│  Spotify                                │
-│    Prefix + s     Toggle play/pause     │
-│    Prefix + ]     Next track            │
-│    Prefix + P     Previous track        │
-└─────────────────────────────────────────┘
+┌───────────────────────────────────────────────┐
+│  tmux Keybindings (Prefix: Ctrl+q)            │
+├───────────────────────────────────────────────┤
+│  Pane                                         │
+│    C-h/j/k/l       Navigate (vim-tmux)        │
+│    Prefix + \       Split horizontal           │
+│    Prefix + -       Split vertical             │
+│    Prefix + H/J/K/L Resize                     │
+│    Prefix + z       Zoom toggle                │
+│    Prefix + x       Close pane                 │
+├───────────────────────────────────────────────┤
+│  Window                                       │
+│    Alt+h / Alt+l    Prev / Next window         │
+│    Prefix + Tab     Last window                │
+├───────────────────────────────────────────────┤
+│  Session                                      │
+│    Prefix + d       Detach                     │
+│    Prefix + C-c     New session                │
+│    Prefix + o       Session picker (sessionx)  │
+├───────────────────────────────────────────────┤
+│  Floating                                     │
+│    Prefix + f / F   Float pane / Menu (floax)  │
+│    Prefix + e       Floating nvim              │
+│    Prefix + g       Floating lazygit           │
+├───────────────────────────────────────────────┤
+│  Tools                                        │
+│    Prefix + t       Thumbs (hint copy)         │
+│    Prefix + X       Extrakto (fzf text)        │
+│    Prefix + /       tmux-fzf                   │
+│    Prefix + w       Jump (EasyMotion)          │
+│    Prefix + Space   Which-key                  │
+├───────────────────────────────────────────────┤
+│  Copy Mode                                    │
+│    Prefix + [ or Enter  Enter copy mode        │
+│    v / y                Select / Copy          │
+├───────────────────────────────────────────────┤
+│  Spotify                                      │
+│    Prefix + s       Toggle play/pause          │
+│    Prefix + n / N   Next / Prev track          │
+└───────────────────────────────────────────────┘
 EOF
 }
 
