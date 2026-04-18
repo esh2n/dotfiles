@@ -1,0 +1,95 @@
+# Paneru - sliding tiling window manager
+# Keybinds: alt-* (same muscle memory as aerospace, only one runs at a time)
+
+[options]
+focus_follows_mouse = true
+mouse_follows_focus = true
+preset_column_widths = [0.33, 0.5, 0.66, 0.75]
+animation_speed = 60
+auto_center = false
+
+[padding]
+top = 52
+bottom = 8
+left = 12
+right = 12
+
+[swipe]
+sensitivity = 0.35
+deceleration = 4.0
+continuous = true
+
+[swipe.scroll]
+modifier = "alt"
+vertical_modifier = "shift"
+
+[decorations.inactive.dim]
+opacity = 0.0
+opacity_night = 0.0
+
+[bindings]
+# Focus (alt + hjkl)
+window_focus_west = "alt - h"
+window_focus_east = "alt - l"
+window_focus_north = "alt - k"
+window_focus_south = "alt - j"
+window_focus_first = "alt - u"
+window_focus_last = "alt - i"
+
+# Move/swap (alt + shift + hjkl)
+window_swap_west = "alt + shift - h"
+window_swap_east = "alt + shift - l"
+window_swap_north = "alt + shift - k"
+window_swap_south = "alt + shift - j"
+
+# Resize & layout
+window_resize = "alt - r"
+window_shrink = "alt + shift - r"
+window_fullwidth = "alt - f"
+window_center = "alt - c"
+window_manage = "alt - t"
+
+# Stack
+window_stack = "alt - s"
+window_unstack = "alt + shift - s"
+window_equalize = "alt - e"
+
+# Virtual workspaces
+window_virtual_north = "alt + ctrl - k"
+window_virtual_south = "alt + ctrl - j"
+window_virtualmove_north = "alt + ctrl + shift - k"
+window_virtualmove_south = "alt + ctrl + shift - j"
+
+# Monitor
+window_nextdisplay = "alt + ctrl - n"
+
+# Quit
+quit = "alt + ctrl + shift - q"
+
+# Ghostty: passthrough terminal shortcuts
+[windows.ghostty]
+title = ".*"
+bundle_id = "com.mitchellh.ghostty"
+bindings_passthrough = ["ctrl-h", "ctrl-l"]
+
+# WezTerm
+[windows.wezterm]
+title = ".*"
+bundle_id = "com.github.wez.wezterm"
+bindings_passthrough = ["ctrl-h", "ctrl-l"]
+
+# Floating apps
+[windows.finder]
+title = ".*"
+bundle_id = "com.apple.finder"
+floating = true
+
+[windows.system-prefs]
+title = ".*"
+bundle_id = "com.apple.systempreferences"
+floating = true
+
+[windows.gather]
+title = ".*"
+bundle_id = "com.gather.Gather"
+floating = true

@@ -11,6 +11,18 @@ function is_vscode() {
   [[ "$TERM_PROGRAM" = "vscode" ]]
 }
 
+# Update tmux window name on cd (works through PTY wrappers like pane-border)
+function _tmux_chpwd() {
+    if [[ -n "$TMUX" ]]; then
+        tmux rename-window -t "$TMUX_PANE" "$(basename "$PWD")" 2>/dev/null
+        # Store real cwd for split-window -c (pane_current_path doesn't update through PTY wrappers)
+        tmux set-option -p -t "$TMUX_PANE" @cwd "$PWD" 2>/dev/null
+    fi
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd _tmux_chpwd
+_tmux_chpwd  # initial report
+
 # Directory Management
 # -----------------------------------------------------------------------------
 function mkcd() {
@@ -214,14 +226,14 @@ function _mx_detect_available() {
   fi
 
   # Check for active sessions
-  if has_command zellij && [[ $(zellij list-sessions 2>/dev/null | wc -l) -gt 1 ]]; then
-    echo "zellij"
-  elif has_command tmux && [[ $(tmux list-sessions 2>/dev/null | wc -l) -gt 0 ]]; then
+  if has_command tmux && [[ $(tmux list-sessions 2>/dev/null | wc -l) -gt 0 ]]; then
     echo "tmux"
-  elif has_command zellij; then
+  elif has_command zellij && [[ $(zellij list-sessions 2>/dev/null | wc -l) -gt 1 ]]; then
     echo "zellij"
   elif has_command tmux; then
     echo "tmux"
+  elif has_command zellij; then
+    echo "zellij"
   else
     echo ""
   fi
@@ -2456,6 +2468,7 @@ _CLAUDE_CHECK_INTERVAL=86400  # 24 hours
 
 _claude_version_check_bg() {
     local cache="$_CLAUDE_VERSION_CACHE"
+
     local latest
     latest=$(npm view @anthropic-ai/claude-code version 2>/dev/null)
     [[ -z "$latest" ]] && return
@@ -2466,7 +2479,13 @@ _claude_version_check_bg() {
 
     python3 -c "
 import json, datetime
+try:
+    old = json.load(open('$cache'))
+except:
+    old = {}
 d = {'current': '$current', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat()}
+if 'rebuild_attempted_at' in old:
+    d['rebuild_attempted_at'] = old['rebuild_attempted_at']
 with open('$cache', 'w') as f:
     json.dump(d, f)
 " 2>/dev/null
@@ -2476,13 +2495,14 @@ _claude_version_warn() {
     local cache="$_CLAUDE_VERSION_CACHE"
     [[ ! -f "$cache" ]] && return
 
-    local current latest
+    local current latest rebuild_at
     eval $(python3 -c "
 import json, sys
 try:
     d = json.load(open('$cache'))
     print(f'current={d[\"current\"]}')
     print(f'latest={d[\"latest\"]}')
+    print(f'rebuild_at={d.get(\"rebuild_attempted_at\", \"\")}')
 except:
     pass
 " 2>/dev/null)
@@ -2490,40 +2510,58 @@ except:
     [[ -z "$current" || -z "$latest" ]] && return
     [[ "$current" == "$latest" ]] && return
 
-    echo "\033[33m⚠ Claude Code v${latest} が利用可能です（現在 v${current}）\033[0m"
-
-    # Ask to update now
-    echo -n "  今すぐ更新しますか？ [y/N] "
-    read -r answer
-    if [[ "$answer" =~ ^[yY]$ ]]; then
-        local dotfiles_root="${DOTFILES_ROOT:-${HOME}/go/github.com/esh2n/dotfiles}"
-        local node2nix_dir="${dotfiles_root}/domains/dev/packages/node2nix"
-        local nix_dir="${dotfiles_root}/core/nix"
-
-        echo "  node2nix を再生成中..."
-        if command -v node2nix &>/dev/null; then
-            (cd "$node2nix_dir" && node2nix -i package.json) 2>/dev/null
-        else
-            (cd "$node2nix_dir" && nix-shell -p nodePackages.node2nix --run "node2nix -i package.json") 2>/dev/null
+    # Skip if rebuild was already attempted within the check interval
+    if [[ -n "$rebuild_at" ]]; then
+        local should_retry
+        should_retry=$(python3 -c "
+import datetime, sys
+try:
+    attempted = datetime.datetime.fromisoformat('$rebuild_at')
+    if (datetime.datetime.now() - attempted).total_seconds() > $_CLAUDE_CHECK_INTERVAL:
+        print('yes')
+    else:
+        print('no')
+except:
+    print('yes')
+" 2>/dev/null)
+        if [[ "$should_retry" == "no" ]]; then
+            echo "\033[33m⚠ Claude Code v${latest} が利用可能（現在 v${current}、次回チェックで再試行）\033[0m"
+            return
         fi
+    fi
 
-        echo "  nix-darwin をビルド中... (数分かかります)"
-        local hostname="${USER}-mac"
-        local flake_uri="git+file://${dotfiles_root}?dir=core/nix"
-        if nix build --impure --no-eval-cache --expr "(builtins.getFlake \"${flake_uri}\").darwinConfigurations.\"${hostname}\".system" -o "${nix_dir}/result" 2>/dev/null; then
-            echo "  ビルド完了。適用にはパスワードが必要です。"
-            sudo "${nix_dir}/result/activate"
-            # Update cache
-            python3 -c "
+    local dotfiles_root="${DOTFILES_ROOT:-${HOME}/go/github.com/esh2n/dotfiles}"
+    local nix_dir="${dotfiles_root}/core/nix"
+
+    echo "\033[33m⚠ Claude Code v${latest} が利用可能です（現在 v${current}）→ 自動更新します\033[0m"
+    echo "  flake lock を更新中..."
+    nix flake update --flake "${dotfiles_root}/core/nix" 2>/dev/null
+
+    echo "  nix-darwin をビルド中... (数分かかります)"
+    if bash "${nix_dir}/update.sh" 2>/dev/null; then
+        # Re-check actual binary version (nixpkgs may lag behind npm)
+        local actual
+        actual=$(command claude-cli --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        [[ -z "$actual" ]] && actual="$current"
+        python3 -c "
 import json, datetime
-d = {'current': '$latest', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat()}
+d = {'current': '$actual', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat(), 'rebuild_attempted_at': datetime.datetime.now().isoformat()}
 with open('$cache', 'w') as f:
     json.dump(d, f)
 " 2>/dev/null
+        if [[ "$actual" == "$latest" ]]; then
             echo "\033[32m  ✅ Claude Code v${latest} に更新しました\033[0m"
         else
-            echo "\033[31m  ❌ ビルドに失敗しました。手動で core/nix/update.sh を実行してください\033[0m"
+            echo "\033[32m  ✅ ビルド完了（v${actual}、nixpkgs が v${latest} に追いつくまで待機）\033[0m"
         fi
+    else
+        python3 -c "
+import json, datetime
+d = {'current': '$current', 'latest': '$latest', 'checked_at': datetime.datetime.now().isoformat(), 'rebuild_attempted_at': datetime.datetime.now().isoformat()}
+with open('$cache', 'w') as f:
+    json.dump(d, f)
+" 2>/dev/null
+        echo "\033[31m  ❌ ビルドに失敗しました。手動で core/nix/update.sh を実行してください\033[0m"
     fi
 }
 
@@ -2546,22 +2584,493 @@ except:
 }
 
 claude-cli() {
+    # Warn if outdated (and auto-rebuild, rate-limited to once per day)
+    _claude_version_warn
+
     # Background version check (non-blocking, once per day)
     if _claude_should_check; then
         (_claude_version_check_bg &) 2>/dev/null
     fi
 
-    # Warn if outdated
-    _claude_version_warn
-
-    # Default flags (auto mode)
+    # Auto mode: inject --permission-mode auto when persisted flag is on
     local -a extra_flags=()
-    local has_permission_mode=false
-    for arg in "$@"; do
-        [[ "$arg" == "--permission-mode" ]] && has_permission_mode=true
-    done
-    $has_permission_mode || extra_flags+=(--permission-mode auto)
+    local auto_flag="$HOME/.claude/.auto-mode"
+    if [[ -f "$auto_flag" ]] && [[ "$(cat "$auto_flag")" == "1" ]]; then
+        local has_permission_mode=false
+        for arg in "$@"; do
+            [[ "$arg" == "--permission-mode" ]] && has_permission_mode=true
+        done
+        $has_permission_mode || extra_flags+=(--permission-mode auto)
+    fi
 
     # Run the real claude-cli with no-flicker mode
     CLAUDE_CODE_NO_FLICKER=1 command claude-cli "${extra_flags[@]}" "$@"
+}
+
+# Toggle auto mode for claude-cli (persisted to ~/.claude/.auto-mode)
+claude-auto() {
+    local flag="$HOME/.claude/.auto-mode"
+    case "${1:-}" in
+        on)  echo "1" > "$flag"; echo "Claude auto mode: ON (persisted)" ;;
+        off) echo "0" > "$flag"; echo "Claude auto mode: OFF (persisted)" ;;
+        *)   local current="0"
+             [[ -f "$flag" ]] && current="$(cat "$flag")"
+             echo "Auto mode: $([ "$current" = "1" ] && echo ON || echo OFF)"
+             echo "Usage: claude-auto {on|off}" ;;
+    esac
+}
+
+# -----------------------------------------------------------------------------
+# Git Utilities (ported from kawarimidoll/dotfiles)
+# -----------------------------------------------------------------------------
+
+# git abort - auto-detect in-progress operation and abort
+function gabort() {
+    local git_dir
+    git_dir="$(git rev-parse --git-dir 2>/dev/null)" || { echo "Not a git repo"; return 1; }
+    if [[ -f "$git_dir/MERGE_HEAD" ]]; then
+        echo "Aborting merge..."
+        git merge --abort
+    elif [[ -d "$git_dir/rebase-merge" ]] || [[ -d "$git_dir/rebase-apply" ]]; then
+        echo "Aborting rebase..."
+        git rebase --abort
+    elif [[ -f "$git_dir/CHERRY_PICK_HEAD" ]]; then
+        echo "Aborting cherry-pick..."
+        git cherry-pick --abort
+    elif [[ -f "$git_dir/REVERT_HEAD" ]]; then
+        echo "Aborting revert..."
+        git revert --abort
+    elif [[ -f "$git_dir/BISECT_LOG" ]]; then
+        echo "Aborting bisect..."
+        git bisect reset
+    else
+        echo "No operation in progress to abort"
+        return 1
+    fi
+}
+
+# git continue - auto-detect in-progress operation and continue
+function gcont() {
+    local git_dir
+    git_dir="$(git rev-parse --git-dir 2>/dev/null)" || { echo "Not a git repo"; return 1; }
+    if [[ -f "$git_dir/MERGE_HEAD" ]]; then
+        echo "Continuing merge..."
+        git commit
+    elif [[ -d "$git_dir/rebase-merge" ]] || [[ -d "$git_dir/rebase-apply" ]]; then
+        echo "Continuing rebase..."
+        git rebase --continue
+    elif [[ -f "$git_dir/CHERRY_PICK_HEAD" ]]; then
+        echo "Continuing cherry-pick..."
+        git cherry-pick --continue
+    elif [[ -f "$git_dir/REVERT_HEAD" ]]; then
+        echo "Continuing revert..."
+        git revert --continue
+    elif [[ -f "$git_dir/BISECT_LOG" ]]; then
+        echo "Marking bisect good..."
+        git bisect good
+    else
+        echo "No operation in progress to continue"
+        return 1
+    fi
+}
+
+# git push-with-check - safe push with wip detection and force protection
+function gpush() {
+    local branch
+    branch="$(git branch --show-current 2>/dev/null)"
+    if [[ -z "$branch" ]]; then
+        echo "Not on a branch (detached HEAD?)"
+        return 1
+    fi
+
+    # Check for wip branch name
+    if [[ "$branch" =~ ^wip ]]; then
+        echo "\033[0;31m⚠ Branch name starts with 'wip': $branch\033[0m"
+        echo -n "Push anyway? [y/N] "
+        read -r ans
+        [[ "$ans" != "y" ]] && return 1
+    fi
+
+    # Check for wip commit messages
+    local wip_commits
+    wip_commits="$(git log @{u}..HEAD --oneline 2>/dev/null | grep -i '^\S\+ wip' | head -5)"
+    if [[ -n "$wip_commits" ]]; then
+        echo "\033[0;31m⚠ WIP commits found:\033[0m"
+        echo "$wip_commits"
+        echo -n "Push anyway? [y/N] "
+        read -r ans
+        [[ "$ans" != "y" ]] && return 1
+    fi
+
+    # Check if behind remote
+    git fetch origin "$branch" --quiet 2>/dev/null
+    local behind
+    behind="$(git rev-list --count HEAD..origin/"$branch" 2>/dev/null)"
+    if [[ -n "$behind" ]] && (( behind > 0 )); then
+        echo "\033[0;33m⚠ Behind remote by $behind commit(s). Consider pulling first.\033[0m"
+    fi
+
+    # Force push protection
+    if [[ "$*" == *"--force"* ]] || [[ "$*" == *"-f"* ]]; then
+        echo "\033[0;33m→ Replacing --force with --force-with-lease --force-if-includes\033[0m"
+        local args=("$@")
+        args=("${args[@]/--force/--force-with-lease --force-if-includes}")
+        args=("${args[@]/-f/--force-with-lease --force-if-includes}")
+        git push "${args[@]}"
+    else
+        git push "$@"
+    fi
+}
+
+# git pull-with-check - pull with dependency change detection
+function gpull() {
+    local before_head
+    before_head="$(git rev-parse HEAD 2>/dev/null)"
+    git pull "$@" || return $?
+    local after_head
+    after_head="$(git rev-parse HEAD 2>/dev/null)"
+    if [[ "$before_head" != "$after_head" ]]; then
+        local changed_files
+        changed_files="$(git diff --name-only "$before_head" "$after_head")"
+        if echo "$changed_files" | grep -qE 'package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml'; then
+            echo "\033[0;31m⚠ package.json / lockfile changed — run npm/pnpm install\033[0m"
+        fi
+        if echo "$changed_files" | grep -qE 'Gemfile|Gemfile\.lock'; then
+            echo "\033[0;31m⚠ Gemfile changed — run bundle install\033[0m"
+        fi
+        if echo "$changed_files" | grep -qE 'go\.mod|go\.sum'; then
+            echo "\033[0;31m⚠ go.mod changed — run go mod download\033[0m"
+        fi
+        if echo "$changed_files" | grep -qE 'requirements\.txt|pyproject\.toml|uv\.lock'; then
+            echo "\033[0;31m⚠ Python deps changed — run uv sync\033[0m"
+        fi
+        if echo "$changed_files" | grep -qE 'Cargo\.toml|Cargo\.lock'; then
+            echo "\033[0;31m⚠ Cargo.toml changed — run cargo build\033[0m"
+        fi
+        if echo "$changed_files" | grep -qE '\.env'; then
+            echo "\033[0;33m⚠ .env file changed — check environment variables\033[0m"
+        fi
+        if echo "$changed_files" | grep -qE 'compose\.y|docker-compose\.y'; then
+            echo "\033[0;33m⚠ Docker compose config changed — rebuild containers\033[0m"
+        fi
+    fi
+}
+
+# fpull - fetch + stash + pull + stash pop
+function fpull() {
+    git fetch --all --prune || return $?
+    local behind
+    behind="$(git rev-list --count HEAD..@{u} 2>/dev/null)"
+    if [[ -z "$behind" ]] || (( behind == 0 )); then
+        echo "Already up to date."
+        return 0
+    fi
+    local has_changes=false
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        has_changes=true
+        echo "Stashing local changes..."
+        git stash push -m "fpull-autostash-$(date +%Y%m%d-%H%M%S)"
+    fi
+    gpull || return $?
+    if [[ "$has_changes" == true ]]; then
+        echo "Restoring stashed changes..."
+        git stash pop
+    fi
+}
+
+# git store - interactive stash management with skim
+function gstore() {
+    if [[ -z "$(git stash list)" ]]; then
+        echo "No stashes"
+        return 0
+    fi
+    local selection
+    selection="$(git stash list | sk \
+        --ansi \
+        --no-multi \
+        --preview 'echo {} | grep -oE "stash@\{[0-9]+\}" | xargs git stash show -p --color=always' \
+        --header 'Enter=apply / Ctrl-x=drop' \
+        --expect 'ctrl-x')"
+    [[ -z "$selection" ]] && return 0
+    local key
+    key="$(head -1 <<< "$selection")"
+    local entry
+    entry="$(tail -1 <<< "$selection")"
+    local stash_ref
+    stash_ref="$(echo "$entry" | grep -oE 'stash@\{[0-9]+\}')"
+    [[ -z "$stash_ref" ]] && return 0
+    if [[ "$key" == "ctrl-x" ]]; then
+        git stash drop "$stash_ref"
+        echo "Dropped $stash_ref"
+    else
+        git stash apply "$stash_ref"
+        echo "Applied $stash_ref"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# ECC Hook Toggle (chooks)
+# -----------------------------------------------------------------------------
+# Interactive hook manager for Claude Code ECC profile.
+# Toggles hooks via ECC_DISABLED_HOOKS in ~/.claude/settings.json.
+# Changes are temporary — `claude-switch ecc` resets to defaults.
+
+_CHOOKS_SETTINGS="$HOME/.claude/settings.json"
+
+_chooks_get_disabled() {
+    jq -r '.env.ECC_DISABLED_HOOKS // ""' "$_CHOOKS_SETTINGS" 2>/dev/null
+}
+
+_chooks_get_profile() {
+    jq -r '.env.ECC_HOOK_PROFILE // "standard"' "$_CHOOKS_SETTINGS" 2>/dev/null
+}
+
+_chooks_get_hook_ids() {
+    jq -r '
+        .hooks | to_entries[] | .value[] | .hooks[]? | .command // empty
+    ' "$_CHOOKS_SETTINGS" 2>/dev/null |
+    grep 'run-with-flags' |
+    sed 's/.*"\([^"]*\)" *"\([^"]*\)" *"\([^"]*\)".*/\1|\3/' |
+    sort -u
+}
+
+_chooks_get_non_toggleable() {
+    jq -r '
+        .hooks | to_entries[] | .value[] | .hooks[]? | .command // empty
+    ' "$_CHOOKS_SETTINGS" 2>/dev/null |
+    grep -v 'run-with-flags' |
+    grep -v 'git-guard' |
+    sed 's|.*/||; s|"||g; s| ||g' |
+    sort -u |
+    head -20
+}
+
+_chooks_git_guard_disabled() {
+    local val
+    val="$(jq -r '.env.GIT_GUARD_DISABLED // ""' "$_CHOOKS_SETTINGS" 2>/dev/null)"
+    [[ "$val" == "1" ]]
+}
+
+_chooks_set_git_guard() {
+    local val="$1"
+    local tmp
+    tmp="$(mktemp)"
+    jq --arg v "$val" '.env.GIT_GUARD_DISABLED = $v' "$_CHOOKS_SETTINGS" > "$tmp" && \
+        mv "$tmp" "$_CHOOKS_SETTINGS"
+}
+
+_CHOOKS_ENGLISH_COACH_FLAG="$HOME/.claude/.english-coach"
+
+_chooks_english_coach_disabled() {
+    [[ ! -f "$_CHOOKS_ENGLISH_COACH_FLAG" ]] || [[ "$(cat "$_CHOOKS_ENGLISH_COACH_FLAG")" != "1" ]]
+}
+
+_chooks_set_english_coach() {
+    echo "$1" > "$_CHOOKS_ENGLISH_COACH_FLAG"
+    # Sync language setting: ON → English, OFF → Japanese
+    local lang="Japanese"
+    [[ "$1" == "1" ]] && lang="English"
+    local tmp
+    tmp="$(mktemp)"
+    jq --arg l "$lang" '.language = $l' "$_CHOOKS_SETTINGS" > "$tmp" && \
+        mv "$tmp" "$_CHOOKS_SETTINGS"
+}
+
+_chooks_set_disabled() {
+    local new_val="$1"
+    local tmp
+    tmp="$(mktemp)"
+    jq --arg v "$new_val" '.env.ECC_DISABLED_HOOKS = $v' "$_CHOOKS_SETTINGS" > "$tmp" && \
+        mv "$tmp" "$_CHOOKS_SETTINGS"
+}
+
+function chooks() {
+    if [[ ! -f "$_CHOOKS_SETTINGS" ]]; then
+        echo "Error: $_CHOOKS_SETTINGS not found. Run claude-switch ecc first."
+        return 1
+    fi
+
+    local cmd="${1:-toggle}"
+
+    case "$cmd" in
+        status)
+            _chooks_status
+            ;;
+        reset)
+            _chooks_set_disabled ""
+            _chooks_set_git_guard ""
+            _chooks_set_english_coach "0"
+            echo "All hooks reset. Takes effect on next Claude Code session."
+            ;;
+        profile)
+            _chooks_profile
+            ;;
+        toggle|*)
+            [[ "$cmd" != "toggle" ]] && shift 2>/dev/null
+            _chooks_toggle
+            ;;
+    esac
+}
+
+_chooks_status() {
+    local profile disabled
+    profile="$(_chooks_get_profile)"
+    disabled="$(_chooks_get_disabled)"
+
+    echo "ECC Hook Manager (profile: \033[1;36m$profile\033[0m)"
+    echo "────────────────────────────────────────"
+
+    _chooks_get_hook_ids | while IFS='|' read -r id profiles; do
+        local state="\033[0;32m[ON] \033[0m"
+        if echo ",$disabled," | grep -q ",$id,"; then
+            state="\033[0;31m[OFF]\033[0m"
+        fi
+        printf "  %b %-40s (%s)\n" "$state" "$id" "$profiles"
+    done
+
+    # git-guard (toggleable via GIT_GUARD_DISABLED env)
+    local gg_state="\033[0;32m[ON] \033[0m"
+    if _chooks_git_guard_disabled; then
+        gg_state="\033[0;31m[OFF]\033[0m"
+    fi
+    printf "  %b %-40s (%s)\n" "$gg_state" "git-guard" "commit/push/reset block"
+
+    # english-coach (toggleable via flag file)
+    local ec_state="\033[0;32m[ON] \033[0m"
+    if _chooks_english_coach_disabled; then
+        ec_state="\033[0;31m[OFF]\033[0m"
+    fi
+    printf "  %b %-40s (%s)\n" "$ec_state" "english-coach" "business English feedback"
+
+    echo "────────────────────────────────────────"
+    _chooks_get_non_toggleable | while read -r name; do
+        printf "  \033[0;90m[--] %-40s (always)\033[0m\n" "$name"
+    done
+
+    if [[ -n "$disabled" ]]; then
+        echo ""
+        echo "Disabled: \033[0;31m$disabled\033[0m"
+    fi
+}
+
+_chooks_toggle() {
+    local profile disabled
+    profile="$(_chooks_get_profile)"
+    disabled="$(_chooks_get_disabled)"
+
+    local lines=()
+
+    # git-guard (env-based toggle)
+    local gg_marker="ON "
+    if _chooks_git_guard_disabled; then
+        gg_marker="OFF"
+    fi
+    lines+=("[$gg_marker] git-guard (commit/push/reset block)")
+
+    # english-coach (file-based toggle)
+    local ec_marker="ON "
+    if _chooks_english_coach_disabled; then
+        ec_marker="OFF"
+    fi
+    lines+=("[$ec_marker] english-coach (business English feedback)")
+
+    while IFS='|' read -r id profiles; do
+        local marker="ON "
+        if echo ",$disabled," | grep -q ",$id,"; then
+            marker="OFF"
+        fi
+        lines+=("[$marker] $id ($profiles)")
+    done < <(_chooks_get_hook_ids)
+
+    if [[ ${#lines[@]} -eq 0 ]]; then
+        echo "No toggleable hooks found."
+        return 1
+    fi
+
+    local selected
+    selected="$(printf '%s\n' "${lines[@]}" | sk \
+        --multi \
+        --ansi \
+        --header "ECC Hooks (profile: $profile) — select to toggle, Enter to apply" \
+        --preview 'echo {}' \
+        --no-sort)"
+
+    [[ -z "$selected" ]] && return 0
+
+    local disabled_set=()
+    IFS=',' read -rA disabled_set <<< "$disabled"
+
+    while IFS= read -r line; do
+        local hook_id
+        hook_id="$(echo "$line" | sed 's/^\[...\] \([^ ]*\).*/\1/')"
+        local current_state
+        current_state="$(echo "$line" | sed 's/^\[\(...\)\].*/\1/')"
+
+        # git-guard uses separate env toggle
+        if [[ "$hook_id" == "git-guard" ]]; then
+            if [[ "$current_state" == "ON " ]]; then
+                _chooks_set_git_guard "1"
+                echo "git-guard: \033[0;31mDISABLED\033[0m (commit/push unblocked)"
+            else
+                _chooks_set_git_guard ""
+                echo "git-guard: \033[0;32mENABLED\033[0m (commit/push blocked)"
+            fi
+            continue
+        fi
+
+        # english-coach uses file-based toggle + language sync
+        if [[ "$hook_id" == "english-coach" ]]; then
+            if [[ "$current_state" == "ON " ]]; then
+                _chooks_set_english_coach "0"
+                echo "english-coach: \033[0;31mDISABLED\033[0m (language → Japanese)"
+            else
+                _chooks_set_english_coach "1"
+                echo "english-coach: \033[0;32mENABLED\033[0m (language → English)"
+            fi
+            continue
+        fi
+
+        if [[ "$current_state" == "ON " ]]; then
+            disabled_set+=("$hook_id")
+        else
+            disabled_set=("${(@)disabled_set:#$hook_id}")
+        fi
+    done <<< "$selected"
+
+    local new_disabled
+    new_disabled="$(printf '%s\n' "${disabled_set[@]}" | grep -v '^$' | sort -u | paste -sd ',' -)"
+
+    _chooks_set_disabled "$new_disabled"
+
+    echo ""
+    echo "Updated. Takes effect on next Claude Code session."
+    echo "Disabled: \033[0;31m${new_disabled:-none}\033[0m"
+    echo ""
+    echo "Run \033[1mchooks reset\033[0m to re-enable all."
+    echo "Run \033[1mclaude-switch ecc\033[0m to fully reset from profile."
+}
+
+_chooks_profile() {
+    local current
+    current="$(_chooks_get_profile)"
+
+    local selected
+    selected="$(printf 'minimal\nstandard\nstrict\n' | sk \
+        --no-multi \
+        --header "Current profile: $current" \
+        --preview 'case {} in
+            minimal) echo "Only critical hooks (session-end, cost-tracker)" ;;
+            standard) echo "Default: most hooks enabled, excluding strict-only (format, typecheck, git-push-reminder)" ;;
+            strict) echo "All hooks: formatting, type checking, git push safety" ;;
+        esac')"
+
+    [[ -z "$selected" ]] && return 0
+
+    local tmp
+    tmp="$(mktemp)"
+    jq --arg v "$selected" '.env.ECC_HOOK_PROFILE = $v' "$_CHOOKS_SETTINGS" > "$tmp" && \
+        mv "$tmp" "$_CHOOKS_SETTINGS"
+
+    echo "Profile changed: \033[1;36m$current\033[0m → \033[1;36m$selected\033[0m"
+    echo "Takes effect on next Claude Code session."
 }

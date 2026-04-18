@@ -1,7 +1,7 @@
 # AeroSpace Configuration
 
-# Start AeroSpace at login
-start-at-login = true
+# Start AeroSpace at login (disabled: using paneru instead)
+start-at-login = false
 
 # Default to accordion mode (better for single windows)
 default-root-container-layout = 'accordion'

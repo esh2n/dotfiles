@@ -81,8 +81,6 @@
     cocoapods
     pnpm
     yarn
-    nodePackages.neovim
-
     # Overlay
     cargo-compete
     go-mockgen
@@ -90,9 +88,8 @@
     spanner-cli
     spanner-dump
 
-    # node2nix packages
-    claude-code
-    aicommits
+    # Node.js CLI (nixpkgs native, overlay renames to claude-cli)
+    claude-cli
   ]
   ++ (with pkgs.brewCasks; [
     wezterm

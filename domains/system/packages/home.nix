@@ -7,7 +7,7 @@
     nerd-fonts.hack
 
     # Userstyles generation
-    nodePackages.less  # LESS compiler for userstyles templates
+    lessc  # LESS compiler for userstyles templates
     jq  # JSON processor for Stylus import.json generation
   ];
 }

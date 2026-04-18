@@ -1,5 +1,9 @@
 # Zsh Initialization
 
+# 0. Theme environment (fzf/bat/ripgrep colors)
+THEME_ENV="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/system/config/theme-env/current.sh"
+[[ -f "$THEME_ENV" ]] && source "$THEME_ENV"
+
 # 1. Common Aliases
 source "${0:A:h}/../common/aliases.sh"
 

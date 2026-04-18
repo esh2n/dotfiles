@@ -201,6 +201,18 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/english-coach.sh",
+            "timeout": 3
+          }
+        ]
+      }
     ]
   }
 }

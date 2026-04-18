@@ -24,19 +24,38 @@ zle -N sk_select_local_branch_except_current
 zle -N sk_select_branch_all
 
 # Initialize completion system
-if type brew &>/dev/null; then
-    FPATH="$(brew --prefix)/share/zsh-completions:${FPATH}"
+if [[ -d /opt/homebrew/share/zsh-completions ]]; then
+    FPATH="/opt/homebrew/share/zsh-completions:${FPATH}"
+elif [[ -d /usr/local/share/zsh-completions ]]; then
+    FPATH="/usr/local/share/zsh-completions:${FPATH}"
 fi
 
-autoload -U compinit
-if [[ $UID -eq 0 ]]; then
-  compinit
-else
-  compinit -u
-fi
+autoload -Uz compinit
 
-# Ensure compdef is available
-autoload -U compdef
+# Cache compinit: full rebuild only once per 24 hours.
+# Glob qualifier (N.mh+24): N=null_glob, .=regular file, mh+24=older than 24h
+# Note: [[ ]] does not expand globs, so use array expansion instead.
+() {
+  local dump="${ZDOTDIR:-$HOME}/.zcompdump"
+  local -a stale=( "${ZDOTDIR:-$HOME}"/.zcompdump(N.mh+24) )
+  if (( ${#stale} )); then
+    if [[ $UID -eq 0 ]]; then
+      compinit -d "$dump"
+    else
+      compinit -i -d "$dump"
+    fi
+  else
+    compinit -C -d "$dump"
+  fi
+}
+
+# Compile zcompdump in background for faster subsequent loads
+{
+  local dump_file="${ZDOTDIR:-$HOME}/.zcompdump"
+  if [[ -s "$dump_file" && (! -s "${dump_file}.zwc" || "$dump_file" -nt "${dump_file}.zwc") ]]; then
+    zcompile "$dump_file"
+  fi
+} &!
 
 # Jujutsu (jj) completion
 if command -v jj &> /dev/null; then
@@ -57,9 +76,14 @@ elif [[ -f /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh 
     source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
 
-# Initialize atuin
+# Initialize atuin (cached)
 if command -v atuin &> /dev/null; then
-    eval "$(atuin init zsh)"
+    local _atuin_cache="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/atuin-init.zsh"
+    if [[ ! -f "$_atuin_cache" || "$(command -v atuin)" -nt "$_atuin_cache" ]]; then
+        mkdir -p "${_atuin_cache:h}"
+        atuin init zsh > "$_atuin_cache"
+    fi
+    source "$_atuin_cache"
 fi
 
 # Initialize yazi
@@ -79,9 +103,13 @@ if command -v vivid &> /dev/null; then
     export LS_COLORS="$(vivid generate molokai)"
 fi
 
-# Initialize thefuck
+# Initialize thefuck (lazy loaded)
 if command -v thefuck &> /dev/null; then
-    eval $(thefuck --alias)
+    fuck() {
+        unset -f fuck
+        eval "$(thefuck --alias)"
+        fuck "$@"
+    }
 fi
 
 # Completion options

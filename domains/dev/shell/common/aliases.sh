@@ -5,6 +5,7 @@
 # Editors
 alias vim='nvim'
 alias vi='vim'
+alias cursor='open -a "Cursor"'
 
 # File operations (eza)
 alias ls="eza --icons"
@@ -81,7 +82,7 @@ alias gstd='git stash drop'
 
 # Remote
 alias grao='git remote add origin'
-alias gra='git remote add'
+alias grma='git remote add'
 alias grro='git remote remove origin'
 alias grr='git remote remove'
 
