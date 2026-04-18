@@ -14,7 +14,7 @@ experimental = false
 verbose = false
 
 [env]
-PYTHONPATH = "${PYTHONPATH:-}:${PWD}"
+PYTHONPATH = "{{ env.PYTHONPATH | default(value='') }}:{{ cwd }}"
 GEM_HOME = "{{HOME}}/.gem"
 GOPATH = "{{HOME}}/go"
 GOBIN = "{{HOME}}/go/bin"
