@@ -248,6 +248,13 @@ main() {
         exit 1
     fi
 
+    # Re-run workspace domain installer (e.g. SbarLua rebuild after sketchybar bump)
+    local workspace_install="${DOTFILES_ROOT}/domains/workspace/install.sh"
+    if [[ -x "$workspace_install" ]]; then
+        log_info "Running workspace domain installer..."
+        bash "$workspace_install" || log_warn "workspace install reported failure (non-critical)"
+    fi
+
     # Re-merge Claude Code profile (source settings may have changed)
     local claude_switch="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
     if [[ -x "$claude_switch" ]]; then

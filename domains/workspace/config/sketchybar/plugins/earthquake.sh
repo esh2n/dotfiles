@@ -6,6 +6,9 @@
 ITEM_NAME="${1:-widgets.earthquake}"
 EQ_API_URL="https://api.p2pquake.net/v2/history?codes=551&limit=1"
 
+# Pin to BSD date — nix's GNU date may be ahead in PATH and doesn't support -j -f
+DATE_BIN=/usr/bin/date
+
 # Fetch earthquake data
 EQ_JSON=$(curl -s --connect-timeout 3 --max-time 5 "$EQ_API_URL")
 
@@ -36,8 +39,8 @@ esac
 
 # Check if earthquake is recent (within 24 hours)
 if [[ -n "$TIME" ]]; then
-    EQ_TIMESTAMP=$(date -j -f "%Y/%m/%d %H:%M:%S" "$TIME" "+%s" 2>/dev/null || echo 0)
-    NOW=$(date +%s)
+    EQ_TIMESTAMP=$("$DATE_BIN" -j -f "%Y/%m/%d %H:%M:%S" "$TIME" "+%s" 2>/dev/null || echo 0)
+    NOW=$("$DATE_BIN" +%s)
     DIFF=$((NOW - EQ_TIMESTAMP))
     
     # If older than 24 hours, show minimal info

@@ -184,6 +184,18 @@ phase_core() {
         log_info "Installing Tmux Plugin Manager (TPM)..."
         git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
     fi
+
+    # Everything Claude Code (ECC): cloned as sibling of dotfiles so
+    # claude-switch resolves it via ${dotfiles_parent}/everything-claude-code.
+    local ecc_dir
+    ecc_dir="$(dirname "${DOTFILES_ROOT}")/everything-claude-code"
+    if [[ ! -d "$ecc_dir/.git" ]]; then
+        log_info "Cloning everything-claude-code..."
+        git clone https://github.com/affaan-m/everything-claude-code.git "$ecc_dir"
+    elif [[ "$FORCE_CLEAN" == "true" ]]; then
+        log_info "Updating everything-claude-code (--force)..."
+        git -C "$ecc_dir" pull --ff-only || log_warn "ECC pull failed (skipping)"
+    fi
 }
 
 phase_domains() {

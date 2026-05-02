@@ -61,3 +61,5 @@ claude-mem() {
     fi
 }
 # alias claude-mem= — managed by function above; do not remove this comment
+
+. "$HOME/.local/share/../bin/env"

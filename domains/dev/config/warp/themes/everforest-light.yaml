@@ -1,0 +1,27 @@
+name: 'Everforest Light'
+accent: '#93b259'
+background: '#fdf6e3'
+foreground: '#5c6a72'
+cursor: '#e69875'
+selection: '#e5dfc5'
+selection_foreground: '#5c6a72'
+details: lighter
+terminal_colors:
+  normal:
+    black: '#e5dfc5'
+    red: '#e67e80'
+    green: '#93b259'
+    yellow: '#dfa000'
+    blue: '#7fbbb3'
+    magenta: '#d699b6'
+    cyan: '#83c092'
+    white: '#708089'
+  bright:
+    black: '#d3c6aa'
+    red: '#e67e80'
+    green: '#93b259'
+    yellow: '#dfa000'
+    blue: '#7fbbb3'
+    magenta: '#d699b6'
+    cyan: '#83c092'
+    white: '#829181'

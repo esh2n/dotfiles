@@ -32,6 +32,7 @@
     taps = [
       "felixkratz/formulae"
       "satococoa/tap"
+      "nikitabobko/tap"
     ];
   };
 

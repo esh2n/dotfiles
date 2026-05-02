@@ -85,7 +85,8 @@
     "ECC_ROOT": "{{DOTFILES_PARENT}}/everything-claude-code",
     "CLAUDE_PLUGIN_ROOT": "{{DOTFILES_PARENT}}/everything-claude-code",
     "ECC_HOOK_PROFILE": "standard",
-    "ECC_DISABLED_HOOKS": ""
+    "ECC_DISABLED_HOOKS": "",
+    "TMUX_SIDEBAR_DISABLED": "1"
   },
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true
@@ -192,7 +193,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.tmux/plugins/tmux-agent-sidebar/hook.sh claude session-start"
+            "command": "bash ~/.claude/hooks/tmux-sidebar.sh claude session-start"
           }
         ]
       }
@@ -252,7 +253,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.tmux/plugins/tmux-agent-sidebar/hook.sh claude activity-log"
+            "command": "bash ~/.claude/hooks/tmux-sidebar.sh claude activity-log"
           }
         ]
       }
@@ -263,7 +264,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.tmux/plugins/tmux-agent-sidebar/hook.sh claude notification"
+            "command": "bash ~/.claude/hooks/tmux-sidebar.sh claude notification"
           }
         ]
       }
@@ -307,7 +308,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.tmux/plugins/tmux-agent-sidebar/hook.sh claude stop"
+            "command": "bash ~/.claude/hooks/tmux-sidebar.sh claude stop"
           }
         ]
       }
@@ -318,7 +319,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.tmux/plugins/tmux-agent-sidebar/hook.sh claude stop-failure"
+            "command": "bash ~/.claude/hooks/tmux-sidebar.sh claude stop-failure"
           }
         ]
       }
@@ -329,7 +330,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.tmux/plugins/tmux-agent-sidebar/hook.sh claude user-prompt-submit"
+            "command": "bash ~/.claude/hooks/tmux-sidebar.sh claude user-prompt-submit"
           }
         ]
       }
@@ -340,7 +341,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.tmux/plugins/tmux-agent-sidebar/hook.sh claude session-end"
+            "command": "bash ~/.claude/hooks/tmux-sidebar.sh claude session-end"
           }
         ]
       }
