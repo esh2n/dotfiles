@@ -1,5 +1,12 @@
 #!/bin/bash
+# launchd starts sketchybar with a minimal PATH; ensure nix + user bins are visible
+# so that mise (and therefore lua) can be located.
+export PATH="/etc/profiles/per-user/$USER/bin:$HOME/.nix-profile/bin:/run/current-system/sw/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
 # Activate mise to make mise-managed tools (lua) available in launchd context
-eval "$(~/.local/bin/mise env -s bash 2>/dev/null)" || true
+if command -v mise >/dev/null 2>&1; then
+    eval "$(mise env -s bash 2>/dev/null)" || true
+fi
+
 cd "$(dirname "$0")"
 exec lua -e 'require("helpers"); require("init")'

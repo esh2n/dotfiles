@@ -3,8 +3,14 @@ local colors = require("colors")
 local settings = require("settings")
 
 -- Execute the event provider binary which provides the event "network_update"
--- for the network interface "en0", which is fired every 2.0 seconds.
-sbar.exec("killall network_load >/dev/null; $CONFIG_DIR/helpers/event_providers/network_load/bin/network_load en0 network_update 2.0")
+-- every 2.0 seconds. Pick the interface backing the default route at startup
+-- so the same config works on machines using en0 (Ethernet) or en1 (Wi-Fi).
+sbar.exec([[
+killall network_load >/dev/null 2>&1
+IFACE="$(route get default 2>/dev/null | awk '/interface:/{print $2}')"
+[ -z "$IFACE" ] && IFACE=en0
+$CONFIG_DIR/helpers/event_providers/network_load/bin/network_load "$IFACE" network_update 2.0
+]])
 
 local popup_width = 250
 

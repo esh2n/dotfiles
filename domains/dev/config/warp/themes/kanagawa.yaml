@@ -1,0 +1,27 @@
+name: 'Kanagawa'
+accent: '#7e9cd8'
+background: '#1f1f28'
+foreground: '#dcd7ba'
+cursor: '#d27e99'
+selection: '#363646'
+selection_foreground: '#dcd7ba'
+details: darker
+terminal_colors:
+  normal:
+    black: '#2a2a37'
+    red: '#c34043'
+    green: '#76946a'
+    yellow: '#c0a36e'
+    blue: '#7e9cd8'
+    magenta: '#957fb8'
+    cyan: '#6a9589'
+    white: '#c8c093'
+  bright:
+    black: '#363646'
+    red: '#e82424'
+    green: '#76946a'
+    yellow: '#ffa066'
+    blue: '#7fb4ca'
+    magenta: '#957fb8'
+    cyan: '#7aa89f'
+    white: '#727169'

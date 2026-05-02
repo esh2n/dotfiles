@@ -2,8 +2,22 @@ local icons = require("icons")
 local colors = require("colors")
 local settings = require("settings")
 
+-- Detect whether this machine actually has a battery. Mac mini / Mac Studio
+-- return only "Now drawing from 'AC Power'" with no charge percentage, which
+-- makes the rest of this widget render "?" forever. Hide it on those hosts.
+local function detect_battery()
+  local handle = io.popen("pmset -g batt 2>/dev/null")
+  if not handle then return false end
+  local output = handle:read("*a") or ""
+  handle:close()
+  return output:find("%%") ~= nil
+end
+local has_battery = detect_battery()
+
 local battery = sbar.add("item", "widgets.battery", {
   position = "right",
+  drawing = has_battery,
+  updates = has_battery,
   icon = {
     font = {
       style = settings.font.style_map["Regular"],

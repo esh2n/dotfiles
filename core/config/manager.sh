@@ -134,6 +134,11 @@ link_domain() {
                 elif [[ "$dirname" == "serena" ]]; then
                     local target="${HOME}/.serena"
                     link_file "$config_dir" "$target"
+                # warp directory should be linked to ~/.warp instead of ~/.config/warp
+                # warpディレクトリは特別に~/.warpにリンクする
+                elif [[ "$dirname" == "warp" ]]; then
+                    local target="${HOME}/.warp"
+                    link_file "$config_dir" "$target"
                 # vscode directory - link settings.json to Application Support on macOS
                 elif [[ "$dirname" == "vscode" ]]; then
                     local target="${HOME}/.config/${dirname}"

@@ -2716,6 +2716,7 @@ _chooks_get_non_toggleable() {
     ' "$_CHOOKS_SETTINGS" 2>/dev/null |
     grep -v 'run-with-flags' |
     grep -v 'git-guard' |
+    grep -v 'tmux-sidebar' |
     sed 's|.*/||; s|"||g; s| ||g' |
     sort -u |
     head -20
@@ -2732,6 +2733,20 @@ _chooks_set_git_guard() {
     local tmp
     tmp="$(mktemp)"
     jq --arg v "$val" '.env.GIT_GUARD_DISABLED = $v' "$_CHOOKS_SETTINGS" > "$tmp" && \
+        mv "$tmp" "$_CHOOKS_SETTINGS"
+}
+
+_chooks_tmux_sidebar_disabled() {
+    local val
+    val="$(jq -r '.env.TMUX_SIDEBAR_DISABLED // "1"' "$_CHOOKS_SETTINGS" 2>/dev/null)"
+    [[ "$val" == "1" ]]
+}
+
+_chooks_set_tmux_sidebar() {
+    local val="$1"
+    local tmp
+    tmp="$(mktemp)"
+    jq --arg v "$val" '.env.TMUX_SIDEBAR_DISABLED = $v' "$_CHOOKS_SETTINGS" > "$tmp" && \
         mv "$tmp" "$_CHOOKS_SETTINGS"
 }
 
@@ -2776,6 +2791,7 @@ function chooks() {
             _chooks_set_disabled ""
             _chooks_set_git_guard ""
             _chooks_set_english_coach "0"
+            _chooks_set_tmux_sidebar "1"
             echo "All hooks reset. Takes effect on next Claude Code session."
             ;;
         profile)
@@ -2818,6 +2834,13 @@ _chooks_status() {
     fi
     printf "  %b %-40s (%s)\n" "$ec_state" "english-coach" "business English feedback"
 
+    # tmux-sidebar (toggleable via TMUX_SIDEBAR_DISABLED env, default OFF)
+    local ts_state="\033[0;32m[ON] \033[0m"
+    if _chooks_tmux_sidebar_disabled; then
+        ts_state="\033[0;31m[OFF]\033[0m"
+    fi
+    printf "  %b %-40s (%s)\n" "$ts_state" "tmux-sidebar" "tmux-agent-sidebar plugin hooks"
+
     echo "────────────────────────────────────────"
     _chooks_get_non_toggleable | while read -r name; do
         printf "  \033[0;90m[--] %-40s (always)\033[0m\n" "$name"
@@ -2849,6 +2872,13 @@ _chooks_toggle() {
         ec_marker="OFF"
     fi
     lines+=("[$ec_marker] english-coach (business English feedback)")
+
+    # tmux-sidebar (env-based toggle, default OFF)
+    local ts_marker="ON "
+    if _chooks_tmux_sidebar_disabled; then
+        ts_marker="OFF"
+    fi
+    lines+=("[$ts_marker] tmux-sidebar (tmux-agent-sidebar plugin hooks)")
 
     while IFS='|' read -r id profiles; do
         local marker="ON "
@@ -2902,6 +2932,18 @@ _chooks_toggle() {
             else
                 _chooks_set_english_coach "1"
                 echo "english-coach: \033[0;32mENABLED\033[0m (language → English)"
+            fi
+            continue
+        fi
+
+        # tmux-sidebar uses separate env toggle (TMUX_SIDEBAR_DISABLED)
+        if [[ "$hook_id" == "tmux-sidebar" ]]; then
+            if [[ "$current_state" == "ON " ]]; then
+                _chooks_set_tmux_sidebar "1"
+                echo "tmux-sidebar: \033[0;31mDISABLED\033[0m"
+            else
+                _chooks_set_tmux_sidebar ""
+                echo "tmux-sidebar: \033[0;32mENABLED\033[0m"
             fi
             continue
         fi

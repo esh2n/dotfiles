@@ -154,8 +154,12 @@ if [[ -d "$BORDERS_CONFIG_DIR" ]]; then
         # Reload Borders
         if command -v borders >/dev/null 2>&1; then
             log_info "Reloading Borders..."
-            # Re-run bordersrc to apply new colors
-            "$BORDERS_CONFIG_DIR/bordersrc"
+            # borders is a long-running daemon; restart it in background
+            pkill -x borders 2>/dev/null || true
+            sleep 0.2
+            nohup "$BORDERS_CONFIG_DIR/bordersrc" > /dev/null 2>&1 &
+            disown 2>/dev/null || true
+            log_success "Restarted Borders"
         fi
     else
         log_warn "Borders theme '$THEME' not found"
@@ -251,6 +255,27 @@ if [[ -d "$SKETCHYBAR_CONFIG_DIR" ]]; then
         fi
     else
         log_warn "Sketchybar theme '$THEME' not found"
+    fi
+fi
+
+# Update Warp Theme
+# Warp loads themes from ~/.warp/themes/<name>.yaml and reads `theme = "<name>"`
+# from settings.toml. It hot-reloads on settings.toml change, so no restart.
+WARP_CONFIG_DIR="$DOTFILES_ROOT/domains/dev/config/warp"
+if [[ ! -d "$WARP_CONFIG_DIR" ]]; then
+    WARP_CONFIG_DIR="$HOME/dotfiles/domains/dev/config/warp"
+fi
+
+if [[ -d "$WARP_CONFIG_DIR" ]]; then
+    WARP_THEME_FILE="$WARP_CONFIG_DIR/themes/$THEME.yaml"
+    WARP_SETTINGS="$WARP_CONFIG_DIR/settings.toml"
+    if [[ -f "$WARP_THEME_FILE" && -f "$WARP_SETTINGS" ]]; then
+        # Replace the existing theme = "..." line. Use a different sed delimiter
+        # to avoid issues if theme names ever contain '/'.
+        sed -i '' "s|^theme = .*|theme = \"$THEME\"|" "$WARP_SETTINGS"
+        log_success "Updated Warp theme to '$THEME'"
+    else
+        log_warn "Warp theme '$THEME' not found"
     fi
 fi
 
