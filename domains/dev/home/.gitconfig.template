@@ -79,11 +79,10 @@
 # GitHub認証情報の管理
 [credential "https://github.com"]
     helper =
-    helper = gh-owner
-    useHttpPath = true
+    helper = !gh auth git-credential
 [credential "https://gist.github.com"]
     helper =
-    helper = !/opt/homebrew/bin/gh auth git-credential
+    helper = !gh auth git-credential
 
 # deltaの設定（高機能なdiff表示ツール）
 [delta]
