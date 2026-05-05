@@ -2,8 +2,18 @@
 # RTK (Rust Token Killer) — PreToolUse hook for Bash commands
 # Rewrites CLI commands through rtk for 60-90% token reduction
 # Gracefully degrades if rtk is not installed
+#
+# Toggleable via `chooks` (see domains/dev/shell/zsh/functions.zsh).
+# Default = OFF — too many `ask` prompts on `cd && ...` and other patterns.
+#   RTK_REWRITE_DISABLED="1" → disabled (default)
+#   RTK_REWRITE_DISABLED=""  → enabled
 
 set -euo pipefail
+
+# Default OFF — bail unless explicitly enabled (RTK_REWRITE_DISABLED unset or "")
+if [[ "${RTK_REWRITE_DISABLED:-1}" == "1" ]]; then
+    exit 0
+fi
 
 # Bail if rtk is not installed
 if ! command -v rtk &>/dev/null; then
