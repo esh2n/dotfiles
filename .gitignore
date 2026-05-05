@@ -129,6 +129,7 @@ domains/dev/config/nvim-lazyvim/lua/plugins/colorscheme.lua
 domains/dev/config/nvim-astrovim/lua/plugins/colorscheme.lua
 domains/dev/config/nvim-nvchad/lua/chadrc.lua
 domains/dev/config/nvim-custom/lua/custom/plugins/colorscheme.lua
+domains/dev/config/nvim-custom/lua/custom/colorscheme.lua
 
 # Shell history and sessions
 .zsh_history
