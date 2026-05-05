@@ -50,6 +50,13 @@ if [[ ! -d "${HOME}/.config/nvim-astrovim" ]]; then
     git clone --depth 1 https://github.com/AstroNvim/AstroNvim ~/.config/nvim-astrovim
 fi
 
+# Default ~/.config/nvim to lazyvim on first setup. Idempotent: skips if the
+# user has already switched to a different distro (symlink / dir already present).
+if [[ ! -L "${HOME}/.config/nvim" && ! -e "${HOME}/.config/nvim" ]]; then
+    log_info "Setting default nvim config to 'lazyvim'..."
+    bash "${SCRIPT_DIR}/bin/nvim-switch" lazyvim || log_warn "nvim-switch lazyvim failed (non-critical)"
+fi
+
 # -----------------------------------------------------------------------------
 # 3. Zellij Plugins
 # -----------------------------------------------------------------------------
