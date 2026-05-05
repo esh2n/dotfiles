@@ -255,6 +255,16 @@ main() {
         bash "$workspace_install" || log_warn "workspace install reported failure (non-critical)"
     fi
 
+    # Default ~/.config/nvim to lazyvim if the user hasn't picked a distro yet.
+    # Idempotent: leaves an existing symlink/dir alone so manual switches stick.
+    if [[ ! -L "${HOME}/.config/nvim" && ! -e "${HOME}/.config/nvim" ]]; then
+        local nvim_switch="${DOTFILES_ROOT}/domains/dev/bin/nvim-switch"
+        if [[ -x "$nvim_switch" ]]; then
+            log_info "Setting default nvim config to 'lazyvim'..."
+            bash "$nvim_switch" lazyvim || log_warn "nvim-switch lazyvim failed (non-critical)"
+        fi
+    fi
+
     # Re-merge Claude Code profile (source settings may have changed)
     local claude_switch="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
     if [[ -x "$claude_switch" ]]; then
