@@ -257,6 +257,52 @@ phase_config() {
         log_info "Applying default Claude Code profile (ecc)..."
         bash "$claude_switch" ecc
     fi
+
+    ensure_git_identity
+}
+
+# Generate ~/.config/git/config.local with user.name / user.email if missing.
+# Values come from (in order): pre-set env vars, ${DOTFILES_ROOT}/.env.
+# No values committed to dotfiles — file itself is gitignored.
+ensure_git_identity() {
+    local config_local="$HOME/.config/git/config.local"
+
+    # Skip if already configured (idempotent).
+    if [[ -f "$config_local" ]] && grep -qE "^[[:space:]]*email[[:space:]]*=" "$config_local"; then
+        log_info "Git identity already configured: $config_local"
+        return 0
+    fi
+
+    local name="${GIT_USER_NAME:-}"
+    local email="${GIT_USER_EMAIL:-}"
+
+    # Fall back to .env (gitignored) if env vars not set.
+    if [[ -z "$name" || -z "$email" ]] && [[ -f "${DOTFILES_ROOT}/.env" ]]; then
+        # shellcheck disable=SC1091
+        set -a
+        source "${DOTFILES_ROOT}/.env"
+        set +a
+        name="${name:-${GIT_USER_NAME:-}}"
+        email="${email:-${GIT_USER_EMAIL:-}}"
+    fi
+
+    if [[ -z "$name" || -z "$email" ]]; then
+        log_warn "Git identity not set. To configure:"
+        log_warn "  Add GIT_USER_NAME and GIT_USER_EMAIL to ${DOTFILES_ROOT}/.env"
+        log_warn "  Or pre-export them, then re-run this installer."
+        log_warn "  Or write ${config_local} manually."
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$config_local")"
+    cat > "$config_local" <<EOF
+# Machine-specific git identity (gitignored).
+# Loaded via [include] in ~/.gitconfig.
+[user]
+    name = ${name}
+    email = ${email}
+EOF
+    log_success "Wrote git identity to $config_local"
 }
 
 phase_verify() {
