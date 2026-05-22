@@ -30,6 +30,36 @@ get_theme_color() {
     grep "^\s*$color_name\s*=" "$theme_file" | sed 's/.*0xff\([a-f0-9]\{6\}\).*/\1/' | head -1
 }
 
+# Convert a 6-char hex color (e.g. "e67e80") to nearest xterm-256 cube index.
+# ripgrep's --colors flag accepts ANSI names or 0-255 indices, not hex.
+# Falls back to 7 (white) on malformed input so the config stays valid.
+hex_to_xterm256() {
+    local hex="${1#\#}"
+    hex="${hex#0x}"
+    if [[ ! "$hex" =~ ^[0-9a-fA-F]{6}$ ]]; then
+        echo 7
+        return
+    fi
+    local r=$((16#${hex:0:2}))
+    local g=$((16#${hex:2:2}))
+    local b=$((16#${hex:4:2}))
+    local r_i g_i b_i
+    # Standard xterm-256 cube quantization (cube stops at 0,95,135,175,215,255)
+    if   (( r < 48 ));  then r_i=0
+    elif (( r < 115 )); then r_i=1
+    else r_i=$(( (r - 35) / 40 ))
+    fi
+    if   (( g < 48 ));  then g_i=0
+    elif (( g < 115 )); then g_i=1
+    else g_i=$(( (g - 35) / 40 ))
+    fi
+    if   (( b < 48 ));  then b_i=0
+    elif (( b < 115 )); then b_i=1
+    else b_i=$(( (b - 35) / 40 ))
+    fi
+    echo $(( 16 + 36 * r_i + 6 * g_i + b_i ))
+}
+
 # VSCode/Cursor theme mapping (POSIX compatible)
 get_vscode_theme() {
     case "$1" in
@@ -703,10 +733,14 @@ end
 FISHEOF
 
 # ripgrep config
+# --colors only accepts ANSI names or 0-255 xterm indices, so convert hex to 256-index.
+RG_C_MATCH="$(hex_to_xterm256 "$C_RED")"
+RG_C_LINE="$(hex_to_xterm256 "$C_YELLOW")"
+RG_C_PATH="$(hex_to_xterm256 "$C_BLUE")"
 cat > "$THEME_ENV_DIR/ripgreprc" << RGEOF
---colors=match:fg:0x${C_RED}
---colors=line:fg:0x${C_YELLOW}
---colors=path:fg:0x${C_BLUE}
+--colors=match:fg:${RG_C_MATCH}
+--colors=line:fg:${RG_C_LINE}
+--colors=path:fg:${RG_C_PATH}
 RGEOF
 
 log_success "Updated CLI tool theme env (fzf/bat/ripgrep/claude-statusline)"
