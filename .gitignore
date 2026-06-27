@@ -44,6 +44,17 @@ log/
 # Codex specific
 **/codex/sessions/
 **/codex/history.jsonl
+# Runtime/state artifacts — may capture environment secrets (do not commit)
+**/codex/shell_snapshots/
+**/codex/cache/
+**/codex/.tmp/
+**/codex/*.sqlite
+**/codex/*.sqlite-shm
+**/codex/*.sqlite-wal
+**/codex/installation_id
+**/codex/models_cache.json
+**/codex/.personality_migration
+**/codex/remote-settings.json
 
 # Generated from templates (do not commit)
 domains/dev/config/vscode/settings.json
@@ -57,6 +68,10 @@ domains/dev/config/claude/rules
 domains/dev/config/claude/scripts
 domains/dev/config/claude/skills
 domains/dev/config/claude/.*-merged/
+domains/dev/config/claude/remote-settings.json
+domains/dev/config/claude/.last-cleanup
+domains/dev/config/claude/.last-update-result.json
+domains/dev/config/claude/correction-analysis/
 domains/dev/config/starship/starship.toml
 domains/dev/config/mise/config.toml
 domains/dev/config/zellij/config.kdl
