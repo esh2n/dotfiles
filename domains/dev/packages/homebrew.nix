@@ -11,6 +11,7 @@
     "dlvhdr/formulae/diffnav"
     "noborus/tap/ov"
     "sesh"
+    "codex"
   ];
 
   homebrew.casks = [
