@@ -259,6 +259,28 @@ phase_config() {
     fi
 
     ensure_git_identity
+    ensure_warp_settings
+}
+
+# Seed ~/.warp/settings.toml (= repo settings.toml via the ~/.warp symlink) from
+# the tracked settings.toml.default if it does not exist yet.
+# Warp rewrites this file on its own (UI toggles) and theme-switch updates the
+# `theme` line, so the live file is gitignored/machine-local — we only seed it
+# once and never clobber an existing one.
+ensure_warp_settings() {
+    local warp_dir="${DOTFILES_ROOT}/domains/dev/config/warp"
+    local live="${warp_dir}/settings.toml"
+    local seed="${warp_dir}/settings.toml.default"
+
+    if [[ -f "$live" ]]; then
+        return 0
+    fi
+    if [[ ! -f "$seed" ]]; then
+        log_warn "Warp settings seed not found: $seed"
+        return 0
+    fi
+    cp "$seed" "$live"
+    log_success "Seeded Warp settings from default: $live"
 }
 
 # Generate ~/.config/git/config.local with user.name / user.email if missing.
