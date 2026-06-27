@@ -79,7 +79,8 @@
 # GitHub認証情報の管理
 [credential "https://github.com"]
     helper =
-    helper = !/opt/homebrew/bin/gh auth git-credential
+    helper = gh-owner
+    useHttpPath = true
 [credential "https://gist.github.com"]
     helper =
     helper = !/opt/homebrew/bin/gh auth git-credential
