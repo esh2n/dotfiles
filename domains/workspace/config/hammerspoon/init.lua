@@ -7,6 +7,11 @@ hs.hotkey.bind({"cmd", "alt", "ctrl"}, "r", function()
 end)
 
 -- Load dropdown system
-dofile(hs.configdir .. "/dropdown.lua")
+-- dofile(hs.configdir .. "/dropdown.lua")
+
+-- GatherV2: hold Z to dance, auto-spam F for confetti.
+-- IMPORTANT: capture the return value as a global so the module's eventtap /
+-- hotkey / watcher userdata are not garbage-collected. See z_to_f_spammer.lua.
+ZSpammer = dofile(hs.configdir .. "/z_to_f_spammer.lua")
 
 hs.alert.show("Hammerspoon ready")
