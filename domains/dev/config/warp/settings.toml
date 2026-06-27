@@ -3,7 +3,7 @@ spacing = "normal"
 
 [appearance.themes]
 system_theme = false
-theme = "rosepine"
+theme = "catppuccin"
 selected_system_themes = { dark = "adeberry", light = "light" }
 
 [appearance.cursor]
