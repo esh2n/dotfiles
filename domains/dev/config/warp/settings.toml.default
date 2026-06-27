@@ -87,7 +87,7 @@ is_settings_sync_enabled = true
 [global_hotkey]
 
 [global_hotkey.dedicated_window]
-enabled = true
+enabled = false
 
 [global_hotkey.dedicated_window.settings]
 active_pin_position = "top"
@@ -108,6 +108,7 @@ show_warning_before_quitting = false
 default_session_mode = "terminal"
 
 [terminal]
+osc52_clipboard_access = "write_only"
 
 [terminal.input]
 input_box_type_setting = "classic"
@@ -119,6 +120,15 @@ right_alt = false
 
 [notifications]
 toast_duration_secs = 8
+
+[notifications.preferences]
+is_agent_task_completed_enabled = true
+is_long_running_enabled = true
+is_needs_attention_enabled = true
+is_password_prompt_enabled = true
+long_running_threshold = 30
+mode = "dismissed"
+play_notification_sound = true
 
 [code]
 
