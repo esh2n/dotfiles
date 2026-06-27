@@ -55,6 +55,10 @@ log/
 **/codex/models_cache.json
 **/codex/.personality_migration
 **/codex/remote-settings.json
+**/codex/version.json
+# Codex-managed skills and rules (installed by codex, not authored here)
+**/codex/skills/
+**/codex/rules/
 
 # Generated from templates (do not commit)
 domains/dev/config/vscode/settings.json
