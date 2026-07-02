@@ -34,7 +34,7 @@ PRのdescription・リンクされたissueを読み、**変更の目的を理解
 - [perspectives/frontend-react.md](perspectives/frontend-react.md) — React/TypeScript
 - [perspectives/backend-go-ddd-clean.md](perspectives/backend-go-ddd-clean.md) — Go/DDD + Clean Architecture
 
-該当するperspectiveファイルが存在しない言語・アーキテクチャの場合は、その分野のベストプラクティスと権威ある参考文献を自分で判断し、同じ構造（観点テーブル + 参考文献リスト）でレビューする。
+該当するperspectiveファイルが存在しない言語・アーキテクチャの場合は、その分野のベストプラクティスと権威ある参考文献を自分で判断し、同じ構造（観点テーブル + 参考文献リスト）でレビューする。レビュー後、その観点が再利用に値するならperspectives/への保存をユーザーに提案する。
 
 ## Step 4: 共通観点（全PRで必ずチェック）
 

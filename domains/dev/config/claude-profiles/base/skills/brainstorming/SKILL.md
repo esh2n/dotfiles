@@ -41,8 +41,8 @@ Start by understanding the current project context, then ask questions one at a 
 
 **Implementation (if continuing):**
 - Ask: "Ready to set up for implementation?"
-- Use superpowers:using-git-worktrees to create isolated workspace
-- Use superpowers:writing-plans to create detailed implementation plan
+- Use the worktree-start skill to create isolated workspace
+- Create a detailed implementation plan (for structured, long-lived specs use the sdd skill instead)
 
 ## Key Principles
 

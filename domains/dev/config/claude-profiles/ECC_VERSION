@@ -1,0 +1,4 @@
+source: https://github.com/affaan-m/everything-claude-code
+commit: 81af40761939056ab3dc54732fd4f562a27309d0
+synced: 2026-07-02
+paths: scripts/hooks scripts/lib skills/continuous-learning-v2 .cursor/rules

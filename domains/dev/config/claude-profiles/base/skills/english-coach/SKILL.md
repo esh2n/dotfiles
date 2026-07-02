@@ -1,9 +1,10 @@
 ---
 name: english-coach
 description: >
-  Business English coaching mode. Appends learning feedback at the end of every response.
-  Covers: natural phrasing, grammar, alternatives with nuance, vocabulary,
-  mixed Japanese/English detection, and assertiveness coaching.
+  Business English coaching. Use when the user writes in English, asks how to
+  phrase something in English, or the english-coach toggle (~/.claude/.english-coach)
+  is on. Appends learning feedback (natural phrasing, grammar, alternatives with
+  nuance, vocabulary, JP/EN mix detection, assertiveness) to the end of responses.
   Inspired by Nani!? translation approach — multiple alternatives with JP nuance explanations.
 ---
 
@@ -68,6 +69,9 @@ Situations: 反対する, 確認する, 提案する, 断る, フィードバッ
 Format: `💡 シーンで使える: [反対する時] "I see it differently — I think..." (「ちょっと違う意見なんですが」に相当。"I disagree"より柔らかい)`
 
 ## Rules
+
+- 該当項目のみ出力する。**何も該当しなければ「コーチング不要（英語は良好）」と一行だけ記載**
+- フィードバックは最大12行。本文への回答を圧迫しない
 
 - **全ての説明はJPで書く** — the user is learning English, not Japanese
 - Keep coaching concise — max ~12 lines. Pick the 2-3 most impactful points

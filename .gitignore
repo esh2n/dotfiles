@@ -35,6 +35,7 @@ log/
 **/claude/projects/
 **/claude/shell-snapshots/
 **/claude/stats-cache.json
+**/claude/.claude-packs
 **/claude/version-cache.json
 **/claude/homunculus/
 **/claude/statsig/

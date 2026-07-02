@@ -9,6 +9,21 @@ argument-hint: <subcommand> [args]
 
 Manage reusable prompt templates stored in `~/.config/prompts/`.
 
+## Quick Start
+
+```bash
+# 初回のみ: ディレクトリ初期化
+mkdir -p ~/.config/prompts/{global,projects}
+
+# よく使う流れ: 一覧 → 検索 → 編集
+/prompt-manager list
+/prompt-manager search review
+/prompt-manager edit review-code
+```
+
+Storage: `~/.config/prompts/global/`(全プロジェクト共通) と
+`~/.config/prompts/projects/<name>/`(プロジェクト限定)。詳細は末尾のDirectory Structure参照。
+
 ## Subcommands
 
 ### `/prompt-manager list`
