@@ -1,6 +1,7 @@
 ---
 name: sdd
 description: Spec-Driven Development workflow. Use when starting a new feature, bugfix, or any task that benefits from structured specification before implementation. Manages tasks and specs in ~/.config/work/{org}/{repo}/tasks/. Subcommands - init, clarify, research, design, tasks, implement, validate, status, list.
+argument-hint: "init|clarify|research|design|tasks|implement|validate|status|list [task-name]"
 ---
 
 # Spec-Driven Development (SDD)
@@ -28,6 +29,11 @@ remote_url=$(git remote get-url origin 2>/dev/null)
 org_repo=$(echo "$remote_url" | sed -E 's#.*(github\.com|gitlab\.com)[:/]##' | sed 's/\.git$//')
 org=$(echo "$org_repo" | cut -d'/' -f1)
 repo=$(echo "$org_repo" | cut -d'/' -f2)
+# Fallback: remoteが無い/未対応ホストならローカル名を使う
+if [ -z "$org" ] || [ -z "$repo" ] || [ "$org" = "$repo" ]; then
+  repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+  org="local"
+fi
 
 WORK_ROOT="$HOME/.config/work/${org}/${repo}"
 TASKS_DIR="${WORK_ROOT}/tasks"
@@ -48,13 +54,13 @@ mkdir -p "${WORK_ROOT}/docs"
 
 新しいタスクを作成し、必要に応じてSDD specを初期化する。
 
-1. 連番を自動採番（既存の最大番号 + 1、ゼロパディング3桁）
-2. slug を生成（英語ケバブケース）
+1. 連番を自動採番: `tasks/` 配下の `NNN-*` ディレクトリ名の数値prefixの最大値+1（ゼロパディング3桁）。**1件も無ければ 001**
+2. slug を生成: 引数が既に英小文字ケバブケースならそのまま。日本語なら意味を英訳した3〜5語のケバブケースに変換
 3. タスクディレクトリを作成
-4. `meta.md` と `notes.md` をテンプレートから生成
-5. ユーザーに確認: **「このタスクにSDD specは必要ですか？」**
-   - feature/大きめの変更 → spec推奨
-   - bugfix/chore → specなしでOK
+4. `meta.md` と `notes.md` をテンプレート（`_templates/`）から生成。**テンプレートが無い環境では**、meta.md は下記の初期値、notes.md は `# {title}` + `## Background` + `## Notes` + `## References` の最小構造で生成する
+5. spec要否の判定（**typeはユーザーの依頼内容から推定する**）:
+   - type が bugfix/chore と判断でき、ユーザーがspecに言及していない → **質問せず `has_spec: false` で作成し、その旨を報告**
+   - type が feature/大きめの変更、または判断がつかない → ユーザーに確認: 「このタスクにSDD specは必要ですか？」
 6. spec必要なら `spec/` ディレクトリを作成し、テンプレートから各ファイルを生成
 
 **生成されるファイル:**
@@ -76,7 +82,7 @@ tasks/{NNN}-{slug}/
 ---
 id: "{NNN}"
 slug: "{slug}"
-title: "{ユーザーが指定したタスク名}"
+title: "{依頼内容から生成した人間可読な一文（日本語可。slugの複製にしない）}"
 type: feature | bugfix | chore | exploration
 status: draft
 branch: ""
@@ -88,7 +94,7 @@ has_spec: true | false
 ```
 
 **`_index.md` を更新:**
-タスク一覧テーブルに新しいタスクを追加する。`_index.md` が存在しなければ作成する。
+タスク一覧テーブルに新しいタスクを追加する。`_index.md` が存在しなければ作成する。列は固定: `| ID | Title | Type | Status | Spec | Updated |`
 
 ### `/sdd clarify` — 曖昧さの解消
 
@@ -216,11 +222,19 @@ has_spec: true | false
 ### `/sdd status` — 現在のタスク状態
 
 1. カレントブランチ名から対応するタスクを検索（meta.md の branch フィールド）
-2. 見つからなければ、最後に更新されたin-progressタスクを表示
-3. 以下を表示:
-   - タスク名・ID・ステータス
-   - spec の有無と各フェーズの進捗
-   - tasks.md の完了率（spec がある場合）
+2. 見つからなければ、status が done 以外のタスクのうち updated が最新のものを表示（その旨を注記）。タスクが0件なら「タスクなし。/sdd init で作成してください」と案内
+3. 以下の形式で表示（spec がある場合は各フェーズ進捗と tasks.md 完了率も）:
+
+```
+📋 SDD Status — {org}/{repo}
+  Task:    {NNN}-{slug}
+  Title:   {title}
+  Type:    {type} / Status: {status}
+  Branch:  {branch または "(未設定)"}
+  Spec:    {あり: フェーズ進捗 / なし: "notes.mdベース"}
+  Updated: {updated}
+  次のアクション: {statusに応じた次の一手を1行}
+```
 
 ### `/sdd list` — タスク一覧
 
@@ -294,9 +308,9 @@ worktree_path=$(pwd)
 # meta.md の branch と worktree フィールドを更新
 ```
 
-**using-git-worktrees スキルとの連携:**
+**worktree-start スキルとの連携:**
 1. `/sdd init` でタスク作成
-2. `using-git-worktrees` でworktree作成
+2. `worktree-start` でworktree作成
 3. meta.md の branch/worktree を自動更新
 4. `/sdd clarify` → `/sdd design` → `/sdd tasks` → `/sdd implement`
 

@@ -2,12 +2,16 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# Claude Code / Cursor Profile Switcher
+# Claude Code Config Composer (packs edition)
 # -----------------------------------------------------------------------------
-# Merges base layer (always applied) + profile layer for each component.
-# Components using merge: skills, hooks, scripts, commands
-# Components using simple swap: agents, rules
-# Files composed via jq/cat: settings.json, CLAUDE.md
+# Composes ~/.claude from three layers:
+#   base/   — personal, always-on skills/hooks/commands/scripts
+#   core/   — curated universal content (vendored from ECC, see ECC_VERSION)
+#   packs/  — optional per-language/domain sets, toggled per machine
+#
+# Enabled packs live in ~/.claude/.claude-packs (seeded from packs.default).
+# Hook runtime is vendored under runtime/ecc — no external checkout needed.
+# `ecc-sync` (maintainer only) refreshes runtime/ from the upstream ECC repo.
 # -----------------------------------------------------------------------------
 
 # Resolve DOTFILES_ROOT from script's own location (works via symlink)
@@ -19,17 +23,19 @@ if [[ -z "${DOTFILES_ROOT:-}" ]]; then
     fi
 fi
 
-# Load utilities
+# Load utilities (with fallbacks so the script works standalone)
 if [[ -n "${DOTFILES_ROOT:-}" && -f "$DOTFILES_ROOT/core/utils/common.sh" ]]; then
     source "$DOTFILES_ROOT/core/utils/common.sh"
 elif [[ -f "$HOME/dotfiles/core/utils/common.sh" ]]; then
     source "$HOME/dotfiles/core/utils/common.sh"
 fi
+type log_info    >/dev/null 2>&1 || log_info()    { echo "[info] $*"; }
+type log_success >/dev/null 2>&1 || log_success() { echo "[ok] $*"; }
+type log_warn    >/dev/null 2>&1 || log_warn()    { echo "[warn] $*"; }
+type log_error   >/dev/null 2>&1 || log_error()   { echo "[error] $*" >&2; }
 
 # Resolve profiles directory
 PROFILES_DIR=""
-GHQ_ROOT="${GHQ_ROOT:-${HOME}/go}"
-
 for candidate in \
     "${DOTFILES_ROOT:-}/domains/dev/config/claude-profiles" \
     "$HOME/dotfiles/domains/dev/config/claude-profiles"; do
@@ -47,32 +53,58 @@ fi
 CLAUDE_DIR="$HOME/.claude"
 CURSOR_DIR="$HOME/.cursor"
 BASE_DIR="$PROFILES_DIR/base"
+CORE_DIR="$PROFILES_DIR/core"
+PACKS_DIR="$PROFILES_DIR/packs"
+RUNTIME_DIR="$PROFILES_DIR/runtime/ecc"
+PACKS_FILE="$CLAUDE_DIR/.claude-packs"
+PACKS_DEFAULT="$PROFILES_DIR/packs.default"
 
-# Directories merged: base/* + profile/* → staging dir with symlinks
-MERGE_DIRS=(skills hooks scripts commands)
-# Directories swapped: profile only (no base layer)
-SWAP_DIRS=(agents rules)
-
-PROFILES=(custom ecc)
+# Components merged across base + core + enabled packs
+MERGE_DIRS=(skills hooks scripts commands agents rules)
 
 # -----------------------------------------------------------------------------
-# detect current profile
+# pack helpers
 # -----------------------------------------------------------------------------
-current_profile() {
-    if [[ -f "$CLAUDE_DIR/.claude-profile" ]]; then
-        cat "$CLAUDE_DIR/.claude-profile"
-        return
+available_packs() {
+    find "$PACKS_DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort
+}
+
+enabled_packs() {
+    if [[ ! -f "$PACKS_FILE" ]]; then
+        if [[ -f "$PACKS_DEFAULT" ]]; then
+            mkdir -p "$CLAUDE_DIR"
+            cp "$PACKS_DEFAULT" "$PACKS_FILE"
+        else
+            touch "$PACKS_FILE"
+        fi
     fi
-    echo "unknown"
+    grep -vE '^\s*(#|$)' "$PACKS_FILE" 2>/dev/null | sort -u
+}
+
+pack_is_enabled() {
+    enabled_packs | grep -qx "$1"
+}
+
+save_packs() {
+    # $@ = pack names
+    mkdir -p "$CLAUDE_DIR"
+    printf '%s\n' "$@" | sort -u | grep -vE '^\s*$' > "$PACKS_FILE" || true
+}
+
+validate_pack() {
+    if [[ ! -d "$PACKS_DIR/$1" ]]; then
+        log_error "Unknown pack: $1"
+        log_info "Available: $(available_packs | tr '\n' ' ')"
+        exit 1
+    fi
 }
 
 # -----------------------------------------------------------------------------
-# merge settings.json (base + layer → output)
+# merge settings.json (base + core layer → output)
 # -----------------------------------------------------------------------------
 merge_settings() {
-    local profile="$1"
     local base="$BASE_DIR/settings.base.json"
-    local layer="$PROFILES_DIR/$profile/settings.layer.json"
+    local layer="$CORE_DIR/settings.layer.json"
     local output="$CLAUDE_DIR/settings.json"
 
     if [[ ! -f "$base" ]]; then
@@ -80,11 +112,10 @@ merge_settings() {
         exit 1
     fi
     if [[ ! -f "$layer" ]]; then
-        log_error "Layer settings not found: $layer"
+        log_error "Core settings not found: $layer"
         exit 1
     fi
 
-    # Resolve dotfiles parent (e.g., ~/go/github.com/esh2n) for sibling repo paths
     local dotfiles_parent
     dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
 
@@ -109,16 +140,17 @@ merge_settings() {
       .env = (($base.env // {}) + ($layer.env // {}))
     ' "$base" "$layer" \
       | sed "s|{{DOTFILES_PARENT}}|${dotfiles_parent}|g" \
+      | sed "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT:-$HOME/dotfiles}|g" \
+      | sed "s|{{HOME}}|${HOME}|g" \
       > "$output"
 }
 
 # -----------------------------------------------------------------------------
-# merge CLAUDE.md (base + layer → output)
+# merge CLAUDE.md (base + core layer → output)
 # -----------------------------------------------------------------------------
 merge_claude_md() {
-    local profile="$1"
     local base="$BASE_DIR/CLAUDE.base.md"
-    local layer="$PROFILES_DIR/$profile/CLAUDE.layer.md"
+    local layer="$CORE_DIR/CLAUDE.layer.md"
     local output="$CLAUDE_DIR/CLAUDE.md"
 
     if [[ -f "$base" && -f "$layer" ]]; then
@@ -133,201 +165,300 @@ merge_claude_md() {
 }
 
 # -----------------------------------------------------------------------------
-# merge_dir: base/{dir}/* + profile/{dir}/* → staging dir with symlinks
-# Works for skills, hooks, scripts, commands
+# merge_dir: base/{dir} + core/{dir} + packs/<enabled>/{dir} → staging symlinks
 # -----------------------------------------------------------------------------
 merge_dir() {
-    local dir_name="$1"
-    local profile="$2"
-    local base_src="$BASE_DIR/$dir_name"
-    local profile_src="$PROFILES_DIR/$profile/$dir_name"
+    local dir_name="$1"; shift
+    local packs=("$@")
     local stage="$CLAUDE_DIR/.${dir_name}-merged"
     local link="$CLAUDE_DIR/$dir_name"
 
-    # Clean/create staging dir
     if [[ -d "$stage" ]]; then
         find "$stage" -mindepth 1 -delete
     else
         mkdir -p "$stage"
     fi
 
-    local count=0
-    local base_count=0
+    local total=0
+    local -a sources=("$BASE_DIR/$dir_name" "$CORE_DIR/$dir_name")
+    local p
+    for p in "${packs[@]}"; do
+        sources+=("$PACKS_DIR/$p/$dir_name")
+    done
 
-    # Symlink base items (always applied)
-    if [[ -d "$base_src" ]]; then
-        for item in "$base_src"/*; do
-            [[ -e "$item" ]] || continue
-            local name
+    local src item name
+    for src in "${sources[@]}"; do
+        [[ -d "$src" ]] || continue
+        for item in "$src"/*; do
+            [[ -e "$item" || -L "$item" ]] || continue
             name="$(basename "$item")"
             ln -sfn "$item" "$stage/$name"
-            ((count++))
+            ((total++)) || true
         done
-    fi
-    base_count=$count
+    done
 
-    # Symlink profile items (profile overrides base if same name)
-    if [[ -d "$profile_src" ]]; then
-        for item in "$profile_src"/*; do
-            [[ -e "$item" ]] || continue
-            local name
-            name="$(basename "$item")"
-            ln -sfn "$item" "$stage/$name"
-            ((count++))
-        done
-    fi
-
-    local profile_count=$((count - base_count))
-
-    # Point ~/.claude/{dir} → staging dir
     if [[ -d "$link" && ! -L "$link" ]]; then
         mv "$link" "$link.backup.$(date +%Y%m%d-%H%M%S)"
     fi
     [[ -L "$link" ]] && rm "$link"
     ln -sfn "$stage" "$link"
 
-    log_success "Merged $dir_name: $base_count base + $profile_count $profile = $count total"
+    log_success "Merged $dir_name: $total items"
 }
 
 # -----------------------------------------------------------------------------
-# swap_dir: simple symlink to profile dir (no base merge)
+# link_cursor_rules: vendored ECC cursor rules → ~/.cursor/rules
 # -----------------------------------------------------------------------------
-swap_dir() {
-    local dir_name="$1"
-    local profile="$2"
-    local target="$PROFILES_DIR/$profile/$dir_name"
-    local link="$CLAUDE_DIR/$dir_name"
-
-    if [[ ! -d "$target" ]]; then
-        [[ -L "$link" ]] && rm "$link" || true
-        return 0
-    fi
-
-    if [[ -d "$link" && ! -L "$link" ]]; then
-        mv "$link" "$link.backup.$(date +%Y%m%d-%H%M%S)"
-    fi
-    [[ -L "$link" ]] && rm "$link"
-    ln -sfn "$target" "$link"
-    log_success "Linked $dir_name → $profile"
+link_cursor_rules() {
+    local src="$RUNTIME_DIR/.cursor/rules"
+    [[ -d "$src" ]] || return 0
+    mkdir -p "$CURSOR_DIR/rules"
+    local rule name count=0
+    for rule in "$src"/*; do
+        [[ -e "$rule" ]] || continue
+        name="$(basename "$rule")"
+        ln -sfn "$rule" "$CURSOR_DIR/rules/$name"
+        ((count++)) || true
+    done
+    log_success "Cursor: linked $count rules → ~/.cursor/rules/"
 }
 
 # -----------------------------------------------------------------------------
-# switch_cursor: install ECC cursor rules or clear them
+# apply: rebuild ~/.claude from base + core + enabled packs
 # -----------------------------------------------------------------------------
-switch_cursor() {
-    local profile="$1"
-    # Resolve ECC repo as sibling of dotfiles (same GitHub user directory)
+apply() {
+    local -a packs=()
+    while IFS= read -r p; do
+        [[ -n "$p" ]] || continue
+        if [[ -d "$PACKS_DIR/$p" ]]; then
+            packs+=("$p")
+        else
+            log_warn "Enabled pack not found, skipping: $p"
+        fi
+    done < <(enabled_packs)
+
+    log_info "Applying: base + core + packs(${packs[*]:-none})"
+
+    merge_settings
+    log_success "Merged settings.json (base + core)"
+
+    merge_claude_md
+    log_success "Merged CLAUDE.md (base + core)"
+
+    local dir
+    for dir in "${MERGE_DIRS[@]}"; do
+        merge_dir "$dir" "${packs[@]+"${packs[@]}"}"
+    done
+
+    link_cursor_rules
+
+    # Legacy marker no longer used; keep it pointing at the new scheme
+    echo "packs" > "$CLAUDE_DIR/.claude-profile"
+
+    echo ""
+    log_success "Applied. Enabled packs: ${packs[*]:-none}"
+    log_info "Restart claude-cli to apply changes"
+}
+
+# -----------------------------------------------------------------------------
+# interactive pack picker (no external dependencies)
+# -----------------------------------------------------------------------------
+interactive() {
+    local -a all=() state=()
+    local p i
+    while IFS= read -r p; do all+=("$p"); done < <(available_packs)
+
+    for i in "${!all[@]}"; do
+        if pack_is_enabled "${all[$i]}"; then state[$i]=1; else state[$i]=0; fi
+    done
+
+    while true; do
+        echo ""
+        echo "Packs (toggle by number, 'a' = apply, 'q' = quit without applying):"
+        for i in "${!all[@]}"; do
+            local mark="[ ]"
+            [[ "${state[$i]}" == 1 ]] && mark="[x]"
+            printf "  %2d. %s %s\n" "$((i + 1))" "$mark" "${all[$i]}"
+        done
+        printf "> "
+        local input
+        read -r input || { echo ""; return 1; }
+        case "$input" in
+            a|A)
+                local -a chosen=()
+                for i in "${!all[@]}"; do
+                    [[ "${state[$i]}" == 1 ]] && chosen+=("${all[$i]}")
+                done
+                save_packs "${chosen[@]+"${chosen[@]}"}"
+                apply
+                return 0
+                ;;
+            q|Q)
+                log_info "Aborted (no changes)"
+                return 0
+                ;;
+            *)
+                local n
+                for n in $input; do
+                    if [[ "$n" =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#all[@]} )); then
+                        i=$((n - 1))
+                        state[$i]=$((1 - state[$i]))
+                    else
+                        log_warn "Invalid selection: $n"
+                    fi
+                done
+                ;;
+        esac
+    done
+}
+
+# -----------------------------------------------------------------------------
+# ecc-sync: refresh runtime/ (and report content drift) from upstream ECC repo
+# Maintainer-only; regular users of the dotfiles never need this.
+# -----------------------------------------------------------------------------
+ecc_sync() {
+    local ref="${1:-origin/main}"
     local dotfiles_parent
     dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
     local ecc_repo="${ECC_ROOT:-${dotfiles_parent}/everything-claude-code}"
-    local cursor_rules="$CURSOR_DIR/rules"
 
-    if [[ "$profile" == "ecc" ]]; then
-        if [[ -d "$ecc_repo/.cursor/rules" ]]; then
-            mkdir -p "$cursor_rules"
-            # Symlink ECC cursor rules
-            for rule in "$ecc_repo/.cursor/rules"/*; do
-                [[ -e "$rule" ]] || continue
-                local name
-                name="$(basename "$rule")"
-                ln -sfn "$rule" "$cursor_rules/$name"
-            done
-            local count
-            count=$(ls "$ecc_repo/.cursor/rules" | wc -l | tr -d ' ')
-            log_success "Cursor: linked $count ECC rules → ~/.cursor/rules/"
-        else
-            log_warn "Cursor: ECC .cursor/rules not found at $ecc_repo"
-        fi
-    elif [[ "$profile" == "custom" ]]; then
-        # Remove ECC cursor rules (only symlinks, preserve real files)
-        if [[ -d "$cursor_rules" ]]; then
-            local removed=0
-            for rule in "$cursor_rules"/*; do
-                [[ -L "$rule" ]] && rm "$rule" && ((removed++))
-            done
-            if [[ $removed -gt 0 ]]; then
-                log_success "Cursor: removed $removed ECC rule symlinks"
-            fi
-        fi
-    fi
-}
-
-# -----------------------------------------------------------------------------
-# Main: switch profile
-# -----------------------------------------------------------------------------
-switch_profile() {
-    local profile="$1"
-    local profile_dir="$PROFILES_DIR/$profile"
-
-    if [[ ! -d "$profile_dir" ]]; then
-        log_error "Profile not found: $profile_dir"
+    if [[ ! -d "$ecc_repo/.git" ]]; then
+        log_error "ECC repo not found: $ecc_repo (clone affaan-m/everything-claude-code or set ECC_ROOT)"
         exit 1
     fi
 
-    log_info "Switching to profile: $profile"
+    log_info "Fetching $ecc_repo ..."
+    git -C "$ecc_repo" fetch --quiet origin
 
-    # 1. Merge files
-    merge_settings "$profile"
-    log_success "Merged settings.json (base + $profile)"
+    local sha
+    sha="$(git -C "$ecc_repo" rev-parse "$ref")"
+    local old_sha=""
+    [[ -f "$PROFILES_DIR/ECC_VERSION" ]] && old_sha="$(grep '^commit:' "$PROFILES_DIR/ECC_VERSION" | awk '{print $2}')"
 
-    merge_claude_md "$profile"
-    log_success "Merged CLAUDE.md (base + $profile)"
+    if [[ "$sha" == "$old_sha" ]]; then
+        log_success "runtime already at $ref ($sha) — nothing to sync"
+        return 0
+    fi
 
-    # 2. Merge directories (base + profile)
-    for dir in "${MERGE_DIRS[@]}"; do
-        merge_dir "$dir" "$profile"
+    local paths=(scripts/hooks scripts/lib skills/continuous-learning-v2 .cursor/rules LICENSE)
+    log_info "Syncing runtime from $ref (${sha:0:12}) ..."
+    local d
+    for d in scripts/hooks scripts/lib skills/continuous-learning-v2 .cursor/rules; do
+        /bin/rm -rf "${RUNTIME_DIR:?}/$d"
     done
+    mkdir -p "$RUNTIME_DIR"
+    git -C "$ecc_repo" archive "$sha" -- "${paths[@]}" | tar -x -C "$RUNTIME_DIR"
 
-    # 3. Swap directories (profile only)
-    for dir in "${SWAP_DIRS[@]}"; do
-        swap_dir "$dir" "$profile"
-    done
+    {
+        echo "source: https://github.com/affaan-m/everything-claude-code"
+        echo "commit: $sha"
+        echo "synced: $(date +%Y-%m-%d)"
+        echo "paths: ${paths[*]}"
+    } > "$PROFILES_DIR/ECC_VERSION"
 
-    # 4. Cursor rules
-    switch_cursor "$profile"
+    log_success "runtime updated → $sha"
+    if [[ -n "$old_sha" ]]; then
+        echo ""
+        log_info "Upstream content changes since last sync (review manually if interested):"
+        git -C "$ecc_repo" diff --stat "$old_sha" "$sha" -- skills agents commands rules 2>/dev/null | tail -1 || true
+        log_info "  git -C $ecc_repo log --oneline $old_sha..$sha -- skills agents commands rules"
+    fi
+    log_info "Run 'claude-switch apply' to activate, then smoke-test a session."
+}
 
-    # 5. Write marker
-    echo "$profile" > "$CLAUDE_DIR/.claude-profile"
-
+# -----------------------------------------------------------------------------
+# status output
+# -----------------------------------------------------------------------------
+show_status() {
+    echo "Enabled packs:"
+    local p
+    while IFS= read -r p; do
+        [[ -n "$p" ]] && echo "  * $p"
+    done < <(enabled_packs)
     echo ""
-    log_success "Switched to: $profile"
-    log_info "Restart claude-cli to apply changes"
+    echo "Available packs:"
+    while IFS= read -r p; do
+        if pack_is_enabled "$p"; then
+            echo "  [x] $p"
+        else
+            echo "  [ ] $p"
+        fi
+    done < <(available_packs)
+    if [[ -f "$PROFILES_DIR/ECC_VERSION" ]]; then
+        echo ""
+        echo "Runtime (vendored ECC):"
+        sed 's/^/  /' "$PROFILES_DIR/ECC_VERSION"
+    fi
 }
 
 # -----------------------------------------------------------------------------
 # Entry point
 # -----------------------------------------------------------------------------
 case "${1:-}" in
-    custom|ecc)
-        switch_profile "$1"
+    "")
+        interactive
         ;;
-    current)
-        echo "Current: $(current_profile)"
+    apply)
+        apply
         ;;
-    list)
-        local_current="$(current_profile)"
-        echo "Available profiles:"
-        for p in "${PROFILES[@]}"; do
-            if [[ "$p" == "$local_current" ]]; then
-                echo "  * $p (active)"
-            else
-                echo "    $p"
-            fi
-        done
+    pack)
+        case "${2:-}" in
+            list|"")
+                show_status
+                ;;
+            enable)
+                shift 2
+                [[ $# -ge 1 ]] || { log_error "Usage: claude-switch pack enable <pack>..."; exit 1; }
+                for p in "$@"; do validate_pack "$p"; done
+                declare -a current=()
+                while IFS= read -r c; do [[ -n "$c" ]] && current+=("$c"); done < <(enabled_packs)
+                save_packs "${current[@]+"${current[@]}"}" "$@"
+                apply
+                ;;
+            disable)
+                shift 2
+                [[ $# -ge 1 ]] || { log_error "Usage: claude-switch pack disable <pack>..."; exit 1; }
+                declare -a current=()
+                while IFS= read -r c; do [[ -n "$c" ]] && current+=("$c"); done < <(enabled_packs)
+                declare -a kept=()
+                for c in "${current[@]+"${current[@]}"}"; do
+                    keep=1
+                    for p in "$@"; do [[ "$c" == "$p" ]] && keep=0; done
+                    [[ $keep == 1 ]] && kept+=("$c")
+                done
+                save_packs "${kept[@]+"${kept[@]}"}"
+                apply
+                ;;
+            *)
+                log_error "Usage: claude-switch pack {list|enable|disable} [pack...]"
+                exit 1
+                ;;
+        esac
+        ;;
+    current|list|status)
+        show_status
+        ;;
+    ecc-sync)
+        ecc_sync "${2:-}"
+        ;;
+    ecc|custom)
+        log_warn "Profiles are gone — config is now base + core + packs."
+        log_warn "Use 'claude-switch pack list' to see packs. Applying current selection..."
+        apply
         ;;
     *)
-        echo "Usage: claude-switch {custom|ecc|current|list}"
+        echo "Usage: claude-switch [command]"
         echo ""
-        echo "Profiles (base layer always included):"
-        echo "  custom  — Personal config + base (skills, hooks, scripts, commands)"
-        echo "  ecc     — Everything Claude Code + base (agents, rules, 46 skills, 62 commands)"
+        echo "  (no args)                     Interactive pack selection, then apply"
+        echo "  apply                         Rebuild ~/.claude from base + core + enabled packs"
+        echo "  pack list                     Show enabled/available packs"
+        echo "  pack enable <pack>...         Enable pack(s) and apply"
+        echo "  pack disable <pack>...        Disable pack(s) and apply"
+        echo "  status                        Same as 'pack list'"
+        echo "  ecc-sync [ref]                (maintainer) refresh vendored runtime from ECC repo"
         echo ""
-        echo "Affects: ~/.claude/ (settings, CLAUDE.md, skills, hooks, scripts, commands, agents, rules)"
-        echo "         ~/.cursor/rules/ (ECC cursor rules when ecc profile)"
-        echo ""
-        echo "Commands:"
-        echo "  current — Show active profile"
-        echo "  list    — List available profiles"
+        echo "Layers: base (personal, always on) + core (universal) + packs (per language/domain)"
+        echo "Enabled packs: ~/.claude/.claude-packs (defaults: packs.default)"
         exit 1
         ;;
 esac

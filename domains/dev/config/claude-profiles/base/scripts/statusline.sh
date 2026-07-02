@@ -200,18 +200,18 @@ pct=10
 pct_prefix="~"
 session_duration=""
 if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
-    # Get context and first message timestamp in single jq call
-    read -r context_length first_timestamp < <(jq -rs '
-        (map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) | last |
-            if . then
-                (.message.usage.input_tokens // 0) +
-                (.message.usage.cache_read_input_tokens // 0) +
-                (.message.usage.cache_creation_input_tokens // 0)
-            else 0 end
-        ) as $ctx |
-        (.[0].snapshot.timestamp // .[0].timestamp // null) as $ts |
-        "\($ctx) \($ts)"
-    ' < "$transcript_path" 2>/dev/null || echo "0 null")
+    # Context length: latest usage entry is near the end — avoid slurping the whole transcript
+    context_length=$(tail -n 300 "$transcript_path" 2>/dev/null | jq -rs '
+        map(select(.message.usage and .isSidechain != true and .isApiErrorMessage != true)) | last |
+        if . then
+            (.message.usage.input_tokens // 0) +
+            (.message.usage.cache_read_input_tokens // 0) +
+            (.message.usage.cache_creation_input_tokens // 0)
+        else 0 end
+    ' 2>/dev/null || echo 0)
+    # First message timestamp lives on line 1
+    first_timestamp=$(head -n 1 "$transcript_path" 2>/dev/null \
+        | jq -r '.snapshot.timestamp // .timestamp // "null"' 2>/dev/null || echo "null")
 
     if [[ "$context_length" -gt 0 ]]; then
         pct=$((context_length * 100 / max_context))
@@ -369,7 +369,7 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
             gsub("\n"; " ") | gsub("  +"; " ")) |
         map(select(is_unhelpful | not)) |
         first // ""
-    ' < "$transcript_path" 2>/dev/null || echo "")
+    ' < <(tail -n 1000 "$transcript_path" 2>/dev/null) 2>/dev/null || echo "")
 
     if [[ -n "$last_user_msg" ]]; then
         if [[ ${#last_user_msg} -gt $max_len ]]; then
