@@ -345,7 +345,7 @@ Pure interactive aliases (no argument support):
 
 #### ECC Hook Manager (`chooks`)
 
-Toggle Claude Code hooks on/off interactively. Changes are temporary — `claude-switch ecc` resets to defaults.
+Toggle Claude Code hooks on/off interactively. Changes are temporary — `claude-switch apply` resets to defaults.
 
 | Command | Description |
 |---------|-------------|
