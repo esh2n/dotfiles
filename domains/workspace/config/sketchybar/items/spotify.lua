@@ -1,4 +1,3 @@
-local icons = require("icons")
 local colors = require("colors")
 
 -- Spotify widget
@@ -31,57 +30,45 @@ local spotify = sbar.add("item", {
   },
   padding_left = 8,
   padding_right = 8,
+  drawing = false,
   updates = true,
 })
 
--- Update function
-local function update_spotify()
-  sbar.exec("osascript -e 'tell application \"System Events\" to (name of processes) contains \"Spotify\"'", function(result)
-    if result == "true" then
-      sbar.exec("osascript -e 'tell application \"Spotify\" to get player state'", function(state)
-        if state and state:match("playing") then
-          sbar.exec("osascript -e 'tell application \"Spotify\" to get (name of current track) & \" - \" & (artist of current track)'", function(track_info)
-            if track_info and track_info ~= "" then
-              spotify:set({
-                icon = { color = colors.green },
-                label = { string = track_info:gsub("\n", ""):sub(1, 25) },
-                drawing = true
-              })
-            end
-          end)
-        elseif state and state:match("paused") then
-          sbar.exec("osascript -e 'tell application \"Spotify\" to get (name of current track) & \" - \" & (artist of current track)'", function(track_info)
-            if track_info and track_info ~= "" then
-              spotify:set({
-                icon = { color = colors.grey },
-                label = { string = track_info:gsub("\n", ""):sub(1, 25) .. " (paused)" },
-                drawing = true
-              })
-            end
-          end)
-        else
-          spotify:set({ drawing = false })
-        end
-      end)
-    else
-      spotify:set({ drawing = false })
-    end
-  end)
-end
+-- Event-driven update via MediaRemote (same push-based source as media.lua).
+-- No polling: avoids the sbar.delay recursion + nested osascript calls that
+-- leaked memory in the previous implementation.
+spotify:subscribe("media_change", function(env)
+  if env.INFO.app ~= "Spotify" then
+    spotify:set({ drawing = false })
+    return
+  end
 
--- Click handler for play/pause
-spotify:subscribe("mouse.clicked", function(env)
-  sbar.exec("osascript -e 'tell application \"Spotify\" to playpause'")
-  sbar.delay(1, update_spotify)
+  local playing = env.INFO.state == "playing"
+  local paused = env.INFO.state == "paused"
+  if not (playing or paused) then
+    spotify:set({ drawing = false })
+    return
+  end
+
+  local title = env.INFO.title or ""
+  local artist = env.INFO.artist or ""
+  local track = title
+  if artist ~= "" then
+    track = title .. " - " .. artist
+  end
+  if paused then
+    track = track .. " (paused)"
+  end
+
+  spotify:set({
+    icon = { color = playing and colors.green or colors.grey },
+    label = { string = track },
+    drawing = true,
+  })
 end)
 
--- Initial update and set timer
-update_spotify()
-sbar.add("event", "spotify_update")
-sbar.trigger("spotify_update")
-
--- Update every 2 seconds
-spotify:subscribe("spotify_update", function(env)
-  update_spotify()
-  sbar.delay(2, function() sbar.trigger("spotify_update") end)
+-- Click toggles play/pause; media_change fires on the resulting state change,
+-- so no manual refresh/delay is needed.
+spotify:subscribe("mouse.clicked", function(env)
+  sbar.exec("osascript -e 'tell application \"Spotify\" to playpause'")
 end)
