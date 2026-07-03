@@ -206,3 +206,8 @@ domains/dev/config/claude/.auto-mode
 
 # Lock files
 domains/dev/config/claude/version-cache.json.lock
+
+# herdr runtime state
+**/herdr/*.log
+**/herdr/*.sock
+**/herdr/session.json

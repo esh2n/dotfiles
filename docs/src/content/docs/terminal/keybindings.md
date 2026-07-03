@@ -1,9 +1,12 @@
 ---
 title: Keybindings
-description: tmux / WezTerm / Zellij で統一された keybinding。
+description: tmux / WezTerm / Zellij / Herdr で統一された keybinding。
 ---
 
-tmux, WezTerm, Zellij の 3 つの terminal で共通の keybinding を使えるようにしている。prefix key は `Ctrl+q`。
+tmux, WezTerm, Zellij, Herdr で共通の keybinding を使えるようにしている。prefix key は `Ctrl+q`。
+
+Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ移動 (`Alt+h`/`Alt+l`) を
+この共通スキームに合わせている。Herdr 固有のキー・エージェント連携は [Herdr](/terminal/herdr/) を参照。
 
 ## Pane 操作
 

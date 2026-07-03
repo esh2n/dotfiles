@@ -204,6 +204,17 @@ vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
 
+-- herdr: send file path / line range to the first coding agent in this tab.
+-- Only registered inside a herdr pane, so it is inert in a normal terminal/tmux/zellij.
+if vim.env.HERDR_ENV == '1' then
+  vim.keymap.set('n', '<leader>zf', function()
+    require('custom.herdr').send_file_to_agent()
+  end, { desc = 'herdr: send file path to agent' })
+  vim.keymap.set('x', '<leader>zl', function()
+    require('custom.herdr').send_selection_to_agent()
+  end, { desc = 'herdr: send file path + line range to agent' })
+end
+
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
 -- is not what someone will guess without a bit more experience.

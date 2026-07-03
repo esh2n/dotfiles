@@ -193,6 +193,7 @@ export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
 ### Terminal & Shell
 - WezTerm, Ghostty, Warp
 - Zellij (terminal multiplexer with rich plugins)
+- Herdr (agent multiplexer, unified keybindings with tmux/Zellij)
 - Zsh, Fish
 - Starship prompt
 
@@ -755,7 +756,7 @@ direnv allow
 
 #### tmux / WezTerm / Zellij (Prefix: Ctrl+q)
 
-Keybindings unified across tmux, WezTerm, and Zellij.
+Keybindings unified across tmux, WezTerm, Zellij, and Herdr (`~/.config/herdr/config.toml`, prefix `Ctrl+q`).
 
 | Operation | Keybind | Note |
 |-----------|---------|------|
