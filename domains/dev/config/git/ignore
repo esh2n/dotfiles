@@ -53,3 +53,5 @@ vendor/
 
 # Personal directories
 .personal/
+
+**/.claude/.cc-writes/
