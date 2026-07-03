@@ -1,0 +1,25 @@
+# Docs: https://herdr.dev/docs/configuration/
+# Symlinked to ~/.config/herdr/config.toml by manager.sh.
+# Herdr's default keymap is already tmux-like; only the deltas from our setup follow.
+
+onboarding = false
+
+[terminal]
+shell_mode = "auto"
+new_cwd = "follow"
+
+[theme]
+name = "catppuccin"
+
+# Desktop notification when an agent finishes or needs input.
+# "terminal" lets the outer terminal (Ghostty/WezTerm) own it, which also works over SSH.
+# Sound is already on by default ([ui.sound] enabled); set enabled=false on shared machines.
+[ui.toast]
+delivery = "terminal"
+
+[keys]
+prefix = "ctrl+q"                     # default: ctrl+b
+split_vertical = "prefix+backslash"  # tmux: prefix \
+split_horizontal = "prefix+minus"    # tmux: prefix -
+previous_tab = "alt+h"               # tmux: M-h
+next_tab = "alt+l"                   # tmux: M-l

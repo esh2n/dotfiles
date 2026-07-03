@@ -12,6 +12,7 @@
     "noborus/tap/ov"
     "sesh"
     "codex"
+    "herdr" # not in nixpkgs
   ];
 
   homebrew.casks = [
