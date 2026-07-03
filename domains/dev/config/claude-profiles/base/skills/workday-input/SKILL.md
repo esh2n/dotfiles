@@ -39,9 +39,7 @@ disable-model-invocation: true
 
 Chrome で Workday の勤怠入力画面を開く。
 
-```
-https://wd3.myworkday.com/sansan/d/calendar/c17/inst/6305!CKExEhYKBQgVEKgiEg0xNzcyNDM4NDAwMDAwGhIKBggDEKGZARIICgYI9wEQ8T4aEQoGCAMQw5oBEgcKBQigMRABGhEKBggDENrjARIHCgUInUsQARoKCgYIAxCWvwISAA~~*1eQOKiPmqks~/rel-task/2997$9444.htmld
-```
+URL は `~/.config/workday/config` の `WORKDAY_CALENDAR_URL` を使う（無ければ作成を案内して停止）。
 
 `tabs_context_mcp` → `tabs_create_mcp` or 既存タブで `navigate` する。
 

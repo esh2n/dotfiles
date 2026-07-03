@@ -41,16 +41,20 @@ Slack MCP が有効であること。
 
 ## Step 1.5: 勤怠チャンネルの確認
 
-`slack_read_channel` で勤怠チャンネル（ID: `G016P32SBRS`）を読み、対象期間のユーザーの申請を確認する。
+社内識別子は `~/.config/workday/config` から読む（`SLACK_USER_ID` / `KINTAI_CHANNEL_ID` /
+`WORKDAY_CALENDAR_URL`）。ファイルが無ければ「~/.config/workday/config を作成してください
+（キー3つ）」と案内して停止する。
+
+`slack_read_channel` で勤怠チャンネル（ID: `{KINTAI_CHANNEL_ID}`）を読み、対象期間のユーザーの申請を確認する。
 
 ```
-channel_id: G016P32SBRS
+channel_id: {KINTAI_CHANNEL_ID}
 oldest: {対象期間の開始 Unix timestamp}
 latest: {対象期間の終了 Unix timestamp}
 response_format: concise
 ```
 
-レスポンスから `U08KZLBBS1W`（ユーザーID）を含むメッセージを抽出し、以下のパターンを検出する:
+レスポンスから `{SLACK_USER_ID}` を含むメッセージを抽出し、以下のパターンを検出する:
 - `年次有給休暇（終日）` → その日を「休暇」としてマーク、勤務時間算出をスキップ
 - `年次有給休暇（午前）` → 「午前半休」、開始時刻を 13:00 に設定
 - `年次有給休暇（午後）` → 「午後半休」、終了時刻を 13:00 に設定
