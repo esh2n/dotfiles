@@ -3,8 +3,9 @@ local colors = require("colors")
 local settings = require("settings")
 
 -- Execute the event provider binary which provides the event "cpu_update" for
--- the cpu load data, which is fired every 2.0 seconds.
-sbar.exec("killall cpu_load >/dev/null; $CONFIG_DIR/helpers/event_providers/cpu_load/bin/cpu_load cpu_update 2.0")
+-- the cpu load data. Every event redraws the whole bar on every display, so
+-- keep the interval modest (5s) to bound the constant CPU cost.
+sbar.exec("killall cpu_load >/dev/null; $CONFIG_DIR/helpers/event_providers/cpu_load/bin/cpu_load cpu_update 5.0")
 
 local cpu = sbar.add("graph", "widgets.cpu" , 42, {
   position = "right",

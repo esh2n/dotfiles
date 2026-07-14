@@ -11,6 +11,6 @@ sbar.bar({
   corner_radius = 12,
   border_color = colors.blue,
   border_width = 2,
-  blur_radius = 20,
+  blur_radius = 0,
   sticky = true,
 })
