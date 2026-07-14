@@ -13,6 +13,7 @@
     "sesh"
     "codex"
     "herdr" # not in nixpkgs
+    "hunk" # not in nixpkgs
   ];
 
   homebrew.casks = [

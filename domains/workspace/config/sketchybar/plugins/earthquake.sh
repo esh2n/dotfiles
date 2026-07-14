@@ -6,8 +6,9 @@
 ITEM_NAME="${1:-widgets.earthquake}"
 EQ_API_URL="https://api.p2pquake.net/v2/history?codes=551&limit=1"
 
-# Pin to BSD date — nix's GNU date may be ahead in PATH and doesn't support -j -f
-DATE_BIN=/usr/bin/date
+# Pin to BSD date — nix's GNU date may be ahead in PATH and doesn't support -j -f.
+# macOS ships BSD date at /bin/date (there is no /usr/bin/date).
+DATE_BIN=/bin/date
 
 # Fetch earthquake data
 EQ_JSON=$(curl -s --connect-timeout 3 --max-time 5 "$EQ_API_URL")
