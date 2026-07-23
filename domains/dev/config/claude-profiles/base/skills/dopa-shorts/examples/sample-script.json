@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "title": "dopamine sample",
+    "slug": "dopamine-sample",
+    "style": "zunda",
+    "voice": "zundamon",
+    "adapter": "voicevox",
+    "speed": 1.15,
+    "bgm": null
+  },
+  "cuts": [
+    {
+      "type": "hook",
+      "text": "スマホがやめられないのは、意志が弱いからじゃないのだ",
+      "telop": "意志のせいじゃない🔥",
+      "emotion": "surprised",
+      "se": "don"
+    },
+    {
+      "type": "body",
+      "text": "犯人はドーパミン。報酬が来るかもって瞬間に一番出るのだ",
+      "telop": "犯人はドーパミン",
+      "emotion": "thinking"
+    },
+    {
+      "type": "body",
+      "text": "つまり通知が来た瞬間が快感のピークなのだ。開いた後じゃないのだ",
+      "telop": "通知の瞬間がピーク",
+      "se": "shakin"
+    },
+    {
+      "type": "body",
+      "text": "ショート動画は、この当たるかもをエンドレスに引かせるガチャなのだ",
+      "telop": "無限ガチャ",
+      "emotion": "surprised",
+      "visual": { "kind": "text", "text": "スワイプ\n= ガチャを引く" }
+    },
+    {
+      "type": "body",
+      "text": "だから対策は根性じゃなくて、通知を切って距離を置く設計なのだ",
+      "telop": "根性より設計",
+      "emotion": "happy",
+      "se": "pop"
+    },
+    {
+      "type": "punch",
+      "text": "…と、その縦動画で解説してるのがこの動画なのだ",
+      "telop": "それがこの動画🫠",
+      "emotion": "happy",
+      "se": "don",
+      "pauseAfterSec": 0.8
+    }
+  ]
+}

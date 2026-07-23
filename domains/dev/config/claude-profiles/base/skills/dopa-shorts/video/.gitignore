@@ -1,0 +1,13 @@
+node_modules/
+out/
+.cache/
+
+# 生成物・DL素材はコミットしない(権利・容量)
+public/voices/*
+!public/voices/.gitkeep
+public/images/*
+!public/images/.gitkeep
+public/se/*
+!public/se/.gitkeep
+public/bgm/*
+!public/bgm/.gitkeep
