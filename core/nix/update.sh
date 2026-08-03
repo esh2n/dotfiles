@@ -265,15 +265,11 @@ main() {
         fi
     fi
 
-    # Re-merge Claude Code profile (source settings may have changed)
+    # Re-merge Claude Code config (source settings may have changed)
     local claude_switch="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
     if [[ -x "$claude_switch" ]]; then
-        local current_profile
-        current_profile=$("$claude_switch" current 2>/dev/null | sed 's/Current: //')
-        if [[ -n "$current_profile" && "$current_profile" != "unknown" ]]; then
-            log_info "Re-merging Claude Code profile: $current_profile"
-            bash "$claude_switch" "$current_profile"
-        fi
+        log_info "Re-merging Claude Code config (base + core + packs)..."
+        bash "$claude_switch" apply || log_warn "claude-switch apply failed (non-critical)"
     fi
 
     echo ""

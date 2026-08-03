@@ -251,11 +251,11 @@ phase_config() {
     log_info "Creating symlinks..."
     "${DOTFILES_ROOT}/core/config/manager.sh" link
 
-    # Generate Claude Code settings (settings.json + CLAUDE.md) via profile merge
+    # Generate Claude Code settings (settings.json + CLAUDE.md) via layer merge
     local claude_switch="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
     if [[ -x "$claude_switch" ]]; then
-        log_info "Applying default Claude Code profile (ecc)..."
-        bash "$claude_switch" ecc
+        log_info "Applying Claude Code config (base + core + packs)..."
+        bash "$claude_switch" apply
     fi
 
     ensure_git_identity
