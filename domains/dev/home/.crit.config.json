@@ -1,0 +1,5 @@
+{
+  "base_branch": "main",
+  "notify_on_round_ready": true,
+  "no_update_check": true
+}

@@ -21,9 +21,13 @@
       url = "github:BatteredBunny/brew-api";
       flake = false;
     };
+    crit = {
+      url = "github:tomasz-tomczyk/crit";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { nixpkgs, nix-darwin, home-manager, brew-nix, ... }:
+  outputs = { nixpkgs, nix-darwin, home-manager, brew-nix, crit, ... }:
     let
       # Get username from environment (requires --impure)
       # Falls back to "ci" in pure evaluation (e.g., CI without --impure)
@@ -45,6 +49,7 @@
           {
             nixpkgs.overlays = [
               (import ./overlays.nix)
+              (final: prev: { crit = crit.packages.${system}.default; })
               brew-nix.overlays.default
             ];
             nixpkgs.config.allowUnfree = true;
