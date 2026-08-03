@@ -75,6 +75,26 @@ if echo "$CMD" | grep -qEi "${G}clean[[:space:]]+-[a-z]*f"; then
   deny "git clean -f blocked. Removes untracked files."
 fi
 
+# ---- identity guard --------------------------------------------------------
+# Optional untracked config ~/.config/git/identity-guard: lines of
+# "<email-pattern> <required-remote-pattern>". If the resolved commit email
+# matches a pattern but origin does NOT match its required remote, deny.
+# Prevents a work identity from leaking into personal repos (and vice versa).
+
+IDG="$HOME/.config/git/identity-guard"
+if [ -f "$IDG" ] && echo "$CMD" | grep -qEi "${G}commit"; then
+  EMAIL=$(git -C "${CWD:-.}" config user.email 2>/dev/null)
+  ORIGIN=$(git -C "${CWD:-.}" remote get-url origin 2>/dev/null)
+  if [ -n "$EMAIL" ]; then
+    while read -r pat remote_pat; do
+      case "$pat" in ''|'#'*) continue ;; esac
+      if echo "$EMAIL" | grep -q "$pat" && ! echo "$ORIGIN" | grep -q "$remote_pat"; then
+        deny "Identity mismatch: user.email ($EMAIL) matches a restricted pattern but origin ($ORIGIN) does not. Fix git config user.email before committing."
+      fi
+    done < "$IDG"
+  fi
+fi
+
 # ---- warn-once -------------------------------------------------------------
 # First attempt is denied with the reason fed back to the agent (forcing a
 # reconsideration turn); an identical retry in the same session passes.
