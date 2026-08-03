@@ -11,9 +11,12 @@ export const meta = {
 }
 
 // args: { question: string, context?: string, model?: string }
-const QUESTION = (args && args.question) || ''
-const CONTEXT = (args && args.context) || ''
-const MODEL = (args && args.model) || 'sonnet'
+// Robustness: named-workflow invocation may deliver args as a JSON string.
+let A = args
+if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
+const QUESTION = (A && A.question) || ''
+const CONTEXT = (A && A.context) || ''
+const MODEL = (A && A.model) || 'sonnet'
 if (!QUESTION) { log('research requires args.question'); return { error: 'no question' } }
 
 phase('Plan')
