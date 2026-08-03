@@ -1,3 +1,7 @@
+---
+paths:
+  - "**/*.{js,jsx,ts,tsx,mjs,cjs,go,py,rs,java,kt,kts,swift,rb,php,c,h,cc,cpp,hpp,cs,sh,bash,zsh,fish,lua,zig,scala}"
+---
 # Common Patterns
 
 ## Skeleton Projects

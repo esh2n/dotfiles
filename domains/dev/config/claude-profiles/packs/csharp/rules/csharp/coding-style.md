@@ -2,6 +2,7 @@
 paths:
   - "**/*.cs"
   - "**/*.csx"
+  - "**/*.csproj"
 ---
 # C# Coding Style
 

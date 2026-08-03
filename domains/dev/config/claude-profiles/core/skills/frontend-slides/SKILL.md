@@ -1,7 +1,8 @@
 ---
 name: frontend-slides
 description: Create stunning, animation-rich HTML presentations from scratch or by converting PowerPoint files. Use when the user wants to build a presentation, convert a PPT/PPTX to web, or create slides for a talk/pitch. Helps non-designers discover their aesthetic through visual exploration rather than abstract choices.
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # Frontend Slides
@@ -53,7 +54,7 @@ If the user already knows the desired preset, skip previews and use it directly.
 
 Otherwise:
 1. Ask what feeling the deck should create: impressed, energized, focused, inspired.
-2. Generate **3 single-slide preview files** in `.ecc-design/slide-previews/`.
+2. Generate **3 single-slide preview files** in `.yoki-design/slide-previews/`.
 3. Each preview must be self-contained, show typography/color/motion clearly, and stay under roughly 100 lines of slide content.
 4. Ask the user which preview to keep or what elements to mix.
 
@@ -168,10 +169,10 @@ Use these maxima unless the user explicitly asks for denser slides and readabili
 - fixed-height content boxes that break on short screens
 - invalid negated CSS functions like `-clamp(...)`
 
-## Related ECC Skills
+## Related Skills
 
-- `frontend-patterns` for component and interaction patterns around the deck
-- `liquid-glass-design` when a presentation intentionally borrows Apple glass aesthetics
+- `frontend-craft` for component and interaction patterns around the deck
+- `ui-ux-pro-max` for style, palette, and font-pairing exploration
 - `e2e-testing` if you need automated browser verification for the final deck
 
 ## Deliverable Checklist

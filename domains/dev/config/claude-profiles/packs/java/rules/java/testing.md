@@ -1,6 +1,8 @@
 ---
 paths:
   - "**/*.java"
+  - "**/pom.xml"
+  - "**/build.gradle*"
 ---
 # Java Testing
 

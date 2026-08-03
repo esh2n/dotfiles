@@ -2,6 +2,7 @@
 paths:
   - "**/*.py"
   - "**/*.pyi"
+  - "**/pyproject.toml"
 ---
 # Python Coding Style
 

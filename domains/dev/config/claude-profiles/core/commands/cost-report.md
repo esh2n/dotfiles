@@ -1,12 +1,12 @@
 ---
-description: Generate a local Claude Code cost report from the ECC cost-tracker metrics log.
+description: Generate a local Claude Code cost report from the yoki cost-tracker metrics log.
 argument-hint: [csv]
 ---
 
 # Cost Report
 
 Summarize local Claude Code spend by day, model, and session from the metrics
-log that ECC's `stop:cost-tracker` hook writes.
+log that yoki's `stop:cost-tracker` hook writes.
 
 ## When to Use
 

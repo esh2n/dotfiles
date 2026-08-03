@@ -7,6 +7,7 @@ paths:
   - "**/*.cxx"
   - "**/*.h"
   - "**/CMakeLists.txt"
+  - "**/*.c"
 ---
 # C++ Patterns
 

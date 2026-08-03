@@ -38,6 +38,7 @@ makefile.local
 Makefile.local
 docker-compose.local.yml
 config.local.*
+.yoki.json
 *.local.json
 *.local.yaml
 *.local.yml

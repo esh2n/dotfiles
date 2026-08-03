@@ -1,7 +1,8 @@
 ---
 name: rust-patterns
 description: Idiomatic Rust patterns, ownership, error handling, traits, concurrency, and best practices for building safe, performant applications.
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # Rust Development Patterns
@@ -497,3 +498,30 @@ async fn bad_async() {
 ```
 
 **Remember**: If it compiles, it's probably correct — but only if you avoid `unwrap()`, minimize `unsafe`, and let the type system work for you.
+
+## Build troubleshooting
+
+Cargo-specific diagnostics when `cargo check` fails or dependencies misbehave:
+
+```bash
+# Dependency conflicts
+cargo tree -d                          # show duplicate dependencies
+cargo tree -i some_crate               # invert — who depends on this?
+
+# Feature resolution
+cargo tree -f "{p} {f}"               # features enabled per crate
+cargo check --features "feat1,feat2"  # test a specific feature combination
+
+# Workspace
+cargo check --workspace               # all members
+cargo check -p specific_crate         # single crate
+
+# Lock file
+cargo update -p specific_crate        # update one dependency (preferred)
+cargo update                          # full refresh (last resort)
+```
+
+Edition / MSRV mismatches: check `edition` and `rust-version` in Cargo.toml against
+`rustc --version` — new syntax may require a newer toolchain (e.g. edition 2024 needs
+rustc 1.85+). Never fix borrow-checker errors with `unsafe` or silence type errors
+with `.unwrap()` — propagate with `?`.

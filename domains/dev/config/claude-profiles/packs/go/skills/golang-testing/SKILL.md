@@ -1,7 +1,8 @@
 ---
 name: golang-testing
 description: Go testing patterns including table-driven tests, subtests, benchmarks, fuzzing, and test coverage. Follows TDD methodology with idiomatic Go practices.
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # Go Testing Patterns
@@ -18,14 +19,7 @@ Comprehensive Go testing patterns for writing reliable, maintainable tests follo
 
 ## TDD Workflow for Go
 
-### The RED-GREEN-REFACTOR Cycle
-
-```
-RED     → Write a failing test first
-GREEN   → Write minimal code to pass the test
-REFACTOR → Improve code while keeping tests green
-REPEAT  → Continue with next requirement
-```
+TDDの進め方（RED-GREEN-REFACTORサイクル、カバレッジ基準）は tdd-workflow skill を参照。
 
 ### Step-by-Step TDD in Go
 
@@ -539,15 +533,6 @@ go tool cover -func=coverage.out
 # Coverage with race detection
 go test -race -coverprofile=coverage.out ./...
 ```
-
-### Coverage Targets
-
-| Code Type | Target |
-|-----------|--------|
-| Critical business logic | 100% |
-| Public APIs | 90%+ |
-| General code | 80%+ |
-| Generated code | Exclude |
 
 ### Excluding Generated Code from Coverage
 

@@ -229,3 +229,20 @@ describe('UsersController', () => {
 - Prefer async provider initialization for DB/cache clients with explicit health checks.
 - Keep background jobs and event consumers in their own modules, not inside HTTP controllers.
 - Make rate limiting, auth, and audit logging explicit for public endpoints.
+
+## API design checklist
+
+Before shipping a new endpoint:
+
+- [ ] Resource URL follows naming conventions (plural, kebab-case, no verbs)
+- [ ] Correct HTTP method used (GET for reads, POST for creates, etc.)
+- [ ] Appropriate status codes returned (not 200 for everything)
+- [ ] Input validated with schema (class-validator DTO / Zod)
+- [ ] Error responses follow standard format with codes and messages
+- [ ] Pagination implemented for list endpoints (cursor or offset)
+- [ ] Authentication required (or explicitly marked as public)
+- [ ] Authorization checked (user can only access their own resources)
+- [ ] Rate limiting configured
+- [ ] Response does not leak internal details (stack traces, SQL errors)
+- [ ] Consistent naming with existing endpoints (camelCase vs snake_case)
+- [ ] Documented (OpenAPI/Swagger spec updated)

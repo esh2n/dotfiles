@@ -1,7 +1,8 @@
 ---
 name: golang-patterns
 description: Idiomatic Go patterns, best practices, and conventions for building robust, efficient, and maintainable Go applications.
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # Go Development Patterns
@@ -598,28 +599,25 @@ goimports -w .
 ### Recommended Linter Configuration (.golangci.yml)
 
 ```yaml
+version: "2"
+
 linters:
+  default: standard  # errcheck, govet, ineffassign, staticcheck, unused
   enable:
-    - errcheck
-    - gosimple
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
-    - gofmt
-    - goimports
     - misspell
     - unconvert
     - unparam
+  settings:
+    errcheck:
+      check-type-assertions: true
+    govet:
+      enable:
+        - shadow
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-  govet:
-    check-shadowing: true
-
-issues:
-  exclude-use-default: false
+formatters:
+  enable:
+    - gofmt
+    - goimports
 ```
 
 ## Quick Reference: Go Idioms
@@ -672,3 +670,24 @@ func (c *Counter) Increment() { c.n++ }        // Pointer receiver
 ```
 
 **Remember**: Go code should be boring in the best way - predictable, consistent, and easy to understand. When in doubt, keep it simple.
+
+## Build troubleshooting
+
+Tool-specific diagnostics when `go build ./...` fails:
+
+```bash
+go vet ./...          # suspicious constructs after the build compiles
+staticcheck ./...     # extended static analysis (if installed)
+golangci-lint run     # aggregated linters (if installed)
+go mod verify         # detect corrupted module cache
+go mod tidy -v        # sync go.mod/go.sum with imports
+```
+
+| Error | Fix |
+|-------|-----|
+| `cannot find package` / missing go.sum entry | `go get <pkg>` or `go mod tidy` |
+| `import cycle not allowed` | Extract shared code into a third package; don't merge the two |
+| `X does not implement Y` (pointer receiver) | Pass `&x` — method set of `*T` includes `T`'s, not vice versa |
+| Build works locally, fails in CI | Check `go.mod` `go` directive vs CI toolchain; `GOFLAGS`/`GOWORK` env |
+
+Fix order: build errors → `go vet` → linters. One fix at a time, re-run the build after each.

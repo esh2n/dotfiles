@@ -1,7 +1,8 @@
 ---
 name: rust-testing
 description: Rust testing patterns including unit tests, integration tests, async testing, property-based testing, mocking, and coverage. Follows TDD methodology.
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # Rust Testing Patterns
@@ -28,14 +29,7 @@ Comprehensive Rust testing patterns for writing reliable, maintainable tests fol
 
 ## TDD Workflow for Rust
 
-### The RED-GREEN-REFACTOR Cycle
-
-```
-RED     → Write a failing test first
-GREEN   → Write minimal code to pass the test
-REFACTOR → Improve code while keeping tests green
-REPEAT  → Continue with next requirement
-```
+TDDの進め方（RED-GREEN-REFACTORサイクル、カバレッジ基準）は tdd-workflow skill を参照。
 
 ### Step-by-Step TDD in Rust
 
@@ -429,15 +423,6 @@ cargo llvm-cov --html             # HTML report
 cargo llvm-cov --lcov > lcov.info # LCOV format for CI
 cargo llvm-cov --fail-under-lines 80  # Fail if below threshold
 ```
-
-### Coverage Targets
-
-| Code Type | Target |
-|-----------|--------|
-| Critical business logic | 100% |
-| Public API | 90%+ |
-| General code | 80%+ |
-| Generated / FFI bindings | Exclude |
 
 ## Testing Commands
 

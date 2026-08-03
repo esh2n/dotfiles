@@ -6,6 +6,23 @@ Rules are composed by `claude-switch` into `~/.claude/rules/`:
 - `<language>/` — provided by language packs; present only when the pack is
   enabled (`claude-switch pack list`)
 
+## Conditional Loading (`paths:` frontmatter)
+
+Every rule file carries a `paths:` frontmatter block — a YAML list of glob
+patterns. The rule is loaded only when a file matching one of its globs is
+accessed, instead of being always-on:
+
+```yaml
+---
+paths:
+  - "**/*.go"
+  - "**/go.mod"
+---
+```
+
+The one deliberate exception is `common/git-workflow.md`, which stays
+always-on: commit conventions have no file trigger.
+
 ## Rule Priority
 
 When language-specific rules and common rules conflict, **language-specific

@@ -2,6 +2,7 @@
 paths:
   - "**/*.kt"
   - "**/*.kts"
+  - "**/build.gradle*"
 ---
 # Kotlin Security
 

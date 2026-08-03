@@ -1,7 +1,8 @@
 ---
 name: ai-regression-testing
-description: Regression testing strategies for AI-assisted development. Sandbox-mode API testing without database dependencies, automated bug-check workflows, and patterns to catch AI blind spots where the same model writes and reviews code.
-origin: ECC
+description: Use when an AI agent has modified API routes or backend logic, when a fixed bug needs a regression guard, or when reviewing AI-written code for blind spots — the same model writing and reviewing code misses systematic errors that only automated regression tests catch.
+metadata:
+  origin: ECC
 ---
 
 # AI Regression Testing

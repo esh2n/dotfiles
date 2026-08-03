@@ -9,7 +9,6 @@ description: Create a richly formatted explanation document as Markdown with cus
 
 この skill はコードを持たない薄い指示書である。語彙・デザインの仕様 (契約) は explain-pages リポジトリ側にあり、必ず実行時に読むこと。
 
-NOTE: このファイルが正本。`~/dotfiles` の ECC profile (`skills/explain-page/SKILL.md`) に同内容のコピーがあり、変更時は両方を更新する。
 
 ## 前提
 

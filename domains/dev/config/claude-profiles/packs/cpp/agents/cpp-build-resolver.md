@@ -38,6 +38,8 @@ cppcheck --enable=all src/ 2>/dev/null || echo "cppcheck not available"
 5. ctest --test-dir build -> Ensure nothing broke
 ```
 
+Fix order: compilation errors first (code must compile), then linker errors (undefined references), then warnings (`-Wall -Wextra`). One fix at a time.
+
 ## Common Fix Patterns
 
 | Error | Cause | Fix |

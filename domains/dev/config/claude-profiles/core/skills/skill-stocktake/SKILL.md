@@ -1,11 +1,13 @@
 ---
+name: skill-stocktake
 description: "Use when auditing Claude skills and commands for quality. Supports Quick Scan (changed skills only) and Full Stocktake modes with sequential subagent batch evaluation."
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # skill-stocktake
 
-Slash command (`/skill-stocktake`) that audits all Claude skills and commands using a quality checklist + AI holistic judgment. Supports two modes: Quick Scan for recently changed skills, and Full Stocktake for a complete review.
+Skill (invoked via the Skill tool as `skill-stocktake`) that audits all Claude skills and commands using a quality checklist + AI holistic judgment. Supports two modes: Quick Scan for recently changed skills, and Full Stocktake for a complete review.
 
 ## Scope
 
@@ -24,7 +26,7 @@ To include project-level skills, run from that project's root directory:
 
 ```bash
 cd ~/path/to/my-project
-/skill-stocktake
+# then invoke the skill-stocktake skill (Skill tool)
 ```
 
 If the project has no `.claude/skills/` directory, only global skills and commands are evaluated.
@@ -34,7 +36,7 @@ If the project has no `.claude/skills/` directory, only global skills and comman
 | Mode | Trigger | Duration |
 |------|---------|---------|
 | Quick Scan | `results.json` exists (default) | 5–10 min |
-| Full Stocktake | `results.json` absent, or `/skill-stocktake full` | 20–30 min |
+| Full Stocktake | `results.json` absent, or skill invoked with arg `full` | 20–30 min |
 
 **Results cache:** `~/.claude/skills/skill-stocktake/results.json`
 
@@ -69,8 +71,10 @@ Scanning:
   ✗ {cwd}/.claude/skills/    (not found — global skills only)
 ```
 
-| Skill | 7d use | 30d use | Description |
-|-------|--------|---------|-------------|
+| Skill | Description |
+|-------|-------------|
+
+使用実績の集計列は設けない（使用実績は claude-mem 等から手動確認する）。
 
 ### Phase 2 — Quality Evaluation
 
@@ -144,8 +148,8 @@ Evaluation is **holistic AI judgment** — not a numeric rubric. Guiding dimensi
 
 ### Phase 3 — Summary Table
 
-| Skill | 7d use | Verdict | Reason |
-|-------|--------|---------|--------|
+| Skill | Verdict | Reason |
+|-------|---------|--------|
 
 ### Phase 4 — Consolidation
 

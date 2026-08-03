@@ -4,6 +4,10 @@ paths:
   - "**/*.tsx"
   - "**/*.js"
   - "**/*.jsx"
+  - "**/*.mts"
+  - "**/*.cts"
+  - "**/package.json"
+  - "**/tsconfig*.json"
 ---
 # TypeScript/JavaScript Coding Style
 

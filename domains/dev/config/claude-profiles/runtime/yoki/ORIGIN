@@ -1,0 +1,4 @@
+name: yoki (良き) — harness & loop & graph pack for Claude Code
+heritage: originally vendored from https://github.com/affaan-m/everything-claude-code
+last-upstream-commit: 81af40761939056ab3dc54732fd4f562a27309d0
+detached: 2026-08-03 (upstream tracking retired; maintained independently)

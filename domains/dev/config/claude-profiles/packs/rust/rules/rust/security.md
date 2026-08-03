@@ -1,6 +1,7 @@
 ---
 paths:
   - "**/*.rs"
+  - "**/Cargo.toml"
 ---
 # Rust Security
 

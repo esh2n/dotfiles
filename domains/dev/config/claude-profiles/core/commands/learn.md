@@ -6,7 +6,7 @@ description: "Extract reusable patterns from the session, self-evaluate quality 
 
 Analyze the current session, extract patterns worth saving as skills, run them through a quality gate, and save to the right location (Global vs Project).
 
-Relationship: `/learn` = manual extraction from the current session; the observe hook + `/evolve` handle automatic instinct capture/promotion.
+Relationship: `/learn` is the distillation step of correction-driven learning. The `correction-detect` Stop hook records user corrections to `~/.claude/homunculus/corrections.jsonl`; this command turns them (and anything else worth keeping from the session) into durable skills/rules.
 
 ## When to Use
 
@@ -23,6 +23,12 @@ Relationship: `/learn` = manual extraction from the current session; the observe
 
 ## Process
 
+0. **Read pending corrections** — run:
+   `grep -h . ~/.claude/homunculus/corrections.jsonl 2>/dev/null | tail -20`
+   Filter to entries matching the current cwd/session where relevant. Each unprocessed
+   correction is a candidate for extraction (the user pushed back for a reason — that
+   reason is usually a durable rule). After extracting from an entry, append its `ts`
+   to `~/.claude/homunculus/corrections.processed` so future runs skip it.
 1. Review the session for extractable patterns
 2. Identify the most valuable/reusable insight
 

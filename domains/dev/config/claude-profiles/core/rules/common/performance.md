@@ -1,3 +1,7 @@
+---
+paths:
+  - "**/.claude/**"
+---
 # Performance Optimization
 
 ## Model Selection Strategy

@@ -1,3 +1,7 @@
+---
+paths:
+  - "**/*.{js,jsx,ts,tsx,mjs,cjs,go,py,rs,java,kt,kts,swift,rb,php,c,h,cc,cpp,hpp,cs,sh,bash,zsh,fish,lua,zig,scala}"
+---
 # Testing Requirements
 
 ## Minimum Test Coverage: 80%
@@ -15,11 +19,7 @@ verify 80%+ coverage. Full workflow, plan handoff, and checkpoints: see the
 
 ## Troubleshooting Test Failures
 
-1. Use **tdd-guide** agent
+1. Follow the **tdd-workflow** skill
 2. Check test isolation
 3. Verify mocks are correct
 4. Fix implementation, not tests (unless tests are wrong)
-
-## Agent Support
-
-- **tdd-guide** - Use PROACTIVELY for new features, enforces write-tests-first

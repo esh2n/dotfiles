@@ -1,7 +1,8 @@
 ---
 name: mcp-server-patterns
 description: Build MCP servers with Node/TypeScript SDK — tools, resources, prompts, Zod validation, stdio vs Streamable HTTP. Verify against official MCP docs (modelcontextprotocol.io) — the SDK API evolves rapidly.
-origin: ECC
+metadata:
+  origin: ECC
 ---
 
 # MCP Server Patterns

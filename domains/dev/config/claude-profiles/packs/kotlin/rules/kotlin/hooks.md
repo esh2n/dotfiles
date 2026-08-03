@@ -2,7 +2,7 @@
 paths:
   - "**/*.kt"
   - "**/*.kts"
-  - "**/build.gradle.kts"
+  - "**/build.gradle*"
 ---
 # Kotlin Hooks
 
