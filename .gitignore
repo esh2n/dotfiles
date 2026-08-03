@@ -212,3 +212,8 @@ domains/dev/config/claude/version-cache.json.lock
 **/herdr/*.sock
 **/herdr/session.json
 **/herdr/.plugins.lock
+
+# machine-local state (never commit)
+domains/dev/config/claude/.cache/
+domains/dev/config/claude/workflows
+domains/dev/config/git/identity-guard
