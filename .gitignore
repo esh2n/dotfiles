@@ -192,6 +192,14 @@ domains/dev/config/claude/metrics/
 domains/dev/config/claude/chrome/chrome-native-host
 domains/dev/config/claude/teams/
 
+# Claude Code runtime state. ~/.claude is a symlink into this repo, so anything
+# the CLI writes at runtime lands in the working tree. daemon/ holds a control
+# key and uploads/ holds pasted images — neither belongs in git.
+domains/dev/config/claude/daemon/
+domains/dev/config/claude/daemon.log
+domains/dev/config/claude/jobs/
+domains/dev/config/claude/uploads/
+
 # Zed editor state
 **/zed/prompts/prompts-library-db.0.mdb/lock.mdb
 
