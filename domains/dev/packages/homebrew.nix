@@ -11,7 +11,6 @@
     "dlvhdr/formulae/diffnav"
     "noborus/tap/ov"
     "sesh"
-    "codex"
     "herdr" # not in nixpkgs
     "hunk" # not in nixpkgs
   ];
@@ -19,5 +18,8 @@
   homebrew.casks = [
     "android-studio"
     "warp"
+    # codex ships as a cask only — there is no `codex` formula, so listing it
+    # under brews made `brew bundle` fail and left the install unmanaged.
+    "codex"
   ];
 }
