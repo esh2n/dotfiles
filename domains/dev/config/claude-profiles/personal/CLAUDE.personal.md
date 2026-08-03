@@ -2,13 +2,16 @@
 
 ## Git Conventions — IMPORTANT
 
-- NEVER commit or push without explicit user instruction
+These mirror what `hooks/git-guard.sh` enforces — the hook is the authority.
+
+- Commit at your own discretion once a unit of work is complete; do not stop to ask
+- Push freely on feature branches; NEVER push to main/master
+- NEVER force push (`-f` / `--force`)
 - NEVER add `Co-Authored-By` or any trailer mentioning AI/Claude
 - NEVER use grandiose language ("revolutionize", "dramatically", "comprehensive overhaul")
 - Format: `<type>(<scope>): <subject>` — 1行、英語、簡潔
 - Subject is lowercase, no period, max 50 chars
 - NEVER create a PR without explicit user instruction
-- NEVER push directly to main/master
 
 ## Security Rules (NEVER)
 
