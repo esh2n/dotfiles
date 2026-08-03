@@ -4,7 +4,6 @@
     "allow": [
       "Read(**)",
       "Grep(**)",
-      "Glob(**)",
       "LS(**)",
       "TodoRead(**)",
       "TodoWrite(**)",
@@ -73,13 +72,6 @@
       "Edit(./**)",
       "Edit(~/.claude/**)",
       "Edit(~/.config/**)",
-      "Write(./**)",
-      "Write(~/.claude/**)",
-      "Write(~/.config/**)",
-      "MultiEdit(./**)",
-      "MultiEdit(~/.claude/**)",
-      "MultiEdit(~/.config/**)",
-      "NotebookEdit(./**)",
       "WebFetch(domain:*)"
     ]
   },
