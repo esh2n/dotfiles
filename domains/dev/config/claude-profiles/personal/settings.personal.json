@@ -257,6 +257,11 @@
             "type": "command",
             "command": "bash ~/.claude/hooks/yoki-project-hint.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/herdr-agent-state.sh session",
+            "timeout": 10
           }
         ]
       }

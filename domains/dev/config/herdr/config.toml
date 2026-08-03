@@ -1,6 +1,7 @@
 # Docs: https://herdr.dev/docs/configuration/
 # Symlinked to ~/.config/herdr/config.toml by manager.sh.
 # Herdr's default keymap is already tmux-like; only the deltas from our setup follow.
+# Requires herdr >= 0.7.4 (popup panes, sidebar row layouts).
 
 onboarding = false
 
@@ -11,11 +12,32 @@ new_cwd = "follow"
 [theme]
 name = "catppuccin"
 
+[update]
+# The binary comes from Homebrew (see domains/dev/packages/homebrew.nix), so
+# herdr must not offer to update itself — a self-update would drift from the
+# Cellar and get clobbered by the next `brew upgrade`. Bump via brew instead.
+version_check = false
+
 # Desktop notification when an agent finishes or needs input.
 # "terminal" lets the outer terminal (Ghostty/WezTerm) own it, which also works over SSH.
 # Sound is already on by default ([ui.sound] enabled); set enabled=false on shared machines.
 [ui.toast]
 delivery = "terminal"
+
+[ui]
+# With splits open, label each pane border with the agent detected inside it.
+show_agent_labels_on_pane_borders = true
+
+# Order the agent panel by attention needed rather than by space.
+# agent_panel_sort = "priority"
+
+# Hide the tab row while a workspace has only one tab.
+# hide_tab_bar_when_single_tab = true
+
+# Claude Code panes get an extra row showing the live turn title, so the
+# sidebar says what the agent is doing, not just that it is busy.
+[ui.sidebar.agents.rows_by_agent]
+claude = [["state_icon", "workspace", "tab"], ["terminal_title_stripped"], ["agent"]]
 
 [keys]
 prefix = "ctrl+q"                     # default: ctrl+b
@@ -23,3 +45,64 @@ split_vertical = "prefix+backslash"  # tmux: prefix \
 split_horizontal = "prefix+minus"    # tmux: prefix -
 previous_tab = "alt+h"               # tmux: M-h
 next_tab = "alt+l"                   # tmux: M-l
+
+# Workspaces are the vertical axis in the sidebar, tabs the horizontal one,
+# so alt+j/k pairs with the alt+h/l above.
+previous_workspace = "alt+k"
+next_workspace = "alt+j"
+
+# prefix+p is free because previous_tab moved to alt+h.
+last_pane = "prefix+p"
+
+# Jump straight to an agent row instead of walking panes.
+focus_agent = "prefix+alt+1..9"
+
+# Floating panes. type="popup" is session-modal and leaves the tab layout alone.
+# Popups take no cwd key, so each command cds itself; herdr injects
+# HERDR_ACTIVE_PANE_CWD for the focused pane. Without it lazygit would open
+# against whichever repo the server happened to start in.
+
+# Editor
+[[keys.command]]
+key = "prefix+alt+e"
+type = "popup"
+command = 'cd "${HERDR_ACTIVE_PANE_CWD:-$HOME}" && nvim'
+width = "92%"
+height = "92%"
+
+# Git
+[[keys.command]]
+key = "prefix+alt+g"
+type = "popup"
+command = 'cd "${HERDR_ACTIVE_PANE_CWD:-$HOME}" && lazygit'
+width = "90%"
+height = "90%"
+
+# Files
+[[keys.command]]
+key = "prefix+f"
+type = "popup"
+command = 'cd "${HERDR_ACTIVE_PANE_CWD:-$HOME}" && yazi'
+width = "85%"
+height = "85%"
+
+# Scratch shell
+[[keys.command]]
+key = "prefix+t"
+type = "popup"
+command = 'cd "${HERDR_ACTIVE_PANE_CWD:-$HOME}" && exec $SHELL'
+width = "70%"
+height = "60%"
+
+[experimental]
+# Prefix chords stop registering while a Japanese IME is active, because the
+# IME swallows the keystroke. Bounce the macOS input source to ASCII for the
+# duration of prefix mode, then restore it.
+switch_ascii_input_source_in_prefix = true
+
+# Claude Code and Codex paint their own cursor, which hides the real one and
+# leaves the IME candidate window stranded at the wrong spot. Expose the cursor
+# to the outer terminal so henkan tracks the caret. Scoped to those two agents
+# so vim's normal mode does not grow a second cursor.
+reveal_hidden_cursor_for_cjk_ime = true
+cjk_ime_agents = ["claude", "codex"]
