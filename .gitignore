@@ -211,3 +211,4 @@ domains/dev/config/claude/version-cache.json.lock
 **/herdr/*.log
 **/herdr/*.sock
 **/herdr/session.json
+**/herdr/.plugins.lock
