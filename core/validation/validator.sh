@@ -123,8 +123,19 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/portability.sh"
             run_portability_checks
             ;;
+        "merge-settings")
+            source "${SCRIPT_DIR}/test-merge-settings.sh"
+            run_merge_settings_checks
+            ;;
+        "git-guard")
+            source "${SCRIPT_DIR}/test-git-guard.sh"
+            run_git_guard_checks
+            ;;
+        "workday-calc")
+            uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
+            ;;
         *)
-            echo "Usage: $0 {pre|post|portability}"
+            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|workday-calc}"
             exit 1
             ;;
     esac

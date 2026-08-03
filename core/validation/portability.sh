@@ -169,13 +169,13 @@ run_portability_checks() {
     echo ""
     log_info "--- 7. Skills: No hardcoded user paths ---"
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/dev/config/claude-profiles/base/skills/morning-brief/SKILL.md" \
+        "$DOTFILES_ROOT/domains/dev/config/claude-profiles/personal/skills/morning-brief/SKILL.md" \
         "morning-brief should use variable paths" || true
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/dev/config/claude-profiles/base/skills/workday-calc/SKILL.md" \
+        "$DOTFILES_ROOT/domains/dev/config/claude-profiles/personal/skills/workday-calc/SKILL.md" \
         "workday-calc should use variable paths" || true
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/dev/config/claude-profiles/base/skills/workday-input/SKILL.md" \
+        "$DOTFILES_ROOT/domains/dev/config/claude-profiles/personal/skills/workday-input/SKILL.md" \
         "workday-input should use variable paths" || true
 
     echo ""

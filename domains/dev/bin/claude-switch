@@ -4,14 +4,15 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # Claude Code Config Composer (packs edition)
 # -----------------------------------------------------------------------------
-# Composes ~/.claude from three layers:
-#   base/   — personal, always-on skills/hooks/commands/scripts
-#   core/   — curated universal content (vendored from ECC, see ECC_VERSION)
-#   packs/  — optional per-language/domain sets, toggled per machine
+# Composes ~/.claude from three layers, weakest to strongest:
+#   core/     — curated universal defaults (always on)
+#   packs/    — optional per-language/domain sets, toggled per machine
+#   personal/ — personal skills/hooks/commands/settings; merged LAST so the
+#               personal layer always wins name collisions and settings keys
 #
 # Enabled packs live in ~/.claude/.claude-packs (seeded from packs.default).
-# Hook runtime is vendored under runtime/ecc — no external checkout needed.
-# `ecc-sync` (maintainer only) refreshes runtime/ from the upstream ECC repo.
+# Hook runtime lives under runtime/yoki (originally vendored from
+# everything-claude-code, now maintained independently — see runtime/yoki/ORIGIN).
 # -----------------------------------------------------------------------------
 
 # Resolve DOTFILES_ROOT from script's own location (works via symlink)
@@ -50,17 +51,17 @@ if [[ -z "$PROFILES_DIR" ]]; then
     exit 1
 fi
 
-CLAUDE_DIR="$HOME/.claude"
-CURSOR_DIR="$HOME/.cursor"
-BASE_DIR="$PROFILES_DIR/base"
+CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+CURSOR_DIR="${CURSOR_DIR:-$HOME/.cursor}"
+PERSONAL_DIR="$PROFILES_DIR/personal"
 CORE_DIR="$PROFILES_DIR/core"
 PACKS_DIR="$PROFILES_DIR/packs"
-RUNTIME_DIR="$PROFILES_DIR/runtime/ecc"
+RUNTIME_DIR="$PROFILES_DIR/runtime/yoki"
 PACKS_FILE="$CLAUDE_DIR/.claude-packs"
 PACKS_DEFAULT="$PROFILES_DIR/packs.default"
 
-# Components merged across base + core + enabled packs
-MERGE_DIRS=(skills hooks scripts commands agents rules)
+# Components merged across core + enabled packs + personal (personal wins)
+MERGE_DIRS=(skills hooks scripts commands agents rules workflows)
 
 # -----------------------------------------------------------------------------
 # pack helpers
@@ -100,45 +101,51 @@ validate_pack() {
 }
 
 # -----------------------------------------------------------------------------
-# merge settings.json (base + core layer → output)
+# merge settings.json (core layer ← personal → output; personal wins)
 # -----------------------------------------------------------------------------
 merge_settings() {
-    local base="$BASE_DIR/settings.base.json"
     local layer="$CORE_DIR/settings.layer.json"
+    local personal="$PERSONAL_DIR/settings.personal.json"
     local output="$CLAUDE_DIR/settings.json"
 
-    if [[ ! -f "$base" ]]; then
-        log_error "Base settings not found: $base"
-        exit 1
-    fi
     if [[ ! -f "$layer" ]]; then
         log_error "Core settings not found: $layer"
+        exit 1
+    fi
+    if [[ ! -f "$personal" ]]; then
+        log_error "Personal settings not found: $personal"
         exit 1
     fi
 
     local dotfiles_parent
     dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
 
+    # Precedence: personal wins every scalar/object key (core is defaults).
+    # deny is a UNION (both layers are self-maintained; deny-more is safer).
+    # hooks: personal entries run FIRST — guards (git-guard) must see the
+    # original command before any rewriter hooks (rtk-rewrite) touch it.
     jq -s '
-      .[0] as $base | .[1] as $layer |
-      ($base * $layer) |
+      .[0] as $layer | .[1] as $personal |
+      ($layer * $personal) |
       .permissions.allow = (
-        ($base.permissions.allow // []) + ($layer.permissions.allow // []) | unique
+        ($layer.permissions.allow // []) + ($personal.permissions.allow // []) | unique
       ) |
-      .permissions.deny = ($base.permissions.deny // []) |
+      .permissions.deny = (
+        ($layer.permissions.deny // []) + ($personal.permissions.deny // []) | unique
+      ) |
       .hooks = (
-        ($base.hooks // {}) as $bh | ($layer.hooks // {}) as $lh |
-        ($bh | keys) + ($lh | keys) | unique |
-        map(. as $k | {($k): (($bh[$k] // []) + ($lh[$k] // []))}) |
+        ($personal.hooks // {}) as $ph | ($layer.hooks // {}) as $lh |
+        ($ph | keys) + ($lh | keys) | unique |
+        map(. as $k | {($k): (($ph[$k] // []) + ($lh[$k] // []))}) |
         add // {}
       ) |
-      .mcpServers = (($base.mcpServers // {}) + ($layer.mcpServers // {})) |
-      .enabledPlugins = (($base.enabledPlugins // {}) + ($layer.enabledPlugins // {})) |
+      .mcpServers = (($layer.mcpServers // {}) + ($personal.mcpServers // {})) |
+      .enabledPlugins = (($layer.enabledPlugins // {}) + ($personal.enabledPlugins // {})) |
       .extraKnownMarketplaces = (
-        ($base.extraKnownMarketplaces // {}) + ($layer.extraKnownMarketplaces // {})
+        ($layer.extraKnownMarketplaces // {}) + ($personal.extraKnownMarketplaces // {})
       ) |
-      .env = (($base.env // {}) + ($layer.env // {}))
-    ' "$base" "$layer" \
+      .env = (($layer.env // {}) + ($personal.env // {}))
+    ' "$layer" "$personal" \
       | sed "s|{{DOTFILES_PARENT}}|${dotfiles_parent}|g" \
       | sed "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT:-$HOME/dotfiles}|g" \
       | sed "s|{{HOME}}|${HOME}|g" \
@@ -146,26 +153,27 @@ merge_settings() {
 }
 
 # -----------------------------------------------------------------------------
-# merge CLAUDE.md (base + core layer → output)
+# merge CLAUDE.md (core layer first, personal last — specific overrides general)
 # -----------------------------------------------------------------------------
 merge_claude_md() {
-    local base="$BASE_DIR/CLAUDE.base.md"
     local layer="$CORE_DIR/CLAUDE.layer.md"
+    local personal="$PERSONAL_DIR/CLAUDE.personal.md"
     local output="$CLAUDE_DIR/CLAUDE.md"
 
-    if [[ -f "$base" && -f "$layer" ]]; then
-        cat "$base" > "$output"
+    if [[ -f "$layer" && -f "$personal" ]]; then
+        cat "$layer" > "$output"
         printf "\n\n" >> "$output"
-        cat "$layer" >> "$output"
-    elif [[ -f "$base" ]]; then
-        cp "$base" "$output"
+        cat "$personal" >> "$output"
+    elif [[ -f "$personal" ]]; then
+        cp "$personal" "$output"
     elif [[ -f "$layer" ]]; then
         cp "$layer" "$output"
     fi
 }
 
 # -----------------------------------------------------------------------------
-# merge_dir: base/{dir} + core/{dir} + packs/<enabled>/{dir} → staging symlinks
+# merge_dir: core/{dir} + packs/<enabled>/{dir} + personal/{dir} → staging
+# symlinks. Later sources overwrite same names, so personal always wins.
 # -----------------------------------------------------------------------------
 merge_dir() {
     local dir_name="$1"; shift
@@ -180,11 +188,12 @@ merge_dir() {
     fi
 
     local total=0
-    local -a sources=("$BASE_DIR/$dir_name" "$CORE_DIR/$dir_name")
+    local -a sources=("$CORE_DIR/$dir_name")
     local p
-    for p in "${packs[@]}"; do
+    for p in "${packs[@]+"${packs[@]}"}"; do
         sources+=("$PACKS_DIR/$p/$dir_name")
     done
+    sources+=("$PERSONAL_DIR/$dir_name")
 
     local src item name
     for src in "${sources[@]}"; do
@@ -224,7 +233,7 @@ link_cursor_rules() {
 }
 
 # -----------------------------------------------------------------------------
-# apply: rebuild ~/.claude from base + core + enabled packs
+# apply: rebuild ~/.claude from core + enabled packs + personal
 # -----------------------------------------------------------------------------
 apply() {
     local -a packs=()
@@ -237,13 +246,13 @@ apply() {
         fi
     done < <(enabled_packs)
 
-    log_info "Applying: base + core + packs(${packs[*]:-none})"
+    log_info "Applying: core + packs(${packs[*]:-none}) + personal"
 
     merge_settings
-    log_success "Merged settings.json (base + core)"
+    log_success "Merged settings.json (core + personal, personal wins)"
 
     merge_claude_md
-    log_success "Merged CLAUDE.md (base + core)"
+    log_success "Merged CLAUDE.md (core + personal)"
 
     local dir
     for dir in "${MERGE_DIRS[@]}"; do
@@ -313,60 +322,6 @@ interactive() {
 }
 
 # -----------------------------------------------------------------------------
-# ecc-sync: refresh runtime/ (and report content drift) from upstream ECC repo
-# Maintainer-only; regular users of the dotfiles never need this.
-# -----------------------------------------------------------------------------
-ecc_sync() {
-    local ref="${1:-origin/main}"
-    local dotfiles_parent
-    dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
-    local ecc_repo="${ECC_ROOT:-${dotfiles_parent}/everything-claude-code}"
-
-    if [[ ! -d "$ecc_repo/.git" ]]; then
-        log_error "ECC repo not found: $ecc_repo (clone affaan-m/everything-claude-code or set ECC_ROOT)"
-        exit 1
-    fi
-
-    log_info "Fetching $ecc_repo ..."
-    git -C "$ecc_repo" fetch --quiet origin
-
-    local sha
-    sha="$(git -C "$ecc_repo" rev-parse "$ref")"
-    local old_sha=""
-    [[ -f "$PROFILES_DIR/ECC_VERSION" ]] && old_sha="$(grep '^commit:' "$PROFILES_DIR/ECC_VERSION" | awk '{print $2}')"
-
-    if [[ "$sha" == "$old_sha" ]]; then
-        log_success "runtime already at $ref ($sha) — nothing to sync"
-        return 0
-    fi
-
-    local paths=(scripts/hooks scripts/lib skills/continuous-learning-v2 .cursor/rules LICENSE)
-    log_info "Syncing runtime from $ref (${sha:0:12}) ..."
-    local d
-    for d in scripts/hooks scripts/lib skills/continuous-learning-v2 .cursor/rules; do
-        /bin/rm -rf "${RUNTIME_DIR:?}/$d"
-    done
-    mkdir -p "$RUNTIME_DIR"
-    git -C "$ecc_repo" archive "$sha" -- "${paths[@]}" | tar -x -C "$RUNTIME_DIR"
-
-    {
-        echo "source: https://github.com/affaan-m/everything-claude-code"
-        echo "commit: $sha"
-        echo "synced: $(date +%Y-%m-%d)"
-        echo "paths: ${paths[*]}"
-    } > "$PROFILES_DIR/ECC_VERSION"
-
-    log_success "runtime updated → $sha"
-    if [[ -n "$old_sha" ]]; then
-        echo ""
-        log_info "Upstream content changes since last sync (review manually if interested):"
-        git -C "$ecc_repo" diff --stat "$old_sha" "$sha" -- skills agents commands rules 2>/dev/null | tail -1 || true
-        log_info "  git -C $ecc_repo log --oneline $old_sha..$sha -- skills agents commands rules"
-    fi
-    log_info "Run 'claude-switch apply' to activate, then smoke-test a session."
-}
-
-# -----------------------------------------------------------------------------
 # status output
 # -----------------------------------------------------------------------------
 show_status() {
@@ -384,10 +339,10 @@ show_status() {
             echo "  [ ] $p"
         fi
     done < <(available_packs)
-    if [[ -f "$PROFILES_DIR/ECC_VERSION" ]]; then
+    if [[ -f "$RUNTIME_DIR/ORIGIN" ]]; then
         echo ""
-        echo "Runtime (vendored ECC):"
-        sed 's/^/  /' "$PROFILES_DIR/ECC_VERSION"
+        echo "Runtime (yoki):"
+        sed 's/^/  /' "$RUNTIME_DIR/ORIGIN"
     fi
 }
 
@@ -439,10 +394,11 @@ case "${1:-}" in
         show_status
         ;;
     ecc-sync)
-        ecc_sync "${2:-}"
+        log_warn "ecc-sync is retired — runtime/yoki is maintained independently (upstream detached)."
+        exit 1
         ;;
     ecc|custom)
-        log_warn "Profiles are gone — config is now base + core + packs."
+        log_warn "Profiles are gone — config is now core + packs + personal."
         log_warn "Use 'claude-switch pack list' to see packs. Applying current selection..."
         apply
         ;;
@@ -450,14 +406,13 @@ case "${1:-}" in
         echo "Usage: claude-switch [command]"
         echo ""
         echo "  (no args)                     Interactive pack selection, then apply"
-        echo "  apply                         Rebuild ~/.claude from base + core + enabled packs"
+        echo "  apply                         Rebuild ~/.claude from core + enabled packs + personal"
         echo "  pack list                     Show enabled/available packs"
         echo "  pack enable <pack>...         Enable pack(s) and apply"
         echo "  pack disable <pack>...        Disable pack(s) and apply"
         echo "  status                        Same as 'pack list'"
-        echo "  ecc-sync [ref]                (maintainer) refresh vendored runtime from ECC repo"
         echo ""
-        echo "Layers: base (personal, always on) + core (universal) + packs (per language/domain)"
+        echo "Layers: core (universal) + packs (per language/domain) + personal (highest precedence, always on)"
         echo "Enabled packs: ~/.claude/.claude-packs (defaults: packs.default)"
         exit 1
         ;;
