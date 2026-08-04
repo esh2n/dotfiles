@@ -242,7 +242,12 @@ if (DELIVERY !== 'none' && succeeded.length > 0) {
 Succeeded tasks:
 ${taskSummary}
 ${DELIVERY === 'draft-pr'
-    ? `3. Push the branch: git push -u origin ${branch}\n4. Open a draft PR: gh pr create --draft. Title: a short summary derived from the task list above. Body: a per-task status line for every task (done/failed/blocked/skipped-dep) plus a short test-evidence summary per succeeded task, ending with this exact line on its own: "🤖 Generated with [Claude Code](https://claude.com/claude-code)".`
+    ? `3. Push the branch: git push -u origin ${branch}
+4. Determine the PR conventions BEFORE writing anything:
+   a. Look for a PR template (.github/PULL_REQUEST_TEMPLATE.md, .github/pull_request_template.md, .github/PULL_REQUEST_TEMPLATE/*.md, docs/pull_request_template.md). If one exists, follow its structure exactly.
+   b. If none exists, study the repo's own precedent: gh pr list --state merged --limit 5 --json title,body — mirror the observed title style and body structure. Do not import conventions the repo does not use.
+5. Open a draft PR: gh pr create --draft. Title: follow the convention found in step 4 (fallback: short conventional-style summary of the task list). Body: template/precedent structure, containing a per-task status line for every task (done/failed/blocked/skipped-dep) and a short test-evidence summary per succeeded task, ending with this exact line on its own: "🤖 Generated with [Claude Code](https://claude.com/claude-code)".
+6. Writing quality: if the PR text is Japanese, load the natural-japanese skill (Skill tool) and apply its rules — natural phrasing, no AI-sounding boilerplate, lead with the conclusion. English text: plain and concrete, no grandiose wording.`
     : 'Do NOT push and do NOT open a PR — commit locally only.'}
 Constraints: this repo's git-guard permits commit/push on a feature branch. Do NOT push to main or master, and NEVER force-push, regardless of what goes wrong.
 On any git or gh command failure, stop that step and report exactly what already succeeded (fail-open reporting) — do not retry failed git/gh commands.
