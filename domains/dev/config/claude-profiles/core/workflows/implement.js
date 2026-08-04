@@ -1,17 +1,22 @@
 export const meta = {
   name: 'implement',
-  description: 'Batch-execute an agreed task list: dependency waves computed in code, file-overlap-aware parallelism in one working tree, per-task verify+retry with test evidence',
+  description: 'Batch-execute an agreed task list: dependency waves computed in code, file-overlap-aware parallelism in one working tree, per-task verify+retry with test evidence, optional delivery (commit / draft-pr) as a final phase',
   whenToUse: 'You already have an agreed task list (from /sdd tasks or a plan) and want it executed with per-task quality gates instead of one long prose run',
   phases: [
     { title: 'Load', detail: 'read task file + project grounding' },
     { title: 'Schedule', detail: 'topological waves, file-overlap batching (pure code)' },
     { title: 'Implement', detail: 'per task: implement -> verify diff -> retry once' },
     { title: 'Gate', detail: 'full lint/typecheck/test run at the end' },
+    { title: 'Deliver', detail: 'commit / draft-pr, only when requested and something succeeded' },
   ],
 }
 
 // args: { tasks?: [{id,title,spec,files?,deps?}], tasksFile?: string,
-//         rules?: [path], docs?: [path], model?: string, max_retry?: number }
+//         rules?: [path], docs?: [path], model?: string, max_retry?: number,
+//         delivery?: 'none' | 'commit' | 'draft-pr' }
+// delivery mode must be confirmed with the user BEFORE launching this workflow —
+// the graph itself never asks mid-run (boundary principle: interactive decisions
+// happen outside the graph, not inside a phase).
 // Robustness: named-workflow invocation may deliver args as a JSON string.
 let A = args
 if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
@@ -21,6 +26,10 @@ const TASKS_FILE = (A && A.tasksFile) || ''
 const RULES = (A && A.rules) || []
 const DOCS = (A && A.docs) || []
 let TASKS = (A && Array.isArray(A.tasks)) ? A.tasks : []
+const DELIVERY_MODES = ['none', 'commit', 'draft-pr']
+const DELIVERY_RAW = (A && A.delivery) || 'none'
+const DELIVERY = DELIVERY_MODES.includes(DELIVERY_RAW) ? DELIVERY_RAW : 'none'
+if (DELIVERY_RAW !== DELIVERY) log(`unknown delivery "${DELIVERY_RAW}" — falling back to "none"`)
 
 phase('Load')
 
@@ -199,9 +208,60 @@ If a category is not configured in this project, say so explicitly rather than r
 
 const tasks = [...results.values()]
 log(`implemented ${tasks.filter((t) => t.status === 'done').length}/${tasks.length} task(s); gate ${gate && gate.ok ? 'passed' : 'needs attention'}`)
+
+phase('Deliver')
+const succeeded = tasks.filter((t) => t.status === 'done')
+let delivery = null
+if (DELIVERY !== 'none' && succeeded.length > 0) {
+  const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  const shortDigest = (s) => {
+    let h = 0
+    for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) | 0
+    return Math.abs(h).toString(36).slice(0, 8)
+  }
+  const firstId = TASKS[0] && TASKS[0].id
+  const slugSource = firstId ? slugify(firstId) : shortDigest(TASKS.map((t) => t.title).join('|'))
+  const branch = `impl/${(slugSource || 'tasks').slice(0, 40)}`
+
+  const DELIVER_SCHEMA = {
+    type: 'object', required: ['branch', 'commits'],
+    properties: {
+      branch: { type: 'string' },
+      commits: { type: 'array', items: { type: 'string' } },
+      pr_url: { type: 'string' },
+    },
+  }
+  const taskSummary = succeeded.map((t) =>
+    `- ${t.id}: ${t.title} | files: ${(t.files_touched || []).join(', ') || '(none declared)'} | evidence: ${String(t.evidence).slice(0, 200)}`,
+  ).join('\n')
+
+  delivery = await agent(
+    `Deliver the working tree changes produced by this implement run.
+1. Create a feature branch named "${branch}" from the current HEAD and switch to it.
+2. Commit the changes: one commit per succeeded task when that task's files_touched are cleanly separable from every other succeeded task's files_touched; otherwise fall back to a single commit covering everything. Conventional commit messages (feat/fix/refactor/...), English, ONE line each, NO AI/assistant/Claude trailers or mentions of any kind, and NEVER include company-internal words (internal product codenames, team names, tickets) — keep messages generic and safe to push anywhere.
+Succeeded tasks:
+${taskSummary}
+${DELIVERY === 'draft-pr'
+    ? `3. Push the branch: git push -u origin ${branch}\n4. Open a draft PR: gh pr create --draft. Title: a short summary derived from the task list above. Body: a per-task status line for every task (done/failed/blocked/skipped-dep) plus a short test-evidence summary per succeeded task, ending with this exact line on its own: "🤖 Generated with [Claude Code](https://claude.com/claude-code)".`
+    : 'Do NOT push and do NOT open a PR — commit locally only.'}
+Constraints: this repo's git-guard permits commit/push on a feature branch. Do NOT push to main or master, and NEVER force-push, regardless of what goes wrong.
+On any git or gh command failure, stop that step and report exactly what already succeeded (fail-open reporting) — do not retry failed git/gh commands.
+Return via StructuredOutput: {branch, commits: [one short description per commit actually made], pr_url (include only if a PR was actually created)}.`,
+    { label: 'deliver', phase: 'Deliver', schema: DELIVER_SCHEMA, model: MODEL },
+  )
+  log(`delivery: branch=${(delivery && delivery.branch) || branch} commits=${(delivery && delivery.commits && delivery.commits.length) || 0}${delivery && delivery.pr_url ? ` pr=${delivery.pr_url}` : ''}`)
+}
+
+const note = DELIVERY === 'none'
+  ? 'Nothing was committed or staged — every change is in the working tree. Review the diff yourself; merge/commit judgment is yours, not the workflow\'s. Tasks marked failed/blocked need a human decision before their dependents (skipped-dep) can run.'
+  : (delivery
+    ? `Delivered on branch ${delivery.branch || '(unknown)'}: ${(delivery.commits || []).length} commit(s)${delivery.pr_url ? `, draft PR ${delivery.pr_url}` : ''}. Tasks marked failed/blocked need a human decision before their dependents (skipped-dep) can run.`
+    : 'Delivery was requested but no task succeeded, so nothing was committed. Tasks marked failed/blocked need a human decision before their dependents (skipped-dep) can run.')
+
 return {
   tasks: tasks.map((t) => ({ ...t, evidence: String(t.evidence).slice(0, 600) })),
   schedule: schedule.map((w) => ({ wave: w.wave, batches: w.batches })),
   gate,
-  note: 'Nothing was committed or staged — every change is in the working tree. Review the diff yourself; merge/commit judgment is yours, not the workflow\'s. Tasks marked failed/blocked need a human decision before their dependents (skipped-dep) can run.',
+  delivery,
+  note,
 }
