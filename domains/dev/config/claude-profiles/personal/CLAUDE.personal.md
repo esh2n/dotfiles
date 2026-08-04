@@ -4,9 +4,10 @@
 
 These mirror what `hooks/git-guard.sh` enforces — the hook is the authority.
 
-- Commit at your own discretion once a unit of work is complete; do not stop to ask
+- Commit at your own discretion once a unit of work is complete; do not stop to ask (split by concern; NEVER include company-internal words in content or messages)
 - Push freely on feature branches; NEVER push to main/master
 - NEVER force push (`-f` / `--force`)
+- Workflows may deliver commits/draft PRs ONLY when the user explicitly chose a delivery mode at launch
 - NEVER add `Co-Authored-By` or any trailer mentioning AI/Claude
 - NEVER use grandiose language ("revolutionize", "dramatically", "comprehensive overhaul")
 - Format: `<type>(<scope>): <subject>` — 1行、英語、簡潔
