@@ -226,3 +226,6 @@ domains/dev/config/claude/version-cache.json.lock
 domains/dev/config/claude/.cache/
 domains/dev/config/claude/workflows
 domains/dev/config/git/identity-guard
+
+# pi-subagents runtime artifacts (per-run transcripts and mission state)
+.pi-subagents/
