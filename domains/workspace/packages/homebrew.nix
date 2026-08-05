@@ -8,6 +8,7 @@
     "azookey"
     "karabiner-elements"
     "aerospace"
+    "omniwm"
     "displaylink"
     "desktoppr"
     "sf-symbols"

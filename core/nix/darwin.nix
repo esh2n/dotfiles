@@ -33,6 +33,7 @@
       "felixkratz/formulae"
       "satococoa/tap"
       "nikitabobko/tap"
+      "BarutSRB/tap"
     ];
   };
 
