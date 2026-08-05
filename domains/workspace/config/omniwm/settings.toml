@@ -917,7 +917,8 @@ layoutType = "niri"
 name = "4"
 
 [workspaces.monitorAssignment]
-type = "main"
+displayUUID = "381801B7-7350-4733-AC1F-4ABA6109A191"
+type = "specificDisplay"
 
 [[workspaces]]
 id = "8B8C45D6-CE9E-41D9-BD50-BE4989D5E3DE"
