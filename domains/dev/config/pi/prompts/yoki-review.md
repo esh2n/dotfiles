@@ -65,9 +65,15 @@ const raw = await runs.all(DIMS.map((d) => ({
 
 // ---- 閾値をコードで再適用する（プロンプト指示だけでは漏れる） ----
 const found = [];
+const parseErrors = [];
 DIMS.forEach((d, i) => {
   const arr = jsonOf(raw[i]);
-  if (!Array.isArray(arr)) return;
+  // パース失敗を「指摘なし」と同一視しない。両者は意味が違う。
+  if (!Array.isArray(arr)) {
+    parseErrors.push({ dim: d.key, agent: d.agent,
+      raw: String(raw[i] && (raw[i].output ?? raw[i])).slice(0, 200) });
+    return;
+  }
   for (const f of arr) {
     const c = parseInt(f.confidence, 10) || 0;
     const im = parseInt(f.importance, 10) || 0;
@@ -77,7 +83,7 @@ DIMS.forEach((d, i) => {
     }
   }
 });
-if (!found.length) return { intent: ctx.intent, findings: [], metrics: { candidates: 0 } };
+if (!found.length) return { intent: ctx.intent, findings: [], parseErrors, metrics: { candidates: 0, lanesFailed: parseErrors.length } };
 
 // ---- 敵対的検証：反証を試み、迷ったら棄却する ----
 const verdicts = await runs.all(found.map((f, i) => ({
@@ -108,9 +114,10 @@ for (const d of DIMS) {
 
 return {
   intent: ctx.intent,
+  parseErrors,
   findings: [...byLoc.values()].map((f) => ({
     tag: "[" + f.dim + "][C:" + f.confidence + "/I:" + f.importance + "]",
     file: f.file, line: f.line, title: f.title, detail: f.detail })),
-  metrics,
+  metrics: { ...metrics, lanesFailed: parseErrors.length },
 };
 ```
