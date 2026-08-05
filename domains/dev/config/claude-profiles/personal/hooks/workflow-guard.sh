@@ -55,7 +55,7 @@ COUNT=0
 [ -f "$STATE/count-$DAY" ] && COUNT=$(tr -cd '0-9' < "$STATE/count-$DAY")
 [ -z "$COUNT" ] && COUNT=0
 if [ "$COUNT" -ge "$CAP" ]; then
-  deny "Workflow daily cap reached ($COUNT/$CAP). Workflows are expensive (recent runs: 0.6-1.5M tokens each). If more runs today are intentional, ask the user to raise the cap: set 'workflowDailyCap': N in the project's .yoki.json (takes effect immediately), or YOKI_WORKFLOW_DAILY_CAP at session start."
+  deny "Workflow daily cap reached ($COUNT/$CAP). Workflows are expensive (recent runs: 0.6-1.5M tokens each). If more runs today are intentional, ask the user to raise the cap: set workflowDailyCap to N in the project's .yoki.json (takes effect immediately), or YOKI_WORKFLOW_DAILY_CAP at session start."
 fi
 
 MARK="$STATE/$SESSION_ID-$NAME"
