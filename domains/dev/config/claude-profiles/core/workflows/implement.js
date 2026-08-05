@@ -212,7 +212,15 @@ log(`implemented ${tasks.filter((t) => t.status === 'done').length}/${tasks.leng
 phase('Deliver')
 const succeeded = tasks.filter((t) => t.status === 'done')
 let delivery = null
-if (DELIVERY !== 'none' && succeeded.length > 0) {
+// The gate is a precondition for delivery, not just a log line: committing or
+// pushing a tree whose lint/typecheck/tests fail violates the repo's own rule
+// ("NEVER commit with failing tests or lint errors"). A missing/errored gate
+// result counts as not-passed — deliver only on an explicit pass.
+const gatePassed = Boolean(gate && gate.ok)
+if (DELIVERY !== 'none' && succeeded.length > 0 && !gatePassed) {
+  log('delivery skipped: quality gate did not pass — commit/push would ship unverified changes')
+}
+if (DELIVERY !== 'none' && succeeded.length > 0 && gatePassed) {
   const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
   const shortDigest = (s) => {
     let h = 0
@@ -246,7 +254,7 @@ ${DELIVERY === 'draft-pr'
 4. Determine the PR conventions BEFORE writing anything:
    a. Look for a PR template (.github/PULL_REQUEST_TEMPLATE.md, .github/pull_request_template.md, .github/PULL_REQUEST_TEMPLATE/*.md, docs/pull_request_template.md). If one exists, follow its structure exactly.
    b. If none exists, study the repo's own precedent: gh pr list --state merged --limit 5 --json title,body — mirror the observed title style and body structure. Do not import conventions the repo does not use.
-5. Open a draft PR: gh pr create --draft. Title: follow the convention found in step 4 (fallback: short conventional-style summary of the task list). Body: template/precedent structure, containing a per-task status line for every task (done/failed/blocked/skipped-dep) and a short test-evidence summary per succeeded task, ending with this exact line on its own: "🤖 Generated with [Claude Code](https://claude.com/claude-code)".
+5. Open a draft PR: gh pr create --draft. Title: follow the convention found in step 4 (fallback: short conventional-style summary of the task list). Body: template/precedent structure, containing a per-task status line for every task (done/failed/blocked/skipped-dep) and a short test-evidence summary per succeeded task. Same trailer rule as the commits above: NO AI/assistant/Claude trailers or mentions of any kind.
 6. Writing quality: if the PR text is Japanese, load the natural-japanese skill (Skill tool) and apply its rules — natural phrasing, no AI-sounding boilerplate, lead with the conclusion. English text: plain and concrete, no grandiose wording.`
     : 'Do NOT push and do NOT open a PR — commit locally only.'}
 Constraints: this repo's git-guard permits commit/push on a feature branch. Do NOT push to main or master, and NEVER force-push, regardless of what goes wrong.
