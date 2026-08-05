@@ -10,6 +10,7 @@
     "karabiner-elements"
     "aerospace"
     "omniwm"
+    "loop"
     "displaylink"
     "desktoppr"
     "sf-symbols"

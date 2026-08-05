@@ -15,6 +15,6 @@ alias brdk='brew services stop borders'
 
 # Workspace set control — thin wrappers over mado (kept for muscle memory)
 alias wsls='mado status'
-alias wsstart='mado use'    # re-applies current profile (default: paneru)
+alias wsstart='mado use'    # re-applies current profile (default: loop)
 alias wsrestart='mado use'  # idempotent: converges to the declared state
 alias wsstop='mado stop'

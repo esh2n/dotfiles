@@ -920,6 +920,7 @@ WM + bar + borders switch as one set. All WMs stay installed; `mado` only change
 
 | Profile | WM | sketchybar | borders |
 |-----------|--------------------------------|----|-----|
+| `loop` (default) | Loop (on-demand snapper) | on | on |
 | `paneru` | Paneru (sliding tiling) | on | on |
 | `aerospace` | AeroSpace (fixed grid) | on | on |
 | `omniwm` | OmniWM (built-in bar/borders) | off | off |

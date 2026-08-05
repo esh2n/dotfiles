@@ -12,6 +12,7 @@ state changes. The active profile is machine-local state
 
 | Profile | WM | sketchybar | borders |
 |---------|----|-----------|---------|
+| `loop` (default) | Loop (on-demand snapper) | on | on |
 | `paneru` | Paneru (sliding tiling) | on | on |
 | `aerospace` | AeroSpace (fixed grid) | on | on |
 | `omniwm` | OmniWM (built-in bar / borders) | off | off |

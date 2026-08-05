@@ -27,11 +27,11 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mado"
 STATE_FILE="$STATE_DIR/profile"
 SERVICES_STATE_FILE="$STATE_DIR/services"
 LAYOUT_DIR="$HOME/.config/aerospace/layouts"
-DEFAULT_PROFILE="paneru"
+DEFAULT_PROFILE="loop"
 
 # Every WM mado knows about; `use` kills all of them before starting the
 # requested one so a stale state file can never cause a double-WM situation.
-KNOWN_WM_PROCS=(AeroSpace paneru OmniWM)
+KNOWN_WM_PROCS=(Loop AeroSpace paneru OmniWM)
 MANAGED_SERVICES=(sketchybar borders)
 
 DRY_RUN=false

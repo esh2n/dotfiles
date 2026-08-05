@@ -12,6 +12,7 @@ WM（AeroSpace / Paneru / OmniWM）と sketchybar / borders を「セット」�
 
 | Profile | WM | sketchybar | borders |
 |---------|----|-----------|---------|
+| `loop`（default） | Loop（on-demand snapper） | on | on |
 | `paneru` | Paneru（sliding tiling） | on | on |
 | `aerospace` | AeroSpace（fixed grid） | on | on |
 | `omniwm` | OmniWM（内蔵 bar / borders） | off | off |
