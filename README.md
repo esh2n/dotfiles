@@ -817,11 +817,11 @@ Agent states (Running/Waiting/Idle/Error) auto-detected. Subagent tree, task pro
 
 Niri-inspired sliding strip tiling WM. Windows are arranged on an infinite horizontal strip — adding windows never resizes existing ones. Use instead of AeroSpace for multi-task workflows.
 
-**Startup:** Only one WM at a time. AeroSpace auto-start is disabled; paneru starts manually.
+**Startup:** Only one WM at a time — switch WM sets with `mado` (see Workspace Profile Switcher below).
 
 ```bash
-paneru                  # Start
-pkill paneru            # Stop
+mado use paneru         # Start (stops other WMs, syncs sketchybar/borders)
+mado stop               # Stop WM and managed services
 paneru send-cmd window focus east   # CLI control
 ```
 
@@ -847,7 +847,7 @@ paneru send-cmd window focus east   # CLI control
 
 #### AeroSpace Window Manager (Fixed Grid Tiling)
 
-> AeroSpace auto-start is disabled by default. Start manually with `open -a AeroSpace` when needed.
+> AeroSpace auto-start is disabled by default. Switch to it with `mado use aerospace` when needed.
 
 **Workspace Design:**
 - W (Work): Cursor, VSCode - Development
@@ -914,27 +914,29 @@ Move Window to Workspace:
 **Multi-Monitor:**
 Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across monitors, then use workspace shortcuts on the focused monitor.
 
-#### Workspace Management CLI
+#### Workspace Profile Switcher (mado)
 
-**Interactive CLI:**
-- `ws` - Launch interactive workspace manager
-- `ws service` - Service management menu
-- `ws layout` - Layout management menu
-- `ws info` - Information menu
+WM + bar + borders switch as one set. All WMs stay installed; `mado` only changes what runs. The active profile is machine-local state (`~/.local/state/mado/`) and is never committed, so each machine can run a different set.
 
-**Features:**
-- Service Management: Start, stop, restart workspace services
-- Layout Save/Restore: Save current window layout and restore to any monitor
-- Presets: Quick setup for common layouts (Communication, etc.)
-- Information: View windows, workspaces, monitors, apps
+| Profile | WM | sketchybar | borders |
+|-----------|--------------------------------|----|-----|
+| `paneru` | Paneru (sliding tiling) | on | on |
+| `aerospace` | AeroSpace (fixed grid) | on | on |
+| `omniwm` | OmniWM (built-in bar/borders) | off | off |
+| `none` | — plain macOS | on | off |
+
+**Commands:**
+- `mado use <profile>` - Switch sets (idempotent: re-run to converge to the declared state)
+- `mado use` - Re-apply the current profile (restart)
+- `mado use <profile> --dry-run` - Show planned actions without executing
+- `mado status` - Recorded profile vs actually running processes
+- `mado list` / `mado stop`
+- `mado layout` / `mado info` - AeroSpace-only layout save/restore and info menus (absorbed from the retired `ws` CLI)
 
 **Legacy Commands:**
 - `brdr/brds/brdk` - Borders restart/start/stop
 - `sbr/sbs/sbk` - Sketchybar restart/start/stop
-- `wsls` - List all workspace services status
-- `wsrestart` - Restart all (Sketchybar, Borders, AeroSpace)
-- `wsstart` - Start all services
-- `wsstop` - Stop all services
+- `wsls/wsstart/wsrestart/wsstop` - Thin wrappers over mado (kept for muscle memory)
 
 #### Known Issues
 When prompted "Ignore insecure directories and continue [y] or abort compinit [n]?", choose `y`. This is a permissions warning for brew-installed completions.

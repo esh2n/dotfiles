@@ -35,7 +35,8 @@ borders "${options[@]}"
 
 ## Workspace CLI integration
 
-Borders can be controlled via the `ws` command (Workspace CLI).
+Borders is started / stopped automatically by `mado` profile switching
+(stopped under the omniwm profile). For manual control use the aliases below.
 
 | Command | Action |
 |---------|--------|

@@ -1,25 +1,38 @@
 ---
-title: Workspace CLI
-description: Manage Sketchybar, Borders, AeroSpace, and other workspace services.
+title: Workspace CLI (mado)
+description: Profile switcher that swaps WM + sketchybar + borders as one set.
 ---
 
-A CLI tool for managing workspace-related services.
+A CLI that switches the WM (AeroSpace / Paneru / OmniWM) together with
+sketchybar / borders as one set. All WMs stay installed; only the running
+state changes. The active profile is machine-local state
+(`~/.local/state/mado/`) and is never committed.
 
-## Interactive mode
+## Profiles
+
+| Profile | WM | sketchybar | borders |
+|---------|----|-----------|---------|
+| `paneru` | Paneru (sliding tiling) | on | on |
+| `aerospace` | AeroSpace (fixed grid) | on | on |
+| `omniwm` | OmniWM (built-in bar / borders) | off | off |
+| `none` | none (plain macOS) | on | off |
+
+## Commands
 
 | Command | What it does |
 |---------|-------------|
-| `ws` | Launch menu |
-| `ws service` | Service management |
-| `ws layout` | Layout management |
-| `ws info` | Info display |
+| `mado use <profile>` | Switch sets (idempotent; re-run converges to the declared state = restart) |
+| `mado use` | Re-apply the current profile |
+| `mado use <profile> --dry-run` | Show planned actions without executing |
+| `mado status` | Recorded profile vs actually running processes |
+| `mado list` | List profiles |
+| `mado stop` | Stop all WMs and managed services |
+| `mado layout` | Layout save / restore menu (aerospace only) |
+| `mado info` | Window / workspace / monitor info (aerospace only) |
 
-## Features
-
-- Start, stop, and restart services
-- Save and restore window layouts
-- Presets for common setups (Communication layout, etc.)
-- View windows, workspaces, monitors, and apps
+`mado layout` / `mado info` were absorbed from the retired `ws` CLI and
+depend on the AeroSpace CLI, so they only work while the aerospace profile
+is active.
 
 ## Legacy commands
 
@@ -27,7 +40,4 @@ A CLI tool for managing workspace-related services.
 |---------|-------------|
 | `brdr` / `brds` / `brdk` | Borders restart / start / stop |
 | `sbr` / `sbs` / `sbk` | Sketchybar restart / start / stop |
-| `wsls` | Show all service statuses |
-| `wsrestart` | Restart everything |
-| `wsstart` | Start everything |
-| `wsstop` | Stop everything |
+| `wsls` / `wsstart` / `wsrestart` / `wsstop` | Thin wrappers over mado |

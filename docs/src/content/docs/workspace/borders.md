@@ -35,7 +35,8 @@ borders "${options[@]}"
 
 ## Workspace CLI との連携
 
-`ws` コマンド (Workspace CLI) から Borders の start / stop / restart を制御できる。
+Borders は `mado` の profile 切替で自動的に start / stop される
+（omniwm profile では停止）。個別操作には以下の alias を使う。
 
 | Command | 操作 |
 |---------|------|
