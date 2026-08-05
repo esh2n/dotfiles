@@ -6,7 +6,6 @@
     "ollama"
     "satococoa/tap/wtp"
     "rtk"
-    "karinushka/paneru/paneru"
     "k1LoW/tap/mo"
     "dlvhdr/formulae/diffnav"
     "noborus/tap/ov"

@@ -2,6 +2,7 @@
   homebrew.brews = [
     "sketchybar"
     "borders"
+    "karinushka/paneru/paneru"
   ];
 
   homebrew.casks = [
