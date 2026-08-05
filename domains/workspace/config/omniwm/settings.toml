@@ -238,6 +238,22 @@ id = "552FB77D-BF0E-4737-90A6-B5BC6986C579"
 minHeight = 320.0
 minWidth = 660.0
 
+[[appRules]]
+bundleId = "com.gather.GatherV2"
+id = "EF2F307A-DCFE-4513-9E3A-07FB56E2EC0A"
+layout = "float"
+
+[[appRules]]
+assignToWorkspace = "7"
+bundleId = "com.tinyspeck.slackmacgap"
+id = "ABB2AAB9-31BE-4ADF-AB34-10EC54845FC5"
+titleSubstring = "アクティビティ"
+
+[[appRules]]
+assignToWorkspace = "3"
+bundleId = "com.tinyspeck.slackmacgap"
+id = "BCFFD141-F7D7-46EE-BB2F-F811F04C25A4"
+
 [[hotkeys]]
 binding = "Option+1"
 id = "switchWorkspace.0"
@@ -925,4 +941,4 @@ layoutType = "niri"
 name = "7"
 
 [workspaces.monitorAssignment]
-type = "secondary"
+type = "tertiary"
