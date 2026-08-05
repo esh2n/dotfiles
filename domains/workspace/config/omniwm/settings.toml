@@ -942,4 +942,5 @@ layoutType = "niri"
 name = "7"
 
 [workspaces.monitorAssignment]
-type = "secondary"
+displayUUID = "E27440B5-C7DA-4682-8D01-6F37A8975A0D"
+type = "specificDisplay"
