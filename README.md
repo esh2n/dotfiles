@@ -914,6 +914,32 @@ Move Window to Workspace:
 **Multi-Monitor:**
 Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across monitors, then use workspace shortcuts on the focused monitor.
 
+#### OmniWM Window Manager (Niri Scrolling Columns)
+
+> Niri/Hyprland-inspired tiling WM with a built-in workspace bar, borders, and quake terminal. Switch with `mado use omniwm` — sketchybar/borders stop because OmniWM draws its own.
+
+**Concepts:** Vertical columns on an infinite horizontal strip (same idea as Paneru — adding windows never shrinks existing ones). Two layout engines per workspace: Niri (scrolling columns) and Dwindle (BSP); toggle with `Opt+Shift+L`.
+
+**Default Keybinds (upstream — pending alt-hjkl re-map):**
+
+| Operation | Keybind |
+|-----------|---------|
+| Focus | `Opt+Arrows` |
+| Move window | `Opt+Shift+Arrows` |
+| Workspace 1-9 | `Opt+1-9` |
+| Fullscreen | `Opt+Return` |
+| Balance columns | `Opt+Shift+B` |
+| Toggle Niri/Dwindle | `Opt+Shift+L` |
+| Quake terminal | `` Opt+` `` |
+| Command palette | `Ctrl+Opt+Space` |
+| Overview | `Opt+Shift+O` |
+
+**Built-ins:** Ghostty-powered quake terminal (position/size/glass configurable), fuzzy command palette, thumbnail overview, scratchpads, Ice-like menu bar icon hiding.
+
+**Customization:** `~/.config/omniwm/settings.toml` (symlinked to `domains/workspace/config/omniwm/`, generated on first launch, live-reloads on save) plus GUI Settings. All hotkeys remappable; App Rules for float/workspace assignment/sizes (replaces AeroSpace's `on-window-detected`); workspace bar position/height/icon overrides; System Hyper Trigger (Caps Lock, F13-F20).
+
+**Automation:** `omniwmctl` — `query` (windows/workspaces/monitors as JSON), `subscribe` (event stream), `watch <event> --exec <script>` (run a script per event; the hook for future sketchybar integration).
+
 #### Workspace Profile Switcher (mado)
 
 WM + bar + borders switch as one set. All WMs stay installed; `mado` only changes what runs. The active profile is machine-local state (`~/.local/state/mado/`) and is never committed, so each machine can run a different set.

@@ -6,9 +6,53 @@ Niri/Hyprland inspired tiling WM (github.com/BarutSRB/OmniWM).
 save — this directory is symlinked to `~/.config/omniwm`, so the generated
 file lands here and gets tracked once tuned.
 
-Conventions to apply when tuning:
+## Agreed target setup (2026-08-05) — apply after first launch
 
-- Keybinds: alt-h/j/k/l base (same muscle memory as aerospace/paneru)
-- Top gap: 52px for sketchybar (match paneru's padding)
-- Only one WM runs at a time (aerospace / paneru / omniwm are exclusive)
+Style: "everything always visible" (not workspace-separated). OmniWM is the
+auto-layout engine for a fixed desk, replacing manual Loop snapping.
+
+### Monitors
+
+- **Main monitor — Niri, one workspace:**
+  `[Cursor/VSCode 0.5][Ghostty 0.25][Dia/Notion 0.25]` — permanent columns
+- **Sub monitor — Dwindle (BSP), notification dashboard:**
+  Slack / Discord / Slack activity window, all visible in a grid
+- Workspaces: `1` = the desk, `2` = overflow only (Spotify etc.)
+
+### Keybinds (match paneru muscle memory)
+
+- Focus: `alt-h/l` (columns), `alt-j/k` (within column)
+- Move: `alt-shift-h/j/k/l`
+- Fullscreen: `alt-f` (unbind default `alt-Return`)
+- Float toggle: `alt-t`
+- Column width: `alt-r` / `alt-shift-r`
+- Workspaces: `alt-1` / `alt-2`
+- Keep defaults: quake `` alt-` ``, palette `ctrl-alt-space`, overview
+  `alt-shift-o`, layout toggle `alt-shift-l`
+- **`alt-space` stays with Raycast** (Ghostty hide/show toggle — must work
+  in every profile, and OmniWM binds die when another WM profile is active,
+  so OmniWM must NOT claim this key). Under omniwm the toggle just
+  hides/shows the tiled Ghostty column (brief reflow, harmless).
+- **`alt-shift-space` = scratchpad, starting with Obsidian** (quick notes
+  from any workspace; pairs mentally with alt-space = Ghostty toggle).
+  Add a second app (e.g. Spotify) only after this sticks. Never `alt-space`.
+
+### App rules
+
+- Slack, Discord → sub-monitor workspace
+- Cursor, VSCode, Ghostty, Dia, Notion → main monitor
+- Gather, Finder, System Settings → float (Gather must stay float —
+  meeting workflow + hammerspoon z_to_f_spammer)
+
+### Verify at first launch (unconfirmed against real schema)
+
+- Can App Rules target a monitor (or a workspace pinned to the sub monitor)?
+- Is `alt-shift-space` assignable as a scratchpad key, and can Obsidian be
+  registered as a scratchpad app?
+- Does the built-in quake terminal read the user's ghostty config?
+- Column width preset granularity (paneru-like 1/3 → 1/2 → 2/3 → 3/4?)
+
+### Constraints
+
+- Only one WM runs at a time — switch with `mado use omniwm` / `mado use loop`
 - Runtime state lives in `~/.local/state/omniwm` (not tracked)
