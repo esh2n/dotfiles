@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 
 # Window management services aliases
+# Profile switching (WM + bar + borders as a set) is handled by `mado`.
 
 # Borders management
 alias brdr='brew services restart borders'
@@ -12,32 +13,8 @@ alias brdk='brew services stop borders'
 # alias sbs='brew services start sketchybar'
 # alias sbk='brew services stop sketchybar'
 
-# Check all workspace services
-alias wsls='brew services list | grep -E "sketchybar|borders" && echo "\nAeroSpace:" && pgrep -l AeroSpace'
-
-# Restart all workspace services
-wsrestart() {
-    echo "Restarting workspace services..."
-    brew services restart sketchybar
-    brew services restart borders
-    killall AeroSpace 2>/dev/null; open -a AeroSpace
-    echo "All workspace services restarted!"
-}
-
-# Start all workspace services
-wsstart() {
-    echo "Starting workspace services..."
-    brew services start sketchybar
-    brew services start borders
-    open -a AeroSpace
-    echo "All workspace services started!"
-}
-
-# Stop all workspace services
-wsstop() {
-    echo "Stopping workspace services..."
-    brew services stop sketchybar
-    brew services stop borders
-    killall AeroSpace 2>/dev/null
-    echo "All workspace services stopped!"
-}
+# Workspace set control — thin wrappers over mado (kept for muscle memory)
+alias wsls='mado status'
+alias wsstart='mado use'    # re-applies current profile (default: paneru)
+alias wsrestart='mado use'  # idempotent: converges to the declared state
+alias wsstop='mado stop'

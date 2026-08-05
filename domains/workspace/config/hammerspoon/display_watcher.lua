@@ -11,9 +11,31 @@ local M = {}
 local DEBOUNCE_SECONDS = 3
 
 local JOBS = {
-  "homebrew.mxcl.sketchybar",
-  "homebrew.mxcl.borders",
+  sketchybar = "homebrew.mxcl.sketchybar",
+  borders = "homebrew.mxcl.borders",
 }
+
+-- mado (bin/mado) records which services the active WM profile keeps running.
+-- Only kickstart those, so a profile that stopped sketchybar/borders (e.g.
+-- omniwm) doesn't get them resurrected on display changes.
+local SERVICES_STATE = os.getenv("HOME") .. "/.local/state/mado/services"
+
+local function activeJobs()
+  local f = io.open(SERVICES_STATE, "r")
+  if not f then
+    -- No mado state yet: pre-mado behavior, restart both
+    local all = {}
+    for _, job in pairs(JOBS) do all[#all + 1] = job end
+    return all
+  end
+  local jobs = {}
+  for line in f:lines() do
+    local job = JOBS[line:gsub("%s+", "")]
+    if job then jobs[#jobs + 1] = job end
+  end
+  f:close()
+  return jobs
+end
 
 local debounceTimer = nil
 
@@ -21,7 +43,7 @@ local function kickstartServices()
   local uid, ok = hs.execute("/usr/bin/id -u")
   if not ok then return end
   uid = uid:gsub("%s+", "")
-  for _, job in ipairs(JOBS) do
+  for _, job in ipairs(activeJobs()) do
     hs.execute(string.format("/bin/launchctl kickstart -k gui/%s/%s", uid, job))
   end
 end
