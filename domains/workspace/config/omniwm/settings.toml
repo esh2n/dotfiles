@@ -902,7 +902,7 @@ name = "2"
 type = "main"
 
 [[workspaces]]
-displayName = "💬"
+displayName = "3 💬"
 id = "BEB842B5-E894-4791-9FD1-397C3CDD3538"
 layoutType = "dwindle"
 name = "3"
@@ -927,7 +927,7 @@ name = "5"
 type = "main"
 
 [[workspaces]]
-displayName = "❤️"
+displayName = "6 ❤️"
 id = "5953F2BF-A378-4266-91B2-287174C4FA4D"
 layoutType = "niri"
 name = "6"
@@ -936,7 +936,7 @@ name = "6"
 type = "secondary"
 
 [[workspaces]]
-displayName = "🚀"
+displayName = "7 🚀"
 id = "A7D5E104-6985-4516-8ED5-07F144F2A33D"
 layoutType = "niri"
 name = "7"
