@@ -44,13 +44,28 @@ auto-layout engine for a fixed desk, replacing manual Loop snapping.
 - Gather, Finder, System Settings → float (Gather must stay float —
   meeting workflow + hammerspoon z_to_f_spammer)
 
-### Verify at first launch (unconfirmed against real schema)
+### Verified against the real schema (2026-08-05)
 
-- Can App Rules target a monitor (or a workspace pinned to the sub monitor)?
-- Is `alt-shift-space` assignable as a scratchpad key, and can Obsidian be
-  registered as a scratchpad app?
-- Does the built-in quake terminal read the user's ghostty config?
-- Column width preset granularity (paneru-like 1/3 → 1/2 → 2/3 → 3/4?)
+- Workspace → monitor pinning: `[workspaces.monitorAssignment] type =
+  "main"/"secondary"`. Workspace 3 = 💬 comm dashboard (dwindle, secondary).
+  NOTE: "secondary" resolved to the Built-in Retina Display on the 3-monitor
+  setup — adjust in Settings > Monitors if the external sub monitor is wanted.
+- Scratchpad: `alt-shift-space` = toggle, `ctrl-alt-shift-space` = assign
+  focused window to scratchpad. To register Obsidian: focus it once and press
+  `ctrl-alt-shift-space`.
+- Column width presets: `niri.containerPrimarySpanPresets` (1/3, 1/2, 2/3,
+  3/4 — paneru parity), cycled with `alt-r` / `alt-shift-r`.
+- IPC: `general.ipcEnabled = true` (requires OmniWM restart to take effect);
+  `omniwmctl query workspaces` works.
+- App Rules in settings.toml carry min sizes only — float指定 and workspace
+  auto-assignment are done via GUI Settings > App Rules (schema fields for
+  those are not emitted by default; check what the GUI writes).
+
+### Still to tune by hand
+
+- Slack/Discord → workspace 3 auto-assignment (GUI App Rules)
+- Gather float rule (GUI App Rules)
+- Whether the built-in quake terminal reads the user's ghostty config
 
 ### Constraints
 
