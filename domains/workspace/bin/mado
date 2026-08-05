@@ -530,6 +530,69 @@ info_menu() {
 }
 
 # -----------------------------------------------------------------------------
+# Interactive menu
+# -----------------------------------------------------------------------------
+
+interactive_switch() {
+    local profiles=() file name num
+    local recorded
+    recorded="$(recorded_profile)"
+    echo ""
+    log_info "Select profile"
+    local i=1
+    for file in "$PROFILE_DIR"/*.profile; do
+        [[ -f "$file" ]] || continue
+        name="$(basename "$file" .profile)"
+        profiles+=("$name")
+        if [[ "$name" == "$recorded" ]]; then
+            echo "$i) $name (current)"
+        else
+            echo "$i) $name"
+        fi
+        ((i++))
+    done
+    echo ""
+    read -p "Select profile number (blank to cancel): " num
+
+    [[ -z "$num" ]] && return 0
+    if [[ ! "$num" =~ ^[0-9]+$ ]] || [[ "$num" -lt 1 ]] || [[ "$num" -gt "${#profiles[@]}" ]]; then
+        log_error "Invalid selection"
+        return 0
+    fi
+    cmd_use "${profiles[$((num - 1))]}"
+}
+
+main_menu() {
+    local choice recorded
+    while true; do
+        recorded="$(recorded_profile)"
+        echo ""
+        echo "mado - WM Profile Switcher"
+        echo "──────────────────────────"
+        echo "Current profile: ${recorded:-(none)}"
+        echo ""
+        echo "1) Switch profile"
+        echo "2) Status"
+        echo "3) Stop everything"
+        echo "4) Layout menu (aerospace only)"
+        echo "5) Info menu (aerospace only)"
+        echo "6) Quit"
+        echo ""
+        read -p "Select option: " choice
+
+        case $choice in
+            1) interactive_switch ;;
+            2) cmd_status ;;
+            3) cmd_stop ;;
+            4) require_aerospace && layout_menu ;;
+            5) require_aerospace && info_menu ;;
+            6) break ;;
+            *) log_error "Invalid option" ;;
+        esac
+    done
+}
+
+# -----------------------------------------------------------------------------
 # CLI
 # -----------------------------------------------------------------------------
 
@@ -538,6 +601,7 @@ usage() {
 mado - WM profile switcher
 
 Usage:
+    mado                             Interactive menu
     mado use [profile] [--dry-run]   Switch to profile (no arg: re-apply current)
     mado stop                        Stop all WMs and managed services
     mado status                      Recorded profile vs actual processes
@@ -571,7 +635,8 @@ main() {
         list)    cmd_list ;;
         layout)  require_aerospace && layout_menu ;;
         info)    require_aerospace && info_menu ;;
-        -h|--help|help|"") usage ;;
+        "")      main_menu ;;
+        -h|--help|help) usage ;;
         *)
             log_error "Unknown command '$cmd'"
             usage

@@ -927,6 +927,7 @@ WM + bar + borders switch as one set. All WMs stay installed; `mado` only change
 | `none` | — plain macOS | on | off |
 
 **Commands:**
+- `mado` - Interactive menu (switch / status / stop / layout / info)
 - `mado use <profile>` - Switch sets (idempotent: re-run to converge to the declared state)
 - `mado use` - Re-apply the current profile (restart)
 - `mado use <profile> --dry-run` - Show planned actions without executing

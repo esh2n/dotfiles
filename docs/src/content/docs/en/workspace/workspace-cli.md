@@ -22,6 +22,7 @@ state changes. The active profile is machine-local state
 
 | Command | What it does |
 |---------|-------------|
+| `mado` | Interactive menu (switch / status / stop / layout / info) |
 | `mado use <profile>` | Switch sets (idempotent; re-run converges to the declared state = restart) |
 | `mado use` | Re-apply the current profile |
 | `mado use <profile> --dry-run` | Show planned actions without executing |

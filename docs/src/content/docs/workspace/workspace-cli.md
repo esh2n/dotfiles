@@ -22,6 +22,7 @@ WM（AeroSpace / Paneru / OmniWM）と sketchybar / borders を「セット」�
 
 | Command | 操作 |
 |---------|------|
+| `mado` | 対話 menu（switch / status / stop / layout / info） |
 | `mado use <profile>` | セット切替（冪等。再実行で宣言状態に収束 = restart） |
 | `mado use` | 現 profile を再適用 |
 | `mado use <profile> --dry-run` | 実行せず操作予定を表示 |
