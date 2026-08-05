@@ -195,16 +195,24 @@ trust_brew_taps() {
         return 0
     fi
     log_info "Trusting third-party Homebrew taps..."
-    brew trust --tap \
-        felixkratz/formulae \
-        satococoa/tap \
-        nikitabobko/tap \
-        barutsrb/tap \
-        karinushka/paneru \
-        k1low/tap \
-        dlvhdr/formulae \
-        noborus/tap \
+    local taps=(
+        felixkratz/formulae
+        satococoa/tap
+        nikitabobko/tap
+        barutsrb/tap
+        karinushka/paneru
+        k1low/tap
+        dlvhdr/formulae
+        noborus/tap
+    )
+    # trust.json lives in $XDG_CONFIG_HOME/homebrew/ when XDG_CONFIG_HOME is
+    # set (interactive shells) but nix-darwin activation runs brew with a
+    # scrubbed env that falls back to ~/.homebrew/ — write to both so the
+    # bundle run during activation sees the trust too.
+    brew trust --tap "${taps[@]}" \
         || log_warn "brew trust reported failure (non-critical)"
+    env -u XDG_CONFIG_HOME brew trust --tap "${taps[@]}" \
+        || log_warn "brew trust (no-XDG) reported failure (non-critical)"
 }
 
 # Main execution
