@@ -1,0 +1,583 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# -----------------------------------------------------------------------------
+# mado - WM profile switcher (窓)
+# Switches between exclusive WM profiles (aerospace / paneru / omniwm / none),
+# each declaring its WM process and the brew services it needs.
+# Absorbs the layout/info tooling from the retired `ws` CLI (aerospace-only).
+# -----------------------------------------------------------------------------
+
+# Load utilities
+if [[ -n "${DOTFILES_ROOT:-}" ]]; then
+    source "$DOTFILES_ROOT/core/utils/common.sh"
+else
+    SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+    DOTFILES_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/../../.." && pwd)"
+    if [[ -f "$DOTFILES_ROOT/core/utils/common.sh" ]]; then
+        source "$DOTFILES_ROOT/core/utils/common.sh"
+    else
+        echo "Error: Cannot find common.sh"
+        exit 1
+    fi
+fi
+
+PROFILE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/mado/profiles"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/mado"
+STATE_FILE="$STATE_DIR/profile"
+SERVICES_STATE_FILE="$STATE_DIR/services"
+LAYOUT_DIR="$HOME/.config/aerospace/layouts"
+DEFAULT_PROFILE="paneru"
+
+# Every WM mado knows about; `use` kills all of them before starting the
+# requested one so a stale state file can never cause a double-WM situation.
+KNOWN_WM_PROCS=(AeroSpace paneru OmniWM)
+MANAGED_SERVICES=(sketchybar borders)
+
+DRY_RUN=false
+
+run() {
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "[dry-run] $*"
+    else
+        eval "$*"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Profiles
+# -----------------------------------------------------------------------------
+
+load_profile() {
+    local name="$1"
+    local file="$PROFILE_DIR/$name.profile"
+    if [[ ! -f "$file" ]]; then
+        log_error "Unknown profile '$name'"
+        cmd_list
+        exit 1
+    fi
+    WM_NAME=""
+    WM_START=""
+    WM_PGREP=""
+    SERVICES_ON=()
+    SERVICES_OFF=()
+    # shellcheck source=/dev/null
+    source "$file"
+}
+
+recorded_profile() {
+    cat "$STATE_FILE" 2>/dev/null || true
+}
+
+current_profile_or_default() {
+    local recorded
+    recorded="$(recorded_profile)"
+    if [[ -z "$recorded" || "$recorded" == "stopped" ]]; then
+        echo "$DEFAULT_PROFILE"
+    else
+        echo "$recorded"
+    fi
+}
+
+record_state() {
+    local profile="$1"
+    shift
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "[dry-run] record state: profile=$profile services=[$*]"
+        return
+    fi
+    mkdir -p "$STATE_DIR"
+    echo "$profile" > "$STATE_FILE"
+    printf '%s\n' "$@" > "$SERVICES_STATE_FILE"
+}
+
+# -----------------------------------------------------------------------------
+# WM / service control
+# -----------------------------------------------------------------------------
+
+stop_all_wms() {
+    local proc
+    for proc in "${KNOWN_WM_PROCS[@]}"; do
+        if pgrep -x "$proc" > /dev/null; then
+            run "pkill -x '$proc' || true"
+        fi
+    done
+}
+
+# Query launchd directly instead of parsing `brew services list` — the latter
+# loads every formula's ruby and breaks whenever any one of them trips a
+# Homebrew bug (seen with jws / stop_timeout).
+service_running() {
+    launchctl print "gui/$(id -u)/homebrew.mxcl.$1" > /dev/null 2>&1
+}
+
+sync_services() {
+    local svc
+    for svc in ${SERVICES_ON[@]+"${SERVICES_ON[@]}"}; do
+        if ! service_running "$svc"; then
+            run "brew services start '$svc'"
+        fi
+    done
+    for svc in ${SERVICES_OFF[@]+"${SERVICES_OFF[@]}"}; do
+        if service_running "$svc"; then
+            run "brew services stop '$svc'"
+        fi
+    done
+}
+
+wait_for_wm() {
+    [[ "$DRY_RUN" == true || -z "$WM_PGREP" ]] && return 0
+    local i
+    for i in $(seq 1 25); do
+        if pgrep -x "$WM_PGREP" > /dev/null; then
+            return 0
+        fi
+        sleep 0.2
+    done
+    log_error "$WM_NAME did not start within 5s (check: pgrep -x $WM_PGREP)"
+    return 1
+}
+
+# -----------------------------------------------------------------------------
+# Commands
+# -----------------------------------------------------------------------------
+
+cmd_use() {
+    local profile="${1:-}"
+    [[ -z "$profile" ]] && profile="$(current_profile_or_default)"
+    load_profile "$profile"
+
+    log_info "Switching to profile '$profile'${WM_NAME:+ (WM: $WM_NAME)}"
+    stop_all_wms
+    sync_services
+    if [[ -n "$WM_START" ]]; then
+        run "$WM_START"
+        wait_for_wm
+    fi
+    record_state "$profile" ${SERVICES_ON[@]+"${SERVICES_ON[@]}"}
+    log_success "Profile '$profile' active"
+}
+
+cmd_stop() {
+    log_info "Stopping all WMs and managed services"
+    stop_all_wms
+    local svc
+    for svc in "${MANAGED_SERVICES[@]}"; do
+        if service_running "$svc"; then
+            run "brew services stop '$svc'"
+        fi
+    done
+    record_state "stopped"
+    log_success "Everything stopped"
+}
+
+cmd_status() {
+    local recorded
+    recorded="$(recorded_profile)"
+    log_info "Recorded profile: ${recorded:-"(none)"}"
+    echo ""
+
+    local proc found=false
+    for proc in "${KNOWN_WM_PROCS[@]}"; do
+        if pgrep -x "$proc" > /dev/null; then
+            log_success "WM running: $proc"
+            found=true
+        fi
+    done
+    [[ "$found" == false ]] && log_warn "No WM running"
+    echo ""
+
+    local svc
+    for svc in "${MANAGED_SERVICES[@]}"; do
+        if service_running "$svc"; then
+            echo "  $svc: running"
+        else
+            echo "  $svc: stopped"
+        fi
+    done
+
+    if [[ -n "$recorded" && "$recorded" != "stopped" && -f "$PROFILE_DIR/$recorded.profile" ]]; then
+        load_profile "$recorded"
+        if [[ -n "$WM_PGREP" ]] && ! pgrep -x "$WM_PGREP" > /dev/null; then
+            echo ""
+            log_warn "State drift: recorded '$recorded' but $WM_NAME is not running (fix: mado use)"
+        fi
+    fi
+}
+
+cmd_list() {
+    local recorded file name
+    recorded="$(recorded_profile)"
+    log_info "Profiles in $PROFILE_DIR"
+    for file in "$PROFILE_DIR"/*.profile; do
+        [[ -f "$file" ]] || continue
+        name="$(basename "$file" .profile)"
+        if [[ "$name" == "$recorded" ]]; then
+            echo "* $name (current)"
+        else
+            echo "  $name"
+        fi
+    done
+}
+
+# -----------------------------------------------------------------------------
+# Layout tools (ported from the retired `ws` CLI; requires AeroSpace)
+# -----------------------------------------------------------------------------
+
+require_aerospace() {
+    if ! command -v aerospace > /dev/null; then
+        log_error "aerospace CLI not found"
+        return 1
+    fi
+    if ! pgrep -x AeroSpace > /dev/null; then
+        log_error "Layout/info tools require the aerospace profile (mado use aerospace)"
+        return 1
+    fi
+}
+
+layout_save() {
+    local layout_name
+    read -p "Enter layout name: " layout_name
+
+    if [[ -z "$layout_name" ]]; then
+        log_error "Layout name cannot be empty"
+        return 1
+    fi
+
+    local layout_file="$LAYOUT_DIR/${layout_name}.json"
+
+    if [[ -f "$layout_file" ]]; then
+        read -p "Layout '$layout_name' already exists. Overwrite? [y/N]: " confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            log_info "Cancelled"
+            return 0
+        fi
+    fi
+
+    log_info "Saving current layout as '$layout_name'"
+
+    local current_workspace
+    current_workspace=$(aerospace list-workspaces --focused)
+
+    local windows_json="[]"
+    while IFS='|' read -r window_id app_name window_title; do
+        window_id=$(echo "$window_id" | xargs)
+        app_name=$(echo "$app_name" | xargs)
+        window_title=$(echo "$window_title" | xargs)
+
+        local app_id
+        app_id=$(aerospace list-apps | grep -F "$app_name" | awk '{print $2}' | head -1)
+
+        if [[ -n "$app_id" ]]; then
+            windows_json=$(echo "$windows_json" | jq --arg id "$window_id" --arg app "$app_name" --arg appid "$app_id" --arg title "$window_title" '. += [{"window_id": $id, "app_name": $app, "app_id": $appid, "window_title": $title}]')
+        fi
+    done < <(aerospace list-windows --workspace focused --format '%{window-id}|%{app-name}|%{window-title}')
+
+    local layout_json
+    layout_json=$(jq -n \
+        --arg name "$layout_name" \
+        --arg workspace "$current_workspace" \
+        --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        --argjson windows "$windows_json" \
+        '{name: $name, workspace: $workspace, timestamp: $timestamp, windows: $windows}')
+
+    echo "$layout_json" > "$layout_file"
+    log_success "Layout '$layout_name' saved to $layout_file"
+}
+
+layout_list() {
+    log_info "Saved Layouts"
+
+    if [[ ! -d "$LAYOUT_DIR" ]] || [[ -z "$(ls -A "$LAYOUT_DIR" 2>/dev/null)" ]]; then
+        log_warn "No saved layouts found"
+        return 0
+    fi
+
+    local i=1
+    for layout_file in "$LAYOUT_DIR"/*.json; do
+        if [[ -f "$layout_file" ]]; then
+            local name=$(basename "$layout_file" .json)
+            local timestamp=$(jq -r '.timestamp // "Unknown"' "$layout_file")
+            local window_count=$(jq '.windows | length' "$layout_file")
+            echo "$i) $name - $window_count windows (saved: $timestamp)"
+            ((i++))
+        fi
+    done
+}
+
+layout_restore() {
+    if [[ ! -d "$LAYOUT_DIR" ]] || [[ -z "$(ls -A "$LAYOUT_DIR" 2>/dev/null)" ]]; then
+        log_warn "No saved layouts found"
+        return 0
+    fi
+
+    echo ""
+    log_info "Select layout to restore"
+    local layouts=()
+    local i=1
+    for layout_file in "$LAYOUT_DIR"/*.json; do
+        if [[ -f "$layout_file" ]]; then
+            local name=$(basename "$layout_file" .json)
+            layouts+=("$layout_file")
+            echo "$i) $name"
+            ((i++))
+        fi
+    done
+    echo ""
+
+    read -p "Select layout number: " layout_num
+
+    if [[ ! "$layout_num" =~ ^[0-9]+$ ]] || [[ "$layout_num" -lt 1 ]] || [[ "$layout_num" -gt "${#layouts[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_layout="${layouts[$((layout_num - 1))]}"
+    local layout_name=$(basename "$selected_layout" .json)
+
+    echo ""
+    log_info "Select monitor"
+    local monitors=()
+    local i=1
+    while IFS='|' read -r monitor_id monitor_name; do
+        monitor_id=$(echo "$monitor_id" | xargs)
+        monitor_name=$(echo "$monitor_name" | xargs)
+        monitors+=("$monitor_id")
+        echo "$i) $monitor_name"
+        ((i++))
+    done < <(aerospace list-monitors --format '%{monitor-id}|%{monitor-name}')
+    echo ""
+
+    read -p "Select monitor number: " monitor_num
+
+    if [[ ! "$monitor_num" =~ ^[0-9]+$ ]] || [[ "$monitor_num" -lt 1 ]] || [[ "$monitor_num" -gt "${#monitors[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_monitor="${monitors[$((monitor_num - 1))]}"
+
+    echo ""
+    read -p "Enter target workspace (e.g., C, W, 1): " target_workspace
+
+    if [[ -z "$target_workspace" ]]; then
+        log_error "Workspace cannot be empty"
+        return 1
+    fi
+
+    log_info "Restoring layout '$layout_name' to monitor $selected_monitor, workspace $target_workspace"
+
+    local app_ids=$(jq -r '.windows[].app_id' "$selected_layout" | sort -u)
+    for app_id in $app_ids; do
+        local app_name=$(jq -r ".windows[] | select(.app_id == \"$app_id\") | .app_name" "$selected_layout" | head -1)
+
+        if ! pgrep -f "$app_id" > /dev/null; then
+            log_info "Launching $app_name"
+            open -a "$app_name" 2>/dev/null || log_warn "Could not launch $app_name"
+            sleep 2
+        fi
+    done
+
+    sleep 3
+
+    log_info "Moving windows to workspace $target_workspace"
+    local window_ids=$(jq -r '.windows[].app_id' "$selected_layout")
+    for app_id in $window_ids; do
+        aerospace list-windows --all | grep "$app_id" | while read -r line; do
+            local wid=$(echo "$line" | awk '{print $1}')
+            aerospace move-node-to-workspace --window-id "$wid" "$target_workspace" 2>/dev/null || true
+        done
+    done
+
+    log_success "Layout restored"
+}
+
+layout_delete() {
+    if [[ ! -d "$LAYOUT_DIR" ]] || [[ -z "$(ls -A "$LAYOUT_DIR" 2>/dev/null)" ]]; then
+        log_warn "No saved layouts found"
+        return 0
+    fi
+
+    echo ""
+    log_info "Select layout to delete"
+    local layouts=()
+    local i=1
+    for layout_file in "$LAYOUT_DIR"/*.json; do
+        if [[ -f "$layout_file" ]]; then
+            local name=$(basename "$layout_file" .json)
+            layouts+=("$layout_file")
+            echo "$i) $name"
+            ((i++))
+        fi
+    done
+    echo ""
+
+    read -p "Select layout number: " layout_num
+
+    if [[ ! "$layout_num" =~ ^[0-9]+$ ]] || [[ "$layout_num" -lt 1 ]] || [[ "$layout_num" -gt "${#layouts[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_layout="${layouts[$((layout_num - 1))]}"
+    local layout_name=$(basename "$selected_layout" .json)
+
+    read -p "Delete layout '$layout_name'? [y/N]: " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        rm "$selected_layout"
+        log_success "Layout '$layout_name' deleted"
+    else
+        log_info "Cancelled"
+    fi
+}
+
+layout_preset_communication() {
+    log_info "Setting up Communication preset (Slack + Gather)"
+
+    echo ""
+    log_info "Select monitor"
+    local monitors=()
+    local i=1
+    while IFS='|' read -r monitor_id monitor_name; do
+        monitor_id=$(echo "$monitor_id" | xargs)
+        monitor_name=$(echo "$monitor_name" | xargs)
+        monitors+=("$monitor_id")
+        echo "$i) $monitor_name"
+        ((i++))
+    done < <(aerospace list-monitors --format '%{monitor-id}|%{monitor-name}')
+    echo ""
+
+    read -p "Select monitor number: " monitor_num
+
+    if [[ ! "$monitor_num" =~ ^[0-9]+$ ]] || [[ "$monitor_num" -lt 1 ]] || [[ "$monitor_num" -gt "${#monitors[@]}" ]]; then
+        log_error "Invalid selection"
+        return 1
+    fi
+
+    local selected_monitor="${monitors[$((monitor_num - 1))]}"
+
+    if ! pgrep -x "Slack" > /dev/null; then
+        log_info "Launching Slack"
+        open -a Slack
+        sleep 3
+    fi
+
+    if ! pgrep -x "Gather" > /dev/null; then
+        log_info "Launching Gather"
+        open -a Gather
+        sleep 3
+    fi
+
+    log_info "Moving windows to workspace C on monitor $selected_monitor"
+    aerospace list-windows --all | grep -E "Slack|Gather" | while read -r line; do
+        window_id=$(echo "$line" | awk '{print $1}')
+        aerospace move-node-to-workspace --window-id "$window_id" C 2>/dev/null || true
+    done
+
+    log_success "Communication preset ready on monitor $selected_monitor"
+    log_info "Tip: Use Alt+- to resize windows if needed"
+}
+
+layout_menu() {
+    mkdir -p "$LAYOUT_DIR"
+    while true; do
+        echo ""
+        echo "Layout Management (aerospace)"
+        echo "─────────────────────────────"
+        echo "1) Save Current Layout"
+        echo "2) Restore Layout"
+        echo "3) List Saved Layouts"
+        echo "4) Delete Layout"
+        echo "5) Preset: Communication (Slack + Gather)"
+        echo "6) Back"
+        echo ""
+        read -p "Select option: " choice
+
+        case $choice in
+            1) layout_save ;;
+            2) layout_restore ;;
+            3) layout_list ;;
+            4) layout_delete ;;
+            5) layout_preset_communication ;;
+            6) break ;;
+            *) log_error "Invalid option" ;;
+        esac
+    done
+}
+
+info_menu() {
+    while true; do
+        echo ""
+        echo "Information (aerospace)"
+        echo "───────────────────────"
+        echo "1) List Windows"
+        echo "2) List Workspaces"
+        echo "3) List Monitors"
+        echo "4) List Apps"
+        echo "5) Back"
+        echo ""
+        read -p "Select option: " choice
+
+        case $choice in
+            1) log_info "Windows"; aerospace list-windows --all ;;
+            2) log_info "Workspaces"; aerospace list-workspaces --all ;;
+            3) log_info "Monitors"; aerospace list-monitors ;;
+            4) log_info "Applications"; aerospace list-apps ;;
+            5) break ;;
+            *) log_error "Invalid option" ;;
+        esac
+    done
+}
+
+# -----------------------------------------------------------------------------
+# CLI
+# -----------------------------------------------------------------------------
+
+usage() {
+    cat << EOF
+mado - WM profile switcher
+
+Usage:
+    mado use [profile] [--dry-run]   Switch to profile (no arg: re-apply current)
+    mado stop                        Stop all WMs and managed services
+    mado status                      Recorded profile vs actual processes
+    mado list                        List available profiles
+    mado layout                      Layout save/restore menu (aerospace only)
+    mado info                        AeroSpace info menu (aerospace only)
+
+Profiles live in $PROFILE_DIR
+State is machine-local: $STATE_DIR (never committed)
+EOF
+}
+
+main() {
+    local cmd="${1:-}"
+    [[ $# -gt 0 ]] && shift
+
+    local args=()
+    local arg
+    for arg in "$@"; do
+        if [[ "$arg" == "--dry-run" ]]; then
+            DRY_RUN=true
+        else
+            args+=("$arg")
+        fi
+    done
+
+    case "$cmd" in
+        use)     cmd_use "${args[0]:-}" ;;
+        stop)    cmd_stop ;;
+        status)  cmd_status ;;
+        list)    cmd_list ;;
+        layout)  require_aerospace && layout_menu ;;
+        info)    require_aerospace && info_menu ;;
+        -h|--help|help|"") usage ;;
+        *)
+            log_error "Unknown command '$cmd'"
+            usage
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
