@@ -187,6 +187,26 @@ cleanup() {
     fi
 }
 
+# Trust third-party taps so brew (with the tap-trust model) can load their
+# formulae/casks during activation. Idempotent; skipped on older brew.
+# Keep in sync with darwin.nix taps and tap-scoped brews in */packages/homebrew.nix.
+trust_brew_taps() {
+    if ! brew trust --help &> /dev/null; then
+        return 0
+    fi
+    log_info "Trusting third-party Homebrew taps..."
+    brew trust --tap \
+        felixkratz/formulae \
+        satococoa/tap \
+        nikitabobko/tap \
+        barutsrb/tap \
+        karinushka/paneru \
+        k1low/tap \
+        dlvhdr/formulae \
+        noborus/tap \
+        || log_warn "brew trust reported failure (non-critical)"
+}
+
 # Main execution
 main() {
     local rebuild=false
@@ -220,6 +240,9 @@ main() {
 
     # Run checks
     check_prerequisites
+
+    # Trust third-party taps before activation loads them
+    trust_brew_taps
 
     # Regenerate node2nix if requested or if package.json changed
     if [[ "$node2nix" == true ]]; then
