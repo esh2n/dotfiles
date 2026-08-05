@@ -3,7 +3,8 @@ description: yoki review — 多角レビュー + 言語別レーン + 閾値 + 
 argument-hint: "[git range]"
 ---
 
-レビュー対象の git 範囲を決めよ。この呼び出しに引数があればその値、無ければ `HEAD~1...HEAD`。以降 `RANGE` と書く箇所は、**すべてその実際の範囲文字列に置換してから**渡すこと。`RANGE` の文字を残したまま渡してはならない。
+レビュー対象の git 範囲を決めよ。この呼び出しに引数があればその値。無ければ `$(git merge-base origin/main HEAD)` を実際に実行して得たコミットハッシュ**単体**（`...HEAD` を付けない——第2リビジョンなしの diff は作業ツリー比較になり、未コミットの変更も対象に含まれる。これが原型 review.js の既定と同じ意味）。origin/main が無ければ `HEAD~1...HEAD`。
+以降 `RANGE` と書く箇所は、**すべてその実際の文字列に置換してから**渡すこと。`RANGE` の文字を残したまま渡してはならない。
 
 手順1 → 手順2 の順で実行せよ。順序を入れ替えるな。あなた自身は差分を読むな。
 
@@ -62,9 +63,9 @@ const VERDICT_SCHEMA = {
   properties: { holds: { type: "boolean" }, reason: { type: "string" } },
 };
 const CONTEXT_SCHEMA = {
-  type: "object", required: ["diff", "intent", "langs"],
+  type: "object", required: ["diff", "files", "intent", "langs"],
   properties: {
-    diff: { type: "string" }, intent: { type: "string" },
+    diff: { type: "string" }, files: { type: "integer" }, intent: { type: "string" },
     langs: { type: "array", items: { type: "string" } },
   },
 };
@@ -87,12 +88,15 @@ const shaped = (v, want) => {
 const prep = await runs.all([{ key: "collect", agent: "reviewer", outputSchema: CONTEXT_SCHEMA, task:
 `次を順に実行せよ。
 1. mktemp で拡張子 .patch の一時ファイルを作り、git diff --no-ext-diff --no-color ${RANGE} をそこに保存する。差分本文は出力するな
-2. ブランチ名と直近5件のコミット件名から、この変更の意図を1文にまとめる
-3. 差分に含まれる言語を拡張子から挙げる（.go=go / .ts,.js=typescript / .tsx,.jsx=react と typescript / .py=python / .rs=rust）
-diff には保存した絶対パス、intent には意図、langs には言語名の配列を入れて返せ。` }]);
+2. git diff --stat ${RANGE} で変更ファイル数を数える
+3. ブランチ名と直近5件のコミット件名から、この変更の意図を1文にまとめる
+4. 差分に含まれる言語を拡張子から挙げる（.go=go / .ts,.js=typescript / .tsx,.jsx=react と typescript / .py=python / .rs=rust）
+diff には保存した絶対パス、files には変更ファイル数、intent には意図、langs には言語名の配列を入れて返せ。` }]);
 
 const ctx = shaped(prep[0], "context");
 if (!ctx || !ctx.diff) return { error: "collect failed", raw: String(prep[0]).slice(0, 300) };
+// 空差分ガード。原型 review.js の files_changed 早期終了に対応する。
+if (!ctx.files) return { intent: ctx.intent, findings: [], metrics: { note: "no changes to review", candidates: 0 } };
 
 // ---- 汎用の観点 ----
 const DIMS = [
@@ -142,14 +146,21 @@ const keep = (dim, agent, arr) => (Array.isArray(arr) ? arr : []).map((f) => ({
 // ---- レーンごとに独立して進める：あるレーンの検証は、他レーンの完了を待たない ----
 const parseErrors = [];
 const lanes = await Promise.all(DIMS.map(async (d) => {
-  const r = await runs.run(d.key, { agent: "reviewer", outputSchema: FINDINGS_SCHEMA, task: reviewTask(d) });
-  const obj = shaped(r, "findings");
-  if (!obj || !Array.isArray(obj.findings)) { parseErrors.push({ dim: d.key, agent: "codex" }); return { dim: d.key, candidates: 0, confirmed: [] }; }
-  const cands = keep(d.key, "codex", obj.findings);
-  if (!cands.length) return { dim: d.key, candidates: 0, confirmed: [] };
-  const vs = await runs.all(cands.map((f, i) => ({ key: d.key + "-v" + i, agent: "reviewer", outputSchema: VERDICT_SCHEMA, task: verifyTask(f) })));
-  return { dim: d.key, candidates: cands.length,
-           confirmed: cands.filter((_, i) => { const v = shaped(vs[i], "verdict"); return v && v.holds === true; }) };
+  // 1レーンの失敗はそのレーンの空結果として記録し、他レーンを道連れにしない
+  // （原型 review.js の pipeline はステージ例外で該当項目だけ null に落とす）。
+  try {
+    const r = await runs.run(d.key, { agent: "reviewer", outputSchema: FINDINGS_SCHEMA, task: reviewTask(d) });
+    const obj = shaped(r, "findings");
+    if (!obj || !Array.isArray(obj.findings)) { parseErrors.push({ dim: d.key, agent: "codex" }); return { dim: d.key, candidates: 0, confirmed: [] }; }
+    const cands = keep(d.key, "codex", obj.findings);
+    if (!cands.length) return { dim: d.key, candidates: 0, confirmed: [] };
+    const vs = await runs.all(cands.map((f, i) => ({ key: d.key + "-v" + i, agent: "reviewer", outputSchema: VERDICT_SCHEMA, task: verifyTask(f) })));
+    return { dim: d.key, candidates: cands.length,
+             confirmed: cands.filter((_, i) => { const v = shaped(vs[i], "verdict"); return v && v.holds === true; }) };
+  } catch (e) {
+    parseErrors.push({ dim: d.key, agent: "codex", error: String(e && e.message || e).slice(0, 120) });
+    return { dim: d.key, candidates: 0, confirmed: [] };
+  }
 }));
 
 // ---- Claude レーンも同じ閾値と検証にかける ----
