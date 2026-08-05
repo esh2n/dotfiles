@@ -239,6 +239,7 @@ minHeight = 320.0
 minWidth = 660.0
 
 [[appRules]]
+assignToWorkspace = "6"
 bundleId = "com.gather.GatherV2"
 id = "EF2F307A-DCFE-4513-9E3A-07FB56E2EC0A"
 layout = "float"
@@ -941,4 +942,4 @@ layoutType = "niri"
 name = "7"
 
 [workspaces.monitorAssignment]
-type = "tertiary"
+type = "secondary"
