@@ -144,14 +144,14 @@ deduplicateAppIcons = false
 enabled = true
 excludedBundleIDs = []
 height = 24.0
-hideEmptyWorkspaces = true
+hideEmptyWorkspaces = false
 notchActiveZoneWidth = 180.0
 notchMode = "moveBelowMenuBar"
 position = "overlappingMenuBar"
 reserveLayoutSpace = false
 revealHoldMilliseconds = 200.0
 revealModifier = "off"
-showFloatingWindows = false
+showFloatingWindows = true
 showLabels = true
 systemStatsButton = false
 windowLevel = "popup"
@@ -908,7 +908,8 @@ layoutType = "dwindle"
 name = "3"
 
 [workspaces.monitorAssignment]
-type = "secondary"
+displayUUID = "37D8832A-2D66-02CA-B9F7-8F30A301B230"
+type = "specificDisplay"
 
 [[workspaces]]
 id = "248AA883-2261-4D45-943C-79C0E46A232B"
@@ -933,7 +934,8 @@ layoutType = "niri"
 name = "6"
 
 [workspaces.monitorAssignment]
-type = "secondary"
+displayUUID = "37D8832A-2D66-02CA-B9F7-8F30A301B230"
+type = "specificDisplay"
 
 [[workspaces]]
 displayName = "7 🚀"
