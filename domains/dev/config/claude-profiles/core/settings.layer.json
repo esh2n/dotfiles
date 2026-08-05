@@ -139,6 +139,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:edit-write:suggest-compact\" \"scripts/hooks/pre-edit-write-suggest-compact.js\" \"standard,strict\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreCompact": [
