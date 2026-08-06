@@ -47,6 +47,7 @@ log/
 **/codex/history.jsonl
 # Runtime/state artifacts — may capture environment secrets (do not commit)
 **/codex/shell_snapshots/
+**/codex/plugins/cache/
 **/codex/cache/
 **/codex/.tmp/
 **/codex/*.sqlite
