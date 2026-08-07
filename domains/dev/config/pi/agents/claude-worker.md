@@ -6,7 +6,9 @@ systemPromptMode: replace
 runner:
   type: external-cli
   command: claude
-  args: ["-p", "--model", "sonnet"]
+  # Edit(//tmp/**): 一意ディレクトリへの結果書き出しだけを許可する。リポジトリは編集不可のまま。
+  # （既定の -p は Write を承認できず「権限がないため書けません」で全ファイル契約が壊れる——実測済み）
+  args: ["-p", "--model", "sonnet", "--allowedTools", "Edit(//tmp/**)"]
   promptDelivery: stdin
 async: true
 ---
