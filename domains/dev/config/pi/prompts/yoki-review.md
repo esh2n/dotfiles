@@ -37,6 +37,9 @@ confidence と importance を各1〜10で自己採点し、両方5以上のも�
 書いたら「done」とだけ答えよ。
 ```
 
+両方の完了は subagent の status / wait で確認せよ。claude-worker は External CLI のため実行中の活動が観測されず、60秒で「needs attention」警告が出るが異常ではない——5分までは無視して待て。長い bash のポーリングループを書くな。
+両方が complete になったら DIR の2ファイルの存在を**1回だけ**確認せよ。無い場合でも stdout ログからの抽出・再構築・手写しは一切禁止——欠損は手順2で missing として記録されるのが正しい動作である。そのまま手順2へ進め。
+
 ## 手順2：残りのレーンと検証をグラフで回す
 
 手順1の2件が完了したら、`subagent` ツールを **`async: false`** で次の workflowScript を呼べ。返ってきた JSON をそのまま出力せよ。
@@ -95,7 +98,7 @@ const shaped = (v, want) => {
 // ---- 差分を1度だけ保存し、言語も拾う ----
 const prep = await runs.all([{ key: "collect", agent: "reviewer", outputSchema: CONTEXT_SCHEMA, task:
 `次を順に実行せよ。
-1. mktemp で拡張子 .patch の一時ファイルを作り、git diff --no-ext-diff --no-color ${RANGE} をそこに保存する。差分本文は出力するな
+1. mktemp /tmp/yoki-diff.XXXXXXXX で一時ファイルを作り（拡張子を付けるな——macOS の mktemp は末尾 X 以外を置換できず、リテラル名の衝突で失敗する）、git diff --no-ext-diff --no-color ${RANGE} をそこに保存する。差分本文は出力するな
 2. git diff --stat ${RANGE} で変更ファイル数を数える
 3. ブランチ名と直近5件のコミット件名から、この変更の意図を1文にまとめる
 4. 差分に含まれる言語を拡張子から挙げる（.go=go / .ts,.js=typescript / .tsx,.jsx=react と typescript / .py=python / .rs=rust）
@@ -149,6 +152,17 @@ const keep = (dim, agent, arr) => (Array.isArray(arr) ? arr : []).map((f) => ({
   title: String(f.title || ""), detail: String(f.detail || ""),
 })).filter((f) => f.confidence >= 5 && f.importance >= 5 && f.file && f.title);
 
+// 検証は1件ずつ独立して失敗を吸収する。検証者が落ちた指摘は「確認できず」として
+// 落とす（原型 review.js の null-drop と同じ）。件数は verifyFailed で可視化する。
+const verifyAll = async (prefix, cands) => {
+  const settled = await Promise.all(cands.map((f, i) =>
+    runs.run(prefix + i, { agent: "reviewer", outputSchema: VERDICT_SCHEMA, task: verifyTask(f) })
+      .then((v) => ({ ok: true, v: shaped(v, "verdict") }))
+      .catch(() => ({ ok: false, v: null }))));
+  return { confirmed: cands.filter((_, i) => settled[i].ok && settled[i].v && settled[i].v.holds === true),
+           failed: settled.filter((x) => !x.ok).length };
+};
+
 // ---- レーンごとに独立して進める：あるレーンの検証は、他レーンの完了を待たない ----
 const parseErrors = [];
 const lanes = await Promise.all(DIMS.map(async (d) => {
@@ -157,25 +171,24 @@ const lanes = await Promise.all(DIMS.map(async (d) => {
   try {
     const r = await runs.run(d.key, { agent: d.agent || "reviewer", outputSchema: FINDINGS_SCHEMA, task: reviewTask(d) });
     const obj = shaped(r, "findings");
-    if (!obj || !Array.isArray(obj.findings)) { parseErrors.push({ dim: d.key, agent: "codex" }); return { dim: d.key, candidates: 0, confirmed: [] }; }
+    if (!obj || !Array.isArray(obj.findings)) { parseErrors.push({ dim: d.key, agent: "codex" }); return { dim: d.key, candidates: 0, confirmed: [], vFailed: 0 }; }
     const cands = keep(d.key, "codex", obj.findings);
-    if (!cands.length) return { dim: d.key, candidates: 0, confirmed: [] };
-    const vs = await runs.all(cands.map((f, i) => ({ key: d.key + "-v" + i, agent: "reviewer", outputSchema: VERDICT_SCHEMA, task: verifyTask(f) })));
-    return { dim: d.key, candidates: cands.length,
-             confirmed: cands.filter((_, i) => { const v = shaped(vs[i], "verdict"); return v && v.holds === true; }) };
+    if (!cands.length) return { dim: d.key, candidates: 0, confirmed: [], vFailed: 0 };
+    const vr = await verifyAll(d.key + "-v", cands);
+    return { dim: d.key, candidates: cands.length, confirmed: vr.confirmed, vFailed: vr.failed };
   } catch (e) {
     parseErrors.push({ dim: d.key, agent: "codex", error: String(e && e.message || e).slice(0, 120) });
-    return { dim: d.key, candidates: 0, confirmed: [] };
+    return { dim: d.key, candidates: 0, confirmed: [], vFailed: 0 };
   }
 }));
 
 // ---- Claude レーンも同じ閾値と検証にかける ----
 const claudeMissing = Array.isArray(ctx.missing) ? ctx.missing : [];
 const claudeCands = keep("claude-lanes", "claude", Array.isArray(ctx.claude) ? ctx.claude : null);
-let claudeConfirmed = [];
+let claudeConfirmed = [], claudeVFailed = 0;
 if (claudeCands.length) {
-  const vs = await runs.all(claudeCands.map((f, i) => ({ key: "cv" + i, agent: "reviewer", outputSchema: VERDICT_SCHEMA, task: verifyTask(f) })));
-  claudeConfirmed = claudeCands.filter((_, i) => { const v = shaped(vs[i], "verdict"); return v && v.holds === true; });
+  const vr = await verifyAll("cv", claudeCands);
+  claudeConfirmed = vr.confirmed; claudeVFailed = vr.failed;
 }
 
 // ---- file:line で重複排除（Claude と Codex が同じ欠陥を拾うことがある） ----
@@ -187,6 +200,7 @@ for (const f of all) {
 }
 
 const metrics = { lanesFailed: parseErrors.length, claudeLanesMissing: claudeMissing.length,
+  verifyFailed: lanes.reduce((n, l) => n + (l.vFailed || 0), 0) + claudeVFailed,
   candidates: lanes.reduce((n, l) => n + l.candidates, 0) + claudeCands.length,
   confirmed: all.length,
   byAgent: { claude: claudeConfirmed.length, codex: lanes.reduce((n, l) => n + l.confirmed.length, 0) },
