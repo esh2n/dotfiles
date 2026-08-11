@@ -15,9 +15,6 @@
     "sesh"
     "herdr" # not in nixpkgs
     "hunk" # not in nixpkgs
-    # microVM sandbox for coding agents. Not in nixpkgs; the tap also needs a
-    # one-time `brew trust docker/tap` that brew bundle cannot declare.
-    "docker/tap/sbx"
   ];
 
   homebrew.casks = [
@@ -28,5 +25,8 @@
     # codex ships as a cask only — there is no `codex` formula, so listing it
     # under brews made `brew bundle` fail and left the install unmanaged.
     "codex"
+    # microVM sandbox for coding agents. docker/tap is casks-only too (same
+    # trap as codex); the tap is trusted in update.sh's trust_brew_taps.
+    "docker/tap/sbx"
   ];
 }
