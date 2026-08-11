@@ -15,6 +15,9 @@
     "sesh"
     "herdr" # not in nixpkgs
     "hunk" # not in nixpkgs
+    # microVM sandbox for coding agents. Not in nixpkgs; the tap also needs a
+    # one-time `brew trust docker/tap` that brew bundle cannot declare.
+    "docker/tap/sbx"
   ];
 
   homebrew.casks = [
