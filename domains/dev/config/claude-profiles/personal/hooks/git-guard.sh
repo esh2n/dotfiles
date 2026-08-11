@@ -5,8 +5,9 @@
 # Policy tiers:
 #   deny always : force push (-f/--force), push to main/master,
 #                 reset --hard, checkout -- ., clean -f,
-#                 commit/push --no-verify (replaces the former
-#                 `npx block-no-verify` hook — no npx spawn per Bash call)
+#                 --no-verify on commit/merge/push and `commit -n` (replaces
+#                 the former `npx block-no-verify` hook — no npx spawn per
+#                 Bash call, and no network fetch)
 #   warn-once   : git commit while on main/master, push --force-with-lease
 #                 (first attempt denied with the reason fed back to the agent;
 #                  an identical retry in the same session passes)
@@ -65,11 +66,6 @@ if echo "$CMD" | grep -qEi "${G}push" && { [ "$BRANCH" = "main" ] || [ "$BRANCH"
   deny "You are on ${BRANCH}. Create a feature branch before pushing."
 fi
 
-if echo "$CMD" | grep -qEi "${G}(commit|push)" \
-   && echo "$CMD" | grep -qEi "(^|[[:space:]])--no-verify([[:space:]]|$)"; then
-  deny "--no-verify blocked. Hooks exist to catch what reviews miss — fix the failing check instead of skipping it."
-fi
-
 if echo "$CMD" | grep -qEi "${G}reset[[:space:]]+--hard"; then
   deny "git reset --hard blocked. Destructive operation requires explicit user approval."
 fi
@@ -80,6 +76,22 @@ fi
 
 if echo "$CMD" | grep -qEi "${G}clean[[:space:]]+-[a-z]*f"; then
   deny "git clean -f blocked. Removes untracked files."
+fi
+
+# --no-verify skips pre-commit/commit-msg/pre-push hooks. Flags are matched
+# against CMD_UNQUOTED (quoted strings stripped) so a -m message that merely
+# mentions the flag does not trigger. -n is only checked for commit: on push
+# it means --dry-run.
+CMD_UNQUOTED=$(echo "$CMD" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')
+
+if echo "$CMD" | grep -qEi "${G}(commit|merge|push)([[:space:]]|$)" \
+   && echo "$CMD_UNQUOTED" | grep -qEi "(^|[[:space:]])--no-verify([[:space:]]|$)"; then
+  deny "--no-verify blocked. It skips git hooks. Fix what the hooks report instead of bypassing them."
+fi
+
+if echo "$CMD" | grep -qEi "${G}commit([[:space:]]|$)" \
+   && echo "$CMD_UNQUOTED" | grep -qEi "(^|[[:space:]])-n([[:space:]]|$)"; then
+  deny "git commit -n blocked. It is short for --no-verify and skips git hooks."
 fi
 
 # ---- identity guard --------------------------------------------------------
