@@ -89,8 +89,14 @@ if echo "$CMD" | grep -qEi "${G}(commit|merge|push)([[:space:]]|$)" \
   deny "--no-verify blocked. It skips git hooks. Fix what the hooks report instead of bypassing them."
 fi
 
-if echo "$CMD" | grep -qEi "${G}commit([[:space:]]|$)" \
-   && echo "$CMD_UNQUOTED" | grep -qEi "(^|[[:space:]])-n([[:space:]]|$)"; then
+# -n is scoped to the `git commit` segment only: matching it across the whole
+# command misreads an unrelated `bash -n` / `grep -n` in a compound command.
+COMMIT_SEG=$(printf '%s' "$CMD_UNQUOTED" | tr ';|&()' '\n' \
+  | grep -Ei "(^|[[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)" \
+  | head -1)
+
+if [ -n "$COMMIT_SEG" ] \
+   && printf '%s' "$COMMIT_SEG" | grep -qEi "(^|[[:space:]])-n([[:space:]]|$)"; then
   deny "git commit -n blocked. It is short for --no-verify and skips git hooks."
 fi
 
