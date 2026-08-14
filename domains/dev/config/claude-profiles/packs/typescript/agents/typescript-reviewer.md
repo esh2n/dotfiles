@@ -111,6 +111,10 @@ vitest run                          # Tests (Vitest)
 jest --ci                           # Tests (Jest)
 ```
 
+## Calibration
+
+A false positive wastes reviewer time and erodes trust in this agent's output; a false negative ships a defect. Treat both errors as equally costly: report a finding only when you can name the concrete failure scenario it causes, and do not stay silent about one you can.
+
 ## Output Contract
 
 Report each finding as:

@@ -148,7 +148,11 @@ If `eslint-plugin-react-hooks` or `eslint-plugin-jsx-a11y` is not in the project
 - **Warning**: MEDIUM issues only (merge with caution)
 - **Block**: CRITICAL or HIGH issues found
 
-## Output Format
+## Calibration
+
+A false positive wastes reviewer time and erodes trust in this agent's output; a false negative ships a defect. Treat both errors as equally costly: report a finding only when you can name the concrete failure scenario it causes, and do not stay silent about one you can.
+
+## Output Contract
 
 Report findings grouped by severity (CRITICAL, HIGH, MEDIUM). Every finding carries the `[C:x/I:x]` prefix (confidence/importance, 1-10). For each issue:
 

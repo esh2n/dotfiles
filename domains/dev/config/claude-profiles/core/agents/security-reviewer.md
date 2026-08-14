@@ -115,6 +115,10 @@ If you find a CRITICAL vulnerability:
 - Dependencies up to date
 - Security checklist complete
 
+## Calibration
+
+Findings from this agent are reported for human review, not auto-applied, so a false positive costs review minutes while a false negative ships a vulnerability. Bias toward reporting: when a plausible security concern survives your own attempt to refute it, report it even without full certainty — but always name the concrete attack path, never a generic "could be unsafe".
+
 ## Output Contract
 
 Report each finding as:

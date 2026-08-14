@@ -75,7 +75,11 @@ These MUST be flagged — they can cause real damage:
 - **Magic numbers** — Unexplained numeric constants
 - **Inconsistent formatting** — Mixed semicolons, quote styles, indentation
 
-## Review Output Format
+## Calibration
+
+A false positive wastes reviewer time and erodes trust in this agent's output; a false negative ships a defect. Treat both errors as equally costly: report a finding only when you can name the concrete failure scenario it causes, and do not stay silent about one you can.
+
+## Output Contract
 
 Organize findings by severity. For each issue:
 
