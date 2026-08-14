@@ -96,6 +96,36 @@ load_domain_shell_configs() {
 }
 
 # -----------------------------------------------------------------------------
+# Cached Eval
+# -----------------------------------------------------------------------------
+
+# Cache the output of slow `<tool> init`-style commands and source the cache.
+# The output is static per tool version, so spawning the binary on every
+# shell (~15-50ms each) is wasted; regenerate only when the binary is newer
+# than the cache. Same pattern as the atuin cache in options.zsh.
+# 重い `<tool> init` 系コマンドの出力をキャッシュして source する。
+# Usage: cached_eval <cache-name> <command> [args...]
+# Example: cached_eval starship-init starship init zsh
+cached_eval() {
+    local name="$1"; shift
+    local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+    local cache="${cache_dir}/${name}.zsh"
+    local bin out
+    bin="$(command -v "$1")" || return 1
+    if [ ! -f "$cache" ] || [ "$bin" -nt "$cache" ]; then
+        [ -d "$cache_dir" ] || mkdir -p "$cache_dir"
+        # Capture first, write only on success — avoids leaving a broken
+        # cache behind (and needs no external `rm`). Empty output is not
+        # cached: e.g. `brew shellenv` prints nothing when its env vars are
+        # inherited, and caching that would break fresh login shells.
+        out="$("$@" 2>/dev/null)" || return 1
+        [ -n "$out" ] || return 1
+        printf '%s\n' "$out" > "$cache"
+    fi
+    source "$cache"
+}
+
+# -----------------------------------------------------------------------------
 # Async Initialization
 # -----------------------------------------------------------------------------
 
@@ -105,24 +135,3 @@ async_run() {
     (eval "$cmd") >/dev/null 2>&1 &
 }
 
-# -----------------------------------------------------------------------------
-# Specific Lazy Loaders (Common)
-# -----------------------------------------------------------------------------
-
-# Example: Lazy load mise (if used)
-init_mise() {
-    if command -v mise >/dev/null; then
-        eval "$(mise activate zsh)"
-    fi
-}
-
-setup_lazy_mise() {
-    if command -v mise >/dev/null; then
-        lazy_load_command "mise" "init_mise"
-        lazy_load_command "node" "init_mise"
-        lazy_load_command "npm" "init_mise"
-        lazy_load_command "python" "init_mise"
-        lazy_load_command "go" "init_mise"
-        lazy_load_command "cargo" "init_mise"
-    fi
-}
