@@ -107,6 +107,8 @@
   "theme": "dark",
   "effortLevel": "high",
   "preferredNotifChannel": "ghostty",
+  "skipWorkflowUsageWarning": true,
+  "agentPushNotifEnabled": true,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/scripts/statusline.sh"
