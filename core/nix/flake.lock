@@ -42,6 +42,32 @@
         "type": "github"
       }
     },
+    "capsule": {
+      "inputs": {
+        "home-manager": [
+          "home-manager"
+        ],
+        "nix-darwin": [
+          "nix-darwin"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786141859,
+        "narHash": "sha256-1vCfB/p2aZAPEQqk3wl9BdY/s2qcnlIO+lZRHrqNXVM=",
+        "owner": "shuymn",
+        "repo": "capsule",
+        "rev": "c449e61e271bea165c334be7b81330168f760767",
+        "type": "github"
+      },
+      "original": {
+        "owner": "shuymn",
+        "repo": "capsule",
+        "type": "github"
+      }
+    },
     "crit": {
       "inputs": {
         "nixpkgs": [
@@ -122,6 +148,7 @@
       "inputs": {
         "brew-api": "brew-api",
         "brew-nix": "brew-nix",
+        "capsule": "capsule",
         "crit": "crit",
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",

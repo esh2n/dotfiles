@@ -25,9 +25,17 @@
       url = "github:tomasz-tomczyk/crit";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # zsh prompt daemon — installed via flake because the author's brew
+    # formula points at the .sha256 asset instead of the tarball (v0.4.0)
+    capsule = {
+      url = "github:shuymn/capsule";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+      inputs.nix-darwin.follows = "nix-darwin";
+    };
   };
 
-  outputs = { nixpkgs, nix-darwin, home-manager, brew-nix, crit, ... }:
+  outputs = { nixpkgs, nix-darwin, home-manager, brew-nix, crit, capsule, ... }:
     let
       # Get username from environment (requires --impure)
       # Falls back to "ci" in pure evaluation (e.g., CI without --impure)
@@ -50,6 +58,7 @@
             nixpkgs.overlays = [
               (import ./overlays.nix)
               (final: prev: { crit = crit.packages.${system}.default; })
+              (final: prev: { capsule = capsule.packages.${system}.default; })
               brew-nix.overlays.default
             ];
             nixpkgs.config.allowUnfree = true;

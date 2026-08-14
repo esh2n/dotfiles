@@ -5,7 +5,8 @@
     zsh-autosuggestions
     zsh-completions
     zsh-syntax-highlighting
-    starship
+    starship # prompt fallback (see integrations.zsh)
+    capsule  # primary zsh prompt (flake input, see core/nix/flake.nix)
 
     # Multiplexers
     tmux
