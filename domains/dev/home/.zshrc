@@ -8,12 +8,9 @@
 # Resolve symlink to find dotfiles root / シンボリックリンクからルートパスを解決
 if [[ -z "$DOTFILES_ROOT" ]]; then
     if [[ -L "${HOME}/.zshrc" ]]; then
-        local link_target=$(readlink "${HOME}/.zshrc")
-        if [[ "$link_target" != /* ]]; then
-            link_target="${HOME}/${link_target}"
-        fi
+        # :A resolves the symlink in-shell (no readlink/dirname forks)
         # .zshrc is in domains/dev/home/.zshrc -> root is ../../../
-        DOTFILES_ROOT=$(dirname $(dirname $(dirname $(dirname "$link_target"))))
+        DOTFILES_ROOT="${${:-${HOME}/.zshrc}:A:h:h:h:h}"
     else
         # Fallback: resolve via ghq root + git remote
         local ghq_root="${GHQ_ROOT:-${HOME}/go}"
@@ -36,16 +33,15 @@ else
     return 1
 fi
 
-# 3. Initialize Lazy Loading / 遅延読み込みの初期化
-setup_lazy_mise
-
-# 4. Load Domain Configurations / ドメイン設定の読み込み
+# 3. Load Domain Configurations / ドメイン設定の読み込み
+# (mise activation lives in integrations.zsh; the old lazy wrappers here
+#  were overwritten by it before ever being used, so they were dropped)
 load_domain_shell_configs "$DOTFILES_ROOT" "zsh"
 
-# 5. Local Config Overrides / ローカル設定の上書き
+# 4. Local Config Overrides / ローカル設定の上書き
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
-# 6. Amazon Q / Other Integrations
+# 5. Amazon Q / Other Integrations
 
 
 # claude-mem: resolve latest installed version dynamically

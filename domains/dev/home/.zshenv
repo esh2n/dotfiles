@@ -22,13 +22,14 @@ fi
 unset _inherited_path
 
 # OS Detection / OS判定
-if [ -x /usr/bin/uname ]; then
-    OSTYPE=$(/usr/bin/uname -s)
-elif [ -x /bin/uname ]; then
-    OSTYPE=$(/bin/uname -s)
-else
-    OSTYPE=${OSTYPE:-unknown}
-fi
+# zsh sets $OSTYPE natively (e.g. darwin25.0, linux-gnu) — map it to the
+# uname -s style names the rest of the config compares against, no fork.
+case "$OSTYPE" in
+    darwin*) OSTYPE="Darwin" ;;
+    linux*)  OSTYPE="Linux" ;;
+    Darwin|Linux) ;; # already mapped (re-sourced)
+    *) OSTYPE=${OSTYPE:-unknown} ;;
+esac
 IS_WSL=0
 if [ "$OSTYPE" = "Linux" ]; then
   if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
@@ -44,10 +45,10 @@ export GHQ_ROOT="$GOPATH"
 # Load profile if exists
 [ -f "$HOME/.profile" ] && source "$HOME/.profile"
 
-# mise (Conditional Initialization / 条件付き初期化)
-if command -v mise >/dev/null 2>&1; then
-    eval "$(mise activate zsh)"
-fi
+# mise: activation lives in integrations.zsh (interactive shells only).
+# Running `mise activate` here cost ~25ms on every zsh invocation for
+# nothing — its hooks only fire at interactive prompts, and non-interactive
+# shells are covered by the mise shims already on PATH below.
 
 # OS Specific Settings / OS固有の設定
 if [ "$OSTYPE" = "Darwin" ]; then
