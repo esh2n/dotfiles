@@ -1,5 +1,7 @@
+
 # Kiro CLI pre block. Keep at the top of this file.
 [[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh"
+
 # .zshrc - Dotfiles Entry Point
 
 # 1. Define Dotfiles Root / ドットファイルルートの定義
@@ -45,8 +47,6 @@ load_domain_shell_configs "$DOTFILES_ROOT" "zsh"
 
 # 6. Amazon Q / Other Integrations
 
-# Kiro CLI post block. Keep at the bottom of this file.
-[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"
 
 # claude-mem: resolve latest installed version dynamically
 claude-mem() {
@@ -63,3 +63,7 @@ claude-mem() {
 # alias claude-mem= — managed by function above; do not remove this comment
 
 . "$HOME/.local/share/../bin/env"
+
+
+# Kiro CLI post block. Keep at the bottom of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"
