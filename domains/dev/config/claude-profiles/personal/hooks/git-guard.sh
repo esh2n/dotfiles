@@ -4,7 +4,9 @@
 #
 # Policy tiers:
 #   deny always : force push (-f/--force), push to main/master,
-#                 reset --hard, checkout -- ., clean -f
+#                 reset --hard, checkout -- ., clean -f,
+#                 commit/push --no-verify (replaces the former
+#                 `npx block-no-verify` hook — no npx spawn per Bash call)
 #   warn-once   : git commit while on main/master, push --force-with-lease
 #                 (first attempt denied with the reason fed back to the agent;
 #                  an identical retry in the same session passes)
@@ -61,6 +63,11 @@ fi
 
 if echo "$CMD" | grep -qEi "${G}push" && { [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; }; then
   deny "You are on ${BRANCH}. Create a feature branch before pushing."
+fi
+
+if echo "$CMD" | grep -qEi "${G}(commit|push)" \
+   && echo "$CMD" | grep -qEi "(^|[[:space:]])--no-verify([[:space:]]|$)"; then
+  deny "--no-verify blocked. Hooks exist to catch what reviews miss — fix the failing check instead of skipping it."
 fi
 
 if echo "$CMD" | grep -qEi "${G}reset[[:space:]]+--hard"; then

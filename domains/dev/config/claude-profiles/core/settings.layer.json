@@ -111,15 +111,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx block-no-verify@1.1.2"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
+            "if": "Bash(git push*)",
             "command": "node \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:bash:git-push-reminder\" \"scripts/hooks/pre-bash-git-push-reminder.js\" \"strict\""
           }
         ]
@@ -162,6 +154,7 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(gh pr create*)",
             "command": "node \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"post:bash:pr-created\" \"scripts/hooks/post-bash-pr-created.js\" \"standard,strict\""
           }
         ]
