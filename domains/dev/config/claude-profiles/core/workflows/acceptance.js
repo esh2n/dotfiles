@@ -19,6 +19,10 @@ export const meta = {
 //   language?: string,                          // report language (default: follow the project's docs)
 //   model?: string,
 // }
+// Model tiers: ground/evidence/verify -> MODEL (verify volume scales with the
+// criteria list and is evidence-based artifact re-reading, so it stays on the
+// finder tier with high effort); gaps critic + report -> session model + high
+// effort (the judgment the shipping decision rests on).
 // Robustness: named-workflow invocation may deliver args as a JSON string.
 let A = args
 if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
@@ -163,7 +167,7 @@ Claimed evidence: ${row.evidence}
 Claimed reasoning: ${row.reasoning}
 
 Open the cited artifact and read it. The claim fails if any of these is true: the citation does not exist; it asserts something adjacent but not this criterion; it would still pass with the behaviour broken; the criterion has parts the evidence does not reach. Default to holds=false when you are unsure — a gap that turns out to be covered costs a re-check, an inflated claim ships a hole. If the status is wrong but some weaker status is right, give corrected_status.`,
-        { label: `verify:${row.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: MODEL },
+        { label: `verify:${row.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: MODEL, effort: 'high' },
       ).then((v) => ({ ...row, verdict: v })),
     ),
   ).then((checked) => {
@@ -234,7 +238,8 @@ Checks this project runs: ${JSON.stringify(ground.verification.commands)}
 Name what is missing. Look for: criteria with no evidence; whole classes of check this project runs that were never applied to this work; parts of the built scope that no criterion covers at all; claims that survived verification but rest on a single fragile artifact; anything that can only be settled on real hardware or by a person.
 
 Then separate out the calls a human must make — scope cuts, accepted risks, criteria that no longer match what the product became. For each, give the options, your recommendation, and the trade-off in one line. Do not invent decisions to fill the list; an empty list is a valid answer.`,
-  { label: 'gaps', phase: 'Gaps', schema: GAPS_SCHEMA, model: MODEL },
+  // Judgment stage: session model (no override), high effort.
+  { label: 'gaps', phase: 'Gaps', schema: GAPS_SCHEMA, effort: 'high' },
 )
 
 phase('Report')
@@ -255,7 +260,8 @@ Structure:
 
 Rules: state only what the evidence supports. Where a coverage claim was refuted, say so and give the refutation. Never present an unrun check as passing. No padding, no praise.
 ${OUT ? `Write the report to ${OUT} as well as returning it.` : ''}`,
-  { label: 'report', phase: 'Report', model: MODEL },
+  // Judgment stage: session model (no override), high effort.
+  { label: 'report', phase: 'Report', effort: 'high' },
 )
 
 return {

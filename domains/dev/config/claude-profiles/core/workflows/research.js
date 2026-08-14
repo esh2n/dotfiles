@@ -10,13 +10,16 @@ export const meta = {
   ],
 }
 
-// args: { question: string, context?: string, model?: string }
+// args: { question: string, context?: string, model?: string, language?: string }
+// Model tiers: plan/search -> MODEL (sonnet); verify + synthesize -> session
+// model + high effort (judgment stays on the caller's tier).
 // Robustness: named-workflow invocation may deliver args as a JSON string.
 let A = args
 if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
 const QUESTION = (A && A.question) || ''
 const CONTEXT = (A && A.context) || ''
 const MODEL = (A && A.model) || 'sonnet'
+const LANGUAGE = (A && A.language) || 'Japanese'
 if (!QUESTION) { log('research requires args.question'); return { error: 'no question' } }
 
 phase('Plan')
@@ -65,7 +68,8 @@ Rules: use WebSearch/WebFetch — do NOT answer from memory (the topic may postd
   (r) => parallel(r.findings.filter((f) => f.load_bearing).map((f) => () =>
     agent(
       `Verify this claim by independently opening the source (and one more source if needed): "${f.claim}" (source: ${f.source}). Does it hold? If wrong or overstated, provide corrected wording.`,
-      { label: `verify:${r.angle}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: MODEL },
+      // Judgment stage: session model (no override), high effort.
+      { label: `verify:${r.angle}`, phase: 'Verify', schema: VERDICT_SCHEMA, effort: 'high' },
     ).then((v) => ({ ...f, verdict: v })),
   )).then((verified) => ({ ...r, verified: verified.filter(Boolean) })),
 )
@@ -73,7 +77,7 @@ Rules: use WebSearch/WebFetch — do NOT answer from memory (the topic may postd
 phase('Synthesize')
 const clean = results.filter(Boolean)
 const summary = await agent(
-  `Synthesize a research report (Japanese) answering: ${QUESTION}
+  `Synthesize a research report, written in ${LANGUAGE}, answering: ${QUESTION}
 ${CONTEXT ? `Reader context: ${CONTEXT}` : ''}
 Material (JSON): ${JSON.stringify(clean.map((r) => ({
     angle: r.angle,
@@ -81,7 +85,8 @@ Material (JSON): ${JSON.stringify(clean.map((r) => ({
     verified: (r.verified || []).map((v) => ({ claim: v.claim, holds: v.verdict && v.verdict.holds, corrected: v.verdict && v.verdict.corrected })),
     unknowns: r.unknowns,
   }))).slice(0, 30000)}
-Rules: lead with the answer; cite sources inline; where verification failed use the corrected wording; state unknowns honestly as 未確認; end with a short 「あなたの環境への含意」 section if context was given. No padding.`,
-  { label: 'synthesize', phase: 'Synthesize', model: MODEL },
+Rules: lead with the answer; cite sources inline; where verification failed use the corrected wording; state unknowns honestly in an explicit "unconfirmed" section; end with a short "implications for your environment" section (in the report language) if context was given. No padding.`,
+  // Judgment stage: session model (no override), high effort.
+  { label: 'synthesize', phase: 'Synthesize', effort: 'high' },
 )
 return { report: summary, unknowns: clean.flatMap((r) => r.unknowns) }

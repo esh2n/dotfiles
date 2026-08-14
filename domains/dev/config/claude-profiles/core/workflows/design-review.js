@@ -10,12 +10,16 @@ export const meta = {
   ],
 }
 
-// args: { target: string (file path, URL, or inline design text), model?: string }
+// args: { target: string (file path, URL, or inline design text), model?: string, language?: string }
+// Model tiers: lanes -> MODEL (sonnet), except the security lane -> opus
+// (misses cost the most, findings are report-only). Verify + synthesize ->
+// session model + high effort: judgment stays on the caller's tier.
 // Robustness: named-workflow invocation may deliver args as a JSON string.
 let A = args
 if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
 const TARGET = (A && A.target) || ''
 const MODEL = (A && A.model) || 'sonnet'
+const LANGUAGE = (A && A.language) || 'Japanese'
 if (!TARGET) { log('design-review requires args.target (path, URL, or design text)'); return { error: 'no target' } }
 
 phase('Gather')
@@ -104,7 +108,7 @@ Rules:
 // verification the moment that lane finishes.
 const runs = await pipeline(
   LANES,
-  (l) => agent(lanePrompt(l), { label: `lane:${l.key}`, phase: 'Panel', schema: LANE_SCHEMA, model: MODEL })
+  (l) => agent(lanePrompt(l), { label: `lane:${l.key}`, phase: 'Panel', schema: LANE_SCHEMA, model: l.key === 'security' ? 'opus' : MODEL })
     // Enforce the C/I floor in code — lanes leak sub-threshold findings despite the prompt.
     .then((r) => ({
       lane: l.key,
@@ -120,7 +124,8 @@ FINDING: ${f.claim}${f.doc_ref ? ` (claims to contradict: ${f.doc_ref})` : ''}
 DESIGN: ${ctx.design_summary}
 GROUNDING:\n${GROUNDING}
 Check: does the design actually say what the finding assumes? If it cites a doc, open that doc and confirm the quote supports the claim. Does the repo already handle this concern elsewhere? Read files if needed.`,
-        { label: `verify:${r.lane}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: MODEL },
+        // Judgment stage: session model (no override), high effort.
+        { label: `verify:${r.lane}`, phase: 'Verify', schema: VERDICT_SCHEMA, effort: 'high' },
       ).then((v) => ({ ...f, verdict: v }))),
   ).then((checked) => ({ ...r, checked: checked.filter(Boolean) })),
 )
@@ -155,11 +160,11 @@ const REPORT_SCHEMA = {
   type: 'object', required: ['verdict', 'report'],
   properties: {
     verdict: { type: 'string', enum: ['proceed', 'proceed-with-changes', 'rethink'] },
-    report: { type: 'string', description: 'the full Japanese markdown report' },
+    report: { type: 'string', description: 'the full markdown report in the requested language' },
   },
 }
 const out = await agent(
-  `以下のデザインレビュー結果を、人間の議論にそのまま使える日本語レポートにまとめてください。
+  `Synthesize this design review into a report, written in ${LANGUAGE}, ready to drop into a human discussion as-is.
 
 DESIGN:
 ${ctx.design_summary}
@@ -167,19 +172,19 @@ ${ctx.design_summary}
 GROUNDING:
 ${GROUNDING}
 
-確定指摘 (JSON): ${JSON.stringify(findings).slice(0, 20000)}
-論点候補 (JSON): ${JSON.stringify(questions).slice(0, 8000)}
-未発見の根拠資料: ${(ctx.missing || []).join(', ') || 'なし'}
+Confirmed findings (JSON): ${JSON.stringify(findings).slice(0, 20000)}
+Open-question candidates (JSON): ${JSON.stringify(questions).slice(0, 8000)}
+Grounding docs NOT found: ${(ctx.missing || []).join(', ') || 'none'}
 
-構成:
-1. 結論 — proceed / proceed-with-changes / rethink のいずれか + 1-2文の理由
-2. レーン別の確定指摘 — 各指摘に [C:n/I:n] タグ、根拠ドキュメントがあるものは引用付きで
-3. トレードオフ表 — 「選択肢 / 得るもの / 失うもの / 判断材料」のmarkdown表
-4. 決めるべき論点 — 人間が下す意思決定として言い切る形で列挙（重複は統合、指摘の言い換えは削る）
-5. 未確認 — 資料が見つからず判断できなかった点を正直に
+Structure:
+1. Verdict — proceed / proceed-with-changes / rethink, plus 1-2 sentences of reasoning
+2. Confirmed findings by lane — each tagged [C:n/I:n]; quote the grounding doc when one backs the finding
+3. Trade-off table — a markdown table: option / what it gains / what it costs / what decides it
+4. Decisions to make — phrased as decisions a human must take (merge duplicates, drop restatements of findings)
+5. Unconfirmed — what could not be judged because no grounding doc was found; say so honestly
 
-ルール: 指摘を水増ししない。根拠のない一般論を書かない。verdict は指摘の重さから決める(重大な未解決が残るなら proceed にしない)。`,
-  { label: 'synthesize', phase: 'Synthesize', model: MODEL, schema: REPORT_SCHEMA },
+Rules: do not pad the findings. No ungrounded generalities. Derive the verdict from the weight of the findings (an unresolved critical finding rules out "proceed").`,
+  { label: 'synthesize', phase: 'Synthesize', schema: REPORT_SCHEMA, effort: 'high' },
 )
 
 // Code-enforced floor: a high-stakes confirmed finding cannot be summarized away.

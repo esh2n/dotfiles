@@ -8,8 +8,11 @@ export const meta = {
   ],
 }
 
-// args: { model?: string } — agent model override, defaults to 'sonnet' for cost.
+// args: { model?: string, language?: string }
+// Model tiers: scanners -> MODEL (sonnet) at low effort (read-only inventory
+// work); synthesize -> session model (judgment stays on the caller's tier).
 const MODEL = (args && args.model) || 'sonnet'
+const LANGUAGE = (args && args.language) || 'Japanese'
 
 phase('Scan')
 
@@ -58,7 +61,7 @@ const SCANNERS = [
 
 const scans = await parallel(SCANNERS.map((s) => () =>
   agent(`${s.prompt}\nSet area="${s.key}". Return every item you judged via StructuredOutput. This is a read-only audit — change nothing.`,
-    { label: `scan:${s.key}`, phase: 'Scan', schema: SCAN_SCHEMA, model: MODEL }),
+    { label: `scan:${s.key}`, phase: 'Scan', schema: SCAN_SCHEMA, model: MODEL, effort: 'low' }),
 ))
 
 phase('Synthesize')
@@ -67,9 +70,10 @@ const drops = found.flatMap((s) => s.items.filter((i) => i.verdict === 'drop-can
 const fixes = found.flatMap((s) => s.items.filter((i) => i.verdict === 'fix').map((i) => `[${s.area}] ${i.name} — ${i.evidence}`))
 
 const summary = await agent(
-  `Merge this stocktake into a short prioritized report (Japanese). Group by area, lead with what to delete and why, then what to fix. Be specific; no padding.
+  `Merge this stocktake into a short prioritized report, written in ${LANGUAGE}. Group by area, lead with what to delete and why, then what to fix. Be specific; no padding.
 DROP CANDIDATES:\n${drops.join('\n') || '(none)'}\nFIX:\n${fixes.join('\n') || '(none)'}`,
-  { label: 'synthesize', phase: 'Synthesize', model: MODEL },
+  // Judgment stage: session model (no override).
+  { label: 'synthesize', phase: 'Synthesize' },
 )
 
 log(`stocktake: ${drops.length} drop candidate(s), ${fixes.length} fix item(s)`)

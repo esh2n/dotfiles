@@ -19,7 +19,11 @@ export const meta = {
 //   grounding?: string[],   // files/dirs the scout must read (repo facts). omit = no Ground phase
 //   evidence?: 'auto' | 'never',  // auto (default): Gate verifies load-bearing claims. never: skip Gate, claims stay unverified
 //   model?: string,
+//   language?: string,      // final synthesis language (default: Japanese)
 // }
+// Model tiers: scout/reframe/criteria/diverge/gate -> MODEL (gate volume
+// scales with claim count and is evidence-based); converge/challenge/
+// synthesize -> session model + high effort (the judgment stages).
 let A = args
 if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
 const QUESTION = (A && A.question) || ''
@@ -27,6 +31,7 @@ const CONTEXT = (A && A.context) || ''
 const GROUNDING = (A && Array.isArray(A.grounding)) ? A.grounding : []
 const EVIDENCE = (A && A.evidence) === 'never' ? 'never' : 'auto'
 const MODEL = (A && A.model) || 'sonnet'
+const LANGUAGE = (A && A.language) || 'Japanese'
 if (!QUESTION) { log('deliberate requires args.question'); return { error: 'no question' } }
 
 // ---- Ground: repo facts digest (optional) ----
@@ -34,7 +39,7 @@ phase('Ground')
 let ground = ''
 if (GROUNDING.length) {
   ground = await agent(
-    `Read these paths and produce a compact facts digest (Japanese, <= 40 lines): what exists, key names/shapes, constraints visible in code or docs. Facts only — no opinions, no proposals.
+    `Read these paths and produce a compact facts digest (English, <= 40 lines): what exists, key names/shapes, constraints visible in code or docs. Facts only — no opinions, no proposals.
 Paths: ${GROUNDING.join(', ')}
 The digest will be handed to every later agent as ground truth about the repo.`,
     { label: 'scout', phase: 'Ground', model: MODEL },
@@ -162,14 +167,16 @@ Criteria: ${JSON.stringify(criteria.criteria)}
 Options: ${JSON.stringify(options)}
 Gate verdicts: ${JSON.stringify(gated)}
 ${round > 1 ? `Previous fatal objections to address: ${JSON.stringify(objections.filter((o) => o.severity === 'fatal'))}` : ''}`,
-    { label: `converge-r${round}`, phase: 'Converge', schema: CONVERGE_SCHEMA, model: MODEL },
+    // Judgment stage: session model (no override), high effort.
+    { label: `converge-r${round}`, phase: 'Converge', schema: CONVERGE_SCHEMA, effort: 'high' },
   )
   phase('Challenge')
   const ch = await agent(
     `You are the designated skeptic. Attack this convergence: hidden assumptions, an option space that was too narrow, criteria that got quietly reweighted after the fact, gate verdicts being ignored. No new scope.
 Real question: ${REAL_Q}
 Convergence: ${JSON.stringify(converged)}`,
-    { label: `challenge-r${round}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, model: MODEL },
+    // Judgment stage: session model (no override), high effort.
+    { label: `challenge-r${round}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, effort: 'high' },
   )
   objections = (ch && ch.objections) || []
   if (!objections.some((o) => o.severity === 'fatal')) break
@@ -178,17 +185,18 @@ Convergence: ${JSON.stringify(converged)}`,
 
 phase('Synthesize')
 const synthesis = await agent(
-  `Synthesize in Japanese:
-1. 本当の問い (reframe の結果) と、元の問いとの差
-2. 推奨 (言い切る) と根拠 — gate を通った事実には出典/ファイル根拠、unverified はそのまま明記
-3. トレードオフと捨てた対案 (1 行ずつ)
-4. 残る反証 (serious 以上) への答え
+  `Synthesize, written in ${LANGUAGE}:
+1. The real question (from the reframe) and how it differs from the original
+2. The recommendation (state it flatly) and its grounds — facts that passed the gate carry their source/file evidence, unverified ones are labeled unverified as-is
+3. Trade-offs and the discarded alternatives (one line each)
+4. Answers to the remaining objections (serious and above)
 Real question: ${REAL_Q}
 Reframe: ${JSON.stringify(reframe)}
 Convergence: ${JSON.stringify(converged)}
 Objections: ${JSON.stringify(objections)}
 Return the final text only.`,
-  { label: 'synthesize', phase: 'Synthesize', model: MODEL },
+  // Judgment stage: session model (no override), high effort.
+  { label: 'synthesize', phase: 'Synthesize', effort: 'high' },
 )
 
 return { question: QUESTION, real_question: REAL_Q, options, criteria: criteria.criteria, gate: gated, convergence: converged, objections, answer: synthesis }
