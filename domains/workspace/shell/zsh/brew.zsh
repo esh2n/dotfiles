@@ -11,18 +11,14 @@ if [ -z "${HOMEBREW_PATH:-}" ]; then
   export HOMEBREW_PATH="$PATH"
 fi
 
-uname_cmd="/usr/bin/uname"
-if [ ! -x "$uname_cmd" ] && [ -x "/bin/uname" ]; then
-  uname_cmd="/bin/uname"
-fi
-if [ ! -x "$uname_cmd" ]; then
-  uname_cmd=$(command -v uname 2>/dev/null)
-fi
-if [ -n "$uname_cmd" ]; then
-  OSTYPE=$("$uname_cmd" -s)
-else
-  OSTYPE=${OSTYPE:-unknown}
-fi
+# zsh sets $OSTYPE natively (e.g. darwin25.0, linux-gnu) — map it to the
+# uname -s style names this file compares against, without forking.
+case "$OSTYPE" in
+    darwin*) OSTYPE="Darwin" ;;
+    linux*)  OSTYPE="Linux" ;;
+    Darwin|Linux) ;; # already mapped by .zshenv
+    *) OSTYPE=${OSTYPE:-unknown} ;;
+esac
 # Helper: determine if brew shellenv can run (needs readlink & dirname)
 __brew_can_use_shellenv=0
 if command -v readlink >/dev/null 2>&1 && command -v dirname >/dev/null 2>&1; then
@@ -81,18 +77,18 @@ fi
 # Homebrewの設定（OS別）
 if [ "$OSTYPE" = "Darwin" ]; then
     # === macOS向けHomebrew設定 ===
-    typeset -U path PATH
+    # -g is required: this file is sourced inside load_domain_shell_configs(),
+    # so a bare `typeset` would create an empty function-local path array,
+    # silently wiping PATH for the rest of the function.
+    typeset -gU path PATH
     path=(
         /opt/homebrew/bin(N-/)
         /usr/local/bin(N-/)
         "${path[@]}"
     )
 
-    if [ -n "$uname_cmd" ]; then
-        ARCH=$("$uname_cmd" -m)
-    else
-        ARCH=${ARCH:-unknown}
-    fi
+    # zsh sets $CPUTYPE natively (uname -m equivalent), no fork needed
+    ARCH="${CPUTYPE:-${ARCH:-unknown}}"
     if [ "$ARCH" = "arm64" ]; then
         PR_ARCH="ARM"
         export BREWx86_BASE=/opt/brew_x86
@@ -150,7 +146,8 @@ else
         export PATH="${BREW_BASE}/bin:${BREW_BASE}/sbin${PATH:+:${PATH}}"
         
         # PATHにLinuxbrewのディレクトリを追加
-        typeset -U path PATH
+        # -g: see the macOS branch — avoid an empty function-local path array
+        typeset -gU path PATH
         path=(
             ${BREW_BASE}/bin(N-/)
             ${BREW_BASE}/sbin(N-/)
