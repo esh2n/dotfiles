@@ -8,8 +8,11 @@ if command -v zoxide &>/dev/null; then
   cached_eval zoxide-init zoxide init zsh
 fi
 
-# Starship (Prompt)
-if command -v starship &>/dev/null; then
+# Prompt: capsule (daemon-based, <1ms render) with starship fallback for
+# machines that have not installed capsule yet
+if command -v capsule &>/dev/null; then
+  eval "$(capsule init zsh)"
+elif command -v starship &>/dev/null; then
   # Use generated config from dotfiles (via symlink)
   export STARSHIP_CONFIG="${HOME}/.config/starship/starship.toml"
   cached_eval starship-init starship init zsh

@@ -1,0 +1,166 @@
+# capsule prompt config — ported from starship.toml (domains/dev/config/starship/)
+# Colors are ANSI names (capsule has no hex support); the terminal theme
+# (catppuccin via theme-env) maps them to the same palette starship used.
+# Not portable from starship: right-side prompt, exit-code number display.
+
+[character]
+glyph = "❯"
+success_style = { fg = "green", bold = true }
+error_style = { fg = "red", bold = true }
+
+[character.vicmd]
+glyph = "❮"
+style = { fg = "yellow" }
+
+[directory]
+style = { fg = "cyan", bold = true }
+
+[git]
+icon = " "
+style = { fg = "green", bold = true }
+indicator_style = { fg = "yellow", bold = true }
+state_style = { fg = "yellow", bold = true }
+detached_hash_style = { fg = "green", bold = true }
+
+[time]
+disabled = false
+format = "HH:MM"
+style = { fg = "bright_black", bold = true }
+
+[cmd_duration]
+threshold_ms = 500
+style = { fg = "magenta", bold = true }
+
+# --- Language versions (starship parity: node/bun/rust/go/python) ---
+
+[[module]]
+name = "node"
+format = "v{version}"
+icon = "⬢"
+connector = "via"
+slot = "line1"
+
+[module.when]
+files = ["package.json"]
+
+[[module.source]]
+name = "version"
+file = ".node-version"
+
+[[module.source]]
+name = "version"
+command = ["node", "--version"]
+regex = 'v?(\d[\d.]*)'
+
+[module.style]
+fg = "magenta"
+bold = true
+
+[module.arbitration]
+group = "node.js"
+priority = 20
+
+[[module]]
+name = "bun"
+format = "v{version}"
+icon = "🥟"
+connector = "via"
+slot = "line1"
+
+[module.when]
+files = ["bun.lock", "bun.lockb", "bunfig.toml"]
+
+[[module.source]]
+name = "version"
+file = ".bun-version"
+
+[[module.source]]
+name = "version"
+command = ["bun", "--version"]
+regex = '(\d[\d.]*)'
+
+[module.style]
+fg = "magenta"
+bold = true
+
+[module.arbitration]
+group = "node.js"
+priority = 10
+
+[[module]]
+name = "rust"
+format = "v{version}"
+icon = "🦀"
+connector = "via"
+slot = "line1"
+
+[module.when]
+files = ["Cargo.toml"]
+
+[[module.source]]
+name = "version"
+command = ["rustc", "--version"]
+regex = 'rustc\s+(\S+)'
+
+[module.style]
+fg = "red"
+bold = true
+
+[[module]]
+name = "go"
+format = "v{version}"
+icon = "🐹"
+connector = "via"
+slot = "line1"
+
+[module.when]
+files = ["go.mod"]
+
+[[module.source]]
+name = "version"
+command = ["go", "version"]
+regex = 'go(\d[\d.]*)'
+
+[module.style]
+fg = "cyan"
+bold = true
+
+[[module]]
+name = "python"
+format = "v{version}"
+icon = "🐍"
+connector = "via"
+slot = "line1"
+
+[module.when]
+files = ["pyproject.toml", "setup.py", "requirements.txt"]
+
+[[module.source]]
+name = "version"
+command = ["python3", "--version"]
+regex = 'Python\s+(\S+)'
+
+[module.style]
+fg = "yellow"
+bold = true
+
+# --- Docker context (starship parity) ---
+
+[[module]]
+name = "docker"
+format = "{context}"
+icon = "🐳"
+connector = "via"
+slot = "line1"
+
+[module.when]
+files = ["Dockerfile", "docker-compose.yml", "compose.yaml"]
+
+[[module.source]]
+name = "context"
+command = ["docker", "context", "show"]
+regex = '(.+)'
+
+[module.style]
+fg = "blue"
+bold = true

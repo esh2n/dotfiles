@@ -11,6 +11,17 @@ source "${DOTFILES_ROOT}/core/utils/common.sh"
 log_info "Installing Dev Domain tools..."
 
 # -----------------------------------------------------------------------------
+# 0. Capsule prompt daemon (idempotent; requires capsule from nix flake input)
+# -----------------------------------------------------------------------------
+
+if has_command "capsule"; then
+    if [[ ! -S "${HOME}/.capsule/capsule.sock" ]]; then
+        log_info "Registering capsule prompt daemon (launchd)..."
+        capsule daemon install || log_warn "capsule daemon install failed (non-critical)"
+    fi
+fi
+
+# -----------------------------------------------------------------------------
 # 1. Language Runtimes (mise)
 # -----------------------------------------------------------------------------
 
