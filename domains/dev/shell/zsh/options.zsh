@@ -57,9 +57,16 @@ autoload -Uz compinit
   fi
 } &!
 
-# Jujutsu (jj) completion
+# Jujutsu (jj) completion (cached; regenerated when the jj binary updates)
 if command -v jj &> /dev/null; then
-  source <(COMPLETE=zsh jj 2>/dev/null || true)
+  () {
+    local cache="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/jj-completion.zsh"
+    if [[ ! -f "$cache" || "$(command -v jj)" -nt "$cache" ]]; then
+      mkdir -p "${cache:h}"
+      COMPLETE=zsh jj > "$cache" 2>/dev/null || true
+    fi
+    source "$cache"
+  }
 fi
 
 # Initialize zsh-autosuggestions
@@ -98,9 +105,20 @@ if command -v yazi &> /dev/null; then
     }
 fi
 
-# Initialize vivid
+# Initialize vivid (cached; regenerated when the vivid binary updates)
+# Sets LS_COLORS for ls and the completion list-colors zstyle below.
 if command -v vivid &> /dev/null; then
-    export LS_COLORS="$(vivid generate molokai)"
+    () {
+        local cache="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/vivid-lscolors"
+        if [[ ! -f "$cache" || "$(command -v vivid)" -nt "$cache" ]]; then
+            mkdir -p "${cache:h}"
+            vivid generate molokai > "$cache" 2>/dev/null || rm -f "$cache"
+        fi
+        [[ -f "$cache" ]] && export LS_COLORS="$(<"$cache")"
+    }
+else
+    # Fallback palette for machines without vivid
+    export LS_COLORS='di=34:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
 fi
 
 # Initialize thefuck (lazy loaded)
@@ -116,7 +134,7 @@ fi
 setopt auto_list
 setopt auto_menu
 zstyle ':completion:*:default' menu select=1
-export LS_COLORS='di=34:ln=35:so=32:pi=33:ex=31:bd=46;34:cd=43;34:su=41;30:sg=46;30:tw=42;30:ow=43;30'
+# LS_COLORS is set in the vivid block above (with a non-vivid fallback)
 zstyle ':completion:*:default' list-colors ${(s.:.)LS_COLORS}
 
 # History
