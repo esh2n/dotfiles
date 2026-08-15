@@ -136,6 +136,36 @@ assert_canonical_checkout() {
     return 1
 }
 
+# pi keeps configuration and runtime state in one directory (~/.pi/agent), so
+# it cannot be symlinked wholesale — that would take auth.json and every saved
+# session with it. Link only what this repo owns.
+#
+# settings.json and prompts/ are single entries; agents/ and extensions/ are
+# linked FILE BY FILE because pi discovers each file there and the directory
+# also has to stay writable for anything pi installs itself.
+#
+# Without this the wiring is hand-made and partial: on 2026-08-15 only
+# claude-worker.md was linked, so /yoki-review called five language reviewers
+# that were not installed.
+link_pi_resources() {
+    local src_dir="$1"
+    local pi_home="${HOME}/.pi/agent"
+
+    ensure_dir "$pi_home"
+
+    [[ -f "${src_dir}/settings.json" ]] && link_file "${src_dir}/settings.json" "${pi_home}/settings.json"
+    [[ -d "${src_dir}/prompts" ]] && link_file "${src_dir}/prompts" "${pi_home}/prompts"
+
+    local sub
+    for sub in agents extensions; do
+        [[ -d "${src_dir}/${sub}" ]] || continue
+        ensure_dir "${pi_home}/${sub}"
+        while IFS= read -r -d '' resource; do
+            link_file "$resource" "${pi_home}/${sub}/$(basename "$resource")"
+        done < <(find "${src_dir}/${sub}" -mindepth 1 -maxdepth 1 \( -type f -o -type l \) -print0)
+    done
+}
+
 # Link all files in a domain
 link_domain() {
     assert_canonical_checkout || return 1
@@ -160,6 +190,14 @@ link_domain() {
                 if [[ "$dirname" == "claude" ]]; then
                     local target="${HOME}/.claude"
                     link_file "$config_dir" "$target"
+                # pi reads ~/.pi/agent — it has no XDG lookup, so ~/.config/pi
+                # would be dead weight. That directory also holds runtime state
+                # (auth.json, sessions/, git/, npm/), so link the children we
+                # own rather than the directory.
+                # piは~/.pi/agentを読む。実行時の状態も同居するため、
+                # ディレクトリごとではなく管理下の項目だけをリンクする。
+                elif [[ "$dirname" == "pi" ]]; then
+                    link_pi_resources "$config_dir"
                 # serena directory should be linked to ~/.serena instead of ~/.config/serena
                 # serenaディレクトリは特別に~/.serenaにリンクする
                 elif [[ "$dirname" == "serena" ]]; then

@@ -2492,6 +2492,25 @@ claude-unattended() {
 }
 
 # Toggle auto mode for claude (persisted to ~/.claude/.auto-mode)
+# -----------------------------------------------------------------------------
+# pi wrapper — same shape as the claude one above
+# -----------------------------------------------------------------------------
+# pi is an npm global under ~/.local, not a nix package: nixpkgs does not carry
+# @earendil-works/pi-coding-agent, and agent CLIs in this repo are installed
+# out-of-band anyway (claude the same way). So the reproducibility this can
+# offer is a named install command instead of a "command not found".
+#
+# The yoki guard extension lives in domains/dev/config/pi/extensions and is
+# installed by claude-switch/manager.sh, not by this function.
+pi() {
+    local pi_bin="${HOME}/.local/bin/pi"
+    if [[ ! -x "$pi_bin" ]]; then
+        echo "\033[31mpi not found at ${pi_bin}. Run: npm install -g --prefix ~/.local @earendil-works/pi-coding-agent\033[0m" >&2
+        return 1
+    fi
+    "$pi_bin" "$@"
+}
+
 claude-auto() {
     local flag="$HOME/.claude/.auto-mode"
     case "${1:-}" in
