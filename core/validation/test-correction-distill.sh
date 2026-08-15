@@ -102,6 +102,8 @@ EOF
     # 5. child env: recursion guard + read-only tools passed to the agent
     check "case5a: child launched with Read-only tools" \
         "$(grep -q -- '--allowedTools Read' "$work/args" 2>/dev/null; echo $?)"
+    check "case5b: write/exec tools explicitly disallowed for the child" \
+        "$(grep -q -- '--disallowedTools' "$work/args" 2>/dev/null; echo $?)"
 
     # 6. NOT_A_CORRECTION: no draft
     cat > "$stub_dir/claude" <<'EOF'

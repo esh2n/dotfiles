@@ -107,6 +107,35 @@ run_unattended_guard_checks() {
     echo '{"unattended": true}' > "$work/.yoki.json"
     assert_deny "case8: .yoki.json unattended flag denies ~/.claude edit" "" \
         "$(make_edit_json "$HOME/.claude/settings.json" "$work")"
+    /bin/rm -f "$work/.yoki.json"
+
+    # 9. wrapper prefixes do not slip past the claude-switch check
+    assert_deny "case9: env claude-switch denied" "1" \
+        "$(make_bash_json "env claude-switch apply" "$work")"
+
+    # 10. quoting the redirect target does not evade the ~/.claude check
+    assert_deny "case10: quoted redirect into ~/.claude denied" "1" \
+        "$(make_bash_json 'echo x > "$HOME/.claude/foo.json"' "$work")"
+
+    # 11. non-redirect writers (cp/mv/...) into ~/.claude denied
+    assert_deny "case11: cp into ~/.claude denied" "1" \
+        "$(make_bash_json "cp /tmp/x.json ~/.claude/settings.json" "$work")"
+
+    # 12. even reads of ~/.claude are blocked while unattended (by design)
+    assert_deny "case12: cat ~/.claude denied while unattended" "1" \
+        "$(make_bash_json "cat ~/.claude/settings.json" "$work")"
+
+    # 13. path traversal does not dodge the file_path prefix match
+    assert_deny "case13: ..-laden edit path denied" "1" \
+        "$(make_edit_json "$work/project/../../.claude/settings.json" "$work")"
+
+    # 14. write-ish command into guardrail sources denied
+    assert_deny "case14: cp into claude-profiles sources denied" "1" \
+        "$(make_bash_json "cp /tmp/evil.sh $work/dotfiles/domains/dev/config/claude-profiles/personal/hooks/x.sh" "$work")"
+
+    # 15. reading guardrail sources stays allowed
+    assert_allow "case15: ls of claude-profiles sources allowed" "1" \
+        "$(make_bash_json "ls $work/dotfiles/domains/dev/config/claude-profiles/" "$work")"
 
     echo ""
     log_info "=== Results ==="

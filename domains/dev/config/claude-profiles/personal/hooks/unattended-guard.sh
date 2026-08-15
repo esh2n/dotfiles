@@ -36,22 +36,73 @@ case "$TOOL" in
   Write|Edit|MultiEdit)
     FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
     [ -n "$FILE" ] || exit 0
+    # A relative or ..-laden path must not dodge the prefix match: deny raw
+    # traversal outright, then canonicalize the directory (best-effort) and
+    # match on the resolved path.
     case "$FILE" in
-      "$HOME/.claude/"*|*/claude-profiles/*)
-        deny "Unattended session: editing guardrail config is blocked. Queue the change for an attended session instead."
+      */../*|../*)
+        deny "Unattended session: paths containing .. are blocked. Use the canonical path in an attended session."
         ;;
     esac
+    RESOLVED="$FILE"
+    FILE_DIR=$(dirname "$FILE" 2>/dev/null)
+    if [ -n "$FILE_DIR" ] && [ -d "$FILE_DIR" ]; then
+      RESOLVED_DIR=$(cd "$FILE_DIR" 2>/dev/null && pwd -P) && RESOLVED="${RESOLVED_DIR}/$(basename "$FILE")"
+    fi
+    # ~/.claude is itself a symlink into the dotfiles repo, so the canonical
+    # target must be denied as well as the ~-anchored spelling. Check the raw
+    # path AND the resolved one: raw catches the common spelling, resolved
+    # catches symlinked/relative routes to the same files.
+    HOME_CLAUDE_REAL=$(cd "$HOME/.claude" 2>/dev/null && pwd -P) || HOME_CLAUDE_REAL=""
+    for CANDIDATE in "$FILE" "$RESOLVED"; do
+      case "$CANDIDATE" in
+        "$HOME/.claude/"*|*/claude-profiles/*)
+          deny "Unattended session: editing guardrail config is blocked. Queue the change for an attended session instead."
+          ;;
+      esac
+      if [ -n "$HOME_CLAUDE_REAL" ]; then
+        case "$CANDIDATE" in
+          "$HOME_CLAUDE_REAL/"*)
+            deny "Unattended session: editing guardrail config is blocked. Queue the change for an attended session instead."
+            ;;
+        esac
+      fi
+    done
     ;;
   Bash)
     CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
     [ -n "$CMD" ] || exit 0
-    # Strip quoted strings so a mention inside a message does not trigger.
-    CMD_UNQUOTED=$(echo "$CMD" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')
-    if echo "$CMD_UNQUOTED" | grep -qE '(^|[;&|(]|\$\()[[:space:]]*claude-switch([[:space:]]|$)'; then
+    # Normalize standalone-quoted single words ("claude-switch") to bare form,
+    # then strip remaining quoted runs (multi-word strings) so a mention
+    # inside a message does not trigger.
+    CMD_NORM=$(echo "$CMD" | sed -E "s/\"([^\" ]+)\"/\1/g; s/'([^' ]+)'/\1/g")
+    CMD_UNQUOTED=$(echo "$CMD_NORM" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')
+
+    # claude-switch as a word anywhere: wrapper prefixes (env, time, nohup,
+    # command, xargs, ...) must not slip past a start-of-segment anchor.
+    if echo "$CMD_UNQUOTED" | grep -qE '(^|[[:space:];&|(])claude-switch([[:space:]]|$)'; then
       deny "Unattended session: claude-switch (config regeneration) is blocked. Queue it for an attended session."
     fi
-    if echo "$CMD_UNQUOTED" | grep -qE '(>>?|[[:space:]]tee[[:space:]])[[:space:]]*(~|\$HOME|'"$HOME"')/\.claude/'; then
-      deny "Unattended session: writing into ~/.claude is blocked. Queue the change for an attended session."
+
+    # Any home-anchored .claude path in the ORIGINAL command (quoted or not):
+    # enumerating write syntaxes (>, tee, cp, mv, sed -i, ...) is a losing
+    # game, and an unattended session has no legitimate reason to touch the
+    # installed config from Bash at all. Repo-local .claude/ (e.g. worktrees)
+    # stays allowed.
+    if echo "$CMD" | grep -qE '(~|\$HOME|\$\{HOME\}|'"$HOME"')/\.claude/'; then
+      deny "Unattended session: touching ~/.claude from Bash is blocked. Queue the change for an attended session."
+    fi
+    # ~/.claude is a symlink into the dotfiles repo — mentioning its canonical
+    # target is the same access by another spelling.
+    HOME_CLAUDE_REAL=$(cd "$HOME/.claude" 2>/dev/null && pwd -P) || HOME_CLAUDE_REAL=""
+    if [ -n "$HOME_CLAUDE_REAL" ] && echo "$CMD" | grep -qF "$HOME_CLAUDE_REAL/"; then
+      deny "Unattended session: touching the installed claude config from Bash is blocked. Queue the change for an attended session."
+    fi
+
+    # Guardrail sources: block write-ish commands that mention claude-profiles/.
+    if echo "$CMD_NORM" | grep -qE 'claude-profiles/' \
+       && echo "$CMD_UNQUOTED" | grep -qE '(>>?|(^|[[:space:];&|(])(tee|cp|mv|install|ln|rsync)([[:space:]]|$)|sed[[:space:]]+-[a-zA-Z]*i)'; then
+      deny "Unattended session: writing into claude-profiles sources is blocked. Queue the change for an attended session."
     fi
     ;;
 esac

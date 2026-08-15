@@ -65,11 +65,11 @@ TIMEOUT_BIN=$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null 
 if [ -n "$TIMEOUT_BIN" ]; then
   OUT=$(printf '%s' "$PROMPT" \
     | env CLAUDECODE='' YOKI_SKIP_DISTILL=1 CORRECTION_DETECT_DISABLED=1 \
-      "$TIMEOUT_BIN" 120 claude --model "$MODEL" --max-turns 8 --allowedTools "Read" -p 2>/dev/null) || exit 0
+      "$TIMEOUT_BIN" 120 claude --model "$MODEL" --max-turns 8 --allowedTools "Read" --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,Bash" -p 2>/dev/null) || exit 0
 else
   OUT=$(printf '%s' "$PROMPT" \
     | env CLAUDECODE='' YOKI_SKIP_DISTILL=1 CORRECTION_DETECT_DISABLED=1 \
-      claude --model "$MODEL" --max-turns 8 --allowedTools "Read" -p 2>/dev/null) || exit 0
+      claude --model "$MODEL" --max-turns 8 --allowedTools "Read" --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,Bash" -p 2>/dev/null) || exit 0
 fi
 
 [ -n "$OUT" ] || exit 0

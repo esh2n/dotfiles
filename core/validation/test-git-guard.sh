@@ -106,14 +106,16 @@ assert_allow() {
     fi
 }
 
-# pr-gate release: allow decision carrying the disclosure instruction
+# pr-gate release: disclosure instruction WITHOUT any permissionDecision —
+# an explicit allow would pre-approve the entire Bash command, so the gate
+# must stay silent toward the permission system.
 assert_release() {
     local description="$1" json="$2"
     TOTAL=$((TOTAL + 1))
     local out
     out=$(run_guard "$json")
-    if echo "$out" | grep -q '"permissionDecision":"allow"' \
-       && echo "$out" | grep -q 'preflight did not pass'; then
+    if echo "$out" | grep -q 'preflight did not pass' \
+       && ! echo "$out" | grep -q '"permissionDecision"'; then
         log_success "PASS: $description"
         PASSED=$((PASSED + 1))
     else
@@ -199,6 +201,22 @@ run_git_guard_checks() {
     # 14. quoted mention of gh pr create in another command -> not gated
     assert_allow "case14: quoted 'gh pr create' inside another command is not gated" \
         "$(make_json 'git log --grep "gh pr create"' "$WT" "$(new_session)")"
+
+    # 15. --no-verify belonging to another tool in a compound command -> allow
+    assert_allow "case15: unrelated --no-verify in compound command is not a false positive" \
+        "$(make_json 'npm test -- --no-verify && git commit -m fix' "$WT" "$(new_session)")"
+
+    # 16. quoting the flag does not evade the deny
+    assert_deny "case16: quoted '--no-verify' still denied" \
+        "$(make_json "git commit -m fix '--no-verify'" "$WT" "$(new_session)")"
+
+    # 17. quoting the verb does not evade the pr-gate (marker is stale here)
+    assert_deny "case17: gh \"pr\" create still gated" \
+        "$(make_json 'gh "pr" create --title x --body y' "$WT" "$(new_session)")"
+
+    # 18. plain --no-verify on commit -> deny
+    assert_deny "case18: git commit --no-verify denied" \
+        "$(make_json "git commit --no-verify -m fix" "$WT" "$(new_session)")"
 
     cleanup_fixture
     trap - RETURN

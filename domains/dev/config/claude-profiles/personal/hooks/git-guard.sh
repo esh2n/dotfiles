@@ -82,14 +82,23 @@ if echo "$CMD" | grep -qEi "${G}clean[[:space:]]+-[a-z]*f"; then
   deny "git clean -f blocked. Removes untracked files."
 fi
 
-# --no-verify skips pre-commit/commit-msg/pre-push hooks. Flags are matched
-# against CMD_UNQUOTED (quoted strings stripped) so a -m message that merely
-# mentions the flag does not trigger. -n is only checked for commit: on push
+# --no-verify skips pre-commit/commit-msg/pre-push hooks. Normalization:
+# standalone-quoted single words ('--no-verify', "pr") are unquoted first so
+# quoting a flag or verb cannot evade matching, THEN remaining quoted runs
+# (multi-word strings like -m messages) are stripped so a message that merely
+# mentions a flag does not trigger. -n is only checked for commit: on push
 # it means --dry-run.
-CMD_UNQUOTED=$(echo "$CMD" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')
+CMD_NORM=$(echo "$CMD" | sed -E "s/\"([^\" ]+)\"/\1/g; s/'([^' ]+)'/\1/g")
+CMD_UNQUOTED=$(echo "$CMD_NORM" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')
 
-if echo "$CMD" | grep -qEi "${G}(commit|merge|push)([[:space:]]|$)" \
-   && echo "$CMD_UNQUOTED" | grep -qEi "(^|[[:space:]])--no-verify([[:space:]]|$)"; then
+# Scoped per shell segment (like the -n check below): the flag must sit in
+# the same command segment as the git commit/merge/push, so an unrelated
+# tool's --no-verify in a compound command is not a false positive.
+NV_SEGS=$(printf '%s' "$CMD_UNQUOTED" | tr ';|&()' '\n' \
+  | grep -Ei "(^|[[:space:]])git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*(commit|merge|push)([[:space:]]|$)") || NV_SEGS=""
+
+if [ -n "$NV_SEGS" ] \
+   && printf '%s' "$NV_SEGS" | grep -qEi "(^|[[:space:]])--no-verify([[:space:]]|$)"; then
   deny "--no-verify blocked. It skips git hooks. Fix what the hooks report instead of bypassing them."
 fi
 
@@ -185,7 +194,11 @@ if [ "${GIT_GUARD_PR_GATE_DISABLED:-}" != "1" ] \
     PR_GATE_N=$(( ${PR_GATE_N:-0} + 1 ))
     mkdir -p "$MARK_DIR" 2>/dev/null && echo "$PR_GATE_N" > "${MARK_DIR}/${PR_GATE_KEY}" 2>/dev/null
     if [ "$PR_GATE_N" -ge 3 ]; then
-      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","additionalContext":"pr-gate released after repeated denies for the same content. You MUST state clearly in the PR body that preflight did not pass for this content."}}\n'
+      # Release WITHOUT a permissionDecision: an explicit allow would
+      # pre-approve the ENTIRE Bash command (anything chained after the
+      # gh pr create included), so stay silent toward the permission system
+      # and only inject the disclosure instruction.
+      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"pr-gate released after repeated denies for the same content. You MUST state clearly in the PR body that preflight did not pass for this content."}}\n'
       exit 0
     fi
     if [ "$PR_GATE_RC" = "1" ]; then
