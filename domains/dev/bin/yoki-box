@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+# Run a coding agent inside a Docker Sandboxes microVM, provisioned with the
+# yoki harness. Invoked through its symlinks, never by this name:
+#
+#   yclaude / ycodex / ygemini / ...   run that agent in a sandbox
+#   yfetch                             pull a sandbox's branches to the host
+#
+# The `y` prefix is the whole interface: `claude` is the host, `yclaude` is the
+# box. Adding an agent is one symlink — the agent name is $0 minus the `y`.
+#
+#   yclaude          guarded   : --clone, no credentials  (default; safe for
+#                                code you do not trust)
+#   yclaude -d       direct    : your real files, edited in place, no fetch
+#   yclaude -c       connected : --clone + GitHub credentials, delivers a PR
+#
+# All modes run Claude Code in `auto` mode (a classifier reviews each action);
+# that comes from the dotfiles settings layer, not from here.
+
+set -euo pipefail
+
+SELF="$(basename "$0")"
+BIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+DOTFILES_ROOT="$(cd "${BIN_DIR}/../../.." && pwd)"
+KITS="${DOTFILES_ROOT}/domains/dev/config/sbx/kits"
+
+die() { printf 'yoki-box: %s\n' "$1" >&2; exit 1; }
+note() { printf '\033[0;34m>\033[0m %s\n' "$1" >&2; }
+
+command -v sbx >/dev/null 2>&1 || die "sbx not installed (brew install docker/tap/sbx)"
+
+# ---------------------------------------------------------------------------
+# sandbox lookup: match on workspace rather than a name convention, so the
+# caller never has to remember what a sandbox was called.
+# ---------------------------------------------------------------------------
+# Several sandboxes can share one workspace, so a first-match wins lookup picks
+# the wrong one silently. Prefer a running sandbox; if that is still ambiguous,
+# refuse and make the caller name it.
+sandbox_for_cwd() {
+  sbx ls --json 2>/dev/null | python3 -c '
+import json, sys, os
+want = os.path.realpath(sys.argv[1])
+hits = [s for s in json.load(sys.stdin).get("sandboxes", [])
+        if any(os.path.realpath(w.split(":")[0]) == want for w in s.get("workspaces", []))]
+if not hits:
+    sys.exit(0)
+running = [s for s in hits if s.get("status") == "running"]
+pool = running or hits
+if len(pool) > 1:
+    sys.stderr.write("ambiguous: %d sandboxes share this workspace (%s)\n"
+                     % (len(pool), ", ".join(s["name"] for s in pool)))
+    sys.exit(3)
+print(pool[0]["name"])
+' "$1"
+}
+
+git_daemon_port() {
+  sbx ls --json 2>/dev/null | python3 -c '
+import json, sys
+name = sys.argv[1]
+for s in json.load(sys.stdin).get("sandboxes", []):
+    if s["name"] == name:
+        for p in s.get("ports") or []:
+            # 9418 is the git daemon; the host port is reassigned on every
+            # start, so it must be resolved fresh and never cached.
+            if p.get("sandbox_port") == 9418:
+                print(p["host_port"]); sys.exit(0)
+' "$1" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# yfetch: bring a sandbox's branches onto the host as sandbox-<name>/*
+# ---------------------------------------------------------------------------
+do_fetch() {
+  local repo_root name port
+  repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" \
+    || die "not inside a git repository"
+
+  if [ -n "${1:-}" ]; then
+    name="$1"
+  else
+    name="$(sandbox_for_cwd "$repo_root")" \
+      || die "name the sandbox explicitly: yfetch <name>"
+  fi
+  [ -n "$name" ] || die "no sandbox found for $repo_root"
+
+  # The daemon only listens while the sandbox runs; exec is the cheapest way
+  # to wake a stopped one.
+  sbx exec "$name" -- true >/dev/null 2>&1 || true
+
+  port="$(git_daemon_port "$name")"
+  [ -n "$port" ] || die "sandbox '$name' exposes no git daemon (direct mode has nothing to fetch)"
+
+  note "fetching from $name (127.0.0.1:$port)"
+  git -C "$repo_root" fetch --prune \
+    "git://127.0.0.1:${port}/$(basename "$repo_root")" \
+    "+refs/heads/*:refs/remotes/sandbox-${name}/*"
+
+  note "branches now under sandbox-${name}/ — review with:"
+  printf '    git log --oneline main..sandbox-%s/<branch>\n' "$name" >&2
+}
+
+# ---------------------------------------------------------------------------
+# agent run
+# ---------------------------------------------------------------------------
+# sbx ships these; anything else runs on the `shell` base and is brought up by
+# its own agents/<name> kit.
+SBX_BUILTIN_AGENTS="claude codex copilot cursor docker-agent droid gemini kiro opencode shell"
+
+do_run() {
+  local agent="$1"; shift
+  local mode=guarded
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -d|--direct)    mode=direct ;;
+      -c|--connected) mode=connected ;;
+      -g|--guarded)   mode=guarded ;;
+      -h|--help)      sed -n '2,20p' "$(readlink -f "$0")"; exit 0 ;;
+      --)             shift; break ;;
+      *)              die "unknown option: $1 (try -d, -c, or -h)" ;;
+    esac
+    shift
+  done
+
+  local posture_kit="${KITS}/postures/${mode}"
+  # direct differs from guarded only by the absence of --clone; it grants the
+  # same (empty) set of credentials, so it reuses the guarded kit.
+  [ "$mode" = direct ] && posture_kit="${KITS}/postures/guarded"
+  [ -d "$posture_kit" ] || die "no kit for mode '$mode' at $posture_kit"
+
+  local -a args=(run --no-share-skills)
+  # --no-share-skills is not optional: sbx otherwise mounts a host-side skills
+  # store read-write over ~/.claude/skills, and claude-switch cannot replace a
+  # mount point ("Device or resource busy"). It is also the cross-sandbox write
+  # hole flagged in the security docs.
+
+  [ "$mode" != direct ] && args+=(--clone)
+
+  local base="$agent"
+  case " ${SBX_BUILTIN_AGENTS} " in
+    *" ${agent} "*) ;;
+    *) base=shell; note "'${agent}' is not an sbx built-in; running on the shell base" ;;
+  esac
+  args+=("$base" .)
+
+  local agent_kit="${KITS}/agents/${agent}"
+  if [ -d "$agent_kit" ]; then
+    # The harness lives in the repo, so the sandbox needs it mounted. Mount the
+    # three paths claude-switch actually reads — not the whole repo, which
+    # would also expose ~1.7GB of past session transcripts under
+    # domains/dev/config/claude/ to whatever is running in the box.
+    args+=("${DOTFILES_ROOT}/core:ro")
+    args+=("${DOTFILES_ROOT}/domains/dev/bin:ro")
+    args+=("${DOTFILES_ROOT}/domains/dev/config/claude-profiles:ro")
+    args+=(--kit "$posture_kit" --kit "$agent_kit")
+  else
+    args+=(--kit "$posture_kit")
+  fi
+
+  # YOKI_BOX_DRY_RUN prints the sbx invocation instead of running it. The run
+  # path itself is an interactive TUI, so this is the only way to assert on the
+  # flags — and it is the fastest way to see what a mode actually grants.
+  if [ -n "${YOKI_BOX_DRY_RUN:-}" ]; then
+    printf 'sbx'; printf ' %q' "${args[@]}"; printf '\n'
+    return 0
+  fi
+
+  note "${agent} in a ${mode} sandbox"
+  sbx "${args[@]}" || true
+
+  sync_packs "$agent"
+  [ "$mode" != direct ] && do_fetch || true
+}
+
+# Packs are a machine-local choice (~/.claude/.claude-packs, 23 to pick from)
+# and the repo's packs.default is empty, so the kit cannot know them. Read the
+# host's set and mirror it — this keeps working as packs are added.
+sync_packs() {
+  [ -d "${KITS}/agents/$1" ] || return 0
+  local name packs
+  name="$(sandbox_for_cwd "$(pwd)")" || return 0
+  [ -n "$name" ] || return 0
+  packs="$(grep -v '^[[:space:]]*#' "${HOME}/.claude/.claude-packs" 2>/dev/null | tr '\n' ' ' | xargs || true)"
+  [ -n "$packs" ] || return 0
+  note "enabling host packs: ${packs}"
+  # shellcheck disable=SC2086
+  sbx exec "$name" -- bash -lc \
+    "DOTFILES_ROOT='${DOTFILES_ROOT}' bash '${DOTFILES_ROOT}/domains/dev/bin/claude-switch' pack enable ${packs}" \
+    >/dev/null 2>&1 || note "pack enable failed (non-fatal)"
+}
+
+case "$SELF" in
+  yfetch)   do_fetch "${1:-}" ;;
+  yoki-box) die "invoke through a symlink (yclaude, ycodex, yfetch, ...)" ;;
+  y?*)      do_run "${SELF#y}" "$@" ;;
+  *)        die "unrecognised invocation: $SELF" ;;
+esac
