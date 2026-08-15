@@ -1,0 +1,106 @@
+schemaVersion: "2"
+kind: mixin
+name: yoki-pi
+displayName: yoki harness for pi
+description: >-
+  Installs pi and the Claude Code CLI it delegates to, then wires both to the
+  dotfiles: ~/.claude from the yoki layers, ~/.pi/agent from the pi config.
+
+# Generated from spec.yaml.in by yoki-box at launch — never installed as a file,
+# because {{DOTFILES_ROOT}} is a literal path belonging to one checkout.
+#
+# WHY THIS KIT EXISTS
+#
+# pi ships no permission layer at all — that is a stated design position, not a
+# gap ("Pi is aggressively extensible so it doesn't have to dictate your
+# workflow"). Counting the layers on this machine:
+#
+#                        Claude Code        pi
+#   permissions.deny     82 rules           none
+#   auto-mode classifier every action       none
+#   yoki hooks           yes                yes (via the yoki-guard extension)
+#
+# The yoki-guard extension carries the git rules across, but `permissions.deny`
+# is interpreted by Claude Code's own engine and cannot be run as a hook, so
+# the layer that actually stands between an agent and `rm -rf` does NOT exist
+# on the pi side. Rebuilding it as a blocklist inside pi would repeat the
+# mistake the sandbox was adopted to avoid: a blocklist on a shell can always
+# be rephrased, a microVM is an allow-list by construction.
+#
+# So pi needs the VM MORE than Claude Code does, not less.
+
+permissions:
+  network:
+    allow:
+      # apt on arm64 Ubuntu resolves to ports.ubuntu.com, not archive.
+      - ports.ubuntu.com
+      - archive.ubuntu.com
+      - security.ubuntu.com
+      # Both agents are installed from npm. Measured 2026-08-15: the documented
+      # `curl -fsSL https://claude.ai/install.sh | bash` returns HTTP 403
+      # through the sandbox proxy, while the npm package installs cleanly — so
+      # the npm route is the one that works here, not merely the tidier one.
+      - registry.npmjs.org
+      # `curl https://mise.run | sh` redirects mise.run -> mise.jdx.dev, and
+      # the installer pulls the binary from the GitHub release assets.
+      - mise.run
+      - mise.jdx.dev
+      - github.com
+      - objects.githubusercontent.com
+      - release-assets.githubusercontent.com
+
+setup:
+  install:
+    - command: apt-get update && apt-get install -y zsh fd-find
+      description: Base-image gaps besides mise (fd ships as fd-find on Ubuntu)
+    - command: curl -fsSL https://mise.run | sh
+      user: "1000"
+      description: Install mise as the agent user so toolchains land in /home/agent
+
+    # Installed as root into the image-wide npm prefix
+    # (/usr/local/share/npm-global, already on PATH for every user) rather than
+    # a per-user --prefix, so `pi` resolves the same however the sandbox is
+    # entered. Measured: node v22 and npm are preinstalled, so nothing else is
+    # needed to run either agent.
+    - command: npm install -g @earendil-works/pi-coding-agent
+      description: pi itself
+
+    # pi's claude-worker agent runs `claude -p` as an external CLI — that is how
+    # this setup reaches the Claude subscription from a pi session, and
+    # /yoki-review calls it twice before anything else runs. Without it that
+    # prompt dies at step 1.
+    - command: npm install -g @anthropic-ai/claude-code
+      description: The CLI pi's claude-worker delegates to
+
+  startup:
+    # Rebuilds ~/.claude from core + packs + personal. The yoki-guard extension
+    # shells out to ~/.claude/hooks/*, so pi has no guardrails until this runs.
+    - command:
+        - sh
+        - -c
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/claude-switch apply
+      user: "1000"
+      description: Rebuild ~/.claude (also what yoki-guard reads its rules from)
+
+    # Links settings.json, prompts/, all six agents/ and the extensions/ into
+    # ~/.pi/agent. Only link_pi_resources is called, never `manager.sh link`,
+    # which would also rewrite ~/.config and ~/bin inside the VM.
+    #
+    # bash, not sh: startup commands run under dash, and both files are bash
+    # (dash died on the first `foo() (` in common.sh). The claude-switch step
+    # above only survives because it spawns bash explicitly.
+    - command:
+        - bash
+        - -c
+        - . {{DOTFILES_ROOT}}/core/utils/common.sh && . {{DOTFILES_ROOT}}/core/config/manager.sh && link_pi_resources {{DOTFILES_ROOT}}/domains/dev/config/pi
+      user: "1000"
+      description: Wire ~/.pi/agent to the repo's pi config
+
+    # NOT DONE HERE: authentication. Both agents use subscription OAuth and
+    # neither credential store is in the repo (~/.pi/agent/auth.json and
+    # ~/.claude/.credentials.json are host runtime state, deliberately not
+    # mounted). A fresh sandbox therefore needs TWO logins: `pi` then /login,
+    # and `claude` then /login. That is the price of not carrying credentials
+    # into a VM that runs untrusted code. If you only need the codex lanes,
+    # skip the claude login and yoki-review's step 1 will report the two
+    # missing files rather than failing.

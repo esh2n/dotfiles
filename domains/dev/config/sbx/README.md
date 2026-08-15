@@ -10,10 +10,10 @@
 **渡したものしか見えない** allow list なので、そこが破れない。
 
 ```
-domains/dev/bin/yoki-box          本体。yclaude / ycodex / ygemini / yopencode / yfetch は全部これへの symlink
+domains/dev/bin/yoki-box          本体。yclaude / ycodex / ypi / ygemini / yopencode / yfetch は全部これへの symlink
 domains/dev/config/sbx/kits/
 ├── postures/{guarded,connected}  何を渡すか(信頼の姿勢)
-└── agents/{claude,codex}         中で何を用意するか(エージェント固有)
+└── agents/{claude,codex,pi}      中で何を用意するか(エージェント固有)
 ```
 
 kit は `--kit` を複数回渡せるので、**posture × agent** の掛け算で組み合わせる。
@@ -85,6 +85,17 @@ VM に入れる理由と、審査を外す理由は別物。
 |---|---|---|
 | Claude Code | `auto` — 分類器が毎操作を審査 | dotfiles の settings layer |
 | Codex | `approval_policy = "never"` / `sandbox_mode = "danger-full-access"` | **sbx が作成時に書く `~/.codex/config.toml`**(コメントに "yolo mode" と明記) |
+| pi | **審査なし**。パーミッション層を持たないのが設計方針 | pi 本体(README に明記) |
+
+**pi は VM が最も要るエージェントです。** 層を数えるとこうなります:
+
+| | Claude Code | pi |
+|---|---|---|
+| `permissions.deny` | **82件** | なし |
+| auto モードの分類器 | 毎操作 | なし |
+| yoki hooks | あり | あり(`yoki-guard.ts` 拡張が `~/.claude/hooks/` を実行) |
+
+`yoki-guard.ts` は git の規律を移植しますが、**`permissions.deny` は Claude Code のエンジンが解釈する設定で、hook として外から実行できません**。つまり `rm -rf` の類に効く層は pi 側に存在しません。それを pi の中でブロックリストとして書き直すのは、sbx を採用した理由(ブロックリストは言い換えで回避できる)に逆行します。だから **pi こそ箱に入れる**、が結論です。
 
 Codex には `auto` に相当する設定キーがない。`on-request` は「モデルが自分で
 聞くか決める」なのでインジェクション下では機能せず、`untrusted` は全部聞いて

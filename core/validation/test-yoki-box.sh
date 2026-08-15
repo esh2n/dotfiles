@@ -149,14 +149,22 @@ run_yoki_box_checks() {
         fi
     fi
 
+    # The regression this guards is a rendered spec.yaml appearing NEXT TO its
+    # spec.yaml.in — an installed artifact carrying one checkout's absolute
+    # paths. Asserted directly rather than through `git status`, which also
+    # trips on any unrelated edit in the tree and so fails hardest exactly when
+    # someone is working on a kit.
     TOTAL=$((TOTAL + 1))
-    if git -C "$DOTFILES_ROOT" status --porcelain -- \
-        domains/dev/config/sbx | grep -q .; then
-        log_error "FAIL: case17: rendering leaves the repo untouched"
-        FAILED=$((FAILED + 1))
-    else
-        log_success "PASS: case17: rendering leaves the repo untouched"
+    local stray=""
+    while IFS= read -r tpl; do
+        [[ -e "${tpl%.in}" ]] && stray="${stray} ${tpl%.in}"
+    done < <(find "${KITS}" -name 'spec.yaml.in')
+    if [[ -z "$stray" ]]; then
+        log_success "PASS: case17: rendering writes no spec.yaml into the repo"
         PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: case17: rendered artifact left in the repo:${stray}"
+        FAILED=$((FAILED + 1))
     fi
 
     # --- argument handling ---------------------------------------------------

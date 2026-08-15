@@ -193,28 +193,33 @@ run_pi_yoki_guard_checks() {
     # up here rather than the first time pi is asked to force-push.
     TOTAL=$((TOTAL + 1))
     local harness out
-    harness="$(mktemp -d)/harness.mts"
+    harness="$(mktemp -d)/harness.mjs"
     cat > "$harness" <<'HARNESS'
-const [, , EXT, REPO] = process.argv;
-const mod = await import(EXT);
-let onToolCall: any = null;
-let onSessionStart: any = null;
+// Loaded through jiti — the loader pi itself depends on — rather than node's
+// --experimental-strip-types. Not a style choice: the sandbox image ships a
+// node built without TypeScript support, so strip-types would report a failure
+// that pi does not actually have.
+const [, , EXT, REPO, JITI] = process.argv;
+const { createJiti } = await import(JITI);
+const mod = await createJiti(import.meta.url).import(EXT);
+let onToolCall = null;
+let onSessionStart = null;
 const fakePi = {
-  on(e: string, h: any) {
+  on(e, h) {
     if (e === "tool_call") onToolCall = h;
     if (e === "session_start") onSessionStart = h;
   },
   registerTool() {},
   registerCommand() {},
 };
-const notices: string[] = [];
+const notices = [];
 const ctx = {
   cwd: REPO,
-  ui: { notify: (m: string) => notices.push(m) },
+  ui: { notify: (m) => notices.push(m) },
   sessionManager: { getSessionId: () => "harness", getSessionFile: () => "" },
 };
 await mod.default(fakePi);
-const call = async (toolName: string, input: any) => {
+const call = async (toolName, input) => {
   if (!onToolCall) return { blocked: false };
   const r = await onToolCall({ toolName, toolCallId: "t", input }, ctx);
   return { blocked: !!r?.block };
@@ -230,12 +235,14 @@ console.log(
 );
 HARNESS
 
-    # Node must be able to strip types; older runtimes cannot run .mts directly.
-    if ! node --experimental-strip-types -e '' >/dev/null 2>&1; then
-        log_warn "SKIP: this node cannot strip TypeScript — runtime cases not run"
+    # jiti ships inside pi; without pi there is nothing to test against anyway.
+    local jiti
+    jiti="$(dirname "$(readlink -f "$(command -v pi 2>/dev/null)" 2>/dev/null)" 2>/dev/null)/../node_modules/jiti/lib/jiti.mjs"
+    if [[ ! -f "$jiti" ]]; then
+        log_warn "SKIP: jiti not found under the installed pi — runtime cases not run"
         TOTAL=$((TOTAL - 1))
     else
-        out=$(GIT_GUARD_DISABLED=0 node --experimental-strip-types "$harness" "$EXT" "$REPO" 2>/dev/null || echo '{}')
+        out=$(GIT_GUARD_DISABLED=0 node "$harness" "$EXT" "$REPO" "$jiti" 2>/dev/null || echo '{}')
         if [[ "$(jq -r '.registered' <<< "$out")" == "true" ]] \
            && [[ "$(jq -r '.force' <<< "$out")" == "true" ]] \
            && [[ "$(jq -r '.plain' <<< "$out")" == "false" ]] \
@@ -253,7 +260,7 @@ HARNESS
         local broken; broken="$(mktemp -d)"
         printf '#!/usr/bin/env bash\n<<<<<<< HEAD\nif [ then\n' > "$broken/git-guard.sh"
         out=$(GIT_GUARD_DISABLED=0 YOKI_HOOKS_DIR="$broken" \
-              node --experimental-strip-types "$harness" "$EXT" "$REPO" 2>/dev/null || echo '{}')
+              node "$harness" "$EXT" "$REPO" "$jiti" 2>/dev/null || echo '{}')
         if [[ "$(jq -r '.registered' <<< "$out")" == "true" ]] \
            && [[ "$(jq -r '.force' <<< "$out")" == "false" ]]; then
             log_success "PASS: case18: a syntactically broken hook fails open"
@@ -268,7 +275,7 @@ HARNESS
         TOTAL=$((TOTAL + 1))
         local empty; empty="$(mktemp -d)"
         out=$(GIT_GUARD_DISABLED=0 YOKI_HOOKS_DIR="$empty" \
-              node --experimental-strip-types "$harness" "$EXT" "$REPO" 2>/dev/null || echo '{}')
+              node "$harness" "$EXT" "$REPO" "$jiti" 2>/dev/null || echo '{}')
         if [[ "$(jq -r '.registered' <<< "$out")" == "false" ]] \
            && [[ "$(jq -r '.warned' <<< "$out")" == "true" ]]; then
             log_success "PASS: case19: missing hooks warn instead of guarding silently"
