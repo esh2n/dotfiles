@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/rtk-rewrite.sh"
+            "command": "bash -c 'h=~/.claude/hooks/rtk-rewrite.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: rtk-rewrite.sh - failing open\" >&2'"
           }
         ]
       },

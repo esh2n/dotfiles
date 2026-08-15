@@ -143,7 +143,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/git-guard.sh"
+            "command": "bash -c 'h=~/.claude/hooks/git-guard.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: git-guard.sh - failing open\" >&2'"
           }
         ]
       },
@@ -152,7 +152,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/workflow-guard.sh",
+            "command": "bash -c 'h=~/.claude/hooks/workflow-guard.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: workflow-guard.sh - failing open\" >&2'",
             "timeout": 5
           }
         ]
@@ -164,7 +164,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/audit-log.sh",
+            "command": "bash -c 'h=~/.claude/hooks/audit-log.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: audit-log.sh - failing open\" >&2'",
             "timeout": 5
           }
         ]
@@ -174,7 +174,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/mcp-audit.sh",
+            "command": "bash -c 'h=~/.claude/hooks/mcp-audit.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: mcp-audit.sh - failing open\" >&2'",
             "timeout": 5
           }
         ]
@@ -206,7 +206,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/english-coach.sh",
+            "command": "bash -c 'h=~/.claude/hooks/english-coach.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: english-coach.sh - failing open\" >&2'",
             "timeout": 3
           }
         ]
@@ -218,7 +218,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/correction-detect.sh",
+            "command": "bash -c 'h=~/.claude/hooks/correction-detect.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: correction-detect.sh - failing open\" >&2'",
             "async": true,
             "timeout": 10
           }
@@ -231,17 +231,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/worktree-hygiene.sh",
+            "command": "bash -c 'h=~/.claude/hooks/worktree-hygiene.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: worktree-hygiene.sh - failing open\" >&2'",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/yoki-project-hint.sh",
+            "command": "bash -c 'h=~/.claude/hooks/yoki-project-hint.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: yoki-project-hint.sh - failing open\" >&2'",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/herdr-agent-state.sh session",
+            "command": "bash -c 'h=~/.claude/hooks/herdr-agent-state.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\" session; fi; echo \"[hook] syntax check failed: herdr-agent-state.sh - failing open\" >&2'",
             "timeout": 10
           }
         ]
