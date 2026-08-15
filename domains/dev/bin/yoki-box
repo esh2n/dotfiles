@@ -56,6 +56,26 @@ print(pool[0]["name"])
 ' "$1"
 }
 
+# ---------------------------------------------------------------------------
+# kit rendering
+# ---------------------------------------------------------------------------
+# A kit that needs the repo has to name it by absolute host path, and that path
+# belongs to whichever checkout yoki-box was invoked from — main or a worktree.
+# Installing the rendered file would therefore hand one checkout's path to
+# every caller, so it is rendered per launch into a temp dir keyed by the root
+# it came from, and never written back into the repo.
+render_kit() {
+  local src="$1" key dst
+  key="$(printf '%s' "$DOTFILES_ROOT" | cksum | cut -d' ' -f1)"
+  dst="${TMPDIR:-/tmp}/yoki-kits/$(basename "$(dirname "$src")")-${key}"
+  mkdir -p "$dst"
+  sed -e "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT}|g" \
+      -e "s|{{HOME}}|${HOME}|g" \
+      -e "s|{{USER}}|${USER}|g" \
+      "$src" > "${dst}/spec.yaml"
+  printf '%s' "$dst"
+}
+
 git_daemon_port() {
   sbx ls --json 2>/dev/null | python3 -c '
 import json, sys
@@ -146,21 +166,24 @@ do_run() {
   esac
   args+=("$base" .)
 
-  # A kit written as spec.yaml.template embeds literal host paths — that is the
-  # only reason to template it — so it needs the repo mounted. A kit written as
-  # a plain spec.yaml is self-contained and gets nothing. Mount only the three
-  # paths claude-switch reads, never the whole repo, which would also expose
-  # ~1.7GB of past session transcripts under domains/dev/config/claude/ to
-  # whatever is running in the box.
+  # A kit written as spec.yaml.in embeds literal host paths — that is the only
+  # reason not to write it as plain YAML — so it needs the repo mounted. A kit
+  # written as a plain spec.yaml is self-contained and gets nothing. Mount only
+  # the three paths claude-switch reads, never the whole repo, which would also
+  # expose ~1.7GB of past session transcripts under domains/dev/config/claude/
+  # to whatever is running in the box.
   local agent_kit="${KITS}/agents/${agent}"
-  if [ -f "${agent_kit}/spec.yaml.template" ]; then
+  if [ -f "${agent_kit}/spec.yaml.in" ]; then
     args+=("${DOTFILES_ROOT}/core:ro")
     args+=("${DOTFILES_ROOT}/domains/dev/bin:ro")
     args+=("${DOTFILES_ROOT}/domains/dev/config/claude-profiles:ro")
+    agent_kit="$(render_kit "${agent_kit}/spec.yaml.in")"
+  elif [ ! -f "${agent_kit}/spec.yaml" ]; then
+    agent_kit=""
   fi
 
   args+=(--kit "$posture_kit")
-  [ -d "$agent_kit" ] && args+=(--kit "$agent_kit")
+  [ -n "$agent_kit" ] && args+=(--kit "$agent_kit")
 
   # Everything after -- belongs to the agent, not to us.
   [ $# -gt 0 ] && args+=(-- "$@")
@@ -186,7 +209,7 @@ do_run() {
 sync_packs() {
   # Only meaningful for a kit that mounts the dotfiles — claude-switch is not
   # on PATH in a sandbox that was never given the repo.
-  [ -f "${KITS}/agents/$1/spec.yaml.template" ] || return 0
+  [ -f "${KITS}/agents/$1/spec.yaml.in" ] || return 0
   local name packs
   name="$(sandbox_for_cwd "$(pwd)")" || return 0
   [ -n "$name" ] || return 0

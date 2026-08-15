@@ -80,7 +80,6 @@ domains/dev/config/claude/.last-update-result.json
 domains/dev/config/claude/correction-analysis/
 domains/dev/config/starship/starship.toml
 domains/dev/config/mise/config.toml
-domains/dev/config/sbx/kits/agents/claude/spec.yaml
 domains/dev/config/zellij/config.kdl
 domains/dev/config/zellij/layouts/default.kdl
 domains/dev/config/zellij/layouts/nord.kdl

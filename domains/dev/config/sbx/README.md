@@ -104,15 +104,18 @@ sbx が書く config には mcp-gateway の設定も同居しているため、k
 - `sbx kit validate <dir>` で検証できる
 - v2 に**エージェントへの指示文を書く場所はない**(`agentContext` /
   `agentInstructions` は v1)。姿勢は `~/.claude/CLAUDE.md` 経由で渡る
-- **`spec.yaml.template` にするのは、ホストの絶対パスを埋め込む必要がある時だけ**。
+- **`spec.yaml.in` にするのは、ホストの絶対パスを埋め込む必要がある時だけ**。
   サンドボックスはリポジトリをホスト側のパスのままマウントするため
-  (`/Users/...` が VM 内にそのまま生える)、`{{DOTFILES_ROOT}}` を
-  `core/config/manager.sh` が展開する。生成物は gitignore 済み
-- `yoki-box` はこの `spec.yaml.template` の有無で挙動を変える:
+  (`/Users/...` が VM 内にそのまま生える)、`{{DOTFILES_ROOT}}` の展開が要る。
+  **展開は `yoki-box` が起動時に `$TMPDIR` へ行い、リポジトリには書き戻さない**
+  — 絶対パスは特定のチェックアウトに属するので、生成物として設置すると
+  worktree から起動した瞬間に嘘になる。拡張子が `.template` ではなく `.in`
+  なのは、`core/config/manager.sh` の生成対象から外すため
+- `yoki-box` はこの `spec.yaml.in` の有無で挙動を変える:
   - **ある** → dotfiles の3ディレクトリ(`core/`, `domains/dev/bin/`,
     `domains/dev/config/claude-profiles/`)を read-only でマウントし、
     起動後にホストの有効パックを同期する
-  - **ない** → 自己完結した kit とみなして何もマウントしない
+  - **ない**(素の `spec.yaml`) → 自己完結した kit とみなして何もマウントしない
 
 リポジトリ全体をマウントしないのは、`domains/dev/config/claude/` の下に
 **過去のセッション記録が約1.7GB ある**から。中で動くものに全部見せる必要はない。

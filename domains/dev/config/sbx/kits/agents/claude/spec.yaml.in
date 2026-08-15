@@ -9,10 +9,13 @@ description: >-
   dotfiles layers, so a sandboxed session runs the same hooks, skills, rules
   and workflows as the host.
 
-# Generated from spec.yaml.template by core/config/manager.sh — edit the
-# template, not the artifact. {{DOTFILES_ROOT}} has to be a literal path
-# because a sandbox mounts the repo at its HOST path (verified: the mount
-# lands on /Users/... inside the VM, via virtiofs, read-only).
+# Rendered by yoki-box at launch, into a temp dir, and never installed as a
+# file. {{DOTFILES_ROOT}} has to be a literal path because a sandbox mounts the
+# repo at its HOST path (verified: the mount lands on /Users/... inside the VM,
+# via virtiofs, read-only) — and a literal path belongs to one checkout, so a
+# generated artifact would be wrong the moment yoki-box runs from a worktree.
+# Rendering at launch means the kit always matches the caller. The `.in`
+# suffix (not `.template`) keeps core/config/manager.sh from generating it.
 #
 # Measured on the base image 2026-08-15 (Ubuntu 26.04, user `agent`,
 # home /home/agent): node v22.22.1, git 2.53, jq, python3, rg, bash, npm/npx,
