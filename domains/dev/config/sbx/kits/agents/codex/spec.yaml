@@ -1,0 +1,64 @@
+schemaVersion: "2"
+kind: mixin
+name: yoki-codex
+requires:
+  agent: codex
+displayName: yoki base tools for Codex
+description: >-
+  Fills the same base-image gaps the Claude kit fills, so a sandboxed Codex
+  session has the same shell and toolchain manager as a sandboxed Claude one.
+
+# Deliberately NOT a .template: unlike yoki-claude this kit embeds no host
+# path, because nothing in claude-profiles/ applies to Codex. yoki-box keys the
+# read-only dotfiles mounts off the presence of a spec.yaml.template, so a kit
+# written as a plain spec.yaml gets no mounts — which is correct here.
+#
+# Measured on the Codex base image 2026-08-15 (Ubuntu, user `agent`, home
+# /home/agent, codex-cli 0.146.0): node, git, jq and rg are PRESENT; zsh, mise
+# and fd are MISSING — the same three gaps as the Claude image, so the install
+# list is identical.
+#
+# What this kit does NOT do, and why:
+#
+# 1. It does not write ~/.codex/config.toml. sbx already writes one at create
+#    time ("yolo mode": approval_policy = "never", sandbox_mode =
+#    "danger-full-access") and that same file carries the mcp-gateway server
+#    with its `Bearer proxy-managed` header. Overwriting it would silently cut
+#    MCP off. CODEX_HOME is set to /home/agent/.codex.
+#
+# 2. It therefore leaves Codex more permissive than Claude in the same posture.
+#    Claude runs `auto` — a classifier reviews every action — because a microVM
+#    stops destruction but not disclosure (/run/sandbox/source is readable and
+#    the Balanced policy allows 192 domains). Codex has no config-level
+#    equivalent of `auto`: `on-request` leaves the decision to the model, which
+#    a prompt injection simply declines to use, and `untrusted` asks about
+#    everything. The nearest real equivalent is the `--approve-for-me` launch
+#    flag (automatic review). Left unwired because sbx's own launch arguments
+#    for the codex agent are not introspectable, so overriding them here would
+#    be guesswork. Pass it yourself when it matters:
+#        ycodex -- --approve-for-me
+#    or layer a profile: put yoki.config.toml under $CODEX_HOME and run
+#        ycodex -- -p yoki
+
+permissions:
+  network:
+    allow:
+      # apt on arm64 Ubuntu resolves to ports.ubuntu.com, not archive.
+      - ports.ubuntu.com
+      - archive.ubuntu.com
+      - security.ubuntu.com
+      # `curl https://mise.run | sh` redirects mise.run -> mise.jdx.dev, and
+      # the installer pulls the binary from the GitHub release assets.
+      - mise.run
+      - mise.jdx.dev
+      - github.com
+      - objects.githubusercontent.com
+      - release-assets.githubusercontent.com
+
+setup:
+  install:
+    - command: apt-get update && apt-get install -y zsh fd-find
+      description: The only base-image gaps besides mise (fd ships as fd-find on Ubuntu)
+    - command: curl -fsSL https://mise.run | sh
+      user: "1000"
+      description: Install mise as the agent user so toolchains land in /home/agent
