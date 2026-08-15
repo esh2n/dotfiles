@@ -1,5 +1,4 @@
 {
-  "apiKeyHelper": "",
   "cleanupPeriodDays": 30,
   "env": {
     "CLAUDECODE": "1",
