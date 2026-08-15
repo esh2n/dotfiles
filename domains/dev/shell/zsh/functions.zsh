@@ -2483,6 +2483,14 @@ claude() {
     CLAUDE_CODE_NO_FLICKER=1 "$claude_bin" "${extra_flags[@]}" "$@"
 }
 
+# Launch an unattended (AFK) session: confirmations relaxed via acceptEdits,
+# while the unattended-guard hook blocks guardrail self-modification
+# (~/.claude/**, claude-profiles/**, claude-switch) for the whole session.
+# Use this for /loop and cron-style runs instead of plain `claude`.
+claude-unattended() {
+    YOKI_UNATTENDED=1 claude --permission-mode acceptEdits "$@"
+}
+
 # Toggle auto mode for claude (persisted to ~/.claude/.auto-mode)
 claude-auto() {
     local flag="$HOME/.claude/.auto-mode"

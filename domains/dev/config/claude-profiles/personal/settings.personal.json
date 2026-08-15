@@ -144,6 +144,21 @@
           {
             "type": "command",
             "command": "bash -c 'h=~/.claude/hooks/git-guard.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: git-guard.sh - failing open\" >&2'"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'h=~/.claude/hooks/unattended-guard.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: unattended-guard.sh - failing open\" >&2'",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'h=~/.claude/hooks/unattended-guard.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: unattended-guard.sh - failing open\" >&2'",
+            "timeout": 5
           }
         ]
       },

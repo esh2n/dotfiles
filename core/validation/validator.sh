@@ -131,11 +131,15 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-git-guard.sh"
             run_git_guard_checks
             ;;
+        "unattended-guard")
+            source "${SCRIPT_DIR}/test-unattended-guard.sh"
+            run_unattended_guard_checks
+            ;;
         "workday-calc")
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|workday-calc}"
+            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|unattended-guard|workday-calc}"
             exit 1
             ;;
     esac
