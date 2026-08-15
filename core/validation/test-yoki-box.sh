@@ -186,6 +186,39 @@ run_yoki_box_checks() {
     out="$(YOKI_BOX_DRY_RUN=1 YOKI_UNATTENDED=1 bash "${BIN}/yclaude" 2>/dev/null)"
     assert_contains "case22: guarded mode still runs when unattended" "--clone" "$out"
 
+    # --- installation ---------------------------------------------------------
+    # The whole interface is symlinks to yoki-box, and the installer used to
+    # match regular files only — which would have put yoki-box in ~/bin with
+    # nothing able to invoke it. Run link_domain against a throwaway HOME and a
+    # non-git fixture (so the worktree guard stays out of the way) and check
+    # that a symlinked launcher lands.
+    TOTAL=$((TOTAL + 1))
+    local fixture fake_home
+    fixture="$(mktemp -d)"
+    fake_home="${fixture}/home"
+    mkdir -p "${fixture}/repo/core/utils" "${fixture}/repo/domains/dev/bin" "$fake_home"
+    cp "${DOTFILES_ROOT}/core/utils/common.sh"   "${fixture}/repo/core/utils/"
+    mkdir -p "${fixture}/repo/core/config"
+    cp "${DOTFILES_ROOT}/core/config/manager.sh" "${fixture}/repo/core/config/"
+    printf '#!/usr/bin/env bash\n' > "${fixture}/repo/domains/dev/bin/tool"
+    ln -s tool "${fixture}/repo/domains/dev/bin/ytool"
+
+    HOME="$fake_home" bash -c "
+        source '${fixture}/repo/core/utils/common.sh'
+        source '${fixture}/repo/core/config/manager.sh'
+        DOTFILES_ROOT='${fixture}/repo' link_domain dev
+    " >/dev/null 2>&1 || true
+
+    if [[ -L "${fake_home}/bin/ytool" && -e "${fake_home}/bin/tool" ]]; then
+        log_success "PASS: case23: installer links symlinked launchers, not just files"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: case23: installer links symlinked launchers, not just files"
+        log_error "  ~/bin contents: $(ls "${fake_home}/bin" 2>&1 | tr '\n' ' ')"
+        FAILED=$((FAILED + 1))
+    fi
+    /bin/rm -rf "$fixture"
+
     echo ""
     log_info "=== Results ==="
     echo ""

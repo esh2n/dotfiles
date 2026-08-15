@@ -215,11 +215,17 @@ link_domain() {
         ensure_dir "${HOME}/bin"
         # Use find to handle all files and avoid glob expansion issues
         # すべてのファイルを処理し、glob展開の問題を回避するためにfindを使用
+        #
+        # Symlinks count too (-type l): yoki-box dispatches on the name it was
+        # invoked as, so yclaude/ycodex/... are symlinks to it and ARE the
+        # interface. Installing only regular files would put yoki-box in ~/bin
+        # and nothing that can call it.
         while IFS= read -r -d '' bin_file; do
             local filename=$(basename "$bin_file")
             local target="${HOME}/bin/${filename}"
             link_file "$bin_file" "$target"
-        done < <(find "${domain_path}/bin" -mindepth 1 -maxdepth 1 -type f -print0)
+        done < <(find "${domain_path}/bin" -mindepth 1 -maxdepth 1 \
+                      \( -type f -o -type l \) -print0)
     fi
     
     # 4. Link Assets (Optional, e.g. to ~/.local/share or specific locations)
