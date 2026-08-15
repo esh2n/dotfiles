@@ -24,6 +24,34 @@ if [[ -z "${DOTFILES_ROOT:-}" ]]; then
     fi
 fi
 
+# --here: apply the checkout this script came from, even if it is a worktree.
+REDIRECTED_FROM=""
+declare -a _argv=()
+for _a in "$@"; do
+    [[ "$_a" == "--here" ]] && { REDIRECTED_FROM="--here"; continue; }
+    _argv+=("$_a")
+done
+set -- "${_argv[@]+"${_argv[@]}"}"
+
+# ~/.claude/settings.json bakes DOTFILES_ROOT into YOKI_ROOT and
+# CLAUDE_PLUGIN_ROOT as absolute paths, so applying from a git worktree leaves
+# every hook on the machine pointing at a directory that vanishes with the
+# worktree. Default to the main checkout; --here opts back in deliberately.
+# Silent no-op where there is no git (inside a sandbox DOTFILES_ROOT comes from
+# the environment and .git is not mounted).
+if [[ "$REDIRECTED_FROM" != "--here" && -n "${DOTFILES_ROOT:-}" ]]; then
+    _common="$(git -C "$DOTFILES_ROOT" rev-parse --git-common-dir 2>/dev/null || true)"
+    if [[ -n "$_common" ]]; then
+        [[ "$_common" == /* ]] || _common="${DOTFILES_ROOT}/${_common}"
+        _canonical="$(cd "${_common}/.." 2>/dev/null && pwd || true)"
+        if [[ -n "$_canonical" && "$_canonical" != "$DOTFILES_ROOT" \
+              && -d "${_canonical}/domains/dev/config/claude-profiles" ]]; then
+            REDIRECTED_FROM="$DOTFILES_ROOT"
+            DOTFILES_ROOT="$_canonical"
+        fi
+    fi
+fi
+
 # Load utilities (with fallbacks so the script works standalone)
 if [[ -n "${DOTFILES_ROOT:-}" && -f "$DOTFILES_ROOT/core/utils/common.sh" ]]; then
     source "$DOTFILES_ROOT/core/utils/common.sh"
@@ -34,6 +62,16 @@ type log_info    >/dev/null 2>&1 || log_info()    { echo "[info] $*"; }
 type log_success >/dev/null 2>&1 || log_success() { echo "[ok] $*"; }
 type log_warn    >/dev/null 2>&1 || log_warn()    { echo "[warn] $*"; }
 type log_error   >/dev/null 2>&1 || log_error()   { echo "[error] $*" >&2; }
+
+case "$REDIRECTED_FROM" in
+    ""|"--here") ;;
+    *)
+        log_warn "Invoked from a worktree — applying the main checkout instead."
+        log_warn "  worktree: $REDIRECTED_FROM"
+        log_warn "  applying: $DOTFILES_ROOT"
+        log_warn "Use 'claude-switch --here ...' to apply the worktree's own content."
+        ;;
+esac
 
 # Resolve profiles directory
 PROFILES_DIR=""

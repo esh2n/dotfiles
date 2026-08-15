@@ -113,11 +113,36 @@ process_all_templates() {
 # Symlink Logic
 # -----------------------------------------------------------------------------
 
+# Every ~/.config entry, ~/.claude and every ~/bin entry is a symlink INTO this
+# checkout. Linking from a git worktree would therefore point the entire
+# installation at a directory that disappears when the worktree is removed, and
+# the breakage is machine-wide and silent. There is no reason to link a
+# worktree, so refuse rather than offer a flag.
+assert_canonical_checkout() {
+    local common canonical
+    common="$(git -C "$DOTFILES_ROOT" rev-parse --git-common-dir 2>/dev/null)" || return 0
+    [[ -n "$common" ]] || return 0
+    # Relative (".git") when DOTFILES_ROOT is the main checkout, absolute when
+    # it is a worktree.
+    [[ "$common" == /* ]] || common="${DOTFILES_ROOT}/${common}"
+    canonical="$(cd "${common}/.." 2>/dev/null && pwd)" || return 0
+    [[ "$canonical" == "$DOTFILES_ROOT" ]] && return 0
+
+    log_error "Refusing to link from a git worktree."
+    log_error "  worktree: $DOTFILES_ROOT"
+    log_error "  main:     $canonical"
+    log_error "~/.claude, ~/bin and ~/.config would point into the worktree and"
+    log_error "break as soon as it is removed. Run this from the main checkout."
+    return 1
+}
+
 # Link all files in a domain
 link_domain() {
+    assert_canonical_checkout || return 1
+
     local domain="$1"
     local domain_path="${DOTFILES_ROOT}/domains/${domain}"
-    
+
     if [[ ! -d "$domain_path" ]]; then
         log_error "Domain not found: $domain"
         return 1
@@ -205,6 +230,8 @@ link_domain() {
 
 # Link all domains
 link_all() {
+    assert_canonical_checkout || return 1
+
     log_info "Linking all domains..."
     for domain_dir in "${DOTFILES_ROOT}/domains/"*; do
         if [[ -d "$domain_dir" ]]; then
