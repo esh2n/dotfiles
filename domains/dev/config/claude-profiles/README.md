@@ -64,12 +64,24 @@ claude-switch apply               # 選択を変えずに再合成
 {
   "hookProfile": "minimal",
   "disabledHooks": ["post:quality-gate", "post:bash:pr-created"],
-  "langs": ["go", "typescript"]
+  "langs": ["go", "typescript"],
+  "allowMainBranchWork": true,
+  "unattended": false,
+  "workflowDailyCap": 5
 }
 ```
 
 - `hookProfile`: minimal | standard | strict — このプロジェクトでのhook強度
 - `disabledHooks`: hook ID の配列 — 個別に無効化
+- `allowMainBranchWork`: 個人リポジトリ向け。main が作業ブランチで PR を
+  作らない運用のとき、git-guard の **main/master への push 拒否2件と
+  main 上コミットの警告だけ**を解除する。force push・`reset --hard`・
+  `clean -f`・`--no-verify`・identity チェック・PR ゲートは**解除されない** —
+  これらはブランチ方針ではなく破壊と衛生の話なので、プロジェクトファイルから
+  外せてしまうとそれは設定ではなく迂回路になる
+- `unattended`: 無人実行中とみなし、ガードレール自身の書き換えを禁止する
+  (unattended-guard.sh)。`YOKI_UNATTENDED=1` と同じ意味
+- `workflowDailyCap`: Workflow の1日あたり起動上限(既定5)
 - `langs`: このプロジェクトが使う言語pack名。packはマシン単位でしか
   有効化できない(ハーネス制約)ため自動切替はできないが、宣言したpackが
   無効ならセッション開始時に有効化コマンドが提示される

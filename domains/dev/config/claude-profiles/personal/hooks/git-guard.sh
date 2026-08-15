@@ -9,6 +9,9 @@
 #                 the former `npx block-no-verify` hook — no npx spawn per
 #                 Bash call, and no network fetch)
 #   warn-once   : git commit while on main/master, push --force-with-lease
+#   relaxable   : the two main/master push denials and the commit-on-main
+#                 warning, via "allowMainBranchWork": true in .yoki.json —
+#                 for personal repos where main IS the working branch
 #                 (first attempt denied with the reason fed back to the agent;
 #                  an identical retry in the same session passes)
 #   pr-gate     : gh pr create requires the preflight pass marker (content
@@ -55,6 +58,35 @@ if [ -n "$CWD" ] && [ -d "$CWD" ]; then
   fi
 fi
 
+# ---- per-project relaxation -------------------------------------------------
+# For personal repos where main IS the working branch (no PRs, local merges),
+# a project .yoki.json with
+#   { "allowMainBranchWork": true }
+# lifts exactly three rules: the two main/master push denials and the
+# commit-on-main warning.
+#
+# It lifts NOTHING else. Force push, reset --hard, clean -f, checkout -- .,
+# --no-verify, the identity check and the PR gate are about damage and hygiene
+# rather than branch policy, so they stay in force here as everywhere. Scoping
+# the flag this narrowly is the point: a project file that could switch the
+# whole guard off would be a bypass, not a preference.
+#
+# Same upward search as workflow-guard.sh, so the flag sits at the repo root
+# and covers subdirectories. Read per invocation, so it takes effect without
+# restarting the session. Fails toward "enforce": no file, unreadable file or
+# missing jq all leave the rules on.
+ALLOW_MAIN=0
+YOKI_DIR="${CWD:-.}"
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if [ -f "$YOKI_DIR/.yoki.json" ]; then
+    jq -e '.allowMainBranchWork == true' "$YOKI_DIR/.yoki.json" >/dev/null 2>&1 && ALLOW_MAIN=1
+    break
+  fi
+  YOKI_PARENT=$(dirname "$YOKI_DIR")
+  [ "$YOKI_PARENT" = "$YOKI_DIR" ] && break
+  YOKI_DIR="$YOKI_PARENT"
+done
+
 # ---- deny always -----------------------------------------------------------
 
 if echo "$CMD" | grep -qEi "${G}push([[:space:]]|$)" \
@@ -62,12 +94,14 @@ if echo "$CMD" | grep -qEi "${G}push([[:space:]]|$)" \
   deny "Force push blocked. Use --force-with-lease if rewriting a feature branch is truly needed."
 fi
 
-if echo "$CMD" | grep -qEi "${G}push([[:space:]]+[^[:space:]]+)*[[:space:]]+(origin[[:space:]]+)?(main|master)([[:space:]]|:|$)"; then
-  deny "Push to main/master blocked. Push a feature branch and open a PR instead."
+if [ "$ALLOW_MAIN" = 0 ] \
+   && echo "$CMD" | grep -qEi "${G}push([[:space:]]+[^[:space:]]+)*[[:space:]]+(origin[[:space:]]+)?(main|master)([[:space:]]|:|$)"; then
+  deny "Push to main/master blocked. Push a feature branch and open a PR instead. (If this repo is personal and main is the working branch, set allowMainBranchWork to true in its .yoki.json.)"
 fi
 
-if echo "$CMD" | grep -qEi "${G}push" && { [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; }; then
-  deny "You are on ${BRANCH}. Create a feature branch before pushing."
+if [ "$ALLOW_MAIN" = 0 ] \
+   && echo "$CMD" | grep -qEi "${G}push" && { [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; }; then
+  deny "You are on ${BRANCH}. Create a feature branch before pushing. (If this repo is personal and main is the working branch, set allowMainBranchWork to true in its .yoki.json.)"
 fi
 
 if echo "$CMD" | grep -qEi "${G}reset[[:space:]]+--hard"; then
@@ -212,7 +246,7 @@ if echo "$CMD" | grep -qEi "${G}push[[:space:]].*--force-with-lease"; then
   warn_once "force-with-lease" "force-with-lease rewrites remote history. If this is intentional (e.g. after rebase of your own feature branch), re-run the same command to proceed."
 fi
 
-if [ "$IS_WORKTREE" != "1" ] \
+if [ "$IS_WORKTREE" != "1" ] && [ "$ALLOW_MAIN" = 0 ] \
    && echo "$CMD" | grep -qEi "${G}commit" && { [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; }; then
   warn_once "commit-on-${BRANCH}" "You are committing directly on ${BRANCH} in the main working tree. Prefer a feature branch or a worktree. If the user explicitly asked for this, re-run the same command to proceed."
 fi

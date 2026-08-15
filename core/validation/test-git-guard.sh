@@ -218,6 +218,41 @@ run_git_guard_checks() {
     assert_deny "case18: git commit --no-verify denied" \
         "$(make_json "git commit --no-verify -m fix" "$WT" "$(new_session)")"
 
+    # --- .yoki.json allowMainBranchWork -------------------------------------
+    # Personal repos where main is the working branch. The flag must lift the
+    # branch-policy rules and nothing else, so each relaxed case is paired with
+    # a damage-control rule that has to stay denied under the same flag.
+    assert_deny "case19: push to main denied without the flag" \
+        "$(make_json "git push origin main" "$REPO" "$(new_session)")"
+
+    echo '{"allowMainBranchWork": true}' > "$REPO/.yoki.json"
+
+    assert_allow "case20: push to main allowed with the flag" \
+        "$(make_json "git push origin main" "$REPO" "$(new_session)")"
+    assert_allow "case21: push while standing on main allowed with the flag" \
+        "$(make_json "git push" "$REPO" "$(new_session)")"
+    assert_allow "case22: commit on main no longer warns with the flag" \
+        "$(make_json "git commit -m fix" "$REPO" "$(new_session)")"
+    mkdir -p "$REPO/sub/deeper"
+    assert_allow "case23: flag is found from a subdirectory" \
+        "$(make_json "git push origin main" "$REPO/sub/deeper" "$(new_session)")"
+
+    assert_deny "case24: force push still denied under the flag" \
+        "$(make_json "git push -f origin main" "$REPO" "$(new_session)")"
+    assert_deny "case25: reset --hard still denied under the flag" \
+        "$(make_json "git reset --hard HEAD~1" "$REPO" "$(new_session)")"
+    assert_deny "case26: --no-verify still denied under the flag" \
+        "$(make_json "git commit --no-verify -m fix" "$REPO" "$(new_session)")"
+
+    # A flag set to anything but true, or malformed JSON, must not relax.
+    echo '{"allowMainBranchWork": "yes"}' > "$REPO/.yoki.json"
+    assert_deny "case27: non-boolean flag does not relax" \
+        "$(make_json "git push origin main" "$REPO" "$(new_session)")"
+    echo 'not json' > "$REPO/.yoki.json"
+    assert_deny "case28: malformed .yoki.json does not relax" \
+        "$(make_json "git push origin main" "$REPO" "$(new_session)")"
+    /bin/rm -f "$REPO/.yoki.json"
+
     cleanup_fixture
     trap - RETURN
 
