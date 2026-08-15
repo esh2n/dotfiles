@@ -65,9 +65,15 @@ process_template() {
     local temp_includes=$(mktemp)
     generate_conditional_includes > "$temp_includes"
 
-    # Replace {{HOME}} and {{USER}} with actual values first
+    # Replace {{HOME}}, {{USER}} and {{DOTFILES_ROOT}} with actual values first.
+    # {{DOTFILES_ROOT}} matches the token claude-switch already expands, and is
+    # what sbx kits need: a sandbox mounts the repo at its host path, so the
+    # kit has to name that path literally.
     local temp_file=$(mktemp)
-    sed -e "s|{{HOME}}|${HOME}|g" -e "s|{{USER}}|${USER}|g" "$template_file" > "$temp_file"
+    sed -e "s|{{HOME}}|${HOME}|g" \
+        -e "s|{{USER}}|${USER}|g" \
+        -e "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT}|g" \
+        "$template_file" > "$temp_file"
 
     # Replace {{CONDITIONAL_INCLUDES}} with generated includes
     if grep -q "{{CONDITIONAL_INCLUDES}}" "$temp_file"; then

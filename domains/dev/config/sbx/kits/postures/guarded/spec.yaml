@@ -1,0 +1,25 @@
+schemaVersion: "2"
+kind: mixin
+name: yoki-guarded
+displayName: yoki guarded posture
+description: >-
+  No outbound credentials. Work leaves the sandbox only through the git daemon,
+  which the human pulls with yfetch. Pair with --clone so the host repository
+  stays read-only.
+
+# This kit is deliberately almost empty — the posture IS what it does not grant.
+#
+# No `credentials:` block. Verified 2026-08-15: with no github secret stored,
+# `gh api user` returns 401 inside the sandbox, so the agent cannot push or
+# open PRs. Adding a github secret here would silently turn this into the
+# connected posture; use yoki-connected instead.
+#
+# No `permissions.network` rules either. The global Balanced policy already
+# allows 192 domains — every package registry plus **.github.com — so adding
+# allow rules would be redundant, and narrowing would mean whack-a-mole deny
+# rules against that list. Real lockdown is `sbx policy init` -> Locked Down
+# globally, then adding back per sandbox. Not done here; see README.
+#
+# Posture rules for the agent itself are carried by ~/.claude/CLAUDE.md, which
+# the yoki-claude kit provisions via claude-switch. schemaVersion 2 has no
+# agent-instructions field (agentContext/agentInstructions are v1 only).

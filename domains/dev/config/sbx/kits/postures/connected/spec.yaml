@@ -1,0 +1,20 @@
+schemaVersion: "2"
+kind: mixin
+name: yoki-connected
+displayName: yoki connected posture
+description: >-
+  GitHub credentials via the host-side proxy, so the agent can push a branch
+  and open a pull request. Work leaves the sandbox as a PR, not as local files.
+
+# The token is stored on the host with `sbx secret set github`; the proxy
+# injects it into outbound requests and the value never enters the VM.
+#
+# This reach is OUTSIDE the VM boundary, so the boundary does not protect it.
+# What stands between the agent and a bad push is `auto` mode (the classifier)
+# plus git-guard.sh, which denies push to main/master and force push.
+#
+# No `permissions.network` rules needed: **.github.com and api.github.com are
+# already allowed by the global Balanced policy.
+
+credentials:
+  - service: github

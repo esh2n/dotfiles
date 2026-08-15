@@ -1,0 +1,66 @@
+schemaVersion: "2"
+kind: mixin
+name: yoki-claude
+requires:
+  agent: claude
+displayName: yoki harness for Claude Code
+description: >-
+  Fills the gaps in the sandbox base image and rebuilds ~/.claude from the
+  dotfiles layers, so a sandboxed session runs the same hooks, skills, rules
+  and workflows as the host.
+
+# Generated from spec.yaml.template by core/config/manager.sh — edit the
+# template, not the artifact. {{DOTFILES_ROOT}} has to be a literal path
+# because a sandbox mounts the repo at its HOST path (verified: the mount
+# lands on /Users/... inside the VM, via virtiofs, read-only).
+#
+# Measured on the base image 2026-08-15 (Ubuntu 26.04, user `agent`,
+# home /home/agent): node v22.22.1, git 2.53, jq, python3, rg, bash, npm/npx,
+# curl are all PRESENT. Only zsh, mise and fd are missing — that is the whole
+# install list. In particular node is preinstalled, so the nine core hooks
+# that shell out to run-with-flags.js work without any extra provisioning.
+
+permissions:
+  network:
+    allow:
+      # apt on arm64 Ubuntu resolves to ports.ubuntu.com, not archive.
+      - ports.ubuntu.com
+      - archive.ubuntu.com
+      - security.ubuntu.com
+      # `curl https://mise.run | sh` redirects mise.run -> mise.jdx.dev, and
+      # the installer then pulls the binary from the GitHub release assets.
+      # Allowing only mise.run is not enough — the policy log showed the
+      # request to mise.jdx.dev hitting default-deny and curl exiting 22.
+      - mise.run
+      - mise.jdx.dev
+      - github.com
+      - objects.githubusercontent.com
+      - release-assets.githubusercontent.com
+
+setup:
+  install:
+    - command: apt-get update && apt-get install -y zsh fd-find
+      description: The only base-image gaps besides mise (fd ships as fd-find on Ubuntu)
+    - command: curl -fsSL https://mise.run | sh
+      user: "1000"
+      description: Install mise as the agent user so toolchains land in /home/agent
+
+  startup:
+    # claude-switch is fully portable — CLAUDE_DIR and DOTFILES_ROOT are both
+    # overridable and it contains no uname checks — so it rebuilds ~/.claude
+    # here exactly as it does on the host. Verified end to end 2026-08-15.
+    - command:
+        - sh
+        - -c
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/claude-switch apply
+      user: "1000"
+      description: Rebuild ~/.claude from core + packs + personal
+    # Packs default to OFF on a fresh machine, and a sandbox is a fresh
+    # machine every time. Without this the sandbox silently runs with fewer
+    # rules and agents than the host (measured: rules 6 -> 2, agents 14 -> 9).
+    - command:
+        - sh
+        - -c
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/claude-switch pack enable go python rust typescript
+      user: "1000"
+      description: Match the host's enabled language packs
