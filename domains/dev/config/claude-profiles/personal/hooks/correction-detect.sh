@@ -3,10 +3,11 @@
 # candidates (correction-driven learning: signal fires only when the user
 # pushes back, instead of observing every tool call).
 #
-# Detection only — no headless analyzer is launched. A matched correction is
-# appended to ~/.claude/homunculus/corrections.jsonl (the instinct pipeline's
-# input) and a systemMessage suggests distilling it via /learn or
-# retrospective-codify.
+# A matched correction is appended to ~/.claude/homunculus/corrections.jsonl
+# (the instinct pipeline's input) and a systemMessage suggests distilling it
+# via /learn or retrospective-codify. When CORRECTION_DISTILL=1 (opt-in,
+# default off), a background read-only distiller additionally drafts a rule
+# update into ~/.claude/homunculus/drafts/ — see correction-distill.sh.
 #
 # Contract for Stop hooks: ALWAYS exit 0, never block the user.
 
@@ -66,6 +67,15 @@ jq -cn --arg ts "$(date +%Y-%m-%dT%H:%M:%S)" --arg sid "$SESSION_ID" \
 
 : > "${STATE_DIR}/${SESSION_ID}.done" 2>/dev/null
 echo $((COUNT + 1)) > "${STATE_DIR}/count-${DAY}" 2>/dev/null
+
+# Opt-in distillation: draft a rule update from this correction in the
+# background (read-only headless agent; the draft lands in
+# ~/.claude/homunculus/drafts/). Launching only after a recorded correction
+# means it inherits this hook's debounce and daily cap.
+DISTILL="${HOME}/.claude/scripts/correction-distill.sh"
+if [ "${CORRECTION_DISTILL:-}" = "1" ] && [ -f "$DISTILL" ]; then
+  nohup bash "$DISTILL" "$TRANSCRIPT" "$SESSION_ID" "$SNIPPET" >/dev/null 2>&1 &
+fi
 
 printf '{"systemMessage":"是正シグナルを検出しました（homunculus/corrections.jsonl に記録）。/learn か retrospective-codify で恒久ルール化を検討してください。"}\n'
 exit 0
