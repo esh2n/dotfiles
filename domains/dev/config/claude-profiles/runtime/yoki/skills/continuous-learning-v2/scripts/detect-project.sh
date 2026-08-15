@@ -2,7 +2,7 @@
 # Continuous Learning v2 - Project Detection Helper
 #
 # Shared logic for detecting current project context.
-# Sourced by observe.sh and start-observer.sh.
+# Sourced by observe.sh (start-observer.sh was removed with the daemon).
 #
 # Exports:
 #   _CLV2_PROJECT_ID     - Short hash identifying the project (or "global")

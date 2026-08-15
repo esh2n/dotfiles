@@ -153,11 +153,29 @@ bash skills/continuous-learning-v2/scripts/migrate-homunculus.sh
 
 ### 1. Enable Observation Hooks
 
-**If installed as a plugin** (recommended):
-
-No extra `settings.json` hook block is required. Claude Code v2.1+ auto-loads the plugin `hooks/hooks.json`, and `observe.sh` is already registered there.
-
-If you previously copied `observe.sh` into `~/.claude/settings.json`, remove that duplicate `PreToolUse` / `PostToolUse` block. Duplicating the plugin hook causes double execution and `${CLAUDE_PLUGIN_ROOT}` resolution errors because that variable is only available inside plugin-managed `hooks/hooks.json` entries.
+> **Status in this repo (2026-08-15): automatic capture is OFF, by omission.**
+>
+> The upstream text below says the plugin's `hooks/hooks.json` registers
+> `observe.sh` automatically. That file was never vendored here — there is no
+> `hooks.json` anywhere in `runtime/yoki`, and `observe.sh` appears in no
+> settings layer. So nothing writes `observations.jsonl`, and no instinct has
+> ever been generated from it.
+>
+> The background observer daemon that consumed those observations
+> (`agents/observer-loop.sh`, `start-observer.sh`, `observer.md`) was **removed**
+> on 2026-08-15: it called a `session-guardian.sh` that never existed in this
+> repo's history, so every cycle would have short-circuited even if started —
+> and nothing started it. `config.json`'s `observer` block was read by no code.
+>
+> The live learning path is instead **correction-driven**: `correction-detect`
+> records your corrections, and `correction-distill` (opt-in via
+> `CORRECTION_DISTILL=1`) drafts rule proposals from them. What remains useful
+> here is the instinct store and its CLI — `/instinct-status`, `/evolve` and
+> `scripts/instinct-cli.py` all still work on manually recorded instincts.
+>
+> To turn automatic capture on, register `observe.sh` in
+> `core/settings.layer.json` yourself using the manual block below. Note it
+> fires on every tool call, so measure the cost before committing to it.
 
 **If installed manually** to `~/.claude/skills`, add this to your `~/.claude/settings.json`:
 
@@ -217,26 +235,18 @@ mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/ecc-homunculus"/{instincts/{perso
 
 ## Configuration
 
-Edit `config.json` to control the background observer:
+`config.json` carries only a version marker now:
 
 ```json
-{
-  "version": "2.1",
-  "observer": {
-    "enabled": false,
-    "run_interval_minutes": 5,
-    "min_observations_to_analyze": 20
-  }
-}
+{ "version": "2.1" }
 ```
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `observer.enabled` | `false` | Enable the background observer agent |
-| `observer.run_interval_minutes` | `5` | How often the observer analyzes observations |
-| `observer.min_observations_to_analyze` | `20` | Minimum observations before analysis runs |
+The `observer` block it used to hold was removed along with the daemon — no
+code ever read it, so the values it advertised (`enabled`,
+`run_interval_minutes`, `min_observations_to_analyze`) did nothing.
 
-Other behavior (observation capture, instinct thresholds, project scoping, promotion criteria) is configured via code defaults in `instinct-cli.py` and `observe.sh`.
+Behavior (observation capture, instinct thresholds, project scoping, promotion
+criteria) is configured via code defaults in `instinct-cli.py` and `observe.sh`.
 
 ## File Structure
 

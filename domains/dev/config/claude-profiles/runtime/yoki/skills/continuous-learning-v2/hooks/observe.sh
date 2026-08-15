@@ -361,6 +361,13 @@ if parsed["output"] is not None:
 print(json.dumps(observation))
 ' >> "$OBSERVATIONS_FILE"
 
+# DEAD PATH (2026-08-15): the observer daemon was removed — agents/ no longer
+# exists — and config.json no longer carries an `observer` block, so
+# OBSERVER_ENABLED below is always false and nothing here executes. Left in
+# place rather than excised because this file is unregistered as a whole (see
+# SKILL.md), so cutting ~110 lines out of it would be risk without benefit.
+# If the observer is ever revived, this block needs a start script again.
+#
 # Lazy-start observer if enabled but not running (first-time setup)
 # Use flock for atomic check-then-act to prevent race conditions
 # Fallback for macOS (no flock): use lockfile or skip
