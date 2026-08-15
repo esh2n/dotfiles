@@ -11,7 +11,11 @@
 #   warn-once   : git commit while on main/master, push --force-with-lease
 #                 (first attempt denied with the reason fed back to the agent;
 #                  an identical retry in the same session passes)
-#   allow       : commit / push on feature branches, gh pr create, etc.
+#   pr-gate     : gh pr create requires the preflight pass marker (content
+#                 hash match); gate-side failures pass through, and the 3rd
+#                 attempt for the same content passes with a disclosure
+#                 instruction for the PR body
+#   allow       : commit / push on feature branches, etc.
 #
 # Regex anchors at command boundaries ((^|[;&|(]|$() ) so occurrences inside
 # commit messages or heredocs do not trigger the guard.
@@ -134,6 +138,62 @@ warn_once() {
   mkdir -p "$MARK_DIR" 2>/dev/null && : > "${MARK_DIR}/${key}" 2>/dev/null
   deny "$reason"
 }
+
+# ---- pr-gate ----------------------------------------------------------------
+# The preflight workflow records sha256(git diff <merge-base(base, HEAD)>)
+# into <repo>/.claude/.cache/preflight/<branch with / -> _>.pass. This gate is
+# that marker's only consumer: it recomputes the hash for the current worktree
+# content and compares. Tiers:
+#   - gate-side failure (no repo, no base, no shasum, malformed marker): pass
+#   - marker missing / hash mismatch: deny, at most twice per content — the
+#     3rd attempt for the same content passes with an instruction to disclose
+#     the skip in the PR body.
+
+PR_GATE_HASH=""
+
+pr_gate_check() {
+  # 0 = pass or fail-open, 1 = marker missing, 2 = hash mismatch
+  command -v shasum >/dev/null 2>&1 || return 0
+  local repo_root branch marker expected base actual
+  repo_root=$(git -C "${CWD:-.}" rev-parse --show-toplevel 2>/dev/null) || return 0
+  [ -n "$repo_root" ] || return 0
+  branch=$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0
+  { [ -n "$branch" ] && [ "$branch" != "HEAD" ]; } || return 0
+  base=$(git -C "$repo_root" merge-base origin/main HEAD 2>/dev/null \
+    || git -C "$repo_root" merge-base main HEAD 2>/dev/null \
+    || git -C "$repo_root" merge-base origin/master HEAD 2>/dev/null \
+    || git -C "$repo_root" merge-base master HEAD 2>/dev/null) || base=""
+  [ -n "$base" ] || return 0
+  actual=$(git -C "$repo_root" diff --no-ext-diff --no-color "$base" 2>/dev/null | shasum -a 256 | cut -d' ' -f1)
+  [ -n "$actual" ] || return 0
+  PR_GATE_HASH="$actual"
+  marker="$repo_root/.claude/.cache/preflight/$(echo "$branch" | tr '/' '_').pass"
+  [ -f "$marker" ] || return 1
+  expected=$(head -1 "$marker" 2>/dev/null | tr -cd 'a-f0-9')
+  [ "${#expected}" -eq 64 ] || return 0
+  [ "$actual" = "$expected" ] || return 2
+  return 0
+}
+
+if [ "${GIT_GUARD_PR_GATE_DISABLED:-}" != "1" ] \
+   && echo "$CMD_UNQUOTED" | grep -qEi "${B}gh[[:space:]]+(-[^[:space:]]+[[:space:]]+)*pr[[:space:]]+create"; then
+  pr_gate_check
+  PR_GATE_RC=$?
+  if [ "$PR_GATE_RC" != "0" ]; then
+    PR_GATE_KEY="pr-gate-$(printf '%s' "${PR_GATE_HASH:-nohash}" | head -c 12)"
+    PR_GATE_N=$(tr -cd '0-9' 2>/dev/null < "${MARK_DIR}/${PR_GATE_KEY}")
+    PR_GATE_N=$(( ${PR_GATE_N:-0} + 1 ))
+    mkdir -p "$MARK_DIR" 2>/dev/null && echo "$PR_GATE_N" > "${MARK_DIR}/${PR_GATE_KEY}" 2>/dev/null
+    if [ "$PR_GATE_N" -ge 3 ]; then
+      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","additionalContext":"pr-gate released after repeated denies for the same content. You MUST state clearly in the PR body that preflight did not pass for this content."}}\n'
+      exit 0
+    fi
+    if [ "$PR_GATE_RC" = "1" ]; then
+      deny "PR creation blocked: no preflight pass marker for this branch. Run /preflight first. (attempt ${PR_GATE_N}/3 for this content; the 3rd attempt passes but the PR body must disclose the skip)"
+    fi
+    deny "PR creation blocked: content changed since preflight passed (hash mismatch). Re-run /preflight. (attempt ${PR_GATE_N}/3 for this content; the 3rd attempt passes but the PR body must disclose the skip)"
+  fi
+fi
 
 if echo "$CMD" | grep -qEi "${G}push[[:space:]].*--force-with-lease"; then
   warn_once "force-with-lease" "force-with-lease rewrites remote history. If this is intentional (e.g. after rebase of your own feature branch), re-run the same command to proceed."

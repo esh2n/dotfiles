@@ -106,6 +106,22 @@ assert_allow() {
     fi
 }
 
+# pr-gate release: allow decision carrying the disclosure instruction
+assert_release() {
+    local description="$1" json="$2"
+    TOTAL=$((TOTAL + 1))
+    local out
+    out=$(run_guard "$json")
+    if echo "$out" | grep -q '"permissionDecision":"allow"' \
+       && echo "$out" | grep -q 'preflight did not pass'; then
+        log_success "PASS: $description"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: $description (expected release+disclosure, got: '${out:-<empty>}')"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Test suite
 # -----------------------------------------------------------------------------
@@ -155,6 +171,34 @@ run_git_guard_checks() {
     json9="$(make_json "git push --force-with-lease origin feature/wt" "$WT" "$s9")"
     assert_deny "case9a: --force-with-lease denied first time" "$json9"
     assert_allow "case9b: --force-with-lease allowed on retry (same session)" "$json9"
+
+    # 10. gh pr create without a preflight marker -> deny
+    assert_deny "case10: gh pr create without preflight marker denied" \
+        "$(make_json "gh pr create --title x --body y" "$WT" "$(new_session)")"
+
+    # 11. gh pr create with a matching marker -> allow
+    mkdir -p "$WT/.claude/.cache/preflight"
+    pr_base="$(git -C "$WT" merge-base main HEAD)"
+    git -C "$WT" diff --no-ext-diff --no-color "$pr_base" | shasum -a 256 | cut -d' ' -f1 \
+        > "$WT/.claude/.cache/preflight/feature_wt.pass"
+    assert_allow "case11: gh pr create with matching preflight marker allowed" \
+        "$(make_json "gh pr create --title x --body y" "$WT" "$(new_session)")"
+
+    # 12. content changed after preflight (hash mismatch) -> deny
+    echo "drift" >> "$WT/file.txt"
+    assert_deny "case12: gh pr create after content change denied" \
+        "$(make_json "gh pr create --title x --body y" "$WT" "$(new_session)")"
+
+    # 13. 3rd attempt for the same content: released with disclosure instruction
+    s13="$(new_session)"
+    json13="$(make_json "gh pr create --title x --body y" "$WT" "$s13")"
+    assert_deny "case13a: hash mismatch denied (attempt 1)" "$json13"
+    assert_deny "case13b: hash mismatch denied (attempt 2)" "$json13"
+    assert_release "case13c: 3rd attempt released with disclosure instruction" "$json13"
+
+    # 14. quoted mention of gh pr create in another command -> not gated
+    assert_allow "case14: quoted 'gh pr create' inside another command is not gated" \
+        "$(make_json 'git log --grep "gh pr create"' "$WT" "$(new_session)")"
 
     cleanup_fixture
     trap - RETURN
