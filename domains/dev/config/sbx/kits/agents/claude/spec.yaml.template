@@ -55,12 +55,11 @@ setup:
         - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/claude-switch apply
       user: "1000"
       description: Rebuild ~/.claude from core + packs + personal
-    # Packs default to OFF on a fresh machine, and a sandbox is a fresh
-    # machine every time. Without this the sandbox silently runs with fewer
-    # rules and agents than the host (measured: rules 6 -> 2, agents 14 -> 9).
-    - command:
-        - sh
-        - -c
-        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/claude-switch pack enable go python rust typescript
-      user: "1000"
-      description: Match the host's enabled language packs
+    # Packs are NOT enabled here. They default to OFF on a fresh machine and a
+    # sandbox is a fresh machine every time, so without them the sandbox runs
+    # with fewer rules and agents than the host (measured: rules 6 -> 2,
+    # agents 14 -> 9). But the enabled set is a machine-local choice — it lives
+    # in ~/.claude/.claude-packs, not in the repo (packs.default is empty), and
+    # there are 23 packs to choose from. Hardcoding a list here would go stale
+    # the first time a pack is added. yoki-box reads the host's .claude-packs
+    # and enables exactly that set after the sandbox is created.
