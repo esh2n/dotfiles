@@ -53,15 +53,23 @@ build_fixture() {
     git -C "$main" add -A
     git -C "$main" commit -q -m "init" >/dev/null
     git -C "$main" worktree add -q -b wt "$FIXTURE_ROOT/wt" main >/dev/null
+
+    # Blast shield for the cases that call the real `link` — see assert_refuses.
+    mkdir -p "${FIXTURE_ROOT}/fake-home"
 }
 
 # Exit status alone is not enough: any unrelated breakage also exits non-zero
 # and would read as a pass. Require the guard's own message too.
+#
+# HOME is redirected for the duration. These cases invoke the real `link`, so
+# if the guard ever regresses the command proceeds — and it would repoint the
+# tester's own ~/.claude, ~/bin and ~/.config at a mktemp fixture that is about
+# to be deleted. Learned the hard way while mutation-testing this very file.
 assert_refuses() {
     local description="$1"; shift
     TOTAL=$((TOTAL + 1))
     local out status=0
-    out=$("$@" 2>&1) || status=$?
+    out=$(HOME="${FIXTURE_ROOT}/fake-home" "$@" 2>&1) || status=$?
     if [[ "$status" -ne 0 ]] && grep -q "Refusing to link from a git worktree" <<< "$out"; then
         log_success "PASS: $description"
         PASSED=$((PASSED + 1))
