@@ -56,6 +56,17 @@ print(pool[0]["name"])
 ' "$1"
 }
 
+# Same gradient the unattended-guard hook uses: the environment first (fixed at
+# session start), then .yoki.json (re-read per call, so it takes effect
+# mid-session). Fails toward "attended" — a missing jq must not make the
+# launcher refuse work.
+unattended() {
+  [ "${YOKI_UNATTENDED:-}" = "1" ] && return 0
+  [ -f .yoki.json ] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  [ "$(jq -r '.unattended // false' .yoki.json 2>/dev/null)" = "true" ]
+}
+
 # ---------------------------------------------------------------------------
 # kit rendering
 # ---------------------------------------------------------------------------
@@ -144,6 +155,15 @@ do_run() {
     esac
     shift
   done
+
+  # Direct mode mounts the working tree read-WRITE, and no host hook runs
+  # inside the VM. In an unattended session that is a way around the unattended
+  # guard: `yclaude -d` in this repo would let the sandboxed agent rewrite
+  # claude-profiles/ with nothing watching. Guarded and connected both --clone,
+  # so the host tree stays read-only and the hole does not exist there.
+  if [ "$mode" = direct ] && unattended; then
+    die "direct mode is blocked in an unattended session — it gives the sandbox write access to this tree. Use guarded mode, or run attended."
+  fi
 
   local posture_kit="${KITS}/postures/${mode}"
   # direct differs from guarded only by the absence of --clone; it grants the

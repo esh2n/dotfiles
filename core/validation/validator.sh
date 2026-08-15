@@ -143,6 +143,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-worktree-guard.sh"
             run_worktree_guard_checks
             ;;
+        "yoki-box")
+            source "${SCRIPT_DIR}/test-yoki-box.sh"
+            run_yoki_box_checks
+            ;;
         "suggest-compact")
             source "${SCRIPT_DIR}/test-suggest-compact.sh"
             run_suggest_compact_checks
@@ -151,7 +155,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|unattended-guard|correction-distill|worktree-guard|suggest-compact|workday-calc}"
+            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|suggest-compact|workday-calc}"
             exit 1
             ;;
     esac
