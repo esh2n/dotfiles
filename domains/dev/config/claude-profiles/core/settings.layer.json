@@ -1,6 +1,6 @@
 {
   "permissions": {
-    "defaultMode": "default",
+    "defaultMode": "auto",
     "allow": [
       "Read(**)",
       "Grep(**)",
