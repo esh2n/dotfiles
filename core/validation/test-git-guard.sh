@@ -259,20 +259,28 @@ run_git_guard_checks() {
     # A transcript directory with a second, recently-touched session file is
     # what "another session is live here" means. Build one, and an equivalent
     # with only a stale sibling, to pin both directions.
-    local tdir stale_dir mine
+    # The warn-once pair must share one session id, and that id has to carry
+    # SESSION_PREFIX so cleanup_fixture removes its marker — a fixed name would
+    # leave the marker behind and make case29 pass only on the first ever run.
+    # Each fixture pairs a session id with its OWN transcript file: the guard
+    # excludes "$SESSION_ID.jsonl" when looking for siblings, so a mismatched
+    # pair would make a session count itself as somebody else.
+    local tdir stale_dir mine live_session stale_session
     tdir="$(mktemp -d)"
     stale_dir="$(mktemp -d)"
-    mine="$tdir/mysession.jsonl"
+    live_session="$(new_session)"
+    stale_session="$(new_session)"
+    mine="$tdir/${live_session}.jsonl"
     : > "$mine"
     : > "$tdir/othersession.jsonl"
-    : > "$stale_dir/mysession.jsonl"
+    : > "$stale_dir/${stale_session}.jsonl"
     : > "$stale_dir/othersession.jsonl"
     touch -t 202501010000 "$stale_dir/othersession.jsonl"
 
     assert_deny "case29: branch switch warns while another session is live" \
-        "$(make_json "git switch other" "$REPO" "mysession" "$mine")"
+        "$(make_json "git switch other" "$REPO" "$live_session" "$mine")"
     assert_allow "case30: re-running the same switch proceeds (warn-once)" \
-        "$(make_json "git switch other" "$REPO" "mysession" "$mine")"
+        "$(make_json "git switch other" "$REPO" "$live_session" "$mine")"
 
     assert_deny "case31: checkout -b warns too" \
         "$(make_json "git checkout -b newbranch" "$REPO" "$(new_session)" "$mine")"
@@ -284,7 +292,7 @@ run_git_guard_checks() {
         "$(make_json "git checkout file.txt" "$REPO" "$(new_session)" "$mine")"
 
     assert_allow "case34: no warning when no other session is live" \
-        "$(make_json "git switch other" "$REPO" "mysession" "$stale_dir/mysession.jsonl")"
+        "$(make_json "git switch other" "$REPO" "$stale_session" "$stale_dir/${stale_session}.jsonl")"
     assert_allow "case35: no warning inside a linked worktree" \
         "$(make_json "git switch other" "$WT" "$(new_session)" "$mine")"
     assert_allow "case36: no warning without a transcript path" \
