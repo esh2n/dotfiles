@@ -139,11 +139,15 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-correction-distill.sh"
             run_correction_distill_checks
             ;;
+        "suggest-compact")
+            source "${SCRIPT_DIR}/test-suggest-compact.sh"
+            run_suggest_compact_checks
+            ;;
         "workday-calc")
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|unattended-guard|correction-distill|workday-calc}"
+            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|unattended-guard|correction-distill|suggest-compact|workday-calc}"
             exit 1
             ;;
     esac
