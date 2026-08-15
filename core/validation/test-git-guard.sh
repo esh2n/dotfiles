@@ -68,9 +68,11 @@ new_session() {
 # Test helpers
 # -----------------------------------------------------------------------------
 make_json() {
-    local cmd="$1" cwd="$2" session="$3"
+    local cmd="$1" cwd="$2" session="$3" transcript="${4:-}"
     jq -cn --arg cmd "$cmd" --arg cwd "$cwd" --arg session "$session" \
-        '{tool_name: "Bash", tool_input: {command: $cmd}, session_id: $session, cwd: $cwd}'
+           --arg transcript "$transcript" \
+        '{tool_name: "Bash", tool_input: {command: $cmd}, session_id: $session, cwd: $cwd}
+         + (if $transcript == "" then {} else {transcript_path: $transcript} end)'
 }
 
 run_guard() {
@@ -252,6 +254,49 @@ run_git_guard_checks() {
     assert_deny "case28: malformed .yoki.json does not relax" \
         "$(make_json "git push origin main" "$REPO" "$(new_session)")"
     /bin/rm -f "$REPO/.yoki.json"
+
+    # --- shared-checkout nudge ----------------------------------------------
+    # A transcript directory with a second, recently-touched session file is
+    # what "another session is live here" means. Build one, and an equivalent
+    # with only a stale sibling, to pin both directions.
+    local tdir stale_dir mine
+    tdir="$(mktemp -d)"
+    stale_dir="$(mktemp -d)"
+    mine="$tdir/mysession.jsonl"
+    : > "$mine"
+    : > "$tdir/othersession.jsonl"
+    : > "$stale_dir/mysession.jsonl"
+    : > "$stale_dir/othersession.jsonl"
+    touch -t 202501010000 "$stale_dir/othersession.jsonl"
+
+    assert_deny "case29: branch switch warns while another session is live" \
+        "$(make_json "git switch other" "$REPO" "mysession" "$mine")"
+    assert_allow "case30: re-running the same switch proceeds (warn-once)" \
+        "$(make_json "git switch other" "$REPO" "mysession" "$mine")"
+
+    assert_deny "case31: checkout -b warns too" \
+        "$(make_json "git checkout -b newbranch" "$REPO" "$(new_session)" "$mine")"
+    assert_deny "case32: checkout of an existing branch warns" \
+        "$(make_json "git checkout feature/wt" "$REPO" "$(new_session)" "$mine")"
+
+    # Precision: a path argument only restores a file, so it must not warn.
+    assert_allow "case33: checkout of a file path does not warn" \
+        "$(make_json "git checkout file.txt" "$REPO" "$(new_session)" "$mine")"
+
+    assert_allow "case34: no warning when no other session is live" \
+        "$(make_json "git switch other" "$REPO" "mysession" "$stale_dir/mysession.jsonl")"
+    assert_allow "case35: no warning inside a linked worktree" \
+        "$(make_json "git switch other" "$WT" "$(new_session)" "$mine")"
+    assert_allow "case36: no warning without a transcript path" \
+        "$(make_json "git switch other" "$REPO" "$(new_session)")"
+
+    # The nudge is about concurrency, not branch policy: allowMainBranchWork
+    # must not switch it off.
+    echo '{"allowMainBranchWork": true}' > "$REPO/.yoki.json"
+    assert_deny "case37: allowMainBranchWork does not suppress the nudge" \
+        "$(make_json "git switch other" "$REPO" "$(new_session)" "$mine")"
+    /bin/rm -f "$REPO/.yoki.json"
+    /bin/rm -rf "$tdir" "$stale_dir"
 
     cleanup_fixture
     trap - RETURN

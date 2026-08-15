@@ -8,7 +8,9 @@
 #                 --no-verify on commit/merge/push and `commit -n` (replaces
 #                 the former `npx block-no-verify` hook — no npx spawn per
 #                 Bash call, and no network fetch)
-#   warn-once   : git commit while on main/master, push --force-with-lease
+#   warn-once   : git commit while on main/master, push --force-with-lease,
+#                 branch switch in the main working tree while another Claude
+#                 session is live there (window: YOKI_SESSION_WINDOW_MIN, 15)
 #   relaxable   : the two main/master push denials and the commit-on-main
 #                 warning, via "allowMainBranchWork": true in .yoki.json —
 #                 for personal repos where main IS the working branch
@@ -33,6 +35,7 @@ CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 
 [ -z "$CMD" ] && exit 0
 
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "nosession"' 2>/dev/null | tr -cd 'a-zA-Z0-9_-')
+TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
 
 # Command-boundary anchor: start of string, after ; & | ( or $(
@@ -244,6 +247,60 @@ fi
 
 if echo "$CMD" | grep -qEi "${G}push[[:space:]].*--force-with-lease"; then
   warn_once "force-with-lease" "force-with-lease rewrites remote history. If this is intentional (e.g. after rebase of your own feature branch), re-run the same command to proceed."
+fi
+
+# ---- shared-checkout nudge --------------------------------------------------
+# Deliberately NOT gated on allowMainBranchWork: this is about concurrency, not
+# branch policy. The two used to be one rule ("don't commit on main, prefer a
+# worktree"), so relaxing the branch policy silently removed the only prompt to
+# isolate — which is a different concern and still applies.
+#
+# The hazard, observed 2026-08-15: a second session ran `git checkout main` in
+# this shared checkout while another was mid-task. HEAD moved, two fresh commits
+# fell out of reach of HEAD, and edits in flight would have been lost. Committed
+# work survived; uncommitted work would not have.
+#
+# Fires only when all three hold, so a solo session never sees it:
+#   1. the command moves HEAD  (git switch, checkout -b/-B, checkout <branch>)
+#   2. we are in the MAIN working tree  (a linked worktree already IS isolation)
+#   3. another session wrote to this project's transcript directory recently
+# warn-once, so re-running the same command proceeds.
+
+# Another Claude session is live here if a transcript other than ours was
+# touched within the window. Transcripts are per-session files in one directory
+# per project, and the running session appends to its own constantly.
+other_session_active() {
+  [ -n "$TRANSCRIPT" ] || return 1
+  local dir count
+  dir=$(dirname "$TRANSCRIPT")
+  [ -d "$dir" ] || return 1
+  count=$(find "$dir" -maxdepth 1 -name '*.jsonl' \
+            -mmin -"${YOKI_SESSION_WINDOW_MIN:-15}" \
+            ! -name "${SESSION_ID}.jsonl" 2>/dev/null | wc -l | tr -d ' ')
+  [ "${count:-0}" -gt 0 ]
+}
+
+# `git switch` and `checkout -b/-B` always move HEAD. Bare `git checkout <x>` is
+# ambiguous — <x> may be a path, which only restores a file — so ask git whether
+# it names a local branch instead of guessing from the string.
+moves_head() {
+  echo "$CMD_UNQUOTED" | grep -qEi "${G}switch([[:space:]]|$)" && return 0
+  echo "$CMD_UNQUOTED" | grep -qEi "${G}checkout[[:space:]]+(-[^[:space:]]+[[:space:]]+)*-[bB]([[:space:]]|$)" && return 0
+
+  local seg tok
+  seg=$(printf '%s' "$CMD_UNQUOTED" | tr ';|&()' '\n' \
+        | grep -Ei "${B}git[[:space:]]+(-[^[:space:]]+[[:space:]]+)*checkout([[:space:]]|$)" \
+        | head -1) || return 1
+  [ -n "$seg" ] || return 1
+  [ -n "$CWD" ] && [ -d "$CWD" ] || return 1
+  tok=$(printf '%s' "$seg" | sed -E 's/.*[[:space:]]checkout[[:space:]]+//' \
+        | tr ' ' '\n' | grep -v '^-' | head -1)
+  [ -n "$tok" ] || return 1
+  git -C "$CWD" show-ref --verify --quiet "refs/heads/${tok}" 2>/dev/null
+}
+
+if [ "$IS_WORKTREE" != "1" ] && moves_head && other_session_active; then
+  warn_once "shared-checkout-switch" "Another Claude session is active in this checkout. Switching branches here moves HEAD under it — on 2026-08-15 that stranded two commits and would have lost uncommitted edits. Work in a worktree instead: git worktree add .claude/worktrees/<name> -b <branch>. Re-run the same command to proceed anyway."
 fi
 
 if [ "$IS_WORKTREE" != "1" ] && [ "$ALLOW_MAIN" = 0 ] \
