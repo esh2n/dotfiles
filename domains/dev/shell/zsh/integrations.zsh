@@ -8,14 +8,14 @@ if command -v zoxide &>/dev/null; then
   cached_eval zoxide-init zoxide init zsh
 fi
 
-# Prompt: capsule (daemon-based, <1ms render) with starship fallback for
-# machines that have not installed capsule yet
-if command -v capsule &>/dev/null; then
-  eval "$(capsule init zsh)"
-elif command -v starship &>/dev/null; then
+# Prompt: starship. capsule stays installed (daemon + ~/.config/capsule) —
+# to try it again, swap this branch order back to capsule-first.
+if command -v starship &>/dev/null; then
   # Use generated config from dotfiles (via symlink)
   export STARSHIP_CONFIG="${HOME}/.config/starship/starship.toml"
   cached_eval starship-init starship init zsh
+elif command -v capsule &>/dev/null; then
+  eval "$(capsule init zsh)"
 fi
 
 # Mise (Version Manager)
