@@ -29,7 +29,7 @@ delivery = "terminal"
 show_agent_labels_on_pane_borders = true
 
 # Order the agent panel by attention needed rather than by space.
-# agent_panel_sort = "priority"
+agent_panel_sort = "priority"
 
 # Hide the tab row while a workspace has only one tab.
 # hide_tab_bar_when_single_tab = true
