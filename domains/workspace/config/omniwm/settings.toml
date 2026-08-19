@@ -3,6 +3,7 @@ monitorDwindleOverrides = []
 monitorGapOverrides = []
 monitorNiriOverrides = []
 monitorOrientationOverrides = []
+monitorRoutingOverrides = []
 
 [appearance]
 mode = "dark"
@@ -33,7 +34,7 @@ useGlobalGaps = true
 
 [focus]
 crossesMonitorAtEdge = false
-followsMouse = true
+followsMouse = false
 followsWindowToMonitor = false
 lockModifier = "off"
 moveCrossesMonitorAtEdge = false
@@ -52,6 +53,7 @@ top = 0.0
 animationsEnabled = true
 defaultLayoutType = "niri"
 hotkeysEnabled = true
+hyperKeyModifiers = "Control+Option+Shift+Command"
 ipcEnabled = true
 preventSleepEnabled = false
 systemHyperTrigger = "None"
@@ -83,7 +85,7 @@ margin = 1
 [niri]
 alwaysCenterSingleColumn = false
 centerFocusedColumn = "never"
-containerPrimarySpanPresets = [0.3333333333333333, 0.5, 0.6666666666666666, 0.75]
+containerPrimarySpanPresets = [0.3333333333333333, 0.5, 0.6666666666666666]
 defaultContainerPrimarySpan = 0.5
 infiniteLoop = false
 singleWindowFit = "fill"
@@ -131,7 +133,7 @@ position = "center"
 widthPercent = 50.0
 
 [routing]
-mode = "custom"
+mode = "macOS"
 
 [statusBar]
 showAppNames = false
@@ -151,7 +153,7 @@ position = "overlappingMenuBar"
 reserveLayoutSpace = false
 revealHoldMilliseconds = 200.0
 revealModifier = "off"
-showFloatingWindows = true
+showFloatingWindows = false
 showLabels = true
 systemStatsButton = false
 windowLevel = "popup"
@@ -238,23 +240,6 @@ id = "552FB77D-BF0E-4737-90A6-B5BC6986C579"
 minHeight = 320.0
 minWidth = 660.0
 
-[[appRules]]
-assignToWorkspace = "6"
-bundleId = "com.gather.GatherV2"
-id = "EF2F307A-DCFE-4513-9E3A-07FB56E2EC0A"
-layout = "float"
-
-[[appRules]]
-assignToWorkspace = "7"
-bundleId = "com.tinyspeck.slackmacgap"
-id = "ABB2AAB9-31BE-4ADF-AB34-10EC54845FC5"
-titleSubstring = "アクティビティ"
-
-[[appRules]]
-assignToWorkspace = "3"
-bundleId = "com.tinyspeck.slackmacgap"
-id = "BCFFD141-F7D7-46EE-BB2F-F811F04C25A4"
-
 [[hotkeys]]
 binding = "Option+1"
 id = "switchWorkspace.0"
@@ -340,19 +325,19 @@ binding = "Unassigned"
 id = "switchWorkspace.previous"
 
 [[hotkeys]]
-binding = "Option+H"
+binding = "Option+Left Arrow"
 id = "focus.left"
 
 [[hotkeys]]
-binding = "Option+J"
+binding = "Option+Down Arrow"
 id = "focus.down"
 
 [[hotkeys]]
-binding = "Option+K"
+binding = "Option+Up Arrow"
 id = "focus.up"
 
 [[hotkeys]]
-binding = "Option+L"
+binding = "Option+Right Arrow"
 id = "focus.right"
 
 [[hotkeys]]
@@ -452,19 +437,19 @@ binding = "Unassigned"
 id = "moveColumnToWorkspace.8"
 
 [[hotkeys]]
-binding = "Option+Shift+H"
+binding = "Option+Shift+Left Arrow"
 id = "move.left"
 
 [[hotkeys]]
-binding = "Option+Shift+J"
+binding = "Option+Shift+Down Arrow"
 id = "move.down"
 
 [[hotkeys]]
-binding = "Option+Shift+K"
+binding = "Option+Shift+Up Arrow"
 id = "move.up"
 
 [[hotkeys]]
-binding = "Option+Shift+L"
+binding = "Option+Shift+Right Arrow"
 id = "move.right"
 
 [[hotkeys]]
@@ -482,14 +467,6 @@ id = "moveWindowDownOrToWorkspaceDown"
 [[hotkeys]]
 binding = "Unassigned"
 id = "moveWindowUpOrToWorkspaceUp"
-
-[[hotkeys]]
-binding = "Unassigned"
-id = "consumeOrExpelWindowLeft"
-
-[[hotkeys]]
-binding = "Unassigned"
-id = "consumeOrExpelWindowRight"
 
 [[hotkeys]]
 binding = "Unassigned"
@@ -512,23 +489,39 @@ binding = "Control+Command+Grave"
 id = "focusMonitorLast"
 
 [[hotkeys]]
-binding = "Unassigned"
+binding = "Control+Command+Left Arrow"
 id = "moveWorkspaceToMonitor.left"
 
 [[hotkeys]]
-binding = "Unassigned"
+binding = "Control+Command+Right Arrow"
 id = "moveWorkspaceToMonitor.right"
 
 [[hotkeys]]
-binding = "Unassigned"
+binding = "Control+Command+Up Arrow"
 id = "moveWorkspaceToMonitor.up"
 
 [[hotkeys]]
-binding = "Unassigned"
+binding = "Control+Command+Down Arrow"
 id = "moveWorkspaceToMonitor.down"
 
 [[hotkeys]]
-binding = "Option+F"
+binding = "Unassigned"
+id = "moveWindowToMonitor.left"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveWindowToMonitor.right"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveWindowToMonitor.up"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveWindowToMonitor.down"
+
+[[hotkeys]]
+binding = "Option+Return"
 id = "toggleFullscreen"
 
 [[hotkeys]]
@@ -680,11 +673,11 @@ binding = "Unassigned"
 id = "moveColumnToIndex.9"
 
 [[hotkeys]]
-binding = "Option+R"
+binding = "Option+Period"
 id = "cycleSizeForward"
 
 [[hotkeys]]
-binding = "Option+Shift+R"
+binding = "Option+Comma"
 id = "cycleSizeBackward"
 
 [[hotkeys]]
@@ -757,35 +750,19 @@ id = "swapSplit"
 
 [[hotkeys]]
 binding = "Unassigned"
-id = "resizeGrow.left"
+id = "resizeGrow.horizontal"
 
 [[hotkeys]]
 binding = "Unassigned"
-id = "resizeGrow.right"
+id = "resizeGrow.vertical"
 
 [[hotkeys]]
 binding = "Unassigned"
-id = "resizeGrow.up"
+id = "resizeShrink.horizontal"
 
 [[hotkeys]]
 binding = "Unassigned"
-id = "resizeGrow.down"
-
-[[hotkeys]]
-binding = "Unassigned"
-id = "resizeShrink.left"
-
-[[hotkeys]]
-binding = "Unassigned"
-id = "resizeShrink.right"
-
-[[hotkeys]]
-binding = "Unassigned"
-id = "resizeShrink.up"
-
-[[hotkeys]]
-binding = "Unassigned"
-id = "resizeShrink.down"
+id = "resizeShrink.vertical"
 
 [[hotkeys]]
 binding = "Unassigned"
@@ -820,7 +797,7 @@ binding = "Control+Option+Space"
 id = "openCommandPalette"
 
 [[hotkeys]]
-binding = "Control+Option+Shift+R"
+binding = "Option+Shift+R"
 id = "raiseAllFloatingWindows"
 
 [[hotkeys]]
@@ -856,7 +833,7 @@ binding = "Option+Grave"
 id = "toggleQuakeTerminal"
 
 [[hotkeys]]
-binding = "Control+Option+L"
+binding = "Option+Shift+L"
 id = "toggleWorkspaceLayout"
 
 [[hotkeys]]
@@ -867,25 +844,8 @@ id = "toggleOverview"
 binding = "Unassigned"
 id = "toggleSystemStats"
 
-[[monitorRoutingOverrides]]
-gridColumn = 0
-gridRow = 0
-monitorDisplayUUID = "37D8832A-2D66-02CA-B9F7-8F30A301B230"
-monitorName = "Built-in Retina Display"
-
-[[monitorRoutingOverrides]]
-gridColumn = 1
-gridRow = 0
-monitorDisplayUUID = "E27440B5-C7DA-4682-8D01-6F37A8975A0D"
-monitorName = "RTK FHD HDR"
-
-[[monitorRoutingOverrides]]
-gridColumn = 2
-gridRow = 0
-monitorDisplayUUID = "8C27030B-39E8-4991-9FD5-9A762A002892"
-monitorName = "LG ULTRAGEAR+"
-
 [[workspaces]]
+displayName = "1 💻"
 id = "AD36F001-C57E-41A5-AC1D-DF5249D007F0"
 layoutType = "niri"
 name = "1"
@@ -894,6 +854,7 @@ name = "1"
 type = "main"
 
 [[workspaces]]
+displayName = "2 🌐"
 id = "454CECD4-5E9D-4ED1-95D7-979D48817F5F"
 layoutType = "niri"
 name = "2"
@@ -904,23 +865,23 @@ type = "main"
 [[workspaces]]
 displayName = "3 💬"
 id = "BEB842B5-E894-4791-9FD1-397C3CDD3538"
-layoutType = "dwindle"
+layoutType = "niri"
 name = "3"
 
 [workspaces.monitorAssignment]
-displayUUID = "37D8832A-2D66-02CA-B9F7-8F30A301B230"
-type = "specificDisplay"
+type = "main"
 
 [[workspaces]]
+displayName = "4 📝"
 id = "248AA883-2261-4D45-943C-79C0E46A232B"
 layoutType = "niri"
 name = "4"
 
 [workspaces.monitorAssignment]
-displayUUID = "381801B7-7350-4733-AC1F-4ABA6109A191"
-type = "specificDisplay"
+type = "main"
 
 [[workspaces]]
+displayName = "5 🎧"
 id = "8B8C45D6-CE9E-41D9-BD50-BE4989D5E3DE"
 layoutType = "niri"
 name = "5"
@@ -935,8 +896,7 @@ layoutType = "niri"
 name = "6"
 
 [workspaces.monitorAssignment]
-displayUUID = "37D8832A-2D66-02CA-B9F7-8F30A301B230"
-type = "specificDisplay"
+type = "secondary"
 
 [[workspaces]]
 displayName = "7 🚀"
@@ -945,5 +905,4 @@ layoutType = "niri"
 name = "7"
 
 [workspaces.monitorAssignment]
-displayUUID = "E27440B5-C7DA-4682-8D01-6F37A8975A0D"
-type = "specificDisplay"
+type = "secondary"
