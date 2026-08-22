@@ -13,7 +13,12 @@ export const meta = {
 
 // args: { tasks?: [{id,title,spec,files?,deps?}], tasksFile?: string,
 //         rules?: [path], docs?: [path], model?: string, max_retry?: number,
-//         delivery?: 'none' | 'commit' | 'draft-pr' }
+//         delivery?: 'none' | 'commit' | 'draft-pr', deliveryBranch?: boolean }
+// delivery: 'commit' commits on whatever branch is already checked out — no
+// branch is created and HEAD never moves. 'draft-pr' still needs a branch to
+// push and open a PR from, so it keeps creating/switching to impl/<id>.
+// deliveryBranch: true opts 'commit' mode into the impl/<id> branch too, for
+// callers that deliberately want a branch even without a PR.
 // delivery mode must be confirmed with the user BEFORE launching this workflow —
 // the graph itself never asks mid-run (boundary principle: interactive decisions
 // happen outside the graph, not inside a phase).
@@ -209,7 +214,8 @@ const gate = await agent(
   `Run this project's full quality gate ONCE over the working tree: lint, typecheck, and the test suite (detect the commands from package.json / Makefile / go.mod / Cargo.toml / pyproject.toml — do not invent commands). Report the commands you ran, pass/fail, and a short list of real failures with file references.
 If a category is not configured in this project, say so explicitly rather than reporting a silent pass. Fix nothing and do NOT commit — this is report-only.`,
   // Judgment stage delivery depends on: session model (no override), high effort.
-  { label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, effort: 'high' },
+  // NOTE: 判定段は opus 明示 (esh2n 承認 2026-08-17 — 未指定はセッションモデルを継承してしまう)
+  { label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, model: 'opus', effort: 'high' },
 )
 
 const tasks = [...results.values()]
@@ -236,6 +242,14 @@ if (DELIVERY !== 'none' && succeeded.length > 0 && gatePassed) {
   const firstId = TASKS[0] && TASKS[0].id
   const slugSource = firstId ? slugify(firstId) : shortDigest(TASKS.map((t) => t.title).join('|'))
   const branch = `impl/${(slugSource || 'tasks').slice(0, 40)}`
+  // A branch is only created for delivery modes that genuinely need a separate
+  // ref: 'draft-pr' pushes it and opens a PR from it. Plain 'commit' delivery
+  // commits on whatever branch is already checked out — creating impl/<id>
+  // there left stale branches behind and, once left checked out, broke the
+  // orchestrator's merge reporting downstream (it expects Deliver to leave
+  // HEAD exactly where it started). args.deliveryBranch is an explicit opt-in
+  // for callers who want a branch even under 'commit' delivery.
+  const useBranch = DELIVERY === 'draft-pr' || Boolean(A && A.deliveryBranch)
 
   const DELIVER_SCHEMA = {
     type: 'object', required: ['branch', 'commits'],
@@ -249,26 +263,34 @@ if (DELIVERY !== 'none' && succeeded.length > 0 && gatePassed) {
     `- ${t.id}: ${t.title} | files: ${(t.files_touched || []).join(', ') || '(none declared)'} | evidence: ${String(t.evidence).slice(0, 200)}`,
   ).join('\n')
 
+  const steps = []
+  steps.push(useBranch
+    ? `Create a feature branch named "${branch}" from the current HEAD and switch to it.`
+    : 'Commit directly on the branch that is already checked out. Do NOT create, checkout, or switch to any other branch at any point in this delivery.')
+  steps.push(`Commit the changes: one commit per succeeded task when that task's files_touched are cleanly separable from every other succeeded task's files_touched; otherwise fall back to a single commit covering everything. Conventional commit messages (feat/fix/refactor/...), English, ONE line each, NO AI/assistant/Claude trailers or mentions of any kind, and NEVER include company-internal words (internal product codenames, team names, tickets) — keep messages generic and safe to push anywhere.\nSucceeded tasks:\n${taskSummary}`)
+  if (DELIVERY === 'draft-pr') {
+    steps.push(`Push the branch: git push -u origin ${branch}`)
+    steps.push(`Determine the PR conventions BEFORE writing anything:
+   a. Look for a PR template (.github/PULL_REQUEST_TEMPLATE.md, .github/pull_request_template.md, .github/PULL_REQUEST_TEMPLATE/*.md, docs/pull_request_template.md). If one exists, follow its structure exactly.
+   b. If none exists, study the repo's own precedent: gh pr list --state merged --limit 5 --json title,body — mirror the observed title style and body structure. Do not import conventions the repo does not use.`)
+    steps.push('Open a draft PR: gh pr create --draft. Title: follow the convention found in the previous step (fallback: short conventional-style summary of the task list). Body: template/precedent structure, containing a per-task status line for every task (done/failed/blocked/skipped-dep) and a short test-evidence summary per succeeded task. Same trailer rule as the commits above: NO AI/assistant/Claude trailers or mentions of any kind.')
+    steps.push('Writing quality: if the PR text is Japanese, load the natural-japanese skill (Skill tool) and apply its rules — natural phrasing, no AI-sounding boilerplate, lead with the conclusion. English text: plain and concrete, no grandiose wording.')
+  } else {
+    steps.push('Do NOT push and do NOT open a PR — commit locally only.')
+  }
+
   delivery = await agent(
     `Deliver the working tree changes produced by this implement run.
-1. Create a feature branch named "${branch}" from the current HEAD and switch to it.
-2. Commit the changes: one commit per succeeded task when that task's files_touched are cleanly separable from every other succeeded task's files_touched; otherwise fall back to a single commit covering everything. Conventional commit messages (feat/fix/refactor/...), English, ONE line each, NO AI/assistant/Claude trailers or mentions of any kind, and NEVER include company-internal words (internal product codenames, team names, tickets) — keep messages generic and safe to push anywhere.
-Succeeded tasks:
-${taskSummary}
-${DELIVERY === 'draft-pr'
-    ? `3. Push the branch: git push -u origin ${branch}
-4. Determine the PR conventions BEFORE writing anything:
-   a. Look for a PR template (.github/PULL_REQUEST_TEMPLATE.md, .github/pull_request_template.md, .github/PULL_REQUEST_TEMPLATE/*.md, docs/pull_request_template.md). If one exists, follow its structure exactly.
-   b. If none exists, study the repo's own precedent: gh pr list --state merged --limit 5 --json title,body — mirror the observed title style and body structure. Do not import conventions the repo does not use.
-5. Open a draft PR: gh pr create --draft. Title: follow the convention found in step 4 (fallback: short conventional-style summary of the task list). Body: template/precedent structure, containing a per-task status line for every task (done/failed/blocked/skipped-dep) and a short test-evidence summary per succeeded task. Same trailer rule as the commits above: NO AI/assistant/Claude trailers or mentions of any kind.
-6. Writing quality: if the PR text is Japanese, load the natural-japanese skill (Skill tool) and apply its rules — natural phrasing, no AI-sounding boilerplate, lead with the conclusion. English text: plain and concrete, no grandiose wording.`
-    : 'Do NOT push and do NOT open a PR — commit locally only.'}
+${steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 Constraints: this repo's git-guard permits commit/push on a feature branch. Do NOT push to main or master, and NEVER force-push, regardless of what goes wrong.
+${useBranch
+    ? 'HEAD invariant: this delivery legitimately switches branches — that is expected.'
+    : 'HEAD invariant: run `git branch --show-current` before and after delivery and confirm they match. This mode must never leave HEAD on a different branch than it started on — no checkout, no branch creation, not even temporarily.'}
 On any git or gh command failure, stop that step and report exactly what already succeeded (fail-open reporting) — do not retry failed git/gh commands.
 Return via StructuredOutput: {branch, commits: [one short description per commit actually made], pr_url (include only if a PR was actually created)}.`,
     { label: 'deliver', phase: 'Deliver', schema: DELIVER_SCHEMA, model: MODEL },
   )
-  log(`delivery: branch=${(delivery && delivery.branch) || branch} commits=${(delivery && delivery.commits && delivery.commits.length) || 0}${delivery && delivery.pr_url ? ` pr=${delivery.pr_url}` : ''}`)
+  log(`delivery: branch=${(delivery && delivery.branch) || (useBranch ? branch : '(current branch)')} commits=${(delivery && delivery.commits && delivery.commits.length) || 0}${delivery && delivery.pr_url ? ` pr=${delivery.pr_url}` : ''}`)
 }
 
 const note = DELIVERY === 'none'
