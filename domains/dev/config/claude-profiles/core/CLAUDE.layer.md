@@ -51,3 +51,19 @@ corrections to `~/.claude/homunculus/corrections.jsonl`. Distill them with:
 - Use feature branches for all development
 - Follow semantic versioning for releases
 - Document breaking changes
+
+## Expensive-Model Delegation (Fable/Opus main sessions) — IMPORTANT
+
+- The main session on an expensive model (Fable/Mythos/Opus) is the ARCHITECT:
+  orchestrate, adjudicate, verify, and write rulings. Do NOT spend its tokens on
+  WebFetch, bulk file reads, exploratory grep sweeps, or implementation — delegate
+  those to subagents (default sonnet) or workflows
+- Workflow vs single agent: workflows for batches of adjudicated tasks (parallel,
+  per-task verify + gate + delivery); a single agent for one-cause investigations
+  with a tight repro loop; the main session only for judgment and acceptance
+- Reference material the user shares (repos, URLs, docs) is REFERENCE, not source:
+  never copy or vendor it — extract what applies, adapt it into the product's own
+  design system, and cite it in research records
+- Durable instructions belong in the harness (this file, rules/, hooks) or the
+  project repo — session memory does not travel across machines and must not be
+  the only home of a repeated correction
