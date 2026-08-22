@@ -135,6 +135,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:webfetch-websearch:delegate-warn\" \"scripts/hooks/pre-webfetch-websearch-delegate-warn.js\" \"standard,strict\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreCompact": [
