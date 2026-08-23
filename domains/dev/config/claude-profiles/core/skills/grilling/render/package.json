@@ -1,0 +1,20 @@
+{
+  "name": "grilling-render",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "grilling のラウンド文書 (round-N.md) を 1 ページの HTML に描画する",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "grilling-render": "./render.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "elkjs": "^0.10.0",
+    "yaml": "^2.8.1"
+  }
+}
