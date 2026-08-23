@@ -101,16 +101,17 @@ has_spec: true | false
 **前提:** カレントタスクが特定されていること（meta.md の status が draft or clarify）
 
 1. `notes.md` と `spec/requirements.md` の現在の内容を読む
-2. 要件の曖昧な点を **最大5つ** の質問として提示する
-3. ユーザーの回答を `spec/requirements.md` に反映する
-4. `meta.md` の status を `clarify` → `requirements-done` に更新
+2. **grilling スキルを起動する**。対象は読み込んだ要件、出力先は `spec/requirements.md`、観点は下記を `--hints` で渡す:
 
-**質問の観点:**
-- 入出力の具体的な形式
-- エッジケースの扱い
-- 非機能要件（パフォーマンス、セキュリティ）
-- 既存コードとの統合ポイント
-- スコープの境界（何をやらないか）
+   ```
+   grilling "<task-id> の要件（notes.md + spec/requirements.md）" \
+     --out spec/requirements.md \
+     --hints "入出力の具体的な形式 / エッジケースの扱い / 非機能要件（パフォーマンス、セキュリティ） / 既存コードとの統合ポイント / スコープの境界（何をやらないか）"
+   ```
+
+   質問は grilling が1問ずつ出し、決定記録を `spec/requirements.md` の `## 決定記録` に書く。ここで自前の質問リストを作らない。
+3. grilling が「共通理解に達した」と報告したら、`meta.md` の status を `clarify` → `requirements-done` に更新（updated も更新）
+4. 共通理解に達していないうちは `/sdd research` に進まない
 
 ### `/sdd research` — 調査
 
@@ -255,7 +256,7 @@ has_spec: true | false
              │                     │ spec必要
              │      ┌──────────────▼──────────────────────┐
              │      │         /sdd clarify                 │
-             │      │   曖昧さ解消（最大5つの質問）         │
+             │      │   曖昧さ解消（grilling で1問ずつ）       │
              │      └──────────────┬──────────────────────┘
              │                     │
              │      ┌──────────────▼──────────────────────┐
