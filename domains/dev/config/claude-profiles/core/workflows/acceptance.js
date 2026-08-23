@@ -167,7 +167,7 @@ Claimed evidence: ${row.evidence}
 Claimed reasoning: ${row.reasoning}
 
 Open the cited artifact and read it. The claim fails if any of these is true: the citation does not exist; it asserts something adjacent but not this criterion; it would still pass with the behaviour broken; the criterion has parts the evidence does not reach. Default to holds=false when you are unsure — a gap that turns out to be covered costs a re-check, an inflated claim ships a hole. If the status is wrong but some weaker status is right, give corrected_status.`,
-        { label: `verify:${row.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: MODEL, effort: 'high' },
+        { label: `verify:${row.id}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: 'opus', effort: 'high' },
       ).then((v) => ({ ...row, verdict: v })),
     ),
   ).then((checked) => {
@@ -238,8 +238,8 @@ Checks this project runs: ${JSON.stringify(ground.verification.commands)}
 Name what is missing. Look for: criteria with no evidence; whole classes of check this project runs that were never applied to this work; parts of the built scope that no criterion covers at all; claims that survived verification but rest on a single fragile artifact; anything that can only be settled on real hardware or by a person.
 
 Then separate out the calls a human must make — scope cuts, accepted risks, criteria that no longer match what the product became. For each, give the options, your recommendation, and the trade-off in one line. Do not invent decisions to fill the list; an empty list is a valid answer.`,
-  // Judgment stage: session model (no override), high effort.
-  { label: 'gaps', phase: 'Gaps', schema: GAPS_SCHEMA, effort: 'high' },
+  // Judgment stage: pinned to opus, high effort.
+  { label: 'gaps', phase: 'Gaps', schema: GAPS_SCHEMA, model: 'opus', effort: 'high' },
 )
 
 phase('Report')
@@ -260,8 +260,8 @@ Structure:
 
 Rules: state only what the evidence supports. Where a coverage claim was refuted, say so and give the refutation. Never present an unrun check as passing. No padding, no praise.
 ${OUT ? `Write the report to ${OUT} as well as returning it.` : ''}`,
-  // Judgment stage: session model (no override), high effort.
-  { label: 'report', phase: 'Report', effort: 'high' },
+  // Judgment stage: pinned to opus, high effort.
+  { label: 'report', phase: 'Report', model: 'opus', effort: 'high' },
 )
 
 return {

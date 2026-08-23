@@ -142,7 +142,7 @@ Reject a finding when ANY of these holds:
 Findings:
 ${codeFindings.map((f, i) => `${i + 1}. ${f.file}${f.line ? ':' + f.line : ''} — ${f.title}: ${f.detail}`).join('\n')}
 Return a verdict for EVERY finding via StructuredOutput.`,
-    { label: 'judge', phase: 'Judge', schema: JUDGE_SCHEMA, effort: 'high' },
+    { label: 'judge', phase: 'Judge', schema: JUDGE_SCHEMA, model: 'opus', effort: 'high' },
   )
   const verdicts = (judge && judge.verdicts) || []
   // Missing verdict = not accepted: only an explicit accept reaches the tree.

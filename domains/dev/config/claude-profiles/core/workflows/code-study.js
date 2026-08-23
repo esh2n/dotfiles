@@ -167,8 +167,8 @@ ${JSON.stringify(sample).slice(0, 20000)}
 
 Job: open the cited source and actually read it. When the content differs from the claim, write what is actually there in reason. When the location does not exist, set holds=false and say so in reason. When in doubt, lean holds=false.
 ${RULES}`,
-      // Judgment stage: session model (no override), high effort.
-      { label: 'check', phase: 'Check', schema: CHECK_SCHEMA, effort: 'high' },
+      // Judgment stage: pinned to sonnet, high effort.
+      { label: 'check', phase: 'Check', schema: CHECK_SCHEMA, model: 'sonnet', effort: 'high' },
     )
   : null
 

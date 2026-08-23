@@ -72,8 +72,8 @@ const fixes = found.flatMap((s) => s.items.filter((i) => i.verdict === 'fix').ma
 const summary = await agent(
   `Merge this stocktake into a short prioritized report, written in ${LANGUAGE}. Group by area, lead with what to delete and why, then what to fix. Be specific; no padding.
 DROP CANDIDATES:\n${drops.join('\n') || '(none)'}\nFIX:\n${fixes.join('\n') || '(none)'}`,
-  // Judgment stage: session model (no override).
-  { label: 'synthesize', phase: 'Synthesize' },
+  // Judgment stage: pinned to sonnet.
+  { label: 'synthesize', phase: 'Synthesize', model: 'sonnet' },
 )
 
 log(`stocktake: ${drops.length} drop candidate(s), ${fixes.length} fix item(s)`)

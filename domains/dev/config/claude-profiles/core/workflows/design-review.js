@@ -124,8 +124,8 @@ FINDING: ${f.claim}${f.doc_ref ? ` (claims to contradict: ${f.doc_ref})` : ''}
 DESIGN: ${ctx.design_summary}
 GROUNDING:\n${GROUNDING}
 Check: does the design actually say what the finding assumes? If it cites a doc, open that doc and confirm the quote supports the claim. Does the repo already handle this concern elsewhere? Read files if needed.`,
-        // Judgment stage: session model (no override), high effort.
-        { label: `verify:${r.lane}`, phase: 'Verify', schema: VERDICT_SCHEMA, effort: 'high' },
+        // Judgment stage: pinned to opus, high effort.
+        { label: `verify:${r.lane}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: 'opus', effort: 'high' },
       ).then((v) => ({ ...f, verdict: v }))),
   ).then((checked) => ({ ...r, checked: checked.filter(Boolean) })),
 )
@@ -184,7 +184,7 @@ Structure:
 5. Unconfirmed — what could not be judged because no grounding doc was found; say so honestly
 
 Rules: do not pad the findings. No ungrounded generalities. Derive the verdict from the weight of the findings (an unresolved critical finding rules out "proceed").`,
-  { label: 'synthesize', phase: 'Synthesize', schema: REPORT_SCHEMA, effort: 'high' },
+  { label: 'synthesize', phase: 'Synthesize', schema: REPORT_SCHEMA, model: 'opus', effort: 'high' },
 )
 
 // Code-enforced floor: a high-stakes confirmed finding cannot be summarized away.

@@ -68,8 +68,8 @@ Rules: use WebSearch/WebFetch — do NOT answer from memory (the topic may postd
   (r) => parallel(r.findings.filter((f) => f.load_bearing).map((f) => () =>
     agent(
       `Verify this claim by independently opening the source (and one more source if needed): "${f.claim}" (source: ${f.source}). Does it hold? If wrong or overstated, provide corrected wording.`,
-      // Judgment stage: session model (no override), high effort.
-      { label: `verify:${r.angle}`, phase: 'Verify', schema: VERDICT_SCHEMA, effort: 'high' },
+      // Judgment stage: pinned to opus, high effort.
+      { label: `verify:${r.angle}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: 'opus', effort: 'high' },
     ).then((v) => ({ ...f, verdict: v })),
   )).then((verified) => ({ ...r, verified: verified.filter(Boolean) })),
 )
@@ -86,7 +86,7 @@ Material (JSON): ${JSON.stringify(clean.map((r) => ({
     unknowns: r.unknowns,
   }))).slice(0, 30000)}
 Rules: lead with the answer; cite sources inline; where verification failed use the corrected wording; state unknowns honestly in an explicit "unconfirmed" section; end with a short "implications for your environment" section (in the report language) if context was given. No padding.`,
-  // Judgment stage: session model (no override), high effort.
-  { label: 'synthesize', phase: 'Synthesize', effort: 'high' },
+  // Judgment stage: pinned to opus, high effort.
+  { label: 'synthesize', phase: 'Synthesize', model: 'opus', effort: 'high' },
 )
 return { report: summary, unknowns: clean.flatMap((r) => r.unknowns) }

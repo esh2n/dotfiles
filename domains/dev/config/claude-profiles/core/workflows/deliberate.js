@@ -167,16 +167,16 @@ Criteria: ${JSON.stringify(criteria.criteria)}
 Options: ${JSON.stringify(options)}
 Gate verdicts: ${JSON.stringify(gated)}
 ${round > 1 ? `Previous fatal objections to address: ${JSON.stringify(objections.filter((o) => o.severity === 'fatal'))}` : ''}`,
-    // Judgment stage: session model (no override), high effort.
-    { label: `converge-r${round}`, phase: 'Converge', schema: CONVERGE_SCHEMA, effort: 'high' },
+    // Judgment stage: pinned to opus, high effort.
+    { label: `converge-r${round}`, phase: 'Converge', schema: CONVERGE_SCHEMA, model: 'opus', effort: 'high' },
   )
   phase('Challenge')
   const ch = await agent(
     `You are the designated skeptic. Attack this convergence: hidden assumptions, an option space that was too narrow, criteria that got quietly reweighted after the fact, gate verdicts being ignored. No new scope.
 Real question: ${REAL_Q}
 Convergence: ${JSON.stringify(converged)}`,
-    // Judgment stage: session model (no override), high effort.
-    { label: `challenge-r${round}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, effort: 'high' },
+    // Judgment stage: pinned to opus, high effort.
+    { label: `challenge-r${round}`, phase: 'Challenge', schema: CHALLENGE_SCHEMA, model: 'opus', effort: 'high' },
   )
   objections = (ch && ch.objections) || []
   if (!objections.some((o) => o.severity === 'fatal')) break
@@ -195,8 +195,8 @@ Reframe: ${JSON.stringify(reframe)}
 Convergence: ${JSON.stringify(converged)}
 Objections: ${JSON.stringify(objections)}
 Return the final text only.`,
-  // Judgment stage: session model (no override), high effort.
-  { label: 'synthesize', phase: 'Synthesize', effort: 'high' },
+  // Judgment stage: pinned to opus, high effort.
+  { label: 'synthesize', phase: 'Synthesize', model: 'opus', effort: 'high' },
 )
 
 return { question: QUESTION, real_question: REAL_Q, options, criteria: criteria.criteria, gate: gated, convergence: converged, objections, answer: synthesis }
