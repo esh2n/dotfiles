@@ -205,6 +205,7 @@ trust_brew_taps() {
         dlvhdr/formulae
         noborus/tap
         docker/tap
+        fayazara/tap
     )
     # trust.json lives in $XDG_CONFIG_HOME/homebrew/ when XDG_CONFIG_HOME is
     # set (interactive shells) but nix-darwin activation runs brew with a
