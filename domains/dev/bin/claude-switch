@@ -91,6 +91,7 @@ fi
 
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 CURSOR_DIR="${CURSOR_DIR:-$HOME/.cursor}"
+CODEX_DIR="${CODEX_DIR:-$HOME/.codex}"
 PERSONAL_DIR="$PROFILES_DIR/personal"
 CORE_DIR="$PROFILES_DIR/core"
 PACKS_DIR="$PROFILES_DIR/packs"
@@ -271,6 +272,48 @@ link_cursor_rules() {
 }
 
 # -----------------------------------------------------------------------------
+# link_codex_ports: skills that ship a Codex port → ~/.codex
+#   <layer>/skills/<skill>/codex/SKILL.md
+#     → ~/.codex/skills/<skill>   (directory symlink → the codex/ dir; Codex
+#       0.147 skips a symlinked SKILL.md but follows a symlinked skill dir,
+#       so the dir is linked and the file stays real. Edits are live.)
+#     → ~/.codex/prompts/<skill>.md  (legacy custom-prompt path, symlink)
+# Skipped when Codex is not installed on this machine.
+# -----------------------------------------------------------------------------
+link_codex_ports() {
+    local packs=("$@")
+    [[ -d "$CODEX_DIR" ]] || return 0
+
+    local -a sources=("$CORE_DIR/skills")
+    local p
+    for p in "${packs[@]+"${packs[@]}"}"; do
+        sources+=("$PACKS_DIR/$p/skills")
+    done
+    sources+=("$PERSONAL_DIR/skills")
+
+    local src port dir name count=0
+    for src in "${sources[@]}"; do
+        [[ -d "$src" ]] || continue
+        for port in "$src"/*/codex/SKILL.md; do
+            [[ -f "$port" ]] || continue
+            dir="$(dirname "$port")"
+            name="$(basename "$(dirname "$dir")")"
+            mkdir -p "$CODEX_DIR/prompts" "$CODEX_DIR/skills"
+            [[ -d "$CODEX_DIR/skills/$name" && ! -L "$CODEX_DIR/skills/$name" ]] \
+                && rm -rf "$CODEX_DIR/skills/$name"
+            ln -sfn "$dir" "$CODEX_DIR/skills/$name"
+            ln -sfn "$port" "$CODEX_DIR/prompts/$name.md"
+            ((count++)) || true
+        done
+    done
+
+    if [[ $count -gt 0 ]]; then
+        log_success "Codex: linked $count skill port(s) → ~/.codex/{prompts,skills}/"
+    fi
+    return 0
+}
+
+# -----------------------------------------------------------------------------
 # apply: rebuild ~/.claude from core + enabled packs + personal
 # -----------------------------------------------------------------------------
 apply() {
@@ -298,6 +341,7 @@ apply() {
     done
 
     link_cursor_rules
+    link_codex_ports "${packs[@]+"${packs[@]}"}"
 
     # Legacy marker no longer used; keep it pointing at the new scheme
     echo "packs" > "$CLAUDE_DIR/.claude-profile"

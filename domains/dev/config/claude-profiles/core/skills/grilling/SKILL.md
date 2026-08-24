@@ -169,6 +169,8 @@ grilling "spec/requirements.md の要件" --out spec/requirements.md \
 
 呼び出し元は、grilling が「共通理解に達した」と報告してから次のフェーズへ進む。
 
+Codex CLI からは `codex/grilling.md` を使う（`claude-switch apply` が `~/.codex/skills/grilling/SKILL.md` と `~/.codex/prompts/grilling.md` に置く。参照する round-format と render は同じ）。
+
 ## 参考
 
 - `references/round-format.md` — ラウンド文書の形式（機械可読な正本）
