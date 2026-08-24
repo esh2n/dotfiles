@@ -15,3 +15,7 @@
 #       - id: hermes-4-405b
 #         name: Hermes 4 405B
 #         api: openai-completions
+
+# Keep the document an object when no custom providers are enabled. A
+# comments-only YAML document parses as null and OMP reports a schema error.
+providers: {}

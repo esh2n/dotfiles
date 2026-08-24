@@ -1,0 +1,26 @@
+# omp (oh-my-pi) global settings. The generated config.yml is mutable runtime
+# state; this template is the cross-machine baseline managed by dotfiles.
+
+tools:
+  # Untrusted repositories belong in the sandbox (yomp). The yoki-guard
+  # extension remains the authority for deterministic command restrictions.
+  approvalMode: yolo
+  approval:
+    eval: prompt
+
+bash:
+  patterns:
+    - match: "git push --force*"
+      approval: deny
+    - match: "git push -f*"
+      approval: deny
+
+modelRoles:
+  default: anthropic/claude-fable-5
+
+symbolPreset: unicode
+composer:
+  shape: box
+theme:
+  light: light
+setupVersion: 2

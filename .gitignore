@@ -169,6 +169,10 @@ domains/dev/config/nvim-custom/lua/custom/colorscheme.lua
 
 # Nix
 result
+
+# OMP creates lock files next to symlinked managed YAML files.
+**/omp/*.lock
+**/omp/config.yml
 result-*
 
 # node2nix

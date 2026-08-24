@@ -1,0 +1,4 @@
+# OMP supplies the server definitions and auto-detects them from project
+# markers plus binaries on PATH. Stop an unused server after five minutes;
+# servers are also terminated when the OMP session exits.
+idleTimeoutMs: 300000

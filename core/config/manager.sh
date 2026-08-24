@@ -181,7 +181,7 @@ link_omp_resources() {
     ensure_dir "$omp_home"
 
     local f
-    for f in config.yml models.yml; do
+    for f in config.yml models.yml lsp.yml; do
         [[ -f "${src_dir}/${f}" ]] && link_file "${src_dir}/${f}" "${omp_home}/${f}"
     done
 
