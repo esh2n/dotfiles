@@ -205,6 +205,7 @@ trust_brew_taps() {
         dlvhdr/formulae
         noborus/tap
         docker/tap
+        can1357/tap
         fayazara/tap
     )
     # trust.json lives in $XDG_CONFIG_HOME/homebrew/ when XDG_CONFIG_HOME is

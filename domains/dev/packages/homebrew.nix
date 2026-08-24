@@ -13,6 +13,7 @@
     "dlvhdr/formulae/diffnav"
     "noborus/tap/ov"
     "sesh"
+    "can1357/tap/omp" # oh-my-pi coding agent; tap trusted in update.sh
     "herdr" # not in nixpkgs
     "hunk" # not in nixpkgs
   ];
