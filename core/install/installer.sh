@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 source "${DOTFILES_ROOT}/core/utils/common.sh"
+source "${DOTFILES_ROOT}/core/utils/homebrew.sh"
 # loader.sh is sourced by zshrc, not needed here directly unless we use lazy functions
 # manager.sh is called as a script
 # validator.sh is called as a script
@@ -39,7 +40,7 @@ phase_bootstrap() {
     else
         log_success "Homebrew already installed."
     fi
-    
+
     # Ensure brew is in PATH for this session (required for subsequent phases)
     # このセッションでbrewをPATHに追加
     if ! has_command "brew"; then
@@ -59,6 +60,10 @@ phase_bootstrap() {
         log_error "Homebrew is not available in PATH. Please check your installation."
         exit 1
     fi
+
+    # nix-darwin invokes Homebrew during the next phase. Trust tap-scoped
+    # packages before activation rather than after it has already failed.
+    trust_brew_taps
     
     # Install Git (if not present, though usually comes with Xcode tools)
     if ! has_command "git"; then

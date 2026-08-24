@@ -13,7 +13,7 @@
     "dlvhdr/formulae/diffnav"
     "noborus/tap/ov"
     "sesh"
-    "can1357/tap/omp" # oh-my-pi coding agent; tap trusted in update.sh
+    "can1357/tap/omp" # oh-my-pi coding agent; tap trusted by core/utils/homebrew.sh
     "herdr" # not in nixpkgs
     "hunk" # not in nixpkgs
   ];
@@ -27,7 +27,7 @@
     # under brews made `brew bundle` fail and left the install unmanaged.
     "codex"
     # microVM sandbox for coding agents. docker/tap is casks-only too (same
-    # trap as codex); the tap is trusted in update.sh's trust_brew_taps.
+    # trap as codex); the tap is trusted by core/utils/homebrew.sh.
     "docker/tap/sbx"
   ];
 }

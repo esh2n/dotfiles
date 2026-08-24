@@ -37,6 +37,8 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+source "${DOTFILES_ROOT}/core/utils/homebrew.sh"
+
 # Show help
 show_help() {
     cat << EOF
@@ -187,37 +189,6 @@ cleanup() {
     fi
 }
 
-# Trust third-party taps so brew (with the tap-trust model) can load their
-# formulae/casks during activation. Idempotent; skipped on older brew.
-# Keep in sync with darwin.nix taps and tap-scoped brews in */packages/homebrew.nix.
-trust_brew_taps() {
-    if ! brew trust --help &> /dev/null; then
-        return 0
-    fi
-    log_info "Trusting third-party Homebrew taps..."
-    local taps=(
-        felixkratz/formulae
-        satococoa/tap
-        nikitabobko/tap
-        barutsrb/tap
-        karinushka/paneru
-        k1low/tap
-        dlvhdr/formulae
-        noborus/tap
-        docker/tap
-        can1357/tap
-        fayazara/tap
-    )
-    # trust.json lives in $XDG_CONFIG_HOME/homebrew/ when XDG_CONFIG_HOME is
-    # set (interactive shells) but nix-darwin activation runs brew with a
-    # scrubbed env that falls back to ~/.homebrew/ — write to both so the
-    # bundle run during activation sees the trust too.
-    brew trust --tap "${taps[@]}" \
-        || log_warn "brew trust reported failure (non-critical)"
-    env -u XDG_CONFIG_HOME brew trust --tap "${taps[@]}" \
-        || log_warn "brew trust (no-XDG) reported failure (non-critical)"
-}
-
 # Main execution
 main() {
     local rebuild=false
@@ -282,12 +253,30 @@ main() {
         exit 1
     fi
 
-    # Re-run workspace domain installer (e.g. SbarLua rebuild after sketchybar bump)
-    local workspace_install="${DOTFILES_ROOT}/domains/workspace/install.sh"
-    if [[ -x "$workspace_install" ]]; then
-        log_info "Running workspace domain installer..."
-        bash "$workspace_install" || log_warn "workspace install reported failure (non-critical)"
+    # Re-render machine-local templates and reconcile symlinks before domain
+    # installers consume those files. This keeps update behavior equivalent to
+    # first installation without overwriting mutable runtime state in Git.
+    local config_manager="${DOTFILES_ROOT}/core/config/manager.sh"
+    if [[ -x "$config_manager" ]]; then
+        log_info "Refreshing generated configuration and symlinks..."
+        "$config_manager" template
+        "$config_manager" link
     fi
+
+    # Nix installs declarative packages, while domain installers reconcile
+    # imperative state such as MCP registrations, gh extensions, generated
+    # assets, browser policies, and SbarLua. They are idempotent and must run
+    # on updates too, otherwise a setting added after initial installation is
+    # never applied to an existing machine.
+    local domain_dir domain_install domain_name
+    for domain_dir in "${DOTFILES_ROOT}/domains/"*; do
+        domain_install="${domain_dir}/install.sh"
+        [[ -f "$domain_install" ]] || continue
+        domain_name="$(basename "$domain_dir")"
+        log_info "Reconciling ${domain_name} domain..."
+        DOTFILES_UPDATE=true bash "$domain_install" || \
+            log_warn "${domain_name} domain update reported failure (non-critical)"
+    done
 
     # Default ~/.config/nvim to lazyvim if the user hasn't picked a distro yet.
     # Idempotent: leaves an existing symlink/dir alone so manual switches stick.
