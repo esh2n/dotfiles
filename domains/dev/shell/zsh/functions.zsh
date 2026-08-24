@@ -2485,7 +2485,7 @@ claude() {
 
 # Launch an unattended (AFK) session: confirmations relaxed via acceptEdits,
 # while the unattended-guard hook blocks guardrail self-modification
-# (~/.claude/**, claude-profiles/**, claude-switch) for the whole session.
+# (~/.claude/**, claude-profiles/**, yoki-switch/claude-switch) for the whole session.
 # Use this for /loop and cron-style runs instead of plain `claude`.
 claude-unattended() {
     YOKI_UNATTENDED=1 claude --permission-mode acceptEdits "$@"
@@ -2501,7 +2501,7 @@ claude-unattended() {
 # offer is a named install command instead of a "command not found".
 #
 # The yoki guard extension lives in domains/dev/config/pi/extensions and is
-# installed by claude-switch/manager.sh, not by this function.
+# installed by yoki-switch/manager.sh, not by this function.
 pi() {
     local pi_bin="${HOME}/.local/bin/pi"
     if [[ ! -x "$pi_bin" ]]; then
@@ -2716,7 +2716,7 @@ function gstore() {
 # -----------------------------------------------------------------------------
 # Interactive hook manager for Claude Code ECC profile.
 # Toggles hooks via ECC_DISABLED_HOOKS in ~/.claude/settings.json.
-# Changes are temporary — `claude-switch ecc` resets to defaults.
+# Changes are temporary — `yoki-switch ecc` resets to defaults.
 
 _CHOOKS_SETTINGS="$HOME/.claude/settings.json"
 
@@ -2819,7 +2819,7 @@ _chooks_set_disabled() {
 
 function chooks() {
     if [[ ! -f "$_CHOOKS_SETTINGS" ]]; then
-        echo "Error: $_CHOOKS_SETTINGS not found. Run claude-switch ecc first."
+        echo "Error: $_CHOOKS_SETTINGS not found. Run yoki-switch ecc first."
         return 1
     fi
 
@@ -3034,7 +3034,7 @@ _chooks_toggle() {
     echo "Disabled: \033[0;31m${new_disabled:-none}\033[0m"
     echo ""
     echo "Run \033[1mchooks reset\033[0m to re-enable all."
-    echo "Run \033[1mclaude-switch ecc\033[0m to fully reset from profile."
+    echo "Run \033[1myoki-switch ecc\033[0m to fully reset from profile."
 }
 
 _chooks_profile() {

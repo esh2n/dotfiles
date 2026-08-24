@@ -20,7 +20,7 @@ Located in `~/.claude/agents/`:
 
 Language-specific reviewers/build-resolvers (go-reviewer, typescript-reviewer,
 rust-reviewer, ...) are provided by language packs — availability depends on
-which packs are enabled (`claude-switch pack list`).
+which packs are enabled (`yoki-switch pack list`).
 
 ## Immediate Agent Usage
 

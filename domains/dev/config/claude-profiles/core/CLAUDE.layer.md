@@ -6,7 +6,7 @@ The agent harness — "yoki" (良き): hooks runtime, correction-driven learning
 and workflow graphs — lives in this dotfiles repo at
 `claude-profiles/runtime/yoki` (`$YOKI_ROOT` points there; heritage in
 `runtime/yoki/ORIGIN`). Language/domain content is toggled per machine via
-`claude-switch pack enable|disable <pack>`.
+`yoki-switch pack enable|disable <pack>` (旧名 claude-switch はエイリアスとして残る).
 
 yoki is organized in three layers:
 - **Harness** — deterministic guards and observation (hooks, permissions)

@@ -34,6 +34,6 @@ done
 MISSING=$(echo "$MISSING" | tr -s ' ' | sed 's/^ //')
 [ -n "$MISSING" ] || exit 0
 
-jq -cn --arg msg "このプロジェクトの .yoki.json は langs=[$(echo "$LANGS" | tr '\n' ' ' | sed 's/ $//')] を宣言していますが、pack未有効: ${MISSING}。必要なら 'claude-switch pack enable ${MISSING}' で有効化できます（言語reviewerとpattern skillが載ります）。" \
+jq -cn --arg msg "このプロジェクトの .yoki.json は langs=[$(echo "$LANGS" | tr '\n' ' ' | sed 's/ $//')] を宣言していますが、pack未有効: ${MISSING}。必要なら 'yoki-switch pack enable ${MISSING}' で有効化できます（言語reviewerとpattern skillが載ります）。" \
   '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$msg}}'
 exit 0

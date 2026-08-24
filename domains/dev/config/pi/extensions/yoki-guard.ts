@@ -25,7 +25,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /** Installed hooks, not the repo sources: ~/.claude/hooks/* are symlinks into
- *  the repo, so this follows whatever claude-switch composed.
+ *  the repo, so this follows whatever yoki-switch composed.
  *
  *  YOKI_HOOKS_DIR redirects it. That is an escape hatch as much as a test seam
  *  — pointing it at an empty directory turns the guard off — but the rules it
@@ -113,11 +113,11 @@ export default function (pi: ExtensionAPI) {
 	const available = HOOKS.map((name) => join(HOOKS_DIR, name)).filter((p) => existsSync(p));
 
 	if (available.length === 0) {
-		// claude-switch has not run on this machine. Say so once rather than
+		// yoki-switch has not run on this machine. Say so once rather than
 		// silently guarding nothing — a guard believed to be on is worse than a
 		// guard known to be off.
 		pi.on("session_start", async (_event, ctx) => {
-			ctx.ui.notify("yoki-guard: no hooks found in ~/.claude/hooks — run claude-switch apply", "warning");
+			ctx.ui.notify("yoki-guard: no hooks found in ~/.claude/hooks — run yoki-switch apply", "warning");
 		});
 		return;
 	}

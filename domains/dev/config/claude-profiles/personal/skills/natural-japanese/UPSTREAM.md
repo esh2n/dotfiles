@@ -13,7 +13,7 @@ git clone --depth 1 https://github.com/coji/natural-japanese /tmp/nj
 rsync -a --delete --exclude UPSTREAM.md /tmp/nj/skills/natural-japanese/ \
   "$DOTFILES_ROOT/domains/dev/config/claude-profiles/personal/skills/natural-japanese/"
 # update the pinned commit above, then:
-claude-switch apply
+yoki-switch apply
 ```
 
 Scripts run via `uv run` (PEP 723 inline deps). `semantic.py` is heavyweight

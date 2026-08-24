@@ -21,5 +21,5 @@ description: >-
 # globally, then adding back per sandbox. Not done here; see README.
 #
 # Posture rules for the agent itself are carried by ~/.claude/CLAUDE.md, which
-# the yoki-claude kit provisions via claude-switch. schemaVersion 2 has no
+# the yoki-claude kit provisions via yoki-switch. schemaVersion 2 has no
 # agent-instructions field (agentContext/agentInstructions are v1 only).

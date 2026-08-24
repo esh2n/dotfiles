@@ -66,7 +66,7 @@ process_template() {
     generate_conditional_includes > "$temp_includes"
 
     # Replace {{HOME}}, {{USER}} and {{DOTFILES_ROOT}} with actual values first.
-    # {{DOTFILES_ROOT}} matches the token claude-switch already expands, and is
+    # {{DOTFILES_ROOT}} matches the token yoki-switch already expands, and is
     # what sbx kits need: a sandbox mounts the repo at its host path, so the
     # kit has to name that path literally.
     local temp_file=$(mktemp)

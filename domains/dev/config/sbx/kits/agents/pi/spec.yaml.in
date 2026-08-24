@@ -78,7 +78,7 @@ setup:
     - command:
         - sh
         - -c
-        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/claude-switch apply
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply
       user: "1000"
       description: Rebuild ~/.claude (also what yoki-guard reads its rules from)
 
@@ -87,7 +87,7 @@ setup:
     # which would also rewrite ~/.config and ~/bin inside the VM.
     #
     # bash, not sh: startup commands run under dash, and both files are bash
-    # (dash died on the first `foo() (` in common.sh). The claude-switch step
+    # (dash died on the first `foo() (` in common.sh). The yoki-switch step
     # above only survives because it spawns bash explicitly.
     - command:
         - bash

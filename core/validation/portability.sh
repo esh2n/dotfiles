@@ -138,12 +138,12 @@ run_portability_checks() {
     echo ""
     log_info "--- 3. Scripts: No hardcoded user paths ---"
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/dev/bin/claude-switch" \
-        "claude-switch should use DOTFILES_ROOT or GITHUB_USER" || true
+        "$DOTFILES_ROOT/domains/dev/bin/yoki-switch" \
+        "yoki-switch should use DOTFILES_ROOT or GITHUB_USER" || true
 
     echo ""
     log_info "--- 4. Claude settings (sources only, not merge output): No hardcoded user paths ---"
-    # NOTE: domains/dev/config/claude/settings.json is a GENERATED file (output of claude-switch).
+    # NOTE: domains/dev/config/claude/settings.json is a GENERATED file (output of yoki-switch).
     # It is expected to contain resolved user-specific paths. Only test SOURCE files.
     assert_no_hardcoded_user \
         "$DOTFILES_ROOT/domains/dev/config/claude-profiles/ecc/settings.layer.json" \
@@ -151,7 +151,7 @@ run_portability_checks() {
     assert_no_hardcoded_user \
         "$DOTFILES_ROOT/domains/dev/config/claude-profiles/ecc/CLAUDE.layer.md" \
         "ECC CLAUDE.md should not contain esh2n paths" || true
-    # NOTE: domains/dev/config/claude/CLAUDE.md is a GENERATED file (output of claude-switch).
+    # NOTE: domains/dev/config/claude/CLAUDE.md is a GENERATED file (output of yoki-switch).
     # Only test the source CLAUDE.layer.md above.
 
     echo ""

@@ -173,7 +173,7 @@ do_run() {
 
   local -a args=(run --no-share-skills)
   # --no-share-skills is not optional: sbx otherwise mounts a host-side skills
-  # store read-write over ~/.claude/skills, and claude-switch cannot replace a
+  # store read-write over ~/.claude/skills, and yoki-switch cannot replace a
   # mount point ("Device or resource busy"). It is also the cross-sandbox write
   # hole flagged in the security docs.
 
@@ -189,7 +189,7 @@ do_run() {
   # A kit written as spec.yaml.in embeds literal host paths — that is the only
   # reason not to write it as plain YAML — so it needs the repo mounted. A kit
   # written as a plain spec.yaml is self-contained and gets nothing. Mount only
-  # the three paths claude-switch reads, never the whole repo, which would also
+  # the three paths yoki-switch reads, never the whole repo, which would also
   # expose ~1.7GB of past session transcripts under domains/dev/config/claude/
   # to whatever is running in the box.
   local agent_kit="${KITS}/agents/${agent}"
@@ -232,7 +232,7 @@ do_run() {
 # and the repo's packs.default is empty, so the kit cannot know them. Read the
 # host's set and mirror it — this keeps working as packs are added.
 sync_packs() {
-  # Only meaningful for a kit that mounts the dotfiles — claude-switch is not
+  # Only meaningful for a kit that mounts the dotfiles — yoki-switch is not
   # on PATH in a sandbox that was never given the repo.
   [ -f "${KITS}/agents/$1/spec.yaml.in" ] || return 0
   local name packs
@@ -243,7 +243,7 @@ sync_packs() {
   note "enabling host packs: ${packs}"
   # shellcheck disable=SC2086
   sbx exec "$name" -- bash -lc \
-    "DOTFILES_ROOT='${DOTFILES_ROOT}' bash '${DOTFILES_ROOT}/domains/dev/bin/claude-switch' pack enable ${packs}" \
+    "DOTFILES_ROOT='${DOTFILES_ROOT}' bash '${DOTFILES_ROOT}/domains/dev/bin/yoki-switch' pack enable ${packs}" \
     >/dev/null 2>&1 || note "pack enable failed (non-fatal)"
 }
 

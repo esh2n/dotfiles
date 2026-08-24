@@ -4,7 +4,7 @@
 # self-modification:
 #   - Write/Edit/MultiEdit into ~/.claude/**        (installed config)
 #   - Write/Edit/MultiEdit into **/claude-profiles/** (guardrail sources)
-#   - Bash invoking claude-switch                    (config regeneration)
+#   - Bash invoking yoki-switch/claude-switch         (config regeneration)
 #   - Bash redirecting output into ~/.claude/**
 #
 # Attended sessions pass through untouched. Fail-open on parse errors: the
@@ -72,16 +72,17 @@ case "$TOOL" in
   Bash)
     CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
     [ -n "$CMD" ] || exit 0
-    # Normalize standalone-quoted single words ("claude-switch") to bare form,
+    # Normalize standalone-quoted single words ("yoki-switch") to bare form,
     # then strip remaining quoted runs (multi-word strings) so a mention
     # inside a message does not trigger.
     CMD_NORM=$(echo "$CMD" | sed -E "s/\"([^\" ]+)\"/\1/g; s/'([^' ]+)'/\1/g")
     CMD_UNQUOTED=$(echo "$CMD_NORM" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')
 
-    # claude-switch as a word anywhere: wrapper prefixes (env, time, nohup,
-    # command, xargs, ...) must not slip past a start-of-segment anchor.
-    if echo "$CMD_UNQUOTED" | grep -qE '(^|[[:space:];&|(])claude-switch([[:space:]]|$)'; then
-      deny "Unattended session: claude-switch (config regeneration) is blocked. Queue it for an attended session."
+    # yoki-switch or its claude-switch alias as a word anywhere: wrapper
+    # prefixes (env, time, nohup, command, xargs, ...) must not slip past a
+    # start-of-segment anchor.
+    if echo "$CMD_UNQUOTED" | grep -qE '(^|[[:space:];&|(])(yoki-switch|claude-switch)([[:space:]]|$)'; then
+      deny "Unattended session: yoki-switch/claude-switch (config regeneration) is blocked. Queue it for an attended session."
     fi
 
     # Any home-anchored .claude path in the ORIGINAL command (quoted or not):

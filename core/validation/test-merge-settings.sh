@@ -4,11 +4,11 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # Merge Settings Regression Test (test-merge-settings.sh)
 # -----------------------------------------------------------------------------
-# Verifies domains/dev/bin/claude-switch's `apply` merge semantics for
+# Verifies domains/dev/bin/yoki-switch's `apply` merge semantics for
 # settings.json: personal wins scalar keys, permissions.deny/allow are a
 # union, and personal hook entries run before core hook entries.
 #
-# Runs claude-switch against a synthetic fixture tree (built under mktemp)
+# Runs yoki-switch against a synthetic fixture tree (built under mktemp)
 # via CLAUDE_DIR / CURSOR_DIR / DOTFILES_ROOT overrides, so the real
 # ~/.claude on this machine is never touched.
 #
@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${DOTFILES_ROOT}/core/utils/common.sh"
 
-CLAUDE_SWITCH="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
+CLAUDE_SWITCH="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
 
 FAILED=0
 PASSED=0
@@ -129,7 +129,7 @@ run_merge_settings_checks() {
     local output
     if ! output=$(DOTFILES_ROOT="$FIXTURE" CLAUDE_DIR="$FIXTURE_CLAUDE" CURSOR_DIR="$FIXTURE/cursor" \
         bash "$CLAUDE_SWITCH" apply 2>&1); then
-        log_error "FAIL: claude-switch apply exited non-zero"
+        log_error "FAIL: yoki-switch apply exited non-zero"
         echo "$output" | sed 's/^/       /'
         FAILED=$((FAILED + 1))
         TOTAL=$((TOTAL + 1))

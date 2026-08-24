@@ -10,7 +10,8 @@ set -euo pipefail
 # directory that disappears when the worktree is removed. Two guards prevent it:
 #
 #   core/config/manager.sh   link  → refuses outright
-#   domains/dev/bin/claude-switch  → applies the main checkout, unless --here
+#   domains/dev/bin/yoki-switch    → applies the main checkout, unless --here
+#     (claude-switch is a permanent symlink alias to the same script)
 #
 # Both are exercised against a throwaway repo + worktree under mktemp, so no
 # host state is touched. The fixture carries only the files the guards read.
@@ -45,7 +46,8 @@ build_fixture() {
              "$main/domains/dev/bin" "$main/domains/dev/config/claude-profiles"
     cp "${DOTFILES_ROOT}/core/config/manager.sh"       "$main/core/config/"
     cp "${DOTFILES_ROOT}/core/utils/common.sh"         "$main/core/utils/"
-    cp "${DOTFILES_ROOT}/domains/dev/bin/claude-switch" "$main/domains/dev/bin/"
+    cp "${DOTFILES_ROOT}/domains/dev/bin/yoki-switch" "$main/domains/dev/bin/"
+    ln -s yoki-switch "$main/domains/dev/bin/claude-switch"
 
     git -C "$main" init -q -b main
     git -C "$main" config user.email "test@example.com"
@@ -92,7 +94,7 @@ assert_succeeds() {
     fi
 }
 
-# Asserts on which root claude-switch decided to use. The warning names the
+# Asserts on which root yoki-switch decided to use. The warning names the
 # worktree it was invoked from and the checkout it redirected to; --here
 # suppresses it entirely.
 assert_redirect() {
@@ -146,13 +148,17 @@ run_worktree_guard_checks() {
                  source '$main/core/config/manager.sh'
                  DOTFILES_ROOT='$FIXTURE_ROOT/nogit' assert_canonical_checkout"
 
-    # --- claude-switch: redirects to the main checkout unless --here ---
+    # --- yoki-switch: redirects to the main checkout unless --here ---
     assert_redirect "case5: invoked from a worktree, redirects to main" yes \
-        bash "$wt/domains/dev/bin/claude-switch" status
+        bash "$wt/domains/dev/bin/yoki-switch" status
     assert_redirect "case6: --here keeps the worktree" no \
-        bash "$wt/domains/dev/bin/claude-switch" --here status
+        bash "$wt/domains/dev/bin/yoki-switch" --here status
     assert_redirect "case7: invoked from the main checkout, no redirect" no \
-        bash "$main/domains/dev/bin/claude-switch" status
+        bash "$main/domains/dev/bin/yoki-switch" status
+
+    # --- claude-switch alias: behaves identically to yoki-switch ---
+    assert_redirect "case8: invoked via claude-switch alias, redirects to main" yes \
+        bash "$wt/domains/dev/bin/claude-switch" status
 
     echo ""
     log_info "=== Results ==="

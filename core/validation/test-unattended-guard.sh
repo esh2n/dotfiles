@@ -91,17 +91,21 @@ run_unattended_guard_checks() {
     assert_allow "case4: unattended edit of normal project file allowed" "1" \
         "$(make_edit_json "$work/project/src/main.go" "$work")"
 
-    # 5. unattended: claude-switch denied
-    assert_deny "case5: unattended claude-switch denied" "1" \
+    # 5. unattended: yoki-switch denied
+    assert_deny "case5: unattended yoki-switch denied" "1" \
+        "$(make_bash_json "yoki-switch apply" "$work")"
+
+    # 5b. unattended: claude-switch alias denied too (same guard, both names)
+    assert_deny "case5b: unattended claude-switch alias denied" "1" \
         "$(make_bash_json "claude-switch apply" "$work")"
 
     # 6. unattended: redirect into ~/.claude denied
     assert_deny "case6: unattended redirect into ~/.claude denied" "1" \
         "$(make_bash_json "echo x > ~/.claude/foo.json" "$work")"
 
-    # 7. unattended: quoted mention of claude-switch is not a false positive
-    assert_allow "case7: quoted claude-switch mention allowed" "1" \
-        "$(make_bash_json 'echo "claude-switch is neat"' "$work")"
+    # 7. unattended: quoted mention of yoki-switch is not a false positive
+    assert_allow "case7: quoted yoki-switch mention allowed" "1" \
+        "$(make_bash_json 'echo "yoki-switch is neat"' "$work")"
 
     # 8. .yoki.json unattended:true marks the session without the env var
     echo '{"unattended": true}' > "$work/.yoki.json"
@@ -109,9 +113,9 @@ run_unattended_guard_checks() {
         "$(make_edit_json "$HOME/.claude/settings.json" "$work")"
     /bin/rm -f "$work/.yoki.json"
 
-    # 9. wrapper prefixes do not slip past the claude-switch check
-    assert_deny "case9: env claude-switch denied" "1" \
-        "$(make_bash_json "env claude-switch apply" "$work")"
+    # 9. wrapper prefixes do not slip past the yoki-switch check
+    assert_deny "case9: env yoki-switch denied" "1" \
+        "$(make_bash_json "env yoki-switch apply" "$work")"
 
     # 10. quoting the redirect target does not evade the ~/.claude check
     assert_deny "case10: quoted redirect into ~/.claude denied" "1" \

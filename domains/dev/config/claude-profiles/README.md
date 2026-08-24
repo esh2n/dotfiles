@@ -2,7 +2,8 @@
 
 Claude Code の設定を3層で合成して `~/.claude` に展開する、自分専用の設定
 パック。ハーネス(hooks/permissions) + ループ(/loop, cron, 是正検出) +
-グラフ(workflows) をまとめて **yoki** と呼ぶ。`claude-switch` だけで完結する。
+グラフ(workflows) をまとめて **yoki** と呼ぶ。`yoki-switch`(旧名 `claude-switch`
+はエイリアスとして残る)だけで完結する。
 
 もとは ECC (Everything Claude Code) のベンダリングから出発したが、
 2026-08-03 に上流追従を廃止して独立メンテに切り替えた(来歴は
@@ -43,11 +44,11 @@ core → packs → personal → `~/.claude/settings.local.json`(マシン固有)
 ## 使い方(利用者)
 
 ```bash
-claude-switch                     # 対話でパックをトグルして適用
-claude-switch pack list           # 有効/利用可能パックの一覧
-claude-switch pack enable kotlin  # パックを有効化して適用
-claude-switch pack disable kotlin # 無効化して適用
-claude-switch apply               # 選択を変えずに再合成
+yoki-switch                     # 対話でパックをトグルして適用
+yoki-switch pack list           # 有効/利用可能パックの一覧
+yoki-switch pack enable kotlin  # パックを有効化して適用
+yoki-switch pack disable kotlin # 無効化して適用
+yoki-switch apply               # 選択を変えずに再合成
 ```
 
 - 各パックは `skills/ agents/ commands/ rules/ workflows/` を持ち、有効化すると
@@ -90,7 +91,7 @@ claude-switch apply               # 選択を変えずに再合成
 rules は `paths:` frontmatter による条件ロードなので、プロジェクトに
 該当ファイルが無ければ元々ロードされない(例: Goを触らないプロジェクトで
 go規約は載らない)。skillの説明文はグローバルに載る仕様のため、
-プロジェクト単位の絞り込みは現状パック単位(`claude-switch pack`)のみ。
+プロジェクト単位の絞り込みは現状パック単位(`yoki-switch pack`)のみ。
 
 ## メンテナンス
 
@@ -102,4 +103,4 @@ go規約は載らない)。skillの説明文はグローバルに載る仕様の
 
 1. `packs/<name>/{skills,agents,commands,rules,workflows}` を作って中身を置く
 2. 必要なら `packs.default` に追記
-3. `claude-switch pack enable <name>`
+3. `yoki-switch pack enable <name>`

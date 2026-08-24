@@ -186,7 +186,7 @@ phase_core() {
     fi
 
     # Everything Claude Code (ECC): cloned as sibling of dotfiles so
-    # claude-switch resolves it via ${dotfiles_parent}/everything-claude-code.
+    # yoki-switch resolves it via ${dotfiles_parent}/everything-claude-code.
     local ecc_dir
     ecc_dir="$(dirname "${DOTFILES_ROOT}")/everything-claude-code"
     if [[ ! -d "$ecc_dir/.git" ]]; then
@@ -252,10 +252,10 @@ phase_config() {
     "${DOTFILES_ROOT}/core/config/manager.sh" link
 
     # Generate Claude Code settings (settings.json + CLAUDE.md) via layer merge
-    local claude_switch="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
-    if [[ -x "$claude_switch" ]]; then
+    local yoki_switch="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
+    if [[ -x "$yoki_switch" ]]; then
         log_info "Applying Claude Code config (base + core + packs)..."
-        bash "$claude_switch" apply
+        bash "$yoki_switch" apply
     fi
 
     ensure_git_identity

@@ -299,10 +299,10 @@ main() {
     fi
 
     # Re-merge Claude Code config (source settings may have changed)
-    local claude_switch="${DOTFILES_ROOT}/domains/dev/bin/claude-switch"
-    if [[ -x "$claude_switch" ]]; then
+    local yoki_switch="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
+    if [[ -x "$yoki_switch" ]]; then
         log_info "Re-merging Claude Code config (base + core + packs)..."
-        bash "$claude_switch" apply || log_warn "claude-switch apply failed (non-critical)"
+        bash "$yoki_switch" apply || log_warn "yoki-switch apply failed (non-critical)"
     fi
 
     echo ""

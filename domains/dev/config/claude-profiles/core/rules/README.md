@@ -1,10 +1,10 @@
 # Rules
 
-Rules are composed by `claude-switch` into `~/.claude/rules/`:
+Rules are composed by `yoki-switch` (alias: `claude-switch`) into `~/.claude/rules/`:
 
 - `common/` — language-agnostic principles, always installed (from core)
 - `<language>/` — provided by language packs; present only when the pack is
-  enabled (`claude-switch pack list`)
+  enabled (`yoki-switch pack list`)
 
 ## Conditional Loading (`paths:` frontmatter)
 

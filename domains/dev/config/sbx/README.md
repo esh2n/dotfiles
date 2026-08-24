@@ -2,7 +2,7 @@
 
 `claude` はホストで走る。`yclaude` は [Docker Sandboxes](https://www.docker.com/products/docker-sandboxes/)
 の microVM の中で走る。**`y` を頭に付けるかどうかだけが操作の差**で、中身は
-`claude-switch` が組み立てた同じ yoki ハーネス(hooks/rules/skills/workflows)。
+`yoki-switch` が組み立てた同じ yoki ハーネス(hooks/rules/skills/workflows)。
 
 なぜ VM かというと、`Bash(rm -rf ...)` のような deny list はシェルに対しては
 構造的に回避できるから — `cd ~/x && rm -rf .`、`$HOME`、スクリプト経由、
@@ -170,7 +170,7 @@ sbx policy log     # default-deny に当たったホスト名がそのまま出�
 ## 落とし穴
 
 - **`--no-share-skills` は必須**。付けないと sbx がホスト側の skills ストアを
-  `~/.claude/skills` に read-write でマウントし、`claude-switch` が
+  `~/.claude/skills` に read-write でマウントし、`yoki-switch` が
   マウントポイントを置き換えられず "Device or resource busy" で落ちる。
   sbx のセキュリティ文書でもサンドボックス間の書き込み穴として挙がっている。
   `sbx create` 時のフラグなので kit には書けない — `yoki-box` が常に付けている

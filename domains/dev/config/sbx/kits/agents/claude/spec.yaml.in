@@ -49,13 +49,13 @@ setup:
       description: Install mise as the agent user so toolchains land in /home/agent
 
   startup:
-    # claude-switch is fully portable — CLAUDE_DIR and DOTFILES_ROOT are both
+    # yoki-switch is fully portable — CLAUDE_DIR and DOTFILES_ROOT are both
     # overridable and it contains no uname checks — so it rebuilds ~/.claude
     # here exactly as it does on the host. Verified end to end 2026-08-15.
     - command:
         - sh
         - -c
-        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/claude-switch apply
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply
       user: "1000"
       description: Rebuild ~/.claude from core + packs + personal
     # Packs are NOT enabled here. They default to OFF on a fresh machine and a

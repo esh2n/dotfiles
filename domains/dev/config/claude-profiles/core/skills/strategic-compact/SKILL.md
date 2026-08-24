@@ -49,7 +49,7 @@ Per-session state lives in `$TMPDIR` (`claude-tool-count-<session>`,
 
 Registered in `core/settings.layer.json` at profile `standard,strict`
 (runs through `run-with-flags.js`; disabled at `minimal`).
-No manual configuration needed after `claude-switch apply`.
+No manual configuration needed after `yoki-switch apply`.
 
 ## Configuration
 
