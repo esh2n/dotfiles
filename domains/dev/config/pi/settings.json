@@ -1,19 +1,6 @@
 {
   "packages": [
-    "git:github.com/nicobailon/pi-subagents",
-    "npm:pi-web-access",
-    "npm:@ogulcancelik/pi-session-recall",
-    "npm:@ff-labs/pi-fff",
-    "npm:pi-lens",
-    "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:@plannotator/pi-extension",
-    "git:github.com/earendil-works/pi-review",
-    "npm:pi-context-view",
-    "npm:@sting8k/pi-vcc",
-    "npm:@howaboua/pi-codex-conversion",
-    "npm:pi-btw",
-    "npm:pi-codex-image-gen",
-    "git:github.com/earendil-works/pi-transcribe"
+    "git:github.com/nicobailon/pi-subagents"
   ],
   "lastChangelogVersion": "0.83.0",
   "theme": "dark",
