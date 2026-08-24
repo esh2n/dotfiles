@@ -1,4 +1,7 @@
+/* color-scheme は配色トークンと同じ 3 状態で切り替える。宣言しないと、暗い配色の
+   ページでもラジオ・テキストエリア・スクロールバーだけが UA の明色で描かれる。 */
 :root{
+  color-scheme:light;
   --bg:#f7f8fa; --surface:#ffffff; --ink:#1b2330; --ink-2:#4a5568; --ink-3:#7b8794;
   --line:#d9dee6; --line-2:#eceff3;
   --ts:#2f6fb5; --ts-soft:#e4eefa; --rs:#b6501a; --rs-soft:#fbe9df;
@@ -7,6 +10,7 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
+    color-scheme:dark;
     --bg:#131821; --surface:#1a2130; --ink:#e7ebf1; --ink-2:#b3bcc9; --ink-3:#7f8a99;
     --line:#2c3646; --line-2:#232c3a;
     --ts:#7fb0e8; --ts-soft:#1e3350; --rs:#e8905e; --rs-soft:#47291a;
@@ -15,6 +19,7 @@
   }
 }
 :root[data-theme="dark"]{
+  color-scheme:dark;
   --bg:#131821; --surface:#1a2130; --ink:#e7ebf1; --ink-2:#b3bcc9; --ink-3:#7f8a99;
   --line:#2c3646; --line-2:#232c3a;
   --ts:#7fb0e8; --ts-soft:#1e3350; --rs:#e8905e; --rs-soft:#47291a;

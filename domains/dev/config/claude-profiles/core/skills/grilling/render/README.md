@@ -14,6 +14,7 @@ cd <skill>/render
 pnpm install                      # 初回のみ（elkjs / yaml）
 
 node render.mjs <round.md> [-o <out.html>] [--title "<見出し>"] [--fragment]
+node render.mjs serve <round.md> [--out <answers.jsonl>] [--port <N>] [--no-open]
 ```
 
 | オプション | 既定 | 意味 |
@@ -34,11 +35,56 @@ node render.mjs <round.md> [-o <out.html>] [--title "<見出し>"] [--fragment]
 ### 完全な文書と fragment の使い分け
 
 - **既定（完全な HTML 文書）** — `<!doctype html>` から始まる自己完結の 1 ファイル。
-  ローカルでそのままブラウザに開ける。
+  ローカルでそのままブラウザに開ける。`serve` が配るのもこれ（+ serve 差し込み）。
 - **`--fragment`** — Artifact ツールで公開するときはこちら。Artifact は渡した
   内容を `<!doctype html>…<head></head><body>` で包むので、`<html>` や `<body>`
   を自分で書いてはいけない、というのがツール側の約束。fragment はこの約束に
   合わせて `<title>` + フォントの `<link>` + `<style>` + `<main>` だけを出す。
+
+## serve — ローカルで回答を集める
+
+ブラウザのあるマシンなら、Artifact を経由せずここで完結する。
+
+```sh
+node render.mjs serve .claude/.cache/grilling/<slug>/round-<n>.md
+```
+
+ラウンドを**完全な HTML 文書**として `127.0.0.1` に配り、`open` でブラウザを開き、
+**全問が提出されるまで戻らない**。答え終わるとプロセスが自分で終わる。
+
+| オプション | 既定 | 意味 |
+| --- | --- | --- |
+| `--out <path>` | `<round.md と同じディレクトリ>/answers.jsonl` | 回答の追記先 |
+| `--port <N>` | 空きポート | 待ち受けポート |
+| `--no-open` | off | ブラウザを自動で開かない（URL は標準エラーに出る） |
+
+- **提出** — 各問の「提出」が `/answer` に
+  `{round, slug, question, choice, note, ts}` を POST する。サーバは jsonl に
+  1 行追記して `204` を返す。`round` / `slug` はラウンド文書の値を使い、
+  クライアントの申告は採らない。未知の問い・未知の選択肢は `400` で書かない。
+- **進捗** — ページ下端に「提出済み n / m」が出る。再読込しても戻らない
+  （サーバが GET のたびに提出済みの問い id を差し込む）。
+- **再提出は上書き** — 同じ問いに何度でも出せる。**jsonl には毎回 1 行残り、
+  最後の行が勝つ**。要約と完了判定は畳んだあとの「効いている回答」で数える。
+- **終了** — 全問揃うと最後の `204` を返してから約 300ms 待ち、標準出力に
+  問いの順で要約を出して **0** で終わる。`Ctrl-C` はそこまでの回答を要約して **130**。
+
+```
+$ node render.mjs serve round-1.md --no-open
+serve: http://127.0.0.1:53127/ — 全 3 問。回答は …/answers.jsonl に追記します（Ctrl-C で中断）
+提出済み 1 / 3
+…
+q1: A — 15分で。リフレッシュは既存のものを使い回す
+q2: B
+q3: other — 両方いらない
+```
+
+要約だけが標準出力に出る（URL と進捗は標準エラー）。呼び出し側はそのまま
+`answer:` 行としてラウンド文書に書き戻せる。
+
+**serve のときだけ差し込むもの**（フッタ・POST するスクリプト・その CSS）は
+`lib/html.mjs` の `serveBlock` にまとめてある。既定の書き出しと `--fragment` には
+一切出さない——Artifact に出す HTML にローカルサーバ前提の JS を混ぜないため。
 
 ## 入力の契約
 
@@ -122,13 +168,17 @@ edges:                     # 任意
 ## テスト
 
 ```sh
-pnpm test        # node:test。parse と render の 2 ファイル
+pnpm test        # node:test。parse / render / serve の 3 ファイル
 ```
 
 検査しているのは主に: 記入例が読めること、スキーマ違反がブロック id つきで
 報告されること、生成 HTML に全問の id と選択肢 key が出ること、凡例が実際に
 使われた種類だけになること、SVG に NaN が出ないこと、ノードのラベルが箱から
 はみ出さないこと、ラウンド文書の文字列がすべてエスケープされること。
+
+serve は実際にサーバを立てて（`--no-open`・空きポート）`fetch` で回答を投げ、
+jsonl の中身・標準出力の要約・終了コード（全問 = 0 / SIGINT = 130）・再提出の
+上書き・400 の検証・serve の差し込みが Artifact 側に漏れないことを見ている。
 
 ## 設計上の約束
 
@@ -139,5 +189,9 @@ pnpm test        # node:test。parse と render の 2 ファイル
 - **外部アセットは Google Fonts だけ** — 画像も CDN スクリプトも使わない。
 - **色は 3 状態のテーマトークン** — 明示指定（`[data-theme]`）と OS 設定の
   両方で正しく出る。単独のメディアクエリの中だけで色を定義しない。
+- **`color-scheme` もトークンと同じ 3 状態で切り替える** — 宣言を落とすと、
+  暗色のページでもラジオ・テキストエリア・スクロールバーだけが UA の明色で
+  描かれる。Artifact 側の外殻は `color-scheme` を宣言するので、こちらが
+  宣言しないと**ローカルで開いたときだけ**フォームが浮く。
 - **文字幅は見積り** — ブラウザで測らずに SVG を確定させるため、ASCII 0.6em /
   CJK 1em で数える。太字は 1.08 倍。

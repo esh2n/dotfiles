@@ -46,23 +46,31 @@ plan / design / decision を、共通理解に達するまで詰める。
 
 ## 6. チャネル
 
-問いをどこに出すか。既定は **リポジトリが個人のものなら `artifact`、そうでなければ `chat`**。
-会社の痕跡（社内ドメインの remote、社内 org、社内ツール名、社内語）が見つかれば chat。
-判断がつかなければ**一度だけ聞く**。
+問いをどこに出すか。**1ラウンド = 1ページ**（frontier の問い **3〜6問**）を出すのが
+`local` と `artifact`。どちらもメインセッションが書くのは**ラウンド文書だけ**で、
+HTML の生成は **sonnet サブエージェント**に投げる。手で HTML や SVG を書かない。
 
-### artifact — 1ラウンド = 1ページ
+会社の痕跡（社内ドメインの remote、社内 org、社内ツール名、社内語）が見つかれば
+`chat`。判断がつかなければ**一度だけ聞く**。
 
-- そのラウンドの frontier の問い（**3〜6問**）を**1ページにまとめて**出す。1問ずつにしない。
-- メインセッションが書くのは**ラウンド文書だけ**。HTML の生成は **sonnet サブエージェント**に投げ、
-  `node <skill>/render/render.mjs <round.md> --fragment -o <scratchpad>/round-<n>.html`
-  を走らせてパスを返させる。手で HTML や SVG を書かない。
-- 公開は Artifact ツール。**毎ラウンド同じファイルパスを渡す**ことで URL を保つ（1 slug = 1 artifact）。
+### local（既定。ブラウザがあるマシンならこれ）
+
+サブエージェントに
+`node <skill>/render/render.mjs serve <round.md>` を走らせる。ページが開き、
+**全問の提出まで戻らない**。戻り値の要約（`q1: A — …`）をそのまま `answer:` 行に写す。
+回答は `<round.md と同じディレクトリ>/answers.jsonl` にも残る（最後の行が勝つ）。
+
+### artifact（共有したい・別端末で答えたい・ユーザーが指定したとき）
+
+- `render.mjs <round.md> --fragment -o <scratchpad>/round-<n>.html` を走らせ、
+  返ってきたパスを Artifact ツールに渡す。
+- **毎ラウンド同じファイルパスを渡す**ことで URL を保つ（1 slug = 1 artifact）。
   `capabilities: {artifact: {}}` を付け、入力が保存されセッションに通知が来るようにする。
 - 回答の回収は artifact の再読込（`action: "read"`）。各 `.answer` の `data-choice` と
   `textarea` の値を取り出し、ラウンド文書に `answer:` 行として書き戻す。
 - 全問に回答が付いたら次のラウンドへ。同じ artifact を上書きする。
 
-### chat
+### chat（フォールバック）
 
 §7 の形式で**1問ずつ**出し、回答を待つ。ページは作らない。
 
@@ -99,8 +107,9 @@ plan / design / decision を、共通理解に達するまで詰める。
 
 ## 9. 記録の寿命
 
-- **HTML** — scratchpad に出す。**残さない**。
-- **ラウンド文書** — `.claude/.cache/grilling/<slug>/round-<n>.md`。grilling をしているあいだだけ。
+- **HTML** — scratchpad に出す。**残さない**（`serve` はファイルに書かず配るだけ）。
+- **ラウンド文書 / `answers.jsonl`** — `.claude/.cache/grilling/<slug>/`。
+  grilling をしているあいだだけ。`answers.jsonl` は `answer:` 行に写したら用済み。
 - **決定記録を書いた時点で**、そのラウンドを順に連結して同じディレクトリの
   `transcript.md` にまとめ、`round-<n>.md` は削除する。決定記録の「元ラウンド」は
   `transcript.md` を指す。

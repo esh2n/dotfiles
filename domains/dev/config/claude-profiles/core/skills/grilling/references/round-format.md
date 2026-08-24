@@ -308,8 +308,12 @@ answer: A — 即時同期。ただし BroadcastChannel 非対応環境は B に
 ## 描画
 
 ```sh
+# ローカルで回答まで集める（既定）。全問の提出まで戻らない
+node <skill>/render/render.mjs serve .claude/.cache/grilling/<slug>/round-<n>.md
+
+# Artifact に出す fragment を書き出す
 node <skill>/render/render.mjs .claude/.cache/grilling/<slug>/round-<n>.md \
-  -o "$SCRATCHPAD/round-<n>.html"
+  --fragment -o "$SCRATCHPAD/round-<n>.html"
 ```
 
 スキーマ違反は終了コード 2 で、どのブロックのどのフィールドかを出す。

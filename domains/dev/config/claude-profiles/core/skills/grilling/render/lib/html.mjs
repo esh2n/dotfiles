@@ -150,9 +150,10 @@ export async function renderPage(round, opts = {}) {
   }
 
   // 問い
-  for (const q of questions) blocks.push(await renderQuestion(q))
+  for (const q of questions) blocks.push(await renderQuestion(q, opts))
 
-  const body = `<main>\n${blocks.join('\n\n')}\n</main>`
+  const main = `<main>\n${blocks.join('\n\n')}\n</main>`
+  const body = opts.serve ? `${main}\n${serveBlock(frontmatter, questions)}` : main
   const style = await readFile(join(TEMPLATE_DIR, 'style.css'), 'utf8')
 
   if (opts.fragment) {
@@ -167,7 +168,63 @@ export async function renderPage(round, opts = {}) {
     .replace('{{BODY}}', () => body)
 }
 
-async function renderQuestion(q) {
+/**
+ * serve モード専用の差し込み。フッタ（提出済み n / m）と、提出ボタンから
+ * `/answer` へ POST するスクリプト。**Artifact / 単体 HTML には一切出さない。**
+ * `STATE_SLOT` はサーバが GET のたびに「提出済みの問い id の配列」へ差し替える。
+ * これでページを再読込しても提出済み数が戻らない。
+ */
+export const STATE_SLOT = '/*__STATE__*/[]'
+
+function jsonInScript(v) {
+  return JSON.stringify(v).replace(/</g, '\\u003c')
+}
+
+function serveBlock(frontmatter, questions) {
+  const cfg = jsonInScript({ round: frontmatter.round, slug: frontmatter.slug, total: questions.length })
+  const css = '.serve-bar{position:sticky;bottom:0;z-index:5;display:flex;gap:8px;justify-content:center;'
+    + 'padding:10px 20px;background:var(--surface);border-top:1px solid var(--line);'
+    + 'color:var(--ink-2);font-size:.85rem}'
+    + '.serve-bar b{color:var(--ink);font-weight:700}'
+    + '.serve-bar[data-done="true"] b{color:var(--rec)}'
+  const js = `(function(){
+var G=${cfg};
+var posted=new Set(${STATE_SLOT});
+function bar(){
+  var el=document.getElementById('serve-bar');
+  if(!el)return;
+  el.setAttribute('data-done',String(posted.size>=G.total));
+  document.getElementById('serve-count').textContent=posted.size+' / '+G.total;
+}
+window.grillingSubmit=function(btn){
+  var a=btn.closest('.answer');
+  var sec=a.closest('section');
+  var st=a.querySelector('.status');
+  var sel=a.querySelector('input[type=radio]:checked');
+  if(!sel){st.textContent='選択肢を 1 つ選んでください';return;}
+  var ta=a.querySelector('textarea');
+  st.textContent='送信中…';
+  fetch('/answer',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
+    round:G.round,slug:G.slug,question:sec.id,choice:sel.value,note:ta?ta.value:'',ts:new Date().toISOString()
+  })}).then(function(r){
+    if(!r.ok){st.textContent='送信できませんでした（'+r.status+'）';return;}
+    a.setAttribute('data-submitted','true');
+    a.setAttribute('data-choice',sel.value);
+    sec.setAttribute('data-submitted','true');
+    st.textContent='提出しました（'+sel.value+'）';
+    posted.add(sec.id);bar();
+  }).catch(function(){st.textContent='送信できませんでした（サーバが終了しています）';});
+};
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bar);else bar();
+})();`
+  return [
+    `<style>${css}</style>`,
+    `<footer class="serve-bar" id="serve-bar" data-done="false">提出済み <b id="serve-count">0 / ${questions.length}</b></footer>`,
+    `<script>${js}</script>`,
+  ].join('\n')
+}
+
+async function renderQuestion(q, opts = {}) {
   const parts = []
   const submitted = Boolean(q.answer)
   const picked = parseAnswer(q)
@@ -249,7 +306,8 @@ async function renderQuestion(q) {
   parts.push(`      <textarea name="${escapeHtml(name)}-note" placeholder="例: A で。ただし …">${escapeHtml(picked.note)}</textarea>`)
   parts.push('    </label>')
   parts.push('    <div class="row">')
-  parts.push(`      <button type="button" onclick="${submitScript(name)}">提出</button>`)
+  const onclick = opts.serve ? 'grillingSubmit(this)' : submitScript(name)
+  parts.push(`      <button type="button" onclick="${onclick}">提出</button>`)
   parts.push(`      <span class="status">${submitted ? `提出済み（${escapeHtml(picked.choice)}）` : '未提出'}</span>`)
   parts.push('    </div>')
   parts.push('  </div>')
