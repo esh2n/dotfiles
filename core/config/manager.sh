@@ -166,6 +166,35 @@ link_pi_resources() {
     done
 }
 
+
+# omp reads ~/.omp/agent — like pi, that directory holds runtime state
+# (agent.db, sessions, logs) next to configuration, so link the children we
+# own rather than the directory. config.yml/models.yml are also WRITTEN by omp
+# at runtime; omp re-reads under a lock and preserves external edits, so a
+# symlink into the repo is safe (same arrangement as pi's settings.json).
+# ompは~/.omp/agentを読む。実行時の状態が同居するため、
+# ディレクトリごとではなく管理下の項目だけをリンクする。
+link_omp_resources() {
+    local src_dir="$1"
+    local omp_home="${HOME}/.omp/agent"
+
+    ensure_dir "$omp_home"
+
+    local f
+    for f in config.yml models.yml; do
+        [[ -f "${src_dir}/${f}" ]] && link_file "${src_dir}/${f}" "${omp_home}/${f}"
+    done
+
+    local sub
+    for sub in extensions agents prompts; do
+        [[ -d "${src_dir}/${sub}" ]] || continue
+        ensure_dir "${omp_home}/${sub}"
+        while IFS= read -r -d '' resource; do
+            link_file "$resource" "${omp_home}/${sub}/$(basename "$resource")"
+        done < <(find "${src_dir}/${sub}" -mindepth 1 -maxdepth 1 \( -type f -o -type l \) -print0)
+    done
+}
+
 # Link all files in a domain
 link_domain() {
     assert_canonical_checkout || return 1
@@ -198,6 +227,10 @@ link_domain() {
                 # ディレクトリごとではなく管理下の項目だけをリンクする。
                 elif [[ "$dirname" == "pi" ]]; then
                     link_pi_resources "$config_dir"
+                # omp reads ~/.omp/agent — same runtime-state situation as pi.
+                # ompも~/.omp/agentを読むため、管理下の項目だけをリンクする。
+                elif [[ "$dirname" == "omp" ]]; then
+                    link_omp_resources "$config_dir"
                 # serena directory should be linked to ~/.serena instead of ~/.config/serena
                 # serenaディレクトリは特別に~/.serenaにリンクする
                 elif [[ "$dirname" == "serena" ]]; then

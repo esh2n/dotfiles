@@ -1,0 +1,71 @@
+schemaVersion: "2"
+kind: mixin
+name: yoki-omp
+displayName: yoki harness for omp
+description: >-
+  Installs omp (oh-my-pi) and wires it to the dotfiles: ~/.claude from the
+  yoki layers, ~/.omp/agent from the omp config.
+
+# Generated from spec.yaml.in by yoki-box at launch — never installed as a file,
+# because {{DOTFILES_ROOT}} is a literal path belonging to one checkout.
+#
+# WHY THIS KIT EXISTS
+#
+# omp defaults to approvalMode: yolo (every tool auto-approved) and
+# auto-executes repo-local .omp/ extensions at session start — both are stated
+# design positions, not gaps (upstream issue #8678 closed as by-design). The
+# yoki-guard extension carries the git rules across, but the layer that stands
+# between an agent and `rm -rf` does NOT exist on the omp side, and a
+# repo-local extension runs before any guard can see it. Same conclusion as
+# the pi kit: omp needs the VM MORE than Claude Code does, not less.
+
+permissions:
+  network:
+    allow:
+      # apt on arm64 Ubuntu resolves to ports.ubuntu.com, not archive.
+      - ports.ubuntu.com
+      - archive.ubuntu.com
+      - security.ubuntu.com
+      # omp installs via the official installer script (prebuilt binary with
+      # the Bun runtime embedded; no Node/Bun prerequisite in the VM).
+      - omp.sh
+      - github.com
+      - objects.githubusercontent.com
+      - release-assets.githubusercontent.com
+      # mise for toolchains, same as the other agent kits.
+      - mise.run
+      - mise.jdx.dev
+
+setup:
+  install:
+    - command: apt-get update && apt-get install -y zsh fd-find
+      description: Base-image gaps besides mise (fd ships as fd-find on Ubuntu)
+    - command: curl -fsSL https://mise.run | sh
+      user: "1000"
+      description: Install mise as the agent user so toolchains land in /home/agent
+    - command: curl -fsSL https://omp.sh/install | sh
+      user: "1000"
+      description: omp itself (prebuilt binary into the agent user's PATH)
+
+  startup:
+    # Rebuilds ~/.claude from core + packs + personal. The yoki-guard extension
+    # shells out to ~/.claude/hooks/*, so omp has no guardrails until this runs.
+    - command:
+        - sh
+        - -c
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply
+      user: "1000"
+      description: Rebuild ~/.claude (also what yoki-guard reads its rules from)
+
+    # Links config.yml, models.yml and extensions/ into ~/.omp/agent.
+    # bash, not sh: startup commands run under dash, and both files are bash.
+    - command:
+        - bash
+        - -c
+        - . {{DOTFILES_ROOT}}/core/utils/common.sh && . {{DOTFILES_ROOT}}/core/config/manager.sh && link_omp_resources {{DOTFILES_ROOT}}/domains/dev/config/omp
+      user: "1000"
+      description: Wire ~/.omp/agent to the repo's omp config
+
+    # NOT DONE HERE: authentication. omp uses subscription OAuth / API keys and
+    # the credential store (~/.omp/agent/agent.db) is host runtime state,
+    # deliberately not mounted. A fresh sandbox needs `omp` + /login.

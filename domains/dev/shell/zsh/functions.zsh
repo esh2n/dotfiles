@@ -3061,3 +3061,29 @@ _chooks_profile() {
     echo "Profile changed: \033[1;36m$current\033[0m → \033[1;36m$selected\033[0m"
     echo "Takes effect on next Claude Code session."
 }
+
+# omp (oh-my-pi) is the daily driver for non-Claude models; pi is retired but
+# its wiring stays dormant. The wrapper pins the security posture:
+# --no-extensions stops repo-local .omp/ extensions from auto-executing on
+# session start (omp runs them by design, issue #8678), while the explicit -e
+# keeps the yoki guard loaded — explicit paths survive --no-extensions.
+# Escape hatches: YOKI_OMP_ALL_EXTENSIONS=1 for trusted repos that need their
+# own .omp/ extensions, or `command omp` for the raw binary.
+omp() {
+    local omp_bin
+    omp_bin="$(whence -p omp)" || {
+        echo "\033[31momp not found. Run: brew install can1357/tap/omp\033[0m" >&2
+        return 1
+    }
+    local guard="${HOME}/.omp/agent/extensions/yoki-guard.ts"
+    if [[ "${YOKI_OMP_ALL_EXTENSIONS:-0}" == "1" ]]; then
+        "$omp_bin" "$@"
+        return
+    fi
+    if [[ ! -f "$guard" ]]; then
+        echo "\033[33myoki-guard missing at ${guard} — run yoki-switch apply; starting omp UNGUARDED\033[0m" >&2
+        "$omp_bin" "$@"
+        return
+    fi
+    "$omp_bin" --no-extensions -e "$guard" "$@"
+}

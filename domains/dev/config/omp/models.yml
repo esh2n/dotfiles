@@ -1,0 +1,17 @@
+# Custom model providers for omp (docs/models.md) — managed by dotfiles,
+# symlinked to ~/.omp/agent/models.yml.
+#
+# Any OpenAI-compatible endpoint can be added here without touching omp's
+# source: baseUrl + apiKey env var + api. Template below for Nous Research
+# Hermes — uncomment after verifying the current base URL and setting the env
+# var (never hardcode the key).
+#
+# providers:
+#   nous:
+#     baseUrl: https://inference-api.nousresearch.com/v1  # VERIFY before enabling
+#     apiKey: NOUS_API_KEY
+#     api: openai-completions
+#     models:
+#       - id: hermes-4-405b
+#         name: Hermes 4 405B
+#         api: openai-completions
