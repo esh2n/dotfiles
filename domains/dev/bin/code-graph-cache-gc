@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Maintain Codebase-Memory indexes without deleting SQLite files behind the
+# server's back. Projects are removed only through its lock-aware CLI.
+
+cache_root="${CBM_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/codebase-memory-mcp}"
+state_dir="${cache_root}/dotfiles-access"
+ttl_days="${CODE_GRAPH_CACHE_TTL_DAYS:-30}"
+max_gib="${CODE_GRAPH_CACHE_MAX_GIB:-5}"
+gc_interval_hours="${CODE_GRAPH_CACHE_GC_INTERVAL_HOURS:-24}"
+quiet=false
+force=false
+dry_run=false
+touch_root=""
+
+usage() {
+    printf '%s\n' "Usage: code-graph-cache-gc [--force] [--dry-run] [--quiet] [--touch REPO]"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --force) force=true ;;
+        --dry-run) dry_run=true ;;
+        --quiet) quiet=true ;;
+        --touch)
+            [[ $# -ge 2 ]] || { usage >&2; exit 2; }
+            touch_root="$2"
+            shift
+            ;;
+        -h|--help) usage; exit 0 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+    shift
+done
+
+is_uint() { [[ "$1" =~ ^[0-9]+$ ]]; }
+is_uint "$ttl_days" || { echo "CODE_GRAPH_CACHE_TTL_DAYS must be an integer" >&2; exit 2; }
+is_uint "$max_gib" || { echo "CODE_GRAPH_CACHE_MAX_GIB must be an integer" >&2; exit 2; }
+is_uint "$gc_interval_hours" || { echo "CODE_GRAPH_CACHE_GC_INTERVAL_HOURS must be an integer" >&2; exit 2; }
+
+mkdir -p "$state_dir"
+chmod 700 "$state_dir" 2>/dev/null || true
+
+path_hash() {
+    printf '%s' "$1" | shasum -a 256 | awk '{print $1}'
+}
+
+write_stamp() {
+    local root="$1" hash tmp
+    root="$(cd "$root" 2>/dev/null && pwd -P || printf '%s' "$root")"
+    hash="$(path_hash "$root")"
+    tmp="${state_dir}/.${hash}.$$"
+    jq -n --arg root_path "$root" --argjson last_used "$(date +%s)" \
+        '{root_path:$root_path,last_used:$last_used}' > "$tmp"
+    mv "$tmp" "${state_dir}/${hash}.json"
+}
+
+if [[ -n "$touch_root" ]]; then
+    write_stamp "$touch_root"
+    exit 0
+fi
+
+command -v codebase-memory-mcp >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
+
+now="$(date +%s)"
+last_gc_file="${state_dir}/.last-gc"
+if [[ "$force" != true && -f "$last_gc_file" ]]; then
+    last_gc="$(stat -f %m "$last_gc_file" 2>/dev/null || stat -c %Y "$last_gc_file" 2>/dev/null || echo 0)"
+    if (( now - last_gc < gc_interval_hours * 3600 )); then
+        exit 0
+    fi
+fi
+
+# mkdir is atomic and works on macOS without an extra flock dependency.
+gc_lock="${state_dir}/.gc-lock"
+if ! mkdir "$gc_lock" 2>/dev/null; then
+    exit 0
+fi
+trap 'rmdir "$gc_lock" 2>/dev/null || true' EXIT
+
+raw="$(codebase-memory-mcp cli list_projects --include-details true --limit 100 2>/dev/null || true)"
+[[ -n "$raw" ]] || exit 0
+
+# CLI versions may return the payload directly or wrapped as MCP text content.
+projects="$(jq -c '
+  if has("projects") then .projects
+  elif (.content?[0]?.text? != null) then (.content[0].text | fromjson | .projects)
+  else [] end
+' <<<"$raw" 2>/dev/null || printf '[]')"
+
+ttl_seconds=$(( ttl_days * 86400 ))
+max_bytes=$(( max_gib * 1024 * 1024 * 1024 ))
+total_bytes="$(jq '[.[].size_bytes // 0] | add // 0' <<<"$projects")"
+
+while IFS=$'\t' read -r name root size; do
+    [[ -n "$name" && -n "$root" ]] || continue
+    hash="$(path_hash "$root")"
+    stamp="${state_dir}/${hash}.json"
+    if [[ ! -f "$stamp" ]]; then
+        # First observation gets a full TTL grace period.
+        write_stamp "$root"
+        continue
+    fi
+    last_used="$(jq -r '.last_used // 0' "$stamp" 2>/dev/null || echo 0)"
+    if (( now - last_used <= ttl_seconds )); then
+        continue
+    fi
+    [[ "$quiet" == true ]] || printf 'expire %s (%s, %s bytes)\n' "$name" "$root" "$size"
+    if [[ "$dry_run" != true ]]; then
+        codebase-memory-mcp cli delete_project --project "$name" >/dev/null
+        rm -f "$stamp"
+    fi
+    total_bytes=$(( total_bytes - size ))
+done < <(jq -r '.[] | [.name, .root_path, (.size_bytes // 0)] | @tsv' <<<"$projects")
+
+# Size pressure uses LRU order, but never evicts an index used in the last day.
+if (( total_bytes > max_bytes )); then
+    while IFS=$'\t' read -r last_used name root size; do
+        (( total_bytes > max_bytes )) || break
+        (( now - last_used > 86400 )) || continue
+        [[ "$quiet" == true ]] || printf 'evict %s (%s, %s bytes)\n' "$name" "$root" "$size"
+        if [[ "$dry_run" != true ]]; then
+            codebase-memory-mcp cli delete_project --project "$name" >/dev/null
+            rm -f "${state_dir}/$(path_hash "$root").json"
+        fi
+        total_bytes=$(( total_bytes - size ))
+    done < <(
+        while IFS=$'\t' read -r name root size; do
+            stamp="${state_dir}/$(path_hash "$root").json"
+            # A TTL pass may already have removed this project.
+            [[ -f "$stamp" ]] || continue
+            last_used="$(jq -r '.last_used // 0' "$stamp" 2>/dev/null || echo 0)"
+            printf '%s\t%s\t%s\t%s\n' "$last_used" "$name" "$root" "$size"
+        done < <(jq -r '.[] | [.name, .root_path, (.size_bytes // 0)] | @tsv' <<<"$projects") | sort -n
+    )
+fi
+
+if [[ "$dry_run" != true ]]; then
+    touch "$last_gc_file"
+fi
+
+if (( total_bytes > max_bytes )) && [[ "$quiet" != true ]]; then
+    printf 'cache remains above limit: %s > %s bytes; recent indexes were preserved\n' \
+        "$total_bytes" "$max_bytes" >&2
+fi

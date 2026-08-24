@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "gh is not installed" >&2
+    exit 1
+fi
+
+if ! gh extension list 2>/dev/null | grep -Fq "orangain/gh-pr-graph"; then
+    echo "gh-pr-graph is not installed; run the dotfiles installer first" >&2
+    exit 1
+fi
+
+# Upgrades are deliberately explicit rather than part of a dotfiles rebuild.
+exec gh extension upgrade pr-graph

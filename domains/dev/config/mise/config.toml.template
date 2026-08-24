@@ -6,13 +6,14 @@ go = "latest"
 rust = "latest"
 bun = "latest"
 deno = "latest"
-flutter = "latest"
+"vfox:mise-plugins/vfox-flutter" = "latest"
 lua = "5.5"
 
 [settings]
 experimental = false
 verbose = false
 env_shell_expand = true
+ruby.compile = false
 
 [env]
 PYTHONPATH = "{{ env.PYTHONPATH | default(value='') }}:{{ cwd }}"

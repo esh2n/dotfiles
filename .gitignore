@@ -163,6 +163,9 @@ domains/dev/config/nvim-custom/lua/custom/colorscheme.lua
 
 # Serena logs
 **/serena/logs/
+**/serena/language_servers/
+**/serena/serena_config.yml
+/.serena/
 
 # Nix
 result

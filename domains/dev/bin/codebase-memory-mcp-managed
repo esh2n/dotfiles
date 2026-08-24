@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Stable entry point shared by Claude Code and Codex. The upstream daemon owns
+# multi-session/worktree coordination; this wrapper only records use and runs a
+# throttled, safe cache GC before handing stdio to the MCP server.
+
+export CBM_CACHE_DIR="${CBM_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/codebase-memory-mcp}"
+export CBM_MEM_BUDGET_MB="${CBM_MEM_BUDGET_MB:-4096}"
+
+repo_root="$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null || pwd -P)"
+if command -v code-graph-cache-gc >/dev/null 2>&1; then
+    code-graph-cache-gc --touch "${repo_root}" --quiet || true
+    code-graph-cache-gc --quiet || true
+fi
+
+exec codebase-memory-mcp "$@"

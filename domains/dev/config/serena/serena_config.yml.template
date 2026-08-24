@@ -1,0 +1,12 @@
+# Serena configuration managed by dotfiles.
+# The generated serena_config.yml is mutable runtime state and is not tracked.
+
+gui_log_window: false
+web_dashboard: false
+web_dashboard_open_on_launch: false
+
+# Projects are activated dynamically from the coding agent's working
+# directory. Serena 1.5+ requires this registry key even when it starts empty.
+projects: []
+
+language_backend: LSP

@@ -37,6 +37,7 @@
     # Git
     git
     gh
+    codebase-memory-mcp
     delta
     git-lfs
     ghq

@@ -28,10 +28,16 @@ fi
 if has_command "mise"; then
     log_info "Installing language runtimes via mise..."
     eval "$(mise activate bash)" 2>/dev/null || true
-    
+
     if [[ -f "${HOME}/.config/mise/config.toml" ]]; then
+        # This file is managed by these dotfiles. mise invalidates trust when
+        # its content changes, so reconcile trust before every install/update.
+        mise trust "${HOME}/.config/mise/config.toml" >/dev/null || \
+            log_warn "Failed to trust managed mise config"
         mise install
     elif [[ -f "${SCRIPT_DIR}/config/mise/config.toml" ]]; then
+        mise trust "${SCRIPT_DIR}/config/mise/config.toml" >/dev/null || \
+            log_warn "Failed to trust managed mise config"
         MISE_CONFIG_DIR="${SCRIPT_DIR}/config/mise" mise install
     fi
     
@@ -127,6 +133,64 @@ fi
 if has_command "git-lfs"; then
     log_info "Initializing git-lfs..."
     git lfs install
+fi
+
+# GitHub CLI extensions are state managed by gh itself. Install missing
+# extensions here, but keep upgrades explicit so a dotfiles rebuild cannot
+# silently change their behaviour.
+if has_command "gh"; then
+    if ! gh extension list 2>/dev/null | grep -Fq "orangain/gh-pr-graph"; then
+        log_info "Installing gh-pr-graph extension..."
+        gh extension install orangain/gh-pr-graph || \
+            log_warn "gh-pr-graph installation failed (is gh authenticated?)"
+    fi
+fi
+
+# Codebase-Memory is packaged by Nix. Its daemon coordinates concurrent
+# Claude/Codex sessions and serializes per-project graph mutations.
+if has_command "codebase-memory-mcp"; then
+    codebase-memory-mcp config set auto_index true >/dev/null || \
+        log_warn "Failed to enable Codebase-Memory auto-index"
+    codebase-memory-mcp config set auto_watch true >/dev/null || \
+        log_warn "Failed to enable Codebase-Memory watcher"
+fi
+
+# Claude stores user-scoped MCP servers in ~/.claude.json, outside the symlinked
+# ~/.claude directory. Project/local entries retain higher precedence.
+if has_command "claude"; then
+    if ! claude mcp get codebase-memory-mcp >/dev/null 2>&1; then
+        log_info "Registering Codebase-Memory MCP for Claude Code..."
+        claude mcp add --transport stdio --scope user codebase-memory-mcp -- \
+            "${HOME}/bin/codebase-memory-mcp-managed" || \
+            log_warn "Failed to register Codebase-Memory MCP for Claude Code"
+    fi
+
+    if ! claude mcp get serena >/dev/null 2>&1; then
+        log_info "Registering Serena MCP for Claude Code..."
+        claude mcp add --transport stdio --scope user serena -- uvx -p 3.13 \
+            serena-agent==1.5.3 start-mcp-server --project-from-cwd \
+            --context claude-code || \
+            log_warn "Failed to register Serena MCP for Claude Code"
+    fi
+fi
+
+# ~/.codex/config.toml contains machine-local trust and hook state, so it is
+# intentionally not replaced wholesale by the tracked template. Reconcile MCP
+# entries through the Codex CLI to preserve that local state.
+if has_command "codex"; then
+    if ! codex mcp get codebase-memory-mcp >/dev/null 2>&1; then
+        log_info "Registering Codebase-Memory MCP for Codex..."
+        codex mcp add codebase-memory-mcp -- \
+            "${HOME}/bin/codebase-memory-mcp-managed" || \
+            log_warn "Failed to register Codebase-Memory MCP for Codex"
+    fi
+
+    if ! codex mcp get serena >/dev/null 2>&1; then
+        log_info "Registering Serena MCP for Codex..."
+        codex mcp add serena -- uvx -p 3.13 serena-agent==1.5.3 \
+            start-mcp-server --project-from-cwd --context codex || \
+            log_warn "Failed to register Serena MCP for Codex"
+    fi
 fi
 
 log_success "Dev Domain installed."

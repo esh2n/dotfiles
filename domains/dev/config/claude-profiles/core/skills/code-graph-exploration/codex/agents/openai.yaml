@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Graph Exploration"
+  short_description: "Choose graph or LSP exploration and verify results"
+  default_prompt: "Use $code-graph-exploration to trace this change across the repository."
