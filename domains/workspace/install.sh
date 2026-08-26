@@ -24,14 +24,13 @@ SBARLUA_REPO="https://github.com/FelixKratz/SbarLua"
 SBARLUA_CACHE_DIR="${HOME}/.cache/sbarlua"
 SBARLUA_TARGET="${HOME}/.local/share/sketchybar_lua/sketchybar.so"
 
+# Print the major.minor of the Lua statically linked into a SbarLua .so.
+sbarlua_so_version() {
+    grep -a -o 'LuaVersion: Lua [0-9]*\.[0-9]*' "$1" 2>/dev/null | head -1 | sed 's/.*Lua //'
+}
+
 install_sbarlua() {
     log_info "Setting up SbarLua..."
-
-    if [[ -f "$SBARLUA_TARGET" && "${FORCE:-false}" != "true" ]]; then
-        log_success "SbarLua already installed: $SBARLUA_TARGET"
-        log_info "  Run with FORCE=true to rebuild"
-        return 0
-    fi
 
     # Activate mise to expose the lua interpreter (sketchybarrc uses the same approach)
     if [[ -x "${HOME}/.local/bin/mise" ]]; then
@@ -41,6 +40,23 @@ install_sbarlua() {
     if ! has_command "lua"; then
         log_error "lua not found in PATH. Install via mise (e.g. 'mise use -g lua@5.5') and retry."
         return 1
+    fi
+
+    local host_ver so_ver
+    host_ver="$(lua -v 2>&1 | sed -n 's/^Lua \([0-9]*\.[0-9]*\).*/\1/p')"
+
+    # SbarLua statically links a vendored Lua; the .so only works when loaded by
+    # an interpreter of the same major.minor (mismatch = empty bar, no error).
+    # Rebuild whenever the installed .so was built for a different Lua than the
+    # one sketchybarrc will run.
+    if [[ -f "$SBARLUA_TARGET" && "${FORCE:-false}" != "true" ]]; then
+        so_ver="$(sbarlua_so_version "$SBARLUA_TARGET")"
+        if [[ -n "$so_ver" && "$so_ver" == "$host_ver" ]]; then
+            log_success "SbarLua already installed: $SBARLUA_TARGET (Lua ${so_ver})"
+            log_info "  Run with FORCE=true to rebuild"
+            return 0
+        fi
+        log_warn "SbarLua was built for Lua ${so_ver:-unknown} but lua is ${host_ver}; rebuilding"
     fi
     if ! has_command "git"; then
         log_error "git not found in PATH."
@@ -76,9 +92,15 @@ install_sbarlua() {
     fi
 
     log_info "Building & installing SbarLua..."
+    make -C "${SBARLUA_CACHE_DIR}" clean >/dev/null 2>&1 || true
     if make -C "${SBARLUA_CACHE_DIR}" install; then
         if [[ -f "$SBARLUA_TARGET" ]]; then
-            log_success "SbarLua installed at $SBARLUA_TARGET"
+            so_ver="$(sbarlua_so_version "$SBARLUA_TARGET")"
+            log_success "SbarLua installed at $SBARLUA_TARGET (Lua ${so_ver:-unknown})"
+            if [[ -n "$so_ver" && "$so_ver" != "$host_ver" ]]; then
+                log_warn "SbarLua vendors Lua ${so_ver} but mise lua is ${host_ver}."
+                log_warn "  Pin lua = \"${so_ver}\" in mise config, or sketchybarrc will fall back to 'mise exec lua@${so_ver}'."
+            fi
         else
             log_error "make install completed but $SBARLUA_TARGET is missing."
             return 1

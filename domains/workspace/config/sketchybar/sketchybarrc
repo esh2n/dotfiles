@@ -10,10 +10,21 @@ fi
 
 cd "$(dirname "$0")"
 
-# SbarLua (~/.local/share/sketchybar_lua/sketchybar.so) is built against Lua 5.4.
-# Loading it from Lua 5.5 (the mise global) fails silently: the config exits
-# without errors and the bar stays empty. Pin 5.4 here regardless of the global.
-if command -v mise >/dev/null 2>&1 && mise where lua@5.4 >/dev/null 2>&1; then
-    exec mise exec lua@5.4 -- lua -e 'require("helpers"); require("init")'
+# SbarLua statically links its own Lua and must be loaded by an interpreter of
+# the same major.minor. A mismatch (e.g. 5.4 .so under the mise-global 5.5)
+# does not raise an error: the config just exits and the bar stays empty.
+# Pick the interpreter that matches the .so; `update` rebuilds the .so against
+# the current lua (domains/workspace/install.sh), so this is only a safety net.
+SBARLUA_SO="$HOME/.local/share/sketchybar_lua/sketchybar.so"
+so_ver="$(grep -a -o 'LuaVersion: Lua [0-9]*\.[0-9]*' "$SBARLUA_SO" 2>/dev/null | head -1 | sed 's/.*Lua //')"
+host_ver="$(lua -v 2>&1 | sed -n 's/^Lua \([0-9]*\.[0-9]*\).*/\1/p')"
+
+if [[ -n "$so_ver" && "$so_ver" != "$host_ver" ]]; then
+    if command -v mise >/dev/null 2>&1 && mise where "lua@${so_ver}" >/dev/null 2>&1; then
+        echo "sketchybarrc: SbarLua is built for Lua ${so_ver}, host lua is ${host_ver}; using lua@${so_ver}" >&2
+        exec mise exec "lua@${so_ver}" -- lua -e 'require("helpers"); require("init")'
+    fi
+    echo "sketchybarrc: SbarLua is built for Lua ${so_ver} but lua is ${host_ver}. Rebuild with: FORCE=true domains/workspace/install.sh" >&2
 fi
+
 exec lua -e 'require("helpers"); require("init")'
