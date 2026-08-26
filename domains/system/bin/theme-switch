@@ -277,11 +277,13 @@ if [[ -d "$SKETCHYBAR_CONFIG_DIR" ]]; then
         log_success "Updated Sketchybar theme symlink"
 
         if command -v sketchybar >/dev/null 2>&1; then
-            # Force sketchybar to exit and restart
-            pkill -f sketchybar 2>/dev/null || true
-            sleep 0.5
-            nohup sketchybar > /dev/null 2>&1 &
-            log_success "Restarted Sketchybar"
+            # sketchybar runs under launchd (KeepAlive); killing it and spawning
+            # a second copy races with launchd. Reload the config in place.
+            if sketchybar --reload >/dev/null 2>&1; then
+                log_success "Reloaded Sketchybar"
+            else
+                log_warn "Sketchybar is not running; skipped reload"
+            fi
         fi
     else
         log_warn "Sketchybar theme '$THEME' not found"

@@ -9,4 +9,11 @@ if command -v mise >/dev/null 2>&1; then
 fi
 
 cd "$(dirname "$0")"
+
+# SbarLua (~/.local/share/sketchybar_lua/sketchybar.so) is built against Lua 5.4.
+# Loading it from Lua 5.5 (the mise global) fails silently: the config exits
+# without errors and the bar stays empty. Pin 5.4 here regardless of the global.
+if command -v mise >/dev/null 2>&1 && mise where lua@5.4 >/dev/null 2>&1; then
+    exec mise exec lua@5.4 -- lua -e 'require("helpers"); require("init")'
+fi
 exec lua -e 'require("helpers"); require("init")'
