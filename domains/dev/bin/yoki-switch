@@ -158,6 +158,8 @@ merge_settings() {
     local personal="$PERSONAL_DIR/settings.personal.json"
     local output="$CLAUDE_DIR/settings.json"
     local -a packs=("$@")
+    local tmp
+    tmp="$(mktemp)"
 
     if [[ ! -f "$layer" ]]; then
         log_error "Core settings not found: $layer"
@@ -213,7 +215,20 @@ merge_settings() {
       | sed "s|{{DOTFILES_PARENT}}|${dotfiles_parent}|g" \
       | sed "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT:-$HOME/dotfiles}|g" \
       | sed "s|{{HOME}}|${HOME}|g" \
-      > "$output"
+      > "$tmp"
+
+    # Runtime-owned keys: Claude Code itself writes .autoMode (environment,
+    # soft_deny) into settings.json; no layer carries it, so a plain rewrite
+    # would drop it on every apply. Carry it over from the previous output.
+    if [[ -f "$output" ]] && jq -e '.autoMode' "$output" >/dev/null 2>&1; then
+        # Never redirect onto "$output" while jq still reads it: the shell
+        # truncates the target first and jq would slurp an empty file.
+        jq --slurpfile prev "$output" '. + {autoMode: $prev[0].autoMode}' "$tmp" > "$tmp.merged"
+        mv "$tmp.merged" "$output"
+        rm -f "$tmp"
+    else
+        mv "$tmp" "$output"
+    fi
 }
 
 # -----------------------------------------------------------------------------
