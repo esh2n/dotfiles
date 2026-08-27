@@ -146,12 +146,18 @@ validate_pack() {
 }
 
 # -----------------------------------------------------------------------------
-# merge settings.json (core layer ← personal → output; personal wins)
+# merge settings.json (core layer ← enabled packs ← personal → output;
+# personal wins, packs win over core, core is the floor)
 # -----------------------------------------------------------------------------
+# Packs may ship their own settings.layer.json (e.g. packs/go/settings.layer.json)
+# to register hooks/permissions/env that only apply when that pack is enabled —
+# see README.md "パックの追加" for the contract. Optional: a pack with no
+# settings.layer.json is skipped and behaves exactly as before this existed.
 merge_settings() {
     local layer="$CORE_DIR/settings.layer.json"
     local personal="$PERSONAL_DIR/settings.personal.json"
     local output="$CLAUDE_DIR/settings.json"
+    local -a packs=("$@")
 
     if [[ ! -f "$layer" ]]; then
         log_error "Core settings not found: $layer"
@@ -162,35 +168,48 @@ merge_settings() {
         exit 1
     fi
 
+    local -a pack_layers=()
+    local p
+    for p in "${packs[@]+"${packs[@]}"}"; do
+        [[ -f "$PACKS_DIR/$p/settings.layer.json" ]] && pack_layers+=("$PACKS_DIR/$p/settings.layer.json")
+    done
+
     local dotfiles_parent
     dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
 
-    # Precedence: personal wins every scalar/object key (core is defaults).
-    # deny is a UNION (both layers are self-maintained; deny-more is safer).
+    # Precedence: personal wins every scalar/object key, packs win over core
+    # (core is defaults). deny is a UNION across all layers (each layer is
+    # self-maintained; deny-more is safer).
     # hooks: personal entries run FIRST — guards (git-guard) must see the
     # original command before any rewriter hooks (rtk-rewrite) touch it.
+    # Enabled-pack hooks (e.g. go-guard) run between personal and core.
+    # jq -s reads every file argument into one array in argument order:
+    # $layer first, $personal last, so .[1:-1] is exactly the pack layers
+    # regardless of how many packs contributed a settings.layer.json (zero
+    # packs collapses to the original 2-file core+personal behavior).
     jq -s '
-      .[0] as $layer | .[1] as $personal |
-      ($layer * $personal) |
+      .[0] as $layer | .[-1] as $personal | (.[1:-1]) as $packs |
+      (reduce $packs[] as $p ({}; . * $p)) as $packsMerged |
+      ($layer * $packsMerged * $personal) |
       .permissions.allow = (
-        ($layer.permissions.allow // []) + ($personal.permissions.allow // []) | unique
+        ($layer.permissions.allow // []) + ($packsMerged.permissions.allow // []) + ($personal.permissions.allow // []) | unique
       ) |
       .permissions.deny = (
-        ($layer.permissions.deny // []) + ($personal.permissions.deny // []) | unique
+        ($layer.permissions.deny // []) + ($packsMerged.permissions.deny // []) + ($personal.permissions.deny // []) | unique
       ) |
       .hooks = (
-        ($personal.hooks // {}) as $ph | ($layer.hooks // {}) as $lh |
-        ($ph | keys) + ($lh | keys) | unique |
-        map(. as $k | {($k): (($ph[$k] // []) + ($lh[$k] // []))}) |
+        ($personal.hooks // {}) as $ph | ($packsMerged.hooks // {}) as $pkh | ($layer.hooks // {}) as $lh |
+        ($ph | keys) + ($pkh | keys) + ($lh | keys) | unique |
+        map(. as $k | {($k): (($ph[$k] // []) + ($pkh[$k] // []) + ($lh[$k] // []))}) |
         add // {}
       ) |
-      .mcpServers = (($layer.mcpServers // {}) + ($personal.mcpServers // {})) |
-      .enabledPlugins = (($layer.enabledPlugins // {}) + ($personal.enabledPlugins // {})) |
+      .mcpServers = (($layer.mcpServers // {}) + ($packsMerged.mcpServers // {}) + ($personal.mcpServers // {})) |
+      .enabledPlugins = (($layer.enabledPlugins // {}) + ($packsMerged.enabledPlugins // {}) + ($personal.enabledPlugins // {})) |
       .extraKnownMarketplaces = (
-        ($layer.extraKnownMarketplaces // {}) + ($personal.extraKnownMarketplaces // {})
+        ($layer.extraKnownMarketplaces // {}) + ($packsMerged.extraKnownMarketplaces // {}) + ($personal.extraKnownMarketplaces // {})
       ) |
-      .env = (($layer.env // {}) + ($personal.env // {}))
-    ' "$layer" "$personal" \
+      .env = (($layer.env // {}) + ($packsMerged.env // {}) + ($personal.env // {}))
+    ' "$layer" "${pack_layers[@]+"${pack_layers[@]}"}" "$personal" \
       | sed "s|{{DOTFILES_PARENT}}|${dotfiles_parent}|g" \
       | sed "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT:-$HOME/dotfiles}|g" \
       | sed "s|{{HOME}}|${HOME}|g" \
@@ -337,8 +356,8 @@ apply() {
 
     log_info "Applying: core + packs(${packs[*]:-none}) + personal"
 
-    merge_settings
-    log_success "Merged settings.json (core + personal, personal wins)"
+    merge_settings "${packs[@]+"${packs[@]}"}"
+    log_success "Merged settings.json (core + packs + personal, personal wins)"
 
     merge_claude_md
     log_success "Merged CLAUDE.md (core + personal)"

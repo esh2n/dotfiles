@@ -51,8 +51,10 @@ yoki-switch pack disable kotlin # 無効化して適用
 yoki-switch apply               # 選択を変えずに再合成
 ```
 
-- 各パックは `skills/ agents/ commands/ rules/ workflows/` を持ち、有効化すると
-  `~/.claude` のマージ結果に加わる(セッションに載るコンテキストもその分だけ)。
+- 各パックは `skills/ agents/ commands/ rules/ workflows/`(任意で `hooks/` と
+  `settings.layer.json`)を持ち、有効化すると `~/.claude` のマージ結果に
+  加わる(セッションに載るコンテキストもその分だけ)。hook の登録方法は
+  「パックが hook を持つ場合」を参照。
 - マシンごとの選択は `~/.claude/.claude-packs`(git 管理外)。初回は
   `packs.default` から複製される。
 
@@ -104,3 +106,40 @@ go規約は載らない)。skillの説明文はグローバルに載る仕様の
 1. `packs/<name>/{skills,agents,commands,rules,workflows}` を作って中身を置く
 2. 必要なら `packs.default` に追記
 3. `yoki-switch pack enable <name>`
+
+### パックが hook を持つ場合
+
+`hooks/` も `MERGE_DIRS` の対象で、有効化すると `packs/<name>/hooks/*` が
+`~/.claude/hooks/` へシンボリックリンクされる(`yoki-switch:109` `MERGE_DIRS`)。
+ただしそれだけでは **実行されない** — hookのファイル配置と、settings.json の
+`hooks.<Event>` への登録は別物。登録側は
+`packs/<name>/settings.layer.json` を置くと、有効化中だけ
+`core/settings.layer.json` と `personal/settings.personal.json` の間に
+マージされる(`merge_settings()`、`yoki-switch` 内。core < packs < personal
+の優先順で、hooks配列は personal → packs → core の順に並ぶ。0パックなら
+今まで通り core+personal の2層のまま)。
+
+```json
+// packs/<name>/settings.layer.json
+{
+  "hooks": {
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": [
+        { "type": "command", "command": "\"${YOKI_NODE:-node}\" ~/.claude/hooks/<name>-guard.js" }
+      ]}
+    ]
+  }
+}
+```
+
+**注意**: `runtime/yoki/scripts/hooks/run-with-flags.js`(プロファイル
+gatingの標準ランナー)は `CLAUDE_PLUGIN_ROOT`(= 常に `runtime/yoki`。
+`core/settings.layer.json` の `env` でグローバルに固定)配下のスクリプトしか
+`require()` できない — path traversal ガードが `packs/<name>/hooks/` は
+もちろん、シンボリックリンク先の `~/.claude/hooks/` すら拒否する(実測
+済み)。そのため pack 製 hook は `run-with-flags.js` を経由できず、上の例の
+ように直接 `node ...` で起動し、プロファイル gating を自前で行う必要がある
+(`runtime/yoki/scripts/lib/hook-flags.js` を `$YOKI_ROOT` 経由で直接
+`require` する — `run-with-flags.js` 自身が使っているのと同じモジュール)。
+実装例: `packs/go/hooks/go-guard-post-edit.js`、詳細は
+`packs/go/rules/golang/hooks.md`。
