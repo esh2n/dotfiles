@@ -9,11 +9,11 @@ metadata:
 
 ## Overview
 
-Go 1.26 (Feb 2026, current patch 1.26.2) and Go 1.25 are the supported
-releases. Models write Go as if 1.19 were current: manual slice helpers,
-`log.Printf`, `v := v`, `interface{}` everywhere. Each has a current form —
-but several have a legitimate "still correct" case, which is the point of the
-third column.
+Go 1.27 (Aug 2026, current release 1.27.0) and Go 1.26 are the supported
+releases; Go 1.25 reached end of life the moment 1.27 shipped. Models write
+Go as if 1.19 were current: manual slice helpers, `log.Printf`, `v := v`,
+`interface{}` everywhere. Each has a current form — but several have a
+legitimate "still correct" case, which is the point of the third column.
 
 Before applying any of this, check the module's `go` directive. **A rewrite
 that is correct for `go 1.24` is a bug in a module declaring `go 1.21`.**
@@ -37,29 +37,74 @@ that is correct for `go 1.24` is a bug in a module declaring `go 1.21`.**
 | `if s != "" { v = s } else if t != "" { v = t } else { v = "default" }` | `cmp.Or(s, t, "default")` (**1.22**) | Fallbacks with side effects or expensive computation — `cmp.Or` evaluates all arguments |
 | `json:"x,omitempty"` on structs, `time.Time`, or `0`-is-meaningful fields | `json:"x,omitzero"` (**1.24**) — honors `IsZero()`, drops zero `time.Time`, and does not swallow a meaningful `false`/`0` | Wire compatibility with a consumer that expects `omitempty`'s exact behavior (empty slice/map elision). `omitzero` keeps `[]T{}`; `omitempty` drops it |
 | `time.Sleep` in concurrency tests, or polling with a timeout | `testing/synctest` (**1.25**, experimental in 1.24) — fake clock, deterministic goroutine quiescence | Integration tests crossing a real network or process boundary, where the fake clock does not apply |
+| `func ptr[T any](v T) *T { return &v }` helper, or a throwaway var solely to take its address (`x := computeDefault(); return &x`) | `new(expr)` (**1.26**) — `new`'s operand may now be an arbitrary expression, e.g. `return new(computeDefault())` | The value needs further mutation before its address escapes — `new(expr)` evaluates and takes the address in one step, no room for an intermediate assignment |
+| Passing a seeded `io.Reader` as the `rand` argument to `rsa.GenerateKey`, `ecdsa.GenerateKey`, `ed25519.GenerateKey`, `rsa.SignPSS`, etc. for deterministic tests | `testing/cryptotest.SetGlobalRandom` (**1.26**) — these functions now ignore their `rand` parameter and always use a secure source; swap the global source for the test instead | Never for the old call signature going forward. The `GODEBUG=cryptocustomrand=1` setting restores 1.25 behavior temporarily — treat it as a migration bridge, not a permanent workaround |
+| Package-scope generic function that exists only to attach behavior to one type, e.g. `func RandN[T any](r *rand.Rand, n T) T` | Generic method (**1.27**): `func (r *Rand) N[T any](n T) T` — a method may now declare its own type parameters | The function is genuinely type-agnostic across many receiver types, or turning it into a method would break an already-public API |
+| Hand-rolled `json.NewDecoder(...).Token()` loops to stream large JSON without buffering it whole | `encoding/json/jsontext` (**1.27**, out of `GOEXPERIMENT=jsonv2` and covered by the compatibility promise) — `jsontext.Decoder`/`Encoder` work over a token/value stream with the same state-machine guarantees | A plain full-document unmarshal into a struct — `encoding/json.Unmarshal` (now v2-backed by default) is still the right default; reach for `jsontext` only when streaming or low-level token control is the actual requirement |
+| Vendoring `google/uuid`, or hand-rolling RFC 9562 byte-twiddling for request/entity IDs | stdlib `uuid` package (**1.27**): `uuid.New()` / `uuid.NewV7()` / `uuid.Parse` | The project already depends on a third-party UUID library for a feature the stdlib subset doesn't cover — check `go doc uuid` on the pinned toolchain before ripping it out, and never migrate if `go.mod` targets `go 1.26` or lower (the package didn't exist yet) |
+| `defer func() { io.Copy(io.Discard, resp.Body); resp.Body.Close() }()` to keep an HTTP/1 connection reusable | Nothing — since **1.27**, `Response.Body.Close()` auto-drains unread content (up to a conservative internal limit) before closing | Bodies that can be arbitrarily large, or non-HTTP/1 traffic — verify the limit with `go doc net/http.Response` on the pinned toolchain before deleting the explicit drain |
+| Code that sets `GODEBUG=asynctimerchan=1`, or that assumes a `time.Timer`/`time.Ticker` channel can hold a buffered tick | Nothing to write — since **1.27** `time` channels are always unbuffered; the GODEBUG setting is removed outright and `go build`/`go test` error if it's still pinned to the old value in `go.mod`/`//go:debug` | Never — this is a runtime-enforced removal, not a style choice. Flag any lingering `asynctimerchan` reference for deletion |
+
+## Newer Toolchain Behavior — No Rewrite, Just Awareness
+
+These changed defaults affect what code *does* or what tooling *catches*,
+not how it should be written. Do not propose a diff for these — just know
+they're active on 1.26/1.27:
+
+- **Green Tea GC is the default GC since 1.26** — expect roughly 10-40% lower
+  GC overhead on allocation-heavy programs, more on newer amd64 CPUs
+  (Ice Lake / Zen 4+). No code change; `GOEXPERIMENT=nogreenteagc` opts out.
+- **`goroutineleak` pprof profile is GA since 1.27** — `runtime/pprof` and the
+  `/debug/pprof/goroutineleak` HTTP endpoint report goroutines blocked on a
+  primitive (channel, `sync.Mutex`, `sync.Cond`, ...) that can never unblock.
+  Concurrency-correctness judgment (is this actually a leak, and what's the
+  fix) belongs to `go-perf-reviewer`/`go-concurrency`, not this skill.
+- **`go test` runs the stdversion vet check by default since 1.27** — it
+  flags stdlib symbols too new for the `go` directive/build tags of the file
+  that uses them. This catches "used a 1.27 API in a file gated to `go
+  1.24`" automatically; no manual `go vet -stdversion` invocation needed.
 
 ## Not Yet — Do Not Reach For These
 
-- **`encoding/json/v2` / `encoding/json/jsontext`** — still behind
-  `GOEXPERIMENT=jsonv2` in Go 1.26, not covered by the compatibility promise.
-  Trajectory points at 1.27 for default. Do not introduce it into production
-  code or suggest it in review yet.
-- **`simd/archsimd`, `runtime/secret`** (1.26) — experimental, arch-limited.
+- **`simd`, `simd/archsimd`, `runtime/secret`** (1.26/1.27) — experimental,
+  arch-limited, behind `GOEXPERIMENT`. Do not introduce into production code
+  or suggest in review yet.
 
-## Let The Toolchain Do The Rewrite
+## Deterministic First: `go fix ./...`
 
-`go fix` in **1.26** absorbed the modernizers (previously `gopls`
-`modernize`): it mechanically applies most of the table above — `min`/`max`,
-`slices`/`maps` helpers, `b.Loop`, `any`, range-over-int, and more.
+`go fix` in **1.26** absorbed the modernizer suite (previously `gopls`'s
+separate `modernize` analysis, plus a source-level inliner driven by
+`//go:fix inline` directives). It mechanically applies most of the table
+above — run it before any hand-editing, and reserve review attention for the
+judgment rows (generics vs interfaces, `errors.Join` vs `%w`, iterator vs
+channel, package vs method) that no fixer can decide.
 
 ```sh
-go fix ./...      # 1.26+: applies modernizers, not just the old API rewrites
+go fix ./...        # 1.26+: runs every modernizer plus the historical fixers
+go fix -diff ./...  # preview the rewrite without writing it
+go fix -any ./...   # run one named modernizer only (substitute the name)
+go tool fix help    # list fixers available on the installed toolchain
 go vet ./...
 ```
 
-Run it before hand-editing. Reserve review attention for the judgment rows —
-generics vs interfaces, `errors.Join` vs `%w`, iterator vs channel — which no
-fixer can decide.
+Modernizers present as of **1.27** — treat this as a snapshot, not a
+guarantee; confirm the live list with `go tool fix help` on the pinned
+toolchain before relying on a name:
+`any`, `atomictypes` (new in 1.27), `bloop`, `embedlit` (new in 1.27),
+`errorsastype`, `forvar`, `hostport`, `importcomment`, `inline`, `mapsloop`,
+`minmax`, `newexpr`, `omitzero`, `rangeint`, `reflecttypefor`,
+`slicesbackward` (new in 1.27), `slicesclip`, `slicescontains`,
+`slicesdelete`, `slicessort`, `stditerators`, `stringsbuilder`,
+`stringscut`, `stringscutprefix`, `stringsseq`, `unsafefuncs` (new in 1.27),
+`waitgroupgo` (renamed from `waitgroup` in 1.27). `fmtappendf` was removed in
+1.27 for stylistic reasons — do not expect it on a 1.27+ toolchain.
+
+For a module still pinned below `go 1.26` (older toolchain, or CI running an
+older Go), run the standalone modernizer instead of `go fix`:
+
+```sh
+go run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@latest -fix ./...
+```
 
 ## Common Mistakes
 
@@ -78,6 +123,10 @@ fixer can decide.
   unwrapping; `errors.Is`/`errors.As` traverse it, manual `Unwrap()` does not.
 - **Generic constraint written as `any` and then type-switched inside.** If the
   body branches on the type, the type parameter buys nothing.
+- **Assuming `encoding/json` still tolerates invalid UTF-8 and duplicate
+  object keys.** Since 1.27 the package is v2-backed by default and rejects
+  both — data that unmarshaled quietly before can now error. Check `go doc`
+  on the pinned toolchain before assuming old leniency.
 
 ## Related
 
