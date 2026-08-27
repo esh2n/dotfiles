@@ -174,127 +174,11 @@ _ = writer.Close() // Best-effort cleanup, error logged elsewhere
 
 ## Concurrency Patterns
 
-### Worker Pool
-
-```go
-func WorkerPool(jobs <-chan Job, results chan<- Result, numWorkers int) {
-    var wg sync.WaitGroup
-
-    for i := 0; i < numWorkers; i++ {
-        wg.Add(1)
-        go func() {
-            defer wg.Done()
-            for job := range jobs {
-                results <- process(job)
-            }
-        }()
-    }
-
-    wg.Wait()
-    close(results)
-}
-```
-
-### Context for Cancellation and Timeouts
-
-```go
-func FetchWithTimeout(ctx context.Context, url string) ([]byte, error) {
-    ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-    defer cancel()
-
-    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-    if err != nil {
-        return nil, fmt.Errorf("create request: %w", err)
-    }
-
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return nil, fmt.Errorf("fetch %s: %w", url, err)
-    }
-    defer resp.Body.Close()
-
-    return io.ReadAll(resp.Body)
-}
-```
-
-### Graceful Shutdown
-
-```go
-func GracefulShutdown(server *http.Server) {
-    quit := make(chan os.Signal, 1)
-    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-    <-quit
-    log.Println("Shutting down server...")
-
-    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-    defer cancel()
-
-    if err := server.Shutdown(ctx); err != nil {
-        log.Fatalf("Server forced to shutdown: %v", err)
-    }
-
-    log.Println("Server exited")
-}
-```
-
-### errgroup for Coordinated Goroutines
-
-```go
-import "golang.org/x/sync/errgroup"
-
-func FetchAll(ctx context.Context, urls []string) ([][]byte, error) {
-    g, ctx := errgroup.WithContext(ctx)
-    results := make([][]byte, len(urls))
-
-    for i, url := range urls {
-        i, url := i, url // Capture loop variables
-        g.Go(func() error {
-            data, err := FetchWithTimeout(ctx, url)
-            if err != nil {
-                return err
-            }
-            results[i] = data
-            return nil
-        })
-    }
-
-    if err := g.Wait(); err != nil {
-        return nil, err
-    }
-    return results, nil
-}
-```
-
-### Avoiding Goroutine Leaks
-
-```go
-// Bad: Goroutine leak if context is cancelled
-func leakyFetch(ctx context.Context, url string) <-chan []byte {
-    ch := make(chan []byte)
-    go func() {
-        data, _ := fetch(url)
-        ch <- data // Blocks forever if no receiver
-    }()
-    return ch
-}
-
-// Good: Properly handles cancellation
-func safeFetch(ctx context.Context, url string) <-chan []byte {
-    ch := make(chan []byte, 1) // Buffered channel
-    go func() {
-        data, err := fetch(url)
-        if err != nil {
-            return
-        }
-        select {
-        case ch <- data:
-        case <-ctx.Done():
-        }
-    }()
-    return ch
-}
-```
+Concurrency patterns, decision tables (channel vs mutex vs atomic), and
+pitfalls now live in `skill: go-concurrency` — see its SKILL.md and
+`references/patterns.md` / `references/pitfalls.md`. go-reviewer reviews
+concurrency correctness against that skill; go-perf-reviewer handles lock
+contention and mutex-vs-atomic tradeoffs.
 
 ## Interface Design
 
@@ -494,79 +378,11 @@ s.Log("Starting...") // Calls embedded Logger.Log
 
 ## Memory and Performance
 
-### Preallocate Slices When Size is Known
-
-```go
-// Bad: Grows slice multiple times
-func processItems(items []Item) []Result {
-    var results []Result
-    for _, item := range items {
-        results = append(results, process(item))
-    }
-    return results
-}
-
-// Good: Single allocation
-func processItems(items []Item) []Result {
-    results := make([]Result, 0, len(items))
-    for _, item := range items {
-        results = append(results, process(item))
-    }
-    return results
-}
-```
-
-### Use sync.Pool for Frequent Allocations
-
-```go
-var bufferPool = sync.Pool{
-    New: func() interface{} {
-        return new(bytes.Buffer)
-    },
-}
-
-func ProcessRequest(data []byte) []byte {
-    buf := bufferPool.Get().(*bytes.Buffer)
-    defer func() {
-        buf.Reset()
-        bufferPool.Put(buf)
-    }()
-
-    buf.Write(data)
-    // Process...
-    return buf.Bytes()
-}
-```
-
-### Avoid String Concatenation in Loops
-
-```go
-// Bad: Creates many string allocations
-func join(parts []string) string {
-    var result string
-    for _, p := range parts {
-        result += p + ","
-    }
-    return result
-}
-
-// Good: Single allocation with strings.Builder
-func join(parts []string) string {
-    var sb strings.Builder
-    for i, p := range parts {
-        if i > 0 {
-            sb.WriteString(",")
-        }
-        sb.WriteString(p)
-    }
-    return sb.String()
-}
-
-// Best: Use standard library
-func join(parts []string) string {
-    return strings.Join(parts, ",")
-}
-```
+Allocation, GC, benchmarking methodology, and the evidence-chain for
+performance claims now live in `skill: go-performance` — see its SKILL.md
+and `references/`. Performance review for Go diffs runs through
+`agent: go-perf-reviewer` (static mode in `/review`, measured mode in
+`go-optimize`), not this section.
 
 ## Go Tooling Integration
 
