@@ -4,7 +4,7 @@ export const meta = {
   whenToUse: 'Reviewing local changes or a branch diff with independent (non-anchored) reviewer contexts',
   phases: [
     { title: 'Collect', detail: 'save diff once, extract intent' },
-    { title: 'Review', detail: 'fan-out reviewers, C>=5 & I>=5 only' },
+    { title: 'Review', detail: 'fan-out reviewers, C>=5 & I>=5 only; dimensions with agentByLang route to a per-language specialist (e.g. Go performance -> go-perf-reviewer) when that language is detected' },
     { title: 'Verify', detail: 'adversarial refutation per finding' },
   ],
 }
@@ -109,10 +109,15 @@ const VERDICT_SCHEMA = {
 // correctness/security ride on the dedicated agent definitions so their curated
 // checklists load instead of a bare persona prompt (they were previously only
 // reachable via interactive one-shot calls).
+// agentByLang: a dimension can name a specialized per-language agent that
+// replaces the generic reviewer for the WHOLE dimension (not a per-file
+// split — a dimension is one review call over the whole diff) when that
+// language is present in the diff. See the resolution loop below, after
+// detectedLangs is known.
 const DIMENSIONS = [
   { key: 'correctness', prompt: 'bugs, logic errors, edge cases, error handling gaps, broken invariants', agentType: 'code-reviewer' },
   { key: 'security', prompt: 'injection, secrets, authz/authn gaps, unsafe input handling, path traversal, SSRF', agentType: 'security-reviewer', model: 'opus' },
-  { key: 'performance', prompt: 'N+1 patterns, needless allocation in loops, missing batching/pagination, blocking I/O' },
+  { key: 'performance', prompt: 'N+1 patterns, needless allocation in loops, missing batching/pagination, blocking I/O', agentByLang: { go: 'go-perf-reviewer' } },
   { key: 'tests', prompt: 'missing test coverage for new behavior, tests that assert nothing, broken test isolation' },
   { key: 'simplification', prompt: 'dead code, duplication of existing utilities in the same repo, overengineering' },
 ]
@@ -139,6 +144,21 @@ const LANG_REVIEWERS = {
 const detectedLangs = (ctx.langs || []).filter((lang) => LANG_REVIEWERS[lang])
 const langLanes = detectedLangs.length ? detectedLangs : Object.keys(LANG_REVIEWERS)
 if (!detectedLangs.length) log('language detection returned nothing — launching all language lanes')
+
+// Resolve agentByLang overrides now that detectedLangs is known. A dimension
+// with a matching language routes its ENTIRE lane to the specialized agent
+// (the diff isn't split by file within a dimension), so mixed-language diffs
+// get the specialist for all files in that dimension; other languages keep
+// the generic reviewer for their own dimensions untouched.
+for (const d of DIMENSIONS) {
+  if (!d.agentByLang) continue
+  const overrideLang = Object.keys(d.agentByLang).find((lang) => detectedLangs.includes(lang))
+  if (overrideLang) {
+    d.agentType = d.agentByLang[overrideLang]
+    d.promptPrefix = 'Mode: static. '
+    log(`${d.key}: routing to ${d.agentType} (${overrideLang} detected in diff)`)
+  }
+}
 for (const lang of langLanes) {
   DIMENSIONS.push({
     key: `lang:${lang}`,
@@ -147,7 +167,7 @@ for (const lang of langLanes) {
   })
 }
 
-const reviewerPrompt = (d) => `You are a fresh-context ${d.key} reviewer. Read the diff file at ${ctx.diff_file} (Read tool). Intent of the change: ${ctx.intent}
+const reviewerPrompt = (d) => `${d.promptPrefix || ''}You are a fresh-context ${d.key} reviewer. Read the diff file at ${ctx.diff_file} (Read tool). Intent of the change: ${ctx.intent}
 
 Focus ONLY on: ${d.prompt}
 ${GROUNDING ? `
