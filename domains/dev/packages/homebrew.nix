@@ -5,6 +5,8 @@
     "fish"
     "thefuck"
     "staticcheck"
+    "golangci-lint"
+    "govulncheck"
     "protoc-gen-go-grpc"
     "ollama"
     "satococoa/tap/wtp"
