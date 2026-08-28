@@ -2,20 +2,56 @@
 // `[[allow]]` sections (contract §6: "設定は store/.writeup.toml。[[allow]]
 // は category + text + reason 必須").
 //
-// Any structural problem (unknown top-level section, unknown key inside a
-// known section, a missing required `[[allow]]` field, or a wrong value
-// type) is a config error: the caller exits(2), same as an unparseable
-// TOML file. This is stricter than most lint config loaders on purpose —
-// a store's `.writeup.toml` is small and hand-edited, so silently ignoring
-// a typo'd key is worse than refusing to run.
+// The store's `.writeup.toml` is a SHARED file (contract §6, §8): besides
+// `[lint]`/`[[allow]]` it also carries `[private]` (publish's word list)
+// and `[cloudflare]` (publish's project/access settings). This loader only
+// owns the lint-relevant sections, so any top-level section other than
+// `lint`/`allow` is a foreign section owned by another tool and is ignored
+// silently — it is neither validated nor rejected. Within the sections this
+// loader does own, it stays strict: an unknown key inside `[lint]`, an
+// unknown key inside an `[[allow]]` entry, a missing required `[[allow]]`
+// field, or a wrong value type is a config error and the caller exits(2),
+// same as an unparseable TOML file. A store's `.writeup.toml` is small and
+// hand-edited, so silently ignoring a typo'd key *within a section this
+// tool owns* is worse than refusing to run.
 
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { parseToml, TomlParseError } from "../toml-lite.mjs";
 
 const LINT_TABLE_KEYS = new Set(["disabled_rules", "fail_on"]);
 const ALLOW_ENTRY_KEYS = new Set(["category", "text", "reason"]);
-const KNOWN_TOP_LEVEL_SECTIONS = new Set(["lint", "allow"]);
 const KNOWN_FAIL_ON_VALUES = new Set(["info", "warn", "error", "critical"]);
+const CONFIG_FILE_NAME = ".writeup.toml";
+
+/**
+ * Finds the `.writeup.toml` that applies to a page when `--config` was not
+ * given. Search order:
+ *   1. `startDir` itself, then each ancestor directory, up to and including
+ *      `$HOME` (or the filesystem root, if `startDir` isn't under `$HOME`).
+ *   2. `$WRITEUP_STORE/.writeup.toml`, if the `WRITEUP_STORE` env var is set.
+ * Returns the first path that exists, or `null` if none does.
+ */
+export function discoverConfigPath(startDir) {
+  const home = os.homedir();
+  let dir = path.resolve(startDir);
+  while (true) {
+    const candidate = path.join(dir, CONFIG_FILE_NAME);
+    if (fs.existsSync(candidate)) return candidate;
+    if (dir === home) break;
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // reached filesystem root
+    dir = parent;
+  }
+
+  if (process.env.WRITEUP_STORE) {
+    const storeCandidate = path.join(process.env.WRITEUP_STORE, CONFIG_FILE_NAME);
+    if (fs.existsSync(storeCandidate)) return storeCandidate;
+  }
+
+  return null;
+}
 
 /**
  * Loads `configPath` if it exists. Returns `{ config, errors }`:
@@ -51,11 +87,9 @@ export function loadWriteupConfig(configPath) {
 
   const errors = [];
 
-  for (const section of Object.keys(parsed)) {
-    if (!KNOWN_TOP_LEVEL_SECTIONS.has(section)) {
-      errors.push(`エラー: 未知の設定セクション [${section}]（${configPath}）`);
-    }
-  }
+  // Top-level sections other than `lint`/`allow` (e.g. publish's `[private]`
+  // and `[cloudflare]`) belong to another tool sharing this same file —
+  // ignore them silently rather than treating them as errors.
 
   let disabledRules = [];
   let failOn = null;

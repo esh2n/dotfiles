@@ -13,7 +13,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { readSourceFile, extractTextFromHtml } from "./lib/text.mjs";
-import { loadWriteupConfig } from "./lib/lint/config.mjs";
+import { loadWriteupConfig, discoverConfigPath } from "./lib/lint/config.mjs";
 import { runLint, validateBaselineData, computeBaselineDiff, GENRE_PROFILES } from "./lib/lint/index.mjs";
 
 const SEVERITY_LABEL = { info: "情報", warn: "警告", error: "エラー", critical: "重大" };
@@ -63,7 +63,8 @@ function printUsage() {
       "options:",
       "  --json                機械可読な JSON で出力する",
       "  --baseline <prev.json> 前回の --json 出力と比較し resolved/new/persisting を判定する",
-      "  --config <path>       .writeup.toml の場所を指定する（未指定時は cwd/.writeup.toml）",
+      "  --config <path>       .writeup.toml の場所を指定する（未指定時は入力ファイルのディレクトリから",
+      "                        $HOME まで祖先を探索し、見つからなければ $WRITEUP_STORE/.writeup.toml を見る）",
       "  --surface-only        表層6検出器 + 文長/括弧カウンタのみ実行する（作業メモ用）",
       "  --experimental        まだ定量校正されていない検出器の finding も出力する",
       `  --genre <name>        ${Object.keys(GENRE_PROFILES).join("/")} のいずれか`,
@@ -129,8 +130,7 @@ async function main() {
       return 1;
     }
   } else {
-    const defaultPath = path.resolve(process.cwd(), ".writeup.toml");
-    if (fs.existsSync(defaultPath)) configPath = defaultPath;
+    configPath = discoverConfigPath(path.dirname(filePath));
   }
   const { config, errors: configErrors } = loadWriteupConfig(configPath);
   if (configErrors.length) {

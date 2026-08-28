@@ -1,0 +1,20 @@
+# Shared store config (contract §6, §8): lint owns [lint]/[[allow]],
+# publish owns [private]/[cloudflare]. lint's loader must ignore the
+# foreign sections rather than erroring on them.
+
+[lint]
+disabled_rules = ["translationese"]
+fail_on = "warn"
+
+[[allow]]
+category = "forbidden_phrase"
+text = "重要なのは"
+reason = "product name, quoted verbatim"
+
+[private]
+words = ["社内コードネーム", "非公開プロジェクト名"]
+
+[cloudflare]
+project = "example-project"
+access_required = true
+access_verified = false

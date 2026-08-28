@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 
 import { runLint, computeBaselineDiff, validateBaselineData, EXPERIMENTAL_CATEGORIES } from "../bin/lib/lint/index.mjs";
 import { parseToml, TomlParseError } from "../bin/lib/toml-lite.mjs";
-import { loadWriteupConfig, isAllowed } from "../bin/lib/lint/config.mjs";
+import { loadWriteupConfig, isAllowed, discoverConfigPath } from "../bin/lib/lint/config.mjs";
 import { extractTextFromHtml } from "../bin/lib/text.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -487,11 +487,36 @@ describe("config validation", () => {
     });
   });
 
-  test("an unknown top-level section is a config error", () => {
-    withTempConfig('[typo]\nfoo = "bar"', (file) => {
-      const { errors } = loadWriteupConfig(file);
-      assert.ok(errors.some((e) => e.includes("typo")));
-    });
+  test("foreign top-level sections ([private], [cloudflare], and any other unknown name) are ignored silently", () => {
+    withTempConfig(
+      [
+        "[lint]",
+        'disabled_rules = ["forbidden_phrase"]',
+        "",
+        "[private]",
+        'words = ["社内コードネーム"]',
+        "",
+        "[cloudflare]",
+        'project = "example-project"',
+        "access_required = true",
+        "",
+        "[typo]",
+        'foo = "bar"',
+      ].join("\n"),
+      (file) => {
+        const { config, errors } = loadWriteupConfig(file);
+        assert.equal(errors.length, 0);
+        assert.deepEqual(config.disabledRules, ["forbidden_phrase"]);
+      }
+    );
+  });
+
+  test("the shared store-config fixture ([lint] + [[allow]] + [private] + [cloudflare]) loads with no errors", () => {
+    const { config, errors } = loadWriteupConfig(path.join(FIXTURES, "store-config.toml"));
+    assert.equal(errors.length, 0);
+    assert.deepEqual(config.disabledRules, ["translationese"]);
+    assert.equal(config.allowList.length, 1);
+    assert.equal(config.allowList[0].category, "forbidden_phrase");
   });
 
   test("an unknown key inside [lint] is a config error", () => {
@@ -566,6 +591,103 @@ describe("CLI wiring for config + allow/disabled_rules", () => {
     const { code, stderr } = runCli([target, "--config", "/no/such/config.toml"]);
     assert.equal(code, 1);
     assert.ok(stderr.length > 0);
+  });
+
+  test("--config pointing at the shared store-config fixture exits 0 and its [[allow]] suppresses the matching finding", () => {
+    withTempDir((dir) => {
+      const cfg = path.join(FIXTURES, "store-config.toml");
+      const target = path.join(dir, "doc.txt");
+      fs.writeFileSync(target, "重要なのは、これだ。\n");
+      const { code, stdout } = runCli([target, "--config", cfg, "--json"]);
+      assert.equal(code, 0);
+      const out = JSON.parse(stdout);
+      assert.ok(!out.findings.some((f) => f.category === "forbidden_phrase"));
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// default config discovery (no --config)
+// ---------------------------------------------------------------------------
+
+describe("default config discovery", () => {
+  test("discoverConfigPath finds .writeup.toml in an ancestor directory", () => {
+    const outerDir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-disc-"));
+    try {
+      const cfg = path.join(outerDir, ".writeup.toml");
+      fs.writeFileSync(cfg, '[lint]\nfail_on = "warn"\n');
+      const innerDir = path.join(outerDir, "a", "b");
+      fs.mkdirSync(innerDir, { recursive: true });
+      assert.equal(discoverConfigPath(innerDir), cfg);
+    } finally {
+      fs.rmSync(outerDir, { recursive: true, force: true });
+    }
+  });
+
+  test("discoverConfigPath falls back to $WRITEUP_STORE/.writeup.toml when no ancestor has one", () => {
+    const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-store-"));
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-target-"));
+    const prevStore = process.env.WRITEUP_STORE;
+    try {
+      const cfg = path.join(storeDir, ".writeup.toml");
+      fs.writeFileSync(cfg, '[lint]\nfail_on = "error"\n');
+      process.env.WRITEUP_STORE = storeDir;
+      assert.equal(discoverConfigPath(targetDir), cfg);
+    } finally {
+      if (prevStore === undefined) delete process.env.WRITEUP_STORE;
+      else process.env.WRITEUP_STORE = prevStore;
+      fs.rmSync(storeDir, { recursive: true, force: true });
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+
+  test("discoverConfigPath returns null when nothing is found", () => {
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-none-"));
+    const prevStore = process.env.WRITEUP_STORE;
+    try {
+      delete process.env.WRITEUP_STORE;
+      assert.equal(discoverConfigPath(targetDir), null);
+    } finally {
+      if (prevStore === undefined) delete process.env.WRITEUP_STORE;
+      else process.env.WRITEUP_STORE = prevStore;
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+
+  test("the CLI (no --config) picks up an ancestor .writeup.toml and applies its disabled_rules", () => {
+    const outerDir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-disc-cli-"));
+    try {
+      fs.writeFileSync(path.join(outerDir, ".writeup.toml"), '[lint]\ndisabled_rules = ["forbidden_phrase"]\n');
+      const innerDir = path.join(outerDir, "sub");
+      fs.mkdirSync(innerDir);
+      const target = path.join(innerDir, "doc.txt");
+      fs.writeFileSync(target, "重要なのは、これだ。\n");
+      const { code, stdout } = runCli([target, "--json"]);
+      assert.equal(code, 0);
+      const out = JSON.parse(stdout);
+      assert.ok(!out.findings.some((f) => f.category === "forbidden_phrase"));
+    } finally {
+      fs.rmSync(outerDir, { recursive: true, force: true });
+    }
+  });
+
+  test("the CLI (no --config, no ancestor config) falls back to $WRITEUP_STORE", () => {
+    const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-store-cli-"));
+    const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-target-cli-"));
+    try {
+      fs.writeFileSync(path.join(storeDir, ".writeup.toml"), '[lint]\ndisabled_rules = ["forbidden_phrase"]\n');
+      const target = path.join(targetDir, "doc.txt");
+      fs.writeFileSync(target, "重要なのは、これだ。\n");
+      const stdout = execFileSync("node", [LINT_BIN, target, "--json"], {
+        encoding: "utf-8",
+        env: { ...process.env, WRITEUP_STORE: storeDir },
+      });
+      const out = JSON.parse(stdout);
+      assert.ok(!out.findings.some((f) => f.category === "forbidden_phrase"));
+    } finally {
+      fs.rmSync(storeDir, { recursive: true, force: true });
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
   });
 });
 
