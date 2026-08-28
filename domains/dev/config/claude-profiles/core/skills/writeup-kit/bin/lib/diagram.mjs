@@ -10,6 +10,7 @@
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { escapeIrScript } from './ir-script.mjs'
 
 const require = createRequire(import.meta.url)
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -989,7 +990,11 @@ export async function renderFigureHtml(ir, { column = COLUMN, rawYaml } = {}) {
   const rendered = await renderDiagram(ir, { column })
   const caption = ir.caption || ir.title
   const scrollAttr = rendered.scroll ? ' data-scroll="true"' : ''
-  const script = rawYaml !== undefined ? rawYaml : ''
+  // The IR text is embedded inside a <script> raw-text element, which
+  // browsers never HTML-decode — escape it here so a user-authored label
+  // or caption can never inject a literal tag or close the block early
+  // (contract in ir-script.mjs; readers unescape with unescapeIrScript).
+  const script = rawYaml !== undefined ? escapeIrScript(rawYaml) : ''
   return {
     html: `<figure class="wu-figure"${scrollAttr}>\n${rendered.svg}\n<figcaption>${esc(caption)}</figcaption>\n<script type="text/x-writeup-diagram">\n${script}\n</script>\n</figure>`,
     ...rendered,

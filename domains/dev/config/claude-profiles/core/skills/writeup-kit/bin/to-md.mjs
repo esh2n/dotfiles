@@ -12,6 +12,7 @@ import {
   elementChildren, textContent, headMeta, titleText, findFirst, findAll,
 } from './lib/html.mjs'
 import { parse as parseYaml } from './lib/yaml-lite.mjs'
+import { unescapeIrScript } from './lib/ir-script.mjs'
 
 // --- inline rendering (a/strong/em/br/.wu-accent/plain text) ---------------
 
@@ -117,7 +118,10 @@ function renderFigure(fig, ctx) {
 function findIr(fig) {
   const script = findFirst(fig, (n) => tagName(n) === 'script' && attr(n, 'type') === 'text/x-writeup-diagram')
   if (!script) return null
-  const raw = textContent(script)
+  // <script> is HTML raw text, so textContent() returns it un-decoded —
+  // unescape before parsing (ir-script.mjs contract; legacy raw text
+  // passes through unchanged).
+  const raw = unescapeIrScript(textContent(script))
   try {
     return parseYaml(raw)
   } catch {

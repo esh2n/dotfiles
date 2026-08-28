@@ -17,6 +17,8 @@ import { renderBody, isLegacyFile, legacyReasons } from '../bin/lib/migrate/body
 import { irToYaml } from '../bin/lib/migrate/util.mjs'
 import { runMigration } from '../bin/migrate-explain-pages.mjs'
 import { parse as parseYamlLite } from '../bin/lib/yaml-lite.mjs'
+import { renderDiagram as renderDiagramDirective } from '../bin/lib/migrate/directives.mjs'
+import { unescapeIrScript } from '../bin/lib/ir-script.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURES = join(HERE, 'fixtures', 'migrate')
@@ -334,6 +336,28 @@ test('e2e: a fallback figure embeds the candidate IR as YAML and round-trips thr
   // the callout carries the failing check name/hint (here: the budget message)
   assert.match(html, /図は変換時に合格せず、表で代替 \(budget: [^)]*\)/)
   rmSync(dest, { recursive: true, force: true })
+})
+
+test('directive: a fallback figure with a hostile label/caption escapes the embedded script and round-trips through the reader', async () => {
+  // 10 nodes exceeds LIMITS.maxNodes (9), forcing the fallback path that
+  // embeds the candidate IR via fallbackFigureHtml().
+  const nodeLines = Array.from({ length: 9 }, (_, i) => `n${i + 2}[ノード${i + 2}]`)
+  const body = [
+    'n1[<img src=x onerror=alert(1)>]',
+    ...nodeLines,
+    'n1 -> n2',
+  ].join('\n')
+  const ctx = { nextDiagramId: () => 'd1', sectionTitle: '</script><script>alert(1)</script>', column: 720 }
+  const { html, figureOk } = await renderDiagramDirective({ body, attrs: {} }, ctx)
+  assert.equal(figureOk, false)
+  assert.ok(!html.includes('<img src=x'), 'raw <img must not appear in the html')
+  assert.ok(!html.includes('</script><script>alert(1)</script>'), 'raw </script> break-out must not appear inside the figure')
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'))
+
+  const scriptMatch = /<script type="text\/x-writeup-diagram">\n([\s\S]*?)\n<\/script>/.exec(html)
+  assert.ok(scriptMatch, 'fallback figure should carry a text/x-writeup-diagram script block')
+  const parsed = parseYamlLite(unescapeIrScript(scriptMatch[1]))
+  assert.equal(parsed.nodes[0].label, '<img src=x onerror=alert(1)>')
 })
 
 test('util: irToYaml round-trips a label containing ": " by quoting it', () => {

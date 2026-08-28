@@ -10,6 +10,7 @@ import { parseOldDiagram } from './old-diagram.mjs'
 import { parseOldSequence } from './old-sequence.mjs'
 import { validateIR } from '../ir.mjs'
 import { renderFigureHtmlChecked } from '../verify-diagram.mjs'
+import { escapeIrScript } from '../ir-script.mjs'
 
 // --- terms ------------------------------------------------------------
 
@@ -194,7 +195,7 @@ function fallbackFigureHtml(candidateIR, reason, detail) {
     `<tbody>\n${rows.join('\n')}\n</tbody>`,
     '</table>',
     `<figcaption>${renderInline(candidateIR.caption)}</figcaption>`,
-    `<script type="text/x-writeup-diagram">\n${yaml}\n</script>`,
+    `<script type="text/x-writeup-diagram">\n${escapeIrScript(yaml)}\n</script>`,
     '</figure>',
     `<div class="wu-callout" data-tone="warn"><p>図は変換時に合格せず、表で代替 (${escapeHtml(reason)}${detailText})</p></div>`,
   ].join('\n')

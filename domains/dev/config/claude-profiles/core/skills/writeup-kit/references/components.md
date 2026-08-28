@@ -171,6 +171,19 @@ edges: []
 </figure>
 ```
 
+The IR script's content is HTML-escaped text (`&` → `&amp;`, `<` → `&lt;`,
+`>` → `&gt;` — `bin/lib/ir-script.mjs`'s `escapeIrScript`/`unescapeIrScript`):
+`<script>` is an HTML raw-text element that browsers never decode, so an
+unescaped label or caption could inject a literal tag or break out of the
+block early via a literal `</script>`. Every writer of this script
+(`renderFigureHtml` in `bin/lib/diagram.mjs`, the migration fallback in
+`bin/lib/migrate/directives.mjs`) escapes before embedding; every reader
+(`bin/rerender-figures.mjs`, `bin/to-md.mjs`) unescapes before parsing the
+YAML/JSON. Unescaping is tolerant of legacy pages written before this
+contract existed: text with neither `&lt;` nor `&amp;` is treated as
+already-raw and passed through unchanged, so old store pages keep parsing
+until `bin/rerender-figures.mjs --all` rewrites them into the escaped form.
+
 A diagram with 2+ groups where every node belongs to one, and the edges
 crossing between groups all point the same overall direction (a DAG over
 the groups — no group cycles back to one that already points to it),

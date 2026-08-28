@@ -30,6 +30,7 @@ import { COLUMN } from './lib/diagram.mjs'
 import { renderFigureHtmlChecked } from './lib/verify-diagram.mjs'
 import { resolveStoreDir } from './lib/store.mjs'
 import { matchesOnly } from './lib/migrate/util.mjs'
+import { unescapeIrScript } from './lib/ir-script.mjs'
 
 // Directories that never hold a source page: the kit's own generated CSS
 // folder, static publish outputs, and pre-writeup-kit legacy pages (which
@@ -119,7 +120,11 @@ export function figureChecksPass(block) {
 export function figureIrText(block) {
   const m = SCRIPT_RE.exec(block.inner)
   if (!m) return null
-  return m[1].replace(/^\n/, '').replace(/\n$/, '')
+  // Writers HTML-escape the IR text before embedding it (ir-script.mjs);
+  // unescape here so the caller gets parseable YAML/JSON back. Tolerant of
+  // legacy pages written before this contract existed (raw, unescaped
+  // text passes through unchanged).
+  return unescapeIrScript(m[1].replace(/^\n/, '').replace(/\n$/, ''))
 }
 
 // --- one figure ------------------------------------------------------------

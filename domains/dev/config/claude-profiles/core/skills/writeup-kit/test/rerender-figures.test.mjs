@@ -9,6 +9,7 @@ import {
   listStorePages, findFigureBlocks, figureChecksPass, figureIrText,
   rerenderOne, rerenderPageText, updateDiagramMeta, rerenderStore, parseArgs, main,
 } from '../bin/rerender-figures.mjs'
+import { escapeIrScript } from '../bin/lib/ir-script.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -17,6 +18,12 @@ const BIN = join(ROOT, 'bin', 'rerender-figures.mjs')
 
 const SIMPLE_YAML = readFileSync(join(FIXTURES, 'simple.yaml'), 'utf8')
 const BUDGET_YAML = readFileSync(join(FIXTURES, 'budget.yaml'), 'utf8')
+// A label carrying a hostile HTML fragment, to exercise the ir-script.mjs
+// escaping contract end-to-end (a store page can hold either the escaped
+// form a current writer produces, or legacy raw text from before the
+// contract existed). Kept short so it doesn't change the node's rendered
+// width enough to trip an unrelated layout-geometry check.
+const DANGEROUS_YAML = SIMPLE_YAML.replace('label: クライアント', 'label: "<b>x</b>"')
 
 const HEAD = '<!doctype html>\n<html><head><title>t</title>\n<meta name="checks" content="self-check=pass">\n</head><body><main>\n'
 const TAIL = '\n</main></body></html>\n'
@@ -88,6 +95,18 @@ describe('rerender-figures: raw scanning helpers', () => {
     assert.equal(figureIrText(blocks[0]), null)
   })
 
+  test('figureIrText unescapes an escaped script back to the original raw IR text', () => {
+    const raw = HEAD + fallbackFigure(escapeIrScript(DANGEROUS_YAML)) + TAIL
+    const blocks = findFigureBlocks(raw)
+    assert.equal(figureIrText(blocks[0]), DANGEROUS_YAML)
+  })
+
+  test('figureIrText leaves legacy unescaped raw text unchanged (pre-contract pages)', () => {
+    const raw = HEAD + fallbackFigure(DANGEROUS_YAML) + TAIL
+    const blocks = findFigureBlocks(raw)
+    assert.equal(figureIrText(blocks[0]), DANGEROUS_YAML)
+  })
+
   test('listStorePages excludes _kit/, public/, .publish/, legacy/, and the store-root index.html', () => {
     const store = tmpStore()
     const pages = listStorePages(store)
@@ -134,6 +153,13 @@ describe('rerender-figures: rerenderOne', () => {
     assert.equal(out.ok, false)
     assert.equal(out.reason, 'parse-error')
   })
+
+  test('a hostile label re-renders without leaking raw HTML into the output figure', async () => {
+    const out = await rerenderOne(DANGEROUS_YAML, { column: 720 })
+    assert.equal(out.ok, true)
+    assert.ok(!out.html.includes('<b>x</b>'))
+    assert.ok(out.html.includes('&lt;b&gt;x&lt;/b&gt;'))
+  })
 })
 
 describe('rerender-figures: rerenderPageText', () => {
@@ -165,6 +191,24 @@ describe('rerender-figures: rerenderPageText', () => {
     const { raw: patched, tried } = await rerenderPageText(raw, { column: 720, all: false })
     assert.equal(tried.length, 0)
     assert.equal(patched, raw)
+  })
+
+  test('reads a properly-escaped fallback figure and re-renders it without leaking raw HTML', async () => {
+    const raw = HEAD + fallbackFigure(escapeIrScript(DANGEROUS_YAML)) + TAIL
+    const { raw: patched, tried } = await rerenderPageText(raw, { column: 720, all: false })
+    assert.equal(tried.length, 1)
+    assert.equal(tried[0].ok, true)
+    assert.ok(!patched.includes('<b>x</b>'))
+    assert.ok(patched.includes('&lt;b&gt;x&lt;/b&gt;'))
+  })
+
+  test('also reads a legacy unescaped fallback figure (pre-contract page) and re-renders it clean', async () => {
+    const raw = HEAD + fallbackFigure(DANGEROUS_YAML) + TAIL
+    const { raw: patched, tried } = await rerenderPageText(raw, { column: 720, all: false })
+    assert.equal(tried.length, 1)
+    assert.equal(tried[0].ok, true)
+    assert.ok(!patched.includes('<b>x</b>'))
+    assert.ok(patched.includes('&lt;b&gt;x&lt;/b&gt;'))
   })
 
   test('--all re-renders an already-passing figure too, replacing stale content', async () => {

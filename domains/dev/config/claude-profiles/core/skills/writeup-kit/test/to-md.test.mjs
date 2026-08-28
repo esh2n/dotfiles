@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { convertToMarkdown } from '../bin/to-md.mjs'
+import { escapeIrScript } from '../bin/lib/ir-script.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -95,6 +96,42 @@ describe('to-md: figure and mermaid fallback', () => {
 
   test('.wu-terms maps to a bulleted "name — what" list', () => {
     assert.match(md, /- \*\*ワーカー\*\* — 再試行を専門に受け持つバックエンドの処理単位。/)
+  })
+})
+
+describe('to-md: diagram IR script escaping contract', () => {
+  // A label with a hostile fragment — findIr() must unescape a <script>
+  // block written under the ir-script.mjs contract, and must still parse
+  // legacy pages that predate it (no &lt;/&amp; in the script text).
+  const irText = 'id: d1\ntitle: t\ncaption: c\ngroups: []\nnodes:\n  - id: a\n    label: "<b>bold</b> & c"\nedges: []\n'
+
+  function pageWithFigureScript(scriptBody) {
+    return `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2>
+        <figure class="wu-figure" data-checks="pass">
+          <svg role="img"><title>t</title><desc>d</desc></svg>
+          <figcaption>cap</figcaption>
+          <script type="text/x-writeup-diagram">\n${scriptBody}\n</script>
+        </figure>
+      </section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+  }
+
+  test('reads an escaped IR script (current writer contract) and recovers the original label', () => {
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-esc-'))
+    const md = convertToMarkdown(pageWithFigureScript(escapeIrScript(irText)), { slug: 'esc', figuresDir, figuresDirRel: 'figs' })
+    assert.match(md, /```mermaid/)
+    assert.ok(md.includes('a[<b>bold</b> & c]'), 'label should round-trip to its original, unescaped text')
+    assert.ok(!md.includes('&lt;b&gt;'), 'no leftover HTML entities in the markdown output')
+  })
+
+  test('also reads a legacy unescaped IR script (pre-contract page)', () => {
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-legacy-'))
+    const md = convertToMarkdown(pageWithFigureScript(irText), { slug: 'legacy', figuresDir, figuresDirRel: 'figs' })
+    assert.match(md, /```mermaid/)
+    assert.ok(md.includes('a[<b>bold</b> & c]'))
   })
 })
 

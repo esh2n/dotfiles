@@ -9,6 +9,7 @@ import {
   renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE,
   chooseOrientation, legendWidth, EDGE_LABEL_SIZE, normalizePolyline,
 } from '../bin/lib/diagram.mjs'
+import { unescapeIrScript } from '../bin/lib/ir-script.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const fixture = (name) => readFileSync(join(HERE, 'fixtures', name), 'utf8')
@@ -495,6 +496,23 @@ test('renderFigureHtml wraps the svg in the kit figure markup with the raw YAML 
   assert.ok(result.html.includes('<script type="text/x-writeup-diagram">'))
   assert.ok(result.html.includes(rawYaml.trim()))
   assert.ok(result.html.trim().endsWith('</figure>'))
+})
+
+test('renderFigureHtml HTML-escapes the embedded IR script so a hostile label/caption can\'t inject markup or close the block early', async () => {
+  const rawYaml = 'id: d1\nlabel: <img src=x onerror=alert(1)>\ncaption: "</script><script>alert(1)</script>"\n'
+  const result = await renderFigureHtml(ir('simple.yaml'), { rawYaml })
+  assert.ok(!result.html.includes('<img src=x'), 'raw <img must not appear in the html')
+  assert.ok(!result.html.includes('</script><script>alert(1)</script>'), 'raw </script> break-out must not appear')
+  assert.ok(result.html.includes('&lt;img src=x onerror=alert(1)&gt;'))
+  assert.ok(result.html.includes('&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;'))
+})
+
+test('the escaped IR script round-trips through unescapeIrScript back to the original raw YAML', async () => {
+  const rawYaml = 'id: d1\nlabel: <img src=x onerror=alert(1)> & more'
+  const result = await renderFigureHtml(ir('simple.yaml'), { rawYaml })
+  const m = /<script type="text\/x-writeup-diagram">\n([\s\S]*?)\n<\/script>/.exec(result.html)
+  assert.ok(m, 'script block not found')
+  assert.equal(unescapeIrScript(m[1]), rawYaml)
 })
 
 // --- groups ------------------------------------------------------------

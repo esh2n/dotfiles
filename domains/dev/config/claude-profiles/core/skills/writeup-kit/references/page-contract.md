@@ -127,6 +127,20 @@ Diagram accessibility (criterion #14 above): `role="img"`, first child is
 `<title>`, `<desc>` is non-empty, and diagram element ids are prefixed
 `wu-d-`.
 
+### `.wu-figure` / IR script escaping
+
+A `.wu-figure`'s `<script type="text/x-writeup-diagram">` block carries the
+diagram IR alongside the rendered SVG, so the figure can be re-rendered or
+converted to Markdown later. Its content is HTML-escaped text — `&`, `<`,
+`>` become `&amp;`, `&lt;`, `&gt;` (`bin/lib/ir-script.mjs`) — because
+`<script>` is an HTML raw-text element that browsers never decode; embedding
+a label or caption verbatim would let it inject a literal tag or, worse,
+close the block early with a literal `</script>`. Every writer of this
+block escapes before embedding; every reader unescapes before parsing the
+YAML/JSON, tolerantly (text with neither `&lt;` nor `&amp;` is treated as
+pre-contract raw text and left as-is, so old pages keep parsing until
+`bin/rerender-figures.mjs --all` rewrites them into the escaped form).
+
 ## 5. HTML → Markdown mapping
 
 `bin/to-md.mjs` reads only role-tagged structure, so the mapping is
