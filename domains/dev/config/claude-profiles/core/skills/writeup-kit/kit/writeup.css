@@ -1,0 +1,806 @@
+/*
+  writeup-kit css v0.1
+
+  Design tokens and the wu- component set for writeup HTML pages:
+  page chrome, section furniture, callouts, comparison and data
+  tables, figures, quotes, code, diffs, chips, and citations.
+
+  Every color routes through a token defined in one of three blocks
+  below (light root, dark media query, dark data-theme override).
+  Type, spacing, radius, and border-width values route through their
+  own token scales. No component rule below writes a literal color
+  or a literal pixel spacing value.
+*/
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+img,
+svg {
+  max-width: 100%;
+  display: block;
+}
+
+/* ---------------------------------------------------------------
+   Tokens — light (bare :root)
+--------------------------------------------------------------- */
+:root {
+  /* color: neutral scale */
+  --wu-ground: #f7f7f5;
+  --wu-surface: #ffffff;
+  --wu-ink: #1c212b;
+  --wu-ink-2: #4a5464;
+  --wu-ink-3: #7c8494;
+  --wu-rule: #d9dce2;
+  --wu-rule-soft: #ececef;
+
+  /* color: the two chromatic colors */
+  --wu-link: #2f4b9c;
+  --wu-accent: #9c4a2f;
+  --wu-accent-soft: #f2e4de;
+
+  /* type roles */
+  --wu-font-body: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --wu-font-heading: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --wu-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* type scale: 13 / 14 / 15.5 / 17 / 21 / 30 */
+  --wu-fs-1: 13px;
+  --wu-fs-2: 14px;
+  --wu-fs-3: 15.5px;
+  --wu-fs-4: 17px;
+  --wu-fs-5: 21px;
+  --wu-fs-6: 30px;
+
+  /* spacing scale: 4 / 8 / 12 / 16 / 24 / 32 / 48 */
+  --wu-sp-1: 4px;
+  --wu-sp-2: 8px;
+  --wu-sp-3: 12px;
+  --wu-sp-4: 16px;
+  --wu-sp-5: 24px;
+  --wu-sp-6: 32px;
+  --wu-sp-7: 48px;
+
+  /* radius scale: 4 / 6 / 8 */
+  --wu-radius-1: 4px;
+  --wu-radius-2: 6px;
+  --wu-radius-3: 8px;
+
+  /* border-width scale: 1 / 1.5 / 2 */
+  --wu-bw-1: 1px;
+  --wu-bw-2: 1.5px;
+  --wu-bw-3: 2px;
+}
+
+/* ---------------------------------------------------------------
+   Tokens — dark, OS preference (paired scale, not an inversion)
+--------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --wu-ground: #13161c;
+    --wu-surface: #1b1f27;
+    --wu-ink: #e7e9ed;
+    --wu-ink-2: #b7bec9;
+    --wu-ink-3: #838b9a;
+    --wu-rule: #333945;
+    --wu-rule-soft: #232833;
+
+    --wu-link: #93a9e8;
+    --wu-accent: #e0987c;
+    --wu-accent-soft: #3a281f;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Tokens — dark, explicit override (wins over OS preference)
+--------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  --wu-ground: #13161c;
+  --wu-surface: #1b1f27;
+  --wu-ink: #e7e9ed;
+  --wu-ink-2: #b7bec9;
+  --wu-ink-3: #838b9a;
+  --wu-rule: #333945;
+  --wu-rule-soft: #232833;
+
+  --wu-link: #93a9e8;
+  --wu-accent: #e0987c;
+  --wu-accent-soft: #3a281f;
+}
+
+/* ---------------------------------------------------------------
+   Base
+--------------------------------------------------------------- */
+body {
+  margin: 0;
+  background: var(--wu-ground);
+  color: var(--wu-ink);
+  font-family: var(--wu-font-body);
+  font-size: var(--wu-fs-3);
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--wu-font-heading);
+  line-height: 1.35;
+  text-wrap: balance;
+  margin: 0;
+  color: var(--wu-ink);
+}
+
+h1 {
+  font-size: var(--wu-fs-6);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: var(--wu-fs-5);
+  font-weight: 700;
+  margin-top: var(--wu-sp-7);
+  padding-top: var(--wu-sp-4);
+  border-top: var(--wu-bw-3) solid var(--wu-ink);
+}
+
+h3 {
+  font-size: var(--wu-fs-4);
+  font-weight: 700;
+  margin-top: var(--wu-sp-6);
+}
+
+h4 {
+  font-size: var(--wu-fs-3);
+  font-weight: 700;
+  margin-top: var(--wu-sp-4);
+  color: var(--wu-ink-2);
+}
+
+p {
+  margin: var(--wu-sp-3) 0;
+}
+
+a {
+  color: var(--wu-link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: var(--wu-bw-3) solid var(--wu-link);
+  outline-offset: 2px;
+}
+
+code {
+  font-family: var(--wu-font-mono);
+  font-size: 0.88em;
+  background: var(--wu-rule-soft);
+  padding: 0 var(--wu-sp-1);
+  border-radius: var(--wu-radius-1);
+}
+
+ul,
+ol {
+  padding-left: 1.4em;
+  margin: var(--wu-sp-2) 0;
+}
+
+li {
+  margin: var(--wu-sp-1) 0;
+}
+
+li::marker {
+  color: var(--wu-ink-3);
+}
+
+hr {
+  border: 0;
+  border-top: var(--wu-bw-1) solid var(--wu-rule);
+  margin: var(--wu-sp-6) 0;
+}
+
+/* ---------------------------------------------------------------
+   .wu-page — the whole page
+--------------------------------------------------------------- */
+.wu-page {
+  background: var(--wu-ground);
+  color: var(--wu-ink);
+}
+
+.wu-page main {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding: var(--wu-sp-7) var(--wu-sp-4) var(--wu-sp-7);
+}
+
+/* ---------------------------------------------------------------
+   .wu-header / .wu-footer — chrome, copied verbatim from the
+   template. Internal helper classes below are scoped to chrome
+   only and are not part of the 20-component vocabulary.
+--------------------------------------------------------------- */
+.wu-header {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding: var(--wu-sp-6) var(--wu-sp-4) var(--wu-sp-5);
+  border-bottom: var(--wu-bw-1) solid var(--wu-rule);
+}
+
+.wu-header .wu-eyebrow {
+  margin: 0;
+  font-family: var(--wu-font-mono);
+  font-size: var(--wu-fs-1);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wu-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.wu-header h1 {
+  margin-top: var(--wu-sp-2);
+}
+
+.wu-header .wu-lede {
+  margin-top: var(--wu-sp-3);
+}
+
+.wu-footer {
+  max-width: 68ch;
+  margin: var(--wu-sp-7) auto 0;
+  padding: var(--wu-sp-4) var(--wu-sp-4) var(--wu-sp-6);
+  border-top: var(--wu-bw-1) solid var(--wu-rule);
+}
+
+.wu-footer dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wu-sp-1) var(--wu-sp-5);
+  margin: 0;
+  font-family: var(--wu-font-mono);
+  font-size: var(--wu-fs-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.wu-footer dt {
+  color: var(--wu-ink-3);
+}
+
+.wu-footer dd {
+  margin: 0;
+  color: var(--wu-ink-2);
+}
+
+/* ---------------------------------------------------------------
+   .wu-lede — one paragraph: what / for whom / conclusion
+--------------------------------------------------------------- */
+.wu-lede {
+  max-width: 68ch;
+  font-size: var(--wu-fs-4);
+  color: var(--wu-ink-2);
+}
+
+/* ---------------------------------------------------------------
+   .wu-summary — 3-5 line summary box
+--------------------------------------------------------------- */
+.wu-summary {
+  margin: var(--wu-sp-5) 0;
+  padding: var(--wu-sp-4) var(--wu-sp-5);
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-left: var(--wu-bw-3) solid var(--wu-ink);
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-surface);
+}
+
+.wu-summary p {
+  margin: var(--wu-sp-1) 0;
+}
+
+/* ---------------------------------------------------------------
+   .wu-toc — table of contents
+--------------------------------------------------------------- */
+.wu-toc {
+  margin: var(--wu-sp-5) 0;
+  padding: var(--wu-sp-4);
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-surface);
+}
+
+.wu-toc p {
+  margin: 0 0 var(--wu-sp-2);
+  font-family: var(--wu-font-heading);
+  font-weight: 700;
+  font-size: var(--wu-fs-1);
+  color: var(--wu-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wu-toc ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.wu-toc li {
+  margin: var(--wu-sp-1) 0;
+  font-size: var(--wu-fs-2);
+}
+
+.wu-toc a {
+  color: var(--wu-ink);
+  text-decoration: none;
+}
+
+.wu-toc a:hover {
+  color: var(--wu-link);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------
+   .wu-section — one h2 block
+--------------------------------------------------------------- */
+.wu-section {
+  margin-top: var(--wu-sp-7);
+}
+
+.wu-section:first-of-type {
+  margin-top: var(--wu-sp-5);
+}
+
+/* ---------------------------------------------------------------
+   .wu-terms — term list (dl)
+--------------------------------------------------------------- */
+.wu-terms {
+  margin: var(--wu-sp-4) 0;
+  display: grid;
+  grid-template-columns: minmax(8em, auto) 1fr;
+  gap: var(--wu-sp-2) var(--wu-sp-4);
+  font-size: var(--wu-fs-2);
+}
+
+.wu-terms dt {
+  font-family: var(--wu-font-heading);
+  font-weight: 700;
+  color: var(--wu-ink-2);
+}
+
+.wu-terms dd {
+  margin: 0;
+  color: var(--wu-ink);
+}
+
+/* ---------------------------------------------------------------
+   .wu-callout — note / warn / decision aside
+   Tone is carried by data-tone, never by a chromatic color: border
+   weight, background wash, and the generated label text do the work.
+--------------------------------------------------------------- */
+.wu-callout {
+  margin: var(--wu-sp-4) 0;
+  padding: var(--wu-sp-3) var(--wu-sp-4);
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-surface);
+}
+
+.wu-callout::before {
+  content: attr(data-tone);
+  display: block;
+  margin-bottom: var(--wu-sp-1);
+  font-family: var(--wu-font-heading);
+  font-weight: 700;
+  font-size: var(--wu-fs-1);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wu-ink-3);
+}
+
+.wu-callout p {
+  margin: 0;
+}
+
+.wu-callout[data-tone="note"] {
+  border-left: var(--wu-bw-1) solid var(--wu-ink-3);
+}
+
+.wu-callout[data-tone="warn"] {
+  border-left: var(--wu-bw-3) solid var(--wu-ink);
+  background: var(--wu-rule-soft);
+}
+
+.wu-callout[data-tone="decision"] {
+  border-left: var(--wu-bw-3) solid var(--wu-ink);
+  border-style: solid;
+}
+
+/* self-check warns when three or more .wu-callout run in a row;
+   not enforced here */
+
+/* ---------------------------------------------------------------
+   .wu-decision — one decision: decision / trade-off / basis
+--------------------------------------------------------------- */
+.wu-decision {
+  margin: var(--wu-sp-5) 0;
+  padding: var(--wu-sp-4) var(--wu-sp-5);
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-left: var(--wu-bw-3) solid var(--wu-ink);
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-surface);
+}
+
+.wu-decision p {
+  margin: var(--wu-sp-2) 0;
+}
+
+.wu-decision p:first-child {
+  margin-top: 0;
+  font-size: var(--wu-fs-4);
+  font-weight: 700;
+}
+
+.wu-decision strong {
+  font-family: var(--wu-font-heading);
+  color: var(--wu-ink-2);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------
+   .wu-compare / .wu-table — tables
+   The class sits directly on <table>; display:block plus
+   overflow-x:auto turns the table itself into the scroll container,
+   so no extra wrapper element is needed.
+   wu-compare: up to 4 columns (row = option). wu-table: up to 5
+   columns. Not enforced here — see self-check.
+--------------------------------------------------------------- */
+.wu-compare,
+.wu-table {
+  display: block;
+  overflow-x: auto;
+  margin: var(--wu-sp-4) 0;
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-surface);
+  border-collapse: collapse;
+  font-size: var(--wu-fs-2);
+}
+
+.wu-compare tbody,
+.wu-compare thead,
+.wu-compare tr,
+.wu-table tbody,
+.wu-table thead,
+.wu-table tr {
+  width: 100%;
+}
+
+.wu-compare th,
+.wu-compare td,
+.wu-table th,
+.wu-table td {
+  padding: var(--wu-sp-2) var(--wu-sp-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: var(--wu-bw-1) solid var(--wu-rule-soft);
+  white-space: normal;
+}
+
+.wu-compare th,
+.wu-table th {
+  font-family: var(--wu-font-heading);
+  font-weight: 700;
+  font-size: var(--wu-fs-1);
+  color: var(--wu-ink-2);
+  background: var(--wu-rule-soft);
+  white-space: nowrap;
+}
+
+.wu-compare tr:last-child td,
+.wu-table tr:last-child td {
+  border-bottom: none;
+}
+
+.wu-compare td.num,
+.wu-table td.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------
+   .wu-steps — numbered procedure, one step per line
+--------------------------------------------------------------- */
+.wu-steps {
+  list-style: decimal;
+  padding-left: 1.6em;
+  margin: var(--wu-sp-4) 0;
+}
+
+.wu-steps li {
+  margin: 0;
+  padding: var(--wu-sp-2) 0;
+  border-bottom: var(--wu-bw-1) solid var(--wu-rule-soft);
+}
+
+.wu-steps li:last-child {
+  border-bottom: none;
+}
+
+.wu-steps li::marker {
+  font-family: var(--wu-font-mono);
+  color: var(--wu-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------
+   .wu-figure — diagram frame: svg + figcaption + IR script
+   The IR <script type="text/x-writeup-diagram"> has no box; the
+   figure's own overflow-x:auto is the scroll container for a wide
+   diagram. The focal node/edge is the only other place the accent
+   color may appear, via the .wu-focal helper class inside the svg.
+--------------------------------------------------------------- */
+.wu-figure {
+  margin: var(--wu-sp-5) 0;
+  padding: var(--wu-sp-4);
+  overflow-x: auto;
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-surface);
+}
+
+.wu-figure svg {
+  margin: 0 auto;
+  color: var(--wu-ink);
+  max-width: 100%;
+  height: auto;
+}
+
+.wu-figure figcaption {
+  margin-top: var(--wu-sp-3);
+  font-size: var(--wu-fs-2);
+  color: var(--wu-ink-2);
+  text-align: center;
+}
+
+.wu-figure .wu-focal {
+  stroke: var(--wu-accent);
+}
+
+.wu-figure text.wu-focal {
+  fill: var(--wu-accent);
+}
+
+/* ---------------------------------------------------------------
+   .wu-quote — original / translation / source
+--------------------------------------------------------------- */
+.wu-quote {
+  margin: var(--wu-sp-4) 0;
+  padding: var(--wu-sp-3) var(--wu-sp-4);
+  border-left: var(--wu-bw-3) solid var(--wu-rule);
+  background: var(--wu-surface);
+}
+
+.wu-quote-original {
+  margin: 0;
+  color: var(--wu-ink-2);
+}
+
+.wu-quote-ja {
+  margin: var(--wu-sp-2) 0 0;
+  color: var(--wu-ink);
+}
+
+.wu-quote-source {
+  display: block;
+  margin-top: var(--wu-sp-2);
+  font-family: var(--wu-font-mono);
+  font-style: normal;
+  font-size: var(--wu-fs-1);
+  color: var(--wu-ink-3);
+}
+
+/* ---------------------------------------------------------------
+   .wu-code — language-tagged code block
+--------------------------------------------------------------- */
+.wu-code {
+  position: relative;
+  display: block;
+  margin: var(--wu-sp-4) 0;
+  padding: var(--wu-sp-5) var(--wu-sp-4) var(--wu-sp-4);
+  overflow-x: auto;
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-rule-soft);
+  font-family: var(--wu-font-mono);
+  font-size: var(--wu-fs-2);
+  line-height: 1.6;
+  color: var(--wu-ink);
+}
+
+.wu-code code {
+  background: none;
+  padding: 0;
+}
+
+.wu-code[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: var(--wu-sp-2);
+  right: var(--wu-sp-3);
+  font-size: var(--wu-fs-1);
+  color: var(--wu-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------------------
+   .wu-diff — before / after, unified style (leading +/- in text)
+--------------------------------------------------------------- */
+.wu-diff {
+  position: relative;
+  display: block;
+  margin: var(--wu-sp-4) 0;
+  padding: var(--wu-sp-5) var(--wu-sp-4) var(--wu-sp-4);
+  overflow-x: auto;
+  border-left: var(--wu-bw-3) solid var(--wu-ink-3);
+  border-radius: var(--wu-radius-2);
+  background: var(--wu-rule-soft);
+  font-family: var(--wu-font-mono);
+  font-size: var(--wu-fs-2);
+  line-height: 1.7;
+  color: var(--wu-ink-2);
+}
+
+.wu-diff code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.wu-diff[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: var(--wu-sp-2);
+  right: var(--wu-sp-3);
+  font-size: var(--wu-fs-1);
+  color: var(--wu-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------------------
+   .wu-chip — parallel classification labels (3-6)
+--------------------------------------------------------------- */
+.wu-chip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wu-sp-2);
+  margin: var(--wu-sp-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wu-chip li {
+  margin: 0;
+  padding: var(--wu-sp-1) var(--wu-sp-3);
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: var(--wu-radius-3);
+  background: var(--wu-surface);
+  color: var(--wu-ink-2);
+  font-family: var(--wu-font-heading);
+  font-weight: 700;
+  font-size: var(--wu-fs-1);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------
+   .wu-meta — source/basis line
+--------------------------------------------------------------- */
+.wu-meta {
+  margin: var(--wu-sp-2) 0;
+  font-family: var(--wu-font-mono);
+  font-size: var(--wu-fs-1);
+  color: var(--wu-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------
+   .wu-open — open questions / assumptions frame
+--------------------------------------------------------------- */
+.wu-open {
+  margin: var(--wu-sp-5) 0;
+  padding: var(--wu-sp-4) var(--wu-sp-5);
+  border: var(--wu-bw-2) dashed var(--wu-rule);
+  border-radius: var(--wu-radius-2);
+}
+
+.wu-open ul,
+.wu-open ol {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------
+   .wu-accent — one emphasis point per page
+--------------------------------------------------------------- */
+.wu-accent {
+  color: var(--wu-accent);
+  font-weight: 700;
+}
+
+/* self-check warns above one .wu-accent per page; not enforced here */
+
+/* ---------------------------------------------------------------
+   Print
+--------------------------------------------------------------- */
+@media print {
+  .wu-toc,
+  .wu-header nav {
+    display: none;
+  }
+
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: inherit;
+  }
+
+  .wu-figure,
+  .wu-compare,
+  .wu-table,
+  .wu-decision {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body,
+  .wu-page {
+    background: white;
+    color: black;
+  }
+
+  a {
+    color: black;
+    text-decoration: underline;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Reduced motion (no animation is used above; this is a safety net
+   for anything a page author adds inline)
+--------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------
+   Narrow screens
+--------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .wu-page main,
+  .wu-header,
+  .wu-footer {
+    padding-left: var(--wu-sp-3);
+    padding-right: var(--wu-sp-3);
+  }
+
+  .wu-terms {
+    grid-template-columns: 1fr;
+  }
+}

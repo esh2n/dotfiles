@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>画像アップロードの再試行方針（部品見本）</title>
+<meta name="description" content="writeup-kit の全21部品を、架空の設計ドキュメント1本の中で実データとともに一度ずつ示す見本ページ">
+<meta name="kind" content="設計">
+<meta name="date" content="2026-08-28">
+<meta name="updated" content="2026-08-28">
+<meta name="checks" content="lint=skipped;self-check=skipped">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!-- kit samples live inside kit/, so this links the sibling file directly;
+     a page inside the store links "../_kit/writeup.css" instead. -->
+<link rel="stylesheet" href="./writeup.css">
+</head>
+<body>
+<div class="wu-page">
+
+<header class="wu-header">
+<p class="wu-eyebrow">設計 &middot; 2026-08-28 &middot; 更新 2026-08-28</p>
+<h1>画像アップロードの再試行方針</h1>
+<p class="wu-lede">画像アップロードに失敗したときの再試行方法を、実装担当者向けに1つに決める。結論は指数バックオフと上限3回で、キューへの移譲は次のフェーズに送る。</p>
+</header>
+
+<main>
+
+<!-- This page is a component sample, not a real store page: it uses a
+     fictitious design topic (an image-upload retry policy) so every
+     wu- component below has real Japanese content, and it deliberately
+     ignores the 設計 kind's normal use/avoid list so all 21 components
+     get a slot in one file. Each demo is followed by a plain "メモ:"
+     line quoting that component's use/avoid note. -->
+
+<p>メモ: 構造部品 &mdash; wu-page（使うとき: 常に1つ／使わないとき: &mdash;）、wu-header・wu-footer（使うとき: 常に、テンプレから逐語コピー／使わないとき: 中身を変えない）、wu-lede（使うとき: 常に1段落／使わないとき: 2段落以上）、wu-section（使うとき: 見出し2の塊、常に／使わないとき: &mdash;）は、このページの骨格そのものが見本になる。</p>
+
+<div class="wu-summary">
+<p>画像アップロードに失敗する原因の大半は、一時的なネットワーク断とサーバー側の過負荷である。</p>
+<p>方針は指数バックオフでの自動再試行を最大3回まで行い、それでも失敗したら手動再試行に切り替える。</p>
+<p>サーバー側キューへの移譲は運用負荷が高いため今回は見送り、次のフェーズの検討事項とする。</p>
+</div>
+<p>メモ: wu-summary &mdash; 使うとき: 決定記録・設計・調査まとめの冒頭／使わないとき: 作業メモ</p>
+
+<nav class="wu-toc">
+<p>目次</p>
+<ol>
+<li><a href="#purpose">目的と読者</a></li>
+<li><a href="#terms">用語</a></li>
+<li><a href="#gap">現状とギャップ</a></li>
+<li><a href="#compare">決定点</a></li>
+<li><a href="#decision">決めたこと</a></li>
+<li><a href="#errors">エラー分類</a></li>
+<li><a href="#steps">進め方</a></li>
+<li><a href="#figure">現状の経路</a></li>
+<li><a href="#quote">参考にした記述</a></li>
+<li><a href="#code">設定の型</a></li>
+<li><a href="#diff">設定変更の差分</a></li>
+<li><a href="#chip">状態タグ</a></li>
+<li><a href="#open">未決・前提</a></li>
+</ol>
+</nav>
+<p>メモ: wu-toc &mdash; 使うとき: 見出し2が5つ以上／使わないとき: 短い文書</p>
+
+<section class="wu-section" id="purpose">
+<h2>目的と読者</h2>
+<p>このドキュメントは、画像アップロード機能の実装担当者と、それをレビューするテックリード向けに、失敗時の再試行方針を1つに決めることを目的とする。<span class="wu-accent">読者が持ち帰るべき結論は1つだけで、既定の再試行方式を指数バックオフにする、という点である。</span></p>
+</section>
+<p>メモ: wu-accent &mdash; 使うとき: 読者が1つだけ持ち帰る点／使わないとき: 2箇所目</p>
+
+<section class="wu-section" id="terms">
+<h2>用語</h2>
+<dl class="wu-terms">
+<dt>指数バックオフ</dt>
+<dd>再試行のたびに待機時間を倍にしていく方式。</dd>
+<dt>冪等キー</dt>
+<dd>同じ処理が複数回届いても、結果が1回分になるようにするための識別子。</dd>
+<dt>デッドレターキュー</dt>
+<dd>上限回数まで失敗した処理を、後で調べられるように退避させておく場所。</dd>
+</dl>
+</section>
+<p>メモ: wu-terms &mdash; 使うとき: 初出の用語が3つ以上／使わないとき: 本文の言い換え</p>
+
+<section class="wu-section" id="gap">
+<h2>現状とギャップ</h2>
+<p>現在のクライアントは失敗時に再試行を行わず、ユーザーが手動でもう一度アップロードボタンを押す必要がある。</p>
+<div class="wu-callout" data-tone="note">
+<p>モバイル回線での失敗率は、Wi-Fi接続時の約4倍という計測結果がある。</p>
+</div>
+<p>この計測は、アプリのクラッシュレポート基盤から取得した直近30日分の集計に基づく。</p>
+<p class="wu-meta">crash-reports/upload-failures-2026-08.csv</p>
+<p>メモ: wu-meta &mdash; 使うとき: 主張の直後／使わないとき: 本文の代わり</p>
+<div class="wu-callout" data-tone="warn">
+<p>再試行の上限を決めずに実装すると、障害発生時にサーバー全体の負荷が跳ね上がる。</p>
+</div>
+<p>この失敗パターンは、過去の障害対応でも繰り返し確認されている。</p>
+<div class="wu-callout" data-tone="decision">
+<p>したがって、再試行の上限は3回で固定し、利用者側の設定では変更できないようにする。</p>
+</div>
+<p>メモ: wu-callout &mdash; 使うとき: 読み飛ばすと困る1点／使わないとき: 連続3つ以上（このページでは間に文章を挟み、3つ連続を避けている）</p>
+</section>
+
+<section class="wu-section" id="compare">
+<h2>決定点</h2>
+<table class="wu-compare">
+<thead><tr><th>案</th><th>実装コスト</th><th>失敗時の体験</th><th>運用負荷</th></tr></thead>
+<tbody>
+<tr><td>固定間隔で再試行</td><td>低</td><td>障害時に一斉再試行が起きやすい</td><td>低</td></tr>
+<tr><td>指数バックオフ</td><td>中</td><td>負荷を分散できる</td><td>中</td></tr>
+<tr><td>サーバー側キューに移譲</td><td>高</td><td>体験は最も安定する</td><td>高</td></tr>
+</tbody>
+</table>
+</section>
+<p>メモ: wu-compare &mdash; 使うとき: 2〜4案を同じ観点で／使わないとき: 1案の説明、手順（4列まで）</p>
+
+<section class="wu-section" id="decision">
+<h2>決めたこと</h2>
+<div class="wu-decision">
+<p><strong>決定:</strong> 再試行は指数バックオフとし、上限は3回とする。</p>
+<p><strong>重視した得失:</strong> 実装コストを抑えつつ障害時の一斉再試行を避けることを優先し、体験の完全な安定は次フェーズに送った。</p>
+<p><strong>根拠:</strong> 直近の障害はいずれも再試行の集中が原因で、上限と待機時間の調整だけで再発を防げる見込みが立った。</p>
+</div>
+</section>
+<p>メモ: wu-decision &mdash; 使うとき: 決定記録／使わないとき: 候補の列挙</p>
+
+<section class="wu-section" id="errors">
+<h2>エラー分類</h2>
+<table class="wu-table">
+<thead><tr><th>エラー種別</th><th>HTTPステータス</th><th>再試行</th><th>初回待機</th><th>上限回数</th></tr></thead>
+<tbody>
+<tr><td>ネットワーク断</td><td>&mdash;</td><td>する</td><td>1秒</td><td class="num">3</td></tr>
+<tr><td>サーバー過負荷</td><td>503</td><td>する</td><td>2秒</td><td class="num">3</td></tr>
+<tr><td>認証切れ</td><td>401</td><td>しない</td><td>&mdash;</td><td class="num">0</td></tr>
+<tr><td>不正なファイル形式</td><td>422</td><td>しない</td><td>&mdash;</td><td class="num">0</td></tr>
+</tbody>
+</table>
+</section>
+<p>メモ: wu-table &mdash; 使うとき: 値の並び／使わないとき: 散文の代わり（5列まで）</p>
+
+<section class="wu-section" id="steps">
+<h2>進め方</h2>
+<ol class="wu-steps">
+<li>再試行ロジックを共通アップロードクライアントに実装する。</li>
+<li>冪等キーをアップロードAPIのリクエストヘッダーに追加する。</li>
+<li>上限に達した処理をデッドレターキューへ退避する処理を実装する。</li>
+<li>障害訓練で上限3回の挙動と負荷への影響を確認する。</li>
+</ol>
+</section>
+<p>メモ: wu-steps &mdash; 使うとき: 順序に意味がある／使わないとき: 並列の列挙</p>
+
+<section class="wu-section" id="figure">
+<h2>現状の経路</h2>
+<figure class="wu-figure">
+<svg role="img" aria-labelledby="wu-d-1-title" aria-describedby="wu-d-1-desc" viewBox="0 0 640 224">
+<title id="wu-d-1-title">現状のアップロード経路</title>
+<desc id="wu-d-1-desc">アップロードはクライアントからAPIを経て再試行ワーカーに渡り、失敗時の再試行はワーカー内で完結する。クライアントには最終結果だけが返る。</desc>
+<defs>
+<marker id="wu-d-arrow-filled" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+</marker>
+<marker id="wu-d-arrow-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+<path d="M1,1 L9,5 L1,9" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+</marker>
+</defs>
+<rect id="wu-d-client" x="16" y="78" width="160" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+<text x="96" y="114" text-anchor="middle" font-size="13" fill="currentColor">クライアント</text>
+<rect id="wu-d-api" x="240" y="78" width="160" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+<text x="320" y="114" text-anchor="middle" font-size="13" fill="currentColor">アップロードAPI</text>
+<rect id="wu-d-worker" class="wu-focal" x="464" y="78" width="160" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="2"></rect>
+<text id="wu-d-worker-label" class="wu-focal" x="544" y="114" text-anchor="middle" font-size="13">再試行ワーカー</text>
+<line x1="176" y1="110" x2="234" y2="110" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-filled)"></line>
+<text x="205" y="100" text-anchor="middle" font-size="11" fill="currentColor">送信</text>
+<line x1="400" y1="110" x2="458" y2="110" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-open)"></line>
+<text x="429" y="100" text-anchor="middle" font-size="11" fill="currentColor">委譲</text>
+<g font-size="11" fill="currentColor">
+<line x1="16" y1="198" x2="46" y2="198" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-filled)"></line>
+<text x="54" y="202">sync（実線・塗り矢尻）</text>
+<line x1="300" y1="198" x2="330" y2="198" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-open)"></line>
+<text x="338" y="202">async（実線・開いた矢尻）</text>
+</g>
+</svg>
+<figcaption>失敗時の再試行はワーカー内で完結し、クライアントには最終結果だけが返る。</figcaption>
+<script type="text/x-writeup-diagram">
+id: d1
+title: 現状のアップロード経路
+caption: 失敗時の再試行はワーカー内で完結し、クライアントには最終結果だけが返る。
+nodes:
+  - id: client
+    label: クライアント
+  - id: api
+    label: アップロードAPI
+  - id: worker
+    label: 再試行ワーカー
+    emphasis: true
+edges:
+  - from: client
+    to: api
+    label: 送信
+    kind: sync
+  - from: api
+    to: worker
+    label: 委譲
+    kind: async
+</script>
+</figure>
+</section>
+<p>メモ: wu-figure &mdash; 使うとき: レンダラーの出力／使わないとき: 手書きSVG、絵文字（このM1段階はレンダラー未実装のため、手描きSVGを暫定の見本として使っている）</p>
+
+<section class="wu-section" id="quote">
+<h2>参考にした記述</h2>
+<blockquote class="wu-quote">
+<p class="wu-quote-original">Clients SHOULD NOT retry a request that has already succeeded from the server's perspective; use an idempotency key to make retries safe.</p>
+<p class="wu-quote-ja">クライアントは、サーバー側からは成功済みとみなされているリクエストを再試行すべきではない。冪等キーを使い、再試行を安全にすること。</p>
+<cite class="wu-quote-source">外部アップロードSDKの実装ガイド（2026年版）、再試行に関する章</cite>
+</blockquote>
+</section>
+<p>メモ: wu-quote &mdash; 使うとき: 外部文書を根拠にする／使わないとき: 自分の文</p>
+
+<section class="wu-section" id="code">
+<h2>設定の型</h2>
+<pre class="wu-code" data-lang="ts"><code>interface RetryPolicy {
+  maxAttempts: number
+  initialDelayMs: number
+  backoffFactor: number
+  idempotencyKeyHeader: string
+}</code></pre>
+</section>
+<p>メモ: wu-code &mdash; 使うとき: DDL・型・設定／使わないとき: 見出し代わり</p>
+
+<section class="wu-section" id="diff">
+<h2>設定変更の差分</h2>
+<pre class="wu-diff" data-lang="diff"><code> maxAttempts: 1
+-initialDelayMs: 0
++initialDelayMs: 1000
++backoffFactor: 2
+ idempotencyKeyHeader: "X-Upload-Idempotency-Key"</code></pre>
+</section>
+<p>メモ: wu-diff &mdash; 使うとき: 変更前後／使わないとき: &mdash;</p>
+
+<section class="wu-section" id="chip">
+<h2>状態タグ</h2>
+<ul class="wu-chip">
+<li>検討中</li>
+<li>レビュー待ち</li>
+<li>決定済み</li>
+<li>実装待ち</li>
+</ul>
+</section>
+<p>メモ: wu-chip &mdash; 使うとき: タグ・状態／使わないとき: 強調・見出し</p>
+
+<section class="wu-section" id="open">
+<h2>未決・前提</h2>
+<div class="wu-open">
+<ul>
+<li>デッドレターキューに退避したデータの保持期間は未定。</li>
+<li>冪等キーの生成方法は、クライアントSDK側のチームとまだ合意していない前提で進める。</li>
+</ul>
+</div>
+</section>
+<p>メモ: wu-open &mdash; 使うとき: 決定記録・設計の末尾／使わないとき: &mdash;</p>
+
+</main>
+
+<footer class="wu-footer">
+<dl>
+<dt>checks</dt><dd>lint=skipped; self-check=skipped（kit component sample, not a store page）</dd>
+<dt>sources</dt><dd>[外部アップロードSDKの実装ガイド (2026/08), 再試行に関する章]</dd>
+</dl>
+</footer>
+
+</div>
+</body>
+</html>
