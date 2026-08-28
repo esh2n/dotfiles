@@ -14,13 +14,15 @@ import { LIMITS, budgetWarnings, formatBudgetWarnings } from './ir.mjs'
 import {
   textWidth, FONT_SIZE, NODE_PAD_X, BOLD_FACTOR, MIN_SCALE, COLUMN, chooseOrientation,
   renderDiagram, wrapFigureHtml,
-  groupLayerMode, groupLayerHeuristicPrefersElk,
+  groupLayerMode, groupLayerHeuristicPrefersElk, LABEL_CLEARANCE,
 } from './diagram.mjs'
 import { renderSequenceDiagram } from './sequence.mjs'
 import { verifySequence } from './verify-sequence.mjs'
 
+// LABEL_CLEARANCE (row #2's 6px floor) is imported from diagram.mjs: the
+// renderer's own manual-label placement keeps the same distance from every
+// other edge, so the two can never drift apart.
 const GRID = 4
-const LABEL_CLEARANCE = 6
 const COLLINEAR_OVERLAP_LIMIT = 8
 const BORDER_HUG_DIST = 4
 const BORDER_HUG_LEN = 16

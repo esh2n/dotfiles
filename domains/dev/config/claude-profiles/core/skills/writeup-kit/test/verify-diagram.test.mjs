@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR, formatBudgetWarnings } from '../bin/lib/ir.mjs'
-import { renderDiagram, renderFigureHtml, normalizePolyline, groupLayerMode, groupLayerHeuristicPrefersElk, COLUMN, MIN_SCALE } from '../bin/lib/diagram.mjs'
+import { renderDiagram, renderFigureHtml, normalizePolyline, groupLayerMode, groupLayerHeuristicPrefersElk, COLUMN, MIN_SCALE, LABEL_CLEARANCE } from '../bin/lib/diagram.mjs'
 import { verifyDiagram, renderChecked, renderFigureHtmlChecked, renderCheckedBest } from '../bin/lib/verify-diagram.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -1026,4 +1026,31 @@ test('renderCheckedBest: the existing fixtures keep the size and mode they rende
     assert.equal(best.height, dims.height, `${name}: height changed`)
     assert.equal(best.scroll, false)
   }
+})
+
+// --- renderCheckedBest: the "down" grouped figures keep their tightened size
+//
+// With hand-placed labels extended to elk's compound-node hierarchy (see
+// the "down layer gaps with groups" tests in diagram.test.mjs), the two ACL
+// figures shrank from 532x936 / 384x972 (152px between group boxes) to
+// 404x748 / 320x812 (74px). Pinned so a spacing regression shows up as a
+// number, not as a screenshot.
+test('renderCheckedBest: acl-overview.yaml / acl-internals.yaml keep their tightened "down" size', async () => {
+  const expected = {
+    'acl-overview.yaml': { mode: 'elk', direction: 'down', width: 404, height: 748 },
+    'acl-internals.yaml': { mode: 'elk', direction: 'down', width: 320, height: 812 },
+  }
+  for (const [name, dims] of Object.entries(expected)) {
+    const best = await renderCheckedBest(ir(name))
+    assert.equal(best.layoutMode, dims.mode, `${name}: layout mode changed`)
+    assert.equal(best.layout.direction, dims.direction, `${name}: orientation changed`)
+    assert.equal(best.width, dims.width, `${name}: width changed`)
+    assert.equal(best.height, dims.height, `${name}: height changed`)
+    assert.equal(best.scroll, false)
+    assert.equal(best.checksOk, true, JSON.stringify(best.failures))
+  }
+})
+
+test('row #2 label-clearance and the renderer\'s own manual-label placement share one 6px floor', () => {
+  assert.equal(LABEL_CLEARANCE, 6)
 })

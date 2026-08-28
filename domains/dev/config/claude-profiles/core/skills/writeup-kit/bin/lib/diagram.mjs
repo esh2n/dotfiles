@@ -494,7 +494,16 @@ function elbowPoints(fromBox, toBox, vertical, offset, midOffset = 0) {
 
 // --- layout ----------------------------------------------------------------
 
-async function layoutOnce(ir, direction, { forceElk = false } = {}) {
+/**
+ * @param {object} ir normalized IR
+ * @param {'right'|'down'} direction
+ * @param {{forceElk?: boolean, elkLabelEdges?: Set<number>}} [opts]
+ *   `elkLabelEdges` — indexes of edges whose label must be attached to elk
+ *   even where the renderer would otherwise place it by hand (the
+ *   per-edge fallback of the manual-label collision block below; internal,
+ *   grows across the recursive retries and is never passed by callers).
+ */
+async function layoutOnce(ir, direction, { forceElk = false, elkLabelEdges = new Set() } = {}) {
   const { nodes, groups, edges } = ir
   const groupLayers = forceElk ? null : computeGroupLayers(ir)
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
@@ -558,26 +567,30 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
       return { index: i, raw: e, kind: e.kind, flip: false, hasVia: false, isInLayer: true, crossLayerEligible: false, hopIds: [] }
     }
 
-    // A plain (no via, no groups at all) edge in "down" orientation runs
-    // vertically, so its label reads sideways-on to the layering axis —
-    // handing it to elk as a real edge label hits the exact same elk
-    // quirk documented just below for groupedPlain edges (a dedicated
-    // label layer padded by nodeNodeBetweenLayers on *both* sides, doubling
-    // the requested gap: 64+64+14=142px measured on a plain 4-node chain
-    // with a single short label, before this fix). Hand-placing it the same
-    // way via/groupedPlain edges already do keeps the real layer-to-layer
-    // gap equal to what layerSpacing (see below) actually asked for.
+    // A plain (no via) edge in "down" orientation runs vertically, so its
+    // label reads sideways-on to the layering axis — handing it to elk as
+    // a real edge label hits the exact same elk quirk documented just
+    // below for groupedPlain edges (a dedicated label layer padded by
+    // nodeNodeBetweenLayers on *both* sides, doubling the requested gap:
+    // 64+64+14=142px measured on a plain 4-node chain with a single short
+    // label, before this fix). Hand-placing it the same way via/groupedPlain
+    // edges already do keeps the real layer-to-layer gap equal to what
+    // layerSpacing (see below) actually asked for.
     //
-    // Scoped to `groups.length === 0` deliberately: a diagram with groups
-    // (whether grouped-layer/flat mode, where these edges are already
-    // groupedPlain/isInLayer and never reach here, or the older elk
-    // compound-node hierarchy from `layer: none` / forceElk) hands elk a
-    // much busier routing problem, and bypassing elk's own label-layer
-    // reservation there was found empirically to shrink elk's routing
-    // budget enough to reopen unrelated label/edge clearance and rhythm
-    // failures on conway.yaml's forced-elk case — that mode keeps its
-    // pre-existing (already-passing) elk-label behavior untouched.
-    const manualLabel = direction === 'down' && !hasVia && !groupedPlain && groups.length === 0
+    // This applies to elk's compound-node hierarchy (a diagram with groups
+    // that doesn't use grouped-layer mode — `layer: none`, forceElk, or a
+    // group graph with a cycle) too: there the same dummy label layer sat
+    // between every pair of group boxes (152px gaps on a 3-group, 4-node
+    // figure whose labels are all one line). elk's hierarchical routing is
+    // a busier problem, though, and a hand-placed label can land where
+    // elk's own would not have: straddling a group border, on top of a
+    // node, or too close to a neighbouring edge (conway.yaml's forced-elk
+    // case does exactly that). So the placement is checked once the
+    // layout is known (see the manual-label collision block after the
+    // grouped-layer block below) and any edge whose hand-placed label
+    // would collide is handed back to elk — `elkLabelEdges` — for that
+    // edge only, re-running the layout with just that label attached.
+    const manualLabel = direction === 'down' && !hasVia && !groupedPlain && !elkLabelEdges.has(i)
     // Whether elk itself positions this edge's label (attached below as a
     // real elk edge label). Only a label the renderer places by hand
     // (via / groupedPlain / manualLabel — all placed at `label_at` along the
@@ -899,8 +912,56 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
     }
   }
 
-  let diagramWidth = Math.max(1, Math.ceil(laid.width))
-  let diagramHeight = Math.max(1, Math.ceil(laid.height))
+  // Manual-label collision fallback (see the `manualLabel` comment in the
+  // edgeMeta loop above). Every hand-placed label is computed here exactly
+  // as draw() will place it (same helpers, same 4px snap) and tested
+  // against what the verify step would reject or a reader would notice:
+  // another edge's path closer than the label-clearance floor, another
+  // label, a node's box, a group's header band, or a group border it
+  // straddles. Each edge with no acceptable candidate is handed back to
+  // elk and the whole layout re-run — a label elk reserves its own layer
+  // for moves the geometry of everything else, so the remaining
+  // hand-placed labels are re-checked on the retry. `elkLabelEdges` only
+  // ever grows, so the recursion is bounded by the edge count.
+  //
+  // A label placed on an edge's outermost run (a loop-around back edge
+  // hugging the canvas edge) can hang past elk's own canvas, which only
+  // ever accounted for the elk-placed labels: the canvas is then shifted
+  // and widened (`laidCanvas`, applied through abs's 'root' offset — see
+  // elkEdgeGeometry()) so no label is ever clipped.
+  let laidCanvas = laid
+  if (!groupLayers && direction === 'down') {
+    const snappedGroups = groups.map((g) => snapBox(abs.get(g.id))).filter(Boolean)
+    const snappedNodes = nodes.map((n) => snapBox(abs.get(n.id))).filter(Boolean)
+    const geometry = edgeMeta.map((meta) => elkEdgeGeometry(meta, laid, abs))
+    const offenders = new Set(elkLabelEdges)
+    const placedLabels = geometry.map((g) => g.elkLabel).filter(Boolean).map((lb) => ({ ...lb, x: snap4(lb.x), y: snap4(lb.y) }))
+    edgeMeta.forEach((meta, k) => {
+      if (!meta.manualLabel || !meta.raw.label) return
+      const otherSections = edgeMeta.flatMap((m, j) => (j === k ? [] : geometry[j].sections))
+      const context = { groups: snappedGroups, nodes: snappedNodes, otherSections, labels: placedLabels }
+      const box = manualLabelCandidates(meta.raw, geometry[k].sections, snappedGroups).find((c) => !manualLabelCollides(c, context))
+      if (box) { meta.labelBox = box; placedLabels.push(box) }
+      else offenders.add(meta.index)
+    })
+    if (offenders.size > elkLabelEdges.size) return layoutOnce(ir, direction, { forceElk, elkLabelEdges: offenders })
+
+    const manualBoxes = edgeMeta.map((m) => m.labelBox).filter(Boolean)
+    if (manualBoxes.length) {
+      const shiftX = snapUp4(Math.max(0, ...manualBoxes.map((b) => CANVAS_PAD - b.x)))
+      const shiftY = snapUp4(Math.max(0, ...manualBoxes.map((b) => CANVAS_PAD - b.y)))
+      const right = Math.max(laid.width, ...manualBoxes.map((b) => b.x + b.width + CANVAS_PAD))
+      const bottom = Math.max(laid.height, ...manualBoxes.map((b) => b.y + b.height + CANVAS_PAD))
+      if (shiftX || shiftY || right > laid.width || bottom > laid.height) {
+        laidCanvas = { ...laid, width: right + shiftX, height: bottom + shiftY }
+        for (const [id, b] of [...abs]) abs.set(id, { ...b, x: b.x + shiftX, y: b.y + shiftY })
+        for (const m of edgeMeta) if (m.labelBox) m.labelBox = { ...m.labelBox, x: m.labelBox.x + shiftX, y: m.labelBox.y + shiftY }
+      }
+    }
+  }
+
+  let diagramWidth = Math.max(1, Math.ceil(laidCanvas.width))
+  let diagramHeight = Math.max(1, Math.ceil(laidCanvas.height))
   if (groupLayers) {
     // Group boxes (GROUP_PAD/GROUP_HEADER padded beyond their member
     // nodes) can protrude past elk's own laid.width/height, which only
@@ -919,7 +980,7 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
   // #7 relies on the legend box actually being inside the canvas).
   const width = snapUp4(Math.max(diagramWidth, legendWidth(usedKinds)))
   const height = snapUp4(Math.max(1, diagramHeight) + (usedKinds.length ? LEGEND_H : 0))
-  return { laid, edgeMeta, abs, usedKinds, groupIndex, width, height, usedGroupLayerMode: !!groupLayers }
+  return { laid: laidCanvas, edgeMeta, abs, usedKinds, groupIndex, width, height, usedGroupLayerMode: !!groupLayers }
 }
 
 function addPort(elkNode, nodeId, edgeIndex, role, side) {
@@ -951,7 +1012,6 @@ function finalizeNode(elkNode) {
 function draw(ir, layout, { column, displayWidth, displayHeight }) {
   const { nodes, groups } = ir
   const { laid, edgeMeta, abs, usedKinds, width, height } = layout
-  const laidById = new Map((laid.edges || []).map((e) => [e.id, e]))
   const uid = `wu-d-${ir.id}`
   const parts = []
   // Collected in parallel with the SVG string so a caller (verify-diagram)
@@ -1011,27 +1071,10 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
     // An in-layer edge (see the grouped-layer mode comment above
     // computeGroupLayers()) was never fed to elk, so its geometry comes
     // from the manual sections layoutOnce() computed once node positions
-    // were known, not from laidById.
-    const hopSections = meta.manualSections ? meta.manualSections : []
-    let elkLabel = null
-    if (!meta.manualSections) {
-      for (const hopId of meta.hopIds) {
-        const laidEdge = laidById.get(hopId)
-        if (!laidEdge) continue
-        const off = abs.get(laidEdge.container || 'root') || { x: 0, y: 0 }
-        const base = laidEdge.container && laidEdge.container !== 'root' ? { x: off.x, y: off.y } : { x: 0, y: 0 }
-        for (const sec of laidEdge.sections || []) {
-          let raw = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint].map((p) => ({ x: p.x + base.x, y: p.y + base.y }))
-          if (meta.flip) raw.reverse()
-          hopSections.push(raw)
-        }
-        if (!meta.hasVia && !meta.manualLabel && e.label) {
-          for (const lb of laidEdge.labels || []) elkLabel = { x: lb.x + base.x, y: lb.y + base.y, width: lb.width, height: lb.height }
-        }
-      }
-    }
-
-    const snappedSections = hopSections.map((raw) => normalizePolyline(raw.map((p) => ({ x: snap4(p.x), y: snap4(p.y) }))))
+    // were known, not from elk's own routing (elkEdgeGeometry()).
+    const { sections: snappedSections, elkLabel } = meta.manualSections
+      ? { sections: snapSections(meta.manualSections), elkLabel: null }
+      : elkEdgeGeometry(meta, laid, abs)
     const d = snappedSections.map((pts) => {
       const strs = pts.map((p) => `${p.x} ${p.y}`)
       return `M${strs[0]} ${strs.slice(1).map((p) => `L${p}`).join(' ')}`
@@ -1046,13 +1089,12 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
         // No single elk edge to attach the label to (hasVia/manualSections),
         // or elk was deliberately never given one to avoid its dummy-layer
         // doubling (manualLabel — see the comment above where it's set) —
-        // either way, place it manually at `label_at` (default 0.5) along
-        // the assembled path's total length.
-        lw = Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10
-        lh = 14
-        const pt = pointAtLength(snappedSections, totalPathLength(snappedSections) * (e.label_at ?? 0.5))
-        lx = snap4(pt.x - lw / 2)
-        ly = snap4(pt.y - lh / 2)
+        // either way, place it manually along the assembled path: at
+        // `label_at` (default 0.5) of the total drawn length, or — for a
+        // manualLabel edge, whose placement layoutOnce()'s collision block
+        // already settled (`labelBox`) — wherever that block found room.
+        const box = meta.labelBox || manualLabelCandidates(e, snappedSections, [])[0]
+        if (box) ({ x: lx, y: ly, width: lw, height: lh } = box)
       } else if (elkLabel) {
         lx = snap4(elkLabel.x)
         ly = snap4(elkLabel.y)
@@ -1160,6 +1202,196 @@ function pointAtLength(sections, target) {
   }
   const last = sections[sections.length - 1]
   return last[last.length - 1]
+}
+
+// --- edge geometry shared by layoutOnce()'s collision check and draw() ----
+
+const EDGE_LABEL_H = 14
+// Mirrors verify-diagram.mjs's LABEL_CLEARANCE (row #2: a label must clear
+// every other edge path by this much) — kept in sync by test.
+export const LABEL_CLEARANCE = 6
+// A hand-placed label straddling a group border, or sitting on a node, is
+// rejected when it comes closer than this to either.
+const LABEL_BOX_MARGIN = 2
+// Room kept between a hand-placed label and the canvas edge when the
+// canvas has to grow to fit it (matches elk's root padding).
+const CANVAS_PAD = 12
+
+/** The 4px-snapped rect draw() emits for a group/node box (null when the
+ * box is unknown). */
+function snapBox(box) {
+  if (!box) return null
+  return { x: snap4(box.x), y: snap4(box.y), width: snapUp4(box.width), height: snapUp4(box.height) }
+}
+
+/** Snap every point of every section to the grid and normalize each. */
+function snapSections(sections) {
+  return sections.map((raw) => normalizePolyline(raw.map((p) => ({ x: snap4(p.x), y: snap4(p.y) }))))
+}
+
+/**
+ * The drawn geometry of an edge elk routed: its hops' sections in absolute
+ * coordinates (container offset applied, `reply` hops flipped back), 4px
+ * snapped and normalized exactly as draw() emits them, plus the absolute
+ * rect of the label elk placed on it (null when elk placed none). The one
+ * place this is computed, so layoutOnce()'s manual-label collision check
+ * and draw() can never disagree about where an edge actually runs.
+ */
+function elkEdgeGeometry(meta, laid, abs) {
+  const laidById = new Map((laid.edges || []).map((e) => [e.id, e]))
+  const raw = []
+  let elkLabel = null
+  for (const hopId of meta.hopIds) {
+    const laidEdge = laidById.get(hopId)
+    if (!laidEdge) continue
+    // Every container's absolute offset, the root's included: the root
+    // is at (0,0) straight out of elk, but layoutOnce()'s canvas shift
+    // (see `laidCanvas`) moves it when a hand-placed label hangs past the
+    // canvas edge.
+    const base = abs.get(laidEdge.container || 'root') || { x: 0, y: 0 }
+    for (const sec of laidEdge.sections || []) {
+      const pts = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint].map((p) => ({ x: p.x + base.x, y: p.y + base.y }))
+      raw.push(meta.flip ? pts.reverse() : pts)
+    }
+    if (!meta.hasVia && !meta.manualLabel && meta.raw.label) {
+      for (const lb of laidEdge.labels || []) elkLabel = { x: lb.x + base.x, y: lb.y + base.y, width: lb.width, height: lb.height }
+    }
+  }
+  return { sections: snapSections(raw), elkLabel }
+}
+
+/** The [lo, hi] span (in length units along the segment a->b) of the part
+ * of that axis-aligned segment lying inside `rect`, or null when none. */
+function segmentSpanInside(a, b, rect) {
+  const horiz = a.y === b.y
+  const fixed = horiz ? a.y : a.x
+  const [r1, r2] = horiz ? [rect.y, rect.y + rect.height] : [rect.x, rect.x + rect.width]
+  if (fixed < r1 || fixed > r2) return null
+  const [s1, s2] = horiz ? [rect.x, rect.x + rect.width] : [rect.y, rect.y + rect.height]
+  const from = horiz ? a.x : a.y
+  const to = horiz ? b.x : b.y
+  const len = Math.abs(to - from)
+  // The rect's span in length units measured from `a` along the segment.
+  const t1 = to >= from ? s1 - from : from - s2
+  const t2 = to >= from ? s2 - from : from - s1
+  const lo = Math.max(0, Math.min(len, t1))
+  const hi = Math.max(0, Math.min(len, t2))
+  return hi > lo ? [lo, hi] : null
+}
+
+/**
+ * Where a hand-placed label may go, best candidate first: 4px-snapped
+ * rects centered on points of `sections`. With an explicit `label_at`, or
+ * without any group box to avoid, the single candidate is `label_at`
+ * (default 0.5) of the path's total drawn length — the pre-existing rule
+ * for via / grouped-layer / plain "down" edges. For a manualLabel edge in
+ * a diagram drawn with elk's compound group boxes, 0.5 of the whole path
+ * is a poor default: a path that starts deep inside one group box and
+ * ends deep inside another has its midpoint wherever the two boxes'
+ * paddings happen to balance, often straddling a border. So candidates
+ * are taken instead from the straight pieces of the path between group
+ * border crossings, each wholly outside every group box or wholly inside
+ * one: pieces outside first (the gap between two groups), then by room
+ * to spare (the label's extent along the piece, plus LABEL_CLEARANCE at
+ * each end); within a piece its center first, then 4px steps outward —
+ * and 0.5 of the whole path is the last resort when no piece has enough
+ * room. layoutOnce()'s collision block picks the first candidate that
+ * clears every other edge, node, and group border (see
+ * manualLabelCollides()).
+ *
+ * @returns {{x:number,y:number,width:number,height:number}[]} empty when
+ *   the path has no points to hang the label on
+ */
+function manualLabelCandidates(e, sections, groupBoxes) {
+  if (!sections.length || !sections[0]?.length) return []
+  const lw = Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10
+  const lh = EDGE_LABEL_H
+  const boxAt = (at) => {
+    const pt = pointAtLength(sections, at)
+    return { x: snap4(pt.x - lw / 2), y: snap4(pt.y - lh / 2), width: lw, height: lh }
+  }
+  const total = totalPathLength(sections)
+  const fallback = boxAt(total * (e.label_at ?? 0.5))
+  if (e.label_at !== undefined || !groupBoxes.length) return [fallback]
+
+  // Split every segment at each group border it crosses; each resulting
+  // piece lies wholly outside every group box or wholly inside one. A
+  // piece outside all boxes (the gap between two groups, where a
+  // cross-group edge's label reads best) ranks before any piece inside a
+  // box (an intra-group edge has nothing else); within each class, the
+  // piece with the most room to spare comes first.
+  const pieces = []
+  let acc = 0
+  for (const sec of sections) {
+    for (let i = 1; i < sec.length; i++) {
+      const a = sec[i - 1], b = sec[i]
+      const len = manhattanLen(a, b)
+      const need = (a.y === b.y ? lw : lh) + 2 * LABEL_CLEARANCE
+      const cuts = new Set([0, len])
+      const spans = groupBoxes.map((g) => segmentSpanInside(a, b, g)).filter(Boolean)
+      for (const [lo, hi] of spans) { cuts.add(lo); cuts.add(hi) }
+      const ts = [...cuts].sort((p, q) => p - q)
+      for (let j = 1; j < ts.length; j++) {
+        const lo = ts[j - 1], hi = ts[j]
+        const spare = (hi - lo) - need
+        if (spare < 0) continue
+        const mid = (lo + hi) / 2
+        const inside = spans.some(([slo, shi]) => mid > slo && mid < shi)
+        pieces.push({ inside, spare, center: acc + mid })
+      }
+      acc += len
+    }
+  }
+  pieces.sort((p, q) => (p.inside !== q.inside ? (p.inside ? 1 : -1) : q.spare - p.spare))
+  const candidates = []
+  for (const { spare, center } of pieces) {
+    candidates.push(boxAt(center))
+    for (let step = GRID; step <= spare / 2; step += GRID) candidates.push(boxAt(center - step), boxAt(center + step))
+  }
+  candidates.push(fallback)
+  return candidates
+}
+
+const rectsOverlap = (a, b, margin = 0) => (
+  a.x < b.x + b.width + margin && a.x + a.width > b.x - margin &&
+  a.y < b.y + b.height + margin && a.y + a.height > b.y - margin
+)
+const rectContains = (outer, inner, margin = 0) => (
+  inner.x >= outer.x + margin && inner.x + inner.width <= outer.x + outer.width - margin &&
+  inner.y >= outer.y + margin && inner.y + inner.height <= outer.y + outer.height - margin
+)
+
+/** Euclidean distance between an axis-aligned segment and a rect — the
+ * same interval math verify-diagram.mjs's label-clearance row uses. */
+function segRectDistance(a, b, rect) {
+  const rx1 = rect.x, rx2 = rect.x + rect.width
+  const ry1 = rect.y, ry2 = rect.y + rect.height
+  const xlo = Math.min(a.x, b.x), xhi = Math.max(a.x, b.x)
+  const ylo = Math.min(a.y, b.y), yhi = Math.max(a.y, b.y)
+  const dx = xhi < rx1 ? rx1 - xhi : xlo > rx2 ? xlo - rx2 : 0
+  const dy = yhi < ry1 ? ry1 - yhi : ylo > ry2 ? ylo - ry2 : 0
+  return Math.hypot(dx, dy)
+}
+
+/**
+ * Whether a hand-placed label rect would be rejected: closer than
+ * LABEL_CLEARANCE to any segment of another edge (verify row #2) or to
+ * another edge's label, on top of a node box or a group's header band
+ * (the GROUP_HEADER strip carrying the group's title), or straddling a
+ * group border (overlapping a group box without sitting wholly inside it,
+ * LABEL_BOX_MARGIN either way).
+ */
+function manualLabelCollides(label, { groups, nodes, otherSections, labels = [] }) {
+  for (const sec of otherSections) {
+    for (let i = 1; i < sec.length; i++) if (segRectDistance(sec[i - 1], sec[i], label) < LABEL_CLEARANCE) return true
+  }
+  for (const other of labels) if (rectsOverlap(label, other, LABEL_CLEARANCE)) return true
+  for (const n of nodes) if (rectsOverlap(label, n, LABEL_BOX_MARGIN)) return true
+  for (const g of groups) {
+    if (rectsOverlap(label, { ...g, height: GROUP_HEADER }, LABEL_BOX_MARGIN)) return true
+    if (rectsOverlap(label, g, LABEL_BOX_MARGIN) && !rectContains(g, label, LABEL_BOX_MARGIN)) return true
+  }
+  return false
 }
 
 const LEGEND_PAD = 12

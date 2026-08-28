@@ -991,3 +991,135 @@ test('a hand-placed (via) label still widens the "right" layer gap to fit itself
   assert.equal(out.width, 536)
   assert.equal(out.height, 104)
 })
+
+// --- "down" layer gaps with groups (elk compound-node hierarchy) ----------
+//
+// The chain-long-labels fix above (hand-placed labels in "down") was first
+// scoped to diagrams without groups. acl-overview.yaml / acl-internals.yaml
+// — both end up "down" via renderCheckedBest() — still handed every label
+// to elk, whose label dummy layer sat between every pair of group boxes:
+// 152px gaps (64 + label + 64) between a 164px group and the next, 936px /
+// 972px tall figures. Hand-placing those labels too, with a per-edge
+// fallback to elk when the hand-placed label would collide (another edge,
+// another label, a node, a group's header band, or a group border it
+// would straddle), brings the gap down to 74px.
+
+const GROUP_HEADER = 36
+
+/** Gap along the stacking axis between consecutive group boxes (sorted by y). */
+function groupGapsDown(out, groupIds) {
+  const boxes = groupIds.map((id) => out.layout.boxes.get(id)).sort((a, b) => a.y - b.y)
+  const gaps = []
+  for (let i = 1; i < boxes.length; i++) gaps.push(boxes[i].y - (boxes[i - 1].y + boxes[i - 1].height))
+  return gaps
+}
+
+const overlaps = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+const contains = (outer, inner) => (
+  inner.x >= outer.x && inner.x + inner.width <= outer.x + outer.width &&
+  inner.y >= outer.y && inner.y + inner.height <= outer.y + outer.height
+)
+
+const DOWN_GROUPED = {
+  'acl-overview.yaml': { groups: ['mine', 'acl', 'other'], width: 404, height: 748, before: { gap: 152, height: 936 } },
+  'acl-internals.yaml': { groups: ['sub', 'layer', 'ext'], width: 320, height: 812, before: { gap: 152, height: 972 } },
+}
+
+for (const [name, spec] of Object.entries(DOWN_GROUPED)) {
+  test(`${name} "down" with groups (elk hierarchy): every group-to-group gap is at most 80px (was ${spec.before.gap}px)`, async () => {
+    const out = await renderDiagram({ ...ir(name), direction: 'down' }, { forceElk: true })
+    assert.equal(out.layout.mode, 'elk')
+    const gaps = groupGapsDown(out, spec.groups)
+    assert.equal(gaps.length, spec.groups.length - 1)
+    for (const gap of gaps) assert.ok(gap <= 80, `${name}: group gap ${gap}px > 80px`)
+  })
+
+  test(`${name} "down" with groups: hand-placed labels sit clear of group borders and header bands, inside the canvas`, async () => {
+    const out = await renderDiagram({ ...ir(name), direction: 'down' }, { forceElk: true })
+    const groupsGeo = out.layout.geo.groups
+    for (const e of out.layout.geo.edges) {
+      if (!e.label) continue
+      const l = e.label
+      assert.ok(l.x >= 0 && l.x + l.width <= out.width, `${name}: label "${l.text}" (${l.x}..${l.x + l.width}) leaves the ${out.width}px canvas`)
+      assert.ok(l.y >= 0 && l.y + l.height <= out.height, `${name}: label "${l.text}" leaves the canvas vertically`)
+      for (const g of groupsGeo) {
+        assert.ok(!(overlaps(l, g) && !contains(g, l)), `${name}: label "${l.text}" straddles group "${g.id}"'s border`)
+        assert.ok(!overlaps(l, { ...g, height: GROUP_HEADER }), `${name}: label "${l.text}" sits on group "${g.id}"'s title band`)
+      }
+    }
+  })
+
+  test(`${name} "down" with groups passes all verify-diagram checks and keeps its size (${spec.width}x${spec.height}, was ${spec.before.height}px tall)`, async () => {
+    const parsed = { ...ir(name), direction: 'down' }
+    const out = await renderDiagram(parsed, { forceElk: true })
+    assert.equal(out.width, spec.width, `${name}: width changed`)
+    assert.equal(out.height, spec.height, `${name}: height changed`)
+    const result = await verifyDiagram(parsed, out, { forceElk: true })
+    assert.equal(result.checks.length, 22)
+    assert.deepEqual(result.checks.filter((c) => !c.ok && c.id <= 20), [], `unexpected failures: ${JSON.stringify(result.failures)}`)
+    assert.equal(result.ok, true)
+    // Every group box still contains each of its member nodes.
+    for (const n of out.layout.geo.nodes) {
+      const g = out.layout.geo.groups.find((gg) => gg.id === n.group)
+      assert.ok(g && contains(g, n), `${name}: node "${n.id}" is outside group "${n.group}"`)
+    }
+  })
+}
+
+/** Whether a label rect is centered on one of its own edge's segments —
+ * how a hand-placed label sits (elk's own placement offsets the label
+ * beside the line by its edge-label spacing instead). */
+function labelCenteredOnOwnPath(e) {
+  const cx = e.label.x + e.label.width / 2
+  const cy = e.label.y + e.label.height / 2
+  return e.sections.some((sec) => sec.some((p, i) => {
+    if (i === 0) return false
+    const q = sec[i - 1]
+    if (p.x === q.x) return Math.abs(cx - p.x) <= 2 && cy >= Math.min(p.y, q.y) && cy <= Math.max(p.y, q.y)
+    return Math.abs(cy - p.y) <= 2 && cx >= Math.min(p.x, q.x) && cx <= Math.max(p.x, q.x)
+  }))
+}
+
+test('acl-internals.yaml "down": only the edge whose hand-placed label has no room (adp->fac, a 104px jog for a 103px label) falls back to an elk-placed label', async () => {
+  const out = await renderDiagram({ ...ir('acl-internals.yaml'), direction: 'down' }, { forceElk: true })
+  const placement = out.layout.geo.edges.map((e) => (labelCenteredOnOwnPath(e) ? 'manual' : 'elk'))
+  assert.deepEqual(placement, ['manual', 'manual', 'manual', 'elk', 'manual'])
+})
+
+test('acl-overview.yaml "down": a hand-placed label on a loop-around edge is kept inside the canvas by widening it, not by falling back to elk', async () => {
+  const out = await renderDiagram({ ...ir('acl-overview.yaml'), direction: 'down' }, { forceElk: true })
+  assert.ok(out.layout.geo.edges.every(labelCenteredOnOwnPath), 'every label is hand-placed')
+  // The two loop-around edges (legacy->translator, translator->domain) run
+  // along the canvas's left/right edge; their labels would have hung out
+  // at x=-32 and x=347 on a 292px canvas.
+  const xs = out.layout.geo.edges.map((e) => e.label.x)
+  assert.ok(Math.min(...xs) >= 12)
+  assert.ok(Math.max(...out.layout.geo.edges.map((e) => e.label.x + e.label.width)) <= out.width - 12)
+  const gaps = groupGapsDown(out, ['mine', 'acl', 'other'])
+  assert.deepEqual(gaps, [74, 74])
+})
+
+test('conway.yaml forced to elk (layer: none) laid out "down" still passes every check with hand-placed labels', async () => {
+  // This is the case the ungrouped-only scoping of the first fix was
+  // protecting: one label ("密結合になりがち") lands on a neighbouring edge
+  // when hand-placed and must fall back to elk for that edge only.
+  const parsed = { ...ir('conway.yaml'), direction: 'down' }
+  const out = await renderDiagram(parsed, { forceElk: true })
+  assert.equal(out.layout.mode, 'elk')
+  const result = await verifyDiagram(parsed, out, { forceElk: true })
+  assert.equal(result.ok, true, JSON.stringify(result.failures))
+  const placement = out.layout.geo.edges.filter((e) => e.label).map((e) => (labelCenteredOnOwnPath(e) ? 'manual' : 'elk'))
+  assert.ok(placement.includes('elk'), 'at least one label fell back to elk')
+  assert.ok(placement.includes('manual'), 'the rest stayed hand-placed')
+})
+
+test('grouped-layer mode "down" has no label-layer bloat to fix: group.yaml / conway.yaml gaps stay at 48px', async () => {
+  // In grouped-layer mode no label is ever handed to elk, so the
+  // node-to-node spacing (64 + GROUP_HEADER) minus the boxes' own
+  // header/padding is what separates consecutive group boxes.
+  for (const [name, groups] of [['groups.yaml', ['browser', 'server']], ['conway.yaml', ['org', 'sys']]]) {
+    const out = await renderDiagram({ ...ir(name), direction: 'down' })
+    assert.equal(out.layout.mode, 'group')
+    assert.deepEqual(groupGapsDown(out, groups), [48], name)
+  }
+})
