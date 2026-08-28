@@ -227,7 +227,7 @@ function renderIndexHtml(records) {
   const kindCounts = new Map()
   const folderCounts = new Map()
   for (const r of records) {
-    const k = r.kind || 'legacy'
+    const k = r.kind || (r.legacy ? 'legacy' : '未分類')
     kindCounts.set(k, (kindCounts.get(k) || 0) + 1)
     if (r.folder) folderCounts.set(r.folder, (folderCounts.get(r.folder) || 0) + 1)
   }
@@ -240,7 +240,7 @@ function renderIndexHtml(records) {
   const folderChips = folders.map((f) => chip('folder', f, folderCounts.get(f))).join('')
 
   const rows = records.map((r) => {
-    const kindKey = r.kind || 'legacy'
+    const kindKey = r.kind || (r.legacy ? 'legacy' : '未分類')
     const checksSummary = Object.entries(r.checks).map(([k, v]) => `${k}=${v}`).join('; ') || '—'
     const hasFail = Object.values(r.checks).includes('fail')
     const href = escapeHtml(r.path)
