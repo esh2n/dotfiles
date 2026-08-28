@@ -66,11 +66,25 @@ dotfiles/
 └── specs/         # Architecture documentation
 ```
 
+## Quick Commands
+
+Every day-to-day entry point is a `make` target (the `Makefile` only dispatches
+to the scripts below; it holds no logic of its own). Run `make` with no
+arguments to print the list:
+
+```bash
+make            # list targets
+make update     # after editing packages/configs: nix build → activate → link → yoki-switch
+make claude     # only ~/.claude changed (packs, hooks, skills): yoki-switch apply
+make link       # only symlinks
+make template   # only .template regeneration
+```
+
 ## Installation
 
 ```bash
 cd dotfiles
-./core/install/installer.sh
+make install    # = ./core/install/installer.sh
 ```
 
 ### Options
@@ -120,20 +134,15 @@ All packages are managed via Nix flake. Priority order:
 After modifying package configurations, apply changes with:
 
 ```bash
-# Quick update after package changes
-./core/nix/update.sh
-
-# Complete rebuild (slower but thorough)
-./core/nix/update.sh --rebuild
-
-# Update after adding npm packages
-./core/nix/update.sh --node2nix
+make update     # ./core/nix/update.sh — quick update after package changes
+make rebuild    # ./core/nix/update.sh --rebuild — complete rebuild (slower but thorough)
+make node2nix   # ./core/nix/update.sh --node2nix — after adding npm packages
 ```
 
 #### Adding NPM Packages via node2nix
 
 1. Edit `domains/dev/packages/node2nix/package.json`
-2. Run update script: `./core/nix/update.sh --node2nix`
+2. Run update script: `make node2nix`
 3. The script will regenerate and apply changes
 
 Example adding a package:
@@ -149,11 +158,8 @@ Example adding a package:
 ### Symlink Management
 
 ```bash
-# Re-apply symlinks
-./core/config/manager.sh link
-
-# Process templates
-./core/config/manager.sh template
+make link       # ./core/config/manager.sh link — re-apply symlinks
+make template   # ./core/config/manager.sh template — process templates
 ```
 
 ### Template System
