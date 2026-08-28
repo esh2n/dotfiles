@@ -40,6 +40,10 @@ it does not add new rules.
   edits a page's own bytes (`bin/lib/favicon.mjs`). `index.html` gets a
   distinct three-bar mark instead of a kind glyph. Page authors never
   write or edit this href by hand.
+- Every `.wu-code`/`.wu-diff` block whose `<code>` content has no `wu-tok-`
+  spans yet is syntax-highlighted in place by `build` (`bin/lib/highlight.mjs`),
+  which sets `data-hl="1"` on the `<pre>` — the fourth and last place `build`
+  edits a page's own bytes; a block already highlighted is left untouched.
 - writeup runs `git add <page> && git commit -m "<kind>: <title>"` on every
   save. Generated artifacts (`manifest.json`, `index.html`, `_kit/`) go into
   the same commit.

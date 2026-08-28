@@ -197,11 +197,16 @@ edges:
 
 <section class="wu-section" id="code">
 <h2>設定の型</h2>
-<pre class="wu-code" data-lang="ts"><code>interface RetryPolicy {
-  maxAttempts: number
-  initialDelayMs: number
-  backoffFactor: number
-  idempotencyKeyHeader: string
+<pre class="wu-code" data-lang="go"><code>// RetryPolicy controls the upload client's retry behavior.
+type RetryPolicy struct {
+	MaxAttempts         int
+	InitialDelayMs      int
+	BackoffFactor       float64
+	IdempotencyKeyHeader string
+}
+
+func DefaultRetryPolicy() RetryPolicy {
+	return RetryPolicy{MaxAttempts: 5, InitialDelayMs: 1000, BackoffFactor: 2}
 }</code></pre>
 </section>
 <p>メモ: wu-code &mdash; 使うとき: DDL・型・設定／使わないとき: 見出し代わり。</p>

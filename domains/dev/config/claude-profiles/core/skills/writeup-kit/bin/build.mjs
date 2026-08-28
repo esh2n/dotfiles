@@ -3,7 +3,7 @@
 // from every page's `<head>` meta, and syncs the kit's CSS into
 // `<store>/_kit/writeup.css` (contract §1, §1-3). Zero-dependency.
 //
-// The three places build.mjs edits a page's own bytes (page-contract.md §1):
+// The four places build.mjs edits a page's own bytes (page-contract.md §1):
 // (1) when a page's `<head>` lacks `<meta name="id">`, build inserts the
 // computed id right after `<meta name="date">` (idempotent — only when the
 // meta is missing; see `insertIdMeta`/`buildPageRecord`); (2) `.wu-header`'s
@@ -15,8 +15,14 @@
 // status favicon `<link rel="icon">` is upserted from the page's `kind` and
 // `checks` meta, right after `<meta name="checks">` when present, else
 // right before the stylesheet `<link>` (idempotent — replaced only when its
-// href would differ; see `ensureFavicon`/`bin/lib/favicon.mjs`). Nothing
-// else about a page is ever rewritten by build — `<meta name="updated">` in
+// href would differ; see `ensureFavicon`/`bin/lib/favicon.mjs`); (4) every
+// `<pre class="wu-code">`/`<pre class="wu-diff">` block whose `<code>`
+// content has no `wu-tok-` spans yet gets syntax-highlighted in place —
+// the existing (HTML-escaped) text is decoded, run through
+// `bin/lib/highlight.mjs`'s `highlight(code, lang)`, and written back with
+// `data-hl="1"` set on the `<pre>` (idempotent — a block already carrying
+// `wu-tok-` spans is left untouched; see `ensureHighlighted`). Nothing else
+// about a page is ever rewritten by build — `<meta name="updated">` in
 // particular is read, not patched, even when the manifest fills in a
 // synthesized time-of-day.
 
@@ -25,8 +31,9 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, relative, sep } from 'node:path'
 import { resolveStoreDir, pageId, isGitRepo, gitLastCommitDatetime } from './lib/store.mjs'
-import { parseHtml, headMeta, titleText } from './lib/html.mjs'
+import { parseHtml, headMeta, titleText, decodeEntities } from './lib/html.mjs'
 import { faviconDataUri, statusFromChecks } from './lib/favicon.mjs'
+import { highlight } from './lib/highlight.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_CSS_PATH = join(HERE, '..', 'kit', 'writeup.css')
@@ -239,15 +246,52 @@ function ensureFavicon(text, dataUri) {
   return text.slice(0, headClose) + tag + '\n' + text.slice(headClose)
 }
 
+const PRE_BLOCK_RE = /<pre\b([^>]*)>([\s\S]*?)<\/pre>/g
+const CODE_WRAP_RE = /^(\s*)<code\b([^>]*)>([\s\S]*?)<\/code>(\s*)$/
+
+function attrValue(attrsStr, name) {
+  const m = new RegExp(`\\b${name}="([^"]*)"`).exec(attrsStr)
+  return m ? m[1] : null
+}
+
+/**
+ * Syntax-highlights every `.wu-code`/`.wu-diff` block whose `<code>` content
+ * has no `wu-tok-` spans yet (page-contract.md §5, `bin/lib/highlight.mjs`).
+ * Decodes the block's existing (HTML-escaped) text, re-renders it through
+ * `highlight(code, lang)`, and marks the `<pre>` with `data-hl="1"`. The
+ * fourth and last place build.mjs edits a page's own bytes — see the module
+ * docstring. Idempotent: a block already containing `wu-tok-` spans (or one
+ * whose shape this regex doesn't recognize) is returned unchanged, never
+ * throws.
+ */
+function ensureHighlighted(text) {
+  return text.replace(PRE_BLOCK_RE, (whole, attrsStr, innerHtml) => {
+    const classes = (attrValue(attrsStr, 'class') || '').split(/\s+/).filter(Boolean)
+    const isDiff = classes.includes('wu-diff')
+    if (!isDiff && !classes.includes('wu-code')) return whole
+    if (innerHtml.includes('wu-tok-')) return whole
+    const codeMatch = CODE_WRAP_RE.exec(innerHtml)
+    if (!codeMatch) return whole
+    const [, ws1, codeAttrs, codeInner, ws2] = codeMatch
+    const lang = isDiff ? 'diff' : (attrValue(attrsStr, 'data-lang') || '')
+    const decoded = decodeEntities(codeInner)
+    const highlighted = highlight(decoded, lang)
+    const newAttrsStr = attrValue(attrsStr, 'data-hl') !== null ? attrsStr : `${attrsStr} data-hl="1"`
+    return `<pre${newAttrsStr}>${ws1}<code${codeAttrs}>${highlighted}</code>${ws2}</pre>`
+  })
+}
+
 /**
  * Builds one manifest record for `relPath`. When the page's `<head>` lacks
  * `<meta name="id">` and `check` is false, inserts the computed id into the
  * file on disk (idempotent: only when missing) — see `insertIdMeta`. Also
  * ensures `.wu-header`'s back-to-index nav href is correct — see
- * `ensureBackNav` — and that the status favicon link reflects this page's
- * current `kind`/`checks` — see `ensureFavicon`. The mtime used for
- * `updated`'s time-of-day fallback is read *before* any edit, so
- * housekeeping itself never bumps a page's `updated`.
+ * `ensureBackNav` — that the status favicon link reflects this page's
+ * current `kind`/`checks` — see `ensureFavicon` — and that every
+ * `.wu-code`/`.wu-diff` block is syntax-highlighted — see
+ * `ensureHighlighted`. The mtime used for `updated`'s time-of-day fallback
+ * is read *before* any edit, so housekeeping itself never bumps a page's
+ * `updated`.
  */
 function buildPageRecord(storeDir, relPath, { check } = {}) {
   const fullPath = join(storeDir, ...relPath.split('/'))
@@ -260,6 +304,7 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
   let metaInserted = false
   let navFixed = false
   let faviconFixed = false
+  let highlightFixed = false
   if (meta.id === undefined) {
     metaInserted = true
     if (!check) text = insertIdMeta(text, id)
@@ -276,7 +321,12 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     faviconFixed = true
     if (!check) text = faviconFixedText
   }
-  if ((metaInserted || navFixed || faviconFixed) && !check) {
+  const highlightedText = ensureHighlighted(text)
+  if (highlightedText !== text) {
+    highlightFixed = true
+    if (!check) text = highlightedText
+  }
+  if ((metaInserted || navFixed || faviconFixed || highlightFixed) && !check) {
     writeFileSync(fullPath, text)
     buf = Buffer.from(text, 'utf8')
     root = parseHtml(text)
@@ -311,7 +361,7 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     bytes: buf.length,
     legacy: relPath.startsWith('legacy/'),
   }
-  return { record, metaInserted, navFixed, faviconFixed }
+  return { record, metaInserted, navFixed, faviconFixed, highlightFixed }
 }
 
 function sortManifest(records) {
@@ -690,7 +740,7 @@ export function buildStore(storeDir, { check = false } = {}) {
 
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
   const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check }))
-  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed)
+  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.highlightFixed)
   const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'
   const manifestPath = join(storeDir, 'manifest.json')

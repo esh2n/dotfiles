@@ -791,3 +791,92 @@ _t2('build: headless page meta is read and id insertion stays idempotent', async
   const rec = (Array.isArray(manifest) ? manifest : (manifest.pages || manifest.entries)).find((r) => r.path.endsWith('headless.html'))
   assert2.equal(rec.kind, '設計')
 })
+
+describe('buildStore(): syntax highlighting of .wu-code / .wu-diff', () => {
+  function pageWithBlocks({ code, diff }) {
+    return '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<title>Highlight fixture</title>\n' +
+      '<meta name="description" content="d">\n<meta name="kind" content="設計">\n<meta name="date" content="2026-08-28">\n' +
+      '<meta name="checks" content="lint=pass;self-check=pass">\n<link rel="stylesheet" href="../_kit/writeup.css">\n</head>\n<body>\n' +
+      '<div class="wu-page">\n<header class="wu-header"><h1>Highlight fixture</h1></header>\n<main>\n<section class="wu-section">\n<h2>code</h2>\n' +
+      code + '\n' + diff + '\n</section>\n</main>\n</body>\n</html>\n'
+  }
+
+  function freshHighlightStore() {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-hl-'))
+    mkdirSync(join(dir, 'notes'), { recursive: true })
+    const page = join(dir, 'notes', '2026-08-28-highlight.html')
+    const codeBlock = '<pre class="wu-code" data-lang="go"><code>func Greet(name string) string {\n\treturn "Hello, " + name + "! &lt;3"\n}</code></pre>'
+    const diffBlock = '<pre class="wu-diff" data-lang="diff"><code> ctx\n-old\n+new</code></pre>'
+    writeFileSync(page, pageWithBlocks({ code: codeBlock, diff: diffBlock }))
+    return { dir, page }
+  }
+
+  test('build wraps .wu-code content in wu-tok- spans and marks the <pre> data-hl="1"', () => {
+    const { page } = freshHighlightStore()
+    buildStore(dirname(page).replace(/\/notes$/, ''))
+    const html = readFileSync(page, 'utf8')
+    assert.match(html, /<pre class="wu-code" data-lang="go" data-hl="1">/)
+    assert.ok(html.includes('wu-tok-kw'), html)
+    assert.ok(html.includes('wu-tok-str'), html)
+  })
+
+  test('build wraps .wu-diff content in wu-tok-add/wu-tok-del spans and marks data-hl="1"', () => {
+    const { page } = freshHighlightStore()
+    buildStore(dirname(page).replace(/\/notes$/, ''))
+    const html = readFileSync(page, 'utf8')
+    assert.match(html, /<pre class="wu-diff" data-lang="diff" data-hl="1">/)
+    assert.ok(html.includes('wu-tok-add'), html)
+    assert.ok(html.includes('wu-tok-del'), html)
+  })
+
+  test('a "<" already escaped in the source is preserved (not double-escaped) through highlighting', () => {
+    const { page } = freshHighlightStore()
+    buildStore(dirname(page).replace(/\/notes$/, ''))
+    const html = readFileSync(page, 'utf8')
+    assert.ok(html.includes('&lt;3'), html)
+    assert.ok(!html.includes('&amp;lt;3'), html)
+  })
+
+  test('idempotent: a second build does not re-wrap already-highlighted spans', () => {
+    const { page } = freshHighlightStore()
+    const store = dirname(page).replace(/\/notes$/, '')
+    buildStore(store)
+    const afterFirst = readFileSync(page, 'utf8')
+    buildStore(store)
+    const afterSecond = readFileSync(page, 'utf8')
+    assert.equal(afterSecond, afterFirst)
+    // no nested/doubled spans: every open wu-tok- span has exactly one matching close in sequence
+    const opens = (afterFirst.match(/<span class="wu-tok-/g) || []).length
+    const closes = (afterFirst.match(/<\/span>/g) || []).length
+    assert.equal(opens, closes)
+    assert.equal((afterFirst.match(/data-hl="1"/g) || []).length, 2)
+  })
+
+  test('a block that already carries wu-tok- spans (pre-highlighted) is left untouched', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-hl-pre-'))
+    mkdirSync(join(dir, 'notes'), { recursive: true })
+    const page = join(dir, 'notes', '2026-08-28-pre.html')
+    const already = '<pre class="wu-code" data-lang="go" data-hl="1"><code><span class="wu-tok-kw">func</span> x() {}</code></pre>'
+    writeFileSync(page, pageWithBlocks({ code: already, diff: '<pre class="wu-diff" data-lang="diff"><code> ctx</code></pre>' }))
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.equal((html.match(/wu-tok-kw/g) || []).length, 1)
+  })
+
+  test('--check reports pagesChanged: true for a page with an un-highlighted .wu-code block, without writing it', () => {
+    const { page } = freshHighlightStore()
+    const store = dirname(page).replace(/\/notes$/, '')
+    const before = readFileSync(page, 'utf8')
+    const result = buildStore(store, { check: true })
+    assert.equal(readFileSync(page, 'utf8'), before)
+    assert.equal(result.pagesChanged, true)
+  })
+
+  test('a highlighted page still passes self-check\'s markdown-convertibility row (wu-tok-* spans are not flagged)', () => {
+    const { page } = freshHighlightStore()
+    const store = dirname(page).replace(/\/notes$/, '')
+    buildStore(store)
+    const result = runSelfCheck(page)
+    assert.ok(!result.warnings.some((w) => w.item === 'markdown-convertibility' && w.detail.includes('wu-tok-')), JSON.stringify(result.warnings))
+  })
+})

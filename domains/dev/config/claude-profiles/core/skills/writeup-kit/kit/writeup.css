@@ -740,6 +740,55 @@ hr {
 }
 
 /* ---------------------------------------------------------------
+   .wu-tok-* — syntax-highlighting token spans, produced by
+   bin/lib/highlight.mjs inside .wu-code/.wu-diff. Two-color rule:
+   only --wu-accent (string) reads as chromatic emphasis; everything
+   else distinguishes itself by weight, the neutral ink scale, or a
+   non-chromatic text decoration, so a page stays legible even when
+   printed or read without color.
+--------------------------------------------------------------- */
+.wu-tok-kw {
+  font-weight: 700;
+}
+
+.wu-tok-str {
+  color: var(--wu-accent);
+}
+
+.wu-tok-cmt {
+  color: var(--wu-ink-3);
+  font-style: normal;
+}
+
+.wu-tok-num {
+  color: var(--wu-ink-2);
+}
+
+.wu-tok-fn {
+  color: var(--wu-ink);
+}
+
+.wu-tok-type {
+  color: var(--wu-ink-2);
+  font-weight: 700;
+}
+
+.wu-tok-op {
+  color: var(--wu-ink-2);
+}
+
+.wu-tok-add {
+  display: block;
+  background: var(--wu-rule-soft);
+}
+
+.wu-tok-del {
+  display: block;
+  text-decoration: line-through;
+  color: var(--wu-ink-3);
+}
+
+/* ---------------------------------------------------------------
    .wu-chip — parallel classification labels (3-6)
 --------------------------------------------------------------- */
 .wu-chip {

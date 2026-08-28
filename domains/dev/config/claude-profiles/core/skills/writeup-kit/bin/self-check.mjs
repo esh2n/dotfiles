@@ -509,7 +509,11 @@ function checkMarkdownConvertibility(root, add) {
       add('warn', 'markdown-convertibility', `<${n.tag}> is outside the §7 HTML→Markdown mapping`)
       continue
     }
-    const unmappedClasses = classList(n).filter((c) => c.startsWith('wu-') && !MD_MAPPED_CLASSES.has(c))
+    // wu-tok-* (bin/lib/highlight.mjs's token spans inside .wu-code/.wu-diff)
+    // are covered by the .wu-code/.wu-diff mapping itself — renderCode()
+    // reads the block's textContent, so the token spans it renders are
+    // invisible to Markdown and never need their own §7 row.
+    const unmappedClasses = classList(n).filter((c) => c.startsWith('wu-') && !c.startsWith('wu-tok-') && !MD_MAPPED_CLASSES.has(c))
     if (unmappedClasses.length) {
       add('warn', 'markdown-convertibility', `<${n.tag}> class not in the §7 mapping: ${unmappedClasses.join(', ')}`)
     }

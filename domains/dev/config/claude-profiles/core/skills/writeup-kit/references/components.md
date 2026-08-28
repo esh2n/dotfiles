@@ -212,6 +212,13 @@ list.
 <pre class="wu-code" data-lang="sql"><code>SELECT 1;</code></pre>
 ```
 
+Author `<code>` plain, un-highlighted, as above — `build` syntax-highlights it
+in place (`bin/lib/highlight.mjs`: go, ts/tsx/js/jsx, sql, yaml, json,
+bash/sh, python, toml, html, diff, or a plain-text no-op for any other
+`data-lang`), wrapping tokens in `<span class="wu-tok-*">` and marking the
+`<pre>` `data-hl="1"`; a block already carrying `wu-tok-` spans is left
+untouched, so re-running `build` never re-wraps it.
+
 ### `.wu-diff` (pre with `data-lang="diff"`)
 
 ```html
