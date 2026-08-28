@@ -317,8 +317,7 @@ hr {
   margin: var(--wu-sp-5) 0;
   padding: var(--wu-sp-4) var(--wu-sp-5);
   border: var(--wu-bw-1) solid var(--wu-rule);
-  border-left: var(--wu-bw-3) solid var(--wu-ink);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-surface);
 }
 
@@ -333,7 +332,7 @@ hr {
   margin: var(--wu-sp-5) 0;
   padding: var(--wu-sp-4);
   border: var(--wu-bw-1) solid var(--wu-rule);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-surface);
 }
 
@@ -409,7 +408,7 @@ hr {
   margin: var(--wu-sp-4) 0;
   padding: var(--wu-sp-3) var(--wu-sp-4);
   border: var(--wu-bw-1) solid var(--wu-rule);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-surface);
 }
 
@@ -430,17 +429,16 @@ hr {
 }
 
 .wu-callout[data-tone="note"] {
-  border-left: var(--wu-bw-1) solid var(--wu-ink-3);
+  border-color: var(--wu-rule);
 }
 
 .wu-callout[data-tone="warn"] {
-  border-left: var(--wu-bw-3) solid var(--wu-ink);
+  border-color: var(--wu-ink-3);
   background: var(--wu-rule-soft);
 }
 
 .wu-callout[data-tone="decision"] {
-  border-left: var(--wu-bw-3) solid var(--wu-ink);
-  border-style: solid;
+  border: var(--wu-bw-2) solid var(--wu-ink);
 }
 
 /* self-check warns when three or more .wu-callout run in a row;
@@ -453,8 +451,7 @@ hr {
   margin: var(--wu-sp-5) 0;
   padding: var(--wu-sp-4) var(--wu-sp-5);
   border: var(--wu-bw-1) solid var(--wu-rule);
-  border-left: var(--wu-bw-3) solid var(--wu-ink);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-surface);
 }
 
@@ -489,7 +486,7 @@ hr {
   table-layout: auto;
   margin: var(--wu-sp-4) 0;
   border: var(--wu-bw-1) solid var(--wu-rule);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-surface);
   border-collapse: collapse;
   font-size: var(--wu-fs-2);
@@ -567,7 +564,7 @@ hr {
   padding: var(--wu-sp-4);
   overflow-x: auto;
   border: var(--wu-bw-1) solid var(--wu-rule);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-surface);
 }
 
@@ -625,7 +622,7 @@ hr {
 .wu-quote {
   margin: var(--wu-sp-4) 0;
   padding: var(--wu-sp-3) var(--wu-sp-4);
-  border-left: var(--wu-bw-3) solid var(--wu-rule);
+  border: var(--wu-bw-1) solid var(--wu-rule);
   background: var(--wu-surface);
 }
 
@@ -657,7 +654,7 @@ hr {
   margin: var(--wu-sp-4) 0;
   padding: var(--wu-sp-5) var(--wu-sp-4) var(--wu-sp-4);
   overflow-x: auto;
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-rule-soft);
   font-family: var(--wu-font-mono);
   font-size: var(--wu-fs-2);
@@ -690,8 +687,7 @@ hr {
   margin: var(--wu-sp-4) 0;
   padding: var(--wu-sp-5) var(--wu-sp-4) var(--wu-sp-4);
   overflow-x: auto;
-  border-left: var(--wu-bw-3) solid var(--wu-ink-3);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
   background: var(--wu-rule-soft);
   font-family: var(--wu-font-mono);
   font-size: var(--wu-fs-2);
@@ -760,7 +756,7 @@ hr {
   margin: var(--wu-sp-5) 0;
   padding: var(--wu-sp-4) var(--wu-sp-5);
   border: var(--wu-bw-2) dashed var(--wu-rule);
-  border-radius: var(--wu-radius-2);
+  border-radius: 0;
 }
 
 .wu-open ul,
