@@ -239,3 +239,15 @@ edges: []
   hex inversion.
 - [ ] Horizontal scroll is contained inside `.wu-table`, `.wu-figure`, and
   `.wu-code` only. Body text wraps at 68ch — it never scrolls horizontally.
+
+### `.wu-scroll`
+
+Scroll container for the rare table (or figure) wider than the column. Wrap
+the element; the page body never scrolls sideways. Tables inside keep their
+natural width instead of stretching to 100%.
+
+```html
+<div class="wu-scroll">
+  <table class="wu-table">…</table>
+</div>
+```

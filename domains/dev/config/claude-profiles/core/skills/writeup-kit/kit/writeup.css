@@ -484,8 +484,9 @@ hr {
 --------------------------------------------------------------- */
 .wu-compare,
 .wu-table {
-  display: block;
-  overflow-x: auto;
+  display: table;
+  width: 100%;
+  table-layout: auto;
   margin: var(--wu-sp-4) 0;
   border: var(--wu-bw-1) solid var(--wu-rule);
   border-radius: var(--wu-radius-2);
@@ -494,14 +495,6 @@ hr {
   font-size: var(--wu-fs-2);
 }
 
-.wu-compare tbody,
-.wu-compare thead,
-.wu-compare tr,
-.wu-table tbody,
-.wu-table thead,
-.wu-table tr {
-  width: 100%;
-}
 
 .wu-compare th,
 .wu-compare td,
@@ -853,4 +846,17 @@ hr {
 .wu-table td.n,
 .wu-compare td.n {
   white-space: nowrap;
+}
+
+/* scroll container for the rare table or figure that is wider than the
+   column; wrap the element in it instead of letting the body scroll */
+.wu-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: var(--wu-sp-4) 0;
+}
+.wu-scroll > .wu-table,
+.wu-scroll > .wu-compare {
+  margin: 0;
+  min-width: max-content;
 }
