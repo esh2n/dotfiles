@@ -4,8 +4,8 @@
 //   node decision-page.mjs <decisions.md> --out <page.html>
 // 書き出し後、writeup-kit の bin/self-check.mjs --write-meta を実行して結果を出す。
 // writeup-kit 必須（ページ意匠そのものが kit のものなので、フォールバックはない）。
-import { readFile, writeFile } from 'node:fs/promises'
-import { resolve, join } from 'node:path'
+import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { resolve, join, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { realpathSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -322,6 +322,7 @@ export async function main(argv) {
     return 3
   }
   const outPath = resolve(args.out)
+  await mkdir(dirname(outPath), { recursive: true })
   await writeFile(outPath, html, 'utf8')
   console.log(outPath)
 
