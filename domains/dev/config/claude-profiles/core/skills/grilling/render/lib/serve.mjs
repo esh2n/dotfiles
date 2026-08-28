@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { spawn } from 'node:child_process'
-import { STATE_SLOT } from './html.mjs'
+import { STATE_SLOT, TITLE_PREFIX_SLOT, FAVICON_SLOT, progressPrefix, faviconState, faviconHref } from './html.mjs'
 
 const MAX_BODY = 64 * 1024
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
@@ -95,8 +95,12 @@ export async function serveRound(o) {
     if (!LOOPBACK_HOST.test(String(req.headers.host || ''))) return send(res, 403, 'forbidden')
 
     if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-      // GET のたびに提出済みの問い id を差し込む。再読込しても提出済み数が戻らない。
-      const page = html.split(STATE_SLOT).join(JSON.stringify([...answers.keys()]))
+      // GET のたびに提出済みの問い id / タイトルの進捗接頭辞 / favicon を差し込む。
+      // 再読込しても提出済み数（と、それに連動する表示）が戻らない。
+      const page = html
+        .split(STATE_SLOT).join(JSON.stringify([...answers.keys()]))
+        .split(TITLE_PREFIX_SLOT).join(progressPrefix(answers.size, total))
+        .split(FAVICON_SLOT).join(faviconHref(faviconState(answers.size, total)))
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
       return void res.end(page)
     }

@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { request as httpRequest } from 'node:http'
 import { parseRound } from '../lib/parse.mjs'
-import { renderPage, STATE_SLOT } from '../lib/html.mjs'
+import { renderPage, STATE_SLOT, faviconHref } from '../lib/html.mjs'
 import { serveRound, summaryLine } from '../lib/serve.mjs'
 import { parseServeArgs } from '../render.mjs'
 
@@ -222,6 +222,61 @@ test('parseServeArgs: --out / --port / --no-open と、不正な値', () => {
   assert.throws(() => parseServeArgs(['r.md', '--port', '70000']), /--port は 1〜65535/)
   assert.throws(() => parseServeArgs(['r.md', '--zzz']), /未知のオプション/)
   assert.throws(() => parseServeArgs(['a.md', 'b.md']), /入力ファイルは 1 つだけ/)
+})
+
+// --- 回答状況のファビコン / タイトル進捗（serve モード） -------------------
+
+function faviconHrefIn(html) {
+  const m = /<link rel="icon" href="([^"]*)">/.exec(html)
+  return m ? m[1] : null
+}
+
+test('serve: 提出が進むほど GET / のファビコンとタイトルが pending → partial → done と変わる', async () => {
+  await withServer('round-serve.md', async (base) => {
+    const page0 = await (await fetch(base)).text()
+    assert.equal(faviconHrefIn(page0), faviconHref('pending'))
+    assert.match(page0, /<title>\(0\/2\) serve モードのテスト用ラウンド<\/title>/)
+
+    await post(base, { question: 'q1', choice: 'A' })
+    const page1 = await (await fetch(base)).text()
+    assert.equal(faviconHrefIn(page1), faviconHref('partial'))
+    assert.match(page1, /<title>\(1\/2\) serve モードのテスト用ラウンド<\/title>/)
+
+    await post(base, { question: 'q2', choice: 'A' })
+    const page2 = await (await fetch(base)).text()
+    assert.equal(faviconHrefIn(page2), faviconHref('done'))
+    assert.match(page2, /<title>\(done\) serve モードのテスト用ラウンド<\/title>/)
+  })
+})
+
+test('serve: answers.jsonl の読み戻しだけで初回 GET から partial / done になる', async () => {
+  const r = round('round-serve.md')
+  const html = await renderPage(r, { serve: true })
+  const dir = mkdtempSync(join(tmpdir(), 'grilling-serve-'))
+  const outPath = join(dir, 'answers.jsonl')
+  const { writeFileSync } = await import('node:fs')
+  writeFileSync(outPath, [
+    JSON.stringify({ round: 1, slug: 'serve-fixture', question: 'q1', choice: 'A', note: '', ts: '2026-01-01T00:00:00.000Z' }),
+  ].join('\n') + '\n', 'utf8')
+
+  const err = sink()
+  const ac = new AbortController()
+  let ready
+  const url = new Promise((resolve) => { ready = resolve })
+  const exit = serveRound({
+    round: r, html, outPath, port: 0, openBrowser: false, signal: ac.signal,
+    onListening: (u) => ready(u), stdout: sink(), stderr: err,
+  })
+  const base = await url
+  try {
+    const page = await (await fetch(base)).text()
+    assert.equal(faviconHrefIn(page), faviconHref('partial'), '読み戻した q1 の分で partial のはず')
+    assert.match(page, /<title>\(1\/2\) serve モードのテスト用ラウンド<\/title>/)
+    await post(base, { question: 'q2', choice: 'A' })
+  } finally {
+    ac.abort()
+    await exit
+  }
 })
 
 test('summaryLine: 補足の改行は 1 行に潰し、空なら choice だけ', () => {

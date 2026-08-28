@@ -30,6 +30,50 @@ export function escapeHtml(s) {
 
 const SAFE_URL = /^(https?:\/\/|mailto:)/i
 
+// ---------------------------------------------------------------------------
+// 回答状況のファビコン — pending（未回答）/ partial（一部回答）/ done（全回答）を
+// 32x32 の inline SVG (data URI) で出す。絵文字・外部ファイルは使わない。
+// 色は ink (#1c2230) と白の 2 色のみ。
+// ---------------------------------------------------------------------------
+
+const INK = '#1c2230'
+
+const FAVICON_SVG = {
+  pending: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">`
+    + `<circle cx="16" cy="16" r="13" fill="none" stroke="${INK}" stroke-width="2"/></svg>`,
+  partial: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">`
+    + `<clipPath id="g"><circle cx="16" cy="16" r="13"/></clipPath>`
+    + `<rect x="0" y="0" width="16" height="32" fill="${INK}" clip-path="url(#g)"/>`
+    + `<circle cx="16" cy="16" r="13" fill="none" stroke="${INK}" stroke-width="2"/></svg>`,
+  done: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">`
+    + `<circle cx="16" cy="16" r="13" fill="${INK}"/>`
+    + `<polyline points="10,17 14,21 22,11" fill="none" stroke="#ffffff" stroke-width="2.5" `
+    + `stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+}
+
+/** 回答済み数から状態 (pending/partial/done) を決める。 */
+export function faviconState(answered, total) {
+  if (total > 0 && answered >= total) return 'done'
+  return answered > 0 ? 'partial' : 'pending'
+}
+
+/** 状態から data:image/svg+xml の href を作る。 */
+export function faviconHref(state) {
+  return `data:image/svg+xml,${encodeURIComponent(FAVICON_SVG[state] || FAVICON_SVG.pending)}`
+}
+
+/** タイトルの先頭に付ける進捗の接頭辞。全回答なら "(done)"、それ以外は "(n/m)"。 */
+export function progressPrefix(answered, total) {
+  return faviconState(answered, total) === 'done' ? '(done)' : `(${answered}/${total})`
+}
+
+// serve モードは POST が来るまで実際の回答数が確定しないので、renderPage の時点では
+// 差し替え用のプレースホルダを埋め込み、serve.mjs が GET のたびに実値へ置き換える
+// （STATE_SLOT と同じやり方）。プレースホルダ自身は escapeHtml を通しても壊れない
+// 文字だけで作る。
+export const FAVICON_SLOT = 'grilling:favicon-slot'
+export const TITLE_PREFIX_SLOT = 'grilling:title-prefix-slot'
+
 /** 行内マークダウンの最小サブセット: `code` / **bold** / [text](url)。 */
 export function mdInline(src) {
   const escaped = escapeHtml(src)
@@ -153,17 +197,29 @@ export async function renderPage(round, opts = {}) {
     ? await renderKitBody({ frontmatter, premise, tree, questions, title, progress, opts, kd })
     : await renderFallbackBody({ frontmatter, premise, tree, questions, title, progress, opts })
 
-  const fullBody = opts.serve ? `${body}\n${serveBlock(frontmatter, questions, Boolean(kd))}` : body
+  const fullBody = opts.serve ? `${body}\n${serveBlock(frontmatter, questions, Boolean(kd), title)}` : body
   const styleTags = await buildStyleTags(kd)
   const fonts = kd ? KIT_FONTS : FONTS
 
   if (opts.fragment) {
+    // fragment は Artifact 公開用。favicon / タイトルの進捗接頭辞は Artifact 側の
+    // 領分なので付けない。
     return `<title>${escapeHtml(title)}</title>\n${fonts}\n${styleTags}\n\n${fullBody}\n`
   }
+
+  // 初期状態の進捗。serve モードは answers.jsonl の読み戻し（serve.mjs）が
+  // 終わるまで確定しないのでプレースホルダを埋め、GET のたびに実値へ置き換える。
+  // 非 serve（単体 HTML）はラウンド文書の `answer:` 行がそのまま正本。
+  const answered = questions.filter((q) => q.answer).length
+  const total = questions.length
+  const titlePrefix = opts.serve ? TITLE_PREFIX_SLOT : progressPrefix(answered, total)
+  const faviconHrefValue = opts.serve ? FAVICON_SLOT : faviconHref(faviconState(answered, total))
+
   const shell = await readFile(join(TEMPLATE_DIR, 'page.html'), 'utf8')
   // $& などの置換パターンを含む見出しでも壊れないよう、すべて関数で差し込む
   return shell
-    .replace('{{TITLE}}', () => escapeHtml(title))
+    .replace('{{TITLE}}', () => escapeHtml(`${titlePrefix} ${title}`))
+    .replace('{{FAVICON}}', () => `<link rel="icon" href="${faviconHrefValue}">`)
     .replace('{{FONTS}}', () => fonts)
     .replace('{{STYLE}}', () => styleTags)
     .replace('{{BODY}}', () => fullBody)
@@ -607,8 +663,10 @@ function jsonInScript(v) {
   return JSON.stringify(v).replace(/</g, '\\u003c')
 }
 
-function serveBlock(frontmatter, questions, usingKit) {
+function serveBlock(frontmatter, questions, usingKit, title) {
   const cfg = jsonInScript({ round: frontmatter.round, slug: frontmatter.slug, total: questions.length })
+  const baseTitle = jsonInScript(title)
+  const icons = jsonInScript(FAVICON_SVG)
   const t = usingKit
     ? { surface: 'var(--wu-surface)', line: 'var(--wu-rule)', ink: 'var(--wu-ink)', ink2: 'var(--wu-ink-2)' }
     : { surface: 'var(--surface)', line: 'var(--line)', ink: 'var(--ink)', ink2: 'var(--ink-2)' }
@@ -622,9 +680,20 @@ function serveBlock(frontmatter, questions, usingKit) {
     + doneRule
   const js = `(function(){
 var G=${cfg};
+var BASE_TITLE=${baseTitle};
+var ICONS=${icons};
 var posted=new Set(${STATE_SLOT});
+function faviconState(n,t){if(t>0&&n>=t)return'done';return n>0?'partial':'pending';}
+function progressPrefix(n,t){return faviconState(n,t)==='done'?'(done)':'('+n+'/'+t+')';}
+function updateHead(){
+  var st=faviconState(posted.size,G.total);
+  var link=document.querySelector('link[rel="icon"]');
+  if(link)link.href='data:image/svg+xml,'+encodeURIComponent(ICONS[st]);
+  document.title=progressPrefix(posted.size,G.total)+' '+BASE_TITLE;
+}
 function bar(){
   var el=document.getElementById('serve-bar');
+  updateHead();
   if(!el)return;
   el.setAttribute('data-done',String(posted.size>=G.total));
   document.getElementById('serve-count').textContent=posted.size+' / '+G.total;

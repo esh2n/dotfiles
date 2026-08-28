@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseRound } from '../lib/parse.mjs'
-import { renderPage, mdInline, mdBlocks, parseAnswer } from '../lib/html.mjs'
+import { renderPage, mdInline, mdBlocks, parseAnswer, faviconState, faviconHref, progressPrefix } from '../lib/html.mjs'
 import { renderDiagram, textWidth, COLUMN, MIN_SCALE } from '../lib/diagram.mjs'
 import { parseArgs } from '../render.mjs'
 
@@ -455,4 +455,77 @@ test('mdBlocks: kit:true では表とコードブロックが wu- クラスに�
 test('mdBlocks: kit を渡さなければ既定のフォールバック出力のまま', () => {
   const table = mdBlocks(['| 案 | 部品 |', '|---|---|', '| A | 増える |'])
   assert.ok(table.startsWith('<div class="scroll"><table class="md">'))
+})
+
+// --- 回答状況のファビコン / タイトル進捗 -----------------------------------
+
+/** html から <link rel="icon" href="..."> の href を 1 つ取り出す。 */
+function faviconHrefIn(html) {
+  const m = /<link rel="icon" href="([^"]*)">/.exec(html)
+  return m ? m[1] : null
+}
+
+/** data:image/svg+xml,... を decode して SVG 文字列に戻す。 */
+function decodeFavicon(href) {
+  assert.ok(href.startsWith('data:image/svg+xml,'), `data URI ではない: ${href}`)
+  return decodeURIComponent(href.slice('data:image/svg+xml,'.length))
+}
+
+test('faviconState: 0 件は pending、一部は partial、全件は done', () => {
+  assert.equal(faviconState(0, 2), 'pending')
+  assert.equal(faviconState(1, 2), 'partial')
+  assert.equal(faviconState(2, 2), 'done')
+})
+
+test('progressPrefix: 全回答なら (done)、それ以外は (n/m)', () => {
+  assert.equal(progressPrefix(0, 2), '(0/2)')
+  assert.equal(progressPrefix(1, 2), '(1/2)')
+  assert.equal(progressPrefix(2, 2), '(done)')
+})
+
+test('faviconHref: 3 状態すべてが妥当な SVG の data URI になる（2 色のみ）', () => {
+  for (const state of ['pending', 'partial', 'done']) {
+    const svg = decodeFavicon(faviconHref(state))
+    assert.ok(svg.includes('<svg'), `${state}: <svg が無い`)
+    assert.ok(svg.includes('viewBox="0 0 32 32"'), `${state}: viewBox が 32x32 でない`)
+    assert.ok(!/[\uD800-\uDFFF]/.test(svg), `${state}: 絵文字（サロゲートペア）が混入している`)
+    const colors = new Set([...svg.matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0].toLowerCase()))
+    assert.ok(colors.size <= 2, `${state}: 色数が 2 を超えている (${[...colors]})`)
+  }
+})
+
+test('未回答 (0/N) のラウンドは pending のファビコンと (0/N) タイトルになる', async () => {
+  const r = round('round-serve.md')
+  const html = await renderPage(r)
+  assert.equal(faviconHrefIn(html), faviconHref('pending'))
+  assert.match(html, /<title>\(0\/2\) serve モードのテスト用ラウンド<\/title>/)
+})
+
+test('全回答済みのラウンドは done のファビコンと (done) タイトルになる', async () => {
+  const r = round('round-example.md')
+  assert.equal(r.questions.filter((q) => q.answer).length, r.questions.length, '前提: fixture が全問回答済み')
+  const html = await renderPage(r)
+  assert.equal(faviconHrefIn(html), faviconHref('done'))
+  assert.match(html, /<title>\(done\) spec\/requirements\.md のセッション保持要件<\/title>/)
+  const svg = decodeFavicon(faviconHrefIn(html))
+  assert.ok(svg.includes('polyline'), 'done はチェックマーク（polyline）を含むはず')
+})
+
+test('一部だけ回答済みのラウンドは partial のファビコンと (n/m) タイトルになる', async () => {
+  // round-example.md は q3 / q4 の 2 問とも answer: 行を持つ。q4 の answer: を落として 1/2 にする。
+  const src = fixture('round-example.md').replace(
+    "\nanswer: A — 即時同期。ただし BroadcastChannel 非対応環境は B にフォールバック\n", '\n',
+  )
+  const r = parseRound(src)
+  assert.equal(r.questions.filter((q) => q.answer).length, 1)
+  const html = await renderPage(r)
+  assert.equal(faviconHrefIn(html), faviconHref('partial'))
+  assert.match(html, /<title>\(1\/2\) spec\/requirements\.md のセッション保持要件<\/title>/)
+})
+
+test('fragment には favicon もタイトルの進捗接頭辞も出ない（Artifact 側の領分）', async () => {
+  const r = round('round-example.md')
+  const frag = await renderPage(r, { fragment: true })
+  assert.ok(!frag.includes('<link rel="icon"'))
+  assert.ok(frag.startsWith(`<title>${r.frontmatter.target}</title>`))
 })
