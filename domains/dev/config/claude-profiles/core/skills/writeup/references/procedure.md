@@ -2,8 +2,82 @@
 
 This expands `SKILL.md`'s 8 steps with the exact CLI output to expect,
 the `.writeup.toml` template, and how the `<meta name="checks">` value
-is composed. All commands below assume `$KIT` and `$STORE` were already
-resolved per `SKILL.md`'s shell snippet.
+is composed. All commands below assume `$KIT` was resolved per
+`SKILL.md`'s shell snippet and `$STORE` was chosen per "Which store".
+
+## Step 0 — which store
+
+Two independent stores are the normal setup: `work` for pages written
+for the day job and `learn` for personal study / personal projects. Each
+is its own git repository with its own `.writeup.toml`, `manifest.json`,
+`index.html` and `_kit/`, so a work page never shows up in the personal
+index (or its publish pre-stage) and vice versa. The registry —
+`~/.local/share/writeup/stores.toml`, or `$WRITEUP_STORES` — names them:
+
+```toml
+default = "learn"
+
+[[store]]
+name = "work"
+path = "work"                                  # relative to the registry's dir, absolute, or ~/...
+cwd_prefixes = ["~/go/github.com/example-org"] # any cwd under one of these → this store
+
+[[store]]
+name = "learn"
+path = "learn"
+```
+
+### `serve.mjs --list-stores` — observed behavior
+
+```
+$ node $KIT/bin/serve.mjs --list-stores
+* work	/Users/me/.local/share/writeup/work	cwd_prefixes=/Users/me/go/github.com/example-org
+  learn	/Users/me/.local/share/writeup/learn	default
+```
+
+`*` marks the store the current directory resolves to. Without a
+registry the output is a single `* legacy	<path>	(no registry: ...)`
+line — the un-split old store, which keeps working unchanged.
+
+The kit's resolution order (`bin/lib/store.mjs` `resolveStoreDir`), the
+same for every CLI that takes `--store`:
+
+1. `--store <dir>`
+2. `--store-name <name>` (serve, publish) — unknown name is an error
+3. `$WRITEUP_STORE`
+4. an existing `.writeup.toml` at or above the current directory
+   (for `publish`, above the page itself)
+5. the registry store whose `cwd_prefixes` covers the current directory
+   (longest prefix wins)
+6. the registry `default`
+7. the legacy single store `~/.local/share/writeup`
+
+The skill's own rule sits on top of 4-7: when the user's request
+clearly says work or learn, that name wins (`--store-name`, or
+`STORE=<that path>`); only otherwise does the `*` line decide.
+
+### Creating and registering stores
+
+```
+node $SELF/scripts/init-store.mjs --name work --cwd-prefix ~/go/github.com/example-org
+node $SELF/scripts/init-store.mjs --name learn --default
+```
+
+`--name` creates `<registry dir>/<name>` (or `--store <dir>`), runs the
+usual store bootstrap (git init, `.writeup.toml`, `_kit/`, build), and
+adds a `[[store]]` entry — never a second one for the same name;
+`--cwd-prefix` (repeatable) is merged into that entry's `cwd_prefixes`,
+`--default` rewrites the registry's `default`. Run with no flags it is
+the legacy single-store bootstrap and does not touch the registry.
+`build`, `rerender-figures` and `self-check` do not take `--store-name`;
+point them at the resolved dir with `--store "$STORE"` instead.
+
+### Serving
+
+`node $KIT/bin/serve.mjs --store-name work` serves one store;
+`node $KIT/bin/serve.mjs --all` starts one listener per registered store
+on consecutive ports (the first store's deterministic port, then +1, …;
+a taken port falls back to a free one) and prints one URL per store.
 
 ## Step 1 — deciding the kind
 
@@ -338,8 +412,11 @@ Covered at the right level of detail already in `SKILL.md` — nothing
 further to add here beyond: `build.mjs`'s observed output is
 `build: N pages (legacy: M) in <store>` followed by
 `build: wrote manifest.json, index.html, _kit/writeup.css`, and it
-accepts `--store <dir>` the same way `self-check`/`publish` do (falls
-back to `$WRITEUP_STORE`, then `~/.local/share/writeup`).
+accepts `--store <dir>` the same way `publish` does (otherwise the
+Step 0 resolution order: `$WRITEUP_STORE`, ancestor `.writeup.toml`,
+registry cwd prefix, registry default, legacy `~/.local/share/writeup`).
+Always pass `--store "$STORE"` so build and commit hit the store chosen
+in Step 0.
 
 
 ## Decision records: one figure per decision

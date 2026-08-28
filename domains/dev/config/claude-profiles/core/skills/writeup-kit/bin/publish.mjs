@@ -16,7 +16,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { basename, dirname, extname, join, relative } from 'node:path'
+import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { runSelfCheck } from './self-check.mjs'
 import { resolveStoreDir, privateWords, cloudflareConfig } from './lib/store.mjs'
 import { parseHtml, headMeta, titleText, textContent, findFirst, tagName } from './lib/html.mjs'
@@ -119,8 +119,11 @@ function wranglerAvailable() {
  * @returns {{ok: true, target: string, output?: string, command?: string, dryRun?: boolean}}
  */
 export function publish(pageFile, opts) {
-  const { to, out, store, dryRun = false, deploy = false } = opts
-  const storeDir = resolveStoreDir(store)
+  const { to, out, store, storeName, dryRun = false, deploy = false } = opts
+  // The page's own store (an ancestor `.writeup.toml`) wins over the
+  // registry's cwd/default pick, so a page in `work/` is checked against
+  // `work/.writeup.toml`'s private words even when run from elsewhere.
+  const storeDir = resolveStoreDir(store, { name: storeName, cwd: dirname(resolve(pageFile)) })
 
   if (!['file', 'artifact', 'cloudflare'].includes(to)) {
     throw new PublishError(2, `unknown --to target: ${to}`)
@@ -214,13 +217,14 @@ function publishToCloudflare(staged, pageFile, storeDir, { deploy }) {
 // --- CLI --------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { file: null, to: null, out: null, store: null, dryRun: false, deploy: false }
+  const args = { file: null, to: null, out: null, store: null, storeName: null, dryRun: false, deploy: false }
   const positional = []
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--to') args.to = argv[++i]
     else if (a === '--out') args.out = argv[++i]
     else if (a === '--store') args.store = argv[++i]
+    else if (a === '--store-name') args.storeName = argv[++i]
     else if (a === '--dry-run') args.dryRun = true
     else if (a === '--deploy') args.deploy = true
     else positional.push(a)
@@ -232,7 +236,7 @@ function parseArgs(argv) {
 function main() {
   const args = parseArgs(process.argv.slice(2))
   if (!args.file || !args.to) {
-    console.error('usage: node bin/publish.mjs <page.html> --to artifact|cloudflare|file [--out path] [--store dir] [--dry-run] [--deploy]')
+    console.error('usage: node bin/publish.mjs <page.html> --to artifact|cloudflare|file [--out path] [--store dir | --store-name name] [--dry-run] [--deploy]')
     return 2
   }
   try {

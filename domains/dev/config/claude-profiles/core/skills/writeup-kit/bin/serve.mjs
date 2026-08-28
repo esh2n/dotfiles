@@ -10,6 +10,12 @@
 // `/id/<8-hex-id>` redirects (302) to a page's path via manifest.json, so a
 // user (or another skill) can say "id 9f3a1c2d を開いて" without knowing the
 // page's folder/slug.
+//
+// Stores: `--store <dir>` / `--store-name <name>` pick one store (see
+// lib/store.mjs for the resolution order); `--all` starts one listener per
+// registered store on consecutive ports and prints one URL per store;
+// `--list-stores` prints the registry (and which store the current
+// directory resolves to) without serving anything.
 
 import { createServer } from 'node:http'
 import { createHash } from 'node:crypto'
@@ -17,7 +23,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveStoreDir, readManifest } from './lib/store.mjs'
+import { resolveStoreDir, explainStoreDir, listStores, readRegistry, readManifest } from './lib/store.mjs'
 import { buildStore } from './build.mjs'
 
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
@@ -47,6 +53,40 @@ export function portForStore(storeDir) {
   const digest = createHash('sha256').update(resolve(storeDir)).digest()
   const n = digest.readUInt32BE(0)
   return PORT_RANGE_START + (n % PORT_RANGE_SIZE)
+}
+
+/** Ports for serving `stores` together: `basePort` (default: the port
+ * derived from the first store's path) and then consecutive ports, kept
+ * inside the deterministic range. Pure — nothing is bound here. */
+export function planAllPorts(stores, basePort) {
+  if (!stores.length) return []
+  const base = basePort ?? portForStore(stores[0].path)
+  return stores.map((s, i) => ({
+    name: s.name,
+    path: s.path,
+    port: PORT_RANGE_START + ((base - PORT_RANGE_START + i) % PORT_RANGE_SIZE),
+  }))
+}
+
+/** Lines for `--list-stores`: one per registered store as
+ * `<mark> <name>\t<path>\t<flags>` where `mark` is `*` for the store the
+ * current directory resolves to and ` ` otherwise, and `flags` lists
+ * `default` and any `cwd_prefixes`. Without a registry the single legacy
+ * store is listed as `* legacy\t<path>\t(no registry)`. Pure — exported
+ * so the format can be tested without spawning the CLI. */
+export function formatStoreList({ cwd = process.cwd() } = {}) {
+  const registry = readRegistry()
+  const picked = explainStoreDir(null, { cwd })
+  if (!registry.stores.length) {
+    return [`* legacy\t${picked.dir}\t(no registry: ${registry.path})`]
+  }
+  return registry.stores.map((s) => {
+    const mark = resolve(s.path) === resolve(picked.dir) ? '*' : ' '
+    const flags = []
+    if (s.isDefault) flags.push('default')
+    if (s.cwdPrefixes.length) flags.push(`cwd_prefixes=${s.cwdPrefixes.join(',')}`)
+    return `${mark} ${s.name}\t${s.path}\t${flags.join(' ')}`.trimEnd()
+  })
 }
 
 /** Resolves a URL path against `root`, refusing to leave it. Returns null
@@ -286,36 +326,83 @@ export async function startServer(storeDir, { port, fallbackToFreePort = true } 
 
 // --- CLI --------------------------------------------------------------------
 
-function parseArgs(argv) {
-  const args = { store: null, port: null, open: true, build: true }
+const USAGE = 'usage: node bin/serve.mjs [--store dir | --store-name name | --all] [--port n] [--no-open] [--no-build] [--list-stores]'
+
+export function parseArgs(argv) {
+  const args = { store: null, storeName: null, all: false, listStores: false, port: null, open: true, build: true }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--store') args.store = argv[++i]
+    else if (a === '--store-name') args.storeName = argv[++i]
+    else if (a === '--all') args.all = true
+    else if (a === '--list-stores') args.listStores = true
     else if (a === '--port') args.port = Number(argv[++i])
     else if (a === '--no-open') args.open = false
     else if (a === '--no-build') args.build = false
+    else if (a === '--help' || a === '-h') args.help = true
+    else throw new Error(`unknown argument: ${a}\n${USAGE}`)
+  }
+  if ((args.store ? 1 : 0) + (args.storeName ? 1 : 0) + (args.all ? 1 : 0) > 1) {
+    throw new Error(`--store, --store-name and --all are mutually exclusive\n${USAGE}`)
   }
   return args
 }
 
+function openInBrowser(url) {
+  if (process.platform !== 'darwin') return
+  try {
+    spawn('open', [url], { stdio: 'ignore', detached: true }).unref()
+  } catch (e) {
+    process.stderr.write(`serve: could not open a browser (${e.message}). Open the URL above manually.\n`)
+  }
+}
+
+function buildIfWanted(args, storeDir) {
+  if (!args.build) return
+  const result = buildStore(storeDir)
+  process.stderr.write(`serve: built ${result.counts.total} pages (legacy: ${result.counts.legacy}) in ${storeDir}\n`)
+}
+
+/** `--all`: one listener per registered store, consecutive ports. A store
+ * whose planned port is taken falls back to a free one. Stores are
+ * started in registry order so the port assignment stays predictable. */
+export async function startAll(stores, { basePort, fallbackToFreePort = true } = {}) {
+  const started = []
+  for (const plan of planAllPorts(stores, basePort)) {
+    const server = await startServer(plan.path, { port: plan.port, fallbackToFreePort })
+    started.push({ name: plan.name, path: plan.path, ...server })
+  }
+  return started
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
-  const storeDir = resolveStoreDir(args.store)
-
-  if (args.build) {
-    const result = buildStore(storeDir)
-    process.stderr.write(`serve: built ${result.counts.total} pages (legacy: ${result.counts.legacy})\n`)
+  if (args.help) {
+    console.log(USAGE)
+    return 0
+  }
+  if (args.listStores) {
+    for (const line of formatStoreList()) console.log(line)
+    return 0
   }
 
+  if (args.all) {
+    const stores = listStores()
+    if (!stores.length) throw new Error(`--all: no registered stores (registry: ${readRegistry().path})`)
+    for (const s of stores) buildIfWanted(args, s.path)
+    const started = await startAll(stores, { basePort: args.port || undefined })
+    for (const s of started) {
+      process.stderr.write(`serve: ${s.url} (store ${s.name}: ${s.path})\n`)
+      if (args.open) openInBrowser(s.url)
+    }
+    return started.map((s) => s.port)
+  }
+
+  const storeDir = resolveStoreDir(args.store, { name: args.storeName })
+  buildIfWanted(args, storeDir)
   const { url, port } = await startServer(storeDir, { port: args.port || undefined })
   process.stderr.write(`serve: ${url} (store: ${storeDir})\n`)
-  if (args.open && process.platform === 'darwin') {
-    try {
-      spawn('open', [url], { stdio: 'ignore', detached: true }).unref()
-    } catch (e) {
-      process.stderr.write(`serve: could not open a browser (${e.message}). Open the URL above manually.\n`)
-    }
-  }
+  if (args.open) openInBrowser(url)
   return port
 }
 

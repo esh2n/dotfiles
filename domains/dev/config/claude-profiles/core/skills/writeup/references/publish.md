@@ -1,11 +1,15 @@
 # Publish
 
 ```
-node $KIT/bin/publish.mjs <page.html> --to artifact|cloudflare|file [--out <path>] [--store <dir>] [--dry-run] [--deploy]
+node $KIT/bin/publish.mjs <page.html> --to artifact|cloudflare|file [--out <path>] [--store <dir> | --store-name <name>] [--dry-run] [--deploy]
 ```
 
-`--store` defaults to `$WRITEUP_STORE`, then `~/.local/share/writeup`,
-same as every other kit CLI. Use `--dry-run` first when you're unsure
+Without `--store`/`--store-name`, the store is the page's own (the
+nearest ancestor `.writeup.toml`), then `$WRITEUP_STORE`, then the
+registry in `~/.local/share/writeup/stores.toml` (cwd prefix match, then
+`default`), then the legacy `~/.local/share/writeup` — so a page in the
+`work` store is always checked against `work`'s own `[private] words`.
+`--store-name work|learn` picks a registered store by name. Use `--dry-run` first when you're unsure
 what a publish will do — it runs the full pre-stage and reports the
 planned output path (and, for `cloudflare`, the `wrangler` command)
 without writing or deploying anything.
