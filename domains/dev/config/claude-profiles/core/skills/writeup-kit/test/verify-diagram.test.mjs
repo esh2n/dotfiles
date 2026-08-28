@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
-import { validateIR } from '../bin/lib/ir.mjs'
+import { validateIR, formatBudgetWarnings } from '../bin/lib/ir.mjs'
 import { renderDiagram, renderFigureHtml, normalizePolyline, groupLayerMode, groupLayerHeuristicPrefersElk } from '../bin/lib/diagram.mjs'
 import { verifyDiagram, renderChecked, renderFigureHtmlChecked, renderCheckedBest } from '../bin/lib/verify-diagram.mjs'
 
@@ -93,12 +93,12 @@ function withSvg(mutate) {
 
 // Sanity: the hand-built base scenario passes all 20 rows, so every
 // per-check "fails" test below is mutating away from a known-good baseline.
-test('the hand-built base fixture passes every one of the 20 checks', async () => {
+test('the hand-built base fixture passes every one of the 22 checks', async () => {
   const result = await verifyDiagram(baseIr(), baseRenderResult())
   const failing = result.checks.filter((c) => !c.ok)
   assert.deepEqual(failing, [], `unexpected failures: ${JSON.stringify(failing)}`)
   assert.equal(result.ok, true)
-  assert.equal(result.checks.length, 20)
+  assert.equal(result.checks.length, 22)
 })
 
 // --- 1. orthogonal ----------------------------------------------------
@@ -687,7 +687,7 @@ test('routeVia detours around a node it is not attached to (checks #3/#8 stay gr
 test('renderChecked attaches checks + checksOk to the plain render result', async () => {
   const out = await renderChecked(ir('simple.yaml'))
   assert.equal(out.checksOk, true)
-  assert.equal(out.checks.length, 20)
+  assert.equal(out.checks.length, 22)
   assert.ok(out.svg.startsWith('<svg'))
 })
 
@@ -834,4 +834,95 @@ test('renderCheckedBest: a plain (non-grouped) IR renders once via elk, same as 
   const best = await renderCheckedBest(ir('simple.yaml'))
   assert.equal(best.layoutMode, 'elk')
   assert.equal(best.checksOk, true)
+})
+
+// --- severities: budgets are guidance (warn), geometry decides (fail) --------
+//
+// The four budget rows (#10 node-count, #11 edge-count, #21 group-count,
+// #22 label-length) are `warn` severity: a figure whose only findings are
+// budget overruns still passes, renders, and carries data-warn. Every other
+// row is `fail` and still blocks the figure.
+
+test('severity: exactly the four budget rows are warn, every other row is fail', async () => {
+  const r = await verifyDiagram(baseIr(), baseRenderResult())
+  const warnIds = r.checks.filter((c) => c.severity === 'warn').map((c) => c.id)
+  assert.deepEqual(warnIds, [10, 11, 21, 22])
+  assert.ok(r.checks.every((c) => c.severity === 'fail' || c.severity === 'warn'))
+  assert.deepEqual(r.failures, [])
+  assert.deepEqual(r.warnings, [])
+})
+
+test('an 11-node IR with passing geometry verifies ok with a budget:nodes warning and renders with data-warn', async () => {
+  const parsedIr = ir('budget.yaml')
+  assert.equal(parsedIr.nodes.length, 11)
+  const out = await renderDiagram(parsedIr)
+  const r = await verifyDiagram(parsedIr, out)
+  assert.equal(r.ok, true)
+  assert.deepEqual(r.failures, [])
+  assert.equal(r.warnings.length, 1)
+  assert.equal(r.warnings[0].id, 10)
+  assert.equal(r.warnings[0].name, 'node-count')
+  assert.equal(r.warnings[0].key, 'budget:nodes')
+  assert.equal(r.warnings[0].value, 11)
+  assert.match(r.warnings[0].hint, /split/)
+  assert.equal(byId(r.checks, 10).ok, false)
+  assert.equal(byId(r.checks, 10).severity, 'warn')
+  assert.equal(formatBudgetWarnings(r.warnings), 'budget:nodes=11')
+
+  const fig = await renderFigureHtmlChecked(parsedIr, { rawYaml: fixture('budget.yaml') })
+  assert.equal(fig.checksOk, true)
+  assert.equal(fig.warn, 'budget:nodes=11')
+  assert.match(fig.html, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:nodes=11">/)
+  assert.match(fig.html, /<svg /)
+})
+
+test('an in-budget figure carries no data-warn attribute at all', async () => {
+  const fig = await renderFigureHtmlChecked(ir('simple.yaml'), { rawYaml: fixture('simple.yaml') })
+  assert.equal(fig.warn, '')
+  assert.deepEqual(fig.warnings, [])
+  assert.ok(!fig.html.includes('data-warn'))
+})
+
+test('a geometry failure still fails even when the IR is also over budget (warnings are reported alongside failures)', async () => {
+  const parsedIr = ir('budget.yaml')
+  const out = await renderDiagram(parsedIr)
+  // mutate the first edge into a diagonal so row #1 (orthogonal, fail severity) trips
+  const geo = out.layout.geo
+  const e0 = geo.edges[0]
+  const sec = e0.sections[0]
+  const bent = { ...out, layout: { ...out.layout, geo: { ...geo, edges: [{ ...e0, sections: [[sec[0], { x: sec[sec.length - 1].x + 4, y: sec[sec.length - 1].y + 4 }]] }, ...geo.edges.slice(1)] } } }
+  const r = await verifyDiagram(parsedIr, bent)
+  assert.equal(r.ok, false)
+  assert.ok(r.failures.some((c) => c.id === 1 && c.name === 'orthogonal'))
+  assert.ok(r.failures.every((c) => c.severity === 'fail'))
+  assert.deepEqual(r.warnings.map((w) => w.key), ['budget:nodes'])
+})
+
+test('group-count (#21) and label-length (#22) warn from the IR alone, in stable data-warn order', async () => {
+  const groups = Array.from({ length: 5 }, (_, i) => ({ id: `g${i}`, label: `G${i}` }))
+  const edges = [{ from: 'a', to: 'b', kind: 'sync', label: 'this edge label is long', from_side: undefined, to_side: undefined, via: [], label_at: undefined }]
+  const r = await verifyDiagram(baseIr({ groups, edges }), baseRenderResult())
+  assert.equal(r.ok, true)
+  assert.equal(byId(r.checks, 21).ok, false)
+  assert.equal(byId(r.checks, 22).ok, false)
+  assert.deepEqual(r.warnings.map((w) => w.key), ['budget:groups', 'budget:label'])
+  assert.equal(formatBudgetWarnings(r.warnings), 'budget:groups=5;budget:label=23')
+})
+
+test('renderCheckedBest on an over-budget auto-mode IR returns a zero-failure candidate and keeps its warnings', async () => {
+  // groups.yaml qualifies for grouped-layer auto mode; pad it past the node
+  // budget with isolated nodes (no new edges, so the geometry stays clean).
+  const raw = parseYaml(fixture('groups.yaml'))
+  const firstGroup = raw.groups[0].id
+  const extra = Array.from({ length: 10 - raw.nodes.length }, (_, i) => ({ id: `pad${i}`, label: `P${i}`, group: firstGroup }))
+  const v = validateIR({ ...raw, nodes: [...raw.nodes, ...extra] })
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(v.ir.nodes.length, 10)
+  assert.equal(groupLayerMode(v.ir), 'auto')
+  const best = await renderCheckedBest(v.ir)
+  assert.ok(['group', 'elk'].includes(best.layoutMode))
+  assert.equal(best.checksOk, true, JSON.stringify(best.failures))
+  assert.deepEqual(best.failures, [])
+  assert.deepEqual(best.warnings.map((w) => w.key), ['budget:nodes'])
+  assert.equal(best.warn, 'budget:nodes=10')
 })

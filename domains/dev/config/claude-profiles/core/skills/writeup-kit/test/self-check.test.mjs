@@ -230,6 +230,26 @@ describe('self-check: adversarial rows', () => {
     const fig = '<figure class="wu-figure" data-checks="pass"><svg role="img"><title>t</title><desc>d</desc></svg><figcaption>c</figcaption></figure>'
     const result = itemsFor(page({ body: DEFAULT_BODY + fig }))
     assert.ok(!result.errors.some((e) => e.item === 'figure-pass'))
+    assert.ok(!result.warnings.some((w) => w.item === 'figure-budget'))
+  })
+
+  test('row 6 (figure-budget): a passing figure with data-warn is a warn row carrying the warning text, not an error', () => {
+    const fig = '<figure class="wu-figure" data-checks="pass" data-warn="budget:nodes=11;budget:label=15"><svg role="img"><title>t</title><desc>d</desc></svg><figcaption>大きい図</figcaption></figure>'
+    const result = itemsFor(page({ body: DEFAULT_BODY + fig }))
+    assert.equal(result.ok, true)
+    assert.ok(!result.errors.some((e) => e.item === 'figure-pass'))
+    const warn = result.warnings.find((w) => w.item === 'figure-budget')
+    assert.ok(warn, 'expected a figure-budget warn row')
+    assert.match(warn.detail, /"大きい図"/)
+    assert.match(warn.detail, /budget:nodes=11;budget:label=15/)
+    assert.match(warn.detail, /consider splitting/)
+  })
+
+  test('row 6: data-warn without data-checks="pass" is still the figure-pass error (no warn row)', () => {
+    const fig = '<figure class="wu-figure" data-warn="budget:nodes=11"><svg role="img"><title>t</title><desc>d</desc></svg><figcaption>c</figcaption></figure>'
+    const result = itemsFor(page({ body: DEFAULT_BODY + fig }))
+    assert.ok(result.errors.some((e) => e.item === 'figure-pass'))
+    assert.ok(!result.warnings.some((w) => w.item === 'figure-budget'))
   })
 
   test('row 7 (svg-a11y): missing role="img" is an error', () => {

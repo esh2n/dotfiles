@@ -304,15 +304,26 @@ function checkKindSections(root, add) {
   }
 }
 
-// --- 6. figure pass marks ----------------------------------------------------
+// --- 6. figure pass marks / budget warnings -----------------------------------
+//
+// `data-checks="pass"` is the gate (verified geometry). `data-warn` is the
+// renderer's note that the figure is over a budget (nodes/edges/groups/
+// edge-label length — guidance, not a gate): it still passes, but the
+// author should consider splitting it, so it is reported as a warn row
+// carrying the renderer's own text (e.g. `budget:nodes=11`).
 
 function checkFigures(root, add) {
   const figures = findAll(root, (n) => isElement(n) && hasClass(n, 'wu-figure'))
   figures.forEach((fig, i) => {
+    const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
+    const label = cap ? textContent(cap).trim() : `#${i + 1}`
     if (attr(fig, 'data-checks') !== 'pass') {
-      const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
-      const label = cap ? textContent(cap).trim() : `#${i + 1}`
       add('error', 'figure-pass', `.wu-figure "${label}" is missing data-checks="pass"`)
+      return
+    }
+    const warn = attr(fig, 'data-warn')
+    if (warn) {
+      add('warn', 'figure-budget', `.wu-figure "${label}" is over budget (${warn}) — consider splitting the figure`)
     }
   })
 }

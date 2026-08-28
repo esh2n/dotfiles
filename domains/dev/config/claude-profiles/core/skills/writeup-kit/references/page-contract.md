@@ -118,6 +118,7 @@ before every save; the result is written into `<meta name="checks">`.
 | Role-tagged structure | Body elements are limited to h2-h4 / p / ul / ol / table / pre / figure / blockquote / dl and `.wu-*` classes | error |
 | Kind's required sections | The section headings from the kind table (`kinds.md`) are present | warn |
 | Diagram pass marks | Every `.wu-figure` carries `data-checks="pass"` | error |
+| Diagram budget warnings | A `.wu-figure` carrying `data-warn` (rendered and passing, but over a budget — see below) is reported with the renderer's text, e.g. `budget:nodes=11` | warn |
 | SVG accessibility | Diagram pass criterion #14 (see below) | error |
 | Accent budget | At most one `.wu-accent` on the page | warn |
 | Emoji / arrow characters | None in body text or diagrams | warn |
@@ -130,6 +131,26 @@ before every save; the result is written into `<meta name="checks">`.
 Diagram accessibility (criterion #14 above): `role="img"`, first child is
 `<title>`, `<desc>` is non-empty, and diagram element ids are prefixed
 `wu-d-`.
+
+### `.wu-figure` / budgets are guidance, verified geometry decides
+
+The flowchart IR budgets (nodes ≤ 9, edges ≤ 12, groups ≤ 4, edge label
+≤ 12 chars) are guidance for authors — the node cap of 9 has measured
+backing and stays the default advice — but they are not a gate. The
+verifier (`bin/lib/verify-diagram.mjs`) splits its rows into two
+severities: `fail` (every geometry check, a11y, svg hygiene, the emphasis
+cap, plus schema errors upstream) and `warn` (the four budget rows). A
+figure whose only findings are warns is rendered, stamped
+`data-checks="pass"`, counted as passing in `<meta checks>`'s
+`diagram=<pass>/<total>`, and additionally carries
+`data-warn="budget:nodes=11;budget:label=15"` (semicolon-separated, stable
+order nodes → edges → groups → label; the attribute is absent when there is
+nothing to warn about). The verifier's result object exposes the two lists
+as `failures` and `warnings`. A geometry failure still fails: the figure is
+not drawn and the page keeps its table fallback. An over-budget figure is
+a hint to the author to consider splitting it (`bin/render-diagram.mjs`
+echoes the warning on stderr, `bin/rerender-figures.mjs` counts it under
+`warned:`, and self-check reports it as the warn row above).
 
 ### `.wu-figure` / IR script escaping
 

@@ -375,16 +375,15 @@ test('kit モード: 検証を通った図は wu-figure data-checks=pass で埋�
   assert.ok(html.includes('id="wu-d-q1-d3-title"'))
 })
 
-test('kit モード: budget を超える図 (d2, 10 ノード) は grilling 自前のレンダラーへフォールバックし、wu-callout が出る', async () => {
+test('kit モード: budget を超える図 (d2, 10 ノード) も幾何検証を通れば kit が描き、data-warn で注意を付ける', async () => {
   const html = await renderPage(round('round-diagram.md'))
-  // d2 は 10 ノードで kit の node-count 上限 (9) を超えるので、grilling 自前の
-  // .scroll>svg のレンダラーで描き、失敗理由を wu-callout に出す
+  // 予算（ノード 9 など）は目安で、幾何検証を通れば描く。超過は data-warn に残る
   const d2Idx = html.indexOf('<figcaption>契約の型は Rust 側にしか無く')
   assert.ok(d2Idx >= 0, 'd2 の figcaption が出ていない')
-  const figureStart = html.lastIndexOf('<figure class="scroll"', d2Idx)
-  assert.ok(figureStart >= 0, 'd2 が grilling 自前のレンダラーで描かれていない')
-  const after = html.slice(d2Idx)
-  assert.match(after.slice(0, 500), /<div class="wu-callout" data-tone="warn"><p>[^<]*<\/p><\/div>/)
+  const figureStart = html.lastIndexOf('<figure class="wu-figure" data-checks="pass" data-warn="budget:nodes=10', d2Idx)
+  assert.ok(figureStart >= 0, 'd2 が kit の図として data-warn 付きで描かれていない')
+  assert.ok(!html.includes('<figure class="scroll"'), '自前レンダラーへ落ちている')
+  assert.ok(!html.includes('<div class="wu-callout" data-tone="warn">'), '検証を通った図に warn callout が出ている')
 })
 
 test('kit モード: 図が無い問いには <div class="wu-callout" は出ない（CSS 定義とは区別する）', async () => {

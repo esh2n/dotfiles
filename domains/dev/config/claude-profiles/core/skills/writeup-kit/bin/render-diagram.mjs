@@ -10,9 +10,13 @@
 //
 // --figure prints the verified <figure class="wu-figure" data-checks="pass">
 // block (svg + figcaption + the original IR script), ready to paste as-is,
-// instead of the bare <svg>. --json always includes a `figureHtml` field
-// (the same block, or null when verification did not pass) regardless of
-// whether --figure was also given.
+// instead of the bare <svg>. A figure that is over budget (nodes/edges/
+// groups/edge-label length — guidance, not a gate) still renders and exits
+// 0; its opening tag also carries `data-warn="budget:nodes=11;…"` and the
+// warnings are echoed on stderr. --json always includes a `figureHtml`
+// field (the same block, or null when verification did not pass) plus
+// `warnings` (the budget warn rows) and `warn` (the data-warn string or
+// null), regardless of whether --figure was also given.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parse as parseYamlLite, YamlError } from './lib/yaml-lite.mjs'
 import { validateIR } from './lib/ir.mjs'
@@ -52,6 +56,15 @@ export function parseArgs(argv) {
 }
 
 const USAGE = 'usage: render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json] [--figure]'
+
+/** Budget warnings (verify-diagram.mjs `warn` rows) go to stderr: the
+ * figure still renders and exits 0, but the author should consider
+ * splitting it. */
+function printWarnings(warnings) {
+  for (const w of warnings) {
+    console.error(`warning: ${w.key}=${w.value} (#${w.id} ${w.name}): ${w.detail}${w.hint ? ` — ${w.hint}` : ''}`)
+  }
+}
 
 export async function main(argv) {
   let args
@@ -100,6 +113,7 @@ export async function main(argv) {
     console.error(`render error: ${e.message}`)
     return 2
   }
+  const warnings = rendered.warnings ?? []
 
   if (args.json) {
     console.log(JSON.stringify({
@@ -111,19 +125,32 @@ export async function main(argv) {
       scaled: rendered.scaled,
       scroll: rendered.scroll,
       checks: rendered.checks,
-      warnings: [],
+      warnings,
+      warn: rendered.warn || null,
     }))
     return rendered.checksOk ? 0 : 3
   }
 
   if (!rendered.checksOk) {
-    console.error('diagram failed verification (contract §4-2):')
+    // Dispatch by IR type (validateIR() always stamps one — see ir.mjs):
+    // renderFigureHtmlChecked() itself already dispatches sequence.mjs vs
+    // diagram.mjs for the actual render+verify work (verify-diagram.mjs),
+    // so the only type-specific thing left here is which contract section
+    // the failing rows belong to, for the error banner.
+    const kind = validated.ir.type === 'sequence' ? 'sequence' : 'diagram'
+    console.error(`${kind} failed verification (contract §4-2):`)
     for (const c of rendered.checks) {
-      if (c.ok) continue
+      if (c.ok || c.severity === 'warn') continue
       console.error(`  #${c.id} ${c.name}: ${c.detail}${c.hint ? ` — hint: ${c.hint}` : ''}`)
     }
+    printWarnings(warnings)
     return 3
   }
+
+  // Budget overruns are advisory: the figure is drawn and passes, the
+  // author is told (on stderr, so stdout stays paste-ready) to consider
+  // splitting it.
+  printWarnings(warnings)
 
   const output = args.figure ? rendered.html : rendered.svg
   if (args.out) {

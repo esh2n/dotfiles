@@ -132,7 +132,9 @@ export function figureIrText(block) {
 /**
  * @param {string} irText raw YAML/JSON from figureIrText()
  * @param {{column: number}} opts
- * @returns {Promise<{ok:boolean, html?:string, reason?:string, message?:string, failing?:object[]}>}
+ * @returns {Promise<{ok:boolean, html?:string, warnings?:object[], warn?:string, reason?:string, message?:string, failing?:object[]}>}
+ *   `warnings` (budget overruns — the figure still rendered and passed) and
+ *   `warn` (the `data-warn` string, '' when none) accompany an ok result.
  */
 export async function rerenderOne(irText, { column }) {
   let raw
@@ -152,10 +154,10 @@ export async function rerenderOne(irText, { column }) {
     return { ok: false, reason: 'render-error', message: e.message }
   }
   if (!rendered.checksOk) {
-    const failing = rendered.checks.filter((c) => !c.ok)
-    return { ok: false, reason: 'verification', failing }
+    const failing = rendered.failures ?? rendered.checks.filter((c) => !c.ok)
+    return { ok: false, reason: 'verification', failing, warnings: rendered.warnings ?? [] }
   }
-  return { ok: true, html: rendered.html }
+  return { ok: true, html: rendered.html, warnings: rendered.warnings ?? [], warn: rendered.warn ?? '' }
 }
 
 // --- one page ----------------------------------------------------------------
@@ -232,8 +234,12 @@ export async function rerenderStore(storeDir, { only = null, dryRun = false, all
     pagesScanned: pages.length,
     figuresTried: 0,
     fixed: 0,
+    // Subset of `fixed`: rendered and passing, but over a budget
+    // (data-warn stamped) — the author should consider splitting these.
+    warned: 0,
     stillFailing: 0,
     failingChecks: {},
+    warnedChecks: {},
     pages: [],
   }
 
@@ -244,14 +250,19 @@ export async function rerenderStore(storeDir, { only = null, dryRun = false, all
     if (tried.length === 0) continue
 
     const fixed = tried.filter((a) => a.ok)
+    const warned = fixed.filter((a) => a.warnings && a.warnings.length)
     const failed = tried.filter((a) => !a.ok)
 
     report.figuresTried += tried.length
     report.fixed += fixed.length
+    report.warned += warned.length
     report.stillFailing += failed.length
     for (const f of failed) {
       const names = f.failing && f.failing.length ? f.failing.map((c) => c.name) : [f.reason]
       for (const name of names) report.failingChecks[name] = (report.failingChecks[name] ?? 0) + 1
+    }
+    for (const w of warned) {
+      for (const b of w.warnings) report.warnedChecks[b.key] = (report.warnedChecks[b.key] ?? 0) + 1
     }
 
     // Recount pass/total across every figure on the page (not just the
@@ -265,8 +276,10 @@ export async function rerenderStore(storeDir, { only = null, dryRun = false, all
       path: rel,
       tried: tried.length,
       fixed: fixed.length,
+      warned: warned.length,
       stillFailing: failed.length,
       diagram: `${ok}/${total}`,
+      warnings: warned.map((w) => w.warn),
       failing: failed.map((f) => ({
         reason: f.reason,
         checks: f.failing ? f.failing.map((c) => c.name) : undefined,
@@ -299,8 +312,8 @@ export function parseArgs(argv) {
   return args
 }
 
-function topFailingChecks(report, n = 5) {
-  return Object.entries(report.failingChecks)
+function topChecks(counts, n = 5) {
+  return Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, n)
     .map(([name, count]) => `${name} (${count})`)
@@ -310,9 +323,12 @@ function topFailingChecks(report, n = 5) {
 function printSummary(report) {
   console.log(`rerender-figures: ${report.pagesScanned} page(s) scanned, ${report.figuresTried} figure(s) tried`)
   console.log(`  fixed: ${report.fixed}`)
+  console.log(`  warned: ${report.warned} (rendered and passing, but over a budget — consider splitting)`)
   console.log(`  still failing: ${report.stillFailing}`)
-  const top = topFailingChecks(report)
-  if (top) console.log(`  top failing checks: ${top}`)
+  const topFail = topChecks(report.failingChecks)
+  if (topFail) console.log(`  top failing checks: ${topFail}`)
+  const topWarn = topChecks(report.warnedChecks)
+  if (topWarn) console.log(`  budget warnings: ${topWarn}`)
 }
 
 export async function main(argv) {

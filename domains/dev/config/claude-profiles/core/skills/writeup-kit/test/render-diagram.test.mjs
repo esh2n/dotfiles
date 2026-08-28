@@ -96,10 +96,28 @@ describe('render-diagram: --figure output', () => {
     assert.match(r.stderr, /diagram failed verification/)
   })
 
-  test('--figure still exits 2 on a budget error, before any figure is built', () => {
+  test('--figure renders an over-budget IR (11 nodes, passing geometry) with data-checks="pass" and data-warn, exit 0', () => {
     const r = runCli([join(FIXTURES, 'budget.yaml'), '--figure'])
+    assert.equal(r.status, 0)
+    assert.match(r.stdout, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:nodes=11">/)
+    assert.match(r.stdout, /<svg /)
+    // the advisory goes to stderr so stdout stays paste-ready
+    assert.match(r.stderr, /warning: budget:nodes=11 .*consider splitting/)
+  })
+
+  test('--figure carries no data-warn at all when the IR is within budget', () => {
+    const r = runCli([join(FIXTURES, 'simple.yaml'), '--figure'])
+    assert.equal(r.status, 0)
+    assert.ok(!r.stdout.includes('data-warn'))
+    assert.equal(r.stderr, '')
+  })
+
+  test('--figure still exits 2 on a schema error, before any figure is built', () => {
+    const file = tmpFile('schema.yaml', 'id: s\ntitle: t\nnodes:\n- id: a\n  label: A\nedges:\n- from: a\n  to: nope\n  kind: sync\n')
+    const r = runCli([file, '--figure'])
     assert.equal(r.status, 2)
     assert.equal(r.stdout, '')
+    assert.match(r.stderr, /schema error/)
   })
 })
 
@@ -144,9 +162,31 @@ describe('render-diagram: main() in-process (exit codes unchanged)', () => {
     }
   })
 
-  test('exit 2 on a budget error', async () => {
-    const code = await main([join(FIXTURES, 'budget.yaml')])
-    assert.equal(code, 2)
+  test('exit 0 on an over-budget IR whose geometry passes (budgets are guidance, not a gate)', async () => {
+    const logs = []
+    const orig = console.log
+    console.log = (s) => logs.push(s)
+    try {
+      const code = await main([join(FIXTURES, 'budget.yaml')])
+      assert.equal(code, 0)
+      assert.match(logs.join('\n'), /^<svg /)
+    } finally {
+      console.log = orig
+    }
+  })
+
+  test('--json reports the budget warnings and the data-warn string alongside ok:true', () => {
+    const r = runCli([join(FIXTURES, 'budget.yaml'), '--json'])
+    assert.equal(r.status, 0)
+    const out = JSON.parse(r.stdout)
+    assert.equal(out.ok, true)
+    assert.equal(out.warn, 'budget:nodes=11')
+    assert.deepEqual(out.warnings.map((w) => [w.key, w.value, w.name]), [['budget:nodes', 11, 'node-count']])
+    assert.match(out.figureHtml, /data-warn="budget:nodes=11"/)
+    // an in-budget IR carries an empty warnings list and a null warn
+    const clean = JSON.parse(runCli([join(FIXTURES, 'simple.yaml'), '--json']).stdout)
+    assert.deepEqual(clean.warnings, [])
+    assert.equal(clean.warn, null)
   })
 
   test('exit 3 on a verification failure', async () => {

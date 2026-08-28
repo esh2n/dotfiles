@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
-import { validateIR } from '../bin/lib/ir.mjs'
+import { validateIR, formatBudgetWarnings } from '../bin/lib/ir.mjs'
 import {
   renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE,
   chooseOrientation, legendWidth, EDGE_LABEL_SIZE, normalizePolyline,
@@ -266,17 +266,26 @@ test('a scrolling figure keeps its native width/height in the svg attributes (no
 
 // --- budgets ---------------------------------------------------------------
 
-test('an IR over the node budget is rejected with a concrete split suggestion', () => {
+// Budgets are guidance, not a gate: validateIR() still accepts the IR and
+// reports the overrun as a warning (with the concrete split suggestion as
+// its hint) so the renderer can draw the figure and stamp data-warn.
+
+test('an IR over the node budget validates with a budget:nodes warning carrying a split suggestion', () => {
   const raw = parseYaml(fixture('budget.yaml'))
   const result = validateIR(raw)
-  assert.equal(result.ok, false)
-  assert.equal(result.reason, 'budget')
-  assert.match(result.message, /nodes: 11 > 9/)
-  assert.match(result.suggestion, /^split:/)
-  assert.match(result.suggestion, /N0/) // n0 has the highest degree (4 edges)
+  assert.equal(result.ok, true)
+  assert.equal(result.warnings.length, 1)
+  const w = result.warnings[0]
+  assert.equal(w.key, 'budget:nodes')
+  assert.equal(w.value, 11)
+  assert.equal(w.limit, 9)
+  assert.match(w.detail, /11 node\(s\)/)
+  assert.match(w.hint, /split:/)
+  assert.match(w.hint, /N0/) // n0 has the highest degree (4 edges)
+  assert.equal(formatBudgetWarnings(result.warnings), 'budget:nodes=11')
 })
 
-test('an IR with 2+ groups over budget suggests splitting by group', () => {
+test('an IR with 2+ groups over budget warns and suggests splitting by group', () => {
   const raw = {
     id: 'g', title: 't',
     groups: [
@@ -286,21 +295,32 @@ test('an IR with 2+ groups over budget suggests splitting by group', () => {
     nodes: [{ id: 'n1', label: 'N1', group: 'a' }],
   }
   const result = validateIR(raw)
-  assert.equal(result.ok, false)
-  assert.equal(result.reason, 'budget')
-  assert.match(result.suggestion, /one diagram per group/)
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.warnings.map((w) => w.key), ['budget:groups'])
+  assert.match(result.warnings[0].hint, /one diagram per group/)
 })
 
-test('an edge label over 12 characters is a budget violation', () => {
+test('an edge label over 12 characters is a budget:label warning with the longest length as its value', () => {
   const raw = {
     id: 'l', title: 't',
     nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
     edges: [{ from: 'a', to: 'b', kind: 'sync', label: 'this label is far too long' }],
   }
   const result = validateIR(raw)
-  assert.equal(result.ok, false)
-  assert.equal(result.reason, 'budget')
-  assert.match(result.message, /label/)
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.warnings.map((w) => w.key), ['budget:label'])
+  assert.equal(result.warnings[0].value, 'this label is far too long'.length)
+  assert.match(result.warnings[0].detail, /label/)
+})
+
+test('budget warnings come back in a stable order (nodes, edges, groups, label) and an in-budget IR has none', () => {
+  const nodes = Array.from({ length: 10 }, (_, i) => ({ id: `n${i}`, label: `N${i}` }))
+  const edges = Array.from({ length: 13 }, (_, i) => ({ from: `n${i % 10}`, to: `n${(i + 1) % 10}`, kind: 'sync', label: i === 0 ? 'a very long edge label' : undefined }))
+  const groups = Array.from({ length: 5 }, (_, i) => ({ id: `g${i}`, label: `G${i}` }))
+  const result = validateIR({ id: 'o', title: 't', nodes, edges, groups })
+  assert.equal(result.ok, true)
+  assert.equal(formatBudgetWarnings(result.warnings), 'budget:nodes=10;budget:edges=13;budget:groups=5;budget:label=22')
+  assert.deepEqual(validateIR(parseYaml(fixture('simple.yaml'))).warnings, [])
 })
 
 test('more than 2 emphasis nodes is a budget violation', () => {
@@ -599,12 +619,12 @@ test('normalizePolyline is a no-op on an already-minimal polyline', () => {
 
 // --- conway.yaml: the fixture that exposed the elk dup/collinear-point bug -
 
-test('conway.yaml (mirrored org/sys groups) renders with all 20 checks passing', async () => {
+test('conway.yaml (mirrored org/sys groups) renders with all 22 checks passing', async () => {
   const parsedIr = ir('conway.yaml')
   const out = await renderDiagram(parsedIr)
   const { verifyDiagram } = await import('../bin/lib/verify-diagram.mjs')
   const result = await verifyDiagram(parsedIr, out)
-  assert.equal(result.checks.length, 20)
+  assert.equal(result.checks.length, 22)
   assert.deepEqual(result.checks.filter((c) => !c.ok), [], `unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
   assert.equal(result.ok, true)
 })
@@ -902,7 +922,7 @@ test('chain-long-labels.yaml (down orientation) passes all verify-diagram checks
   const parsedIr = ir('chain-long-labels.yaml')
   const out = await renderDiagram(parsedIr)
   const result = await verifyDiagram(parsedIr, out)
-  assert.equal(result.checks.length, 20)
+  assert.equal(result.checks.length, 22)
   assert.deepEqual(result.checks.filter((c) => !c.ok), [], `unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
   assert.equal(result.ok, true)
 })
