@@ -11,30 +11,39 @@ and say so before doing it, since it's a slower, unindexed operation.
 
 | Key | Source | Use for filtering |
 |---|---|---|
-| `path` | Path relative to the store | The result you return |
+| `path` | Path relative to the store | Linking |
+| `id` | sha256(`path`), first 8 hex chars | Resolving "id 9f3a1c2d を開いて/直して" |
+| `ref` | `<folder>/<slug>` | A short handle to quote back to the user instead of the full path |
 | `title` | `<title>` | Substring match against the user's query |
 | `description` | `<meta name="description">` | Substring match against the user's query |
 | `kind` | `<meta name="kind">` | Exact match against one of the 8 kind values |
 | `folder` | Leading path segment | Exact match against a project/topic name |
 | `date` | Filename | Rarely filtered on directly |
-| `updated` | `<meta name="updated">` (falls back to `date`) | Sort key, descending, for the returned candidates |
+| `updated` | `<meta name="updated">` (falls back to `date`), always a full datetime | Sort key, descending, for the returned candidates |
 | `checks` | Parsed `<meta name="checks">` | Use to warn if a candidate never passed lint/self-check |
 | `sha256` / `bytes` | Computed from the file | Not used for search |
 
 ## Procedure
 
 1. Read `<store>/manifest.json`.
-2. If the user named a kind (e.g. "設計書探して"), filter to that `kind`
+2. If the user gave an id directly (e.g. "id 9f3a1c2d を開いて", "id
+   9f3a1c2d を直して"), look it up by exact match on `id` and skip the rest
+   of this procedure — an id is already a single, specific page.
+3. If the user named a kind (e.g. "設計書探して"), filter to that `kind`
    first.
-3. If the user named a project/topic, filter to that `folder`.
-4. Substring-match the remaining free text (case-insensitive) against
+4. If the user named a project/topic, filter to that `folder`.
+5. Substring-match the remaining free text (case-insensitive) against
    `title` and `description`.
-5. Sort by `updated` descending.
-6. Return **at most 3** candidates, each as `path` — `updated` —
+6. Sort by `updated` descending.
+7. Return **at most 3** candidates, each as `id` — `ref` — `updated` —
    `description`. If more than 3 match, say how many matched and ask a
    narrowing question rather than dumping the whole list.
-7. If nothing matches, say so plainly — do not silently widen the search
+8. If nothing matches, say so plainly — do not silently widen the search
    to page bodies without asking.
+
+`bin/serve.mjs` also serves `/id/<id>`, which 302-redirects to the page's
+path — handy for handing the user a clickable link once you've resolved an
+id, rather than re-deriving the path yourself.
 
 ## Worked example
 
@@ -44,9 +53,9 @@ Manifest (abridged):
 
 ```json
 [
-  {"path": "auth/2026-07-02-token-refresh-design.html", "title": "トークン更新方式の設計", "description": "アクセストークンの自動更新をどこで行うかの設計", "kind": "設計", "folder": "auth", "updated": "2026-07-20"},
-  {"path": "auth/2026-06-01-login-flow-decision.html", "title": "ログインフローの決定記録", "description": "ソーシャルログインの採否を決めた記録", "kind": "決定記録", "folder": "auth", "updated": "2026-06-01"},
-  {"path": "billing/2026-05-10-invoice-design.html", "title": "請求書生成の設計", "description": "月次請求書の生成パイプライン", "kind": "設計", "folder": "billing", "updated": "2026-05-10"}
+  {"path": "auth/2026-07-02-token-refresh-design.html", "id": "9f3a1c2d", "ref": "auth/token-refresh-design", "title": "トークン更新方式の設計", "description": "アクセストークンの自動更新をどこで行うかの設計", "kind": "設計", "folder": "auth", "updated": "2026-07-20T11:40+09:00"},
+  {"path": "auth/2026-06-01-login-flow-decision.html", "id": "3b7e0a91", "ref": "auth/login-flow-decision", "title": "ログインフローの決定記録", "description": "ソーシャルログインの採否を決めた記録", "kind": "決定記録", "folder": "auth", "updated": "2026-06-01T09:15+09:00"},
+  {"path": "billing/2026-05-10-invoice-design.html", "id": "c14d2f88", "ref": "billing/invoice-design", "title": "請求書生成の設計", "description": "月次請求書の生成パイプライン", "kind": "設計", "folder": "billing", "updated": "2026-05-10T16:02+09:00"}
 ]
 ```
 
@@ -57,8 +66,8 @@ user actually used, "認証まわり", against related vocabulary in the
 fields). Result: one candidate.
 
 Reply:
-> 1件見つかりました — `auth/2026-07-02-token-refresh-design.html`
-> （更新: 2026-07-20） トークン更新方式の設計。アクセストークンの自動更新を
+> 1件見つかりました — id `9f3a1c2d` (`auth/token-refresh-design`、更新:
+> 2026-07-20 11:40) トークン更新方式の設計。アクセストークンの自動更新を
 > どこで行うかの設計。
 
 If two or three had matched, list all of them the same way, newest

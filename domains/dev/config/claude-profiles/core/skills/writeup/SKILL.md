@@ -88,7 +88,15 @@ diagram=fallback"` — never claim a normal run happened.
 6. **Save.** Path: `<store>/<folder>/<YYYY-MM-DD>-<slug>.html`, where
    `folder` is the project or topic. New page: date is today. Revision:
    **keep the existing filename** (its date never changes) and set
-   `<meta name="updated">` to today.
+   `<meta name="updated">` to today's date, or — better, since it sorts and
+   displays at minute granularity — today's datetime:
+   ```bash
+   date +%Y-%m-%dT%H:%M%z | sed -E 's/([0-9]{2})([0-9]{2})$/\1:\2/'
+   ```
+   (portable macOS/Linux: `date`'s `%z` prints a bare `+0900`; the `sed`
+   inserts the colon `build.mjs`/self-check expect, `+09:00`.) A bare date
+   also still works — build fills in a time-of-day from git/mtime for
+   sorting, but the datetime form is more precise and skips that fallback.
 7. **Build and commit.**
    ```
    node $KIT/bin/build.mjs
@@ -100,17 +108,20 @@ diagram=fallback"` — never claim a normal run happened.
 ## Revisions
 
 Overwrite the same file — same filename, same `<meta name="date">` —
-bump `<meta name="updated">` to today, then repeat steps 4-7. A page
-whose *nature* changed (a design draft that became a decision) is a new
-page of the new `kind`, not a revision.
+bump `<meta name="updated">` to today (step 6's datetime one-liner), then
+repeat steps 4-7. A page whose *nature* changed (a design draft that
+became a decision) is a new page of the new `kind`, not a revision.
 
 ## Searching
 
 Read `<store>/manifest.json` and filter by `kind` / `folder` / `title` /
 `description` — never grep page bodies unless the user explicitly asks
-for full-text search. Return at most 3 candidates: path, `updated`, and
-`description`. Full procedure and a worked example in
-`references/search.md`.
+for full-text search. Return at most 3 candidates: `id`, `ref`, `updated`,
+and `description`. If the user names an id directly ("id 9f3a1c2d を開いて",
+"id 9f3a1c2d を直して"), resolve it via an exact match on manifest's `id`
+field instead of searching — `bin/serve.mjs`'s `/id/<id>` route also
+302-redirects there, for handing back a clickable link. Full procedure and
+a worked example in `references/search.md`.
 
 ## Input from Markdown
 
