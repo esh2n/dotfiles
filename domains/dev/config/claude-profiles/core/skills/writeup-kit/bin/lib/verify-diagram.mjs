@@ -13,7 +13,8 @@
 import { LIMITS } from './ir.mjs'
 import {
   textWidth, FONT_SIZE, NODE_PAD_X, BOLD_FACTOR, MIN_SCALE, COLUMN, chooseOrientation,
-  renderDiagram, renderFigureHtml as renderFigureHtmlPlain,
+  renderDiagram, wrapFigureHtml,
+  groupLayerMode, groupLayerHeuristicPrefersElk,
 } from './diagram.mjs'
 
 const GRID = 4
@@ -374,7 +375,7 @@ function checkLabelFit(ctx) {
 }
 
 async function checkOrientation(ctx) {
-  const chosen = await chooseOrientation(ctx.ir, { column: ctx.column })
+  const chosen = await chooseOrientation(ctx.ir, { column: ctx.column, forceElk: ctx.forceElk })
   if (chosen.pinned) return { ok: true, detail: `direction pinned to "${chosen.direction}" — auto-select does not apply` }
   const actual = ctx.renderResult.layout.direction
   const ok = actual === chosen.direction
@@ -474,14 +475,17 @@ const CHECK_DEFS = [
  *   carry `layout.geo` (nodes/groups/edges geometry). Hand-built objects of
  *   the same shape are accepted, which is how tests exercise adversarial
  *   layouts without going through elk.
- * @param {{column?: number}} [opts]
+ * @param {{column?: number, forceElk?: boolean}} [opts] `forceElk` must
+ *   match whatever `renderResult` was itself rendered with (see
+ *   diagram.mjs's chooseOrientation() doc comment) — row #16 recomputes the
+ *   orientation choice for the same mode, not the IR's default mode.
  * @returns {Promise<{ok: boolean, checks: Array<{id:number, name:string, ok:boolean, detail:string, hint?:string}>}>}
  */
-export async function verifyDiagram(ir, renderResult, { column = COLUMN } = {}) {
+export async function verifyDiagram(ir, renderResult, { column = COLUMN, forceElk = false } = {}) {
   if (!renderResult || !renderResult.layout || !renderResult.layout.geo) {
     throw new Error('verifyDiagram requires renderResult.layout.geo (render with the current diagram.mjs, or build one with the same shape)')
   }
-  const ctx = { ir, renderResult, geo: renderResult.layout.geo, svg: renderResult.svg, column }
+  const ctx = { ir, renderResult, geo: renderResult.layout.geo, svg: renderResult.svg, column, forceElk }
 
   const checks = []
   for (const [id, name, fn] of CHECK_DEFS) {
@@ -496,34 +500,88 @@ export async function verifyDiagram(ir, renderResult, { column = COLUMN } = {}) 
   return { ok: checks.every((c) => c.ok), checks }
 }
 
+/** renderDiagram() + verifyDiagram() for one specific mode, tagged with
+ * which mode it used — the building block renderCheckedBest() compares. */
+async function renderAndVerify(ir, { column, forceElk, layoutMode }) {
+  const rendered = await renderDiagram(ir, { column, forceElk })
+  const verification = await verifyDiagram(ir, rendered, { column, forceElk })
+  return { ...rendered, checks: verification.checks, checksOk: verification.ok, layoutMode }
+}
+
+const countFailing = (r) => r.checks.filter((c) => !c.ok).length
+
+/**
+ * The "try, verify, pick" strategy for an IR that may qualify for
+ * grouped-layer mode (see diagram.mjs's groupLayerMode()):
+ *
+ * - `'forced-elk'`/`'off'` — only elk's hierarchical layout ever applies;
+ *   render and verify that once.
+ * - `'forced-group'` — a group carries an explicit numeric `layer:`, an
+ *   explicit request for grouped-layer mode; render and verify that once,
+ *   no elk fallback attempt (the caller asked for this mode outright).
+ * - `'auto'` — the IR qualifies purely by topological auto-detection.
+ *   Render *both* modes and verify each; return the first that passes all
+ *   20 checks. groupLayerHeuristicPrefersElk() (a cheap topology read —
+ *   see its doc comment in diagram.mjs) decides which mode is tried, and
+ *   preferred on a tie, first: normally grouped-layer, but elk first when
+ *   the IR's cross-layer/in-layer edge shape is one the hand-drawn
+ *   grouped-layer router is more likely to struggle with. If neither mode
+ *   passes every check, the result with fewer failing checks wins (ties
+ *   broken the same way) so a caller reporting an exit-3 failure still
+ *   gets the more-nearly-passing candidate's hints.
+ *
+ * @param {object} ir validated IR from ir.mjs
+ * @param {{column?: number}} [opts]
+ * @returns {Promise<object>} a renderDiagram()-shaped result plus
+ *   `checks`, `checksOk`, and `layoutMode` ('group'|'elk' — which mode won)
+ */
+export async function renderCheckedBest(ir, { column = COLUMN } = {}) {
+  const mode = groupLayerMode(ir)
+  if (mode === 'forced-group') return renderAndVerify(ir, { column, forceElk: false, layoutMode: 'group' })
+  if (mode !== 'auto') return renderAndVerify(ir, { column, forceElk: true, layoutMode: 'elk' })
+
+  const preferElk = groupLayerHeuristicPrefersElk(ir)
+  const order = preferElk
+    ? [{ forceElk: true, layoutMode: 'elk' }, { forceElk: false, layoutMode: 'group' }]
+    : [{ forceElk: false, layoutMode: 'group' }, { forceElk: true, layoutMode: 'elk' }]
+
+  const results = []
+  for (const opt of order) {
+    const result = await renderAndVerify(ir, { column, ...opt })
+    if (result.checksOk) return result
+    results.push(result)
+  }
+  const [first, second] = results
+  return countFailing(second) < countFailing(first) ? second : first
+}
+
 /**
  * renderDiagram() + verifyDiagram() in one call — what the CLI and page
  * builder use so they never have a rendered SVG without a verification
- * result attached to it.
+ * result attached to it. Implements the "try, verify, pick" strategy (see
+ * renderCheckedBest()) for an IR that qualifies for grouped-layer mode.
  *
  * @param {object} ir validated IR from ir.mjs
  * @param {{column?: number}} [opts]
  */
 export async function renderChecked(ir, { column = COLUMN } = {}) {
-  const rendered = await renderDiagram(ir, { column })
-  const verification = await verifyDiagram(ir, rendered, { column })
-  return { ...rendered, checks: verification.checks, checksOk: verification.ok }
+  return renderCheckedBest(ir, { column })
 }
 
 /**
- * renderFigureHtml() that also runs verification and stamps
- * `data-checks="pass"` on the <figure> only when every one of the 20 rows
- * passes (contract §5 relies on this attribute to know a figure was
- * checked, not just rendered).
+ * renderFigureHtml() that also runs verification (via renderCheckedBest())
+ * and stamps `data-checks="pass"` on the <figure> only when every one of
+ * the 20 rows passes (contract §5 relies on this attribute to know a
+ * figure was checked, not just rendered).
  *
  * @param {object} ir validated IR from ir.mjs
  * @param {{column?: number, rawYaml?: string}} [opts]
  */
 export async function renderFigureHtmlChecked(ir, { column = COLUMN, rawYaml } = {}) {
-  const plain = await renderFigureHtmlPlain(ir, { column, rawYaml })
-  const verification = await verifyDiagram(ir, plain, { column })
-  const html = verification.ok
-    ? plain.html.replace(/^<figure class="wu-figure"/, '<figure class="wu-figure" data-checks="pass"')
-    : plain.html
-  return { ...plain, html, checks: verification.checks, checksOk: verification.ok }
+  const best = await renderCheckedBest(ir, { column })
+  const plainHtml = wrapFigureHtml(ir, best, { rawYaml })
+  const html = best.checksOk
+    ? plainHtml.replace(/^<figure class="wu-figure"/, '<figure class="wu-figure" data-checks="pass"')
+    : plainHtml
+  return { ...best, html, checks: best.checks, checksOk: best.checksOk }
 }

@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR } from '../bin/lib/ir.mjs'
-import { renderDiagram, renderFigureHtml, normalizePolyline } from '../bin/lib/diagram.mjs'
-import { verifyDiagram, renderChecked, renderFigureHtmlChecked } from '../bin/lib/verify-diagram.mjs'
+import { renderDiagram, renderFigureHtml, normalizePolyline, groupLayerMode, groupLayerHeuristicPrefersElk } from '../bin/lib/diagram.mjs'
+import { verifyDiagram, renderChecked, renderFigureHtmlChecked, renderCheckedBest } from '../bin/lib/verify-diagram.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const fixture = (name) => readFileSync(join(HERE, 'fixtures', name), 'utf8')
@@ -701,4 +701,137 @@ test('renderFigureHtmlChecked stamps data-checks="pass" only when every row pass
   // false case using the same figure template renderFigureHtml produces.
   const plain = await renderFigureHtml(ir('simple.yaml'), { rawYaml: fixture('simple.yaml') })
   assert.ok(!plain.html.includes('data-checks="pass"'), 'renderFigureHtml (unchecked) must not stamp data-checks itself')
+})
+
+// --- renderCheckedBest: the "try, verify, pick" strategy -------------------
+//
+// Regression coverage for rerender-figures.mjs on the real store dropping
+// 139 -> 127 passing figures once grouped-layer mode started auto-applying
+// to any DAG-shaped grouped IR, even where its hand-drawn router did worse
+// than elk's own orthogonal one. renderCheckedBest() is what renderChecked()
+// and renderFigureHtmlChecked() (and so rerender-figures.mjs/
+// render-diagram.mjs) now call instead of a single renderDiagram().
+
+test('renderCheckedBest: an explicit numeric `layer:` forces grouped-layer mode only', async () => {
+  const raw = {
+    id: 'explicit-layer', title: 't', direction: 'right',
+    groups: [{ id: 'g1', label: 'G1', layer: 1 }, { id: 'g2', label: 'G2', layer: 0 }],
+    nodes: [{ id: 'n1', label: 'N1', group: 'g1' }, { id: 'n2', label: 'N2', group: 'g2' }],
+    edges: [{ from: 'n1', to: 'n2', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'forced-group')
+  const best = await renderCheckedBest(v.ir)
+  assert.equal(best.layoutMode, 'group')
+  assert.equal(best.checksOk, true)
+})
+
+test('renderCheckedBest: `layer: none` forces elk mode only', async () => {
+  const rawNone = parseYaml(fixture('conway.yaml'))
+  rawNone.groups[0].layer = 'none'
+  const v = validateIR(rawNone)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'forced-elk')
+  const best = await renderCheckedBest(v.ir)
+  assert.equal(best.layoutMode, 'elk')
+  assert.equal(best.checksOk, true)
+})
+
+test('renderCheckedBest: auto-eligible IR that fully passes in grouped-layer mode stays grouped-layer', async () => {
+  const best = await renderCheckedBest(ir('conway.yaml'))
+  assert.equal(groupLayerMode(ir('conway.yaml')), 'auto')
+  assert.equal(best.layoutMode, 'group')
+  assert.equal(best.checksOk, true)
+})
+
+// Real fixture (a 2-group cert-chain diagram from the store this regression
+// was found on) where grouped-layer mode alone fails verification but elk's
+// hierarchical layout passes cleanly — exactly the shape rerender-figures.mjs
+// found 12 real pages of on the store copy.
+function certChainIr() {
+  return {
+    id: 'd1', title: '証明書チェーンの検証',
+    groups: [
+      { id: 'store', label: 'OS / ブラウザのルートストア' },
+      { id: 'sent', label: 'サーバーがハンドシェイクで送るチェーン' },
+    ],
+    nodes: [
+      { id: 'root', label: 'ルート CA 証明書', group: 'store' },
+      { id: 'inter', label: '中間 CA 証明書', group: 'sent' },
+      { id: 'leaf', label: 'サーバー証明書', group: 'sent' },
+    ],
+    edges: [
+      { from: 'root', to: 'inter', kind: 'sync', label: '署名を検証' },
+      { from: 'inter', to: 'leaf', kind: 'sync', label: '署名を検証' },
+    ],
+  }
+}
+
+test('renderCheckedBest: falls back to elk when grouped-layer mode fails verification (real regression fixture)', async () => {
+  const v = validateIR(certChainIr())
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'auto')
+  assert.equal(groupLayerHeuristicPrefersElk(v.ir), false, 'this fixture should try grouped-layer mode first, then fall back')
+
+  // Confirm the regression is actually present in this fixture: grouped-layer
+  // mode alone fails, so a plain renderDiagram()/verifyDiagram() call (the
+  // pre-fix pipeline) would have reported this figure as failing.
+  const group = await renderDiagram(v.ir, { forceElk: false })
+  const groupVerify = await verifyDiagram(v.ir, group, { forceElk: false })
+  assert.equal(groupVerify.ok, false, 'fixture no longer exercises the regression — pick a different one')
+
+  const best = await renderCheckedBest(v.ir)
+  assert.equal(best.checksOk, true)
+  assert.equal(best.layoutMode, 'elk')
+})
+
+// Real fixture (a 3-group framework-comparison diagram, also from the store)
+// where *neither* mode fully passes — the tie-break should still pick
+// whichever candidate has fewer failing checks (elk, here), and this shape
+// is also the one groupLayerHeuristicPrefersElk() flags (the downstream node
+// carries two cross-layer edges), so it tries elk first.
+function frameworkComparisonIr() {
+  return {
+    id: 'd1', title: 't', direction: 'right',
+    groups: [{ id: 'lib', label: 'ライブラリ層' }, { id: 'full', label: 'フルフレームワーク層' }, { id: 'meta', label: 'メタフレームワーク層' }],
+    nodes: [
+      { id: 'react', label: 'React', group: 'lib' },
+      { id: 'angular', label: 'Angular', group: 'full' },
+      { id: 'next', label: 'Next や Nuxt や SvelteKit', group: 'meta' },
+    ],
+    edges: [
+      { from: 'react', to: 'next', kind: 'sync', label: '本体の上に載る' },
+      { from: 'angular', to: 'next', kind: 'sync', label: '本体の上に載る' },
+    ],
+  }
+}
+
+test('renderCheckedBest: when neither mode fully passes, picks the candidate with fewer failing checks', async () => {
+  const v = validateIR(frameworkComparisonIr())
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'auto')
+  assert.equal(groupLayerHeuristicPrefersElk(v.ir), true, 'this fixture should try elk first per the heuristic')
+
+  const group = await renderDiagram(v.ir, { forceElk: false })
+  const groupVerify = await verifyDiagram(v.ir, group, { forceElk: false })
+  const elk = await renderDiagram(v.ir, { forceElk: true })
+  const elkVerify = await verifyDiagram(v.ir, elk, { forceElk: true })
+  assert.equal(groupVerify.ok, false, 'fixture no longer exercises the regression — pick a different one')
+  assert.equal(elkVerify.ok, false, 'fixture no longer exercises the regression — pick a different one')
+  const groupFailing = groupVerify.checks.filter((c) => !c.ok).length
+  const elkFailing = elkVerify.checks.filter((c) => !c.ok).length
+  assert.ok(elkFailing < groupFailing, 'fixture should make elk the strictly better of two failing candidates')
+
+  const best = await renderCheckedBest(v.ir)
+  assert.equal(best.checksOk, false)
+  assert.equal(best.layoutMode, 'elk')
+  assert.equal(best.checks.filter((c) => !c.ok).length, elkFailing)
+})
+
+test('renderCheckedBest: a plain (non-grouped) IR renders once via elk, same as renderChecked always did', async () => {
+  assert.equal(groupLayerMode(ir('simple.yaml')), 'off')
+  const best = await renderCheckedBest(ir('simple.yaml'))
+  assert.equal(best.layoutMode, 'elk')
+  assert.equal(best.checksOk, true)
 })

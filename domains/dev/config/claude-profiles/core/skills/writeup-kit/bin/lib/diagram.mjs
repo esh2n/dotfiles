@@ -92,12 +92,12 @@ function edgeStyle(kind, uid) {
  * is a larger denominator than column (720) — favoring "down" on every
  * ordinary chain even though "right" already fits outright.
  */
-async function pickOrientation(ir, column) {
+async function pickOrientation(ir, column, { forceElk = false } = {}) {
   if (ir.direction) {
-    return { direction: ir.direction, pinned: true, layouts: { [ir.direction]: await layoutOnce(ir, ir.direction) } }
+    return { direction: ir.direction, pinned: true, layouts: { [ir.direction]: await layoutOnce(ir, ir.direction, { forceElk }) } }
   }
-  const right = await layoutOnce(ir, 'right')
-  const down = await layoutOnce(ir, 'down')
+  const right = await layoutOnce(ir, 'right', { forceElk })
+  const down = await layoutOnce(ir, 'down', { forceElk })
   const rightFits = right.width <= column
   const downFits = down.width <= column
   const direction = rightFits ? 'right' : downFits ? 'down' : (fitRatio(down, column) < fitRatio(right, column) ? 'down' : 'right')
@@ -117,10 +117,16 @@ async function pickOrientation(ir, column) {
  * unaffected by presentation scaling.
  *
  * @param {object} ir normalized IR from ir.mjs
- * @param {{column?: number}} [opts]
+ * @param {{column?: number, forceElk?: boolean}} [opts] `forceElk` renders
+ *   with elk's compound-node hierarchical layout even when the IR would
+ *   otherwise qualify for grouped-layer mode — used by verify-diagram.mjs's
+ *   "try, verify, pick" strategy (see renderCheckedBest()) to lay out the
+ *   fallback candidate for an IR that auto-qualifies for grouped-layer mode.
+ *   Has no effect on an IR that doesn't qualify for grouped-layer mode in
+ *   the first place (already elk either way).
  */
-export async function renderDiagram(ir, { column = COLUMN } = {}) {
-  const { direction, layouts } = await pickOrientation(ir, column)
+export async function renderDiagram(ir, { column = COLUMN, forceElk = false } = {}) {
+  const { direction, layouts } = await pickOrientation(ir, column, { forceElk })
   const best = layouts[direction]
 
   let scaled = false
@@ -140,18 +146,21 @@ export async function renderDiagram(ir, { column = COLUMN } = {}) {
     height: best.height,
     scaled,
     scroll,
-    layout: { direction, boxes: best.abs, usedKinds: best.usedKinds, geo: drawn.geo },
+    layout: { direction, boxes: best.abs, usedKinds: best.usedKinds, geo: drawn.geo, mode: best.usedGroupLayerMode ? 'group' : 'elk' },
   }
 }
 
 /**
  * Lay out both orientations and report which one renderDiagram would pick
  * (the amended row #16 rule — see pickOrientation()), without drawing.
- * Exposed for verify-diagram.mjs's orientation-choice check.
+ * Exposed for verify-diagram.mjs's orientation-choice check. `forceElk` must
+ * match whatever the renderResult being checked was itself rendered with, or
+ * the recomputed "best" orientation can legitimately disagree — grouped-layer
+ * and elk layouts of the same IR don't always fit the column the same way.
  */
-export async function chooseOrientation(ir, { column = COLUMN } = {}) {
+export async function chooseOrientation(ir, { column = COLUMN, forceElk = false } = {}) {
   if (ir.direction) return { direction: ir.direction, pinned: true }
-  const { direction, layouts } = await pickOrientation(ir, column)
+  const { direction, layouts } = await pickOrientation(ir, column, { forceElk })
   return { direction, pinned: false, fitRatio: { right: fitRatio(layouts.right, column), down: fitRatio(layouts.down, column) } }
 }
 
@@ -214,13 +223,20 @@ export const fitRatio = (l, column) => Math.max(l.width / column, l.height / MAX
  * (both A->B and B->A edges exist) has no well-defined topological order,
  * so auto-detection backs off (falls back to layer 0 for every group) —
  * an explicit numeric `layer:` still wins over that fallback per group.
+ *
+ * `analyzeGroups()` below folds this decision and `groupLayerMode()`'s
+ * (forced-group/auto/forced-elk/off) into one pass over `ir.groups`/
+ * `ir.edges` so the two can never drift apart — computeGroupLayers() (the
+ * Map layoutOnce() actually lays out with) and groupLayerMode() (the label
+ * verify-diagram.mjs's "try, verify, pick" strategy branches on) are both
+ * thin views onto the same `{ mode, layers }` result.
  */
-function computeGroupLayers(ir) {
+function analyzeGroups(ir) {
   const { groups, nodes, edges } = ir
-  if (groups.length < 2) return null
-  if (groups.some((g) => g.group !== undefined)) return null
-  if (groups.some((g) => g.layer === 'none')) return null
-  if (!nodes.every((n) => n.group !== undefined)) return null
+  if (groups.length < 2) return { mode: 'off' }
+  if (groups.some((g) => g.group !== undefined)) return { mode: 'off' }
+  if (!nodes.every((n) => n.group !== undefined)) return { mode: 'off' }
+  if (groups.some((g) => g.layer === 'none')) return { mode: 'forced-elk' }
 
   const groupIds = groups.map((g) => g.id)
   const nodeGroup = new Map(nodes.map((n) => [n.id, n.group]))
@@ -233,12 +249,95 @@ function computeGroupLayers(ir) {
 
   const dag = isAcyclic(groupIds, adj)
   const hasExplicit = groups.some((g) => typeof g.layer === 'number')
-  if (!hasExplicit && !dag) return null
+  if (!hasExplicit && !dag) return { mode: 'off' }
 
   const base = dag ? longestPathLayers(groupIds, adj) : new Map(groupIds.map((id) => [id, 0]))
   const layers = new Map()
   for (const g of groups) layers.set(g.id, typeof g.layer === 'number' ? g.layer : base.get(g.id))
-  return layers
+  return { mode: hasExplicit ? 'forced-group' : 'auto', layers }
+}
+
+function computeGroupLayers(ir) {
+  const a = analyzeGroups(ir)
+  return a.mode === 'forced-group' || a.mode === 'auto' ? a.layers : null
+}
+
+/**
+ * Whether `ir` qualifies for grouped-layer mode and, if so, whether that
+ * came from an explicit per-group hint:
+ * - `'off'` — doesn't qualify (see analyzeGroups()'s doc comment above for
+ *   every disqualifying shape); layoutOnce() always uses elk's hierarchy.
+ * - `'forced-elk'` — some group carries `layer: none`, an explicit
+ *   page-wide opt-out; layoutOnce() always uses elk's hierarchy.
+ * - `'forced-group'` — some group carries an explicit numeric `layer:`;
+ *   the caller asked for grouped-layer mode outright, so verify-diagram.mjs
+ *   renders only that mode (no elk fallback attempt).
+ * - `'auto'` — qualifies purely by topological auto-detection (no explicit
+ *   hint anywhere); this is the case renderCheckedBest() tries both modes
+ *   for and picks the one that actually verifies.
+ */
+export function groupLayerMode(ir) {
+  return analyzeGroups(ir).mode
+}
+
+/**
+ * A cheap topology heuristic for the 'auto' case: grouped-layer mode's
+ * hand-drawn cross-layer connector (crossLayerElbow()) draws one straight
+ * elbow per edge from each box's own border, with no awareness of *other*
+ * nodes or edges sharing its layer gap — unlike elk's own orthogonal
+ * router, it never detours around a third node placed between the two it
+ * connects, nor spaces itself apart from a parallel sibling beyond the
+ * per-pair lane fan-out inLayerElbow() already does for repeated node
+ * pairs. Two shapes are more likely than not to defeat that: a node with
+ * more than one cross-layer edge (several elbows converging on/departing
+ * the same border, crowding the node-clearance and label-clearance checks
+ * more than a lone cross-layer edge would), and a long in-layer chain
+ * within one group (>2 hops — the group-layer mode books enough same-layer
+ * spacing for adjacent pairs, but a chain gives more edges more chances to
+ * cut past a same-layer neighbor several hops down the line). Neither
+ * condition *guarantees* a check failure — this only orders which mode
+ * renderCheckedBest() tries and prefers first; a genuine failure is still
+ * caught (and, if it flips the outcome, corrected) by the verify step.
+ */
+export function groupLayerHeuristicPrefersElk(ir) {
+  const { nodes, groups, edges } = ir
+  if (groups.length < 2) return false
+  const nodeGroup = new Map(nodes.map((n) => [n.id, n.group]))
+  const crossCount = new Map(nodes.map((n) => [n.id, 0]))
+  const intraAdj = new Map(nodes.map((n) => [n.id, new Set()]))
+  for (const e of edges) {
+    const fg = nodeGroup.get(e.from)
+    const tg = nodeGroup.get(e.to)
+    if (fg === undefined || tg === undefined) continue
+    if (fg !== tg) {
+      crossCount.set(e.from, (crossCount.get(e.from) || 0) + 1)
+      crossCount.set(e.to, (crossCount.get(e.to) || 0) + 1)
+    } else if (e.from !== e.to) {
+      intraAdj.get(e.from).add(e.to)
+      intraAdj.get(e.to).add(e.from)
+    }
+  }
+  const manyCrossPerNode = [...crossCount.values()].some((c) => c > 1)
+  if (manyCrossPerNode) return true
+  return longestChainLength(nodes.map((n) => n.id), intraAdj) > 2
+}
+
+/** Longest simple path (edge count) in an undirected adjacency map — small
+ * graphs only (kit node-count budgets keep this well within brute-force DFS
+ * range). Used by groupLayerHeuristicPrefersElk() to size in-layer chains. */
+function longestChainLength(ids, adj) {
+  let best = 0
+  const visit = (node, visited, depth) => {
+    if (depth > best) best = depth
+    for (const next of adj.get(node)) {
+      if (visited.has(next)) continue
+      visited.add(next)
+      visit(next, visited, depth + 1)
+      visited.delete(next)
+    }
+  }
+  for (const id of ids) visit(id, new Set([id]), 0)
+  return best
 }
 
 /** DFS 3-color cycle check over the group graph `adj` (id -> Set<id>). */
@@ -335,9 +434,21 @@ function inLayerElbow(fromBox, toBox, direction, offset = 0) {
  * layoutOnce()'s partition-alignment pass) box positions instead is what
  * actually keeps conway.yaml's three "写し取る" edges parallel and equal
  * length.
+ *
+ * `midOffset` shifts the elbow's own middle jog coordinate (midX/midY,
+ * *not* the box-touching ends the way inLayerElbow's `offset` does) —
+ * used to fan out multiple cross-layer edges that share the exact same
+ * pair of layer-facing borders (see the corridor-grouping block in
+ * layoutOnce()) apart from each other. A mirrored pair whose near/far
+ * centers already line up (nearCy===farCy or nearCx===farCx — conway.yaml's
+ * ta->sa etc.) draws a straight line regardless of `midOffset`:
+ * normalizePolyline() collapses the jog away before the offset can ever
+ * show up, since the jog's only visible when the centers *don't* line up
+ * — exactly the case where two edges sharing a corridor would otherwise
+ * overlap.
  */
-function crossLayerElbow(fromBox, toBox, direction) {
-  return elbowPoints(fromBox, toBox, direction === 'down', 0)
+function crossLayerElbow(fromBox, toBox, direction, midOffset = 0) {
+  return elbowPoints(fromBox, toBox, direction === 'down', 0, midOffset)
 }
 
 /**
@@ -350,9 +461,11 @@ function crossLayerElbow(fromBox, toBox, direction) {
  * jog keeps every segment axis-aligned instead of drawing a diagonal.
  * `offset` (inLayerElbow only) shifts both ends on the non-`vertical` axis,
  * clamped to stay within each box's own span, to fan out multiple edges
- * between the same node pair onto parallel lanes.
+ * between the same node pair onto parallel lanes. `midOffset`
+ * (crossLayerElbow only) shifts the jog's own mid coordinate instead, to
+ * fan out multiple edges that share the same pair of facing borders.
  */
-function elbowPoints(fromBox, toBox, vertical, offset) {
+function elbowPoints(fromBox, toBox, vertical, offset, midOffset = 0) {
   const fromFirst = vertical ? fromBox.y <= toBox.y : fromBox.x <= toBox.x
   const near = fromFirst ? fromBox : toBox
   const far = fromFirst ? toBox : fromBox
@@ -366,14 +479,14 @@ function elbowPoints(fromBox, toBox, vertical, offset) {
     const farCx = far.x + far.width / 2 + clamped(far)
     const nearY = near.y + near.height
     const farY = far.y
-    const midY = (nearY + farY) / 2
+    const midY = (nearY + farY) / 2 + midOffset
     pts = [{ x: nearCx, y: nearY }, { x: nearCx, y: midY }, { x: farCx, y: midY }, { x: farCx, y: farY }]
   } else {
     const nearCy = near.y + near.height / 2 + clamped(near)
     const farCy = far.y + far.height / 2 + clamped(far)
     const nearX = near.x + near.width
     const farX = far.x
-    const midX = (nearX + farX) / 2
+    const midX = (nearX + farX) / 2 + midOffset
     pts = [{ x: nearX, y: nearCy }, { x: midX, y: nearCy }, { x: midX, y: farCy }, { x: farX, y: farCy }]
   }
   return fromFirst ? pts : pts.slice().reverse()
@@ -381,9 +494,9 @@ function elbowPoints(fromBox, toBox, vertical, offset) {
 
 // --- layout ----------------------------------------------------------------
 
-async function layoutOnce(ir, direction) {
+async function layoutOnce(ir, direction, { forceElk = false } = {}) {
   const { nodes, groups, edges } = ir
-  const groupLayers = computeGroupLayers(ir)
+  const groupLayers = forceElk ? null : computeGroupLayers(ir)
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
   const partitionOf = (nodeId) => {
     if (!groupLayers) return undefined
@@ -626,9 +739,7 @@ async function layoutOnce(ir, direction) {
     // anyway). Two (or more) in-layer edges between the *same* node pair --
     // e.g. groups.yaml's gw->db request and db->gw reply, both inside the
     // "server" group -- fan out onto parallel lanes (see inLayerElbow()'s
-    // `offset`) instead of being drawn on top of each other; cross-layer
-    // edges never need that (two nodes only ever share one direct edge in
-    // practice, and elk's own sibling ordering already keeps them apart).
+    // `offset`) instead of being drawn on top of each other.
     const pairs = new Map()
     for (const meta of edgeMeta) {
       if (!meta.isInLayer) continue
@@ -650,11 +761,90 @@ async function layoutOnce(ir, direction) {
         meta.manualSections = fromBox && toBox ? [inLayerElbow(fromBox, toBox, direction, offset)] : []
       })
     }
+    // crossLayerEligible edges connecting the exact same pair of
+    // layer-facing borders (e.g. every edge crossing from layer 0 straight
+    // into layer 1 has an identical near/far border pair once the
+    // axis-alignment pass above pins every node in a partition to one
+    // shared stacking-axis coordinate) would otherwise all compute the
+    // identical elbow mid coordinate from crossLayerElbow(), landing their
+    // middle jogs collinear and overlapping (checkCollinearOverlap)
+    // whenever the jog isn't degenerate — i.e. whenever the two edges
+    // connect node pairs whose centers don't already line up on the cross
+    // axis (a mirrored pair like conway.yaml's ta->sa always lines up, so
+    // this never touches that fixture — see crossLayerElbow()'s doc
+    // comment). Fan same-corridor edges across parallel mid coordinates the
+    // same way the in-layer loop above fans repeated same-pair edges, wide
+    // enough that a label riding the widest one still keeps its 6px
+    // clearance from a neighbor's path (checkLabelClearance).
+    const corridorAxisVertical = direction === 'down'
+    // The near/far border pair a given (fromBox, toBox) pair would draw its
+    // elbow between — see elbowPoints()'s own near/far selection, mirrored
+    // here so a corridor's grouping key and its span are read the exact
+    // same way the geometry itself will be computed.
+    const corridorSpan = (fromBox, toBox) => {
+      const fromFirst = corridorAxisVertical ? fromBox.y <= toBox.y : fromBox.x <= toBox.x
+      const near = fromFirst ? fromBox : toBox
+      const far = fromFirst ? toBox : fromBox
+      return corridorAxisVertical ? [near.y + near.height, far.y] : [near.x + near.width, far.x]
+    }
+    // Whether this edge's own elbow is degenerate (its two boxes already
+    // share a coordinate on the cross axis, so normalizePolyline() collapses
+    // the jog to a single straight segment regardless of any mid coordinate
+    // — conway.yaml's mirrored ta->sa is exactly this shape). A degenerate
+    // edge never needs — or safely tolerates — a nonzero midOffset: since
+    // its whole path sits on one line already, nudging the mid coordinate
+    // off that line reintroduces a jog (and, if the nudge overshoots the
+    // corridor's own span, a direction-reversing zigzag) for no reason, so
+    // it's excluded from the fan-out below and always drawn with offset 0.
+    const isDegenerate = (fromBox, toBox) => (
+      corridorAxisVertical
+        ? fromBox.x + fromBox.width / 2 === toBox.x + toBox.width / 2
+        : fromBox.y + fromBox.height / 2 === toBox.y + toBox.height / 2
+    )
+    const corridors = new Map()
     for (const meta of edgeMeta) {
       if (!meta.crossLayerEligible) continue
       const fromBox = abs.get(meta.raw.from)
       const toBox = abs.get(meta.raw.to)
-      meta.manualSections = fromBox && toBox ? [crossLayerElbow(fromBox, toBox, direction)] : []
+      if (!fromBox || !toBox) continue
+      if (isDegenerate(fromBox, toBox)) { meta.manualSections = [crossLayerElbow(fromBox, toBox, direction, 0)]; continue }
+      const [nearCoord, farCoord] = corridorSpan(fromBox, toBox)
+      const key = `${nearCoord}|${farCoord}`
+      if (!corridors.has(key)) corridors.set(key, { metas: [], nearCoord, farCoord })
+      corridors.get(key).metas.push(meta)
+    }
+    const CROSS_LANE_MIN_GAP = 24
+    const CROSS_LANE_MARGIN = 12
+    for (const { metas, nearCoord, farCoord } of corridors.values()) {
+      const n = metas.length
+      if (n === 1) {
+        const [meta] = metas
+        const fromBox = abs.get(meta.raw.from)
+        const toBox = abs.get(meta.raw.to)
+        meta.manualSections = [crossLayerElbow(fromBox, toBox, direction, 0)]
+        continue
+      }
+      const center = (nearCoord + farCoord) / 2
+      const lo = Math.min(nearCoord, farCoord) + CROSS_LANE_MARGIN
+      const hi = Math.max(nearCoord, farCoord) - CROSS_LANE_MARGIN
+      const maxLabelW = Math.max(0, ...metas.map((m) => (
+        m.raw.label ? Math.ceil(textWidth(m.raw.label, EDGE_LABEL_SIZE)) + 10 : 0
+      )))
+      const gap = Math.max(CROSS_LANE_MIN_GAP, maxLabelW + 16)
+      metas.forEach((meta, idx) => {
+        const target = center + (idx - (n - 1) / 2) * gap
+        // Clamp the fanned position to the corridor's own span (minus a
+        // small margin) so a wide gap (many edges, or a long label) can
+        // never push the jog past the far side's own border and invert the
+        // path's direction into a backtracking zigzag instead of a clean
+        // elbow. A corridor too narrow for even the margin (lo > hi) just
+        // falls every member back to the shared center — no worse than the
+        // pre-fan-out overlap this loop exists to avoid.
+        const midOffset = (hi >= lo ? Math.max(lo, Math.min(hi, target)) : center) - center
+        const fromBox = abs.get(meta.raw.from)
+        const toBox = abs.get(meta.raw.to)
+        meta.manualSections = fromBox && toBox ? [crossLayerElbow(fromBox, toBox, direction, midOffset)] : []
+      })
     }
   }
 
@@ -678,7 +868,7 @@ async function layoutOnce(ir, direction) {
   // #7 relies on the legend box actually being inside the canvas).
   const width = snapUp4(Math.max(diagramWidth, legendWidth(usedKinds)))
   const height = snapUp4(Math.max(1, diagramHeight) + (usedKinds.length ? LEGEND_H : 0))
-  return { laid, edgeMeta, abs, usedKinds, groupIndex, width, height }
+  return { laid, edgeMeta, abs, usedKinds, groupIndex, width, height, usedGroupLayerMode: !!groupLayers }
 }
 
 function addPort(elkNode, nodeId, edgeIndex, role, side) {
@@ -979,15 +1169,20 @@ function absolutePositions(laid) {
 // --- figure wrapper ----------------------------------------------------
 
 /**
- * Wrap a rendered diagram in the kit's <figure class="wu-figure"> markup,
- * matching kit/samples.html: svg, then figcaption, then the original IR
- * text preserved verbatim for re-editing / HTML->Markdown conversion.
+ * Wrap an already-rendered diagram (renderDiagram()'s return shape — svg +
+ * scroll are the only fields read here) in the kit's
+ * <figure class="wu-figure"> markup, matching kit/samples.html: svg, then
+ * figcaption, then the original IR text preserved verbatim for re-editing /
+ * HTML->Markdown conversion. Split out from renderFigureHtml() so
+ * verify-diagram.mjs's renderCheckedBest() — which may render two candidate
+ * layouts (grouped-layer and elk) before picking a winner — can wrap
+ * whichever `rendered` it already has, instead of rendering a third time.
  *
  * @param {object} ir normalized IR from ir.mjs
- * @param {{column?: number, rawYaml?: string}} [opts]
+ * @param {{svg: string, scroll: boolean}} rendered renderDiagram()'s return
+ * @param {{rawYaml?: string}} [opts]
  */
-export async function renderFigureHtml(ir, { column = COLUMN, rawYaml } = {}) {
-  const rendered = await renderDiagram(ir, { column })
+export function wrapFigureHtml(ir, rendered, { rawYaml } = {}) {
   const caption = ir.caption || ir.title
   const scrollAttr = rendered.scroll ? ' data-scroll="true"' : ''
   // The IR text is embedded inside a <script> raw-text element, which
@@ -995,8 +1190,17 @@ export async function renderFigureHtml(ir, { column = COLUMN, rawYaml } = {}) {
   // or caption can never inject a literal tag or close the block early
   // (contract in ir-script.mjs; readers unescape with unescapeIrScript).
   const script = rawYaml !== undefined ? escapeIrScript(rawYaml) : ''
+  return `<figure class="wu-figure"${scrollAttr}>\n${rendered.svg}\n<figcaption>${esc(caption)}</figcaption>\n<script type="text/x-writeup-diagram">\n${script}\n</script>\n</figure>`
+}
+
+/**
+ * @param {object} ir normalized IR from ir.mjs
+ * @param {{column?: number, rawYaml?: string, forceElk?: boolean}} [opts]
+ */
+export async function renderFigureHtml(ir, { column = COLUMN, rawYaml, forceElk = false } = {}) {
+  const rendered = await renderDiagram(ir, { column, forceElk })
   return {
-    html: `<figure class="wu-figure"${scrollAttr}>\n${rendered.svg}\n<figcaption>${esc(caption)}</figcaption>\n<script type="text/x-writeup-diagram">\n${script}\n</script>\n</figure>`,
+    html: wrapFigureHtml(ir, rendered, { rawYaml }),
     ...rendered,
   }
 }

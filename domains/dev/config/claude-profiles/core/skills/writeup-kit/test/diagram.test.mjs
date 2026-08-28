@@ -8,7 +8,9 @@ import { validateIR } from '../bin/lib/ir.mjs'
 import {
   renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE,
   chooseOrientation, legendWidth, EDGE_LABEL_SIZE, normalizePolyline,
+  groupLayerMode, groupLayerHeuristicPrefersElk,
 } from '../bin/lib/diagram.mjs'
+import { verifyDiagram } from '../bin/lib/verify-diagram.mjs'
 import { unescapeIrScript } from '../bin/lib/ir-script.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -715,4 +717,158 @@ test('`layer: none` on a group opts the whole diagram out of grouped-layer mode'
     noneOut.width !== autoOut.width || noneOut.height !== autoOut.height,
     'layer: none should change the layout, not silently match grouped-layer mode',
   )
+})
+
+// --- groupLayerMode(): the classification renderCheckedBest() branches on -
+
+test('groupLayerMode: "off" when there are fewer than 2 groups', () => {
+  const raw = {
+    id: 'w', title: 't',
+    groups: [{ id: 'g1', label: 'G1' }],
+    nodes: [{ id: 'n1', label: 'N1', group: 'g1' }],
+    edges: [],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'off')
+})
+
+test('groupLayerMode: "off" when a node belongs to no group', () => {
+  const raw = {
+    id: 'w', title: 't',
+    groups: [{ id: 'g1', label: 'G1' }, { id: 'g2', label: 'G2' }],
+    nodes: [{ id: 'n1', label: 'N1', group: 'g1' }, { id: 'n2', label: 'N2' }],
+    edges: [{ from: 'n1', to: 'n2', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'off')
+})
+
+test('groupLayerMode: "off" when the inter-group edges cycle and no explicit `layer:` breaks the tie', () => {
+  const raw = {
+    id: 'w', title: 't',
+    groups: [{ id: 'g1', label: 'G1' }, { id: 'g2', label: 'G2' }],
+    nodes: [{ id: 'a', label: 'A', group: 'g1' }, { id: 'b', label: 'B', group: 'g2' }],
+    edges: [{ from: 'a', to: 'b', kind: 'sync' }, { from: 'b', to: 'a', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'off')
+})
+
+test('groupLayerMode: "forced-elk" when a group carries `layer: none`', () => {
+  const rawNone = parseYaml(fixture('conway.yaml'))
+  rawNone.groups[0].layer = 'none'
+  const v = validateIR(rawNone)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'forced-elk')
+})
+
+test('groupLayerMode: "forced-group" when a group carries an explicit numeric `layer:`', () => {
+  const raw = {
+    id: 'w', title: 't',
+    groups: [{ id: 'g1', label: 'G1', layer: 1 }, { id: 'g2', label: 'G2', layer: 0 }],
+    nodes: [{ id: 'n1', label: 'N1', group: 'g1' }, { id: 'n2', label: 'N2', group: 'g2' }],
+    edges: [{ from: 'n1', to: 'n2', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'forced-group')
+})
+
+test('groupLayerMode: "auto" when the inter-group edges form a DAG with no explicit hints', () => {
+  assert.equal(groupLayerMode(ir('conway.yaml')), 'auto')
+})
+
+// --- groupLayerHeuristicPrefersElk(): the "try, verify, pick" order hint --
+
+test('groupLayerHeuristicPrefersElk: false for a plain two-group chain (one cross edge per node, no in-layer chain)', () => {
+  const raw = {
+    id: 'w', title: 't',
+    groups: [{ id: 'g1', label: 'G1' }, { id: 'g2', label: 'G2' }],
+    nodes: [{ id: 'a', label: 'A', group: 'g1' }, { id: 'b', label: 'B', group: 'g2' }],
+    edges: [{ from: 'a', to: 'b', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerHeuristicPrefersElk(v.ir), false)
+})
+
+test('groupLayerHeuristicPrefersElk: true when one node carries more than one cross-layer edge', () => {
+  // The shape that exposed this: two upstream nodes in different layers
+  // both feeding a single downstream node one layer further on.
+  const raw = {
+    id: 'w', title: 't', direction: 'right',
+    groups: [{ id: 'lib', label: 'L' }, { id: 'full', label: 'F' }, { id: 'meta', label: 'M' }],
+    nodes: [
+      { id: 'react', label: 'React', group: 'lib' },
+      { id: 'angular', label: 'Angular', group: 'full' },
+      { id: 'next', label: 'Next', group: 'meta' },
+    ],
+    edges: [
+      { from: 'react', to: 'next', kind: 'sync' },
+      { from: 'angular', to: 'next', kind: 'sync' },
+    ],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerHeuristicPrefersElk(v.ir), true)
+})
+
+test('groupLayerHeuristicPrefersElk: true when an in-layer chain exceeds 2 hops', () => {
+  const raw = {
+    id: 'w', title: 't', direction: 'right',
+    groups: [{ id: 'g1', label: 'G1' }, { id: 'g2', label: 'G2' }],
+    nodes: [
+      { id: 'a', label: 'A', group: 'g1' }, { id: 'b', label: 'B', group: 'g1' },
+      { id: 'c', label: 'C', group: 'g1' }, { id: 'd', label: 'D', group: 'g1' },
+      { id: 'x', label: 'X', group: 'g2' },
+    ],
+    edges: [
+      { from: 'a', to: 'b', kind: 'sync' },
+      { from: 'b', to: 'c', kind: 'sync' },
+      { from: 'c', to: 'd', kind: 'sync' },
+      { from: 'a', to: 'x', kind: 'sync' },
+    ],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerHeuristicPrefersElk(v.ir), true)
+})
+
+// --- grouped-layer router: cross-layer corridor fan-out --------------------
+//
+// Regression coverage for the "flat mode draws its own edge geometry and is
+// weaker than elk's router" bug (rerender-figures.mjs on the real store
+// dropped 139 -> 127 passing figures after grouped-layer mode landed): three
+// edges sharing one node (one hub, three siblings one layer over) all cross
+// the exact same pair of layer-facing borders, so crossLayerElbow() computed
+// the identical mid coordinate for all three before this fan-out existed —
+// landing their non-degenerate middle jogs collinear and overlapping.
+
+test('grouped-layer router: cross-layer edges fanning out from one hub node no longer trip collinear-overlap', async () => {
+  const raw = {
+    id: 'fanout', title: 't', direction: 'right',
+    groups: [{ id: 'hub', label: 'Hub' }, { id: 'leaves', label: 'Leaves' }],
+    nodes: [
+      { id: 'h', label: 'H', group: 'hub' },
+      { id: 't1', label: 'T1', group: 'leaves' },
+      { id: 't2', label: 'T2', group: 'leaves' },
+      { id: 't3', label: 'T3', group: 'leaves' },
+    ],
+    edges: [
+      { from: 'h', to: 't1', kind: 'sync', label: 'aaa' },
+      { from: 'h', to: 't2', kind: 'sync', label: 'bbb' },
+      { from: 'h', to: 't3', kind: 'sync', label: 'ccc' },
+    ],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  assert.equal(groupLayerMode(v.ir), 'auto')
+  const rendered = await renderDiagram(v.ir, { forceElk: false })
+  assert.equal(rendered.layout.mode, 'group')
+  const result = await verifyDiagram(v.ir, rendered, { forceElk: false })
+  const collinear = result.checks.find((c) => c.name === 'collinear-overlap')
+  assert.equal(collinear.ok, true, collinear.detail)
 })
