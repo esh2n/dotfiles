@@ -1,7 +1,7 @@
 // serve モード — ラウンドをローカルに立てて、回答が揃うまでブロックする。
 // 依存は node 標準のみ（node:http）。ページ側の差し込みは lib/html.mjs の serveBlock。
 import { createServer } from 'node:http'
-import { appendFile, mkdir } from 'node:fs/promises'
+import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { spawn } from 'node:child_process'
 import { STATE_SLOT } from './html.mjs'
@@ -24,7 +24,8 @@ export function summaryLine(id, rec) {
  * @param {object} o.round      parseRound の戻り値
  * @param {string} o.html       serve 差し込み済みの完全な HTML
  * @param {string} o.outPath    追記先の answers.jsonl
- * @param {number} [o.port]     0 なら空きポート
+ * @param {number} [o.port]     0 なら空きポート。render.mjs は省略時に slug 由来の固定ポートを渡す
+ * @param {boolean} [o.fallbackToFreePort] port が使用中 (EADDRINUSE) なら空きポートへ退避する
  * @param {boolean} [o.openBrowser]
  * @param {AbortSignal} [o.signal] abort すると SIGINT と同じ扱い（130）で畳む
  * @param {(url: string, port: number) => void} [o.onListening]
@@ -34,7 +35,7 @@ export function summaryLine(id, rec) {
  */
 export async function serveRound(o) {
   const {
-    round, html, outPath, port = 0, openBrowser = true, signal,
+    round, html, outPath, port = 0, fallbackToFreePort = false, openBrowser = true, signal,
     onListening, stdout = process.stdout, stderr = process.stderr,
   } = o
   const questions = round.questions
@@ -44,6 +45,13 @@ export async function serveRound(o) {
   const answers = new Map()
 
   await mkdir(dirname(outPath), { recursive: true })
+  // 同じラウンドの提出済み回答を読み戻す。サーバーを立て直しても（別プロセスで
+  // 提出済みでも）提出済み表示と完了判定が振り出しに戻らないようにする。
+  for (const rec of await readExistingAnswers(outPath)) {
+    if (rec.slug !== round.frontmatter.slug || rec.round !== round.frontmatter.round) continue
+    if (!allowed.get(rec.question)?.has(rec.choice)) continue
+    answers.set(rec.question, rec)
+  }
   // 追記を直列化する。同時提出でも 1 行が混ざらない。
   let writeChain = Promise.resolve()
 
@@ -146,14 +154,23 @@ export async function serveRound(o) {
     })
   })
 
-  await new Promise((resolveListen, rejectListen) => {
+  const listenOn = (p) => new Promise((resolveListen, rejectListen) => {
     server.once('error', rejectListen)
-    server.listen(port, '127.0.0.1', () => {
+    server.listen(p, '127.0.0.1', () => {
       server.off('error', rejectListen)
       server.on('error', (e) => stderr.write(`serve: ${e.message}\n`))
       resolveListen()
     })
   })
+  try {
+    await listenOn(port)
+  } catch (e) {
+    // slug 由来の固定ポートが別プロセスに使われているときだけ空きポートへ退避する。
+    // 明示の --port は退避しない（ユーザーがその番号を期待している）。
+    if (!(fallbackToFreePort && e.code === 'EADDRINUSE')) throw e
+    stderr.write(`serve: ポート ${port} は使用中のため空きポートに退避します\n`)
+    await listenOn(0)
+  }
 
   process.on('SIGINT', onSigint)
   if (signal) {
@@ -164,7 +181,9 @@ export async function serveRound(o) {
   const bound = server.address().port
   const url = `http://127.0.0.1:${bound}/`
   stderr.write(`serve: ${url} — 全 ${total} 問。回答は ${outPath} に追記します（Ctrl-C で中断）\n`)
+  if (answers.size) stderr.write(`提出済み ${answers.size} / ${total}（読み戻し）\n`)
   onListening?.(url, bound)
+  if (answers.size >= total) scheduleFinish()
   if (openBrowser && process.platform === 'darwin') {
     try {
       spawn('open', [url], { stdio: 'ignore', detached: true }).unref()
@@ -174,6 +193,26 @@ export async function serveRound(o) {
   }
 
   return await exit
+}
+
+/** answers.jsonl を読み、壊れた行は捨てて record の配列を返す。無ければ空。 */
+async function readExistingAnswers(path) {
+  let text
+  try {
+    text = await readFile(path, 'utf8')
+  } catch (e) {
+    if (e.code === 'ENOENT') return []
+    throw e
+  }
+  const out = []
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const rec = JSON.parse(line)
+      if (rec && typeof rec === 'object') out.push(rec)
+    } catch { /* 壊れた行は無視 */ }
+  }
+  return out
 }
 
 function readBody(req) {

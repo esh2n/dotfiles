@@ -142,8 +142,21 @@ test('行内マークダウンは code / bold / 安全な link だけを通す',
   assert.equal(mdInline('<b>raw</b>'), '&lt;b&gt;raw&lt;/b&gt;')
 })
 
-test('ブロックマークダウンは段落とリストだけ', () => {
+test('ブロックマークダウンは段落とリスト', () => {
   assert.equal(mdBlocks(['あ', 'い', '', '- x', '- y']), '<p>あ い</p>\n<ul><li>x</li><li>y</li></ul>')
+})
+
+test('ブロックマークダウンの小見出しは深さを問わず h4 になる', () => {
+  assert.equal(mdBlocks(['#### 何の話か', '本文', '### 深さ 3 でも', '- x']),
+    '<h4>何の話か</h4>\n<p>本文</p>\n<h4>深さ 3 でも</h4>\n<ul><li>x</li></ul>')
+})
+
+test('ブロックマークダウンの GFM 表は区切り行を捨てて <table> になる', () => {
+  const html = mdBlocks(['| 案 | 部品 |', '|---|---|', '| A | 増える |', '| B | **増えない** |'])
+  assert.equal(html,
+    '<div class="scroll"><table class="md"><thead><tr><th>案</th><th>部品</th></tr></thead>'
+    + '<tbody><tr><td>A</td><td>増える</td></tr><tr><td>B</td><td><strong>増えない</strong></td></tr></tbody></table></div>')
+  assert.ok(!mdBlocks(['| <b>x</b> |', '|---|', '| y |']).includes('<b>x</b>'), '生 HTML は通さない')
 })
 
 test('answer 行を選択キーと補足に割る', () => {

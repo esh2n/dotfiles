@@ -29,6 +29,9 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans JP",system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.8;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 main{max-width:760px;margin:0 auto;padding:48px 20px 96px;display:grid;gap:40px}
+/* grid item は min-width:auto なので、列より広い図 (.scroll>svg) があると main ごと広がって
+   ページが右に寄る。子孫のブロックを min-width:0 にして、はみ出しを .scroll の中に閉じ込める。 */
+main>*,main section>*,main article>*,main .prose>*,main figure{min-width:0}
 h1,h2,h3{font-family:"Zen Kaku Gothic New","Noto Sans JP",sans-serif;text-wrap:balance;line-height:1.35;margin:0}
 h1{font-size:2rem;font-weight:700}
 h2{font-size:1.35rem;font-weight:700}
@@ -48,7 +51,12 @@ section{display:grid;gap:16px}
 .panel dt{color:var(--ink-3);font-size:.85rem;padding-top:.2em;white-space:nowrap}
 .panel dd{margin:0}
 .prose{display:grid;gap:10px;color:var(--ink-2)}
+.prose pre.code{margin:0;padding:10px 12px;background:var(--line-2);border-radius:6px;overflow-x:auto;font-size:.85rem;line-height:1.5}
+.prose pre.code code{background:none;padding:0;font-size:inherit;word-break:normal;white-space:pre}
 .prose ul{margin:0;padding-left:1.3em;display:grid;gap:4px}
+.prose h4{font-family:"Zen Kaku Gothic New","Noto Sans JP",sans-serif;font-size:.95rem;font-weight:700;color:var(--ink);margin:6px 0 0}
+.prose table.md th,.prose table.md td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+.prose table.md th{background:var(--line-2);color:var(--ink);font-weight:600;white-space:nowrap}
 ul.tree{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 ul.tree ul{list-style:none;margin:8px 0 0;padding:0 0 0 18px;display:grid;gap:8px;border-left:1px solid var(--line)}
 .tnode{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;line-height:1.6}

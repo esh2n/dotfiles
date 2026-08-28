@@ -100,13 +100,24 @@ async function mainServe(argv) {
 
   const html = await renderPage(round, { title: args.title, serve: true })
   const outPath = resolve(args.out || join(dirname(inputPath), 'answers.jsonl'))
+  // --port 省略時は slug から決まる固定ポートにする。ラウンドをまたいで同じ URL を
+  // 開き直せることが serve の使い勝手そのものなので、空きポート任せにしない。
+  const port = args.port || slugPort(round.frontmatter.slug)
   return await serveRound({
     round,
     html,
     outPath,
-    port: args.port,
+    port,
+    fallbackToFreePort: args.port === 0,
     openBrowser: args.open,
   })
+}
+
+/** slug を 40000〜49999 のポートに写す。同じ slug なら常に同じ番号。 */
+export function slugPort(slug) {
+  let h = 0
+  for (const ch of String(slug)) h = (h * 31 + ch.codePointAt(0)) >>> 0
+  return 40000 + (h % 10000)
 }
 
 export async function main(argv) {

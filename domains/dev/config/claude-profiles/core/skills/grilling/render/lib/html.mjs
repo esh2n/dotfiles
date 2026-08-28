@@ -36,25 +36,57 @@ function inlineRest(s) {
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
 }
 
-/** 段落とリストだけのブロックマークダウン。生の HTML は一切通さない。 */
+/**
+ * ブロックマークダウンの最小サブセット: 段落 / `- ` リスト / `####` 小見出し / GFM 表。
+ * 生の HTML は一切通さない。解説を「読み物」でなく構造化した「説明」にするための語彙。
+ */
 export function mdBlocks(lines) {
   const out = []
   let para = []
   let list = []
+  let table = []
   const flushPara = () => { if (para.length) { out.push(`<p>${mdInline(para.join(' '))}</p>`); para = [] } }
   const flushList = () => {
     if (list.length) { out.push(`<ul>${list.map((li) => `<li>${mdInline(li)}</li>`).join('')}</ul>`); list = [] }
   }
+  const flushTable = () => { if (table.length) { out.push(renderTable(table)); table = [] } }
+  let code = null // コードブロックの中は行をそのまま集める
   for (const raw of lines) {
+    if (code) {
+      if (/^```\s*$/.test(raw.trim())) { out.push(`<pre class="code"><code>${escapeHtml(code.body.join('\n'))}</code></pre>`); code = null }
+      else code.body.push(raw)
+      continue
+    }
     const line = raw.trim()
-    if (line === '') { flushPara(); flushList(); continue }
+    const fence = /^```(\S*)\s*$/.exec(line)
+    if (fence) { flushPara(); flushList(); flushTable(); code = { lang: fence[1], body: [] }; continue }
+    if (line === '') { flushPara(); flushList(); flushTable(); continue }
+    // 表: `| a | b |` の行が続く。区切り行 (`|---|---|`) は読み飛ばす
+    if (/^\|.*\|$/.test(line)) {
+      flushPara(); flushList()
+      if (!/^\|[\s:|-]+\|$/.test(line)) table.push(line)
+      continue
+    }
+    flushTable()
+    // 小見出し: 深さは問わず h4 に揃える（問いの h2 / 選択肢の h3 より下）
+    const h = /^#{3,6}\s+(.*)$/.exec(line)
+    if (h) { flushPara(); flushList(); out.push(`<h4>${mdInline(h[1])}</h4>`); continue }
     const li = /^[-*]\s+(.*)$/.exec(line)
     if (li) { flushPara(); list.push(li[1]); continue }
     flushList()
     para.push(line)
   }
-  flushPara(); flushList()
+  flushPara(); flushList(); flushTable()
   return out.join('\n')
+}
+
+/** GFM 表の行（先頭行が見出し行）を <table> にする。セルは mdInline を通す。 */
+function renderTable(rows) {
+  const cells = (row) => row.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+  const [head, ...body] = rows.map(cells)
+  const th = head.map((c) => `<th>${mdInline(c)}</th>`).join('')
+  const trs = body.map((r) => `<tr>${r.map((c) => `<td>${mdInline(c)}</td>`).join('')}</tr>`).join('')
+  return `<div class="scroll"><table class="md"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`
 }
 
 const TREE_STATE_LABEL = { decided: '決定済み', asked: '回答待ち', open: '未着手' }

@@ -113,6 +113,11 @@ export function parseRound(text) {
         if (!current) throw new SchemaError('question', '問い (### ❓ Q[n]) の外に question フェンスがあります')
         if (current.questionFence) throw new SchemaError('question', `Q${current.num}: question フェンスが 2 つあります`)
         current.questionFence = raw
+      } else {
+        // それ以外 (go / sql / text など) はコードブロックとして散文に残す。mdBlocks が <pre> にする
+        const codeLines = ['```' + info, ...body, '```']
+        if (mode === 'question' && current && !current.questionFence) current.prose.push(...codeLines)
+        else if (mode === 'premise' && premiseRaw) premiseRaw.prose.push(...codeLines)
       }
       continue
     }
