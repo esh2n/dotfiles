@@ -1,0 +1,18 @@
+{
+  "cases": [
+    { "input": "今のコードの流れ、見せて", "expect": true, "note": "「見せて」直接トリガー" },
+    { "input": "この差分どこが変わるか図にしてほしい", "expect": true, "note": "diff の一瞥、show-me の主用途" },
+    { "input": "/show-me このコンポーネント構造", "expect": true, "note": "コマンド直呼び" },
+    { "input": "構造をさっと一瞥したい", "expect": true, "note": "「一瞥したい」直接トリガー" },
+    { "input": "今の話を絵にして", "expect": true, "note": "「今の話を絵で」直接トリガー" },
+    { "input": "この関数呼び出しの関係をツリーで見せて", "expect": true, "note": "call tree ビュー" },
+    { "input": "このアルゴリズムの流れを疑似コードでさっと見せて", "expect": true, "note": "pseudocode ビュー、in-chat 前提" },
+    { "input": "この設計について決定記録を残して", "expect": false, "note": "durable doc は writeup" },
+    { "input": "量子もつれの仕組みを子供にもわかるように説明して", "expect": false, "note": "beginner explainer は eli5" },
+    { "input": "このプランの穴を突いて深掘りしてほしい", "expect": false, "note": "grilling の設計インタビュー" },
+    { "input": "今回の調査結果をまとめて資料にして", "expect": false, "note": "調査まとめは writeup" },
+    { "input": "この設計書にして残しておいて", "expect": false, "note": "保存前提の資料は writeup" },
+    { "input": "この判断をストレステストしてほしい", "expect": false, "note": "grilling の直接トリガー文言" },
+    { "input": "5歳児向けに絵本みたいに説明して", "expect": false, "note": "eli5 の領域" }
+  ]
+}

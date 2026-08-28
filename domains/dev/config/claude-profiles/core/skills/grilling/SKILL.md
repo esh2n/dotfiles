@@ -1,6 +1,6 @@
 ---
 name: grilling
-description: Relentless design interview that grills a plan, spec, or decision until you and the user reach shared understanding. Use when the user types /grilling, says "grill me", "詰めて", "深掘りして", "設計を詰めたい", "プランの穴を突いて", "この判断をストレステストして", or hands over a draft design and asks what is missing. Asks only decisions that carry a real trade-off — facts that code, config, or docs can answer are investigated by subagents instead of being asked. Every question ships with concrete options, what each option gains and loses, a recommendation naming the trade-off it prioritizes, and verified sources. Writes a decision record to the file given by --out.
+description: Relentless design interview that grills a plan, spec, or decision until you and the user reach shared understanding. Use when the user types /grilling, says "grill me", "詰めて", "深掘りして", "設計を詰めたい", "プランの穴を突いて", "この判断をストレステストして", or hands over a draft design and asks what is missing. Asks only decisions that carry a real trade-off — facts that code, config, or docs can answer are investigated by subagents instead of being asked. Every question ships with concrete options, what each option gains and loses, a recommendation naming the trade-off it prioritizes, and verified sources. Writes a decision record to the file given by --out. Not for writing a durable document (use writeup), a quick in-chat view (use show-me), or a beginner picture explainer (use eli5).
 ---
 
 # grilling

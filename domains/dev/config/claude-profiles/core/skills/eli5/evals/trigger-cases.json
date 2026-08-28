@@ -1,0 +1,16 @@
+{
+  "cases": [
+    { "input": "/eli5 ブロックチェーン", "expect": true, "note": "コマンド直呼び" },
+    { "input": "量子コンピュータの仕組みを5歳児にもわかるように教えて", "expect": true, "note": "explain like I'm five 直接トリガー" },
+    { "input": "非エンジニアの上司に見せられるくらい簡単に説明して", "expect": true, "note": "non-expert 向け、eli5 の想定読者" },
+    { "input": "TCPの仕組みってどういう感じ？めちゃくちゃ簡単に教えて", "expect": true, "note": "how does X actually work, simply" },
+    { "input": "子供でもわかるようにDNSの仕組みを絵で教えて", "expect": true, "note": "picture-first explainer" },
+    { "input": "新入社員向けにKubernetesを超わかりやすく説明して", "expect": true, "note": "new hire 向け、想定読者に一致" },
+    { "input": "この設計、見せて", "expect": false, "note": "in-chat の一枚絵は show-me" },
+    { "input": "この差分どこが変わるか一目でわかるようにして", "expect": false, "note": "show-me の領域" },
+    { "input": "この設計について決定記録として残して", "expect": false, "note": "durable doc は writeup" },
+    { "input": "このプランの穴を突いて、詰めてほしい", "expect": false, "note": "grilling の設計インタビュー" },
+    { "input": "Kubernetesについて詳しいリファレンスドキュメントとしてまとめて", "expect": false, "note": "深掘りのリファレンスは対象外、eli5 は簡略化専用" },
+    { "input": "この判断のトレードオフをストレステストして", "expect": false, "note": "grilling の直接トリガー文言" }
+  ]
+}

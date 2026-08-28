@@ -1,0 +1,18 @@
+{
+  "cases": [
+    { "input": "この設計について決定記録を残して", "expect": true, "note": "決定記録、writeup の核トリガー" },
+    { "input": "今回の調査結果をまとめて資料にしてください", "expect": true, "note": "調査まとめ、durable doc" },
+    { "input": "この文字起こしから議事録を作ってほしい", "expect": true, "note": "議事録、writeup の8種の一つ" },
+    { "input": "起票用にPBI資料にしてまとめておいて", "expect": true, "note": "PBI 資料" },
+    { "input": "このアーキテクチャ、設計書にしてください", "expect": true, "note": "設計書、明示トリガー" },
+    { "input": "参考資料まとめを作って、あとで見返せるように残して", "expect": true, "note": "参考資料まとめ + 保存前提" },
+    { "input": "/writeup 今日の作業メモ", "expect": true, "note": "コマンド直呼び" },
+    { "input": "この設計、見せて", "expect": false, "note": "一回きりの可視化は show-me。durable ではない" },
+    { "input": "今の話を絵で説明して", "expect": false, "note": "in-chat の一枚絵は show-me の領域" },
+    { "input": "量子コンピュータを子供にもわかるように説明して", "expect": false, "note": "初心者向け絵解きは eli5、writeup の絵解きは記録目的のみ" },
+    { "input": "このプランの穴を突いて、詰めてほしい", "expect": false, "note": "grilling の設計インタビュー。writeup はその後の記録先でしかない" },
+    { "input": "この差分、どこが変わるか一目でわかるようにして", "expect": false, "note": "コンパクトな差分ビューは show-me" },
+    { "input": "この判断、ストレステストしてほしい", "expect": false, "note": "grilling のトリガー文言そのもの" },
+    { "input": "5歳児にもわかるようにこの仕組みを教えて", "expect": false, "note": "eli5 の直接トリガー" }
+  ]
+}

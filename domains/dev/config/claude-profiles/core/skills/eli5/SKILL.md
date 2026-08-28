@@ -1,6 +1,6 @@
 ---
 name: eli5
-description: Explain a topic like I'm a 5 year old — a dead-simple picture explainer published as an HTML Artifact (big inline-SVG pictures, few words, one idea per panel). Use when the user types /eli5 <topic>, asks "how does X actually work, simply", "explain like I'm five", or wants something to show a non-expert (family, a new hire, a stakeholder). Not for reference docs or deep dives — use explain-page for those.
+description: Explain a topic like I'm a 5 year old — a dead-simple picture explainer published as an HTML Artifact (big inline-SVG pictures, few words, one idea per panel). Use when the user types /eli5 <topic>, asks "how does X actually work, simply", "explain like I'm five", or wants something to show a non-expert (family, a new hire, a stakeholder). Not for reference docs or deep dives (use writeup for a page that is kept) or a quick in-chat view (use show-me).
 metadata:
   origin: Anthropic official eli5 skill (one-line prompt), extended
 ---
@@ -51,7 +51,7 @@ Panels in this order, each a single sentence of "what it shows":
 
 - Load `artifact-design` (required) and `artifact-diagramming` (for the SVGs) before writing the file.
 - One scrolling page, one panel per screen-ish section; panels stack vertically on narrow screens.
-- Drawings are inline SVG with a handful of large shapes and thick strokes — no external images, no photos, no icon fonts. Use `currentColor` / CSS tokens so every drawing survives both light and dark theme.
+- Drawings are inline SVG with a handful of large shapes and thick strokes — no external images, no photos, no icon fonts. Use `currentColor` / CSS tokens so every drawing survives both light and dark theme. If the `writeup-kit` skill is installed (`../writeup-kit/kit/writeup.css` next to this skill, or `~/.claude/skills/writeup-kit/`), take the color and type tokens from it so explainers match the rest of the document family; do not use its components — pictures stay pictures.
 - Type: one large friendly face, headline ≥ 2rem, body ≥ 1.25rem. No bullet lists, no tables, no code blocks in the body.
 - Title: the topic as a short noun phrase. Favicon: one emoji matching the analogy.
 - Write the file to the scratchpad and publish with the Artifact tool; give the user the link.

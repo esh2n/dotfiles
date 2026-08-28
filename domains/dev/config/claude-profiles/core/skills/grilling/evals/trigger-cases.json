@@ -1,0 +1,16 @@
+{
+  "cases": [
+    { "input": "/grilling このプラン", "expect": true, "note": "コマンド直呼び" },
+    { "input": "この設計、詰めてほしい", "expect": true, "note": "「詰めて」直接トリガー" },
+    { "input": "このプランの穴を突いてほしい", "expect": true, "note": "「プランの穴を突いて」直接トリガー" },
+    { "input": "この判断をストレステストしてほしい", "expect": true, "note": "「判断をストレステストして」直接トリガー" },
+    { "input": "grill me on this design", "expect": true, "note": "英語トリガー" },
+    { "input": "この設計案、何が足りないか深掘りして共通理解を作りたい", "expect": true, "note": "「深掘りして」+ 共通理解、grilling の目的そのもの" },
+    { "input": "この設計、見せて", "expect": false, "note": "可視化のみは show-me" },
+    { "input": "この設計について決定記録を残して", "expect": false, "note": "記録作成は writeup" },
+    { "input": "5歳児にもわかるようにこの仕組みを説明して", "expect": false, "note": "eli5 の領域" },
+    { "input": "今の話を絵にして構造を一瞥したい", "expect": false, "note": "show-me の領域" },
+    { "input": "今回の調査結果をまとめて資料にして", "expect": false, "note": "調査まとめは writeup" },
+    { "input": "量子コンピュータの仕組みをすごく簡単に教えて", "expect": false, "note": "eli5 の領域、詰める意図はない" }
+  ]
+}

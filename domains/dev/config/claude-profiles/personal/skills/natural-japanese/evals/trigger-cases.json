@@ -1,0 +1,16 @@
+{
+  "cases": [
+    { "input": "議事録を自然な日本語に整えて", "expect": true, "note": "議事録の校正、対象doctype" },
+    { "input": "この調査レポート、AI臭さを消してほしい", "expect": true, "note": "AI臭さ除去、調査レポート" },
+    { "input": "このメールの文章、もっと自然な日本語にして", "expect": true, "note": "メール + 直接トリガー句" },
+    { "input": "この文章AIが書いた？スコアで判定して", "expect": true, "note": "AI臭さの診断・採点、書き換えなし" },
+    { "input": "noteの記事を新しく書きたい、テーマはこれ", "expect": true, "note": "note記事の新規執筆" },
+    { "input": "この報告書、結論から書き直して", "expect": true, "note": "報告書 + 「結論から書いて」トリガー" },
+    { "input": "この技術文書の章構成とMarkdownの脚注記法を整えて", "expect": false, "note": "章構成・Markdown整形は明示的に対象外" },
+    { "input": "この設計について決定記録を残して", "expect": false, "note": "決定記録は writeup の領域" },
+    { "input": "このプランの穴を突いて深掘りしてほしい", "expect": false, "note": "grilling の設計インタビュー" },
+    { "input": "この差分、どこが変わるか見せて", "expect": false, "note": "show-me の領域、文章の自然さの話ではない" },
+    { "input": "5歳児にもわかるようにこの仕組みを英語で説明して", "expect": false, "note": "eli5 の領域、AI臭さ除去ではなく簡略化の依頼" },
+    { "input": "このPythonコードのバグを直して", "expect": false, "note": "文章編集と無関係なコーディング依頼" }
+  ]
+}

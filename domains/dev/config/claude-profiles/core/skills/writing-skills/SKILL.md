@@ -166,6 +166,29 @@ Use skill name only, with explicit requirement markers — not `@` links, which 
 - Good: `**REQUIRED BACKGROUND:** You MUST understand systematic-debugging`
 - Bad: `@skills/testing/test-driven-development/SKILL.md`
 
+## Trigger Evaluation
+
+Description quality (CSO above) is a claim about behavior — verify it
+the same way you verify anything else in this skill: with a test, not
+a read-through. `scripts/trigger-eval.mjs` (zero-dep Node) checks
+whether a skill's frontmatter `description` alone triggers correctly
+against labeled example inputs, including hard negatives that resemble
+a neighbouring skill's territory.
+
+Add `evals/trigger-cases.json` to the skill directory, then:
+
+```bash
+node scripts/trigger-eval.mjs prepare <skill-dir> --out prompt.md
+# send prompt.md to a fresh sonnet subagent, save its JSON reply
+node scripts/trigger-eval.mjs score <skill-dir> answers.json
+```
+
+The harness never judges — it prepares the prompt and scores the
+judge's answers (TP/FP/FN/TN, precision/recall/accuracy, misses with
+notes). Edit the description, not the cases, until you hit 100% on
+train cases and ≥90% on holdout. Full workflow, including how to run
+the judge as a subagent: `references/trigger-eval.md`.
+
 ## Flowchart Usage
 
 Use a small inline flowchart ONLY for non-obvious decision points or "A vs B" choices where an agent might stop too early. Never use one for reference material (use tables/lists), code examples (use markdown blocks), or linear instructions (use numbered lists). Never use generic step labels (`step1`, `helper2`) — labels need semantic meaning.
