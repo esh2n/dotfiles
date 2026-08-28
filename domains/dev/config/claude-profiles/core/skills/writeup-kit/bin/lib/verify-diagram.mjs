@@ -541,15 +541,55 @@ async function renderAndVerify(ir, { column, forceElk, layoutMode }) {
 const countFailing = (r) => r.checks.filter((c) => !c.ok).length
 
 /** Candidate ranking for renderCheckedBest(): a candidate with zero
- * failures beats any that has one; among those, fewer warnings; then fewer
- * failing rows overall (today's crossing/geometry tie-break); a full tie
- * keeps the first-tried (heuristically preferred) candidate. Returns true
- * when `b` should replace `a`. */
+ * failures beats any that has one; among those, one that shows whole in the
+ * column (no sideways scroll — native or scaled within MIN_SCALE) beats one
+ * that scrolls; then fewer warnings; then fewer failing rows overall
+ * (today's crossing/geometry tie-break); a full tie keeps the first-tried
+ * (heuristically preferred) candidate. Returns true when `b` should
+ * replace `a`.
+ *
+ * "No scroll" ranks above "fewer warnings" deliberately: a budget warning
+ * is advisory text in `data-warn`, while a scrolling figure hides its
+ * right-hand part from every reader who doesn't drag sideways — a
+ * passing-but-1900px-wide layout must never outrank a compact one that
+ * fits. */
 function betterCandidate(a, b) {
   const aClean = a.failures.length === 0, bClean = b.failures.length === 0
   if (aClean !== bClean) return bClean
+  if (a.scroll !== b.scroll) return !b.scroll
   if (a.warnings.length !== b.warnings.length) return b.warnings.length < a.warnings.length
   return countFailing(b) < countFailing(a)
+}
+
+const isClean = (r) => r.checksOk && r.warnings.length === 0 && !r.scroll
+
+/** The orientation to retry when a pinned one can only be shown with a
+ * sideways scroll. */
+const otherDirection = (d) => (d === 'down' ? 'right' : 'down')
+
+/**
+ * Render `ir` in one layout mode and verify it; when `ir.direction` is
+ * pinned and that orientation falls back to scroll (wider than
+ * column / MIN_SCALE), also render the *other* orientation (pinned in a
+ * copy of the IR, so row #16 keeps treating it as an explicit choice) and
+ * return both candidates, pinned one first. An unpinned IR already picks
+ * its orientation inside renderDiagram() (see pickOrientation()), so it
+ * yields a single candidate; a pinned orientation that merely scales down
+ * (>= MIN_SCALE) is honored outright and also yields one.
+ *
+ * A pin is a preference about reading direction, not a request to scroll:
+ * the real page this was measured on carried `direction: right` (a
+ * Mermaid `flowchart LR` migrated 1:1) on a 3-group figure whose "right"
+ * layout is ~1400px wide even with spacing fixed — its groups' node and
+ * edge labels simply don't fit side by side in a 720px column — while
+ * "down" showed the whole figure at native size.
+ */
+async function renderCandidates(ir, { column, forceElk, layoutMode }) {
+  const first = await renderAndVerify(ir, { column, forceElk, layoutMode })
+  if (!ir.direction || !first.scroll) return [first]
+  const retry = { ...ir, direction: otherDirection(ir.direction) }
+  const second = await renderAndVerify(retry, { column, forceElk, layoutMode })
+  return [first, second]
 }
 
 /**
@@ -569,9 +609,15 @@ function betterCandidate(a, b) {
  *   elk first when the IR's cross-layer/in-layer edge shape is one the
  *   hand-drawn grouped-layer router is more likely to struggle with.
  *   Otherwise the better candidate wins (betterCandidate(): zero failures
- *   first, then fewer warnings, then fewer failing rows — so a caller
- *   reporting an exit-3 failure still gets the more-nearly-passing
- *   candidate's hints).
+ *   first, then no sideways scroll, then fewer warnings, then fewer failing
+ *   rows — so a caller reporting an exit-3 failure still gets the
+ *   more-nearly-passing candidate's hints).
+ *
+ * Orthogonally to the mode, every mode tried contributes one candidate per
+ * orientation renderCandidates() lays out: the IR's own (auto-picked, or
+ * pinned) orientation, plus the other one when a pinned orientation could
+ * only be shown scrolling. "Clean" — the early-return condition — means
+ * every row passes, no warning, and no scroll.
  *
  * @param {object} ir validated IR from ir.mjs
  * @param {{column?: number}} [opts]
@@ -581,19 +627,18 @@ function betterCandidate(a, b) {
  */
 export async function renderCheckedBest(ir, { column = COLUMN } = {}) {
   const mode = groupLayerMode(ir)
-  if (mode === 'forced-group') return renderAndVerify(ir, { column, forceElk: false, layoutMode: 'group' })
-  if (mode !== 'auto') return renderAndVerify(ir, { column, forceElk: true, layoutMode: 'elk' })
-
-  const preferElk = groupLayerHeuristicPrefersElk(ir)
-  const order = preferElk
-    ? [{ forceElk: true, layoutMode: 'elk' }, { forceElk: false, layoutMode: 'group' }]
-    : [{ forceElk: false, layoutMode: 'group' }, { forceElk: true, layoutMode: 'elk' }]
+  let order
+  if (mode === 'forced-group') order = [{ forceElk: false, layoutMode: 'group' }]
+  else if (mode !== 'auto') order = [{ forceElk: true, layoutMode: 'elk' }]
+  else if (groupLayerHeuristicPrefersElk(ir)) order = [{ forceElk: true, layoutMode: 'elk' }, { forceElk: false, layoutMode: 'group' }]
+  else order = [{ forceElk: false, layoutMode: 'group' }, { forceElk: true, layoutMode: 'elk' }]
 
   let best = null
   for (const opt of order) {
-    const result = await renderAndVerify(ir, { column, ...opt })
-    if (result.checksOk && result.warnings.length === 0) return result
-    if (!best || betterCandidate(best, result)) best = result
+    for (const result of await renderCandidates(ir, { column, ...opt })) {
+      if (isClean(result)) return result
+      if (!best || betterCandidate(best, result)) best = result
+    }
   }
   return best
 }
@@ -620,8 +665,16 @@ export async function renderChecked(ir, { column = COLUMN } = {}) {
  */
 async function renderSequenceChecked(ir, { column = COLUMN } = {}) {
   const rendered = renderSequenceDiagram(ir, { column })
-  const verification = verifySequence(ir, rendered)
-  return { ...rendered, checks: verification.checks, checksOk: verification.ok }
+  const verification = verifySequence(ir, rendered, { column })
+  return {
+    ...rendered,
+    checks: verification.checks,
+    checksOk: verification.ok,
+    failures: verification.failures,
+    warnings: verification.warnings,
+    warn: formatBudgetWarnings(verification.warnings),
+    layoutMode: 'sequence',
+  }
 }
 
 /**
@@ -641,25 +694,19 @@ async function renderSequenceChecked(ir, { column = COLUMN } = {}) {
  * @param {{column?: number, rawYaml?: string}} [opts]
  */
 export async function renderFigureHtmlChecked(ir, { column = COLUMN, rawYaml } = {}) {
-  if (ir.type === 'sequence') {
-    const best = await renderSequenceChecked(ir, { column })
-    const plainHtml = wrapFigureHtml(ir, best, { rawYaml })
-    let html = plainHtml.replace(/^<figure class="wu-figure"/, '<figure class="wu-figure" data-type="sequence"')
-    if (best.checksOk) {
-      html = html.replace('<figure class="wu-figure" data-type="sequence"', '<figure class="wu-figure" data-checks="pass" data-type="sequence"')
-    }
-    return { ...best, html, checks: best.checks, checksOk: best.checksOk }
-  }
-
-  // Flowchart: `data-checks="pass"` when no `fail` row failed; a budget
+  // Both kinds: `data-checks="pass"` when no `fail` row failed; a budget
   // overrun (warn rows) still passes and is surfaced as
-  // `data-warn="budget:nodes=11;budget:label=15"` (stable order, no
-  // attribute at all when there is nothing to warn about).
-  const best = await renderCheckedBest(ir, { column })
+  // `data-warn="budget:nodes=11;budget:label=15"` (flowchart) or
+  // `data-warn="budget:participants=7;budget:messages=20;budget:label=23"`
+  // (sequence) — stable order, no attribute at all when there is nothing
+  // to warn about. A sequence figure additionally carries
+  // `data-type="sequence"` (after the check attributes).
+  const isSequence = ir.type === 'sequence'
+  const best = isSequence ? await renderSequenceChecked(ir, { column }) : await renderCheckedBest(ir, { column })
   const plainHtml = wrapFigureHtml(ir, best, { rawYaml })
-  const warnAttr = best.warn ? ` data-warn="${best.warn}"` : ''
-  const html = best.checksOk
-    ? plainHtml.replace(/^<figure class="wu-figure"/, `<figure class="wu-figure" data-checks="pass"${warnAttr}`)
-    : plainHtml
+  const passAttr = best.checksOk ? ' data-checks="pass"' : ''
+  const warnAttr = best.checksOk && best.warn ? ` data-warn="${best.warn}"` : ''
+  const typeAttr = isSequence ? ' data-type="sequence"' : ''
+  const html = plainHtml.replace(/^<figure class="wu-figure"/, `<figure class="wu-figure"${passAttr}${warnAttr}${typeAttr}`)
   return { ...best, html, checks: best.checks, checksOk: best.checksOk }
 }

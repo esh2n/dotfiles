@@ -401,15 +401,16 @@ test('e2e: sequence directive renders a wu-figure sequence diagram when it fits 
   rmSync(dest, { recursive: true, force: true })
 })
 
-test('e2e: a sequence directive over budget falls back to a wu-steps list, IR kept for a later rerender', async () => {
+test('e2e: a sequence directive over budget still renders (guidance only), carries data-warn, and logs the warning', async () => {
   const dest = tmpDest()
   const { entry } = await migrateOne('2026-01-17-sequence-overflow.md', { dryRun: false, dest })
-  assert.equal(entry.sequenceAsSteps, 1)
-  assert.equal(entry.figures.fallback, 1)
+  assert.equal(entry.sequenceAsSteps, 0)
+  assert.equal(entry.figures.ok, 1)
+  assert.equal(entry.figures.fallback, 0)
+  assert.ok(entry.warnings.some((w) => w.includes('budget:messages=17')), JSON.stringify(entry.warnings))
   const html = readFileSync(join(dest, entry.dest), 'utf8')
-  assert.match(html, /<figure class="wu-figure" data-type="sequence">/)
-  assert.ok(!html.includes('data-checks="pass"'))
-  assert.match(html, /class="wu-steps"/)
+  assert.match(html, /<figure class="wu-figure" data-checks="pass" data-warn="budget:messages=17" data-type="sequence">/)
+  assert.ok(!html.includes('class="wu-steps"'))
   assert.match(html, /<script type="text\/x-writeup-diagram">/)
   rmSync(dest, { recursive: true, force: true })
 })

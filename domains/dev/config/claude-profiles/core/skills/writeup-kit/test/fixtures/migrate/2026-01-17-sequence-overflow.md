@@ -1,6 +1,6 @@
 ---
 title: シーケンス超過テスト
-summary: sequence directive がメッセージ上限を超えて steps へフォールバックすることを確認する。
+summary: sequence directive がメッセージ上限を超えても図として描かれ、data-warn を持つことを確認する。
 date: 2026-01-17
 tags: [test]
 ---

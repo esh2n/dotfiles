@@ -152,6 +152,16 @@ a hint to the author to consider splitting it (`bin/render-diagram.mjs`
 echoes the warning on stderr, `bin/rerender-figures.mjs` counts it under
 `warned:`, and self-check reports it as the warn row above).
 
+A `type: sequence` figure follows the same policy with its own three
+budgets (participants ≤ 6, rows ≤ 16, message label ≤ 16 chars —
+`bin/lib/verify-sequence.mjs` rows #1–#3, `warn`): the overrun is stamped
+as `data-warn="budget:participants=7;budget:messages=20;budget:label=23"`
+(stable order participants → messages → label), while geometry — labels
+and notes clearing every lifeline they do not belong to, the scale floor
+of 0.78 or the scroll fallback — decides pass/fail. The same tools read
+both kinds through the one `data-warn` attribute; nothing special-cases
+`data-type="sequence"`.
+
 ### `.wu-figure` / IR script escaping
 
 A `.wu-figure`'s `<script type="text/x-writeup-diagram">` block carries the

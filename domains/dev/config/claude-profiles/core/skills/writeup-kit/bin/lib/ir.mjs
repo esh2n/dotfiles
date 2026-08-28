@@ -1,8 +1,9 @@
 // Validates and normalizes a parsed diagram IR object against the writeup
 // contract (§4-1 IR shape, §4-2 budgets). Schema violations throw IrError
 // internally and are turned into a structured `{ ok:false, reason:'schema' }`
-// result; budget overruns become `{ ok:false, reason:'budget', suggestion }`
-// so a caller can print the reason without a stack trace.
+// result; the emphasis cap is the one budget that still rejects
+// (`{ ok:false, reason:'budget', suggestion }`), every other budget overrun
+// comes back as an advisory `warnings` entry on an `ok:true` result.
 
 export class IrError extends Error {
   constructor(message) {
@@ -36,11 +37,12 @@ const IR_TYPES = new Set(['diagram', 'sequence'])
 
 /**
  * Schema violations and the emphasis cap are hard rejections. The four
- * flowchart budgets (nodes / edges / groups / edge-label length) are
- * guidance, not gates: an over-budget IR still validates, and the overruns
- * come back as `warnings` (see budgetWarnings()) so the renderer can draw
- * the figure and stamp `data-warn` on it while verified geometry decides
- * pass/fail. `type: sequence` keeps its own budget handling untouched.
+ * flowchart budgets (nodes / edges / groups / edge-label length) and the
+ * three sequence budgets (participants / messages / message-label length)
+ * are guidance, not gates: an over-budget IR still validates, and the
+ * overruns come back as `warnings` (see budgetWarnings() /
+ * sequenceBudgetWarnings()) so the renderer can draw the figure and stamp
+ * `data-warn` on it while verified geometry decides pass/fail.
  *
  * @param {unknown} raw parsed IR (from yaml-lite or JSON)
  * @returns {{ok:true, ir:object, warnings:Array<{key:string, value:number, limit:number, detail:string, hint:string}>} | {ok:false, reason:'schema'|'budget', message:string, suggestion?:string}}
@@ -53,11 +55,7 @@ export function validateIR(raw) {
     if (e instanceof IrError) return { ok: false, reason: 'schema', message: e.message }
     throw e
   }
-  if (ir.type === 'sequence') {
-    const budget = checkSequenceBudgets(ir)
-    if (!budget.ok) return budget
-    return { ok: true, ir, warnings: [] }
-  }
+  if (ir.type === 'sequence') return { ok: true, ir, warnings: sequenceBudgetWarnings(ir) }
   const hard = checkBudgets(ir)
   if (!hard.ok) return hard
   return { ok: true, ir, warnings: budgetWarnings(ir) }
@@ -336,37 +334,51 @@ function normalizeMessages(raw, participantIds) {
   })
 }
 
-function checkSequenceBudgets(ir) {
-  const violations = []
+/**
+ * The three sequence budgets (SEQUENCE_LIMITS: participants ≤ 6, rows ≤ 16,
+ * message/self label ≤ 16 chars) as advisory warnings — the `type:
+ * sequence` counterpart of budgetWarnings() below, same record shape, so
+ * verify-diagram.mjs / rerender-figures.mjs / self-check.mjs handle both
+ * figure kinds through one code path. Verified geometry (sequence.mjs
+ * widens a column gap to fit the widest label between its lifelines;
+ * verify-sequence.mjs checks the result) decides whether a figure renders.
+ * Order is stable (participants, messages, label) so the `data-warn`
+ * attribute built from it (formatBudgetWarnings()) is byte-stable too.
+ *
+ * @param {object} ir normalized `type: sequence` IR
+ * @returns {Array<{key:string, value:number, limit:number, detail:string, hint:string}>}
+ */
+export function sequenceBudgetWarnings(ir) {
+  const out = []
   if (ir.participants.length > SEQUENCE_LIMITS.maxParticipants) {
-    violations.push(`participants: ${ir.participants.length} > ${SEQUENCE_LIMITS.maxParticipants}`)
+    out.push({
+      key: 'budget:participants', value: ir.participants.length, limit: SEQUENCE_LIMITS.maxParticipants,
+      detail: `${ir.participants.length} participant(s) (guidance ≤ ${SEQUENCE_LIMITS.maxParticipants})`,
+      hint: 'consider splitting the sequence: draw one sequence diagram per participant subset',
+    })
   }
   if (ir.messages.length > SEQUENCE_LIMITS.maxMessages) {
-    violations.push(`messages: ${ir.messages.length} > ${SEQUENCE_LIMITS.maxMessages}`)
+    out.push({
+      key: 'budget:messages', value: ir.messages.length, limit: SEQUENCE_LIMITS.maxMessages,
+      detail: `${ir.messages.length} row(s) (guidance ≤ ${SEQUENCE_LIMITS.maxMessages})`,
+      hint: `consider splitting the sequence: split after message ${SEQUENCE_LIMITS.maxMessages}`,
+    })
   }
+  const longLabels = []
   ir.messages.forEach((m, i) => {
-    if ((m.rowType === 'message' || m.rowType === 'self') && m.label && [...m.label].length > SEQUENCE_LIMITS.maxLabelLen) {
-      violations.push(`messages[${i}].label "${m.label}" exceeds ${SEQUENCE_LIMITS.maxLabelLen} chars`)
-    }
+    if (m.rowType !== 'message' && m.rowType !== 'self') return
+    const len = m.label ? [...m.label].length : 0
+    if (len > SEQUENCE_LIMITS.maxLabelLen) longLabels.push({ i, label: m.label, len })
   })
-
-  if (violations.length === 0) return { ok: true }
-  return {
-    ok: false,
-    reason: 'budget',
-    message: violations.join('; '),
-    suggestion: buildSequenceSplitSuggestion(ir),
+  if (longLabels.length) {
+    const longest = longLabels.reduce((a, b) => (b.len > a.len ? b : a))
+    out.push({
+      key: 'budget:label', value: longest.len, limit: SEQUENCE_LIMITS.maxLabelLen,
+      detail: longLabels.map((e) => `messages[${e.i}].label "${e.label}" is ${e.len} chars (guidance ≤ ${SEQUENCE_LIMITS.maxLabelLen})`).join('; '),
+      hint: longLabels.map((e) => `shorten label of message ${e.i + 1} ("${e.label}", ${e.len} > ${SEQUENCE_LIMITS.maxLabelLen})`).join('; ') + ', or move the wording into a note',
+    })
   }
-}
-
-function buildSequenceSplitSuggestion(ir) {
-  if (ir.messages.length > SEQUENCE_LIMITS.maxMessages) {
-    return `split: draw a second sequence diagram continuing after message ${SEQUENCE_LIMITS.maxMessages}`
-  }
-  if (ir.participants.length > SEQUENCE_LIMITS.maxParticipants) {
-    return 'split: draw one sequence diagram per participant subset'
-  }
-  return 'shorten the offending label(s), or split into two sequence diagrams'
+  return out
 }
 
 // --- budgets -------------------------------------------------------------
@@ -434,8 +446,9 @@ export function budgetWarnings(ir) {
   return out
 }
 
-/** `data-warn` attribute value: `budget:nodes=11;budget:label=15` (stable
- * order, semicolon-separated); '' when there is nothing to warn about. */
+/** `data-warn` attribute value: `budget:nodes=11;budget:label=15` (or, for
+ * a sequence, `budget:participants=7;budget:messages=20;budget:label=23`) —
+ * stable order, semicolon-separated; '' when there is nothing to warn about. */
 export function formatBudgetWarnings(warnings) {
   return warnings.map((w) => `${w.key}=${w.value}`).join(';')
 }

@@ -234,7 +234,7 @@ export async function renderDiagram(node, ctx) {
     return { html: fallbackFigureHtml(candidateIR, 'render-error', e.message), warnings, figureOk: false }
   }
   if (!rendered.checksOk) {
-    const failingChecks = rendered.checks.filter((c) => !c.ok)
+    const failingChecks = rendered.failures ?? rendered.checks.filter((c) => !c.ok)
     const failing = failingChecks.map((c) => c.name).join(', ')
     warnings.push(`diagram: verification failed (${failing})`)
     const hint = failingChecks.map((c) => c.hint).filter(Boolean).join('; ')
@@ -244,9 +244,12 @@ export async function renderDiagram(node, ctx) {
   return { html: rendered.html, warnings, figureOk: true }
 }
 
-// --- sequence (rendered as a wu-figure sequence diagram when it fits the
-// contract budget; falls back to the old steps-list rendering, with the
-// candidate IR kept in the fallback figure's script, otherwise) -----------
+// --- sequence (rendered as a wu-figure sequence diagram whenever its
+// geometry verifies — the participant/message/label budgets are guidance,
+// logged as warnings and stamped as data-warn, never a reason to fall
+// back; falls back to the old steps-list rendering, with the candidate IR
+// kept in the fallback figure's script, on a schema error or a geometry
+// failure) --------------------------------------------------------------
 
 /** The pre-M2 rendering: one step per line, "A → B: label" / "注 (A): text".
  * Used both as the final output when the candidate IR never even validates
@@ -304,6 +307,12 @@ export async function renderSequence(node, ctx) {
     warnings.push(`sequence: ${validated.reason} violation — ${validated.message}`)
     return { html: sequenceFallbackHtml(parsed, candidateIR, validated.reason, validated.message), warnings, figureOk: false }
   }
+  // Budget overruns are guidance, not a gate (same as renderDiagram()
+  // above): the figure is still drawn and carries data-warn; note it in
+  // the migration report so the author can consider splitting it later.
+  for (const w of validated.warnings ?? []) {
+    warnings.push(`sequence: budget warning — ${w.key}=${w.value} (${w.detail})`)
+  }
 
   let rendered
   try {
@@ -313,7 +322,7 @@ export async function renderSequence(node, ctx) {
     return { html: sequenceFallbackHtml(parsed, candidateIR, 'render-error', e.message), warnings, figureOk: false }
   }
   if (!rendered.checksOk) {
-    const failingChecks = rendered.checks.filter((c) => !c.ok)
+    const failingChecks = rendered.failures ?? rendered.checks.filter((c) => !c.ok)
     const failing = failingChecks.map((c) => c.name).join(', ')
     warnings.push(`sequence: verification failed (${failing})`)
     const hint = failingChecks.map((c) => c.hint).filter(Boolean).join('; ')

@@ -214,16 +214,16 @@ id: s1
 type: sequence
 title: 更新通知の取り込み
 caption: 1 日 1 回、ページ単位で取り込む
-participants:            # ≤6, left→right order
+participants:            # ≤6 (guidance), left→right order
   - id: sched
     label: スケジューラ
   - id: api
     label: 更新通知 API
     tone: rs
-messages:                 # ≤16 rows total, top→bottom order
+messages:                 # ≤16 rows total (guidance), top→bottom order
   - from: sched
     to: api
-    label: 1 ページ取得        # ≤16 chars
+    label: 1 ページ取得        # ≤16 chars (guidance)
     kind: sync             # sync | async | reply (reply = dashed, open arrow)
   - from: api
     to: sched
@@ -239,6 +239,20 @@ Rendered ids are prefixed the same way (`wu-d-<id>-`), and the figure
 carries `data-type="sequence"` alongside `data-checks="pass"` so
 `bin/rerender-figures.mjs` and the migration converter can tell which
 verifier a stored figure's embedded IR needs without re-parsing it. The
+three budgets (participants ≤ 6, rows ≤ 16, message/self label ≤ 16
+chars) are guidance with the same policy as the node/edge diagram's: an
+overrun is a `warn` row, the figure still renders and passes, and the
+overrun is stamped as
+`data-warn="budget:participants=7;budget:messages=20;budget:label=23"`
+(stable order participants → messages → label). What gates rendering is
+geometry: the layout widens the gap between two lifelines to fit the
+widest message label drawn between them (and the gap beside a self-label
+or a wide note), the verifier fails a label/note that still runs within
+6px of a lifeline it does not belong to (`lifeline-clearance`) or of
+another label (`label-clearance`), and a figure wider than the 720px
+column takes the same scale-down-to-0.78-or-scroll decision as a node
+diagram (`projected-scale`). A label on an arrow that crosses a middle
+lifeline is drawn over a surface-colored mask rather than rejected. The
 `messages` budget (≤16) counts every row — plain messages, notes, and
 self-messages alike, since each occupies its own 40px row regardless of
 kind. A `from`/`to` message and a `self` message never share a `kind`

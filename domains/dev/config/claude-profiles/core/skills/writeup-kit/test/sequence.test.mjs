@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
-import { validateIR, SEQUENCE_LIMITS } from '../bin/lib/ir.mjs'
+import { validateIR, SEQUENCE_LIMITS, formatBudgetWarnings } from '../bin/lib/ir.mjs'
 import { layoutSequence, renderSequenceDiagram } from '../bin/lib/sequence.mjs'
 import { verifySequence } from '../bin/lib/verify-sequence.mjs'
 import { renderFigureHtmlChecked } from '../bin/lib/verify-diagram.mjs'
@@ -122,33 +122,45 @@ describe('ir.mjs: type: sequence schema', () => {
   })
 })
 
-describe('ir.mjs: SEQUENCE_LIMITS budgets', () => {
-  test('more than 6 participants is a budget error with a split suggestion', () => {
+describe('ir.mjs: SEQUENCE_LIMITS budgets are advisory warnings', () => {
+  test('more than 6 participants validates with a budget:participants warning and a split hint', () => {
     const result = ir('seq-too-many-participants.yaml')
-    assert.equal(result.ok, false)
-    assert.equal(result.reason, 'budget')
-    assert.match(result.message, /participants: 7 > 6/)
-    assert.match(result.suggestion, /split/)
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:participants=7'])
+    assert.equal(result.warnings[0].limit, SEQUENCE_LIMITS.maxParticipants)
+    assert.match(result.warnings[0].hint, /split/)
   })
 
-  test('more than 16 message rows is a budget error', () => {
+  test('more than 16 message rows validates with a budget:messages warning', () => {
     const result = ir('seq-over-messages.yaml')
-    assert.equal(result.ok, false)
-    assert.equal(result.reason, 'budget')
-    assert.match(result.message, /messages: 17 > 16/)
-    assert.match(result.suggestion, /continuing after message 16/)
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:messages=17'])
+    assert.match(result.warnings[0].hint, /split after message 16/)
   })
 
-  test('a message label over 16 chars is a budget error', () => {
+  test('a message label over 16 chars validates with a budget:label warning naming the message', () => {
     const result = ir('seq-label-too-long.yaml')
-    assert.equal(result.ok, false)
-    assert.equal(result.reason, 'budget')
-    assert.match(result.message, /exceeds 16 chars/)
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:label=20'])
+    assert.match(result.warnings[0].detail, /messages\[0\]\.label/)
+    assert.match(result.warnings[0].hint, /shorten label of message 1/)
   })
 
-  test('exactly 6 participants and 16 messages both validate (at the limit, not over it)', () => {
-    const six = validIr('seq-six-participants.yaml')
-    assert.equal(six.participants.length, 6)
+  test('all three overruns warn at once, in stable participants → messages → label order', () => {
+    const result = validateIR({
+      id: 's', type: 'sequence', title: 't',
+      participants: Array.from({ length: 7 }, (_, i) => ({ id: `p${i}`, label: `P${i}` })),
+      messages: Array.from({ length: 20 }, (_, i) => ({ from: 'p0', to: 'p1', kind: 'sync', label: i === 0 ? 'x'.repeat(23) : 'm' })),
+    })
+    assert.equal(result.ok, true)
+    assert.equal(formatBudgetWarnings(result.warnings), 'budget:participants=7;budget:messages=20;budget:label=23')
+  })
+
+  test('exactly 6 participants and 16 messages both validate with no warning (at the limit, not over it)', () => {
+    const six = ir('seq-six-participants.yaml')
+    assert.equal(six.ok, true)
+    assert.equal(six.ir.participants.length, 6)
+    assert.deepEqual(six.warnings, [])
   })
 })
 
@@ -183,6 +195,103 @@ describe('sequence.mjs: layoutSequence', () => {
     const [a, b] = note.over.map((id) => layout.geo.lifelines.find((ll) => ll.id === id).x)
     const lo = Math.min(a, b), hi = Math.max(a, b)
     assert.ok(note.x <= lo && note.x + note.width >= hi)
+  })
+
+  test('a long message label widens the gap between its two lifelines instead of overlapping them', () => {
+    const short = validIr('seq-simple.yaml')
+    const long = structuredClone(short)
+    long.messages[0].label = 'request(socV2s, entityType, template, filename)'
+    const gapOf = (layout, from, to) => {
+      const x = (id) => layout.geo.lifelines.find((ll) => ll.id === id).x
+      return Math.abs(x(to) - x(from))
+    }
+    const { from, to } = long.messages[0]
+    const before = layoutSequence(short)
+    const after = layoutSequence(long)
+    assert.ok(gapOf(after, from, to) > gapOf(before, from, to), 'the gap should grow to fit the label')
+    const row = after.geo.rows[0]
+    const lo = Math.min(row.path[0].x, row.path[1].x), hi = Math.max(row.path[0].x, row.path[1].x)
+    assert.ok(row.label.x >= lo + 6, `label starts ${row.label.x}, lifeline at ${lo}`)
+    assert.ok(row.label.x + row.label.width <= hi - 6, `label ends ${row.label.x + row.label.width}, lifeline at ${hi}`)
+  })
+
+  test('a long label on a→b never reaches the neighbouring lifeline c', () => {
+    const v = validateIR({
+      id: 'w', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }],
+      messages: [{ from: 'a', to: 'b', kind: 'sync', label: 'とても長いメッセージラベルで隣の列まで届きそうな文' }],
+    })
+    assert.ok(v.ok)
+    const layout = layoutSequence(v.ir)
+    const c = layout.geo.lifelines.find((ll) => ll.id === 'c').x
+    const label = layout.geo.rows[0].label
+    assert.ok(label.x + label.width <= c - 6)
+    const result = verifySequence(v.ir, renderSequenceDiagram(v.ir))
+    assert.equal(byId(result.checks, 13).ok, true, JSON.stringify(byId(result.checks, 13)))
+  })
+
+  test('a long self-message label widens the gap to the next column', () => {
+    const v = validateIR({
+      id: 'w', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+      messages: [{ self: 'a', label: '自分自身への長いラベル付き呼び出し' }],
+    })
+    assert.ok(v.ok)
+    const layout = layoutSequence(v.ir)
+    const b = layout.geo.lifelines.find((ll) => ll.id === 'b').x
+    const label = layout.geo.rows[0].label
+    assert.ok(label.x + label.width <= b - 6, `self label ends ${label.x + label.width}, lifeline b at ${b}`)
+  })
+
+  test('a wide note over one participant widens both neighbouring gaps and never overhangs the left edge', () => {
+    const v = validateIR({
+      id: 'w', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }],
+      messages: [
+        { note: 'とても長い注記がひとつの列の上に置かれて両隣まで届きそう', over: ['b'] },
+        { note: '左端の列の上の長い注記', over: ['a'] },
+      ],
+    })
+    assert.ok(v.ok)
+    const layout = layoutSequence(v.ir)
+    const x = (id) => layout.geo.lifelines.find((ll) => ll.id === id).x
+    const [wide, left] = layout.geo.rows
+    assert.ok(wide.x >= x('a') + 6 && wide.x + wide.width <= x('c') - 6)
+    assert.ok(left.x >= 0, `note x=${left.x} runs off the left edge`)
+    const result = verifySequence(v.ir, renderSequenceDiagram(v.ir))
+    assert.equal(byId(result.checks, 13).ok, true, JSON.stringify(byId(result.checks, 13)))
+  })
+
+  test('a label over a lifeline its arrow crosses is masked with the surface color, not rejected', () => {
+    const v = validateIR({
+      id: 'w', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }],
+      messages: [{ from: 'a', to: 'c', kind: 'sync', label: 'crossing b' }],
+    })
+    assert.ok(v.ok)
+    const rendered = renderSequenceDiagram(v.ir)
+    assert.deepEqual(rendered.layout.geo.rows[0].crosses, ['b'])
+    assert.match(rendered.svg, /<rect [^>]*fill="var\(--wu-surface\)" stroke="none"\/><text id="wu-d-w-message-0-label"/)
+    const result = verifySequence(v.ir, rendered)
+    assert.equal(result.ok, true, JSON.stringify(result.failures))
+  })
+
+  test('a note over one column followed by a labeled message into that column keeps label clearance (the real CSV-download page)', () => {
+    const v = validateIR({
+      id: 'w', type: 'sequence', title: 't',
+      participants: [{ id: 'u', label: 'ユーザー' }, { id: 'fe', label: '画面 / Next.js' }, { id: 'job', label: 'CsvDownloadJobService' }],
+      messages: [
+        { from: 'job', to: 'fe', kind: 'reply', label: '受付' },
+        { note: 'ダウンロード履歴画面へ遷移', over: ['fe'] },
+        { from: 'u', to: 'fe', kind: 'sync', label: '準備完了後に「ダウンロード」' },
+      ],
+    })
+    assert.ok(v.ok)
+    const rendered = renderSequenceDiagram(v.ir)
+    const [, note, next] = rendered.layout.geo.rows
+    assert.ok(note.y + note.height + 6 <= next.label.y, `note bottom ${note.y + note.height} reaches the next label at ${next.label.y}`)
+    const result = verifySequence(v.ir, rendered)
+    assert.deepEqual(result.failures, [])
   })
 
   test('a self row loops out to the right of its own lifeline and back', () => {
@@ -244,26 +353,43 @@ describe('verify-sequence.mjs', () => {
     }
   })
 
-  test('#1 participant-count fails when the ir itself carries more than 6 (hand-built, bypassing budgets)', () => {
-    const bigIr = { ...goodIr(), participants: Array.from({ length: 7 }, (_, i) => ({ id: `p${i}`, label: `P${i}`, tone: 'neutral' })) }
-    const result = verifySequence(bigIr, goodRender())
-    assert.equal(byId(result.checks, 1).ok, false)
+  test('every row carries a severity: #1–#3 are warn, everything else fail', () => {
+    const result = verifySequence(goodIr(), goodRender())
+    for (const c of result.checks) assert.equal(c.severity, c.id <= 3 ? 'warn' : 'fail', `#${c.id} ${c.name}`)
+    assert.deepEqual(result.failures, [])
+    assert.deepEqual(result.warnings, [])
   })
 
-  test('#2 message-count fails when the ir carries more than 16 rows', () => {
+  test('#1 participant-count warns (ok stays true) when the ir carries more than 6', () => {
+    const bigIr = { ...goodIr(), participants: Array.from({ length: 7 }, (_, i) => ({ id: `p${i}`, label: `P${i}`, tone: 'neutral' })) }
+    const result = verifySequence(bigIr, goodRender())
+    const c = byId(result.checks, 1)
+    assert.equal(c.ok, false)
+    assert.equal(c.severity, 'warn')
+    assert.equal(c.key, 'budget:participants')
+    assert.equal(c.value, 7)
+    assert.equal(result.warnings.length, 1)
+    assert.equal(result.warnings[0].key, 'budget:participants')
+    assert.ok(!result.failures.some((f) => f.id === 1))
+  })
+
+  test('#2 message-count warns when the ir carries more than 16 rows', () => {
     const manyIr = { ...goodIr(), messages: Array.from({ length: 17 }, () => ({ rowType: 'message', from: 'sched', to: 'api', label: '', kind: 'sync' })) }
     const result = verifySequence(manyIr, goodRender())
     assert.equal(byId(result.checks, 2).ok, false)
+    assert.equal(byId(result.checks, 2).severity, 'warn')
     assert.match(byId(result.checks, 2).hint, /split after message 16/)
   })
 
-  test('#3 label-length fails on a message label over 16 chars, with a "shorten label of message N" hint', () => {
+  test('#3 label-length warns on a message label over 16 chars, with a "shorten label of message N" hint', () => {
     const longIr = structuredClone(goodIr())
     longIr.messages[0].label = 'この文はとても長くて十六文字を超えます'
     const result = verifySequence(longIr, goodRender())
     const c = byId(result.checks, 3)
     assert.equal(c.ok, false)
+    assert.equal(c.severity, 'warn')
     assert.match(c.hint, /shorten label of message 1/)
+    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:label=19'])
   })
 
   test('#4 references-exist fails when a message references an unknown participant', () => {
@@ -301,6 +427,58 @@ describe('verify-sequence.mjs', () => {
     labeled[1].label.y = labeled[0].label.y
     const result = verifySequence(goodIr(), bad)
     assert.equal(byId(result.checks, 7).ok, false)
+  })
+
+  test('#7 label-clearance is about labels only: a label pushed onto a lifeline is #13, not #7', () => {
+    const bad = structuredClone(goodRender())
+    const msg = bad.layout.geo.rows.find((r) => r.type === 'message' && r.label)
+    const other = bad.layout.geo.lifelines.find((ll) => ll.id !== msg.from && ll.id !== msg.to)
+      ?? bad.layout.geo.lifelines.find((ll) => ll.id === msg.to)
+    msg.label.x = other.x - 4
+    const result = verifySequence(goodIr(), bad)
+    assert.equal(byId(result.checks, 7).ok, true)
+    assert.equal(byId(result.checks, 13).ok, false)
+    assert.match(byId(result.checks, 13).detail, new RegExp(`lifeline "${other.id}"`))
+  })
+
+  test('#13 lifeline-clearance catches a message label widened over the neighbouring lifeline', () => {
+    const v = validateIR({
+      id: 'w', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }],
+      messages: [{ from: 'a', to: 'b', kind: 'sync', label: 'ok' }],
+    })
+    const bad = structuredClone(renderSequenceDiagram(v.ir))
+    const c = bad.layout.geo.lifelines.find((ll) => ll.id === 'c').x
+    bad.layout.geo.rows[0].label.width = c - bad.layout.geo.rows[0].label.x + 4
+    const result = verifySequence(v.ir, bad)
+    assert.equal(byId(result.checks, 13).ok, false)
+    assert.equal(result.ok, false)
+    assert.ok(result.failures.some((f) => f.name === 'lifeline-clearance'))
+  })
+
+  test('#13 lifeline-clearance catches a note box that reaches a lifeline outside its "over" span', () => {
+    const v = validateIR({
+      id: 'w', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+      messages: [{ note: 'n', over: ['a'] }],
+    })
+    const bad = structuredClone(renderSequenceDiagram(v.ir))
+    const note = bad.layout.geo.rows[0]
+    const b = bad.layout.geo.lifelines.find((ll) => ll.id === 'b')
+    note.width = b.x + 4 - note.x
+    const result = verifySequence(v.ir, bad)
+    assert.equal(byId(result.checks, 13).ok, false)
+    assert.match(byId(result.checks, 13).detail, /note\[0\] is 0\.0px from lifeline "b"/)
+  })
+
+  test('#14 projected-scale fails when a hand-built result is too wide for the column without the scroll fallback', () => {
+    const bad = structuredClone(goodRender())
+    bad.width = 2000
+    bad.scroll = false
+    const result = verifySequence(goodIr(), bad, { column: 720 })
+    assert.equal(byId(result.checks, 14).ok, false)
+    bad.scroll = true
+    assert.equal(byId(verifySequence(goodIr(), bad, { column: 720 }).checks, 14).ok, true)
   })
 
   test('#8 font-size fails on an ad-hoc font-size in the svg', () => {
@@ -349,6 +527,31 @@ describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: sequence'
     assert.match(rendered.html, /<script type="text\/x-writeup-diagram">/)
   })
 
+  test('the three over-budget fixtures render as passing figures carrying data-warn, with every geometry row green', async () => {
+    const expected = {
+      'seq-over-messages.yaml': 'budget:messages=17',
+      'seq-label-too-long.yaml': 'budget:label=20',
+      'seq-too-many-participants.yaml': 'budget:participants=7',
+    }
+    for (const [name, warn] of Object.entries(expected)) {
+      const rendered = await renderFigureHtmlChecked(validIr(name), { rawYaml: fixture(name) })
+      assert.equal(rendered.checksOk, true, `${name}: ${JSON.stringify(rendered.failures)}`)
+      assert.deepEqual(rendered.failures, [], name)
+      assert.equal(rendered.warn, warn, name)
+      assert.ok(rendered.html.startsWith(`<figure class="wu-figure" data-checks="pass" data-warn="${warn}" data-type="sequence">`), `${name}: ${rendered.html.slice(0, 120)}`)
+      const geometry = rendered.checks.filter((c) => c.severity === 'fail')
+      assert.ok(geometry.every((c) => c.ok), `${name}: ${JSON.stringify(geometry.filter((c) => !c.ok))}`)
+    }
+  })
+
+  test('the 7-participant fixture goes through the same scale/scroll decision as a node diagram', async () => {
+    const rendered = await renderFigureHtmlChecked(validIr('seq-too-many-participants.yaml'))
+    assert.ok(rendered.width > 720)
+    assert.ok(rendered.scaled || rendered.scroll)
+    if (rendered.scroll) assert.match(rendered.html, /data-scroll="true"/)
+    assert.equal(rendered.checks.find((c) => c.name === 'projected-scale').ok, true)
+  })
+
   test('the embedded script round-trips back to the same IR', async () => {
     const raw = fixture('seq-simple.yaml')
     const validated = validateIR(parseYaml(raw))
@@ -381,10 +584,21 @@ describe('render-diagram.mjs CLI: type sequence', () => {
     assert.match(r.stdout, /<svg /)
   })
 
-  test('a budget violation exits 2 before any figure is built', () => {
+  test('a budget overrun still exits 0 with a data-warn figure, and echoes the warning on stderr', () => {
     const r = runCli([join(HERE, 'fixtures', 'seq-over-messages.yaml'), '--figure'])
-    assert.equal(r.status, 2)
-    assert.equal(r.stdout, '')
+    assert.equal(r.status, 0)
+    assert.match(r.stdout, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:messages=17" data-type="sequence">/)
+    assert.match(r.stderr, /warning: budget:messages=17 \(#2 message-count\)/)
+  })
+
+  test('--json on an over-budget sequence reports ok:true plus warnings and the data-warn string', () => {
+    const r = runCli([join(HERE, 'fixtures', 'seq-too-many-participants.yaml'), '--json'])
+    assert.equal(r.status, 0)
+    const out = JSON.parse(r.stdout)
+    assert.equal(out.ok, true)
+    assert.equal(out.warn, 'budget:participants=7')
+    assert.deepEqual(out.warnings.map((w) => w.key), ['budget:participants'])
+    assert.match(out.figureHtml, /data-warn="budget:participants=7" data-type="sequence"/)
   })
 
   test('--json figureHtml is the verified sequence figure', () => {
@@ -410,20 +624,34 @@ describe('directives.mjs: renderSequence migration', () => {
     assert.ok(!html.includes('class="wu-steps"'))
   })
 
-  test('a sequence over budget falls back to the steps list, with the candidate IR kept in the figure script', async () => {
+  test('a sequence over budget still renders as a figure with data-warn, the warning recorded for the report', async () => {
     const lines = ['participant u[ユーザー]', 'participant s[サーバー]']
     for (let i = 0; i < 17; i++) lines.push(`u -> s : m${i}`)
     const { html, warnings, figureOk } = await renderSequenceDirective({ body: lines.join('\n') }, ctx())
-    assert.equal(figureOk, false)
-    assert.ok(warnings.some((w) => w.startsWith('sequence:')))
-    assert.match(html, /<figure class="wu-figure" data-type="sequence">/)
-    assert.ok(!html.includes('data-checks="pass"'))
-    assert.match(html, /class="wu-steps"/)
+    assert.equal(figureOk, true)
+    assert.deepEqual(warnings, ['sequence: budget warning — budget:messages=17 (17 row(s) (guidance ≤ 16))'])
+    assert.match(html, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:messages=17" data-type="sequence">/)
+    assert.ok(!html.includes('class="wu-steps"'))
     const scriptMatch = /<script type="text\/x-writeup-diagram">\n([\s\S]*?)\n<\/script>/.exec(html)
-    assert.ok(scriptMatch, 'fallback figure should still carry the candidate IR script')
+    assert.ok(scriptMatch)
     const parsed = parseYamlLite(unescapeIrScript(scriptMatch[1]))
     assert.equal(parsed.type, 'sequence')
     assert.equal(parsed.messages.length, 17)
+  })
+
+  test('a long old-DSL label (the real CSV-download page) renders with budget:label and a widened gap', async () => {
+    const body = [
+      'participant u[ユーザー]', 'participant fe[画面 / Next.js]', 'participant job[CsvDownloadJobService]',
+      'u -> fe : 組織を絞って「ダウンロード」',
+      'fe -> job : request(socV2s, entityType, template, filename)',
+      'job --> fe : 受付 {tone=success}',
+      'note over fe : ダウンロード履歴画面へ遷移',
+    ].join('\n')
+    const { html, warnings, figureOk } = await renderSequenceDirective({ body }, ctx())
+    assert.equal(figureOk, true)
+    assert.equal(warnings.length, 1)
+    assert.match(warnings[0], /budget:label=47/)
+    assert.match(html, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:label=47" data-type="sequence">/)
   })
 
   test('a note maps to a single-participant "over" list', async () => {

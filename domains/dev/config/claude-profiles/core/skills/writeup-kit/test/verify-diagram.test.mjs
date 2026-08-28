@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR, formatBudgetWarnings } from '../bin/lib/ir.mjs'
-import { renderDiagram, renderFigureHtml, normalizePolyline, groupLayerMode, groupLayerHeuristicPrefersElk } from '../bin/lib/diagram.mjs'
+import { renderDiagram, renderFigureHtml, normalizePolyline, groupLayerMode, groupLayerHeuristicPrefersElk, COLUMN, MIN_SCALE } from '../bin/lib/diagram.mjs'
 import { verifyDiagram, renderChecked, renderFigureHtmlChecked, renderCheckedBest } from '../bin/lib/verify-diagram.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -925,4 +925,102 @@ test('renderCheckedBest on an over-budget auto-mode IR returns a zero-failure ca
   assert.deepEqual(best.failures, [])
   assert.deepEqual(best.warnings.map((w) => w.key), ['budget:nodes'])
   assert.equal(best.warn, 'budget:nodes=10')
+})
+
+// --- renderCheckedBest: a pinned orientation that can only scroll yields ---
+//
+// Two figures from a real page (acl-overview.yaml / acl-internals.yaml: 4-6
+// nodes in 3 groups, `direction: right` pinned by a 1:1 Mermaid `flowchart
+// LR` migration) rendered as 1908px / 1972px-wide SVGs that passed every
+// check (`data-checks="pass" data-scroll="true"`) while a reader saw only
+// their left third. Even with the "right" spacing triple-booking fixed
+// (diagram.test.mjs), their node and edge labels don't fit side by side in
+// a 720px column, so renderCheckedBest() now retries the other orientation
+// when a pinned one falls back to scroll, and ranks "no scroll" right after
+// "zero failures".
+
+/** The on-page width the <svg> will occupy (its width attribute). */
+function svgDisplayWidth(svg) {
+  const m = /<svg\b[^>]*\bwidth="([^"]+)"/.exec(svg)
+  assert.ok(m, 'svg root is missing a width attribute')
+  return Number(m[1])
+}
+
+for (const name of ['acl-overview.yaml', 'acl-internals.yaml']) {
+  test(`renderCheckedBest: ${name} (pinned right, 3 groups) shows whole in the column — no scroll, every check passing`, async () => {
+    const parsedIr = ir(name)
+    assert.equal(parsedIr.direction, 'right')
+    const best = await renderCheckedBest(parsedIr)
+    assert.equal(best.checksOk, true, `failures: ${JSON.stringify(best.failures)}`)
+    assert.equal(best.scroll, false, `${name} still scrolls at ${best.width}px`)
+    assert.ok(best.width <= COLUMN || (best.scaled && COLUMN / best.width >= MIN_SCALE), `${name}: ${best.width}px neither fits ${COLUMN}px nor scales within ${MIN_SCALE}`)
+    assert.ok(svgDisplayWidth(best.svg) <= COLUMN)
+    assert.equal(best.layout.direction, 'down')
+    const html = (await renderFigureHtmlChecked(parsedIr, { rawYaml: fixture(name) })).html
+    assert.match(html, /^<figure class="wu-figure" data-checks="pass"/)
+    assert.doesNotMatch(html, /data-scroll="true"/)
+  })
+}
+
+test('renderCheckedBest: a pinned orientation that merely scales (>= MIN_SCALE) is honored, not flipped (wide.yaml)', async () => {
+  const best = await renderCheckedBest(ir('wide.yaml'))
+  assert.equal(best.layout.direction, 'right')
+  assert.equal(best.scaled, true)
+  assert.equal(best.scroll, false)
+  assert.equal(best.width, 900)
+})
+
+test('renderCheckedBest: a pinned orientation that would scroll yields to the other one when that shows whole (scroll.yaml)', async () => {
+  // renderDiagram() itself still honors the pin (see diagram.test.mjs's
+  // scroll-threshold tests, which are what scroll.yaml exists for); only
+  // the verified "try, verify, pick" path retries the other orientation.
+  const pinned = await renderDiagram(ir('scroll.yaml'))
+  assert.equal(pinned.scroll, true)
+  const best = await renderCheckedBest(ir('scroll.yaml'))
+  assert.equal(best.layout.direction, 'down')
+  assert.equal(best.scroll, false)
+  assert.ok(best.width <= COLUMN)
+  assert.equal(best.checksOk, true)
+})
+
+test('renderCheckedBest: when both orientations of a pinned IR scroll, the pinned one is kept', async () => {
+  // A 6-node wide chain (scrolls laid out "right") whose head also fans out
+  // to 7 wide siblings (a row too wide for the column laid out "down").
+  const wide = (i) => ({ id: `n${i}`, label: `XXXXXXXXXX${i}` })
+  const raw = {
+    id: 'both', title: 't', direction: 'right',
+    nodes: [...Array.from({ length: 6 }, (_, i) => wide(i)), ...Array.from({ length: 7 }, (_, i) => wide(10 + i))],
+    edges: [
+      ...Array.from({ length: 5 }, (_, i) => ({ from: `n${i}`, to: `n${i + 1}`, kind: 'sync' })),
+      ...Array.from({ length: 7 }, (_, i) => ({ from: 'n0', to: `n${10 + i}`, kind: 'sync' })),
+    ],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  const down = await renderDiagram({ ...v.ir, direction: 'down' })
+  assert.equal(down.scroll, true, 'this fixture only demonstrates the tie if "down" scrolls too')
+  const best = await renderCheckedBest(v.ir)
+  assert.equal(best.layout.direction, 'right')
+  assert.equal(best.scroll, true)
+})
+
+test('renderCheckedBest: the existing fixtures keep the size and mode they rendered at before the scroll ranking', async () => {
+  const expected = {
+    'simple.yaml': { mode: 'elk', direction: 'down', width: 276, height: 320 },
+    'groups.yaml': { mode: 'group', direction: 'right', width: 360, height: 284 },
+    'conway.yaml': { mode: 'group', direction: 'right', width: 384, height: 472 },
+    'hints.yaml': { mode: 'elk', direction: 'right', width: 536, height: 104 },
+    'budget.yaml': { mode: 'elk', direction: 'right', width: 336, height: 660 },
+    'wide.yaml': { mode: 'elk', direction: 'right', width: 900, height: 104 },
+    'samples-figure.yaml': { mode: 'elk', direction: 'down', width: 184, height: 320 },
+    'chain-long-labels.yaml': { mode: 'elk', direction: 'down', width: 348, height: 428 },
+  }
+  for (const [name, dims] of Object.entries(expected)) {
+    const best = await renderCheckedBest(ir(name))
+    assert.equal(best.layoutMode, dims.mode, `${name}: layout mode changed`)
+    assert.equal(best.layout.direction, dims.direction, `${name}: orientation changed`)
+    assert.equal(best.width, dims.width, `${name}: width changed`)
+    assert.equal(best.height, dims.height, `${name}: height changed`)
+    assert.equal(best.scroll, false)
+  }
 })

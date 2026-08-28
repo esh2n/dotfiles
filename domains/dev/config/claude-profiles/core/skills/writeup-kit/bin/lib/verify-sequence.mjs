@@ -1,15 +1,20 @@
 // Machine verification of a rendered sequence diagram (bin/lib/sequence.mjs)
 // against the sequence contract described alongside SEQUENCE_LIMITS in
-// bin/lib/ir.mjs: participant/message budgets, label length, every
-// from/to/self/over reference resolving, arrows staying horizontal at the
-// lifeline they touch, every drawn coordinate on the 4px grid, labels/notes
-// clearing each other and any lifeline they don't belong to by 6px, and the
-// same font-size/stroke/color/svg-shape/a11y rules diagram.mjs's figures
-// follow (kept as small standalone checks here rather than importing
-// verify-diagram.mjs's private helpers, since those read diagram-specific
-// geometry — see verify-diagram.mjs's own doc comment for why geometry
-// checks read layout.geo instead of re-parsing the SVG).
-import { SEQUENCE_LIMITS } from './ir.mjs'
+// bin/lib/ir.mjs. Rows carry a severity like verify-diagram.mjs's: the
+// three budgets (participants / rows / label length, rows #1–#3) are
+// `warn` — advisory, surfaced as `warnings` and `data-warn`, never a
+// failure — and everything else is `fail`: every from/to/self/over
+// reference resolving, arrows staying horizontal at the lifeline they
+// touch, every drawn coordinate on the 4px grid, labels/notes clearing each
+// other (#7) and any lifeline they don't belong to (#13) by 6px, the
+// projected scale staying ≥ MIN_SCALE unless the scroll fallback is in
+// effect (#14), and the same font-size/stroke/color/svg-shape/a11y rules
+// diagram.mjs's figures follow (kept as small standalone checks here rather
+// than importing verify-diagram.mjs's private helpers, since those read
+// diagram-specific geometry — see verify-diagram.mjs's own doc comment for
+// why geometry checks read layout.geo instead of re-parsing the SVG).
+import { sequenceBudgetWarnings } from './ir.mjs'
+import { COLUMN, MIN_SCALE } from './diagram.mjs'
 
 const LABEL_CLEARANCE = 6
 const ALLOWED_FONT_SIZES = new Set([13, 11])
@@ -36,13 +41,20 @@ function rectLineDistance(rect, line) {
   return Math.hypot(dx, dy)
 }
 
-/** The set of participant ids a row is expected to sit near — excluded from
- * that row's own lifeline-clearance check (a message necessarily touches
- * its from/to lifelines; a note deliberately spans the ones in `over`). */
-function ownParticipants(row) {
-  if (row.type === 'message') return new Set([row.from, row.to])
-  if (row.type === 'self') return new Set([row.participant])
-  return new Set(row.over)
+/** The lifelines a row's label/box is allowed to sit over — excluded from
+ * that row's lifeline-clearance check (#13). A message label is centered
+ * on its arrow, so it may lie over a lifeline the arrow crosses
+ * (`row.crosses`, drawn with a mask by sequence.mjs) — but not over its own
+ * from/to lifelines, which layoutColumns() widens the gap to keep clear. A
+ * note deliberately spans every lifeline from the leftmost to the rightmost
+ * of its `over` participants. A self label sits beside its loop and must
+ * clear every lifeline, its own included. */
+function coveredLifelines(row, lifelines) {
+  if (row.type === 'message') return new Set(row.crosses ?? [])
+  if (row.type === 'self') return new Set()
+  const xs = row.over.map((id) => lifelines.find((ll) => ll.id === id)?.x).filter((x) => x !== undefined)
+  const lo = Math.min(...xs), hi = Math.max(...xs)
+  return new Set(lifelines.filter((ll) => ll.x >= lo && ll.x <= hi).map((ll) => ll.id))
 }
 
 /** Every row's label-like rect (a message/self label, or a note's own box —
@@ -58,40 +70,21 @@ function labelRects(rows) {
 
 // --- checks --------------------------------------------------------------
 
-function checkParticipantCount(ctx) {
-  const n = ctx.ir.participants.length
-  const ok = n <= SEQUENCE_LIMITS.maxParticipants
-  return {
-    ok,
-    detail: `${n} participant(s) (limit ${SEQUENCE_LIMITS.maxParticipants})`,
-    hint: ok ? undefined : `split the sequence: move some participants into a second figure (${n} > ${SEQUENCE_LIMITS.maxParticipants})`,
+// The three budget rows (#1–#3) are `warn` severity: they read ir.mjs's
+// sequenceBudgetWarnings() — the same source validateIR() reports from —
+// so a figure that is only over budget still renders and passes, carrying
+// the overrun in `data-warn`. Geometry (every other row) decides pass/fail.
+function budgetCheck(key, okDetail) {
+  return (ctx) => {
+    const w = ctx.budget.find((b) => b.key === key)
+    if (!w) return { ok: true, detail: okDetail(ctx) }
+    return { ok: false, detail: w.detail, hint: w.hint, key: w.key, value: w.value }
   }
 }
 
-function checkMessageCount(ctx) {
-  const n = ctx.ir.messages.length
-  const ok = n <= SEQUENCE_LIMITS.maxMessages
-  return {
-    ok,
-    detail: `${n} row(s) (limit ${SEQUENCE_LIMITS.maxMessages})`,
-    hint: ok ? undefined : `split after message ${SEQUENCE_LIMITS.maxMessages}`,
-  }
-}
-
-function checkLabelLength(ctx) {
-  const offenders = []
-  ctx.ir.messages.forEach((m, i) => {
-    if (m.rowType !== 'message' && m.rowType !== 'self') return
-    if (m.label && [...m.label].length > SEQUENCE_LIMITS.maxLabelLen) {
-      offenders.push(`shorten label of message ${i + 1} ("${m.label}", ${[...m.label].length} > ${SEQUENCE_LIMITS.maxLabelLen})`)
-    }
-  })
-  return {
-    ok: offenders.length === 0,
-    detail: offenders.length ? offenders.join('; ') : 'every message/self label is within the 16-char budget',
-    hint: offenders.length ? offenders.join('; ') : undefined,
-  }
-}
+const checkParticipantCount = budgetCheck('budget:participants', (ctx) => `${ctx.ir.participants.length} participant(s) (guidance ≤ 6)`)
+const checkMessageCount = budgetCheck('budget:messages', (ctx) => `${ctx.ir.messages.length} row(s) (guidance ≤ 16)`)
+const checkLabelLength = budgetCheck('budget:label', () => 'every message/self label is within the 16-char guidance')
 
 function checkReferencesExist(ctx) {
   const ids = new Set(ctx.ir.participants.map((p) => p.id))
@@ -169,21 +162,53 @@ function checkLabelClearance(ctx) {
       const d = rectDistance(rect, labels[j].rect)
       if (d < worst) { worst = d; against = `${labels[j].row.type}[${labels[j].row.index}]` }
     }
-    const own = ownParticipants(row)
-    for (const ll of ctx.geo.lifelines) {
-      if (own.has(ll.id)) continue
-      const d = rectLineDistance(rect, ll)
-      if (d < worst) { worst = d; against = `lifeline "${ll.id}"` }
-    }
     if (worst < LABEL_CLEARANCE) offenders.push({ row, worst, against })
   }
   const ok = offenders.length === 0
   return {
     ok,
     detail: ok
-      ? 'every label/note clears every other label and unrelated lifeline by ≥6px'
+      ? 'every label/note clears every other label/note by ≥6px'
       : offenders.map((o) => `${o.row.type}[${o.row.index}] is ${o.worst.toFixed(1)}px from ${o.against}`).join('; '),
     hint: ok ? undefined : offenders.map((o) => `shorten or reposition ${o.row.type}[${o.row.index}] (crowds ${o.against})`).join('; '),
+  }
+}
+
+/** A label must not run into a lifeline it does not belong to — including
+ * a message's own from/to lifelines, since layoutColumns() widens the gap
+ * to hold the label; only the lifelines the arrow itself crosses, and the
+ * ones a note spans, are exempt (see coveredLifelines()). This is the row
+ * that fails when a long label would otherwise overlap a neighbouring
+ * column. */
+function checkLifelineClearance(ctx) {
+  const offenders = []
+  for (const { row, rect } of labelRects(ctx.geo.rows)) {
+    const covered = coveredLifelines(row, ctx.geo.lifelines)
+    for (const ll of ctx.geo.lifelines) {
+      if (covered.has(ll.id)) continue
+      const d = rectLineDistance(rect, ll)
+      if (d < LABEL_CLEARANCE) offenders.push({ row, d, id: ll.id })
+    }
+  }
+  const ok = offenders.length === 0
+  return {
+    ok,
+    detail: ok
+      ? 'every label/note clears every lifeline it does not belong to by ≥6px'
+      : offenders.map((o) => `${o.row.type}[${o.row.index}] is ${o.d.toFixed(1)}px from lifeline "${o.id}"`).join('; '),
+    hint: ok ? undefined : offenders.map((o) => `shorten ${o.row.type}[${o.row.index}] or widen the gap at lifeline "${o.id}" (the layout should have widened it — check layoutColumns())`).join('; '),
+  }
+}
+
+function checkProjectedScale(ctx) {
+  const { renderResult, column } = ctx
+  if (renderResult.scroll) return { ok: true, detail: 'scroll fallback in effect; the 0.78 floor does not apply' }
+  const scale = renderResult.width > column ? column / renderResult.width : 1
+  const ok = scale >= MIN_SCALE
+  return {
+    ok,
+    detail: `effective scale ${scale.toFixed(3)} at a ${column}px column`,
+    hint: ok ? undefined : 'the figure needs to shrink below 0.78 to fit — reduce participants or shorten labels, or accept the scroll fallback',
   }
 }
 
@@ -256,43 +281,62 @@ function checkA11y(ctx) {
 
 // --- driver ----------------------------------------------------------------
 
+// [id, name, fn, severity]: `fail` rows gate rendering; `warn` rows (the
+// three budgets) are advisory — a failing warn row is reported in
+// `warnings` and `data-warn`, never in `failures`.
 const CHECK_DEFS = [
-  [1, 'participant-count', checkParticipantCount],
-  [2, 'message-count', checkMessageCount],
-  [3, 'label-length', checkLabelLength],
-  [4, 'references-exist', checkReferencesExist],
-  [5, 'arrows-horizontal', checkArrowsHorizontal],
-  [6, 'rows-grid', checkGrid],
-  [7, 'label-clearance', checkLabelClearance],
-  [8, 'font-size', checkFontSizes],
-  [9, 'stroke-width', checkStrokeWidths],
-  [10, 'no-hex-colors', checkNoHexColors],
-  [11, 'single-finite-svg', checkSingleFiniteSvg],
-  [12, 'a11y', checkA11y],
+  [1, 'participant-count', checkParticipantCount, 'warn'],
+  [2, 'message-count', checkMessageCount, 'warn'],
+  [3, 'label-length', checkLabelLength, 'warn'],
+  [4, 'references-exist', checkReferencesExist, 'fail'],
+  [5, 'arrows-horizontal', checkArrowsHorizontal, 'fail'],
+  [6, 'rows-grid', checkGrid, 'fail'],
+  [7, 'label-clearance', checkLabelClearance, 'fail'],
+  [8, 'font-size', checkFontSizes, 'fail'],
+  [9, 'stroke-width', checkStrokeWidths, 'fail'],
+  [10, 'no-hex-colors', checkNoHexColors, 'fail'],
+  [11, 'single-finite-svg', checkSingleFiniteSvg, 'fail'],
+  [12, 'a11y', checkA11y, 'fail'],
+  [13, 'lifeline-clearance', checkLifelineClearance, 'fail'],
+  [14, 'projected-scale', checkProjectedScale, 'fail'],
 ]
 
 /**
  * Verify a rendered sequence diagram (bin/lib/sequence.mjs's
- * renderSequenceDiagram() output) against the sequence contract.
+ * renderSequenceDiagram() output) against the sequence contract. Same
+ * result shape as verify-diagram.mjs's verifyDiagram(): every check has a
+ * severity, `ok` is true when no `fail` row fails, and budget overruns
+ * only populate `warnings`.
  *
  * @param {object} ir validated `type: sequence` IR from ir.mjs
  * @param {object} renderResult renderSequenceDiagram()'s return — must carry
  *   `layout.geo` (participants/lifelines/rows geometry)
- * @returns {{ok: boolean, checks: Array<{id:number, name:string, ok:boolean, detail:string, hint?:string}>}}
+ * @param {{column?: number}} [opts] the column width the scale/scroll
+ *   decision was made against (row #14)
+ * @returns {{ok: boolean, checks: Array<{id:number, name:string, severity:'fail'|'warn', ok:boolean, detail:string, hint?:string}>, failures: object[], warnings: Array<{id:number, name:string, key:string, value:number, detail:string, hint?:string}>}}
  */
-export function verifySequence(ir, renderResult) {
+export function verifySequence(ir, renderResult, { column = COLUMN } = {}) {
   if (!renderResult || !renderResult.layout || !renderResult.layout.geo) {
     throw new Error('verifySequence requires renderResult.layout.geo (render with sequence.mjs, or build one with the same shape)')
   }
-  const ctx = { ir, renderResult, geo: renderResult.layout.geo, svg: renderResult.svg }
-  const checks = CHECK_DEFS.map(([id, name, fn]) => {
+  const ctx = { ir, renderResult, geo: renderResult.layout.geo, svg: renderResult.svg, column, budget: sequenceBudgetWarnings(ir) }
+  const checks = CHECK_DEFS.map(([id, name, fn, severity]) => {
     let result
     try {
       result = fn(ctx)
     } catch (e) {
       result = { ok: false, detail: `check threw: ${e.message}`, hint: 'internal verifier error — check the renderResult/ir shape passed in' }
     }
-    return { id, name, ok: result.ok, detail: result.detail, hint: result.hint }
+    const check = { id, name, severity, ok: result.ok, detail: result.detail, hint: result.hint }
+    if (severity === 'warn' && !result.ok) {
+      check.key = result.key
+      check.value = result.value
+    }
+    return check
   })
-  return { ok: checks.every((c) => c.ok), checks }
+  const failures = checks.filter((c) => c.severity === 'fail' && !c.ok)
+  const warnings = checks
+    .filter((c) => c.severity === 'warn' && !c.ok)
+    .map(({ id, name, key, value, detail, hint }) => ({ id, name, key, value, detail, hint }))
+  return { ok: failures.length === 0, checks, failures, warnings }
 }
