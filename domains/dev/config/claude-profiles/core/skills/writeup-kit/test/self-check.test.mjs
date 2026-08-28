@@ -130,6 +130,21 @@ describe('self-check: adversarial rows', () => {
     assert.ok(result.errors.some((e) => e.item === 'single-file' && /style\.css/.test(e.detail)))
   })
 
+  test('row 1: <link rel="icon"> with a data: href is allowed (the status favicon)', () => {
+    const result = itemsFor(page({ extraHead: '<link rel="icon" href="data:image/svg+xml,%3Csvg%3E%3C%2Fsvg%3E">' }))
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'))
+  })
+
+  test('row 1: <link rel="icon"> with a non-data (external file) href is still an error', () => {
+    const result = itemsFor(page({ extraHead: '<link rel="icon" href="https://example.com/favicon.ico">' }))
+    assert.ok(result.errors.some((e) => e.item === 'single-file' && /favicon\.ico/.test(e.detail)))
+  })
+
+  test('row 1: <link rel="icon"> with a bare relative file href is still an error', () => {
+    const result = itemsFor(page({ extraHead: '<link rel="icon" href="./favicon.png">' }))
+    assert.ok(result.errors.some((e) => e.item === 'single-file' && /favicon\.png/.test(e.detail)))
+  })
+
   test('row 2 (required-meta): a missing kind is an error', () => {
     const html = page().replace('<meta name="kind" content="作業メモ">', '')
     const result = itemsFor(html)

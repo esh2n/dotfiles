@@ -5,7 +5,10 @@
 // back-to-index nav for the target (dropped for file/artifact; rewritten to
 // `/index.html` or dropped for cloudflare — see `adjustBackNav`), (3) reject
 // on a company-trace word hit, (4) enforce the 16MB Artifact-tool size
-// ceiling. Then dispatch to one of 3 targets.
+// ceiling. Then dispatch to one of 3 targets. The status favicon `<link
+// rel="icon">` (page-contract.md §1) is not touched by any of this — its
+// href is an inline `data:` URI already, so it carries through to every
+// target unchanged.
 //
 // Exit codes: 0 success/dry-run, 2 usage error, 3 self-check failed,
 // 4 private-word hit, 5 cloudflare Access not verified, 6 size over 16MB.

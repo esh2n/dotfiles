@@ -111,6 +111,15 @@ function checkSingleFile(root, add) {
   for (const ref of externalRefs(root)) {
     const url = ref.url
     if (isAllowedExternal(url)) continue
+    if (ref.tag === 'link' && attr(ref.node, 'rel') === 'icon') {
+      // The status favicon (page-contract.md §1) is a data: URI build.mjs
+      // upserts on every page — allowed here specifically because it is
+      // inline, not a fetch to an external host. Any other icon href
+      // (a real external file) is still rejected like any other link.
+      if (url.startsWith('data:')) continue
+      add('error', 'single-file', `icon link references disallowed non-data URL: ${url}`)
+      continue
+    }
     add('error', 'single-file', `${ref.tag} references disallowed external URL: ${url}`)
   }
 }

@@ -241,6 +241,45 @@ describe('publish(): pre-stage guards', () => {
   })
 })
 
+describe('publish(): status favicon survives staging', () => {
+  test('--to file keeps the <link rel="icon"> href unchanged', () => {
+    const store = freshStore()
+    const original = readFileSync(join(store, DECISION_REL), 'utf8')
+    const iconMatch = /<link rel="icon" href="[^"]*">/.exec(original)
+    assert.ok(iconMatch, 'fixture page should already carry a favicon link after freshStore()\'s buildStore()')
+    const outFile = join(store, 'out-icon.html')
+    const result = publish(join(store, DECISION_REL), { to: 'file', out: outFile, store })
+    assert.equal(result.ok, true)
+    assert.ok(readFileSync(outFile, 'utf8').includes(iconMatch[0]))
+  })
+
+  test('--to artifact keeps the <link rel="icon"> href unchanged', () => {
+    const store = freshStore()
+    const original = readFileSync(join(store, DECISION_REL), 'utf8')
+    const iconMatch = /<link rel="icon" href="[^"]*">/.exec(original)
+    const result = publish(join(store, DECISION_REL), { to: 'artifact', store })
+    assert.ok(readFileSync(result.output, 'utf8').includes(iconMatch[0]))
+  })
+
+  test('--to cloudflare keeps the <link rel="icon"> href unchanged', () => {
+    const store = freshStore()
+    const tomlPath = join(store, '.writeup.toml')
+    writeFileSync(tomlPath, readFileSync(tomlPath, 'utf8') + '\naccess_verified = true\n')
+    const original = readFileSync(join(store, DECISION_REL), 'utf8')
+    const iconMatch = /<link rel="icon" href="[^"]*">/.exec(original)
+    const result = publish(join(store, DECISION_REL), { to: 'cloudflare', store })
+    assert.ok(readFileSync(result.output, 'utf8').includes(iconMatch[0]))
+  })
+
+  test('the staged page still satisfies self-check\'s single-file row (icon is a data: href)', () => {
+    const store = freshStore()
+    const outFile = join(store, 'out-icon-check.html')
+    publish(join(store, DECISION_REL), { to: 'file', out: outFile, store })
+    const result = runSelfCheck(outFile)
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'), JSON.stringify(result.errors))
+  })
+})
+
 describe('publish: CLI', () => {
   test('exit code 0 for a clean --to file publish', () => {
     const store = freshStore()

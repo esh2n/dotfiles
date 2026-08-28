@@ -3,7 +3,7 @@
 // from every page's `<head>` meta, and syncs the kit's CSS into
 // `<store>/_kit/writeup.css` (contract §1, §1-3). Zero-dependency.
 //
-// The two places build.mjs edits a page's own bytes (page-contract.md §1):
+// The three places build.mjs edits a page's own bytes (page-contract.md §1):
 // (1) when a page's `<head>` lacks `<meta name="id">`, build inserts the
 // computed id right after `<meta name="date">` (idempotent — only when the
 // meta is missing; see `insertIdMeta`/`buildPageRecord`); (2) `.wu-header`'s
@@ -11,8 +11,12 @@
 // gets its `href` rewritten to the relative path up to the store root's
 // `index.html` for this page's depth (`index.html`, `../index.html`, …),
 // inserting the nav as the header's first child when a pre-nav page lacks
-// it entirely (idempotent; see `ensureBackNav`/`backNavHref`). Nothing else
-// about a page is ever rewritten by build — `<meta name="updated">` in
+// it entirely (idempotent; see `ensureBackNav`/`backNavHref`); (3) the
+// status favicon `<link rel="icon">` is upserted from the page's `kind` and
+// `checks` meta, right after `<meta name="checks">` when present, else
+// right before the stylesheet `<link>` (idempotent — replaced only when its
+// href would differ; see `ensureFavicon`/`bin/lib/favicon.mjs`). Nothing
+// else about a page is ever rewritten by build — `<meta name="updated">` in
 // particular is read, not patched, even when the manifest fills in a
 // synthesized time-of-day.
 
@@ -22,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, relative, sep } from 'node:path'
 import { resolveStoreDir, pageId, isGitRepo, gitLastCommitDatetime } from './lib/store.mjs'
 import { parseHtml, headMeta, titleText } from './lib/html.mjs'
+import { faviconDataUri, statusFromChecks } from './lib/favicon.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_CSS_PATH = join(HERE, '..', 'kit', 'writeup.css')
@@ -194,14 +199,49 @@ function ensureBackNav(text, relPath) {
   return text.slice(0, navStart) + patchedNav + text.slice(navStart + navBlock.length)
 }
 
+const FAVICON_LINK_RE = /<link\s+rel="icon"[^>]*>/
+const CHECKS_META_RE = /<meta\s+name="checks"[^>]*>\n?/
+const STYLESHEET_LINK_RE = /<link\s+rel="stylesheet"[^>]*>/
+
+/**
+ * Upserts `<link rel="icon" href="…">` — the status favicon for this page's
+ * `kind`/`checks` (page-contract.md §1, `bin/lib/favicon.mjs`). Replaces an
+ * existing icon link only when its href differs (idempotent); inserted
+ * right after `<meta name="checks">` when present, else right before the
+ * first stylesheet `<link>` (falling back to just before `</head>` if
+ * neither is found). The third and last place build.mjs edits a page's own
+ * bytes — see the module docstring.
+ */
+function ensureFavicon(text, dataUri) {
+  const tag = `<link rel="icon" href="${dataUri}">`
+  const existing = FAVICON_LINK_RE.exec(text)
+  if (existing) {
+    if (existing[0] === tag) return text
+    return text.slice(0, existing.index) + tag + text.slice(existing.index + existing[0].length)
+  }
+  const checksMatch = CHECKS_META_RE.exec(text)
+  if (checksMatch) {
+    const at = checksMatch.index + checksMatch[0].length
+    return text.slice(0, at) + tag + '\n' + text.slice(at)
+  }
+  const styleMatch = STYLESHEET_LINK_RE.exec(text)
+  if (styleMatch) {
+    return text.slice(0, styleMatch.index) + tag + '\n' + text.slice(styleMatch.index)
+  }
+  const headClose = text.indexOf('</head>')
+  if (headClose === -1) return tag + '\n' + text
+  return text.slice(0, headClose) + tag + '\n' + text.slice(headClose)
+}
+
 /**
  * Builds one manifest record for `relPath`. When the page's `<head>` lacks
  * `<meta name="id">` and `check` is false, inserts the computed id into the
  * file on disk (idempotent: only when missing) — see `insertIdMeta`. Also
  * ensures `.wu-header`'s back-to-index nav href is correct — see
- * `ensureBackNav`. The mtime used for `updated`'s time-of-day fallback is
- * read *before* either edit, so housekeeping itself never bumps a page's
- * `updated`.
+ * `ensureBackNav` — and that the status favicon link reflects this page's
+ * current `kind`/`checks` — see `ensureFavicon`. The mtime used for
+ * `updated`'s time-of-day fallback is read *before* any edit, so
+ * housekeeping itself never bumps a page's `updated`.
  */
 function buildPageRecord(storeDir, relPath, { check } = {}) {
   const fullPath = join(storeDir, ...relPath.split('/'))
@@ -213,6 +253,7 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
   const id = pageId(relPath)
   let metaInserted = false
   let navFixed = false
+  let faviconFixed = false
   if (meta.id === undefined) {
     metaInserted = true
     if (!check) text = insertIdMeta(text, id)
@@ -222,7 +263,14 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     navFixed = true
     if (!check) text = navFixedText
   }
-  if ((metaInserted || navFixed) && !check) {
+  const checksParsed = parseChecks(meta.checks)
+  const desiredIcon = faviconDataUri({ kind: meta.kind, status: statusFromChecks(checksParsed) })
+  const faviconFixedText = ensureFavicon(text, desiredIcon)
+  if (faviconFixedText !== text) {
+    faviconFixed = true
+    if (!check) text = faviconFixedText
+  }
+  if ((metaInserted || navFixed || faviconFixed) && !check) {
     writeFileSync(fullPath, text)
     buf = Buffer.from(text, 'utf8')
     root = parseHtml(text)
@@ -257,7 +305,7 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     bytes: buf.length,
     legacy: relPath.startsWith('legacy/'),
   }
-  return { record, metaInserted, navFixed }
+  return { record, metaInserted, navFixed, faviconFixed }
 }
 
 function sortManifest(records) {
@@ -378,6 +426,7 @@ function renderIndexHtml(records) {
 <title>writeup</title>
 <meta name="description" content="writeup store の検索">
 <meta name="robots" content="noindex">
+<link rel="icon" href="${faviconDataUri({ kind: 'index' })}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="./_kit/writeup.css">
 <style data-index>
@@ -628,7 +677,7 @@ export function buildStore(storeDir, { check = false } = {}) {
 
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
   const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check }))
-  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed)
+  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed)
   const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'
   const manifestPath = join(storeDir, 'manifest.json')

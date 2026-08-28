@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { buildStore } from '../bin/build.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
+import { faviconDataUri, statusFromChecks } from '../bin/lib/favicon.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -617,6 +618,123 @@ describe('buildStore(): grouped index view ("まとまり")', () => {
     buildStore(store)
     const result = runSelfCheck(join(store, 'index.html'))
     assert.ok(!result.errors.some((e) => e.item === 'single-file'), JSON.stringify(result.errors))
+  })
+})
+
+describe('buildStore(): status favicon', () => {
+  function iconHrefOf(html) {
+    const m = /<link rel="icon" href="([^"]*)">/.exec(html)
+    return m ? m[1] : null
+  }
+
+  function decodedSvgOf(html) {
+    const href = iconHrefOf(html)
+    return href ? decodeURIComponent(href.slice('data:image/svg+xml,'.length)) : null
+  }
+
+  test('build inserts <link rel="icon"> exactly once into a page that lacks one', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'design', '2026-08-05-example-design.html'), 'utf8')
+    assert.equal((html.match(/<link rel="icon"/g) || []).length, 1)
+  })
+
+  test('the inserted href matches faviconDataUri({kind, status}) computed from the page\'s own meta', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'design', '2026-08-05-example-design.html'), 'utf8')
+    // fixture: kind=設計, checks=lint=pass;self-check=pass;diagram=1/1 -> status pass
+    const expected = faviconDataUri({ kind: '設計', status: 'pass' })
+    assert.equal(iconHrefOf(html), expected)
+  })
+
+  test('a page whose checks include self-check=fail gets the fail-ring favicon', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'decision', '2026-08-01-example-decision.html')
+    const html0 = readFileSync(pagePath, 'utf8').replace('lint=pass;self-check=pass', 'lint=pass;self-check=fail')
+    writeFileSync(pagePath, html0)
+    buildStore(store)
+    const html = readFileSync(pagePath, 'utf8')
+    assert.equal(decodedSvgOf(html), decodeURIComponent(faviconDataUri({ kind: '決定記録', status: 'fail' }).slice('data:image/svg+xml,'.length)))
+    assert.match(decodedSvgOf(html), /stroke-width="3"/)
+  })
+
+  test('a legacy page (no kind, no checks meta) gets the pending, middle-dot favicon', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'legacy', '2019-05-01-legacy-note.html'), 'utf8')
+    const svg = decodedSvgOf(html)
+    assert.match(svg, />·<\/text>/)
+    assert.match(svg, /stroke-dasharray="3 2"/)
+    assert.equal(statusFromChecks({}), 'pending')
+  })
+
+  test('index.html carries the index (three-bar) favicon', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const svg = decodedSvgOf(html)
+    assert.ok(svg)
+    assert.ok(!svg.includes('<text'))
+    assert.equal((svg.match(/fill="#ffffff"/g) || []).length, 3)
+  })
+
+  test('meta insertion is idempotent: a second build does not touch the icon link again', () => {
+    const store = freshStore()
+    buildStore(store)
+    const pagePath = join(store, 'design', '2026-08-05-example-design.html')
+    const afterFirst = readFileSync(pagePath, 'utf8')
+    buildStore(store)
+    const afterSecond = readFileSync(pagePath, 'utf8')
+    assert.equal(afterSecond, afterFirst)
+  })
+
+  test('a stale icon href (checks changed since the last build) is rewritten to the correct one', () => {
+    const store = freshStore()
+    buildStore(store)
+    const pagePath = join(store, 'design', '2026-08-05-example-design.html')
+    const before = readFileSync(pagePath, 'utf8')
+    const iconCountBefore = (before.match(/<link rel="icon"/g) || []).length
+    assert.equal(iconCountBefore, 1)
+
+    const withFail = before.replace('lint=pass;self-check=pass', 'lint=fail;self-check=pass')
+    writeFileSync(pagePath, withFail)
+    buildStore(store)
+    const after = readFileSync(pagePath, 'utf8')
+    assert.equal((after.match(/<link rel="icon"/g) || []).length, 1)
+    assert.equal(decodedSvgOf(after), decodeURIComponent(faviconDataUri({ kind: '設計', status: 'fail' }).slice('data:image/svg+xml,'.length)))
+  })
+
+  test('--check reports pagesChanged: true for a page without a favicon link yet, without writing it', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'decision', '2026-08-01-example-decision.html')
+    const before = readFileSync(pagePath, 'utf8')
+    const result = buildStore(store, { check: true })
+    assert.equal(readFileSync(pagePath, 'utf8'), before)
+    assert.ok(!before.includes('rel="icon"'))
+    assert.equal(result.pagesChanged, true)
+  })
+
+  test('a built page still passes self-check\'s single-file row with the icon link present', () => {
+    const store = freshStore()
+    buildStore(store)
+    const result = runSelfCheck(join(store, 'design', '2026-08-05-example-design.html'))
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'), JSON.stringify(result.errors))
+  })
+
+  test('the icon is inserted right after <meta name="checks"> when that meta is present', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'design', '2026-08-05-example-design.html'), 'utf8')
+    assert.match(html, /<meta name="checks"[^>]*>\n<link rel="icon"/)
+  })
+
+  test('with neither a checks meta nor a stylesheet link (legacy/**), the icon falls back to just before </head>', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'legacy', '2019-05-01-legacy-note.html'), 'utf8')
+    assert.ok(!html.includes('rel="stylesheet"'))
+    assert.match(html, /<link rel="icon"[^>]*>\n<\/head>/)
   })
 })
 

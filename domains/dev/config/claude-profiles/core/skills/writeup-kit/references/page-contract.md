@@ -30,6 +30,16 @@ it does not add new rules.
   the nav entirely when a page predates it — the other place `build` edits
   a page's own bytes (see the `id` bullet in §2 for the first). Page authors
   never write or edit this href by hand.
+- `<link rel="icon" href="data:image/svg+xml,…">` is the page's status
+  favicon: a small ink square carrying one glyph for the page's `kind` (a
+  middle dot for an unrecognized/legacy kind), with an accent ring around
+  it when the page's `checks` aren't clean (no ring = pass, solid = fail,
+  dashed = pending). `build` upserts this link from the page's current
+  `kind`/`checks` on every run — right after `<meta name="checks">` when
+  present, else before the stylesheet `<link>` — the third place `build`
+  edits a page's own bytes (`bin/lib/favicon.mjs`). `index.html` gets a
+  distinct three-bar mark instead of a kind glyph. Page authors never
+  write or edit this href by hand.
 - writeup runs `git add <page> && git commit -m "<kind>: <title>"` on every
   save. Generated artifacts (`manifest.json`, `index.html`, `_kit/`) go into
   the same commit.
@@ -47,6 +57,7 @@ and structure do not):
 <meta name="id" content="9f3a1c2d">                <!-- optional: stable short id, see below; build fills it in when absent -->
 <meta name="updated" content="2026-08-25">         <!-- revision date, or a datetime with minutes; controls list ordering -->
 <meta name="checks" content="lint=pass;self-check=pass;diagram=3/3">
+<link rel="icon" href="data:image/svg+xml,...">    <!-- status favicon; build derives and upserts this from kind/checks -->
 <meta name="sources" content="...">                <!-- citation for external documents; omit if none -->
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="../_kit/writeup.css">
@@ -95,7 +106,7 @@ before every save; the result is written into `<meta name="checks">`.
 
 | Item | What is checked | On failure |
 |---|---|---|
-| Single file; external references limited to `_kit/writeup.css` and Google Fonts | `href`/`src` of every `link`/`script`/`img` | error |
+| Single file; external references limited to `_kit/writeup.css`, Google Fonts, and a `rel="icon"` `data:` href | `href`/`src` of every `link`/`script`/`img` | error |
 | Required head meta (`title` / `description` / `kind` / `date`) | Present, and `kind` is one of the 8 values | error |
 | `id` meta (optional) | If present, matches the computed value | warn |
 | `updated` meta format (optional) | `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM(+TZ\|Z)` | warn |
