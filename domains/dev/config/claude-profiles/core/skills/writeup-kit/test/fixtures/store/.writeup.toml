@@ -1,0 +1,6 @@
+[private]
+words = ["acmecorp", "ACME-INTERNAL", "project-phoenix"]
+
+[cloudflare]
+project = "example-writeup"
+access_required = true

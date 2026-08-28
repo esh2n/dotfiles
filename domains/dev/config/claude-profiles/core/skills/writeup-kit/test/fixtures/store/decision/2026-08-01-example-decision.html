@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>再試行方針の決定</title>
+<meta name="description" content="画像アップロード失敗時の再試行方針を指数バックオフに決めた記録">
+<meta name="kind" content="決定記録">
+<meta name="date" content="2026-08-01">
+<meta name="updated" content="2026-08-10">
+<meta name="checks" content="lint=pass;self-check=pass">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../_kit/writeup.css">
+</head>
+<body>
+<div class="wu-page">
+
+<header class="wu-header">
+<p class="wu-eyebrow">決定記録 &middot; 2026-08-01 &middot; 更新 2026-08-10</p>
+<h1>再試行方針の決定</h1>
+<p class="wu-lede">画像アップロード失敗時の再試行方針を指数バックオフに決めた記録。</p>
+</header>
+
+<main>
+
+<div class="wu-summary">
+<p>再試行は指数バックオフとし、上限は3回とする。</p>
+<p>サーバー側キューへの移譲は次のフェーズに送る。</p>
+</div>
+
+<section class="wu-section">
+<h2>決まったこと</h2>
+<div class="wu-decision">
+<p><strong>決定:</strong> 再試行は指数バックオフとし、上限は3回とする。</p>
+<p><strong>重視した得失:</strong> 実装コストを抑えつつ一斉再試行を避けた。</p>
+<p><strong>根拠:</strong> 過去の障害はいずれも再試行の集中が原因だった。</p>
+</div>
+<p class="wu-meta">crash-reports/upload-failures-2026-08.csv</p>
+</section>
+
+<section class="wu-section">
+<h2>却下した案</h2>
+<table class="wu-compare">
+<thead><tr><th>案</th><th>実装コスト</th><th>運用負荷</th></tr></thead>
+<tbody>
+<tr><td>固定間隔で再試行</td><td>低</td><td>低</td></tr>
+<tr><td>サーバー側キューに移譲</td><td>高</td><td>高</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="wu-section">
+<h2>未決・前提</h2>
+<div class="wu-open">
+<ul>
+<li>デッドレターキューの保持期間は未定。</li>
+<li>冪等キーの生成方法はまだ合意していない。</li>
+</ul>
+</div>
+</section>
+
+<section class="wu-section">
+<h2>次のステップ</h2>
+<ol class="wu-steps">
+<li>再試行ロジックを共通クライアントに実装する。</li>
+<li>冪等キーをリクエストヘッダーに追加する。</li>
+<li>障害訓練で上限3回の挙動を確認する。</li>
+</ol>
+</section>
+
+</main>
+
+<footer class="wu-footer">
+<dl>
+<dt>checks</dt><dd>lint=pass; self-check=pass</dd>
+<dt>sources</dt><dd>&mdash;</dd>
+</dl>
+</footer>
+
+</div>
+</body>
+</html>

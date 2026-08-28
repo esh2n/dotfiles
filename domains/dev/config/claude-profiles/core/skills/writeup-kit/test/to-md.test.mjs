@@ -1,0 +1,152 @@
+import { test, describe } from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { convertToMarkdown } from '../bin/to-md.mjs'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const ROOT = join(HERE, '..')
+const STORE = join(ROOT, 'test', 'fixtures', 'store')
+
+function convertFixture(relPath, opts = {}) {
+  const html = readFileSync(join(STORE, relPath), 'utf8')
+  const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-figs-'))
+  return { md: convertToMarkdown(html, { slug: 'page', figuresDir, figuresDirRel: 'figs', ...opts }), figuresDir }
+}
+
+describe('to-md: decision-record snapshot', () => {
+  const { md } = convertFixture('decision/2026-08-01-example-decision.html')
+
+  test('frontmatter carries title/kind/date/updated', () => {
+    assert.match(md, /^---\ntitle: "再試行方針の決定"\nkind: "決定記録"\ndate: "2026-08-01"\nupdated: "2026-08-10"\n---/)
+  })
+
+  test('h2 sections map to ##', () => {
+    assert.match(md, /## 決まったこと/)
+    assert.match(md, /## 却下した案/)
+    assert.match(md, /## 未決・前提/)
+    assert.match(md, /## 次のステップ/)
+  })
+
+  test('.wu-summary maps to a > [!NOTE] blockquote', () => {
+    assert.match(md, /> \[!NOTE\]\n> 再試行は指数バックオフとし、上限は3回とする。/)
+  })
+
+  test('.wu-decision maps to a bulleted, bolded-label list', () => {
+    assert.match(md, /- \*\*決定\*\*: 再試行は指数バックオフとし、上限は3回とする。/)
+    assert.match(md, /- \*\*根拠\*\*: 過去の障害はいずれも再試行の集中が原因だった。/)
+  })
+
+  test('.wu-compare maps to a GFM table', () => {
+    assert.match(md, /\| 案 \| 実装コスト \| 運用負荷 \|/)
+    assert.match(md, /\| --- \| --- \| --- \|/)
+    assert.match(md, /\| 固定間隔で再試行 \| 低 \| 低 \|/)
+  })
+
+  test('.wu-open maps to a bullet list of open items', () => {
+    assert.match(md, /- デッドレターキューの保持期間は未定。/)
+  })
+
+  test('.wu-steps maps to a numbered list', () => {
+    assert.match(md, /1\. 再試行ロジックを共通クライアントに実装する。\n2\. 冪等キーをリクエストヘッダーに追加する。\n3\. 障害訓練で上限3回の挙動を確認する。/)
+  })
+
+  test('.wu-meta becomes a trailing footnote', () => {
+    assert.match(md, /\[\^1\]/)
+    assert.match(md, /\[\^1\]: crash-reports\/upload-failures-2026-08\.csv/)
+  })
+})
+
+describe('to-md: figure and mermaid fallback', () => {
+  const { md, figuresDir } = convertFixture('design/2026-08-05-example-design.html', { slug: 'design-page' })
+
+  test('writes the figure SVG to <figures-dir>/<slug>-<figure-id>.svg', () => {
+    const files = readdirSync(figuresDir)
+    assert.deepEqual(files, ['design-page-d1.svg'])
+    const svg = readFileSync(join(figuresDir, 'design-page-d1.svg'), 'utf8')
+    assert.match(svg, /^<svg /)
+    assert.match(svg, /<title id="wu-d-1-title">現状の経路<\/title>/)
+    // Case-sensitive SVG attributes must round-trip untouched.
+    assert.match(svg, /viewBox="0 0 640 260"/)
+  })
+
+  test('emits an image reference with the caption and figure path', () => {
+    assert.match(md, /!\[クライアントからAPIへ送信し、APIがワーカーへ委譲し、ワーカーが応答を返す。\]\(figs\/design-page-d1\.svg\)/)
+  })
+
+  test('emits a ```mermaid fallback block generated from the IR', () => {
+    assert.match(md, /```mermaid\nflowchart LR\n/)
+  })
+
+  test('mermaid groups become a subgraph containing its member nodes', () => {
+    assert.match(md, /subgraph backend\[バックエンド\]/)
+    assert.match(md, /api\[API\]/)
+    assert.match(md, /worker\[ワーカー\]/)
+    assert.match(md, /end\n/)
+  })
+
+  test('mermaid renders sync edges as -->, async as -.->, and reply as -.->|reply|', () => {
+    assert.match(md, /client -->\|送信\| api/)
+    assert.match(md, /api -\.->\|委譲\| worker/)
+    assert.match(md, /worker -\.->\|reply\| client/)
+  })
+
+  test('.wu-terms maps to a bulleted "name — what" list', () => {
+    assert.match(md, /- \*\*ワーカー\*\* — 再試行を専門に受け持つバックエンドの処理単位。/)
+  })
+})
+
+describe('to-md: unmapped elements', () => {
+  test('an element outside the §7 mapping becomes an HTML comment placeholder and warns on stderr', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"><h1>t</h1></header>
+      <main><nav class="wu-nav-not-mapped"><p>x</p></nav></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const originalWrite = process.stderr.write
+    let captured = ''
+    process.stderr.write = (chunk) => { captured += chunk; return true }
+    let md
+    try {
+      md = convertToMarkdown(html, { slug: 'unmapped' })
+    } finally {
+      process.stderr.write = originalWrite
+    }
+    assert.match(md, /<!-- writeup: unmapped nav\.wu-nav-not-mapped -->/)
+    assert.match(captured, /unmapped element <nav\.wu-nav-not-mapped>/)
+  })
+
+  test('content nested under an unmapped wrapper is still converted, not dropped', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><nav class="wu-weird"><h2>見出し</h2></nav></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'nested' })
+    assert.match(md, /## 見出し/)
+  })
+})
+
+describe('to-md: inline formatting', () => {
+  test('.wu-accent renders as **bold** inline within a paragraph', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p>前 <span class="wu-accent">強調</span> 後</p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'accent' })
+    assert.match(md, /前 \*\*強調\*\* 後/)
+  })
+
+  test('an inline <a> renders as a Markdown link', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p><a href="https://example.com">link</a></p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'link' })
+    assert.match(md, /\[link\]\(https:\/\/example\.com\)/)
+  })
+})

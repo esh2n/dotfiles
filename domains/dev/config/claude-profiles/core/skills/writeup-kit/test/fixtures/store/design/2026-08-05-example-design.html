@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>アップロード経路の設計</title>
+<meta name="description" content="アップロード経路をクライアント・API・ワーカーの3段に分ける設計">
+<meta name="kind" content="設計">
+<meta name="date" content="2026-08-05">
+<meta name="updated" content="2026-08-05">
+<meta name="checks" content="lint=pass;self-check=pass;diagram=1/1">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../_kit/writeup.css">
+</head>
+<body>
+<div class="wu-page">
+
+<header class="wu-header">
+<p class="wu-eyebrow">設計 &middot; 2026-08-05 &middot; 更新 2026-08-05</p>
+<h1>アップロード経路の設計</h1>
+<p class="wu-lede">アップロード経路をクライアント・API・ワーカーの3段に分ける設計。</p>
+</header>
+
+<main>
+
+<section class="wu-section">
+<h2>目的と読者</h2>
+<p>実装担当者向けに、アップロード経路の段構成を1つに決める。</p>
+</section>
+
+<section class="wu-section">
+<h2>用語</h2>
+<dl class="wu-terms">
+<dt>ワーカー</dt>
+<dd>再試行を専門に受け持つバックエンドの処理単位。</dd>
+<dt>委譲</dt>
+<dd>APIが受けた処理をワーカーに渡すこと。</dd>
+</dl>
+</section>
+
+<section class="wu-section">
+<h2>現状とギャップ</h2>
+<figure class="wu-figure" data-checks="pass">
+<svg role="img" aria-labelledby="wu-d-1-title wu-d-1-desc" viewBox="0 0 640 260">
+<title id="wu-d-1-title">現状の経路</title>
+<desc id="wu-d-1-desc">クライアントからAPIへ送信し、APIがワーカーへ委譲し、ワーカーが応答を返す。</desc>
+<rect id="wu-d-client" x="16" y="100" width="140" height="56" rx="6" fill="none" stroke="currentColor"></rect>
+<text x="86" y="132" text-anchor="middle" font-size="13" fill="currentColor">クライアント</text>
+<g id="wu-d-backend">
+<rect x="220" y="60" width="380" height="140" rx="8" fill="none" stroke="currentColor" stroke-dasharray="4 4"></rect>
+<text x="236" y="80" font-size="11" fill="currentColor">バックエンド</text>
+<rect id="wu-d-api" x="248" y="100" width="120" height="56" rx="6" fill="none" stroke="currentColor"></rect>
+<text x="308" y="132" text-anchor="middle" font-size="13" fill="currentColor">API</text>
+<rect id="wu-d-worker" class="wu-focal" x="448" y="100" width="120" height="56" rx="6" fill="none" stroke="currentColor" stroke-width="2"></rect>
+<text x="508" y="132" text-anchor="middle" font-size="13" fill="currentColor">ワーカー</text>
+</g>
+<line x1="156" y1="128" x2="244" y2="128" stroke="currentColor"></line>
+<text x="200" y="118" text-anchor="middle" font-size="11" fill="currentColor">送信</text>
+<line x1="368" y1="128" x2="444" y2="128" stroke="currentColor" stroke-dasharray="2 2"></line>
+<text x="406" y="118" text-anchor="middle" font-size="11" fill="currentColor">委譲</text>
+</svg>
+<figcaption>クライアントからAPIへ送信し、APIがワーカーへ委譲し、ワーカーが応答を返す。</figcaption>
+<script type="text/x-writeup-diagram">
+id: d1
+title: 現状の経路
+caption: クライアントからAPIへ送信し、APIがワーカーへ委譲し、ワーカーが応答を返す。
+direction: right
+groups:
+  - id: backend
+    label: バックエンド
+    tone: ts
+nodes:
+  - id: client
+    label: クライアント
+  - id: api
+    label: API
+    group: backend
+  - id: worker
+    label: ワーカー
+    group: backend
+    emphasis: true
+edges:
+  - from: client
+    to: api
+    label: 送信
+    kind: sync
+  - from: api
+    to: worker
+    label: 委譲
+    kind: async
+  - from: worker
+    to: client
+    kind: reply
+</script>
+</figure>
+</section>
+
+<section class="wu-section">
+<h2>あるべき姿</h2>
+<p>ワーカーは再試行の上限を持ち、上限に達したら結果だけを返す。</p>
+</section>
+
+<section class="wu-section">
+<h2>決定点</h2>
+<table class="wu-compare">
+<thead><tr><th>案</th><th>実装コスト</th><th>運用負荷</th></tr></thead>
+<tbody>
+<tr><td>API内で再試行</td><td>低</td><td>中</td></tr>
+<tr><td>ワーカーに分離</td><td>中</td><td>低</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="wu-section">
+<h2>進め方</h2>
+<div class="wu-open">
+<ul>
+<li>ワーカーの永続化方式はまだ決めていない。</li>
+</ul>
+</div>
+</section>
+
+</main>
+
+<footer class="wu-footer">
+<dl>
+<dt>checks</dt><dd>lint=pass; self-check=pass; diagram=1/1</dd>
+<dt>sources</dt><dd>&mdash;</dd>
+</dl>
+</footer>
+
+</div>
+</body>
+</html>
