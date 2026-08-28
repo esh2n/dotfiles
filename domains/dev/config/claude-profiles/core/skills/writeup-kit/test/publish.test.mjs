@@ -1,11 +1,11 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { publish, inlineKitCss, findPrivateWordHits, assertSize, PublishError } from '../bin/publish.mjs'
+import { publish, inlineKitCss, adjustBackNav, findPrivateWordHits, assertSize, PublishError } from '../bin/publish.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
 import { buildStore } from '../bin/build.mjs'
 
@@ -131,6 +131,75 @@ describe('publish(): targets', () => {
       () => publish(join(store, DECISION_REL), { to: 'cloudflare', store, dryRun: true }),
       (e) => e instanceof PublishError && e.code === 5,
     )
+  })
+})
+
+describe('adjustBackNav(): .wu-nav pre-stage handling', () => {
+  const withNav = (href) =>
+    `<header class="wu-header"><nav class="wu-nav"><a class="wu-back" href="${href}">一覧</a></nav>` +
+    `<p class="wu-eyebrow">e</p><h1>t</h1><p class="wu-lede">l</p></header>`
+
+  test('--to file drops .wu-nav entirely', () => {
+    const out = adjustBackNav(withNav('../index.html'), 'file', '/does/not/matter')
+    assert.ok(!/<nav class="wu-nav"/.test(out))
+    assert.ok(!/wu-back/.test(out))
+  })
+
+  test('--to artifact drops .wu-nav entirely', () => {
+    const out = adjustBackNav(withNav('../index.html'), 'artifact', '/does/not/matter')
+    assert.ok(!/<nav class="wu-nav"/.test(out))
+  })
+
+  test('--to cloudflare drops .wu-nav when <store>/public/index.html does not exist yet', () => {
+    const store = freshStore()
+    const out = adjustBackNav(withNav('../index.html'), 'cloudflare', store)
+    assert.ok(!/<nav class="wu-nav"/.test(out))
+  })
+
+  test('--to cloudflare rewrites the href to /index.html when <store>/public/index.html exists', () => {
+    const store = freshStore()
+    mkdirSync(join(store, 'public'), { recursive: true })
+    writeFileSync(join(store, 'public', 'index.html'), '<html></html>')
+    const out = adjustBackNav(withNav('../index.html'), 'cloudflare', store)
+    assert.match(out, /<a class="wu-back" href="\/index\.html">/)
+  })
+
+  test('a page with no .wu-nav at all is left untouched (any target)', () => {
+    const headerOnly = '<header class="wu-header"><p class="wu-eyebrow">e</p><h1>t</h1><p class="wu-lede">l</p></header>'
+    assert.equal(adjustBackNav(headerOnly, 'file', '/x'), headerOnly)
+    assert.equal(adjustBackNav(headerOnly, 'cloudflare', '/x'), headerOnly)
+  })
+
+  test('publish(): --to file writes a staged page with .wu-nav removed', () => {
+    const store = freshStore()
+    const outFile = join(store, 'out-file.html')
+    const result = publish(join(store, DECISION_REL), { to: 'file', out: outFile, store })
+    assert.equal(result.ok, true)
+    assert.ok(!/<nav class="wu-nav"/.test(readFileSync(outFile, 'utf8')))
+  })
+
+  test('publish(): --to artifact writes a staged page with .wu-nav removed', () => {
+    const store = freshStore()
+    const result = publish(join(store, DECISION_REL), { to: 'artifact', store })
+    assert.ok(!/<nav class="wu-nav"/.test(readFileSync(result.output, 'utf8')))
+  })
+
+  test('publish(): --to cloudflare with no public/index.html yet removes .wu-nav', () => {
+    const store = freshStore()
+    const tomlPath = join(store, '.writeup.toml')
+    writeFileSync(tomlPath, readFileSync(tomlPath, 'utf8') + '\naccess_verified = true\n')
+    const result = publish(join(store, DECISION_REL), { to: 'cloudflare', store })
+    assert.ok(!/<nav class="wu-nav"/.test(readFileSync(result.output, 'utf8')))
+  })
+
+  test('publish(): --to cloudflare with an existing public/index.html rewrites the href to /index.html', () => {
+    const store = freshStore()
+    const tomlPath = join(store, '.writeup.toml')
+    writeFileSync(tomlPath, readFileSync(tomlPath, 'utf8') + '\naccess_verified = true\n')
+    mkdirSync(join(store, 'public'), { recursive: true })
+    writeFileSync(join(store, 'public', 'index.html'), '<html></html>')
+    const result = publish(join(store, DECISION_REL), { to: 'cloudflare', store })
+    assert.match(readFileSync(result.output, 'utf8'), /<a class="wu-back" href="\/index\.html">/)
   })
 })
 

@@ -43,10 +43,15 @@ component side of the kind-to-component mapping in `kinds.md`.
 ### `.wu-header` / `.wu-footer`
 
 Chrome. Copy these two blocks verbatim from `kit/template.html`; only the
-text values (kind, dates, title, lede, checks, sources) change.
+text values (kind, dates, title, lede, checks, sources) change. `.wu-nav`,
+the header's first child, is copied verbatim too — its `href` is a
+placeholder; `build` rewrites it to the correct relative path up to the
+store root's `index.html` (or inserts the nav entirely if a pre-nav page
+lacks it) — never edit that href by hand.
 
 ```html
 <header class="wu-header">
+<nav class="wu-nav"><a class="wu-back" href="../index.html">一覧</a></nav>
 <p class="wu-eyebrow">設計 &middot; 2026-08-28 &middot; 更新 2026-08-28</p>
 <h1>ページ表題を一文で</h1>
 <p class="wu-lede">このページが何を・誰に向けて書き、何を結論とするかを一段落で書く。</p>

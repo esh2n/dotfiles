@@ -23,6 +23,13 @@ it does not add new rules.
 - A page links `_kit/writeup.css` with a relative path
   (`../_kit/writeup.css`). When the kit's version bumps, `build` re-syncs
   `_kit/` so every page's look stays in sync.
+- `.wu-header`'s first child is a back-to-index nav,
+  `<nav class="wu-nav"><a class="wu-back" href="…">一覧</a></nav>`. `build`
+  keeps its `href` pointed at the store root's `index.html` for the page's
+  depth (`index.html` at depth 0, `../index.html` at depth 1, …), inserting
+  the nav entirely when a page predates it — the other place `build` edits
+  a page's own bytes (see the `id` bullet in §2 for the first). Page authors
+  never write or edit this href by hand.
 - writeup runs `git add <page> && git commit -m "<kind>: <title>"` on every
   save. Generated artifacts (`manifest.json`, `index.html`, `_kit/`) go into
   the same commit.

@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 // publish.mjs — stages a page for an external audience (contract §8).
-// Pre-stage, always in this order: (1) self-check must pass, (2) inline the
-// kit CSS, (3) reject on a company-trace word hit, (4) enforce the 16MB
-// Artifact-tool size ceiling. Then dispatch to one of 3 targets.
+// Pre-stage, always in this order: (0) --to is one of the 3 known targets,
+// (1) self-check must pass, (2) inline the kit CSS and adjust `.wu-header`'s
+// back-to-index nav for the target (dropped for file/artifact; rewritten to
+// `/index.html` or dropped for cloudflare — see `adjustBackNav`), (3) reject
+// on a company-trace word hit, (4) enforce the 16MB Artifact-tool size
+// ceiling. Then dispatch to one of 3 targets.
 //
 // Exit codes: 0 success/dry-run, 2 usage error, 3 self-check failed,
 // 4 private-word hit, 5 cloudflare Access not verified, 6 size over 16MB.
@@ -41,6 +44,25 @@ export function inlineKitCss(html, storeDir) {
   const css = existsSync(cssPath) ? readFileSync(cssPath, 'utf8') : ''
   const style = `<style>\n${css}\n</style>`
   return html.slice(0, m.index) + style + html.slice(m.index + m[0].length)
+}
+
+const NAV_BLOCK_RE = /\s*<nav\s+class="wu-nav"[^>]*>[\s\S]*?<\/nav>/
+const BACK_HREF_RE = /(<a\s+class="wu-back"[^>]*\shref=")([^"]*)(")/
+
+/** Adjusts `.wu-header`'s back-to-index nav for the target audience: a
+ * single exported file (`--to file` / `--to artifact`) has no store index
+ * to link back to, so the nav is dropped entirely. `--to cloudflare`
+ * deploys into `public/`, which only carries its own `index.html` once
+ * `build` has been run against it — when `<store>/public/index.html`
+ * exists, the nav's href is rewritten to the deployed site's absolute
+ * `/index.html`; otherwise it is dropped the same as file/artifact. A page
+ * with no `.wu-nav` at all (predates this feature, or already stripped) is
+ * left untouched either way. */
+export function adjustBackNav(html, to, storeDir) {
+  if (to === 'cloudflare' && existsSync(join(storeDir, 'public', 'index.html'))) {
+    return html.replace(BACK_HREF_RE, (whole, pre, _href, post) => `${pre}/index.html${post}`)
+  }
+  return html.replace(NAV_BLOCK_RE, '')
 }
 
 /** Every word from the store's `[private] words` list found in the page's
@@ -97,10 +119,14 @@ export function publish(pageFile, opts) {
   const { to, out, store, dryRun = false, deploy = false } = opts
   const storeDir = resolveStoreDir(store)
 
+  if (!['file', 'artifact', 'cloudflare'].includes(to)) {
+    throw new PublishError(2, `unknown --to target: ${to}`)
+  }
+
   assertSelfCheckPasses(pageFile)
 
   const raw = readFileSync(pageFile, 'utf8')
-  const staged = inlineKitCss(raw, storeDir)
+  const staged = adjustBackNav(inlineKitCss(raw, storeDir), to, storeDir)
 
   const hits = findPrivateWordHits(staged, privateWords(storeDir))
   if (hits.length) {
@@ -109,9 +135,6 @@ export function publish(pageFile, opts) {
 
   assertSize(staged)
 
-  if (!['file', 'artifact', 'cloudflare'].includes(to)) {
-    throw new PublishError(2, `unknown --to target: ${to}`)
-  }
   if (to === 'cloudflare') assertCloudflareAccess(storeDir)
 
   if (dryRun) {

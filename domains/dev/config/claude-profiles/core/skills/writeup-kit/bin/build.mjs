@@ -3,12 +3,18 @@
 // from every page's `<head>` meta, and syncs the kit's CSS into
 // `<store>/_kit/writeup.css` (contract §1, §1-3). Zero-dependency.
 //
-// The one place build.mjs edits a page's own bytes: when a page's `<head>`
-// lacks `<meta name="id">`, build inserts the computed id right after
-// `<meta name="date">` (idempotent — only when the meta is missing; see
-// `insertIdMeta`/`buildPageRecord`). Nothing else about a page is ever
-// rewritten by build — `<meta name="updated">` in particular is read, not
-// patched, even when the manifest fills in a synthesized time-of-day.
+// The two places build.mjs edits a page's own bytes (page-contract.md §1):
+// (1) when a page's `<head>` lacks `<meta name="id">`, build inserts the
+// computed id right after `<meta name="date">` (idempotent — only when the
+// meta is missing; see `insertIdMeta`/`buildPageRecord`); (2) `.wu-header`'s
+// back-to-index nav (`<nav class="wu-nav"><a class="wu-back" href="…">`)
+// gets its `href` rewritten to the relative path up to the store root's
+// `index.html` for this page's depth (`index.html`, `../index.html`, …),
+// inserting the nav as the header's first child when a pre-nav page lacks
+// it entirely (idempotent; see `ensureBackNav`/`backNavHref`). Nothing else
+// about a page is ever rewritten by build — `<meta name="updated">` in
+// particular is read, not patched, even when the manifest fills in a
+// synthesized time-of-day.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -147,12 +153,55 @@ function insertIdMeta(text, id) {
   return text.slice(0, headClose) + metaTag + '\n' + text.slice(headClose)
 }
 
+/** The relative path from a page at `relPath` (store-relative, `/`-separated)
+ * up to the store root's `index.html`: `index.html` for a store-root page
+ * (depth 0), `../index.html` for one folder down (depth 1), `../../index.html`
+ * for two, and so on. */
+function backNavHref(relPath) {
+  const depth = relPath.split('/').length - 1
+  return depth === 0 ? 'index.html' : '../'.repeat(depth) + 'index.html'
+}
+
+const HEADER_OPEN_RE = /<header\b[^>]*class="[^"]*\bwu-header\b[^"]*"[^>]*>/
+const LEADING_NAV_RE = /^\s*<nav\s+class="wu-nav"[^>]*>[\s\S]*?<\/nav>/
+const BACK_HREF_RE = /(<a\s+class="wu-back"[^>]*\shref=")([^"]*)(")/
+
+/**
+ * Ensures `.wu-header`'s back-to-index nav has the correct href for this
+ * page's depth (see `backNavHref`), inserting `<nav class="wu-nav"><a
+ * class="wu-back" href="…">一覧</a></nav>` as the header's first child when
+ * the page predates it. The other place build.mjs edits a page's own bytes
+ * — see the module docstring. A page without `.wu-header` at all (e.g. a
+ * frozen legacy/** page) is left untouched. Idempotent: a no-op once the
+ * nav is present with the correct href.
+ */
+function ensureBackNav(text, relPath) {
+  const headerMatch = HEADER_OPEN_RE.exec(text)
+  if (!headerMatch) return text
+  const afterHeader = headerMatch.index + headerMatch[0].length
+  const desiredHref = backNavHref(relPath)
+  const tail = text.slice(afterHeader)
+  const navMatch = LEADING_NAV_RE.exec(tail)
+  if (!navMatch) {
+    const navHtml = `<nav class="wu-nav"><a class="wu-back" href="${desiredHref}">一覧</a></nav>\n`
+    return text.slice(0, afterHeader) + navHtml + text.slice(afterHeader)
+  }
+  const navBlock = navMatch[0]
+  const hrefMatch = BACK_HREF_RE.exec(navBlock)
+  if (!hrefMatch || hrefMatch[2] === desiredHref) return text
+  const navStart = afterHeader
+  const patchedNav = navBlock.slice(0, hrefMatch.index) + hrefMatch[1] + desiredHref + hrefMatch[3] + navBlock.slice(hrefMatch.index + hrefMatch[0].length)
+  return text.slice(0, navStart) + patchedNav + text.slice(navStart + navBlock.length)
+}
+
 /**
  * Builds one manifest record for `relPath`. When the page's `<head>` lacks
  * `<meta name="id">` and `check` is false, inserts the computed id into the
- * file on disk (idempotent: only when missing) — see `insertIdMeta`. The
- * mtime used for `updated`'s time-of-day fallback is read *before* that
- * insertion, so the housekeeping edit itself never bumps a page's `updated`.
+ * file on disk (idempotent: only when missing) — see `insertIdMeta`. Also
+ * ensures `.wu-header`'s back-to-index nav href is correct — see
+ * `ensureBackNav`. The mtime used for `updated`'s time-of-day fallback is
+ * read *before* either edit, so housekeeping itself never bumps a page's
+ * `updated`.
  */
 function buildPageRecord(storeDir, relPath, { check } = {}) {
   const fullPath = join(storeDir, ...relPath.split('/'))
@@ -163,15 +212,21 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
   let meta = headMeta(root)
   const id = pageId(relPath)
   let metaInserted = false
+  let navFixed = false
   if (meta.id === undefined) {
     metaInserted = true
-    if (!check) {
-      text = insertIdMeta(text, id)
-      writeFileSync(fullPath, text)
-      buf = Buffer.from(text, 'utf8')
-      root = parseHtml(text)
-      meta = headMeta(root)
-    }
+    if (!check) text = insertIdMeta(text, id)
+  }
+  const navFixedText = ensureBackNav(text, relPath)
+  if (navFixedText !== text) {
+    navFixed = true
+    if (!check) text = navFixedText
+  }
+  if ((metaInserted || navFixed) && !check) {
+    writeFileSync(fullPath, text)
+    buf = Buffer.from(text, 'utf8')
+    root = parseHtml(text)
+    meta = headMeta(root)
   }
   const title = titleText(root)
   const segments = relPath.split('/')
@@ -202,7 +257,7 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     bytes: buf.length,
     legacy: relPath.startsWith('legacy/'),
   }
-  return { record, metaInserted }
+  return { record, metaInserted, navFixed }
 }
 
 function sortManifest(records) {
@@ -573,7 +628,7 @@ export function buildStore(storeDir, { check = false } = {}) {
 
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
   const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check }))
-  const pagesChanged = built.some((b) => b.metaInserted)
+  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed)
   const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'
   const manifestPath = join(storeDir, 'manifest.json')

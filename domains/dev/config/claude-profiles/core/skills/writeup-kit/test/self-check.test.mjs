@@ -159,6 +159,32 @@ describe('self-check: adversarial rows', () => {
     assert.ok(result.errors.some((e) => e.item === 'chrome'))
   })
 
+  test('row 3: a header with .wu-nav (matching the template) is not a chrome error', () => {
+    const headerWithNav = '<header class="wu-header"><nav class="wu-nav"><a class="wu-back" href="../index.html">一覧</a></nav><p class="wu-eyebrow">e</p><h1>t</h1><p class="wu-lede">l</p></header>'
+    const html = page().replace(HEADER, headerWithNav)
+    const result = itemsFor(html)
+    assert.ok(!result.errors.some((e) => e.item === 'chrome'))
+  })
+
+  test('row 3: a header without .wu-nav (predating the feature) is still not a chrome error', () => {
+    const result = itemsFor(page())
+    assert.ok(!result.errors.some((e) => e.item === 'chrome'))
+  })
+
+  test('row 3: the chrome-match rule ignores .wu-back\'s href value entirely', () => {
+    const headerWithNav = '<header class="wu-header"><nav class="wu-nav"><a class="wu-back" href="/anything/weird.html">一覧</a></nav><p class="wu-eyebrow">e</p><h1>t</h1><p class="wu-lede">l</p></header>'
+    const html = page().replace(HEADER, headerWithNav)
+    const result = itemsFor(html)
+    assert.ok(!result.errors.some((e) => e.item === 'chrome'))
+  })
+
+  test('row 3: a .wu-nav that is missing its a.wu-back link is still a chrome error (nav shape itself is checked)', () => {
+    const badNavHeader = '<header class="wu-header"><nav class="wu-nav"><span>一覧</span></nav><p class="wu-eyebrow">e</p><h1>t</h1><p class="wu-lede">l</p></header>'
+    const html = page().replace(HEADER, badNavHeader)
+    const result = itemsFor(html)
+    assert.ok(result.errors.some((e) => e.item === 'chrome'))
+  })
+
   test('row 4 (role-structure): an <aside> inside main is a disallowed element', () => {
     const result = itemsFor(page({ body: DEFAULT_BODY + '<aside>x</aside>' }))
     assert.ok(result.errors.some((e) => e.item === 'role-structure' && /aside/.test(e.detail)))

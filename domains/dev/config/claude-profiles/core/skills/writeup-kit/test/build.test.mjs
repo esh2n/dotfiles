@@ -296,6 +296,106 @@ describe('buildStore(): id / slug / ref', () => {
   })
 })
 
+describe('buildStore(): .wu-nav back-to-index href', () => {
+  function headerOf(html) {
+    return /<header[\s\S]*?<\/header>/.exec(html)[0]
+  }
+
+  test('depth 1 (one folder down): href is ../index.html', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'design', '2026-08-05-example-design.html'), 'utf8')
+    assert.match(headerOf(html), /<nav class="wu-nav"><a class="wu-back" href="\.\.\/index\.html">/)
+  })
+
+  test('depth 0 (store-root page): href is index.html (no ../)', () => {
+    const store = freshStore()
+    writeFileSync(
+      join(store, '2026-09-02-root-page.html'),
+      readFileSync(join(store, 'decision', '2026-08-01-example-decision.html'), 'utf8')
+        .replace('<meta name="date" content="2026-08-01">', '<meta name="date" content="2026-09-02">'),
+    )
+    buildStore(store)
+    const html = readFileSync(join(store, '2026-09-02-root-page.html'), 'utf8')
+    assert.match(headerOf(html), /<nav class="wu-nav"><a class="wu-back" href="index\.html">/)
+  })
+
+  test('depth 3 (three folders down): href is ../../../index.html', () => {
+    const store = freshStore()
+    mkdirSync(join(store, 'a', 'b', 'c'), { recursive: true })
+    writeFileSync(
+      join(store, 'a', 'b', 'c', '2026-09-02-deep.html'),
+      readFileSync(join(store, 'decision', '2026-08-01-example-decision.html'), 'utf8')
+        .replace('<meta name="date" content="2026-08-01">', '<meta name="date" content="2026-09-02">'),
+    )
+    buildStore(store)
+    const html = readFileSync(join(store, 'a', 'b', 'c', '2026-09-02-deep.html'), 'utf8')
+    assert.match(headerOf(html), /<nav class="wu-nav"><a class="wu-back" href="\.\.\/\.\.\/\.\.\/index\.html">/)
+  })
+
+  test('inserts the nav as .wu-header\'s first child exactly once on a page that predates it', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'decision', '2026-08-01-example-decision.html')
+    buildStore(store)
+    const html = readFileSync(pagePath, 'utf8')
+    const navCount = (html.match(/<nav class="wu-nav"/g) || []).length
+    assert.equal(navCount, 1)
+    assert.match(html, /<header class="wu-header"><nav class="wu-nav">/)
+  })
+
+  test('a second build makes no further change to a page whose nav href is already correct', () => {
+    const store = freshStore()
+    buildStore(store)
+    const pagePath = join(store, 'decision', '2026-08-01-example-decision.html')
+    const afterFirst = readFileSync(pagePath, 'utf8')
+    const result = buildStore(store)
+    const afterSecond = readFileSync(pagePath, 'utf8')
+    assert.equal(afterSecond, afterFirst)
+    assert.equal(result.pagesChanged, false)
+  })
+
+  test('a stale nav href (page moved to a different depth) is rewritten to the correct one', () => {
+    const store = freshStore()
+    buildStore(store)
+    const pagePath = join(store, 'decision', '2026-08-01-example-decision.html')
+    const staleHtml = readFileSync(pagePath, 'utf8').replace(
+      '<nav class="wu-nav"><a class="wu-back" href="../index.html">一覧</a></nav>',
+      '<nav class="wu-nav"><a class="wu-back" href="../../index.html">一覧</a></nav>',
+    )
+    writeFileSync(pagePath, staleHtml)
+    buildStore(store)
+    const fixed = readFileSync(pagePath, 'utf8')
+    assert.match(headerOf(fixed), /href="\.\.\/index\.html"/)
+  })
+
+  test('a page without .wu-header (legacy/**) gets no nav (build still fills in the unrelated id meta)', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'legacy', '2019-05-01-legacy-note.html')
+    const before = readFileSync(pagePath, 'utf8')
+    assert.ok(!before.includes('wu-nav'))
+    buildStore(store)
+    const after = readFileSync(pagePath, 'utf8')
+    assert.ok(!after.includes('wu-nav'))
+  })
+
+  test('--check reports pagesChanged: true for a nav-less page without writing it', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'decision', '2026-08-01-example-decision.html')
+    const before = readFileSync(pagePath, 'utf8')
+    const result = buildStore(store, { check: true })
+    assert.equal(readFileSync(pagePath, 'utf8'), before)
+    assert.ok(!before.includes('wu-nav'))
+    assert.equal(result.pagesChanged, true)
+  })
+
+  test('a built page still passes self-check\'s chrome row', () => {
+    const store = freshStore()
+    buildStore(store)
+    const result = runSelfCheck(join(store, 'design', '2026-08-05-example-design.html'))
+    assert.ok(!result.errors.some((e) => e.item === 'chrome'), JSON.stringify(result.errors))
+  })
+})
+
 describe('buildStore(): updated datetime', () => {
   test('a full ISO datetime <meta updated> is carried through unchanged', () => {
     const store = freshStore()

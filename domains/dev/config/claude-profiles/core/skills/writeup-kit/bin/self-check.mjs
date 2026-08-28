@@ -184,6 +184,13 @@ function checkUpdatedFormat(root, add) {
 
 // --- 3. chrome matches template ---------------------------------------------
 
+/** `true` for a structural-signature child that is `<nav class="wu-nav">`
+ * (the back-to-index link `build` inserts/rewrites as `.wu-header`'s first
+ * child — page-contract.md §1). */
+function isNavSig(childSig) {
+  return !!childSig && childSig.tag === 'nav' && childSig.classes.includes('wu-nav')
+}
+
 let cachedTemplateSignatures = null
 function templateSignatures() {
   if (cachedTemplateSignatures) return cachedTemplateSignatures
@@ -191,20 +198,44 @@ function templateSignatures() {
   const tplRoot = parseHtml(text)
   const header = findFirst(tplRoot, (n) => isElement(n) && hasClass(n, 'wu-header'))
   const footer = findFirst(tplRoot, (n) => isElement(n) && hasClass(n, 'wu-footer'))
+  const headerSig = header ? structuralSignature(header) : null
+  let nav = null
+  let headerWithoutNav = headerSig
+  if (headerSig && isNavSig(headerSig.children[0])) {
+    nav = headerSig.children[0]
+    headerWithoutNav = { ...headerSig, children: headerSig.children.slice(1) }
+  }
   cachedTemplateSignatures = {
-    header: header ? structuralSignature(header) : null,
+    headerWithoutNav,
+    nav,
     footer: footer ? structuralSignature(footer) : null,
   }
   return cachedTemplateSignatures
 }
 
+/** `.wu-header` must match the template once its optional `.wu-nav` first
+ * child is set aside: `build` inserts/rewrites that nav's `href` for a
+ * page's depth (page-contract.md §1), so this row has to accept a header
+ * both before a page has been built (no nav yet) and after (nav present,
+ * any href — `structuralSignature` already carries no attrs, so the href
+ * itself is never compared). A present nav's own shape (`nav > a.wu-back`)
+ * is still checked against the template's, so a malformed or misplaced nav
+ * is still a chrome error. */
 function checkChrome(root, add) {
   const tpl = templateSignatures()
   const header = findFirst(root, (n) => isElement(n) && hasClass(n, 'wu-header'))
   const footer = findFirst(root, (n) => isElement(n) && hasClass(n, 'wu-footer'))
-  if (!header) add('error', 'chrome', 'missing .wu-header')
-  else if (!signaturesEqual(structuralSignature(header), tpl.header)) {
-    add('error', 'chrome', '.wu-header structure does not match kit/template.html')
+  if (!header) {
+    add('error', 'chrome', 'missing .wu-header')
+  } else {
+    const sig = structuralSignature(header)
+    const hasNav = isNavSig(sig.children[0])
+    const rest = hasNav ? { ...sig, children: sig.children.slice(1) } : sig
+    const restOk = signaturesEqual(rest, tpl.headerWithoutNav)
+    const navOk = !hasNav || !tpl.nav || signaturesEqual(sig.children[0], tpl.nav)
+    if (!restOk || !navOk) {
+      add('error', 'chrome', '.wu-header structure does not match kit/template.html')
+    }
   }
   if (!footer) add('error', 'chrome', 'missing .wu-footer')
   else if (!signaturesEqual(structuralSignature(footer), tpl.footer)) {

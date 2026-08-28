@@ -257,6 +257,33 @@ hr {
   border-bottom: var(--wu-bw-1) solid var(--wu-rule);
 }
 
+.wu-nav {
+  margin: 0 0 var(--wu-sp-2);
+}
+
+.wu-back {
+  display: inline-block;
+  font-family: var(--wu-font-mono);
+  font-size: var(--wu-fs-1);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wu-ink-3);
+  text-decoration: none;
+  border: none;
+}
+
+.wu-back::before {
+  content: "← ";
+}
+
+.wu-back:hover,
+.wu-back:focus-visible {
+  color: var(--wu-link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 .wu-header .wu-eyebrow {
   margin: 0;
   font-family: var(--wu-font-mono);
