@@ -14,7 +14,9 @@ import { renderInline, rewritePageLink } from '../bin/lib/migrate/inline.mjs'
 import { parseBlocks, renderBlocksHtml } from '../bin/lib/migrate/blocks.mjs'
 import { parseDatedFilename, matchesOnly, cssHrefForDepth } from '../bin/lib/migrate/util.mjs'
 import { renderBody, isLegacyFile, legacyReasons } from '../bin/lib/migrate/body.mjs'
+import { irToYaml } from '../bin/lib/migrate/util.mjs'
 import { runMigration } from '../bin/migrate-explain-pages.mjs'
+import { parse as parseYamlLite } from '../bin/lib/yaml-lite.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURES = join(HERE, 'fixtures', 'migrate')
@@ -314,6 +316,39 @@ test('e2e: a 12-node diagram exceeds the node budget and falls back to a table',
   assert.match(html, /図は変換時に合格せず、表で代替/)
   assert.match(html, /class="wu-callout" data-tone="warn"/)
   rmSync(dest, { recursive: true, force: true })
+})
+
+test('e2e: a fallback figure embeds the candidate IR as YAML and round-trips through yaml-lite.mjs', async () => {
+  const dest = tmpDest()
+  const { entry } = await migrateOne('2026-01-09-diagram-fallback.md', { dryRun: false, dest })
+  const html = readFileSync(join(dest, entry.dest), 'utf8')
+  const scriptMatch = /<figure class="wu-figure">[\s\S]*?<script type="text\/x-writeup-diagram">\n([\s\S]*?)\n<\/script>\n<\/figure>/.exec(html)
+  assert.ok(scriptMatch, 'fallback figure should carry a text/x-writeup-diagram script block')
+  const yaml = scriptMatch[1]
+  const parsed = parseYamlLite(yaml)
+  assert.equal(parsed.id, 'd1') // this fixture's only diagram, so nextDiagramId assigns "d1"
+  assert.equal(parsed.nodes.length, 12)
+  assert.equal(parsed.edges.length, 1)
+  assert.equal(parsed.edges[0].from, 'n1')
+  assert.equal(parsed.edges[0].to, 'n2')
+  // the callout carries the failing check name/hint (here: the budget message)
+  assert.match(html, /図は変換時に合格せず、表で代替 \(budget: [^)]*\)/)
+  rmSync(dest, { recursive: true, force: true })
+})
+
+test('util: irToYaml round-trips a label containing ": " by quoting it', () => {
+  const ir = {
+    id: 'd1',
+    title: 'A: push を含むタイトル',
+    caption: 'キャプション',
+    nodes: [{ id: 'a', label: 'A: push' }, { id: 'b', label: 'B' }],
+    edges: [{ from: 'a', to: 'b', kind: 'sync', label: 'x: y' }],
+  }
+  const yaml = irToYaml(ir)
+  const parsed = parseYamlLite(yaml)
+  assert.equal(parsed.title, 'A: push を含むタイトル')
+  assert.equal(parsed.nodes[0].label, 'A: push')
+  assert.equal(parsed.edges[0].label, 'x: y')
 })
 
 test('e2e: sequence directive is converted to a wu-steps list (sequence-as-steps)', async () => {

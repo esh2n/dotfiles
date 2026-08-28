@@ -3,7 +3,7 @@
 // {html, warnings, figure?, sequenceAsSteps?} so the caller can accumulate
 // per-file report counters without re-inspecting the HTML it produced.
 
-import { escapeHtml } from './util.mjs'
+import { escapeHtml, irToYaml } from './util.mjs'
 import { renderInline } from './inline.mjs'
 import { parseBlocks, renderBlocksHtml } from './blocks.mjs'
 import { parseOldDiagram } from './old-diagram.mjs'
@@ -172,7 +172,7 @@ function buildCandidateIR(parsed, attrs, { id, title, caption }) {
   return { id, title, caption, direction, groups, nodes, edges }
 }
 
-function fallbackFigureHtml(candidateIR, reason) {
+function fallbackFigureHtml(candidateIR, reason, detail) {
   const rows = []
   for (const n of candidateIR.nodes) {
     rows.push(`<tr><td>node</td><td>${escapeHtml(n.id)}: ${renderInline(n.label)}${n.group ? ` (${escapeHtml(n.group)})` : ''}</td></tr>`)
@@ -180,6 +180,13 @@ function fallbackFigureHtml(candidateIR, reason) {
   for (const e of candidateIR.edges) {
     rows.push(`<tr><td>edge</td><td>${escapeHtml(e.from)} → ${escapeHtml(e.to)} (${e.kind})${e.label ? `: ${renderInline(e.label)}` : ''}</td></tr>`)
   }
+  // Embed the candidate IR as YAML in the same place a rendered figure
+  // would carry its IR (script right after figcaption, before </figure>),
+  // so bin/rerender-figures.mjs can pick it back up and try again later
+  // (e.g. after a renderer fix or a budget-driven manual split) without
+  // anyone having to reconstruct the diagram from the table by hand.
+  const yaml = irToYaml(candidateIR)
+  const detailText = detail ? `: ${escapeHtml(detail)}` : ''
   const html = [
     '<figure class="wu-figure">',
     '<table class="wu-table">',
@@ -187,8 +194,9 @@ function fallbackFigureHtml(candidateIR, reason) {
     `<tbody>\n${rows.join('\n')}\n</tbody>`,
     '</table>',
     `<figcaption>${renderInline(candidateIR.caption)}</figcaption>`,
+    `<script type="text/x-writeup-diagram">\n${yaml}\n</script>`,
     '</figure>',
-    `<div class="wu-callout" data-tone="warn"><p>図は変換時に合格せず、表で代替 (${escapeHtml(reason)})</p></div>`,
+    `<div class="wu-callout" data-tone="warn"><p>図は変換時に合格せず、表で代替 (${escapeHtml(reason)}${detailText})</p></div>`,
   ].join('\n')
   return html
 }
@@ -208,7 +216,7 @@ export async function renderDiagram(node, ctx) {
   const validated = validateIR(candidateIR)
   if (!validated.ok) {
     warnings.push(`diagram: ${validated.reason} violation — ${validated.message}`)
-    return { html: fallbackFigureHtml(candidateIR, validated.reason), warnings, figureOk: false }
+    return { html: fallbackFigureHtml(candidateIR, validated.reason, validated.message), warnings, figureOk: false }
   }
 
   let rendered
@@ -216,12 +224,15 @@ export async function renderDiagram(node, ctx) {
     rendered = await renderFigureHtmlChecked(validated.ir, { column: ctx.column, rawYaml: JSON.stringify(validated.ir) })
   } catch (e) {
     warnings.push(`diagram: render threw: ${e.message}`)
-    return { html: fallbackFigureHtml(candidateIR, 'render-error'), warnings, figureOk: false }
+    return { html: fallbackFigureHtml(candidateIR, 'render-error', e.message), warnings, figureOk: false }
   }
   if (!rendered.checksOk) {
-    const failing = rendered.checks.filter((c) => !c.ok).map((c) => c.name).join(', ')
+    const failingChecks = rendered.checks.filter((c) => !c.ok)
+    const failing = failingChecks.map((c) => c.name).join(', ')
     warnings.push(`diagram: verification failed (${failing})`)
-    return { html: fallbackFigureHtml(candidateIR, 'verification') , warnings, figureOk: false }
+    const hint = failingChecks.map((c) => c.hint).filter(Boolean).join('; ')
+    const detail = hint ? `${failing} — ${hint}` : failing
+    return { html: fallbackFigureHtml(candidateIR, 'verification', detail), warnings, figureOk: false }
   }
   return { html: rendered.html, warnings, figureOk: true }
 }

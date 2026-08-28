@@ -63,6 +63,95 @@ export function parseDatedFilename(basename) {
   return { date: null, slug: basename.replace(/\.md$/, '') }
 }
 
+// --- IR -> YAML (for embedding a candidate/failed IR into a fallback figure) --
+
+/** True when a plain YAML scalar needs quoting to survive a round-trip
+ * through yaml-lite.mjs's parser: it would otherwise be misread as a
+ * different type (true/false/null/number), get its comment-stripping or
+ * ": " key-split rules triggered, or be parsed as an inline sequence. */
+function yamlScalarNeedsQuote(s) {
+  if (s === '') return true
+  if (s === 'true' || s === 'false' || s === 'null' || s === '~') return true
+  if (/^-?\d+$/.test(s) || /^-?\d+\.\d+$/.test(s) || /^-?\d+(\.\d+)?e[+-]?\d+$/i.test(s)) return true
+  if (s.includes(': ') || /:$/.test(s)) return true
+  if (s.startsWith('[') || s.startsWith('"') || s.startsWith("'")) return true
+  if (/(^|\s)#/.test(s)) return true
+  if (/^\s|\s$/.test(s)) return true
+  return false
+}
+
+/** Double-quote a scalar for yaml-lite.mjs (which only supports the
+ * escapes it lists: \n \t \r \" \\ \/). */
+function yamlQuote(s) {
+  return `"${String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t')}"`
+}
+
+/** A YAML-lite scalar for `value` — quoted only when required to round-trip. */
+function yamlScalar(value) {
+  if (typeof value === 'boolean' || typeof value === 'number') return String(value)
+  const s = String(value)
+  return yamlScalarNeedsQuote(s) ? yamlQuote(s) : s
+}
+
+/** Serialize a diagram IR-shaped object (id/title/caption/direction/
+ * groups/nodes/edges — the same fields ir.mjs normalizes, but tolerant of
+ * a candidate IR that never passed validateIR) into the YAML-lite shape
+ * the renderer accepts, for embedding a failed diagram's IR into a
+ * fallback figure's `<script type="text/x-writeup-diagram">`. */
+export function irToYaml(ir) {
+  const lines = []
+  lines.push(`id: ${yamlScalar(ir.id)}`)
+  lines.push(`title: ${yamlScalar(ir.title)}`)
+  if (ir.caption !== undefined && ir.caption !== null && ir.caption !== '') {
+    lines.push(`caption: ${yamlScalar(ir.caption)}`)
+  }
+  if (ir.direction) lines.push(`direction: ${yamlScalar(ir.direction)}`)
+
+  const groups = ir.groups || []
+  if (groups.length) {
+    lines.push('groups:')
+    for (const g of groups) {
+      lines.push(`- id: ${yamlScalar(g.id)}`)
+      lines.push(`  label: ${yamlScalar(g.label)}`)
+      if (g.tone && g.tone !== 'neutral') lines.push(`  tone: ${yamlScalar(g.tone)}`)
+      if (g.group) lines.push(`  group: ${yamlScalar(g.group)}`)
+    }
+  }
+
+  const nodes = ir.nodes || []
+  lines.push(nodes.length ? 'nodes:' : 'nodes: []')
+  for (const n of nodes) {
+    lines.push(`- id: ${yamlScalar(n.id)}`)
+    lines.push(`  label: ${yamlScalar(n.label)}`)
+    if (n.group) lines.push(`  group: ${yamlScalar(n.group)}`)
+    if (n.tone && n.tone !== 'neutral') lines.push(`  tone: ${yamlScalar(n.tone)}`)
+    if (n.dashed) lines.push('  dashed: true')
+    if (n.emphasis) lines.push('  emphasis: true')
+  }
+
+  const edges = ir.edges || []
+  if (edges.length) {
+    lines.push('edges:')
+    for (const e of edges) {
+      lines.push(`- from: ${yamlScalar(e.from)}`)
+      lines.push(`  to: ${yamlScalar(e.to)}`)
+      lines.push(`  kind: ${yamlScalar(e.kind ?? 'sync')}`)
+      if (e.label !== undefined && e.label !== null && e.label !== '') lines.push(`  label: ${yamlScalar(e.label)}`)
+      if (e.from_side) lines.push(`  from_side: ${yamlScalar(e.from_side)}`)
+      if (e.to_side) lines.push(`  to_side: ${yamlScalar(e.to_side)}`)
+      if (e.via && e.via.length) lines.push(`  via: [${e.via.map(yamlScalar).join(', ')}]`)
+      if (e.label_at !== undefined && e.label_at !== null) lines.push(`  label_at: ${e.label_at}`)
+    }
+  }
+
+  return lines.join('\n')
+}
+
 /** A relative path from a page at `n` folders deep back to the store root,
  * suffixed with `_kit/writeup.css`. self-check's allowed-external regex
  * only recognizes a leading "./" or one/two "../" segments (contract §1
