@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR, formatBudgetWarnings } from '../bin/lib/ir.mjs'
 import { renderDiagram, renderFigureHtml, normalizePolyline, groupLayerMode, groupLayerHeuristicPrefersElk, COLUMN, MIN_SCALE, LABEL_CLEARANCE } from '../bin/lib/diagram.mjs'
-import { verifyDiagram, renderChecked, renderFigureHtmlChecked, renderCheckedBest } from '../bin/lib/verify-diagram.mjs'
+import { verifyDiagram, renderChecked, renderFigureHtmlChecked, renderCheckedBest, betterCandidate } from '../bin/lib/verify-diagram.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const fixture = (name) => readFileSync(join(HERE, 'fixtures', name), 'utf8')
@@ -768,21 +768,38 @@ function certChainIr() {
   }
 }
 
-test('renderCheckedBest: falls back to elk when grouped-layer mode fails verification (real regression fixture)', async () => {
+test('renderCheckedBest: the certificate-chain fixture that once failed grouped-layer mode now passes it outright (labels sit beside their runs)', async () => {
+  // This fixture was the original "falls back to elk" regression: its
+  // in-layer 署名を検証 label, centered on its connector, collided. With
+  // hand-placed labels offset beside their own segment the grouped-layer
+  // candidate is clean, so it is what renderCheckedBest() returns first.
   const v = validateIR(certChainIr())
   assert.ok(v.ok, JSON.stringify(v))
   assert.equal(groupLayerMode(v.ir), 'auto')
-  assert.equal(groupLayerHeuristicPrefersElk(v.ir), false, 'this fixture should try grouped-layer mode first, then fall back')
-
-  // Confirm the regression is actually present in this fixture: grouped-layer
-  // mode alone fails, so a plain renderDiagram()/verifyDiagram() call (the
-  // pre-fix pipeline) would have reported this figure as failing.
+  assert.equal(groupLayerHeuristicPrefersElk(v.ir), false)
   const group = await renderDiagram(v.ir, { forceElk: false })
   const groupVerify = await verifyDiagram(v.ir, group, { forceElk: false })
-  assert.equal(groupVerify.ok, false, 'fixture no longer exercises the regression — pick a different one')
-
+  assert.equal(groupVerify.ok, true, JSON.stringify(groupVerify.failures))
   const best = await renderCheckedBest(v.ir)
   assert.equal(best.checksOk, true)
+  assert.equal(best.layoutMode, 'group')
+})
+
+test('renderCheckedBest: falls back to elk when grouped-layer mode fails verification (acl-internals.yaml)', async () => {
+  const parsed = ir('acl-internals.yaml')
+  assert.equal(groupLayerMode(parsed), 'auto')
+  assert.equal(groupLayerHeuristicPrefersElk(parsed), false, 'this fixture should try grouped-layer mode first, then fall back')
+
+  // Confirm the regression is actually present in this fixture: grouped-layer
+  // mode alone fails (its hand-drawn router puts an in-layer edge through a
+  // sibling node), so a plain renderDiagram()/verifyDiagram() call (the
+  // pre-fix pipeline) would have reported this figure as failing.
+  const group = await renderDiagram(parsed, { forceElk: false })
+  const groupVerify = await verifyDiagram(parsed, group, { forceElk: false })
+  assert.equal(groupVerify.ok, false, 'fixture no longer exercises the regression — pick a different one')
+
+  const best = await renderCheckedBest(parsed)
+  assert.equal(best.checksOk, true, JSON.stringify(best.failures))
   assert.equal(best.layoutMode, 'elk')
 })
 
@@ -807,7 +824,29 @@ function frameworkComparisonIr() {
   }
 }
 
-test('renderCheckedBest: when neither mode fully passes, picks the candidate with fewer failing checks', async () => {
+test('betterCandidate: zero failures first, then no scroll, then fewer warnings, then fewer failing rows; a full tie keeps the first', () => {
+  const cand = ({ fail = 0, warn = 0, scroll = false, failingRows = fail + warn }) => ({
+    failures: Array.from({ length: fail }, (_, i) => ({ id: i })),
+    warnings: Array.from({ length: warn }, (_, i) => ({ id: 10 + i })),
+    scroll,
+    checks: [...Array.from({ length: failingRows }, () => ({ ok: false })), { ok: true }],
+  })
+  assert.equal(betterCandidate(cand({ fail: 1 }), cand({ fail: 0, scroll: true })), true, 'clean beats failing even when it scrolls')
+  assert.equal(betterCandidate(cand({ fail: 0, scroll: true }), cand({ fail: 0 })), true, 'no scroll beats scroll')
+  assert.equal(betterCandidate(cand({ fail: 0 }), cand({ fail: 0, scroll: true })), false)
+  assert.equal(betterCandidate(cand({ warn: 2 }), cand({ warn: 1 })), true, 'fewer warnings')
+  assert.equal(betterCandidate(cand({ fail: 2 }), cand({ fail: 1 })), true, 'fewer failing rows when both fail')
+  assert.equal(betterCandidate(cand({ fail: 1 }), cand({ fail: 2 })), false)
+  assert.equal(betterCandidate(cand({ fail: 1 }), cand({ fail: 1 })), false, 'a full tie keeps the first-tried candidate')
+})
+
+test('renderCheckedBest: when neither mode fully passes and they tie on failing rows, the first-tried (heuristically preferred) candidate is kept', async () => {
+  // The framework-comparison fixture used to fail twice in grouped-layer
+  // mode (border-hug + label-clearance) against once in elk; with labels
+  // placed beside their runs it fails once in each — border-hug (its
+  // fanned cross-layer elbow runs along a group border) vs elk's diagonal
+  // segment — so the ranking's final tie-break, "keep the first tried",
+  // is what decides, and the heuristic tries elk first for this shape.
   const v = validateIR(frameworkComparisonIr())
   assert.ok(v.ok, JSON.stringify(v))
   assert.equal(groupLayerMode(v.ir), 'auto')
@@ -821,7 +860,7 @@ test('renderCheckedBest: when neither mode fully passes, picks the candidate wit
   assert.equal(elkVerify.ok, false, 'fixture no longer exercises the regression — pick a different one')
   const groupFailing = groupVerify.checks.filter((c) => !c.ok).length
   const elkFailing = elkVerify.checks.filter((c) => !c.ok).length
-  assert.ok(elkFailing < groupFailing, 'fixture should make elk the strictly better of two failing candidates')
+  assert.ok(elkFailing <= groupFailing, 'fixture should make elk the better-or-equal of two failing candidates')
 
   const best = await renderCheckedBest(v.ir)
   assert.equal(best.checksOk, false)
@@ -1036,9 +1075,13 @@ test('renderCheckedBest: the existing fixtures keep the size and mode they rende
 // 404x748 / 320x812 (74px). Pinned so a spacing regression shows up as a
 // number, not as a screenshot.
 test('renderCheckedBest: acl-overview.yaml / acl-internals.yaml keep their tightened "down" size', async () => {
+  // 404x748 / 320x812 -> 432x612 / 320x688 once the group boxes stopped
+  // carrying elk's phantom bottom band (see diagram.test.mjs's "group
+  // padding" tests); the extra 28px of width is the loop-around label
+  // now sitting beside its run instead of astride it.
   const expected = {
-    'acl-overview.yaml': { mode: 'elk', direction: 'down', width: 404, height: 748 },
-    'acl-internals.yaml': { mode: 'elk', direction: 'down', width: 320, height: 812 },
+    'acl-overview.yaml': { mode: 'elk', direction: 'down', width: 432, height: 612 },
+    'acl-internals.yaml': { mode: 'elk', direction: 'down', width: 320, height: 688 },
   }
   for (const [name, dims] of Object.entries(expected)) {
     const best = await renderCheckedBest(ir(name))
@@ -1053,4 +1096,35 @@ test('renderCheckedBest: acl-overview.yaml / acl-internals.yaml keep their tight
 
 test('row #2 label-clearance and the renderer\'s own manual-label placement share one 6px floor', () => {
   assert.equal(LABEL_CLEARANCE, 6)
+})
+
+// --- grilling's round-diagram.md figures, and one path for CLI + page builder
+//
+// grilling's html.mjs hands each round diagram to renderFigureHtmlChecked();
+// bin/render-diagram.mjs --json goes through renderCheckedBest(). Both must
+// report the same verdict for the same IR — they share the candidate
+// selection, and these tests keep it that way for every flowchart fixture.
+
+const FLOWCHART_FIXTURES = ['simple.yaml', 'groups.yaml', 'hints.yaml', 'wide.yaml', 'scroll.yaml', 'conway.yaml', 'budget.yaml', 'samples-figure.yaml', 'chain-long-labels.yaml', 'acl-overview.yaml', 'acl-internals.yaml', 'browser-server.yaml', 'two-workspaces.yaml']
+
+test('renderFigureHtmlChecked and renderCheckedBest agree on mode, orientation, size and verdict for every fixture', async () => {
+  for (const name of FLOWCHART_FIXTURES) {
+    const parsed = ir(name)
+    const best = await renderCheckedBest(parsed)
+    const figure = await renderFigureHtmlChecked(parsed, { rawYaml: fixture(name) })
+    const summary = (r) => ({ ok: r.checksOk, mode: r.layoutMode, direction: r.layout.direction, width: r.width, height: r.height, scroll: r.scroll, failures: r.failures.map((f) => f.name), warn: r.warn })
+    assert.deepEqual(summary(figure), summary(best), `${name}: the two paths disagree`)
+    assert.equal(figure.html.includes('data-checks="pass"'), best.checksOk, `${name}: data-checks stamp disagrees with the verdict`)
+  }
+})
+
+test('browser-server.yaml / two-workspaces.yaml (grilling round-diagram.md figures) pass every geometry check through both paths', async () => {
+  for (const [name, warn] of [['browser-server.yaml', ''], ['two-workspaces.yaml', 'budget:nodes=10']]) {
+    const parsed = ir(name)
+    const figure = await renderFigureHtmlChecked(parsed, { rawYaml: fixture(name) })
+    assert.equal(figure.checksOk, true, `${name}: ${JSON.stringify(figure.failures)}`)
+    assert.equal(figure.warn, warn, name)
+    assert.match(figure.html, warn ? new RegExp(`^<figure class="wu-figure" data-checks="pass" data-warn="${warn}">`) : /^<figure class="wu-figure" data-checks="pass">/)
+    assert.equal(figure.scroll, false, name)
+  }
 })

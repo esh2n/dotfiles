@@ -1,0 +1,62 @@
+id: d2
+title: 置き場所の候補
+caption: 契約の型は Rust 側にしか無く、TS 側には契約パッケージが無い。
+groups:
+  - id: ts
+    label: TypeScript（pnpm workspace）
+    tone: ts
+  - id: rs
+    label: Rust（cargo workspace）
+    tone: rs
+nodes:
+  - id: tokens
+    label: packages/tokens
+    group: ts
+  - id: ui
+    label: packages/ui
+    group: ts
+  - id: viewer
+    label: apps/viewer
+    group: ts
+  - id: site
+    label: apps/site
+    group: ts
+  - id: tscontract
+    label: TS の契約パッケージ — 存在しない
+    group: ts
+    tone: ts
+    dashed: true
+  - id: renderer
+    label: "新規: レンダラー + CLI"
+    group: ts
+    tone: new
+    emphasis: true
+  - id: contracts
+    label: crates/contracts
+    group: rs
+  - id: daemon
+    label: crates/daemon
+    group: rs
+  - id: masterdata
+    label: crates/master_data
+    group: rs
+  - id: ingest
+    label: "将来: daemon が決定記録を取り込む"
+    group: rs
+    tone: new
+    dashed: true
+edges:
+  - from: ui
+    to: renderer
+    label: 使う
+    kind: sync
+  - from: tokens
+    to: contracts
+    label: 生成
+    kind: async
+  - from: contracts
+    to: daemon
+    kind: sync
+  - from: contracts
+    to: masterdata
+    kind: sync

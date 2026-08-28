@@ -555,7 +555,7 @@ const countFailing = (r) => r.checks.filter((c) => !c.ok).length
  * right-hand part from every reader who doesn't drag sideways — a
  * passing-but-1900px-wide layout must never outrank a compact one that
  * fits. */
-function betterCandidate(a, b) {
+export function betterCandidate(a, b) {
   const aClean = a.failures.length === 0, bClean = b.failures.length === 0
   if (aClean !== bClean) return bClean
   if (a.scroll !== b.scroll) return !b.scroll

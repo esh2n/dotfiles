@@ -1,0 +1,59 @@
+# Regression fixture (2026-08-28): grilling's round-diagram.md "現在地"
+# figure (q1-d1) — 5 nodes in 2 groups, 5 labeled edges (sync/reply/async),
+# no direction. Rendered through renderFigureHtmlChecked it failed rhythm
+# ("edges[3] segment 2/3 is 4px (< 16px, interior)") on the reply edge's
+# hand-drawn loop, while every other candidate the "try, verify, pick"
+# strategy could have taken was clean.
+id: d1
+title: 現在地
+caption: いまはブラウザが API を直接叩いており、更新の主体がどこにも無い。
+groups:
+- id: browser
+  label: ブラウザ
+  tone: ts
+- id: server
+  label: サーバ
+  tone: rs
+nodes:
+- id: spa
+  label: SPA
+  group: browser
+  tone: ts
+- id: sdk
+  label: 認証 SDK
+  group: browser
+  tone: ts
+  emphasis: true
+- id: bff
+  label: BFF
+  group: server
+  tone: rs
+- id: idp
+  label: IdP
+  group: server
+- id: future
+  label: 将来の更新ワーカー
+  group: server
+  tone: new
+  dashed: true
+edges:
+- from: spa
+  to: sdk
+  kind: sync
+  label: 呼ぶ
+- from: sdk
+  to: bff
+  kind: sync
+  label: API 呼び出し
+- from: bff
+  to: idp
+  kind: sync
+  label: 検証
+- from: bff
+  to: sdk
+  kind: reply
+  label: 401 を返す
+- from: bff
+  to: future
+  kind: async
+  label: 期限切れ通知

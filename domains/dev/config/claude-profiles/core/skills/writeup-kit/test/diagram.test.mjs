@@ -8,9 +8,9 @@ import { validateIR, formatBudgetWarnings } from '../bin/lib/ir.mjs'
 import {
   renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE,
   chooseOrientation, legendWidth, EDGE_LABEL_SIZE, normalizePolyline,
-  groupLayerMode, groupLayerHeuristicPrefersElk,
+  groupLayerMode, groupLayerHeuristicPrefersElk, straightenJogs, labelsCramped, LABEL_CLEARANCE,
 } from '../bin/lib/diagram.mjs'
-import { verifyDiagram } from '../bin/lib/verify-diagram.mjs'
+import { verifyDiagram, renderCheckedBest } from '../bin/lib/verify-diagram.mjs'
 import { unescapeIrScript } from '../bin/lib/ir-script.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -1020,9 +1020,15 @@ const contains = (outer, inner) => (
   inner.y >= outer.y && inner.y + inner.height <= outer.y + outer.height
 )
 
+// The sizes pinned here moved once more when the group boxes stopped
+// carrying elk's phantom bottom band (see the "group padding" tests
+// below): 404x748 -> 432x612 and 320x812 -> 320x688. acl-overview.yaml
+// got 28px *wider* in the same change because its loop-around label
+// ("自分の型へ変換して返す") now sits beside its run, on the only side
+// with room — outside the loop — instead of astride it.
 const DOWN_GROUPED = {
-  'acl-overview.yaml': { groups: ['mine', 'acl', 'other'], width: 404, height: 748, before: { gap: 152, height: 936 } },
-  'acl-internals.yaml': { groups: ['sub', 'layer', 'ext'], width: 320, height: 812, before: { gap: 152, height: 972 } },
+  'acl-overview.yaml': { groups: ['mine', 'acl', 'other'], width: 432, height: 612, before: { gap: 152, height: 936 } },
+  'acl-internals.yaml': { groups: ['sub', 'layer', 'ext'], width: 320, height: 688, before: { gap: 152, height: 972 } },
 }
 
 for (const [name, spec] of Object.entries(DOWN_GROUPED)) {
@@ -1066,29 +1072,19 @@ for (const [name, spec] of Object.entries(DOWN_GROUPED)) {
   })
 }
 
-/** Whether a label rect is centered on one of its own edge's segments —
- * how a hand-placed label sits (elk's own placement offsets the label
- * beside the line by its edge-label spacing instead). */
-function labelCenteredOnOwnPath(e) {
-  const cx = e.label.x + e.label.width / 2
-  const cy = e.label.y + e.label.height / 2
-  return e.sections.some((sec) => sec.some((p, i) => {
-    if (i === 0) return false
-    const q = sec[i - 1]
-    if (p.x === q.x) return Math.abs(cx - p.x) <= 2 && cy >= Math.min(p.y, q.y) && cy <= Math.max(p.y, q.y)
-    return Math.abs(cy - p.y) <= 2 && cx >= Math.min(p.x, q.x) && cx <= Math.max(p.x, q.x)
-  }))
-}
+// geo.edges[].label.placed records who positioned a label: 'manual' (the
+// renderer's own placement, beside the label's own segment) or 'elk'
+// (attached to elk as a real edge label — the per-edge fallback).
+const placementOf = (out) => out.layout.geo.edges.filter((e) => e.label).map((e) => e.label.placed)
 
 test('acl-internals.yaml "down": only the edge whose hand-placed label has no room (adp->fac, a 104px jog for a 103px label) falls back to an elk-placed label', async () => {
   const out = await renderDiagram({ ...ir('acl-internals.yaml'), direction: 'down' }, { forceElk: true })
-  const placement = out.layout.geo.edges.map((e) => (labelCenteredOnOwnPath(e) ? 'manual' : 'elk'))
-  assert.deepEqual(placement, ['manual', 'manual', 'manual', 'elk', 'manual'])
+  assert.deepEqual(placementOf(out), ['manual', 'manual', 'manual', 'elk', 'manual'])
 })
 
 test('acl-overview.yaml "down": a hand-placed label on a loop-around edge is kept inside the canvas by widening it, not by falling back to elk', async () => {
   const out = await renderDiagram({ ...ir('acl-overview.yaml'), direction: 'down' }, { forceElk: true })
-  assert.ok(out.layout.geo.edges.every(labelCenteredOnOwnPath), 'every label is hand-placed')
+  assert.ok(placementOf(out).every((p) => p === 'manual'), 'every label is hand-placed')
   // The two loop-around edges (legacy->translator, translator->domain) run
   // along the canvas's left/right edge; their labels would have hung out
   // at x=-32 and x=347 on a 292px canvas.
@@ -1096,7 +1092,8 @@ test('acl-overview.yaml "down": a hand-placed label on a loop-around edge is kep
   assert.ok(Math.min(...xs) >= 12)
   assert.ok(Math.max(...out.layout.geo.edges.map((e) => e.label.x + e.label.width)) <= out.width - 12)
   const gaps = groupGapsDown(out, ['mine', 'acl', 'other'])
-  assert.deepEqual(gaps, [74, 74])
+  assert.equal(gaps.length, 2)
+  for (const gap of gaps) assert.ok(gap >= 64 && gap <= 80, `gap ${gap}px outside the 64..80px band`)
 })
 
 test('conway.yaml forced to elk (layer: none) laid out "down" still passes every check with hand-placed labels', async () => {
@@ -1108,7 +1105,7 @@ test('conway.yaml forced to elk (layer: none) laid out "down" still passes every
   assert.equal(out.layout.mode, 'elk')
   const result = await verifyDiagram(parsed, out, { forceElk: true })
   assert.equal(result.ok, true, JSON.stringify(result.failures))
-  const placement = out.layout.geo.edges.filter((e) => e.label).map((e) => (labelCenteredOnOwnPath(e) ? 'manual' : 'elk'))
+  const placement = placementOf(out)
   assert.ok(placement.includes('elk'), 'at least one label fell back to elk')
   assert.ok(placement.includes('manual'), 'the rest stayed hand-placed')
 })
@@ -1121,5 +1118,170 @@ test('grouped-layer mode "down" has no label-layer bloat to fix: group.yaml / co
     const out = await renderDiagram({ ...ir(name), direction: 'down' })
     assert.equal(out.layout.mode, 'group')
     assert.deepEqual(groupGapsDown(out, groups), [48], name)
+  }
+})
+
+// --- group padding: a group box hugs its nodes on every side ---------------
+//
+// The vendored elkjs applies `elk.nodeSize.minimum`'s x component to a
+// compound node's *height* as well (its y component is ignored), so every
+// group whose title was wider than its natural height carried
+// title-width-minus-natural-height pixels of dead space below its last
+// node: acl-overview.yaml's one-node groups were 164px tall (36 header +
+// 44 node + 16 padding = 96 natural; 164 = the title's minimum width). The
+// title's width is now reserved through the group's right padding
+// instead, so the box's bottom padding equals its side padding again.
+
+const GROUP_PAD = 16
+
+/** Per group: left and bottom padding between the box and its content —
+ * its member nodes, plus any edge vertex routed inside the box (elk's
+ * compound layout keeps a lane for an edge that enters a group through
+ * its side border and bends inside; that lane is content, a phantom band
+ * with nothing in it is not) — on the drawn (4px-snapped) geometry. */
+function groupPaddings(out) {
+  return out.layout.geo.groups.map((g) => {
+    const members = out.layout.geo.nodes.filter((n) => n.group === g.id)
+    assert.ok(members.length, `group "${g.id}" has no member nodes in geo`)
+    const insideBox = (p) => p.x > g.x && p.x < g.x + g.width && p.y > g.y && p.y < g.y + g.height - 2
+    const vertices = out.layout.geo.edges.flatMap((e) => e.sections.flat()).filter(insideBox)
+    const left = Math.min(...members.map((n) => n.x)) - g.x
+    const bottom = g.y + g.height - Math.max(...members.map((n) => n.y + n.height), ...vertices.map((p) => p.y))
+    return { id: g.id, left, bottom }
+  })
+}
+
+for (const [name, mode] of [['acl-overview.yaml', 'elk'], ['acl-internals.yaml', 'elk'], ['browser-server.yaml', 'elk'], ['two-workspaces.yaml', 'elk'], ['conway.yaml', 'elk'], ['groups.yaml', 'group'], ['conway.yaml', 'group']]) {
+  for (const direction of ['down', 'right']) {
+    test(`${name} "${direction}" (${mode} mode): every group's bottom padding equals its side padding (±4px grid)`, async () => {
+      const out = await renderDiagram({ ...ir(name), direction }, { forceElk: mode === 'elk' })
+      assert.equal(out.layout.mode, mode)
+      for (const { id, left, bottom } of groupPaddings(out)) {
+        assert.ok(Math.abs(left - GROUP_PAD) <= 4, `${name} ${direction}: group "${id}" left padding ${left}px`)
+        assert.ok(Math.abs(bottom - left) <= 4, `${name} ${direction}: group "${id}" bottom padding ${bottom}px vs side ${left}px`)
+      }
+    })
+  }
+}
+
+test('acl-overview.yaml "down": a one-node group whose title is wider than its node is header + node + padding tall, not title-width tall', async () => {
+  const out = await renderDiagram({ ...ir('acl-overview.yaml'), direction: 'down' }, { forceElk: true })
+  const mine = out.layout.geo.groups.find((g) => g.id === 'mine')
+  const domain = out.layout.geo.nodes.find((n) => n.id === 'domain')
+  assert.equal(mine.height, 36 + domain.height + GROUP_PAD) // 96, was 164
+  // The title still fits: the box is at least as wide as the bold title.
+  assert.ok(mine.width >= Math.ceil(textWidth('自分のコンテキスト') * 1.08) + 36)
+})
+
+// --- labels sit beside their path, never across it -------------------------
+
+const FIXTURES_WITH_LABELS = ['acl-overview.yaml', 'acl-internals.yaml', 'groups.yaml', 'hints.yaml', 'conway.yaml', 'browser-server.yaml', 'two-workspaces.yaml', 'simple.yaml', 'chain-long-labels.yaml']
+
+function segRectDistance(a, b, rect) {
+  const xlo = Math.min(a.x, b.x), xhi = Math.max(a.x, b.x)
+  const ylo = Math.min(a.y, b.y), yhi = Math.max(a.y, b.y)
+  const dx = xhi < rect.x ? rect.x - xhi : xlo > rect.x + rect.width ? xlo - (rect.x + rect.width) : 0
+  const dy = yhi < rect.y ? rect.y - yhi : ylo > rect.y + rect.height ? ylo - (rect.y + rect.height) : 0
+  return Math.hypot(dx, dy)
+}
+
+for (const name of FIXTURES_WITH_LABELS) {
+  test(`${name}: no label box intersects any edge segment — its own edge included (best candidate)`, async () => {
+    const best = await renderCheckedBest(ir(name))
+    let labels = 0
+    for (const e of best.layout.geo.edges) {
+      if (!e.label) continue
+      labels++
+      for (const other of best.layout.geo.edges) {
+        for (const sec of other.sections) {
+          for (let i = 1; i < sec.length; i++) {
+            const d = segRectDistance(sec[i - 1], sec[i], e.label)
+            assert.ok(d > 0, `${name}: label "${e.label.text}" (edges[${e.index}], ${e.label.placed}) is crossed by edges[${other.index}]`)
+            if (e.label.placed === 'manual') assert.ok(d >= LABEL_CLEARANCE, `${name}: hand-placed label "${e.label.text}" is ${d}px from edges[${other.index}]`)
+          }
+        }
+      }
+    }
+    assert.ok(labels > 0)
+  })
+}
+
+test('acl-overview.yaml "down": the label between the two 20px-apart nodes (Service -> Translator, 変換を依頼) sits beside its edge, not across it', async () => {
+  const out = await renderDiagram({ ...ir('acl-overview.yaml'), direction: 'down' }, { forceElk: true })
+  const e = out.layout.geo.edges[1]
+  assert.equal(e.label.text, '変換を依頼')
+  assert.equal(e.label.placed, 'manual')
+  const x = e.sections[0][0].x
+  assert.ok(e.label.x >= x + LABEL_CLEARANCE || e.label.x + e.label.width <= x - LABEL_CLEARANCE, `label ${e.label.x}..${e.label.x + e.label.width} straddles x=${x}`)
+})
+
+// --- two labels on neighbouring parallel runs are a line apart -------------
+
+test('labelsCramped: labels closer than 16px along the reading axis while within 24px across it are cramped; a line apart is not', () => {
+  const a = { x: 100, y: 100, width: 80, height: 14 }
+  assert.equal(labelsCramped(a, { x: 150, y: 120, width: 80, height: 14 }), true) // 6px below, overlapping in x
+  assert.equal(labelsCramped(a, { x: 150, y: 130, width: 80, height: 14 }), false) // 16px below
+  assert.equal(labelsCramped(a, { x: 200, y: 108, width: 80, height: 14 }), true) // 20px to the right, same line
+  assert.equal(labelsCramped(a, { x: 210, y: 108, width: 80, height: 14 }), false) // 30px to the right
+  assert.equal(labelsCramped(a, { x: 100, y: 116, width: 80, height: 14 }), true) // 2px below: overlap-close on both axes
+})
+
+for (const name of FIXTURES_WITH_LABELS) {
+  test(`${name}: no two labels are cramped against each other (best candidate)`, async () => {
+    const best = await renderCheckedBest(ir(name))
+    const labels = best.layout.geo.edges.filter((e) => e.label).map((e) => e.label)
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = i + 1; j < labels.length; j++) {
+        assert.ok(!labelsCramped(labels[i], labels[j]), `${name}: "${labels[i].text}" and "${labels[j].text}" are cramped: ${JSON.stringify([labels[i], labels[j]])}`)
+      }
+    }
+  })
+}
+
+test('acl-overview.yaml "down": 自分の型で要求 and 自分の型へ変換して返す (parallel vertical runs) are at least a line apart or well clear sideways', async () => {
+  const out = await renderDiagram({ ...ir('acl-overview.yaml'), direction: 'down' }, { forceElk: true })
+  const a = out.layout.geo.edges[0].label
+  const b = out.layout.geo.edges[4].label
+  assert.equal(a.text, '自分の型で要求')
+  assert.equal(b.text, '自分の型へ変換して返す')
+  const xGap = Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width))
+  const yGap = Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height))
+  assert.ok(yGap >= 16 || xGap >= 24, `labels ${JSON.stringify([a, b])} are only ${yGap}px apart vertically and ${xGap}px sideways`)
+})
+
+// --- sub-grid jogs left by the 4px snap are straightened -------------------
+
+test('straightenJogs: a 4px jog between two parallel runs is collapsed onto the longer run', () => {
+  // elk: 224 -> 225.67, snapped to 224 / 228 — the acl-overview domain->service edge.
+  const pts = [{ x: 224, y: 116 }, { x: 224, y: 160 }, { x: 228, y: 160 }, { x: 228, y: 244 }]
+  const out = normalizePolyline(straightenJogs(pts))
+  assert.deepEqual(out, [{ x: 228, y: 116 }, { x: 228, y: 244 }])
+})
+
+test('straightenJogs: a genuine 8px+ jog is left alone', () => {
+  const pts = [{ x: 224, y: 116 }, { x: 224, y: 160 }, { x: 232, y: 160 }, { x: 232, y: 244 }]
+  assert.deepEqual(straightenJogs(pts), pts)
+})
+
+test('straightenJogs: an interior run only slides when the segment beyond it keeps its direction and its 8px floor', () => {
+  // horizontal 12px, then vertical 20px, 4px jog, vertical 60px: the short
+  // vertical run would slide 4px, shrinking the 12px horizontal to 8 (ok).
+  const ok = [{ x: 100, y: 100 }, { x: 112, y: 100 }, { x: 112, y: 120 }, { x: 108, y: 120 }, { x: 108, y: 180 }]
+  assert.deepEqual(normalizePolyline(straightenJogs(ok)), [{ x: 100, y: 100 }, { x: 108, y: 100 }, { x: 108, y: 180 }])
+  // With only an 8px horizontal, sliding would leave 4px: the other (longer)
+  // run slides instead, since its far end is the path's own endpoint.
+  const tight = [{ x: 100, y: 100 }, { x: 108, y: 100 }, { x: 108, y: 120 }, { x: 104, y: 120 }, { x: 104, y: 180 }]
+  assert.deepEqual(normalizePolyline(straightenJogs(tight)), [{ x: 100, y: 100 }, { x: 108, y: 100 }, { x: 108, y: 180 }])
+})
+
+test('browser-server.yaml (grilling\'s 現在地 figure) passes every check: its reply edge no longer carries a 4px jog', async () => {
+  const best = await renderCheckedBest(ir('browser-server.yaml'))
+  assert.equal(best.checksOk, true, JSON.stringify(best.failures))
+  assert.equal(best.warnings.length, 0)
+  for (const e of best.layout.geo.edges) {
+    for (const sec of e.sections) for (let i = 1; i < sec.length; i++) {
+      const len = Math.abs(sec[i].x - sec[i - 1].x) + Math.abs(sec[i].y - sec[i - 1].y)
+      assert.ok(len >= 8, `edges[${e.index}] has a ${len}px segment`)
+    }
   }
 })
