@@ -1,0 +1,28 @@
+id: d5
+title: 横に長い図
+caption: 列幅を超えて縮小される例。
+direction: right
+nodes:
+- id: n0
+  label: XXXXXXXXXX0
+- id: n1
+  label: XXXXXXXXXX1
+- id: n2
+  label: XXXXXXXXXX2
+- id: n3
+  label: XXXXXXXXXX3
+- id: n4
+  label: XXXXXXXXXX4
+edges:
+- from: n0
+  to: n1
+  kind: sync
+- from: n1
+  to: n2
+  kind: sync
+- from: n2
+  to: n3
+  kind: sync
+- from: n3
+  to: n4
+  kind: sync

@@ -1,0 +1,39 @@
+id: d4
+title: 予算超過の図
+caption: ノードが多すぎる例。
+nodes:
+- id: n0
+  label: N0
+- id: n1
+  label: N1
+- id: n2
+  label: N2
+- id: n3
+  label: N3
+- id: n4
+  label: N4
+- id: n5
+  label: N5
+- id: n6
+  label: N6
+- id: n7
+  label: N7
+- id: n8
+  label: N8
+- id: n9
+  label: N9
+- id: n10
+  label: N10
+edges:
+- from: n0
+  to: n1
+  kind: sync
+- from: n0
+  to: n2
+  kind: sync
+- from: n0
+  to: n3
+  kind: sync
+- from: n0
+  to: n4
+  kind: sync

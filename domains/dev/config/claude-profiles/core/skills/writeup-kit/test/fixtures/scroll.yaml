@@ -1,0 +1,33 @@
+id: d6
+title: 縮小限界を超える図
+caption: 0.78倍の下限を下回るのでスクロールに逃がす例。
+direction: right
+nodes:
+- id: n0
+  label: XXXXXXXXXX0
+- id: n1
+  label: XXXXXXXXXX1
+- id: n2
+  label: XXXXXXXXXX2
+- id: n3
+  label: XXXXXXXXXX3
+- id: n4
+  label: XXXXXXXXXX4
+- id: n5
+  label: XXXXXXXXXX5
+edges:
+- from: n0
+  to: n1
+  kind: sync
+- from: n1
+  to: n2
+  kind: sync
+- from: n2
+  to: n3
+  kind: sync
+- from: n3
+  to: n4
+  kind: sync
+- from: n4
+  to: n5
+  kind: sync

@@ -1,0 +1,18 @@
+id: d3
+title: 経由指定つきの経路
+caption: A から B へ GW を経由して届く。
+nodes:
+- id: a
+  label: A
+- id: b
+  label: B
+- id: gw
+  label: GW
+edges:
+- from: a
+  to: b
+  kind: sync
+  from_side: right
+  to_side: left
+  via: [gw]
+  label_at: 0.3

@@ -1,0 +1,46 @@
+id: d2
+title: 現在地
+caption: この絵が主張することを一文で
+direction: right
+groups:
+- id: browser
+  label: ブラウザ
+  tone: ts
+- id: server
+  label: サーバー
+  tone: rs
+nodes:
+- id: spa
+  label: SPA
+  group: browser
+  tone: ts
+- id: sdk
+  label: SDK
+  group: browser
+  tone: ts
+  dashed: true
+- id: gw
+  label: API Gateway
+  group: server
+  tone: rs
+- id: db
+  label: DB
+  group: server
+  tone: rs
+edges:
+- from: spa
+  to: sdk
+  label: "呼ぶ"
+  kind: sync
+- from: sdk
+  to: gw
+  label: 送信
+  kind: async
+- from: gw
+  to: db
+  label: 問い合わせ
+  kind: sync
+- from: db
+  to: gw
+  label: 応答
+  kind: reply
