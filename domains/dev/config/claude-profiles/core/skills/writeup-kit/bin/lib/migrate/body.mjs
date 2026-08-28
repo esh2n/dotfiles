@@ -63,8 +63,9 @@ export async function renderBody(bodyMarkdown, opts = {}) {
       result = await renderDiagram(node, { nextDiagramId, sectionTitle, column: opts.column })
       figures[result.figureOk ? 'ok' : 'fallback']++
     } else if (node.name === 'sequence') {
-      result = renderSequence(node)
-      sequenceAsSteps++
+      result = await renderSequence(node, { nextDiagramId, sectionTitle, column: opts.column })
+      figures[result.figureOk ? 'ok' : 'fallback']++
+      if (!result.figureOk) sequenceAsSteps++
     } else {
       result = { html: '', warnings: [`directive not converted (unsupported outside legacy set): ${node.name}`] }
     }

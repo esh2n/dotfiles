@@ -183,6 +183,11 @@ YAML/JSON. Unescaping is tolerant of legacy pages written before this
 contract existed: text with neither `&lt;` nor `&amp;` is treated as
 already-raw and passed through unchanged, so old store pages keep parsing
 until `bin/rerender-figures.mjs --all` rewrites them into the escaped form.
+The IR budgets (nodes ≤ 9, edges ≤ 12, groups ≤ 4, edge label ≤ 12 chars)
+are guidance; verified geometry decides whether the figure renders. An
+over-budget figure still renders with `data-checks="pass"` plus
+`data-warn="budget:nodes=11"` — a signal that the author should consider
+splitting it (page-contract.md §4).
 
 A diagram with 2+ groups where every node belongs to one, and the edges
 crossing between groups all point the same overall direction (a DAG over
@@ -195,6 +200,51 @@ explicit `layer: <int>` (0-based) to pin its order by hand, or `layer:
 none` to opt that diagram back out to elk's default layout — see
 `references/procedure.md` in the `writeup` skill for the full IR hint
 list.
+
+### `.wu-figure` — `type: sequence` (participants + messages)
+
+A second `.wu-figure` IR shape, alongside the node/edge diagram above,
+for call sequences (who calls whom, in order) — laid out on a fixed grid
+(`bin/lib/sequence.mjs`, no elk) instead of the node/edge diagram's
+layered layout, and verified against its own contract
+(`bin/lib/verify-sequence.mjs`) instead of the 20-row one above:
+
+```yaml
+id: s1
+type: sequence
+title: 更新通知の取り込み
+caption: 1 日 1 回、ページ単位で取り込む
+participants:            # ≤6, left→right order
+  - id: sched
+    label: スケジューラ
+  - id: api
+    label: 更新通知 API
+    tone: rs
+messages:                 # ≤16 rows total, top→bottom order
+  - from: sched
+    to: api
+    label: 1 ページ取得        # ≤16 chars
+    kind: sync             # sync | async | reply (reply = dashed, open arrow)
+  - from: api
+    to: sched
+    label: has_next=false
+    kind: reply
+  - note: has_next が false まで繰り返す   # spans the two participants of the
+    over: [sched, api]                     # preceding message when `over` is omitted
+  - self: api                              # a self-message (drawn as a small loop)
+    label: 検証
+```
+
+Rendered ids are prefixed the same way (`wu-d-<id>-`), and the figure
+carries `data-type="sequence"` alongside `data-checks="pass"` so
+`bin/rerender-figures.mjs` and the migration converter can tell which
+verifier a stored figure's embedded IR needs without re-parsing it. The
+`messages` budget (≤16) counts every row — plain messages, notes, and
+self-messages alike, since each occupies its own 40px row regardless of
+kind. A `from`/`to` message and a `self` message never share a `kind`
+field value with the row-shape itself: `kind` is always sync/async/reply
+(arrow style); whether the row *is* a message, a note, or a self-message
+is decided by which of `from`+`to` / `note` / `self` is present.
 
 ### `.wu-quote`
 

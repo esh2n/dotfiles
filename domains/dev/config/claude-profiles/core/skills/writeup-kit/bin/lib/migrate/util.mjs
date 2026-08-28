@@ -91,8 +91,10 @@ function yamlQuote(s) {
     .replace(/\t/g, '\\t')}"`
 }
 
-/** A YAML-lite scalar for `value` — quoted only when required to round-trip. */
-function yamlScalar(value) {
+/** A YAML-lite scalar for `value` — quoted only when required to round-trip.
+ * Exported so old-sequence.mjs's sequenceIrToYaml() can reuse the same
+ * quoting contract as irToYaml() below instead of duplicating it. */
+export function yamlScalar(value) {
   if (typeof value === 'boolean' || typeof value === 'number') return String(value)
   const s = String(value)
   return yamlScalarNeedsQuote(s) ? yamlQuote(s) : s

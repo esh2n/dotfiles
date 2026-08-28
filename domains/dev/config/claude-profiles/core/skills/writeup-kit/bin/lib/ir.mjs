@@ -19,14 +19,31 @@ export const LIMITS = {
   maxEmphasis: 2,
 }
 
+/** Budgets for `type: sequence` IR (see sequence.mjs/verify-sequence.mjs) —
+ * kept alongside LIMITS so both IR shapes' schema+budget rules live in this
+ * one file. */
+export const SEQUENCE_LIMITS = {
+  maxParticipants: 6,
+  maxMessages: 16,
+  maxLabelLen: 16,
+}
+
 const TONES = new Set(['ts', 'rs', 'new', 'neutral'])
 const KINDS = new Set(['sync', 'async', 'reply'])
 const SIDES = new Set(['top', 'right', 'bottom', 'left'])
 const DIRECTIONS = new Set(['right', 'down'])
+const IR_TYPES = new Set(['diagram', 'sequence'])
 
 /**
+ * Schema violations and the emphasis cap are hard rejections. The four
+ * flowchart budgets (nodes / edges / groups / edge-label length) are
+ * guidance, not gates: an over-budget IR still validates, and the overruns
+ * come back as `warnings` (see budgetWarnings()) so the renderer can draw
+ * the figure and stamp `data-warn` on it while verified geometry decides
+ * pass/fail. `type: sequence` keeps its own budget handling untouched.
+ *
  * @param {unknown} raw parsed IR (from yaml-lite or JSON)
- * @returns {{ok:true, ir:object} | {ok:false, reason:'schema'|'budget', message:string, suggestion?:string}}
+ * @returns {{ok:true, ir:object, warnings:Array<{key:string, value:number, limit:number, detail:string, hint:string}>} | {ok:false, reason:'schema'|'budget', message:string, suggestion?:string}}
  */
 export function validateIR(raw) {
   let ir
@@ -36,15 +53,29 @@ export function validateIR(raw) {
     if (e instanceof IrError) return { ok: false, reason: 'schema', message: e.message }
     throw e
   }
-  const budget = checkBudgets(ir)
-  if (!budget.ok) return budget
-  return { ok: true, ir }
+  if (ir.type === 'sequence') {
+    const budget = checkSequenceBudgets(ir)
+    if (!budget.ok) return budget
+    return { ok: true, ir, warnings: [] }
+  }
+  const hard = checkBudgets(ir)
+  if (!hard.ok) return hard
+  return { ok: true, ir, warnings: budgetWarnings(ir) }
 }
 
 // --- structural validation --------------------------------------------
 
+/** `raw.type` dispatch: `undefined`/`null` defaults to the original
+ * node/edge diagram shape (kept backward compatible with every pre-existing
+ * IR, which never carried a `type` field); `"sequence"` normalizes against
+ * the participants/messages shape instead — see normalizeSequence(). */
 function normalize(raw) {
   if (!isObj(raw)) throw new IrError('IR must be a mapping')
+  const type = raw.type === undefined || raw.type === null ? 'diagram' : raw.type
+  if (typeof type !== 'string' || !IR_TYPES.has(type)) {
+    throw new IrError(`ir.type must be diagram|sequence (got: ${JSON.stringify(raw.type)})`)
+  }
+  if (type === 'sequence') return normalizeSequence(raw)
 
   const id = requireStr(raw, 'id', 'ir')
   const title = requireStr(raw, 'title', 'ir')
@@ -67,7 +98,7 @@ function normalize(raw) {
 
   const edges = normalizeEdges(raw.edges, nodeIds)
 
-  return { id, title, caption, direction, groups, nodes, edges }
+  return { id, type: 'diagram', title, caption, direction, groups, nodes, edges }
 }
 
 function normalizeGroups(raw) {
@@ -200,27 +231,122 @@ function normalizeEdges(raw, nodeIds) {
   })
 }
 
-// --- budgets -------------------------------------------------------------
+// --- sequence IR (type: sequence) --------------------------------------
+//
+// Shape: `{ id, type:'sequence', title, caption, participants, messages }`.
+// `participants` is a flat list of `{id, label, tone}` (left→right order —
+// no groups/nesting, sequence diagrams don't need them). `messages` is one
+// row per line of the diagram, top→bottom, each row one of three shapes
+// distinguished by which key is present:
+//   - a plain message: `{from, to, label?, kind}` (kind: sync|async|reply)
+//   - a note:          `{note: text, over?: [participant ids]}` — `over`
+//     defaults to the two participants of the immediately preceding message
+//     row when omitted (an error if there is no preceding message to infer
+//     it from)
+//   - a self-message:  `{self: participant id, label?, kind?}` (kind
+//     defaults to sync)
+// Normalized rows carry a `rowType` discriminator ('message'|'note'|'self')
+// instead of reusing the raw `note`/`self` keys as flags, so a message's
+// own `kind` (sync/async/reply) is never confused with the row-shape
+// discriminator.
 
-function checkBudgets(ir) {
+function normalizeSequence(raw) {
+  const id = requireStr(raw, 'id', 'ir')
+  const title = requireStr(raw, 'title', 'ir')
+  const caption = optStr(raw, 'caption', 'ir')
+  const participants = normalizeParticipants(raw.participants)
+  const participantIds = new Set(participants.map((p) => p.id))
+  const messages = normalizeMessages(raw.messages, participantIds)
+  return { id, type: 'sequence', title, caption, participants, messages }
+}
+
+function normalizeParticipants(raw) {
+  if (!Array.isArray(raw) || raw.length === 0) throw new IrError('ir.participants must be a non-empty list')
+  const seen = new Set()
+  return raw.map((p, i) => {
+    const ctx = `participants[${i}]`
+    if (!isObj(p)) throw new IrError(`${ctx} must be a mapping`)
+    const id = requireStr(p, 'id', ctx)
+    if (seen.has(id)) throw new IrError(`duplicate participant id: "${id}"`)
+    seen.add(id)
+    const label = requireStr(p, 'label', ctx)
+    const tone = validateTone(p.tone, ctx)
+    return { id, label, tone }
+  })
+}
+
+function validateSeqKind(v, ctx, { required }) {
+  if (v === undefined || v === null) {
+    if (required) throw new IrError(`${ctx}.kind is required and must be sync|async|reply`)
+    return 'sync'
+  }
+  if (typeof v !== 'string' || !KINDS.has(v)) {
+    throw new IrError(`${ctx}.kind must be sync|async|reply (got: ${JSON.stringify(v)})`)
+  }
+  return v
+}
+
+function normalizeMessages(raw, participantIds) {
+  if (raw === undefined || raw === null) return []
+  if (!Array.isArray(raw)) throw new IrError('ir.messages must be a list')
+  let prevMessage = null
+  return raw.map((m, i) => {
+    const ctx = `messages[${i}]`
+    if (!isObj(m)) throw new IrError(`${ctx} must be a mapping`)
+
+    if (m.note !== undefined) {
+      const text = requireStr(m, 'note', ctx)
+      let over
+      if (m.over !== undefined && m.over !== null) {
+        if (!Array.isArray(m.over) || m.over.length === 0) {
+          throw new IrError(`${ctx}.over must be a non-empty list of participant ids`)
+        }
+        over = m.over.map((v) => {
+          if (typeof v !== 'string' || !participantIds.has(v)) {
+            throw new IrError(`${ctx}.over references unknown participant "${v}"`)
+          }
+          return v
+        })
+      } else if (prevMessage) {
+        over = [prevMessage.from, prevMessage.to]
+      } else {
+        throw new IrError(`${ctx}: note has no "over" and no preceding message to infer it from`)
+      }
+      return { rowType: 'note', text, over }
+    }
+
+    if (m.self !== undefined) {
+      const participant = requireStr(m, 'self', ctx)
+      if (!participantIds.has(participant)) throw new IrError(`${ctx}.self references unknown participant "${participant}"`)
+      const label = optStr(m, 'label', ctx) ?? ''
+      const kind = validateSeqKind(m.kind, ctx, { required: false })
+      return { rowType: 'self', participant, label, kind }
+    }
+
+    const from = requireStr(m, 'from', ctx)
+    const to = requireStr(m, 'to', ctx)
+    if (!participantIds.has(from)) throw new IrError(`${ctx}.from references unknown participant "${from}"`)
+    if (!participantIds.has(to)) throw new IrError(`${ctx}.to references unknown participant "${to}"`)
+    if (from === to) throw new IrError(`${ctx}: from and to must differ — use "self:" for a self-message`)
+    const label = optStr(m, 'label', ctx) ?? ''
+    const kind = validateSeqKind(m.kind, ctx, { required: true })
+    const rec = { rowType: 'message', from, to, label, kind }
+    prevMessage = rec
+    return rec
+  })
+}
+
+function checkSequenceBudgets(ir) {
   const violations = []
-
-  if (ir.nodes.length > LIMITS.maxNodes) {
-    violations.push(`nodes: ${ir.nodes.length} > ${LIMITS.maxNodes}`)
+  if (ir.participants.length > SEQUENCE_LIMITS.maxParticipants) {
+    violations.push(`participants: ${ir.participants.length} > ${SEQUENCE_LIMITS.maxParticipants}`)
   }
-  if (ir.edges.length > LIMITS.maxEdges) {
-    violations.push(`edges: ${ir.edges.length} > ${LIMITS.maxEdges}`)
+  if (ir.messages.length > SEQUENCE_LIMITS.maxMessages) {
+    violations.push(`messages: ${ir.messages.length} > ${SEQUENCE_LIMITS.maxMessages}`)
   }
-  if (ir.groups.length > LIMITS.maxGroups) {
-    violations.push(`groups: ${ir.groups.length} > ${LIMITS.maxGroups}`)
-  }
-  const emphasisCount = ir.nodes.filter((n) => n.emphasis).length
-  if (emphasisCount > LIMITS.maxEmphasis) {
-    violations.push(`emphasis: ${emphasisCount} > ${LIMITS.maxEmphasis}`)
-  }
-  ir.edges.forEach((e, i) => {
-    if (e.label !== undefined && [...e.label].length > LIMITS.maxLabelLen) {
-      violations.push(`edges[${i}].label "${e.label}" exceeds ${LIMITS.maxLabelLen} chars`)
+  ir.messages.forEach((m, i) => {
+    if ((m.rowType === 'message' || m.rowType === 'self') && m.label && [...m.label].length > SEQUENCE_LIMITS.maxLabelLen) {
+      violations.push(`messages[${i}].label "${m.label}" exceeds ${SEQUENCE_LIMITS.maxLabelLen} chars`)
     }
   })
 
@@ -229,8 +355,89 @@ function checkBudgets(ir) {
     ok: false,
     reason: 'budget',
     message: violations.join('; '),
-    suggestion: buildSplitSuggestion(ir),
+    suggestion: buildSequenceSplitSuggestion(ir),
   }
+}
+
+function buildSequenceSplitSuggestion(ir) {
+  if (ir.messages.length > SEQUENCE_LIMITS.maxMessages) {
+    return `split: draw a second sequence diagram continuing after message ${SEQUENCE_LIMITS.maxMessages}`
+  }
+  if (ir.participants.length > SEQUENCE_LIMITS.maxParticipants) {
+    return 'split: draw one sequence diagram per participant subset'
+  }
+  return 'shorten the offending label(s), or split into two sequence diagrams'
+}
+
+// --- budgets -------------------------------------------------------------
+
+/** The one budget that stays a hard rejection: more than 2 emphasis nodes
+ * has no focal point left to emphasize, so the figure is wrong, not just
+ * crowded. */
+function checkBudgets(ir) {
+  const emphasisCount = ir.nodes.filter((n) => n.emphasis).length
+  if (emphasisCount <= LIMITS.maxEmphasis) return { ok: true }
+  return {
+    ok: false,
+    reason: 'budget',
+    message: `emphasis: ${emphasisCount} > ${LIMITS.maxEmphasis}`,
+    suggestion: `drop emphasis from ${emphasisCount - LIMITS.maxEmphasis} node(s) — only 1–2 focal points are allowed`,
+  }
+}
+
+/**
+ * The four flowchart budgets (contract §4-2: nodes ≤ 9, edges ≤ 12,
+ * groups ≤ 4, edge label ≤ 12 chars) as advisory warnings. The node cap of
+ * 9 has measured backing and stays the default guidance for authors, but
+ * verified geometry — not the count — decides whether a figure renders.
+ * Order is stable (nodes, edges, groups, label) so the `data-warn`
+ * attribute built from it (formatBudgetWarnings()) is byte-stable too.
+ *
+ * @param {object} ir normalized flowchart IR
+ * @returns {Array<{key:string, value:number, limit:number, detail:string, hint:string}>}
+ */
+export function budgetWarnings(ir) {
+  const out = []
+  const split = () => buildSplitSuggestion(ir)
+  if (ir.nodes.length > LIMITS.maxNodes) {
+    out.push({
+      key: 'budget:nodes', value: ir.nodes.length, limit: LIMITS.maxNodes,
+      detail: `${ir.nodes.length} node(s) (guidance ≤ ${LIMITS.maxNodes})`,
+      hint: `consider splitting the figure — ${split()}`,
+    })
+  }
+  if (ir.edges.length > LIMITS.maxEdges) {
+    out.push({
+      key: 'budget:edges', value: ir.edges.length, limit: LIMITS.maxEdges,
+      detail: `${ir.edges.length} edge(s) (guidance ≤ ${LIMITS.maxEdges})`,
+      hint: `consider splitting the figure — ${split()}`,
+    })
+  }
+  if (ir.groups.length > LIMITS.maxGroups) {
+    out.push({
+      key: 'budget:groups', value: ir.groups.length, limit: LIMITS.maxGroups,
+      detail: `${ir.groups.length} group(s) (guidance ≤ ${LIMITS.maxGroups})`,
+      hint: `consider splitting the figure — ${split()}`,
+    })
+  }
+  const longLabels = ir.edges
+    .map((e, i) => ({ i, label: e.label, len: e.label === undefined ? 0 : [...e.label].length }))
+    .filter((e) => e.len > LIMITS.maxLabelLen)
+  if (longLabels.length) {
+    const longest = longLabels.reduce((a, b) => (b.len > a.len ? b : a))
+    out.push({
+      key: 'budget:label', value: longest.len, limit: LIMITS.maxLabelLen,
+      detail: longLabels.map((e) => `edges[${e.i}].label "${e.label}" is ${e.len} chars (guidance ≤ ${LIMITS.maxLabelLen})`).join('; '),
+      hint: 'shorten the edge label(s), or move the wording into the caption',
+    })
+  }
+  return out
+}
+
+/** `data-warn` attribute value: `budget:nodes=11;budget:label=15` (stable
+ * order, semicolon-separated); '' when there is nothing to warn about. */
+export function formatBudgetWarnings(warnings) {
+  return warnings.map((w) => `${w.key}=${w.value}`).join(';')
 }
 
 /** A concrete "how to fix it" suggestion: split by group, or around the highest-degree node. */

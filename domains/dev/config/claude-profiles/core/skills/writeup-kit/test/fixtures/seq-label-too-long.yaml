@@ -1,0 +1,14 @@
+id: s5
+type: sequence
+title: ラベル超過
+caption: 16 文字を超えるラベル
+participants:
+- id: a
+  label: A
+- id: b
+  label: B
+messages:
+- from: a
+  to: b
+  kind: sync
+  label: これは十六文字を超える長すぎるラベルです

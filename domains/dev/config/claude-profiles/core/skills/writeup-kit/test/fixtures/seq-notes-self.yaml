@@ -1,0 +1,24 @@
+id: s3
+type: sequence
+title: 更新通知の取り込み（注記・自己呼び出しあり）
+caption: 1 日 1 回、ページ単位で取り込み、取得後に検証する
+participants:
+- id: sched
+  label: スケジューラ
+- id: api
+  label: 更新通知 API
+  tone: rs
+messages:
+- from: sched
+  to: api
+  label: 1 ページ取得
+  kind: sync
+- from: api
+  to: sched
+  label: has_next=false
+  kind: reply
+- note: has_next が false まで繰り返す
+  over: [sched, api]
+- self: sched
+  label: 検証
+- note: ログを書く

@@ -10,12 +10,14 @@
 // which turns segment/rect distance into simple 1-D interval math. a11y,
 // color, font-size, and stroke/rx checks read the SVG text itself since
 // that is the artifact those rows actually constrain.
-import { LIMITS } from './ir.mjs'
+import { LIMITS, budgetWarnings, formatBudgetWarnings } from './ir.mjs'
 import {
   textWidth, FONT_SIZE, NODE_PAD_X, BOLD_FACTOR, MIN_SCALE, COLUMN, chooseOrientation,
   renderDiagram, wrapFigureHtml,
   groupLayerMode, groupLayerHeuristicPrefersElk,
 } from './diagram.mjs'
+import { renderSequenceDiagram } from './sequence.mjs'
+import { verifySequence } from './verify-sequence.mjs'
 
 const GRID = 4
 const LABEL_CLEARANCE = 6
@@ -286,25 +288,22 @@ function checkProjectedScale(ctx) {
   }
 }
 
-function checkNodeCount(ctx) {
-  const n = ctx.ir.nodes.length
-  const ok = n <= LIMITS.maxNodes
-  return {
-    ok,
-    detail: `${n} node(s) (limit ${LIMITS.maxNodes})`,
-    hint: ok ? undefined : `split the diagram: move some nodes into a second figure (${n} > ${LIMITS.maxNodes})`,
+// The four budget rows (#10, #11, #21, #22) are `warn` severity: they read
+// ir.mjs's budgetWarnings() — the same source validateIR() reports from —
+// so a figure that is only over budget still renders and passes, carrying
+// the overrun in `data-warn`. Geometry (every other row) decides pass/fail.
+function budgetCheck(key, okDetail) {
+  return (ctx) => {
+    const w = ctx.budget.find((b) => b.key === key)
+    if (!w) return { ok: true, detail: okDetail(ctx) }
+    return { ok: false, detail: w.detail, hint: w.hint, key: w.key, value: w.value }
   }
 }
 
-function checkEdgeCount(ctx) {
-  const n = ctx.ir.edges.length
-  const ok = n <= LIMITS.maxEdges
-  return {
-    ok,
-    detail: `${n} edge(s) (limit ${LIMITS.maxEdges})`,
-    hint: ok ? undefined : `split the diagram: move some edges into a second figure (${n} > ${LIMITS.maxEdges})`,
-  }
-}
+const checkNodeCount = budgetCheck('budget:nodes', (ctx) => `${ctx.ir.nodes.length} node(s) (guidance ≤ ${LIMITS.maxNodes})`)
+const checkEdgeCount = budgetCheck('budget:edges', (ctx) => `${ctx.ir.edges.length} edge(s) (guidance ≤ ${LIMITS.maxEdges})`)
+const checkGroupCount = budgetCheck('budget:groups', (ctx) => `${ctx.ir.groups.length} group(s) (guidance ≤ ${LIMITS.maxGroups})`)
+const checkLabelLength = budgetCheck('budget:label', () => `every edge label is ≤ ${LIMITS.maxLabelLen} chars`)
 
 function checkGrid(ctx) {
   const offenders = []
@@ -443,32 +442,42 @@ function checkSingleFiniteSvg(ctx) {
 
 // --- driver ------------------------------------------------------------
 
+// [id, name, fn, severity]: `fail` rows gate rendering; `warn` rows (the
+// four budgets) are advisory — a failing warn row is reported in
+// `warnings` and `data-warn`, never in `failures`.
 const CHECK_DEFS = [
-  [1, 'orthogonal', checkOrthogonal],
-  [2, 'label-clearance', checkLabelClearance],
-  [3, 'unrelated-crossing', checkCrossings],
-  [4, 'collinear-overlap', checkCollinearOverlap],
-  [5, 'border-hug', checkBorderHug],
-  [6, 'rhythm', checkRhythm],
-  [7, 'legend-clearance', checkLegend],
-  [8, 'node-clearance', checkNodeClearance],
-  [9, 'projected-scale', checkProjectedScale],
-  [10, 'node-count', checkNodeCount],
-  [11, 'edge-count', checkEdgeCount],
-  [12, 'grid-4px', checkGrid],
-  [13, 'emphasis-count', checkEmphasis],
-  [14, 'a11y', checkA11y],
-  [15, 'label-fit', checkLabelFit],
-  [16, 'orientation-choice', checkOrientation],
-  [17, 'dark-3-state', checkNoHexColors],
-  [18, 'font-size', checkFontSizes],
-  [19, 'stroke-radius', checkStrokeAndRadius],
-  [20, 'single-finite-svg', checkSingleFiniteSvg],
+  [1, 'orthogonal', checkOrthogonal, 'fail'],
+  [2, 'label-clearance', checkLabelClearance, 'fail'],
+  [3, 'unrelated-crossing', checkCrossings, 'fail'],
+  [4, 'collinear-overlap', checkCollinearOverlap, 'fail'],
+  [5, 'border-hug', checkBorderHug, 'fail'],
+  [6, 'rhythm', checkRhythm, 'fail'],
+  [7, 'legend-clearance', checkLegend, 'fail'],
+  [8, 'node-clearance', checkNodeClearance, 'fail'],
+  [9, 'projected-scale', checkProjectedScale, 'fail'],
+  [10, 'node-count', checkNodeCount, 'warn'],
+  [11, 'edge-count', checkEdgeCount, 'warn'],
+  [12, 'grid-4px', checkGrid, 'fail'],
+  [13, 'emphasis-count', checkEmphasis, 'fail'],
+  [14, 'a11y', checkA11y, 'fail'],
+  [15, 'label-fit', checkLabelFit, 'fail'],
+  [16, 'orientation-choice', checkOrientation, 'fail'],
+  [17, 'dark-3-state', checkNoHexColors, 'fail'],
+  [18, 'font-size', checkFontSizes, 'fail'],
+  [19, 'stroke-radius', checkStrokeAndRadius, 'fail'],
+  [20, 'single-finite-svg', checkSingleFiniteSvg, 'fail'],
+  [21, 'group-count', checkGroupCount, 'warn'],
+  [22, 'label-length', checkLabelLength, 'warn'],
 ]
+
+export { formatBudgetWarnings }
 
 /**
  * Verify a rendered diagram against the writeup contract's §4-2 acceptance
- * table (20 rows).
+ * table: rows 1–20 plus the two extra budget rows 21–22. Every check has a
+ * severity — `fail` (geometry, a11y, svg hygiene) or `warn` (the four
+ * budgets: node/edge/group count and edge-label length). `ok` is true when
+ * no `fail` row fails; budget overruns only populate `warnings`.
  *
  * @param {object} ir validated IR from ir.mjs
  * @param {object} renderResult the object renderDiagram() returns — must
@@ -479,36 +488,69 @@ const CHECK_DEFS = [
  *   match whatever `renderResult` was itself rendered with (see
  *   diagram.mjs's chooseOrientation() doc comment) — row #16 recomputes the
  *   orientation choice for the same mode, not the IR's default mode.
- * @returns {Promise<{ok: boolean, checks: Array<{id:number, name:string, ok:boolean, detail:string, hint?:string}>}>}
+ * @returns {Promise<{ok: boolean, checks: Array<{id:number, name:string, severity:'fail'|'warn', ok:boolean, detail:string, hint?:string}>, failures: object[], warnings: Array<{id:number, name:string, key:string, value:number, detail:string, hint?:string}>}>}
  */
 export async function verifyDiagram(ir, renderResult, { column = COLUMN, forceElk = false } = {}) {
   if (!renderResult || !renderResult.layout || !renderResult.layout.geo) {
     throw new Error('verifyDiagram requires renderResult.layout.geo (render with the current diagram.mjs, or build one with the same shape)')
   }
-  const ctx = { ir, renderResult, geo: renderResult.layout.geo, svg: renderResult.svg, column, forceElk }
+  const ctx = {
+    ir, renderResult, geo: renderResult.layout.geo, svg: renderResult.svg, column, forceElk,
+    budget: budgetWarnings(ir),
+  }
 
   const checks = []
-  for (const [id, name, fn] of CHECK_DEFS) {
+  for (const [id, name, fn, severity] of CHECK_DEFS) {
     let result
     try {
       result = await fn(ctx)
     } catch (e) {
       result = { ok: false, detail: `check threw: ${e.message}`, hint: 'internal verifier error — check the renderResult/ir shape passed in' }
     }
-    checks.push({ id, name, ok: result.ok, detail: result.detail, hint: result.hint })
+    const check = { id, name, severity, ok: result.ok, detail: result.detail, hint: result.hint }
+    if (severity === 'warn' && !result.ok) {
+      check.key = result.key
+      check.value = result.value
+    }
+    checks.push(check)
   }
-  return { ok: checks.every((c) => c.ok), checks }
+  const failures = checks.filter((c) => c.severity === 'fail' && !c.ok)
+  const warnings = checks
+    .filter((c) => c.severity === 'warn' && !c.ok)
+    .map(({ id, name, key, value, detail, hint }) => ({ id, name, key, value, detail, hint }))
+  return { ok: failures.length === 0, checks, failures, warnings }
 }
 
 /** renderDiagram() + verifyDiagram() for one specific mode, tagged with
- * which mode it used — the building block renderCheckedBest() compares. */
+ * which mode it used — the building block renderCheckedBest() compares.
+ * `warn` is the ready-made `data-warn` value ('' when nothing to warn). */
 async function renderAndVerify(ir, { column, forceElk, layoutMode }) {
   const rendered = await renderDiagram(ir, { column, forceElk })
   const verification = await verifyDiagram(ir, rendered, { column, forceElk })
-  return { ...rendered, checks: verification.checks, checksOk: verification.ok, layoutMode }
+  return {
+    ...rendered,
+    checks: verification.checks,
+    checksOk: verification.ok,
+    failures: verification.failures,
+    warnings: verification.warnings,
+    warn: formatBudgetWarnings(verification.warnings),
+    layoutMode,
+  }
 }
 
 const countFailing = (r) => r.checks.filter((c) => !c.ok).length
+
+/** Candidate ranking for renderCheckedBest(): a candidate with zero
+ * failures beats any that has one; among those, fewer warnings; then fewer
+ * failing rows overall (today's crossing/geometry tie-break); a full tie
+ * keeps the first-tried (heuristically preferred) candidate. Returns true
+ * when `b` should replace `a`. */
+function betterCandidate(a, b) {
+  const aClean = a.failures.length === 0, bClean = b.failures.length === 0
+  if (aClean !== bClean) return bClean
+  if (a.warnings.length !== b.warnings.length) return b.warnings.length < a.warnings.length
+  return countFailing(b) < countFailing(a)
+}
 
 /**
  * The "try, verify, pick" strategy for an IR that may qualify for
@@ -520,20 +562,22 @@ const countFailing = (r) => r.checks.filter((c) => !c.ok).length
  *   explicit request for grouped-layer mode; render and verify that once,
  *   no elk fallback attempt (the caller asked for this mode outright).
  * - `'auto'` — the IR qualifies purely by topological auto-detection.
- *   Render *both* modes and verify each; return the first that passes all
- *   20 checks. groupLayerHeuristicPrefersElk() (a cheap topology read —
- *   see its doc comment in diagram.mjs) decides which mode is tried, and
- *   preferred on a tie, first: normally grouped-layer, but elk first when
- *   the IR's cross-layer/in-layer edge shape is one the hand-drawn
- *   grouped-layer router is more likely to struggle with. If neither mode
- *   passes every check, the result with fewer failing checks wins (ties
- *   broken the same way) so a caller reporting an exit-3 failure still
- *   gets the more-nearly-passing candidate's hints.
+ *   Render *both* modes and verify each; return the first that is clean
+ *   (no failing row, no warning). groupLayerHeuristicPrefersElk() (a cheap
+ *   topology read — see its doc comment in diagram.mjs) decides which mode
+ *   is tried, and preferred on a tie, first: normally grouped-layer, but
+ *   elk first when the IR's cross-layer/in-layer edge shape is one the
+ *   hand-drawn grouped-layer router is more likely to struggle with.
+ *   Otherwise the better candidate wins (betterCandidate(): zero failures
+ *   first, then fewer warnings, then fewer failing rows — so a caller
+ *   reporting an exit-3 failure still gets the more-nearly-passing
+ *   candidate's hints).
  *
  * @param {object} ir validated IR from ir.mjs
  * @param {{column?: number}} [opts]
  * @returns {Promise<object>} a renderDiagram()-shaped result plus
- *   `checks`, `checksOk`, and `layoutMode` ('group'|'elk' — which mode won)
+ *   `checks`, `checksOk`, `failures`, `warnings`, `warn` (the `data-warn`
+ *   string, '' when none) and `layoutMode` ('group'|'elk' — which mode won)
  */
 export async function renderCheckedBest(ir, { column = COLUMN } = {}) {
   const mode = groupLayerMode(ir)
@@ -545,14 +589,13 @@ export async function renderCheckedBest(ir, { column = COLUMN } = {}) {
     ? [{ forceElk: true, layoutMode: 'elk' }, { forceElk: false, layoutMode: 'group' }]
     : [{ forceElk: false, layoutMode: 'group' }, { forceElk: true, layoutMode: 'elk' }]
 
-  const results = []
+  let best = null
   for (const opt of order) {
     const result = await renderAndVerify(ir, { column, ...opt })
-    if (result.checksOk) return result
-    results.push(result)
+    if (result.checksOk && result.warnings.length === 0) return result
+    if (!best || betterCandidate(best, result)) best = result
   }
-  const [first, second] = results
-  return countFailing(second) < countFailing(first) ? second : first
+  return best
 }
 
 /**
@@ -569,19 +612,54 @@ export async function renderChecked(ir, { column = COLUMN } = {}) {
 }
 
 /**
- * renderFigureHtml() that also runs verification (via renderCheckedBest())
- * and stamps `data-checks="pass"` on the <figure> only when every one of
- * the 20 rows passes (contract §5 relies on this attribute to know a
- * figure was checked, not just rendered).
+ * The `type: sequence` counterpart of renderAndVerify()/renderCheckedBest()
+ * above: sequence.mjs's layout is a fixed grid (no elk, no orientation
+ * choice, no grouped-layer mode), so there is only ever one candidate to
+ * render and verify — unlike renderCheckedBest() there is no "try both,
+ * pick the winner" step.
+ */
+async function renderSequenceChecked(ir, { column = COLUMN } = {}) {
+  const rendered = renderSequenceDiagram(ir, { column })
+  const verification = verifySequence(ir, rendered)
+  return { ...rendered, checks: verification.checks, checksOk: verification.ok }
+}
+
+/**
+ * renderFigureHtml() that also runs verification and stamps
+ * `data-checks="pass"` on the <figure> only when every check passes
+ * (contract §5 relies on this attribute to know a figure was checked, not
+ * just rendered). Dispatches on `ir.type`: a `type: sequence` IR is laid
+ * out/verified by sequence.mjs/verify-sequence.mjs instead of
+ * diagram.mjs/renderCheckedBest() above, and its figure additionally
+ * carries `data-type="sequence"` so downstream tooling (rerender-figures.mjs,
+ * self-check.mjs) can tell the two figure kinds apart without re-parsing the
+ * embedded IR. diagram.mjs's wrapFigureHtml() is reused as-is either way —
+ * it only ever reads `rendered.svg`/`rendered.scroll` and `ir.title`/
+ * `ir.caption`, which both render results shapes provide identically.
  *
  * @param {object} ir validated IR from ir.mjs
  * @param {{column?: number, rawYaml?: string}} [opts]
  */
 export async function renderFigureHtmlChecked(ir, { column = COLUMN, rawYaml } = {}) {
+  if (ir.type === 'sequence') {
+    const best = await renderSequenceChecked(ir, { column })
+    const plainHtml = wrapFigureHtml(ir, best, { rawYaml })
+    let html = plainHtml.replace(/^<figure class="wu-figure"/, '<figure class="wu-figure" data-type="sequence"')
+    if (best.checksOk) {
+      html = html.replace('<figure class="wu-figure" data-type="sequence"', '<figure class="wu-figure" data-checks="pass" data-type="sequence"')
+    }
+    return { ...best, html, checks: best.checks, checksOk: best.checksOk }
+  }
+
+  // Flowchart: `data-checks="pass"` when no `fail` row failed; a budget
+  // overrun (warn rows) still passes and is surfaced as
+  // `data-warn="budget:nodes=11;budget:label=15"` (stable order, no
+  // attribute at all when there is nothing to warn about).
   const best = await renderCheckedBest(ir, { column })
   const plainHtml = wrapFigureHtml(ir, best, { rawYaml })
+  const warnAttr = best.warn ? ` data-warn="${best.warn}"` : ''
   const html = best.checksOk
-    ? plainHtml.replace(/^<figure class="wu-figure"/, '<figure class="wu-figure" data-checks="pass"')
+    ? plainHtml.replace(/^<figure class="wu-figure"/, `<figure class="wu-figure" data-checks="pass"${warnAttr}`)
     : plainHtml
   return { ...best, html, checks: best.checks, checksOk: best.checksOk }
 }

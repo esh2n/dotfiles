@@ -1,0 +1,19 @@
+id: s1
+type: sequence
+title: 更新通知の取り込み
+caption: 1 日 1 回、ページ単位で取り込む
+participants:
+- id: sched
+  label: スケジューラ
+- id: api
+  label: 更新通知 API
+  tone: rs
+messages:
+- from: sched
+  to: api
+  label: 1 ページ取得
+  kind: sync
+- from: api
+  to: sched
+  label: has_next=false
+  kind: reply

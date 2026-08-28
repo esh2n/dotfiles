@@ -308,44 +308,58 @@ test('e2e: a small diagram renders and passes verification (figures.ok)', async 
   assert.equal(entry.figures.fallback, 0)
 })
 
-test('e2e: a 12-node diagram exceeds the node budget and falls back to a table', async () => {
+test('e2e: a 12-node diagram is over the node budget (guidance only) but renders, passes, and carries data-warn', async () => {
   const dest = tmpDest()
   const { entry } = await migrateOne('2026-01-09-diagram-fallback.md', { dryRun: false, dest })
+  assert.equal(entry.figures.ok, 1)
+  assert.equal(entry.figures.fallback, 0)
+  assert.ok(entry.warnings.some((w) => /budget warning — budget:nodes=12/.test(w)))
+  const html = readFileSync(join(dest, entry.dest), 'utf8')
+  assert.match(html, /<figure class="wu-figure" data-checks="pass" data-warn="budget:nodes=12">/)
+  assert.ok(!html.includes('図は変換時に合格せず、表で代替'))
+  assert.match(html, /diagram=1\/1/)
+  rmSync(dest, { recursive: true, force: true })
+})
+
+test('e2e: a K3,3 diagram fails geometry (unrelated crossing) and falls back to a table', async () => {
+  const dest = tmpDest()
+  const { entry } = await migrateOne('2026-01-15-diagram-geometry-fallback.md', { dryRun: false, dest })
   assert.equal(entry.figures.ok, 0)
   assert.equal(entry.figures.fallback, 1)
-  assert.ok(entry.warnings.some((w) => /budget/.test(w)))
+  assert.ok(entry.warnings.some((w) => /verification failed \(.*unrelated-crossing/.test(w)))
   const html = readFileSync(join(dest, entry.dest), 'utf8')
   assert.match(html, /図は変換時に合格せず、表で代替/)
   assert.match(html, /class="wu-callout" data-tone="warn"/)
+  assert.ok(!html.includes('data-warn'))
   rmSync(dest, { recursive: true, force: true })
 })
 
 test('e2e: a fallback figure embeds the candidate IR as YAML and round-trips through yaml-lite.mjs', async () => {
   const dest = tmpDest()
-  const { entry } = await migrateOne('2026-01-09-diagram-fallback.md', { dryRun: false, dest })
+  const { entry } = await migrateOne('2026-01-15-diagram-geometry-fallback.md', { dryRun: false, dest })
   const html = readFileSync(join(dest, entry.dest), 'utf8')
   const scriptMatch = /<figure class="wu-figure">[\s\S]*?<script type="text\/x-writeup-diagram">\n([\s\S]*?)\n<\/script>\n<\/figure>/.exec(html)
   assert.ok(scriptMatch, 'fallback figure should carry a text/x-writeup-diagram script block')
   const yaml = scriptMatch[1]
   const parsed = parseYamlLite(yaml)
   assert.equal(parsed.id, 'd1') // this fixture's only diagram, so nextDiagramId assigns "d1"
-  assert.equal(parsed.nodes.length, 12)
-  assert.equal(parsed.edges.length, 1)
-  assert.equal(parsed.edges[0].from, 'n1')
-  assert.equal(parsed.edges[0].to, 'n2')
-  // the callout carries the failing check name/hint (here: the budget message)
-  assert.match(html, /図は変換時に合格せず、表で代替 \(budget: [^)]*\)/)
+  assert.equal(parsed.nodes.length, 6)
+  assert.equal(parsed.edges.length, 9)
+  assert.equal(parsed.edges[0].from, 'l0')
+  assert.equal(parsed.edges[0].to, 'r0')
+  // the callout carries the failing check name/hint (here: the crossing row)
+  assert.match(html, /図は変換時に合格せず、表で代替 \(verification: [^)]*unrelated-crossing[^)]*\)/)
   rmSync(dest, { recursive: true, force: true })
 })
 
 test('directive: a fallback figure with a hostile label/caption escapes the embedded script and round-trips through the reader', async () => {
-  // 10 nodes exceeds LIMITS.maxNodes (9), forcing the fallback path that
-  // embeds the candidate IR via fallbackFigureHtml().
-  const nodeLines = Array.from({ length: 9 }, (_, i) => `n${i + 2}[ノード${i + 2}]`)
+  // K3,3 (non-planar, so an unrelated-edge crossing is unavoidable) forces
+  // the geometry-failure fallback path that embeds the candidate IR via
+  // fallbackFigureHtml(). Budgets alone no longer do — they are guidance.
   const body = [
     'n1[<img src=x onerror=alert(1)>]',
-    ...nodeLines,
-    'n1 -> n2',
+    'n2[ノード2]', 'n3[ノード3]', 'n4[ノード4]', 'n5[ノード5]', 'n6[ノード6]',
+    ...['n1', 'n2', 'n3'].flatMap((l) => ['n4', 'n5', 'n6'].map((r) => `${l} -> ${r}`)),
   ].join('\n')
   const ctx = { nextDiagramId: () => 'd1', sectionTitle: '</script><script>alert(1)</script>', column: 720 }
   const { html, figureOk } = await renderDiagramDirective({ body, attrs: {} }, ctx)
@@ -375,14 +389,28 @@ test('util: irToYaml round-trips a label containing ": " by quoting it', () => {
   assert.equal(parsed.edges[0].label, 'x: y')
 })
 
-test('e2e: sequence directive is converted to a wu-steps list (sequence-as-steps)', async () => {
+test('e2e: sequence directive renders a wu-figure sequence diagram when it fits the budget', async () => {
   const dest = tmpDest()
   const { entry } = await migrateOne('2026-01-10-sequence.md', { dryRun: false, dest })
-  assert.equal(entry.sequenceAsSteps, 1)
+  assert.equal(entry.sequenceAsSteps, 0)
+  assert.equal(entry.figures.ok, 1)
   const html = readFileSync(join(dest, entry.dest), 'utf8')
+  assert.match(html, /<figure class="wu-figure" data-checks="pass" data-type="sequence">/)
+  assert.match(html, /<script type="text\/x-writeup-diagram">/)
+  assert.ok(!html.includes('class="wu-steps"'), 'a figure that fits the budget should not fall back to a steps list')
+  rmSync(dest, { recursive: true, force: true })
+})
+
+test('e2e: a sequence directive over budget falls back to a wu-steps list, IR kept for a later rerender', async () => {
+  const dest = tmpDest()
+  const { entry } = await migrateOne('2026-01-17-sequence-overflow.md', { dryRun: false, dest })
+  assert.equal(entry.sequenceAsSteps, 1)
+  assert.equal(entry.figures.fallback, 1)
+  const html = readFileSync(join(dest, entry.dest), 'utf8')
+  assert.match(html, /<figure class="wu-figure" data-type="sequence">/)
+  assert.ok(!html.includes('data-checks="pass"'))
   assert.match(html, /class="wu-steps"/)
-  assert.match(html, /ユーザー → サーバー: リクエスト送信/)
-  assert.match(html, /サーバー → ユーザー \(応答\): レスポンス返却/)
+  assert.match(html, /<script type="text\/x-writeup-diagram">/)
   rmSync(dest, { recursive: true, force: true })
 })
 

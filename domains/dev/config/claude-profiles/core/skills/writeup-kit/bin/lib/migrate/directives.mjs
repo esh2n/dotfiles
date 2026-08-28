@@ -7,7 +7,7 @@ import { escapeHtml, irToYaml } from './util.mjs'
 import { renderInline } from './inline.mjs'
 import { parseBlocks, renderBlocksHtml } from './blocks.mjs'
 import { parseOldDiagram } from './old-diagram.mjs'
-import { parseOldSequence } from './old-sequence.mjs'
+import { parseOldSequence, toSequenceIR, sequenceIrToYaml } from './old-sequence.mjs'
 import { validateIR } from '../ir.mjs'
 import { renderFigureHtmlChecked } from '../verify-diagram.mjs'
 import { escapeIrScript } from '../ir-script.mjs'
@@ -219,6 +219,12 @@ export async function renderDiagram(node, ctx) {
     warnings.push(`diagram: ${validated.reason} violation — ${validated.message}`)
     return { html: fallbackFigureHtml(candidateIR, validated.reason, validated.message), warnings, figureOk: false }
   }
+  // Budget overruns are guidance, not a gate: the figure is still drawn
+  // (verified geometry decides) and carries data-warn; note it for the
+  // migration log so the author can consider splitting it later.
+  for (const w of validated.warnings ?? []) {
+    warnings.push(`diagram: budget warning — ${w.key}=${w.value} (${w.detail})`)
+  }
 
   let rendered
   try {
@@ -238,11 +244,15 @@ export async function renderDiagram(node, ctx) {
   return { html: rendered.html, warnings, figureOk: true }
 }
 
-// --- sequence (converted to a steps list, no figure) ------------------------
+// --- sequence (rendered as a wu-figure sequence diagram when it fits the
+// contract budget; falls back to the old steps-list rendering, with the
+// candidate IR kept in the fallback figure's script, otherwise) -----------
 
-export function renderSequence(node) {
-  const parsed = parseOldSequence(node.body)
-  const warnings = [...parsed.warnings]
+/** The pre-M2 rendering: one step per line, "A → B: label" / "注 (A): text".
+ * Used both as the final output when the candidate IR never even validates
+ * (nothing renderable to fall back from) and as the content of the wrapped
+ * fallback figure when it validates but fails verification. */
+function sequenceStepsHtml(parsed) {
   const labelOf = (id) => parsed.participants.find((p) => p.id === id)?.label ?? id
   const lines = []
   for (const ev of parsed.events) {
@@ -253,6 +263,62 @@ export function renderSequence(node) {
       lines.push(`${renderInline(labelOf(ev.from))} → ${renderInline(labelOf(ev.to))}${suffix}: ${renderInline(ev.label)}`)
     }
   }
-  const html = `<ol class="wu-steps">\n${lines.map((l) => `<li>${l}</li>`).join('\n')}\n</ol>`
-  return { html, warnings }
+  return `<ol class="wu-steps">\n${lines.map((l) => `<li>${l}</li>`).join('\n')}\n</ol>`
+}
+
+/** The steps list wrapped in a `<figure class="wu-figure">` carrying the
+ * candidate IR's script — never `data-checks="pass"` (that's reserved for a
+ * figure that actually rendered/verified as a sequence diagram), but
+ * discoverable by bin/rerender-figures.mjs's `<figure class="...wu-figure...">`
+ * scan the same way a fallen-back diagram already is (see
+ * fallbackFigureHtml() above), so a later kit/renderer fix — or a manual
+ * split into a smaller sequence — can pick the IR back up and re-render it
+ * without reconstructing it from the steps list by hand. */
+function sequenceFallbackHtml(parsed, candidateIR, reason, detail) {
+  const yaml = sequenceIrToYaml(candidateIR)
+  const detailText = detail ? `: ${escapeHtml(detail)}` : ''
+  return [
+    '<figure class="wu-figure" data-type="sequence">',
+    sequenceStepsHtml(parsed),
+    `<figcaption>${renderInline(candidateIR.caption)}</figcaption>`,
+    `<script type="text/x-writeup-diagram">\n${escapeIrScript(yaml)}\n</script>`,
+    '</figure>',
+    `<div class="wu-callout" data-tone="warn"><p>シーケンス図は変換時に合格せず、手順リストで代替 (${escapeHtml(reason)}${detailText})</p></div>`,
+  ].join('\n')
+}
+
+/**
+ * @param {object} node directive-tree node (name === 'sequence')
+ * @param {{nextDiagramId: () => string, sectionTitle: string, column?: number}} ctx
+ */
+export async function renderSequence(node, ctx) {
+  const parsed = parseOldSequence(node.body)
+  const warnings = [...parsed.warnings]
+  const id = ctx.nextDiagramId()
+  const title = ctx.sectionTitle || `シーケンス ${id}`
+  const caption = ctx.sectionTitle ? `${ctx.sectionTitle}のシーケンス` : `${id} の内容`
+  const candidateIR = toSequenceIR(parsed, { id, title, caption })
+
+  const validated = validateIR(candidateIR)
+  if (!validated.ok) {
+    warnings.push(`sequence: ${validated.reason} violation — ${validated.message}`)
+    return { html: sequenceFallbackHtml(parsed, candidateIR, validated.reason, validated.message), warnings, figureOk: false }
+  }
+
+  let rendered
+  try {
+    rendered = await renderFigureHtmlChecked(validated.ir, { column: ctx.column, rawYaml: JSON.stringify(validated.ir) })
+  } catch (e) {
+    warnings.push(`sequence: render threw: ${e.message}`)
+    return { html: sequenceFallbackHtml(parsed, candidateIR, 'render-error', e.message), warnings, figureOk: false }
+  }
+  if (!rendered.checksOk) {
+    const failingChecks = rendered.checks.filter((c) => !c.ok)
+    const failing = failingChecks.map((c) => c.name).join(', ')
+    warnings.push(`sequence: verification failed (${failing})`)
+    const hint = failingChecks.map((c) => c.hint).filter(Boolean).join('; ')
+    const detail = hint ? `${failing} — ${hint}` : failing
+    return { html: sequenceFallbackHtml(parsed, candidateIR, 'verification', detail), warnings, figureOk: false }
+  }
+  return { html: rendered.html, warnings, figureOk: true }
 }

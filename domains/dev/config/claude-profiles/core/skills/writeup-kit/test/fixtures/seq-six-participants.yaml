@@ -1,0 +1,58 @@
+id: s2
+type: sequence
+title: 6 者間のリクエスト連携
+caption: ゲートウェイからサービスを連鎖的に呼び出し、逆順に応答が返る
+participants:
+- id: c
+  label: クライアント
+- id: gw
+  label: ゲートウェイ
+- id: auth
+  label: 認証
+- id: cat
+  label: カタログ
+- id: inv
+  label: 在庫
+- id: pay
+  label: 決済
+messages:
+- from: c
+  to: gw
+  label: 開始
+  kind: sync
+- from: gw
+  to: auth
+  label: 認証依頼
+  kind: sync
+- from: auth
+  to: cat
+  label: 委譲
+  kind: sync
+- from: cat
+  to: inv
+  label: 委譲
+  kind: sync
+- from: inv
+  to: pay
+  label: 決済実行
+  kind: sync
+- from: pay
+  to: inv
+  label: 完了
+  kind: reply
+- from: inv
+  to: cat
+  label: 完了
+  kind: reply
+- from: cat
+  to: auth
+  label: 完了
+  kind: reply
+- from: auth
+  to: gw
+  label: 完了
+  kind: reply
+- from: gw
+  to: c
+  label: 完了
+  kind: reply
