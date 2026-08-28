@@ -300,9 +300,16 @@ const BLOCK_BREAKS = /<(br|hr)\s*\/?>/gi;
  * structure. The returned text has its own coordinate system (offsets are
  * not mapped back to the source HTML).
  */
+const LABEL_PREFIX = /(<p[^>]*>)\s*<strong>[^<]{1,24}[:：]<\/strong>\s*/g;
+
 export function extractTextFromHtml(html) {
   let text = stripMaskedTags(html);
   text = stripWuFigure(text);
+  // Component labels — `<p><strong>決定:</strong> …` in a decision card,
+  // `<p><strong>根拠・補足:</strong>` and the like — are structure, not
+  // prose: a page with 25 cards repeats each label 25 times, which the
+  // repeated-sentence-lead detector would otherwise flag on every card.
+  text = text.replace(LABEL_PREFIX, "$1");
   text = text.replace(BLOCK_END_TAGS, "\n\n");
   text = text.replace(BLOCK_BREAKS, "\n");
   text = text.replace(/<[^>]+>/g, "");

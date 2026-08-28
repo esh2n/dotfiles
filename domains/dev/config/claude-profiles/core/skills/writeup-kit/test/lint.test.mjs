@@ -389,6 +389,17 @@ describe("baseline diffing", () => {
 // ---------------------------------------------------------------------------
 
 describe("HTML extraction/masking", () => {
+  test("component labels (<p><strong>決定:</strong> …) are dropped so repeated card labels are not prose", () => {
+    const card = '<div class="wu-decision"><p><strong>決定:</strong> 判断は画面から直接書く。</p><p><strong>重視したトレードオフ:</strong> 速さより整合を優先した。</p><p><strong>根拠・補足:</strong></p><ul><li>出典 A</li></ul></div>';
+    const text = extractTextFromHtml(card.repeat(3));
+    assert.ok(!text.includes("決定:"));
+    assert.ok(!text.includes("重視したトレードオフ:"));
+    assert.ok(!text.includes("根拠・補足:"));
+    assert.ok(text.includes("判断は画面から直接書く。"));
+    // a strong span that is not a label prefix stays
+    assert.ok(extractTextFromHtml("<p>これは<strong>重要:</strong>な点。</p>").includes("重要:"));
+  });
+
   test("pre/code/table/script/style/.wu-figure content is excluded from lint text", () => {
     const html = fixture("masked.html");
     const text = extractTextFromHtml(html);
