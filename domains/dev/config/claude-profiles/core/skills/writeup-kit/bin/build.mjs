@@ -114,9 +114,9 @@ function renderIndexHtml(records) {
     const title = escapeHtml(r.title || r.path)
     const desc = escapeHtml(r.description || '')
     return `<tr data-kind="${escapeHtml(r.kind)}" data-folder="${escapeHtml(r.folder)}" data-text="${escapeHtml((r.title + ' ' + r.description).toLowerCase())}">` +
-      `<td>${escapeHtml(r.updated)}</td>` +
-      `<td>${escapeHtml(r.kind)}</td>` +
-      `<td>${escapeHtml(r.folder)}</td>` +
+      `<td class="n">${escapeHtml(r.updated)}</td>` +
+      `<td class="n">${escapeHtml(r.kind)}</td>` +
+      `<td class="n">${escapeHtml(r.folder)}</td>` +
       `<td><a href="${href}">${title}</a>${desc ? ` — ${desc}` : ''}</td>` +
       `<td>${escapeHtml(checksSummary)}</td>` +
       `</tr>`
