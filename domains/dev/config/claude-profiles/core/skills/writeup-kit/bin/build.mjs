@@ -176,6 +176,11 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
   const title = titleText(root)
   const segments = relPath.split('/')
   const folder = segments.length > 1 ? segments[0] : ''
+  // Full directory path (everything before the filename) — the "topic" a
+  // page belongs to in a migrated store, where one folder holds the
+  // successive documents of one subject (draft -> review -> decision).
+  // Equal to `folder` for a one-segment folder, '' for a store-root page.
+  const folderPath = segments.length > 1 ? segments.slice(0, -1).join('/') : ''
   const date = dateFromFilename(relPath, meta.date)
   const updated = computeUpdated(storeDir, relPath, originalMtime, meta, date)
   const { slug, ref } = slugAndRef(relPath, folder)
@@ -188,6 +193,7 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     description: meta.description || '',
     kind: meta.kind || '',
     folder,
+    folderPath,
     date,
     updated,
     checks: parseChecks(meta.checks),
@@ -223,11 +229,78 @@ function displayDatetime(iso) {
   return m ? `${m[1]} ${m[2]}` : (iso || '')
 }
 
+/** `kind`, falling back to `legacy` (for legacy/** pages) or `未分類`. Used
+ * both for the top filter chips and for a row/group's own kind label. */
+function kindKeyOf(r) {
+  return r.kind || (r.legacy ? 'legacy' : '未分類')
+}
+
+/** One page row — shared between the flat list and a group's page list. */
+function renderRow(r) {
+  const kindKey = kindKeyOf(r)
+  const checksSummary = Object.entries(r.checks).map(([k, v]) => `${k}=${v}`).join('; ') || '—'
+  const hasFail = Object.values(r.checks).includes('fail')
+  const href = escapeHtml(r.path)
+  const title = escapeHtml(r.title || r.path)
+  const desc = escapeHtml(r.description || '')
+  const searchBlob = normalizeForSearch([r.title, r.description, r.ref, r.id, r.folder].join(' '))
+  return `<li class="wu-idx-row" data-kind="${escapeHtml(kindKey)}" data-folder="${escapeHtml(r.folder)}" data-date="${escapeHtml(r.date)}" data-updated="${escapeHtml(r.updated)}" data-title="${escapeHtml(r.title || r.path)}" data-s="${escapeHtml(searchBlob)}">` +
+    `<div class="wu-idx-row1"><span class="wu-idx-tag">${escapeHtml(kindKey)}</span><a class="wu-idx-title" href="${href}">${title}</a><span class="wu-idx-id">${escapeHtml(r.id)}</span></div>` +
+    `<p class="wu-idx-desc">${desc}</p>` +
+    `<p class="wu-idx-line3"><span>${escapeHtml(r.ref)}</span> &middot; <span class="wu-idx-updated">${escapeHtml(displayDatetime(r.updated))}</span> &middot; <span class="${hasFail ? 'wu-idx-warn' : 'wu-idx-muted'}">${escapeHtml(checksSummary)}</span></p>` +
+    `</li>`
+}
+
+/** Folder-path label for a group header: the full path with its last
+ * segment (the topic itself, e.g. "a-network" in "engineering/backend/
+ * a-network") bolded, and any parent segments kept plain as breadcrumb. */
+function groupPathHtml(folderPath) {
+  if (!folderPath) return '<b>(root)</b>'
+  const parts = folderPath.split('/')
+  const last = parts.pop()
+  const prefix = parts.join('/')
+  return prefix ? `${escapeHtml(prefix)}/<b>${escapeHtml(last)}</b>` : `<b>${escapeHtml(last)}</b>`
+}
+
+/** Groups `records` (already sorted `updated` desc) by `folderPath`. Because
+ * the input is globally sorted by `updated` desc, taking groups in the order
+ * their first member is seen yields groups ordered by their own latest
+ * `updated` desc too — no separate group-level sort needed. */
+function buildGroups(records) {
+  const order = []
+  const byFolder = new Map()
+  for (const r of records) {
+    let g = byFolder.get(r.folderPath)
+    if (!g) {
+      g = { folderPath: r.folderPath, pages: [] }
+      byFolder.set(r.folderPath, g)
+      order.push(g)
+    }
+    g.pages.push(r)
+  }
+  return order
+}
+
+function renderGroup(g) {
+  const kinds = [...new Set(g.pages.map(kindKeyOf))].sort()
+  const kindChipsHtml = kinds.map((k) => `<span class="wu-idx-gk">${escapeHtml(k)}</span>`).join('')
+  const latest = g.pages[0].updated
+  return `<details class="wu-idx-group" open data-folder="${escapeHtml(g.folderPath)}">` +
+    `<summary class="wu-idx-ghead">` +
+    `<span class="wu-idx-gpath">${groupPathHtml(g.folderPath)}</span>` +
+    `<span class="wu-idx-gcount" data-total="${g.pages.length}">${g.pages.length} 件</span>` +
+    `<span class="wu-idx-gupdated">${escapeHtml(displayDatetime(latest))}</span>` +
+    `<span class="wu-idx-gkinds">${kindChipsHtml}</span>` +
+    `</summary>` +
+    `<ul class="wu-idx-list">${g.pages.map(renderRow).join('\n')}</ul>` +
+    `</details>`
+}
+
 function renderIndexHtml(records) {
   const kindCounts = new Map()
   const folderCounts = new Map()
   for (const r of records) {
-    const k = r.kind || (r.legacy ? 'legacy' : '未分類')
+    const k = kindKeyOf(r)
     kindCounts.set(k, (kindCounts.get(k) || 0) + 1)
     if (r.folder) folderCounts.set(r.folder, (folderCounts.get(r.folder) || 0) + 1)
   }
@@ -239,20 +312,9 @@ function renderIndexHtml(records) {
   const kindChips = kinds.map((k) => chip('kind', k, kindCounts.get(k))).join('')
   const folderChips = folders.map((f) => chip('folder', f, folderCounts.get(f))).join('')
 
-  const rows = records.map((r) => {
-    const kindKey = r.kind || (r.legacy ? 'legacy' : '未分類')
-    const checksSummary = Object.entries(r.checks).map(([k, v]) => `${k}=${v}`).join('; ') || '—'
-    const hasFail = Object.values(r.checks).includes('fail')
-    const href = escapeHtml(r.path)
-    const title = escapeHtml(r.title || r.path)
-    const desc = escapeHtml(r.description || '')
-    const searchBlob = normalizeForSearch([r.title, r.description, r.ref, r.id, r.folder].join(' '))
-    return `<li class="wu-idx-row" data-kind="${escapeHtml(kindKey)}" data-folder="${escapeHtml(r.folder)}" data-date="${escapeHtml(r.date)}" data-updated="${escapeHtml(r.updated)}" data-title="${escapeHtml(r.title || r.path)}" data-s="${escapeHtml(searchBlob)}">` +
-      `<div class="wu-idx-row1"><span class="wu-idx-tag">${escapeHtml(kindKey)}</span><a class="wu-idx-title" href="${href}">${title}</a><span class="wu-idx-id">${escapeHtml(r.id)}</span></div>` +
-      `<p class="wu-idx-desc">${desc}</p>` +
-      `<p class="wu-idx-line3"><span>${escapeHtml(r.ref)}</span> &middot; <span class="wu-idx-updated">${escapeHtml(displayDatetime(r.updated))}</span> &middot; <span class="${hasFail ? 'wu-idx-warn' : 'wu-idx-muted'}">${escapeHtml(checksSummary)}</span></p>` +
-      `</li>`
-  }).join('\n')
+  const groups = buildGroups(records)
+  const groupedHtml = groups.map(renderGroup).join('\n')
+  const rows = records.map(renderRow).join('\n')
 
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -281,6 +343,20 @@ function renderIndexHtml(records) {
 .wu-idx-line3{margin:0;font-family:var(--wu-font-mono);font-size:var(--wu-fs-1);color:var(--wu-ink-3);font-variant-numeric:tabular-nums;}
 .wu-idx-muted{color:var(--wu-ink-3);}
 .wu-idx-warn{color:var(--wu-ink);font-weight:700;border-left:var(--wu-bw-3) solid var(--wu-ink);padding-left:var(--wu-sp-2);}
+.wu-idx-viewbar{display:flex;align-items:center;gap:var(--wu-sp-2);flex-wrap:wrap;}
+.wu-vbtn{cursor:pointer;font:inherit;padding:var(--wu-sp-1) var(--wu-sp-3);border:var(--wu-bw-1) solid var(--wu-rule);border-radius:var(--wu-radius-3);background:var(--wu-surface);color:var(--wu-ink-2);font-family:var(--wu-font-heading);font-weight:700;font-size:var(--wu-fs-1);line-height:1.6;white-space:nowrap;}
+.wu-vbtn[aria-pressed="true"]{background:var(--wu-ink);color:var(--wu-surface);border-color:var(--wu-ink);}
+.wu-idx-groups{margin:0;padding:0;}
+.wu-idx-group{padding:var(--wu-sp-2) 0;border-bottom:var(--wu-bw-1) solid var(--wu-rule-soft);}
+.wu-idx-group[hidden]{display:none;}
+.wu-idx-ghead{cursor:pointer;display:flex;align-items:baseline;gap:var(--wu-sp-3);flex-wrap:wrap;padding:var(--wu-sp-1) 0;}
+.wu-idx-ghead::-webkit-details-marker{display:none;}
+.wu-idx-gpath{font-family:var(--wu-font-mono);font-weight:500;color:var(--wu-ink);}
+.wu-idx-gpath b{font-weight:700;}
+.wu-idx-gcount,.wu-idx-gupdated{font-family:var(--wu-font-mono);color:var(--wu-ink-3);font-variant-numeric:tabular-nums;}
+.wu-idx-gkinds{display:flex;gap:var(--wu-sp-1);flex-wrap:wrap;}
+.wu-idx-gk{font-family:var(--wu-font-heading);font-weight:700;font-size:var(--wu-fs-1);color:var(--wu-ink-2);background:var(--wu-rule-soft);border-radius:var(--wu-radius-1);padding:0 var(--wu-sp-2);}
+.wu-idx-group>.wu-idx-list{margin-top:var(--wu-sp-2);padding-left:var(--wu-sp-4);}
 </style>
 </head>
 <body>
@@ -295,14 +371,23 @@ function renderIndexHtml(records) {
 <input id="wu-q" class="wu-idx-search" type="search" autofocus placeholder="題名・要約・slug・id">
 <ul class="wu-idx-filters" id="wu-chips">${kindChips}${folderChips}</ul>
 <div class="wu-idx-bar">
-<p id="wu-count" class="wu-idx-count">${records.length} 件中 ${records.length} 件</p>
+<p id="wu-count" class="wu-idx-count">${records.length} 件中 ${records.length} 件 &middot; ${groups.length} グループ</p>
+<div class="wu-idx-viewbar">
+<button type="button" id="wu-view-grouped" class="wu-vbtn" aria-pressed="true">まとまり</button>
+<button type="button" id="wu-view-flat" class="wu-vbtn" aria-pressed="false">フラット</button>
+<button type="button" id="wu-expand-all" class="wu-vbtn">すべて展開</button>
+<button type="button" id="wu-collapse-all" class="wu-vbtn">すべて折りたたむ</button>
 <select id="wu-sort" class="wu-idx-sort">
 <option value="updated">更新が新しい順</option>
 <option value="created">作成が新しい順</option>
 <option value="title">題名</option>
 </select>
 </div>
-<ul class="wu-idx-list" id="wu-rows">
+</div>
+<div class="wu-idx-groups" id="wu-groups">
+${groupedHtml}
+</div>
+<ul class="wu-idx-list" id="wu-rows" hidden>
 ${rows}
 </ul>
 </section>
@@ -316,23 +401,37 @@ ${rows}
 </div>
 <script>
 (function () {
-  var rows = Array.prototype.slice.call(document.querySelectorAll('#wu-rows .wu-idx-row'))
-  var total = rows.length
+  var flatRows = Array.prototype.slice.call(document.querySelectorAll('#wu-rows > .wu-idx-row'))
+  var total = flatRows.length
   var searchEl = document.getElementById('wu-q')
   var countEl = document.getElementById('wu-count')
   var sortEl = document.getElementById('wu-sort')
   var listEl = document.getElementById('wu-rows')
-  var chipEls = Array.prototype.slice.call(document.querySelectorAll('.wu-fchip'))
+  var groupsEl = document.getElementById('wu-groups')
+  var groupEls = Array.prototype.slice.call(document.querySelectorAll('.wu-idx-group'))
+  var chipEls = Array.prototype.slice.call(document.querySelectorAll('#wu-chips .wu-fchip'))
+  var viewGroupedBtn = document.getElementById('wu-view-grouped')
+  var viewFlatBtn = document.getElementById('wu-view-flat')
+  var expandAllBtn = document.getElementById('wu-expand-all')
+  var collapseAllBtn = document.getElementById('wu-collapse-all')
   var selKind = new Set()
   var selFolder = new Set()
+  var view = 'grouped'
+  var collapsed = new Set()
 
   function norm(s) { return (s || '').normalize('NFKC').toLowerCase() }
+  function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)) } catch (e) { return null } }
+  function saveJson(key, v) { try { localStorage.setItem(key, JSON.stringify(v)) } catch (e) {} }
 
-  function readUrl() {
+  function readState() {
     var p = new URLSearchParams(location.search)
     searchEl.value = p.get('q') || ''
     ;(p.get('kind') || '').split(',').filter(Boolean).forEach(function (k) { selKind.add(k) })
     ;(p.get('folder') || '').split(',').filter(Boolean).forEach(function (f) { selFolder.add(f) })
+    var v = p.get('view')
+    if (v === 'flat' || v === 'grouped') view = v
+    else { try { view = localStorage.getItem('writeup.index.view') || 'grouped' } catch (e) {} }
+    ;(loadJson('writeup.index.collapsed') || []).forEach(function (f) { collapsed.add(f) })
   }
 
   function writeUrl() {
@@ -340,6 +439,7 @@ ${rows}
     if (searchEl.value) p.set('q', searchEl.value)
     if (selKind.size) p.set('kind', Array.from(selKind).join(','))
     if (selFolder.size) p.set('folder', Array.from(selFolder).join(','))
+    if (view === 'flat') p.set('view', 'flat')
     var qs = p.toString()
     history.replaceState(null, '', qs ? '?' + qs : location.pathname)
   }
@@ -353,29 +453,60 @@ ${rows}
     })
   }
 
+  function applyView() {
+    var grouped = view === 'grouped'
+    groupsEl.hidden = !grouped
+    listEl.hidden = grouped
+    viewGroupedBtn.setAttribute('aria-pressed', grouped ? 'true' : 'false')
+    viewFlatBtn.setAttribute('aria-pressed', grouped ? 'false' : 'true')
+    try { localStorage.setItem('writeup.index.view', view) } catch (e) {}
+  }
+
+  function applyCollapsed() {
+    groupEls.forEach(function (g) { g.open = !collapsed.has(g.dataset.folder) })
+  }
+
+  function rowMatches(row, q) {
+    var okKind = selKind.size === 0 || selKind.has(row.dataset.kind)
+    var okFolder = selFolder.size === 0 || selFolder.has(row.dataset.folder)
+    var okText = !q || row.dataset.s.indexOf(q) !== -1
+    return okKind && okFolder && okText
+  }
+
   function apply() {
     var q = norm(searchEl.value.trim())
     var shown = 0
-    rows.forEach(function (row) {
-      var okKind = selKind.size === 0 || selKind.has(row.dataset.kind)
-      var okFolder = selFolder.size === 0 || selFolder.has(row.dataset.folder)
-      var okText = !q || row.dataset.s.indexOf(q) !== -1
-      var visible = okKind && okFolder && okText
+    flatRows.forEach(function (row) {
+      var visible = rowMatches(row, q)
       row.style.display = visible ? '' : 'none'
       if (visible) shown++
     })
-    countEl.textContent = total + ' 件中 ' + shown + ' 件'
+    var groupsShown = 0
+    groupEls.forEach(function (g) {
+      var gRows = Array.prototype.slice.call(g.querySelectorAll('.wu-idx-row'))
+      var gShown = 0
+      gRows.forEach(function (row) {
+        var visible = rowMatches(row, q)
+        row.style.display = visible ? '' : 'none'
+        if (visible) gShown++
+      })
+      g.hidden = gShown === 0
+      if (gShown) groupsShown++
+      var head = g.querySelector('.wu-idx-gcount')
+      if (head) head.textContent = (gShown === gRows.length ? gRows.length : gShown + '/' + gRows.length) + ' 件'
+    })
+    countEl.textContent = total + ' 件中 ' + shown + ' 件 · ' + groupsShown + ' グループ'
     writeUrl()
   }
 
   function sortRows() {
     var mode = sortEl.value
-    rows = rows.slice().sort(function (a, b) {
+    flatRows = flatRows.slice().sort(function (a, b) {
       if (mode === 'title') return a.dataset.title.localeCompare(b.dataset.title, 'ja')
       var key = mode === 'created' ? 'date' : 'updated'
       return a.dataset[key] < b.dataset[key] ? 1 : a.dataset[key] > b.dataset[key] ? -1 : 0
     })
-    rows.forEach(function (row) { listEl.appendChild(row) })
+    flatRows.forEach(function (row) { listEl.appendChild(row) })
   }
 
   chipEls.forEach(function (c) {
@@ -388,6 +519,24 @@ ${rows}
   })
   searchEl.addEventListener('input', apply)
   sortEl.addEventListener('change', function () { sortRows(); apply() })
+  viewGroupedBtn.addEventListener('click', function () { view = 'grouped'; applyView(); apply() })
+  viewFlatBtn.addEventListener('click', function () { view = 'flat'; applyView(); apply() })
+  expandAllBtn.addEventListener('click', function () {
+    collapsed.clear()
+    applyCollapsed()
+    saveJson('writeup.index.collapsed', [])
+  })
+  collapseAllBtn.addEventListener('click', function () {
+    groupEls.forEach(function (g) { collapsed.add(g.dataset.folder) })
+    applyCollapsed()
+    saveJson('writeup.index.collapsed', Array.from(collapsed))
+  })
+  groupEls.forEach(function (g) {
+    g.addEventListener('toggle', function () {
+      if (g.open) collapsed.delete(g.dataset.folder); else collapsed.add(g.dataset.folder)
+      saveJson('writeup.index.collapsed', Array.from(collapsed))
+    })
+  })
   document.addEventListener('keydown', function (e) {
     if (e.key === '/' && document.activeElement !== searchEl) {
       e.preventDefault()
@@ -398,8 +547,10 @@ ${rows}
     }
   })
 
-  readUrl()
+  readState()
   updateChips()
+  applyView()
+  applyCollapsed()
   sortRows()
   apply()
 })()

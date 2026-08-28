@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>アップロード経路の設計レビュー</title>
+<meta name="description" content="アップロード経路の設計をレビューし、ワーカー分離案の妥当性を確認した記録">
+<meta name="kind" content="設計">
+<meta name="date" content="2026-08-06">
+<meta name="updated" content="2026-08-06">
+<meta name="checks" content="lint=pass;self-check=pass">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../_kit/writeup.css">
+</head>
+<body>
+<div class="wu-page">
+
+<header class="wu-header">
+<p class="wu-eyebrow">設計 &middot; 2026-08-06 &middot; 更新 2026-08-06</p>
+<h1>アップロード経路の設計レビュー</h1>
+<p class="wu-lede">アップロード経路の設計をレビューし、ワーカー分離案の妥当性を確認した記録。</p>
+</header>
+
+<main>
+
+<section class="wu-section">
+<h2>目的と読者</h2>
+<p>実装担当者向けに、たたき台の設計に対するレビュー結果を残す。</p>
+</section>
+
+<section class="wu-section">
+<h2>用語</h2>
+<dl class="wu-terms">
+<dt>レビュー</dt>
+<dd>たたき台の設計案を関係者で確認し、進め方を確定する場。</dd>
+</dl>
+</section>
+
+<section class="wu-section">
+<h2>現状とギャップ</h2>
+<p>たたき台ではワーカー分離案と固定間隔案が併記されていた。</p>
+</section>
+
+<section class="wu-section">
+<h2>あるべき姿</h2>
+<p>ワーカー分離案を基本線とし、固定間隔案は却下する。</p>
+</section>
+
+<section class="wu-section">
+<h2>決定点</h2>
+<table class="wu-compare">
+<thead><tr><th>案</th><th>実装コスト</th><th>運用負荷</th></tr></thead>
+<tbody>
+<tr><td>ワーカーに分離</td><td>中</td><td>低</td></tr>
+<tr><td>固定間隔で再試行</td><td>低</td><td>高</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="wu-section">
+<h2>進め方</h2>
+<div class="wu-open">
+<ul>
+<li>決定記録への反映は別途行う。</li>
+</ul>
+</div>
+</section>
+
+</main>
+
+<footer class="wu-footer">
+<dl>
+<dt>checks</dt><dd>lint=pass; self-check=pass</dd>
+<dt>sources</dt><dd>&mdash;</dd>
+</dl>
+</footer>
+
+</div>
+</body>
+</html>

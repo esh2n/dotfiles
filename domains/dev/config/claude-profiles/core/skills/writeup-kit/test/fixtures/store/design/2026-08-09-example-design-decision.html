@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>アップロード経路の設計決定</title>
+<meta name="description" content="アップロード経路の設計をワーカー分離案に決定した記録">
+<meta name="kind" content="決定記録">
+<meta name="date" content="2026-08-09">
+<meta name="updated" content="2026-08-09">
+<meta name="checks" content="lint=pass;self-check=pass">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../_kit/writeup.css">
+</head>
+<body>
+<div class="wu-page">
+
+<header class="wu-header">
+<p class="wu-eyebrow">決定記録 &middot; 2026-08-09 &middot; 更新 2026-08-09</p>
+<h1>アップロード経路の設計決定</h1>
+<p class="wu-lede">アップロード経路の設計をワーカー分離案に決定した記録。</p>
+</header>
+
+<main>
+
+<div class="wu-summary">
+<p>アップロード経路はワーカーに再試行を分離する構成に決定した。</p>
+</div>
+
+<section class="wu-section">
+<h2>決まったこと</h2>
+<div class="wu-decision">
+<p><strong>決定:</strong> アップロード経路はワーカーに再試行を分離する構成とする。</p>
+<p><strong>重視した得失:</strong> 運用負荷を優先し、実装コストの増分を許容した。</p>
+<p><strong>根拠:</strong> レビューでワーカー分離案が妥当と確認できたため。</p>
+</div>
+</section>
+
+<section class="wu-section">
+<h2>却下した案</h2>
+<table class="wu-compare">
+<thead><tr><th>案</th><th>実装コスト</th><th>運用負荷</th></tr></thead>
+<tbody>
+<tr><td>固定間隔で再試行</td><td>低</td><td>高</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="wu-section">
+<h2>未決・前提</h2>
+<div class="wu-open">
+<ul>
+<li>ワーカーの永続化方式はまだ決めていない。</li>
+</ul>
+</div>
+</section>
+
+<section class="wu-section">
+<h2>次のステップ</h2>
+<ol class="wu-steps">
+<li>ワーカーを実装する。</li>
+<li>設計レビューの指摘事項を反映する。</li>
+</ol>
+</section>
+
+</main>
+
+<footer class="wu-footer">
+<dl>
+<dt>checks</dt><dd>lint=pass; self-check=pass</dd>
+<dt>sources</dt><dd>&mdash;</dd>
+</dl>
+</footer>
+
+</div>
+</body>
+</html>

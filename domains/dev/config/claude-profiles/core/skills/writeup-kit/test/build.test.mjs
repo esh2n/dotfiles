@@ -26,6 +26,8 @@ describe('buildStore(): manifest fields', () => {
     assert.deepEqual(paths, [
       'decision/2026-08-01-example-decision.html',
       'design/2026-08-05-example-design.html',
+      'design/2026-08-06-example-design-review.html',
+      'design/2026-08-09-example-design-decision.html',
       'legacy/2019-05-01-legacy-note.html',
     ])
   })
@@ -53,7 +55,7 @@ describe('buildStore(): manifest fields', () => {
     assert.equal(legacy.date, '2019-05-01')
     // legacy page has no <meta updated> at all -> falls back to date, with a synthesized time-of-day
     assert.match(legacy.updated, /^2019-05-01T\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
-    const design = records.find((r) => r.path.startsWith('design/'))
+    const design = records.find((r) => r.path === 'design/2026-08-05-example-design.html')
     assert.equal(design.date, '2026-08-05')
     // design page's <meta updated> is date-only ("2026-08-05") -> same date, time filled in
     assert.match(design.updated, /^2026-08-05T\d{2}:\d{2}[+-]\d{2}:\d{2}$/)
@@ -62,7 +64,7 @@ describe('buildStore(): manifest fields', () => {
   test('checks is parsed from <meta name="checks"> into a key=value map', () => {
     const store = freshStore()
     const { records } = buildStore(store)
-    const design = records.find((r) => r.path.startsWith('design/'))
+    const design = records.find((r) => r.path === 'design/2026-08-05-example-design.html')
     assert.deepEqual(design.checks, { lint: 'pass', 'self-check': 'pass', diagram: '1/1' })
     const legacy = records.find((r) => r.path.startsWith('legacy/'))
     assert.deepEqual(legacy.checks, {})
@@ -117,14 +119,14 @@ describe('buildStore(): writes and idempotence', () => {
     assert.ok(!result.errors.some((e) => e.item === 'single-file'), JSON.stringify(result.errors))
   })
 
-  test('index.html embeds exactly one inline <script> of at most 120 lines', () => {
+  test('index.html embeds exactly one inline <script> of at most 160 lines', () => {
     const store = freshStore()
     buildStore(store)
     const html = readFileSync(join(store, 'index.html'), 'utf8')
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
     assert.equal(scripts.length, 1)
     const lineCount = scripts[0][1].trim().split('\n').length
-    assert.ok(lineCount <= 120, `script has ${lineCount} lines`)
+    assert.ok(lineCount <= 160, `script has ${lineCount} lines`)
   })
 
   test('index.html lists every page and links to it', () => {
@@ -186,7 +188,7 @@ describe('buildStore(): writes and idempotence', () => {
     )
     const result = buildStore(store)
     assert.ok(result.records.some((r) => r.path === 'notes/2026-09-01-extra.html'))
-    assert.equal(result.counts.total, 4)
+    assert.equal(result.counts.total, 6)
   })
 })
 
@@ -288,7 +290,7 @@ describe('buildStore(): id / slug / ref', () => {
     const { records } = buildStore(store)
     // build never overwrites an existing id meta, even if it doesn't match the computed value
     assert.match(readFileSync(pagePath, 'utf8'), /content="deadbeef"/)
-    const design = records.find((r) => r.path.startsWith('design/'))
+    const design = records.find((r) => r.path === 'design/2026-08-05-example-design.html')
     // ...but the manifest's id is always the computed one, independent of the page's own meta
     assert.notEqual(design.id, 'deadbeef')
   })
@@ -345,15 +347,16 @@ describe('buildStore(): search-first index.html', () => {
     assert.match(html, /<input id="wu-q"[^>]*autofocus[^>]*placeholder="題名・要約・slug・id"/)
     assert.match(html, /<select id="wu-sort"/)
     assert.match(html, /id="wu-count"/)
-    assert.match(html, /3 件中 3 件/) // fixture store has 3 pages, none filtered initially
+    // fixture store has 5 pages across 3 topic folders, none filtered initially
+    assert.match(html, /5 件中 5 件 &middot; 3 グループ/)
   })
 
   test('emits a kind chip per kind (legacy pages grouped under a "legacy" chip) with counts', () => {
     const store = freshStore()
     buildStore(store)
     const html = readFileSync(join(store, 'index.html'), 'utf8')
-    assert.match(html, /data-group="kind" data-value="決定記録"[^>]*>決定記録 \(1\)/)
-    assert.match(html, /data-group="kind" data-value="設計"[^>]*>設計 \(1\)/)
+    assert.match(html, /data-group="kind" data-value="決定記録"[^>]*>決定記録 \(2\)/)
+    assert.match(html, /data-group="kind" data-value="設計"[^>]*>設計 \(2\)/)
     assert.match(html, /data-group="kind" data-value="legacy"[^>]*>legacy \(1\)/)
   })
 
@@ -362,7 +365,7 @@ describe('buildStore(): search-first index.html', () => {
     buildStore(store)
     const html = readFileSync(join(store, 'index.html'), 'utf8')
     assert.match(html, /data-group="folder" data-value="decision"[^>]*>decision \(1\)/)
-    assert.match(html, /data-group="folder" data-value="design"[^>]*>design \(1\)/)
+    assert.match(html, /data-group="folder" data-value="design"[^>]*>design \(3\)/)
     assert.match(html, /data-group="folder" data-value="legacy"[^>]*>legacy \(1\)/)
   })
 
@@ -405,6 +408,115 @@ describe('buildStore(): search-first index.html', () => {
     for (const r of records) {
       assert.ok(manifest.some((m) => m.id === r.id && m.path === r.path))
     }
+  })
+})
+
+describe('buildStore(): manifest folderPath', () => {
+  test('folderPath is the full directory path (folder for a one-segment path, "" for a store-root page)', () => {
+    const store = freshStore()
+    const { records } = buildStore(store)
+    const decision = records.find((r) => r.path === 'decision/2026-08-01-example-decision.html')
+    assert.equal(decision.folderPath, 'decision')
+    const review = records.find((r) => r.path === 'design/2026-08-06-example-design-review.html')
+    assert.equal(review.folderPath, 'design')
+  })
+
+  test('a manifest record carries ref, slug, and folderPath together', () => {
+    const store = freshStore()
+    const { records } = buildStore(store)
+    const decision = records.find((r) => r.path === 'decision/2026-08-01-example-decision.html')
+    assert.equal(decision.ref, 'decision/example-decision')
+    assert.equal(decision.slug, 'example-decision')
+    assert.equal(decision.folderPath, 'decision')
+  })
+})
+
+describe('buildStore(): grouped index view ("まとまり")', () => {
+  function groupedBlock(html) {
+    const m = /<div class="wu-idx-groups" id="wu-groups">([\s\S]*?)<\/div>\s*<ul class="wu-idx-list" id="wu-rows"/.exec(html)
+    return m[1]
+  }
+
+  test('renders one <details class="wu-idx-group"> per topic folder (folderPath), including single-page folders', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const block = groupedBlock(html)
+    assert.match(block, /<details class="wu-idx-group" open data-folder="decision">/)
+    assert.match(block, /<details class="wu-idx-group" open data-folder="design">/)
+    assert.match(block, /<details class="wu-idx-group" open data-folder="legacy">/)
+  })
+
+  test('a group header shows the page count, the group\'s latest updated, and its kind chips', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const block = groupedBlock(html)
+    // design/ now holds 3 pages (draft, review, decision); latest updated is the decision page's 2026-08-09
+    assert.match(block, /data-folder="design">[\s\S]*?class="wu-idx-gcount" data-total="3">3 件</)
+    assert.match(block, /data-folder="design"[\s\S]*?class="wu-idx-gupdated">2026-08-09 \d{2}:\d{2}</)
+    assert.match(block, /data-folder="design"[\s\S]*?class="wu-idx-gkinds">(?:<span class="wu-idx-gk">[^<]+<\/span>){2}/)
+    // decision/ is a single-page folder and still renders as a (compact) group
+    assert.match(block, /data-folder="decision">[\s\S]*?class="wu-idx-gcount" data-total="1">1 件</)
+  })
+
+  test('the folder-path label bolds only the last segment', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    assert.match(html, /<span class="wu-idx-gpath"><b>design<\/b><\/span>/)
+  })
+
+  test('groups are ordered by the group\'s own latest updated, descending', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const block = groupedBlock(html)
+    // decision (updated 2026-08-10) > design (latest member updated 2026-08-09) > legacy (2019)
+    const iDecision = block.indexOf('data-folder="decision"')
+    const iDesign = block.indexOf('data-folder="design"')
+    const iLegacy = block.indexOf('data-folder="legacy"')
+    assert.ok(iDecision >= 0 && iDesign > iDecision && iLegacy > iDesign)
+  })
+
+  test('a group lists its own pages sorted by updated descending', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const block = groupedBlock(html)
+    const designGroup = /<details class="wu-idx-group" open data-folder="design">([\s\S]*?)<\/details>/.exec(block)[1]
+    const iDecision = designGroup.indexOf('design/2026-08-09-example-design-decision.html')
+    const iReview = designGroup.indexOf('design/2026-08-06-example-design-review.html')
+    const iDraft = designGroup.indexOf('design/2026-08-05-example-design.html')
+    assert.ok(iDecision >= 0 && iReview > iDecision && iDraft > iReview)
+  })
+
+  test('the flat row list is still present (each page appears in #wu-rows too, for the "フラット" view)', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const flatBlock = /<ul class="wu-idx-list" id="wu-rows" hidden>([\s\S]*?)<\/ul>\s*<\/section>/.exec(html)[1]
+    assert.match(flatBlock, /href="decision\/2026-08-01-example-decision\.html"/)
+    assert.match(flatBlock, /href="design\/2026-08-06-example-design-review\.html"/)
+    assert.match(flatBlock, /href="design\/2026-08-09-example-design-decision\.html"/)
+    assert.match(flatBlock, /href="legacy\/2019-05-01-legacy-note\.html"/)
+  })
+
+  test('renders a まとまり/フラット view toggle and expand/collapse-all controls', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    assert.match(html, /<button type="button" id="wu-view-grouped"[^>]*>まとまり<\/button>/)
+    assert.match(html, /<button type="button" id="wu-view-flat"[^>]*>フラット<\/button>/)
+    assert.match(html, /<button type="button" id="wu-expand-all"[^>]*>すべて展開<\/button>/)
+    assert.match(html, /<button type="button" id="wu-collapse-all"[^>]*>すべて折りたたむ<\/button>/)
+  })
+
+  test('index.html still satisfies the single-file self-check row with the grouped view added', () => {
+    const store = freshStore()
+    buildStore(store)
+    const result = runSelfCheck(join(store, 'index.html'))
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'), JSON.stringify(result.errors))
   })
 })
 
