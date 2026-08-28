@@ -77,6 +77,13 @@ svg {
   --wu-bw-1: 1px;
   --wu-bw-2: 1.5px;
   --wu-bw-3: 2px;
+
+  /* figure tones (ts / rs / new / neutral): neutral gray shades only,
+     never a chromatic color — distinguished by fill lightness alone */
+  --wu-fig-tone-ts: #f1f2f5;
+  --wu-fig-tone-rs: #e4e7ec;
+  --wu-fig-tone-new: #ffffff;
+  --wu-fig-tone-neutral: #ececef;
 }
 
 /* ---------------------------------------------------------------
@@ -95,6 +102,11 @@ svg {
     --wu-link: #93a9e8;
     --wu-accent: #e0987c;
     --wu-accent-soft: #3a281f;
+
+    --wu-fig-tone-ts: #1f242e;
+    --wu-fig-tone-rs: #2a303b;
+    --wu-fig-tone-new: #1b1f27;
+    --wu-fig-tone-neutral: #232833;
   }
 }
 
@@ -113,6 +125,11 @@ svg {
   --wu-link: #93a9e8;
   --wu-accent: #e0987c;
   --wu-accent-soft: #3a281f;
+
+  --wu-fig-tone-ts: #1f242e;
+  --wu-fig-tone-rs: #2a303b;
+  --wu-fig-tone-new: #1b1f27;
+  --wu-fig-tone-neutral: #232833;
 }
 
 /* ---------------------------------------------------------------
@@ -565,6 +582,32 @@ hr {
   color: var(--wu-ink);
   max-width: 100%;
   height: auto;
+}
+
+/* scroll fallback (contract §4-2 #9): the figure already scrolls via
+   overflow-x:auto above; the svg must keep its native width instead of
+   being squashed to the column by the max-width:100% rule above */
+.wu-figure[data-scroll="true"] svg {
+  max-width: none;
+}
+
+/* tone fill (ts / rs / new / neutral), applied to both group frames and
+   member node boxes — data-tone sits on the <rect> itself, not a wrapper
+   group, so the selector targets rect directly */
+.wu-figure rect[data-tone="ts"] {
+  fill: var(--wu-fig-tone-ts);
+}
+
+.wu-figure rect[data-tone="rs"] {
+  fill: var(--wu-fig-tone-rs);
+}
+
+.wu-figure rect[data-tone="new"] {
+  fill: var(--wu-fig-tone-new);
+}
+
+.wu-figure rect[data-tone="neutral"] {
+  fill: var(--wu-fig-tone-neutral);
 }
 
 .wu-figure figcaption {

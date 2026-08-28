@@ -20,11 +20,11 @@ export const FONT_SIZE = 13
 export const EDGE_LABEL_SIZE = 11
 export const SUBLABEL_SIZE = 11
 const NODE_H = 44
-const NODE_PAD_X = 18
+export const NODE_PAD_X = 18
 const NODE_MIN_W = 124
 const GROUP_HEADER = 36
 const GROUP_PAD = 16
-const BOLD_FACTOR = 1.08
+export const BOLD_FACTOR = 1.08
 const LEGEND_H = 36
 const GRID = 4
 
@@ -110,11 +110,24 @@ export async function renderDiagram(ir, { column = COLUMN } = {}) {
     height: best.height,
     scaled,
     scroll,
-    layout: { direction, boxes: best.abs, usedKinds: best.usedKinds },
+    layout: { direction, boxes: best.abs, usedKinds: best.usedKinds, geo: drawn.geo },
   }
 }
 
-const fitRatio = (l, column) => Math.max(l.width / column, l.height / MAX_HEIGHT)
+/**
+ * Lay out both orientations and report which one renderDiagram would pick
+ * (the smaller fitRatio), without drawing. Exposed for verify-diagram.mjs's
+ * orientation-choice check (contract §4-2 #16).
+ */
+export async function chooseOrientation(ir, { column = COLUMN } = {}) {
+  if (ir.direction) return { direction: ir.direction, pinned: true }
+  const right = await layoutOnce(ir, 'right')
+  const down = await layoutOnce(ir, 'down')
+  const direction = fitRatio(down, column) < fitRatio(right, column) ? 'down' : 'right'
+  return { direction, pinned: false, fitRatio: { right: fitRatio(right, column), down: fitRatio(down, column) } }
+}
+
+export const fitRatio = (l, column) => Math.max(l.width / column, l.height / MAX_HEIGHT)
 
 // --- layout ----------------------------------------------------------------
 
@@ -238,25 +251,29 @@ function draw(ir, layout, { column }) {
   const { laid, elkEdges, abs, usedKinds, width, height } = layout
   const uid = `wu-d-${ir.id}`
   const parts = []
+  // Collected in parallel with the SVG string so a caller (verify-diagram)
+  // can check geometry against the contract's acceptance rows without
+  // re-parsing the markup. Coordinates here are the exact post-snap values
+  // that end up in the SVG attributes.
+  const geo = { nodes: [], groups: [], edges: [], legend: null }
 
   parts.push(`<title id="${uid}-title">${esc(ir.title)}</title>`)
   parts.push(`<desc id="${uid}-desc">${esc(ir.caption || ir.title)}</desc>`)
 
   parts.push('<defs>')
   parts.push(`<marker id="${uid}-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>`)
-  parts.push(`<marker id="${uid}-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0.5 0.5 L9.5 5 L0.5 9.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></marker>`)
+  parts.push(`<marker id="${uid}-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0.5 0.5 L9.5 5 L0.5 9.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>`)
   parts.push('</defs>')
 
-  // Groups: neutral container box. `tone` is recorded as data-tone so a
-  // future kit CSS token (e.g. --wu-fig-ts) can style it; today writeup.css
-  // defines no per-tone color, so we stay neutral (see report: missing
-  // tokens).
+  // Groups: neutral container box. `tone` is recorded as data-tone so the
+  // kit's --wu-fig-tone-* tokens can style it (see kit/writeup.css).
   const drawGroup = (g) => {
     const box = abs.get(g.id)
     if (!box) return
     const x = snap4(box.x), y = snap4(box.y), w = snapUp4(box.width), h = snapUp4(box.height)
     parts.push(`<rect id="${uid}-${g.id}" data-tone="${esc(g.tone)}" x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="var(--wu-rule-soft)" stroke="currentColor" stroke-width="1"/>`)
     parts.push(`<text x="${x + GROUP_PAD}" y="${y + 23}" font-size="${FONT_SIZE}" font-weight="700" fill="currentColor">${esc(g.label)}</text>`)
+    geo.groups.push({ id: g.id, x, y, width: w, height: h, label: g.label, tone: g.tone })
   }
   for (const g of groups) drawGroup(g)
 
@@ -271,41 +288,54 @@ function draw(ir, layout, { column }) {
     parts.push(`<rect id="${uid}-${n.id}" data-tone="${esc(n.tone)}"${cls} x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="currentColor" stroke-width="${sw}"${dash}/>`)
     const weight = n.emphasis ? ' font-weight="700"' : ''
     parts.push(`<text id="${uid}-${n.id}-label"${cls} x="${x + w / 2}" y="${y + h / 2 + FONT_SIZE * 0.35}" font-size="${FONT_SIZE}" text-anchor="middle" fill="currentColor"${weight}>${esc(n.label)}</text>`)
+    geo.nodes.push({ id: n.id, x, y, width: w, height: h, label: n.label, tone: n.tone, emphasis: !!n.emphasis, dashed: !!n.dashed, group: n.group })
   }
 
   // Edges. `via` bypasses elk's own bend points: elkjs has no notion of
   // "route near this existing node without connecting to it", so a `via`
   // hint is honored as a manual orthogonal polyline through each via
   // node's center, inserted between elk's own start/end anchor points.
-  // This keeps every segment axis-aligned (contract #1) but does not avoid
-  // overlapping nodes or other edges the way elk's own router does — full
-  // collision-free geometry is out of scope for this renderer and belongs
-  // to the later geometry-verification step.
+  // routeVia detours around any *other* node box that the naive hop would
+  // cross (contract §4-2 #8) — see hopAvoiding below — but still does not
+  // avoid other edges the way elk's own router does; that residual case is
+  // caught (not fixed) by verify-diagram.mjs.
   for (const [i, e] of (laid.edges || []).entries()) {
     const meta = elkEdges[i]
     const off = abs.get(e.container || 'root') || { x: 0, y: 0 }
     const base = e.container && e.container !== 'root' ? { x: off.x, y: off.y } : { x: 0, y: 0 }
     const st = edgeStyle(meta.kind, uid)
+    const geoEdge = { id: `${uid}-edge-${i}`, index: i, from: meta.raw.from, to: meta.raw.to, kind: meta.kind, sections: [], label: null }
     for (const sec of e.sections || []) {
       let raw = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint].map((p) => ({ x: p.x + base.x, y: p.y + base.y }))
       if (meta.flip) raw.reverse()
       if (meta.raw.via && meta.raw.via.length) {
-        raw = routeVia(raw[0], raw[raw.length - 1], meta.raw.via.map((vid) => centerOf(abs.get(vid))))
+        const attached = new Set([meta.raw.from, meta.raw.to, ...meta.raw.via])
+        const obstacles = nodes.filter((n) => !attached.has(n.id)).map((n) => abs.get(n.id)).filter(Boolean)
+        raw = routeVia(raw[0], raw[raw.length - 1], meta.raw.via.map((vid) => centerOf(abs.get(vid))), obstacles, VIA_CLEARANCE)
       }
-      const pts = raw.map((p) => `${snap4(p.x)} ${snap4(p.y)}`)
+      const snapped = raw.map((p) => ({ x: snap4(p.x), y: snap4(p.y) }))
+      const pts = snapped.map((p) => `${p.x} ${p.y}`)
       const d = `M${pts[0]} ${pts.slice(1).map((p) => `L${p}`).join(' ')}`
       const dash = st.dash ? ` stroke-dasharray="${st.dash}"` : ''
       parts.push(`<path id="${uid}-edge-${i}" d="${d}" fill="none" stroke="currentColor" stroke-width="1"${dash} marker-end="url(#${st.marker})"/>`)
+      geoEdge.sections.push(snapped)
     }
     for (const lb of e.labels || []) {
-      parts.push(`<text x="${snap4(lb.x + base.x)}" y="${snap4(lb.y + base.y + 11)}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(meta.raw.label)}</text>`)
+      const lx = snap4(lb.x + base.x), ly = snap4(lb.y + base.y)
+      parts.push(`<text x="${lx}" y="${snap4(lb.y + base.y + 11)}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(meta.raw.label)}</text>`)
+      geoEdge.label = { x: lx, y: ly, width: lb.width || Math.ceil(textWidth(meta.raw.label, EDGE_LABEL_SIZE)) + 10, height: lb.height || 14, text: meta.raw.label }
     }
+    geo.edges.push(geoEdge)
   }
 
-  if (usedKinds.length) parts.push(legendSvg(usedKinds, uid, snap4(Math.ceil(laid.height) + 8)))
+  if (usedKinds.length) {
+    const legendY = snap4(Math.ceil(laid.height) + 8)
+    parts.push(legendSvg(usedKinds, uid, legendY))
+    geo.legend = { x: 0, y: legendY, width, height: height - legendY }
+  }
 
   const svg = `<svg role="img" aria-labelledby="${uid}-title ${uid}-desc" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${parts.join('')}</svg>`
-  return { svg }
+  return { svg, geo }
 }
 
 function centerOf(box) {
@@ -313,17 +343,83 @@ function centerOf(box) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
-/** Build an all-orthogonal polyline start -> via[0] -> ... -> end. */
-function routeVia(start, end, viaPoints) {
+// Minimum clearance a manual via-hop keeps from any node box it does not
+// intend to touch (contract §4-2 #8 asks for 2px; padded so post-snap
+// rounding of both the node box and the edge point never eats it away).
+const VIA_CLEARANCE = 8
+
+/**
+ * Build an all-orthogonal polyline start -> via[0] -> ... -> end, detouring
+ * around any `obstacles` box (a node the edge is not attached to) that the
+ * direct hop would otherwise cut through or run too close to.
+ */
+function routeVia(start, end, viaPoints, obstacles = [], margin = VIA_CLEARANCE) {
   const points = [start, ...viaPoints, end]
   const out = [points[0]]
   for (let i = 1; i < points.length; i++) {
     const prev = out[out.length - 1]
     const next = points[i]
-    if (prev.x !== next.x && prev.y !== next.y) {
-      out.push({ x: next.x, y: prev.y })
+    const hop = obstacles.length ? hopAvoiding(prev, next, obstacles, margin) : lShapeHop(prev, next)
+    for (const p of hop.slice(1)) out.push(p)
+  }
+  return dedupePolyline(out)
+}
+
+/** The plain single-corner hop routeVia used before collision-avoidance existed. */
+function lShapeHop(prev, next) {
+  if (prev.x === next.x || prev.y === next.y) return [prev, next]
+  return [prev, { x: next.x, y: prev.y }, next]
+}
+
+/** An orthogonal hop from `from` to `to` that keeps `margin` clear of every obstacle box. */
+function hopAvoiding(from, to, obstacles, margin) {
+  const bendA = [from, { x: to.x, y: from.y }, to]
+  const bendB = [from, { x: from.x, y: to.y }, to]
+  if (!polylineHitsAny(bendA, obstacles, margin)) return dedupePolyline(bendA)
+  if (!polylineHitsAny(bendB, obstacles, margin)) return dedupePolyline(bendB)
+
+  // Both single-corner hops cut through something: detour around the
+  // union of the boxes actually in the way, going over the top or under
+  // the bottom of that union, whichever costs less vertical travel.
+  const blockers = obstacles.filter((o) => polylineHitsAny(bendA, [o], margin) || polylineHitsAny(bendB, [o], margin))
+  const top = Math.min(...blockers.map((o) => o.y)) - margin
+  const bottom = Math.max(...blockers.map((o) => o.y + o.height)) + margin
+  const costAbove = Math.abs(from.y - top) + Math.abs(to.y - top)
+  const costBelow = Math.abs(from.y - bottom) + Math.abs(to.y - bottom)
+  const laneY = costAbove <= costBelow ? top : bottom
+  return dedupePolyline([from, { x: from.x, y: laneY }, { x: to.x, y: laneY }, to])
+}
+
+function polylineHitsAny(path, obstacles, margin) {
+  for (let i = 1; i < path.length; i++) {
+    for (const o of obstacles) {
+      if (segRectDist(path[i - 1], path[i], o) < margin) return true
     }
-    out.push(next)
+  }
+  return false
+}
+
+/** Euclidean distance between an axis-aligned segment and a box (both treated as AABBs). */
+function segRectDist(a, b, rect) {
+  const rx1 = rect.x, rx2 = rect.x + rect.width, ry1 = rect.y, ry2 = rect.y + rect.height
+  if (a.y === b.y) {
+    const y = a.y, xlo = Math.min(a.x, b.x), xhi = Math.max(a.x, b.x)
+    const dy = y < ry1 ? ry1 - y : y > ry2 ? y - ry2 : 0
+    const dx = xhi < rx1 ? rx1 - xhi : xlo > rx2 ? xlo - rx2 : 0
+    return Math.hypot(dx, dy)
+  }
+  const x = a.x, ylo = Math.min(a.y, b.y), yhi = Math.max(a.y, b.y)
+  const dx = x < rx1 ? rx1 - x : x > rx2 ? x - rx2 : 0
+  const dy = yhi < ry1 ? ry1 - yhi : ylo > ry2 ? ylo - ry2 : 0
+  return Math.hypot(dx, dy)
+}
+
+function dedupePolyline(pts) {
+  const out = []
+  for (const p of pts) {
+    const last = out[out.length - 1]
+    if (last && last.x === p.x && last.y === p.y) continue
+    out.push(p)
   }
   return out
 }

@@ -4,11 +4,14 @@
 //   node bin/render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json]
 //
 // Exit codes: 0 ok, 1 cannot read the input file, 2 the IR failed to parse
-// or validate (a one-line reason + suggestion is printed to stderr).
+// or validate (a one-line reason + suggestion is printed to stderr), 3 the
+// diagram rendered but failed contract §4-2 verification (the failing rows
+// and their hints are printed to stderr).
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parse as parseYamlLite, YamlError } from './lib/yaml-lite.mjs'
 import { validateIR } from './lib/ir.mjs'
-import { renderDiagram, COLUMN } from './lib/diagram.mjs'
+import { COLUMN } from './lib/diagram.mjs'
+import { renderChecked } from './lib/verify-diagram.mjs'
 
 export function parseArgs(argv) {
   const args = { input: null, column: COLUMN, out: null, json: false, help: false }
@@ -84,7 +87,7 @@ export async function main(argv) {
 
   let rendered
   try {
-    rendered = await renderDiagram(validated.ir, { column: args.column })
+    rendered = await renderChecked(validated.ir, { column: args.column })
   } catch (e) {
     console.error(`render error: ${e.message}`)
     return 2
@@ -92,15 +95,25 @@ export async function main(argv) {
 
   if (args.json) {
     console.log(JSON.stringify({
-      ok: true,
+      ok: rendered.checksOk,
       svg: rendered.svg,
       width: rendered.width,
       height: rendered.height,
       scaled: rendered.scaled,
       scroll: rendered.scroll,
+      checks: rendered.checks,
       warnings: [],
     }))
-    return 0
+    return rendered.checksOk ? 0 : 3
+  }
+
+  if (!rendered.checksOk) {
+    console.error('diagram failed verification (contract §4-2):')
+    for (const c of rendered.checks) {
+      if (c.ok) continue
+      console.error(`  #${c.id} ${c.name}: ${c.detail}${c.hint ? ` — hint: ${c.hint}` : ''}`)
+    }
+    return 3
   }
 
   if (args.out) {
