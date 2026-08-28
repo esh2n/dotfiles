@@ -290,6 +290,31 @@ test('#7 legend-clearance: fails when an edge segment intersects the legend regi
   assert.ok(c.hint)
 })
 
+// The legend box the check inspects must be the one actually inside the
+// rendered canvas: when the legend needs more room than the diagram (a
+// narrow diagram with all 3 edge kinds), the canvas widens to fit it
+// (contract §4-2 amendment) — the legend box here must reflect that wider
+// canvas, not the narrower diagram width, or this check would compare
+// edges against a legend region narrower than what is actually drawn.
+test('#7 legend-clearance: uses the widened canvas as the legend box, not the narrower diagram width', async () => {
+  const raw = {
+    id: 'leg', title: 't', direction: 'down',
+    nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+    edges: [
+      { from: 'a', to: 'b', kind: 'sync' },
+      { from: 'b', to: 'a', kind: 'async' },
+      { from: 'a', to: 'b', kind: 'reply' },
+    ],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok)
+  const out = await renderDiagram(v.ir)
+  assert.ok(out.layout.geo.legend.width > 148, `legend box should span the widened canvas, got ${out.layout.geo.legend.width}`)
+  assert.equal(out.layout.geo.legend.width, out.width)
+  const r = await verifyDiagram(v.ir, out)
+  assert.equal(byId(r.checks, 7).ok, true)
+})
+
 // --- 8. edge clears unrelated nodes by >=2px ------------------------------
 
 test('#8 node-clearance: passes when the only nodes near the path are the ones it is attached to', async () => {
@@ -494,6 +519,23 @@ test('#16 orientation-choice: fails when the claimed direction is the worse-fitt
   const c = byId(r.checks, 16)
   assert.equal(c.ok, false)
   assert.ok(c.hint)
+})
+
+// Amended row #16: a short chain that fits the column laid out "right" must
+// pass even though a naive fitRatio comparison would call "down" the better
+// fit (see diagram.test.mjs for why the two denominators disagree).
+test('#16 orientation-choice: passes for a chain that fits right, even though down has the smaller raw fitRatio', async () => {
+  const raw = {
+    id: 'chain3', title: 't',
+    nodes: [{ id: 'a', label: 'N0' }, { id: 'b', label: 'N1' }, { id: 'c', label: 'N2' }],
+    edges: [{ from: 'a', to: 'b', kind: 'sync' }, { from: 'b', to: 'c', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok)
+  const out = await renderDiagram(v.ir)
+  assert.equal(out.layout.direction, 'right')
+  const r = await verifyDiagram(v.ir, out)
+  assert.equal(byId(r.checks, 16).ok, true)
 })
 
 // --- 17. dark 3-state: no hex colors, no rgb() ----------------------------

@@ -565,8 +565,9 @@ hr {
    .wu-figure — diagram frame: svg + figcaption + IR script
    The IR <script type="text/x-writeup-diagram"> has no box; the
    figure's own overflow-x:auto is the scroll container for a wide
-   diagram. The focal node/edge is the only other place the accent
-   color may appear, via the .wu-focal helper class inside the svg.
+   diagram. The focal node's box is the only other place the accent
+   color may appear (stroke only, via .wu-focal on the svg <rect> —
+   its label text stays ink-colored, just bold).
 --------------------------------------------------------------- */
 .wu-figure {
   margin: var(--wu-sp-5) 0;
@@ -578,10 +579,11 @@ hr {
 }
 
 .wu-figure svg {
-  margin: 0 auto;
   color: var(--wu-ink);
   max-width: 100%;
   height: auto;
+  display: block;
+  margin-inline: auto;
 }
 
 /* scroll fallback (contract §4-2 #9): the figure already scrolls via
@@ -617,12 +619,11 @@ hr {
   text-align: center;
 }
 
-.wu-figure .wu-focal {
+/* Accent stroke is the only emphasis cue; the label text stays the normal
+   ink color (bold weight, set inline in the svg, is enough on its own) —
+   filling it with the accent color reads as too heavy at 13px. */
+.wu-figure rect.wu-focal {
   stroke: var(--wu-accent);
-}
-
-.wu-figure text.wu-focal {
-  fill: var(--wu-accent);
 }
 
 /* ---------------------------------------------------------------

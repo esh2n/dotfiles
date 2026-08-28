@@ -73,37 +73,66 @@ function edgeStyle(kind, uid) {
 }
 
 /**
+ * Decide which orientation a diagram should use and lay out whatever that
+ * requires. An explicit `ir.direction` always wins outright (only that one
+ * orientation is laid out). Otherwise both "right" and "down" are laid out
+ * and compared by the amended contract row #16 rule: prefer "right" if it
+ * fits the column unscaled (width <= column); otherwise prefer "down" if
+ * *it* fits unscaled; otherwise fall back to whichever has the smaller
+ * fitRatio = max(w/column, h/MAX_HEIGHT), same as before this amendment.
+ *
+ * This is the single source of truth both renderDiagram() and
+ * chooseOrientation() build on, so the two can never disagree the way the
+ * old renderDiagram (which only ever looked at the alternate orientation
+ * when its first pick overflowed) could disagree with a plain fitRatio
+ * comparison: a short, comfortably-fitting "right" chain has a small but
+ * nonzero width/column ratio, while the equivalent "down" stack's
+ * height/MAX_HEIGHT ratio is smaller still purely because MAX_HEIGHT (900)
+ * is a larger denominator than column (720) — favoring "down" on every
+ * ordinary chain even though "right" already fits outright.
+ */
+async function pickOrientation(ir, column) {
+  if (ir.direction) {
+    return { direction: ir.direction, pinned: true, layouts: { [ir.direction]: await layoutOnce(ir, ir.direction) } }
+  }
+  const right = await layoutOnce(ir, 'right')
+  const down = await layoutOnce(ir, 'down')
+  const rightFits = right.width <= column
+  const downFits = down.width <= column
+  const direction = rightFits ? 'right' : downFits ? 'down' : (fitRatio(down, column) < fitRatio(right, column) ? 'down' : 'right')
+  return { direction, pinned: false, layouts: { right, down } }
+}
+
+/**
  * Render a validated diagram IR (see bin/lib/ir.mjs) to an SVG string.
  *
- * Orientation: lays out both "right" and "down" (unless `ir.direction` is
- * pinned) and keeps whichever has the smaller fitRatio = max(w/column,
- * h/MAX_HEIGHT). If the winner is wider than `column`, scale down to fit —
- * but never below MIN_SCALE; past that point we keep native size and
- * report `scroll: true` instead of shrinking further.
+ * Orientation: see pickOrientation() above. If the winner is wider than
+ * `column`, scale down to fit — but never below MIN_SCALE; past that point
+ * we keep native size and report `scroll: true` instead of shrinking
+ * further. The <svg>'s `width`/`height` attributes reflect that final
+ * on-page CSS-px size (native, or scaled down when `scaled` is true); the
+ * `viewBox` and the returned `width`/`height` fields always stay the
+ * unscaled layout size so downstream geometry/verification math is
+ * unaffected by presentation scaling.
  *
  * @param {object} ir normalized IR from ir.mjs
  * @param {{column?: number}} [opts]
  */
 export async function renderDiagram(ir, { column = COLUMN } = {}) {
-  const first = await layoutOnce(ir, ir.direction || 'right')
-  let best = first
-  let direction = ir.direction || 'right'
-
-  if (fitRatio(first, column) > 1 && !ir.direction) {
-    const other = direction === 'down' ? 'right' : 'down'
-    const alt = await layoutOnce(ir, other)
-    if (fitRatio(alt, column) < fitRatio(first, column)) { best = alt; direction = other }
-  }
+  const { direction, layouts } = await pickOrientation(ir, column)
+  const best = layouts[direction]
 
   let scaled = false
   let scroll = false
+  let displayWidth = best.width
+  let displayHeight = best.height
   if (best.width > column) {
-    const candidate = column / best.width
-    if (candidate >= MIN_SCALE) scaled = true
+    const scale = column / best.width
+    if (scale >= MIN_SCALE) { scaled = true; displayWidth = column; displayHeight = Math.round(best.height * scale) }
     else scroll = true
   }
 
-  const drawn = draw(ir, best, { column })
+  const drawn = draw(ir, best, { column, displayWidth, displayHeight })
   return {
     svg: drawn.svg,
     width: best.width,
@@ -116,15 +145,13 @@ export async function renderDiagram(ir, { column = COLUMN } = {}) {
 
 /**
  * Lay out both orientations and report which one renderDiagram would pick
- * (the smaller fitRatio), without drawing. Exposed for verify-diagram.mjs's
- * orientation-choice check (contract §4-2 #16).
+ * (the amended row #16 rule — see pickOrientation()), without drawing.
+ * Exposed for verify-diagram.mjs's orientation-choice check.
  */
 export async function chooseOrientation(ir, { column = COLUMN } = {}) {
   if (ir.direction) return { direction: ir.direction, pinned: true }
-  const right = await layoutOnce(ir, 'right')
-  const down = await layoutOnce(ir, 'down')
-  const direction = fitRatio(down, column) < fitRatio(right, column) ? 'down' : 'right'
-  return { direction, pinned: false, fitRatio: { right: fitRatio(right, column), down: fitRatio(down, column) } }
+  const { direction, layouts } = await pickOrientation(ir, column)
+  return { direction, pinned: false, fitRatio: { right: fitRatio(layouts.right, column), down: fitRatio(layouts.down, column) } }
 }
 
 export const fitRatio = (l, column) => Math.max(l.width / column, l.height / MAX_HEIGHT)
@@ -218,7 +245,12 @@ async function layoutOnce(ir, direction) {
 
   const usedKinds = EDGE_KIND_ORDER.filter((k) => edges.some((e) => e.kind === k))
   const abs = absolutePositions(laid)
-  const width = snapUp4(Math.max(1, Math.ceil(laid.width)))
+  const diagramWidth = Math.max(1, Math.ceil(laid.width))
+  // The legend can need more room than the diagram itself (a short/narrow
+  // diagram with long edge-kind labels): widen the canvas to fit it rather
+  // than letting it clip or run past the svg's own viewBox (contract §4-2
+  // #7 relies on the legend box actually being inside the canvas).
+  const width = snapUp4(Math.max(diagramWidth, legendWidth(usedKinds)))
   const height = snapUp4(Math.max(1, Math.ceil(laid.height)) + (usedKinds.length ? LEGEND_H : 0))
   return { laid, elkEdges, abs, usedKinds, groupIndex, width, height }
 }
@@ -246,7 +278,7 @@ function finalizeNode(elkNode) {
 
 // --- drawing -----------------------------------------------------------
 
-function draw(ir, layout, { column }) {
+function draw(ir, layout, { column, displayWidth, displayHeight }) {
   const { nodes, groups } = ir
   const { laid, elkEdges, abs, usedKinds, width, height } = layout
   const uid = `wu-d-${ir.id}`
@@ -334,7 +366,15 @@ function draw(ir, layout, { column }) {
     geo.legend = { x: 0, y: legendY, width, height: height - legendY }
   }
 
-  const svg = `<svg role="img" aria-labelledby="${uid}-title ${uid}-desc" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${parts.join('')}</svg>`
+  // width/height are the on-page CSS-px size (native, or scaled down to
+  // the column — contract §4-2 "natural size" fix): the browser stretches
+  // or shrinks the viewBox's coordinate system to fill exactly that box,
+  // so the figure never renders larger than intended just because its
+  // container happens to be wider (kit/writeup.css's `.wu-figure svg` only
+  // adds `max-width:100%; height:auto` on top, for narrower viewports).
+  const dw = displayWidth ?? width
+  const dh = displayHeight ?? height
+  const svg = `<svg role="img" aria-labelledby="${uid}-title ${uid}-desc" width="${dw}" height="${dh}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${parts.join('')}</svg>`
   return { svg, geo }
 }
 
@@ -424,16 +464,45 @@ function dedupePolyline(pts) {
   return out
 }
 
+const LEGEND_PAD = 12
+const LEGEND_SWATCH = 30
+const LEGEND_SWATCH_GAP = 8
+const LEGEND_ITEM_GAP = 22
+
+/**
+ * Per-kind legend item metrics (swatch position, label text position/width).
+ * Shared by legendSvg() (drawing) and legendWidth() (sizing the canvas) so
+ * the two can never drift apart — the canvas is only ever as wide as what
+ * legendSvg actually draws.
+ */
+function legendItems(kinds) {
+  let x = LEGEND_PAD
+  const items = []
+  for (const k of kinds) {
+    const label = EDGE_KIND_LABEL[k]
+    const labelWidth = Math.ceil(textWidth(label, EDGE_LABEL_SIZE))
+    const swatchX = x
+    const textX = swatchX + LEGEND_SWATCH + LEGEND_SWATCH_GAP
+    items.push({ kind: k, label, swatchX, textX, labelWidth, end: textX + labelWidth })
+    x = textX + labelWidth + LEGEND_ITEM_GAP
+  }
+  return items
+}
+
+/** Canvas width the legend needs, including its own left/right padding. */
+export function legendWidth(kinds) {
+  if (!kinds.length) return 0
+  const items = legendItems(kinds)
+  return items[items.length - 1].end + LEGEND_PAD
+}
+
 function legendSvg(kinds, uid, y) {
   const out = [`<g id="${uid}-legend" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">`]
-  let x = 12
-  for (const k of kinds) {
-    const st = edgeStyle(k, uid)
+  for (const item of legendItems(kinds)) {
+    const st = edgeStyle(item.kind, uid)
     const dash = st.dash ? ` stroke-dasharray="${st.dash}"` : ''
-    out.push(`<path d="M${x} ${y + 8} L${x + 30} ${y + 8}" fill="none" stroke="currentColor" stroke-width="1"${dash} marker-end="url(#${st.marker})"/>`)
-    const label = EDGE_KIND_LABEL[k]
-    out.push(`<text x="${x + 38}" y="${y + 12}">${esc(label)}</text>`)
-    x += 38 + Math.ceil(textWidth(label, EDGE_LABEL_SIZE)) + 22
+    out.push(`<path d="M${item.swatchX} ${y + 8} L${item.swatchX + LEGEND_SWATCH} ${y + 8}" fill="none" stroke="currentColor" stroke-width="1"${dash} marker-end="url(#${st.marker})"/>`)
+    out.push(`<text x="${item.textX}" y="${y + 12}">${esc(item.label)}</text>`)
   }
   out.push('</g>')
   return out.join('')

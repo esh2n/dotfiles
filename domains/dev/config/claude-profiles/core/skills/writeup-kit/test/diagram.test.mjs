@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR } from '../bin/lib/ir.mjs'
-import { renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE } from '../bin/lib/diagram.mjs'
+import {
+  renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE,
+  chooseOrientation, legendWidth, EDGE_LABEL_SIZE,
+} from '../bin/lib/diagram.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const fixture = (name) => readFileSync(join(HERE, 'fixtures', name), 'utf8')
@@ -103,6 +106,32 @@ test('a pinned direction is never overridden even if it does not fit', async () 
   assert.equal(out.layout.direction, 'right')
 })
 
+// A short chain that comfortably fits the column laid out "right" still has
+// a *larger* fitRatio than the same chain laid out "down" — max(w/720, ...)
+// vs max(h/900, ...): the "down" ratio's larger denominator (MAX_HEIGHT=900
+// vs COLUMN=720) makes it come out smaller even though "right" already fits
+// outright. A naive "smaller fitRatio wins" comparison would pick "down"
+// for every ordinary chain like this one, stacking it needlessly tall
+// (contract §4-2 #16 amendment). The rule now checks "does right fit at
+// scale 1" first, before ever comparing ratios.
+test('a chain that fits the column laid out right is not stacked down just because down has the smaller fitRatio', async () => {
+  const raw = {
+    id: 'chain3', title: 't',
+    nodes: [{ id: 'a', label: 'N0' }, { id: 'b', label: 'N1' }, { id: 'c', label: 'N2' }],
+    edges: [{ from: 'a', to: 'b', kind: 'sync' }, { from: 'b', to: 'c', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok)
+  const chosen = await chooseOrientation(v.ir)
+  assert.ok(chosen.fitRatio.right <= 1, `expected "right" to fit the column outright, got fitRatio ${chosen.fitRatio.right}`)
+  assert.ok(chosen.fitRatio.down < chosen.fitRatio.right, 'this fixture only demonstrates the amendment if the naive comparison would have picked "down"')
+  assert.equal(chosen.direction, 'right')
+
+  const out = await renderDiagram(v.ir)
+  assert.equal(out.layout.direction, 'right')
+  assert.ok(out.width <= COLUMN)
+})
+
 // --- scale / scroll thresholds -------------------------------------------
 
 test('a figure that fits the column is neither scaled nor scrolled', async () => {
@@ -126,6 +155,50 @@ test('a figure that would need to shrink below 0.78 scrolls instead of scaling',
   assert.ok(COLUMN / out.width < MIN_SCALE, `expected scroll.yaml to need scale < ${MIN_SCALE}`)
   assert.equal(out.scaled, false)
   assert.equal(out.scroll, true)
+})
+
+// --- natural size: explicit svg width/height -----------------------------
+//
+// The <svg> only carried a viewBox before; with no width/height attribute a
+// browser gives it no intrinsic size, so CSS's `max-width:100%` (a
+// *maximum*, not a fixed size) let a wide container stretch it — and
+// `height:auto` then scaled the height up right along with it, turning a
+// short 3-node chain into a figure thousands of pixels tall. Explicit
+// width/height (in CSS px, after any scale-down) give the svg a real
+// intrinsic size so it only ever shrinks to fit a narrower container, never
+// grows to fill a wider one.
+
+function svgAttrs(svg) {
+  const w = /<svg\b[^>]*\bwidth="([^"]+)"/.exec(svg)
+  const h = /<svg\b[^>]*\bheight="([^"]+)"/.exec(svg)
+  assert.ok(w && h, 'svg root is missing a width or height attribute')
+  return { width: Number(w[1]), height: Number(h[1]) }
+}
+
+test('a figure at native size carries width/height attributes equal to the layout size', async () => {
+  const out = await renderDiagram(ir('simple.yaml'))
+  const attrs = svgAttrs(out.svg)
+  assert.equal(attrs.width, out.width)
+  assert.equal(attrs.height, out.height)
+  assert.match(out.svg, /^<svg role="img" aria-labelledby="wu-d-d1-title wu-d-d1-desc" width="\d+" height="\d+" viewBox="0 0 \d+ \d+"/)
+})
+
+test('a scaled-down figure carries width/height attributes at the scaled (not native) size', async () => {
+  const out = await renderDiagram(ir('wide.yaml'))
+  assert.equal(out.scaled, true)
+  const attrs = svgAttrs(out.svg)
+  assert.equal(attrs.width, COLUMN)
+  assert.ok(attrs.width < out.width, 'scaled width attribute should be smaller than the native layout width')
+  assert.equal(attrs.height, Math.round(out.height * (COLUMN / out.width)))
+  assert.match(out.svg, new RegExp(`viewBox="0 0 ${out.width} ${out.height}"`))
+})
+
+test('a scrolling figure keeps its native width/height in the svg attributes (no shrink)', async () => {
+  const out = await renderDiagram(ir('scroll.yaml'))
+  assert.equal(out.scroll, true)
+  const attrs = svgAttrs(out.svg)
+  assert.equal(attrs.width, out.width)
+  assert.equal(attrs.height, out.height)
 })
 
 // --- budgets ---------------------------------------------------------------
@@ -251,6 +324,44 @@ test('the legend lists only the edge kinds actually used, and nothing when there
   assert.ok(!out3.svg.includes('wu-d-y-legend'))
 })
 
+/** The x/text-end of every `<text>` inside the drawn `<g id="...-legend">`. */
+function legendTextEnds(svg) {
+  const g = /<g id="wu-d-[^"]*-legend"[^>]*>([\s\S]*?)<\/g>/.exec(svg)
+  assert.ok(g, 'legend group not found in svg')
+  return [...g[1].matchAll(/<text x="([-\d.]+)"[^>]*>([^<]*)<\/text>/g)]
+    .map(([, x, label]) => Number(x) + Math.ceil(textWidth(label, EDGE_LABEL_SIZE)))
+}
+
+test('the legend always fits inside the canvas, even when it is wider than the diagram', async () => {
+  for (const name of ['simple.yaml', 'groups.yaml']) {
+    const out = await renderDiagram(ir(name))
+    const ends = legendTextEnds(out.svg)
+    assert.ok(ends.length > 0, `${name}: expected at least one legend entry`)
+    for (const end of ends) assert.ok(end <= out.width - 12, `${name}: legend text ends at ${end}, past width-padding ${out.width - 12}`)
+  }
+
+  // Two tiny nodes (single-node-wide "down" diagram) but all 3 edge kinds:
+  // the legend ("sync" + "async" + "reply") needs more horizontal room than
+  // the diagram itself, so the canvas must widen to fit it rather than
+  // clipping the last label at the svg's right edge.
+  const raw = {
+    id: 'leg', title: 't', direction: 'down',
+    nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+    edges: [
+      { from: 'a', to: 'b', kind: 'sync' },
+      { from: 'b', to: 'a', kind: 'async' },
+      { from: 'a', to: 'b', kind: 'reply' },
+    ],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok)
+  const out = await renderDiagram(v.ir)
+  const legendNeeds = legendWidth(out.layout.usedKinds)
+  assert.ok(legendNeeds > 148, `fixture should need a wider canvas than the diagram alone (got ${legendNeeds})`)
+  assert.ok(out.width >= legendNeeds, `canvas (${out.width}) should have widened to fit the legend (${legendNeeds})`)
+  for (const end of legendTextEnds(out.svg)) assert.ok(end <= out.width - 12, `legend text ends at ${end}, past width-padding ${out.width - 12}`)
+})
+
 // --- no hardcoded hex colors --------------------------------------------
 
 test('the svg never hardcodes a hex color (colors route through currentColor/CSS vars)', async () => {
@@ -290,4 +401,26 @@ test('emphasis nodes get the wu-focal class instead of an inline color', async (
   const out = await renderDiagram(ir('simple.yaml'))
   assert.ok(out.svg.includes('class="wu-focal"'))
   assert.equal((out.svg.match(/class="wu-focal"/g) || []).length, 2) // rect + text for the one emphasis node
+})
+
+test('an emphasis node gets a 1.5 stroke width and its label stays ink-colored, not accent-colored', async () => {
+  const out = await renderDiagram(ir('simple.yaml')) // worker: emphasis: true
+  const rect = /<rect id="wu-d-d1-worker"[^>]*\/>/.exec(out.svg)
+  assert.ok(rect, 'emphasis node rect not found')
+  assert.match(rect[0], /stroke-width="1\.5"/)
+  const text = /<text id="wu-d-d1-worker-label"[^>]*>[^<]*<\/text>/.exec(out.svg)
+  assert.ok(text, 'emphasis node label not found')
+  // fill stays currentColor (normal ink) — any accent color comes from CSS
+  // stroke on the rect only, never from the svg's own text fill.
+  assert.match(text[0], /fill="currentColor"/)
+  assert.doesNotMatch(text[0], /var\(--wu-accent\)|#[0-9a-fA-F]{3,8}/)
+})
+
+// The accent color for an emphasized node is a border-only cue: the CSS
+// must stroke the .wu-focal <rect>, never fill the .wu-focal <text> (that
+// read as too heavy at 13px) — this guards the two rules staying paired.
+test('kit css gives .wu-focal an accent stroke on the rect only, never an accent fill on the text', async () => {
+  const css = readFileSync(join(HERE, '..', 'kit', 'writeup.css'), 'utf8')
+  assert.match(css, /\.wu-figure rect\.wu-focal\s*\{[^}]*stroke:\s*var\(--wu-accent\)/)
+  assert.doesNotMatch(css, /\.wu-figure\s+text\.wu-focal/)
 })
