@@ -1,0 +1,49 @@
+writeup 実装の作業メモ（2026-08-28）
+
+一覧
+
+作業メモ &middot; 2026-08-28 &middot; 更新 2026-08-28
+
+writeup 実装の作業メモ（2026-08-28）
+
+explain-pages を writeup と writeup-kit に置き換えた。設計は grilling の 9 ラウンドで決め、契約 v0.2 に沿って kit・skill・移行まで実装した。このメモは翌日の自分向けで、残りの作業を先頭に置く。
+
+次にやること
+
+lint の ngram_repetition と low_specificity を、校正コーパスで lindera の分割粒度に合わせて再校正する。
+
+publish の 公開ホスティング 先に Access を設定し、
+ の
+ を立てる。
+
+writeup / writeup-kit / grilling / eli5 / show-me を 1 つの plugin として配布できる形にする。
+
+explain-pages リポジトリをアーカイブするか決める。
+
+移行した旧ページのうち self-check が fail のもの（104 件）は、読み直すときに直す。
+
+今日分かったこと
+
+kit の道具は node だけで動く。elk（1.5MB）と lindera（17.8MB）は skill に同梱し、vendor 配下に
+ で commonjs を宣言しないと ESM 設定を継承して壊れる。
+
+図のレンダラーは 20 項目の幾何検証を通す。via 指定は elk の辺の連鎖として配置しないと、ノードの箱を貫く線が出る。
+
+向きの規則は「right が列幅に収まれば right」に改めた。fitRatio の最小だけだと短い直列でも縦になる。
+
+self-check は文をブロック要素ごとに区切らないと、表や目次の文字を連結して長文と誤検知する。
+
+移行は 198 件のうち 187 件を機械変換できた。図は 139 枚が検証を通り、83 枚は表に落ちた。辺ラベル 12 字の上限が旧図には厳しい。
+
+ は Node 22 で落ちる。裸の
+ を使う。
+
+dotfiles: core/skills/writeup-kit（テスト 363）、core/skills/grilling（テスト 84）。store: ~/.local/share/writeup（git）。
+
+checks
+
+lint=pass; self-check=pass
+
+sources
+
+&mdash;

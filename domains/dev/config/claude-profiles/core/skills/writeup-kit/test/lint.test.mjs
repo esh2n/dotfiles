@@ -234,7 +234,7 @@ describe("rhythm_statistics (mora-based burstiness)", () => {
   });
 });
 
-describe("ngram_repetition (uses joinNouns — 分割粒度)", () => {
+describe("ngram_repetition (unjoined IPADIC tokens — see morph.mjs granularity note)", () => {
   test("positive: 6+ sentences sharing the same lead bigram fire repeated_sentence_lead", async () => {
     const { findings } = await runLint(fixture("ngram-repetition.txt"));
     assert.ok(categoriesOf(findings).has("repeated_sentence_lead"));
@@ -246,7 +246,7 @@ describe("ngram_repetition (uses joinNouns — 分割粒度)", () => {
   });
 });
 
-describe("lexical_diversity (TTR / MTLD, uses joinNouns — 分割粒度)", () => {
+describe("lexical_diversity (TTR / MTLD, unjoined IPADIC tokens)", () => {
   test("positive: a long, heavily repetitive document fires both TTR and MTLD", async () => {
     const { findings, stats } = await runLint(fixture("low-lexical-diversity.txt"));
     assert.ok(categoriesOf(findings).has("low_lexical_diversity_ttr"));
@@ -261,7 +261,7 @@ describe("lexical_diversity (TTR / MTLD, uses joinNouns — 分割粒度)", () =
   });
 });
 
-describe("low_specificity (uses joinNouns — 分割粒度)", () => {
+describe("low_specificity (unjoined IPADIC tokens)", () => {
   test("positive: an abstract-noun-heavy paragraph with no proper nouns/numbers/examples fires", async () => {
     const { findings } = await runLint(fixture("low-specificity.txt"));
     assert.ok(categoriesOf(findings).has("low_specificity"));

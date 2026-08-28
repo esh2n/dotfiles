@@ -57,23 +57,23 @@ mix work pages into `learn` or vice versa — when unsure, ask first.
    - Copy `$KIT/kit/template.html`, including its `.wu-nav` back-link.
      Never edit `.wu-header` / `.wu-footer` structure (chrome) — only the
      text values inside it (title, kind, dates, lede, checks, sources);
-     `build` (step 7) fixes `.wu-nav`'s `href` for this page's depth, or
-     inserts the nav if it's missing.
-   - Write the body in Japanese with role-named `.wu-*` components,
-     covering this kind's required sections in order.
+     `build` (step 7) fixes `.wu-nav`'s `href` for the page's depth or inserts it.
+   - Read `$KIT/references/writing.md` (reader, one takeaway, sentence
+     and card rules), then write the body in Japanese with role-named
+     `.wu-*` components, covering this kind's required sections in order.
    - For each figure, write the diagram IR as YAML, then run:
      ```
      node $KIT/bin/render-diagram.mjs ir.yaml --figure > fig.html
      ```
      (or `--json` and take `figureHtml`). Paste the returned `<figure>`
-     as-is — it carries `data-checks="pass"`, the `<figcaption>`, and the
-     IR in `<script type="text/x-writeup-diagram">`; never hand-wrap a raw
-     `<svg>`. Exit 2 = IR invalid (fix the named field, or split per the
-     `budget` suggestion). Exit 3 = failed a contract §4-2 check: fix per
-     `checks[].hint`, re-render, up to 3 attempts; still failing with the
-     kit present → keep the IR with a `.wu-callout data-tone="warn"`
-     naming the check and tell the user — never swap in a `.wu-table`
-     (kit-less mode only). Full detail in `references/procedure.md`.
+     as-is (it carries `data-checks="pass"`, the caption, and the IR in
+     `<script type="text/x-writeup-diagram">`); never hand-wrap a raw
+     `<svg>`. Exit 2 = IR invalid (fix the named field). Over-budget
+     figures still render, marked `data-warn` — consider splitting.
+     Exit 3 = failed a contract §4-2 check: fix per `checks[].hint`,
+     re-render, up to 3 attempts; still failing → keep the IR with a
+     `.wu-callout data-tone="warn"` naming the check and tell the user;
+     a `.wu-table` stand-in is for kit-less mode only (`references/procedure.md`).
 4. **Lint.**
    ```
    node $KIT/bin/lint.mjs page.html --json

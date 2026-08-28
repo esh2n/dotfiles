@@ -1,0 +1,252 @@
+writeup — HTML 成果物 skill 群と履歴ビューワ
+
+一覧
+
+決定記録 ・ 2026-08-28
+
+writeup — HTML 成果物 skill 群と履歴ビューワ
+
+grilling 2026-08-27〜28（9 ラウンド、Q1〜Q29）。explain-pages を置き換える。前提は page-skills-premise.md、参考資料 11 件の調査は Skills Intake 2026-08。
+
+決まったこと
+
+構成と名前
+
+名前は
+（履歴 HTML の skill）と
+（共有参照）。ローマ字の日本語は使わない
+
+重視したトレードオフ: 覚えやすさより、役割が読めて既存名（cmd / skill / brew / npm）と衝突しないこと
+
+単発 HTML（grilling / eli5 / show-me）と履歴 HTML（writeup）は別 skill。kit を共有
+
+重視したトレードオフ: skill ごとの自由度より、直す場所が 1 つであること
+
+kit は
+ に独立 skill として置き、bin（図レンダラー・lint・self-check・build・serve・publish・変換器）も kit 内。store は
+、公開専用は
+
+重視したトレードオフ: skill が 1 つ増えることより、単発と履歴の分離と yoki 合成の単純さ
+
+skill は自分以外も使う。mise / uv / 別 skill / 別 CLI に依存しない。
+ だけで動く。配布は
+
+
+
+
+ を 1 plugin として。kit は兄弟ディレクトリで解決し、無ければ各 skill はインライン CSS の最低限で動く
+
+重視したトレードオフ: 自分の環境の都合より、他人が入れてそのまま動くこと
+
+指示文（SKILL.md・references・rule）は英語、成果物は日本語
+
+HTML の作り方
+
+本文は LLM が kit のテンプレを複製して直書き。図と一覧は依存ゼロのレンダラー
+
+重視したトレードオフ: 図の品質を機械で担保しつつ、本文の自由度を Markdown に縛らない
+
+図レンダラーは grilling の
+ を母体に、elkjs を同梱して依存ゼロ化。合格基準は diagram-design と archify の機械検査の和集合 17 行（直交・ラベル被り・交差・通路共有・枠線追従・刻み・凡例・ノード通過・投影サイズ・ノード上限・辺上限・4px・focal・a11y）+ 手元だけの 3 つ（日本語幅の実測・向き自動・ダーク 3 状態）を全部機械検査
+
+重視したトレードオフ: 実装量より「超えた」と言い切れる基準
+
+図の IR は YAML（nodes / groups / edges、tone / dashed / emphasis、kind = sync / async / reply）に、辺の出る側・経由点・ラベル位置の局所指示を任意で足す。意味パターンは 3 回出た型だけ足す
+
+重視したトレードオフ: IR の小ささより、合格しない図を直せること
+
+本文の self-check は依存ゼロ（構造・kit 規約・図の合格印・a11y・文長と括弧の数）。文章の質はgateに分ける
+
+重視したトレードオフ: 網羅より依存ゼロ
+
+kit
+
+デジタル庁 DS の文書系部品 9 個（heading / blockquote / table / list / description-list / toc / notification-banner / card / divider）とトークン（色・フォントサイズ・elevation・角丸）を、役割名（
+）の層で包む。ダーク 3 状態は自前。UI 部品は取らない。逐語コピーせず自前で書き直し、kit 内に出所を書かない
+
+重視したトレードオフ: 自前で品質担保する手間より、DS の文書系部品を借りて包む保守
+
+対応表は部品側（用途の限定、20 行）とタイプ側（必須節・長さ・図の枚数）の両方。成果物タイプは 8 つ: 決定記録・設計・調査まとめ・参考資料まとめ・PBI 資料・絵解き・作業メモ・議事録
+
+重視したトレードオフ: 表 2 枚の読む量より、部品の誤用と型の崩れの両方を止めること
+
+文章 gate
+
+必須。品質は natural-japanese と同等。
+ に Node 版 lint（13 検出器）を自己完結で持ち、形態素解析は lindera（WASM、IPADIC、約 18MB、MIT） を同梱。
+ と
+ は校正コーパス（人間 103 + AI 81 文書）で閾値を再校正。natural-japanese は後で kit の lint を使う向きに寄せる
+
+重視したトレードオフ: 純 JS の実績より、保守されている解析器を小さく同梱すること
+
+eli5 / show-me にはgateを掛けない。writeup と決定記録に掛ける
+
+履歴と公開
+
+正本は HTML（役割つき構造、kit の CSS を相対 link）。store を git 化し、writeup が保存時に commit。build が HTML の
+
+ とファイル名の日付から manifest.json と index.html を全件再生成。serve は
+ で 127.0.0.1
+
+重視したトレードオフ: スクリプト 2 本の保守より、書き忘れで壊れない一覧と git の履歴
+
+改版は同じファイルを上書き、git が版、
+ で一覧を並べる。性質が変わるもの（設計案 → 決定記録）は別 kind の新規ページ
+
+HTML→Markdown は依存ゼロの変換器で決定論的に出す（PR 本文用）。図は SVG 添付か、IR から Mermaid の劣化版
+
+。前段（kit のインライン展開 + 会社の痕跡の検査）は共通、後段だけ差し替え。公開ホスティング は公開専用ディレクトリ（store と物理分離）だけを読み、Access 必須、
+。Access が無ければ拒否
+
+workflow（research / design-review / acceptance / deliberate）の報告は、writeup の
+ で受ける。workflow は無変更
+
+writeup skill は manifest を読んで候補 3 件を返す「探す」手順を持つ。全文検索は持たない
+
+移行
+
+旧 198 ページ: 機械変換できる directive（diagram 147 / sequence 74 / terms 186 / cells 81 / steps 72 / diff 14 / scorebars 11）は変換、aggregate / board / board / html の 11 件は旧出力を
+ に凍結。変換前の Markdown を最初の commit に残す
+
+検討して却下した案
+
+統合ビューワ計画（7 月の統合ビューワ計画）を引き継ぐ — 設計書だけでコードは無く、器が大きすぎた。契約レベルの判断（Markdown 素表示・directive 廃止・Mermaid 正本）だけ拾い直した
+
+Markdown を正本にして Node レンダラーで変換 — 本文を直書きにしている参考実装の総意に反し、変換器が可用性を下げる
+
+Mermaid を図の正本にして埋め込む — 品質重視の 3 件（archify・diagram-design・mathbullet）が全て採らない。配置を調整できない。コードホスティングサービス 互換は PR 用の劣化版で足りる
+
+archify を図レンダラーとして導入 — 見た目が kit と揃わず、CLI が素の SVG を吐けない。IR 設計と検証項目は手本にした
+
+LLM が SVG を直書き（diagram-design 方式） — 品質が LLM の描画力に依存し、今回の不満（読めない図）に弱い
+
+explain-pages の React ビューワを残してレンダラーだけ差し替え — 固定幅と React Flow marker の制約が残る。7.4k 行の編集 UI は使い方に見合わない
+
+uv を mise で配布して natural-japanese をそのままgateに — 他人が入れても動く前提に反する
+
+kuromoji.js を同梱 — 2018 年で保守停止、辞書は 2007 年版 IPADIC、39MB
+
+外部ツール バイナリ — 200MB、リリース配布ページ のみ、brew 無し
+
+ローマ字の日本語の固有名（栞・棚・矢倉） — 却下（アレルギー）。
+ は既存名と隣接するので却下
+
+版番号つきファイルや archive/ コピーによる版管理 — git と二重
+
+未決・前提
+
+kit を共有参照にすることと skill の自己完結の両立は「1 plugin として配り、kit が無ければ最低限で動く」で置く。plugin の配布単位（marketplace のエントリ）は未着手
+
+公開先の認証機能 の設定は explain-pages の project を流用する前提。無ければ
+ は拒否
+
+レビューコメントの戻し（Artifact のコメント → 本文への反映）は範囲外
+
+図の合格基準 17 行のうち機械で判定できない行が出たら、その行だけ規約に落として理由を記録する
+
+lindera の固有名詞判定が弱ければ UniDic 版に差し替える。解析器の呼び出しは 1 箇所に閉じる
+
+8 タイプで足りない型は 3 回出たら足す
+
+推奨アプローチ
+
+M0 契約 — kit の契約を 1 文書に: 役割名部品と対応表（部品 20 行・タイプ 8 行）、図の IR と合格基準 17+3、self-check の項目、frontmatter 相当の
+（title / description / kind / date / updated / checks / sources）
+
+M1 kit — DS の文書系部品とトークンを自前で書き直し
+ で包む。ダーク 3 状態。テンプレ 1 枚と部品見本 1 枚
+
+M2 図レンダラー — grilling
+ を kit の bin に移し、elkjs 同梱、直交ルーティング、幾何検証 17 行、a11y。テストは archify / diagram-design の検証項目を手本に
+
+M3 gate — Node 版 lint（13 検出器）+ lindera WASM 同梱、校正コーパスで再校正。self-check（依存ゼロ）
+
+M4 writeup skill — 手順: 対象と kind → テンプレ複製 → 書く → gate → self-check → 保存 + commit。
+、探す手順、publish（artifact / 公開ホスティング / file）、HTML→Markdown 変換器、build / serve
+
+M5 移行 — 変換器 + legacy 凍結 + 最初の commit
+
+M6 単発 skill の接続 — grilling のラウンド HTML を kit に乗せ替え、決定記録を writeup に落とす。show-me 新設。eli5 は kit のトークンだけ使う
+
+M7 品質ループ — trigger eval（外部ツール 方式）、natural-japanese を kit の lint に寄せる
+
+次のステップ
+
+この決定記録を
+ の最初の page（kind: 決定記録）にする — M4 完成時に最初の保存対象
+
+M0 の契約文書を書き、レビュー（Artifact）
+
+grilling の未コミット差分（表・コード・小見出し、slugPort、回答読み戻し、min-width:0）を先に閉じる（M2 の土台）
+
+M1〜M7 を順に。各 M の終わりで self-check とテストを回す
+
+出典
+
+explain-pages:
+、
+、
+、
+、
+、
+
+grilling render:
+、
+、
+、
+
+natural-japanese:
+、
+、
+
+archify:
+、
+、
+、
+、
+、
+、
+
+diagram-design:
+、
+、
+、
+、
+、
+
+mathbullet:
+、
+、
+
+Warp common-skills:
+、
+、
+、
+、
+
+ある個人ブログ:
+
+デジタル庁 DS: https://（ソースリポジトリURL省略）、
+）、https://（ソースリポジトリURL省略））
+
+Mermaid: https://（公式ドキュメントURL省略）、https://（公式ドキュメントURL省略）、https://（ソースリポジトリURL省略）
+
+lindera: https://（ソースリポジトリURL省略） push、MIT）。kuromoji: https://（パッケージURL省略））
+
+workflows:
+、
+、
+
+store 実データ:
+（198 件、directive 使用数）
+
+元ラウンド:
+（ラウンド 1〜9、Q1〜Q29、回答つき）
+
+checks
+
+self-check=pending
+
+sources
+
+13 件

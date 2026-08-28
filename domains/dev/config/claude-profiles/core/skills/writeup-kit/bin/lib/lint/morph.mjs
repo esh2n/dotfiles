@@ -17,14 +17,39 @@
 // tagsets and needed no change — confirmed by tokenizing each fixture
 // sentence through the vendored lindera build during porting.
 //
-// Granularity note (compound nouns): ngram_repetition, lexical_diversity,
-// and low_specificity read `ts.joinedTokens` (IPADIC tokens run through
-// tokenize.mjs's joinNounTokens(), approximating Sudachi's longest-unit
-// segmentation) instead of `ts.tokens` — see tokenize.mjs's doc comment.
-// The other 4 morph detectors match short, fixed function words/phrases
-// that segmentation granularity doesn't affect, so they read `ts.tokens`
-// (IPADIC's native, unjoined segmentation) directly, matching the
-// contract's per-detector 分割粒度 column.
+// Granularity note (compound nouns): every detector here reads `ts.tokens`
+// (IPADIC's native, unjoined segmentation). An earlier revision fed the
+// three token-counting detectors (ngram_repetition, lexical_diversity,
+// low_specificity) `ts.joinedTokens` (consecutive nouns merged by
+// tokenize.mjs's joinNounTokens()) on the assumption that this approximates
+// Sudachi SplitMode.C. The 2026-08 calibration run (test/fixtures/lint-corpus,
+// 15 store pages + 10 controls, both linters run on the same files) showed
+// the opposite: the merge is far more aggressive than Sudachi C, which only
+// merges dictionary-known compounds (楽観ロック stays 楽観/ロック in Sudachi C
+// but became one token here). Measured against the Python original:
+//   - lead-bigram repeat counts (repeated_sentence_lead), 12 docs where
+//     either side fired: unjoined matched the original exactly on 7/12 and
+//     was within ±5 on 9/12; joined matched on 3/12 and reported 0 on 5 docs
+//     where the original fired (e.g. store-04: unjoined 17 / original 17 /
+//     joined 0).
+//   - TTR on the 8 docs past the 4000-char gate: unjoined was within
+//     -0.004..-0.044 of the original on every doc; joined ran +0.04..+0.14
+//     high (store-14: unjoined 0.272 / original 0.287 / joined 0.416).
+//   - MTLD, same docs: unjoined 54.8..129.3 vs original 55.4..142.0;
+//     joined 72.6..285.6 (1.2x-2.0x the original).
+//   - lead POS 4-gram top ratio: unjoined within ±0.07 of the original on
+//     18/25 docs and within ±0.11 on 24/25 (outlier store-01: 0.259 vs
+//     0.107); joined ran higher than the original on 23/25 docs, by up to
+//     4.3x (store-14: 0.255 vs 0.059; ctrl-good-01: unjoined 0.417 /
+//     original 0.385 / joined 0.750).
+//   - low_specificity paragraphs evaluated/fired: unjoined matched the
+//     original's evaluated count on 25/25 docs and fired count on 23/25;
+//     joined matched evaluated on 20/25 and fired on 23/25 (a tie on
+//     fired, so the evaluated count decided it).
+// So the unjoined stream is the better approximation of the original for
+// all three, and the thresholds below keep their original values except
+// where noted. `ts.joinedTokens` is still populated by tokenizeSentences()
+// for callers that want the compound view, but no detector reads it.
 
 import { tokenize, joinNounTokens } from "../tokenize.mjs";
 import { iterParagraphsWithLines, lineColToOffset } from "../text.mjs";
@@ -100,13 +125,39 @@ export const UNIFORM_PARAGRAPH_MIN_PARAGRAPHS = 4;
 export const UNIFORM_PARAGRAPH_CV_THRESHOLD = 0.15;
 
 export const BURSTINESS_MIN_TOKENIZED = 6;
-export const BURSTINESS_THRESHOLD = -0.24;
+// 2026-08 kit calibration (test/fixtures/lint-corpus). The original's -0.24
+// (itself marked provisional there, AI n=3) fired on every one of the 5
+// well-written controls in BOTH implementations — the mora metric agrees
+// between IPADIC and Sudachi within 0.08 (largest gap ctrl-good-05: kit
+// -0.412 / original -0.329), so this is not a tokenizer artifact but a
+// threshold tuned on essay/novel prose, where sentence length varies more
+// than in the memos, minutes, and design docs this kit lints. Measured
+// burstiness on the corpus (kit values):
+//   good controls  -0.334 (minutes) / -0.374 (essay) / -0.453 (tech memo) /
+//                  -0.347 (long report) / -0.412 (decision)   -> max -0.334, min -0.453
+//   bad controls   -0.801 (lead repeat) / -0.509 (low lexdiv) / -0.515
+//                  (low specificity) / -0.771 (uniform rhythm) / -0.585
+//                  (AI-flavored)                                -> max -0.509
+//   15 store pages -0.309 .. +0.011 (none below -0.31)
+// -0.48 is the midpoint between the worst good control (-0.453) and the best
+// bad control (-0.509): good 0/5, bad 5/5, store 0/15 fire. At -0.24 the
+// split was good 5/5, bad 5/5, store 4/15 (no separation). The margin on
+// either side is only ~0.03, so treat a value near -0.48 as borderline.
+export const BURSTINESS_THRESHOLD = -0.48;
 export const AUTOCORR_MIN_XS = 4;
 export const AUTOCORR_THRESHOLD = 0.6;
 
 export const NGRAM_LEAD_REPEAT_THRESHOLD = 6;
 export const NGRAM_TEMPLATE_MIN_COUNT = 6;
-export const NGRAM_TEMPLATE_RATIO_THRESHOLD = 0.4;
+// 2026-08 kit calibration (EXPERIMENTAL category, off by default). With the
+// unjoined token stream the top-POS-4-gram ratio tracks the original within
+// ±0.07, but the kit runs slightly high on short minutes-style text:
+// ctrl-good-01 measured 0.417 (original 0.385), which the original's 0.4
+// would flag. Bad controls the original flags: ctrl-bad-01 1.000 (original
+// 1.000), ctrl-bad-02 0.466 (original 0.466). Every other corpus doc is
+// <= 0.375 in both. 0.45 sits between the highest good (0.417) and the
+// lowest flagged bad (0.466): same decisions as the original on all 25 docs.
+export const NGRAM_TEMPLATE_RATIO_THRESHOLD = 0.45;
 
 export const LEXDIV_MIN_TOKENS = 30;
 export const TTR_THRESHOLD = 0.45;
@@ -460,7 +511,7 @@ export function detectRhythmStatistics(
 }
 
 // ---------------------------------------------------------------------------
-// 10) ngram_repetition (uses joinedTokens — 分割粒度対応)
+// 10) ngram_repetition (reads ts.tokens — see the granularity note above)
 // ---------------------------------------------------------------------------
 function isProperNounOrTechTerm(token) {
   const isProperNoun = token.pos[0] === "名詞" && token.pos[1] === "固有名詞";
@@ -476,7 +527,7 @@ export function detectNgramRepetition(
 
   const leadBigrams = [];
   for (const ts of tokenized) {
-    const leadTokens = ts.joinedTokens.slice(0, 2);
+    const leadTokens = ts.tokens.slice(0, 2);
     if (leadTokens.length === 2) {
       leadBigrams.push({
         no: ts.line,
@@ -516,7 +567,7 @@ export function detectNgramRepetition(
 
   const leadPosNgrams = [];
   for (const ts of tokenized) {
-    const posSeq = ts.joinedTokens.slice(0, 4).map((t) => t.pos[0]);
+    const posSeq = ts.tokens.slice(0, 4).map((t) => t.pos[0]);
     if (posSeq.length === 4) leadPosNgrams.push({ no: ts.line, rawText: ts.rawText, seq: posSeq.join("/") });
   }
   const totalWithNgram = leadPosNgrams.length;
@@ -560,7 +611,7 @@ export function detectNgramRepetition(
 }
 
 // ---------------------------------------------------------------------------
-// 11) lexical_diversity (TTR / MTLD, uses joinedTokens — 分割粒度対応)
+// 11) lexical_diversity (TTR / MTLD, reads ts.tokens — see the granularity note above)
 // ---------------------------------------------------------------------------
 export function computeMtld(tokens, threshold = 0.72) {
   if (tokens.length < 20) return null;
@@ -599,7 +650,7 @@ export function detectLexicalDiversity(
   const contentTokens = [];
   const totalDocChars = tokenized.reduce((acc, ts) => acc + ts.rawText.length, 0);
   for (const ts of tokenized) {
-    for (const t of ts.joinedTokens) {
+    for (const t of ts.tokens) {
       if (CONTENT_WORD_POS.has(t.pos[0])) contentTokens.push(t.baseForm);
     }
   }
@@ -649,7 +700,7 @@ export function detectLexicalDiversity(
 }
 
 // ---------------------------------------------------------------------------
-// 12) low_specificity (uses joinNouns:true tokenization — 分割粒度対応)
+// 12) low_specificity (unjoined tokenization — see the granularity note above)
 // ---------------------------------------------------------------------------
 export async function detectLowSpecificity(
   lines,
@@ -675,7 +726,7 @@ export async function detectLowSpecificity(
     const paraMasked = paraLines.map(([, t]) => t).join("\n");
     if (paraMasked.length < minChars) continue;
 
-    const tokens = await tokenize(paraMasked, { joinNouns: true });
+    const tokens = await tokenize(paraMasked, { joinNouns: false });
     const contentWords = tokens.filter((t) => CONTENT_WORD_POS.has(t.pos[0]));
     if (contentWords.length < minContentWords) continue;
 

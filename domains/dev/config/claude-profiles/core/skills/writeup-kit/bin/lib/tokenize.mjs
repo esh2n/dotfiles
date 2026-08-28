@@ -6,12 +6,12 @@
 // Backend: lindera (WASM build), embedded IPADIC dictionary, vendored under
 // vendor/lindera/. IPADIC segments shorter than Sudachi's SplitMode C
 // ("longest unit") used by the original Python lint (natural-japanese
-// scripts/lint.py). Most detectors don't care (they match single short
-// tokens or POS-major-class only), but three detectors that depend on
-// longest-unit granularity (ngram_repetition, low_specificity,
-// lexical_diversity) ask for `joinNouns: true`, which merges consecutive
-// noun tokens into one compound token before they see the stream — see
-// joinNounTokens() below.
+// scripts/lint.py). The detectors read the raw IPADIC stream: a 25-text
+// calibration corpus (test/fixtures/lint-corpus/) showed the raw tokens
+// track the original's ngram / low_specificity / lexical_diversity values
+// more closely than the compound-noun join did (the join over-merges
+// relative to SplitMode C). `joinNouns: true` — joinNounTokens() below —
+// stays available as an opt-in for callers that want longest-unit nouns.
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
