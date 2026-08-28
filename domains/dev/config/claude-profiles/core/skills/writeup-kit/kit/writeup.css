@@ -197,6 +197,14 @@ a:hover {
   text-decoration-thickness: 2px;
 }
 
+/* An internal link whose target no longer exists in the store (build marks
+   it with data-wu-missing). Dotted underline in the muted ink; the title
+   attribute is not set so the href stays visible on hover in the status bar. */
+a[data-wu-missing] {
+  color: var(--wu-ink-3);
+  text-decoration-style: dotted;
+}
+
 a:focus-visible,
 button:focus-visible {
   outline: var(--wu-bw-3) solid var(--wu-link);

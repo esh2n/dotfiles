@@ -34,6 +34,7 @@ import { resolveStoreDir, pageId, isGitRepo, gitLastCommitDatetime } from './lib
 import { parseHtml, headMeta, titleText, decodeEntities } from './lib/html.mjs'
 import { faviconDataUri, statusFromChecks } from './lib/favicon.mjs'
 import { highlight } from './lib/highlight.mjs'
+import { repairLinks } from './lib/links.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_CSS_PATH = join(HERE, '..', 'kit', 'writeup.css')
@@ -293,7 +294,7 @@ function ensureHighlighted(text) {
  * is read *before* any edit, so housekeeping itself never bumps a page's
  * `updated`.
  */
-function buildPageRecord(storeDir, relPath, { check } = {}) {
+function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
   const fullPath = join(storeDir, ...relPath.split('/'))
   const originalMtime = statSync(fullPath).mtime
   let buf = readFileSync(fullPath)
@@ -305,6 +306,8 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
   let navFixed = false
   let faviconFixed = false
   let highlightFixed = false
+  let linksFixed = false
+  let missingLinks = 0
   if (meta.id === undefined) {
     metaInserted = true
     if (!check) text = insertIdMeta(text, id)
@@ -326,7 +329,22 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     highlightFixed = true
     if (!check) text = highlightedText
   }
-  if ((metaInserted || navFixed || faviconFixed || highlightFixed) && !check) {
+  if (linkResolver) {
+    // (5) internal links: pages migrated from the old tool wrote hrefs
+    // relative to the store root; rewrite them page-relative, follow
+    // moved (legacy) targets, and mark the rest with data-wu-missing.
+    const repaired = repairLinks(text, {
+      pagePath: relPath,
+      exists: linkResolver.exists,
+      resolveLegacy: linkResolver.resolveLegacy,
+    })
+    missingLinks = repaired.missing
+    if (repaired.html !== text) {
+      linksFixed = true
+      if (!check) text = repaired.html
+    }
+  }
+  if ((metaInserted || navFixed || faviconFixed || highlightFixed || linksFixed) && !check) {
     writeFileSync(fullPath, text)
     buf = Buffer.from(text, 'utf8')
     root = parseHtml(text)
@@ -360,8 +378,34 @@ function buildPageRecord(storeDir, relPath, { check } = {}) {
     sha256: createHash('sha256').update(buf).digest('hex'),
     bytes: buf.length,
     legacy: relPath.startsWith('legacy/'),
+    missingLinks,
   }
-  return { record, metaInserted, navFixed, faviconFixed, highlightFixed }
+  return { record, metaInserted, navFixed, faviconFixed, highlightFixed, linksFixed }
+}
+
+/**
+ * Link resolver for `repairLinks`: `exists` answers from the store's page
+ * list (plus directories on disk); `resolveLegacy` follows a target to its
+ * `legacy/` copy when the migration froze it there, then falls back to a
+ * page whose file name is unique in the store (the old tool addressed
+ * pages by name, and several were later moved into topic folders).
+ */
+function makeLinkResolver(storeDir, relPaths) {
+  const pages = new Set(relPaths)
+  const byName = new Map()
+  for (const p of relPaths) {
+    const name = p.slice(p.lastIndexOf('/') + 1)
+    byName.set(name, byName.has(name) ? null : p)
+  }
+  const exists = (rel) => rel === 'index.html' || pages.has(rel) || existsSync(join(storeDir, ...rel.split('/')))
+  const resolveLegacy = (rel) => {
+    const html = rel.replace(/\.md$/, '.html')
+    if (!rel.startsWith('legacy/') && pages.has('legacy/' + html)) return 'legacy/' + html
+    const name = html.slice(html.lastIndexOf('/') + 1)
+    const unique = byName.get(name)
+    return unique || null
+  }
+  return { exists, resolveLegacy }
 }
 
 function sortManifest(records) {
@@ -739,8 +783,9 @@ export function buildStore(storeDir, { check = false } = {}) {
   const cssChanged = existingCss !== kitCss
 
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
-  const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check }))
-  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.highlightFixed)
+  const linkResolver = makeLinkResolver(storeDir, relPaths)
+  const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check, linkResolver }))
+  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.highlightFixed || b.linksFixed)
   const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'
   const manifestPath = join(storeDir, 'manifest.json')
