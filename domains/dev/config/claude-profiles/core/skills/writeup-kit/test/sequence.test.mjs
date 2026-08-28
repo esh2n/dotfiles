@@ -122,6 +122,16 @@ describe('ir.mjs: type: sequence schema', () => {
   })
 })
 
+describe('ir.mjs: sequence normalization is idempotent', () => {
+  test('a normalized IR (rowType note/self/message) re-validates to the same rows', () => {
+    const first = validateIR(parseYaml(fixture('seq-notes-self.yaml')))
+    assert.equal(first.ok, true)
+    const again = validateIR(JSON.parse(JSON.stringify(first.ir)))
+    assert.equal(again.ok, true, JSON.stringify(again))
+    assert.deepEqual(again.ir.messages, first.ir.messages)
+  })
+})
+
 describe('ir.mjs: SEQUENCE_LIMITS budgets are advisory warnings', () => {
   test('more than 6 participants validates with a budget:participants warning and a split hint', () => {
     const result = ir('seq-too-many-participants.yaml')

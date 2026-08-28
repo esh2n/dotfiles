@@ -288,9 +288,15 @@ function normalizeMessages(raw, participantIds) {
   if (raw === undefined || raw === null) return []
   if (!Array.isArray(raw)) throw new IrError('ir.messages must be a list')
   let prevMessage = null
-  return raw.map((m, i) => {
+  return raw.map((row, i) => {
     const ctx = `messages[${i}]`
-    if (!isObj(m)) throw new IrError(`${ctx} must be a mapping`)
+    if (!isObj(row)) throw new IrError(`${ctx} must be a mapping`)
+    // Accept an already-normalized row (rowType/text/participant) so the IR a
+    // figure embeds after rendering re-validates unchanged: normalization is
+    // idempotent.
+    const m = row.rowType === 'note' ? { note: row.text, over: row.over }
+      : row.rowType === 'self' ? { self: row.participant, label: row.label, kind: row.kind }
+      : row
 
     if (m.note !== undefined) {
       const text = requireStr(m, 'note', ctx)
