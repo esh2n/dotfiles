@@ -3,8 +3,9 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { parseToml } from './toml-lite.mjs'
 
 /** Resolve the store directory: explicit arg > WRITEUP_STORE env > default. */
@@ -36,6 +37,47 @@ export function privateWords(storeDir) {
 export function cloudflareConfig(storeDir) {
   const cfg = readStoreConfig(storeDir)
   return (cfg && typeof cfg.cloudflare === 'object' && !Array.isArray(cfg.cloudflare)) ? cfg.cloudflare : {}
+}
+
+/** Stable short id for a page: the first 8 hex chars of sha256(relPath),
+ * where `relPath` is the page's store-relative path with `/` separators.
+ * Path-based (not content-based), so it never changes on revision and
+ * stays unique across folders since the full path is hashed. */
+export function pageId(relPath) {
+  return createHash('sha256').update(relPath).digest('hex').slice(0, 8)
+}
+
+/** Finds the store root containing `startDir` (or `startDir` itself) by
+ * walking up looking for `.writeup.toml`, stopping at `$HOME` or the
+ * filesystem root. Returns `null` if none is found — e.g. a file being
+ * self-checked outside any known store, where a page's `id` cannot be
+ * verified against its (unknowable) store-relative path. */
+export function discoverStoreRoot(startDir) {
+  const home = homedir()
+  let dir = resolve(startDir)
+  while (true) {
+    if (existsSync(join(dir, '.writeup.toml'))) return dir
+    if (dir === home) break
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  return null
+}
+
+/** `git log -1 --format=%cI -- <relPath>` (the file's last commit datetime,
+ * ISO 8601 with a minute-and-second offset), or `null` if `dir` is not a
+ * git repo, the file has no commits, or git is unavailable. */
+export function gitLastCommitDatetime(dir, relPath) {
+  try {
+    const out = execFileSync('git', ['log', '-1', '--format=%cI', '--', relPath], {
+      cwd: dir,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString().trim()
+    return out || null
+  } catch {
+    return null
+  }
 }
 
 export function isGitRepo(dir) {

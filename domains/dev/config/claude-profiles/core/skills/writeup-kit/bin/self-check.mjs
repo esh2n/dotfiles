@@ -12,12 +12,13 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import {
   parseHtml, findAll, findFirst, isElement, tagName, attr, classList, hasClass,
   elementChildren, textContent, headMeta, titleText, externalRefs,
   structuralSignature, signaturesEqual,
 } from './lib/html.mjs'
+import { discoverStoreRoot, pageId } from './lib/store.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_TEMPLATE_PATH = join(HERE, '..', 'kit', 'template.html')
@@ -83,6 +84,8 @@ export function runSelfCheck(filePath) {
 
   checkSingleFile(root, add)
   checkRequiredMeta(root, add)
+  checkIdMeta(root, filePath, add)
+  checkUpdatedFormat(root, add)
   checkChrome(root, add)
   checkRoleStructure(root, add)
   checkKindSections(root, add)
@@ -140,6 +143,43 @@ function checkRequiredMeta(root, add) {
   else if (!/^\d{4}-\d{2}-\d{2}$/.test(meta.date)) {
     add('error', 'required-meta', `<meta name="date"> is not YYYY-MM-DD: ${meta.date}`)
   }
+}
+
+// --- 2b. id meta (optional; must match the computed value when present) -----
+
+/** `<meta name="id">` is optional. When present, it must equal the
+ * path-derived id (contract §1-3: `pageId` = first 8 hex chars of
+ * sha256(store-relative path)) — a warn, not an error, since a mismatch
+ * doesn't break anything the page itself does, only cross-page lookups by
+ * id. Verification needs the page's store-relative path, so it only runs
+ * when `filePath` resolves under a store (an ancestor `.writeup.toml`) —
+ * a page checked outside any known store skips this row silently rather
+ * than guessing. */
+function checkIdMeta(root, filePath, add) {
+  const meta = headMeta(root)
+  if (meta.id === undefined || meta.id === '') return
+  const storeRoot = discoverStoreRoot(dirname(resolve(filePath)))
+  if (!storeRoot) return
+  const relPath = relative(storeRoot, resolve(filePath)).split(sep).join('/')
+  const expected = pageId(relPath)
+  if (meta.id !== expected) {
+    add('warn', 'id-meta', `<meta name="id"> is "${meta.id}", expected "${expected}" (computed from ${relPath})`)
+  }
+}
+
+// --- 2c. updated meta format --------------------------------------------------
+
+const UPDATED_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const UPDATED_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$/
+
+/** `<meta name="updated">` may be a bare date (`YYYY-MM-DD`) or an ISO
+ * datetime with minutes (`YYYY-MM-DDTHH:MM+09:00` / `...Z`) — both are
+ * accepted; anything else is a warn. */
+function checkUpdatedFormat(root, add) {
+  const meta = headMeta(root)
+  if (meta.updated === undefined || meta.updated === '') return
+  if (UPDATED_DATE_RE.test(meta.updated) || UPDATED_DATETIME_RE.test(meta.updated)) return
+  add('warn', 'updated-format', `<meta name="updated"> is not YYYY-MM-DD or YYYY-MM-DDTHH:MM(+TZ|Z): ${meta.updated}`)
 }
 
 // --- 3. chrome matches template ---------------------------------------------

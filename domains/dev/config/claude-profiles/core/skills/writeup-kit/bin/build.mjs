@@ -2,12 +2,19 @@
 // build.mjs — regenerates `<store>/manifest.json` and `<store>/index.html`
 // from every page's `<head>` meta, and syncs the kit's CSS into
 // `<store>/_kit/writeup.css` (contract §1, §1-3). Zero-dependency.
+//
+// The one place build.mjs edits a page's own bytes: when a page's `<head>`
+// lacks `<meta name="id">`, build inserts the computed id right after
+// `<meta name="date">` (idempotent — only when the meta is missing; see
+// `insertIdMeta`/`buildPageRecord`). Nothing else about a page is ever
+// rewritten by build — `<meta name="updated">` in particular is read, not
+// patched, even when the manifest fills in a synthesized time-of-day.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, relative, sep } from 'node:path'
-import { resolveStoreDir } from './lib/store.mjs'
+import { resolveStoreDir, pageId, isGitRepo, gitLastCommitDatetime } from './lib/store.mjs'
 import { parseHtml, headMeta, titleText } from './lib/html.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -68,19 +75,115 @@ function dateFromFilename(relPath, metaDate) {
   return metaDate || ''
 }
 
-function buildPageRecord(storeDir, relPath) {
+/** `slug` = filename without its `YYYY-MM-DD-` date prefix and `.html`
+ * extension. `ref` = `<folder>/<slug>` (bare `slug` for a store-root page). */
+function slugAndRef(relPath, folder) {
+  const base = relPath.split('/').pop()
+  const slug = base.replace(/\.html$/, '').replace(/^\d{4}-\d{2}-\d{2}-/, '')
+  const ref = folder ? `${folder}/${slug}` : slug
+  return { slug, ref }
+}
+
+const FULL_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}([+-]\d{2}:\d{2}|Z)$/
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+/** `+09:00`-style local UTC offset for a `Date`. */
+function isoOffset(date) {
+  const offsetMin = -date.getTimezoneOffset()
+  const sign = offsetMin >= 0 ? '+' : '-'
+  const abs = Math.abs(offsetMin)
+  return `${sign}${pad2(Math.floor(abs / 60))}:${pad2(abs % 60)}`
+}
+
+function timeOfDayFromMtime(mtime) {
+  return `${pad2(mtime.getHours())}:${pad2(mtime.getMinutes())}${isoOffset(mtime)}`
+}
+
+/** `HH:MM+TZ` for a page: from `git log`'s commit time when the store is a
+ * git repo and the file has history, else the file's mtime. Used only to
+ * fill in the *time* half of a date-only `<meta name="updated">` — the
+ * *date* half always comes from the meta (or the filename), never from git
+ * or mtime, so a page's `updated` date never silently drifts. */
+function timeOfDayString(storeDir, relPath, mtime) {
+  if (isGitRepo(storeDir)) {
+    const commitIso = gitLastCommitDatetime(storeDir, relPath)
+    if (commitIso) {
+      const m = /T(\d{2}:\d{2}):\d{2}([+-]\d{2}:\d{2}|Z)$/.exec(commitIso)
+      if (m) return `${m[1]}${m[2]}`
+    }
+  }
+  return timeOfDayFromMtime(mtime)
+}
+
+/** manifest `updated`: the full ISO datetime when `<meta name="updated">`
+ * already carries one; otherwise the date (from the meta, or the filename
+ * date as a last resort) with a synthesized time-of-day appended (contract
+ * §3). The page's own `<meta name="updated">` is never rewritten. */
+function computeUpdated(storeDir, relPath, mtime, meta, date) {
+  const raw = meta.updated || ''
+  if (FULL_DATETIME_RE.test(raw)) return raw
+  const dateOnly = DATE_ONLY_RE.test(raw) ? raw : date
+  if (!dateOnly) return ''
+  return `${dateOnly}T${timeOfDayString(storeDir, relPath, mtime)}`
+}
+
+/** Inserts `<meta name="id" content="…">` right after `<meta name="date">`
+ * (or before `</head>` if that tag is somehow absent). The only place
+ * build.mjs edits a page's bytes — see the module docstring. */
+function insertIdMeta(text, id) {
+  const metaTag = `<meta name="id" content="${id}">`
+  const dateRe = /<meta\s+name="date"[^>]*>\n?/
+  const m = dateRe.exec(text)
+  if (m) {
+    const at = m.index + m[0].length
+    return text.slice(0, at) + metaTag + '\n' + text.slice(at)
+  }
+  const headClose = text.indexOf('</head>')
+  if (headClose === -1) return metaTag + '\n' + text
+  return text.slice(0, headClose) + metaTag + '\n' + text.slice(headClose)
+}
+
+/**
+ * Builds one manifest record for `relPath`. When the page's `<head>` lacks
+ * `<meta name="id">` and `check` is false, inserts the computed id into the
+ * file on disk (idempotent: only when missing) — see `insertIdMeta`. The
+ * mtime used for `updated`'s time-of-day fallback is read *before* that
+ * insertion, so the housekeeping edit itself never bumps a page's `updated`.
+ */
+function buildPageRecord(storeDir, relPath, { check } = {}) {
   const fullPath = join(storeDir, ...relPath.split('/'))
-  const buf = readFileSync(fullPath)
-  const text = buf.toString('utf8')
-  const root = parseHtml(text)
-  const meta = headMeta(root)
+  const originalMtime = statSync(fullPath).mtime
+  let buf = readFileSync(fullPath)
+  let text = buf.toString('utf8')
+  let root = parseHtml(text)
+  let meta = headMeta(root)
+  const id = pageId(relPath)
+  let metaInserted = false
+  if (meta.id === undefined) {
+    metaInserted = true
+    if (!check) {
+      text = insertIdMeta(text, id)
+      writeFileSync(fullPath, text)
+      buf = Buffer.from(text, 'utf8')
+      root = parseHtml(text)
+      meta = headMeta(root)
+    }
+  }
   const title = titleText(root)
   const segments = relPath.split('/')
   const folder = segments.length > 1 ? segments[0] : ''
   const date = dateFromFilename(relPath, meta.date)
-  const updated = meta.updated || date
-  return {
+  const updated = computeUpdated(storeDir, relPath, originalMtime, meta, date)
+  const { slug, ref } = slugAndRef(relPath, folder)
+  const record = {
     path: relPath,
+    id,
+    slug,
+    ref,
     title,
     description: meta.description || '',
     kind: meta.kind || '',
@@ -93,6 +196,7 @@ function buildPageRecord(storeDir, relPath) {
     bytes: buf.length,
     legacy: relPath.startsWith('legacy/'),
   }
+  return { record, metaInserted }
 }
 
 function sortManifest(records) {
@@ -107,59 +211,100 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+/** NFKC-normalized, lowercased form used for both the precomputed
+ * per-row search blob and the runtime query (contract: substring match,
+ * case-insensitive, NFKC-normalized). */
+function normalizeForSearch(s) {
+  return String(s).normalize('NFKC').toLowerCase()
+}
+
+function displayDatetime(iso) {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(iso || '')
+  return m ? `${m[1]} ${m[2]}` : (iso || '')
+}
+
 function renderIndexHtml(records) {
+  const kindCounts = new Map()
+  const folderCounts = new Map()
+  for (const r of records) {
+    const k = r.kind || 'legacy'
+    kindCounts.set(k, (kindCounts.get(k) || 0) + 1)
+    if (r.folder) folderCounts.set(r.folder, (folderCounts.get(r.folder) || 0) + 1)
+  }
+  const kinds = [...kindCounts.keys()].sort()
+  const folders = [...folderCounts.keys()].sort()
+
+  const chip = (group, value, count) =>
+    `<li><button type="button" class="wu-fchip" data-group="${group}" data-value="${escapeHtml(value)}" aria-pressed="false">${escapeHtml(value)} (${count})</button></li>`
+  const kindChips = kinds.map((k) => chip('kind', k, kindCounts.get(k))).join('')
+  const folderChips = folders.map((f) => chip('folder', f, folderCounts.get(f))).join('')
+
   const rows = records.map((r) => {
+    const kindKey = r.kind || 'legacy'
     const checksSummary = Object.entries(r.checks).map(([k, v]) => `${k}=${v}`).join('; ') || '—'
+    const hasFail = Object.values(r.checks).includes('fail')
     const href = escapeHtml(r.path)
     const title = escapeHtml(r.title || r.path)
     const desc = escapeHtml(r.description || '')
-    return `<tr data-kind="${escapeHtml(r.kind)}" data-folder="${escapeHtml(r.folder)}" data-text="${escapeHtml((r.title + ' ' + r.description).toLowerCase())}">` +
-      `<td class="n">${escapeHtml(r.updated)}</td>` +
-      `<td class="n">${escapeHtml(r.kind)}</td>` +
-      `<td class="n">${escapeHtml(r.folder)}</td>` +
-      `<td><a href="${href}">${title}</a>${desc ? ` — ${desc}` : ''}</td>` +
-      `<td>${escapeHtml(checksSummary)}</td>` +
-      `</tr>`
+    const searchBlob = normalizeForSearch([r.title, r.description, r.ref, r.id, r.folder].join(' '))
+    return `<li class="wu-idx-row" data-kind="${escapeHtml(kindKey)}" data-folder="${escapeHtml(r.folder)}" data-date="${escapeHtml(r.date)}" data-updated="${escapeHtml(r.updated)}" data-title="${escapeHtml(r.title || r.path)}" data-s="${escapeHtml(searchBlob)}">` +
+      `<div class="wu-idx-row1"><span class="wu-idx-tag">${escapeHtml(kindKey)}</span><a class="wu-idx-title" href="${href}">${title}</a><span class="wu-idx-id">${escapeHtml(r.id)}</span></div>` +
+      `<p class="wu-idx-desc">${desc}</p>` +
+      `<p class="wu-idx-line3"><span>${escapeHtml(r.ref)}</span> &middot; <span class="wu-idx-updated">${escapeHtml(displayDatetime(r.updated))}</span> &middot; <span class="${hasFail ? 'wu-idx-warn' : 'wu-idx-muted'}">${escapeHtml(checksSummary)}</span></p>` +
+      `</li>`
   }).join('\n')
-
-  const kinds = [...new Set(records.map((r) => r.kind).filter(Boolean))].sort()
-  const folders = [...new Set(records.map((r) => r.folder).filter(Boolean))].sort()
-  const kindOptions = kinds.map((k) => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('')
-  const folderOptions = folders.map((f) => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('')
 
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <title>writeup</title>
-<meta name="description" content="writeup store の一覧">
+<meta name="description" content="writeup store の検索">
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="./_kit/writeup.css">
+<style data-index>
+.wu-idx-search{width:100%;box-sizing:border-box;padding:var(--wu-sp-3) var(--wu-sp-4);font-size:var(--wu-fs-4);font-family:inherit;color:var(--wu-ink);background:var(--wu-surface);border:var(--wu-bw-2) solid var(--wu-rule);border-radius:var(--wu-radius-2);}
+.wu-idx-filters{display:flex;flex-wrap:wrap;gap:var(--wu-sp-2);margin:var(--wu-sp-4) 0;padding:0;list-style:none;}
+.wu-fchip{cursor:pointer;font:inherit;padding:var(--wu-sp-1) var(--wu-sp-3);border:var(--wu-bw-1) solid var(--wu-rule);border-radius:var(--wu-radius-3);background:var(--wu-surface);color:var(--wu-ink-2);font-family:var(--wu-font-heading);font-weight:700;font-size:var(--wu-fs-1);line-height:1.6;white-space:nowrap;}
+.wu-fchip.is-active{background:var(--wu-ink);color:var(--wu-surface);border-color:var(--wu-ink);}
+.wu-idx-bar{display:flex;align-items:center;justify-content:space-between;gap:var(--wu-sp-4);margin:var(--wu-sp-3) 0;flex-wrap:wrap;}
+.wu-idx-count{margin:0;color:var(--wu-ink-3);font-size:var(--wu-fs-1);font-variant-numeric:tabular-nums;}
+.wu-idx-sort{font:inherit;padding:var(--wu-sp-1) var(--wu-sp-2);border:var(--wu-bw-1) solid var(--wu-rule);border-radius:var(--wu-radius-2);background:var(--wu-surface);color:var(--wu-ink);}
+.wu-idx-list{list-style:none;margin:0;padding:0;}
+.wu-idx-row{padding:var(--wu-sp-3) 0;border-bottom:var(--wu-bw-1) solid var(--wu-rule-soft);}
+.wu-idx-row1{display:flex;align-items:baseline;gap:var(--wu-sp-2);flex-wrap:wrap;}
+.wu-idx-tag{font-family:var(--wu-font-heading);font-weight:700;font-size:var(--wu-fs-1);color:var(--wu-ink-2);background:var(--wu-rule-soft);border-radius:var(--wu-radius-1);padding:0 var(--wu-sp-2);}
+.wu-idx-title{font-weight:700;color:var(--wu-link);}
+.wu-idx-id{font-family:var(--wu-font-mono);font-size:var(--wu-fs-1);color:var(--wu-ink-3);}
+.wu-idx-desc{margin:var(--wu-sp-1) 0;color:var(--wu-ink-2);}
+.wu-idx-line3{margin:0;font-family:var(--wu-font-mono);font-size:var(--wu-fs-1);color:var(--wu-ink-3);font-variant-numeric:tabular-nums;}
+.wu-idx-muted{color:var(--wu-ink-3);}
+.wu-idx-warn{color:var(--wu-ink);font-weight:700;border-left:var(--wu-bw-3) solid var(--wu-ink);padding-left:var(--wu-sp-2);}
+</style>
 </head>
 <body>
 <div class="wu-page">
 <header class="wu-header">
 <p class="wu-eyebrow">writeup store</p>
 <h1>writeup</h1>
-<p class="wu-lede">このstoreにある全ページの一覧。kind・フォルダ・文字列で絞り込める。</p>
+<p class="wu-lede">題名・要約・slug・id で検索して開く。</p>
 </header>
 <main>
 <section class="wu-section">
-<h2>一覧</h2>
-<p>
-<label>kind <select id="wu-filter-kind"><option value="">すべて</option>${kindOptions}</select></label>
-<label>フォルダ <select id="wu-filter-folder"><option value="">すべて</option>${folderOptions}</select></label>
-<label>検索 <input id="wu-filter-text" type="text" placeholder="題名・要約"></label>
-</p>
-<div class="tablewrap">
-<table class="wu-table" id="wu-index-table">
-<thead><tr><th>更新</th><th>kind</th><th>フォルダ</th><th>題名（要約）</th><th>checks</th></tr></thead>
-<tbody>
-${rows}
-</tbody>
-</table>
+<input id="wu-q" class="wu-idx-search" type="search" autofocus placeholder="題名・要約・slug・id">
+<ul class="wu-idx-filters" id="wu-chips">${kindChips}${folderChips}</ul>
+<div class="wu-idx-bar">
+<p id="wu-count" class="wu-idx-count">${records.length} 件中 ${records.length} 件</p>
+<select id="wu-sort" class="wu-idx-sort">
+<option value="updated">更新が新しい順</option>
+<option value="created">作成が新しい順</option>
+<option value="title">題名</option>
+</select>
 </div>
+<ul class="wu-idx-list" id="wu-rows">
+${rows}
+</ul>
 </section>
 </main>
 <footer class="wu-footer">
@@ -171,24 +316,92 @@ ${rows}
 </div>
 <script>
 (function () {
-  var kindSel = document.getElementById('wu-filter-kind')
-  var folderSel = document.getElementById('wu-filter-folder')
-  var textInput = document.getElementById('wu-filter-text')
-  var rows = Array.prototype.slice.call(document.querySelectorAll('#wu-index-table tbody tr'))
-  function apply() {
-    var kind = kindSel.value
-    var folder = folderSel.value
-    var text = textInput.value.trim().toLowerCase()
-    rows.forEach(function (row) {
-      var okKind = !kind || row.getAttribute('data-kind') === kind
-      var okFolder = !folder || row.getAttribute('data-folder') === folder
-      var okText = !text || row.getAttribute('data-text').indexOf(text) !== -1
-      row.style.display = (okKind && okFolder && okText) ? '' : 'none'
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#wu-rows .wu-idx-row'))
+  var total = rows.length
+  var searchEl = document.getElementById('wu-q')
+  var countEl = document.getElementById('wu-count')
+  var sortEl = document.getElementById('wu-sort')
+  var listEl = document.getElementById('wu-rows')
+  var chipEls = Array.prototype.slice.call(document.querySelectorAll('.wu-fchip'))
+  var selKind = new Set()
+  var selFolder = new Set()
+
+  function norm(s) { return (s || '').normalize('NFKC').toLowerCase() }
+
+  function readUrl() {
+    var p = new URLSearchParams(location.search)
+    searchEl.value = p.get('q') || ''
+    ;(p.get('kind') || '').split(',').filter(Boolean).forEach(function (k) { selKind.add(k) })
+    ;(p.get('folder') || '').split(',').filter(Boolean).forEach(function (f) { selFolder.add(f) })
+  }
+
+  function writeUrl() {
+    var p = new URLSearchParams()
+    if (searchEl.value) p.set('q', searchEl.value)
+    if (selKind.size) p.set('kind', Array.from(selKind).join(','))
+    if (selFolder.size) p.set('folder', Array.from(selFolder).join(','))
+    var qs = p.toString()
+    history.replaceState(null, '', qs ? '?' + qs : location.pathname)
+  }
+
+  function updateChips() {
+    chipEls.forEach(function (c) {
+      var set = c.dataset.group === 'kind' ? selKind : selFolder
+      var active = set.has(c.dataset.value)
+      c.classList.toggle('is-active', active)
+      c.setAttribute('aria-pressed', active ? 'true' : 'false')
     })
   }
-  kindSel.addEventListener('change', apply)
-  folderSel.addEventListener('change', apply)
-  textInput.addEventListener('input', apply)
+
+  function apply() {
+    var q = norm(searchEl.value.trim())
+    var shown = 0
+    rows.forEach(function (row) {
+      var okKind = selKind.size === 0 || selKind.has(row.dataset.kind)
+      var okFolder = selFolder.size === 0 || selFolder.has(row.dataset.folder)
+      var okText = !q || row.dataset.s.indexOf(q) !== -1
+      var visible = okKind && okFolder && okText
+      row.style.display = visible ? '' : 'none'
+      if (visible) shown++
+    })
+    countEl.textContent = total + ' 件中 ' + shown + ' 件'
+    writeUrl()
+  }
+
+  function sortRows() {
+    var mode = sortEl.value
+    rows = rows.slice().sort(function (a, b) {
+      if (mode === 'title') return a.dataset.title.localeCompare(b.dataset.title, 'ja')
+      var key = mode === 'created' ? 'date' : 'updated'
+      return a.dataset[key] < b.dataset[key] ? 1 : a.dataset[key] > b.dataset[key] ? -1 : 0
+    })
+    rows.forEach(function (row) { listEl.appendChild(row) })
+  }
+
+  chipEls.forEach(function (c) {
+    c.addEventListener('click', function () {
+      var set = c.dataset.group === 'kind' ? selKind : selFolder
+      if (set.has(c.dataset.value)) set.delete(c.dataset.value); else set.add(c.dataset.value)
+      updateChips()
+      apply()
+    })
+  })
+  searchEl.addEventListener('input', apply)
+  sortEl.addEventListener('change', function () { sortRows(); apply() })
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== searchEl) {
+      e.preventDefault()
+      searchEl.focus()
+    } else if (e.key === 'Escape' && document.activeElement === searchEl) {
+      searchEl.value = ''
+      apply()
+    }
+  })
+
+  readUrl()
+  updateChips()
+  sortRows()
+  apply()
 })()
 </script>
 </body>
@@ -208,7 +421,9 @@ export function buildStore(storeDir, { check = false } = {}) {
   const cssChanged = existingCss !== kitCss
 
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
-  const records = sortManifest(relPaths.map((p) => buildPageRecord(storeDir, p)))
+  const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check }))
+  const pagesChanged = built.some((b) => b.metaInserted)
+  const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'
   const manifestPath = join(storeDir, 'manifest.json')
   const existingManifest = existsSync(manifestPath) ? readFileSync(manifestPath, 'utf8') : null
@@ -219,7 +434,7 @@ export function buildStore(storeDir, { check = false } = {}) {
   const existingIndex = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : null
   const indexChanged = existingIndex !== indexHtml
 
-  const changed = cssChanged || manifestChanged || indexChanged
+  const changed = cssChanged || manifestChanged || indexChanged || pagesChanged
 
   if (!check) {
     mkdirSync(dirname(destCssPath), { recursive: true })
@@ -234,6 +449,7 @@ export function buildStore(storeDir, { check = false } = {}) {
     cssChanged,
     manifestChanged,
     indexChanged,
+    pagesChanged,
     counts: {
       total: records.length,
       legacy: records.filter((r) => r.legacy).length,

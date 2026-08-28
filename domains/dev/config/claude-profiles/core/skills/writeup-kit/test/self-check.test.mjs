@@ -1,11 +1,12 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { runSelfCheck, writeMetaChecks } from '../bin/self-check.mjs'
+import { pageId } from '../bin/lib/store.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -383,5 +384,73 @@ describe('self-check: CLI and --write-meta', () => {
     writeMetaChecks(file, true)
     const updated = readFileSync(file, 'utf8')
     assert.match(updated, /<meta name="checks" content="self-check=pass">/)
+  })
+})
+
+describe('self-check: <meta name="updated"> format', () => {
+  test('a bare date (YYYY-MM-DD) is accepted with no finding', () => {
+    const result = itemsFor(page({ extraHead: '<meta name="updated" content="2026-08-20">' }))
+    assert.ok(!result.items.some((i) => i.item === 'updated-format'))
+  })
+
+  test('an ISO datetime with minutes and a +TZ offset is accepted with no finding', () => {
+    const result = itemsFor(page({ extraHead: '<meta name="updated" content="2026-08-20T14:05+09:00">' }))
+    assert.ok(!result.items.some((i) => i.item === 'updated-format'))
+  })
+
+  test('an ISO datetime with a trailing Z is accepted with no finding', () => {
+    const result = itemsFor(page({ extraHead: '<meta name="updated" content="2026-08-20T14:05Z">' }))
+    assert.ok(!result.items.some((i) => i.item === 'updated-format'))
+  })
+
+  test('a malformed updated value (missing minutes) is a warning', () => {
+    const result = itemsFor(page({ extraHead: '<meta name="updated" content="2026-08-20T14+09:00">' }))
+    assert.ok(result.warnings.some((w) => w.item === 'updated-format'))
+  })
+
+  test('an absent updated meta is not flagged (optional, falls back to date)', () => {
+    const result = itemsFor(page())
+    assert.ok(!result.items.some((i) => i.item === 'updated-format'))
+  })
+})
+
+describe('self-check: <meta name="id"> (optional, must match the computed value)', () => {
+  function storeWithPage(relPath, extraHead) {
+    const storeDir = mkdtempSync(join(tmpdir(), 'wu-selfcheck-store-'))
+    writeFileSync(join(storeDir, '.writeup.toml'), '[private]\nwords = []\n')
+    const parts = relPath.split('/')
+    const fileDir = parts.length > 1 ? join(storeDir, ...parts.slice(0, -1)) : storeDir
+    if (fileDir !== storeDir) mkdirSync(fileDir, { recursive: true })
+    const filePath = join(storeDir, ...parts)
+    writeFileSync(filePath, page({ extraHead }))
+    return { storeDir, filePath }
+  }
+
+  test('id meta absent is not flagged (optional)', () => {
+    const { filePath } = storeWithPage('decision/2026-08-20-test.html')
+    const result = runSelfCheck(filePath)
+    assert.ok(!result.items.some((i) => i.item === 'id-meta'))
+  })
+
+  test('id meta matching the computed value (from the store-relative path) is not flagged', () => {
+    const relPath = 'decision/2026-08-20-test.html'
+    const id = pageId(relPath)
+    const { filePath } = storeWithPage(relPath, `<meta name="id" content="${id}">`)
+    const result = runSelfCheck(filePath)
+    assert.ok(!result.items.some((i) => i.item === 'id-meta'))
+  })
+
+  test('id meta not matching the computed value is a warning naming both values', () => {
+    const relPath = 'decision/2026-08-20-test.html'
+    const { filePath } = storeWithPage(relPath, '<meta name="id" content="deadbeef">')
+    const result = runSelfCheck(filePath)
+    const expected = pageId(relPath)
+    assert.ok(result.warnings.some((w) => w.item === 'id-meta' && w.detail.includes('deadbeef') && w.detail.includes(expected)))
+  })
+
+  test('a page outside any store (no ancestor .writeup.toml) skips id verification rather than guessing', () => {
+    const file = writeTempPage(page({ extraHead: '<meta name="id" content="deadbeef">' }))
+    const result = runSelfCheck(file)
+    assert.ok(!result.items.some((i) => i.item === 'id-meta'))
   })
 })

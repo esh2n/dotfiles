@@ -6,6 +6,10 @@
 // Safety, ported from grilling's render/lib/serve.mjs: loopback-only bind,
 // a Host-header allowlist (defeats DNS rebinding), and path resolution that
 // refuses to escape the store root (defeats `..` traversal).
+//
+// `/id/<8-hex-id>` redirects (302) to a page's path via manifest.json, so a
+// user (or another skill) can say "id 9f3a1c2d を開いて" without knowing the
+// page's folder/slug.
 
 import { createServer } from 'node:http'
 import { createHash } from 'node:crypto'
@@ -17,6 +21,7 @@ import { resolveStoreDir } from './lib/store.mjs'
 import { buildStore } from './build.mjs'
 
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
+const ID_ROUTE_RE = /^\/id\/([0-9a-f]{8})\/?$/
 const PORT_RANGE_START = 40000
 const PORT_RANGE_SIZE = 10000
 
@@ -60,9 +65,29 @@ function send(res, code, body, headers = {}) {
   res.end(body)
 }
 
+/** `/id/<8-hex-id>` → 302 to the page's path, resolved via manifest.json.
+ * Read-only: never rebuilds the manifest itself, so this never mutates the
+ * store — a request just reflects whatever the last build wrote. */
+async function handleIdRoute(req, res, storeDir, id) {
+  let manifest
+  try {
+    manifest = JSON.parse(await readFile(join(storeDir, 'manifest.json'), 'utf8'))
+  } catch {
+    return send(res, 404, 'not found (no manifest.json — run build first)')
+  }
+  const record = Array.isArray(manifest) ? manifest.find((r) => r.id === id) : null
+  if (!record) return send(res, 404, `not found: no page with id ${id}`)
+  res.writeHead(302, { location: '/' + record.path })
+  res.end()
+}
+
 async function handleRequest(req, res, storeDir) {
   if (!LOOPBACK_HOST.test(String(req.headers.host || ''))) return send(res, 403, 'forbidden')
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed')
+
+  const pathOnly = (req.url || '/').split('?')[0].split('#')[0]
+  const idMatch = ID_ROUTE_RE.exec(pathOnly)
+  if (idMatch) return handleIdRoute(req, res, storeDir, idMatch[1])
 
   const target = resolveSafePath(storeDir, req.url || '/')
   if (!target) return send(res, 400, 'bad request')
