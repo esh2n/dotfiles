@@ -407,3 +407,25 @@ describe('buildStore(): search-first index.html', () => {
     }
   })
 })
+
+// regression: a page without <head> (meta tags at top level) must be read and
+// must not receive a second <meta name="id"> on rebuild
+import { test as _t2 } from 'node:test'
+import assert2 from 'node:assert/strict'
+import { mkdtempSync as _mk, writeFileSync as _wf, readFileSync as _rf, mkdirSync as _md } from 'node:fs'
+import { tmpdir as _tmp } from 'node:os'
+import { join as _j } from 'node:path'
+_t2('build: headless page meta is read and id insertion stays idempotent', async () => {
+  const { buildStore } = await import('../bin/build.mjs')
+  const dir = _mk(_j(_tmp(), 'wu-headless-'))
+  _md(_j(dir, 'notes'), { recursive: true })
+  const page = _j(dir, 'notes', '2026-08-28-headless.html')
+  _wf(page, '<title>Headless</title>\n<meta name="description" content="d">\n<meta name="kind" content="設計">\n<meta name="date" content="2026-08-28">\n<main><section class="wu-section"><h2>x</h2><p>y</p></section></main>\n')
+  await buildStore(dir)
+  await buildStore(dir)
+  const text = _rf(page, 'utf8')
+  assert2.equal((text.match(/name="id"/g) || []).length, 1)
+  const manifest = JSON.parse(_rf(_j(dir, 'manifest.json'), 'utf8'))
+  const rec = (manifest.entries || manifest).find((r) => r.path.endsWith('headless.html'))
+  assert2.equal(rec.kind, '設計')
+})

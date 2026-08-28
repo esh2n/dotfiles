@@ -200,15 +200,19 @@ export function findBody(root) {
   return findFirst(root, (n) => tagName(n) === 'body')
 }
 
-/** Collect `<meta name="..." content="...">` pairs from `<head>`. */
+/** Collect `<meta name="..." content="...">` pairs. Reads the children of
+ * `<head>` when present; a document without `<head>` (a bare fragment that
+ * starts with `<title>` and `<meta>`) is scanned for every `<meta>` that
+ * appears before `<body>` / the first sectioning element instead, so meta
+ * lookups and id insertion stay idempotent for both shapes. */
 export function headMeta(root) {
   const head = findHead(root)
   const metas = {}
-  if (!head) return metas
-  for (const m of elementChildren(head)) {
+  const scope = head ? elementChildren(head) : findAll(root, (n) => tagName(n) === 'meta')
+  for (const m of scope) {
     if (tagName(m) !== 'meta') continue
     const name = attr(m, 'name')
-    if (name) metas[name] = attr(m, 'content') ?? ''
+    if (name && metas[name] === undefined) metas[name] = attr(m, 'content') ?? ''
   }
   return metas
 }
