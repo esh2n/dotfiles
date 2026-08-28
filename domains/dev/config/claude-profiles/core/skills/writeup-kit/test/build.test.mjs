@@ -426,6 +426,6 @@ _t2('build: headless page meta is read and id insertion stays idempotent', async
   const text = _rf(page, 'utf8')
   assert2.equal((text.match(/name="id"/g) || []).length, 1)
   const manifest = JSON.parse(_rf(_j(dir, 'manifest.json'), 'utf8'))
-  const rec = (manifest.pages || manifest.entries || manifest).find((r) => r.path.endsWith('headless.html'))
+  const rec = (Array.isArray(manifest) ? manifest : (manifest.pages || manifest.entries)).find((r) => r.path.endsWith('headless.html'))
   assert2.equal(rec.kind, '設計')
 })
