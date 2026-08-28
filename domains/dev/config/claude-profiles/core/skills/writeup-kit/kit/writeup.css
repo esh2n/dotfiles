@@ -848,3 +848,9 @@ hr {
     grid-template-columns: 1fr;
   }
 }
+
+/* short cells that must not wrap (date, kind, folder) */
+.wu-table td.n,
+.wu-compare td.n {
+  white-space: nowrap;
+}
