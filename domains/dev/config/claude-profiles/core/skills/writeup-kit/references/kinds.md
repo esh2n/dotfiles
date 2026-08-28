@@ -13,16 +13,22 @@ one of these 8 kind contracts.
 
 ## Kind table
 
-| kind | Required sections | Use | Avoid | Length / figure budget |
+Figures are not budgeted by count. Draw one wherever a reader would grasp a
+structure, a flow, or a comparison faster from a picture than from the prose;
+skip it where the prose already says it. The only numeric limit is per figure
+(≤9 nodes, ≤12 edges — see the diagram IR contract). The "where a figure
+helps" column lists the typical spots per kind; it is guidance, not a cap.
+
+| kind | Required sections | Use | Avoid | Length / where a figure helps |
 |---|---|---|---|---|
-| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, decision, compare, open, meta, steps | chip | 2,000-4,000 chars, 0-2 figures |
-| 設計 (design) | 目的と読者／用語／現状とギャップ／あるべき姿／決定点／進め方 | terms, figure, compare, code, open | chip | 3,000-8,000 chars, 1-4 figures |
-| 調査まとめ (research summary) | 問い／結論／根拠（表）／未確認／含意 | summary, table, quote, meta | decision | 2,000-6,000 chars, 0-2 figures |
-| 参考資料まとめ (reference roundup) | 資料一覧（表）／各資料の要点／取るもの・置き先 | table, quote, meta, chip | steps | 3,000-8,000 chars, 0-1 figures |
-| PBI 資料 (PBI doc) | 背景／決めたこと／未決／関係する文書 | summary, decision, meta, open | figure (only when actually needed) | 1,000-3,000 chars, 0-1 figures |
+| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, decision, compare, open, meta, steps | chip | 2,000-4,000 chars. A figure helps for: comparing options, showing which path a decision changes |
+| 設計 (design) | 目的と読者／用語／現状とギャップ／あるべき姿／決定点／進め方 | terms, figure, compare, code, open | chip | 3,000-8,000 chars. A figure helps for: parts and the routes between them, state transitions, before/after of a structure |
+| 調査まとめ (research summary) | 問い／結論／根拠（表）／未確認／含意 | summary, table, quote, meta | decision | 2,000-6,000 chars. A figure helps for: the current flow being investigated, where a measurement was taken |
+| 参考資料まとめ (reference roundup) | 資料一覧（表）／各資料の要点／取るもの・置き先 | table, quote, meta, chip | steps | 3,000-8,000 chars. A figure helps for: how the references relate to each other or to your own parts |
+| PBI 資料 (PBI doc) | 背景／決めたこと／未決／関係する文書 | summary, decision, meta, open | chip | 1,000-3,000 chars. A figure helps for: the scope boundary, the affected flow |
 | 絵解き (picture explainer) | フック／問題／仕組み3枚／現実復帰／まとめ1文 | figure (pictures) only | table, code, terms | 5-8 panels, ~50 chars of body text per panel |
-| 作業メモ (work note) | 今日分かったこと／次にやること | steps, meta | summary, toc, compare | ≤1,000 chars, 0 figures |
-| 議事録 (meeting minutes) | 決定／宿題（誰が・いつまで）／論点（未決） | decision, steps, open | figure | 1,000-3,000 chars, 0 figures |
+| 作業メモ (work note) | 今日分かったこと／次にやること | steps, meta | summary, toc, compare | ≤1,000 chars. A figure is rare; sketch one only if it saves the next-day self a re-read |
+| 議事録 (meeting minutes) | 決定／宿題（誰が・いつまで）／論点（未決） | decision, steps, open | compare | 1,000-3,000 chars. A figure helps only when a decision hinges on a structure that words keep misreading |
 
 ## Skeletons
 

@@ -45,7 +45,7 @@ honestly, e.g. `checks="lint=skipped;self-check=pass;diagram=fallback"`.
    Markdown" below).
 2. **Read the contract for this kind.** Read the matching row of
    `$KIT/references/kinds.md` (required sections, use/avoid components,
-   length/figure budget) and `$KIT/references/components.md` (the 20
+   length guide, where a figure helps) and `$KIT/references/components.md` (the 20
    role-named components) — read only what you need, both are short tables.
 3. **Write the page.**
    - Copy `$KIT/kit/template.html`, including its `.wu-nav` back-link.
