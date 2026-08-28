@@ -38,7 +38,12 @@ function toPosix(p) {
 }
 
 /** Recursively lists `*.html` files under `dir`, skipping the store's
- * generated/publish-only directories. Returns paths relative to `dir`. */
+ * generated/publish-only directories and, at the store root only, any
+ * top-level directory whose name starts with `_` (e.g. `_design/` —
+ * bootstrap/scratch material that isn't a page folder). `_kit` is already
+ * covered by `EXCLUDED_DIRS`; this is a separate, broader rule so a
+ * `_scratch/` or `_design/` folder never needs to be added there by hand.
+ * Returns paths relative to `dir`. */
 function listHtmlFiles(dir, base = dir) {
   const out = []
   let entries
@@ -54,6 +59,7 @@ function listHtmlFiles(dir, base = dir) {
     const full = join(dir, e.name)
     if (e.isDirectory()) {
       if (EXCLUDED_DIRS.has(e.name)) continue
+      if (dir === base && e.name.startsWith('_')) continue
       out.push(...listHtmlFiles(full, base))
     } else if (e.isFile() && e.name.endsWith('.html')) {
       const rel = toPosix(relative(base, full))

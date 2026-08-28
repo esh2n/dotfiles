@@ -33,6 +33,13 @@ describe('buildStore(): manifest fields', () => {
     ])
   })
 
+  test('skips a top-level underscore directory (e.g. _scratch/) entirely — not indexed as a page', () => {
+    const store = freshStore()
+    const { records } = buildStore(store)
+    const paths = records.map((r) => r.path)
+    assert.ok(!paths.some((p) => p.startsWith('_scratch/')), `expected no _scratch/ page, got: ${paths.join(', ')}`)
+  })
+
   test('reads title/description/kind from <head> meta', () => {
     const store = freshStore()
     const { records } = buildStore(store)
