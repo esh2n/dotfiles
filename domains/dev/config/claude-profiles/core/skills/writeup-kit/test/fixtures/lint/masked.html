@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<style>
+重要なのは、この style ブロックの中身は絶対にlintされないという点だ。
+</style>
+<script>
+console.log("重要なのは、この script の中身も絶対にlintされない");
+</script>
+</head>
+<body>
+<h2>見出し</h2>
+<p>重要なのは、地の文だけがlintされるという点だ。</p>
+<pre><code>重要なのは、pre/code の中身は絶対にlintされないという点だ。することができる。</code></pre>
+<table>
+<tr><td>重要なのは、表のセルは絶対にlintされないという点だ</td></tr>
+</table>
+<figure class="wu-figure">
+<svg><title>重要なのは、diagram の中身は絶対にlintされない</title></svg>
+<script type="text/x-writeup-diagram">nodes: []</script>
+</figure>
+<p>もう一段落です。ここには問題ありません。</p>
+</body>
+</html>
