@@ -162,6 +162,7 @@ h4 {
   font-family: var(--wu-font-heading);
   line-height: var(--wu-lh-heading);
   text-wrap: balance;
+  word-break: auto-phrase; /* keep Japanese phrases whole when a title wraps (Chromium; others ignore) */
   margin: 0;
   color: var(--wu-ink);
 }

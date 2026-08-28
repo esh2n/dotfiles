@@ -185,10 +185,20 @@ export async function rerenderPageText(raw, { column, all }) {
   let patched = raw
   const fixes = attempts.filter((a) => a.ok).sort((a, b) => b.block.start - a.block.start)
   for (const fix of fixes) {
-    patched = patched.slice(0, fix.block.start) + fix.html + patched.slice(fix.block.end)
+    const end = staleCalloutEnd(patched, fix.block.end)
+    patched = patched.slice(0, fix.block.start) + fix.html + patched.slice(end)
   }
 
   return { raw: patched, tried: attempts }
+}
+
+/** The migration follows a fallback table with a warn callout explaining
+ * why the figure was not drawn. Once the figure renders, that callout is
+ * stale; return the offset just past it (or `end` itself when absent). */
+const STALE_CALLOUT_RE = /^\s*<div class="wu-callout" data-tone="warn"><p>(?:図|シーケンス図)は変換時に合格せず[^<]*<\/p><\/div>/
+export function staleCalloutEnd(raw, end) {
+  const m = STALE_CALLOUT_RE.exec(raw.slice(end, end + 4000))
+  return m ? end + m[0].length : end
 }
 
 // --- diagram=ok/total meta ---------------------------------------------------

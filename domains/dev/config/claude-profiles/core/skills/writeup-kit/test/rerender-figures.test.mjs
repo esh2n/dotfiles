@@ -200,11 +200,20 @@ describe('rerender-figures: rerenderPageText', () => {
     assert.equal(tried[0].ok, true)
     assert.match(patched, /<figure class="wu-figure" data-checks="pass">/)
     assert.ok(!/<table class="wu-table">/.test(patched)) // the old table fallback is gone
-    // everything outside the <figure>...</figure> span is untouched, including
-    // the sibling warn callout the migration converter also emitted
+    // everything outside the <figure>...</figure> span is untouched, except
+    // the sibling warn callout the migration converter emitted to explain
+    // the fallback — stale once the figure renders, so it goes too
     assert.ok(patched.startsWith(HEAD))
     assert.ok(patched.endsWith(TAIL))
-    assert.match(patched, /図は変換時に合格せず、表で代替/)
+    assert.ok(!/図は変換時に合格せず、表で代替/.test(patched))
+  })
+
+  test('the stale callout is only removed when it directly follows the fixed figure', async () => {
+    const raw = HEAD + fallbackFigure(SIMPLE_YAML) + '\n<p>本文</p>\n<div class="wu-callout" data-tone="warn"><p>図は変換時に合格せず、表で代替 (other)</p></div>' + TAIL
+    const { raw: patched } = await rerenderPageText(raw, { column: 720, all: false })
+    assert.ok(!/\(verification\)/.test(patched)) // the adjacent one is gone
+    assert.match(patched, /\(other\)/) // an unrelated callout further down stays
+    assert.match(patched, /<p>本文<\/p>/)
   })
 
   test('a still-failing figure is left byte-for-byte untouched', async () => {
