@@ -543,9 +543,18 @@ describe('buildStore(): grouped index view ("まとまり")', () => {
     buildStore(store)
     const html = readFileSync(join(store, 'index.html'), 'utf8')
     const block = groupedBlock(html)
-    assert.match(block, /<details class="wu-idx-group" open data-folder="decision">/)
-    assert.match(block, /<details class="wu-idx-group" open data-folder="design">/)
-    assert.match(block, /<details class="wu-idx-group" open data-folder="legacy">/)
+    assert.match(block, /<details class="wu-idx-group" data-folder="decision">/)
+    assert.match(block, /<details class="wu-idx-group" data-folder="design">/)
+    assert.match(block, /<details class="wu-idx-group" data-folder="legacy">/)
+  })
+
+  test('groups render collapsed by default (no "open" attribute on <details>)', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const block = groupedBlock(html)
+    assert.doesNotMatch(block, /<details class="wu-idx-group" open /)
+    assert.doesNotMatch(block, /<details[^>]* open[^>]* class="wu-idx-group"/)
   })
 
   test('a group header shows the page count, the group\'s latest updated, and its kind chips', () => {
@@ -585,7 +594,7 @@ describe('buildStore(): grouped index view ("まとまり")', () => {
     buildStore(store)
     const html = readFileSync(join(store, 'index.html'), 'utf8')
     const block = groupedBlock(html)
-    const designGroup = /<details class="wu-idx-group" open data-folder="design">([\s\S]*?)<\/details>/.exec(block)[1]
+    const designGroup = /<details class="wu-idx-group" data-folder="design">([\s\S]*?)<\/details>/.exec(block)[1]
     const iDecision = designGroup.indexOf('design/2026-08-09-example-design-decision.html')
     const iReview = designGroup.indexOf('design/2026-08-06-example-design-review.html')
     const iDraft = designGroup.indexOf('design/2026-08-05-example-design.html')
@@ -618,6 +627,22 @@ describe('buildStore(): grouped index view ("まとまり")', () => {
     buildStore(store)
     const result = runSelfCheck(join(store, 'index.html'))
     assert.ok(!result.errors.some((e) => e.item === 'single-file'), JSON.stringify(result.errors))
+  })
+
+  test('a group\'s <summary> carries the clickable-header class', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    const block = groupedBlock(html)
+    assert.match(block, /<summary class="wu-idx-ghead">/)
+  })
+
+  test('the script persists an OPEN set under the new storage key, not the old "collapsed" key', () => {
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    assert.match(html, /writeup\.index\.open/)
+    assert.doesNotMatch(html, /localStorage\.setItem\('writeup\.index\.collapsed'/)
   })
 })
 

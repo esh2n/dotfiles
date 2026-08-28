@@ -388,7 +388,7 @@ function renderGroup(g) {
   const kinds = [...new Set(g.pages.map(kindKeyOf))].sort()
   const kindChipsHtml = kinds.map((k) => `<span class="wu-idx-gk">${escapeHtml(k)}</span>`).join('')
   const latest = g.pages[0].updated
-  return `<details class="wu-idx-group" open data-folder="${escapeHtml(g.folderPath)}">` +
+  return `<details class="wu-idx-group" data-folder="${escapeHtml(g.folderPath)}">` +
     `<summary class="wu-idx-ghead">` +
     `<span class="wu-idx-gpath">${groupPathHtml(g.folderPath)}</span>` +
     `<span class="wu-idx-gcount" data-total="${g.pages.length}">${g.pages.length} 件</span>` +
@@ -453,8 +453,12 @@ function renderIndexHtml(records) {
 .wu-idx-groups{margin:0;padding:0;}
 .wu-idx-group{padding:var(--wu-sp-2) 0;border-bottom:var(--wu-bw-1) solid var(--wu-rule-soft);}
 .wu-idx-group[hidden]{display:none;}
-.wu-idx-ghead{cursor:pointer;display:flex;align-items:baseline;gap:var(--wu-sp-3);flex-wrap:wrap;padding:var(--wu-sp-1) 0;}
+.wu-idx-ghead{cursor:pointer;display:flex;align-items:baseline;gap:var(--wu-sp-3);flex-wrap:wrap;padding:var(--wu-sp-2);margin:0;border-radius:var(--wu-radius-2);list-style:none;}
 .wu-idx-ghead::-webkit-details-marker{display:none;}
+.wu-idx-ghead::before{content:"";flex:none;width:0;height:0;border-style:solid;border-width:5px 0 5px 7px;border-color:transparent transparent transparent var(--wu-ink-3);transition:transform .15s ease;}
+.wu-idx-group[open]>.wu-idx-ghead::before{transform:rotate(90deg);}
+.wu-idx-ghead:hover{background:var(--wu-rule-soft);}
+.wu-idx-ghead:focus-visible{outline:var(--wu-bw-2) solid var(--wu-ink);outline-offset:2px;}
 .wu-idx-gpath{font-family:var(--wu-font-mono);font-weight:500;color:var(--wu-ink);}
 .wu-idx-gpath b{font-weight:700;}
 .wu-idx-gcount,.wu-idx-gupdated{font-family:var(--wu-font-mono);color:var(--wu-ink-3);font-variant-numeric:tabular-nums;}
@@ -521,11 +525,14 @@ ${rows}
   var selKind = new Set()
   var selFolder = new Set()
   var view = 'grouped'
-  var collapsed = new Set()
+  var openSet = new Set()
+  var syncingOpen = false
 
   function norm(s) { return (s || '').normalize('NFKC').toLowerCase() }
   function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)) } catch (e) { return null } }
   function saveJson(key, v) { try { localStorage.setItem(key, JSON.stringify(v)) } catch (e) {} }
+  function saveOpenSet() { saveJson('writeup.index.open', Array.from(openSet)) }
+  function setGroupOpen(g, isOpen) { syncingOpen = true; g.open = isOpen; syncingOpen = false }
 
   function readState() {
     var p = new URLSearchParams(location.search)
@@ -535,7 +542,9 @@ ${rows}
     var v = p.get('view')
     if (v === 'flat' || v === 'grouped') view = v
     else { try { view = localStorage.getItem('writeup.index.view') || 'grouped' } catch (e) {} }
-    ;(loadJson('writeup.index.collapsed') || []).forEach(function (f) { collapsed.add(f) })
+    var storedOpen = loadJson('writeup.index.open')
+    if (storedOpen) storedOpen.forEach(function (f) { openSet.add(f) })
+    else { try { localStorage.removeItem('writeup.index.collapsed') } catch (e) {} }
   }
 
   function writeUrl() {
@@ -566,10 +575,6 @@ ${rows}
     try { localStorage.setItem('writeup.index.view', view) } catch (e) {}
   }
 
-  function applyCollapsed() {
-    groupEls.forEach(function (g) { g.open = !collapsed.has(g.dataset.folder) })
-  }
-
   function rowMatches(row, q) {
     var okKind = selKind.size === 0 || selKind.has(row.dataset.kind)
     var okFolder = selFolder.size === 0 || selFolder.has(row.dataset.folder)
@@ -579,6 +584,7 @@ ${rows}
 
   function apply() {
     var q = norm(searchEl.value.trim())
+    var filterActive = !!q || selKind.size > 0 || selFolder.size > 0
     var shown = 0
     flatRows.forEach(function (row) {
       var visible = rowMatches(row, q)
@@ -598,6 +604,7 @@ ${rows}
       if (gShown) groupsShown++
       var head = g.querySelector('.wu-idx-gcount')
       if (head) head.textContent = (gShown === gRows.length ? gRows.length : gShown + '/' + gRows.length) + ' 件'
+      setGroupOpen(g, filterActive ? gShown > 0 : openSet.has(g.dataset.folder))
     })
     countEl.textContent = total + ' 件中 ' + shown + ' 件 · ' + groupsShown + ' グループ'
     writeUrl()
@@ -626,19 +633,20 @@ ${rows}
   viewGroupedBtn.addEventListener('click', function () { view = 'grouped'; applyView(); apply() })
   viewFlatBtn.addEventListener('click', function () { view = 'flat'; applyView(); apply() })
   expandAllBtn.addEventListener('click', function () {
-    collapsed.clear()
-    applyCollapsed()
-    saveJson('writeup.index.collapsed', [])
+    groupEls.forEach(function (g) { openSet.add(g.dataset.folder) })
+    saveOpenSet()
+    apply()
   })
   collapseAllBtn.addEventListener('click', function () {
-    groupEls.forEach(function (g) { collapsed.add(g.dataset.folder) })
-    applyCollapsed()
-    saveJson('writeup.index.collapsed', Array.from(collapsed))
+    openSet.clear()
+    saveOpenSet()
+    apply()
   })
   groupEls.forEach(function (g) {
     g.addEventListener('toggle', function () {
-      if (g.open) collapsed.delete(g.dataset.folder); else collapsed.add(g.dataset.folder)
-      saveJson('writeup.index.collapsed', Array.from(collapsed))
+      if (syncingOpen) return
+      if (g.open) openSet.add(g.dataset.folder); else openSet.delete(g.dataset.folder)
+      saveOpenSet()
     })
   })
   document.addEventListener('keydown', function (e) {
@@ -654,7 +662,6 @@ ${rows}
   readState()
   updateChips()
   applyView()
-  applyCollapsed()
   sortRows()
   apply()
 })()
