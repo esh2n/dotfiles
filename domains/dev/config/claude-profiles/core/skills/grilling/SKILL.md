@@ -58,6 +58,12 @@ plan / design / decision を、共通理解に達するまで詰める。
 `local` と `artifact`。どちらもメインセッションが書くのは**ラウンド文書だけ**で、
 HTML の生成は **sonnet サブエージェント**に投げる。手で HTML や SVG を書かない。
 
+ラウンドの HTML 意匠は `render/` が自動で決める: きょうだいディレクトリ
+（`../writeup-kit`）か `~/.claude/skills/writeup-kit` に writeup-kit があれば
+そちらのページ意匠・図の検証（`bin/lib/verify-diagram.mjs`）に乗せ、無ければ
+grilling 自前の `template/style.css` と `lib/diagram.mjs` にフォールバックする。
+呼び出し側はどちらが使われているかを気にしなくてよい（`render/README.md` 参照）。
+
 フォールバック順は **local → artifact → chat**。codex から呼ばれる場合も含め、
 ブラウザのあるマシンなら常に local。artifact は共有したい・別端末で答えたい・
 ユーザーが指定したときだけ。chat は描画が使えないときの最終手段。
@@ -231,6 +237,10 @@ serve は**全問の提出まで戻らない**。戻り値の要約（`q1: A —
   find .claude/.cache/grilling -mindepth 1 -maxdepth 1 -type d -mtime +60 -exec rm -rf {} +
   ```
 
+- **grilling は writeup の store（`~/.local/share/writeup/`）に直接書き込まない。**
+  決定記録を保存として残すときは §12 の writeup 手順（`decision-page.mjs` → `writeup` の
+  保存フロー）を必ず経由する。grilling 自身が store 配下にファイルを置くことはない。
+
 ## 10. 終了
 
 frontier が空になり、重要な枝に暗黙の前提が残っていないことを確認したうえで、
@@ -267,6 +277,26 @@ frontier が空になり、重要な枝に暗黙の前提が残っていない�
 
 **ADR 昇格の基準**: 戻しにくい／自明でない／本物のトレードオフがある——この3つを**すべて**満たす決定のときだけ、別途 ADR の作成を提案する（勝手に書かない）。
 
+### 決定記録を残す（ユーザーが保存を望んだとき）
+
+`--out` に書いた決定記録をページとして残したいとユーザーが言ったら、次を実行する。
+grilling 自身は store に触らない——ここから先は writeup 側の手順。
+
+```sh
+node <skill>/render/decision-page.mjs <--out のファイル> --out <scratchpad>/decision.html
+```
+
+`decision-page.mjs` は `## 決定記録` ブロック（決まったこと / 検討して却下した案 /
+未決・前提 / 推奨アプローチ / 出典 / 次のステップ / 元ラウンド）を writeup-kit の
+`kind: 決定記録` ページに変換し、書き出した直後に kit の
+`bin/self-check.mjs --write-meta` を走らせて結果を出す（writeup-kit が無い環境では
+実行できない旨だけ伝える）。self-check の指摘（長文・括弧の重なりなど）は
+内容側の問題なので、必要なら決定記録の文面を削ってから作り直す。
+
+保存は writeup の手順に従う: `<store>/<folder>/<date>-<slug>.html` に置き、
+`writeup` の build / commit を経る。grilling は `--out` のファイルと
+`decision.html` を作るところまでで、store への配置・commit は writeup 側の責務。
+
 ## 13. 他スキルからの利用
 
 `grilling <対象> --out <path> --hints "..."` を呼ぶだけでよい。
@@ -285,6 +315,7 @@ Codex からは `@grilling`（または /skills メニュー）で使える。`c
 ## 参考
 
 - `references/round-format.md` — ラウンド文書の形式（機械可読な正本）
-- `render/README.md` — ラウンド文書を1ページの HTML にする描画面
+- `render/README.md` — ラウンド文書を1ページの HTML にする描画面（writeup-kit がある場合の意匠も含む）
+- `render/decision-page.mjs` — 決定記録 Markdown を writeup の `kind: 決定記録` ページに変換する
 - Matt Pocock, `grilling` skill — https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling
 - ryonakae, `dig` skill — https://github.com/ryonakae/dotfiles/blob/master/config/.agents/skills/dig/SKILL.md

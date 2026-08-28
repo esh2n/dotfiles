@@ -1,11 +1,49 @@
 # render — ラウンド文書を 1 ページの HTML にする
 
 grilling が書いたラウンド文書（`round-<n>.md`）を読み、そのラウンドの問いを
-すべて載せた 1 枚の HTML にする。図は elkjs でレイアウトしてインライン SVG に
-書き出すので、外部アセットは Google Fonts のスタイルシートだけ。
+すべて載せた 1 枚の HTML にする。外部アセットは Google Fonts のスタイルシートだけ。
 
 **このディレクトリは grilling スキルの一部。生成物（HTML）は scratchpad に置き、
 リポジトリには残さない。**
+
+## ページ意匠 — writeup-kit があれば乗せ、無ければ自前
+
+`lib/kit.mjs` が起動のたびに writeup-kit の在り処を解決する
+（きょうだいディレクトリ `../writeup-kit` → `~/.claude/skills/writeup-kit` →
+無し、の順）。
+
+- **kit がある場合** — ページ chrome（`.wu-header`/`.wu-footer`）と本文の
+  コンポーネント（`.wu-summary`/`.wu-terms`/`.wu-compare`/`.wu-decision`/
+  `.wu-meta`/`.wu-table`/`.wu-code`/`.wu-steps`）に乗せる。回答フォーム・
+  設計ツリーの入れ子・進捗行は kit に対応語彙が無いので、`lib/html.mjs` が
+  足す小さな `<style data-grilling>` ブロック（kit の CSS 変数 `--wu-*` を
+  使う）だけで賄う。図は kit の `bin/lib/verify-diagram.mjs`
+  (`renderFigureHtmlChecked`) にそのまま渡し、幾何・a11y・budget の 20 項目
+  検証に通れば `<figure class="wu-figure" data-checks="pass">` として埋め込む。
+  通らなければその図だけ `lib/diagram.mjs`（自前の elkjs レンダラー）に
+  フォールバックし、失敗理由の最初の hint を `.wu-callout` で注記する。
+- **kit が無い場合** — これまでどおり `template/style.css` と
+  `lib/diagram.mjs` だけで完結する（外部依存ゼロ）。
+- `renderPage(round, { kitDir: null })` で kit 無し経路を強制できる
+  （フォールバックのテスト用）。
+
+図は elkjs でレイアウトしてインライン SVG に書き出す（kit ありなら kit 版、
+無しなら grilling 自前版のどちらか一方）。
+
+## 決定記録 → writeup ページ
+
+`decision-page.mjs` は grilling の決定記録 Markdown（`## 決定記録` ブロック）を
+writeup-kit の `kind: 決定記録` ページに変換する（writeup-kit 必須、
+フォールバック無し）。
+
+```sh
+node decision-page.mjs <decisions.md> --out <page.html>
+```
+
+書き出した直後に writeup-kit の `bin/self-check.mjs --write-meta` を実行し、
+結果をそのまま標準出力に出す。self-check の指摘は内容側の問題（長文・括弧の
+重なりなど）であることが多く、`decision-page.mjs` 自身は本文を書き換えない。
+store への配置・commit は writeup 側の保存手順に従う（`SKILL.md` §12）。
 
 ## 使い方
 
@@ -168,7 +206,7 @@ edges:                     # 任意
 ## テスト
 
 ```sh
-pnpm test        # node:test。parse / render / serve の 3 ファイル
+pnpm test        # node:test。parse / render / serve / decision-page の 4 ファイル
 ```
 
 検査しているのは主に: 記入例が読めること、スキーマ違反がブロック id つきで

@@ -267,7 +267,7 @@ function buildQuestion(q) {
   const prioritized = requireString(block, doc, 'prioritized_tradeoff')
   const rationale = requireString(block, doc, 'rationale')
   const sources = validateSources(block, doc.sources)
-  const diagrams = q.diagramFences.map((raw, idx) => validateDiagram(`q${q.num}`, idx, yamlOf(`diagram q${q.num}[${idx}]`, raw)))
+  const diagrams = q.diagramFences.map((raw, idx) => validateDiagram(`q${q.num}`, idx, yamlOf(`diagram q${q.num}[${idx}]`, raw), raw))
   const dids = new Set()
   for (const d of diagrams) {
     if (dids.has(d.id)) throw new SchemaError(`diagram ${d.id}`, `Q${q.num} 内で diagram id が重複しています`)
@@ -303,7 +303,7 @@ function validateSources(block, sources) {
   })
 }
 
-function validateDiagram(qid, idx, doc) {
+function validateDiagram(qid, idx, doc, rawText) {
   if (!isPlainObject(doc)) throw new SchemaError(`diagram ${qid}[${idx}]`, 'マッピングではありません')
   const id = requireString(`diagram ${qid}[${idx}]`, doc, 'id')
   const block = `diagram ${id}`
@@ -379,7 +379,7 @@ function validateDiagram(qid, idx, doc) {
     }
   }
 
-  return { id, title, caption, groups, nodes, edges, direction, directionPinned }
+  return { id, title, caption, groups, nodes, edges, direction, directionPinned, raw: rawText }
 }
 
 function validateTone(block, tone) {

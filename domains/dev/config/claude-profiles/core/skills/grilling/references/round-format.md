@@ -325,4 +325,9 @@ node <skill>/render/render.mjs .claude/.cache/grilling/<slug>/round-<n>.md \
 ```
 
 スキーマ違反は終了コード 2 で、どのブロックのどのフィールドかを出す。
-詳細は [`../render/README.md`](../render/README.md)。
+
+ページの意匠は `render/lib/kit.mjs` が自動で決める。writeup-kit（きょうだい
+ディレクトリ、または `~/.claude/skills/writeup-kit`）があればそちらの
+chrome・コンポーネント・図の検証に乗り、無ければこれまでどおり grilling 自前の
+意匠にフォールバックする。この形式自体（frontmatter / 前提 / 設計ツリー / 問い /
+図）はどちらの意匠でも変わらない。詳細は [`../render/README.md`](../render/README.md)。

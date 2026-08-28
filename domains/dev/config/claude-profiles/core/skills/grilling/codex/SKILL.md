@@ -35,6 +35,9 @@ argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 ## チャネル
 
 - **local（既定）** — 上の `render.mjs serve`。ブラウザがあるマシンならこれ。
+  ページの意匠は writeup-kit がきょうだいディレクトリか `~/.claude/skills/writeup-kit`
+  にあればそちらに乗り、無ければ grilling 自前の意匠にフォールバックする
+  （呼び出し側は気にしなくてよい）。
 - **chat（フォールバック）** — 1問ずつ次の形式で出して回答を待つ。ページは作らない。1問 25 行以内、選択肢 2〜4 個。
 
 ```
@@ -52,6 +55,10 @@ argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 
 `## 決定記録` の下に `### 決まったこと`（決定 — 重視したトレードオフ1行）/ `### 検討して却下した案`（案 — 却下理由）/ `### 未決・前提`（残る前提と、崩れたときの影響）/ `### 推奨アプローチ` / `### 出典`（URL or path:line）/ `### 次のステップ` / `### 元ラウンド`（`.claude/.cache/grilling/<slug>/transcript.md`）を書け。
 戻しにくい・自明でない・本物のトレードオフがある——この3つを**すべて**満たす決定のときだけ ADR 作成を提案しろ（勝手に書くな）。
+
+ユーザーが保存を望んだら `node <skill>/render/decision-page.mjs <--out のファイル> --out <path>.html` で
+writeup-kit の `kind: 決定記録` ページに変換し、writeup の保存手順（store への配置・commit）に渡せ。
+grilling 自身は store に書き込まない。
 
 ## 記録の寿命
 

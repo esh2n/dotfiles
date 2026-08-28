@@ -30,8 +30,8 @@ test('ページに全問の id / 選択肢 key / 回答フォームが出る', a
   assert.ok(html.includes('<button type="button"'))
 })
 
-test('回答済みの問いは data-submitted と data-choice が入り、ラジオが選ばれている', async () => {
-  const html = await renderPage(round('round-example.md'))
+test('フォールバック: 回答済みの問いは data-submitted と data-choice が入り、ラジオが選ばれている', async () => {
+  const html = await renderPage(round('round-example.md'), { kitDir: null })
   assert.match(html, /<section class="qsec" id="q3" data-submitted="true">/)
   assert.match(html, /<div class="answer" data-submitted="true" data-choice="A">/)
   assert.match(html, /name="q3" value="A" checked/)
@@ -44,17 +44,43 @@ test('未回答の問いは data-submitted="false"', async () => {
   assert.ok(!/<section class="qsec" id="q1" data-submitted="true">/.test(html))
 })
 
-test('推奨の選択肢だけに 推奨 タグが付く', async () => {
-  const html = await renderPage(round('round-diagram.md'))
+test('フォールバック: 推奨の選択肢だけに 推奨 タグが付く', async () => {
+  const html = await renderPage(round('round-diagram.md'), { kitDir: null })
   assert.equal((html.match(/<span class="tag">推奨<\/span>/g) || []).length, 1)
 })
 
-test('前提パネルと進捗行が出る', async () => {
+test('kit モード: 選択肢の比較表に推奨だけ (推奨) が付く', async () => {
   const html = await renderPage(round('round-diagram.md'))
+  assert.ok(html.includes('<table class="wu-compare">'))
+  assert.equal((html.match(/<strong>\(推奨\)<\/strong>/g) || []).length, 1)
+})
+
+test('フォールバック: 前提パネルと進捗行が出る', async () => {
+  const html = await renderPage(round('round-diagram.md'), { kitDir: null })
   assert.ok(html.includes('<div class="eyebrow">前提</div>'))
   assert.ok(html.includes('この作業'))
   assert.ok(html.includes('決めると始まること'))
   assert.match(html, /決定済み 1 \/ 回答待ち 1 \/ 未着手 2/)
+})
+
+test('kit モード: 前提は wu-terms に、進捗は footer に出る', async () => {
+  const html = await renderPage(round('round-diagram.md'))
+  assert.ok(html.includes('<h2>前提</h2>'))
+  assert.ok(html.includes('<dl class="wu-terms">'))
+  assert.ok(html.includes('この作業'))
+  assert.ok(html.includes('決めると始まること'))
+  assert.match(html, /決定済み 1 \/ 回答待ち 1 \/ 未着手 2/)
+  assert.ok(html.includes('<footer class="wu-footer">'))
+})
+
+test('kit モード: 前提のリード文の後に段落が残るときは wu-summary に入る', async () => {
+  const src = fixture('round-diagram.md').replace(
+    'セッションの保存先は httpOnly Cookie に決まっている。残るのは更新（リフレッシュ）を\n**誰が起こすか**で、ここが決まらないと BFF の責務も SDK の API も書き始められない。\n',
+    'セッションの保存先は httpOnly Cookie に決まっている。\n\n残る論点は更新（リフレッシュ）を誰が起こすかである。\n',
+  )
+  const html = await renderPage(parseRound(src))
+  assert.ok(html.includes('<div class="wu-summary">'))
+  assert.ok(html.includes('残る論点は更新'))
 })
 
 test('凡例には実際に使われた辺の種類だけが、sync → async → reply の順で出る', async () => {
@@ -224,11 +250,21 @@ test('GRILLING_OUT_DIR が既定の出力先になる', async () => {
 
 // --- 設計ツリーは入れ子リスト -------------------------------------------
 
-test('設計ツリーは SVG ではなく入れ子リストで出る', async () => {
-  const html = await renderPage(round('round-example.md'))
+test('フォールバック: 設計ツリーは SVG ではなく入れ子リスト (ul) で出る', async () => {
+  const html = await renderPage(round('round-example.md'), { kitDir: null })
   assert.ok(html.includes('<ul class="tree">'))
   // 図は問いの中だけ。ツリーの節に figure は使わない
   assert.ok(!/設計ツリー<\/div>\s*<figure/.test(html))
+  for (const label of ['セッショントークンの保持方式', '保存先（Cookie / localStorage）', 'リフレッシュトークンの失効伝播']) {
+    assert.ok(html.includes(label), `${label} が出ていない`)
+  }
+})
+
+test('kit モード: 設計ツリーは wu-section の中の入れ子リスト (ol) で出る', async () => {
+  const html = await renderPage(round('round-example.md'))
+  assert.ok(html.includes('<h2>設計ツリー</h2>'))
+  assert.ok(html.includes('<ol class="tree">'))
+  assert.ok(!/設計ツリー<\/h2>\s*<figure/.test(html))
   for (const label of ['セッショントークンの保持方式', '保存先（Cookie / localStorage）', 'リフレッシュトークンの失効伝播']) {
     assert.ok(html.includes(label), `${label} が出ていない`)
   }
@@ -258,16 +294,22 @@ test('ツリーの下に件数の1行がある', async () => {
   assert.match(html, /<p class="note">決定済み 1 \/ 回答待ち 2 \/ 未着手 2。/)
 })
 
-test('入れ子は ul の入れ子で表す', async () => {
-  const html = await renderPage(round('round-example.md'))
+test('フォールバック: 入れ子は ul の入れ子で表す', async () => {
+  const html = await renderPage(round('round-example.md'), { kitDir: null })
   // root > n2 > n4 の 3 階層ぶん ul が開く
   assert.ok((html.match(/<ul class="tree">/g) || []).length >= 3)
 })
 
+test('kit モード: 入れ子は ol の入れ子で表す', async () => {
+  const html = await renderPage(round('round-example.md'))
+  // root > n2 > n4 の 3 階層ぶん ol が開く
+  assert.ok((html.match(/<ol class="tree">/g) || []).length >= 3)
+})
+
 // --- 図は列幅に収める ----------------------------------------------------
 
-test('10 ノード 2 群の図も列幅（720px）に収まる', async () => {
-  const html = await renderPage(round('round-diagram.md'))
+test('フォールバック: 10 ノード 2 群の図も列幅（720px）に収まる', async () => {
+  const html = await renderPage(round('round-diagram.md'), { kitDir: null })
   const widths = [...html.matchAll(/--fig-w:(\d+)px/g)].map((m) => Number(m[1]))
   assert.ok(widths.length >= 3, `図が ${widths.length} 枚しか出ていない`)
   for (const w of widths) assert.ok(w <= COLUMN, `--fig-w:${w}px が列幅 ${COLUMN}px を超えている`)
@@ -299,9 +341,9 @@ test('direction を明示した図は向きを変えられない', async () => {
 
 // --- 推奨の論証 ----------------------------------------------------------
 
-test('推奨ボックスは 見出し + rationale の段落で構成される', async () => {
+test('フォールバック: 推奨ボックスは 見出し + rationale の段落で構成される', async () => {
   const r = round('round-diagram.md')
-  const html = await renderPage(r)
+  const html = await renderPage(r, { kitDir: null })
   const q = r.questions[0]
   assert.ok(html.includes(`<h3>${q.recommended} — ${q.prioritized_tradeoff}</h3>`))
   assert.ok(html.includes('水平展開のたびに共有ストアの話が付いてくる'))
@@ -310,4 +352,107 @@ test('推奨ボックスは 見出し + rationale の段落で構成される', 
   const recBox = /<div class="rec-box">([\s\S]*?)<\/div>\s*<div class="answer"/.exec(html)
   assert.ok(recBox, 'rec-box が見つからない')
   assert.ok(!recBox[1].includes('得るもの'))
+})
+
+test('kit モード: 推奨は wu-decision に、根拠の段落も出る', async () => {
+  const r = round('round-diagram.md')
+  const html = await renderPage(r)
+  const q = r.questions[0]
+  assert.ok(html.includes('<div class="wu-decision">'))
+  assert.ok(html.includes(`<strong>推奨:</strong> ${q.recommended} —`))
+  assert.ok(html.includes(`<strong>重視したトレードオフ:</strong> ${q.prioritized_tradeoff}`))
+  assert.ok(html.includes('水平展開のたびに共有ストアの話が付いてくる'))
+  assert.ok(html.includes('条件つき: 同時実行が問題になった時点で B へ移す。'))
+})
+
+// --- kit モード: 図は kit の renderFigureHtmlChecked に委譲、budget/検証に落ちたら
+//     grilling 自前のレンダラー + wu-callout にフォールバックする -----------------
+
+test('kit モード: 検証を通った図は wu-figure data-checks=pass で埋め込まれる', async () => {
+  const html = await renderPage(round('round-diagram.md'))
+  // d3 は 4 ノードで kit の 20 項目検証をすべて通る
+  assert.ok(html.includes('<figure class="wu-figure" data-checks="pass">'))
+  assert.ok(html.includes('id="wu-d-q1-d3-title"'))
+})
+
+test('kit モード: budget を超える図 (d2, 10 ノード) は grilling 自前のレンダラーへフォールバックし、wu-callout が出る', async () => {
+  const html = await renderPage(round('round-diagram.md'))
+  // d2 は 10 ノードで kit の node-count 上限 (9) を超えるので、grilling 自前の
+  // .scroll>svg のレンダラーで描き、失敗理由を wu-callout に出す
+  const d2Idx = html.indexOf('<figcaption>契約の型は Rust 側にしか無く')
+  assert.ok(d2Idx >= 0, 'd2 の figcaption が出ていない')
+  const figureStart = html.lastIndexOf('<figure class="scroll"', d2Idx)
+  assert.ok(figureStart >= 0, 'd2 が grilling 自前のレンダラーで描かれていない')
+  const after = html.slice(d2Idx)
+  assert.match(after.slice(0, 500), /<div class="wu-callout" data-tone="warn"><p>[^<]*<\/p><\/div>/)
+})
+
+test('kit モード: 図が無い問いには <div class="wu-callout" は出ない（CSS 定義とは区別する）', async () => {
+  const html = await renderPage(round('round-serve.md'))
+  assert.ok(!html.includes('<figure'))
+  assert.ok(!html.includes('<div class="wu-callout"'))
+})
+
+test('kit モード: 検証用 fixture (round-kit.md) は 2 問・表・#### 小見出し・図をすべて描く', async () => {
+  const r = round('round-kit.md')
+  assert.equal(r.questions.length, 2)
+  const html = await renderPage(r)
+  assert.ok(html.includes('<h2>Q1: 図は誰が描きますか</h2>'))
+  assert.ok(html.includes('<h2>Q2: ページの chrome（見出し・進捗）はどちらに寄せますか</h2>'))
+  assert.ok(html.includes('<table class="wu-table">'), '#### 比較 直後の GFM 表が wu-table になっていない')
+  assert.ok(html.includes('<h4>kit がある場合</h4>'))
+  assert.ok(html.includes('<h4>比較</h4>'))
+  assert.ok(html.includes('<figure class="wu-figure" data-checks="pass">'), 'd1 が kit の検証を通っていない')
+  assert.equal((html.match(/<table class="wu-compare">/g) || []).length, 2)
+})
+
+// --- kit.mjs: writeup-kit の在り処解決 ------------------------------------
+
+test('kit.mjs: override なしでは grilling のきょうだいの writeup-kit を自動判定する', async () => {
+  const { kitDir } = await import('../lib/kit.mjs')
+  const dir = kitDir()
+  assert.ok(dir, 'このリポジトリでは writeup-kit がきょうだいに実在するはず')
+  assert.ok(dir.endsWith('writeup-kit'))
+})
+
+test('kit.mjs: override に null を渡すと無いものとして扱う', async () => {
+  const { kitDir } = await import('../lib/kit.mjs')
+  assert.equal(kitDir(null), null)
+})
+
+test('kit.mjs: override に不正なパスを渡すと無いものとして扱う', async () => {
+  const { kitDir } = await import('../lib/kit.mjs')
+  assert.equal(kitDir('/no/such/writeup-kit'), null)
+})
+
+test('kit.mjs: kitCss / loadKitRenderFigureHtmlChecked / loadKitYamlParse が実体を返す', async () => {
+  const { kitCss, loadKitRenderFigureHtmlChecked, loadKitYamlParse } = await import('../lib/kit.mjs')
+  const css = await kitCss()
+  assert.ok(css.includes('--wu-ink'))
+  const renderFn = await loadKitRenderFigureHtmlChecked()
+  assert.equal(typeof renderFn, 'function')
+  const parseFn = await loadKitYamlParse()
+  assert.equal(typeof parseFn, 'function')
+  assert.deepEqual(parseFn('a: 1\nb: 2'), { a: 1, b: 2 })
+})
+
+test('kit.mjs: kit が無いときは全部 null を返す', async () => {
+  const { kitCss, loadKitRenderFigureHtmlChecked, loadKitYamlParse } = await import('../lib/kit.mjs')
+  assert.equal(await kitCss(null), null)
+  assert.equal(await loadKitRenderFigureHtmlChecked(null), null)
+  assert.equal(await loadKitYamlParse(null), null)
+})
+
+// --- mdBlocks の kit オプション --------------------------------------------
+
+test('mdBlocks: kit:true では表とコードブロックが wu- クラスになる', () => {
+  const table = mdBlocks(['| 案 | 部品 |', '|---|---|', '| A | 増える |'], { kit: true })
+  assert.ok(table.startsWith('<table class="wu-table">'))
+  const code = mdBlocks(['```sql', 'SELECT 1;', '```'], { kit: true })
+  assert.equal(code, '<pre class="wu-code" data-lang="sql"><code>SELECT 1;</code></pre>')
+})
+
+test('mdBlocks: kit を渡さなければ既定のフォールバック出力のまま', () => {
+  const table = mdBlocks(['| 案 | 部品 |', '|---|---|', '| A | 増える |'])
+  assert.ok(table.startsWith('<div class="scroll"><table class="md">'))
 })
