@@ -650,7 +650,7 @@ test('#20 single-finite-svg: fails when there is more than one <svg> root', asyn
 // --- real fixtures through the full pipeline -----------------------------
 
 test('every non-budget fixture passes all 20 checks end to end', async () => {
-  for (const name of ['simple.yaml', 'groups.yaml', 'hints.yaml', 'wide.yaml', 'scroll.yaml']) {
+  for (const name of ['simple.yaml', 'groups.yaml', 'hints.yaml', 'wide.yaml', 'scroll.yaml', 'conway.yaml']) {
     const parsedIr = ir(name)
     const out = await renderDiagram(parsedIr)
     const result = await verifyDiagram(parsedIr, out)

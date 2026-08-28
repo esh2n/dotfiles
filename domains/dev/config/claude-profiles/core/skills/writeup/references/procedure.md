@@ -117,6 +117,62 @@ Redirect it straight into a file (`--figure > fig.html`) or pass `--out`;
 either way, paste the result verbatim — never hand-wrap a raw `<svg>`
 yourself.
 
+### Exit 3 — fixing a failed check, kit present
+
+`ok:false`'s `checks` array names every failing row with a concrete
+`hint` (contract §4-2). Edit the IR and re-render, up to 3 attempts,
+picking the move the hint actually names:
+
+- `hint` mentions `from_side`/`to_side`/`via` (crossing, collinear
+  overlap, border-hug, node-clearance) → add that field to the offending
+  edge.
+- `hint` mentions the rhythm floor (a segment under 8px/16px) → widen
+  node spacing, or drop the `via` bend causing the short jog.
+- `hint` mentions orientation → pin `direction` to the value it names.
+- `hint` mentions the label → shorten it, or move it with `label_at`.
+- `hint` mentions the budget (node/edge count) → split into a second
+  diagram along the suggested cut.
+- Two or more groups should read as parallel columns/rows (an org group
+  next to the system group it owns, each member mirrored 1:1) rather than
+  elk's default nested boxes → this is usually automatic (see below), but
+  add `layer: <int>` (0-based) to a group to pin its column/row order
+  explicitly, or `layer: none` to any group to opt the whole diagram back
+  out to elk's default layout.
+
+Two or more groups where every node belongs to one and the inter-group
+edges form a DAG (no A→B *and* B→A between the same two groups) auto-
+detect this "grouped-layer" mode with no hint needed: each group's
+column/row order is the length of the longest inter-group-edge path to
+it, so a group nothing points to (e.g. "org") sits before a group only
+reachable from it (e.g. "sys"), however many hops apart. An intra-group
+edge (e.g. team A → team B, both inside "org") never affects that
+ordering — it draws as a short straight connector between the two boxes
+instead of pushing one of them into a second column.
+
+Still `ok:false` after 3 attempts (kit present): do **not** fall back to
+a `.wu-table` — that fallback exists only for kit-less mode (no
+`render-diagram.mjs` to call at all). Instead keep the original IR
+visible and flag it honestly:
+
+```html
+<figure class="wu-figure">
+<div class="wu-callout" data-tone="warn">
+<p>この図は自動レイアウトの検証(#6 rhythm)を通過できず、手動での調整が必要です。</p>
+</div>
+<figcaption>キャプション</figcaption>
+<script type="text/x-writeup-diagram">
+id: d1
+...
+</script>
+</figure>
+```
+
+Name the specific failing check (id + name, e.g. "#6 rhythm") in the
+callout so the reader — and the next attempt — knows exactly what to
+fix, and tell the user in the same turn rather than only noting it in
+the page. This figure does not get `data-checks="pass"`; count it as a
+miss in step 5's `diagram=N/N` tally (see below).
+
 ## Step 4 — lint
 
 ### `lint.mjs` — observed behavior
@@ -216,15 +272,41 @@ yourself, in this order, before running `--write-meta`:
 1. Replace `lint=pending` with `lint=pass` once you've resolved every
    lint finding (fix or keep), or `lint=skipped` in kit-less fallback
    mode (§ SKILL.md "Zero-dependency rule").
-2. Set `diagram=N/N` where `N` is the number of `.wu-figure` elements on
-   the page — since you only ever paste an `ok:true` render, this is
-   always `N/N` for a normal run; use `diagram=0/0` for a page with no
-   figures, and `diagram=fallback` in kit-less mode.
+2. Set `diagram=M/N` where `N` is the number of `.wu-figure` elements on
+   the page and `M` is how many of them carry `data-checks="pass"`. This
+   is `N/N` whenever every figure is a passing `ok:true` render (the
+   normal case); it drops below `N/N` only for a figure kept after the
+   exit-3 fallback (its warn callout is the honest record of why). Use
+   `diagram=0/0` for a page with no figures, `diagram=fallback` in
+   kit-less mode.
 3. Run `node $KIT/bin/self-check.mjs page.html --write-meta`, which then
    only has to fill in `self-check=pass` (or `fail`) next to the values
    you already set.
 
 Result, e.g.: `checks="lint=pass;self-check=pass;diagram=2/2"`.
+
+### After a kit/renderer upgrade — `rerender-figures.mjs`
+
+A kit upgrade can change what contract §4-2 accepts (a fixed check, a
+loosened budget), which means some figures kept as an exit-3 table
+fallback may now render clean, and — less often — some previously-passing
+figures may now fail under the tightened contract. Re-run every stored
+figure that carries a recoverable IR instead of hand-checking each page:
+
+```
+node $KIT/bin/rerender-figures.mjs --store <dir>
+```
+
+It finds every `.wu-figure` with an embedded
+`<script type="text/x-writeup-diagram">` that isn't already marked
+`data-checks="pass"`, re-renders it, and — only on success — replaces that
+one `<figure>...</figure>` block in place and updates the page's
+`diagram=M/N` meta; a figure that still fails is left untouched and shows
+up in the printed summary with its failing check names. Add `--all` after
+a change that could regress a passing figure (re-tries every figure, not
+just fallbacks), `--only <glob>` to scope to part of the store,
+`--dry-run` to preview without writing, and `--report out.json` for the
+full per-page/per-figure detail behind the summary line.
 
 ## Step 7 — `.writeup.toml` template
 

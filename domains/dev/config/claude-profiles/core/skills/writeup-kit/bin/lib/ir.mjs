@@ -83,8 +83,24 @@ function normalizeGroups(raw) {
     const label = requireStr(g, 'label', ctx)
     const tone = validateTone(g.tone, ctx)
     const parent = optStr(g, 'group', ctx)
-    return { id, label, tone, group: parent }
+    const layer = validateGroupLayer(g.layer, ctx)
+    return { id, label, tone, group: parent, layer }
   })
+}
+
+/**
+ * A group's `layer:` hint — see diagram.mjs's computeGroupLayers() for what
+ * it does. A non-negative integer pins the group to that elk partition
+ * outright; `"auto"` explicitly opts into the automatic topological
+ * assignment (the default when the hint is omitted); `"none"` opts the
+ * whole diagram out of grouped-layer mode so elk's default hierarchical
+ * layout applies instead.
+ */
+function validateGroupLayer(v, ctx) {
+  if (v === undefined || v === null) return undefined
+  if (v === 'auto' || v === 'none') return v
+  if (typeof v === 'number' && Number.isInteger(v) && v >= 0) return v
+  throw new IrError(`${ctx}.layer must be a non-negative integer, "auto", or "none" (got: ${JSON.stringify(v)})`)
 }
 
 function validateGroupNesting(groups, groupIds) {

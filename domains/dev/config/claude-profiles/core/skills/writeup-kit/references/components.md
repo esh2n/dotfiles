@@ -171,6 +171,18 @@ edges: []
 </figure>
 ```
 
+A diagram with 2+ groups where every node belongs to one, and the edges
+crossing between groups all point the same overall direction (a DAG over
+the groups — no group cycles back to one that already points to it),
+renders those groups as parallel columns (`right`) or rows (`down`)
+instead of elk's default nested boxes: each group's position is the
+longest inter-group-edge path to it, so a group nothing points to sits
+first, however many groups separate it from the last. Give a group an
+explicit `layer: <int>` (0-based) to pin its order by hand, or `layer:
+none` to opt that diagram back out to elk's default layout — see
+`references/procedure.md` in the `writeup` skill for the full IR hint
+list.
+
 ### `.wu-quote`
 
 ```html

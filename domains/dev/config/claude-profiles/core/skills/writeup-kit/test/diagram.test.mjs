@@ -588,3 +588,113 @@ test('conway.yaml (mirrored org/sys groups) renders with all 20 checks passing',
   assert.deepEqual(result.checks.filter((c) => !c.ok), [], `unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
   assert.equal(result.ok, true)
 })
+
+// --- grouped-layer mode (auto-detection, explicit `layer:`, `layer: none`) -
+
+/** A geo edge's single unbent segment: exactly one section, exactly two
+ * points — the shape a hand-drawn in-layer/cross-layer connector always
+ * produces when its two boxes share a coordinate on the cross axis. */
+function soleSegment(geoEdge) {
+  assert.equal(geoEdge.sections.length, 1, `edges[${geoEdge.index}] should draw as one section`)
+  const sec = geoEdge.sections[0]
+  assert.equal(sec.length, 2, `edges[${geoEdge.index}] should have no bends, got ${JSON.stringify(sec)}`)
+  return sec
+}
+
+function axisOf(sec) {
+  const [a, b] = sec
+  if (a.y === b.y) return 'horizontal'
+  if (a.x === b.x) return 'vertical'
+  assert.fail(`segment is neither horizontal nor vertical: ${JSON.stringify(sec)}`)
+}
+
+function manhattanLen(a, b) {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+}
+
+test('conway.yaml auto-detects grouped-layer mode: the three 写し取る edges are parallel, unbent, and each under 200px', async () => {
+  const parsedIr = ir('conway.yaml')
+  const out = await renderDiagram(parsedIr)
+  const crossEdges = [0, 1, 2].map((i) => out.layout.geo.edges[i])
+  const axes = crossEdges.map((e) => axisOf(soleSegment(e)))
+  assert.ok(axes.every((a) => a === axes[0]), `写し取る edges are not all on the same axis: ${JSON.stringify(axes)}`)
+  for (const e of crossEdges) {
+    const [a, b] = e.sections[0]
+    const len = manhattanLen(a, b)
+    assert.ok(len < 200, `edges[${e.index}] (${e.from}->${e.to}) is ${len}px, expected < 200px`)
+  }
+})
+
+test('conway.yaml: ta->tb draws as a single straight in-layer connector between the A and B boxes', async () => {
+  const parsedIr = ir('conway.yaml')
+  const out = await renderDiagram(parsedIr)
+  const geo = out.layout.geo
+  const taTb = geo.edges.find((e) => e.from === 'ta' && e.to === 'tb')
+  assert.ok(taTb, 'ta->tb edge not found')
+  const sec = soleSegment(taTb)
+  const boxA = geo.nodes.find((n) => n.id === 'ta')
+  const boxB = geo.nodes.find((n) => n.id === 'tb')
+  // Both endpoints sit on the facing borders of A and B (not floating away
+  // from either box), whichever orientation the axis-auto-select picked.
+  const onBorder = (p, box) => (
+    (Math.abs(p.x - box.x) < 0.5 || Math.abs(p.x - (box.x + box.width)) < 0.5) ||
+    (Math.abs(p.y - box.y) < 0.5 || Math.abs(p.y - (box.y + box.height)) < 0.5)
+  )
+  assert.ok(sec.some((p) => onBorder(p, boxA)), `neither endpoint touches A's border: ${JSON.stringify(sec)}`)
+  assert.ok(sec.some((p) => onBorder(p, boxB)), `neither endpoint touches B's border: ${JSON.stringify(sec)}`)
+})
+
+test('conway.yaml renders ok in both orientations, each choosing "right" columns or "down" rows per the fit rule', async () => {
+  for (const direction of ['right', 'down']) {
+    const raw = { ...ir('conway.yaml'), direction }
+    const out = await renderDiagram(raw)
+    assert.equal(out.layout.direction, direction)
+    const { verifyDiagram } = await import('../bin/lib/verify-diagram.mjs')
+    const result = await verifyDiagram(raw, out)
+    assert.deepEqual(result.checks.filter((c) => !c.ok), [], `${direction}: unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
+  }
+})
+
+test('an explicit numeric `layer:` on a group overrides the auto topological order', async () => {
+  const raw = {
+    id: 'explicit-layer', title: 't', direction: 'right',
+    groups: [
+      { id: 'g1', label: 'G1', layer: 1 },
+      { id: 'g2', label: 'G2', layer: 0 },
+    ],
+    nodes: [
+      { id: 'n1', label: 'N1', group: 'g1' },
+      { id: 'n2', label: 'N2', group: 'g2' },
+    ],
+    // n1 -> n2 would put g1 before g2 under auto-detection; the explicit
+    // layer hints (g1: 1, g2: 0) reverse that.
+    edges: [{ from: 'n1', to: 'n2', kind: 'sync' }],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  const out = await renderDiagram(v.ir)
+  const n1 = out.layout.geo.nodes.find((n) => n.id === 'n1')
+  const n2 = out.layout.geo.nodes.find((n) => n.id === 'n2')
+  assert.ok(n2.x < n1.x, `expected g2 (layer 0) before g1 (layer 1): n1.x=${n1.x} n2.x=${n2.x}`)
+  const { verifyDiagram } = await import('../bin/lib/verify-diagram.mjs')
+  const result = await verifyDiagram(v.ir, out)
+  assert.deepEqual(result.checks.filter((c) => !c.ok), [], `unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
+})
+
+test('`layer: none` on a group opts the whole diagram out of grouped-layer mode', async () => {
+  const rawNone = parseYaml(fixture('conway.yaml'))
+  rawNone.groups[0].layer = 'none'
+  const v = validateIR(rawNone)
+  assert.ok(v.ok, JSON.stringify(v))
+
+  const autoOut = await renderDiagram(ir('conway.yaml'))
+  const noneOut = await renderDiagram(v.ir)
+  // `layer: none` restores elk's own hierarchical compound-node layout —
+  // the same shape conway.yaml had before this mode existed, which is a
+  // visibly different (and, per the original bug report, worse) size than
+  // the grouped-layer auto-detected one.
+  assert.ok(
+    noneOut.width !== autoOut.width || noneOut.height !== autoOut.height,
+    'layer: none should change the layout, not silently match grouped-layer mode',
+  )
+})

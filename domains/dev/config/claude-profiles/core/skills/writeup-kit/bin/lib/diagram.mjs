@@ -156,15 +156,244 @@ export async function chooseOrientation(ir, { column = COLUMN } = {}) {
 
 export const fitRatio = (l, column) => Math.max(l.width / column, l.height / MAX_HEIGHT)
 
+// --- grouped-layer mode ------------------------------------------------
+//
+// A "mirrored groups" diagram (org team A/B/C next to the system A/B/C it
+// owns, conway.yaml being the fixture that exposed this) wants its groups
+// drawn as parallel columns/rows, not elk's default hierarchical layout —
+// elk's compound-node layered algorithm solves a *separate* layered
+// sub-problem inside each group box, so an ordinary intra-group edge
+// (ta->tb) pushes tb into a second internal layer instead of leaving it
+// stacked beside ta, which detours every other edge around the resulting
+// lopsided box.
+//
+// elk's `elk.layered.layering.layerChoiceConstraint` (the option whose id
+// this feature was originally specified against) looks like the right
+// primitive but is a no-op through elkjs: per its own metadata description
+// ("this option is not part of any of ELK Layered's default configurations
+// but is only evaluated as part of the InteractiveLayeredGraphVisitor,
+// which must be applied manually or used via the DiagramLayoutEngine"), it
+// only takes effect through a Java-only visitor elkjs never ports —
+// confirmed empirically: setting it on a node has zero effect on the
+// resulting layer. `elk.partitioning.activate` + `elk.partitioning.
+// partition` (also real, documented options) DO work through elkjs, but
+// only constrain relative *ordering* between different partitions, not
+// "these same-partition nodes must share one layer" — a same-partition
+// pair still gets split across layers by their own edges. The layout that
+// actually works: flatten the whole diagram to elk's root (no elk compound
+// group nodes at all), assign every node's partition = its group's layer,
+// and simply never feed intra-group ("in-layer") edges to elk in the first
+// place — with nothing forcing them apart, same-partition nodes with no
+// edges *between* them collapse onto one shared layer on their own. Group
+// boxes are then drawn from the resulting node bounds by hand (see the
+// group-box block in layoutOnce()), and the omitted in-layer edges are
+// drawn by hand too (see inLayerElbow()).
+
+/**
+ * Decide whether "grouped-layer" mode applies to `ir`, and if so, the elk
+ * partition index (0-based "layer") each group gets. Returns `null` when
+ * the mode does not apply, in which case layoutOnce() falls back to the
+ * pre-existing elk-compound-node hierarchy unchanged.
+ *
+ * The mode is off when there are fewer than 2 groups, when any group
+ * nests under another (nesting depth is orthogonal to this mode and not
+ * supported by it — a nested group's own children still need the compound
+ * hierarchy), when any group is hinted `layer: none` (an explicit
+ * page-wide opt-out), or when some node belongs to no group at all (a
+ * partition needs to be assigned to *every* node or the flat layout has
+ * nothing to anchor an unassigned node to).
+ *
+ * Otherwise the mode is on when at least one group carries an explicit
+ * numeric `layer:`, or — with no explicit hint anywhere — when the
+ * inter-group edges (edges whose two endpoints sit in different groups)
+ * form a DAG over the groups: each group's layer is then the length of the
+ * longest path to it in that DAG, so "org" (no incoming inter-group edges)
+ * sits at layer 0 and "sys" (reachable only via an org->sys edge) at layer
+ * 1, transitively, however many hops separate them. A cycle between groups
+ * (both A->B and B->A edges exist) has no well-defined topological order,
+ * so auto-detection backs off (falls back to layer 0 for every group) —
+ * an explicit numeric `layer:` still wins over that fallback per group.
+ */
+function computeGroupLayers(ir) {
+  const { groups, nodes, edges } = ir
+  if (groups.length < 2) return null
+  if (groups.some((g) => g.group !== undefined)) return null
+  if (groups.some((g) => g.layer === 'none')) return null
+  if (!nodes.every((n) => n.group !== undefined)) return null
+
+  const groupIds = groups.map((g) => g.id)
+  const nodeGroup = new Map(nodes.map((n) => [n.id, n.group]))
+  const adj = new Map(groupIds.map((id) => [id, new Set()]))
+  for (const e of edges) {
+    const fromGroup = nodeGroup.get(e.from)
+    const toGroup = nodeGroup.get(e.to)
+    if (fromGroup !== undefined && toGroup !== undefined && fromGroup !== toGroup) adj.get(fromGroup).add(toGroup)
+  }
+
+  const dag = isAcyclic(groupIds, adj)
+  const hasExplicit = groups.some((g) => typeof g.layer === 'number')
+  if (!hasExplicit && !dag) return null
+
+  const base = dag ? longestPathLayers(groupIds, adj) : new Map(groupIds.map((id) => [id, 0]))
+  const layers = new Map()
+  for (const g of groups) layers.set(g.id, typeof g.layer === 'number' ? g.layer : base.get(g.id))
+  return layers
+}
+
+/** DFS 3-color cycle check over the group graph `adj` (id -> Set<id>). */
+function isAcyclic(ids, adj) {
+  const WHITE = 0, GRAY = 1, BLACK = 2
+  const color = new Map(ids.map((id) => [id, WHITE]))
+  const visit = (id) => {
+    color.set(id, GRAY)
+    for (const next of adj.get(id)) {
+      if (color.get(next) === GRAY) return false
+      if (color.get(next) === WHITE && !visit(next)) return false
+    }
+    color.set(id, BLACK)
+    return true
+  }
+  for (const id of ids) if (color.get(id) === WHITE && !visit(id)) return false
+  return true
+}
+
+/**
+ * Longest-path layer assignment over a DAG (Kahn's algorithm + a running
+ * max): a source (no incoming edges) sits at layer 0; every other node's
+ * layer is 1 + the max layer among its direct predecessors. This is what
+ * guarantees every group-graph edge always points from a strictly lower
+ * layer to a strictly higher one, however many hops the DAG has.
+ */
+function longestPathLayers(ids, adj) {
+  const indeg = new Map(ids.map((id) => [id, 0]))
+  for (const id of ids) for (const next of adj.get(id)) indeg.set(next, indeg.get(next) + 1)
+  const queue = ids.filter((id) => indeg.get(id) === 0)
+  const layer = new Map(ids.map((id) => [id, 0]))
+  while (queue.length) {
+    const id = queue.shift()
+    for (const next of adj.get(id)) {
+      layer.set(next, Math.max(layer.get(next), layer.get(id) + 1))
+      indeg.set(next, indeg.get(next) - 1)
+      if (indeg.get(next) === 0) queue.push(next)
+    }
+  }
+  return layer
+}
+
+/**
+ * A hand-drawn connector between two nodes elk assigned to the same
+ * group-layer column/row (see computeGroupLayers() and the "in-layer"
+ * branch in layoutOnce()) — elk never routes this edge, so there is no elk
+ * section to read for it. "right" stacks a layer's nodes vertically, so
+ * the connector runs top-to-bottom between the two boxes' facing borders;
+ * "down" stacks them horizontally, so it runs left-to-right instead. When
+ * both boxes share the same center on the cross axis (the common case —
+ * same-width nodes in one column/row, e.g. conway.yaml's ta/tb) the two
+ * middle points collapse onto the two end points once normalizePolyline()
+ * runs, leaving a single straight segment; when the boxes differ in size
+ * enough that their centers don't line up, the elbow's middle jog keeps
+ * every segment axis-aligned instead of drawing a diagonal.
+ *
+ * Only handles the case where nothing else sits between the two boxes on
+ * the stacking axis — true for every fixture this kit currently draws in
+ * this mode. A same-layer edge between two non-adjacent nodes would cut
+ * straight through whatever sits between them; checkNodeClearance /
+ * checkCrossings will flag that the same way they flag any other bad
+ * route, and the fix is the same as elsewhere in the kit: reorder the
+ * nodes (so the connected pair ends up adjacent) or give the edge an
+ * explicit `via`.
+ *
+ * `offset` shifts both ends on the cross axis (x when stacking is
+ * vertical, y when it's horizontal) — used to fan out multiple in-layer
+ * edges between the *same* node pair (groups.yaml's gw<->db request/reply
+ * pair) into parallel lanes instead of drawing them on top of each other,
+ * which would fail both the collinear-overlap and label-clearance checks.
+ * It is clamped to stay within each box's own span so the line still
+ * touches that box's border, not float off its side.
+ */
+function inLayerElbow(fromBox, toBox, direction, offset = 0) {
+  return elbowPoints(fromBox, toBox, direction !== 'down', offset)
+}
+
+/**
+ * A hand-drawn connector between two nodes in *different* group-layer
+ * columns/rows, replacing whatever polyline elk itself computed for a
+ * plain (no `via`, no `from_side`/`to_side`) edge between them.
+ *
+ * elk is still fed this edge (see edgeInputs in layoutOnce()) so its
+ * crossing-minimization still orders same-partition siblings using it —
+ * only the *drawn* geometry is replaced. That turned out to be necessary,
+ * not just tidier: elk's own edge-label handling can put one connected
+ * pair a full extra layer-spacing further along the stacking axis than
+ * another pair crossing the exact same two layers with the exact same
+ * label (confirmed empirically — 3 identically-labeled parallel edges
+ * between two elk.partitioning layers, and elk staggers one of them), so
+ * even the box positions elk hands back for supposedly-aligned columns
+ * can't be trusted at pixel level once labels are involved. Drawing every
+ * plain grouped-layer edge from the final (already-realigned, see
+ * layoutOnce()'s partition-alignment pass) box positions instead is what
+ * actually keeps conway.yaml's three "写し取る" edges parallel and equal
+ * length.
+ */
+function crossLayerElbow(fromBox, toBox, direction) {
+  return elbowPoints(fromBox, toBox, direction === 'down', 0)
+}
+
+/**
+ * Shared elbow-shape math for inLayerElbow()/crossLayerElbow(): a 4-point
+ * polyline between two boxes' facing borders, running along the `vertical`
+ * axis (y) when true, the horizontal axis (x) otherwise. When both boxes
+ * share the same coordinate on the *other* axis (the common case — same
+ * column/row), normalizePolyline() collapses the two middle points onto
+ * the two ends, leaving a single straight segment; otherwise the middle
+ * jog keeps every segment axis-aligned instead of drawing a diagonal.
+ * `offset` (inLayerElbow only) shifts both ends on the non-`vertical` axis,
+ * clamped to stay within each box's own span, to fan out multiple edges
+ * between the same node pair onto parallel lanes.
+ */
+function elbowPoints(fromBox, toBox, vertical, offset) {
+  const fromFirst = vertical ? fromBox.y <= toBox.y : fromBox.x <= toBox.x
+  const near = fromFirst ? fromBox : toBox
+  const far = fromFirst ? toBox : fromBox
+  const clamped = (box) => {
+    const room = Math.max(0, (vertical ? box.width : box.height) / 2 - 10)
+    return Math.max(-room, Math.min(room, offset))
+  }
+  let pts
+  if (vertical) {
+    const nearCx = near.x + near.width / 2 + clamped(near)
+    const farCx = far.x + far.width / 2 + clamped(far)
+    const nearY = near.y + near.height
+    const farY = far.y
+    const midY = (nearY + farY) / 2
+    pts = [{ x: nearCx, y: nearY }, { x: nearCx, y: midY }, { x: farCx, y: midY }, { x: farCx, y: farY }]
+  } else {
+    const nearCy = near.y + near.height / 2 + clamped(near)
+    const farCy = far.y + far.height / 2 + clamped(far)
+    const nearX = near.x + near.width
+    const farX = far.x
+    const midX = (nearX + farX) / 2
+    pts = [{ x: nearX, y: nearCy }, { x: midX, y: nearCy }, { x: midX, y: farCy }, { x: farX, y: farCy }]
+  }
+  return fromFirst ? pts : pts.slice().reverse()
+}
+
 // --- layout ----------------------------------------------------------------
 
 async function layoutOnce(ir, direction) {
   const { nodes, groups, edges } = ir
+  const groupLayers = computeGroupLayers(ir)
+  const nodeById = new Map(nodes.map((n) => [n.id, n]))
+  const partitionOf = (nodeId) => {
+    if (!groupLayers) return undefined
+    const grp = nodeById.get(nodeId)?.group
+    return grp === undefined ? undefined : groupLayers.get(grp)
+  }
 
   const elkNodes = new Map()
   for (const n of nodes) {
     const size = nodeSize(n.label, { bold: n.emphasis })
-    elkNodes.set(n.id, { id: n.id, width: size.width, height: size.height, ports: [] })
+    elkNodes.set(n.id, { id: n.id, width: size.width, height: size.height, ports: [], partition: partitionOf(n.id) })
   }
 
   // Build one elk edge per "hop". A plain edge is a single hop (from -> to).
@@ -183,13 +412,38 @@ async function layoutOnce(ir, direction) {
   // segment). A `via` edge's label has no single elk edge to attach to —
   // draw() places it manually at `label_at` along the assembled path's
   // total length instead (see pointAtLength()).
+  //
+  // In grouped-layer mode (groupLayers !== null), an edge whose two
+  // endpoints share a partition ("in-layer") is left out of `edgeInputs`
+  // altogether — see the "grouped-layer mode" comment above
+  // computeGroupLayers() for why — and marked `isInLayer` instead; its
+  // geometry is filled in by hand once node positions are known (the
+  // group-box block below). A *plain* edge between two different
+  // partitions (`crossLayerEligible`) is still fed to elk — its
+  // crossing-minimization still needs it to order same-partition siblings
+  // well — but its drawn geometry gets replaced the same way, by
+  // crossLayerElbow(): see that function's doc comment for why elk's own
+  // routing can't be trusted at pixel level here either. An edge with
+  // `via` or an explicit `from_side`/`to_side` keeps elk's real routing
+  // regardless of mode — that hint asked for elk's own port logic.
   let labelSpace = 0
+  let inLayerLabelSpace = 0
   const edgeInputs = []
   const edgeMeta = edges.map((e, i) => {
     const labelWidth = e.label ? Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10 : 0
+    const hasVia = !!(e.via && e.via.length)
+    const hasPorts = !!(e.from_side || e.to_side)
+    const fp = partitionOf(e.from)
+    const tp = partitionOf(e.to)
+    const groupedPlain = groupLayers !== null && !hasVia && !hasPorts && fp !== undefined && tp !== undefined
+    const isInLayer = groupedPlain && fp === tp
+    if (isInLayer) {
+      if (e.label) inLayerLabelSpace = Math.max(inLayerLabelSpace, labelWidth)
+      return { index: i, raw: e, kind: e.kind, flip: false, hasVia: false, isInLayer: true, crossLayerEligible: false, hopIds: [] }
+    }
+
     if (e.label) labelSpace = Math.max(labelSpace, labelWidth)
     const flip = e.kind === 'reply'
-    const hasVia = !!(e.via && e.via.length)
     const chain = hasVia ? [e.from, ...e.via, e.to] : [e.from, e.to]
     const hopCount = chain.length - 1
     const hopIds = []
@@ -202,12 +456,29 @@ async function layoutOnce(ir, direction) {
       if (h === hopCount - 1 && e.to_side) toEnd = addPort(elkNodes.get(hopTo), hopTo, i, 'to', e.to_side)
       const hopId = `e${i}_h${h}`
       hopIds.push(hopId)
-      const labels = !hasVia && e.label ? [{ id: `el${i}`, text: e.label, width: labelWidth, height: 14 }] : []
+      // A groupedPlain edge's drawn geometry (and label) is entirely
+      // hand-computed later (see crossLayerElbow() and the manualSections
+      // block) — attaching a label here would only cost accuracy for
+      // nothing gained: empirically, elk gives 3 identically-labeled
+      // parallel edges between the same two elk.partitioning layers a
+      // layer-to-layer gap several times wider than
+      // nodeNodeBetweenLayers alone (it appears to reserve a label-sized
+      // dummy layer *per edge* rather than sharing one), which is exactly
+      // what made conway.yaml's "写し取る" edges too long. `labelSpace`
+      // (below) still widens the real inter-layer gap enough for our own
+      // hand-placed label to fit.
+      const labels = !hasVia && !groupedPlain && e.label ? [{ id: `el${i}`, text: e.label, width: labelWidth, height: 14 }] : []
       edgeInputs.push({ id: hopId, sources: [flip ? toEnd : fromEnd], targets: [flip ? fromEnd : toEnd], labels })
     }
-    return { index: i, raw: e, kind: e.kind, flip, hasVia, hopIds }
+    return { index: i, raw: e, kind: e.kind, flip, hasVia, isInLayer: false, crossLayerEligible: groupedPlain, hopIds }
   })
   const layerSpacing = Math.max(64, labelSpace + 36)
+  // Same-layer node spacing needs extra room only when an in-layer edge
+  // carries a label (the label is centered on the connector — see
+  // inLayerElbow()/draw()'s manual-label branch — and needs headroom
+  // between the two boxes it sits between); everywhere else this keeps the
+  // pre-existing fixed 26px.
+  const sameLayerSpacing = groupLayers ? Math.max(26, inLayerLabelSpace + 16) : 26
 
   // Group/node children are built only now, after every addPort() call
   // above has already mutated each elkNode's `ports` array — finalizeNode()
@@ -231,8 +502,45 @@ async function layoutOnce(ir, direction) {
     }
   }
 
-  const children = [...rootGroups.map(buildGroupNode)]
-  for (const n of nodes) if (!n.group) children.push(finalizeNode(elkNodes.get(n.id)))
+  // Grouped-layer mode feeds elk a flat graph — every node a direct root
+  // child carrying `elk.partitioning.partition` — instead of the nested
+  // compound group nodes buildGroupNode() produces; group boxes are drawn
+  // from the resulting node bounds afterward (see the group-box block
+  // below), the same way the legend is sized from what it will actually
+  // draw rather than delegated to elk.
+  let children
+  const rootExtraOptions = {}
+  if (groupLayers) {
+    children = nodes.map((n) => finalizeNode(elkNodes.get(n.id)))
+    rootExtraOptions['elk.partitioning.activate'] = 'true'
+    // A node whose every edge is in-layer (excluded from edgeInputs above —
+    // groups.yaml's "db" is exactly this: both gw->db and db->gw are
+    // intra-group) is otherwise a fully disconnected node in elk's eyes.
+    // elk's default `separateConnectedComponents` packs each disconnected
+    // piece into its own compact block *before* honoring partitioning,
+    // which can strand such a node outside its group's column/row entirely
+    // — disabling it keeps every node, edge-less or not, positioned by its
+    // partition alone.
+    rootExtraOptions['elk.separateConnectedComponents'] = 'false'
+  } else {
+    children = [...rootGroups.map(buildGroupNode)]
+    for (const n of nodes) if (!n.group) children.push(finalizeNode(elkNodes.get(n.id)))
+  }
+
+  // Grouped-layer mode reserves room for each group's header text
+  // (GROUP_HEADER, 36px) since elk no longer draws the group boxes itself
+  // and so never accounts for it: "right" places layers side by side, so
+  // every column's header sits in the same top band — boost the root's own
+  // top padding once. "down" stacks layers top to bottom, so *every* layer
+  // after the first also needs its own header room immediately above it —
+  // boost the inter-layer spacing too, on top of the one-time top padding
+  // for the first layer's header. The root's side/bottom padding is also
+  // floored to GROUP_PAD (16px, more than the usual 12px) so a group box —
+  // which pads GROUP_PAD beyond its member nodes on those three sides —
+  // never lands at a negative coordinate.
+  const rootPaddingTop = groupLayers ? 12 + GROUP_HEADER : 12
+  const rootPaddingSide = groupLayers ? Math.max(12, GROUP_PAD) : 12
+  const layerSpacingUsed = groupLayers && direction === 'down' ? layerSpacing + GROUP_HEADER : layerSpacing
 
   const laid = await elk.layout({
     id: 'root',
@@ -241,27 +549,134 @@ async function layoutOnce(ir, direction) {
       'elk.direction': direction === 'down' ? 'DOWN' : 'RIGHT',
       'elk.edgeRouting': 'ORTHOGONAL',
       'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
-      'elk.padding': '[top=12,left=12,bottom=12,right=12]',
-      'elk.layered.spacing.nodeNodeBetweenLayers': String(layerSpacing),
+      'elk.padding': `[top=${rootPaddingTop},left=${rootPaddingSide},bottom=${rootPaddingSide},right=${rootPaddingSide}]`,
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(layerSpacingUsed),
       'elk.layered.spacing.edgeNodeBetweenLayers': '20',
-      'elk.spacing.nodeNode': '26',
+      'elk.spacing.nodeNode': String(sameLayerSpacing),
       'elk.spacing.edgeNode': '18',
       'elk.spacing.edgeLabel': '6',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+      ...rootExtraOptions,
     },
     children,
     edges: edgeInputs,
   })
-
   const usedKinds = EDGE_KIND_ORDER.filter((k) => edges.some((e) => e.kind === k))
   const abs = absolutePositions(laid)
-  const diagramWidth = Math.max(1, Math.ceil(laid.width))
+
+  if (groupLayers) {
+    // elk's own per-node layer assignment can drift apart within one
+    // partition once edge labels are involved — confirmed empirically: 3
+    // identically-labeled parallel edges crossing the same two
+    // elk.partitioning layers, and elk staggers one of them a full extra
+    // layer-spacing along the stacking axis, even though every one of them
+    // is a plain edge with no reason to differ. Force every node in a
+    // partition onto the same stacking-axis coordinate (the furthest-out
+    // one, so nothing ever lands *before* another member and re-crosses an
+    // earlier partition's boundary) — the cross-axis (sibling ordering)
+    // coordinate elk chose is left alone. This is safe unconditionally
+    // (not just for edge-less nodes like groups.yaml's "db") because every
+    // plain edge's drawn geometry gets recomputed from these final
+    // positions right below (crossLayerElbow/inLayerElbow), never read
+    // from elk's own (now possibly stale) polyline.
+    const axisKey = direction === 'down' ? 'y' : 'x'
+    const byPartition = new Map()
+    for (const n of nodes) {
+      const p = partitionOf(n.id)
+      if (p === undefined) continue
+      if (!byPartition.has(p)) byPartition.set(p, [])
+      byPartition.get(p).push(n.id)
+    }
+    for (const ids of byPartition.values()) {
+      const boxes = ids.map((id) => abs.get(id)).filter(Boolean)
+      if (boxes.length < 2) continue
+      const target = Math.max(...boxes.map((b) => b[axisKey]))
+      for (const id of ids) {
+        const b = abs.get(id)
+        if (b && b[axisKey] !== target) abs.set(id, { ...b, [axisKey]: target })
+      }
+    }
+
+    // Group box = the bounding box of its member nodes' actual positions,
+    // padded the same way buildGroupNode()'s elk.padding padded a compound
+    // group node (GROUP_HEADER on top for the label, GROUP_PAD elsewhere),
+    // widened to the label's own minimum width when the members alone
+    // wouldn't be wide enough for it to fit.
+    for (const g of groups) {
+      const memberBoxes = nodes.filter((n) => n.group === g.id).map((n) => abs.get(n.id)).filter(Boolean)
+      if (!memberBoxes.length) continue
+      const minX = Math.min(...memberBoxes.map((b) => b.x))
+      const minY = Math.min(...memberBoxes.map((b) => b.y))
+      const maxX = Math.max(...memberBoxes.map((b) => b.x + b.width))
+      const maxY = Math.max(...memberBoxes.map((b) => b.y + b.height))
+      const minW = snapUp4(Math.ceil(textWidth(g.label, FONT_SIZE) * BOLD_FACTOR) + NODE_PAD_X * 2)
+      abs.set(g.id, {
+        x: minX - GROUP_PAD,
+        y: minY - GROUP_HEADER,
+        width: Math.max(maxX - minX + GROUP_PAD * 2, minW),
+        height: (maxY - minY) + GROUP_HEADER + GROUP_PAD,
+      })
+    }
+    // Now that node positions are final, fill in the geometry of every
+    // edge elk's own polyline can no longer be trusted for in this mode:
+    // in-layer edges (elk never routed them at all -- see the edgeMeta loop
+    // above) and crossLayerEligible edges (elk did route them, but see
+    // crossLayerElbow()'s doc comment for why that routing is discarded
+    // anyway). Two (or more) in-layer edges between the *same* node pair --
+    // e.g. groups.yaml's gw->db request and db->gw reply, both inside the
+    // "server" group -- fan out onto parallel lanes (see inLayerElbow()'s
+    // `offset`) instead of being drawn on top of each other; cross-layer
+    // edges never need that (two nodes only ever share one direct edge in
+    // practice, and elk's own sibling ordering already keeps them apart).
+    const pairs = new Map()
+    for (const meta of edgeMeta) {
+      if (!meta.isInLayer) continue
+      const key = [meta.raw.from, meta.raw.to].slice().sort().join(' ')
+      if (!pairs.has(key)) pairs.set(key, [])
+      pairs.get(key).push(meta)
+    }
+    const IN_LAYER_LANE_MIN_GAP = 24
+    for (const metas of pairs.values()) {
+      const n = metas.length
+      const maxLabelW = Math.max(0, ...metas.map((m) => (
+        m.raw.label ? Math.ceil(textWidth(m.raw.label, EDGE_LABEL_SIZE)) + 10 : 0
+      )))
+      const gap = n > 1 ? Math.max(IN_LAYER_LANE_MIN_GAP, maxLabelW + 16) : 0
+      metas.forEach((meta, idx) => {
+        const offset = (idx - (n - 1) / 2) * gap
+        const fromBox = abs.get(meta.raw.from)
+        const toBox = abs.get(meta.raw.to)
+        meta.manualSections = fromBox && toBox ? [inLayerElbow(fromBox, toBox, direction, offset)] : []
+      })
+    }
+    for (const meta of edgeMeta) {
+      if (!meta.crossLayerEligible) continue
+      const fromBox = abs.get(meta.raw.from)
+      const toBox = abs.get(meta.raw.to)
+      meta.manualSections = fromBox && toBox ? [crossLayerElbow(fromBox, toBox, direction)] : []
+    }
+  }
+
+  let diagramWidth = Math.max(1, Math.ceil(laid.width))
+  let diagramHeight = Math.max(1, Math.ceil(laid.height))
+  if (groupLayers) {
+    // Group boxes (GROUP_PAD/GROUP_HEADER padded beyond their member
+    // nodes) can protrude past elk's own laid.width/height, which only
+    // ever accounted for the flat nodes' extents plus the root's 12px
+    // padding — widen the canvas so a group box is never clipped.
+    for (const g of groups) {
+      const b = abs.get(g.id)
+      if (!b) continue
+      diagramWidth = Math.max(diagramWidth, Math.ceil(b.x + b.width) + 12)
+      diagramHeight = Math.max(diagramHeight, Math.ceil(b.y + b.height) + 12)
+    }
+  }
   // The legend can need more room than the diagram itself (a short/narrow
   // diagram with long edge-kind labels): widen the canvas to fit it rather
   // than letting it clip or run past the svg's own viewBox (contract §4-2
   // #7 relies on the legend box actually being inside the canvas).
   const width = snapUp4(Math.max(diagramWidth, legendWidth(usedKinds)))
-  const height = snapUp4(Math.max(1, Math.ceil(laid.height)) + (usedKinds.length ? LEGEND_H : 0))
+  const height = snapUp4(Math.max(1, diagramHeight) + (usedKinds.length ? LEGEND_H : 0))
   return { laid, edgeMeta, abs, usedKinds, groupIndex, width, height }
 }
 
@@ -279,10 +694,13 @@ function addPort(elkNode, nodeId, edgeIndex, role, side) {
 
 function finalizeNode(elkNode) {
   const out = { id: elkNode.id, width: elkNode.width, height: elkNode.height }
+  const layoutOptions = {}
   if (elkNode.ports.length) {
     out.ports = elkNode.ports
-    out.layoutOptions = { 'elk.portConstraints': 'FIXED_SIDE' }
+    layoutOptions['elk.portConstraints'] = 'FIXED_SIDE'
   }
+  if (elkNode.partition !== undefined) layoutOptions['elk.partitioning.partition'] = String(elkNode.partition)
+  if (Object.keys(layoutOptions).length) out.layoutOptions = layoutOptions
   return out
 }
 
@@ -348,20 +766,26 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
     const e = meta.raw
     const st = edgeStyle(meta.kind, uid)
     const geoEdge = { id: `${uid}-edge-${meta.index}`, index: meta.index, from: e.from, to: e.to, kind: meta.kind, sections: [], label: null }
-    const hopSections = []
+    // An in-layer edge (see the grouped-layer mode comment above
+    // computeGroupLayers()) was never fed to elk, so its geometry comes
+    // from the manual sections layoutOnce() computed once node positions
+    // were known, not from laidById.
+    const hopSections = meta.manualSections ? meta.manualSections : []
     let elkLabel = null
-    for (const hopId of meta.hopIds) {
-      const laidEdge = laidById.get(hopId)
-      if (!laidEdge) continue
-      const off = abs.get(laidEdge.container || 'root') || { x: 0, y: 0 }
-      const base = laidEdge.container && laidEdge.container !== 'root' ? { x: off.x, y: off.y } : { x: 0, y: 0 }
-      for (const sec of laidEdge.sections || []) {
-        let raw = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint].map((p) => ({ x: p.x + base.x, y: p.y + base.y }))
-        if (meta.flip) raw.reverse()
-        hopSections.push(raw)
-      }
-      if (!meta.hasVia && e.label) {
-        for (const lb of laidEdge.labels || []) elkLabel = { x: lb.x + base.x, y: lb.y + base.y, width: lb.width, height: lb.height }
+    if (!meta.manualSections) {
+      for (const hopId of meta.hopIds) {
+        const laidEdge = laidById.get(hopId)
+        if (!laidEdge) continue
+        const off = abs.get(laidEdge.container || 'root') || { x: 0, y: 0 }
+        const base = laidEdge.container && laidEdge.container !== 'root' ? { x: off.x, y: off.y } : { x: 0, y: 0 }
+        for (const sec of laidEdge.sections || []) {
+          let raw = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint].map((p) => ({ x: p.x + base.x, y: p.y + base.y }))
+          if (meta.flip) raw.reverse()
+          hopSections.push(raw)
+        }
+        if (!meta.hasVia && e.label) {
+          for (const lb of laidEdge.labels || []) elkLabel = { x: lb.x + base.x, y: lb.y + base.y, width: lb.width, height: lb.height }
+        }
       }
     }
 
@@ -376,7 +800,7 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
 
     if (e.label) {
       let lx, ly, lw, lh
-      if (meta.hasVia) {
+      if (meta.hasVia || meta.manualSections) {
         // No single elk edge to attach the label to — place it manually at
         // `label_at` (default 0.5) along the assembled path's total length.
         lw = Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10
