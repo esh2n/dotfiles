@@ -7,7 +7,7 @@ import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR } from '../bin/lib/ir.mjs'
 import {
   renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE,
-  chooseOrientation, legendWidth, EDGE_LABEL_SIZE,
+  chooseOrientation, legendWidth, EDGE_LABEL_SIZE, normalizePolyline,
 } from '../bin/lib/diagram.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -534,4 +534,57 @@ test('kit css gives .wu-focal an accent stroke on the rect only, never an accent
   const css = readFileSync(join(HERE, '..', 'kit', 'writeup.css'), 'utf8')
   assert.match(css, /\.wu-figure rect\.wu-focal\s*\{[^}]*stroke:\s*var\(--wu-accent\)/)
   assert.doesNotMatch(css, /\.wu-figure\s+text\.wu-focal/)
+})
+
+// --- edge polyline normalization (dup/collinear points from elk) ---------
+
+test('normalizePolyline drops consecutive duplicate points and merges collinear same-direction runs into the minimal polyline', () => {
+  // A duplicated point (elk repeating a via/port touch point) followed by
+  // three collinear vertical bend points all moving the same direction —
+  // the minimal path is a single "down, then left" polyline.
+  const points = [
+    { x: 344, y: 192 },
+    { x: 344, y: 232 },
+    { x: 344, y: 232 }, // exact duplicate of the previous point
+    { x: 344, y: 400 }, // collinear, same direction (still moving down)
+    { x: 344, y: 624 }, // collinear, same direction (still moving down)
+    { x: 168, y: 624 }, // turn: now moving left
+    { x: 168, y: 632 }, // turn: now moving down again
+  ]
+  assert.deepEqual(normalizePolyline(points), [
+    { x: 344, y: 192 },
+    { x: 344, y: 624 },
+    { x: 168, y: 624 },
+    { x: 168, y: 632 },
+  ])
+})
+
+test('normalizePolyline never merges a genuine turn (a real short jog stays its own segment)', () => {
+  // Same axis and direction changes twice in a row over a short span —
+  // this is a real zigzag, not a collinear run, and must survive intact
+  // so checkRhythm can still see (and flag) the short interior segment.
+  const points = [
+    { x: 0, y: 0 },
+    { x: 40, y: 0 },
+    { x: 40, y: 8 }, // turn: down (short — 8px)
+    { x: 80, y: 8 }, // turn: right again
+  ]
+  assert.deepEqual(normalizePolyline(points), points)
+})
+
+test('normalizePolyline is a no-op on an already-minimal polyline', () => {
+  const points = [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 60 }]
+  assert.deepEqual(normalizePolyline(points), points)
+})
+
+// --- conway.yaml: the fixture that exposed the elk dup/collinear-point bug -
+
+test('conway.yaml (mirrored org/sys groups) renders with all 20 checks passing', async () => {
+  const parsedIr = ir('conway.yaml')
+  const out = await renderDiagram(parsedIr)
+  const { verifyDiagram } = await import('../bin/lib/verify-diagram.mjs')
+  const result = await verifyDiagram(parsedIr, out)
+  assert.equal(result.checks.length, 20)
+  assert.deepEqual(result.checks.filter((c) => !c.ok), [], `unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
+  assert.equal(result.ok, true)
 })

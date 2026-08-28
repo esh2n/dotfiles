@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR } from '../bin/lib/ir.mjs'
-import { renderDiagram, renderFigureHtml } from '../bin/lib/diagram.mjs'
+import { renderDiagram, renderFigureHtml, normalizePolyline } from '../bin/lib/diagram.mjs'
 import { verifyDiagram, renderChecked, renderFigureHtmlChecked } from '../bin/lib/verify-diagram.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -269,6 +269,37 @@ test('#6 rhythm: fails on a short interior segment', async () => {
   const r = await verifyDiagram(baseIr(), rr)
   const c = byId(r.checks, 6)
   assert.equal(c.ok, false)
+  assert.ok(c.hint)
+})
+
+// A raw elk-style point list carrying the exact defect diagram.mjs's
+// normalizePolyline() is meant to clean up (a duplicate touch point, then
+// a run of collinear bend points) alongside a genuine 8px interior jog
+// that is NOT a duplicate/collinear artifact. Normalizing must erase the
+// former but leave the latter alone, and the rhythm check must still
+// flag it — normalization is not a way to launder a real too-short
+// segment past the verifier.
+test('#6 rhythm: a genuine 8px interior segment still fails after normalizePolyline (not just a duplicate/collinear artifact)', async () => {
+  const raw = [
+    { x: 124, y: 20 },
+    { x: 160, y: 20 },
+    { x: 160, y: 20 }, // exact duplicate — must be dropped
+    { x: 160, y: 60 }, // collinear continuation — must merge into one run
+    { x: 220, y: 60 },
+    { x: 220, y: 68 }, // genuine turn: real 8px interior jog (< 16px floor)
+    { x: 300, y: 68 },
+  ]
+  const normalized = normalizePolyline(raw)
+  // the real 8px jog survives normalization as its own segment
+  assert.ok(normalized.some((p, i) => i > 0 && Math.abs(p.x - normalized[i - 1].x) + Math.abs(p.y - normalized[i - 1].y) === 8))
+  const rr = withGeo((geo) => {
+    geo.edges[0].sections = [normalized]
+    return geo
+  })
+  const r = await verifyDiagram(baseIr(), rr)
+  const c = byId(r.checks, 6)
+  assert.equal(c.ok, false)
+  assert.match(c.detail, /8px/)
   assert.ok(c.hint)
 })
 

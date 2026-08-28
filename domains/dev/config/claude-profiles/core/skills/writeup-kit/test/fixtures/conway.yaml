@@ -1,0 +1,56 @@
+id: d-conway
+title: 本来の定義 — 組織とアーキテクチャは鏡写し
+caption: チームの境界とサービスの境界が一致する。
+groups:
+  - id: org
+    label: 組織
+    tone: ts
+  - id: sys
+    label: システム
+    tone: rs
+nodes:
+  - id: ta
+    label: チームA
+    group: org
+    tone: ts
+  - id: tb
+    label: チームB
+    group: org
+    tone: ts
+  - id: tc
+    label: チームC
+    group: org
+    tone: ts
+  - id: sa
+    label: 決済サービス
+    group: sys
+    tone: rs
+  - id: sb
+    label: 在庫サービス
+    group: sys
+    tone: rs
+  - id: sc
+    label: 配送サービス
+    group: sys
+    tone: rs
+edges:
+  - from: ta
+    to: sa
+    label: 写し取る
+    kind: sync
+  - from: tb
+    to: sb
+    label: 写し取る
+    kind: sync
+  - from: tc
+    to: sc
+    label: 写し取る
+    kind: sync
+  - from: ta
+    to: tb
+    label: 頻繁に連絡
+    kind: sync
+  - from: sa
+    to: sb
+    label: 密結合になりがち
+    kind: sync

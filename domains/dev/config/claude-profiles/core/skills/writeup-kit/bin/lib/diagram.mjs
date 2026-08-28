@@ -365,7 +365,7 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
       }
     }
 
-    const snappedSections = hopSections.map((raw) => raw.map((p) => ({ x: snap4(p.x), y: snap4(p.y) })))
+    const snappedSections = hopSections.map((raw) => normalizePolyline(raw.map((p) => ({ x: snap4(p.x), y: snap4(p.y) }))))
     const d = snappedSections.map((pts) => {
       const strs = pts.map((p) => `${p.x} ${p.y}`)
       return `M${strs[0]} ${strs.slice(1).map((p) => `L${p}`).join(' ')}`
@@ -414,6 +414,47 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
   const dh = displayHeight ?? height
   const svg = `<svg role="img" aria-labelledby="${uid}-title ${uid}-desc" width="${dw}" height="${dh}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">${parts.join('')}</svg>`
   return { svg, geo }
+}
+
+/**
+ * Normalize one axis-aligned polyline to its minimal point list: drop
+ * consecutive duplicate points, then merge any run of consecutive
+ * collinear segments that keep moving in the same direction on the same
+ * axis into a single segment (skipping the redundant intermediate
+ * vertices). A genuine turn — the direction changes axis, or reverses
+ * back over the same axis — is never merged away, so a real short jog
+ * still shows up as its own segment for the rhythm check (contract §4-2
+ * #6) to see.
+ *
+ * elk sometimes hands back consecutive identical points (a via/port touch
+ * point repeated) or several collinear bend points along what is really
+ * one straight run; left as-is those become 0px (or otherwise sub-floor)
+ * "segments" that trip checkRhythm even though nothing is actually drawn
+ * there. Normalizing after the 4px snap (snapping itself can also collapse
+ * two close points onto the same grid cell) is what both the drawn `d`
+ * path and the geometry handed to verify-diagram.mjs should see.
+ *
+ * @param {{x:number,y:number}[]} points
+ * @returns {{x:number,y:number}[]}
+ */
+export function normalizePolyline(points) {
+  const deduped = []
+  for (const p of points) {
+    const last = deduped[deduped.length - 1]
+    if (!last || last.x !== p.x || last.y !== p.y) deduped.push(p)
+  }
+  if (deduped.length < 3) return deduped
+  const out = [deduped[0], deduped[1]]
+  for (let i = 2; i < deduped.length; i++) {
+    const p = deduped[i]
+    const b = out[out.length - 1]
+    const a = out[out.length - 2]
+    const dir1 = { x: Math.sign(b.x - a.x), y: Math.sign(b.y - a.y) }
+    const dir2 = { x: Math.sign(p.x - b.x), y: Math.sign(p.y - b.y) }
+    if (dir1.x === dir2.x && dir1.y === dir2.y) out[out.length - 1] = p
+    else out.push(p)
+  }
+  return out
 }
 
 /** Manhattan length of one axis-aligned segment. */
