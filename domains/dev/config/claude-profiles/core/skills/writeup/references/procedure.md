@@ -30,7 +30,7 @@ forcing every workflow report into 決定記録 by default.
 
 ```
 $ node $KIT/bin/render-diagram.mjs --help
-usage: render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json]
+usage: render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json] [--figure]
 ```
 
 Exit codes: `0` ok, `1` cannot read the input file, `2` the IR failed to
@@ -61,10 +61,14 @@ edges:
 
 ```
 $ node $KIT/bin/render-diagram.mjs sample.ir.yaml --json
-{"ok":true,"svg":"<svg role=\"img\" aria-labelledby=\"wu-d-d1-title wu-d-d1-desc\" viewBox=\"0 0 148 300\" ...>...</svg>","width":148,"height":300,"scaled":false,"scroll":false,"checks":[...20 rows, all ok:true...],"warnings":[]}
+{"ok":true,"svg":"<svg role=\"img\" aria-labelledby=\"wu-d-d1-title wu-d-d1-desc\" viewBox=\"0 0 148 300\" ...>...</svg>","figureHtml":"<figure class=\"wu-figure\" data-checks=\"pass\">...</figure>","width":148,"height":300,"scaled":false,"scroll":false,"checks":[...20 rows, all ok:true...],"warnings":[]}
 $ echo $?
 0
 ```
+
+`figureHtml` is the same verified `<figure>` block `--figure` prints below
+— present whenever `ok` is `true`, `null` otherwise — so a caller can take
+either the raw `svg` or the ready-to-paste figure from one `--json` call.
 
 A budget overrun (10 nodes, over the limit of 9) fails at exit 2 before
 any geometry check runs, with a concrete `split:` suggestion:
@@ -76,12 +80,16 @@ $ echo $?
 2
 ```
 
-Wrap an `ok:true` result into the page like this (the CLI gives you
-`svg` only, not the surrounding `.wu-figure`):
+`--figure` prints the whole `<figure class="wu-figure">` block ready to
+paste into the page as-is — svg, `<figcaption>` from the IR's `caption`,
+and the original IR in `<script type="text/x-writeup-diagram">`, already
+stamped `data-checks="pass"` (only ever stamped when all 20 checks
+passed):
 
-```html
-<figure class="wu-figure">
-<!-- paste the "svg" string here verbatim -->
+```
+$ node $KIT/bin/render-diagram.mjs sample.ir.yaml --figure
+<figure class="wu-figure" data-checks="pass">
+<svg role="img" ...>...</svg>
 <figcaption>SPA が API を直接呼んでいる</figcaption>
 <script type="text/x-writeup-diagram">
 id: d1
@@ -101,7 +109,13 @@ edges:
     kind: sync
 </script>
 </figure>
+$ echo $?
+0
 ```
+
+Redirect it straight into a file (`--figure > fig.html`) or pass `--out`;
+either way, paste the result verbatim — never hand-wrap a raw `<svg>`
+yourself.
 
 ## Step 4 — lint
 
@@ -114,13 +128,24 @@ $ node $KIT/bin/lint.mjs --help
 options:
   --json                機械可読な JSON で出力する
   --baseline <prev.json> 前回の --json 出力と比較し resolved/new/persisting を判定する
-  --config <path>       .writeup.toml の場所を指定する（未指定時は cwd/.writeup.toml）
+  --config <path>       .writeup.toml の場所を指定する（未指定時は入力ファイルのディレクトリから
+                        $HOME まで祖先を探索し、見つからなければ $WRITEUP_STORE/.writeup.toml を見る）
   --surface-only        表層6検出器 + 文長/括弧カウンタのみ実行する（作業メモ用）
   --experimental        まだ定量校正されていない検出器の finding も出力する
   --genre <name>        essay/tech/business のいずれか
 
 終了コード: 0 = 実行成功（finding件数に関わらず）, 1 = 入力エラー, 2 = 設定エラー
 ```
+
+`--config` is only for pointing at a `.writeup.toml` outside that search
+path (a fixture, a second store); the normal case needs nothing extra —
+`lint.mjs` walks up from the page's own directory to `$HOME` looking for
+`.writeup.toml`, then falls back to `$WRITEUP_STORE/.writeup.toml`, so it
+finds the store's config on its own. That same file's `[private]` and
+`[cloudflare]` sections (owned by `publish.mjs`) are ignored, not
+rejected — only `[lint]` and `[[allow]]` are validated, and an `[[allow]]`
+entry needs all three of `category`, `text`, and `reason` or the config
+is treated as malformed (exit 2).
 
 Exit 0 means "ran successfully" regardless of finding count — lint is a
 report, not a gate that fails the build. A sample `--surface-only --json`
@@ -154,35 +179,6 @@ run on a short passage:
 For each finding: rewrite the passage (fix) or leave it and note the
 reason in the commit message (keep), e.g.
 `decision: 再試行方針 (lint: keep forbidden_phrase L12 — 固有の技術用語のため)`.
-
-### The `--config` trap (do not point it at the store's `.writeup.toml`)
-
-`lint.mjs`'s config loader (`bin/lib/lint/config.mjs`) only recognizes
-two top-level TOML sections: `[lint]` and `[allow]`. The store's own
-`.writeup.toml` (written by `scripts/init-store.mjs`) also carries
-`[private]` and `[cloudflare]` — required by `publish.mjs` — so pointing
-`--config` (or running with `cwd` equal to the store root, which is the
-default lookup path) at that same file makes lint exit 2:
-
-```
-$ node $KIT/bin/lint.mjs note.txt --config "$STORE/.writeup.toml" --json
-エラー: 未知の設定セクション [private]（.../.writeup.toml）
-エラー: 未知の設定セクション [cloudflare]（.../.writeup.toml）
-$ echo $?
-2
-```
-
-This was verified directly against the kit as shipped — it is not a
-misconfiguration you can fix in the store's file (removing `[private]`/
-`[cloudflare]` would break `publish.mjs`, which requires them in that
-exact file). Until the kit's lint config loader accepts (and ignores)
-unrelated top-level sections, run `lint.mjs` **without** `--config`, from
-a working directory that has no `.writeup.toml` of its own (the page's
-own folder inside the store is fine — only the store root carries the
-file). This means `[lint].disabled_rules` and `[[allow]]` entries written
-into the store's `.writeup.toml` are currently inert; do not tell a user
-they took effect. Report this as a known limitation if a user asks why
-an allowlisted finding still shows up.
 
 ## Step 5 — self-check and the `checks` meta
 
@@ -250,9 +246,9 @@ access_verified = false
 `[private].words` is a list of case-insensitive substrings `publish.mjs`
 refuses to publish if they appear anywhere in the page's title, meta
 values, or body text — see `references/publish.md`. `[cloudflare]` gates
-`--to cloudflare` the same way. `[lint]` exists per the contract (§6) but
-is currently inert when read through `lint.mjs --config` pointed at this
-same file — see the "`--config` trap" above.
+`--to cloudflare` the same way. `[lint]`/`[[allow]]` are `lint.mjs`'s own
+sections (§6) — it finds this same file automatically (Step 4 above) and
+ignores `[private]`/`[cloudflare]` rather than erroring on them.
 
 ## Steps 6-8
 

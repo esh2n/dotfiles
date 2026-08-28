@@ -58,26 +58,26 @@ diagram=fallback"` — never claim a normal run happened.
      covering this kind's required sections in order.
    - For each figure, write the diagram IR as YAML, then run:
      ```
-     node $KIT/bin/render-diagram.mjs ir.yaml --json
+     node $KIT/bin/render-diagram.mjs ir.yaml --figure > fig.html
      ```
-     This returns `{ok, svg, ...}` — `svg` is a raw `<svg>` string, not a
-     full `<figure>`. Only when `ok` is `true`, wrap it yourself into the
-     `.wu-figure` shape: the `svg`, a `<figcaption>` from the IR's
-     `caption`, then the original IR YAML in
-     `<script type="text/x-writeup-diagram">`. Exit 2 = IR invalid (fix
-     the named field, or split per the `budget` suggestion); exit 3 =
-     rendered but failed a contract §4-2 check — fix per `checks[].hint`
-     and re-render. Full detail in `references/procedure.md`.
+     (or `--json` and take the `figureHtml` field). Paste the returned
+     `<figure>` block into the page as-is — it already carries
+     `data-checks="pass"`, the `<figcaption>`, and the IR in
+     `<script type="text/x-writeup-diagram">`. Never hand-wrap a raw
+     `<svg>` yourself. Exit 2 = IR invalid (fix the named field, or split
+     per the `budget` suggestion); exit 3 = rendered but failed a
+     contract §4-2 check — fix per `checks[].hint` and re-render. Full
+     detail in `references/procedure.md`.
 4. **Lint.**
    ```
    node $KIT/bin/lint.mjs page.html --json
    ```
-   Add `--surface-only` only for 作業メモ (contract Q33). Do not point
-   `--config` at the store's `.writeup.toml` (its `[private]` /
-   `[cloudflare]` sections make lint.mjs's config loader exit 2) — see
-   `references/procedure.md`. For each finding, decide fix-or-keep;
-   findings you keep get their reason in the commit message (step 7),
-   never in the page body.
+   Add `--surface-only` only for 作業メモ (contract Q33). `lint.mjs` finds
+   the store's `.writeup.toml` automatically (ancestor search, then
+   `$WRITEUP_STORE`) — `[private]`/`[cloudflare]` sections there are fine,
+   no `--config` needed. `[[allow]]` entries need `category`, `text`, and
+   `reason`. For each finding, decide fix-or-keep; findings you keep get
+   their reason in the commit message (step 7), never in the page body.
 5. **Self-check.**
    ```
    node $KIT/bin/self-check.mjs page.html --write-meta
