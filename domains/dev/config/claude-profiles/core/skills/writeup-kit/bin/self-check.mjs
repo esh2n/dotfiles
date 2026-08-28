@@ -46,7 +46,7 @@ export const KIND_SECTIONS = {
 const ALLOWED_BODY_TAGS = new Set([
   'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
   'pre', 'code', 'figure', 'figcaption', 'svg', 'blockquote', 'dl', 'dt', 'dd',
-  'section', 'div', 'span', 'a', 'strong', 'em', 'br', 'script',
+  'section', 'div', 'span', 'a', 'strong', 'em', 'br', 'script', 'nav', 'cite',
 ])
 // A small, pragmatic exception to the "only wu-* classes" rule: the kit's
 // own reference pages (kit/samples.html, the contract) right-align/no-wrap
@@ -247,6 +247,12 @@ function checkSvgA11y(root, add) {
     if (!desc || !textContent(desc).trim()) {
       add('error', 'svg-a11y', `${label}: <desc> is missing or empty`)
     }
+    const badIds = findAll(svg, (n) => isElement(n) && attr(n, 'id'))
+      .map((n) => attr(n, 'id'))
+      .filter((id) => !id.startsWith('wu-d-'))
+    if (badIds.length) {
+      add('error', 'svg-a11y', `${label}: id(s) not prefixed "wu-d-": ${badIds.join(', ')}`)
+    }
   })
 }
 
@@ -311,14 +317,19 @@ function checkTableColumns(root, add) {
 
 // --- sentence extraction (shared by 12 and 13) --------------------------------
 
-/** Text of <main>, excluding code/pre/script (diagram IR, code samples) and
- * `.wu-meta` (a citation/path line, not prose — often has no 。！？ at all,
- * which would otherwise read as one very long "sentence"). */
+/** Text of <main>, excluding code/pre/script (diagram IR, code samples),
+ * `.wu-meta` (a citation/path line, not prose), `table` (cell values, not
+ * sentences), `nav` (`.wu-toc` link labels, not sentences), and
+ * `blockquote` (`.wu-quote`'s original/translated excerpt is someone else's
+ * writing, not the page author's prose, and the original may not even use
+ * full-width 。！？) — none of these follow sentence-final punctuation, so
+ * counting them would read as one very long "sentence" merged with
+ * whatever text happens to sit next to them in the DOM. */
 function mainProseText(root) {
   const main = findMain(root)
   if (!main) return ''
   const skip = new Set()
-  for (const n of findAll(main, (n) => isElement(n) && (['pre', 'code', 'script', 'svg'].includes(n.tag) || hasClass(n, 'wu-meta')))) {
+  for (const n of findAll(main, (n) => isElement(n) && (['pre', 'code', 'script', 'svg', 'table', 'nav', 'blockquote'].includes(n.tag) || hasClass(n, 'wu-meta')))) {
     for (const d of findAll(n, () => true)) skip.add(d)
   }
   const parts = []
@@ -367,13 +378,13 @@ function checkParentheticals(bodyText, add) {
 const MD_MAPPED_TAGS = new Set([
   'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'table', 'thead', 'tbody',
   'tr', 'th', 'td', 'pre', 'code', 'figure', 'figcaption', 'blockquote', 'section', 'div',
-  'span', 'a', 'strong', 'em', 'br', 'svg', 'script', 'cite',
+  'span', 'a', 'strong', 'em', 'br', 'svg', 'script', 'cite', 'nav',
 ])
 const MD_MAPPED_CLASSES = new Set([
   'wu-lede', 'wu-summary', 'wu-terms', 'wu-callout', 'wu-decision', 'wu-compare', 'wu-table',
   'wu-steps', 'wu-figure', 'wu-quote', 'wu-quote-original', 'wu-quote-ja', 'wu-quote-source',
   'wu-code', 'wu-diff', 'wu-chip', 'wu-meta', 'wu-open', 'wu-accent', 'wu-section', 'wu-focal',
-  'wu-eyebrow',
+  'wu-eyebrow', 'wu-toc',
 ])
 
 function checkMarkdownConvertibility(root, add) {

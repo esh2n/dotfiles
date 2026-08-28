@@ -7,7 +7,7 @@
 <meta name="kind" content="設計">
 <meta name="date" content="2026-08-28">
 <meta name="updated" content="2026-08-28">
-<meta name="checks" content="lint=skipped;self-check=skipped">
+<meta name="checks" content="lint=skipped;self-check=pass;diagram=1/1">
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <!-- kit samples live inside kit/, so this links the sibling file directly;
@@ -32,14 +32,14 @@
      get a slot in one file. Each demo is followed by a plain "メモ:"
      line quoting that component's use/avoid note. -->
 
-<p>メモ: 構造部品 &mdash; wu-page（使うとき: 常に1つ／使わないとき: &mdash;）、wu-header・wu-footer（使うとき: 常に、テンプレから逐語コピー／使わないとき: 中身を変えない）、wu-lede（使うとき: 常に1段落／使わないとき: 2段落以上）、wu-section（使うとき: 見出し2の塊、常に／使わないとき: &mdash;）は、このページの骨格そのものが見本になる。</p>
+<p>メモ: 構造部品。wu-page（使うとき: 常に1つ／使わないとき: &mdash;）。wu-header・wu-footer（使うとき: 常に、テンプレから逐語コピー／使わないとき: 中身を変えない）。wu-lede（使うとき: 常に1段落／使わないとき: 2段落以上）。wu-section（使うとき: 見出し2の塊、常に／使わないとき: &mdash;）。これらはこのページの骨格そのものが見本になる。</p>
 
 <div class="wu-summary">
 <p>画像アップロードに失敗する原因の大半は、一時的なネットワーク断とサーバー側の過負荷である。</p>
 <p>方針は指数バックオフでの自動再試行を最大3回まで行い、それでも失敗したら手動再試行に切り替える。</p>
 <p>サーバー側キューへの移譲は運用負荷が高いため今回は見送り、次のフェーズの検討事項とする。</p>
 </div>
-<p>メモ: wu-summary &mdash; 使うとき: 決定記録・設計・調査まとめの冒頭／使わないとき: 作業メモ</p>
+<p>メモ: wu-summary &mdash; 使うとき: 決定記録・設計・調査まとめの冒頭／使わないとき: 作業メモ。</p>
 
 <nav class="wu-toc">
 <p>目次</p>
@@ -59,13 +59,13 @@
 <li><a href="#open">未決・前提</a></li>
 </ol>
 </nav>
-<p>メモ: wu-toc &mdash; 使うとき: 見出し2が5つ以上／使わないとき: 短い文書</p>
+<p>メモ: wu-toc &mdash; 使うとき: 見出し2が5つ以上／使わないとき: 短い文書。</p>
 
 <section class="wu-section" id="purpose">
 <h2>目的と読者</h2>
 <p>このドキュメントは、画像アップロード機能の実装担当者と、それをレビューするテックリード向けに、失敗時の再試行方針を1つに決めることを目的とする。<span class="wu-accent">読者が持ち帰るべき結論は1つだけで、既定の再試行方式を指数バックオフにする、という点である。</span></p>
 </section>
-<p>メモ: wu-accent &mdash; 使うとき: 読者が1つだけ持ち帰る点／使わないとき: 2箇所目</p>
+<p>メモ: wu-accent &mdash; 使うとき: 読者が1つだけ持ち帰る点／使わないとき: 2箇所目。</p>
 
 <section class="wu-section" id="terms">
 <h2>用語</h2>
@@ -78,7 +78,7 @@
 <dd>上限回数まで失敗した処理を、後で調べられるように退避させておく場所。</dd>
 </dl>
 </section>
-<p>メモ: wu-terms &mdash; 使うとき: 初出の用語が3つ以上／使わないとき: 本文の言い換え</p>
+<p>メモ: wu-terms &mdash; 使うとき: 初出の用語が3つ以上／使わないとき: 本文の言い換え。</p>
 
 <section class="wu-section" id="gap">
 <h2>現状とギャップ</h2>
@@ -88,7 +88,7 @@
 </div>
 <p>この計測は、アプリのクラッシュレポート基盤から取得した直近30日分の集計に基づく。</p>
 <p class="wu-meta">crash-reports/upload-failures-2026-08.csv</p>
-<p>メモ: wu-meta &mdash; 使うとき: 主張の直後／使わないとき: 本文の代わり</p>
+<p>メモ: wu-meta &mdash; 使うとき: 主張の直後／使わないとき: 本文の代わり。</p>
 <div class="wu-callout" data-tone="warn">
 <p>再試行の上限を決めずに実装すると、障害発生時にサーバー全体の負荷が跳ね上がる。</p>
 </div>
@@ -96,7 +96,7 @@
 <div class="wu-callout" data-tone="decision">
 <p>したがって、再試行の上限は3回で固定し、利用者側の設定では変更できないようにする。</p>
 </div>
-<p>メモ: wu-callout &mdash; 使うとき: 読み飛ばすと困る1点／使わないとき: 連続3つ以上（このページでは間に文章を挟み、3つ連続を避けている）</p>
+<p>メモ: wu-callout &mdash; 使うとき: 読み飛ばすと困る1点／使わないとき: 連続3つ以上（このページでは間に文章を挟み、3つ連続を避けている）。</p>
 </section>
 
 <section class="wu-section" id="compare">
@@ -110,7 +110,7 @@
 </tbody>
 </table>
 </section>
-<p>メモ: wu-compare &mdash; 使うとき: 2〜4案を同じ観点で／使わないとき: 1案の説明、手順（4列まで）</p>
+<p>メモ: wu-compare &mdash; 使うとき: 2〜4案を同じ観点で／使わないとき: 1案の説明、手順（4列まで）。</p>
 
 <section class="wu-section" id="decision">
 <h2>決めたこと</h2>
@@ -120,7 +120,7 @@
 <p><strong>根拠:</strong> 直近の障害はいずれも再試行の集中が原因で、上限と待機時間の調整だけで再発を防げる見込みが立った。</p>
 </div>
 </section>
-<p>メモ: wu-decision &mdash; 使うとき: 決定記録／使わないとき: 候補の列挙</p>
+<p>メモ: wu-decision &mdash; 使うとき: 決定記録／使わないとき: 候補の列挙。</p>
 
 <section class="wu-section" id="errors">
 <h2>エラー分類</h2>
@@ -134,7 +134,7 @@
 </tbody>
 </table>
 </section>
-<p>メモ: wu-table &mdash; 使うとき: 値の並び／使わないとき: 散文の代わり（5列まで）</p>
+<p>メモ: wu-table &mdash; 使うとき: 値の並び／使わないとき: 散文の代わり（5列まで）。</p>
 
 <section class="wu-section" id="steps">
 <h2>進め方</h2>
@@ -145,65 +145,38 @@
 <li>障害訓練で上限3回の挙動と負荷への影響を確認する。</li>
 </ol>
 </section>
-<p>メモ: wu-steps &mdash; 使うとき: 順序に意味がある／使わないとき: 並列の列挙</p>
+<p>メモ: wu-steps &mdash; 使うとき: 順序に意味がある／使わないとき: 並列の列挙。</p>
 
 <section class="wu-section" id="figure">
 <h2>現状の経路</h2>
-<figure class="wu-figure">
-<svg role="img" aria-labelledby="wu-d-1-title" aria-describedby="wu-d-1-desc" viewBox="0 0 640 224">
-<title id="wu-d-1-title">現状のアップロード経路</title>
-<desc id="wu-d-1-desc">アップロードはクライアントからAPIを経て再試行ワーカーに渡り、失敗時の再試行はワーカー内で完結する。クライアントには最終結果だけが返る。</desc>
-<defs>
-<marker id="wu-d-arrow-filled" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-<path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
-</marker>
-<marker id="wu-d-arrow-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-<path d="M1,1 L9,5 L1,9" fill="none" stroke="currentColor" stroke-width="1.5"></path>
-</marker>
-</defs>
-<rect id="wu-d-client" x="16" y="78" width="160" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
-<text x="96" y="114" text-anchor="middle" font-size="13" fill="currentColor">クライアント</text>
-<rect id="wu-d-api" x="240" y="78" width="160" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
-<text x="320" y="114" text-anchor="middle" font-size="13" fill="currentColor">アップロードAPI</text>
-<rect id="wu-d-worker" class="wu-focal" x="464" y="78" width="160" height="64" rx="6" fill="none" stroke="currentColor" stroke-width="2"></rect>
-<text id="wu-d-worker-label" class="wu-focal" x="544" y="114" text-anchor="middle" font-size="13">再試行ワーカー</text>
-<line x1="176" y1="110" x2="234" y2="110" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-filled)"></line>
-<text x="205" y="100" text-anchor="middle" font-size="11" fill="currentColor">送信</text>
-<line x1="400" y1="110" x2="458" y2="110" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-open)"></line>
-<text x="429" y="100" text-anchor="middle" font-size="11" fill="currentColor">委譲</text>
-<g font-size="11" fill="currentColor">
-<line x1="16" y1="198" x2="46" y2="198" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-filled)"></line>
-<text x="54" y="202">sync（実線・塗り矢尻）</text>
-<line x1="300" y1="198" x2="330" y2="198" stroke="currentColor" stroke-width="1.5" marker-end="url(#wu-d-arrow-open)"></line>
-<text x="338" y="202">async（実線・開いた矢尻）</text>
-</g>
-</svg>
+<figure class="wu-figure" data-checks="pass">
+<svg role="img" aria-labelledby="wu-d-d1-title wu-d-d1-desc" viewBox="0 0 164 492" xmlns="http://www.w3.org/2000/svg"><title id="wu-d-d1-title">現状のアップロード経路</title><desc id="wu-d-d1-desc">失敗時の再試行はワーカー内で完結し、クライアントには最終結果だけが返る。</desc><defs><marker id="wu-d-d1-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker><marker id="wu-d-d1-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0.5 0.5 L9.5 5 L0.5 9.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><rect id="wu-d-d1-client" data-tone="neutral" x="20" y="12" width="124" height="44" rx="6" fill="none" stroke="currentColor" stroke-width="1"/><text id="wu-d-d1-client-label" x="82" y="38.55" font-size="13" text-anchor="middle" fill="currentColor">クライアント</text><rect id="wu-d-d1-api" data-tone="neutral" x="12" y="208" width="140" height="44" rx="6" fill="none" stroke="currentColor" stroke-width="1"/><text id="wu-d-d1-api-label" x="82" y="234.55" font-size="13" text-anchor="middle" fill="currentColor">アップロードAPI</text><rect id="wu-d-d1-worker" data-tone="neutral" class="wu-focal" x="16" y="400" width="136" height="44" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/><text id="wu-d-d1-worker-label" class="wu-focal" x="84" y="426.55" font-size="13" text-anchor="middle" fill="currentColor" font-weight="700">再試行ワーカー</text><path id="wu-d-d1-edge-0" d="M84 56 L84 208" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-d1-solid)"/><text x="44" y="136" font-size="11" fill="currentColor">送信</text><path id="wu-d-d1-edge-1" d="M84 252 L84 400" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-d1-open)"/><text x="44" y="328" font-size="11" fill="currentColor">委譲</text><g id="wu-d-d1-legend" font-size="11" fill="currentColor"><path d="M12 472 L42 472" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-d1-solid)"/><text x="50" y="476">sync</text><path d="M99 472 L129 472" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-d1-open)"/><text x="137" y="476">async</text></g></svg>
 <figcaption>失敗時の再試行はワーカー内で完結し、クライアントには最終結果だけが返る。</figcaption>
 <script type="text/x-writeup-diagram">
 id: d1
 title: 現状のアップロード経路
 caption: 失敗時の再試行はワーカー内で完結し、クライアントには最終結果だけが返る。
 nodes:
-  - id: client
-    label: クライアント
-  - id: api
-    label: アップロードAPI
-  - id: worker
-    label: 再試行ワーカー
-    emphasis: true
+- id: client
+  label: クライアント
+- id: api
+  label: アップロードAPI
+- id: worker
+  label: 再試行ワーカー
+  emphasis: true
 edges:
-  - from: client
-    to: api
-    label: 送信
-    kind: sync
-  - from: api
-    to: worker
-    label: 委譲
-    kind: async
+- from: client
+  to: api
+  label: 送信
+  kind: sync
+- from: api
+  to: worker
+  label: 委譲
+  kind: async
 </script>
 </figure>
 </section>
-<p>メモ: wu-figure &mdash; 使うとき: レンダラーの出力／使わないとき: 手書きSVG、絵文字（このM1段階はレンダラー未実装のため、手描きSVGを暫定の見本として使っている）</p>
+<p>メモ: wu-figure &mdash; 使うとき: レンダラーの出力／使わないとき: 手書きSVG、絵文字。</p>
 
 <section class="wu-section" id="quote">
 <h2>参考にした記述</h2>
@@ -213,7 +186,7 @@ edges:
 <cite class="wu-quote-source">外部アップロードSDKの実装ガイド（2026年版）、再試行に関する章</cite>
 </blockquote>
 </section>
-<p>メモ: wu-quote &mdash; 使うとき: 外部文書を根拠にする／使わないとき: 自分の文</p>
+<p>メモ: wu-quote &mdash; 使うとき: 外部文書を根拠にする／使わないとき: 自分の文。</p>
 
 <section class="wu-section" id="code">
 <h2>設定の型</h2>
@@ -224,7 +197,7 @@ edges:
   idempotencyKeyHeader: string
 }</code></pre>
 </section>
-<p>メモ: wu-code &mdash; 使うとき: DDL・型・設定／使わないとき: 見出し代わり</p>
+<p>メモ: wu-code &mdash; 使うとき: DDL・型・設定／使わないとき: 見出し代わり。</p>
 
 <section class="wu-section" id="diff">
 <h2>設定変更の差分</h2>
@@ -234,7 +207,7 @@ edges:
 +backoffFactor: 2
  idempotencyKeyHeader: "X-Upload-Idempotency-Key"</code></pre>
 </section>
-<p>メモ: wu-diff &mdash; 使うとき: 変更前後／使わないとき: &mdash;</p>
+<p>メモ: wu-diff &mdash; 使うとき: 変更前後／使わないとき: &mdash;。</p>
 
 <section class="wu-section" id="chip">
 <h2>状態タグ</h2>
@@ -245,7 +218,7 @@ edges:
 <li>実装待ち</li>
 </ul>
 </section>
-<p>メモ: wu-chip &mdash; 使うとき: タグ・状態／使わないとき: 強調・見出し</p>
+<p>メモ: wu-chip &mdash; 使うとき: タグ・状態／使わないとき: 強調・見出し。</p>
 
 <section class="wu-section" id="open">
 <h2>未決・前提</h2>
@@ -256,7 +229,7 @@ edges:
 </ul>
 </div>
 </section>
-<p>メモ: wu-open &mdash; 使うとき: 決定記録・設計の末尾／使わないとき: &mdash;</p>
+<p>メモ: wu-open &mdash; 使うとき: 決定記録・設計の末尾／使わないとき: &mdash;。</p>
 
 </main>
 

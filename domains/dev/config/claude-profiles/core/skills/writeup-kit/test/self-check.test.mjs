@@ -57,21 +57,27 @@ function itemsFor(html) {
 }
 
 describe('self-check: reference pages', () => {
-  test('kit/samples.html: figure row fails because the hand-drawn SVG lacks data-checks="pass"', () => {
+  test('kit/samples.html: figure row passes because the figure is real renderer output with data-checks="pass"', () => {
     const result = runSelfCheck(join(ROOT, 'kit', 'samples.html'))
-    assert.ok(result.errors.some((e) => e.item === 'figure-pass'), 'expected a figure-pass error')
+    assert.ok(!result.errors.some((e) => e.item === 'figure-pass'), 'expected no figure-pass error')
   })
 
-  test('kit/samples.html: chrome and required meta still pass (only content-shape rows should fail)', () => {
+  test('kit/samples.html: chrome and required meta pass', () => {
     const result = runSelfCheck(join(ROOT, 'kit', 'samples.html'))
     assert.ok(!result.errors.some((e) => e.item === 'chrome'))
     assert.ok(!result.errors.some((e) => e.item === 'required-meta'))
     assert.ok(!result.errors.some((e) => e.item === 'single-file'))
   })
 
-  test('kit/samples.html: svg a11y passes even though data-checks is missing (independent rows)', () => {
+  test('kit/samples.html: svg a11y passes', () => {
     const result = runSelfCheck(join(ROOT, 'kit', 'samples.html'))
     assert.ok(!result.errors.some((e) => e.item === 'svg-a11y'))
+  })
+
+  test('kit/samples.html: passes self-check with zero errors (only the kind-sections warning is expected)', () => {
+    const result = runSelfCheck(join(ROOT, 'kit', 'samples.html'))
+    assert.deepEqual(result.errors, [])
+    assert.ok(result.warnings.every((w) => w.item === 'kind-sections'))
   })
 
   test('a well-formed synthetic page passes with zero errors and zero warnings', () => {
@@ -128,9 +134,14 @@ describe('self-check: adversarial rows', () => {
     assert.ok(result.errors.some((e) => e.item === 'chrome'))
   })
 
-  test('row 4 (role-structure): a <nav> inside main is a disallowed element', () => {
-    const result = itemsFor(page({ body: DEFAULT_BODY + '<nav>x</nav>' }))
-    assert.ok(result.errors.some((e) => e.item === 'role-structure' && /nav/.test(e.detail)))
+  test('row 4 (role-structure): an <aside> inside main is a disallowed element', () => {
+    const result = itemsFor(page({ body: DEFAULT_BODY + '<aside>x</aside>' }))
+    assert.ok(result.errors.some((e) => e.item === 'role-structure' && /aside/.test(e.detail)))
+  })
+
+  test('row 4: a <nav> (.wu-toc) inside main is allowed', () => {
+    const result = itemsFor(page({ body: DEFAULT_BODY + '<nav class="wu-toc"><p>目次</p><ol><li><a href="#a">a</a></li></ol></nav>' }))
+    assert.ok(!result.errors.some((e) => e.item === 'role-structure' && /nav/.test(e.detail)))
   })
 
   test('row 4: a non-wu- class on a body element is an error', () => {
@@ -171,6 +182,18 @@ describe('self-check: adversarial rows', () => {
     const fig = '<figure class="wu-figure" data-checks="pass"><svg role="img"><title>t</title><desc></desc></svg></figure>'
     const result = itemsFor(page({ body: DEFAULT_BODY + fig }))
     assert.ok(result.errors.some((e) => e.item === 'svg-a11y' && /desc/.test(e.detail)))
+  })
+
+  test('row 7 (svg-a11y): an id inside the svg not prefixed "wu-d-" is an error', () => {
+    const fig = '<figure class="wu-figure" data-checks="pass"><svg role="img"><title>t</title><desc>d</desc><g id="node-1"></g></svg></figure>'
+    const result = itemsFor(page({ body: DEFAULT_BODY + fig }))
+    assert.ok(result.errors.some((e) => e.item === 'svg-a11y' && /wu-d-/.test(e.detail) && /node-1/.test(e.detail)))
+  })
+
+  test('row 7: every id inside the svg prefixed "wu-d-" clears the id-prefix row', () => {
+    const fig = '<figure class="wu-figure" data-checks="pass"><svg role="img"><title>t</title><desc>d</desc><g id="wu-d-demo-node-1"></g></svg></figure>'
+    const result = itemsFor(page({ body: DEFAULT_BODY + fig }))
+    assert.ok(!result.errors.some((e) => e.item === 'svg-a11y'))
   })
 
   test('row 8 (accent-budget): a second .wu-accent is a warning', () => {
@@ -242,6 +265,31 @@ describe('self-check: adversarial rows', () => {
   test('row 13: a single parenthetical group is not flagged', () => {
     const result = itemsFor(page({ body: DEFAULT_BODY + '<p>これは（注記1）だけを含む文である。</p>' }))
     assert.ok(!result.warnings.some((w) => w.item === 'parentheticals'))
+  })
+
+  test('row 12: table cell text is not counted as prose, even when it runs long unpunctuated', () => {
+    const s = 'あ'.repeat(130)
+    const table = `<table class="wu-table"><thead><tr><th>x</th></tr></thead><tbody><tr><td>${s}</td></tr></tbody></table>`
+    const result = itemsFor(page({ body: DEFAULT_BODY + table + '<p>結論。</p>' }))
+    assert.ok(!result.errors.some((e) => e.item === 'sentence-length'))
+    assert.ok(!result.warnings.some((w) => w.item === 'sentence-length'))
+  })
+
+  test('row 12: .wu-toc nav link labels are not counted as prose', () => {
+    const s = 'あ'.repeat(130)
+    const nav = `<nav class="wu-toc"><p>目次</p><ol><li><a href="#a">${s}</a></li></ol></nav>`
+    const result = itemsFor(page({ body: DEFAULT_BODY + nav + '<p>結論。</p>' }))
+    assert.ok(!result.errors.some((e) => e.item === 'sentence-length'))
+    assert.ok(!result.warnings.some((w) => w.item === 'sentence-length'))
+  })
+
+  test('row 12: a blockquote (.wu-quote) excerpt is not counted as prose, even without full-width punctuation', () => {
+    const quote = '<blockquote class="wu-quote"><p class="wu-quote-original">' +
+      'A very long English sentence with no full-width terminator that would otherwise merge into the surrounding prose run on and on and on.' +
+      '</p></blockquote>'
+    const result = itemsFor(page({ body: DEFAULT_BODY + quote + '<p>結論。</p>' }))
+    assert.ok(!result.errors.some((e) => e.item === 'sentence-length'))
+    assert.ok(!result.warnings.some((w) => w.item === 'sentence-length'))
   })
 
   test('row 14 (markdown-convertibility): an <input> element is outside the §7 mapping', () => {

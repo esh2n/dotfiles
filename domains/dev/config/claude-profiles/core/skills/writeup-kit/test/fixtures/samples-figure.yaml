@@ -1,0 +1,20 @@
+id: d1
+title: 現状のアップロード経路
+caption: 失敗時の再試行はワーカー内で完結し、クライアントには最終結果だけが返る。
+nodes:
+- id: client
+  label: クライアント
+- id: api
+  label: アップロードAPI
+- id: worker
+  label: 再試行ワーカー
+  emphasis: true
+edges:
+- from: client
+  to: api
+  label: 送信
+  kind: sync
+- from: api
+  to: worker
+  label: 委譲
+  kind: async
