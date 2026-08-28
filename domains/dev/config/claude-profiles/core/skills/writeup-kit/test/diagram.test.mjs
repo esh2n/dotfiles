@@ -872,3 +872,50 @@ test('grouped-layer router: cross-layer edges fanning out from one hub node no l
   const collinear = result.checks.find((c) => c.name === 'collinear-overlap')
   assert.equal(collinear.ok, true, collinear.detail)
 })
+
+// --- chain-long-labels.yaml: down-orientation layer spacing regression -----
+//
+// Before this fix, the between-layer spacing fed to elk
+// (elk.layered.spacing.nodeNodeBetweenLayers) was derived from edge-label
+// WIDTH regardless of orientation. In "down" orientation edges run
+// vertically and their labels sit beside the line, so only the label's
+// HEIGHT should matter — using width there reserved a whole label's text
+// width as *vertical* whitespace at every layer gap, and (compounded by
+// elk's own habit of giving a labeled edge a dedicated label layer padded on
+// both sides) turned a plain 4-node chain with long node labels and short
+// edge labels into a tall column of mostly whitespace.
+
+test('chain-long-labels.yaml (down orientation) keeps consecutive layer gaps under 120px', async () => {
+  const parsedIr = ir('chain-long-labels.yaml')
+  assert.equal(parsedIr.direction, 'down')
+  const out = await renderDiagram(parsedIr)
+  assert.equal(out.layout.direction, 'down')
+  const boxes = parsedIr.nodes.map((n) => out.layout.boxes.get(n.id))
+  boxes.sort((a, b) => a.y - b.y)
+  for (let i = 1; i < boxes.length; i++) {
+    const gap = boxes[i].y - (boxes[i - 1].y + boxes[i - 1].height)
+    assert.ok(gap <= 120, `gap between layer ${i - 1} and ${i} is ${gap}px, expected <= 120px`)
+  }
+})
+
+test('chain-long-labels.yaml (down orientation) passes all verify-diagram checks', async () => {
+  const parsedIr = ir('chain-long-labels.yaml')
+  const out = await renderDiagram(parsedIr)
+  const result = await verifyDiagram(parsedIr, out)
+  assert.equal(result.checks.length, 20)
+  assert.deepEqual(result.checks.filter((c) => !c.ok), [], `unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
+  assert.equal(result.ok, true)
+})
+
+test('"right" orientation layer spacing is unchanged by the "down" fix: simple.yaml / conway.yaml widths', async () => {
+  // Pinned regression values — right orientation's layer spacing formula
+  // (max edge-label width + padding) is untouched by this fix, so these
+  // must keep matching what renderDiagram already produced beforehand.
+  const expected = { 'simple.yaml': { width: 760, height: 152 }, 'conway.yaml': { width: 384, height: 472 } }
+  for (const [name, dims] of Object.entries(expected)) {
+    const raw = { ...ir(name), direction: 'right' }
+    const out = await renderDiagram(raw)
+    assert.equal(out.width, dims.width, `${name}: width changed`)
+    assert.equal(out.height, dims.height, `${name}: height changed`)
+  }
+})

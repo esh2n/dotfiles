@@ -541,10 +541,12 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
   // `via` or an explicit `from_side`/`to_side` keeps elk's real routing
   // regardless of mode — that hint asked for elk's own port logic.
   let labelSpace = 0
+  let labelLines = 1
   let inLayerLabelSpace = 0
   const edgeInputs = []
   const edgeMeta = edges.map((e, i) => {
     const labelWidth = e.label ? Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10 : 0
+    const labelLineCount = e.label ? String(e.label).split('\n').length : 1
     const hasVia = !!(e.via && e.via.length)
     const hasPorts = !!(e.from_side || e.to_side)
     const fp = partitionOf(e.from)
@@ -556,7 +558,30 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
       return { index: i, raw: e, kind: e.kind, flip: false, hasVia: false, isInLayer: true, crossLayerEligible: false, hopIds: [] }
     }
 
-    if (e.label) labelSpace = Math.max(labelSpace, labelWidth)
+    if (e.label) {
+      labelSpace = Math.max(labelSpace, labelWidth)
+      labelLines = Math.max(labelLines, labelLineCount)
+    }
+    // A plain (no via, no groups at all) edge in "down" orientation runs
+    // vertically, so its label reads sideways-on to the layering axis —
+    // handing it to elk as a real edge label hits the exact same elk
+    // quirk documented just below for groupedPlain edges (a dedicated
+    // label layer padded by nodeNodeBetweenLayers on *both* sides, doubling
+    // the requested gap: 64+64+14=142px measured on a plain 4-node chain
+    // with a single short label, before this fix). Hand-placing it the same
+    // way via/groupedPlain edges already do keeps the real layer-to-layer
+    // gap equal to what layerSpacing (see below) actually asked for.
+    //
+    // Scoped to `groups.length === 0` deliberately: a diagram with groups
+    // (whether grouped-layer/flat mode, where these edges are already
+    // groupedPlain/isInLayer and never reach here, or the older elk
+    // compound-node hierarchy from `layer: none` / forceElk) hands elk a
+    // much busier routing problem, and bypassing elk's own label-layer
+    // reservation there was found empirically to shrink elk's routing
+    // budget enough to reopen unrelated label/edge clearance and rhythm
+    // failures on conway.yaml's forced-elk case — that mode keeps its
+    // pre-existing (already-passing) elk-label behavior untouched.
+    const manualLabel = direction === 'down' && !hasVia && !groupedPlain && groups.length === 0
     const flip = e.kind === 'reply'
     const chain = hasVia ? [e.from, ...e.via, e.to] : [e.from, e.to]
     const hopCount = chain.length - 1
@@ -581,12 +606,32 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
       // what made conway.yaml's "写し取る" edges too long. `labelSpace`
       // (below) still widens the real inter-layer gap enough for our own
       // hand-placed label to fit.
-      const labels = !hasVia && !groupedPlain && e.label ? [{ id: `el${i}`, text: e.label, width: labelWidth, height: 14 }] : []
+      const labels = !hasVia && !groupedPlain && !manualLabel && e.label ? [{ id: `el${i}`, text: e.label, width: labelWidth, height: 14 }] : []
       edgeInputs.push({ id: hopId, sources: [flip ? toEnd : fromEnd], targets: [flip ? fromEnd : toEnd], labels })
     }
-    return { index: i, raw: e, kind: e.kind, flip, hasVia, isInLayer: false, crossLayerEligible: groupedPlain, hopIds }
+    return { index: i, raw: e, kind: e.kind, flip, hasVia, isInLayer: false, crossLayerEligible: groupedPlain, manualLabel, hopIds }
   })
-  const layerSpacing = Math.max(64, labelSpace + 36)
+  // Between-layer spacing must reserve room along the axis an edge label
+  // actually occupies there, which flips with orientation: "right" runs
+  // edges horizontally and stacks each label above its run, so the label's
+  // WIDTH eats into the horizontal gap between columns (unchanged below).
+  // "down" runs edges vertically and sits the label beside the line, so
+  // only the label's (line-count-driven) HEIGHT matters there — using
+  // width for "down" too was the bug: it reserved a whole label's text
+  // width as *vertical* whitespace between every layer, e.g. ~600px of gap
+  // for a couple of short 2-3 char labels on a plain 4-node chain.
+  // Between-layer spacing must reserve room along the axis an edge label
+  // actually occupies there, which flips with orientation: "right" runs
+  // edges horizontally and stacks each label above its run, so the label's
+  // WIDTH eats into the horizontal gap between columns (unchanged below).
+  // "down" runs edges vertically and sits the label beside the line, so
+  // only the label's (line-count-driven) HEIGHT matters there — using
+  // width for "down" too was the bug: it reserved a whole label's text
+  // width as *vertical* whitespace between every layer, e.g. a 216px gap
+  // for a couple of short 4-5 char labels on a plain 4-node chain.
+  const layerSpacing = direction === 'down'
+    ? Math.max(64, labelLines * 16 + 32)
+    : Math.max(64, labelSpace + 36)
   // Same-layer node spacing needs extra room only when an in-layer edge
   // carries a label (the label is centered on the connector — see
   // inLayerElbow()/draw()'s manual-label branch — and needs headroom
@@ -974,7 +1019,7 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
           if (meta.flip) raw.reverse()
           hopSections.push(raw)
         }
-        if (!meta.hasVia && e.label) {
+        if (!meta.hasVia && !meta.manualLabel && e.label) {
           for (const lb of laidEdge.labels || []) elkLabel = { x: lb.x + base.x, y: lb.y + base.y, width: lb.width, height: lb.height }
         }
       }
@@ -991,9 +1036,12 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
 
     if (e.label) {
       let lx, ly, lw, lh
-      if (meta.hasVia || meta.manualSections) {
-        // No single elk edge to attach the label to — place it manually at
-        // `label_at` (default 0.5) along the assembled path's total length.
+      if (meta.hasVia || meta.manualSections || meta.manualLabel) {
+        // No single elk edge to attach the label to (hasVia/manualSections),
+        // or elk was deliberately never given one to avoid its dummy-layer
+        // doubling (manualLabel — see the comment above where it's set) —
+        // either way, place it manually at `label_at` (default 0.5) along
+        // the assembled path's total length.
         lw = Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10
         lh = 14
         const pt = pointAtLength(snappedSections, totalPathLength(snappedSections) * (e.label_at ?? 0.5))

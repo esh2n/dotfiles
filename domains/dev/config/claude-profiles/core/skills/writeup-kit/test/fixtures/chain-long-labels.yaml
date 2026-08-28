@@ -1,0 +1,26 @@
+id: d-chain-long
+title: 長いノードラベルと短いエッジラベルの縦チェーン
+caption: down方向で層間の空白が過大にならないことを確かめる回帰フィクスチャ。
+direction: down
+nodes:
+- id: n0
+  label: アップロード可能な最大ファイルサイズの設定値
+- id: n1
+  label: 画像リサイズジョブをキューへ登録する処理
+- id: n2
+  label: 非同期ワーカーによるS3アップロード変換処理
+- id: n3
+  label: 変換結果をCDN配信バケットへ書き込む処理
+edges:
+- from: n0
+  to: n1
+  label: 上限なし
+  kind: sync
+- from: n1
+  to: n2
+  label: ページごと
+  kind: async
+- from: n2
+  to: n3
+  label: 上限なし
+  kind: sync
