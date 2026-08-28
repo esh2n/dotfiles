@@ -39,6 +39,19 @@ export function cloudflareConfig(storeDir) {
   return (cfg && typeof cfg.cloudflare === 'object' && !Array.isArray(cfg.cloudflare)) ? cfg.cloudflare : {}
 }
 
+/** Reads and parses `<store>/manifest.json`. Returns `[]` when the file is
+ * missing, unreadable, malformed JSON, or not an array — read-only lookups
+ * (id redirects, 404 "near pages" candidates) should degrade to "no
+ * candidates" rather than throw. */
+export function readManifest(storeDir) {
+  try {
+    const data = JSON.parse(readFileSync(join(storeDir, 'manifest.json'), 'utf8'))
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
 /** Stable short id for a page: the first 8 hex chars of sha256(relPath),
  * where `relPath` is the page's store-relative path with `/` separators.
  * Path-based (not content-based), so it never changes on revision and
