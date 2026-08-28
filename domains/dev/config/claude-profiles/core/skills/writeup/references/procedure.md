@@ -340,3 +340,8 @@ further to add here beyond: `build.mjs`'s observed output is
 `build: wrote manifest.json, index.html, _kit/writeup.css`, and it
 accepts `--store <dir>` the same way `self-check`/`publish` do (falls
 back to `$WRITEUP_STORE`, then `~/.local/share/writeup`).
+
+
+## Decision records: one figure per decision
+
+For kind 決定記録, treat a figure as the default for every decision that changes a path, a placement, or a state. Write a small IR (≤6 nodes) that shows the chosen route with `kind: sync` edges and the rejected route with `dashed: true` nodes/edges, render it with `render-diagram.mjs --figure`, and place the `<figure>` inside the `.wu-decision` after the 決定 line. Decisions about wording, numbers, or scope need no figure.

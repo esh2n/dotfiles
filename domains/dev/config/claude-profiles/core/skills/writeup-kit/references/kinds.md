@@ -21,7 +21,7 @@ helps" column lists the typical spots per kind; it is guidance, not a cap.
 
 | kind | Required sections | Use | Avoid | Length / where a figure helps |
 |---|---|---|---|---|
-| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, decision, compare, open, meta, steps | chip | 2,000-4,000 chars. A figure helps for: comparing options, showing which path a decision changes |
+| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, decision, figure, compare, open, meta, steps | chip | 2,000-4,000 chars. Default: one figure per decision that changes a path, a placement, or a state — the chosen route solid, the rejected one dashed; decisions about wording or numbers need none |
 | 設計 (design) | 目的と読者／用語／現状とギャップ／あるべき姿／決定点／進め方 | terms, figure, compare, code, open | chip | 3,000-8,000 chars. A figure helps for: parts and the routes between them, state transitions, before/after of a structure |
 | 調査まとめ (research summary) | 問い／結論／根拠（表）／未確認／含意 | summary, table, quote, meta | decision | 2,000-6,000 chars. A figure helps for: the current flow being investigated, where a measurement was taken |
 | 参考資料まとめ (reference roundup) | 資料一覧（表）／各資料の要点／取るもの・置き先 | table, quote, meta, chip | steps | 3,000-8,000 chars. A figure helps for: how the references relate to each other or to your own parts |
@@ -33,6 +33,10 @@ helps" column lists the typical spots per kind; it is guidance, not a cap.
 ## Skeletons
 
 ### 決定記録 (decision record)
+
+Put a `.wu-figure` inside (or right after) each `.wu-decision` whose decision
+changes where something flows or lives; show the chosen path solid and the
+rejected path dashed so the reader sees the alternative without reading it.
 
 Required sections in order: 決まったこと (what was decided) / 却下した案
 (rejected options) / 未決・前提 (open questions and assumptions) / 次のステップ
