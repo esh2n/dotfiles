@@ -5,6 +5,7 @@
 // 書き出し後、writeup-kit の bin/self-check.mjs --write-meta を実行して結果を出す。
 // writeup-kit 必須（ページ意匠そのものが kit のものなので、フォールバックはない）。
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { resolve, join, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { realpathSync } from 'node:fs'
@@ -229,12 +230,28 @@ function renderSourcesSection(sources, originRound) {
  * 決定記録の構造化データを、kit/template.html の chrome に乗せた
  * 1 枚の完全な HTML 文書にする。writeup-kit 必須（フォールバックなし）。
  * @param {ReturnType<typeof parseDecisionRecord>} parsed
- * @param {{date?: string, kitDir?: string}} [opts]
+ * @param {{date?: string, kitDir?: string, cssHref?: string}} [opts]
+ *   cssHref: store 内に置くページは kit の CSS を相対 link する（例 ../_kit/writeup.css）。
+ *   省略時はインライン（store 外の単体出力用）
  */
+
+/** 出力先が writeup の store 内なら、祖先の `_kit/writeup.css` への相対パスを返す（無ければ null）。 */
+function findStoreKitHref(dir) {
+  let cur = resolve(dir)
+  const ups = []
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(join(cur, '_kit', 'writeup.css'))) return [...ups, '_kit', 'writeup.css'].join('/')
+    const parent = dirname(cur)
+    if (parent === cur) break
+    ups.push('..'); cur = parent
+  }
+  return null
+}
+
 export async function buildDecisionPage(parsed, opts = {}) {
   const kd = kitDir(opts.kitDir)
   if (!kd) throw new Error('writeup-kit が見つかりません（decision-page.mjs は kit 必須です）')
-  const css = await kitCss(kd)
+  const css = opts.cssHref ? null : await kitCss(kd)
 
   const date = opts.date || new Date().toISOString().slice(0, 10)
   const title = stripMd(parsed.title)
@@ -267,7 +284,7 @@ export async function buildDecisionPage(parsed, opts = {}) {
     // fonts.googleapis.com 配下のパス付き URL だけを許す。preconnect の
     // オリジンだけの href は弾かれるので置かない）。
     '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">',
-    `<style>\n${css}</style>`,
+    opts.cssHref ? `<link rel="stylesheet" href="${escapeHtml(opts.cssHref)}">` : `<style>\n${css}</style>`,
     '</head>',
     '<body>',
     '<div class="wu-page">',
@@ -314,14 +331,15 @@ export async function main(argv) {
     console.error(`${inputPath}: ${e.message}`)
     return 2
   }
+  const outPath = resolve(args.out)
+  const cssHref = findStoreKitHref(dirname(outPath))
   let html
   try {
-    html = await buildDecisionPage(parsed)
+    html = await buildDecisionPage(parsed, { cssHref })
   } catch (e) {
     console.error(e.message)
     return 3
   }
-  const outPath = resolve(args.out)
   await mkdir(dirname(outPath), { recursive: true })
   await writeFile(outPath, html, 'utf8')
   console.log(outPath)
