@@ -16,3 +16,4 @@ edges:
   to_side: left
   via: [gw]
   label_at: 0.3
+  label: 認可

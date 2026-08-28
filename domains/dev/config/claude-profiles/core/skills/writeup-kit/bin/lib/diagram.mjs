@@ -167,14 +167,51 @@ async function layoutOnce(ir, direction) {
     elkNodes.set(n.id, { id: n.id, width: size.width, height: size.height, ports: [] })
   }
 
-  // Local routing hints (from_side / to_side): give the node FIXED_SIDE port
-  // constraints and an explicit port on the requested side, per node per edge.
-  const edgePorts = edges.map(() => ({}))
-  edges.forEach((e, i) => {
-    if (e.from_side) edgePorts[i].fromPort = addPort(elkNodes.get(e.from), e.from, i, 'from', e.from_side)
-    if (e.to_side) edgePorts[i].toPort = addPort(elkNodes.get(e.to), e.to, i, 'to', e.to_side)
+  // Build one elk edge per "hop". A plain edge is a single hop (from -> to).
+  // An edge with `via: [v1, v2, …]` becomes a chain of hops
+  // (from -> v1 -> v2 -> … -> to) fed to elk as real edges, so elk assigns
+  // real ports on every via node and routes each hop orthogonally between
+  // real node borders — never through a via node's interior the way a
+  // hand-rolled "route near this node" polyline would. `from_side`/`to_side`
+  // only ever apply to the chain's outer ends (the first hop's source, the
+  // last hop's target); via nodes get elk's own port choice. `reply` edges
+  // are still fed to elk reversed per hop (layering has no cycle) and
+  // flipped back per hop when draw() stitches the hops into one path.
+  //
+  // Edge labels are reserved room via `labelSpace` either way, but only a
+  // plain edge's label is attached to elk (elk positions it along its one
+  // segment). A `via` edge's label has no single elk edge to attach to —
+  // draw() places it manually at `label_at` along the assembled path's
+  // total length instead (see pointAtLength()).
+  let labelSpace = 0
+  const edgeInputs = []
+  const edgeMeta = edges.map((e, i) => {
+    const labelWidth = e.label ? Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10 : 0
+    if (e.label) labelSpace = Math.max(labelSpace, labelWidth)
+    const flip = e.kind === 'reply'
+    const hasVia = !!(e.via && e.via.length)
+    const chain = hasVia ? [e.from, ...e.via, e.to] : [e.from, e.to]
+    const hopCount = chain.length - 1
+    const hopIds = []
+    for (let h = 0; h < hopCount; h++) {
+      const hopFrom = chain[h]
+      const hopTo = chain[h + 1]
+      let fromEnd = hopFrom
+      let toEnd = hopTo
+      if (h === 0 && e.from_side) fromEnd = addPort(elkNodes.get(hopFrom), hopFrom, i, 'from', e.from_side)
+      if (h === hopCount - 1 && e.to_side) toEnd = addPort(elkNodes.get(hopTo), hopTo, i, 'to', e.to_side)
+      const hopId = `e${i}_h${h}`
+      hopIds.push(hopId)
+      const labels = !hasVia && e.label ? [{ id: `el${i}`, text: e.label, width: labelWidth, height: 14 }] : []
+      edgeInputs.push({ id: hopId, sources: [flip ? toEnd : fromEnd], targets: [flip ? fromEnd : toEnd], labels })
+    }
+    return { index: i, raw: e, kind: e.kind, flip, hasVia, hopIds }
   })
+  const layerSpacing = Math.max(64, labelSpace + 36)
 
+  // Group/node children are built only now, after every addPort() call
+  // above has already mutated each elkNode's `ports` array — finalizeNode()
+  // snapshots `ports` at this point, so ports must exist before it runs.
   const groupIndex = new Map(groups.map((g) => [g.id, g]))
   const rootGroups = groups.filter((g) => g.group === undefined)
   const childGroups = (parentId) => groups.filter((g) => g.group === parentId)
@@ -197,33 +234,6 @@ async function layoutOnce(ir, direction) {
   const children = [...rootGroups.map(buildGroupNode)]
   for (const n of nodes) if (!n.group) children.push(finalizeNode(elkNodes.get(n.id)))
 
-  let labelSpace = 0
-  const elkEdges = edges.map((e, i) => {
-    const labels = []
-    if (e.label) {
-      const w = Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10
-      labelSpace = Math.max(labelSpace, w)
-      labels.push({ id: `el${i}`, text: e.label, width: w, height: 14 })
-    }
-    // `reply` edges point back toward an earlier layer; feed them to elk
-    // reversed so layering has no cycle, then flip the drawn point order
-    // back so the arrowhead still lands on the real target.
-    const flip = e.kind === 'reply'
-    const fromEnd = edgePorts[i].fromPort || e.from
-    const toEnd = edgePorts[i].toPort || e.to
-    return {
-      id: `e${i}`,
-      sources: [flip ? toEnd : fromEnd],
-      targets: [flip ? fromEnd : toEnd],
-      labels,
-      kind: e.kind,
-      flip,
-      raw: e,
-      index: i,
-    }
-  })
-  const layerSpacing = Math.max(64, labelSpace + 36)
-
   const laid = await elk.layout({
     id: 'root',
     layoutOptions: {
@@ -240,7 +250,7 @@ async function layoutOnce(ir, direction) {
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
     },
     children,
-    edges: elkEdges.map(({ id, sources, targets, labels }) => ({ id, sources, targets, labels })),
+    edges: edgeInputs,
   })
 
   const usedKinds = EDGE_KIND_ORDER.filter((k) => edges.some((e) => e.kind === k))
@@ -252,7 +262,7 @@ async function layoutOnce(ir, direction) {
   // #7 relies on the legend box actually being inside the canvas).
   const width = snapUp4(Math.max(diagramWidth, legendWidth(usedKinds)))
   const height = snapUp4(Math.max(1, Math.ceil(laid.height)) + (usedKinds.length ? LEGEND_H : 0))
-  return { laid, elkEdges, abs, usedKinds, groupIndex, width, height }
+  return { laid, edgeMeta, abs, usedKinds, groupIndex, width, height }
 }
 
 function addPort(elkNode, nodeId, edgeIndex, role, side) {
@@ -280,7 +290,8 @@ function finalizeNode(elkNode) {
 
 function draw(ir, layout, { column, displayWidth, displayHeight }) {
   const { nodes, groups } = ir
-  const { laid, elkEdges, abs, usedKinds, width, height } = layout
+  const { laid, edgeMeta, abs, usedKinds, width, height } = layout
+  const laidById = new Map((laid.edges || []).map((e) => [e.id, e]))
   const uid = `wu-d-${ir.id}`
   const parts = []
   // Collected in parallel with the SVG string so a caller (verify-diagram)
@@ -323,39 +334,66 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
     geo.nodes.push({ id: n.id, x, y, width: w, height: h, label: n.label, tone: n.tone, emphasis: !!n.emphasis, dashed: !!n.dashed, group: n.group })
   }
 
-  // Edges. `via` bypasses elk's own bend points: elkjs has no notion of
-  // "route near this existing node without connecting to it", so a `via`
-  // hint is honored as a manual orthogonal polyline through each via
-  // node's center, inserted between elk's own start/end anchor points.
-  // routeVia detours around any *other* node box that the naive hop would
-  // cross (contract §4-2 #8) — see hopAvoiding below — but still does not
-  // avoid other edges the way elk's own router does; that residual case is
-  // caught (not fixed) by verify-diagram.mjs.
-  for (const [i, e] of (laid.edges || []).entries()) {
-    const meta = elkEdges[i]
-    const off = abs.get(e.container || 'root') || { x: 0, y: 0 }
-    const base = e.container && e.container !== 'root' ? { x: off.x, y: off.y } : { x: 0, y: 0 }
+  // Edges. A plain edge is one hop, drawn exactly as elk laid it out. A
+  // `via` edge is a chain of hops (see layoutOnce) that elk laid out and
+  // ported independently — each hop touches its via node's real border,
+  // never its interior — and is stitched here into ONE drawn path: a
+  // single <path> whose `d` uses one "M…L…" subpath per hop (so the SVG
+  // never draws a straight connector between a hop's end and the next
+  // hop's start, which could cut across the via node's box) and exactly
+  // one marker-end (SVG only ever places marker-end at the path's very
+  // last vertex, so a chain of hops draws exactly one arrowhead, on the
+  // final hop, with no marker at the via touch points in between).
+  for (const meta of edgeMeta) {
+    const e = meta.raw
     const st = edgeStyle(meta.kind, uid)
-    const geoEdge = { id: `${uid}-edge-${i}`, index: i, from: meta.raw.from, to: meta.raw.to, kind: meta.kind, sections: [], label: null }
-    for (const sec of e.sections || []) {
-      let raw = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint].map((p) => ({ x: p.x + base.x, y: p.y + base.y }))
-      if (meta.flip) raw.reverse()
-      if (meta.raw.via && meta.raw.via.length) {
-        const attached = new Set([meta.raw.from, meta.raw.to, ...meta.raw.via])
-        const obstacles = nodes.filter((n) => !attached.has(n.id)).map((n) => abs.get(n.id)).filter(Boolean)
-        raw = routeVia(raw[0], raw[raw.length - 1], meta.raw.via.map((vid) => centerOf(abs.get(vid))), obstacles, VIA_CLEARANCE)
+    const geoEdge = { id: `${uid}-edge-${meta.index}`, index: meta.index, from: e.from, to: e.to, kind: meta.kind, sections: [], label: null }
+    const hopSections = []
+    let elkLabel = null
+    for (const hopId of meta.hopIds) {
+      const laidEdge = laidById.get(hopId)
+      if (!laidEdge) continue
+      const off = abs.get(laidEdge.container || 'root') || { x: 0, y: 0 }
+      const base = laidEdge.container && laidEdge.container !== 'root' ? { x: off.x, y: off.y } : { x: 0, y: 0 }
+      for (const sec of laidEdge.sections || []) {
+        let raw = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint].map((p) => ({ x: p.x + base.x, y: p.y + base.y }))
+        if (meta.flip) raw.reverse()
+        hopSections.push(raw)
       }
-      const snapped = raw.map((p) => ({ x: snap4(p.x), y: snap4(p.y) }))
-      const pts = snapped.map((p) => `${p.x} ${p.y}`)
-      const d = `M${pts[0]} ${pts.slice(1).map((p) => `L${p}`).join(' ')}`
-      const dash = st.dash ? ` stroke-dasharray="${st.dash}"` : ''
-      parts.push(`<path id="${uid}-edge-${i}" d="${d}" fill="none" stroke="currentColor" stroke-width="1"${dash} marker-end="url(#${st.marker})"/>`)
-      geoEdge.sections.push(snapped)
+      if (!meta.hasVia && e.label) {
+        for (const lb of laidEdge.labels || []) elkLabel = { x: lb.x + base.x, y: lb.y + base.y, width: lb.width, height: lb.height }
+      }
     }
-    for (const lb of e.labels || []) {
-      const lx = snap4(lb.x + base.x), ly = snap4(lb.y + base.y)
-      parts.push(`<text x="${lx}" y="${snap4(lb.y + base.y + 11)}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(meta.raw.label)}</text>`)
-      geoEdge.label = { x: lx, y: ly, width: lb.width || Math.ceil(textWidth(meta.raw.label, EDGE_LABEL_SIZE)) + 10, height: lb.height || 14, text: meta.raw.label }
+
+    const snappedSections = hopSections.map((raw) => raw.map((p) => ({ x: snap4(p.x), y: snap4(p.y) })))
+    const d = snappedSections.map((pts) => {
+      const strs = pts.map((p) => `${p.x} ${p.y}`)
+      return `M${strs[0]} ${strs.slice(1).map((p) => `L${p}`).join(' ')}`
+    }).join(' ')
+    const dash = st.dash ? ` stroke-dasharray="${st.dash}"` : ''
+    parts.push(`<path id="${uid}-edge-${meta.index}" d="${d}" fill="none" stroke="currentColor" stroke-width="1"${dash} marker-end="url(#${st.marker})"/>`)
+    geoEdge.sections = snappedSections
+
+    if (e.label) {
+      let lx, ly, lw, lh
+      if (meta.hasVia) {
+        // No single elk edge to attach the label to — place it manually at
+        // `label_at` (default 0.5) along the assembled path's total length.
+        lw = Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10
+        lh = 14
+        const pt = pointAtLength(snappedSections, totalPathLength(snappedSections) * (e.label_at ?? 0.5))
+        lx = snap4(pt.x - lw / 2)
+        ly = snap4(pt.y - lh / 2)
+      } else if (elkLabel) {
+        lx = snap4(elkLabel.x)
+        ly = snap4(elkLabel.y)
+        lw = elkLabel.width || Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10
+        lh = elkLabel.height || 14
+      }
+      if (lx !== undefined) {
+        parts.push(`<text x="${lx}" y="${snap4(ly + 11)}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(e.label)}</text>`)
+        geoEdge.label = { x: lx, y: ly, width: lw, height: lh, text: e.label }
+      }
     }
     geo.edges.push(geoEdge)
   }
@@ -378,90 +416,40 @@ function draw(ir, layout, { column, displayWidth, displayHeight }) {
   return { svg, geo }
 }
 
-function centerOf(box) {
-  if (!box) return { x: 0, y: 0 }
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+/** Manhattan length of one axis-aligned segment. */
+function manhattanLen(a, b) {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 }
 
-// Minimum clearance a manual via-hop keeps from any node box it does not
-// intend to touch (contract §4-2 #8 asks for 2px; padded so post-snap
-// rounding of both the node box and the edge point never eats it away).
-const VIA_CLEARANCE = 8
-
-/**
- * Build an all-orthogonal polyline start -> via[0] -> ... -> end, detouring
- * around any `obstacles` box (a node the edge is not attached to) that the
- * direct hop would otherwise cut through or run too close to.
- */
-function routeVia(start, end, viaPoints, obstacles = [], margin = VIA_CLEARANCE) {
-  const points = [start, ...viaPoints, end]
-  const out = [points[0]]
-  for (let i = 1; i < points.length; i++) {
-    const prev = out[out.length - 1]
-    const next = points[i]
-    const hop = obstacles.length ? hopAvoiding(prev, next, obstacles, margin) : lShapeHop(prev, next)
-    for (const p of hop.slice(1)) out.push(p)
-  }
-  return dedupePolyline(out)
+/** Total drawn length of a `via` edge's assembled path — the sum of every
+ * segment in every hop's section, deliberately NOT counting any (undrawn)
+ * gap between one hop's end and the next hop's start at a via node's
+ * border, since `label_at` positions the label along what actually gets
+ * drawn. */
+function totalPathLength(sections) {
+  let len = 0
+  for (const sec of sections) for (let i = 1; i < sec.length; i++) len += manhattanLen(sec[i - 1], sec[i])
+  return len
 }
 
-/** The plain single-corner hop routeVia used before collision-avoidance existed. */
-function lShapeHop(prev, next) {
-  if (prev.x === next.x || prev.y === next.y) return [prev, next]
-  return [prev, { x: next.x, y: prev.y }, next]
-}
-
-/** An orthogonal hop from `from` to `to` that keeps `margin` clear of every obstacle box. */
-function hopAvoiding(from, to, obstacles, margin) {
-  const bendA = [from, { x: to.x, y: from.y }, to]
-  const bendB = [from, { x: from.x, y: to.y }, to]
-  if (!polylineHitsAny(bendA, obstacles, margin)) return dedupePolyline(bendA)
-  if (!polylineHitsAny(bendB, obstacles, margin)) return dedupePolyline(bendB)
-
-  // Both single-corner hops cut through something: detour around the
-  // union of the boxes actually in the way, going over the top or under
-  // the bottom of that union, whichever costs less vertical travel.
-  const blockers = obstacles.filter((o) => polylineHitsAny(bendA, [o], margin) || polylineHitsAny(bendB, [o], margin))
-  const top = Math.min(...blockers.map((o) => o.y)) - margin
-  const bottom = Math.max(...blockers.map((o) => o.y + o.height)) + margin
-  const costAbove = Math.abs(from.y - top) + Math.abs(to.y - top)
-  const costBelow = Math.abs(from.y - bottom) + Math.abs(to.y - bottom)
-  const laneY = costAbove <= costBelow ? top : bottom
-  return dedupePolyline([from, { x: from.x, y: laneY }, { x: to.x, y: laneY }, to])
-}
-
-function polylineHitsAny(path, obstacles, margin) {
-  for (let i = 1; i < path.length; i++) {
-    for (const o of obstacles) {
-      if (segRectDist(path[i - 1], path[i], o) < margin) return true
+/** The point `target` manhattan-length units along `sections` (see
+ * totalPathLength) — clamped to the last point if `target` overruns. */
+function pointAtLength(sections, target) {
+  let acc = 0
+  for (const sec of sections) {
+    for (let i = 1; i < sec.length; i++) {
+      const a = sec[i - 1], b = sec[i]
+      const len = manhattanLen(a, b)
+      const isLast = sec === sections[sections.length - 1] && i === sec.length - 1
+      if (acc + len >= target || isLast) {
+        const t = len === 0 ? 0 : Math.max(0, Math.min(1, (target - acc) / len))
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
+      }
+      acc += len
     }
   }
-  return false
-}
-
-/** Euclidean distance between an axis-aligned segment and a box (both treated as AABBs). */
-function segRectDist(a, b, rect) {
-  const rx1 = rect.x, rx2 = rect.x + rect.width, ry1 = rect.y, ry2 = rect.y + rect.height
-  if (a.y === b.y) {
-    const y = a.y, xlo = Math.min(a.x, b.x), xhi = Math.max(a.x, b.x)
-    const dy = y < ry1 ? ry1 - y : y > ry2 ? y - ry2 : 0
-    const dx = xhi < rx1 ? rx1 - xhi : xlo > rx2 ? xlo - rx2 : 0
-    return Math.hypot(dx, dy)
-  }
-  const x = a.x, ylo = Math.min(a.y, b.y), yhi = Math.max(a.y, b.y)
-  const dx = x < rx1 ? rx1 - x : x > rx2 ? x - rx2 : 0
-  const dy = yhi < ry1 ? ry1 - yhi : ylo > ry2 ? ylo - ry2 : 0
-  return Math.hypot(dx, dy)
-}
-
-function dedupePolyline(pts) {
-  const out = []
-  for (const p of pts) {
-    const last = out[out.length - 1]
-    if (last && last.x === p.x && last.y === p.y) continue
-    out.push(p)
-  }
-  return out
+  const last = sections[sections.length - 1]
+  return last[last.length - 1]
 }
 
 const LEGEND_PAD = 12

@@ -1,20 +1,26 @@
 #!/usr/bin/env node
 // CLI for the zero-dependency diagram renderer.
 //
-//   node bin/render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json]
+//   node bin/render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json] [--figure]
 //
 // Exit codes: 0 ok, 1 cannot read the input file, 2 the IR failed to parse
 // or validate (a one-line reason + suggestion is printed to stderr), 3 the
 // diagram rendered but failed contract §4-2 verification (the failing rows
 // and their hints are printed to stderr).
+//
+// --figure prints the verified <figure class="wu-figure" data-checks="pass">
+// block (svg + figcaption + the original IR script), ready to paste as-is,
+// instead of the bare <svg>. --json always includes a `figureHtml` field
+// (the same block, or null when verification did not pass) regardless of
+// whether --figure was also given.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { parse as parseYamlLite, YamlError } from './lib/yaml-lite.mjs'
 import { validateIR } from './lib/ir.mjs'
 import { COLUMN } from './lib/diagram.mjs'
-import { renderChecked } from './lib/verify-diagram.mjs'
+import { renderFigureHtmlChecked } from './lib/verify-diagram.mjs'
 
 export function parseArgs(argv) {
-  const args = { input: null, column: COLUMN, out: null, json: false, help: false }
+  const args = { input: null, column: COLUMN, out: null, json: false, figure: false, help: false }
   const rest = []
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
@@ -27,6 +33,8 @@ export function parseArgs(argv) {
       if (args.out === undefined) throw new Error('--out requires a path')
     } else if (a === '--json') {
       args.json = true
+    } else if (a === '--figure') {
+      args.figure = true
     } else if (a === '-h' || a === '--help') {
       args.help = true
     } else if (a.startsWith('--')) {
@@ -43,7 +51,7 @@ export function parseArgs(argv) {
   return args
 }
 
-const USAGE = 'usage: render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json]'
+const USAGE = 'usage: render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json] [--figure]'
 
 export async function main(argv) {
   let args
@@ -87,7 +95,7 @@ export async function main(argv) {
 
   let rendered
   try {
-    rendered = await renderChecked(validated.ir, { column: args.column })
+    rendered = await renderFigureHtmlChecked(validated.ir, { column: args.column, rawYaml: text })
   } catch (e) {
     console.error(`render error: ${e.message}`)
     return 2
@@ -97,6 +105,7 @@ export async function main(argv) {
     console.log(JSON.stringify({
       ok: rendered.checksOk,
       svg: rendered.svg,
+      figureHtml: rendered.checksOk ? rendered.html : null,
       width: rendered.width,
       height: rendered.height,
       scaled: rendered.scaled,
@@ -116,10 +125,11 @@ export async function main(argv) {
     return 3
   }
 
+  const output = args.figure ? rendered.html : rendered.svg
   if (args.out) {
-    writeFileSync(args.out, rendered.svg, 'utf8')
+    writeFileSync(args.out, output, 'utf8')
   } else {
-    console.log(rendered.svg)
+    console.log(output)
   }
   return 0
 }

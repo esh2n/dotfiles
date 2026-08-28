@@ -33,6 +33,66 @@ function allEdgePaths(svg) {
   return [...svg.matchAll(/<path id="(wu-d-[^"]*?-edge-\d+)"[^>]*? d="([^"]+)"/g)].map((m) => m[2])
 }
 
+/** Every attribute (name="value") on one edge path's opening <path> tag. */
+function edgeTag(svg, edgeId) {
+  const re = new RegExp(`<path id="${edgeId}"[^>]*>`)
+  const m = re.exec(svg)
+  assert.ok(m, `edge path ${edgeId} not found in svg`)
+  return m[0]
+}
+
+/** A `d` attribute's point list split into one array per "M…" subpath — a
+ * `via` edge draws one subpath per hop, so hop boundaries (at a via node's
+ * border) never get treated as a single connected segment. */
+function edgeSubpaths(svg, edgeId) {
+  const re = new RegExp(`<path id="${edgeId}"[^>]*? d="([^"]+)"`)
+  const m = re.exec(svg)
+  assert.ok(m, `edge path ${edgeId} not found in svg`)
+  return m[1].split(/(?=M)/).filter(Boolean).map((sub) => {
+    const nums = sub.match(/-?\d+(?:\.\d+)?/g).map(Number)
+    const pts = []
+    for (let i = 0; i < nums.length; i += 2) pts.push({ x: nums[i], y: nums[i + 1] })
+    return pts
+  })
+}
+
+/** True when an axis-aligned segment cuts through `box`'s strict interior
+ * (touching the border only, from an elk-terminated edge endpoint, does not
+ * count — this is what distinguishes "routed near/through a node" from
+ * "routed to touch a node's border", contract §4-2 #8's real intent). */
+function segmentEntersBoxInterior(a, b, box) {
+  const insideX = (x) => x > box.x && x < box.x + box.width
+  const insideY = (y) => y > box.y && y < box.y + box.height
+  if (a.y === b.y) {
+    if (!insideY(a.y)) return false
+    const xlo = Math.min(a.x, b.x), xhi = Math.max(a.x, b.x)
+    return xhi > box.x && xlo < box.x + box.width
+  }
+  if (!insideX(a.x)) return false
+  const ylo = Math.min(a.y, b.y), yhi = Math.max(a.y, b.y)
+  return yhi > box.y && ylo < box.y + box.height
+}
+
+/** True when any segment of any subpath enters any node's box interior. */
+function anySegmentEntersAnyNode(subpaths, boxes) {
+  for (const sec of subpaths) {
+    for (let i = 1; i < sec.length; i++) {
+      for (const box of boxes.values()) {
+        if (segmentEntersBoxInterior(sec[i - 1], sec[i], box)) return true
+      }
+    }
+  }
+  return false
+}
+
+/** Node boxes in the same post-snap coordinate space the svg's own edge
+ * points are drawn in (`renderDiagram`'s `layout.boxes` is elk's raw,
+ * pre-snap layout — off by up to a few px from what actually ends up in
+ * the markup, which is exactly what layout.geo.nodes records). */
+function geoNodeBoxes(out) {
+  return new Map(out.layout.geo.nodes.map((n) => [n.id, n]))
+}
+
 // --- CJK vs ASCII width ---------------------------------------------------
 
 test('CJK characters are estimated wider than ASCII for the same count', () => {
@@ -271,14 +331,65 @@ test('from_side/to_side hints anchor the edge to the requested side of each node
   assert.ok(Math.abs(end.x - boxB.x) <= 8, `edge does not end at B's left side (end.x=${end.x})`)
 })
 
-test('a `via` hint routes the edge near the named node, still fully orthogonal', async () => {
+test('a `via` hint routes the edge to touch the named node\'s border as a real elk endpoint, not through its interior', async () => {
   const parsedIr = ir('hints.yaml')
   const out = await renderDiagram(parsedIr)
-  const boxGw = out.layout.boxes.get('gw')
-  const pts = edgePoints(out.svg, 'wu-d-d3-edge-0')
-  const gwCenter = { x: boxGw.x + boxGw.width / 2, y: boxGw.y + boxGw.height / 2 }
-  const closest = Math.min(...pts.map((p) => Math.hypot(p.x - gwCenter.x, p.y - gwCenter.y)))
-  assert.ok(closest <= 8, `via node "gw" not visited by the edge path (closest=${closest})`)
+  const boxGw = geoNodeBoxes(out).get('gw')
+  const subpaths = edgeSubpaths(out.svg, 'wu-d-d3-edge-0')
+  // one via node -> two hops -> two "M…" subpaths in the drawn path.
+  assert.equal(subpaths.length, 2, `expected 2 subpaths (a->gw, gw->b), got ${subpaths.length}`)
+  const onBorder = (p) => (
+    Math.abs(p.x - boxGw.x) < 0.5 || Math.abs(p.x - (boxGw.x + boxGw.width)) < 0.5 ||
+    Math.abs(p.y - boxGw.y) < 0.5 || Math.abs(p.y - (boxGw.y + boxGw.height)) < 0.5
+  )
+  const hop0End = subpaths[0][subpaths[0].length - 1]
+  const hop1Start = subpaths[1][0]
+  assert.ok(onBorder(hop0End), `hop into gw does not end on its border: ${JSON.stringify(hop0End)}`)
+  assert.ok(onBorder(hop1Start), `hop out of gw does not start on its border: ${JSON.stringify(hop1Start)}`)
+})
+
+test('a `via` hint never draws a segment through the via node\'s interior (or any other node\'s)', async () => {
+  const parsedIr = ir('hints.yaml')
+  const out = await renderDiagram(parsedIr)
+  const subpaths = edgeSubpaths(out.svg, 'wu-d-d3-edge-0')
+  assert.ok(!anySegmentEntersAnyNode(subpaths, geoNodeBoxes(out)), 'a segment cuts through a node box (including "gw")')
+})
+
+test('a `via` edge draws as one <path> with exactly one arrowhead and its label at label_at', async () => {
+  const parsedIr = ir('hints.yaml')
+  const out = await renderDiagram(parsedIr)
+  const svg = out.svg
+  assert.equal((svg.match(/<path id="wu-d-d3-edge-0"/g) || []).length, 1, 'expected exactly one <path> for the via edge')
+  const tag = edgeTag(svg, 'wu-d-d3-edge-0')
+  assert.equal((tag.match(/marker-end=/g) || []).length, 1, 'expected exactly one marker-end (one arrowhead)')
+  assert.ok(!/marker-start=|marker-mid=/.test(tag), 'no marker-start/marker-mid — a via touch point must not draw an arrowhead')
+  assert.match(svg, />認可</, 'edge label text is present in the svg')
+  assert.ok(out.layout.geo.edges[0].label, 'geo.edges[0].label was not recorded')
+})
+
+test('a two-via chain (a -> v1 -> v2 -> b) draws as one path and passes all 20 checks', async () => {
+  const raw = {
+    id: 'via2', title: '2-via chain', direction: 'right',
+    nodes: [
+      { id: 'a', label: 'A' }, { id: 'v1', label: 'V1' }, { id: 'v2', label: 'V2' }, { id: 'b', label: 'B' },
+    ],
+    edges: [
+      { from: 'a', to: 'b', kind: 'sync', via: ['v1', 'v2'], label: '経由', label_at: 0.5 },
+    ],
+  }
+  const v = validateIR(raw)
+  assert.ok(v.ok, JSON.stringify(v))
+  const out = await renderDiagram(v.ir)
+  const subpaths = edgeSubpaths(out.svg, 'wu-d-via2-edge-0')
+  assert.equal(subpaths.length, 3, `expected 3 hops (a->v1, v1->v2, v2->b), got ${subpaths.length}`)
+  assert.ok(!anySegmentEntersAnyNode(subpaths, geoNodeBoxes(out)), 'a segment cuts through a node box')
+  const tag = edgeTag(out.svg, 'wu-d-via2-edge-0')
+  assert.equal((tag.match(/marker-end=/g) || []).length, 1, 'expected exactly one arrowhead')
+  assert.ok(!/marker-start=|marker-mid=/.test(tag))
+
+  const { verifyDiagram } = await import('../bin/lib/verify-diagram.mjs')
+  const result = await verifyDiagram(v.ir, out)
+  assert.deepEqual(result.checks.filter((c) => !c.ok), [], `unexpected failures: ${JSON.stringify(result.checks.filter((c) => !c.ok))}`)
 })
 
 // --- a11y ------------------------------------------------------------------

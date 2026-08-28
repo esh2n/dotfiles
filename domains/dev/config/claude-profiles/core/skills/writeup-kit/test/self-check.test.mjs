@@ -105,6 +105,30 @@ describe('self-check: adversarial rows', () => {
     assert.ok(!result.errors.some((e) => e.item === 'single-file'))
   })
 
+  test('row 1: the kit link is allowed at folder depth 1 (../_kit/writeup.css)', () => {
+    const html = page().replace('href="../_kit/writeup.css"', 'href="../_kit/writeup.css"')
+    const result = itemsFor(html)
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'))
+  })
+
+  test('row 1: the kit link is allowed at folder depth 3 (../../../_kit/writeup.css)', () => {
+    const html = page().replace('href="../_kit/writeup.css"', 'href="../../../_kit/writeup.css"')
+    const result = itemsFor(html)
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'))
+  })
+
+  test('row 1: ./writeup.css (the form used from inside _kit/ itself) is allowed', () => {
+    const html = page().replace('href="../_kit/writeup.css"', 'href="./writeup.css"')
+    const result = itemsFor(html)
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'))
+  })
+
+  test('row 1: a wrong path that merely resembles the kit link is still rejected', () => {
+    const html = page().replace('href="../_kit/writeup.css"', 'href="../_kit/style.css"')
+    const result = itemsFor(html)
+    assert.ok(result.errors.some((e) => e.item === 'single-file' && /style\.css/.test(e.detail)))
+  })
+
   test('row 2 (required-meta): a missing kind is an error', () => {
     const html = page().replace('<meta name="kind" content="作業メモ">', '')
     const result = itemsFor(html)
@@ -255,6 +279,18 @@ describe('self-check: adversarial rows', () => {
     const s = 'あ'.repeat(130)
     const result = itemsFor(page({ body: DEFAULT_BODY + `<p>${s}。</p>` }))
     assert.ok(result.errors.some((e) => e.item === 'sentence-length'))
+  })
+
+  test('row 12: two adjacent 60-char paragraphs never concatenate into one long "sentence"', () => {
+    // Neither paragraph ends with 。！？ on its own — each is one prose block
+    // (contract §5), so they must be measured independently. Concatenating
+    // them across the <p> boundary would read as one ~120-char run and
+    // wrongly warn/error.
+    const s1 = 'あ'.repeat(60)
+    const s2 = 'い'.repeat(60)
+    const result = itemsFor(page({ body: DEFAULT_BODY + `<p>${s1}</p><p>${s2}</p>` }))
+    assert.ok(!result.warnings.some((w) => w.item === 'sentence-length'), JSON.stringify(result.warnings))
+    assert.ok(!result.errors.some((e) => e.item === 'sentence-length'), JSON.stringify(result.errors))
   })
 
   test('row 13 (parentheticals): 2+ parenthetical groups in one sentence is a warning', () => {

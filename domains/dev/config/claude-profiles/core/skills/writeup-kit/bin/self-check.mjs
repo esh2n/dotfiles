@@ -92,9 +92,9 @@ export function runSelfCheck(filePath) {
   checkEmojiArrows(root, add)
   checkCalloutRuns(root, add)
   checkTableColumns(root, add)
-  const bodyText = mainProseText(root)
-  checkSentenceLength(bodyText, add)
-  checkParentheticals(bodyText, add)
+  const proseBlocks = mainProseBlocks(root)
+  checkSentenceLength(proseBlocks, add)
+  checkParentheticals(proseBlocks, add)
   checkMarkdownConvertibility(root, add)
 
   const errors = items.filter((i) => i.level === 'error')
@@ -113,8 +113,13 @@ function checkSingleFile(root, add) {
 }
 
 function isAllowedExternal(url) {
-  if (/^\.?\.?\/(?:\.\.\/)?_kit\/writeup\.css$/.test(url)) return true
-  if (url === '../_kit/writeup.css' || url === './writeup.css' || url === 'writeup.css') return true
+  // The kit link at any folder depth: one or more `../` hops up to `_kit/`
+  // (a page nested any number of folders under the store root), `./_kit/`
+  // (build.mjs's generated store-root index.html, which sits beside `_kit/`
+  // rather than under it), or the single-hop `./writeup.css` form pages
+  // inside `_kit/` itself use.
+  if (/^(?:\.\.\/)+_kit\/writeup\.css$/.test(url)) return true
+  if (url === './_kit/writeup.css' || url === './writeup.css') return true
   if (/^https:\/\/fonts\.googleapis\.com\//.test(url)) return true
   if (/^https:\/\/fonts\.gstatic\.com\//.test(url)) return true
   return false
@@ -317,27 +322,50 @@ function checkTableColumns(root, add) {
 
 // --- sentence extraction (shared by 12 and 13) --------------------------------
 
-/** Text of <main>, excluding code/pre/script (diagram IR, code samples),
- * `.wu-meta` (a citation/path line, not prose), `table` (cell values, not
- * sentences), `nav` (`.wu-toc` link labels, not sentences), and
- * `blockquote` (`.wu-quote`'s original/translated excerpt is someone else's
- * writing, not the page author's prose, and the original may not even use
- * full-width 。！？) — none of these follow sentence-final punctuation, so
- * counting them would read as one very long "sentence" merged with
- * whatever text happens to sit next to them in the DOM. */
-function mainProseText(root) {
+// Each of these is its own text run: a real prose block boundary. Text is
+// never concatenated across two of these (e.g. two adjacent <p> — one
+// missing its closing 。 — must not merge into one run and misread as a
+// single long sentence; see the regression test in self-check.test.mjs).
+const PROSE_BLOCK_TAGS = new Set(['p', 'li', 'dt', 'dd', 'figcaption', 'h2', 'h3', 'h4'])
+
+// Subtrees whose text is never prose: code/pre/script (diagram IR, code
+// samples), `.wu-meta` (a citation/path line, not prose), `table` (cell
+// values, not sentences), `nav` (`.wu-toc` link labels, not sentences),
+// `blockquote` (`.wu-quote`'s original/translated excerpt is someone
+// else's writing, not the page author's prose, and the original may not
+// even use full-width 。！？), and `svg` (diagram markup, not prose).
+const PROSE_SKIP_TAGS = new Set(['pre', 'code', 'table', 'nav', 'blockquote', 'script', 'svg'])
+
+/** A block element's own text, recursing into inline descendants (e.g. a
+ * <p>'s <strong>/<a>/<em>) but stopping at a nested prose-block tag (it
+ * gets its own separate run — e.g. a <li> containing a nested <ul><li>)
+ * or a skip subtree. */
+function blockOwnText(node, skip) {
+  let text = ''
+  for (const child of node.children || []) {
+    if (child.type === 'text') { text += child.value; continue }
+    if (!isElement(child) || skip.has(child) || PROSE_BLOCK_TAGS.has(child.tag)) continue
+    text += blockOwnText(child, skip)
+  }
+  return text
+}
+
+/** One text run per prose block element in <main> (contract §5's
+ * sentence-length/parentheses rows read each block independently — see
+ * PROSE_BLOCK_TAGS/PROSE_SKIP_TAGS above). */
+function mainProseBlocks(root) {
   const main = findMain(root)
-  if (!main) return ''
+  if (!main) return []
   const skip = new Set()
-  for (const n of findAll(main, (n) => isElement(n) && (['pre', 'code', 'script', 'svg', 'table', 'nav', 'blockquote'].includes(n.tag) || hasClass(n, 'wu-meta')))) {
+  for (const n of findAll(main, (n) => isElement(n) && (PROSE_SKIP_TAGS.has(n.tag) || hasClass(n, 'wu-meta')))) {
     for (const d of findAll(n, () => true)) skip.add(d)
   }
-  const parts = []
-  for (const n of findAll(main, (n) => n.type === 'text')) {
+  const blocks = []
+  for (const n of findAll(main, (n) => isElement(n) && PROSE_BLOCK_TAGS.has(n.tag))) {
     if (skip.has(n)) continue
-    parts.push(n.value)
+    blocks.push(blockOwnText(n, skip))
   }
-  return parts.join('')
+  return blocks
 }
 
 function splitSentences(text) {
@@ -349,24 +377,28 @@ function splitSentences(text) {
 
 // --- 12. sentence length --------------------------------------------------------
 
-function checkSentenceLength(bodyText, add) {
-  for (const s of splitSentences(bodyText)) {
-    const len = [...s].length
-    if (len > 120) {
-      add('error', 'sentence-length', `sentence over 120 chars (${len}): ${s.slice(0, 40)}…`)
-    } else if (len > 80) {
-      add('warn', 'sentence-length', `sentence over 80 chars (${len}): ${s.slice(0, 40)}…`)
+function checkSentenceLength(blocks, add) {
+  for (const block of blocks) {
+    for (const s of splitSentences(block)) {
+      const len = [...s].length
+      if (len > 120) {
+        add('error', 'sentence-length', `sentence over 120 chars (${len}): ${s.slice(0, 40)}…`)
+      } else if (len > 80) {
+        add('warn', 'sentence-length', `sentence over 80 chars (${len}): ${s.slice(0, 40)}…`)
+      }
     }
   }
 }
 
 // --- 13. parenthetical annotations -----------------------------------------------
 
-function checkParentheticals(bodyText, add) {
-  for (const s of splitSentences(bodyText)) {
-    const matches = s.match(PAREN_RE)
-    if (matches && matches.length >= 2) {
-      add('warn', 'parentheticals', `sentence has ${matches.length} parenthetical groups: ${s.slice(0, 40)}…`)
+function checkParentheticals(blocks, add) {
+  for (const block of blocks) {
+    for (const s of splitSentences(block)) {
+      const matches = s.match(PAREN_RE)
+      if (matches && matches.length >= 2) {
+        add('warn', 'parentheticals', `sentence has ${matches.length} parenthetical groups: ${s.slice(0, 40)}…`)
+      }
     }
   }
 }
