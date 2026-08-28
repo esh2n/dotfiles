@@ -1,0 +1,54 @@
+# Regression fixture (2026-08-28): the same page's "ACL の内部構造" figure — 6
+# nodes in 3 groups, 5 labeled sync edges, direction pinned to `right`.
+# Rendered as a 1972x220 SVG (data-checks="pass" data-scroll="true").
+id: d2
+title: ACL の内部構造
+caption: ACL の内部構造の図
+direction: right
+groups:
+- id: sub
+  label: 自分のサブシステム
+- id: layer
+  label: 腐敗防止層
+- id: ext
+  label: 外部サブシステム
+nodes:
+- id: client
+  label: ドメイン / ユースケース
+  group: sub
+- id: svc
+  label: Service
+  group: layer
+- id: adp
+  label: Adapter
+  group: layer
+- id: trans
+  label: Translator
+  group: layer
+- id: fac
+  label: Facade
+  group: layer
+- id: messy
+  label: 雑然としたインターフェース
+  group: ext
+edges:
+- from: client
+  to: svc
+  kind: sync
+  label: 自分の型で呼ぶ
+- from: svc
+  to: adp
+  kind: sync
+  label: サービス IF
+- from: adp
+  to: trans
+  kind: sync
+  label: 変換を依頼
+- from: adp
+  to: fac
+  kind: sync
+  label: 整えた IF で呼ぶ
+- from: fac
+  to: messy
+  kind: sync
+  label: 外部の生 IF を呼ぶ

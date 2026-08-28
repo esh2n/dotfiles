@@ -558,10 +558,6 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
       return { index: i, raw: e, kind: e.kind, flip: false, hasVia: false, isInLayer: true, crossLayerEligible: false, hopIds: [] }
     }
 
-    if (e.label) {
-      labelSpace = Math.max(labelSpace, labelWidth)
-      labelLines = Math.max(labelLines, labelLineCount)
-    }
     // A plain (no via, no groups at all) edge in "down" orientation runs
     // vertically, so its label reads sideways-on to the layering axis —
     // handing it to elk as a real edge label hits the exact same elk
@@ -582,6 +578,22 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
     // failures on conway.yaml's forced-elk case — that mode keeps its
     // pre-existing (already-passing) elk-label behavior untouched.
     const manualLabel = direction === 'down' && !hasVia && !groupedPlain && groups.length === 0
+    // Whether elk itself positions this edge's label (attached below as a
+    // real elk edge label). Only a label the renderer places by hand
+    // (via / groupedPlain / manualLabel — all placed at `label_at` along the
+    // final path) needs `labelSpace` to widen the inter-layer gap so the
+    // run is long enough to carry it: elk reserves a dedicated label-sized
+    // dummy layer for every label it places itself, padded by
+    // nodeNodeBetweenLayers on BOTH sides, so counting such a label into
+    // nodeNodeBetweenLayers as well booked its width three times over
+    // (2 x (label + 36) + label): a 13-char CJK label turned every "right"
+    // layer gap into ~530px and a 4-node, 3-group figure into a 1908px-wide
+    // sideways-scrolling SVG whose right-hand group nobody ever saw.
+    const elkPlacesLabel = !!e.label && !hasVia && !groupedPlain && !manualLabel
+    if (e.label) {
+      if (!elkPlacesLabel) labelSpace = Math.max(labelSpace, labelWidth)
+      labelLines = Math.max(labelLines, labelLineCount)
+    }
     const flip = e.kind === 'reply'
     const chain = hasVia ? [e.from, ...e.via, e.to] : [e.from, e.to]
     const hopCount = chain.length - 1
@@ -606,7 +618,7 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
       // what made conway.yaml's "写し取る" edges too long. `labelSpace`
       // (below) still widens the real inter-layer gap enough for our own
       // hand-placed label to fit.
-      const labels = !hasVia && !groupedPlain && !manualLabel && e.label ? [{ id: `el${i}`, text: e.label, width: labelWidth, height: 14 }] : []
+      const labels = elkPlacesLabel ? [{ id: `el${i}`, text: e.label, width: labelWidth, height: 14 }] : []
       edgeInputs.push({ id: hopId, sources: [flip ? toEnd : fromEnd], targets: [flip ? fromEnd : toEnd], labels })
     }
     return { index: i, raw: e, kind: e.kind, flip, hasVia, isInLayer: false, crossLayerEligible: groupedPlain, manualLabel, hopIds }
@@ -614,21 +626,15 @@ async function layoutOnce(ir, direction, { forceElk = false } = {}) {
   // Between-layer spacing must reserve room along the axis an edge label
   // actually occupies there, which flips with orientation: "right" runs
   // edges horizontally and stacks each label above its run, so the label's
-  // WIDTH eats into the horizontal gap between columns (unchanged below).
-  // "down" runs edges vertically and sits the label beside the line, so
-  // only the label's (line-count-driven) HEIGHT matters there — using
-  // width for "down" too was the bug: it reserved a whole label's text
-  // width as *vertical* whitespace between every layer, e.g. ~600px of gap
-  // for a couple of short 2-3 char labels on a plain 4-node chain.
-  // Between-layer spacing must reserve room along the axis an edge label
-  // actually occupies there, which flips with orientation: "right" runs
-  // edges horizontally and stacks each label above its run, so the label's
-  // WIDTH eats into the horizontal gap between columns (unchanged below).
-  // "down" runs edges vertically and sits the label beside the line, so
-  // only the label's (line-count-driven) HEIGHT matters there — using
-  // width for "down" too was the bug: it reserved a whole label's text
-  // width as *vertical* whitespace between every layer, e.g. a 216px gap
-  // for a couple of short 4-5 char labels on a plain 4-node chain.
+  // WIDTH eats into the horizontal gap between columns — but only for a
+  // label the renderer places by hand (`labelSpace` counts just those, see
+  // `elkPlacesLabel` above; a label elk places gets its own elk-reserved
+  // label layer instead, so the gap here stays at the 64px base). "down"
+  // runs edges vertically and sits the label beside the line, so only the
+  // label's (line-count-driven) HEIGHT matters there — using width for
+  // "down" too was the bug: it reserved a whole label's text width as
+  // *vertical* whitespace between every layer, e.g. a 216px gap for a
+  // couple of short 4-5 char labels on a plain 4-node chain.
   const layerSpacing = direction === 'down'
     ? Math.max(64, labelLines * 16 + 32)
     : Math.max(64, labelSpace + 36)

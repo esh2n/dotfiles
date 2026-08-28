@@ -929,13 +929,65 @@ test('chain-long-labels.yaml (down orientation) passes all verify-diagram checks
 
 test('"right" orientation layer spacing is unchanged by the "down" fix: simple.yaml / conway.yaml widths', async () => {
   // Pinned regression values — right orientation's layer spacing formula
-  // (max edge-label width + padding) is untouched by this fix, so these
-  // must keep matching what renderDiagram already produced beforehand.
-  const expected = { 'simple.yaml': { width: 760, height: 152 }, 'conway.yaml': { width: 384, height: 472 } }
+  // is untouched by the "down" fix, so these must keep matching what
+  // renderDiagram produces. simple.yaml was 760 wide until the "right"
+  // triple-booking fix (see the `elkPlacesLabel` comment in diagram.mjs):
+  // its 2-char labels are elk-placed, so nodeNodeBetweenLayers dropped from
+  // max(64, 32 + 36) = 68 to the 64px base on each of its two layer gaps.
+  const expected = { 'simple.yaml': { width: 744, height: 152 }, 'conway.yaml': { width: 384, height: 472 } }
   for (const [name, dims] of Object.entries(expected)) {
     const raw = { ...ir(name), direction: 'right' }
     const out = await renderDiagram(raw)
     assert.equal(out.width, dims.width, `${name}: width changed`)
     assert.equal(out.height, dims.height, `${name}: height changed`)
   }
+})
+
+// --- "right" layer gaps: elk-placed labels are booked once, not three times
+//
+// Two figures from a real page (acl-overview.yaml / acl-internals.yaml, 4-6
+// nodes in 3 groups, direction pinned to `right`) rendered 1908px and
+// 1972px wide: every layer gap was ~2 x (label + 36) + label, because
+// `labelSpace` widened nodeNodeBetweenLayers by the widest label AND elk
+// reserved its own label-sized dummy layer padded by that same spacing on
+// both sides. A label elk places itself must not count into `labelSpace`.
+
+/** Horizontal gap between consecutive group boxes (sorted by x). */
+function groupGaps(out, groupIds) {
+  const boxes = groupIds.map((id) => out.layout.boxes.get(id)).sort((a, b) => a.x - b.x)
+  const gaps = []
+  for (let i = 1; i < boxes.length; i++) gaps.push(boxes[i].x - (boxes[i - 1].x + boxes[i - 1].width))
+  return gaps
+}
+
+test('acl-overview.yaml pinned right: each group-to-group gap is at most the widest label crossing it plus 2 x 64px, not ~3 labels wide', async () => {
+  const parsed = ir('acl-overview.yaml')
+  assert.equal(parsed.direction, 'right')
+  const out = await renderDiagram(parsed, { forceElk: true })
+  assert.equal(out.layout.direction, 'right')
+  const widest = Math.max(...parsed.edges.map((e) => Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10))
+  const gaps = groupGaps(out, ['mine', 'acl', 'other'])
+  assert.equal(gaps.length, 2)
+  for (const gap of gaps) {
+    assert.ok(gap <= widest + 2 * 64 + 16, `group gap ${gap}px exceeds widest label ${widest}px + 2 x 64px spacing (was ~530px before the fix)`)
+  }
+  assert.ok(out.width < 1500, `acl-overview.yaml right width ${out.width} (was 1908 before the fix)`)
+})
+
+test('acl-internals.yaml pinned right (elk mode) shrank from 1972px: no group gap exceeds the widest label plus 2 x 64px', async () => {
+  const parsed = ir('acl-internals.yaml')
+  const out = await renderDiagram(parsed, { forceElk: true })
+  const widest = Math.max(...parsed.edges.map((e) => Math.ceil(textWidth(e.label, EDGE_LABEL_SIZE)) + 10))
+  for (const gap of groupGaps(out, ['sub', 'layer', 'ext'])) {
+    assert.ok(gap <= widest + 2 * 64 + 16, `group gap ${gap}px exceeds widest label ${widest}px + 2 x 64px spacing`)
+  }
+  assert.ok(out.width < 1700, `acl-internals.yaml right width ${out.width} (was 1972 before the fix)`)
+})
+
+test('a hand-placed (via) label still widens the "right" layer gap to fit itself: hints.yaml keeps its size', async () => {
+  // hints.yaml's only edge is a `via` edge whose label is placed by hand at
+  // label_at, so its width must still be booked into nodeNodeBetweenLayers.
+  const out = await renderDiagram({ ...ir('hints.yaml'), direction: 'right' })
+  assert.equal(out.width, 536)
+  assert.equal(out.height, 104)
 })

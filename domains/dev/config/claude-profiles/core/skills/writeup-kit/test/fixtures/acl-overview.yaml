@@ -1,0 +1,50 @@
+# Regression fixture (2026-08-28): a real page's "ACL とは" figure — 4 nodes in
+# 3 groups, 5 labeled sync edges, direction pinned to `right`. Rendered as a
+# 1908x252 SVG (data-checks="pass" data-scroll="true") that showed only its
+# left third in the column; see the "right layer gaps" tests in
+# test/diagram.test.mjs and the renderCheckedBest tests in test/verify-diagram.test.mjs.
+id: d1
+title: ACL とは
+caption: ACL とはの図
+direction: right
+groups:
+- id: mine
+  label: 自分のコンテキスト
+- id: acl
+  label: 腐敗防止層
+- id: other
+  label: 外部のコンテキスト
+nodes:
+- id: domain
+  label: ドメインモデル
+  group: mine
+- id: service
+  label: Service
+  group: acl
+- id: translator
+  label: Translator
+  group: acl
+- id: legacy
+  label: 外部システム / レガシー
+  group: other
+edges:
+- from: domain
+  to: service
+  kind: sync
+  label: 自分の型で要求
+- from: service
+  to: translator
+  kind: sync
+  label: 変換を依頼
+- from: translator
+  to: legacy
+  kind: sync
+  label: 外部の型・プロトコルで呼ぶ
+- from: legacy
+  to: translator
+  kind: sync
+  label: 外部の型で応答
+- from: translator
+  to: domain
+  kind: sync
+  label: 自分の型へ変換して返す

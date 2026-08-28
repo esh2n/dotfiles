@@ -957,8 +957,11 @@ for (const name of ['acl-overview.yaml', 'acl-internals.yaml']) {
     assert.ok(svgDisplayWidth(best.svg) <= COLUMN)
     assert.equal(best.layout.direction, 'down')
     const html = (await renderFigureHtmlChecked(parsedIr, { rawYaml: fixture(name) })).html
-    assert.match(html, /^<figure class="wu-figure" data-checks="pass"/)
-    assert.doesNotMatch(html, /data-scroll="true"/)
+    const figureTag = /^<figure[^>]*>/.exec(html)[0]
+    assert.match(figureTag, /^<figure class="wu-figure" data-checks="pass"/)
+    // The fixture's own YAML comment quotes the old `data-scroll="true"`, so
+    // only the <figure> opening tag is inspected, not the embedded IR text.
+    assert.doesNotMatch(figureTag, /data-scroll/)
   })
 }
 
