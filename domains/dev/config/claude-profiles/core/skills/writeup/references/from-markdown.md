@@ -20,7 +20,7 @@ the kit's own `to-md.mjs` mapping (`$KIT/references/page-contract.md`
 | A plain `>` blockquote with a source line | `.wu-quote` (original / translation / source) |
 | `##` / `###` / `####` | `.wu-section > h2` / `h3` / `h4` |
 | `- **name** — definition` list (3+ items) | `.wu-terms` (`<dl>`) |
-| `- **決定**: … / 重視した得失: … / 根拠: …` block | `.wu-decision` |
+| `- **決定**: … / 重視したトレードオフ: … / 根拠: …` block | `.wu-decision` |
 | GFM table, ≤4 columns, rows = options judged on the same axes | `.wu-compare` |
 | GFM table, otherwise (≤5 columns) | `.wu-table` |
 | Numbered list where order matters | `.wu-steps` (`<ol>`) |
