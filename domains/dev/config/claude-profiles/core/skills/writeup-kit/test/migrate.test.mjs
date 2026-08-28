@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path'
 import { parseFrontmatter } from '../bin/lib/migrate/frontmatter.mjs'
 import { parseAttrString, splitLabelAndAttrs } from '../bin/lib/migrate/attrs.mjs'
 import { parseOldDiagram } from '../bin/lib/migrate/old-diagram.mjs'
-import { parseOldSequence } from '../bin/lib/migrate/old-sequence.mjs'
+import { parseOldSequence, toSequenceIR } from '../bin/lib/migrate/old-sequence.mjs'
 import { parseDirectiveTree } from '../bin/lib/migrate/directive-tree.mjs'
 import { renderInline, rewritePageLink } from '../bin/lib/migrate/inline.mjs'
 import { parseBlocks, renderBlocksHtml } from '../bin/lib/migrate/blocks.mjs'
@@ -137,6 +137,15 @@ test('old-diagram: an unrecognized line is a warning, not a throw', () => {
 })
 
 // --- old-sequence.mjs -------------------------------------------------
+
+test('old-sequence: `A -> A: label` becomes an IR self-message', () => {
+  const parsed = parseOldSequence(['participant A', 'participant B', 'A -> A: 検証', 'A --> B: 結果'].join('\n'))
+  const ir = toSequenceIR(parsed, { id: 'x', title: 't', caption: 'c' })
+  assert.deepEqual(ir.messages[0], { self: 'A', label: '検証', kind: 'sync' })
+  assert.equal(ir.messages[1].from, 'A')
+  assert.equal(ir.messages[1].to, 'B')
+  assert.equal(ir.messages[1].kind, 'reply')
+})
 
 test('old-sequence: parses participants, a dashed+toned message, and a note', () => {
   const r = parseOldSequence('participant u[User]\nparticipant s[Server]\nu -> s : req\ns --> u : ok {tone=success}\nnote over s : done')

@@ -88,7 +88,10 @@ export function toSequenceIR(parsed, { id, title, caption }) {
   const messages = parsed.events.map((ev) => (
     ev.kind === 'note'
       ? { note: ev.text, over: [ev.over] }
-      : { from: ev.from, to: ev.to, label: ev.label, kind: ev.dashed ? 'reply' : 'sync' }
+      : ev.from === ev.to
+        // `A -> A: label` in the old DSL is a self-message; the IR spells it `self:`
+        ? { self: ev.from, label: ev.label, kind: ev.dashed ? 'reply' : 'sync' }
+        : { from: ev.from, to: ev.to, label: ev.label, kind: ev.dashed ? 'reply' : 'sync' }
   ))
   return { id, type: 'sequence', title, caption, participants, messages }
 }
