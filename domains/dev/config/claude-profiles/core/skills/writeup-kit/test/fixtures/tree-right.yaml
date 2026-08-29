@@ -1,0 +1,27 @@
+id: t2
+type: tree
+direction: right
+title: 設定ファイルの構成
+caption: 横向き。ルートから右へ枝分かれ
+root:
+  id: cfg
+  label: config
+  children:
+    - id: core
+      label: core
+      children:
+        - id: rules
+          label: rules
+        - id: skills
+          label: skills
+        - id: hooks
+          label: hooks
+    - id: packs
+      label: packs
+      children:
+        - id: go
+          label: go
+        - id: ts
+          label: typescript
+    - id: runtime
+      label: runtime

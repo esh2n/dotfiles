@@ -272,8 +272,8 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 11 | Polar chart | `polar` | Q | planned |
 | 12 | Loop / flywheel | `loop` | G(cyclic) | planned |
 | 13 | Nested | `nested` | L | implemented (`bin/lib/figures/nested.mjs`) |
-| 14 | Tree | `tree` | H | planned |
-| 15 | Org chart | `org-chart` | H | planned |
+| 14 | Tree | `tree` | H | implemented (`bin/lib/figures/tree.mjs`) |
+| 15 | Org chart | `org-chart` | H | implemented as `tree` with `variant: org` |
 | 16 | Layer stack | `layers` | L | implemented (`bin/lib/figures/layers.mjs`) |
 | 17 | Venn | `venn` | M | planned |
 | 18 | Pyramid / funnel | `pyramid` | H/Q | planned |

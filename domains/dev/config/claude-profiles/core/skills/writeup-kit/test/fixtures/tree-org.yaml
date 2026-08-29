@@ -1,0 +1,32 @@
+id: org1
+type: tree
+variant: org
+title: 開発組織の体制
+caption: 技術部門の下に開発と基盤の 2 チーム、事業部門の下に営業
+root:
+  id: ceo
+  label: 代表
+  sub: CEO
+  emphasis: true
+  children:
+    - id: tech
+      label: 技術部門
+      sub: CTO
+      children:
+        - id: dev
+          label: 開発チーム
+          sub: Eng Lead
+        - id: platform
+          label: 基盤チーム
+          sub: Platform Lead
+          tone: new
+    - id: biz
+      label: 事業部門
+      sub: COO
+      children:
+        - id: sales
+          label: 営業チーム
+          sub: Sales Lead
+    - id: admin
+      label: 管理部門
+      sub: CFO

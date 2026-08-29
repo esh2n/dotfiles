@@ -1,0 +1,42 @@
+id: t3
+type: tree
+title: 17 ノードの木
+root:
+  id: r
+  label: root
+  children:
+    - id: a
+      label: A
+      children:
+        - id: a1
+          label: A1
+        - id: a2
+          label: A2
+        - id: a3
+          label: A3
+        - id: a4
+          label: A4
+    - id: b
+      label: B
+      children:
+        - id: b1
+          label: B1
+        - id: b2
+          label: B2
+        - id: b3
+          label: B3
+        - id: b4
+          label: B4
+    - id: c
+      label: C
+      children:
+        - id: c1
+          label: C1
+        - id: c2
+          label: C2
+        - id: c3
+          label: C3
+        - id: c4
+          label: C4
+    - id: d
+      label: D

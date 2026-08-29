@@ -1,0 +1,24 @@
+id: t1
+type: tree
+title: 移行方式の選択肢
+caption: 段階移行を採る。一括は停止時間、並行運用は二重保守が重い
+root:
+  id: migrate
+  label: 移行方式
+  children:
+    - id: bigbang
+      label: 一括切替
+      children:
+        - id: downtime
+          label: 停止時間
+    - id: phased
+      label: 段階移行
+      emphasis: true
+      children:
+        - id: strangler
+          label: ストラングラー
+        - id: dual-write
+          label: 二重書き込み
+    - id: parallel
+      label: 並行運用
+      tone: rs
