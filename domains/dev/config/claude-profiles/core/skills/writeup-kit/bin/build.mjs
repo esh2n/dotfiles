@@ -29,8 +29,8 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { dirname, join, relative, sep } from 'node:path'
-import { resolveStoreDir, pageId, isGitRepo, gitLastCommitDatetime } from './lib/store.mjs'
+import { dirname, join, relative, resolve, sep } from 'node:path'
+import { resolveStoreDir, pageId, isGitRepo, gitLastCommitDatetime, listStores } from './lib/store.mjs'
 import { parseHtml, headMeta, titleText, decodeEntities } from './lib/html.mjs'
 import { faviconDataUri, statusFromChecks } from './lib/favicon.mjs'
 import { highlight } from './lib/highlight.mjs'
@@ -499,7 +499,17 @@ function renderGroup(g) {
     `</details>`
 }
 
-function renderIndexHtml(records) {
+/** The registry name of `storeDir` (work / learn …), or '' when the store is
+ * not registered — the index shows it so two open stores are told apart. */
+function storeNameFor(storeDir) {
+  let stores = []
+  try { stores = listStores() } catch { return '' }
+  const here = resolve(storeDir)
+  const hit = stores.find((st) => resolve(st.path) === here)
+  return hit ? hit.name : ''
+}
+
+function renderIndexHtml(records, { storeName = '' } = {}) {
   const kindCounts = new Map()
   const folderCounts = new Map()
   for (const r of records) {
@@ -523,7 +533,7 @@ function renderIndexHtml(records) {
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>writeup</title>
+<title>${storeName ? `writeup · ${escapeHtml(storeName)}` : 'writeup'}</title>
 <meta name="description" content="writeup store の検索">
 <meta name="robots" content="noindex">
 <link rel="icon" href="${faviconDataUri({ kind: 'index' })}">
@@ -532,6 +542,7 @@ function renderIndexHtml(records) {
 <style data-index>
 .wu-idx-search{width:100%;box-sizing:border-box;padding:var(--wu-sp-3) var(--wu-sp-4);font-size:var(--wu-fs-4);font-family:inherit;color:var(--wu-ink);background:var(--wu-surface);border:var(--wu-bw-2) solid var(--wu-rule);border-radius:var(--wu-radius-2);}
 .wu-idx-filters{display:flex;flex-wrap:wrap;gap:var(--wu-sp-2);margin:var(--wu-sp-4) 0;padding:0;list-style:none;}
+.wu-idx-sep{width:1px;align-self:stretch;background:var(--wu-rule);margin:0 var(--wu-sp-1);}
 .wu-fchip{cursor:pointer;font:inherit;padding:var(--wu-sp-1) var(--wu-sp-3);border:var(--wu-bw-1) solid var(--wu-rule);border-radius:var(--wu-radius-3);background:var(--wu-surface);color:var(--wu-ink-2);font-family:var(--wu-font-heading);font-weight:700;font-size:var(--wu-fs-1);line-height:1.6;white-space:nowrap;}
 .wu-fchip.is-active{background:var(--wu-ink);color:var(--wu-surface);border-color:var(--wu-ink);}
 .wu-idx-bar{display:flex;align-items:center;justify-content:space-between;gap:var(--wu-sp-4);margin:var(--wu-sp-3) 0;flex-wrap:wrap;}
@@ -570,14 +581,14 @@ function renderIndexHtml(records) {
 <body>
 <div class="wu-page">
 <header class="wu-header">
-<p class="wu-eyebrow">writeup store</p>
-<h1>writeup</h1>
+<p class="wu-eyebrow">writeup store${storeName ? ` · ${escapeHtml(storeName)}` : ''}</p>
+<h1>${storeName ? escapeHtml(storeName) : 'writeup'}</h1>
 <p class="wu-lede">題名・要約・slug・id で検索して開く。</p>
 </header>
 <main>
 <section class="wu-section">
 <input id="wu-q" class="wu-idx-search" type="search" autofocus placeholder="題名・要約・slug・id">
-<ul class="wu-idx-filters" id="wu-chips">${kindChips}${folderChips}</ul>
+<ul class="wu-idx-filters" id="wu-chips">${kindChips}<li class="wu-idx-sep" aria-hidden="true"></li>${folderChips}</ul>
 <div class="wu-idx-bar">
 <p id="wu-count" class="wu-idx-count">${records.length} 件中 ${records.length} 件 &middot; ${groups.length} グループ</p>
 <div class="wu-idx-viewbar">
@@ -792,7 +803,7 @@ export function buildStore(storeDir, { check = false } = {}) {
   const existingManifest = existsSync(manifestPath) ? readFileSync(manifestPath, 'utf8') : null
   const manifestChanged = existingManifest !== manifestText
 
-  const indexHtml = renderIndexHtml(records)
+  const indexHtml = renderIndexHtml(records, { storeName: storeNameFor(storeDir) })
   const indexPath = join(storeDir, 'index.html')
   const existingIndex = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : null
   const indexChanged = existingIndex !== indexHtml
