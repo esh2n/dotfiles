@@ -257,13 +257,16 @@ test('e2e: steps directive becomes an ol.wu-steps (written page contains three <
   rmSync(dest, { recursive: true, force: true })
 })
 
-test('e2e: cells directive is converted to a wu-table', async () => {
+test('e2e: cells directive is converted to a .wu-cells strip, not a table', async () => {
   const dest = tmpDest()
   const { entry } = await migrateOne('2026-01-03-cells.md', { dryRun: false, dest })
   const html = readFileSync(join(dest, entry.dest), 'utf8')
   assert.equal(entry.directives.cells, 1)
-  assert.match(html, /class="wu-table"/)
-  assert.match(html, /境界の前後で 200 件が通過する/)
+  assert.match(html, /<div class="wu-cells">/)
+  assert.equal((html.match(/class="wu-cells-row"/g) || []).length, 2)
+  assert.match(html, /<p class="wu-cells-title">境界のテスト<\/p>/)
+  assert.match(html, /<p class="wu-cells-note">境界の前後で 200 件が通過する<\/p>/)
+  assert.doesNotMatch(html, /<th>行<\/th>/)
   rmSync(dest, { recursive: true, force: true })
 })
 

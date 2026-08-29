@@ -5,6 +5,7 @@
 
 import { escapeHtml, irToYaml } from './util.mjs'
 import { renderInline } from './inline.mjs'
+import { parseCells, cellsHtml } from '../cells.mjs'
 import { parseBlocks, renderBlocksHtml } from './blocks.mjs'
 import { parseOldDiagram } from './old-diagram.mjs'
 import { parseOldSequence, toSequenceIR, sequenceIrToYaml } from './old-sequence.mjs'
@@ -38,52 +39,37 @@ export function renderSteps(body) {
   return { html: `<ol class="wu-steps">\n${lis}\n</ol>`, warnings: [] }
 }
 
-// --- cells / scorebars (both fall back to a plain table) -----------------
+// --- cells (the `.wu-cells` component) / scorebars (a plain table) --------
 
-function parseCellSuffixes(raw) {
-  let text = raw.trim()
-  let tone
-  let count
-  const toneMatch = /@([a-zA-Z]+)/.exec(text)
-  if (toneMatch) { tone = toneMatch[1]; text = (text.slice(0, toneMatch.index) + text.slice(toneMatch.index + toneMatch[0].length)).trim() }
-  const countMatch = /\*(\d+)/.exec(text)
-  if (countMatch) { count = Number(countMatch[1]); text = (text.slice(0, countMatch.index) + text.slice(countMatch.index + countMatch[0].length)).trim() }
-  if (text === '_') text = ''
-  return { text, tone, count: count && count > 1 ? count : undefined }
-}
-
-function cellCaption(cell) {
-  const bits = []
-  if (cell.tone) bits.push(cell.tone)
-  if (cell.count) bits.push(`×${cell.count}`)
-  return bits.length ? `${cell.text} (${bits.join(', ')})` : cell.text
-}
-
+/**
+ * `:::cells` → the kit's `.wu-cells` component: one thing split into
+ * labelled parts, drawn as adjacent boxes in a strip. The grammar, the
+ * old-tone → kit-tone map, the accent budget and the markup all live in
+ * bin/lib/cells.mjs so the component and this migration cannot drift.
+ *
+ * Scoring bars (`:::scorebars`) deliberately stay a table — see
+ * renderScorebars() below.
+ */
 export function renderCells(body, attrs) {
-  const rows = []
-  for (const rawLine of body.split('\n')) {
-    const line = rawLine.trim()
-    if (line === '') continue
-    if (line.startsWith('row')) {
-      const rest = line.slice(3).trim()
-      const segs = rest.split('|')
-      const label = segs.shift().trim()
-      const cells = segs.map((s) => cellCaption(parseCellSuffixes(s))).filter((s) => s !== '')
-      rows.push([label || '(no label)', cells.join('; ')])
-    } else if (line.startsWith('note')) {
-      const rest = line.slice(4).trim()
-      const cell = parseCellSuffixes(rest)
-      rows.push(['note', cellCaption(cell)])
-    }
+  const parsed = parseCells(body)
+  const warnings = [...parsed.warnings]
+  for (const key of Object.keys(attrs)) {
+    if (key !== 'title') warnings.push(`cells: unsupported attribute ignored: ${key}`)
   }
-  const title = attrs.title ? `<p><strong>${renderInline(attrs.title)}</strong></p>\n` : ''
-  const body_ = rows.map((r) => `<tr><td>${renderInline(r[0])}</td><td>${renderInline(r[1])}</td></tr>`).join('\n')
   return {
-    html: `${title}<table class="wu-table">\n<thead><tr><th>行</th><th>内容</th></tr></thead>\n<tbody>\n${body_}\n</tbody>\n</table>`,
-    warnings: [],
+    html: cellsHtml(parsed, { title: attrs.title, inline: renderInline }),
+    warnings,
   }
 }
 
+/**
+ * `:::scorebars` → a plain table, on purpose. Every one of the 11 real uses
+ * is "2–8 options scored 1–5 against a handful of criteria", which the
+ * figure survey puts squarely in the table lane ("3 列の表で伝わるなら表"),
+ * and which the decision-record research found in none of the design
+ * documents we measured. The table is the honest rendering; do not replace
+ * it with a bar figure.
+ */
 export function renderScorebars(body, attrs) {
   const rows = []
   const axesOrder = []
