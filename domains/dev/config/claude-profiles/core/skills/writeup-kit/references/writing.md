@@ -34,6 +34,7 @@ Read by the writeup, grilling, eli5 and show-me skills before they draft Japanes
 - Explain the mechanism first, then hand over the name: `GPS で現在地を取り、最寄りの避難所までの経路を音声で案内する。この機能を「避難誘導モード」と呼ぶ。`
 - Define each term once, in `.wu-terms` (`<dt>` name, `<dd>` one line), when three or more terms appear for the first time. Then use exactly that spelling everywhere — no switching between `リトライ` / `再試行` / `retry` on the same page.
 - Do not paraphrase body text into `.wu-terms`; it holds definitions only.
+- Keep engineering loanwords the way engineers say them — katakana or English: バージョン, トレードオフ, スコープ, コントラスト, レンダラー, シングルソースオブトゥルース, タイプ (of a figure). Do not "translate" them into kanji (版, 正本, 索引, 型, 走査): the reader then has to translate them back. Native Japanese words are fine where they are the everyday word (決定, 根拠, 却下).
 
 ## 5. `.wu-summary`
 
