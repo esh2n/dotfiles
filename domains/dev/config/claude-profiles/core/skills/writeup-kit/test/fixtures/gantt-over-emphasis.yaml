@@ -1,0 +1,20 @@
+id: g5
+type: gantt
+title: 強調しすぎ
+unit: ordinal
+tasks:
+  - id: a
+    label: A
+    from: 0
+    to: 1
+    emphasis: true
+  - id: b
+    label: B
+    from: 2
+    to: 3
+    emphasis: true
+  - id: c
+    label: C
+    from: 4
+    to: 5
+    emphasis: true

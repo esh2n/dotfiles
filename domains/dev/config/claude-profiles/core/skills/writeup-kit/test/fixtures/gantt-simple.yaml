@@ -1,0 +1,27 @@
+id: g1
+type: gantt
+title: 2 月のリリース作業
+caption: 実装のあとに検証、検証の終わりが公開判定
+unit: day
+tasks:
+  - id: impl
+    label: 実装
+    from: 2026-02-02
+    to: 2026-02-13
+    tone: ts
+  - id: review
+    label: レビュー
+    from: 2026-02-09
+    to: 2026-02-17
+  - id: verify
+    label: 検証
+    from: 2026-02-16
+    to: 2026-02-20
+    emphasis: true
+  - id: go
+    label: 公開判定
+    from: 2026-02-23
+    milestone: true
+deps:
+  - from: verify
+    to: go

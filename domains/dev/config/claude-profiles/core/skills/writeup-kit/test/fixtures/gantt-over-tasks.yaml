@@ -1,0 +1,58 @@
+id: g3
+type: gantt
+title: スプリント計画
+caption: 13 本の作業
+unit: ordinal
+tasks:
+  - id: t1
+    label: 作業 1
+    from: 1
+    to: 2
+  - id: t2
+    label: 作業 2
+    from: 2
+    to: 3
+  - id: t3
+    label: 作業 3
+    from: 3
+    to: 4
+  - id: t4
+    label: 作業 4
+    from: 4
+    to: 5
+  - id: t5
+    label: 作業 5
+    from: 5
+    to: 6
+  - id: t6
+    label: 作業 6
+    from: 6
+    to: 7
+  - id: t7
+    label: 作業 7
+    from: 7
+    to: 8
+  - id: t8
+    label: 作業 8
+    from: 8
+    to: 9
+  - id: t9
+    label: 作業 9
+    from: 9
+    to: 10
+  - id: t10
+    label: 作業 10
+    from: 10
+    to: 11
+  - id: t11
+    label: 作業 11
+    from: 11
+    to: 12
+  - id: t12
+    label: 作業 12
+    from: 12
+    to: 13
+  - id: t13
+    label: 作業 13
+    from: 13
+    to: 14

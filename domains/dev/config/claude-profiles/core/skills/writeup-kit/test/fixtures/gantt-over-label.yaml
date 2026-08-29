@@ -1,0 +1,17 @@
+id: g4
+type: gantt
+title: 月次計画
+unit: month
+tasks:
+  - id: a
+    label: 要件定義とステークホルダー合意
+    from: 2026-01
+    to: 2026-02
+  - id: b
+    label: 実装
+    from: 2026-03
+    to: 2026-05
+  - id: c
+    label: 公開
+    from: 2026-06
+    milestone: true

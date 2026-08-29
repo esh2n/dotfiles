@@ -1,0 +1,62 @@
+id: g2
+type: gantt
+title: 基盤移行の段取り
+caption: 準備・移行・定着の 3 段階。凍結の後に移行を始め、切替の後に旧系を止める
+unit: week
+range:
+  from: 2026-W10
+  to: 2026-W21
+tasks:
+  - id: inventory
+    label: 棚卸し
+    group: 準備
+    from: 2026-W10
+    to: 2026-W11
+  - id: design
+    label: 移行設計
+    group: 準備
+    from: 2026-W11
+    to: 2026-W13
+    tone: ts
+  - id: freeze
+    label: 仕様凍結
+    group: 準備
+    from: 2026-W13
+    milestone: true
+  - id: migrate
+    label: データ移行
+    group: 移行
+    from: 2026-W14
+    to: 2026-W16
+    emphasis: true
+    tone: new
+  - id: verify
+    label: 並行検証
+    group: 移行
+    from: 2026-W16
+    to: 2026-W18
+    tone: new
+  - id: cutover
+    label: 切替
+    group: 移行
+    from: 2026-W19
+    milestone: true
+    emphasis: true
+  - id: watch
+    label: 監視強化
+    group: 定着
+    from: 2026-W19
+    to: 2026-W20
+  - id: retire
+    label: 旧系停止
+    group: 定着
+    from: 2026-W21
+    to: 2026-W21
+    tone: rs
+deps:
+  - from: freeze
+    to: migrate
+  - from: verify
+    to: cutover
+  - from: cutover
+    to: retire

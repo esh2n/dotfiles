@@ -280,7 +280,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 19 | Bar chart (incl. dumbbell) | `bar` | Q / D | planned |
 | 20 | Treemap | `treemap` | Q | planned |
 | 21 | Line chart (incl. slopegraph, ridgeline) | `line` | Q / D | planned |
-| 22 | Gantt | `gantt` | S | planned |
+| 22 | Gantt | `gantt` | S | implemented (`bin/lib/figures/gantt.mjs`) |
 | 23 | Scatter / bubble | `scatter` | Q | planned |
 | 24 | High-Level | `high-level` | G+L | planned |
 | 25 | Process | `process` | G+L(grid) | implemented (`bin/lib/figures/process.mjs`) |
