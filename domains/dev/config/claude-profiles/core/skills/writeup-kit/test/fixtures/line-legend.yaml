@@ -1,0 +1,13 @@
+id: l6
+type: line
+title: 凡例帯に落ちる折れ線
+caption: 直接ラベルが長すぎるので凡例帯を使う
+x:
+  values: [Q1, Q2, Q3, Q4]
+series:
+- id: a
+  label: 新アーキテクチャ移行後の月間コスト
+  values: [10, 12, 9, 8]
+- id: b
+  label: 旧アーキテクチャ据え置きの月間コスト
+  values: [10, 11, 12, 13]

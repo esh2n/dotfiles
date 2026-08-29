@@ -1,0 +1,23 @@
+id: l3
+type: line
+variant: ridgeline
+title: リージョン別レイテンシ分布
+caption: 10ms ビンごとのリクエスト比率（%）。ap-northeast-1 が最も裾が短い
+unit: '%'
+x:
+  label: レイテンシ（ms）
+  values: ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90', '100', '110']
+series:
+- id: tokyo
+  label: ap-northeast-1
+  emphasis: true
+  values: [2, 18, 34, 22, 12, 6, 3, 2, 1, 0, 0, 0]
+- id: virginia
+  label: us-east-1
+  values: [0, 4, 12, 22, 26, 18, 10, 5, 2, 1, 0, 0]
+- id: frankfurt
+  label: eu-central-1
+  values: [0, 2, 8, 14, 20, 22, 16, 10, 5, 2, 1, 0]
+- id: sydney
+  label: ap-southeast-2
+  values: [0, 1, 3, 6, 10, 15, 20, 18, 14, 8, 4, 1]

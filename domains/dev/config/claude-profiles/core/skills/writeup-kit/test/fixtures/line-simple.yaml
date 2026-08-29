@@ -1,0 +1,19 @@
+id: l1
+type: line
+title: API p95 レイテンシの推移
+caption: 週次の p95（ms）。search は 3 月第 2 週に計測欠損
+unit: ms
+x:
+  label: 週
+  values: [W01, W02, W03, W04, W05, W06, W07, W08]
+series:
+- id: search
+  label: 検索
+  emphasis: true
+  values: [420, 410, 380, null, 300, 240, 200, 180]
+- id: list
+  label: 一覧
+  values: [260, 250, 255, 240, 230, 220, 215, 210]
+- id: detail
+  label: 詳細
+  values: [150, 148, 152, 149, 145, 142, 140, 140]

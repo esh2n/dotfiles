@@ -1,0 +1,34 @@
+id: l2
+type: line
+variant: slopegraph
+title: 移行前後の p95 レイテンシ
+caption: 8 エンドポイントの p95（ms）。強調は今回の移行対象
+unit: ms
+x:
+  values: [移行前, 移行後]
+series:
+- id: search
+  label: 検索
+  emphasis: true
+  values: [420, 180]
+- id: list
+  label: 一覧
+  values: [260, 210]
+- id: detail
+  label: 詳細
+  values: [150, 140]
+- id: export
+  label: エクスポート
+  values: [900, 640]
+- id: login
+  label: ログイン
+  values: [120, 125]
+- id: upload
+  label: アップロード
+  values: [700, 320]
+- id: report
+  label: レポート
+  values: [640, 630]
+- id: settings
+  label: 設定
+  values: [130, 128]

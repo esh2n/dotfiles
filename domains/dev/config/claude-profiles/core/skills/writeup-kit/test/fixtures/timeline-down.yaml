@@ -1,0 +1,22 @@
+id: releases
+type: timeline
+title: リリース履歴
+caption: v1 から v2 まで、間隔は実際の日数に比例
+direction: down
+events:
+  - id: v1
+    label: v1.0
+    at: 2025-10-01
+  - id: v11
+    label: v1.1
+    at: 2025-12-01
+    note: 修正のみ
+  - id: v15
+    label: v1.5
+    at: 2026-02-01
+    tone: ts
+  - id: v2
+    label: v2.0
+    at: 2026-08-01
+    emphasis: true
+    note: 互換性なし

@@ -1,0 +1,20 @@
+id: rollout
+type: timeline
+title: 段階的ロールアウト
+caption: 社内利用から全ユーザーまで 4 段階
+events:
+  - id: internal
+    label: 社内限定
+    at: Phase 1
+  - id: beta
+    label: ベータ
+    at: Phase 2
+    note: 希望者 200 名
+  - id: ga
+    label: 一般公開
+    at: Phase 3
+    emphasis: true
+  - id: default
+    label: 既定で有効
+    at: Phase 4
+    tone: new

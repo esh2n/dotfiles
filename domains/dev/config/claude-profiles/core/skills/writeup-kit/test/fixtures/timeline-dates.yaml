@@ -1,0 +1,24 @@
+id: incident
+type: timeline
+title: 障害対応の時系列
+caption: 検知から復旧まで、3 月 3 日と 4 日の 2 件が密集
+events:
+  - id: deploy
+    label: デプロイ
+    at: 2026-01-10
+  - id: detect
+    label: 検知
+    at: 2026-03-03
+    tone: rs
+  - id: rollback
+    label: ロールバック
+    at: 2026-03-04
+    emphasis: true
+    note: 影響 2 時間
+  - id: postmortem
+    label: ポストモーテム
+    at: 2026-05-15
+  - id: fix
+    label: 恒久対策
+    at: 2026-10-01
+    tone: new
