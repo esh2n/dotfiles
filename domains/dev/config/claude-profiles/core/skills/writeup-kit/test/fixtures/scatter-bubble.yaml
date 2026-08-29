@@ -1,0 +1,66 @@
+id: s2
+type: scatter
+title: 施策の工数と効果
+caption: 円の面積は影響ユーザー数。強調は今期の着手候補
+x:
+  label: 工数
+  unit: 人日
+y:
+  label: 効果
+  unit: pt
+size:
+  label: 影響ユーザー数
+  unit: 人
+series:
+- id: platform
+  label: 基盤
+- id: feature
+  label: 機能
+points:
+- id: cache
+  label: キャッシュ
+  x: 12
+  y: 68
+  size: 4200
+  series: platform
+  emphasis: true
+- id: index
+  label: 索引再設計
+  x: 30
+  y: 55
+  size: 3600
+  series: platform
+- id: batch
+  label: バッチ分割
+  x: 18
+  y: 25
+  size: 900
+  series: platform
+- id: search
+  label: 検索改善
+  x: 45
+  y: 80
+  size: 5200
+  series: feature
+- id: export
+  label: エクスポート
+  x: 8
+  y: 30
+  size: 700
+  series: feature
+- id: mobile
+  label: モバイル対応
+  x: 60
+  y: 62
+  size: 2400
+  series: feature
+- id: notify
+  x: 22
+  y: 45
+  size: 1500
+  series: feature
+- id: audit
+  x: 38
+  y: 20
+  size: 600
+  series: platform

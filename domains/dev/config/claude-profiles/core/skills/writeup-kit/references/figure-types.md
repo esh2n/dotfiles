@@ -281,7 +281,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 20 | Treemap | `treemap` | Q | implemented (`bin/lib/figures/treemap.mjs`) |
 | 21 | Line chart (incl. slopegraph, ridgeline) | `line` | Q / D | implemented (`bin/lib/figures/line.mjs`) |
 | 22 | Gantt | `gantt` | S | implemented (`bin/lib/figures/gantt.mjs`) |
-| 23 | Scatter / bubble | `scatter` | Q | planned |
+| 23 | Scatter / bubble | `scatter` | Q | implemented (`bin/lib/figures/scatter.mjs`) |
 | 24 | High-Level | `high-level` | G+L | planned |
 | 25 | Process | `process` | G+L(grid) | implemented (`bin/lib/figures/process.mjs`) |
 | 26 | Medallion | `medallion` | L | implemented (`bin/lib/figures/medallion.mjs`) |

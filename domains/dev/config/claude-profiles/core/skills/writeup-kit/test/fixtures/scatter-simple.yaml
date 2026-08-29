@@ -1,0 +1,38 @@
+id: s1
+type: scatter
+title: エンドポイント別のレイテンシとトラフィック
+caption: 右上ほど遅く・多い。強調は今回の改善対象
+x:
+  label: リクエスト数
+  unit: 千/日
+y:
+  label: p95
+  unit: ms
+points:
+- id: search
+  label: 検索
+  x: 120
+  y: 420
+  emphasis: true
+- id: list
+  label: 一覧
+  x: 260
+  y: 260
+- id: detail
+  label: 詳細
+  x: 340
+  y: 150
+- id: export
+  label: エクスポート
+  x: 12
+  y: 900
+- id: login
+  x: 80
+  y: 120
+- id: upload
+  label: アップロード
+  x: 30
+  y: 700
+- id: health
+  x: 400
+  y: 20

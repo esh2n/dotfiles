@@ -1,0 +1,43 @@
+id: s3
+type: scatter
+title: 成功率とレイテンシ
+caption: 差を見せるため y 軸は 96 から
+x:
+  label: p95
+  unit: ms
+y:
+  label: 成功率
+  unit: '%'
+  from: 96
+series:
+- id: api
+  label: API
+- id: web
+  label: Web
+- id: batch
+  label: バッチ
+points:
+- id: a1
+  label: 検索
+  x: 420
+  y: 99.2
+  series: api
+- id: a2
+  x: 260
+  y: 98.4
+  series: api
+- id: w1
+  label: トップ
+  x: 900
+  y: 97.1
+  series: web
+- id: w2
+  x: 640
+  y: 99.6
+  series: web
+- id: b1
+  label: 夜間集計
+  x: 1500
+  y: 96.5
+  series: batch
+  emphasis: true
