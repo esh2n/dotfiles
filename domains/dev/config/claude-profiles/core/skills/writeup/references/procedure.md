@@ -43,7 +43,20 @@ One line per store: `<mark> <name>\t<path>\t<description>\t<flags>`
 directory resolves to — here a repository marker chose `work`; without
 one the `default` line carries the `*`. Without a registry the output is
 a single `* legacy	<path>	(no registry: ...)` line — the un-split old
-store, which keeps working unchanged.
+store, which keeps working unchanged. When that path has no `.writeup.toml`
+either, nothing has been set up on this machine at all and the line ends
+with `— no store yet: run ...`:
+
+```
+$ node $KIT/bin/serve.mjs --list-stores
+* legacy	/Users/me/.local/share/writeup	(no registry: ...) — no store yet: run `node <writeup skill>/scripts/init-store.mjs --name <name> --description <text> [--default]`
+```
+
+That is the newcomer's state. Do **not** start writing against it: go to
+"Creating and registering stores" below, make `work` and `private`, and
+only then continue with Step 1. Writing first leaves the page in a
+directory that is not a git repository and has no `.writeup.toml`, which
+breaks the commit in Step 7 and gives lint no config to read.
 
 The kit's resolution order (`bin/lib/store.mjs` `resolveStoreDir`), the
 same for every CLI that takes `--store`:
@@ -152,6 +165,30 @@ the kind whose required sections it already roughly matches, rather than
 forcing every workflow report into 決定記録 by default.
 
 ## Step 3 — writing the page and rendering figures
+
+### The stylesheet link
+
+`kit/template.html` ships `<link rel="stylesheet" href="./writeup.css">`.
+That is correct only for `template.html` and `samples.html`, which sit
+inside `kit/` next to the CSS. A page saved into the store links the kit
+from its own depth instead — one level down (`<store>/<folder>/page.html`)
+means `../_kit/writeup.css`:
+
+```html
+<link rel="stylesheet" href="../_kit/writeup.css">
+```
+
+Write it that way when you copy the template. `build` also repairs it, so
+neither the placeholder nor a moved page stays broken — observed:
+
+| link as saved | after `build`, page at depth 1 | at depth 2 |
+|---|---|---|
+| `./writeup.css` (placeholder) | `../_kit/writeup.css` | `../../_kit/writeup.css` |
+| `../_kit/writeup.css` | unchanged | `../../_kit/writeup.css` |
+
+So a page that renders as unstyled HTML the moment you save it is almost
+always just a page that has not been built yet: run Step 7's
+`build.mjs --store "$STORE"` and reload before looking for anything worse.
 
 ### Choosing the figure type — before any IR is written
 
@@ -436,6 +473,15 @@ yourself, in this order, before running `--write-meta`:
 
 Result, e.g.: `checks="lint=pass;self-check=pass;diagram=2/2"`.
 
+The `<meta name="checks">` tag is the single source of that value — every
+tool reads and writes it there, and nothing else. The `.wu-footer` carries
+`<dt>checks</dt><dd>lint=pending; self-check=pending</dd>`, which is the
+same string typed out for a human reading the page. It is chrome text, so
+you may edit it (unlike the footer's structure), and **no tool syncs it**:
+`--write-meta` patches the meta only, and `build` leaves the footer alone.
+Retype it by hand in the same edit that finalises the meta — otherwise a
+page whose gates all passed still displays `pending` to its reader.
+
 ### After a kit/renderer upgrade — `rerender-figures.mjs`
 
 A kit upgrade can change what contract §4-2 accepts (a fixed check, a
@@ -494,6 +540,17 @@ Step 0 resolution order: `$WRITEUP_STORE`, ancestor `.writeup.toml`,
 repository marker, registry default, legacy `~/.local/share/writeup`).
 Always pass `--store "$STORE"` so build and commit hit the store chosen
 in Step 0.
+
+Step 7's commit assumes `$STORE` is a git repository. `init-store.mjs`
+makes each store one (`git init`) as part of the bootstrap, and each named
+store gets its own repo — never the enclosing one — so `work` and
+`private` keep separate histories. If the commit instead fails with git's
+`not a git repository` error, the directory was never bootstrapped: `build` (and `serve`) will create
+`~/.local/share/writeup` and write `manifest.json`, `index.html` and
+`_kit/` into it on a fresh machine, but that leaves no `.git` and no
+`.writeup.toml`. Run `node $SELF/scripts/init-store.mjs --name <name>
+--description <text>` against that directory — it is idempotent and
+leaves the existing pages alone — then retry the commit.
 
 
 ## Decision records: writing 決まったこと

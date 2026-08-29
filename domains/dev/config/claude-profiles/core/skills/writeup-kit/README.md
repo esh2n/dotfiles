@@ -36,7 +36,7 @@ place, tools that need it say so and name both paths they checked.
 Verify the copy:
 
 ```bash
-cd ~/.claude/skills/writeup-kit && node --test   # 1617 tests
+cd ~/.claude/skills/writeup-kit && node --test   # 1740 tests
 cd ~/.claude/skills/writeup     && node --test   #   15 tests
 ```
 
@@ -108,10 +108,10 @@ node $KIT/bin/serve.mjs --store "$STORE"                        # 5. read it
 
 Between 1 and 2 you write the page itself: copy `kit/template.html`, point its
 stylesheet at `../_kit/writeup.css` (the template ships with `./writeup.css`,
-correct only for files inside `kit/`), fill in the `<head>` meta and the header
-text, paste the `<figure>` from step 1 unmodified, and write the body from the
-components in `kit/samples.html`. Save it as
-`$STORE/<folder>/<YYYY-MM-DD>-<slug>.html`, then commit in `$STORE`.
+correct only inside `kit/`; step 4's `build` repairs it either way), fill in
+the `<head>` meta and the header text, paste the `<figure>` from step 1
+unmodified, and write the body from the components in `kit/samples.html`.
+Save it as `$STORE/<folder>/<YYYY-MM-DD>-<slug>.html`, then commit in `$STORE`.
 
 ## References
 
