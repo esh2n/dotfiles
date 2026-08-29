@@ -26,7 +26,7 @@ entities:
       - name: f9
         type: int
   - id: e2
-    label: とても長いテーブルの名前です
+    label: とても長いテーブルの名前の見本です
     emphasis: true
     fields:
       - name: f1
