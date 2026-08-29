@@ -1,0 +1,23 @@
+id: kb1
+type: board
+variant: kanban
+title: 今週の作業状態
+caption: 進行中は 3 枚まで。ブロック中の 1 枚は濃い色
+columns:
+  - id: todo
+    label: 未着手
+    cards: [検索の遅延調査, 招待メール文面, 監査ログ出力]
+  - id: doing
+    label: 進行中
+    limit: 3
+    cards:
+      - 決済連携
+      - label: SSO 連携
+        tone: rs
+  - id: review
+    label: レビュー中
+    limit: 2
+    cards: [組織作成 API]
+  - id: done
+    label: 完了
+    cards: [メール登録, 共有リンク]

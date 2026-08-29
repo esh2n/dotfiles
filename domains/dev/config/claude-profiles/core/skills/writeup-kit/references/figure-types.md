@@ -291,10 +291,10 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 30 | Sankey | `sankey` | Q(flow) | planned |
 | 31 | Fishbone | `fishbone` | H(cause) | planned |
 | 32 | Wardley map | `wardley` | M(2-axis ordinal) | planned (positions are authored, not derived — IR carries them verbatim) |
-| 33 | Kanban | `kanban` | M(state census) | planned |
+| 33 | Kanban | `kanban` | M(state census) | implemented as `board` with `variant: kanban` |
 | 34 | User journey | `journey` | S+M | planned |
 | 35 | Deployment | `deployment` | L+G | planned |
 | 36 | Dependency graph | `dependency` | G(DAG) | planned |
 | 37 | UML class | `uml-class` | G(H) | planned |
-| 38 | Story map | `story-map` | M(grid) | planned |
+| 38 | Story map | `story-map` | M(grid) | implemented as `board` with `variant: story-map` |
 | 39 | Database schema | `db-schema` | G(H) | planned |

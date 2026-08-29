@@ -1,0 +1,15 @@
+id: kb2
+type: board
+variant: kanban
+title: 進行中が上限超え
+columns:
+  - id: todo
+    label: 未着手
+    cards: [監査ログ出力]
+  - id: doing
+    label: 進行中
+    limit: 2
+    cards: [決済連携, SSO 連携, 組織作成 API]
+  - id: done
+    label: 完了
+    cards: [メール登録]

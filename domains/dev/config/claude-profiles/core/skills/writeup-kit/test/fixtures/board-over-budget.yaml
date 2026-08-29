@@ -1,0 +1,33 @@
+id: kb-over
+type: board
+variant: kanban
+title: 予算超過のボード
+columns:
+  - id: c1
+    label: 列1
+    limit: 2
+    cards:
+      - label: カード 1
+        emphasis: true
+      - label: カード 2
+        emphasis: true
+      - label: カード 3
+        emphasis: true
+  - id: c2
+    label: 列2
+    cards: [a, b, c, d, e, f, g, h, i]
+  - id: c3
+    label: 列3
+    cards: [このラベルは十五文字を超える長さだ]
+  - id: c4
+    label: 列4
+    cards: [x]
+  - id: c5
+    label: 列5
+    cards: [x]
+  - id: c6
+    label: 列6
+    cards: [x]
+  - id: c7
+    label: 列7
+    cards: [x]

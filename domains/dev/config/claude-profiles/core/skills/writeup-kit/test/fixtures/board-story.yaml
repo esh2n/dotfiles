@@ -1,0 +1,31 @@
+id: sm1
+type: board
+variant: story-map
+title: オンボーディングのストーリーマップ
+caption: 1 本目のカット線より上が MVP、2 本目までが Release 2。最リスクは決済連携
+columns:
+  - id: signup
+    label: 登録
+    cards: [メール登録, SSO 連携, 二要素認証]
+  - id: setup
+    label: 初期設定
+    cards:
+      - 組織作成
+      - label: 決済連携
+        emphasis: true
+      - 招待メール
+      - 権限テンプレート
+  - id: use
+    label: 利用
+    cards: [記事作成, 共有リンク, コメント, バージョン履歴]
+  - id: notify
+    label: 通知
+    cards: [メール通知, Slack 連携]
+  - id: review
+    label: 振り返り
+    cards: [利用レポート, エクスポート, 監査ログ出力]
+cuts:
+  - after: 0
+    label: MVP
+  - after: 2
+    label: Release 2
