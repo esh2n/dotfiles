@@ -1,0 +1,48 @@
+id: st3
+type: state
+title: 状態が多すぎる例
+direction: right
+states:
+  - id: s1
+    label: S1
+  - id: s2
+    label: S2
+  - id: s3
+    label: S3
+  - id: s4
+    label: S4
+  - id: s5
+    label: S5
+  - id: s6
+    label: S6
+  - id: s7
+    label: S7
+  - id: s8
+    label: S8
+  - id: s9
+    label: S9
+transitions:
+  - from: s1
+    to: s2
+    label: e1
+  - from: s2
+    to: s3
+    label: e2
+  - from: s3
+    to: s4
+    label: e3
+  - from: s4
+    to: s5
+    label: e4
+  - from: s5
+    to: s6
+    label: e5
+  - from: s6
+    to: s7
+    label: e6
+  - from: s7
+    to: s8
+    label: e7
+  - from: s8
+    to: s9
+    label: e8

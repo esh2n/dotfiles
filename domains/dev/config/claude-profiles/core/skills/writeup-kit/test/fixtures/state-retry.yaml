@@ -1,0 +1,34 @@
+id: st2
+type: state
+title: 取り込みジョブの状態
+caption: 検証で失敗したら取得待ちに戻る。取得中は進捗ごとに自己遷移する
+states:
+  - id: pending
+    label: 取得待ち
+    initial: true
+  - id: fetching
+    label: 取得中
+    tone: ts
+  - id: verifying
+    label: 検証
+    emphasis: true
+  - id: done
+    label: 完了
+    final: true
+transitions:
+  - from: pending
+    to: fetching
+    label: 開始
+  - from: fetching
+    to: fetching
+    label: 次ページ
+  - from: fetching
+    to: verifying
+    label: 取得完了
+    kind: async
+  - from: verifying
+    to: done
+    label: 検証 OK
+  - from: verifying
+    to: pending
+    label: 失敗

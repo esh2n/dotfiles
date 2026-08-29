@@ -1,0 +1,23 @@
+id: st1
+type: state
+title: 接続の状態
+caption: 切断は必ず再接続待ちを経由する
+states:
+  - id: idle
+    label: 未接続
+  - id: connecting
+    label: 接続中
+    tone: ts
+  - id: open
+    label: 接続済み
+    emphasis: true
+transitions:
+  - from: idle
+    to: connecting
+    label: connect
+  - from: connecting
+    to: open
+    label: ack
+  - from: open
+    to: idle
+    label: close

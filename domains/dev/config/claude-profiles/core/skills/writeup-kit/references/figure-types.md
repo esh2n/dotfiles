@@ -263,7 +263,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 2 | IT current-state | `it-state` | G+L | planned |
 | 3 | Flowchart | `flowchart` | G | planned |
 | 4 | Sequence | `sequence` | S | implemented (`bin/lib/figures/sequence.mjs`) |
-| 5 | State machine | `state` | ST | planned |
+| 5 | State machine | `state` | ST | implemented (`bin/lib/figures/state.mjs`) |
 | 6 | ER / data model | `er` | G(H) | planned |
 | 7 | Timeline | `timeline` | S | planned (sketched in `_template.mjs.txt`) |
 | 8 | Swimlane | `swimlane` | G+L | planned |

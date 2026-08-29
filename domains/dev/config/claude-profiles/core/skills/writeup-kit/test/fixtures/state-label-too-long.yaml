@@ -1,0 +1,12 @@
+id: st4
+type: state
+title: ラベルが長すぎる例
+states:
+  - id: a
+    label: A
+  - id: b
+    label: B
+transitions:
+  - from: a
+    to: b
+    label: この遷移ラベルは十二文字を超えている
