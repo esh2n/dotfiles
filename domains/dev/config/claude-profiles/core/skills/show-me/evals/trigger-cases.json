@@ -1,18 +1,324 @@
 {
   "cases": [
-    { "input": "今のコードの流れ、見せて", "expect": true, "note": "「見せて」直接トリガー" },
-    { "input": "この差分どこが変わるか図にしてほしい", "expect": true, "note": "diff の一瞥、show-me の主用途" },
-    { "input": "/show-me このコンポーネント構造", "expect": true, "note": "コマンド直呼び" },
-    { "input": "構造をさっと一瞥したい", "expect": true, "note": "「一瞥したい」直接トリガー" },
-    { "input": "今の話を絵にして", "expect": true, "note": "「今の話を絵で」直接トリガー" },
-    { "input": "この関数呼び出しの関係をツリーで見せて", "expect": true, "note": "call tree ビュー" },
-    { "input": "このアルゴリズムの流れを疑似コードでさっと見せて", "expect": true, "note": "pseudocode ビュー、in-chat 前提" },
-    { "input": "この設計について決定記録を残して", "expect": false, "note": "durable doc は writeup" },
-    { "input": "量子もつれの仕組みを子供にもわかるように説明して", "expect": false, "note": "beginner explainer は eli5" },
-    { "input": "このプランの穴を突いて深掘りしてほしい", "expect": false, "note": "grilling の設計インタビュー" },
-    { "input": "今回の調査結果をまとめて資料にして", "expect": false, "note": "調査まとめは writeup" },
-    { "input": "この設計書にして残しておいて", "expect": false, "note": "保存前提の資料は writeup" },
-    { "input": "この判断をストレステストしてほしい", "expect": false, "note": "grilling の直接トリガー文言" },
-    { "input": "5歳児向けに絵本みたいに説明して", "expect": false, "note": "eli5 の領域" }
+    {
+      "input": "今のコードの流れ、見せて",
+      "expect": true,
+      "note": "「見せて」直接トリガー"
+    },
+    {
+      "input": "この差分どこが変わるか図にしてほしい",
+      "expect": true,
+      "note": "diff の一瞥、show-me の主用途"
+    },
+    {
+      "input": "/show-me このコンポーネント構造",
+      "expect": true,
+      "note": "コマンド直呼び"
+    },
+    {
+      "input": "構造をさっと一瞥したい",
+      "expect": true,
+      "note": "「一瞥したい」直接トリガー"
+    },
+    {
+      "input": "今の話を絵にして",
+      "expect": true,
+      "note": "「今の話を絵で」直接トリガー"
+    },
+    {
+      "input": "この関数呼び出しの関係をツリーで見せて",
+      "expect": true,
+      "note": "call tree ビュー"
+    },
+    {
+      "input": "このアルゴリズムの流れを疑似コードでさっと見せて",
+      "expect": true,
+      "note": "pseudocode ビュー、in-chat 前提"
+    },
+    {
+      "input": "この設計について決定記録を残して",
+      "expect": false,
+      "note": "durable doc は writeup"
+    },
+    {
+      "input": "量子もつれの仕組みを子供にもわかるように説明して",
+      "expect": false,
+      "note": "beginner explainer は eli5"
+    },
+    {
+      "input": "このプランの穴を突いて深掘りしてほしい",
+      "expect": false,
+      "note": "grilling の設計インタビュー"
+    },
+    {
+      "input": "今回の調査結果をまとめて資料にして",
+      "expect": false,
+      "note": "調査まとめは writeup"
+    },
+    {
+      "input": "この設計書にして残しておいて",
+      "expect": false,
+      "note": "保存前提の資料は writeup"
+    },
+    {
+      "input": "この判断をストレステストしてほしい",
+      "expect": false,
+      "note": "grilling の直接トリガー文言"
+    },
+    {
+      "input": "5歳児向けに絵本みたいに説明して",
+      "expect": false,
+      "note": "eli5 の領域"
+    },
+    {
+      "input": "認証方式を Firebase Auth に決めた件、決定記録として残しておきたい",
+      "expect": false,
+      "note": "決定記録 (kind 1)"
+    },
+    {
+      "input": "通知基盤の設計書にまとめて。あとでチームに共有する",
+      "expect": false,
+      "note": "設計 (kind 2)"
+    },
+    {
+      "input": "さっき調べた Kafka の再送まわり、調査まとめにして残しておいて",
+      "expect": false,
+      "note": "調査まとめ (kind 3)"
+    },
+    {
+      "input": "参考にしたブログと RFC を参考資料まとめにしておいて",
+      "expect": false,
+      "note": "参考資料まとめ (kind 4)"
+    },
+    {
+      "input": "次スプリントの PBI 資料を作って。受け入れ条件込みで",
+      "expect": false,
+      "note": "PBI 資料 (kind 5)"
+    },
+    {
+      "input": "新メンバーがあとで見返せるように、このアーキテクチャの絵解きページを作って",
+      "expect": false,
+      "note": "絵解き (kind 6) — eli5 と紛らわしい。'見返せる' が kept の合図"
+    },
+    {
+      "input": "今日やった移行作業の作業メモを残しておいて",
+      "expect": false,
+      "note": "作業メモ (kind 7)"
+    },
+    {
+      "input": "さっきの設計 MTG の議事録にまとめて",
+      "expect": false,
+      "note": "議事録 (kind 8)"
+    },
+    {
+      "input": "今の議論、あとで見返せるようにまとめて",
+      "expect": false,
+      "note": "「まとめて」+ kept"
+    },
+    {
+      "input": "/writeup さっきの調査結果",
+      "expect": false,
+      "note": "明示コマンド"
+    },
+    {
+      "input": "ADR として書き残しておいて",
+      "expect": false,
+      "note": "英語略語 ADR。description に語なし(adversarial)"
+    },
+    {
+      "input": "今の話を図にして",
+      "expect": true,
+      "note": "明示トリガ"
+    },
+    {
+      "input": "このリクエストがどのミドルウェアを通るか、ざっと見せて",
+      "expect": true,
+      "note": "code flow の in-chat view"
+    },
+    {
+      "input": "この差分でどこが変わる？",
+      "expect": true,
+      "note": "明示トリガ「どこが変わる？」"
+    },
+    {
+      "input": "このパッケージのコンポーネント構造を一瞥したい",
+      "expect": true,
+      "note": "明示トリガ"
+    },
+    {
+      "input": "show me how the retry path works",
+      "expect": true,
+      "note": "英語トリガ"
+    },
+    {
+      "input": "/show-me モジュール依存",
+      "expect": true,
+      "note": "明示コマンド"
+    },
+    {
+      "input": "文章で説明されても頭に入らないので、この状態遷移をチャットにさっと絵で出して",
+      "expect": true,
+      "note": "in-chat 明示・保存不要"
+    },
+    {
+      "input": "このマルチテナント設計を詰めたい",
+      "expect": false,
+      "note": "明示トリガ「詰めたい」"
+    },
+    {
+      "input": "この移行プランの穴を突いて",
+      "expect": false,
+      "note": "明示トリガ"
+    },
+    {
+      "input": "/grilling docs/design/notification.md",
+      "expect": false,
+      "note": "明示コマンド"
+    },
+    {
+      "input": "このスキーマ変更の判断、ストレステストしてほしい",
+      "expect": false,
+      "note": "明示トリガ"
+    },
+    {
+      "input": "設計ドラフト書いたんだけど、何が抜けてる？",
+      "expect": false,
+      "note": "draft を渡して欠落を問う"
+    },
+    {
+      "input": "この決め方でいいのか、もっと深掘りして",
+      "expect": false,
+      "note": "「深掘りして」— research と紛らわしい"
+    },
+    {
+      "input": "OAuth って結局何なの？5歳児に説明して",
+      "expect": false,
+      "note": "明示トリガ"
+    },
+    {
+      "input": "妻に説明したいんだけど、Kubernetes をめちゃくちゃ簡単に",
+      "expect": false,
+      "note": "非専門家向け"
+    },
+    {
+      "input": "/eli5 分散トランザクション",
+      "expect": false,
+      "note": "明示コマンド"
+    },
+    {
+      "input": "CDN の仕組みって、ざっくり言うとどう動いてるの？簡単に",
+      "expect": false,
+      "note": "how does X work, simply"
+    },
+    {
+      "input": "この関数何してる？",
+      "expect": false,
+      "note": "near-miss: 通常の説明。図も文書も要らない"
+    },
+    {
+      "input": "テスト直して",
+      "expect": false,
+      "note": "near-miss: 実装タスク"
+    },
+    {
+      "input": "PR の説明文書いて",
+      "expect": false,
+      "note": "near-miss: 書く依頼だが kept document ではない"
+    },
+    {
+      "input": "この構成図を Figma で作って",
+      "expect": false,
+      "note": "near-miss: 図だが外部ツール指定 (figma MCP)"
+    },
+    {
+      "input": "議事録を Notion にまとめて",
+      "expect": false,
+      "note": "near-miss: writeup 語彙だが出力先が Notion (notion MCP)"
+    },
+    {
+      "input": "このエラーの原因調べて",
+      "expect": false,
+      "note": "near-miss: デバッグ"
+    },
+    {
+      "input": "README を更新して",
+      "expect": false,
+      "note": "near-miss: 既存リポジトリ内ドキュメントの編集"
+    },
+    {
+      "input": "このコード、もう少し読みやすくして",
+      "expect": false,
+      "note": "near-miss: リファクタ"
+    },
+    {
+      "input": "なんでこのテスト落ちてるか教えて",
+      "expect": false,
+      "note": "near-miss: 調査・デバッグ"
+    },
+    {
+      "input": "来週の発表用にスライド作って",
+      "expect": false,
+      "note": "near-miss: frontend-slides の領域"
+    },
+    {
+      "input": "この設計、レビューして",
+      "expect": false,
+      "note": "near-miss: design-review workflow。grilling の『詰める』ではない"
+    },
+    {
+      "input": "この関数のリファクタ案を3つ出して",
+      "expect": false,
+      "note": "near-miss: 選択肢を出すが design interview ではない"
+    },
+    {
+      "input": "この設計、誰が読んでも分かるように絵解きにして、ページとして残して",
+      "expect": false,
+      "note": "S1 絵解き+kept vs eli5 picture explainer"
+    },
+    {
+      "input": "新人に見せる用の説明ページ作って",
+      "expect": false,
+      "note": "S2 new hire(eli5) と page(writeup) が両取り"
+    },
+    {
+      "input": "この設計の抜け漏れをまとめて",
+      "expect": false,
+      "note": "S3 まとめて(writeup語) + what is missing(grilling)"
+    },
+    {
+      "input": "今の話、あとで見返したいから図にして",
+      "expect": false,
+      "note": "S4 図にして(show-me語) + kept(writeup)"
+    },
+    {
+      "input": "設計を詰めた結果を決定記録に残して",
+      "expect": false,
+      "note": "S5 grilling は --out に決定記録を書く。writeup も決定記録を主張"
+    },
+    {
+      "input": "このプランの穴を突いた上で、ドキュメントにして",
+      "expect": false,
+      "note": "S6 grilling→writeup の連鎖。両方 fire が正解か曖昧"
+    },
+    {
+      "input": "TCP の輻輳制御、社内 wiki に貼れるくらいちゃんとまとめて",
+      "expect": false,
+      "note": "S7 外部destination。Notion FP と同型"
+    },
+    {
+      "input": "この関数の呼び出し関係を Mermaid で出して",
+      "expect": true,
+      "note": "S8 明示トリガ語なしの構造ビュー"
+    },
+    {
+      "input": "調査した内容を Slack に貼るので短くまとめて",
+      "expect": false,
+      "note": "S9 まとめて だが one-off・外部destination"
+    },
+    {
+      "input": "アーキテクチャを5分で説明できるようにして",
+      "expect": false,
+      "note": "S10 簡単に説明 vs 一瞥"
+    }
   ]
 }

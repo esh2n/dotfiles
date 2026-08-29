@@ -1,6 +1,6 @@
 ---
 name: eli5
-description: Explain a topic like I'm a 5 year old — a dead-simple picture explainer published as an HTML Artifact (big inline-SVG pictures, few words, one idea per panel). Use when the user types /eli5 <topic>, asks "how does X actually work, simply", "explain like I'm five", or wants something to show a non-expert (family, a new hire, a stakeholder). Not for reference docs or deep dives (use writeup for a page that is kept) or a quick in-chat view (use show-me).
+description: Explain a topic like I'm a 5 year old — a dead-simple picture explainer published as an HTML Artifact (big inline-SVG pictures, few words, one idea per panel). Use when the user types /eli5 <topic>, asks "how does X actually work, simply", "explain like I'm five", or wants a throwaway picture to show a non-expert (family, a new hire, a stakeholder) — an Artifact for one conversation, not a page anyone keeps; 「説明ページを作って」 for the team is writeup 絵解き. Not for reference docs or deep dives (use writeup for a page that is kept), a quick in-chat view (use show-me), or anything about the codebase and its design in front of you — a design, a decision, or a mechanism a colleague asks about goes to writeup or show-me, however simply it is meant to be explained.
 metadata:
   origin: Anthropic official eli5 skill (one-line prompt), extended
 ---
