@@ -6,7 +6,7 @@
 import { escapeHtml, escapeAttr } from './util.mjs'
 
 const GOOGLE_FONTS_HREF =
-  'https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap'
+  'https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap'
 
 /**
  * @param {object} p

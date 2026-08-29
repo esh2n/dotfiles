@@ -14,13 +14,13 @@ const TEMPLATE_DIR = join(HERE, '..', 'template')
 
 const FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
   + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&amp;family=Noto+Sans+JP:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">'
+  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?amp;family=Noto+Sans+JP:wght@400;500;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">'
 
 // kit/template.html の <link> と同じフォント指定（kit 側の CSS 変数
 // --wu-font-body / --wu-font-heading / --wu-font-mono が前提にしているもの）。
 const KIT_FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
   + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&amp;family=BIZ+UDPGothic:wght@400;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">'
+  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?amp;family=BIZ+UDPGothic:wght@400;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">'
 
 export function escapeHtml(s) {
   return String(s)

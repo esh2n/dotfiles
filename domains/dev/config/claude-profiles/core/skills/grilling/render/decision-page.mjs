@@ -283,7 +283,7 @@ export async function buildDecisionPage(parsed, opts = {}) {
     // kit/template.html と同じ 1 本だけ（self-check の single-file チェックは
     // fonts.googleapis.com 配下のパス付き URL だけを許す。preconnect の
     // オリジンだけの href は弾かれるので置かない）。
-    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">',
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">',
     opts.cssHref ? `<link rel="stylesheet" href="${escapeHtml(opts.cssHref)}">` : `<style>\n${css}</style>`,
     '</head>',
     '<body>',
