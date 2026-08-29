@@ -6,13 +6,15 @@
 //   - legacy: a single store at `~/.local/share/writeup` (or `$WRITEUP_STORE`)
 //     whose root directly contains `.writeup.toml`;
 //   - registry: `~/.local/share/writeup/stores.toml` (or `$WRITEUP_STORES`)
-//     naming several independent stores (e.g. `work` and `learn`), each its
-//     own git repo with its own `.writeup.toml`, picked by an explicit name,
-//     by the current working directory (`cwd_prefixes`), or by `default`.
+//     naming several independent stores (e.g. `work` and `private`), each
+//     its own git repo with its own `.writeup.toml`, picked by an explicit
+//     name, by a repository marker (`<repo root>/.writeup` naming a store),
+//     or by `default`. The registry holds only `default` and, per store,
+//     `name` / `path` / `description` — never a directory-to-store mapping.
 
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { parseToml } from './toml-lite.mjs'
@@ -43,11 +45,11 @@ function resolveAgainst(baseDir, p) {
 }
 
 /** Parses `stores.toml` into `{ path, exists, defaultName, stores }` where
- * each store is `{ name, path (absolute), isDefault, cwdPrefixes (absolute) }`.
+ * each store is `{ name, path (absolute), isDefault, description }` —
+ * `description` is the entry's one-line `description` (`''` when absent).
  * A missing registry yields `exists: false` and no stores. A malformed
  * registry throws (TomlParseError) — never silently read as empty. Entries
- * without a `name` or a `path` are skipped; a duplicate name keeps the
- * first entry. */
+ * without a `name` are skipped; a duplicate name keeps the first entry. */
 export function readRegistry(path = registryPath()) {
   if (!existsSync(path)) return { path, exists: false, defaultName: null, stores: [] }
   const cfg = parseToml(readFileSync(path, 'utf8'))
@@ -59,19 +61,18 @@ export function readRegistry(path = registryPath()) {
     if (!entry || typeof entry.name !== 'string' || !entry.name) continue
     if (seen.has(entry.name)) continue
     const rawPath = typeof entry.path === 'string' && entry.path ? entry.path : entry.name
-    const prefixes = Array.isArray(entry.cwd_prefixes) ? entry.cwd_prefixes : []
     seen.add(entry.name)
     stores.push({
       name: entry.name,
       path: resolveAgainst(baseDir, rawPath),
       isDefault: entry.name === defaultName,
-      cwdPrefixes: prefixes.filter((p) => typeof p === 'string' && p).map((p) => resolveAgainst(baseDir, p)),
+      description: typeof entry.description === 'string' ? entry.description.trim() : '',
     })
   }
   return { path, exists: true, defaultName, stores }
 }
 
-/** Every registered store as `[{ name, path, isDefault, cwdPrefixes }]`,
+/** Every registered store as `[{ name, path, isDefault, description }]`,
  * `[]` when there is no registry. */
 export function listStores() {
   return readRegistry().stores
@@ -82,22 +83,55 @@ export function resolveStoreByName(name) {
   return listStores().find((s) => s.name === name) ?? null
 }
 
-function isUnder(dir, prefix) {
-  return dir === prefix || dir.startsWith(prefix + sep)
+/** The marker file a repository may carry at its root: `.writeup` with a
+ * single `store = "<name>"` line. It names a store *name*, never a path,
+ * so the same file works on any machine whose registry has that name. */
+export const REPO_MARKER = '.writeup'
+
+/** The nearest git repository root at or above `startDir` — the first
+ * directory containing `.git` (a directory, or the file a worktree /
+ * submodule leaves there). `null` outside any repository. */
+export function findRepoRoot(startDir) {
+  let dir = resolve(startDir)
+  while (true) {
+    if (existsSync(join(dir, '.git'))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) return null
+    dir = parent
+  }
 }
 
-/** The registered store whose `cwd_prefixes` contains `cwd` — the longest
- * matching prefix wins when several stores overlap. `null` if none. */
-export function resolveStoreByCwd(cwd, stores = listStores()) {
-  const dir = resolve(cwd)
-  let best = null
-  let bestLen = -1
-  for (const s of stores) {
-    for (const p of s.cwdPrefixes) {
-      if (isUnder(dir, p) && p.length > bestLen) { best = s; bestLen = p.length }
-    }
-  }
-  return best
+/** Parses the marker text (`store = "work"`) into the store name, or
+ * `null` when the file names nothing. Throws on malformed TOML. */
+export function parseRepoMarker(text) {
+  const cfg = parseToml(text)
+  return typeof cfg.store === 'string' && cfg.store ? cfg.store : null
+}
+
+/** The repository marker for `cwd`: `{ repoRoot, path, name }` when the
+ * nearest repository root above `cwd` has a `.writeup` naming a store,
+ * else `null` (no repository, no marker, or a marker naming nothing).
+ * Only the nearest repository is consulted — a marker in a parent
+ * repository does not leak into a nested one. */
+export function findRepoMarker(cwd) {
+  const repoRoot = findRepoRoot(cwd)
+  if (!repoRoot) return null
+  const path = join(repoRoot, REPO_MARKER)
+  if (!existsSync(path)) return null
+  const name = parseRepoMarker(readFileSync(path, 'utf8'))
+  return name ? { repoRoot, path, name } : null
+}
+
+/** The registered store a repository marker names, or `null` without a
+ * marker. A marker naming a store missing from this machine's registry
+ * throws — silently falling through to `default` would file a page in
+ * the wrong store. */
+function resolveStoreByMarker(cwd, stores) {
+  const marker = findRepoMarker(cwd)
+  if (!marker) return null
+  const s = stores.find((st) => st.name === marker.name)
+  if (!s) throw new Error(`${marker.path} names unknown store "${marker.name}" (registry: ${registryPath()})`)
+  return { store: s, marker }
 }
 
 /** Resolves the store directory, in this order:
@@ -106,7 +140,9 @@ export function resolveStoreByCwd(cwd, stores = listStores()) {
  *      unknown name throws rather than silently picking another store
  *   3. `$WRITEUP_STORE`
  *   4. ancestor discovery: an existing `.writeup.toml` at or above `cwd`
- *   5. the registry store whose `cwd_prefixes` covers `cwd`
+ *      (a page's own store)
+ *   5. the repository marker: `<repo root>/.writeup` (`store = "<name>"`)
+ *      of the nearest git repository containing `cwd`
  *   6. the registry `default`
  *   7. the legacy single store (`~/.local/share/writeup`), when its root
  *      directly contains `.writeup.toml`
@@ -124,8 +160,8 @@ export function resolveStoreDir(explicit, { cwd = process.cwd(), name } = {}) {
   const discovered = discoverStoreRoot(cwd)
   if (discovered) return discovered
   const registry = readRegistry()
-  const byCwd = resolveStoreByCwd(cwd, registry.stores)
-  if (byCwd) return byCwd.path
+  const byMarker = resolveStoreByMarker(cwd, registry.stores)
+  if (byMarker) return byMarker.store.path
   const dflt = registry.stores.find((s) => s.isDefault)
   if (dflt) return dflt.path
   return defaultStoreBase()
@@ -134,7 +170,8 @@ export function resolveStoreDir(explicit, { cwd = process.cwd(), name } = {}) {
 /** Explains which rule picked the store for `cwd` — the same order as
  * `resolveStoreDir`, returned as `{ dir, via, name }` for `--list-stores`
  * style output. `via` is one of `explicit`, `name`, `env`, `ancestor`,
- * `cwd_prefix`, `default`, `legacy`, `fallback`. */
+ * `marker`, `default`, `legacy`, `fallback`; a `marker` result also carries
+ * `markerPath`. */
 export function explainStoreDir(explicit, { cwd = process.cwd(), name } = {}) {
   if (explicit) return { dir: explicit, via: 'explicit', name: null }
   if (name) return { dir: resolveStoreDir(null, { cwd, name }), via: 'name', name }
@@ -142,8 +179,8 @@ export function explainStoreDir(explicit, { cwd = process.cwd(), name } = {}) {
   const discovered = discoverStoreRoot(cwd)
   if (discovered) return { dir: discovered, via: 'ancestor', name: null }
   const registry = readRegistry()
-  const byCwd = resolveStoreByCwd(cwd, registry.stores)
-  if (byCwd) return { dir: byCwd.path, via: 'cwd_prefix', name: byCwd.name }
+  const byMarker = resolveStoreByMarker(cwd, registry.stores)
+  if (byMarker) return { dir: byMarker.store.path, via: 'marker', name: byMarker.store.name, markerPath: byMarker.marker.path }
   const dflt = registry.stores.find((s) => s.isDefault)
   if (dflt) return { dir: dflt.path, via: 'default', name: dflt.name }
   const legacy = defaultStoreBase()

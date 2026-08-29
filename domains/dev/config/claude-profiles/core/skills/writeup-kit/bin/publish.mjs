@@ -121,7 +121,7 @@ function wranglerAvailable() {
 export function publish(pageFile, opts) {
   const { to, out, store, storeName, dryRun = false, deploy = false } = opts
   // The page's own store (an ancestor `.writeup.toml`) wins over the
-  // registry's cwd/default pick, so a page in `work/` is checked against
+  // registry's marker/default pick, so a page in `work/` is checked against
   // `work/.writeup.toml`'s private words even when run from elsewhere.
   const storeDir = resolveStoreDir(store, { name: storeName, cwd: dirname(resolve(pageFile)) })
 

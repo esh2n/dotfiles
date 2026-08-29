@@ -5,7 +5,8 @@
 // works even before the kit is resolved.
 //
 //   node scripts/init-store.mjs [--store dir]
-//   node scripts/init-store.mjs --name <name> [--store dir] [--cwd-prefix <p>]... [--default]
+//   node scripts/init-store.mjs --name <name> [--store dir] [--description <text>] [--default]
+//   node scripts/init-store.mjs --marker <name>
 //
 // Without --name this is the legacy single store: --store, then
 // $WRITEUP_STORE, then ~/.local/share/writeup — the registry is not touched,
@@ -15,8 +16,14 @@
 // `<registry dir>/<name>`) and registered in the store registry
 // (`$WRITEUP_STORES`, else ~/.local/share/writeup/stores.toml): the
 // registry is created if missing, a `[[store]]` entry is appended if absent
-// (never duplicated), --cwd-prefix values are merged into that entry's
-// `cwd_prefixes`, and --default sets the registry's `default`.
+// (never duplicated), --description sets that entry's one-line
+// `description`, and --default sets the registry's `default`.
+//
+// --marker <name> writes the repository marker `<repo root>/.writeup`
+// (`store = "<name>"`) for the git repository containing the current
+// directory, so later saves from that repository resolve to <name> without
+// asking. The marker names a store *name*, not a path, so the file is
+// portable to any machine whose registry has that name.
 //
 // Idempotent: every step checks what's already there before writing, so
 // running this twice against the same store makes no further changes
@@ -26,7 +33,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -45,6 +52,10 @@ access_verified = false
 
 const GITIGNORE_TEMPLATE = `.publish/
 `
+
+/** The repository marker file name — the same as writeup-kit's
+ * bin/lib/store.mjs `REPO_MARKER`. */
+export const REPO_MARKER = '.writeup'
 
 function defaultStoreBase() {
   return join(homedir(), '.local', 'share', 'writeup')
@@ -73,19 +84,17 @@ export function registryPath() {
 //
 // Line-based so that comments and unrelated entries survive untouched. Only
 // the shape the kit's toml-lite parser reads is written: a top-level
-// `default = "<name>"`, then `[[store]]` tables with `name`, `path`, and a
-// single-line `cwd_prefixes = [...]`.
+// `default = "<name>"`, then `[[store]]` tables with `name`, `path` and an
+// optional one-line `description`.
 
 function tomlString(s) {
   return '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
 }
 
-function parseTomlStringArray(inner) {
-  const out = []
-  const re = /"((?:[^"\\]|\\.)*)"|'([^']*)'/g
-  let m
-  while ((m = re.exec(inner))) out.push(m[1] !== undefined ? m[1].replace(/\\(.)/g, '$1') : m[2])
-  return out
+function tomlStringValue(line, key) {
+  const m = new RegExp(`^\\s*${key}\\s*=\\s*(?:"((?:[^"\\\\]|\\\\.)*)"|'([^']*)')`).exec(line)
+  if (!m) return null
+  return m[1] !== undefined ? m[1].replace(/\\(.)/g, '$1') : m[2]
 }
 
 /** Splits registry text into `{ header: string[], entries: [{ lines }] }`
@@ -109,22 +118,19 @@ function splitRegistry(text) {
 
 function entryName(entry) {
   for (const line of entry.lines) {
-    const m = /^\s*name\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'([^']*)')/.exec(line)
-    if (m) return m[1] !== undefined ? m[1].replace(/\\(.)/g, '$1') : m[2]
+    const v = tomlStringValue(line, 'name')
+    if (v !== null) return v
   }
   return null
 }
 
-/** Merges `prefixes` into the entry's single-line `cwd_prefixes` (adding
- * the line when absent). Returns true when the entry changed. */
-function mergeCwdPrefixes(entry, prefixes) {
-  if (!prefixes.length) return false
-  const idx = entry.lines.findIndex((l) => /^\s*cwd_prefixes\s*=/.test(l))
-  const existing = idx === -1 ? [] : parseTomlStringArray(entry.lines[idx].replace(/^\s*cwd_prefixes\s*=/, ''))
-  const merged = [...existing]
-  for (const p of prefixes) if (!merged.includes(p)) merged.push(p)
-  if (merged.length === existing.length) return false
-  const line = `cwd_prefixes = [${merged.map(tomlString).join(', ')}]`
+/** Sets the entry's single-line `description` (adding the line when
+ * absent). Returns true when the entry changed. */
+function setDescription(entry, description) {
+  if (description === null || description === undefined) return false
+  const idx = entry.lines.findIndex((l) => /^\s*description\s*=/.test(l))
+  if (idx !== -1 && tomlStringValue(entry.lines[idx], 'description') === description) return false
+  const line = `description = ${tomlString(description)}`
   if (idx === -1) {
     // Insert after the last non-blank line of the entry so a trailing blank
     // line (entry separator) stays trailing.
@@ -151,11 +157,11 @@ export function portablePath(target, registryDir) {
 
 /**
  * Returns `{ text, changes }`: the registry text with `name` registered at
- * `storePath`, `cwdPrefixes` merged in, and (when `makeDefault`) the
- * top-level `default` set. Pure — the caller writes the file. Registering
- * an already-present name never adds a second `[[store]]`.
+ * `storePath`, its `description` set when given, and (when `makeDefault`)
+ * the top-level `default` set. Pure — the caller writes the file.
+ * Registering an already-present name never adds a second `[[store]]`.
  */
-export function registerStore(text, { name, storePath, cwdPrefixes = [], makeDefault = false, registryDir }) {
+export function registerStore(text, { name, storePath, description = null, makeDefault = false, registryDir }) {
   const changes = []
   const { header, entries } = splitRegistry(text || '')
 
@@ -180,8 +186,7 @@ export function registerStore(text, { name, storePath, cwdPrefixes = [], makeDef
   } else {
     changes.push(`store "${name}" already registered — left as is`)
   }
-  const portablePrefixes = cwdPrefixes.map((p) => portablePath(expandHome(p), registryDir))
-  if (mergeCwdPrefixes(entry, portablePrefixes)) changes.push(`cwd_prefixes for "${name}" now include ${portablePrefixes.join(', ')}`)
+  if (setDescription(entry, description)) changes.push(`description for "${name}" = "${description}"`)
 
   // Re-assemble: header, then entries separated by exactly one blank line.
   const headerText = header.join('\n').replace(/\s+$/, '')
@@ -201,7 +206,64 @@ export function registerStoreInFile(registryFile, opts) {
     writeFileSync(registryFile, text)
   }
   for (const c of changes) log.push(`init-store: ${c}`)
-  if (!/^\s*default\s*=/m.test(text)) log.push('init-store: registry has no default yet — pass --default on the store that should win when no cwd prefix matches')
+  if (!/^\s*default\s*=/m.test(text)) log.push('init-store: registry has no default yet — pass --default on the store that should win when no repository marker applies')
+  return log
+}
+
+/** The names registered in `registryFile` (`[]` when it does not exist). */
+export function registeredNames(registryFile) {
+  if (!existsSync(registryFile)) return []
+  return splitRegistry(readFileSync(registryFile, 'utf8')).entries.map(entryName).filter((n) => n !== null)
+}
+
+// --- repository marker --------------------------------------------------------
+
+/** The nearest git repository root at or above `startDir` — the first
+ * directory containing `.git`. `null` outside any repository. */
+export function findRepoRoot(startDir) {
+  let dir = resolve(startDir)
+  while (true) {
+    if (existsSync(join(dir, '.git'))) return dir
+    const parent = dirname(dir)
+    if (parent === dir) return null
+    dir = parent
+  }
+}
+
+/** The text of a marker naming `name`. */
+export function markerText(name) {
+  return `store = ${tomlString(name)}\n`
+}
+
+/**
+ * Writes `<repo root>/.writeup` naming `name` for the repository containing
+ * `cwd`. `name` must be registered in `registryFile` (a marker naming an
+ * unknown store would make every kit CLI in that repository fail, since
+ * the kit refuses to guess). Idempotent; an existing marker naming another
+ * store is rewritten and reported. Returns the log lines.
+ */
+export function writeRepoMarker(name, { cwd = process.cwd(), registryFile = registryPath() } = {}) {
+  const repoRoot = findRepoRoot(cwd)
+  if (!repoRoot) throw new Error(`--marker: ${resolve(cwd)} is not inside a git repository`)
+  const names = registeredNames(registryFile)
+  if (!names.includes(name)) {
+    throw new Error(`--marker: "${name}" is not a registered store (registry: ${registryFile}; known: ${names.join(', ') || 'none'}) — register it first with --name ${name}`)
+  }
+  const path = join(repoRoot, REPO_MARKER)
+  const text = markerText(name)
+  const log = []
+  if (existsSync(path)) {
+    const before = readFileSync(path, 'utf8')
+    if (before === text) {
+      log.push(`init-store: ${path} already names "${name}" — left as is`)
+      return log
+    }
+    writeFileSync(path, text)
+    log.push(`init-store: rewrote ${path} → store = "${name}" (was: ${before.trim()})`)
+    return log
+  }
+  writeFileSync(path, text)
+  log.push(`init-store: wrote ${path} (store = "${name}") — commit it: it names a store by name, so it works on any machine with that store registered`)
   return log
 }
 
@@ -215,22 +277,31 @@ function resolveKitDir() {
   return null
 }
 
-const USAGE = 'usage: node scripts/init-store.mjs [--store dir] [--name name [--cwd-prefix p]... [--default]]'
+const USAGE = 'usage: node scripts/init-store.mjs [--store dir] [--name name [--description text] [--default]] | --marker name'
+const NAME_RE = /^[A-Za-z0-9_-]+$/
 
 export function parseArgs(argv) {
-  const args = { store: null, name: null, cwdPrefixes: [], makeDefault: false }
+  const args = { store: null, name: null, description: null, makeDefault: false, marker: null }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--store') args.store = argv[++i]
     else if (a === '--name') args.name = argv[++i]
-    else if (a === '--cwd-prefix') args.cwdPrefixes.push(argv[++i])
+    else if (a === '--description') args.description = argv[++i]
     else if (a === '--default') args.makeDefault = true
+    else if (a === '--marker') args.marker = argv[++i]
     else throw new Error(`unknown argument: ${a}\n${USAGE}`)
   }
-  if (!args.name && (args.cwdPrefixes.length || args.makeDefault)) {
-    throw new Error(`--cwd-prefix and --default need --name\n${USAGE}`)
+  if (args.marker !== null) {
+    if (!args.marker || !NAME_RE.test(args.marker)) throw new Error(`--marker needs a store name matching [A-Za-z0-9_-]+`)
+    if (args.store || args.name || args.description !== null || args.makeDefault) {
+      throw new Error(`--marker takes no other flags\n${USAGE}`)
+    }
+    return args
   }
-  if (args.name && !/^[A-Za-z0-9_-]+$/.test(args.name)) {
+  if (!args.name && (args.description !== null || args.makeDefault)) {
+    throw new Error(`--description and --default need --name\n${USAGE}`)
+  }
+  if (args.name && !NAME_RE.test(args.name)) {
     throw new Error(`--name must match [A-Za-z0-9_-]+: ${args.name}`)
   }
   return args
@@ -305,11 +376,11 @@ export function initStore(storeDir) {
 
 /** A named store: `--store` or `<registry dir>/<name>`, created like any
  * other store and then registered. */
-export function initNamedStore({ name, store, cwdPrefixes = [], makeDefault = false }) {
+export function initNamedStore({ name, store, description = null, makeDefault = false }) {
   const registryFile = registryPath()
   const storeDir = store ? resolve(expandHome(store)) : join(dirname(registryFile), name)
   const log = initStore(storeDir)
-  log.push(...registerStoreInFile(registryFile, { name, storePath: storeDir, cwdPrefixes, makeDefault }))
+  log.push(...registerStoreInFile(registryFile, { name, storePath: storeDir, description, makeDefault }))
   return log
 }
 
@@ -321,9 +392,17 @@ function main() {
     console.error(`init-store: ${e.message}`)
     return 2
   }
-  const log = args.name
-    ? initNamedStore(args)
-    : initStore(resolveStoreDir(args.store))
+  let log
+  try {
+    log = args.marker
+      ? writeRepoMarker(args.marker)
+      : args.name
+        ? initNamedStore(args)
+        : initStore(resolveStoreDir(args.store))
+  } catch (e) {
+    console.error(`init-store: ${e.message}`)
+    return 1
+  }
   for (const line of log) console.log(line)
   return 0
 }

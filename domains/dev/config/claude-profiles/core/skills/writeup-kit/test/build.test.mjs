@@ -1,11 +1,11 @@
-import { test, describe } from 'node:test'
+import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { buildStore } from '../bin/build.mjs'
+import { buildStore, renderStoreSwitcher } from '../bin/build.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
 import { faviconDataUri, statusFromChecks } from '../bin/lib/favicon.mjs'
 
@@ -894,5 +894,70 @@ describe('buildStore(): syntax highlighting of .wu-code / .wu-diff', () => {
     buildStore(store)
     const result = runSelfCheck(page)
     assert.ok(!result.warnings.some((w) => w.item === 'markdown-convertibility' && w.detail.includes('wu-tok-')), JSON.stringify(result.warnings))
+  })
+})
+
+describe('buildStore(): store switcher in the index header', () => {
+  const ENV_KEYS = ['WRITEUP_STORE', 'WRITEUP_STORES']
+  let savedEnv
+  beforeEach(() => {
+    savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]))
+    for (const k of ENV_KEYS) delete process.env[k]
+  })
+  afterEach(() => {
+    for (const k of ENV_KEYS) {
+      if (savedEnv[k] === undefined) delete process.env[k]
+      else process.env[k] = savedEnv[k]
+    }
+  })
+
+  /** Two registered stores (`work`, `private` = default) under one base
+   * dir, `work` populated from the fixture; returns the built work index. */
+  function registeredStores() {
+    const base = mkdtempSync(join(tmpdir(), 'wu-switch-'))
+    cpSync(FIXTURE_STORE, join(base, 'work'), { recursive: true })
+    mkdirSync(join(base, 'private'), { recursive: true })
+    writeFileSync(join(base, 'stores.toml'), 'default = "private"\n\n[[store]]\nname = "work"\npath = "work"\ndescription = "仕事"\n\n[[store]]\nname = "private"\npath = "private"\ndescription = "個人"\n')
+    process.env.WRITEUP_STORES = join(base, 'stores.toml')
+    return base
+  }
+
+  test('renderStoreSwitcher: relative ../<name>/index.html links, aria-current on the current store, description as title', () => {
+    const stores = [{ name: 'work', description: '仕事' }, { name: 'private', description: '' }]
+    const html = renderStoreSwitcher('private', stores)
+    assert.equal(html, '<nav class="wu-idx-stores" aria-label="store"><a href="../work/index.html" title="仕事">work</a><a href="../private/index.html" aria-current="page">private</a></nav>\n')
+    assert.equal(renderStoreSwitcher('', stores), '')
+    assert.equal(renderStoreSwitcher('other', stores), '')
+    assert.equal((renderStoreSwitcher('work', stores).match(/aria-current/g) || []).length, 1)
+  })
+
+  test('a registered store\'s index carries the switcher above the eyebrow, inside .wu-header', () => {
+    const base = registeredStores()
+    buildStore(join(base, 'work'))
+    const html = readFileSync(join(base, 'work', 'index.html'), 'utf8')
+    const header = /<header class="wu-header">([\s\S]*?)<\/header>/.exec(html)[1]
+    const nav = header.indexOf('<nav class="wu-idx-stores"')
+    const eyebrow = header.indexOf('<p class="wu-eyebrow">')
+    assert.ok(nav !== -1 && eyebrow !== -1 && nav < eyebrow, header)
+    assert.match(header, /<a href="\.\.\/work\/index\.html" aria-current="page" title="仕事">work<\/a>/)
+    assert.match(header, /<a href="\.\.\/private\/index\.html" title="個人">private<\/a>/)
+    assert.doesNotMatch(header, /aria-current="page"[^>]*>private/)
+    // Styled with the existing index tokens only; nothing remembered client-side.
+    assert.match(html, /\.wu-idx-stores a\[aria-current="page"\]\{color:var\(--wu-ink\);\}/)
+    assert.doesNotMatch(html, /localStorage[^\n]*stores/)
+    // The private (default) store gets the same switcher with its own current mark.
+    buildStore(join(base, 'private'))
+    const other = readFileSync(join(base, 'private', 'index.html'), 'utf8')
+    assert.match(other, /<a href="\.\.\/private\/index\.html" aria-current="page" title="個人">private<\/a>/)
+    assert.match(other, /<a href="\.\.\/work\/index\.html" title="仕事">work<\/a>/)
+  })
+
+  test('an unregistered store (or no registry) builds an index without a switcher', () => {
+    process.env.WRITEUP_STORES = join(tmpdir(), 'wu-nope', 'stores.toml')
+    const store = freshStore()
+    buildStore(store)
+    const html = readFileSync(join(store, 'index.html'), 'utf8')
+    assert.doesNotMatch(html, /wu-idx-stores"/)
+    assert.match(html, /<p class="wu-eyebrow">writeup store<\/p>/)
   })
 })

@@ -1,21 +1,26 @@
 #!/usr/bin/env node
-// serve.mjs — a static file server for a writeup store, bound to 127.0.0.1
-// only. Builds the store first (unless --no-build) so `index.html` and
+// serve.mjs — a static file server for writeup stores, bound to 127.0.0.1
+// only. Builds each store first (unless --no-build) so `index.html` and
 // `manifest.json` are current. Zero-dependency (node:http only).
 //
 // Safety, ported from grilling's render/lib/serve.mjs: loopback-only bind,
 // a Host-header allowlist (defeats DNS rebinding), and path resolution that
 // refuses to escape the store root (defeats `..` traversal).
 //
-// `/id/<8-hex-id>` redirects (302) to a page's path via manifest.json, so a
-// user (or another skill) can say "id 9f3a1c2d を開いて" without knowing the
-// page's folder/slug.
+// One viewer for every store. With no store flag every registered store is
+// served from a single port, each under its own prefix:
 //
-// Stores: `--store <dir>` / `--store-name <name>` pick one store (see
-// lib/store.mjs for the resolution order); `--all` starts one listener per
-// registered store on consecutive ports and prints one URL per store;
-// `--list-stores` prints the registry (and which store the current
-// directory resolves to) without serving anything.
+//   /                      → 302 to the default store's index (`/<name>/`)
+//   /<name>/…              → files of the store registered as <name>
+//   /<name>/id/<8-hex-id>  → 302 to that page inside <name>
+//   /id/<8-hex-id>         → 302 to the page, searched across every store
+//
+// The index page's store switcher (build.mjs) links `../<name>/index.html`,
+// which resolves under these prefixes exactly as it does on `file://`.
+// `--store <dir>` / `--store-name <name>` serve one store at the root, the
+// old single-store behaviour, and without a registry the legacy single
+// store is served the same way. `--list-stores` prints the registry (and
+// which store the current directory resolves to) without serving.
 
 import { createServer } from 'node:http'
 import { createHash } from 'node:crypto'
@@ -23,7 +28,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveStoreDir, explainStoreDir, listStores, readRegistry, readManifest } from './lib/store.mjs'
+import { resolveStoreDir, explainStoreDir, readRegistry, readManifest } from './lib/store.mjs'
 import { buildStore } from './build.mjs'
 
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
@@ -47,45 +52,35 @@ const MIME = {
   '.woff2': 'font/woff2',
 }
 
-/** Deterministic port derived from the store's absolute path, so the same
- * store always tries the same port across runs. */
+/** Deterministic port derived from an absolute path, so the same store
+ * (or the same registry, for the all-stores viewer) always tries the same
+ * port across runs. */
 export function portForStore(storeDir) {
   const digest = createHash('sha256').update(resolve(storeDir)).digest()
   const n = digest.readUInt32BE(0)
   return PORT_RANGE_START + (n % PORT_RANGE_SIZE)
 }
 
-/** Ports for serving `stores` together: `basePort` (default: the port
- * derived from the first store's path) and then consecutive ports, kept
- * inside the deterministic range. Pure — nothing is bound here. */
-export function planAllPorts(stores, basePort) {
-  if (!stores.length) return []
-  const base = basePort ?? portForStore(stores[0].path)
-  return stores.map((s, i) => ({
-    name: s.name,
-    path: s.path,
-    port: PORT_RANGE_START + ((base - PORT_RANGE_START + i) % PORT_RANGE_SIZE),
-  }))
-}
-
 /** Lines for `--list-stores`: one per registered store as
- * `<mark> <name>\t<path>\t<flags>` where `mark` is `*` for the store the
- * current directory resolves to and ` ` otherwise, and `flags` lists
- * `default` and any `cwd_prefixes`. Without a registry the single legacy
- * store is listed as `* legacy\t<path>\t(no registry)`. Pure — exported
- * so the format can be tested without spawning the CLI. */
+ * `<mark> <name>\t<path>\t<description>\t<flags>` where `mark` is `*` for
+ * the store the current directory resolves to (repository marker, else
+ * `default`) and ` ` otherwise, `description` is the registry's one-line
+ * description (may be empty) and `flags` is `default` or empty; trailing
+ * tabs are trimmed. Without a registry the single legacy store is listed
+ * as `* legacy\t<path>\t(no registry)`. Pure — exported so the format can
+ * be tested without spawning the CLI. */
 export function formatStoreList({ cwd = process.cwd() } = {}) {
   const registry = readRegistry()
-  const picked = explainStoreDir(null, { cwd })
   if (!registry.stores.length) {
+    const picked = explainStoreDir(null, { cwd })
     return [`* legacy\t${picked.dir}\t(no registry: ${registry.path})`]
   }
+  let pickedDir = null
+  try { pickedDir = resolve(explainStoreDir(null, { cwd }).dir) } catch { pickedDir = null }
   return registry.stores.map((s) => {
-    const mark = resolve(s.path) === resolve(picked.dir) ? '*' : ' '
-    const flags = []
-    if (s.isDefault) flags.push('default')
-    if (s.cwdPrefixes.length) flags.push(`cwd_prefixes=${s.cwdPrefixes.join(',')}`)
-    return `${mark} ${s.name}\t${s.path}\t${flags.join(' ')}`.trimEnd()
+    const mark = resolve(s.path) === pickedDir ? '*' : ' '
+    const flags = s.isDefault ? 'default' : ''
+    return `${mark} ${s.name}\t${s.path}\t${s.description}\t${flags}`.replace(/\t+$/, '')
   })
 }
 
@@ -105,6 +100,51 @@ function send(res, code, body, headers = {}) {
   res.end(body)
 }
 
+// --- mounts -----------------------------------------------------------------
+//
+// A mount is one store at a URL prefix: `{ name, prefix, dir, isDefault }`.
+// Single-store mode is one mount with the empty prefix; the all-stores
+// viewer is one mount per registered store with prefix `/<name>`.
+
+/** Mounts for `stores` (`[{ name, path, isDefault }]`): prefix `/<name>`
+ * each. The default mount is the registry default, else the first store. */
+export function mountsFor(stores) {
+  const mounts = stores.map((s) => ({ name: s.name, prefix: `/${s.name}`, dir: s.path, isDefault: !!s.isDefault }))
+  if (mounts.length && !mounts.some((m) => m.isDefault)) mounts[0].isDefault = true
+  return mounts
+}
+
+/** Where a request path lands, given `mounts`. Pure. Returns one of:
+ *   `{ kind: 'redirect', location }`      — `/` → default index, `/<name>` → `/<name>/`
+ *   `{ kind: 'id', id, mount }`           — `/id/<id>` (mount null = every store)
+ *                                           or `/<name>/id/<id>`
+ *   `{ kind: 'file', mount, rest }`       — a path inside one mount
+ *   `{ kind: 'unknown' }`                 — no mount claims the path */
+export function routeRequest(pathOnly, mounts) {
+  const single = mounts.length === 1 && mounts[0].prefix === ''
+  if (!single) {
+    if (pathOnly === '/' || pathOnly === '') {
+      const dflt = mounts.find((m) => m.isDefault) || mounts[0]
+      return dflt ? { kind: 'redirect', location: `${dflt.prefix}/` } : { kind: 'unknown' }
+    }
+    const idAll = ID_ROUTE_RE.exec(pathOnly)
+    if (idAll) return { kind: 'id', id: idAll[1], mount: null }
+  }
+  for (const mount of mounts) {
+    if (mount.prefix === '') {
+      const idMatch = ID_ROUTE_RE.exec(pathOnly)
+      return idMatch ? { kind: 'id', id: idMatch[1], mount } : { kind: 'file', mount, rest: pathOnly || '/' }
+    }
+    if (pathOnly === mount.prefix) return { kind: 'redirect', location: `${mount.prefix}/` }
+    if (pathOnly.startsWith(mount.prefix + '/')) {
+      const rest = pathOnly.slice(mount.prefix.length)
+      const idMatch = ID_ROUTE_RE.exec(rest)
+      return idMatch ? { kind: 'id', id: idMatch[1], mount } : { kind: 'file', mount, rest }
+    }
+  }
+  return { kind: 'unknown' }
+}
+
 // --- 404 handling ------------------------------------------------------------
 //
 // When a requested path doesn't resolve to a file, look the request's
@@ -113,7 +153,8 @@ function send(res, code, body, headers = {}) {
 // anything else (zero matches, or more than one) renders a kit-styled 404
 // page listing whatever near-matches were found plus a link into the index
 // search. Legacy pages (`legacy/**`) are ordinary manifest records, so they
-// participate exactly like any other page.
+// participate exactly like any other page. A path no mount claims is looked
+// up across every mount.
 
 function safeDecode(s) {
   try { return decodeURIComponent(s) } catch { return s }
@@ -154,11 +195,25 @@ export function findNotFoundCandidates(manifest, basename) {
   return out
 }
 
+/** Candidates across `mounts`, each tagged with the mount it came from. */
+function findCandidatesAcross(mounts, basename) {
+  const out = []
+  for (const mount of mounts) {
+    for (const r of findNotFoundCandidates(readManifest(mount.dir), basename)) out.push({ ...r, mount })
+  }
+  return out
+}
+
 /** `/`-prefixed URL for a store-relative page path, each segment
  * percent-encoded individually (so a `Location` header is always valid even
  * if a path segment ever contains characters that need escaping). */
 function encodePath(relPath) {
   return '/' + relPath.split('/').map(encodeURIComponent).join('/')
+}
+
+/** The URL of a page inside its mount. */
+function pageUrl(mount, relPath) {
+  return `${mount.prefix}${encodePath(relPath)}`
 }
 
 function escapeHtml(s) {
@@ -172,33 +227,35 @@ function shortDatetime(iso) {
   return m ? `${m[1]} ${m[2]}` : (iso || '')
 }
 
-/** The kit-styled 404 page: `.wu-header` (back nav to `/`, eyebrow, the
- * requested path as h1, a lede), an optional "近いページ" section listing
- * `candidates`, and an always-present "探す" section linking into the index
- * search for `searchQuery`. No inline styles beyond the kit's own
- * stylesheet, no emoji, no external assets — only `/_kit/writeup.css`. */
-function renderNotFoundHtml(requestedPath, candidates, searchQuery) {
+/** The kit-styled 404 page: `.wu-header` (back nav to the index of `home`,
+ * eyebrow, the requested path as h1, a lede), an optional "近いページ"
+ * section listing `candidates` (each linked inside its own mount, named
+ * when the viewer has several), and an always-present "探す" section
+ * linking into `home`'s index search for `searchQuery`. No inline styles
+ * beyond the kit's own stylesheet, no emoji, no external assets — only
+ * `home`'s `_kit/writeup.css`. */
+function renderNotFoundHtml(requestedPath, candidates, searchQuery, home, { named = false } = {}) {
   const nearHtml = candidates.length
     ? `<section class="wu-section">
 <h2>近いページ</h2>
 <ul>
-${candidates.map((c) => `<li><a href="${escapeHtml(encodePath(c.path))}">${escapeHtml(c.title || c.path)}</a> &middot; ${escapeHtml(c.ref || '')} &middot; ${escapeHtml(shortDatetime(c.updated))}</li>`).join('\n')}
+${candidates.map((c) => `<li><a href="${escapeHtml(pageUrl(c.mount, c.path))}">${escapeHtml(c.title || c.path)}</a> &middot; ${named ? `${escapeHtml(c.mount.name)} &middot; ` : ''}${escapeHtml(c.ref || '')} &middot; ${escapeHtml(shortDatetime(c.updated))}</li>`).join('\n')}
 </ul>
 </section>`
     : ''
-  const searchHref = `/?q=${encodeURIComponent(searchQuery)}`
+  const searchHref = `${home.prefix}/?q=${encodeURIComponent(searchQuery)}`
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <title>見つかりません</title>
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="/_kit/writeup.css">
+<link rel="stylesheet" href="${escapeHtml(home.prefix)}/_kit/writeup.css">
 </head>
 <body>
 <div class="wu-page">
 <header class="wu-header">
-<nav class="wu-nav"><a class="wu-back" href="/">一覧</a></nav>
+<nav class="wu-nav"><a class="wu-back" href="${escapeHtml(home.prefix)}/">一覧</a></nav>
 <p class="wu-eyebrow">見つかりません</p>
 <h1>${escapeHtml(requestedPath)}</h1>
 <p class="wu-lede">このパスにページはありません。</p>
@@ -218,66 +275,76 @@ ${nearHtml}
 
 /** Sends the 404 page for `requestedPath` (already decoded), listing
  * `candidates` (possibly empty) as near-matches. */
-function sendNotFound(res, requestedPath, candidates) {
+function sendNotFound(res, requestedPath, candidates, home, opts) {
   const searchQuery = stripDateAndExt(basenameOf(requestedPath))
-  const html = renderNotFoundHtml(requestedPath, candidates, searchQuery)
+  const html = renderNotFoundHtml(requestedPath, candidates, searchQuery, home, opts)
   res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' })
   res.end(html)
 }
 
 /** A request path that didn't resolve to a file: looks up candidates by
- * basename and either redirects (302) to a unique match — logging the
- * redirect to stderr — or renders the 404 page with whatever candidates (if
- * any) were found. */
-function handleNotFound(res, storeDir, pathOnly) {
+ * basename in `searchMounts` and either redirects (302) to a unique match
+ * — logging the redirect to stderr — or renders the 404 page with whatever
+ * candidates (if any) were found. */
+function handleNotFound(res, pathOnly, searchMounts, home) {
   const requestedPath = safeDecode(pathOnly)
-  const manifest = readManifest(storeDir)
-  const candidates = findNotFoundCandidates(manifest, basenameOf(requestedPath))
+  const candidates = findCandidatesAcross(searchMounts, basenameOf(requestedPath))
   if (candidates.length === 1) {
-    const location = encodePath(candidates[0].path)
+    const location = pageUrl(candidates[0].mount, candidates[0].path)
     process.stderr.write(`serve: 404 redirect ${requestedPath} -> ${location} (matched ${candidates[0].ref})\n`)
     res.writeHead(302, { location })
     return void res.end()
   }
-  return sendNotFound(res, requestedPath, candidates)
+  return sendNotFound(res, requestedPath, candidates, home, { named: searchMounts.length > 1 })
 }
 
-/** `/id/<8-hex-id>` → 302 to the page's path, resolved via manifest.json,
- * or the same kit-styled 404 page as any other unresolved path when the id
+/** `/id/<8-hex-id>` → 302 to the page's path, resolved via manifest.json of
+ * `searchMounts` (one store, or every store for the viewer-wide route), or
+ * the same kit-styled 404 page as any other unresolved path when the id
  * isn't known (or manifest.json doesn't exist yet). Read-only: never
  * rebuilds the manifest itself, so this never mutates the store — a request
  * just reflects whatever the last build wrote. */
-async function handleIdRoute(req, res, storeDir, id, pathOnly) {
-  const manifest = readManifest(storeDir)
-  const record = manifest.find((r) => r && r.id === id)
-  if (!record) return sendNotFound(res, safeDecode(pathOnly), [])
-  res.writeHead(302, { location: encodePath(record.path) })
-  res.end()
+function handleIdRoute(res, id, pathOnly, searchMounts, home) {
+  for (const mount of searchMounts) {
+    const record = readManifest(mount.dir).find((r) => r && r.id === id)
+    if (record) {
+      res.writeHead(302, { location: pageUrl(mount, record.path) })
+      return void res.end()
+    }
+  }
+  return sendNotFound(res, safeDecode(pathOnly), [], home)
 }
 
-async function handleRequest(req, res, storeDir) {
+async function handleRequest(req, res, mounts) {
   if (!LOOPBACK_HOST.test(String(req.headers.host || ''))) return send(res, 403, 'forbidden')
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'method not allowed')
 
   const pathOnly = (req.url || '/').split('?')[0].split('#')[0]
-  const idMatch = ID_ROUTE_RE.exec(pathOnly)
-  if (idMatch) return handleIdRoute(req, res, storeDir, idMatch[1], pathOnly)
+  const home = mounts.find((m) => m.isDefault) || mounts[0]
+  const route = routeRequest(pathOnly, mounts)
+  if (route.kind === 'redirect') {
+    res.writeHead(302, { location: route.location })
+    return void res.end()
+  }
+  if (route.kind === 'id') return handleIdRoute(res, route.id, pathOnly, route.mount ? [route.mount] : mounts, route.mount || home)
+  if (route.kind === 'unknown') return handleNotFound(res, pathOnly, mounts, home)
 
-  const target = resolveSafePath(storeDir, req.url || '/')
+  const { mount, rest } = route
+  const target = resolveSafePath(mount.dir, rest)
   if (!target) return send(res, 400, 'bad request')
 
   let st
   try {
     st = await stat(target)
   } catch {
-    return handleNotFound(res, storeDir, pathOnly)
+    return handleNotFound(res, pathOnly, [mount], mount)
   }
   const filePath = st.isDirectory() ? join(target, 'index.html') : target
   let body
   try {
     body = await readFile(filePath)
   } catch {
-    return handleNotFound(res, storeDir, pathOnly)
+    return handleNotFound(res, pathOnly, [mount], mount)
   }
   const type = MIME[extname(filePath).toLowerCase()] || 'application/octet-stream'
   res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' })
@@ -285,14 +352,9 @@ async function handleRequest(req, res, storeDir) {
   res.end(body)
 }
 
-/**
- * Starts the static server. Resolves once listening; the server keeps
- * running until `stop()` is called (or the process exits).
- * @returns {Promise<{server: import('node:http').Server, port: number, url: string, stop: () => Promise<void>}>}
- */
-export async function startServer(storeDir, { port, fallbackToFreePort = true } = {}) {
+async function listen(mounts, { port, fallbackToFreePort }) {
   const server = createServer((req, res) => {
-    handleRequest(req, res, storeDir).catch((e) => {
+    handleRequest(req, res, mounts).catch((e) => {
       if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' })
       res.end(`internal error: ${e.message}`)
     })
@@ -306,35 +368,56 @@ export async function startServer(storeDir, { port, fallbackToFreePort = true } 
     })
   })
 
-  const requested = port ?? portForStore(storeDir)
   try {
-    await listenOn(requested)
+    await listenOn(port)
   } catch (e) {
     if (!(fallbackToFreePort && e.code === 'EADDRINUSE')) throw e
     await listenOn(0)
   }
 
   const bound = server.address().port
-  const url = `http://127.0.0.1:${bound}/`
   return {
     server,
     port: bound,
-    url,
+    url: `http://127.0.0.1:${bound}/`,
+    mounts,
     stop: () => new Promise((res) => { server.closeAllConnections?.(); server.close(() => res()) }),
   }
 }
 
+/**
+ * Starts the single-store server: `storeDir` at the root. Resolves once
+ * listening; the server keeps running until `stop()` is called (or the
+ * process exits).
+ * @returns {Promise<{server: import('node:http').Server, port: number, url: string, stop: () => Promise<void>}>}
+ */
+export async function startServer(storeDir, { port, fallbackToFreePort = true } = {}) {
+  const mounts = [{ name: null, prefix: '', dir: storeDir, isDefault: true }]
+  return listen(mounts, { port: port ?? portForStore(storeDir), fallbackToFreePort })
+}
+
+/**
+ * Starts the all-stores viewer: every store in `stores`
+ * (`[{ name, path, isDefault }]`, registry order) under `/<name>/` on one
+ * port — by default the port derived from `portKey` (the registry path),
+ * so the viewer keeps its address across runs whatever the stores are.
+ */
+export async function startMultiServer(stores, { port, portKey, fallbackToFreePort = true } = {}) {
+  if (!stores.length) throw new Error('startMultiServer: no stores')
+  const mounts = mountsFor(stores)
+  return listen(mounts, { port: port ?? portForStore(portKey ?? stores[0].path), fallbackToFreePort })
+}
+
 // --- CLI --------------------------------------------------------------------
 
-const USAGE = 'usage: node bin/serve.mjs [--store dir | --store-name name | --all] [--port n] [--no-open] [--no-build] [--list-stores]'
+const USAGE = 'usage: node bin/serve.mjs [--store dir | --store-name name] [--port n] [--no-open] [--no-build] [--list-stores]'
 
 export function parseArgs(argv) {
-  const args = { store: null, storeName: null, all: false, listStores: false, port: null, open: true, build: true }
+  const args = { store: null, storeName: null, listStores: false, port: null, open: true, build: true }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--store') args.store = argv[++i]
     else if (a === '--store-name') args.storeName = argv[++i]
-    else if (a === '--all') args.all = true
     else if (a === '--list-stores') args.listStores = true
     else if (a === '--port') args.port = Number(argv[++i])
     else if (a === '--no-open') args.open = false
@@ -342,8 +425,8 @@ export function parseArgs(argv) {
     else if (a === '--help' || a === '-h') args.help = true
     else throw new Error(`unknown argument: ${a}\n${USAGE}`)
   }
-  if ((args.store ? 1 : 0) + (args.storeName ? 1 : 0) + (args.all ? 1 : 0) > 1) {
-    throw new Error(`--store, --store-name and --all are mutually exclusive\n${USAGE}`)
+  if (args.store && args.storeName) {
+    throw new Error(`--store and --store-name are mutually exclusive\n${USAGE}`)
   }
   return args
 }
@@ -363,18 +446,6 @@ function buildIfWanted(args, storeDir) {
   process.stderr.write(`serve: built ${result.counts.total} pages (legacy: ${result.counts.legacy}) in ${storeDir}\n`)
 }
 
-/** `--all`: one listener per registered store, consecutive ports. A store
- * whose planned port is taken falls back to a free one. Stores are
- * started in registry order so the port assignment stays predictable. */
-export async function startAll(stores, { basePort, fallbackToFreePort = true } = {}) {
-  const started = []
-  for (const plan of planAllPorts(stores, basePort)) {
-    const server = await startServer(plan.path, { port: plan.port, fallbackToFreePort })
-    started.push({ name: plan.name, path: plan.path, ...server })
-  }
-  return started
-}
-
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (args.help) {
@@ -386,16 +457,13 @@ async function main() {
     return 0
   }
 
-  if (args.all) {
-    const stores = listStores()
-    if (!stores.length) throw new Error(`--all: no registered stores (registry: ${readRegistry().path})`)
-    for (const s of stores) buildIfWanted(args, s.path)
-    const started = await startAll(stores, { basePort: args.port || undefined })
-    for (const s of started) {
-      process.stderr.write(`serve: ${s.url} (store ${s.name}: ${s.path})\n`)
-      if (args.open) openInBrowser(s.url)
-    }
-    return started.map((s) => s.port)
+  const registry = readRegistry()
+  if (!args.store && !args.storeName && registry.stores.length) {
+    for (const s of registry.stores) buildIfWanted(args, s.path)
+    const { url, port, mounts } = await startMultiServer(registry.stores, { port: args.port || undefined, portKey: registry.path })
+    for (const m of mounts) process.stderr.write(`serve: ${url}${m.name}/ (store ${m.name}: ${m.dir}${m.isDefault ? ', default' : ''})\n`)
+    if (args.open) openInBrowser(url)
+    return port
   }
 
   const storeDir = resolveStoreDir(args.store, { name: args.storeName })

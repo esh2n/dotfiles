@@ -1,6 +1,7 @@
-// store.test.mjs — the store registry (`stores.toml`) and the store
-// resolution order, plus serve.mjs's multi-store helpers (`--all` port
-// planning, `--list-stores` formatting) and publish's `--store-name`.
+// store.test.mjs — the store registry (`stores.toml`), the repository
+// marker (`<repo root>/.writeup`), the store resolution order, plus
+// serve.mjs's registry helpers (`--list-stores` formatting, single-port
+// multi-store routing) and publish's `--store-name`.
 
 import { test, describe, beforeEach, afterEach, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -9,10 +10,10 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  readRegistry, listStores, resolveStoreByName, resolveStoreByCwd, resolveStoreDir,
-  explainStoreDir, registryPath, defaultStoreBase, expandHome,
+  readRegistry, listStores, resolveStoreByName, resolveStoreDir, explainStoreDir,
+  registryPath, defaultStoreBase, expandHome, findRepoRoot, findRepoMarker, parseRepoMarker,
 } from '../bin/lib/store.mjs'
-import { planAllPorts, formatStoreList, parseArgs, startAll, portForStore } from '../bin/serve.mjs'
+import { formatStoreList, parseArgs, mountsFor, routeRequest, startMultiServer, startServer, portForStore } from '../bin/serve.mjs'
 import { publish } from '../bin/publish.mjs'
 import { buildStore } from '../bin/build.mjs'
 
@@ -34,30 +35,39 @@ afterEach(() => {
   }
 })
 
-/** A temp base dir holding a registry with `work` (cwd-prefixed) and
- * `learn` (default), each an initialised store directory. */
+/** A temp base dir holding a registry with `work` and `private`
+ * (default), each an initialised store directory, plus a fake git
+ * repository (`repos/some-service`, with a `.git` dir and a `src/`
+ * subdir) carrying no marker yet, and an `elsewhere/` dir outside any
+ * repository. */
 function registryFixture({ withDefault = true } = {}) {
   const base = mkdtempSync(join(tmpdir(), 'wu-stores-'))
-  const repos = join(base, 'repos', 'example-org')
-  mkdirSync(join(repos, 'some-service', 'src'), { recursive: true })
+  const repo = join(base, 'repos', 'some-service')
+  mkdirSync(join(repo, '.git'), { recursive: true })
+  mkdirSync(join(repo, 'src', 'deep'), { recursive: true })
   mkdirSync(join(base, 'elsewhere'), { recursive: true })
-  for (const name of ['work', 'learn']) {
+  for (const name of ['work', 'private']) {
     mkdirSync(join(base, name), { recursive: true })
     writeFileSync(join(base, name, '.writeup.toml'), '[private]\nwords = []\n')
   }
   const registry = join(base, 'stores.toml')
-  writeFileSync(registry, `${withDefault ? 'default = "learn"\n\n' : ''}# registered stores
+  writeFileSync(registry, `${withDefault ? 'default = "private"\n\n' : ''}# registered stores
 [[store]]
 name = "work"
 path = "work"
-cwd_prefixes = ["${repos}"]
+description = "仕事"
 
 [[store]]
-name = "learn"
-path = "learn"
+name = "private"
+path = "private"
+description = "個人"
 `)
   process.env.WRITEUP_STORES = registry
-  return { base, registry, repos }
+  return { base, registry, repo }
+}
+
+function marker(repo, name) {
+  writeFileSync(join(repo, '.writeup'), `store = "${name}"\n`)
 }
 
 describe('registry parsing', () => {
@@ -76,22 +86,29 @@ describe('registry parsing', () => {
     assert.equal(resolveStoreByName('work'), null)
   })
 
-  test('[[store]] entries resolve path relative to the registry dir, absolute and ~ pass through', () => {
-    const { base, repos } = registryFixture()
+  test('[[store]] entries carry name / path / description only; path resolves relative to the registry dir, absolute and ~ pass through', () => {
+    const { base } = registryFixture()
     const r = readRegistry()
     assert.equal(r.exists, true)
-    assert.equal(r.defaultName, 'learn')
-    assert.deepEqual(r.stores.map((s) => s.name), ['work', 'learn'])
-    assert.equal(r.stores[0].path, join(base, 'work'))
-    assert.deepEqual(r.stores[0].cwdPrefixes, [repos])
-    assert.equal(r.stores[0].isDefault, false)
-    assert.equal(r.stores[1].isDefault, true)
+    assert.equal(r.defaultName, 'private')
+    assert.deepEqual(r.stores, [
+      { name: 'work', path: join(base, 'work'), isDefault: false, description: '仕事' },
+      { name: 'private', path: join(base, 'private'), isDefault: true, description: '個人' },
+    ])
 
-    writeFileSync(process.env.WRITEUP_STORES, `[[store]]\nname = "abs"\npath = "/srv/abs"\n[[store]]\nname = "home"\npath = "~/h"\ncwd_prefixes = ["~/p"]\n`)
+    writeFileSync(process.env.WRITEUP_STORES, `[[store]]\nname = "abs"\npath = "/srv/abs"\n[[store]]\nname = "home"\npath = "~/h"\n`)
     const r2 = readRegistry()
     assert.equal(r2.stores[0].path, '/srv/abs')
+    assert.equal(r2.stores[0].description, '')
     assert.equal(r2.stores[1].path, expandHome('~/h'))
-    assert.deepEqual(r2.stores[1].cwdPrefixes, [expandHome('~/p')])
+  })
+
+  test('cwd_prefixes in an old registry are ignored, not mapped', () => {
+    const { base } = registryFixture()
+    writeFileSync(process.env.WRITEUP_STORES, `default = "private"\n[[store]]\nname = "work"\npath = "work"\ncwd_prefixes = ["${join(base, 'repos')}"]\n[[store]]\nname = "private"\npath = "private"\n`)
+    const r = readRegistry()
+    assert.ok(!('cwdPrefixes' in r.stores[0]))
+    assert.equal(resolveStoreDir(null, { cwd: join(base, 'repos', 'some-service', 'src') }), join(base, 'private'))
   })
 
   test('entries without a name are skipped and a duplicate name keeps the first', () => {
@@ -112,72 +129,119 @@ describe('registry parsing', () => {
     const { base } = registryFixture()
     assert.deepEqual(listStores().map(({ name, path, isDefault }) => ({ name, path, isDefault })), [
       { name: 'work', path: join(base, 'work'), isDefault: false },
-      { name: 'learn', path: join(base, 'learn'), isDefault: true },
+      { name: 'private', path: join(base, 'private'), isDefault: true },
     ])
     assert.equal(resolveStoreByName('work').path, join(base, 'work'))
     assert.equal(resolveStoreByName('nope'), null)
   })
 })
 
-describe('resolution order', () => {
-  test('explicit dir wins over everything', () => {
-    const { repos } = registryFixture()
-    process.env.WRITEUP_STORE = '/env/store'
-    assert.equal(resolveStoreDir('/explicit', { cwd: repos, name: 'learn' }), '/explicit')
-    assert.equal(explainStoreDir('/explicit', { cwd: repos }).via, 'explicit')
+describe('repository marker', () => {
+  test('findRepoRoot walks up to the nearest .git (dir or file), null outside a repo', () => {
+    const { base, repo } = registryFixture()
+    assert.equal(findRepoRoot(join(repo, 'src', 'deep')), repo)
+    assert.equal(findRepoRoot(repo), repo)
+    const worktree = join(base, 'wt')
+    mkdirSync(join(worktree, 'a'), { recursive: true })
+    writeFileSync(join(worktree, '.git'), 'gitdir: /somewhere\n')
+    assert.equal(findRepoRoot(join(worktree, 'a')), worktree)
+    assert.equal(findRepoRoot(join(base, 'elsewhere')), null)
   })
 
-  test('name beats $WRITEUP_STORE and cwd; an unknown name throws', () => {
-    const { base, repos } = registryFixture()
+  test('parseRepoMarker reads store = "<name>", tolerates comments, null when nothing is named', () => {
+    assert.equal(parseRepoMarker('store = "work"\n'), 'work')
+    assert.equal(parseRepoMarker('# which store this repo saves to\nstore = "private"\n'), 'private')
+    assert.equal(parseRepoMarker(''), null)
+    assert.equal(parseRepoMarker('other = 1\n'), null)
+  })
+
+  test('findRepoMarker: the nearest repo\'s .writeup, from any depth; none without a marker or a repo', () => {
+    const { base, repo } = registryFixture()
+    assert.equal(findRepoMarker(join(repo, 'src', 'deep')), null)
+    marker(repo, 'work')
+    assert.deepEqual(findRepoMarker(join(repo, 'src', 'deep')), { repoRoot: repo, path: join(repo, '.writeup'), name: 'work' })
+    assert.deepEqual(findRepoMarker(repo).name, 'work')
+    assert.equal(findRepoMarker(join(base, 'elsewhere')), null)
+    // A nested repository does not inherit its parent's marker.
+    const nested = join(repo, 'vendor', 'lib')
+    mkdirSync(join(nested, '.git'), { recursive: true })
+    assert.equal(findRepoMarker(nested), null)
+  })
+})
+
+describe('resolution order', () => {
+  test('explicit dir wins over everything', () => {
+    const { repo } = registryFixture()
+    marker(repo, 'work')
     process.env.WRITEUP_STORE = '/env/store'
-    assert.equal(resolveStoreDir(null, { cwd: repos, name: 'learn' }), join(base, 'learn'))
-    assert.equal(explainStoreDir(null, { name: 'learn' }).via, 'name')
+    assert.equal(resolveStoreDir('/explicit', { cwd: repo, name: 'private' }), '/explicit')
+    assert.equal(explainStoreDir('/explicit', { cwd: repo }).via, 'explicit')
+  })
+
+  test('name beats $WRITEUP_STORE and the marker; an unknown name throws', () => {
+    const { base, repo } = registryFixture()
+    marker(repo, 'work')
+    process.env.WRITEUP_STORE = '/env/store'
+    assert.equal(resolveStoreDir(null, { cwd: repo, name: 'private' }), join(base, 'private'))
+    assert.equal(explainStoreDir(null, { name: 'private' }).via, 'name')
     assert.throws(() => resolveStoreDir(null, { name: 'nope' }), /unknown store name: nope/)
   })
 
-  test('$WRITEUP_STORE beats ancestor discovery, cwd prefixes and default', () => {
-    const { base, repos } = registryFixture()
+  test('$WRITEUP_STORE beats ancestor discovery, the marker and default', () => {
+    const { base, repo } = registryFixture()
+    marker(repo, 'work')
     process.env.WRITEUP_STORE = '/env/store'
-    assert.equal(resolveStoreDir(null, { cwd: repos }), '/env/store')
+    assert.equal(resolveStoreDir(null, { cwd: repo }), '/env/store')
     assert.equal(resolveStoreDir(null, { cwd: join(base, 'work', 'sub') }), '/env/store')
-    assert.equal(explainStoreDir(null, { cwd: repos }).via, 'env')
+    assert.equal(explainStoreDir(null, { cwd: repo }).via, 'env')
   })
 
-  test('an ancestor .writeup.toml beats the registry', () => {
+  test('an ancestor .writeup.toml (a page\'s own store) beats the registry', () => {
     const { base } = registryFixture()
     mkdirSync(join(base, 'work', 'topic'), { recursive: true })
     assert.equal(resolveStoreDir(null, { cwd: join(base, 'work', 'topic') }), join(base, 'work'))
     assert.equal(explainStoreDir(null, { cwd: join(base, 'work', 'topic') }).via, 'ancestor')
   })
 
-  test('a cwd under a cwd_prefix picks that store; otherwise the default', () => {
-    const { base, repos } = registryFixture()
-    const inside = join(repos, 'some-service', 'src')
+  test('a repo marker beats the registry default; without one the default wins', () => {
+    const { base, repo } = registryFixture()
+    const inside = join(repo, 'src', 'deep')
+    assert.equal(resolveStoreDir(null, { cwd: inside }), join(base, 'private'))
+    assert.deepEqual(explainStoreDir(null, { cwd: inside }), { dir: join(base, 'private'), via: 'default', name: 'private' })
+    marker(repo, 'work')
     assert.equal(resolveStoreDir(null, { cwd: inside }), join(base, 'work'))
-    assert.equal(resolveStoreDir(null, { cwd: repos }), join(base, 'work'))
-    assert.deepEqual(explainStoreDir(null, { cwd: inside }), { dir: join(base, 'work'), via: 'cwd_prefix', name: 'work' })
-    // A sibling whose name merely starts with the prefix string is not "under" it.
-    mkdirSync(repos + '-other', { recursive: true })
-    assert.equal(resolveStoreDir(null, { cwd: repos + '-other' }), join(base, 'learn'))
-    assert.deepEqual(explainStoreDir(null, { cwd: join(base, 'elsewhere') }), { dir: join(base, 'learn'), via: 'default', name: 'learn' })
+    assert.equal(resolveStoreDir(null, { cwd: repo }), join(base, 'work'))
+    assert.deepEqual(explainStoreDir(null, { cwd: inside }), { dir: join(base, 'work'), via: 'marker', name: 'work', markerPath: join(repo, '.writeup') })
+    assert.deepEqual(explainStoreDir(null, { cwd: join(base, 'elsewhere') }), { dir: join(base, 'private'), via: 'default', name: 'private' })
   })
 
-  test('the longest matching cwd_prefix wins', () => {
-    const { base, repos } = registryFixture()
-    writeFileSync(process.env.WRITEUP_STORES, `[[store]]\nname = "work"\npath = "work"\ncwd_prefixes = ["${dirname(repos)}"]\n[[store]]\nname = "learn"\npath = "learn"\ncwd_prefixes = ["${repos}"]\n`)
-    assert.equal(resolveStoreByCwd(join(repos, 'x')).name, 'learn')
-    assert.equal(resolveStoreByCwd(join(dirname(repos), 'other')).name, 'work')
-    assert.equal(resolveStoreDir(null, { cwd: join(repos, 'x') }), join(base, 'learn'))
+  test('the directory a repo lives under never matters — only its marker does', () => {
+    const { base, repo } = registryFixture()
+    // A sibling repository next to a marked one is unaffected.
+    marker(repo, 'work')
+    const sibling = join(base, 'repos', 'other-service')
+    mkdirSync(join(sibling, '.git'), { recursive: true })
+    assert.equal(resolveStoreDir(null, { cwd: sibling }), join(base, 'private'))
+    // A non-repo directory under repos/ is not "in" any repository.
+    mkdirSync(join(base, 'repos', 'notes'), { recursive: true })
+    assert.equal(resolveStoreDir(null, { cwd: join(base, 'repos', 'notes') }), join(base, 'private'))
   })
 
-  test('no default in the registry and no match → legacy single store path', () => {
+  test('a marker naming a store missing from the registry throws (never falls through to default)', () => {
+    const { repo } = registryFixture()
+    marker(repo, 'archive')
+    assert.throws(() => resolveStoreDir(null, { cwd: join(repo, 'src') }), /names unknown store "archive"/)
+    assert.throws(() => explainStoreDir(null, { cwd: repo }), /names unknown store "archive"/)
+  })
+
+  test('no default in the registry and no marker → legacy single store path', () => {
     const { base } = registryFixture({ withDefault: false })
     assert.equal(resolveStoreDir(null, { cwd: join(base, 'elsewhere') }), defaultStoreBase())
     const via = explainStoreDir(null, { cwd: join(base, 'elsewhere') }).via
     assert.ok(via === 'legacy' || via === 'fallback', via)
   })
 
-  test('no registry at all → legacy single store path (old behaviour)', () => {
+  test('no registry at all → legacy single store path (old behaviour), even inside a marked repo', () => {
     process.env.WRITEUP_STORES = join(tmpdir(), 'wu-nope', 'stores.toml')
     const cwd = mkdtempSync(join(tmpdir(), 'wu-cwd-'))
     assert.equal(resolveStoreDir(null, { cwd }), defaultStoreBase())
@@ -185,31 +249,26 @@ describe('resolution order', () => {
   })
 })
 
-describe('serve.mjs multi-store helpers', () => {
-  test('planAllPorts assigns consecutive ports from the first store\'s port', () => {
-    const stores = [{ name: 'work', path: '/s/work' }, { name: 'learn', path: '/s/learn' }, { name: 'x', path: '/s/x' }]
-    const plan = planAllPorts(stores)
-    const base = portForStore('/s/work')
-    assert.deepEqual(plan.map((p) => p.port), [base, base + 1, base + 2])
-    assert.deepEqual(plan.map((p) => p.name), ['work', 'learn', 'x'])
-    assert.deepEqual(planAllPorts(stores, 45000).map((p) => p.port), [45000, 45001, 45002])
-    assert.deepEqual(planAllPorts([], 45000), [])
-  })
-
-  test('planAllPorts wraps inside the deterministic port range', () => {
-    const stores = [{ name: 'a', path: '/a' }, { name: 'b', path: '/b' }]
-    assert.deepEqual(planAllPorts(stores, 49999).map((p) => p.port), [49999, 40000])
-  })
-
-  test('formatStoreList marks the store the cwd resolves to', () => {
-    const { base, repos } = registryFixture()
-    const lines = formatStoreList({ cwd: repos })
+describe('serve.mjs registry helpers', () => {
+  test('formatStoreList: <mark> <name>\\t<path>\\t<description>\\t<flags>, * on the store the cwd resolves to', () => {
+    const { base, repo } = registryFixture()
+    marker(repo, 'work')
+    const lines = formatStoreList({ cwd: join(repo, 'src') })
     assert.equal(lines.length, 2)
-    assert.equal(lines[0], `* work\t${join(base, 'work')}\tcwd_prefixes=${repos}`)
-    assert.equal(lines[1], `  learn\t${join(base, 'learn')}\tdefault`)
+    assert.equal(lines[0], `* work\t${join(base, 'work')}\t仕事`)
+    assert.equal(lines[1], `  private\t${join(base, 'private')}\t個人\tdefault`)
     const fromElsewhere = formatStoreList({ cwd: join(base, 'elsewhere') })
     assert.ok(fromElsewhere[0].startsWith('  work'))
-    assert.ok(fromElsewhere[1].startsWith('* learn'))
+    assert.ok(fromElsewhere[1].startsWith('* private'))
+    assert.ok(!lines.join('\n').includes('cwd_prefix'))
+  })
+
+  test('formatStoreList: an empty description leaves its column empty; a bad marker marks nothing', () => {
+    const { base, repo } = registryFixture()
+    writeFileSync(process.env.WRITEUP_STORES, `default = "private"\n[[store]]\nname = "work"\npath = "work"\n[[store]]\nname = "private"\npath = "private"\n`)
+    assert.deepEqual(formatStoreList({ cwd: join(base, 'elsewhere') }), [`  work\t${join(base, 'work')}`, `* private\t${join(base, 'private')}\t\tdefault`])
+    marker(repo, 'archive')
+    assert.ok(formatStoreList({ cwd: repo }).every((l) => l.startsWith('  ')))
   })
 
   test('formatStoreList without a registry lists the single legacy store', () => {
@@ -219,39 +278,140 @@ describe('serve.mjs multi-store helpers', () => {
     assert.ok(lines[0].startsWith(`* legacy\t${defaultStoreBase()}\t(no registry:`), lines[0])
   })
 
-  test('parseArgs accepts --store-name, --all, --list-stores and rejects mixing them', () => {
+  test('parseArgs accepts --store-name and --list-stores, rejects --all and mixing store flags', () => {
     assert.equal(parseArgs(['--store-name', 'work']).storeName, 'work')
-    assert.equal(parseArgs(['--all', '--no-open']).all, true)
     assert.equal(parseArgs(['--list-stores']).listStores, true)
-    assert.throws(() => parseArgs(['--store', '/x', '--all']), /mutually exclusive/)
+    assert.equal(parseArgs(['--no-open', '--no-build']).build, false)
+    assert.throws(() => parseArgs(['--all']), /unknown argument/)
     assert.throws(() => parseArgs(['--store-name', 'a', '--store', '/x']), /mutually exclusive/)
     assert.throws(() => parseArgs(['--bogus']), /unknown argument/)
   })
 })
 
-describe('startAll', () => {
+describe('single-port routing (pure)', () => {
+  const stores = [{ name: 'work', path: '/s/work', isDefault: false }, { name: 'private', path: '/s/private', isDefault: true }]
+  const mounts = mountsFor(stores)
+
+  test('mountsFor: /<name> prefixes; the registry default, else the first store, is the default mount', () => {
+    assert.deepEqual(mounts.map((m) => [m.name, m.prefix, m.dir, m.isDefault]), [['work', '/work', '/s/work', false], ['private', '/private', '/s/private', true]])
+    const noDefault = mountsFor(stores.map((s) => ({ ...s, isDefault: false })))
+    assert.equal(noDefault[0].isDefault, true)
+  })
+
+  test('/ redirects to the default store index; /<name> to /<name>/', () => {
+    assert.deepEqual(routeRequest('/', mounts), { kind: 'redirect', location: '/private/' })
+    assert.deepEqual(routeRequest('/work', mounts), { kind: 'redirect', location: '/work/' })
+  })
+
+  test('/<name>/… lands in that store; /id/ searches every store; /<name>/id/ one store', () => {
+    const r = routeRequest('/work/decision/x.html', mounts)
+    assert.equal(r.kind, 'file'); assert.equal(r.mount.name, 'work'); assert.equal(r.rest, '/decision/x.html')
+    assert.equal(routeRequest('/private/', mounts).rest, '/')
+    assert.deepEqual(routeRequest('/id/0123abcd', mounts), { kind: 'id', id: '0123abcd', mount: null })
+    const one = routeRequest('/work/id/0123abcd', mounts)
+    assert.equal(one.kind, 'id'); assert.equal(one.mount.name, 'work')
+    assert.equal(routeRequest('/workshop/x.html', mounts).kind, 'unknown')
+    assert.equal(routeRequest('/nope/', mounts).kind, 'unknown')
+  })
+
+  test('single-store mode (empty prefix) keeps the old root routing', () => {
+    const single = [{ name: null, prefix: '', dir: '/s', isDefault: true }]
+    assert.deepEqual(routeRequest('/', single), { kind: 'file', mount: single[0], rest: '/' })
+    assert.equal(routeRequest('/id/0123abcd', single).kind, 'id')
+    assert.equal(routeRequest('/work/x.html', single).rest, '/work/x.html')
+  })
+})
+
+describe('startMultiServer: every store on one port', () => {
   const started = []
   after(async () => { await Promise.all(started.map((s) => s.stop())) })
 
-  test('starts one listener per store and each serves its own index', async () => {
-    const base = mkdtempSync(join(tmpdir(), 'wu-all-'))
+  async function viewer() {
+    const { base, registry } = registryFixture()
     const stores = []
-    for (const name of ['work', 'learn']) {
+    for (const name of ['work', 'private']) {
       const dir = join(base, name)
       cpSync(FIXTURE_STORE, dir, { recursive: true })
-      buildStore(dir)
-      stores.push({ name, path: dir })
+      stores.push({ name, path: dir, isDefault: name === 'private', records: buildStore(dir).records })
     }
-    const servers = await startAll(stores, { fallbackToFreePort: true })
-    started.push(...servers)
-    assert.equal(servers.length, 2)
-    assert.deepEqual(servers.map((s) => s.name), ['work', 'learn'])
-    assert.notEqual(servers[0].port, servers[1].port)
-    for (const s of servers) {
-      const res = await fetch(s.url)
+    const server = await startMultiServer(stores, { portKey: registry, fallbackToFreePort: true })
+    started.push(server)
+    return { base, registry, stores, server }
+  }
+
+  async function get(url) {
+    const res = await fetch(url, { redirect: 'manual' })
+    return { status: res.status, location: res.headers.get('location'), body: await res.text() }
+  }
+
+  test('serves /work/ and /private/ from one port, / redirects to the default store', async () => {
+    const { server } = await viewer()
+    const root = await get(server.url)
+    assert.equal(root.status, 302)
+    assert.equal(root.location, '/private/')
+    for (const name of ['work', 'private']) {
+      const res = await get(`${server.url}${name}/`)
       assert.equal(res.status, 200)
-      assert.match(await res.text(), /<html/)
+      assert.match(res.body, new RegExp(`writeup store · ${name}`))
+      assert.match(res.body, new RegExp(`<a href="\\.\\./${name}/index\\.html" aria-current="page"`))
     }
+    assert.equal((await get(`${server.url}work`)).location, '/work/')
+  })
+
+  test('pages and kit css resolve inside their store prefix', async () => {
+    const { stores, server } = await viewer()
+    const page = stores[0].records.find((r) => r.path === 'decision/2026-08-01-example-decision.html')
+    const res = await get(`${server.url}work/${page.path}`)
+    assert.equal(res.status, 200)
+    assert.match(res.body, /<html/)
+    assert.equal((await get(`${server.url}work/_kit/writeup.css`)).status, 200)
+    assert.equal((await get(`${server.url}private/_kit/writeup.css`)).status, 200)
+  })
+
+  test('/id/<id> finds the page in whichever store has it; /<name>/id/<id> only in that store', async () => {
+    const { base, stores, server } = await viewer()
+    // Give `private` a page `work` lacks, so the id is unique to one store.
+    mkdirSync(join(base, 'private', 'note'), { recursive: true })
+    const src = readFileSync(join(base, 'private', 'decision', '2026-08-01-example-decision.html'), 'utf8')
+    writeFileSync(join(base, 'private', 'note', '2026-08-02-only-here.html'), src.replace(/<meta name="id" content="[0-9a-f]{8}">/, ''))
+    const records = buildStore(join(base, 'private')).records
+    const only = records.find((r) => r.path === 'note/2026-08-02-only-here.html')
+    assert.ok(only)
+    assert.equal((await get(`${server.url}id/${only.id}`)).location, `/private/${only.path}`)
+    assert.equal((await get(`${server.url}private/id/${only.id}`)).location, `/private/${only.path}`)
+    assert.equal((await get(`${server.url}work/id/${only.id}`)).status, 404)
+    // An id present in both stores (same fixture) resolves to the first store in registry order.
+    const shared = stores[0].records[0]
+    assert.equal((await get(`${server.url}id/${shared.id}`)).location, `/work/${shared.path}`)
+    assert.equal((await get(`${server.url}id/deadbeef`)).status, 404)
+  })
+
+  test('404 inside a store links back into that store; an unknown prefix searches every store', async () => {
+    const { server } = await viewer()
+    const inStore = await get(`${server.url}work/totally-unknown-xyz.html`)
+    assert.equal(inStore.status, 404)
+    assert.match(inStore.body, /class="wu-back" href="\/work\/"/)
+    assert.match(inStore.body, /href="\/work\/_kit\/writeup\.css"/)
+    assert.match(inStore.body, /href="\/work\/\?q=totally-unknown-xyz"/)
+    const unique = await get(`${server.url}work/legacy-note.html`)
+    assert.equal(unique.status, 302)
+    assert.match(unique.location, /^\/work\/legacy\//)
+    const across = await get(`${server.url}nope/legacy-note.html`)
+    assert.equal(across.status, 404)
+    assert.match(across.body, /href="\/work\/legacy\//)
+    assert.match(across.body, /href="\/private\/legacy\//)
+    assert.match(across.body, /&middot; work &middot;/)
+  })
+
+  test('the viewer port is derived from the registry path, and startServer still serves one store at the root', async () => {
+    const { base, registry, stores, server } = await viewer()
+    assert.ok(server.port === portForStore(registry) || server.port > 0)
+    const single = await startServer(stores[0].path, { fallbackToFreePort: true })
+    started.push(single)
+    const res = await get(single.url)
+    assert.equal(res.status, 200)
+    assert.match(res.body, /writeup store · work/)
+    assert.ok(existsSync(join(base, 'work', 'index.html')))
   })
 })
 

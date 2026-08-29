@@ -8,36 +8,42 @@ is composed. All commands below assume `$KIT` was resolved per
 ## Step 0 — which store
 
 Two independent stores are the normal setup: `work` for pages written
-for the day job and `learn` for personal study / personal projects. Each
-is its own git repository with its own `.writeup.toml`, `manifest.json`,
-`index.html` and `_kit/`, so a work page never shows up in the personal
-index (or its publish pre-stage) and vice versa. The registry —
-`~/.local/share/writeup/stores.toml`, or `$WRITEUP_STORES` — names them:
+for the day job and `private` for personal study / personal projects.
+Each is its own git repository with its own `.writeup.toml`,
+`manifest.json`, `index.html` and `_kit/`, so a work page never shows up
+in the personal index (or its publish pre-stage) and vice versa. The
+registry — `~/.local/share/writeup/stores.toml`, or `$WRITEUP_STORES` —
+holds only the default and, per store, a name, a path and a one-line
+description. It never maps directories to stores:
 
 ```toml
-default = "learn"
+default = "private"
 
 [[store]]
 name = "work"
-path = "work"                                  # relative to the registry's dir, absolute, or ~/...
-cwd_prefixes = ["~/go/github.com/example-org"] # any cwd under one of these → this store
+path = "work"          # relative to the registry's dir, absolute, or ~/...
+description = "仕事"
 
 [[store]]
-name = "learn"
-path = "learn"
+name = "private"
+path = "private"
+description = "個人"
 ```
 
 ### `serve.mjs --list-stores` — observed behavior
 
 ```
 $ node $KIT/bin/serve.mjs --list-stores
-* work	/Users/me/.local/share/writeup/work	cwd_prefixes=/Users/me/go/github.com/example-org
-  learn	/Users/me/.local/share/writeup/learn	default
+* work	/Users/me/.local/share/writeup/work	仕事
+  private	/Users/me/.local/share/writeup/private	個人	default
 ```
 
-`*` marks the store the current directory resolves to. Without a
-registry the output is a single `* legacy	<path>	(no registry: ...)`
-line — the un-split old store, which keeps working unchanged.
+One line per store: `<mark> <name>\t<path>\t<description>\t<flags>`
+(trailing empty columns trimmed). `*` marks the store the current
+directory resolves to — here a repository marker chose `work`; without
+one the `default` line carries the `*`. Without a registry the output is
+a single `* legacy	<path>	(no registry: ...)` line — the un-split old
+store, which keeps working unchanged.
 
 The kit's resolution order (`bin/lib/store.mjs` `resolveStoreDir`), the
 same for every CLI that takes `--store`:
@@ -45,28 +51,51 @@ same for every CLI that takes `--store`:
 1. `--store <dir>`
 2. `--store-name <name>` (serve, publish) — unknown name is an error
 3. `$WRITEUP_STORE`
-4. an existing `.writeup.toml` at or above the current directory
-   (for `publish`, above the page itself)
-5. the registry store whose `cwd_prefixes` covers the current directory
-   (longest prefix wins)
+4. an existing `.writeup.toml` at or above the current directory — a
+   page's own store (for `publish`, above the page itself)
+5. the repository marker: `<repo root>/.writeup` of the nearest git
+   repository containing the current directory (see below); a marker
+   naming a store this registry lacks is an error, never a silent
+   fall-through
 6. the registry `default`
 7. the legacy single store `~/.local/share/writeup`
 
-The skill's own rule sits on top of 4-7: when the user's request
-clearly says work or learn, that name wins (`--store-name`, or
-`STORE=<that path>`); only otherwise does the `*` line decide.
+### Deciding, declaring, and the repository marker
+
+The skill's own rule sits on top of 4-7: the agent decides the store
+from the request wording (仕事/会社/業務 vs 個人/勉強), the repository it
+is working in, and the recent conversation, and declares the choice in
+one line before saving (「work に保存します」). Only when genuinely
+unsure does it ask, once. The `*` line is a hint, not the decision.
+
+After the first save inside a repository, offer to write the marker so
+later saves there skip the question:
+
+```
+$ node $SELF/scripts/init-store.mjs --marker work
+init-store: wrote /path/to/repo/.writeup (store = "work") — commit it: it names a store by name, so it works on any machine with that store registered
+```
+
+`<repo root>/.writeup` holds one line, `store = "work"`. It names a
+store *name*, never a path, so committing it makes the choice portable:
+any machine whose registry has a `work` store resolves the same way,
+whatever directory the repository was cloned into. Running `--marker`
+again is a no-op; naming a different store rewrites the file and says
+what it replaced; an unregistered name or a directory outside any git
+repository is refused. Only the nearest repository's marker counts — a
+nested repository does not inherit its parent's.
 
 ### Creating and registering stores
 
 ```
-node $SELF/scripts/init-store.mjs --name work --cwd-prefix ~/go/github.com/example-org
-node $SELF/scripts/init-store.mjs --name learn --default
+node $SELF/scripts/init-store.mjs --name work --description 仕事
+node $SELF/scripts/init-store.mjs --name private --description 個人 --default
 ```
 
 `--name` creates `<registry dir>/<name>` (or `--store <dir>`), runs the
 usual store bootstrap (git init, `.writeup.toml`, `_kit/`, build), and
 adds a `[[store]]` entry — never a second one for the same name;
-`--cwd-prefix` (repeatable) is merged into that entry's `cwd_prefixes`,
+`--description` sets (or updates) that entry's one-line `description`,
 `--default` rewrites the registry's `default`. Run with no flags it is
 the legacy single-store bootstrap and does not touch the registry.
 `build`, `rerender-figures` and `self-check` do not take `--store-name`;
@@ -74,10 +103,34 @@ point them at the resolved dir with `--store "$STORE"` instead.
 
 ### Serving
 
-`node $KIT/bin/serve.mjs --store-name work` serves one store;
-`node $KIT/bin/serve.mjs --all` starts one listener per registered store
-on consecutive ports (the first store's deterministic port, then +1, …;
-a taken port falls back to a free one) and prints one URL per store.
+`node $KIT/bin/serve.mjs` with no store flag is the one viewer for every
+registered store, on a single port (derived from the registry path, so
+it is stable across runs; a taken port falls back to a free one):
+
+```
+$ node $KIT/bin/serve.mjs --no-open
+serve: built 12 pages (legacy: 3) in /Users/me/.local/share/writeup/work
+serve: built 8 pages (legacy: 0) in /Users/me/.local/share/writeup/private
+serve: http://127.0.0.1:41234/work/ (store work: /Users/me/.local/share/writeup/work)
+serve: http://127.0.0.1:41234/private/ (store private: /Users/me/.local/share/writeup/private, default)
+```
+
+- `/` redirects to the default store's index (`/private/`).
+- `/<name>/…` serves that store's files; `/<name>` redirects to `/<name>/`.
+- `/id/<id>` redirects to the page in whichever store has it (registry
+  order on a tie); `/<name>/id/<id>` looks in one store only.
+- A path under `/<name>/` that does not exist gets that store's 404 page
+  (near pages, index search); a path under no store prefix is looked up
+  across every store, each candidate labelled with its store.
+
+The index page of each store carries a switcher above its eyebrow: the
+current store (`aria-current="page"`) and links to the others, written
+as `../<name>/index.html` so the same file works under `serve` and on
+`file://`. Nothing is kept in `localStorage`; the URL carries the store.
+
+`--store <dir>` / `--store-name <name>` serve one store at the root (the
+old single-store layout, `/id/<id>` included); without a registry the
+legacy store is served that way automatically.
 
 ## Step 1 — deciding the kind
 
@@ -414,11 +467,55 @@ further to add here beyond: `build.mjs`'s observed output is
 `build: wrote manifest.json, index.html, _kit/writeup.css`, and it
 accepts `--store <dir>` the same way `publish` does (otherwise the
 Step 0 resolution order: `$WRITEUP_STORE`, ancestor `.writeup.toml`,
-registry cwd prefix, registry default, legacy `~/.local/share/writeup`).
+repository marker, registry default, legacy `~/.local/share/writeup`).
 Always pass `--store "$STORE"` so build and commit hit the store chosen
 in Step 0.
 
 
-## Decision records: one figure per decision
+## Decision records: writing 決まったこと
 
-For kind 決定記録, treat a figure as the default for every decision that changes a path, a placement, or a state. Write a small IR (≤6 nodes) that shows the chosen route with `kind: sync` edges and the rejected route with `dashed: true` nodes/edges, render it with `render-diagram.mjs --figure`, and place the `<figure>` inside the `.wu-decision` after the 決定 line. Decisions about wording, numbers, or scope need no figure.
+For kind 決定記録 the decisions are headings and prose, not cards
+(`$KIT/references/kinds.md` has the skeleton, `writing.md` §7 the
+sentence shape). Write them in this order:
+
+1. `.wu-lede`, then `.wu-summary` with no signal phrase (`結論から言うと`
+   and its kin are lint `forbidden_phrase` hits).
+2. The 一覧表 before the first `h2`: `.wu-table`, columns 番号 / 決定 /
+   タグ / 状態, one row per decision, each 決定 cell
+   `<a href="#d<n>">`. self-check `decision-index` looks for it.
+3. `<h2>決まったこと</h2>`; theme `h2`s under it only when the list is
+   long enough to group.
+4. Per decision, `<h3 id="d<n>">` whose text is the decision, then the
+   first paragraph as one unlabeled Y-shaped sentence (局面 / 選んだ /
+   捨てた / 得る / 受け入れる, natural Japanese, two sentences if one
+   would pass 80 chars), then prose that says why it wins and names the
+   rejected option inside the prose, then a `.wu-meta` line with the basis
+   (path / URL / agreement date). self-check `decision-shape` warns on any
+   decision h3 that lacks the paragraph or the `.wu-meta` before the next
+   heading. Do not write `<p><strong>決定:</strong>` lines — three of the
+   same label is `label-repeat`.
+5. Close the decisions with `<h3>決定の関係図</h3>` and one dependency
+   figure (制約する / 可能にする / 競合する); self-check `relation-figure`
+   asks for it at 5 or more decisions.
+6. 却下した案 as prose or a list — a `.wu-compare` only with 3+ options
+   and 3+ criteria — then 未決・前提, 出典, 次のステップ.
+
+`.wu-decision` cards stay for a design doc with one or two decisions;
+three on a 決定記録 is `decision-cards`.
+
+## Decision records: figures
+
+A figure goes right before a decision's prose only when a figure type
+fits the decision — never one per decision, never as decoration:
+
+- the decision changes a structure → the same figure type twice, before
+  and after, so the reader compares the difference and nothing else;
+- it changes a flow or a state → process / data-flow / sequence / state;
+- it compares options → quadrant / radar / matrix, or a table when the
+  criteria are qualitative.
+
+Decisions about wording, numbers, or scope get no figure; two decisions
+that change the same structure or flow share one. Write a small IR (≤9
+nodes), render with `render-diagram.mjs --figure`, paste the `<figure>`
+verbatim between the summary sentence and the prose, and do not restate
+in the prose what the figure shows (`writing.md` §3).

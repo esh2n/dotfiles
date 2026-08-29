@@ -28,20 +28,20 @@ skip lint. Record it honestly: `checks="lint=skipped;self-check=pass;diagram=fal
 
 ## Which store (before choosing the kind)
 
-Two independent stores — `work` (day-job pages) and `learn` (personal
-study / projects), each its own git repo — are registered in
-`~/.local/share/writeup/stores.toml`. Run
-`node "$KIT/bin/serve.mjs" --list-stores`: one line per store,
-`<mark> <name>\t<path>\t<flags>`, `*` = the store the current directory
-resolves to (`cwd_prefixes` match, else `default`). Pick, in order:
-1. The request clearly says work (仕事/会社/業務) or learn (個人/勉強) —
-   that store wins over `*`. 2. Otherwise the `*` line. 3. A single
-   `* legacy` line = no registry: that path is the only store.
-Set `STORE=<chosen path>`; pass `--store "$STORE"` to every kit CLI
-(`serve`/`publish` also take `--store-name`; `serve --all` serves every
-store, one port each). Register: `node "$SELF/scripts/init-store.mjs
---name work --cwd-prefix <repo dir>` / `--name learn --default`. Never
-mix work pages into `learn` or vice versa — when unsure, ask first.
+Stores are registered in `~/.local/share/writeup/stores.toml` — `default`
+plus `name`/`path`/`description` per store (`work` = 仕事, `private` =
+個人; never a directory mapping). `node "$KIT/bin/serve.mjs" --list-stores`
+prints `<mark> <name>\t<path>\t<description>\t<flags>`, `*` = the store
+this directory resolves to (repo marker, else `default`). Decide from the
+request wording, the repository you are in, and the recent conversation;
+declare it in one line before saving (「work に保存します」); ask once only
+when genuinely unsure. Set `STORE=<that path>` and pass `--store "$STORE"`
+to every kit CLI (`serve`/`publish` also take `--store-name`). After the
+first save inside a repository, offer `node "$SELF/scripts/init-store.mjs"
+--marker <name>`: it writes `<repo root>/.writeup` (`store = "<name>"`) so
+later saves there skip the question — portable to any machine, since it
+names a store, not a path. New store: `init-store.mjs --name <name>
+--description <text> [--default]`. Never mix work pages into `private`.
 
 ## Procedure
 
