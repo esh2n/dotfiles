@@ -288,7 +288,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 27 | Data flow | `data-flow` | G+L(grid) | covered by `diagram` (node/edge renderer: `layer:` group hints, stage order left → right) |
 | 28 | DP integration | `dp-integration` | G+L | planned |
 | 29 | DP security matrix | `matrix` (generic rows × columns; the DP security matrix is a preset) | M | implemented (`bin/lib/figures/matrix.mjs`) |
-| 30 | Sankey | `sankey` | Q(flow) | planned |
+| 30 | Sankey | `sankey` | Q(flow) | implemented (`bin/lib/figures/sankey.mjs`) |
 | 31 | Fishbone | `fishbone` | H(cause) | implemented (`bin/lib/figures/fishbone.mjs`) |
 | 32 | Wardley map | `wardley` | M(2-axis ordinal) | planned (positions are authored, not derived — IR carries them verbatim) |
 | 33 | Kanban | `kanban` | M(state census) | implemented as `board` with `variant: kanban` |

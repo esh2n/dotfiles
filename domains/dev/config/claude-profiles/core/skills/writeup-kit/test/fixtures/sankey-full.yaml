@@ -1,0 +1,67 @@
+id: sk2
+type: sankey
+title: 月次クラウド費用の配賦
+caption: 共有基盤の費用は利用量比で各プロダクトへ配賦し、未配賦分は差分として開示する
+unit: 万円
+nodes:
+- id: compute
+  label: コンピュート
+  stage: 0
+- id: storage
+  label: ストレージ
+  stage: 0
+- id: network
+  label: ネットワーク
+  stage: 0
+- id: shared
+  label: 共有基盤
+  stage: 1
+- id: direct
+  label: 直課
+  stage: 1
+- id: prod-a
+  label: プロダクト A
+  stage: 2
+  emphasis: true
+- id: prod-b
+  label: プロダクト B
+  stage: 2
+- id: unalloc
+  label: 未配賦
+  stage: 2
+links:
+- from: compute
+  to: shared
+  value: 90
+- from: compute
+  to: direct
+  value: 40
+- from: storage
+  to: shared
+  value: 30
+- from: storage
+  to: direct
+  value: 12
+- from: network
+  to: shared
+  value: 18
+- from: network
+  to: prod-b
+  value: 2
+  label: CDN
+- from: shared
+  to: prod-a
+  value: 80
+  label: 利用量比
+- from: shared
+  to: prod-b
+  value: 50
+- from: shared
+  to: unalloc
+  value: 4
+- from: direct
+  to: prod-a
+  value: 32
+- from: direct
+  to: prod-b
+  value: 20

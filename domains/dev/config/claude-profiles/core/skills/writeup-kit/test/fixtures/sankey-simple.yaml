@@ -1,0 +1,30 @@
+id: sk1
+type: sankey
+title: 問い合わせの振り分け
+caption: 一次対応で半分がチャットに流れる
+nodes:
+- id: mail
+  label: メール
+  stage: 0
+- id: phone
+  label: 電話
+  stage: 0
+- id: chat
+  label: チャット
+  stage: 1
+- id: visit
+  label: 訪問
+  stage: 1
+links:
+- from: mail
+  to: chat
+  value: 60
+- from: mail
+  to: visit
+  value: 20
+- from: phone
+  to: chat
+  value: 30
+- from: phone
+  to: visit
+  value: 50
