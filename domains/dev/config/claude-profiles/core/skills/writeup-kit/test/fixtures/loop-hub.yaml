@@ -1,0 +1,31 @@
+id: growth-loop
+type: loop
+title: 成長ループ
+caption: 一周ごとに中央のデータ資産が積み上がり、次の周を速くする
+hub: データ資産
+direction: cw
+steps:
+  - id: users
+    label: 利用者が増える
+    tone: ts
+  - id: data
+    label: データが貯まる
+    note: 行動ログ・評価
+  - id: model
+    label: 精度が上がる
+    emphasis: true
+  - id: ux
+    label: 体験が良くなる
+    note: 解約率が下がる
+  - id: referral
+    label: 紹介が増える
+edgeLabels:
+  - from: data
+    to: model
+    label: 再学習
+  - from: referral
+    to: users
+    label: 口コミ
+exits:
+  - from: ux
+    label: 有料プランへ

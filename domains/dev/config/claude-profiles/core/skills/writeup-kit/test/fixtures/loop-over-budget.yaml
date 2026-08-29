@@ -1,0 +1,26 @@
+id: over
+type: loop
+title: 予算超過のループ
+hub: 蓄積
+steps:
+  - id: s1
+    label: とても長いステップ名をそのまま書いた例
+    emphasis: true
+  - id: s2
+    label: 二つ目
+    emphasis: true
+  - id: s3
+    label: 三つ目
+    emphasis: true
+  - id: s4
+    label: 四つ目
+  - id: s5
+    label: 五つ目
+  - id: s6
+    label: 六つ目
+  - id: s7
+    label: 七つ目
+  - id: s8
+    label: 八つ目
+  - id: s9
+    label: 九つ目

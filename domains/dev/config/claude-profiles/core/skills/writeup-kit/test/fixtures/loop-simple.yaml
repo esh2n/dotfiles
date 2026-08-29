@@ -1,0 +1,13 @@
+id: review-cycle
+type: loop
+title: レビューの循環
+caption: 書く・レビュー・修正・マージを一周として繰り返す
+steps:
+  - id: write
+    label: 書く
+  - id: review
+    label: レビュー
+  - id: fix
+    label: 修正
+  - id: merge
+    label: マージ

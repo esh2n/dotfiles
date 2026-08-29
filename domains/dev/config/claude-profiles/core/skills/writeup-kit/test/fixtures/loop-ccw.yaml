@@ -1,0 +1,14 @@
+id: incident-loop
+type: loop
+title: 障害対応の循環
+direction: ccw
+steps:
+  - id: detect
+    label: 検知
+  - id: respond
+    label: 対応
+  - id: learn
+    label: 振り返り
+exits:
+  - from: respond
+    label: エスカレーション

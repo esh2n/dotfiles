@@ -270,7 +270,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 9 | Quadrant | `quadrant` | M | implemented (`bin/lib/figures/quadrant.mjs`) |
 | 10 | Radar / Spider | `radar` | M/Q | implemented (`bin/lib/figures/radar.mjs`) |
 | 11 | Polar chart | `polar` | Q | planned |
-| 12 | Loop / flywheel | `loop` | G(cyclic) | planned |
+| 12 | Loop / flywheel | `loop` | G(cyclic) | implemented (`bin/lib/figures/loop.mjs`) |
 | 13 | Nested | `nested` | L | implemented (`bin/lib/figures/nested.mjs`) |
 | 14 | Tree | `tree` | H | implemented (`bin/lib/figures/tree.mjs`) |
 | 15 | Org chart | `org-chart` | H | implemented as `tree` with `variant: org` |
