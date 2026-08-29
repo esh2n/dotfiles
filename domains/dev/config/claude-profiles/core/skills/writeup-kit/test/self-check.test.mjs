@@ -515,3 +515,203 @@ describe('self-check: <meta name="id"> (optional, must match the computed value)
     assert.ok(!result.items.some((i) => i.item === 'id-meta'))
   })
 })
+
+// ---------------------------------------------------------------------------
+// Decision record layout rows (kinds.md 決定記録; writing.md "Prohibitions")
+// ---------------------------------------------------------------------------
+
+const DR_INDEX =
+  '<table class="wu-table"><thead><tr><th>番号</th><th>決定</th><th>タグ</th><th>状態</th></tr></thead>' +
+  '<tbody><tr><td>1</td><td><a href="#d1">案 A にする</a></td><td>経路</td><td>合意</td></tr></tbody></table>'
+
+/** One decision in the h3 + summary sentence + prose + basis shape. */
+function decision(n, { meta = true, prose = true } = {}) {
+  return `<h3 id="d${n}">決定 ${n} は案 A にする</h3>` +
+    (prose ? `<p>案 B を捨て、案 A を選ぶ。</p><p>案 A が勝つ理由。</p>` : '') +
+    (meta ? '<p class="wu-meta">docs/adr/x.md (2026-08-20 合意)</p>' : '')
+}
+
+const DR_TAIL =
+  '<section class="wu-section"><h2>却下した案</h2><p>案 B は捨てた。</p></section>' +
+  '<section class="wu-section"><h2>未決・前提</h2><div class="wu-open"><ul><li>未決。</li></ul></div></section>' +
+  '<section class="wu-section"><h2>次のステップ</h2><ol class="wu-steps"><li>実装。</li></ol></section>'
+
+function decisionRecord({ index = DR_INDEX, decisions = decision(1), extra = '', kind = '決定記録' } = {}) {
+  return page({
+    kind,
+    body:
+      '<div class="wu-summary"><p>要約。</p></div>' + index +
+      `<section class="wu-section"><h2>決まったこと</h2>${decisions}${extra}</section>` + DR_TAIL,
+  })
+}
+
+const RELATION_FIGURE =
+  '<h3>決定の関係図</h3><figure class="wu-figure" data-checks="pass">' +
+  '<svg role="img"><title id="wu-d-r-title">関係図</title><desc id="wu-d-r-desc">d</desc></svg>' +
+  '<figcaption>図 決定の関係図。矢印は制約する</figcaption></figure>'
+
+describe('self-check: decision-shape (h3 + <p> + .wu-meta per decision)', () => {
+  test('negative: h3 id="d<n>" followed by a <p> and a .wu-meta line is clean', () => {
+    const result = itemsFor(decisionRecord())
+    assert.ok(!result.items.some((i) => i.item === 'decision-shape'), JSON.stringify(result.items))
+  })
+
+  test('positive: a decision h3 with no .wu-meta before the next h3 warns, naming the h3', () => {
+    const result = itemsFor(decisionRecord({ decisions: decision(1, { meta: false }) + decision(2) }))
+    const hits = result.warnings.filter((w) => w.item === 'decision-shape')
+    assert.equal(hits.length, 1)
+    assert.ok(hits[0].detail.includes('決定 1 は案 A にする'))
+    assert.ok(hits[0].detail.includes('.wu-meta'))
+  })
+
+  test('positive: a decision h3 with a .wu-meta but no <p> warns about the missing paragraph', () => {
+    const result = itemsFor(decisionRecord({ decisions: decision(1, { prose: false }) }))
+    const hit = result.warnings.find((w) => w.item === 'decision-shape')
+    assert.ok(hit && hit.detail.includes('<p>'))
+  })
+
+  test('the 決定の関係図 h3 (no id="d<n>") is not treated as a decision', () => {
+    const result = itemsFor(decisionRecord({ decisions: decision(1) + decision(2), extra: RELATION_FIGURE }))
+    assert.ok(!result.items.some((i) => i.item === 'decision-shape'))
+  })
+
+  test('theme h2s between 決まったこと and 却下した案 keep the decisions in scope', () => {
+    const decisions = decision(1) + '<h2>テーマ B</h2>' + decision(2, { meta: false })
+    const result = itemsFor(decisionRecord({ decisions }))
+    const hits = result.warnings.filter((w) => w.item === 'decision-shape')
+    assert.equal(hits.length, 1)
+    assert.ok(hits[0].detail.includes('決定 2'))
+  })
+
+  test('a page whose h3s carry no id="d<n>" has every h3 checked (card-per-theme layout)', () => {
+    const decisions = '<h3>経路</h3><div class="wu-decision"><p><strong>決定:</strong> A。</p></div>'
+    const result = itemsFor(decisionRecord({ decisions }))
+    assert.ok(result.warnings.some((w) => w.item === 'decision-shape' && w.detail.includes('経路')))
+  })
+
+  test('not applied to other kinds', () => {
+    const result = itemsFor(decisionRecord({ kind: '設計', decisions: decision(1, { meta: false }) }))
+    assert.ok(!result.items.some((i) => i.item === 'decision-shape'))
+  })
+})
+
+describe('self-check: label-repeat (same <p><strong>label:</strong> 3 or more times)', () => {
+  const labelled = (label, n) => Array.from({ length: n }, () => `<p><strong>${label}</strong> 本文。</p>`).join('')
+
+  test('positive: three <p><strong>決定:</strong> paragraphs warn with the label and the count', () => {
+    const result = itemsFor(page({ body: DEFAULT_BODY + labelled('決定:', 3) }))
+    const hit = result.warnings.find((w) => w.item === 'label-repeat')
+    assert.ok(hit && hit.detail.includes('決定') && hit.detail.includes('3 times'))
+  })
+
+  test('positive: a full-width colon (：) counts the same', () => {
+    const result = itemsFor(page({ body: DEFAULT_BODY + labelled('根拠：', 3) }))
+    assert.ok(result.warnings.some((w) => w.item === 'label-repeat' && w.detail.includes('根拠')))
+  })
+
+  test('negative: two of the same label is not flagged', () => {
+    const result = itemsFor(page({ body: DEFAULT_BODY + labelled('決定:', 2) }))
+    assert.ok(!result.items.some((i) => i.item === 'label-repeat'))
+  })
+
+  test('negative: three different labels (one card) are not flagged', () => {
+    const body = DEFAULT_BODY + labelled('決定:', 1) + labelled('重視したトレードオフ:', 1) + labelled('根拠:', 1)
+    const result = itemsFor(page({ body }))
+    assert.ok(!result.items.some((i) => i.item === 'label-repeat'))
+  })
+
+  test('negative: bold text without a trailing colon is not a label', () => {
+    const result = itemsFor(page({ body: DEFAULT_BODY + labelled('強調', 3) }))
+    assert.ok(!result.items.some((i) => i.item === 'label-repeat'))
+  })
+
+  test('applies regardless of kind (fires on a 作業メモ too)', () => {
+    const result = itemsFor(page({ kind: '作業メモ', body: DEFAULT_BODY + labelled('結果:', 3) }))
+    assert.ok(result.warnings.some((w) => w.item === 'label-repeat'))
+  })
+})
+
+describe('self-check: decision-index (一覧表 before the first h2)', () => {
+  test('negative: a .wu-table whose first header is 番号 before the first h2 is clean', () => {
+    const result = itemsFor(decisionRecord())
+    assert.ok(!result.items.some((i) => i.item === 'decision-index'))
+  })
+
+  test('positive: a 決定記録 with no such table warns', () => {
+    const result = itemsFor(decisionRecord({ index: '' }))
+    assert.ok(result.warnings.some((w) => w.item === 'decision-index'))
+  })
+
+  test('positive: the table after the first h2 does not count', () => {
+    const result = itemsFor(decisionRecord({ index: '', extra: DR_INDEX }))
+    assert.ok(result.warnings.some((w) => w.item === 'decision-index'))
+  })
+
+  test('positive: a table whose first header is not 番号 does not count', () => {
+    const other = DR_INDEX.replace('<th>番号</th>', '<th>項目</th>')
+    const result = itemsFor(decisionRecord({ index: other }))
+    assert.ok(result.warnings.some((w) => w.item === 'decision-index'))
+  })
+
+  test('not applied to other kinds', () => {
+    const result = itemsFor(decisionRecord({ kind: '設計', index: '' }))
+    assert.ok(!result.items.some((i) => i.item === 'decision-index'))
+  })
+})
+
+describe('self-check: decision-cards (.wu-decision is for 1–2 decisions)', () => {
+  const card = '<div class="wu-decision"><p>決定。</p></div>'
+
+  test('positive: three .wu-decision on a 決定記録 warn', () => {
+    const result = itemsFor(decisionRecord({ extra: card + card + card }))
+    const hit = result.warnings.find((w) => w.item === 'decision-cards')
+    assert.ok(hit && hit.detail.includes('3 times') && hit.detail.includes('1–2'))
+  })
+
+  test('negative: two .wu-decision are allowed', () => {
+    const result = itemsFor(decisionRecord({ extra: card + card }))
+    assert.ok(!result.items.some((i) => i.item === 'decision-cards'))
+  })
+
+  test('not applied to other kinds', () => {
+    const result = itemsFor(decisionRecord({ kind: '設計', extra: card + card + card }))
+    assert.ok(!result.items.some((i) => i.item === 'decision-cards'))
+  })
+})
+
+describe('self-check: relation-figure (info; 5 or more decisions need one 決定の関係図)', () => {
+  const five = [1, 2, 3, 4, 5].map((n) => decision(n)).join('')
+
+  test('positive: five decisions and no figure whose caption mentions 関係 is an info, not a warning', () => {
+    const result = itemsFor(decisionRecord({ decisions: five }))
+    const hit = result.infos.find((i) => i.item === 'relation-figure')
+    assert.ok(hit && hit.detail.includes('5 decisions'))
+    assert.ok(!result.warnings.some((w) => w.item === 'relation-figure'))
+    assert.equal(result.ok, true)
+  })
+
+  test('negative: a figure whose caption contains 関係 satisfies the row', () => {
+    const result = itemsFor(decisionRecord({ decisions: five, extra: RELATION_FIGURE }))
+    assert.ok(!result.items.some((i) => i.item === 'relation-figure'))
+  })
+
+  test('negative: four decisions do not ask for one', () => {
+    const result = itemsFor(decisionRecord({ decisions: [1, 2, 3, 4].map((n) => decision(n)).join('') }))
+    assert.ok(!result.items.some((i) => i.item === 'relation-figure'))
+  })
+
+  test('a card-per-theme page counts its .wu-decision cards as the decisions', () => {
+    const card = '<div class="wu-decision"><p>決定。</p></div>'
+    const decisions = '<h3>テーマ</h3>' + card.repeat(5) + '<p class="wu-meta">x</p>'
+    const result = itemsFor(decisionRecord({ decisions }))
+    assert.ok(result.infos.some((i) => i.item === 'relation-figure' && i.detail.includes('5 decisions')))
+  })
+
+  test('--json output carries the info rows under "infos"', () => {
+    const file = writeTempPage(decisionRecord({ decisions: five }))
+    const run = spawnSync('node', [SELF_CHECK_BIN, file, '--json'], { encoding: 'utf8' })
+    const out = JSON.parse(run.stdout)
+    assert.equal(run.status, 0)
+    assert.ok(out.infos.some((i) => i.item === 'relation-figure'))
+  })
+})

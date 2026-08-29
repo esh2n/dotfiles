@@ -95,6 +95,8 @@ export function runSelfCheck(filePath) {
   checkEmojiArrows(root, add)
   checkCalloutRuns(root, add)
   checkTableColumns(root, add)
+  checkLabelRepeat(root, add)
+  checkDecisionRecord(root, add)
   const proseBlocks = mainProseBlocks(root)
   checkSentenceLength(proseBlocks, add)
   checkParentheticals(proseBlocks, add)
@@ -102,7 +104,8 @@ export function runSelfCheck(filePath) {
 
   const errors = items.filter((i) => i.level === 'error')
   const warnings = items.filter((i) => i.level === 'warn')
-  return { unreadable: false, ok: errors.length === 0, errors, warnings, items }
+  const infos = items.filter((i) => i.level === 'info')
+  return { unreadable: false, ok: errors.length === 0, errors, warnings, infos, items }
 }
 
 // --- 1. single file / allowed externals -------------------------------------
@@ -411,6 +414,142 @@ function checkTableColumns(root, add) {
   }
 }
 
+// --- 11b. repeated generic label ------------------------------------------------
+//
+// `<p><strong>決定:</strong> …` repeated down the page is the card template
+// showing through: the same label + colon on item after item. Two of the
+// same label is a coincidence; three is a mould. Not kind-gated — the
+// pattern is a writing tell wherever it appears (writing.md "Prohibitions").
+
+const LABEL_COLON_RE = /^(.*?)\s*[:：]\s*$/
+
+/** The label text of a `<p>` whose first non-blank child is a `<strong>`
+ * ending in `:`/`：` (whitespace-only text before it is ignored), or null. */
+function leadingLabel(p) {
+  let first = null
+  for (const child of p.children || []) {
+    if (child.type === 'text' && !child.value.trim()) continue
+    first = child
+    break
+  }
+  if (!isElement(first) || first.tag !== 'strong') return null
+  const m = LABEL_COLON_RE.exec(textContent(first).trim())
+  if (!m || !m[1]) return null
+  return m[1]
+}
+
+function checkLabelRepeat(root, add) {
+  const main = findMain(root)
+  if (!main) return
+  const svgNodes = svgDescendantSet(main)
+  const counts = new Map()
+  for (const p of findAll(main, (n) => tagName(n) === 'p')) {
+    if (svgNodes.has(p)) continue
+    const label = leadingLabel(p)
+    if (label === null) continue
+    counts.set(label, (counts.get(label) || 0) + 1)
+  }
+  for (const [label, n] of counts) {
+    if (n >= 3) {
+      add('warn', 'label-repeat', `<p><strong>${label}:</strong> appears ${n} times — a repeated generic label reads as a filled-in template; move what the label names into the heading or the prose`)
+    }
+  }
+}
+
+// --- 11c. decision record layout (kind 決定記録) ----------------------------------
+//
+// The layout kinds.md fixes for a 決定記録: a 一覧表 (`.wu-table`, first
+// header 番号) before the first h2; each decision an `h3 id="d<n>"` whose
+// text is the decision, followed by at least one `<p>` (the one-sentence
+// summary, then the prose) and a `.wu-meta` basis line before the next
+// heading; `.wu-decision` cards only for a design doc's 1–2 decisions,
+// never for the list; and, once the list is long, one 決定の関係図.
+
+const DECISION_H3_ID_RE = /^d\d+$/
+const DECISION_SECTION_HEADING = '決まったこと'
+// h2s that close the decisions span (theme h2s in between are allowed).
+const DECISION_TAIL_HEADINGS = ['却下した案', '未決・前提', '次のステップ']
+const DECISION_CARDS_MAX = 2
+const RELATION_FIGURE_MIN_DECISIONS = 5
+
+function headingText(n) {
+  return textContent(n).replace(/\s+/g, ' ').trim()
+}
+
+function checkDecisionRecord(root, add) {
+  if (headMeta(root).kind !== '決定記録') return
+  const main = findMain(root)
+  if (!main) return
+  const svgNodes = svgDescendantSet(main)
+  // Document order, SVG internals excluded.
+  const flat = findAll(main, isElement).filter((n) => !svgNodes.has(n))
+
+  // (c) decision-index: a 一覧表 before the first h2.
+  const firstH2 = flat.findIndex((n) => n.tag === 'h2')
+  const head = firstH2 === -1 ? flat : flat.slice(0, firstH2)
+  const hasIndex = head.some((n) => hasClass(n, 'wu-table') && firstHeaderText(n) === '番号')
+  if (!hasIndex) {
+    add('warn', 'decision-index', 'no 一覧表 before the first h2 — a 決定記録 opens with a .wu-table (番号 / 決定 / タグ / 状態) whose 決定 cells link to each h3 id="d<n>"')
+  }
+
+  // (d) decision-cards: cards are for 1–2 decisions, not the list.
+  const cards = flat.filter((n) => hasClass(n, 'wu-decision'))
+  if (cards.length > DECISION_CARDS_MAX) {
+    add('warn', 'decision-cards', `.wu-decision appears ${cards.length} times — cards are for 1–2 decisions; write the list as h3 + summary sentence + prose + .wu-meta`)
+  }
+
+  // (a) decision-shape: every decision h3 in the 決まったこと span.
+  const spanStart = flat.findIndex((n) => n.tag === 'h2' && headingText(n).includes(DECISION_SECTION_HEADING))
+  let decisionCount = 0
+  if (spanStart !== -1) {
+    let spanEnd = flat.length
+    for (let i = spanStart + 1; i < flat.length; i++) {
+      const n = flat[i]
+      if (n.tag === 'h2' && DECISION_TAIL_HEADINGS.some((h) => headingText(n).includes(h))) { spanEnd = i; break }
+    }
+    const h3Idx = []
+    for (let i = spanStart + 1; i < spanEnd; i++) if (flat[i].tag === 'h3') h3Idx.push(i)
+    // h3s carrying id="d<n>" are the decisions; an h3 without one (the
+    // 決定の関係図 heading) is not. A page that gave no h3 an id is checked
+    // on every h3 instead, so a card-per-theme page still gets the row.
+    const withId = h3Idx.filter((i) => DECISION_H3_ID_RE.test(attr(flat[i], 'id') || ''))
+    const decisions = withId.length ? withId : h3Idx
+    // Without ids the h3s are most likely theme headings over cards, so
+    // the cards are the better decision count for the relation-figure row.
+    decisionCount = withId.length || Math.max(h3Idx.length, cards.length)
+    for (const i of decisions) {
+      let paragraphs = 0
+      let metas = 0
+      for (let j = i + 1; j < spanEnd; j++) {
+        const n = flat[j]
+        if (n.tag === 'h2' || n.tag === 'h3') break
+        if (hasClass(n, 'wu-meta')) metas++
+        else if (n.tag === 'p') paragraphs++
+      }
+      if (paragraphs < 1 || metas < 1) {
+        const missing = [paragraphs < 1 ? 'a <p>' : null, metas < 1 ? 'a .wu-meta basis line' : null].filter(Boolean).join(' and ')
+        add('warn', 'decision-shape', `h3 "${headingText(flat[i]).slice(0, 40)}" is not followed by ${missing} before the next heading`)
+      }
+    }
+  }
+
+  // (e) relation-figure: a long list needs one 決定の関係図.
+  if (decisionCount === 0) decisionCount = cards.length
+  if (decisionCount >= RELATION_FIGURE_MIN_DECISIONS) {
+    const hasRelation = flat.some((n) => hasClass(n, 'wu-figure') && findAll(n, (c) => tagName(c) === 'figcaption').some((c) => textContent(c).includes('関係')))
+    if (!hasRelation) {
+      add('info', 'relation-figure', `${decisionCount} decisions and no figure whose caption mentions 関係 — end the decisions with one 決定の関係図 (制約する / 可能にする / 競合する)`)
+    }
+  }
+}
+
+function firstHeaderText(table) {
+  const headRow = findFirst(table, (n) => tagName(n) === 'tr')
+  if (!headRow) return ''
+  const cell = elementChildren(headRow).find((n) => tagName(n) === 'th' || tagName(n) === 'td')
+  return cell ? textContent(cell).trim() : ''
+}
+
 // --- sentence extraction (shared by 12 and 13) --------------------------------
 
 // Each of these is its own text run: a real prose block boundary. Text is
@@ -605,7 +744,7 @@ function main() {
   }
   if (args.writeMeta) writeMetaChecks(args.file, result.ok)
   if (args.json) {
-    console.log(JSON.stringify({ ok: result.ok, errors: result.errors, warnings: result.warnings, items: result.items }, null, 2))
+    console.log(JSON.stringify({ ok: result.ok, errors: result.errors, warnings: result.warnings, infos: result.infos, items: result.items }, null, 2))
   } else {
     const out = formatHuman(result)
     if (out) console.log(out)

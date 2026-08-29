@@ -17,9 +17,9 @@ component side of the kind-to-component mapping in `kinds.md`.
 | `.wu-section` | One h2 block | Always | — |
 | `.wu-terms` | Term list (name — what it is) | 3 or more terms introduced for the first time | Paraphrasing body text |
 | `.wu-callout` | Note / warning / decision aside (tone: `note` \| `warn` \| `decision`) | One point the reader must not skip | Three or more in a row |
-| `.wu-decision` | One decision (decision, trade-off prioritized, basis) | A decision record entry | Enumerating candidates |
-| `.wu-compare` | Comparison table (row = option, column = axis, up to 4 columns) | Judging 2-4 options on the same axes | Explaining one option, or a procedure |
-| `.wu-table` | General table (up to 5 columns, one line per cell) | A plain list of values | A substitute for prose |
+| `.wu-decision` | One decision as a card (decision, trade-off prioritized, basis) | A design doc recording 1-2 decisions in passing; comparable parallel items | The list of decisions in a 決定記録 (those are `h3` + prose, `kinds.md`); enumerating candidates |
+| `.wu-compare` | Comparison table (row = option, column = axis, up to 4 columns) | Judging 3 or more options on 3 or more axes | Fewer options or axes (name the rejected option in the prose); explaining one option, or a procedure |
+| `.wu-table` | General table (up to 5 columns, one line per cell); also the 決定記録's 一覧表 | A plain list of values; the index of decisions at the top of a 決定記録 (番号 / 決定 / タグ / 状態) | A substitute for prose |
 | `.wu-steps` | Numbered procedure, one step per line | Order matters | A parallel enumeration |
 | `.wu-figure` | Diagram frame (SVG + caption + IR) | Renderer output only | Hand-drawn SVG, emoji |
 | `.wu-quote` | Quote (original / translation / source) | Citing an external document | Your own sentence |
@@ -117,6 +117,14 @@ lacks it) — never edit that href by hand.
 
 ### `.wu-decision`
 
+A card for a single decision that appears inside another kind of page — a
+design doc that fixes one or two things along the way, or a set of
+comparable parallel items. It is not the unit of a 決定記録: there, each
+decision is an `h3` whose text is the decision, one unlabeled summary
+sentence, prose, and a `.wu-meta` line (`kinds.md`, `writing.md` §7).
+Three or more cards on a 決定記録 trigger self-check `decision-cards`;
+three of the same `<strong>label:</strong>` anywhere trigger `label-repeat`.
+
 ```html
 <div class="wu-decision">
   <p><strong>Decision:</strong> what was chosen.</p>
@@ -140,6 +148,22 @@ lacks it) — never edit that href by hand.
 <table class="wu-table">
   <thead><tr><th>Key</th><th>Value</th></tr></thead>
   <tbody><tr><td>path</td><td>store-relative path</td></tr></tbody>
+</table>
+```
+
+The same component is the 一覧表 that opens a 決定記録 — placed before the
+first `h2`, columns 番号 / 決定 / タグ / 状態, one row per decision, the
+決定 cell an `<a href="#d<n>">` to that decision's `h3`. No basis column:
+the table exists to see the whole list at once and jump, not to argue.
+self-check `decision-index` looks for it by its first header, 番号.
+
+```html
+<table class="wu-table">
+  <thead><tr><th>番号</th><th>決定</th><th>タグ</th><th>状態</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><a href="#d1">取得は 15 分ごとに起動する</a></td><td>上限</td><td>合意</td></tr>
+    <tr><td>2</td><td><a href="#d2">fan-out は横断検索にする</a></td><td>経路</td><td>合意</td></tr>
+  </tbody>
 </table>
 ```
 

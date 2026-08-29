@@ -21,7 +21,7 @@ helps" column lists the typical spots per kind; it is guidance, not a cap.
 
 | kind | Required sections | Use | Avoid | Length / where a figure helps |
 |---|---|---|---|---|
-| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, decision, figure, compare, open, meta, steps | chip | 2,000-4,000 chars. Default: one figure per decision that changes a path, a placement, or a state — the chosen route solid, the rejected one dashed; decisions about wording or numbers need none |
+| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, table (the 一覧表), figure, meta, open, steps | chip; decision (cards) for the list of decisions; compare unless 3+ options × 3+ criteria | 2,000-4,000 chars. 図が効く場面: a decision that changes a structure (the same figure type twice, before/after), a flow or a state (process / data-flow / sequence / state), or that compares options (quadrant / radar / matrix; a table when qualitative). Wording, numbers, and scope need none. One 決定の関係図 closes the decisions |
 | 設計 (design) | 目的と読者／用語／現状とギャップ／あるべき姿／決定点／進め方 | terms, figure, compare, code, open | chip | 3,000-8,000 chars. A figure helps for: parts and the routes between them, state transitions, before/after of a structure |
 | 調査まとめ (research summary) | 問い／結論／根拠（表）／未確認／含意 | summary, table, quote, meta | decision | 2,000-6,000 chars. A figure helps for: the current flow being investigated, where a measurement was taken |
 | 参考資料まとめ (reference roundup) | 資料一覧（表）／各資料の要点／取るもの・置き先 | table, quote, meta, chip | steps | 3,000-8,000 chars. A figure helps for: how the references relate to each other or to your own parts |
@@ -34,27 +34,66 @@ helps" column lists the typical spots per kind; it is guidance, not a cap.
 
 ### 決定記録 (decision record)
 
-Put a `.wu-figure` inside (or right after) each `.wu-decision` whose decision
-changes where something flows or lives; show the chosen path solid and the
-rejected path dashed so the reader sees the alternative without reading it.
+A decision record is a list of decisions the reader scans by heading, not
+a column of cards. The page runs, in this order:
 
-Required sections in order: 決まったこと (what was decided) / 却下した案
-(rejected options) / 未決・前提 (open questions and assumptions) / 次のステップ
-(next steps). Write 次のステップ with `wu-steps` (ordered). Do not use `wu-chip`
-in this kind.
+1. `.wu-lede`, then `.wu-summary` — conclusions first, no signal phrase
+   (`writing.md` §3, §6).
+2. The 一覧表: a `.wu-table` with the columns 番号 / 決定 / タグ / 状態,
+   one row per decision, each 決定 cell an `<a href="#d<n>">` to its h3.
+   No basis column — the table is for seeing the whole and jumping.
+3. `<h2>決まったこと</h2>`, then theme `h2`s when the list is long enough
+   to group (a theme h2 sits between 決まったこと and 却下した案; a short
+   list has none).
+4. One decision = `<h3 id="d<n>">` whose text **is** the decision, then:
+   - the first paragraph: one unlabeled summary sentence in the Y shape
+     (局面 / 選んだ / 捨てた / 得る / 受け入れる — natural Japanese; two
+     sentences when one would pass 80 characters);
+   - prose saying why it wins, naming the rejected option inside the prose;
+   - a `.wu-meta` line with the basis — path, URL, or agreement date;
+   - a figure **right before the prose**, only when a figure type fits: a
+     structure changes → the same type twice, before/after; a flow or a
+     state changes → process / data-flow / sequence / state; options are
+     compared → quadrant / radar / matrix, a table when qualitative.
+     Decisions about wording, numbers, or scope get none; two decisions
+     that change the same structure share one figure.
+5. At the end of the decisions, one 決定の関係図 (`.wu-figure`, dependency
+   type): which decision 制約する / 可能にする / 競合する which.
+6. 却下した案 as prose or a list. A comparison table only when there are
+   3 or more options and 3 or more criteria.
+7. 未決・前提 (`.wu-open`), 出典 when the page rests on external
+   documents, 次のステップ (`.wu-steps`, ordered). No `.wu-chip` in this kind.
+
+`.wu-decision` cards are for a callout, for comparable parallel items, or
+for a design doc that records one or two decisions — never for the list of
+decisions here. self-check enforces the shape: `decision-index`,
+`decision-shape`, `decision-cards`, `relation-figure` (`page-contract.md` §4).
 
 ```html
+<div class="wu-summary"><p>...</p></div>
+<table class="wu-table">
+  <thead><tr><th>番号</th><th>決定</th><th>タグ</th><th>状態</th></tr></thead>
+  <tbody><tr><td>1</td><td><a href="#d1">fan-out は横断検索にする</a></td><td>経路</td><td>合意</td></tr></tbody>
+</table>
 <section class="wu-section"><h2>決まったこと</h2>
-  <div class="wu-decision">...</div>
+  <h3 id="d1">fan-out は横断検索にし、tenant 表を廃止する</h3>
+  <p>テナントごとに検索する局面で、テナント表の維持ではなく横断検索を選び、空振りの行が消え、索引の追加を受け入れる。</p>
+  <figure class="wu-figure">...before...</figure>
+  <figure class="wu-figure">...after...</figure>
+  <p>テナント表を残す案は...だが、...。</p>
+  <p class="wu-meta">docs/adr/APP_013.md:28 / 2026-08-27 合意</p>
+  <h3 id="d2">...</h3>
+  ...
+  <h3>決定の関係図</h3>
+  <figure class="wu-figure">...</figure>
 </section>
-<section class="wu-section"><h2>却下した案</h2>
-  <table class="wu-compare">...</table>
-</section>
+<section class="wu-section"><h2>却下した案</h2><p>...</p></section>
 <section class="wu-section"><h2>未決・前提</h2>
   <div class="wu-open"><ul><li>...</li></ul></div>
 </section>
+<section class="wu-section"><h2>出典</h2><p class="wu-meta">...</p></section>
 <section class="wu-section"><h2>次のステップ</h2>
-  <ul><li>...</li></ul>
+  <ol class="wu-steps"><li>...</li></ol>
 </section>
 ```
 

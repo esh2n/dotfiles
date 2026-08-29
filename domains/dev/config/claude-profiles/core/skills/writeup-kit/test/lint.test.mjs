@@ -48,6 +48,38 @@ describe("forbidden_phrase", () => {
     const { findings } = await runLint(fixture("clean-natural.txt"));
     assert.ok(!categoriesOf(findings).has("forbidden_phrase"));
   });
+
+  // Summary signal phrases (writing.md "Prohibitions"): a phrase that only
+  // announces a summary is starting. 結論から言うと / まとめると were already
+  // listed; 以下に示す / 本節では join them at the same warn severity.
+  for (const phrase of ["結論から言うと", "まとめると", "以下に示す", "本節では"]) {
+    test(`positive: summary signal phrase 「${phrase}」 fires at warn`, async () => {
+      const { findings } = await runLint(`${phrase}、再試行は 3 回で止める。\n`);
+      const hit = findings.find((f) => f.category === "forbidden_phrase" && f.message.includes(phrase));
+      assert.ok(hit, JSON.stringify(findings));
+      assert.equal(hit.severity, "warn");
+    });
+  }
+
+  test("negative: the summary itself, without a signal phrase, is clean", async () => {
+    const { findings } = await runLint("再試行は 3 回で止める。上限に達した処理は退避する。\n");
+    assert.ok(!categoriesOf(findings).has("forbidden_phrase"));
+  });
+
+  test("a signal phrase can still be kept through the [[allow]] mechanism", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wu-lint-signal-"));
+    try {
+      const cfg = path.join(dir, "allow.toml");
+      fs.writeFileSync(cfg, ["[[allow]]", 'category = "forbidden_phrase"', 'text = "本節では"', 'reason = "quoted heading"'].join("\n"));
+      const target = path.join(dir, "doc.txt");
+      fs.writeFileSync(target, "本節では、再試行を扱う。\n");
+      const { code, stdout } = runCli([target, "--config", cfg, "--json"]);
+      assert.equal(code, 0);
+      assert.ok(!JSON.parse(stdout).findings.some((f) => f.category === "forbidden_phrase"));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("translationese (surface)", () => {
