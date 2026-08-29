@@ -111,6 +111,22 @@ describe('buildStore(): sort order', () => {
   })
 })
 
+describe('buildStore(): kit css href follows the page depth', () => {
+  test('a page moved two folders deep gets ../../_kit/writeup.css', () => {
+    const store = freshStore()
+    const deep = join(store, 'a', 'b')
+    mkdirSync(deep, { recursive: true })
+    const src = readFileSync(join(store, 'decision', '2026-08-01-example-decision.html'), 'utf8')
+    writeFileSync(join(deep, '2026-08-02-moved.html'), src) // still links ../_kit/writeup.css
+    buildStore(store)
+    const out = readFileSync(join(deep, '2026-08-02-moved.html'), 'utf8')
+    assert.match(out, /href="\.\.\/\.\.\/_kit\/writeup\.css"/)
+    assert.ok(!/href="\.\.\/_kit\/writeup\.css"/.test(out))
+    buildStore(store)
+    assert.equal(readFileSync(join(deep, '2026-08-02-moved.html'), 'utf8'), out) // idempotent
+  })
+})
+
 describe('buildStore(): writes and idempotence', () => {
   test('writes manifest.json, index.html, and _kit/writeup.css', () => {
     const store = freshStore()

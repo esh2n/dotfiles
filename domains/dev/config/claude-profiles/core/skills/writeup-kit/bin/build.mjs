@@ -181,6 +181,19 @@ function backNavHref(relPath) {
   return depth === 0 ? 'index.html' : '../'.repeat(depth) + 'index.html'
 }
 
+const KIT_CSS_HREF_RE = /(<link\b[^>]*\shref=")((?:\.\.\/|\.\/)*_kit\/writeup\.css)(")/g
+
+/**
+ * Ensures every `<link href="…/_kit/writeup.css">` points at the store's
+ * kit CSS from this page's depth: a page moved into a deeper folder (store
+ * reorganisation, `git mv`) would otherwise lose its stylesheet. Idempotent.
+ */
+function ensureKitCssHref(text, relPath) {
+  const depth = relPath.split('/').length - 1
+  const want = (depth === 0 ? '' : '../'.repeat(depth)) + '_kit/writeup.css'
+  return text.replace(KIT_CSS_HREF_RE, (m, a, href, c) => (href === want ? m : a + want + c))
+}
+
 const HEADER_OPEN_RE = /<header\b[^>]*class="[^"]*\bwu-header\b[^"]*"[^>]*>/
 const LEADING_NAV_RE = /^\s*<nav\s+class="wu-nav"[^>]*>[\s\S]*?<\/nav>/
 const BACK_HREF_RE = /(<a\s+class="wu-back"[^>]*\shref=")([^"]*)(")/
@@ -316,6 +329,11 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
   if (navFixedText !== text) {
     navFixed = true
     if (!check) text = navFixedText
+  }
+  const cssFixedText = ensureKitCssHref(text, relPath)
+  if (cssFixedText !== text) {
+    navFixed = true // counted with the nav: both are "path depth" repairs
+    if (!check) text = cssFixedText
   }
   const checksParsed = parseChecks(meta.checks)
   const desiredIcon = faviconDataUri({ kind: meta.kind, status: statusFromChecks(checksParsed) })
