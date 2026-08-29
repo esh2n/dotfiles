@@ -1,0 +1,34 @@
+id: lakehouse
+type: medallion
+title: レイクハウスの層構成
+caption: ゴールド層だけを BI と公開 API に開放し、下位層は内部利用に限る
+stages:
+  - id: landing
+    label: ランディング
+    items: [files, cdc_stream]
+    properties: ["保持 7 日", "そのまま保存"]
+  - id: bronze
+    label: ブロンズ
+    items: [raw_events, raw_orders, raw_users]
+    properties: ["保持 90 日", "スキーマ検証なし", "追記のみ"]
+  - id: silver
+    label: シルバー
+    items: [events, orders, users]
+    properties: ["保持 2 年", "重複排除・型検証", "PII マスク"]
+  - id: gold
+    label: ゴールド
+    emphasis: true
+    items: [daily_sales, customer_360]
+    properties: ["保持 無期限", "SLA 付き品質検査", "契約スキーマ"]
+promotions:
+  - from: landing
+    to: bronze
+    label: 取り込み
+  - from: bronze
+    to: silver
+    label: 正規化
+  - from: silver
+    to: gold
+    label: 集計・公開
+sources: [アプリ DB, 行動ログ, 外部 CSV]
+consumers: [BI, 公開 API, ML 学習]

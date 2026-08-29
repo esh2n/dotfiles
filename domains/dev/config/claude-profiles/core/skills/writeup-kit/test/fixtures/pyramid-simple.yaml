@@ -1,0 +1,16 @@
+id: needs
+type: pyramid
+title: 優先順位の階層
+caption: 上に行くほど後回しにできる
+tiers:
+  - id: brand
+    label: ブランド
+    emphasis: true
+  - id: growth
+    label: 成長
+  - id: reliability
+    label: 信頼性
+    note: SLO を守る
+  - id: security
+    label: セキュリティ
+    tone: rs

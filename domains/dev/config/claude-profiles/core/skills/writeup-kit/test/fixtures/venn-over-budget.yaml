@@ -1,0 +1,20 @@
+id: v-over
+type: venn
+title: 予算超過の venn
+sets:
+- id: a
+  label: プラットフォームエンジニアリング
+- id: b
+  label: 開発
+- id: c
+  label: 運用
+regions:
+- of: [a, b]
+  label: 共同
+  emphasis: true
+- of: [b, c]
+  label: 引き継ぎ
+  emphasis: true
+- of: [a, b, c]
+  label: 全員
+  emphasis: true

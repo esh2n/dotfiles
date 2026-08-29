@@ -1,0 +1,17 @@
+id: v2
+type: venn
+title: 監視と可観測性の守備範囲
+caption: 重なる部分が両チームの共同責任
+sets:
+- id: sre
+  label: SRE チーム
+- id: dev
+  label: 開発チーム
+regions:
+- of: [sre]
+  label: 基盤アラート
+- of: [dev]
+  label: 機能ログ
+- of: [sre, dev]
+  label: SLO ダッシュボード
+  emphasis: true

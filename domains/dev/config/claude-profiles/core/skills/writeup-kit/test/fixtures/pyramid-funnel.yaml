@@ -1,0 +1,24 @@
+id: trial-funnel
+type: pyramid
+variant: funnel
+title: トライアル転換ファネル
+caption: 招待から有料化までの落ち込みは招待→初回ログインが最大
+tiers:
+  - id: invited
+    label: 招待
+    value: 8400
+  - id: login
+    label: 初回ログイン
+    value: 3100
+    note: 7 日以内
+  - id: active
+    label: 週次利用
+    value: 1250
+  - id: paid
+    label: 有料化
+    value: 190
+    emphasis: true
+  - id: expanded
+    label: 追加席購入
+    value: 42
+    note: 90 日以内

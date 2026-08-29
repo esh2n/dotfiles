@@ -1,0 +1,42 @@
+id: fb-over
+type: fishbone
+title: 予算超過の魚骨図
+effect: リリース判定会が毎回 2 時間を超える
+categories:
+  - id: c1
+    label: 人
+    causes:
+      - label: 参加者が多すぎる
+        emphasis: true
+      - 決裁者不在
+      - 準備不足
+      - 発言の偏り
+      - 議題外の議論
+      - 途中参加が多い
+  - id: c2
+    label: 方法
+    causes:
+      - label: 議題が事前共有されない
+        emphasis: true
+      - 定型フォーマットなし
+  - id: c3
+    label: 設備
+    causes:
+      - label: 会議室の予約が取れない
+        emphasis: true
+  - id: c4
+    label: 材料
+    causes:
+      - 検証報告が長い
+  - id: c5
+    label: 計測
+    causes:
+      - 所要時間を記録していない
+  - id: c6
+    label: 環境
+    causes:
+      - リモート混在
+  - id: c7
+    label: 管理
+    causes:
+      - 判定基準が文書化されていない状態

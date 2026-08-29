@@ -275,8 +275,8 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 14 | Tree | `tree` | H | implemented (`bin/lib/figures/tree.mjs`) |
 | 15 | Org chart | `org-chart` | H | implemented as `tree` with `variant: org` |
 | 16 | Layer stack | `layers` | L | implemented (`bin/lib/figures/layers.mjs`) |
-| 17 | Venn | `venn` | M | planned |
-| 18 | Pyramid / funnel | `pyramid` | H/Q | planned |
+| 17 | Venn | `venn` | M | implemented (`bin/lib/figures/venn.mjs`) |
+| 18 | Pyramid / funnel | `pyramid` | H/Q | implemented (`bin/lib/figures/pyramid.mjs`) |
 | 19 | Bar chart (incl. dumbbell) | `bar` | Q / D | planned |
 | 20 | Treemap | `treemap` | Q | planned |
 | 21 | Line chart (incl. slopegraph, ridgeline) | `line` | Q / D | planned |
@@ -284,12 +284,12 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 23 | Scatter / bubble | `scatter` | Q | planned |
 | 24 | High-Level | `high-level` | G+L | planned |
 | 25 | Process | `process` | G+L(grid) | implemented (`bin/lib/figures/process.mjs`) |
-| 26 | Medallion | `medallion` | L | planned |
+| 26 | Medallion | `medallion` | L | implemented (`bin/lib/figures/medallion.mjs`) |
 | 27 | Data flow | `data-flow` | G+L(grid) | planned |
 | 28 | DP integration | `dp-integration` | G+L | planned |
 | 29 | DP security matrix | `matrix` (generic rows × columns; the DP security matrix is a preset) | M | implemented (`bin/lib/figures/matrix.mjs`) |
 | 30 | Sankey | `sankey` | Q(flow) | planned |
-| 31 | Fishbone | `fishbone` | H(cause) | planned |
+| 31 | Fishbone | `fishbone` | H(cause) | implemented (`bin/lib/figures/fishbone.mjs`) |
 | 32 | Wardley map | `wardley` | M(2-axis ordinal) | planned (positions are authored, not derived — IR carries them verbatim) |
 | 33 | Kanban | `kanban` | M(state census) | implemented as `board` with `variant: kanban` |
 | 34 | User journey | `journey` | S+M | planned |

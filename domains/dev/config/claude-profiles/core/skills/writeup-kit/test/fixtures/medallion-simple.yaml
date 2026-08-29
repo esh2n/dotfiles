@@ -1,0 +1,21 @@
+id: tiers-simple
+type: medallion
+title: データ層の段階
+caption: 生データは検証を経てから集計層に昇格する
+stages:
+  - id: bronze
+    label: ブロンズ
+    items: [raw_events]
+  - id: silver
+    label: シルバー
+    items: [events]
+  - id: gold
+    label: ゴールド
+    items: [daily_sales]
+promotions:
+  - from: bronze
+    to: silver
+    label: 検証
+  - from: silver
+    to: gold
+    label: 集計

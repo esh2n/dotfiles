@@ -1,0 +1,27 @@
+id: v3
+type: venn
+title: 何を仕事にするか
+caption: 三つが重なる領域を狙う
+sets:
+- id: can
+  label: できる
+- id: wanted
+  label: 求められる
+- id: paid
+  label: 稼げる
+regions:
+- of: [can]
+  label: 趣味
+- of: [wanted]
+  label: 頼まれごと
+- of: [paid]
+  label: 割り切り
+- of: [can, wanted]
+  label: 頼られる仕事
+- of: [wanted, paid]
+  label: 市場がある
+- of: [can, paid]
+  label: 専門性
+- of: [can, wanted, paid]
+  label: 狙う領域
+  emphasis: true

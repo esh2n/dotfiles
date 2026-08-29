@@ -1,0 +1,24 @@
+id: fb-simple
+type: fishbone
+title: 夜間バッチ遅延の原因分析
+caption: 3 カテゴリを調査し、索引欠落を根本原因と判断
+effect: 夜間バッチが朝 6 時までに終わらない
+categories:
+  - id: db
+    label: DB
+    causes:
+      - label: 索引の欠落
+        emphasis: true
+      - ロック待ち
+      - 統計情報の古さ
+  - id: job
+    label: ジョブ設計
+    causes:
+      - 逐次実行
+      - 再試行の重複
+  - id: ops
+    label: 運用
+    causes:
+      - 監視閾値が高い
+      - 手動再実行
+      - 週次の全件再計算

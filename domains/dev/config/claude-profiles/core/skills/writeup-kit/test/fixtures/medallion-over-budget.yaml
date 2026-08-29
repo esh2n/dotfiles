@@ -1,0 +1,31 @@
+id: tiers-over
+type: medallion
+title: 段階が多すぎる層構成
+stages:
+  - id: landing
+    label: ランディング
+    emphasis: true
+    items: [a1, a2, a3, a4, a5, a6, a7]
+  - id: bronze
+    label: ブロンズ
+    emphasis: true
+  - id: silver
+    label: シルバー
+    emphasis: true
+  - id: gold
+    label: ゴールド
+  - id: platinum
+    label: プラチナ
+  - id: archive
+    label: アーカイブ（コールドストレージ）
+promotions:
+  - from: landing
+    to: bronze
+  - from: bronze
+    to: silver
+  - from: silver
+    to: gold
+  - from: gold
+    to: platinum
+  - from: platinum
+    to: archive

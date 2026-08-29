@@ -1,0 +1,23 @@
+id: over
+type: pyramid
+title: 予算超過のピラミッド
+tiers:
+  - id: t1
+    label: 第一層
+    emphasis: true
+  - id: t2
+    label: 第二層
+    emphasis: true
+  - id: t3
+    label: 第三層
+    emphasis: true
+  - id: t4
+    label: 第四層
+  - id: t5
+    label: 第五層
+  - id: t6
+    label: 第六層
+  - id: t7
+    label: とても長いラベルを持つ第七層です
+  - id: t8
+    label: 第八層
