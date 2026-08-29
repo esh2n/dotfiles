@@ -6,6 +6,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { runSelfCheck, writeMetaChecks } from '../bin/self-check.mjs'
+import { SIDETOC_SCRIPT } from '../bin/build.mjs'
 import { pageId } from '../bin/lib/store.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -208,6 +209,42 @@ describe('self-check: adversarial rows', () => {
   test('row 4: a <nav> (.wu-toc) inside main is allowed', () => {
     const result = itemsFor(page({ body: DEFAULT_BODY + '<nav class="wu-toc"><p>目次</p><ol><li><a href="#a">a</a></li></ol></nav>' }))
     assert.ok(!result.errors.some((e) => e.item === 'role-structure' && /nav/.test(e.detail)))
+  })
+
+  test('inline-script: build\'s pinned side-TOC script is accepted', () => {
+    const html = page().replace('</body>', `<script>${SIDETOC_SCRIPT}</script>\n</body>`)
+    const result = itemsFor(html)
+    assert.deepEqual(result.errors.filter((e) => e.item === 'inline-script'), [])
+  })
+
+  test('inline-script: any other executable script is an error', () => {
+    const result = itemsFor(page().replace('</body>', '<script>console.log(1)</script>\n</body>'))
+    assert.ok(result.errors.some((e) => e.item === 'inline-script'), JSON.stringify(result.errors))
+  })
+
+  test('inline-script: a script whose source drifts from the pin by one character is an error', () => {
+    const drifted = SIDETOC_SCRIPT.replace("'0px 0px -72% 0px'", "'0px 0px -50% 0px'")
+    const result = itemsFor(page().replace('</body>', `<script>${drifted}</script>\n</body>`))
+    assert.ok(result.errors.some((e) => e.item === 'inline-script'), JSON.stringify(result.errors))
+  })
+
+  test('inline-script: the pinned script twice on one page is an error', () => {
+    const twice = `<script>${SIDETOC_SCRIPT}</script>\n<script>${SIDETOC_SCRIPT}</script>\n</body>`
+    const result = itemsFor(page().replace('</body>', twice))
+    assert.ok(result.errors.some((e) => e.item === 'inline-script' && /more than once/.test(e.detail)))
+  })
+
+  test('inline-script: a .wu-figure IR block (type="text/x-writeup-diagram") is data, not a script', () => {
+    const ir = '<figure class="wu-figure" data-checks="pass"><script type="text/x-writeup-diagram">type: flow</script></figure>'
+    const result = itemsFor(page({ body: DEFAULT_BODY + ir }))
+    assert.deepEqual(result.errors.filter((e) => e.item === 'inline-script'), [])
+  })
+
+  test('markdown-convertibility: the generated .wu-sidetoc nav is mapped, not a warn', () => {
+    const nav = '<nav class="wu-sidetoc" aria-label="目次"><ol><li><a href="#a">a</a><ol class="wu-sidetoc-sub"><li><a href="#b">b</a></li></ol></li></ol></nav>'
+    const result = itemsFor(page({ body: nav + DEFAULT_BODY }))
+    assert.ok(!result.warnings.some((w) => w.item === 'markdown-convertibility' && /wu-sidetoc/.test(w.detail)), JSON.stringify(result.warnings))
+    assert.ok(!result.errors.some((e) => e.item === 'role-structure'), JSON.stringify(result.errors))
   })
 
   test('row 4: a non-wu- class on a body element is an error', () => {

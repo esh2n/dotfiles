@@ -19,6 +19,7 @@ import {
   structuralSignature, signaturesEqual,
 } from './lib/html.mjs'
 import { discoverStoreRoot, pageId } from './lib/store.mjs'
+import { SIDETOC_SCRIPT } from './build.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_TEMPLATE_PATH = join(HERE, '..', 'kit', 'template.html')
@@ -83,6 +84,7 @@ export function runSelfCheck(filePath) {
   }
 
   checkSingleFile(root, add)
+  checkInlineScripts(root, add)
   checkRequiredMeta(root, add)
   checkIdMeta(root, filePath, add)
   checkUpdatedFormat(root, add)
@@ -124,6 +126,31 @@ function checkSingleFile(root, add) {
       continue
     }
     add('error', 'single-file', `${ref.tag} references disallowed external URL: ${url}`)
+  }
+}
+
+// The MIME types a browser executes; every other `type` marks the block as
+// inert data (the `.wu-figure` IR block's `text/x-writeup-diagram`).
+const JS_SCRIPT_TYPES = new Set(['', 'text/javascript', 'application/javascript', 'module'])
+
+/**
+ * A page may carry exactly one executable `<script>`: the side-TOC scroll
+ * spy `build` injects, pinned to `SIDETOC_SCRIPT`'s source (page-contract.md
+ * §1 rewrite point 6, §4). Anything else executable — a hand-written
+ * snippet, an analytics tag, a second copy — is an error, so a store page
+ * stays a document rather than an app.
+ */
+function checkInlineScripts(root, add) {
+  let pinned = 0
+  for (const node of findAll(root, (n) => isElement(n) && n.tag === 'script')) {
+    const type = (attr(node, 'type') || '').trim().toLowerCase()
+    if (!JS_SCRIPT_TYPES.has(type)) continue
+    if (textContent(node).trim() === SIDETOC_SCRIPT.trim()) {
+      pinned++
+      if (pinned > 1) add('error', 'inline-script', "the page carries build's side-TOC script more than once")
+      continue
+    }
+    add('error', 'inline-script', "executable <script> that is not build's pinned side-TOC script")
   }
 }
 
@@ -646,7 +673,7 @@ const MD_MAPPED_CLASSES = new Set([
   'wu-lede', 'wu-summary', 'wu-terms', 'wu-callout', 'wu-decision', 'wu-compare', 'wu-table',
   'wu-steps', 'wu-figure', 'wu-quote', 'wu-quote-original', 'wu-quote-ja', 'wu-quote-source',
   'wu-code', 'wu-diff', 'wu-chip', 'wu-meta', 'wu-open', 'wu-accent', 'wu-section', 'wu-focal',
-  'wu-eyebrow', 'wu-toc',
+  'wu-eyebrow', 'wu-toc', 'wu-sidetoc', 'wu-sidetoc-sub',
 ])
 
 function checkMarkdownConvertibility(root, add) {

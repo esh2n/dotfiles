@@ -278,6 +278,16 @@ describe('serve.mjs registry helpers', () => {
     assert.ok(lines[0].startsWith(`* legacy\t${defaultStoreBase()}\t(no registry:`), lines[0])
   })
 
+  test('formatStoreList says how to make a store when nothing is initialized yet', () => {
+    process.env.WRITEUP_STORES = join(tmpdir(), 'wu-nope', 'stores.toml')
+    const [line] = formatStoreList({ cwd: tmpdir() })
+    // defaultStoreBase() has no .writeup.toml under a throwaway HOME, so the
+    // path is only where a store *would* go — the line must name init-store.
+    if (!existsSync(join(defaultStoreBase(), '.writeup.toml'))) {
+      assert.match(line, /no store yet: run `node <writeup skill>\/scripts\/init-store\.mjs/)
+    }
+  })
+
   test('parseArgs accepts --store-name and --list-stores, rejects --all and mixing store flags', () => {
     assert.equal(parseArgs(['--store-name', 'work']).storeName, 'work')
     assert.equal(parseArgs(['--list-stores']).listStores, true)

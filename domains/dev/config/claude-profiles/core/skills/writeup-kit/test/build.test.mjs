@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { buildStore, renderStoreSwitcher } from '../bin/build.mjs'
+import { buildStore, renderStoreSwitcher, SIDETOC_SCRIPT } from '../bin/build.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
 import { faviconDataUri, statusFromChecks } from '../bin/lib/favicon.mjs'
 
@@ -959,5 +959,146 @@ describe('buildStore(): store switcher in the index header', () => {
     const html = readFileSync(join(store, 'index.html'), 'utf8')
     assert.doesNotMatch(html, /wu-idx-stores"/)
     assert.match(html, /<p class="wu-eyebrow">writeup store<\/p>/)
+  })
+})
+
+describe('buildStore(): .wu-sidetoc side table of contents', () => {
+  function sideTocPage(bodyInner) {
+    return '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<title>目次フィクスチャ</title>\n' +
+      '<meta name="description" content="d">\n<meta name="kind" content="設計">\n<meta name="date" content="2026-08-29">\n' +
+      '<meta name="checks" content="lint=pass;self-check=pass">\n<link rel="stylesheet" href="../_kit/writeup.css">\n</head>\n<body>\n' +
+      '<div class="wu-page">\n<header class="wu-header"><h1>目次フィクスチャ</h1></header>\n<main>\n' +
+      bodyInner + '\n</main>\n</footer>\n</div>\n</body>\n</html>\n'
+  }
+
+  function sections(...heads) {
+    return heads.map((h) => `<section class="wu-section">\n${h}\n<p>本文。</p>\n</section>`).join('\n')
+  }
+
+  function freshTocStore(bodyInner) {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-toc-'))
+    mkdirSync(join(dir, 'notes'), { recursive: true })
+    const page = join(dir, 'notes', '2026-08-29-toc.html')
+    writeFileSync(page, sideTocPage(bodyInner))
+    return { dir, page }
+  }
+
+  const THREE = sections('<h2>目的と読者</h2>', '<h2>あるべき姿</h2>', '<h2>進め方</h2>')
+
+  test('generates <nav class="wu-sidetoc"> as <main>\'s first child from the page h2', () => {
+    const { dir, page } = freshTocStore(THREE)
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.match(html, /<main>\s*<nav class="wu-sidetoc" aria-label="目次">/)
+    assert.match(html, /<a href="#目的と読者" title="目的と読者">目的と読者<\/a>/)
+    assert.match(html, /<a href="#進め方" title="進め方">進め方<\/a>/)
+    // the nav is inside main, before the first section
+    assert.ok(html.indexOf('wu-sidetoc') < html.indexOf('<section class="wu-section">'), html)
+  })
+
+  test('adds a stable id to every h2/h3 that lacks one, deduping with -2', () => {
+    const { dir, page } = freshTocStore(sections('<h2>方針</h2>', '<h2>方針</h2>', '<h2>まとめ</h2>'))
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.match(html, /<h2 id="方針">方針<\/h2>/)
+    assert.match(html, /<h2 id="方針-2">方針<\/h2>/)
+    assert.match(html, /<a href="#方針-2"/)
+  })
+
+  test('never rewrites an existing id — a 決定記録\'s id="d<n>" anchors survive and are what the nav links to', () => {
+    const body = sections('<h2>決まったこと</h2>\n<h3 id="d1">再試行は3回</h3>\n<h3 id="d2">上限は10分</h3>', '<h2>却下した案</h2>', '<h2>次のステップ</h2>')
+    const { dir, page } = freshTocStore(body)
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.match(html, /<h3 id="d1">再試行は3回<\/h3>/)
+    assert.match(html, /<h3 id="d2">上限は10分<\/h3>/)
+    assert.match(html, /<a href="#d1" title="再試行は3回">/)
+    assert.doesNotMatch(html, /id="再試行は3回"/)
+  })
+
+  test('h3 entries nest one level under their h2 in an ol.wu-sidetoc-sub', () => {
+    const body = sections('<h2>現状</h2>\n<h3>取り込み</h3>\n<h3>保存</h3>', '<h2>あるべき姿</h2>', '<h2>進め方</h2>')
+    const { dir, page } = freshTocStore(body)
+    buildStore(dir)
+    const nav = /<nav class="wu-sidetoc"[\s\S]*?<\/nav>/.exec(readFileSync(page, 'utf8'))[0]
+    assert.match(nav, /<li><a href="#現状"[^>]*>現状<\/a>\n<ol class="wu-sidetoc-sub">\n<li><a href="#取り込み"/)
+    assert.match(nav, /<li><a href="#保存"[^>]*>保存<\/a><\/li>\n<\/ol>\n<\/li>/)
+  })
+
+  test('under 12 entries the nav ships expanded; 12 or more ships data-collapsed="true"', () => {
+    const short = freshTocStore(THREE)
+    buildStore(short.dir)
+    assert.match(readFileSync(short.page, 'utf8'), /<nav class="wu-sidetoc" aria-label="目次">/)
+
+    const many = Array.from({ length: 12 }, (_, i) => `<h2>節${i + 1}</h2>`)
+    const long = freshTocStore(sections(...many))
+    buildStore(long.dir)
+    assert.match(readFileSync(long.page, 'utf8'), /<nav class="wu-sidetoc" aria-label="目次" data-collapsed="true">/)
+  })
+
+  test('injects exactly one pinned scroll-spy <script> before </body>, and self-check accepts it', () => {
+    const { dir, page } = freshTocStore(THREE)
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.equal((html.match(/<script>/g) || []).length, 1)
+    assert.ok(html.includes(`<script>${SIDETOC_SCRIPT}</script>`), html)
+    assert.ok(html.indexOf('<script>') > html.indexOf('</main>'), html)
+    const result = runSelfCheck(page)
+    assert.deepEqual(result.errors.filter((e) => e.item === 'inline-script'), [])
+  })
+
+  test('the pinned script is under 40 lines and references nothing external', () => {
+    const lines = SIDETOC_SCRIPT.trim().split('\n')
+    assert.ok(lines.length < 40, `script is ${lines.length} lines`)
+    assert.doesNotMatch(SIDETOC_SCRIPT, /https?:|import |fetch\(|src=/)
+  })
+
+  test('a page with fewer than three h2 gets no nav, and an existing one is removed', () => {
+    const { dir, page } = freshTocStore(THREE)
+    buildStore(dir)
+    assert.match(readFileSync(page, 'utf8'), /wu-sidetoc/)
+    // drop one section, rebuild: the nav and its script go away with it
+    const trimmed = readFileSync(page, 'utf8').replace(/<section class="wu-section">\n<h2 id="進め方">[\s\S]*?<\/section>\n/, '')
+    writeFileSync(page, trimmed)
+    buildStore(dir)
+    const after = readFileSync(page, 'utf8')
+    assert.doesNotMatch(after, /wu-sidetoc/)
+    assert.doesNotMatch(after, /<script>/)
+  })
+
+  test('idempotent: a second build leaves the page bytes untouched', () => {
+    const { dir, page } = freshTocStore(sections('<h2>現状</h2>\n<h3>取り込み</h3>', '<h2>あるべき姿</h2>', '<h2>進め方</h2>'))
+    buildStore(dir)
+    const first = readFileSync(page, 'utf8')
+    const second = buildStore(dir)
+    assert.equal(readFileSync(page, 'utf8'), first)
+    assert.equal(second.pagesChanged, false)
+  })
+
+  test('regenerated in place when the headings change: entries follow, ids are not duplicated', () => {
+    const { dir, page } = freshTocStore(THREE)
+    buildStore(dir)
+    const edited = readFileSync(page, 'utf8').replace('<h2 id="進め方">進め方</h2>', '<h2 id="進め方">進め方</h2>\n<h3>体制</h3>')
+    writeFileSync(page, edited)
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.equal((html.match(/<nav class="wu-sidetoc"/g) || []).length, 1)
+    assert.equal((html.match(/<script>/g) || []).length, 1)
+    assert.equal((html.match(/id="進め方"/g) || []).length, 1)
+    assert.match(html, /<a href="#体制"/)
+  })
+
+  test('kit CSS keeps the nav out of narrow viewports and sticky beside the column on wide ones', () => {
+    const css = readFileSync(join(ROOT, 'kit', 'writeup.css'), 'utf8')
+    assert.match(css, /\.wu-sidetoc \{\n {2}display: none;\n\}/)
+    assert.match(css, /@media \(min-width: 1200px\) \{/)
+    const wide = css.slice(css.indexOf('@media (min-width: 1200px)'))
+    assert.match(wide, /position: sticky;/)
+    assert.match(wide, /top: var\(--wu-sp-5\);/)
+    assert.match(wide, /text-overflow: ellipsis;/)
+    // the figure bleed rule is untouched and still fires from 800px up
+    assert.match(css, /@media \(min-width: 800px\) \{\n {2}\.wu-figure \{\n {4}margin-inline: calc\(-1 \* \(2 \* var\(--wu-sp-4\) \+ var\(--wu-bw-1\)\)\);/)
+    // not printed
+    assert.match(css, /@media print \{\n {2}\.wu-toc,\n {2}\.wu-sidetoc,/)
   })
 })

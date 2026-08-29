@@ -3,7 +3,7 @@
 // from every page's `<head>` meta, and syncs the kit's CSS into
 // `<store>/_kit/writeup.css` (contract §1, §1-3). Zero-dependency.
 //
-// The four places build.mjs edits a page's own bytes (page-contract.md §1):
+// The six places build.mjs edits a page's own bytes (page-contract.md §1):
 // (1) when a page's `<head>` lacks `<meta name="id">`, build inserts the
 // computed id right after `<meta name="date">` (idempotent — only when the
 // meta is missing; see `insertIdMeta`/`buildPageRecord`); (2) `.wu-header`'s
@@ -21,10 +21,18 @@
 // the existing (HTML-escaped) text is decoded, run through
 // `bin/lib/highlight.mjs`'s `highlight(code, lang)`, and written back with
 // `data-hl="1"` set on the `<pre>` (idempotent — a block already carrying
-// `wu-tok-` spans is left untouched; see `ensureHighlighted`). Nothing else
-// about a page is ever rewritten by build — `<meta name="updated">` in
-// particular is read, not patched, even when the manifest fills in a
-// synthesized time-of-day.
+// `wu-tok-` spans is left untouched; see `ensureHighlighted`); (5) internal
+// `<a href>` values are repaired against the store's page list — rewritten
+// page-relative, followed to a moved (`legacy/`) target, or marked
+// `data-wu-missing` when nothing resolves (idempotent; see
+// `bin/lib/links.mjs`'s `repairLinks`); (6) the side table of contents —
+// `<nav class="wu-sidetoc">` as `<main>`'s first child, generated from the
+// page's own h2/h3 (which each get a stable `id` when they lack one), plus
+// the pinned scroll-spy `<script>` before `</body>` (idempotent: stripped
+// and regenerated from the current headings, removed when the page has
+// fewer than three h2; see `ensureSideToc`). Nothing else about a page is
+// ever rewritten by build — `<meta name="updated">` in particular is read,
+// not patched, even when the manifest fills in a synthesized time-of-day.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -236,7 +244,7 @@ const STYLESHEET_LINK_RE = /<link\s+rel="stylesheet"[^>]*>/
  * existing icon link only when its href differs (idempotent); inserted
  * right after `<meta name="checks">` when present, else right before the
  * first stylesheet `<link>` (falling back to just before `</head>` if
- * neither is found). The third and last place build.mjs edits a page's own
+ * neither is found). The third place build.mjs edits a page's own
  * bytes — see the module docstring.
  */
 function ensureFavicon(text, dataUri) {
@@ -273,7 +281,7 @@ function attrValue(attrsStr, name) {
  * has no `wu-tok-` spans yet (page-contract.md §5, `bin/lib/highlight.mjs`).
  * Decodes the block's existing (HTML-escaped) text, re-renders it through
  * `highlight(code, lang)`, and marks the `<pre>` with `data-hl="1"`. The
- * fourth and last place build.mjs edits a page's own bytes — see the module
+ * fourth place build.mjs edits a page's own bytes — see the module
  * docstring. Idempotent: a block already containing `wu-tok-` spans (or one
  * whose shape this regex doesn't recognize) is returned unchanged, never
  * throws.
@@ -295,6 +303,168 @@ function ensureHighlighted(text) {
   })
 }
 
+// --- side table of contents (rewrite point 6) --------------------------------
+
+/** Below this many `h2` a page is short enough to read without a TOC: the
+ * nav is not generated (and an existing one is removed). */
+const SIDETOC_MIN_H2 = 3
+/** From this many entries (h2 + h3) the nav ships collapsed: h3 entries are
+ * revealed by CSS only under the h2 the reader is currently in. */
+const SIDETOC_COLLAPSE_AT = 12
+
+/**
+ * The one executable script a page may carry: the side-TOC scroll spy.
+ * Pinned — `bin/self-check.mjs` compares a page's script against this exact
+ * source and errors on any other executable script (page-contract.md §4).
+ * Kept under 40 lines and free of external references, like the index
+ * page's inline script. Without it (or without IntersectionObserver) the
+ * nav still links and jumps; only the highlight is missing.
+ */
+export const SIDETOC_SCRIPT = `
+(function () {
+  var nav = document.querySelector('.wu-sidetoc')
+  if (!nav || !window.IntersectionObserver) return
+  var links = Array.prototype.slice.call(nav.querySelectorAll('a[href^="#"]'))
+  var byId = {}
+  var heads = []
+  links.forEach(function (a) {
+    var id = decodeURIComponent(a.getAttribute('href').slice(1))
+    var el = document.getElementById(id)
+    if (!el) return
+    byId[id] = a
+    heads.push(el)
+  })
+  if (!heads.length) return
+  var seen = {}
+  var cur = null
+  function mark(id) {
+    if (id === cur) return
+    cur = id
+    links.forEach(function (a) { a.removeAttribute('aria-current') })
+    var a = byId[id]
+    if (!a) return
+    a.setAttribute('aria-current', 'true')
+    if (nav.scrollHeight > nav.clientHeight) {
+      nav.scrollTop = Math.max(0, a.offsetTop - nav.clientHeight / 2)
+    }
+  }
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { seen[e.target.id] = e.isIntersecting })
+    for (var i = 0; i < heads.length; i++) {
+      if (seen[heads[i].id]) { mark(heads[i].id); break }
+    }
+  }, { rootMargin: '0px 0px -72% 0px' })
+  heads.forEach(function (h) { obs.observe(h) })
+})()
+`
+
+const MAIN_OPEN_RE = /<main\b[^>]*>/
+const SIDETOC_NAV_RE = /\n?[ \t]*<nav class="wu-sidetoc"[\s\S]*?<\/nav>\n?/
+const SIDETOC_SCRIPT_RE = /[ \t]*<script>(?:(?!<\/script>)[\s\S])*?wu-sidetoc(?:(?!<\/script>)[\s\S])*?<\/script>\n?/
+const HEADING_RE = /<(h2|h3)\b([^>]*)>([\s\S]*?)<\/\1>/g
+const ID_ATTR_RE = /\sid="([^"]*)"/g
+
+/** A heading's plain label: tags stripped, entities decoded, whitespace
+ * collapsed. */
+function headingLabel(innerHtml) {
+  return decodeEntities(innerHtml.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * A URL- and attribute-safe id from a heading's text. Letters (Japanese
+ * included) and digits survive, whitespace becomes `-`, everything else is
+ * dropped; a leading digit gets a `sec-` prefix so the id is also a valid
+ * CSS identifier.
+ */
+export function sideTocSlug(label) {
+  let s = label.normalize('NFKC').toLowerCase().trim()
+  s = s.replace(/[\s　]+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '')
+  s = s.replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '')
+  if (!s) return 'section'
+  return /^\d/.test(s) ? 'sec-' + s : s
+}
+
+/** `base`, or `base-2` / `base-3` / … — the first form not already `used`. */
+function uniqueId(base, used) {
+  if (!used.has(base)) return base
+  for (let n = 2; ; n++) {
+    const cand = `${base}-${n}`
+    if (!used.has(cand)) return cand
+  }
+}
+
+/** The nav markup for `entries` (document order, level 2 or 3). h3 entries
+ * nest in an `ol.wu-sidetoc-sub` under the h2 they follow. */
+function renderSideToc(entries) {
+  const collapsed = entries.length >= SIDETOC_COLLAPSE_AT
+  const link = (e) => {
+    const label = escapeHtml(e.label)
+    return `<a href="#${escapeHtml(e.id)}" title="${label}">${label}</a>`
+  }
+  const out = [`<nav class="wu-sidetoc" aria-label="目次"${collapsed ? ' data-collapsed="true"' : ''}>`, '<ol>']
+  let sub = false
+  let li = false
+  for (const e of entries) {
+    if (e.level === 2) {
+      if (sub) { out.push('</ol>'); sub = false }
+      if (li) out.push('</li>')
+      out.push(`<li>${link(e)}`)
+      li = true
+    } else {
+      if (!li) { out.push('<li>'); li = true }
+      if (!sub) { out.push('<ol class="wu-sidetoc-sub">'); sub = true }
+      out.push(`<li>${link(e)}</li>`)
+    }
+  }
+  if (sub) out.push('</ol>')
+  if (li) out.push('</li>')
+  out.push('</ol>', '</nav>')
+  return out.join('\n') + '\n'
+}
+
+/**
+ * Regenerates the page's side table of contents (page-contract.md §1): a
+ * `<nav class="wu-sidetoc">` as `<main>`'s first child, built from the
+ * page's own h2/h3, plus the pinned scroll-spy script before `</body>`.
+ * Every h2/h3 that lacks an `id` gets one (slug of its text, deduped
+ * `-2`/`-3`); an id already on a heading is never rewritten, so a decision
+ * record's `id="d<n>"` anchors survive and are what the nav links to.
+ * A page with fewer than three h2 gets no nav — an existing one is removed.
+ * The sixth and last place build.mjs edits a page's own bytes — see the
+ * module docstring. Idempotent: the nav and script are stripped and rebuilt
+ * from the current headings on every run, so a second run is a no-op.
+ */
+function ensureSideToc(text) {
+  if (!MAIN_OPEN_RE.test(text)) return text
+  let out = text.replace(SIDETOC_NAV_RE, '').replace(SIDETOC_SCRIPT_RE, '')
+  const open = MAIN_OPEN_RE.exec(out)
+  const mainStart = open.index + open[0].length
+  const mainEnd = out.lastIndexOf('</main>')
+  if (mainEnd < mainStart) return out
+  const used = new Set()
+  for (const m of out.matchAll(ID_ATTR_RE)) used.add(m[1])
+  const entries = []
+  const body = out.slice(mainStart, mainEnd).replace(HEADING_RE, (whole, tag, attrs, inner) => {
+    const label = headingLabel(inner)
+    let id = attrValue(attrs, 'id')
+    let replaced = whole
+    if (!id) {
+      id = uniqueId(sideTocSlug(label), used)
+      replaced = `<${tag}${attrs} id="${id}">${inner}</${tag}>`
+    }
+    used.add(id)
+    entries.push({ level: tag === 'h2' ? 2 : 3, id, label })
+    return replaced
+  })
+  const head = out.slice(0, mainStart)
+  const tail = out.slice(mainEnd)
+  if (entries.filter((e) => e.level === 2).length < SIDETOC_MIN_H2) return head + body + tail
+  out = head + '\n' + renderSideToc(entries) + body + tail
+  const scriptBlock = `<script>${SIDETOC_SCRIPT}</script>\n`
+  const bodyClose = out.lastIndexOf('</body>')
+  return bodyClose === -1 ? out + scriptBlock : out.slice(0, bodyClose) + scriptBlock + out.slice(bodyClose)
+}
+
 /**
  * Builds one manifest record for `relPath`. When the page's `<head>` lacks
  * `<meta name="id">` and `check` is false, inserts the computed id into the
@@ -303,7 +473,8 @@ function ensureHighlighted(text) {
  * `ensureBackNav` — that the status favicon link reflects this page's
  * current `kind`/`checks` — see `ensureFavicon` — and that every
  * `.wu-code`/`.wu-diff` block is syntax-highlighted — see
- * `ensureHighlighted`. The mtime used for `updated`'s time-of-day fallback
+ * `ensureHighlighted` — and that the side table of contents matches the
+ * page's current headings — see `ensureSideToc`. The mtime used for `updated`'s time-of-day fallback
  * is read *before* any edit, so housekeeping itself never bumps a page's
  * `updated`.
  */
@@ -319,6 +490,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
   let navFixed = false
   let faviconFixed = false
   let highlightFixed = false
+  let tocFixed = false
   let linksFixed = false
   let missingLinks = 0
   if (meta.id === undefined) {
@@ -347,6 +519,11 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
     highlightFixed = true
     if (!check) text = highlightedText
   }
+  const tocFixedText = ensureSideToc(text)
+  if (tocFixedText !== text) {
+    tocFixed = true
+    if (!check) text = tocFixedText
+  }
   if (linkResolver) {
     // (5) internal links: pages migrated from the old tool wrote hrefs
     // relative to the store root; rewrite them page-relative, follow
@@ -362,7 +539,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
       if (!check) text = repaired.html
     }
   }
-  if ((metaInserted || navFixed || faviconFixed || highlightFixed || linksFixed) && !check) {
+  if ((metaInserted || navFixed || faviconFixed || highlightFixed || tocFixed || linksFixed) && !check) {
     writeFileSync(fullPath, text)
     buf = Buffer.from(text, 'utf8')
     root = parseHtml(text)
@@ -398,7 +575,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
     legacy: relPath.startsWith('legacy/'),
     missingLinks,
   }
-  return { record, metaInserted, navFixed, faviconFixed, highlightFixed, linksFixed }
+  return { record, metaInserted, navFixed, faviconFixed, highlightFixed, tocFixed, linksFixed }
 }
 
 /**
@@ -839,7 +1016,7 @@ export function buildStore(storeDir, { check = false } = {}) {
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
   const linkResolver = makeLinkResolver(storeDir, relPaths)
   const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check, linkResolver }))
-  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.highlightFixed || b.linksFixed)
+  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.highlightFixed || b.tocFixed || b.linksFixed)
   const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'
   const manifestPath = join(storeDir, 'manifest.json')
