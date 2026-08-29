@@ -1,0 +1,47 @@
+id: order-stack
+type: layers
+title: 注文システムの層構成
+caption: 認可はドメイン層、暗号化はストレージ層で強制する
+layers:
+  - id: ui
+    label: UI
+    items: [Web, Mobile, 管理画面]
+  - id: api
+    label: API
+    tone: ts
+    items:
+      - id: gw
+        label: Gateway
+        tone: ts
+      - id: auth
+        label: 認証
+      - id: rate
+        label: レート制限
+  - id: domain
+    label: ドメイン
+    emphasis: true
+    items: [注文, 在庫, 決済, 配送, 請求]
+  - id: storage
+    label: ストレージ
+    tone: rs
+    items: [PostgreSQL, S3]
+side:
+  label: 統制
+  items:
+    - layer: ui
+      text: CSRF トークン
+    - layer: api
+      text: 認証・レート制限
+    - layer: domain
+      text: 認可・不変条件
+    - layer: storage
+      text: 暗号化・保持期限
+arrows:
+  - from: ui
+    to: api
+    label: HTTPS
+  - from: api
+    to: domain
+  - from: domain
+    to: storage
+    label: SQL / put

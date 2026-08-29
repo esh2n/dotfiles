@@ -51,13 +51,16 @@ function scratchDir() {
 describe('figures/index.mjs: discovery from the filesystem', () => {
   test('the real folder yields exactly the plugin files, skipping index.mjs, _-prefixed helpers and the .txt template', () => {
     const files = pluginFiles(FIGURES_DIR)
-    assert.deepEqual(files, ['sequence.mjs'])
+    const expected = readdirSync(FIGURES_DIR).filter((f) => f.endsWith('.mjs') && f !== 'index.mjs' && !f.startsWith('_')).sort()
+    assert.deepEqual(files, expected)
+    assert.ok(files.includes('sequence.mjs'))
     const all = readdirSync(FIGURES_DIR)
     assert.ok(all.includes('index.mjs') && all.includes('_shared.mjs') && all.includes('_template.mjs.txt'))
   })
 
   test('listFigureTypes() lists the builtin diagram first, then every plugin alphabetically', () => {
-    assert.deepEqual(listFigureTypes(), ['diagram', 'sequence'])
+    const plugins = pluginFiles(FIGURES_DIR).map((f) => f.replace(/\.mjs$/, '')).sort()
+    assert.deepEqual(listFigureTypes(), ['diagram', ...plugins])
     assert.deepEqual(irTypes(), listFigureTypes())
   })
 
@@ -88,7 +91,7 @@ describe('figures/index.mjs: discovery from the filesystem', () => {
     const r = validateIR({ id: 'x', type: 'nope', title: 't' })
     assert.equal(r.ok, false)
     assert.equal(r.reason, 'schema')
-    assert.match(r.message, /ir\.type must be diagram\|sequence \(got: "nope"\)/)
+    assert.match(r.message, /ir\.type must be diagram\|[a-z|-]*sequence[a-z|-]* \(got: "nope"\)/)
   })
 
   test('loadFigureTypes(dir) discovers a stub plugin and keys it by its exported type', async () => {
@@ -262,7 +265,7 @@ describe('render-diagram.mjs: --list-types and --doc', () => {
     const r = runCli(['--doc', 'nope'])
     assert.equal(r.status, 2)
     assert.equal(r.stdout, '')
-    assert.match(r.stderr, /unknown figure type "nope" — known: diagram, sequence/)
+    assert.match(r.stderr, /unknown figure type "nope" — known: diagram, (?:[a-z-]+, )*sequence/)
   })
 
   test('--help mentions the two new flags', () => {

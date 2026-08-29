@@ -1,0 +1,29 @@
+id: r1
+type: radar
+title: 検索バックエンドの比較
+caption: 各基準を 0〜1 に正規化して採点
+axes:
+- id: speed
+  label: 速度
+- id: relevance
+  label: 精度
+- id: ops
+  label: 運用の手間
+- id: cost
+  label: コスト
+series:
+- id: es
+  label: Elastic
+  emphasis: true
+  values:
+    speed: 0.9
+    relevance: 0.8
+    ops: 0.4
+    cost: 0.5
+- id: pg
+  label: Postgres FTS
+  values:
+    speed: 0.6
+    relevance: 0.5
+    ops: 0.9
+    cost: 0.9

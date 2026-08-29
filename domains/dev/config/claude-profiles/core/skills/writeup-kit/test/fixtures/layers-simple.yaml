@@ -1,0 +1,21 @@
+id: osi-lite
+type: layers
+title: 通信スタック
+caption: 上から下へ、依存は一方向
+layers:
+  - id: app
+    label: アプリ
+  - id: transport
+    label: トランスポート
+    emphasis: true
+  - id: network
+    label: ネットワーク
+  - id: link
+    label: リンク
+arrows:
+  - from: app
+    to: transport
+    label: 送信
+  - from: link
+    to: network
+    label: 受信

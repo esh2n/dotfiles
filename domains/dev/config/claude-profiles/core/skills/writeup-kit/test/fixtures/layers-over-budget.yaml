@@ -1,0 +1,24 @@
+id: over
+type: layers
+title: 予算超過のスタック
+layers:
+  - id: l1
+    label: 第一層
+    emphasis: true
+  - id: l2
+    label: 第二層
+    emphasis: true
+  - id: l3
+    label: 第三層
+    emphasis: true
+    items: [a, b, c, d, e, f, g, h, i]
+  - id: l4
+    label: 第四層
+  - id: l5
+    label: 第五層
+  - id: l6
+    label: 第六層
+  - id: l7
+    label: とても長いラベルを持つ第七層です
+  - id: l8
+    label: 第八層
