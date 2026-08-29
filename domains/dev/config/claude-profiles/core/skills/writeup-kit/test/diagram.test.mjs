@@ -570,9 +570,16 @@ test('an emphasis node gets a 1.5 stroke width and its label stays ink-colored, 
 // The accent color for an emphasized node is a border-only cue: the CSS
 // must stroke the .wu-focal <rect>, never fill the .wu-focal <text> (that
 // read as too heavy at 13px) — this guards the two rules staying paired.
-test('kit css gives .wu-focal an accent stroke on the rect only, never an accent fill on the text', async () => {
+test('kit css gives .wu-focal an accent stroke on the shapes only, never an accent fill on the text', async () => {
   const css = readFileSync(join(HERE, '..', 'kit', 'writeup.css'), 'utf8')
-  assert.match(css, /\.wu-figure rect\.wu-focal\s*\{[^}]*stroke:\s*var\(--wu-accent\)/)
+  // one rule, listing every shape a plugin may mark focal (rect, circle,
+  // ellipse, polygon, path) — text is never in it
+  const rule = css.match(/((?:\.wu-figure\s+\w+\.wu-focal,?\s*)+)\{([^}]*)\}/)
+  assert.ok(rule, 'a .wu-figure <shape>.wu-focal rule exists')
+  assert.match(rule[2], /stroke:\s*var\(--wu-accent\)/)
+  for (const shape of ['rect', 'circle', 'polygon', 'path']) {
+    assert.match(rule[1], new RegExp(`\\.wu-figure ${shape}\\.wu-focal`), `${shape} is in the focal rule`)
+  }
   assert.doesNotMatch(css, /\.wu-figure\s+text\.wu-focal/)
 })
 

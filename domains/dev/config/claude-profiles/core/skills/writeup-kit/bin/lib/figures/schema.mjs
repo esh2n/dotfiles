@@ -5,24 +5,41 @@
 //                      at the line ends plus the cardinality as text
 //   class  — UML class: header + attributes + methods section, hollow
 //            triangle for inheritance, dashed open arrow for `uses`,
-//            multiplicities as text only (no crow's foot)
+//            filled / hollow diamond at the owner end for composition /
+//            aggregation, multiplicities as text only (no crow's foot)
 //   db     — database schema: header + columns with PK/FK tags, crow's
-//            foot / bar at the line ends, no cardinality text
+//            foot / bar at the line ends, no cardinality text; a relation
+//            joins the two *rows* it is about (the child's FK row and the
+//            parent's PK row) and carries its ON DELETE rule as a muted tag
 //
 // IR shape: `{ id, type:'schema', title, caption, variant, direction,
 // entities, relations }`. An entity is `{ id, label, fields:[{ name, type?,
 // key?: pk|fk, note? }], methods:[string], emphasis, tone }`; a relation is
-// `{ from, to, kind: one-many|many-many|one-one|inherits|uses, label,
-// from_card?, to_card? }` — `from` is the "one" side of a one-many.
+// `{ from, to, kind: one-many|many-many|one-one|inherits|uses|composition|
+// aggregation, label, from_card?, to_card?, onDelete? }` — `from` is the
+// "one" side of a one-many and the owner (diamond) side of a composition /
+// aggregation. `composition`/`aggregation` are class-only, `onDelete` is
+// db-only; either outside its variant is a schema error.
+//
+// Vocabulary: `entities` / `entity-count` keep the ER term because the IR
+// name is public (renaming it would break every stored figure) — the kit
+// wording rule is waived for this one type.
 //
 // Layout: boxes are sized from their longest field line (kit text-width
 // estimate), placed by the vendored elk layered engine (the same file
 // diagram.mjs loads — only node positions are taken from it), and joined
 // by orthogonal relations the plugin routes itself: straight, Z through
 // the layer gap, or a detour around the outside; ports fan out along a
-// box side; parallel mid-segments spread onto lanes. Every position sits
-// on the 4px grid. End markers, cardinality text and labels are placed
-// so they never overlap (verify rows 10–12).
+// box side (in db they are pinned to the joined rows and only the left /
+// right sides are used, so the line meets the column it is about);
+// parallel mid-segments spread onto lanes. Every position sits on the 4px
+// grid. End markers, cardinality text, ON DELETE tags and labels are
+// placed so they never overlap (verify rows 10–13).
+//
+// A field (or method) list longer than the per-entity budget is drawn as
+// the first N lines plus a muted `+M more` row — the full count still
+// drives the budget warning, and a relation that would land on a hidden
+// row anchors to the `+M more` row instead.
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -38,9 +55,22 @@ export const type = 'schema'
 
 export const limits = { maxEntities: 8, maxFields: 8, maxRelations: 12, maxLabelLen: 14, maxEmphasis: 2 }
 
+// A db schema and a class diagram are read differently from an ER sketch:
+// a physical schema stops being readable past five tables, and a class
+// diagram past five members per compartment. `limits` above is the er
+// baseline (and what --list-types prints); these override it per variant.
+const VARIANT_LIMITS = {
+  db: { maxEntities: 5, maxRelations: 6 },
+  class: { maxEntities: 7, maxFields: 5, maxRelations: 8 },
+}
+
+const limitsFor = (variant) => ({ ...limits, ...(VARIANT_LIMITS[variant] || {}) })
+
 const VARIANTS = new Set(['er', 'class', 'db'])
 const DIRECTIONS = new Set(['auto', 'right', 'down'])
-const REL_KINDS = new Set(['one-many', 'many-many', 'one-one', 'inherits', 'uses'])
+const REL_KINDS = new Set(['one-many', 'many-many', 'one-one', 'inherits', 'uses', 'composition', 'aggregation'])
+const REL_KIND_WORDING = 'one-many|many-many|one-one|inherits|uses|composition|aggregation'
+const CLASS_ONLY_KINDS = new Set(['composition', 'aggregation'])
 const KEYS = new Set(['pk', 'fk'])
 
 const MARGIN = 16        // canvas margin (also the outer detour channel)
@@ -86,7 +116,7 @@ export function normalize(raw, ctx = 'ir') {
   if (!Array.isArray(raw.entities) || raw.entities.length === 0) throw new IrError(`${ctx}.entities must be a non-empty list`)
   const seen = new Set()
   const entities = raw.entities.map((e, i) => normalizeEntity(e, `${ctx}.entities[${i}]`, seen))
-  const relations = normalizeRelations(raw.relations, seen, ctx)
+  const relations = normalizeRelations(raw.relations, seen, ctx, variant)
   return { id, type, title, caption, variant, direction, entities, relations }
 }
 
@@ -121,7 +151,7 @@ function normalizeField(raw, ctx) {
   return { name, type: optStr(raw, 'type', ctx), key, note: optStr(raw, 'note', ctx) }
 }
 
-function normalizeRelations(raw, ids, ctx) {
+function normalizeRelations(raw, ids, ctx, variant) {
   if (raw === undefined || raw === null) return []
   if (!Array.isArray(raw)) throw new IrError(`${ctx}.relations must be a list`)
   return raw.map((r, i) => {
@@ -132,8 +162,12 @@ function normalizeRelations(raw, ids, ctx) {
     if (!ids.has(from)) throw new IrError(`${rctx}.from references unknown entity "${from}"`)
     if (!ids.has(to)) throw new IrError(`${rctx}.to references unknown entity "${to}"`)
     if (from === to) throw new IrError(`${rctx}: from and to must differ (self relations are not drawn)`)
-    const kind = normalizeEnum(r.kind, REL_KINDS, 'one-many', `${rctx}.kind`, 'one-many|many-many|one-one|inherits|uses')
-    return { from, to, kind, label: optStr(r, 'label', rctx) ?? '', from_card: optCard(r, 'from_card', rctx), to_card: optCard(r, 'to_card', rctx) }
+    const kind = normalizeEnum(r.kind, REL_KINDS, 'one-many', `${rctx}.kind`, REL_KIND_WORDING)
+    if (CLASS_ONLY_KINDS.has(kind) && variant !== 'class') throw new IrError(`${rctx}.kind: ${kind} belongs to variant: class`)
+    const onDelete = optStr(r, 'onDelete', rctx)
+    if (onDelete !== undefined && variant !== 'db') throw new IrError(`${rctx}.onDelete belongs to variant: db`)
+    if (onDelete !== undefined && onDelete.trim() === '') throw new IrError(`${rctx}.onDelete must be a non-empty string`)
+    return { from, to, kind, label: optStr(r, 'label', rctx) ?? '', from_card: optCard(r, 'from_card', rctx), to_card: optCard(r, 'to_card', rctx), onDelete }
   })
 }
 
@@ -141,21 +175,27 @@ function normalizeRelations(raw, ids, ctx) {
 
 export function budgetWarnings(ir) {
   const out = []
+  const lim = limitsFor(ir.variant)
   const n = ir.entities.length
-  if (n > limits.maxEntities) {
-    out.push(budgetWarning('budget:entities', n, limits.maxEntities,
-      `${n} entities (guidance ≤ ${limits.maxEntities})`,
+  if (n > lim.maxEntities) {
+    out.push(budgetWarning('budget:entities', n, lim.maxEntities,
+      `${n} entities (guidance ≤ ${lim.maxEntities} for variant: ${ir.variant})`,
       'split the model by ownership, or drop the lookup tables'))
   }
-  const widest = ir.entities.reduce((m, e) => (e.fields.length > (m ? m.fields.length : 0) ? e : m), null)
-  if (widest && widest.fields.length > limits.maxFields) {
-    out.push(budgetWarning('budget:fields', widest.fields.length, limits.maxFields,
-      `entity "${widest.id}" lists ${widest.fields.length} fields (guidance ≤ ${limits.maxFields})`,
-      `keep the keys and the fields the decision is about in "${widest.id}"; drop the rest`))
+  // one compartment at a time: fields, and (class only) methods
+  const sections = ir.entities.flatMap((e) => [
+    { id: e.id, what: 'fields', count: e.fields.length },
+    ...(ir.variant === 'class' ? [{ id: e.id, what: 'methods', count: e.methods.length }] : []),
+  ])
+  const widest = sections.reduce((m, s) => (s.count > (m ? m.count : 0) ? s : m), null)
+  if (widest && widest.count > lim.maxFields) {
+    out.push(budgetWarning('budget:fields', widest.count, lim.maxFields,
+      `entity "${widest.id}" lists ${widest.count} ${widest.what} (guidance ≤ ${lim.maxFields})`,
+      `keep the keys and the ${widest.what} the decision is about in "${widest.id}"; the rest collapse into a "+N more" row`))
   }
-  if (ir.relations.length > limits.maxRelations) {
-    out.push(budgetWarning('budget:relations', ir.relations.length, limits.maxRelations,
-      `${ir.relations.length} relations (guidance ≤ ${limits.maxRelations})`,
+  if (ir.relations.length > lim.maxRelations) {
+    out.push(budgetWarning('budget:relations', ir.relations.length, lim.maxRelations,
+      `${ir.relations.length} relations (guidance ≤ ${lim.maxRelations} for variant: ${ir.variant})`,
       'draw only the relations that carry the decision — not every FK needs a line'))
   }
   const labels = [
@@ -190,17 +230,31 @@ function fieldLineWidth(f, variant) {
   return tag + w11(f.name) + (right ? TYPE_GAP + w11(right) : 0)
 }
 
+/** The first `max` items plus how many were left out. */
+function collapse(items, max) {
+  if (items.length <= max) return { shown: items, hidden: 0 }
+  return { shown: items.slice(0, max), hidden: items.length - max }
+}
+
+const moreText = (hidden) => `+${hidden} more`
+
 function measureEntity(e, variant) {
+  const max = limitsFor(variant).maxFields
+  const f = collapse(e.fields, max)
+  const m = collapse(e.methods, max)
   const labelW = Math.ceil(textWidth(e.label, FONT_SIZE) * BOLD_FACTOR)
-  const lines = [labelW, ...e.fields.map((f) => fieldLineWidth(f, variant)), ...e.methods.map(w11)]
+  const extra = [f.hidden, m.hidden].filter(Boolean).map((h) => w11(moreText(h)))
+  const lines = [labelW, ...f.shown.map((x) => fieldLineWidth(x, variant)), ...m.shown.map(w11), ...extra]
   const width = snapUp4(Math.max(MIN_W, Math.max(...lines) + PAD * 2))
   const showMethods = variant === 'class' && e.methods.length > 0
-  const rows = e.fields.map((f, i) => ({ ...f, top: HEADER_H + i * ROW_H, text: f.name, right: rightText(f), tag: variant === 'db' && f.key ? f.key.toUpperCase() : '' }))
+  const rows = f.shown.map((x, i) => ({ ...x, top: HEADER_H + i * ROW_H, text: x.name, right: rightText(x), tag: variant === 'db' && x.key ? x.key.toUpperCase() : '' }))
+  if (f.hidden) rows.push({ name: moreText(f.hidden), text: moreText(f.hidden), right: '', tag: '', top: HEADER_H + rows.length * ROW_H, more: true, hidden: f.hidden })
   // the separator band exists only between two non-empty sections
-  const sep = showMethods && e.fields.length > 0 ? SEP_H : 0
-  const methodsTop = HEADER_H + e.fields.length * ROW_H + sep
-  const methods = showMethods ? e.methods.map((m, i) => ({ text: m, top: methodsTop + i * ROW_H })) : []
-  const bodyEnd = showMethods ? methodsTop + methods.length * ROW_H : HEADER_H + e.fields.length * ROW_H
+  const sep = showMethods && rows.length > 0 ? SEP_H : 0
+  const methodsTop = HEADER_H + rows.length * ROW_H + sep
+  const methods = showMethods ? m.shown.map((x, i) => ({ text: x, top: methodsTop + i * ROW_H })) : []
+  if (showMethods && m.hidden) methods.push({ text: moreText(m.hidden), top: methodsTop + methods.length * ROW_H, more: true, hidden: m.hidden })
+  const bodyEnd = showMethods ? methodsTop + methods.length * ROW_H : HEADER_H + rows.length * ROW_H
   const height = snapUp4(Math.max(bodyEnd + BOTTOM_PAD, HEADER_H + 12))
   return { id: e.id, label: e.label, tone: e.tone, emphasis: e.emphasis, width, height, rows, methods, methodsTop: showMethods ? methodsTop : undefined, methodsSep: sep > 0 }
 }
@@ -218,7 +272,8 @@ export async function layout(ir, { column = COLUMN } = {}) {
 }
 
 async function place(ir, sizes, direction) {
-  const maxLabelW = Math.max(0, ...ir.relations.map((r) => (r.label ? w11(r.label) + 8 : 0)))
+  const annotW = Math.max(0, ...ir.relations.map((r) => (r.onDelete ? w11(odText(r)) + 12 : 0)))
+  const maxLabelW = Math.max(0, annotW, ...ir.relations.map((r) => (r.label ? w11(r.label) + 8 : 0)))
   const hasCards = ir.variant !== 'db' && ir.relations.some((r) => cardsOf(r, ir.variant).some(Boolean))
   const laid = await elk.layout({
     id: 'root',
@@ -242,22 +297,37 @@ async function place(ir, sizes, direction) {
   })
   const byId = new Map(boxes.map((b) => [b.id, b]))
 
-  // Pass 1: route with centered ports to learn which side each relation
-  // leaves/enters; pass 2: fan the ports out along each side and route
-  // again with the sides fixed.
-  const first = ir.relations.map((r, i) => routeEdge(r, i, byId, boxes, null))
-  const ports = assignPorts(first, byId)
-  const edges = ir.relations.map((r, i) => routeEdge(r, i, byId, boxes, ports.get(i)))
+  // db: the ports are the rows the relation is about, so there is nothing
+  // to fan out — route once with the row y pinned and only the left/right
+  // sides in play. Otherwise pass 1 routes with centered ports to learn
+  // which side each relation leaves/enters, and pass 2 fans the ports out
+  // along each side and routes again with the sides fixed.
+  let edges
+  if (ir.variant === 'db') {
+    const entById = new Map(ir.entities.map((e) => [e.id, e]))
+    const anchors = ir.relations.map((r) => rowAnchors(r, byId, entById))
+    edges = ir.relations.map((r, i) => {
+      const [a, b] = anchors[i]
+      const e = routeEdge(r, i, byId, boxes, { pa: anchorY(byId.get(r.from), a.row), pb: anchorY(byId.get(r.to), b.row) }, true)
+      e.anchors = anchors[i]
+      return e
+    })
+  } else {
+    const first = ir.relations.map((r, i) => routeEdge(r, i, byId, boxes, null))
+    const ports = assignPorts(first, byId)
+    edges = ir.relations.map((r, i) => routeEdge(r, i, byId, boxes, ports.get(i)))
+  }
   spreadMids(edges)
 
   for (const e of edges) decorate(e, ir)
+  placeEndTexts(edges, boxes)
   placeLabels(edges, boxes)
 
   // Translate so nothing sits closer than 8px to the top-left, then size
   // the canvas from everything drawn.
   const rects = () => [
     ...boxes,
-    ...edges.flatMap((e) => [e.labelBox, ...e.ends.map((n) => n.markerBox), ...e.ends.map((n) => n.cardBox)].filter(Boolean)),
+    ...edges.flatMap((e) => [e.labelBox, ...e.ends.map((n) => n.markerBox), ...e.ends.map((n) => n.cardBox), ...e.ends.map((n) => n.odBox)].filter(Boolean)),
     ...edges.flatMap((e) => e.points.map((p) => ({ x: p.x, y: p.y, width: 0, height: 0 }))),
   ]
   let all = rects()
@@ -283,6 +353,7 @@ function translate(boxes, edges, dx, dy) {
       n.x += dx; n.y += dy
       if (n.markerBox) { n.markerBox.x += dx; n.markerBox.y += dy }
       if (n.cardBox) { n.cardBox.x += dx; n.cardBox.y += dy }
+      if (n.odBox) { n.odBox.x += dx; n.odBox.y += dy }
     }
   }
 }
@@ -295,6 +366,8 @@ function legendFor(ir) {
     if (kinds.has('one-many') || kinds.has('one-one')) items.push({ label: 'one', marker: 'bar' })
   }
   if (kinds.has('inherits')) items.push({ label: 'inherits', marker: 'tri' })
+  if (kinds.has('composition')) items.push({ label: 'composition', marker: 'dia' })
+  if (kinds.has('aggregation')) items.push({ label: 'aggregation', marker: 'dia-open' })
   if (kinds.has('uses')) items.push({ label: 'uses', marker: 'open', dash: '5 4' })
   return items.length ? { items } : null
 }
@@ -366,20 +439,67 @@ function routeIsClear(pts, A, B, boxes) {
   return true
 }
 
-/** Side pairs to try, most natural first, given where B sits relative to A. */
-function sidePairs(A, B) {
+/** Side pairs to try, most natural first, given where B sits relative to A.
+ * `horizontalOnly` (db) keeps every port on a left/right side so it can sit
+ * on a field row. */
+function sidePairs(A, B, horizontalOnly = false) {
   const pairs = []
   if (B.x >= right(A)) pairs.push(['right', 'left'])
   if (right(B) <= A.x) pairs.push(['left', 'right'])
+  if (horizontalOnly) {
+    pairs.push(['right', 'right'], ['left', 'left'])
+    return pairs
+  }
   if (B.y >= bottom(A)) pairs.push(['bottom', 'top'])
   if (bottom(B) <= A.y) pairs.push(['top', 'bottom'])
   pairs.push(['top', 'top'], ['bottom', 'bottom'], ['left', 'left'], ['right', 'right'])
   return pairs
 }
 
-function routeEdge(r, index, byId, boxes, port) {
+/** Where on a box side the relation attaches: the middle of the row it
+ * joins (rows are ROW_H tall and start on the 4px grid, so top + 12 is on
+ * the grid too), or the side's centre when the entity lists no fields. */
+const ROW_ANCHOR = 12
+const anchorY = (box, row) => (row === null ? cy(box) : snap4(box.y + box.rows[row].top + ROW_ANCHOR))
+
+/** `user_id` refers to `users`; `id` refers to nothing. */
+const stem = (s) => String(s).toLowerCase().replace(/[^a-z0-9]/g, '').replace(/id$/, '').replace(/s$/, '')
+function refersTo(fieldName, other) {
+  const f = stem(fieldName)
+  if (!f) return false
+  return [other.id, other.label].some((cand) => {
+    const c = stem(cand)
+    return !!c && (c === f || c.startsWith(f) || f.startsWith(c))
+  })
+}
+
+/** The row index a db relation end attaches to: the key row that names the
+ * other table, else the first row with that key, else the first row — and
+ * the "+N more" row when the field it wants is collapsed away. */
+function anchorIndex(box, ent, key, other) {
+  if (!box.rows.length) return null
+  const visible = box.rows.filter((r) => !r.more).length
+  const fields = ent.fields
+  const keyed = fields.filter((f) => f.key === key)
+  const target = keyed.find((f) => refersTo(f.name, other)) ?? keyed[0] ?? fields.find((f) => refersTo(f.name, other))
+  if (!target) return 0
+  const idx = fields.indexOf(target)
+  if (idx < visible) return idx
+  const more = box.rows.findIndex((r) => r.more)
+  return more >= 0 ? more : visible - 1
+}
+
+/** [parent end, child end] — `from` is the "one" side, so its PK row and
+ * the child's FK row are what the line is about. */
+function rowAnchors(r, byId, entById) {
   const A = byId.get(r.from), B = byId.get(r.to)
-  const pairs = port ? [port.sides] : sidePairs(A, B)
+  const ref = (box, row) => ({ box: box.id, row, name: row === null ? '' : box.rows[row].text })
+  return [ref(A, anchorIndex(A, entById.get(r.from), 'pk', B)), ref(B, anchorIndex(B, entById.get(r.to), 'fk', A))]
+}
+
+function routeEdge(r, index, byId, boxes, port, horizontalOnly = false) {
+  const A = byId.get(r.from), B = byId.get(r.to)
+  const pairs = port?.sides ? [port.sides] : sidePairs(A, B, horizontalOnly)
   let fallback = null
   for (const sides of pairs) {
     for (const c of candidates(A, B, sides, port?.pa, port?.pb, boxes)) {
@@ -465,19 +585,44 @@ function cardsOf(r, variant) {
   return [undefined, undefined]
 }
 
+/** The ON DELETE rule as it reads on a schema print-out. */
+const odText = (r) => (r.onDelete ? r.onDelete.trim().toUpperCase() : '')
+
 function markersOf(r, variant) {
   if (r.kind === 'inherits') return [null, 'tri']
   if (r.kind === 'uses') return [null, 'open']
+  // the diamond sits at the owner end — `from` is the whole, `to` the part
+  if (r.kind === 'composition') return ['dia', null]
+  if (r.kind === 'aggregation') return ['dia-open', null]
   if (variant === 'class') return [null, null]
   if (r.kind === 'one-many') return ['bar', 'crow']
   if (r.kind === 'many-many') return ['crow', 'crow']
   return ['bar', 'bar']
 }
 
+/** Text set just past the end marker, below the line (horizontal ends) or
+ * on the side away from the next bend (vertical ends), so it never meets
+ * the label, which starts on the bend's side. */
+function endTextBox(text, P, Q, R, dir, horizontal) {
+  const cw = w11(text)
+  if (horizontal) {
+    return {
+      box: { x: dir > 0 ? P.x + MARKER + 4 : P.x - MARKER - 4 - snapUp4(cw), y: P.y + 8, width: cw, height: CARD_H },
+      anchor: dir > 0 ? 'start' : 'end',
+    }
+  }
+  const leftSide = !R || R.x >= Q.x
+  return {
+    box: { x: leftSide ? P.x - 8 - snapUp4(cw) : P.x + 8, y: dir > 0 ? P.y + MARKER + 4 : P.y - MARKER - 4 - CARD_H, width: cw, height: CARD_H },
+    anchor: leftSide ? 'end' : 'start',
+  }
+}
+
 function decorate(e, ir) {
   const r = ir.relations[e.index]
   const cards = cardsOf(r, ir.variant)
   const markers = markersOf(r, ir.variant)
+  const od = ir.variant === 'db' ? odText(r) : ''
   const pts = e.points
   e.dash = r.kind === 'uses'
   e.ends = [0, 1].map((k) => {
@@ -493,23 +638,67 @@ function decorate(e, ir) {
         : { x: P.x - 8, y: dir > 0 ? P.y : P.y - MARKER, width: 16, height: MARKER }
       : null
     const card = cards[k]
-    let cardBox = null
-    let cardAnchor = 'start'
-    if (card) {
-      const cw = w11(card)
-      if (horizontal) {
-        cardBox = { x: dir > 0 ? P.x + MARKER + 4 : P.x - MARKER - 4 - snapUp4(cw), y: P.y + 8, width: cw, height: CARD_H }
-        cardAnchor = dir > 0 ? 'start' : 'end'
-      } else {
-        // the side away from the next bend, so the label (which starts on
-        // the bend's side) can never meet it
-        const leftSide = !R || R.x >= Q.x
-        cardBox = { x: leftSide ? P.x - 8 - snapUp4(cw) : P.x + 8, y: dir > 0 ? P.y + MARKER + 4 : P.y - MARKER - 4 - CARD_H, width: cw, height: CARD_H }
-        cardAnchor = leftSide ? 'end' : 'start'
-      }
+    const cardAt = card ? endTextBox(card, P, Q, R, dir, horizontal) : null
+    // the ON DELETE rule belongs to the child end — the row that loses its
+    // parent — so it only ever hangs off end 1
+    const onDelete = k === 1 && od ? od : ''
+    const odAt = onDelete ? endTextBox(onDelete, P, Q, R, dir, horizontal) : null
+    return {
+      x: P.x, y: P.y, side: e.sides[k], marker, markerBox,
+      card, cardBox: cardAt ? cardAt.box : null, cardAnchor: cardAt ? cardAt.anchor : 'start',
+      onDelete, odBox: odAt ? odAt.box : null, odAnchor: odAt ? odAt.anchor : 'start',
     }
-    return { x: P.x, y: P.y, side: e.sides[k], marker, markerBox, card, cardBox, cardAnchor }
   })
+}
+
+/** The four spots an ON DELETE tag may take, most conventional first:
+ * below the line just past the marker, above it, then the same two a step
+ * further along the line. */
+function odCandidates(e, k, w) {
+  const pts = e.points
+  const P = k === 0 ? pts[0] : pts[pts.length - 1]
+  const Q = k === 0 ? pts[1] : pts[pts.length - 2]
+  const R = k === 0 ? pts[2] : pts[pts.length - 3]
+  const horizontal = P.y === Q.y
+  const dir = horizontal ? Math.sign(Q.x - P.x) : Math.sign(Q.y - P.y)
+  const out = []
+  const box = (x, y, anchor) => out.push({ x: snap4(x), y: snap4(y), width: w, height: CARD_H, anchor })
+  if (horizontal) {
+    const anchor = dir > 0 ? 'start' : 'end'
+    for (const step of [0, 24, 48, 72]) {
+      const x = dir > 0 ? P.x + MARKER + 4 + step : P.x - MARKER - 4 - snapUp4(w) - step
+      box(x, P.y + 8, anchor)
+      box(x, P.y - 8 - CARD_H, anchor)
+    }
+  } else {
+    const near = !R || R.x >= Q.x
+    for (const step of [0, 24, 48, 72]) {
+      const y = dir > 0 ? P.y + MARKER + 4 + step : P.y - MARKER - 4 - CARD_H - step
+      box(near ? P.x - 8 - snapUp4(w) : P.x + 8, y, near ? 'end' : 'start')
+      box(near ? P.x + 8 : P.x - 8 - snapUp4(w), y, near ? 'start' : 'end')
+    }
+  }
+  return out
+}
+
+/** ON DELETE tags sit in the layer gap the relations run through, so each
+ * one takes the first of its spots that is clear of the boxes, the other
+ * tags and every line. */
+function placeEndTexts(edges, boxes) {
+  const segments = edges.flatMap((e) => e.points.slice(1).map((q, i) => [e.points[i], q]))
+  const taken = []
+  for (const e of edges) {
+    e.ends.forEach((n, k) => {
+      if (!n.odBox) return
+      const cands = odCandidates(e, k, n.odBox.width)
+      const clear = (c) => !boxes.some((b) => rectsOverlap(c, b)) && !taken.some((t) => rectsOverlap(c, t))
+        && !segments.some(([p, q]) => segmentCrosses(p, q, c))
+      const pick = cands.find(clear) ?? cands[0]
+      n.odBox = { x: pick.x, y: pick.y, width: pick.width, height: pick.height }
+      n.odAnchor = pick.anchor
+      taken.push(n.odBox)
+    })
+  }
 }
 
 /**
@@ -562,7 +751,7 @@ function labelCandidates(e) {
 
 function placeLabels(edges, boxes) {
   const rects = [...boxes]
-  for (const e of edges) for (const n of e.ends) { if (n.markerBox) rects.push(n.markerBox); if (n.cardBox) rects.push(n.cardBox) }
+  for (const e of edges) for (const n of e.ends) { if (n.markerBox) rects.push(n.markerBox); if (n.cardBox) rects.push(n.cardBox); if (n.odBox) rects.push(n.odBox) }
   const segments = edges.flatMap((e) => e.points.slice(1).map((q, i) => [e.points[i], q]))
   for (const e of edges) {
     e.labelBox = null
@@ -589,6 +778,8 @@ export function draw(geo, ir) {
     `<marker id="${uid}-bar" viewBox="0 0 12 12" refX="12" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M6 0 L6 12" fill="none" stroke="currentColor" stroke-width="1"/></marker>`,
     `<marker id="${uid}-tri" viewBox="0 0 12 12" refX="12" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M0 0 L12 6 L0 12 z" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1"/></marker>`,
     `<marker id="${uid}-open" viewBox="0 0 12 12" refX="12" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M0 0 L12 6 L0 12" fill="none" stroke="currentColor" stroke-width="1"/></marker>`,
+    `<marker id="${uid}-dia" viewBox="0 0 12 12" refX="12" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M0 6 L6 1 L12 6 L6 11 z" fill="currentColor" stroke="currentColor" stroke-width="1"/></marker>`,
+    `<marker id="${uid}-dia-open" viewBox="0 0 12 12" refX="12" refY="6" markerWidth="12" markerHeight="12" orient="auto-start-reverse"><path d="M0 6 L6 1 L12 6 L6 11 z" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1"/></marker>`,
     '</defs>']
   for (const b of geo.geo.boxes) {
     const cls = b.emphasis ? ' class="wu-focal"' : ''
@@ -605,14 +796,14 @@ export function draw(geo, ir) {
         x += TAG_W
       }
       const deco = row.key === 'pk' && ir.variant !== 'db' ? ' text-decoration="underline"' : ''
-      parts.push(`<text id="${uid}-${b.id}-f${i}" x="${x}" y="${y}" font-size="${EDGE_LABEL_SIZE}"${deco} fill="currentColor">${esc(row.text)}</text>`)
+      parts.push(`<text id="${uid}-${b.id}-f${i}" x="${x}" y="${y}" font-size="${EDGE_LABEL_SIZE}"${deco} fill="${row.more ? muted : 'currentColor'}">${esc(row.text)}</text>`)
       if (row.right) parts.push(`<text x="${right(b) - PAD}" y="${y}" font-size="${EDGE_LABEL_SIZE}" text-anchor="end" fill="${muted}">${esc(row.right)}</text>`)
     })
     if (b.methodsTop !== undefined) {
       const sy = b.y + b.methodsTop - SEP_H / 2
       if (b.methodsSep) parts.push(`<line x1="${b.x}" y1="${sy}" x2="${right(b)}" y2="${sy}" stroke="currentColor" stroke-width="1"/>`)
       b.methods.forEach((m, i) => {
-        parts.push(`<text id="${uid}-${b.id}-m${i}" x="${b.x + PAD}" y="${b.y + m.top + 14}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(m.text)}</text>`)
+        parts.push(`<text id="${uid}-${b.id}-m${i}" x="${b.x + PAD}" y="${b.y + m.top + 14}" font-size="${EDGE_LABEL_SIZE}" fill="${m.more ? muted : 'currentColor'}">${esc(m.text)}</text>`)
       })
     }
   }
@@ -623,10 +814,16 @@ export function draw(geo, ir) {
     const me = e.ends[1].marker ? ` marker-end="url(#${uid}-${e.ends[1].marker})"` : ''
     parts.push(`<path id="${uid}-r${e.index}" d="${d}" fill="none" stroke="currentColor" stroke-width="1"${dash}${ms}${me}/>`)
     e.ends.forEach((n, k) => {
-      if (!n.cardBox) return
-      const c = n.cardBox
-      const x = n.cardAnchor === 'end' ? c.x + c.width : c.x
-      parts.push(`<text id="${uid}-r${e.index}-c${k}" x="${x}" y="${c.y + 10}" font-size="${EDGE_LABEL_SIZE}" text-anchor="${n.cardAnchor}" fill="currentColor">${esc(n.card)}</text>`)
+      if (n.cardBox) {
+        const c = n.cardBox
+        const x = n.cardAnchor === 'end' ? c.x + c.width : c.x
+        parts.push(`<text id="${uid}-r${e.index}-c${k}" x="${x}" y="${c.y + 10}" font-size="${EDGE_LABEL_SIZE}" text-anchor="${n.cardAnchor}" fill="currentColor">${esc(n.card)}</text>`)
+      }
+      if (n.odBox) {
+        const o = n.odBox
+        const x = n.odAnchor === 'end' ? o.x + o.width : o.x
+        parts.push(`<text id="${uid}-r${e.index}-od" x="${x}" y="${o.y + 10}" font-size="${EDGE_LABEL_SIZE}" text-anchor="${n.odAnchor}" fill="${muted}">${esc(n.onDelete)}</text>`)
+      }
     })
     if (e.labelBox) {
       const l = e.labelBox
@@ -728,18 +925,57 @@ export function verify(geo, ir) {
   const decorations = edges.flatMap((e) => e.ends.flatMap((n, k) => [
     n.markerBox && { rect: n.markerBox, what: `the ${k ? 'end' : 'start'} marker of relation ${e.index}` },
     n.cardBox && { rect: n.cardBox, what: `the ${k ? 'end' : 'start'} cardinality of relation ${e.index}` },
+    n.odBox && { rect: n.odBox, what: `the ON DELETE tag of relation ${e.index}` },
   ].filter(Boolean)))
   for (const e of edges) {
     if (!e.labelBox) continue
     for (const d of decorations) if (rectsOverlap(e.labelBox, d.rect)) markerHits.push(`label of relation ${e.index} overlaps ${d.what}`)
   }
-  rows.push(failRow(12, 'marker-label-clear', markerHits, `no end marker or cardinality text overlaps a label (${variant})`, 'move the label away from the line ends — labels sit above the upper segment, cardinalities below it'))
+  // the ON DELETE tag hangs in the gap the relations run through
+  const segments = edges.flatMap((e) => e.points.slice(1).map((q, i) => [e.points[i], q]))
+  for (const e of edges) {
+    for (const n of e.ends) {
+      if (!n.odBox) continue
+      for (const b of boxes) if (rectsOverlap(n.odBox, b)) markerHits.push(`the ON DELETE tag of relation ${e.index} overlaps "${b.id}"`)
+      if (segments.some(([p, q]) => segmentCrosses(p, q, n.odBox))) markerHits.push(`the ON DELETE tag of relation ${e.index} sits on a relation line`)
+    }
+  }
+  rows.push(failRow(12, 'marker-label-clear', markerHits, `no end marker, cardinality or ON DELETE text overlaps a label (${variant})`, 'move the label away from the line ends — labels sit above the upper segment, cardinalities below it'))
+
+  // db: the line has to touch the row it is about; class: the diamond has
+  // to sit at the owner (from) end.
+  const anchored = []
+  for (const e of edges) {
+    if (variant === 'db') {
+      if (!e.anchors) { anchored.push(`relation ${e.index} names no rows to join`); continue }
+      e.anchors.forEach((a, k) => {
+        const b = byId.get(a.box)
+        if (!b) return
+        if (e.sides[k] !== 'left' && e.sides[k] !== 'right') {
+          anchored.push(`relation ${e.index} leaves "${a.box}" on its ${e.sides[k]} side, off the rows`)
+          return
+        }
+        const P = k === 0 ? e.points[0] : e.points[e.points.length - 1]
+        const rowTop = a.row === null ? null : b.y + b.rows[a.row].top
+        const ok = rowTop === null ? P.y === cy(b) : P.y >= rowTop && P.y <= rowTop + ROW_H
+        if (!ok) anchored.push(`relation ${e.index} misses the "${a.name || 'centre'}" row of "${a.box}"`)
+      })
+    }
+    const kind = ir.relations[e.index]?.kind
+    if (kind === 'composition' || kind === 'aggregation') {
+      const want = kind === 'composition' ? 'dia' : 'dia-open'
+      if (e.ends[0].marker !== want) anchored.push(`relation ${e.index} (${kind}) has no diamond at the "${e.from}" end`)
+      if (e.ends[1].marker) anchored.push(`relation ${e.index} (${kind}) marks the "${e.to}" (part) end`)
+    }
+  }
+  const anchorOk = variant === 'db' ? 'every relation meets the key row it joins' : 'every diamond sits at the owner end'
+  rows.push(failRow(13, 'end-anchors', anchored, `${anchorOk} (${variant})`, 'in db a relation joins the child FK row to the parent PK row — check rowAnchors(); the diamond of a composition/aggregation belongs at the `from` end'))
   return rows
 }
 
 export const doc = {
   purpose: 'entity boxes with a field list and typed relations — ER / data model (er), UML class (class), database schema (db)',
-  whenToUse: 'when the decision is about *what the data is and how it relates* — table ownership, a type/inheritance design, a schema change. Not for flow (use diagram) or call order (use sequence). Budgets: entities ≤ 8, fields per entity ≤ 8, relations ≤ 12, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the decision is about *what the data is and how it relates* — table ownership, a type/inheritance design, a schema change. Not for flow (use diagram) or call order (use sequence). variant: db joins the child FK row to the parent PK row (not box to box) and draws each relation\'s `onDelete` (cascade / restrict / set null) as a muted CASCADE tag at the child end; variant: class adds `composition` (filled diamond) and `aggregation` (hollow diamond) at the owner (`from`) end next to `inherits` (hollow triangle) and `uses` (dashed open arrow). A compartment longer than its budget shows the first N lines and a muted "+M more" row. Budgets: entities ≤ 8 (db 5, class 7), fields per entity ≤ 8 (class 5 per compartment), relations ≤ 12 (db 6, class 8), label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: order-model
 type: schema
 title: 注文まわりのデータモデル
@@ -797,5 +1033,5 @@ relations:
     to: line
     kind: one-many
 `,
-  rows: ['entity-count', 'field-count', 'relation-count', 'label-length', 'emphasis-count', 'relation-refs', 'box-overlap', 'field-fit', 'edges-orthogonal', 'edge-clearance', 'label-clear', 'marker-label-clear'],
+  rows: ['entity-count', 'field-count', 'relation-count', 'label-length', 'emphasis-count', 'relation-refs', 'box-overlap', 'field-fit', 'edges-orthogonal', 'edge-clearance', 'label-clear', 'marker-label-clear', 'end-anchors'],
 }

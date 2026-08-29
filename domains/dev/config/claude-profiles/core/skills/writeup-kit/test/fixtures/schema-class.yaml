@@ -1,7 +1,7 @@
 id: s-class
 type: schema
 title: 図形の型階層
-caption: Shape が抽象。Renderer は Shape だけを知る
+caption: Shape が抽象。Canvas は図形を所有し、パレットは共有する
 variant: class
 entities:
   - id: shape
@@ -38,6 +38,11 @@ entities:
         type: Shape[]
     methods:
       - "+ add(s: Shape)"
+  - id: palette
+    label: Palette
+    fields:
+      - name: colors
+        type: string[]
   - id: renderer
     label: Renderer
     methods:
@@ -51,8 +56,14 @@ relations:
     kind: inherits
   - from: canvas
     to: shape
-    kind: one-many
-    label: 保持
+    kind: composition
+    label: 所有
+    from_card: "1"
+    to_card: "*"
+  - from: canvas
+    to: palette
+    kind: aggregation
+    label: 参照
   - from: renderer
     to: canvas
     kind: uses
