@@ -7,7 +7,7 @@
 // Deliberately NOT elk-based: a sequence is a fixed grid (participants on
 // a row, messages on 40px rows), which is both sufficient and fully
 // deterministic — no layout engine needed. The budgets (participants ≤6,
-// messages ≤16, label ≤16 chars — SEQUENCE_LIMITS in ir.mjs) are guidance
+// messages ≤16, label ≤16 chars — SEQUENCE_LIMITS in verify-sequence.mjs) are guidance
 // reported as warnings, not layout inputs: the column gaps grow to fit the
 // widest label drawn between two lifelines (see layoutColumns()), so a
 // long label widens its gap instead of running into the neighbouring
@@ -15,11 +15,8 @@
 // decision (COLUMN / MIN_SCALE) as a node/edge diagram. Column x / row y
 // positions are snapped to the 4px grid the same way diagram.mjs's
 // layoutOnce()/draw() do.
-import { textWidth, snap4, snapUp4, COLUMN, MIN_SCALE, FONT_SIZE, EDGE_LABEL_SIZE, NODE_PAD_X } from './diagram.mjs'
-
-const esc = (s) => String(s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+import { textWidth, snap4, snapUp4, COLUMN, FONT_SIZE, EDGE_LABEL_SIZE, NODE_PAD_X } from './diagram.mjs'
+import { esc, fitToColumn, wrapFigureSvg } from './figures/_shared.mjs'
 
 // --- layout constants (all multiples of 4 — see checkRowsGrid in
 // verify-sequence.mjs) ------------------------------------------------------
@@ -208,13 +205,16 @@ function pathD(points) {
   return `M${points[0].x} ${points[0].y} ${points.slice(1).map((p) => `L${p.x} ${p.y}`).join(' ')}`
 }
 
-function drawSequenceSvg(ir, layout, { displayWidth, displayHeight }) {
-  const { width, height, geo } = layout
+/**
+ * The inner SVG of a sequence figure — everything after <title>/<desc>:
+ * marker defs, lifelines, participant boxes, message/self/note rows. No
+ * <svg> root: figures/_shared.mjs's wrapFigureSvg() adds it (this is the
+ * `draw()` half of the `sequence` plugin's contract).
+ */
+export function drawSequenceInner(ir, layout) {
+  const { geo } = layout
   const uid = `wu-d-${ir.id}`
   const parts = []
-
-  parts.push(`<title id="${uid}-title">${esc(ir.title)}</title>`)
-  parts.push(`<desc id="${uid}-desc">${esc(ir.caption || ir.title)}</desc>`)
 
   parts.push('<defs>')
   parts.push(`<marker id="${uid}-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>`)
@@ -252,15 +252,17 @@ function drawSequenceSvg(ir, layout, { displayWidth, displayHeight }) {
     }
   }
 
-  const svgOpen = `<svg role="img" aria-labelledby="${uid}-title ${uid}-desc" width="${displayWidth}" height="${displayHeight}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`
-  return `${svgOpen}${parts.join('')}</svg>`
+  return parts.join('')
 }
 
 /**
- * Render a validated sequence IR to an SVG string. Same scale/scroll
- * contract as diagram.mjs's renderDiagram(): shrink to `column` (COLUMN,
- * 720) down to MIN_SCALE (0.78), then fall back to `scroll: true` (native
- * size) below that — the returned shape (`svg`/`width`/`height`/`scaled`/`scroll`/
+ * Render a validated sequence IR to an SVG string — layoutSequence() +
+ * drawSequenceInner() through the shared column fit and <svg> wrapper
+ * (figures/_shared.mjs), exactly what the figure dispatcher does for the
+ * `sequence` plugin. Same scale/scroll contract as diagram.mjs's
+ * renderDiagram(): shrink to `column` (COLUMN, 720) down to MIN_SCALE
+ * (0.78), then fall back to `scroll: true` (native size) below that — the
+ * returned shape (`svg`/`width`/`height`/`scaled`/`scroll`/
  * `layout.geo`) is intentionally the same one renderDiagram() returns, so
  * diagram.mjs's wrapFigureHtml() and verify-diagram.mjs's dispatch can
  * treat a sequence render result as a drop-in.
@@ -270,15 +272,7 @@ function drawSequenceSvg(ir, layout, { displayWidth, displayHeight }) {
  */
 export function renderSequenceDiagram(ir, { column = COLUMN } = {}) {
   const layout = layoutSequence(ir)
-  let scaled = false
-  let scroll = false
-  let displayWidth = layout.width
-  let displayHeight = layout.height
-  if (layout.width > column) {
-    const scale = column / layout.width
-    if (scale >= MIN_SCALE) { scaled = true; displayWidth = column; displayHeight = Math.round(layout.height * scale) }
-    else scroll = true
-  }
-  const svg = drawSequenceSvg(ir, layout, { displayWidth, displayHeight })
-  return { svg, width: layout.width, height: layout.height, scaled, scroll, layout: { geo: layout.geo } }
+  const fit = fitToColumn(layout.width, layout.height, column)
+  const svg = wrapFigureSvg(ir, layout, drawSequenceInner(ir, layout), fit)
+  return { svg, width: layout.width, height: layout.height, scaled: fit.scaled, scroll: fit.scroll, layout: { geo: layout.geo } }
 }

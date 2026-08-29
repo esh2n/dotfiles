@@ -1,0 +1,140 @@
+// Template for a new figure type — copy to bin/lib/figures/<type>.mjs and
+// fill in every export. The `.txt` suffix keeps this file out of the
+// registry (figures/index.mjs loads `*.mjs` only, and skips `_`-prefixed
+// names as well). Full contract: references/figure-types.md.
+//
+// Import rule: only `./_shared.mjs` and renderer modules (../diagram.mjs
+// for constants like COLUMN/FONT_SIZE/snap4/textWidth, or your own
+// ../<type>.mjs). NEVER import ../ir.mjs, ../verify-diagram.mjs, or
+// ./index.mjs — they import this folder, and the top-level-await
+// discovery would deadlock on the cycle.
+import { IrError, isObj, requireStr, optStr, validateTone, normalizeHeader, budgetWarning, esc } from './_shared.mjs'
+import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE } from '../diagram.mjs'
+
+/** The IR `type:` value this plugin owns. Lowercase [a-z0-9-]; must be
+ * unique across the folder (the registry throws on a duplicate). */
+export const type = 'timeline'
+
+/** Advisory budgets. Overruns become `warnings` (validateIR) and a
+ * `data-warn="budget:<key>=<value>"` attribute — never a rejection. Name
+ * them max<Thing>; the `--list-types` CLI prints them as-is. */
+export const limits = { maxEvents: 12, maxLabelLen: 16 }
+
+/**
+ * Schema validation → normalized IR. Throw IrError with `${ctx}`-prefixed
+ * paths (`ir.events[3].label is required …`); ir.mjs turns it into
+ * `{ ok:false, reason:'schema', message }`. Must be idempotent: feeding
+ * the returned IR back in yields a deep-equal IR (figures embed their IR
+ * and re-validate it on rerender). Always return `type` set to this
+ * plugin's `type`.
+ */
+export function normalize(raw, ctx = 'ir') {
+  if (!isObj(raw)) throw new IrError(`${ctx} must be a mapping`)
+  const { id, title, caption } = normalizeHeader(raw, ctx)
+  if (!Array.isArray(raw.events) || raw.events.length === 0) throw new IrError(`${ctx}.events must be a non-empty list`)
+  const events = raw.events.map((e, i) => {
+    const ectx = `events[${i}]`
+    if (!isObj(e)) throw new IrError(`${ectx} must be a mapping`)
+    return {
+      date: requireStr(e, 'date', ectx),
+      label: requireStr(e, 'label', ectx),
+      tone: validateTone(e.tone, ectx),
+      major: e.major === true,
+    }
+  })
+  return { id, type, title, caption, events }
+}
+
+/**
+ * Budget overruns as `{ key, value, limit, detail, hint }` records
+ * (budgetWarning() builds one) in a STABLE order — the `data-warn` string
+ * is built from it and must be byte-stable across runs. Keys are
+ * `budget:<thing>`. Return [] when within budget.
+ */
+export function budgetWarnings(ir) {
+  const out = []
+  if (ir.events.length > limits.maxEvents) {
+    out.push(budgetWarning('budget:events', ir.events.length, limits.maxEvents,
+      `${ir.events.length} event(s) (guidance ≤ ${limits.maxEvents})`,
+      'consider splitting the timeline at a phase boundary'))
+  }
+  return out
+}
+
+/**
+ * Deterministic geometry: `{ width, height, geo, legend? }`. `width`/
+ * `height` are the native canvas size (multiples of 4); the dispatcher
+ * decides scale-to-column vs sideways scroll from them (COLUMN / MIN_SCALE),
+ * exactly as for the node/edge diagram. `geo` is whatever your draw() and
+ * verify() read — every position-like number in it (x/y/x1/y1/x2/y2/cx/cy/
+ * yTop/yBottom/centerX/centerY) must sit on the 4px grid (shared row
+ * `grid-4px`); snap with snap4()/snapUp4(). `legend` (optional) is
+ * `{ y, items: [{ label, dash?, marker? }] }` — the shared wrapper draws it;
+ * reserve its 20px in `height` and define any `marker` ids in your defs.
+ * No randomness, no Date.now(): same IR → same geometry, every time.
+ */
+export async function layout(ir, { column } = {}) {
+  const gap = 96
+  const events = ir.events.map((e, i) => ({ ...e, x: snap4(32 + i * gap), y: 48 }))
+  const width = snapUp4(64 + (ir.events.length - 1) * gap)
+  const height = 96
+  return { width, height, geo: { baselineY: 48, events } }
+}
+
+/**
+ * The inner SVG (a string) — NO <svg> root, NO <title>/<desc>: the shared
+ * wrapper adds `<svg role="img" aria-labelledby=… width height viewBox>`,
+ * the title/desc pair, and the optional legend. Rules the shared rows
+ * enforce: every `id` prefixed `wu-d-<ir.id>-`; font-size 13 or 11 only;
+ * stroke-width 1 or 1.5; rx 4/6/8; no hex/rgb() colors — use currentColor
+ * and var(--wu-*) tokens; escape every label with esc().
+ */
+export function draw(geo, ir, { scaled, scroll } = {}) {
+  const uid = `wu-d-${ir.id}`
+  const parts = [`<line id="${uid}-baseline" x1="0" y1="${geo.geo.baselineY}" x2="${geo.width}" y2="${geo.geo.baselineY}" stroke="currentColor" stroke-width="1"/>`]
+  geo.geo.events.forEach((e, i) => {
+    parts.push(`<circle id="${uid}-ev-${i}" cx="${e.x}" cy="${e.y}" r="${e.major ? 6 : 4}" fill="currentColor"/>`)
+    parts.push(`<text id="${uid}-ev-${i}-label" x="${e.x}" y="${e.y - 12}" font-size="${EDGE_LABEL_SIZE}" text-anchor="middle" fill="currentColor">${esc(e.label)}</text>`)
+  })
+  return parts.join('')
+}
+
+/**
+ * Type-specific verify rows: `[{ id, name, severity:'fail'|'warn', ok,
+ * detail, hint }]`. Number them 1..n; the dispatcher appends the shared
+ * rows (single-finite-svg, a11y, font-size, stroke-radius, dark-3-state,
+ * grid-4px, projected-scale) after your highest id. Budget rows are
+ * severity `warn` and, when failing, also carry `key`/`value` from the
+ * matching budgetWarnings() record — that is how they reach `data-warn`.
+ * Geometry rows (`fail`) decide whether the figure renders at all: every
+ * rule that lives only in prose ships broken figures, so encode it here.
+ * `opts` carries `{ column, svg, rendered }` if a row needs them.
+ */
+export function verify(geo, ir, { column, svg, rendered } = {}) {
+  const rows = []
+  const budget = budgetWarnings(ir)
+  const w = budget.find((b) => b.key === 'budget:events')
+  rows.push({ id: 1, name: 'event-count', severity: 'warn', ok: !w, detail: w ? w.detail : `${ir.events.length} event(s)`, hint: w?.hint, key: w?.key, value: w?.value })
+  const xs = geo.geo.events.map((e) => e.x)
+  const ordered = xs.every((x, i) => i === 0 || x > xs[i - 1])
+  rows.push({ id: 2, name: 'events-ordered', severity: 'fail', ok: ordered, detail: ordered ? 'events run left to right' : 'events are not left-to-right', hint: ordered ? undefined : 'sort events by date before laying out' })
+  return rows
+}
+
+/** Printed by `render-diagram.mjs --list-types` / `--doc <type>`, and
+ * copied into references/figure-types.md's table when the type ships. */
+export const doc = {
+  purpose: 'events on a time axis (release history, incident timeline, roadmap)',
+  whenToUse: 'when *when* matters more than *what connects to what*; not for causal chains (use sequence).',
+  irExample: `id: releases
+type: timeline
+title: リリース履歴
+events:
+  - date: 2026-01
+    label: v1.0
+    major: true
+  - date: 2026-03
+    label: v1.1
+`,
+  rows: ['event-count', 'events-ordered'],
+}

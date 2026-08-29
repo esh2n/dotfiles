@@ -9,15 +9,26 @@
 // SVG string, because every edge is guaranteed axis-aligned (contract #1),
 // which turns segment/rect distance into simple 1-D interval math. a11y,
 // color, font-size, and stroke/rx checks read the SVG text itself since
-// that is the artifact those rows actually constrain.
+// that is the artifact those rows actually constrain — those svg-level rows
+// (a11y / dark-3-state / font-size / stroke-radius / single-finite-svg /
+// projected-scale) are the ones every figure kind shares, so they are
+// imported from figures/_shared.mjs rather than defined here.
+//
+// Any `type:` other than the builtin node/edge diagram is a figure plugin
+// (bin/lib/figures/<type>.mjs): renderCheckedBest() / renderFigureHtmlChecked()
+// route it through figures/index.mjs's renderFigure() + verifyFigure() and
+// keep the same output contract (data-checks / data-warn / data-type).
 import { LIMITS, budgetWarnings, formatBudgetWarnings } from './ir.mjs'
 import {
-  textWidth, FONT_SIZE, NODE_PAD_X, BOLD_FACTOR, MIN_SCALE, COLUMN, chooseOrientation,
+  textWidth, FONT_SIZE, NODE_PAD_X, BOLD_FACTOR, COLUMN, chooseOrientation,
   renderDiagram, wrapFigureHtml,
   groupLayerMode, groupLayerHeuristicPrefersElk, LABEL_CLEARANCE,
 } from './diagram.mjs'
-import { renderSequenceDiagram } from './sequence.mjs'
-import { verifySequence } from './verify-sequence.mjs'
+import { getFigureType, isPluginType, renderFigure, verifyFigure } from './figures/index.mjs'
+import {
+  checkA11y, checkNoHexColors, checkFontSizes, checkStrokeAndRadius, checkSingleFiniteSvg, checkProjectedScale,
+  summarizeChecks,
+} from './figures/_shared.mjs'
 
 // LABEL_CLEARANCE (row #2's 6px floor) is imported from diagram.mjs: the
 // renderer's own manual-label placement keeps the same distance from every
@@ -29,9 +40,6 @@ const BORDER_HUG_LEN = 16
 const MIN_SEGMENT = 8
 const MIN_INTERIOR_SEGMENT = 16
 const NODE_CLEARANCE = 2
-const ALLOWED_FONT_SIZES = new Set([13, 11])
-const ALLOWED_STROKE_WIDTHS = new Set([1, 1.5])
-const ALLOWED_RX = new Set([4, 6, 8])
 
 // --- axis-aligned geometry helpers -----------------------------------------
 
@@ -278,18 +286,6 @@ function checkNodeClearance(ctx) {
   }
 }
 
-function checkProjectedScale(ctx) {
-  const { renderResult, column } = ctx
-  if (renderResult.scroll) return { ok: true, detail: 'scroll fallback in effect; the 0.78 floor does not apply' }
-  const scale = renderResult.width > column ? column / renderResult.width : 1
-  const ok = scale >= MIN_SCALE
-  return {
-    ok,
-    detail: `effective scale ${scale.toFixed(3)} at a ${column}px column`,
-    hint: ok ? undefined : 'the figure needs to shrink below 0.78 to fit — reduce node/edge count or shorten labels, or accept the scroll fallback',
-  }
-}
-
 // The four budget rows (#10, #11, #21, #22) are `warn` severity: they read
 // ir.mjs's budgetWarnings() — the same source validateIR() reports from —
 // so a figure that is only over budget still renders and passes, carrying
@@ -341,25 +337,6 @@ function checkEmphasis(ctx) {
   }
 }
 
-function checkA11y(ctx) {
-  const svg = ctx.svg
-  const idPrefix = `wu-d-${ctx.ir.id}-`
-  const problems = []
-  if (!/^<svg\b[^>]*\brole="img"/.test(svg)) problems.push('svg root missing role="img"')
-  const firstTag = /<svg[^>]*>(<[a-zA-Z]+)/.exec(svg)
-  if (!firstTag || firstTag[1] !== '<title') problems.push('first child of <svg> is not <title>')
-  const desc = /<desc[^>]*>([^<]*)<\/desc>/.exec(svg)
-  if (!desc || !desc[1].trim()) problems.push('<desc> missing or empty')
-  const ids = [...svg.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])
-  const badIds = ids.filter((id) => !id.startsWith(idPrefix))
-  if (badIds.length) problems.push(`id(s) not prefixed "${idPrefix}": ${badIds.slice(0, 4).join(', ')}`)
-  return {
-    ok: problems.length === 0,
-    detail: problems.length ? problems.join('; ') : 'role="img", <title> first child, non-empty <desc>, ids all prefixed correctly',
-    hint: problems.length ? `fix svg generation: ${problems.join('; ')}` : undefined,
-  }
-}
-
 function checkLabelFit(ctx) {
   const offenders = []
   for (const n of ctx.geo.nodes) {
@@ -384,61 +361,6 @@ async function checkOrientation(ctx) {
     ok,
     detail: `renderer picked "${actual}"; recomputed best fit is "${chosen.direction}" (fitRatio right=${chosen.fitRatio.right.toFixed(3)}, down=${chosen.fitRatio.down.toFixed(3)})`,
     hint: ok ? undefined : `pin direction: ${chosen.direction} in the IR — the renderer chose the worse-fitting orientation`,
-  }
-}
-
-function checkNoHexColors(ctx) {
-  const svg = ctx.svg
-  const withoutRefs = svg.replace(/url\(#[^)]*\)/g, '').replace(/#wu-d-[^"'\s)]*/g, '')
-  const hasHex = /#[0-9a-fA-F]{3,8}\b/.test(withoutRefs)
-  const hasRgb = /\brgb\(/i.test(svg)
-  const ok = !hasHex && !hasRgb
-  const found = [hasHex && 'a hex color', hasRgb && 'rgb()'].filter(Boolean).join(' and ')
-  return {
-    ok,
-    detail: ok ? 'no hex color or rgb() in the svg — every color routes through currentColor/var(--wu-*)' : `found ${found} in the svg`,
-    hint: ok ? undefined : 'replace the literal color with currentColor or a var(--wu-*) token so all 3 themes stay in sync',
-  }
-}
-
-function checkFontSizes(ctx) {
-  const sizes = [...ctx.svg.matchAll(/font-size="([^"]+)"/g)].map((m) => parseFloat(m[1]))
-  const bad = [...new Set(sizes.filter((s) => !ALLOWED_FONT_SIZES.has(s)))]
-  return {
-    ok: bad.length === 0,
-    detail: bad.length ? `font-size(s) outside {13,11}: ${bad.join(', ')}` : 'every font-size is 13 or 11',
-    hint: bad.length ? 'draw text with FONT_SIZE (13) or EDGE_LABEL_SIZE/SUBLABEL_SIZE (11), not an ad-hoc size' : undefined,
-  }
-}
-
-function checkStrokeAndRadius(ctx) {
-  const strokeWidths = [...ctx.svg.matchAll(/stroke-width="([^"]+)"/g)].map((m) => parseFloat(m[1]))
-  const badSw = [...new Set(strokeWidths.filter((w) => !ALLOWED_STROKE_WIDTHS.has(w)))]
-  const rxs = [...ctx.svg.matchAll(/\brx="([^"]+)"/g)].map((m) => parseFloat(m[1]))
-  const badRx = [...new Set(rxs.filter((r) => !ALLOWED_RX.has(r)))]
-  const problems = []
-  if (badSw.length) problems.push(`stroke-width outside {1,1.5}: ${badSw.join(', ')}`)
-  if (badRx.length) problems.push(`rx outside {4,6,8}: ${badRx.join(', ')}`)
-  return {
-    ok: problems.length === 0,
-    detail: problems.length ? problems.join('; ') : 'stroke widths and corner radii stay within the kit scale',
-    hint: problems.length ? `${problems.join('; ')} — use the kit's border-width (1/1.5) and radius (4/6/8) scale` : undefined,
-  }
-}
-
-function checkSingleFiniteSvg(ctx) {
-  const svgOpenCount = (ctx.svg.match(/<svg[\s>]/g) || []).length
-  const hasBadValue = /\b(NaN|Infinity|undefined)\b/.test(ctx.svg)
-  const ok = svgOpenCount === 1 && !hasBadValue
-  const problems = []
-  if (svgOpenCount !== 1) problems.push(`found ${svgOpenCount} <svg> elements, expected 1`)
-  if (hasBadValue) problems.push('markup contains NaN/Infinity/undefined')
-  return {
-    ok,
-    detail: ok ? 'exactly one <svg>, no non-finite values in the markup' : problems.join('; '),
-    hint: ok ? undefined : problems.includes(`found ${svgOpenCount} <svg> elements, expected 1`)
-      ? 'emit exactly one <svg> root per figure'
-      : 'a computed geometry value was NaN/Infinity/undefined — check for a missing node/group box lookup upstream',
   }
 }
 
@@ -503,6 +425,8 @@ export async function verifyDiagram(ir, renderResult, { column = COLUMN, forceEl
 
   const checks = []
   for (const [id, name, fn, severity] of CHECK_DEFS) {
+    // runCheck() is sync; row #16 (orientation-choice) is async, so await
+    // inside a try of its own here.
     let result
     try {
       result = await fn(ctx)
@@ -516,11 +440,7 @@ export async function verifyDiagram(ir, renderResult, { column = COLUMN, forceEl
     }
     checks.push(check)
   }
-  const failures = checks.filter((c) => c.severity === 'fail' && !c.ok)
-  const warnings = checks
-    .filter((c) => c.severity === 'warn' && !c.ok)
-    .map(({ id, name, key, value, detail, hint }) => ({ id, name, key, value, detail, hint }))
-  return { ok: failures.length === 0, checks, failures, warnings }
+  return summarizeChecks(checks)
 }
 
 /** renderDiagram() + verifyDiagram() for one specific mode, tagged with
@@ -621,13 +541,19 @@ async function renderCandidates(ir, { column, forceElk, layoutMode }) {
  * only be shown scrolling. "Clean" — the early-return condition — means
  * every row passes, no warning, and no scroll.
  *
+ * A plugin IR (`ir.type` other than `diagram`) skips all of this: it has
+ * one deterministic layout, rendered and verified once through
+ * figures/index.mjs (renderPluginChecked()).
+ *
  * @param {object} ir validated IR from ir.mjs
  * @param {{column?: number}} [opts]
  * @returns {Promise<object>} a renderDiagram()-shaped result plus
  *   `checks`, `checksOk`, `failures`, `warnings`, `warn` (the `data-warn`
- *   string, '' when none) and `layoutMode` ('group'|'elk' — which mode won)
+ *   string, '' when none) and `layoutMode` ('group'|'elk' — which mode
+ *   won; the type name for a plugin figure)
  */
 export async function renderCheckedBest(ir, { column = COLUMN } = {}) {
+  if (ir.type && ir.type !== 'diagram') return renderPluginChecked(ir, { column })
   const mode = groupLayerMode(ir)
   let order
   if (mode === 'forced-group') order = [{ forceElk: false, layoutMode: 'group' }]
@@ -659,15 +585,17 @@ export async function renderChecked(ir, { column = COLUMN } = {}) {
 }
 
 /**
- * The `type: sequence` counterpart of renderAndVerify()/renderCheckedBest()
- * above: sequence.mjs's layout is a fixed grid (no elk, no orientation
+ * The plugin counterpart of renderAndVerify()/renderCheckedBest() above:
+ * a figure plugin's layout is deterministic (no elk, no orientation
  * choice, no grouped-layer mode), so there is only ever one candidate to
- * render and verify — unlike renderCheckedBest() there is no "try both,
- * pick the winner" step.
+ * render and verify — unlike the diagram path there is no "try both, pick
+ * the winner" step. `layoutMode` carries the type name.
  */
-async function renderSequenceChecked(ir, { column = COLUMN } = {}) {
-  const rendered = renderSequenceDiagram(ir, { column })
-  const verification = verifySequence(ir, rendered, { column })
+async function renderPluginChecked(ir, { column = COLUMN } = {}) {
+  const plugin = getFigureType(ir.type)
+  if (!plugin || !isPluginType(ir.type)) throw new Error(`unknown figure type "${ir.type}"`)
+  const rendered = await renderFigure(plugin, ir, { column })
+  const verification = await verifyFigure(plugin, ir, rendered, { column })
   return {
     ...rendered,
     checks: verification.checks,
@@ -675,7 +603,7 @@ async function renderSequenceChecked(ir, { column = COLUMN } = {}) {
     failures: verification.failures,
     warnings: verification.warnings,
     warn: formatBudgetWarnings(verification.warnings),
-    layoutMode: 'sequence',
+    layoutMode: ir.type,
   }
 }
 
@@ -683,32 +611,33 @@ async function renderSequenceChecked(ir, { column = COLUMN } = {}) {
  * renderFigureHtml() that also runs verification and stamps
  * `data-checks="pass"` on the <figure> only when every check passes
  * (contract §5 relies on this attribute to know a figure was checked, not
- * just rendered). Dispatches on `ir.type`: a `type: sequence` IR is laid
- * out/verified by sequence.mjs/verify-sequence.mjs instead of
- * diagram.mjs/renderCheckedBest() above, and its figure additionally
- * carries `data-type="sequence"` so downstream tooling (rerender-figures.mjs,
- * self-check.mjs) can tell the two figure kinds apart without re-parsing the
+ * just rendered). Dispatches on `ir.type`: a plugin IR (any type other
+ * than the builtin diagram — `sequence` today) is laid out/verified by its
+ * plugin through figures/index.mjs instead of diagram.mjs/
+ * renderCheckedBest() above, and its figure additionally carries
+ * `data-type="<type>"` so downstream tooling (rerender-figures.mjs,
+ * self-check.mjs) can tell the figure kinds apart without re-parsing the
  * embedded IR. diagram.mjs's wrapFigureHtml() is reused as-is either way —
  * it only ever reads `rendered.svg`/`rendered.scroll` and `ir.title`/
- * `ir.caption`, which both render results shapes provide identically.
+ * `ir.caption`, which every render result shape provides identically.
  *
  * @param {object} ir validated IR from ir.mjs
  * @param {{column?: number, rawYaml?: string}} [opts]
  */
 export async function renderFigureHtmlChecked(ir, { column = COLUMN, rawYaml } = {}) {
-  // Both kinds: `data-checks="pass"` when no `fail` row failed; a budget
+  // Every kind: `data-checks="pass"` when no `fail` row failed; a budget
   // overrun (warn rows) still passes and is surfaced as
-  // `data-warn="budget:nodes=11;budget:label=15"` (flowchart) or
+  // `data-warn="budget:nodes=11;budget:label=15"` (diagram) or
   // `data-warn="budget:participants=7;budget:messages=20;budget:label=23"`
   // (sequence) — stable order, no attribute at all when there is nothing
-  // to warn about. A sequence figure additionally carries
-  // `data-type="sequence"` (after the check attributes).
-  const isSequence = ir.type === 'sequence'
-  const best = isSequence ? await renderSequenceChecked(ir, { column }) : await renderCheckedBest(ir, { column })
+  // to warn about. A plugin figure additionally carries
+  // `data-type="<type>"` (after the check attributes).
+  const isPlugin = Boolean(ir.type) && ir.type !== 'diagram'
+  const best = await renderCheckedBest(ir, { column })
   const plainHtml = wrapFigureHtml(ir, best, { rawYaml })
   const passAttr = best.checksOk ? ' data-checks="pass"' : ''
   const warnAttr = best.checksOk && best.warn ? ` data-warn="${best.warn}"` : ''
-  const typeAttr = isSequence ? ' data-type="sequence"' : ''
+  const typeAttr = isPlugin ? ` data-type="${ir.type}"` : ''
   const html = plainHtml.replace(/^<figure class="wu-figure"/, `<figure class="wu-figure"${passAttr}${warnAttr}${typeAttr}`)
   return { ...best, html, checks: best.checks, checksOk: best.checksOk }
 }

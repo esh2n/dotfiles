@@ -1,16 +1,26 @@
-// Validates and normalizes a parsed diagram IR object against the writeup
+// Validates and normalizes a parsed figure IR object against the writeup
 // contract (§4-1 IR shape, §4-2 budgets). Schema violations throw IrError
 // internally and are turned into a structured `{ ok:false, reason:'schema' }`
 // result; the emphasis cap is the one budget that still rejects
 // (`{ ok:false, reason:'budget', suggestion }`), every other budget overrun
 // comes back as an advisory `warnings` entry on an `ok:true` result.
+//
+// Two kinds of IR come through here:
+//   - the default node/edge diagram (`type:` absent or `diagram`) — its
+//     schema and budgets are defined in this file and rendered by
+//     diagram.mjs / verify-diagram.mjs;
+//   - every other `type:` is a figure plugin (bin/lib/figures/<type>.mjs,
+//     discovered by figures/index.mjs) and validateIR() routes the raw IR
+//     to that plugin's normalize() / budgetWarnings().
+// The schema helpers themselves (IrError, requireStr, …) live in
+// figures/_shared.mjs so plugins can import them without importing this
+// file (see the import-graph rule in figures/index.mjs).
+import {
+  IrError, isObj, requireStr, optStr, validateTone, validateBool, KINDS, normalizeHeader,
+} from './figures/_shared.mjs'
+import { getFigureType, listFigureTypes, registerBuiltin } from './figures/index.mjs'
 
-export class IrError extends Error {
-  constructor(message) {
-    super(message)
-    this.name = 'IrError'
-  }
-}
+export { IrError }
 
 export const LIMITS = {
   maxNodes: 9,
@@ -20,29 +30,17 @@ export const LIMITS = {
   maxEmphasis: 2,
 }
 
-/** Budgets for `type: sequence` IR (see sequence.mjs/verify-sequence.mjs) —
- * kept alongside LIMITS so both IR shapes' schema+budget rules live in this
- * one file. */
-export const SEQUENCE_LIMITS = {
-  maxParticipants: 6,
-  maxMessages: 16,
-  maxLabelLen: 16,
-}
-
-const TONES = new Set(['ts', 'rs', 'new', 'neutral'])
-const KINDS = new Set(['sync', 'async', 'reply'])
 const SIDES = new Set(['top', 'right', 'bottom', 'left'])
 const DIRECTIONS = new Set(['right', 'down'])
-const IR_TYPES = new Set(['diagram', 'sequence'])
 
 /**
  * Schema violations and the emphasis cap are hard rejections. The four
- * flowchart budgets (nodes / edges / groups / edge-label length) and the
- * three sequence budgets (participants / messages / message-label length)
- * are guidance, not gates: an over-budget IR still validates, and the
- * overruns come back as `warnings` (see budgetWarnings() /
- * sequenceBudgetWarnings()) so the renderer can draw the figure and stamp
- * `data-warn` on it while verified geometry decides pass/fail.
+ * flowchart budgets (nodes / edges / groups / edge-label length) — and
+ * every plugin type's budgets — are guidance, not gates: an over-budget IR
+ * still validates, and the overruns come back as `warnings` (see
+ * budgetWarnings() / the plugin's budgetWarnings()) so the renderer can
+ * draw the figure and stamp `data-warn` on it while verified geometry
+ * decides pass/fail.
  *
  * @param {unknown} raw parsed IR (from yaml-lite or JSON)
  * @returns {{ok:true, ir:object, warnings:Array<{key:string, value:number, limit:number, detail:string, hint:string}>} | {ok:false, reason:'schema'|'budget', message:string, suggestion?:string}}
@@ -55,7 +53,7 @@ export function validateIR(raw) {
     if (e instanceof IrError) return { ok: false, reason: 'schema', message: e.message }
     throw e
   }
-  if (ir.type === 'sequence') return { ok: true, ir, warnings: sequenceBudgetWarnings(ir) }
+  if (ir.type !== 'diagram') return { ok: true, ir, warnings: getFigureType(ir.type).budgetWarnings(ir) }
   const hard = checkBudgets(ir)
   if (!hard.ok) return hard
   return { ok: true, ir, warnings: budgetWarnings(ir) }
@@ -63,21 +61,27 @@ export function validateIR(raw) {
 
 // --- structural validation --------------------------------------------
 
+/** The `type:` values validateIR() accepts: the builtin diagram plus every
+ * registered plugin. */
+export const irTypes = () => listFigureTypes()
+
 /** `raw.type` dispatch: `undefined`/`null` defaults to the original
  * node/edge diagram shape (kept backward compatible with every pre-existing
- * IR, which never carried a `type` field); `"sequence"` normalizes against
- * the participants/messages shape instead — see normalizeSequence(). */
+ * IR, which never carried a `type` field); any other value is looked up in
+ * the figure registry and normalized by that plugin. */
 function normalize(raw) {
   if (!isObj(raw)) throw new IrError('IR must be a mapping')
   const type = raw.type === undefined || raw.type === null ? 'diagram' : raw.type
-  if (typeof type !== 'string' || !IR_TYPES.has(type)) {
-    throw new IrError(`ir.type must be diagram|sequence (got: ${JSON.stringify(raw.type)})`)
+  if (typeof type !== 'string' || !getFigureType(type)) {
+    throw new IrError(`ir.type must be ${irTypes().join('|')} (got: ${JSON.stringify(raw.type)})`)
   }
-  if (type === 'sequence') return normalizeSequence(raw)
+  if (type !== 'diagram') {
+    const ir = getFigureType(type).normalize(raw, 'ir')
+    if (!isObj(ir) || ir.type !== type) throw new Error(`figure type "${type}": normalize() must return an IR with type "${type}"`)
+    return ir
+  }
 
-  const id = requireStr(raw, 'id', 'ir')
-  const title = requireStr(raw, 'title', 'ir')
-  const caption = optStr(raw, 'caption', 'ir')
+  const { id, title, caption } = normalizeHeader(raw, 'ir')
 
   let direction
   if (raw.direction !== undefined && raw.direction !== null) {
@@ -229,164 +233,6 @@ function normalizeEdges(raw, nodeIds) {
   })
 }
 
-// --- sequence IR (type: sequence) --------------------------------------
-//
-// Shape: `{ id, type:'sequence', title, caption, participants, messages }`.
-// `participants` is a flat list of `{id, label, tone}` (left→right order —
-// no groups/nesting, sequence diagrams don't need them). `messages` is one
-// row per line of the diagram, top→bottom, each row one of three shapes
-// distinguished by which key is present:
-//   - a plain message: `{from, to, label?, kind}` (kind: sync|async|reply)
-//   - a note:          `{note: text, over?: [participant ids]}` — `over`
-//     defaults to the two participants of the immediately preceding message
-//     row when omitted (an error if there is no preceding message to infer
-//     it from)
-//   - a self-message:  `{self: participant id, label?, kind?}` (kind
-//     defaults to sync)
-// Normalized rows carry a `rowType` discriminator ('message'|'note'|'self')
-// instead of reusing the raw `note`/`self` keys as flags, so a message's
-// own `kind` (sync/async/reply) is never confused with the row-shape
-// discriminator.
-
-function normalizeSequence(raw) {
-  const id = requireStr(raw, 'id', 'ir')
-  const title = requireStr(raw, 'title', 'ir')
-  const caption = optStr(raw, 'caption', 'ir')
-  const participants = normalizeParticipants(raw.participants)
-  const participantIds = new Set(participants.map((p) => p.id))
-  const messages = normalizeMessages(raw.messages, participantIds)
-  return { id, type: 'sequence', title, caption, participants, messages }
-}
-
-function normalizeParticipants(raw) {
-  if (!Array.isArray(raw) || raw.length === 0) throw new IrError('ir.participants must be a non-empty list')
-  const seen = new Set()
-  return raw.map((p, i) => {
-    const ctx = `participants[${i}]`
-    if (!isObj(p)) throw new IrError(`${ctx} must be a mapping`)
-    const id = requireStr(p, 'id', ctx)
-    if (seen.has(id)) throw new IrError(`duplicate participant id: "${id}"`)
-    seen.add(id)
-    const label = requireStr(p, 'label', ctx)
-    const tone = validateTone(p.tone, ctx)
-    return { id, label, tone }
-  })
-}
-
-function validateSeqKind(v, ctx, { required }) {
-  if (v === undefined || v === null) {
-    if (required) throw new IrError(`${ctx}.kind is required and must be sync|async|reply`)
-    return 'sync'
-  }
-  if (typeof v !== 'string' || !KINDS.has(v)) {
-    throw new IrError(`${ctx}.kind must be sync|async|reply (got: ${JSON.stringify(v)})`)
-  }
-  return v
-}
-
-function normalizeMessages(raw, participantIds) {
-  if (raw === undefined || raw === null) return []
-  if (!Array.isArray(raw)) throw new IrError('ir.messages must be a list')
-  let prevMessage = null
-  return raw.map((row, i) => {
-    const ctx = `messages[${i}]`
-    if (!isObj(row)) throw new IrError(`${ctx} must be a mapping`)
-    // Accept an already-normalized row (rowType/text/participant) so the IR a
-    // figure embeds after rendering re-validates unchanged: normalization is
-    // idempotent.
-    const m = row.rowType === 'note' ? { note: row.text, over: row.over }
-      : row.rowType === 'self' ? { self: row.participant, label: row.label, kind: row.kind }
-      : row
-
-    if (m.note !== undefined) {
-      const text = requireStr(m, 'note', ctx)
-      let over
-      if (m.over !== undefined && m.over !== null) {
-        if (!Array.isArray(m.over) || m.over.length === 0) {
-          throw new IrError(`${ctx}.over must be a non-empty list of participant ids`)
-        }
-        over = m.over.map((v) => {
-          if (typeof v !== 'string' || !participantIds.has(v)) {
-            throw new IrError(`${ctx}.over references unknown participant "${v}"`)
-          }
-          return v
-        })
-      } else if (prevMessage) {
-        over = [prevMessage.from, prevMessage.to]
-      } else {
-        throw new IrError(`${ctx}: note has no "over" and no preceding message to infer it from`)
-      }
-      return { rowType: 'note', text, over }
-    }
-
-    if (m.self !== undefined) {
-      const participant = requireStr(m, 'self', ctx)
-      if (!participantIds.has(participant)) throw new IrError(`${ctx}.self references unknown participant "${participant}"`)
-      const label = optStr(m, 'label', ctx) ?? ''
-      const kind = validateSeqKind(m.kind, ctx, { required: false })
-      return { rowType: 'self', participant, label, kind }
-    }
-
-    const from = requireStr(m, 'from', ctx)
-    const to = requireStr(m, 'to', ctx)
-    if (!participantIds.has(from)) throw new IrError(`${ctx}.from references unknown participant "${from}"`)
-    if (!participantIds.has(to)) throw new IrError(`${ctx}.to references unknown participant "${to}"`)
-    if (from === to) throw new IrError(`${ctx}: from and to must differ — use "self:" for a self-message`)
-    const label = optStr(m, 'label', ctx) ?? ''
-    const kind = validateSeqKind(m.kind, ctx, { required: true })
-    const rec = { rowType: 'message', from, to, label, kind }
-    prevMessage = rec
-    return rec
-  })
-}
-
-/**
- * The three sequence budgets (SEQUENCE_LIMITS: participants ≤ 6, rows ≤ 16,
- * message/self label ≤ 16 chars) as advisory warnings — the `type:
- * sequence` counterpart of budgetWarnings() below, same record shape, so
- * verify-diagram.mjs / rerender-figures.mjs / self-check.mjs handle both
- * figure kinds through one code path. Verified geometry (sequence.mjs
- * widens a column gap to fit the widest label between its lifelines;
- * verify-sequence.mjs checks the result) decides whether a figure renders.
- * Order is stable (participants, messages, label) so the `data-warn`
- * attribute built from it (formatBudgetWarnings()) is byte-stable too.
- *
- * @param {object} ir normalized `type: sequence` IR
- * @returns {Array<{key:string, value:number, limit:number, detail:string, hint:string}>}
- */
-export function sequenceBudgetWarnings(ir) {
-  const out = []
-  if (ir.participants.length > SEQUENCE_LIMITS.maxParticipants) {
-    out.push({
-      key: 'budget:participants', value: ir.participants.length, limit: SEQUENCE_LIMITS.maxParticipants,
-      detail: `${ir.participants.length} participant(s) (guidance ≤ ${SEQUENCE_LIMITS.maxParticipants})`,
-      hint: 'consider splitting the sequence: draw one sequence diagram per participant subset',
-    })
-  }
-  if (ir.messages.length > SEQUENCE_LIMITS.maxMessages) {
-    out.push({
-      key: 'budget:messages', value: ir.messages.length, limit: SEQUENCE_LIMITS.maxMessages,
-      detail: `${ir.messages.length} row(s) (guidance ≤ ${SEQUENCE_LIMITS.maxMessages})`,
-      hint: `consider splitting the sequence: split after message ${SEQUENCE_LIMITS.maxMessages}`,
-    })
-  }
-  const longLabels = []
-  ir.messages.forEach((m, i) => {
-    if (m.rowType !== 'message' && m.rowType !== 'self') return
-    const len = m.label ? [...m.label].length : 0
-    if (len > SEQUENCE_LIMITS.maxLabelLen) longLabels.push({ i, label: m.label, len })
-  })
-  if (longLabels.length) {
-    const longest = longLabels.reduce((a, b) => (b.len > a.len ? b : a))
-    out.push({
-      key: 'budget:label', value: longest.len, limit: SEQUENCE_LIMITS.maxLabelLen,
-      detail: longLabels.map((e) => `messages[${e.i}].label "${e.label}" is ${e.len} chars (guidance ≤ ${SEQUENCE_LIMITS.maxLabelLen})`).join('; '),
-      hint: longLabels.map((e) => `shorten label of message ${e.i + 1} ("${e.label}", ${e.len} > ${SEQUENCE_LIMITS.maxLabelLen})`).join('; ') + ', or move the wording into a note',
-    })
-  }
-  return out
-}
-
 // --- budgets -------------------------------------------------------------
 
 /** The one budget that stays a hard rejection: more than 2 emphasis nodes
@@ -479,36 +325,52 @@ function buildSplitSuggestion(ir) {
   return `split: move the edges around node "${label}" (degree ${top.d}) into a separate diagram`
 }
 
-// --- helpers ---------------------------------------------------------------
+// --- the builtin diagram, listed next to the plugins ------------------------
 
-const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+/** verify-diagram.mjs's row names (§4-2 rows 1–20 plus the two extra
+ * budget rows 21–22), for `render-diagram.mjs --list-types` / `--doc`. */
+export const DIAGRAM_ROWS = [
+  'orthogonal', 'label-clearance', 'unrelated-crossing', 'collinear-overlap', 'border-hug', 'rhythm',
+  'legend-clearance', 'node-clearance', 'projected-scale', 'node-count', 'edge-count', 'grid-4px',
+  'emphasis-count', 'a11y', 'label-fit', 'orientation-choice', 'dark-3-state', 'font-size', 'stroke-radius',
+  'single-finite-svg', 'group-count', 'label-length',
+]
 
-function requireStr(obj, field, ctx) {
-  const v = obj[field]
-  if (typeof v !== 'string' || v.trim() === '') {
-    throw new IrError(`${ctx}.${field} is required and must be a non-empty string`)
-  }
-  return v
-}
-
-function optStr(obj, field, ctx) {
-  const v = obj[field]
-  if (v === undefined || v === null) return undefined
-  if (typeof v !== 'string') throw new IrError(`${ctx}.${field} must be a string (got: ${JSON.stringify(v)})`)
-  return v
-}
-
-function validateTone(tone, ctx) {
-  if (tone === undefined || tone === null) return 'neutral'
-  if (typeof tone !== 'string' || !TONES.has(tone)) {
-    throw new IrError(`${ctx}.tone must be ts|rs|new|neutral (got: ${JSON.stringify(tone)})`)
-  }
-  return tone
-}
-
-function validateBool(obj, field, ctx) {
-  const v = obj[field]
-  if (v === undefined || v === null) return false
-  if (typeof v !== 'boolean') throw new IrError(`${ctx}.${field} must be a boolean`)
-  return v
-}
+registerBuiltin({
+  type: 'diagram',
+  limits: LIMITS,
+  doc: {
+    purpose: 'boxes (nodes) in optional groups, connected by orthogonal edges — structure, flow, and boundaries',
+    whenToUse: 'the default figure: components and their connections, layers, before/after structure. `type:` may be omitted. Not for time-ordered calls (use sequence). Budgets: nodes ≤ 9, edges ≤ 12, groups ≤ 4, edge label ≤ 12 chars (guidance); emphasis ≤ 2 (hard).',
+    irExample: `id: acl
+title: 腐敗防止層の位置
+caption: 外部モデルは ACL で内部モデルに翻訳される
+direction: right
+groups:
+  - id: ours
+    label: 自社ドメイン
+    tone: ts
+nodes:
+  - id: ext
+    label: 外部 API
+    tone: neutral
+  - id: acl
+    label: ACL
+    group: ours
+    emphasis: true
+  - id: core
+    label: ドメイン
+    group: ours
+edges:
+  - from: ext
+    to: acl
+    kind: sync
+    label: 生データ
+  - from: acl
+    to: core
+    kind: sync
+    label: 内部モデル
+`,
+    rows: DIAGRAM_ROWS,
+  },
+})

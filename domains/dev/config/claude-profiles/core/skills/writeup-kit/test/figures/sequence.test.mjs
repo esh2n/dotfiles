@@ -1,22 +1,31 @@
+// `type: sequence` — schema, budgets, layout, verify rows, the registry
+// dispatch, the CLI, and the old-DSL migration. Lives in test/figures/
+// (one file per figure type, see references/figure-types.md); the
+// fixtures are test/fixtures/sequence-*.yaml and the pre-registry output
+// snapshots test/fixtures/snapshots/sequence-*.html.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
-import { validateIR, SEQUENCE_LIMITS, formatBudgetWarnings } from '../bin/lib/ir.mjs'
-import { layoutSequence, renderSequenceDiagram } from '../bin/lib/sequence.mjs'
-import { verifySequence } from '../bin/lib/verify-sequence.mjs'
-import { renderFigureHtmlChecked } from '../bin/lib/verify-diagram.mjs'
-import { unescapeIrScript } from '../bin/lib/ir-script.mjs'
-import { renderSequence as renderSequenceDirective } from '../bin/lib/migrate/directives.mjs'
-import { parse as parseYamlLite } from '../bin/lib/yaml-lite.mjs'
+import { parse as parseYaml } from '../../bin/lib/yaml-lite.mjs'
+import { validateIR, formatBudgetWarnings } from '../../bin/lib/ir.mjs'
+import { limits as SEQUENCE_LIMITS } from '../../bin/lib/figures/sequence.mjs'
+import { getFigureType, renderFigure, verifyFigure } from '../../bin/lib/figures/index.mjs'
+import { layoutSequence, renderSequenceDiagram } from '../../bin/lib/sequence.mjs'
+import { verifySequence } from '../../bin/lib/verify-sequence.mjs'
+import { renderFigureHtmlChecked } from '../../bin/lib/verify-diagram.mjs'
+import { unescapeIrScript } from '../../bin/lib/ir-script.mjs'
+import { renderSequence as renderSequenceDirective } from '../../bin/lib/migrate/directives.mjs'
+import { parse as parseYamlLite } from '../../bin/lib/yaml-lite.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const ROOT = join(HERE, '..')
+const ROOT = join(HERE, '..', '..')
 const BIN = join(ROOT, 'bin', 'render-diagram.mjs')
-const fixture = (name) => readFileSync(join(HERE, 'fixtures', name), 'utf8')
+const FIXTURES = join(ROOT, 'test', 'fixtures')
+const fixture = (name) => readFileSync(join(FIXTURES, name), 'utf8')
+const snapshot = (name) => readFileSync(join(FIXTURES, 'snapshots', name), 'utf8')
 
 function ir(name) {
   const result = validateIR(parseYaml(fixture(name)))
@@ -124,7 +133,7 @@ describe('ir.mjs: type: sequence schema', () => {
 
 describe('ir.mjs: sequence normalization is idempotent', () => {
   test('a normalized IR (rowType note/self/message) re-validates to the same rows', () => {
-    const first = validateIR(parseYaml(fixture('seq-notes-self.yaml')))
+    const first = validateIR(parseYaml(fixture('sequence-notes-self.yaml')))
     assert.equal(first.ok, true)
     const again = validateIR(JSON.parse(JSON.stringify(first.ir)))
     assert.equal(again.ok, true, JSON.stringify(again))
@@ -134,7 +143,7 @@ describe('ir.mjs: sequence normalization is idempotent', () => {
 
 describe('ir.mjs: SEQUENCE_LIMITS budgets are advisory warnings', () => {
   test('more than 6 participants validates with a budget:participants warning and a split hint', () => {
-    const result = ir('seq-too-many-participants.yaml')
+    const result = ir('sequence-too-many-participants.yaml')
     assert.equal(result.ok, true)
     assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:participants=7'])
     assert.equal(result.warnings[0].limit, SEQUENCE_LIMITS.maxParticipants)
@@ -142,14 +151,14 @@ describe('ir.mjs: SEQUENCE_LIMITS budgets are advisory warnings', () => {
   })
 
   test('more than 16 message rows validates with a budget:messages warning', () => {
-    const result = ir('seq-over-messages.yaml')
+    const result = ir('sequence-over-messages.yaml')
     assert.equal(result.ok, true)
     assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:messages=17'])
     assert.match(result.warnings[0].hint, /split after message 16/)
   })
 
   test('a message label over 16 chars validates with a budget:label warning naming the message', () => {
-    const result = ir('seq-label-too-long.yaml')
+    const result = ir('sequence-label-too-long.yaml')
     assert.equal(result.ok, true)
     assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:label=20'])
     assert.match(result.warnings[0].detail, /messages\[0\]\.label/)
@@ -167,7 +176,7 @@ describe('ir.mjs: SEQUENCE_LIMITS budgets are advisory warnings', () => {
   })
 
   test('exactly 6 participants and 16 messages both validate with no warning (at the limit, not over it)', () => {
-    const six = ir('seq-six-participants.yaml')
+    const six = ir('sequence-six-participants.yaml')
     assert.equal(six.ok, true)
     assert.equal(six.ir.participants.length, 6)
     assert.deepEqual(six.warnings, [])
@@ -178,7 +187,7 @@ describe('ir.mjs: SEQUENCE_LIMITS budgets are advisory warnings', () => {
 
 describe('sequence.mjs: layoutSequence', () => {
   test('participant boxes, lifelines, and rows are all on the 4px grid', () => {
-    const layout = layoutSequence(validIr('seq-notes-self.yaml'))
+    const layout = layoutSequence(validIr('sequence-notes-self.yaml'))
     for (const p of layout.geo.participants) {
       for (const v of [p.x, p.y, p.width, p.height]) assert.equal(v % 4, 0, `participant ${p.id} off-grid`)
     }
@@ -192,14 +201,14 @@ describe('sequence.mjs: layoutSequence', () => {
   })
 
   test('lifelines run the full height and rows are ordered top-to-bottom', () => {
-    const layout = layoutSequence(validIr('seq-notes-self.yaml'))
+    const layout = layoutSequence(validIr('sequence-notes-self.yaml'))
     const ys = layout.geo.rows.map((r) => r.y)
     assert.deepEqual(ys, [...ys].sort((a, b) => a - b))
     for (const ll of layout.geo.lifelines) assert.ok(ll.yBottom > ll.yTop)
   })
 
   test('a note row spans from the leftmost to the rightmost of its "over" participants', () => {
-    const layout = layoutSequence(validIr('seq-notes-self.yaml'))
+    const layout = layoutSequence(validIr('sequence-notes-self.yaml'))
     const note = layout.geo.rows.find((r) => r.type === 'note' && r.over.length === 2)
     assert.ok(note)
     const [a, b] = note.over.map((id) => layout.geo.lifelines.find((ll) => ll.id === id).x)
@@ -208,7 +217,7 @@ describe('sequence.mjs: layoutSequence', () => {
   })
 
   test('a long message label widens the gap between its two lifelines instead of overlapping them', () => {
-    const short = validIr('seq-simple.yaml')
+    const short = validIr('sequence-simple.yaml')
     const long = structuredClone(short)
     long.messages[0].label = 'request(socV2s, entityType, template, filename)'
     const gapOf = (layout, from, to) => {
@@ -305,7 +314,7 @@ describe('sequence.mjs: layoutSequence', () => {
   })
 
   test('a self row loops out to the right of its own lifeline and back', () => {
-    const layout = layoutSequence(validIr('seq-notes-self.yaml'))
+    const layout = layoutSequence(validIr('sequence-notes-self.yaml'))
     const self = layout.geo.rows.find((r) => r.type === 'self')
     assert.ok(self)
     const ll = layout.geo.lifelines.find((l) => l.id === self.participant)
@@ -321,7 +330,7 @@ describe('sequence.mjs: renderSequenceDiagram', () => {
     // ≥0.78 or mark scroll" — 6 short-labeled participants is exactly the
     // "otherwise" case: the natural width exceeds 720, but not badly enough
     // to need the scroll fallback.
-    const rendered = renderSequenceDiagram(validIr('seq-six-participants.yaml'))
+    const rendered = renderSequenceDiagram(validIr('sequence-six-participants.yaml'))
     assert.ok(rendered.width > 720, `expected a 6-participant diagram to exceed 720px natively, got ${rendered.width}`)
     assert.equal(rendered.scroll, false)
     assert.equal(rendered.scaled, true)
@@ -339,7 +348,7 @@ describe('sequence.mjs: renderSequenceDiagram', () => {
   })
 
   test('every id in the svg is prefixed wu-d-<id>-', () => {
-    const rendered = renderSequenceDiagram(validIr('seq-notes-self.yaml'))
+    const rendered = renderSequenceDiagram(validIr('sequence-notes-self.yaml'))
     const ids = [...rendered.svg.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])
     assert.ok(ids.length > 0)
     for (const id of ids) assert.ok(id.startsWith('wu-d-s3-'), `id ${id} not prefixed`)
@@ -349,11 +358,11 @@ describe('sequence.mjs: renderSequenceDiagram', () => {
 // --- verify-sequence.mjs ---------------------------------------------------
 
 describe('verify-sequence.mjs', () => {
-  const goodIr = () => validIr('seq-notes-self.yaml')
+  const goodIr = () => validIr('sequence-notes-self.yaml')
   const goodRender = () => renderSequenceDiagram(goodIr())
 
   test('a real render of every fixture that validates passes every check', () => {
-    for (const name of ['seq-simple.yaml', 'seq-six-participants.yaml', 'seq-notes-self.yaml']) {
+    for (const name of ['sequence-simple.yaml', 'sequence-six-participants.yaml', 'sequence-notes-self.yaml']) {
       const validated = validIr(name)
       const rendered = renderSequenceDiagram(validated)
       const result = verifySequence(validated, rendered)
@@ -531,7 +540,7 @@ describe('verify-sequence.mjs', () => {
 
 describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: sequence', () => {
   test('a sequence IR renders a data-checks="pass" data-type="sequence" figure', async () => {
-    const rendered = await renderFigureHtmlChecked(validIr('seq-simple.yaml'), { rawYaml: fixture('seq-simple.yaml') })
+    const rendered = await renderFigureHtmlChecked(validIr('sequence-simple.yaml'), { rawYaml: fixture('sequence-simple.yaml') })
     assert.equal(rendered.checksOk, true)
     assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-type="sequence">/)
     assert.match(rendered.html, /<script type="text\/x-writeup-diagram">/)
@@ -539,9 +548,9 @@ describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: sequence'
 
   test('the three over-budget fixtures render as passing figures carrying data-warn, with every geometry row green', async () => {
     const expected = {
-      'seq-over-messages.yaml': 'budget:messages=17',
-      'seq-label-too-long.yaml': 'budget:label=20',
-      'seq-too-many-participants.yaml': 'budget:participants=7',
+      'sequence-over-messages.yaml': 'budget:messages=17',
+      'sequence-label-too-long.yaml': 'budget:label=20',
+      'sequence-too-many-participants.yaml': 'budget:participants=7',
     }
     for (const [name, warn] of Object.entries(expected)) {
       const rendered = await renderFigureHtmlChecked(validIr(name), { rawYaml: fixture(name) })
@@ -555,7 +564,7 @@ describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: sequence'
   })
 
   test('the 7-participant fixture goes through the same scale/scroll decision as a node diagram', async () => {
-    const rendered = await renderFigureHtmlChecked(validIr('seq-too-many-participants.yaml'))
+    const rendered = await renderFigureHtmlChecked(validIr('sequence-too-many-participants.yaml'))
     assert.ok(rendered.width > 720)
     assert.ok(rendered.scaled || rendered.scroll)
     if (rendered.scroll) assert.match(rendered.html, /data-scroll="true"/)
@@ -563,7 +572,7 @@ describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: sequence'
   })
 
   test('the embedded script round-trips back to the same IR', async () => {
-    const raw = fixture('seq-simple.yaml')
+    const raw = fixture('sequence-simple.yaml')
     const validated = validateIR(parseYaml(raw))
     const rendered = await renderFigureHtmlChecked(validated.ir, { rawYaml: raw })
     const scriptMatch = /<script type="text\/x-writeup-diagram">\n([\s\S]*?)\n<\/script>/.exec(rendered.html)
@@ -584,25 +593,105 @@ describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: sequence'
   })
 })
 
+// --- figures/index.mjs: the sequence plugin through the registry ----------
+
+describe('figures/sequence.mjs: the plugin renders byte-identically to the pre-registry sequence path', () => {
+  const NAMES = ['simple', 'six-participants', 'notes-self', 'over-messages', 'label-too-long', 'too-many-participants']
+
+  test('the plugin is registered under type "sequence" with the sequence budgets', () => {
+    const plugin = getFigureType('sequence')
+    assert.ok(plugin)
+    assert.equal(plugin.builtin, false)
+    assert.deepEqual(plugin.limits, { maxParticipants: 6, maxMessages: 16, maxLabelLen: 16 })
+    assert.deepEqual(plugin.doc.rows, ['participant-count', 'message-count', 'label-length', 'references-exist', 'arrows-horizontal', 'rows-grid', 'label-clearance', 'lifeline-clearance'])
+  })
+
+  test('renderFigureHtmlChecked() output equals the snapshot taken before the registry existed, for every sequence fixture', async () => {
+    for (const name of NAMES) {
+      const raw = fixture(`sequence-${name}.yaml`)
+      const rendered = await renderFigureHtmlChecked(validIr(`sequence-${name}.yaml`), { rawYaml: raw })
+      assert.equal(rendered.html, snapshot(`sequence-${name}.html`), `sequence-${name}: figure html drifted from the pre-registry snapshot`)
+    }
+  })
+
+  test('renderFigure() through the registry equals renderSequenceDiagram() byte for byte (svg, size, scale/scroll)', async () => {
+    const plugin = getFigureType('sequence')
+    for (const name of NAMES) {
+      const ir = validIr(`sequence-${name}.yaml`)
+      const viaRegistry = await renderFigure(plugin, ir)
+      const direct = renderSequenceDiagram(ir)
+      assert.equal(viaRegistry.svg, direct.svg, name)
+      assert.deepEqual([viaRegistry.width, viaRegistry.height, viaRegistry.scaled, viaRegistry.scroll], [direct.width, direct.height, direct.scaled, direct.scroll], name)
+      assert.deepEqual(viaRegistry.layout.geo, direct.layout.geo, name)
+    }
+  })
+
+  test('verifyFigure() = the plugin\'s 8 own rows (verify-sequence ids kept) + the 7 shared rows, same verdict and warnings as verifySequence()', async () => {
+    const plugin = getFigureType('sequence')
+    for (const name of NAMES) {
+      const ir = validIr(`sequence-${name}.yaml`)
+      const rendered = await renderFigure(plugin, ir)
+      const viaRegistry = await verifyFigure(plugin, ir, rendered)
+      const direct = verifySequence(ir, rendered)
+      assert.equal(viaRegistry.ok, direct.ok, name)
+      assert.deepEqual(viaRegistry.warnings.map((w) => [w.key, w.value, w.name]), direct.warnings.map((w) => [w.key, w.value, w.name]), name)
+      assert.deepEqual(viaRegistry.checks.map((c) => c.name), [
+        'participant-count', 'message-count', 'label-length', 'references-exist', 'arrows-horizontal', 'rows-grid', 'label-clearance', 'lifeline-clearance',
+        'single-finite-svg', 'a11y', 'font-size', 'stroke-radius', 'dark-3-state', 'grid-4px', 'projected-scale',
+      ], name)
+      assert.deepEqual(viaRegistry.checks.slice(0, 8).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 13], name)
+      assert.deepEqual(viaRegistry.checks.slice(8).map((c) => c.id), [14, 15, 16, 17, 18, 19, 20], name)
+      // every row in the direct verifier has the same verdict in the registry path
+      for (const c of direct.checks) {
+        const twin = viaRegistry.checks.find((r) => r.name === c.name) ?? viaRegistry.checks.find((r) => r.name === { 'stroke-width': 'stroke-radius', 'no-hex-colors': 'dark-3-state' }[c.name])
+        assert.ok(twin, `${name}: no registry twin for ${c.name}`)
+        assert.equal(twin.ok, c.ok, `${name}: ${c.name}`)
+      }
+    }
+  })
+
+  test('the plugin\'s normalize() is idempotent and equals validateIR() for the same raw IR', () => {
+    const plugin = getFigureType('sequence')
+    for (const name of NAMES) {
+      const raw = parseYaml(fixture(`sequence-${name}.yaml`))
+      const once = plugin.normalize(raw, 'ir')
+      assert.deepEqual(once, validIr(`sequence-${name}.yaml`), name)
+      assert.deepEqual(plugin.normalize(JSON.parse(JSON.stringify(once)), 'ir'), once, `${name}: not idempotent`)
+    }
+  })
+
+  test('shared row grid-4px reads the plugin geometry: an off-grid lifeline x fails it', async () => {
+    const plugin = getFigureType('sequence')
+    const ir = validIr('sequence-simple.yaml')
+    const bad = structuredClone(await renderFigure(plugin, ir))
+    bad.layout.geo.lifelines[0].x += 2
+    const result = await verifyFigure(plugin, ir, bad)
+    const row = result.checks.find((c) => c.name === 'grid-4px')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /lifelines\[0\]\.x=/)
+    assert.ok(result.failures.some((f) => f.name === 'grid-4px'))
+  })
+})
+
 // --- render-diagram.mjs CLI --------------------------------------------
 
 describe('render-diagram.mjs CLI: type sequence', () => {
   test('--figure prints a verified sequence figure', () => {
-    const r = runCli([join(HERE, 'fixtures', 'seq-simple.yaml'), '--figure'])
+    const r = runCli([join(FIXTURES, 'sequence-simple.yaml'), '--figure'])
     assert.equal(r.status, 0)
     assert.match(r.stdout, /^<figure class="wu-figure" data-checks="pass" data-type="sequence">/)
     assert.match(r.stdout, /<svg /)
   })
 
   test('a budget overrun still exits 0 with a data-warn figure, and echoes the warning on stderr', () => {
-    const r = runCli([join(HERE, 'fixtures', 'seq-over-messages.yaml'), '--figure'])
+    const r = runCli([join(FIXTURES, 'sequence-over-messages.yaml'), '--figure'])
     assert.equal(r.status, 0)
     assert.match(r.stdout, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:messages=17" data-type="sequence">/)
     assert.match(r.stderr, /warning: budget:messages=17 \(#2 message-count\)/)
   })
 
   test('--json on an over-budget sequence reports ok:true plus warnings and the data-warn string', () => {
-    const r = runCli([join(HERE, 'fixtures', 'seq-too-many-participants.yaml'), '--json'])
+    const r = runCli([join(FIXTURES, 'sequence-too-many-participants.yaml'), '--json'])
     assert.equal(r.status, 0)
     const out = JSON.parse(r.stdout)
     assert.equal(out.ok, true)
@@ -612,7 +701,7 @@ describe('render-diagram.mjs CLI: type sequence', () => {
   })
 
   test('--json figureHtml is the verified sequence figure', () => {
-    const r = runCli([join(HERE, 'fixtures', 'seq-simple.yaml'), '--json'])
+    const r = runCli([join(FIXTURES, 'sequence-simple.yaml'), '--json'])
     assert.equal(r.status, 0)
     const out = JSON.parse(r.stdout)
     assert.equal(out.ok, true)

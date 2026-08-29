@@ -1,23 +1,36 @@
 // Machine verification of a rendered sequence diagram (bin/lib/sequence.mjs)
-// against the sequence contract described alongside SEQUENCE_LIMITS in
-// bin/lib/ir.mjs. Rows carry a severity like verify-diagram.mjs's: the
-// three budgets (participants / rows / label length, rows #1–#3) are
-// `warn` — advisory, surfaced as `warnings` and `data-warn`, never a
-// failure — and everything else is `fail`: every from/to/self/over
-// reference resolving, arrows staying horizontal at the lifeline they
-// touch, every drawn coordinate on the 4px grid, labels/notes clearing each
-// other (#7) and any lifeline they don't belong to (#13) by 6px, the
-// projected scale staying ≥ MIN_SCALE unless the scroll fallback is in
-// effect (#14), and the same font-size/stroke/color/svg-shape/a11y rules
-// diagram.mjs's figures follow (kept as small standalone checks here rather
-// than importing verify-diagram.mjs's private helpers, since those read
-// diagram-specific geometry — see verify-diagram.mjs's own doc comment for
-// why geometry checks read layout.geo instead of re-parsing the SVG).
-import { sequenceBudgetWarnings } from './ir.mjs'
-import { COLUMN, MIN_SCALE } from './diagram.mjs'
+// against the sequence contract. Rows carry a severity like
+// verify-diagram.mjs's: the three budgets (participants / rows / label
+// length, rows #1–#3 — SEQUENCE_LIMITS below) are `warn` — advisory,
+// surfaced as `warnings` and `data-warn`, never a failure — and everything
+// else is `fail`: every from/to/self/over reference resolving, arrows
+// staying horizontal at the lifeline they touch, every drawn coordinate on
+// the 4px grid, labels/notes clearing each other (#7) and any lifeline they
+// don't belong to (#13) by 6px, the projected scale staying ≥ MIN_SCALE
+// unless the scroll fallback is in effect (#14), and the same font-size/
+// stroke/color/svg-shape/a11y rules every figure follows (imported from
+// figures/_shared.mjs — the same functions the figure dispatcher appends
+// after a plugin's own rows).
+//
+// Two callers: verifySequence() below runs all 14 rows for direct use
+// (tests, hand-built adversarial geometry), while the `sequence` plugin
+// (figures/sequence.mjs) returns only the type-specific rows
+// (SEQUENCE_OWN_ROWS) and lets the dispatcher append the shared ones.
+import { COLUMN } from './diagram.mjs'
+import {
+  budgetWarning, checkFontSizes, checkNoHexColors, checkSingleFiniteSvg, checkA11y, checkProjectedScale,
+  runCheck, summarizeChecks,
+} from './figures/_shared.mjs'
+
+/** Budgets for `type: sequence` IR — guidance reported as warnings, never
+ * a gate (see sequenceBudgetWarnings()). */
+export const SEQUENCE_LIMITS = {
+  maxParticipants: 6,
+  maxMessages: 16,
+  maxLabelLen: 16,
+}
 
 const LABEL_CLEARANCE = 6
-const ALLOWED_FONT_SIZES = new Set([13, 11])
 const ALLOWED_STROKE_WIDTHS = new Set([1, 1.5])
 const GRID = 4
 
@@ -70,10 +83,54 @@ function labelRects(rows) {
 
 // --- checks --------------------------------------------------------------
 
-// The three budget rows (#1–#3) are `warn` severity: they read ir.mjs's
-// sequenceBudgetWarnings() — the same source validateIR() reports from —
-// so a figure that is only over budget still renders and passes, carrying
-// the overrun in `data-warn`. Geometry (every other row) decides pass/fail.
+/**
+ * The three sequence budgets (SEQUENCE_LIMITS: participants ≤ 6, rows ≤ 16,
+ * message/self label ≤ 16 chars) as advisory warnings — the `type:
+ * sequence` counterpart of ir.mjs's budgetWarnings(), same record shape,
+ * so verify-diagram.mjs / rerender-figures.mjs / self-check.mjs handle
+ * every figure kind through one code path. Verified geometry (sequence.mjs
+ * widens a column gap to fit the widest label between its lifelines; the
+ * rows below check the result) decides whether a figure renders. Order is
+ * stable (participants, messages, label) so the `data-warn` attribute
+ * built from it (formatBudgetWarnings()) is byte-stable too. The plugin
+ * re-exports this as its `budgetWarnings`.
+ *
+ * @param {object} ir normalized `type: sequence` IR
+ * @returns {Array<{key:string, value:number, limit:number, detail:string, hint:string}>}
+ */
+export function sequenceBudgetWarnings(ir) {
+  const out = []
+  const L = SEQUENCE_LIMITS
+  if (ir.participants.length > L.maxParticipants) {
+    out.push(budgetWarning('budget:participants', ir.participants.length, L.maxParticipants,
+      `${ir.participants.length} participant(s) (guidance ≤ ${L.maxParticipants})`,
+      'consider splitting the sequence: draw one sequence diagram per participant subset'))
+  }
+  if (ir.messages.length > L.maxMessages) {
+    out.push(budgetWarning('budget:messages', ir.messages.length, L.maxMessages,
+      `${ir.messages.length} row(s) (guidance ≤ ${L.maxMessages})`,
+      `consider splitting the sequence: split after message ${L.maxMessages}`))
+  }
+  const longLabels = []
+  ir.messages.forEach((m, i) => {
+    if (m.rowType !== 'message' && m.rowType !== 'self') return
+    const len = m.label ? [...m.label].length : 0
+    if (len > L.maxLabelLen) longLabels.push({ i, label: m.label, len })
+  })
+  if (longLabels.length) {
+    const longest = longLabels.reduce((a, b) => (b.len > a.len ? b : a))
+    out.push(budgetWarning('budget:label', longest.len, L.maxLabelLen,
+      longLabels.map((e) => `messages[${e.i}].label "${e.label}" is ${e.len} chars (guidance ≤ ${L.maxLabelLen})`).join('; '),
+      longLabels.map((e) => `shorten label of message ${e.i + 1} ("${e.label}", ${e.len} > ${L.maxLabelLen})`).join('; ') + ', or move the wording into a note'))
+  }
+  return out
+}
+
+// The three budget rows (#1–#3) are `warn` severity: they read
+// sequenceBudgetWarnings() above — the same source validateIR() reports
+// from — so a figure that is only over budget still renders and passes,
+// carrying the overrun in `data-warn`. Geometry (every other row) decides
+// pass/fail.
 function budgetCheck(key, okDetail) {
   return (ctx) => {
     const w = ctx.budget.find((b) => b.key === key)
@@ -200,28 +257,6 @@ function checkLifelineClearance(ctx) {
   }
 }
 
-function checkProjectedScale(ctx) {
-  const { renderResult, column } = ctx
-  if (renderResult.scroll) return { ok: true, detail: 'scroll fallback in effect; the 0.78 floor does not apply' }
-  const scale = renderResult.width > column ? column / renderResult.width : 1
-  const ok = scale >= MIN_SCALE
-  return {
-    ok,
-    detail: `effective scale ${scale.toFixed(3)} at a ${column}px column`,
-    hint: ok ? undefined : 'the figure needs to shrink below 0.78 to fit — reduce participants or shorten labels, or accept the scroll fallback',
-  }
-}
-
-function checkFontSizes(ctx) {
-  const sizes = [...ctx.svg.matchAll(/font-size="([^"]+)"/g)].map((m) => parseFloat(m[1]))
-  const bad = [...new Set(sizes.filter((s) => !ALLOWED_FONT_SIZES.has(s)))]
-  return {
-    ok: bad.length === 0,
-    detail: bad.length ? `font-size(s) outside {13,11}: ${bad.join(', ')}` : 'every font-size is 13 or 11',
-    hint: bad.length ? 'draw text at FONT_SIZE (13, participant labels) or EDGE_LABEL_SIZE (11, message/note text), not an ad-hoc size' : undefined,
-  }
-}
-
 function checkStrokeWidths(ctx) {
   const widths = [...ctx.svg.matchAll(/stroke-width="([^"]+)"/g)].map((m) => parseFloat(m[1]))
   const bad = [...new Set(widths.filter((w) => !ALLOWED_STROKE_WIDTHS.has(w)))]
@@ -229,53 +264,6 @@ function checkStrokeWidths(ctx) {
     ok: bad.length === 0,
     detail: bad.length ? `stroke-width outside {1,1.5}: ${bad.join(', ')}` : 'every stroke-width is 1 or 1.5',
     hint: bad.length ? 'use the kit\'s border-width scale (1/1.5)' : undefined,
-  }
-}
-
-function checkNoHexColors(ctx) {
-  const svg = ctx.svg
-  const withoutRefs = svg.replace(/url\(#[^)]*\)/g, '').replace(/#wu-d-[^"'\s)]*/g, '')
-  const hasHex = /#[0-9a-fA-F]{3,8}\b/.test(withoutRefs)
-  const hasRgb = /\brgb\(/i.test(svg)
-  const ok = !hasHex && !hasRgb
-  const found = [hasHex && 'a hex color', hasRgb && 'rgb()'].filter(Boolean).join(' and ')
-  return {
-    ok,
-    detail: ok ? 'no hex color or rgb() in the svg — every color routes through currentColor/var(--wu-*)' : `found ${found} in the svg`,
-    hint: ok ? undefined : 'replace the literal color with currentColor or a var(--wu-*) token',
-  }
-}
-
-function checkSingleFiniteSvg(ctx) {
-  const svgOpenCount = (ctx.svg.match(/<svg[\s>]/g) || []).length
-  const hasBadValue = /\b(NaN|Infinity|undefined)\b/.test(ctx.svg)
-  const ok = svgOpenCount === 1 && !hasBadValue
-  const problems = []
-  if (svgOpenCount !== 1) problems.push(`found ${svgOpenCount} <svg> elements, expected 1`)
-  if (hasBadValue) problems.push('markup contains NaN/Infinity/undefined')
-  return {
-    ok,
-    detail: ok ? 'exactly one <svg>, no non-finite values in the markup' : problems.join('; '),
-    hint: ok ? undefined : problems.join('; '),
-  }
-}
-
-function checkA11y(ctx) {
-  const svg = ctx.svg
-  const idPrefix = `wu-d-${ctx.ir.id}-`
-  const problems = []
-  if (!/^<svg\b[^>]*\brole="img"/.test(svg)) problems.push('svg root missing role="img"')
-  const firstTag = /<svg[^>]*>(<[a-zA-Z]+)/.exec(svg)
-  if (!firstTag || firstTag[1] !== '<title') problems.push('first child of <svg> is not <title>')
-  const desc = /<desc[^>]*>([^<]*)<\/desc>/.exec(svg)
-  if (!desc || !desc[1].trim()) problems.push('<desc> missing or empty')
-  const ids = [...svg.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])
-  const badIds = ids.filter((id) => !id.startsWith(idPrefix))
-  if (badIds.length) problems.push(`id(s) not prefixed "${idPrefix}": ${badIds.slice(0, 4).join(', ')}`)
-  return {
-    ok: problems.length === 0,
-    detail: problems.length ? problems.join('; ') : 'role="img", <title> first child, non-empty <desc>, ids all prefixed correctly',
-    hint: problems.length ? `fix svg generation: ${problems.join('; ')}` : undefined,
   }
 }
 
@@ -301,6 +289,11 @@ const CHECK_DEFS = [
   [14, 'projected-scale', checkProjectedScale, 'fail'],
 ]
 
+/** The rows that are specific to a sequence figure — what the `sequence`
+ * plugin's verify() returns. The other six (#8–#12, #14) are the shared
+ * rows figures/_shared.mjs defines and the dispatcher appends itself. */
+export const SEQUENCE_OWN_ROWS = ['participant-count', 'message-count', 'label-length', 'references-exist', 'arrows-horizontal', 'rows-grid', 'label-clearance', 'lifeline-clearance']
+
 /**
  * Verify a rendered sequence diagram (bin/lib/sequence.mjs's
  * renderSequenceDiagram() output) against the sequence contract. Same
@@ -321,12 +314,7 @@ export function verifySequence(ir, renderResult, { column = COLUMN } = {}) {
   }
   const ctx = { ir, renderResult, geo: renderResult.layout.geo, svg: renderResult.svg, column, budget: sequenceBudgetWarnings(ir) }
   const checks = CHECK_DEFS.map(([id, name, fn, severity]) => {
-    let result
-    try {
-      result = fn(ctx)
-    } catch (e) {
-      result = { ok: false, detail: `check threw: ${e.message}`, hint: 'internal verifier error — check the renderResult/ir shape passed in' }
-    }
+    const result = runCheck(fn, ctx)
     const check = { id, name, severity, ok: result.ok, detail: result.detail, hint: result.hint }
     if (severity === 'warn' && !result.ok) {
       check.key = result.key
@@ -334,9 +322,5 @@ export function verifySequence(ir, renderResult, { column = COLUMN } = {}) {
     }
     return check
   })
-  const failures = checks.filter((c) => c.severity === 'fail' && !c.ok)
-  const warnings = checks
-    .filter((c) => c.severity === 'warn' && !c.ok)
-    .map(({ id, name, key, value, detail, hint }) => ({ id, name, key, value, detail, hint }))
-  return { ok: failures.length === 0, checks, failures, warnings }
+  return summarizeChecks(checks)
 }

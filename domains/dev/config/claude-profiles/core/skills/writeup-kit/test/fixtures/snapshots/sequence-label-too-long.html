@@ -1,0 +1,21 @@
+<figure class="wu-figure" data-checks="pass" data-warn="budget:label=20" data-type="sequence">
+<svg role="img" aria-labelledby="wu-d-s5-title wu-d-s5-desc" width="364" height="100" viewBox="0 0 364 100" xmlns="http://www.w3.org/2000/svg"><title id="wu-d-s5-title">ラベル超過</title><desc id="wu-d-s5-desc">16 文字を超えるラベル</desc><defs><marker id="wu-d-s5-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker><marker id="wu-d-s5-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0.5 0.5 L9.5 5 L0.5 9.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs><line id="wu-d-s5-life-a" x1="56" y1="44" x2="56" y2="92" stroke="currentColor" stroke-width="1" stroke-dasharray="4 4"/><line id="wu-d-s5-life-b" x1="308" y1="44" x2="308" y2="92" stroke="currentColor" stroke-width="1" stroke-dasharray="4 4"/><rect id="wu-d-s5-p-a" data-tone="neutral" x="24" y="8" width="64" height="36" rx="6" fill="none" stroke="currentColor" stroke-width="1"/><text id="wu-d-s5-p-a-label" x="56" y="30.55" font-size="13" text-anchor="middle" fill="currentColor">A</text><rect id="wu-d-s5-p-b" data-tone="neutral" x="276" y="8" width="64" height="36" rx="6" fill="none" stroke="currentColor" stroke-width="1"/><text id="wu-d-s5-p-b-label" x="308" y="30.55" font-size="13" text-anchor="middle" fill="currentColor">B</text><path id="wu-d-s5-message-0" d="M56 68 L308 68" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-s5-solid)"/><text id="wu-d-s5-message-0-label" x="68" y="64" font-size="11" fill="currentColor">これは十六文字を超える長すぎるラベルです</text></svg>
+<figcaption>16 文字を超えるラベル</figcaption>
+<script type="text/x-writeup-diagram">
+id: s5
+type: sequence
+title: ラベル超過
+caption: 16 文字を超えるラベル
+participants:
+- id: a
+  label: A
+- id: b
+  label: B
+messages:
+- from: a
+  to: b
+  kind: sync
+  label: これは十六文字を超える長すぎるラベルです
+
+</script>
+</figure>
