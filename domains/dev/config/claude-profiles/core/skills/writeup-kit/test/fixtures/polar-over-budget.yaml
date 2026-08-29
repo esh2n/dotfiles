@@ -1,0 +1,41 @@
+id: p9
+type: polar
+title: 予算超過のポーラー
+max: 10
+categories:
+- id: c01
+  label: 区分一
+  focal: true
+- id: c02
+  label: 区分二
+  focal: true
+- id: c03
+  label: 区分三
+- id: c04
+  label: 区分四
+- id: c05
+  label: 区分五
+- id: c06
+  label: 区分六
+- id: c07
+  label: 区分七
+- id: c08
+  label: 区分八
+- id: c09
+  label: 区分九
+- id: c10
+  label: 十三文字を超える長い区分ラベル
+series:
+- id: s1
+  label: 系列 1
+  values:
+    c01: 7
+    c02: 2
+    c03: 6
+    c04: 4
+    c05: 8
+    c06: 3
+    c07: 9
+    c08: 1
+    c09: 5
+    c10: 0

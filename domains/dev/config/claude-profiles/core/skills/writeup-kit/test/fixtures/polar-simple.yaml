@@ -1,0 +1,36 @@
+id: p1
+type: polar
+title: 時間帯別の問い合わせ件数
+caption: 3 時間ごとの 1 日平均、外周が 40 件
+unit: 件
+max: 40
+categories:
+- id: h00
+  label: 0–3 時
+- id: h03
+  label: 3–6 時
+- id: h06
+  label: 6–9 時
+- id: h09
+  label: 9–12 時
+- id: h12
+  label: 12–15 時
+- id: h15
+  label: 15–18 時
+  focal: true
+- id: h18
+  label: 18–21 時
+- id: h21
+  label: 21–24 時
+series:
+- id: avg
+  label: 1 日平均
+  values:
+    h00: 2
+    h03: 1
+    h06: 6
+    h09: 31
+    h12: 22
+    h15: 36
+    h18: 14
+    h21: 5

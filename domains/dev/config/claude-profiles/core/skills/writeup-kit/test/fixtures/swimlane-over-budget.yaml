@@ -1,0 +1,91 @@
+id: sw4
+type: swimlane
+title: 予算超過の流れ
+caption: 6 レーン・13 手順・長いラベル・強調 3・分岐ラベル無し
+lanes:
+  - id: l1
+    label: 営業
+  - id: l2
+    label: 企画
+  - id: l3
+    label: 開発
+  - id: l4
+    label: QA
+  - id: l5
+    label: 運用
+  - id: l6
+    label: 顧客
+steps:
+  - id: s1
+    label: 受注
+    lane: l1
+    kind: start
+  - id: s2
+    label: 要件整理
+    lane: l2
+  - id: s3
+    label: 見積
+    lane: l2
+    emphasis: true
+  - id: s4
+    label: 承認？
+    lane: l1
+    kind: decision
+  - id: s5
+    label: 実装
+    lane: l3
+    emphasis: true
+  - id: s6
+    label: レビュー
+    lane: l3
+  - id: s7
+    label: 検証環境で総合テストを実施する
+    lane: l4
+    emphasis: true
+  - id: s8
+    label: 修正
+    lane: l3
+  - id: s9
+    label: 再検証
+    lane: l4
+  - id: s10
+    label: リリース
+    lane: l5
+  - id: s11
+    label: 監視
+    lane: l5
+  - id: s12
+    label: 受け入れ
+    lane: l6
+  - id: s13
+    label: 完了
+    lane: l6
+    kind: end
+edges:
+  - from: s1
+    to: s2
+  - from: s2
+    to: s3
+  - from: s3
+    to: s4
+  - from: s4
+    to: s5
+    label: 承認
+  - from: s4
+    to: s2
+  - from: s5
+    to: s6
+  - from: s6
+    to: s7
+  - from: s7
+    to: s8
+  - from: s8
+    to: s9
+  - from: s9
+    to: s10
+  - from: s10
+    to: s11
+  - from: s11
+    to: s12
+  - from: s12
+    to: s13

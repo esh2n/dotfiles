@@ -266,10 +266,10 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 5 | State machine | `state` | ST | implemented (`bin/lib/figures/state.mjs`) |
 | 6 | ER / data model | `er` | G(H) | implemented as `schema` with `variant: er` |
 | 7 | Timeline | `timeline` | S | implemented (`bin/lib/figures/timeline.mjs`) |
-| 8 | Swimlane | `swimlane` | G+L | planned |
+| 8 | Swimlane | `swimlane` | G+L | implemented (`bin/lib/figures/swimlane.mjs`) |
 | 9 | Quadrant | `quadrant` | M | implemented (`bin/lib/figures/quadrant.mjs`) |
 | 10 | Radar / Spider | `radar` | M/Q | implemented (`bin/lib/figures/radar.mjs`) |
-| 11 | Polar chart | `polar` | Q | planned |
+| 11 | Polar chart | `polar` | Q | implemented (`bin/lib/figures/polar.mjs`) |
 | 12 | Loop / flywheel | `loop` | G(cyclic) | implemented (`bin/lib/figures/loop.mjs`) |
 | 13 | Nested | `nested` | L | implemented (`bin/lib/figures/nested.mjs`) |
 | 14 | Tree | `tree` | H | implemented (`bin/lib/figures/tree.mjs`) |
@@ -290,7 +290,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 29 | DP security matrix | `matrix` (generic rows × columns; the DP security matrix is a preset) | M | implemented (`bin/lib/figures/matrix.mjs`) |
 | 30 | Sankey | `sankey` | Q(flow) | implemented (`bin/lib/figures/sankey.mjs`) |
 | 31 | Fishbone | `fishbone` | H(cause) | implemented (`bin/lib/figures/fishbone.mjs`) |
-| 32 | Wardley map | `wardley` | M(2-axis ordinal) | planned (positions are authored, not derived — IR carries them verbatim) |
+| 32 | Wardley map | `wardley` | M(2-axis ordinal) | implemented as `freeform` with `preset: wardley` (authored coordinates, verified) |
 | 33 | Kanban | `kanban` | M(state census) | implemented as `board` with `variant: kanban` |
 | 34 | User journey | `journey` | S+M | implemented (`bin/lib/figures/journey.mjs`) |
 | 35 | Deployment | `deployment` | L+G | planned |

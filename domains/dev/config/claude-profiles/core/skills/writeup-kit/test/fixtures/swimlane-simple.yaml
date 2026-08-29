@@ -1,0 +1,30 @@
+id: sw1
+type: swimlane
+title: 問い合わせ対応の流れ
+caption: サポートが一次回答し、開発が調査する
+lanes:
+  - id: customer
+    label: 顧客
+  - id: support
+    label: サポート
+  - id: dev
+    label: 開発
+steps:
+  - id: ask
+    label: 問い合わせ
+    lane: customer
+    kind: start
+  - id: triage
+    label: 一次切り分け
+    lane: support
+  - id: investigate
+    label: 原因調査
+    lane: dev
+    emphasis: true
+  - id: reply
+    label: 回答
+    lane: support
+  - id: close
+    label: 完了
+    lane: customer
+    kind: end

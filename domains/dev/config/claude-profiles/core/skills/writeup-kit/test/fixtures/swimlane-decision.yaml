@@ -1,0 +1,59 @@
+id: sw2
+type: swimlane
+title: 経費申請の流れ
+caption: 差戻しは申請者に戻り、支払と通知は並行する
+lanes:
+  - id: requester
+    label: 申請者
+  - id: manager
+    label: 上長
+  - id: accounting
+    label: 経理
+steps:
+  - id: draft
+    label: 申請を作成
+    lane: requester
+    kind: start
+  - id: submit
+    label: 提出
+    lane: requester
+  - id: review
+    label: 内容を確認
+    lane: manager
+  - id: approve
+    label: 承認する？
+    lane: manager
+    kind: decision
+  - id: pay
+    label: 支払処理
+    lane: accounting
+    emphasis: true
+    tone: ts
+  - id: notify
+    label: 結果を通知
+    lane: requester
+    parallel: true
+  - id: done
+    label: 完了
+    lane: requester
+    kind: end
+edges:
+  - from: draft
+    to: submit
+  - from: submit
+    to: review
+  - from: review
+    to: approve
+  - from: approve
+    to: pay
+    label: 承認
+  - from: approve
+    to: notify
+    label: 承認済
+  - from: approve
+    to: draft
+    label: 差戻し
+  - from: pay
+    to: done
+  - from: notify
+    to: done

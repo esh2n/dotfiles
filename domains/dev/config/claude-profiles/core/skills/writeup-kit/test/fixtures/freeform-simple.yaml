@@ -1,0 +1,65 @@
+id: ff-simple
+type: freeform
+title: 手描きの配置図
+caption: 社内ゾーンの 2 サービスと外部の監視、注記つき
+width: 400
+height: 200
+elements:
+- kind: region
+  id: zone
+  x: 16
+  y: 16
+  w: 240
+  h: 152
+  label: 社内ネットワーク
+- kind: box
+  id: web
+  x: 32
+  y: 56
+  w: 96
+  h: 32
+  label: Web
+  tone: ts
+  emphasis: true
+- kind: box
+  id: api
+  x: 144
+  y: 56
+  w: 96
+  h: 32
+  label: API
+  tone: rs
+- kind: box
+  id: batch
+  x: 32
+  y: 128
+  w: 96
+  h: 32
+  label: バッチ
+  dashed: true
+- kind: line
+  id: web-api
+  points: [[128, 72], [144, 72]]
+  arrow: true
+- kind: line
+  id: api-batch
+  points: [[192, 88], [192, 112], [80, 112], [80, 128]]
+  arrow: true
+  dashed: true
+  label: 夜間
+- kind: circle
+  id: monitor
+  cx: 296
+  cy: 72
+  r: 12
+  label: 監視
+- kind: line
+  id: monitor-api
+  points: [[284, 72], [240, 72]]
+  arrow: true
+- kind: text
+  id: note
+  x: 272
+  y: 136
+  text: 外部 SaaS
+  size: small

@@ -1,0 +1,55 @@
+id: sw3
+type: swimlane
+title: リリース手順（縦）
+caption: 長い流れは縦に並べる
+direction: down
+lanes:
+  - id: dev
+    label: 開発
+  - id: qa
+    label: QA
+  - id: ops
+    label: 運用
+steps:
+  - id: impl
+    label: 実装
+    lane: dev
+    kind: start
+  - id: pr
+    label: PR 作成
+    lane: dev
+  - id: test
+    label: 検証
+    lane: qa
+  - id: ok
+    label: 合格？
+    lane: qa
+    kind: decision
+  - id: deploy
+    label: デプロイ
+    lane: ops
+    emphasis: true
+  - id: watch
+    label: 監視
+    lane: ops
+  - id: done
+    label: 完了
+    lane: ops
+    kind: end
+edges:
+  - from: impl
+    to: pr
+  - from: pr
+    to: test
+  - from: test
+    to: ok
+  - from: ok
+    to: deploy
+    label: はい
+  - from: ok
+    to: impl
+    label: いいえ
+  - from: deploy
+    to: watch
+  - from: watch
+    to: done

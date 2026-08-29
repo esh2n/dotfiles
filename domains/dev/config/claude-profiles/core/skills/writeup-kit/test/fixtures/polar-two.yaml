@@ -1,0 +1,29 @@
+id: p2
+type: polar
+title: 二系列は radar へ
+caption: 2 つ目の系列はスキーマエラーになる
+unit: 件
+categories:
+- id: q1
+  label: Q1
+- id: q2
+  label: Q2
+- id: q3
+  label: Q3
+- id: q4
+  label: Q4
+series:
+- id: this
+  label: 今年
+  values:
+    q1: 4
+    q2: 6
+    q3: 9
+    q4: 7
+- id: last
+  label: 昨年
+  values:
+    q1: 3
+    q2: 3
+    q3: 6
+    q4: 8
