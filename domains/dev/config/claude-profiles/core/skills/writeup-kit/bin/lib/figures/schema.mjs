@@ -145,7 +145,7 @@ export function budgetWarnings(ir) {
   if (n > limits.maxEntities) {
     out.push(budgetWarning('budget:entities', n, limits.maxEntities,
       `${n} entities (guidance ≤ ${limits.maxEntities})`,
-      'split the model at an aggregate boundary, or drop the lookup tables'))
+      'split the model by ownership, or drop the lookup tables'))
   }
   const widest = ir.entities.reduce((m, e) => (e.fields.length > (m ? m.fields.length : 0) ? e : m), null)
   if (widest && widest.fields.length > limits.maxFields) {
@@ -173,7 +173,7 @@ export function budgetWarnings(ir) {
   if (emphasized > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
       `${emphasized} emphasized entities (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis on the aggregate root or the table the decision is about'))
+      'keep emphasis on the table the decision is about'))
   }
   return out
 }
@@ -739,11 +739,11 @@ export function verify(geo, ir) {
 
 export const doc = {
   purpose: 'entity boxes with a field list and typed relations — ER / data model (er), UML class (class), database schema (db)',
-  whenToUse: 'when the decision is about *what the data is and how it relates* — aggregate boundaries, a type/inheritance design, a schema change. Not for flow (use diagram) or call order (use sequence). Budgets: entities ≤ 8, fields per entity ≤ 8, relations ≤ 12, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the decision is about *what the data is and how it relates* — table ownership, a type/inheritance design, a schema change. Not for flow (use diagram) or call order (use sequence). Budgets: entities ≤ 8, fields per entity ≤ 8, relations ≤ 12, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: order-model
 type: schema
 title: 注文まわりのデータモデル
-caption: 注文が集約ルート。明細は注文の中でだけ意味を持つ
+caption: 明細は注文の中でだけ意味を持つ
 variant: er
 entities:
   - id: customer

@@ -1,7 +1,7 @@
 id: s-er
 type: schema
 title: 注文まわりのデータモデル
-caption: 注文が集約ルート。明細は注文の中でだけ意味を持つ
+caption: 明細は注文の中でだけ意味を持つ
 variant: er
 entities:
   - id: customer
