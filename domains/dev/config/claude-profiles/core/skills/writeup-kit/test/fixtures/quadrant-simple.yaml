@@ -1,0 +1,39 @@
+id: q1
+type: quadrant
+title: 改善案の比較
+caption: 左上の案から着手する
+x:
+  label: 実装コスト
+  low: 低
+  high: 高
+y:
+  label: 効果
+  low: 小
+  high: 大
+quadrants:
+  tl: すぐやる
+  tr: 計画して投資
+  bl: 手が空いたら
+  br: 見送り
+items:
+- id: cache
+  label: キャッシュ導入
+  x: 0.2
+  y: 0.72
+  emphasis: true
+- id: rewrite
+  label: 全面書き換え
+  x: 0.9
+  y: 0.85
+- id: logs
+  label: ログ整備
+  x: 0.32
+  y: 0.3
+- id: manual
+  label: 手動運用の継続
+  x: 0.1
+  y: 0.12
+- id: partial
+  label: 部分移行
+  x: 0.62
+  y: 0.62

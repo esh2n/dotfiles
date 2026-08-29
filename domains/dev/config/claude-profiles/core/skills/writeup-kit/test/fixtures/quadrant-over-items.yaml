@@ -1,0 +1,60 @@
+id: q-over
+type: quadrant
+title: 13 案の比較
+x:
+  label: コスト
+y:
+  label: 効果
+items:
+- id: a
+  label: A
+  x: 0.1
+  y: 0.9
+- id: b
+  label: B
+  x: 0.2
+  y: 0.8
+- id: c
+  label: C
+  x: 0.3
+  y: 0.7
+- id: d
+  label: D
+  x: 0.4
+  y: 0.6
+- id: e
+  label: E
+  x: 0.6
+  y: 0.4
+- id: f
+  label: F
+  x: 0.7
+  y: 0.3
+- id: g
+  label: G
+  x: 0.8
+  y: 0.2
+- id: h
+  label: H
+  x: 0.9
+  y: 0.1
+- id: i
+  label: I
+  x: 0.1
+  y: 0.1
+- id: j
+  label: J
+  x: 0.2
+  y: 0.2
+- id: k
+  label: K
+  x: 0.8
+  y: 0.8
+- id: l
+  label: L
+  x: 0.9
+  y: 0.9
+- id: m
+  label: M
+  x: 0.3
+  y: 0.3

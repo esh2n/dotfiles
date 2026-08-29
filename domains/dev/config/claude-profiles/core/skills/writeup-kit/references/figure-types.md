@@ -267,7 +267,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 6 | ER / data model | `er` | G(H) | planned |
 | 7 | Timeline | `timeline` | S | planned (sketched in `_template.mjs.txt`) |
 | 8 | Swimlane | `swimlane` | G+L | planned |
-| 9 | Quadrant | `quadrant` | M | planned |
+| 9 | Quadrant | `quadrant` | M | implemented (`bin/lib/figures/quadrant.mjs`) |
 | 10 | Radar / Spider | `radar` | M/Q | implemented (`bin/lib/figures/radar.mjs`) |
 | 11 | Polar chart | `polar` | Q | planned |
 | 12 | Loop / flywheel | `loop` | G(cyclic) | planned |
