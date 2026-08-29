@@ -1,0 +1,35 @@
+id: n2
+type: nested
+title: 注文システムの責務境界
+caption: 与信は注文 API から決済 API へ、完了通知はワーカーへ戻る
+root:
+  id: system
+  label: 注文システム
+  children:
+    - id: order
+      label: 注文サービス
+      children:
+        - id: order-api
+          label: API
+        - id: order-db
+          label: 注文 DB
+        - id: order-worker
+          label: ワーカー
+    - id: pay
+      label: 決済サービス
+      tone: rs
+      children:
+        - id: pay-api
+          label: 決済 API
+          emphasis: true
+        - id: pay-ledger
+          label: 台帳
+        - id: pay-notify
+          label: 通知
+edges:
+  - from: order-api
+    to: pay-api
+    label: 与信
+  - from: pay-notify
+    to: order-worker
+    label: 完了

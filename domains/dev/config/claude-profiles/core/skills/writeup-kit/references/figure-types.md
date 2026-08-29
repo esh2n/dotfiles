@@ -271,7 +271,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 10 | Radar / Spider | `radar` | M/Q | implemented (`bin/lib/figures/radar.mjs`) |
 | 11 | Polar chart | `polar` | Q | planned |
 | 12 | Loop / flywheel | `loop` | G(cyclic) | planned |
-| 13 | Nested | `nested` | L | planned |
+| 13 | Nested | `nested` | L | implemented (`bin/lib/figures/nested.mjs`) |
 | 14 | Tree | `tree` | H | planned |
 | 15 | Org chart | `org-chart` | H | planned |
 | 16 | Layer stack | `layers` | L | implemented (`bin/lib/figures/layers.mjs`) |

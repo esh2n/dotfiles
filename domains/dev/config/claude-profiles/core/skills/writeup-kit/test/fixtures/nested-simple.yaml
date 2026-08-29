@@ -1,0 +1,13 @@
+id: n1
+type: nested
+title: 取り込みの責務
+caption: スケジューラと取り込み API は同じ境界の中
+root:
+  id: ingest
+  label: 取り込み
+  children:
+    - id: sched
+      label: スケジューラ
+    - id: api
+      label: 更新通知 API
+      tone: rs
