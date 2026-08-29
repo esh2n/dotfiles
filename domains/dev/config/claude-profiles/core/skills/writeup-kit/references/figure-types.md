@@ -254,18 +254,18 @@ The 39 patterns of the diagram-design survey
 classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 **M** matrix/comparison · **L** layers/containment · **ST** state machine ·
 **Q** quantity/chart · **D** before-after/diff. Status is `builtin`,
-`implemented`, or `planned`; only `diagram` and `sequence` exist today.
+`implemented`, `covered by diagram`, or `planned`. Keep this column current when a plugin lands.
 
 | # | Pattern | Plugin `type` | Class | Status |
 |---|---|---|---|---|
 | – | Node/edge diagram (kit default) | `diagram` | G | builtin (`ir.mjs` + `diagram.mjs`, not a plugin) |
-| 1 | Architecture | `architecture` | G | planned (may become a `diagram` preset: zones = groups) |
+| 1 | Architecture | `architecture` | G | covered by `diagram` (node/edge renderer: groups + tones + `wu-focal`) |
 | 2 | IT current-state | `it-state` | G+L | planned |
-| 3 | Flowchart | `flowchart` | G | planned |
+| 3 | Flowchart | `flowchart` | G | covered by `diagram` (node/edge renderer: decision nodes as labelled branches) |
 | 4 | Sequence | `sequence` | S | implemented (`bin/lib/figures/sequence.mjs`) |
 | 5 | State machine | `state` | ST | implemented (`bin/lib/figures/state.mjs`) |
 | 6 | ER / data model | `er` | G(H) | planned |
-| 7 | Timeline | `timeline` | S | planned (sketched in `_template.mjs.txt`) |
+| 7 | Timeline | `timeline` | S | implemented (`bin/lib/figures/timeline.mjs`) |
 | 8 | Swimlane | `swimlane` | G+L | planned |
 | 9 | Quadrant | `quadrant` | M | implemented (`bin/lib/figures/quadrant.mjs`) |
 | 10 | Radar / Spider | `radar` | M/Q | implemented (`bin/lib/figures/radar.mjs`) |
@@ -285,7 +285,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 24 | High-Level | `high-level` | G+L | planned |
 | 25 | Process | `process` | G+L(grid) | implemented (`bin/lib/figures/process.mjs`) |
 | 26 | Medallion | `medallion` | L | implemented (`bin/lib/figures/medallion.mjs`) |
-| 27 | Data flow | `data-flow` | G+L(grid) | planned |
+| 27 | Data flow | `data-flow` | G+L(grid) | covered by `diagram` (node/edge renderer: `layer:` group hints, stage order left → right) |
 | 28 | DP integration | `dp-integration` | G+L | planned |
 | 29 | DP security matrix | `matrix` (generic rows × columns; the DP security matrix is a preset) | M | implemented (`bin/lib/figures/matrix.mjs`) |
 | 30 | Sankey | `sankey` | Q(flow) | planned |
@@ -294,7 +294,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 33 | Kanban | `kanban` | M(state census) | implemented as `board` with `variant: kanban` |
 | 34 | User journey | `journey` | S+M | planned |
 | 35 | Deployment | `deployment` | L+G | planned |
-| 36 | Dependency graph | `dependency` | G(DAG) | planned |
+| 36 | Dependency graph | `dependency` | G(DAG) | covered by `diagram` (node/edge renderer: DAG; accent the one edge that breaks a cycle) |
 | 37 | UML class | `uml-class` | G(H) | planned |
 | 38 | Story map | `story-map` | M(grid) | implemented as `board` with `variant: story-map` |
 | 39 | Database schema | `db-schema` | G(H) | planned |
