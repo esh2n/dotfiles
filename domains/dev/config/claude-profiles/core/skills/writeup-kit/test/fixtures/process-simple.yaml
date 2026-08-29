@@ -1,0 +1,25 @@
+id: p1
+type: process
+title: 更新通知の取り込み手順
+caption: 取得・変換・保存の 3 段階
+slots: [入力, 処理, 出力]
+stages:
+  - id: fetch
+    label: 取得
+    cells:
+      入力: 更新通知 API
+      処理: 1 ページずつ取得
+      出力: 生 JSON
+  - id: transform
+    label: 変換
+    emphasis: true
+    cells:
+      入力: 生 JSON
+      処理: [正規化, 差分抽出]
+      出力: ページ差分
+  - id: store
+    label: 保存
+    cells:
+      入力: ページ差分
+      処理: upsert
+      出力: store 更新

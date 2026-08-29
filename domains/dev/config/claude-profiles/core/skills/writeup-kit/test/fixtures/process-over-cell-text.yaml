@@ -1,0 +1,14 @@
+id: p-long
+type: process
+title: 長い項目
+slots: [入力, 処理]
+stages:
+  - id: a
+    label: A
+    cells:
+      入力: 短い
+      処理: この項目は十六文字を超える長さになっている
+  - id: b
+    label: B
+    cells:
+      入力: 短い

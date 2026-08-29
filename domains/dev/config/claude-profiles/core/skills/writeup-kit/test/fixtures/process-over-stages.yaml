@@ -1,0 +1,40 @@
+id: p-over
+type: process
+title: 7 段階の手順
+slots: [入力, 出力]
+stages:
+  - id: s1
+    label: 一
+    cells:
+      入力: a
+      出力: b
+  - id: s2
+    label: 二
+    cells:
+      入力: b
+      出力: c
+  - id: s3
+    label: 三
+    cells:
+      入力: c
+      出力: d
+  - id: s4
+    label: 四
+    cells:
+      入力: d
+      出力: e
+  - id: s5
+    label: 五
+    cells:
+      入力: e
+      出力: f
+  - id: s6
+    label: 六
+    cells:
+      入力: f
+      出力: g
+  - id: s7
+    label: 七
+    cells:
+      入力: g
+      出力: h

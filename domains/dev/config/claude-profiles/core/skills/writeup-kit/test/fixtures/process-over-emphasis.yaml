@@ -1,0 +1,20 @@
+id: p-emph
+type: process
+title: 強調しすぎ
+slots: [処理]
+stages:
+  - id: a
+    label: A
+    emphasis: true
+    cells:
+      処理: x
+  - id: b
+    label: B
+    emphasis: true
+    cells:
+      処理: y
+  - id: c
+    label: C
+    emphasis: true
+    cells:
+      処理: z

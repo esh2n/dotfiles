@@ -1,0 +1,60 @@
+id: p-full
+type: process
+title: 機能開発プロセス（6 段階）
+caption: 各段階の入力・処理・出力と、それを統制する仕組み
+slots: [入力, 処理, 出力, 統制]
+stages:
+  - id: discover
+    label: 発見
+    cells:
+      入力: 顧客ヒアリング記録
+      処理: [課題の言語化, 優先度づけ]
+      出力: 課題一覧
+  - id: define
+    label: 定義
+    cells:
+      入力: 課題一覧
+      処理: 受け入れ条件の明文化
+      出力: PBI
+  - id: design
+    label: 設計
+    emphasis: true
+    cells:
+      入力: PBI
+      処理: [設計書, 設計レビュー]
+      出力: 承認済み設計書
+      統制: [design-review, ADR]
+  - id: build
+    label: 実装
+    cells:
+      入力: 承認済み設計書
+      処理: [実装, テスト, コードレビュー]
+      出力: マージ済み PR
+  - id: verify
+    label: 検証
+    cells:
+      入力: マージ済み PR
+      処理: [E2E, 手動確認]
+      出力: 検証報告
+  - id: release
+    label: 公開
+    cells:
+      入力: 検証報告
+      処理: 段階的デプロイ
+      出力: リリースノート
+      統制: リリース判定会
+arrows:
+  - from: discover
+    to: define
+  - from: define
+    to: design
+  - from: design
+    to: build
+    label: 承認後
+  - from: build
+    to: verify
+  - from: verify
+    to: build
+    label: 差し戻し
+  - from: verify
+    to: release

@@ -268,13 +268,13 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 7 | Timeline | `timeline` | S | planned (sketched in `_template.mjs.txt`) |
 | 8 | Swimlane | `swimlane` | G+L | planned |
 | 9 | Quadrant | `quadrant` | M | planned |
-| 10 | Radar / Spider | `radar` | M/Q | planned |
+| 10 | Radar / Spider | `radar` | M/Q | implemented (`bin/lib/figures/radar.mjs`) |
 | 11 | Polar chart | `polar` | Q | planned |
 | 12 | Loop / flywheel | `loop` | G(cyclic) | planned |
 | 13 | Nested | `nested` | L | planned |
 | 14 | Tree | `tree` | H | planned |
 | 15 | Org chart | `org-chart` | H | planned |
-| 16 | Layer stack | `layers` | L | planned |
+| 16 | Layer stack | `layers` | L | implemented (`bin/lib/figures/layers.mjs`) |
 | 17 | Venn | `venn` | M | planned |
 | 18 | Pyramid / funnel | `pyramid` | H/Q | planned |
 | 19 | Bar chart (incl. dumbbell) | `bar` | Q / D | planned |
@@ -283,11 +283,11 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 22 | Gantt | `gantt` | S | planned |
 | 23 | Scatter / bubble | `scatter` | Q | planned |
 | 24 | High-Level | `high-level` | G+L | planned |
-| 25 | Process | `process` | G+L(grid) | planned |
+| 25 | Process | `process` | G+L(grid) | implemented (`bin/lib/figures/process.mjs`) |
 | 26 | Medallion | `medallion` | L | planned |
 | 27 | Data flow | `data-flow` | G+L(grid) | planned |
 | 28 | DP integration | `dp-integration` | G+L | planned |
-| 29 | DP security matrix | `matrix` (generic rows × columns; the DP security matrix is a preset) | M | planned |
+| 29 | DP security matrix | `matrix` (generic rows × columns; the DP security matrix is a preset) | M | implemented (`bin/lib/figures/matrix.mjs`) |
 | 30 | Sankey | `sankey` | Q(flow) | planned |
 | 31 | Fishbone | `fishbone` | H(cause) | planned |
 | 32 | Wardley map | `wardley` | M(2-axis ordinal) | planned (positions are authored, not derived — IR carries them verbatim) |
