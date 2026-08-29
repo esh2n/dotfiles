@@ -153,11 +153,35 @@ forcing every workflow report into 決定記録 by default.
 
 ## Step 3 — writing the page and rendering figures
 
+### Choosing the figure type — before any IR is written
+
+A figure has a `type:`, and the type is a decision, not a default. Ask
+what the reader must see faster than prose — a structure, a flow or time,
+a state, a quantity or comparison, a containment or scope, a hierarchy, a
+cause — and map the answer with the table in `$KIT/references/writing.md`
+§4 (`kinds.md` names the 2–4 types that usually fit the page's kind). Then
+confirm against the renderer, which is the authority on what exists:
+
+```
+node $KIT/bin/render-diagram.mjs --list-types      # every type: purpose, when to use, budgets, verify rows
+node $KIT/bin/render-diagram.mjs --doc <type>      # that type's IR example (YAML) — start the IR from it
+node $KIT/bin/render-diagram.mjs --doc state > ir.yaml && node $KIT/bin/render-diagram.mjs ir.yaml --figure
+```
+
+`--doc` prints the IR *shape* for the type (its top-level keys differ per
+type: `states:`/`transitions:` for `state`, `participants:`/`messages:` for
+`sequence`, `categories:`/`series:` for `bar`, …), so read it before writing
+rather than guessing keys from the `diagram` schema. Every type renders
+with the same `--figure` / `--json` command and the same exit codes below.
+A before/after pair is the same type twice; `freeform` only when
+`--list-types` shows nothing covers the picture.
+
 ### `render-diagram.mjs` — observed behavior
 
 ```
 $ node $KIT/bin/render-diagram.mjs --help
 usage: render-diagram.mjs <ir.yaml|ir.json> [--column 720] [--out out.svg] [--json] [--figure]
+       render-diagram.mjs --list-types | --doc <type>
 ```
 
 Exit codes: `0` ok, `1` cannot read the input file, `2` the IR failed to
@@ -494,8 +518,8 @@ sentence shape). Write them in this order:
    decision h3 that lacks the paragraph or the `.wu-meta` before the next
    heading. Do not write `<p><strong>決定:</strong>` lines — three of the
    same label is `label-repeat`.
-5. Close the decisions with `<h3>決定の関係図</h3>` and one dependency
-   figure (制約する / 可能にする / 競合する); self-check `relation-figure`
+5. Close the decisions with `<h3>決定の関係図</h3>` and one `diagram`
+   drawn as a DAG (制約する / 可能にする / 競合する); self-check `relation-figure`
    asks for it at 5 or more decisions.
 6. 却下した案 as prose or a list — a `.wu-compare` only with 3+ options
    and 3+ criteria — then 未決・前提, 出典, 次のステップ.
@@ -506,16 +530,21 @@ three on a 決定記録 is `decision-cards`.
 ## Decision records: figures
 
 A figure goes right before a decision's prose only when a figure type
-fits the decision — never one per decision, never as decoration:
+fits the decision — never one per decision, never as decoration. Pick the
+type by what the reader must see (`writing.md` §4):
 
-- the decision changes a structure → the same figure type twice, before
-  and after, so the reader compares the difference and nothing else;
-- it changes a flow or a state → process / data-flow / sequence / state;
-- it compares options → quadrant / radar / matrix, or a table when the
-  criteria are qualitative.
+- the decision changes a structure → the same type twice (`diagram` or
+  `zones`), before and after, so the reader compares the difference and
+  nothing else;
+- it changes a flow → `sequence` (who calls whom), `swimlane` (hand-offs),
+  `process` (the same facets per stage);
+- it changes a state → `state`, twice when a transition is added or removed;
+- it compares options → `matrix` / `quadrant` / `radar`, or a table when
+  the criteria are qualitative or a 3-column table already says it.
 
 Decisions about wording, numbers, or scope get no figure; two decisions
-that change the same structure or flow share one. Write a small IR (≤9
-nodes), render with `render-diagram.mjs --figure`, paste the `<figure>`
-verbatim between the summary sentence and the prose, and do not restate
-in the prose what the figure shows (`writing.md` §3).
+that change the same structure or flow share one. Take the IR shape from
+`render-diagram.mjs --doc <type>`, keep it within the type's budgets
+(`--list-types`), render with `render-diagram.mjs --figure`, paste the
+`<figure>` verbatim between the summary sentence and the prose, and do not
+restate in the prose what the figure shows (`writing.md` §3).

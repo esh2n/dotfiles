@@ -29,7 +29,7 @@ Each of these is a shape the reader recognises before reading a word of it, and 
 - **Summary signal phrases** — `結論から言うと`, `まとめると`, `以下に示す`, `本節では`. Why: the phrase announces a summary instead of being one; the first sentence of the paragraph should already be the summary (参照 skill の一致点). lint `forbidden_phrase` warns on each.
 - **The same sentence mould three times in a row** — `X は Y である。A は B である。C は D である。` Why: the reader stops parsing after the second and reads the third as noise (参照 skill の一致点). Break the run with a 体言止め, a question, or a different length.
 - **Prose that restates a figure** — a paragraph walking through what the diagram already shows. Why: text that duplicates a picture costs attention twice and lowers comprehension (Ayres & Sweller, redundancy effect). Let the figure carry it; write only what the figure cannot say.
-- **Decorative figures** — a diagram placed because the section looked bare. Why: a figure with no mechanism to show pulls attention away from the argument (seductive details). Draw a figure only where a type fits — see `kinds.md`, 図が効く場面.
+- **Decorative figures** — a diagram placed because the section looked bare. Why: a figure with no mechanism to show pulls attention away from the argument (seductive details). Draw a figure only where a type fits — §4 (the type rule) and `kinds.md`, 図が効く場面.
 
 ## 4. List, table, figure, or prose
 
@@ -38,7 +38,30 @@ Each of these is a shape the reader recognises before reading a word of it, and 
 | Prose | The items are linked by cause, sequence, or contrast — anything you would connect with `そのため` or `だが` | Three or more independent items with identical shape |
 | List | Items are truly parallel: same grammar, same abstraction level, no relation between them worth a sentence (decisions with owner and date, steps) | Explaining why something happened |
 | Table | Two or more attributes per item, and the reader will compare across rows (`.wu-compare`, up to 4 columns). A comparison table of options only when there are 3 or more options and 3 or more criteria; below that, name the rejected option in the prose | A single column of text — that is a list |
-| Figure | Parts and the routes between them, state transitions, a before/after of a structure | Wording, numbers, or anything a sentence says faster |
+| Figure | The reader must *see* something faster than prose can say it — a structure, a flow, a state, a quantity, a scope, a hierarchy, a cause (the rule below names the type) | Wording, numbers, or anything a sentence says faster; a comparison that a 3-column table already says |
+
+### Choosing the figure type
+
+A figure is drawn in a *type*, and the type is chosen before the IR is written — not defaulted to boxes-and-arrows. The rule:
+
+1. **Ask what the reader must see faster than prose.** Not "what is this section about" but "what would take three sentences to say and one glance to see". The answer falls into one of the rows below; if it falls into none, the section wants prose or a table, not a figure.
+2. **Map the answer to a type.** `node bin/render-diagram.mjs --list-types` prints every type with its purpose and its budgets; `--doc <type>` prints an IR example to start from.
+
+| The reader must see | Type (pick the narrowest that fits) |
+|---|---|
+| Structure — parts and the routes between them, layers | `diagram` (the default), `zones` (which zone a part lives in, which links cross), `nested` (what sits inside what), `layers` (a ranked stack), `medallion` (data tiers) |
+| Flow or time — who does what in what order, when | `sequence` (who calls whom), `swimlane` (hand-offs between actors), `process` (the same facets per stage), `timeline` (dated events), `gantt` (durations and overlap), `journey` (how each stage feels), `loop` (a cycle that closes on itself) |
+| State — which state becomes which, on what event | `state` |
+| Quantity or comparison | `bar` (magnitudes; dumbbell for a before/after per item), `line` (a trend; slopegraph for two states), `scatter` (two measures per item), `radar` (options × criteria), `polar` (a cyclic axis), `quadrant` (two criteria, placed), `matrix` (which pairs hold), `venn` (2–3 overlapping sets), `treemap` (part-to-whole), `sankey` (where a quantity splits), `pyramid` (ranked tiers or a funnel) |
+| Containment or scope — where a boundary lies | `nested` (no links), `zones` (with links) |
+| Hierarchy — one parent per node, or what the data is | `tree` (`variant: org` for people), `schema` (`er` / `class` / `db`) |
+| Cause — why one symptom happened | `fishbone` |
+| A census of work by column | `board` (`variant: kanban` or `story-map`) |
+| Nothing above fits | `freeform` — only after `--list-types` has been read and nothing covers the picture; it lays out nothing for you |
+
+3. **Before/after is the same type twice.** A decision that changes a structure gets two figures of one type (two `diagram`s, two `state`s, two `zones`), so the reader compares the change and nothing else. Two types side by side compare the drawings, not the design.
+4. **A table wins when a 3-column table says it.** Option × criterion with a mark per cell is a `.wu-compare` before it is a `matrix`; only when the *pattern* of marks is the message (a diagonal, a gap) does the figure pay for itself.
+5. **Budgets are guidance; geometry decides.** Every type prints its budgets in `--list-types` (nodes ≤ 9 for `diagram`, participants ≤ 6 for `sequence`, …). An over-budget figure still renders, stamped `data-warn`, and is a hint to split; a figure whose labels collide or whose edges cross something they do not connect fails verification and is not drawn (`page-contract.md` §4).
 
 ## 5. Terminology
 
@@ -79,13 +102,25 @@ The `.wu-decision` card (決定 / 重視したトレードオフ / 根拠・補�
 
 ## 8. Before / after
 
-Before (one sentence, nested parentheses, abstract nouns, hedged ending):
+Prose — before (one sentence, nested parentheses, abstract nouns, hedged ending):
 
 > 本機能の重要性を踏まえ、さまざまな観点（性能（特に応答時間）や保守性など）から検討した結果、現行方式には課題があると考えられるため、方式の見直しが必要になる可能性があると思われます。
 
 After (conclusion first, one idea per sentence, a number, a label for the unknown):
 
 > 通知の配信方式を変える。現行のポーリングは毎分 1,200 回の問い合わせの 98% が空振りだった（8 月 12 日計測）。応答時間への影響は【要確認】で、9 月の実装時に測る。
+
+Figure — before (the writer reaches for the default type and fills a section):
+
+> 決定 3「注文の取り消しは配送開始前のみ許可する」に、注文・決済・配送・通知の 4 つのボックスを矢印でつないだ `diagram` を 1 枚
+
+The reader sees four boxes and learns nothing the heading did not say — the decision is about *which state may become which*, and a box diagram cannot show that.
+
+Figure — after (the type answers "what must the reader see faster than prose"):
+
+> 同じ決定に `state` を 2 枚（変更前・変更後）。変更前は 配送中 → 取消 の遷移があり、変更後はその 1 本だけが消えている。キャプションは「配送開始後は取り消せない」
+
+One type, twice, the difference isolated; the prose then says only why (`writing.md` §3, no restating the figure).
 
 ## 9. Before publishing
 

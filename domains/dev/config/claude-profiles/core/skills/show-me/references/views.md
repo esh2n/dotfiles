@@ -113,11 +113,18 @@ src/
 **When**: the point is *interaction between parts* — who calls whom,
 what messages cross a boundary, an async handoff. Chat renders Mermaid
 live, so it's the one view here that's a real diagram instead of text.
+Choose the Mermaid form the way the kit chooses a figure type — by what
+the reader must see faster than prose (`writeup-kit/references/writing.md`
+§4): flow or time → `sequenceDiagram`, structure → `flowchart LR`, state →
+`stateDiagram-v2`. Quantities and comparisons are not a Mermaid job here —
+a short table in the reply, or a kit `bar` / `matrix` figure if it must
+be kept.
 
 **When not**: more than ~9 nodes (split the question, or escalate to
 `writeup`'s figure pipeline instead — that's a keepable diagram, this
-is a disposable one). Also skip it for pure logic (use pseudocode) or
-pure structure with no interaction (use a tree).
+is a disposable one; there the same question maps to one of the kit's
+types via `render-diagram.mjs --list-types`). Also skip it for pure logic
+(use pseudocode) or pure structure with no interaction (use a tree).
 
 **Template**:
 ```mermaid

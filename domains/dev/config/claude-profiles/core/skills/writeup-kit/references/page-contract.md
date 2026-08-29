@@ -169,6 +169,18 @@ of 0.78 or the scroll fallback — decides pass/fail. The same tools read
 both kinds through the one `data-warn` attribute; nothing special-cases
 `data-type="sequence"`.
 
+Every other figure type (`state`, `zones`, `bar`, `matrix`, … — the plugins
+under `bin/lib/figures/`, listed by `bin/render-diagram.mjs --list-types`)
+follows this same policy with its own budgets: each type's `limits` are
+guidance printed by `--list-types`, an overrun is stamped into `data-warn`
+in the type's stable key order, and the type's own geometry rows plus the
+shared rows (`figure-types.md` §3) decide pass/fail. The rendered figure
+carries `data-type="<type>"`; self-check reads only `data-checks` and
+`data-warn`, so a page may mix types freely. Which type to draw is the
+author's decision, made before the IR is written — `writing.md` §4 has the
+rule (what must the reader see faster than prose) and the type table;
+`kinds.md` names the types that usually fit each kind.
+
 ### `.wu-figure` / IR script escaping
 
 A `.wu-figure`'s `<script type="text/x-writeup-diagram">` block carries the

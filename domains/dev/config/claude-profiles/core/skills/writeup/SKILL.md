@@ -61,19 +61,19 @@ names a store, not a path. New store: `init-store.mjs --name <name>
    - Read `$KIT/references/writing.md` (reader, one takeaway, sentence
      and card rules), then write the body in Japanese with role-named
      `.wu-*` components, covering this kind's required sections in order.
-   - For each figure, write the diagram IR as YAML, then run:
+   - For each figure, pick the type first (`writing.md` §4: what must the
+     reader see faster than prose — structure / flow / state / quantity /
+     hierarchy / cause), check it against `render-diagram.mjs --list-types`,
+     take the IR shape from `--doc <type>`, write the IR as YAML, then run:
      ```
      node $KIT/bin/render-diagram.mjs ir.yaml --figure > fig.html
      ```
-     (or `--json` and take `figureHtml`). Paste the returned `<figure>`
-     as-is (it carries `data-checks="pass"`, the caption, and the IR in
-     `<script type="text/x-writeup-diagram">`); never hand-wrap a raw
-     `<svg>`. Exit 2 = IR invalid (fix the named field). Over-budget
-     figures still render, marked `data-warn` — consider splitting.
-     Exit 3 = failed a contract §4-2 check: fix per `checks[].hint`,
-     re-render, up to 3 attempts; still failing → keep the IR with a
-     `.wu-callout data-tone="warn"` naming the check and tell the user;
-     a `.wu-table` stand-in is for kit-less mode only (`references/procedure.md`).
+     (same command for every type; or `--json`, take `figureHtml`). Paste
+     the `<figure>` as-is (`data-checks="pass"`, caption, IR script); never
+     hand-wrap a raw `<svg>`. Exit 2 = IR invalid (fix the named field);
+     over-budget figures render with `data-warn` (consider splitting); exit
+     3 = a failed §4-2 check: fix per `checks[].hint`, up to 3 attempts, then
+     keep the IR with a `.wu-callout data-tone="warn"` naming the check and tell the user (`references/procedure.md`).
 4. **Lint.**
    ```
    node $KIT/bin/lint.mjs page.html --json

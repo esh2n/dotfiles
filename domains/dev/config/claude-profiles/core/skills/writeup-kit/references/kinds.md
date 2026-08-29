@@ -15,20 +15,23 @@ one of these 8 kind contracts.
 
 Figures are not budgeted by count. Draw one wherever a reader would grasp a
 structure, a flow, or a comparison faster from a picture than from the prose;
-skip it where the prose already says it. The only numeric limit is per figure
-(≤9 nodes, ≤12 edges — see the diagram IR contract). The "where a figure
-helps" column lists the typical spots per kind; it is guidance, not a cap.
+skip it where the prose already says it. Each figure is drawn in a *type*
+chosen by what the reader must see (`writing.md` §4 — the rule and the full
+type table; `bin/render-diagram.mjs --list-types` prints every type with its
+budgets). Budgets are per type and per figure (`diagram`: ≤9 nodes, ≤12
+edges) and are guidance; verified geometry decides. The 図が効く場面 column
+names the 2–4 types that usually fit each kind; it is guidance, not a cap.
 
 | kind | Required sections | Use | Avoid | Length / where a figure helps |
 |---|---|---|---|---|
-| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, table (the 一覧表), figure, meta, open, steps | chip; decision (cards) for the list of decisions; compare unless 3+ options × 3+ criteria | 2,000-4,000 chars. 図が効く場面: a decision that changes a structure (the same figure type twice, before/after), a flow or a state (process / data-flow / sequence / state), or that compares options (quadrant / radar / matrix; a table when qualitative). Wording, numbers, and scope need none. One 決定の関係図 closes the decisions |
-| 設計 (design) | 目的と読者／用語／現状とギャップ／あるべき姿／決定点／進め方 | terms, figure, compare, code, open | chip | 3,000-8,000 chars. A figure helps for: parts and the routes between them, state transitions, before/after of a structure |
-| 調査まとめ (research summary) | 問い／結論／根拠（表）／未確認／含意 | summary, table, quote, meta | decision | 2,000-6,000 chars. A figure helps for: the current flow being investigated, where a measurement was taken |
-| 参考資料まとめ (reference roundup) | 資料一覧（表）／各資料の要点／取るもの・置き先 | table, quote, meta, chip | steps | 3,000-8,000 chars. A figure helps for: how the references relate to each other or to your own parts |
-| PBI 資料 (PBI doc) | 背景／決めたこと／未決／関係する文書 | summary, decision, meta, open | chip | 1,000-3,000 chars. A figure helps for: the scope boundary, the affected flow |
-| 絵解き (picture explainer) | フック／問題／仕組み3枚／現実復帰／まとめ1文 | figure (pictures) only | table, code, terms | 5-8 panels, ~50 chars of body text per panel |
-| 作業メモ (work note) | 今日分かったこと／次にやること | steps, meta | summary, toc, compare | ≤1,000 chars. A figure is rare; sketch one only if it saves the next-day self a re-read |
-| 議事録 (meeting minutes) | 決定／宿題（誰が・いつまで）／論点（未決） | decision, steps, open | compare | 1,000-3,000 chars. A figure helps only when a decision hinges on a structure that words keep misreading |
+| 決定記録 (decision record) | 決まったこと／却下した案／未決・前提／次のステップ | summary, table (the 一覧表), figure, meta, open, steps | chip; decision (cards) for the list of decisions; compare unless 3+ options × 3+ criteria | 2,000-4,000 chars. 図が効く場面: `diagram` twice (before/after) for a decision that changes a structure; `state` when it changes which state may become which; `sequence` when it changes who calls whom; `matrix` when it compares options by criteria (a table when qualitative). Wording, numbers, and scope need none. One 決定の関係図 (`diagram`, a DAG) closes the decisions |
+| 設計 (design) | 目的と読者／用語／現状とギャップ／あるべき姿／決定点／進め方 | terms, figure, compare, code, open | chip | 3,000-8,000 chars. 図が効く場面: `zones` for the parts and which links cross a boundary (現状とギャップ / あるべき姿, same type twice); `sequence` for the call order the design fixes; `schema` when the data model is the decision; `state` for a lifecycle |
+| 調査まとめ (research summary) | 問い／結論／根拠（表）／未確認／含意 | summary, table, quote, meta | decision | 2,000-6,000 chars. 図が効く場面: `bar` for measured magnitudes across categories; `line` for a trend or a two-state slopegraph; `scatter` when each item has two measures; `matrix` for which pairs hold; `timeline` for the events behind the question. The flow under investigation is a `diagram` only when a measurement point must be located on it |
+| 参考資料まとめ (reference roundup) | 資料一覧（表）／各資料の要点／取るもの・置き先 | table, quote, meta, chip | steps | 3,000-8,000 chars. 図が効く場面: `tree` for how the references decompose or derive from each other; `matrix` for reference × topic coverage; `venn` when 2–3 references overlap and the overlap has a name |
+| PBI 資料 (PBI doc) | 背景／決めたこと／未決／関係する文書 | summary, decision, meta, open | chip | 1,000-3,000 chars. 図が効く場面: `swimlane` for the affected flow and its hand-offs; `journey` when the user's experience per stage is the point; `board` (`story-map`) for where the release is cut. The scope boundary is a `nested` only when words keep misreading it |
+| 絵解き (picture explainer) | フック／問題／仕組み3枚／現実復帰／まとめ1文 | figure (pictures) only | table, code, terms | 5-8 panels, ~50 chars of body text per panel. 図が効く場面: every panel; any type, one idea per figure — the type follows the idea (`writing.md` §4), never the previous panel |
+| 作業メモ (work note) | 今日分かったこと／次にやること | steps, meta | summary, toc, compare | ≤1,000 chars. 図が効く場面: usually none; a `diagram` only if it saves the next-day self a re-read |
+| 議事録 (meeting minutes) | 決定／宿題（誰が・いつまで）／論点（未決） | decision, steps, open | compare | 1,000-3,000 chars. 図が効く場面: usually none; `timeline` or `gantt` when the meeting fixed a schedule, a `diagram` only when a decision hinges on a structure that words keep misreading |
 
 ## Skeletons
 
@@ -51,14 +54,15 @@ a column of cards. The page runs, in this order:
      sentences when one would pass 80 characters);
    - prose saying why it wins, naming the rejected option inside the prose;
    - a `.wu-meta` line with the basis — path, URL, or agreement date;
-   - a figure **right before the prose**, only when a figure type fits: a
-     structure changes → the same type twice, before/after; a flow or a
-     state changes → process / data-flow / sequence / state; options are
-     compared → quadrant / radar / matrix, a table when qualitative.
+   - a figure **right before the prose**, only when a figure type fits
+     (`writing.md` §4): a structure changes → the same type twice,
+     before/after (`diagram` / `zones`); a flow changes → `sequence` /
+     `swimlane` / `process`; a state changes → `state`; options are
+     compared → `matrix` / `quadrant` / `radar`, a table when qualitative.
      Decisions about wording, numbers, or scope get none; two decisions
      that change the same structure share one figure.
-5. At the end of the decisions, one 決定の関係図 (`.wu-figure`, dependency
-   type): which decision 制約する / 可能にする / 競合する which.
+5. At the end of the decisions, one 決定の関係図 (`.wu-figure`, a `diagram`
+   drawn as a DAG): which decision 制約する / 可能にする / 競合する which.
 6. 却下した案 as prose or a list. A comparison table only when there are
    3 or more options and 3 or more criteria.
 7. 未決・前提 (`.wu-open`), 出典 when the page rests on external
@@ -196,7 +200,8 @@ stays short and plain.
 ### 議事録 (meeting minutes)
 
 Required sections: 決定 (decisions) / 宿題（誰が・いつまで） (action items,
-who by when) / 論点（未決） (open discussion points). No diagrams.
+who by when) / 論点（未決） (open discussion points). Usually no figure; a
+`timeline` / `gantt` only when the meeting fixed a schedule.
 
 ```html
 <section class="wu-section"><h2>決定</h2><div class="wu-decision">...</div></section>
