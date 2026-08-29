@@ -1,0 +1,28 @@
+id: j-emph
+type: journey
+title: 強調が多い旅
+rows: [行動]
+stages:
+  - id: a
+    label: 一
+    emotion: -1
+    emphasis: true
+    cells:
+      行動: 探す
+  - id: b
+    label: 二
+    emotion: -2
+    emphasis: true
+    cells:
+      行動: 迷う
+  - id: c
+    label: 三
+    emotion: 0
+    emphasis: true
+    cells:
+      行動: 聞く
+  - id: d
+    label: 四
+    emotion: 1
+    cells:
+      行動: 使う

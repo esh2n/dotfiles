@@ -1,0 +1,46 @@
+id: j-full
+type: journey
+title: 経費精算の体験（6 段階）
+caption: 領収書の受け取りから振込までの流れ。申請画面の入力で最も沈み、承認で持ち直す
+persona: 出張の多い営業担当
+rows: [行動, 接点, 不満]
+stages:
+  - id: receipt
+    label: 領収書受領
+    emotion: 0
+    cells:
+      行動: 領収書をもらう
+      接点: 店頭
+  - id: photo
+    label: 撮影
+    emotion: 1
+    cells:
+      行動: [スマホで撮影, アプリに保存]
+      接点: モバイルアプリ
+  - id: input
+    label: 申請入力
+    emphasis: true
+    emotion: -2
+    cells:
+      行動: [項目を手入力, 科目を選ぶ]
+      接点: 申請画面
+      不満: [科目名が分からない, 入力が多い]
+  - id: submit
+    label: 提出
+    emotion: -1
+    cells:
+      行動: 上長に提出
+      接点: 申請画面
+      不満: 差し戻しが怖い
+  - id: approve
+    label: 承認
+    emotion: 1
+    cells:
+      行動: 承認通知を受ける
+      接点: 通知
+  - id: payout
+    label: 振込
+    emotion: 2
+    cells:
+      行動: 入金を確認
+      接点: 給与明細

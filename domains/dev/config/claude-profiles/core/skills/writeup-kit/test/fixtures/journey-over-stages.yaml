@@ -1,0 +1,45 @@
+id: j-stages
+type: journey
+title: 8 段階の旅
+rows: [行動]
+stages:
+  - id: s1
+    label: 認知
+    emotion: 0
+    cells:
+      行動: 記事を読む
+  - id: s2
+    label: 興味
+    emotion: 1
+    cells:
+      行動: サイトを見る
+  - id: s3
+    label: 比較
+    emotion: 0
+    cells:
+      行動: 他社と比べる
+  - id: s4
+    label: 試用
+    emotion: -1
+    cells:
+      行動: 試す
+  - id: s5
+    label: 購入
+    emotion: 1
+    cells:
+      行動: 契約する
+  - id: s6
+    label: 導入
+    emotion: -1
+    cells:
+      行動: 設定する
+  - id: s7
+    label: 定着
+    emotion: 1
+    cells:
+      行動: 毎日使う
+  - id: s8
+    label: 推奨
+    emotion: 2
+    cells:
+      行動: 人に勧める

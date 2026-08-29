@@ -1,0 +1,21 @@
+id: j-rows
+type: journey
+title: 5 行の旅
+rows: [行動, 接点, 不満, 気持ち, 機会]
+stages:
+  - id: a
+    label: 前
+    emotion: 0
+    cells:
+      行動: 探す
+      接点: 検索
+      不満: 遅い
+      気持ち: 不安
+      機会: 案内
+  - id: b
+    label: 後
+    emotion: 1
+    cells:
+      行動: 使う
+      接点: 画面
+      気持ち: 安心

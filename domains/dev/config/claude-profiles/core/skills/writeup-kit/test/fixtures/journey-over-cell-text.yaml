@@ -1,0 +1,15 @@
+id: j-text
+type: journey
+title: 長い文言の旅
+rows: [行動]
+stages:
+  - id: a
+    label: 前
+    emotion: 0
+    cells:
+      行動: 検索エンジンで製品名を調べて公式サイトを開く
+  - id: b
+    label: 後
+    emotion: 1
+    cells:
+      行動: 使う

@@ -292,7 +292,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 31 | Fishbone | `fishbone` | H(cause) | implemented (`bin/lib/figures/fishbone.mjs`) |
 | 32 | Wardley map | `wardley` | M(2-axis ordinal) | planned (positions are authored, not derived — IR carries them verbatim) |
 | 33 | Kanban | `kanban` | M(state census) | implemented as `board` with `variant: kanban` |
-| 34 | User journey | `journey` | S+M | planned |
+| 34 | User journey | `journey` | S+M | implemented (`bin/lib/figures/journey.mjs`) |
 | 35 | Deployment | `deployment` | L+G | planned |
 | 36 | Dependency graph | `dependency` | G(DAG) | covered by `diagram` (node/edge renderer: DAG; accent the one edge that breaks a cycle) |
 | 37 | UML class | `uml-class` | G(H) | implemented as `schema` with `variant: class` |

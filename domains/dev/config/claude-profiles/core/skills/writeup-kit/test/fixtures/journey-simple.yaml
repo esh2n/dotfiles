@@ -1,0 +1,23 @@
+id: j1
+type: journey
+title: 問い合わせ対応の体験
+caption: 送信・待機・回答の 3 段階。待機で気持ちが沈む
+rows: [行動, 不満]
+stages:
+  - id: send
+    label: 送信
+    emotion: 1
+    cells:
+      行動: フォームに入力
+  - id: wait
+    label: 待機
+    emphasis: true
+    emotion: -1
+    cells:
+      行動: 返信を待つ
+      不満: 進捗が見えない
+  - id: answer
+    label: 回答
+    emotion: 2
+    cells:
+      行動: 回答を読む
