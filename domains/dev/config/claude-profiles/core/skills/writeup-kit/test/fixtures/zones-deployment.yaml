@@ -20,13 +20,13 @@ zones:
     tone: ts
     nodes:
       - id: pg
-        label: PostgreSQL
+        label: RDB
         kind: store
       - id: mq
         label: MQ
         kind: queue
       - id: cache
-        label: Redis
+        label: キャッシュ
         kind: store
   - id: external
     label: 外部

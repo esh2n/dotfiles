@@ -41,7 +41,6 @@ tasks:
     group: 移行
     from: 2026-W19
     milestone: true
-    emphasis: true
   - id: watch
     label: 監視強化
     group: 定着

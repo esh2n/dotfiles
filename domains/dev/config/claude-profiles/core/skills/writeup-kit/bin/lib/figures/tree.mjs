@@ -7,24 +7,34 @@
 // elbows.
 //
 // IR shape: `{ id, type:'tree', title, caption, variant, direction, root }`.
-// `root` is `{ id, label, sub?, tone, emphasis, children: [same shape] }`;
+// `root` is `{ id, label, sub?, tone, emphasis, vacant?, children: [same shape] }`;
 // `variant` is `tree` (default) or `org`; `direction` is `down` (default)
 // or `right` (wide trees: the breadth axis becomes vertical). Every node id
-// is unique across the tree.
+// is unique across the tree. `vacant: true` (org: an unfilled post) draws
+// the box with a dashed outline.
 //
 // Layout is a deterministic tidy tree (Reingold–Tilford in its bounding-box
 // form): subtrees are measured bottom-up and placed side by side with a
 // fixed gap, every parent is centred over the midpoint of its first and
-// last child, and levels sit at fixed depths. Nodes on one level share a
-// width (so siblings line up) and a height (so the connector bus always
-// runs through the empty band between two levels). Everything lands on the
-// 4px grid: node widths are multiples of 8, heights 40 or 56, gaps 24/40.
+// last child, and levels sit at fixed depths. Node widths come in two
+// kinds only (survey #14): the root's own, and one width shared by every
+// other node — so siblings and cousins line up and the root reads as a
+// tier of its own; in `variant: org` the root is at least 16px wider than
+// the rest. Heights are per level (label 40 / label + sub 56) so the
+// connector bus always runs through the empty band between two levels.
+// Everything lands on the 4px grid: node widths are multiples of 8,
+// heights 40 or 56, gaps 24/40.
+//
+// Budgets (survey #14 / #15): nodes ≤ 16 (org 12), 4 levels, ≤ 5 nodes on
+// any one level (`budget:breadth`), org direct reports ≤ 5 per manager
+// (`budget:reports`), label ≤ 14 chars, one emphasized node — the root or
+// one leaf, never both (`budget:emphasis-place`).
 import { IrError, isObj, requireStr, optStr, validateTone, validateBool, normalizeHeader, budgetWarning, esc } from './_shared.mjs'
 import { snap4, snapUp4, textWidth, FONT_SIZE, SUBLABEL_SIZE, BOLD_FACTOR } from '../diagram.mjs'
 
 export const type = 'tree'
 
-export const limits = { maxNodes: 16, maxDepth: 4, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { maxNodes: 16, maxDepth: 4, maxBreadth: 5, maxLabelLen: 14, maxEmphasis: 1, orgMaxNodes: 12, orgMaxReports: 5 }
 
 const VARIANTS = new Set(['tree', 'org'])
 const DIRECTIONS = new Set(['down', 'right'])
@@ -36,6 +46,8 @@ const NODE_H_SUB = 56       // label + sub line
 const SIB_GAP = 24          // between sibling subtrees (breadth axis)
 const LEVEL_GAP = 40        // between levels (depth axis); the bus runs at its middle
 const CENTRE_TOLERANCE = 4  // parent centre vs. midpoint of first/last child centre
+const ORG_ROOT_EXTRA = 16   // org: the root box is at least this much wider than the others
+const VACANT_DASH = '5 4'
 
 // --- schema --------------------------------------------------------------
 
@@ -68,6 +80,7 @@ function normalizeNode(raw, ctx, seen) {
   const sub = optStr(raw, 'sub', ctx)
   const tone = validateTone(raw.tone, ctx)
   const emphasis = validateBool(raw, 'emphasis', ctx)
+  const vacant = validateBool(raw, 'vacant', ctx)
   let children = []
   if (raw.children !== undefined && raw.children !== null) {
     if (!Array.isArray(raw.children)) throw new IrError(`${ctx}.children must be a list`)
@@ -75,6 +88,7 @@ function normalizeNode(raw, ctx, seen) {
   }
   const node = { id, label, tone, emphasis, children }
   if (sub !== undefined && sub.trim() !== '') node.sub = sub
+  if (vacant) node.vacant = true
   return node
 }
 
@@ -93,12 +107,27 @@ const depthOf = (root) => Math.max(...flatten(root).map((r) => r.level))
 
 // --- budgets ---------------------------------------------------------------
 
+/** Node count and per-level width, as `[level, count]` for the widest level. */
+function widestLevel(all) {
+  const counts = new Map()
+  for (const r of all) counts.set(r.level, (counts.get(r.level) ?? 0) + 1)
+  return [...counts.entries()].reduce((m, e) => (e[1] > m[1] ? e : m), [1, 0])
+}
+
+/** The manager with the most direct reports, as `{ node, count }`. */
+function widestFanout(all) {
+  return all.reduce((m, r) => (r.node.children.length > m.count ? { node: r.node, count: r.node.children.length } : m), { node: undefined, count: 0 })
+}
+
+const maxNodesOf = (ir) => (ir.variant === 'org' ? limits.orgMaxNodes : limits.maxNodes)
+
 export function budgetWarnings(ir) {
   const out = []
   const all = flatten(ir.root)
-  if (all.length > limits.maxNodes) {
-    out.push(budgetWarning('budget:nodes', all.length, limits.maxNodes,
-      `${all.length} node(s) (guidance ≤ ${limits.maxNodes})`,
+  const maxNodes = maxNodesOf(ir)
+  if (all.length > maxNodes) {
+    out.push(budgetWarning('budget:nodes', all.length, maxNodes,
+      `${all.length} node(s) (guidance ≤ ${maxNodes}${ir.variant === 'org' ? ' for an org chart' : ''})`,
       'collapse a subtree into one node, or split the figure at a branch'))
   }
   const depth = depthOf(ir.root)
@@ -107,6 +136,20 @@ export function budgetWarnings(ir) {
       `${depth} level(s) (guidance ≤ ${limits.maxDepth})`,
       'cut the tree at a level and draw the deeper part as its own figure'))
   }
+  const [wideLevel, breadth] = widestLevel(all)
+  if (breadth > limits.maxBreadth) {
+    out.push(budgetWarning('budget:breadth', breadth, limits.maxBreadth,
+      `${breadth} node(s) on level ${wideLevel} (guidance ≤ ${limits.maxBreadth} per level)`,
+      `group the level-${wideLevel} nodes under intermediate parents, or draw that level's subtrees as their own figures`))
+  }
+  if (ir.variant === 'org') {
+    const fan = widestFanout(all)
+    if (fan.count > limits.orgMaxReports) {
+      out.push(budgetWarning('budget:reports', fan.count, limits.orgMaxReports,
+        `"${fan.node.id}" has ${fan.count} direct reports (guidance ≤ ${limits.orgMaxReports})`,
+        `add a middle tier under "${fan.node.id}", or list the reports in a table`))
+    }
+  }
   const longest = all.reduce((m, r) => ([...r.node.label].length > (m ? [...m.node.label].length : 0) ? r : m), null)
   if (longest && [...longest.node.label].length > limits.maxLabelLen) {
     const len = [...longest.node.label].length
@@ -114,11 +157,18 @@ export function budgetWarnings(ir) {
       `label of node "${longest.node.id}" is ${len} chars (guidance ≤ ${limits.maxLabelLen})`,
       `shorten label of node "${longest.node.id}"`))
   }
-  const emphasized = all.filter((r) => r.node.emphasis).length
-  if (emphasized > limits.maxEmphasis) {
-    out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
-      `${emphasized} emphasized node(s) (guidance ≤ ${limits.maxEmphasis})`,
+  const emphasized = all.filter((r) => r.node.emphasis)
+  if (emphasized.length > limits.maxEmphasis) {
+    out.push(budgetWarning('budget:emphasis', emphasized.length, limits.maxEmphasis,
+      `${emphasized.length} emphasized node(s) (guidance ≤ ${limits.maxEmphasis})`,
       'keep emphasis on the root or the one leaf the decision is about'))
+  }
+  const rootEmphasized = ir.root.emphasis
+  const leafEmphasized = emphasized.filter((r) => r.level > 1 && r.node.children.length === 0)
+  if (rootEmphasized && leafEmphasized.length) {
+    out.push(budgetWarning('budget:emphasis-place', 1 + leafEmphasized.length, 1,
+      `the root and ${leafEmphasized.length} leaf/leaves (${leafEmphasized.map((r) => `"${r.node.id}"`).join(', ')}) are both emphasized`,
+      'emphasize either the root or the one leaf the decision is about, not both'))
   }
   return out
 }
@@ -130,18 +180,26 @@ export function budgetWarnings(ir) {
 
 const snapUp8 = (v) => Math.ceil(v / 8) * 8
 
-/** Per-level node size: one width and one height per level so siblings
- * line up and the inter-level band stays empty for the bus. */
-function levelSizes(root) {
+/** Per-level node size: heights are one per level so the inter-level band
+ * stays empty for the bus; widths come in two kinds — the root's own and one
+ * shared by every other level (survey #14: at most two box widths) — so
+ * siblings and cousins line up. An org chart's root is a tier of its own:
+ * at least ORG_ROOT_EXTRA wider than the rest. */
+function levelSizes(root, variant) {
   const widths = []
   const heights = []
+  let rootW = 0
+  let restW = 0
   for (const { node, level } of flatten(root)) {
     const labelW = textWidth(node.label, FONT_SIZE) * (node.emphasis ? BOLD_FACTOR : 1)
     const subW = node.sub ? textWidth(node.sub, SUBLABEL_SIZE) : 0
     const w = snapUp8(Math.max(NODE_MIN_W, Math.ceil(Math.max(labelW, subW)) + PAD_X * 2))
-    widths[level] = Math.max(widths[level] ?? 0, w)
+    if (level === 1) rootW = w
+    else restW = Math.max(restW, w)
     heights[level] = Math.max(heights[level] ?? NODE_H, node.sub ? NODE_H_SUB : NODE_H)
   }
+  if (variant === 'org' && restW > 0) rootW = Math.max(rootW, restW + ORG_ROOT_EXTRA)
+  for (let level = 1; level < heights.length; level++) widths[level] = level === 1 ? rootW : restW
   return { widths, heights }
 }
 
@@ -178,13 +236,14 @@ function place(sub, b0, depthAt, breadth, depth, parent, out) {
     b: b0 + sub.c - breadth[level] / 2, d: depthAt[level], bw: breadth[level], dw: depth[level],
   }
   if (sub.node.sub) rec.sub = sub.node.sub
+  if (sub.node.vacant) rec.vacant = true
   out.push(rec)
   for (const k of sub.kids) place(k.sub, b0 + k.off, depthAt, breadth, depth, sub.node.id, out)
 }
 
 export async function layout(ir) {
   const down = ir.direction === 'down'
-  const { widths, heights } = levelSizes(ir.root)
+  const { widths, heights } = levelSizes(ir.root, ir.variant)
   const breadth = down ? widths : heights   // extent along the sibling axis, per level
   const depth = down ? heights : widths     // extent along the parent→child axis, per level
   const depthAt = []
@@ -258,7 +317,8 @@ export function draw(geo, ir) {
     const cls = n.emphasis ? ' class="wu-focal"' : ''
     const sw = n.emphasis ? 1.5 : 1
     const weight = n.emphasis ? ' font-weight="700"' : ''
-    parts.push(`<rect id="${uid}-${n.id}" data-tone="${esc(n.tone)}"${cls} x="${n.x}" y="${n.y}" width="${n.width}" height="${n.height}" rx="6" fill="${nodeFill(n)}" stroke="currentColor" stroke-width="${sw}"/>`)
+    const dash = n.vacant ? ` stroke-dasharray="${VACANT_DASH}"` : ''
+    parts.push(`<rect id="${uid}-${n.id}" data-tone="${esc(n.tone)}"${cls}${n.vacant ? ' data-vacant="true"' : ''} x="${n.x}" y="${n.y}" width="${n.width}" height="${n.height}" rx="6" fill="${nodeFill(n)}" stroke="currentColor" stroke-width="${sw}"${dash}/>`)
     if (n.sub) {
       parts.push(`<text id="${uid}-${n.id}-label" x="${n.cx}" y="${n.y + 23}" font-size="${FONT_SIZE}" text-anchor="middle"${weight} fill="currentColor">${esc(n.label)}</text>`)
       parts.push(`<text id="${uid}-${n.id}-sub" x="${n.cx}" y="${n.y + 41}" font-size="${SUBLABEL_SIZE}" text-anchor="middle" fill="var(--wu-ink-3)">${esc(n.sub)}</text>`)
@@ -308,9 +368,19 @@ export function verify(geo, ir) {
   const rows = [
     warnRow(1, 'node-count', budget, 'budget:nodes', `${all.length} node(s)`),
     warnRow(2, 'depth', budget, 'budget:depth', `${depthOf(ir.root)} level(s)`),
-    warnRow(3, 'label-length', budget, 'budget:label', `every label within ${limits.maxLabelLen} chars`),
-    warnRow(4, 'emphasis-count', budget, 'budget:emphasis', `${all.filter((r) => r.node.emphasis).length} emphasized node(s)`),
+    warnRow(3, 'breadth', budget, 'budget:breadth', `at most ${widestLevel(all)[1]} node(s) on one level`),
+    warnRow(4, 'reports', budget, 'budget:reports', ir.variant === 'org' ? `at most ${widestFanout(all).count} direct report(s) per manager` : 'not an org chart'),
+    warnRow(5, 'label-length', budget, 'budget:label', `every label within ${limits.maxLabelLen} chars`),
+    warnRow(6, 'emphasis-count', budget, 'budget:emphasis', `${all.filter((r) => r.node.emphasis).length} emphasized node(s)`),
+    warnRow(7, 'emphasis-place', budget, 'budget:emphasis-place', 'emphasis sits on the root or a leaf, not both'),
   ]
+
+  const widthKinds = [...new Set(nodes.map((n) => (ir.direction === 'down' ? n.width : n.height)))]
+  const restKinds = [...new Set(nodes.filter((n) => n.level > 1).map((n) => (ir.direction === 'down' ? n.width : n.height)))]
+  const widthProblems = []
+  if (widthKinds.length > 2) widthProblems.push(`${widthKinds.length} box widths (${widthKinds.join(', ')})`)
+  if (restKinds.length > 1) widthProblems.push(`non-root nodes use ${restKinds.length} widths (${restKinds.join(', ')})`)
+  rows.push(failRow(8, 'node-widths', widthProblems, 'boxes come in at most two widths: the root and everyone else', 'size every non-root node to the widest non-root label — see levelSizes()'))
 
   const overlap = []
   for (let i = 0; i < nodes.length; i++) {
@@ -318,7 +388,7 @@ export function verify(geo, ir) {
       if (rectsOverlap(nodes[i], nodes[j])) overlap.push(`"${nodes[i].id}" overlaps "${nodes[j].id}"`)
     }
   }
-  rows.push(failRow(5, 'node-overlap', overlap, 'no two nodes overlap', 'subtrees must be separated by the sibling gap — check measure()'))
+  rows.push(failRow(9, 'node-overlap', overlap, 'no two nodes overlap', 'subtrees must be separated by the sibling gap — check measure()'))
 
   const shape = []
   const cross = []
@@ -339,8 +409,8 @@ export function verify(geo, ir) {
       }
     }
   }
-  rows.push(failRow(6, 'connectors-orthogonal', shape, 'every connector is orthogonal and attaches to both node borders', 'route connectors as stem → bus → drop, starting and ending on the node borders'))
-  rows.push(failRow(7, 'connector-clearance', cross, 'no connector crosses an unrelated node', 'the bus must run in the empty band between two levels — check LEVEL_GAP and the per-level heights'))
+  rows.push(failRow(10, 'connectors-orthogonal', shape, 'every connector is orthogonal and attaches to both node borders', 'route connectors as stem → bus → drop, starting and ending on the node borders'))
+  rows.push(failRow(11, 'connector-clearance', cross, 'no connector crosses an unrelated node', 'the bus must run in the empty band between two levels — check LEVEL_GAP and the per-level heights'))
 
   const centred = []
   const axis = ir.direction === 'down' ? 'cx' : 'cy'
@@ -352,13 +422,13 @@ export function verify(geo, ir) {
     const off = Math.abs(p[axis] - mid)
     if (off > CENTRE_TOLERANCE) centred.push(`"${p.id}" is ${off}px off the centre of its children`)
   }
-  rows.push(failRow(8, 'parent-centred', centred, `every parent sits within ±${CENTRE_TOLERANCE}px of the midpoint of its first and last child`, 'centre each parent over its children in measure() before placing the level'))
+  rows.push(failRow(12, 'parent-centred', centred, `every parent sits within ±${CENTRE_TOLERANCE}px of the midpoint of its first and last child`, 'centre each parent over its children in measure() before placing the level'))
   return rows
 }
 
 export const doc = {
   purpose: 'a hierarchy — one root, children under or right of their parent (decomposition, option tree, org chart with variant: org)',
-  whenToUse: 'when the *structure itself* is the subject and every node has exactly one parent; use dependency/diagram for shared parents or cycles, nested for containment. `variant: org` adds a muted role line (`sub`) and a shared bus under each parent. Budgets: nodes ≤ 16, 4 levels, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn; wide trees can use `direction: right`.',
+  whenToUse: 'when the *structure itself* is the subject and every node has exactly one parent; use dependency/diagram for shared parents or cycles, nested for containment. `variant: org` adds a muted role line (`sub`), a shared bus under each parent, a wider root tier and `vacant: true` (dashed box) for an unfilled post. Budgets: nodes ≤ 16 (org 12), 4 levels, ≤ 5 nodes per level, org ≤ 5 direct reports, label ≤ 14 chars, emphasis ≤ 1 on the root or one leaf — guidance, over-budget figures still render with data-warn; boxes come in two widths (root / others); wide trees can use `direction: right`.',
   irExample: `id: team-org
 type: tree
 variant: org
@@ -391,5 +461,5 @@ root:
       label: 管理部門
       sub: CFO
 `,
-  rows: ['node-count', 'depth', 'label-length', 'emphasis-count', 'node-overlap', 'connectors-orthogonal', 'connector-clearance', 'parent-centred'],
+  rows: ['node-count', 'depth', 'breadth', 'reports', 'label-length', 'emphasis-count', 'emphasis-place', 'node-widths', 'node-overlap', 'connectors-orthogonal', 'connector-clearance', 'parent-centred'],
 }

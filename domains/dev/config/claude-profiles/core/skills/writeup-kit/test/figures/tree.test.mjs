@@ -86,13 +86,52 @@ describe('tree: budgets are advisory warnings in a stable order', () => {
   test('17 nodes validate with a budget:nodes warning that reaches data-warn and still renders as a passing figure', async () => {
     const r = validateIR(parseYaml(fixture('tree-over-nodes.yaml')))
     assert.equal(r.ok, true)
-    assert.deepEqual(r.warnings.map((w) => `${w.key}=${w.value}`), ['budget:nodes=17'])
-    assert.equal(formatBudgetWarnings(r.warnings), 'budget:nodes=17')
+    assert.deepEqual(r.warnings.map((w) => `${w.key}=${w.value}`), ['budget:nodes=17', 'budget:breadth=12'])
+    assert.equal(formatBudgetWarnings(r.warnings), 'budget:nodes=17;budget:breadth=12')
+    assert.match(r.warnings[1].detail, /12 node\(s\) on level 3 \(guidance ≤ 5 per level\)/)
+    assert.match(r.warnings[1].hint, /group the level-3 nodes/)
     const html = await renderFigureHtmlChecked(r.ir)
-    assert.match(html.html, /data-checks="pass" data-warn="budget:nodes=17" data-type="tree" data-scroll="true"/)
+    assert.match(html.html, /data-checks="pass" data-warn="budget:nodes=17;budget:breadth=12" data-type="tree" data-scroll="true"/)
   })
 
-  test('5 levels, a label over 14 chars and 3 emphasized nodes warn in the order nodes → depth → label → emphasis', () => {
+  test('org: 13 nodes exceed the org budget of 12 (a plain tree of 13 does not); 6 direct reports warn as budget:reports', () => {
+    const wide = (variant) => ({ id: 't', type: 'tree', variant, title: 't', root: node('r', 'R', { children: Array.from({ length: 4 }, (_, i) => node(`m${i}`, `M${i}`, { children: [node(`m${i}a`, 'a'), node(`m${i}b`, 'b')] })) }) })
+    assert.deepEqual(validateIR(wide('tree')).warnings.map((w) => w.key), ['budget:breadth'])
+    const org = validateIR(wide('org'))
+    assert.deepEqual(org.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:nodes', 13, 12], ['budget:breadth', 8, 5]])
+    assert.match(org.warnings[0].detail, /for an org chart/)
+    const fan = validateIR({ id: 't', type: 'tree', variant: 'org', title: 't', root: node('r', 'R', { children: Array.from({ length: 6 }, (_, i) => node(`s${i}`, `S${i}`)) }) })
+    assert.deepEqual(fan.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:breadth', 6, 5], ['budget:reports', 6, 5]])
+    assert.match(fan.warnings[1].detail, /"r" has 6 direct reports/)
+    assert.match(fan.warnings[1].hint, /middle tier under "r"/)
+    // the same fan-out in a plain tree is only a breadth warning
+    const plainFan = validateIR({ id: 't', type: 'tree', title: 't', root: node('r', 'R', { children: Array.from({ length: 6 }, (_, i) => node(`s${i}`, `S${i}`)) }) })
+    assert.deepEqual(plainFan.warnings.map((w) => w.key), ['budget:breadth'])
+  })
+
+  test('emphasis: two nodes exceed the one-focal budget; the root and a leaf together also warn as budget:emphasis-place', () => {
+    const rootAndLeaf = minimal()
+    rootAndLeaf.root.emphasis = true
+    rootAndLeaf.root.children[0].emphasis = true
+    const r = validateIR(rootAndLeaf)
+    assert.deepEqual(r.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:emphasis', 2, 1], ['budget:emphasis-place', 2, 1]])
+    assert.match(r.warnings[1].detail, /the root and 1 leaf\/leaves \("a"\) are both emphasized/)
+    assert.match(r.warnings[1].hint, /either the root or the one leaf/)
+    // one leaf alone, or the root alone, is the survey's accent
+    const leaf = minimal()
+    leaf.root.children[1].emphasis = true
+    assert.deepEqual(validateIR(leaf).warnings, [])
+    const root = minimal()
+    root.root.emphasis = true
+    assert.deepEqual(validateIR(root).warnings, [])
+    // vacant is kept only when true
+    const vacant = validateIR({ ...minimal(), root: node('r', 'R', { children: [node('a', 'A', { vacant: true }), node('b', 'B', { vacant: false })] }) })
+    assert.equal(vacant.ir.root.children[0].vacant, true)
+    assert.equal('vacant' in vacant.ir.root.children[1], false)
+    assert.match(validateIR({ ...minimal(), root: node('r', 'R', { vacant: 'yes' }) }).message, /^ir\.root\.vacant must be a boolean/)
+  })
+
+  test('5 levels, a label over 14 chars and 3 emphasized nodes warn in the order nodes → depth → breadth → reports → label → emphasis → emphasis-place', () => {
     const raw = minimal()
     raw.root.emphasis = true
     raw.root.children[0].emphasis = true
@@ -101,14 +140,14 @@ describe('tree: budgets are advisory warnings in a stable order', () => {
     raw.root.children[1].children = [node('l3', 'L3', { children: [node('l4', 'L4', { children: [node('l5', 'L5')] })] })]
     const r = validateIR(raw)
     assert.equal(r.ok, true)
-    assert.deepEqual(r.warnings.map((w) => w.key), ['budget:depth', 'budget:label', 'budget:emphasis'])
+    assert.deepEqual(r.warnings.map((w) => w.key), ['budget:depth', 'budget:label', 'budget:emphasis', 'budget:emphasis-place'])
     assert.equal(r.warnings[0].value, 5)
     assert.match(r.warnings[1].hint, /shorten label of node "a"/)
     assert.equal(r.warnings[2].value, 3)
     assert.deepEqual(tree.budgetWarnings(r.ir), r.warnings)
     const many = minimal()
     many.root.children = Array.from({ length: 16 }, (_, i) => node(`n${i}`, `N${i}`))
-    assert.deepEqual(validateIR(many).warnings.map((w) => w.key), ['budget:nodes'])
+    assert.deepEqual(validateIR(many).warnings.map((w) => w.key), ['budget:nodes', 'budget:breadth'])
   })
 })
 
@@ -125,6 +164,11 @@ describe('tree: layout', () => {
       assert.equal(new Set(row.map((n) => n.y)).size, 1, `level ${level} shares a y`)
       assert.ok(row.every((n) => n.height === 56), `level ${level} is 56px tall (sub line)`)
     }
+    // two box widths only: the root's own (an org root is ≥ 16px wider) and one for everyone else
+    const rest = geo.nodes.filter((n) => n.level > 1)
+    assert.equal(new Set(rest.map((n) => n.width)).size, 1, 'every non-root node shares one width')
+    assert.ok(find(geo, 'ceo').width >= rest[0].width + 16, 'the org root is a wider tier')
+    assert.equal(find(geo, 'ceo').width % 8, 0)
     const [tech, biz, admin] = ['tech', 'biz', 'admin'].map((id) => find(geo, id))
     assert.ok(tech.x + tech.width + 24 <= biz.x && biz.x + biz.width + 24 <= admin.x, 'siblings run left to right ≥ 24px apart')
     assert.equal(find(geo, 'dev').y, tech.y + tech.height + 40, 'the next level sits one LEVEL_GAP below')
@@ -156,6 +200,12 @@ describe('tree: layout', () => {
     assert.equal(cfg.cy, (kids[0].cy + kids[2].cy) / 2)
     for (const b of geo.buses) assert.equal(b.x1, b.x2, 'bus is vertical')
     assert.equal(geo.nodes.filter((n) => n.level === 1)[0].height, 40)
+    // a plain tree: non-root widths are one value (the widest non-root label), the root its own
+    const plain = (await rendered('tree-simple.yaml')).geo
+    assert.equal(new Set(plain.nodes.filter((n) => n.level > 1).map((n) => n.width)).size, 1)
+    assert.ok(new Set(plain.nodes.map((n) => n.width)).size <= 2)
+    // in direction: right the breadth axis is height, and the same two-kind rule holds there
+    assert.equal(new Set(geo.nodes.filter((n) => n.level > 1).map((n) => n.width)).size, 1)
   })
 
   test('layout is deterministic: same IR → byte-identical svg and deep-equal geometry', async () => {
@@ -179,17 +229,37 @@ describe('tree: layout', () => {
 // --- verify rows ----------------------------------------------------------------
 
 describe('tree: verify rows', () => {
-  test('a real render of every fixture passes every fail row; rows 1–4 warn, 5–8 fail; the 7 shared rows follow', async () => {
+  test('a real render of every fixture passes every fail row; rows 1–7 warn, 8–12 fail; the 7 shared rows follow', async () => {
     for (const name of FIXTURE_NAMES) {
       const { ir, out } = await rendered(name)
       const result = await verifyFigure(tree, ir, out)
       assert.deepEqual(result.failures, [], name)
       assert.equal(result.ok, true)
-      assert.deepEqual(result.checks.slice(0, 8).map((c) => c.severity), ['warn', 'warn', 'warn', 'warn', 'fail', 'fail', 'fail', 'fail'])
-      assert.deepEqual(result.checks.slice(0, 8).map((c) => c.name), tree.doc.rows)
-      assert.equal(result.checks.length, 8 + 7)
+      assert.deepEqual(result.checks.slice(0, 12).map((c) => c.severity), [...Array(7).fill('warn'), ...Array(5).fill('fail')])
+      assert.deepEqual(result.checks.slice(0, 12).map((c) => c.name), tree.doc.rows)
+      assert.equal(result.checks.length, 12 + 7)
       if (name !== 'tree-over-nodes.yaml') assert.deepEqual(result.warnings, [], name)
+      const reports = byName(result.checks, 'reports')
+      assert.equal(reports.ok, true)
+      assert.match(reports.detail, ir.variant === 'org' ? /direct report\(s\) per manager/ : /not an org chart/)
     }
+  })
+
+  test('node-widths fails when a third box width appears or non-root nodes stop sharing one', async () => {
+    const { ir, out } = await rendered('tree-org.yaml')
+    const clean = await verifyFigure(tree, ir, out)
+    assert.equal(byName(clean.checks, 'node-widths').ok, true)
+    const bad = structuredClone(out)
+    const dev = find(bad.layout.geo, 'dev')
+    dev.width += 8
+    dev.cx += 4
+    const result = await verifyFigure(tree, ir, bad)
+    const row = byName(result.checks, 'node-widths')
+    assert.equal(row.severity, 'fail')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /3 box widths/)
+    assert.match(row.detail, /non-root nodes use 2 widths/)
+    assert.match(row.hint, /levelSizes/)
   })
 
   test('node-overlap fails when a sibling is moved onto its neighbour', async () => {
@@ -250,7 +320,7 @@ describe('tree: verify rows', () => {
     assert.equal(byName(four.checks, 'parent-centred').ok, true)
   })
 
-  test('emphasis-count warns (ok stays true overall) when 3 nodes are emphasized', async () => {
+  test('emphasis-count and emphasis-place warn (ok stays true overall) when the root and 2 leaves are emphasized', async () => {
     const raw = minimal()
     raw.root.emphasis = true
     raw.root.children.forEach((c) => { c.emphasis = true })
@@ -258,8 +328,9 @@ describe('tree: verify rows', () => {
     const out = await renderFigure(tree, ir)
     const result = await verifyFigure(tree, ir, out)
     assert.equal(result.ok, true)
-    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:emphasis=3'])
+    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:emphasis=3', 'budget:emphasis-place=3'])
     assert.equal(byName(result.checks, 'emphasis-count').severity, 'warn')
+    assert.equal(byName(result.checks, 'emphasis-place').severity, 'warn')
   })
 })
 
@@ -271,7 +342,11 @@ describe('tree: draw, registry dispatch and CLI', () => {
     assert.equal((org.out.svg.match(/id="wu-d-org1-bus-/g) || []).length, 3)
     assert.doesNotMatch(org.out.svg, /-link-/)
     assert.match(org.out.svg, /<text id="wu-d-org1-ceo-sub" [^>]*font-size="11" [^>]*fill="var\(--wu-ink-3\)">CEO<\/text>/)
-    assert.match(org.out.svg, /<rect id="wu-d-org1-ceo" data-tone="neutral" class="wu-focal"[^>]*stroke-width="1.5"/)
+    assert.match(org.out.svg, /<rect id="wu-d-org1-ceo" data-tone="neutral" class="wu-focal"[^>]*stroke-width="1.5"\/>/)
+    // the vacant post is a dashed box
+    assert.match(org.out.svg, /<rect id="wu-d-org1-admin" data-tone="neutral" data-vacant="true"[^>]*stroke-width="1" stroke-dasharray="5 4"\/>/)
+    assert.equal((org.out.svg.match(/stroke-dasharray/g) || []).length, 1)
+    assert.match(org.out.svg, /<text id="wu-d-org1-admin-sub"[^>]*>CFO（空席）<\/text>/)
     const plain = await rendered('tree-simple.yaml')
     assert.equal((plain.out.svg.match(/id="wu-d-t1-link-/g) || []).length, 6)
     assert.doesNotMatch(plain.out.svg, /-bus-/)
@@ -281,7 +356,7 @@ describe('tree: draw, registry dispatch and CLI', () => {
 
   test('the registry knows tree with its limits and rows; the doc example is a 7-node 3-level org chart that renders clean', async () => {
     const t = getFigureType('tree')
-    assert.deepEqual(t.limits, { maxNodes: 16, maxDepth: 4, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(t.limits, { maxNodes: 16, maxDepth: 4, maxBreadth: 5, maxLabelLen: 14, maxEmphasis: 1, orgMaxNodes: 12, orgMaxReports: 5 })
     assert.deepEqual(t.doc.rows, tree.doc.rows)
     const r = validateIR(parseYaml(t.doc.irExample))
     assert.equal(r.ok, true, JSON.stringify(r))
@@ -314,8 +389,8 @@ describe('tree: draw, registry dispatch and CLI', () => {
     assert.equal(over.status, 0, over.stderr)
     const j = JSON.parse(over.stdout)
     assert.ok(j.figureHtml)
-    assert.equal(j.warn, 'budget:nodes=17')
-    assert.deepEqual(j.warnings.map((w) => w.key), ['budget:nodes'])
+    assert.equal(j.warn, 'budget:nodes=17;budget:breadth=12')
+    assert.deepEqual(j.warnings.map((w) => w.key), ['budget:nodes', 'budget:breadth'])
     const doc = runCli(['--doc', 'tree'])
     assert.equal(doc.status, 0, doc.stderr)
     assert.equal(doc.stdout, tree.doc.irExample)

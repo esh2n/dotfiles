@@ -29,4 +29,5 @@ root:
           sub: Sales Lead
     - id: admin
       label: 管理部門
-      sub: CFO
+      sub: CFO（空席）
+      vacant: true

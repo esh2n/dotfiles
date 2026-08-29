@@ -103,20 +103,38 @@ describe('figures/radar.mjs: budgets', () => {
     assert.match(result.warnings[2].hint, /shorten axes\[8\]\.label/)
   })
 
-  test('exactly 8 axes and 3 series are within budget (at the limit, not over it)', () => {
+  test('exactly 5 axes and 3 series are within budget (at the limit, not over it)', () => {
     const result = validateIR(parseYaml(fixture('radar-three.yaml')))
     assert.equal(result.ok, true)
-    assert.equal(result.ir.axes.length, 8)
+    assert.equal(result.ir.axes.length, 5)
     assert.equal(result.ir.series.length, 3)
     assert.deepEqual(result.warnings, [])
-    assert.deepEqual(plugin().limits, { maxAxes: 8, maxSeries: 3, maxLabelLen: 12 })
+    assert.deepEqual(plugin().limits, { maxAxes: 5, maxSeries: 3, maxLabelLen: 12, maxEmphasis: 1 })
+  })
+
+  test('a 6th axis warns; exactly 2 series warns (bars/table compare two better); a 2nd emphasis warns', () => {
+    const six = validateIR(rawIr({
+      axes: ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => ({ id, label: id.toUpperCase() })),
+      series: [{ id: 's', label: 'S', values: { a: 1, b: 1, c: 1, d: 1, e: 1, f: 1 } }],
+    }))
+    assert.deepEqual(six.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:axes', 6, 5]])
+    const two = validateIR(rawIr({ series: [{ id: 's1', label: 'S1', values: { a: 1, b: 1, c: 1 } }, { id: 's2', label: 'S2', values: { a: 0, b: 1, c: 0 } }] }))
+    assert.deepEqual(two.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:series', 2, 3]])
+    assert.match(two.warnings[0].detail, /2 series — a two-option comparison reads better as bars or a table/)
+    assert.match(two.warnings[0].hint, /grouped bar \/ table/)
+    const focal2 = validateIR(rawIr({ series: [
+      { id: 's1', label: 'S1', values: { a: 1, b: 1, c: 1 }, emphasis: true },
+      { id: 's2', label: 'S2', values: { a: 0, b: 1, c: 0 }, emphasis: true },
+      { id: 's3', label: 'S3', values: { a: 0, b: 0, c: 1 } },
+    ] }))
+    assert.deepEqual(focal2.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:emphasis', 2, 1]])
   })
 })
 
 // --- layout ---------------------------------------------------------------
 
 describe('figures/radar.mjs: layout', () => {
-  test('the 8-axis / 3-series figure stays within the column, on the grid, with N vertices per series', async () => {
+  test('the 5-axis / 3-series figure stays within the column, on the grid, with N vertices per series', async () => {
     const { ir, r } = await rendered('radar-three.yaml')
     assert.ok(r.width <= COLUMN, `width ${r.width} > ${COLUMN}`)
     assert.equal(r.scaled, false)
@@ -126,7 +144,9 @@ describe('figures/radar.mjs: layout', () => {
     const geo = r.layout.geo
     assert.equal(geo.cx % 4, 0)
     assert.equal(geo.cy % 4, 0)
-    assert.equal(geo.rings.length, 4)
+    assert.equal(geo.rings.length, 5)
+    assert.deepEqual(geo.rings.map((ring) => ring.value), [1, 2, 3, 4, 5])
+    assert.ok(Math.abs(geo.rings[4].r - geo.radius) < 0.1)
     for (const a of geo.axes) { assert.equal(a.label.x % 4, 0); assert.equal(a.label.y % 4, 0) }
     for (const s of geo.series) assert.equal(s.points.length, ir.axes.length)
     assert.equal(r.layout.legend.items.length, 3)
@@ -146,11 +166,12 @@ describe('figures/radar.mjs: layout', () => {
     assert.ok(bottom.label.box.top > geo.cy + geo.radius)
   })
 
-  test('series are told apart without colour: solid + fill, dashed, dotted; emphasis adds vertex dots', async () => {
+  test('series are told apart without colour: solid + fill, dashed, dotted; only the focal series is 1.5px with vertex dots', async () => {
     const { r } = await rendered('radar-three.yaml')
     assert.match(r.svg, /<polygon id="wu-d-r3-series-a" points="[^"]+" fill="currentColor" fill-opacity="0.08" stroke="currentColor" stroke-width="1.5"[^>]*\/>/)
-    assert.match(r.svg, /<polygon id="wu-d-r3-series-b" [^>]*fill="none"[^>]*stroke-dasharray="6 4"\/>/)
-    assert.match(r.svg, /<polygon id="wu-d-r3-series-c" [^>]*fill="none"[^>]*stroke-dasharray="1.5 3.5"\/>/)
+    assert.match(r.svg, /<polygon id="wu-d-r3-series-b" [^>]*fill="none" stroke="currentColor" stroke-width="1"[^>]*stroke-dasharray="6 4"\/>/)
+    assert.match(r.svg, /<polygon id="wu-d-r3-series-c" [^>]*fill="none" stroke="currentColor" stroke-width="1"[^>]*stroke-dasharray="1.5 3.5"\/>/)
+    assert.equal((r.svg.match(/<circle id="wu-d-r3-ring-/g) || []).length, 5)
     assert.match(r.svg, /<g id="wu-d-r3-series-a-dots"/)
     assert.doesNotMatch(r.svg, /series-b-dots|series-c-dots/)
     assert.match(r.svg, /<g id="wu-d-r3-legend"/)
@@ -185,11 +206,12 @@ describe('figures/radar.mjs: verify rows', () => {
     const { ir, r } = await rendered('radar-simple.yaml')
     const result = await verifyFigure(plugin(), ir, r)
     assert.equal(result.ok, true, JSON.stringify(result.failures))
-    assert.deepEqual(result.checks.slice(0, 7).map((c) => c.name), radar.doc.rows)
-    assert.deepEqual(radar.doc.rows, ['axis-count', 'series-count', 'label-length', 'values-in-range', 'labels-clear', 'polygons-closed', 'series-distinct'])
+    assert.deepEqual(result.checks.slice(0, 8).map((c) => c.name), radar.doc.rows)
+    assert.deepEqual(radar.doc.rows, ['axis-count', 'series-count', 'label-length', 'emphasis-count', 'values-in-range', 'labels-clear', 'polygons-closed', 'series-distinct'])
+    assert.deepEqual(result.warnings, [])
   })
 
-  test('#4 values-in-range fails on a value above max or below 0', async () => {
+  test('#5 values-in-range fails on a value above max or below 0', async () => {
     const { ir, r } = await rendered('radar-simple.yaml')
     const over = structuredClone(ir)
     over.series[0].values.speed = 1.2
@@ -203,7 +225,7 @@ describe('figures/radar.mjs: verify rows', () => {
     assert.equal(b.ok, false)
   })
 
-  test('#5 labels-clear fails when two labels overlap, and when a label is moved onto the rings', async () => {
+  test('#6 labels-clear fails when two labels overlap, and when a label is moved onto the rings', async () => {
     const { ir, r } = await rendered('radar-simple.yaml')
     const clash = structuredClone(r)
     clash.layout.geo.axes[1].label.box = { ...clash.layout.geo.axes[0].label.box }
@@ -218,7 +240,7 @@ describe('figures/radar.mjs: verify rows', () => {
     assert.match(byName(b.checks, 'labels-clear').detail, /from the outer ring/)
   })
 
-  test('#6 polygons-closed fails when a series loses a vertex in the geometry or in the svg', async () => {
+  test('#7 polygons-closed fails when a series loses a vertex in the geometry or in the svg', async () => {
     const { ir, r } = await rendered('radar-simple.yaml')
     const geoBad = structuredClone(r)
     geoBad.layout.geo.series[0].points.pop()
@@ -226,19 +248,19 @@ describe('figures/radar.mjs: verify rows', () => {
     assert.equal(byName(a.checks, 'polygons-closed').ok, false)
     assert.match(byName(a.checks, 'polygons-closed').detail, /3 vertices, expected 4/)
     const svgBad = structuredClone(r)
-    svgBad.svg = svgBad.svg.replace(/(<polygon id="wu-d-r1-series-pg" points=")([^"]+)"/, (_, pre, pts) => `${pre}${pts.split(' ').slice(0, 6).join(' ')}"`)
+    svgBad.svg = svgBad.svg.replace(/(<polygon id="wu-d-r1-series-rdb" points=")([^"]+)"/, (_, pre, pts) => `${pre}${pts.split(' ').slice(0, 6).join(' ')}"`)
     const b = await verifyFigure(plugin(), ir, svgBad)
     assert.equal(byName(b.checks, 'polygons-closed').ok, false)
     assert.match(byName(b.checks, 'polygons-closed').detail, /3 points in the svg, expected 4/)
   })
 
-  test('#7 series-distinct fails when two series share a stroke pattern', async () => {
+  test('#8 series-distinct fails when two series share a stroke pattern', async () => {
     const { ir, r } = await rendered('radar-simple.yaml')
     const bad = structuredClone(r)
     bad.layout.geo.series[1].dash = bad.layout.geo.series[0].dash
     const result = await verifyFigure(plugin(), ir, bad)
     assert.equal(byName(result.checks, 'series-distinct').ok, false)
-    assert.match(byName(result.checks, 'series-distinct').detail, /"es" and "pg" both use a solid stroke/)
+    assert.match(byName(result.checks, 'series-distinct').detail, /"search" and "rdb" both use a solid stroke/)
   })
 
   test('the shared rows follow the plugin rows and the geometry passes grid-4px', async () => {
@@ -247,7 +269,7 @@ describe('figures/radar.mjs: verify rows', () => {
     assert.equal(byName(result.checks, 'grid-4px').ok, true, byName(result.checks, 'grid-4px').detail)
     assert.equal(byName(result.checks, 'dark-3-state').ok, true)
     assert.equal(byName(result.checks, 'stroke-radius').ok, true)
-    assert.equal(byName(result.checks, 'grid-4px').id, 13)
+    assert.equal(byName(result.checks, 'grid-4px').id, 14)
   })
 })
 
@@ -284,7 +306,8 @@ describe('figures/radar.mjs: renderFigureHtmlChecked and the CLI', () => {
     const example = validateIR(parseYaml(doc.stdout))
     assert.ok(example.ok)
     assert.equal(example.ir.axes.length, 5)
-    assert.equal(example.ir.series.length, 2)
+    assert.equal(example.ir.series.length, 3)
+    assert.equal(example.ir.series.filter((s) => s.emphasis).length, 1)
     assert.deepEqual(example.warnings, [])
   })
 })

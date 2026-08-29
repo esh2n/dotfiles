@@ -1,6 +1,6 @@
 id: r3
 type: radar
-title: 三案の八基準比較
+title: 三案の五基準比較
 caption: 5 点満点で採点、外周が 5
 max: 5
 axes:
@@ -12,14 +12,8 @@ axes:
   label: コスト
 - id: ops
   label: 運用負荷
-- id: learn
-  label: 学習コスト
-- id: eco
-  label: エコシステム
 - id: sec
   label: セキュリティ
-- id: migrate
-  label: 移行のしやすさ
 series:
 - id: a
   label: A 案
@@ -29,10 +23,7 @@ series:
     scale: 4
     cost: 2
     ops: 3
-    learn: 2
-    eco: 5
     sec: 4
-    migrate: 1
 - id: b
   label: B 案
   values:
@@ -40,10 +31,7 @@ series:
     scale: 3
     cost: 4
     ops: 4
-    learn: 4
-    eco: 3
     sec: 3
-    migrate: 4
 - id: c
   label: C 案
   values:
@@ -51,7 +39,4 @@ series:
     scale: 2
     cost: 5
     ops: 5
-    learn: 5
-    eco: 2
     sec: 2
-    migrate: 5

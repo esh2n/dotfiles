@@ -9,7 +9,9 @@
 // no groups/nesting, sequence diagrams don't need them). `messages` is one
 // row per line of the diagram, top→bottom, each row one of three shapes
 // distinguished by which key is present:
-//   - a plain message: `{from, to, label?, kind}` (kind: sync|async|reply)
+//   - a plain message: `{from, to, label?, kind}` (kind: sync|async|reply —
+//     drawn with diagram.mjs's EDGE_KIND_STYLE: solid+filled / dashed+open /
+//     dashed+filled; a legend strip names the kinds when more than one is used)
 //   - a note:          `{note: text, over?: [participant ids]}` — `over`
 //     defaults to the two participants of the immediately preceding message
 //     row when omitted (an error if there is no preceding message to infer
@@ -147,7 +149,7 @@ export function verify(geo, ir, { column, svg, rendered } = {}) {
 
 export const doc = {
   purpose: 'time-ordered messages between participants (API traces, protocols, call order)',
-  whenToUse: 'when the reader must follow *who calls whom in what order*; not for structure (use diagram) or branching logic. Budgets: participants ≤ 6, rows ≤ 16, message label ≤ 16 chars — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the reader must follow *who calls whom in what order*; not for structure (use diagram) or branching logic. Arrows: sync = solid + filled head, async = dashed + open head, reply = dashed + filled head (a legend names the kinds in use). Combined fragments (alt/opt/loop) and activation bars are not supported — put the condition in a `note:` row, or draw one sequence per branch. Budgets: participants ≤ 6, rows ≤ 16, message label ≤ 16 chars — guidance, over-budget figures still render with data-warn.',
   irExample: `id: checkout
 type: sequence
 title: チェックアウトの呼び出し順

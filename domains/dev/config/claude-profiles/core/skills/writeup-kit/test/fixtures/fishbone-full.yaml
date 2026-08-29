@@ -1,7 +1,7 @@
 id: fb-full
 type: fishbone
 title: 障害の原因分析（6 カテゴリ）
-caption: 6M で整理。強調した 2 件が根本原因
+caption: 6M で整理。強調した骨が根本原因
 effect: デプロイ後 5 分で API が 502 を返す
 categories:
   - id: people
@@ -9,7 +9,6 @@ categories:
     causes:
       - 手順書の未読
       - 引き継ぎ漏れ
-      - 深夜作業
       - 承認者不在
   - id: method
     label: 方法
@@ -18,33 +17,27 @@ categories:
       - label: カナリア未実施
         emphasis: true
       - ロールバック未定義
-      - 変更凍結の不在
   - id: machine
     label: 設備
     causes:
       - ノード数の削減
-      - label: プール上限 10
-        emphasis: true
+      - プール上限 10
       - ヘルスチェック遅延
-      - LB の設定差分
   - id: material
     label: 材料
     causes:
       - 古い依存ライブラリ
       - 設定ファイルの差
       - 秘密情報の期限切れ
-      - 画像タグの不一致
   - id: measure
     label: 計測
     causes:
       - p95 の未監視
       - アラート閾値が高い
       - ログの欠落
-      - ダッシュボード陳腐化
   - id: env
     label: 環境
     causes:
       - DNS キャッシュ切れ
       - 証明書の更新
       - リージョン障害
-      - 時刻同期のずれ

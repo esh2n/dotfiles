@@ -28,10 +28,3 @@ series:
     osaka: 150
     singapore: 90
     oregon: 240
-- id: batch
-  label: バッチ
-  values:
-    tokyo: 75
-    osaka: 40
-    singapore: 20
-    oregon: 55

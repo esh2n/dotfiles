@@ -1,7 +1,7 @@
 id: s2
 type: scatter
 title: 施策の工数と効果
-caption: 円の面積は影響ユーザー数。強調は今期の着手候補
+caption: 円の面積は影響ユーザー数。強調は今期の着手候補、ラベルは上位 3 件
 x:
   label: 工数
   unit: 人日
@@ -31,7 +31,6 @@ points:
   size: 3600
   series: platform
 - id: batch
-  label: バッチ分割
   x: 18
   y: 25
   size: 900
@@ -43,13 +42,11 @@ points:
   size: 5200
   series: feature
 - id: export
-  label: エクスポート
   x: 8
   y: 30
   size: 700
   series: feature
 - id: mobile
-  label: モバイル対応
   x: 60
   y: 62
   size: 2400

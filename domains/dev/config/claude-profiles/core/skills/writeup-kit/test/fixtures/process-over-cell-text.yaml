@@ -5,6 +5,7 @@ slots: [入力, 処理]
 stages:
   - id: a
     label: A
+    emphasis: true
     cells:
       入力: 短い
       処理: この項目は十六文字を超える長さになっている

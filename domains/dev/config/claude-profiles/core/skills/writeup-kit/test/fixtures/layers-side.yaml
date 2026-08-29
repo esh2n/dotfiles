@@ -1,7 +1,7 @@
 id: order-stack
 type: layers
 title: 注文システムの層構成
-caption: 認可はドメイン層、暗号化はストレージ層で強制する
+caption: 認可は業務ロジック層、暗号化はストレージ層で強制する
 layers:
   - id: ui
     label: UI
@@ -17,14 +17,14 @@ layers:
         label: 認証
       - id: rate
         label: レート制限
-  - id: domain
-    label: ドメイン
+  - id: logic
+    label: 業務ロジック
     emphasis: true
     items: [注文, 在庫, 決済, 配送, 請求]
   - id: storage
     label: ストレージ
     tone: rs
-    items: [PostgreSQL, S3]
+    items: [RDB, オブジェクト保管]
 side:
   label: 統制
   items:
@@ -32,7 +32,7 @@ side:
       text: CSRF トークン
     - layer: api
       text: 認証・レート制限
-    - layer: domain
+    - layer: logic
       text: 認可・不変条件
     - layer: storage
       text: 暗号化・保持期限
@@ -41,7 +41,7 @@ arrows:
     to: api
     label: HTTPS
   - from: api
-    to: domain
-  - from: domain
+    to: logic
+  - from: logic
     to: storage
     label: SQL / put

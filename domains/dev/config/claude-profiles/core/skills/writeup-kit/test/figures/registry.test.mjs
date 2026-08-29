@@ -78,7 +78,7 @@ describe('figures/index.mjs: discovery from the filesystem', () => {
     assert.ok(d && d.builtin === true)
     assert.equal(d.limits, LIMITS)
     assert.equal(d.doc.rows, DIAGRAM_ROWS)
-    assert.match(d.doc.irExample, /^id: acl\n/)
+    assert.match(d.doc.irExample, /^id: request-path\n/)
     assert.equal(isPluginType('diagram'), false)
     assert.equal(hasFigureType('diagram'), true)
     assert.equal('layout' in d, false)

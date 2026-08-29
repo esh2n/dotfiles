@@ -8,20 +8,28 @@
 //
 // IR shape: `{ id, type:'process', title, caption, slots, stages, arrows }`.
 //   - `slots`  — row labels, top → bottom (≤ 4 guidance);
-//   - `stages` — `[{ id, label, emphasis?, cells: { <slot>: string | [string] } }]`,
+//   - `stages` — `[{ id, label, emphasis?, focal?, cells: { <slot>: string | [string] } }]`,
 //     left → right (≤ 6 guidance); a cell is a list of short items (≤ 16
 //     chars each, guidance); a slot a stage does not mention is empty;
+//     `emphasis` marks the focal stage (exactly one, guidance) and
+//     `focal: <slot>` the one focal cell of the figure (≤ 1, guidance);
 //   - `arrows` — `'between-stages'` (default: one arrow from each stage to
 //     the next, along the first slot row) or an explicit list of
 //     `{ from, to, label? }` stage references.
+//
+// Budgets differ from the survey's lane × step process (lanes ≤ 6, steps
+// ≤ 12) on purpose: that grid holds one 100px node per lane × step, this
+// one holds up to 4 rows of wrapped text per stage, so 6 stages is what a
+// 720px column fits, and 4 slots is the semantic set (入力/処理/出力/統制).
 //
 // Layout is a deterministic grid, no layout engine: column width comes
 // from the widest cell line in that stage (an item wider than WRAP_W is
 // wrapped onto two lines first), row height from the tallest cell in that
 // row, the header band from the stage labels. Adjacent forward arrows run
-// straight through the gap between two columns; any other arrow leaves the
-// bottom border of its stage, runs along a channel below the grid and
-// enters the target's bottom border — so no arrow ever crosses a cell,
+// straight through the gap between two columns; any other arrow (a skip
+// or a return) leaves the top border of its stage header, makes one jog
+// over the header band and drops into the target header's top border —
+// never more than one jog, never through a cell, never under the grid —
 // which the `arrows-clear` row then proves. Every position is snapped to
 // the 4px grid.
 //
@@ -32,7 +40,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE } from '../diagra
 
 export const type = 'process'
 
-export const limits = { maxStages: 6, maxSlots: 4, maxCellTextLen: 16, maxCells: 20, maxEmphasis: 2 }
+export const limits = { maxStages: 6, maxSlots: 4, maxCellTextLen: 16, maxCells: 20, maxEmphasis: 1, maxFocal: 1 }
 
 // --- layout constants (multiples of 4 unless noted) ------------------------
 const MARGIN = 16
@@ -50,9 +58,11 @@ const ROW_MIN_H = 32
 const WRAP_W = 88             // an item wider than this is wrapped onto 2 lines
 const ARROW_LABEL_H = 14
 const ARROW_LABEL_PAD = 8
-const CHANNEL_TOP = 16        // grid bottom → first channel
-const CHANNEL_PITCH = 24
-const CHANNEL_STUB = 8        // in/out stubs sit ±8px from the column center
+const OVER_GAP = 16           // header top → nearest over-header lane
+const OVER_PITCH = 24         // between two over-header lanes
+const OVER_STUB = 8           // out stubs sit +8px, in stubs −8px from the column center (then +8 per extra)
+const OVER_LABEL_CLEAR = 20   // topmost lane → canvas top when that lane carries a label
+const OVER_LINE_CLEAR = 8     // … when it does not
 const BETWEEN_STAGES = 'between-stages'
 
 // --- schema --------------------------------------------------------------
@@ -89,7 +99,12 @@ function normalizeStages(raw, slots, ctx) {
     const label = requireStr(s, 'label', sctx)
     const emphasis = validateBool(s, 'emphasis', sctx)
     const cells = normalizeCells(s.cells, slots, sctx)
-    return { id, label, emphasis, cells }
+    const focal = optStr(s, 'focal', sctx)
+    if (focal !== undefined) {
+      if (!slots.includes(focal)) throw new IrError(`${sctx}.focal references unknown slot "${focal}" (declared: ${slots.join(', ')})`)
+      if (!cells[focal]) throw new IrError(`${sctx}.focal names slot "${focal}" but the stage has no cell there`)
+    }
+    return { id, label, emphasis, focal, cells }
   })
 }
 
@@ -170,11 +185,23 @@ export function budgetWarnings(ir) {
       long.map((e) => `stage "${e.c.stage.id}" / ${e.c.slot} "${e.item}" is ${e.len} chars (guidance ≤ ${limits.maxCellTextLen})`).join('; '),
       long.map((e) => `shorten "${e.item}" in stage "${e.c.stage.id}" (${e.len} > ${limits.maxCellTextLen})`).join('; ') + ', or move the wording into the caption'))
   }
+  // the focal stage: exactly one — none leaves the reader without the
+  // step the figure is about, more than one dilutes it
   const emphasized = ir.stages.filter((s) => s.emphasis)
   if (emphasized.length > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized.length, limits.maxEmphasis,
-      `${emphasized.length} emphasized stage(s) (guidance ≤ ${limits.maxEmphasis})`,
-      `keep emphasis on at most ${limits.maxEmphasis} stages (${emphasized.map((s) => `"${s.id}"`).join(', ')} are all emphasized)`))
+      `${emphasized.length} emphasized stage(s) (guidance: exactly ${limits.maxEmphasis})`,
+      `keep emphasis on exactly ${limits.maxEmphasis} stage (${emphasized.map((s) => `"${s.id}"`).join(', ')} are all emphasized)`))
+  } else if (emphasized.length === 0) {
+    out.push(budgetWarning('budget:emphasis', 0, limits.maxEmphasis,
+      `no emphasized stage (guidance: exactly ${limits.maxEmphasis})`,
+      'mark the stage the figure is about with emphasis: true'))
+  }
+  const focal = ir.stages.filter((s) => s.focal)
+  if (focal.length > limits.maxFocal) {
+    out.push(budgetWarning('budget:focal', focal.length, limits.maxFocal,
+      `${focal.length} focal cell(s) (guidance ≤ ${limits.maxFocal})`,
+      `keep focal on one cell (${focal.map((s) => `"${s.id}"/${s.focal}`).join(', ')} are all focal)`))
   }
   return out
 }
@@ -254,10 +281,18 @@ export async function layout(ir) {
   const gaps = Array.from({ length: Math.max(0, nStages - 1) }, () => STAGE_GAP)
   const routed = arrowSpecs.map((a, index) => {
     const fi = indexOf.get(a.from), ti = indexOf.get(a.to)
-    const route = ti === fi + 1 ? 'gap' : 'channel'
+    const route = ti === fi + 1 ? 'gap' : 'over'
     if (route === 'gap' && a.label) gaps[fi] = Math.max(gaps[fi], snapUp4(arrowLabelW(a.label) + ARROW_LABEL_PAD * 2))
     return { ...a, index, fi, ti, route }
   })
+  // over-header arrows: one lane each, the shortest span nearest the
+  // header band so the fewest verticals cross a lower lane; the band
+  // above the headers grows with the lanes and the topmost lane's label
+  const overOrder = routed.filter((a) => a.route === 'over')
+    .sort((a, b) => Math.abs(a.ti - a.fi) - Math.abs(b.ti - b.fi) || a.index - b.index)
+  const laneOf = new Map(overOrder.map((a, k) => [a.index, k]))
+  const topClear = overOrder.length ? (overOrder[overOrder.length - 1].label ? OVER_LABEL_CLEAR : OVER_LINE_CLEAR) : 0
+  const headerY = MARGIN + (overOrder.length ? topClear + (overOrder.length - 1) * OVER_PITCH + OVER_GAP : 0)
 
   // 4. columns
   const slotColW = snapUp4(Math.max(SLOT_COL_MIN_W, Math.ceil(Math.max(...slots.map((s) => textWidth(s, EDGE_LABEL_SIZE)))) + 8))
@@ -266,14 +301,14 @@ export async function layout(ir) {
   let x = gridLeft
   stages.forEach((s, i) => {
     const width = colWidths[i]
-    stageGeo.push({ id: s.id, label: s.label, emphasis: s.emphasis, index: i, x, width, centerX: snap4(x + width / 2), header: { x, y: MARGIN, width, height: HEADER_H } })
+    stageGeo.push({ id: s.id, label: s.label, emphasis: s.emphasis, index: i, x, width, centerX: snap4(x + width / 2), header: { x, y: headerY, width, height: HEADER_H } })
     x += width + (i < nStages - 1 ? gaps[i] : 0)
   })
   const gridRight = x
 
   // 5. rows + cells
   const rows = []
-  let y = MARGIN + HEADER_H + HEADER_GAP
+  let y = headerY + HEADER_H + HEADER_GAP
   slots.forEach((slot, r) => {
     const height = rowHeights[r]
     rows.push({ slot, index: r, y, height, centerY: snap4(y + height / 2) })
@@ -296,17 +331,20 @@ export async function layout(ir) {
         })
         ly += ITEM_GAP
       })
-      cells.push({ stage: s.id, slot: row.slot, x: col.x, y: row.y, width: col.width, height: row.height, items: s.cells[row.slot], lines })
+      cells.push({ stage: s.id, slot: row.slot, x: col.x, y: row.y, width: col.width, height: row.height, items: s.cells[row.slot], lines, focal: s.focal === row.slot })
     })
   })
   const slotLabels = rows.map((row) => ({ slot: row.slot, x: MARGIN + slotColW, y: row.centerY + 4, width: Math.ceil(textWidth(row.slot, EDGE_LABEL_SIZE)) }))
 
-  // 6. arrow paths — gap arrows along the first row's center; channel arrows
-  //    below the grid, shortest span first so fewer channels cross
-  const channelOrder = routed.filter((a) => a.route === 'channel')
-    .sort((a, b) => Math.abs(a.ti - a.fi) - Math.abs(b.ti - b.fi) || a.index - b.index)
-  const channelOf = new Map(channelOrder.map((a, k) => [a.index, k]))
+  // 6. arrow paths — gap arrows along the first row's center; over arrows
+  //    leave the source header's top (right of center), run along their
+  //    lane above the header band and drop into the target header's top
+  //    (left of center); a stage with several exits/entries fans them
+  //    outward by OVER_STUB each
   const firstRowY = rows[0].centerY
+  const stubOffset = (list, a) => list.filter((o) => o.index !== a.index && o.index < a.index).length
+  const exits = (id) => overOrder.filter((o) => o.from === id)
+  const entries = (id) => overOrder.filter((o) => o.to === id)
   const arrows = routed.map((a) => {
     const from = stageGeo[a.fi], to = stageGeo[a.ti]
     if (a.route === 'gap') {
@@ -315,21 +353,21 @@ export async function layout(ir) {
       const label = a.label ? { text: a.label, x: snap4((x1 + x2) / 2), y: firstRowY - 8, width: arrowLabelW(a.label), height: ARROW_LABEL_H } : null
       return { from: a.from, to: a.to, index: a.index, route: 'gap', path, label }
     }
-    const k = channelOf.get(a.index)
-    const cy = gridBottom + CHANNEL_TOP + k * CHANNEL_PITCH
-    const x1 = snap4(from.centerX + CHANNEL_STUB), x2 = snap4(to.centerX - CHANNEL_STUB)
-    const path = [{ x: x1, y: gridBottom }, { x: x1, y: cy }, { x: x2, y: cy }, { x: x2, y: gridBottom }]
-    const label = a.label ? { text: a.label, x: snap4((x1 + x2) / 2), y: cy - 8, width: arrowLabelW(a.label), height: ARROW_LABEL_H } : null
-    return { from: a.from, to: a.to, index: a.index, route: 'channel', path, label }
+    const k = laneOf.get(a.index)
+    const laneY = headerY - OVER_GAP - k * OVER_PITCH
+    const x1 = snap4(from.centerX + OVER_STUB * (1 + stubOffset(exits(a.from), a)))
+    const x2 = snap4(to.centerX - OVER_STUB * (1 + stubOffset(entries(a.to), a)))
+    const path = [{ x: x1, y: headerY }, { x: x1, y: laneY }, { x: x2, y: laneY }, { x: x2, y: headerY }]
+    const label = a.label ? { text: a.label, x: snap4((x1 + x2) / 2), y: laneY - 8, width: arrowLabelW(a.label), height: ARROW_LABEL_H } : null
+    return { from: a.from, to: a.to, index: a.index, route: 'over', lane: k, path, label }
   })
-  const channels = channelOrder.length
-  const height = snapUp4(gridBottom + (channels ? CHANNEL_TOP + (channels - 1) * CHANNEL_PITCH + 8 : 0) + MARGIN)
+  const height = snapUp4(gridBottom + MARGIN)
   const width = snapUp4(gridRight + MARGIN)
 
   return {
     width,
     height,
-    geo: { header: { y: MARGIN, height: HEADER_H }, slotColumn: { x: MARGIN, width: slotColW }, stages: stageGeo, rows, cells, slotLabels, arrows, gridLeft, gridRight, gridBottom },
+    geo: { header: { y: headerY, height: HEADER_H }, slotColumn: { x: MARGIN, width: slotColW }, stages: stageGeo, rows, cells, slotLabels, arrows, gridLeft, gridRight, gridBottom },
   }
 }
 
@@ -376,7 +414,8 @@ export function draw(layoutResult, ir) {
 
   // cells
   geo.cells.forEach((c, i) => {
-    parts.push(`<rect id="${uid}-cell-${i}" x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" rx="4" fill="var(--wu-surface)" stroke="var(--wu-rule)" stroke-width="1"/>`)
+    const focal = c.focal ? ' class="wu-focal" stroke="currentColor" stroke-width="1.5"' : ' stroke="var(--wu-rule)" stroke-width="1"'
+    parts.push(`<rect id="${uid}-cell-${i}" x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" rx="4" fill="var(--wu-surface)"${focal}/>`)
     c.lines.forEach((l, j) => {
       parts.push(`<text id="${uid}-cell-${i}-l${j}" x="${l.x}" y="${l.y}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(l.text)}</text>`)
     })
@@ -420,8 +459,9 @@ export function verify(layoutResult, ir) {
   budgetRow(3, 'cell-count', 'budget:cells', `${cellEntries(ir).length} filled cell(s)`)
   budgetRow(4, 'cell-text-length', 'budget:cell-text', `every cell item is ≤ ${limits.maxCellTextLen} chars`)
   budgetRow(5, 'emphasis-count', 'budget:emphasis', `${ir.stages.filter((s) => s.emphasis).length} emphasized stage(s)`)
+  budgetRow(6, 'focal-count', 'budget:focal', `${ir.stages.filter((s) => s.focal).length} focal cell(s)`)
 
-  // 6. references: every cell sits in a declared stage and slot, every
+  // 7. references: every cell sits in a declared stage and slot, every
   //    arrow joins two declared stages
   const stageIds = new Set(geo.stages.map((s) => s.id))
   const slotSet = new Set(geo.rows.map((r) => r.slot))
@@ -434,9 +474,9 @@ export function verify(layoutResult, ir) {
     if (!stageIds.has(a.from)) badRefs.push(`arrows[${a.index}].from → unknown stage "${a.from}"`)
     if (!stageIds.has(a.to)) badRefs.push(`arrows[${a.index}].to → unknown stage "${a.to}"`)
   })
-  rows.push({ id: 6, name: 'references-exist', severity: 'fail', ok: badRefs.length === 0, detail: badRefs.length ? badRefs.join('; ') : 'every cell and arrow references a declared stage/slot', hint: badRefs.length ? 'declare the stage/slot before referencing it' : undefined })
+  rows.push({ id: 7, name: 'references-exist', severity: 'fail', ok: badRefs.length === 0, detail: badRefs.length ? badRefs.join('; ') : 'every cell and arrow references a declared stage/slot', hint: badRefs.length ? 'declare the stage/slot before referencing it' : undefined })
 
-  // 7. grid: every cell matches its column (x/width) and row (y/height);
+  // 8. grid: every cell matches its column (x/width) and row (y/height);
   //    no two cells overlap
   const stageOf = new Map(geo.stages.map((s) => [s.id, s]))
   const rowOf = new Map(geo.rows.map((r) => [r.slot, r]))
@@ -454,9 +494,9 @@ export function verify(layoutResult, ir) {
       }
     }
   }
-  rows.push({ id: 7, name: 'grid-aligned', severity: 'fail', ok: gridProblems.length === 0, detail: gridProblems.length ? gridProblems.slice(0, 4).join('; ') : `${geo.cells.length} cell(s) aligned to ${geo.stages.length} column(s) × ${geo.rows.length} row(s), none overlapping`, hint: gridProblems.length ? 'derive every cell rect from its stage column and slot row — never position a cell on its own' : undefined })
+  rows.push({ id: 8, name: 'grid-aligned', severity: 'fail', ok: gridProblems.length === 0, detail: gridProblems.length ? gridProblems.slice(0, 4).join('; ') : `${geo.cells.length} cell(s) aligned to ${geo.stages.length} column(s) × ${geo.rows.length} row(s), none overlapping`, hint: gridProblems.length ? 'derive every cell rect from its stage column and slot row — never position a cell on its own' : undefined })
 
-  // 8. text inside its cell with padding
+  // 9. text inside its cell with padding
   const textProblems = []
   geo.cells.forEach((c, i) => {
     c.lines.forEach((l, j) => {
@@ -466,36 +506,39 @@ export function verify(layoutResult, ir) {
       if (top < c.y + CELL_PAD_Y || l.y > c.y + c.height - CELL_PAD_Y + 4) textProblems.push(`cells[${i}] line ${j} "${l.text}" overflows vertically`)
     })
   })
-  rows.push({ id: 8, name: 'text-inside-cells', severity: 'fail', ok: textProblems.length === 0, detail: textProblems.length ? textProblems.slice(0, 4).join('; ') : `every cell line sits inside its cell with ${CELL_PAD_X}/${CELL_PAD_Y}px padding`, hint: textProblems.length ? 'size the column from the widest wrapped line and the row from the tallest cell before placing text' : undefined })
+  rows.push({ id: 9, name: 'text-inside-cells', severity: 'fail', ok: textProblems.length === 0, detail: textProblems.length ? textProblems.slice(0, 4).join('; ') : `every cell line sits inside its cell with ${CELL_PAD_X}/${CELL_PAD_Y}px padding`, hint: textProblems.length ? 'size the column from the widest wrapped line and the row from the tallest cell before placing text' : undefined })
 
-  // 9. arrows: orthogonal, endpoints on a stage border, no segment through
-  //    a cell or header
+  // 10. arrows: orthogonal with at most one jog (≤ 4 points), endpoints on
+  //     a stage side border or the header's top border, no segment through
+  //     a cell or header, nothing routed under the grid
   const boxes = [...geo.cells, ...geo.stages.map((s) => s.header)]
   const arrowProblems = []
   for (const a of geo.arrows) {
     const from = stageOf.get(a.from), to = stageOf.get(a.to)
     const p = a.path
+    if (p.length > 4) arrowProblems.push(`arrows[${a.index}] has ${p.length - 2} bends (at most one jog = 2 bends)`)
     for (let i = 1; i < p.length; i++) {
       if (p[i].x !== p[i - 1].x && p[i].y !== p[i - 1].y) arrowProblems.push(`arrows[${a.index}] segment ${i} is diagonal`)
       const hit = boxes.find((b) => segmentThroughRect(p[i - 1], p[i], b))
       if (hit) arrowProblems.push(`arrows[${a.index}] segment ${i} passes through ${hit.stage ? `cell ${hit.stage}/${hit.slot}` : 'a stage header'}`)
     }
+    if (p.some((pt) => pt.y > geo.gridBottom)) arrowProblems.push(`arrows[${a.index}] runs below the grid`)
     if (from && to) {
       const start = p[0], end = p[p.length - 1]
       const onBorder = (pt, s) => (pt.x === s.x || pt.x === s.x + s.width) && pt.y >= geo.header.y && pt.y <= geo.gridBottom
-        || (pt.y === geo.gridBottom && pt.x >= s.x && pt.x <= s.x + s.width)
+        || (pt.y === geo.header.y && pt.x >= s.x && pt.x <= s.x + s.width)
       if (!onBorder(start, from)) arrowProblems.push(`arrows[${a.index}] does not start on the border of stage "${a.from}"`)
       if (!onBorder(end, to)) arrowProblems.push(`arrows[${a.index}] does not end on the border of stage "${a.to}"`)
     }
   }
-  rows.push({ id: 9, name: 'arrows-clear', severity: 'fail', ok: arrowProblems.length === 0, detail: arrowProblems.length ? arrowProblems.slice(0, 4).join('; ') : `${geo.arrows.length} arrow(s) run orthogonally between stage borders, none through a cell`, hint: arrowProblems.length ? 'route adjacent arrows through the column gap and every other arrow through the channel below the grid' : undefined })
+  rows.push({ id: 10, name: 'arrows-clear', severity: 'fail', ok: arrowProblems.length === 0, detail: arrowProblems.length ? arrowProblems.slice(0, 4).join('; ') : `${geo.arrows.length} arrow(s) run orthogonally between stage borders with at most one jog, none through a cell`, hint: arrowProblems.length ? 'route adjacent forward arrows through the column gap and every other arrow over the header band with one jog' : undefined })
 
   return rows
 }
 
 export const doc = {
   purpose: 'a stage × slot grid — what goes in, happens, comes out and is governed at each step of a process',
-  whenToUse: 'when the reader must compare the *same* few facets (入力/処理/出力/統制) across sequential stages; not for who-hands-off-to-whom (use sequence or a swimlane) or for structure (use diagram). Budgets: stages ≤ 6, slots ≤ 4, cell item ≤ 16 chars, filled cells ≤ 20, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the reader must compare the *same* few facets (入力/処理/出力/統制) across sequential stages; not for who-hands-off-to-whom (use sequence or a swimlane) or for structure (use diagram). Budgets: stages ≤ 6, slots ≤ 4 (a stage × semantic-slot table of wrapped text — narrower than the survey\'s lane × step grid of fixed nodes on purpose), cell item ≤ 16 chars, filled cells ≤ 20, emphasis (the focal stage) exactly 1, focal cell ≤ 1 — guidance, over-budget figures still render with data-warn. Arrows: adjacent forward ones run through the column gap along the first row; any skip or return goes over the header band with one jog, never under the grid.',
   irExample: `id: release-process
 type: process
 title: リリース手順
@@ -511,6 +554,7 @@ stages:
   - id: build
     label: 実装
     emphasis: true
+    focal: 処理
     cells:
       入力: リリース計画
       処理: [実装, レビュー]
@@ -528,5 +572,5 @@ stages:
       処理: デプロイ
       出力: リリースノート
 `,
-  rows: ['stage-count', 'slot-count', 'cell-count', 'cell-text-length', 'emphasis-count', 'references-exist', 'grid-aligned', 'text-inside-cells', 'arrows-clear'],
+  rows: ['stage-count', 'slot-count', 'cell-count', 'cell-text-length', 'emphasis-count', 'focal-count', 'references-exist', 'grid-aligned', 'text-inside-cells', 'arrows-clear'],
 }

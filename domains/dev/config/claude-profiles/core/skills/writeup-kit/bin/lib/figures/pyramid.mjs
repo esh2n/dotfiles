@@ -11,6 +11,14 @@
 //   tiers:   [{ id, label, value?, note?, emphasis, tone }] ordered top → bottom;
 //            `value` is all-or-none (a partial funnel cannot be proportional)
 //
+// Focal tier: exactly one tier carries the accent. When no tier says
+// `emphasis: true`, normalize() fills the default in — the apex for a
+// pyramid, the bottleneck (narrowest, bottom) tier for a funnel — so the
+// drawing always has one accent and the IR round-trips unchanged. Budgets
+// (design survey #18): 4–6 tiers, emphasis ≤ 1, a funnel should carry real
+// values, and a pyramid's accent belongs on the apex, never on the base —
+// each an advisory warn row.
+//
 // Only ranked or monotonically shrinking data belongs here (design survey
 // #18): a set without rank wants a tree or a bar chart, and a flow that
 // branches wants a sankey.
@@ -19,7 +27,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, COL
 
 export const type = 'pyramid'
 
-export const limits = { maxTiers: 7, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { minTiers: 4, maxTiers: 6, maxLabelLen: 14, maxEmphasis: 1 }
 
 const VARIANTS = new Set(['pyramid', 'funnel'])
 
@@ -45,8 +53,13 @@ export function normalize(raw, ctx = 'ir') {
   const { id, title, caption } = normalizeHeader(raw, ctx)
   const variant = normalizeVariant(raw.variant, ctx)
   const tiers = normalizeTiers(raw.tiers, ctx)
+  if (!tiers.some((t) => t.emphasis)) tiers[defaultFocalIndex(variant, tiers.length)].emphasis = true
   return { id, type, title, caption, variant, tiers }
 }
+
+/** The tier that takes the accent when the author names none: the apex of
+ * a pyramid (index 0), the bottleneck of a funnel (the last, narrowest tier). */
+const defaultFocalIndex = (variant, n) => (variant === 'funnel' ? n - 1 : 0)
 
 function normalizeVariant(v, ctx) {
   if (v === undefined || v === null) return 'pyramid'
@@ -98,6 +111,10 @@ export function budgetWarnings(ir) {
     out.push(budgetWarning('budget:tiers', n, limits.maxTiers,
       `${n} tier(s) (guidance ≤ ${limits.maxTiers})`,
       'merge neighbouring tiers or keep only the stages the decision is about'))
+  } else if (n < limits.minTiers) {
+    out.push(budgetWarning('budget:tiers', n, limits.minTiers,
+      `${n} tier(s) (guidance ≥ ${limits.minTiers})`,
+      'fewer than 4 tiers reads as a before/after — name the intermediate stages, or use a bar chart'))
   }
   const longest = longestLabel(ir)
   if (longest.length > limits.maxLabelLen) {
@@ -110,6 +127,17 @@ export function budgetWarnings(ir) {
     out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
       `${emphasized} emphasized tier(s) (guidance ≤ ${limits.maxEmphasis})`,
       'keep emphasis on the apex or the one bottleneck tier'))
+  }
+  if (ir.variant === 'funnel' && !hasValues(ir)) {
+    out.push(budgetWarning('budget:values', 0, n,
+      `funnel without values (0 of ${n} tiers carry one)`,
+      'a funnel is a claim about drop-off — give every tier its real count so the widths are proportional, or draw a pyramid'))
+  }
+  const base = ir.tiers[n - 1]
+  if (ir.variant === 'pyramid' && base.emphasis) {
+    out.push(budgetWarning('budget:base-emphasis', 1, 0,
+      `the base tier "${base.id}" carries emphasis`,
+      'a pyramid\'s accent belongs on the apex (or the one bottleneck tier) — the base is the widest tier and needs no accent to be seen'))
   }
   return out
 }
@@ -292,6 +320,8 @@ export function verify(layoutResult, ir, { svg = '' } = {}) {
   budgetRow(1, 'tier-count', 'budget:tiers', `${ir.tiers.length} tier(s)`)
   budgetRow(2, 'label-length', 'budget:label', `longest label ${longestLabel(ir).length} chars`)
   budgetRow(3, 'emphasis-count', 'budget:emphasis', `${ir.tiers.filter((t) => t.emphasis).length} emphasized tier(s)`)
+  budgetRow(4, 'funnel-values', 'budget:values', ir.variant === 'funnel' ? 'every funnel tier carries a value' : 'not a funnel')
+  budgetRow(5, 'emphasis-placement', 'budget:base-emphasis', ir.variant === 'pyramid' ? 'the accent is off the base tier' : 'a funnel may accent its bottleneck')
 
   // 4. tiers in IR order, top → bottom, sharing both the edge y and the edge width
   const order = ir.tiers.map((t) => t.id)
@@ -305,7 +335,7 @@ export function verify(layoutResult, ir, { svg = '' } = {}) {
   const positive = geo.tiers.every((t) => t.yBottom > t.yTop)
   const orderedOk = inOrder && gaps.length === 0 && positive
   rows.push({
-    id: 4, name: 'tiers-ordered', severity: 'fail', ok: orderedOk,
+    id: 6, name: 'tiers-ordered', severity: 'fail', ok: orderedOk,
     detail: orderedOk ? 'tiers run top to bottom in IR order, each sharing its edge with the next'
       : !inOrder ? 'tier order differs from ir.tiers' : !positive ? 'a tier has no height' : `tiers not touching edge to edge: ${gaps.join(', ')}`,
     hint: orderedOk ? undefined : 'stack tiers in IR order so each starts on the previous tier\'s bottom edge with the same width',
@@ -318,7 +348,7 @@ export function verify(layoutResult, ir, { svg = '' } = {}) {
   const monotonic = edges.every((w, k) => k === 0 || step(edges[k - 1], w)) && edges.length > 1
     && (funnel ? edges[0] > edges[edges.length - 1] : edges[0] < edges[edges.length - 1])
   rows.push({
-    id: 5, name: 'widths-monotonic', severity: 'fail', ok: monotonic,
+    id: 7, name: 'widths-monotonic', severity: 'fail', ok: monotonic,
     detail: monotonic ? `widths ${funnel ? 'narrow downward' : 'widen downward'} (${edges.join(' → ')})`
       : `widths are not ${funnel ? 'non-increasing' : 'non-decreasing'} top → bottom (${edges.join(' → ')})`,
     hint: monotonic ? undefined : funnel
@@ -339,12 +369,12 @@ export function verify(layoutResult, ir, { svg = '' } = {}) {
       else if (!new RegExp(`id="wu-d-${ir.id}-t-${t.id}"[^>]*data-value="${t.value}"`).test(svg)) off.push(`${t.id} (missing data-value)`)
     }
     rows.push({
-      id: 6, name: 'values-proportional', severity: 'fail', ok: off.length === 0,
+      id: 8, name: 'values-proportional', severity: 'fail', ok: off.length === 0,
       detail: off.length ? `tier width not proportional to its value or value not drawn: ${off.join(', ')}` : `every tier's ${funnel ? 'top' : 'base'} edge is value/max × ${WIDE_W}px within 1px, value drawn at the right`,
       hint: off.length ? 'lay widths out from value/max × the wide end and draw each value in the right-hand column' : undefined,
     })
   } else {
-    rows.push({ id: 6, name: 'values-proportional', severity: 'fail', ok: true, detail: 'no values — widths step evenly' })
+    rows.push({ id: 8, name: 'values-proportional', severity: 'fail', ok: true, detail: 'no values — widths step evenly' })
   }
 
   // 7. every label legible: inside labels clear the slanted edges, outside labels sit within the canvas behind a leader that does not cross the value column
@@ -369,7 +399,7 @@ export function verify(layoutResult, ir, { svg = '' } = {}) {
     }
   }
   rows.push({
-    id: 7, name: 'labels-legible', severity: 'fail', ok: bad.length === 0,
+    id: 9, name: 'labels-legible', severity: 'fail', ok: bad.length === 0,
     detail: bad.length ? `label(s) not legible: ${bad.join(', ')}` : `${geo.labels.filter((l) => l.inside).length} label(s) inside their tier, ${geo.labels.filter((l) => !l.inside).length} outside with a leader`,
     hint: bad.length ? 'move a label that no longer fits its tier outside with a leader, or shorten it' : undefined,
   })
@@ -381,7 +411,7 @@ export function verify(layoutResult, ir, { svg = '' } = {}) {
 
 export const doc = {
   purpose: 'stacked tiers narrowing upward (a ranked hierarchy, apex on top) or downward (a conversion funnel, optionally proportional to real values)',
-  whenToUse: 'when the tiers are truly ranked or shrink monotonically and the question is "what sits above what" or "where do we lose the most"; not for unranked sets (use a tree or a bar chart) or branching flows (use a sankey). Budgets: tiers ≤ 7, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the tiers are truly ranked or shrink monotonically and the question is "what sits above what" or "where do we lose the most"; not for unranked sets (use a tree or a bar chart) or branching flows (use a sankey). Budgets: tiers 4–6, label ≤ 14 chars, emphasis ≤ 1 (on the apex or the bottleneck, never the base), funnels carry real values — guidance, over-budget figures still render with data-warn. With no emphasis given, the apex (pyramid) or the bottom tier (funnel) takes the accent.',
   irExample: `id: signup-funnel
 type: pyramid
 variant: funnel
@@ -404,5 +434,5 @@ tiers:
     value: 210
     note: 3 か月後
 `,
-  rows: ['tier-count', 'label-length', 'emphasis-count', 'tiers-ordered', 'widths-monotonic', 'values-proportional', 'labels-legible'],
+  rows: ['tier-count', 'label-length', 'emphasis-count', 'funnel-values', 'emphasis-placement', 'tiers-ordered', 'widths-monotonic', 'values-proportional', 'labels-legible'],
 }

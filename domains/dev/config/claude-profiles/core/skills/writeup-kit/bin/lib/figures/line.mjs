@@ -5,23 +5,26 @@
 //   ridgeline   one row per series, each a small distribution over x drawn
 //               as a lightly filled area on its own baseline, shared amplitude
 //
-// IR shape: `{ id, type:'line', title, caption?, variant?, unit?, yFrom?, x, series }`.
+// IR shape: `{ id, type:'line', title, caption?, variant?, unit?, x, series }`.
 //   variant: line | slopegraph | ridgeline           default line
 //   unit:    string appended to values ("ms", "%")   optional
-//   yFrom:   number, the y axis start                 default 0; ≠ 0 draws a visible
-//                                                     axis break and a footnote
 //   x:       { label?, values: [string] }             categories or dates, in order
+//                                                     (guidance 4–12 for line / ridgeline)
 //   series:  [{ id, label, values: [number|null], emphasis? }]
 //            values.length === x.values.length; null = missing (a gap, disclosed
 //            in a footnote); ridgeline values must be ≥ 0 and never null
 //
-// Chart rules encoded here (survey §2 row 21 + the chart rules): the y axis
-// starts at 0 unless `yFrom` says otherwise, and then the break is visible
-// and written out; no splines (straight segments only); series are told
-// apart by stroke pattern (solid / dashed / dotted / dash-dot), never by
-// colour; labels sit at the line ends when they fit, else in the shared
-// legend strip; `emphasis` is a heavier line + larger dots (≤ 2 per figure);
-// every drawn point carries `data-value`.
+// Chart rules encoded here (survey §2 row 21 + the chart rules): the value
+// axis always starts at 0 and is never truncated — there is no `yFrom`
+// (giving one is a schema error: a chart that needs a cut axis to show its
+// difference wants a slopegraph or a dumbbell instead); no splines
+// (straight segments only); series are told apart by stroke pattern (solid
+// / dashed / dotted / dash-dot), never by colour; labels sit at the line
+// ends when they fit, else in the shared legend strip; `emphasis` is the
+// focal series — a heavier line and the only one with vertex dots (≤ 2 per
+// figure); every drawn point, focal or not, carries `data-value` (a
+// non-focal point is an invisible anchor, so verify() still reads every
+// number back off the svg).
 //
 // Grid: axes, ticks, x positions, label anchors and baselines are on the
 // 4px grid (`x`/`y` keys — the shared `grid-4px` row reads them). Data
@@ -33,7 +36,8 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, COLUMN, BOLD_FAC
 
 export const type = 'line'
 
-export const limits = { maxSeries: 4, maxX: 24, maxItems: 12, maxEmphasis: 2, maxLabelLen: 14 }
+/** Survey §1/§2 row 21: points 4–12, slopegraph 4–10 items, ridgeline 3–12 rows. */
+export const limits = { maxSeries: 4, minX: 4, maxX: 12, maxItems: 10, minRidges: 3, maxRidges: 12, maxEmphasis: 2, maxLabelLen: 14 }
 
 const VARIANTS = new Set(['line', 'slopegraph', 'ridgeline'])
 const PAD = 16
@@ -62,10 +66,10 @@ export function normalize(raw, ctx = 'ir') {
   const { id, title, caption } = normalizeHeader(raw, ctx)
   const variant = normalizeVariant(raw.variant, ctx)
   const unit = optStr(raw, 'unit', ctx)
-  const yFrom = normalizeYFrom(raw.yFrom, variant, ctx)
+  rejectYFrom(raw, ctx)
   const x = normalizeX(raw.x, variant, ctx)
-  const series = normalizeSeries(raw.series, x, variant, yFrom, ctx)
-  return { id, type, title, caption, variant, unit, yFrom, x, series }
+  const series = normalizeSeries(raw.series, x, variant, ctx)
+  return { id, type, title, caption, variant, unit, x, series }
 }
 
 function normalizeVariant(v, ctx) {
@@ -74,11 +78,11 @@ function normalizeVariant(v, ctx) {
   return v
 }
 
-function normalizeYFrom(v, variant, ctx) {
-  if (v === undefined || v === null) return 0
-  if (typeof v !== 'number' || !Number.isFinite(v)) throw new IrError(`${ctx}.yFrom must be a finite number (got: ${JSON.stringify(v)})`)
-  if (variant === 'ridgeline' && v !== 0) throw new IrError(`${ctx}.yFrom is not allowed for a ridgeline (every ridge sits on its own zero baseline)`)
-  return v
+/** The value axis is never truncated (survey §2 row 21 「ゼロ基線」): a
+ * `yFrom` key — any value, even 0 — is refused so the intent surfaces. */
+function rejectYFrom(raw, ctx) {
+  if (raw.yFrom === undefined || raw.yFrom === null) return
+  throw new IrError(`${ctx}.yFrom is not supported — the value axis always starts at 0 and is never truncated; 差分を見せたいなら slopegraph か dumbbell（bar の variant: dumbbell）を使う`)
 }
 
 function normalizeX(raw, variant, ctx) {
@@ -96,7 +100,7 @@ function normalizeX(raw, variant, ctx) {
   return { label, values }
 }
 
-function normalizeSeries(raw, x, variant, yFrom, ctx) {
+function normalizeSeries(raw, x, variant, ctx) {
   if (!Array.isArray(raw) || raw.length === 0) throw new IrError(`${ctx}.series must be a non-empty list`)
   const seen = new Set()
   const n = x.values.length
@@ -117,7 +121,6 @@ function normalizeSeries(raw, x, variant, yFrom, ctx) {
       }
       if (typeof v !== 'number' || !Number.isFinite(v)) throw new IrError(`${vctx} must be a finite number or null (got: ${JSON.stringify(v)})`)
       if (variant === 'ridgeline' && v < 0) throw new IrError(`${vctx} must be ≥ 0 in a ridgeline (got: ${v})`)
-      if (v < yFrom) throw new IrError(`${vctx} (${v}) lies below yFrom (${yFrom}) — lower yFrom or fix the value`)
       return v
     })
     if (!values.some((v) => v !== null)) throw new IrError(`${sctx}.values has no value at all — drop the series or fill at least one point`)
@@ -130,12 +133,21 @@ function normalizeSeries(raw, x, variant, yFrom, ctx) {
 export function budgetWarnings(ir) {
   const out = []
   const slope = ir.variant === 'slopegraph'
+  const ridge = ir.variant === 'ridgeline'
   const count = ir.series.length
   if (slope && count > limits.maxItems) {
     out.push(budgetWarning('budget:items', count, limits.maxItems,
       `${count} slopegraph items (guidance ≤ ${limits.maxItems})`,
       `keep the ${limits.maxItems} items whose change matters and move the rest to a table`))
-  } else if (!slope && count > limits.maxSeries) {
+  } else if (ridge && count > limits.maxRidges) {
+    out.push(budgetWarning('budget:ridges', count, limits.maxRidges,
+      `${count} ridgeline rows (guidance ${limits.minRidges}–${limits.maxRidges})`,
+      `keep the ${limits.maxRidges} distributions the caption compares and move the rest to a table, or split by theme`))
+  } else if (ridge && count < limits.minRidges) {
+    out.push(budgetWarning('budget:ridges', count, limits.minRidges,
+      `${count} ridgeline rows (guidance ${limits.minRidges}–${limits.maxRidges})`,
+      `${count} distribution(s) read better as one line chart — a ridgeline earns its rows from ${limits.minRidges} up`))
+  } else if (!slope && !ridge && count > limits.maxSeries) {
     out.push(budgetWarning('budget:series', count, limits.maxSeries,
       `${count} series (guidance ≤ ${limits.maxSeries})`,
       `only ${DASHES.length} stroke patterns stay distinguishable without colour — split into one chart per ${limits.maxSeries} series, or use small multiples`))
@@ -143,8 +155,12 @@ export function budgetWarnings(ir) {
   const nx = ir.x.values.length
   if (!slope && nx > limits.maxX) {
     out.push(budgetWarning('budget:x', nx, limits.maxX,
-      `${nx} x values (guidance ≤ ${limits.maxX})`,
+      `${nx} x values (guidance ${limits.minX}–${limits.maxX})`,
       `aggregate to ≤ ${limits.maxX} points (weekly instead of daily) or show only the decisive window`))
+  } else if (!slope && nx < limits.minX) {
+    out.push(budgetWarning('budget:x', nx, limits.minX,
+      `${nx} x values (guidance ${limits.minX}–${limits.maxX})`,
+      `${nx} points show no trend — use a bar (or a slopegraph for exactly 2 states) or add more x values`))
   }
   const long = []
   ir.series.forEach((s, i) => {
@@ -180,10 +196,10 @@ const fmtUnit = (v, unit) => (unit ? `${fmt(v)}${[...unit].length === 1 ? '' : '
 const labelW = (text, bold = false) => Math.ceil(textWidth(text, FONT_SIZE) * (bold ? BOLD_FACTOR : 1))
 const smallW = (text) => Math.ceil(textWidth(text, EDGE_LABEL_SIZE))
 
-/** Nice ticks: a 1/2/2.5/5 × 10^k step giving ≤ 6 steps from `from` (the
- * declared axis start) to the data maximum; data below `from` (negative
- * values with the default 0) extend the axis down to a step multiple. */
-function niceScale(lo, hi, from) {
+/** Nice ticks: a 1/2/2.5/5 × 10^k step giving ≤ 6 steps from 0 (the axis
+ * always starts there) to the data maximum; negative data extends the axis
+ * down to a step multiple — the 0 end is never cut off. */
+function niceScale(lo, hi, from = 0) {
   const span = Math.max(hi - Math.min(lo, from), 0)
   const rough = span > 0 ? span / 4 : 1
   const mag = Math.pow(10, Math.floor(Math.log10(rough)))
@@ -257,12 +273,9 @@ const labelBox = (x, y, width, anchor) => {
   return { left, top: y - 13, right: left + width, bottom: y + 3 }
 }
 
-/** Footnotes drawn under the plot: the axis break and the missing values. */
+/** Footnotes drawn under the plot: the missing values. */
 function buildNotes(ir) {
   const notes = []
-  if (ir.variant !== 'ridgeline' && ir.yFrom !== 0) {
-    notes.push({ key: 'yfrom', text: `y 軸は ${fmtUnit(ir.yFrom, ir.unit)} から始まる（0 起点ではない）` })
-  }
   const missing = ir.series
     .map((s) => ({ label: s.label, xs: ir.x.values.filter((_, j) => s.values[j] === null) }))
     .filter((m) => m.xs.length)
@@ -290,7 +303,7 @@ function segmentsOf(points) {
 function layoutLine(ir, column) {
   const n = ir.x.values.length
   const vals = allValues(ir)
-  const scale = niceScale(Math.min(...vals), Math.max(...vals), ir.yFrom)
+  const scale = niceScale(Math.min(...vals), Math.max(...vals))
   const tickPx = clamp(snap4(PLOT_H_TARGET / scale.nSteps), TICK_PX_MIN, TICK_PX_MAX)
   const plotH = scale.nSteps * tickPx
   const tickLabels = scale.ticks.map((t, k) => (k === scale.ticks.length - 1 ? fmtUnit(t, ir.unit) : fmt(t)))
@@ -350,18 +363,17 @@ function layoutLine(ir, column) {
   } else {
     height = snapUp4(cursor + PAD)
   }
-  const axisBreak = ir.yFrom !== 0 ? [{ x: plotLeft, y: baseline - 12 }] : []
   return {
     width: Math.max(width, snapUp4(legendWidth(legendItems))),
     height,
-    geo: { variant: 'line', scale: { ...scale, baseline, plotH }, plot: { left: plotLeft, right: plotRight, top, baseline }, ticks, xLabels, xTitle, series, labels, labelMode, axisBreak, notes },
+    geo: { variant: 'line', scale: { ...scale, baseline, plotH }, plot: { left: plotLeft, right: plotRight, top, baseline }, ticks, xLabels, xTitle, series, labels, labelMode, notes },
     ...(legend ? { legend } : {}),
   }
 }
 
 function layoutSlopegraph(ir, column) {
   const vals = allValues(ir)
-  const scale = niceScale(Math.min(...vals), Math.max(...vals), ir.yFrom)
+  const scale = niceScale(Math.min(...vals), Math.max(...vals))
   const plotH = clamp(snapUp4(ir.series.length * 28), 200, 360)
   const top = 48
   const baseline = top + plotH
@@ -408,11 +420,10 @@ function layoutSlopegraph(ir, column) {
   }
   const notes = placeNotes(buildNotes(ir), PAD, baseline + 20 + 20)
   const height = snapUp4(baseline + 20 + (notes.length ? 8 + notes.length * NOTE_STEP : 0) + PAD)
-  const axisBreak = ir.yFrom !== 0 ? axes.map((a) => ({ x: a.x, y: baseline - 12 })) : []
   return {
     width,
     height,
-    geo: { variant: 'slopegraph', scale: { ...scale, baseline, plotH }, plot: { left: xL, right: xR, top, baseline }, axes, ticks, series, labels, labelMode: 'direct', axisBreak, notes },
+    geo: { variant: 'slopegraph', scale: { ...scale, baseline, plotH }, plot: { left: xL, right: xR, top, baseline }, axes, ticks, series, labels, labelMode: 'direct', notes },
   }
 }
 
@@ -450,7 +461,7 @@ function layoutRidgeline(ir, column) {
   return {
     width,
     height: snapUp4(cursor + PAD),
-    geo: { variant: 'ridgeline', scale: { vmax, amp: RIDGE_AMP, pitch: RIDGE_PITCH }, plot: { left: plotLeft, right: plotRight, top, baseline: lastBaseline }, rows, xLabels, xTitle, series, labels, labelMode: 'direct', scaleHint, axisBreak: [], notes },
+    geo: { variant: 'ridgeline', scale: { vmax, amp: RIDGE_AMP, pitch: RIDGE_PITCH }, plot: { left: plotLeft, right: plotRight, top, baseline: lastBaseline }, rows, xLabels, xTitle, series, labels, labelMode: 'direct', scaleHint, notes },
   }
 }
 
@@ -464,6 +475,14 @@ export async function layout(ir, { column = COLUMN } = {}) {
 
 const pathOf = (seg) => seg.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.px} ${p.py}`).join(' ')
 
+/** Vertex dots belong to the focal series only (survey §1 row 21); a
+ * non-focal point is still emitted as an invisible anchor (`fill="none"`)
+ * so its `data-value` stays readable off the svg. */
+function pointCircle(uid, s, p, j, r) {
+  const paint = s.emphasis ? '' : ' fill="none"'
+  return `<circle id="${uid}-series-${s.id}-pt-${j}" cx="${p.px}" cy="${p.py}" r="${r}" data-value="${esc(fmt(p.value))}"${paint}/>`
+}
+
 function drawSeriesLines(uid, series) {
   const parts = []
   // emphasized series last so they sit on top
@@ -476,7 +495,7 @@ function drawSeriesLines(uid, series) {
     parts.push(`<g id="${uid}-series-${s.id}-points" fill="currentColor">`)
     s.points.forEach((p, j) => {
       if (p.value === null) return
-      parts.push(`<circle id="${uid}-series-${s.id}-pt-${j}" cx="${p.px}" cy="${p.py}" r="${s.emphasis ? DOT_R_EMPHASIS : DOT_R}" data-value="${esc(fmt(p.value))}"/>`)
+      parts.push(pointCircle(uid, s, p, j, s.emphasis ? DOT_R_EMPHASIS : DOT_R))
     })
     parts.push('</g>')
   }
@@ -492,14 +511,6 @@ function drawLabels(uid, labels) {
   }
   parts.push('</g>')
   return parts
-}
-
-/** A "//" break on a vertical axis at (x, y): a surface-coloured gap, then two slashes. */
-function drawAxisBreak(uid, b, i) {
-  return `<g id="${uid}-axis-break${i > 0 ? `-${i}` : ''}">` +
-    `<rect x="${b.x - 2}" y="${b.y - 4}" width="4" height="8" fill="var(--wu-surface)" stroke="none"/>` +
-    `<path d="M${b.x - 4} ${b.y + 1} L${b.x + 4} ${b.y - 5} M${b.x - 4} ${b.y + 5} L${b.x + 4} ${b.y - 1}" fill="none" stroke="currentColor" stroke-width="1"/>` +
-    '</g>'
 }
 
 function drawNotes(uid, notes) {
@@ -536,7 +547,6 @@ function drawLineVariant(uid, geo) {
   parts.push('</g>')
   parts.push(...drawXLabels(uid, geo))
   parts.push(...drawSeriesLines(uid, geo.series))
-  geo.axisBreak.forEach((b, i) => parts.push(drawAxisBreak(uid, b, i)))
   parts.push(...drawLabels(uid, geo.labels))
   parts.push(...drawNotes(uid, geo.notes))
   return parts
@@ -560,7 +570,6 @@ function drawSlopegraph(uid, geo) {
   }
   parts.push('</g>')
   parts.push(...drawSeriesLines(uid, geo.series))
-  geo.axisBreak.forEach((b, i) => parts.push(drawAxisBreak(uid, b, i)))
   parts.push(...drawLabels(uid, geo.labels))
   parts.push(...drawNotes(uid, geo.notes))
   return parts
@@ -582,7 +591,7 @@ function drawRidgeline(uid, geo) {
     parts.push(`<path id="${uid}-ridge-${s.id}" d="${area}" fill="currentColor" fill-opacity="${s.emphasis ? 0.12 : 0.06}" stroke="none"/>`)
     parts.push(`<path id="${uid}-series-${s.id}" d="${pathOf(s.segments[0])}" fill="none" stroke="currentColor" stroke-width="${s.emphasis ? 1.5 : 1}" stroke-linejoin="round" stroke-linecap="round"/>`)
     parts.push(`<g id="${uid}-series-${s.id}-points" fill="currentColor">`)
-    pts.forEach((p, j) => parts.push(`<circle id="${uid}-series-${s.id}-pt-${j}" cx="${p.px}" cy="${p.py}" r="1.5" data-value="${esc(fmt(p.value))}"/>`))
+    pts.forEach((p, j) => parts.push(pointCircle(uid, s, p, j, 1.5)))
     parts.push('</g>')
   }
   parts.push(...drawLabels(uid, geo.labels))
@@ -612,7 +621,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
     const w = budget.find((b) => keys.includes(b.key))
     rows.push({ id, name, severity: 'warn', ok: !w, detail: w ? w.detail : okDetail, hint: w?.hint, key: w?.key, value: w?.value })
   }
-  warnRow(1, 'series-count', ['budget:series', 'budget:items'], `${ir.series.length} ${ir.variant === 'slopegraph' ? 'items' : 'series'}`)
+  warnRow(1, 'series-count', ['budget:series', 'budget:items', 'budget:ridges'], `${ir.series.length} ${ir.variant === 'slopegraph' ? 'items' : ir.variant === 'ridgeline' ? 'ridgeline rows' : 'series'}`)
   warnRow(2, 'x-count', ['budget:x'], `${ir.x.values.length} x values`)
   warnRow(3, 'label-length', ['budget:label'], `every label ≤ ${limits.maxLabelLen} chars`)
   warnRow(4, 'emphasis-count', ['budget:emphasis'], `${ir.series.filter((s) => s.emphasis).length} emphasized series (≤ ${limits.maxEmphasis})`)
@@ -683,23 +692,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
     hint: distinct.length ? (geo.variant === 'line' ? `at most ${DASHES.length} series per chart (guidance ≤ ${limits.maxSeries}) so each keeps a distinct stroke pattern` : 'give every series a unique label; a slopegraph item is named at both ends') : undefined,
   })
 
-  // #8 a y axis that does not start at 0 shows a break and says so
-  const breakProblems = []
-  if (ir.variant !== 'ridgeline' && ir.yFrom !== 0) {
-    if (!geo.axisBreak?.length) breakProblems.push('no axis-break marker in the geometry')
-    if (!(geo.notes || []).some((n) => n.key === 'yfrom')) breakProblems.push('no yFrom footnote in the geometry')
-    if (svg !== undefined) {
-      if (!svg.includes(`id="${uid}-axis-break"`)) breakProblems.push('no axis-break marker drawn')
-      if (!svg.includes(`id="${uid}-note-yfrom"`)) breakProblems.push('no yFrom footnote drawn')
-    }
-  }
-  rows.push({
-    id: 8, name: 'axis-break-disclosed', severity: 'fail', ok: breakProblems.length === 0,
-    detail: breakProblems.length ? breakProblems.join('; ') : ir.yFrom === 0 || ir.variant === 'ridgeline' ? 'the y axis starts at 0' : `y axis starts at ${ir.yFrom}: break marker and footnote present`,
-    hint: breakProblems.length ? 'a truncated axis must show a break marker on the axis and a footnote naming the start value' : undefined,
-  })
-
-  // #9 missing values are drawn as gaps and written out
+  // #8 missing values are drawn as gaps and written out
   const missProblems = []
   const missing = ir.series.filter((s) => s.values.some((v) => v === null))
   if (missing.length) {
@@ -717,7 +710,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
     }
   }
   rows.push({
-    id: 9, name: 'missing-disclosed', severity: 'fail', ok: missProblems.length === 0,
+    id: 8, name: 'missing-disclosed', severity: 'fail', ok: missProblems.length === 0,
     detail: missProblems.length ? missProblems.join('; ') : missing.length ? `${missing.length} series with gaps: drawn as breaks and listed in the footnote` : 'no missing values',
     hint: missProblems.length ? 'never interpolate across a null — break the line there and list the gap in the footnote' : undefined,
   })
@@ -728,7 +721,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
 
 export const doc = {
   purpose: 'a quantity over an ordered axis: a trend (line), a before/after shift per item (slopegraph), or one small distribution per row (ridgeline)',
-  whenToUse: 'when the direction and speed of change is the point — a trend over 4–24 dates or categories, exactly two states compared item by item (slopegraph), or a few distributions compared row by row (ridgeline). For a single snapshot comparison use a bar or a table. Budgets: series ≤ 4 (slopegraph items ≤ 12), x values ≤ 24, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the direction and speed of change is the point — a trend over 4–12 dates or categories, exactly two states compared item by item (slopegraph), or a few distributions compared row by row (ridgeline). For a single snapshot comparison use a bar or a table. The value axis always starts at 0 (no yFrom — to show a small difference use a slopegraph or a bar dumbbell); only the emphasized series carries vertex dots. Budgets: series ≤ 4 (slopegraph items 4–10, ridgeline rows 3–12), x values 4–12, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: p95-migration
 type: line
 variant: slopegraph
@@ -758,5 +751,5 @@ series:
     label: アップロード
     values: [700, 320]
 `,
-  rows: ['series-count', 'x-count', 'label-length', 'emphasis-count', 'points-proportional', 'end-labels-clear', 'series-distinct', 'axis-break-disclosed', 'missing-disclosed'],
+  rows: ['series-count', 'x-count', 'label-length', 'emphasis-count', 'points-proportional', 'end-labels-clear', 'series-distinct', 'missing-disclosed'],
 }

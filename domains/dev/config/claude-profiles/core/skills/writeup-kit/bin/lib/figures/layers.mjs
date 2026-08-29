@@ -1,5 +1,5 @@
 // `type: layers` — a layer stack: full-width bands stacked top to bottom
-// (UI / API / domain / storage, OSI, a runtime stack), each band optionally
+// (UI / API / business logic / storage, OSI, a runtime stack), each band optionally
 // holding items (the components living in that layer, wrapped ≤ 4 per row),
 // an optional right-hand side column aligned band by band (a control
 // catalog — "which layer enforces what"), and optional vertical arrows
@@ -14,19 +14,25 @@
 //
 // Only a true abstraction stack belongs here (design survey #16): when the
 // bands are not ranked, the reader wants a swimlane or a node/edge diagram.
+// The survey's budgets: 4–6 layers (fewer is a list, more is a wall), bands
+// ≥ 56px tall, one accent layer. Arrow labels sit in the gap right of the
+// shaft(s); a gap holding two labelled arrows widens to 48px and stacks
+// the two labels so the `arrow-label-clear` row (no label over a band,
+// another shaft or another label) holds by construction.
 import { IrError, isObj, requireStr, optStr, validateTone, validateBool, normalizeHeader, budgetWarning, esc } from './_shared.mjs'
 import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, COLUMN } from '../diagram.mjs'
 
 export const type = 'layers'
 
-export const limits = { maxLayers: 7, maxItemsPerLayer: 8, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { minLayers: 4, maxLayers: 6, maxItemsPerLayer: 8, maxLabelLen: 14, maxEmphasis: 1 }
 
 // --- layout constants (px, all multiples of 4 where they become positions) --
 
 const PAD = 16            // canvas margin
 const BAND_GAP = 8        // between bands without arrows
 const ARROW_GAP = 32      // between bands when any arrow is declared
-const BAND_MIN_H = 48
+const ARROW_GAP_2 = 48    // …when that gap holds two labelled arrows (labels stack)
+const BAND_MIN_H = 56
 const BAND_PAD = 12       // item ↔ band edge clearance (verify demands ≥ 8)
 const NUM_W = 24          // index number column inside the band
 const TITLE_PAD = 12
@@ -41,6 +47,8 @@ const SIDE_LINE = 16
 const SIDE_HEADER = 24
 const ARROW_X = 40        // arrow shaft offset from the band's left edge
 const ARROW_PAIR = 16     // second shaft (opposite direction) offset
+const ARROW_LABEL_GAP = 8 // rightmost shaft → label
+const ARROW_LABEL_H = 16  // label box height (11px text)
 
 // --- schema --------------------------------------------------------------
 
@@ -144,8 +152,12 @@ export function budgetWarnings(ir) {
   const n = ir.layers.length
   if (n > limits.maxLayers) {
     out.push(budgetWarning('budget:layers', n, limits.maxLayers,
-      `${n} layer(s) (guidance ≤ ${limits.maxLayers})`,
+      `${n} layer(s) (guidance ${limits.minLayers}–${limits.maxLayers})`,
       'merge neighbouring layers or split the stack into two figures'))
+  } else if (n < limits.minLayers) {
+    out.push(budgetWarning('budget:layers', n, limits.minLayers,
+      `${n} layer(s) (guidance ${limits.minLayers}–${limits.maxLayers})`,
+      'fewer than 4 bands read as a list — add the missing layer or state the ranking in prose'))
   }
   const fattest = ir.layers.reduce((m, l) => (l.items.length > m.items.length ? l : m), ir.layers[0])
   if (fattest.items.length > limits.maxItemsPerLayer) {
@@ -163,7 +175,7 @@ export function budgetWarnings(ir) {
   if (emphasized > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
       `${emphasized} emphasized layer(s) (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis on the one or two layers the decision is about'))
+      'keep emphasis on the one layer the decision is about'))
   }
   return out
 }
@@ -182,6 +194,8 @@ export async function layout(ir, { column = COLUMN } = {}) {
   const hasSide = Boolean(ir.side)
   const arrows = ir.arrows ?? []
   const gap = arrows.length ? ARROW_GAP : BAND_GAP
+  // gap i (below layer i) widens when two labelled arrows share it
+  const gapBelow = gapWidths(ir, gap)
 
   // title column: index number + label (bold when emphasized)
   const titleW = ir.layers.reduce((m, l) => Math.max(m, boldWidth(l.label)), 0)
@@ -245,12 +259,14 @@ export async function layout(ir, { column = COLUMN } = {}) {
     entries.forEach((e, k) => {
       sideEntries.push({ layer: l.id, text: e.text, x: sideX + SIDE_PAD, y: blockTop + EDGE_LABEL_SIZE + 1 + k * SIDE_LINE })
     })
-    y += height + gap
+    y += height + gapBelow[i]
   })
-  const stackBottom = y - gap
+  const stackBottom = y - gapBelow[ir.layers.length - 1]
   const height = snapUp4(stackBottom + PAD)
 
   const byId = new Map(bands.map((b) => [b.id, b]))
+  const indexOf = new Map(ir.layers.map((l, i) => [l.id, i]))
+  const gapOf = (a) => Math.min(indexOf.get(a.from), indexOf.get(a.to))
   const arrowGeo = arrows.map((a, i) => {
     const from = byId.get(a.from)
     const to = byId.get(a.to)
@@ -262,14 +278,42 @@ export async function layout(ir, { column = COLUMN } = {}) {
       x2: x, y2: down ? to.yTop : to.yBottom,
     }
   })
+  // labels: right of the rightmost shaft in the gap, vertically centred
+  // on the gap; two labelled arrows in one gap stack (down above, up below)
+  arrowGeo.forEach((a) => {
+    if (!a.label) return
+    const g = gapOf(a)
+    const peers = arrowGeo.filter((o) => gapOf(o) === g)
+    const labelled = peers.filter((o) => o.label)
+    const shaftRight = Math.max(...peers.map((o) => o.x1))
+    const top = Math.min(a.y1, a.y2)
+    const mid = snap4((a.y1 + a.y2) / 2)
+    const baseline = labelled.length > 1 ? (a.down ? mid - 4 : mid + 12) : mid + 4
+    const x = shaftRight + ARROW_LABEL_GAP
+    const width = Math.ceil(textWidth(a.label, EDGE_LABEL_SIZE))
+    a.labelBox = { text: a.label, x, y: baseline, left: x, top: baseline - 12, right: x + width, bottom: baseline - 12 + ARROW_LABEL_H, gapTop: top }
+  })
 
   const side = hasSide
     ? { label: ir.side.label, x: sideX, y: PAD + EDGE_LABEL_SIZE + 1, width: sideW, entries: sideEntries }
     : undefined
 
-  const geo = { bands, items, arrows: arrowGeo, titleColW, itemW, gap }
+  const geo = { bands, items, arrows: arrowGeo, titleColW, itemW, gap, gapBelow }
   if (side) geo.side = side
   return { width, height, geo }
+}
+
+/** Gap below each layer: `base`, or ARROW_GAP_2 when two labelled arrows
+ * join that pair of layers (their labels stack in the gap). */
+function gapWidths(ir, base) {
+  const indexOf = new Map(ir.layers.map((l, i) => [l.id, i]))
+  const labelled = new Array(ir.layers.length).fill(0)
+  for (const a of ir.arrows ?? []) {
+    if (!a.label) continue
+    const g = Math.min(indexOf.get(a.from), indexOf.get(a.to))
+    if (Math.abs(indexOf.get(a.from) - indexOf.get(a.to)) === 1) labelled[g] += 1
+  }
+  return labelled.map((n) => (n > 1 ? ARROW_GAP_2 : base))
 }
 
 // --- draw ----------------------------------------------------------------
@@ -300,10 +344,9 @@ export function draw(layoutResult, ir) {
 
   for (const a of geo.arrows) {
     parts.push(`<line id="${uid}-a-${a.index}" x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="currentColor" stroke-width="1" marker-end="url(#${uid}-solid)"/>`)
-    if (a.label) {
-      const lx = Math.max(a.x1, a.x2) + 8
-      const ly = (a.y1 + a.y2) / 2 + EDGE_LABEL_SIZE * 0.35
-      parts.push(`<text id="${uid}-a-${a.index}-label" x="${lx}" y="${ly}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(a.label)}</text>`)
+    if (a.labelBox) {
+      const l = a.labelBox
+      parts.push(`<text id="${uid}-a-${a.index}-label" x="${l.x}" y="${l.y}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(l.text)}</text>`)
     }
   }
 
@@ -399,18 +442,42 @@ export function verify(layoutResult, ir) {
     hint: badArrows.length ? 'an arrow may only join a layer to the one directly above or below it — route through the intermediate layers or drop it' : undefined,
   })
 
+  // 9. every arrow label sits in the gap: over no band, across no other
+  //    shaft, on no other label
+  const labelProblems = []
+  const labelled = geo.arrows.filter((a) => a.labelBox)
+  for (const a of labelled) {
+    const l = a.labelBox
+    const who = `label "${l.text}" of ${a.from}→${a.to}`
+    const band = geo.bands.find((b) => l.left < b.x + b.width && b.x < l.right && l.top < b.yBottom && b.yTop < l.bottom)
+    if (band) labelProblems.push(`${who} covers band "${band.id}"`)
+    for (const o of geo.arrows) {
+      if (o.index === a.index) continue
+      const y1 = Math.min(o.y1, o.y2), y2 = Math.max(o.y1, o.y2)
+      if (o.x1 > l.left && o.x1 < l.right && y1 < l.bottom && l.top < y2) labelProblems.push(`${who} is crossed by the shaft of ${o.from}→${o.to}`)
+      const m = o.labelBox
+      if (m && o.index > a.index && l.left < m.right && m.left < l.right && l.top < m.bottom && m.top < l.bottom) labelProblems.push(`${who} overlaps label "${m.text}" of ${o.from}→${o.to}`)
+    }
+  }
+  rows.push({
+    id: 9, name: 'arrow-label-clear', severity: 'fail', ok: labelProblems.length === 0,
+    detail: labelProblems.length ? labelProblems.slice(0, 4).join('; ')
+      : labelled.length ? `${labelled.length} arrow label(s) sit in their gap clear of bands, shafts and each other` : 'no arrow labels',
+    hint: labelProblems.length ? 'place the label right of the rightmost shaft in the gap and widen the gap when two labelled arrows share it' : undefined,
+  })
+
   return rows
 }
 
 // --- doc -----------------------------------------------------------------
 
 export const doc = {
-  purpose: 'a ranked stack of layers (UI / API / domain / storage) with the components in each and, optionally, what each layer enforces',
-  whenToUse: 'when the bands are truly ordered by abstraction and the question is "which layer owns/enforces what" or "what does adding/replacing a layer touch"; not for peers without rank (use diagram or a swimlane). Budgets: layers ≤ 7, items per layer ≤ 8, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  purpose: 'a ranked stack of layers (UI / API / business logic / storage) with the components in each and, optionally, what each layer enforces',
+  whenToUse: 'when the bands are truly ordered by abstraction and the question is "which layer owns/enforces what" or "what does adding/replacing a layer touch"; not for peers without rank (use diagram or a swimlane). Budgets: 4–6 layers, items per layer ≤ 8, label ≤ 14 chars, emphasis ≤ 1 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: web-stack
 type: layers
 title: Web アプリの層構成
-caption: 認可はドメイン層で強制し、UI は表示のみ
+caption: 認可は業務ロジック層で強制し、UI は表示のみ
 layers:
   - id: ui
     label: UI
@@ -422,21 +489,21 @@ layers:
         label: Gateway
         tone: ts
       - 認証
-  - id: domain
-    label: ドメイン
+  - id: logic
+    label: 業務ロジック
     emphasis: true
     items: [注文, 在庫, 決済]
   - id: storage
     label: ストレージ
     tone: rs
-    items: [PostgreSQL, S3]
+    items: [RDB, オブジェクト保管]
 side:
   label: 統制
   items:
-    - layer: domain
+    - layer: logic
       text: 認可・不変条件
     - layer: storage
       text: 暗号化・保持期限
 `,
-  rows: ['layer-count', 'items-per-layer', 'label-length', 'emphasis-count', 'bands-ordered', 'items-inside-band', 'side-aligned', 'arrows-adjacent'],
+  rows: ['layer-count', 'items-per-layer', 'label-length', 'emphasis-count', 'bands-ordered', 'items-inside-band', 'side-aligned', 'arrows-adjacent', 'arrow-label-clear'],
 }

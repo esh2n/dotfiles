@@ -5,6 +5,7 @@ slots: [入力, 出力]
 stages:
   - id: s1
     label: 一
+    emphasis: true
     cells:
       入力: a
       出力: b

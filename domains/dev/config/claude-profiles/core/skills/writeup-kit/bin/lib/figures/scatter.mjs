@@ -5,16 +5,20 @@
 // IR shape: `{ id, type:'scatter', title, caption?, x, y, size?, points, series? }`.
 //   x, y:    { label, unit?, from? }        axis title (+ unit in parentheses);
 //                                           `from` is the axis start, default 0 —
-//                                           ≠ 0 draws a visible axis break and a
-//                                           footnote (survey chart rule)
+//                                           ≠ 0 is tolerated for a scatter only
+//                                           (a distribution has no baseline to
+//                                           lie about), draws a visible axis
+//                                           break + footnote AND carries an
+//                                           `axis:from` warning
 //   size:    { label, unit? }               declares bubbles: every point then
 //                                           needs `size` > 0, drawn as AREA ∝ size
 //                                           (r = R_MAX·√(size/max)); the footnote
 //                                           「円の面積 = <label>」 and a reference
 //                                           bubble in the legend state the scale
 //   points:  [{ id, label?, x, y, size?, series?, emphasis? }]
-//            label is optional — only labelled points get text; emphasis is
-//            the kit accent stroke + bold label (≤ 2 per figure)
+//            label is optional — only labelled points get text (guidance
+//            ≤ 3 labelled: the survey's "2–3 点"); emphasis is the kit
+//            accent stroke + bold label (≤ 2 per figure)
 //   series:  [{ id, label }] ≤ 3            when declared, every point names one
 //
 // Rules the verify rows encode (survey §2 row 23): every marker sits inside
@@ -23,8 +27,13 @@
 // larger bubbles are drawn first so no bubble hides a smaller one; labels
 // are de-collided on the 4px grid with leaders (as in quadrant) and never
 // overlap each other or another marker; series shapes are unique; a
-// truncated axis is disclosed. Budgets: points ≤ 30, labelled ≤ 12, label ≤
-// 12 chars, emphasis ≤ 2 — warnings, never a rejection.
+// truncated axis is disclosed (fail row) and warned about (warn row).
+// Budgets: points ≤ 30 (bubbles 5–15), labelled ≤ 3, label ≤ 12 chars,
+// emphasis ≤ 2 — warnings, never a rejection.
+//
+// No rotated text: the y title sits horizontally above the axis at the
+// top-left (survey §5 「縦書きテキスト」 anti-pattern), the x title centred
+// under the tick row.
 //
 // Grid: the plot frame, ticks, tick labels, titles, label boxes, leaders'
 // label ends and the legend row are on the 4px grid (`x`/`y` keys — the
@@ -38,16 +47,17 @@ import { COLUMN, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, snap4, snapUp4, textWi
 
 export const type = 'scatter'
 
-export const limits = { maxPoints: 30, maxLabelled: 12, maxLabelLen: 12, maxEmphasis: 2 }
+/** Survey §2 row 23: labels on 2–3 points, bubbles 5–15 points. */
+export const limits = { maxPoints: 30, minBubbles: 5, maxBubbles: 15, maxLabelled: 3, maxLabelLen: 12, maxEmphasis: 2 }
 
 // --- metrics -----------------------------------------------------------------
 
 const PAD = 16
-const AXIS_GAP = 8             // rotated y title → tick labels
+const TITLE_GAP = 4            // y title row → plot frame
 const LABEL_GAP = 8            // marker edge → label box; tick → tick label
 const LABEL_H = 16             // 13px text box, on the grid
 const LABEL_PAD = 4            // halo padding either side of the label text
-const SMALL_H = 16             // 11px text box (rotated title width, tick rows)
+const SMALL_H = 16             // 11px text box (tick rows)
 const DOT_R = 5                // plain marker (equivalent-area radius)
 const DOT_R_EMPHASIS = 6
 const R_MAX = 24               // bubble radius at the largest size
@@ -183,11 +193,20 @@ export function budgetWarnings(ir) {
       `${n} point(s) (guidance ≤ ${limits.maxPoints})`,
       `bin or aggregate to ≤ ${limits.maxPoints} points, or show only the decisive subset`))
   }
+  if (ir.size && n > limits.maxBubbles) {
+    out.push(budgetWarning('budget:bubbles', n, limits.maxBubbles,
+      `${n} bubble(s) (guidance ${limits.minBubbles}–${limits.maxBubbles})`,
+      `bubbles overlap past ${limits.maxBubbles} — drop the size axis (plain markers), or show only the decisive subset`))
+  } else if (ir.size && n < limits.minBubbles) {
+    out.push(budgetWarning('budget:bubbles', n, limits.minBubbles,
+      `${n} bubble(s) (guidance ${limits.minBubbles}–${limits.maxBubbles})`,
+      `${n} sized items read better as a bar of the size value — a bubble chart earns its area from ${limits.minBubbles} points up`))
+  }
   const labelled = ir.points.filter((p) => p.label !== undefined)
   if (labelled.length > limits.maxLabelled) {
     out.push(budgetWarning('budget:labels', labelled.length, limits.maxLabelled,
       `${labelled.length} labelled point(s) (guidance ≤ ${limits.maxLabelled})`,
-      `label only the points the caption talks about (≤ ${limits.maxLabelled}); the rest stay as markers`))
+      `label only the 2–3 points the caption talks about; the rest stay as markers (name them in the caption or a table)`))
   }
   const long = labelled.filter((p) => [...p.label].length > limits.maxLabelLen)
   if (long.length) {
@@ -201,6 +220,12 @@ export function budgetWarnings(ir) {
     out.push(budgetWarning('budget:emphasis', focal, limits.maxEmphasis,
       `${focal} emphasized point(s) (guidance ≤ ${limits.maxEmphasis})`,
       `keep emphasis for the ${limits.maxEmphasis} point(s) the caption names — more than two accents is no emphasis`))
+  }
+  const truncated = ['x', 'y'].filter((a) => ir[a].from !== 0)
+  if (truncated.length) {
+    out.push(budgetWarning('axis:from', truncated.length, 0,
+      `${truncated.map((a) => `${a} axis starts at ${fmtUnit(ir[a].from, ir[a].unit)}`).join(', ')} (guidance: axes start at 0)`,
+      'a cut axis is tolerated for a scatter only because a distribution has no baseline — the break marker and footnote disclose it; drop `from` unless the spread is unreadable from 0'))
   }
   return out
 }
@@ -361,8 +386,11 @@ export async function layout(ir, { column = COLUMN } = {}) {
   const yTickLabels = sy.ticks.map(fmt)
   const yTickW = Math.max(...yTickLabels.map(smallW))
   const xTickWidest = Math.max(...xTickLabels.map(smallW))
-  const plotX = snapUp4(PAD + SMALL_H + AXIS_GAP + yTickW + LABEL_GAP)
-  const plotY = PAD
+  const plotX = snapUp4(PAD + yTickW + LABEL_GAP)
+  // the y title is a horizontal row above the frame, flush with the tick labels
+  const yTitleText = titleOf(ir.y)
+  const yTitle = { text: yTitleText, x: PAD, y: PAD, width: snapUp4(boxW(yTitleText, FONT_SIZE)), height: LABEL_H }
+  const plotY = yTitle.y + LABEL_H + TITLE_GAP
 
   const availInner = column - plotX - PAD - inset * 2
   let tickPxX = clamp(snap4(INNER_W_TARGET / sx.nSteps), TICK_X_MIN, TICK_X_MAX)
@@ -380,14 +408,11 @@ export async function layout(ir, { column = COLUMN } = {}) {
   const xTicks = sx.ticks.map((t, k) => ({ value: t, label: xTickLabels[k], x: inner.x + k * tickPxX, zero: t === 0 && sx.vmin < 0, shown: k % xSkip === 0 }))
   const yTicks = sy.ticks.map((t, k) => ({ value: t, label: yTickLabels[k], y: inner.y + innerH - k * tickPxY, zero: t === 0 && sy.vmin < 0, shown: true }))
 
-  // titles: x centred under the tick row, y rotated at the left edge
+  // x title: centred under the tick row (the y title row is above the frame)
   const xTitleText = titleOf(ir.x)
-  const yTitleText = titleOf(ir.y)
   const tickRowY = plot.y + plot.height + 4          // top of the x tick label row
   const xTitleW = snapUp4(boxW(xTitleText, FONT_SIZE))
   const xTitle = { text: xTitleText, x: snap4(plot.x + plot.width / 2 - xTitleW / 2), y: tickRowY + SMALL_H + 4, width: xTitleW, height: LABEL_H }
-  const yTitleW = snapUp4(boxW(yTitleText, FONT_SIZE))
-  const yTitle = { text: yTitleText, x: PAD, y: snap4(plot.y + plot.height / 2 - yTitleW / 2), width: SMALL_H, height: yTitleW }
 
   // markers (0.1px centres; radius is the equivalent-area radius)
   const seriesIndex = new Map((ir.series || []).map((s, i) => [s.id, i]))
@@ -440,7 +465,7 @@ export async function layout(ir, { column = COLUMN } = {}) {
     cursor = y + legendRow.height
   }
   const noteW = notes.length ? Math.max(...notes.map((n) => smallW(n.text))) + PAD * 2 : 0
-  const width = snapUp4(Math.max(plot.x + plot.width + PAD, legendRow ? legendRow.width : 0, noteW))
+  const width = snapUp4(Math.max(plot.x + plot.width + PAD, yTitle.x + yTitle.width + PAD, legendRow ? legendRow.width : 0, noteW))
   const height = snapUp4(cursor + PAD)
   const axisBreaks = []
   if (ir.x.from !== 0) axisBreaks.push({ axis: 'x', x: plot.x + 12, y: plot.y + plot.height })
@@ -534,9 +559,7 @@ export function draw(layoutResult, ir) {
   yTicks.forEach((t, k) => parts.push(`<text id="${uid}-y-${k}" x="${plot.x - LABEL_GAP}" y="${t.y + 4}">${esc(t.label)}</text>`))
   parts.push('</g>')
   parts.push(`<text id="${uid}-x-title" x="${xTitle.x + xTitle.width / 2}" y="${xTitle.y + 12}" font-size="${FONT_SIZE}" text-anchor="middle" fill="currentColor">${esc(xTitle.text)}</text>`)
-  const ycx = yTitle.x + 12
-  const ycy = yTitle.y + yTitle.height / 2
-  parts.push(`<text id="${uid}-y-title" x="${ycx}" y="${ycy}" transform="rotate(-90 ${ycx} ${ycy})" font-size="${FONT_SIZE}" text-anchor="middle" fill="currentColor">${esc(yTitle.text)}</text>`)
+  parts.push(`<text id="${uid}-y-title" x="${yTitle.x}" y="${yTitle.y + 12}" font-size="${FONT_SIZE}" fill="currentColor">${esc(yTitle.text)}</text>`)
   for (const b of axisBreaks) parts.push(drawAxisBreak(uid, b))
 
   // leaders, label halos, label text, then every marker on top
@@ -673,7 +696,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
     hint: shapeProblems.length ? `at most ${MAX_SERIES} series, one shape each (circle / square / triangle) — never colour` : undefined,
   })
 
-  // #6 an axis that does not start at 0 shows a break and says so
+  // #6 an axis that does not start at 0 shows a break and says so (the cut itself is warned about in #11)
   const breakProblems = []
   for (const axis of ['x', 'y']) {
     if (ir[axis].from === 0) continue
@@ -691,16 +714,17 @@ export function verify(layoutResult, ir, { svg } = {}) {
     hint: breakProblems.length ? 'a truncated axis must show a break marker on the axis and a footnote naming the start value' : undefined,
   })
 
-  // #7–#10 budgets (warn)
+  // #7–#11 budgets and the axis start (warn)
   const budget = budgetWarnings(ir)
-  const budgetRow = (id, name, key, okDetail) => {
-    const w = budget.find((b) => b.key === key)
+  const budgetRow = (id, name, keys, okDetail) => {
+    const w = budget.find((b) => keys.includes(b.key))
     return { id, name, severity: 'warn', ok: !w, detail: w ? w.detail : okDetail, hint: w?.hint, key: w?.key, value: w?.value }
   }
-  rows.push(budgetRow(7, 'point-count', 'budget:points', `${ir.points.length} point(s)`))
-  rows.push(budgetRow(8, 'labelled-count', 'budget:labels', `${ir.points.filter((p) => p.label !== undefined).length} labelled point(s)`))
-  rows.push(budgetRow(9, 'label-length', 'budget:label', `every label ≤ ${limits.maxLabelLen} chars`))
-  rows.push(budgetRow(10, 'emphasis-count', 'budget:emphasis', `${ir.points.filter((p) => p.emphasis).length} emphasized point(s)`))
+  rows.push(budgetRow(7, 'point-count', ['budget:points', 'budget:bubbles'], `${ir.points.length} ${bubble ? 'bubble(s)' : 'point(s)'}`))
+  rows.push(budgetRow(8, 'labelled-count', ['budget:labels'], `${ir.points.filter((p) => p.label !== undefined).length} labelled point(s)`))
+  rows.push(budgetRow(9, 'label-length', ['budget:label'], `every label ≤ ${limits.maxLabelLen} chars`))
+  rows.push(budgetRow(10, 'emphasis-count', ['budget:emphasis'], `${ir.points.filter((p) => p.emphasis).length} emphasized point(s)`))
+  rows.push(budgetRow(11, 'axis-from-zero', ['axis:from'], 'both axes start at 0'))
   return rows
 }
 
@@ -708,7 +732,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
 
 export const doc = {
   purpose: 'two quantities per item on numeric axes — a distribution or correlation; a third quantity as bubble area; up to three series by marker shape',
-  whenToUse: 'when every item has two measured values and their spread or relation is the message (cost × effect, latency × traffic, size × growth); with a third quantity add `size` for bubbles (area ∝ value, the scale is stated). Not for ordered categories (use bar or line) or hand-placed positions (use quadrant). Budgets: points ≤ 30, labelled points ≤ 12, label ≤ 12 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn; series ≤ 3 is a hard limit (circle / square / triangle).',
+  whenToUse: 'when every item has two measured values and their spread or relation is the message (cost × effect, latency × traffic, size × growth); with a third quantity add `size` for bubbles (area ∝ value, the scale is stated). Not for ordered categories (use bar or line) or hand-placed positions (use quadrant). Budgets: points ≤ 30 (bubbles 5–15), labelled points ≤ 3, label ≤ 12 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn; series ≤ 3 is a hard limit (circle / square / triangle). An axis start other than 0 (`from`) is tolerated for a scatter only — it is disclosed with a break marker and footnote and carries an axis:from warning.',
   irExample: `id: initiatives
 type: scatter
 title: 施策の工数と効果
@@ -742,7 +766,6 @@ points:
     size: 3600
     series: platform
   - id: batch
-    label: バッチ分割
     x: 18
     y: 25
     size: 900
@@ -754,13 +777,11 @@ points:
     size: 5200
     series: feature
   - id: export
-    label: エクスポート
     x: 8
     y: 30
     size: 700
     series: feature
   - id: mobile
-    label: モバイル対応
     x: 60
     y: 62
     size: 2400
@@ -776,5 +797,5 @@ points:
     size: 600
     series: platform
 `,
-  rows: ['points-in-plot', 'points-proportional', 'bubble-area-proportional', 'labels-no-overlap', 'series-distinct', 'axis-break-disclosed', 'point-count', 'labelled-count', 'label-length', 'emphasis-count'],
+  rows: ['points-in-plot', 'points-proportional', 'bubble-area-proportional', 'labels-no-overlap', 'series-distinct', 'axis-break-disclosed', 'point-count', 'labelled-count', 'label-length', 'emphasis-count', 'axis-from-zero'],
 }

@@ -5,7 +5,7 @@
 // above/below when the axis runs right, left/right when it runs down — so
 // neighbouring labels never collide.
 //
-// IR shape: `{ id, type:'timeline', title, caption, events, scale, direction }`
+// IR shape: `{ id, type:'timeline', title, caption, events, scale, direction, unit }`
 //   events:    [{ id, label, at, note?, emphasis, tone }] in chronological
 //              order; `at` is an ISO date (YYYY, YYYY-MM, YYYY-MM-DD) or a
 //              free ordinal label ("Phase 1", "T+0")
@@ -13,6 +13,13 @@
 //              'ordinal' (uniform spacing); defaults to `time` when every
 //              `at` parses as a date, otherwise `ordinal`
 //   direction: 'right' (default) or 'down'
+//   unit:      the axis unit label (design survey #7: an axis always names
+//              its unit), drawn horizontally in 11px past the arrowhead.
+//              Inferred when absent: dated events → the finest date part in
+//              which the events differ (日 / 月 / 年), ordinal events → 順.
+//
+// The one emphasized milestone is the survey's "big dot": a circle of
+// r=6 (`wu-focal`, stroke 1.5) against r=4 for every other event.
 //
 // The time scale is honest (design survey #7: unequal gaps stay unequal)
 // until it would make labels overlap; then the layout falls back to ordinal
@@ -38,7 +45,9 @@ const AXIS_LEAD = 16      // axis overhang before the first marker
 const DOWN_STEP = 80      // ordinal spacing (and the default time-axis length per gap) when the axis runs down
 const DOWN_MAX_LEN = 640  // longest time axis a `down` figure may grow to
 const DOT_R = 4
-const FOCAL_SIZE = 12
+const FOCAL_R = 6         // the emphasized milestone: a bigger dot, not a different shape
+const UNIT_GAP = 8        // arrowhead tip → unit label (right)
+const UNIT_DROP = 16      // arrowhead tip → unit label baseline (down)
 // text baselines relative to the axis (right) — above: label / note / at
 const ABOVE = { at: -20, label: -36, labelWithNote: -52, note: -36, top: -48, topWithNote: -64 }
 // below: at / label / note
@@ -51,6 +60,10 @@ const SIDE = { at: -4, label: 12, atWithNote: -12, labelWithNote: 4, note: 20, b
 const SCALES = new Set(['ordinal', 'time'])
 const DIRECTIONS = new Set(['right', 'down'])
 const DATE_RE = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/
+const UNIT_DAY = '日'
+const UNIT_MONTH = '月'
+const UNIT_YEAR = '年'
+const UNIT_ORDINAL = '順'
 
 /** Milliseconds since the epoch for `YYYY`, `YYYY-MM`, `YYYY-MM-DD`; null
  * for anything else (an ordinal label). Unexported: helpers stay private. */
@@ -65,6 +78,26 @@ function parseAt(at) {
   const back = new Date(t)
   if (back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) return null
   return t
+}
+
+/**
+ * The axis unit when the author gave none: for dated events the finest
+ * date part in which the events actually differ (different days → 日,
+ * same days but different months → 月, otherwise 年); a single event (or
+ * events on one date) falls back to the finest part its `at` spells out;
+ * any non-date `at` → 順 (ordinal).
+ */
+function inferUnit(events) {
+  if (events.some((e) => parseAt(e.at) === null)) return UNIT_ORDINAL
+  const parts = events.map((e) => DATE_RE.exec(e.at))
+  const differs = (i) => new Set(parts.map((m) => m[i])).size > 1
+  if (differs(3)) return UNIT_DAY
+  if (differs(2)) return UNIT_MONTH
+  if (differs(1)) return UNIT_YEAR
+  // one date (or one event): the finest part written
+  if (parts.some((m) => m[3] !== undefined)) return UNIT_DAY
+  if (parts.some((m) => m[2] !== undefined)) return UNIT_MONTH
+  return UNIT_YEAR
 }
 
 export function normalize(raw, ctx = 'ir') {
@@ -102,7 +135,9 @@ export function normalize(raw, ctx = 'ir') {
   let direction = optStr(raw, 'direction', ctx)
   if (direction === undefined) direction = 'right'
   else if (!DIRECTIONS.has(direction)) throw new IrError(`${ctx}.direction must be right|down (got: ${JSON.stringify(direction)})`)
-  return { id, type, title, caption, events, scale, direction }
+  let unit = optStr(raw, 'unit', ctx)
+  if (unit === undefined || unit.trim() === '') unit = inferUnit(events)
+  return { id, type, title, caption, events, scale, direction, unit }
 }
 
 // --- budgets -------------------------------------------------------------
@@ -208,8 +243,11 @@ export async function layout(ir, { column = COLUMN } = {}) {
     return { w, hasNote, half: 0, before: hasNote ? SIDE.beforeWithNote : SIDE.before, after: hasNote ? SIDE.afterWithNote : SIDE.after }
   })
   const times = ir.scale === 'time' ? ir.events.map((e) => parseAt(e.at)) : null
+  const unitW = Math.ceil(textWidth(ir.unit, EDGE_LABEL_SIZE))
   const mStart = snapUp4(PAD + Math.max(metrics[0].before, AXIS_LEAD))
-  const mEnd = snapUp4(PAD + Math.max(metrics[n - 1].after, ARROW_ROOM))
+  // the end margin also holds the unit label past the arrowhead
+  const unitRoom = right ? ARROW_ROOM + UNIT_GAP + unitW : ARROW_ROOM + UNIT_DROP
+  const mEnd = snapUp4(PAD + Math.max(metrics[n - 1].after, unitRoom))
   const fillLen = right ? snap4(Math.floor((column - mStart - mEnd) / 4) * 4) : (n - 1) * DOWN_STEP
   const maxLen = right ? snap4(Math.floor((column / MIN_SCALE - mStart - mEnd) / 4) * 4) : DOWN_MAX_LEN
   const placed = placeAlongAxis(metrics, times, { fillLen, maxLen })
@@ -218,6 +256,7 @@ export async function layout(ir, { column = COLUMN } = {}) {
   let width
   let height
   let axis
+  let unit
   const events = []
   if (right) {
     const aboveDepth = metrics.reduce((m, mt, i) => (i % 2 === 0 ? Math.max(m, mt.hasNote ? -ABOVE.topWithNote : -ABOVE.top) : m), 0)
@@ -226,6 +265,8 @@ export async function layout(ir, { column = COLUMN } = {}) {
     width = mStart + placed.length + mEnd
     height = snapUp4(axisY + belowDepth + PAD)
     axis = { x1: mStart - AXIS_LEAD, y1: axisY, x2: mStart + placed.length + ARROW_ROOM, y2: axisY }
+    // the box is left/top/right/bottom on purpose: a text-fitted edge is a size, not a grid position
+    unit = { text: ir.unit, x: axis.x2 + UNIT_GAP, y: axisY + 4, anchor: 'start', box: { left: axis.x2 + UNIT_GAP, top: axisY - 8, right: axis.x2 + UNIT_GAP + unitW, bottom: axisY + 8 } }
     ir.events.forEach((e, i) => {
       const mt = metrics[i]
       const cx = positions[i]
@@ -253,6 +294,7 @@ export async function layout(ir, { column = COLUMN } = {}) {
     width = snapUp4(axisX + BLOCK_GAP + rightW + PAD)
     height = mStart + placed.length + mEnd
     axis = { x1: axisX, y1: mStart - AXIS_LEAD, x2: axisX, y2: mStart + placed.length + ARROW_ROOM }
+    unit = { text: ir.unit, x: axisX, y: axis.y2 + UNIT_DROP, anchor: 'middle', box: { left: axisX - Math.ceil(unitW / 2), top: axis.y2 + UNIT_DROP - 12, right: axisX + Math.ceil(unitW / 2), bottom: axis.y2 + UNIT_DROP + 4 } }
     ir.events.forEach((e, i) => {
       const mt = metrics[i]
       const cy = positions[i]
@@ -270,7 +312,7 @@ export async function layout(ir, { column = COLUMN } = {}) {
     })
   }
 
-  const geo = { direction: ir.direction, scale: ir.scale, compressed: placed.compressed, collisions: placed.collisions, axis, events }
+  const geo = { direction: ir.direction, scale: ir.scale, compressed: placed.compressed, collisions: placed.collisions, axis, unit, events }
   return { width, height, geo }
 }
 
@@ -285,15 +327,17 @@ export function draw(layoutResult, ir) {
   parts.push('</defs>')
   const a = geo.axis
   parts.push(`<line id="${uid}-axis" x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="currentColor" stroke-width="1" marker-end="url(#${uid}-solid)"/>`)
+  const u = geo.unit
+  const unitAnchor = u.anchor === 'start' ? '' : ` text-anchor="${u.anchor}"`
+  parts.push(`<text id="${uid}-unit" x="${u.x}" y="${u.y}" font-size="${EDGE_LABEL_SIZE}"${unitAnchor} fill="var(--wu-ink-3)">${esc(u.text)}</text>`)
 
   for (const e of geo.events) {
     const t = e.tick
     parts.push(`<line id="${uid}-tick-${e.id}" x1="${t.x1}" y1="${t.y1}" x2="${t.x2}" y2="${t.y2}" stroke="currentColor" stroke-width="1"/>`)
+    const fill = e.tone === 'neutral' ? 'var(--wu-surface)' : `var(--wu-fig-tone-${e.tone})`
     if (e.emphasis) {
-      const half = FOCAL_SIZE / 2
-      parts.push(`<rect id="${uid}-ev-${e.id}" class="wu-focal" data-tone="${esc(e.tone)}" x="${e.cx - half}" y="${e.cy - half}" width="${FOCAL_SIZE}" height="${FOCAL_SIZE}" rx="4" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1.5"/>`)
+      parts.push(`<circle id="${uid}-ev-${e.id}" class="wu-focal" data-tone="${esc(e.tone)}" cx="${e.cx}" cy="${e.cy}" r="${FOCAL_R}" fill="${fill}" stroke="currentColor" stroke-width="1.5"/>`)
     } else {
-      const fill = e.tone === 'neutral' ? 'var(--wu-surface)' : `var(--wu-fig-tone-${e.tone})`
       parts.push(`<circle id="${uid}-ev-${e.id}" cx="${e.cx}" cy="${e.cy}" r="${DOT_R}" fill="${fill}" stroke="currentColor" stroke-width="1.5"/>`)
     }
     for (const l of e.lines) {
@@ -386,6 +430,24 @@ export function verify(layoutResult, ir) {
     ...(compressed ? { key: 'scale:compressed', value: geo.collisions } : {}),
   })
 
+  // 8. the axis names its unit, past the arrowhead and clear of every block
+  const u = geo.unit
+  const unitProblems = []
+  if (!u || typeof u.text !== 'string' || u.text.trim() === '') unitProblems.push('the axis has no unit label')
+  else {
+    const b = u.box
+    const past = right ? b.left >= geo.axis.x2 : b.top >= geo.axis.y2
+    if (!past) unitProblems.push(`unit label "${u.text}" sits before the axis end`)
+    const asRect = { x: b.left, y: b.top, width: b.right - b.left, height: b.bottom - b.top }
+    for (const e of geo.events) if (overlaps(asRect, e.block)) unitProblems.push(`unit label "${u.text}" overlaps the block of "${e.id}"`)
+    if (b.left < 0 || b.right > layoutResult.width || b.top < 0 || b.bottom > layoutResult.height) unitProblems.push(`unit label "${u.text}" leaves the canvas`)
+  }
+  rows.push({
+    id: 8, name: 'axis-unit', severity: 'fail', ok: unitProblems.length === 0,
+    detail: unitProblems.length ? unitProblems.join('; ') : `axis unit "${u.text}" sits past the arrowhead, clear of every block`,
+    hint: unitProblems.length ? 'set `unit` (年 / 月 / 日 / 順 …) and keep the end margin wide enough for it' : undefined,
+  })
+
   return rows
 }
 
@@ -393,7 +455,7 @@ export function verify(layoutResult, ir) {
 
 export const doc = {
   purpose: 'events on a single time axis (release history, incident timeline, phased migration), labels alternating across the axis',
-  whenToUse: 'when *when* matters more than *what connects to what* — the context and stages behind a decision; not for causal chains (use sequence) nor for parallel tasks with durations (use gantt). Budgets: events ≤ 12, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn. Dates (YYYY, YYYY-MM, YYYY-MM-DD) get a proportional time scale; anything else is ordinal.',
+  whenToUse: 'when *when* matters more than *what connects to what* — the context and stages behind a decision; not for causal chains (use sequence) nor for parallel tasks with durations (use gantt). Budgets: events ≤ 12, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn. Dates (YYYY, YYYY-MM, YYYY-MM-DD) get a proportional time scale; anything else is ordinal. The axis always ends in a unit label (`unit`, inferred as 日 / 月 / 年 / 順 when absent) and the emphasized milestone is the one big dot.',
   irExample: `id: migration
 type: timeline
 title: 移行の経緯
@@ -423,5 +485,5 @@ events:
     at: 2026-09-30
     tone: rs
 `,
-  rows: ['event-count', 'label-length', 'emphasis-count', 'events-ordered', 'labels-clear', 'events-on-axis', 'time-scale'],
+  rows: ['event-count', 'label-length', 'emphasis-count', 'events-ordered', 'labels-clear', 'events-on-axis', 'time-scale', 'axis-unit'],
 }

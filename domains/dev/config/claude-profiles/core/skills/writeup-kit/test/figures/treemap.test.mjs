@@ -119,12 +119,23 @@ describe('figures/treemap.mjs: budgets', () => {
     for (const name of CLEAN) assert.deepEqual(treemap.budgetWarnings(validIr(name)), [], name)
   })
 
+  test('a 9th top-level item and a 2nd emphasis each warn on their own (items ≤ 8, emphasis ≤ 1)', () => {
+    const items = Array.from({ length: 9 }, (_, i) => ({ id: `i${i}`, label: `項目${i}`, value: 90 - i * 5 }))
+    const nine = validateIR({ id: 'n', type: 'treemap', title: 't', items })
+    assert.equal(nine.ok, true)
+    assert.deepEqual(nine.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:items', 9, 8]])
+    const two = validateIR({ id: 'e', type: 'treemap', title: 't', items: [{ id: 'a', label: 'A', value: 5, emphasis: true }, { id: 'b', label: 'B', value: 4, emphasis: true }] })
+    assert.deepEqual(two.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:emphasis', 2, 1]])
+  })
+
   test('every budget key fires, in a stable order, and reaches data-warn', async () => {
     const ir = validIr('treemap-over-budget.yaml')
     const warns = treemap.budgetWarnings(ir)
     assert.deepEqual(warns.map((w) => w.key), ['budget:items', 'budget:children', 'budget:label', 'budget:emphasis'])
-    assert.deepEqual(warns.map((w) => [w.value, w.limit]), [[13, 12], [9, 8], [15, 12], [3, 2]])
+    assert.deepEqual(warns.map((w) => [w.value, w.limit]), [[13, 8], [9, 8], [15, 12], [3, 1]])
     for (const w of warns) assert.ok(w.hint && w.detail)
+    assert.match(warns[0].hint, /8 largest items and fold the rest into one 「その他」 item/)
+    assert.match(warns[3].hint, /the one cell/)
     const rendered = await renderFigureHtmlChecked(ir)
     assert.equal(rendered.checksOk, true, JSON.stringify(rendered.failures))
     assert.match(rendered.html, /data-warn="budget:items=13;budget:children=9;budget:label=15;budget:emphasis=3" data-type="treemap"/)
@@ -406,7 +417,7 @@ describe('figures/treemap.mjs: registry dispatch and CLI', () => {
 
   test('the registry lists treemap with its limits and doc rows', () => {
     assert.equal(plugin.type, 'treemap')
-    assert.deepEqual(plugin.limits, { maxItems: 12, maxChildren: 8, maxLabelLen: 12, maxEmphasis: 2 })
+    assert.deepEqual(plugin.limits, { maxItems: 8, maxChildren: 8, maxLabelLen: 12, maxEmphasis: 1 })
     assert.deepEqual(plugin.doc.rows, OWN_ROWS)
   })
 

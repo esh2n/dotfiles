@@ -56,7 +56,10 @@ describe('swimlane: schema', () => {
     assert.equal(ir.type, 'swimlane')
     assert.equal(ir.direction, 'right')
     assert.deepEqual(ir.steps[0], { id: 's1', label: 'one', lane: 'a', kind: 'step', tone: 'neutral', emphasis: false, parallel: false })
-    assert.deepEqual(ir.edges, [{ from: 's1', to: 's2', label: '' }, { from: 's2', to: 's3', label: '' }])
+    assert.deepEqual(ir.edges, [{ from: 's1', to: 's2', label: '', emphasis: false }, { from: 's2', to: 's3', label: '', emphasis: false }])
+    const focal = plugin.normalize(minimal({ edges: [{ from: 's1', to: 's2', label: 'hand-off', emphasis: true }] }))
+    assert.deepEqual(focal.edges[0], { from: 's1', to: 's2', label: 'hand-off', emphasis: true })
+    assert.throws(() => plugin.normalize(minimal({ edges: [{ from: 's1', to: 's2', emphasis: 'yes' }] })), /edges\[0\]\.emphasis must be a boolean/)
   })
 
   test('normalize is idempotent on every fixture', () => {
@@ -108,20 +111,51 @@ describe('swimlane: budgets', () => {
     assert.deepEqual(w.map((x) => x.key), ['budget:lanes', 'budget:steps', 'budget:label', 'budget:emphasis', 'budget:decision'])
     assert.deepEqual(w.map((x) => x.value), [6, 13, 15, 3, 1])
     assert.match(w[2].detail, /step "s7"/)
-    assert.match(w[4].detail, /decision "s4" lacks two labelled outgoing edges/)
+    assert.match(w[4].detail, /decision "s4" has fewer than two outgoing edges/)
     assert.equal(formatBudgetWarnings(w), 'budget:lanes=6;budget:steps=13;budget:label=15;budget:emphasis=3;budget:decision=1')
     const r = validateIR(raw('swimlane-over-budget.yaml'))
     assert.equal(r.ok, true)
     assert.deepEqual(r.warnings.map((x) => x.key), w.map((x) => x.key))
   })
 
-  test('a decision with one outgoing edge, or an unlabelled branch, warns; two labelled branches do not', () => {
+  test('a decision with one outgoing edge warns; two labelled branches do not; an unlabelled branch is a fail row, not a warning', async () => {
     const one = plugin.normalize(minimal({ steps: [{ id: 's1', label: 'q?', lane: 'a', kind: 'decision' }, { id: 's2', label: 'y', lane: 'b' }], edges: [{ from: 's1', to: 's2', label: 'yes' }] }))
     assert.deepEqual(plugin.budgetWarnings(one).map((x) => x.key), ['budget:decision'])
     const two = plugin.normalize(minimal({ steps: [{ id: 's1', label: 'q?', lane: 'a', kind: 'decision' }, { id: 's2', label: 'y', lane: 'b' }, { id: 's3', label: 'n', lane: 'a' }], edges: [{ from: 's1', to: 's2', label: 'yes' }, { from: 's1', to: 's3', label: 'no' }] }))
     assert.deepEqual(plugin.budgetWarnings(two), [])
     const unlabelled = plugin.normalize(minimal({ steps: two.steps, edges: [{ from: 's1', to: 's2', label: 'yes' }, { from: 's1', to: 's3' }] }))
-    assert.deepEqual(plugin.budgetWarnings(unlabelled).map((x) => x.key), ['budget:decision'])
+    assert.deepEqual(plugin.budgetWarnings(unlabelled), [])
+    const rendered = await renderFigure(plugin, unlabelled)
+    const result = await verifyFigure(plugin, unlabelled, rendered)
+    assert.equal(result.ok, false)
+    const row = byName(result.checks, 'decision-labels')
+    assert.deepEqual([row.severity, row.ok], ['fail', false])
+    assert.match(row.detail, /unlabelled branch\(es\): edges\[1\] s1 → s3/)
+    assert.match(row.hint, /label each branch out of a decision/)
+    assert.deepEqual(result.failures.map((f) => f.name), ['decision-labels'])
+    const html = await renderFigureHtmlChecked(unlabelled, { rawYaml: 'id: m\n' })
+    assert.equal(html.checksOk, false)
+  })
+
+  test('emphasis on edges shares the accent budget with steps; more than one backward edge warns', () => {
+    const shared = plugin.normalize(minimal({
+      steps: [{ id: 's1', label: 'one', lane: 'a', emphasis: true }, { id: 's2', label: 'two', lane: 'b', emphasis: true }, { id: 's3', label: 'three', lane: 'a' }],
+      edges: [{ from: 's1', to: 's2', emphasis: true }, { from: 's2', to: 's3' }],
+    }))
+    const w = plugin.budgetWarnings(shared)
+    assert.deepEqual(w.map((x) => [x.key, x.value]), [['budget:emphasis', 3]])
+    assert.match(w[0].detail, /3 emphasized step\(s\)\/edge\(s\)/)
+    assert.match(w[0].hint, /edge s1 → s2/)
+    const twoBack = plugin.normalize(minimal({
+      steps: [{ id: 's1', label: 'one', lane: 'a' }, { id: 's2', label: 'two', lane: 'b' }, { id: 's3', label: 'three', lane: 'a' }],
+      edges: [{ from: 's1', to: 's2' }, { from: 's2', to: 's3' }, { from: 's3', to: 's1', label: 'redo' }, { from: 's2', to: 's1', label: 'fix' }],
+    }))
+    const b = plugin.budgetWarnings(twoBack)
+    assert.deepEqual(b.map((x) => [x.key, x.value, x.limit]), [['budget:back', 2, 1]])
+    assert.match(b[0].detail, /s3 → s1, s2 → s1/)
+    assert.match(b[0].hint, /reorder the steps/)
+    const oneBack = plugin.normalize({ ...twoBack, edges: twoBack.edges.slice(0, 3) })
+    assert.deepEqual(plugin.budgetWarnings(oneBack), [])
   })
 })
 
@@ -305,6 +339,21 @@ describe('swimlane: registry + output', () => {
       assert.ok(!/data-warn=/.test(r.html), `${name} should carry no data-warn`)
       assert.match(r.html, /<svg role="img"/)
     }
+  })
+
+  test('a focal edge is drawn in the accent colour at 1.5px with its own arrowhead; the others stay in ink', async () => {
+    const ir = validateIR(parseYaml(plugin.doc.irExample)).ir
+    const r = await renderFigure(plugin, ir)
+    const focal = r.layout.geo.edges.find((e) => e.emphasis)
+    assert.deepEqual([focal.from, focal.to], ['approve', 'pay'])
+    assert.match(r.svg, new RegExp(`<path id="wu-d-expense-approval-e-${focal.index}" class="wu-focal" d="[^"]+" fill="none" stroke="var\\(--wu-accent\\)" stroke-width="1.5" marker-end="url\\(#wu-d-expense-approval-focal\\)"`))
+    assert.match(r.svg, /<marker id="wu-d-expense-approval-focal"[^>]*><path [^>]*fill="var\(--wu-accent\)"/)
+    assert.match(r.svg, new RegExp(`<text id="wu-d-expense-approval-e-${focal.index}-label"[^>]*font-weight="700"`))
+    assert.equal((r.svg.match(/stroke="var\(--wu-accent\)"/g) || []).length, 1, 'only the focal edge carries the accent stroke')
+    assert.equal((r.svg.match(/<path id="wu-d-expense-approval-e-\d+" d=[^>]*stroke="currentColor" stroke-width="1"/g) || []).length, ir.edges.length - 1)
+    const result = await verifyFigure(plugin, ir, r)
+    assert.equal(result.ok, true, JSON.stringify(result.failures))
+    assert.deepEqual(result.warnings, [])
   })
 
   test('the decision figure draws a diamond, pills, the focal step, lane labels and arrowheads', async () => {

@@ -1,11 +1,13 @@
 // `type: radar` — a spider chart: N axes radiating from one centre, 1–3
-// series drawn as closed polygons over 4 concentric rings. Compares a few
+// series drawn as closed polygons over 5 concentric rings. Compares a few
 // options on several criteria (capability matrix, scoring of alternatives).
 //
 // IR shape: `{ id, type:'radar', title, caption?, axes, max?, series }`.
-//   axes:   [{ id, label }]                      3–8 (fewer than 3 cannot form a polygon → schema error)
+//   axes:   [{ id, label }]                      3–5 (fewer than 3 cannot form a polygon → schema error; > 5 warns)
 //   max:    number > 0, the outer ring's value   default 1 (values are normalized to 0..max)
-//   series: [{ id, label, values: { <axisId>: number }, emphasis? }]   1–3
+//   series: [{ id, label, values: { <axisId>: number }, emphasis? }]   1–3; exactly 2 warns
+//           (two options compare better as bars or a table); `emphasis`
+//           marks the one focal series (a second one warns)
 // Every axis must have a value in every series — a missing value is a
 // schema error, not a silent 0 (the survey's rule: stop and ask). Values
 // outside 0..max are a verify `fail` row (the polygon would leave the
@@ -14,7 +16,8 @@
 //
 // Distinguishing series without colour: the first series is a solid stroke
 // with a light neutral fill (currentColor at 8%), the second a dashed
-// stroke, the third a dotted stroke; `emphasis: true` adds vertex dots.
+// stroke, the third a dotted stroke. Every series is a 1px line; the focal
+// series (`emphasis: true`) is the only one drawn at 1.5px with vertex dots.
 // The legend at the bottom is the shared wrapper's (`legend` in layout()).
 //
 // Geometry and the 4px grid: the centre, the axis-label anchors, the
@@ -28,10 +31,10 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, COLUMN } from '.
 
 export const type = 'radar'
 
-export const limits = { maxAxes: 8, maxSeries: 3, maxLabelLen: 12 }
+export const limits = { maxAxes: 5, maxSeries: 3, maxLabelLen: 12, maxEmphasis: 1 }
 
 const MIN_AXES = 3
-const RINGS = 4
+const RINGS = 5
 const RADIUS = 160          // outer ring radius at a 720px column
 const RADIUS_MIN = 96       // the layout shrinks to this before it lets the dispatcher scale/scroll
 const LABEL_GAP = 12        // ring → label anchor
@@ -115,6 +118,16 @@ export function budgetWarnings(ir) {
     out.push(budgetWarning('budget:series', ir.series.length, limits.maxSeries,
       `${ir.series.length} series (guidance ≤ ${limits.maxSeries})`,
       `only ${limits.maxSeries} stroke patterns stay distinguishable without colour — draw one radar per ${limits.maxSeries} options, or use a table`))
+  } else if (ir.series.length === 2) {
+    out.push(budgetWarning('budget:series', 2, limits.maxSeries,
+      '2 series — a two-option comparison reads better as bars or a table',
+      'add the third option the decision compares, or draw a grouped bar / table instead of a radar'))
+  }
+  const focal = ir.series.filter((s) => s.emphasis).length
+  if (focal > limits.maxEmphasis) {
+    out.push(budgetWarning('budget:emphasis', focal, limits.maxEmphasis,
+      `${focal} emphasized series (guidance ≤ ${limits.maxEmphasis})`,
+      'keep the thick line and vertex dots for the one series the decision is about — a second focal series is no focus'))
   }
   const long = []
   ir.axes.forEach((a, i) => {
@@ -241,7 +254,10 @@ export function draw(layoutResult, ir) {
     const points = s.points.map(abs).join(' ')
     const fill = s.fill ? ' fill="currentColor" fill-opacity="0.08"' : ' fill="none"'
     const dash = s.dash ? ` stroke-dasharray="${s.dash}"` : ''
-    parts.push(`<polygon id="${uid}-series-${s.id}" points="${points}"${fill} stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"${dash}/>`)
+    // The focal series is the only thick line (1.5px) and the only one with
+    // vertex dots; the rest stay 1px so the eye lands on one polygon.
+    const sw = s.emphasis ? 1.5 : 1
+    parts.push(`<polygon id="${uid}-series-${s.id}" points="${points}"${fill} stroke="currentColor" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"${dash}/>`)
     if (s.emphasis) {
       parts.push(`<g id="${uid}-series-${s.id}-dots" fill="currentColor">`)
       s.points.forEach((p, i) => parts.push(`<circle id="${uid}-series-${s.id}-dot-${i}" cx="${round1(cx + p.px)}" cy="${round1(cy + p.py)}" r="${DOT_R}"/>`))
@@ -283,8 +299,9 @@ export function verify(layoutResult, ir, { svg } = {}) {
   warnRow(1, 'axis-count', 'budget:axes', `${ir.axes.length} axes`)
   warnRow(2, 'series-count', 'budget:series', `${ir.series.length} series`)
   warnRow(3, 'label-length', 'budget:label', `every label ≤ ${limits.maxLabelLen} chars`)
+  warnRow(4, 'emphasis-count', 'budget:emphasis', `${ir.series.filter((s) => s.emphasis).length} emphasized series`)
 
-  // #4 values within 0..max
+  // #5 values within 0..max
   const outOfRange = []
   ir.series.forEach((s, i) => {
     for (const a of ir.axes) {
@@ -293,12 +310,12 @@ export function verify(layoutResult, ir, { svg } = {}) {
     }
   })
   rows.push({
-    id: 4, name: 'values-in-range', severity: 'fail', ok: outOfRange.length === 0,
+    id: 5, name: 'values-in-range', severity: 'fail', ok: outOfRange.length === 0,
     detail: outOfRange.length ? `outside 0..${ir.max}: ${outOfRange.slice(0, 6).join(', ')}` : `every value lies within 0..${ir.max}`,
     hint: outOfRange.length ? `normalize every value to 0..${ir.max} (or raise max) before drawing` : undefined,
   })
 
-  // #5 axis labels clear of each other and of the outer ring
+  // #6 axis labels clear of each other and of the outer ring
   const problems = []
   const labels = geo.axes.map((a) => ({ id: a.id, box: a.label.box }))
   for (let i = 0; i < labels.length; i++) {
@@ -309,12 +326,12 @@ export function verify(layoutResult, ir, { svg } = {}) {
     if (d < geo.radius + RING_CLEAR) problems.push(`"${labels[i].id}" is ${round1(d - geo.radius)}px from the outer ring (need ≥ ${RING_CLEAR})`)
   }
   rows.push({
-    id: 5, name: 'labels-clear', severity: 'fail', ok: problems.length === 0,
+    id: 6, name: 'labels-clear', severity: 'fail', ok: problems.length === 0,
     detail: problems.length ? problems.slice(0, 6).join('; ') : 'axis labels sit outside the rings and clear of each other',
     hint: problems.length ? 'shorten the axis labels (≤ 12 chars) or reduce the axis count' : undefined,
   })
 
-  // #6 polygons closed with N vertices — in the geometry and in the svg
+  // #7 polygons closed with N vertices — in the geometry and in the svg
   const n = ir.axes.length
   const uid = `wu-d-${ir.id}`
   const polyProblems = []
@@ -328,12 +345,12 @@ export function verify(layoutResult, ir, { svg } = {}) {
     }
   }
   rows.push({
-    id: 6, name: 'polygons-closed', severity: 'fail', ok: polyProblems.length === 0,
+    id: 7, name: 'polygons-closed', severity: 'fail', ok: polyProblems.length === 0,
     detail: polyProblems.length ? polyProblems.join('; ') : `every series is a closed <polygon> with ${n} vertices`,
     hint: polyProblems.length ? 'every series must carry one value per axis and be drawn as a single closed polygon' : undefined,
   })
 
-  // #7 series distinguishable without colour
+  // #8 series distinguishable without colour
   const seen = new Map()
   const dupes = []
   for (const s of geo.series) {
@@ -342,7 +359,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
     else seen.set(key, s.id)
   }
   rows.push({
-    id: 7, name: 'series-distinct', severity: 'fail', ok: dupes.length === 0,
+    id: 8, name: 'series-distinct', severity: 'fail', ok: dupes.length === 0,
     detail: dupes.length ? dupes.join('; ') : 'every series has its own stroke pattern (solid / dashed / dotted)',
     hint: dupes.length ? `give each series a distinct stroke pattern — at most ${DASHES.length} series per radar (guidance ≤ ${limits.maxSeries})` : undefined,
   })
@@ -353,7 +370,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
 
 export const doc = {
   purpose: 'a few options scored on several criteria (capability matrix, alternative comparison)',
-  whenToUse: 'when 1–3 options must be compared on 3–8 quantified criteria at a glance; if the criteria are qualitative, or there are more series, use a table. Budgets: axes ≤ 8, series ≤ 3, label ≤ 12 chars — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when 1 or 3 options must be compared on 3–5 quantified criteria at a glance; if the criteria are qualitative, there are more series, or exactly two options (bars or a table compare two better), use a table. Budgets: axes ≤ 5, series ≤ 3 (exactly 2 warns), label ≤ 12 chars, emphasis ≤ 1 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: queue-choice
 type: radar
 title: キュー基盤の比較
@@ -370,8 +387,8 @@ axes:
   - id: ecosystem
     label: エコシステム
 series:
-  - id: kafka
-    label: Kafka
+  - id: self-hosted
+    label: 自前キュー
     emphasis: true
     values:
       throughput: 1
@@ -379,14 +396,22 @@ series:
       ops: 0.3
       cost: 0.4
       ecosystem: 0.9
-  - id: sqs
-    label: SQS
+  - id: managed
+    label: マネージドキュー
     values:
       throughput: 0.5
       latency: 0.5
       ops: 0.9
       cost: 0.8
       ecosystem: 0.6
+  - id: broker
+    label: ブローカー型
+    values:
+      throughput: 0.8
+      latency: 0.8
+      ops: 0.5
+      cost: 0.5
+      ecosystem: 0.7
 `,
-  rows: ['axis-count', 'series-count', 'label-length', 'values-in-range', 'labels-clear', 'polygons-closed', 'series-distinct'],
+  rows: ['axis-count', 'series-count', 'label-length', 'emphasis-count', 'values-in-range', 'labels-clear', 'polygons-closed', 'series-distinct'],
 }

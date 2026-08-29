@@ -60,7 +60,7 @@ describe('figures/scatter.mjs: schema', () => {
     assert.ok(p && p.builtin === false)
     assert.equal(p.type, 'scatter')
     assert.deepEqual(p.doc.rows, scatter.doc.rows)
-    assert.deepEqual(p.limits, { maxPoints: 30, maxLabelled: 12, maxLabelLen: 12, maxEmphasis: 2 })
+    assert.deepEqual(p.limits, { maxPoints: 30, minBubbles: 5, maxBubbles: 15, maxLabelled: 3, maxLabelLen: 12, maxEmphasis: 2 })
   })
 
   test('a minimal IR normalizes: axes get from=0, points keep only the fields given, emphasis=false', () => {
@@ -125,9 +125,27 @@ describe('figures/scatter.mjs: budgets', () => {
     assert.equal(result.ok, true)
     assert.equal(formatBudgetWarnings(result.warnings), 'budget:points=31;budget:labels=13;budget:label=13;budget:emphasis=3')
     assert.match(result.warnings[2].hint, /shorten "とても長いラベルの点その一"/)
-    for (const name of ['scatter-simple.yaml', 'scatter-bubble.yaml', 'scatter-from.yaml']) {
+    for (const name of ['scatter-simple.yaml', 'scatter-bubble.yaml']) {
       assert.deepEqual(scatter.budgetWarnings(validIr(name)), [], name)
     }
+  })
+
+  test('a fourth label warns (survey: label 2–3 points); bubbles warn outside 5–15; a cut axis carries axis:from', () => {
+    const four = validateIR(rawIr({ points: [1, 2, 3, 4].map((i) => ({ id: `p${i}`, label: `L${i}`, x: i, y: i })) }))
+    assert.equal(formatBudgetWarnings(four.warnings), 'budget:labels=4')
+    assert.match(four.warnings[0].hint, /label only the 2–3 points/)
+    const bubbles = (n) => validateIR(rawIr({ size: { label: 'n' }, points: Array.from({ length: n }, (_, i) => ({ id: `p${i}`, x: i, y: i, size: i + 1 })) }))
+    assert.equal(formatBudgetWarnings(bubbles(4).warnings), 'budget:bubbles=4')
+    assert.match(bubbles(4).warnings[0].detail, /4 bubble\(s\) \(guidance 5–15\)/)
+    assert.deepEqual(bubbles(5).warnings, [])
+    assert.deepEqual(bubbles(15).warnings, [])
+    assert.equal(formatBudgetWarnings(bubbles(16).warnings), 'budget:bubbles=16')
+    assert.match(bubbles(16).warnings[0].hint, /drop the size axis/)
+    const from = validateIR(parseYaml(fixture('scatter-from.yaml')))
+    assert.equal(formatBudgetWarnings(from.warnings), 'axis:from=1')
+    assert.match(from.warnings[0].detail, /y axis starts at 96% \(guidance: axes start at 0\)/)
+    assert.match(from.warnings[0].hint, /tolerated for a scatter only/)
+    assert.equal(formatBudgetWarnings(validateIR(rawIr({ x: { label: 'c', from: 5 }, y: { label: 'v', from: 2 } })).warnings), 'axis:from=2')
   })
 })
 
@@ -158,7 +176,12 @@ describe('figures/scatter.mjs: layout', () => {
     assert.match(r.svg, /<text id="wu-d-s1-p-search-label" [^>]*font-weight="700"[^>]*>検索<\/text>/)
     assert.doesNotMatch(r.svg, /wu-d-s1-p-login-label/)
     assert.match(r.svg, /<text id="wu-d-s1-x-title" [^>]*>リクエスト数（千\/日）<\/text>/)
-    assert.match(r.svg, /<text id="wu-d-s1-y-title" [^>]*transform="rotate\(-90 [^"]+\)"[^>]*>p95（ms）<\/text>/)
+    // the y title is a horizontal row above the frame at the top-left — never rotated
+    assert.match(r.svg, /<text id="wu-d-s1-y-title" x="16" y="28" font-size="13" fill="currentColor">p95（ms）<\/text>/)
+    assert.doesNotMatch(r.svg, /rotate\(/)
+    assert.equal(geo.yTitle.y + geo.yTitle.height <= geo.plot.y, true)
+    assert.equal(geo.yTitle.x, 16)
+    assert.equal(geo.plot.y, 36)
     assert.equal((r.svg.match(/data-x="/g) || []).length, ir.points.length)
   })
 
@@ -200,6 +223,16 @@ describe('figures/scatter.mjs: layout', () => {
     assert.deepEqual(geo.axisBreaks.map((b) => b.axis), ['y'])
     assert.match(r.svg, /<g id="wu-d-s3-axis-break-y">/)
     assert.match(r.svg, /<text id="wu-d-s3-note-yfrom" [^>]*>y 軸は 96% から始まる（0 起点ではない）<\/text>/)
+    const ir = validIr('scatter-from.yaml')
+    const v = await verifyFigure(plugin(), ir, r)
+    assert.equal(v.ok, true, JSON.stringify(v.failures))
+    assert.equal(byName(v.checks, 'axis-break-disclosed').ok, true)
+    const warn = byName(v.checks, 'axis-from-zero')
+    assert.equal(warn.severity, 'warn')
+    assert.equal(warn.ok, false)
+    assert.equal(warn.key, 'axis:from')
+    assert.equal(warn.value, 1)
+    assert.deepEqual(v.warnings.map((w) => w.key), ['axis:from'])
     assert.deepEqual(geo.legend.items.filter((it) => it.kind === 'series').map((it) => it.shape), ['circle', 'square', 'triangle'])
     assert.match(r.svg, /<polygon id="wu-d-s3-p-b1" points="[^"]+" data-x="1500" data-y="96.5" fill="currentColor" stroke="var\(--wu-accent\)" stroke-width="1.5"\/>/)
     assert.match(r.svg, /<rect id="wu-d-s3-p-w1" x="[\d.]+" y="[\d.]+" width="8.86" height="8.86" data-x="900"/)
@@ -243,12 +276,14 @@ describe('figures/scatter.mjs: layout', () => {
 // --- verify rows ----------------------------------------------------------
 
 describe('figures/scatter.mjs: verify rows', () => {
-  test('doc.rows lists the ten own rows in verify() order and the shared rows follow from id 11', async () => {
+  test('doc.rows lists the eleven own rows in verify() order and the shared rows follow from id 12', async () => {
     const { ir, r } = await rendered('scatter-simple.yaml')
     const result = await verifyFigure(plugin(), ir, r)
-    assert.deepEqual(result.checks.slice(0, 10).map((c) => c.name), scatter.doc.rows)
-    assert.deepEqual(result.checks.slice(0, 10).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    assert.equal(byName(result.checks, 'single-finite-svg').id, 11)
+    assert.deepEqual(result.checks.slice(0, 11).map((c) => c.name), scatter.doc.rows)
+    assert.deepEqual(result.checks.slice(0, 11).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    assert.equal(byName(result.checks, 'single-finite-svg').id, 12)
+    assert.equal(byName(result.checks, 'axis-from-zero').ok, true)
+    assert.equal(byName(result.checks, 'axis-from-zero').detail, 'both axes start at 0')
     for (const name of ALL) {
       const x = await rendered(name)
       const v = await verifyFigure(plugin(), x.ir, x.r)
@@ -410,7 +445,7 @@ describe('figures/scatter.mjs: renderFigureHtmlChecked and the CLI', () => {
     assert.ok(over.html.startsWith('<figure class="wu-figure" data-checks="pass" data-warn="budget:points=31;budget:labels=13;budget:label=13;budget:emphasis=3" data-type="scatter">'))
   })
 
-  test('CLI: --figure exits 0 for simple and bubble, --json reports ok + checks, --doc scatter is a clean 8-point / 2-series bubble chart', () => {
+  test('CLI: --figure exits 0 for simple and bubble, --json reports ok + checks, --doc scatter is a clean 8-point / 2-series / 3-label bubble chart', () => {
     for (const f of ['scatter-simple.yaml', 'scatter-bubble.yaml']) {
       const fig = runCli([join(FIXTURES, f), '--figure'])
       assert.equal(fig.status, 0, `${f}: ${fig.stderr}`)
@@ -420,7 +455,7 @@ describe('figures/scatter.mjs: renderFigureHtmlChecked and the CLI', () => {
     const json = JSON.parse(runCli([join(FIXTURES, 'scatter-bubble.yaml'), '--json']).stdout)
     assert.equal(json.ok, true)
     assert.ok(json.checks.some((c) => c.name === 'bubble-area-proportional' && c.ok))
-    assert.equal(json.checks.length, 17)
+    assert.equal(json.checks.length, 18)
     const doc = runCli(['--doc', 'scatter'])
     assert.equal(doc.status, 0)
     assert.equal(doc.stdout, scatter.doc.irExample)
@@ -429,9 +464,10 @@ describe('figures/scatter.mjs: renderFigureHtmlChecked and the CLI', () => {
     assert.equal(example.ir.points.length, 8)
     assert.equal(example.ir.series.length, 2)
     assert.ok(example.ir.points.every((p) => p.size > 0))
+    assert.equal(example.ir.points.filter((p) => p.label).length, 3)
     assert.deepEqual(example.warnings, [])
     const listed = runCli(['--list-types'])
     assert.match(listed.stdout, /^scatter {2}\(plugin\)\n {2}purpose: /m)
-    assert.match(listed.stdout, /budgets: maxPoints=30 maxLabelled=12 maxLabelLen=12 maxEmphasis=2/)
+    assert.match(listed.stdout, /budgets: maxPoints=30 minBubbles=5 maxBubbles=15 maxLabelled=3 maxLabelLen=12 maxEmphasis=2/)
   })
 })

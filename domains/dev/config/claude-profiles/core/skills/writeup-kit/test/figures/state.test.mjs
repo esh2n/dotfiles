@@ -58,12 +58,13 @@ describe('state: schema', () => {
     assert.deepEqual(plugin.normalize(simple), simple)
   })
 
-  test('rejects unknown state references, duplicate ids, bad kind/direction, >2 emphasis', () => {
+  test('rejects unknown state references, duplicate ids, bad kind/direction, >1 emphasis', () => {
     assert.throws(() => plugin.normalize(minimal({ transitions: [{ from: 'a', to: 'zz' }] })), /transitions\[0\]\.to references unknown state "zz"/)
     assert.throws(() => plugin.normalize(minimal({ states: [{ id: 'a', label: 'A' }, { id: 'a', label: 'B' }] })), /duplicate state id "a"/)
     assert.throws(() => plugin.normalize(minimal({ transitions: [{ from: 'a', to: 'b', kind: 'reply' }] })), /kind must be sync\|async/)
     assert.throws(() => plugin.normalize(minimal({ direction: 'up' })), /direction must be down\|right/)
-    assert.throws(() => plugin.normalize(minimal({ states: [{ id: 'a', label: 'A', emphasis: true }, { id: 'b', label: 'B', emphasis: true }, { id: 'c', label: 'C', emphasis: true }] })), /at most 2 focal states/)
+    assert.throws(() => plugin.normalize(minimal({ states: [{ id: 'a', label: 'A', emphasis: true }, { id: 'b', label: 'B', emphasis: true }] })), /2 states carry emphasis — at most 1 focal state is allowed/)
+    assert.equal(plugin.normalize(minimal({ states: [{ id: 'a', label: 'A', emphasis: true }, { id: 'b', label: 'B' }] })).states[0].emphasis, true)
     assert.throws(() => plugin.normalize(minimal({ states: [] })), /states must be a non-empty list/)
   })
 
@@ -104,12 +105,32 @@ describe('state: budgets', () => {
     assert.match(w[0].detail, /transition 0 label/)
   })
 
-  test('transitions over 16 and unlabeled transitions warn', () => {
-    const transitions = Array.from({ length: 17 }, (_, i) => ({ from: i % 2 ? 'a' : 'b', to: i % 2 ? 'b' : 'a', label: `e${i}` }))
-    const w = plugin.budgetWarnings(plugin.normalize(minimal({ transitions })))
-    assert.deepEqual(w.map((x) => x.key), ['budget:transitions'])
-    const u = plugin.budgetWarnings(plugin.normalize(minimal({ transitions: [{ from: 'a', to: 'b' }] })))
-    assert.deepEqual(u.map((x) => x.key), ['budget:unlabeled'])
+  test('more transitions than twice the states warns (budget:transitions, limit = min(16, 2 × states))', () => {
+    const edges = (n) => Array.from({ length: n }, (_, i) => ({ from: i % 2 ? 'a' : 'b', to: i % 2 ? 'b' : 'a', label: `e${i}` }))
+    const four = plugin.budgetWarnings(plugin.normalize(minimal({ transitions: edges(4) })))
+    assert.deepEqual(four, [], '2 states × 2 = 4 transitions is within guidance')
+    const five = plugin.budgetWarnings(plugin.normalize(minimal({ transitions: edges(5) })))
+    assert.deepEqual(five.map((x) => [x.key, x.value, x.limit]), [['budget:transitions', 5, 4]])
+    assert.match(five[0].detail, /5 transition\(s\) for 2 state\(s\) \(guidance ≤ 2 × states = 4\)/)
+    assert.match(five[0].hint, /two machines/)
+    const nine = plugin.normalize({ ...minimal(), states: Array.from({ length: 9 }, (_, i) => ({ id: `s${i}`, label: `S${i}` })), transitions: Array.from({ length: 17 }, (_, i) => ({ from: `s${i % 9}`, to: `s${(i + 1) % 9}`, label: `e${i}` })) })
+    const capped = plugin.budgetWarnings(nine).find((x) => x.key === 'budget:transitions')
+    assert.equal(capped.limit, 16, 'the 16 cap still applies past 8 states')
+  })
+
+  test('an unlabeled transition is not a budget warning any more — it fails the transition-labels row', async () => {
+    const ir = plugin.normalize(minimal({ transitions: [{ from: 'a', to: 'b' }, { from: 'b', to: 'a', label: 'back' }] }))
+    assert.deepEqual(plugin.budgetWarnings(ir), [])
+    const rendered = await renderFigure(plugin, ir)
+    const result = await verifyFigure(plugin, ir, rendered)
+    assert.equal(result.ok, false)
+    const row = byName(result.checks, 'transition-labels')
+    assert.deepEqual([row.severity, row.ok], ['fail', false])
+    assert.match(row.detail, /1 transition\(s\) without a label: a → b/)
+    assert.match(row.hint, /name the event on every transition/)
+    assert.deepEqual(result.failures.map((f) => f.name), ['transition-labels'])
+    const html = await renderFigureHtmlChecked(ir, { rawYaml: 'id: m\n' })
+    assert.equal(html.checksOk, false)
   })
 
   test('an unreachable state warns (budget:unreachable) and the reachable row reports it', async () => {
@@ -143,7 +164,12 @@ describe('state: layout', () => {
     const self = L.geo.transitions.find((t) => t.from === 'fetching' && t.to === 'fetching')
     assert.equal(self.cls, 'self')
     assert.equal(self.points.length, 4)
-    assert.ok(self.points.every((p) => p.x >= byId.get('fetching').x + byId.get('fetching').width), 'the self loop sits on the right side')
+    const fb = byId.get('fetching')
+    assert.ok(self.points.every((p) => p.y <= fb.y), 'the self loop sits above the box')
+    assert.ok(self.points.every((p) => p.x > fb.cx && p.x <= fb.x + fb.width), 'its feet are at the right corner of the top edge')
+    assert.deepEqual([self.points[0].y, self.points[1].y, self.points[2].y, self.points[3].y], [fb.y, fb.y - 16, fb.y - 16, fb.y])
+    const inEdge = L.geo.transitions.find((t) => t.from === 'pending' && t.to === 'fetching')
+    assert.ok(inEdge.points.every((p) => p.x < self.points[0].x - 8), 'the incoming edge lands left of the loop')
     assert.equal(L.geo.markers.initial.length, 1)
     assert.equal(L.geo.markers.final.length, 1)
     assert.ok(L.geo.markers.initial[0].cy < byId.get('pending').y)
@@ -153,12 +179,19 @@ describe('state: layout', () => {
     assert.ok(L.legend, 'async transition → legend')
   })
 
-  test('direction: right lays ranks out left to right', async () => {
+  test('direction: right lays ranks out left to right; a self loop still sits above its box', async () => {
     const ir = validIr('state-over-states.yaml')
     const L = await plugin.layout(ir)
     const xs = L.geo.states.map((s) => s.x)
     assert.ok(xs.every((x, i) => i === 0 || x > xs[i - 1]))
     assert.ok(new Set(L.geo.states.map((s) => s.y)).size === 1, 'a chain sits on one row')
+    const looped = plugin.normalize(minimal({ direction: 'right', transitions: [{ from: 'a', to: 'b', label: 'go' }, { from: 'b', to: 'b', label: 'again' }, { from: 'b', to: 'a', label: 'reset' }] }))
+    const rendered = await renderFigure(plugin, looped)
+    const result = await verifyFigure(plugin, looped, rendered)
+    assert.equal(result.ok, true, JSON.stringify(result.failures))
+    const b = rendered.layout.geo.states.find((s) => s.id === 'b')
+    const self = rendered.layout.geo.transitions.find((t) => t.cls === 'self')
+    assert.ok(self.points.every((p) => p.y <= b.y && p.x > b.cx && p.x <= b.x + b.width))
   })
 
   test('layout is deterministic and every label is beside its edge', async () => {
@@ -258,6 +291,7 @@ describe('state: registry + output', () => {
     const p = getFigureType('state')
     assert.ok(p && !p.builtin)
     assert.equal(p.limits.maxStates, 8)
+    assert.equal(p.limits.maxEmphasis, 1)
   })
 
   test('renderFigureHtmlChecked → data-checks="pass" data-type="state" for state-simple and state-retry', async () => {

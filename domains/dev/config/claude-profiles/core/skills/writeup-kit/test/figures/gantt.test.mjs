@@ -31,7 +31,7 @@ function runCli(args) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr }
 }
 
-const OWN_ROWS = ['task-count', 'group-count', 'label-length', 'emphasis-count', 'spans-ordered', 'bars-in-range', 'rows-clear', 'deps-clear']
+const OWN_ROWS = ['task-count', 'group-count', 'label-length', 'emphasis-count', 'deps-count', 'parallel-count', 'spans-ordered', 'bars-in-range', 'rows-clear', 'deps-clear']
 const SHARED_ROWS = ['single-finite-svg', 'a11y', 'font-size', 'stroke-radius', 'dark-3-state', 'grid-4px', 'projected-scale']
 
 const minimal = () => ({
@@ -106,9 +106,43 @@ describe('gantt: schema', () => {
 // --- budgets -------------------------------------------------------------
 
 describe('gantt: budgets', () => {
-  test('clean fixtures have no warnings', () => {
+  test('gantt-simple has no warnings; gantt-groups warns only on its 3 dependency arrows (the survey has none by default)', () => {
     assert.deepEqual(plugin.budgetWarnings(validIr('gantt-simple.yaml')), [])
-    assert.deepEqual(plugin.budgetWarnings(validIr('gantt-groups.yaml')), [])
+    const w = plugin.budgetWarnings(validIr('gantt-groups.yaml'))
+    assert.deepEqual(w.map((x) => [x.key, x.value, x.limit]), [['budget:deps', 3, 0]])
+    assert.match(w[0].detail, /survey forbids them by default/)
+    assert.match(w[0].hint, /row order and phases/)
+    assert.deepEqual(plugin.budgetWarnings(validIr('gantt-groups.yaml')).map((x) => x.key), ['budget:deps'])
+  })
+
+  test('budget:parallel fires when more than 5 tasks of one group are in flight at once; milestones and other groups do not count', () => {
+    const task = (i, group, from, to, extra = {}) => ({ id: `t${i}`, label: `T${i}`, group, from, to, ...extra })
+    const six = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', tasks: Array.from({ length: 6 }, (_, i) => task(i, 'a', i, 6)) })
+    assert.equal(six.ok, true, JSON.stringify(six))
+    assert.deepEqual(six.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:parallel', 6, 5]])
+    assert.match(six.warnings[0].detail, /6 task\(s\) in flight at once in group "a"/)
+    assert.match(six.warnings[0].hint, /stagger/)
+    // the same 6 tasks spread over two groups: 3 + 3 → no warning
+    const split = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', tasks: Array.from({ length: 6 }, (_, i) => task(i, i < 3 ? 'a' : 'b', i, 6)) })
+    assert.deepEqual(split.warnings, [])
+    // 5 bars + a milestone inside their span → milestones are points, not work
+    const ms = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', tasks: [...Array.from({ length: 5 }, (_, i) => task(i, 'a', 0, 4)), task(9, 'a', 2, undefined, { milestone: true })] })
+    assert.deepEqual(ms.warnings, [])
+    // `to` is inclusive: a task ending at 3 and one starting at 3 overlap, one starting at 4 does not
+    const touch = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', tasks: [...Array.from({ length: 5 }, (_, i) => task(i, 'a', 0, 3)), task(5, 'a', 3, 6)] })
+    assert.deepEqual(touch.warnings.map((w) => w.key), ['budget:parallel'])
+    const clear = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', tasks: [...Array.from({ length: 5 }, (_, i) => task(i, 'a', 0, 3)), task(5, 'a', 4, 6)] })
+    assert.deepEqual(clear.warnings, [])
+    // ungrouped charts count the whole chart as one phase
+    const flat = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', tasks: Array.from({ length: 6 }, (_, i) => task(i, undefined, 0, 2)) })
+    assert.equal(flat.warnings[0].key, 'budget:parallel')
+    assert.doesNotMatch(flat.warnings[0].detail, /in group/)
+  })
+
+  test('two emphasized tasks already exceed the one-focal budget', () => {
+    const r = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', tasks: [{ id: 'a', label: 'A', from: 0, to: 1, emphasis: true }, { id: 'b', label: 'B', from: 2, to: 3, emphasis: true }] })
+    assert.deepEqual(r.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:emphasis', 2, 1]])
+    assert.match(r.warnings[0].hint, /the one task the schedule hinges on/)
   })
 
   test('each budget key fires on its fixture and reaches data-warn', async () => {
@@ -127,7 +161,7 @@ describe('gantt: budgets', () => {
     }
   })
 
-  test('keys come out in a stable order: tasks, groups, label, emphasis', () => {
+  test('keys come out in a stable order: tasks, groups, label, emphasis, deps, parallel', () => {
     const tasks = Array.from({ length: 13 }, (_, i) => ({
       id: `t${i}`, label: i === 0 ? 'この作業名は十四文字を超える長さ' : `T${i}`, from: i, to: i + 1, group: `G${i % 5}`, emphasis: i < 3,
     }))
@@ -135,6 +169,8 @@ describe('gantt: budgets', () => {
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.deepEqual(plugin.budgetWarnings(r.ir).map((w) => w.key), ['budget:tasks', 'budget:groups', 'budget:label', 'budget:emphasis'])
     assert.equal(formatBudgetWarnings(r.warnings), 'budget:tasks=13;budget:groups=5;budget:label=16;budget:emphasis=3')
+    const all = validateIR({ id: 'g', type: 'gantt', title: 't', unit: 'ordinal', deps: [{ from: 't0', to: 't1' }], tasks: tasks.map((t) => ({ ...t, from: 0, to: 20, group: 'G' })) })
+    assert.equal(formatBudgetWarnings(all.warnings), 'budget:tasks=13;budget:label=16;budget:emphasis=3;budget:deps=1;budget:parallel=13')
   })
 })
 
@@ -247,16 +283,25 @@ describe('gantt: layout', () => {
 // --- verify --------------------------------------------------------------
 
 describe('gantt: verify rows', () => {
-  test('a clean render passes every own row and the shared rows, in order, ids 1..15', async () => {
+  test('a clean render passes every own row and the shared rows, in order, ids 1..17; deps-count is the only warn on gantt-groups', async () => {
     for (const name of ['gantt-simple.yaml', 'gantt-groups.yaml']) {
       const ir = validIr(name)
       const rendered = await renderFigure(p(), ir)
       const result = await verifyFigure(p(), ir, rendered)
       assert.equal(result.ok, true, `${name}: ${JSON.stringify(result.failures)}`)
       assert.deepEqual(result.checks.map((c) => c.name), [...OWN_ROWS, ...SHARED_ROWS], name)
-      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 15 }, (_, i) => i + 1), name)
-      assert.deepEqual(result.warnings, [], name)
+      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 17 }, (_, i) => i + 1), name)
+      assert.deepEqual(result.checks.slice(0, 6).map((c) => c.severity), Array(6).fill('warn'), name)
+      if (name === 'gantt-simple.yaml') assert.deepEqual(result.warnings, [], name)
+      else assert.deepEqual(result.warnings.map((w) => [w.name, w.key, w.value]), [['deps-count', 'budget:deps', 3]], name)
     }
+    const clean = await verifyFigure(p(), validIr('gantt-simple.yaml'), await renderFigure(p(), validIr('gantt-simple.yaml')))
+    for (const name of ['deps-count', 'parallel-count']) {
+      const row = clean.checks.find((c) => c.name === name)
+      assert.equal(row.ok, true)
+      assert.equal('key' in row, false)
+    }
+    assert.match(clean.checks.find((c) => c.name === 'parallel-count').detail, /at most 2 task\(s\) in flight/)
   })
 
   test('emphasis-count is a warn row carrying the budget key/value and never gates the figure', async () => {
@@ -388,7 +433,7 @@ describe('gantt: registry dispatch and CLI', () => {
   test('the plugin is registered with its budgets and row names', () => {
     const g = getFigureType('gantt')
     assert.ok(g && !g.builtin)
-    assert.deepEqual(g.limits, { maxTasks: 12, maxGroups: 4, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(g.limits, { maxTasks: 12, maxGroups: 4, maxLabelLen: 14, maxEmphasis: 1, maxDeps: 0, maxParallel: 5 })
     assert.deepEqual(g.doc.rows, OWN_ROWS)
   })
 
@@ -396,24 +441,27 @@ describe('gantt: registry dispatch and CLI', () => {
     const raw = fixture('gantt-groups.yaml')
     const rendered = await renderFigureHtmlChecked(validIr('gantt-groups.yaml'), { rawYaml: raw })
     assert.equal(rendered.checksOk, true)
-    assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-type="gantt">/)
+    assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:deps=3" data-type="gantt">/)
     assert.match(rendered.html, /<rect id="wu-d-g2-bar-3" class="wu-focal" data-tone="new"/)
-    assert.match(rendered.html, /<rect id="wu-d-g2-ms-5" class="wu-focal"/)
+    assert.match(rendered.html, /<rect id="wu-d-g2-ms-5" x=/)
     assert.match(rendered.html, /<text id="wu-d-g2-label-3"[^>]*font-weight="700"/)
     assert.match(rendered.html, /<rect id="wu-d-g2-bar-1" data-tone="ts"/)
     assert.match(rendered.html, /<text id="wu-d-g2-band-0-label"[^>]*>準備<\/text>/)
-    assert.equal((rendered.html.match(/class="wu-focal"/g) || []).length, 2)
+    assert.equal((rendered.html.match(/class="wu-focal"/g) || []).length, 1)
     assert.equal((rendered.html.match(/<path id="wu-d-g2-dep-/g) || []).length, 3)
     assert.match(rendered.html, /<script type="text\/x-writeup-diagram">/)
   })
 
-  test('--figure renders gantt-simple and gantt-groups as verified figures', () => {
-    for (const name of ['gantt-simple.yaml', 'gantt-groups.yaml']) {
-      const r = runCli([join(FIXTURES, name), '--figure'])
-      assert.equal(r.status, 0, `${name}: ${r.stderr}`)
-      assert.match(r.stdout, /^<figure class="wu-figure" data-checks="pass" data-type="gantt">/)
-      assert.match(r.stdout, /<svg role="img"/)
-    }
+  test('--figure renders gantt-simple clean and gantt-groups with the deps warning on stderr and in data-warn', () => {
+    const simple = runCli([join(FIXTURES, 'gantt-simple.yaml'), '--figure'])
+    assert.equal(simple.status, 0, simple.stderr)
+    assert.match(simple.stdout, /^<figure class="wu-figure" data-checks="pass" data-type="gantt">/)
+    assert.match(simple.stdout, /<svg role="img"/)
+    assert.equal(simple.stderr, '')
+    const groups = runCli([join(FIXTURES, 'gantt-groups.yaml'), '--figure'])
+    assert.equal(groups.status, 0, groups.stderr)
+    assert.match(groups.stdout, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:deps=3" data-type="gantt">/)
+    assert.match(groups.stderr, /warning: budget:deps=3/)
   })
 
   test('--json on an over-budget gantt reports ok:true plus the warning and data-warn string', () => {
@@ -426,7 +474,7 @@ describe('gantt: registry dispatch and CLI', () => {
     assert.match(out.figureHtml, /data-warn="budget:tasks=13" data-type="gantt"/)
   })
 
-  test('--doc gantt prints the 6-task / 2-group / 2-dep example and it renders clean', () => {
+  test('--doc gantt prints the 6-task / 2-group example with one focal task and no dependency arrow, and it renders clean', () => {
     const r = runCli(['--doc', 'gantt'])
     assert.equal(r.status, 0, r.stderr)
     assert.equal(r.stdout, plugin.doc.irExample)
@@ -434,7 +482,9 @@ describe('gantt: registry dispatch and CLI', () => {
     assert.equal(ir.ok, true, JSON.stringify(ir))
     assert.equal(ir.ir.tasks.length, 6)
     assert.equal(new Set(ir.ir.tasks.map((t) => t.group)).size, 2)
-    assert.equal(ir.ir.deps.length, 2)
+    assert.equal(ir.ir.deps.length, 0)
+    assert.equal(ir.ir.tasks.filter((t) => t.emphasis).length, 1)
     assert.deepEqual(ir.warnings, [])
+    assert.match(plugin.doc.whenToUse, /deviate from the survey/)
   })
 })

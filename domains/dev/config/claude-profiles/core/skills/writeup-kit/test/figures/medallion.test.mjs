@@ -19,7 +19,7 @@ const FIXTURES = join(ROOT, 'test', 'fixtures')
 const fixture = (name) => readFileSync(join(FIXTURES, name), 'utf8')
 const ALL_FIXTURES = ['medallion-simple.yaml', 'medallion-full.yaml', 'medallion-over-budget.yaml']
 const CLEAN_FIXTURES = ['medallion-simple.yaml', 'medallion-full.yaml']
-const BUDGET_KEYS = ['budget:stages', 'budget:items', 'budget:label', 'budget:emphasis']
+const BUDGET_KEYS = ['budget:stages', 'budget:items', 'budget:label']
 
 function validIr(name) {
   const result = validateIR(parseYaml(fixture(name)))
@@ -107,16 +107,23 @@ describe('figures/medallion.mjs: budgets', () => {
     for (const name of CLEAN_FIXTURES) assert.deepEqual(medallion.budgetWarnings(validIr(name)), [], name)
   })
 
+  test('fewer than 3 stages warns budget:stages against the lower bound (a 2-stage ladder is a before/after)', () => {
+    const two = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emphasis: true }, { id: 'b', label: 'B' }], promotions: undefined })
+    assert.equal(two.ok, true)
+    assert.deepEqual(two.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:stages', 2, 3]])
+    assert.match(two.warnings[0].detail, /guidance ≥ 3/)
+  })
+
   test('every budget key fires, in a stable order, and reaches data-warn', async () => {
     const ir = validIr('medallion-over-budget.yaml')
     const warns = medallion.budgetWarnings(ir)
     assert.deepEqual(warns.map((w) => w.key), BUDGET_KEYS)
-    assert.deepEqual(warns.map((w) => w.value), [6, 7, 16, 3])
-    assert.equal(formatBudgetWarnings(warns), 'budget:stages=6;budget:items=7;budget:label=16;budget:emphasis=3')
+    assert.deepEqual(warns.map((w) => w.value), [7, 7, 16])
+    assert.equal(formatBudgetWarnings(warns), 'budget:stages=7;budget:items=7;budget:label=16')
     for (const w of warns) assert.ok(w.hint && w.hint !== w.detail, `${w.key} needs a concrete hint`)
     const rendered = await renderFigureHtmlChecked(ir, { rawYaml: fixture('medallion-over-budget.yaml') })
     assert.equal(rendered.checksOk, true, JSON.stringify(rendered.failures))
-    assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:stages=6;budget:items=7;budget:label=16;budget:emphasis=3" data-type="medallion" data-scroll="true">/)
+    assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:stages=7;budget:items=7;budget:label=16" data-type="medallion" data-scroll="true">/)
   })
 })
 
@@ -322,20 +329,44 @@ describe('figures/medallion.mjs: verify rows', () => {
     assert.match(row.detail, /gold:"保持 無期限"/)
   })
 
-  test('the four budget rows are warn rows carrying key/value only when they fail', async () => {
+  test('focal-count fails (hard rule) when no stage or more than one stage carries emphasis', async () => {
+    for (const [stages, re] of [
+      [[{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }], /no stage carries emphasis/],
+      [[{ id: 'a', label: 'A', emphasis: true }, { id: 'b', label: 'B', emphasis: true }, { id: 'c', label: 'C' }], /2 stages carry emphasis: a, b/],
+    ]) {
+      const r = validateIR({ ...minimal(), stages, promotions: undefined })
+      assert.equal(r.ok, true, JSON.stringify(r))
+      assert.deepEqual(r.warnings, [], 'the focal rule is a fail row, not a budget warning')
+      const v = await verifyFigure(plugin, r.ir, await renderFigure(plugin, r.ir))
+      assert.equal(v.ok, false)
+      const row = byName(v.checks, 'focal-count')
+      assert.equal(row.id, 4)
+      assert.equal(row.severity, 'fail')
+      assert.equal(row.ok, false)
+      assert.match(row.detail, re)
+      assert.match(row.hint, /exactly one stage/)
+      const html = await renderFigureHtmlChecked(r.ir)
+      assert.equal(html.checksOk, false)
+    }
+    const one = validIr('medallion-simple.yaml')
+    const row = byName((await verifyFigure(plugin, one, await renderFigure(plugin, one))).checks, 'focal-count')
+    assert.equal(row.ok, true)
+    assert.match(row.detail, /one focal stage \("gold"\)/)
+  })
+
+  test('the three budget rows are warn rows carrying key/value only when they fail', async () => {
     const ir = validIr('medallion-over-budget.yaml')
     const rendered = await renderFigure(plugin, ir)
     const v = await verifyFigure(plugin, ir, rendered)
     assert.equal(v.ok, true, JSON.stringify(v.failures))
     assert.deepEqual(v.warnings.map((w) => [w.name, w.key, w.value]), [
-      ['stage-count', 'budget:stages', 6],
+      ['stage-count', 'budget:stages', 7],
       ['items-per-stage', 'budget:items', 7],
       ['label-length', 'budget:label', 16],
-      ['emphasis-count', 'budget:emphasis', 3],
     ])
     const cleanIr = validIr('medallion-full.yaml')
     const clean = await verifyFigure(plugin, cleanIr, await renderFigure(plugin, cleanIr))
-    for (const name of ['stage-count', 'items-per-stage', 'label-length', 'emphasis-count']) {
+    for (const name of ['stage-count', 'items-per-stage', 'label-length']) {
       const row = byName(clean.checks, name)
       assert.equal(row.severity, 'warn')
       assert.equal(row.ok, true)
@@ -386,7 +417,7 @@ describe('figures/medallion.mjs: registry dispatch and CLI', () => {
 
   test('the registry lists medallion with its limits and doc rows', () => {
     assert.equal(plugin.type, 'medallion')
-    assert.deepEqual(plugin.limits, { maxStages: 5, maxItemsPerStage: 6, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plugin.limits, { minStages: 3, maxStages: 6, maxItemsPerStage: 6, maxLabelLen: 14, maxEmphasis: 1 })
     assert.equal(plugin.doc.rows.length, 8)
   })
 
@@ -398,6 +429,7 @@ describe('figures/medallion.mjs: registry dispatch and CLI', () => {
     assert.equal(r.ir.sources.length, 2)
     assert.equal(r.ir.consumers.length, 2)
     assert.ok(r.ir.stages.every((s) => s.items.length > 0 && s.properties.length > 0))
+    assert.equal(r.ir.stages.filter((s) => s.emphasis).length, 1)
     assert.deepEqual(medallion.budgetWarnings(r.ir), [])
     const rendered = await renderFigureHtmlChecked(r.ir, { rawYaml: plugin.doc.irExample })
     assert.equal(rendered.checksOk, true, JSON.stringify(rendered.failures))
@@ -413,9 +445,9 @@ describe('figures/medallion.mjs: registry dispatch and CLI', () => {
     const out = JSON.parse(json.stdout)
     assert.equal(out.ok, true)
     assert.deepEqual(out.warnings.map((w) => w.key), BUDGET_KEYS)
-    assert.match(out.figureHtml, /data-warn="budget:stages=6;budget:items=7;budget:label=16;budget:emphasis=3" data-type="medallion"/)
+    assert.match(out.figureHtml, /data-warn="budget:stages=7;budget:items=7;budget:label=16" data-type="medallion"/)
     const warnFig = runCli([join(FIXTURES, 'medallion-over-budget.yaml'), '--figure'])
     assert.equal(warnFig.status, 0)
-    assert.match(warnFig.stderr, /warning: budget:stages=6/)
+    assert.match(warnFig.stderr, /warning: budget:stages=7/)
   })
 })

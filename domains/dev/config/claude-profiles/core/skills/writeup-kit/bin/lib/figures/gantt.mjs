@@ -17,6 +17,15 @@
 //     in row order (≤ 12 guidance); `to` is inclusive; a milestone has no
 //     `to` (it equals `from`); either every task carries a `group` or none;
 //   - `deps`  — `[{ from, to }]` finish-to-start arrows between task ids.
+//     Deliberate deviation from the diagram-pattern survey (#22), which
+//     forbids dependency arrows by default: the kit keeps them as an
+//     opt-in, but any use is reported as `budget:deps` (limit 0) so the
+//     author hears the survey's advice — say the order with rows and
+//     phases first, draw an arrow only for the gate the caption is about.
+//
+// Budgets (survey #22): tasks ≤ 12, groups ≤ 4, label ≤ 14 chars, one
+// focal task, at most 5 tasks in flight at once inside a group
+// (`budget:parallel`; milestones are points and do not count), deps 0.
 //
 // Layout is a deterministic grid, no layout engine: the label column is
 // fitted to the widest task label, the unit width is chosen so the chart
@@ -36,7 +45,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, COLUMN, BOLD_FAC
 
 export const type = 'gantt'
 
-export const limits = { maxTasks: 12, maxGroups: 4, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { maxTasks: 12, maxGroups: 4, maxLabelLen: 14, maxEmphasis: 1, maxDeps: 0, maxParallel: 5 }
 
 const UNITS = ['day', 'week', 'month', 'ordinal']
 
@@ -240,6 +249,31 @@ function normalizeDeps(raw, tasks, ctx) {
 
 const groupsOf = (ir) => [...new Set(ir.tasks.map((t) => t.group).filter((g) => g !== undefined))]
 
+/** Per group (the whole chart when ungrouped): the most tasks in flight at
+ * one time, by sweeping start/end events — `to` is inclusive, so a task
+ * ending at t and one starting at t overlap while t+1 is clear. Milestones
+ * are points, not work, and are left out. */
+function peakParallel(ir) {
+  const blocks = new Map()
+  for (const t of ir.tasks) {
+    if (t.milestone) continue
+    const key = t.group ?? ''
+    if (!blocks.has(key)) blocks.set(key, [])
+    blocks.get(key).push({ t0: parseTime(t.from, ir.unit, 'ir.tasks'), t1: parseTime(t.to, ir.unit, 'ir.tasks') })
+  }
+  let peak = { group: undefined, count: 0 }
+  for (const [group, spans] of blocks) {
+    const events = spans.flatMap((s) => [{ t: s.t0, d: 1 }, { t: s.t1 + 1, d: -1 }])
+      .sort((a, b) => a.t - b.t || a.d - b.d)
+    let open = 0
+    for (const e of events) {
+      open += e.d
+      if (open > peak.count) peak = { group: group === '' ? undefined : group, count: open }
+    }
+  }
+  return peak
+}
+
 export function budgetWarnings(ir) {
   const out = []
   const n = ir.tasks.length
@@ -273,7 +307,18 @@ export function budgetWarnings(ir) {
   if (emphasized.length > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized.length, limits.maxEmphasis,
       `${emphasized.length} emphasized task(s) (guidance ≤ ${limits.maxEmphasis})`,
-      `keep emphasis on at most ${limits.maxEmphasis} tasks (${emphasized.map((t) => `"${t.id}"`).join(', ')} are all emphasized)`))
+      `keep emphasis on the one task the schedule hinges on (${emphasized.map((t) => `"${t.id}"`).join(', ')} are all emphasized)`))
+  }
+  if (ir.deps.length > limits.maxDeps) {
+    out.push(budgetWarning('budget:deps', ir.deps.length, limits.maxDeps,
+      `${ir.deps.length} dependency arrow(s) (guidance: none — the survey forbids them by default)`,
+      'say the order with row order and phases instead; keep an arrow only for the one gate the caption is about'))
+  }
+  const peak = peakParallel(ir)
+  if (peak.count > limits.maxParallel) {
+    out.push(budgetWarning('budget:parallel', peak.count, limits.maxParallel,
+      `${peak.count} task(s) in flight at once${peak.group !== undefined ? ` in group "${peak.group}"` : ''} (guidance ≤ ${limits.maxParallel})`,
+      'stagger the tasks, roll the parallel ones up into one bar, or split the phase into two groups'))
   }
   return out
 }
@@ -478,16 +523,18 @@ export function verify(layoutResult, ir) {
   budgetRow(2, 'group-count', 'budget:groups', `${groupsOf(ir).length} group(s)`)
   budgetRow(3, 'label-length', 'budget:label', `every label ≤ ${limits.maxLabelLen} chars`)
   budgetRow(4, 'emphasis-count', 'budget:emphasis', `${ir.tasks.filter((t) => t.emphasis).length} emphasized task(s)`)
+  budgetRow(5, 'deps-count', 'budget:deps', 'no dependency arrows')
+  budgetRow(6, 'parallel-count', 'budget:parallel', `at most ${peakParallel(ir).count} task(s) in flight at once`)
 
-  // 5. every span runs forward and its bar is as long as its span
+  // 7. every span runs forward and its bar is as long as its span
   const spanProblems = []
   for (const b of geo.bars) {
     if (b.t1 < b.t0) spanProblems.push(`task "${b.task}" ends (${formatTime(b.t1, geo.unit)}) before it starts (${formatTime(b.t0, geo.unit)})`)
     else if (b.kind === 'bar' && b.width !== (b.t1 - b.t0 + 1) * geo.unitW) spanProblems.push(`task "${b.task}" bar width ${b.width} ≠ ${b.t1 - b.t0 + 1} unit(s) × ${geo.unitW}px`)
   }
-  rows.push({ id: 5, name: 'spans-ordered', severity: 'fail', ok: spanProblems.length === 0, detail: spanProblems.length ? spanProblems.slice(0, 4).join('; ') : `${geo.bars.length} span(s) run forward, bar widths match their spans`, hint: spanProblems.length ? 'set every task\'s to ≥ from and derive the bar width from the span, never by hand' : undefined })
+  rows.push({ id: 7, name: 'spans-ordered', severity: 'fail', ok: spanProblems.length === 0, detail: spanProblems.length ? spanProblems.slice(0, 4).join('; ') : `${geo.bars.length} span(s) run forward, bar widths match their spans`, hint: spanProblems.length ? 'set every task\'s to ≥ from and derive the bar width from the span, never by hand' : undefined })
 
-  // 6. every bar / milestone sits inside the chart range
+  // 8. every bar / milestone sits inside the chart range
   const rangeProblems = []
   for (const b of geo.bars) {
     if (b.kind === 'milestone') {
@@ -496,9 +543,9 @@ export function verify(layoutResult, ir) {
       rangeProblems.push(`task "${b.task}" (${formatTime(b.t0, geo.unit)}..${formatTime(b.t1, geo.unit)}) lies outside range ${ir.range.from}..${ir.range.to}`)
     }
   }
-  rows.push({ id: 6, name: 'bars-in-range', severity: 'fail', ok: rangeProblems.length === 0, detail: rangeProblems.length ? rangeProblems.slice(0, 4).join('; ') : `every bar sits inside ${ir.range.from}..${ir.range.to}`, hint: rangeProblems.length ? 'widen range (or drop it so it is derived from the tasks), or trim the task to the range' : undefined })
+  rows.push({ id: 8, name: 'bars-in-range', severity: 'fail', ok: rangeProblems.length === 0, detail: rangeProblems.length ? rangeProblems.slice(0, 4).join('; ') : `every bar sits inside ${ir.range.from}..${ir.range.to}`, hint: rangeProblems.length ? 'widen range (or drop it so it is derived from the tasks), or trim the task to the range' : undefined })
 
-  // 7. rows and bands never overlap, every bar stays inside its row
+  // 9. rows and bands never overlap, every bar stays inside its row
   const rowProblems = []
   const lanes = [...geo.bands.map((b) => ({ name: `band "${b.group}"`, y: b.y, height: b.height })), ...geo.rows.map((r) => ({ name: `row "${r.task}"`, y: r.y, height: r.height }))]
   for (let i = 0; i < lanes.length; i++) {
@@ -513,9 +560,9 @@ export function verify(layoutResult, ir) {
     if (!r) { rowProblems.push(`bar "${b.task}" has no row`); continue }
     if (b.y < r.y || b.y + b.height > r.y + r.height) rowProblems.push(`bar "${b.task}" leaves its row (y ${b.y}..${b.y + b.height} vs row ${r.y}..${r.y + r.height})`)
   }
-  rows.push({ id: 7, name: 'rows-clear', severity: 'fail', ok: rowProblems.length === 0, detail: rowProblems.length ? rowProblems.slice(0, 4).join('; ') : `${geo.rows.length} row(s) and ${geo.bands.length} band(s) stack without overlap, every bar inside its row`, hint: rowProblems.length ? 'stack bands and rows top → bottom from the axis and place each bar from its row, never on its own' : undefined })
+  rows.push({ id: 9, name: 'rows-clear', severity: 'fail', ok: rowProblems.length === 0, detail: rowProblems.length ? rowProblems.slice(0, 4).join('; ') : `${geo.rows.length} row(s) and ${geo.bands.length} band(s) stack without overlap, every bar inside its row`, hint: rowProblems.length ? 'stack bands and rows top → bottom from the axis and place each bar from its row, never on its own' : undefined })
 
-  // 8. dependency arrows: known ends, orthogonal, finish → start, no bar crossed
+  // 10. dependency arrows: known ends, orthogonal, finish → start, no bar crossed
   const barOf = new Map(geo.bars.map((b) => [b.task, b]))
   const depProblems = []
   for (const d of geo.deps) {
@@ -536,18 +583,18 @@ export function verify(layoutResult, ir) {
       if (!onStart && !onTopOrBottom) depProblems.push(`deps[${d.index}] does not end on the start of "${d.to}"`)
     }
   }
-  rows.push({ id: 8, name: 'deps-clear', severity: 'fail', ok: depProblems.length === 0, detail: depProblems.length ? depProblems.slice(0, 4).join('; ') : `${geo.deps.length} dependency arrow(s) run orthogonally from a bar end to the next bar start, none through a bar`, hint: depProblems.length ? 'order dependent tasks next to each other (the arrow drops straight down), or drop the dep and say it in the caption' : undefined })
+  rows.push({ id: 10, name: 'deps-clear', severity: 'fail', ok: depProblems.length === 0, detail: depProblems.length ? depProblems.slice(0, 4).join('; ') : `${geo.deps.length} dependency arrow(s) run orthogonally from a bar end to the next bar start, none through a bar`, hint: depProblems.length ? 'order dependent tasks next to each other (the arrow drops straight down), or drop the dep and say it in the caption' : undefined })
 
   return rows
 }
 
 export const doc = {
   purpose: 'tasks on a time axis — what runs when, what overlaps, which milestone gates which step',
-  whenToUse: 'when *when* and *how long* matter and the reader must see overlap between parallel tracks; not for who-calls-whom (use sequence) or a bare list of dated events (use timeline). Units: day / week / month / ordinal. Budgets: tasks ≤ 12, groups ≤ 4, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn; a dependency arrow that would cross another bar fails the figure.',
+  whenToUse: 'when *when* and *how long* matter and the reader must see overlap between parallel tracks; not for who-calls-whom (use sequence) or a bare list of dated events (use timeline). Units: day / week / month / ordinal. Budgets: tasks ≤ 12, groups ≤ 4, label ≤ 14 chars, emphasis ≤ 1, ≤ 5 tasks in flight at once per group — guidance, over-budget figures still render with data-warn. Dependency arrows deviate from the survey (which has none): `deps` stays an opt-in but every use warns as budget:deps, and an arrow that would cross another bar fails the figure.',
   irExample: `id: migration-plan
 type: gantt
 title: 移行計画
-caption: 準備 3 週、切替 4 週。仕様凍結の後にデータ移行を始める
+caption: 準備 3 週、切替 4 週。仕様凍結の後にデータ移行を始め、検証を終えてから切り替える
 unit: week
 tasks:
   - id: inventory
@@ -581,11 +628,6 @@ tasks:
     group: 切替
     from: 2026-W16
     milestone: true
-deps:
-  - from: design
-    to: migrate
-  - from: verify
-    to: cutover
 `,
-  rows: ['task-count', 'group-count', 'label-length', 'emphasis-count', 'spans-ordered', 'bars-in-range', 'rows-clear', 'deps-clear'],
+  rows: ['task-count', 'group-count', 'label-length', 'emphasis-count', 'deps-count', 'parallel-count', 'spans-ordered', 'bars-in-range', 'rows-clear', 'deps-clear'],
 }

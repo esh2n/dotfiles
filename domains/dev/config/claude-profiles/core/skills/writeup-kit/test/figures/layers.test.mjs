@@ -129,8 +129,8 @@ describe('figures/layers.mjs: layout', () => {
   test('items wrap at 4 per row and the band grows to hold every row', async () => {
     const ir = validIr('layers-side.yaml')
     const l = await layers.layout(ir, { column: 720 })
-    const domain = l.geo.bands.find((b) => b.id === 'domain')
-    const items = l.geo.items.filter((i) => i.layer === 'domain')
+    const domain = l.geo.bands.find((b) => b.id === 'logic')
+    const items = l.geo.items.filter((i) => i.layer === 'logic')
     assert.equal(items.length, 5)
     const rows = new Set(items.map((i) => i.y))
     assert.equal(rows.size, 2)
@@ -139,6 +139,12 @@ describe('figures/layers.mjs: layout', () => {
     assert.ok(items[4].y + items[4].height + 8 <= domain.yBottom)
     const single = l.geo.bands.find((b) => b.id === 'storage')
     assert.ok(single.height < domain.height)
+    assert.equal(single.height, 56, 'a one-row band is 56px (the survey\'s minimum band height)')
+  })
+
+  test('bands without items are 56px tall', async () => {
+    const l = await layers.layout(validIr('layers-simple.yaml'), { column: 720 })
+    for (const b of l.geo.bands) assert.equal(b.height, 56)
   })
 
   test('the side column sits right of the bands, its entries within their band, width from the longest text', async () => {
@@ -152,9 +158,12 @@ describe('figures/layers.mjs: layout', () => {
       const b = l.geo.bands.find((x) => x.id === e.layer)
       assert.ok(e.y - 11 >= b.yTop && e.y <= b.yBottom, `${e.layer} entry outside its band`)
     }
-    const withoutSide = await layers.layout(validIr('layers-simple.yaml'), { column: 720 })
+    const { side: _side, ...noSide } = ir
+    const withoutSide = await layers.layout(noSide, { column: 720 })
     assert.equal(withoutSide.geo.side, undefined)
-    assert.ok(withoutSide.geo.bands[0].width > band.width, 'bands widen when there is no side column')
+    assert.ok(withoutSide.width < l.width, 'the canvas narrows when there is no side column')
+    assert.ok(withoutSide.geo.bands[0].width >= band.width, 'bands never narrow when the side column goes')
+    assert.equal((await layers.layout(validIr('layers-simple.yaml'), { column: 720 })).geo.side, undefined)
   })
 
   test('arrows run vertically through the gap between the two bands they join', async () => {
@@ -168,6 +177,30 @@ describe('figures/layers.mjs: layout', () => {
     assert.equal(up.y1, link.yTop)
     assert.equal(up.y2, network.yBottom)
     assert.ok(up.y1 > up.y2, 'the second arrow points upward')
+    for (const a of [down, up]) {
+      assert.equal(a.labelBox.x, a.x1 + 8, 'label sits 8px right of the shaft')
+      assert.equal(a.labelBox.y, (a.y1 + a.y2) / 2 + 4, 'label baseline centred on the gap')
+      assert.equal(a.labelBox.top, a.labelBox.y - 12)
+      assert.equal(a.labelBox.bottom, a.labelBox.top + 16)
+    }
+  })
+
+  test('two labelled arrows in one gap widen it to 48px and stack their labels right of both shafts', async () => {
+    const raw = { ...minimal(), side: undefined, layers: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }, { id: 'd', label: 'D' }], arrows: [{ from: 'a', to: 'b', label: '要求' }, { from: 'b', to: 'a', label: '応答' }, { from: 'c', to: 'd', label: '書込' }] }
+    const ir = validateIR(raw).ir
+    const l = await layers.layout(ir, { column: 720 })
+    const [a, b, c] = l.geo.bands
+    assert.equal(b.yTop - a.yBottom, 48)
+    assert.equal(c.yTop - b.yBottom, 32)
+    const [down, up, single] = l.geo.arrows
+    assert.equal(down.labelBox.x, up.x1 + 8, 'the down label clears the up shaft')
+    assert.equal(up.labelBox.x, up.x1 + 8)
+    assert.equal(down.labelBox.bottom, up.labelBox.top, 'labels stack without overlapping')
+    assert.ok(down.labelBox.top >= a.yBottom + 8 && up.labelBox.bottom <= b.yTop - 8, 'both labels stay inside the gap')
+    assert.equal(single.labelBox.x, single.x1 + 8)
+    const v = await verifyFigure(plugin, ir, await renderFigure(plugin, ir))
+    assert.equal(v.ok, true, JSON.stringify(v.failures))
+    assert.equal(byName(v.checks, 'arrow-label-clear').detail, '3 arrow label(s) sit in their gap clear of bands, shafts and each other')
   })
 
   test('every position sits on the 4px grid and the layout is deterministic', async () => {
@@ -195,8 +228,8 @@ describe('figures/layers.mjs: verify rows', () => {
       const v = await verifyFigure(plugin, ir, rendered)
       assert.equal(v.ok, true, `${name}: ${JSON.stringify(v.failures)}`)
       assert.deepEqual(v.warnings, [])
-      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.name), plugin.doc.rows)
-      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8])
+      assert.deepEqual(v.checks.slice(0, 9).map((c) => c.name), plugin.doc.rows)
+      assert.deepEqual(v.checks.slice(0, 9).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9])
     }
   })
 
@@ -269,6 +302,42 @@ describe('figures/layers.mjs: verify rows', () => {
     assert.equal(byName(layers.verify(l, ir), 'arrows-adjacent').ok, false)
   })
 
+  test('arrow-label-clear fails when a label is moved over a band, across another shaft, or onto another label', async () => {
+    const raw = { ...minimal(), side: undefined, layers: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }, { id: 'd', label: 'D' }], arrows: [{ from: 'a', to: 'b', label: '要求' }, { from: 'b', to: 'a', label: '応答' }] }
+    const ir = validateIR(raw).ir
+    const onBand = await layers.layout(ir)
+    const band = onBand.geo.bands[1]
+    Object.assign(onBand.geo.arrows[0].labelBox, { top: band.yTop + 8, bottom: band.yTop + 24 })
+    let row = byName(layers.verify(onBand, ir), 'arrow-label-clear')
+    assert.equal(row.severity, 'fail')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /label "要求" of a→b covers band "b"/)
+    const acrossShaft = await layers.layout(ir)
+    const l = acrossShaft.geo.arrows[0].labelBox
+    Object.assign(l, { left: l.left - 24, x: l.x - 24 })
+    row = byName(layers.verify(acrossShaft, ir), 'arrow-label-clear')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /is crossed by the shaft of b→a/)
+    const onLabel = await layers.layout(ir)
+    const m = onLabel.geo.arrows[1].labelBox
+    Object.assign(onLabel.geo.arrows[0].labelBox, { top: m.top, bottom: m.bottom, y: m.y })
+    row = byName(layers.verify(onLabel, ir), 'arrow-label-clear')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /overlaps label "応答" of b→a/)
+  })
+
+  test('layer-count warns below 4 layers as well as above 6', async () => {
+    const three = validateIR({ ...minimal(), side: undefined, arrows: undefined })
+    assert.deepEqual(three.warnings.map((w) => `${w.key}=${w.value}`), ['budget:layers=3'])
+    assert.match(three.warnings[0].hint, /fewer than 4 bands read as a list/)
+    const six = validateIR({ ...minimal(), side: undefined, arrows: undefined, layers: Array.from({ length: 6 }, (_, i) => ({ id: `l${i}`, label: `L${i}` })) })
+    assert.deepEqual(six.warnings, [])
+    const seven = validateIR({ ...minimal(), side: undefined, arrows: undefined, layers: Array.from({ length: 7 }, (_, i) => ({ id: `l${i}`, label: `L${i}` })) })
+    assert.deepEqual(seven.warnings.map((w) => `${w.key}=${w.value}`), ['budget:layers=7'])
+    const twoAccents = validateIR({ ...minimal(), side: undefined, arrows: undefined, layers: Array.from({ length: 4 }, (_, i) => ({ id: `l${i}`, label: `L${i}`, emphasis: i < 2 })) })
+    assert.deepEqual(twoAccents.warnings.map((w) => `${w.key}=${w.value}`), ['budget:emphasis=2'])
+  })
+
   test('the four budget rows are warn rows carrying key/value only when they fail', async () => {
     const ir = validIr('layers-over-budget.yaml')
     const rendered = await renderFigure(plugin, ir)
@@ -320,8 +389,8 @@ describe('figures/layers.mjs: registry dispatch and CLI', () => {
 
   test('the registry lists layers with its limits and doc rows', () => {
     assert.equal(plugin.type, 'layers')
-    assert.deepEqual(plugin.limits, { maxLayers: 7, maxItemsPerLayer: 8, maxLabelLen: 14, maxEmphasis: 2 })
-    assert.equal(plugin.doc.rows.length, 8)
+    assert.deepEqual(plugin.limits, { minLayers: 4, maxLayers: 6, maxItemsPerLayer: 8, maxLabelLen: 14, maxEmphasis: 1 })
+    assert.equal(plugin.doc.rows.length, 9)
   })
 
   test('doc.irExample validates with 4 layers and a 2-entry side column, and renders clean', async () => {
@@ -330,6 +399,7 @@ describe('figures/layers.mjs: registry dispatch and CLI', () => {
     assert.equal(r.ir.layers.length, 4)
     assert.equal(r.ir.side.items.length, 2)
     assert.ok(r.ir.layers.every((l) => l.items.length > 0))
+    assert.doesNotMatch(plugin.doc.irExample, /ドメイン|domain|PostgreSQL|S3/)
     const rendered = await renderFigureHtmlChecked(r.ir, { rawYaml: plugin.doc.irExample })
     assert.equal(rendered.checksOk, true)
     assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-type="layers">/)

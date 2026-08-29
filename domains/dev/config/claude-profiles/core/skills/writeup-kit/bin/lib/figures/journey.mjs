@@ -8,10 +8,18 @@
 //
 // IR shape: `{ id, type:'journey', title, caption?, persona?, rows, stages }`.
 //   - `persona` — one line naming whose journey this is (optional);
-//   - `rows`    — row labels, top → bottom (≤ 4 guidance);
+//   - `rows`    — row labels, top → bottom (≤ 3 guidance);
 //   - `stages`  — `[{ id, label, emphasis?, emotion?, cells: { <row>: string | [string] } }]`,
-//     left → right (≤ 7 guidance); `emotion` is an integer -2..2 (悪い →
-//     良い); a cell is a list of short items (≤ 16 chars each, guidance).
+//     left → right (≤ 6 guidance); `emotion` is one of the five named
+//     levels 最悪 / 悪い / 普通 / 良い / 最高 (or worst / bad / neutral /
+//     good / best) — the survey's rule is names, not numbers — normalized
+//     to the internal integer -2..2 (integers are still accepted); a cell
+//     is a list of short items (≤ 16 chars each, guidance).
+//   - `emphasis` marks the pain point (≤ 2, guidance) and belongs on a
+//     trough of the curve — an emphasized stage that is not a local
+//     minimum warns (`budget:trough`). When no stage carries emphasis,
+//     normalize() puts it on the trough (the lowest emotion, earliest on
+//     ties) so the figure always has its one accent.
 //
 // Layout is a deterministic grid, no layout engine: column width from the
 // widest cell line in that stage (an item wider than WRAP_W is wrapped onto
@@ -31,7 +39,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE } from '../diagra
 
 export const type = 'journey'
 
-export const limits = { maxStages: 7, maxRows: 4, maxCellTextLen: 16, maxEmphasis: 2 }
+export const limits = { maxStages: 6, maxRows: 3, maxCellTextLen: 16, maxEmphasis: 2 }
 
 // --- layout constants (multiples of 4 unless noted) ------------------------
 const MARGIN = 16
@@ -53,6 +61,9 @@ const LEVEL_PITCH = 16        // one emotion step = 16px, so ±2 spans 64px
 const BAND_PAD = 12           // band edge → outermost level line
 const EMOTION_MIN = -2
 const EMOTION_MAX = 2
+/** The five named sentiment levels (survey #34: names, not numbers). */
+const EMOTION_NAMES = { 最悪: -2, 悪い: -1, 普通: 0, 良い: 1, 最高: 2, worst: -2, bad: -1, neutral: 0, good: 1, best: 2 }
+const EMOTION_NAME_LIST = '最悪|悪い|普通|良い|最高 (or worst|bad|neutral|good|best)'
 const DOT_R = 3
 const DOT_R_EMPHASIS = 5
 const LABEL_GOOD = '良い'
@@ -66,8 +77,27 @@ export function normalize(raw, ctx = 'ir') {
   const { id, title, caption } = normalizeHeader(raw, ctx)
   const persona = optStr(raw, 'persona', ctx)
   const rows = normalizeRows(raw.rows, ctx)
-  const stages = normalizeStages(raw.stages, rows, ctx)
+  const stages = withDefaultFocal(normalizeStages(raw.stages, rows, ctx))
   return { id, type, title, caption, persona, rows, stages }
+}
+
+/** Index of the trough: the lowest emotion among stages that carry one,
+ * earliest on ties; -1 when no stage has an emotion. */
+function troughIndex(stages) {
+  let best = -1
+  stages.forEach((s, i) => {
+    if (s.emotion === null) return
+    if (best === -1 || s.emotion < stages[best].emotion) best = i
+  })
+  return best
+}
+
+/** The focal default: no `emphasis` anywhere → the trough gets it. */
+function withDefaultFocal(stages) {
+  if (stages.some((s) => s.emphasis)) return stages
+  const t = troughIndex(stages)
+  if (t === -1) return stages
+  return stages.map((s, i) => (i === t ? { ...s, emphasis: true } : s))
 }
 
 function normalizeRows(raw, ctx) {
@@ -98,12 +128,14 @@ function normalizeStages(raw, rows, ctx) {
   })
 }
 
-/** `emotion` is an integer -2..2 or absent (`null` once normalized, so the
- * normalized stage re-normalizes unchanged). */
+/** `emotion` is a named level (最悪 … 最高 / worst … best) or, for
+ * backward compatibility, an integer -2..2; absent → `null`. Stored as the
+ * integer, so the normalized stage re-normalizes unchanged. */
 function normalizeEmotion(v, sctx) {
   if (v === undefined || v === null) return null
+  if (typeof v === 'string' && Object.hasOwn(EMOTION_NAMES, v)) return EMOTION_NAMES[v]
   if (typeof v !== 'number' || !Number.isInteger(v) || v < EMOTION_MIN || v > EMOTION_MAX) {
-    throw new IrError(`${sctx}.emotion must be an integer from ${EMOTION_MIN} to ${EMOTION_MAX} (got: ${JSON.stringify(v)})`)
+    throw new IrError(`${sctx}.emotion must be one of ${EMOTION_NAME_LIST} or an integer from ${EMOTION_MIN} to ${EMOTION_MAX} (got: ${JSON.stringify(v)})`)
   }
   return v
 }
@@ -168,7 +200,23 @@ export function budgetWarnings(ir) {
       `${emphasized.length} emphasized stage(s) (guidance ≤ ${limits.maxEmphasis})`,
       `keep emphasis on at most ${limits.maxEmphasis} stages — the lowest point of the curve is the natural one (${emphasized.map((s) => `"${s.id}"`).join(', ')} are all emphasized)`))
   }
+  const offTrough = emphasized.filter((s) => !isTrough(ir.stages, s))
+  if (offTrough.length) {
+    out.push(budgetWarning('budget:trough', offTrough.length, 0,
+      offTrough.map((s) => `stage "${s.id}" is emphasized but ${s.emotion === null ? 'has no emotion' : 'is not a low point of the curve'}`).join('; '),
+      `move the emphasis to a trough — a pain point is where the curve dips (${offTrough.map((s) => `"${s.id}"`).join(', ')})`))
+  }
   return out
+}
+
+/** A stage is a trough when it carries an emotion no higher than its
+ * neighbours' (the nearest stages with an emotion on either side). */
+function isTrough(stages, stage) {
+  if (stage.emotion === null) return false
+  const withEmotion = stages.filter((s) => s.emotion !== null)
+  const i = withEmotion.indexOf(stage)
+  const prev = withEmotion[i - 1], next = withEmotion[i + 1]
+  return (!prev || prev.emotion >= stage.emotion) && (!next || next.emotion >= stage.emotion)
 }
 
 // --- text wrapping ---------------------------------------------------------
@@ -484,8 +532,9 @@ export function verify(layoutResult, ir) {
   budgetRow(2, 'row-count', 'budget:rows', `${ir.rows.length} row(s)`)
   budgetRow(3, 'cell-text-length', 'budget:cell-text', `every cell item is ≤ ${limits.maxCellTextLen} chars`)
   budgetRow(4, 'emphasis-count', 'budget:emphasis', `${ir.stages.filter((s) => s.emphasis).length} emphasized stage(s)`)
+  budgetRow(5, 'emphasis-at-trough', 'budget:trough', 'every emphasized stage sits on a low point of the curve')
 
-  // 5. references: every cell sits in a declared stage and row, every
+  // 6. references: every cell sits in a declared stage and row, every
   //    curve point belongs to a declared stage that carries an emotion
   const stageOf = new Map(geo.stages.map((s) => [s.id, s]))
   const rowOf = new Map(geo.rows.map((r) => [r.row, r]))
@@ -500,9 +549,9 @@ export function verify(layoutResult, ir) {
     if (!s) badRefs.push(`band.points[${i}] → unknown stage "${p.stage}"`)
     else if (s.emotion === null || s.emotion === undefined) badRefs.push(`band.points[${i}] → stage "${p.stage}" has no emotion`)
   })
-  rows.push({ id: 5, name: 'references-exist', severity: 'fail', ok: badRefs.length === 0, detail: badRefs.length ? badRefs.join('; ') : 'every cell and curve point references a declared stage/row', hint: badRefs.length ? 'declare the stage/row before referencing it' : undefined })
+  rows.push({ id: 6, name: 'references-exist', severity: 'fail', ok: badRefs.length === 0, detail: badRefs.length ? badRefs.join('; ') : 'every cell and curve point references a declared stage/row', hint: badRefs.length ? 'declare the stage/row before referencing it' : undefined })
 
-  // 6. grid: every cell matches its column × row, no two cells overlap,
+  // 7. grid: every cell matches its column × row, no two cells overlap,
   //    every text line sits inside its cell with padding
   const gridProblems = []
   geo.cells.forEach((c, i) => {
@@ -524,9 +573,9 @@ export function verify(layoutResult, ir) {
       }
     }
   }
-  rows.push({ id: 6, name: 'cells-inside-grid', severity: 'fail', ok: gridProblems.length === 0, detail: gridProblems.length ? gridProblems.slice(0, 4).join('; ') : `${geo.cells.length} cell(s) aligned to ${geo.stages.length} column(s) × ${geo.rows.length} row(s), text inside with ${CELL_PAD_X}/${CELL_PAD_Y}px padding`, hint: gridProblems.length ? 'derive every cell rect from its stage column and row, and size the column from the widest wrapped line' : undefined })
+  rows.push({ id: 7, name: 'cells-inside-grid', severity: 'fail', ok: gridProblems.length === 0, detail: gridProblems.length ? gridProblems.slice(0, 4).join('; ') : `${geo.cells.length} cell(s) aligned to ${geo.stages.length} column(s) × ${geo.rows.length} row(s), text inside with ${CELL_PAD_X}/${CELL_PAD_Y}px padding`, hint: gridProblems.length ? 'derive every cell rect from its stage column and row, and size the column from the widest wrapped line' : undefined })
 
-  // 7. curve: every point at its stage centre, at the y its emotion maps to,
+  // 8. curve: every point at its stage centre, at the y its emotion maps to,
   //    inside the band; points strictly left → right; the interpolant stays
   //    within the band and between neighbouring values (no overshoot)
   const curveProblems = []
@@ -551,9 +600,9 @@ export function verify(layoutResult, ir) {
       }
     }
   }
-  rows.push({ id: 7, name: 'curve-at-stage-centres', severity: 'fail', ok: curveProblems.length === 0, detail: curveProblems.length ? curveProblems.slice(0, 4).join('; ') : b ? `${points.length} point(s) at their stage centres, ${b.segments.length} monotone segment(s) inside the band` : 'no emotion given — no band drawn', hint: curveProblems.length ? 'place every point at (stage.centerX, zeroY − emotion × pitch) and build the curve with monotone tangents' : undefined })
+  rows.push({ id: 8, name: 'curve-at-stage-centres', severity: 'fail', ok: curveProblems.length === 0, detail: curveProblems.length ? curveProblems.slice(0, 4).join('; ') : b ? `${points.length} point(s) at their stage centres, ${b.segments.length} monotone segment(s) inside the band` : 'no emotion given — no band drawn', hint: curveProblems.length ? 'place every point at (stage.centerX, zeroY − emotion × pitch) and build the curve with monotone tangents' : undefined })
 
-  // 8. no label crosses the curve
+  // 9. no label crosses the curve
   const crossProblems = []
   if (b && points.length) {
     const samples = sampleCurve(points, b.segments)
@@ -562,14 +611,14 @@ export function verify(layoutResult, ir) {
       if (hit) crossProblems.push(`${box.what} crosses the curve near x=${hit.x.toFixed(0)}`)
     }
   }
-  rows.push({ id: 8, name: 'labels-clear-of-curve', severity: 'fail', ok: crossProblems.length === 0, detail: crossProblems.length ? crossProblems.slice(0, 4).join('; ') : b ? `no label box touches the curve (${labelBoxes(geo).length} label(s) checked)` : 'no curve drawn', hint: crossProblems.length ? 'keep the band free of text — labels belong in the row column or above the grid' : undefined })
+  rows.push({ id: 9, name: 'labels-clear-of-curve', severity: 'fail', ok: crossProblems.length === 0, detail: crossProblems.length ? crossProblems.slice(0, 4).join('; ') : b ? `no label box touches the curve (${labelBoxes(geo).length} label(s) checked)` : 'no curve drawn', hint: crossProblems.length ? 'keep the band free of text — labels belong in the row column or above the grid' : undefined })
 
   return rows
 }
 
 export const doc = {
   purpose: 'a user journey — one person\'s stages left → right, what they do / touch / suffer in each, and an emotion curve across the stages',
-  whenToUse: 'when the reader must see *how the experience feels* at each step, not just what happens; give every stage an emotion (-2..2) or use process / timeline instead, and use diagram when no person is involved. Budgets: stages ≤ 7, rows ≤ 4, cell item ≤ 16 chars, emphasis ≤ 2 (the low point) — guidance, over-budget figures still render with data-warn. The curve is the one documented exemption from the orthogonal-routing rule.',
+  whenToUse: 'when the reader must see *how the experience feels* at each step, not just what happens; give every stage an emotion named 最悪 / 悪い / 普通 / 良い / 最高 or use process / timeline instead, and use diagram when no person is involved. Budgets: stages ≤ 6, rows ≤ 3, cell item ≤ 16 chars, emphasis ≤ 2 and only on a trough of the curve (with no emphasis given, the lowest point gets it) — guidance, over-budget figures still render with data-warn. The curve is the one documented exemption from the orthogonal-routing rule.',
   irExample: `id: onboarding-journey
 type: journey
 title: 初回利用の体験
@@ -579,13 +628,13 @@ rows: [行動, 接点, 不満]
 stages:
   - id: invite
     label: 招待
-    emotion: 1
+    emotion: 良い
     cells:
       行動: 招待メールを開く
       接点: メール
   - id: signup
     label: 登録
-    emotion: 0
+    emotion: 普通
     cells:
       行動: [アカウント作成, 認証]
       接点: 登録画面
@@ -593,23 +642,23 @@ stages:
   - id: setup
     label: 初期設定
     emphasis: true
-    emotion: -2
+    emotion: 最悪
     cells:
       行動: 連携先を選ぶ
       接点: 設定画面
       不満: [用語が分からない, 手順が長い]
   - id: first-use
     label: 初回利用
-    emotion: 1
+    emotion: 良い
     cells:
       行動: 最初の画面を作る
       接点: エディタ
   - id: habit
     label: 定着
-    emotion: 2
+    emotion: 最高
     cells:
       行動: 毎朝開く
       接点: 通知
 `,
-  rows: ['stage-count', 'row-count', 'cell-text-length', 'emphasis-count', 'references-exist', 'cells-inside-grid', 'curve-at-stage-centres', 'labels-clear-of-curve'],
+  rows: ['stage-count', 'row-count', 'cell-text-length', 'emphasis-count', 'emphasis-at-trough', 'references-exist', 'cells-inside-grid', 'curve-at-stage-centres', 'labels-clear-of-curve'],
 }

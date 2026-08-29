@@ -34,7 +34,7 @@ function runCli(args) {
 
 const plugin = getFigureType('pyramid')
 const WIDE_W = 416
-const OWN_ROWS = ['tier-count', 'label-length', 'emphasis-count', 'tiers-ordered', 'widths-monotonic', 'values-proportional', 'labels-legible']
+const OWN_ROWS = ['tier-count', 'label-length', 'emphasis-count', 'funnel-values', 'emphasis-placement', 'tiers-ordered', 'widths-monotonic', 'values-proportional', 'labels-legible']
 
 const minimal = () => ({
   id: 'p', type: 'pyramid', title: 't',
@@ -113,12 +113,39 @@ describe('figures/pyramid.mjs: budgets', () => {
   test('every budget key fires, in a stable order, and reaches data-warn', async () => {
     const ir = validIr('pyramid-over-budget.yaml')
     const warns = pyramid.budgetWarnings(ir)
-    assert.deepEqual(warns.map((w) => w.key), ['budget:tiers', 'budget:label', 'budget:emphasis'])
-    assert.deepEqual(warns.map((w) => [w.value, w.limit]), [[8, 7], [16, 14], [3, 2]])
+    assert.deepEqual(warns.map((w) => w.key), ['budget:tiers', 'budget:label', 'budget:emphasis', 'budget:base-emphasis'])
+    assert.deepEqual(warns.map((w) => [w.value, w.limit]), [[8, 6], [16, 14], [3, 1], [1, 0]])
     for (const w of warns) assert.ok(w.hint && w.detail)
+    assert.match(warns[3].detail, /base tier "t8" carries emphasis/)
     const rendered = await renderFigureHtmlChecked(ir)
     assert.equal(rendered.checksOk, true, JSON.stringify(rendered.failures))
-    assert.match(rendered.html, /data-warn="budget:tiers=8;budget:label=16;budget:emphasis=3" data-type="pyramid"/)
+    assert.match(rendered.html, /data-warn="budget:tiers=8;budget:label=16;budget:emphasis=3;budget:base-emphasis=1" data-type="pyramid"/)
+  })
+
+  test('fewer than 4 tiers warns against the lower bound; a funnel without values warns budget:values', () => {
+    const three = validateIR(minimal())
+    assert.equal(three.ok, true)
+    assert.deepEqual(three.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:tiers', 3, 4]])
+    assert.match(three.warnings[0].detail, /guidance ≥ 4/)
+    const funnel = validateIR({ ...minimal(), variant: 'funnel', tiers: ['a', 'b', 'c', 'd'].map((id) => ({ id, label: id })) })
+    assert.equal(funnel.ok, true)
+    assert.deepEqual(funnel.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:values', 0, 4]])
+    assert.match(funnel.warnings[0].hint, /real count/)
+    // the base warning is a pyramid rule only: a funnel's bottleneck is its bottom tier
+    const bottleneck = validateIR(funnelValues([100, 50, 10, 2]))
+    assert.equal(bottleneck.ir.tiers[3].emphasis, true)
+    assert.deepEqual(bottleneck.warnings, [])
+  })
+
+  test('with no emphasis given, the apex (pyramid) or the bottom tier (funnel) becomes the focal tier, and normalize stays idempotent', () => {
+    const pyr = validateIR({ ...minimal(), tiers: ['a', 'b', 'c', 'd'].map((id) => ({ id, label: id })) })
+    assert.deepEqual(pyr.ir.tiers.map((t) => t.emphasis), [true, false, false, false])
+    const fun = validateIR(funnelValues([100, 50, 10, 2]))
+    assert.deepEqual(fun.ir.tiers.map((t) => t.emphasis), [false, false, false, true])
+    assert.deepEqual(pyramid.normalize(fun.ir), fun.ir)
+    // an explicit emphasis anywhere switches the default off
+    const explicit = validateIR({ ...minimal(), tiers: [{ id: 'a', label: 'a' }, { id: 'b', label: 'b', emphasis: true }, { id: 'c', label: 'c' }, { id: 'd', label: 'd' }] })
+    assert.deepEqual(explicit.ir.tiers.map((t) => t.emphasis), [false, true, false, false])
   })
 })
 
@@ -215,8 +242,8 @@ describe('figures/pyramid.mjs: verify rows', () => {
       const v = await verifyFigure(plugin, ir, rendered)
       assert.equal(v.ok, true, `${name}: ${JSON.stringify(v.failures)}`)
       assert.deepEqual(v.warnings, [])
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.name), plugin.doc.rows)
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7])
+      assert.deepEqual(v.checks.slice(0, 9).map((c) => c.name), plugin.doc.rows)
+      assert.deepEqual(v.checks.slice(0, 9).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9])
     }
   })
 
@@ -308,7 +335,7 @@ describe('figures/pyramid.mjs: verify rows', () => {
     assert.match(byName(pyramid.verify(fl2, f), 'labels-legible').detail, /paid \(outside label runs past the value column\)/)
   })
 
-  test('the three budget rows are warn rows carrying key/value only when they fail', async () => {
+  test('the five budget rows are warn rows carrying key/value only when they fail', async () => {
     const ir = validIr('pyramid-over-budget.yaml')
     const v = await verifyFigure(plugin, ir, await renderFigure(plugin, ir))
     assert.equal(v.ok, true)
@@ -316,10 +343,11 @@ describe('figures/pyramid.mjs: verify rows', () => {
       ['tier-count', 'budget:tiers', 8],
       ['label-length', 'budget:label', 16],
       ['emphasis-count', 'budget:emphasis', 3],
+      ['emphasis-placement', 'budget:base-emphasis', 1],
     ])
     const clean = validIr('pyramid-simple.yaml')
     const cv = await verifyFigure(plugin, clean, await renderFigure(plugin, clean))
-    for (const name of ['tier-count', 'label-length', 'emphasis-count']) {
+    for (const name of ['tier-count', 'label-length', 'emphasis-count', 'funnel-values', 'emphasis-placement']) {
       const row = byName(cv.checks, name)
       assert.equal(row.severity, 'warn')
       assert.equal(row.ok, true)
@@ -371,7 +399,7 @@ describe('figures/pyramid.mjs: registry dispatch and CLI', () => {
 
   test('the registry lists pyramid with its limits and doc rows', () => {
     assert.equal(plugin.type, 'pyramid')
-    assert.deepEqual(plugin.limits, { maxTiers: 7, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plugin.limits, { minTiers: 4, maxTiers: 6, maxLabelLen: 14, maxEmphasis: 1 })
     assert.deepEqual(plugin.doc.rows, OWN_ROWS)
   })
 
@@ -396,8 +424,8 @@ describe('figures/pyramid.mjs: registry dispatch and CLI', () => {
     assert.equal(json.status, 0, json.stderr)
     const out = JSON.parse(json.stdout)
     assert.equal(out.ok, true)
-    assert.deepEqual(out.warnings.map((w) => w.key), ['budget:tiers', 'budget:label', 'budget:emphasis'])
-    assert.match(out.figureHtml, /data-warn="budget:tiers=8;budget:label=16;budget:emphasis=3" data-type="pyramid"/)
+    assert.deepEqual(out.warnings.map((w) => w.key), ['budget:tiers', 'budget:label', 'budget:emphasis', 'budget:base-emphasis'])
+    assert.match(out.figureHtml, /data-warn="budget:tiers=8;budget:label=16;budget:emphasis=3;budget:base-emphasis=1" data-type="pyramid"/)
     const warnFig = runCli([join(FIXTURES, 'pyramid-over-budget.yaml'), '--figure'])
     assert.equal(warnFig.status, 0)
     assert.match(warnFig.stderr, /warning: budget:tiers=8/)

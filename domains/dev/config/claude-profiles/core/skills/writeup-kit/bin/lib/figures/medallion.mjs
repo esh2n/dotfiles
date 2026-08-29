@@ -8,7 +8,10 @@
 //
 // IR shape: `{ id, type:'medallion', title, caption, stages, promotions?, sources?, consumers? }`
 //   stages:     [{ id, label, items: [string], properties: [string], emphasis }]
-//               ordered left → right (3–5 by guidance)
+//               ordered left → right (3–6 by guidance; 2 is the schema floor)
+//               — exactly one stage carries `emphasis` (the design survey's
+//               #26 rule: 0 or more than 1 focal tier is a stop, so verify
+//               row `focal-count` fails rather than warns)
 //   promotions: [{ from, to, label? }] — stage ids; a promotion may only
 //               join a stage to the one directly right of it (verify row)
 //   sources:    [string] feeding stages[0]; consumers: [string] reading the last
@@ -23,7 +26,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, COL
 
 export const type = 'medallion'
 
-export const limits = { maxStages: 5, maxItemsPerStage: 6, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { minStages: 3, maxStages: 6, maxItemsPerStage: 6, maxLabelLen: 14, maxEmphasis: 1 }
 
 // --- layout constants (px; anything that becomes a position is a multiple of 4)
 
@@ -135,6 +138,10 @@ export function budgetWarnings(ir) {
     out.push(budgetWarning('budget:stages', ir.stages.length, limits.maxStages,
       `${ir.stages.length} stage(s) (guidance ≤ ${limits.maxStages})`,
       'merge neighbouring stages that share a quality bar, or split the platform into two figures'))
+  } else if (ir.stages.length < limits.minStages) {
+    out.push(budgetWarning('budget:stages', ir.stages.length, limits.minStages,
+      `${ir.stages.length} stage(s) (guidance ≥ ${limits.minStages})`,
+      'two tiers are a before/after, not a refinement ladder — name the intermediate quality bar, or use a diagram'))
   }
   const fattest = ir.stages.reduce((m, s) => (s.items.length > m.items.length ? s : m), ir.stages[0])
   if (fattest.items.length > limits.maxItemsPerStage) {
@@ -148,14 +155,11 @@ export function budgetWarnings(ir) {
       `label "${longest}" is ${longest.length} chars (guidance ≤ ${limits.maxLabelLen})`,
       'shorten the label and move the detail into the stage properties or the caption'))
   }
-  const emphasized = ir.stages.filter((s) => s.emphasis).length
-  if (emphasized > limits.maxEmphasis) {
-    out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
-      `${emphasized} emphasized stage(s) (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis on the one or two stages the decision is about'))
-  }
   return out
 }
+
+/** Stages carrying `emphasis` — exactly one is the hard rule (verify row `focal-count`). */
+const focalStages = (ir) => ir.stages.filter((s) => s.emphasis)
 
 // --- layout --------------------------------------------------------------
 
@@ -335,7 +339,17 @@ export function verify(layoutResult, ir) {
   budgetRow(1, 'stage-count', 'budget:stages', `${ir.stages.length} stage(s)`)
   budgetRow(2, 'items-per-stage', 'budget:items', `at most ${ir.stages.reduce((m, s) => Math.max(m, s.items.length), 0)} item(s) in a stage`)
   budgetRow(3, 'label-length', 'budget:label', `longest label ${longestLabel(ir).length} chars`)
-  budgetRow(4, 'emphasis-count', 'budget:emphasis', `${ir.stages.filter((s) => s.emphasis).length} emphasized stage(s)`)
+
+  // 4. exactly one focal stage — the survey's rule for this type is a stop,
+  //    not guidance: no accent leaves the reader guessing which tier the
+  //    figure is about, two accents make the tint ladder unreadable
+  const focal = focalStages(ir)
+  rows.push({
+    id: 4, name: 'focal-count', severity: 'fail', ok: focal.length === 1,
+    detail: focal.length === 1 ? `one focal stage ("${focal[0].id}")`
+      : focal.length === 0 ? 'no stage carries emphasis' : `${focal.length} stages carry emphasis: ${focal.map((s) => s.id).join(', ')}`,
+    hint: focal.length === 1 ? undefined : `set emphasis: true on exactly one stage — the tier the caption's decision is about (limit ${limits.maxEmphasis})`,
+  })
 
   // 5. columns run left → right in IR order, equal width, never overlapping
   const order = ir.stages.map((s) => s.id)
@@ -408,7 +422,7 @@ export function verify(layoutResult, ir) {
 
 export const doc = {
   purpose: 'data-platform stages left → right (bronze → silver → gold) with the datasets in each, per-stage properties, and the promotions between them',
-  whenToUse: 'when one dataset moves through ranked quality/access tiers and the question is "what lives where, under which rules, and how does it get promoted"; not for a role workflow (use process) or a cluster overview (use diagram). Budgets: stages ≤ 5, items per stage ≤ 6, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when one dataset moves through ranked quality/access tiers and the question is "what lives where, under which rules, and how does it get promoted"; not for a role workflow (use process) or a cluster overview (use diagram). Budgets: stages 3–6, items per stage ≤ 6, label ≤ 14 chars — guidance, over-budget figures still render with data-warn. Exactly one stage must carry emphasis (verify row focal-count fails on 0 or 2+).',
   irExample: `id: lakehouse-tiers
 type: medallion
 title: レイクハウスの層構成
@@ -437,5 +451,5 @@ promotions:
 sources: [アプリ DB, 行動ログ]
 consumers: [BI, 公開 API]
 `,
-  rows: ['stage-count', 'items-per-stage', 'label-length', 'emphasis-count', 'stages-ordered', 'promotions-adjacent', 'arc-labels-clear', 'items-inside-stage'],
+  rows: ['stage-count', 'items-per-stage', 'label-length', 'focal-count', 'stages-ordered', 'promotions-adjacent', 'arc-labels-clear', 'items-inside-stage'],
 }

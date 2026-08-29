@@ -1,20 +1,21 @@
-# Regression fixture (2026-08-28): the same page's "ACL の内部構造" figure — 6
+# Regression fixture (2026-08-28): the same page's layer-internals figure
+# (labels since neutralised at equal textWidth) — 6
 # nodes in 3 groups, 5 labeled sync edges, direction pinned to `right`.
 # Rendered as a 1972x220 SVG (data-checks="pass" data-scroll="true").
 id: d2
-title: ACL の内部構造
-caption: ACL の内部構造の図
+title: 境界変換層の内部構造
+caption: 境界変換層の内部構造の図
 direction: right
 groups:
 - id: sub
   label: 自分のサブシステム
 - id: layer
-  label: 腐敗防止層
+  label: 境界変換層
 - id: ext
   label: 外部サブシステム
 nodes:
 - id: client
-  label: ドメイン / ユースケース
+  label: 業務ロジック / 利用機能
   group: sub
 - id: svc
   label: Service

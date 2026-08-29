@@ -173,6 +173,37 @@ describe('quadrant: layout', () => {
     for (const c of l.geo.corners) assert.equal(inPlot(c), true, `corner ${c.corner} outside the plot`)
   })
 
+  test('axis text sits at the ends of the axis lines, horizontal: name + high at the right / top end, low at the left / bottom end, never at a midpoint', async () => {
+    const ir = validIr('quadrant-simple.yaml')
+    const l = await quadrant.layout(ir, { column: COLUMN })
+    const { plot, axes, texts } = l.geo
+    const t = Object.fromEntries(texts.map((x) => [x.role, x]))
+    for (const x of texts) assert.equal('rotate' in x, false, `${x.role} is rotated`)
+    // x axis: low ← plot → label, high on the horizontal axis line's row
+    assert.equal(t['x-low'].x + t['x-low'].width, plot.x - 8)
+    assert.equal(t['x-label'].x, plot.x + plot.width + 8)
+    assert.equal(t['x-high'].x, t['x-label'].x + t['x-label'].width + 4)
+    for (const role of ['x-low', 'x-label', 'x-high']) {
+      assert.ok(t[role].y <= axes.horizontal.y && t[role].y + t[role].height >= axes.horizontal.y, `${role} straddles the horizontal axis`)
+    }
+    // y axis: label + high centred on the vertical axis above the plot, low below it
+    assert.ok(t['y-label'].y + t['y-label'].height <= plot.y)
+    assert.equal(t['y-high'].y, t['y-label'].y)
+    assert.equal(t['y-high'].x, t['y-label'].x + t['y-label'].width + 4)
+    const topMid = (t['y-label'].x + t['y-high'].x + t['y-high'].width) / 2
+    assert.ok(Math.abs(topMid - axes.vertical.x) <= 4, `top group centred on the axis (${topMid} vs ${axes.vertical.x})`)
+    assert.ok(t['y-low'].y >= plot.y + plot.height)
+    assert.ok(Math.abs(t['y-low'].x + t['y-low'].width / 2 - axes.vertical.x) <= 4)
+    // the plot's bottom band no longer carries the axis name at its midpoint
+    assert.ok(!texts.some((x) => x.role === 'x-label' && Math.abs(x.x + x.width / 2 - axes.vertical.x) < plot.width / 4))
+    assert.equal(l.width, 624)
+    // without low/high the name alone marks the high end
+    const bare = await quadrant.layout(quadrant.normalize(minimal()))
+    assert.deepEqual(bare.geo.texts.map((x) => x.role), ['x-label', 'y-label'])
+    assert.equal(bare.geo.texts[0].x, bare.geo.plot.x + bare.geo.plot.width + 8)
+    assert.equal(bare.geo.plot.x, 16)
+  })
+
   test('items map x→right and y→up onto the 4px grid; (0,0) is the bottom-left corner, (1,1) the top-right', async () => {
     const ir = quadrant.normalize(minimal({ items: [
       { id: 'bl', label: 'bl', x: 0, y: 0 }, { id: 'tr', label: 'tr', x: 1, y: 1 }, { id: 'mid', label: 'm', x: 0.37, y: 0.61 },
@@ -264,7 +295,9 @@ describe('quadrant: layout', () => {
     assert.match(rendered.svg, /<text id="wu-d-q1-i-cache-label"[^>]*font-weight="700"/)
     assert.match(rendered.svg, /<circle id="wu-d-q1-i-rewrite" cx="\d+" cy="\d+" r="4" fill="currentColor"\/>/)
     assert.match(rendered.svg, /<text id="wu-d-q1-q-tl"[^>]*fill="var\(--wu-ink-3\)">すぐやる<\/text>/)
-    assert.match(rendered.svg, /<text id="wu-d-q1-y-label"[^>]*transform="rotate\(-90 /)
+    assert.doesNotMatch(rendered.svg, /rotate\(/)
+    assert.match(rendered.svg, /<text id="wu-d-q1-x-label" x="\d+" y="224" font-size="13" text-anchor="start" fill="currentColor">実装コスト<\/text><text id="wu-d-q1-x-high" [^>]*font-size="11"[^>]*fill="var\(--wu-ink-3\)">高<\/text>/)
+    assert.match(rendered.svg, /<text id="wu-d-q1-y-label" x="\d+" y="28" font-size="13" text-anchor="start" fill="currentColor">効果<\/text><text id="wu-d-q1-y-high" [^>]*>大<\/text>/)
     assert.doesNotMatch(rendered.svg, /#[0-9a-f]{3,6}\b/i)
   })
 })

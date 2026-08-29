@@ -6,12 +6,18 @@
 // rule: they are cubic curves with no arrowhead — direction is left → right
 // by construction (a link may only join a stage to a later one).
 //
-// IR shape: `{ id, type:'sankey', title, caption?, unit?, nodes, links }`
-//   nodes: [{ id, label, stage, emphasis? }]   stage: integer ≥ 0, columns
-//          are the distinct stages in ascending order; nodes stack in IR
-//          order inside a column
-//   links: [{ from, to, value, label? }]        from.stage < to.stage, value > 0
-//   unit:  appended to every value label ("件", "GB")
+// IR shape: `{ id, type:'sankey', title, caption?, unit?, stages?, nodes, links }`
+//   nodes:  [{ id, label, stage, emphasis? }]   stage: integer ≥ 0, columns
+//           are the distinct stages in ascending order; nodes stack in IR
+//           order inside a column
+//   links:  [{ from, to, value, label? }]        from.stage < to.stage, value > 0
+//   unit:   appended to every value label ("件", "GB")
+//   stages: [label, …] — one column header per distinct stage, in stage
+//           order (11px muted text above each column); optional
+//
+// Budgets (survey #30): 3 stages (fewer or more warns `budget:stages`),
+// nodes ≤ 8, links ≤ 12, and no ribbon thinner than 4px — a flow that thin
+// warns `budget:ribbon` and belongs folded into an 「その他」 link.
 //
 // Chart rules encoded here (the survey's verify-sankey contract): ribbon
 // thickness = value × one shared scale (every ribbon carries `data-value`
@@ -33,7 +39,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, COL
 
 export const type = 'sankey'
 
-export const limits = { maxNodes: 12, maxLinks: 16, maxLabelLen: 12, maxEmphasis: 2 }
+export const limits = { maxNodes: 8, maxLinks: 12, maxLabelLen: 12, maxEmphasis: 2, stages: 3, minRibbon: 4 }
 
 // --- layout constants (px) ------------------------------------------------
 
@@ -45,6 +51,7 @@ const LABEL_STEP = 20       // minimum distance between neighbouring node-label 
 const MAX_COL_H = 400       // the tallest column reaches this (bars + gaps)
 const MIN_COL_GAP = 160     // bar-left to bar-left of the next column
 const VALUE_MIN_H = 14      // a ribbon at least this tall carries its value label
+const HEADER_H = 24         // room above the columns when `stages` headers are given
 const VALUE_T = [0.5, 0.3, 0.7, 0.2, 0.8]  // label spots along a ribbon, tried in order
 const LABEL_CLEAR = 8       // clearance between any two labels
 const FOOT_LINE = 16
@@ -64,7 +71,21 @@ export function normalize(raw, ctx = 'ir') {
   if (unit !== undefined) out.unit = unit
   out.nodes = normalizeNodes(raw.nodes, ctx)
   out.links = normalizeLinks(raw.links, out.nodes, ctx)
+  const stages = normalizeStages(raw.stages, out.nodes, ctx)
+  if (stages !== undefined) out.stages = stages
   return out
+}
+
+/** `stages: [label, …]` — optional column headers, exactly one per distinct stage. */
+function normalizeStages(raw, nodes, ctx) {
+  if (raw === undefined || raw === null) return undefined
+  if (!Array.isArray(raw)) throw new IrError(`${ctx}.stages must be a list of column header strings`)
+  const count = new Set(nodes.map((n) => n.stage)).size
+  if (raw.length !== count) throw new IrError(`${ctx}.stages needs one header per stage — ${count} stage(s) in nodes, ${raw.length} header(s) given`)
+  return raw.map((h, i) => {
+    if (typeof h !== 'string' || h.trim() === '') throw new IrError(`${ctx}.stages[${i}] must be a non-empty string`)
+    return h
+  })
 }
 
 function normalizeNodes(raw, ctx) {
@@ -111,6 +132,12 @@ function normalizeLinks(raw, nodes, ctx) {
 const labelsOf = (ir) => [...ir.nodes.map((n) => n.label), ...ir.links.map((l) => l.label).filter(Boolean)]
 const longestLabel = (ir) => labelsOf(ir).reduce((m, l) => (l.length > m.length ? l : m), '')
 const emphasized = (ir) => ir.nodes.filter((n) => n.emphasis)
+const stageCount = (ir) => new Set(ir.nodes.map((n) => n.stage)).size
+/** Links whose ribbon, at the shared scale the layout will use, is thinner than `minRibbon`. */
+function thinLinks(ir) {
+  const scale = flowScale(ir)
+  return ir.links.map((l, i) => ({ ...l, index: i, thickness: round2(l.value * scale) })).filter((l) => l.thickness < limits.minRibbon)
+}
 
 export function budgetWarnings(ir) {
   const out = []
@@ -136,6 +163,21 @@ export function budgetWarnings(ir) {
       `${emph} emphasized node(s) (guidance ≤ ${limits.maxEmphasis})`,
       'keep emphasis on the one or two nodes whose flow the decision is about'))
   }
+  const stages = stageCount(ir)
+  if (stages !== limits.stages) {
+    out.push(budgetWarning('budget:stages', stages, limits.stages,
+      `${stages} stage(s) (guidance: exactly ${limits.stages})`,
+      stages < limits.stages
+        ? 'a sankey earns its ribbons with a middle stage — with two stages a grouped bar or a table compares the same split'
+        : 'more than three stages lose the reader between columns — split the figure at a stage, or merge adjacent stages'))
+  }
+  const thin = thinLinks(ir)
+  if (thin.length) {
+    const thinnest = thin.reduce((m, l) => (l.thickness < m.thickness ? l : m))
+    out.push(budgetWarning('budget:ribbon', Math.round(thinnest.thickness * 10) / 10, limits.minRibbon,
+      `${thin.length} ribbon(s) thinner than ${limits.minRibbon}px: ${thin.map((l) => `${l.from}→${l.to} ${l.thickness}px`).join(', ')}`,
+      'fold every flow that thin into one 「その他」 link per source — a ribbon under 4px cannot be read as a quantity'))
+  }
   return out
 }
 
@@ -152,6 +194,25 @@ const textBox = (x, y, w, size, anchor = 'start') => {
   return { left, right: left + w, top: y - size, bottom: y + size * 0.25 }
 }
 const overlaps = (a, b) => a.left < b.right + LABEL_CLEAR && b.left < a.right + LABEL_CLEAR && a.top < b.bottom && b.top < a.bottom
+
+/** The shared px-per-unit scale: the column with the most flow per available
+ * px decides, so its bars plus their ≥ 12px gaps reach MAX_COL_H. Pure in the
+ * IR (no column width involved), so budgetWarnings() can use it too. */
+function flowScale(ir) {
+  const totals = flowTotals(ir)
+  const columns = new Map()
+  for (const nd of ir.nodes) {
+    if (!columns.has(nd.stage)) columns.set(nd.stage, [])
+    columns.get(nd.stage).push(totals.get(nd.id).basis)
+  }
+  let scale = Infinity
+  for (const col of columns.values()) {
+    const sum = col.reduce((s, b) => s + b, 0)
+    // each gap may grow by < 4px when the next bar snaps up to the grid
+    if (sum > 0) scale = Math.min(scale, (MAX_COL_H - (NODE_GAP + 4) * (col.length - 1)) / sum)
+  }
+  return Math.floor(scale * 100) / 100
+}
 
 /** Per-node flow totals from the IR. */
 function flowTotals(ir) {
@@ -198,13 +259,8 @@ function layoutAt(ir, targetWidth) {
   ir.nodes.forEach((node, i) => columns[colOf.get(node.stage)].push({ ...node, index: i, col: colOf.get(node.stage), ...totals.get(node.id) }))
 
   // one scale: the column with the most flow per available px decides
-  let scale = Infinity
-  for (const col of columns) {
-    const sum = col.reduce((s, nd) => s + nd.basis, 0)
-    // each gap may grow by < 4px when the next bar snaps up to the grid
-    if (sum > 0) scale = Math.min(scale, (MAX_COL_H - (NODE_GAP + 4) * (col.length - 1)) / sum)
-  }
-  scale = Math.floor(scale * 100) / 100
+  const scale = flowScale(ir)
+  const headerH = ir.stages ? HEADER_H : 0
 
   // node label widths (label 13px, total 11px muted)
   const labelW = (nd) => {
@@ -246,7 +302,7 @@ function layoutAt(ir, targetWidth) {
   const maxH = Math.max(...heights)
   const nodes = []
   columns.forEach((col, i) => {
-    const offset = snap4(PAD + (maxH - heights[i]) / 2)
+    const offset = snap4(PAD + headerH + (maxH - heights[i]) / 2)
     for (const nd of col) {
       nd.x = xs[i]
       nd.y += offset
@@ -281,8 +337,18 @@ function layoutAt(ir, targetWidth) {
     return rec
   })
 
-  // labels: node labels first (fixed), then ribbon values greedily
+  // labels: column headers and node labels first (fixed), then ribbon values greedily
   const labels = []
+  // Headers hang off the bars the way node labels do: the first column's
+  // starts at its bar, the last column's ends at its bar, the rest centre.
+  const headers = (ir.stages ?? []).map((text, i) => {
+    const anchor = i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'
+    const x = anchor === 'start' ? xs[i] : anchor === 'end' ? xs[i] + NODE_W : snap4(xs[i] + NODE_W / 2)
+    const y = PAD + 12
+    const w = Math.ceil(textWidth(text, EDGE_LABEL_SIZE))
+    labels.push({ id: `header-${i}`, kind: 'header', x, y, anchor, width: w, box: textBox(x, y, w, EDGE_LABEL_SIZE, anchor) })
+    return { text, x, y, anchor }
+  })
   for (const nd of nodes) {
     const last = nd.col === n - 1
     const x = last ? nd.x - LABEL_GAP : nd.x + NODE_W + LABEL_GAP
@@ -307,7 +373,7 @@ function layoutAt(ir, targetWidth) {
   if (thin.length) footTexts.push(`${THIN_PREFIX}${thin.map((t) => `${byId.get(t.ribbon.from).label}→${byId.get(t.ribbon.to).label} ${t.text}`).join('、')}`)
   const diff = unbalanced(ir)
   if (diff.length) footTexts.push(`${DIFF_PREFIX}${diff.map((d) => `${d.label} 入 ${fmt(d.in, ir.unit)} / 出 ${fmt(d.out, ir.unit)}`).join('、')}`)
-  const colBottom = snapUp4(PAD + maxH)
+  const colBottom = snapUp4(PAD + headerH + maxH)
   const footnotes = footTexts.map((text, k) => {
     const y = colBottom + PAD + 12 + k * FOOT_LINE
     const w = Math.ceil(textWidth(text, EDGE_LABEL_SIZE))
@@ -316,7 +382,7 @@ function layoutAt(ir, targetWidth) {
   })
   const height = snapUp4(footnotes.length ? footnotes[footnotes.length - 1].y + PAD : colBottom + PAD)
 
-  const geo = { scale, unit: ir.unit, stages, nodes, ribbons, labels, footnotes, pitches, colBottom }
+  const geo = { scale, unit: ir.unit, stages, headers, nodes, ribbons, labels, footnotes, pitches, colBottom }
   return { width, height, geo }
 }
 
@@ -359,6 +425,10 @@ export function draw(layoutResult, ir) {
       : `fill="currentColor" fill-opacity="${RIBBON_OPACITY}" stroke="none"`
     parts.push(`<path id="${uid}-r-${r.index}" data-value="${r.value}" data-from="${esc(r.from)}" data-to="${esc(r.to)}" d="${d}" ${paint}/>`)
   }
+
+  geo.headers.forEach((h, i) => {
+    parts.push(`<text id="${uid}-header-${i}" x="${h.x}" y="${h.y}" font-size="${EDGE_LABEL_SIZE}" text-anchor="${h.anchor}" fill="var(--wu-ink-3)">${esc(h.text)}</text>`)
+  })
 
   for (const nd of geo.nodes) {
     const cls = nd.emphasis ? ' class="wu-focal"' : ''
@@ -490,6 +560,10 @@ export function verify(layoutResult, ir, { svg } = {}) {
     hint: clash.length ? 'shorten node labels or merge the smallest nodes so every label has its own room' : undefined,
   })
 
+  // #10–#11 the survey's shape budgets: exactly 3 stages, no ribbon under 4px
+  warnRow(10, 'stage-count', 'budget:stages', `${stageCount(ir)} stages`)
+  warnRow(11, 'ribbon-min', 'budget:ribbon', `every ribbon ≥ ${limits.minRibbon}px (thinnest ${g.ribbons.reduce((m, r) => Math.min(m, r.thickness), Infinity)}px)`)
+
   return rows
 }
 
@@ -497,12 +571,13 @@ export function verify(layoutResult, ir, { svg } = {}) {
 
 export const doc = {
   purpose: 'quantities flowing between stages as ribbons whose thickness is the value (traffic routing, cost allocation, funnel with branches)',
-  whenToUse: 'when the reader must see where a quantity splits and merges across 2–4 stages and how big each branch is; not for a plain funnel without branches (use pyramid) or a role workflow without quantities (use process). Budgets: nodes ≤ 12, links ≤ 16, label ≤ 12 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn. A node whose inflow and outflow differ is disclosed in a 差分 footnote; ribbons too thin for a value label list their value in a 細い流れ footnote.',
+  whenToUse: 'when the reader must see where a quantity splits and merges across three stages and how big each branch is; not for a plain funnel without branches (use pyramid) or a role workflow without quantities (use process). Budgets: exactly 3 stages, nodes ≤ 8, links ≤ 12, label ≤ 12 chars, emphasis ≤ 2, every ribbon ≥ 4px (fold thinner flows into 「その他」) — guidance, over-budget figures still render with data-warn. `stages: [label, …]` puts a header above each column. A node whose inflow and outflow differ is disclosed in a 差分 footnote; ribbons too thin for a value label list their value in a 細い流れ footnote.',
   irExample: `id: traffic-routing
 type: sankey
 title: 流入経路と申込までの振り分け
 caption: 検索と広告は LP に集中し、申込の 6 割は LP 経由
 unit: 件
+stages: [流入元, 着地ページ, 結果]
 nodes:
   - id: search
     label: 検索
@@ -552,5 +627,5 @@ links:
     to: exit
     value: 70
 `,
-  rows: ['node-count', 'link-count', 'label-length', 'emphasis-count', 'links-forward', 'ribbons-proportional', 'flow-conserved', 'nodes-stacked', 'labels-clear'],
+  rows: ['node-count', 'link-count', 'label-length', 'emphasis-count', 'links-forward', 'ribbons-proportional', 'flow-conserved', 'nodes-stacked', 'labels-clear', 'stage-count', 'ribbon-min'],
 }

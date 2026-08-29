@@ -248,7 +248,7 @@ messages:                 # ≤16 rows total (guidance), top→bottom order
   - from: sched
     to: api
     label: 1 ページ取得        # ≤16 chars (guidance)
-    kind: sync             # sync | async | reply (reply = dashed, open arrow)
+    kind: sync             # sync (solid, filled head) | async (dashed, open head) | reply (dashed, filled head)
   - from: api
     to: sched
     label: has_next=false

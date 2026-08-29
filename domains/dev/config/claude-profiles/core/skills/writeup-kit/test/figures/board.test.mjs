@@ -31,7 +31,7 @@ function runCli(args) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr }
 }
 
-const OWN_ROWS = ['column-count', 'cards-per-column', 'label-length', 'emphasis-count', 'wip-within-limit', 'cards-in-column', 'cards-no-overlap', 'wip-count-matches', 'cuts-clear', 'text-inside-cards']
+const OWN_ROWS = ['column-count', 'cards-per-column', 'total-cards', 'cut-count', 'label-length', 'emphasis-count', 'wip-within-limit', 'wip-limits-set', 'cards-in-column', 'cards-no-overlap', 'wip-count-matches', 'cuts-clear', 'text-inside-cards']
 const SHARED_ROWS = ['single-finite-svg', 'a11y', 'font-size', 'stroke-radius', 'dark-3-state', 'grid-4px', 'projected-scale']
 
 const minimal = (extra = {}) => ({
@@ -124,19 +124,41 @@ describe('board: budgets', () => {
   })
 
   test('each budget key fires alone on an inline IR', () => {
-    const cols = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, label: `C${i}`, cards: ['x'] }))
+    const cols = (n, extra = {}) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, label: `C${i}`, cards: ['x'], ...(i > 0 && i < n - 1 ? extra : {}) }))
     const key = (ir) => plugin.budgetWarnings(validateIR(ir).ir).map((w) => [w.key, w.value])
-    assert.deepEqual(key(minimal({ columns: cols(7) })), [['budget:columns', 7]])
-    assert.deepEqual(key(minimal({ columns: [{ id: 'a', label: 'A', cards: Array.from({ length: 9 }, (_, i) => `k${i}`) }] })), [['budget:cards', 9]])
+    assert.deepEqual(key(minimal({ columns: cols(6, { limit: 2 }) })), [['budget:columns', 6]])
+    assert.deepEqual(key(minimal({ columns: cols(5, { limit: 2 }) })), [])
+    assert.deepEqual(key(minimal({ columns: [{ id: 'a', label: 'A', cards: Array.from({ length: 5 }, (_, i) => `k${i}`) }] })), [['budget:cards', 5]])
+    assert.deepEqual(key(minimal({ columns: cols(4, { limit: 4 }).map((c) => ({ ...c, cards: ['a', 'b', 'c', 'd'] })) })), [['budget:total', 16]])
     assert.deepEqual(key(minimal({ columns: [{ id: 'a', label: 'A', cards: ['このラベルは十五文字ある長さです'] }] })), [['budget:label', 16]])
-    assert.deepEqual(key(minimal({ columns: [{ id: 'a', label: 'A', cards: ['x', 'y', 'z'].map((label) => ({ label, emphasis: true })) }] })), [['budget:emphasis', 3]])
+    assert.deepEqual(key(minimal({ columns: [{ id: 'a', label: 'A', cards: ['x', 'y'].map((label) => ({ label, emphasis: true })) }] })), [['budget:emphasis', 2]])
+    assert.deepEqual(key(minimal({ columns: cols(3) })), [['budget:limit', 1]])
+    const story = (columns, cuts) => ({ id: 'b', type: 'board', title: 't', variant: 'story-map', columns, cuts })
+    assert.deepEqual(key(story([{ id: 'a', label: 'A', cards: ['1', '2', '3', '4', '5'] }], [{ after: 0, label: 'r1' }, { after: 1, label: 'r2' }, { after: 2, label: 'r3' }, { after: 3, label: 'r4' }])), [['budget:cuts', 4]])
+    assert.deepEqual(key(story([{ id: 'a', label: 'A', cards: ['1', '2', '3', '4', '5', '6'] }], [{ after: 4, label: 'r1' }])), [['budget:cards', 5]])
+    assert.deepEqual(key(story([{ id: 'a', label: 'A', cards: ['1', '2', '3', '4', '5', '6'] }], [{ after: 2, label: 'r1' }])), [])
   })
 
-  test('keys come out in a stable order: columns, cards, label, emphasis, wip', () => {
+  test('story-map cards-per-column counts within a slice and names the slice', () => {
+    const ir = validateIR({ id: 'b', type: 'board', title: 't', variant: 'story-map', columns: [{ id: 'a', label: 'A', cards: ['1', '2', '3', '4', '5', '6', '7'] }], cuts: [{ after: 1, label: 'r1' }] }).ir
+    const w = plugin.budgetWarnings(ir)
+    assert.deepEqual(w.map((x) => [x.key, x.value]), [['budget:cards', 5]])
+    assert.match(w[0].detail, /column "a" holds 5 card\(s\) in slice 2/)
+  })
+
+  test('an in-progress kanban column without a WIP limit warns budget:limit naming it; first and last columns are exempt', () => {
+    const ir = validateIR(minimal({ columns: [{ id: 'todo', label: 'T', cards: ['a'] }, { id: 'doing', label: 'D', cards: ['b'] }, { id: 'review', label: 'R', limit: 1, cards: ['c'] }, { id: 'done', label: 'X', cards: ['d'] }] })).ir
+    const w = plugin.budgetWarnings(ir)
+    assert.deepEqual(w.map((x) => [x.key, x.value]), [['budget:limit', 1]])
+    assert.match(w[0].detail, /without a WIP limit: "doing"/)
+    assert.match(w[0].hint, /set `limit` on "doing"/)
+  })
+
+  test('keys come out in a stable order: columns, cards, total, label, emphasis, wip, limit', () => {
     const r = validateIR(parseYaml(fixture('board-over-budget.yaml')))
     assert.equal(r.ok, true)
-    assert.deepEqual(plugin.budgetWarnings(r.ir).map((w) => w.key), ['budget:columns', 'budget:cards', 'budget:label', 'budget:emphasis', 'budget:wip'])
-    assert.equal(formatBudgetWarnings(r.warnings), 'budget:columns=7;budget:cards=9;budget:label=17;budget:emphasis=3;budget:wip=1')
+    assert.deepEqual(plugin.budgetWarnings(r.ir).map((w) => w.key), ['budget:columns', 'budget:cards', 'budget:total', 'budget:label', 'budget:emphasis', 'budget:wip', 'budget:limit'])
+    assert.equal(formatBudgetWarnings(r.warnings), 'budget:columns=7;budget:cards=9;budget:total=17;budget:label=17;budget:emphasis=3;budget:wip=1;budget:limit=5')
   })
 })
 
@@ -229,14 +251,14 @@ describe('board: layout', () => {
 // --- verify --------------------------------------------------------------
 
 describe('board: verify rows', () => {
-  test('a clean render passes every own row and the shared rows, in order, ids 1..17', async () => {
+  test('a clean render passes every own row and the shared rows, in order, ids 1..20', async () => {
     for (const name of ['board-kanban.yaml', 'board-story.yaml']) {
       const ir = validIr(name)
       const rendered = await renderFigure(p(), ir)
       const result = await verifyFigure(p(), ir, rendered)
       assert.equal(result.ok, true, `${name}: ${JSON.stringify(result.failures)}`)
       assert.deepEqual(result.checks.map((c) => c.name), [...OWN_ROWS, ...SHARED_ROWS], name)
-      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 17 }, (_, i) => i + 1), name)
+      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 20 }, (_, i) => i + 1), name)
       assert.deepEqual(result.warnings, [], name)
     }
   })
@@ -249,7 +271,9 @@ describe('board: verify rows', () => {
     assert.deepEqual([wip.severity, wip.ok, wip.key, wip.value], ['warn', false, 'budget:wip', 1])
     const emph = result.checks.find((c) => c.name === 'emphasis-count')
     assert.deepEqual([emph.severity, emph.ok, emph.key, emph.value], ['warn', false, 'budget:emphasis', 3])
-    assert.deepEqual(result.warnings.map((w) => w.key), ['budget:columns', 'budget:cards', 'budget:label', 'budget:emphasis', 'budget:wip'])
+    const limit = result.checks.find((c) => c.name === 'wip-limits-set')
+    assert.deepEqual([limit.severity, limit.ok, limit.key, limit.value], ['warn', false, 'budget:limit', 5])
+    assert.deepEqual(result.warnings.map((w) => w.key), ['budget:columns', 'budget:cards', 'budget:total', 'budget:label', 'budget:emphasis', 'budget:wip', 'budget:limit'])
   })
 
   test('cards-in-column fails when a card leaves its column, its row, or the lane', async () => {
@@ -356,7 +380,7 @@ describe('board: registry dispatch and CLI', () => {
   test('the plugin is registered with its budgets and row names', () => {
     const plug = p()
     assert.ok(plug && !plug.builtin)
-    assert.deepEqual(plug.limits, { maxColumns: 6, maxCardsPerColumn: 8, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plug.limits, { maxColumns: 5, maxCardsPerColumn: 4, maxCards: 12, maxCuts: 3, maxLabelLen: 14, maxEmphasis: 1 })
     assert.deepEqual(plug.doc.rows, OWN_ROWS)
   })
 
@@ -396,8 +420,8 @@ describe('board: registry dispatch and CLI', () => {
     assert.equal(r.status, 0, r.stderr)
     const out = JSON.parse(r.stdout)
     assert.equal(out.ok, true)
-    assert.equal(out.warn, 'budget:columns=7;budget:cards=9;budget:label=17;budget:emphasis=3;budget:wip=1')
-    assert.match(out.figureHtml, /data-warn="budget:columns=7;[^"]*budget:wip=1" data-type="board"/)
+    assert.equal(out.warn, 'budget:columns=7;budget:cards=9;budget:total=17;budget:label=17;budget:emphasis=3;budget:wip=1;budget:limit=5')
+    assert.match(out.figureHtml, /data-warn="budget:columns=7;[^"]*budget:wip=1;budget:limit=5" data-type="board"/)
   })
 
   test('--doc board prints the 4-activity story map with one cut and it renders clean', () => {

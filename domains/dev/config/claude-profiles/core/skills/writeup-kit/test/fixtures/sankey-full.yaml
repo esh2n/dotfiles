@@ -47,7 +47,7 @@ links:
   value: 18
 - from: network
   to: prod-b
-  value: 2
+  value: 3
   label: CDN
 - from: shared
   to: prod-a

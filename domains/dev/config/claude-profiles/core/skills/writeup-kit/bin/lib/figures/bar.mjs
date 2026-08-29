@@ -6,23 +6,27 @@
 // IR shape: `{ id, type:'bar', title, caption?, variant, orientation?, unit?,
 //              allowNegative?, categories, series, emphasis? }`.
 //   variant:      single | grouped | stacked | dumbbell        default single
-//   orientation:  horizontal | vertical                          default horizontal (labels read better)
+//   orientation:  horizontal | vertical                          default horizontal (labels read better);
+//                                                                 dumbbell is horizontal only (schema error otherwise)
 //   unit:         string appended to the last axis tick ("ms", "件")
-//   categories:   [{ id, label }]                                 1..n (guidance ≤ 10)
+//   categories:   [{ id, label }]                                 1..n (guidance 4–8)
 //   series:       [{ id, label, values: { <categoryId>: number | null } }]
-//                 exactly 1 for single, exactly 2 for dumbbell (before, after), guidance ≤ 3 otherwise
-//   emphasis:     [categoryId]                                     bold label + accent stroke, guidance ≤ 2
+//                 exactly 1 for single, exactly 2 for dumbbell (before, after),
+//                 guidance ≤ 2 for grouped and ≤ 3 for stacked
+//   emphasis:     [categoryId]                                     bold label + accent stroke, guidance ≤ 1
 //
-// Chart rules encoded here (the survey's type-bar contract): the value axis
-// always starts at 0 and is never truncated — a negative value is a schema
-// error unless `allowNegative: true`, in which case the axis extends below 0
-// rather than moving it; a missing value (`null` or an absent key) is drawn
-// as a muted "—" in the bar's place AND listed in a footnote line
-// 「欠損: …」 so the reader never mistakes it for 0; every bar and marker
-// carries `data-value` so verify() can read the number back off the svg and
-// compare it with the drawn geometry (within 1px). Series are told apart by
-// fill lightness (currentColor at 85 / 50 / 22 %) plus a legend strip, never
-// by hue, so the three themes stay in sync.
+// Chart rules encoded here (the survey's type-bar contract, §2 row 19): the
+// value axis always starts at 0 and is never truncated — a negative value is
+// a schema error unless `allowNegative: true`, in which case the axis extends
+// below 0 rather than moving it; a dumbbell is horizontal only (the survey:
+// "2 系列のみ・横のみ"), so `orientation: vertical` with it is a schema
+// error rather than a silently different chart; a missing value (`null` or
+// an absent key) is drawn as a muted "—" in the bar's place AND listed in a
+// footnote line 「欠損: …」 so the reader never mistakes it for 0; every bar
+// and marker carries `data-value` so verify() can read the number back off
+// the svg and compare it with the drawn geometry (within 1px). Series are
+// told apart by fill lightness (currentColor at 85 / 50 / 22 %) plus a
+// legend strip, never by hue, so the three themes stay in sync.
 //
 // Grid: the plot origin, row/slot positions, label anchors, legend and
 // footnote sit on the 4px grid (shared row `grid-4px`). Bar ends, ticks and
@@ -34,7 +38,8 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, COL
 
 export const type = 'bar'
 
-export const limits = { maxCategories: 10, maxSeries: 3, maxLabelLen: 14, maxEmphasis: 2 }
+/** Survey §2 row 19: bars 4–8, grouped ≤ 2 groups (stacked ≤ 3 segments), focal 1. */
+export const limits = { minCategories: 4, maxCategories: 8, maxSeries: 3, maxGroupedSeries: 2, maxLabelLen: 14, maxEmphasis: 1 }
 
 const VARIANTS = ['single', 'grouped', 'stacked', 'dumbbell']
 const ORIENTATIONS = ['horizontal', 'vertical']
@@ -67,6 +72,7 @@ export function normalize(raw, ctx = 'ir') {
   const unit = optStr(raw, 'unit', ctx)
   const allowNegative = validateBool(raw, 'allowNegative', ctx)
   if (allowNegative && variant === 'stacked') throw new IrError(`${ctx}.allowNegative cannot be combined with variant: stacked (segments below 0 have no single axis) — use grouped`)
+  if (variant === 'dumbbell' && orientation === 'vertical') throw new IrError(`${ctx}.orientation: vertical cannot be combined with variant: dumbbell — a dumbbell is horizontal only (before/after markers read left to right along one row); drop orientation, or use grouped for a vertical before/after`)
   const categories = normalizeCategories(raw.categories, ctx)
   const series = normalizeSeries(raw.series, categories, { variant, allowNegative }, ctx)
   const emphasis = normalizeEmphasis(raw.emphasis, categories, ctx)
@@ -136,15 +142,23 @@ function normalizeEmphasis(raw, categories, ctx) {
 
 export function budgetWarnings(ir) {
   const out = []
-  if (ir.categories.length > limits.maxCategories) {
-    out.push(budgetWarning('budget:categories', ir.categories.length, limits.maxCategories,
-      `${ir.categories.length} categories (guidance ≤ ${limits.maxCategories})`,
+  const n = ir.categories.length
+  if (n > limits.maxCategories) {
+    out.push(budgetWarning('budget:categories', n, limits.maxCategories,
+      `${n} categories (guidance ${limits.minCategories}–${limits.maxCategories})`,
       'group the long tail into an "other" category, or split the chart by theme'))
+  } else if (n < limits.minCategories) {
+    out.push(budgetWarning('budget:categories', n, limits.minCategories,
+      `${n} categories (guidance ${limits.minCategories}–${limits.maxCategories})`,
+      `${n} numbers read better as a sentence or a table row — a bar chart earns its space from ${limits.minCategories} categories up`))
   }
-  if (ir.series.length > limits.maxSeries) {
-    out.push(budgetWarning('budget:series', ir.series.length, limits.maxSeries,
-      `${ir.series.length} series (guidance ≤ ${limits.maxSeries})`,
-      `only ${limits.maxSeries} fill lightnesses stay distinguishable — draw one chart per ${limits.maxSeries} series, or use a table`))
+  const maxSeries = ir.variant === 'grouped' ? limits.maxGroupedSeries : limits.maxSeries
+  if (ir.series.length > maxSeries) {
+    out.push(budgetWarning('budget:series', ir.series.length, maxSeries,
+      `${ir.series.length} series (guidance ≤ ${maxSeries}${ir.variant === 'grouped' ? ' for grouped' : ''})`,
+      ir.variant === 'grouped'
+        ? `a grouped bar compares at most ${limits.maxGroupedSeries} groups side by side — use stacked (≤ ${limits.maxSeries} segments), one chart per pair, or a table`
+        : `only ${limits.maxSeries} fill lightnesses stay distinguishable — draw one chart per ${limits.maxSeries} series, or use a table`))
   }
   const long = []
   ir.categories.forEach((c, i) => {
@@ -164,7 +178,7 @@ export function budgetWarnings(ir) {
   if (ir.emphasis.length > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', ir.emphasis.length, limits.maxEmphasis,
       `${ir.emphasis.length} emphasized categories (guidance ≤ ${limits.maxEmphasis})`,
-      'emphasize only the category the caption talks about'))
+      'emphasize only the one category the caption talks about — two accents is no focal point'))
   }
   return out
 }
@@ -402,10 +416,10 @@ function layoutVertical(ir, column) {
   const uid = `wu-d-${ir.id}`
   const parts = commonParts(ir)
   const { axis, valW, catW, hasNegative } = parts
-  const dumbbell = ir.variant === 'dumbbell'
+  // a dumbbell never gets here: normalize() rejects variant: dumbbell × vertical
   const n = ir.series.length
   const thick = Math.max(BAR_THICK, snapUp4(valW + 6))
-  const groupW = ir.variant === 'grouped' ? n * thick + (n - 1) * 4 : dumbbell ? MARKER_R * 2 : thick
+  const groupW = ir.variant === 'grouped' ? n * thick + (n - 1) * 4 : thick
   const slotW = Math.ceil(Math.max(40, catW + 8, groupW + 12) / 8) * 8
   const tickW = Math.max(...parts.tickTexts.map((t) => textWidth(t, EDGE_LABEL_SIZE)))
   const plotX0 = PAD + snapUp4(tickW + 8)
@@ -415,7 +429,7 @@ function layoutVertical(ir, column) {
   const plotBottom = plotTop + PLOT_H
   const scale = PLOT_H / (axis.hi - axis.lo)
   const pos = Object.assign((v) => round1(plotBottom - (v - axis.lo) * scale), { scale })
-  const bottomGutter = dumbbell || hasNegative ? 20 : 0
+  const bottomGutter = hasNegative ? 20 : 0
   const catY = plotBottom + bottomGutter + 16
   const out = { bars: [], markers: [], lines: [], nas: [], labels: [], uid }
   const catLabels = []
@@ -424,8 +438,7 @@ function layoutVertical(ir, column) {
     const cx = x + slotW / 2
     catLabels.push({ id: c.id, text: c.label, x: cx, y: catY, anchor: 'middle', bold: ir.emphasis.includes(c.id) })
     out.labels.push({ id: `${uid}-cat-${c.id}`, box: textBox(cx, catY, c.label, FONT_SIZE, 'middle') })
-    if (dumbbell) placeDumbbellColumn(ir, c, { cx, pos, plotBottom }, out)
-    else if (ir.variant === 'stacked') placeStackedColumn(ir, c, { cx, pos, thick }, out)
+    if (ir.variant === 'stacked') placeStackedColumn(ir, c, { cx, pos, thick }, out)
     else placeBarColumn(ir, c, { cx, pos, thick, groupW, plotBottom }, out)
     return { id: c.id, x, cx }
   })
@@ -499,26 +512,6 @@ function placeStackedColumn(ir, c, { cx, pos, thick }, out) {
   }
 }
 
-function placeDumbbellColumn(ir, c, { cx, pos, plotBottom }, out) {
-  const [before, after] = ir.series
-  const vb = before.values[c.id]
-  const va = after.values[c.id]
-  const present = [[before, vb, 0], [after, va, 1]].filter(([, v]) => v !== null)
-  for (const s of ir.series) {
-    if (s.values[c.id] !== null) continue
-    out.nas.push({ category: c.id, series: s.id, tx: cx, ty: plotBottom + 14, anchor: 'middle' })
-    out.labels.push({ id: `${out.uid}-na-${c.id}-${s.id}`, box: textBox(cx, plotBottom + 14, NA, EDGE_LABEL_SIZE, 'middle') })
-  }
-  if (present.length === 2) out.lines.push({ category: c.id, cx, y1v: pos(vb), y2v: pos(va), delta: round6(va - vb) })
-  const lo = present.length === 2 ? Math.min(vb, va) : null
-  for (const [s, v, j] of present) {
-    out.markers.push({ category: c.id, series: s.id, seriesIndex: j, value: v, cx, py: pos(v), filled: j === 1, emphasis: ir.emphasis.includes(c.id) })
-    const below = present.length === 2 && v === lo && !(vb === va && j === 1)
-    const ly = round1(pos(v) + (below ? MARKER_LABEL_GAP + 9 : -MARKER_LABEL_GAP + 2))
-    out.labels.push({ id: `${out.uid}-val-${c.id}-${s.id}`, box: textBox(cx, ly, fmt(v), EDGE_LABEL_SIZE, 'middle'), text: fmt(v), tx: cx, ty: ly, anchor: 'middle', category: c.id, series: s.id, kind: 'value' })
-  }
-}
-
 // --- draw ------------------------------------------------------------------
 
 export function draw(layoutResult, ir) {
@@ -555,18 +548,14 @@ export function draw(layoutResult, ir) {
     }
     parts.push('</g>')
   }
-  // dumbbell lines + markers
+  // dumbbell lines + markers (horizontal only — see normalize())
   if (g.lines.length || g.markers.length) {
     parts.push(`<g id="${uid}-dumbbells" stroke="currentColor" stroke-width="1.5">`)
     for (const l of g.lines) {
-      parts.push(horizontal
-        ? `<line id="${uid}-delta-${l.category}" data-delta="${l.delta}" x1="${l.from}" y1="${l.cy}" x2="${l.to}" y2="${l.cy}"/>`
-        : `<line id="${uid}-delta-${l.category}" data-delta="${l.delta}" x1="${l.cx}" y1="${l.y1v}" x2="${l.cx}" y2="${l.y2v}"/>`)
+      parts.push(`<line id="${uid}-delta-${l.category}" data-delta="${l.delta}" x1="${l.from}" y1="${l.cy}" x2="${l.to}" y2="${l.cy}"/>`)
     }
     for (const m of g.markers) {
-      const cx = horizontal ? m.px : m.cx
-      const cy = horizontal ? m.cy : m.py
-      parts.push(`<circle id="${uid}-mark-${m.category}-${m.series}" data-value="${m.value}" data-category="${esc(m.category)}" data-series="${esc(m.series)}" cx="${cx}" cy="${cy}" r="${MARKER_R}" fill="${m.filled ? 'currentColor' : 'var(--wu-surface)'}"/>`)
+      parts.push(`<circle id="${uid}-mark-${m.category}-${m.series}" data-value="${m.value}" data-category="${esc(m.category)}" data-series="${esc(m.series)}" cx="${m.px}" cy="${m.cy}" r="${MARKER_R}" fill="${m.filled ? 'currentColor' : 'var(--wu-surface)'}"/>`)
     }
     parts.push('</g>')
   }
@@ -644,13 +633,14 @@ export function verify(layoutResult, ir, { svg } = {}) {
   // #6 every bar / marker proportional to its data-value, in geometry and in the svg
   const propProblems = []
   const scale = g.axis.scale
-  const markerPos = (v) => (horizontal ? g.plot.x + (v - g.axis.lo) * scale : g.plot.yBottom - (v - g.axis.lo) * scale)
+  // dumbbell markers exist in horizontal layouts only (normalize() rejects the vertical dumbbell)
+  const markerPos = (v) => g.plot.x + (v - g.axis.lo) * scale
   for (const b of g.bars) {
     if (Math.abs(b.len - Math.abs(b.value) * scale) > 1) propProblems.push(`bar ${b.category}/${b.series}: length ${b.len} ≠ |${b.value}| × ${scale}`)
   }
   for (const m of g.markers) {
-    const actual = horizontal ? m.px : m.py
-    if (Math.abs(actual - markerPos(m.value)) > 1) propProblems.push(`marker ${m.category}/${m.series}: at ${actual}, value ${m.value} maps to ${round1(markerPos(m.value))}`)
+    if (!horizontal) { propProblems.push(`marker ${m.category}/${m.series} in a vertical layout (dumbbell is horizontal only)`); continue }
+    if (Math.abs(m.px - markerPos(m.value)) > 1) propProblems.push(`marker ${m.category}/${m.series}: at ${m.px}, value ${m.value} maps to ${round1(markerPos(m.value))}`)
   }
   if (svg !== undefined) {
     let seen = 0
@@ -663,7 +653,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
     for (const m of svg.matchAll(/<circle id="([^"]+)" data-value="([^"]+)"[^>]*\scx="([^"]+)" cy="([^"]+)"/g)) {
       seen++
       const v = parseFloat(m[2])
-      const actual = parseFloat(horizontal ? m[3] : m[4])
+      const actual = parseFloat(m[3])
       if (Math.abs(actual - markerPos(v)) > 1) propProblems.push(`svg ${m[1]}: drawn at ${actual} for value ${v} (expected ${round1(markerPos(v))})`)
     }
     const expectedCount = g.bars.length + g.markers.length
@@ -734,7 +724,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
 
 export const doc = {
   purpose: 'quantities compared across categories — single bars, grouped, stacked, or a before/after dumbbell',
-  whenToUse: 'when the reader must compare exact magnitudes (cost, latency, counts) across 2–10 categories; the dumbbell variant when the *difference* between two states per category is the point. Not for parts of a whole by area (treemap) or trends over many points (line). Budgets: categories ≤ 10, series ≤ 3, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn. The value axis always starts at 0; a null value is drawn as "—" and listed in a 欠損 footnote.',
+  whenToUse: 'when the reader must compare exact magnitudes (cost, latency, counts) across 4–8 categories; the dumbbell variant (horizontal only) when the *difference* between two states per category is the point. Not for parts of a whole by area (treemap) or trends over many points (line). Budgets: categories 4–8, series ≤ 2 for grouped / ≤ 3 for stacked, label ≤ 14 chars, emphasis ≤ 1 — guidance, over-budget figures still render with data-warn. The value axis always starts at 0; a null value is drawn as "—" and listed in a 欠損 footnote.',
   irExample: `id: p95-before-after
 type: bar
 variant: dumbbell

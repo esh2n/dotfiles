@@ -31,7 +31,7 @@ function runCli(args) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr }
 }
 
-const OWN_ROWS = ['stage-count', 'slot-count', 'cell-count', 'cell-text-length', 'emphasis-count', 'references-exist', 'grid-aligned', 'text-inside-cells', 'arrows-clear']
+const OWN_ROWS = ['stage-count', 'slot-count', 'cell-count', 'cell-text-length', 'emphasis-count', 'focal-count', 'references-exist', 'grid-aligned', 'text-inside-cells', 'arrows-clear']
 const SHARED_ROWS = ['single-finite-svg', 'a11y', 'font-size', 'stroke-radius', 'dark-3-state', 'grid-4px', 'projected-scale']
 
 const minimal = () => ({
@@ -51,9 +51,21 @@ describe('process: schema', () => {
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.equal(r.ir.type, 'process')
     assert.deepEqual(r.ir.slots, ['in', 'out'])
-    assert.deepEqual(r.ir.stages[0], { id: 'a', label: 'A', emphasis: false, cells: { in: ['x'], out: ['y', 'z'] } })
+    assert.deepEqual(r.ir.stages[0], { id: 'a', label: 'A', emphasis: false, focal: undefined, cells: { in: ['x'], out: ['y', 'z'] } })
     assert.deepEqual(r.ir.stages[1].cells, { out: ['w'] })
     assert.equal(r.ir.arrows, 'between-stages')
+  })
+
+  test('focal names the one focal cell of a stage: it must be a declared slot the stage fills', () => {
+    const ok = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emphasis: true, focal: 'out', cells: { out: 'y' } }] })
+    assert.equal(ok.ok, true, JSON.stringify(ok))
+    assert.equal(ok.ir.stages[0].focal, 'out')
+    const ghost = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', focal: 'ghost', cells: { out: 'y' } }] })
+    assert.equal(ghost.ok, false)
+    assert.match(ghost.message, /focal references unknown slot "ghost" \(declared: in, out\)/)
+    const empty = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', focal: 'in', cells: { out: 'y' } }] })
+    assert.equal(empty.ok, false)
+    assert.match(empty.message, /focal names slot "in" but the stage has no cell there/)
   })
 
   test('slots must be a non-empty list of unique strings', () => {
@@ -97,6 +109,23 @@ describe('process: schema', () => {
 describe('process: budgets', () => {
   test('a clean fixture has no warnings', () => {
     assert.deepEqual(plugin.budgetWarnings(validIr('process-simple.yaml')), [])
+    assert.deepEqual(plugin.budgetWarnings(validIr('process-full.yaml')), [])
+  })
+
+  test('the focal stage is exactly one: none warns budget:emphasis=0, two warns =2; a second focal cell warns budget:focal', () => {
+    const none = validateIR(minimal())
+    assert.deepEqual(none.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:emphasis', 0, 1]])
+    assert.match(none.warnings[0].hint, /emphasis: true/)
+    const two = minimal()
+    two.stages.forEach((s) => { s.emphasis = true })
+    assert.deepEqual(validateIR(two).warnings.map((w) => [w.key, w.value]), [['budget:emphasis', 2]])
+    const focal = minimal()
+    focal.stages[0].emphasis = true
+    focal.stages[0].focal = 'in'
+    focal.stages[1].focal = 'out'
+    const w = validateIR(focal).warnings
+    assert.deepEqual(w.map((x) => [x.key, x.value, x.limit]), [['budget:focal', 2, 1]])
+    assert.match(w[0].hint, /"a"\/in, "b"\/out/)
   })
 
   test('each budget key fires on its fixture and reaches data-warn', async () => {
@@ -172,27 +201,54 @@ describe('process: layout', () => {
     assert.equal(geo.rows.find((r) => r.slot === '出力').height, 32)
   })
 
-  test('arrows: adjacent forward arrows cross the column gap on the first row; others take the channel below the grid', async () => {
+  test('arrows: adjacent forward arrows cross the column gap on the first row; a return goes over the header band with one jog, never under the grid', async () => {
     const ir = validIr('process-full.yaml')
     const { geo, height } = await plugin.layout(ir)
     assert.equal(geo.arrows.length, 6)
     const gap = geo.arrows.filter((a) => a.route === 'gap')
-    const channel = geo.arrows.filter((a) => a.route === 'channel')
+    const over = geo.arrows.filter((a) => a.route === 'over')
     assert.equal(gap.length, 5)
-    assert.equal(channel.length, 1)
+    assert.equal(over.length, 1)
     for (const a of gap) {
       const from = geo.stages.find((s) => s.id === a.from), to = geo.stages.find((s) => s.id === a.to)
       assert.deepEqual(a.path, [{ x: from.x + from.width, y: geo.rows[0].centerY }, { x: to.x, y: geo.rows[0].centerY }])
     }
-    const back = channel[0]
-    assert.deepEqual([back.from, back.to, back.label.text], ['verify', 'build', '差し戻し'])
-    assert.equal(back.path[0].y, geo.gridBottom)
-    assert.equal(back.path[3].y, geo.gridBottom)
-    assert.ok(back.path[1].y > geo.gridBottom && back.path[1].y < height)
+    const back = over[0]
+    assert.deepEqual([back.from, back.to, back.label.text, back.lane], ['verify', 'build', '差し戻し', 0])
+    const verify = geo.stages.find((s) => s.id === 'verify'), build = geo.stages.find((s) => s.id === 'build')
+    assert.equal(back.path.length, 4, 'one jog = 4 points')
+    assert.deepEqual(back.path, [
+      { x: verify.centerX + 8, y: geo.header.y }, { x: verify.centerX + 8, y: geo.header.y - 16 },
+      { x: build.centerX - 8, y: geo.header.y - 16 }, { x: build.centerX - 8, y: geo.header.y },
+    ])
+    assert.equal(geo.header.y, 16 + 20 + 16, 'the band above the headers holds the lane and its label')
+    assert.equal(back.label.y, geo.header.y - 16 - 8)
+    assert.ok(geo.arrows.every((a) => a.path.every((p) => p.y <= geo.gridBottom)), 'nothing runs under the grid')
+    assert.equal(height, Math.ceil((geo.gridBottom + 16) / 4) * 4, 'no channel below the grid')
     const labelled = gap.find((a) => a.label)
     assert.equal(labelled.label.text, '承認後')
     const gapW = geo.stages.find((s) => s.id === 'build').x - (geo.stages.find((s) => s.id === 'design').x + geo.stages.find((s) => s.id === 'design').width)
     assert.ok(gapW >= labelled.label.width + 16, 'a labelled gap is widened to hold its label')
+  })
+
+  test('several over-header arrows stack on lanes (shortest nearest the header) and fan their stubs; without any the header sits at the margin', async () => {
+    const raw = { ...minimal(), stages: ['a', 'b', 'c', 'd'].map((id) => ({ id, label: id.toUpperCase(), emphasis: id === 'a', cells: { in: 'x' } })) }
+    raw.arrows = [{ from: 'a', to: 'b' }, { from: 'a', to: 'd', label: 'skip' }, { from: 'c', to: 'a' }, { from: 'd', to: 'a' }]
+    const ir = validateIR(raw).ir
+    const { geo } = await plugin.layout(ir)
+    const byIndex = (i) => geo.arrows.find((a) => a.index === i)
+    assert.equal(byIndex(0).route, 'gap')
+    assert.deepEqual([byIndex(2).lane, byIndex(1).lane, byIndex(3).lane], [0, 1, 2], 'c→a (span 2) nearest, then a→d and d→a (span 3) in arrow order')
+    assert.equal(byIndex(2).path[1].y, geo.header.y - 16)
+    assert.equal(byIndex(1).path[1].y, geo.header.y - 16 - 24)
+    assert.equal(byIndex(3).path[1].y, geo.header.y - 16 - 48)
+    assert.equal(geo.header.y, 16 + 8 + 48 + 16, 'top lane without a label needs only 8px of clearance')
+    const a = geo.stages.find((s) => s.id === 'a')
+    assert.equal(byIndex(1).path[0].x, a.centerX + 8, 'the one exit sits right of center')
+    assert.deepEqual([byIndex(2).path[3].x, byIndex(3).path[3].x], [a.centerX - 8, a.centerX - 16], 'two entries fan left of center')
+    for (const arrow of geo.arrows) for (const p of arrow.path) { assert.equal(p.x % 4, 0); assert.equal(p.y % 4, 0) }
+    const plain = await plugin.layout(validIr('process-simple.yaml'))
+    assert.equal(plain.geo.header.y, 16)
   })
 
   test('the default between-stages arrows join each stage to the next', async () => {
@@ -233,7 +289,7 @@ describe('process: verify rows', () => {
       const result = await verifyFigure(p(), ir, rendered)
       assert.equal(result.ok, true, `${name}: ${JSON.stringify(result.failures)}`)
       assert.deepEqual(result.checks.map((c) => c.name), [...OWN_ROWS, ...SHARED_ROWS], name)
-      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 16 }, (_, i) => i + 1), name)
+      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 17 }, (_, i) => i + 1), name)
       assert.deepEqual(result.warnings, [], name)
     }
   })
@@ -302,7 +358,7 @@ describe('process: verify rows', () => {
     assert.match(row.detail, /diagonal/)
 
     const through = structuredClone(await renderFigure(p(), ir))
-    const back = through.layout.geo.arrows.find((a) => a.route === 'channel')
+    const back = through.layout.geo.arrows.find((a) => a.route === 'over')
     const y = through.layout.geo.rows[1].centerY
     back.path = [{ x: back.path[0].x, y }, { x: back.path[3].x, y }]
     row = (await verifyFigure(p(), ir, through)).checks.find((c) => c.name === 'arrows-clear')
@@ -313,6 +369,27 @@ describe('process: verify rows', () => {
     off.layout.geo.arrows[0].path[0].x += 4
     row = (await verifyFigure(p(), ir, off)).checks.find((c) => c.name === 'arrows-clear')
     assert.equal(row.ok, false)
+    assert.match(row.detail, /does not start on the border/)
+  })
+
+  test('arrows-clear fails on a second jog and on the old channel under the grid', async () => {
+    const ir = validIr('process-full.yaml')
+    const twoJogs = structuredClone(await renderFigure(p(), ir))
+    const over = twoJogs.layout.geo.arrows.find((a) => a.route === 'over')
+    const [p0, p1, p2, p3] = over.path
+    over.path = [p0, p1, { x: p1.x - 8, y: p1.y }, { x: p1.x - 8, y: p1.y - 8 }, { x: p2.x, y: p1.y - 8 }, { x: p2.x, y: p2.y }, p3]
+    let row = (await verifyFigure(p(), ir, twoJogs)).checks.find((c) => c.name === 'arrows-clear')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /has 5 bends \(at most one jog = 2 bends\)/)
+
+    const under = structuredClone(await renderFigure(p(), ir))
+    const geo = under.layout.geo
+    const back = geo.arrows.find((a) => a.route === 'over')
+    const cy = geo.gridBottom + 16
+    back.path = [{ x: back.path[0].x, y: geo.gridBottom }, { x: back.path[0].x, y: cy }, { x: back.path[3].x, y: cy }, { x: back.path[3].x, y: geo.gridBottom }]
+    row = (await verifyFigure(p(), ir, under)).checks.find((c) => c.name === 'arrows-clear')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /runs below the grid/)
     assert.match(row.detail, /does not start on the border/)
   })
 
@@ -333,7 +410,7 @@ describe('process: registry dispatch and CLI', () => {
   test('the plugin is registered with its budgets and row names', () => {
     const p = getFigureType('process')
     assert.ok(p && !p.builtin)
-    assert.deepEqual(p.limits, { maxStages: 6, maxSlots: 4, maxCellTextLen: 16, maxCells: 20, maxEmphasis: 2 })
+    assert.deepEqual(p.limits, { maxStages: 6, maxSlots: 4, maxCellTextLen: 16, maxCells: 20, maxEmphasis: 1, maxFocal: 1 })
     assert.deepEqual(p.doc.rows, OWN_ROWS)
   })
 
@@ -346,6 +423,16 @@ describe('process: registry dispatch and CLI', () => {
     assert.match(rendered.html, /<text id="wu-d-p1-stage-transform-label"[^>]*font-weight="700"/)
     assert.match(rendered.html, /<script type="text\/x-writeup-diagram">/)
     assert.equal((rendered.html.match(/class="wu-focal"/g) || []).length, 1)
+  })
+
+  test('a focal cell is the second (and last) wu-focal element: a 1.5px currentColor cell border in the focal stage', async () => {
+    const rendered = await renderFigureHtmlChecked(validIr('process-full.yaml'))
+    assert.equal(rendered.checksOk, true)
+    assert.equal((rendered.html.match(/class="wu-focal"/g) || []).length, 2)
+    assert.match(rendered.html, /<rect id="wu-d-p-full-cell-\d+" x="\d+" y="\d+" width="\d+" height="\d+" rx="4" fill="var\(--wu-surface\)" class="wu-focal" stroke="currentColor" stroke-width="1.5"\/>/)
+    const { layout } = await renderFigure(getFigureType('process'), validIr('process-full.yaml'))
+    const focal = layout.geo.cells.filter((c) => c.focal)
+    assert.deepEqual(focal.map((c) => [c.stage, c.slot]), [['design', '処理']])
   })
 
   test('--figure renders process-simple and process-full as verified figures', () => {

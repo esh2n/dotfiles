@@ -4,7 +4,8 @@
 //
 // IR shape: `{ id, type:'venn', title, caption?, sets, regions }`.
 //   sets:    [{ id, label }]                          exactly 2 or 3
-//   regions: [{ of: [setId, …], label, emphasis? }]  ≤ 7; `of` names the sets
+//   regions: [{ of: [setId, …], label, emphasis? }]  ≤ 7, every combination
+//            named (a missing one warns `budget:unlabeled`); `of` names the sets
 //            whose intersection (and nothing else) the region is — `[a]` is
 //            "only a", `[a, b]` is "a and b but not c". Each combination may
 //            appear once; a region naming an unknown set is a schema error.
@@ -18,7 +19,8 @@
 // above / below-right / below-left for three); region labels sit at the
 // region's centroid, sampled on the 4px grid, wrapped onto at most two
 // lines. `emphasis` is the kit's usual cue — bold label, accent-stroked
-// pill (`rect.wu-focal`) — never a coloured region.
+// pill (`rect.wu-focal`) — never a coloured region; one accent, and on an
+// intersection (a single-set accent warns `budget:emphasis-single`).
 //
 // Grid: circle centres, label anchors and the canvas are on the 4px grid
 // (shared row `grid-4px`). Label boxes use left/top/right/bottom keys —
@@ -28,7 +30,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, COLUMN } from '../diagram.mjs'
 
 export const type = 'venn'
 
-export const limits = { maxSets: 3, maxRegions: 7, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { maxSets: 3, maxRegions: 7, maxLabelLen: 14, maxEmphasis: 1 }
 
 const MIN_SETS = 2
 const R = 120                // circle radius
@@ -119,9 +121,36 @@ export function budgetWarnings(ir) {
   if (focal > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', focal, limits.maxEmphasis,
       `${focal} emphasized region(s) (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis for the one intersection the page is about — more than two accents is no emphasis'))
+      'keep emphasis for the one intersection the page is about — a second accent is no emphasis'))
+  }
+  const missing = unlabelledRegions(ir)
+  if (missing.length) {
+    out.push(budgetWarning('budget:unlabeled', missing.length, 0,
+      `${missing.length} region(s) without a label: ${missing.map((of) => `[${of.join(', ')}]`).join(', ')}`,
+      'name every region, including each set on its own — an empty region reads as "nothing lives here", not as "unnamed"'))
+  }
+  const single = ir.regions.filter((r) => r.emphasis && r.of.length === 1)
+  if (single.length) {
+    out.push(budgetWarning('budget:emphasis-single', single.length, 0,
+      `emphasis on a single-set region: ${single.map((r) => `[${r.of[0]}] "${r.label}"`).join(', ')}`,
+      'the accent belongs on one intersection — the overlap is what a venn is for; a single set that matters most is a different figure'))
   }
   return out
+}
+
+/** Every non-empty combination of the sets, singles first, in set order —
+ * the regions a venn has whether or not the author named them. */
+function allCombinations(sets) {
+  const ids = sets.map((s) => s.id)
+  const out = []
+  for (let mask = 1; mask < 1 << ids.length; mask++) out.push(ids.filter((_, i) => mask & (1 << i)))
+  return out.sort((a, b) => a.length - b.length || ids.indexOf(a[0]) - ids.indexOf(b[0]))
+}
+
+/** Combinations no region names (each as an ordered list of set ids). */
+function unlabelledRegions(ir) {
+  const named = new Set(ir.regions.map((r) => r.of.join('+')))
+  return allCombinations(ir.sets).filter((of) => !named.has(of.join('+')))
 }
 
 // --- text ------------------------------------------------------------------
@@ -412,6 +441,10 @@ export function verify(layoutResult, ir) {
     detail: overlapProblems.length ? overlapProblems.slice(0, 6).join('; ') : 'no label box overlaps another',
     hint: overlapProblems.length ? 'shorten the colliding labels or drop one of the regions' : undefined,
   })
+
+  // #8–#9 every region named (single sets included); the accent on an intersection
+  warnRow(8, 'regions-labelled', 'budget:unlabeled', `all ${allCombinations(ir.sets).length} regions carry a label`)
+  warnRow(9, 'emphasis-on-intersection', 'budget:emphasis-single', 'emphasis (if any) sits on an intersection')
   return rows
 }
 
@@ -419,7 +452,7 @@ export function verify(layoutResult, ir) {
 
 export const doc = {
   purpose: 'two or three overlapping concerns and what sits in each overlap (responsibility overlap, skill × demand × pay)',
-  whenToUse: 'when the *overlap* of 2–3 sets is the message and each intersection has a name; not for four or more sets (use a matrix) or for honest set sizes (areas here are fixed, not data). Budgets: regions ≤ 7, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the *overlap* of 2–3 sets is the message and every region — each set alone and each intersection — has a name; not for four or more sets (use a matrix) or for honest set sizes (areas here are fixed, not data). Budgets: regions ≤ 7, label ≤ 14 chars, emphasis ≤ 1 and on an intersection, no region left unlabelled — guidance, over-budget figures still render with data-warn.',
   irExample: `id: career-fit
 type: venn
 title: 何を仕事にするか
@@ -432,6 +465,12 @@ sets:
   - id: paid
     label: 稼げる
 regions:
+  - of: [can]
+    label: 趣味
+  - of: [wanted]
+    label: 頼まれごと
+  - of: [paid]
+    label: 割り切り
   - of: [can, wanted]
     label: 頼られる仕事
   - of: [wanted, paid]
@@ -442,5 +481,5 @@ regions:
     label: 狙う領域
     emphasis: true
 `,
-  rows: ['region-count', 'label-length', 'emphasis-count', 'regions-valid', 'region-labels-inside', 'set-labels-outside', 'labels-no-overlap'],
+  rows: ['region-count', 'label-length', 'emphasis-count', 'regions-valid', 'region-labels-inside', 'set-labels-outside', 'labels-no-overlap', 'regions-labelled', 'emphasis-on-intersection'],
 }

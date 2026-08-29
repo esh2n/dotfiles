@@ -1,6 +1,6 @@
-// `type: bar` — schema, budgets, layout (single / grouped / stacked /
-// dumbbell, both orientations), verify rows, the registry dispatch and the
-// CLI. Fixtures: test/fixtures/bar-*.yaml.
+// `type: bar` — schema, budgets, layout (single / grouped / stacked in both
+// orientations, dumbbell horizontal only), verify rows, the registry
+// dispatch and the CLI. Fixtures: test/fixtures/bar-*.yaml.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -33,8 +33,8 @@ const plugin = () => getFigureType('bar')
 function rawIr(overrides = {}) {
   return {
     id: 'b', type: 'bar', title: 't',
-    categories: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }],
-    series: [{ id: 's1', label: 'S1', values: { a: 10, b: 25 } }],
+    categories: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }, { id: 'd', label: 'D' }],
+    series: [{ id: 's1', label: 'S1', values: { a: 10, b: 25, d: 4 } }],
     ...overrides,
   }
 }
@@ -68,8 +68,19 @@ describe('figures/bar.mjs: schema', () => {
     assert.equal(result.ir.orientation, 'horizontal')
     assert.equal(result.ir.allowNegative, false)
     assert.deepEqual(result.ir.emphasis, [])
-    assert.deepEqual(result.ir.series[0].values, { a: 10, b: 25, c: null })
+    assert.deepEqual(result.ir.series[0].values, { a: 10, b: 25, c: null, d: 4 })
     assert.deepEqual(result.warnings, [])
+  })
+
+  test('a dumbbell is horizontal only: variant: dumbbell × orientation: vertical is a schema error with a hint', () => {
+    const two = [{ id: 'before', label: 'B', values: { a: 1 } }, { id: 'after', label: 'A', values: { a: 2 } }]
+    const r = validateIR(rawIr({ variant: 'dumbbell', orientation: 'vertical', series: two }))
+    assert.equal(r.ok, false)
+    assert.equal(r.reason, 'schema')
+    assert.match(r.message, /orientation: vertical cannot be combined with variant: dumbbell — a dumbbell is horizontal only/)
+    assert.match(r.message, /use grouped/)
+    assert.equal(validateIR(rawIr({ variant: 'dumbbell', orientation: 'horizontal', series: two })).ok, true)
+    assert.equal(validateIR(rawIr({ variant: 'grouped', orientation: 'vertical', series: two })).ok, true)
   })
 
   test('an unknown variant or orientation is a schema error', () => {
@@ -121,7 +132,24 @@ describe('figures/bar.mjs: budgets', () => {
     assert.equal(formatBudgetWarnings(result.warnings), 'budget:categories=11;budget:series=4;budget:label=17;budget:emphasis=3')
     assert.match(result.warnings[2].detail, /categories\[10\]\.label/)
     assert.match(result.warnings[2].hint, /shorten categories\[10\]\.label/)
-    assert.deepEqual(plugin().limits, { maxCategories: 10, maxSeries: 3, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plugin().limits, { minCategories: 4, maxCategories: 8, maxSeries: 3, maxGroupedSeries: 2, maxLabelLen: 14, maxEmphasis: 1 })
+  })
+
+  test('survey budgets: fewer than 4 categories warns, grouped warns above 2 series while stacked allows 3, a second emphasis warns', () => {
+    const few = validateIR(rawIr({ categories: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }], series: [{ id: 's1', label: 'S1', values: { a: 10, b: 25, c: 4 } }] }))
+    assert.equal(few.ok, true, few.message)
+    assert.equal(formatBudgetWarnings(few.warnings), 'budget:categories=3')
+    assert.match(few.warnings[0].detail, /3 categories \(guidance 4–8\)/)
+    assert.equal(few.warnings[0].limit, 4)
+    const three = [{ id: 's1', label: 'S1', values: { a: 1 } }, { id: 's2', label: 'S2', values: { a: 2 } }, { id: 's3', label: 'S3', values: { a: 3 } }]
+    const grouped = validateIR(rawIr({ variant: 'grouped', series: three }))
+    assert.equal(formatBudgetWarnings(grouped.warnings), 'budget:series=3')
+    assert.match(grouped.warnings[0].detail, /3 series \(guidance ≤ 2 for grouped\)/)
+    assert.match(grouped.warnings[0].hint, /use stacked/)
+    assert.deepEqual(validateIR(rawIr({ variant: 'stacked', series: three })).warnings, [])
+    const two = validateIR(rawIr({ emphasis: ['a', 'b'] }))
+    assert.equal(formatBudgetWarnings(two.warnings), 'budget:emphasis=2')
+    assert.deepEqual(validateIR(rawIr({ emphasis: ['a'] })).warnings, [])
   })
 
   test('the clean fixtures carry no warnings', () => {
@@ -159,19 +187,22 @@ describe('figures/bar.mjs: layout', () => {
     assert.match(r.svg, /<text id="wu-d-b1-cat-compute" [^>]*font-weight="700">コンピュート<\/text>/)
   })
 
-  test('grouped: 3 bars per row told apart by fill-opacity, one legend entry per series', async () => {
+  test('grouped: 2 bars per row told apart by fill-opacity, one legend entry per series; a third series takes the 22% fill', async () => {
     const { r } = await rendered('bar-grouped.yaml')
     const g = r.layout.geo
-    assert.equal(g.bars.length, 12)
+    assert.equal(g.bars.length, 8)
     const tokyo = g.bars.filter((b) => b.category === 'tokyo')
-    assert.deepEqual(tokyo.map((b) => b.seriesIndex), [0, 1, 2])
-    assert.ok(tokyo[1].top > tokyo[0].top && tokyo[2].top > tokyo[1].top)
+    assert.deepEqual(tokyo.map((b) => b.seriesIndex), [0, 1])
+    assert.ok(tokyo[1].top > tokyo[0].top)
     assert.match(r.svg, /id="wu-d-b2-bar-tokyo-read"[^>]*fill-opacity="0\.85"/)
     assert.match(r.svg, /id="wu-d-b2-bar-tokyo-write"[^>]*fill-opacity="0\.5"/)
-    assert.match(r.svg, /id="wu-d-b2-bar-tokyo-batch"[^>]*fill-opacity="0\.22"/)
-    assert.deepEqual(g.legend.items.map((i) => i.id), ['read', 'write', 'batch'])
+    assert.deepEqual(g.legend.items.map((i) => i.id), ['read', 'write'])
     assert.equal(g.footnote, null)
     assert.doesNotMatch(r.svg, /footnote/)
+    const stacked = await renderedRaw(rawIr({ variant: 'stacked', series: [
+      { id: 's1', label: 'S1', values: { a: 10, b: 5, c: 4, d: 2 } }, { id: 's2', label: 'S2', values: { a: 6, b: 5, c: 4, d: 2 } }, { id: 's3', label: 'S3', values: { a: 3, b: 5, c: 4, d: 2 } },
+    ] }))
+    assert.match(stacked.r.svg, /id="wu-d-b-bar-a-s3"[^>]*fill-opacity="0\.22"/)
   })
 
   test('dumbbell: open before / filled after markers, a connecting line carrying the delta, labels on the outer sides', async () => {
@@ -223,7 +254,7 @@ describe('figures/bar.mjs: layout', () => {
   })
 
   test('allowNegative extends the axis below 0 instead of moving it; the zero line stays inside the plot', async () => {
-    const { ir, r } = await renderedRaw(rawIr({ allowNegative: true, unit: '%', series: [{ id: 'd', label: 'Δ', values: { a: -12, b: 8, c: 3 } }] }))
+    const { ir, r } = await renderedRaw(rawIr({ allowNegative: true, unit: '%', series: [{ id: 'd', label: 'Δ', values: { a: -12, b: 8, c: 3, d: 1 } }] }))
     const g = r.layout.geo
     assert.ok(g.axis.lo < 0 && g.axis.lo <= -12)
     assert.ok(g.axis.hi >= 8)
@@ -263,14 +294,14 @@ describe('figures/bar.mjs: verify rows', () => {
     assert.deepEqual(bar.doc.rows, ['category-count', 'series-count', 'label-length', 'emphasis-count', 'axis-from-zero', 'bars-proportional', 'labels-clear', 'legend-series', 'missing-disclosed'])
   })
 
-  test('#4 emphasis-count warns (never fails) above 2 emphasized categories', async () => {
-    const { ir, r } = await renderedRaw(rawIr({ emphasis: ['a', 'b', 'c'] }))
+  test('#4 emphasis-count warns (never fails) above 1 emphasized category', async () => {
+    const { ir, r } = await renderedRaw(rawIr({ emphasis: ['a', 'b'] }))
     const result = await verifyFigure(plugin(), ir, r)
     const row = byName(result.checks, 'emphasis-count')
     assert.equal(row.severity, 'warn')
     assert.equal(row.ok, false)
     assert.equal(row.key, 'budget:emphasis')
-    assert.equal(row.value, 3)
+    assert.equal(row.value, 2)
     assert.equal(result.ok, true)
   })
 
@@ -328,11 +359,11 @@ describe('figures/bar.mjs: verify rows', () => {
     const { ir, r } = await rendered('bar-grouped.yaml')
     const missing = structuredClone(r)
     missing.layout.geo.legend.items.pop()
-    missing.svg = missing.svg.replace(/<text id="wu-d-b2-legend-batch" data-series="batch"[^>]*>[^<]*<\/text>/, '')
+    missing.svg = missing.svg.replace(/<text id="wu-d-b2-legend-write" data-series="write"[^>]*>[^<]*<\/text>/, '')
     const a = await verifyFigure(plugin(), ir, missing)
     assert.equal(byName(a.checks, 'legend-series').ok, false)
-    assert.match(byName(a.checks, 'legend-series').detail, /legend lists \[read, write\], series are \[read, write, batch\]/)
-    assert.match(byName(a.checks, 'legend-series').detail, /series "batch" missing from the svg legend/)
+    assert.match(byName(a.checks, 'legend-series').detail, /legend lists \[read\], series are \[read, write\]/)
+    assert.match(byName(a.checks, 'legend-series').detail, /series "write" missing from the svg legend/)
     const wrong = structuredClone(r)
     wrong.svg = wrong.svg.replace(/(<text id="wu-d-b2-legend-write" data-series="write"[^>]*>)[^<]*(<\/text>)/, '$1書込$2')
     const b = await verifyFigure(plugin(), ir, wrong)

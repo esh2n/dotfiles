@@ -6,7 +6,7 @@ caption: 1 本目のカット線より上が MVP、2 本目までが Release 2�
 columns:
   - id: signup
     label: 登録
-    cards: [メール登録, SSO 連携, 二要素認証]
+    cards: [メール登録, SSO 連携]
   - id: setup
     label: 初期設定
     cards:
@@ -17,13 +17,13 @@ columns:
       - 権限テンプレート
   - id: use
     label: 利用
-    cards: [記事作成, 共有リンク, コメント, バージョン履歴]
+    cards: [記事作成, 共有リンク, コメント]
   - id: notify
     label: 通知
-    cards: [メール通知, Slack 連携]
+    cards: [メール通知]
   - id: review
     label: 振り返り
-    cards: [利用レポート, エクスポート, 監査ログ出力]
+    cards: [利用レポート, 監査ログ出力]
 cuts:
   - after: 0
     label: MVP

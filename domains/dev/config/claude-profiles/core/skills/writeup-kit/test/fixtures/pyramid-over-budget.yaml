@@ -10,7 +10,6 @@ tiers:
     emphasis: true
   - id: t3
     label: 第三層
-    emphasis: true
   - id: t4
     label: 第四層
   - id: t5
@@ -21,3 +20,4 @@ tiers:
     label: とても長いラベルを持つ第七層です
   - id: t8
     label: 第八層
+    emphasis: true

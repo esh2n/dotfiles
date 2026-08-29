@@ -113,24 +113,31 @@ describe('figures/matrix.mjs: budgets are advisory warnings in a stable order', 
     const r = ir('matrix-over-budget.yaml')
     assert.equal(r.ok, true)
     assert.equal(formatBudgetWarnings(r.warnings), 'budget:rows=11;budget:columns=9;budget:header=15;budget:emphasis=3')
-    assert.deepEqual(r.warnings.map((w) => w.limit), [10, 8, 14, 2])
-    assert.match(r.warnings[0].hint, /split the matrix after row 10/)
+    assert.deepEqual(r.warnings.map((w) => w.limit), [6, 8, 14, 1])
+    assert.match(r.warnings[0].hint, /split the matrix after row 6/)
     assert.match(r.warnings[2].detail, /columns\[0\]\.label is 15 chars/)
-    assert.match(r.warnings[3].hint, /one or two cells/)
+    assert.match(r.warnings[3].hint, /the one cell/)
   })
 
-  test('exactly 10 rows, 8 columns, a 14-char header and 2 emphasized cells are within budget', () => {
+  test('exactly 6 rows, 8 columns, a 14-char header and 1 emphasized cell are within budget; a 7th row or a 2nd emphasis warns', () => {
     const r = ir('matrix-wide.yaml')
     assert.equal(r.ok, true)
-    assert.equal(r.ir.rows.length, 10)
+    assert.equal(r.ir.rows.length, 6)
     assert.equal(r.ir.columns.length, 8)
-    const two = validateIR(raw({
+    const one = validateIR(raw({
       rows: [{ id: 'a', label: '十四文字ちょうどの見出しです確認' .slice(0, 14) }, { id: 'b', label: 'B' }],
+      cells: [{ row: 'a', col: 'x', mark: 'yes', emphasis: true }, { row: 'b', col: 'y', mark: 'no' }],
+    }))
+    assert.equal([...one.ir.rows[0].label].length, 14)
+    assert.deepEqual(one.warnings, [])
+    assert.deepEqual(r.warnings, [])
+    const two = validateIR(raw({
+      rows: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
       cells: [{ row: 'a', col: 'x', mark: 'yes', emphasis: true }, { row: 'b', col: 'y', mark: 'no', emphasis: true }],
     }))
-    assert.equal([...two.ir.rows[0].label].length, 14)
-    assert.deepEqual(two.warnings, [])
-    assert.deepEqual(r.warnings, [])
+    assert.deepEqual(two.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:emphasis', 2, 1]])
+    const seven = validateIR(raw({ rows: 'abcdefg'.split('').map((id) => ({ id, label: id })), cells: [] }))
+    assert.deepEqual(seven.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:rows', 7, 6]])
   })
 })
 
@@ -348,7 +355,7 @@ describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: matrix', 
     assert.deepEqual(back.ir, validIr('matrix-simple.yaml'))
   })
 
-  test('matrix-wide (10 × 8) is wider than the column and scales (≥ 0.78) instead of scrolling, every row green', async () => {
+  test('matrix-wide (6 × 8) is wider than the column and scales (≥ 0.78) instead of scrolling, every row green', async () => {
     const rendered = await renderFigureHtmlChecked(validIr('matrix-wide.yaml'), { rawYaml: fixture('matrix-wide.yaml') })
     assert.equal(rendered.checksOk, true, JSON.stringify(rendered.failures))
     assert.ok(rendered.width > 720, `width ${rendered.width}`)
@@ -368,7 +375,7 @@ describe('verify-diagram.mjs: renderFigureHtmlChecked dispatches type: matrix', 
   test('the plugin is registered with its limits and rows, and its doc.irExample renders clean with a legend', async () => {
     const plugin = getFigureType('matrix')
     assert.equal(plugin.builtin, false)
-    assert.deepEqual(plugin.limits, { maxRows: 10, maxColumns: 8, maxHeaderLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plugin.limits, { maxRows: 6, maxColumns: 8, maxHeaderLen: 14, maxEmphasis: 1 })
     const r = validateIR(parseYaml(plugin.doc.irExample))
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.equal(r.ir.rows.length, 4)

@@ -32,7 +32,7 @@ function rawIr(overrides = {}) {
   return {
     id: 'v', type: 'venn', title: 't',
     sets: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
-    regions: [{ of: ['a', 'b'], label: 'both' }],
+    regions: [{ of: ['a'], label: 'only a' }, { of: ['b'], label: 'only b' }, { of: ['a', 'b'], label: 'both' }],
     ...overrides,
   }
 }
@@ -55,7 +55,7 @@ const corners = (b) => [[b.left, b.top], [b.right, b.top], [b.left, b.bottom], [
 
 describe('figures/venn.mjs: schema', () => {
   test('a minimal valid venn IR normalizes: emphasis defaults to false, `of` is ordered by set order', () => {
-    const result = validateIR(rawIr({ regions: [{ of: ['b', 'a'], label: 'both' }] }))
+    const result = validateIR(rawIr({ regions: [{ of: ['b', 'a'], label: 'both' }, { of: ['a'], label: 'a' }, { of: ['b'], label: 'b' }] }))
     assert.equal(result.ok, true)
     assert.equal(result.ir.type, 'venn')
     assert.deepEqual(result.ir.regions[0], { of: ['a', 'b'], label: 'both', emphasis: false })
@@ -100,10 +100,24 @@ describe('figures/venn.mjs: budgets', () => {
   test('the over-budget fixture warns on label and emphasis in stable order', () => {
     const result = validateIR(parseYaml(fixture('venn-over-budget.yaml')))
     assert.equal(result.ok, true)
-    assert.equal(formatBudgetWarnings(result.warnings), 'budget:label=16;budget:emphasis=3')
+    assert.equal(formatBudgetWarnings(result.warnings), 'budget:label=16;budget:emphasis=3;budget:unlabeled=4')
     assert.match(result.warnings[0].detail, /sets\[0\]\.label/)
     assert.match(result.warnings[0].hint, /shorten sets\[0\]\.label/)
     assert.match(result.warnings[1].hint, /one intersection/)
+    assert.match(result.warnings[2].detail, /4 region\(s\) without a label: \[a\], \[b\], \[c\], \[a, c\]/)
+  })
+
+  test('an unnamed region warns budget:unlabeled; an accent on a single-set region warns budget:emphasis-single', () => {
+    const missing = validateIR(rawIr({ regions: [{ of: ['a', 'b'], label: 'both' }] }))
+    assert.equal(missing.ok, true)
+    assert.deepEqual(missing.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:unlabeled', 2, 0]])
+    assert.match(missing.warnings[0].detail, /\[a\], \[b\]/)
+    assert.match(missing.warnings[0].hint, /each set on its own/)
+    const single = validateIR(rawIr({ regions: [{ of: ['a'], label: 'only a', emphasis: true }, { of: ['b'], label: 'only b' }, { of: ['a', 'b'], label: 'both' }] }))
+    assert.deepEqual(single.warnings.map((w) => [w.key, w.value]), [['budget:emphasis-single', 1]])
+    assert.match(single.warnings[0].detail, /\[a\] "only a"/)
+    const both = validateIR(rawIr({ regions: [{ of: ['a'], label: 'only a', emphasis: true }, { of: ['b'], label: 'only b', emphasis: true }, { of: ['a', 'b'], label: 'both' }] }))
+    assert.deepEqual(both.warnings.map((w) => w.key), ['budget:emphasis', 'budget:emphasis-single'])
   })
 
   test('a region count above the limit warns first; the 7-region fixture is at the limit, not over it', () => {
@@ -115,7 +129,7 @@ describe('figures/venn.mjs: budgets', () => {
     const w = venn.budgetWarnings(over)
     assert.equal(w[0].key, 'budget:regions')
     assert.equal(w[0].value, 8)
-    assert.deepEqual(plugin().limits, { maxSets: 3, maxRegions: 7, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plugin().limits, { maxSets: 3, maxRegions: 7, maxLabelLen: 14, maxEmphasis: 1 })
   })
 })
 
@@ -213,9 +227,9 @@ describe('figures/venn.mjs: verify rows', () => {
       const result = await verifyFigure(plugin(), ir, r)
       assert.equal(result.ok, true, `${name}: ${JSON.stringify(result.failures)}`)
       assert.deepEqual(result.warnings, [])
-      assert.deepEqual(result.checks.slice(0, 7).map((c) => c.name), venn.doc.rows)
+      assert.deepEqual(result.checks.slice(0, 9).map((c) => c.name), venn.doc.rows)
     }
-    assert.deepEqual(venn.doc.rows, ['region-count', 'label-length', 'emphasis-count', 'regions-valid', 'region-labels-inside', 'set-labels-outside', 'labels-no-overlap'])
+    assert.deepEqual(venn.doc.rows, ['region-count', 'label-length', 'emphasis-count', 'regions-valid', 'region-labels-inside', 'set-labels-outside', 'labels-no-overlap', 'regions-labelled', 'emphasis-on-intersection'])
   })
 
   test('#1–#3 budget rows warn (never fail) and carry key/value for data-warn', async () => {
@@ -225,7 +239,10 @@ describe('figures/venn.mjs: verify rows', () => {
     assert.equal(byName(result.checks, 'label-length').ok, false)
     assert.equal(byName(result.checks, 'label-length').severity, 'warn')
     assert.equal(byName(result.checks, 'emphasis-count').value, 3)
-    assert.deepEqual(result.warnings.map((w) => w.key), ['budget:label', 'budget:emphasis'])
+    assert.deepEqual(result.warnings.map((w) => w.key), ['budget:label', 'budget:emphasis', 'budget:unlabeled'])
+    assert.equal(byName(result.checks, 'regions-labelled').severity, 'warn')
+    assert.equal(byName(result.checks, 'regions-labelled').value, 4)
+    assert.equal(byName(result.checks, 'emphasis-on-intersection').ok, true)
     const many = structuredClone(validIr('venn-three.yaml'))
     many.regions.push({ of: ['can'], label: 'dup', emphasis: false })
     const m = await verifyFigure(plugin(), many, await renderFigure(plugin(), many))
@@ -288,8 +305,8 @@ describe('figures/venn.mjs: verify rows', () => {
     for (const name of ['grid-4px', 'dark-3-state', 'stroke-radius', 'font-size', 'a11y', 'single-finite-svg', 'projected-scale']) {
       assert.equal(byName(result.checks, name).ok, true, `${name}: ${byName(result.checks, name).detail}`)
     }
-    assert.equal(byName(result.checks, 'single-finite-svg').id, 8)
-    assert.equal(byName(result.checks, 'grid-4px').id, 13)
+    assert.equal(byName(result.checks, 'single-finite-svg').id, 10)
+    assert.equal(byName(result.checks, 'grid-4px').id, 15)
   })
 })
 
@@ -308,8 +325,8 @@ describe('figures/venn.mjs: renderFigureHtmlChecked and the CLI', () => {
   test('the over-budget fixture still passes, carrying data-warn with every geometry row green', async () => {
     const out = await renderFigureHtmlChecked(validIr('venn-over-budget.yaml'), { rawYaml: fixture('venn-over-budget.yaml') })
     assert.equal(out.checksOk, true, JSON.stringify(out.failures))
-    assert.equal(out.warn, 'budget:label=16;budget:emphasis=3')
-    assert.ok(out.html.startsWith('<figure class="wu-figure" data-checks="pass" data-warn="budget:label=16;budget:emphasis=3" data-type="venn">'))
+    assert.equal(out.warn, 'budget:label=16;budget:emphasis=3;budget:unlabeled=4')
+    assert.ok(out.html.startsWith('<figure class="wu-figure" data-checks="pass" data-warn="budget:label=16;budget:emphasis=3;budget:unlabeled=4" data-type="venn">'))
   })
 
   test('CLI: --figure exits 0 with the figure, --json reports ok + checks, --doc venn renders clean', () => {
@@ -326,7 +343,7 @@ describe('figures/venn.mjs: renderFigureHtmlChecked and the CLI', () => {
     const example = validateIR(parseYaml(doc.stdout))
     assert.ok(example.ok)
     assert.equal(example.ir.sets.length, 3)
-    assert.equal(example.ir.regions.length, 4)
+    assert.equal(example.ir.regions.length, 7)
     assert.deepEqual(example.warnings, [])
   })
 })

@@ -2,15 +2,20 @@
 // (initial state first, longest-path rank from there), transitions as
 // orthogonal arrows, an initial marker (filled dot → state) and final
 // markers (double ring) in neutral ink, self-transitions as a small loop
-// on the state's side. Plugin contract: references/figure-types.md.
+// above the state (the survey's "self-loop on the upper side"). Plugin
+// contract: references/figure-types.md.
 //
 // IR shape: `{ id, type:'state', title, caption, direction, states,
 // transitions }`. `states` is `[{ id, label, tone, initial, final,
 // emphasis }]` (list order is the tie-break for placement; when no state
-// is marked `initial` the first one is). `transitions` is `[{ from, to,
-// label, kind }]` — `label` may be empty (the design rules discourage it,
-// so it is a warning), `kind` is sync|async (open arrowhead for async),
-// `from == to` is a self-transition.
+// is marked `initial` the first one is; `emphasis` on at most one state —
+// the survey allows a single accent, so a second one is a schema error).
+// `transitions` is `[{ from, to, label, kind }]` — `label` must name the
+// event: the survey forbids unlabeled transitions, so an empty label is a
+// verify `fail` row (`transition-labels`), not a warning; `kind` is
+// sync|async (open arrowhead for async); `from == to` is a
+// self-transition. More transitions than twice the states warns
+// (`budget:transitions`): that machine wants splitting.
 //
 // Layout (pure, no elk): every state gets a rank — 0 for initial states,
 // otherwise the longest path over the forward edges (edges that close a
@@ -26,7 +31,9 @@
 //     its rank (else via the gap channel), along a lane on the cross-start
 //     side, enter the target's cross-start side (or via the channel above
 //     it when it is not first in its rank);
-//   - self: a 20×16 loop on the cross-end side.
+//   - self: a 16×16 loop above the box (y − 16), its feet at the box's
+//     right corner so they clear the ports spread around the centre — the
+//     box is widened when many ports would reach that corner.
 // Labels are placed after routing: for each transition a list of
 // candidate boxes beside each of its segments (longest segment first) is
 // tried against every segment, state box, marker and label placed so far,
@@ -39,8 +46,9 @@ import { snap4, snapUp4, textWidth, nodeSize, FONT_SIZE, EDGE_LABEL_SIZE } from 
 export const type = 'state'
 
 /** Advisory budgets (warnings). `maxEmphasis` is the one hard limit — a
- * third focal state leaves nothing focal, so normalize() rejects it. */
-export const limits = { maxStates: 8, maxTransitions: 16, maxLabelLen: 12, maxRanks: 4, maxEmphasis: 2 }
+ * second focal state leaves nothing focal, so normalize() rejects it.
+ * `maxTransitions` is the outer cap; the working guidance is 2 × states. */
+export const limits = { maxStates: 8, maxTransitions: 16, maxLabelLen: 12, maxRanks: 4, maxEmphasis: 1 }
 
 const DIRECTIONS = new Set(['down', 'right'])
 const STATE_KINDS = new Set(['sync', 'async'])
@@ -55,8 +63,10 @@ const CHANNEL_OFFSET_FINAL = 48 // …when that rank holds a final marker
 const LANE_STEP = 16
 const PORT_STEP = 16            // ports along the main-start/main-end sides
 const SIDE_PORT_STEP = 8        // ports along the cross-start side
-const SELF_W = 20
-const SELF_H = 16
+const SELF_W = 16               // loop width (foot to foot)
+const SELF_H = 16               // loop height above the box
+const SELF_CORNER = 8           // right foot ← box's right edge
+const SELF_CLEAR = 12           // left foot ↔ nearest port on that side
 const INITIAL_OFFSET = 28       // dot center before the box's main-start
 const INITIAL_R = 6
 const FINAL_OFFSET = 28         // ring center after the box's main-end
@@ -94,7 +104,7 @@ export function normalize(raw, ctx = 'ir') {
   if (!states.some((s) => s.initial)) states[0].initial = true
   const emphasisCount = states.filter((s) => s.emphasis).length
   if (emphasisCount > limits.maxEmphasis) {
-    throw new IrError(`${ctx}.states: ${emphasisCount} states carry emphasis — at most ${limits.maxEmphasis} focal states are allowed`)
+    throw new IrError(`${ctx}.states: ${emphasisCount} states carry emphasis — at most ${limits.maxEmphasis} focal state is allowed`)
   }
   const transitions = normalizeTransitions(raw.transitions, seen, ctx)
   return { id, type, title, caption, direction, states, transitions }
@@ -194,10 +204,11 @@ export function budgetWarnings(ir) {
       `${ir.states.length} state(s) (guidance ≤ ${L.maxStates})`,
       'split into two machines at a state that reads as a phase boundary'))
   }
-  if (ir.transitions.length > L.maxTransitions) {
-    out.push(budgetWarning('budget:transitions', ir.transitions.length, L.maxTransitions,
-      `${ir.transitions.length} transition(s) (guidance ≤ ${L.maxTransitions})`,
-      'collapse "from any state" transitions into one note, or split the machine'))
+  const transitionCap = Math.min(L.maxTransitions, ir.states.length * 2)
+  if (ir.transitions.length > transitionCap) {
+    out.push(budgetWarning('budget:transitions', ir.transitions.length, transitionCap,
+      `${ir.transitions.length} transition(s) for ${ir.states.length} state(s) (guidance ≤ 2 × states = ${transitionCap})`,
+      'more transitions than twice the states means two machines — split it, or collapse "from any state" transitions into one note'))
   }
   let longest = null
   ir.transitions.forEach((t, i) => {
@@ -221,12 +232,6 @@ export function budgetWarnings(ir) {
       `${unreachable.length} state(s) unreachable from an initial state: ${unreachable.join(', ')}`,
       'add the transition that enters them, mark one initial, or drop them'))
   }
-  const unlabeled = ir.transitions.filter((t) => !t.label).length
-  if (unlabeled) {
-    out.push(budgetWarning('budget:unlabeled', unlabeled, 0,
-      `${unlabeled} transition(s) without a label`,
-      'name the event on every transition — an unlabeled arrow is a guess for the reader'))
-  }
   return out
 }
 
@@ -244,12 +249,6 @@ export async function layout(ir) {
   const byId = new Map(states.map((s) => [s.id, s]))
   const index = new Map(states.map((s, i) => [s.id, i]))
   const lastRank = ranks.length - 1
-
-  // Box sizes: width from the label (diagram.mjs's nodeSize), height 44.
-  const size = new Map(states.map((s) => {
-    const { width } = nodeSize(s.label, { bold: s.emphasis })
-    return [s.id, direction === 'down' ? { main: BOX_H, cross: width, w: width, h: BOX_H } : { main: width, cross: BOX_H, w: width, h: BOX_H }]
-  }))
 
   // Transition classes.
   const classified = transitions.map((t, i) => {
@@ -276,6 +275,27 @@ export async function layout(ir) {
     ordered.forEach((id, i) => pos.set(id, i))
   }
   const firstInRank = new Set(ranks.map((r) => r[0]))
+
+  // Box sizes: width from the label (diagram.mjs's nodeSize), height 44.
+  // A state with a self-transition is widened, if need be, so the loop's
+  // feet at its right corner clear the ports spread on that top side —
+  // in-ports (direction down) or side ports (direction right).
+  const topSpreadHalf = (id) => {
+    if (direction === 'down') {
+      let n = byId.get(id).initial ? 1 : 0
+      for (const t of classified) if (t.to === id && (t.cls === 'forward' || (t.cls === 'back' && !firstInRank.has(id)))) n++
+      return Math.max(0, n - 1) * PORT_STEP / 2
+    }
+    if (!firstInRank.has(id)) return 0
+    const outs = classified.filter((t) => t.cls === 'back' && t.from === id).length
+    const ins = classified.filter((t) => t.cls === 'back' && t.to === id).length
+    return Math.max(0, Math.max(outs, ins) - 1) * SIDE_PORT_STEP / 2
+  }
+  const size = new Map(states.map((s) => {
+    let { width } = nodeSize(s.label, { bold: s.emphasis })
+    if (selfOf.has(s.id)) width = Math.max(width, snapUp4(2 * (SELF_CORNER + SELF_W + SELF_CLEAR + topSpreadHalf(s.id))))
+    return [s.id, direction === 'down' ? { main: BOX_H, cross: width, w: width, h: BOX_H } : { main: width, cross: BOX_H, w: width, h: BOX_H }]
+  }))
 
   // Cross packing: each box reserves its width plus the self-loop and
   // its label on the cross-end side; ranks are centered on the widest.
@@ -332,8 +352,9 @@ export async function layout(ir) {
     if (t.cls === 'self') continue
     const rf = rank.get(t.from), rt = rank.get(t.to)
     if (t.cls === 'forward') {
-      const straight = t.span === 1 && centerCross(t.from) === centerCross(t.to)
-      routes.set(t.index, { straight })
+      // `straight` is settled below once the ports are allocated: a
+      // span-1 edge is straight only when its two ports coincide.
+      routes.set(t.index, { straight: false })
       outPorts.get(t.from).push({ index: t.index, cross: centerCross(t.to) })
       inPorts.get(t.to).push({ index: t.index, cross: centerCross(t.from) })
       if (t.span > 1) { useChannel(rf, t); useChannel(rt - 1, t) }
@@ -354,10 +375,25 @@ export async function layout(ir) {
     if (s.initial) inPorts.get(s.id).push({ index: `initial:${s.id}`, cross: Number.POSITIVE_INFINITY })
   }
 
+  // Port positions on the main-start/main-end sides (cross only, so they
+  // are known before the main axis is laid out), sorted by the far end's
+  // cross. A span-1 forward edge is straight when its two ports coincide;
+  // every other one is a Z through a channel lane.
+  const portAt = (list, sortKey, center, step) => {
+    const sorted = [...list].sort((a, b) => a[sortKey] - b[sortKey] || String(a.index).localeCompare(String(b.index)))
+    const xs = spread(center, sorted.length, step)
+    return new Map(sorted.map((p, i) => [p.index, xs[i]]))
+  }
+  const outAt = new Map(states.map((s) => [s.id, portAt(outPorts.get(s.id), 'cross', centerCross(s.id), PORT_STEP)]))
+  const inAt = new Map(states.map((s) => [s.id, portAt(inPorts.get(s.id), 'cross', centerCross(s.id), PORT_STEP)]))
+
   // Main positions: rank starts, gap sizes from channel lanes and final
   // markers. Straight forward edges never need a channel; Z edges do.
   for (const t of classified) {
-    if (t.cls === 'forward' && t.span === 1 && !routes.get(t.index).straight) useChannel(rank.get(t.from), t)
+    if (t.cls !== 'forward' || t.span !== 1) continue
+    const straight = outAt.get(t.from).get(t.index) === inAt.get(t.to).get(t.index)
+    routes.set(t.index, { straight })
+    if (!straight) useChannel(rank.get(t.from), t)
   }
   const finalInRank = ranks.map((ids) => ids.some((id) => byId.get(id).final))
   const topLanes = (channelUsers.get(-1) ?? []).length
@@ -398,17 +434,8 @@ export async function layout(ir) {
   const mainEnd = (id) => mainOf(id) + size.get(id).main
   const mainCenter = (id) => snap4(mainOf(id) + size.get(id).main / 2)
   const crossOf = (id) => boxCross.get(id)
-  const crossEnd = (id) => crossOf(id) + size.get(id).cross
 
-  // Port positions: main-start/main-end ports sorted by the far end's
-  // cross, side ports by the far end's rank.
-  const portAt = (list, sortKey, center, step) => {
-    const sorted = [...list].sort((a, b) => a[sortKey] - b[sortKey] || String(a.index).localeCompare(String(b.index)))
-    const xs = spread(center, sorted.length, step)
-    return new Map(sorted.map((p, i) => [p.index, xs[i]]))
-  }
-  const outAt = new Map(states.map((s) => [s.id, portAt(outPorts.get(s.id), 'cross', centerCross(s.id), PORT_STEP)]))
-  const inAt = new Map(states.map((s) => [s.id, portAt(inPorts.get(s.id), 'cross', centerCross(s.id), PORT_STEP)]))
+  // Side ports (cross-start side), sorted by the far end's rank.
   const sideOutAt = new Map(states.map((s) => [s.id, portAt(sidePortsOut.get(s.id), 'main', mainCenter(s.id), SIDE_PORT_STEP)]))
   const sideInAt = new Map(states.map((s) => [s.id, portAt(sidePortsIn.get(s.id), 'main', mainCenter(s.id), SIDE_PORT_STEP)]))
 
@@ -417,9 +444,11 @@ export async function layout(ir) {
   const edges = classified.map((t) => {
     const pts = []
     if (t.cls === 'self') {
-      const c0 = crossEnd(t.from)
-      const m0 = mainCenter(t.from) - SELF_H / 2
-      pts.push(P(m0, c0), P(m0, c0 + SELF_W), P(m0 + SELF_H, c0 + SELF_W), P(m0 + SELF_H, c0))
+      // Above the box in x/y terms whatever the direction: out of the
+      // top edge near the right corner, up, right, back down.
+      const b = box.get(t.from)
+      const xb = b.x + b.width - SELF_CORNER, xa = xb - SELF_W
+      pts.push({ x: xa, y: b.y }, { x: xa, y: b.y - SELF_H }, { x: xb, y: b.y - SELF_H }, { x: xb, y: b.y })
     } else if (t.cls === 'forward') {
       const pc = outAt.get(t.from).get(t.index)
       const tc = inAt.get(t.to).get(t.index)
@@ -640,7 +669,8 @@ export function verify(layoutResult, ir) {
   budgetRow(4, 'label-length', 'budget:label', `every transition label is within the ${limits.maxLabelLen}-char guidance`)
   budgetRow(5, 'rank-count', 'budget:ranks', `${geo.ranks.length} rank(s)`)
   budgetRow(6, 'reachable', 'budget:unreachable', 'every state is reachable from an initial state')
-  budgetRow(7, 'transition-labels', 'budget:unlabeled', 'every transition carries a label')
+  const unlabeled = ir.transitions.filter((t) => !t.label).map((t) => `${t.from} → ${t.to}`)
+  rows.push({ id: 7, name: 'transition-labels', severity: 'fail', ok: unlabeled.length === 0, detail: unlabeled.length ? `${unlabeled.length} transition(s) without a label: ${unlabeled.join(', ')}` : 'every transition carries a label', hint: unlabeled.length ? 'name the event on every transition — an unlabeled arrow is a guess for the reader; put the guard or action in the caption' : undefined })
 
   const overlaps = []
   for (let i = 0; i < geo.states.length; i++) {
@@ -687,7 +717,7 @@ export function verify(layoutResult, ir) {
 
 export const doc = {
   purpose: 'states and the transitions between them (order lifecycle, connection state, wizard steps)',
-  whenToUse: 'when the reader must see *which state can become which, on what event* — not for call order (use sequence) or structure (use diagram). Budgets: states ≤ 8 across ≤ 4 ranks, transitions ≤ 16, label ≤ 12 chars; more transitions than 2× states means two machines. Guidance only — over-budget figures still render with data-warn.',
+  whenToUse: 'when the reader must see *which state can become which, on what event* — not for call order (use sequence) or structure (use diagram). Budgets: states ≤ 8 across ≤ 4 ranks, transitions ≤ 2 × states (and ≤ 16), label ≤ 12 chars — guidance, over-budget figures still render with data-warn. Hard rules: every transition is labelled (an empty label fails verification) and at most one state carries emphasis. Self-transitions are drawn as a small loop above the state.',
   irExample: `id: fetch-lifecycle
 type: state
 title: 取り込みジョブの状態

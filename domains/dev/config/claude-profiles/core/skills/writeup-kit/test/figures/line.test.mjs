@@ -19,7 +19,7 @@ const ROOT = join(HERE, '..', '..')
 const BIN = join(ROOT, 'bin', 'render-diagram.mjs')
 const FIXTURES = join(ROOT, 'test', 'fixtures')
 const fixture = (name) => readFileSync(join(FIXTURES, name), 'utf8')
-const ALL = ['line-simple.yaml', 'line-slope.yaml', 'line-ridge.yaml', 'line-yfrom.yaml', 'line-over-budget.yaml', 'line-legend.yaml']
+const ALL = ['line-simple.yaml', 'line-slope.yaml', 'line-ridge.yaml', 'line-over-budget.yaml', 'line-legend.yaml']
 
 function validIr(name) {
   const result = validateIR(parseYaml(fixture(name)))
@@ -33,8 +33,8 @@ const plugin = () => getFigureType('line')
 function rawIr(overrides = {}) {
   return {
     id: 'l', type: 'line', title: 't',
-    x: { values: ['a', 'b', 'c'] },
-    series: [{ id: 's1', label: 'S1', values: [1, 2, 3] }],
+    x: { values: ['a', 'b', 'c', 'd'] },
+    series: [{ id: 's1', label: 'S1', values: [1, 2, 3, 4] }],
     ...overrides,
   }
 }
@@ -53,34 +53,43 @@ function runCli(args) {
 // --- schema ---------------------------------------------------------------
 
 describe('figures/line.mjs: schema', () => {
-  test('a minimal IR normalizes with variant=line, yFrom=0, emphasis=false defaults', () => {
+  test('a minimal IR normalizes with variant=line, emphasis=false defaults and no yFrom key', () => {
     const result = validateIR(rawIr())
     assert.equal(result.ok, true)
     assert.equal(result.ir.type, 'line')
     assert.equal(result.ir.variant, 'line')
-    assert.equal(result.ir.yFrom, 0)
-    assert.deepEqual(result.ir.x, { label: undefined, values: ['a', 'b', 'c'] })
-    assert.deepEqual(result.ir.series[0], { id: 's1', label: 'S1', values: [1, 2, 3], emphasis: false })
+    assert.equal('yFrom' in result.ir, false)
+    assert.deepEqual(result.ir.x, { label: undefined, values: ['a', 'b', 'c', 'd'] })
+    assert.deepEqual(result.ir.series[0], { id: 's1', label: 'S1', values: [1, 2, 3, 4], emphasis: false })
     assert.deepEqual(result.warnings, [])
   })
 
-  test('unknown variant, a slopegraph without exactly 2 x values, and yFrom on a ridgeline are schema errors', () => {
+  test('unknown variant and a slopegraph without exactly 2 x values are schema errors', () => {
     assert.match(validateIR(rawIr({ variant: 'spline' })).message, /variant must be line\|slopegraph\|ridgeline/)
     const slope = validateIR(rawIr({ variant: 'slopegraph' }))
     assert.equal(slope.ok, false)
     assert.equal(slope.reason, 'schema')
     assert.match(slope.message, /exactly 2 entries for a slopegraph/)
-    assert.match(validateIR(rawIr({ variant: 'ridgeline', yFrom: 1 })).message, /yFrom is not allowed for a ridgeline/)
   })
 
-  test('value lists must match x, hold finite numbers or null, stay above yFrom, and a ridgeline rejects null/negative', () => {
-    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [1, 2] }] })).message, /has 2 entries but x.values has 3/)
-    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [1, 'x', 3] }] })).message, /must be a finite number or null/)
-    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [null, null, null] }] })).message, /no value at all/)
-    assert.match(validateIR(rawIr({ yFrom: 2 })).message, /lies below yFrom/)
-    assert.match(validateIR(rawIr({ variant: 'ridgeline', series: [{ id: 's', label: 'S', values: [1, null, 3] }] })).message, /ridgeline needs a value at every x/)
-    assert.match(validateIR(rawIr({ variant: 'ridgeline', series: [{ id: 's', label: 'S', values: [1, -1, 3] }] })).message, /must be ≥ 0 in a ridgeline/)
-    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [1, 2, 3] }, { id: 's', label: 'T', values: [1, 2, 3] }] })).message, /duplicate series id/)
+  test('the value axis is never truncated: yFrom (any value, any variant) is a schema error pointing at slopegraph / dumbbell', () => {
+    for (const [variant, yFrom] of [['line', 96], ['line', 0], ['slopegraph', 100], ['ridgeline', 1]]) {
+      const extra = variant === 'slopegraph' ? { x: { values: ['before', 'after'] }, series: [{ id: 's', label: 'S', values: [120, 130] }] } : {}
+      const r = validateIR(rawIr({ variant, yFrom, ...extra }))
+      assert.equal(r.ok, false, `${variant} yFrom ${yFrom}`)
+      assert.equal(r.reason, 'schema')
+      assert.match(r.message, /yFrom is not supported — the value axis always starts at 0 and is never truncated/)
+      assert.match(r.message, /差分を見せたいなら slopegraph か dumbbell/)
+    }
+  })
+
+  test('value lists must match x, hold finite numbers or null, and a ridgeline rejects null/negative', () => {
+    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [1, 2] }] })).message, /has 2 entries but x.values has 4/)
+    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [1, 'x', 3, 4] }] })).message, /must be a finite number or null/)
+    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [null, null, null, null] }] })).message, /no value at all/)
+    assert.match(validateIR(rawIr({ variant: 'ridgeline', series: [{ id: 's', label: 'S', values: [1, null, 3, 4] }] })).message, /ridgeline needs a value at every x/)
+    assert.match(validateIR(rawIr({ variant: 'ridgeline', series: [{ id: 's', label: 'S', values: [1, -1, 3, 4] }] })).message, /must be ≥ 0 in a ridgeline/)
+    assert.match(validateIR(rawIr({ series: [{ id: 's', label: 'S', values: [1, 2, 3, 4] }, { id: 's', label: 'T', values: [1, 2, 3, 4] }] })).message, /duplicate series id/)
   })
 
   test('normalize() is idempotent for every fixture', () => {
@@ -101,13 +110,30 @@ describe('figures/line.mjs: budgets', () => {
     assert.match(result.warnings[2].hint, /shorten series\[4\]\.label/)
   })
 
-  test('a slopegraph counts items (≤ 12) instead of series; 8 items are within budget', () => {
+  test('a slopegraph counts items (≤ 10) instead of series; 8 items are within budget', () => {
     const ir = validIr('line-slope.yaml')
     assert.deepEqual(line.budgetWarnings(ir), [])
-    const many = { ...ir, series: Array.from({ length: 13 }, (_, i) => ({ id: `i${i}`, label: `I${i}`, values: [i, i + 1], emphasis: false })) }
+    const many = { ...ir, series: Array.from({ length: 11 }, (_, i) => ({ id: `i${i}`, label: `I${i}`, values: [i, i + 1], emphasis: false })) }
     const w = line.budgetWarnings(many)
-    assert.equal(formatBudgetWarnings(w), 'budget:items=13')
-    assert.deepEqual(plugin().limits, { maxSeries: 4, maxX: 24, maxItems: 12, maxEmphasis: 2, maxLabelLen: 14 })
+    assert.equal(formatBudgetWarnings(w), 'budget:items=11')
+    assert.deepEqual(plugin().limits, { maxSeries: 4, minX: 4, maxX: 12, maxItems: 10, minRidges: 3, maxRidges: 12, maxEmphasis: 2, maxLabelLen: 14 })
+  })
+
+  test('survey ranges: fewer than 4 x values warns (line and ridgeline, not slopegraph); a ridgeline warns below 3 or above 12 rows', () => {
+    const few = validateIR(rawIr({ x: { values: ['a', 'b', 'c'] }, series: [{ id: 's1', label: 'S1', values: [1, 2, 3] }] }))
+    assert.equal(few.ok, true)
+    assert.equal(formatBudgetWarnings(few.warnings), 'budget:x=3')
+    assert.match(few.warnings[0].detail, /3 x values \(guidance 4–12\)/)
+    assert.equal(few.warnings[0].limit, 4)
+    const slope = validateIR(rawIr({ variant: 'slopegraph', x: { values: ['before', 'after'] }, series: [{ id: 's', label: 'S', values: [1, 2] }] }))
+    assert.deepEqual(slope.warnings, [])
+    const ridge = (n) => validateIR(rawIr({ variant: 'ridgeline', series: Array.from({ length: n }, (_, i) => ({ id: `r${i}`, label: `R${i}`, values: [1, 2, 3, 1] })) }))
+    assert.equal(formatBudgetWarnings(ridge(2).warnings), 'budget:ridges=2')
+    assert.match(ridge(2).warnings[0].detail, /2 ridgeline rows \(guidance 3–12\)/)
+    assert.deepEqual(ridge(3).warnings, [])
+    assert.deepEqual(ridge(12).warnings, [])
+    assert.equal(formatBudgetWarnings(ridge(13).warnings), 'budget:ridges=13')
+    assert.match(ridge(13).warnings[0].hint, /move the rest to a table/)
   })
 })
 
@@ -136,6 +162,10 @@ describe('figures/line.mjs: layout', () => {
     assert.match(r.svg, /<path id="wu-d-l1-series-detail" [^>]*stroke-dasharray="1.5 3.5"/)
     assert.match(r.svg, /<path id="wu-d-l1-series-search" d="M[^"]*" fill="none" stroke="currentColor" stroke-width="1.5"/)
     assert.equal((r.svg.match(/data-value="/g) || []).length, 23)
+    // only the focal series carries visible vertex dots; the others keep invisible data-value anchors
+    assert.match(r.svg, /<circle id="wu-d-l1-series-search-pt-0" cx="[\d.]+" cy="[\d.]+" r="3" data-value="420"\/>/)
+    assert.match(r.svg, /<circle id="wu-d-l1-series-list-pt-0" cx="[\d.]+" cy="[\d.]+" r="2" data-value="260" fill="none"\/>/)
+    assert.equal((r.svg.match(/<circle [^>]*data-value="[^"]*" fill="none"\/>/g) || []).length, 16)
     assert.match(r.svg, /<text id="wu-d-l1-note-missing" [^>]*>欠損: 検索（W04）<\/text>/)
     assert.match(r.svg, /<text id="wu-d-l1-y-5" [^>]*>500 ms<\/text>/)
   })
@@ -175,16 +205,21 @@ describe('figures/line.mjs: layout', () => {
     assert.match(r.svg, /<text id="wu-d-l3-scale" [^>]*>max 34%<\/text>/)
   })
 
-  test('yFrom ≠ 0 draws an axis break and a footnote; long end labels fall back to the legend strip', async () => {
-    const { r } = await rendered('line-yfrom.yaml')
-    assert.equal(r.layout.geo.scale.ymin, 96)
-    assert.match(r.svg, /<g id="wu-d-l4-axis-break">/)
-    assert.match(r.svg, /<text id="wu-d-l4-note-yfrom" [^>]*>y 軸は 96% から始まる（0 起点ではない）<\/text>/)
+  test('the y axis starts at 0 even for a narrow band of values, with no axis break anywhere; long end labels fall back to the legend strip', async () => {
+    const narrow = validateIR(rawIr({ unit: '%', series: [{ id: 'ok', label: '成功率', values: [99.2, 98.4, 97.2, 99.5] }] })).ir
+    const nr = await renderFigure(plugin(), narrow)
+    assert.equal(nr.layout.geo.scale.ymin, 0)
+    assert.equal(nr.layout.geo.ticks[0].value, 0)
+    assert.equal('axisBreak' in nr.layout.geo, false)
+    assert.doesNotMatch(nr.svg, /axis-break|note-yfrom/)
     const { r: legend } = await rendered('line-legend.yaml')
     assert.equal(legend.layout.geo.labelMode, 'legend')
     assert.deepEqual(legend.layout.geo.labels, [])
     assert.equal(legend.layout.legend.items.length, 2)
     assert.match(legend.svg, /<g id="wu-d-l6-legend"/)
+    // no focal series: no visible dot at all, every point still an anchor
+    assert.equal((legend.svg.match(/<circle /g) || []).length, 8)
+    assert.doesNotMatch(legend.svg, /<circle [^>]*data-value="[^"]*"\/>/)
   })
 
   test('layout and svg are deterministic: two renders of the same IR are deep-equal / byte-equal', async () => {
@@ -253,30 +288,13 @@ describe('figures/line.mjs: verify rows', () => {
     assert.equal(byName(b.checks, 'series-distinct').ok, false)
     assert.match(byName(b.checks, 'series-distinct').detail, /"list" has no end label/)
     // a 6th series repeats a pattern even before any mutation
-    const six = validateIR(rawIr({ series: Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, label: `S${i}`, values: [i, i + 1, i + 2] })) }))
+    const six = validateIR(rawIr({ series: Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, label: `S${i}`, values: [i, i + 1, i + 2, i + 3] })) }))
     assert.equal(six.ok, true)
     const sixR = await renderFigure(plugin(), six.ir)
     assert.equal(byName((await verifyFigure(plugin(), six.ir, sixR)).checks, 'series-distinct').ok, false)
   })
 
-  test('#8 axis-break-disclosed fails when the break marker or the footnote is missing from the svg', async () => {
-    const { ir, r } = await rendered('line-yfrom.yaml')
-    const good = await verifyFigure(plugin(), ir, r)
-    assert.equal(byName(good.checks, 'axis-break-disclosed').ok, true)
-    const noBreak = structuredClone(r)
-    noBreak.svg = noBreak.svg.replace('id="wu-d-l4-axis-break"', 'id="wu-d-l4-axis-brk"')
-    const a = await verifyFigure(plugin(), ir, noBreak)
-    assert.equal(byName(a.checks, 'axis-break-disclosed').ok, false)
-    assert.match(byName(a.checks, 'axis-break-disclosed').detail, /no axis-break marker drawn/)
-    const noNote = structuredClone(r)
-    noNote.layout.geo.notes = []
-    noNote.svg = noNote.svg.replace('id="wu-d-l4-note-yfrom"', 'id="wu-d-l4-note-x"')
-    const b = await verifyFigure(plugin(), ir, noNote)
-    assert.equal(byName(b.checks, 'axis-break-disclosed').ok, false)
-    assert.match(byName(b.checks, 'axis-break-disclosed').detail, /no yFrom footnote/)
-  })
-
-  test('#9 missing-disclosed fails when a null is bridged instead of broken, or the footnote drops the series', async () => {
+  test('#8 missing-disclosed fails when a null is bridged instead of broken, or the footnote drops the series', async () => {
     const { ir, r } = await rendered('line-simple.yaml')
     const bridged = structuredClone(r)
     const s = bridged.layout.geo.series[0]
@@ -291,12 +309,14 @@ describe('figures/line.mjs: verify rows', () => {
     assert.match(byName(b.checks, 'missing-disclosed').detail, /does not name "検索"/)
   })
 
-  test('the shared rows follow the plugin rows (ids 10+) and every fixture passes them', async () => {
+  test('the shared rows follow the eight plugin rows (ids 9+) and every fixture passes them', async () => {
+    assert.deepEqual(line.doc.rows, ['series-count', 'x-count', 'label-length', 'emphasis-count', 'points-proportional', 'end-labels-clear', 'series-distinct', 'missing-disclosed'])
     for (const name of ALL) {
       const { ir, r } = await rendered(name)
       const result = await verifyFigure(plugin(), ir, r)
       assert.equal(result.ok, true, `${name}: ${JSON.stringify(result.failures)}`)
-      assert.equal(byName(result.checks, 'single-finite-svg').id, 10)
+      assert.deepEqual(result.checks.slice(0, 8).map((c) => c.name), line.doc.rows)
+      assert.equal(byName(result.checks, 'single-finite-svg').id, 9)
       for (const row of ['grid-4px', 'dark-3-state', 'stroke-radius', 'font-size', 'a11y']) {
         assert.equal(byName(result.checks, row).ok, true, `${name} ${row}: ${byName(result.checks, row).detail}`)
       }

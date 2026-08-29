@@ -25,7 +25,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, COL
 
 export const type = 'treemap'
 
-export const limits = { maxItems: 12, maxChildren: 8, maxLabelLen: 12, maxEmphasis: 2 }
+export const limits = { maxItems: 8, maxChildren: 8, maxLabelLen: 12, maxEmphasis: 1 }
 
 // --- layout constants (px; positions land on the 4px grid) ---------------
 
@@ -116,7 +116,7 @@ export function budgetWarnings(ir) {
   if (n > limits.maxItems) {
     out.push(budgetWarning('budget:items', n, limits.maxItems,
       `${n} top-level item(s) (guidance ≤ ${limits.maxItems})`,
-      'merge the smallest items into an 「その他」 item'))
+      `keep the ${limits.maxItems} largest items and fold the rest into one 「その他」 item — more cells than that stop being comparable by eye`))
   }
   const biggest = ir.items.reduce((m, it) => ((it.children?.length ?? 0) > (m ? m.children.length : 0) ? it : m), null)
   if (biggest && biggest.children.length > limits.maxChildren) {
@@ -136,7 +136,7 @@ export function budgetWarnings(ir) {
   if (emphasized > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
       `${emphasized} emphasized item(s) (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis on the one or two cells the decision is about'))
+      'keep emphasis on the one cell the decision is about — a second accent is no accent'))
   }
   return out
 }
@@ -509,7 +509,7 @@ export function verify(layoutResult, ir, { svg = '' } = {}) {
 
 export const doc = {
   purpose: 'part-to-whole by area — nested rectangles sized to their value (cost split, effort allocation, storage by team)',
-  whenToUse: 'when *relative size* is the point and there are more parts than a bar chart reads well with; not for exact values (use bar), containment without quantities (use nested) or parent–child tracing (use tree). Two levels at most. Budgets: items ≤ 12, children ≤ 8 per item, label ≤ 12 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when *relative size* is the point and there are more parts than a bar chart reads well with; not for exact values (use bar), containment without quantities (use nested) or parent–child tracing (use tree). Two levels at most. Budgets: items ≤ 8 (fold the rest into 「その他」), children ≤ 8 per item, label ≤ 12 chars, emphasis ≤ 1 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: cloud-cost
 type: treemap
 title: 月次クラウド費用の内訳

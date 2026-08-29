@@ -9,28 +9,28 @@ elements:
 - kind: box
   id: user
   x: 176
-  y: 16
+  y: 24
   w: 96
   h: 28
   label: 利用者
 - kind: box
   id: booking
   x: 176
-  y: 72
+  y: 80
   w: 96
   h: 28
   label: 予約 UI
 - kind: box
   id: api
   x: 176
-  y: 128
+  y: 136
   w: 96
   h: 28
   label: 予約 API
 - kind: box
   id: payment
   x: 288
-  y: 184
+  y: 192
   w: 88
   h: 28
   label: 決済
@@ -38,35 +38,35 @@ elements:
 - kind: box
   id: db
   x: 176
-  y: 200
+  y: 208
   w: 96
   h: 28
   label: 予約 DB
 - kind: box
   id: cloud
   x: 376
-  y: 240
+  y: 248
   w: 96
   h: 28
   label: クラウド基盤
 - kind: line
   id: user-booking
-  points: [[224, 44], [224, 72]]
+  points: [[224, 52], [224, 80]]
 - kind: line
   id: booking-api
-  points: [[224, 100], [224, 128]]
+  points: [[224, 108], [224, 136]]
 - kind: line
   id: api-payment
-  points: [[272, 148], [312, 184]]
+  points: [[272, 156], [312, 192]]
 - kind: line
   id: api-db
-  points: [[224, 156], [224, 200]]
+  points: [[224, 164], [224, 208]]
 - kind: line
   id: db-cloud
-  points: [[272, 220], [400, 240]]
+  points: [[272, 228], [400, 248]]
 - kind: line
   id: payment-move
-  points: [[376, 196], [440, 196]]
+  points: [[376, 204], [440, 204]]
   arrow: true
   dashed: true
   label: SaaS へ

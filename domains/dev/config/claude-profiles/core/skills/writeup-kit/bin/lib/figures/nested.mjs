@@ -1,7 +1,8 @@
 // `type: nested` — containment boxes: what sits inside what. A root box
-// holds child boxes, which may hold their own (three levels at most), and
-// the reader learns scope, boundaries and responsibilities from the
-// nesting alone. Optional edges connect any two boxes with an orthogonal
+// holds child boxes, which may hold their own (3–5 levels is the survey's
+// range: fewer reads as a plain group, more than 5 is unreadable and 6 is
+// the hard cap), and the reader learns scope, boundaries and
+// responsibilities from the nesting alone. Optional edges connect any two boxes with an orthogonal
 // arrow that runs between box borders through the gaps, never across a
 // sibling or a title band.
 //
@@ -9,7 +10,9 @@
 // `root` is `{ id, label, tone, emphasis, children: [same shape] }`;
 // `edges` is `[{ from, to, label }]`; `direction` is `down` (children in
 // a column), `right` (a row) or `auto` (a row up to 3 children, else a
-// 2-column grid). Every box id is unique across the whole tree.
+// 2-column grid). Every box id is unique across the whole tree. The one
+// accent (`emphasis`, ≤ 1) belongs on an innermost box — a leaf — because
+// that is where the decision lands; an emphasized container warns.
 //
 // Layout is a deterministic bottom-up measure / top-down place: a leaf is
 // sized from its label like a diagram node, a container from its children
@@ -20,9 +23,10 @@ import { snap4, snapUp4, textWidth, nodeSize, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_F
 
 export const type = 'nested'
 
-export const limits = { maxBoxes: 12, maxDepth: 3, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { maxBoxes: 12, minDepth: 3, maxDepth: 5, maxLabelLen: 14, maxEmphasis: 1 }
 
 const DIRECTIONS = new Set(['auto', 'down', 'right'])
+const HARD_MAX_DEPTH = 6  // schema error above this; 4–5 render with a depth warning
 const MAX_EDGES = 6
 const MARGIN = 8
 const TITLE_BAND = 36     // diagram.mjs GROUP_HEADER
@@ -51,14 +55,14 @@ export function normalize(raw, ctx = 'ir') {
 function normalizeDirection(v, ctx) {
   if (v === undefined || v === null) return 'auto'
   if (typeof v !== 'string' || !DIRECTIONS.has(v)) {
-    throw new IrError(`${ctx}.direction must be down|right (got: ${JSON.stringify(v)})`)
+    throw new IrError(`${ctx}.direction must be auto|down|right (got: ${JSON.stringify(v)})`)
   }
   return v
 }
 
 function normalizeBox(raw, ctx, level, seen) {
   if (!isObj(raw)) throw new IrError(`${ctx} must be a mapping`)
-  if (level > limits.maxDepth) throw new IrError(`${ctx}: nesting exceeds ${limits.maxDepth} levels`)
+  if (level > HARD_MAX_DEPTH) throw new IrError(`${ctx}: nesting exceeds ${HARD_MAX_DEPTH} levels`)
   const id = requireStr(raw, 'id', ctx)
   if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new IrError(`${ctx}.id must match [A-Za-z0-9_-]+ (got: ${JSON.stringify(id)})`)
   if (seen.has(id)) throw new IrError(`duplicate box id: "${id}"`)
@@ -138,11 +142,27 @@ export function budgetWarnings(ir) {
       `label of box "${longest.box.id}" is ${len} chars (guidance ≤ ${limits.maxLabelLen})`,
       `shorten label of box "${longest.box.id}"`))
   }
-  const emphasized = all.filter((r) => r.box.emphasis).length
-  if (emphasized > limits.maxEmphasis) {
-    out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
-      `${emphasized} emphasized box(es) (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis on the one or two boxes the decision is about'))
+  const depth = all.reduce((m, r) => Math.max(m, r.level), 0)
+  if (depth < limits.minDepth) {
+    out.push(budgetWarning('budget:depth', depth, limits.minDepth,
+      `${depth} nesting level(s) (guidance ${limits.minDepth}–${limits.maxDepth})`,
+      'with fewer than 3 levels the nesting carries no structure — use a diagram with a group, or add the inner level'))
+  } else if (depth > limits.maxDepth) {
+    out.push(budgetWarning('budget:depth', depth, limits.maxDepth,
+      `${depth} nesting levels (guidance ${limits.minDepth}–${limits.maxDepth})`,
+      'collapse the innermost level or split the figure at the level the decision is about'))
+  }
+  const emphasized = all.filter((r) => r.box.emphasis)
+  if (emphasized.length > limits.maxEmphasis) {
+    out.push(budgetWarning('budget:emphasis', emphasized.length, limits.maxEmphasis,
+      `${emphasized.length} emphasized box(es) (guidance ≤ ${limits.maxEmphasis})`,
+      'keep emphasis on the one box the decision is about'))
+  }
+  const outer = emphasized.filter((r) => r.box.children.length > 0)
+  if (outer.length) {
+    out.push(budgetWarning('budget:emphasis-outer', outer.length, 0,
+      `emphasized container(s) ${outer.map((r) => `"${r.box.id}"`).join(', ')} — the accent belongs on an innermost box`,
+      'move emphasis to the leaf the decision lands on; a container is already set apart by its title band'))
   }
   return out
 }
@@ -461,7 +481,9 @@ export function verify(geo, ir) {
   const rows = [
     warnRow(1, 'box-count', budget, 'budget:boxes', `${all.length} box(es)`),
     warnRow(2, 'label-length', budget, 'budget:label', 'every label within 14 chars'),
-    warnRow(3, 'emphasis-count', budget, 'budget:emphasis', `${all.filter((r) => r.box.emphasis).length} emphasized box(es)`),
+    warnRow(3, 'depth', budget, 'budget:depth', `${all.reduce((m, r) => Math.max(m, r.level), 0)} nesting level(s)`),
+    warnRow(4, 'emphasis-count', budget, 'budget:emphasis', `${all.filter((r) => r.box.emphasis).length} emphasized box(es)`),
+    warnRow(5, 'emphasis-innermost', budget, 'budget:emphasis-outer', 'every emphasized box is an innermost box'),
   ]
 
   const contain = []
@@ -475,7 +497,7 @@ export function verify(geo, ir) {
     }
     if (b.y < p.y + TITLE_BAND) band.push(`"${b.id}" covers the title band of "${p.id}"`)
   }
-  rows.push(failRow(4, 'containment', contain, `every child sits ≥ ${MIN_CLEARANCE}px inside its parent`, 'the layout must pad children inside their parent — check measure()/place()'))
+  rows.push(failRow(6, 'containment', contain, `every child sits ≥ ${MIN_CLEARANCE}px inside its parent`, 'the layout must pad children inside their parent — check measure()/place()'))
 
   const overlap = []
   for (const p of boxes) {
@@ -486,8 +508,8 @@ export function verify(geo, ir) {
       }
     }
   }
-  rows.push(failRow(5, 'sibling-overlap', overlap, 'no two siblings overlap', 'siblings must be separated by the gap — check arrangeRows()'))
-  rows.push(failRow(6, 'title-band-clear', band, `every title band (${TITLE_BAND}px) is free of children`, 'start children below the parent\'s title band'))
+  rows.push(failRow(7, 'sibling-overlap', overlap, 'no two siblings overlap', 'siblings must be separated by the gap — check arrangeRows()'))
+  rows.push(failRow(8, 'title-band-clear', band, `every title band (${TITLE_BAND}px) is free of children`, 'start children below the parent\'s title band'))
 
   const shape = []
   const cross = []
@@ -502,13 +524,35 @@ export function verify(geo, ir) {
     const first = e.points[0], last = e.points[e.points.length - 1]
     if (!onBorder(first, A)) shape.push(`edge ${e.index} does not start on the border of "${A.id}"`)
     if (!onBorder(last, B)) shape.push(`edge ${e.index} does not end on the border of "${B.id}"`)
-    if (!routeIsClear(e.points, A, B, obstaclesFor(e.from, e.to, byId, boxes), boxes[0])) {
+    const obstacles = obstaclesFor(e.from, e.to, byId, boxes)
+    if (!routeIsClear(e.points, A, B, obstacles, boxes[0])) {
       cross.push(`edge ${e.index} ("${e.from}"→"${e.to}") runs through an unrelated box or a title band, or leaves the root box`)
     }
+    cross.push(...labelProblems(e, A, B, obstacles, edges))
   }
-  rows.push(failRow(7, 'edges-orthogonal', shape, 'every edge is orthogonal and attaches to both box borders', 'route edges with axis-aligned segments that start and end on the box borders'))
-  rows.push(failRow(8, 'edge-clearance', cross, 'no edge crosses an unrelated box or a title band; every edge stays inside the root box', 'move the endpoints so a gap route exists, or drop the edge — nesting already shows containment'))
+  rows.push(failRow(9, 'edges-orthogonal', shape, 'every edge is orthogonal and attaches to both box borders', 'route edges with axis-aligned segments that start and end on the box borders'))
+  rows.push(failRow(10, 'edge-clearance', cross, 'no edge or edge label crosses an unrelated box or a title band; every edge stays inside the root box', 'move the endpoints so a gap route exists, shorten the label, or drop the edge — nesting already shows containment'))
   return rows
+}
+
+/** The label box of `e` must not cover a box (either endpoint, or any
+ * obstacle the edge itself must avoid), be crossed by another edge's
+ * segment, or overlap another edge's label. */
+function labelProblems(e, A, B, obstacles, edges) {
+  const l = e.labelBox
+  if (!l) return []
+  const out = []
+  const who = `edge ${e.index} label "${l.text}"`
+  for (const b of [A, B, ...obstacles]) {
+    if (rectsOverlap(l, b)) { out.push(`${who} covers ${b.kind === 'band' ? 'the title band of' : 'box'} "${b.id}"`); break }
+  }
+  for (const o of edges) {
+    if (o.index === e.index) continue
+    const crossed = o.points.slice(0, -1).some((p, i) => segmentCrosses(p, o.points[i + 1], l))
+    if (crossed) out.push(`${who} is crossed by edge ${o.index}`)
+    if (o.labelBox && o.index > e.index && rectsOverlap(l, o.labelBox)) out.push(`${who} overlaps edge ${o.index} label "${o.labelBox.text}"`)
+  }
+  return out
 }
 
 function onBorder(p, b) {
@@ -519,7 +563,7 @@ function onBorder(p, b) {
 
 export const doc = {
   purpose: 'containment boxes — what sits inside what (scope, boundaries, responsibilities)',
-  whenToUse: 'when the decision is *where a boundary lies* or *what a component owns*; not for flow (use diagram) or call order (use sequence). Budgets: boxes ≤ 12, 3 levels, label ≤ 14 chars, emphasis ≤ 2, edges ≤ 6 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the decision is *where a boundary lies* or *what a component owns*; not for flow (use diagram) or call order (use sequence). Budgets: boxes ≤ 12, 3–5 levels (6 is the hard cap), label ≤ 14 chars, emphasis ≤ 1 and on an innermost box, edges ≤ 6 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: order-scope
 type: nested
 title: 注文システムの責務境界
@@ -549,5 +593,5 @@ edges:
     to: pay-api
     label: 与信
 `,
-  rows: ['box-count', 'label-length', 'emphasis-count', 'containment', 'sibling-overlap', 'title-band-clear', 'edges-orthogonal', 'edge-clearance'],
+  rows: ['box-count', 'label-length', 'depth', 'emphasis-count', 'emphasis-innermost', 'containment', 'sibling-overlap', 'title-band-clear', 'edges-orthogonal', 'edge-clearance'],
 }

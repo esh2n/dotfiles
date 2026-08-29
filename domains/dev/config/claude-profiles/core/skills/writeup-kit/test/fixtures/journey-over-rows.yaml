@@ -1,7 +1,7 @@
 id: j-rows
 type: journey
-title: 5 行の旅
-rows: [行動, 接点, 不満, 気持ち, 機会]
+title: 4 行の旅
+rows: [行動, 接点, 不満, 気持ち]
 stages:
   - id: a
     label: 前
@@ -11,7 +11,6 @@ stages:
       接点: 検索
       不満: 遅い
       気持ち: 不安
-      機会: 案内
   - id: b
     label: 後
     emotion: 1

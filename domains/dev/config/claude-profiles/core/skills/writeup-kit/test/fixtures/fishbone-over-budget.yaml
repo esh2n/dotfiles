@@ -15,27 +15,36 @@ categories:
       - 途中参加が多い
   - id: c2
     label: 方法
+    emphasis: true
     causes:
-      - label: 議題が事前共有されない
-        emphasis: true
+      - 議題が事前共有されない
       - 定型フォーマットなし
+      - 判定基準が口頭
   - id: c3
     label: 設備
     causes:
       - label: 会議室の予約が取れない
         emphasis: true
+      - 回線が不安定
+      - 画面共有が遅い
   - id: c4
     label: 材料
     causes:
       - 検証報告が長い
+      - 変更一覧が未整理
+      - リスク表が古い
   - id: c5
     label: 計測
     causes:
       - 所要時間を記録していない
+      - 議題ごとの時間なし
+      - 持ち越し数が不明
   - id: c6
     label: 環境
     causes:
       - リモート混在
+      - 時差のある参加者
+      - 会議室の騒音
   - id: c7
     label: 管理
     causes:

@@ -33,7 +33,7 @@ function runCli(args) {
 }
 
 const plugin = getFigureType('timeline')
-const ROWS = ['event-count', 'label-length', 'emphasis-count', 'events-ordered', 'labels-clear', 'events-on-axis', 'time-scale']
+const ROWS = ['event-count', 'label-length', 'emphasis-count', 'events-ordered', 'labels-clear', 'events-on-axis', 'time-scale', 'axis-unit']
 
 const minimal = () => ({
   id: 's', type: 'timeline', title: 't',
@@ -55,6 +55,7 @@ describe('figures/timeline.mjs: schema', () => {
     assert.equal(r.ir.type, 'timeline')
     assert.equal(r.ir.scale, 'time')
     assert.equal(r.ir.direction, 'right')
+    assert.equal(r.ir.unit, '月', 'YYYY-MM events differing in month → 月')
     assert.deepEqual(r.ir.events[0], { id: 'a', label: 'A', at: '2026-01', emphasis: false, tone: 'neutral' })
     assert.deepEqual(r.ir.events[1], { id: 'b', label: 'B', at: '2026-03', note: 'n', emphasis: true, tone: 'ts' })
     // a free ordinal label anywhere → ordinal; a bare year arrives as a number and is kept as text
@@ -66,6 +67,26 @@ describe('figures/timeline.mjs: schema', () => {
     const down = validateIR({ ...minimal(), scale: 'ordinal', direction: 'down' })
     assert.equal(down.ir.scale, 'ordinal')
     assert.equal(down.ir.direction, 'down')
+  })
+
+  test('unit: explicit wins; otherwise the finest date part the events differ in (日 / 月 / 年), or 順 for ordinal events', () => {
+    const unitOf = (events, extra = {}) => validateIR({ ...minimal(), ...extra, events: events.map((at, i) => ({ id: `e${i}`, label: 'L', at })) }).ir.unit
+    assert.equal(unitOf(['2026-01-15', '2026-03-03']), '日')
+    assert.equal(unitOf(['2026-01-15', '2026-03-15']), '月', 'same day of month, months differ')
+    assert.equal(unitOf(['2026-01-01', '2027-01-01']), '年')
+    assert.equal(unitOf([2025, 2026]), '年')
+    assert.equal(unitOf(['2026-01-01']), '日', 'a single event keeps the finest part it spells out')
+    assert.equal(unitOf(['2026-05']), '月')
+    assert.equal(unitOf(['Phase 1', 'Phase 2']), '順')
+    assert.equal(unitOf(['Q1', '2026']), '順', 'one non-date makes the axis ordinal')
+    assert.equal(unitOf(['2026-01-01', '2026-02-01'], { unit: '週' }), '週')
+    assert.equal(unitOf(['2026-01-01', '2026-02-01'], { unit: '' }), '月', 'an empty unit is inferred')
+    assert.equal(validIr('timeline-simple.yaml').unit, '順')
+    assert.equal(validIr('timeline-dates.yaml').unit, '日')
+    assert.equal(validIr('timeline-down.yaml').unit, '月')
+    const bad = validateIR({ ...minimal(), unit: 3 })
+    assert.equal(bad.ok, false)
+    assert.match(bad.message, /ir\.unit must be a string/)
   })
 
   test('normalize is idempotent', () => {
@@ -231,8 +252,8 @@ describe('figures/timeline.mjs: verify rows', () => {
       const v = await verifyFigure(plugin, ir, rendered)
       assert.equal(v.ok, true, `${name}: ${JSON.stringify(v.failures)}`)
       assert.deepEqual(v.warnings, [])
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.name), ROWS)
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7])
+      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.name), ROWS)
+      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8])
       assert.deepEqual(plugin.doc.rows, ROWS)
     }
   })
@@ -311,6 +332,39 @@ describe('figures/timeline.mjs: verify rows', () => {
     assert.equal('key' in row, false)
   })
 
+  test('axis-unit fails when the unit label is missing, sits before the axis end, or overlaps a block', async () => {
+    const ir = validIr('timeline-simple.yaml')
+    const clean = timeline.verify(await timeline.layout(ir), ir)
+    const ok = byName(clean, 'axis-unit')
+    assert.equal(ok.severity, 'fail')
+    assert.equal(ok.ok, true)
+    assert.match(ok.detail, /axis unit "順" sits past the arrowhead/)
+    const missing = await timeline.layout(ir)
+    missing.geo.unit.text = ''
+    let row = byName(timeline.verify(missing, ir), 'axis-unit')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /no unit label/)
+    assert.match(row.hint, /set `unit`/)
+    const early = await timeline.layout(ir)
+    const shift = early.geo.unit.box.right - early.geo.unit.box.left
+    early.geo.unit.box.left = early.geo.axis.x2 - 8
+    early.geo.unit.box.right = early.geo.unit.box.left + shift
+    row = byName(timeline.verify(early, ir), 'axis-unit')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /sits before the axis end/)
+    const onto = await timeline.layout(ir)
+    const last = onto.geo.events[3]
+    onto.geo.unit.box = { left: last.block.x, top: last.block.y, right: last.block.x + 8, bottom: last.block.y + 8 }
+    row = byName(timeline.verify(onto, ir), 'axis-unit')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /overlaps the block of "default"/)
+    // down: the check runs on the y axis
+    const d = await timeline.layout(validIr('timeline-down.yaml'))
+    assert.equal(byName(timeline.verify(d, validIr('timeline-down.yaml')), 'axis-unit').ok, true)
+    d.geo.unit.box.top = d.geo.axis.y2 - 4
+    assert.equal(byName(timeline.verify(d, validIr('timeline-down.yaml')), 'axis-unit').ok, false)
+  })
+
   test('the three budget rows are warn rows carrying key/value only when they fail', async () => {
     const ir = validIr('timeline-over-budget.yaml')
     const rendered = await renderFigure(plugin, ir)
@@ -334,12 +388,14 @@ describe('figures/timeline.mjs: verify rows', () => {
 // --- draw ------------------------------------------------------------------
 
 describe('figures/timeline.mjs: draw', () => {
-  test('emphasis is the focal square + bold label, tone fills the dot, dates sit in ink-3, labels are escaped', async () => {
+  test('emphasis is the one big dot (r=6, wu-focal) + bold label, tone fills every dot, dates sit in ink-3, labels are escaped', async () => {
     const raw = { ...minimal(), events: [{ id: 'a', label: 'A & <B>', at: '2026-01', emphasis: true, tone: 'ts' }, { id: 'b', label: 'B', at: '2026-02', tone: 'rs', note: 'x<y' }, { id: 'c', label: 'C', at: '2026-03' }] }
     const r = validateIR(raw)
     assert.equal(r.ok, true)
     const rendered = await renderFigure(plugin, r.ir)
-    assert.match(rendered.svg, /<rect id="wu-d-s-ev-a" class="wu-focal" data-tone="ts"[^>]*rx="4"[^>]*stroke-width="1.5"/)
+    assert.match(rendered.svg, /<circle id="wu-d-s-ev-a" class="wu-focal" data-tone="ts" cx="\d+" cy="\d+" r="6" fill="var\(--wu-fig-tone-ts\)" stroke="currentColor" stroke-width="1.5"\/>/)
+    assert.doesNotMatch(rendered.svg, /<rect id="wu-d-s-ev-/)
+    assert.match(rendered.svg, /<circle id="wu-d-s-ev-c"[^>]*r="4"/)
     assert.match(rendered.svg, /<text id="wu-d-s-ev-a-label"[^>]*font-weight="700"[^>]*>A &amp; &lt;B&gt;<\/text>/)
     assert.match(rendered.svg, /<circle id="wu-d-s-ev-b"[^>]*fill="var\(--wu-fig-tone-rs\)"/)
     assert.match(rendered.svg, /<circle id="wu-d-s-ev-c"[^>]*fill="var\(--wu-surface\)"/)
@@ -348,6 +404,33 @@ describe('figures/timeline.mjs: draw', () => {
     assert.match(rendered.svg, /<line id="wu-d-s-axis"[^>]*marker-end="url\(#wu-d-s-solid\)"/)
     assert.doesNotMatch(rendered.svg, /<text id="wu-d-s-ev-b-label"[^>]*font-weight/)
     assert.doesNotMatch(rendered.svg, /#[0-9a-fA-F]{6}\b/)
+  })
+
+  test('the unit label is drawn horizontally in 11px ink-3 past the arrowhead: right of it (right) or under it (down), inside the canvas', async () => {
+    const ir = validIr('timeline-simple.yaml')
+    const l = await timeline.layout(ir, { column: 720 })
+    const u = l.geo.unit
+    assert.equal(u.text, '順')
+    assert.equal(u.anchor, 'start')
+    assert.equal(u.x, l.geo.axis.x2 + 8)
+    assert.equal(u.y, l.geo.axis.y1 + 4)
+    assert.ok(u.box.right <= l.width - 8, 'the end margin holds the label')
+    const rendered = await renderFigure(plugin, ir)
+    assert.match(rendered.svg, new RegExp(`<text id="wu-d-rollout-unit" x="${u.x}" y="${u.y}" font-size="11" fill="var\\(--wu-ink-3\\)">順</text>`))
+    assert.doesNotMatch(rendered.svg, /rotate\(|writing-mode/)
+    const down = validIr('timeline-down.yaml')
+    const dl = await timeline.layout(down, { column: 720 })
+    assert.equal(dl.geo.unit.anchor, 'middle')
+    assert.equal(dl.geo.unit.x, dl.geo.axis.x1)
+    assert.equal(dl.geo.unit.y, dl.geo.axis.y2 + 16)
+    assert.ok(dl.geo.unit.box.bottom <= dl.height)
+    const ds = await renderFigure(plugin, down)
+    assert.match(ds.svg, /<text id="wu-d-releases-unit"[^>]*text-anchor="middle" fill="var\(--wu-ink-3\)">月<\/text>/)
+    // an explicit unit is drawn verbatim and a long one widens the end margin
+    const wide = validateIR({ ...minimal(), unit: '営業日ベース' })
+    const wl = await timeline.layout(wide.ir, { column: 720 })
+    assert.ok(wl.geo.unit.box.right <= wl.width)
+    assert.ok(wl.width <= 720)
   })
 })
 
@@ -368,7 +451,8 @@ describe('figures/timeline.mjs: registry dispatch and CLI', () => {
   test('the registry lists timeline with its limits and doc rows', () => {
     assert.equal(plugin.type, 'timeline')
     assert.deepEqual(plugin.limits, { maxEvents: 12, maxLabelLen: 14, maxEmphasis: 2 })
-    assert.equal(plugin.doc.rows.length, 7)
+    assert.equal(plugin.doc.rows.length, 8)
+    assert.deepEqual(plugin.doc.rows, ROWS)
   })
 
   test('doc.irExample validates with 6 dated events on a time scale, and renders clean', async () => {

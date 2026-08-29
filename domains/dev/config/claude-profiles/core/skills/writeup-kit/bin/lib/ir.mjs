@@ -342,34 +342,47 @@ registerBuiltin({
   doc: {
     purpose: 'boxes (nodes) in optional groups, connected by orthogonal edges — structure, flow, and boundaries',
     whenToUse: 'the default figure: components and their connections, layers, before/after structure. `type:` may be omitted. Not for time-ordered calls (use sequence). Budgets: nodes ≤ 9, edges ≤ 12, groups ≤ 4, edge label ≤ 12 chars (guidance); emphasis ≤ 2 (hard).',
-    irExample: `id: acl
-title: 腐敗防止層の位置
-caption: 外部モデルは ACL で内部モデルに翻訳される
-direction: right
+    irExample: `id: request-path
+title: リクエストの通り道
+caption: API は応答を返してから、キュー経由でワーカーに渡す
 groups:
-  - id: ours
-    label: 自社ドメイン
+  - id: backend
+    label: バックエンド
     tone: ts
 nodes:
-  - id: ext
-    label: 外部 API
+  - id: ui
+    label: 画面
     tone: neutral
-  - id: acl
-    label: ACL
-    group: ours
+  - id: api
+    label: API
+    group: backend
     emphasis: true
-  - id: core
-    label: ドメイン
-    group: ours
+  - id: queue
+    label: キュー
+    group: backend
+  - id: worker
+    label: ワーカー
+    group: backend
+  - id: db
+    label: DB
+    group: backend
 edges:
-  - from: ext
-    to: acl
+  - from: ui
+    to: api
     kind: sync
-    label: 生データ
-  - from: acl
-    to: core
+    label: 送信
+  - from: api
+    to: queue
+    kind: async
+    label: 積む
+  - from: queue
+    to: worker
     kind: sync
-    label: 内部モデル
+    label: 取り出す
+  - from: worker
+    to: db
+    kind: sync
+    label: 保存
 `,
     rows: DIAGRAM_ROWS,
   },

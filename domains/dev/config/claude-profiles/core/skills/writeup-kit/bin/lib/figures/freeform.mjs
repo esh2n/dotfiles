@@ -23,15 +23,21 @@
 // `preset: wardley` adds the two Wardley axes — x = evolution (genesis /
 // custom / product / commodity, four bands, never numbers), y =
 // visibility (value chain, visible at the top) — and requires every box
-// and circle to lie inside the plot the axes frame. Positions are still
-// authored: a Wardley map's positions are the analyst's judgement, which
-// no layout engine can derive.
+// and circle to lie inside the plot the axes frame. Both axis titles are
+// plain horizontal words with a short arrowhead line beside them for the
+// direction (no rotated text, no arrow characters — the kit's self-check
+// flags both). Positions are still authored: a Wardley map's positions are
+// the analyst's judgement, which no layout engine can derive. The survey's
+// wardley budgets (§2 row 32) apply under the preset: components (boxes +
+// circles) ≤ 9, links (lines) ≤ 12, and no isolated component — a node no
+// line starts or ends at is warned about as `wardley:isolated`.
 import { IrError, isObj, requireStr, optStr, validateTone, validateBool, normalizeHeader, budgetWarning, esc } from './_shared.mjs'
 import { FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, snap4, snapUp4, textWidth } from '../diagram.mjs'
 
 export const type = 'freeform'
 
-export const limits = { maxElements: 24, maxLabelLen: 20, maxEmphasis: 2 }
+/** maxComponents / maxLinks apply under `preset: wardley` only (survey §2 row 32). */
+export const limits = { maxElements: 24, maxLabelLen: 20, maxEmphasis: 2, maxComponents: 9, maxLinks: 12 }
 
 // --- metrics ------------------------------------------------------------------
 
@@ -50,11 +56,14 @@ const SIZES = new Set(['small', 'normal'])
 const ANCHORS = new Set(['start', 'middle', 'end'])
 
 // Wardley preset: the plot the axes frame, in canvas coordinates
-const W_LEFT = 32              // y axis band (rotated "visibility")
-const W_TOP = 8
+const W_LEFT = 32              // y axis band
+const W_TOP = 24               // "visibility" title row (4..20) + gap, above the plot
 const W_RIGHT = 8
-const W_BOTTOM = 36            // tick labels + "evolution →"
+const W_BOTTOM = 36            // tick labels + "evolution" title row
+const W_ARROW = 16             // length of the direction arrow beside each axis title
 const W_BANDS = ['genesis', 'custom', 'product', 'commodity']
+const W_X_TITLE = 'evolution'
+const W_Y_TITLE = 'visibility'
 
 // --- schema -------------------------------------------------------------------
 
@@ -204,6 +213,40 @@ export function budgetWarnings(ir) {
       `${focal} emphasized box(es) (guidance ≤ ${limits.maxEmphasis})`,
       'keep emphasis for the one or two elements the caption is about — more than two accents is no emphasis'))
   }
+  if (ir.preset === 'wardley') out.push(...wardleyWarnings(ir))
+  return out
+}
+
+/** The bounding box of a box or circle straight from the IR (budgets run
+ * before layout). */
+const irNodeBox = (e) => (e.kind === 'circle'
+  ? { x: e.cx - e.r, y: e.cy - e.r, width: e.r * 2, height: e.r * 2 }
+  : { x: e.x, y: e.y, width: e.w, height: e.h })
+
+/** Survey §2 row 32 under `preset: wardley`: components ≤ 9, links ≤ 12,
+ * and every component connected — an isolated node says nothing about
+ * the value chain and is deleted, not drawn. */
+function wardleyWarnings(ir) {
+  const out = []
+  const nodes = ir.elements.filter((e) => e.kind === 'box' || e.kind === 'circle')
+  const links = ir.elements.filter((e) => e.kind === 'line')
+  if (nodes.length > limits.maxComponents) {
+    out.push(budgetWarning('budget:components', nodes.length, limits.maxComponents,
+      `${nodes.length} wardley components (guidance ≤ ${limits.maxComponents})`,
+      `keep the ${limits.maxComponents} components the decision turns on; fold the rest into their parent or a second map`))
+  }
+  if (links.length > limits.maxLinks) {
+    out.push(budgetWarning('budget:links', links.length, limits.maxLinks,
+      `${links.length} wardley links (guidance ≤ ${limits.maxLinks})`,
+      `draw only the dependencies the caption reads along (≤ ${limits.maxLinks}); a fully wired map hides the chain`))
+  }
+  const ends = links.flatMap((l) => [l.points[0], l.points[l.points.length - 1]].map(([x, y]) => ({ x, y })))
+  const isolated = nodes.filter((n) => !ends.some((p) => nearNode(p, { kind: n.kind, ...irNodeBox(n), r: n.r, cx: n.cx, cy: n.cy })))
+  if (isolated.length) {
+    out.push(budgetWarning('wardley:isolated', isolated.length, 0,
+      `${isolated.length} isolated component(s): ${isolated.map((n) => n.id).join(', ')} (no line starts or ends there)`,
+      'connect the component into the value chain with a line, or delete it — an isolated component is not part of the map'))
+  }
   return out
 }
 
@@ -274,13 +317,18 @@ function wardleyGeometry(width, height) {
     const cx = plot.x + band * i + band / 2
     texts.push({ owner: 'preset', role: `tick-${name}`, text: name, size: EDGE_LABEL_SIZE, anchor: 'middle', ax: snap4(cx), ...textBox(cx, axisY + 4, name, EDGE_LABEL_SIZE, 'middle') })
   })
-  texts.push({ owner: 'preset', role: 'x-title', text: 'evolution →', size: EDGE_LABEL_SIZE, anchor: 'end', ax: right(plot), ...textBox(right(plot), axisY + 20, 'evolution →', EDGE_LABEL_SIZE, 'end') })
-  const yTitle = 'visibility ↑'
-  const yLen = snapUp4(textWidth(yTitle, EDGE_LABEL_SIZE) + TEXT_PAD * 2)
-  const midY = plot.y + plot.height / 2
-  texts.push({ owner: 'preset', role: 'y-title', text: yTitle, size: EDGE_LABEL_SIZE, anchor: 'middle', rotate: true, x: 8, y: snap4(midY - yLen / 2), width: TEXT_H, height: yLen })
+  // axis titles: plain horizontal words, each with a short arrowhead line
+  // beside it giving the direction (never rotated, never an arrow glyph)
+  const xRowTop = axisY + 20
+  const xArrow = { x1: right(plot) - W_ARROW, y1: xRowTop + TEXT_H / 2, x2: right(plot), y2: xRowTop + TEXT_H / 2 }
+  const xAx = xArrow.x1 - TEXT_PAD
+  texts.push({ owner: 'preset', role: 'x-title', text: W_X_TITLE, size: EDGE_LABEL_SIZE, anchor: 'end', ax: xAx, ...textBox(xAx, xRowTop, W_X_TITLE, EDGE_LABEL_SIZE, 'end') })
+  const yRowTop = W_TOP - TEXT_H - 4
+  const yArrow = { x1: plot.x, y1: yRowTop + TEXT_H, x2: plot.x, y2: yRowTop }
+  const yAx = plot.x + TEXT_PAD * 2
+  texts.push({ owner: 'preset', role: 'y-title', text: W_Y_TITLE, size: EDGE_LABEL_SIZE, anchor: 'start', ax: yAx, ...textBox(yAx, yRowTop, W_Y_TITLE, EDGE_LABEL_SIZE, 'start') })
   const dividers = [1, 2, 3].map((i) => ({ x: plot.x + band * i, y1: plot.y, y2: axisY }))
-  return { plot, axes: { x: { x1: plot.x, x2: right(plot), y: axisY }, y: { x: plot.x, y1: plot.y, y2: axisY } }, dividers, texts }
+  return { plot, axes: { x: { x1: plot.x, x2: right(plot), y: axisY }, y: { x: plot.x, y1: plot.y, y2: axisY } }, arrows: { x: xArrow, y: yArrow }, dividers, texts }
 }
 
 export async function layout(ir) {
@@ -339,7 +387,7 @@ export async function layout(ir) {
   const geo = { canvas: { width, height }, elements, texts }
   if (ir.preset === 'wardley') {
     const w = wardleyGeometry(width, height)
-    geo.preset = { name: 'wardley', plot: w.plot, axes: w.axes, dividers: w.dividers }
+    geo.preset = { name: 'wardley', plot: w.plot, axes: w.axes, arrows: w.arrows, dividers: w.dividers }
     geo.texts.push(...w.texts)
   }
   return { width, height, geo }
@@ -348,13 +396,18 @@ export async function layout(ir) {
 // --- draw -------------------------------------------------------------------------
 
 function drawPreset(uid, preset) {
-  const { plot, axes, dividers } = preset
+  const { plot, axes, arrows, dividers } = preset
   const parts = []
   for (const [i, d] of dividers.entries()) {
     parts.push(`<line id="${uid}-band-${i}" x1="${d.x}" y1="${d.y1}" x2="${d.x}" y2="${d.y2}" stroke="var(--wu-rule)" stroke-width="1" stroke-dasharray="2 4"/>`)
   }
   parts.push(`<line id="${uid}-axis-x" x1="${axes.x.x1}" y1="${axes.x.y}" x2="${axes.x.x2}" y2="${axes.x.y}" stroke="currentColor" stroke-width="1"/>`)
   parts.push(`<line id="${uid}-axis-y" x1="${axes.y.x}" y1="${axes.y.y1}" x2="${axes.y.x}" y2="${axes.y.y2}" stroke="currentColor" stroke-width="1"/>`)
+  // the direction of each axis: a short muted line with a real arrowhead beside the title word
+  for (const axis of ['x', 'y']) {
+    const a = arrows[axis]
+    parts.push(`<line id="${uid}-arrow-${axis}" x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="var(--wu-ink-3)" stroke-width="1" marker-end="url(#${uid}-muted)"/>`)
+  }
   return parts.join('')
 }
 
@@ -362,12 +415,6 @@ function drawPresetTexts(uid, texts) {
   const parts = []
   for (const t of texts) {
     if (t.owner !== 'preset') continue
-    if (t.rotate) {
-      const cx = t.x + TEXT_H / 2
-      const cy = t.y + t.height / 2
-      parts.push(`<text id="${uid}-${t.role}" x="${cx}" y="${cy + 4}" transform="rotate(-90 ${cx} ${cy})" font-size="${t.size}" text-anchor="middle" fill="var(--wu-ink-3)">${esc(t.text)}</text>`)
-      continue
-    }
     parts.push(`<text id="${uid}-${t.role}" x="${t.ax}" y="${t.y + BASELINE}" font-size="${t.size}" text-anchor="${t.anchor}" fill="var(--wu-ink-3)">${esc(t.text)}</text>`)
   }
   return parts.join('')
@@ -378,6 +425,7 @@ export function draw(geo, ir) {
   const { elements, texts, preset } = geo.geo
   const parts = ['<defs>',
     `<marker id="${uid}-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>`,
+    ...(preset ? [`<marker id="${uid}-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--wu-ink-3)"/></marker>`] : []),
     '</defs>']
   if (preset) parts.push(drawPreset(uid, preset))
   const byKind = (k) => elements.filter((e) => e.kind === k)
@@ -523,12 +571,18 @@ export function verify(geo, ir) {
   rows.push(failRow(9, 'preset-in-plot', outPlot,
     preset ? `every box and circle lies inside the ${preset.name} plot (${preset.plot.x}..${right(preset.plot)} × ${preset.plot.y}..${bottom(preset.plot)})` : 'no preset — no plot to check',
     preset ? `keep every box and circle inside x ${preset.plot.x}..${right(preset.plot)}, y ${preset.plot.y}..${bottom(preset.plot)} (the axis bands are reserved)` : undefined))
+
+  // 10–12. wardley budgets (warn; no-ops without the preset)
+  const none = preset ? undefined : 'no preset — not a wardley map'
+  rows.push(warnRow(10, 'wardley-components', budget, 'budget:components', none ?? `${nodes.length} component(s)`))
+  rows.push(warnRow(11, 'wardley-links', budget, 'budget:links', none ?? `${elements.filter((e) => e.kind === 'line').length} link(s)`))
+  rows.push(warnRow(12, 'wardley-isolated', budget, 'wardley:isolated', none ?? 'every component is on a line'))
   return rows
 }
 
 export const doc = {
   purpose: 'a one-off figure drawn from authored coordinates — boxes, text, lines, circles, regions on a canvas of your size; preset: wardley adds the evolution × visibility axes',
-  whenToUse: 'when no parametric type fits and the picture is worth authoring by hand: every coordinate is yours, the plugin only draws with kit tokens and verifies (inside the canvas, no text overlap, no text across a border, lines clear of unconnected nodes, 4px grid). preset: wardley for a Wardley map — x = genesis/custom/product/commodity, y = visibility, positions are the analyst\'s judgement. Budgets: elements ≤ 24, label ≤ 20 chars, emphasis ≤ 2. Freeform is for one-off figures only: run `render-diagram.mjs --list-types` first and pick a parametric type when one covers the picture — it lays out for you and verifies more; reach for freeform only when none does.',
+  whenToUse: 'when no parametric type fits and the picture is worth authoring by hand: every coordinate is yours, the plugin only draws with kit tokens and verifies (inside the canvas, no text overlap, no text across a border, lines clear of unconnected nodes, 4px grid). preset: wardley for a Wardley map — x = genesis/custom/product/commodity, y = visibility (both titles horizontal, direction shown by an arrowhead line), positions are the analyst\'s judgement, the plot starts at y = 24. Budgets: elements ≤ 24, label ≤ 20 chars, emphasis ≤ 2; under preset: wardley also components ≤ 9, links ≤ 12 and no isolated component. Freeform is for one-off figures only: run `render-diagram.mjs --list-types` first and pick a parametric type when one covers the picture — it lays out for you and verifies more; reach for freeform only when none does.',
   irExample: `id: wardley-booking
 type: freeform
 preset: wardley
@@ -540,28 +594,28 @@ elements:
   - kind: box
     id: user
     x: 176
-    y: 16
+    y: 24
     w: 96
     h: 28
     label: 利用者
   - kind: box
     id: booking
     x: 176
-    y: 72
+    y: 80
     w: 96
     h: 28
     label: 予約 UI
   - kind: box
     id: api
     x: 176
-    y: 128
+    y: 136
     w: 96
     h: 28
     label: 予約 API
   - kind: box
     id: payment
     x: 288
-    y: 184
+    y: 192
     w: 88
     h: 28
     label: 決済
@@ -569,32 +623,32 @@ elements:
   - kind: box
     id: db
     x: 176
-    y: 200
+    y: 208
     w: 96
     h: 28
     label: 予約 DB
   - kind: box
     id: cloud
     x: 376
-    y: 240
+    y: 248
     w: 96
     h: 28
     label: クラウド基盤
   - kind: line
     id: user-booking
-    points: [[224, 44], [224, 72]]
+    points: [[224, 52], [224, 80]]
   - kind: line
     id: booking-api
-    points: [[224, 100], [224, 128]]
+    points: [[224, 108], [224, 136]]
   - kind: line
     id: api-payment
-    points: [[272, 148], [312, 184]]
+    points: [[272, 156], [312, 192]]
   - kind: line
     id: api-db
-    points: [[224, 156], [224, 200]]
+    points: [[224, 164], [224, 208]]
   - kind: line
     id: db-cloud
-    points: [[272, 220], [400, 240]]
+    points: [[272, 228], [400, 248]]
 `,
-  rows: ['in-canvas', 'text-no-overlap', 'text-clear-of-borders', 'lines-avoid-nodes', 'grid-4px-authored', 'element-count', 'label-length', 'emphasis-count', 'preset-in-plot'],
+  rows: ['in-canvas', 'text-no-overlap', 'text-clear-of-borders', 'lines-avoid-nodes', 'grid-4px-authored', 'element-count', 'label-length', 'emphasis-count', 'preset-in-plot', 'wardley-components', 'wardley-links', 'wardley-isolated'],
 }

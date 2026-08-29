@@ -694,7 +694,11 @@ hr {
 /* Accent stroke is the only emphasis cue; the label text stays the normal
    ink color (bold weight, set inline in the svg, is enough on its own) —
    filling it with the accent color reads as too heavy at 13px. */
-.wu-figure rect.wu-focal {
+.wu-figure rect.wu-focal,
+.wu-figure circle.wu-focal,
+.wu-figure ellipse.wu-focal,
+.wu-figure polygon.wu-focal,
+.wu-figure path.wu-focal {
   stroke: var(--wu-accent);
 }
 

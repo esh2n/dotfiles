@@ -1,28 +1,34 @@
 id: j-emph
 type: journey
 title: 強調が多い旅
+caption: 谷は 3 つあるが、強調は 2 つまで
 rows: [行動]
 stages:
   - id: a
     label: 一
-    emotion: -1
+    emotion: 悪い
     emphasis: true
     cells:
       行動: 探す
   - id: b
     label: 二
-    emotion: -2
+    emotion: 普通
+    cells:
+      行動: 聞く
+  - id: c
+    label: 三
+    emotion: 最悪
     emphasis: true
     cells:
       行動: 迷う
-  - id: c
-    label: 三
-    emotion: 0
-    emphasis: true
-    cells:
-      行動: 聞く
   - id: d
     label: 四
-    emotion: 1
+    emotion: 良い
     cells:
       行動: 使う
+  - id: e
+    label: 五
+    emotion: 普通
+    emphasis: true
+    cells:
+      行動: 悩む

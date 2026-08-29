@@ -11,6 +11,7 @@ stages:
     items: [events]
   - id: gold
     label: ゴールド
+    emphasis: true
     items: [daily_sales]
 promotions:
   - from: bronze

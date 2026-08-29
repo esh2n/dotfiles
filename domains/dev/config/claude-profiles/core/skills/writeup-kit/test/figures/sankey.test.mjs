@@ -32,8 +32,8 @@ const plugin = () => getFigureType('sankey')
 function rawIr(overrides = {}) {
   return {
     id: 's', type: 'sankey', title: 't',
-    nodes: [{ id: 'a', label: 'A', stage: 0 }, { id: 'b', label: 'B', stage: 0 }, { id: 'c', label: 'C', stage: 1 }],
-    links: [{ from: 'a', to: 'c', value: 10 }, { from: 'b', to: 'c', value: 5 }],
+    nodes: [{ id: 'a', label: 'A', stage: 0 }, { id: 'b', label: 'B', stage: 0 }, { id: 'c', label: 'C', stage: 1 }, { id: 'd', label: 'D', stage: 2 }],
+    links: [{ from: 'a', to: 'c', value: 10 }, { from: 'b', to: 'c', value: 5 }, { from: 'c', to: 'd', value: 15 }],
     ...overrides,
   }
 }
@@ -59,6 +59,7 @@ describe('figures/sankey.mjs: schema', () => {
     assert.deepEqual(result.ir.nodes[0], { id: 'a', label: 'A', stage: 0, emphasis: false })
     assert.deepEqual(result.ir.links[0], { from: 'a', to: 'c', value: 10 })
     assert.equal('unit' in result.ir, false)
+    assert.equal('stages' in result.ir, false)
     assert.deepEqual(result.warnings, [])
     const full = validateIR(rawIr({ unit: '件', links: [{ from: 'a', to: 'c', value: 1.5, label: 'x' }] }))
     assert.equal(full.ir.unit, '件')
@@ -85,6 +86,18 @@ describe('figures/sankey.mjs: schema', () => {
     assert.match(bad({ nodes: [{ id: 'a', label: 'A', stage: 0 }, { id: 'a', label: 'A2', stage: 1 }] }), /duplicate node id: "a"/)
     assert.match(bad({ links: [] }), /links must be a non-empty list/)
   })
+
+  test('stages: optional column headers, exactly one per distinct stage, each a non-empty string', () => {
+    const ok = validateIR(rawIr({ stages: ['入', '中', '出'] }))
+    assert.equal(ok.ok, true, ok.message)
+    assert.deepEqual(ok.ir.stages, ['入', '中', '出'])
+    assert.deepEqual(ok.warnings, [])
+    assert.deepEqual(sankey.normalize(ok.ir), ok.ir)
+    const bad = (overrides) => { const r = validateIR(rawIr(overrides)); assert.equal(r.ok, false); return r.message }
+    assert.match(bad({ stages: ['入', '出'] }), /stages needs one header per stage — 3 stage\(s\) in nodes, 2 header\(s\) given/)
+    assert.match(bad({ stages: '入' }), /stages must be a list/)
+    assert.match(bad({ stages: ['入', '', '出'] }), /stages\[1\] must be a non-empty string/)
+  })
 })
 
 // --- budgets --------------------------------------------------------------
@@ -94,11 +107,45 @@ describe('figures/sankey.mjs: budgets', () => {
     const result = validateIR(parseYaml(fixture('sankey-over-budget.yaml')))
     assert.equal(result.ok, true)
     assert.deepEqual(result.warnings.map((w) => [w.key, w.value, w.limit]), [
-      ['budget:nodes', 13, 12], ['budget:links', 17, 16], ['budget:label', 13, 12], ['budget:emphasis', 3, 2],
+      ['budget:nodes', 13, 8], ['budget:links', 17, 12], ['budget:label', 13, 12], ['budget:emphasis', 3, 2],
     ])
     assert.equal(formatBudgetWarnings(result.warnings), 'budget:nodes=13;budget:links=17;budget:label=13;budget:emphasis=3')
     assert.ok(result.warnings.every((w) => w.hint && w.hint !== w.detail))
     assert.deepEqual(sankey.budgetWarnings(validIr('sankey-full.yaml')), [])
+    assert.deepEqual(plugin().limits, { maxNodes: 8, maxLinks: 12, maxLabelLen: 12, maxEmphasis: 2, stages: 3, minRibbon: 4 })
+  })
+
+  test('a 9th node and a 13th link warn on the new budgets', () => {
+    const nodes = [...Array.from({ length: 5 }, (_, i) => ({ id: `s${i}`, label: `S${i}`, stage: 0 })), { id: 'm', label: 'M', stage: 1 }, ...Array.from({ length: 3 }, (_, i) => ({ id: `e${i}`, label: `E${i}`, stage: 2 }))]
+    const links = [...Array.from({ length: 5 }, (_, i) => ({ from: `s${i}`, to: 'm', value: 30 })), ...Array.from({ length: 3 }, (_, i) => ({ from: 'm', to: `e${i}`, value: 50 }))]
+    const nine = validateIR(rawIr({ nodes, links }))
+    assert.deepEqual(nine.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:nodes', 9, 8]])
+    const many = validateIR(rawIr({ nodes, links: [...links, ...Array.from({ length: 5 }, (_, i) => ({ from: `s${i}`, to: 'e0', value: 30 }))] }))
+    assert.deepEqual(many.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:nodes', 9, 8], ['budget:links', 13, 12]])
+  })
+
+  test('two or four stages warn budget:stages; three do not', () => {
+    const two = validateIR(parseYaml(fixture('sankey-simple.yaml')))
+    assert.deepEqual(two.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:stages', 2, 3]])
+    assert.match(two.warnings[0].hint, /grouped bar or a table/)
+    const four = validateIR(rawIr({ nodes: [...rawIr().nodes, { id: 'e', label: 'E', stage: 3 }], links: [...rawIr().links, { from: 'd', to: 'e', value: 15 }] }))
+    assert.deepEqual(four.warnings.map((w) => [w.key, w.value]), [['budget:stages', 4]])
+    assert.match(four.warnings[0].hint, /split the figure at a stage/)
+    assert.deepEqual(validateIR(rawIr()).warnings, [])
+  })
+
+  test('a ribbon thinner than 4px at the shared scale warns budget:ribbon with the thinnest px as the value', async () => {
+    const ir = rawIr({ links: [{ from: 'a', to: 'c', value: 1000 }, { from: 'b', to: 'c', value: 3 }, { from: 'c', to: 'd', value: 1003 }] })
+    const r = validateIR(ir)
+    assert.deepEqual(r.warnings.map((w) => [w.key, w.value, w.limit]), [['budget:ribbon', 1.1, 4]])
+    assert.match(r.warnings[0].detail, /1 ribbon\(s\) thinner than 4px: b→c 1\.14px/)
+    assert.match(r.warnings[0].hint, /「その他」/)
+    const rendered = await renderFigure(plugin(), r.ir)
+    const thin = rendered.layout.geo.ribbons.find((rb) => rb.from === 'b')
+    assert.equal(thin.thickness, 1.14)
+    const v = await verifyFigure(plugin(), r.ir, rendered)
+    assert.equal(v.ok, true, JSON.stringify(v.failures))
+    assert.deepEqual(v.warnings.map((w) => [w.name, w.key, w.value]), [['ribbon-min', 'budget:ribbon', 1.1]])
   })
 })
 
@@ -153,7 +200,7 @@ describe('figures/sankey.mjs: layout', () => {
     const cdn = g.ribbons.find((rb) => rb.from === 'network' && rb.to === 'prod-b')
     assert.ok(cdn.thickness < 14)
     assert.equal(cdn.valueLabel, undefined)
-    assert.equal(g.footnotes[0].text, '細い流れ: ネットワーク→プロダクト B CDN 2万円、共有基盤→未配賦 4万円')
+    assert.equal(g.footnotes[0].text, '細い流れ: ネットワーク→プロダクト B CDN 3万円、共有基盤→未配賦 4万円')
     assert.equal(g.footnotes[1].text, '差分: 共有基盤 入 138万円 / 出 134万円')
     const labelled = g.ribbons.filter((rb) => rb.valueLabel)
     assert.ok(labelled.every((rb) => rb.thickness >= 14))
@@ -171,19 +218,46 @@ describe('figures/sankey.mjs: layout', () => {
     assert.deepEqual(r.layout.geo.footnotes, [])
     assert.ok(r.layout.geo.ribbons.every((rb) => rb.valueLabel))
     assert.doesNotMatch(r.svg, /foot-/)
+    assert.deepEqual(r.layout.geo.headers, [])
+    assert.doesNotMatch(r.svg, /-header-/)
+  })
+
+  test('stages headers sit above the columns (first starts at its bar, last ends at its bar, middle centred), push the bars down 24px and join the label set', async () => {
+    const base = validateIR(rawIr()).ir
+    const withHeaders = validateIR(rawIr({ stages: ['入力', '処理', '出力'] })).ir
+    const a = await renderFigure(plugin(), base)
+    const b = await renderFigure(plugin(), withHeaders)
+    assert.equal(b.height, a.height + 24)
+    const h = b.layout.geo.headers
+    assert.deepEqual(h.map((x) => x.anchor), ['start', 'middle', 'end'])
+    assert.deepEqual(h.map((x) => x.y), [28, 28, 28])
+    const cols = [0, 1, 2].map((c) => b.layout.geo.nodes.find((nd) => nd.col === c))
+    assert.equal(h[0].x, cols[0].x)
+    assert.equal(h[2].x, cols[2].x + cols[2].width)
+    assert.ok(h[1].x > cols[1].x && h[1].x < cols[1].x + cols[1].width + 4)
+    for (const nd of b.layout.geo.nodes) assert.ok(nd.y >= 16 + 24, `${nd.id} y ${nd.y}`)
+    for (const [i, nd] of b.layout.geo.nodes.entries()) assert.equal(nd.y, a.layout.geo.nodes[i].y + 24)
+    assert.deepEqual(b.layout.geo.labels.filter((l) => l.kind === 'header').map((l) => l.id), ['header-0', 'header-1', 'header-2'])
+    assert.match(b.svg, /<text id="wu-d-s-header-0" x="16" y="28" font-size="11" text-anchor="start" fill="var\(--wu-ink-3\)">入力<\/text>/)
+    assert.match(b.svg, /<text id="wu-d-s-header-2" [^>]*text-anchor="end"[^>]*>出力<\/text>/)
+    const v = await verifyFigure(plugin(), withHeaders, b)
+    assert.equal(v.ok, true, JSON.stringify(v.failures))
+    assert.deepEqual(v.warnings, [])
   })
 })
 
 // --- verify rows ----------------------------------------------------------
 
 describe('figures/sankey.mjs: verify rows fail on a mutated render', () => {
-  test('a clean render passes every row, own rows numbered 1..9 before the shared rows', async () => {
+  test('a clean render passes every row, own rows numbered 1..11 before the shared rows', async () => {
     const { ir, r } = await rendered('sankey-full.yaml')
     const result = await verifyFigure(plugin(), ir, r)
     assert.equal(result.ok, true, JSON.stringify(result.failures))
-    assert.deepEqual(result.checks.slice(0, 9).map((c) => c.name), sankey.doc.rows)
-    assert.deepEqual(result.checks.slice(0, 9).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9])
+    assert.deepEqual(result.checks.slice(0, 11).map((c) => c.name), sankey.doc.rows)
+    assert.deepEqual(result.checks.slice(0, 11).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
     assert.deepEqual(result.warnings, [])
+    assert.equal(byName(result.checks, 'stage-count').severity, 'warn')
+    assert.equal(byName(result.checks, 'ribbon-min').severity, 'warn')
   })
 
   test('#1–#4 budget rows warn (never fail) with key/value on the over-budget fixture', async () => {
@@ -280,11 +354,11 @@ describe('figures/sankey.mjs: verify rows fail on a mutated render', () => {
 // --- registry dispatch + CLI ----------------------------------------------
 
 describe('figures/sankey.mjs: renderFigureHtmlChecked and the CLI', () => {
-  test('simple and full render as data-checks="pass" data-type="sankey" figures with data-value ribbons and no literal colors', async () => {
-    for (const name of ['sankey-simple.yaml', 'sankey-full.yaml']) {
+  test('simple and full render as data-checks="pass" data-type="sankey" figures with data-value ribbons and no literal colors (the 2-stage simple one carries the stages warn)', async () => {
+    for (const [name, warn] of [['sankey-simple.yaml', ' data-warn="budget:stages=2"'], ['sankey-full.yaml', '']]) {
       const out = await renderFigureHtmlChecked(validIr(name), { rawYaml: fixture(name) })
       assert.equal(out.checksOk, true, `${name}: ${JSON.stringify(out.failures)}`)
-      assert.match(out.html, /^<figure class="wu-figure" data-checks="pass" data-type="sankey">/)
+      assert.ok(out.html.startsWith(`<figure class="wu-figure" data-checks="pass"${warn} data-type="sankey">`), out.html.slice(0, 120))
       assert.match(out.html, /<script type="text\/x-writeup-diagram">/)
       assert.match(out.html, /data-value="/)
       assert.doesNotMatch(out.html, /#[0-9a-fA-F]{3,6}\b|rgb\(/)
@@ -313,6 +387,7 @@ describe('figures/sankey.mjs: renderFigureHtmlChecked and the CLI', () => {
     const example = validateIR(parseYaml(doc.stdout))
     assert.ok(example.ok, example.message)
     assert.equal(new Set(example.ir.nodes.map((n) => n.stage)).size, 3)
+    assert.deepEqual(example.ir.stages, ['流入元', '着地ページ', '結果'])
     assert.equal(example.ir.nodes.length, 7)
     assert.equal(example.ir.links.length, 8)
     assert.deepEqual(example.warnings, [])

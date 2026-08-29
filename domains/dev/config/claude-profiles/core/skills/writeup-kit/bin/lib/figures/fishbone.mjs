@@ -8,9 +8,16 @@
 // IR shape: `{ id, type:'fishbone', title, caption, effect, categories }`
 //   effect:     the symptom the figure explains (write it as a symptom, not
 //               as the fix — "p95 が 3 倍に悪化", not "キャッシュを入れる")
-//   categories: [{ id, label, causes: [{ label, emphasis }] }] — a raw cause
-//               may be a bare string; `emphasis` marks a root cause (accent
-//               tick + bold text, ≤ 2 per figure)
+//   categories: [{ id, label, emphasis, causes: [{ label, emphasis }] }] — a
+//               raw cause may be a bare string. The accent lives on the
+//               category bone (design survey #31: accent = the root-cause
+//               bone + the effect box): `emphasis` on a category draws its
+//               bone and label box in the accent stroke, and `emphasis` on a
+//               cause promotes its category (normalize() sets the category's
+//               `emphasis`) and bolds the cause text. At most one accented
+//               bone per figure (budget:emphasis).
+// Budgets (survey #31): categories ≤ 6, causes ≤ 3 per bone and ≤ 18 in
+// total, labels ≤ 14 chars — advisory warn rows.
 //
 // Geometry: the bones are the documented exception to the kit's
 // orthogonal-connector rule (design survey §3: "Fishbone の骨"). They are
@@ -24,7 +31,7 @@ import { snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR } from '../
 
 export const type = 'fishbone'
 
-export const limits = { maxCategories: 6, maxCausesPerCategory: 5, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { maxCategories: 6, maxCausesPerCategory: 3, maxCauses: 18, maxLabelLen: 14, maxEmphasis: 1 }
 
 // --- layout constants (px; positions derived from them stay on the 4px grid) --
 
@@ -72,7 +79,9 @@ function normalizeCategories(raw, ctx) {
       if (isObj(k)) return { label: requireStr(k, 'label', kctx), emphasis: validateBool(k, 'emphasis', kctx) }
       throw new IrError(`${kctx} must be a string or a mapping`)
     })
-    return { id, label, causes }
+    // an emphasised cause accents its bone: the category becomes the focal one
+    const emphasis = validateBool(c, 'emphasis', cctx) || causes.some((k) => k.emphasis)
+    return { id, label, emphasis, causes }
   })
 }
 
@@ -87,7 +96,8 @@ function longestLabel(ir) {
   return best
 }
 
-const emphasisCount = (ir) => ir.categories.reduce((n, c) => n + c.causes.filter((k) => k.emphasis).length, 0)
+const emphasisCount = (ir) => ir.categories.filter((c) => c.emphasis).length
+const causeCount = (ir) => ir.categories.reduce((n, c) => n + c.causes.length, 0)
 
 export function budgetWarnings(ir) {
   const out = []
@@ -103,6 +113,12 @@ export function budgetWarnings(ir) {
       `category "${fattest.id}" lists ${fattest.causes.length} cause(s) (guidance ≤ ${limits.maxCausesPerCategory})`,
       `keep the causes of "${fattest.id}" that were actually investigated and move the rest to the caption or a list`))
   }
+  const total = causeCount(ir)
+  if (total > limits.maxCauses) {
+    out.push(budgetWarning('budget:total', total, limits.maxCauses,
+      `${total} causes in total (guidance ≤ ${limits.maxCauses})`,
+      'a fishbone shows what was investigated, not everything imaginable — keep the causes with evidence and list the rest in the caption'))
+  }
   const longest = longestLabel(ir)
   if (longest.length > limits.maxLabelLen) {
     out.push(budgetWarning('budget:label', longest.length, limits.maxLabelLen,
@@ -112,8 +128,8 @@ export function budgetWarnings(ir) {
   const emphasized = emphasisCount(ir)
   if (emphasized > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
-      `${emphasized} emphasized cause(s) (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis on the one or two root causes the decision acts on'))
+      `${emphasized} emphasized bone(s) (guidance ≤ ${limits.maxEmphasis})`,
+      'keep the accent on the one bone whose root cause the decision acts on'))
   }
   return out
 }
@@ -176,7 +192,7 @@ export async function layout(ir) {
         text: { x: bx - TICK - TICK_GAP, y, width: causeWidth(k), anchor: 'end' },
       }
     })
-    return { id: c.id, index: i, side: top ? 'top' : 'bottom', x1: tipX, y1: tipY, x2: join, y2: spineY, box, causes }
+    return { id: c.id, index: i, side: top ? 'top' : 'bottom', emphasis: c.emphasis, x1: tipX, y1: tipY, x2: join, y2: spineY, box, causes }
   })
 
   return { width, height, geo: { spineY, spine, effect, bones, spacing, slots: K } }
@@ -196,16 +212,18 @@ export function draw(layoutResult, ir) {
   parts.push(`<line id="${uid}-spine" x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="currentColor" stroke-width="1.5" marker-end="url(#${uid}-solid)"/>`)
 
   for (const b of geo.bones) {
-    parts.push(`<line id="${uid}-bone-${b.id}" x1="${b.x1}" y1="${b.y1}" x2="${b.x2}" y2="${b.y2}" stroke="currentColor" stroke-width="1" marker-end="url(#${uid}-solid)"/>`)
+    // the accent is the bone itself (plus its label box), never a cause tick
+    const boneStroke = b.emphasis ? 'var(--wu-accent)' : 'currentColor'
+    const boneSw = b.emphasis ? 1.5 : 1
+    const boxCls = b.emphasis ? ' class="wu-focal"' : ''
+    parts.push(`<line id="${uid}-bone-${b.id}" x1="${b.x1}" y1="${b.y1}" x2="${b.x2}" y2="${b.y2}" stroke="${boneStroke}" stroke-width="${boneSw}" marker-end="url(#${uid}-solid)"/>`)
     const bx = b.box
-    parts.push(`<rect id="${uid}-cat-${b.id}" x="${bx.x}" y="${bx.y}" width="${bx.width}" height="${bx.height}" rx="4" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1"/>`)
+    parts.push(`<rect id="${uid}-cat-${b.id}"${boxCls} x="${bx.x}" y="${bx.y}" width="${bx.width}" height="${bx.height}" rx="4" fill="var(--wu-surface)" stroke="currentColor" stroke-width="${boneSw}"/>`)
     parts.push(`<text id="${uid}-cat-${b.id}-label" x="${bx.x + bx.width / 2}" y="${bx.y + bx.height / 2 + FONT_SIZE * 0.35}" font-size="${FONT_SIZE}" font-weight="700" text-anchor="middle" fill="currentColor">${esc(bx.label)}</text>`)
     for (const k of b.causes) {
       const t = k.tick
-      const stroke = k.emphasis ? 'var(--wu-accent)' : 'currentColor'
-      const sw = k.emphasis ? 1.5 : 1
       const weight = k.emphasis ? ' font-weight="700"' : ''
-      parts.push(`<line id="${uid}-tick-${b.id}-${k.index}" x1="${t.x1}" y1="${t.y1}" x2="${t.x2}" y2="${t.y2}" stroke="${stroke}" stroke-width="${sw}"/>`)
+      parts.push(`<line id="${uid}-tick-${b.id}-${k.index}" x1="${t.x1}" y1="${t.y1}" x2="${t.x2}" y2="${t.y2}" stroke="currentColor" stroke-width="1"/>`)
       parts.push(`<text id="${uid}-cause-${b.id}-${k.index}" x="${k.text.x}" y="${k.text.y + EDGE_LABEL_SIZE * 0.35}" font-size="${EDGE_LABEL_SIZE}"${weight} text-anchor="end" fill="currentColor">${esc(k.label)}</text>`)
     }
   }
@@ -251,8 +269,9 @@ export function verify(layoutResult, ir) {
   }
   budgetRow(1, 'category-count', 'budget:categories', `${ir.categories.length} categor${ir.categories.length === 1 ? 'y' : 'ies'}`)
   budgetRow(2, 'causes-per-category', 'budget:causes', `at most ${ir.categories.reduce((m, c) => Math.max(m, c.causes.length), 0)} cause(s) per category`)
-  budgetRow(3, 'label-length', 'budget:label', `longest label ${longestLabel(ir).length} chars`)
-  budgetRow(4, 'emphasis-count', 'budget:emphasis', `${emphasisCount(ir)} emphasized cause(s)`)
+  budgetRow(3, 'cause-total', 'budget:total', `${causeCount(ir)} cause(s) in total`)
+  budgetRow(4, 'label-length', 'budget:label', `longest label ${longestLabel(ir).length} chars`)
+  budgetRow(5, 'emphasis-count', 'budget:emphasis', `${emphasisCount(ir)} emphasized bone(s)`)
 
   // 5. the spine is horizontal and ends exactly at the effect box, which
   //    straddles it and stays inside the canvas
@@ -262,7 +281,7 @@ export function verify(layoutResult, ir) {
   const inside = effect.x + effect.width <= layoutResult.width
   const effectOk = spineFlat && endsAtBox && inside
   rows.push({
-    id: 5, name: 'effect-at-spine-end', severity: 'fail', ok: effectOk,
+    id: 6, name: 'effect-at-spine-end', severity: 'fail', ok: effectOk,
     detail: effectOk ? 'the spine runs horizontally into the effect box at its right end'
       : !spineFlat ? 'the spine is not a horizontal left-to-right line'
         : !endsAtBox ? `the spine ends at x=${spine.x2} but the effect box starts at x=${effect.x} (spine y=${spineY}, box y ${effect.y}–${effect.y + effect.height})`
@@ -285,7 +304,7 @@ export function verify(layoutResult, ir) {
   })
   const bonesOk = bad.length === 0 && geo.bones.length === ir.categories.length
   rows.push({
-    id: 6, name: 'bones-alternate', severity: 'fail', ok: bonesOk,
+    id: 7, name: 'bones-alternate', severity: 'fail', ok: bonesOk,
     detail: bonesOk ? `${geo.bones.length} bone(s) alternate above/below the spine at 60° in IR order`
       : bad.length ? bad.join('; ') : 'bone count differs from ir.categories',
     hint: bonesOk ? undefined : 'hang category 0 above the spine, 1 below, 2 above… each bone from its join on the spine back toward the tail at 60°',
@@ -319,7 +338,7 @@ export function verify(layoutResult, ir) {
     }
   }
   rows.push({
-    id: 7, name: 'no-overlap', severity: 'fail', ok: hits.length === 0,
+    id: 8, name: 'no-overlap', severity: 'fail', ok: hits.length === 0,
     detail: hits.length ? `overlap(s): ${hits.slice(0, 4).join(', ')}${hits.length > 4 ? `, … (${hits.length})` : ''}` : `${labels.length} label(s) clear of every line and of each other`,
     hint: hits.length ? 'widen the join spacing to the longest cause text plus the tick, or shorten the label' : undefined,
   })
@@ -331,11 +350,11 @@ export function verify(layoutResult, ir) {
 
 export const doc = {
   purpose: 'a cause-and-effect (Ishikawa) diagram: one symptom, the categories of causes examined, and which ones were the root',
-  whenToUse: 'when a decision record needs to show *why* — which cause categories were investigated for one symptom and which cause the decision acts on (postmortems, "why this change"); not for a chain of events in time (use sequence or a timeline). Write the effect as a symptom, not as the fix. Budgets: categories ≤ 6, causes per category ≤ 5, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when a decision record needs to show *why* — which cause categories were investigated for one symptom and which cause the decision acts on (postmortems, "why this change"); not for a chain of events in time (use sequence or a timeline). Write the effect as a symptom, not as the fix. The accent is the root-cause bone (emphasis on a category, or on one of its causes) plus the effect box. Budgets: categories ≤ 6, causes ≤ 3 per bone and ≤ 18 in total, label ≤ 14 chars, emphasis ≤ 1 bone — guidance, over-budget figures still render with data-warn.',
   irExample: `id: p95-regression
 type: fishbone
 title: p95 悪化の原因分析
-caption: 根本原因は接続プールの枯渇。強調した 2 件が対処対象
+caption: 根本原因は接続プールの枯渇。強調した骨が対処対象
 effect: デプロイ後に API の p95 が 3 倍に悪化
 categories:
   - id: code
@@ -349,8 +368,7 @@ categories:
     label: インフラ
     causes:
       - ノード数の削減
-      - label: プール上限 10
-        emphasis: true
+      - プール上限 10
       - DNS キャッシュ切れ
   - id: process
     label: 手順
@@ -365,5 +383,5 @@ categories:
       - 索引の欠落
       - 統計情報の古さ
 `,
-  rows: ['category-count', 'causes-per-category', 'label-length', 'emphasis-count', 'effect-at-spine-end', 'bones-alternate', 'no-overlap'],
+  rows: ['category-count', 'causes-per-category', 'cause-total', 'label-length', 'emphasis-count', 'effect-at-spine-end', 'bones-alternate', 'no-overlap'],
 }

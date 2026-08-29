@@ -30,7 +30,7 @@ const runCli = (args) => spawnSync(process.execPath, [BIN, ...args], { encoding:
 const box = (id, label, extra = {}) => ({ id, label, ...extra })
 const minimal = () => ({
   id: 'n', type: 'nested', title: 't',
-  root: box('r', 'R', { children: [box('a', 'A'), box('b', 'B', { tone: 'rs' })] }),
+  root: box('r', 'R', { children: [box('a', 'A'), box('b', 'B', { children: [box('b1', 'B1', { tone: 'rs' })] })] }),
   edges: [{ from: 'a', to: 'b', label: 'x' }],
 })
 
@@ -60,12 +60,32 @@ describe('nested: schema', () => {
     assert.deepEqual(twice, nested.normalize(minimal()))
   })
 
-  test('a fourth nesting level is a schema error naming the path', () => {
-    const raw = { ...minimal(), root: box('r', 'R', { children: [box('l2', 'L2', { children: [box('l3', 'L3', { children: [box('l4', 'L4')] })] })] }), edges: [] }
-    const r = validateIR(raw)
-    assert.equal(r.ok, false)
-    assert.equal(r.reason, 'schema')
-    assert.match(r.message, /^ir\.root\.children\[0\]\.children\[0\]\.children\[0\]: nesting exceeds 3 levels$/)
+  test('4 and 5 levels validate clean, 6 warns budget:depth, 7 is a schema error naming the path', () => {
+    const chain = (n) => {
+      let inner = box(`l${n}`, `L${n}`)
+      for (let i = n - 1; i >= 2; i--) inner = box(`l${i}`, `L${i}`, { children: [inner] })
+      return { ...minimal(), root: box('r', 'R', { children: [inner] }), edges: [] }
+    }
+    for (const n of [4, 5]) {
+      const r = validateIR(chain(n))
+      assert.equal(r.ok, true, `${n} levels: ${JSON.stringify(r)}`)
+      assert.deepEqual(r.warnings, [], `${n} levels`)
+    }
+    const six = validateIR(chain(6))
+    assert.equal(six.ok, true)
+    assert.deepEqual(six.warnings.map((w) => `${w.key}=${w.value}`), ['budget:depth=6'])
+    assert.match(six.warnings[0].hint, /collapse the innermost level/)
+    const seven = validateIR(chain(7))
+    assert.equal(seven.ok, false)
+    assert.equal(seven.reason, 'schema')
+    assert.match(seven.message, /^ir\.root\.children\[0\](\.children\[0\]){5}: nesting exceeds 6 levels$/)
+  })
+
+  test('2 levels validate with a budget:depth warning (the nesting carries no structure yet)', () => {
+    const r = validateIR({ ...minimal(), root: box('r', 'R', { children: [box('a', 'A'), box('b', 'B')] }) })
+    assert.equal(r.ok, true)
+    assert.deepEqual(r.warnings.map((w) => `${w.key}=${w.value}`), ['budget:depth=2'])
+    assert.match(r.warnings[0].hint, /use a diagram with a group/)
   })
 
   test('duplicate ids, unknown edge endpoints, self edges and ancestor edges are rejected', () => {
@@ -78,7 +98,7 @@ describe('nested: schema', () => {
     const contain = validateIR({ ...minimal(), edges: [{ from: 'r', to: 'a' }] })
     assert.match(contain.message, /contain one another/)
     const dir = validateIR({ ...minimal(), direction: 'up' })
-    assert.match(dir.message, /direction must be down\|right/)
+    assert.match(dir.message, /direction must be auto\|down\|right/)
   })
 })
 
@@ -95,7 +115,7 @@ describe('nested: budgets are advisory warnings in a stable order', () => {
     assert.match(html.html, /data-warn="budget:boxes=13"/)
   })
 
-  test('a label over 14 chars warns naming the box; 3 emphasized boxes warn; order is boxes → edges → label → emphasis', () => {
+  test('a label over 14 chars warns naming the box; 3 emphasized boxes warn; order is boxes → edges → label → depth → emphasis → emphasis-outer', () => {
     const raw = minimal()
     raw.root.children[0].label = 'とても長い部品の名前が十四文字を超える'
     raw.root.children[0].emphasis = true
@@ -104,10 +124,24 @@ describe('nested: budgets are advisory warnings in a stable order', () => {
     raw.edges = Array.from({ length: 7 }, () => ({ from: 'a', to: 'b' }))
     const r = validateIR(raw)
     assert.equal(r.ok, true)
-    assert.deepEqual(r.warnings.map((w) => w.key), ['budget:edges', 'budget:label', 'budget:emphasis'])
+    assert.deepEqual(r.warnings.map((w) => w.key), ['budget:edges', 'budget:label', 'budget:emphasis', 'budget:emphasis-outer'])
     assert.match(r.warnings[1].hint, /shorten label of box "a"/)
     assert.equal(r.warnings[2].value, 3)
+    assert.equal(r.warnings[3].value, 2)
+    assert.match(r.warnings[3].detail, /"r", "b"/)
     assert.deepEqual(nested.budgetWarnings(r.ir), r.warnings)
+  })
+
+  test('2 emphasized boxes exceed the accent budget of 1; one emphasized container warns emphasis-outer alone', () => {
+    const two = minimal()
+    two.root.children[0].emphasis = true
+    two.root.children[1].children[0].emphasis = true
+    assert.deepEqual(validateIR(two).warnings.map((w) => `${w.key}=${w.value}`), ['budget:emphasis=2'])
+    const outer = minimal()
+    outer.root.children[1].emphasis = true
+    const r = validateIR(outer)
+    assert.deepEqual(r.warnings.map((w) => `${w.key}=${w.value}`), ['budget:emphasis-outer=1'])
+    assert.match(r.warnings[0].hint, /move emphasis to the leaf/)
   })
 })
 
@@ -170,16 +204,27 @@ describe('nested: layout', () => {
 // --- verify rows ----------------------------------------------------------------
 
 describe('nested: verify rows', () => {
-  test('a real render of every fixture passes every row; rows 1–3 warn, 4–8 fail; shared rows follow', async () => {
+  test('a real render of every fixture passes every row; rows 1–5 warn, 6–10 fail; shared rows follow', async () => {
     for (const name of ['nested-simple.yaml', 'nested-deep.yaml']) {
       const { ir, out } = await rendered(name)
       const result = await verifyFigure(nested, ir, out)
       assert.deepEqual(result.checks.filter((c) => !c.ok), [], name)
       assert.equal(result.ok, true)
-      assert.deepEqual(result.checks.slice(0, 8).map((c) => c.severity), ['warn', 'warn', 'warn', 'fail', 'fail', 'fail', 'fail', 'fail'])
-      assert.deepEqual(result.checks.slice(0, 8).map((c) => c.name), nested.doc.rows)
-      assert.equal(result.checks.length, 8 + 7)
+      assert.deepEqual(result.checks.slice(0, 10).map((c) => c.severity), ['warn', 'warn', 'warn', 'warn', 'warn', 'fail', 'fail', 'fail', 'fail', 'fail'])
+      assert.deepEqual(result.checks.slice(0, 10).map((c) => c.name), nested.doc.rows)
+      assert.equal(result.checks.length, 10 + 7)
     }
+  })
+
+  test('a 5-level chain with an edge renders and passes every row without a warning', async () => {
+    let inner = box('l5', 'L5', { emphasis: true })
+    for (let i = 4; i >= 2; i--) inner = box(`l${i}`, `L${i}`, { children: [inner] })
+    const raw = { ...minimal(), root: box('r', 'R', { children: [inner, box('peer', 'Peer')] }), edges: [{ from: 'l5', to: 'peer', label: '参照' }] }
+    const ir = validateIR(raw).ir
+    const out = await renderFigure(nested, ir)
+    const result = await verifyFigure(nested, ir, out)
+    assert.deepEqual(result.checks.filter((c) => !c.ok).map((c) => `${c.name}: ${c.detail}`), [])
+    assert.deepEqual([...new Set(out.layout.geo.boxes.map((b) => b.level))].sort(), [1, 2, 3, 4, 5])
   })
 
   test('containment fails when a child is pushed outside its parent\'s padding', async () => {
@@ -242,7 +287,7 @@ describe('nested: verify rows', () => {
     assert.match(byName(result.checks, 'edge-clearance').detail, /edge 0 \("order-api"→"pay-api"\)/)
   })
 
-  test('emphasis-count warns (ok stays true overall) when 3 boxes are emphasized', async () => {
+  test('emphasis-count and emphasis-innermost warn (ok stays true overall) when 3 boxes including containers are emphasized', async () => {
     const raw = minimal()
     raw.root.emphasis = true
     raw.root.children.forEach((c) => { c.emphasis = true })
@@ -250,8 +295,34 @@ describe('nested: verify rows', () => {
     const out = await renderFigure(nested, ir)
     const result = await verifyFigure(nested, ir, out)
     assert.equal(result.ok, true)
-    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:emphasis=3'])
+    assert.deepEqual(result.warnings.map((w) => `${w.key}=${w.value}`), ['budget:emphasis=3', 'budget:emphasis-outer=2'])
     assert.equal(byName(result.checks, 'emphasis-count').severity, 'warn')
+    assert.equal(byName(result.checks, 'emphasis-innermost').severity, 'warn')
+    assert.equal(byName(result.checks, 'depth').ok, true)
+  })
+
+  test('edge-clearance fails when an edge label is moved onto a box, under another edge, or onto another label', async () => {
+    const { ir, out } = await rendered('nested-deep.yaml')
+    const clean = await verifyFigure(nested, ir, out)
+    assert.equal(byName(clean.checks, 'edge-clearance').ok, true)
+    const onBox = structuredClone(out)
+    const ledger = onBox.layout.geo.boxes.find((b) => b.id === 'pay-ledger')
+    Object.assign(onBox.layout.geo.edges[0].labelBox, { x: ledger.x + 8, y: ledger.y + 8 })
+    let row = byName((await verifyFigure(nested, ir, onBox)).checks, 'edge-clearance')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /edge 0 label "与信" covers box "pay-ledger"/)
+    const underEdge = structuredClone(out)
+    const other = underEdge.layout.geo.edges[1]
+    const seg = other.points[1], seg2 = other.points[2]
+    Object.assign(underEdge.layout.geo.edges[0].labelBox, { x: Math.min(seg.x, seg2.x) + 8, y: seg.y - 8 })
+    row = byName((await verifyFigure(nested, ir, underEdge)).checks, 'edge-clearance')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /label "与信" is crossed by edge 1/)
+    const onLabel = structuredClone(out)
+    Object.assign(onLabel.layout.geo.edges[0].labelBox, { x: onLabel.layout.geo.edges[1].labelBox.x, y: onLabel.layout.geo.edges[1].labelBox.y })
+    row = byName((await verifyFigure(nested, ir, onLabel)).checks, 'edge-clearance')
+    assert.equal(row.ok, false)
+    assert.match(row.detail, /label "与信" overlaps edge 1 label "完了"/)
   })
 })
 
@@ -260,9 +331,7 @@ describe('nested: verify rows', () => {
 describe('nested: registry dispatch and CLI', () => {
   test('the registry knows nested with its limits and rows; the doc example renders clean', async () => {
     const t = getFigureType('nested')
-    assert.equal(t.limits.maxBoxes, 12)
-    assert.equal(t.limits.maxDepth, 3)
-    assert.equal(t.limits.maxLabelLen, 14)
+    assert.deepEqual(t.limits, { maxBoxes: 12, minDepth: 3, maxDepth: 5, maxLabelLen: 14, maxEmphasis: 1 })
     const r = validateIR(parseYaml(t.doc.irExample))
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.deepEqual(r.warnings, [])

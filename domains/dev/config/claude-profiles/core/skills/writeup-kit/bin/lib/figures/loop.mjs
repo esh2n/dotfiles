@@ -1,15 +1,21 @@
-// `type: loop` — a cyclic flow (flywheel): 3–8 steps as boxes on one
-// circle, the first at the top, each joined to the next by an arc on that
-// same circle with an arrowhead, the last arc closing back to the first.
-// An optional hub sits at the centre with a dashed spoke to every step
-// (the write-back that makes a flywheel: every turn accumulates something
-// in the hub). An exit is a short orthogonal arrow leaving one step
-// outward — the one place the cycle is left.
+// `type: loop` — a cyclic flow (flywheel): 5–8 steps (3 is the schema
+// floor) as boxes on one circle, the first at the top, each joined to the
+// next by an arc on that same circle with an arrowhead, the last arc
+// closing back to the first. A hub sits at the centre with a dashed spoke
+// to every step (the write-back that makes a flywheel: every turn
+// accumulates something in the hub) — a ring without a hub is a Cycle,
+// not a Loop (design survey #12), so a missing hub is a budget warning.
+// An exit is a short orthogonal arrow leaving one step outward — the one
+// place the cycle is left.
+//
+// Focal: at most one step carries `emphasis`; when none does, the hub is
+// the focal element (accent stroke, `geo.hub.focal`), so a loop always
+// has exactly one accent.
 //
 // IR shape: `{ id, type:'loop', title, caption?, hub?, steps, direction?, exits?, edgeLabels? }`
-//   steps:      [{ id, label, note?, emphasis?, tone? }] in flow order, 3–8 by guidance
+//   steps:      [{ id, label, note?, emphasis?, tone? }] in flow order, 5–8 by guidance (≥ 3)
 //   direction:  'cw' (default) | 'ccw' — which way round the steps run from the top
-//   hub:        string — centre label; spokes are drawn only when it is set
+//   hub:        string — centre label; spokes are drawn only when it is set (missing → budget:hub)
 //   exits:      [{ from: stepId, label }] — outward arrow from a step
 //   edgeLabels: [{ from, to, label }] — text outside the arc from `from` to
 //               the step that follows it (any other pair is a schema error)
@@ -28,7 +34,7 @@ import { snap4, snapUp4, textWidth, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FACTOR, COL
 
 export const type = 'loop'
 
-export const limits = { maxSteps: 8, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { minSteps: 5, maxSteps: 8, maxLabelLen: 14, maxEmphasis: 1 }
 
 const MIN_STEPS = 3
 const PAD = 16               // canvas margin
@@ -150,6 +156,10 @@ export function budgetWarnings(ir) {
     out.push(budgetWarning('budget:steps', ir.steps.length, limits.maxSteps,
       `${ir.steps.length} step(s) (guidance ≤ ${limits.maxSteps})`,
       'merge neighbouring steps that one actor performs, or split the cycle into an inner and an outer loop'))
+  } else if (ir.steps.length < limits.minSteps) {
+    out.push(budgetWarning('budget:steps', ir.steps.length, limits.minSteps,
+      `${ir.steps.length} step(s) (guidance ≥ ${limits.minSteps})`,
+      'a loop of fewer than 5 steps rarely says more than a sentence — name the intermediate steps, or describe the cycle in prose'))
   }
   const longest = longestLabel(ir)
   if (charLen(longest) > limits.maxLabelLen) {
@@ -161,7 +171,12 @@ export function budgetWarnings(ir) {
   if (emphasized > limits.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized, limits.maxEmphasis,
       `${emphasized} emphasized step(s) (guidance ≤ ${limits.maxEmphasis})`,
-      'keep emphasis on the one or two steps the decision is about'))
+      'keep emphasis on the one step the decision is about (or on none — the hub then takes the accent)'))
+  }
+  if (!ir.hub) {
+    out.push(budgetWarning('budget:hub', 0, 1,
+      'no hub — the steps form a ring with nothing accumulating in the middle',
+      'a ring without a hub is a Cycle, not a Loop (hub のない環は Cycle であって Loop ではない) — name what every turn builds up (hub:), or draw the steps as a process'))
   }
   return out
 }
@@ -412,7 +427,8 @@ export async function layout(ir, { column = COLUMN } = {}) {
     exits: exits.map((e) => ({ ...e, x1: e.x1 + cx, y1: e.y1 + cy, x2: e.x2 + cx, y2: e.y2 + cy, label: shiftText(e.label) })),
   }
   if (ir.hub) {
-    geo.hub = { text: ir.hub, cx, cy, r: hubR }
+    // the hub takes the accent when no step claims it
+    geo.hub = { text: ir.hub, cx, cy, r: hubR, focal: !ir.steps.some((s) => s.emphasis) }
     geo.spokes = spokes.map((s) => ({ ...s, sx: round1(s.sx + cx), sy: round1(s.sy + cy), ex: round1(s.ex + cx), ey: round1(s.ey + cy) }))
   }
   return { width, height, geo }
@@ -430,7 +446,8 @@ export function draw(layoutResult, ir) {
 
   if (geo.hub) {
     // the hub is the one dense fill: a currentColor wash with the heavy stroke
-    parts.push(`<circle id="${uid}-hub" cx="${geo.hub.cx}" cy="${geo.hub.cy}" r="${geo.hub.r}" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.5"/>`)
+    const focal = geo.hub.focal ? ' class="wu-focal" stroke="var(--wu-accent)"' : ' stroke="currentColor"'
+    parts.push(`<circle id="${uid}-hub" cx="${geo.hub.cx}" cy="${geo.hub.cy}" r="${geo.hub.r}" fill="currentColor" fill-opacity="0.12"${focal} stroke-width="1.5"/>`)
     parts.push(`<text id="${uid}-hub-label" x="${geo.hub.cx}" y="${geo.hub.cy + 4}" font-size="${FONT_SIZE}" font-weight="700" text-anchor="middle" fill="currentColor">${esc(geo.hub.text)}</text>`)
     parts.push(`<g id="${uid}-spokes" stroke="var(--wu-ink-3)" stroke-width="1" stroke-dasharray="4 3">`)
     for (const s of geo.spokes) parts.push(`<line id="${uid}-spoke-${s.to}" x1="${s.sx}" y1="${s.sy}" x2="${s.ex}" y2="${s.ey}"/>`)
@@ -477,6 +494,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
   budgetRow(1, 'step-count', 'budget:steps', `${ir.steps.length} step(s)`)
   budgetRow(2, 'label-length', 'budget:label', `longest label ${charLen(longestLabel(ir))} chars`)
   budgetRow(3, 'emphasis-count', 'budget:emphasis', `${ir.steps.filter((s) => s.emphasis).length} emphasized step(s)`)
+  budgetRow(4, 'hub-present', 'budget:hub', `hub "${ir.hub}"${geo.hub?.focal ? ' carries the accent' : ''}`)
 
   // re-centre the geometry so the placement predicates apply as in layout()
   const { cx, cy } = geo
@@ -489,7 +507,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
   // 4. step boxes never overlap each other or the hub
   const boxes = boxProblems(steps, hubR)
   rows.push({
-    id: 4, name: 'boxes-clear', severity: 'fail', ok: boxes.length === 0,
+    id: 5, name: 'boxes-clear', severity: 'fail', ok: boxes.length === 0,
     detail: boxes.length ? boxes.slice(0, 6).join('; ') : `every step box keeps ≥ ${BOX_GAP}px from its neighbours${hubR ? ` and ≥ ${HUB_GAP}px from the hub` : ''}`,
     hint: boxes.length ? 'shorten the step labels or reduce the step count so the circle can hold every box' : undefined,
   })
@@ -497,7 +515,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
   // 5. arcs stay on the circle, clear of every box, and are long enough to read
   const arcIssues = arcProblems(steps, arcs, geo.radius, hubR)
   rows.push({
-    id: 5, name: 'arcs-clear', severity: 'fail', ok: arcIssues.length === 0,
+    id: 6, name: 'arcs-clear', severity: 'fail', ok: arcIssues.length === 0,
     detail: arcIssues.length ? arcIssues.slice(0, 6).join('; ') : `every arc keeps ≥ ${ARC_GAP}px from the boxes and is ≥ ${ARC_MIN_LEN}px long`,
     hint: arcIssues.length ? 'widen the circle (fewer or shorter steps) so each arc has room between its two boxes' : undefined,
   })
@@ -505,7 +523,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
   // 6. arc labels and exits clear of boxes, the hub, and each other
   const labelIssues = labelProblems(steps, arcs, exits, hubR)
   rows.push({
-    id: 6, name: 'labels-clear', severity: 'fail', ok: labelIssues.length === 0,
+    id: 7, name: 'labels-clear', severity: 'fail', ok: labelIssues.length === 0,
     detail: labelIssues.length ? labelIssues.slice(0, 6).join('; ') : (arcs.some((a) => a.label) || exits.length ? `arc labels and exits keep ≥ ${LABEL_CLEAR}px from every box and each other` : 'no arc labels or exits'),
     hint: labelIssues.length ? 'shorten the arc/exit label, or drop it and say it in the caption' : undefined,
   })
@@ -533,7 +551,7 @@ export function verify(layoutResult, ir, { svg } = {}) {
     }
   })
   rows.push({
-    id: 7, name: 'arrow-direction', severity: 'fail', ok: dirIssues.length === 0,
+    id: 8, name: 'arrow-direction', severity: 'fail', ok: dirIssues.length === 0,
     detail: dirIssues.length ? dirIssues.slice(0, 6).join('; ') : `every arc runs ${ir.direction === 'ccw' ? 'counter-clockwise' : 'clockwise'} from a step to the next, arrowhead at the next step`,
     hint: dirIssues.length ? 'lay each arc out from step i to step i+1 in the direction the IR names, and draw it with the matching sweep flag' : undefined,
   })
@@ -543,8 +561,8 @@ export function verify(layoutResult, ir, { svg } = {}) {
 // --- doc -----------------------------------------------------------------
 
 export const doc = {
-  purpose: 'a cycle whose last step feeds the first (flywheel): steps round a circle, arcs between them, an optional hub that accumulates, exits where the loop is left',
-  whenToUse: 'when the point is that the flow closes on itself and each turn strengthens something in the middle — growth loops, feedback loops, a review cycle. A flow with an end or a branch is a process/diagram; a plain cycle without accumulation needs no hub. Budgets: steps ≤ 8, label ≤ 14 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  purpose: 'a cycle whose last step feeds the first (flywheel): steps round a circle, arcs between them, a hub that accumulates, exits where the loop is left',
+  whenToUse: 'when the point is that the flow closes on itself and each turn strengthens something in the middle — growth loops, feedback loops, a review cycle. A flow with an end or a branch is a process/diagram; a ring with nothing accumulating is a Cycle, not a Loop — it warns (budget:hub) and probably wants prose or a process. Budgets: steps 5–8, label ≤ 14 chars, emphasis ≤ 1, hub present — guidance, over-budget figures still render with data-warn. With no step emphasised, the hub takes the accent.',
   irExample: `id: data-flywheel
 type: loop
 title: データ資産のフライホイール
@@ -572,5 +590,5 @@ exits:
   - from: ux
     label: 有料プランへ
 `,
-  rows: ['step-count', 'label-length', 'emphasis-count', 'boxes-clear', 'arcs-clear', 'labels-clear', 'arrow-direction'],
+  rows: ['step-count', 'label-length', 'emphasis-count', 'hub-present', 'boxes-clear', 'arcs-clear', 'labels-clear', 'arrow-direction'],
 }

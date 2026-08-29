@@ -1,22 +1,23 @@
-# Regression fixture (2026-08-28): a real page's "ACL とは" figure — 4 nodes in
+# Regression fixture (2026-08-28): a real page's boundary-translation-layer
+# overview figure (labels since neutralised at equal textWidth) — 4 nodes in
 # 3 groups, 5 labeled sync edges, direction pinned to `right`. Rendered as a
 # 1908x252 SVG (data-checks="pass" data-scroll="true") that showed only its
 # left third in the column; see the "right layer gaps" tests in
 # test/diagram.test.mjs and the renderCheckedBest tests in test/verify-diagram.test.mjs.
 id: d1
-title: ACL とは
-caption: ACL とはの図
+title: 境界変換層とは
+caption: 境界変換層とはの図
 direction: right
 groups:
 - id: mine
-  label: 自分のコンテキスト
+  label: 自分の内部システム
 - id: acl
-  label: 腐敗防止層
+  label: 境界変換層
 - id: other
-  label: 外部のコンテキスト
+  label: 外部の既存システム
 nodes:
 - id: domain
-  label: ドメインモデル
+  label: 内部のデータ型
   group: mine
 - id: service
   label: Service

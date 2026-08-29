@@ -10,4 +10,9 @@ root:
       label: スケジューラ
     - id: api
       label: 更新通知 API
-      tone: rs
+      children:
+        - id: recv
+          label: 受信
+        - id: check
+          label: 検証
+          tone: rs

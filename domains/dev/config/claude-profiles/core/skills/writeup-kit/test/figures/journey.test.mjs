@@ -30,7 +30,7 @@ function runCli(args) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr }
 }
 
-const OWN_ROWS = ['stage-count', 'row-count', 'cell-text-length', 'emphasis-count', 'references-exist', 'cells-inside-grid', 'curve-at-stage-centres', 'labels-clear-of-curve']
+const OWN_ROWS = ['stage-count', 'row-count', 'cell-text-length', 'emphasis-count', 'emphasis-at-trough', 'references-exist', 'cells-inside-grid', 'curve-at-stage-centres', 'labels-clear-of-curve']
 const SHARED_ROWS = ['single-finite-svg', 'a11y', 'font-size', 'stroke-radius', 'dark-3-state', 'grid-4px', 'projected-scale']
 const ALL_FIXTURES = ['journey-simple.yaml', 'journey-full.yaml', 'journey-over-stages.yaml', 'journey-over-rows.yaml', 'journey-over-cell-text.yaml', 'journey-over-emphasis.yaml']
 
@@ -71,16 +71,38 @@ describe('journey: schema', () => {
     assert.match(r.message, /unknown row "ghost" \(declared: act, pain\)/)
   })
 
-  test('emotion must be an integer -2..2; duplicate stage ids and non-string cells are rejected', () => {
-    for (const bad of [3, -3, 1.5, '1', true]) {
+  test('emotion is a named level (最悪 … 最高 / worst … best) normalized to -2..2; integers still accepted; anything else rejected', () => {
+    const names = [['最悪', -2], ['悪い', -1], ['普通', 0], ['良い', 1], ['最高', 2], ['worst', -2], ['bad', -1], ['neutral', 0], ['good', 1], ['best', 2]]
+    for (const [name, value] of names) {
+      const r = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emotion: name }] })
+      assert.equal(r.ok, true, name)
+      assert.equal(r.ir.stages[0].emotion, value, name)
+    }
+    assert.equal(validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emotion: -1 }] }).ir.stages[0].emotion, -1)
+    for (const bad of [3, -3, 1.5, '1', 'ok', true]) {
       const r = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emotion: bad }] })
       assert.equal(r.ok, false, JSON.stringify(bad))
-      assert.match(r.message, /stages\[0\]\.emotion must be an integer from -2 to 2/)
+      assert.match(r.message, /stages\[0\]\.emotion must be one of 最悪\|悪い\|普通\|良い\|最高 .* or an integer from -2 to 2/)
     }
     const dup = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A' }, { id: 'a', label: 'B' }] })
     assert.match(dup.message, /duplicate stage id "a"/)
     const cell = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', cells: { act: [''] } }] })
     assert.match(cell.message, /cells\["act"\]\[0\] must be a non-empty string/)
+  })
+
+  test('focal default: with no emphasis anywhere, the trough (lowest emotion, earliest on ties) gets it', () => {
+    const stages = [
+      { id: 'a', label: 'A', emotion: 'good' }, { id: 'b', label: 'B', emotion: 'bad' },
+      { id: 'c', label: 'C', emotion: 'neutral' }, { id: 'd', label: 'D', emotion: 'bad' },
+    ]
+    const r = validateIR({ ...minimal(), stages })
+    assert.equal(r.ok, true)
+    assert.deepEqual(r.ir.stages.map((s) => s.emphasis), [false, true, false, false])
+    assert.deepEqual(r.warnings, [])
+    const explicit = validateIR({ ...minimal(), stages: stages.map((s, i) => (i === 3 ? { ...s, emphasis: true } : s)) })
+    assert.deepEqual(explicit.ir.stages.map((s) => s.emphasis), [false, false, false, true], 'an explicit emphasis is left alone')
+    const none = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] })
+    assert.deepEqual(none.ir.stages.map((s) => s.emphasis), [false, false], 'no emotion → no default focal')
   })
 
   test('normalize() is idempotent for every fixture and equals validateIR()', () => {
@@ -105,8 +127,8 @@ describe('journey: budgets', () => {
 
   test('each budget key fires on its fixture and reaches data-warn', async () => {
     const cases = [
-      ['journey-over-stages.yaml', 'budget:stages', 8],
-      ['journey-over-rows.yaml', 'budget:rows', 5],
+      ['journey-over-stages.yaml', 'budget:stages', 7],
+      ['journey-over-rows.yaml', 'budget:rows', 4],
       ['journey-over-cell-text.yaml', 'budget:cell-text', 22],
       ['journey-over-emphasis.yaml', 'budget:emphasis', 3],
     ]
@@ -121,15 +143,26 @@ describe('journey: budgets', () => {
     }
   })
 
-  test('keys come out in a stable order: stages, rows, cell-text, emphasis', () => {
+  test('an emphasized stage that is not a low point of the curve (or has no emotion) warns with budget:trough', () => {
+    const peak = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emotion: 'bad' }, { id: 'b', label: 'B', emotion: 'best', emphasis: true }, { id: 'c', label: 'C', emotion: 'neutral' }] })
+    assert.deepEqual(peak.warnings.map((w) => [w.key, w.value]), [['budget:trough', 1]])
+    assert.match(peak.warnings[0].detail, /stage "b" is emphasized but is not a low point/)
+    assert.match(peak.warnings[0].hint, /move the emphasis to a trough/)
+    const blank = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emotion: 'bad' }, { id: 'b', label: 'B', emphasis: true }] })
+    assert.match(blank.warnings[0].detail, /stage "b" is emphasized but has no emotion/)
+    const plateau = validateIR({ ...minimal(), stages: [{ id: 'a', label: 'A', emotion: 'bad' }, { id: 'b', label: 'B', emotion: 'bad', emphasis: true }, { id: 'c', label: 'C', emotion: 'good' }] })
+    assert.deepEqual(plateau.warnings, [], 'a flat low stretch counts as a trough')
+  })
+
+  test('keys come out in a stable order: stages, rows, cell-text, emphasis, trough', () => {
     const ir = validateIR({
       ...minimal(),
       rows: ['r1', 'r2', 'r3', 'r4', 'r5'],
-      stages: Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, label: `S${i}`, emotion: 0, emphasis: i < 3, cells: { r1: 'a very long cell item indeed' } })),
+      stages: Array.from({ length: 8 }, (_, i) => ({ id: `s${i}`, label: `S${i}`, emotion: i === 1 ? 1 : 0, emphasis: i < 3, cells: { r1: 'a very long cell item indeed' } })),
     }).ir
     const keys = plugin.budgetWarnings(ir).map((w) => w.key)
-    assert.deepEqual(keys, ['budget:stages', 'budget:rows', 'budget:cell-text', 'budget:emphasis'])
-    assert.equal(formatBudgetWarnings(plugin.budgetWarnings(ir)), 'budget:stages=8;budget:rows=5;budget:cell-text=28;budget:emphasis=3')
+    assert.deepEqual(keys, ['budget:stages', 'budget:rows', 'budget:cell-text', 'budget:emphasis', 'budget:trough'])
+    assert.equal(formatBudgetWarnings(plugin.budgetWarnings(ir)), 'budget:stages=8;budget:rows=5;budget:cell-text=28;budget:emphasis=3;budget:trough=1')
   })
 })
 
@@ -215,7 +248,7 @@ describe('journey: layout', () => {
     assert.ok(a.width <= 720)
   })
 
-  test('an 8-stage journey fits the column through shared scaling, not the scroll fallback', async () => {
+  test('a 7-stage journey fits the column through shared scaling, not the scroll fallback', async () => {
     const r = await renderFigure(getFigureType('journey'), validIr('journey-over-stages.yaml'))
     assert.equal(r.scaled, true)
     assert.equal(r.scroll, false)
@@ -228,14 +261,14 @@ describe('journey: layout', () => {
 describe('journey: verify rows', () => {
   const p = () => getFigureType('journey')
 
-  test('a clean render passes every own row and the shared rows, in order, ids 1..15', async () => {
+  test('a clean render passes every own row and the shared rows, in order, ids 1..16', async () => {
     for (const name of ['journey-simple.yaml', 'journey-full.yaml']) {
       const ir = validIr(name)
       const rendered = await renderFigure(p(), ir)
       const result = await verifyFigure(p(), ir, rendered)
       assert.equal(result.ok, true, `${name}: ${JSON.stringify(result.failures)}`)
       assert.deepEqual(result.checks.map((c) => c.name), [...OWN_ROWS, ...SHARED_ROWS], name)
-      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 15 }, (_, i) => i + 1), name)
+      assert.deepEqual(result.checks.map((c) => c.id), Array.from({ length: 16 }, (_, i) => i + 1), name)
       assert.deepEqual(result.warnings, [], name)
     }
   })
@@ -350,7 +383,7 @@ describe('journey: registry dispatch and CLI', () => {
   test('the plugin is registered with its budgets and row names', () => {
     const p = getFigureType('journey')
     assert.ok(p && !p.builtin)
-    assert.deepEqual(p.limits, { maxStages: 7, maxRows: 4, maxCellTextLen: 16, maxEmphasis: 2 })
+    assert.deepEqual(p.limits, { maxStages: 6, maxRows: 3, maxCellTextLen: 16, maxEmphasis: 2 })
     assert.deepEqual(p.doc.rows, OWN_ROWS)
   })
 
@@ -383,15 +416,18 @@ describe('journey: registry dispatch and CLI', () => {
     assert.equal(r.status, 0, r.stderr)
     const out = JSON.parse(r.stdout)
     assert.equal(out.ok, true)
-    assert.equal(out.warn, 'budget:stages=8')
+    assert.equal(out.warn, 'budget:stages=7')
     assert.deepEqual(out.warnings.map((w) => w.key), ['budget:stages'])
-    assert.match(out.figureHtml, /data-warn="budget:stages=8" data-type="journey"/)
+    assert.match(out.figureHtml, /data-warn="budget:stages=7" data-type="journey"/)
+    assert.match(out.figureHtml, /<rect id="wu-d-j-stages-stage-s4" data-tone="neutral" class="wu-focal"/, 'the default focal lands on the earliest trough')
   })
 
-  test('--doc journey prints the 5 × 3 example with emotions and it renders clean', () => {
+  test('--doc journey prints the 5 × 3 example with named emotions and it renders clean', () => {
     const r = runCli(['--doc', 'journey'])
     assert.equal(r.status, 0, r.stderr)
     assert.equal(r.stdout, plugin.doc.irExample)
+    assert.match(r.stdout, /emotion: 最悪/)
+    assert.ok(!/emotion: -?\d/.test(r.stdout), 'the example uses names, not numbers')
     const ir = validateIR(parseYaml(r.stdout))
     assert.equal(ir.ok, true, JSON.stringify(ir))
     assert.equal(ir.ir.stages.length, 5)

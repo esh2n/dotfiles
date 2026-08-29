@@ -33,7 +33,8 @@ function runCli(args) {
 }
 
 const plugin = getFigureType('fishbone')
-const OWN_ROWS = ['category-count', 'causes-per-category', 'label-length', 'emphasis-count', 'effect-at-spine-end', 'bones-alternate', 'no-overlap']
+const OWN_ROWS = ['category-count', 'causes-per-category', 'cause-total', 'label-length', 'emphasis-count', 'effect-at-spine-end', 'bones-alternate', 'no-overlap']
+const WARN = 'budget:categories=7;budget:causes=6;budget:total=22;budget:label=16;budget:emphasis=3'
 
 const minimal = () => ({
   id: 's', type: 'fishbone', title: 't', effect: 'slow',
@@ -47,13 +48,18 @@ const minimal = () => ({
 // --- schema ----------------------------------------------------------------
 
 describe('figures/fishbone.mjs: schema', () => {
-  test('a valid IR normalizes: bare-string causes become { label, emphasis:false }', () => {
+  test('a valid IR normalizes: bare-string causes become { label, emphasis:false }; an emphasised cause promotes its category', () => {
     const r = validateIR(minimal())
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.equal(r.ir.type, 'fishbone')
     assert.equal(r.ir.effect, 'slow')
-    assert.deepEqual(r.ir.categories[0], { id: 'a', label: 'A', causes: [{ label: 'a1', emphasis: false }, { label: 'a2', emphasis: true }] })
-    assert.deepEqual(r.ir.categories[1].causes, [{ label: 'b1', emphasis: false }])
+    assert.deepEqual(r.ir.categories[0], { id: 'a', label: 'A', emphasis: true, causes: [{ label: 'a1', emphasis: false }, { label: 'a2', emphasis: true }] })
+    assert.deepEqual(r.ir.categories[1], { id: 'b', label: 'B', emphasis: false, causes: [{ label: 'b1', emphasis: false }] })
+    // emphasis may also sit on the category itself (no cause bolded)
+    const cat = validateIR({ ...minimal(), categories: [{ id: 'a', label: 'A', emphasis: true, causes: ['a1'] }, { id: 'b', label: 'B', causes: ['b1'] }] })
+    assert.equal(cat.ir.categories[0].emphasis, true)
+    assert.equal(cat.ir.categories[0].causes[0].emphasis, false)
+    assert.match(validateIR({ ...minimal(), categories: [{ id: 'a', label: 'A', emphasis: 'yes', causes: ['a1'] }] }).message, /categories\[0\]\.emphasis must be a boolean/)
   })
 
   test('normalize is idempotent', () => {
@@ -101,13 +107,15 @@ describe('figures/fishbone.mjs: budgets', () => {
   test('every budget key fires, in a stable order, and reaches data-warn', async () => {
     const ir = validIr('fishbone-over-budget.yaml')
     const warns = fishbone.budgetWarnings(ir)
-    assert.deepEqual(warns.map((w) => w.key), ['budget:categories', 'budget:causes', 'budget:label', 'budget:emphasis'])
-    assert.deepEqual(warns.map((w) => w.value), [7, 6, 16, 3])
-    assert.equal(formatBudgetWarnings(warns), 'budget:categories=7;budget:causes=6;budget:label=16;budget:emphasis=3')
+    assert.deepEqual(warns.map((w) => w.key), ['budget:categories', 'budget:causes', 'budget:total', 'budget:label', 'budget:emphasis'])
+    assert.deepEqual(warns.map((w) => w.value), [7, 6, 22, 16, 3])
+    assert.deepEqual(warns.map((w) => w.limit), [6, 3, 18, 14, 1])
+    assert.equal(formatBudgetWarnings(warns), WARN)
+    assert.match(warns[4].detail, /3 emphasized bone\(s\)/, 'emphasis counts bones: c1 (via a cause), c2 (category), c3 (via a cause)')
     for (const w of warns) assert.ok(w.hint && w.hint !== w.detail, `${w.key} needs a concrete hint`)
     const rendered = await renderFigureHtmlChecked(ir, { rawYaml: fixture('fishbone-over-budget.yaml') })
     assert.equal(rendered.checksOk, true, JSON.stringify(rendered.failures))
-    assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-warn="budget:categories=7;budget:causes=6;budget:label=16;budget:emphasis=3" data-type="fishbone" data-scroll="true">/)
+    assert.match(rendered.html, new RegExp(`^<figure class="wu-figure" data-checks="pass" data-warn="${WARN}" data-type="fishbone" data-scroll="true">`))
     assert.equal(rendered.scroll, true, '7 categories with a 16-char label fall back to the sideways scroll')
   })
 })
@@ -233,9 +241,9 @@ describe('figures/fishbone.mjs: verify rows', () => {
       const v = await verifyFigure(plugin, ir, rendered)
       assert.equal(v.ok, true, `${name}: ${JSON.stringify(v.failures)}`)
       assert.deepEqual(v.warnings, [])
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.name), plugin.doc.rows)
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7])
-      assert.deepEqual(v.checks.slice(4, 7).map((c) => c.severity), ['fail', 'fail', 'fail'])
+      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.name), plugin.doc.rows)
+      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8])
+      assert.deepEqual(v.checks.slice(5, 8).map((c) => c.severity), ['fail', 'fail', 'fail'])
     }
   })
 
@@ -309,7 +317,7 @@ describe('figures/fishbone.mjs: verify rows', () => {
     assert.match(row.detail, /effect box × bone/)
   })
 
-  test('the four budget rows are warn rows carrying key/value only when they fail', async () => {
+  test('the five budget rows are warn rows carrying key/value only when they fail', async () => {
     const ir = validIr('fishbone-over-budget.yaml')
     const rendered = await renderFigure(plugin, ir)
     const v = await verifyFigure(plugin, ir, rendered)
@@ -317,12 +325,13 @@ describe('figures/fishbone.mjs: verify rows', () => {
     assert.deepEqual(v.warnings.map((w) => [w.name, w.key, w.value]), [
       ['category-count', 'budget:categories', 7],
       ['causes-per-category', 'budget:causes', 6],
+      ['cause-total', 'budget:total', 22],
       ['label-length', 'budget:label', 16],
       ['emphasis-count', 'budget:emphasis', 3],
     ])
     const cleanIr = validIr('fishbone-simple.yaml')
     const clean = await verifyFigure(plugin, cleanIr, await renderFigure(plugin, cleanIr))
-    for (const name of OWN_ROWS.slice(0, 4)) {
+    for (const name of OWN_ROWS.slice(0, 5)) {
       const row = byName(clean.checks, name)
       assert.equal(row.severity, 'warn')
       assert.equal(row.ok, true)
@@ -334,17 +343,23 @@ describe('figures/fishbone.mjs: verify rows', () => {
 // --- draw ------------------------------------------------------------------
 
 describe('figures/fishbone.mjs: draw', () => {
-  test('emphasis is an accent tick + bold text, the effect box is the focal rect, labels are escaped', async () => {
-    const raw = { ...minimal(), effect: 'A & <B>', categories: [{ id: 'a', label: 'x<y', causes: [{ label: 'root & cause', emphasis: true }, 'plain'] }] }
+  test('emphasis is the accent bone + focal label box (never a tick), the root cause is bold, the effect box is the focal rect, labels are escaped', async () => {
+    const raw = { ...minimal(), effect: 'A & <B>', categories: [{ id: 'a', label: 'x<y', causes: [{ label: 'root & cause', emphasis: true }, 'plain'] }, { id: 'b', label: 'B', causes: ['b1'] }] }
     const r = validateIR(raw)
     assert.equal(r.ok, true, JSON.stringify(r))
     const rendered = await renderFigure(plugin, r.ir)
+    assert.equal(rendered.layout.geo.bones[0].emphasis, true)
     assert.match(rendered.svg, /<rect id="wu-d-s-effect" class="wu-focal"[^>]*rx="6"[^>]*stroke-width="1.5"/)
     assert.match(rendered.svg, /<text id="wu-d-s-effect-label"[^>]*font-weight="700"[^>]*>A &amp; &lt;B&gt;<\/text>/)
+    assert.match(rendered.svg, /<line id="wu-d-s-bone-a"[^>]*stroke="var\(--wu-accent\)" stroke-width="1.5"/)
+    assert.match(rendered.svg, /<rect id="wu-d-s-cat-a" class="wu-focal"[^>]*stroke-width="1.5"/)
     assert.match(rendered.svg, /<text id="wu-d-s-cat-a-label"[^>]*font-weight="700"[^>]*>x&lt;y<\/text>/)
-    assert.match(rendered.svg, /<line id="wu-d-s-tick-a-0"[^>]*stroke="var\(--wu-accent\)" stroke-width="1.5"/)
+    assert.match(rendered.svg, /<line id="wu-d-s-bone-b"[^>]*stroke="currentColor" stroke-width="1"/)
+    assert.match(rendered.svg, /<rect id="wu-d-s-cat-b" x=/)
+    assert.match(rendered.svg, /<line id="wu-d-s-tick-a-0"[^>]*stroke="currentColor" stroke-width="1"/)
     assert.match(rendered.svg, /<text id="wu-d-s-cause-a-0"[^>]*font-weight="700" text-anchor="end"[^>]*>root &amp; cause<\/text>/)
     assert.match(rendered.svg, /<line id="wu-d-s-tick-a-1"[^>]*stroke="currentColor" stroke-width="1"/)
+    assert.doesNotMatch(rendered.svg, /wu-accent[^>]*stroke-width="1"\/>/, 'no accent on a 1px stroke')
     assert.doesNotMatch(rendered.svg, /<text id="wu-d-s-cause-a-1"[^>]*font-weight/)
     assert.match(rendered.svg, /<line id="wu-d-s-spine"[^>]*marker-end="url\(#wu-d-s-solid\)"/)
     assert.match(rendered.svg, /<line id="wu-d-s-bone-a"[^>]*marker-end="url\(#wu-d-s-solid\)"/)
@@ -355,7 +370,7 @@ describe('figures/fishbone.mjs: draw', () => {
 // --- registry + CLI --------------------------------------------------------
 
 describe('figures/fishbone.mjs: registry dispatch and CLI', () => {
-  test('fishbone-simple.yaml and fishbone-full.yaml (6 × 4) render as data-checks="pass" data-type="fishbone" figures', async () => {
+  test('fishbone-simple.yaml and fishbone-full.yaml (6 × 3) render as data-checks="pass" data-type="fishbone" figures', async () => {
     for (const name of ['fishbone-simple.yaml', 'fishbone-full.yaml']) {
       const ir = validIr(name)
       const rendered = await renderFigureHtmlChecked(ir, { rawYaml: fixture(name) })
@@ -365,14 +380,14 @@ describe('figures/fishbone.mjs: registry dispatch and CLI', () => {
     }
     const full = validIr('fishbone-full.yaml')
     assert.equal(full.categories.length, 6)
-    assert.ok(full.categories.every((c) => c.causes.length === 4))
+    assert.ok(full.categories.every((c) => c.causes.length === 3))
     const r = await renderFigure(plugin, full)
-    assert.equal(r.scroll, false, 'a 6 × 4 fishbone fits the column by scaling')
+    assert.equal(r.scroll, false, 'a 6 × 3 fishbone fits the column by scaling')
   })
 
   test('the registry lists fishbone with its limits and doc rows', () => {
     assert.equal(plugin.type, 'fishbone')
-    assert.deepEqual(plugin.limits, { maxCategories: 6, maxCausesPerCategory: 5, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plugin.limits, { maxCategories: 6, maxCausesPerCategory: 3, maxCauses: 18, maxLabelLen: 14, maxEmphasis: 1 })
     assert.deepEqual(plugin.doc.rows, OWN_ROWS)
   })
 
@@ -381,7 +396,9 @@ describe('figures/fishbone.mjs: registry dispatch and CLI', () => {
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.equal(r.ir.categories.length, 4)
     assert.ok(r.ir.categories.every((c) => c.causes.length === 3))
-    assert.equal(r.ir.categories.flatMap((c) => c.causes).filter((k) => k.emphasis).length, 2)
+    assert.equal(r.ir.categories.flatMap((c) => c.causes).filter((k) => k.emphasis).length, 1)
+    assert.deepEqual(r.ir.categories.filter((c) => c.emphasis).map((c) => c.id), ['code'])
+    assert.deepEqual(fishbone.budgetWarnings(r.ir), [])
     const rendered = await renderFigureHtmlChecked(r.ir, { rawYaml: plugin.doc.irExample })
     assert.equal(rendered.checksOk, true, JSON.stringify(rendered.failures))
     assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-type="fishbone">/)
@@ -395,8 +412,8 @@ describe('figures/fishbone.mjs: registry dispatch and CLI', () => {
     assert.equal(json.status, 0, json.stderr)
     const out = JSON.parse(json.stdout)
     assert.equal(out.ok, true)
-    assert.deepEqual(out.warnings.map((w) => w.key), ['budget:categories', 'budget:causes', 'budget:label', 'budget:emphasis'])
-    assert.match(out.figureHtml, /data-warn="budget:categories=7;budget:causes=6;budget:label=16;budget:emphasis=3" data-type="fishbone"/)
+    assert.deepEqual(out.warnings.map((w) => w.key), ['budget:categories', 'budget:causes', 'budget:total', 'budget:label', 'budget:emphasis'])
+    assert.match(out.figureHtml, new RegExp(`data-warn="${WARN}" data-type="fishbone"`))
     const warnFig = runCli([join(FIXTURES, 'fishbone-over-budget.yaml'), '--figure'])
     assert.equal(warnFig.status, 0)
     assert.match(warnFig.stderr, /warning: budget:categories=7/)

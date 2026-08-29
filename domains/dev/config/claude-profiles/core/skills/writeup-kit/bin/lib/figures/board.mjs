@@ -13,12 +13,17 @@
 //     marked `emphasis` — the accent stays on the cut lines and that card.
 //
 // IR shape: `{ id, type:'board', title, caption, variant, columns, cuts }`.
-//   - `columns` — `[{ id, label, limit?, cards }]` left → right (≤ 6
-//     guidance); `limit` is a positive integer and kanban-only;
-//   - `cards` — `[string | { label, emphasis?, tone? }]` top → bottom (≤ 8
-//     per column guidance, label ≤ 14 chars guidance);
+//   - `columns` — `[{ id, label, limit?, cards }]` left → right (≤ 5
+//     guidance for both variants); `limit` is a positive integer and
+//     kanban-only — every column between the first and the last (the
+//     in-progress states) should carry one, a missing one warns;
+//   - `cards` — `[string | { label, emphasis?, tone? }]` top → bottom
+//     (≤ 4 per column — per column *within a slice* on a story map —,
+//     ≤ 12 on the whole board, label ≤ 14 chars; guidance);
 //   - `cuts` — story-map only: `[{ after, label }]`, `after` the 0-based
-//     row index the line is drawn *below*.
+//     row index the line is drawn *below* (≤ 3 cuts guidance).
+// The accent budget is one card: on a kanban the over-WIP chip is the
+// other accent, on a story map the cut lines are.
 //
 // Layout is a fixed grid: every column is the same width, derived from the
 // 720px COLUMN (and grown, still equal, when a wrapped card line or a
@@ -35,7 +40,7 @@ import { snap4, snapUp4, textWidth, COLUMN, FONT_SIZE, EDGE_LABEL_SIZE, BOLD_FAC
 
 export const type = 'board'
 
-export const limits = { maxColumns: 6, maxCardsPerColumn: 8, maxLabelLen: 14, maxEmphasis: 2 }
+export const limits = { maxColumns: 5, maxCardsPerColumn: 4, maxCards: 12, maxCuts: 3, maxLabelLen: 14, maxEmphasis: 1 }
 
 const VARIANTS = new Set(['kanban', 'story-map'])
 
@@ -148,6 +153,29 @@ function normalizeCuts(raw, variant, columns, ctx) {
 
 const allCards = (ir) => ir.columns.flatMap((c) => c.cards.map((card) => ({ column: c, card })))
 const overLimit = (ir) => ir.columns.filter((c) => c.limit !== undefined && c.cards.length > c.limit)
+/** Kanban: the in-progress states are every column but the first and the last. */
+const intermediateWithoutLimit = (ir) => (ir.variant === 'kanban' ? ir.columns.slice(1, -1).filter((c) => c.limit === undefined) : [])
+
+/** Cards per column, counted inside one slice (the rows between two
+ * cuts) on a story map, over the whole column on a kanban. Returns the
+ * fullest `{ column, count, slice }`. */
+function fullestColumn(ir) {
+  const cuts = (ir.cuts ?? []).map((c) => c.after)
+  let best = { column: ir.columns[0], count: 0, slice: 0 }
+  ir.columns.forEach((c) => {
+    if (ir.variant !== 'story-map') {
+      if (c.cards.length > best.count) best = { column: c, count: c.cards.length, slice: 0 }
+      return
+    }
+    let count = 0, slice = 0
+    c.cards.forEach((_, row) => {
+      count += 1
+      if (count > best.count) best = { column: c, count, slice }
+      if (cuts.includes(row)) { count = 0; slice += 1 }
+    })
+  })
+  return best
+}
 
 export function budgetWarnings(ir) {
   const out = []
@@ -157,11 +185,24 @@ export function budgetWarnings(ir) {
       `${n} column(s) (guidance ≤ ${limits.maxColumns})`,
       `merge states or split the board after column ${limits.maxColumns} ("${ir.columns[limits.maxColumns - 1].label}")`))
   }
-  const tallest = ir.columns.reduce((a, b) => (b.cards.length > a.cards.length ? b : a))
-  if (tallest.cards.length > limits.maxCardsPerColumn) {
-    out.push(budgetWarning('budget:cards', tallest.cards.length, limits.maxCardsPerColumn,
-      `column "${tallest.id}" holds ${tallest.cards.length} card(s) (guidance ≤ ${limits.maxCardsPerColumn})`,
-      `drop or merge cards in "${tallest.id}" past the ${limits.maxCardsPerColumn}th, or move the rest into the caption`))
+  const fullest = fullestColumn(ir)
+  if (fullest.count > limits.maxCardsPerColumn) {
+    const where = ir.variant === 'story-map' ? `column "${fullest.column.id}" holds ${fullest.count} card(s) in slice ${fullest.slice + 1}` : `column "${fullest.column.id}" holds ${fullest.count} card(s)`
+    out.push(budgetWarning('budget:cards', fullest.count, limits.maxCardsPerColumn,
+      `${where} (guidance ≤ ${limits.maxCardsPerColumn})`,
+      `drop or merge cards in "${fullest.column.id}" past the ${limits.maxCardsPerColumn}th, or move the rest into the caption`))
+  }
+  const total = allCards(ir).length
+  if (total > limits.maxCards) {
+    out.push(budgetWarning('budget:total', total, limits.maxCards,
+      `${total} card(s) on the board (guidance ≤ ${limits.maxCards})`,
+      `keep the ${limits.maxCards} cards the reader must see and fold the rest into the caption or a second board`))
+  }
+  const cuts = (ir.cuts ?? []).length
+  if (cuts > limits.maxCuts) {
+    out.push(budgetWarning('budget:cuts', cuts, limits.maxCuts,
+      `${cuts} cut line(s) (guidance ≤ ${limits.maxCuts})`,
+      `show the first ${limits.maxCuts} releases and describe the later ones in the caption`))
   }
   const long = allCards(ir).map((e) => ({ ...e, len: [...e.card.label].length })).filter((e) => e.len > limits.maxLabelLen)
   if (long.length) {
@@ -181,6 +222,12 @@ export function budgetWarnings(ir) {
     out.push(budgetWarning('budget:wip', over.length, 0,
       over.map((c) => `column "${c.id}" holds ${c.cards.length} card(s) over its WIP limit ${c.limit}`).join('; '),
       over.map((c) => `finish or pull back ${c.cards.length - c.limit} card(s) in "${c.id}"`).join('; ') + ' — or raise the limit if the census is the point'))
+  }
+  const noLimit = intermediateWithoutLimit(ir)
+  if (noLimit.length) {
+    out.push(budgetWarning('budget:limit', noLimit.length, 0,
+      `in-progress column(s) without a WIP limit: ${noLimit.map((c) => `"${c.id}"`).join(', ')}`,
+      `set \`limit\` on ${noLimit.map((c) => `"${c.id}"`).join(', ')} — a kanban without a cap on its in-progress states is a to-do list`))
   }
   return out
 }
@@ -384,12 +431,15 @@ export function verify(layoutResult, ir) {
     rows.push({ id, name, severity: 'warn', ok: !w, detail: w ? w.detail : okDetail, hint: w?.hint, key: w?.key, value: w?.value })
   }
   budgetRow(1, 'column-count', 'budget:columns', `${ir.columns.length} column(s)`)
-  budgetRow(2, 'cards-per-column', 'budget:cards', `at most ${Math.max(...ir.columns.map((c) => c.cards.length))} card(s) in a column`)
-  budgetRow(3, 'label-length', 'budget:label', `every card label is ≤ ${limits.maxLabelLen} chars`)
-  budgetRow(4, 'emphasis-count', 'budget:emphasis', `${allCards(ir).filter((e) => e.card.emphasis).length} emphasized card(s)`)
-  budgetRow(5, 'wip-within-limit', 'budget:wip', ir.variant === 'kanban' ? 'every column with a limit is at or under it' : 'story map — no WIP limits')
+  budgetRow(2, 'cards-per-column', 'budget:cards', `at most ${fullestColumn(ir).count} card(s) in a column${ir.variant === 'story-map' ? ' within one slice' : ''}`)
+  budgetRow(3, 'total-cards', 'budget:total', `${allCards(ir).length} card(s) on the board`)
+  budgetRow(4, 'cut-count', 'budget:cuts', ir.variant === 'story-map' ? `${(ir.cuts ?? []).length} cut line(s)` : 'kanban — no cut lines')
+  budgetRow(5, 'label-length', 'budget:label', `every card label is ≤ ${limits.maxLabelLen} chars`)
+  budgetRow(6, 'emphasis-count', 'budget:emphasis', `${allCards(ir).filter((e) => e.card.emphasis).length} emphasized card(s)`)
+  budgetRow(7, 'wip-within-limit', 'budget:wip', ir.variant === 'kanban' ? 'every column with a limit is at or under it' : 'story map — no WIP limits')
+  budgetRow(8, 'wip-limits-set', 'budget:limit', ir.variant === 'kanban' ? 'every in-progress column carries a WIP limit' : 'story map — no WIP limits')
 
-  // 6. every card sits on its column (x/width) and its row (y/height),
+  // 9. every card sits on its column (x/width) and its row (y/height),
   //    inside the column's lane
   const colOf = new Map(geo.columns.map((c) => [c.id, c]))
   const inColumn = []
@@ -400,9 +450,9 @@ export function verify(layoutResult, ir) {
     if (!r || card.y !== r.y || card.height !== r.height) inColumn.push(`cards[${i}] ("${card.label}") y/height ${card.y}/${card.height} ≠ row ${card.row}`)
     if (card.y < c.lane.y + c.header.height || card.y + card.height > c.lane.y + c.lane.height) inColumn.push(`cards[${i}] ("${card.label}") leaves the lane of "${c.id}"`)
   })
-  rows.push({ id: 6, name: 'cards-in-column', severity: 'fail', ok: inColumn.length === 0, detail: inColumn.length ? inColumn.slice(0, 4).join('; ') : `${geo.cards.length} card(s) each on its column × row, inside the lane`, hint: inColumn.length ? 'derive every card rect from its column and row — never position a card on its own' : undefined })
+  rows.push({ id: 9, name: 'cards-in-column', severity: 'fail', ok: inColumn.length === 0, detail: inColumn.length ? inColumn.slice(0, 4).join('; ') : `${geo.cards.length} card(s) each on its column × row, inside the lane`, hint: inColumn.length ? 'derive every card rect from its column and row — never position a card on its own' : undefined })
 
-  // 7. no two cards overlap
+  // 10. no two cards overlap
   const overlaps = []
   for (let i = 0; i < geo.cards.length; i++) {
     for (let j = i + 1; j < geo.cards.length; j++) {
@@ -410,9 +460,9 @@ export function verify(layoutResult, ir) {
       if (overlapsOpen(a.x, a.x + a.width, b.x, b.x + b.width) && overlapsOpen(a.y, a.y + a.height, b.y, b.y + b.height)) overlaps.push(`cards[${i}] ("${a.label}") overlaps cards[${j}] ("${b.label}")`)
     }
   }
-  rows.push({ id: 7, name: 'cards-no-overlap', severity: 'fail', ok: overlaps.length === 0, detail: overlaps.length ? overlaps.slice(0, 4).join('; ') : 'no two cards overlap', hint: overlaps.length ? `keep ${CARD_GAP}px between stacked cards and ${COL_GAP}px between columns` : undefined })
+  rows.push({ id: 10, name: 'cards-no-overlap', severity: 'fail', ok: overlaps.length === 0, detail: overlaps.length ? overlaps.slice(0, 4).join('; ') : 'no two cards overlap', hint: overlaps.length ? `keep ${CARD_GAP}px between stacked cards and ${COL_GAP}px between columns` : undefined })
 
-  // 8. the WIP count each header shows equals the cards drawn in that column
+  // 11. the WIP count each header shows equals the cards drawn in that column
   const wip = []
   for (const c of geo.columns) {
     const drawn = geo.cards.filter((card) => card.column === c.id).length
@@ -424,9 +474,9 @@ export function verify(layoutResult, ir) {
       if (c.over !== over) wip.push(`column "${c.id}" over-limit flag is ${c.over}, expected ${over}`)
     }
   }
-  rows.push({ id: 8, name: 'wip-count-matches', severity: 'fail', ok: wip.length === 0, detail: wip.length ? wip.join('; ') : 'every column count (and chip) equals its drawn cards', hint: wip.length ? 'compute the chip text from the cards actually laid out, never from a separate count' : undefined })
+  rows.push({ id: 11, name: 'wip-count-matches', severity: 'fail', ok: wip.length === 0, detail: wip.length ? wip.join('; ') : 'every column count (and chip) equals its drawn cards', hint: wip.length ? 'compute the chip text from the cards actually laid out, never from a separate count' : undefined })
 
-  // 9. cut lines run between rows: no line through a card, no label over
+  // 12. cut lines run between rows: no line through a card, no label over
   //    a card, every line inside the grid span
   const cutProblems = []
   for (const cut of geo.cuts) {
@@ -440,9 +490,9 @@ export function verify(layoutResult, ir) {
     if (prev && cut.y <= prev.y + prev.height) cutProblems.push(`cuts[${cut.index}] is not below row ${cut.after}`)
     if (next && cut.y >= next.y) cutProblems.push(`cuts[${cut.index}] is not above row ${cut.after + 1}`)
   }
-  rows.push({ id: 9, name: 'cuts-clear', severity: 'fail', ok: cutProblems.length === 0, detail: cutProblems.length ? cutProblems.slice(0, 4).join('; ') : `${geo.cuts.length} cut line(s) run between rows across the whole grid, none through a card`, hint: cutProblems.length ? `insert ${CUT_EXTRA}px between the two rows a cut separates and draw the line in that corridor` : undefined })
+  rows.push({ id: 12, name: 'cuts-clear', severity: 'fail', ok: cutProblems.length === 0, detail: cutProblems.length ? cutProblems.slice(0, 4).join('; ') : `${geo.cuts.length} cut line(s) run between rows across the whole grid, none through a card`, hint: cutProblems.length ? `insert ${CUT_EXTRA}px between the two rows a cut separates and draw the line in that corridor` : undefined })
 
-  // 10. text inside its card with padding
+  // 13. text inside its card with padding
   const textProblems = []
   geo.cards.forEach((card, i) => {
     card.lines.forEach((l, k) => {
@@ -452,14 +502,14 @@ export function verify(layoutResult, ir) {
     })
     if (card.lines.length > 2) textProblems.push(`cards[${i}] ("${card.label}") has ${card.lines.length} lines (max 2)`)
   })
-  rows.push({ id: 10, name: 'text-inside-cards', severity: 'fail', ok: textProblems.length === 0, detail: textProblems.length ? textProblems.slice(0, 4).join('; ') : `every card line (≤ 2 per card) sits inside its card with ${CARD_PAD_X}/${CARD_PAD_Y}px padding`, hint: textProblems.length ? 'grow the shared column width from the widest wrapped line before placing text' : undefined })
+  rows.push({ id: 13, name: 'text-inside-cards', severity: 'fail', ok: textProblems.length === 0, detail: textProblems.length ? textProblems.slice(0, 4).join('; ') : `every card line (≤ 2 per card) sits inside its card with ${CARD_PAD_X}/${CARD_PAD_Y}px padding`, hint: textProblems.length ? 'grow the shared column width from the widest wrapped line before placing text' : undefined })
 
   return rows
 }
 
 export const doc = {
   purpose: 'equal-width columns of stacked cards — a kanban (states × WIP count) or a story map (activities × steps with release cut lines)',
-  whenToUse: 'kanban when the message is "how much sits in each state right now" (a census, no arrows — use process/swimlane for hand-offs); story-map when the decision is where to cut a release across a story-ordered backlog. Budgets: columns ≤ 6, cards per column ≤ 8, label ≤ 14 chars, emphasis ≤ 2; a kanban column over its WIP limit warns — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'kanban when the message is "how much sits in each state right now" (a census, no arrows — use process/swimlane for hand-offs); story-map when the decision is where to cut a release across a story-ordered backlog. Budgets (both variants): columns ≤ 5, cards ≤ 4 per column (per column within a slice on a story map) and ≤ 12 on the board, label ≤ 14 chars, emphasis ≤ 1 (the over-WIP chip / the cut lines are the other accent); story-map cuts ≤ 3; a kanban column over its WIP limit warns, and so does an in-progress column without one — guidance, over-budget figures still render with data-warn.',
   irExample: `id: onboarding-map
 type: board
 variant: story-map
@@ -486,5 +536,5 @@ cuts:
   - after: 1
     label: MVP
 `,
-  rows: ['column-count', 'cards-per-column', 'label-length', 'emphasis-count', 'wip-within-limit', 'cards-in-column', 'cards-no-overlap', 'wip-count-matches', 'cuts-clear', 'text-inside-cards'],
+  rows: ['column-count', 'cards-per-column', 'total-cards', 'cut-count', 'label-length', 'emphasis-count', 'wip-within-limit', 'wip-limits-set', 'cards-in-column', 'cards-no-overlap', 'wip-count-matches', 'cuts-clear', 'text-inside-cards'],
 }

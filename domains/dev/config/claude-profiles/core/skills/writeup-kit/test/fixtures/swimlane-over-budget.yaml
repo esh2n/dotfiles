@@ -1,7 +1,7 @@
 id: sw4
 type: swimlane
 title: 予算超過の流れ
-caption: 6 レーン・13 手順・長いラベル・強調 3・分岐ラベル無し
+caption: 6 レーン・13 手順・長いラベル・強調 3・分岐が 1 本
 lanes:
   - id: l1
     label: 営業
@@ -71,8 +71,6 @@ edges:
   - from: s4
     to: s5
     label: 承認
-  - from: s4
-    to: s2
   - from: s5
     to: s6
   - from: s6

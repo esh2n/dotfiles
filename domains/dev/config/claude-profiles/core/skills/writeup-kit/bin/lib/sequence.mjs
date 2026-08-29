@@ -14,9 +14,14 @@
 // lifeline, and the resulting width goes through the same scale/scroll
 // decision (COLUMN / MIN_SCALE) as a node/edge diagram. Column x / row y
 // positions are snapped to the 4px grid the same way diagram.mjs's
-// layoutOnce()/draw() do.
-import { textWidth, snap4, snapUp4, COLUMN, FONT_SIZE, EDGE_LABEL_SIZE, NODE_PAD_X } from './diagram.mjs'
-import { esc, fitToColumn, wrapFigureSvg } from './figures/_shared.mjs'
+// layoutOnce()/draw() do. Arrow styles come from diagram.mjs's
+// EDGE_KIND_STYLE (sync = solid + filled head, async = dashed + open head,
+// reply = dashed + filled head) so the two figure kinds never disagree; a
+// legend strip (figures/_shared.mjs's drawLegend, the diagram's metrics)
+// is appended whenever more than one kind is drawn, since a dashed line
+// alone no longer tells async from reply.
+import { textWidth, snap4, snapUp4, COLUMN, FONT_SIZE, EDGE_LABEL_SIZE, NODE_PAD_X, EDGE_KIND_STYLE, EDGE_KIND_ORDER } from './diagram.mjs'
+import { esc, fitToColumn, wrapFigureSvg, legendWidth, LEGEND_HEIGHT } from './figures/_shared.mjs'
 
 // --- layout constants (all multiples of 4 — see checkRowsGrid in
 // verify-sequence.mjs) ------------------------------------------------------
@@ -37,12 +42,6 @@ const SELF_LOOP_W = 40
 const SELF_LOOP_H = 16
 const NOTE_H = 24
 const LABEL_H = 14
-
-const EDGE_KIND_STYLE = {
-  sync: { dash: null, marker: 'solid' },
-  async: { dash: null, marker: 'open' },
-  reply: { dash: '5 4', marker: 'open' },
-}
 
 // --- column layout -----------------------------------------------------
 
@@ -130,7 +129,7 @@ function selfLabelBox(text, leftX, midY) {
 /**
  * Lay out a validated sequence IR (bin/lib/ir.mjs's `type: sequence` shape)
  * into pixel geometry: participant boxes, dashed lifelines, and one row per
- * message/note/self entry. Returns `{width, height, geo}` — `geo` is read
+ * message/note/self entry. Returns `{width, height, geo, legend?}` — `geo` is read
  * both by draw() below and by verify-sequence.mjs's checks, the same split
  * diagram.mjs/verify-diagram.mjs use.
  */
@@ -193,10 +192,21 @@ export function layoutSequence(ir) {
     ...rows.map((r) => (r.type === 'note' ? r.x + r.width : r.type === 'self' ? r.path[1].x : 0)),
     ...rows.map((r) => (r.label ? r.label.x + r.label.width : 0)),
   )
-  const width = snapUp4(rightMost + MARGIN_X)
-  const height = snapUp4(lifelineBottom + 8)
+  let width = snapUp4(rightMost + MARGIN_X)
+  let height = snapUp4(lifelineBottom + 8)
 
-  return { width, height, geo: { participants: boxes, lifelines, rows } }
+  // Legend only when the arrows use more than one kind: with one kind the
+  // style carries no contrast worth naming. Items in the diagram's order.
+  let legend
+  const usedKinds = EDGE_KIND_ORDER.filter((k) => rows.some((r) => r.type !== 'note' && r.kind === k))
+  if (usedKinds.length > 1) {
+    const items = usedKinds.map((k) => ({ label: k, dash: EDGE_KIND_STYLE[k].dash, marker: EDGE_KIND_STYLE[k].marker }))
+    legend = { y: height, items }
+    width = Math.max(width, snapUp4(legendWidth(items)))
+    height = snapUp4(height + LEGEND_HEIGHT + 4)
+  }
+
+  return { width, height, geo: { participants: boxes, lifelines, rows }, legend }
 }
 
 // --- drawing -------------------------------------------------------------

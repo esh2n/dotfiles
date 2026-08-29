@@ -298,7 +298,7 @@ describe('sequence.mjs: layoutSequence', () => {
   test('a note over one column followed by a labeled message into that column keeps label clearance (the real CSV-download page)', () => {
     const v = validateIR({
       id: 'w', type: 'sequence', title: 't',
-      participants: [{ id: 'u', label: 'ユーザー' }, { id: 'fe', label: '画面 / Next.js' }, { id: 'job', label: 'CsvDownloadJobService' }],
+      participants: [{ id: 'u', label: 'ユーザー' }, { id: 'fe', label: '画面 / フロント' }, { id: 'job', label: 'CsvDownloadJobService' }],
       messages: [
         { from: 'job', to: 'fe', kind: 'reply', label: '受付' },
         { note: 'ダウンロード履歴画面へ遷移', over: ['fe'] },
@@ -740,7 +740,7 @@ describe('directives.mjs: renderSequence migration', () => {
 
   test('a long old-DSL label (the real CSV-download page) renders with budget:label and a widened gap', async () => {
     const body = [
-      'participant u[ユーザー]', 'participant fe[画面 / Next.js]', 'participant job[CsvDownloadJobService]',
+      'participant u[ユーザー]', 'participant fe[画面 / フロント]', 'participant job[CsvDownloadJobService]',
       'u -> fe : 組織を絞って「ダウンロード」',
       'fe -> job : request(socV2s, entityType, template, filename)',
       'job --> fe : 受付 {tone=success}',
@@ -758,5 +758,80 @@ describe('directives.mjs: renderSequence migration', () => {
     const { html, figureOk } = await renderSequenceDirective({ body }, ctx())
     assert.equal(figureOk, true)
     assert.match(html, /ここでログを書く/)
+  })
+})
+
+// --- arrow kinds + legend (shared EDGE_KIND_STYLE with diagram.mjs) ----------
+
+describe('sequence.mjs: arrow kinds and legend', () => {
+  const threeKinds = () => validateIR({
+    id: 'k', type: 'sequence', title: 't',
+    participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+    messages: [
+      { from: 'a', to: 'b', kind: 'sync', label: 'call' },
+      { from: 'a', to: 'b', kind: 'async', label: 'event' },
+      { from: 'b', to: 'a', kind: 'reply', label: 'ok' },
+      { self: 'a', kind: 'async', label: 'tick' },
+    ],
+  }).ir
+
+  test('sync = solid + filled head, async = dashed + open head, reply = dashed + filled head (self-messages included)', () => {
+    const { svg } = renderSequenceDiagram(threeKinds())
+    const row = (type, i) => new RegExp(`<path id="wu-d-k-${type}-${i}"[^>]*>`).exec(svg)?.[0]
+    assert.ok(row('message', 0) && !row('message', 0).includes('stroke-dasharray') && row('message', 0).includes('url(#wu-d-k-solid)'), `sync: ${row('message', 0)}`)
+    assert.ok(row('message', 1) && row('message', 1).includes('stroke-dasharray="5 4"') && row('message', 1).includes('url(#wu-d-k-open)'), `async: ${row('message', 1)}`)
+    assert.ok(row('message', 2) && row('message', 2).includes('stroke-dasharray="5 4"') && row('message', 2).includes('url(#wu-d-k-solid)'), `reply: ${row('message', 2)}`)
+    assert.ok(row('self', 3) && row('self', 3).includes('stroke-dasharray="5 4"') && row('self', 3).includes('url(#wu-d-k-open)'), `async self: ${row('self', 3)}`)
+  })
+
+  test('a legend strip names the kinds in use (diagram order, matching swatches) below the lifelines, adding 24px on the 4px grid', () => {
+    const ir = threeKinds()
+    const layout = layoutSequence(ir)
+    assert.ok(layout.legend, 'legend expected with three kinds')
+    assert.deepEqual(layout.legend.items, [
+      { label: 'sync', dash: null, marker: 'solid' },
+      { label: 'async', dash: '5 4', marker: 'open' },
+      { label: 'reply', dash: '5 4', marker: 'solid' },
+    ])
+    const lifelineBottom = layout.geo.lifelines[0].yBottom
+    assert.ok(layout.legend.y >= lifelineBottom + 8, `legend y ${layout.legend.y} overlaps the lifelines ending at ${lifelineBottom}`)
+    assert.equal(layout.height, layout.legend.y + 24)
+    assert.equal(layout.height % 4, 0)
+    const { svg } = renderSequenceDiagram(ir)
+    const legend = /<g id="wu-d-k-legend"[^>]*>([\s\S]*?)<\/g>/.exec(svg)?.[1]
+    assert.ok(legend, 'legend group not drawn')
+    assert.deepEqual([...legend.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]), ['sync', 'async', 'reply'])
+    const swatches = [...legend.matchAll(/<path [^>]*>/g)].map((m) => m[0])
+    assert.ok(!swatches[0].includes('stroke-dasharray') && swatches[0].includes('#wu-d-k-solid'))
+    assert.ok(swatches[1].includes('stroke-dasharray="5 4"') && swatches[1].includes('#wu-d-k-open'))
+    assert.ok(swatches[2].includes('stroke-dasharray="5 4"') && swatches[2].includes('#wu-d-k-solid'))
+    const result = verifySequence(ir, renderSequenceDiagram(ir))
+    assert.equal(result.ok, true, JSON.stringify(result.failures))
+  })
+
+  test('a single-kind sequence draws no legend and keeps its height', () => {
+    const one = validateIR({
+      id: 'one', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+      messages: [{ from: 'a', to: 'b', kind: 'sync', label: 'x' }, { from: 'b', to: 'a', kind: 'sync', label: 'y' }],
+    }).ir
+    const layout = layoutSequence(one)
+    assert.equal(layout.legend, undefined)
+    assert.equal(layout.height, layout.geo.lifelines[0].yBottom + 8)
+    assert.ok(!renderSequenceDiagram(one).svg.includes('wu-d-one-legend'))
+  })
+
+  test('the legend widens a narrow canvas rather than running past it', () => {
+    const narrow = validateIR({
+      id: 'n', type: 'sequence', title: 't',
+      participants: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+      messages: [{ from: 'a', to: 'b', kind: 'sync' }, { from: 'a', to: 'b', kind: 'async' }, { from: 'b', to: 'a', kind: 'reply' }],
+    }).ir
+    const { svg, width } = renderSequenceDiagram(narrow)
+    const legend = /<g id="wu-d-n-legend"[^>]*>([\s\S]*?)<\/g>/.exec(svg)[1]
+    for (const m of legend.matchAll(/<text x="(\d+)"[^>]*>([^<]*)<\/text>/g)) {
+      assert.ok(Number(m[1]) + m[2].length * 7 <= width, `legend label "${m[2]}" at x=${m[1]} runs past width ${width}`)
+    }
+    assert.equal(width % 4, 0)
   })
 })

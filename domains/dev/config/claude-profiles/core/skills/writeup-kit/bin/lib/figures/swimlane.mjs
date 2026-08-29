@@ -13,8 +13,14 @@
 //     flow order; `kind` is step (rect) | decision (diamond) | start | end
 //     (pills); `parallel: true` puts the step in the same column as the
 //     previous one (it must then sit in a different lane);
-//   - `edges` — `[{ from, to, label }]`; when omitted, consecutive steps
-//     are connected;
+//   - `edges` — `[{ from, to, label, emphasis }]`; when omitted, consecutive
+//     steps are connected. `emphasis: true` on an edge accents the hand-off
+//     that couples or delays the most (survey #8) — it shares the accent
+//     budget with steps (≤ 2 in total). Every outgoing edge of a decision
+//     must carry its outcome label: an unlabelled branch fails
+//     verification (`decision-labels`), and a decision with fewer than two
+//     outgoing edges warns. More than one backward edge warns
+//     (`budget:back`): reorder the steps instead of drawing a snake;
 //   - `direction` — `right` (lanes horizontal, flow left → right; default)
 //     or `down` (lanes vertical, flow top → bottom — for long flows).
 //
@@ -143,7 +149,7 @@ function normalizeSteps(raw, lanes, ctx) {
 
 function normalizeEdges(raw, steps, ctx) {
   if (raw === undefined || raw === null) {
-    return steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id, label: '' }))
+    return steps.slice(1).map((s, i) => ({ from: steps[i].id, to: s.id, label: '', emphasis: false }))
   }
   if (!Array.isArray(raw)) throw new IrError(`${ctx}.edges must be a list of { from, to, label? }`)
   const ids = new Set(steps.map((s) => s.id))
@@ -155,18 +161,28 @@ function normalizeEdges(raw, steps, ctx) {
     if (!ids.has(from)) throw new IrError(`${ectx}.from references unknown step "${from}"`)
     if (!ids.has(to)) throw new IrError(`${ectx}.to references unknown step "${to}"`)
     if (from === to) throw new IrError(`${ectx}: from and to must differ (a swimlane has no self loops)`)
-    return { from, to, label: optStr(e, 'label', ectx) ?? '' }
+    return { from, to, label: optStr(e, 'label', ectx) ?? '', emphasis: validateBool(e, 'emphasis', ectx) }
   })
 }
 
 // --- budgets ---------------------------------------------------------------
 
-/** Decisions whose outgoing edges are fewer than two or not all labelled. */
+/** Decisions with fewer than two outgoing edges (a fork needs two ways out). */
 function weakDecisions(ir) {
-  return ir.steps.filter((s) => s.kind === 'decision').filter((s) => {
-    const out = ir.edges.filter((e) => e.from === s.id)
-    return out.length < 2 || out.some((e) => !e.label)
-  })
+  return ir.steps.filter((s) => s.kind === 'decision').filter((s) => ir.edges.filter((e) => e.from === s.id).length < 2)
+}
+
+/** Outgoing edges of a decision that carry no outcome label — forbidden. */
+function unlabelledBranches(ir) {
+  const decisions = new Set(ir.steps.filter((s) => s.kind === 'decision').map((s) => s.id))
+  return ir.edges.map((e, i) => ({ e, i })).filter(({ e }) => decisions.has(e.from) && !e.label)
+}
+
+/** Edges that run against the flow (target column before source column). */
+function backEdges(ir) {
+  const cols = columnsOf(ir.steps)
+  const col = new Map(ir.steps.map((s, i) => [s.id, cols[i]]))
+  return ir.edges.filter((e) => col.get(e.to) < col.get(e.from))
 }
 
 export function budgetWarnings(ir) {
@@ -194,17 +210,23 @@ export function budgetWarnings(ir) {
       `${longest.what} label "${longest.label}" is ${longest.len} chars (guidance ≤ ${L.maxLabelLen})`,
       'shorten the label to the action; put the detail in the caption'))
   }
-  const emphasized = ir.steps.filter((s) => s.emphasis)
+  const emphasized = [...ir.steps.filter((s) => s.emphasis).map((s) => `step "${s.id}"`), ...ir.edges.filter((e) => e.emphasis).map((e) => `edge ${e.from} → ${e.to}`)]
   if (emphasized.length > L.maxEmphasis) {
     out.push(budgetWarning('budget:emphasis', emphasized.length, L.maxEmphasis,
-      `${emphasized.length} emphasized step(s) (guidance ≤ ${L.maxEmphasis})`,
-      `keep emphasis on at most ${L.maxEmphasis} steps (${emphasized.map((s) => `"${s.id}"`).join(', ')} are all emphasized)`))
+      `${emphasized.length} emphasized step(s)/edge(s) (guidance ≤ ${L.maxEmphasis})`,
+      `keep emphasis on at most ${L.maxEmphasis} steps or hand-offs in total (${emphasized.join(', ')} are all emphasized)`))
   }
   const weak = weakDecisions(ir)
   if (weak.length) {
     out.push(budgetWarning('budget:decision', weak.length, 0,
-      weak.map((s) => `decision "${s.id}" lacks two labelled outgoing edges`).join('; '),
+      weak.map((s) => `decision "${s.id}" has fewer than two outgoing edges`).join('; '),
       'give every decision at least two outgoing edges, each labelled with its outcome (はい / いいえ)'))
+  }
+  const back = backEdges(ir)
+  if (back.length > 1) {
+    out.push(budgetWarning('budget:back', back.length, 1,
+      `${back.length} backward edge(s): ${back.map((e) => `${e.from} → ${e.to}`).join(', ')} (guidance ≤ 1)`,
+      'a flow that snakes back more than once is drawn in the wrong order — reorder the steps so at most one edge runs backward'))
   }
   return out
 }
@@ -423,7 +445,7 @@ export async function layout(ir) {
       default:
         break
     }
-    return { index: e.index, from: e.from, to: e.to, route: e.route, text: e.label, points: simplify(pts), label: null }
+    return { index: e.index, from: e.from, to: e.to, route: e.route, emphasis: e.emphasis, text: e.label, points: simplify(pts), label: null }
   })
 
   const stepGeo = steps.map((s, i) => {
@@ -586,6 +608,9 @@ export function draw(layoutResult, ir) {
   const parts = []
   parts.push('<defs>')
   parts.push(`<marker id="${uid}-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>`)
+  if (geo.edges.some((e) => e.emphasis)) {
+    parts.push(`<marker id="${uid}-focal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--wu-accent)"/></marker>`)
+  }
   parts.push('</defs>')
 
   // lanes: label cells, rules, frame
@@ -601,9 +626,11 @@ export function draw(layoutResult, ir) {
     parts.push(`<text id="${uid}-lane-${l.id}-label" x="${l.textX}" y="${l.textY}" font-size="${FONT_SIZE}" text-anchor="middle" fill="currentColor">${esc(l.label)}</text>`)
   }
 
-  // edges under the boxes
+  // edges under the boxes; the focal hand-off in the accent colour, heavier
   for (const e of geo.edges) {
-    parts.push(`<path id="${uid}-e-${e.index}" d="${pathD(e.points)}" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#${uid}-solid)"/>`)
+    const stroke = e.emphasis ? 'var(--wu-accent)' : 'currentColor'
+    const cls = e.emphasis ? ' class="wu-focal"' : ''
+    parts.push(`<path id="${uid}-e-${e.index}"${cls} d="${pathD(e.points)}" fill="none" stroke="${stroke}" stroke-width="${e.emphasis ? 1.5 : 1}" marker-end="url(#${uid}-${e.emphasis ? 'focal' : 'solid'})"/>`)
   }
 
   // steps
@@ -616,14 +643,14 @@ export function draw(layoutResult, ir) {
   // edge labels last, over everything
   for (const e of geo.edges) {
     if (!e.label) continue
-    parts.push(`<text id="${uid}-e-${e.index}-label" x="${e.label.x + 4}" y="${e.label.y + 11}" font-size="${EDGE_LABEL_SIZE}" fill="currentColor">${esc(e.label.text)}</text>`)
+    parts.push(`<text id="${uid}-e-${e.index}-label" x="${e.label.x + 4}" y="${e.label.y + 11}" font-size="${EDGE_LABEL_SIZE}"${e.emphasis ? ' font-weight="700"' : ''} fill="currentColor">${esc(e.label.text)}</text>`)
   }
   return parts.join('')
 }
 
 // --- verify ----------------------------------------------------------------
 
-const ROW_NAMES = ['references', 'lane-count', 'step-count', 'label-length', 'emphasis-count', 'decision-branches', 'steps-in-lane', 'edges-clear', 'label-clear']
+const ROW_NAMES = ['references', 'lane-count', 'step-count', 'label-length', 'emphasis-count', 'decision-branches', 'back-edges', 'decision-labels', 'steps-in-lane', 'edges-clear', 'label-clear']
 
 export function verify(layoutResult, ir) {
   const geo = layoutResult.geo
@@ -645,10 +672,15 @@ export function verify(layoutResult, ir) {
   budgetRow(2, 'lane-count', 'budget:lanes', `${ir.lanes.length} lane(s)`)
   budgetRow(3, 'step-count', 'budget:steps', `${ir.steps.length} step(s)`)
   budgetRow(4, 'label-length', 'budget:label', `every label is within the ${limits.maxLabelLen}-char guidance`)
-  budgetRow(5, 'emphasis-count', 'budget:emphasis', `${ir.steps.filter((s) => s.emphasis).length} emphasized step(s)`)
-  budgetRow(6, 'decision-branches', 'budget:decision', 'every decision has two or more labelled outgoing edges')
+  budgetRow(5, 'emphasis-count', 'budget:emphasis', `${ir.steps.filter((s) => s.emphasis).length + ir.edges.filter((e) => e.emphasis).length} emphasized step(s)/edge(s)`)
+  budgetRow(6, 'decision-branches', 'budget:decision', 'every decision has two or more outgoing edges')
+  budgetRow(7, 'back-edges', 'budget:back', `${backEdges(ir).length} backward edge(s)`)
 
-  // 7. every step box inside its lane band, past the label band
+  // 8. every branch out of a decision names its outcome (hard rule)
+  const blank = unlabelledBranches(ir)
+  rows.push({ id: 8, name: 'decision-labels', severity: 'fail', ok: blank.length === 0, detail: blank.length ? `unlabelled branch(es): ${blank.map(({ e, i }) => `edges[${i}] ${e.from} → ${e.to}`).join(', ')}` : 'every outgoing edge of a decision carries its outcome label', hint: blank.length ? 'label each branch out of a decision with its outcome (はい / いいえ, 承認 / 差戻し) — an unlabelled fork cannot be read' : undefined })
+
+  // 9. every step box inside its lane band, past the label band
   const laneOf = new Map(geo.lanes.map((l) => [l.id, l]))
   const outside = []
   for (const s of geo.steps) {
@@ -659,9 +691,9 @@ export function verify(layoutResult, ir) {
     if (!inLane) outside.push(`step ${s.id} leaves lane "${s.lane}"`)
     else if (overBand) outside.push(`step ${s.id} overlaps the lane label`)
   }
-  rows.push({ id: 7, name: 'steps-in-lane', severity: 'fail', ok: outside.length === 0, detail: outside.length ? outside.join('; ') : `every step box sits inside its lane band`, hint: outside.length ? 'internal layout error — report the IR' : undefined })
+  rows.push({ id: 9, name: 'steps-in-lane', severity: 'fail', ok: outside.length === 0, detail: outside.length ? outside.join('; ') : `every step box sits inside its lane band`, hint: outside.length ? 'internal layout error — report the IR' : undefined })
 
-  // 8. edges orthogonal and never through a step box
+  // 10. edges orthogonal and never through a step box
   const problems = []
   for (const e of geo.edges) {
     for (let i = 1; i < e.points.length; i++) {
@@ -671,9 +703,9 @@ export function verify(layoutResult, ir) {
       if (hit) problems.push(`edge ${e.index} segment ${i} passes through step ${hit.id}`)
     }
   }
-  rows.push({ id: 8, name: 'edges-clear', severity: 'fail', ok: problems.length === 0, detail: problems.length ? problems.slice(0, 4).join('; ') : `${geo.edges.length} edge(s) run orthogonally, none through a step box`, hint: problems.length ? 'route lane changes through the gutter between columns; mark a side-by-side step parallel: true' : undefined })
+  rows.push({ id: 10, name: 'edges-clear', severity: 'fail', ok: problems.length === 0, detail: problems.length ? problems.slice(0, 4).join('; ') : `${geo.edges.length} edge(s) run orthogonally, none through a step box`, hint: problems.length ? 'route lane changes through the gutter between columns; mark a side-by-side step parallel: true' : undefined })
 
-  // 9. labels clear of every line and box
+  // 11. labels clear of every line and box
   const lines = []
   for (const e of geo.edges) for (let i = 1; i < e.points.length; i++) lines.push({ a: e.points[i - 1], b: e.points[i], owner: `edge ${e.index}` })
   geo.separators.forEach((s, i) => lines.push({ a: { x: s.x1, y: s.y1 }, b: { x: s.x2, y: s.y2 }, owner: `lane rule ${i}` }))
@@ -690,14 +722,14 @@ export function verify(layoutResult, ir) {
     if (hitLabel) labelHits.push(`label "${e.label.text}" overlaps label "${hitLabel.text}"`)
     seen.push(e.label)
   }
-  rows.push({ id: 9, name: 'label-clear', severity: 'fail', ok: labelHits.length === 0, detail: labelHits.length ? labelHits.slice(0, 4).join('; ') : 'every edge label sits beside its edge, clear of every line and box', hint: labelHits.length ? 'shorten the label, move the step to another column, or drop the label into the caption' : undefined })
+  rows.push({ id: 11, name: 'label-clear', severity: 'fail', ok: labelHits.length === 0, detail: labelHits.length ? labelHits.slice(0, 4).join('; ') : 'every edge label sits beside its edge, clear of every line and box', hint: labelHits.length ? 'shorten the label, move the step to another column, or drop the label into the caption' : undefined })
 
   return rows
 }
 
 export const doc = {
   purpose: 'a flow whose steps sit in lanes (actors / systems) — who does what in what order, and where the work changes hands',
-  whenToUse: 'when the hand-offs between actors matter as much as the order of steps (approval flows, cross-team release steps); not for the payload of every step (use process) or for call order inside one system (use sequence). Budgets: lanes ≤ 5, steps ≤ 12, label ≤ 14 chars, emphasis ≤ 2; a decision needs two labelled outgoing edges. Guidance only — over-budget figures still render with data-warn. Long flows: direction: down.',
+  whenToUse: 'when the hand-offs between actors matter as much as the order of steps (approval flows, cross-team release steps); not for the payload of every step (use process) or for call order inside one system (use sequence). Budgets: lanes ≤ 5, steps ≤ 12, label ≤ 14 chars, emphasis ≤ 2 across steps and edges (put it on the hand-off that couples or delays the most), backward edges ≤ 1; a decision needs two outgoing edges. Guidance only — over-budget figures still render with data-warn. Hard rule: every branch out of a decision is labelled with its outcome. Long flows: direction: down.',
   irExample: `id: expense-approval
 type: swimlane
 title: 経費申請の流れ
@@ -745,6 +777,7 @@ edges:
   - from: approve
     to: pay
     label: 承認
+    emphasis: true
   - from: approve
     to: draft
     label: 差戻し

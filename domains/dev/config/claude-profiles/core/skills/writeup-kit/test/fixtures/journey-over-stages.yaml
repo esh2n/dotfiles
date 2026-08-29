@@ -1,6 +1,6 @@
 id: j-stages
 type: journey
-title: 8 段階の旅
+title: 7 段階の旅
 rows: [行動]
 stages:
   - id: s1
@@ -38,8 +38,3 @@ stages:
     emotion: 1
     cells:
       行動: 毎日使う
-  - id: s8
-    label: 推奨
-    emotion: 2
-    cells:
-      行動: 人に勧める

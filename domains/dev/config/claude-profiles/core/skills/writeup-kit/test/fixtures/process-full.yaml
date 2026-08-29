@@ -19,6 +19,7 @@ stages:
   - id: design
     label: 設計
     emphasis: true
+    focal: 処理
     cells:
       入力: PBI
       処理: [設計書, 設計レビュー]

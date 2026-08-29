@@ -6,7 +6,9 @@
 // Ported from the grilling render/lib/diagram.mjs prototype: CJK/ASCII
 // width estimate, 720px column, orientation auto-select via fitRatio,
 // MIN_SCALE 0.78 / scroll fallback, layer spacing derived from edge label
-// width, and the sync/async/reply edge styles + legend.
+// width, and the sync/async/reply edge styles + legend. EDGE_KIND_STYLE
+// below is the kit's one definition of kind → line style; sequence.mjs
+// imports it so a dashed async arrow means the same thing in every figure.
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
@@ -57,8 +59,22 @@ const esc = (s) => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
-const EDGE_KIND_ORDER = ['sync', 'async', 'reply']
+export const EDGE_KIND_ORDER = ['sync', 'async', 'reply']
 const EDGE_KIND_LABEL = { sync: 'sync', async: 'async', reply: 'reply' }
+
+/**
+ * Edge kind → line style, shared by the node/edge diagram and the sequence
+ * figure (sequence.mjs imports it): the line says *when* (solid = the
+ * caller waits, dashed = it does not / this is the answer coming back) and
+ * the arrowhead says *what* (filled = a call or its return, open = a
+ * fire-and-forget message). `marker` is the id suffix of the <marker> each
+ * renderer defines in its own <defs> (`wu-d-<id>-solid` / `-open`).
+ */
+export const EDGE_KIND_STYLE = {
+  sync: { dash: null, marker: 'solid' },
+  async: { dash: '5 4', marker: 'open' },
+  reply: { dash: '5 4', marker: 'solid' },
+}
 const SIDE_TO_ELK = { top: 'NORTH', right: 'EAST', bottom: 'SOUTH', left: 'WEST' }
 
 /** Node box size, wide enough that `label` never overflows at 13px. */
@@ -68,9 +84,8 @@ export function nodeSize(label, { bold = false, fontSize = FONT_SIZE, minWidth =
 }
 
 function edgeStyle(kind, uid) {
-  if (kind === 'sync') return { dash: null, marker: `${uid}-solid` }
-  if (kind === 'async') return { dash: null, marker: `${uid}-open` }
-  return { dash: '5 4', marker: `${uid}-open` }
+  const st = EDGE_KIND_STYLE[kind] ?? EDGE_KIND_STYLE.sync
+  return { dash: st.dash, marker: `${uid}-${st.marker}` }
 }
 
 /**

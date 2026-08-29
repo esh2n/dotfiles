@@ -126,7 +126,7 @@ describe('freeform: schema', () => {
 
 describe('freeform: budgets', () => {
   test('limits are elements ≤ 24, label ≤ 20 chars, emphasis ≤ 2', () => {
-    assert.deepEqual(freeform.limits, { maxElements: 24, maxLabelLen: 20, maxEmphasis: 2 })
+    assert.deepEqual(freeform.limits, { maxElements: 24, maxLabelLen: 20, maxEmphasis: 2, maxComponents: 9, maxLinks: 12 })
   })
 
   test('25 elements → budget:elements=25 as a validateIR warning, still ok', () => {
@@ -151,6 +151,33 @@ describe('freeform: budgets', () => {
     const many = freeform.normalize(minimal({ elements: [...elements, ...Array.from({ length: 21 }, (_, i) => ({ kind: 'circle', id: `c${i}`, cx: 8 + i * 12, cy: 100, r: 4 }))] }))
     assert.deepEqual(freeform.budgetWarnings(many).map((x) => x.key), ['budget:elements', 'budget:label', 'budget:emphasis'])
     assert.deepEqual(freeform.budgetWarnings(freeform.normalize(minimal())), [])
+  })
+
+  test('preset: wardley adds the survey budgets — components ≤ 9, links ≤ 12, no isolated component; a plain freeform never warns on them', () => {
+    const node = (i) => box(`n${i}`, 40 + (i % 4) * 104, 32 + Math.floor(i / 4) * 48, { w: 96, h: 28 })
+    const link = (i) => ({ kind: 'line', id: `l${i}`, points: [[88 + (i % 4) * 104, 60 + Math.floor(i / 4) * 48], [88 + (i % 4) * 104, 80 + Math.floor(i / 4) * 48]] })
+    const wardley = (elements) => freeform.normalize(minimal({ preset: 'wardley', width: 488, height: 320, elements }))
+    // 10 connected components: every box has a line starting on its bottom edge
+    const ten = wardley([...Array.from({ length: 10 }, (_, i) => node(i)), ...Array.from({ length: 10 }, (_, i) => link(i))])
+    const w = freeform.budgetWarnings(ten)
+    assert.deepEqual(w.map((x) => x.key), ['budget:components'])
+    assert.equal(w[0].value, 10)
+    assert.match(w[0].detail, /10 wardley components \(guidance ≤ 9\)/)
+    // 13 links on 4 connected boxes
+    const many = wardley([...Array.from({ length: 4 }, (_, i) => node(i)), ...Array.from({ length: 13 }, (_, i) => ({ kind: 'line', id: `l${i}`, points: [[88 + (i % 4) * 104, 60], [88 + (i % 4) * 104, 96 + i * 4]] }))])
+    const wl = freeform.budgetWarnings(many)
+    assert.deepEqual(wl.map((x) => x.key), ['budget:links'])
+    assert.equal(wl[0].value, 13)
+    // an isolated box and an isolated circle
+    const lonely = wardley([node(0), node(1), link(0), { kind: 'circle', id: 'c', cx: 400, cy: 200, r: 6 }])
+    const wi = freeform.budgetWarnings(lonely)
+    assert.deepEqual(wi.map((x) => x.key), ['wardley:isolated'])
+    assert.equal(wi[0].value, 2)
+    assert.match(wi[0].detail, /isolated component\(s\): n1, c/)
+    assert.match(wi[0].hint, /connect the component/)
+    // the same elements without the preset: no wardley warning
+    assert.deepEqual(freeform.budgetWarnings(freeform.normalize(minimal({ width: 488, height: 320, elements: lonely.elements }))), [])
+    assert.deepEqual(freeform.budgetWarnings(validIr('freeform-wardley.yaml')), [])
   })
 })
 
@@ -178,16 +205,31 @@ describe('freeform: layout', () => {
   test('preset: wardley frames a plot with the two axes, four evenly spaced band ticks and three dividers on the grid', async () => {
     const ir = validIr('freeform-wardley.yaml')
     const l = await freeform.layout(ir)
-    const { plot, axes, dividers } = l.geo.preset
-    assert.deepEqual(plot, { x: 32, y: 8, width: 448, height: 276 })
+    const { plot, axes, arrows, dividers } = l.geo.preset
+    assert.deepEqual(plot, { x: 32, y: 24, width: 448, height: 260 })
     assert.deepEqual(axes.x, { x1: 32, x2: 480, y: 284 })
-    assert.deepEqual(axes.y, { x: 32, y1: 8, y2: 284 })
+    assert.deepEqual(axes.y, { x: 32, y1: 24, y2: 284 })
     assert.deepEqual(dividers.map((d) => d.x), [144, 256, 368])
     const ticks = l.geo.texts.filter((t) => t.owner === 'preset' && t.role.startsWith('tick-'))
     assert.deepEqual(ticks.map((t) => t.text), ['genesis', 'custom', 'product', 'commodity'])
     assert.deepEqual(ticks.map((t) => t.ax), [88, 200, 312, 424])
     for (const t of ticks) assert.ok(t.y >= axes.x.y, `tick ${t.text} sits below the x axis`)
-    assert.ok(l.geo.texts.some((t) => t.role === 'y-title' && t.rotate))
+    // axis titles: horizontal plain words, no arrow glyph; the direction is a short arrowhead line beside each
+    const xTitle = l.geo.texts.find((t) => t.role === 'x-title')
+    const yTitle = l.geo.texts.find((t) => t.role === 'y-title')
+    assert.equal(xTitle.text, 'evolution')
+    assert.equal(yTitle.text, 'visibility')
+    for (const t of [xTitle, yTitle]) {
+      assert.equal('rotate' in t, false)
+      assert.equal(t.height, 16)
+      assert.doesNotMatch(t.text, /[←-⇿]/u)
+    }
+    assert.deepEqual(arrows.x, { x1: 464, y1: 312, x2: 480, y2: 312 })
+    assert.deepEqual(arrows.y, { x1: 32, y1: 20, x2: 32, y2: 4 })
+    assert.equal(xTitle.x + xTitle.width, 460)
+    assert.equal(yTitle.y, 4)
+    assert.ok(yTitle.y + yTitle.height <= plot.y)
+    assert.ok(yTitle.x >= arrows.y.x1, "the y title sits right of its direction arrow")
   })
 
   test('layout and render are deterministic: same IR → deep-equal geometry and byte-identical svg', async () => {
@@ -212,25 +254,46 @@ describe('freeform: layout', () => {
     assert.match(svg, /<text id="wu-d-ff-simple-note"[^>]*font-size="11"/)
     assert.doesNotMatch(svg, /#[0-9a-fA-F]{6}\b/)
     assert.doesNotMatch(svg, /<svg/)
+    assert.doesNotMatch(svg, /wu-d-ff-simple-muted/, 'the muted arrowhead marker is a wardley-only def')
+    const w = validIr('freeform-wardley.yaml')
+    const wsvg = freeform.draw(await freeform.layout(w), w)
+    assert.doesNotMatch(wsvg, /rotate\(/)
+    assert.doesNotMatch(wsvg, /[←-⇿]/u, 'no arrow characters (self-check emoji/arrow rule)')
+    assert.match(wsvg, /<marker id="wu-d-ff-wardley-muted"[^>]*><path [^>]*fill="var\(--wu-ink-3\)"\/><\/marker>/)
+    assert.match(wsvg, /<line id="wu-d-ff-wardley-arrow-x" x1="464" y1="312" x2="480" y2="312" stroke="var\(--wu-ink-3\)" stroke-width="1" marker-end="url\(#wu-d-ff-wardley-muted\)"\/>/)
+    assert.match(wsvg, /<line id="wu-d-ff-wardley-arrow-y" x1="32" y1="20" x2="32" y2="4" [^>]*marker-end="url\(#wu-d-ff-wardley-muted\)"\/>/)
+    assert.match(wsvg, /<text id="wu-d-ff-wardley-x-title" x="460" y="316" font-size="11" text-anchor="end" fill="var\(--wu-ink-3\)">evolution<\/text>/)
+    assert.match(wsvg, /<text id="wu-d-ff-wardley-y-title" x="40" y="16" font-size="11" text-anchor="start" fill="var\(--wu-ink-3\)">visibility<\/text>/)
   })
 })
 
 // --- verify rows -----------------------------------------------------------------
 
 describe('freeform: verify rows fail on a crafted IR', () => {
-  const rows = ['in-canvas', 'text-no-overlap', 'text-clear-of-borders', 'lines-avoid-nodes', 'grid-4px-authored', 'element-count', 'label-length', 'emphasis-count', 'preset-in-plot']
+  const rows = ['in-canvas', 'text-no-overlap', 'text-clear-of-borders', 'lines-avoid-nodes', 'grid-4px-authored', 'element-count', 'label-length', 'emphasis-count', 'preset-in-plot', 'wardley-components', 'wardley-links', 'wardley-isolated']
 
-  test('doc.rows lists the nine own rows in verify() order, the shared rows follow, and the fixtures pass', async () => {
+  test('doc.rows lists the twelve own rows in verify() order, the shared rows follow, and the fixtures pass', async () => {
     assert.deepEqual(freeform.doc.rows, rows)
     for (const f of ['freeform-simple.yaml', 'freeform-wardley.yaml']) {
       const { verification } = await renderAndVerify(validIr(f))
-      assert.deepEqual(verification.checks.slice(0, 9).map((c) => c.name), rows)
-      assert.deepEqual(verification.checks.slice(0, 9).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9])
-      assert.equal(verification.checks[9].name, 'single-finite-svg')
-      assert.equal(verification.checks[9].id, 10)
+      assert.deepEqual(verification.checks.slice(0, 12).map((c) => c.name), rows)
+      assert.deepEqual(verification.checks.slice(0, 12).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+      assert.equal(verification.checks[12].name, 'single-finite-svg')
+      assert.equal(verification.checks[12].id, 13)
       assert.equal(verification.ok, true, `${f}: ${JSON.stringify(verification.failures)}`)
       assert.deepEqual(verification.warnings, [])
     }
+    const simple = await renderAndVerify(validIr('freeform-simple.yaml'))
+    assert.equal(byName(simple.verification.checks, 'wardley-isolated').detail, 'no preset — not a wardley map')
+    const lonely = freeform.normalize(minimal({ preset: 'wardley', width: 488, height: 320, elements: [box('a', 40, 40), box('b', 200, 40)] }))
+    const lv = await renderAndVerify(lonely)
+    assert.equal(lv.verification.ok, true)
+    const row = byName(lv.verification.checks, 'wardley-isolated')
+    assert.equal(row.severity, 'warn')
+    assert.equal(row.ok, false)
+    assert.equal(row.key, 'wardley:isolated')
+    assert.equal(row.value, 2)
+    assert.deepEqual(lv.verification.warnings.map((w) => w.key), ['wardley:isolated'])
   })
 
   test('#1 in-canvas fails for a box past the right edge, a line point below the bottom, and a text whose width leaves the canvas', async () => {
@@ -343,7 +406,7 @@ describe('freeform: verify rows fail on a crafted IR', () => {
     assert.equal(r.ok, false)
     assert.equal(r.severity, 'fail')
     assert.match(r.detail, /a \(box\)/)
-    assert.match(r.hint, /x 32\.\.480, y 8\.\.284/)
+    assert.match(r.hint, /x 32\.\.480, y 24\.\.284/)
     r = byName(await ownRows(minimal({ preset: 'wardley', width: 488, height: 320, elements: [{ kind: 'circle', id: 'c', cx: 200, cy: 280, r: 6 }] })), 'preset-in-plot')
     assert.match(r.detail, /c \(circle\)/)
     r = byName(await ownRows(minimal()), 'preset-in-plot')
@@ -383,10 +446,11 @@ describe('freeform: registry path and CLI', () => {
     }
     const j = JSON.parse(runCli([join(FIXTURES, 'freeform-wardley.yaml'), '--json']).stdout)
     assert.equal(j.ok, true)
-    assert.equal(j.checks.length, 16)
+    assert.equal(j.checks.length, 19)
     assert.equal(j.checks.filter((c) => !c.ok).length, 0)
     assert.match(j.figureHtml, /genesis/)
     assert.match(j.figureHtml, /commodity/)
+    assert.doesNotMatch(j.figureHtml, /[←-⇿]/u)
   })
 
   test('--doc freeform prints the irExample (a wardley map: 6 boxes, 5 lines) and it renders clean; --list-types mentions the escape-hatch rule', () => {
@@ -401,7 +465,7 @@ describe('freeform: registry path and CLI', () => {
     assert.deepEqual(ir.warnings, [])
     const listed = runCli(['--list-types'])
     assert.match(listed.stdout, /^freeform {2}\(plugin\)\n {2}purpose: /m)
-    assert.match(listed.stdout, /budgets: maxElements=24 maxLabelLen=20 maxEmphasis=2/)
+    assert.match(listed.stdout, /budgets: maxElements=24 maxLabelLen=20 maxEmphasis=2 maxComponents=9 maxLinks=12/)
     assert.match(listed.stdout, /one-off figures only/)
     assert.match(listed.stdout, /--list-types/)
     assert.match(freeform.doc.whenToUse, /one-off figures only[^]*--list-types/)

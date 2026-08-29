@@ -22,6 +22,3 @@ tasks:
     label: 公開判定
     from: 2026-02-23
     milestone: true
-deps:
-  - from: verify
-    to: go

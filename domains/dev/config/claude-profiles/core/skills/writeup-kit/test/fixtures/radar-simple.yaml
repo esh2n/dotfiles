@@ -12,18 +12,25 @@ axes:
 - id: cost
   label: コスト
 series:
-- id: es
-  label: Elastic
+- id: search
+  label: 検索エンジン
   emphasis: true
   values:
     speed: 0.9
     relevance: 0.8
     ops: 0.4
     cost: 0.5
-- id: pg
-  label: Postgres FTS
+- id: rdb
+  label: RDB 全文検索
   values:
     speed: 0.6
     relevance: 0.5
     ops: 0.9
     cost: 0.9
+- id: hosted
+  label: マネージド検索
+  values:
+    speed: 0.8
+    relevance: 0.7
+    ops: 0.7
+    cost: 0.3

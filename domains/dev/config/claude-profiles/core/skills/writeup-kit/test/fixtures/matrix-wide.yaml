@@ -13,16 +13,8 @@ rows:
   label: 通知配信
 - id: audit
   label: 監査ログ
-- id: i18n
-  label: 多言語表示
-- id: billing
-  label: 請求・決済
-- id: sso
-  label: SSO 連携
 - id: api
   label: 外部 API
-- id: report
-  label: 集計レポート
 columns:
 - id: local
   label: ローカル
@@ -136,60 +128,6 @@ cells:
 - row: audit
   col: demo
   mark: no
-- row: i18n
-  col: dev
-  mark: yes
-- row: i18n
-  col: stg
-  mark: partial
-- row: i18n
-  col: prod
-  mark: no
-- row: i18n
-  col: sandbox
-  mark: yes
-- row: i18n
-  col: demo
-  mark: partial
-- row: i18n
-  col: legacy
-  mark: no
-- row: billing
-  col: local
-  mark: no
-- row: billing
-  col: stg
-  mark: yes
-- row: billing
-  col: prod
-  mark: partial
-- row: billing
-  col: dr
-  mark: no
-- row: billing
-  col: demo
-  mark: yes
-- row: billing
-  col: legacy
-  mark: partial
-- row: sso
-  col: local
-  mark: partial
-- row: sso
-  col: dev
-  mark: no
-- row: sso
-  col: prod
-  mark: yes
-- row: sso
-  col: dr
-  mark: partial
-- row: sso
-  col: sandbox
-  mark: no
-- row: sso
-  col: legacy
-  mark: yes
 - row: api
   col: local
   mark: yes
@@ -207,22 +145,4 @@ cells:
   mark: partial
 - row: api
   col: demo
-  mark: no
-- row: report
-  col: dev
-  mark: yes
-- row: report
-  col: stg
-  mark: partial
-- row: report
-  col: prod
-  mark: no
-- row: report
-  col: sandbox
-  mark: yes
-- row: report
-  col: demo
-  mark: partial
-- row: report
-  col: legacy
   mark: no

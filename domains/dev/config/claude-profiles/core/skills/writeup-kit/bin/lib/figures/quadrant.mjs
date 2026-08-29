@@ -3,8 +3,12 @@
 // Risk × Value, 実装コスト × 効果). This is the *standard* quadrant of the
 // diagram-pattern survey: positions carry meaning, the four cells are not
 // painted, and the axis text sits at the ends of the axes (never at the
-// midpoint). The "consultant 2×2" (four scenario cards, one focal cell, no
-// points) is a different grammar and not this type.
+// midpoint, survey §2 row 9): the axis name and its `high` word read
+// horizontally at the high end of the axis line — x at the right end
+// (「実装コスト 高」), y at the top end (「効果 大」) — and the `low` word
+// alone marks the other end. Nothing is rotated. The "consultant 2×2"
+// (four scenario cards, one focal cell, no points) is a different grammar
+// and not this type.
 //
 // IR shape: `{ id, type:'quadrant', title, caption, x:{label, low?, high?},
 // y:{label, low?, high?}, quadrants?:{tl?, tr?, bl?, br?}, items:[{id,
@@ -16,8 +20,10 @@
 // marker (dots are always ink). Neutral by default.
 //
 // Layout is a fixed, deterministic 4:3 plot (≤ COLUMN wide) with the axis
-// lines through the middle, the axis labels outside, optional corner
-// captions in muted ink, and one dot + label per item. Labels sit to the
+// lines through the middle, the axis text outside at the four ends of the
+// cross (top: y name + high; bottom: y low; right: x name + high; left: x
+// low), optional corner captions in muted ink, and one dot + label per
+// item. Labels sit to the
 // right of the dot and flip to the left near the right edge; when two
 // labels would overlap, the later one is nudged on the 4px grid (sideways,
 // then above/below) until it is clear of every placed label, marker, corner
@@ -36,6 +42,7 @@ export const limits = { maxItems: 12, maxLabelLen: 12, maxEmphasis: 2 }
 const PAD = 16                 // canvas padding
 const PLOT_W_MAX = 480         // plot width at a full column (4:3 → 360 tall)
 const AXIS_GAP = 8             // plot edge → axis text
+const END_GAP = 4              // axis name → its `high` word
 const LABEL_GAP = 8            // marker centre → label box
 const LABEL_H = 16             // 13px text box, on the grid
 const LABEL_PAD = 4            // halo padding either side of the label text
@@ -196,17 +203,27 @@ function leaderFor(m, box) {
   return { x1: m.cx, y1: m.cy, x2: snap4(end.x), y2: snap4(end.y) }
 }
 
-export async function layout(ir, { column = COLUMN } = {}) {
-  const xEnds = [ir.x.low, ir.x.high].filter((s) => s !== undefined)
-  const yEnds = [ir.y.low, ir.y.high].filter((s) => s !== undefined)
-  const yEndW = yEnds.length ? Math.max(...yEnds.map((s) => boxW(s, EDGE_LABEL_SIZE))) : 0
+const smallBox = (text) => (text === undefined ? 0 : snapUp4(boxW(text, EDGE_LABEL_SIZE)))
 
-  // left band: rotated y label (16) + gap + y end labels + gap
-  const leftBand = PAD + SMALL_H + AXIS_GAP + (yEnds.length ? snapUp4(yEndW) + AXIS_GAP : 0)
+export async function layout(ir, { column = COLUMN } = {}) {
+  const xLabelW = snapUp4(boxW(ir.x.label, FONT_SIZE))
+  const yLabelW = snapUp4(boxW(ir.y.label, FONT_SIZE))
+  const xLowW = smallBox(ir.x.low)
+  const xHighW = smallBox(ir.x.high)
+  const yLowW = smallBox(ir.y.low)
+  const yHighW = smallBox(ir.y.high)
+
+  // bands around the plot: the axis text sits at the four ends of the cross
+  //   left   x.low (muted) at the left end of the horizontal axis
+  //   right  x.label + x.high at its right end
+  //   top    y.label + y.high above the top end of the vertical axis
+  //   bottom y.low (muted) below its bottom end
+  const leftBand = PAD + (xLowW ? xLowW + AXIS_GAP : 0)
+  const rightBand = AXIS_GAP + xLabelW + (xHighW ? END_GAP + xHighW : 0) + PAD
   const plotX = snapUp4(leftBand)
-  const plotW = Math.min(PLOT_W_MAX, Math.floor((column - plotX - PAD) / 4) * 4)
+  const plotW = Math.min(PLOT_W_MAX, Math.floor((column - plotX - rightBand) / 4) * 4)
   const plotH = snap4(plotW * 3 / 4)
-  const plotY = PAD
+  const plotY = PAD + LABEL_H + AXIS_GAP
   const plot = { x: plotX, y: plotY, width: plotW, height: plotH }
   const midX = plotX + plotW / 2
   const midY = plotY + plotH / 2
@@ -214,30 +231,26 @@ export async function layout(ir, { column = COLUMN } = {}) {
 
   // axis text (all outside the plot); boxes are screen-space for collision
   const texts = []
-  const xLabelW = snapUp4(boxW(ir.x.label, FONT_SIZE))
-  const bandY = plotY + plotH + AXIS_GAP
-  const endBoxes = []
-  if (ir.x.low !== undefined) {
-    const w = snapUp4(boxW(ir.x.low, EDGE_LABEL_SIZE))
-    endBoxes.push({ role: 'x-low', text: ir.x.low, x: plotX, y: bandY, width: w, height: SMALL_H, anchor: 'start', size: EDGE_LABEL_SIZE, muted: true })
+  const sideY = snap4(midY - LABEL_H / 2)
+  if (xLowW) {
+    texts.push({ role: 'x-low', text: ir.x.low, x: plotX - AXIS_GAP - xLowW, y: sideY, width: xLowW, height: SMALL_H, anchor: 'end', size: EDGE_LABEL_SIZE, muted: true })
   }
-  if (ir.x.high !== undefined) {
-    const w = snapUp4(boxW(ir.x.high, EDGE_LABEL_SIZE))
-    endBoxes.push({ role: 'x-high', text: ir.x.high, x: plotX + plotW - w, y: bandY, width: w, height: SMALL_H, anchor: 'end', size: EDGE_LABEL_SIZE, muted: true })
+  const xLabelX = plotX + plotW + AXIS_GAP
+  texts.push({ role: 'x-label', text: ir.x.label, x: xLabelX, y: sideY, width: xLabelW, height: LABEL_H, anchor: 'start', size: FONT_SIZE, muted: false })
+  if (xHighW) {
+    texts.push({ role: 'x-high', text: ir.x.high, x: xLabelX + xLabelW + END_GAP, y: sideY, width: xHighW, height: SMALL_H, anchor: 'start', size: EDGE_LABEL_SIZE, muted: true })
   }
-  let xLabel = { role: 'x-label', text: ir.x.label, x: snap4(midX - xLabelW / 2), y: bandY, width: xLabelW, height: LABEL_H, anchor: 'middle', size: FONT_SIZE, muted: false }
-  if (endBoxes.some((b) => intersects(b, xLabel))) xLabel = { ...xLabel, y: bandY + LABEL_H }
-  texts.push(...endBoxes, xLabel)
-  const bottom = Math.max(xLabel.y + LABEL_H, ...endBoxes.map((b) => b.y + b.height))
-
-  const yLabelW = snapUp4(boxW(ir.y.label, FONT_SIZE))
-  texts.push({ role: 'y-label', text: ir.y.label, x: PAD, y: snap4(midY - yLabelW / 2), width: SMALL_H, height: yLabelW, anchor: 'middle', size: FONT_SIZE, muted: false, rotate: true })
-  const yEndX = PAD + SMALL_H + AXIS_GAP
-  if (ir.y.high !== undefined) {
-    texts.push({ role: 'y-high', text: ir.y.high, x: yEndX, y: plotY, width: snapUp4(yEndW), height: SMALL_H, anchor: 'end', size: EDGE_LABEL_SIZE, muted: true })
+  const topW = yLabelW + (yHighW ? END_GAP + yHighW : 0)
+  const topX = snap4(midX - topW / 2)
+  texts.push({ role: 'y-label', text: ir.y.label, x: topX, y: PAD, width: yLabelW, height: LABEL_H, anchor: 'start', size: FONT_SIZE, muted: false })
+  if (yHighW) {
+    texts.push({ role: 'y-high', text: ir.y.high, x: topX + yLabelW + END_GAP, y: PAD, width: yHighW, height: SMALL_H, anchor: 'start', size: EDGE_LABEL_SIZE, muted: true })
   }
-  if (ir.y.low !== undefined) {
-    texts.push({ role: 'y-low', text: ir.y.low, x: yEndX, y: plotY + plotH - SMALL_H, width: snapUp4(yEndW), height: SMALL_H, anchor: 'end', size: EDGE_LABEL_SIZE, muted: true })
+  let bottom = plotY + plotH
+  if (yLowW) {
+    const box = { role: 'y-low', text: ir.y.low, x: snap4(midX - yLowW / 2), y: plotY + plotH + AXIS_GAP, width: yLowW, height: SMALL_H, anchor: 'middle', size: EDGE_LABEL_SIZE, muted: true }
+    texts.push(box)
+    bottom = box.y + box.height
   }
 
   // corner captions (inside the plot, muted)
@@ -282,7 +295,7 @@ export async function layout(ir, { column = COLUMN } = {}) {
     return { id: it.id, label: it.label, emphasis: it.emphasis, tone: it.tone, marker: m, labelBox: rec }
   })
 
-  const width = snapUp4(plotX + plotW + PAD)
+  const width = snapUp4(plotX + plotW + rightBand)
   const height = snapUp4(bottom + PAD)
   return { width, height, geo: { plot, axes, texts, corners, items } }
 }
@@ -303,12 +316,6 @@ export function draw(geo, ir) {
   parts.push(`<line id="${uid}-axis-h" x1="${axes.horizontal.x1}" y1="${axes.horizontal.y}" x2="${axes.horizontal.x2}" y2="${axes.horizontal.y}" stroke="currentColor" stroke-width="1"/>`)
   for (const t of texts) {
     const fill = t.muted ? 'var(--wu-ink-3)' : 'currentColor'
-    if (t.rotate) {
-      const cx = t.x + 12
-      const cy = t.y + t.height / 2
-      parts.push(`<text id="${uid}-${t.role}" x="${cx}" y="${cy}" transform="rotate(-90 ${cx} ${cy})" font-size="${t.size}" text-anchor="middle" fill="${fill}">${esc(t.text)}</text>`)
-      continue
-    }
     const tx = t.anchor === 'end' ? t.x + t.width : t.anchor === 'middle' ? t.x + t.width / 2 : t.x
     parts.push(`<text id="${uid}-${t.role}" x="${tx}" y="${t.y + 12}" font-size="${t.size}" text-anchor="${t.anchor}" fill="${fill}">${esc(t.text)}</text>`)
   }
@@ -351,7 +358,7 @@ export function verify(geo, ir) {
   })
   rows.push({
     id: 1, name: 'axis-labels', severity: 'fail', ok: axisLabels.length === 0,
-    detail: axisLabels.length ? `missing axis label(s): ${axisLabels.join(', ')}` : 'both axes carry a label outside the plot',
+    detail: axisLabels.length ? `missing axis label(s): ${axisLabels.join(', ')}` : 'both axes carry a label at the high end of their axis line, outside the plot',
     hint: axisLabels.length ? 'give x.label and y.label a one-word criterion each' : undefined,
   })
 
@@ -413,7 +420,7 @@ export function verify(geo, ir) {
 
 export const doc = {
   purpose: 'options compared on two criteria — a 2×2 with labelled axes and items placed by coordinates',
-  whenToUse: 'when the *position* of each option against two criteria is the message (Impact × Effort, Risk × Value, 実装コスト × 効果); not for four scenario cards without points (consultant 2×2) or more than two criteria (use radar or a table). Budgets: items ≤ 12, label ≤ 12 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
+  whenToUse: 'when the *position* of each option against two criteria is the message (Impact × Effort, Risk × Value, 実装コスト × 効果); not for four scenario cards without points (consultant 2×2) or more than two criteria (use radar or a table). Axis names are one word each and sit at the high end of their axis (x at the right, y at the top, never rotated) next to the `high` word; `low` marks the other end. Budgets: items ≤ 12, label ≤ 12 chars, emphasis ≤ 2 — guidance, over-budget figures still render with data-warn.',
   irExample: `id: options
 type: quadrant
 title: 改善案の比較

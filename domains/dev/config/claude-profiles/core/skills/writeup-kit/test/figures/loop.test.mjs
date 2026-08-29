@@ -18,9 +18,11 @@ const BIN = join(ROOT, 'bin', 'render-diagram.mjs')
 const FIXTURES = join(ROOT, 'test', 'fixtures')
 const fixture = (name) => readFileSync(join(FIXTURES, name), 'utf8')
 const ALL_FIXTURES = ['loop-simple.yaml', 'loop-hub.yaml', 'loop-ccw.yaml', 'loop-over-budget.yaml']
-const CLEAN_FIXTURES = ['loop-simple.yaml', 'loop-hub.yaml', 'loop-ccw.yaml']
+const CLEAN_FIXTURES = ['loop-hub.yaml']
+// Rings under the step floor and without a hub: they render (data-checks pass) but carry data-warn.
+const UNDER_FIXTURES = { 'loop-simple.yaml': 'budget:steps=4;budget:hub=0', 'loop-ccw.yaml': 'budget:steps=3;budget:hub=0' }
 const BUDGET_KEYS = ['budget:steps', 'budget:label', 'budget:emphasis']
-const OWN_ROWS = ['step-count', 'label-length', 'emphasis-count', 'boxes-clear', 'arcs-clear', 'labels-clear', 'arrow-direction']
+const OWN_ROWS = ['step-count', 'label-length', 'emphasis-count', 'hub-present', 'boxes-clear', 'arcs-clear', 'labels-clear', 'arrow-direction']
 
 function validIr(name) {
   const result = validateIR(parseYaml(fixture(name)))
@@ -115,6 +117,21 @@ describe('figures/loop.mjs: schema', () => {
 describe('figures/loop.mjs: budgets', () => {
   test('within budget → no warnings', () => {
     for (const name of CLEAN_FIXTURES) assert.deepEqual(loop.budgetWarnings(validIr(name)), [], name)
+  })
+
+  test('fewer than 5 steps warns against the lower bound and a missing hub warns budget:hub (a Cycle, not a Loop)', async () => {
+    for (const [name, warn] of Object.entries(UNDER_FIXTURES)) {
+      const r = validateIR(parseYaml(fixture(name)))
+      assert.equal(r.ok, true)
+      assert.equal(formatBudgetWarnings(r.warnings), warn, name)
+      assert.match(r.warnings[0].detail, /guidance ≥ 5/)
+      assert.match(r.warnings[1].hint, /Cycle, not a Loop/)
+      const rendered = await renderFigureHtmlChecked(r.ir, { rawYaml: fixture(name) })
+      assert.equal(rendered.checksOk, true, `${name}: ${JSON.stringify(rendered.failures)}`)
+      assert.match(rendered.html, new RegExp(`^<figure class="wu-figure" data-checks="pass" data-warn="${warn}" data-type="loop">`))
+    }
+    const six = validateIR({ ...minimal(), steps: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, label: id })), edgeLabels: undefined, exits: undefined })
+    assert.deepEqual(six.warnings, [], 'five steps with a hub is within budget')
   })
 
   test('every budget key fires, in a stable order, and reaches data-warn', async () => {
@@ -277,8 +294,8 @@ describe('figures/loop.mjs: verify rows', () => {
       const v = await verifyFigure(plugin, ir, rendered)
       assert.equal(v.ok, true, `${name}: ${JSON.stringify(v.failures)}`)
       assert.deepEqual(v.warnings, [])
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.name), plugin.doc.rows)
-      assert.deepEqual(v.checks.slice(0, 7).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7])
+      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.name), plugin.doc.rows)
+      assert.deepEqual(v.checks.slice(0, 8).map((c) => c.id), [1, 2, 3, 4, 5, 6, 7, 8])
       assert.deepEqual(plugin.doc.rows, OWN_ROWS)
     }
   })
@@ -368,7 +385,7 @@ describe('figures/loop.mjs: verify rows', () => {
     assert.equal(byName(loop.verify(l, ir, { svg: rendered.svg }), 'arrow-direction').ok, true)
   })
 
-  test('the three budget rows are warn rows carrying key/value only when they fail', async () => {
+  test('the four budget rows are warn rows carrying key/value only when they fail', async () => {
     const ir = validIr('loop-over-budget.yaml')
     const rendered = await renderFigure(plugin, ir)
     const v = await verifyFigure(plugin, ir, rendered)
@@ -380,12 +397,30 @@ describe('figures/loop.mjs: verify rows', () => {
     ])
     const cleanIr = validIr('loop-hub.yaml')
     const clean = await verifyFigure(plugin, cleanIr, await renderFigure(plugin, cleanIr))
-    for (const name of ['step-count', 'label-length', 'emphasis-count']) {
+    for (const name of ['step-count', 'label-length', 'emphasis-count', 'hub-present']) {
       const row = byName(clean.checks, name)
       assert.equal(row.severity, 'warn')
       assert.equal(row.ok, true)
       assert.equal('key' in row, false)
     }
+    const noHub = validIr('loop-simple.yaml')
+    const nh = await verifyFigure(plugin, noHub, await renderFigure(plugin, noHub))
+    assert.deepEqual(nh.warnings.map((w) => [w.name, w.key, w.value]), [['step-count', 'budget:steps', 4], ['hub-present', 'budget:hub', 0]])
+  })
+
+  test('the hub takes the accent (wu-focal) only when no step carries emphasis', async () => {
+    const stepFocal = validIr('loop-hub.yaml')
+    const a = await renderFigure(plugin, stepFocal)
+    assert.equal(a.layout.geo.hub.focal, false)
+    assert.match(a.svg, /<circle id="wu-d-growth-loop-hub"[^>]*stroke="currentColor" stroke-width="1.5"\/>/)
+    assert.doesNotMatch(a.svg, /<circle id="wu-d-growth-loop-hub"[^>]*wu-focal/)
+    const hubFocal = validateIR({ ...minimal(), steps: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, label: id })), edgeLabels: undefined, exits: undefined }).ir
+    const b = await renderFigure(plugin, hubFocal)
+    assert.equal(b.layout.geo.hub.focal, true)
+    assert.match(b.svg, /<circle id="wu-d-l-hub"[^>]*class="wu-focal" stroke="var\(--wu-accent\)" stroke-width="1.5"\/>/)
+    assert.doesNotMatch(b.svg, /<rect id="wu-d-l-step-[a-e]"[^>]*wu-focal/)
+    const v = await verifyFigure(plugin, hubFocal, b)
+    assert.match(byName(v.checks, 'hub-present').detail, /carries the accent/)
   })
 })
 
@@ -423,7 +458,7 @@ describe('figures/loop.mjs: registry dispatch and CLI', () => {
     for (const name of ['loop-simple.yaml', 'loop-hub.yaml']) {
       const rendered = await renderFigureHtmlChecked(validIr(name), { rawYaml: fixture(name) })
       assert.equal(rendered.checksOk, true, `${name}: ${JSON.stringify(rendered.failures)}`)
-      assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" data-type="loop">/)
+      assert.match(rendered.html, /^<figure class="wu-figure" data-checks="pass" (data-warn="[^"]+" )?data-type="loop">/)
       assert.match(rendered.html, /<script type="text\/x-writeup-diagram">/)
       assert.equal(rendered.html.includes('data-scroll="true"'), false, `${name} should fit the column`)
       assert.equal(rendered.scaled, false, `${name} should render 1:1 inside the column`)
@@ -432,7 +467,7 @@ describe('figures/loop.mjs: registry dispatch and CLI', () => {
 
   test('the registry lists loop with its limits and doc rows', () => {
     assert.equal(plugin.type, 'loop')
-    assert.deepEqual(plugin.limits, { maxSteps: 8, maxLabelLen: 14, maxEmphasis: 2 })
+    assert.deepEqual(plugin.limits, { minSteps: 5, maxSteps: 8, maxLabelLen: 14, maxEmphasis: 1 })
     assert.deepEqual(plugin.doc.rows, OWN_ROWS)
   })
 
