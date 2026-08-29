@@ -1,0 +1,51 @@
+id: zhl
+type: zones
+variant: high-level
+title: 検索リクエストの経路
+caption: Edge で認証し、アプリ層は検索と索引更新に分かれる
+zones:
+  - id: edge
+    label: Edge
+    nodes:
+      - id: cdn
+        label: CDN
+      - id: gw
+        label: Gateway
+        emphasis: true
+  - id: app
+    label: アプリ
+    nodes:
+      - id: search
+        label: 検索 API
+      - id: indexer
+        label: 索引更新
+      - id: queue
+        label: 更新キュー
+        kind: queue
+  - id: data
+    label: データ
+    tone: rs
+    nodes:
+      - id: es
+        label: 検索索引
+        kind: store
+      - id: db
+        label: 商品 DB
+        kind: store
+edges:
+  - from: cdn
+    to: gw
+  - from: gw
+    to: search
+    label: 認証済み
+  - from: search
+    to: es
+  - from: queue
+    to: indexer
+    kind: async
+  - from: indexer
+    to: es
+  - from: db
+    to: queue
+    kind: async
+    label: 変更通知

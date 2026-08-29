@@ -1,0 +1,55 @@
+id: zdep
+type: zones
+variant: deployment
+title: 本番デプロイ構成
+caption: Web と API は同一リージョンの別ノード、DB はマネージド
+zones:
+  - id: region-a
+    label: region-a
+    nodes:
+      - id: lb
+        label: ロードバランサ
+      - id: web
+        label: Web ×3
+        kind: ui
+      - id: api
+        label: API ×2
+        emphasis: true
+  - id: managed
+    label: マネージド
+    tone: ts
+    nodes:
+      - id: pg
+        label: PostgreSQL
+        kind: store
+      - id: mq
+        label: MQ
+        kind: queue
+      - id: cache
+        label: Redis
+        kind: store
+  - id: external
+    label: 外部
+    nodes:
+      - id: mail
+        label: メール配信
+        kind: external
+edges:
+  - from: lb
+    to: web
+    label: https:443
+  - from: web
+    to: api
+    label: http:8080
+  - from: api
+    to: pg
+    label: tcp:5432
+  - from: api
+    to: cache
+  - from: api
+    to: mq
+    kind: async
+  - from: mq
+    to: mail
+    kind: async
+    label: smtp:587

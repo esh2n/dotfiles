@@ -260,7 +260,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 |---|---|---|---|---|
 | – | Node/edge diagram (kit default) | `diagram` | G | builtin (`ir.mjs` + `diagram.mjs`, not a plugin) |
 | 1 | Architecture | `architecture` | G | covered by `diagram` (node/edge renderer: groups + tones + `wu-focal`) |
-| 2 | IT current-state | `it-state` | G+L | planned |
+| 2 | IT current-state | `it-state` | G+L | implemented as `zones` with `variant: it-state` |
 | 3 | Flowchart | `flowchart` | G | covered by `diagram` (node/edge renderer: decision nodes as labelled branches) |
 | 4 | Sequence | `sequence` | S | implemented (`bin/lib/figures/sequence.mjs`) |
 | 5 | State machine | `state` | ST | implemented (`bin/lib/figures/state.mjs`) |
@@ -282,18 +282,18 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 21 | Line chart (incl. slopegraph, ridgeline) | `line` | Q / D | implemented (`bin/lib/figures/line.mjs`) |
 | 22 | Gantt | `gantt` | S | implemented (`bin/lib/figures/gantt.mjs`) |
 | 23 | Scatter / bubble | `scatter` | Q | implemented (`bin/lib/figures/scatter.mjs`) |
-| 24 | High-Level | `high-level` | G+L | planned |
+| 24 | High-Level | `high-level` | G+L | implemented as `zones` with `variant: high-level` |
 | 25 | Process | `process` | G+L(grid) | implemented (`bin/lib/figures/process.mjs`) |
 | 26 | Medallion | `medallion` | L | implemented (`bin/lib/figures/medallion.mjs`) |
 | 27 | Data flow | `data-flow` | G+L(grid) | covered by `diagram` (node/edge renderer: `layer:` group hints, stage order left → right) |
-| 28 | DP integration | `dp-integration` | G+L | planned |
+| 28 | DP integration | `dp-integration` | G+L | implemented as `zones` with `variant: integration` |
 | 29 | DP security matrix | `matrix` (generic rows × columns; the DP security matrix is a preset) | M | implemented (`bin/lib/figures/matrix.mjs`) |
 | 30 | Sankey | `sankey` | Q(flow) | implemented (`bin/lib/figures/sankey.mjs`) |
 | 31 | Fishbone | `fishbone` | H(cause) | implemented (`bin/lib/figures/fishbone.mjs`) |
 | 32 | Wardley map | `wardley` | M(2-axis ordinal) | implemented as `freeform` with `preset: wardley` (authored coordinates, verified) |
 | 33 | Kanban | `kanban` | M(state census) | implemented as `board` with `variant: kanban` |
 | 34 | User journey | `journey` | S+M | implemented (`bin/lib/figures/journey.mjs`) |
-| 35 | Deployment | `deployment` | L+G | planned |
+| 35 | Deployment | `deployment` | L+G | implemented as `zones` with `variant: deployment` |
 | 36 | Dependency graph | `dependency` | G(DAG) | covered by `diagram` (node/edge renderer: DAG; accent the one edge that breaks a cycle) |
 | 37 | UML class | `uml-class` | G(H) | implemented as `schema` with `variant: class` |
 | 38 | Story map | `story-map` | M(grid) | implemented as `board` with `variant: story-map` |

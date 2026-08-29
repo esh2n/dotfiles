@@ -1,0 +1,69 @@
+id: zint
+type: zones
+variant: integration
+title: データ基盤の統合トポロジ
+caption: ソースは取込 API 経由で基盤に入り、利用側は公開面から読む
+zones:
+  - id: sources
+    label: ソース
+    nodes:
+      - id: crm
+        label: CRM
+        kind: external
+      - id: app
+        label: 業務アプリ
+      - id: logs
+        label: ログ
+        kind: queue
+  - id: platform
+    label: 基盤
+    tone: ts
+    nodes:
+      - id: ingest
+        label: 取込 API
+        emphasis: true
+      - id: lake
+        label: レイク
+        kind: store
+      - id: mart
+        label: マート
+        kind: store
+        emphasis: true
+  - id: consumers
+    label: 利用
+    nodes:
+      - id: bi
+        label: BI
+        kind: ui
+      - id: ml
+        label: 学習
+      - id: partner
+        label: パートナー
+        kind: external
+edges:
+  - from: crm
+    to: ingest
+    label: 日次
+  - from: app
+    to: ingest
+    label: CDC
+  - from: logs
+    to: ingest
+    kind: async
+  - from: ingest
+    to: lake
+  - from: lake
+    to: mart
+  - from: mart
+    to: bi
+  - from: mart
+    to: ml
+    kind: async
+    label: 週次
+  - from: mart
+    to: partner
+    label: API
+  - from: ml
+    to: lake
+    kind: reply
+    label: 予測

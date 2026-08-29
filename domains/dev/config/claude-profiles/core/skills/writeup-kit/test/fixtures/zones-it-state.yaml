@@ -1,0 +1,56 @@
+id: zit
+type: zones
+variant: it-state
+title: 現行 IT 構成
+caption: 本番と分析基盤は夜間バッチのファイル連携でつながる
+zones:
+  - id: prod
+    label: 本番
+    nodes:
+      - id: crm
+        label: CRM
+        kind: ui
+      - id: erp
+        label: ERP
+      - id: proddb
+        label: 業務 DB
+        kind: store
+  - id: batch
+    label: 連携
+    nodes:
+      - id: sftp
+        label: SFTP
+        emphasis: true
+      - id: etl
+        label: 夜間バッチ
+  - id: analytics
+    label: 分析
+    tone: ts
+    nodes:
+      - id: dwh
+        label: DWH
+        kind: store
+      - id: bi
+        label: BI
+        kind: ui
+      - id: vendor
+        label: 外部集計
+        kind: external
+edges:
+  - from: crm
+    to: proddb
+  - from: erp
+    to: proddb
+  - from: proddb
+    to: sftp
+    label: CSV
+  - from: sftp
+    to: etl
+  - from: etl
+    to: dwh
+  - from: dwh
+    to: bi
+  - from: dwh
+    to: vendor
+    kind: async
+    label: 月次
