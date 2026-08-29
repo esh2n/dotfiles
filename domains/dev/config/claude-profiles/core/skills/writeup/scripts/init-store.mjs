@@ -325,16 +325,13 @@ function ensureFile(path, content, log, label) {
   log.push(`init-store: wrote ${label}`)
 }
 
+/** True only when `dir` is *itself* a repository root. `git rev-parse
+ * --is-inside-work-tree` walks up, so it answers yes for a store created
+ * inside another repository (a $HOME under version control, or a named
+ * store under a legacy store) and the store would then never get its own
+ * repo — every commit would land in the enclosing one. */
 function isGitRepo(dir) {
-  try {
-    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
-      cwd: dir,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    return true
-  } catch {
-    return false
-  }
+  return existsSync(join(dir, '.git'))
 }
 
 export function initStore(storeDir) {

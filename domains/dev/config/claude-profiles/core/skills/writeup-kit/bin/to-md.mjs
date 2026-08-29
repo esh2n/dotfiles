@@ -58,24 +58,33 @@ function renderTable(table) {
 
 const MERMAID_ARROW = { sync: '-->', async: '-.->', reply: '-.->' }
 
+/** A mermaid `flowchart` for a node/edge IR, or `null` when this IR has no
+ * nodes to draw. `groups` and `edges` are optional in the IR (a diagram
+ * without groups is the common case), and the non-`diagram` figure types —
+ * bar, timeline, matrix and the rest — carry no nodes at all; none of them
+ * has a flowchart form, so they get the SVG image without a mermaid block. */
 function mermaidFromIr(ir) {
+  const nodes = Array.isArray(ir.nodes) ? ir.nodes : []
+  const groups = Array.isArray(ir.groups) ? ir.groups : []
+  const edges = Array.isArray(ir.edges) ? ir.edges : []
+  if (!nodes.length) return null
   const dir = ir.direction === 'down' ? 'TD' : 'LR'
   const lines = [`flowchart ${dir}`]
   const grouped = new Map()
-  for (const g of ir.groups) grouped.set(g.id, [])
+  for (const g of groups) grouped.set(g.id, [])
   const ungrouped = []
-  for (const n of ir.nodes) {
+  for (const n of nodes) {
     const line = `${n.id}[${n.label}]`
     if (n.group && grouped.has(n.group)) grouped.get(n.group).push(line)
     else ungrouped.push(line)
   }
-  for (const g of ir.groups) {
+  for (const g of groups) {
     lines.push(`  subgraph ${g.id}[${g.label}]`)
     for (const line of grouped.get(g.id)) lines.push(`    ${line}`)
     lines.push('  end')
   }
   for (const line of ungrouped) lines.push(`  ${line}`)
-  for (const e of ir.edges) {
+  for (const e of edges) {
     const arrow = MERMAID_ARROW[e.kind] || '-->'
     if (e.kind === 'reply') {
       lines.push(`  ${e.from} ${arrow}|reply| ${e.to}`)
@@ -103,10 +112,11 @@ function renderFigure(fig, ctx) {
     writeFileSync(join(ctx.figuresDir, svgFileName), serialize(svg))
     const relPath = ctx.figuresDirRel ? `${ctx.figuresDirRel}/${svgFileName}` : svgFileName
     out.push(`![${caption}](${relPath})`)
-    if (ir) {
+    const mermaid = ir ? mermaidFromIr(ir) : null
+    if (mermaid) {
       out.push('')
       out.push('```mermaid')
-      out.push(mermaidFromIr(ir))
+      out.push(mermaid)
       out.push('```')
     }
   } else if (svg) {
@@ -196,6 +206,24 @@ function renderOpen(div) {
   return items.join('\n')
 }
 
+/** `.wu-cells` — one thing split into labelled parts. Markdown has no strip,
+ * so each row becomes a list item (`**label** — part / part / part`), the
+ * optional title a bold line, and each `.wu-cells-note` a plain line. Tones
+ * and `data-count` widths are presentation and do not survive. */
+function renderCells(div) {
+  const lines = []
+  for (const child of elementChildren(div)) {
+    if (hasClass(child, 'wu-cells-title')) { lines.push(`**${inlineText(child)}**`); continue }
+    if (hasClass(child, 'wu-cells-note')) { lines.push(inlineText(child)); continue }
+    if (!hasClass(child, 'wu-cells-row')) continue
+    const kids = elementChildren(child)
+    const label = kids.filter((k) => hasClass(k, 'wu-cells-label')).map((k) => inlineText(k))[0]
+    const parts = kids.filter((k) => hasClass(k, 'wu-cell')).map((k) => inlineText(k)).filter((t) => t !== '')
+    lines.push(`- ${label ? `**${label}** — ` : ''}${parts.join(' / ')}`)
+  }
+  return lines.join('\n')
+}
+
 function renderMeta(p) {
   footnoteCounter += 1
   const n = footnoteCounter
@@ -224,6 +252,7 @@ function renderBlock(node, out, ctx) {
     return void out.push(`> [!NOTE]\n> ${body}`)
   }
   if (tag === 'dl' && hasClass(node, 'wu-terms')) return void out.push(renderDl(node))
+  if (hasClass(node, 'wu-cells')) return void out.push(renderCells(node))
   if (hasClass(node, 'wu-callout')) return void out.push(renderCallout(node))
   if (hasClass(node, 'wu-decision')) return void out.push(renderDecision(node))
   if (hasClass(node, 'wu-compare') || hasClass(node, 'wu-table')) return void out.push(renderTable(node))

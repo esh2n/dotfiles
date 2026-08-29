@@ -99,6 +99,37 @@ describe('to-md: figure and mermaid fallback', () => {
   })
 })
 
+describe('to-md: IRs without groups/nodes', () => {
+  /** A page carrying one figure whose IR is `ir` (as a YAML string). */
+  function pageWithIr(irYaml) {
+    return `<!DOCTYPE html><html lang="ja"><head><title>t</title>
+<meta name="description" content="d"><meta name="kind" content="決定記録">
+<meta name="date" content="2026-08-29"></head><body><div class="wu-page">
+<main><figure class="wu-figure" data-checks="pass"><svg viewBox="0 0 10 10"></svg>
+<figcaption>c</figcaption><script type="text/x-writeup-diagram">${escapeIrScript(irYaml)}</script>
+</figure></main></div></body></html>`
+  }
+
+  test('a diagram IR with no groups still converts (groups/edges are optional)', () => {
+    // Regression: `for (const g of ir.groups)` threw TypeError on every
+    // diagram written without a `groups:` key — the common case.
+    const md = convertToMarkdown(pageWithIr('id: g\nnodes:\n  - id: a\n    label: A\n  - id: b\n    label: B\nedges:\n  - from: a\n    to: b\n    label: L\n'), {
+      slug: 'p', figuresDir: mkdtempSync(join(tmpdir(), 'wu-tomd-nogroups-')), figuresDirRel: 'figs',
+    })
+    assert.match(md, /```mermaid\nflowchart LR\n/)
+    assert.match(md, /a -->\|L\| b/)
+    assert.doesNotMatch(md, /subgraph/)
+  })
+
+  test('a node-less IR (bar, timeline, …) gets the SVG but no mermaid block', () => {
+    const md = convertToMarkdown(pageWithIr('id: q\ntype: bar\ncategories: [a, b, c, d]\n'), {
+      slug: 'p', figuresDir: mkdtempSync(join(tmpdir(), 'wu-tomd-nonodes-')), figuresDirRel: 'figs',
+    })
+    assert.match(md, /!\[c\]\(figs\/p-q\.svg\)/)
+    assert.doesNotMatch(md, /```mermaid/)
+  })
+})
+
 describe('to-md: diagram IR script escaping contract', () => {
   // A label with a hostile fragment — findIr() must unescape a <script>
   // block written under the ir-script.mjs contract, and must still parse

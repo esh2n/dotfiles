@@ -6,6 +6,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -203,6 +204,28 @@ describe('--marker (repository marker)', () => {
     assert.ok(!existsSync(join(repo, REPO_MARKER)))
     mkdirSync(join(base, 'loose'), { recursive: true })
     assert.throws(() => writeRepoMarker('work', { cwd: join(base, 'loose') }), /not inside a git repository/)
+  })
+})
+
+describe('each store gets its own git repository', () => {
+  test('a store created inside another repository still gets its own .git', () => {
+    // `git rev-parse --is-inside-work-tree` walks up, so an outer repo (a
+    // version-controlled $HOME, or the legacy store created by a flag-less
+    // run) used to make every named store share the enclosing repo — and
+    // `git -C "$STORE" commit` would then mix the stores into one history.
+    const base = mkdtempSync(join(tmpdir(), 'wu-nested-'))
+    const outer = join(base, 'outer')
+    mkdirSync(outer, { recursive: true })
+    execFileSync('git', ['init'], { cwd: outer, stdio: 'ignore' })
+
+    const inner = join(outer, 'work')
+    const log = initStore(inner)
+    assert.ok(existsSync(join(inner, '.git')), log.join('\n'))
+    assert.ok(log.some((l) => l.includes('ran git init')), log.join('\n'))
+
+    // Idempotent: the second run sees the store's own repo and leaves it.
+    const again = initStore(inner)
+    assert.ok(again.some((l) => l.includes('already a git repository')), again.join('\n'))
   })
 })
 

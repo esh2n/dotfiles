@@ -24,11 +24,16 @@
 
 import { createServer } from 'node:http'
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveStoreDir, explainStoreDir, readRegistry, readManifest } from './lib/store.mjs'
+
+/** What to run when no store exists yet. The writeup skill owns
+ * init-store.mjs; the kit only points at it. */
+const INIT_HINT = 'run `node <writeup skill>/scripts/init-store.mjs --name <name> --description <text> [--default]`'
 import { buildStore } from './build.mjs'
 
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/
@@ -73,7 +78,11 @@ export function formatStoreList({ cwd = process.cwd() } = {}) {
   const registry = readRegistry()
   if (!registry.stores.length) {
     const picked = explainStoreDir(null, { cwd })
-    return [`* legacy\t${picked.dir}\t(no registry: ${registry.path})`]
+    // `fallback` means nothing is initialized yet: the path is only where a
+    // store *would* go. Say so, and name the command that makes one — this
+    // is the first writeup command a newcomer runs.
+    const hint = picked.via === 'fallback' ? ` — no store yet: ${INIT_HINT}` : ''
+    return [`* legacy\t${picked.dir}\t(no registry: ${registry.path})${hint}`]
   }
   let pickedDir = null
   try { pickedDir = resolve(explainStoreDir(null, { cwd }).dir) } catch { pickedDir = null }
@@ -467,6 +476,9 @@ async function main() {
   }
 
   const storeDir = resolveStoreDir(args.store, { name: args.storeName })
+  if (!existsSync(join(storeDir, '.writeup.toml'))) {
+    process.stderr.write(`serve: ${storeDir} is not an initialized store (no .writeup.toml) — ${INIT_HINT}\n`)
+  }
   buildIfWanted(args, storeDir)
   const { url, port } = await startServer(storeDir, { port: args.port || undefined })
   process.stderr.write(`serve: ${url} (store: ${storeDir})\n`)
