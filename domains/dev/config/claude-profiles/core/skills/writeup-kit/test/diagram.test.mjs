@@ -7,7 +7,7 @@ import { parse as parseYaml } from '../bin/lib/yaml-lite.mjs'
 import { validateIR, formatBudgetWarnings } from '../bin/lib/ir.mjs'
 import {
   renderDiagram, renderFigureHtml, textWidth, COLUMN, MIN_SCALE,
-  chooseOrientation, legendWidth, EDGE_LABEL_SIZE, normalizePolyline,
+  chooseOrientation, legendWidth, EDGE_LABEL_SIZE, EDGE_KIND_STYLE, normalizePolyline,
   groupLayerMode, groupLayerHeuristicPrefersElk, straightenJogs, labelsCramped, LABEL_CLEARANCE,
 } from '../bin/lib/diagram.mjs'
 import { verifyDiagram, renderCheckedBest } from '../bin/lib/verify-diagram.mjs'
@@ -1284,4 +1284,38 @@ test('browser-server.yaml (grilling\'s 現在地 figure) passes every check: its
       assert.ok(len >= 8, `edges[${e.index}] has a ${len}px segment`)
     }
   }
+})
+
+// --- edge kind → line style (shared with sequence.mjs) ------------------
+
+test('edge kinds draw as sync = solid + filled head, async = dashed + open head, reply = dashed + filled head, and the legend swatches match', async () => {
+  assert.deepEqual(EDGE_KIND_STYLE, {
+    sync: { dash: null, marker: 'solid' },
+    async: { dash: '5 4', marker: 'open' },
+    reply: { dash: '5 4', marker: 'solid' },
+  })
+  const parsed = validateIR({
+    id: 'k', title: 't',
+    nodes: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }],
+    edges: [
+      { from: 'a', to: 'b', kind: 'sync' },
+      { from: 'b', to: 'c', kind: 'async' },
+      { from: 'c', to: 'a', kind: 'reply' },
+    ],
+  })
+  assert.ok(parsed.ok)
+  const out = await renderDiagram(parsed.ir)
+  const edge = (i) => new RegExp(`<path id="wu-d-k-edge-${i}"[^>]*>`).exec(out.svg)?.[0]
+  assert.ok(edge(0) && !edge(0).includes('stroke-dasharray') && edge(0).includes('marker-end="url(#wu-d-k-solid)"'), `sync: ${edge(0)}`)
+  assert.ok(edge(1) && edge(1).includes('stroke-dasharray="5 4"') && edge(1).includes('marker-end="url(#wu-d-k-open)"'), `async: ${edge(1)}`)
+  assert.ok(edge(2) && edge(2).includes('stroke-dasharray="5 4"') && edge(2).includes('marker-end="url(#wu-d-k-solid)"'), `reply: ${edge(2)}`)
+
+  const legend = /<g id="wu-d-k-legend"[^>]*>([\s\S]*?)<\/g>/.exec(out.svg)?.[1]
+  assert.ok(legend, 'legend group not found')
+  const swatches = [...legend.matchAll(/<path [^>]*>/g)].map((m) => m[0])
+  assert.equal(swatches.length, 3)
+  assert.ok(!swatches[0].includes('stroke-dasharray') && swatches[0].includes('#wu-d-k-solid'), `sync swatch: ${swatches[0]}`)
+  assert.ok(swatches[1].includes('stroke-dasharray="5 4"') && swatches[1].includes('#wu-d-k-open'), `async swatch: ${swatches[1]}`)
+  assert.ok(swatches[2].includes('stroke-dasharray="5 4"') && swatches[2].includes('#wu-d-k-solid'), `reply swatch: ${swatches[2]}`)
+  assert.deepEqual([...legend.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]), ['sync', 'async', 'reply'])
 })
