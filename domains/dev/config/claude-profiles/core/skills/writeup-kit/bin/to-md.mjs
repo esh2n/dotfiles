@@ -13,6 +13,7 @@ import {
 } from './lib/html.mjs'
 import { parse as parseYaml } from './lib/yaml-lite.mjs'
 import { unescapeIrScript } from './lib/ir-script.mjs'
+import { diffFigureText } from './lib/diffview.mjs'
 
 // --- inline rendering (a/strong/em/br/.wu-accent/plain text) ---------------
 
@@ -125,6 +126,23 @@ function renderFigure(fig, ctx) {
   return out.join('\n')
 }
 
+/** `.wu-diffview` — the rendered `.wu-dv` tables are a presentation of one
+ * raw unified diff, and Markdown already has an honest form for that: a
+ * ```` ```diff ```` fence holding the diff itself, read back from the
+ * figure's `text/x-writeup-diff` script (the source of truth `build`
+ * re-renders from). Line numbers, hunk chrome and word marks are the
+ * rendering and do not survive; `data-mode` is presentation too. A figure
+ * whose script is missing falls back to its caption. */
+function renderDiffView(fig) {
+  const raw = diffFigureText(serialize(fig))
+  const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
+  const caption = cap ? inlineText(cap) : ''
+  const out = []
+  if (raw !== null) out.push('```diff\n' + raw.replace(/\n+$/, '') + '\n```')
+  if (caption) out.push(caption)
+  return out.join('\n\n')
+}
+
 function findIr(fig) {
   const script = findFirst(fig, (n) => tagName(n) === 'script' && attr(n, 'type') === 'text/x-writeup-diagram')
   if (!script) return null
@@ -218,10 +236,28 @@ function renderCells(div) {
     if (!hasClass(child, 'wu-cells-row')) continue
     const kids = elementChildren(child)
     const label = kids.filter((k) => hasClass(k, 'wu-cells-label')).map((k) => inlineText(k))[0]
-    const parts = kids.filter((k) => hasClass(k, 'wu-cell')).map((k) => inlineText(k)).filter((t) => t !== '')
+    const parts = kids.filter((k) => hasClass(k, 'wu-cell')).map(cellText).filter((t) => t !== '')
     lines.push(`- ${label ? `**${label}** — ` : ''}${parts.join(' / ')}`)
   }
   return lines.join('\n')
+}
+
+/** One `.wu-cell`'s text. A cell can hold a bare string ("パース"), a
+ * label/value pair ("MAJOR" + "1"), and an `×N` chip, in any combination;
+ * `inlineText` would run them together as "MAJOR1" / "進行中×6", so the
+ * pieces are re-joined with spaces here. */
+function cellText(cell) {
+  const kids = elementChildren(cell)
+  const count = kids.filter((k) => hasClass(k, 'wu-cell-count')).map((k) => inlineText(k))[0] ?? ''
+  const pair = kids.filter((k) => hasClass(k, 'wu-cell-label') || hasClass(k, 'wu-cell-value')).map((k) => inlineText(k))
+  let head
+  if (pair.length) {
+    head = pair.filter((t) => t !== '').join(' ')
+  } else {
+    head = inlineText(cell)
+    if (count && head.endsWith(count)) head = head.slice(0, -count.length)
+  }
+  return [head, count].filter((t) => t !== '').join(' ')
 }
 
 function renderMeta(p) {
@@ -257,6 +293,7 @@ function renderBlock(node, out, ctx) {
   if (hasClass(node, 'wu-decision')) return void out.push(renderDecision(node))
   if (hasClass(node, 'wu-compare') || hasClass(node, 'wu-table')) return void out.push(renderTable(node))
   if (tag === 'ol' && hasClass(node, 'wu-steps')) return void out.push(renderSteps(node))
+  if (hasClass(node, 'wu-diffview')) return void out.push(renderDiffView(node))
   if (hasClass(node, 'wu-figure')) return void out.push(renderFigure(node, ctx))
   if (hasClass(node, 'wu-quote')) return void out.push(renderQuote(node))
   if (hasClass(node, 'wu-code')) return void out.push(renderCode(node, attr(node, 'data-lang') || ''))
@@ -285,6 +322,8 @@ function renderBlock(node, out, ctx) {
   }
   if (tag === 'table') return void out.push(renderTable(node))
   if (tag === 'pre') return void out.push(renderCode(node, attr(node, 'data-lang') || ''))
+  if (hasClass(node, 'wu-dv') || classList(node).some((c) => c.startsWith('wu-dv-'))) return // diffview's rendered tables (build.mjs), a presentation of the raw diff
+  if (tag === 'nav' && hasClass(node, 'wu-sidetoc')) return // generated side TOC (build.mjs), not content
   if (tag === 'header' && hasClass(node, 'wu-header')) return // chrome, not content
   if (tag === 'footer' && hasClass(node, 'wu-footer')) return // chrome, not content
 

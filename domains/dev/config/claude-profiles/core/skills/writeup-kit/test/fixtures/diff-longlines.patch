@@ -1,0 +1,6 @@
+@@ -18,4 +18,4 @@ reporting rollup
+ with recent as (select * from orders where created_at > now() - interval '30 days')
+-select o.id, o.customer_id, o.total, o.status, o.created_at, o.updated_at, c.name, c.email, c.region, c.segment, sum(l.qty) as items, sum(l.qty * l.unit_price) as revenue from recent o join customers c on c.id = o.customer_id join order_lines l on l.order_id = o.id group by 1,2,3,4,5,6,7,8,9,10 order by revenue desc limit 100;
++select o.id, o.customer_id, o.total, o.status, o.created_at, o.updated_at, c.name, c.email, c.region, c.segment, sum(l.qty) as items, sum(l.qty * l.unit_price) as revenue from recent o join customers c on c.id = o.customer_id join order_lines l on l.order_id = o.id where o.status <> 'canceled' group by 1,2,3,4,5,6,7,8,9,10 order by revenue desc limit 100;
+ -- rollup feeds the weekly digest
+ -- guard: <script>alert(1)</script> must stay inert

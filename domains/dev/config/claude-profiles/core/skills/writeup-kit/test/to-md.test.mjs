@@ -218,3 +218,53 @@ describe('to-md: inline formatting', () => {
     assert.match(md, /\[link\]\(https:\/\/example\.com\)/)
   })
 })
+
+describe('to-md: the generated .wu-sidetoc is chrome, not content', () => {
+  const page = '<html><head><title>目次つき</title><meta name="kind" content="設計"></head><body><div class="wu-page"><main>\n' +
+    '<nav class="wu-sidetoc" aria-label="目次"><ol><li><a href="#a" title="節 A">節 A</a>\n' +
+    '<ol class="wu-sidetoc-sub"><li><a href="#b" title="節 B">節 B</a></li></ol></li></ol></nav>\n' +
+    '<section class="wu-section"><h2 id="a">節 A</h2><p>本文。</p><h3 id="b">節 B</h3><p>本文。</p></section>\n' +
+    '</main></div></body></html>'
+
+  test('the nav produces no "unmapped" placeholder and no duplicated heading list', () => {
+    const md = convertToMarkdown(page, { slug: 'p', figuresDir: mkdtempSync(join(tmpdir(), 'wu-tomd-')), figuresDirRel: 'figs' })
+    assert.doesNotMatch(md, /unmapped/)
+    assert.doesNotMatch(md, /wu-sidetoc/)
+    assert.equal((md.match(/^## 節 A$/gm) || []).length, 1)
+    assert.match(md, /### 節 B/)
+  })
+})
+
+describe('to-md: .wu-diffview becomes a ```diff fence holding the raw diff', () => {
+  const RAW = '--- a/internal/order/service.go\n+++ b/internal/order/service.go\n' +
+    '@@ -12,3 +12,3 @@ func Place() error {\n \tctx = withTimeout(ctx)\n' +
+    '-\treturn errors.New("invalid total")\n+\treturn fmt.Errorf("invalid total: %d", total)\n'
+  const page = '<html><head><title>差分</title><meta name="kind" content="設計"></head><body><div class="wu-page"><main>\n' +
+    '<section class="wu-section"><h2>変更</h2>\n' +
+    '<figure class="wu-diffview" data-mode="unified" data-lang="go">\n' +
+    '<table class="wu-dv" data-mode="unified" data-lang="go"><thead><tr><th class="wu-dv-file" colspan="4">internal/order/service.go</th></tr></thead>' +
+    '<tbody><tr class="wu-dv-del"><td class="wu-dv-no">13</td><td class="wu-dv-no"></td><td class="wu-dv-mark">−</td>' +
+    '<td class="wu-dv-code">return errors.New(<mark class="wu-dv-w">"invalid total"</mark>)</td></tr></tbody></table>\n' +
+    '<figcaption>ラップ済みエラーに変えた。</figcaption>\n' +
+    '<script type="text/x-writeup-diff">\n' + escapeIrScript(RAW.replace(/\n$/, '')) + '\n</script>\n</figure>\n' +
+    '</section>\n</main></div></body></html>'
+
+  const md = convertToMarkdown(page, { slug: 'p', figuresDir: mkdtempSync(join(tmpdir(), 'wu-tomd-dv-')), figuresDirRel: 'figs' })
+
+  test('the fence carries the raw unified diff, unescaped, not the rendered table', () => {
+    assert.match(md, /```diff\n/)
+    assert.ok(md.includes('--- a/internal/order/service.go'), md)
+    assert.ok(md.includes('+\treturn fmt.Errorf("invalid total: %d", total)'), md)
+    assert.ok(md.includes('```diff\n' + RAW.replace(/\n$/, '') + '\n```'), md)
+  })
+
+  test('the rendered tables, line numbers and word marks do not leak into the Markdown', () => {
+    assert.doesNotMatch(md, /wu-dv/)
+    assert.doesNotMatch(md, /unmapped/)
+    assert.doesNotMatch(md, /\| 13 \|/)
+  })
+
+  test('the figcaption survives as a line after the fence', () => {
+    assert.match(md, /```\n\nラップ済みエラーに変えた。/)
+  })
+})

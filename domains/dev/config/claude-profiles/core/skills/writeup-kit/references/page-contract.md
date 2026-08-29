@@ -22,12 +22,22 @@ it does not add new rules.
   change on a later revision.
 - A page links `_kit/writeup.css` with a relative path
   (`../_kit/writeup.css`). When the kit's version bumps, `build` re-syncs
-  `_kit/` so every page's look stays in sync.
+  `_kit/` so every page's look stays in sync. `build` also repairs the href
+  itself — both a wrong depth and the bare `writeup.css` / `./writeup.css`
+  a page inherits from `kit/template.html` (which links its own sibling)
+  are rewritten to this page's `…/_kit/writeup.css`; self-check's `kit-css`
+  row fails a page that never went through `build`, since an unstyled page
+  is otherwise silent.
+- `build` refuses a target directory without `.writeup.toml` at its root
+  and creates nothing, printing the `init-store.mjs --name <name> --store
+  <dir>` command instead: a directory that was never initialised has no
+  `[private]` word list and no git, so filling it with `manifest.json` /
+  `index.html` / `_kit/` would produce a half store that looks real.
 - `.wu-header`'s first child is a back-to-index nav,
   `<nav class="wu-nav"><a class="wu-back" href="…">一覧</a></nav>`. `build`
   keeps its `href` pointed at the store root's `index.html` for the page's
   depth (`index.html` at depth 0, `../index.html` at depth 1, …), inserting
-  the nav entirely when a page predates it — the second of the six places
+  the nav entirely when a page predates it — the second of the seven places
   `build` edits a page's own bytes (see the `id` bullet in §2 for the
   first). Page authors never write or edit this href by hand.
 - `<link rel="icon" href="data:image/svg+xml,…">` is the page's status
@@ -40,17 +50,26 @@ it does not add new rules.
   edits a page's own bytes (`bin/lib/favicon.mjs`). `index.html` gets a
   distinct three-bar mark instead of a kind glyph. Page authors never
   write or edit this href by hand.
+- Every `<figure class="wu-diffview">` is re-rendered by `build` from the raw
+  unified diff its `<script type="text/x-writeup-diff">` carries, into one
+  `<table class="wu-dv">` per file (`bin/lib/diffview.mjs`) — the fourth
+  place `build` edits a page's own bytes. The figure's children are
+  normalized to tables → figcaption → script, so the pass always rebuilds
+  from the stored raw text: re-running it is a no-op, and editing `data-mode`
+  (`unified` | `split`) or `data-lang` takes effect on the next `build`. A
+  figure whose diff fails to parse is left untouched and reported by file and
+  line; it never aborts the build.
 - Every `.wu-code`/`.wu-diff` block whose `<code>` content has no `wu-tok-`
   spans yet is syntax-highlighted in place by `build` (`bin/lib/highlight.mjs`),
-  which sets `data-hl="1"` on the `<pre>` — the fourth place `build`
+  which sets `data-hl="1"` on the `<pre>` — the fifth place `build`
   edits a page's own bytes; a block already highlighted is left untouched.
 - Internal `<a href>` values are repaired against the store's page list
   (`bin/lib/links.mjs`): rewritten page-relative, followed to a target the
   migration moved into `legacy/`, or marked `data-wu-missing` when nothing
-  resolves — the fifth place `build` edits a page's own bytes. `#fragment`,
+  resolves — the sixth place `build` edits a page's own bytes. `#fragment`,
   absolute, and external hrefs are never touched.
 - The side table of contents is regenerated from the page's own `h2`/`h3`
-  (`ensureSideToc` in `bin/build.mjs`) — the sixth and last place `build`
+  (`ensureSideToc` in `bin/build.mjs`) — the seventh and last place `build`
   edits a page's own bytes. `<nav class="wu-sidetoc" aria-label="目次">`
   becomes `<main>`'s first child and the pinned scroll-spy `<script>` goes
   in before `</body>`; both are stripped and rebuilt on every run, and
@@ -95,7 +114,7 @@ and structure do not):
 - `id` is optional. When present it must match the computed value (first 8
   hex chars of sha256 of the page's store-relative path) — self-check warns
   on a mismatch. `build` inserts the computed `id` into a page that lacks
-  the meta entirely (the first of the six places `build` edits a page's own
+  the meta entirely (the first of the seven places `build` edits a page's own
   bytes — §1 lists them all); it never overwrites an existing `id` meta,
   matching or not.
 - `updated` accepts two shapes: a bare date (`YYYY-MM-DD`) or an ISO
@@ -134,6 +153,7 @@ rows (listed under `infos` in `--json`) are suggestions.
 |---|---|---|
 | Single file; external references limited to `_kit/writeup.css`, Google Fonts, and a `rel="icon"` `data:` href | `href`/`src` of every `link`/`script`/`img` | error |
 | Required head meta (`title` / `description` / `kind` / `date`) | Present, and `kind` is one of the 8 values | error |
+| Kit stylesheet link (`kit-css`) | A `<link rel="stylesheet">` resolves to `_kit/writeup.css` at the page's depth (the bare `./writeup.css` is accepted only for the kit's own pages, which really do sit beside the file; a page with the CSS inlined in a `<style>` — a publish target — is exempt) | error |
 | Inline scripts | The only executable `<script>` a page may carry is `build`'s side-TOC scroll spy, byte-identical to `SIDETOC_SCRIPT` in `bin/build.mjs` and present at most once; a `<script type="text/x-writeup-diagram">` IR block is inert data, not a script | error |
 | `id` meta (optional) | If present, matches the computed value | warn |
 | `updated` meta format (optional) | `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM(+TZ\|Z)` | warn |
@@ -216,6 +236,16 @@ YAML/JSON, tolerantly (text with neither `&lt;` nor `&amp;` is treated as
 pre-contract raw text and left as-is, so old pages keep parsing until
 `bin/rerender-figures.mjs --all` rewrites them into the escaped form).
 
+### `.wu-diffview` / diff script escaping
+
+A `.wu-diffview`'s `<script type="text/x-writeup-diff">` block carries the
+raw unified diff under the same escaping contract as the diagram IR: `&`,
+`<`, `>` are written as `&amp;`, `&lt;`, `&gt;` (`bin/lib/ir-script.mjs`),
+because a patch that touches HTML would otherwise embed a literal tag, or
+close the block early with a literal `</script>`. `build` writes the escaped
+form on every render and unescapes tolerantly on read, so a hand-written
+block with raw text still parses.
+
 ## 5. HTML → Markdown mapping
 
 `bin/to-md.mjs` reads only role-tagged structure, so the mapping is
@@ -227,13 +257,16 @@ deterministic. Any element not in this table makes self-check emit a warn.
 | `.wu-lede` / `.wu-summary` | Opening paragraph / `> [!NOTE]` blockquote |
 | h2 / h3 / h4 | `##` / `###` / `####` |
 | `.wu-terms` (dl) | `- **name** — what it is` |
+| `.wu-cells` | One list item per row (`- **label** — part / part / part`); the title a bold line, notes plain lines |
 | `.wu-callout` (note / warn / decision) | `> [!NOTE]` / `> [!WARNING]` / `> [!IMPORTANT]` |
 | `.wu-decision` | `- **decision** — trade-off prioritized. basis: …` |
 | `.wu-compare` / `.wu-table` | GFM table |
 | `.wu-steps` | Numbered list |
 | `.wu-figure` | `![caption](diagram SVG file)` plus an optional ```` ```mermaid ```` block generated from the IR (a degraded rendering) |
+| `.wu-sidetoc` (generated) | Dropped — a Markdown reader gets its outline from the headings |
 | `.wu-quote` | A fenced code block holding the original, translation, and source |
 | `.wu-code` / `.wu-diff` | ```` ```lang ```` / ```` ```diff ```` |
+| `.wu-diffview` | ```` ```diff ```` holding the raw unified diff from the figure's `text/x-writeup-diff` script (the tables are a rendering, the script is the source) |
 | `.wu-chip` | Enumerated as inline `` `code` `` spans |
 | `.wu-meta` | A trailing footnote `[^n]` |
 | `.wu-open` | `## 未決・前提` plus a bullet list |

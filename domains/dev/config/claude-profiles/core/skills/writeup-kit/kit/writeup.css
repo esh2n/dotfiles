@@ -570,6 +570,187 @@ hr {
 }
 
 /* ---------------------------------------------------------------
+   .wu-cells — one thing split into labelled parts
+
+   Every value routes through an existing token; no new token is
+   introduced and no literal color or spacing appears below.
+
+   Structure (static HTML the writer types; build never generates it):
+
+     <div class="wu-cells">
+       <p class="wu-cells-title">…</p>                     optional
+       <div class="wu-cells-row">
+         <span class="wu-cells-label">…</span>             optional
+         <span class="wu-cell" data-tone="base">…</span>
+         <span class="wu-cell" data-tone="key" data-count="3">
+           <span class="wu-cell-label">MINOR</span>
+           <span class="wu-cell-value">4</span>
+           <span class="wu-cell-count">×3</span>           optional
+         </span>
+       </div>
+       <p class="wu-cells-note">…</p>                      optional
+     </div>
+
+   Tones are five steps of the neutral fill scale plus `--wu-accent` for
+   the one focal cell (`key`), never a hue that means good/bad:
+     key    accent fill + accent rule — budget 1 per component
+     strong darkest neutral fill
+     base   mid neutral fill (the default)
+     soft   surface fill, outline only
+     ghost  no fill, dashed rule — also the empty `_` spacer cell
+
+   Widths: a cell is sized by its content (`flex-basis: auto`) and grows
+   by `data-count` (the span weight), so a 999-vs-1 split gives the small
+   cell its text width and the large one all the slack. The strip wraps
+   instead of shrinking past min-content, so nothing is ever cut.
+--------------------------------------------------------------- */
+.wu-cells {
+  margin-block: var(--wu-sp-5);
+}
+
+.wu-cells-title {
+  margin-block: 0 var(--wu-sp-2);
+  font-size: var(--wu-fs-2);
+  font-weight: 700;
+  line-height: var(--wu-lh-heading);
+  color: var(--wu-ink-2);
+}
+
+.wu-cells-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--wu-sp-1);
+  margin-block-end: var(--wu-sp-1);
+}
+
+.wu-cells-label {
+  flex: 0 0 auto;
+  inline-size: 9.5em;
+  padding-block: var(--wu-sp-1);
+  padding-inline-end: var(--wu-sp-2);
+  font-size: var(--wu-fs-2);
+  line-height: var(--wu-lh-heading);
+  color: var(--wu-ink-2);
+}
+
+.wu-cell {
+  flex: var(--wu-cell-span, 1) 1 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--wu-sp-1);
+  padding: var(--wu-sp-1) var(--wu-sp-2);
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: var(--wu-radius-1);
+  background: var(--wu-fig-tone-ts);
+  font-size: var(--wu-fs-2);
+  line-height: var(--wu-lh-heading);
+  color: var(--wu-ink);
+  text-align: center;
+}
+
+/* `data-count` is the span weight. 2–12 covers everything a writer types
+   by hand; past that the element carries `style="--wu-cell-span:N"`
+   (the corpus reaches 999 for an error-budget split). */
+.wu-cell[data-count="2"] { --wu-cell-span: 2; }
+.wu-cell[data-count="3"] { --wu-cell-span: 3; }
+.wu-cell[data-count="4"] { --wu-cell-span: 4; }
+.wu-cell[data-count="5"] { --wu-cell-span: 5; }
+.wu-cell[data-count="6"] { --wu-cell-span: 6; }
+.wu-cell[data-count="7"] { --wu-cell-span: 7; }
+.wu-cell[data-count="8"] { --wu-cell-span: 8; }
+.wu-cell[data-count="9"] { --wu-cell-span: 9; }
+.wu-cell[data-count="10"] { --wu-cell-span: 10; }
+.wu-cell[data-count="11"] { --wu-cell-span: 11; }
+.wu-cell[data-count="12"] { --wu-cell-span: 12; }
+
+.wu-cell[data-tone="key"] {
+  background: var(--wu-accent-soft);
+  border-color: var(--wu-accent);
+  font-weight: 700;
+}
+
+.wu-cell[data-tone="strong"] {
+  background: var(--wu-fig-tone-rs);
+}
+
+.wu-cell[data-tone="base"] {
+  background: var(--wu-fig-tone-ts);
+}
+
+.wu-cell[data-tone="soft"] {
+  background: var(--wu-surface);
+  color: var(--wu-ink-2);
+}
+
+.wu-cell[data-tone="ghost"] {
+  background: none;
+  border-style: dashed;
+  border-color: var(--wu-rule);
+  color: var(--wu-ink-3);
+}
+
+/* The `_` spacer: an empty span that offsets what follows. */
+.wu-cell:empty {
+  min-inline-size: var(--wu-sp-5);
+}
+
+/* The filler that pads a short row to the block's widest row, so every row
+   of one component shares a single width scale. Structural, not content. */
+.wu-cell[data-fill] {
+  border-color: transparent;
+  background: none;
+  min-inline-size: 0;
+}
+
+.wu-cell-label {
+  color: inherit;
+}
+
+.wu-cell-value {
+  font-family: var(--wu-font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.wu-cell-count {
+  font-size: var(--wu-fs-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--wu-ink-3);
+}
+
+.wu-cell[data-tone="key"] .wu-cell-count {
+  color: var(--wu-ink-2);
+}
+
+.wu-cells-note {
+  margin-block: var(--wu-sp-2) 0;
+  font-size: var(--wu-fs-2);
+  line-height: var(--wu-lh-heading);
+  color: var(--wu-ink-3);
+}
+
+.wu-cells-note + .wu-cells-row {
+  margin-block-start: var(--wu-sp-4);
+}
+
+/* Narrow viewport: the row label takes its own line above the strip so the
+   parts keep their content width instead of being squeezed. */
+@media (max-width: 40em) {
+  .wu-cells-label {
+    inline-size: 100%;
+    padding-block-end: 0;
+  }
+
+  /* the alignment gutter a label-less row keeps on wide viewports has
+     nothing left to align to once the label sits on its own line */
+  .wu-cells-label:empty {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------
    .wu-callout — note / warn / decision aside
    Tone is carried by data-tone, never by a chromatic color: border
    weight, background wash, and the generated label text do the work.
@@ -949,6 +1130,336 @@ hr {
   display: block;
   text-decoration: line-through;
   color: var(--wu-ink-3);
+}
+
+/* ---------------------------------------------------------------
+   .wu-diffview / .wu-dv — GitHub-style diff view, rendered from the
+   figure's raw unified diff by bin/lib/diffview.mjs
+
+   No color. Additions and deletions are told apart by three
+   non-chromatic signals stacked together: the marker column
+   (`+` / U+2212 `−`), a background tint mixed from the neutral
+   scale, and — for deletions only — muted ink that also flattens
+   the syntax-highlight tokens inside the row. The kit allows
+   exactly two chromatic colors on a page (--wu-link and
+   --wu-accent) and a diff must not spend either of them: a page
+   with a green/red diff has no color left for the one thing the
+   reader is supposed to look at.
+
+   Tints are derived with color-mix() from --wu-ink over
+   --wu-surface, so they follow the theme instead of hard-coding a
+   shade; each is declared twice, the plain --wu-rule-soft first,
+   so a browser without color-mix() still gets a usable tint. Dark
+   values are mixed harder because a light film over a dark surface
+   reads weaker than the same film over white.
+
+   Deliberately absent: sticky line-number columns. A long line
+   scrolls the whole table horizontally and the numbers scroll with
+   it. Pinning them needs fixed column widths and an opaque
+   background per tint, which is a lot of machinery for a case a
+   reader resolves by scrolling back.
+--------------------------------------------------------------- */
+.wu-diffview {
+  --wu-dv-tint-add: var(--wu-rule-soft);
+  --wu-dv-tint-add: color-mix(in srgb, var(--wu-ink) 6%, var(--wu-surface));
+  --wu-dv-tint-del: var(--wu-rule-soft);
+  --wu-dv-tint-del: color-mix(in srgb, var(--wu-ink) 13%, var(--wu-surface));
+  --wu-dv-tint-hunk: var(--wu-rule-soft);
+  --wu-dv-tint-hunk: color-mix(in srgb, var(--wu-ink) 8%, var(--wu-surface));
+  --wu-dv-tint-word: var(--wu-rule);
+  --wu-dv-tint-word: color-mix(in srgb, var(--wu-ink) 20%, var(--wu-surface));
+
+  margin: var(--wu-sp-4) 0;
+  padding: 0;
+  overflow-x: auto;
+  background: var(--wu-surface);
+  border-top: var(--wu-bw-1) solid var(--wu-rule);
+  border-bottom: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: 0;
+}
+
+.wu-diffview > figcaption {
+  position: sticky;
+  left: 0;
+  padding: var(--wu-sp-2) var(--wu-sp-3);
+  font-size: var(--wu-fs-1);
+  line-height: var(--wu-lh-body);
+  color: var(--wu-ink-3);
+}
+
+/* --- the table ------------------------------------------------ */
+.wu-dv {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--wu-font-mono);
+  font-size: var(--wu-fs-1);
+  line-height: var(--wu-lh-code);
+  color: var(--wu-ink);
+  tab-size: 4;
+}
+
+.wu-dv + .wu-dv {
+  border-top: var(--wu-bw-1) solid var(--wu-rule);
+}
+
+.wu-dv td,
+.wu-dv th {
+  height: calc(var(--wu-fs-1) * var(--wu-lh-code)); /* keeps a blank line a full line tall */
+  vertical-align: top;
+  border: 0;
+}
+
+/* --- file header row ------------------------------------------ */
+.wu-dv-file th {
+  padding: var(--wu-sp-2) var(--wu-sp-3);
+  text-align: left;
+  font-weight: 400;
+  border-bottom: var(--wu-bw-1) solid var(--wu-rule);
+}
+
+.wu-dv-path {
+  font-weight: 700;
+  color: var(--wu-ink);
+  word-break: break-all;
+}
+
+.wu-dv-arrow {
+  padding: 0 var(--wu-sp-1);
+  font-weight: 400;
+  color: var(--wu-ink-3);
+}
+
+.wu-dv-unnamed,
+.wu-dv-note {
+  font-weight: 400;
+  color: var(--wu-ink-3);
+}
+
+.wu-dv-note::before {
+  content: " · ";
+}
+
+.wu-dv-stat {
+  float: right;
+  padding-left: var(--wu-sp-3);
+  color: var(--wu-ink-2);
+  white-space: nowrap;
+}
+
+/* --- hunk header row ------------------------------------------ */
+.wu-dv-hunk td {
+  padding: var(--wu-sp-1) var(--wu-sp-3);
+  background: var(--wu-dv-tint-hunk);
+  border-top: var(--wu-bw-1) solid var(--wu-rule-soft);
+  border-bottom: var(--wu-bw-1) solid var(--wu-rule-soft);
+  color: var(--wu-ink-3);
+}
+
+.wu-dv-at {
+  font-weight: 700;
+}
+
+.wu-dv-fn {
+  padding-left: var(--wu-sp-2);
+}
+
+/* --- line rows ------------------------------------------------ */
+.wu-dv-no {
+  width: 1%;
+  padding: 0 var(--wu-sp-2);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--wu-ink-3);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.wu-dv-mark {
+  width: 1%;
+  padding: 0 var(--wu-sp-1) 0 var(--wu-sp-2);
+  text-align: center;
+  color: var(--wu-ink-2);
+  border-left: var(--wu-bw-1) solid var(--wu-rule-soft);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.wu-dv-code {
+  width: 100%;
+  padding: 0 var(--wu-sp-3) 0 var(--wu-sp-2);
+  white-space: pre;
+}
+
+/* row tints: unified puts the class on the <tr>, split on the two
+   cells of the changed side */
+.wu-dv[data-mode="unified"] tr.wu-dv-add > td,
+.wu-dv td.wu-dv-add {
+  background: var(--wu-dv-tint-add);
+}
+
+.wu-dv[data-mode="unified"] tr.wu-dv-del > td,
+.wu-dv td.wu-dv-del {
+  background: var(--wu-dv-tint-del);
+}
+
+/* deletions read as receding: muted ink, and the highlight tokens
+   inside them give up their own color so the whole line greys out */
+.wu-dv[data-mode="unified"] tr.wu-dv-del > td,
+.wu-dv td.wu-dv-del,
+.wu-dv[data-mode="unified"] tr.wu-dv-del [class^="wu-tok-"],
+.wu-dv td.wu-dv-del [class^="wu-tok-"] {
+  color: var(--wu-ink-3);
+}
+
+/* --- intra-line word mark -------------------------------------- */
+.wu-dv-w {
+  background: var(--wu-dv-tint-word);
+  color: inherit;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* the "\ No newline at end of file" flag */
+.wu-dv-nonl {
+  padding-left: var(--wu-sp-2);
+  color: var(--wu-ink-3);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* --- split mode ------------------------------------------------ */
+.wu-dv[data-mode="split"] td:nth-child(2),
+.wu-dv[data-mode="split"] td:nth-child(4) {
+  width: 50%;
+}
+
+.wu-dv[data-mode="split"] td:nth-child(3) {
+  border-left: var(--wu-bw-1) solid var(--wu-rule);
+}
+
+/* the empty half of a lone add or del: no tint at all, so the tint scale
+   only ever means "added" or "removed" and never "nothing here" */
+.wu-dv[data-mode="split"] td.wu-dv-blank {
+  background: none;
+}
+
+/* --- dark ------------------------------------------------------ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .wu-diffview {
+    --wu-dv-tint-add: color-mix(in srgb, var(--wu-ink) 9%, var(--wu-surface));
+    --wu-dv-tint-del: color-mix(in srgb, var(--wu-ink) 19%, var(--wu-surface));
+    --wu-dv-tint-hunk: color-mix(in srgb, var(--wu-ink) 12%, var(--wu-surface));
+    --wu-dv-tint-word: color-mix(in srgb, var(--wu-ink) 30%, var(--wu-surface));
+  }
+}
+
+:root[data-theme="dark"] .wu-diffview {
+  --wu-dv-tint-add: color-mix(in srgb, var(--wu-ink) 9%, var(--wu-surface));
+  --wu-dv-tint-del: color-mix(in srgb, var(--wu-ink) 19%, var(--wu-surface));
+  --wu-dv-tint-hunk: color-mix(in srgb, var(--wu-ink) 12%, var(--wu-surface));
+  --wu-dv-tint-word: color-mix(in srgb, var(--wu-ink) 30%, var(--wu-surface));
+}
+
+/* --- narrow: split falls back to the unified stacking ----------
+   Under 800px two code columns cannot both hold a line of code, so
+   each split row becomes a two-column grid: the old side lands on
+   the first line, the new side under it — the unified reading order.
+   The marker column does not exist in split markup, so the tinted
+   cells grow a `+` / `−` prefix here to keep the non-color signal. */
+@media (max-width: 800px) {
+  .wu-dv[data-mode="split"] tbody tr {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  .wu-dv[data-mode="split"] tbody tr.wu-dv-hunk {
+    display: table-row;
+  }
+
+  .wu-dv[data-mode="split"] td:nth-child(2),
+  .wu-dv[data-mode="split"] td:nth-child(4) {
+    width: auto;
+  }
+
+  .wu-dv[data-mode="split"] td:nth-child(3) {
+    border-left: 0;
+  }
+
+  .wu-dv[data-mode="split"] td.wu-dv-blank {
+    display: none;
+  }
+
+  /* a context line is the same text on both sides; stacked, it would read
+     as a duplicated line, so only the new side survives — the column then
+     runs ctx/add on new numbers and del on old, i.e. the unified reading
+     minus its old-number column */
+  .wu-dv[data-mode="split"] tbody tr.wu-dv-ctx td:nth-child(1),
+  .wu-dv[data-mode="split"] tbody tr.wu-dv-ctx td:nth-child(2) {
+    display: none;
+  }
+
+  /* every code cell reserves the marker column, so context and changed
+     lines still start at the same column */
+  .wu-dv[data-mode="split"] td.wu-dv-code::before {
+    content: "";
+    display: inline-block;
+    width: 1ch;
+    margin-right: var(--wu-sp-1);
+    color: var(--wu-ink-2);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .wu-dv[data-mode="split"] td.wu-dv-code.wu-dv-add::before {
+    content: "+";
+  }
+
+  .wu-dv[data-mode="split"] td.wu-dv-code.wu-dv-del::before {
+    content: "\2212";
+  }
+}
+
+/* --- print ------------------------------------------------------ */
+@media print {
+  .wu-diffview {
+    overflow-x: visible;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .wu-dv .wu-dv-code {
+    white-space: pre-wrap; /* paper does not scroll */
+    word-break: break-all;
+  }
+
+  .wu-dv-add,
+  .wu-dv-del,
+  .wu-dv-hunk td,
+  .wu-dv-w {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* --- forced colors ---------------------------------------------
+   The tints disappear under a forced palette; the marker column
+   carries the distinction in unified mode, and split mode gets a
+   left rule on the changed cells so the row is still readable. */
+@media (forced-colors: active) {
+  .wu-dv td,
+  .wu-dv th {
+    border-color: CanvasText;
+  }
+
+  .wu-dv td.wu-dv-add,
+  .wu-dv td.wu-dv-del {
+    border-left: var(--wu-bw-3) solid CanvasText;
+  }
+
+  .wu-dv-w {
+    text-decoration: underline;
+  }
 }
 
 /* ---------------------------------------------------------------

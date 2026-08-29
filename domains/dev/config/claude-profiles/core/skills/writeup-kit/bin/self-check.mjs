@@ -49,6 +49,10 @@ const ALLOWED_BODY_TAGS = new Set([
   'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
   'pre', 'code', 'figure', 'figcaption', 'svg', 'blockquote', 'dl', 'dt', 'dd',
   'section', 'div', 'span', 'a', 'strong', 'em', 'br', 'script', 'nav', 'cite',
+  // <mark> is emitted only by bin/lib/diffview.mjs, for the changed middle
+  // of a paired add/del line inside a .wu-diffview table — allowed there and
+  // nowhere else (see `checkRoleStructure`).
+  'mark',
 ])
 // A small, pragmatic exception to the "only wu-* classes" rule: the kit's
 // own reference pages (kit/samples.html, the contract) right-align/no-wrap
@@ -84,6 +88,7 @@ export function runSelfCheck(filePath) {
   }
 
   checkSingleFile(root, add)
+  checkKitCss(root, filePath, add)
   checkInlineScripts(root, add)
   checkRequiredMeta(root, add)
   checkIdMeta(root, filePath, add)
@@ -92,6 +97,7 @@ export function runSelfCheck(filePath) {
   checkRoleStructure(root, add)
   checkKindSections(root, add)
   checkFigures(root, add)
+  checkDiffViews(root, add)
   checkSvgA11y(root, add)
   checkAccentBudget(root, add)
   checkEmojiArrows(root, add)
@@ -129,6 +135,37 @@ function checkSingleFile(root, add) {
   }
 }
 
+const KIT_CSS_DEPTH_RE = /^(?:\.\.\/)*_kit\/writeup\.css$/
+const KIT_CSS_SIBLING_RE = /^(?:\.\/)?writeup\.css$/
+
+/**
+ * A page must actually link the store's kit stylesheet
+ * (`…/_kit/writeup.css`, `./_kit/writeup.css` at the store root) — a page
+ * started from `kit/template.html` keeps that file's own sibling link
+ * (`./writeup.css`) and renders completely unstyled inside a store, which
+ * nothing else notices. The sibling form is accepted only for a page that
+ * really does sit next to a `writeup.css` on disk: the kit's own reference
+ * pages (`kit/template.html`, `kit/samples.html`). A page carrying an
+ * inline `<style>` (a publish target, whose CSS was inlined) is exempt.
+ * `build` repairs the href; this row is the gate for a page that never
+ * went through `build`.
+ */
+function checkKitCss(root, filePath, add) {
+  // A publish target (contract §6-2) carries the kit CSS inlined in a
+  // <style> block and drops the link on purpose — nothing to resolve.
+  if (findFirst(root, (n) => isElement(n) && n.tag === 'style')) return
+  const links = findAll(root, (n) => isElement(n) && n.tag === 'link' && (attr(n, 'rel') || '') === 'stylesheet')
+  const hrefs = links.map((n) => attr(n, 'href') || '').filter((h) => !/^https?:/.test(h))
+  const siblingCss = join(dirname(filePath), 'writeup.css')
+  const ok = hrefs.some((h) => KIT_CSS_DEPTH_RE.test(h) || h === './_kit/writeup.css' || (KIT_CSS_SIBLING_RE.test(h) && existsSync(siblingCss)))
+  if (ok) return
+  if (!hrefs.length) {
+    add('error', 'kit-css', 'no stylesheet link — the page must link the store kit CSS (../_kit/writeup.css)')
+    return
+  }
+  add('error', 'kit-css', `stylesheet link does not resolve to the store kit CSS: ${hrefs.join(', ')} (expected ../_kit/writeup.css at this page's depth)`)
+}
+
 // The MIME types a browser executes; every other `type` marks the block as
 // inert data (the `.wu-figure` IR block's `text/x-writeup-diagram`).
 const JS_SCRIPT_TYPES = new Set(['', 'text/javascript', 'application/javascript', 'module'])
@@ -136,7 +173,7 @@ const JS_SCRIPT_TYPES = new Set(['', 'text/javascript', 'application/javascript'
 /**
  * A page may carry exactly one executable `<script>`: the side-TOC scroll
  * spy `build` injects, pinned to `SIDETOC_SCRIPT`'s source (page-contract.md
- * §1 rewrite point 6, §4). Anything else executable — a hand-written
+ * §1 rewrite point 7, §4). Anything else executable — a hand-written
  * snippet, an analytics tag, a second copy — is an error, so a store page
  * stays a document rather than an app.
  */
@@ -290,6 +327,19 @@ function findMain(root) {
   return findFirst(root, (n) => tagName(n) === 'body')
 }
 
+/** Every element inside `main`'s subtree that sits under a
+ * `<figure class="wu-diffview">` — the one place `<mark>` is legitimate,
+ * since `bin/lib/diffview.mjs` emits it for a changed line's middle. A
+ * `<mark>` anywhere else is a writer highlighting prose, which the kit's
+ * two-color rule does not allow. */
+function diffViewDescendantSet(main) {
+  const set = new Set()
+  for (const fig of findAll(main, (n) => isElement(n) && hasClass(n, 'wu-diffview'))) {
+    for (const n of findAll(fig, () => true)) set.add(n)
+  }
+  return set
+}
+
 /** Every element inside `main`'s subtree that is itself inside an `<svg>`
  * (so structural/class checks can skip SVG internals entirely). */
 function svgDescendantSet(main) {
@@ -306,11 +356,16 @@ function checkRoleStructure(root, add) {
   const main = findMain(root)
   if (!main) return
   const svgNodes = svgDescendantSet(main)
+  const diffViewNodes = diffViewDescendantSet(main)
   for (const n of findAll(main, isElement)) {
     if (n === main) continue
     if (svgNodes.has(n)) continue
     if (!ALLOWED_BODY_TAGS.has(n.tag)) {
       add('error', 'role-structure', `disallowed element in body: <${n.tag}>`)
+      continue
+    }
+    if (n.tag === 'mark' && !diffViewNodes.has(n)) {
+      add('error', 'role-structure', '<mark> outside a .wu-diffview — the kit has no prose highlight')
       continue
     }
     const bad = classList(n).filter((c) => !c.startsWith('wu-') && !ALLOWED_NON_WU_CLASSES.has(c))
@@ -356,6 +411,18 @@ function checkFigures(root, add) {
       add('warn', 'figure-budget', `.wu-figure "${label}" is over budget (${warn}) — consider splitting the figure`)
     }
   })
+}
+
+/** A `<figure class="wu-diffview">` whose body carries no rendered
+ * `<table class="wu-dv">` means `build` never ran over the page, or the raw
+ * diff failed to parse — either way the page ships raw diff text with
+ * nothing rendered. */
+function checkDiffViews(root, add) {
+  for (const f of findAll(root, (n) => isElement(n) && hasClass(n, 'wu-diffview'))) {
+    if (!findFirst(f, (n) => isElement(n) && hasClass(n, 'wu-dv'))) {
+      add('error', 'diffview-unrendered', '.wu-diffview has no rendered .wu-dv table — run build')
+    }
+  }
 }
 
 // --- 7. SVG a11y --------------------------------------------------------------
@@ -667,13 +734,18 @@ function checkParentheticals(blocks, add) {
 const MD_MAPPED_TAGS = new Set([
   'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'table', 'thead', 'tbody',
   'tr', 'th', 'td', 'pre', 'code', 'figure', 'figcaption', 'blockquote', 'section', 'div',
-  'span', 'a', 'strong', 'em', 'br', 'svg', 'script', 'cite', 'nav',
+  'span', 'a', 'strong', 'em', 'br', 'svg', 'script', 'cite', 'nav', 'mark',
 ])
 const MD_MAPPED_CLASSES = new Set([
   'wu-lede', 'wu-summary', 'wu-terms', 'wu-callout', 'wu-decision', 'wu-compare', 'wu-table',
   'wu-steps', 'wu-figure', 'wu-quote', 'wu-quote-original', 'wu-quote-ja', 'wu-quote-source',
-  'wu-code', 'wu-diff', 'wu-chip', 'wu-meta', 'wu-open', 'wu-accent', 'wu-section', 'wu-focal',
-  'wu-eyebrow', 'wu-toc', 'wu-sidetoc', 'wu-sidetoc-sub',
+  'wu-code', 'wu-diff', 'wu-diffview', 'wu-dv', 'wu-chip', 'wu-meta', 'wu-open', 'wu-accent',
+  'wu-section', 'wu-focal', 'wu-eyebrow', 'wu-toc', 'wu-sidetoc', 'wu-sidetoc-sub',
+  // .wu-cells — one thing split into labelled parts; bin/to-md.mjs renders
+  // the strip as one list item per row, so every class under it is covered
+  // by the .wu-cells row of the §7 mapping.
+  'wu-cells', 'wu-cells-title', 'wu-cells-row', 'wu-cells-label',
+  'wu-cell', 'wu-cell-label', 'wu-cell-value', 'wu-cell-count', 'wu-cells-note',
 ])
 
 function checkMarkdownConvertibility(root, add) {
@@ -687,10 +759,11 @@ function checkMarkdownConvertibility(root, add) {
       continue
     }
     // wu-tok-* (bin/lib/highlight.mjs's token spans inside .wu-code/.wu-diff)
-    // are covered by the .wu-code/.wu-diff mapping itself — renderCode()
-    // reads the block's textContent, so the token spans it renders are
-    // invisible to Markdown and never need their own §7 row.
-    const unmappedClasses = classList(n).filter((c) => c.startsWith('wu-') && !c.startsWith('wu-tok-') && !MD_MAPPED_CLASSES.has(c))
+    // and wu-dv-* (diffview's rows, cells and word marks) are covered by the
+    // .wu-code/.wu-diff and .wu-diffview mappings themselves — to-md reads
+    // the block's own text, so these internal spans are invisible to
+    // Markdown and never need their own §7 row.
+    const unmappedClasses = classList(n).filter((c) => c.startsWith('wu-') && !c.startsWith('wu-tok-') && !c.startsWith('wu-dv-') && !MD_MAPPED_CLASSES.has(c))
     if (unmappedClasses.length) {
       add('warn', 'markdown-convertibility', `<${n.tag}> class not in the §7 mapping: ${unmappedClasses.join(', ')}`)
     }

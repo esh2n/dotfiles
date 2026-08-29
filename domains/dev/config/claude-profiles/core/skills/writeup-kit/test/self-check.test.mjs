@@ -752,3 +752,79 @@ describe('self-check: relation-figure (info; 5 or more decisions need one 決定
     assert.ok(out.infos.some((i) => i.item === 'relation-figure'))
   })
 })
+
+describe('self-check: kit stylesheet link (kit-css)', () => {
+  test('a page carrying the template\'s own ./writeup.css href is an error', () => {
+    const html = page().replace('<link rel="stylesheet" href="../_kit/writeup.css">', '<link rel="stylesheet" href="./writeup.css">')
+    const result = itemsFor(html)
+    assert.ok(result.errors.some((e) => e.item === 'kit-css'), JSON.stringify(result.errors))
+  })
+
+  test('a page with no stylesheet link at all is an error', () => {
+    const html = page().replace('<link rel="stylesheet" href="../_kit/writeup.css">', '')
+    assert.ok(itemsFor(html).errors.some((e) => e.item === 'kit-css'))
+  })
+
+  test('a correct ../_kit/writeup.css (any depth) passes, and so does the store-root ./_kit/ form', () => {
+    assert.deepEqual(itemsFor(page()).errors.filter((e) => e.item === 'kit-css'), [])
+    const deep = page().replace('href="../_kit/writeup.css"', 'href="../../../_kit/writeup.css"')
+    assert.deepEqual(itemsFor(deep).errors.filter((e) => e.item === 'kit-css'), [])
+    const root = page().replace('href="../_kit/writeup.css"', 'href="./_kit/writeup.css"')
+    assert.deepEqual(itemsFor(root).errors.filter((e) => e.item === 'kit-css'), [])
+  })
+
+  test('a publish target with the CSS inlined in <style> is exempt', () => {
+    const html = page().replace('<link rel="stylesheet" href="../_kit/writeup.css">', '<style>.wu-page{color:#000}</style>')
+    assert.deepEqual(itemsFor(html).errors.filter((e) => e.item === 'kit-css'), [])
+  })
+})
+
+describe('self-check: .wu-diffview', () => {
+  const RENDERED =
+    '<section class="wu-section"><h2>今日分かったこと</h2>' +
+    '<figure class="wu-diffview" data-mode="unified">\n' +
+    '<table class="wu-dv" data-mode="unified" data-lang="go">\n' +
+    '<thead><tr><th class="wu-dv-file" colspan="4">x.go</th></tr></thead>\n' +
+    '<tbody>\n<tr class="wu-dv-hunk"><td colspan="4">@@ -1,2 +1,2 @@</td></tr>\n' +
+    '<tr class="wu-dv-del"><td class="wu-dv-no">1</td><td class="wu-dv-no"></td><td class="wu-dv-mark">−</td>' +
+    '<td class="wu-dv-code">a := <mark class="wu-dv-w">1</mark></td></tr>\n' +
+    '<tr class="wu-dv-add"><td class="wu-dv-no"></td><td class="wu-dv-no">1</td><td class="wu-dv-mark">+</td>' +
+    '<td class="wu-dv-code">a := <mark class="wu-dv-w">2</mark></td></tr>\n' +
+    '</tbody>\n</table>\n<figcaption>差分。</figcaption>\n' +
+    '<script type="text/x-writeup-diff">\n--- a/x.go\n+++ b/x.go\n@@ -1,2 +1,2 @@\n-a := 1\n+a := 2\n</script>\n</figure>' +
+    '</section>' +
+    '<section class="wu-section"><h2>次にやること</h2><ol class="wu-steps"><li>短い文。</li></ol></section>'
+
+  test('a rendered diff view passes: no diffview-unrendered error, no role-structure/markdown warnings for it', () => {
+    const result = itemsFor(page({ body: RENDERED }))
+    assert.ok(!result.errors.some((e) => e.item === 'diffview-unrendered'), JSON.stringify(result.errors))
+    assert.ok(!result.errors.some((e) => e.item === 'role-structure'), JSON.stringify(result.errors))
+    assert.ok(!result.warnings.some((w) => w.item === 'markdown-convertibility'), JSON.stringify(result.warnings))
+  })
+
+  test('<mark> is allowed inside a diff view (it is what the word mark uses)', () => {
+    const result = itemsFor(page({ body: RENDERED }))
+    assert.ok(!result.items.some((i) => i.detail && i.detail.includes('mark')), JSON.stringify(result.items))
+  })
+
+  test('a .wu-diffview with no rendered .wu-dv table is a diffview-unrendered error', () => {
+    const body =
+      '<section class="wu-section"><h2>今日分かったこと</h2>' +
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">\n--- a/x.go\n+++ b/x.go\n@@ -1,1 +1,1 @@\n-a\n+b\n</script>' +
+      '<figcaption>未描画。</figcaption></figure></section>' +
+      '<section class="wu-section"><h2>次にやること</h2><ol class="wu-steps"><li>短い文。</li></ol></section>'
+    const result = itemsFor(page({ body }))
+    assert.ok(result.errors.some((e) => e.item === 'diffview-unrendered'), JSON.stringify(result.errors))
+  })
+
+  test('a stray <mark> outside a diff view is still rejected by the role-structure allow-list', () => {
+    const body =
+      '<section class="wu-section"><h2>今日分かったこと</h2><p>ここに<mark>強調</mark>がある。</p></section>' +
+      '<section class="wu-section"><h2>次にやること</h2><ol class="wu-steps"><li>短い文。</li></ol></section>'
+    const result = itemsFor(page({ body }))
+    assert.ok(
+      result.items.some((i) => i.detail && i.detail.includes('mark')),
+      'expected a finding naming <mark>: ' + JSON.stringify(result.items),
+    )
+  })
+})

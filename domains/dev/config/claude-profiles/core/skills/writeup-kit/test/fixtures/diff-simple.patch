@@ -1,0 +1,27 @@
+diff --git a/internal/order/service.go b/internal/order/service.go
+index 7c1a9f2..b3d40e8 100644
+--- a/internal/order/service.go
++++ b/internal/order/service.go
+@@ -12,7 +12,10 @@ func (s *Service) Place(ctx context.Context, o Order) error {
+ 	ctx = s.withTimeout(ctx)
+ 	if o.Total <= 0 {
+-		return errors.New("invalid total")
++		return fmt.Errorf("invalid total: %d", o.Total)
+ 	}
++	if o.Items == nil {
++		return ErrNoItems
++	}
+ 	s.log.Info("placing order")
+ 	return s.repo.Save(ctx, o)
+ }
+@@ -40,7 +43,8 @@ func (s *Service) Cancel(ctx context.Context, id string) error {
+ 	o, err := s.repo.Find(ctx, id)
+ 	if err != nil {
+ 		return err
+ 	}
+-	o.Status = StatusCancelled
+-	total := computeTotal(o.Items)
++	o.Status = StatusCanceled
++	total := computeTotal(o.Lines)
++	s.metrics.Inc("order.cancel")
+ 	return s.repo.Save(ctx, o)

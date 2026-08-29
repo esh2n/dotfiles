@@ -1,13 +1,16 @@
 import { test, describe, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, cpSync, readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { buildStore, renderStoreSwitcher, SIDETOC_SCRIPT } from '../bin/build.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
 import { faviconDataUri, statusFromChecks } from '../bin/lib/favicon.mjs'
+import { escapeIrScript } from '../bin/lib/ir-script.mjs'
+import { diffFigureText } from '../bin/lib/diffview.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -897,6 +900,103 @@ describe('buildStore(): syntax highlighting of .wu-code / .wu-diff', () => {
   })
 })
 
+describe('buildStore(): .wu-diffview rendering (bin/lib/diffview.mjs)', () => {
+  const PATCH = readFileSync(join(ROOT, 'test', 'fixtures', 'diff-simple.patch'), 'utf8')
+
+  function pageWithDiffFigure(rawDiff, { mode = 'unified' } = {}) {
+    return '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<title>Diffview fixture</title>\n' +
+      '<meta name="description" content="d">\n<meta name="kind" content="設計">\n<meta name="date" content="2026-08-30">\n' +
+      '<meta name="checks" content="lint=pass;self-check=pass">\n<link rel="stylesheet" href="../_kit/writeup.css">\n</head>\n<body>\n' +
+      '<div class="wu-page">\n<header class="wu-header"><h1>Diffview fixture</h1></header>\n<main>\n<section class="wu-section">\n<h2>diff</h2>\n' +
+      `<figure class="wu-diffview" data-mode="${mode}"><script type="text/x-writeup-diff">\n` +
+      escapeIrScript(rawDiff.replace(/\n$/, '')) +
+      '\n</script><figcaption>注文サービスの変更。</figcaption></figure>\n' +
+      '</section>\n</main>\n</body>\n</html>\n'
+  }
+
+  function freshDiffStore(rawDiff, opts) {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-dv-'))
+    mkdirSync(join(dir, 'notes'), { recursive: true })
+    const page = join(dir, 'notes', '2026-08-30-diffview.html')
+    writeFileSync(page, pageWithDiffFigure(rawDiff, opts))
+    return { dir, page }
+  }
+
+  test('build renders an authored .wu-diffview into a .wu-dv table with line numbers and hunk headers', () => {
+    const { dir, page } = freshDiffStore(PATCH)
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.match(html, /<table class="wu-dv" data-mode="unified"/)
+    assert.ok(html.includes('internal/order/service.go'), html.slice(0, 800))
+    assert.ok(html.includes('wu-dv-hunk'), 'expected a hunk header row')
+    assert.ok(html.includes('<mark class="wu-dv-w">'), 'expected an intra-line word mark')
+  })
+
+  test('build keeps the raw diff in the script and normalizes children to tables → figcaption → script', () => {
+    const { dir, page } = freshDiffStore(PATCH)
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    const fig = /<figure class="wu-diffview"[\s\S]*?<\/figure>/.exec(html)[0]
+    assert.ok(fig.indexOf('<table class="wu-dv"') < fig.indexOf('<figcaption'), 'tables come before the figcaption')
+    assert.ok(fig.indexOf('<figcaption') < fig.indexOf('text/x-writeup-diff'), 'figcaption comes before the script')
+    assert.equal(diffFigureText(fig), PATCH.replace(/\n$/, ''))
+  })
+
+  test('data-mode="split" renders the split-column table instead', () => {
+    const { dir, page } = freshDiffStore(PATCH, { mode: 'split' })
+    buildStore(dir)
+    const html = readFileSync(page, 'utf8')
+    assert.match(html, /<table class="wu-dv" data-mode="split"/)
+  })
+
+  test('idempotent: a second build reproduces the same bytes and does not double-render', () => {
+    const { dir, page } = freshDiffStore(PATCH)
+    buildStore(dir)
+    const afterFirst = readFileSync(page, 'utf8')
+    buildStore(dir)
+    const afterSecond = readFileSync(page, 'utf8')
+    assert.equal(afterSecond, afterFirst)
+    assert.equal((afterFirst.match(/<table class="wu-dv"/g) || []).length, 1)
+    assert.equal((afterFirst.match(/text\/x-writeup-diff/g) || []).length, 1)
+  })
+
+  test('--check reports pagesChanged for an unrendered .wu-diffview without writing the page', () => {
+    const { dir, page } = freshDiffStore(PATCH)
+    const before = readFileSync(page, 'utf8')
+    const result = buildStore(dir, { check: true })
+    assert.equal(readFileSync(page, 'utf8'), before)
+    assert.equal(result.pagesChanged, true)
+  })
+
+  test('a malformed diff leaves the figure byte-for-byte untouched and is reported in diffErrors', () => {
+    const { dir, page } = freshDiffStore('--- a/x.go\n+++ b/x.go\n@@ -bogus +1 @@\n ctx\n')
+    const figureOf = (html) => /<figure class="wu-diffview"[\s\S]*?<\/figure>/.exec(html)[0]
+    const before = figureOf(readFileSync(page, 'utf8'))
+    const result = buildStore(dir)
+    const after = readFileSync(page, 'utf8')
+    assert.equal(figureOf(after), before)
+    assert.ok(!after.includes('wu-dv'), 'nothing was rendered')
+    assert.equal(result.diffErrors.length, 1)
+    assert.match(result.diffErrors[0], /^notes\/2026-08-30-diffview\.html: /)
+    assert.match(result.diffErrors[0], /@@ -bogus \+1 @@/)
+  })
+
+  test('a .wu-diffview left unrendered is an error self-check names (diffview-unrendered)', () => {
+    const { dir, page } = freshDiffStore('--- a/x.go\n+++ b/x.go\n@@ -bogus +1 @@\n ctx\n')
+    buildStore(dir)
+    const result = runSelfCheck(page)
+    assert.ok(result.errors.some((e) => e.item === 'diffview-unrendered'), JSON.stringify(result.errors))
+  })
+
+  test('a rendered diff view passes self-check: no unmapped wu-dv-* warning, no diffview-unrendered error', () => {
+    const { dir, page } = freshDiffStore(PATCH)
+    buildStore(dir)
+    const result = runSelfCheck(page)
+    assert.ok(!result.errors.some((e) => e.item === 'diffview-unrendered'), JSON.stringify(result.errors))
+    assert.ok(!result.warnings.some((w) => w.item === 'markdown-convertibility'), JSON.stringify(result.warnings))
+  })
+})
+
 describe('buildStore(): store switcher in the index header', () => {
   const ENV_KEYS = ['WRITEUP_STORE', 'WRITEUP_STORES']
   let savedEnv
@@ -1100,5 +1200,107 @@ describe('buildStore(): .wu-sidetoc side table of contents', () => {
     assert.match(css, /@media \(min-width: 800px\) \{\n {2}\.wu-figure \{\n {4}margin-inline: calc\(-1 \* \(2 \* var\(--wu-sp-4\) \+ var\(--wu-bw-1\)\)\);/)
     // not printed
     assert.match(css, /@media print \{\n {2}\.wu-toc,\n {2}\.wu-sidetoc,/)
+  })
+})
+
+describe('build CLI: refuses a directory that is not a store', () => {
+  const BUILD_BIN = join(ROOT, 'bin', 'build.mjs')
+
+  function runBuild(dir, extra = []) {
+    return spawnSync(process.execPath, [BUILD_BIN, '--store', dir, ...extra], { encoding: 'utf8' })
+  }
+
+  test('a missing directory is refused (exit 1) and never created', () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'wu-nostore-')), 'never-made')
+    const r = runBuild(dir)
+    assert.equal(r.status, 1)
+    assert.equal(existsSync(dir), false, 'build must not create the store directory')
+    assert.match(r.stderr, /is not a writeup store \(no \.writeup\.toml\)/)
+  })
+
+  test('the refusal prints the exact init-store command to run', () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'wu-nostore-')), 'notes')
+    const r = runBuild(dir)
+    assert.match(r.stderr, /scripts\/init-store\.mjs --name notes --store /)
+    assert.ok(r.stderr.includes(dir), r.stderr)
+  })
+
+  test('an existing directory without .writeup.toml is refused, and nothing is written into it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-nostore-'))
+    const r = runBuild(dir)
+    assert.equal(r.status, 1)
+    assert.equal(existsSync(join(dir, 'manifest.json')), false)
+    assert.equal(existsSync(join(dir, 'index.html')), false)
+    assert.equal(existsSync(join(dir, '_kit')), false)
+  })
+
+  test('--check is refused the same way (no half store from a check run)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-nostore-'))
+    const r = runBuild(dir, ['--check'])
+    assert.equal(r.status, 1)
+    assert.equal(existsSync(join(dir, 'manifest.json')), false)
+  })
+
+  test('a real store (with .writeup.toml) builds as before', () => {
+    const store = freshStore()
+    const r = runBuild(store)
+    assert.equal(r.status, 0, r.stderr)
+    assert.match(r.stdout, /build: wrote manifest\.json/)
+    assert.equal(existsSync(join(store, 'manifest.json')), true)
+  })
+})
+
+describe('buildStore(): kit CSS href repair for a page started from kit/template.html', () => {
+  function pageWithCssHref(href) {
+    return '<!DOCTYPE html>\n<html lang="ja">\n<head>\n<meta charset="UTF-8">\n<title>テンプレ由来</title>\n' +
+      '<meta name="description" content="d">\n<meta name="kind" content="設計">\n<meta name="date" content="2026-08-29">\n' +
+      `<link rel="stylesheet" href="${href}">\n</head>\n<body>\n<div class="wu-page">\n` +
+      '<header class="wu-header"><h1>テンプレ由来</h1></header>\n<main>\n<section class="wu-section"><h2>節</h2><p>本文。</p></section>\n</main>\n</div>\n</body>\n</html>\n'
+  }
+
+  function storeWith(href, relDir) {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-css-'))
+    writeFileSync(join(dir, '.writeup.toml'), '[private]\nwords = []\n')
+    mkdirSync(join(dir, ...relDir.split('/')), { recursive: true })
+    const page = join(dir, ...relDir.split('/'), '2026-08-29-from-template.html')
+    writeFileSync(page, pageWithCssHref(href))
+    return { dir, page }
+  }
+
+  test('the template\'s own "./writeup.css" becomes ../_kit/writeup.css at depth 1', () => {
+    const { dir, page } = storeWith('./writeup.css', 'notes')
+    buildStore(dir)
+    assert.match(readFileSync(page, 'utf8'), /<link rel="stylesheet" href="\.\.\/_kit\/writeup\.css">/)
+  })
+
+  test('a bare "writeup.css" is repaired too, at the page\'s own depth', () => {
+    const { dir, page } = storeWith('writeup.css', 'a/b')
+    buildStore(dir)
+    assert.match(readFileSync(page, 'utf8'), /href="\.\.\/\.\.\/_kit\/writeup\.css"/)
+  })
+
+  test('an already-correct href is left alone (idempotent)', () => {
+    const { dir, page } = storeWith('../_kit/writeup.css', 'notes')
+    buildStore(dir)
+    const first = readFileSync(page, 'utf8')
+    buildStore(dir)
+    assert.equal(readFileSync(page, 'utf8'), first)
+  })
+
+  test('self-check fails a page whose stylesheet link does not resolve to _kit/writeup.css', () => {
+    const { page } = storeWith('./writeup.css', 'notes')
+    const before = runSelfCheck(page)
+    assert.ok(before.errors.some((e) => e.item === 'kit-css'), JSON.stringify(before.errors))
+    // …and passes that row once build has repaired the href
+    const { dir, page: page2 } = storeWith('./writeup.css', 'notes')
+    buildStore(dir)
+    assert.deepEqual(runSelfCheck(page2).errors.filter((e) => e.item === 'kit-css'), [])
+  })
+
+  test('self-check accepts the kit\'s own reference pages, whose ./writeup.css sibling really exists', () => {
+    for (const name of ['template.html', 'samples.html']) {
+      const result = runSelfCheck(join(ROOT, 'kit', name))
+      assert.deepEqual(result.errors.filter((e) => e.item === 'kit-css'), [], name)
+    }
   })
 })

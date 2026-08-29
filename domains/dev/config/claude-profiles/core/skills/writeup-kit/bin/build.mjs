@@ -3,7 +3,7 @@
 // from every page's `<head>` meta, and syncs the kit's CSS into
 // `<store>/_kit/writeup.css` (contract §1, §1-3). Zero-dependency.
 //
-// The six places build.mjs edits a page's own bytes (page-contract.md §1):
+// The seven places build.mjs edits a page's own bytes (page-contract.md §1):
 // (1) when a page's `<head>` lacks `<meta name="id">`, build inserts the
 // computed id right after `<meta name="date">` (idempotent — only when the
 // meta is missing; see `insertIdMeta`/`buildPageRecord`); (2) `.wu-header`'s
@@ -16,16 +16,24 @@
 // `checks` meta, right after `<meta name="checks">` when present, else
 // right before the stylesheet `<link>` (idempotent — replaced only when its
 // href would differ; see `ensureFavicon`/`bin/lib/favicon.mjs`); (4) every
-// `<pre class="wu-code">`/`<pre class="wu-diff">` block whose `<code>`
-// content has no `wu-tok-` spans yet gets syntax-highlighted in place —
+// `<figure class="wu-diffview">` is re-rendered from the raw unified diff
+// its `text/x-writeup-diff` script carries into a `<table class="wu-dv">`
+// per file — line numbers, hunk headers, unified or split columns,
+// intra-line word marks (`bin/lib/diffview.mjs`, `ensureDiffViews`); the
+// figure's children are normalized to tables → figcaption → script, so the
+// pass always rebuilds from the stored raw text and re-running it is a
+// no-op, while editing `data-mode` or `data-lang` takes effect on the next
+// build; (5) every `<pre class="wu-code">`/`<pre class="wu-diff">` block
+// whose `<code>` content has no `wu-tok-` spans yet gets highlighted in
+// place —
 // the existing (HTML-escaped) text is decoded, run through
 // `bin/lib/highlight.mjs`'s `highlight(code, lang)`, and written back with
 // `data-hl="1"` set on the `<pre>` (idempotent — a block already carrying
-// `wu-tok-` spans is left untouched; see `ensureHighlighted`); (5) internal
+// `wu-tok-` spans is left untouched; see `ensureHighlighted`); (6) internal
 // `<a href>` values are repaired against the store's page list — rewritten
 // page-relative, followed to a moved (`legacy/`) target, or marked
 // `data-wu-missing` when nothing resolves (idempotent; see
-// `bin/lib/links.mjs`'s `repairLinks`); (6) the side table of contents —
+// `bin/lib/links.mjs`'s `repairLinks`); (7) the side table of contents —
 // `<nav class="wu-sidetoc">` as `<main>`'s first child, generated from the
 // page's own h2/h3 (which each get a stable `id` when they lack one), plus
 // the pinned scroll-spy `<script>` before `</body>` (idempotent: stripped
@@ -42,6 +50,7 @@ import { resolveStoreDir, pageId, isGitRepo, gitLastCommitDatetime, listStores }
 import { parseHtml, headMeta, titleText, decodeEntities } from './lib/html.mjs'
 import { faviconDataUri, statusFromChecks } from './lib/favicon.mjs'
 import { highlight } from './lib/highlight.mjs'
+import { ensureDiffViews } from './lib/diffview.mjs'
 import { repairLinks } from './lib/links.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -189,12 +198,18 @@ function backNavHref(relPath) {
   return depth === 0 ? 'index.html' : '../'.repeat(depth) + 'index.html'
 }
 
-const KIT_CSS_HREF_RE = /(<link\b[^>]*\shref=")((?:\.\.\/|\.\/)*_kit\/writeup\.css)(")/g
+const KIT_CSS_HREF_RE = /(<link\b[^>]*\shref=")((?:\.\.\/|\.\/)*(?:_kit\/)?writeup\.css)(")/g
 
 /**
- * Ensures every `<link href="…/_kit/writeup.css">` points at the store's
- * kit CSS from this page's depth: a page moved into a deeper folder (store
- * reorganisation, `git mv`) would otherwise lose its stylesheet. Idempotent.
+ * Ensures every link to the kit stylesheet points at the store's copy from
+ * this page's depth. Two ways a page gets this wrong: it was moved into a
+ * deeper folder (store reorganisation, `git mv`), or it was started from
+ * `kit/template.html`, which links its own sibling `./writeup.css` — a page
+ * saved into a store with that href renders completely unstyled. Both the
+ * `…/_kit/writeup.css` and the bare `writeup.css` / `./writeup.css` forms
+ * are rewritten to the correct `…/_kit/writeup.css`. Idempotent. (Pages
+ * that live inside `_kit/` itself, where `./writeup.css` is correct, are
+ * never scanned — `_kit` is an excluded directory.)
  */
 function ensureKitCssHref(text, relPath) {
   const depth = relPath.split('/').length - 1
@@ -490,6 +505,8 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
   let navFixed = false
   let faviconFixed = false
   let highlightFixed = false
+  let diffViewFixed = false
+  const diffErrors = []
   let tocFixed = false
   let linksFixed = false
   let missingLinks = 0
@@ -514,6 +531,11 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
     faviconFixed = true
     if (!check) text = faviconFixedText
   }
+  const diffViewText = ensureDiffViews(text, { onError: (m) => diffErrors.push(`${relPath}: ${m}`) })
+  if (diffViewText !== text) {
+    diffViewFixed = true
+    if (!check) text = diffViewText
+  }
   const highlightedText = ensureHighlighted(text)
   if (highlightedText !== text) {
     highlightFixed = true
@@ -525,7 +547,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
     if (!check) text = tocFixedText
   }
   if (linkResolver) {
-    // (5) internal links: pages migrated from the old tool wrote hrefs
+    // (6) internal links: pages migrated from the old tool wrote hrefs
     // relative to the store root; rewrite them page-relative, follow
     // moved (legacy) targets, and mark the rest with data-wu-missing.
     const repaired = repairLinks(text, {
@@ -539,7 +561,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
       if (!check) text = repaired.html
     }
   }
-  if ((metaInserted || navFixed || faviconFixed || highlightFixed || tocFixed || linksFixed) && !check) {
+  if ((metaInserted || navFixed || faviconFixed || diffViewFixed || highlightFixed || tocFixed || linksFixed) && !check) {
     writeFileSync(fullPath, text)
     buf = Buffer.from(text, 'utf8')
     root = parseHtml(text)
@@ -575,7 +597,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
     legacy: relPath.startsWith('legacy/'),
     missingLinks,
   }
-  return { record, metaInserted, navFixed, faviconFixed, highlightFixed, tocFixed, linksFixed }
+  return { record, metaInserted, navFixed, faviconFixed, diffViewFixed, highlightFixed, tocFixed, linksFixed, diffErrors }
 }
 
 /**
@@ -1016,7 +1038,8 @@ export function buildStore(storeDir, { check = false } = {}) {
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
   const linkResolver = makeLinkResolver(storeDir, relPaths)
   const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check, linkResolver }))
-  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.highlightFixed || b.tocFixed || b.linksFixed)
+  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.diffViewFixed || b.highlightFixed || b.tocFixed || b.linksFixed)
+  const diffErrors = built.flatMap((b) => b.diffErrors ?? [])
   const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'
   const manifestPath = join(storeDir, 'manifest.json')
@@ -1044,6 +1067,7 @@ export function buildStore(storeDir, { check = false } = {}) {
     manifestChanged,
     indexChanged,
     pagesChanged,
+    diffErrors,
     counts: {
       total: records.length,
       legacy: records.filter((r) => r.legacy).length,
@@ -1063,11 +1087,49 @@ function parseArgs(argv) {
   return args
 }
 
+/** The `init-store.mjs` path to print in the "not a store" message: the
+ * writeup skill sits beside the kit in every layout the kit supports
+ * (`<skills>/writeup/scripts/init-store.mjs`). Falls back to a generic
+ * placeholder when the sibling skill isn't installed. */
+function initStoreCommand(storeDir) {
+  const sibling = join(HERE, '..', '..', 'writeup', 'scripts', 'init-store.mjs')
+  const script = existsSync(sibling) ? sibling : '<writeup skill>/scripts/init-store.mjs'
+  const name = storeDir.split(sep).filter(Boolean).pop() || 'work'
+  return `node ${script} --name ${name} --store ${storeDir}`
+}
+
+/**
+ * A store is a directory with `.writeup.toml` at its root (page-contract.md
+ * §1). Building anything else would silently create a half store — a
+ * `manifest.json`, an `index.html` and a `_kit/` in a directory with no
+ * config and no git — so the CLI refuses and prints the one command that
+ * makes a real store. `buildStore()` itself stays usable on any directory,
+ * which is what the tests build against.
+ */
+function refuseNonStore(storeDir) {
+  if (existsSync(join(storeDir, '.writeup.toml'))) return null
+  const lines = [
+    `build: ${storeDir} is not a writeup store (no .writeup.toml).`,
+    existsSync(storeDir)
+      ? 'build refuses to write manifest.json/index.html/_kit into a directory that was never initialised.'
+      : 'build refuses to create a store directory implicitly.',
+    'Create one first:',
+    `  ${initStoreCommand(storeDir)}`,
+  ]
+  return lines.join('\n')
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2))
   const storeDir = resolveStoreDir(args.store)
+  const refusal = refuseNonStore(storeDir)
+  if (refusal) {
+    console.error(refusal)
+    return 1
+  }
   const result = buildStore(storeDir, { check: args.check })
   console.log(`build: ${result.counts.total} pages (legacy: ${result.counts.legacy}) in ${storeDir}`)
+  for (const message of result.diffErrors ?? []) console.error(`build: ${message}`)
   if (args.check) {
     if (result.changed) {
       console.log('build --check: manifest.json/index.html/_kit/writeup.css would change')

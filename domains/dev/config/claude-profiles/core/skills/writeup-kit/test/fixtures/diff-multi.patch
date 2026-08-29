@@ -1,0 +1,27 @@
+diff --git a/pkg/http/router.go b/internal/transport/router.go
+similarity index 92%
+rename from pkg/http/router.go
+rename to internal/transport/router.go
+index 1122334..5566778 100644
+--- a/pkg/http/router.go
++++ b/internal/transport/router.go
+@@ -3,6 +3,6 @@ package transport
+ import (
+ 	"net/http"
+ )
+-func New() *http.ServeMux {
++func NewRouter() *http.ServeMux {
+ 	return http.NewServeMux()
+ }
+diff --git a/scripts/legacy_seed.sh b/scripts/legacy_seed.sh
+deleted file mode 100755
+index 99aabbc..0000000
+--- a/scripts/legacy_seed.sh
++++ /dev/null
+@@ -1,5 +0,0 @@
+-#!/usr/bin/env bash
+-set -euo pipefail
+-
+-psql -c "insert into orders (id) values (1)"
+-echo done
+\\ No newline at end of file
