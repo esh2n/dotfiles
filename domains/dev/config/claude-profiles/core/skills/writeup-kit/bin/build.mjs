@@ -517,17 +517,37 @@ function renderGroup(g) {
     `</details>`
 }
 
-/** The registry name of `storeDir` (work / learn …), or '' when the store is
- * not registered — the index shows it so two open stores are told apart. */
-function storeNameFor(storeDir) {
+/** The registry view of `storeDir`: `{ storeName, stores }` where
+ * `storeName` is its registered name (work / private …, '' when the store
+ * is not registered — the index shows it so two open stores are told
+ * apart) and `stores` is every registered store (`[{ name, description,
+ * isDefault }]`, registry order) for the index's store switcher. */
+function storeContextFor(storeDir) {
   let stores = []
-  try { stores = listStores() } catch { return '' }
+  try { stores = listStores() } catch { return { storeName: '', stores: [] } }
   const here = resolve(storeDir)
   const hit = stores.find((st) => resolve(st.path) === here)
-  return hit ? hit.name : ''
+  return { storeName: hit ? hit.name : '', stores }
 }
 
-function renderIndexHtml(records, { storeName = '' } = {}) {
+/** The store switcher at the top of the index header: the current store
+ * and every other registered store as plain text links, `../<name>/index.html`
+ * relative so the same HTML works under `serve` (`/<name>/…`) and on
+ * `file://` (sibling store directories). The current store carries
+ * `aria-current="page"`. Nothing is remembered client-side — the URL
+ * carries the store. Empty when the store is not registered. */
+export function renderStoreSwitcher(storeName, stores) {
+  if (!storeName || !stores.some((s) => s.name === storeName)) return ''
+  const links = stores.map((s) => {
+    const current = s.name === storeName ? ' aria-current="page"' : ''
+    const title = s.description ? ` title="${escapeHtml(s.description)}"` : ''
+    return `<a href="../${escapeHtml(s.name)}/index.html"${current}${title}>${escapeHtml(s.name)}</a>`
+  })
+  return `<nav class="wu-idx-stores" aria-label="store">${links.join('')}</nav>
+`
+}
+
+function renderIndexHtml(records, { storeName = '', stores = [] } = {}) {
   const kindCounts = new Map()
   const folderCounts = new Map()
   for (const r of records) {
@@ -555,9 +575,14 @@ function renderIndexHtml(records, { storeName = '' } = {}) {
 <meta name="description" content="writeup store の検索">
 <meta name="robots" content="noindex">
 <link rel="icon" href="${faviconDataUri({ kind: 'index' })}">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="./_kit/writeup.css">
 <style data-index>
+.wu-idx-stores{display:flex;flex-wrap:wrap;margin:0 0 var(--wu-sp-3);font-family:var(--wu-font-heading);font-weight:700;font-size:var(--wu-fs-1);line-height:1.6;}
+.wu-idx-stores a{color:var(--wu-ink-3);text-decoration:none;padding:0 var(--wu-sp-2);border-left:var(--wu-bw-1) solid var(--wu-rule);}
+.wu-idx-stores a:first-child{padding-left:0;border-left:0;}
+.wu-idx-stores a:hover{text-decoration:underline;}
+.wu-idx-stores a[aria-current="page"]{color:var(--wu-ink);}
 .wu-idx-search{width:100%;box-sizing:border-box;padding:var(--wu-sp-3) var(--wu-sp-4);font-size:var(--wu-fs-4);font-family:inherit;color:var(--wu-ink);background:var(--wu-surface);border:var(--wu-bw-2) solid var(--wu-rule);border-radius:var(--wu-radius-2);}
 .wu-idx-filters{display:flex;flex-wrap:wrap;gap:var(--wu-sp-2);margin:var(--wu-sp-4) 0;padding:0;list-style:none;}
 .wu-idx-sep{width:1px;align-self:stretch;background:var(--wu-rule);margin:0 var(--wu-sp-1);}
@@ -599,7 +624,7 @@ function renderIndexHtml(records, { storeName = '' } = {}) {
 <body>
 <div class="wu-page">
 <header class="wu-header">
-<p class="wu-eyebrow">writeup store${storeName ? ` · ${escapeHtml(storeName)}` : ''}</p>
+${renderStoreSwitcher(storeName, stores)}<p class="wu-eyebrow">writeup store${storeName ? ` · ${escapeHtml(storeName)}` : ''}</p>
 <h1>${storeName ? escapeHtml(storeName) : 'writeup'}</h1>
 <p class="wu-lede">題名・要約・slug・id で検索して開く。</p>
 </header>
@@ -821,7 +846,7 @@ export function buildStore(storeDir, { check = false } = {}) {
   const existingManifest = existsSync(manifestPath) ? readFileSync(manifestPath, 'utf8') : null
   const manifestChanged = existingManifest !== manifestText
 
-  const indexHtml = renderIndexHtml(records, { storeName: storeNameFor(storeDir) })
+  const indexHtml = renderIndexHtml(records, storeContextFor(storeDir))
   const indexPath = join(storeDir, 'index.html')
   const existingIndex = existsSync(indexPath) ? readFileSync(indexPath, 'utf8') : null
   const indexChanged = existingIndex !== indexHtml

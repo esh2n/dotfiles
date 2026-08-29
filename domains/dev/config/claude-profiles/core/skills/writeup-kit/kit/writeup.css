@@ -37,7 +37,7 @@ svg {
   --wu-surface: #ffffff;
   --wu-ink: #1c212b;
   --wu-ink-2: #4a5464;
-  --wu-ink-3: #5f6776; /* 5.7:1 on ground, 4.6:1 on rule-soft (bin/contrast.mjs) */
+  --wu-ink-3: #565e6d; /* 6.1:1 on ground, 5.5:1 on rule-soft (bin/contrast.mjs); Lc 77 (APCA) — 2026-08-29 token research */
   --wu-rule: #d9dce2;
   --wu-rule-soft: #ececef;
 
@@ -48,14 +48,14 @@ svg {
 
   /* type roles */
   --wu-font-body: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
-  --wu-font-heading: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --wu-font-heading: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif; /* one family: headings = body at 700 (owner decision, 2026-08-29) */
   --wu-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  /* type scale: 13 / 14 / 15.5 / 17 / 21 / 30 */
+  /* type scale: 13 / 14 / 16 / 18 / 21 / 30 (body 16px: 2026-08-29 token research) */
   --wu-fs-1: 13px;
   --wu-fs-2: 14px;
-  --wu-fs-3: 15.5px;
-  --wu-fs-4: 17px;
+  --wu-fs-3: 16px;
+  --wu-fs-4: 18px;
   --wu-fs-5: 21px;
   --wu-fs-6: 30px;
 
@@ -83,7 +83,7 @@ svg {
   --wu-lh-heading: 1.35;
   --wu-lh-code: 1.6;
   --wu-lh-diff: 1.7;
-  --wu-measure: 68ch;
+  --wu-measure: 45em; /* 45 full-width chars = 720px at fs-3 16px (2026-08-29 token research) */
 
   /* figure tones (ts / rs / new / neutral): neutral gray shades only,
      never a chromatic color — distinguished by fill lightness. Steps are
@@ -104,13 +104,13 @@ svg {
     --wu-ground: #13161c;
     --wu-surface: #1b1f27;
     --wu-ink: #e7e9ed;
-    --wu-ink-2: #b7bec9;
-    --wu-ink-3: #9aa2b0; /* 6.4:1 on ground, 5.4:1 on rule-soft (bin/contrast.mjs) */
+    --wu-ink-2: #c8cdd6;
+    --wu-ink-3: #b3bac4; /* 9.3:1 on ground, 7.5:1 on rule-soft (bin/contrast.mjs); Lc 64 (APCA) */
     --wu-rule: #333945;
     --wu-rule-soft: #232833;
 
-    --wu-link: #93a9e8;
-    --wu-accent: #e0987c;
+    --wu-link: #abbdee;
+    --wu-accent: #e8ab93;
     --wu-accent-soft: #3a281f;
 
     --wu-fig-tone-ts: #232936;
@@ -127,13 +127,13 @@ svg {
   --wu-ground: #13161c;
   --wu-surface: #1b1f27;
   --wu-ink: #e7e9ed;
-  --wu-ink-2: #b7bec9;
-  --wu-ink-3: #9aa2b0;
+  --wu-ink-2: #c8cdd6;
+  --wu-ink-3: #b3bac4;
   --wu-rule: #333945;
   --wu-rule-soft: #232833;
 
-  --wu-link: #93a9e8;
-  --wu-accent: #e0987c;
+  --wu-link: #abbdee;
+  --wu-accent: #e8ab93;
   --wu-accent-soft: #3a281f;
 
   --wu-fig-tone-ts: #232936;
@@ -636,6 +636,18 @@ hr {
   border: var(--wu-bw-1) solid var(--wu-rule);
   border-radius: 0;
   background: var(--wu-surface);
+}
+
+/* At the 45em reading measure the figure's inner width would be 654px,
+   below the renderer's 720px column (bin/lib/diagram.mjs COLUMN), so every
+   figure would be scaled by 0.91. Let the figure box bleed past the text
+   column — main padding + figure padding + border on each side — so the
+   inner width is exactly 720px and figures render 1:1. Only when the
+   viewport has room; narrow screens keep the figure inside the column. */
+@media (min-width: 800px) {
+  .wu-figure {
+    margin-inline: calc(-1 * (2 * var(--wu-sp-4) + var(--wu-bw-1)));
+  }
 }
 
 .wu-figure svg {

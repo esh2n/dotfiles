@@ -209,10 +209,11 @@ describe('contrast: CLI', () => {
       const good = join(dir, 'good.css')
       const bad = join(dir, 'bad.css')
       const base = readFileSync(KIT_CSS, 'utf8')
-      // darken light ink-3 and lighten dark ink-3 (both dark blocks) so every text pair clears 4.5:1
+      // the kit itself passes since the 2026-08-29 token research; keep the fixture at the
+      // pre-research ink-3 values (light 5.7:1, dark 6.4:1 on ground) so it still exercises the AA margin
       writeFileSync(good, base
-        .replace('--wu-ink-3: #7c8494;', '--wu-ink-3: #5f6776;')
-        .replaceAll('--wu-ink-3: #838b9a;', '--wu-ink-3: #9aa2b0;'))
+        .replace('--wu-ink-3: #565e6d;', '--wu-ink-3: #5f6776;')
+        .replaceAll('--wu-ink-3: #b3bac4;', '--wu-ink-3: #9aa2b0;'))
       writeFileSync(bad, base.replace('--wu-ink: #1c212b;', '--wu-ink: #aaaaaa;'))
       const g = run(['--css', good])
       assert.equal(g.status, 0, g.stdout)
