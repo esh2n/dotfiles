@@ -1,0 +1,37 @@
+id: b2
+type: bar
+variant: grouped
+title: リージョン別スループット
+caption: 秒間リクエスト数、ピーク時
+unit: rps
+categories:
+- id: tokyo
+  label: 東京
+- id: osaka
+  label: 大阪
+- id: singapore
+  label: シンガポール
+- id: oregon
+  label: オレゴン
+series:
+- id: read
+  label: 読み取り
+  values:
+    tokyo: 1200
+    osaka: 640
+    singapore: 380
+    oregon: 910
+- id: write
+  label: 書き込み
+  values:
+    tokyo: 310
+    osaka: 150
+    singapore: 90
+    oregon: 240
+- id: batch
+  label: バッチ
+  values:
+    tokyo: 75
+    osaka: 40
+    singapore: 20
+    oregon: 55

@@ -1,0 +1,27 @@
+id: b1
+type: bar
+title: 月次コストの内訳
+caption: 2026 年 7 月、サービス別
+unit: 万円
+categories:
+- id: compute
+  label: コンピュート
+- id: storage
+  label: ストレージ
+- id: network
+  label: ネットワーク
+- id: db
+  label: DB
+- id: other
+  label: その他
+emphasis:
+- compute
+series:
+- id: cost
+  label: 月額
+  values:
+    compute: 128
+    storage: 42.5
+    network: 17
+    db: 64
+    other: null

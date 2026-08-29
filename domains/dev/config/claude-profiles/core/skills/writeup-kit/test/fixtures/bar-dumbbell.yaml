@@ -1,0 +1,36 @@
+id: b3
+type: bar
+variant: dumbbell
+title: エンドポイント別 p95 遅延の前後
+caption: 接続プール導入の前後。線の長さが差分
+unit: ms
+categories:
+- id: search
+  label: 検索
+- id: detail
+  label: 詳細取得
+- id: create
+  label: 登録
+- id: export
+  label: エクスポート
+- id: auth
+  label: 認証
+emphasis:
+- search
+series:
+- id: before
+  label: 導入前
+  values:
+    search: 820
+    detail: 310
+    create: 540
+    export: null
+    auth: 95
+- id: after
+  label: 導入後
+  values:
+    search: 260
+    detail: 180
+    create: 410
+    export: 900
+    auth: 90

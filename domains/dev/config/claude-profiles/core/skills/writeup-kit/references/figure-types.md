@@ -277,7 +277,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 16 | Layer stack | `layers` | L | implemented (`bin/lib/figures/layers.mjs`) |
 | 17 | Venn | `venn` | M | implemented (`bin/lib/figures/venn.mjs`) |
 | 18 | Pyramid / funnel | `pyramid` | H/Q | implemented (`bin/lib/figures/pyramid.mjs`) |
-| 19 | Bar chart (incl. dumbbell) | `bar` | Q / D | planned |
+| 19 | Bar chart (incl. dumbbell) | `bar` | Q / D | implemented (`bin/lib/figures/bar.mjs`) |
 | 20 | Treemap | `treemap` | Q | planned |
 | 21 | Line chart (incl. slopegraph, ridgeline) | `line` | Q / D | implemented (`bin/lib/figures/line.mjs`) |
 | 22 | Gantt | `gantt` | S | implemented (`bin/lib/figures/gantt.mjs`) |
