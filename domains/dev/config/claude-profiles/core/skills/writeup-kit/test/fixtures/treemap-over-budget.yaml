@@ -1,0 +1,73 @@
+id: over
+type: treemap
+title: 予算超過のツリーマップ
+items:
+  - id: g1
+    label: とても長いラベルを持つグループ
+    emphasis: true
+    children:
+      - id: c1
+        label: 子1
+        value: 30
+        emphasis: true
+      - id: c2
+        label: 子2
+        value: 25
+        emphasis: true
+      - id: c3
+        label: 子3
+        value: 20
+      - id: c4
+        label: 子4
+        value: 15
+      - id: c5
+        label: 子5
+        value: 12
+      - id: c6
+        label: 子6
+        value: 10
+      - id: c7
+        label: 子7
+        value: 8
+      - id: c8
+        label: 子8
+        value: 6
+      - id: c9
+        label: 子9
+        value: 4
+  - id: i2
+    label: 項目2
+    value: 60
+  - id: i3
+    label: 項目3
+    value: 55
+  - id: i4
+    label: 項目4
+    value: 50
+  - id: i5
+    label: 項目5
+    value: 45
+  - id: i6
+    label: 項目6
+    value: 40
+  - id: i7
+    label: 項目7
+    value: 35
+  - id: i8
+    label: 項目8
+    value: 30
+  - id: i9
+    label: 項目9
+    value: 25
+  - id: i10
+    label: 項目10
+    value: 20
+  - id: i11
+    label: 項目11
+    value: 15
+  - id: i12
+    label: 項目12
+    value: 10
+  - id: i13
+    label: 項目13
+    value: 5

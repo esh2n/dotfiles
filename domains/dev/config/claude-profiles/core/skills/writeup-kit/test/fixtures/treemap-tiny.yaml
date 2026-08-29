@@ -1,0 +1,24 @@
+id: request-mix
+type: treemap
+title: リクエスト種別の割合
+caption: 検索が 8 割以上、管理系は表示できないほど小さい
+unit: "%"
+items:
+  - id: search
+    label: 検索
+    value: 82
+  - id: detail
+    label: 詳細表示
+    value: 11
+  - id: write
+    label: 書き込み
+    value: 5.5
+  - id: admin
+    label: 管理画面操作
+    value: 1
+  - id: export
+    label: エクスポート
+    value: 0.4
+  - id: misc
+    label: その他の操作
+    value: 0.1

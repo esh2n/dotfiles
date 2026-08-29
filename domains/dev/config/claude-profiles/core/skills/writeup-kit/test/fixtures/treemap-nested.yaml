@@ -1,0 +1,44 @@
+id: storage-by-team
+type: treemap
+title: チーム別ストレージ使用量
+caption: 分析チームの生データが全体の 4 割を占める
+unit: TB
+items:
+  - id: analytics
+    label: 分析
+    children:
+      - id: raw
+        label: 生データ
+        value: 42
+        emphasis: true
+      - id: curated
+        label: 加工済み
+        value: 14
+      - id: sandbox
+        label: 検証用
+        value: 6
+  - id: product
+    label: プロダクト
+    value: 40
+    children:
+      - id: media
+        label: メディア
+        value: 18
+      - id: db
+        label: DB
+        value: 12
+      - id: logs
+        label: ログ
+        value: 7
+  - id: platform
+    label: 基盤
+    children:
+      - id: backup
+        label: バックアップ
+        value: 11
+      - id: images
+        label: イメージ
+        value: 5
+  - id: shared
+    label: 共有
+    value: 4

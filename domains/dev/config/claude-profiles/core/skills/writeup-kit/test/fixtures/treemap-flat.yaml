@@ -1,0 +1,25 @@
+id: effort-split
+type: treemap
+title: 四半期の工数配分
+caption: 新機能とリファクタで 3 分の 2、運用対応は 1 割強
+unit: 人日
+items:
+  - id: feature
+    label: 新機能
+    value: 96
+  - id: refactor
+    label: リファクタ
+    value: 58
+    emphasis: true
+  - id: ops
+    label: 運用対応
+    value: 31
+  - id: review
+    label: レビュー
+    value: 22
+  - id: meeting
+    label: 会議
+    value: 18
+  - id: onboarding
+    label: 受け入れ
+    value: 9
