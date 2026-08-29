@@ -626,7 +626,7 @@ function renderIndexHtml(records, { storeName = '', stores = [] } = {}) {
 <header class="wu-header">
 ${renderStoreSwitcher(storeName, stores)}<p class="wu-eyebrow">writeup store${storeName ? ` · ${escapeHtml(storeName)}` : ''}</p>
 <h1>${storeName ? escapeHtml(storeName) : 'writeup'}</h1>
-<p class="wu-lede">題名・要約・slug・id で検索して開く。</p>
+<p class="wu-lede">題名・要約・slug・id で検索</p>
 </header>
 <main>
 <section class="wu-section">
