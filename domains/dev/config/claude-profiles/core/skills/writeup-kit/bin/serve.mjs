@@ -258,7 +258,7 @@ ${candidates.map((c) => `<li><a href="${escapeHtml(pageUrl(c.mount, c.path))}">$
 <nav class="wu-nav"><a class="wu-back" href="${escapeHtml(home.prefix)}/">一覧</a></nav>
 <p class="wu-eyebrow">見つかりません</p>
 <h1>${escapeHtml(requestedPath)}</h1>
-<p class="wu-lede">このパスにページはありません。</p>
+<p class="wu-lede">このパスにページはありません</p>
 </header>
 <main>
 ${nearHtml}
