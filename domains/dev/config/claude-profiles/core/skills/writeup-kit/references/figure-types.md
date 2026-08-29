@@ -264,7 +264,7 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 3 | Flowchart | `flowchart` | G | covered by `diagram` (node/edge renderer: decision nodes as labelled branches) |
 | 4 | Sequence | `sequence` | S | implemented (`bin/lib/figures/sequence.mjs`) |
 | 5 | State machine | `state` | ST | implemented (`bin/lib/figures/state.mjs`) |
-| 6 | ER / data model | `er` | G(H) | planned |
+| 6 | ER / data model | `er` | G(H) | implemented as `schema` with `variant: er` |
 | 7 | Timeline | `timeline` | S | implemented (`bin/lib/figures/timeline.mjs`) |
 | 8 | Swimlane | `swimlane` | G+L | planned |
 | 9 | Quadrant | `quadrant` | M | implemented (`bin/lib/figures/quadrant.mjs`) |
@@ -295,6 +295,6 @@ classes: **G** graph/flow · **S** sequence/time · **H** hierarchy/tree ·
 | 34 | User journey | `journey` | S+M | planned |
 | 35 | Deployment | `deployment` | L+G | planned |
 | 36 | Dependency graph | `dependency` | G(DAG) | covered by `diagram` (node/edge renderer: DAG; accent the one edge that breaks a cycle) |
-| 37 | UML class | `uml-class` | G(H) | planned |
+| 37 | UML class | `uml-class` | G(H) | implemented as `schema` with `variant: class` |
 | 38 | Story map | `story-map` | M(grid) | implemented as `board` with `variant: story-map` |
-| 39 | Database schema | `db-schema` | G(H) | planned |
+| 39 | Database schema | `db-schema` | G(H) | implemented as `schema` with `variant: db` |

@@ -1,0 +1,112 @@
+id: s-over
+type: schema
+title: 予算超過のスキーマ
+variant: er
+entities:
+  - id: e1
+    label: E1
+    emphasis: true
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+      - name: f3
+        type: int
+      - name: f4
+        type: int
+      - name: f5
+        type: int
+      - name: f6
+        type: int
+      - name: f7
+        type: int
+      - name: f8
+        type: int
+      - name: f9
+        type: int
+  - id: e2
+    label: とても長いエンティティの名前です
+    emphasis: true
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+  - id: e3
+    label: E3
+    emphasis: true
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+  - id: e4
+    label: E4
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+  - id: e5
+    label: E5
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+  - id: e6
+    label: E6
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+  - id: e7
+    label: E7
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+  - id: e8
+    label: E8
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+  - id: e9
+    label: E9
+    fields:
+      - name: f1
+        type: int
+      - name: f2
+        type: int
+relations:
+  - from: e1
+    to: e2
+  - from: e2
+    to: e3
+  - from: e3
+    to: e4
+  - from: e4
+    to: e5
+  - from: e5
+    to: e6
+  - from: e6
+    to: e7
+  - from: e7
+    to: e8
+  - from: e8
+    to: e9
+  - from: e1
+    to: e3
+  - from: e2
+    to: e4
+  - from: e3
+    to: e5
+  - from: e4
+    to: e6
+  - from: e5
+    to: e7

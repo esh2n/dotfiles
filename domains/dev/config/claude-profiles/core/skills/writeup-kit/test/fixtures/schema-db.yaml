@@ -1,0 +1,70 @@
+id: s-db
+type: schema
+title: 注文テーブルの物理スキーマ
+caption: 注文を消すと明細も消える（CASCADE）。商品は残る
+variant: db
+direction: right
+entities:
+  - id: users
+    label: users
+    fields:
+      - name: id
+        type: bigint
+        key: pk
+      - name: email
+        type: text
+        note: uq
+      - name: created_at
+        type: timestamptz
+  - id: orders
+    label: orders
+    emphasis: true
+    fields:
+      - name: id
+        type: bigint
+        key: pk
+      - name: user_id
+        type: bigint
+        key: fk
+      - name: status
+        type: text
+      - name: total
+        type: numeric
+  - id: order_items
+    label: order_items
+    fields:
+      - name: id
+        type: bigint
+        key: pk
+      - name: order_id
+        type: bigint
+        key: fk
+      - name: product_id
+        type: bigint
+        key: fk
+      - name: qty
+        type: int
+  - id: products
+    label: products
+    fields:
+      - name: id
+        type: bigint
+        key: pk
+      - name: sku
+        type: text
+        note: uq
+      - name: price
+        type: numeric
+relations:
+  - from: users
+    to: orders
+    kind: one-many
+    label: RESTRICT
+  - from: orders
+    to: order_items
+    kind: one-many
+    label: CASCADE
+  - from: products
+    to: order_items
+    kind: one-many
+    label: RESTRICT

@@ -1,0 +1,70 @@
+id: s-er
+type: schema
+title: 注文まわりのデータモデル
+caption: 注文が集約ルート。明細は注文の中でだけ意味を持つ
+variant: er
+entities:
+  - id: customer
+    label: 顧客
+    fields:
+      - name: id
+        type: uuid
+        key: pk
+      - name: name
+        type: text
+  - id: order
+    label: 注文
+    emphasis: true
+    fields:
+      - name: id
+        type: uuid
+        key: pk
+      - name: customer_id
+        type: uuid
+        key: fk
+      - name: status
+        type: enum
+        note: 下書き/確定
+  - id: line
+    label: 明細
+    fields:
+      - name: order_id
+        type: uuid
+        key: fk
+      - name: product_id
+        type: uuid
+        key: fk
+      - name: qty
+        type: int
+  - id: product
+    label: 商品
+    tone: rs
+    fields:
+      - name: id
+        type: uuid
+        key: pk
+      - name: price
+        type: money
+  - id: tag
+    label: タグ
+    fields:
+      - name: id
+        type: uuid
+        key: pk
+      - name: name
+        type: text
+relations:
+  - from: customer
+    to: order
+    kind: one-many
+    label: 発注
+  - from: order
+    to: line
+    kind: one-many
+  - from: product
+    to: line
+    kind: one-many
+  - from: product
+    to: tag
+    kind: many-many
+    label: 分類

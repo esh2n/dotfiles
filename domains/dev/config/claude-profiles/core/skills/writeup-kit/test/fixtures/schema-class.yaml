@@ -1,0 +1,59 @@
+id: s-class
+type: schema
+title: 図形の型階層
+caption: Shape が抽象。Renderer は Shape だけを知る
+variant: class
+entities:
+  - id: shape
+    label: Shape
+    emphasis: true
+    fields:
+      - name: id
+        type: string
+      - name: origin
+        type: Point
+    methods:
+      - "+ area(): number"
+      - "+ bounds(): Rect"
+  - id: circle
+    label: Circle
+    fields:
+      - name: radius
+        type: number
+    methods:
+      - "+ area(): number"
+  - id: rect
+    label: Rect
+    fields:
+      - name: w
+        type: number
+      - name: h
+        type: number
+    methods:
+      - "+ area(): number"
+  - id: canvas
+    label: Canvas
+    fields:
+      - name: shapes
+        type: Shape[]
+    methods:
+      - "+ add(s: Shape)"
+  - id: renderer
+    label: Renderer
+    methods:
+      - "+ draw(c: Canvas)"
+relations:
+  - from: circle
+    to: shape
+    kind: inherits
+  - from: rect
+    to: shape
+    kind: inherits
+  - from: canvas
+    to: shape
+    kind: one-many
+    label: 保持
+  - from: renderer
+    to: canvas
+    kind: uses
+    label: 描画
