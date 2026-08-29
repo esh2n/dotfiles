@@ -1,0 +1,62 @@
+id: m1
+type: matrix
+title: 移行案の比較
+caption: 段階移行が費用と停止時間の両方で優位
+rows:
+- id: bigbang
+  label: 一括切替
+- id: staged
+  label: 段階移行
+- id: parallel
+  label: 並行稼働
+columns:
+- id: cost
+  label: 費用
+- id: downtime
+  label: 停止時間
+- id: rollback
+  label: 巻き戻し
+- id: period
+  label: 期間
+legend:
+  yes: 有利
+  partial: 条件付き
+  no: 不利
+cells:
+- row: bigbang
+  col: cost
+  mark: yes
+- row: bigbang
+  col: downtime
+  mark: no
+- row: bigbang
+  col: rollback
+  mark: no
+- row: bigbang
+  col: period
+  text: 1 週
+- row: staged
+  col: cost
+  mark: partial
+- row: staged
+  col: downtime
+  mark: yes
+  emphasis: true
+- row: staged
+  col: rollback
+  mark: yes
+- row: staged
+  col: period
+  text: 6 週
+- row: parallel
+  col: cost
+  mark: no
+- row: parallel
+  col: downtime
+  mark: yes
+- row: parallel
+  col: rollback
+  mark: partial
+- row: parallel
+  col: period
+  text: 10 週
