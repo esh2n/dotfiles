@@ -45,7 +45,7 @@ export async function renderPdf(htmlPath, pdfPath) {
   try {
     browser = await chromium.launch()
     const page = await browser.newPage()
-    await page.goto(`file://${resolve(htmlPath)}`, { waitUntil: 'load' })
+    await page.goto(pathToFileURL(resolve(htmlPath)).href, { waitUntil: 'load' })
     await page.waitForTimeout(500)
     await page.pdf({
       path: pdfPath,
