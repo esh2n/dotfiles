@@ -76,6 +76,8 @@ into `private`.
      hand-wrap a raw `<svg>`. Exit 2 = IR invalid, exit 3 = a failed
      geometry check; over-budget figures render with `data-warn`. Handling
      each, and the 3-attempt rule: `references/procedure.md`.
+   - A screenshot goes in `.wu-shot` with the file in `<slug>-assets/` next
+     to the page; never `<img>` elsewhere, never an external image URL.
 4. **Lint.** `node $KIT/bin/lint.mjs page.html --json`.
    `--surface-only` only for 作業メモ (contract Q33). `lint.mjs` finds
    `.writeup.toml` itself (ancestor search, then `$WRITEUP_STORE`).
@@ -131,6 +133,12 @@ loss where mermaid is richer), then continue at step 3. Mapping table:
 
 ## Publish
 
+The store page links `../_kit/writeup.css` (and, for a `.wu-shot`, its
+`<slug>-assets/` files) — both exist only inside the store, so a copy of
+the page handed anywhere else (the Artifact tool, Slack, email, a repo)
+renders unstyled and without pictures; the only HTML that ever leaves the
+store is `publish.mjs` / `pr-pack.mjs` output.
+
 `node $KIT/bin/publish.mjs page.html --to artifact|cloudflare|file …`.
 `--to artifact` writes `<store>/.publish/<slug>.artifact.html` — hand it to
 the Artifact tool (favicon `📄`; title from `<title>`), write the returned
@@ -155,6 +163,6 @@ external host involved. Walkthrough: `references/publish.md`.
 - Pasting a diagram whose `render-diagram.mjs --json` returned `ok: false` — only exit-0 renders belong on the page.
 - Forgetting to bump `<meta name="updated">` on a revision — the index sorts by `updated`, so a silent overwrite falls out of view.
 - Publishing before self-check passes on its own — publish re-runs it and refuses at exit 3, but that's a backstop, not your gate.
-- Handing a page's HTML to the Artifact tool (or any host) without going through `publish.mjs` — publish inlines the kit CSS, drops the back nav, screens private words, and re-runs build's rendering passes (viewport meta, `.wu-diffview` tables, code highlighting). A page shipped around it renders plain, un-highlighted, and zoomed-out on a phone.
+- Handing a page's HTML to the Artifact tool (or any host) without going through `publish.mjs` — the store file links `../_kit/writeup.css` and its `<slug>-assets/` images, which exist only inside the store, so a raw copy renders unstyled and with broken pictures; `publish` inlines the kit CSS and every `.wu-shot` image, drops the back nav, screens private words, and re-runs build's rendering passes (viewport meta, `.wu-diffview` tables, code highlighting) — the only HTML that should ever leave the store is its output.
 - Publishing a page that was never built and assuming it is finished — highlighting and diff tables are added by `build` (step 7), not by the author; publish re-applies them as a backstop, but the copy in the store stays unrendered until `build` runs.
 - Saving to whichever store `serve` last used — the store is decided per request ("Which store" above); `build`/`git` must target that same `$STORE`.

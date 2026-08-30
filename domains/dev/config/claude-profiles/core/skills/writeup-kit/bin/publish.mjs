@@ -4,14 +4,18 @@
 // (1) run build's rendering passes (viewport meta, `.wu-diffview` tables,
 // code highlighting — `ensureRendered`) so a page that skipped `build`, or a
 // kit reference page no store build scans, never ships unrendered, then
-// self-check must pass on that rendered text, (2) inline the kit CSS and adjust `.wu-header`'s
-// back-to-index nav for the target (dropped for file/artifact; rewritten to
-// `/index.html` or dropped for cloudflare — see `adjustBackNav`), (3) reject
-// on a company-trace word hit, (4) enforce the 16MB Artifact-tool size
-// ceiling. Then dispatch to one of 3 targets. The status favicon `<link
-// rel="icon">` (page-contract.md §1) is not touched by any of this — its
-// href is an inline `data:` URI already, so it carries through to every
-// target unchanged.
+// self-check must pass on that rendered text (it needs the page's own
+// `.wu-shot` asset files to exist on disk, which is still true at this
+// point — nothing has moved them yet), (2) inline the kit CSS, (3) inline
+// every `.wu-shot` image (a page-relative `<slug>-assets/*` file) as a
+// `data:` URI (`inlinePageAssets`) so the staged output stays one file for
+// every target, (4) adjust `.wu-header`'s back-to-index nav for the target
+// (dropped for file/artifact; rewritten to `/index.html` or dropped for
+// cloudflare — see `adjustBackNav`), (5) reject on a company-trace word
+// hit, (6) enforce the 16MB Artifact-tool size ceiling. Then dispatch to
+// one of 3 targets. The status favicon `<link rel="icon">` (page-
+// contract.md §1) is not touched by any of this — its href is an inline
+// `data:` URI already, so it carries through to every target unchanged.
 //
 // Exit codes: 0 success/dry-run, 2 usage error, 3 self-check failed,
 // 4 private-word hit, 5 cloudflare Access not verified, 6 size over 16MB,
@@ -52,6 +56,39 @@ export function inlineKitCss(html, storeDir) {
   const css = existsSync(cssPath) ? readFileSync(cssPath, 'utf8') : ''
   const style = `<style>\n${css}\n</style>`
   return html.slice(0, m.index) + style + html.slice(m.index + m[0].length)
+}
+
+const MIME_BY_EXT = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+}
+
+const IMG_SRC_RE = /(<img\b[^>]*\bsrc=")([^"]+)("[^>]*>)/g
+
+/** Replaces every page-relative `<img src>` (a `.wu-shot` asset file next
+ * to the page, under `<slug>-assets/`) with a `data:<mime>;base64,…` URI
+ * read from `pageDir`, so the staged output stays one self-contained file
+ * for every publish target — the same reason `inlineKitCss` inlines the
+ * stylesheet instead of leaving it as a link. A `data:` src (already
+ * inline) or an external one (`http(s):`, already rejected by self-check's
+ * `single-file`/`shot` rows before this ever runs) is left untouched;
+ * inlining is a plain text substitution, not an HTML re-serialization, for
+ * the same reason `inlineKitCss`'s regex swap is — the rest of the page's
+ * bytes (a figure's sha256'd SVG + IR pair) must not risk reformatting. */
+export function inlinePageAssets(html, pageDir) {
+  return html.replace(IMG_SRC_RE, (whole, pre, src, post) => {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('/')) return whole
+    const filePath = join(pageDir, src)
+    if (!existsSync(filePath)) return whole
+    const mime = MIME_BY_EXT[extname(filePath).slice(1).toLowerCase()]
+    if (!mime) return whole
+    const data = readFileSync(filePath).toString('base64')
+    return `${pre}data:${mime};base64,${data}${post}`
+  })
 }
 
 const NAV_BLOCK_RE = /\s*<nav\s+class="wu-nav"[^>]*>[\s\S]*?<\/nav>/
@@ -148,7 +185,9 @@ export function publish(pageFile, opts) {
 
   assertSelfCheckPasses(rendered, pageFile)
 
-  const staged = adjustBackNav(inlineKitCss(rendered, storeDir), to, storeDir)
+  const cssInlined = inlineKitCss(rendered, storeDir)
+  const assetsInlined = inlinePageAssets(cssInlined, dirname(pageFile))
+  const staged = adjustBackNav(assetsInlined, to, storeDir)
 
   const hits = findPrivateWordHits(staged, privateWords(storeDir))
   if (hits.length) {

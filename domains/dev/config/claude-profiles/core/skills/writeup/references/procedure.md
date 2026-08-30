@@ -213,6 +213,31 @@ with the same `--figure` / `--json` command and the same exit codes below.
 A before/after pair is the same type twice; `freeform` only when
 `--list-types` shows nothing covers the picture.
 
+### Pictures — screenshots and photos
+
+When the reader must see the actual rendering — a UI, a terminal, a
+physical thing — that is not a figure decision at all: use `.wu-shot`, not
+a `diagram` traced over a screenshot and not a screenshot of something a
+figure could draw instead (`writing.md` §4). Markup:
+
+```html
+<figure class="wu-shot">
+<img src="2026-08-28-example-assets/mobile-before.png" alt="再試行ダイアログを表示したアプリ画面" width="390" height="844">
+<figcaption>失敗時に表示される再試行ダイアログ</figcaption>
+</figure>
+```
+
+Save the image file into `<slug>-assets/` next to the page (`<slug>` = the
+page's own filename without `.html`) and reference it with a page-relative
+`src` — a `data:` URI also works, for a screenshot you have only as bytes.
+`alt` is required; self-check's `shot` row errors without it, on an
+external URL, on a page-relative `src` whose file does not exist, and on a
+second `<img>` in one figure (a before/after is two `.wu-shot` figures, the
+same as a before/after diagram is the same type twice). `publish.mjs` and
+`pr-pack.mjs` both inline the file as a `data:` URI when staging the page;
+`to-md.mjs` copies it into the figures directory instead. `components.md`
+has the full contract.
+
 ### `render-diagram.mjs` — observed behavior
 
 ```

@@ -159,17 +159,19 @@ rows (listed under `infos` in `--json`) are suggestions.
 
 | Item | What is checked | On failure |
 |---|---|---|
-| Single file; external references limited to `_kit/writeup.css`, Google Fonts, and a `rel="icon"` `data:` href | `href`/`src` of every `link`/`script`/`img` | error |
+| Single file; external references limited to `_kit/writeup.css`, Google Fonts, and a `rel="icon"` `data:` href | `href`/`src` of every `link`/`script`/`img` (an `<img src>` is allowed when it is page-relative or a `data:` URI — never `http(s):`) | error |
 | Required head meta (`title` / `description` / `kind` / `date`) | Present, and `kind` is one of the 8 values | error |
 | Kit stylesheet link (`kit-css`) | A `<link rel="stylesheet">` resolves to `_kit/writeup.css` at the page's depth (the bare `./writeup.css` is accepted only for the kit's own pages, which really do sit beside the file; a page with the CSS inlined in a `<style>` — a publish target — is exempt) | error |
 | Inline scripts | The only executable `<script>` a page may carry is `build`'s side-TOC scroll spy, byte-identical to `SIDETOC_SCRIPT` in `bin/build.mjs` and present at most once; a `<script type="text/x-writeup-diagram">` IR block is inert data, not a script | error |
 | `id` meta (optional) | If present, matches the computed value | warn |
 | `updated` meta format (optional) | `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM(+TZ\|Z)` | warn |
 | Chrome matches the template | `.wu-header` / `.wu-footer` structure is a copy of the template | error |
-| Role-tagged structure | Body elements are limited to h2-h4 / p / ul / ol / table / pre / figure / blockquote / dl and `.wu-*` classes | error |
+| Role-tagged structure | Body elements are limited to h2-h4 / p / ul / ol / table / pre / figure / blockquote / dl and `.wu-*` classes; `<img>` is allowed only inside `<figure class="wu-shot">` | error |
 | Kind's required sections | The section headings from the kind table (`kinds.md`) are present | warn |
 | Diagram pass marks | Every `.wu-figure` carries `data-checks="pass"` | error |
 | Diagram budget warnings | A `.wu-figure` carrying `data-warn` (rendered and passing, but over a budget — see below) is reported with the renderer's text, e.g. `budget:nodes=11` | warn |
+| Screenshot / photo (`shot`) | Every `.wu-shot` carries exactly one `<img>` with `alt`, whose `src` is page-relative (resolving under the page's own directory) or a `data:` URI; a page-relative `src` must exist on disk | error |
+| Screenshot / photo size (`shot`) | The summed size of every `.wu-shot` image (files + `data:` payloads) exceeds 8MB (the Artifact tool's ceiling is 16MB after CSS inlining) | warn |
 | SVG accessibility | Diagram pass criterion #14 (see below) | error |
 | Accent budget | At most one `.wu-accent` on the page | warn |
 | Emoji / arrow characters | None in body text or diagrams | warn |
@@ -271,6 +273,7 @@ deterministic. Any element not in this table makes self-check emit a warn.
 | `.wu-compare` / `.wu-table` | GFM table |
 | `.wu-steps` | Numbered list |
 | `.wu-figure` | `![caption](diagram SVG file)` plus an optional ```` ```mermaid ```` block generated from the IR (a degraded rendering) |
+| `.wu-shot` | `![alt](screenshot file)` (or `#` with no figures dir) using the `<img>`'s own `alt`, then the `<figcaption>` as a line below it |
 | `.wu-sidetoc` (generated) | Dropped — a Markdown reader gets its outline from the headings |
 | `.wu-quote` | A fenced code block holding the original, translation, and source |
 | `.wu-code` / `.wu-diff` | ```` ```lang ```` / ```` ```diff ```` |
@@ -282,6 +285,12 @@ deterministic. Any element not in this table makes self-check emit a warn.
 
 ## 6. Publish
 
+The store page itself links `../_kit/writeup.css` and, for a `.wu-shot`,
+its `<slug>-assets/` files — both of which exist only inside the store, so
+a copy of the page handed anywhere else renders unstyled and without
+pictures; the only HTML that ever leaves the store is `publish.mjs` /
+`pr-pack.mjs` output.
+
 ```
 writeup publish <page> --to artifact | cloudflare | file [--out <path>]
 ```
@@ -290,8 +299,9 @@ writeup publish <page> --to artifact | cloudflare | file [--out <path>]
 
 1. self-check passes
 2. Kit CSS is inlined; the Google Fonts `<link>` is left in place
-3. A check for company traces
-4. File size ≤ 16MB
+3. Every `.wu-shot` image is inlined as a `data:` URI (`inlinePageAssets`)
+4. A check for company traces
+5. File size ≤ 16MB
 
 **Company-trace check**: rejects the publish if the page body or meta
 contains any word from the store's own `.writeup.toml` `[private]` list

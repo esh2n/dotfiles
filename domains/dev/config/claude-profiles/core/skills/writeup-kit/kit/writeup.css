@@ -988,7 +988,8 @@ hr {
   fill: var(--wu-fig-tone-neutral);
 }
 
-.wu-figure figcaption {
+.wu-figure figcaption,
+.wu-shot figcaption {
   margin-top: var(--wu-sp-3);
   font-size: var(--wu-fs-2);
   color: var(--wu-ink-2);
@@ -1004,6 +1005,29 @@ hr {
 .wu-figure polygon.wu-focal,
 .wu-figure path.wu-focal {
   stroke: var(--wu-accent);
+}
+
+/* ---------------------------------------------------------------
+   .wu-shot — screenshot / photo frame: img + figcaption
+   Same frame as .wu-figure (margin/padding/border/surface); unlike a
+   rendered diagram svg, a screenshot has no intrinsic column width to
+   preserve, so it simply scales down to fit — no bleed, no scroll
+   fallback, no tone/focal styling.
+--------------------------------------------------------------- */
+.wu-shot {
+  margin: var(--wu-sp-5) 0;
+  padding: var(--wu-sp-4);
+  overflow-x: auto;
+  border: var(--wu-bw-1) solid var(--wu-rule);
+  border-radius: 0;
+  background: var(--wu-surface);
+}
+
+.wu-shot img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
 }
 
 /* ---------------------------------------------------------------
@@ -1574,6 +1598,7 @@ hr {
   }
 
   .wu-figure,
+  .wu-shot,
   .wu-compare,
   .wu-table,
   .wu-decision {
@@ -1664,6 +1689,7 @@ hr {
   .wu-quote,
   .wu-open,
   .wu-figure,
+  .wu-shot,
   .wu-chip li,
   .wu-table th,
   .wu-table td {

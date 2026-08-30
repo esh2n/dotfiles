@@ -4,7 +4,7 @@
 // guess. Anything outside the mapping becomes an HTML comment placeholder
 // plus a stderr warning, rather than being silently dropped.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { basename, dirname, extname, join } from 'node:path'
 import {
@@ -124,6 +124,68 @@ function renderFigure(fig, ctx) {
     out.push(`![${caption}](#)`)
   }
   return out.join('\n')
+}
+
+const SHOT_EXT_BY_MIME = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/svg+xml': 'svg',
+}
+
+/** Decodes a `.wu-shot` `data:` `src` into its raw bytes plus a file
+ * extension guessed from its MIME type (`bin` for anything unrecognized —
+ * still a usable, if oddly-named, file). */
+function decodeShotDataUri(url) {
+  const m = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(url)
+  if (!m) return { ext: 'bin', buffer: Buffer.from(url, 'utf8') }
+  const [, mime, isBase64, payload] = m
+  const buffer = isBase64 ? Buffer.from(payload, 'base64') : Buffer.from(decodeURIComponent(payload), 'utf8')
+  return { ext: SHOT_EXT_BY_MIME[mime] || 'bin', buffer }
+}
+
+/** `.wu-shot` — a screenshot or photo (evidence, not a mechanism —
+ * writing.md §4), one `<img>` plus an optional `<figcaption>`. The image
+ * becomes a Markdown image using the `<img>`'s own `alt` (falling back to
+ * the caption when `alt` is empty), and the caption — a separate piece of
+ * text from `alt` — follows as its own line, the same "block, then a
+ * caption line below it" shape `renderDiffView` uses for its fence. With a
+ * figures directory available the file is materialized there: a
+ * page-relative `src` is copied from `ctx.pageDir` under its own basename
+ * (so `figures/shot-sample.png` is the same name the author saved), a
+ * `data:` `src` is decoded to `<slug>-shot<N>.<ext>`. Without a figures
+ * directory it degrades to the same `![alt](#)` placeholder `.wu-figure`
+ * uses when it has no svg to write out. */
+function renderShot(fig, ctx) {
+  const img = findFirst(fig, (n) => tagName(n) === 'img')
+  const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
+  const caption = cap ? inlineText(cap) : ''
+  if (!img) return caption
+  const alt = attr(img, 'alt') || caption
+  const src = attr(img, 'src') || ''
+  const out = []
+
+  if (ctx.figuresDir) {
+    ctx.figureIndex += 1
+    mkdirSync(ctx.figuresDir, { recursive: true })
+    let fileName
+    if (src.startsWith('data:')) {
+      const { ext, buffer } = decodeShotDataUri(src)
+      fileName = `${ctx.slug}-shot${ctx.figureIndex}.${ext}`
+      writeFileSync(join(ctx.figuresDir, fileName), buffer)
+    } else {
+      const srcPath = ctx.pageDir ? join(ctx.pageDir, src) : src
+      fileName = basename(srcPath)
+      copyFileSync(srcPath, join(ctx.figuresDir, fileName))
+    }
+    const relPath = ctx.figuresDirRel ? `${ctx.figuresDirRel}/${fileName}` : fileName
+    out.push(`![${alt}](${relPath})`)
+  } else {
+    out.push(`![${alt}](#)`)
+  }
+  if (caption) out.push(caption)
+  return out.join('\n\n')
 }
 
 /** `.wu-diffview` — the rendered `.wu-dv` tables are a presentation of one
@@ -295,6 +357,7 @@ function renderBlock(node, out, ctx) {
   if (tag === 'ol' && hasClass(node, 'wu-steps')) return void out.push(renderSteps(node))
   if (hasClass(node, 'wu-diffview')) return void out.push(renderDiffView(node))
   if (hasClass(node, 'wu-figure')) return void out.push(renderFigure(node, ctx))
+  if (hasClass(node, 'wu-shot')) return void out.push(renderShot(node, ctx))
   if (hasClass(node, 'wu-quote')) return void out.push(renderQuote(node))
   if (hasClass(node, 'wu-code')) return void out.push(renderCode(node, attr(node, 'data-lang') || ''))
   if (hasClass(node, 'wu-diff')) return void out.push(renderCode(node, 'diff'))
@@ -357,7 +420,11 @@ function renderFrontmatter(meta, title) {
 
 /**
  * @param {string} html
- * @param {{ slug: string, figuresDir?: string, figuresDirRel?: string }} opts
+ * @param {{ slug: string, figuresDir?: string, figuresDirRel?: string, pageDir?: string }} opts
+ *   `pageDir` — the page's own directory, needed only to copy a
+ *   `.wu-shot`'s page-relative image file (`renderShot`); a `.wu-figure`'s
+ *   svg needs no such lookup, since it is serialized straight out of the
+ *   parsed HTML.
  */
 export function convertToMarkdown(html, opts) {
   footnoteCounter = 0
@@ -376,6 +443,7 @@ export function convertToMarkdown(html, opts) {
     slug: opts.slug,
     figuresDir: opts.figuresDir,
     figuresDirRel: opts.figuresDirRel,
+    pageDir: opts.pageDir,
     figureIndex: 0,
   }
   if (main) {
@@ -421,7 +489,7 @@ function main() {
   const slug = basename(args.file, extname(args.file))
   const outPath = args.out || join(dirname(args.file), `${slug}.md`)
   const figuresDir = args.figuresDir || join(dirname(outPath), `${slug}-figures`)
-  const md = convertToMarkdown(html, { slug, figuresDir, figuresDirRel: `${slug}-figures` })
+  const md = convertToMarkdown(html, { slug, figuresDir, figuresDirRel: `${slug}-figures`, pageDir: dirname(args.file) })
   writeFileSync(outPath, md)
   console.log(`to-md: wrote ${outPath}`)
   return 0
