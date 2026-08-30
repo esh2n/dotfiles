@@ -152,8 +152,9 @@ hosted URL. `--out` is required; omitting it is a usage error (exit 2).
 
 A GitHub pull request is not a hosted URL and there is no external host to
 hand a file to — but there is also no reason to write into the repository
-either: `gh` (the next release after 2.98.0, or trunk today — GHES is not
-supported) can attach files straight to a PR body or comment with `--attach
+either: `gh` with `--attach` (merged to cli/cli trunk on 2026-08-25, in no
+release yet; the dotfiles nix overlay pins `gh` to a trunk commit so every
+machine has it — GHES is not supported) can attach files straight to a PR body or comment with `--attach
 <file>`, uploading each to GitHub's own attachment store and rewriting any
 `![alt](figures/x.svg)` reference in the uploaded Markdown to the uploaded
 URL. `--to github` writes exactly the folder that flow needs — Markdown
