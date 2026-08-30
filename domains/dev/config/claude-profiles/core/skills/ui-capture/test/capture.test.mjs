@@ -347,6 +347,101 @@ describe("ui-capture bin/capture.mjs", () => {
     fs.rmSync(manifestOut, { recursive: true, force: true });
   });
 
+  // findManifest はリポジトリ境界(.git を含むディレクトリ)で探索を止める
+  // — .git のあるディレクトリ自身は調べるが、それより上(別リポジトリ)へは
+  // 辿らない。--dry-run は playwright を呼ぶ前に return するので、この2件は
+  // playwright の可否に関係なく走らせる。
+  test("findManifest finds a manifest at a .git boundary directory", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-gitroot-"));
+    fs.mkdirSync(path.join(root, ".git"));
+    fs.writeFileSync(
+      path.join(root, ".ui-capture.json"),
+      JSON.stringify({ launch: "true", url: "http://example.invalid", ready: "x" }),
+    );
+    const startDir = path.join(root, "a", "b");
+    fs.mkdirSync(startDir, { recursive: true });
+    const scenarioPath = path.join(root, "scenario.json");
+    fs.writeFileSync(scenarioPath, JSON.stringify({ steps: [] }));
+
+    const result = await runCapture([
+      "--project",
+      startDir,
+      "--scenario",
+      scenarioPath,
+      "--out",
+      path.join(root, "out"),
+      "--dry-run",
+    ]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const summary = JSON.parse(result.stdout);
+    assert.equal(summary.manifest, path.join(root, ".ui-capture.json"));
+
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  test("findManifest does not cross a .git boundary to a manifest above it", async () => {
+    const outer = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-gitouter-"));
+    fs.writeFileSync(
+      path.join(outer, ".ui-capture.json"),
+      JSON.stringify({ launch: "true", url: "http://example.invalid", ready: "x" }),
+    );
+    const repoDir = path.join(outer, "repo");
+    fs.mkdirSync(path.join(repoDir, ".git"), { recursive: true });
+    const startDir = path.join(repoDir, "x");
+    fs.mkdirSync(startDir, { recursive: true });
+    const scenarioPath = path.join(outer, "scenario.json");
+    fs.writeFileSync(scenarioPath, JSON.stringify({ steps: [] }));
+
+    const result = await runCapture([
+      "--project",
+      startDir,
+      "--scenario",
+      scenarioPath,
+      "--out",
+      path.join(outer, "out"),
+      "--dry-run",
+    ]);
+    assert.equal(result.status, 2, result.stdout + result.stderr);
+    assert.match(result.stderr, /起動手段なし/);
+
+    fs.rmSync(outer, { recursive: true, force: true });
+  });
+
+  test("--timeout applies to waitFor and fails fast with the step index", async (t) => {
+    if (!resolvable) {
+      t.skip("playwright not resolvable");
+      return;
+    }
+    const timeoutOut = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-timeout-"));
+    const scenarioPath = path.join(timeoutOut, "timeout.json");
+    fs.writeFileSync(
+      scenarioPath,
+      JSON.stringify({ steps: [{ goto: "/" }, { waitFor: "#never-appears" }] }),
+    );
+    const startedAt = Date.now();
+    const result = await runCapture([
+      "--url",
+      site.url,
+      "--scenario",
+      scenarioPath,
+      "--out",
+      timeoutOut,
+      // 1ms だと同じ既定タイムアウトを使う goto すら間に合わないことがある
+      // (127.0.0.1 相手でも初回ナビゲーションはブラウザの初期化コストを
+      // 引きずる)。goto は十分間に合うが waitFor の欠けたセレクタ待ちは
+      // 確実に超える程度の値にして、失敗するのが step 1 であることを固定する。
+      "--timeout",
+      "300",
+    ]);
+    const elapsedMs = Date.now() - startedAt;
+    assert.equal(result.status, 4, result.stdout + result.stderr);
+    assert.match(result.stderr, /step 1/);
+    // 既定の5000msどころか、playwrightの既定30sより遥かに早く落ちることを
+    // 確かめる(プロセス起動オーバーヘッドの余裕を見て3秒以内)。
+    assert.ok(elapsedMs < 3000, `expected fast failure, took ${elapsedMs}ms`);
+    fs.rmSync(timeoutOut, { recursive: true, force: true });
+  });
+
   test("no --url and no .ui-capture.json exits 2 with a clear message", async (t) => {
     if (!resolvable) {
       t.skip("playwright not resolvable");

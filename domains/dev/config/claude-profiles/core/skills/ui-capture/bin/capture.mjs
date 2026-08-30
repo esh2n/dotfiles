@@ -30,6 +30,7 @@ function parseArgs(argv) {
     theme: null,
     dryRun: false,
     keepVideo: false,
+    timeout: 5000,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -73,6 +74,9 @@ function parseArgs(argv) {
         break;
       case "--keep-video":
         args.keepVideo = true;
+        break;
+      case "--timeout":
+        args.timeout = Number(next());
         break;
       default:
         throw new UsageError(`unknown flag: ${flag}`);
@@ -185,12 +189,16 @@ function sleep(ms) {
 }
 
 // startDir から上へ辿って最初に見つかった .ui-capture.json のパスを返す。
-// 見つからなければ null(filesystem root まで探して諦める)。
+// リポジトリ境界(.git を含むディレクトリ)より上へは辿らない — 別
+// リポジトリのマニフェストを誤って拾わないため。.git のあるディレクトリ
+// 自身は最後にもう一度だけ調べてから探索を止める。.git に一度も出会わ
+// なければ、従来どおり filesystem root まで辿って諦める。
 function findManifest(startDir) {
   let dir = path.resolve(startDir);
   for (;;) {
     const candidate = path.join(dir, MANIFEST_NAME);
     if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(path.join(dir, ".git"))) return null;
     const parent = path.dirname(dir);
     if (parent === dir) return null;
     dir = parent;
@@ -508,7 +516,9 @@ async function main() {
     // NOTE: セレクタが存在しない失敗ステップを Playwright の既定 30s より
     // 早く exit 4 にするため、既定タイムアウトを短くしておく(scenario.json
     // の "wait" ステップはこれとは別の明示待ちなので影響を受けない)。
-    page.setDefaultTimeout(5000);
+    // --timeout で上書き可能(goto や waitFor など timeout を明示しない
+    // 呼び出しはすべてこの既定値に従う — Playwright の仕様)。
+    page.setDefaultTimeout(args.timeout);
 
     const files = [];
     const startedAt = Date.now();

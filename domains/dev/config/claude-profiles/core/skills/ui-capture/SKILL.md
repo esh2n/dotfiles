@@ -90,8 +90,11 @@ node "$SELF/bin/capture.mjs" --project . --scenario scenario.json --out ./out
 主なフラグ(すべて省略可、既定値は括弧内): `--project`(`.ui-capture.json`
 を探し始めるディレクトリ。既定は cwd)、`--width`(1280)、`--height`(800)、
 `--scale`(2、`deviceScaleFactor`)、`--gif-fps`(10)、`--gif-width`(800)、
-`--theme light|dark`(`prefers-color-scheme` をエミュレート)、`--dry-run`
-(何も実行・書き出しせず、シナリオの妥当性とステップ数だけ確認する)。
+`--theme light|dark`(`prefers-color-scheme` をエミュレート)、`--timeout`
+(5000、ms。`page.setDefaultTimeout()` に渡す既定タイムアウト — セレクタ
+待ち・クリック・`goto` など timeout を明示しないステップ全般に効く)、
+`--dry-run`(何も実行・書き出しせず、シナリオの妥当性とステップ数だけ
+確認する)。
 
 標準出力に JSON 要約(撮ったファイル・バイト数・GIF の長さ・
 `launched`(マニフェストから自分で起動したか)・8MB/8s 予算超過の
@@ -160,6 +163,10 @@ fps 10・width 800・目安 8 秒以内にしてある。長いフローは複�
 
 プロジェクトのルートに1つ置く。capture.mjs は `--project`(既定 cwd)から
 上へディレクトリを辿り、最初に見つかった `.ui-capture.json` を使う。
+探索は `.git`(ファイルでもディレクトリでも可)のあるディレクトリで止まる
+— そのディレクトリ自身は調べるが、それより上(別リポジトリ)へは辿らない。
+`.git` に一度も出会わなければ、従来どおり filesystem root まで辿って
+諦める。
 
 ```json
 {
