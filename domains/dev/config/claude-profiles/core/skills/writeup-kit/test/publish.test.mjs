@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { publish, inlineKitCss, adjustBackNav, findPrivateWordHits, assertSize, inlinePageAssets, PublishError } from '../bin/publish.mjs'
+import { publish, inlineKitCss, adjustBackNav, findPrivateWordHits, assertSize, inlinePageAssets, toArtifactFragment, PublishError } from '../bin/publish.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
 import { buildStore } from '../bin/build.mjs'
 import { makeTinyPng } from './helpers/tiny-png.mjs'
@@ -512,5 +512,110 @@ describe('inlinePageAssets(): .wu-shot image inlining', () => {
     const staged = readFileSync(outFile, 'utf8')
     assert.match(staged, /<img src="data:image\/png;base64,/)
     assert.ok(!staged.includes('src="2026-08-01-example-decision-assets'))
+  })
+})
+
+describe('toArtifactFragment(): the Artifact tool\'s fragment contract', () => {
+  const HEAD =
+    '<meta charset="UTF-8">\n' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+    '<title>t</title>\n' +
+    '<meta name="description" content="d">\n' +
+    '<style>.x{color:red}</style>\n'
+
+  const page = (bodyInner) => `<!DOCTYPE html><html lang="ja"><head>\n${HEAD}</head>\n<body>\n${bodyInner}\n</body></html>`
+
+  test('starts with <title>', () => {
+    const frag = toArtifactFragment(page('<main><section class="wu-section">x</section></main>'))
+    assert.match(frag, /^<title>t<\/title>/)
+  })
+
+  test('contains exactly one <style>', () => {
+    const frag = toArtifactFragment(page('<main></main>'))
+    assert.equal((frag.match(/<style>/g) || []).length, 1)
+  })
+
+  test('strips the whole skeleton: no DOCTYPE/html/head/body tags, no charset/viewport metas, no HTML comments', () => {
+    const frag = toArtifactFragment(page('<main><!-- a comment --><section class="wu-section">x</section></main>'))
+    assert.ok(!frag.includes('<!DOCTYPE'), frag)
+    assert.ok(!frag.includes('<html'), frag)
+    assert.ok(!frag.includes('<head>'), frag)
+    assert.ok(!frag.includes('<body'), frag)
+    assert.ok(!frag.includes('<meta charset'), frag)
+    assert.ok(!frag.includes('<meta name="viewport"'), frag)
+    assert.ok(!frag.includes('<!--'), frag)
+  })
+
+  test('a sidetoc <script> sitting right before </body> survives', () => {
+    const frag = toArtifactFragment(page(
+      '<main><section class="wu-section">x</section></main>\n<script>window.wuSideToc = 1</script>',
+    ))
+    assert.match(frag, /<script>window\.wuSideToc = 1<\/script>/)
+  })
+
+  test('throws PublishError(2) when no <head>…</head>/<body>…</body> skeleton can be found', () => {
+    assert.throws(
+      () => toArtifactFragment('<div>not a full document, no skeleton at all</div>'),
+      (e) => e instanceof PublishError && e.code === 2,
+    )
+  })
+
+  test('a page whose own comments literally quote </body> and </head> (mirrors kit/template.html) still yields the full body', () => {
+    const templatePath = join(ROOT, 'kit', 'template.html')
+    const template = readFileSync(templatePath, 'utf8')
+    // template.html's sidetoc comment already quotes </body> literally
+    // (right after <main>, well before the real closing tags) — extend it
+    // to also quote </head>, so the fixture exercises both hazards this
+    // fix guards against in the same comment.
+    const mirrored = template.replace(
+      'pinned script before </body>) once the page has three or more h2,',
+      'pinned script before </body>, mirroring the shape of </head>) once the page has three or more h2,',
+    )
+    assert.notEqual(mirrored, template, 'fixture setup: the sidetoc comment text must still match')
+    assert.match(mirrored, /<!--[\s\S]*<\/body>[\s\S]*<\/head>[\s\S]*-->/, 'fixture setup: both strings must land inside the same comment')
+
+    const srcSectionCount = (template.match(/<section class="wu-section"/g) || []).length
+    assert.ok(srcSectionCount > 0, 'fixture setup: template.html should carry example sections')
+
+    const frag = toArtifactFragment(mirrored)
+    const fragSectionCount = (frag.match(/<section class="wu-section"/g) || []).length
+    assert.equal(fragSectionCount, srcSectionCount)
+    assert.ok(!frag.includes('<!--'), frag)
+  })
+})
+
+describe('publish(): --to artifact is a fragment, --to file is still a full document', () => {
+  test('--to artifact output has no DOCTYPE/html/head/body wrapper', () => {
+    const store = freshStore()
+    const result = publish(join(store, DECISION_REL), { to: 'artifact', store })
+    const artifactHtml = readFileSync(result.output, 'utf8')
+    assert.ok(!artifactHtml.includes('<!DOCTYPE'), artifactHtml)
+    assert.ok(!artifactHtml.includes('<html'), artifactHtml)
+    assert.ok(!artifactHtml.includes('<head>'), artifactHtml)
+    assert.ok(!artifactHtml.includes('<body'), artifactHtml)
+    assert.match(artifactHtml, /^<title>/)
+  })
+
+  test('--to file output is still a full standalone document', () => {
+    const store = freshStore()
+    const outFile = join(store, 'out-full-doc.html')
+    publish(join(store, DECISION_REL), { to: 'file', out: outFile, store })
+    const fileHtml = readFileSync(outFile, 'utf8')
+    assert.match(fileHtml, /^<!DOCTYPE html>/)
+    assert.match(fileHtml, /<html[^>]*>/)
+    assert.match(fileHtml, /<head>/)
+    assert.match(fileHtml, /<body>/)
+  })
+
+  test('--dry-run for --to artifact reports the output will be a fragment', () => {
+    const store = freshStore()
+    const result = publish(join(store, DECISION_REL), { to: 'artifact', store, dryRun: true })
+    assert.equal(result.fragment, true)
+  })
+
+  test('--dry-run for --to file does not claim a fragment', () => {
+    const store = freshStore()
+    const result = publish(join(store, DECISION_REL), { to: 'file', out: join(store, 'x.html'), store, dryRun: true })
+    assert.ok(!result.fragment)
   })
 })

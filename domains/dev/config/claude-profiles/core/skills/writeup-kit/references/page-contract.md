@@ -313,7 +313,7 @@ never shipped inside the kit.
 
 | Target | Behavior |
 |---|---|
-| `artifact` | Hands the single file to the Artifact tool. The returned URL is written back into `<meta name="published-artifact">` and committed. |
+| `artifact` | Writes `<store>/.publish/<slug>.artifact.html` as a **fragment**, not a full document — `toArtifactFragment` strips `<!DOCTYPE>`/`<html>`/`<head>`/`<body>` and the charset/viewport `<meta>`s (the Artifact tool supplies its own skeleton and those two metas), keeping `<title>` first, per the tool's own contract. Hand the file to the Artifact tool as-is; the returned URL is written back into `<meta name="published-artifact">` on the source page and committed. |
 | `cloudflare` | Places the file at `store/public/<same relative path>`, then runs `wrangler pages deploy` against `public/` only. Rejected if Cloudflare Access is not enabled. `noindex` is verified before deploy. |
 | `file` | Writes the single file to `--out` (for a Slack attachment or email). |
 

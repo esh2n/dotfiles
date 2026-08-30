@@ -39,7 +39,7 @@ without writing or deploying anything.
 | Code | Meaning |
 |---|---|
 | 0 | Success (or a completed `--dry-run` report) |
-| 2 | Usage error — missing `<page.html>` or `--to`, or an unknown `--to` value |
+| 2 | Usage error — missing `<page.html>` or `--to`, an unknown `--to` value, or (`--to artifact` only) the page's `<head>…</head>`/`<body>…</body>` skeleton could not be located to build the Artifact fragment — a bug, not an authoring mistake; every self-check-passing page has both |
 | 3 | self-check failed; publish refused |
 | 4 | A private word was found on the page; publish refused |
 | 5 | `--to cloudflare` and Cloudflare Access is not verified |
@@ -83,8 +83,15 @@ $ node $KIT/bin/publish.mjs page.html --to artifact
 publish: wrote /path/to/store/.publish/2026-08-14-example.artifact.html
 ```
 
-The CLI's job stops at writing that single self-contained HTML file —
-publish.mjs never calls the Artifact tool itself. After it returns:
+The CLI's job stops at writing that file — publish.mjs never calls the
+Artifact tool itself. **The `.artifact.html` file is a fragment shaped for
+the Artifact tool, not a full document**: `toArtifactFragment` strips
+`<!DOCTYPE>`/`<html>`/`<head>`/`<body>` and the charset/viewport `<meta>`s
+before writing it, because the Artifact tool wraps whatever it's given in
+its own `<!doctype html>…<head>…</head><body>` skeleton (plus those two
+metas) — handing it a full document would double them up. Hand the file
+over exactly as written; do not strip anything from it yourself. After
+`publish.mjs` returns:
 
 1. Read the written `.publish/<slug>.artifact.html` file.
 2. Call the Artifact tool with that file as `file_path`, `favicon: "📄"`
