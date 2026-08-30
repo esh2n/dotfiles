@@ -30,6 +30,7 @@ import { runSelfCheckText } from './self-check.mjs'
 import { ensureRendered } from './build.mjs'
 import { resolveStoreDir, privateWords, cloudflareConfig } from './lib/store.mjs'
 import { parseHtml, headMeta, titleText, textContent, findFirst, tagName } from './lib/html.mjs'
+import { resolvePageAsset } from './lib/assets.mjs'
 
 const MAX_BYTES = 16 * 1024 * 1024
 
@@ -128,18 +129,23 @@ const IMG_SRC_RE = /(<img\b[^>]*\bsrc=")([^"]+)("[^>]*>)/g
  * for every publish target — the same reason `inlineKitCss` inlines the
  * stylesheet instead of leaving it as a link. A `data:` src (already
  * inline) or an external one (`http(s):`, already rejected by self-check's
- * `single-file`/`shot` rows before this ever runs) is left untouched;
- * inlining is a plain text substitution, not an HTML re-serialization, for
- * the same reason `inlineKitCss`'s regex swap is — the rest of the page's
- * bytes (a figure's sha256'd SVG + IR pair) must not risk reformatting. */
+ * `single-file`/`shot` rows before this ever runs) is left untouched, and
+ * so is a `src` that fails `resolvePageAsset`'s containment guard (path
+ * traversal, a symlink escaping `pageDir`, or a disallowed extension) — by
+ * the time publish runs, self-check has already refused a page whose shot
+ * escapes its own directory, so this is a defensive no-op, not the gate
+ * itself: the untouched page-relative src just ships as-is rather than
+ * risking pulling an out-of-tree file into the inlined output. Inlining is
+ * a plain text substitution, not an HTML re-serialization, for the same
+ * reason `inlineKitCss`'s regex swap is — the rest of the page's bytes (a
+ * figure's sha256'd SVG + IR pair) must not risk reformatting. */
 export function inlinePageAssets(html, pageDir) {
   return html.replace(IMG_SRC_RE, (whole, pre, src, post) => {
-    if (/^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('/')) return whole
-    const filePath = join(pageDir, src)
-    if (!existsSync(filePath)) return whole
-    const mime = MIME_BY_EXT[extname(filePath).slice(1).toLowerCase()]
+    const resolved = resolvePageAsset(pageDir, src)
+    if (!resolved || !existsSync(resolved)) return whole
+    const mime = MIME_BY_EXT[extname(resolved).slice(1).toLowerCase()]
     if (!mime) return whole
-    const data = readFileSync(filePath).toString('base64')
+    const data = readFileSync(resolved).toString('base64')
     return `${pre}data:${mime};base64,${data}${post}`
   })
 }

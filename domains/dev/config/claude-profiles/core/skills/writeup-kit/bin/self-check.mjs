@@ -12,13 +12,14 @@
 
 import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import {
   parseHtml, findAll, findFirst, isElement, tagName, attr, classList, hasClass,
   elementChildren, textContent, headMeta, titleText, externalRefs,
   structuralSignature, signaturesEqual,
 } from './lib/html.mjs'
 import { discoverStoreRoot, pageId } from './lib/store.mjs'
+import { resolvePageAsset } from './lib/assets.mjs'
 import { SIDETOC_SCRIPT } from './build.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -96,7 +97,7 @@ const HINTS = {
     if (/has no <img>/.test(detail)) return 'add the <img> — components.md .wu-shot'
     if (/has \d+ <img> elements/.test(detail)) return 'one picture per figure — split a before/after into two .wu-shot figures'
     if (/is not page-relative or a data: URI/.test(detail)) return 'move the file into <slug>-assets/ next to the page, or inline it as a data: URI'
-    if (/escapes the page.s own directory/.test(detail)) return 'keep the file under the page\'s own directory, never above <slug>-assets/'
+    if (/escapes the page.s own directory/.test(detail)) return 'keep the file (and, if it\'s a symlink, its real target) under the page\'s own directory, never above <slug>-assets/'
     if (/image file does not exist/.test(detail)) return 'save the file into <slug>-assets/ next to the page, at that exact path'
     if (/images total/.test(detail)) return 'compress the screenshot(s) or crop to the relevant area'
     return 'see components.md .wu-shot'
@@ -275,8 +276,9 @@ function isAllowedExternal(url) {
 /** No scheme (so not `data:`, `http:`, `https:`, …) and no leading `/` —
  * the shape a `.wu-shot` `src` must have to be "next to the page" rather
  * than a fetch to an external host. Escaping above the page's own
- * directory via `../` is checked separately, where a page path is
- * available (`resolveShotAsset`, `checkShot`). */
+ * directory via `../` (or a symlink pointing outside it) is checked
+ * separately, where a page path is available (`resolvePageAsset`,
+ * `checkShot`). */
 function isPageRelativeUrl(url) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false
   if (url.startsWith('/')) return false
@@ -523,17 +525,6 @@ function checkFigures(root, add) {
 
 const SHOT_TOTAL_WARN_BYTES = 8 * 1024 * 1024
 
-/** Resolves a `.wu-shot` `src` against the page's own directory, rejecting
- * anything that would escape it via `../` — the contract keeps asset files
- * inside `<slug>-assets/`, next to the page, never above it. Returns the
- * resolved absolute path, or `null` when it escapes. */
-function resolveShotAsset(src, pageDir) {
-  const resolved = resolve(pageDir, src)
-  const rel = relative(pageDir, resolved)
-  if (rel !== '' && (rel.startsWith('..') || isAbsolute(rel))) return null
-  return resolved
-}
-
 /** The byte size a `data:` URI's payload decodes to — base64 decoded when
  * the URI says so, percent-decoded otherwise — used only for the 8MB
  * budget warning, so an approximation on a malformed URI is fine. */
@@ -584,7 +575,7 @@ function checkShot(root, filePath, add) {
         add('error', 'shot', `.wu-shot ${label}: <img src> is not page-relative or a data: URI: ${src}`)
         continue
       }
-      const resolved = resolveShotAsset(src, pageDir)
+      const resolved = resolvePageAsset(pageDir, src)
       if (!resolved) {
         add('error', 'shot', `.wu-shot ${label}: <img src> escapes the page's own directory: ${src}`)
         continue

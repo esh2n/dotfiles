@@ -152,12 +152,13 @@ describe('prPack(): .wu-shot images', () => {
     return pagePath
   }
 
-  test('the asset file is copied into <out>/figures/<basename>, unrenamed', async () => {
+  test('the asset file is copied into <out>/figures/ as <slug>-shot<N>-<basename>, not its own bare basename (collision-proof)', async () => {
     const store = freshStore()
     const pagePath = addShot(store)
     const out = freshOut()
     await prPack(pagePath, { out, store })
-    assert.ok(existsSync(join(out, 'figures', 'shot.png')))
+    assert.ok(existsSync(join(out, 'figures', '2026-08-05-example-design-shot2-shot.png')))
+    assert.ok(!existsSync(join(out, 'figures', 'shot.png')))
   })
 
   test('the Markdown links it under figures/ using the <img>\'s own alt text, with the caption below', async () => {
@@ -166,7 +167,7 @@ describe('prPack(): .wu-shot images', () => {
     const out = freshOut()
     await prPack(pagePath, { out, store })
     const md = readFileSync(join(out, '2026-08-05-example-design.md'), 'utf8')
-    assert.match(md, /!\[実機の画面\]\(figures\/shot\.png\)/)
+    assert.match(md, /!\[実機の画面\]\(figures\/2026-08-05-example-design-shot2-shot\.png\)/)
     assert.match(md, /実機の見え方/)
   })
 
@@ -180,14 +181,101 @@ describe('prPack(): .wu-shot images', () => {
     assert.ok(!html.includes('src="2026-08-05-example-design-assets'))
   })
 
-  test('--body-out rewrites the figures/shot.png reference to a SHA-pinned blob URL', async () => {
+  test('--body-out rewrites the figures/<slug>-shot<N>-shot.png reference to a SHA-pinned blob URL', async () => {
     const store = freshStore()
     const pagePath = addShot(store)
     const out = freshOut()
     const bodyOut = join(out, 'body.md')
     await prPack(pagePath, { out, store, repo: 'o/r', sha: 'abc123', path: 'docs/x', bodyOut })
     const body = readFileSync(bodyOut, 'utf8')
-    assert.match(body, /https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/figures\/shot\.png\?raw=true/)
+    assert.match(body, /https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/figures\/2026-08-05-example-design-shot2-shot\.png\?raw=true/)
+  })
+})
+
+describe('prPack(): existingSlug() — reusing a pack with no <page.html>', () => {
+  test('an --out with no .md file throws PrPackError(2)', async () => {
+    const out = freshOut()
+    await assert.rejects(
+      () => prPack(null, { out, repo: 'o/r', sha: 'abc123', path: 'docs/x', bodyOut: join(out, 'body.md') }),
+      (e) => e instanceof PrPackError && e.code === 2 && /found 0/.test(e.message),
+    )
+  })
+
+  test('an --out with two or more .md files throws PrPackError(2)', async () => {
+    const store = freshStore()
+    const out = freshOut()
+    await prPack(join(store, DESIGN_REL), { out, store })
+    // A second, unrelated .md file dropped into the same pack directory —
+    // existingSlug() can no longer tell which one is the pack's own.
+    writeFileSync(join(out, 'stray.md'), '# stray\n')
+    await assert.rejects(
+      () => prPack(null, { out, repo: 'o/r', sha: 'abc123', path: 'docs/x', bodyOut: join(out, 'body.md') }),
+      (e) => e instanceof PrPackError && e.code === 2 && /found 2/.test(e.message),
+    )
+  })
+})
+
+describe('prPack(): unrenderable .wu-diffview', () => {
+  test('throws PrPackError(7) instead of packing a page with a diff that fails to parse', async () => {
+    const store = freshStore()
+    const out = freshOut()
+    const badPage = join(store, 'bad-diff-fn.html')
+    writeFileSync(badPage, [
+      '<!DOCTYPE html><html><head><title>t</title></head><body>',
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">',
+      '@@ -1,5 +1,5 @@',
+      ' unchanged',
+      '</script></figure>',
+      '</body></html>',
+    ].join('\n'))
+    await assert.rejects(
+      () => prPack(badPage, { out, store }),
+      (e) => e instanceof PrPackError && e.code === 7,
+    )
+  })
+})
+
+describe('prPack(): private-word gate', () => {
+  /** Injects a private word (from the fixture store's own
+   * `[private] words`, see test/fixtures/store/.writeup.toml) into the
+   * design page's body text. */
+  function withPrivateWord(store) {
+    const pagePath = join(store, DESIGN_REL)
+    const html = readFileSync(pagePath, 'utf8')
+      .replace('実装担当者向けに、アップロード経路の段構成を1つに決める。', 'acmecorpの実装担当者向けに、アップロード経路の段構成を1つに決める。')
+    writeFileSync(pagePath, html)
+    return pagePath
+  }
+
+  test('a page hitting a private word is refused at exit code 4 without --internal', async () => {
+    const store = freshStore()
+    const pagePath = withPrivateWord(store)
+    const out = freshOut()
+    await assert.rejects(
+      () => prPack(pagePath, { out, store }),
+      (e) => e instanceof PrPackError && e.code === 4 && /acmecorp/.test(e.detail),
+    )
+  })
+
+  test('the same page packs fine with --internal', async () => {
+    const store = freshStore()
+    const pagePath = withPrivateWord(store)
+    const out = freshOut()
+    const result = await prPack(pagePath, { out, store, internal: true })
+    assert.equal(result.ok, true)
+    assert.ok(existsSync(join(out, 'index.html')))
+  })
+
+  test('CLI: exit code 4 without --internal, exit 0 with it', () => {
+    const store = freshStore()
+    const pagePath = withPrivateWord(store)
+    const out1 = freshOut()
+    const r1 = spawnSync(process.execPath, [PR_PACK_BIN, pagePath, '--out', out1, '--store', store])
+    assert.equal(r1.status, 4)
+
+    const out2 = freshOut()
+    const r2 = spawnSync(process.execPath, [PR_PACK_BIN, pagePath, '--out', out2, '--store', store, '--internal'])
+    assert.equal(r2.status, 0, r2.stderr.toString())
   })
 })
 
@@ -230,5 +318,23 @@ describe('prPack(): CLI', () => {
     writeFileSync(badPage, '<html><head><title>t</title><meta name="kind" content="not-a-kind"></head><body>x</body></html>')
     const r = spawnSync(process.execPath, [PR_PACK_BIN, badPage, '--out', out, '--store', store])
     assert.equal(r.status, 3)
+  })
+
+  test('an unrenderable .wu-diffview exits 7', () => {
+    const store = freshStore()
+    const out = freshOut()
+    const badPage = join(store, 'bad-diff.html')
+    // Same malformed hunk as publish.test.mjs's exit-7 case: the header
+    // claims 5 old/5 new lines but only one line follows.
+    writeFileSync(badPage, [
+      '<!DOCTYPE html><html><head><title>t</title></head><body>',
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">',
+      '@@ -1,5 +1,5 @@',
+      ' unchanged',
+      '</script></figure>',
+      '</body></html>',
+    ].join('\n'))
+    const r = spawnSync(process.execPath, [PR_PACK_BIN, badPage, '--out', out, '--store', store])
+    assert.equal(r.status, 7)
   })
 })

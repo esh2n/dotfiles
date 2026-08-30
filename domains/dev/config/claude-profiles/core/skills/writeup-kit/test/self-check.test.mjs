@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -864,6 +864,43 @@ describe('self-check: .wu-shot (screenshot / photo)', () => {
     assert.ok(!result.warnings.some((w) => w.item === 'shot'), JSON.stringify(result.warnings))
   })
 
+  test('a .wu-shot with no <img> at all is an error, with a hint', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<figcaption>空の枠</figcaption>'),
+    })
+    const result = runSelfCheck(writeTempPage(html))
+    const hit = result.errors.find((e) => e.item === 'shot' && /has no <img>/.test(e.detail))
+    assert.ok(hit, JSON.stringify(result.errors))
+    assert.match(hit.detail, /空の枠/)
+    assert.match(hit.detail, /→ add the <img>/)
+  })
+
+  test('an <img> with no src at all is an error naming the figure', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img alt="a"><figcaption>キャプション</figcaption>'),
+    })
+    const result = runSelfCheck(writeTempPage(html))
+    const hit = result.errors.find((e) => e.item === 'shot' && /has no src/.test(e.detail))
+    assert.ok(hit, JSON.stringify(result.errors))
+  })
+
+  test('.wu-shot images totalling over 8MB is a warning naming the total', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="shot-assets/big.png" alt="a">'),
+    })
+    const file = writeTempPage(html)
+    const assetDir = join(dirname(file), 'shot-assets')
+    mkdirSync(assetDir, { recursive: true })
+    // checkShot only sums file sizes on disk — the bytes don't need to be a
+    // real PNG for the 8MB budget row to fire.
+    writeFileSync(join(assetDir, 'big.png'), Buffer.alloc(9 * 1024 * 1024))
+    const result = runSelfCheck(file)
+    const hit = result.warnings.find((w) => w.item === 'shot' && /images total/.test(w.detail))
+    assert.ok(hit, JSON.stringify(result.warnings))
+    assert.match(hit.detail, /9\.0MB/)
+    assert.match(hit.detail, /→ compress the screenshot/)
+  })
+
   test('missing alt is an error naming the figure', () => {
     const html = page({
       body: DEFAULT_BODY + shot('<img src="shot-assets/pic.png"><figcaption>キャプション</figcaption>'),
@@ -926,6 +963,22 @@ describe('self-check: .wu-shot (screenshot / photo)', () => {
     })
     const result = runSelfCheck(writeTempPage(html))
     assert.ok(result.errors.some((e) => e.item === 'shot' && /escapes the page's own directory/.test(e.detail)))
+  })
+
+  test('a src that is a symlink whose real target escapes the page\'s own directory is an error, with a symlink hint', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="shot-assets/link.png" alt="a">'),
+    })
+    const file = writeTempPage(html)
+    const assetDir = join(dirname(file), 'shot-assets')
+    mkdirSync(assetDir, { recursive: true })
+    const outsideDir = mkdtempSync(join(tmpdir(), 'wu-selfcheck-outside-'))
+    writeFileSync(join(outsideDir, 'secret.png'), makeTinyPng())
+    symlinkSync(join(outsideDir, 'secret.png'), join(assetDir, 'link.png'))
+    const result = runSelfCheck(file)
+    const hit = result.errors.find((e) => e.item === 'shot' && /escapes the page's own directory/.test(e.detail))
+    assert.ok(hit, JSON.stringify(result.errors))
+    assert.match(hit.detail, /symlink/)
   })
 })
 

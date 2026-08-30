@@ -14,6 +14,7 @@ import {
 import { parse as parseYaml } from './lib/yaml-lite.mjs'
 import { unescapeIrScript } from './lib/ir-script.mjs'
 import { diffFigureText } from './lib/diffview.mjs'
+import { resolvePageAsset } from './lib/assets.mjs'
 
 // --- inline rendering (a/strong/em/br/code/.wu-accent/plain text) ----------
 
@@ -179,11 +180,20 @@ function decodeShotDataUri(url) {
  * text from `alt` — follows as its own line, the same "block, then a
  * caption line below it" shape `renderDiffView` uses for its fence. With a
  * figures directory available the file is materialized there: a
- * page-relative `src` is copied from `ctx.pageDir` under its own basename
- * (so `figures/shot-sample.png` is the same name the author saved), a
- * `data:` `src` is decoded to `<slug>-shot<N>.<ext>`. Without a figures
- * directory it degrades to the same `![alt](#)` placeholder `.wu-figure`
- * uses when it has no svg to write out. */
+ * page-relative `src` is copied from `ctx.pageDir`, named
+ * `<slug>-shot<N>-<basename>` (`N` = `ctx.figureIndex`, the same
+ * position-in-document counter the `data:` branch already uses) rather
+ * than its own bare basename — two shots on the same page that both happen
+ * to be saved as e.g. `shot.png` would otherwise silently overwrite one
+ * another in `figures/`. A `data:` `src` is decoded to
+ * `<slug>-shot<N>.<ext>`. The page-relative `src` is resolved through
+ * `resolvePageAsset` (path traversal / symlink-escape / extension guard —
+ * lib/assets.mjs); a `src` it rejects is never copied — the figure
+ * degrades to the same `![alt](#)` placeholder `.wu-figure` uses when it
+ * has no svg to write out, plus a stderr warning, rather than either
+ * throwing or silently exfiltrating a file from outside the page's own
+ * directory. Without a figures directory at all it degrades to that same
+ * placeholder unconditionally. */
 function renderShot(fig, ctx) {
   const img = findFirst(fig, (n) => tagName(n) === 'img')
   const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
@@ -196,18 +206,21 @@ function renderShot(fig, ctx) {
   if (ctx.figuresDir) {
     ctx.figureIndex += 1
     mkdirSync(ctx.figuresDir, { recursive: true })
-    let fileName
+    let fileName = null
     if (src.startsWith('data:')) {
       const { ext, buffer } = decodeShotDataUri(src)
       fileName = `${ctx.slug}-shot${ctx.figureIndex}.${ext}`
       writeFileSync(join(ctx.figuresDir, fileName), buffer)
     } else {
-      const srcPath = ctx.pageDir ? join(ctx.pageDir, src) : src
-      fileName = basename(srcPath)
-      copyFileSync(srcPath, join(ctx.figuresDir, fileName))
+      const resolved = ctx.pageDir ? resolvePageAsset(ctx.pageDir, src) : null
+      if (resolved && existsSync(resolved)) {
+        fileName = `${ctx.slug}-shot${ctx.figureIndex}-${basename(src)}`
+        copyFileSync(resolved, join(ctx.figuresDir, fileName))
+      } else {
+        process.stderr.write(`to-md: refusing to copy unsafe .wu-shot src: ${src}\n`)
+      }
     }
-    const relPath = ctx.figuresDirRel ? `${ctx.figuresDirRel}/${fileName}` : fileName
-    out.push(`![${alt}](${relPath})`)
+    out.push(fileName ? `![${alt}](${ctx.figuresDirRel ? `${ctx.figuresDirRel}/${fileName}` : fileName})` : `![${alt}](#)`)
   } else {
     out.push(`![${alt}](#)`)
   }

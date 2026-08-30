@@ -2,7 +2,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
+import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { convertToMarkdown } from '../bin/to-md.mjs'
 import { escapeIrScript } from '../bin/lib/ir-script.mjs'
@@ -139,7 +139,7 @@ describe('to-md: .wu-shot (screenshot / photo)', () => {
 <main><figure class="wu-shot">${imgHtml}${capHtml}</figure></main></div></body></html>`
   }
 
-  test('a page-relative src is copied into figuresDir under its own basename; alt becomes the image text, caption follows', () => {
+  test('a page-relative src is copied into figuresDir as <slug>-shot<N>-<basename>; alt becomes the image text, caption follows', () => {
     const pageDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-page-'))
     mkdirSync(join(pageDir, 'shot-assets'), { recursive: true })
     const png = makeTinyPng()
@@ -147,9 +147,52 @@ describe('to-md: .wu-shot (screenshot / photo)', () => {
     const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-figs-'))
     const html = pageWithShot('<img src="shot-assets/pic.png" alt="実機の画面">')
     const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figures', pageDir })
-    assert.match(md, /!\[実機の画面\]\(figures\/pic\.png\)/)
+    assert.match(md, /!\[実機の画面\]\(figures\/p-shot1-pic\.png\)/)
     assert.match(md, /キャプション/)
-    assert.ok(readFileSync(join(figuresDir, 'pic.png')).equals(png))
+    assert.ok(readFileSync(join(figuresDir, 'p-shot1-pic.png')).equals(png))
+  })
+
+  test('two .wu-shot figures on the same page get distinct file names, even with the same basename', () => {
+    const pageDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-collide-'))
+    mkdirSync(join(pageDir, 'a'), { recursive: true })
+    mkdirSync(join(pageDir, 'b'), { recursive: true })
+    const png = makeTinyPng()
+    writeFileSync(join(pageDir, 'a', 'pic.png'), png)
+    writeFileSync(join(pageDir, 'b', 'pic.png'), png)
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-collide-figs-'))
+    const html = `<!DOCTYPE html><html lang="ja"><head><title>t</title>
+<meta name="description" content="d"><meta name="kind" content="設計">
+<meta name="date" content="2026-08-29"></head><body><div class="wu-page">
+<main>
+<figure class="wu-shot"><img src="a/pic.png" alt="a"><figcaption>1枚目</figcaption></figure>
+<figure class="wu-shot"><img src="b/pic.png" alt="b"><figcaption>2枚目</figcaption></figure>
+</main></div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figures', pageDir })
+    assert.match(md, /!\[a\]\(figures\/p-shot1-pic\.png\)/)
+    assert.match(md, /!\[b\]\(figures\/p-shot2-pic\.png\)/)
+    assert.ok(readFileSync(join(figuresDir, 'p-shot1-pic.png')).equals(png))
+    assert.ok(readFileSync(join(figuresDir, 'p-shot2-pic.png')).equals(png))
+  })
+
+  test('a src that escapes the page directory (..) is refused: ![alt](#) placeholder, no file copied', () => {
+    const pageDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-escape-'))
+    const outsideDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-outside-'))
+    writeFileSync(join(outsideDir, 'secret.png'), makeTinyPng())
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-escape-figs-'))
+    const rel = relative(pageDir, join(outsideDir, 'secret.png'))
+    const html = pageWithShot(`<img src="${rel}" alt="実機の画面">`)
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figures', pageDir })
+    assert.match(md, /!\[実機の画面\]\(#\)/)
+    assert.equal(readdirSync(figuresDir).length, 0)
+  })
+
+  test('an absolute src is refused the same way', () => {
+    const pageDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-abs-'))
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-abs-figs-'))
+    const html = pageWithShot('<img src="/etc/passwd" alt="実機の画面">')
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figures', pageDir })
+    assert.match(md, /!\[実機の画面\]\(#\)/)
+    assert.equal(readdirSync(figuresDir).length, 0)
   })
 
   test('a data: src is decoded and written as <slug>-shot<N>.<ext> (no pageDir needed)', () => {

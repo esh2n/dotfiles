@@ -151,8 +151,11 @@ a `publish.mjs` target — there's no external host to hand a file to. Use
 `node $KIT/bin/pr-pack.mjs page.html --out <repo>/docs/writeup/<slug> --pdf`
 instead: it commits the staged page, its Markdown, and its figures straight
 into the repo and, once pushed, a second `--body-out` run turns them into a
-PR body of SHA-pinned `blob` URLs — private repos stay private with no
-external host involved. Walkthrough: `references/publish.md`.
+PR body of SHA-pinned `blob` URLs. It runs the same private-word check as
+`publish.mjs` by default (exit 4 on a hit) — a public repo's PR is exactly
+as exposed as an Artifact page; pass `--internal` only for a private
+company repo whose readers are its own members. Walkthrough:
+`references/publish.md`.
 
 ## Common Mistakes
 

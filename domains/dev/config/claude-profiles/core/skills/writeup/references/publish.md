@@ -141,14 +141,26 @@ PDF) is committed straight into the repo and referenced from the PR body
 by SHA-pinned `blob` URLs — GitHub serves a `blob` URL only to accounts
 with read access to the repo, so a private repo stays private with no
 external host in the loop at all. It shares publish's pre-stage exactly
-(render → self-check → inline kit CSS → drop the back nav) but has no
-private-word check: the audience for a link inside the repo's own PR is
-that repo's own members, who could already read the page (and its private
-words) by checking out the branch.
+(render → self-check → inline kit CSS → drop the back nav → **private-word
+check**, same as `publish.mjs`, exit 4 on a hit).
+
+By default, a hit refuses the pack exactly like `publish.mjs` does — a
+public repo's PR is exactly as exposed as an Artifact or a Cloudflare
+page, so "it never leaves the repo" is not on its own a reason to skip the
+check. Pass `--internal` only for a private company repo whose PR readers
+are the repo's own members and internal names are expected on the page —
+that is the one case where the check would only produce false positives.
 
 ```
-node $KIT/bin/pr-pack.mjs page.html --out <repo>/docs/writeup/<slug> --pdf
+node $KIT/bin/pr-pack.mjs page.html --out <repo>/docs/writeup/<slug> --pdf [--internal]
 ```
+
+**Exit codes**: 0 ok, 2 usage error (missing `--out`, `--body-out` without
+`--repo`/`--sha`/`--path`, or `--out` reused with `<page.html>` omitted
+while it holds anything other than exactly one existing `.md` pack), 3
+self-check failed, 4 a private word was found (unless `--internal`), 7 a
+`.wu-diffview` could not be rendered — same causes and remedies as
+`publish.mjs`'s table above.
 
 writes `<out>/index.html` (the staged page — same rendering as any other
 `publish.mjs` target), `<out>/<slug>.md` (to-md's conversion) and

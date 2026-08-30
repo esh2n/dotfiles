@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// pr-pack.mjs — attaches a writeup page to a GitHub pull request in a
-// PRIVATE repository, with no external host: everything (the staged page,
-// its Markdown, its figures, optionally a PDF) is committed into the repo
-// itself and referenced from the PR body by SHA-pinned `blob` URLs. GitHub
-// only serves a blob URL to accounts with read access to the repo, so a
-// private repo stays private — nothing here uploads anywhere.
+// pr-pack.mjs — attaches a writeup page to a GitHub pull request, with no
+// external host: everything (the staged page, its Markdown, its figures,
+// optionally a PDF) is committed into the repo itself and referenced from
+// the PR body by SHA-pinned `blob` URLs — nothing here uploads anywhere.
+// This also works for a private repository: GitHub only serves a blob URL
+// to accounts with read access to the repo, so a private repo stays
+// private too.
 //
 // Why SHA-pinned `blob` links and not a branch link: a branch ref moves (or
 // disappears once the PR merges and the branch is deleted); a commit SHA
@@ -20,24 +21,29 @@
 // pack into a PR body whose links point at that exact commit. See
 // references/publish.md for the full walkthrough.
 //
-// No private-word check here (contrast with publish.mjs): the audience for
-// a blob URL inside a private repo's own PR is that repo's own members —
-// the same people who could already read the page and its private words by
-// checking out the branch. The check exists for publish.mjs's targets
-// (artifact / cloudflare / a shared file), which can reach people outside
-// the repo; a PR pack never leaves it.
+// Private-word check: unlike publish.mjs's targets (artifact / cloudflare /
+// a shared file, which can reach people outside the repo), a PR pack never
+// leaves the repository — its links are SHA-pinned `blob` URLs GitHub only
+// serves to accounts with read access. That is still not a blanket license
+// to skip the check: this repo may be public, in which case a PR is
+// exactly as exposed as publish.mjs's targets. So pr-pack runs the same
+// `findPrivateWordHits` check publish.mjs does, by default, and refuses at
+// exit 4 on a hit — pass `--internal` only for a private company repo
+// whose PR readers are the repo's own members, where internal names are
+// expected and the check would only ever produce false positives.
 //
 // Pre-stage mirrors publish.mjs exactly: render (ensureRendered) -> self-
 // check -> inline kit CSS -> inline every .wu-shot image as a data: URI
 // (inlinePageAssets, from publish.mjs) -> drop the back-to-index nav (there
 // is no store index inside a PR pack, so this always uses publish's 'file'
-// target behavior). Figures are extracted by to-md.mjs and then each
-// rewritten through standaloneSvg (lib/standalone-svg.mjs) so they carry
-// their own look with no page CSS around them; a .wu-shot's image file is
-// instead copied as-is into <out>/figures/ by to-md.mjs (it is already a
-// raster, nothing to restyle).
+// target behavior) -> private-word check (unless --internal). Figures are
+// extracted by to-md.mjs and then each rewritten through standaloneSvg
+// (lib/standalone-svg.mjs) so they carry their own look with no page CSS
+// around them; a .wu-shot's image file is instead copied as-is into
+// <out>/figures/ by to-md.mjs (it is already a raster, nothing to restyle).
 //
 // Exit codes: 0 ok, 2 usage error, 3 self-check failed,
+// 4 a private word was found on the page (unless --internal),
 // 7 a `.wu-diffview` whose diff could not be rendered.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs'
@@ -45,8 +51,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { runSelfCheckText } from './self-check.mjs'
 import { ensureRendered } from './build.mjs'
-import { inlineKitCss, adjustBackNav, inlinePageAssets } from './publish.mjs'
-import { resolveStoreDir } from './lib/store.mjs'
+import { inlineKitCss, adjustBackNav, inlinePageAssets, findPrivateWordHits } from './publish.mjs'
+import { resolveStoreDir, privateWords } from './lib/store.mjs'
 import { convertToMarkdown } from './to-md.mjs'
 import { standaloneSvg } from './lib/standalone-svg.mjs'
 
@@ -78,7 +84,7 @@ function slugOf(pageFile) {
  * converts the rendered page to `<out>/<slug>.md` with its figures under
  * `<out>/figures/`, each figure rewritten through `standaloneSvg`. Returns
  * the slug. */
-function writePack(pageFile, out, { store, storeName }) {
+function writePack(pageFile, out, { store, storeName, internal }) {
   let raw
   try {
     raw = readFileSync(pageFile, 'utf8')
@@ -96,6 +102,13 @@ function writePack(pageFile, out, { store, storeName }) {
   const storeDir = resolveStoreDir(store, { name: storeName, cwd: dirname(resolve(pageFile)) })
   const pageDir = dirname(pageFile)
   const staged = adjustBackNav(inlinePageAssets(inlineKitCss(rendered, storeDir), pageDir), 'file', storeDir)
+
+  if (!internal) {
+    const hits = findPrivateWordHits(staged, privateWords(storeDir))
+    if (hits.length) {
+      throw new PrPackError(4, 'pr-pack refused: private words found on the page', hits.join(', '))
+    }
+  }
 
   mkdirSync(out, { recursive: true })
   writeFileSync(join(out, 'index.html'), staged)
@@ -241,13 +254,13 @@ function existingSlug(out) {
  * @returns {Promise<{ok: true, out: string, slug: string, index?: string, md?: string, figuresDir?: string, pdf?: object, bodyOut?: string}>}
  */
 export async function prPack(pageFile, opts) {
-  const { out, store, storeName, pdf = false, repo, sha, path: repoPath, bodyOut } = opts
+  const { out, store, storeName, pdf = false, repo, sha, path: repoPath, bodyOut, internal = false } = opts
   if (!out) throw new PrPackError(2, '--out <dir> is required')
   if (bodyOut && (!repo || !sha || !repoPath)) {
     throw new PrPackError(2, '--body-out requires --repo, --sha and --path')
   }
 
-  const slug = pageFile ? writePack(pageFile, out, { store, storeName }) : existingSlug(out)
+  const slug = pageFile ? writePack(pageFile, out, { store, storeName, internal }) : existingSlug(out)
 
   const result = { ok: true, out, slug }
   if (pageFile) {
@@ -274,7 +287,7 @@ export async function prPack(pageFile, opts) {
 function parseArgs(argv) {
   const args = {
     file: null, out: null, store: null, storeName: null, pdf: false,
-    repo: null, sha: null, path: null, bodyOut: null,
+    repo: null, sha: null, path: null, bodyOut: null, internal: false,
   }
   const positional = []
   for (let i = 0; i < argv.length; i++) {
@@ -287,13 +300,14 @@ function parseArgs(argv) {
     else if (a === '--sha') args.sha = argv[++i]
     else if (a === '--path') args.path = argv[++i]
     else if (a === '--body-out') args.bodyOut = argv[++i]
+    else if (a === '--internal') args.internal = true
     else positional.push(a)
   }
   args.file = positional[0] ?? null
   return args
 }
 
-const USAGE = 'usage: node bin/pr-pack.mjs <page.html> --out <dir> [--store <dir> | --store-name <name>] [--pdf] [--repo owner/name --sha <sha> --path <repo-relative dir> --body-out <file>]'
+const USAGE = 'usage: node bin/pr-pack.mjs <page.html> --out <dir> [--store <dir> | --store-name <name>] [--pdf] [--internal] [--repo owner/name --sha <sha> --path <repo-relative dir> --body-out <file>]'
 
 async function main() {
   const args = parseArgs(process.argv.slice(2))
@@ -304,7 +318,7 @@ async function main() {
   try {
     const result = await prPack(args.file, {
       out: args.out, store: args.store, storeName: args.storeName, pdf: args.pdf,
-      repo: args.repo, sha: args.sha, path: args.path, bodyOut: args.bodyOut,
+      repo: args.repo, sha: args.sha, path: args.path, bodyOut: args.bodyOut, internal: args.internal,
     })
     console.log(`pr-pack: wrote ${result.out}`)
     if (result.index) console.log(`  index: ${result.index}`)
