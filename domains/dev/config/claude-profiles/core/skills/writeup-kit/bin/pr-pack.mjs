@@ -152,8 +152,9 @@ async function renderPdf(indexHtmlPath, pdfPath) {
     console.log('pr-pack: pdf skipped (playwright-core not found)')
     return { generated: false }
   }
-  const browser = await chromium.launch()
+  let browser
   try {
+    browser = await chromium.launch()
     const page = await browser.newPage()
     await page.goto(`file://${resolve(indexHtmlPath)}`, { waitUntil: 'load' })
     await page.waitForTimeout(500)
@@ -163,8 +164,11 @@ async function renderPdf(indexHtmlPath, pdfPath) {
       printBackground: true,
       margin: { top: '16mm', bottom: '16mm', left: '14mm', right: '14mm' },
     })
+  } catch (err) {
+    console.log(`pr-pack: pdf skipped (${err?.message ?? err})`)
+    return { generated: false }
   } finally {
-    await browser.close()
+    await browser?.close()
   }
   return { generated: true, path: pdfPath }
 }
