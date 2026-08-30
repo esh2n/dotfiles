@@ -1122,13 +1122,21 @@ hr {
   color: var(--wu-ink-2);
 }
 
+/* inline-block at full width, not block: the span is followed by the
+   line's own preserved newline, and a block would end the line once by
+   itself and then again at that newline, leaving an empty line between
+   every marked line. */
+.wu-tok-add,
+.wu-tok-del {
+  display: inline-block;
+  min-width: 100%;
+}
+
 .wu-tok-add {
-  display: block;
   background: var(--wu-rule-soft);
 }
 
 .wu-tok-del {
-  display: block;
   text-decoration: line-through;
   color: var(--wu-ink-3);
 }
