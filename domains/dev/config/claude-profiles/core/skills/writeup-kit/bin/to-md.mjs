@@ -83,48 +83,10 @@ function renderTable(table) {
   return lines.join('\n')
 }
 
-// --- figure (svg -> file, IR -> optional mermaid) --------------------------
-
-const MERMAID_ARROW = { sync: '-->', async: '-.->', reply: '-.->' }
-
-/** A mermaid `flowchart` for a node/edge IR, or `null` when this IR has no
- * nodes to draw. `groups` and `edges` are optional in the IR (a diagram
- * without groups is the common case), and the non-`diagram` figure types —
- * bar, timeline, matrix and the rest — carry no nodes at all; none of them
- * has a flowchart form, so they get the SVG image without a mermaid block. */
-function mermaidFromIr(ir) {
-  const nodes = Array.isArray(ir.nodes) ? ir.nodes : []
-  const groups = Array.isArray(ir.groups) ? ir.groups : []
-  const edges = Array.isArray(ir.edges) ? ir.edges : []
-  if (!nodes.length) return null
-  const dir = ir.direction === 'down' ? 'TD' : 'LR'
-  const lines = [`flowchart ${dir}`]
-  const grouped = new Map()
-  for (const g of groups) grouped.set(g.id, [])
-  const ungrouped = []
-  for (const n of nodes) {
-    const line = `${n.id}[${n.label}]`
-    if (n.group && grouped.has(n.group)) grouped.get(n.group).push(line)
-    else ungrouped.push(line)
-  }
-  for (const g of groups) {
-    lines.push(`  subgraph ${g.id}[${g.label}]`)
-    for (const line of grouped.get(g.id)) lines.push(`    ${line}`)
-    lines.push('  end')
-  }
-  for (const line of ungrouped) lines.push(`  ${line}`)
-  for (const e of edges) {
-    const arrow = MERMAID_ARROW[e.kind] || '-->'
-    if (e.kind === 'reply') {
-      lines.push(`  ${e.from} ${arrow}|reply| ${e.to}`)
-    } else if (e.label) {
-      lines.push(`  ${e.from} ${arrow}|${e.label}| ${e.to}`)
-    } else {
-      lines.push(`  ${e.from} ${arrow} ${e.to}`)
-    }
-  }
-  return lines.join('\n')
-}
+// --- figure (svg -> file) ----------------------------------------------------
+// The figure travels only as its SVG image. No Mermaid fallback: the owner
+// forbids Mermaid output (2026-08-30 — unreadable), and every GitHub /
+// Markdown route now carries the standalone SVG itself.
 
 /** Sanitizes an untrusted id/filename fragment into a safe path component:
  * only `[A-Za-z0-9_-]` survives, any run of anything else (a `/`, a `..`
@@ -178,13 +140,6 @@ function renderFigure(fig, ctx) {
     if (ctx.manifest) ctx.manifest.push({ file: svgFileName, kind: 'figure' })
     const relPath = ctx.figuresDirRel ? `${ctx.figuresDirRel}/${svgFileName}` : svgFileName
     out.push(`![${altCaption}](${relPath})`)
-    const mermaid = ir ? mermaidFromIr(ir) : null
-    if (mermaid) {
-      out.push('')
-      out.push('```mermaid')
-      out.push(mermaid)
-      out.push('```')
-    }
   } else if (svg) {
     out.push(`![${altCaption}](#)`)
   }
@@ -290,7 +245,7 @@ function renderDiffView(fig) {
   return out.join('\n\n')
 }
 
-function findIr(fig) {
+export function findIr(fig) {
   const script = findFirst(fig, (n) => tagName(n) === 'script' && attr(n, 'type') === 'text/x-writeup-diagram')
   if (!script) return null
   // <script> is HTML raw text, so textContent() returns it un-decoded —

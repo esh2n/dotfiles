@@ -272,7 +272,7 @@ deterministic. Any element not in this table makes self-check emit a warn.
 | `.wu-decision` | `- **decision** — trade-off prioritized. basis: …` |
 | `.wu-compare` / `.wu-table` | GFM table |
 | `.wu-steps` | Numbered list |
-| `.wu-figure` | `![caption](diagram SVG file)` plus an optional ```` ```mermaid ```` block generated from the IR (a degraded rendering) |
+| `.wu-figure` | `![caption](diagram SVG file)` — the SVG only; no Mermaid block (owner decision 2026-08-30: Mermaid output is forbidden as unreadable) |
 | `.wu-shot` | `![alt](screenshot file)` (or `#` with no figures dir) using the `<img>`'s own `alt`, then the `<figcaption>` as a line below it |
 | `.wu-sidetoc` (generated) | Dropped — a Markdown reader gets its outline from the headings |
 | `.wu-quote` | A fenced code block holding the original, translation, and source |

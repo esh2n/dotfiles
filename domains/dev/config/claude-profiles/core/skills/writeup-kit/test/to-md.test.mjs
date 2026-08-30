@@ -4,7 +4,8 @@ import { mkdtempSync, readFileSync, writeFileSync, readdirSync, mkdirSync, exist
 import { tmpdir } from 'node:os'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { convertToMarkdown } from '../bin/to-md.mjs'
+import { convertToMarkdown, findIr } from '../bin/to-md.mjs'
+import { parseHtml, findFirst, tagName } from '../bin/lib/html.mjs'
 import { escapeIrScript } from '../bin/lib/ir-script.mjs'
 import { makeTinyPng } from './helpers/tiny-png.mjs'
 
@@ -61,7 +62,7 @@ describe('to-md: decision-record snapshot', () => {
   })
 })
 
-describe('to-md: figure and mermaid fallback', () => {
+describe('to-md: figure (SVG only, no mermaid)', () => {
   const { md, figuresDir } = convertFixture('design/2026-08-05-example-design.html', { slug: 'design-page' })
 
   test('writes the figure SVG to <figures-dir>/<slug>-<figure-id>.svg', () => {
@@ -78,21 +79,9 @@ describe('to-md: figure and mermaid fallback', () => {
     assert.match(md, /!\[クライアントからAPIへ送信し、APIがワーカーへ委譲し、ワーカーが応答を返す。\]\(figs\/design-page-d1\.svg\)/)
   })
 
-  test('emits a ```mermaid fallback block generated from the IR', () => {
-    assert.match(md, /```mermaid\nflowchart LR\n/)
-  })
-
-  test('mermaid groups become a subgraph containing its member nodes', () => {
-    assert.match(md, /subgraph backend\[バックエンド\]/)
-    assert.match(md, /api\[API\]/)
-    assert.match(md, /worker\[ワーカー\]/)
-    assert.match(md, /end\n/)
-  })
-
-  test('mermaid renders sync edges as -->, async as -.->, and reply as -.->|reply|', () => {
-    assert.match(md, /client -->\|送信\| api/)
-    assert.match(md, /api -\.->\|委譲\| worker/)
-    assert.match(md, /worker -\.->\|reply\| client/)
+  test('never emits a ```mermaid block, even for a node/edge diagram IR', () => {
+    assert.doesNotMatch(md, /```mermaid/)
+    assert.doesNotMatch(md, /flowchart/)
   })
 
   test('.wu-terms maps to a bulleted "name — what" list', () => {
@@ -117,9 +106,8 @@ describe('to-md: IRs without groups/nodes', () => {
     const md = convertToMarkdown(pageWithIr('id: g\nnodes:\n  - id: a\n    label: A\n  - id: b\n    label: B\nedges:\n  - from: a\n    to: b\n    label: L\n'), {
       slug: 'p', figuresDir: mkdtempSync(join(tmpdir(), 'wu-tomd-nogroups-')), figuresDirRel: 'figs',
     })
-    assert.match(md, /```mermaid\nflowchart LR\n/)
-    assert.match(md, /a -->\|L\| b/)
-    assert.doesNotMatch(md, /subgraph/)
+    assert.match(md, /!\[c\]\(figs\/p-g\.svg\)/)
+    assert.doesNotMatch(md, /```mermaid/)
   })
 
   test('a node-less IR (bar, timeline, …) gets the SVG but no mermaid block', () => {
@@ -240,17 +228,20 @@ describe('to-md: diagram IR script escaping contract', () => {
 
   test('reads an escaped IR script (current writer contract) and recovers the original label', () => {
     const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-esc-'))
-    const md = convertToMarkdown(pageWithFigureScript(escapeIrScript(irText)), { slug: 'esc', figuresDir, figuresDirRel: 'figs' })
-    assert.match(md, /```mermaid/)
-    assert.ok(md.includes('a[<b>bold</b> & c]'), 'label should round-trip to its original, unescaped text')
-    assert.ok(!md.includes('&lt;b&gt;'), 'no leftover HTML entities in the markdown output')
+    const html = pageWithFigureScript(escapeIrScript(irText))
+    const md = convertToMarkdown(html, { slug: 'esc', figuresDir, figuresDirRel: 'figs' })
+    assert.match(md, /!\[cap\]\(figs\/esc-d1\.svg\)/)
+    const fig = findFirst(parseHtml(html), (n) => tagName(n) === 'figure')
+    assert.equal(findIr(fig).nodes[0].label, '<b>bold</b> & c', 'label should round-trip to its original, unescaped text')
   })
 
   test('also reads a legacy unescaped IR script (pre-contract page)', () => {
     const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-legacy-'))
-    const md = convertToMarkdown(pageWithFigureScript(irText), { slug: 'legacy', figuresDir, figuresDirRel: 'figs' })
-    assert.match(md, /```mermaid/)
-    assert.ok(md.includes('a[<b>bold</b> & c]'))
+    const html = pageWithFigureScript(irText)
+    const md = convertToMarkdown(html, { slug: 'legacy', figuresDir, figuresDirRel: 'figs' })
+    assert.match(md, /!\[cap\]\(figs\/legacy-d1\.svg\)/)
+    const fig = findFirst(parseHtml(html), (n) => tagName(n) === 'figure')
+    assert.equal(findIr(fig).nodes[0].label, '<b>bold</b> & c')
   })
 })
 
