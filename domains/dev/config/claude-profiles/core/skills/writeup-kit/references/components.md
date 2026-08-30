@@ -487,9 +487,12 @@ and a bare hunk with no `---`/`+++` pair are all accepted.
 </script><figcaption>合計値の検証をエラー値からラップ済みエラーに変えた。</figcaption></figure>
 ```
 
-No color: additions and deletions are distinguished by the marker column
-(`+` / `−`), a neutral background tint, and muted ink on deletions. A page
-gets two chromatic colors (link, accent) and a diff must not spend them.
+Additions and deletions are distinguished by the marker column (`+` /
+`−`), a pale green / pale red row tint (`--wu-syn-add` / `--wu-syn-del`,
+low saturation so the page's accent still leads), and muted ink on
+deletions. The tints belong to the syntax set (`tokens.md`), which never
+leaves code and diff blocks; prose still gets exactly two chromatic colors
+(link, accent).
 
 ### `.wu-chip`
 

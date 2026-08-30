@@ -211,10 +211,28 @@ export const USAGE_PAIRS = [
 
   // --- on the code background (code, .wu-code, .wu-diff, th, .wu-callout[warn]) ---
   { fg: '--wu-ink', bg: '--wu-rule-soft', kind: 'text', usage: 'code (inline), .wu-code, .wu-tok-fn, .wu-callout[warn] p, .wu-figure group label' },
-  { fg: '--wu-ink-2', bg: '--wu-rule-soft', kind: 'text', usage: '.wu-diff, th, .wu-tok-num, .wu-tok-type, .wu-tok-op' },
+  { fg: '--wu-ink-2', bg: '--wu-rule-soft', kind: 'text', usage: '.wu-diff, th, .wu-tok-num, .wu-tok-op' },
   { fg: '--wu-ink-3', bg: '--wu-rule-soft', kind: 'text', usage: '.wu-code/.wu-diff[data-lang]::before, .wu-tok-cmt, .wu-tok-del, .wu-callout[warn]::before' },
   { fg: '--wu-link', bg: '--wu-rule-soft', kind: 'text', usage: 'a > code (inline code inside a link)' },
   { fg: '--wu-accent', bg: '--wu-rule-soft', kind: 'text', usage: '.wu-tok-str' },
+  { fg: '--wu-syn-kw', bg: '--wu-rule-soft', kind: 'text', usage: '.wu-tok-kw' },
+  { fg: '--wu-syn-type', bg: '--wu-rule-soft', kind: 'text', usage: '.wu-tok-type' },
+
+  // --- inside diff rows (.wu-tok-add/.wu-tok-del in .wu-diff, .wu-dv row tints) ---
+  { fg: '--wu-ink', bg: '--wu-syn-add', kind: 'text', usage: '.wu-tok-add line, .wu-dv add row text' },
+  { fg: '--wu-ink-2', bg: '--wu-syn-add', kind: 'text', usage: '.wu-tok-num/.wu-tok-op inside an add row; .wu-diff add line' },
+  { fg: '--wu-ink-3', bg: '--wu-syn-add', kind: 'text', usage: '.wu-tok-cmt inside an add row' },
+  { fg: '--wu-accent', bg: '--wu-syn-add', kind: 'text', usage: '.wu-tok-str inside an add row' },
+  { fg: '--wu-syn-kw', bg: '--wu-syn-add', kind: 'text', usage: '.wu-tok-kw inside an add row' },
+  { fg: '--wu-syn-type', bg: '--wu-syn-add', kind: 'text', usage: '.wu-tok-type inside an add row' },
+  { fg: '--wu-ink-3', bg: '--wu-syn-del', kind: 'text', usage: '.wu-tok-del line, .wu-dv del row (muted ink, tokens flattened to ink-3)' },
+  { fg: '--wu-ink', bg: '--wu-syn-del', kind: 'text', usage: '.wu-dv del row line numbers / marker' },
+  { fg: '--wu-syn-add', bg: '--wu-surface', kind: 'ui', usage: '.wu-dv add row tint vs the untinted context row (lightness-only distinction; marker column carries it)' },
+  { fg: '--wu-syn-del', bg: '--wu-surface', kind: 'ui', usage: '.wu-dv del row tint vs the untinted context row (lightness-only distinction; marker column carries it)' },
+  { fg: '--wu-syn-add', bg: '--wu-rule-soft', kind: 'ui', usage: '.wu-tok-add line vs the .wu-diff block background' },
+  { fg: '--wu-syn-del', bg: '--wu-rule-soft', kind: 'ui', usage: '.wu-tok-del line vs the .wu-diff block background' },
+  { fg: '--wu-syn-kw', bg: '--wu-surface', kind: 'text', usage: '.wu-tok-kw in a .wu-dv context row' },
+  { fg: '--wu-syn-type', bg: '--wu-surface', kind: 'text', usage: '.wu-tok-type in a .wu-dv context row' },
 
   // --- figure tone fills (svg text is currentColor = ink; rect stroke is ink) ---
   { fg: '--wu-ink', bg: '--wu-fig-tone-ts', kind: 'text', usage: '.wu-figure rect[data-tone="ts"] + label' },

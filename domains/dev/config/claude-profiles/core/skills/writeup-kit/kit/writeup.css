@@ -41,10 +41,18 @@ svg {
   --wu-rule: #d9dce2;
   --wu-rule-soft: #ececef;
 
-  /* color: the two chromatic colors */
+  /* color: the two chromatic colors of prose */
   --wu-link: #2f4b9c;
   --wu-accent: #9c4a2f;
   --wu-accent-soft: #f2e4de;
+
+  /* color: syntax — a quiet second set that lives only inside code and
+     diff blocks (.wu-tok-*, .wu-dv row tints); never used in prose.
+     All ≥ 4.5:1 on rule-soft, surface and both row tints (bin/contrast.mjs) */
+  --wu-syn-kw: #5e3d8c;
+  --wu-syn-type: #1a6363;
+  --wu-syn-add: #e2efe0;
+  --wu-syn-del: #f6e3e3;
 
   /* type roles */
   --wu-font-body: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
@@ -113,6 +121,11 @@ svg {
     --wu-accent: #e8ab93;
     --wu-accent-soft: #3a281f;
 
+    --wu-syn-kw: #c9a7e6;
+    --wu-syn-type: #7fc5c1;
+    --wu-syn-add: #1e3326;
+    --wu-syn-del: #3b2326;
+
     --wu-fig-tone-ts: #232936;
     --wu-fig-tone-rs: #353c49;
     --wu-fig-tone-new: #161a21;
@@ -135,6 +148,11 @@ svg {
   --wu-link: #abbdee;
   --wu-accent: #e8ab93;
   --wu-accent-soft: #3a281f;
+
+  --wu-syn-kw: #c9a7e6;
+  --wu-syn-type: #7fc5c1;
+  --wu-syn-add: #1e3326;
+  --wu-syn-del: #3b2326;
 
   --wu-fig-tone-ts: #232936;
   --wu-fig-tone-rs: #353c49;
@@ -1086,13 +1104,15 @@ hr {
 
 /* ---------------------------------------------------------------
    .wu-tok-* — syntax-highlighting token spans, produced by
-   bin/lib/highlight.mjs inside .wu-code/.wu-diff. Two-color rule:
-   only --wu-accent (string) reads as chromatic emphasis; everything
-   else distinguishes itself by weight, the neutral ink scale, or a
-   non-chromatic text decoration, so a page stays legible even when
-   printed or read without color.
+   bin/lib/highlight.mjs inside .wu-code/.wu-diff. Restrained
+   palette (owner decision, 2026-08-30): keyword and type each get
+   one low-saturation hue from the --wu-syn-* set, string keeps the
+   page accent, and comment / number / operator stay on the neutral
+   ink scale. Weight and text decoration carry the same distinctions
+   without color, so a printed or monochrome page still reads.
 --------------------------------------------------------------- */
 .wu-tok-kw {
+  color: var(--wu-syn-kw);
   font-weight: 700;
 }
 
@@ -1114,7 +1134,7 @@ hr {
 }
 
 .wu-tok-type {
-  color: var(--wu-ink-2);
+  color: var(--wu-syn-type);
   font-weight: 700;
 }
 
@@ -1133,10 +1153,11 @@ hr {
 }
 
 .wu-tok-add {
-  background: var(--wu-rule-soft);
+  background: var(--wu-syn-add);
 }
 
 .wu-tok-del {
+  background: var(--wu-syn-del);
   text-decoration: line-through;
   color: var(--wu-ink-3);
 }
@@ -1145,22 +1166,20 @@ hr {
    .wu-diffview / .wu-dv — GitHub-style diff view, rendered from the
    figure's raw unified diff by bin/lib/diffview.mjs
 
-   No color. Additions and deletions are told apart by three
-   non-chromatic signals stacked together: the marker column
-   (`+` / U+2212 `−`), a background tint mixed from the neutral
-   scale, and — for deletions only — muted ink that also flattens
-   the syntax-highlight tokens inside the row. The kit allows
-   exactly two chromatic colors on a page (--wu-link and
-   --wu-accent) and a diff must not spend either of them: a page
-   with a green/red diff has no color left for the one thing the
-   reader is supposed to look at.
+   Additions and deletions are told apart by three signals stacked
+   together: the marker column (`+` / U+2212 `−`), a row tint
+   (--wu-syn-add / --wu-syn-del — the pale green / pale red every
+   diff reader already knows, kept low in saturation so the page's
+   own accent still stands out), and — for deletions only — muted
+   ink that also flattens the syntax-highlight tokens inside the row.
+   The tints are part of the syntax set, not the prose palette: they
+   never leave code and diff blocks.
 
-   Tints are derived with color-mix() from --wu-ink over
-   --wu-surface, so they follow the theme instead of hard-coding a
-   shade; each is declared twice, the plain --wu-rule-soft first,
-   so a browser without color-mix() still gets a usable tint. Dark
-   values are mixed harder because a light film over a dark surface
-   reads weaker than the same film over white.
+   The hunk-header and word-mark tints are still derived with
+   color-mix() from --wu-ink over --wu-surface, so they follow the
+   theme instead of hard-coding a shade; each is declared twice, the
+   plain --wu-rule-soft / --wu-rule first, so a browser without
+   color-mix() still gets a usable tint.
 
    Deliberately absent: sticky line-number columns. A long line
    scrolls the whole table horizontally and the numbers scroll with
@@ -1169,10 +1188,8 @@ hr {
    reader resolves by scrolling back.
 --------------------------------------------------------------- */
 .wu-diffview {
-  --wu-dv-tint-add: var(--wu-rule-soft);
-  --wu-dv-tint-add: color-mix(in srgb, var(--wu-ink) 6%, var(--wu-surface));
-  --wu-dv-tint-del: var(--wu-rule-soft);
-  --wu-dv-tint-del: color-mix(in srgb, var(--wu-ink) 13%, var(--wu-surface));
+  --wu-dv-tint-add: var(--wu-syn-add);
+  --wu-dv-tint-del: var(--wu-syn-del);
   --wu-dv-tint-hunk: var(--wu-rule-soft);
   --wu-dv-tint-hunk: color-mix(in srgb, var(--wu-ink) 8%, var(--wu-surface));
   --wu-dv-tint-word: var(--wu-rule);
