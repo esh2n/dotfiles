@@ -28,6 +28,7 @@ export function buildPageHtml(p) {
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(p.title)}</title>
 <meta name="description" content="${escapeAttr(p.description)}">
 <meta name="kind" content="${escapeAttr(p.kind)}">
@@ -73,6 +74,7 @@ export function buildLegacyStubHtml(p) {
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(p.title)}</title>
 <meta name="description" content="${escapeAttr(p.description)}">
 <meta name="kind" content="${escapeAttr(p.kind)}">

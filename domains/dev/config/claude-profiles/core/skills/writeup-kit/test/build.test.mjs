@@ -1304,3 +1304,61 @@ describe('buildStore(): kit CSS href repair for a page started from kit/template
     }
   })
 })
+
+describe('buildStore(): <meta name="viewport"> (phones lay the page out at device width)', () => {
+  const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">'
+
+  test('build inserts the viewport meta exactly once, right after <meta charset>, into a page that lacks it', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'design', '2026-08-05-example-design.html')
+    assert.ok(!readFileSync(pagePath, 'utf8').includes('name="viewport"'))
+    buildStore(store)
+    const html = readFileSync(pagePath, 'utf8')
+    assert.equal((html.match(/name="viewport"/g) || []).length, 1)
+    assert.match(html, /<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n/)
+  })
+
+  test('a second build is a no-op for a page that already carries the meta', () => {
+    const store = freshStore()
+    buildStore(store)
+    const pagePath = join(store, 'design', '2026-08-05-example-design.html')
+    const afterFirst = readFileSync(pagePath, 'utf8')
+    const result = buildStore(store, { check: true })
+    assert.equal(result.pagesChanged, false)
+    assert.equal(readFileSync(pagePath, 'utf8'), afterFirst)
+  })
+
+  test('an existing viewport meta with different content is left untouched', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'design', '2026-08-05-example-design.html')
+    const custom = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
+    writeFileSync(pagePath, readFileSync(pagePath, 'utf8').replace('<meta charset="UTF-8">\n', `<meta charset="UTF-8">\n${custom}\n`))
+    buildStore(store)
+    const html = readFileSync(pagePath, 'utf8')
+    assert.equal((html.match(/name="viewport"/g) || []).length, 1)
+    assert.ok(html.includes(custom))
+  })
+
+  test('without a charset meta the tag goes right after <head>', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'design', '2026-08-05-example-design.html')
+    writeFileSync(pagePath, readFileSync(pagePath, 'utf8').replace('<meta charset="UTF-8">\n', ''))
+    buildStore(store)
+    assert.match(readFileSync(pagePath, 'utf8'), /<head>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n/)
+  })
+
+  test('--check reports pagesChanged: true for a page without the meta, without writing it', () => {
+    const store = freshStore()
+    const pagePath = join(store, 'decision', '2026-08-01-example-decision.html')
+    const before = readFileSync(pagePath, 'utf8')
+    const result = buildStore(store, { check: true })
+    assert.equal(readFileSync(pagePath, 'utf8'), before)
+    assert.equal(result.pagesChanged, true)
+  })
+
+  test('the generated index.html carries the viewport meta too', () => {
+    const store = freshStore()
+    buildStore(store)
+    assert.ok(readFileSync(join(store, 'index.html'), 'utf8').includes(VIEWPORT))
+  })
+})

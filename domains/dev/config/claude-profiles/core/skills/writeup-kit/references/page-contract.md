@@ -37,7 +37,7 @@ it does not add new rules.
   `<nav class="wu-nav"><a class="wu-back" href="…">一覧</a></nav>`. `build`
   keeps its `href` pointed at the store root's `index.html` for the page's
   depth (`index.html` at depth 0, `../index.html` at depth 1, …), inserting
-  the nav entirely when a page predates it — the second of the seven places
+  the nav entirely when a page predates it — the second of the eight places
   `build` edits a page's own bytes (see the `id` bullet in §2 for the
   first). Page authors never write or edit this href by hand.
 - `<link rel="icon" href="data:image/svg+xml,…">` is the page's status
@@ -69,8 +69,8 @@ it does not add new rules.
   resolves — the sixth place `build` edits a page's own bytes. `#fragment`,
   absolute, and external hrefs are never touched.
 - The side table of contents is regenerated from the page's own `h2`/`h3`
-  (`ensureSideToc` in `bin/build.mjs`) — the seventh and last place `build`
-  edits a page's own bytes. `<nav class="wu-sidetoc" aria-label="目次">`
+  (`ensureSideToc` in `bin/build.mjs`) — the seventh place `build` edits
+  a page's own bytes. `<nav class="wu-sidetoc" aria-label="目次">`
   becomes `<main>`'s first child and the pinned scroll-spy `<script>` goes
   in before `</body>`; both are stripped and rebuilt on every run, and
   removed when the page has fewer than three `h2`. Every `h2`/`h3` lacking
@@ -82,6 +82,12 @@ it does not add new rules.
   viewports ≥ 1200px, in the page margin beside the unchanged 45em column;
   below that the hand-written `.wu-toc`, when the page has one, is the
   fallback. Page authors never write or edit this nav (`components.md`).
+- `<meta name="viewport" content="width=device-width, initial-scale=1">` is
+  inserted right after `<meta charset>` when a page lacks it — the eighth
+  and last place `build` edits a page's own bytes. Without it a phone
+  browser lays the page out at a ~980px virtual width and zooms out, so
+  none of the narrow-screen CSS applies. A viewport meta already present is
+  left as is, whatever its content.
 - writeup runs `git add <page> && git commit -m "<kind>: <title>"` on every
   save. Generated artifacts (`manifest.json`, `index.html`, `_kit/`) go into
   the same commit.
@@ -92,6 +98,8 @@ Every page's `<head>` must contain exactly this shape (values change, keys
 and structure do not):
 
 ```html
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">  <!-- build inserts this when absent; without it phones render the page at ~980px and zoom out -->
 <title>識別結果の手動修正の設計</title>
 <meta name="description" content="一文の要約（一覧の 2 行目）">
 <meta name="kind" content="設計">                 <!-- one of the 8 kind values, see kinds.md -->
@@ -114,7 +122,7 @@ and structure do not):
 - `id` is optional. When present it must match the computed value (first 8
   hex chars of sha256 of the page's store-relative path) — self-check warns
   on a mismatch. `build` inserts the computed `id` into a page that lacks
-  the meta entirely (the first of the seven places `build` edits a page's own
+  the meta entirely (the first of the eight places `build` edits a page's own
   bytes — §1 lists them all); it never overwrites an existing `id` meta,
   matching or not.
 - `updated` accepts two shapes: a bare date (`YYYY-MM-DD`) or an ISO

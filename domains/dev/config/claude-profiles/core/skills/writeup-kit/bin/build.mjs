@@ -3,7 +3,7 @@
 // from every page's `<head>` meta, and syncs the kit's CSS into
 // `<store>/_kit/writeup.css` (contract §1, §1-3). Zero-dependency.
 //
-// The seven places build.mjs edits a page's own bytes (page-contract.md §1):
+// The eight places build.mjs edits a page's own bytes (page-contract.md §1):
 // (1) when a page's `<head>` lacks `<meta name="id">`, build inserts the
 // computed id right after `<meta name="date">` (idempotent — only when the
 // meta is missing; see `insertIdMeta`/`buildPageRecord`); (2) `.wu-header`'s
@@ -38,7 +38,10 @@
 // page's own h2/h3 (which each get a stable `id` when they lack one), plus
 // the pinned scroll-spy `<script>` before `</body>` (idempotent: stripped
 // and regenerated from the current headings, removed when the page has
-// fewer than three h2; see `ensureSideToc`). Nothing else about a page is
+// fewer than three h2; see `ensureSideToc`). (8) `<meta name="viewport">`
+// is inserted right after `<meta charset>` when the head lacks it, so the
+// page lays out at device width on a phone (idempotent; see
+// `ensureViewport`). Nothing else about a page is
 // ever rewritten by build — `<meta name="updated">` in particular is read,
 // not patched, even when the manifest fills in a synthesized time-of-day.
 
@@ -247,6 +250,33 @@ function ensureBackNav(text, relPath) {
   const navStart = afterHeader
   const patchedNav = navBlock.slice(0, hrefMatch.index) + hrefMatch[1] + desiredHref + hrefMatch[3] + navBlock.slice(hrefMatch.index + hrefMatch[0].length)
   return text.slice(0, navStart) + patchedNav + text.slice(navStart + navBlock.length)
+}
+
+const VIEWPORT_META_RE = /<meta\s+name="viewport"[^>]*>/
+const CHARSET_META_RE = /<meta\s+charset=[^>]*>\n?/i
+const VIEWPORT_META_TAG = '<meta name="viewport" content="width=device-width, initial-scale=1">'
+
+/**
+ * Ensures `<meta name="viewport" content="width=device-width, initial-scale=1">`
+ * is present (page-contract.md §2). Without it a phone browser lays the
+ * page out at a ~980px virtual width and zooms out, so the narrow-screen
+ * CSS never applies and the text is unreadably small. Inserted right after
+ * `<meta charset>` when present, else right after `<head>` (falling back
+ * to the very start of the file). An existing viewport meta is left as
+ * is, whatever its content. The eighth place build.mjs edits a page's own
+ * bytes — see the module docstring.
+ */
+function ensureViewport(text) {
+  if (VIEWPORT_META_RE.test(text)) return text
+  const charsetMatch = CHARSET_META_RE.exec(text)
+  if (charsetMatch) {
+    const at = charsetMatch.index + charsetMatch[0].length
+    return text.slice(0, at) + VIEWPORT_META_TAG + '\n' + text.slice(at)
+  }
+  const headOpen = text.indexOf('<head>')
+  if (headOpen === -1) return VIEWPORT_META_TAG + '\n' + text
+  const at = headOpen + '<head>'.length
+  return text.slice(0, at) + '\n' + VIEWPORT_META_TAG + text.slice(at)
 }
 
 const FAVICON_LINK_RE = /<link\s+rel="icon"[^>]*>/
@@ -504,6 +534,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
   let metaInserted = false
   let navFixed = false
   let faviconFixed = false
+  let viewportFixed = false
   let highlightFixed = false
   let diffViewFixed = false
   const diffErrors = []
@@ -523,6 +554,11 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
   if (cssFixedText !== text) {
     navFixed = true // counted with the nav: both are "path depth" repairs
     if (!check) text = cssFixedText
+  }
+  const viewportFixedText = ensureViewport(text)
+  if (viewportFixedText !== text) {
+    viewportFixed = true
+    if (!check) text = viewportFixedText
   }
   const checksParsed = parseChecks(meta.checks)
   const desiredIcon = faviconDataUri({ kind: meta.kind, status: statusFromChecks(checksParsed) })
@@ -561,7 +597,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
       if (!check) text = repaired.html
     }
   }
-  if ((metaInserted || navFixed || faviconFixed || diffViewFixed || highlightFixed || tocFixed || linksFixed) && !check) {
+  if ((metaInserted || navFixed || faviconFixed || viewportFixed || diffViewFixed || highlightFixed || tocFixed || linksFixed) && !check) {
     writeFileSync(fullPath, text)
     buf = Buffer.from(text, 'utf8')
     root = parseHtml(text)
@@ -597,7 +633,7 @@ function buildPageRecord(storeDir, relPath, { check, linkResolver } = {}) {
     legacy: relPath.startsWith('legacy/'),
     missingLinks,
   }
-  return { record, metaInserted, navFixed, faviconFixed, diffViewFixed, highlightFixed, tocFixed, linksFixed, diffErrors }
+  return { record, metaInserted, navFixed, faviconFixed, viewportFixed, diffViewFixed, highlightFixed, tocFixed, linksFixed, diffErrors }
 }
 
 /**
@@ -770,6 +806,7 @@ function renderIndexHtml(records, { storeName = '', stores = [] } = {}) {
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${storeName ? `writeup · ${escapeHtml(storeName)}` : 'writeup'}</title>
 <meta name="description" content="writeup store の検索">
 <meta name="robots" content="noindex">
@@ -1038,7 +1075,7 @@ export function buildStore(storeDir, { check = false } = {}) {
   const relPaths = existsSync(storeDir) ? listHtmlFiles(storeDir).sort() : []
   const linkResolver = makeLinkResolver(storeDir, relPaths)
   const built = relPaths.map((p) => buildPageRecord(storeDir, p, { check, linkResolver }))
-  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.diffViewFixed || b.highlightFixed || b.tocFixed || b.linksFixed)
+  const pagesChanged = built.some((b) => b.metaInserted || b.navFixed || b.faviconFixed || b.viewportFixed || b.diffViewFixed || b.highlightFixed || b.tocFixed || b.linksFixed)
   const diffErrors = built.flatMap((b) => b.diffErrors ?? [])
   const records = sortManifest(built.map((b) => b.record))
   const manifestText = JSON.stringify(records, null, 2) + '\n'

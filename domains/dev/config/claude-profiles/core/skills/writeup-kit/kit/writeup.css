@@ -824,9 +824,10 @@ hr {
 
 /* ---------------------------------------------------------------
    .wu-compare / .wu-table — tables
-   The class sits directly on <table>; display:block plus
-   overflow-x:auto turns the table itself into the scroll container,
-   so no extra wrapper element is needed.
+   The class sits directly on <table>. On a narrow viewport (see the
+   "Narrow screens" block) the table turns into its own scroll
+   container — display:block plus overflow-x:auto — so a five-column
+   table never widens the page; no wrapper element is needed.
    wu-compare: up to 4 columns (row = option). wu-table: up to 5
    columns. Not enforced here — see self-check.
 --------------------------------------------------------------- */
@@ -1589,6 +1590,18 @@ hr {
   .wu-footer {
     padding-left: var(--wu-sp-3);
     padding-right: var(--wu-sp-3);
+  }
+
+  /* A table wider than the column (nowrap headers, td.num) would otherwise
+     push the whole page sideways. As a block the table hugs its content
+     when it fits and scrolls inside its own border when it does not. */
+  .wu-compare,
+  .wu-table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 
   .wu-terms {
