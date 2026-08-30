@@ -233,10 +233,11 @@ page's own filename without `.html`) and reference it with a page-relative
 `alt` is required; self-check's `shot` row errors without it, on an
 external URL, on a page-relative `src` whose file does not exist, and on a
 second `<img>` in one figure (a before/after is two `.wu-shot` figures, the
-same as a before/after diagram is the same type twice). `publish.mjs` and
-`pr-pack.mjs` both inline the file as a `data:` URI when staging the page;
-`to-md.mjs` copies it into the figures directory instead. `components.md`
-has the full contract.
+same as a before/after diagram is the same type twice). Every
+`publish.mjs` target inlines the file as a `data:` URI into the staged
+`<slug>.html`; `--to github` additionally runs `to-md.mjs` to build the
+folder's Markdown, which copies the file into `figures/` instead.
+`components.md` has the full contract.
 
 ### `render-diagram.mjs` — observed behavior
 

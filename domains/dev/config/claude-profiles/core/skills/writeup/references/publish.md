@@ -2,12 +2,12 @@
 
 The store page links `../_kit/writeup.css` (and, for a `.wu-shot`, its
 `<slug>-assets/` files) — both exist only inside the store, so a copy of
-the page handed anywhere else (the Artifact tool, Slack, email, a repo)
+the page handed anywhere else (the Artifact tool, Slack, email, a PR)
 renders unstyled and without pictures. The only HTML that ever leaves the
-store is `publish.mjs` / `pr-pack.mjs` output.
+store is `publish.mjs` output.
 
 ```
-node $KIT/bin/publish.mjs <page.html> --to artifact|cloudflare|file [--out <path>] [--store <dir> | --store-name <name>] [--dry-run] [--deploy]
+node $KIT/bin/publish.mjs <page.html> --to artifact|cloudflare|file|github [--out <path>] [--store <dir> | --store-name <name>] [--dry-run] [--deploy] [--pdf] [--internal]
 ```
 
 Without `--store`/`--store-name`, the store is the page's own (the
@@ -74,6 +74,13 @@ that happens to collide with an entry in `[private].words`), say so and
 ask the user whether to remove it from the store's word list — do not
 silently strip it from the page instead.
 
+`--internal` skips this check entirely, for every target — pass it only
+for a private company repo whose PR readers are the repo's own members
+and internal names are expected on the page; that is the one case where
+the check would only ever produce false positives. It exists mainly for
+`--to github`, where the audience is a specific repo's own PR, but nothing
+stops it being passed to another target for the same reason.
+
 ## Targets
 
 ### `artifact`
@@ -138,85 +145,84 @@ publish: wrote /tmp/for-slack.html
 Use this when the destination is a Slack attachment or an email, not a
 hosted URL. `--out` is required; omitting it is a usage error (exit 2).
 
-## GitHub pull request (private-repo safe)
+### `github` (private-repo safe, no repo write)
 
-`publish.mjs` has no target for "attach this to a PR" — a PR review is not
-a hosted URL and there is no external host to hand a file to, private repo
-or not. `$KIT/bin/pr-pack.mjs` is a separate, sibling CLI for exactly that
-case: everything (the staged page, its Markdown, its figures, optionally a
-PDF) is committed straight into the repo and referenced from the PR body
-by SHA-pinned `blob` URLs — GitHub serves a `blob` URL only to accounts
-with read access to the repo, so a private repo stays private with no
-external host in the loop at all. It shares publish's pre-stage exactly
-(render → self-check → inline kit CSS → drop the back nav → **private-word
-check**, same as `publish.mjs`, exit 4 on a hit).
-
-By default, a hit refuses the pack exactly like `publish.mjs` does — a
-public repo's PR is exactly as exposed as an Artifact or a Cloudflare
-page, so "it never leaves the repo" is not on its own a reason to skip the
-check. Pass `--internal` only for a private company repo whose PR readers
-are the repo's own members and internal names are expected on the page —
-that is the one case where the check would only produce false positives.
+A GitHub pull request is not a hosted URL and there is no external host to
+hand a file to — but there is also no reason to write into the repository
+either: `gh` (the next release after 2.98.0, or trunk today — GHES is not
+supported) can attach files straight to a PR body or comment with `--attach
+<file>`, uploading each to GitHub's own attachment store and rewriting any
+`![alt](figures/x.svg)` reference in the uploaded Markdown to the uploaded
+URL. `--to github` writes exactly the folder that flow needs — Markdown
+plus standalone SVG figures — and stops there. It never commits anything,
+computes no SHA, opens no branch, and never calls `gh` itself.
 
 ```
-node $KIT/bin/pr-pack.mjs page.html --out <repo>/docs/writeup/<slug> --pdf [--internal]
+$ node $KIT/bin/publish.mjs page.html --to github --out /tmp/pack [--pdf] [--internal]
+publish: wrote /tmp/pack
+  gh pr create --body-file /tmp/pack/page.md --attach /tmp/pack/figures/page-fig1.svg (or gh pr comment)
 ```
 
-**Exit codes**: 0 ok, 2 usage error (missing `--out`, `--body-out` without
-`--repo`/`--sha`/`--path`, or `--out` reused with `<page.html>` omitted
-while it holds anything other than exactly one existing `.md` pack), 3
-self-check failed, 4 a private word was found (unless `--internal`), 7 a
-`.wu-diffview` could not be rendered — same causes and remedies as
-`publish.mjs`'s table above.
+Without `--out`, it defaults to `<store>/.publish/<slug>.github/`. Runs
+the same pre-stage as every other target, in the same order (render →
+self-check → inline kit CSS → inline `.wu-shot` images → drop the back
+nav → **private-word check**, exit 4 on a hit unless `--internal` → size),
+then writes:
 
-writes `<out>/index.html` (the staged page — same rendering as any other
-`publish.mjs` target), `<out>/<slug>.md` (to-md's conversion) and
-`<out>/figures/*.svg` (one file per `.wu-figure`, each restyled by
-`standalone-svg.mjs` — see below). `--pdf` additionally renders
-`<out>/<slug>.pdf` via a headless Chromium if `playwright-core` resolves
-(`await import('playwright-core')`, or the module path in
-`$WRITEUP_PLAYWRIGHT_CORE`); if neither resolves it prints `pr-pack: pdf
-skipped (playwright-core not found)` and still exits 0 — a pack without a
-PDF is still useful.
+- **`<slug>.md`** — to-md's Markdown conversion, with every `.wu-figure`
+  linked as `figures/<name>.svg` — the exact relative path shape `gh
+  --attach` rewrites — and every `.wu-shot` linked as `figures/<file>` the
+  same way. The YAML frontmatter block to-md would normally emit is
+  stripped (GitHub would render it as a raw `---` fence, not metadata);
+  the `# title` line right after it stays.
+- **`figures/*.svg`** — one file per `.wu-figure`, each rewritten through
+  `standalone-svg.mjs` so it carries its own light-theme background and
+  tokens with no page CSS around it (see below), plus each `.wu-shot`'s
+  image file copied in as-is (already a raster, nothing to restyle).
+- **`<slug>.html`** — the same fully staged, self-contained document every
+  other target produces (kit CSS inlined, `.wu-shot` images inlined, back
+  nav dropped). Useful on its own as the 原本 — a human can attach it too,
+  or just keep it, even though nothing in this target ever uploads it
+  anywhere automatically.
+- **`<slug>.pdf`**, only with `--pdf` — rendered from that same
+  `<slug>.html` via a headless Chromium, if `playwright-core` resolves
+  (`await import('playwright-core')`, or the module path in
+  `$WRITEUP_PLAYWRIGHT_CORE`); if neither resolves, publish prints `pdf
+  skipped: playwright-core not found` and still exits 0 — a folder without
+  a PDF is still useful. **A PDF can only be attached to a PR *comment*,
+  not the description** (GitHub's description editor does not accept a
+  raw file upload the way a comment does), and even there it is a
+  clickable attachment, not rendered inline — mention it in the body as a
+  manual "see the attached PDF" pointer rather than expecting it to
+  display.
 
-This is a two-step SHA dance, because you cannot know a commit's SHA
-before you make the commit:
+`--dry-run` reports the plan — the folder path and the file list it would
+write — without writing anything.
+
+Once the folder exists, a human (or a follow-up tool call) runs:
 
 ```
-node $KIT/bin/pr-pack.mjs page.html --out docs/writeup/<slug> --pdf
-git add docs/writeup/<slug> && git commit -m "docs: add <slug> writeup pack"
-git push -u origin <branch>
-SHA=$(git rev-parse HEAD)
-node $KIT/bin/pr-pack.mjs --out docs/writeup/<slug> \
-  --repo <owner>/<repo> --sha "$SHA" --path docs/writeup/<slug> \
-  --body-out /tmp/body.md
-gh pr create --draft --title "<title>" --body-file /tmp/body.md
+gh pr create --body-file /tmp/pack/page.md --attach /tmp/pack/figures/page-fig1.svg --attach /tmp/pack/figures/page-fig2.svg
+# or, on an existing PR:
+gh pr comment <number> --body-file /tmp/pack/page.md --attach /tmp/pack/figures/page-fig1.svg
+# or --attach /tmp/pack/page.pdf on a comment, for the PDF
 ```
 
-The second run omits `<page.html>` — it reuses the pack already on disk
-(found by its `<slug>.md`) rather than re-rendering, since the whole point
-is to turn the *committed* pack into links, not a fresh copy of it.
-`--body-out` requires `--repo`, `--sha` and `--path` together; it rewrites
-every `](figures/…)` and `src="figures/…"` reference in the Markdown to
-`https://github.com/<owner>/<repo>/blob/<sha>/<path>/figures/…?raw=true`,
-strips the Markdown frontmatter block (GitHub would render it as a raw
-`---` fence, not metadata) while keeping the `# title` line, and appends a
-footer line: `> 原本（kit の見た目のまま）: <blob URL of index.html>`,
-plus `・PDF: <blob URL>` when the PDF exists. Only the figure links above
-carry `?raw=true` (they are an `<img>`/`![]()` src, which needs the raw
-bytes to render); the footer's two links are plain blob-view URLs a human
-clicks — GitHub's syntax-highlighted HTML source with a Download button
-for `index.html`, or its inline PDF preview for the PDF — and `?raw=true`
-on either would force a raw download instead.
+`--attach` accepts each figure individually; build the list from the
+files actually in `figures/` (publish's own printed hint already does
+this for you). On GHES, or with an older `gh`, there is no `--attach` at
+all — drag-and-drop the same `figures/*.svg` files into the PR
+description or comment editor by hand instead; GitHub still rewrites the
+Markdown references the same way.
 
 **What survives into the PR body's Markdown**: alerts (`> [!NOTE]` etc.),
-tables, ```` ```diff ```` fences, and a `mermaid` fence for any figure that
-carries diagram IR — GitHub renders all of these natively in a PR body.
-**What only `index.html` (and the PDF) keep**: the kit's own styling and
-type scale, diff view line numbers and hunk chrome, and the side table of
-contents — none of that survives HTML→Markdown, so link both in the PR
-description (`原本` = "the original, in the kit's own look") for a
-reviewer who wants the fuller picture.
+tables, ```` ```diff ```` fences, and code blocks — GitHub renders all of
+these natively. **What only the SVG figures (and the optional PDF) keep**:
+the kit's own styling and type scale, diff view line numbers and hunk
+chrome, and the side table of contents — none of that survives
+HTML→Markdown text, which is exactly why each figure ships as its own
+standalone image instead of being redrawn as a mermaid block (mermaid is
+not used anywhere in this kit).
 
 **Figures are opaque light cards, deliberately**: `standalone-svg.mjs`
 inlines the kit's light-theme tokens plus an opaque `var(--wu-surface)`
@@ -224,7 +230,10 @@ background into each figure SVG, so it reads as a light card on GitHub's
 theme too — `prefers-color-scheme` inside an `<img>` follows the *viewer's
 OS*, not GitHub's own light/dark toggle, so there is no single dark-aware
 variant that would track GitHub's theme; one opaque light card is the
-robust choice. A `.wu-shot` screenshot needs no such restyling — it is
-already a raster, so `to-md.mjs` just copies its file as-is into the same
-`<out>/figures/` directory, under its own basename, and links it the same
-way as a figure's SVG.
+robust choice.
+
+**Tokens**: `gh --attach` uploads as the account `gh` is authenticated
+as — either OAuth (`gh auth login`) or a fine-grained PAT with write
+access to the repository (attachments are a write, same as posting the PR
+or comment itself). No token or scope is specific to this feature beyond
+that.

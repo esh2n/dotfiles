@@ -36,7 +36,7 @@ place, tools that need it say so and name both paths they checked.
 Verify the copy:
 
 ```bash
-cd ~/.claude/skills/writeup-kit && node --test   # 1740 tests
+cd ~/.claude/skills/writeup-kit && node --test   # 1867 tests
 cd ~/.claude/skills/writeup     && node --test   #   15 tests
 ```
 
@@ -88,9 +88,8 @@ resolves to.
 | `self-check.mjs <page.html>` | Structural gate: required `<meta>`, header/footer chrome matching `kit/template.html`, component shape per kind, `data-checks="pass"` on every figure. `--write-meta` patches the `self-check=` key. |
 | `build.mjs --store <dir>` | Regenerates the store's `manifest.json` and `index.html` from each page's `<head>`, syncs `kit/writeup.css` into `_kit/`, and fixes each page's `.wu-nav` link and status favicon. |
 | `serve.mjs [--store <dir>]` | Static server on 127.0.0.1 for one store, or for every registered store on one port. Builds first unless `--no-build`. |
-| `publish.mjs <page.html> --to artifact\|cloudflare\|file` | Stages a page for an external audience, re-running self-check and a private-word scan first. |
+| `publish.mjs <page.html> --to artifact\|cloudflare\|file\|github` | Stages a page for an external audience, re-running self-check and a private-word scan first (`--internal` skips the scan, for a private company repo whose readers are its own members). `artifact`/`cloudflare`/`file` write one staged file; `github` instead writes a folder — `<slug>.md` (figures linked as `figures/<name>.svg`), `figures/*.svg` (each restyled standalone), `<slug>.html` (the staged document), and `<slug>.pdf` with `--pdf` — meant for `gh pr create\|comment --body-file <slug>.md --attach figures/...`, never a repo commit. |
 | `to-md.mjs <page.html>` | Converts a page to Markdown; `--figures-dir` writes each figure's SVG out and adds a mermaid block for node/edge diagrams. |
-| `pr-pack.mjs <page.html> --out <dir>` | Packs a page for a GitHub pull request: staged `index.html` + `<slug>.md` + `figures/*.svg`, optional `--pdf`; re-runs self-check and a private-word scan first (exit 4 on a hit; pass `--internal` for a private company repo where that check would only false-positive). `--repo/--sha/--path --body-out` turns a committed pack into a PR body of SHA-pinned blob URLs. |
 | `rerender-figures.mjs --store <dir>` | Re-renders every stored figure whose IR is still embedded, reporting fixed / warned / still-failing counts. |
 | `contrast.mjs` | Audits `kit/writeup.css` tokens for WCAG contrast in both themes. |
 | `migrate-explain-pages.mjs --src <dir> --dest <store>` | One-off importer for the old explain-pages Markdown format. |

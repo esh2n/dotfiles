@@ -400,12 +400,13 @@ as a diagram, never screenshot a diagram).
 - **Size**: keep the summed size of a page's `.wu-shot` images under 8MB —
   self-check warns above that, since the Artifact tool's own ceiling is
   16MB after the kit CSS is inlined alongside everything else on the page.
-- **Publish inlines it, `to-md`/`pr-pack` copy it to `figures/`.**
-  `publish.mjs` and `pr-pack.mjs` both turn a page-relative `src` into a
-  `data:` URI (`inlinePageAssets`) so the staged page stays one file;
-  `to-md.mjs` instead copies the file into a figures directory under its
-  own basename (or decodes a `data:` src to `<slug>-shot<N>.<ext>`) and
-  links it from the Markdown the same way `.wu-figure`'s SVG is.
+- **Publish inlines it; `to-md` and `publish --to github` copy it to
+  `figures/`.** Every `publish.mjs` target turns a page-relative `src`
+  into a `data:` URI (`inlinePageAssets`) so the `<slug>.html` it stages
+  stays one file; `--to github` additionally runs `to-md.mjs` to build the
+  folder's Markdown, which copies the file into `figures/` under its own
+  basename (or decodes a `data:` src to `<slug>-shot<N>.<ext>`) and links
+  it the same way `.wu-figure`'s SVG is.
 
 ### `.wu-figure` — `type: sequence` (participants + messages)
 

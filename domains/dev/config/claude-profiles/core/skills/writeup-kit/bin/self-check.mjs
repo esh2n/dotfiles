@@ -86,7 +86,7 @@ const HINTS = {
     ? 'put it in <figure class="wu-shot"> with src under <slug>-assets/ or a data: URI — components.md'
     : 'use a role-named .wu-* component from components.md'),
   'single-file': 'copy the file next to the page (<slug>-assets/) or use a data: URI; external hosts are never fetched',
-  'kit-css': 'run build; a page handed outside the store must be publish.mjs / pr-pack.mjs output, never the store file',
+  'kit-css': 'run build; a page handed outside the store must be publish.mjs output, never the store file',
   'required-meta': 'add the missing tag next to the others in <head> — see kit/template.html',
   'chrome': 'copy .wu-header/.wu-footer verbatim from kit/template.html and change only the text',
   'figure-pass': 're-render with render-diagram.mjs --figure and paste its <figure> as-is',

@@ -135,11 +135,11 @@ loss where mermaid is richer), then continue at step 3. Mapping table:
 
 The store page links `../_kit/writeup.css` (and, for a `.wu-shot`, its
 `<slug>-assets/` files) — both exist only inside the store, so a copy of
-the page handed anywhere else (the Artifact tool, Slack, email, a repo)
+the page handed anywhere else (the Artifact tool, Slack, email, a PR)
 renders unstyled and without pictures; the only HTML that ever leaves the
-store is `publish.mjs` / `pr-pack.mjs` output.
+store is `publish.mjs` output.
 
-`node $KIT/bin/publish.mjs page.html --to artifact|cloudflare|file …`.
+`node $KIT/bin/publish.mjs page.html --to artifact|cloudflare|file|github …`.
 `--to artifact` writes `<store>/.publish/<slug>.artifact.html` as a
 **fragment** (no `<!DOCTYPE>`/`<html>`/`<head>`/`<body>`, `<title>` first)
 already shaped for the Artifact tool's own contract — hand it to the tool
@@ -149,16 +149,23 @@ name="published-artifact">`, commit. Exit 4 (private-word refusal) is
 final — never bypass it. `--to cloudflare` needs `[cloudflare]
 access_verified = true`. Exit codes and walkthroughs: `references/publish.md`.
 
-**GitHub PR（非公開リポでも可）**: attaching a page to a pull request is not
-a `publish.mjs` target — there's no external host to hand a file to. Use
-`node $KIT/bin/pr-pack.mjs page.html --out <repo>/docs/writeup/<slug> --pdf`
-instead: it commits the staged page, its Markdown, and its figures straight
-into the repo and, once pushed, a second `--body-out` run turns them into a
-PR body of SHA-pinned `blob` URLs. It runs the same private-word check as
-`publish.mjs` by default (exit 4 on a hit) — a public repo's PR is exactly
-as exposed as an Artifact page; pass `--internal` only for a private
-company repo whose readers are its own members. Walkthrough:
-`references/publish.md`.
+**GitHub PR（非公開リポでも可）**: `--to github` is the one target that
+writes a **folder**, not a single file — there is no repo commit, no
+branch and no external host in this path, only GitHub's own attachment
+store. `node $KIT/bin/publish.mjs page.html --to github --out
+<dir> [--pdf] [--internal]` writes `<slug>.md` (figures linked as
+`figures/<name>.svg`), `figures/*.svg` restyled standalone, a staged
+`<slug>.html` (the 原本, useful on its own), and `<slug>.pdf` with `--pdf`.
+Hand the folder to `gh pr create|comment --body-file <slug>.md --attach
+figures/... [--attach <slug>.pdf]` — `--attach` uploads the files and
+rewrites the Markdown's `![alt](figures/x.svg)` references to the
+uploaded URLs (`gh` version: the next release after 2.98.0, or trunk —
+GHES does not support it; on GHES, or an older `gh`, drag the same
+`figures/` files into the PR editor by hand instead). It runs the same
+private-word check as every other target by default (exit 4 on a hit) —
+a public repo's PR is exactly as exposed as an Artifact page; pass
+`--internal` only for a private company repo whose readers are its own
+members. Walkthrough: `references/publish.md`.
 
 ## Common Mistakes
 

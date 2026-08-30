@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // publish.mjs — stages a page for an external audience (contract §8).
-// Pre-stage, always in this order: (0) --to is one of the 3 known targets,
+// Pre-stage, always in this order: (0) --to is one of the 4 known targets,
 // (1) run build's rendering passes (viewport meta, `.wu-diffview` tables,
 // code highlighting — `ensureRendered`) so a page that skipped `build`, or a
 // kit reference page no store build scans, never ships unrendered, then
@@ -10,20 +10,31 @@
 // every `.wu-shot` image (a page-relative `<slug>-assets/*` file) as a
 // `data:` URI (`inlinePageAssets`) so the staged output stays one file for
 // every target, (4) adjust `.wu-header`'s back-to-index nav for the target
-// (dropped for file/artifact; rewritten to `/index.html` or dropped for
-// cloudflare — see `adjustBackNav`), (5) reject on a company-trace word
-// hit, (6) enforce the 16MB Artifact-tool size ceiling. Then dispatch to
-// one of 3 targets: `file` and `cloudflare` write the staged text as a
-// full, standalone document (a Slack attachment / email, and a hosted
-// page, both need one); `artifact` writes it through `toArtifactFragment`
-// instead, which strips the `<!DOCTYPE>`/`<html>`/`<head>`/`<body>`
-// skeleton and the charset/viewport `<meta>`s — the Artifact tool supplies
-// its own version of exactly those, and wraps whatever this returns inside
-// them, so a full document there would double them up. The status favicon
-// `<link rel="icon">` (page-contract.md §1) is not touched by any of this
-// — its href is an inline `data:` URI already, so it carries through to
-// every target unchanged (and survives `toArtifactFragment` too, since
-// that only removes the skeleton tags and the two `<meta>`s named above).
+// (dropped for file/artifact/github; rewritten to `/index.html` or dropped
+// for cloudflare — see `adjustBackNav`), (5) reject on a company-trace word
+// hit (skippable with `--internal`, for a private repo whose readers are
+// its own members — `github` only), (6) enforce the 16MB Artifact-tool
+// size ceiling. Then dispatch to one of 4 targets: `file` and `cloudflare`
+// write the staged text as a full, standalone document (a Slack attachment
+// / email, and a hosted page, both need one); `artifact` writes it through
+// `toArtifactFragment` instead, which strips the
+// `<!DOCTYPE>`/`<html>`/`<head>`/`<body>` skeleton and the charset/viewport
+// `<meta>`s — the Artifact tool supplies its own version of exactly those,
+// and wraps whatever this returns inside them, so a full document there
+// would double them up. `github` is the one target that writes a folder,
+// not a single file: there is no external host to hand a GitHub PR body a
+// file, only GitHub's own attachment store, and the only door into that is
+// `gh pr create|edit|comment --attach` rewriting `![alt](figures/x.svg)`
+// references in an uploaded Markdown body — so this target never touches a
+// repository, computes no SHA, and calls no `gh` itself; it just writes
+// `<slug>.md` (figures linked as `figures/<name>.svg`, the exact relative
+// shape `--attach` rewrites) plus the `figures/` files plus a staged
+// `<slug>.html` (and optionally `<slug>.pdf`) for a human to attach, drag
+// in, or keep as the 原本. The status favicon `<link rel="icon">`
+// (page-contract.md §1) is not touched by any of this — its href is an
+// inline `data:` URI already, so it carries through to every target
+// unchanged (and survives `toArtifactFragment` too, since that only
+// removes the skeleton tags and the two `<meta>`s named above).
 //
 // Exit codes: 0 success/dry-run, 2 usage error (including `--to artifact`
 // failing to locate the skeleton `toArtifactFragment` needs), 3 self-check
@@ -32,7 +43,7 @@
 // kit CSS `<link>` survived inlining (see `inlineKitCss`'s comment-skip
 // below).
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
@@ -41,6 +52,9 @@ import { ensureRendered } from './build.mjs'
 import { resolveStoreDir, privateWords, cloudflareConfig } from './lib/store.mjs'
 import { parseHtml, headMeta, titleText, textContent, findFirst, tagName } from './lib/html.mjs'
 import { resolvePageAsset } from './lib/assets.mjs'
+import { convertToMarkdown } from './to-md.mjs'
+import { standaloneSvg } from './lib/standalone-svg.mjs'
+import { renderPdf } from './lib/pdf.mjs'
 
 const MAX_BYTES = 16 * 1024 * 1024
 
@@ -227,16 +241,24 @@ function wranglerAvailable() {
 
 /**
  * Runs the full pre-stage and dispatches to the requested target.
- * @returns {{ok: true, target: string, output?: string, command?: string, dryRun?: boolean}}
+ *
+ * Synchronous for the `file`/`artifact`/`cloudflare` targets (unchanged
+ * from before `github` existed — every existing caller keeps working
+ * without an `await`). `github` returns a `Promise` instead — writing its
+ * folder can involve an async PDF render (`--pdf`) — so callers of that
+ * target must `await` the result.
+ *
+ * @returns {{ok: true, target: string, output?: string, command?: string, dryRun?: boolean}
+ *   | Promise<{ok: true, target: 'github', output: string, md: string, figuresDir: string, html: string, pdf?: object, hint: string}>}
  */
 export function publish(pageFile, opts) {
-  const { to, out, store, storeName, dryRun = false, deploy = false } = opts
+  const { to, out, store, storeName, dryRun = false, deploy = false, internal = false, pdf = false } = opts
   // The page's own store (an ancestor `.writeup.toml`) wins over the
   // registry's marker/default pick, so a page in `work/` is checked against
   // `work/.writeup.toml`'s private words even when run from elsewhere.
   const storeDir = resolveStoreDir(store, { name: storeName, cwd: dirname(resolve(pageFile)) })
 
-  if (!['file', 'artifact', 'cloudflare'].includes(to)) {
+  if (!['file', 'artifact', 'cloudflare', 'github'].includes(to)) {
     throw new PublishError(2, `unknown --to target: ${to}`)
   }
 
@@ -258,9 +280,11 @@ export function publish(pageFile, opts) {
   const assetsInlined = inlinePageAssets(cssInlined, dirname(pageFile))
   const staged = adjustBackNav(assetsInlined, to, storeDir)
 
-  const hits = findPrivateWordHits(staged, privateWords(storeDir))
-  if (hits.length) {
-    throw new PublishError(4, 'publish refused: private words found on the page', hits.join(', '))
+  if (!internal) {
+    const hits = findPrivateWordHits(staged, privateWords(storeDir))
+    if (hits.length) {
+      throw new PublishError(4, 'publish refused: private words found on the page', hits.join(', '))
+    }
   }
 
   assertSize(staged)
@@ -268,11 +292,12 @@ export function publish(pageFile, opts) {
   if (to === 'cloudflare') assertCloudflareAccess(storeDir)
 
   if (dryRun) {
-    return planDryRun(pageFile, staged, { to, out, storeDir, deploy })
+    return planDryRun(pageFile, staged, { to, out, storeDir, deploy, pdf })
   }
 
   if (to === 'file') return publishToFile(staged, out)
   if (to === 'artifact') return publishToArtifact(staged, pageFile, storeDir)
+  if (to === 'github') return publishToGithub(staged, rendered, pageFile, storeDir, { out, pdf })
   return publishToCloudflare(staged, pageFile, storeDir, { deploy })
 }
 
@@ -283,7 +308,7 @@ function assertCloudflareAccess(storeDir) {
   }
 }
 
-function planDryRun(pageFile, staged, { to, out, storeDir, deploy }) {
+function planDryRun(pageFile, staged, { to, out, storeDir, deploy, pdf }) {
   const bytes = Buffer.byteLength(staged, 'utf8')
   const plan = { ok: true, target: to, dryRun: true, bytes }
   if (to === 'file') plan.output = out || '(missing --out)'
@@ -301,6 +326,15 @@ function planDryRun(pageFile, staged, { to, out, storeDir, deploy }) {
     const project = cloudflareConfig(storeDir).project || '<project>'
     plan.command = `wrangler pages deploy public --project-name ${project}`
     plan.wouldDeploy = deploy
+  }
+  if (to === 'github') {
+    const slug = slugOf(pageFile)
+    plan.output = githubOutDir(storeDir, slug, out)
+    // Exact figure file names depend on each figure's IR id, only known
+    // once to-md.mjs actually walks the page — a dry-run reports the
+    // shape of what would land in the folder, not the final names.
+    plan.files = [`${slug}.md`, `${slug}.html`, 'figures/ (*.svg per .wu-figure, plus any .wu-shot copies)']
+    if (pdf) plan.files.push(`${slug}.pdf`)
   }
   return plan
 }
@@ -385,6 +419,94 @@ function publishToArtifact(staged, pageFile, storeDir) {
   return { ok: true, target: 'artifact', output: out }
 }
 
+const FRONTMATTER_RE = /^---\n[\s\S]*?\n---\n\n?/
+
+/** Strips to-md's YAML frontmatter block, keeping the `# title` line right
+ * after it — a GitHub PR body would otherwise render the frontmatter as a
+ * raw `---` fence, not metadata. */
+function stripFrontmatter(md) {
+  return md.replace(FRONTMATTER_RE, '')
+}
+
+function githubOutDir(storeDir, slug, out) {
+  return out || join(storeDir, '.publish', `${slug}.github`)
+}
+
+/** Rewrites every `*.svg` to-md just wrote into `figuresDir` through
+ * `standaloneSvg`, using the kit's own `writeup.css` (figures are a kit
+ * component; a store's `_kit/writeup.css` is only ever a synced copy of
+ * the same file, so reading the kit's copy directly needs no store at
+ * all — useful when `pageFile` has no store, like kit/samples.html). A
+ * `.wu-shot` copy (already a raster) is left untouched. */
+function restyleFigures(figuresDir) {
+  if (!existsSync(figuresDir)) return
+  const cssPath = join(KIT_DIR, 'writeup.css')
+  const cssText = existsSync(cssPath) ? readFileSync(cssPath, 'utf8') : ''
+  for (const name of readdirSync(figuresDir)) {
+    if (!name.endsWith('.svg')) continue
+    const file = join(figuresDir, name)
+    const svg = readFileSync(file, 'utf8')
+    writeFileSync(file, standaloneSvg(svg, cssText))
+  }
+}
+
+/** A `gh` invocation the caller can run once the folder is committed
+ * nowhere and attached everywhere: `--attach` uploads each figure to
+ * GitHub's own attachment store and rewrites the Markdown body's
+ * `![alt](figures/x.svg)` references to the uploaded URLs. Built from the
+ * actual files on disk, not a guess — a page with no figures gets a plain
+ * `--body-file` command. */
+function attachHint(mdPath, figuresDir) {
+  const files = existsSync(figuresDir) ? readdirSync(figuresDir).sort() : []
+  const attach = files.map((f) => `--attach ${join(figuresDir, f)}`).join(' ')
+  const base = `gh pr create --body-file ${mdPath}`
+  return `${attach ? `${base} ${attach}` : base} (or gh pr comment)`
+}
+
+/**
+ * Writes the `github` target's output folder: `<slug>.md` (to-md's
+ * Markdown, figures linked as `figures/<name>.svg` — the exact relative
+ * shape `gh --attach` rewrites), `figures/*.svg` (each `.wu-figure`
+ * restyled through `standaloneSvg` so it carries its own look) plus any
+ * `.wu-shot` file copied alongside them, `<slug>.html` (the same staged,
+ * fully self-contained document every other target produces — useful on
+ * its own as the 原本 for a human to attach or keep), and, only with
+ * `--pdf`, `<slug>.pdf` rendered from that same `<slug>.html`.
+ *
+ * Never writes into a repository, computes no SHA, and never calls `gh`
+ * itself — the only door into a PR's body or a comment is `gh`'s own
+ * `--attach` upload, run by a human (or a follow-up tool call) afterward.
+ *
+ * Async only because `--pdf` is (`renderPdf` launches a real headless
+ * Chromium); the caller (`publish()`) returns whatever this returns, so
+ * only a `--to github` call needs an `await` — every other target stays
+ * synchronous.
+ */
+async function publishToGithub(staged, rendered, pageFile, storeDir, { out, pdf: wantPdf }) {
+  const slug = slugOf(pageFile)
+  const dir = githubOutDir(storeDir, slug, out)
+  const figuresDir = join(dir, 'figures')
+  mkdirSync(dir, { recursive: true })
+
+  const htmlPath = join(dir, `${slug}.html`)
+  writeFileSync(htmlPath, staged)
+
+  const md = convertToMarkdown(rendered, { slug, figuresDir, figuresDirRel: 'figures', pageDir: dirname(pageFile) })
+  const mdPath = join(dir, `${slug}.md`)
+  writeFileSync(mdPath, stripFrontmatter(md))
+
+  restyleFigures(figuresDir)
+
+  const result = { ok: true, target: 'github', output: dir, md: mdPath, figuresDir, html: htmlPath }
+
+  if (wantPdf) {
+    result.pdf = await renderPdf(htmlPath, join(dir, `${slug}.pdf`))
+  }
+
+  result.hint = attachHint(mdPath, figuresDir)
+  return result
+}
+
 function publishToCloudflare(staged, pageFile, storeDir, { deploy }) {
   const cfg = cloudflareConfig(storeDir)
   const rel = relative(storeDir, pageFile)
@@ -413,7 +535,10 @@ function publishToCloudflare(staged, pageFile, storeDir, { deploy }) {
 // --- CLI --------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { file: null, to: null, out: null, store: null, storeName: null, dryRun: false, deploy: false }
+  const args = {
+    file: null, to: null, out: null, store: null, storeName: null,
+    dryRun: false, deploy: false, pdf: false, internal: false,
+  }
   const positional = []
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
@@ -423,29 +548,40 @@ function parseArgs(argv) {
     else if (a === '--store-name') args.storeName = argv[++i]
     else if (a === '--dry-run') args.dryRun = true
     else if (a === '--deploy') args.deploy = true
+    else if (a === '--pdf') args.pdf = true
+    else if (a === '--internal') args.internal = true
     else positional.push(a)
   }
   args.file = positional[0] ?? null
   return args
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (!args.file || !args.to) {
-    console.error('usage: node bin/publish.mjs <page.html> --to artifact|cloudflare|file [--out path] [--store dir | --store-name name] [--dry-run] [--deploy]')
+    console.error('usage: node bin/publish.mjs <page.html> --to artifact|cloudflare|file|github [--out path] [--store dir | --store-name name] [--dry-run] [--deploy] [--pdf] [--internal]')
     return 2
   }
   try {
-    const result = publish(args.file, args)
+    const result = await publish(args.file, args)
     if (result.dryRun) {
       console.log(`publish --dry-run: target=${result.target} bytes=${result.bytes}`)
       console.log(`  output: ${result.output}`)
       if (result.fragment) console.log('  note: written as a <head>/<body>-stripped fragment for the Artifact tool, not a full document — bytes above is the pre-fragment upper bound')
       if (result.command) console.log(`  command: ${result.command}${result.wouldDeploy ? '' : ' (not run; pass --deploy)'}`)
+      if (result.files) {
+        console.log(`  would write, under ${result.output}/:`)
+        for (const f of result.files) console.log(`    ${f}`)
+      }
     } else {
       console.log(`publish: wrote ${result.output}`)
       if (result.command) console.log(`  ${result.deployed ? 'ran' : 'to deploy'}: ${result.command}`)
       if (result.deploySkippedReason) console.log(`  skipped deploy: ${result.deploySkippedReason}`)
+      if (result.pdf) {
+        if (result.pdf.generated) console.log(`  pdf: ${result.pdf.path}`)
+        else console.log(`  pdf skipped: ${result.pdf.reason}`)
+      }
+      if (result.hint) console.log(`  ${result.hint}`)
     }
     return 0
   } catch (e) {
@@ -460,5 +596,5 @@ function main() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  process.exit(main())
+  main().then((code) => process.exit(code))
 }

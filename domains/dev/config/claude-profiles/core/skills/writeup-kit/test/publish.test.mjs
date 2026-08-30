@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,6 +15,7 @@ const ROOT = join(HERE, '..')
 const FIXTURE_STORE = join(ROOT, 'test', 'fixtures', 'store')
 const PUBLISH_BIN = join(ROOT, 'bin', 'publish.mjs')
 const DECISION_REL = join('decision', '2026-08-01-example-decision.html')
+const DESIGN_REL = join('design', '2026-08-05-example-design.html')
 
 function freshStore() {
   const dir = mkdtempSync(join(tmpdir(), 'wu-publish-'))
@@ -268,7 +269,7 @@ describe('publish(): pre-stage guards', () => {
     // The hunk header claims 5 old and 5 new lines but only one line
     // follows it — parseUnifiedDiff (bin/lib/diffview.mjs) throws "hunk
     // ends early", which ensureDiffViews turns into an onError call rather
-    // than letting it propagate; publish/pr-pack collect those and refuse.
+    // than letting it propagate; publish collects those and refuses.
     writeFileSync(badPage, [
       '<!DOCTYPE html><html><head><title>t</title></head><body>',
       '<figure class="wu-diffview"><script type="text/x-writeup-diff">',
@@ -617,5 +618,270 @@ describe('publish(): --to artifact is a fragment, --to file is still a full docu
     const store = freshStore()
     const result = publish(join(store, DECISION_REL), { to: 'file', out: join(store, 'x.html'), store, dryRun: true })
     assert.ok(!result.fragment)
+  })
+})
+
+// --- --to github ------------------------------------------------------------
+// `github` is the one target that writes a folder, not a single file: a
+// GitHub PR body has no repo write, no branch and no external host to hand
+// a file to — the only door in is `gh --attach` uploading the Markdown's
+// figures/ files. See bin/publish.mjs's publishToGithub() docblock.
+
+function freshGithubOut() {
+  return mkdtempSync(join(tmpdir(), 'wu-publish-github-out-'))
+}
+
+describe('publish(): --to github writes a folder', () => {
+  test('writes <slug>.md, <slug>.html and figures/*.svg for a page with a figure', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    assert.equal(result.ok, true)
+    assert.equal(result.target, 'github')
+    assert.equal(result.output, out)
+    assert.ok(existsSync(join(out, '2026-08-05-example-design.md')))
+    assert.ok(existsSync(join(out, '2026-08-05-example-design.html')))
+    const figs = readdirSync(join(out, 'figures')).filter((f) => f.endsWith('.svg'))
+    assert.ok(figs.length >= 1, 'expected at least one figure svg')
+  })
+
+  test('defaults to <store>/.publish/<slug>.github when --out is omitted', async () => {
+    const store = freshStore()
+    const result = await publish(join(store, DESIGN_REL), { to: 'github', store })
+    assert.equal(result.output, join(store, '.publish', '2026-08-05-example-design.github'))
+  })
+
+  test('the md links its figure under figures/ — the exact relative shape gh --attach rewrites', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    const md = readFileSync(join(out, '2026-08-05-example-design.md'), 'utf8')
+    assert.match(md, /!\[[^\]]*\]\(figures\/[^)]+\.svg\)/)
+  })
+
+  test('the figure svg is rewritten through standaloneSvg (carries its own style + background)', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    const figs = readdirSync(join(out, 'figures')).filter((f) => f.endsWith('.svg'))
+    const svg = readFileSync(join(out, 'figures', figs[0]), 'utf8')
+    assert.match(svg, /^<svg[^>]*><style/)
+    assert.match(svg, /fill="var\(--wu-surface\)"/)
+  })
+
+  test('<slug>.html is a full standalone document (not a fragment) with no back nav and an inline <style>', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    const html = readFileSync(result.html, 'utf8')
+    assert.match(html, /^<!DOCTYPE html>/)
+    assert.match(html, /<head>/)
+    assert.match(html, /<body>/)
+    assert.ok(!html.includes('<nav class="wu-nav"'))
+    assert.match(html, /<style>[\s\S]*<\/style>/)
+  })
+
+  test('strips the frontmatter block from the md but keeps the # title line', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    const md = readFileSync(join(out, '2026-08-05-example-design.md'), 'utf8')
+    assert.ok(!md.startsWith('---'))
+    assert.match(md, /^# /)
+  })
+
+  test('returns a gh --attach hint built from the actual figure files on disk', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    assert.match(result.hint, /^gh pr create --body-file /)
+    assert.ok(result.hint.includes(join(out, '2026-08-05-example-design.md')))
+    const figs = readdirSync(join(out, 'figures')).filter((f) => f.endsWith('.svg'))
+    for (const f of figs) assert.ok(result.hint.includes(`--attach ${join(out, 'figures', f)}`))
+    assert.match(result.hint, /\(or gh pr comment\)$/)
+  })
+})
+
+describe('publish(): --to github .wu-shot images', () => {
+  function addShot(store) {
+    const pagePath = join(store, DESIGN_REL)
+    const assetDir = join(dirname(pagePath), '2026-08-05-example-design-assets')
+    mkdirSync(assetDir, { recursive: true })
+    writeFileSync(join(assetDir, 'shot.png'), makeTinyPng())
+    const html = readFileSync(pagePath, 'utf8')
+    const shot = '<figure class="wu-shot"><img src="2026-08-05-example-design-assets/shot.png" alt="実機の画面"><figcaption>実機の見え方</figcaption></figure>'
+    writeFileSync(pagePath, html.replace('</main>', shot + '</main>'))
+    return pagePath
+  }
+
+  test('is copied into <out>/figures/ (collision-proof <slug>-shot<N>-<basename>) and linked from the md', async () => {
+    const store = freshStore()
+    const pagePath = addShot(store)
+    const out = freshGithubOut()
+    await publish(pagePath, { to: 'github', store, out })
+    assert.ok(existsSync(join(out, 'figures', '2026-08-05-example-design-shot2-shot.png')))
+    const md = readFileSync(join(out, '2026-08-05-example-design.md'), 'utf8')
+    assert.match(md, /!\[実機の画面\]\(figures\/2026-08-05-example-design-shot2-shot\.png\)/)
+  })
+
+  test('<slug>.html still carries it inlined as a data: URI, not a page-relative src', async () => {
+    const store = freshStore()
+    const pagePath = addShot(store)
+    const out = freshGithubOut()
+    const result = await publish(pagePath, { to: 'github', store, out })
+    const html = readFileSync(result.html, 'utf8')
+    assert.match(html, /<img src="data:image\/png;base64,/)
+  })
+})
+
+describe('publish(): --to github --pdf', () => {
+  test('without playwright-core, skips gracefully — still ok, no .pdf on disk', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const savedEnv = process.env.WRITEUP_PLAYWRIGHT_CORE
+    delete process.env.WRITEUP_PLAYWRIGHT_CORE
+    try {
+      const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out, pdf: true })
+      assert.equal(result.ok, true)
+      assert.equal(result.pdf.generated, false)
+      assert.ok(!existsSync(join(out, '2026-08-05-example-design.pdf')))
+    } finally {
+      if (savedEnv !== undefined) process.env.WRITEUP_PLAYWRIGHT_CORE = savedEnv
+    }
+  })
+
+  test('without --pdf, the result carries no pdf key and no file is written', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    assert.equal(result.pdf, undefined)
+    assert.ok(!existsSync(join(out, '2026-08-05-example-design.pdf')))
+  })
+})
+
+describe('publish(): --to github --dry-run writes nothing', () => {
+  test('reports the planned folder and file list without touching disk', () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = publish(join(store, DESIGN_REL), { to: 'github', store, out, dryRun: true })
+    assert.equal(result.dryRun, true)
+    assert.equal(result.target, 'github')
+    assert.equal(result.output, out)
+    assert.ok(result.files.some((f) => f.endsWith('.md')))
+    assert.ok(result.files.some((f) => f.endsWith('.html')))
+    assert.ok(!existsSync(join(out, '2026-08-05-example-design.md')))
+    assert.ok(!existsSync(join(out, '2026-08-05-example-design.html')))
+  })
+
+  test('--pdf on a dry-run lists the .pdf file too', () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = publish(join(store, DESIGN_REL), { to: 'github', store, out, dryRun: true, pdf: true })
+    assert.ok(result.files.some((f) => f.endsWith('.pdf')))
+  })
+})
+
+describe('publish(): --to github private-word gate', () => {
+  function withPrivateWord(store) {
+    const pagePath = join(store, DESIGN_REL)
+    const html = readFileSync(pagePath, 'utf8')
+      .replace('実装担当者向けに、アップロード経路の段構成を1つに決める。', 'acmecorpの実装担当者向けに、アップロード経路の段構成を1つに決める。')
+    writeFileSync(pagePath, html)
+    return pagePath
+  }
+
+  test('a page hitting a private word is refused at exit code 4 without --internal', async () => {
+    const store = freshStore()
+    const pagePath = withPrivateWord(store)
+    const out = freshGithubOut()
+    await assert.rejects(
+      async () => publish(pagePath, { to: 'github', store, out }),
+      (e) => e instanceof PublishError && e.code === 4 && /acmecorp/.test(e.detail),
+    )
+  })
+
+  test('the same page packs fine with --internal', async () => {
+    const store = freshStore()
+    const pagePath = withPrivateWord(store)
+    const out = freshGithubOut()
+    const result = await publish(pagePath, { to: 'github', store, out, internal: true })
+    assert.equal(result.ok, true)
+    assert.ok(existsSync(join(out, '2026-08-05-example-design.md')))
+  })
+})
+
+describe('publish(): --to github unrenderable .wu-diffview', () => {
+  test('throws PublishError(7) instead of writing a folder for a page with a diff that fails to parse', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const badPage = join(store, 'bad-diff-github.html')
+    writeFileSync(badPage, [
+      '<!DOCTYPE html><html><head><title>t</title></head><body>',
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">',
+      '@@ -1,5 +1,5 @@',
+      ' unchanged',
+      '</script></figure>',
+      '</body></html>',
+    ].join('\n'))
+    await assert.rejects(
+      async () => publish(badPage, { to: 'github', store, out }),
+      (e) => e instanceof PublishError && e.code === 7,
+    )
+  })
+})
+
+describe('publish(): --to github CLI', () => {
+  test('exit code 0 for a clean publish; writes the folder', () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const r = spawnSync(process.execPath, [
+      PUBLISH_BIN, join(store, DESIGN_REL), '--to', 'github', '--out', out, '--store', store,
+    ])
+    assert.equal(r.status, 0, r.stderr.toString())
+    assert.ok(existsSync(join(out, '2026-08-05-example-design.md')))
+    assert.ok(existsSync(join(out, '2026-08-05-example-design.html')))
+  })
+
+  test('exit code 4 without --internal on a private-word hit, exit 0 with it', () => {
+    const store = freshStore()
+    const pagePath = join(store, DESIGN_REL)
+    const html = readFileSync(pagePath, 'utf8')
+      .replace('実装担当者向けに、アップロード経路の段構成を1つに決める。', 'ACME-INTERNALの方針。')
+    writeFileSync(pagePath, html)
+
+    const out1 = freshGithubOut()
+    const r1 = spawnSync(process.execPath, [PUBLISH_BIN, pagePath, '--to', 'github', '--out', out1, '--store', store])
+    assert.equal(r1.status, 4)
+
+    const out2 = freshGithubOut()
+    const r2 = spawnSync(process.execPath, [PUBLISH_BIN, pagePath, '--to', 'github', '--out', out2, '--store', store, '--internal'])
+    assert.equal(r2.status, 0, r2.stderr.toString())
+  })
+
+  test('--dry-run reports the plan and writes nothing', () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const r = spawnSync(process.execPath, [
+      PUBLISH_BIN, join(store, DESIGN_REL), '--to', 'github', '--out', out, '--store', store, '--dry-run',
+    ])
+    assert.equal(r.status, 0, r.stderr.toString())
+    assert.match(r.stdout.toString(), /would write/)
+    assert.ok(!existsSync(join(out, '2026-08-05-example-design.md')))
+  })
+
+  test('an unrenderable .wu-diffview exits 7', () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const badPage = join(store, 'bad-diff-github-cli.html')
+    writeFileSync(badPage, [
+      '<!DOCTYPE html><html><head><title>t</title></head><body>',
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">',
+      '@@ -1,5 +1,5 @@',
+      ' unchanged',
+      '</script></figure>',
+      '</body></html>',
+    ].join('\n'))
+    const r = spawnSync(process.execPath, [PUBLISH_BIN, badPage, '--to', 'github', '--out', out, '--store', store])
+    assert.equal(r.status, 7)
   })
 })

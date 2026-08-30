@@ -288,11 +288,11 @@ deterministic. Any element not in this table makes self-check emit a warn.
 The store page itself links `../_kit/writeup.css` and, for a `.wu-shot`,
 its `<slug>-assets/` files — both of which exist only inside the store, so
 a copy of the page handed anywhere else renders unstyled and without
-pictures; the only HTML that ever leaves the store is `publish.mjs` /
-`pr-pack.mjs` output.
+pictures; the only HTML that ever leaves the store is `publish.mjs`
+output.
 
 ```
-writeup publish <page> --to artifact | cloudflare | file [--out <path>]
+writeup publish <page> --to artifact | cloudflare | file | github [--out <path>] [--pdf] [--internal]
 ```
 
 **Pre-stage (common to every target), in order:**
@@ -300,14 +300,16 @@ writeup publish <page> --to artifact | cloudflare | file [--out <path>]
 1. self-check passes
 2. Kit CSS is inlined; the Google Fonts `<link>` is left in place
 3. Every `.wu-shot` image is inlined as a `data:` URI (`inlinePageAssets`)
-4. A check for company traces
+4. A check for company traces (skippable with `--internal`)
 5. File size ≤ 16MB
 
 **Company-trace check**: rejects the publish if the page body or meta
 contains any word from the store's own `.writeup.toml` `[private]` list
 (internal domains, org names, product names, abbreviations — one hit is
 enough to reject). This list is kept per store, one per person/org — it is
-never shipped inside the kit.
+never shipped inside the kit. `--internal` skips it, for a private company
+repo whose PR readers are the repo's own members and internal names are
+expected — that is the one case where the check would only false-positive.
 
 **Targets:**
 
@@ -316,14 +318,11 @@ never shipped inside the kit.
 | `artifact` | Writes `<store>/.publish/<slug>.artifact.html` as a **fragment**, not a full document — `toArtifactFragment` strips `<!DOCTYPE>`/`<html>`/`<head>`/`<body>` and the charset/viewport `<meta>`s (the Artifact tool supplies its own skeleton and those two metas), keeping `<title>` first, per the tool's own contract. Hand the file to the Artifact tool as-is; the returned URL is written back into `<meta name="published-artifact">` on the source page and committed. |
 | `cloudflare` | Places the file at `store/public/<same relative path>`, then runs `wrangler pages deploy` against `public/` only. Rejected if Cloudflare Access is not enabled. `noindex` is verified before deploy. |
 | `file` | Writes the single file to `--out` (for a Slack attachment or email). |
+| `github` | The only target that writes a **folder**, not one file — `<store>/.publish/<slug>.github/` (or `--out <dir>`): `<slug>.md` (to-md's Markdown, figures linked as `figures/<name>.svg`), `figures/*.svg` (each restyled standalone) plus copied `.wu-shot` files, `<slug>.html` (the same staged document every other target produces), and `<slug>.pdf` with `--pdf`. Never writes into a repository, computes no SHA, and never calls `gh` — it just writes the folder a human (or a follow-up tool call) hands to `gh pr create\|edit\|comment --body-file <slug>.md --attach figures/...`, which uploads the figures to GitHub's own attachment store and rewrites the Markdown's `![alt](figures/x.svg)` references to the uploaded URLs. |
 
-**GitHub pull request** is not a `publish()` target — there is no external
-host to hand a file to, private repo or not. `bin/pr-pack.mjs` is a
-separate CLI that shares this pre-stage (minus the company-trace check:
-the audience for a link inside the repo's own PR is that repo's own
-members) and commits everything — staged page, Markdown, figures, optional
-PDF — into the repo itself, referenced from the PR body by SHA-pinned
-`blob` URLs. See `writeup/references/publish.md`.
+See `writeup/references/publish.md` for the `github` target's full
+walkthrough (`gh` version requirement, what survives HTML→Markdown, and
+why PDF is comment-only).
 
 ## 7. Cross-skill resolution
 
