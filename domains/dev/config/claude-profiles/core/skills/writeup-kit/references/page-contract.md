@@ -159,7 +159,7 @@ rows (listed under `infos` in `--json`) are suggestions.
 
 | Item | What is checked | On failure |
 |---|---|---|
-| Single file; external references limited to `_kit/writeup.css`, Google Fonts, and a `rel="icon"` `data:` href | `href`/`src` of every `link`/`script`/`img` (an `<img src>` is allowed when it is page-relative or a `data:` URI — never `http(s):`) | error |
+| Single file; external references limited to `_kit/writeup.css`, Google Fonts, and a `rel="icon"` `data:` href | `href`/`src` of every `link`/`script`/`img`/svg `image` (an `<img src>` or svg `<image href>`/`xlink:href` is allowed when it is page-relative or a `data:` URI — never `http(s):`) | error |
 | Required head meta (`title` / `description` / `kind` / `date`) | Present, and `kind` is one of the 8 values | error |
 | Kit stylesheet link (`kit-css`) | A `<link rel="stylesheet">` resolves to `_kit/writeup.css` at the page's depth (the bare `./writeup.css` is accepted only for the kit's own pages, which really do sit beside the file; a page with the CSS inlined in a `<style>` — a publish target — is exempt) | error |
 | Inline scripts | The only executable `<script>` a page may carry is `build`'s side-TOC scroll spy, byte-identical to `SIDETOC_SCRIPT` in `bin/build.mjs` and present at most once; a `<script type="text/x-writeup-diagram">` IR block is inert data, not a script | error |

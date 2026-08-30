@@ -182,13 +182,16 @@ export function runSelfCheckText(raw, filePath) {
 function checkSingleFile(root, add) {
   for (const ref of externalRefs(root)) {
     const url = ref.url
-    if (ref.tag === 'img') {
+    if (ref.tag === 'img' || ref.tag === 'image') {
       // A .wu-shot image lives next to the page (`<slug>-assets/…`) or is
       // inlined as a data: URI — never fetched from an external host. Its
       // existence on disk, alt text, and one-per-figure rule are checked
       // separately by `checkShot`; this row only screens the URL shape.
+      // The same rule applies to a bare svg `<image>` (`href`/`xlink:href`):
+      // a screenshot belongs in `.wu-shot`, never inside a figure's SVG
+      // (components.md), so this is the only gate such a reference gets.
       if (url.startsWith('data:') || isPageRelativeUrl(url)) continue
-      add('error', 'single-file', `img references disallowed external URL: ${url}`)
+      add('error', 'single-file', `${ref.tag} references disallowed external URL: ${url}`)
       continue
     }
     if (isAllowedExternal(url)) continue

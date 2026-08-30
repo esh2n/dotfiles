@@ -372,6 +372,12 @@ none` to opt that diagram back out to elk's default layout — see
 `references/procedure.md` in the `writeup` skill for the full IR hint
 list.
 
+The renderer never emits an `<image>` element inside a `.wu-figure`'s
+`<svg>` — a screenshot belongs in `.wu-shot` (below), never embedded as an
+`<image href>`/`xlink:href` in diagram markup. self-check's `single-file`
+row rejects one with an external `href`/`xlink:href` the same way it
+rejects an external `<img src>`.
+
 ### `.wu-shot` (figure > img + figcaption)
 
 A screenshot or photo — evidence that the reader must actually see, not a
@@ -389,6 +395,9 @@ as a diagram, never screenshot a diagram).
 - **One `<img>` per figure.** A before/after is two `.wu-shot` figures, the
   same as a before/after diagram is the same `.wu-figure` type twice —
   self-check's `shot` row errors on a second `<img>` in one figure.
+- **A screenshot always goes in `.wu-shot`'s `<img>`, never as an
+  `<image>` inside a `.wu-figure`'s SVG** — the renderer never emits one,
+  and self-check's `single-file` row screens any that shows up by hand.
 - **The file lives next to the page**, in `<slug>-assets/` (`<slug>` = the
   page's own filename without `.html`) — `src` is a page-relative path to
   it, or a `data:` URI. Never an `http(s):` URL: self-check's `single-file`

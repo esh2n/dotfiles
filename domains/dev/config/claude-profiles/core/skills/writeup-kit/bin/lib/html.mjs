@@ -222,7 +222,8 @@ export function titleText(root) {
   return t ? textContent(t).trim() : ''
 }
 
-/** Every external `href`/`src` reachable from `link`, `script`, and `img`. */
+/** Every external `href`/`src` reachable from `link`, `script`, `img`, and
+ * svg `image` (whose reference lives in `href` or the legacy `xlink:href`). */
 export function externalRefs(root) {
   const refs = []
   for (const n of findAll(root, isElement)) {
@@ -237,6 +238,10 @@ export function externalRefs(root) {
     if (tagName(n) === 'img') {
       const src = attr(n, 'src')
       if (src) refs.push({ tag: 'img', url: src, node: n })
+    }
+    if (tagName(n) === 'image') {
+      const href = attr(n, 'href') ?? attr(n, 'xlink:href')
+      if (href) refs.push({ tag: 'image', url: href, node: n })
     }
   }
   return refs

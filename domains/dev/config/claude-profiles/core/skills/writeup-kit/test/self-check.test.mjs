@@ -164,6 +164,36 @@ describe('self-check: adversarial rows', () => {
     assert.ok(result.errors.some((e) => e.item === 'single-file' && /favicon\.png/.test(e.detail)))
   })
 
+  test('row 1: an external svg <image href> inside a figure is an error, even though role-structure exempts the <svg> subtree', () => {
+    const svgImage = '<figure class="wu-figure">' +
+      '<svg role="img" aria-labelledby="wu-d-1-title" viewBox="0 0 640 320">' +
+      '<title id="wu-d-1-title">t</title><desc>d</desc>' +
+      '<image href="https://evil.example.com/x.png" /></svg>' +
+      '<figcaption>c</figcaption></figure>'
+    const result = itemsForBody(svgImage)
+    assert.ok(result.errors.some((e) => e.item === 'single-file' && /x\.png/.test(e.detail)))
+  })
+
+  test('row 1: a data: svg <image href> inside a figure is not a single-file error', () => {
+    const svgImage = '<figure class="wu-figure">' +
+      '<svg role="img" aria-labelledby="wu-d-1-title" viewBox="0 0 640 320">' +
+      '<title id="wu-d-1-title">t</title><desc>d</desc>' +
+      '<image href="data:image/png;base64,AA==" /></svg>' +
+      '<figcaption>c</figcaption></figure>'
+    const result = itemsForBody(svgImage)
+    assert.ok(!result.errors.some((e) => e.item === 'single-file'))
+  })
+
+  test('row 1: the legacy xlink:href variant of an external svg <image> is an error too', () => {
+    const svgImage = '<figure class="wu-figure">' +
+      '<svg role="img" aria-labelledby="wu-d-1-title" viewBox="0 0 640 320">' +
+      '<title id="wu-d-1-title">t</title><desc>d</desc>' +
+      '<image xlink:href="https://evil.example.com/y.png" /></svg>' +
+      '<figcaption>c</figcaption></figure>'
+    const result = itemsForBody(svgImage)
+    assert.ok(result.errors.some((e) => e.item === 'single-file' && /y\.png/.test(e.detail)))
+  })
+
   test('row 2 (required-meta): a missing kind is an error', () => {
     const html = page().replace('<meta name="kind" content="作業メモ">', '')
     const result = itemsFor(html)
