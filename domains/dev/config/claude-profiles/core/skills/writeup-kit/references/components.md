@@ -1,11 +1,11 @@
 # Components
 
-22 role-named components, class-prefixed `wu-`. A component is named for its
+23 role-named components, class-prefixed `wu-`. A component is named for its
 **role in the document**, never for its appearance — there is no `.box` or
 `.blue`. Each has a "use when" and a "do not use when" — this is the
 component side of the kind-to-component mapping in `kinds.md`.
 
-One entry in the table below — `.wu-sidetoc` — is not one of the 22: it is
+One entry in the table below — `.wu-sidetoc` — is not one of the 23: it is
 generated chrome that `build` writes into every long page, listed here so an
 author recognizes it and leaves it alone.
 
@@ -28,6 +28,7 @@ author recognizes it and leaves it alone.
 | `.wu-table` | General table (up to 5 columns, one line per cell); also the 決定記録's 一覧表 | A plain list of values; the index of decisions at the top of a 決定記録 (番号 / 決定 / タグ / 状態) | A substitute for prose |
 | `.wu-steps` | Numbered procedure, one step per line | Order matters | A parallel enumeration |
 | `.wu-figure` | Diagram frame (SVG + caption + IR) | Renderer output only | Hand-drawn SVG, emoji |
+| `.wu-shot` | Screenshot / photo frame (img + caption) | The reader must see the actual rendering — a UI, a terminal, a physical thing | A structure or mechanism a `.wu-figure` type can draw |
 | `.wu-quote` | Quote (original / translation / source) | Citing an external document | Your own sentence |
 | `.wu-code` | Code block, language-tagged (`<pre>`) | DDL, types, config | A heading substitute |
 | `.wu-diff` | Diff (before / after), plain `<pre>` with leading `+`/`-` | A 3-6 line change quoted inline in prose | A real patch with more than one hunk or file — use `.wu-diffview` |
@@ -370,6 +371,41 @@ explicit `layer: <int>` (0-based) to pin its order by hand, or `layer:
 none` to opt that diagram back out to elk's default layout — see
 `references/procedure.md` in the `writeup` skill for the full IR hint
 list.
+
+### `.wu-shot` (figure > img + figcaption)
+
+A screenshot or photo — evidence that the reader must actually see, not a
+mechanism a `.wu-figure` type could draw instead (`writing.md` §4: a
+screenshot is evidence, a figure is a mechanism; never redraw a screenshot
+as a diagram, never screenshot a diagram).
+
+```html
+<figure class="wu-shot">
+  <img src="2026-08-28-example-assets/mobile-before.png" alt="再試行ダイアログを表示したアプリ画面" width="390" height="844">
+  <figcaption>失敗時に表示される再試行ダイアログ</figcaption>
+</figure>
+```
+
+- **One `<img>` per figure.** A before/after is two `.wu-shot` figures, the
+  same as a before/after diagram is the same `.wu-figure` type twice —
+  self-check's `shot` row errors on a second `<img>` in one figure.
+- **The file lives next to the page**, in `<slug>-assets/` (`<slug>` = the
+  page's own filename without `.html`) — `src` is a page-relative path to
+  it, or a `data:` URI. Never an `http(s):` URL: self-check's `single-file`
+  and `shot` rows both reject an external host, and `shot` also errors on a
+  page-relative `src` whose file does not exist on disk.
+- **`alt` is required** — self-check's `shot` row errors without it.
+  `width`/`height` are recommended (they hold the layout steady while the
+  image loads) but optional.
+- **Size**: keep the summed size of a page's `.wu-shot` images under 8MB —
+  self-check warns above that, since the Artifact tool's own ceiling is
+  16MB after the kit CSS is inlined alongside everything else on the page.
+- **Publish inlines it, `to-md`/`pr-pack` copy it to `figures/`.**
+  `publish.mjs` and `pr-pack.mjs` both turn a page-relative `src` into a
+  `data:` URI (`inlinePageAssets`) so the staged page stays one file;
+  `to-md.mjs` instead copies the file into a figures directory under its
+  own basename (or decodes a `data:` src to `<slug>-shot<N>.<ext>`) and
+  links it from the Markdown the same way `.wu-figure`'s SVG is.
 
 ### `.wu-figure` — `type: sequence` (participants + messages)
 

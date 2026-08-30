@@ -5,9 +5,10 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { publish, inlineKitCss, adjustBackNav, findPrivateWordHits, assertSize, PublishError } from '../bin/publish.mjs'
+import { publish, inlineKitCss, adjustBackNav, findPrivateWordHits, assertSize, inlinePageAssets, PublishError } from '../bin/publish.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
 import { buildStore } from '../bin/build.mjs'
+import { makeTinyPng } from './helpers/tiny-png.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -370,5 +371,63 @@ describe('publish(): build\'s rendering passes are applied before staging', () =
     const staged = readFileSync(outFile, 'utf8')
     assert.match(staged, /<span class="wu-tok-kw">type<\/span>/)
     assert.match(staged, /<table class="wu-dv"/)
+  })
+
+  test('kit/samples.html\'s .wu-shot sample is inlined as a data: URI, not left page-relative', () => {
+    const outFile = join(freshStore(), 'samples.html')
+    publish(join(ROOT, 'kit', 'samples.html'), { to: 'file', out: outFile, store: FIXTURE_STORE })
+    const staged = readFileSync(outFile, 'utf8')
+    assert.match(staged, /<img src="data:image\/png;base64,/)
+    assert.ok(!staged.includes('src="samples-assets/'))
+  })
+})
+
+describe('inlinePageAssets(): .wu-shot image inlining', () => {
+  test('a page-relative <img src> is replaced with a data: URI holding the exact file bytes', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-publish-assets-'))
+    mkdirSync(join(dir, 'shot-assets'), { recursive: true })
+    const png = makeTinyPng()
+    writeFileSync(join(dir, 'shot-assets', 'pic.png'), png)
+    const html = '<figure class="wu-shot"><img src="shot-assets/pic.png" alt="a"></figure>'
+    const out = inlinePageAssets(html, dir)
+    assert.match(out, /<img src="data:image\/png;base64,/)
+    const b64 = /src="data:image\/png;base64,([^"]+)"/.exec(out)[1]
+    assert.ok(Buffer.from(b64, 'base64').equals(png))
+  })
+
+  test('a data: src and an http(s) src are left untouched', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-publish-assets-'))
+    const html = '<img src="data:image/png;base64,AAAA" alt="a"><img src="https://example.com/x.png" alt="b">'
+    assert.equal(inlinePageAssets(html, dir), html)
+  })
+
+  test('a page-relative src whose file is missing on disk is left untouched (defensive; self-check already gates this before publish reaches here)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-publish-assets-'))
+    const html = '<img src="shot-assets/missing.png" alt="a">'
+    assert.equal(inlinePageAssets(html, dir), html)
+  })
+
+  test('mime is chosen from the file extension (png/jpg/jpeg/gif/webp/svg)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-publish-assets-'))
+    writeFileSync(join(dir, 'pic.jpg'), makeTinyPng())
+    const out = inlinePageAssets('<img src="pic.jpg" alt="a">', dir)
+    assert.match(out, /src="data:image\/jpeg;base64,/)
+  })
+
+  test('publish(): the staged output has no page-relative .wu-shot src left', () => {
+    const store = freshStore()
+    const pagePath = join(store, DECISION_REL)
+    const pageDir = dirname(pagePath)
+    const assetDir = join(pageDir, '2026-08-01-example-decision-assets')
+    mkdirSync(assetDir, { recursive: true })
+    writeFileSync(join(assetDir, 'shot.png'), makeTinyPng())
+    const html = readFileSync(pagePath, 'utf8')
+    const shot = '<figure class="wu-shot"><img src="2026-08-01-example-decision-assets/shot.png" alt="実機の画面"><figcaption>c</figcaption></figure>'
+    writeFileSync(pagePath, html.replace('</main>', shot + '</main>'))
+    const outFile = join(store, 'out-shot.html')
+    publish(pagePath, { to: 'file', out: outFile, store })
+    const staged = readFileSync(outFile, 'utf8')
+    assert.match(staged, /<img src="data:image\/png;base64,/)
+    assert.ok(!staged.includes('src="2026-08-01-example-decision-assets'))
   })
 })

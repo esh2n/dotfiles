@@ -39,6 +39,7 @@ Each of these is a shape the reader recognises before reading a word of it, and 
 | List | Items are truly parallel: same grammar, same abstraction level, no relation between them worth a sentence (decisions with owner and date, steps) | Explaining why something happened |
 | Table | Two or more attributes per item, and the reader will compare across rows (`.wu-compare`, up to 4 columns). A comparison table of options only when there are 3 or more options and 3 or more criteria; below that, name the rejected option in the prose | A single column of text — that is a list |
 | Figure | The reader must *see* something faster than prose can say it — a structure, a flow, a state, a quantity, a scope, a hierarchy, a cause (the rule below names the type) | Wording, numbers, or anything a sentence says faster; a comparison that a 3-column table already says |
+| `.wu-shot` | The reader must see the actual rendering — a UI, a terminal, a physical thing — not a mechanism a figure could draw. A screenshot is evidence, a figure is a mechanism: never redraw a screenshot as a diagram, never screenshot a diagram | Anything a figure type in the table below can draw more clearly |
 
 ### Choosing the figure type
 

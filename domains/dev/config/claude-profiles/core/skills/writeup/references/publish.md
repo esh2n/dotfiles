@@ -1,5 +1,11 @@
 # Publish
 
+The store page links `../_kit/writeup.css` (and, for a `.wu-shot`, its
+`<slug>-assets/` files) — both exist only inside the store, so a copy of
+the page handed anywhere else (the Artifact tool, Slack, email, a repo)
+renders unstyled and without pictures. The only HTML that ever leaves the
+store is `publish.mjs` / `pr-pack.mjs` output.
+
 ```
 node $KIT/bin/publish.mjs <page.html> --to artifact|cloudflare|file [--out <path>] [--store <dir> | --store-name <name>] [--dry-run] [--deploy]
 ```
@@ -22,8 +28,11 @@ without writing or deploying anything.
 2. The kit CSS `<link>` is replaced with an inlined `<style>`; the Google
    Fonts `<link>` is left as-is (that's the one external reference an
    Artifact page is allowed to keep).
-3. **Private-word check** — see below.
-4. Size check: the fully-staged (CSS-inlined) page must be ≤ 16MB.
+3. Every `.wu-shot` image is inlined as a `data:` URI, so the staged page
+   stays one file even when the page carries a screenshot.
+4. **Private-word check** — see below.
+5. Size check: the fully-staged (CSS-inlined, images-inlined) page must be
+   ≤ 16MB.
 
 ## Exit codes
 
@@ -190,5 +199,7 @@ background into each figure SVG, so it reads as a light card on GitHub's
 theme too — `prefers-color-scheme` inside an `<img>` follows the *viewer's
 OS*, not GitHub's own light/dark toggle, so there is no single dark-aware
 variant that would track GitHub's theme; one opaque light card is the
-robust choice. A raster screenshot, if one is needed alongside a figure,
-goes in the same `<out>/figures/` directory and is linked the same way.
+robust choice. A `.wu-shot` screenshot needs no such restyling — it is
+already a raster, so `to-md.mjs` just copies its file as-is into the same
+`<out>/figures/` directory, under its own basename, and links it the same
+way as a figure's SVG.

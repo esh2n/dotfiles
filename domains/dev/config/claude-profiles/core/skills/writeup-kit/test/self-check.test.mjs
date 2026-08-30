@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process'
 import { runSelfCheck, writeMetaChecks } from '../bin/self-check.mjs'
 import { SIDETOC_SCRIPT } from '../bin/build.mjs'
 import { pageId } from '../bin/lib/store.mjs'
+import { makeTinyPng } from './helpers/tiny-png.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -18,6 +19,17 @@ function writeTempPage(html) {
   const dir = mkdtempSync(join(tmpdir(), 'wu-selfcheck-'))
   const file = join(dir, `page-${tmpCounter++}.html`)
   writeFileSync(file, html)
+  return file
+}
+
+/** Writes `html` as a temp page, then writes `buffer` at `relPath` under
+ * the page's own directory (e.g. `shot-assets/pic.png`) — the on-disk half
+ * of a `.wu-shot` fixture whose `<img src>` names that same `relPath`. */
+function writeTempPageWithAsset(html, relPath, buffer = makeTinyPng()) {
+  const file = writeTempPage(html)
+  const assetPath = join(dirname(file), relPath)
+  mkdirSync(dirname(assetPath), { recursive: true })
+  writeFileSync(assetPath, buffer)
   return file
 }
 
@@ -56,6 +68,12 @@ ${FOOTER}
 function itemsFor(html) {
   const file = writeTempPage(html)
   return runSelfCheck(file)
+}
+
+/** `itemsFor(page({ body }))`, for a test that only cares about swapping
+ * the body content. */
+function itemsForBody(body) {
+  return itemsFor(page({ body: DEFAULT_BODY + body }))
 }
 
 describe('self-check: reference pages', () => {
@@ -826,5 +844,150 @@ describe('self-check: .wu-diffview', () => {
       result.items.some((i) => i.detail && i.detail.includes('mark')),
       'expected a finding naming <mark>: ' + JSON.stringify(result.items),
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// .wu-shot (screenshot / photo) — row 6b and its role-structure interaction
+// ---------------------------------------------------------------------------
+
+describe('self-check: .wu-shot (screenshot / photo)', () => {
+  const shot = (inner) => `<figure class="wu-shot">${inner}</figure>`
+
+  test('ok case: a real file, alt present, is clean', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="shot-assets/pic.png" alt="実機の画面"><figcaption>実機の見え方</figcaption>'),
+    })
+    const file = writeTempPageWithAsset(html, 'shot-assets/pic.png')
+    const result = runSelfCheck(file)
+    assert.deepEqual(result.errors, [])
+    assert.ok(!result.warnings.some((w) => w.item === 'shot'), JSON.stringify(result.warnings))
+  })
+
+  test('missing alt is an error naming the figure', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="shot-assets/pic.png"><figcaption>キャプション</figcaption>'),
+    })
+    const file = writeTempPageWithAsset(html, 'shot-assets/pic.png')
+    const result = runSelfCheck(file)
+    const hit = result.errors.find((e) => e.item === 'shot' && /missing alt text/.test(e.detail))
+    assert.ok(hit, JSON.stringify(result.errors))
+    assert.match(hit.detail, /キャプション/)
+  })
+
+  test('an external (http) src is an error, not a page-relative or data: src', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="https://example.com/pic.png" alt="a">'),
+    })
+    const result = runSelfCheck(writeTempPage(html))
+    assert.ok(result.errors.some((e) => e.item === 'shot' && /not page-relative or a data: URI/.test(e.detail)))
+  })
+
+  test('a page-relative src whose file does not exist is an error', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="shot-assets/missing.png" alt="a">'),
+    })
+    const result = runSelfCheck(writeTempPage(html))
+    assert.ok(result.errors.some((e) => e.item === 'shot' && /image file does not exist/.test(e.detail)))
+  })
+
+  test('an <img> outside .wu-shot is a role-structure error carrying the .wu-shot hint', () => {
+    const html = page({ body: DEFAULT_BODY + '<img src="x.png" alt="a">' })
+    const result = runSelfCheck(writeTempPage(html))
+    const hit = result.errors.find((e) => e.item === 'role-structure' && /<img>/.test(e.detail))
+    assert.ok(hit, JSON.stringify(result.errors))
+    assert.match(hit.detail, /figure class="wu-shot"/)
+    assert.match(hit.detail, /<slug>-assets\//)
+  })
+
+  test('a data: src is accepted with no shot or single-file error', () => {
+    const dataUri = `data:image/png;base64,${makeTinyPng().toString('base64')}`
+    const html = page({
+      body: DEFAULT_BODY + shot(`<img src="${dataUri}" alt="a">`),
+    })
+    const result = runSelfCheck(writeTempPage(html))
+    assert.deepEqual(result.errors.filter((e) => e.item === 'shot' || e.item === 'single-file'), [])
+  })
+
+  test('two <img> in one .wu-shot is an error (one picture per figure)', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="shot-assets/a.png" alt="a"><img src="shot-assets/b.png" alt="b">'),
+    })
+    const file = writeTempPageWithAsset(html, 'shot-assets/a.png')
+    writeFileSync(join(dirname(file), 'shot-assets', 'b.png'), makeTinyPng())
+    const result = runSelfCheck(file)
+    const hit = result.errors.find((e) => e.item === 'shot' && /has 2 <img> elements/.test(e.detail))
+    assert.ok(hit, JSON.stringify(result.errors))
+  })
+
+  test('a page-relative src that escapes the page\'s own directory (../) is an error', () => {
+    const html = page({
+      body: DEFAULT_BODY + shot('<img src="../outside.png" alt="a">'),
+    })
+    const result = runSelfCheck(writeTempPage(html))
+    assert.ok(result.errors.some((e) => e.item === 'shot' && /escapes the page's own directory/.test(e.detail)))
+  })
+})
+
+describe('self-check: error hints (the "→ …" tail appended to a finding\'s detail)', () => {
+  test('role-structure: a disallowed <img> points at .wu-shot, a disallowed tag points at components.md generically', () => {
+    const imgResult = runSelfCheck(writeTempPage(page({ body: DEFAULT_BODY + '<img src="x.png" alt="a">' })))
+    const imgHit = imgResult.errors.find((e) => e.item === 'role-structure' && /<img>/.test(e.detail))
+    assert.match(imgHit.detail, /→.*wu-shot/)
+
+    const asideResult = itemsForBody('<aside>x</aside>')
+    const asideHit = asideResult.errors.find((e) => e.item === 'role-structure' && /aside/.test(e.detail))
+    assert.match(asideHit.detail, /→ use a role-named \.wu-\* component from components\.md/)
+  })
+
+  test('chrome, figure-pass, kit-css, single-file, required-meta and svg-a11y each carry a hint tail', () => {
+    const badKitCss = itemsFor(page().replace('<link rel="stylesheet" href="../_kit/writeup.css">', '<link rel="stylesheet" href="./writeup.css">'))
+    assert.match(badKitCss.errors.find((e) => e.item === 'kit-css').detail, /→ run build/)
+
+    const badChrome = itemsFor(page().replace('<p class="wu-lede">l</p>', ''))
+    assert.match(badChrome.errors.find((e) => e.item === 'chrome').detail, /→ copy \.wu-header\/\.wu-footer verbatim/)
+
+    const fig = '<figure class="wu-figure"><svg role="img"><title>t</title><desc>d</desc></svg><figcaption>c</figcaption></figure>'
+    const badFigure = itemsForBody(fig)
+    assert.match(badFigure.errors.find((e) => e.item === 'figure-pass').detail, /→ re-render with render-diagram\.mjs/)
+
+    const badSingleFile = itemsFor(page({ extraLink: '<script src="https://evil.example.com/a.js"></script>' }))
+    assert.match(badSingleFile.errors.find((e) => e.item === 'single-file').detail, /→ copy the file next to the page/)
+
+    const badMeta = itemsFor(page().replace('<meta name="kind" content="作業メモ">', ''))
+    assert.match(badMeta.errors.find((e) => e.item === 'required-meta' && /kind/.test(e.detail)).detail, /→ add the missing tag/)
+
+    const badSvg = itemsForBody('<figure class="wu-figure" data-checks="pass"><svg><title>t</title><desc>d</desc></svg></figure>')
+    assert.match(badSvg.errors.find((e) => e.item === 'svg-a11y').detail, /→ never hand-edit generated diagram markup/)
+  })
+
+  test('accent-budget (warn) and shot each carry a hint tail too', () => {
+    const badAccent = itemsForBody('<p><span class="wu-accent">a</span> <span class="wu-accent">b</span></p>')
+    assert.match(badAccent.warnings.find((w) => w.item === 'accent-budget').detail, /→ keep exactly one \.wu-accent/)
+
+    const html = page({ body: DEFAULT_BODY + '<figure class="wu-shot"><img src="shot-assets/pic.png"></figure>' })
+    const file = writeTempPageWithAsset(html, 'shot-assets/pic.png')
+    const shotHit = runSelfCheck(file).errors.find((e) => e.item === 'shot' && /missing alt text/.test(e.detail))
+    assert.match(shotHit.detail, /→ add alt text describing what the screenshot shows/)
+  })
+
+  test('diffview-unrendered keeps its own "run build" wording, with no duplicated hint tail', () => {
+    const body =
+      '<section class="wu-section"><h2>今日分かったこと</h2>' +
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">\n--- a/x.go\n+++ b/x.go\n@@ -1,1 +1,1 @@\n-a\n+b\n</script>' +
+      '<figcaption>未描画。</figcaption></figure></section>' +
+      '<section class="wu-section"><h2>次にやること</h2><ol class="wu-steps"><li>短い文。</li></ol></section>'
+    const result = itemsForBody(body)
+    const hit = result.errors.find((e) => e.item === 'diffview-unrendered')
+    assert.equal((hit.detail.match(/run build/g) || []).length, 1)
+  })
+
+  test('the JSON/CLI shape is unchanged — the hint lives inside "detail", not a new field', () => {
+    const file = writeTempPage(page({ kind: 'no-such-kind' }))
+    const run = spawnSync(process.execPath, [SELF_CHECK_BIN, file, '--json'], { encoding: 'utf8' })
+    const out = JSON.parse(run.stdout)
+    const hit = out.errors.find((e) => e.item === 'required-meta' && /8 kinds/.test(e.detail))
+    assert.ok(hit)
+    assert.deepEqual(Object.keys(hit).sort(), ['detail', 'item', 'level'])
   })
 })

@@ -28,11 +28,14 @@
 // the repo; a PR pack never leaves it.
 //
 // Pre-stage mirrors publish.mjs exactly: render (ensureRendered) -> self-
-// check -> inline kit CSS -> drop the back-to-index nav (there is no store
-// index inside a PR pack, so this always uses publish's 'file' target
-// behavior). Figures are extracted by to-md.mjs and then each rewritten
-// through standaloneSvg (lib/standalone-svg.mjs) so they carry their own
-// look with no page CSS around them.
+// check -> inline kit CSS -> inline every .wu-shot image as a data: URI
+// (inlinePageAssets, from publish.mjs) -> drop the back-to-index nav (there
+// is no store index inside a PR pack, so this always uses publish's 'file'
+// target behavior). Figures are extracted by to-md.mjs and then each
+// rewritten through standaloneSvg (lib/standalone-svg.mjs) so they carry
+// their own look with no page CSS around them; a .wu-shot's image file is
+// instead copied as-is into <out>/figures/ by to-md.mjs (it is already a
+// raster, nothing to restyle).
 //
 // Exit codes: 0 ok, 2 usage error, 3 self-check failed,
 // 7 a `.wu-diffview` whose diff could not be rendered.
@@ -42,7 +45,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { runSelfCheckText } from './self-check.mjs'
 import { ensureRendered } from './build.mjs'
-import { inlineKitCss, adjustBackNav } from './publish.mjs'
+import { inlineKitCss, adjustBackNav, inlinePageAssets } from './publish.mjs'
 import { resolveStoreDir } from './lib/store.mjs'
 import { convertToMarkdown } from './to-md.mjs'
 import { standaloneSvg } from './lib/standalone-svg.mjs'
@@ -91,14 +94,15 @@ function writePack(pageFile, out, { store, storeName }) {
   assertSelfCheckPasses(rendered, pageFile)
 
   const storeDir = resolveStoreDir(store, { name: storeName, cwd: dirname(resolve(pageFile)) })
-  const staged = adjustBackNav(inlineKitCss(rendered, storeDir), 'file', storeDir)
+  const pageDir = dirname(pageFile)
+  const staged = adjustBackNav(inlinePageAssets(inlineKitCss(rendered, storeDir), pageDir), 'file', storeDir)
 
   mkdirSync(out, { recursive: true })
   writeFileSync(join(out, 'index.html'), staged)
 
   const slug = slugOf(pageFile)
   const figuresDir = join(out, 'figures')
-  const md = convertToMarkdown(rendered, { slug, figuresDir, figuresDirRel: 'figures' })
+  const md = convertToMarkdown(rendered, { slug, figuresDir, figuresDirRel: 'figures', pageDir })
   writeFileSync(join(out, `${slug}.md`), md)
 
   restyleFigures(figuresDir)

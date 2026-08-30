@@ -1,11 +1,12 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { convertToMarkdown } from '../bin/to-md.mjs'
 import { escapeIrScript } from '../bin/lib/ir-script.mjs'
+import { makeTinyPng } from './helpers/tiny-png.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -127,6 +128,50 @@ describe('to-md: IRs without groups/nodes', () => {
     })
     assert.match(md, /!\[c\]\(figs\/p-q\.svg\)/)
     assert.doesNotMatch(md, /```mermaid/)
+  })
+})
+
+describe('to-md: .wu-shot (screenshot / photo)', () => {
+  function pageWithShot(imgHtml, capHtml = '<figcaption>キャプション</figcaption>') {
+    return `<!DOCTYPE html><html lang="ja"><head><title>t</title>
+<meta name="description" content="d"><meta name="kind" content="設計">
+<meta name="date" content="2026-08-29"></head><body><div class="wu-page">
+<main><figure class="wu-shot">${imgHtml}${capHtml}</figure></main></div></body></html>`
+  }
+
+  test('a page-relative src is copied into figuresDir under its own basename; alt becomes the image text, caption follows', () => {
+    const pageDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-page-'))
+    mkdirSync(join(pageDir, 'shot-assets'), { recursive: true })
+    const png = makeTinyPng()
+    writeFileSync(join(pageDir, 'shot-assets', 'pic.png'), png)
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-figs-'))
+    const html = pageWithShot('<img src="shot-assets/pic.png" alt="実機の画面">')
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figures', pageDir })
+    assert.match(md, /!\[実機の画面\]\(figures\/pic\.png\)/)
+    assert.match(md, /キャプション/)
+    assert.ok(readFileSync(join(figuresDir, 'pic.png')).equals(png))
+  })
+
+  test('a data: src is decoded and written as <slug>-shot<N>.<ext> (no pageDir needed)', () => {
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-data-'))
+    const png = makeTinyPng()
+    const html = pageWithShot(`<img src="data:image/png;base64,${png.toString('base64')}" alt="実機の画面">`)
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figures' })
+    assert.match(md, /!\[実機の画面\]\(figures\/p-shot1\.png\)/)
+    assert.ok(readFileSync(join(figuresDir, 'p-shot1.png')).equals(png))
+  })
+
+  test('without a figures dir it degrades to the same ![alt](#) placeholder .wu-figure uses; the caption still follows', () => {
+    const html = pageWithShot('<img src="shot-assets/pic.png" alt="実機の画面">')
+    const md = convertToMarkdown(html, { slug: 'p' })
+    assert.match(md, /!\[実機の画面\]\(#\)/)
+    assert.match(md, /キャプション/)
+  })
+
+  test('alt falls back to the caption text when the <img> carries no alt', () => {
+    const html = pageWithShot('<img src="shot-assets/pic.png">')
+    const md = convertToMarkdown(html, { slug: 'p' })
+    assert.match(md, /!\[キャプション\]\(#\)/)
   })
 })
 

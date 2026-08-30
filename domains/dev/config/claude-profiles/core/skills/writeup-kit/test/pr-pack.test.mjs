@@ -1,12 +1,13 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
+import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { prPack, PrPackError } from '../bin/pr-pack.mjs'
 import { buildStore } from '../bin/build.mjs'
+import { makeTinyPng } from './helpers/tiny-png.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -119,6 +120,59 @@ describe('prPack(): --body-out', () => {
     const result = await prPack(null, { out, repo: 'o/r', sha: 'abc123', path: 'docs/x', bodyOut })
     assert.equal(result.slug, '2026-08-05-example-design')
     assert.ok(existsSync(bodyOut))
+  })
+})
+
+describe('prPack(): .wu-shot images', () => {
+  /** Adds a `.wu-shot` figure (with a real on-disk asset) to the fixture
+   * design page before packing it. */
+  function addShot(store) {
+    const pagePath = join(store, DESIGN_REL)
+    const assetDir = join(dirname(pagePath), '2026-08-05-example-design-assets')
+    mkdirSync(assetDir, { recursive: true })
+    writeFileSync(join(assetDir, 'shot.png'), makeTinyPng())
+    const html = readFileSync(pagePath, 'utf8')
+    const shot = '<figure class="wu-shot"><img src="2026-08-05-example-design-assets/shot.png" alt="実機の画面"><figcaption>実機の見え方</figcaption></figure>'
+    writeFileSync(pagePath, html.replace('</main>', shot + '</main>'))
+    return pagePath
+  }
+
+  test('the asset file is copied into <out>/figures/<basename>, unrenamed', async () => {
+    const store = freshStore()
+    const pagePath = addShot(store)
+    const out = freshOut()
+    await prPack(pagePath, { out, store })
+    assert.ok(existsSync(join(out, 'figures', 'shot.png')))
+  })
+
+  test('the Markdown links it under figures/ using the <img>\'s own alt text, with the caption below', async () => {
+    const store = freshStore()
+    const pagePath = addShot(store)
+    const out = freshOut()
+    await prPack(pagePath, { out, store })
+    const md = readFileSync(join(out, '2026-08-05-example-design.md'), 'utf8')
+    assert.match(md, /!\[実機の画面\]\(figures\/shot\.png\)/)
+    assert.match(md, /実機の見え方/)
+  })
+
+  test('the staged index.html carries the image inlined as a data: URI, not a page-relative src', async () => {
+    const store = freshStore()
+    const pagePath = addShot(store)
+    const out = freshOut()
+    await prPack(pagePath, { out, store })
+    const html = readFileSync(join(out, 'index.html'), 'utf8')
+    assert.match(html, /<img src="data:image\/png;base64,/)
+    assert.ok(!html.includes('src="2026-08-05-example-design-assets'))
+  })
+
+  test('--body-out rewrites the figures/shot.png reference to a SHA-pinned blob URL', async () => {
+    const store = freshStore()
+    const pagePath = addShot(store)
+    const out = freshOut()
+    const bodyOut = join(out, 'body.md')
+    await prPack(pagePath, { out, store, repo: 'o/r', sha: 'abc123', path: 'docs/x', bodyOut })
+    const body = readFileSync(bodyOut, 'utf8')
+    assert.match(body, /https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/figures\/shot\.png\?raw=true/)
   })
 })
 

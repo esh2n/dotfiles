@@ -10,9 +10,9 @@
 // build.mjs and to-md.mjs also read, and a full HTML round-trip through the
 // tolerant parser would risk reformatting them).
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import {
   parseHtml, findAll, findFirst, isElement, tagName, attr, classList, hasClass,
   elementChildren, textContent, headMeta, titleText, externalRefs,
@@ -53,6 +53,10 @@ const ALLOWED_BODY_TAGS = new Set([
   // of a paired add/del line inside a .wu-diffview table — allowed there and
   // nowhere else (see `checkRoleStructure`).
   'mark',
+  // <img> is allowed only inside a <figure class="wu-shot"> — a screenshot
+  // or photo, the one place a bare raster image belongs (see
+  // `checkRoleStructure` and the `shot` row, `checkShot`).
+  'img',
 ])
 // A small, pragmatic exception to the "only wu-* classes" rule: the kit's
 // own reference pages (kit/samples.html, the contract) right-align/no-wrap
@@ -67,6 +71,42 @@ const PAREN_RE = /[（(][^（）()]*[）)]/g
 
 function isSvgOrDescendant(node, ancestorsOfSvg) {
   return ancestorsOfSvg.has(node)
+}
+
+// --- hints (appended to a finding's detail by `add`, see runSelfCheckText) --
+//
+// Keyed by `item`. A plain string is appended verbatim; a function receives
+// the finding's own `detail` text so a single item with several distinct
+// causes (role-structure, shot) can point at the right fix for each one.
+// `diffview-unrendered` is deliberately absent: its own detail text already
+// says "run build", so a second hint tail would only repeat it.
+const HINTS = {
+  'role-structure': (detail) => (/<img>/.test(detail)
+    ? 'put it in <figure class="wu-shot"> with src under <slug>-assets/ or a data: URI — components.md'
+    : 'use a role-named .wu-* component from components.md'),
+  'single-file': 'copy the file next to the page (<slug>-assets/) or use a data: URI; external hosts are never fetched',
+  'kit-css': 'run build; a page handed outside the store must be publish.mjs / pr-pack.mjs output, never the store file',
+  'required-meta': 'add the missing tag next to the others in <head> — see kit/template.html',
+  'chrome': 'copy .wu-header/.wu-footer verbatim from kit/template.html and change only the text',
+  'figure-pass': 're-render with render-diagram.mjs --figure and paste its <figure> as-is',
+  'svg-a11y': 'never hand-edit generated diagram markup — re-render with render-diagram.mjs --figure',
+  'accent-budget': 'keep exactly one .wu-accent on the page; move the emphasis into the prose instead of adding a second',
+  'shot': (detail) => {
+    if (/is missing alt text/.test(detail)) return 'add alt text describing what the screenshot shows'
+    if (/has no <img>/.test(detail)) return 'add the <img> — components.md .wu-shot'
+    if (/has \d+ <img> elements/.test(detail)) return 'one picture per figure — split a before/after into two .wu-shot figures'
+    if (/is not page-relative or a data: URI/.test(detail)) return 'move the file into <slug>-assets/ next to the page, or inline it as a data: URI'
+    if (/escapes the page.s own directory/.test(detail)) return 'keep the file under the page\'s own directory, never above <slug>-assets/'
+    if (/image file does not exist/.test(detail)) return 'save the file into <slug>-assets/ next to the page, at that exact path'
+    if (/images total/.test(detail)) return 'compress the screenshot(s) or crop to the relevant area'
+    return 'see components.md .wu-shot'
+  },
+}
+
+function hintFor(item, detail) {
+  const h = HINTS[item]
+  if (!h) return null
+  return typeof h === 'function' ? h(detail) : h
 }
 
 export function runSelfCheck(filePath) {
@@ -85,7 +125,18 @@ export function runSelfCheck(filePath) {
  * `publish.mjs` to check the rendered, not-yet-written staging text. */
 export function runSelfCheckText(raw, filePath) {
   const items = []
-  const add = (level, item, detail) => items.push({ level, item, detail: detail ?? '' })
+  // Every error-level finding (and a few high-value warn ones) gets an
+  // actionable "→ …" tail appended to its detail text — the finding names
+  // the problem, the hint names the fix, so a caller never has to guess
+  // "disallowed <img> — then how do I show a picture?" on their own. Hint
+  // text stays inside `detail`, so `--json`'s shape (and any test doing a
+  // regex/substring match against it) is unaffected; only tests asserting
+  // an *exact* detail string would need updating, and none do today.
+  const add = (level, item, detail) => {
+    const base = detail ?? ''
+    const hint = hintFor(item, base)
+    items.push({ level, item, detail: hint ? (base ? `${base} → ${hint}` : hint) : base })
+  }
 
   let root
   try {
@@ -104,6 +155,7 @@ export function runSelfCheckText(raw, filePath) {
   checkRoleStructure(root, add)
   checkKindSections(root, add)
   checkFigures(root, add)
+  checkShot(root, filePath, add)
   checkDiffViews(root, add)
   checkSvgA11y(root, add)
   checkAccentBudget(root, add)
@@ -128,6 +180,15 @@ export function runSelfCheckText(raw, filePath) {
 function checkSingleFile(root, add) {
   for (const ref of externalRefs(root)) {
     const url = ref.url
+    if (ref.tag === 'img') {
+      // A .wu-shot image lives next to the page (`<slug>-assets/…`) or is
+      // inlined as a data: URI — never fetched from an external host. Its
+      // existence on disk, alt text, and one-per-figure rule are checked
+      // separately by `checkShot`; this row only screens the URL shape.
+      if (url.startsWith('data:') || isPageRelativeUrl(url)) continue
+      add('error', 'single-file', `img references disallowed external URL: ${url}`)
+      continue
+    }
     if (isAllowedExternal(url)) continue
     if (ref.tag === 'link' && attr(ref.node, 'rel') === 'icon') {
       // The status favicon (page-contract.md §1) is a data: URI build.mjs
@@ -209,6 +270,17 @@ function isAllowedExternal(url) {
   if (/^https:\/\/fonts\.googleapis\.com\//.test(url)) return true
   if (/^https:\/\/fonts\.gstatic\.com\//.test(url)) return true
   return false
+}
+
+/** No scheme (so not `data:`, `http:`, `https:`, …) and no leading `/` —
+ * the shape a `.wu-shot` `src` must have to be "next to the page" rather
+ * than a fetch to an external host. Escaping above the page's own
+ * directory via `../` is checked separately, where a page path is
+ * available (`resolveShotAsset`, `checkShot`). */
+function isPageRelativeUrl(url) {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return false
+  if (url.startsWith('/')) return false
+  return true
 }
 
 // --- 2. required head meta --------------------------------------------------
@@ -357,6 +429,20 @@ function svgDescendantSet(main) {
   return set
 }
 
+/** Every element inside `main`'s subtree that sits under a
+ * `<figure class="wu-shot">` — the one place a bare `<img>` is legitimate
+ * (a screenshot or photo, its file next to the page in `<slug>-assets/`, or
+ * a `data:` URI). An `<img>` anywhere else is a disallowed body element
+ * (see `checkRoleStructure`); the figure's own contract — alt text, src
+ * shape, file existence, one image per figure — is `checkShot`'s job. */
+function shotDescendantSet(main) {
+  const set = new Set()
+  for (const fig of findAll(main, (n) => isElement(n) && hasClass(n, 'wu-shot'))) {
+    for (const n of findAll(fig, () => true)) set.add(n)
+  }
+  return set
+}
+
 // --- 4. role-tagged structure ------------------------------------------------
 
 function checkRoleStructure(root, add) {
@@ -364,6 +450,7 @@ function checkRoleStructure(root, add) {
   if (!main) return
   const svgNodes = svgDescendantSet(main)
   const diffViewNodes = diffViewDescendantSet(main)
+  const shotNodes = shotDescendantSet(main)
   for (const n of findAll(main, isElement)) {
     if (n === main) continue
     if (svgNodes.has(n)) continue
@@ -373,6 +460,10 @@ function checkRoleStructure(root, add) {
     }
     if (n.tag === 'mark' && !diffViewNodes.has(n)) {
       add('error', 'role-structure', '<mark> outside a .wu-diffview — the kit has no prose highlight')
+      continue
+    }
+    if (n.tag === 'img' && !shotNodes.has(n)) {
+      add('error', 'role-structure', '<img> outside a .wu-shot — the kit has no bare image')
       continue
     }
     const bad = classList(n).filter((c) => !c.startsWith('wu-') && !ALLOWED_NON_WU_CLASSES.has(c))
@@ -418,6 +509,97 @@ function checkFigures(root, add) {
       add('warn', 'figure-budget', `.wu-figure "${label}" is over budget (${warn}) — consider splitting the figure`)
     }
   })
+}
+
+// --- 6b. .wu-shot (screenshot / photo) ---------------------------------------
+//
+// Contract: one `<img>` per `<figure class="wu-shot">`, `alt` required, and
+// a `src` that is either page-relative (resolves under the page's own
+// directory — the `<slug>-assets/` convention, never above it) or a `data:`
+// URI. Existence is checked on disk, resolved against the page's own
+// directory (`dirname(filePath)` — the same basis `checkKitCss`'s sibling
+// lookup and `checkIdMeta`'s store-relative path both already use, so a
+// page checked from any cwd resolves its own assets the same way).
+
+const SHOT_TOTAL_WARN_BYTES = 8 * 1024 * 1024
+
+/** Resolves a `.wu-shot` `src` against the page's own directory, rejecting
+ * anything that would escape it via `../` — the contract keeps asset files
+ * inside `<slug>-assets/`, next to the page, never above it. Returns the
+ * resolved absolute path, or `null` when it escapes. */
+function resolveShotAsset(src, pageDir) {
+  const resolved = resolve(pageDir, src)
+  const rel = relative(pageDir, resolved)
+  if (rel !== '' && (rel.startsWith('..') || isAbsolute(rel))) return null
+  return resolved
+}
+
+/** The byte size a `data:` URI's payload decodes to — base64 decoded when
+ * the URI says so, percent-decoded otherwise — used only for the 8MB
+ * budget warning, so an approximation on a malformed URI is fine. */
+function dataUriByteSize(url) {
+  const comma = url.indexOf(',')
+  if (comma === -1) return Buffer.byteLength(url, 'utf8')
+  const meta = url.slice('data:'.length, comma)
+  const payload = url.slice(comma + 1)
+  if (/;base64$/i.test(meta)) {
+    try { return Buffer.from(payload, 'base64').length } catch { return Buffer.byteLength(payload, 'utf8') }
+  }
+  try { return Buffer.byteLength(decodeURIComponent(payload), 'utf8') } catch { return Buffer.byteLength(payload, 'utf8') }
+}
+
+function checkShot(root, filePath, add) {
+  const main = findMain(root)
+  if (!main) return
+  const figures = findAll(main, (n) => isElement(n) && hasClass(n, 'wu-shot'))
+  if (!figures.length) return
+  const pageDir = dirname(filePath)
+  let totalBytes = 0
+  figures.forEach((fig, i) => {
+    const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
+    const capText = cap ? textContent(cap).trim() : ''
+    const label = capText ? `"${capText}"` : `#${i + 1}`
+    const imgs = findAll(fig, (n) => tagName(n) === 'img')
+    if (imgs.length === 0) {
+      add('error', 'shot', `.wu-shot ${label} has no <img>`)
+      return
+    }
+    if (imgs.length > 1) {
+      add('error', 'shot', `.wu-shot ${label} has ${imgs.length} <img> elements`)
+    }
+    for (const img of imgs) {
+      if (!attr(img, 'alt')) {
+        add('error', 'shot', `.wu-shot ${label}: <img> is missing alt text`)
+      }
+      const src = attr(img, 'src') || ''
+      if (!src) {
+        add('error', 'shot', `.wu-shot ${label}: <img> has no src`)
+        continue
+      }
+      if (src.startsWith('data:')) {
+        totalBytes += dataUriByteSize(src)
+        continue
+      }
+      if (!isPageRelativeUrl(src)) {
+        add('error', 'shot', `.wu-shot ${label}: <img src> is not page-relative or a data: URI: ${src}`)
+        continue
+      }
+      const resolved = resolveShotAsset(src, pageDir)
+      if (!resolved) {
+        add('error', 'shot', `.wu-shot ${label}: <img src> escapes the page's own directory: ${src}`)
+        continue
+      }
+      if (!existsSync(resolved)) {
+        add('error', 'shot', `.wu-shot ${label}: image file does not exist: ${src}`)
+        continue
+      }
+      try { totalBytes += statSync(resolved).size } catch { /* unreadable; not this row's concern */ }
+    }
+  })
+  if (totalBytes > SHOT_TOTAL_WARN_BYTES) {
+    const mb = (totalBytes / (1024 * 1024)).toFixed(1)
+    add('warn', 'shot', `.wu-shot images total ${mb}MB — the Artifact tool's limit is 16MB after CSS inlining`)
+  }
 }
 
 /** A `<figure class="wu-diffview">` whose body carries no rendered
@@ -742,10 +924,12 @@ const MD_MAPPED_TAGS = new Set([
   'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'dl', 'dt', 'dd', 'table', 'thead', 'tbody',
   'tr', 'th', 'td', 'pre', 'code', 'figure', 'figcaption', 'blockquote', 'section', 'div',
   'span', 'a', 'strong', 'em', 'br', 'svg', 'script', 'cite', 'nav', 'mark',
+  // <img> — the one child of .wu-shot; bin/to-md.mjs's renderShot maps it.
+  'img',
 ])
 const MD_MAPPED_CLASSES = new Set([
   'wu-lede', 'wu-summary', 'wu-terms', 'wu-callout', 'wu-decision', 'wu-compare', 'wu-table',
-  'wu-steps', 'wu-figure', 'wu-quote', 'wu-quote-original', 'wu-quote-ja', 'wu-quote-source',
+  'wu-steps', 'wu-figure', 'wu-shot', 'wu-quote', 'wu-quote-original', 'wu-quote-ja', 'wu-quote-source',
   'wu-code', 'wu-diff', 'wu-diffview', 'wu-dv', 'wu-chip', 'wu-meta', 'wu-open', 'wu-accent',
   'wu-section', 'wu-focal', 'wu-eyebrow', 'wu-toc', 'wu-sidetoc', 'wu-sidetoc-sub',
   // .wu-cells — one thing split into labelled parts; bin/to-md.mjs renders
