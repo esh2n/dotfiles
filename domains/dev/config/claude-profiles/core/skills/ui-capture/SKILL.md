@@ -1,6 +1,6 @@
 ---
 name: ui-capture
-description: Use when the user wants a screenshot or short GIF of a web UI for a PR description, writeup document, or Artifact — a running or headlessly-launchable web app, not a native macOS app (Tauri/Swift apps steal the user's screen and are out of scope). Symptoms include "スクショ撮って", "GIF にして", "見せて" about a web page, or a request to attach visual evidence of a UI change to a PR or design doc.
+description: Use when the user wants a screenshot or short GIF of a web UI for a PR description, writeup document, or Artifact — a running or headlessly-launchable web app, not a native macOS app (Tauri/Swift apps steal the user's screen and are out of scope). Symptoms include "スクショ撮って", "GIF にして", "動きを撮って" about a web page, or a request to attach visual evidence of a UI change to a PR or design doc.
 ---
 
 # ui-capture
