@@ -76,7 +76,14 @@ export function runSelfCheck(filePath) {
   } catch (e) {
     return { unreadable: true, message: `cannot read file: ${filePath} (${e.message})` }
   }
+  return runSelfCheckText(raw, filePath)
+}
 
+/** Runs every self-check row over `raw` as if it were the content of
+ * `filePath` — the path only feeds the rows that look at the page's
+ * location (kit CSS href depth, `id` meta vs. store-relative path). Used by
+ * `publish.mjs` to check the rendered, not-yet-written staging text. */
+export function runSelfCheckText(raw, filePath) {
   const items = []
   const add = (level, item, detail) => items.push({ level, item, detail: detail ?? '' })
 

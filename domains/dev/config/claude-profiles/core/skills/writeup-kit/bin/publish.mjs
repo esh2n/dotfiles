@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // publish.mjs — stages a page for an external audience (contract §8).
 // Pre-stage, always in this order: (0) --to is one of the 3 known targets,
-// (1) self-check must pass, (2) inline the kit CSS and adjust `.wu-header`'s
+// (1) run build's rendering passes (viewport meta, `.wu-diffview` tables,
+// code highlighting — `ensureRendered`) so a page that skipped `build`, or a
+// kit reference page no store build scans, never ships unrendered, then
+// self-check must pass on that rendered text, (2) inline the kit CSS and adjust `.wu-header`'s
 // back-to-index nav for the target (dropped for file/artifact; rewritten to
 // `/index.html` or dropped for cloudflare — see `adjustBackNav`), (3) reject
 // on a company-trace word hit, (4) enforce the 16MB Artifact-tool size
@@ -11,13 +14,15 @@
 // target unchanged.
 //
 // Exit codes: 0 success/dry-run, 2 usage error, 3 self-check failed,
-// 4 private-word hit, 5 cloudflare Access not verified, 6 size over 16MB.
+// 4 private-word hit, 5 cloudflare Access not verified, 6 size over 16MB,
+// 7 a `.wu-diffview` whose diff could not be rendered.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
-import { runSelfCheck } from './self-check.mjs'
+import { runSelfCheckText } from './self-check.mjs'
+import { ensureRendered } from './build.mjs'
 import { resolveStoreDir, privateWords, cloudflareConfig } from './lib/store.mjs'
 import { parseHtml, headMeta, titleText, textContent, findFirst, tagName } from './lib/html.mjs'
 
@@ -92,8 +97,8 @@ export function assertSize(staged) {
   return bytes
 }
 
-function assertSelfCheckPasses(pageFile) {
-  const result = runSelfCheck(pageFile)
+function assertSelfCheckPasses(rendered, pageFile) {
+  const result = runSelfCheckText(rendered, pageFile)
   if (result.unreadable) throw new PublishError(3, `self-check could not read the page: ${result.message}`)
   if (!result.ok) {
     const detail = result.errors.map((e) => `${e.item} — ${e.detail}`).join('\n')
@@ -129,10 +134,21 @@ export function publish(pageFile, opts) {
     throw new PublishError(2, `unknown --to target: ${to}`)
   }
 
-  assertSelfCheckPasses(pageFile)
+  let raw
+  try {
+    raw = readFileSync(pageFile, 'utf8')
+  } catch (e) {
+    throw new PublishError(3, `self-check could not read the page: cannot read file: ${pageFile} (${e.message})`)
+  }
+  const renderErrors = []
+  const rendered = ensureRendered(raw, { onError: (m) => renderErrors.push(m) })
+  if (renderErrors.length) {
+    throw new PublishError(7, 'publish refused: a .wu-diffview could not be rendered', renderErrors.join('\n'))
+  }
 
-  const raw = readFileSync(pageFile, 'utf8')
-  const staged = adjustBackNav(inlineKitCss(raw, storeDir), to, storeDir)
+  assertSelfCheckPasses(rendered, pageFile)
+
+  const staged = adjustBackNav(inlineKitCss(rendered, storeDir), to, storeDir)
 
   const hits = findPrivateWordHits(staged, privateWords(storeDir))
   if (hits.length) {

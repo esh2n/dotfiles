@@ -308,3 +308,67 @@ describe('publish: CLI', () => {
     assert.equal(r.status, 2)
   })
 })
+
+describe('publish(): build\'s rendering passes are applied before staging', () => {
+  const CODE = '<pre class="wu-code" data-lang="go"><code>func main() {\n\treturn "ok"\n}</code></pre>\n'
+  const DIFF = '<figure class="wu-diffview" data-mode="unified" data-lang="go"><script type="text/x-writeup-diff">\n--- a/x.go\n+++ b/x.go\n@@ -1 +1 @@\n-old := 1\n+new := 2\n</script><figcaption>c</figcaption></figure>\n'
+
+  function pageWith(store, extra) {
+    const pagePath = join(store, DECISION_REL)
+    const html = readFileSync(pagePath, 'utf8')
+    assert.ok(html.includes('</main>'))
+    writeFileSync(pagePath, html.replace('</main>', extra + '</main>'))
+    return pagePath
+  }
+
+  test('a never-built page gets its .wu-code highlighted in the staged output, while the store copy stays as written', () => {
+    const store = freshStore()
+    const pagePath = pageWith(store, CODE)
+    const outFile = join(store, 'out.html')
+    publish(pagePath, { to: 'file', out: outFile, store })
+    const staged = readFileSync(outFile, 'utf8')
+    assert.match(staged, /<span class="wu-tok-kw">func<\/span>/)
+    assert.match(staged, /data-hl="1"/)
+    assert.ok(!readFileSync(pagePath, 'utf8').includes('wu-tok-'))
+  })
+
+  test('a never-built .wu-diffview is rendered into a .wu-dv table in the staged output', () => {
+    const store = freshStore()
+    const pagePath = pageWith(store, DIFF)
+    const outFile = join(store, 'out.html')
+    publish(pagePath, { to: 'file', out: outFile, store })
+    const staged = readFileSync(outFile, 'utf8')
+    assert.match(staged, /<table class="wu-dv"/)
+    assert.match(staged, /text\/x-writeup-diff/)
+  })
+
+  test('the staged output carries the viewport meta even when the page lacks it', () => {
+    const store = freshStore()
+    const pagePath = join(store, DECISION_REL)
+    writeFileSync(pagePath, readFileSync(pagePath, 'utf8').replace(/<meta name="viewport"[^>]*>\n?/, ''))
+    assert.ok(!readFileSync(pagePath, 'utf8').includes('name="viewport"'))
+    const outFile = join(store, 'out.html')
+    publish(pagePath, { to: 'file', out: outFile, store })
+    assert.match(readFileSync(outFile, 'utf8'), /<meta name="viewport" content="width=device-width, initial-scale=1">/)
+  })
+
+  test('an already-built page stages byte-identically to the build\'s rendering (the passes are idempotent)', () => {
+    const store = freshStore()
+    const pagePath = pageWith(store, CODE + DIFF)
+    buildStore(store)
+    const built = readFileSync(pagePath, 'utf8')
+    const outFile = join(store, 'out.html')
+    publish(pagePath, { to: 'file', out: outFile, store })
+    const staged = readFileSync(outFile, 'utf8')
+    const codeOf = (s) => s.slice(s.indexOf('<pre class="wu-code"'), s.indexOf('</main>'))
+    assert.equal(codeOf(staged), codeOf(built))
+  })
+
+  test('kit/samples.html publishes with highlighted code and a rendered diff view', () => {
+    const outFile = join(freshStore(), 'samples.html')
+    publish(join(ROOT, 'kit', 'samples.html'), { to: 'file', out: outFile, store: FIXTURE_STORE })
+    const staged = readFileSync(outFile, 'utf8')
+    assert.match(staged, /<span class="wu-tok-kw">type<\/span>/)
+    assert.match(staged, /<table class="wu-dv"/)
+  })
+})

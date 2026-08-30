@@ -35,6 +35,7 @@ without writing or deploying anything.
 | 4 | A private word was found on the page; publish refused |
 | 5 | `--to cloudflare` and Cloudflare Access is not verified |
 | 6 | Staged page exceeds the 16MB Artifact limit |
+| 7 | A `.wu-diffview` on the page carries a diff that could not be parsed; publish refused (fix the diff inside its script, or drop the figure) |
 
 ## Private-word check (exit 4)
 

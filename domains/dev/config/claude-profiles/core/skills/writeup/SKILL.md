@@ -147,4 +147,6 @@ access_verified = true`. Exit codes and walkthroughs: `references/publish.md`.
 - Pasting a diagram whose `render-diagram.mjs --json` returned `ok: false` — only exit-0 renders belong on the page.
 - Forgetting to bump `<meta name="updated">` on a revision — the index sorts by `updated`, so a silent overwrite falls out of view.
 - Publishing before self-check passes on its own — publish re-runs it and refuses at exit 3, but that's a backstop, not your gate.
+- Handing a page's HTML to the Artifact tool (or any host) without going through `publish.mjs` — publish inlines the kit CSS, drops the back nav, screens private words, and re-runs build's rendering passes (viewport meta, `.wu-diffview` tables, code highlighting). A page shipped around it renders plain, un-highlighted, and zoomed-out on a phone.
+- Publishing a page that was never built and assuming it is finished — highlighting and diff tables are added by `build` (step 7), not by the author; publish re-applies them as a backstop, but the copy in the store stays unrendered until `build` runs.
 - Saving to whichever store `serve` last used — the store is decided per request ("Which store" above); `build`/`git` must target that same `$STORE`.

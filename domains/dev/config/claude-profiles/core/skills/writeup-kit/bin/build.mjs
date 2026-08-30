@@ -266,7 +266,7 @@ const VIEWPORT_META_TAG = '<meta name="viewport" content="width=device-width, in
  * is, whatever its content. The eighth place build.mjs edits a page's own
  * bytes — see the module docstring.
  */
-function ensureViewport(text) {
+export function ensureViewport(text) {
   if (VIEWPORT_META_RE.test(text)) return text
   const charsetMatch = CHARSET_META_RE.exec(text)
   if (charsetMatch) {
@@ -331,7 +331,7 @@ function attrValue(attrsStr, name) {
  * whose shape this regex doesn't recognize) is returned unchanged, never
  * throws.
  */
-function ensureHighlighted(text) {
+export function ensureHighlighted(text) {
   return text.replace(PRE_BLOCK_RE, (whole, attrsStr, innerHtml) => {
     const classes = (attrValue(attrsStr, 'class') || '').split(/\s+/).filter(Boolean)
     const isDiff = classes.includes('wu-diff')
@@ -508,6 +508,20 @@ function ensureSideToc(text) {
   const scriptBlock = `<script>${SIDETOC_SCRIPT}</script>\n`
   const bodyClose = out.lastIndexOf('</body>')
   return bodyClose === -1 ? out + scriptBlock : out.slice(0, bodyClose) + scriptBlock + out.slice(bodyClose)
+}
+
+/**
+ * The store-independent rendering passes in build order — viewport meta,
+ * `.wu-diffview` tables, `.wu-code`/`.wu-diff` highlighting. `buildStore`
+ * runs each one separately so it can report which pass changed a page;
+ * `publish.mjs` runs this composition over a page right before staging, so
+ * a page that was never built (or a kit reference page such as
+ * `kit/samples.html`, which no store build ever scans) still ships
+ * rendered. Same input, same output as a build of that page. Diff-view
+ * parse errors go to `onError(message)`; the figure is then left as is.
+ */
+export function ensureRendered(text, { onError = () => {} } = {}) {
+  return ensureHighlighted(ensureDiffViews(ensureViewport(text), { onError }))
 }
 
 /**

@@ -209,29 +209,76 @@ edges:
 
 <section class="wu-section" id="code">
 <h2>設定の型</h2>
-<pre class="wu-code" data-lang="go"><code>// RetryPolicy controls the upload client's retry behavior.
-type RetryPolicy struct {
-	MaxAttempts         int
-	InitialDelayMs      int
-	BackoffFactor       float64
-	IdempotencyKeyHeader string
+<pre class="wu-code" data-lang="go" data-hl="1"><code><span class="wu-tok-cmt">// RetryPolicy controls the upload client's retry behavior.</span>
+<span class="wu-tok-kw">type</span> <span class="wu-tok-type">RetryPolicy</span> <span class="wu-tok-kw">struct</span> {
+	<span class="wu-tok-type">MaxAttempts</span>         <span class="wu-tok-type">int</span>
+	<span class="wu-tok-type">InitialDelayMs</span>      <span class="wu-tok-type">int</span>
+	<span class="wu-tok-type">BackoffFactor</span>       <span class="wu-tok-type">float64</span>
+	<span class="wu-tok-type">IdempotencyKeyHeader</span> <span class="wu-tok-type">string</span>
 }
 
-func DefaultRetryPolicy() RetryPolicy {
-	return RetryPolicy{MaxAttempts: 5, InitialDelayMs: 1000, BackoffFactor: 2}
+<span class="wu-tok-kw">func</span> <span class="wu-tok-fn">DefaultRetryPolicy</span>() <span class="wu-tok-type">RetryPolicy</span> {
+	<span class="wu-tok-kw">return</span> <span class="wu-tok-type">RetryPolicy</span>{<span class="wu-tok-type">MaxAttempts</span>: <span class="wu-tok-num">5</span>, <span class="wu-tok-type">InitialDelayMs</span>: <span class="wu-tok-num">1000</span>, <span class="wu-tok-type">BackoffFactor</span>: <span class="wu-tok-num">2</span>}
 }</code></pre>
 </section>
 <p>メモ: wu-code &mdash; 使うとき: DDL・型・設定／使わないとき: 見出し代わり。</p>
 
 <section class="wu-section" id="diff">
 <h2>設定変更の差分</h2>
-<pre class="wu-diff" data-lang="diff"><code> maxAttempts: 1
--initialDelayMs: 0
-+initialDelayMs: 1000
-+backoffFactor: 2
+<pre class="wu-diff" data-lang="diff" data-hl="1"><code> maxAttempts: 1
+<span class="wu-tok-del">-initialDelayMs: 0</span>
+<span class="wu-tok-add">+initialDelayMs: 1000</span>
+<span class="wu-tok-add">+backoffFactor: 2</span>
  idempotencyKeyHeader: "X-Upload-Idempotency-Key"</code></pre>
 </section>
 <p>メモ: wu-diff &mdash; 使うとき: 変更前後／使わないとき: &mdash;。</p>
+
+<section class="wu-section" id="diffview">
+<h2>実装の差分</h2>
+<figure class="wu-diffview" data-mode="unified" data-lang="go">
+<table class="wu-dv" data-mode="unified" data-lang="go">
+<thead><tr class="wu-dv-file"><th colspan="4" scope="colgroup"><span class="wu-dv-path">internal/upload/client.go</span><span class="wu-dv-stat">+4 −1</span></th></tr></thead>
+<tbody>
+<tr class="wu-dv-hunk"><td colspan="4"><span class="wu-dv-at">@@ -41,10 +41,13 @@</span> <span class="wu-dv-fn">func (c *Client) Put(ctx context.Context, blob Blob) error {</span></td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">41</td><td class="wu-dv-no">41</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">	<span class="wu-tok-kw">var</span> lastErr <span class="wu-tok-type">error</span></td></tr>
+<tr class="wu-dv-line wu-dv-del"><td class="wu-dv-no">42</td><td class="wu-dv-no"></td><td class="wu-dv-mark" aria-hidden="true">−</td><td class="wu-dv-code">	<span class="wu-tok-kw">for</span> attempt :<span class="wu-tok-op">=</span> <span class="wu-tok-num">0</span>; attempt <span class="wu-tok-op">&lt;</span> <span class="wu-tok-num">1</span>; attempt<span class="wu-tok-op">++</span> {</td></tr>
+<tr class="wu-dv-line wu-dv-add"><td class="wu-dv-no"></td><td class="wu-dv-no">42</td><td class="wu-dv-mark" aria-hidden="true">+</td><td class="wu-dv-code">	delay :<span class="wu-tok-op">=</span> time.<span class="wu-tok-fn">Duration</span>(c.policy.<span class="wu-tok-type">InitialDelayMs</span>) <span class="wu-tok-op">*</span> time.<span class="wu-tok-type">Millisecond</span></td></tr>
+<tr class="wu-dv-line wu-dv-add"><td class="wu-dv-no"></td><td class="wu-dv-no">43</td><td class="wu-dv-mark" aria-hidden="true">+</td><td class="wu-dv-code">	<span class="wu-tok-kw">for</span> attempt :<span class="wu-tok-op">=</span> <span class="wu-tok-num">0</span>; attempt <span class="wu-tok-op">&lt;</span> c.policy.<span class="wu-tok-type">MaxAttempts</span>; attempt<span class="wu-tok-op">++</span> {</td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">43</td><td class="wu-dv-no">44</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">		<span class="wu-tok-kw">if</span> err :<span class="wu-tok-op">=</span> c.<span class="wu-tok-fn">put</span>(ctx, blob); err <span class="wu-tok-op">==</span> <span class="wu-tok-kw">nil</span> {</td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">44</td><td class="wu-dv-no">45</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">			<span class="wu-tok-kw">return</span> <span class="wu-tok-kw">nil</span></td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">45</td><td class="wu-dv-no">46</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">		} <span class="wu-tok-kw">else</span> {</td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">46</td><td class="wu-dv-no">47</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">			lastErr <span class="wu-tok-op">=</span> err</td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">47</td><td class="wu-dv-no">48</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">		}</td></tr>
+<tr class="wu-dv-line wu-dv-add"><td class="wu-dv-no"></td><td class="wu-dv-no">49</td><td class="wu-dv-mark" aria-hidden="true">+</td><td class="wu-dv-code">		time.<span class="wu-tok-fn">Sleep</span>(delay)</td></tr>
+<tr class="wu-dv-line wu-dv-add"><td class="wu-dv-no"></td><td class="wu-dv-no">50</td><td class="wu-dv-mark" aria-hidden="true">+</td><td class="wu-dv-code">		delay <span class="wu-tok-op">=</span> time.<span class="wu-tok-fn">Duration</span>(<span class="wu-tok-type">float64</span>(delay) <span class="wu-tok-op">*</span> c.policy.<span class="wu-tok-type">BackoffFactor</span>)</td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">48</td><td class="wu-dv-no">51</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">	}</td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">49</td><td class="wu-dv-no">52</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">	<span class="wu-tok-kw">return</span> fmt.<span class="wu-tok-fn">Errorf</span>(<span class="wu-tok-str">"upload failed after retries: %w"</span>, lastErr)</td></tr>
+<tr class="wu-dv-line wu-dv-ctx"><td class="wu-dv-no">50</td><td class="wu-dv-no">53</td><td class="wu-dv-mark" aria-hidden="true"></td><td class="wu-dv-code">}</td></tr>
+</tbody>
+</table>
+<figcaption>再試行ループを方針値で回し、待機を指数で伸ばす。</figcaption>
+<script type="text/x-writeup-diff">
+--- a/internal/upload/client.go
++++ b/internal/upload/client.go
+@@ -41,10 +41,13 @@ func (c *Client) Put(ctx context.Context, blob Blob) error {
+ 	var lastErr error
+-	for attempt := 0; attempt &lt; 1; attempt++ {
++	delay := time.Duration(c.policy.InitialDelayMs) * time.Millisecond
++	for attempt := 0; attempt &lt; c.policy.MaxAttempts; attempt++ {
+ 		if err := c.put(ctx, blob); err == nil {
+ 			return nil
+ 		} else {
+ 			lastErr = err
+ 		}
++		time.Sleep(delay)
++		delay = time.Duration(float64(delay) * c.policy.BackoffFactor)
+ 	}
+ 	return fmt.Errorf("upload failed after retries: %w", lastErr)
+ }
+</script>
+</figure>
+</section>
+<p>メモ: wu-diffview &mdash; 使うとき: 行番号が要る本物のパッチ／使わないとき: 数行の before/after は wu-diff。</p>
 
 <section class="wu-section" id="chip">
 <h2>状態タグ</h2>
