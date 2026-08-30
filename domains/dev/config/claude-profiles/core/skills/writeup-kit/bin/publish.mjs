@@ -13,14 +13,24 @@
 // (dropped for file/artifact; rewritten to `/index.html` or dropped for
 // cloudflare — see `adjustBackNav`), (5) reject on a company-trace word
 // hit, (6) enforce the 16MB Artifact-tool size ceiling. Then dispatch to
-// one of 3 targets. The status favicon `<link rel="icon">` (page-
-// contract.md §1) is not touched by any of this — its href is an inline
-// `data:` URI already, so it carries through to every target unchanged.
+// one of 3 targets: `file` and `cloudflare` write the staged text as a
+// full, standalone document (a Slack attachment / email, and a hosted
+// page, both need one); `artifact` writes it through `toArtifactFragment`
+// instead, which strips the `<!DOCTYPE>`/`<html>`/`<head>`/`<body>`
+// skeleton and the charset/viewport `<meta>`s — the Artifact tool supplies
+// its own version of exactly those, and wraps whatever this returns inside
+// them, so a full document there would double them up. The status favicon
+// `<link rel="icon">` (page-contract.md §1) is not touched by any of this
+// — its href is an inline `data:` URI already, so it carries through to
+// every target unchanged (and survives `toArtifactFragment` too, since
+// that only removes the skeleton tags and the two `<meta>`s named above).
 //
-// Exit codes: 0 success/dry-run, 2 usage error, 3 self-check failed,
-// 4 private-word hit, 5 cloudflare Access not verified, 6 size over 16MB,
-// 7 a `.wu-diffview` whose diff could not be rendered, 8 the kit CSS
-// `<link>` survived inlining (see `inlineKitCss`'s comment-skip below).
+// Exit codes: 0 success/dry-run, 2 usage error (including `--to artifact`
+// failing to locate the skeleton `toArtifactFragment` needs), 3 self-check
+// failed, 4 private-word hit, 5 cloudflare Access not verified, 6 size
+// over 16MB, 7 a `.wu-diffview` whose diff could not be rendered, 8 the
+// kit CSS `<link>` survived inlining (see `inlineKitCss`'s comment-skip
+// below).
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -277,7 +287,14 @@ function planDryRun(pageFile, staged, { to, out, storeDir, deploy }) {
   const bytes = Buffer.byteLength(staged, 'utf8')
   const plan = { ok: true, target: to, dryRun: true, bytes }
   if (to === 'file') plan.output = out || '(missing --out)'
-  if (to === 'artifact') plan.output = join(storeDir, '.publish', `${slugOf(pageFile)}.artifact.html`)
+  if (to === 'artifact') {
+    plan.output = join(storeDir, '.publish', `${slugOf(pageFile)}.artifact.html`)
+    // The reported `bytes` is still the full staged document's size (a
+    // conservative, slightly-over-real-size upper bound for the 16MB
+    // check); the file actually written is smaller — a fragment with the
+    // <!DOCTYPE>/<html>/<head>/<body> skeleton and two <meta>s stripped.
+    plan.fragment = true
+  }
   if (to === 'cloudflare') {
     const rel = relative(storeDir, pageFile)
     plan.output = join(storeDir, 'public', rel)
@@ -295,11 +312,76 @@ function publishToFile(staged, out) {
   return { ok: true, target: 'file', output: out }
 }
 
+const HEAD_OPEN_TAG = '<head>'
+const HEAD_COMMENT_RE = /<!--[\s\S]*?-->/g
+const META_CHARSET_RE = /<meta\s+charset="[^"]*"\s*>/gi
+const META_VIEWPORT_RE = /<meta\s+name="viewport"[^>]*>/gi
+const TITLE_TAG_RE = /<title\b[^>]*>[\s\S]*?<\/title>/i
+
+/**
+ * Converts a full staged HTML document into the fragment the Artifact tool
+ * expects: no `<!DOCTYPE>`/`<html>`/`<head>`/`<body>` of its own, since the
+ * tool wraps whatever it's given in exactly that skeleton (plus a charset
+ * and viewport `<meta>`) at publish time. Returns the `<head>`'s own
+ * children — minus the charset/viewport `<meta>`s the tool already
+ * supplies, minus every HTML comment, with `<title>` moved to the very
+ * front (the tool's contract: "put your own `<title>` and `<style>` at the
+ * top of the file") — followed by the `<body>`'s inner content (comments
+ * removed there too).
+ *
+ * The skeleton is located by literal tag search (`indexOf`/`lastIndexOf`),
+ * never a regex spanning from an opening tag to its closing one: this
+ * kit's own `kit/template.html` carries an explanatory comment that quotes
+ * `</body>` as literal text (the sidetoc note right after `<main>`), so the
+ * *first* `</head>`/`</body>` found via a naive scan is correct, but a
+ * naive scan for `</body>` specifically must use the *last* occurrence —
+ * the same reason `build.mjs`'s own sidetoc-script insertion point is
+ * `text.lastIndexOf('</body>')`, not the first. A `<body …>` open tag's own
+ * closing `>` is located rather than assuming a bare `<body>`, since a
+ * page could (in principle) carry attributes there.
+ */
+export function toArtifactFragment(html) {
+  // `<head>` never carries attributes in this kit — an exact literal match
+  // (rather than `indexOf('<head')` + a search for its closing `>`) also
+  // sidesteps `<head` matching as a prefix of `<header`, which does carry
+  // attributes and appears inside every page's body.
+  const headOpen = html.indexOf(HEAD_OPEN_TAG)
+  const headInnerStart = headOpen === -1 ? -1 : headOpen + HEAD_OPEN_TAG.length
+  const headClose = headInnerStart === -1 ? -1 : html.indexOf('</head>', headInnerStart)
+  const bodyOpen = html.indexOf('<body')
+  const bodyOpenEnd = bodyOpen === -1 ? -1 : html.indexOf('>', bodyOpen)
+  const bodyClose = html.lastIndexOf('</body>')
+  if (
+    headOpen === -1 || headClose === -1 ||
+    bodyOpen === -1 || bodyOpenEnd === -1 || bodyClose === -1 ||
+    bodyClose <= bodyOpenEnd
+  ) {
+    throw new PublishError(2, 'publish refused: could not locate a <head>…</head> / <body>…</body> skeleton to build the Artifact fragment')
+  }
+
+  const headInner = html.slice(headInnerStart, headClose)
+    .replace(HEAD_COMMENT_RE, '')
+    .replace(META_CHARSET_RE, '')
+    .replace(META_VIEWPORT_RE, '')
+  const bodyInner = html.slice(bodyOpenEnd + 1, bodyClose).replace(HEAD_COMMENT_RE, '')
+
+  const titleMatch = TITLE_TAG_RE.exec(headInner)
+  const title = titleMatch ? titleMatch[0] : ''
+  const headWithoutTitle = titleMatch
+    ? headInner.slice(0, titleMatch.index) + headInner.slice(titleMatch.index + titleMatch[0].length)
+    : headInner
+
+  return [title, headWithoutTitle, bodyInner]
+    .filter((part) => part.trim() !== '')
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n') + '\n'
+}
+
 function publishToArtifact(staged, pageFile, storeDir) {
   const dir = join(storeDir, '.publish')
   mkdirSync(dir, { recursive: true })
   const out = join(dir, `${slugOf(pageFile)}.artifact.html`)
-  writeFileSync(out, staged)
+  writeFileSync(out, toArtifactFragment(staged))
   return { ok: true, target: 'artifact', output: out }
 }
 
@@ -358,6 +440,7 @@ function main() {
     if (result.dryRun) {
       console.log(`publish --dry-run: target=${result.target} bytes=${result.bytes}`)
       console.log(`  output: ${result.output}`)
+      if (result.fragment) console.log('  note: written as a <head>/<body>-stripped fragment for the Artifact tool, not a full document — bytes above is the pre-fragment upper bound')
       if (result.command) console.log(`  command: ${result.command}${result.wouldDeploy ? '' : ' (not run; pass --deploy)'}`)
     } else {
       console.log(`publish: wrote ${result.output}`)

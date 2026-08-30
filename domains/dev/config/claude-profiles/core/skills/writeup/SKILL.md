@@ -140,10 +140,13 @@ renders unstyled and without pictures; the only HTML that ever leaves the
 store is `publish.mjs` / `pr-pack.mjs` output.
 
 `node $KIT/bin/publish.mjs page.html --to artifact|cloudflare|file …`.
-`--to artifact` writes `<store>/.publish/<slug>.artifact.html` — hand it to
-the Artifact tool (favicon `📄`; title from `<title>`), write the returned
-URL into `<meta name="published-artifact">`, commit. Exit 4 (private-word
-refusal) is final — never bypass it. `--to cloudflare` needs `[cloudflare]
+`--to artifact` writes `<store>/.publish/<slug>.artifact.html` as a
+**fragment** (no `<!DOCTYPE>`/`<html>`/`<head>`/`<body>`, `<title>` first)
+already shaped for the Artifact tool's own contract — hand it to the tool
+as `file_path` exactly as written, never stripped or re-wrapped by hand
+(favicon `📄`; title from `<title>`), write the returned URL into `<meta
+name="published-artifact">`, commit. Exit 4 (private-word refusal) is
+final — never bypass it. `--to cloudflare` needs `[cloudflare]
 access_verified = true`. Exit codes and walkthroughs: `references/publish.md`.
 
 **GitHub PR（非公開リポでも可）**: attaching a page to a pull request is not
