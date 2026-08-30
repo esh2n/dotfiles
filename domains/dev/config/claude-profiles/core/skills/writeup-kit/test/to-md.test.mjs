@@ -262,6 +262,105 @@ describe('to-md: inline formatting', () => {
     const md = convertToMarkdown(html, { slug: 'link' })
     assert.match(md, /\[link\]\(https:\/\/example\.com\)/)
   })
+
+  test('an inline <code> becomes a GFM code span, not bare text', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p>色は <code>currentColor</code> を使う。</p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'code' })
+    assert.match(md, /色は `currentColor` を使う。/)
+  })
+
+  test('an inline <code> with an interior backtick uses a longer fence, unambiguous with no padding needed', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p><code>a\`b</code></p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'code2' })
+    assert.match(md, /``a`b``/)
+  })
+
+  test('an inline <code> that starts with a backtick gets a padding space (GFM rule)', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p><code>\`x</code></p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'code3' })
+    assert.match(md, /`` `x ``/)
+  })
+
+  test('a literal < in plain prose (written as &lt; in the source) is escaped as \\<, not left as raw HTML', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p>&lt;img&gt; 内の src を見る。docs/writeup/&lt;slug&gt;/ 以下に置く。</p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'lt' })
+    assert.match(md, /\\<img> 内の src を見る。docs\/writeup\/\\<slug>\/ 以下に置く。/)
+  })
+
+  test('a paragraph line-wrapped across multiple lines in the HTML source collapses to one line (no leaked raw newline)', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p>1行目の文。
+2行目の文。</p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'wrap' })
+    assert.match(md, /1行目の文。 2行目の文。/)
+  })
+
+  test('a <br> hard break inside a paragraph is still a real line break (not collapsed like source whitespace)', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2><p>1行目<br>2行目</p></section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'br' })
+    assert.match(md, /1行目\n2行目/)
+  })
+})
+
+describe('to-md: blockquotes prefix every line with "> " (.wu-summary / .wu-callout / bare <blockquote>)', () => {
+  function pageWithBody(body) {
+    return `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <header class="wu-header"></header>
+      <main><section class="wu-section"><h2>h</h2>${body}</section></main>
+      <footer class="wu-footer"></footer>
+    </div></body></html>`
+  }
+
+  test('.wu-summary as one <p> with a <br> hard break: every line stays inside the > [!NOTE] alert', () => {
+    const md = convertToMarkdown(pageWithBody('<div class="wu-summary"><p>1行目<br>2行目</p></div>'), { slug: 'p' })
+    assert.match(md, /> \[!NOTE\]\n> 1行目\n> 2行目/)
+    assert.doesNotMatch(md, /^2行目/m)
+  })
+
+  test('.wu-summary with 3 separate <p> paragraphs keeps a blank ">" line between them (regression)', () => {
+    const md = convertToMarkdown(pageWithBody('<div class="wu-summary"><p>一</p><p>二</p><p>三</p></div>'), { slug: 'p' })
+    assert.match(md, /> \[!NOTE\]\n> 一\n>\n> 二\n>\n> 三/)
+  })
+
+  test('.wu-callout with a <br> hard break: every line stays inside the alert', () => {
+    const md = convertToMarkdown(pageWithBody('<div class="wu-callout" data-tone="warn"><p>1行目<br>2行目</p></div>'), { slug: 'p' })
+    assert.match(md, /> \[!WARNING\]\n> 1行目\n> 2行目/)
+    assert.doesNotMatch(md, /^2行目/m)
+  })
+
+  test('a bare <blockquote> (not .wu-quote) with a <br> hard break: every line stays inside the quote', () => {
+    const md = convertToMarkdown(pageWithBody('<blockquote>1行目<br>2行目</blockquote>'), { slug: 'p' })
+    assert.match(md, /> 1行目\n> 2行目/)
+    assert.doesNotMatch(md, /^2行目/m)
+  })
+
+  test('a plain <p> starting with a literal > (written as &gt;) is escaped, not read as a blockquote', () => {
+    const md = convertToMarkdown(pageWithBody('<p>&gt;これは引用ではない。</p>'), { slug: 'p' })
+    assert.match(md, /^\\>これは引用ではない。$/m)
+  })
 })
 
 describe('to-md: the generated .wu-sidetoc is chrome, not content', () => {
