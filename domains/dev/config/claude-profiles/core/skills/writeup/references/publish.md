@@ -45,6 +45,7 @@ without writing or deploying anything.
 | 5 | `--to cloudflare` and Cloudflare Access is not verified |
 | 6 | Staged page exceeds the 16MB Artifact limit |
 | 7 | A `.wu-diffview` on the page carries a diff that could not be parsed; publish refused (fix the diff inside its script, or drop the figure) |
+| 8 | The `_kit/writeup.css` `<link>` was still present after CSS inlining — a bug, not an authoring mistake; report it rather than retrying |
 
 ## Private-word check (exit 4)
 
@@ -182,7 +183,12 @@ every `](figures/…)` and `src="figures/…"` reference in the Markdown to
 strips the Markdown frontmatter block (GitHub would render it as a raw
 `---` fence, not metadata) while keeping the `# title` line, and appends a
 footer line: `> 原本（kit の見た目のまま）: <blob URL of index.html>`,
-plus `・PDF: <blob URL>` when the PDF exists.
+plus `・PDF: <blob URL>` when the PDF exists. Only the figure links above
+carry `?raw=true` (they are an `<img>`/`![]()` src, which needs the raw
+bytes to render); the footer's two links are plain blob-view URLs a human
+clicks — GitHub's syntax-highlighted HTML source with a Download button
+for `index.html`, or its inline PDF preview for the PDF — and `?raw=true`
+on either would force a raw download instead.
 
 **What survives into the PR body's Markdown**: alerts (`> [!NOTE]` etc.),
 tables, ```` ```diff ```` fences, and a `mermaid` fence for any figure that

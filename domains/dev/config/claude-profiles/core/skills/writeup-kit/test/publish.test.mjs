@@ -73,6 +73,51 @@ describe('publish: pre-stage helpers', () => {
   })
 })
 
+describe('inlineKitCss(): a commented-out example link (kit/template.html shape) is ignored', () => {
+  // The exact comment kit/template.html keeps right before its real <link>
+  // — an authored page copied from the template keeps this too, and it
+  // quotes the very same href the real regex is looking for.
+  const TEMPLATE_COMMENT =
+    '<!--\n' +
+    '  A page inside the store links the kit two directories up:\n' +
+    '    <link rel="stylesheet" href="../_kit/writeup.css">\n' +
+    '  template.html and samples.html live inside kit/ itself, so they\n' +
+    '  link the sibling file directly instead.\n' +
+    '-->\n'
+  const REAL_LINK = '<link rel="stylesheet" href="../_kit/writeup.css">'
+
+  test('the CSS is inlined at the real link, not inside the comment; exactly one <style> remains, and no real link survives', () => {
+    const store = freshStore()
+    const html = `<html><head><title>t</title>\n${TEMPLATE_COMMENT}${REAL_LINK}\n</head><body>x</body></html>`
+    const staged = inlineKitCss(html, store)
+    assert.equal((staged.match(/<style>/g) || []).length, 1)
+    const withoutComments = staged.replace(/<!--[\s\S]*?-->/g, '')
+    assert.ok(!withoutComments.includes('_kit/writeup.css'), 'no real <link> to _kit/writeup.css should remain outside the comment')
+    const commentEnd = staged.indexOf('-->') + 3
+    assert.ok(staged.indexOf('<style>') > commentEnd, 'the <style> must be inserted after the comment closes, not inside it')
+  })
+
+  test('publish(): a page copied verbatim from kit/template.html (comment kept) renders styled', () => {
+    const store = freshStore()
+    const pagePath = join(store, DECISION_REL)
+    const html = readFileSync(pagePath, 'utf8')
+    assert.ok(html.includes(REAL_LINK))
+    writeFileSync(pagePath, html.replace(REAL_LINK, TEMPLATE_COMMENT + REAL_LINK))
+    const outFile = join(store, 'out-template-comment.html')
+    publish(pagePath, { to: 'file', out: outFile, store })
+    const staged = readFileSync(outFile, 'utf8')
+    assert.equal((staged.match(/<style>/g) || []).length, 1)
+    const css = readFileSync(join(store, '_kit', 'writeup.css'), 'utf8')
+    assert.ok(staged.includes(css.trim().slice(0, 40)), 'the real kit CSS must be inlined, not left empty/missing')
+  })
+
+  test('inlineKitCss throws PublishError(8) when a real link still survives after inlining (defense in depth)', () => {
+    const store = freshStore()
+    const html = `<head>${REAL_LINK}${REAL_LINK}</head>`
+    assert.throws(() => inlineKitCss(html, store), (e) => e instanceof PublishError && e.code === 8)
+  })
+})
+
 describe('publish(): targets', () => {
   test('--to file writes the staged (CSS-inlined) page to --out', () => {
     const store = freshStore()

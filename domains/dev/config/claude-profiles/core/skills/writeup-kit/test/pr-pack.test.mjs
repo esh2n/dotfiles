@@ -78,7 +78,9 @@ describe('prPack(): --body-out', () => {
     })
     const body = readFileSync(bodyOut, 'utf8')
     assert.match(body, /https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/figures\/[^)\s]+\.svg\?raw=true/)
-    assert.match(body, /> 原本（kit の見た目のまま）: https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/index\.html\?raw=true/)
+    // The 原本 link is a plain blob-view link (GitHub's syntax-highlighted
+    // HTML source + Download button), not an <img> src — no ?raw=true.
+    assert.match(body, /> 原本（kit の見た目のまま）: https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/index\.html\n/)
   })
 
   test('appends a ・PDF: line when the pdf exists', async () => {
@@ -90,7 +92,20 @@ describe('prPack(): --body-out', () => {
     writeFileSync(join(out, '2026-08-05-example-design.pdf'), 'not a real pdf')
     await prPack(null, { out, repo: 'o/r', sha: 'abc123', path: 'docs/x', bodyOut })
     const body = readFileSync(bodyOut, 'utf8')
-    assert.match(body, /・PDF: https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/2026-08-05-example-design\.pdf\?raw=true/)
+    // A plain blob-view link, not ?raw=true — GitHub renders a PDF inline
+    // only at the plain blob URL; ?raw=true would force a raw download.
+    assert.match(body, /・PDF: https:\/\/github\.com\/o\/r\/blob\/abc123\/docs\/x\/2026-08-05-example-design\.pdf\n/)
+  })
+
+  test('the footer links never carry ?raw=true (unlike figure links, which do)', async () => {
+    const store = freshStore()
+    const out = freshOut()
+    const bodyOut = join(out, 'body.md')
+    await prPack(join(store, DESIGN_REL), { out, store, repo: 'o/r', sha: 'abc123', path: 'docs/x', bodyOut })
+    const body = readFileSync(bodyOut, 'utf8')
+    const footerLine = body.split('\n').find((l) => l.startsWith('> 原本'))
+    assert.ok(footerLine, body)
+    assert.ok(!footerLine.includes('?raw=true'), footerLine)
   })
 
   test('strips the frontmatter block but keeps the # title line', async () => {

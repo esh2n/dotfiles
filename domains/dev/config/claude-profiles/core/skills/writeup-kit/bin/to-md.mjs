@@ -15,14 +15,41 @@ import { parse as parseYaml } from './lib/yaml-lite.mjs'
 import { unescapeIrScript } from './lib/ir-script.mjs'
 import { diffFigureText } from './lib/diffview.mjs'
 
-// --- inline rendering (a/strong/em/br/.wu-accent/plain text) ---------------
+// --- inline rendering (a/strong/em/br/code/.wu-accent/plain text) ----------
+
+/** Escapes a literal `<` in plain (non-code) text so GitHub's Markdown
+ * renderer treats it as a character, not the start of inline HTML — a
+ * page whose prose says `<img>` or `docs/writeup/<slug>/` would otherwise
+ * have that fragment silently stripped or misrendered. `>` is intentionally
+ * left alone here; a leading `>` is only a problem at the very start of a
+ * line, handled separately (`escapeLeadingGt`) where a text run becomes
+ * its own line. */
+function escapeInlineText(text) {
+  return text.replace(/</g, '\\<')
+}
+
+/** GFM inline code span for a `<code>` element's own raw text — read with
+ * `textContent`, never routed back through `renderInline`/`escapeInlineText`,
+ * since a code span's content is verbatim (a literal `<` inside `` `code` ``
+ * needs no escaping, and must not gain one). The backtick fence is chosen
+ * longer than any run of backticks already inside the text, with a padding
+ * space when the text starts or ends with a backtick — the same rule GFM
+ * itself uses to keep the fence from being ambiguous with its own content. */
+function inlineCode(text) {
+  const runs = text.match(/`+/g) || []
+  const longest = runs.reduce((max, r) => Math.max(max, r.length), 0)
+  const fence = '`'.repeat(longest + 1)
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : ''
+  return `${fence}${pad}${text}${pad}${fence}`
+}
 
 function renderInline(node) {
-  if (node.type === 'text') return node.value
+  if (node.type === 'text') return escapeInlineText(node.value.replace(/\s+/g, ' '))
   if (node.type !== 'element') return ''
   const tag = node.tag
   const inner = () => (node.children || []).map(renderInline).join('')
   if (tag === 'br') return '\n'
+  if (tag === 'code') return inlineCode(textContent(node))
   if (tag === 'strong') return `**${inner()}**`
   if (tag === 'em') return `*${inner()}*`
   if (tag === 'a') {
@@ -184,7 +211,7 @@ function renderShot(fig, ctx) {
   } else {
     out.push(`![${alt}](#)`)
   }
-  if (caption) out.push(caption)
+  if (caption) out.push(escapeLeadingGt(caption))
   return out.join('\n\n')
 }
 
@@ -201,7 +228,7 @@ function renderDiffView(fig) {
   const caption = cap ? inlineText(cap) : ''
   const out = []
   if (raw !== null) out.push('```diff\n' + raw.replace(/\n+$/, '') + '\n```')
-  if (caption) out.push(caption)
+  if (caption) out.push(escapeLeadingGt(caption))
   return out.join('\n\n')
 }
 
@@ -237,11 +264,31 @@ function renderDl(dl) {
   return lines.join('\n')
 }
 
+/** Escapes a leading `>` — a text run that becomes its own standalone
+ * line/block (a plain `<p>`, a `.wu-shot`/`.wu-diffview` caption) would
+ * otherwise open that line as a one-line Markdown blockquote if the
+ * source text itself starts with `>`. Applied per line so a `<br>`-created
+ * hard break inside the same block is covered too. */
+function escapeLeadingGt(text) {
+  return text.split('\n').map((line) => (line.startsWith('>') ? `\\${line}` : line)).join('\n')
+}
+
+/** Prefixes *every* line of `text` with GFM blockquote syntax (`> `, or a
+ * bare `>` for a blank line) — not only its first line. `inlineText`
+ * collapses whitespace inside one text node, but a `<br>` (a deliberate
+ * hard break) or a multi-`<p>` body still produces an embedded `\n`;
+ * joining those into `> [!NOTE]\n> ${body}` naively only prefixes the
+ * very first line, so every line after the first falls out of the alert
+ * as its own paragraph once GitHub renders it — the exact bug this fixes. */
+function toBlockquote(text) {
+  return text.split('\n').map((line) => (line === '' ? '>' : `> ${line}`)).join('\n')
+}
+
 function renderCallout(div) {
   const tone = attr(div, 'data-tone')
   const prefix = tone === 'warn' ? '[!WARNING]' : tone === 'decision' ? '[!IMPORTANT]' : '[!NOTE]'
   const bodyLines = elementChildren(div).map((p) => inlineText(p)).filter(Boolean)
-  return [`> ${prefix}`, ...bodyLines.map((l) => `> ${l}`)].join('\n')
+  return toBlockquote([prefix, ...bodyLines].join('\n'))
 }
 
 function renderDecision(div) {
@@ -342,12 +389,12 @@ function renderBlock(node, out, ctx) {
   if (tag === 'h4') return void out.push(`#### ${inlineText(node)}`)
 
   if (hasClass(node, 'wu-lede')) {
-    return void out.push(inlineText(node))
+    return void out.push(escapeLeadingGt(inlineText(node)))
   }
   if (hasClass(node, 'wu-summary')) {
     const paras = elementChildren(node).length ? elementChildren(node) : [node]
-    const body = paras.map((p) => inlineText(p)).join('\n>\n> ')
-    return void out.push(`> [!NOTE]\n> ${body}`)
+    const body = paras.map((p) => inlineText(p)).join('\n\n')
+    return void out.push(toBlockquote(`[!NOTE]\n${body}`))
   }
   if (tag === 'dl' && hasClass(node, 'wu-terms')) return void out.push(renderDl(node))
   if (hasClass(node, 'wu-cells')) return void out.push(renderCells(node))
@@ -376,7 +423,7 @@ function renderBlock(node, out, ctx) {
 
   if (tag === 'p' || tag === 'blockquote') {
     const text = inlineText(node)
-    if (text) out.push(tag === 'blockquote' ? `> ${text}` : text)
+    if (text) out.push(tag === 'blockquote' ? toBlockquote(text) : escapeLeadingGt(text))
     return
   }
   if (tag === 'ul' || tag === 'ol') {

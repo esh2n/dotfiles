@@ -19,7 +19,8 @@
 //
 // Exit codes: 0 success/dry-run, 2 usage error, 3 self-check failed,
 // 4 private-word hit, 5 cloudflare Access not verified, 6 size over 16MB,
-// 7 a `.wu-diffview` whose diff could not be rendered.
+// 7 a `.wu-diffview` whose diff could not be rendered, 8 the kit CSS
+// `<link>` survived inlining (see `inlineKitCss`'s comment-skip below).
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -43,19 +44,71 @@ export class PublishError extends Error {
   }
 }
 
+/** Byte ranges (`[start, end)`) of every `<!-- … -->` comment in `html` —
+ * used to keep a text-surgery regex from matching an *example* fragment
+ * quoted inside an explanatory comment, rather than the real markup it is
+ * commenting on. */
+function commentRanges(html) {
+  const ranges = []
+  const re = /<!--[\s\S]*?-->/g
+  let m
+  while ((m = re.exec(html))) ranges.push([m.index, m.index + m[0].length])
+  return ranges
+}
+
+function isInsideRanges(index, ranges) {
+  return ranges.some(([start, end]) => index >= start && index < end)
+}
+
+const KIT_CSS_LINK_RE = /<link\s+rel="stylesheet"\s+href="((?:\.\.\/)?_kit\/writeup\.css|\.\/writeup\.css)"\s*>/g
+
+/** `true` when a *real* (not commented-out) kit CSS `<link>` is still
+ * present in `html` — the check `inlineKitCss` runs on its own output
+ * before returning, so a page whose link somehow survived inlining fails
+ * loudly instead of shipping unstyled. */
+function kitCssLinkRemains(html) {
+  const ranges = commentRanges(html)
+  let m
+  KIT_CSS_LINK_RE.lastIndex = 0
+  while ((m = KIT_CSS_LINK_RE.exec(html))) {
+    if (!isInsideRanges(m.index, ranges)) return true
+  }
+  return false
+}
+
 /** Replaces the kit CSS `<link>` with an inline `<style>`, keeping any
  * Google Fonts `<link>` untouched. Resolves the CSS file relative to
  * `storeDir` (a page-local `../_kit/writeup.css`) or falls back to the
- * kit's own copy (`./writeup.css`, used by kit/template.html itself). */
+ * kit's own copy (`./writeup.css`, used by kit/template.html itself).
+ *
+ * `kit/template.html` (and every page copied from it) carries an
+ * explanatory `<!-- … -->` comment right before the real `<link>`, quoting
+ * that exact same href as an example — a naive first-match regex hits the
+ * commented-out copy first and inlines the CSS *inside the comment*,
+ * leaving the real `<link>` untouched and the staged page unstyled with no
+ * error at all. So this matches every occurrence and takes the first one
+ * that does not fall inside an HTML comment (`commentRanges`), and then
+ * re-checks its own output (`kitCssLinkRemains`) so that exact silent
+ * failure can never ship again — a real `<link>` still present afterward
+ * throws instead of publishing an unstyled page. */
 export function inlineKitCss(html, storeDir) {
-  const linkRe = /<link\s+rel="stylesheet"\s+href="((?:\.\.\/)?_kit\/writeup\.css|\.\/writeup\.css)"\s*>/
-  const m = linkRe.exec(html)
-  if (!m) return html
-  const href = m[1]
+  const ranges = commentRanges(html)
+  KIT_CSS_LINK_RE.lastIndex = 0
+  let m
+  let match = null
+  while ((m = KIT_CSS_LINK_RE.exec(html))) {
+    if (!isInsideRanges(m.index, ranges)) { match = m; break }
+  }
+  if (!match) return html
+  const href = match[1]
   const cssPath = href.endsWith('_kit/writeup.css') ? join(storeDir, '_kit', 'writeup.css') : join(KIT_DIR, 'writeup.css')
   const css = existsSync(cssPath) ? readFileSync(cssPath, 'utf8') : ''
   const style = `<style>\n${css}\n</style>`
-  return html.slice(0, m.index) + style + html.slice(m.index + m[0].length)
+  const staged = html.slice(0, match.index) + style + html.slice(match.index + match[0].length)
+  if (kitCssLinkRemains(staged)) {
+    throw new PublishError(8, 'publish refused: a _kit/writeup.css stylesheet link survived CSS inlining — the staged page would render unstyled')
+  }
+  return staged
 }
 
 const MIME_BY_EXT = {

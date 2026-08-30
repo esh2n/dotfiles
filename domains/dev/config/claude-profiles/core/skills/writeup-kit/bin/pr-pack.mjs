@@ -177,8 +177,20 @@ function stripFrontmatter(md) {
   return md.replace(FRONTMATTER_RE, '')
 }
 
-function blobUrl(repo, sha, repoPath, relPath) {
-  return `https://github.com/${repo}/blob/${sha}/${repoPath}/${relPath}?raw=true`
+/**
+ * A SHA-pinned blob URL. `?raw=true` is for an `<img>`/`![]()` reference —
+ * it makes GitHub serve the raw file bytes so the image actually renders
+ * inline. The footer's own two links (`原本` and `・PDF`) are plain links a
+ * human clicks, not an image src: GitHub's blob *viewer* — syntax-
+ * highlighted HTML source with a Download button, or its inline PDF
+ * preview — is what we want there, and `?raw=true` on a PDF forces a raw
+ * download instead of that inline preview. So `raw` defaults to `true`
+ * (every existing figure link keeps working unchanged) and the footer
+ * passes `raw: false` explicitly.
+ */
+function blobUrl(repo, sha, repoPath, relPath, { raw = true } = {}) {
+  const base = `https://github.com/${repo}/blob/${sha}/${repoPath}/${relPath}`
+  return raw ? `${base}?raw=true` : base
 }
 
 /** Rewrites every `](figures/...)` and `src="figures/..."` reference in the
@@ -193,10 +205,10 @@ function rewriteFigureLinks(md, { repo, sha, path: repoPath }) {
 }
 
 function footer({ repo, sha, path: repoPath, slug, hasPdf }) {
-  const indexUrl = blobUrl(repo, sha, repoPath, 'index.html')
+  const indexUrl = blobUrl(repo, sha, repoPath, 'index.html', { raw: false })
   let line = `> 原本（kit の見た目のまま）: ${indexUrl}`
   if (hasPdf) {
-    line += ` ・PDF: ${blobUrl(repo, sha, repoPath, `${slug}.pdf`)}`
+    line += ` ・PDF: ${blobUrl(repo, sha, repoPath, `${slug}.pdf`, { raw: false })}`
   }
   return line
 }
