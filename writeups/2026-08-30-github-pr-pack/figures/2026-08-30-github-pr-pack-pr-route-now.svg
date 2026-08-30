@@ -1,0 +1,80 @@
+<svg role="img" aria-labelledby="wu-d-pr-route-now-title wu-d-pr-route-now-desc" width="720" height="368" viewBox="0 0 720 368" xmlns="http://www.w3.org/2000/svg"><style data-wu-standalone="true">svg {
+  --wu-ground: #f7f7f5;
+  --wu-surface: #ffffff;
+  --wu-ink: #1c212b;
+  --wu-ink-2: #4a5464;
+  --wu-ink-3: #565e6d;
+  --wu-rule: #d9dce2;
+  --wu-rule-soft: #ececef;
+  --wu-link: #2f4b9c;
+  --wu-accent: #9c4a2f;
+  --wu-accent-soft: #f2e4de;
+  --wu-syn-kw: #5e3d8c;
+  --wu-syn-type: #1a6363;
+  --wu-syn-add: #e2efe0;
+  --wu-syn-del: #f6e3e3;
+  --wu-font-body: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --wu-font-heading: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --wu-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --wu-fs-1: 13px;
+  --wu-fs-2: 14px;
+  --wu-fs-3: 16px;
+  --wu-fs-4: 18px;
+  --wu-fs-5: 21px;
+  --wu-fs-6: 30px;
+  --wu-sp-1: 4px;
+  --wu-sp-2: 8px;
+  --wu-sp-3: 12px;
+  --wu-sp-4: 16px;
+  --wu-sp-5: 24px;
+  --wu-sp-6: 32px;
+  --wu-sp-7: 48px;
+  --wu-radius-1: 4px;
+  --wu-radius-2: 6px;
+  --wu-radius-3: 8px;
+  --wu-bw-1: 1px;
+  --wu-bw-2: 1.5px;
+  --wu-bw-3: 2px;
+  --wu-lh-body: 1.85;
+  --wu-lh-heading: 1.35;
+  --wu-lh-code: 1.6;
+  --wu-lh-diff: 1.7;
+  --wu-measure: 45em;
+  --wu-fig-tone-ts: #e9ecf1;
+  --wu-fig-tone-rs: #d2d7df;
+  --wu-fig-tone-new: #ffffff;
+  --wu-fig-tone-neutral: #f1f1f3;
+  color: var(--wu-ink);
+  font-family: var(--wu-font-body);
+}
+
+svg {
+  color: var(--wu-ink);
+  height: auto;
+}
+
+rect[data-tone="ts"] {
+  fill: var(--wu-fig-tone-ts);
+}
+
+rect[data-tone="rs"] {
+  fill: var(--wu-fig-tone-rs);
+}
+
+rect[data-tone="new"] {
+  fill: var(--wu-fig-tone-new);
+}
+
+rect[data-tone="neutral"] {
+  fill: var(--wu-fig-tone-neutral);
+}
+
+figcaption {
+  font-size: var(--wu-fs-2);
+  color: var(--wu-ink-2);
+  text-align: center;
+}
+
+rect.wu-focal, circle.wu-focal, ellipse.wu-focal, polygon.wu-focal, path.wu-focal {
+  stroke: var(--wu-accent);
+}</style><rect width="100%" height="100%" fill="var(--wu-surface)"></rect><title id="wu-d-pr-route-now-title">現状の PR 説明の経路</title><desc id="wu-d-pr-route-now-desc">外部ホストの URL を PR に貼るため、閲覧の可否はリポジトリの権限と切れている</desc><defs><marker id="wu-d-pr-route-now-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path></marker><marker id="wu-d-pr-route-now-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0.5 0.5 L9.5 5 L0.5 9.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></marker></defs><rect id="wu-d-pr-route-now-z-local" data-tone="neutral" x="16" y="16" width="688" height="72" rx="8" fill="var(--wu-fig-tone-neutral)" stroke="currentColor" stroke-width="1"></rect><text id="wu-d-pr-route-now-z-local-label" x="28" y="56.55" font-size="13" font-weight="700" fill="currentColor">手元</text><rect id="wu-d-pr-route-now-z-host" data-tone="rs" x="16" y="148" width="688" height="72" rx="8" fill="var(--wu-fig-tone-rs)" stroke="currentColor" stroke-width="1"></rect><text id="wu-d-pr-route-now-z-host-label" x="28" y="188.55" font-size="13" font-weight="700" fill="currentColor">外部ホスト</text><rect id="wu-d-pr-route-now-z-github" data-tone="neutral" x="16" y="280" width="688" height="72" rx="8" fill="var(--wu-fig-tone-neutral)" stroke="currentColor" stroke-width="1"></rect><text id="wu-d-pr-route-now-z-github-label" x="28" y="320.55" font-size="13" font-weight="700" fill="currentColor">GitHub</text><rect id="wu-d-pr-route-now-n-page" x="128" y="32" width="140" height="40" rx="6" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1"></rect><text id="wu-d-pr-route-now-n-page-label" x="198" y="56.55" font-size="13" text-anchor="middle" fill="currentColor">writeup ページ</text><rect id="wu-d-pr-route-now-n-artifact" class="wu-focal" x="128" y="164" width="104" height="40" rx="6" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 4"></rect><text id="wu-d-pr-route-now-n-artifact-label" x="180" y="188.55" font-size="13" text-anchor="middle" font-weight="700" fill="currentColor">Artifact</text><rect id="wu-d-pr-route-now-n-cf" x="256" y="164" width="116" height="40" rx="6" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1" stroke-dasharray="5 4"></rect><text id="wu-d-pr-route-now-n-cf-label" x="314" y="188.55" font-size="13" text-anchor="middle" fill="currentColor">Cloudflare</text><rect id="wu-d-pr-route-now-n-body" x="128" y="296" width="96" height="40" rx="6" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1"></rect><text id="wu-d-pr-route-now-n-body-label" x="176" y="320.55" font-size="13" text-anchor="middle" fill="currentColor">PR 本文</text><rect id="wu-d-pr-route-now-n-reader" x="248" y="296" width="96" height="40" rx="6" fill="var(--wu-surface)" stroke="currentColor" stroke-width="1"></rect><text id="wu-d-pr-route-now-n-reader-label" x="296" y="320.55" font-size="13" text-anchor="middle" fill="currentColor">閲覧者</text><path id="wu-d-pr-route-now-e-0" d="M176 72 L176 108 L180 108 L180 164" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-route-now-solid)"></path><text id="wu-d-pr-route-now-e-0-label" x="186" y="140" font-size="11" fill="currentColor">publish</text><path id="wu-d-pr-route-now-e-1" d="M220 72 L220 128 L316 128 L316 164" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-route-now-solid)"></path><text id="wu-d-pr-route-now-e-1-label" x="246" y="120" font-size="11" fill="currentColor">publish</text><path id="wu-d-pr-route-now-e-2" d="M180 204 L180 240 L160 240 L160 296" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-route-now-solid)"></path><text id="wu-d-pr-route-now-e-2-label" x="166" y="272" font-size="11" fill="currentColor">URL</text><path id="wu-d-pr-route-now-e-3" d="M316 204 L316 260 L192 260 L192 296" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-route-now-solid)"></path><text id="wu-d-pr-route-now-e-3-label" x="246" y="252" font-size="11" fill="currentColor">URL</text><path id="wu-d-pr-route-now-e-4" d="M248 316 L224 316" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-route-now-solid)"></path></svg>

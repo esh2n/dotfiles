@@ -1,0 +1,80 @@
+<svg role="img" aria-labelledby="wu-d-pr-pack-flow-title wu-d-pr-pack-flow-desc" width="1084" height="248" viewBox="0 0 1084 248" xmlns="http://www.w3.org/2000/svg"><style data-wu-standalone="true">svg {
+  --wu-ground: #f7f7f5;
+  --wu-surface: #ffffff;
+  --wu-ink: #1c212b;
+  --wu-ink-2: #4a5464;
+  --wu-ink-3: #565e6d;
+  --wu-rule: #d9dce2;
+  --wu-rule-soft: #ececef;
+  --wu-link: #2f4b9c;
+  --wu-accent: #9c4a2f;
+  --wu-accent-soft: #f2e4de;
+  --wu-syn-kw: #5e3d8c;
+  --wu-syn-type: #1a6363;
+  --wu-syn-add: #e2efe0;
+  --wu-syn-del: #f6e3e3;
+  --wu-font-body: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --wu-font-heading: "BIZ UDPGothic", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --wu-font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --wu-fs-1: 13px;
+  --wu-fs-2: 14px;
+  --wu-fs-3: 16px;
+  --wu-fs-4: 18px;
+  --wu-fs-5: 21px;
+  --wu-fs-6: 30px;
+  --wu-sp-1: 4px;
+  --wu-sp-2: 8px;
+  --wu-sp-3: 12px;
+  --wu-sp-4: 16px;
+  --wu-sp-5: 24px;
+  --wu-sp-6: 32px;
+  --wu-sp-7: 48px;
+  --wu-radius-1: 4px;
+  --wu-radius-2: 6px;
+  --wu-radius-3: 8px;
+  --wu-bw-1: 1px;
+  --wu-bw-2: 1.5px;
+  --wu-bw-3: 2px;
+  --wu-lh-body: 1.85;
+  --wu-lh-heading: 1.35;
+  --wu-lh-code: 1.6;
+  --wu-lh-diff: 1.7;
+  --wu-measure: 45em;
+  --wu-fig-tone-ts: #e9ecf1;
+  --wu-fig-tone-rs: #d2d7df;
+  --wu-fig-tone-new: #ffffff;
+  --wu-fig-tone-neutral: #f1f1f3;
+  color: var(--wu-ink);
+  font-family: var(--wu-font-body);
+}
+
+svg {
+  color: var(--wu-ink);
+  height: auto;
+}
+
+rect[data-tone="ts"] {
+  fill: var(--wu-fig-tone-ts);
+}
+
+rect[data-tone="rs"] {
+  fill: var(--wu-fig-tone-rs);
+}
+
+rect[data-tone="new"] {
+  fill: var(--wu-fig-tone-new);
+}
+
+rect[data-tone="neutral"] {
+  fill: var(--wu-fig-tone-neutral);
+}
+
+figcaption {
+  font-size: var(--wu-fs-2);
+  color: var(--wu-ink-2);
+  text-align: center;
+}
+
+rect.wu-focal, circle.wu-focal, ellipse.wu-focal, polygon.wu-focal, path.wu-focal {
+  stroke: var(--wu-accent);
+}</style><rect width="100%" height="100%" fill="var(--wu-surface)"></rect><title id="wu-d-pr-pack-flow-title">PR を作るまでの手順</title><desc id="wu-d-pr-pack-flow-desc">SHA は push 後に決まるので、本文の生成は 2 回目の pr-pack になる</desc><defs><marker id="wu-d-pr-pack-flow-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path></marker></defs><rect id="wu-d-pr-pack-flow-lane-writeup" x="16" y="16" width="72" height="72" fill="var(--wu-rule-soft)" stroke="none"></rect><rect id="wu-d-pr-pack-flow-lane-git" x="16" y="88" width="72" height="72" fill="var(--wu-rule-soft)" stroke="none"></rect><rect id="wu-d-pr-pack-flow-lane-gh" x="16" y="160" width="72" height="72" fill="var(--wu-rule-soft)" stroke="none"></rect><line id="wu-d-pr-pack-flow-rule-0" x1="16" y1="88" x2="1068" y2="88" stroke="var(--wu-rule)" stroke-width="1"></line><line id="wu-d-pr-pack-flow-rule-1" x1="16" y1="160" x2="1068" y2="160" stroke="var(--wu-rule)" stroke-width="1"></line><line id="wu-d-pr-pack-flow-rule-2" x1="88" y1="16" x2="88" y2="232" stroke="var(--wu-rule)" stroke-width="1"></line><rect id="wu-d-pr-pack-flow-frame" x="16" y="16" width="1052" height="216" fill="none" stroke="var(--wu-rule)" stroke-width="1"></rect><text id="wu-d-pr-pack-flow-lane-writeup-label" x="52" y="56" font-size="13" text-anchor="middle" fill="currentColor">writeup</text><text id="wu-d-pr-pack-flow-lane-git-label" x="52" y="128" font-size="13" text-anchor="middle" fill="currentColor">git</text><text id="wu-d-pr-pack-flow-lane-gh-label" x="52" y="200" font-size="13" text-anchor="middle" fill="currentColor">gh</text><path id="wu-d-pr-pack-flow-e-0" d="M200 52 L232 52" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-pack-flow-solid)"></path><path id="wu-d-pr-pack-flow-e-1" d="M376 52 L392 52 L392 124 L408 124" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-pack-flow-solid)"></path><path id="wu-d-pr-pack-flow-e-2" d="M536 124 L568 124" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-pack-flow-solid)"></path><path id="wu-d-pr-pack-flow-e-3" d="M656 124 L668 124 L668 52 L716 52" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-pack-flow-solid)"></path><path id="wu-d-pr-pack-flow-e-4" d="M804 52 L820 52 L820 196 L836 196" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-pack-flow-solid)"></path><path id="wu-d-pr-pack-flow-e-5" d="M972 196 L1004 196" fill="none" stroke="currentColor" stroke-width="1" marker-end="url(#wu-d-pr-pack-flow-solid)"></path><path id="wu-d-pr-pack-flow-write" data-tone="neutral" fill="var(--wu-fig-tone-neutral)" stroke-width="1" d="M108 32 H180 A20 20 0 0 1 180 72 H108 A20 20 0 0 1 108 32 Z" stroke="currentColor"></path><text id="wu-d-pr-pack-flow-write-label" x="144" y="56" font-size="13" text-anchor="middle" fill="currentColor">ページを書く</text><rect id="wu-d-pr-pack-flow-pack" data-tone="neutral" fill="var(--wu-fig-tone-neutral)" stroke-width="1" x="232" y="32" width="144" height="40" rx="4" stroke="currentColor"></rect><text id="wu-d-pr-pack-flow-pack-label" x="304" y="56" font-size="13" text-anchor="middle" fill="currentColor">pr-pack で書き出す</text><rect id="wu-d-pr-pack-flow-commit" data-tone="neutral" fill="var(--wu-fig-tone-neutral)" stroke-width="1" x="408" y="104" width="128" height="40" rx="4" stroke="currentColor"></rect><text id="wu-d-pr-pack-flow-commit-label" x="472" y="128" font-size="13" text-anchor="middle" fill="currentColor">docs/ をコミット</text><rect id="wu-d-pr-pack-flow-push" data-tone="neutral" fill="var(--wu-fig-tone-neutral)" stroke-width="1" x="568" y="104" width="88" height="40" rx="4" stroke="currentColor"></rect><text id="wu-d-pr-pack-flow-push-label" x="612" y="128" font-size="13" text-anchor="middle" fill="currentColor">push する</text><rect id="wu-d-pr-pack-flow-body" data-tone="neutral" fill="var(--wu-fig-tone-neutral)" stroke-width="1" x="716" y="32" width="88" height="40" rx="4" stroke="currentColor"></rect><text id="wu-d-pr-pack-flow-body-label" x="760" y="56" font-size="13" text-anchor="middle" fill="currentColor">本文を生成</text><rect id="wu-d-pr-pack-flow-pr" data-tone="neutral" class="wu-focal" fill="var(--wu-fig-tone-neutral)" stroke-width="1.5" x="836" y="176" width="136" height="40" rx="4" stroke="currentColor"></rect><text id="wu-d-pr-pack-flow-pr-label" x="904" y="200" font-size="13" font-weight="700" text-anchor="middle" fill="currentColor">draft PR を作る</text><path id="wu-d-pr-pack-flow-done" data-tone="neutral" fill="var(--wu-fig-tone-neutral)" stroke-width="1" d="M1024 176 H1048 A20 20 0 0 1 1048 216 H1024 A20 20 0 0 1 1024 176 Z" stroke="currentColor"></path><text id="wu-d-pr-pack-flow-done-label" x="1036" y="200" font-size="13" text-anchor="middle" fill="currentColor">完了</text><text id="wu-d-pr-pack-flow-e-3-label" x="680" y="75" font-size="11" fill="currentColor">SHA</text></svg>
