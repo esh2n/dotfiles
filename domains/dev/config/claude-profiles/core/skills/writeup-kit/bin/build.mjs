@@ -55,6 +55,7 @@ import { faviconDataUri, statusFromChecks } from './lib/favicon.mjs'
 import { highlight } from './lib/highlight.mjs'
 import { ensureDiffViews } from './lib/diffview.mjs'
 import { repairLinks } from './lib/links.mjs'
+import { isMain } from './lib/main.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_CSS_PATH = join(HERE, '..', 'kit', 'writeup.css')
@@ -1193,6 +1194,6 @@ function main() {
   return 0
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   process.exit(main())
 }

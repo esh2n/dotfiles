@@ -30,13 +30,38 @@
 // beyond a `build` re-sync (which is itself a no-op once the kit's CSS
 // hasn't changed).
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+
+// Inlined from bin/lib/main.mjs (kept in sync manually): this script has no
+// dependency on writeup-kit's own libs by design (see file header), so the
+// realpath-safe entry-point check is duplicated here rather than imported.
+// `process.argv[1]` keeps a symlinked invocation path (this script is
+// normally reached via `~/.claude/skills/writeup` -> this repo) while
+// `import.meta.url` resolves to the realpath, so comparing raw strings
+// misses a symlinked run; comparing realpaths on both sides fixes it.
+function isMain(importMetaUrl) {
+  const argvPath = resolve(process.argv[1] ?? '')
+  let argvReal
+  try {
+    argvReal = realpathSync(argvPath)
+  } catch {
+    argvReal = argvPath
+  }
+  const modulePath = fileURLToPath(importMetaUrl)
+  let moduleReal
+  try {
+    moduleReal = realpathSync(modulePath)
+  } catch {
+    moduleReal = modulePath
+  }
+  return argvReal === moduleReal
+}
 const SKILL_DIR = join(HERE, '..')
 
 const WRITEUP_TOML_TEMPLATE = `[private]
@@ -404,6 +429,6 @@ function main() {
   return 0
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   process.exit(main())
 }

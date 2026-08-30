@@ -5,7 +5,6 @@
 // plus a stderr warning, rather than being silently dropped.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { basename, dirname, extname, join } from 'node:path'
 import {
   parseHtml, serialize, isElement, tagName, attr, hasClass, classList,
@@ -15,6 +14,7 @@ import { parse as parseYaml } from './lib/yaml-lite.mjs'
 import { unescapeIrScript } from './lib/ir-script.mjs'
 import { diffFigureText } from './lib/diffview.mjs'
 import { resolvePageAsset } from './lib/assets.mjs'
+import { isMain } from './lib/main.mjs'
 
 // --- inline rendering (a/strong/em/br/code/.wu-accent/plain text) ----------
 
@@ -608,6 +608,6 @@ function main() {
   return 0
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   process.exit(main())
 }

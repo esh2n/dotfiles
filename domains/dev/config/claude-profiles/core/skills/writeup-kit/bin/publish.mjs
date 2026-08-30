@@ -57,6 +57,7 @@ import { resolvePageAsset } from './lib/assets.mjs'
 import { convertToMarkdown } from './to-md.mjs'
 import { standaloneSvg } from './lib/standalone-svg.mjs'
 import { renderPdf } from './lib/pdf.mjs'
+import { isMain } from './lib/main.mjs'
 
 const MAX_BYTES = 16 * 1024 * 1024
 
@@ -638,6 +639,6 @@ async function main() {
   }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main().then((code) => process.exit(code))
 }

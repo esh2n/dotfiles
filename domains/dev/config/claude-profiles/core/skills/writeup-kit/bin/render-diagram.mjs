@@ -30,6 +30,7 @@ import { validateIR } from './lib/ir.mjs'
 import { COLUMN } from './lib/diagram.mjs'
 import { renderFigureHtmlChecked } from './lib/verify-diagram.mjs'
 import { getFigureType, listFigureTypes } from './lib/figures/index.mjs'
+import { isMain } from './lib/main.mjs'
 
 export function parseArgs(argv) {
   const args = { input: null, column: COLUMN, out: null, json: false, figure: false, help: false, listTypes: false, doc: null }
@@ -207,6 +208,6 @@ export async function main(argv) {
   return 0
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => process.exit(code))
 }

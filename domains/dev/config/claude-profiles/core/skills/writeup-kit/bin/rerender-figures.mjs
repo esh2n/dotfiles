@@ -22,7 +22,6 @@
 // (also 2).
 
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { join, relative, sep } from 'node:path'
 import { parse as parseYamlLite, YamlError } from './lib/yaml-lite.mjs'
 import { validateIR } from './lib/ir.mjs'
@@ -31,6 +30,7 @@ import { renderFigureHtmlChecked } from './lib/verify-diagram.mjs'
 import { resolveStoreDir } from './lib/store.mjs'
 import { matchesOnly } from './lib/migrate/util.mjs'
 import { unescapeIrScript } from './lib/ir-script.mjs'
+import { isMain } from './lib/main.mjs'
 
 // Directories that never hold a source page: the kit's own generated CSS
 // folder, static publish outputs, and pre-writeup-kit legacy pages (which
@@ -376,6 +376,6 @@ export async function main(argv) {
   return 0
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main(process.argv.slice(2)).then((code) => process.exit(code))
 }

@@ -28,8 +28,8 @@ import { existsSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { extname, join, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { resolveStoreDir, explainStoreDir, readRegistry, readManifest } from './lib/store.mjs'
+import { isMain } from './lib/main.mjs'
 
 /** What to run when no store exists yet. The writeup skill owns
  * init-store.mjs; the kit only points at it. */
@@ -486,7 +486,7 @@ async function main() {
   return port
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   main().catch((e) => {
     console.error(`serve: ${e.stack || e}`)
     process.exitCode = 1

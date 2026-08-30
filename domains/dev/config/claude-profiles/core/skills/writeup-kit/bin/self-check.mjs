@@ -21,6 +21,7 @@ import {
 import { discoverStoreRoot, pageId } from './lib/store.mjs'
 import { resolvePageAsset } from './lib/assets.mjs'
 import { SIDETOC_SCRIPT } from './build.mjs'
+import { isMain } from './lib/main.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_TEMPLATE_PATH = join(HERE, '..', 'kit', 'template.html')
@@ -1035,6 +1036,6 @@ function main() {
   return result.ok ? 0 : 1
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   process.exit(main())
 }

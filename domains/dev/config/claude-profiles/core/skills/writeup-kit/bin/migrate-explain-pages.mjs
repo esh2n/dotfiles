@@ -23,6 +23,7 @@ import { renderBody, isLegacyFile, legacyReasons } from './lib/migrate/body.mjs'
 import { buildPageHtml, buildLegacyStubHtml } from './lib/migrate/page.mjs'
 import { parseDatedFilename, matchesOnly, cssHrefForDepth } from './lib/migrate/util.mjs'
 import { runSelfCheck } from './self-check.mjs'
+import { isMain } from './lib/main.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -248,7 +249,7 @@ export async function runMigration(args) {
   return { entries, totals }
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const args = parseArgs(process.argv.slice(2))
   runMigration(args).catch((e) => {
     console.error(`error: ${e.message}`)

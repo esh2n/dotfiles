@@ -94,6 +94,11 @@ resolves to.
 | `contrast.mjs` | Audits `kit/writeup.css` tokens for WCAG contrast in both themes. |
 | `migrate-explain-pages.mjs --src <dir> --dest <store>` | One-off importer for the old explain-pages Markdown format. |
 
+Each CLI's entry guard resolves realpaths on both sides (`bin/lib/main.mjs`'s
+`isMain`) rather than comparing `process.argv[1]` to `import.meta.url`
+directly — the kit is normally invoked through the `~/.claude/skills`
+symlink, and a raw string comparison never matches through it.
+
 ## First page in five commands
 
 Assuming a store at `$STORE` and the kit at `$KIT`:
