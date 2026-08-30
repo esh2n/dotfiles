@@ -126,21 +126,58 @@ function mermaidFromIr(ir) {
   return lines.join('\n')
 }
 
+/** Sanitizes an untrusted id/filename fragment into a safe path component:
+ * only `[A-Za-z0-9_-]` survives, any run of anything else (a `/`, a `..`
+ * traversal segment, a space, a paren) collapses to a single `-`, and a
+ * leading/trailing `-` left over from that collapse is trimmed. A result
+ * left empty (nothing survived — e.g. an id of `../..`) falls back to
+ * `fallback` so the file still gets a name. Used both for a diagram IR's
+ * own `id` (`renderFigure`) and for the base name of a `.wu-shot`'s copied
+ * file (`renderShot`) — in both cases the string reaches this function
+ * from data the page's own author controls, and in both cases it becomes
+ * the tail of a path this code itself joins under `figuresDir`, so an
+ * unsanitized `../../evil` would write outside that directory. */
+function sanitizePathPart(raw, fallback) {
+  const cleaned = String(raw ?? '')
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return cleaned || fallback
+}
+
+/** Escapes text bound for the `alt` slot of a Markdown image (`![alt](path)`)
+ * — used for a `.wu-shot`'s alt/caption and a `.wu-figure`'s caption, both
+ * of which land in that position without ever passing through
+ * `renderInline`'s own escaping (that path only ever escapes a literal
+ * `<`, and running an image's alt through it wouldn't touch the image
+ * syntax's own delimiters). A backslash is escaped first so escaping the
+ * brackets/parens afterward can't produce a stray double-escape; `]`/`[`
+ * would otherwise be read as the alt bracket closing early or a nested
+ * link opening, `(`/`)` would be read as the path parens, and a raw
+ * newline would break the single-line `![]()` form entirely. */
+function escapeImageAltText(text) {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/([[\]()])/g, '\\$1')
+    .replace(/\r?\n/g, ' ')
+}
+
 function renderFigure(fig, ctx) {
   const svg = findFirst(fig, (n) => tagName(n) === 'svg')
   const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
   const caption = cap ? inlineText(cap) : ''
+  const altCaption = escapeImageAltText(caption)
   const out = []
 
   if (svg && ctx.figuresDir) {
     ctx.figureIndex += 1
     const ir = findIr(fig)
-    const figId = ir?.id || `fig${ctx.figureIndex}`
+    const figId = sanitizePathPart(ir?.id, `fig${ctx.figureIndex}`)
     const svgFileName = `${ctx.slug}-${figId}.svg`
     mkdirSync(ctx.figuresDir, { recursive: true })
     writeFileSync(join(ctx.figuresDir, svgFileName), serialize(svg))
+    if (ctx.manifest) ctx.manifest.push({ file: svgFileName, kind: 'figure' })
     const relPath = ctx.figuresDirRel ? `${ctx.figuresDirRel}/${svgFileName}` : svgFileName
-    out.push(`![${caption}](${relPath})`)
+    out.push(`![${altCaption}](${relPath})`)
     const mermaid = ir ? mermaidFromIr(ir) : null
     if (mermaid) {
       out.push('')
@@ -149,7 +186,7 @@ function renderFigure(fig, ctx) {
       out.push('```')
     }
   } else if (svg) {
-    out.push(`![${caption}](#)`)
+    out.push(`![${altCaption}](#)`)
   }
   return out.join('\n')
 }
@@ -199,7 +236,7 @@ function renderShot(fig, ctx) {
   const cap = findFirst(fig, (n) => tagName(n) === 'figcaption')
   const caption = cap ? inlineText(cap) : ''
   if (!img) return caption
-  const alt = attr(img, 'alt') || caption
+  const alt = escapeImageAltText(attr(img, 'alt') || caption)
   const src = attr(img, 'src') || ''
   const out = []
 
@@ -214,12 +251,20 @@ function renderShot(fig, ctx) {
     } else {
       const resolved = ctx.pageDir ? resolvePageAsset(ctx.pageDir, src) : null
       if (resolved && existsSync(resolved)) {
-        fileName = `${ctx.slug}-shot${ctx.figureIndex}-${basename(src)}`
+        // The copy is ours to name, so its base name is sanitized the same
+        // way a figure id is — a src basename of `") pwned` or one with a
+        // space would otherwise land unescaped in `![alt](path)` below.
+        const rawBase = basename(src)
+        const ext = extname(rawBase)
+        const base = sanitizePathPart(ext ? rawBase.slice(0, -ext.length) : rawBase, `shot${ctx.figureIndex}`)
+        const safeExt = ext.replace(/[^A-Za-z0-9.]/g, '')
+        fileName = `${ctx.slug}-shot${ctx.figureIndex}-${base}${safeExt}`
         copyFileSync(resolved, join(ctx.figuresDir, fileName))
       } else {
         process.stderr.write(`to-md: refusing to copy unsafe .wu-shot src: ${src}\n`)
       }
     }
+    if (fileName && ctx.manifest) ctx.manifest.push({ file: fileName, kind: 'shot' })
     out.push(fileName ? `![${alt}](${ctx.figuresDirRel ? `${ctx.figuresDirRel}/${fileName}` : fileName})` : `![${alt}](#)`)
   } else {
     out.push(`![${alt}](#)`)
@@ -480,11 +525,18 @@ function renderFrontmatter(meta, title) {
 
 /**
  * @param {string} html
- * @param {{ slug: string, figuresDir?: string, figuresDirRel?: string, pageDir?: string }} opts
+ * @param {{ slug: string, figuresDir?: string, figuresDirRel?: string, pageDir?: string, manifest?: Array }} opts
  *   `pageDir` — the page's own directory, needed only to copy a
  *   `.wu-shot`'s page-relative image file (`renderShot`); a `.wu-figure`'s
  *   svg needs no such lookup, since it is serialized straight out of the
- *   parsed HTML.
+ *   parsed HTML. `manifest` — an optional array the caller owns; every
+ *   file this call writes into `figuresDir` is pushed onto it as
+ *   `{ file, kind: 'figure' | 'shot' }` (`file` is the bare name, relative
+ *   to `figuresDir`), so a caller that needs to tell a `.wu-figure`'s own
+ *   SVG export apart from a `.wu-shot`'s copied screenshot — e.g. publish's
+ *   `restyleFigures`, which must never re-style a shot even when it
+ *   happens to be an `.svg` too — doesn't have to guess from the directory
+ *   listing alone.
  */
 export function convertToMarkdown(html, opts) {
   footnoteCounter = 0
@@ -505,6 +557,7 @@ export function convertToMarkdown(html, opts) {
     figuresDirRel: opts.figuresDirRel,
     pageDir: opts.pageDir,
     figureIndex: 0,
+    manifest: opts.manifest,
   }
   if (main) {
     for (const child of elementChildren(main)) {

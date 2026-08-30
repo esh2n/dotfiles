@@ -13,8 +13,9 @@
 // (dropped for file/artifact/github; rewritten to `/index.html` or dropped
 // for cloudflare — see `adjustBackNav`), (5) reject on a company-trace word
 // hit (skippable with `--internal`, for a private repo whose readers are
-// its own members — `github` only), (6) enforce the 16MB Artifact-tool
-// size ceiling. Then dispatch to one of 4 targets: `file` and `cloudflare`
+// its own members — restricted to `github`: passing `--internal` for any
+// other target is a usage error, exit 2, not a silent skip), (6) enforce
+// the 16MB Artifact-tool size ceiling. Then dispatch to one of 4 targets: `file` and `cloudflare`
 // write the staged text as a full, standalone document (a Slack attachment
 // / email, and a hosted page, both need one); `artifact` writes it through
 // `toArtifactFragment` instead, which strips the
@@ -37,7 +38,8 @@
 // removes the skeleton tags and the two `<meta>`s named above).
 //
 // Exit codes: 0 success/dry-run, 2 usage error (including `--to artifact`
-// failing to locate the skeleton `toArtifactFragment` needs), 3 self-check
+// failing to locate the skeleton `toArtifactFragment` needs, and
+// `--internal` passed for any target other than `github`), 3 self-check
 // failed, 4 private-word hit, 5 cloudflare Access not verified, 6 size
 // over 16MB, 7 a `.wu-diffview` whose diff could not be rendered, 8 the
 // kit CSS `<link>` survived inlining (see `inlineKitCss`'s comment-skip
@@ -262,6 +264,10 @@ export function publish(pageFile, opts) {
     throw new PublishError(2, `unknown --to target: ${to}`)
   }
 
+  if (internal && to !== 'github') {
+    throw new PublishError(2, '--internal only applies to --to github; for artifact/cloudflare/file the private-word check always runs')
+  }
+
   let raw
   try {
     raw = readFileSync(pageFile, 'utf8')
@@ -432,35 +438,67 @@ function githubOutDir(storeDir, slug, out) {
   return out || join(storeDir, '.publish', `${slug}.github`)
 }
 
-/** Rewrites every `*.svg` to-md just wrote into `figuresDir` through
- * `standaloneSvg`, using the kit's own `writeup.css` (figures are a kit
- * component; a store's `_kit/writeup.css` is only ever a synced copy of
- * the same file, so reading the kit's copy directly needs no store at
- * all — useful when `pageFile` has no store, like kit/samples.html). A
- * `.wu-shot` copy (already a raster) is left untouched. */
-function restyleFigures(figuresDir) {
+/** Rewrites every file to-md's own manifest marked `kind: 'figure'`
+ * (a `.wu-figure`'s exported SVG) through `standaloneSvg`, using the kit's
+ * own `writeup.css` (figures are a kit component; a store's
+ * `_kit/writeup.css` is only ever a synced copy of the same file, so
+ * reading the kit's copy directly needs no store at all — useful when
+ * `pageFile` has no store, like kit/samples.html).
+ *
+ * Deliberately driven by the manifest, never a directory listing filtered
+ * on `.svg` — a `.wu-shot` screenshot whose own source happens to be an
+ * `.svg` (allowed by `lib/assets.mjs`'s extension guard) sits in the same
+ * `figures/` directory with the same extension, and restyling it would
+ * inject the kit's CSS/background into a file that is meant to ship
+ * byte-identical to what the page author supplied — the manifest is the
+ * only thing that actually knows which file came from which component. */
+function restyleFigures(figuresDir, figureFiles) {
   if (!existsSync(figuresDir)) return
   const cssPath = join(KIT_DIR, 'writeup.css')
   const cssText = existsSync(cssPath) ? readFileSync(cssPath, 'utf8') : ''
-  for (const name of readdirSync(figuresDir)) {
-    if (!name.endsWith('.svg')) continue
+  for (const name of figureFiles) {
     const file = join(figuresDir, name)
+    if (!existsSync(file)) continue
     const svg = readFileSync(file, 'utf8')
     writeFileSync(file, standaloneSvg(svg, cssText))
   }
 }
 
+/** Single-quotes `s` for safe interpolation into a shell command line:
+ * wraps it in `'…'` and escapes every embedded `'` as `'\''` (close the
+ * quote, an escaped literal quote, reopen the quote) — the standard POSIX
+ * shell-quoting trick, since a single-quoted string otherwise cannot
+ * contain a `'` at all. Used everywhere `attachHint` interpolates a path
+ * it did not fully control the shape of (a slug or figure file name can,
+ * in principle, come from page content) into the printed `gh`/`cd`
+ * command. */
+export function shQuote(s) {
+  return `'${String(s).replace(/'/g, "'\\''")}'`
+}
+
 /** A `gh` invocation the caller can run once the folder is committed
  * nowhere and attached everywhere: `--attach` uploads each figure to
  * GitHub's own attachment store and rewrites the Markdown body's
- * `![alt](figures/x.svg)` references to the uploaded URLs. Built from the
- * actual files on disk, not a guess — a page with no figures gets a plain
- * `--body-file` command. */
-function attachHint(mdPath, figuresDir) {
+ * `![alt](figures/x.svg)` references to the uploaded URLs — but only when
+ * the attached path resolves to the *same file* as the reference, and
+ * that resolution runs against the process's current working directory
+ * (cli/cli#14262), not against the Markdown file's own location. The
+ * `.md` here links its figures as the relative `figures/<name>.svg` (the
+ * shape `--attach` rewrites), so the printed command `cd`s into the
+ * output folder first and passes `--attach` the same relative
+ * `figures/<name>.svg` path — an absolute `--attach` path would still
+ * upload the file, but silently fail to rewrite the reference, appending
+ * the image at the end of the body instead of inlining it where the
+ * figure actually sits. Every path is single-quoted (`shQuote`) since a
+ * slug or figure file name is, in principle, content-controlled. Built
+ * from the actual files on disk, not a guess — a page with no figures
+ * gets a plain `--body-file` command. */
+export function attachHint(dir, mdPath, figuresDir) {
+  const mdRel = relative(dir, mdPath)
   const files = existsSync(figuresDir) ? readdirSync(figuresDir).sort() : []
-  const attach = files.map((f) => `--attach ${join(figuresDir, f)}`).join(' ')
-  const base = `gh pr create --body-file ${mdPath}`
-  return `${attach ? `${base} ${attach}` : base} (or gh pr comment)`
+  const attach = files.map((f) => `--attach ${shQuote(join('figures', f))}`).join(' ')
+  const bodyArgs = `--body-file ${shQuote(mdRel)}${attach ? ` ${attach}` : ''}`
+  return `(cd ${shQuote(dir)} && gh pr create ${bodyArgs}) (or, from inside that folder: gh pr comment <number> ${bodyArgs})`
 }
 
 /**
@@ -491,11 +529,16 @@ async function publishToGithub(staged, rendered, pageFile, storeDir, { out, pdf:
   const htmlPath = join(dir, `${slug}.html`)
   writeFileSync(htmlPath, staged)
 
-  const md = convertToMarkdown(rendered, { slug, figuresDir, figuresDirRel: 'figures', pageDir: dirname(pageFile) })
+  // to-md's manifest tells figure exports (kind: 'figure') apart from
+  // .wu-shot copies (kind: 'shot') that happen to land in the same
+  // figures/ directory — only the former gets restyled below.
+  const manifest = []
+  const md = convertToMarkdown(rendered, { slug, figuresDir, figuresDirRel: 'figures', pageDir: dirname(pageFile), manifest })
   const mdPath = join(dir, `${slug}.md`)
   writeFileSync(mdPath, stripFrontmatter(md))
 
-  restyleFigures(figuresDir)
+  const figureFiles = manifest.filter((m) => m.kind === 'figure').map((m) => m.file)
+  restyleFigures(figuresDir, figureFiles)
 
   const result = { ok: true, target: 'github', output: dir, md: mdPath, figuresDir, html: htmlPath }
 
@@ -503,7 +546,7 @@ async function publishToGithub(staged, rendered, pageFile, storeDir, { out, pdf:
     result.pdf = await renderPdf(htmlPath, join(dir, `${slug}.pdf`))
   }
 
-  result.hint = attachHint(mdPath, figuresDir)
+  result.hint = attachHint(dir, mdPath, figuresDir)
   return result
 }
 

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { publish, inlineKitCss, adjustBackNav, findPrivateWordHits, assertSize, inlinePageAssets, toArtifactFragment, PublishError } from '../bin/publish.mjs'
+import { publish, inlineKitCss, adjustBackNav, findPrivateWordHits, assertSize, inlinePageAssets, toArtifactFragment, attachHint, shQuote, PublishError } from '../bin/publish.mjs'
 import { runSelfCheck } from '../bin/self-check.mjs'
 import { buildStore } from '../bin/build.mjs'
 import { makeTinyPng } from './helpers/tiny-png.mjs'
@@ -694,11 +694,18 @@ describe('publish(): --to github writes a folder', () => {
     const store = freshStore()
     const out = freshGithubOut()
     const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out })
-    assert.match(result.hint, /^gh pr create --body-file /)
-    assert.ok(result.hint.includes(join(out, '2026-08-05-example-design.md')))
+    assert.match(result.hint, /^\(cd '/)
+    assert.ok(result.hint.includes(`cd '${out}' && gh pr create --body-file '2026-08-05-example-design.md'`))
     const figs = readdirSync(join(out, 'figures')).filter((f) => f.endsWith('.svg'))
-    for (const f of figs) assert.ok(result.hint.includes(`--attach ${join(out, 'figures', f)}`))
-    assert.match(result.hint, /\(or gh pr comment\)$/)
+    for (const f of figs) assert.ok(result.hint.includes(`--attach 'figures/${f}'`))
+    assert.match(result.hint, /gh pr comment <number> /)
+  })
+
+  test('the hint quotes the md and attach paths and never uses an absolute --attach path', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out })
+    assert.ok(!result.hint.includes(join(out, 'figures')), 'an absolute --attach path is never rewritten by gh --attach (cli/cli#14262)')
   })
 })
 
@@ -731,6 +738,24 @@ describe('publish(): --to github .wu-shot images', () => {
     const result = await publish(pagePath, { to: 'github', store, out })
     const html = readFileSync(result.html, 'utf8')
     assert.match(html, /<img src="data:image\/png;base64,/)
+  })
+
+  test('a .wu-shot whose src is an .svg is copied byte-identical, never restyled through standaloneSvg', async () => {
+    const store = freshStore()
+    const pagePath = join(store, DESIGN_REL)
+    const assetDir = join(dirname(pagePath), '2026-08-05-example-design-assets')
+    mkdirSync(assetDir, { recursive: true })
+    const svgSrc = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>'
+    writeFileSync(join(assetDir, 'shot.svg'), svgSrc)
+    const html = readFileSync(pagePath, 'utf8')
+    const shot = '<figure class="wu-shot"><img src="2026-08-05-example-design-assets/shot.svg" alt="実機の画面"><figcaption>実機の見え方</figcaption></figure>'
+    writeFileSync(pagePath, html.replace('</main>', shot + '</main>'))
+
+    const out = freshGithubOut()
+    await publish(pagePath, { to: 'github', store, out })
+    const copied = readdirSync(join(out, 'figures')).find((f) => f.includes('shot') && f.endsWith('.svg'))
+    assert.ok(copied, 'expected the .wu-shot svg to be copied into figures/')
+    assert.equal(readFileSync(join(out, 'figures', copied), 'utf8'), svgSrc, 'must be byte-identical to the source, not run through standaloneSvg')
   })
 })
 
@@ -883,5 +908,93 @@ describe('publish(): --to github CLI', () => {
     ].join('\n'))
     const r = spawnSync(process.execPath, [PUBLISH_BIN, badPage, '--to', 'github', '--out', out, '--store', store])
     assert.equal(r.status, 7)
+  })
+})
+
+describe('publish(): --to github, a page with no .wu-figure/.wu-shot at all', () => {
+  test('writes the folder with no figures/ directory (or an empty one) and a hint carrying no --attach', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DECISION_REL), { to: 'github', store, out })
+    assert.equal(result.ok, true)
+    assert.ok(existsSync(join(out, '2026-08-01-example-decision.md')))
+    assert.ok(existsSync(join(out, '2026-08-01-example-decision.html')))
+    const figuresExists = existsSync(join(out, 'figures'))
+    if (figuresExists) assert.deepEqual(readdirSync(join(out, 'figures')), [])
+    assert.ok(!result.hint.includes('--attach'))
+    assert.match(result.hint, /^\(cd '/)
+  })
+})
+
+describe('shQuote / attachHint: shell-safe quoting (publish refused unquoted paths into a shell command)', () => {
+  test('shQuote wraps a plain path in single quotes', () => {
+    assert.equal(shQuote('/tmp/plain/path.md'), "'/tmp/plain/path.md'")
+  })
+
+  test('shQuote escapes an embedded single quote as \'\\\'\'', () => {
+    assert.equal(shQuote("it's"), "'it'\\''s'")
+  })
+
+  test('shQuote leaves an embedded space untouched other than the surrounding quotes', () => {
+    assert.equal(shQuote('a b/c.md'), "'a b/c.md'")
+  })
+
+  test('attachHint quotes a folder path containing a space and a single quote', () => {
+    const dir = "/tmp/it's a dir"
+    const figuresDir = join(dir, 'figures')
+    const hint = attachHint(dir, join(dir, "it's a slug.md"), figuresDir)
+    assert.ok(hint.startsWith(`(cd ${shQuote(dir)} && gh pr create --body-file ${shQuote("it's a slug.md")}`))
+  })
+
+  test('attachHint quotes a figure file name containing a space and a single quote, as a relative figures/ path', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'wu-attach-hint-'))
+    const figuresDir = join(dir, 'figures')
+    mkdirSync(figuresDir, { recursive: true })
+    writeFileSync(join(figuresDir, "a b'c.svg"), '<svg></svg>')
+    const hint = attachHint(dir, join(dir, 'slug.md'), figuresDir)
+    assert.ok(hint.includes(`--attach ${shQuote("figures/a b'c.svg")}`))
+    assert.ok(!hint.includes(join(figuresDir, "a b'c.svg")), 'must never print the absolute figures/ path')
+  })
+})
+
+describe('publish(): --internal is restricted to --to github', () => {
+  for (const to of ['artifact', 'file', 'cloudflare']) {
+    test(`--to ${to} with --internal is a usage error (exit 2), not a silent skip of the private-word check`, async () => {
+      const store = freshStore()
+      await assert.rejects(
+        async () => publish(join(store, DECISION_REL), { to, store, internal: true }),
+        (e) => e instanceof PublishError && e.code === 2 && /--internal/.test(e.message) && /github/.test(e.message),
+      )
+    })
+  }
+
+  test('--to github with --internal is accepted (unchanged behavior)', async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DECISION_REL), { to: 'github', store, out, internal: true })
+    assert.equal(result.ok, true)
+  })
+
+  test('CLI: --to artifact --internal exits 2 with a message naming github', () => {
+    const store = freshStore()
+    const r = spawnSync(process.execPath, [
+      PUBLISH_BIN, join(store, DECISION_REL), '--to', 'artifact', '--store', store, '--internal',
+    ])
+    assert.equal(r.status, 2)
+    assert.match(r.stderr.toString(), /--internal/)
+    assert.match(r.stderr.toString(), /github/)
+  })
+})
+
+describe('publish(): --to github --pdf, playwright-core actually resolvable', () => {
+  test('renders a real PDF starting with %PDF', { skip: !process.env.WRITEUP_PLAYWRIGHT_CORE }, async () => {
+    const store = freshStore()
+    const out = freshGithubOut()
+    const result = await publish(join(store, DESIGN_REL), { to: 'github', store, out, pdf: true })
+    assert.equal(result.ok, true)
+    assert.equal(result.pdf.generated, true)
+    assert.ok(existsSync(result.pdf.path))
+    const bytes = readFileSync(result.pdf.path)
+    assert.equal(bytes.subarray(0, 4).toString('latin1'), '%PDF')
   })
 })

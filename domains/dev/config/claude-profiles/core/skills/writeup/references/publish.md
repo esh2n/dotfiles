@@ -39,7 +39,7 @@ without writing or deploying anything.
 | Code | Meaning |
 |---|---|
 | 0 | Success (or a completed `--dry-run` report) |
-| 2 | Usage error — missing `<page.html>` or `--to`, an unknown `--to` value, or (`--to artifact` only) the page's `<head>…</head>`/`<body>…</body>` skeleton could not be located to build the Artifact fragment — a bug, not an authoring mistake; every self-check-passing page has both |
+| 2 | Usage error — missing `<page.html>` or `--to`, an unknown `--to` value, `--internal` passed for any target other than `github`, or (`--to artifact` only) the page's `<head>…</head>`/`<body>…</body>` skeleton could not be located to build the Artifact fragment — a bug, not an authoring mistake; every self-check-passing page has both |
 | 3 | self-check failed; publish refused |
 | 4 | A private word was found on the page; publish refused |
 | 5 | `--to cloudflare` and Cloudflare Access is not verified |
@@ -74,12 +74,15 @@ that happens to collide with an entry in `[private].words`), say so and
 ask the user whether to remove it from the store's word list — do not
 silently strip it from the page instead.
 
-`--internal` skips this check entirely, for every target — pass it only
-for a private company repo whose PR readers are the repo's own members
-and internal names are expected on the page; that is the one case where
-the check would only ever produce false positives. It exists mainly for
-`--to github`, where the audience is a specific repo's own PR, but nothing
-stops it being passed to another target for the same reason.
+`--internal` skips this check entirely, but **only for `--to github`** —
+passing it with any other `--to` value is a usage error (exit 2), not a
+silent skip: `artifact`/`cloudflare`/`file` always run the check, and exit
+4 there is final (never bypass it — see above). Pass `--internal` only for
+a private company repo whose PR readers are the repo's own members and
+internal names are expected on the page; that is the one case where the
+check would only ever produce false positives, and it is specific to
+`--to github`'s audience — a specific repo's own PR — which the other
+three targets don't share.
 
 ## Targets
 
@@ -160,7 +163,7 @@ computes no SHA, opens no branch, and never calls `gh` itself.
 ```
 $ node $KIT/bin/publish.mjs page.html --to github --out /tmp/pack [--pdf] [--internal]
 publish: wrote /tmp/pack
-  gh pr create --body-file /tmp/pack/page.md --attach /tmp/pack/figures/page-fig1.svg (or gh pr comment)
+  (cd '/tmp/pack' && gh pr create --body-file 'page.md' --attach 'figures/page-fig1.svg') (or, from inside that folder: gh pr comment <number> --body-file 'page.md' --attach 'figures/page-fig1.svg')
 ```
 
 Without `--out`, it defaults to `<store>/.publish/<slug>.github/`. Runs
@@ -199,21 +202,32 @@ then writes:
 `--dry-run` reports the plan — the folder path and the file list it would
 write — without writing anything.
 
-Once the folder exists, a human (or a follow-up tool call) runs:
+Once the folder exists, a human (or a follow-up tool call) runs the
+printed hint (publish's own hint above already builds this from the files
+actually in `figures/`):
 
 ```
-gh pr create --body-file /tmp/pack/page.md --attach /tmp/pack/figures/page-fig1.svg --attach /tmp/pack/figures/page-fig2.svg
-# or, on an existing PR:
-gh pr comment <number> --body-file /tmp/pack/page.md --attach /tmp/pack/figures/page-fig1.svg
-# or --attach /tmp/pack/page.pdf on a comment, for the PDF
+(cd /tmp/pack && gh pr create --body-file page.md --attach figures/page-fig1.svg --attach figures/page-fig2.svg)
+# or, on an existing PR, from inside that same folder:
+gh pr comment <number> --body-file page.md --attach figures/page-fig1.svg
+# or --attach page.pdf on a comment, for the PDF
 ```
 
-`--attach` accepts each figure individually; build the list from the
-files actually in `figures/` (publish's own printed hint already does
-this for you). On GHES, or with an older `gh`, there is no `--attach` at
-all — drag-and-drop the same `figures/*.svg` files into the PR
-description or comment editor by hand instead; GitHub still rewrites the
-Markdown references the same way.
+**Run it from inside the output folder, with the relative `figures/…`
+paths — never an absolute `--attach` path.** `gh --attach` only rewrites a
+Markdown body's `![alt](figures/x.svg)` reference when the attached path
+resolves to the *same file* as the reference, and that resolution runs
+against the shell's current working directory, not the Markdown file's
+own location (cli/cli#14262) — an absolute `--attach` path still uploads
+the file, but the reference in the body is left unrewritten and the image
+is appended at the end instead of appearing where the figure actually
+sits. This is exactly why the printed hint wraps the command in `cd
+'<folder>' && …` with relative paths; keep that shape if you build the
+`gh` command by hand instead of using the hint. `--attach` accepts each
+figure individually. On GHES, or with an older `gh`, there is no
+`--attach` at all — drag-and-drop the same `figures/*.svg` files into the
+PR description or comment editor by hand instead; GitHub still rewrites
+the Markdown references the same way.
 
 **What survives into the PR body's Markdown**: alerts (`> [!NOTE]` etc.),
 tables, ```` ```diff ```` fences, and code blocks — GitHub renders all of

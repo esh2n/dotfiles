@@ -157,15 +157,21 @@ store. `node $KIT/bin/publish.mjs page.html --to github --out
 `figures/<name>.svg`), `figures/*.svg` restyled standalone, a staged
 `<slug>.html` (the 原本, useful on its own), and `<slug>.pdf` with `--pdf`.
 Hand the folder to `gh pr create|comment --body-file <slug>.md --attach
-figures/... [--attach <slug>.pdf]` — `--attach` uploads the files and
-rewrites the Markdown's `![alt](figures/x.svg)` references to the
-uploaded URLs (`gh` version: the next release after 2.98.0, or trunk —
-GHES does not support it; on GHES, or an older `gh`, drag the same
-`figures/` files into the PR editor by hand instead). It runs the same
-private-word check as every other target by default (exit 4 on a hit) —
-a public repo's PR is exactly as exposed as an Artifact page; pass
-`--internal` only for a private company repo whose readers are its own
-members. Walkthrough: `references/publish.md`.
+figures/... [--attach <slug>.pdf]`, run **from inside that folder** —
+`--attach` only rewrites a `![alt](figures/x.svg)` reference when the
+attached path resolves against the current working directory to the same
+file as the reference (cli/cli#14262); an absolute `--attach` path still
+uploads but leaves the reference unrewritten. Use publish's own printed
+hint, which is already shaped `(cd '<folder>' && gh pr create --body-file
+'<slug>.md' --attach 'figures/...')` for exactly this reason (`gh`
+version: the next release after 2.98.0, or trunk — GHES does not support
+`--attach`; on GHES, or an older `gh`, drag the same `figures/` files into
+the PR editor by hand instead). It runs the same private-word check as
+every other target by default (exit 4 on a hit) — a public repo's PR is
+exactly as exposed as an Artifact page; pass `--internal` only for a
+private company repo whose readers are its own members — **`--internal`
+only applies to `--to github`**, passing it with any other `--to` is a
+usage error (exit 2). Walkthrough: `references/publish.md`.
 
 ## Common Mistakes
 

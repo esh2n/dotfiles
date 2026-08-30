@@ -307,9 +307,11 @@ writeup publish <page> --to artifact | cloudflare | file | github [--out <path>]
 contains any word from the store's own `.writeup.toml` `[private]` list
 (internal domains, org names, product names, abbreviations — one hit is
 enough to reject). This list is kept per store, one per person/org — it is
-never shipped inside the kit. `--internal` skips it, for a private company
-repo whose PR readers are the repo's own members and internal names are
-expected — that is the one case where the check would only false-positive.
+never shipped inside the kit. `--internal` skips it, but only for `--to
+github` — a private company repo whose PR readers are its own members and
+internal names are expected, the one case where the check would only
+false-positive. Passing `--internal` with any other `--to` is a usage
+error (exit 2), not a silent skip.
 
 **Targets:**
 

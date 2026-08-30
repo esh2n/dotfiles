@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -453,5 +453,107 @@ describe('to-md: .wu-diffview becomes a ```diff fence holding the raw diff', () 
 
   test('the figcaption survives as a line after the fence', () => {
     assert.match(md, /```\n\nラップ済みエラーに変えた。/)
+  })
+})
+
+describe('to-md: sanitizes an untrusted diagram IR id before using it in a file name', () => {
+  function pageWithIrId(id) {
+    return `<!DOCTYPE html><html lang="ja"><head><title>t</title></head><body><div class="wu-page">
+<main><figure class="wu-figure" data-checks="pass"><svg viewBox="0 0 10 10"></svg>
+<figcaption>c</figcaption><script type="text/x-writeup-diagram">id: ${id}\n</script>
+</figure></main></div></body></html>`
+  }
+
+  test('an id containing ../ and / is flattened, never escaping figuresDir', () => {
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-figid-'))
+    const md = convertToMarkdown(pageWithIrId('../../etc/passwd'), { slug: 'p', figuresDir, figuresDirRel: 'figs' })
+    const files = readdirSync(figuresDir)
+    assert.deepEqual(files, ['p-etc-passwd.svg'])
+    assert.match(md, /!\[c\]\(figs\/p-etc-passwd\.svg\)/)
+  })
+
+  test('an id that sanitizes to nothing falls back to fig<N>', () => {
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-figid-empty-'))
+    const md = convertToMarkdown(pageWithIrId('../..'), { slug: 'p', figuresDir, figuresDirRel: 'figs' })
+    assert.deepEqual(readdirSync(figuresDir), ['p-fig1.svg'])
+    assert.match(md, /!\[c\]\(figs\/p-fig1\.svg\)/)
+  })
+})
+
+describe('to-md: sanitizes a copied .wu-shot file name (the copy is ours to name)', () => {
+  test('a src basename with a space and parens is sanitized, extension preserved, bytes untouched', () => {
+    const pageDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-unsafe-name-'))
+    mkdirSync(join(pageDir, 'assets'), { recursive: true })
+    const png = makeTinyPng()
+    writeFileSync(join(pageDir, 'assets', 'pic (1).png'), png)
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-unsafe-figs-'))
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <main><figure class="wu-shot"><img src="assets/pic (1).png" alt="a"></figure></main></div></body></html>`
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figures', pageDir })
+    const files = readdirSync(figuresDir)
+    assert.equal(files.length, 1)
+    assert.ok(!files[0].includes(' '), files[0])
+    assert.ok(!files[0].includes('('), files[0])
+    assert.ok(!files[0].includes(')'), files[0])
+    assert.match(files[0], /\.png$/)
+    assert.ok(md.includes(`figures/${files[0]}`))
+    assert.ok(readFileSync(join(figuresDir, files[0])).equals(png))
+  })
+})
+
+describe('to-md: alt/caption text is escaped for the ![alt](path) position', () => {
+  test('.wu-shot alt containing ], [, (, ) and a backslash is escaped', () => {
+    const png = makeTinyPng()
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <main><figure class="wu-shot"><img src="data:image/png;base64,${png.toString('base64')}" alt="a] b[ c( d) e\\f"></figure></main></div></body></html>`
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-shot-alt-'))
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figs' })
+    assert.ok(md.includes('![a\\] b\\[ c\\( d\\) e\\\\f](figs/p-shot1.png)'), md)
+  })
+
+  test('.wu-figure caption containing ] and ) is escaped', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <main><figure class="wu-figure" data-checks="pass"><svg viewBox="0 0 10 10"></svg>
+      <figcaption>a] b) c</figcaption></figure></main></div></body></html>`
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-figcap-'))
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figs' })
+    assert.ok(md.includes('![a\\] b\\) c](figs/p-fig1.svg)'), md)
+  })
+
+  test('.wu-figure caption with a <br> hard break is flattened to one line for the image syntax', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <main><figure class="wu-figure" data-checks="pass"><svg viewBox="0 0 10 10"></svg>
+      <figcaption>a<br>b]</figcaption></figure></main></div></body></html>`
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-figcap-nl-'))
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figs' })
+    assert.ok(md.includes('![a b\\]](figs/p-fig1.svg)'), md)
+  })
+})
+
+describe('to-md: convertToMarkdown(html, { manifest }) records which files it wrote and as what kind', () => {
+  test('a passed-in manifest array is pushed a { file, kind } entry per figure/shot file written', () => {
+    const pageDir = mkdtempSync(join(tmpdir(), 'wu-tomd-manifest-page-'))
+    writeFileSync(join(pageDir, 'shot.png'), makeTinyPng())
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <main>
+      <figure class="wu-figure" data-checks="pass"><svg viewBox="0 0 10 10"></svg><figcaption>c</figcaption></figure>
+      <figure class="wu-shot"><img src="shot.png" alt="a"></figure>
+      </main></div></body></html>`
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-manifest-figs-'))
+    const manifest = []
+    convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figs', pageDir, manifest })
+    assert.deepEqual(manifest, [
+      { file: 'p-fig1.svg', kind: 'figure' },
+      { file: 'p-shot2-shot.png', kind: 'shot' },
+    ])
+    for (const { file } of manifest) assert.ok(existsSync(join(figuresDir, file)))
+  })
+
+  test('without a manifest option, conversion still works exactly as before (no crash on the omitted array)', () => {
+    const html = `<!DOCTYPE html><html><head><title>t</title></head><body><div class="wu-page">
+      <main><figure class="wu-figure" data-checks="pass"><svg viewBox="0 0 10 10"></svg><figcaption>c</figcaption></figure></main></div></body></html>`
+    const figuresDir = mkdtempSync(join(tmpdir(), 'wu-tomd-nomanifest-'))
+    const md = convertToMarkdown(html, { slug: 'p', figuresDir, figuresDirRel: 'figs' })
+    assert.match(md, /!\[c\]\(figs\/p-fig1\.svg\)/)
   })
 })
