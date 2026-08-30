@@ -138,6 +138,14 @@ URL into `<meta name="published-artifact">`, commit. Exit 4 (private-word
 refusal) is final — never bypass it. `--to cloudflare` needs `[cloudflare]
 access_verified = true`. Exit codes and walkthroughs: `references/publish.md`.
 
+**GitHub PR（非公開リポでも可）**: attaching a page to a pull request is not
+a `publish.mjs` target — there's no external host to hand a file to. Use
+`node $KIT/bin/pr-pack.mjs page.html --out <repo>/docs/writeup/<slug> --pdf`
+instead: it commits the staged page, its Markdown, and its figures straight
+into the repo and, once pushed, a second `--body-out` run turns them into a
+PR body of SHA-pinned `blob` URLs — private repos stay private with no
+external host involved. Walkthrough: `references/publish.md`.
+
 ## Common Mistakes
 
 - Restyling `.wu-header` / `.wu-footer` instead of only changing their text — self-check rejects chrome that diverges from the template; likewise hand-editing `.wu-nav`'s `href` (`build` computes it).

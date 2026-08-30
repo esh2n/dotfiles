@@ -307,6 +307,14 @@ never shipped inside the kit.
 | `cloudflare` | Places the file at `store/public/<same relative path>`, then runs `wrangler pages deploy` against `public/` only. Rejected if Cloudflare Access is not enabled. `noindex` is verified before deploy. |
 | `file` | Writes the single file to `--out` (for a Slack attachment or email). |
 
+**GitHub pull request** is not a `publish()` target — there is no external
+host to hand a file to, private repo or not. `bin/pr-pack.mjs` is a
+separate CLI that shares this pre-stage (minus the company-trace check:
+the audience for a link inside the repo's own PR is that repo's own
+members) and commits everything — staged page, Markdown, figures, optional
+PDF — into the repo itself, referenced from the PR body by SHA-pinned
+`blob` URLs. See `writeup/references/publish.md`.
+
 ## 7. Cross-skill resolution
 
 - Kit resolution order for a calling skill: (1) sibling directory
