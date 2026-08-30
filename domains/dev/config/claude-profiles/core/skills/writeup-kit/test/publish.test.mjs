@@ -262,6 +262,27 @@ describe('publish(): pre-stage guards', () => {
     assert.equal(runSelfCheck(badPage).ok, false)
   })
 
+  test('refuses to publish when a .wu-diffview cannot be rendered (exit code 7)', () => {
+    const store = freshStore()
+    const badPage = join(store, 'bad-diff.html')
+    // The hunk header claims 5 old and 5 new lines but only one line
+    // follows it — parseUnifiedDiff (bin/lib/diffview.mjs) throws "hunk
+    // ends early", which ensureDiffViews turns into an onError call rather
+    // than letting it propagate; publish/pr-pack collect those and refuse.
+    writeFileSync(badPage, [
+      '<!DOCTYPE html><html><head><title>t</title></head><body>',
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">',
+      '@@ -1,5 +1,5 @@',
+      ' unchanged',
+      '</script></figure>',
+      '</body></html>',
+    ].join('\n'))
+    assert.throws(
+      () => publish(badPage, { to: 'file', out: join(store, 'o.html'), store }),
+      (e) => e instanceof PublishError && e.code === 7,
+    )
+  })
+
   test('refuses to publish when a private word appears on the page (exit code 4)', () => {
     const store = freshStore()
     const html = readFileSync(join(store, DECISION_REL), 'utf8')
@@ -346,6 +367,23 @@ describe('publish: CLI', () => {
       PUBLISH_BIN, page, '--to', 'file', '--out', join(store, 'cli-out2.html'), '--store', store,
     ])
     assert.equal(r.status, 4)
+  })
+
+  test('exit code 7 on the CLI for an unrenderable .wu-diffview', () => {
+    const store = freshStore()
+    const badPage = join(store, 'bad-diff-cli.html')
+    writeFileSync(badPage, [
+      '<!DOCTYPE html><html><head><title>t</title></head><body>',
+      '<figure class="wu-diffview"><script type="text/x-writeup-diff">',
+      '@@ -1,5 +1,5 @@',
+      ' unchanged',
+      '</script></figure>',
+      '</body></html>',
+    ].join('\n'))
+    const r = spawnSync(process.execPath, [
+      PUBLISH_BIN, badPage, '--to', 'file', '--out', join(store, 'cli-out3.html'), '--store', store,
+    ])
+    assert.equal(r.status, 7)
   })
 
   test('usage error (missing --to) exits 2', () => {
