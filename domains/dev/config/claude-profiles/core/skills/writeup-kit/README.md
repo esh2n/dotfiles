@@ -90,6 +90,7 @@ resolves to.
 | `serve.mjs [--store <dir>]` | Static server on 127.0.0.1 for one store, or for every registered store on one port. Builds first unless `--no-build`. |
 | `publish.mjs <page.html> --to artifact\|cloudflare\|file` | Stages a page for an external audience, re-running self-check and a private-word scan first. |
 | `to-md.mjs <page.html>` | Converts a page to Markdown; `--figures-dir` writes each figure's SVG out and adds a mermaid block for node/edge diagrams. |
+| `pr-pack.mjs <page.html> --out <dir>` | Packs a page for a GitHub pull request (private-repo safe): staged `index.html` + `<slug>.md` + `figures/*.svg`, optional `--pdf`; `--repo/--sha/--path --body-out` turns a committed pack into a PR body of SHA-pinned blob URLs. |
 | `rerender-figures.mjs --store <dir>` | Re-renders every stored figure whose IR is still embedded, reporting fixed / warned / still-failing counts. |
 | `contrast.mjs` | Audits `kit/writeup.css` tokens for WCAG contrast in both themes. |
 | `migrate-explain-pages.mjs --src <dir> --dest <store>` | One-off importer for the old explain-pages Markdown format. |

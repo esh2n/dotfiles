@@ -120,3 +120,75 @@ publish: wrote /tmp/for-slack.html
 
 Use this when the destination is a Slack attachment or an email, not a
 hosted URL. `--out` is required; omitting it is a usage error (exit 2).
+
+## GitHub pull request (private-repo safe)
+
+`publish.mjs` has no target for "attach this to a PR" — a PR review is not
+a hosted URL and there is no external host to hand a file to, private repo
+or not. `$KIT/bin/pr-pack.mjs` is a separate, sibling CLI for exactly that
+case: everything (the staged page, its Markdown, its figures, optionally a
+PDF) is committed straight into the repo and referenced from the PR body
+by SHA-pinned `blob` URLs — GitHub serves a `blob` URL only to accounts
+with read access to the repo, so a private repo stays private with no
+external host in the loop at all. It shares publish's pre-stage exactly
+(render → self-check → inline kit CSS → drop the back nav) but has no
+private-word check: the audience for a link inside the repo's own PR is
+that repo's own members, who could already read the page (and its private
+words) by checking out the branch.
+
+```
+node $KIT/bin/pr-pack.mjs page.html --out <repo>/docs/writeup/<slug> --pdf
+```
+
+writes `<out>/index.html` (the staged page — same rendering as any other
+`publish.mjs` target), `<out>/<slug>.md` (to-md's conversion) and
+`<out>/figures/*.svg` (one file per `.wu-figure`, each restyled by
+`standalone-svg.mjs` — see below). `--pdf` additionally renders
+`<out>/<slug>.pdf` via a headless Chromium if `playwright-core` resolves
+(`await import('playwright-core')`, or the module path in
+`$WRITEUP_PLAYWRIGHT_CORE`); if neither resolves it prints `pr-pack: pdf
+skipped (playwright-core not found)` and still exits 0 — a pack without a
+PDF is still useful.
+
+This is a two-step SHA dance, because you cannot know a commit's SHA
+before you make the commit:
+
+```
+node $KIT/bin/pr-pack.mjs page.html --out docs/writeup/<slug> --pdf
+git add docs/writeup/<slug> && git commit -m "docs: add <slug> writeup pack"
+git push -u origin <branch>
+SHA=$(git rev-parse HEAD)
+node $KIT/bin/pr-pack.mjs --out docs/writeup/<slug> \
+  --repo <owner>/<repo> --sha "$SHA" --path docs/writeup/<slug> \
+  --body-out /tmp/body.md
+gh pr create --draft --title "<title>" --body-file /tmp/body.md
+```
+
+The second run omits `<page.html>` — it reuses the pack already on disk
+(found by its `<slug>.md`) rather than re-rendering, since the whole point
+is to turn the *committed* pack into links, not a fresh copy of it.
+`--body-out` requires `--repo`, `--sha` and `--path` together; it rewrites
+every `](figures/…)` and `src="figures/…"` reference in the Markdown to
+`https://github.com/<owner>/<repo>/blob/<sha>/<path>/figures/…?raw=true`,
+strips the Markdown frontmatter block (GitHub would render it as a raw
+`---` fence, not metadata) while keeping the `# title` line, and appends a
+footer line: `> 原本（kit の見た目のまま）: <blob URL of index.html>`,
+plus `・PDF: <blob URL>` when the PDF exists.
+
+**What survives into the PR body's Markdown**: alerts (`> [!NOTE]` etc.),
+tables, ```` ```diff ```` fences, and a `mermaid` fence for any figure that
+carries diagram IR — GitHub renders all of these natively in a PR body.
+**What only `index.html` (and the PDF) keep**: the kit's own styling and
+type scale, diff view line numbers and hunk chrome, and the side table of
+contents — none of that survives HTML→Markdown, so link both in the PR
+description (`原本` = "the original, in the kit's own look") for a
+reviewer who wants the fuller picture.
+
+**Figures are opaque light cards, deliberately**: `standalone-svg.mjs`
+inlines the kit's light-theme tokens plus an opaque `var(--wu-surface)`
+background into each figure SVG, so it reads as a light card on GitHub's
+theme too — `prefers-color-scheme` inside an `<img>` follows the *viewer's
+OS*, not GitHub's own light/dark toggle, so there is no single dark-aware
+variant that would track GitHub's theme; one opaque light card is the
+robust choice. A raster screenshot, if one is needed alongside a figure,
+goes in the same `<out>/figures/` directory and is linked the same way.
