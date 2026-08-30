@@ -164,7 +164,9 @@ file as the reference (cli/cli#14262); an absolute `--attach` path still
 uploads but leaves the reference unrewritten. Use publish's own printed
 hint, which is already shaped `(cd '<folder>' && gh pr create --body-file
 '<slug>.md' --attach 'figures/...')` for exactly this reason (`gh`
-version: the next release after 2.98.0, or trunk — GHES does not support
+version: one that carries `--attach` — no release does yet, so the dotfiles
+nix overlay (`core/nix/overlays.nix`) pins `gh` to a cli/cli trunk commit on
+every machine; drop the override once a release ships it. GHES does not support
 `--attach`; on GHES, or an older `gh`, drag the same `figures/` files into
 the PR editor by hand instead). It runs the same private-word check as
 every other target by default (exit 4 on a hit) — a public repo's PR is
