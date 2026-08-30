@@ -239,6 +239,19 @@ same as a before/after diagram is the same type twice). Every
 folder's Markdown, which copies the file into `figures/` instead.
 `components.md` has the full contract.
 
+**Getting the screenshot when the claim is a UI change.** A `.wu-shot`
+usually shows a running web app, not a diagram: when the page's claim is a
+UI change (before/after, an operation flow) and the project this page is
+about has a `.ui-capture.json` manifest, use the `ui-capture` skill to
+produce the file rather than describing the change in prose and leaving
+the figure for later. Write a scenario from the routes/components the diff
+actually touched; a static state is a PNG, a flow is a GIF (its defaults —
+fps 10, width 800, ≤ 8s — already fit the `.wu-shot` 8MB budget). If the
+project has no manifest and no already-running instance to point `--url`
+at, or the flow genuinely cannot be captured (a native macOS surface,
+something 見た目 that only exists mid-interaction), say so under 未確認 —
+never leave a `.wu-shot` figure in the page with no image file behind it.
+
 ### `render-diagram.mjs` — observed behavior
 
 ```
@@ -354,8 +367,8 @@ picking the move the hint actually names:
   out to elk's default layout.
 
 Two or more groups where every node belongs to one and the inter-group
-edges form a DAG (no A→B *and* B→A between the same two groups) auto-
-detect this "grouped-layer" mode with no hint needed: each group's
+edges form a DAG (no pair of groups with an edge each direction between
+them) auto-detect this "grouped-layer" mode with no hint needed: each group's
 column/row order is the length of the longest inter-group-edge path to
 it, so a group nothing points to (e.g. "org") sits before a group only
 reachable from it (e.g. "sys"), however many hops apart. An intra-group

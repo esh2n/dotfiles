@@ -78,6 +78,13 @@ into `private`.
      each, and the 3-attempt rule: `references/procedure.md`.
    - A screenshot goes in `.wu-shot` with the file in `<slug>-assets/` next
      to the page; never `<img>` elsewhere, never an external image URL.
+   - When the page's claim is a UI change (before/after, an operation flow)
+     and the project has `.ui-capture.json`, produce the evidence with the
+     `ui-capture` skill instead of describing it in prose: derive the
+     scenario from the routes/components the diff touched, GIF only for a
+     flow and PNG for a state (budgets fps 10 / width 800 / ≤ 8s). If it
+     cannot be captured, say why under 未確認 instead of leaving a
+     `.wu-shot` without a file.
 4. **Lint.** `node $KIT/bin/lint.mjs page.html --json`.
    `--surface-only` only for 作業メモ (contract Q33). `lint.mjs` finds
    `.writeup.toml` itself (ancestor search, then `$WRITEUP_STORE`).
