@@ -1,0 +1,56 @@
+#!/bin/sh
+# Thin launcher for yoki-artifact.mjs — the same shape as ui-capture's
+# launcher, for the same reason.
+#
+# mise switches the active Node by cwd, and this CLI is meant to be run from
+# inside whatever repo the agent happens to be working in. A project pinning
+# Node 18 would otherwise run the CLI under a Node with no global fetch, and
+# it would fail deep in a request instead of at the door. This launcher picks
+# the Node explicitly and execs the .mjs with it.
+#
+# Resolution order:
+#   1. $YOKI_ARTIFACT_NODE, if set (explicit escape hatch)
+#   2. `command -v node` (whatever is on PATH)
+# The .mjs re-checks the version itself and refuses below Node 22, so a wrong
+# answer here is reported, never silently tolerated.
+#
+# yoki-artifact.mjs sits next to this file, so the launcher has to find its own
+# directory. Two installed shapes reach it, and only one of them works from
+# `dirname "$0"` alone:
+#   - through a directory symlink (~/.claude/skills/yoki-artifact): $0 is not
+#     itself a link, and dirname is the directory *through* the symlink — fine.
+#   - through a FILE symlink (domains/dev/bin/yoki-artifact, and the ~/bin copy
+#     the dotfiles linker makes from it): dirname would be the link's own
+#     directory, which holds no .mjs.
+# So walk the link chain first. The bound is a cycle guard only; the kernel
+# already refuses to exec a cyclic chain, so hitting it means something is very
+# wrong and we say so rather than spinning.
+set -eu
+
+SYMLINK_HOPS_MAX=32
+
+self=$0
+hops=0
+while [ -L "$self" ]; do
+  hops=$((hops + 1))
+  if [ "$hops" -gt "$SYMLINK_HOPS_MAX" ]; then
+    echo "yoki-artifact: symlink chain from $0 is deeper than $SYMLINK_HOPS_MAX" >&2
+    exit 1
+  fi
+  target=$(readlink "$self")
+  case $target in
+    /*) self=$target ;;
+    *) self=$(dirname "$self")/$target ;;
+  esac
+done
+
+self_dir=$(cd "$(dirname "$self")" && pwd)
+
+if [ -n "${YOKI_ARTIFACT_NODE:-}" ]; then
+  node_bin=$YOKI_ARTIFACT_NODE
+elif ! node_bin=$(command -v node); then
+  echo "yoki-artifact: no node found (checked \$YOKI_ARTIFACT_NODE, PATH)" >&2
+  exit 1
+fi
+
+exec "$node_bin" "$self_dir/yoki-artifact.mjs" "$@"

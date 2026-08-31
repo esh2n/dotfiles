@@ -1,0 +1,11 @@
+{
+  "name": "yoki-artifact-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "coverage": "node --test --experimental-test-coverage \"test/*.test.mjs\"",
+    "dev": "wrangler dev --local",
+    "deploy": "wrangler deploy"
+  }
+}

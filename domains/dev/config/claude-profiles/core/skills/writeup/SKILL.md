@@ -146,7 +146,7 @@ the page handed anywhere else (the Artifact tool, Slack, email, a PR)
 renders unstyled and without pictures; the only HTML that ever leaves the
 store is `publish.mjs` output.
 
-`node $KIT/bin/publish.mjs page.html --to artifact|cloudflare|file|github …`.
+`node $KIT/bin/publish.mjs page.html --to artifact|cloudflare|file|github|yoki-artifact …`.
 `--to artifact` writes `<store>/.publish/<slug>.artifact.html` as a
 **fragment** (no `<!DOCTYPE>`/`<html>`/`<head>`/`<body>`, `<title>` first)
 already shaped for the Artifact tool's own contract — hand it to the tool
@@ -155,6 +155,23 @@ as `file_path` exactly as written, never stripped or re-wrapped by hand
 name="published-artifact">`, commit. Exit 4 (private-word refusal) is
 final — never bypass it. `--to cloudflare` needs `[cloudflare]
 access_verified = true`. Exit codes and walkthroughs: `references/publish.md`.
+
+**別 harness からも同じ URL を（Codex / omp を含む）**: `--to yoki-artifact`
+is the cross-harness route to a private URL — it stages exactly like `--to
+file` (full standalone document, private-word check included, no
+`--internal`), writes `<store>/.publish/<slug>.yoki-artifact.html`, then
+execs the `yoki-artifact` CLI on `PATH` (`publish <staged> --channel <slug
+or --channel> --title <page title> --json`) and records the URL it returns
+on the source page as `<meta name="published-yoki-artifact">` — the same
+ledger as `published-artifact`, written for you because this target knows
+the URL. Inside Claude Code the native Artifact tool remains the shorter
+path for a one-off page; reach for this one when the page must be
+publishable or updatable from a harness that has no Artifact tool, or when
+comments should come back through `yoki-artifact comments`. `--channel`
+(default: the page slug) is what keeps the URL stable across re-publishes —
+update a page under the same channel, never a new one. A missing or failing
+CLI is exit 9, with the CLI's own message as the detail. Walkthrough:
+`references/publish.md`; the CLI itself: the `yoki-artifact` skill.
 
 **GitHub PR（非公開リポでも可）**: `--to github` is the one target that
 writes a **folder**, not a single file — there is no repo commit, no

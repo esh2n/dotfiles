@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // publish.mjs — stages a page for an external audience (contract §8).
-// Pre-stage, always in this order: (0) --to is one of the 4 known targets,
+// Pre-stage, always in this order: (0) --to is one of the 5 known targets,
 // (1) run build's rendering passes (viewport meta, `.wu-diffview` tables,
 // code highlighting — `ensureRendered`) so a page that skipped `build`, or a
 // kit reference page no store build scans, never ships unrendered, then
@@ -10,14 +10,16 @@
 // every `.wu-shot` image (a page-relative `<slug>-assets/*` file) as a
 // `data:` URI (`inlinePageAssets`) so the staged output stays one file for
 // every target, (4) adjust `.wu-header`'s back-to-index nav for the target
-// (dropped for file/artifact/github; rewritten to `/index.html` or dropped
-// for cloudflare — see `adjustBackNav`), (5) reject on a company-trace word
+// (dropped for file/artifact/github/yoki-artifact; rewritten to
+// `/index.html` or dropped for cloudflare — see `adjustBackNav`), (5) reject on a company-trace word
 // hit (skippable with `--internal`, for a private repo whose readers are
 // its own members — restricted to `github`: passing `--internal` for any
 // other target is a usage error, exit 2, not a silent skip), (6) enforce
-// the 16MB Artifact-tool size ceiling. Then dispatch to one of 4 targets: `file` and `cloudflare`
+// the 16MB Artifact-tool size ceiling. Then dispatch to one of 5 targets: `file`, `cloudflare` and
+// `yoki-artifact`
 // write the staged text as a full, standalone document (a Slack attachment
-// / email, and a hosted page, both need one); `artifact` writes it through
+// / email, a hosted page, and a page handed to the yoki-artifact CLI all
+// need one); `artifact` writes it through
 // `toArtifactFragment` instead, which strips the
 // `<!DOCTYPE>`/`<html>`/`<head>`/`<body>` skeleton and the charset/viewport
 // `<meta>`s — the Artifact tool supplies its own version of exactly those,
@@ -37,13 +39,28 @@
 // unchanged (and survives `toArtifactFragment` too, since that only
 // removes the skeleton tags and the two `<meta>`s named above).
 //
+// `yoki-artifact` is the one target that *does* call an external CLI: it
+// writes `<store>/.publish/<slug>.yoki-artifact.html` (a full document,
+// staged exactly like `--to file`) and then execs
+// `yoki-artifact publish <staged> --channel <slug|--channel> --title
+// <page title> --json`, taking the viewer URL out of that JSON and
+// recording it on the *source* page as `<meta
+// name="published-yoki-artifact">` — the same bookkeeping the `artifact`
+// target asks the agent to do by hand with `published-artifact`, done here
+// because this target actually knows the URL. `--dry-run` stops after the
+// plan and never execs anything. The CLI is reached through `PATH` only;
+// this file never opens a socket itself.
+//
 // Exit codes: 0 success/dry-run, 2 usage error (including `--to artifact`
 // failing to locate the skeleton `toArtifactFragment` needs, and
 // `--internal` passed for any target other than `github`), 3 self-check
 // failed, 4 private-word hit, 5 cloudflare Access not verified, 6 size
 // over 16MB, 7 a `.wu-diffview` whose diff could not be rendered, 8 the
 // kit CSS `<link>` survived inlining (see `inlineKitCss`'s comment-skip
-// below).
+// below), 9 the `yoki-artifact` CLI is missing from `PATH`, failed, or
+// answered with something that is not a publish result. (9, not 7: 7 and
+// 8 were already taken by the two failures above and reusing one would
+// make a CLI failure indistinguishable from an unrenderable diff.)
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -60,6 +77,14 @@ import { renderPdf } from './lib/pdf.mjs'
 import { isMain } from './lib/main.mjs'
 
 const MAX_BYTES = 16 * 1024 * 1024
+
+/** Every `--to` value publish accepts, in the order the usage string lists them. */
+export const TARGETS = ['artifact', 'cloudflare', 'file', 'github', 'yoki-artifact']
+
+/** The executable `--to yoki-artifact` looks for on `PATH`, and the meta tag it
+ * records the returned viewer URL under on the source page. */
+const YOKI_ARTIFACT_BIN = 'yoki-artifact'
+export const YOKI_ARTIFACT_META = 'published-yoki-artifact'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const KIT_DIR = join(HERE, '..', 'kit')
@@ -181,7 +206,8 @@ const NAV_BLOCK_RE = /\s*<nav\s+class="wu-nav"[^>]*>[\s\S]*?<\/nav>/
 const BACK_HREF_RE = /(<a\s+class="wu-back"[^>]*\shref=")([^"]*)(")/
 
 /** Adjusts `.wu-header`'s back-to-index nav for the target audience: a
- * single exported file (`--to file` / `--to artifact`) has no store index
+ * single exported file (`--to file` / `--to artifact` / `--to github` /
+ * `--to yoki-artifact`) has no store index
  * to link back to, so the nav is dropped entirely. `--to cloudflare`
  * deploys into `public/`, which only carries its own `index.html` once
  * `build` has been run against it — when `<store>/public/index.html`
@@ -255,13 +281,13 @@ function wranglerAvailable() {
  *   | Promise<{ok: true, target: 'github', output: string, md: string, figuresDir: string, html: string, pdf?: object, hint: string}>}
  */
 export function publish(pageFile, opts) {
-  const { to, out, store, storeName, dryRun = false, deploy = false, internal = false, pdf = false } = opts
+  const { to, out, store, storeName, channel = null, dryRun = false, deploy = false, internal = false, pdf = false } = opts
   // The page's own store (an ancestor `.writeup.toml`) wins over the
   // registry's marker/default pick, so a page in `work/` is checked against
   // `work/.writeup.toml`'s private words even when run from elsewhere.
   const storeDir = resolveStoreDir(store, { name: storeName, cwd: dirname(resolve(pageFile)) })
 
-  if (!['file', 'artifact', 'cloudflare', 'github'].includes(to)) {
+  if (!TARGETS.includes(to)) {
     throw new PublishError(2, `unknown --to target: ${to}`)
   }
 
@@ -299,12 +325,13 @@ export function publish(pageFile, opts) {
   if (to === 'cloudflare') assertCloudflareAccess(storeDir)
 
   if (dryRun) {
-    return planDryRun(pageFile, staged, { to, out, storeDir, deploy, pdf })
+    return planDryRun(pageFile, staged, { to, out, storeDir, deploy, pdf, channel })
   }
 
   if (to === 'file') return publishToFile(staged, out)
   if (to === 'artifact') return publishToArtifact(staged, pageFile, storeDir)
   if (to === 'github') return publishToGithub(staged, rendered, pageFile, storeDir, { out, pdf })
+  if (to === 'yoki-artifact') return publishToYokiArtifact(staged, pageFile, storeDir, { channel })
   return publishToCloudflare(staged, pageFile, storeDir, { deploy })
 }
 
@@ -315,7 +342,7 @@ function assertCloudflareAccess(storeDir) {
   }
 }
 
-function planDryRun(pageFile, staged, { to, out, storeDir, deploy, pdf }) {
+function planDryRun(pageFile, staged, { to, out, storeDir, deploy, pdf, channel }) {
   const bytes = Buffer.byteLength(staged, 'utf8')
   const plan = { ok: true, target: to, dryRun: true, bytes }
   if (to === 'file') plan.output = out || '(missing --out)'
@@ -333,6 +360,17 @@ function planDryRun(pageFile, staged, { to, out, storeDir, deploy, pdf }) {
     const project = cloudflareConfig(storeDir).project || '<project>'
     plan.command = `wrangler pages deploy public --project-name ${project}`
     plan.wouldDeploy = deploy
+  }
+  if (to === 'yoki-artifact') {
+    const slug = slugOf(pageFile)
+    plan.output = yokiArtifactStagedPath(storeDir, slug)
+    plan.channel = yokiArtifactChannel(channel, slug)
+    plan.title = titleText(parseHtml(staged))
+    plan.command = yokiArtifactArgv(plan.output, plan.channel, plan.title).join(' ')
+    // A dry run stops here: no CLI is spawned, so no URL comes back and
+    // `<meta name="published-yoki-artifact">` on the source page is left
+    // exactly as it was.
+    plan.wouldRecordMeta = YOKI_ARTIFACT_META
   }
   if (to === 'github') {
     const slug = slugOf(pageFile)
@@ -424,6 +462,140 @@ function publishToArtifact(staged, pageFile, storeDir) {
   const out = join(dir, `${slugOf(pageFile)}.artifact.html`)
   writeFileSync(out, toArtifactFragment(staged))
   return { ok: true, target: 'artifact', output: out }
+}
+
+// --- --to yoki-artifact -----------------------------------------------------
+
+function yokiArtifactStagedPath(storeDir, slug) {
+  return join(storeDir, '.publish', `${slug}.yoki-artifact.html`)
+}
+
+/** The channel the page is published under: `--channel` when given, the
+ * page's slug otherwise. The channel's *shape* (lowercase, 2-63 chars) is
+ * deliberately not re-validated here — `yoki-artifact`'s own validate.mjs
+ * and the Worker behind it are the authority on that, and a second copy of
+ * the rule in this file would only ever drift out of step with them. What is
+ * checked here is the one thing this file owns: that a channel exists at all. */
+function yokiArtifactChannel(channel, slug) {
+  const value = String(channel ?? '').trim() || slug
+  if (!value) {
+    throw new PublishError(2, '--to yoki-artifact could not derive a channel: pass --channel <name>')
+  }
+  return value
+}
+
+function yokiArtifactArgv(stagedPath, channel, title) {
+  const argv = [YOKI_ARTIFACT_BIN, 'publish', stagedPath, '--channel', channel]
+  if (title) argv.push('--title', title)
+  argv.push('--json')
+  return argv
+}
+
+/** Upsert `<meta name="published-yoki-artifact" content="<url>">` on the
+ * *source* page — the store copy, never the `.publish/` staging copy, which
+ * is regenerated on every publish and read by nobody afterward. A narrow
+ * text patch, not an HTML re-serialization, for the same reason
+ * `self-check.mjs`'s `writeMetaChecks` is one: every other byte of the
+ * page (a figure's sha256'd SVG + IR pair) must survive untouched. */
+export function writePublishedYokiArtifactMeta(filePath, url) {
+  const raw = readFileSync(filePath, 'utf8')
+  const re = new RegExp(`(<meta\\s+name="${YOKI_ARTIFACT_META}"\\s+content=")([^"]*)("\\s*>)`)
+  const m = re.exec(raw)
+  if (m) {
+    writeFileSync(filePath, raw.slice(0, m.index) + m[1] + url + m[3] + raw.slice(m.index + m[0].length))
+    return
+  }
+  const insertion = `<meta name="${YOKI_ARTIFACT_META}" content="${url}">\n`
+  const headClose = raw.indexOf('</head>')
+  if (headClose === -1) {
+    writeFileSync(filePath, insertion + raw)
+  } else {
+    writeFileSync(filePath, raw.slice(0, headClose) + insertion + raw.slice(headClose))
+  }
+}
+
+/** The `{ok, url, …}` object the CLI prints with `--json`, or a
+ * PublishError(9) explaining what came back instead. The CLI prints exactly
+ * one JSON line on success, so the last non-empty line is the result even if
+ * something upstream (a Node warning) shares the pipe. */
+function parseYokiArtifactResult(stdout, argv) {
+  const lines = String(stdout || '').split('\n').map((l) => l.trim()).filter(Boolean)
+  const last = lines[lines.length - 1]
+  let parsed = null
+  try {
+    parsed = last ? JSON.parse(last) : null
+  } catch {
+    parsed = null
+  }
+  if (!parsed || parsed.ok !== true || typeof parsed.url !== 'string' || !parsed.url) {
+    throw new PublishError(
+      9,
+      `publish refused: \`${argv.join(' ')}\` did not return a published URL`,
+      String(stdout || '').trim() || '(no output)',
+    )
+  }
+  return parsed
+}
+
+/**
+ * Writes `<store>/.publish/<slug>.yoki-artifact.html` (the same full,
+ * standalone document `--to file` produces) and hands it to the
+ * `yoki-artifact` CLI, which is what actually talks to the Worker — this
+ * file opens no socket of its own and holds no credential.
+ *
+ * The CLI runs its own pre-flight (secret scan, CSP-allowlist scan, 16MB
+ * ceiling, and writeup-kit's self-check when it recognises a kit page)
+ * before any byte leaves the machine; that is deliberately a *second*
+ * gate, not a replacement for the staging checks above.
+ *
+ * Its viewer URL is then recorded on the source page as `<meta
+ * name="published-yoki-artifact">`, the same bookkeeping `--to artifact`
+ * asks the agent to do by hand for `published-artifact`.
+ */
+function publishToYokiArtifact(staged, pageFile, storeDir, { channel }) {
+  const slug = slugOf(pageFile)
+  const chan = yokiArtifactChannel(channel, slug)
+  const title = titleText(parseHtml(staged))
+
+  const dir = join(storeDir, '.publish')
+  mkdirSync(dir, { recursive: true })
+  const out = yokiArtifactStagedPath(storeDir, slug)
+  writeFileSync(out, staged)
+
+  const argv = yokiArtifactArgv(out, chan, title)
+  let stdout
+  try {
+    stdout = execFileSync(argv[0], argv.slice(1), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e) {
+    // ENOENT is "not installed / not on PATH"; anything else is the CLI
+    // itself refusing (its own exit codes: 1 usage, 2 network/auth, 3
+    // external refs, 4 secret scan, 5 too large). Both are reported as 9,
+    // with the CLI's own message kept as the detail rather than swallowed.
+    const missing = e && e.code === 'ENOENT'
+    const detail = [e && e.stdout, e && e.stderr].map((s) => String(s || '').trim()).filter(Boolean).join('\n')
+    throw new PublishError(
+      9,
+      missing
+        ? `publish refused: \`${YOKI_ARTIFACT_BIN}\` is not on PATH — install the yoki-artifact skill's bin/ first (the staged page is at ${out})`
+        : `publish refused: \`${argv.join(' ')}\` failed (exit ${e && e.status !== undefined ? e.status : '?'})`,
+      detail || (e && e.message) || '(no output)',
+    )
+  }
+
+  const result = parseYokiArtifactResult(stdout, argv)
+  writePublishedYokiArtifactMeta(pageFile, result.url)
+
+  return {
+    ok: true,
+    target: 'yoki-artifact',
+    output: out,
+    channel: chan,
+    title,
+    url: result.url,
+    version: result.version ?? null,
+    unchanged: result.unchanged === true,
+    meta: YOKI_ARTIFACT_META,
+  }
 }
 
 const FRONTMATTER_RE = /^---\n[\s\S]*?\n---\n\n?/
@@ -580,7 +752,7 @@ function publishToCloudflare(staged, pageFile, storeDir, { deploy }) {
 
 function parseArgs(argv) {
   const args = {
-    file: null, to: null, out: null, store: null, storeName: null,
+    file: null, to: null, out: null, store: null, storeName: null, channel: null,
     dryRun: false, deploy: false, pdf: false, internal: false,
   }
   const positional = []
@@ -588,6 +760,7 @@ function parseArgs(argv) {
     const a = argv[i]
     if (a === '--to') args.to = argv[++i]
     else if (a === '--out') args.out = argv[++i]
+    else if (a === '--channel') args.channel = argv[++i]
     else if (a === '--store') args.store = argv[++i]
     else if (a === '--store-name') args.storeName = argv[++i]
     else if (a === '--dry-run') args.dryRun = true
@@ -603,7 +776,9 @@ function parseArgs(argv) {
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (!args.file || !args.to) {
-    console.error('usage: node bin/publish.mjs <page.html> --to artifact|cloudflare|file|github [--out path] [--store dir | --store-name name] [--dry-run] [--deploy] [--pdf] [--internal]')
+    console.error('usage: node bin/publish.mjs <page.html> --to artifact|cloudflare|file|github|yoki-artifact [--out path] [--channel name] [--store dir | --store-name name] [--dry-run] [--deploy] [--pdf] [--internal]')
+    console.error('  --channel applies to --to yoki-artifact (default: the page slug)')
+    console.error('  exit codes: 2 usage, 3 self-check, 4 private word, 5 cloudflare Access, 6 over 16MB, 7 unrenderable .wu-diffview, 8 kit CSS link survived inlining, 9 the yoki-artifact CLI is missing from PATH or failed')
     return 2
   }
   try {
@@ -612,13 +787,23 @@ async function main() {
       console.log(`publish --dry-run: target=${result.target} bytes=${result.bytes}`)
       console.log(`  output: ${result.output}`)
       if (result.fragment) console.log('  note: written as a <head>/<body>-stripped fragment for the Artifact tool, not a full document — bytes above is the pre-fragment upper bound')
-      if (result.command) console.log(`  command: ${result.command}${result.wouldDeploy ? '' : ' (not run; pass --deploy)'}`)
+      if (result.channel) console.log(`  channel: ${result.channel}`)
+      if (result.command) {
+        // cloudflare's command is opt-in via --deploy even outside a dry run;
+        // every other target's is simply not run because this *is* a dry run.
+        const why = result.wouldDeploy ? '' : result.target === 'cloudflare' ? ' (not run; pass --deploy)' : ' (not run; --dry-run)'
+        console.log(`  command: ${result.command}${why}`)
+      }
       if (result.files) {
         console.log(`  would write, under ${result.output}/:`)
         for (const f of result.files) console.log(`    ${f}`)
       }
     } else {
       console.log(`publish: wrote ${result.output}`)
+      if (result.url) {
+        console.log(`  ${result.unchanged ? 'unchanged' : `published v${result.version}`} on channel ${result.channel}: ${result.url}`)
+        console.log(`  recorded on the source page as <meta name="${result.meta}">`)
+      }
       if (result.command) console.log(`  ${result.deployed ? 'ran' : 'to deploy'}: ${result.command}`)
       if (result.deploySkippedReason) console.log(`  skipped deploy: ${result.deploySkippedReason}`)
       if (result.pdf) {

@@ -7,7 +7,7 @@ renders unstyled and without pictures. The only HTML that ever leaves the
 store is `publish.mjs` output.
 
 ```
-node $KIT/bin/publish.mjs <page.html> --to artifact|cloudflare|file|github [--out <path>] [--store <dir> | --store-name <name>] [--dry-run] [--deploy] [--pdf] [--internal]
+node $KIT/bin/publish.mjs <page.html> --to artifact|cloudflare|file|github|yoki-artifact [--out <path>] [--channel <name>] [--store <dir> | --store-name <name>] [--dry-run] [--deploy] [--pdf] [--internal]
 ```
 
 Without `--store`/`--store-name`, the store is the page's own (the
@@ -46,6 +46,7 @@ without writing or deploying anything.
 | 6 | Staged page exceeds the 16MB Artifact limit |
 | 7 | A `.wu-diffview` on the page carries a diff that could not be parsed; publish refused (fix the diff inside its script, or drop the figure) |
 | 8 | The `_kit/writeup.css` `<link>` was still present after CSS inlining — a bug, not an authoring mistake; report it rather than retrying |
+| 9 | `--to yoki-artifact` and the `yoki-artifact` CLI is missing from `PATH`, exited non-zero, or answered with something that is not a publish result (its own message is printed as the detail) |
 
 ## Private-word check (exit 4)
 
@@ -115,6 +116,38 @@ over exactly as written; do not strip anything from it yourself. After
    as `<meta name="published-artifact" content="<url>">`, inserted next
    to the other meta tags.
 4. `git -C "$STORE" add -A && git -C "$STORE" commit -m "publish: <title> to artifact"`.
+
+### `yoki-artifact`
+
+```
+$ node $KIT/bin/publish.mjs page.html --to yoki-artifact [--channel <name>]
+publish: wrote /path/to/store/.publish/2026-08-14-example.yoki-artifact.html
+  published v3 on channel 2026-08-14-example: https://<worker>/a/2026-08-14-example
+  recorded on the source page as <meta name="published-yoki-artifact">
+```
+
+The cross-harness route to a private URL — the one target that works
+identically from Claude Code, Codex and omp, because the publishing is
+done by the `yoki-artifact` CLI on `PATH` rather than by a tool only one
+harness has (inside Claude Code the native Artifact tool is still there;
+see the `yoki-artifact` skill for when each one is the right pick). It
+stages exactly like `--to file` — a full standalone document, CSS
+inlined, `.wu-shot` images inlined, back-nav dropped, private-word check
+(no `--internal` here), 16MB check — writes it to
+`<store>/.publish/<slug>.yoki-artifact.html`, then execs `yoki-artifact
+publish <staged> --channel <slug or --channel> --title <page title>
+--json` and writes the viewer URL it returns into the *source* page as
+`<meta name="published-yoki-artifact" content="<url>">` — the same
+bookkeeping the `artifact` target asks you to do by hand for
+`published-artifact`, done for you because this target actually knows the
+URL. `--channel` defaults to the page slug and is what keeps the URL
+stable across re-publishes, so use the same channel when updating a page
+rather than inventing a new one. The CLI runs its own pre-flight (secret
+scan, CSP-allowlist scan, size) before anything leaves the machine; a
+missing or failing CLI is exit 9, with the CLI's own message as the
+detail, and the staged file is left in place so you can retry without
+re-staging. `--dry-run` reports the staged path, the channel, the title
+and the exact command, and execs nothing.
 
 ### `cloudflare`
 

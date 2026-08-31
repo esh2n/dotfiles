@@ -1,0 +1,44 @@
+# yoki-artifact — Worker + Static Assets on workers.dev (spike S7).
+#
+# Cloudflare Access fronts this Worker as a Worker-level application. Behind
+# Static Assets the internal router does NOT pass `ctx.access` to the user
+# Worker, so identity comes from validating the `Cf-Access-Jwt-Assertion`
+# header inside src/auth.mjs — never from `ctx.access` or from the
+# `cf-access-authenticated-user-email` convenience header.
+
+name = "yoki-artifact"
+main = "src/index.mjs"
+# `wrangler dev` refuses a compatibility date newer than the workerd binary its
+# own version ships ("newest date supported by this server binary is ..."), so
+# for local runs on an older wrangler pass `--compatibility-date <that date>`
+# rather than editing this line: deploys must keep the real date.
+compatibility_date = "2026-08-31"
+workers_dev = true
+
+# public/ holds only the viewer shell (HTML/CSS/JS). Artifact HTML never
+# becomes a static asset: it is streamed from R2 by /r/* with a per-response
+# sandbox CSP. `run_worker_first` keeps the asset router from answering the
+# routes the Worker owns.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/r/*", "/a/*", "/"]
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "yoki-artifact"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yoki-artifact"
+# Replace with the id printed by `wrangler d1 create yoki-artifact`.
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# Placeholders — set the real values before deploying (`wrangler deploy --var`
+# or by editing this block). They are configuration, not secrets: the Access
+# AUD and team domain are public identifiers. src/index.mjs refuses to serve
+# anything if one of them is empty.
+[vars]
+ACCESS_TEAM_DOMAIN = "REPLACE-team.cloudflareaccess.com"
+ACCESS_AUD = "REPLACE-access-application-aud"
+OWNER_EMAIL = "REPLACE-owner@example.com"

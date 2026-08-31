@@ -147,6 +147,30 @@
         ]
       }
     ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"session:artifact-comments\" \"scripts/hooks/artifact-comments.js\" \"standard,strict\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"session:artifact-comments\" \"scripts/hooks/artifact-comments.js\" \"standard,strict\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": "*",

@@ -986,6 +986,209 @@ describe('publish(): --internal is restricted to --to github', () => {
   })
 })
 
+// --- --to yoki-artifact -----------------------------------------------------
+// `yoki-artifact` stages exactly like `--to file` (a full standalone
+// document) and then hands that file to the `yoki-artifact` CLI, which is
+// the only thing in this path that talks to a network. Every test below
+// stubs that CLI on PATH — publish.mjs must never reach a real Worker, and
+// the stub is also how the argv it builds is observed.
+
+/** A fake `yoki-artifact` executable in a fresh PATH directory. `body` is the
+ * shell script's body; it always records its own argv to `<dir>/argv.txt`
+ * first so a test can assert on what publish.mjs actually invoked. */
+function stubYokiArtifact(body) {
+  const dir = mkdtempSync(join(tmpdir(), 'wu-yoki-bin-'))
+  const argvFile = join(dir, 'argv.txt')
+  const script = `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(argvFile)}\n${body}\n`
+  writeFileSync(join(dir, 'yoki-artifact'), script, { mode: 0o755 })
+  return { dir, argvFile }
+}
+
+const STUB_URL = 'https://artifacts.example.test/a/example-channel'
+const STUB_OK = `echo '{"ok":true,"channel":"c","version":3,"url":"${STUB_URL}","bytes":42,"unchanged":false,"warnings":[]}'`
+
+/** Runs publish.mjs as a subprocess with `stubDir` prepended to PATH, so the
+ * stub is found without mutating this test process's own environment. */
+function runPublishWithStub(stubDir, args) {
+  return spawnSync(process.execPath, [PUBLISH_BIN, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${stubDir}:${process.env.PATH}` },
+  })
+}
+
+describe('publish(): --to yoki-artifact --dry-run plans without running anything', () => {
+  test('reports the staged path, the channel, and the CLI command it would run', () => {
+    const store = freshStore()
+    const result = publish(join(store, DECISION_REL), { to: 'yoki-artifact', store, dryRun: true })
+    assert.equal(result.dryRun, true)
+    assert.equal(result.target, 'yoki-artifact')
+    assert.equal(result.output, join(store, '.publish', '2026-08-01-example-decision.yoki-artifact.html'))
+    assert.equal(result.channel, '2026-08-01-example-decision')
+    assert.equal(result.title, '再試行方針の決定')
+    assert.match(result.command, /^yoki-artifact publish .*\.yoki-artifact\.html --channel 2026-08-01-example-decision --title .* --json$/)
+  })
+
+  test('--channel overrides the slug in the plan', () => {
+    const store = freshStore()
+    const result = publish(join(store, DECISION_REL), { to: 'yoki-artifact', store, dryRun: true, channel: 'retry-policy' })
+    assert.equal(result.channel, 'retry-policy')
+    assert.match(result.command, /--channel retry-policy/)
+  })
+
+  test('writes nothing and records no meta on the source page', () => {
+    const store = freshStore()
+    const page = join(store, DECISION_REL)
+    publish(page, { to: 'yoki-artifact', store, dryRun: true })
+    assert.ok(!existsSync(join(store, '.publish')))
+    assert.ok(!readFileSync(page, 'utf8').includes('published-yoki-artifact'))
+  })
+})
+
+describe('publish(): --to yoki-artifact staged file shape', () => {
+  test('writes <store>/.publish/<slug>.yoki-artifact.html as a full standalone document', () => {
+    const store = freshStore()
+    const stub = stubYokiArtifact(STUB_OK)
+    const r = runPublishWithStub(stub.dir, [join(store, DECISION_REL), '--to', 'yoki-artifact', '--store', store])
+    assert.equal(r.status, 0, r.stderr)
+
+    const staged = join(store, '.publish', '2026-08-01-example-decision.yoki-artifact.html')
+    assert.ok(existsSync(staged))
+    const html = readFileSync(staged, 'utf8')
+    assert.match(html, /^<!DOCTYPE html>/)
+    assert.match(html, /<head>/)
+    assert.match(html, /<body>/)
+    // staged exactly like --to file: kit CSS inlined, back-nav dropped
+    assert.match(html, /<style>/)
+    assert.ok(!html.includes('href="../_kit/writeup.css"'))
+    assert.ok(!/<nav class="wu-nav"/.test(html))
+  })
+
+  test('.wu-shot images are inlined as data: URIs, like every other target', () => {
+    const store = freshStore()
+    const page = join(store, DECISION_REL)
+    const assetsDir = join(dirname(page), '2026-08-01-example-decision-assets')
+    mkdirSync(assetsDir, { recursive: true })
+    writeFileSync(join(assetsDir, 'shot.png'), makeTinyPng())
+    const html = readFileSync(page, 'utf8')
+    writeFileSync(page, html.replace(
+      '<main>',
+      '<main>\n<figure class="wu-shot"><img src="2026-08-01-example-decision-assets/shot.png" alt="画面"></figure>',
+    ))
+
+    const stub = stubYokiArtifact(STUB_OK)
+    const r = runPublishWithStub(stub.dir, [page, '--to', 'yoki-artifact', '--store', store])
+    assert.equal(r.status, 0, r.stderr)
+    const staged = readFileSync(join(store, '.publish', '2026-08-01-example-decision.yoki-artifact.html'), 'utf8')
+    assert.match(staged, /src="data:image\/png;base64,/)
+    assert.ok(!staged.includes('src="2026-08-01-example-decision-assets/shot.png"'))
+  })
+
+  test('the staged path, channel and title are what the CLI is actually invoked with', () => {
+    const store = freshStore()
+    const stub = stubYokiArtifact(STUB_OK)
+    const r = runPublishWithStub(stub.dir, [
+      join(store, DECISION_REL), '--to', 'yoki-artifact', '--store', store, '--channel', 'retry-policy',
+    ])
+    assert.equal(r.status, 0, r.stderr)
+    const argv = readFileSync(stub.argvFile, 'utf8').split('\n').filter(Boolean)
+    assert.deepEqual(argv, [
+      'publish',
+      join(store, '.publish', '2026-08-01-example-decision.yoki-artifact.html'),
+      '--channel', 'retry-policy',
+      '--title', '再試行方針の決定',
+      '--json',
+    ])
+  })
+})
+
+describe('publish(): --to yoki-artifact records the returned URL on the source page', () => {
+  test('inserts <meta name="published-yoki-artifact"> into the store page, not the staged copy', () => {
+    const store = freshStore()
+    const page = join(store, DECISION_REL)
+    const stub = stubYokiArtifact(STUB_OK)
+    const r = runPublishWithStub(stub.dir, [page, '--to', 'yoki-artifact', '--store', store])
+    assert.equal(r.status, 0, r.stderr)
+
+    const source = readFileSync(page, 'utf8')
+    assert.ok(source.includes(`<meta name="published-yoki-artifact" content="${STUB_URL}">`), source.slice(0, 600))
+    assert.match(r.stdout, /published v3 on channel 2026-08-01-example-decision/)
+    assert.ok(r.stdout.includes(STUB_URL))
+  })
+
+  test('a second publish updates the existing meta in place rather than adding a second one', () => {
+    const store = freshStore()
+    const page = join(store, DECISION_REL)
+    const first = stubYokiArtifact(STUB_OK)
+    assert.equal(runPublishWithStub(first.dir, [page, '--to', 'yoki-artifact', '--store', store]).status, 0)
+
+    const newUrl = 'https://artifacts.example.test/a/second-run'
+    const second = stubYokiArtifact(`echo '{"ok":true,"channel":"c","version":4,"url":"${newUrl}","unchanged":false}'`)
+    assert.equal(runPublishWithStub(second.dir, [page, '--to', 'yoki-artifact', '--store', store]).status, 0)
+
+    const source = readFileSync(page, 'utf8')
+    assert.equal((source.match(/name="published-yoki-artifact"/g) || []).length, 1)
+    assert.ok(source.includes(`content="${newUrl}"`))
+    // the page still self-checks after the patch — the meta must not break it
+    assert.equal(runSelfCheck(page).ok, true)
+  })
+})
+
+describe('publish(): --to yoki-artifact CLI failures are exit 9', () => {
+  test('exit 9 when yoki-artifact is not on PATH, and the staged file is still there', () => {
+    const store = freshStore()
+    const emptyBin = mkdtempSync(join(tmpdir(), 'wu-yoki-empty-'))
+    const r = spawnSync(process.execPath, [PUBLISH_BIN, join(store, DECISION_REL), '--to', 'yoki-artifact', '--store', store], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: emptyBin },
+    })
+    assert.equal(r.status, 9)
+    assert.match(r.stderr, /not on PATH/)
+    assert.ok(existsSync(join(store, '.publish', '2026-08-01-example-decision.yoki-artifact.html')))
+  })
+
+  test('exit 9 when the CLI exits non-zero, keeping its own message as the detail', () => {
+    const store = freshStore()
+    const page = join(store, DECISION_REL)
+    const stub = stubYokiArtifact(`echo '{"ok":false,"code":"secret_found","error":"looks like a credential"}'\nexit 4`)
+    const r = runPublishWithStub(stub.dir, [page, '--to', 'yoki-artifact', '--store', store])
+    assert.equal(r.status, 9)
+    assert.match(r.stderr, /failed \(exit 4\)/)
+    assert.match(r.stderr, /secret_found/)
+    assert.ok(!readFileSync(page, 'utf8').includes('published-yoki-artifact'))
+  })
+
+  test('exit 9 when the CLI exits 0 but prints no publish result', () => {
+    const store = freshStore()
+    const page = join(store, DECISION_REL)
+    const stub = stubYokiArtifact("echo 'not json at all'")
+    const r = runPublishWithStub(stub.dir, [page, '--to', 'yoki-artifact', '--store', store])
+    assert.equal(r.status, 9)
+    assert.match(r.stderr, /did not return a published URL/)
+    assert.ok(!readFileSync(page, 'utf8').includes('published-yoki-artifact'))
+  })
+})
+
+describe('publish(): --to yoki-artifact runs the same pre-stage gates as every other target', () => {
+  test('a private-word hit is refused (exit 4) before the CLI is ever reached', () => {
+    const store = freshStore()
+    const page = join(store, DECISION_REL)
+    const html = readFileSync(page, 'utf8')
+    writeFileSync(page, html.replace('<main>', '<main>\n<p>acmecorp の話</p>'))
+    const stub = stubYokiArtifact(STUB_OK)
+    const r = runPublishWithStub(stub.dir, [page, '--to', 'yoki-artifact', '--store', store])
+    assert.equal(r.status, 4)
+    assert.ok(!existsSync(stub.argvFile), 'the CLI must not be invoked when the private-word check refuses')
+  })
+
+  test('--internal is still restricted to --to github (exit 2)', () => {
+    const store = freshStore()
+    assert.throws(
+      () => publish(join(store, DECISION_REL), { to: 'yoki-artifact', store, internal: true }),
+      (e) => e instanceof PublishError && e.code === 2,
+    )
+  })
+})
+
 describe('publish(): --to github --pdf, playwright-core actually resolvable', () => {
   test('renders a real PDF starting with %PDF', { skip: !process.env.WRITEUP_PLAYWRIGHT_CORE }, async () => {
     const store = freshStore()

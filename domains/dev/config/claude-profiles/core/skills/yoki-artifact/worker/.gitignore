@@ -1,0 +1,7 @@
+# wrangler's local cache and simulated-binding state
+.wrangler/
+node_modules/
+
+# viewer allow-list: real addresses, not repo content (viewers.example.json is
+# the template)
+viewers.json
