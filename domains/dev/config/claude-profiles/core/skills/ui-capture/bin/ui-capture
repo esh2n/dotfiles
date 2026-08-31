@@ -1,0 +1,45 @@
+#!/bin/sh
+# Thin launcher for ui-capture's capture.mjs.
+#
+# Why this exists (ui-capture の設計 決定点2 — "Node の版が repo ごとに
+# 違う場合"): mise switches the active Node by cwd. A project can pin an
+# older Node than Playwright's supported floor. Running capture.mjs
+# directly from inside such a project would silently run the capture
+# process under that old Node. This launcher resolves the Node bin/setup.mjs
+# recorded at setup time and execs capture.mjs with it instead, so the
+# capture process's Node never depends on which repo's cwd it was invoked
+# from.
+#
+# Resolution order:
+#   1. $UI_CAPTURE_NODE, if set (explicit escape hatch)
+#   2. the "node" path recorded in ~/.local/share/ui-capture/meta.json by
+#      bin/setup.mjs
+#   3. `command -v node` (whatever is on PATH)
+set -eu
+
+self_dir=$(cd "$(dirname "$0")" && pwd)
+meta="$HOME/.local/share/ui-capture/meta.json"
+
+node_from_meta() {
+  [ -f "$meta" ] || return 1
+  sed -n 's/.*"node"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$meta" | head -n1
+}
+
+node_bin=""
+if [ -n "${UI_CAPTURE_NODE:-}" ]; then
+  node_bin=$UI_CAPTURE_NODE
+else
+  meta_node=$(node_from_meta || true)
+  if [ -n "$meta_node" ] && [ -x "$meta_node" ]; then
+    node_bin=$meta_node
+  fi
+fi
+
+if [ -z "$node_bin" ]; then
+  if ! node_bin=$(command -v node); then
+    echo "ui-capture: no node found (checked \$UI_CAPTURE_NODE, $meta, PATH)" >&2
+    exit 6
+  fi
+fi
+
+exec "$node_bin" "$self_dir/capture.mjs" "$@"

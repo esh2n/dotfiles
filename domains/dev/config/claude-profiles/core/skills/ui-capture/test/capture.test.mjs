@@ -24,9 +24,18 @@ import assert from "node:assert/strict";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CAPTURE_BIN = path.join(HERE, "..", "bin", "capture.mjs");
+const LAUNCHER_BIN = path.join(HERE, "..", "bin", "ui-capture");
 const PLAYWRIGHT_PATH =
   process.env.UI_CAPTURE_PLAYWRIGHT ??
   "/Users/esh2n/go/github.com/esh2n/arekore/apps/viewer/node_modules/playwright";
+
+// capture.mjs 自身がエクスポートする純関数(Node バージョンガード)を単体で
+// 検証する。プロセスの process.version は non-writable なので、子プロセス
+// を実際に古い Node で spawn してガードを踏ませることはできない(このマシン
+// に入っている mise 管理の 20.x は bin/ が空 — 実体を持たない placeholder)。
+// そのため純関数レベルでの検証にとどめる。capture.mjs は import 時に
+// main() を自動実行しない(entrypoint ガード付き)ので import は安全。
+import { nodeMajorVersion, nodeVersionOk, nodeVersionGuardMessage } from "../bin/capture.mjs";
 
 function playwrightResolvable() {
   try {
@@ -78,10 +87,11 @@ function startFixtureServer() {
 // 子プロセスの完了まで止まり、同じプロセス内で待ち受けているフィクスチャ
 // HTTP サーバが接続を捌けなくなる(子の Chromium が goto でタイムアウトする
 // 原因になった実際のバグ)。非同期 spawn + Promise で待つ。
-function runCapture(args, env = {}) {
+function runCapture(args, env = {}, spawnOptions = {}) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [CAPTURE_BIN, ...args], {
       env: { ...process.env, UI_CAPTURE_PLAYWRIGHT: PLAYWRIGHT_PATH, ...env },
+      ...spawnOptions,
     });
     let stdout = "";
     let stderr = "";
@@ -464,4 +474,146 @@ describe("ui-capture bin/capture.mjs", () => {
     assert.match(result.stderr, /起動手段なし/);
     fs.rmSync(emptyDir, { recursive: true, force: true });
   });
+
+  // --- Node バージョンガード(ui-capture の設計 決定点2「Node の版が repo
+  // ごとに違う場合」)------------------------------------------------------
+  // process.version は non-writable なので、実際に古い Node で子プロセスを
+  // spawn してガードを踏ませることができない(このマシンの mise 管理下の
+  // 20.x は bin/ が空の placeholder — ダウンロード済みの実体を持たない)。
+  // 純関数を単体で検証する。
+  describe("node version guard (unit)", () => {
+    test("nodeMajorVersion parses the major from a v-prefixed version", () => {
+      assert.equal(nodeMajorVersion("v22.20.0"), 22);
+      assert.equal(nodeMajorVersion("v26.6.0"), 26);
+      assert.equal(nodeMajorVersion("v9.0.0"), 9);
+      assert.ok(Number.isNaN(nodeMajorVersion("not-a-version")));
+    });
+
+    test("nodeVersionOk rejects below 22, accepts 22+", () => {
+      assert.equal(nodeVersionOk("v21.7.3"), false);
+      assert.equal(nodeVersionOk("v18.20.4"), false);
+      assert.equal(nodeVersionOk("v22.0.0"), true);
+      assert.equal(nodeVersionOk("v26.6.0"), true);
+    });
+
+    test("nodeVersionGuardMessage names bin/ui-capture and $UI_CAPTURE_NODE", () => {
+      const message = nodeVersionGuardMessage("v18.20.4");
+      assert.match(message, /v18\.20\.4/);
+      assert.match(message, /bin\/ui-capture/);
+      assert.match(message, /UI_CAPTURE_NODE/);
+    });
+
+    test("main() returns exit 6 under a version below 22 (process.version is real, so this only runs the guard-adjacent assertion)", () => {
+      // We cannot force this process's own process.version, so this is a
+      // documentation-level assertion that the running test process itself
+      // (Node 22+, per SKILL.md's stated floor) passes the guard — the real
+      // rejection path is covered by the unit tests above.
+      assert.equal(nodeVersionOk(), true, `test runner itself must be Node 22+, got ${process.version}`);
+    });
+  });
+
+  // --- 共有 Playwright の解決順(project → env → shared)-------------------
+  describe("shared playwright resolution", () => {
+    test("resolves via the shared install when project has no node_modules and no env override", async (t) => {
+      if (!resolvable) {
+        t.skip(`playwright not resolvable at ${PLAYWRIGHT_PATH} — set UI_CAPTURE_PLAYWRIGHT`);
+        return;
+      }
+      const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-fakehome-"));
+      const sharedNodeModules = path.join(fakeHome, ".local", "share", "ui-capture", "node_modules");
+      fs.mkdirSync(sharedNodeModules, { recursive: true });
+      fs.symlinkSync(PLAYWRIGHT_PATH, path.join(sharedNodeModules, "playwright"), "dir");
+
+      const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-noshare-project-"));
+      const scenarioPath = path.join(projectDir, "scenario.json");
+      fs.writeFileSync(scenarioPath, JSON.stringify({ steps: [] }));
+
+      const result = await runCapture(
+        ["--url", "http://127.0.0.1:1", "--scenario", scenarioPath, "--out", path.join(projectDir, "out"), "--dry-run"],
+        { HOME: fakeHome, UI_CAPTURE_PLAYWRIGHT: "" },
+        { cwd: projectDir },
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      const summary = JSON.parse(result.stdout);
+      assert.equal(summary.playwright, "shared", result.stdout);
+
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    });
+
+    test("dry-run reports playwright: null when nothing resolves", async () => {
+      const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-fakehome-empty-"));
+      const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-noresolve-project-"));
+      const scenarioPath = path.join(projectDir, "scenario.json");
+      fs.writeFileSync(scenarioPath, JSON.stringify({ steps: [] }));
+
+      const result = await runCapture(
+        ["--url", "http://127.0.0.1:1", "--scenario", scenarioPath, "--out", path.join(projectDir, "out"), "--dry-run"],
+        { HOME: fakeHome, UI_CAPTURE_PLAYWRIGHT: "" },
+        { cwd: projectDir },
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      const summary = JSON.parse(result.stdout);
+      assert.equal(summary.playwright, null, result.stdout);
+
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    });
+  });
+
+  // --- 薄いランチャ(bin/ui-capture)の node 解決 ---------------------------
+  describe("bin/ui-capture launcher", () => {
+    test("resolves node from meta.json in $HOME/.local/share/ui-capture and execs capture.mjs", () => {
+      const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-launcher-home-"));
+      const shareDir = path.join(fakeHome, ".local", "share", "ui-capture");
+      fs.mkdirSync(shareDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(shareDir, "meta.json"),
+        JSON.stringify(
+          {
+            node: process.execPath,
+            nodeVersion: process.version,
+            playwright: "1.61.1",
+            installedAt: new Date().toISOString(),
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = spawnSync(LAUNCHER_BIN, ["--help"], {
+        env: { ...process.env, HOME: fakeHome },
+        encoding: "utf8",
+      });
+      // "--help" is not a recognized capture.mjs flag — reaching its
+      // UsageError (rather than a shell "command not found" or the version
+      // guard's exit 6) proves the launcher resolved meta.json's node and
+      // exec'd capture.mjs with it.
+      assert.equal(result.status, 2, result.stdout + result.stderr);
+      assert.match(result.stderr, /unknown flag: --help/);
+
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    });
+
+    test("falls back to PATH's node when meta.json is absent", () => {
+      const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-launcher-nohome-"));
+      const result = spawnSync(LAUNCHER_BIN, ["--help"], {
+        env: { ...process.env, HOME: fakeHome },
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 2, result.stdout + result.stderr);
+      assert.match(result.stderr, /unknown flag: --help/);
+      fs.rmSync(fakeHome, { recursive: true, force: true });
+    });
+
+    test("$UI_CAPTURE_NODE overrides meta.json", () => {
+      const result = spawnSync(LAUNCHER_BIN, ["--help"], {
+        env: { ...process.env, UI_CAPTURE_NODE: process.execPath, HOME: "/nonexistent-home" },
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 2, result.stdout + result.stderr);
+      assert.match(result.stderr, /unknown flag: --help/);
+    });
+  });
+
 });

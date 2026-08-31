@@ -11,8 +11,39 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
+const SKILL_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// --- Node バージョンガード ---------------------------------------------------
+// Playwright の npm パッケージは純 JS で Node の版に依存しないが、実際に
+// 効くのはこの capture.mjs を実行する Node の版。mise は cwd で Node を
+// 切り替えるため、古い Node を pin した repo の中で直接 `node bin/
+// capture.mjs` すると撮影側もその Node で走ってしまう。bin/ui-capture
+// (薄いランチャ) はこれを避けて harness の Node で再実行するが、直接
+// `node capture.mjs` された場合の保険として、ここでも版を検査する。
+
+const MIN_NODE_MAJOR = 22;
+
+export function nodeMajorVersion(version = process.version) {
+  const match = /^v(\d+)\./.exec(version);
+  return match ? Number(match[1]) : NaN;
+}
+
+export function nodeVersionOk(version = process.version) {
+  const major = nodeMajorVersion(version);
+  return Number.isFinite(major) && major >= MIN_NODE_MAJOR;
+}
+
+export function nodeVersionGuardMessage(version = process.version) {
+  return (
+    `ui-capture requires Node ${MIN_NODE_MAJOR}+ (running under ${version}). ` +
+    "Run via bin/ui-capture (it resolves the Node recorded by bin/setup.mjs " +
+    `in ~/.local/share/ui-capture/meta.json), or set $UI_CAPTURE_NODE to a ` +
+    `Node ${MIN_NODE_MAJOR}+ binary.`
+  );
+}
 
 // --- CLI 引数 -------------------------------------------------------------
 
@@ -103,37 +134,69 @@ class StepError extends Error {
 }
 
 // --- playwright の解決 -----------------------------------------------------
-// 呼び出し元プロジェクトの node_modules から解決する — このスキル自身は
-// playwright を持たない(zero-dependency rule)。$UI_CAPTURE_PLAYWRIGHT で
-// 明示指定も可(テストや、node_modules から辿れない配置向け)。
+// このスキル自身は playwright を持たない(zero-dependency rule)。解決順は
+// 3段階(ADR相当の裁定 — ui-capture の設計 決定点2):
+//   1. 呼び出し元プロジェクトの node_modules — プロジェクトが自分の版を
+//      固定しているなら、それを常に優先する
+//   2. $UI_CAPTURE_PLAYWRIGHT — 明示指定(テストや、node_modules から
+//      辿れない配置向け)
+//   3. 共有インストール(~/.local/share/ui-capture/node_modules/playwright、
+//      bin/setup.mjs が一度だけ用意する)— Node でないプロダクト向けの
+//      最後の手段。使うときは PLAYWRIGHT_BROWSERS_PATH を同ディレクトリ内の
+//      browsers/ に固定してから import する(npm 本体と Chromium の版を
+//      一致させるため — setup.mjs が両方をそこに揃えている)。
+// どれも解決できなければ、bin/setup.mjs を指す明示エラーで exit 3。
+
+const SHARED_DIR = path.join(os.homedir(), ".local", "share", "ui-capture");
+const SHARED_PLAYWRIGHT_MODULE = path.join(SHARED_DIR, "node_modules", "playwright");
+const SHARED_BROWSERS_DIR = path.join(SHARED_DIR, "browsers");
 
 function resolvePlaywright() {
+  // 1. project node_modules
+  try {
+    const resolved = require.resolve("playwright", {
+      paths: [process.cwd()],
+    });
+    return { module: require(resolved), source: "project" };
+  } catch {
+    // fall through to the next source
+  }
+
+  // 2. explicit override
   const override = process.env.UI_CAPTURE_PLAYWRIGHT;
   if (override) {
     const entry = path.isAbsolute(override)
       ? override
       : path.resolve(process.cwd(), override);
     try {
-      return require(entry);
+      return { module: require(entry), source: "env" };
     } catch (error) {
       throw new PlaywrightNotFoundError(
         `UI_CAPTURE_PLAYWRIGHT=${override} could not be required: ${error.message}`,
       );
     }
   }
-  try {
-    const resolved = require.resolve("playwright", {
-      paths: [process.cwd()],
-    });
-    return require(resolved);
-  } catch (error) {
-    throw new PlaywrightNotFoundError(
-      "playwright not found in the project's node_modules and " +
-        "UI_CAPTURE_PLAYWRIGHT is not set. Run this from the project " +
-        "directory (its node_modules must have playwright installed), " +
-        "or set UI_CAPTURE_PLAYWRIGHT=/path/to/node_modules/playwright.",
-    );
+
+  // 3. shared install (bin/setup.mjs)
+  if (fs.existsSync(SHARED_PLAYWRIGHT_MODULE)) {
+    if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+      process.env.PLAYWRIGHT_BROWSERS_PATH = SHARED_BROWSERS_DIR;
+    }
+    try {
+      return { module: require(SHARED_PLAYWRIGHT_MODULE), source: "shared" };
+    } catch (error) {
+      throw new PlaywrightNotFoundError(
+        `shared playwright at ${SHARED_PLAYWRIGHT_MODULE} could not be required: ${error.message}`,
+      );
+    }
   }
+
+  throw new PlaywrightNotFoundError(
+    "playwright not found in the project's node_modules, " +
+      "UI_CAPTURE_PLAYWRIGHT is not set, and there is no shared install at " +
+      `${SHARED_PLAYWRIGHT_MODULE}. Run node ${path.join(SKILL_DIR, "bin", "setup.mjs")} ` +
+      "once per machine, or set UI_CAPTURE_PLAYWRIGHT=/path/to/node_modules/playwright.",
+  );
 }
 
 // --- シナリオの読み込みと検証 -----------------------------------------------
@@ -448,6 +511,11 @@ async function runStep(page, step, index, baseUrl) {
 // --- 本体 -------------------------------------------------------------------
 
 async function main() {
+  if (!nodeVersionOk()) {
+    process.stderr.write(`${nodeVersionGuardMessage()}\n`);
+    return 6;
+  }
+
   const args = parseArgs(process.argv.slice(2));
   const scenario = loadScenario(args.scenario);
 
@@ -465,6 +533,14 @@ async function main() {
   const resolvedUrl = args.url ?? manifest.url;
 
   if (args.dryRun) {
+    // dry-run はシナリオの妥当性だけを見る契約 — playwright が無い環境
+    // でも使えるよう、解決を試みるが失敗しても dry-run 自体は落とさない。
+    let playwrightSource = null;
+    try {
+      playwrightSource = resolvePlaywright().source;
+    } catch {
+      // playwright not resolvable — fine for a dry-run
+    }
     process.stdout.write(
       `${JSON.stringify(
         {
@@ -473,6 +549,7 @@ async function main() {
           manifest: manifestPath,
           steps: scenario.steps.length,
           gif: scenario.gif ? scenario.gif.name : null,
+          playwright: playwrightSource,
         },
         null,
         2,
@@ -492,7 +569,9 @@ async function main() {
   }
 
   try {
-    const { chromium } = resolvePlaywright();
+    const resolvedPlaywright = resolvePlaywright();
+    const { chromium } = resolvedPlaywright.module;
+    const playwrightSource = resolvedPlaywright.source;
     const wantsGif = Boolean(scenario.gif);
     const ffmpegAvailable = wantsGif ? hasFfmpeg() : false;
     let videoDir = null;
@@ -594,6 +673,7 @@ async function main() {
     const summary = {
       url: resolvedUrl,
       launched,
+      playwright: playwrightSource,
       out: args.out,
       files: files.map((f) => ({ kind: f.kind, path: f.path, bytes: f.bytes })),
       gif: gifResult,
@@ -608,26 +688,37 @@ async function main() {
   }
 }
 
-main()
-  .then((code) => {
-    process.exitCode = code ?? 0;
-  })
-  .catch((error) => {
-    if (error instanceof UsageError || error instanceof ScenarioError) {
-      process.stderr.write(`${error.message}\n`);
-      process.exitCode = 2;
-      return;
-    }
-    if (error instanceof PlaywrightNotFoundError) {
-      process.stderr.write(`${error.message}\n`);
-      process.exitCode = 3;
-      return;
-    }
-    if (error instanceof LaunchError) {
-      process.stderr.write(`${error.message}\n`);
-      process.exitCode = 5;
-      return;
-    }
-    process.stderr.write(`${error.stack ?? error.message}\n`);
-    process.exitCode = 1;
-  });
+// import 時に main() を自動実行しない — テストが nodeVersionOk 等の純関数
+// だけを import できるようにするためのエントリポイントガード。
+// `node bin/capture.mjs ...` でも `bin/ui-capture`(node capture.mjs を
+// exec するだけ)でも process.argv[1] はこのファイル自身のパスになるので
+// isMain は true のまま。
+const isMain =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main()
+    .then((code) => {
+      process.exitCode = code ?? 0;
+    })
+    .catch((error) => {
+      if (error instanceof UsageError || error instanceof ScenarioError) {
+        process.stderr.write(`${error.message}\n`);
+        process.exitCode = 2;
+        return;
+      }
+      if (error instanceof PlaywrightNotFoundError) {
+        process.stderr.write(`${error.message}\n`);
+        process.exitCode = 3;
+        return;
+      }
+      if (error instanceof LaunchError) {
+        process.stderr.write(`${error.message}\n`);
+        process.exitCode = 5;
+        return;
+      }
+      process.stderr.write(`${error.stack ?? error.message}\n`);
+      process.exitCode = 1;
+    });
+}
