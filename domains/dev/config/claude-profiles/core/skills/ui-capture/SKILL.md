@@ -25,18 +25,79 @@ macOS アプリ(Tauri のパレット、Swift Core 等)は AppKit / Accessibilit
 
 ## Zero-dependency rule
 
-`node` 単体で動く。追加インストールは一切しない。
+このスキル自身は `node_modules` を持たない。追加インストールはスキルの
+外(マシン共有の1箇所)で完結させる。
 
-- **playwright** は呼び出し元プロジェクトの `node_modules` から解決する
-  (`require.resolve('playwright', { paths: [process.cwd()] })`)。このスキル
-  自身は playwright を持たない。プロジェクトの外から呼ぶ、あるいはテストで
-  固定パスを使いたい場合は環境変数 `UI_CAPTURE_PLAYWRIGHT=/path/to/
-  node_modules/playwright` で上書きできる。どちらでも解決できなければ
-  exit 3(playwright not found)で明確に落ちる。
+- **playwright** は3段階で解決する(この順)。
+  1. 呼び出し元プロジェクトの `node_modules`
+     (`require.resolve('playwright', { paths: [process.cwd()] })`) —
+     プロジェクトが自分の版を固定しているなら常にそれを優先する
+  2. `$UI_CAPTURE_PLAYWRIGHT=/path/to/node_modules/playwright` — 明示指定
+     (テストや、node_modules から辿れない配置向け)
+  3. 共有インストール `~/.local/share/ui-capture/node_modules/playwright`
+     — `bin/setup.mjs` がマシンごとに一度用意する(次節)。Go・Swift 等
+     Node を持たないプロダクトの最後の手段。使うときは
+     `PLAYWRIGHT_BROWSERS_PATH` を同ディレクトリ内の `browsers/` に固定
+     してから import する(npm 本体と Chromium の版を一致させるため)
+  どれも解決できなければ exit 3(playwright not found)で、`bin/setup.mjs`
+  を指す明示エラーとともに落ちる。
 - **ffmpeg** は PATH 上のものを使う(WebM → GIF の 2 パス変換
   `palettegen`/`paletteuse`)。無ければ GIF は静かに失敗させず、要約 JSON に
   `gif: { status: "skipped", reason: "ffmpeg not found on PATH" }` を出して
   exit 0 で終える(PNG は撮れているので致命ではない)。
+
+## 初期設定(マシンごとに一度)
+
+Node でないプロダクトでも撮れるようにするには、マシンごとに一度だけ:
+
+```bash
+node "$SELF/bin/setup.mjs"
+```
+
+`~/.local/share/ui-capture/` に playwright(1.61.1 固定)と Chromium
+(同ディレクトリ内の `browsers/`)を揃える。npm 本体と Chromium の版は
+必ず一致していなければならないので、両方をこの1ディレクトリに閉じて
+setup.mjs だけが書き換える(nix との二重管理はしない — ui-capture の設計
+決定点2)。冪等 — 既に同じ版が入っていれば何もダウンロードし直さない。
+setup 時に使った node の絶対パスと版を `~/.local/share/ui-capture/
+meta.json` に記録する(次節の理由で使う)。
+
+`--upgrade` で版を固定したまま再インストール、`--upgrade --playwright
+<version>` で版を上げて再インストールする(`--playwright` 単独では使えない
+— 誤って野良の版を入れないため)。npm が無い、または Node が22未満なら
+明確なメッセージで落ちる(それぞれ exit 7、exit 6)。
+
+Node がプロジェクトになく共有インストールも使わないプロダクト(このスキル
+自身の開発を含む)では setup.mjs は不要 — `--url` か、プロジェクト自身の
+`node_modules` の playwright で足りる。
+
+## Node の版(`bin/ui-capture` 経由での実行を推奨)
+
+mise は cwd でツールの版を切り替える。古い Node(Playwright がサポートする
+下限は22)を pin した repo の中で `.ui-capture.json` から起動して撮影する
+と、capture.mjs 自身もその古い Node で走ってしまいかねない — アプリの
+dev サーバと撮影プロセスは別プロセスなので結合はしないが、
+**capture.mjs を実行する Node の版**だけは効く。
+
+これを避けるため、薄いランチャ `bin/ui-capture` を経由することを推奨する:
+
+```bash
+"$SELF/bin/ui-capture" --url http://127.0.0.1:PORT --scenario scenario.json --out ./out
+```
+
+`bin/ui-capture` は次の順で node を解決し、それで `capture.mjs` を
+`exec` する:
+
+1. `$UI_CAPTURE_NODE`(明示指定の逃げ道)
+2. `~/.local/share/ui-capture/meta.json` に記録された node(`bin/setup.mjs`
+   が setup 時に記録)
+3. `command -v node`(PATH 上のもの)
+
+`node "$SELF/bin/capture.mjs" ...` と直接叩くことも変わらずできる —
+その場合は呼び出し元の Node がそのまま使われる(cwd が22以上を pin した
+repo なら問題ない)。capture.mjs 自身も起動時に `process.version` を検査し、
+22未満なら `bin/ui-capture` と `$UI_CAPTURE_NODE` を案内して exit 6 で
+落ちる(黙って古い Node では走らない)。
 
 ## 手順
 
@@ -60,10 +121,12 @@ macOS アプリ(Tauri のパレット、Swift Core 等)は AppKit / Accessibilit
 形(対話 CLI 等)のときに向く。
 
 **経路 B — `.ui-capture.json` マニフェストを書き、capture.mjs 自身に
-起動させる。** プロジェクトのルートに1度だけ書けば、以後は capture.mjs が
-起動から後始末まで面倒を見る(「起動する側」も「片付ける側」も自分で
-やる)。書式は次の節。プロジェクトに `.ui-capture.json` が無く、
-`--url` も渡されなければ、capture.mjs は起動を推測せず
+起動させる。** `node "$SELF/bin/capture.mjs" init` で雛形を作れる(見つけた
+`dev`/`start`/`serve` スクリプトを候補提示し、最有力を埋める。実行はしない
+— `url`/`ready` は手で確認して埋める)。プロジェクトのルートに1度だけ
+書けば、以後は capture.mjs が起動から後始末まで面倒を見る(「起動する側」
+も「片付ける側」も自分でやる)。書式は次の節。プロジェクトに
+`.ui-capture.json` が無く、`--url` も渡されなければ、capture.mjs は起動を推測せず
 `起動手段なし: --url か .ui-capture.json を用意する` で exit 2 する —
 これは意図した挙動で、回避しようとせずプロジェクト側にマニフェストを
 足す。
@@ -79,12 +142,15 @@ SAFETY: `headless: false` は絶対に渡さない。`open`、`osascript`、ブ�
 
 ### 3. capture.mjs を実行する
 
+`bin/ui-capture` 経由を推奨する(前節「Node の版」)。`node bin/capture.mjs`
+と直接叩いても、cwd が22以上の Node を pin していれば同じ結果になる。
+
 ```bash
 # 経路 A(--url)
-node "$SELF/bin/capture.mjs" --url http://127.0.0.1:PORT --scenario scenario.json --out ./out
+"$SELF/bin/ui-capture" --url http://127.0.0.1:PORT --scenario scenario.json --out ./out
 
 # 経路 B(.ui-capture.json、--project は省略すると cwd から上へ探す)
-node "$SELF/bin/capture.mjs" --project . --scenario scenario.json --out ./out
+"$SELF/bin/ui-capture" --project . --scenario scenario.json --out ./out
 ```
 
 主なフラグ(すべて省略可、既定値は括弧内): `--project`(`.ui-capture.json`
@@ -97,12 +163,17 @@ node "$SELF/bin/capture.mjs" --project . --scenario scenario.json --out ./out
 確認する)。
 
 標準出力に JSON 要約(撮ったファイル・バイト数・GIF の長さ・
-`launched`(マニフェストから自分で起動したか)・8MB/8s 予算超過の
-warning)を1回だけ出す。exit code: 0=成功、2=引数かシナリオが不正
-(`--url` も `.ui-capture.json` も無い場合を含む)、3=playwright が
-解決できない、4=ステップ実行失敗(どのステップ・どのセレクタで失敗したかを
-stderr に出す)、5=マニフェストの `launch` が readiness まで届かずタイムアウト
-(60秒)、または `launch` コマンド自体が起動できなかった。
+`launched`(マニフェストから自分で起動したか)・`playwright`(解決元 —
+`"project" | "env" | "shared"`)・8MB/8s 予算超過の warning)を1回だけ出す。
+`--dry-run` の要約にも `playwright` は入るが、解決できなくても dry-run 自体
+は落とさない(`null` になるだけ — シナリオの妥当性だけを見る契約のため)。
+
+exit code: 0=成功、2=引数かシナリオが不正(`--url` も `.ui-capture.json` も
+無い場合を含む)、3=playwright が解決できない、4=ステップ実行失敗
+(どのステップ・どのセレクタで失敗したかを stderr に出す)、5=マニフェストの
+`launch` が readiness まで届かずタイムアウト(60秒)、または `launch`
+コマンド自体が起動できなかった、6=実行中の Node が22未満(`bin/ui-capture`
+か `$UI_CAPTURE_NODE` で22以上の node を使う)。
 
 ### 4. writeup へ渡す
 
@@ -161,12 +232,17 @@ fps 10・width 800・目安 8 秒以内にしてある。長いフローは複�
 
 ## プロジェクトマニフェスト(`.ui-capture.json`)
 
-プロジェクトのルートに1つ置く。capture.mjs は `--project`(既定 cwd)から
-上へディレクトリを辿り、最初に見つかった `.ui-capture.json` を使う。
-探索は `.git`(ファイルでもディレクトリでも可)のあるディレクトリで止まる
-— そのディレクトリ自身は調べるが、それより上(別リポジトリ)へは辿らない。
-`.git` に一度も出会わなければ、従来どおり filesystem root まで辿って
-諦める。
+プロジェクトのルートに1つ置く。**commit しない** — dotfiles の global
+gitignore に `.ui-capture.json` が入っているので(`.yoki.json` と同じ扱い)、
+`git status` にも出ない。checkout ごと・マシンごとに1回作る(ui-capture の
+設計 決定点1 — 案A。「repo 外に置く」対案は今回不採用: 同期されない
+`~/.config/work` では別マシンに効かず、A の運用が harness に前例済み)。
+
+capture.mjs は `--project`(既定 cwd)から上へディレクトリを辿り、最初に
+見つかった `.ui-capture.json` を使う。探索は `.git`(ファイルでもディレクトリ
+でも可)のあるディレクトリで止まる — そのディレクトリ自身は調べるが、
+それより上(別リポジトリ)へは辿らない。`.git` に一度も出会わなければ、
+従来どおり filesystem root まで辿って諦める。
 
 ```json
 {
@@ -184,6 +260,24 @@ fps 10・width 800・目安 8 秒以内にしてある。長いフローは複�
 | `ready` | 必須 | 起動完了の判定。文字列なら `launch` の stdout/stderr にその部分文字列が出るまで待つ。`{ "http": "/path" }` なら `url + path` が HTTP 200 を返すまで待つ。どちらもタイムアウトは60秒(exit 5) |
 | `stop` | 任意 | 撮影後に実行する終了コマンド。省略時は `launch` が作ったプロセスグループへ `SIGTERM` を送る(`spawn` を `detached: true` で起動しているため、グループごと止まる) |
 | `env` | 任意 | `launch`/`stop` に追加で渡す環境変数(`process.env` に上書きマージ) |
+
+### 雛形を作る — `capture.mjs init`
+
+新しいプロジェクトで手で書く代わりに:
+
+```bash
+node "$SELF/bin/capture.mjs" init
+# 既にあるものを書き換えるなら:
+node "$SELF/bin/capture.mjs" init --force
+```
+
+repo ルート(cwd から上へ `.git` を探して見つけたディレクトリ。無ければ
+exit 2)に `.ui-capture.json` の雛形を書く。**何も実行しない** — root と
+`apps/*` の `package.json` から `dev`/`start`/`serve` スクリプトを候補として
+拾い、最有力(root の `dev` を最優先)を `launch` に埋めるだけ。`url` と
+`ready` は環境依存で推測できないのでプレースホルダのまま残す — 標準出力
+の候補一覧を見て手で埋める。既に `.ui-capture.json` があれば `--force` を
+付けない限り exit 2 で止まり、上書きしない。
 
 capture.mjs は撮影の成功・失敗を問わず、自分が起動したプロセスを最後に
 必ず止める(`finally` で片付け、常駐プロセスを残さない)。
@@ -205,6 +299,11 @@ capture.mjs は撮影の成功・失敗を問わず、自分が起動したプ�
 - **GIF が長すぎる/大きすぎる** — 1本のシナリオに複数のフローを詰め込んで
   8 秒・8MB を超える。フローごとに `gif.name` を分けて複数回実行する。
 - **playwright が見つからないのに黙ってエラーメッセージだけ見て諦める** —
-  `UI_CAPTURE_PLAYWRIGHT` で明示指定できることを忘れない。
+  プロジェクトに `node_modules` が無いなら `UI_CAPTURE_PLAYWRIGHT` で明示
+  指定するか、`node bin/setup.mjs` を一度実行して共有インストールを使う。
 - **ffmpeg が無い環境で GIF 必須だと思い込む** — スキップは正常系(exit 0)。
   PNG だけでも十分な提出物になることが多い。
+- **古い Node を pin した repo の中で `node bin/capture.mjs` を直接叩く** —
+  `bin/ui-capture` 経由なら harness の Node に固定される。直接叩くなら
+  cwd が22以上を pin していることを確認する(exit 6 が出たら
+  `bin/ui-capture` に切り替える)。
