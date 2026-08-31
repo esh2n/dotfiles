@@ -508,6 +508,122 @@ async function runStep(page, step, index, baseUrl) {
   }
 }
 
+// --- init サブコマンド -------------------------------------------------------
+// `capture.mjs init` は .ui-capture.json の雛形を repo ルートに書く。
+// launch は package.json の dev/start/serve スクリプトから最有力候補を
+// 選んで埋めるが、url は環境依存で推測できないのでプレースホルダのまま
+// 残し、ready も同様。**実行は一切しない** — 起動コマンドを実際に走らせて
+// ポートを推測するようなことはしない(ui-capture の設計 進め方2)。
+
+class ManifestExistsError extends Error {}
+
+const CANDIDATE_SCRIPTS = ["dev", "start", "serve"];
+const SCRIPT_RANK = { dev: 0, start: 1, serve: 2 };
+
+function findRepoRoot(startDir) {
+  let dir = path.resolve(startDir);
+  for (;;) {
+    if (fs.existsSync(path.join(dir, ".git"))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function detectPackageManager(root) {
+  if (fs.existsSync(path.join(root, "pnpm-lock.yaml"))) return "pnpm";
+  if (fs.existsSync(path.join(root, "yarn.lock"))) return "yarn";
+  return "npm";
+}
+
+function scriptCommand(pm, scriptName, subdir) {
+  if (subdir) {
+    if (pm === "pnpm") return `pnpm --dir ${subdir} run ${scriptName}`;
+    if (pm === "yarn") return `yarn --cwd ${subdir} run ${scriptName}`;
+    return `npm run ${scriptName} --prefix ${subdir}`;
+  }
+  if (pm === "pnpm") return `pnpm run ${scriptName}`;
+  if (pm === "yarn") return `yarn run ${scriptName}`;
+  return `npm run ${scriptName}`;
+}
+
+function readPackageScripts(pkgPath) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    return pkg && typeof pkg.scripts === "object" && pkg.scripts !== null ? pkg.scripts : {};
+  } catch {
+    return {};
+  }
+}
+
+// package.json の dev/start/serve スクリプトを repo ルートと apps/* から
+// 集める。実行はしない — 候補として提示するだけ。
+function findLaunchCandidates(root) {
+  const pm = detectPackageManager(root);
+  const candidates = [];
+  const collect = (pkgPath, subdir) => {
+    const scripts = readPackageScripts(pkgPath);
+    for (const name of CANDIDATE_SCRIPTS) {
+      if (typeof scripts[name] === "string") {
+        candidates.push({
+          location: subdir ? path.join(subdir, "package.json") : "package.json",
+          script: name,
+          command: scriptCommand(pm, name, subdir),
+        });
+      }
+    }
+  };
+  collect(path.join(root, "package.json"), null);
+  const appsDir = path.join(root, "apps");
+  if (fs.existsSync(appsDir) && fs.statSync(appsDir).isDirectory()) {
+    for (const entry of fs.readdirSync(appsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      collect(path.join(appsDir, entry.name, "package.json"), path.join("apps", entry.name));
+    }
+  }
+  return candidates;
+}
+
+// root package.json の dev を最有力とし、apps/* より優先する。
+function pickBestCandidate(candidates) {
+  if (candidates.length === 0) return null;
+  return [...candidates].sort((a, b) => {
+    const aRoot = a.location === "package.json" ? 0 : 1;
+    const bRoot = b.location === "package.json" ? 0 : 1;
+    if (aRoot !== bRoot) return aRoot - bRoot;
+    return SCRIPT_RANK[a.script] - SCRIPT_RANK[b.script];
+  })[0];
+}
+
+function runInit(initArgv) {
+  const force = initArgv.includes("--force");
+  const root = findRepoRoot(process.cwd());
+  if (!root) {
+    throw new UsageError("init: no .git found above cwd — run this inside a repo");
+  }
+  const manifestPath = path.join(root, MANIFEST_NAME);
+  if (fs.existsSync(manifestPath) && !force) {
+    throw new ManifestExistsError(`${manifestPath} already exists — pass --force to overwrite`);
+  }
+
+  const candidates = findLaunchCandidates(root);
+  const chosen = pickBestCandidate(candidates);
+  const template = {
+    launch: chosen ? chosen.command : "TODO: fill in the dev/start command",
+    url: "http://127.0.0.1:PORT",
+    ready: "TODO: a substring launch prints when ready, or { \"http\": \"/path\" }",
+  };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(template, null, 2)}\n`);
+
+  process.stdout.write(
+    `${JSON.stringify({ wrote: manifestPath, candidates, chosen }, null, 2)}\n`,
+  );
+  process.stderr.write(
+    `wrote ${manifestPath} — fill in "url" and "ready" before using it (see candidates above)\n`,
+  );
+  return 0;
+}
+
 // --- 本体 -------------------------------------------------------------------
 
 async function main() {
@@ -516,7 +632,12 @@ async function main() {
     return 6;
   }
 
-  const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  if (argv[0] === "init") {
+    return runInit(argv.slice(1));
+  }
+
+  const args = parseArgs(argv);
   const scenario = loadScenario(args.scenario);
 
   // URL の解決: --url があればそれを使う。無ければ .ui-capture.json を
@@ -703,7 +824,11 @@ if (isMain) {
       process.exitCode = code ?? 0;
     })
     .catch((error) => {
-      if (error instanceof UsageError || error instanceof ScenarioError) {
+      if (
+        error instanceof UsageError ||
+        error instanceof ScenarioError ||
+        error instanceof ManifestExistsError
+      ) {
         process.stderr.write(`${error.message}\n`);
         process.exitCode = 2;
         return;

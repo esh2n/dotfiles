@@ -616,4 +616,80 @@ describe("ui-capture bin/capture.mjs", () => {
     });
   });
 
+  // --- init サブコマンド ----------------------------------------------------
+  describe("capture.mjs init", () => {
+    test("writes a manifest template with the best dev/start/serve candidate", () => {
+      // realpathSync: on macOS os.tmpdir() lives under /var, itself a
+      // symlink to /private/var. A child process's own process.cwd() (used
+      // internally by findRepoRoot) reports the resolved /private/var/...
+      // path, so build the expected path the same way to compare strings.
+      const repoDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-init-repo-")));
+      fs.mkdirSync(path.join(repoDir, ".git"));
+      fs.writeFileSync(
+        path.join(repoDir, "package.json"),
+        JSON.stringify({ name: "root", scripts: { dev: "vite", build: "vite build" } }),
+      );
+
+      const result = spawnSync(process.execPath, [CAPTURE_BIN, "init"], {
+        cwd: repoDir,
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+
+      const manifestPath = path.join(repoDir, ".ui-capture.json");
+      assert.ok(fs.existsSync(manifestPath));
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      assert.equal(manifest.launch, "npm run dev");
+      assert.equal(manifest.url, "http://127.0.0.1:PORT");
+      assert.equal(typeof manifest.ready, "string");
+
+      const summary = JSON.parse(result.stdout);
+      assert.equal(summary.wrote, manifestPath);
+      assert.ok(Array.isArray(summary.candidates));
+      assert.equal(summary.chosen.command, "npm run dev");
+
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    });
+
+    test("refuses to overwrite an existing manifest without --force", () => {
+      const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-init-exists-"));
+      fs.mkdirSync(path.join(repoDir, ".git"));
+      fs.writeFileSync(path.join(repoDir, "package.json"), JSON.stringify({ scripts: {} }));
+      fs.writeFileSync(path.join(repoDir, ".ui-capture.json"), JSON.stringify({ sentinel: true }));
+
+      const result = spawnSync(process.execPath, [CAPTURE_BIN, "init"], {
+        cwd: repoDir,
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 2, result.stdout + result.stderr);
+      assert.match(result.stderr, /already exists/);
+      const untouched = JSON.parse(fs.readFileSync(path.join(repoDir, ".ui-capture.json"), "utf8"));
+      assert.deepEqual(untouched, { sentinel: true });
+
+      const forced = spawnSync(process.execPath, [CAPTURE_BIN, "init", "--force"], {
+        cwd: repoDir,
+        encoding: "utf8",
+      });
+      assert.equal(forced.status, 0, forced.stdout + forced.stderr);
+      const overwritten = JSON.parse(fs.readFileSync(path.join(repoDir, ".ui-capture.json"), "utf8"));
+      assert.equal(overwritten.sentinel, undefined);
+
+      fs.rmSync(repoDir, { recursive: true, force: true });
+    });
+
+    test("errors when run outside a git repo", () => {
+      // os.tmpdir() (and its ancestors) are assumed to hold no .git — the
+      // same assumption the pre-existing "no --url and no .ui-capture.json"
+      // test above already relies on for findManifest's upward walk.
+      const noGitDir = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-init-nogit-"));
+      const result = spawnSync(process.execPath, [CAPTURE_BIN, "init"], {
+        cwd: noGitDir,
+        encoding: "utf8",
+      });
+      assert.equal(result.status, 2, result.stdout + result.stderr);
+      assert.match(result.stderr, /no \.git found/);
+      assert.deepEqual(fs.readdirSync(noGitDir), []);
+      fs.rmSync(noGitDir, { recursive: true, force: true });
+    });
+  });
 });
