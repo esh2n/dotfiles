@@ -308,12 +308,77 @@ describe("ui-capture bin/capture.mjs", () => {
         fs.readdirSync(outDir).filter((f) => f.endsWith(".webm")),
         [],
       );
+      // gif + shot with ffmpeg available: the recording is split from the
+      // screenshot pass to keep the video clean (see capture.mjs's twoPass).
+      assert.equal(summary.passes, 2, JSON.stringify(summary));
     } else {
       assert.equal(summary.gif.status, "skipped");
+      // no ffmpeg means no recording is attempted at all — single pass.
+      assert.equal(summary.passes, 1, JSON.stringify(summary));
       t.diagnostic("ffmpeg not on PATH — gif assertions skipped");
     }
 
     fs.rmSync(outDir, { recursive: true, force: true });
+  });
+
+  test("gif-only scenario (no shot steps) runs a single pass", async (t) => {
+    if (!resolvable) {
+      t.skip("playwright not resolvable");
+      return;
+    }
+    const gifOnlyOut = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-gifonly-"));
+    const scenarioPath = path.join(gifOnlyOut, "scenario.json");
+    fs.writeFileSync(
+      scenarioPath,
+      JSON.stringify({
+        steps: [{ goto: "/" }, { click: "#toggle" }, { wait: 200 }],
+        gif: { name: "toggle-only" },
+      }),
+    );
+    const result = await runCapture([
+      "--url",
+      site.url,
+      "--scenario",
+      scenarioPath,
+      "--out",
+      gifOnlyOut,
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+    const summary = JSON.parse(result.stdout);
+    assert.equal(summary.passes, 1, JSON.stringify(summary));
+    if (hasFfmpeg()) {
+      assert.equal(summary.gif.status, "ok", JSON.stringify(summary.gif));
+    }
+    fs.rmSync(gifOnlyOut, { recursive: true, force: true });
+  });
+
+  test("shot-only scenario (no gif) runs a single pass", async (t) => {
+    if (!resolvable) {
+      t.skip("playwright not resolvable");
+      return;
+    }
+    const shotOnlyOut = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-shotonly-"));
+    const scenarioPath = path.join(shotOnlyOut, "scenario.json");
+    fs.writeFileSync(
+      scenarioPath,
+      JSON.stringify({ steps: [{ goto: "/" }, { shot: "only" }] }),
+    );
+    const result = await runCapture([
+      "--url",
+      site.url,
+      "--scenario",
+      scenarioPath,
+      "--out",
+      shotOnlyOut,
+    ]);
+    assert.equal(result.status, 0, result.stderr);
+    const summary = JSON.parse(result.stdout);
+    assert.equal(summary.passes, 1, JSON.stringify(summary));
+    assert.equal(summary.gif, null);
+    const pngPath = path.join(shotOnlyOut, "only.png");
+    assert.ok(fs.existsSync(pngPath), "only.png should exist");
+    assert.ok(isPng(pngPath), "only.png should have PNG magic bytes");
+    fs.rmSync(shotOnlyOut, { recursive: true, force: true });
   });
 
   test("invalid scenario exits 2", async (t) => {

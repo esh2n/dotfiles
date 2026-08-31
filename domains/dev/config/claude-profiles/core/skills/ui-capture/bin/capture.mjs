@@ -508,6 +508,28 @@ async function runStep(page, step, index, baseUrl) {
   }
 }
 
+// --- パス実行 -----------------------------------------------------------
+// シナリオの全ステップを1コンテキスト分流し、PNG を書き出す。
+// skipShots=true のときは shot ステップを丸ごと飛ばす(録画パス専用 —
+// clip の boundingBox 取得すら行わない、置き換えは「何もしない」)。
+// 理由: 録画中に page.screenshot を挟むと Chromium の screencast が
+// 一時停止・再開し、直後の2〜3フレームがサイズ不一致の灰 padding で壊れて
+// GIF に混入する。wait 等のタイミングは変えないので録画の尺は変わらない。
+async function runStepsOnce(page, steps, baseUrl, outDir, { skipShots }) {
+  const files = [];
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index];
+    if (skipShots && "shot" in step) continue;
+    const shotRequest = await runStep(page, step, index, baseUrl);
+    if (shotRequest) {
+      const filePath = path.join(outDir, `${shotRequest.name}.png`);
+      await page.screenshot({ path: filePath, ...shotRequest.options });
+      files.push({ kind: "png", path: filePath, bytes: fs.statSync(filePath).size });
+    }
+  }
+  return files;
+}
+
 // --- init サブコマンド -------------------------------------------------------
 // `capture.mjs init` は .ui-capture.json の雛形を repo ルートに書く。
 // launch は package.json の dev/start/serve スクリプトから最有力候補を
@@ -694,46 +716,81 @@ async function main() {
     const { chromium } = resolvedPlaywright.module;
     const playwrightSource = resolvedPlaywright.source;
     const wantsGif = Boolean(scenario.gif);
+    const hasShotSteps = scenario.steps.some((step) => "shot" in step);
     const ffmpegAvailable = wantsGif ? hasFfmpeg() : false;
     let videoDir = null;
     if (wantsGif && ffmpegAvailable) {
       videoDir = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-video-"));
     }
+    // gif と shot が同居するシナリオは録画パスと静止画パスを2周に分ける。
+    // 録画中の page.screenshot は Chromium の screencast を一時停止・再開
+    // させ、直後の2〜3フレームがサイズ不一致の灰 padding で壊れて GIF に
+    // 混入するため分離する(esh2n 裁定 2026-08-30)。videoDir が無ければ
+    // (gif 指定なし、または ffmpeg 不在)そもそも録画しないので1周のまま。
+    const twoPass = Boolean(videoDir) && hasShotSteps;
 
     // SAFETY: headless: false は絶対に渡さない — 画面を奪うウィンドウを開く。
+    // ブラウザは1個だけ起動して両パスで使い回す(アプリの再起動もしない —
+    // manifest.launch はこの try の外、main() 冒頭で既に1回だけ呼んである)。
     const browser = await chromium.launch();
-    const contextOptions = {
+    const baseContextOptions = {
       viewport: { width: args.width, height: args.height },
       deviceScaleFactor: args.scale,
     };
-    if (args.theme) contextOptions.colorScheme = args.theme;
-    if (videoDir) {
-      contextOptions.recordVideo = { dir: videoDir, size: { width: args.width, height: args.height } };
-    }
+    if (args.theme) baseContextOptions.colorScheme = args.theme;
 
-    const context = await browser.newContext(contextOptions);
-    const page = await context.newPage();
-    // NOTE: セレクタが存在しない失敗ステップを Playwright の既定 30s より
-    // 早く exit 4 にするため、既定タイムアウトを短くしておく(scenario.json
-    // の "wait" ステップはこれとは別の明示待ちなので影響を受けない)。
-    // --timeout で上書き可能(goto や waitFor など timeout を明示しない
-    // 呼び出しはすべてこの既定値に従う — Playwright の仕様)。
-    page.setDefaultTimeout(args.timeout);
-
-    const files = [];
-    const startedAt = Date.now();
+    let files = [];
+    let measuredSeconds = 0;
+    let activeContext = null;
     try {
-      for (let index = 0; index < scenario.steps.length; index += 1) {
-        const step = scenario.steps[index];
-        const shotRequest = await runStep(page, step, index, resolvedUrl);
-        if (shotRequest) {
-          const filePath = path.join(args.out, `${shotRequest.name}.png`);
-          await page.screenshot({ path: filePath, ...shotRequest.options });
-          files.push({ kind: "png", path: filePath, bytes: fs.statSync(filePath).size });
+      if (twoPass) {
+        // パス1(録画): recordVideo 付きコンテキストで shot をスキップして
+        // 全ステップを実行する。
+        const recordContext = await browser.newContext({
+          ...baseContextOptions,
+          recordVideo: { dir: videoDir, size: { width: args.width, height: args.height } },
+        });
+        activeContext = recordContext;
+        const recordPage = await recordContext.newPage();
+        recordPage.setDefaultTimeout(args.timeout);
+        const startedAt = Date.now();
+        await runStepsOnce(recordPage, scenario.steps, resolvedUrl, args.out, { skipShots: true });
+        measuredSeconds = (Date.now() - startedAt) / 1000;
+        await recordContext.close();
+        activeContext = null;
+
+        // パス2(静止画): 同じ viewport/scale/theme のフレッシュな
+        // コンテキストで shot を含む全ステップを実行する。動画は録らない。
+        const shotContext = await browser.newContext(baseContextOptions);
+        activeContext = shotContext;
+        const shotPage = await shotContext.newPage();
+        shotPage.setDefaultTimeout(args.timeout);
+        files = await runStepsOnce(shotPage, scenario.steps, resolvedUrl, args.out, { skipShots: false });
+        await shotContext.close();
+        activeContext = null;
+      } else {
+        const contextOptions = { ...baseContextOptions };
+        if (videoDir) {
+          contextOptions.recordVideo = { dir: videoDir, size: { width: args.width, height: args.height } };
         }
+        const context = await browser.newContext(contextOptions);
+        activeContext = context;
+        const page = await context.newPage();
+        // NOTE: セレクタが存在しない失敗ステップを Playwright の既定 30s
+        // より早く exit 4 にするため、既定タイムアウトを短くしておく
+        // (scenario.json の "wait" ステップはこれとは別の明示待ちなので
+        // 影響を受けない)。--timeout で上書き可能(goto や waitFor など
+        // timeout を明示しない呼び出しはすべてこの既定値に従う —
+        // Playwright の仕様)。
+        page.setDefaultTimeout(args.timeout);
+        const startedAt = Date.now();
+        files = await runStepsOnce(page, scenario.steps, resolvedUrl, args.out, { skipShots: false });
+        measuredSeconds = (Date.now() - startedAt) / 1000;
+        await context.close();
+        activeContext = null;
       }
     } catch (error) {
-      await context.close();
+      if (activeContext) await activeContext.close();
       await browser.close();
       if (error instanceof StepError) {
         process.stderr.write(
@@ -743,9 +800,6 @@ async function main() {
       }
       throw error;
     }
-
-    const measuredSeconds = (Date.now() - startedAt) / 1000;
-    await context.close();
 
     let gifResult = null;
     if (wantsGif) {
@@ -796,6 +850,7 @@ async function main() {
       launched,
       playwright: playwrightSource,
       out: args.out,
+      passes: twoPass ? 2 : 1,
       files: files.map((f) => ({ kind: f.kind, path: f.path, bytes: f.bytes })),
       gif: gifResult,
       warnings,
