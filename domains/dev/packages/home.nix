@@ -37,6 +37,7 @@
     # Git
     git
     gh
+    wrangler # cloudflare workers cli — yoki-artifact deploy/login
     codebase-memory-mcp
     delta
     git-lfs
