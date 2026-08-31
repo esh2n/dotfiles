@@ -382,6 +382,31 @@ check_unit_suites() {
     fi
 }
 
+# This file is the only thing that runs the worker/ and test/ suites, so it is
+# worthless unless the runner actually calls it. Asserted statically rather
+# than by invoking validator.sh, which would re-enter this very suite.
+check_validator_wiring() {
+    local validator="${SCRIPT_DIR}/validator.sh"
+
+    if grep -qE '^\s+yoki-artifact\s*$' "$validator"; then
+        pass "case37: validator.sh runs yoki-artifact in its default (no-args) pass"
+    else
+        fail "case37: validator.sh runs yoki-artifact in its default (no-args) pass"
+    fi
+
+    if grep -qF '"yoki-artifact")' "$validator"; then
+        pass "case38: validator.sh accepts \`validator.sh yoki-artifact\`"
+    else
+        fail "case38: validator.sh accepts \`validator.sh yoki-artifact\`"
+    fi
+
+    if grep -q 'Usage: \$0 .*|yoki-artifact|' "$validator"; then
+        pass "case39: validator.sh usage line lists yoki-artifact"
+    else
+        fail "case39: validator.sh usage line lists yoki-artifact"
+    fi
+}
+
 run_e2e_checks() {
     check_bin_symlink
     check_publish
@@ -390,6 +415,7 @@ run_e2e_checks() {
     check_revoke
     check_secret_gate
     check_unit_suites
+    check_validator_wiring
 }
 
 run_yoki_artifact_checks() {

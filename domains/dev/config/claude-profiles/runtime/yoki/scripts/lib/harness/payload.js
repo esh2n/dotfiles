@@ -65,9 +65,18 @@ function parseApplyPatch(patchText, cwd) {
     if (section.kind === 'Update File') {
       return { tool_name: 'Edit', tool_input: { file_path: absPath } };
     }
-    // Delete File
-    return { tool_name: 'Bash', tool_input: { command: `rm ${absPath}` } };
+    // Delete File. The synthetic command exists so Bash guards can tokenize
+    // it, so it has to be a command a shell would actually parse the way the
+    // patch means: a path with a space or a metacharacter must stay one
+    // argument, not become two words or a substitution.
+    return { tool_name: 'Bash', tool_input: { command: `rm ${shellQuote(absPath)}` } };
   });
+}
+
+/** POSIX single-quoting: everything inside is literal, and an embedded
+ *  single quote is closed, escaped and reopened ('\'' — the standard idiom). */
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
 
 function resolveCodexPath(p, cwd) {
@@ -77,13 +86,29 @@ function resolveCodexPath(p, cwd) {
 }
 
 /** One normalized payload per file for a multi-file patch; a single object
- *  when only one file is touched; `payload:null` + `meta.payloads:[]` for a
- *  patch the parser found no recognizable file sections in (defensive). */
-function buildFanout(payloads) {
+ *  when only one file is touched. An empty list would mean "this tool call
+ *  reaches no hook at all", so `meta.emptyFanout` marks it for the runners —
+ *  the tool-call paths below never produce one (they fall back to a
+ *  conservative single payload instead). */
+function buildFanout(payloads, harness) {
   if (payloads.length === 1) {
-    return { payload: payloads[0], meta: { harness: 'codex' } };
+    return { payload: payloads[0], meta: { harness } };
   }
-  return { payload: null, meta: { harness: 'codex', payloads } };
+  const meta = { harness, payloads };
+  if (payloads.length === 0) meta.emptyFanout = true;
+  return { payload: null, meta };
+}
+
+// A patch body the parser did not recognize must not become zero payloads:
+// zero payloads means no guard hook ever sees the tool call, and both runners
+// read that as "allow". Hand the hooks the call as it actually arrived
+// instead — same tool name, raw input — so a guard matching on tool_name
+// (Bash, apply_patch, edit) still gets its say.
+function warnUnparsedToolInput(harness, toolName) {
+  process.stderr.write(
+    `[harness/payload] ${harness}: could not extract any file from ${toolName} input; ` +
+      'passing the raw tool call to the hooks unchanged\n'
+  );
 }
 
 function normalizeCodex(raw) {
@@ -116,13 +141,17 @@ function normalizeCodex(raw) {
     const patchText =
       raw.tool_input && typeof raw.tool_input.command === 'string' ? raw.tool_input.command : '';
     const sections = parseApplyPatch(patchText, raw.cwd);
+    if (sections.length === 0) {
+      warnUnparsedToolInput('codex', 'apply_patch');
+      return { payload: Object.assign({}, raw), meta: { harness: 'codex' } };
+    }
     const rest = Object.assign({}, raw);
     delete rest.tool_name;
     delete rest.tool_input;
     const payloads = sections.map((s) =>
       Object.assign({}, rest, { tool_name: s.tool_name, tool_input: s.tool_input })
     );
-    return buildFanout(payloads);
+    return buildFanout(payloads, 'codex');
   }
 
   if (toolName === 'collaborationspawn_agent' || toolName === 'spawn_agent') {
@@ -162,10 +191,11 @@ const OMP_TOOL_NAME_MAP = {
   task: 'Task',
 };
 
-/** Ported verbatim from domains/dev/config/omp/extensions/yoki-guard.ts
- *  `editPaths()` — omp's edit tool consumes hashline patches (`[PATH#TAG]`
- *  sections) or, on the apply_patch contract, `*** Update File:` envelopes.
- *  Keep this in sync with that file if the format ever changes there. */
+/** omp's edit tool consumes hashline patches (`[PATH#TAG]` sections) or, on
+ *  the apply_patch contract, `*** Update File:` envelopes. This is the sole
+ *  source of truth for that parse: the omp extension
+ *  (domains/dev/config/omp/extensions/yoki-bridge.ts) deliberately
+ *  reimplements nothing and delegates every tool-call translation here. */
 function ompEditPaths(input) {
   if (typeof input.path === 'string') return [input.path];
   const text = typeof input.input === 'string' ? input.input : '';
@@ -185,7 +215,12 @@ function mapOmpTool(toolName, input) {
     return [{ tool_name: 'Write', tool_input: { file_path: safeInput.path, content: safeInput.content } }];
   }
   if (toolName === 'edit' || toolName === 'apply_patch') {
-    return ompEditPaths(safeInput).map((p) => ({ tool_name: 'Edit', tool_input: { file_path: p } }));
+    const paths = ompEditPaths(safeInput);
+    if (paths.length === 0) {
+      warnUnparsedToolInput('omp', toolName);
+      return [{ tool_name: toolName, tool_input: safeInput }];
+    }
+    return paths.map((p) => ({ tool_name: 'Edit', tool_input: { file_path: p } }));
   }
   if (Object.prototype.hasOwnProperty.call(OMP_TOOL_NAME_MAP, toolName)) {
     return [{ tool_name: OMP_TOOL_NAME_MAP[toolName], tool_input: safeInput }];
@@ -242,10 +277,7 @@ function normalizeOmp(raw) {
       const built = mapped.map((m) =>
         Object.assign({}, base, { tool_name: m.tool_name, tool_input: m.tool_input })
       );
-      if (built.length === 1) {
-        return { payload: built[0], meta: { harness: 'omp' } };
-      }
-      return { payload: null, meta: { harness: 'omp', payloads: built } };
+      return buildFanout(built, 'omp');
     }
 
     case 'session_before_compact':

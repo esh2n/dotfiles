@@ -109,12 +109,17 @@ async function loadCommentContext({ id, store, config, identity }) {
   if (!comment) {
     throw notFound("no_such_comment", "That comment does not exist.");
   }
+  // Same rule as every other entry point: a revoked artifact looks like it
+  // never existed to anyone but the owner. Holding a comment id from before
+  // the revoke must not be a way back in — reply/resolve/seen all land here.
+  // The owner (and the CLI's service identity, which isOwner() covers) still
+  // sees revoked channels, which is what `seen` needs.
   const context = await loadArtifactContext({
     store,
     config,
     identity,
     channel: comment.channel,
-    includeRevoked: true,
+    includeRevoked: isOwner(identity, config.ownerEmail),
   });
   return { comment, ...context };
 }

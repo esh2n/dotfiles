@@ -55,12 +55,31 @@ function stringField(value, field, file) {
   return value.trim();
 }
 
+/** `wrangler dev` serves the Worker over plain http on the loopback interface,
+ *  and that is the only place a cleartext base URL is ever legitimate. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+export function isLoopbackHost(hostname) {
+  return LOOPBACK_HOSTS.has(String(hostname).toLowerCase());
+}
+
 function normalizeBaseUrl(value, source) {
   let url;
   try {
     url = new URL(value);
   } catch {
     throw usageError("bad_base_url", `${source} is not a valid URL: ${value}`);
+  }
+  // Every request to this origin carries the Access service-token pair. Over
+  // plain http that secret is on the wire in the clear, and it is a full
+  // owner credential on the Worker — so http is refused outright except
+  // against loopback, where there is no wire.
+  if (url.protocol === "http:" && !isLoopbackHost(url.hostname)) {
+    throw usageError(
+      "insecure_base_url",
+      `${source} must be an https URL — the Access service token would travel in cleartext: ${value}`,
+      "http:// is accepted only for localhost / 127.0.0.1 (wrangler dev).",
+    );
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw usageError("bad_base_url", `${source} must be an http(s) URL: ${value}`);

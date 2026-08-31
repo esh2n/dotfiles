@@ -28,6 +28,8 @@ import { scanExternalRefs, scanSecrets } from "../bin/lib/scan.mjs";
 import { nodeVersionOk } from "../bin/lib/node-version.mjs";
 import { FALLBACK_HINTS, HINT_LINE_LIMIT, setupHints } from "../bin/lib/cmd-doctor.mjs";
 import { openUrl } from "../bin/lib/open-url.mjs";
+import { cmdWatch, isFatalWatchError } from "../bin/lib/cmd-watch.mjs";
+import { networkError } from "../bin/lib/errors.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const LAUNCHER = path.join(HERE, "..", "bin", "yoki-artifact");
@@ -424,6 +426,31 @@ describe("config and env precedence", () => {
     assert.equal(result.code, 2);
     assert.match(result.stderr, /Cannot reach/);
   });
+
+  // Every request to the base URL carries the Access service-token pair, and
+  // that token is a full owner credential on the Worker. Over plain http it
+  // travels in the clear, so a non-loopback http URL is refused before any
+  // request is built.
+  test("a plain-http base URL is refused before anything is sent", async () => {
+    const before = server.requests.length;
+    const result = await runCli(["list"], { env: credentials({ YOKI_ARTIFACT_URL: "http://artifacts.example.test" }) });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /must be an https URL/);
+    assert.equal(server.requests.length, before, "nothing may reach the network");
+  });
+
+  test("a plain-http base URL in the config file is refused the same way", async () => {
+    writeConfig({ baseUrl: "http://artifacts.example.test", clientId: CLIENT_ID });
+    const result = await runCli(["list"], { env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }) });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /must be an https URL/);
+  });
+
+  test("http on loopback is still allowed, for wrangler dev", async () => {
+    assert.match(server.baseUrl, /^http:\/\/127\.0\.0\.1:/, "the fixture server is the loopback case");
+    const result = await runCli(["list", "--json"]);
+    assert.equal(result.code, 0, result.stderr);
+  });
 });
 
 describe("secretCommand", () => {
@@ -608,6 +635,89 @@ describe("watch --once", () => {
     const result = await runCli(["watch", "--once"]);
     assert.equal(result.code, 1);
     assert.match(result.stderr, /watch needs at least one <channel>/);
+  });
+});
+
+// The long-running mode is driven in-process: a child running forever cannot
+// be asserted on, and the point of these cases is which failures end the loop.
+describe("watch (long-running)", () => {
+  /** Drives cmdWatch until `responses` is exhausted, then ends it with a
+   *  non-CliError, which the loop always treats as fatal. */
+  async function runLoop(responses) {
+    const state = fs.mkdtempSync(path.join(os.tmpdir(), "yoki-watch-"));
+    const printed = [];
+    const warned = [];
+    let call = 0;
+
+    const client = {
+      viewerUrl: (channel) => `https://artifacts.example.test/a/${channel}`,
+      async request() {
+        const next = responses[call++];
+        if (next === undefined) throw new Error("loop-end");
+        if (next instanceof Error) throw next;
+        return { status: 200, body: { comments: next } };
+      },
+    };
+
+    const error = await cmdWatch({
+      client,
+      positionals: ["demo-loop"],
+      flags: { interval: 5 },
+      env: { XDG_STATE_HOME: state },
+      now: () => new Date("2026-08-31T12:00:00.000Z"),
+      print: (line) => printed.push(line),
+      stderr: { write: (line) => warned.push(line) },
+      sleep: async () => {},
+    }).then(
+      () => null,
+      (err) => err,
+    );
+
+    return { error, printed, warned, calls: call };
+  }
+
+  const agentComment = (id) => ({
+    id,
+    channel: "demo-loop",
+    author: "viewer@example.test",
+    body: "please fix the legend",
+    to_agent: true,
+    agent_seen_at: null,
+    resolved_at: null,
+    parent_id: null,
+    created_at: "2026-08-31T11:00:00.000Z",
+  });
+
+  test("a transient poll failure is reported and the loop keeps going", async () => {
+    const { error, printed, warned, calls } = await runLoop([
+      [],
+      networkError("http_502", "artifacts.example.test is having a moment"),
+      [agentComment("late-1")],
+    ]);
+
+    assert.equal(error.message, "loop-end", "only the injected fatal error ends the loop");
+    assert.equal(calls, 4, "the poll after the failure still ran");
+    assert.match(warned.join(""), /having a moment/);
+    assert.equal(printed.length, 1);
+    assert.equal(JSON.parse(printed[0]).comment.id, "late-1");
+  });
+
+  test("an Access rejection ends the watch instead of retrying forever", async () => {
+    const forbidden = networkError("not_shared", "Access rejected the request (403): no");
+    forbidden.status = 403;
+
+    const { error, calls } = await runLoop([[], forbidden]);
+
+    assert.equal(error, forbidden);
+    assert.equal(calls, 2, "no further polls after a permanent refusal");
+  });
+
+  test("isFatalWatchError separates permanent refusals from blips", () => {
+    assert.equal(isFatalWatchError(networkError("http_502", "bad gateway")), false);
+    assert.equal(isFatalWatchError(networkError("unreachable", "timed out")), false);
+    assert.equal(isFatalWatchError(networkError("access_redirect", "not authorised")), true);
+    assert.equal(isFatalWatchError(Object.assign(networkError("nope", "x"), { status: 401 })), true);
+    assert.equal(isFatalWatchError(new Error("something else entirely")), true);
   });
 });
 

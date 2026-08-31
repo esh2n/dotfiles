@@ -95,7 +95,18 @@ describe("d1Store statements", () => {
 
     await store.updateArtifactHead({ channel: "notes", title: "Notes", latestVersion: 2, updatedAt: "t1" });
     assert.match(last(db).sql, /revoked_at = NULL/);
-    assert.deepEqual(last(db).args, ["Notes", 2, "t1", "notes"]);
+    // The last two are the compare-and-swap guard, null here = unconditional.
+    assert.deepEqual(last(db).args, ["Notes", 2, "t1", "notes", null, null]);
+
+    await store.updateArtifactHead({
+      channel: "notes",
+      title: "Notes",
+      latestVersion: 3,
+      updatedAt: "t2",
+      expectedVersion: 2,
+    });
+    assert.match(last(db).sql, /\(\? IS NULL OR latest_version = \?\)/);
+    assert.deepEqual(last(db).args, ["Notes", 3, "t2", "notes", 2, 2]);
 
     await store.setRevokedAt("notes", "t2");
     assert.deepEqual(last(db).args, ["t2", "t2", "notes"]);

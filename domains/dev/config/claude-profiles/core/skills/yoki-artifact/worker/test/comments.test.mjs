@@ -276,3 +276,46 @@ describe("reply, resolve and seen", () => {
     );
   });
 });
+
+describe("revocation closes the comment endpoints too", () => {
+  /** A revoked artifact whose viewer list was never cleared — exactly what
+   *  `yoki-artifact revoke` leaves behind. */
+  function revoked(comments = [rootComment]) {
+    const store = seeded(comments);
+    store._artifacts.set("notes", {
+      ...store._artifacts.get("notes"),
+      revoked_at: "2026-08-31T11:45:00.000Z",
+    });
+    return store;
+  }
+
+  test("a viewer holding a comment id cannot reply after a revoke", async () => {
+    await assert.rejects(
+      handleReplyComment({
+        request: jsonRequest({ body: "still here" }),
+        params: { id: "c1" },
+        identity: viewer,
+        config,
+        store: revoked(),
+        now: NOW,
+      }),
+      (err) => err.status === 404,
+    );
+  });
+
+  test("a viewer cannot resolve their own comment after a revoke", async () => {
+    await assert.rejects(
+      handleResolveComment({ params: { id: "c1" }, identity: viewer, config, store: revoked(), now: NOW }),
+      (err) => err.status === 404,
+    );
+  });
+
+  test("the owner and the CLI service token still reach a revoked artifact's comments", async () => {
+    const store = revoked();
+    const { comment } = await handleSeenComment({ params: { id: "c1" }, identity: service, config, store, now: NOW });
+    assert.equal(comment.agent_seen_at, NOW.toISOString());
+
+    const resolved = await handleResolveComment({ params: { id: "c1" }, identity: owner, config, store, now: NOW });
+    assert.equal(resolved.comment.resolved_by, OWNER_EMAIL);
+  });
+});

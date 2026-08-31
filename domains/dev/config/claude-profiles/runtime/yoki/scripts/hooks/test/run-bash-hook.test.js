@@ -168,3 +168,31 @@ test('bash syntax error fails open: stderr warning, exit 0, no stdout', () => {
     fs.unlinkSync(badHook);
   }
 });
+
+// ---------------------------------------------------------------------------
+// an unrecognized patch body must still reach the guard
+// ---------------------------------------------------------------------------
+
+test('codex apply_patch with an unparseable body still runs the hook once', () => {
+  const result = runBashHook('codex', {
+    hook_event_name: 'PreToolUse',
+    session_id: 'sess-codex-opaque',
+    cwd: process.cwd(),
+    tool_name: 'apply_patch',
+    tool_input: { command: 'this is not a patch envelope' }
+  });
+
+  // git-guard has no opinion on a non-Bash call, so the verdict is silence —
+  // what matters is that the runner did not skip the hook outright, which it
+  // announces on stderr when the normalizer can make nothing of the body.
+  assert.equal(result.status, 0);
+  assert.match(result.stderr, /could not extract any file from apply_patch input/);
+});
+
+// ---------------------------------------------------------------------------
+// this file is an executable, not a library
+// ---------------------------------------------------------------------------
+
+test('run-bash-hook.js exports nothing — every caller spawns it', () => {
+  assert.deepEqual(Object.keys(require(RUN_BASH_HOOK)), []);
+});

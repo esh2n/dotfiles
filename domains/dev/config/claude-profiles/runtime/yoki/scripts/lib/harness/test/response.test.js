@@ -377,3 +377,104 @@ test('combineDecisions: ignores null/non-object entries defensively', () => {
   assert.equal(combined.blocked, true);
   assert.equal(combined.reason, 'x');
 });
+
+// --- non-blocking verdicts survive the combine. `permissionDecision: 'allow'`
+// is a real Claude hook verdict (auto-approve), and it used to be read only
+// off blocking decisions, so an allowing hook was silently downgraded to
+// "no opinion" everywhere the combine round-trip runs. ---
+
+test('combineDecisions: an explicit non-blocking allow is carried, not dropped', () => {
+  const combined = combineDecisions([
+    { blocked: false, permissionDecision: 'allow', reason: 'pre-approved by policy' },
+    { blocked: false, additionalContext: 'hook B ran' },
+  ]);
+
+  assert.equal(combined.blocked, false);
+  assert.equal(combined.permissionDecision, 'allow');
+  assert.equal(combined.reason, 'pre-approved by policy');
+  assert.equal(combined.additionalContext, 'hook B ran');
+});
+
+test('combineDecisions: ask outranks allow among non-blocking verdicts', () => {
+  const combined = combineDecisions([
+    { blocked: false, permissionDecision: 'allow', reason: 'fine by me' },
+    { blocked: false, permissionDecision: 'ask', reason: 'check with the human' },
+    { blocked: false, permissionDecision: 'allow', reason: 'also fine' },
+  ]);
+
+  assert.equal(combined.blocked, false);
+  assert.equal(combined.permissionDecision, 'ask');
+  assert.equal(combined.reason, 'check with the human');
+});
+
+test('combineDecisions: a deny still beats any non-blocking allow', () => {
+  const combined = combineDecisions([
+    { blocked: false, permissionDecision: 'allow', reason: 'fine by me' },
+    { blocked: true, permissionDecision: 'deny', reason: 'absolutely not' },
+  ]);
+
+  assert.equal(combined.blocked, true);
+  assert.equal(combined.permissionDecision, 'deny');
+  assert.equal(combined.reason, 'absolutely not');
+});
+
+test('translateResponse: a non-blocking allow reaches the canonical decision', () => {
+  const stdout = JSON.stringify({
+    hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow', permissionDecisionReason: 'ok' },
+  });
+  const result = translateResponse({ stdout, exitCode: 0, stderr: '', event: 'PreToolUse' }, 'codex');
+
+  assert.equal(result.decision.blocked, false);
+  assert.equal(result.decision.permissionDecision, 'allow');
+  assert.equal(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision, 'allow');
+});
+
+// --- an input rewrite with no verdict attached is still a rewrite ---
+
+test('codex: updatedInput is rendered even with no verdict, only context, beside it', () => {
+  const stdout = JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      additionalContext: 'rewrote the command',
+      updatedInput: { command: 'echo safe' },
+    },
+  });
+  const result = translateResponse({ stdout, exitCode: 0, stderr: '', event: 'PreToolUse' }, 'codex');
+  const hso = JSON.parse(result.stdout).hookSpecificOutput;
+
+  assert.equal(hso.additionalContext, 'rewrote the command');
+  assert.deepEqual(hso.updatedInput, { command: 'echo safe' });
+  assert.deepEqual(result.decision.updatedInput, { command: 'echo safe' });
+});
+
+test('combineDecisions: updatedInput survives alongside a plain context entry', () => {
+  const combined = combineDecisions([
+    { blocked: false, additionalContext: 'note' },
+    { blocked: false, updatedInput: { command: 'echo safe' } },
+  ]);
+
+  assert.deepEqual(combined.updatedInput, { command: 'echo safe' });
+});
+
+// --- plain-text stdout survives into the canonical decision, so a caller that
+// combines and re-renders (run-with-flags.js) can still get it back ---
+
+test("the canonical decision carries a hook's plain-text stdout", () => {
+  const result = translateResponse(
+    { stdout: 'remember: the deploy freeze is on', exitCode: 0, stderr: '', event: 'SessionStart' },
+    'codex'
+  );
+
+  assert.equal(result.decision.plainText, 'remember: the deploy freeze is on');
+  assert.equal(result.stdout, 'remember: the deploy freeze is on');
+});
+
+test('combineDecisions: plain-text stdout is concatenated in order', () => {
+  const combined = combineDecisions([
+    { blocked: false, plainText: 'first note' },
+    { blocked: false },
+    { blocked: false, plainText: 'second note' },
+  ]);
+
+  assert.equal(combined.plainText, 'first note\nsecond note');
+});

@@ -16,7 +16,7 @@ import { usageError } from "./errors.mjs";
 export const DEFAULT_INTERVAL_SECONDS = 30;
 export const MIN_INTERVAL_SECONDS = 5;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const realSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function watchChannels(positionals) {
   if (positionals.length === 0) {
@@ -55,7 +55,32 @@ async function pollOnce({ client, channels, file, now }) {
   return Object.freeze(written);
 }
 
-export async function cmdWatch({ client, positionals, flags, env, now = () => new Date(), print }) {
+/**
+ * Which failures end a long-running watch. Anything Access or the CLI itself
+ * refuses is permanent — retrying it every 30s just hides it — while a
+ * timeout, a 5xx or a rate limit is exactly what a poll loop is supposed to
+ * ride out. `access_redirect` is a service token that is not authorised for
+ * this app: permanent, even though it arrives as a redirect.
+ */
+export function isFatalWatchError(error) {
+  if (!error || typeof error !== "object") return true;
+  if (error.name !== "CliError") return true;
+  if (error.code === "access_redirect") return true;
+  return error.status === 401 || error.status === 403;
+}
+
+export async function cmdWatch({
+  client,
+  positionals,
+  flags,
+  env,
+  now = () => new Date(),
+  print,
+  stderr,
+  // Injected for the same reason `now` is: the loop's failure handling has to
+  // be testable without waiting out a real poll interval.
+  sleep = realSleep,
+}) {
   const channels = watchChannels(positionals);
   const interval = watchInterval(flags);
   const file = inboxPath(env);
@@ -75,9 +100,20 @@ export async function cmdWatch({ client, positionals, flags, env, now = () => ne
   // Long-running mode: print each entry as it arrives rather than accumulating
   // a result nobody would ever see.
   for (const entry of first) print(JSON.stringify(entry));
+  const warn = (line) => stderr?.write?.(`${line}\n`);
   for (;;) {
     await sleep(interval * 1000);
-    const entries = await pollOnce({ client, channels, file, now });
+    let entries;
+    try {
+      entries = await pollOnce({ client, channels, file, now });
+    } catch (error) {
+      // A blip must not end the watch: the SessionStart hook only ever reads
+      // the inbox file, so a dead watcher looks exactly like "no new
+      // comments" and unread comments stop arriving silently.
+      if (isFatalWatchError(error)) throw error;
+      warn(`watch: ${error.message} — retrying in ${interval}s`);
+      continue;
+    }
     for (const entry of entries) print(JSON.stringify(entry));
   }
 }

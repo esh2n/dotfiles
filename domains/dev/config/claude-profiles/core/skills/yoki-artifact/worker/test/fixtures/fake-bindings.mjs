@@ -36,9 +36,13 @@ export function fakeStore(seed = {}) {
       if (artifacts.has(row.channel)) throw new Error(`duplicate artifact ${row.channel}`);
       artifacts.set(row.channel, { revoked_at: null, ...row });
     },
-    async updateArtifactHead({ channel, title, latestVersion, updatedAt }) {
+    // Mirrors the D1 compare-and-swap: with `expectedVersion` set, the head
+    // only moves while it still holds that version, and the return value says
+    // whether it did.
+    async updateArtifactHead({ channel, title, latestVersion, updatedAt, expectedVersion = null }) {
       const current = artifacts.get(channel);
       if (!current) throw new Error(`no artifact ${channel}`);
+      if (expectedVersion !== null && current.latest_version !== expectedVersion) return false;
       artifacts.set(channel, {
         ...current,
         title,
@@ -46,6 +50,7 @@ export function fakeStore(seed = {}) {
         updated_at: updatedAt,
         revoked_at: null,
       });
+      return true;
     },
     async setRevokedAt(channel, revokedAt) {
       const current = artifacts.get(channel);

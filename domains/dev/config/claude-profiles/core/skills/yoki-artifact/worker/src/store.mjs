@@ -8,9 +8,12 @@
 //   Store
 //     getArtifact(channel)                  -> row | null
 //     listArtifacts()                       -> row[]  (+ unread_agent_comments)
-//     insertArtifact(row)                   -> void
-//     updateArtifactHead({channel, title, latestVersion, updatedAt})
-//                                              sets head + clears revoked_at
+//     insertArtifact(row)                   -> void  (throws on duplicate)
+//     updateArtifactHead({channel, title, latestVersion, updatedAt,
+//                         expectedVersion})    -> boolean: sets head + clears
+//                                              revoked_at, only while the head
+//                                              still equals expectedVersion
+//                                              (null = unconditional)
 //     setRevokedAt(channel, revokedAt)      -> void
 //     getVersion(channel, version)          -> row | null
 //     listVersions(channel)                 -> row[]  (newest first)
@@ -30,7 +33,7 @@
 //
 // D1 access is always through bound parameters — no string interpolation.
 
-import { badRequest, misconfigured, tooLarge } from "./http.mjs";
+import { badRequest, conflict, misconfigured, tooLarge } from "./http.mjs";
 
 /** Channel names live in URLs and R2 keys, so keep them boring. */
 export const CHANNEL_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
@@ -113,15 +116,21 @@ export function d1Store(db) {
         .bind(row.channel, row.title, row.owner, row.latest_version, row.created_at, row.updated_at)
         .run();
     },
-    async updateArtifactHead({ channel, title, latestVersion, updatedAt }) {
-      await db
+    // `expectedVersion` makes this a compare-and-swap: the UPDATE only lands
+    // while the head still holds the version the caller read. That single
+    // statement is what serializes two concurrent publishes to one channel —
+    // D1 has no interactive transaction to wrap the read and the write in.
+    // Returns whether a row actually moved.
+    async updateArtifactHead({ channel, title, latestVersion, updatedAt, expectedVersion = null }) {
+      const result = await db
         .prepare(
           `UPDATE artifacts
               SET title = ?, latest_version = ?, updated_at = ?, revoked_at = NULL
-            WHERE channel = ?`,
+            WHERE channel = ? AND (? IS NULL OR latest_version = ?)`,
         )
-        .bind(title, latestVersion, updatedAt, channel)
+        .bind(title, latestVersion, updatedAt, channel, expectedVersion, expectedVersion)
         .run();
+      return (result?.meta?.changes ?? 1) > 0;
     },
     async setRevokedAt(channel, revokedAt) {
       await db
@@ -266,8 +275,37 @@ export async function publishVersion({ store, blobs, channel, html, title, label
     }
   }
 
+  // Claim the version number before writing anything under it. Two publishes
+  // racing on one channel both read the same `latest_version`, so the claim —
+  // a conditional UPDATE, or the artifacts primary key for a brand-new
+  // channel — is what decides which one owns `version`. The loser is told so
+  // (409) instead of overwriting the winner's R2 object with bytes the
+  // surviving versions row does not describe.
   const version = existing ? existing.latest_version + 1 : 1;
-  // R2 first: a versions row must never point at a missing object.
+  if (existing) {
+    const claimed = await store.updateArtifactHead({
+      channel,
+      title: cleanTitle ?? existing.title,
+      latestVersion: version,
+      updatedAt: at,
+      expectedVersion: existing.latest_version,
+    });
+    if (!claimed) throw versionConflict(channel, version);
+  } else {
+    try {
+      await store.insertArtifact({
+        channel,
+        title: cleanTitle ?? channel,
+        owner,
+        latest_version: version,
+        created_at: at,
+        updated_at: at,
+      });
+    } catch {
+      throw versionConflict(channel, version);
+    }
+  }
+
   await blobs.put(objectKey(channel, version), bytes, { sha256: sha });
   await store.insertVersion({
     channel,
@@ -278,22 +316,13 @@ export async function publishVersion({ store, blobs, channel, html, title, label
     note: cleanText(note, LIMITS.note),
     created_at: at,
   });
-  if (existing) {
-    await store.updateArtifactHead({
-      channel,
-      title: cleanTitle ?? existing.title,
-      latestVersion: version,
-      updatedAt: at,
-    });
-  } else {
-    await store.insertArtifact({
-      channel,
-      title: cleanTitle ?? channel,
-      owner,
-      latest_version: version,
-      created_at: at,
-      updated_at: at,
-    });
-  }
   return Object.freeze({ channel, version, unchanged: false, sha256: sha, bytes: bytes.byteLength });
+}
+
+function versionConflict(channel, version) {
+  return conflict(
+    "version_conflict",
+    "Another publish to this artifact landed first; re-read the current version and publish again.",
+    `channel=${channel} version=${version}`,
+  );
 }

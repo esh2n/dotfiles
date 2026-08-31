@@ -21,8 +21,9 @@
  *     tool_result, session_stop, before_agent_start, session_before_compact).
  *
  * combineDecisions() merges several canonical decisions (one per hook that
- * fired for the same event) for the T1 fan-out case: first deny wins,
- * additionalContext is concatenated.
+ * fired for the same event) for the T1 fan-out case: first deny wins, an
+ * explicit non-blocking 'ask' outranks an explicit 'allow', and
+ * additionalContext / plain-text stdout are concatenated.
  */
 
 'use strict';
@@ -123,6 +124,11 @@ function mapAskForExec(effects, harnessName) {
   return { ...effects, permissionDecision: 'deny', blocked: true, reason };
 }
 
+// `plainText` rides along on the canonical decision because Claude Code's
+// convention for SessionStart/UserPromptSubmit is that a hook's *non-JSON*
+// stdout is added to the model's context verbatim. A caller that combines
+// several decisions and re-renders them (run-with-flags.js's fan-out path)
+// has no other way to get that text back.
 function toCanonicalDecision(effects) {
   return {
     blocked: effects.blocked,
@@ -132,6 +138,7 @@ function toCanonicalDecision(effects) {
     updatedInput: effects.updatedInput,
     systemMessage: effects.systemMessage,
     suppressOutput: effects.suppressOutput,
+    plainText: effects.plainText,
   };
 }
 
@@ -149,8 +156,12 @@ function buildCodexPayload(effects) {
   } else if (effects.jsonStopBlocked) {
     payload.decision = 'block';
     if (effects.reason) payload.reason = effects.reason;
-  } else if (effects.additionalContext) {
-    payload.hookSpecificOutput = { hookEventName: effects.event, additionalContext: effects.additionalContext };
+  } else if (effects.additionalContext || effects.updatedInput) {
+    payload.hookSpecificOutput = { hookEventName: effects.event };
+    if (effects.additionalContext) payload.hookSpecificOutput.additionalContext = effects.additionalContext;
+    // An input rewrite with no verdict attached is still a rewrite; dropping
+    // it would silently run the tool call the hook meant to change.
+    if (effects.updatedInput) payload.hookSpecificOutput.updatedInput = effects.updatedInput;
   }
 
   if (effects.systemMessage) payload.systemMessage = effects.systemMessage;
@@ -263,10 +274,21 @@ function translateResponse(input, harness) {
   };
 }
 
+// Non-blocking verdicts still have to be ranked against each other: 'ask' is
+// the more conservative of the two, so one hook asking beats another allowing.
+// A blocking 'deny' is handled separately and outranks both.
+const NON_BLOCKING_RANK = { allow: 1, ask: 2 };
+
 /**
  * Combines the canonical `decision` of several hooks that fired for the same
  * event (T1 fan-out): the first blocking decision wins, and every non-empty
  * additionalContext is concatenated in order with '\n'.
+ *
+ * A hook may also emit an explicit *non-blocking* verdict —
+ * `permissionDecision: 'allow'` (auto-approve) or `'ask'` — which is a real
+ * decision, not the absence of one. Those are carried too (most conservative
+ * wins) so the rebuilt harness output can forward them instead of degrading
+ * them into "no opinion".
  *
  * @param {object[]} list
  * @returns {object} canonical decision
@@ -282,16 +304,21 @@ function combineDecisions(list) {
     updatedInput: undefined,
     systemMessage: undefined,
     suppressOutput: undefined,
+    plainText: undefined,
   };
 
   const contexts = [];
   const systemMessages = [];
+  const plainTexts = [];
+  let nonBlocking;
+  let nonBlockingReason;
 
   for (const decision of decisions) {
     if (!decision || typeof decision !== 'object') continue;
 
     if (nonEmptyString(decision.additionalContext)) contexts.push(decision.additionalContext);
     if (nonEmptyString(decision.systemMessage)) systemMessages.push(decision.systemMessage);
+    if (nonEmptyString(decision.plainText)) plainTexts.push(decision.plainText);
     if (decision.updatedInput && typeof decision.updatedInput === 'object') {
       combined.updatedInput = decision.updatedInput; // last writer wins
     }
@@ -301,11 +328,26 @@ function combineDecisions(list) {
       combined.blocked = true;
       combined.reason = decision.reason;
       combined.permissionDecision = decision.permissionDecision || 'deny';
+      continue;
     }
+
+    if (!decision.blocked && Object.prototype.hasOwnProperty.call(NON_BLOCKING_RANK, decision.permissionDecision)) {
+      const rank = NON_BLOCKING_RANK[decision.permissionDecision];
+      if (nonBlocking === undefined || rank > NON_BLOCKING_RANK[nonBlocking]) {
+        nonBlocking = decision.permissionDecision;
+        nonBlockingReason = decision.reason;
+      }
+    }
+  }
+
+  if (!combined.blocked && nonBlocking !== undefined) {
+    combined.permissionDecision = nonBlocking;
+    if (nonEmptyString(nonBlockingReason)) combined.reason = nonBlockingReason;
   }
 
   if (contexts.length > 0) combined.additionalContext = contexts.join('\n');
   if (systemMessages.length > 0) combined.systemMessage = systemMessages.join('\n');
+  if (plainTexts.length > 0) combined.plainText = plainTexts.join('\n');
 
   return combined;
 }

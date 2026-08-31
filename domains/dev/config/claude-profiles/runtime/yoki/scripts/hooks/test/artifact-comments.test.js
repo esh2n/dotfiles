@@ -84,8 +84,11 @@ test('SessionStart reports unread comments as hookSpecificOutput.additionalConte
   const result = runWith(state, { hook_event_name: 'SessionStart' });
   const out = contextOf(result);
   assert.equal(out.hookEventName, 'SessionStart');
-  assert.match(out.additionalContext, /^yoki-artifact: 1 unread comment on design-doc$/m);
-  assert.match(out.additionalContext, /alice@example\.test: please add the rollback plan \(id c1\)/);
+  assert.match(out.additionalContext, /^yoki-artifact: 1 unread comment on design-doc\./m);
+  assert.match(
+    out.additionalContext,
+    /<untrusted-comment author="alice@example\.test" id="c1">please add the rollback plan<\/untrusted-comment>/
+  );
   assert.match(out.additionalContext, /yoki-artifact reply <channel> <id>/);
   assert.match(out.additionalContext, /yoki-artifact seen <channel> <id>/);
 });
@@ -121,8 +124,8 @@ test('the cursor advances so the same comment is not announced twice', () => {
   appendInbox(state, [entry('c3', { channel: 'retry-policy', body: 'one more' })]);
   const second = contextOf(runWith(state, { hook_event_name: 'UserPromptSubmit' }));
   assert.match(second.additionalContext, /1 unread comment on retry-policy/);
-  assert.match(second.additionalContext, /\(id c3\)/);
-  assert.ok(!second.additionalContext.includes('id c1'));
+  assert.match(second.additionalContext, /id="c3"/);
+  assert.ok(!second.additionalContext.includes('id="c1"'));
   assert.equal(readCursorFile(state).delivered, 3);
 });
 
@@ -133,12 +136,12 @@ test('at most 5 comments are quoted, but the count and the cursor cover them all
   writeInbox(state, many);
 
   const out = contextOf(runWith(state, { hook_event_name: 'SessionStart' }));
-  const quoted = out.additionalContext.split('\n').filter(l => /\(id c\d+\)/.test(l));
+  const quoted = out.additionalContext.split('\n').filter(l => /id="c\d+"/.test(l));
   assert.equal(quoted.length, hook.MAX_SHOWN);
   assert.match(out.additionalContext, /8 unread comments/);
   // newest first
-  assert.match(quoted[0], /\(id c8\)/);
-  assert.match(quoted[4], /\(id c4\)/);
+  assert.match(quoted[0], /id="c8"/);
+  assert.match(quoted[4], /id="c4"/);
   assert.match(out.additionalContext, /… 3 older/);
   assert.equal(readCursorFile(state).delivered, 8);
 });
@@ -154,7 +157,7 @@ test('a long body is truncated', () => {
   const state = freshState();
   writeInbox(state, [entry('c1', { body: 'x'.repeat(500) })]);
   const out = contextOf(runWith(state, { hook_event_name: 'SessionStart' }));
-  const line = out.additionalContext.split('\n').find(l => l.includes('(id c1)'));
+  const line = out.additionalContext.split('\n').find(l => l.includes('id="c1"'));
   assert.ok(line.includes('…'));
   assert.ok(line.length < 300, line.length);
 });
@@ -165,7 +168,7 @@ test('a truncated final line does not cost the entries that parsed', () => {
   fs.appendFileSync(file, '{"channel":"design-doc","comm\n', 'utf8');
   const out = contextOf(runWith(state, { hook_event_name: 'SessionStart' }));
   assert.match(out.additionalContext, /1 unread comment/);
-  assert.match(out.additionalContext, /\(id c1\)/);
+  assert.match(out.additionalContext, /id="c1"/);
 });
 
 test('a cursor pointing past the end of a truncated log resets instead of skipping everything', () => {

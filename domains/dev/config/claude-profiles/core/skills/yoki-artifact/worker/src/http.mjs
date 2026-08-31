@@ -20,6 +20,7 @@ export const badRequest = (code, message, detail = null) => new HttpError(400, c
 export const unauthorized = (code, message, detail = null) => new HttpError(401, code, message, detail);
 export const forbidden = (code, message, detail = null) => new HttpError(403, code, message, detail);
 export const notFound = (code, message, detail = null) => new HttpError(404, code, message, detail);
+export const conflict = (code, message, detail = null) => new HttpError(409, code, message, detail);
 export const tooLarge = (code, message, detail = null) => new HttpError(413, code, message, detail);
 export const rateLimited = (code, message, detail = null) => new HttpError(429, code, message, detail);
 export const misconfigured = (message, detail = null) => new HttpError(500, "misconfigured", message, detail);

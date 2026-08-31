@@ -103,21 +103,17 @@ function exitWithStdout(text, exitCode) {
   process.stdout.write(text, () => process.exit(exitCode));
 }
 
-// `opts.emitStderr` (default true) preserves the original side effect of
-// flushing `output.stderr` to this process's real stderr immediately; the
-// non-Claude harness bridge passes `false` so it can hold the text and feed
-// it through translateResponse instead (the returned `stderr` field carries
-// it either way).
-function resolveHookResult(raw, output, opts = {}) {
-  const emitStderr = opts.emitStderr !== false;
-
+// Normalizes whatever a hook's run() returned into {stdout, exitCode, stderr}.
+// The stderr text is returned rather than written here, so the caller decides
+// whether it goes straight to this process's stderr (the Claude path) or
+// through translateResponse first (the non-Claude harness bridge).
+function resolveHookResult(raw, output) {
   if (typeof output === 'string' || Buffer.isBuffer(output)) {
     return { stdout: String(output), exitCode: 0, stderr: '' };
   }
 
   if (output && typeof output === 'object') {
     const stderrText = typeof output.stderr === 'string' ? output.stderr : '';
-    if (emitStderr) writeStderr(output.stderr);
     const exitCode = Number.isInteger(output.exitCode) ? output.exitCode : 0;
 
     if (Object.prototype.hasOwnProperty.call(output, 'additionalContext')) {
@@ -167,9 +163,10 @@ function withTempEnv(extraEnv, fn) {
 }
 
 // Runs one hook invocation (require() fast path or legacy spawnSync) against
-// an already Claude-shaped payload, mirroring the claude-path execution below
-// but returning {stdout, exitCode, stderr} instead of writing/exiting, so the
-// non-Claude harness bridge can translate the result before emitting it.
+// an already Claude-shaped payload and returns {stdout, exitCode, stderr}
+// instead of writing/exiting. Both entry points use it — the Claude path
+// writes the result out directly, the non-Claude harness bridge translates it
+// first — so the invocation mechanics exist exactly once.
 function runHookOnce(rawForHook, ctx) {
   const { hookModule, hasRunExport, hookId, pluginRoot, scriptPath, truncated, extraEnv } = ctx;
 
@@ -183,7 +180,7 @@ function runHookOnce(rawForHook, ctx) {
           truncated,
           maxStdin: MAX_STDIN
         });
-        return resolveHookResult(rawForHook, output, { emitStderr: false });
+        return resolveHookResult(rawForHook, output);
       } catch (runErr) {
         process.stderr.write(`[Hook] run() error for ${hookId}: ${runErr.message}\n`);
         return { stdout: rawForHook, exitCode: 0, stderr: '' };
@@ -212,10 +209,11 @@ function runHookOnce(rawForHook, ctx) {
 
   if (result.error || result.signal || result.status === null) {
     const failureDetail = result.error ? result.error.message : result.signal ? `terminated by signal ${result.signal}` : 'missing exit status';
+    const failureLine = `[Hook] legacy hook execution failed for ${hookId}: ${failureDetail}`;
     return {
       stdout,
       exitCode: 1,
-      stderr: stderrText || `[Hook] legacy hook execution failed for ${hookId}: ${failureDetail}`
+      stderr: stderrText ? `${stderrText.replace(/\n+$/, '')}\n${failureLine}` : failureLine
     };
   }
 
@@ -233,8 +231,12 @@ function buildClaudeOutputFromDecision(decision, event) {
   const hookSpecificOutput = {};
   let hasHookSpecificOutput = false;
 
-  if (canonical.blocked) {
-    hookSpecificOutput.permissionDecision = canonical.permissionDecision || 'deny';
+  // A verdict is a verdict whether or not it blocks: an explicit 'allow'
+  // (auto-approve) or 'ask' must survive the round trip, not be flattened
+  // into "no opinion" because only `blocked` was checked here.
+  if (canonical.blocked || canonical.permissionDecision) {
+    hookSpecificOutput.permissionDecision =
+      canonical.permissionDecision || (canonical.blocked ? 'deny' : undefined);
     hasHookSpecificOutput = true;
     if (canonical.reason) hookSpecificOutput.permissionDecisionReason = canonical.reason;
   }
@@ -254,11 +256,14 @@ function buildClaudeOutputFromDecision(decision, event) {
   if (canonical.systemMessage) payload.systemMessage = canonical.systemMessage;
   if (canonical.suppressOutput !== undefined) payload.suppressOutput = canonical.suppressOutput;
 
-  return {
-    stdout: Object.keys(payload).length > 0 ? JSON.stringify(payload) : '',
-    exitCode: 0,
-    stderr: ''
-  };
+  // With nothing JSON-shaped to encode, plain stdout is still the hooks'
+  // answer — Claude adds a hook's non-JSON stdout to the model's context
+  // verbatim — so re-emit it as plain text instead of an empty string.
+  const stdout = Object.keys(payload).length > 0
+    ? JSON.stringify(payload)
+    : (canonical.plainText || '');
+
+  return { stdout, exitCode: 0, stderr: '' };
 }
 
 // Non-Claude harness bridge: normalize the raw event into Claude's hook
@@ -289,11 +294,22 @@ function runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, trunca
     : (normalized.meta && Array.isArray(normalized.meta.payloads) ? normalized.meta.payloads : []);
 
   if (payloads.length === 0) {
+    // Echoing the raw event with exit 0 is "no opinion", which is only an
+    // honest answer for an event that carries no tool call. A tool event
+    // whose fan-out came back empty means no guard hook ever saw it —
+    // payload.js falls back to a raw single payload so this should be
+    // unreachable, but say so if it ever is.
+    if (normalized.meta && normalized.meta.emptyFanout) {
+      process.stderr.write(
+        `[Hook] ${harness} tool event produced no payload for ${hookId}; no hook ran (failing open)\n`
+      );
+    }
     exitWithStdout(sanitizeEcho(raw), 0);
     return;
   }
 
   const decisions = [];
+  const translations = [];
   let event = '';
 
   for (const payloadItem of payloads) {
@@ -310,11 +326,28 @@ function runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, trunca
       extraEnv: { YOKI_HARNESS: harness, CLAUDE_HOOK_EVENT_NAME: event }
     });
 
+    // Echoing the input back is Claude's pass-through idiom for "no opinion".
+    // Under codex/omp that echo would be the *normalized event* offered as if
+    // it were a hook response, so drop it rather than forward it.
+    const hookStdout = runResult.stdout === rawForHook ? '' : runResult.stdout;
+
     const translated = translateResponse(
-      { stdout: runResult.stdout, exitCode: runResult.exitCode, stderr: runResult.stderr, event },
+      { stdout: hookStdout, exitCode: runResult.exitCode, stderr: runResult.stderr, event },
       harness
     );
     decisions.push(translated.decision);
+    translations.push(translated);
+  }
+
+  // One payload means there is nothing to combine: emit what T2 already
+  // rendered, exactly as run-bash-hook.js does. Re-encoding it from the
+  // canonical decision would drop everything the decision cannot carry —
+  // plain-text stdout above all — and would silently make the two entry
+  // points into the same pipeline disagree.
+  if (translations.length === 1) {
+    writeStderr(translations[0].stderr);
+    exitWithStdout(translations[0].stdout, translations[0].exitCode);
+    return;
   }
 
   const combined = combineDecisions(decisions);
@@ -448,51 +481,22 @@ async function main() {
     return;
   }
 
-  if (hookModule && typeof hookModule.run === 'function') {
-    try {
-      const output = hookModule.run(raw, {
-        hookId,
-        pluginRoot,
-        scriptPath,
-        truncated,
-        maxStdin: MAX_STDIN
-      });
-      const result = resolveHookResult(raw, output);
-      exitWithStdout(sanitizeEcho(result.stdout), result.exitCode);
-    } catch (runErr) {
-      process.stderr.write(`[Hook] run() error for ${hookId}: ${runErr.message}\n`);
-      exitWithStdout(sanitizeEcho(raw), 0);
-    }
-    return;
-  }
-
-  // Legacy path: spawn a child Node process for hooks without run() export
-  const result = spawnSync(process.execPath, [scriptPath], {
-    input: raw,
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      CLAUDE_PLUGIN_ROOT: pluginRoot,
-      YOKI_PLUGIN_ROOT: pluginRoot,
-      YOKI_HOOK_ID: hookId,
-      YOKI_HOOK_INPUT_TRUNCATED: truncated ? '1' : '0',
-      YOKI_HOOK_INPUT_MAX_BYTES: String(MAX_STDIN)
-    },
-    cwd: process.cwd(),
-    timeout: 30000
+  // The Claude path runs the very same invocation mechanics as the harness
+  // bridge (require() fast path, else a legacy child process), so it goes
+  // through runHookOnce too — one implementation of the env vars, the
+  // timeout and the error normalization, rather than two that drift apart.
+  const result = runHookOnce(raw, {
+    hookModule,
+    hasRunExport,
+    hookId,
+    pluginRoot,
+    scriptPath,
+    truncated,
+    extraEnv: {}
   });
 
-  const legacyStdout = sanitizeEcho(resolveLegacySpawnStdout(raw, result));
-  if (result.stderr) process.stderr.write(result.stderr);
-
-  if (result.error || result.signal || result.status === null) {
-    const failureDetail = result.error ? result.error.message : result.signal ? `terminated by signal ${result.signal}` : 'missing exit status';
-    writeStderr(`[Hook] legacy hook execution failed for ${hookId}: ${failureDetail}`);
-    exitWithStdout(legacyStdout, 1);
-    return;
-  }
-
-  exitWithStdout(legacyStdout, Number.isInteger(result.status) ? result.status : 0);
+  writeStderr(result.stderr);
+  exitWithStdout(sanitizeEcho(result.stdout), result.exitCode);
 }
 
 main().catch(err => {

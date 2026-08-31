@@ -130,12 +130,21 @@ function combinedDecisionToClaudeOutput(decision) {
     if (decision.reason) out.hookSpecificOutput.permissionDecisionReason = decision.reason;
     if (decision.additionalContext) out.hookSpecificOutput.additionalContext = decision.additionalContext;
     if (decision.updatedInput) out.hookSpecificOutput.updatedInput = decision.updatedInput;
-  } else if (decision.additionalContext) {
-    out.hookSpecificOutput = { additionalContext: decision.additionalContext };
+  } else if (decision.additionalContext || decision.updatedInput) {
+    out.hookSpecificOutput = {};
+    if (decision.additionalContext) out.hookSpecificOutput.additionalContext = decision.additionalContext;
+    if (decision.updatedInput) out.hookSpecificOutput.updatedInput = decision.updatedInput;
   }
 
   if (decision.systemMessage) out.systemMessage = decision.systemMessage;
   if (decision.suppressOutput !== undefined) out.suppressOutput = decision.suppressOutput;
+
+  // Nothing JSON-shaped to say, but the hooks wrote plain stdout: Claude's
+  // convention is that such text goes to the model verbatim, so re-emit it as
+  // plain text rather than as an empty JSON object that would drop it.
+  if (Object.keys(out).length === 0 && decision.plainText) {
+    return { stdout: decision.plainText, exitCode: 0, stderr: '' };
+  }
 
   return { stdout: JSON.stringify(out), exitCode: 0, stderr: '' };
 }
@@ -192,6 +201,16 @@ function main() {
   const payloads = payload !== null ? [payload] : Array.isArray(meta.payloads) ? meta.payloads : [];
 
   if (payloads.length === 0) {
+    // No payload means no hook ran, which reads as "allow". That is only a
+    // legitimate answer when the event carries no tool call at all; a tool
+    // event whose fan-out came back empty is a coverage hole worth saying
+    // out loud (payload.js already falls back to a raw single payload, so
+    // this is the last line of defence).
+    if (meta && meta.emptyFanout) {
+      process.stderr.write(
+        `[run-bash-hook] ${harness} tool event produced no payload; no hook ran (failing open)\n`
+      );
+    }
     process.exit(0);
     return;
   }
@@ -216,11 +235,9 @@ function main() {
   emitAndExit(final);
 }
 
+// This file is an executable, not a library: every caller (the omp bridge,
+// the validation suites, the tests) reaches it as `node run-bash-hook.js`.
+// Nothing requires it, so it exports nothing.
 if (require.main === module) {
   main();
 }
-
-module.exports = {
-  resolveHookPath,
-  parseArgs,
-};

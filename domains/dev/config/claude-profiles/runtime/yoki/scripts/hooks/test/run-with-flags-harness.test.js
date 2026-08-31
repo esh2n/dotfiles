@@ -16,7 +16,25 @@ const REL_SCRIPT_PATH = 'hooks/fixture-hook.js';
 // and denies a Write/Edit whose file_path contains "BLOCKED" (JSON
 // hookSpecificOutput deny, the newer convention) — everything else is
 // allowed (no opinion).
+//
+// It also covers the two non-deny answers a hook can give and the bridge has
+// to forward: an explicit `permissionDecision: 'allow'` (auto-approve —
+// "PREAPPROVED" in the command, "ALLOWED" in the path) and plain, non-JSON
+// stdout on SessionStart, which Claude adds to the model's context verbatim.
 const FIXTURE_HOOK_SOURCE = `'use strict';
+
+function verdict(payload, decision, reason) {
+  return {
+    stdout: JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: payload.hook_event_name,
+        permissionDecision: decision,
+        permissionDecisionReason: reason
+      }
+    }),
+    exitCode: 0
+  };
+}
 
 function run(raw) {
   let payload;
@@ -24,6 +42,10 @@ function run(raw) {
     payload = JSON.parse(raw);
   } catch {
     return {};
+  }
+
+  if (payload.hook_event_name === 'SessionStart' || payload.hook_event_name === 'PreCompact') {
+    return { stdout: 'deploy freeze is on until Friday', exitCode: 0 };
   }
 
   const toolName = payload.tool_name;
@@ -34,22 +56,19 @@ function run(raw) {
     if (command.includes('forbidden')) {
       return { exitCode: 2, stderr: 'no forbidden commands' };
     }
+    if (command.includes('PREAPPROVED')) {
+      return verdict(payload, 'allow', 'on the always-allow list');
+    }
     return {};
   }
 
   if (toolName === 'Write' || toolName === 'Edit') {
     const target = String(input.file_path || '');
     if (target.includes('BLOCKED')) {
-      return {
-        stdout: JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: payload.hook_event_name,
-            permissionDecision: 'deny',
-            permissionDecisionReason: 'blocked file: ' + target
-          }
-        }),
-        exitCode: 0
-      };
+      return verdict(payload, 'deny', 'blocked file: ' + target);
+    }
+    if (target.includes('ALLOWED')) {
+      return verdict(payload, 'allow', 'always-allow file: ' + target);
     }
     return {};
   }
@@ -169,7 +188,12 @@ test('codex: Bash allow passes through with no block', () => {
   }
 });
 
-test('codex: Bash deny renders as a codex hookSpecificOutput deny', () => {
+// A single (non-fanned-out) payload is emitted exactly as T2 rendered it, the
+// same as run-bash-hook.js does — so an `exit 2` + stderr deny stays an
+// `exit 2` + stderr deny, which is codex's other native block contract. Only
+// the fan-out case (below) has several verdicts to merge, and merging is what
+// re-encodes them as one hookSpecificOutput JSON deny.
+test('codex: Bash deny keeps the hook\'s own exit-2 + stderr rendering', () => {
   const pluginRoot = makePluginRoot();
   try {
     const codexPayload = {
@@ -187,11 +211,9 @@ test('codex: Bash deny renders as a codex hookSpecificOutput deny', () => {
 
     const result = runRunner(pluginRoot, [HOOK_ID, REL_SCRIPT_PATH, '--harness', 'codex'], codexPayload);
 
-    assert.equal(result.status, 0);
-    const parsed = JSON.parse(result.stdout);
-    assert.equal(parsed.hookSpecificOutput.hookEventName, 'PreToolUse');
-    assert.equal(parsed.hookSpecificOutput.permissionDecision, 'deny');
-    assert.equal(parsed.hookSpecificOutput.permissionDecisionReason, 'no forbidden commands');
+    assert.equal(result.status, 2);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /no forbidden commands/);
   } finally {
     fs.rmSync(pluginRoot, { recursive: true, force: true });
   }
@@ -296,6 +318,116 @@ test('omp: session_stop with no opinion renders as {continue: true}', () => {
     assert.equal(result.status, 0);
     const parsed = JSON.parse(result.stdout);
     assert.equal(parsed.continue, true);
+  } finally {
+    fs.rmSync(pluginRoot, { recursive: true, force: true });
+  }
+});
+
+// --- explicit non-blocking verdicts and plain-text stdout survive the bridge ---
+
+function preToolUsePayload(overrides) {
+  return Object.assign(
+    {
+      session_id: 'codex-sess-allow',
+      turn_id: 'turn-allow',
+      transcript_path: '/tmp/codex-allow.jsonl',
+      cwd: '/tmp/proj',
+      hook_event_name: 'PreToolUse',
+      model: 'gpt-test',
+      permission_mode: 'bypassPermissions',
+      tool_use_id: 'exec-allow'
+    },
+    overrides
+  );
+}
+
+test('codex: an explicit allow is forwarded, not degraded to "no opinion"', () => {
+  const pluginRoot = makePluginRoot();
+  try {
+    const result = runRunner(
+      pluginRoot,
+      [HOOK_ID, REL_SCRIPT_PATH, '--harness', 'codex'],
+      preToolUsePayload({ tool_name: 'Bash', tool_input: { command: 'echo PREAPPROVED' } })
+    );
+
+    assert.equal(result.status, 0);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.hookSpecificOutput.permissionDecision, 'allow');
+    assert.equal(parsed.hookSpecificOutput.permissionDecisionReason, 'on the always-allow list');
+  } finally {
+    fs.rmSync(pluginRoot, { recursive: true, force: true });
+  }
+});
+
+test('codex: an allow survives the apply_patch fan-out combine', () => {
+  const pluginRoot = makePluginRoot();
+  try {
+    // Two files, both explicitly allowed: the combined verdict is still an
+    // allow, and it has to reach the wire.
+    const patchText = [
+      '*** Begin Patch',
+      '*** Update File: ALLOWED-one.txt',
+      '@@',
+      '-old',
+      '+new',
+      '*** Update File: ALLOWED-two.txt',
+      '@@',
+      '-old',
+      '+new',
+      '*** End Patch'
+    ].join('\n');
+
+    const result = runRunner(
+      pluginRoot,
+      [HOOK_ID, REL_SCRIPT_PATH, '--harness', 'codex'],
+      preToolUsePayload({ tool_name: 'apply_patch', tool_input: { command: patchText } })
+    );
+
+    assert.equal(result.status, 0);
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.hookSpecificOutput.permissionDecision, 'allow');
+    assert.match(parsed.hookSpecificOutput.permissionDecisionReason, /always-allow file/);
+  } finally {
+    fs.rmSync(pluginRoot, { recursive: true, force: true });
+  }
+});
+
+test('codex: SessionStart plain-text stdout reaches the wire unchanged', () => {
+  const pluginRoot = makePluginRoot();
+  try {
+    const result = runRunner(pluginRoot, [HOOK_ID, REL_SCRIPT_PATH, '--harness', 'codex'], {
+      session_id: 'codex-sess-start',
+      transcript_path: '/tmp/codex-start.jsonl',
+      cwd: '/tmp/proj',
+      hook_event_name: 'SessionStart',
+      model: 'gpt-test',
+      permission_mode: 'bypassPermissions',
+      source: 'startup'
+    });
+
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, 'deploy freeze is on until Friday');
+  } finally {
+    fs.rmSync(pluginRoot, { recursive: true, force: true });
+  }
+});
+
+test('omp: plain-text stdout becomes the session_before_compact summary', () => {
+  const pluginRoot = makePluginRoot();
+  try {
+    const result = runRunner(pluginRoot, [HOOK_ID, REL_SCRIPT_PATH, '--harness', 'omp'], {
+      event: 'session_before_compact',
+      payload: { type: 'session_before_compact', preparation: 'x' },
+      ctx: {
+        session_id: 'omp-sess-3',
+        session_file: '/tmp/omp-3.jsonl',
+        cwd: '/tmp/proj',
+        model: 'omp-test'
+      }
+    });
+
+    assert.equal(result.status, 0);
+    assert.deepEqual(JSON.parse(result.stdout), { summary: 'deploy freeze is on until Friday' });
   } finally {
     fs.rmSync(pluginRoot, { recursive: true, force: true });
   }

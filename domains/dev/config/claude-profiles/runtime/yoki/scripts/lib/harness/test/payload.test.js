@@ -141,7 +141,7 @@ test('codex apply_patch Delete File becomes a Bash rm payload', () => {
   const { payload } = normalizePayload(deleteRaw, 'codex');
 
   assert.equal(payload.tool_name, 'Bash');
-  assert.equal(payload.tool_input.command, `rm ${path.join(raw.cwd, 'a.txt')}`);
+  assert.equal(payload.tool_input.command, `rm '${path.join(raw.cwd, 'a.txt')}'`);
 });
 
 test('codex apply_patch touching several files fans out via meta.payloads', () => {
@@ -166,7 +166,7 @@ test('codex apply_patch touching several files fans out via meta.payloads', () =
   assert.equal(updatePayload.tool_input.file_path, path.join(raw.cwd, 'b.txt'));
 
   assert.equal(deletePayload.tool_name, 'Bash');
-  assert.equal(deletePayload.tool_input.command, `rm ${path.join(raw.cwd, 'c.txt')}`);
+  assert.equal(deletePayload.tool_input.command, `rm '${path.join(raw.cwd, 'c.txt')}'`);
 
   // Every fanned-out payload still carries the shared envelope fields.
   for (const p of meta.payloads) {
@@ -388,4 +388,104 @@ test('normalizePayload throws on an unknown harness', () => {
 test('normalizePayload tolerates a non-object raw payload for codex/omp', () => {
   assert.deepEqual(normalizePayload(null, 'codex'), { payload: null, meta: { harness: 'codex' } });
   assert.deepEqual(normalizePayload(null, 'omp'), { payload: null, meta: { harness: 'omp' } });
+});
+
+// ---------------------------------------------------------------------------
+// the synthetic `rm` has to be a command a shell would parse the way the
+// patch means — a Bash guard tokenizes it to decide what is being deleted
+// ---------------------------------------------------------------------------
+
+test('codex Delete File quotes a path containing spaces', () => {
+  const raw = fixture('codex', 'pre_tool_use_apply_patch_update');
+  const deleteRaw = Object.assign({}, raw, {
+    tool_input: { command: '*** Begin Patch\n*** Delete File: my notes.txt\n*** End Patch' },
+  });
+  const { payload } = normalizePayload(deleteRaw, 'codex');
+
+  assert.equal(payload.tool_input.command, `rm '${path.join(raw.cwd, 'my notes.txt')}'`);
+});
+
+test('codex Delete File escapes an embedded single quote and shell metacharacters', () => {
+  const raw = fixture('codex', 'pre_tool_use_apply_patch_update');
+  const deleteRaw = Object.assign({}, raw, {
+    tool_input: { command: "*** Begin Patch\n*** Delete File: it's; rm -rf $HOME\n*** End Patch" },
+  });
+  const { payload } = normalizePayload(deleteRaw, 'codex');
+
+  const target = path.join(raw.cwd, "it's; rm -rf $HOME");
+  assert.equal(payload.tool_input.command, `rm '${target.replace(/'/g, "'\\''")}'`);
+  // A shell parses that back as exactly one argument: the file itself.
+  assert.equal(shellWords(payload.tool_input.command)[1], target);
+});
+
+/** Minimal POSIX word-splitter, enough to prove the quoting round-trips. */
+function shellWords(command) {
+  const words = [];
+  let word = '';
+  let quoted = false;
+  let started = false;
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (ch === "'") {
+      quoted = !quoted;
+      started = true;
+      continue;
+    }
+    if (!quoted && ch === ' ') {
+      if (started) words.push(word);
+      word = '';
+      started = false;
+      continue;
+    }
+    if (!quoted && ch === '\\') {
+      word += command[++i];
+      started = true;
+      continue;
+    }
+    word += ch;
+    started = true;
+  }
+  if (started) words.push(word);
+  return words;
+}
+
+// ---------------------------------------------------------------------------
+// an unrecognized patch/edit body must still reach the guards: zero payloads
+// means no hook runs, and both runners read that as "allow"
+// ---------------------------------------------------------------------------
+
+test('codex apply_patch with an unrecognized body yields one conservative payload', () => {
+  const raw = fixture('codex', 'pre_tool_use_apply_patch_update');
+  const opaque = Object.assign({}, raw, { tool_input: { command: 'not a patch at all' } });
+  const { payload, meta } = normalizePayload(opaque, 'codex');
+
+  assert.notEqual(payload, null);
+  assert.equal(meta.payloads, undefined);
+  assert.equal(payload.tool_name, 'apply_patch');
+  assert.deepEqual(payload.tool_input, { command: 'not a patch at all' });
+});
+
+test('omp edit with an unrecognized body yields one conservative payload', () => {
+  const raw = fixture('omp', 'tool_call_edit_hashline');
+  const opaque = Object.assign({}, raw, {
+    payload: Object.assign({}, raw.payload, { input: { input: 'no hashline, no envelope' } }),
+  });
+  const { payload, meta } = normalizePayload(opaque, 'omp');
+
+  assert.notEqual(payload, null);
+  assert.equal(meta.payloads, undefined);
+  assert.equal(payload.tool_name, 'edit');
+  assert.deepEqual(payload.tool_input, { input: 'no hashline, no envelope' });
+});
+
+// ---------------------------------------------------------------------------
+// documentation the code has to keep honest
+// ---------------------------------------------------------------------------
+
+test('payload.js does not point maintainers at the deleted omp yoki-guard.ts', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'payload.js'), 'utf8');
+  assert.ok(
+    !source.includes('omp/extensions/yoki-guard.ts'),
+    'that file was replaced by yoki-bridge.ts, which delegates here instead'
+  );
 });

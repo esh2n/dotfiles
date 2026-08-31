@@ -91,8 +91,13 @@ export function createClient({ baseUrl, clientId, secret, fetchImpl = fetch, tim
 
     if (!response.ok) {
       const message = describeFailure(response.status, payload);
-      if (response.status === 413) throw sizeError("too_large", message);
-      throw networkError(payload?.code ?? `http_${response.status}`, message, text.slice(0, 400));
+      // `status` rides along so a caller can tell a transient failure from a
+      // permanent one (the watch loop retries the first, gives up on the
+      // second) without re-parsing the message.
+      if (response.status === 413) throw Object.assign(sizeError("too_large", message), { status: 413 });
+      throw Object.assign(networkError(payload?.code ?? `http_${response.status}`, message, text.slice(0, 400)), {
+        status: response.status,
+      });
     }
     if (expectJson && payload === null) {
       throw networkError("bad_response", `${url.pathname} did not return JSON.`, text.slice(0, 400));
