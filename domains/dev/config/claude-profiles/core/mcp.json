@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "ecc.mcp.v1",
+  "_comment": "Source of truth for MCP server registration across every harness (Claude Code, Codex, omp) — task T13. Converted at apply time by runtime/yoki/scripts/lib/mcp-inventory/writers/{claude,codex,omp}.js. `targets.<harness>` means 'this writer should emit the server', not merely 'this server happens to run under that harness' — codebase-memory-mcp and serena keep targets.claude=false even though install.sh registers them for Claude too, because that registration goes through `claude mcp add` into ~/.claude.json (a different file, untouched by this migration) and duplicating it into settings.json's mcpServers would risk two live instances of the same server. `env` values must be `${ENV_VAR}` references, never literal secrets (enforced by lib/mcp-inventory/source.js at load time) — see the dropped local 'figma' Codex entry below for the example that motivated the rule.",
+  "servers": [
+    {
+      "name": "figma-remote",
+      "transport": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "env": {},
+      "targets": { "claude": true, "codex": false, "omp": false }
+    },
+    {
+      "name": "figma-desktop",
+      "transport": "http",
+      "url": "http://127.0.0.1:3845/mcp",
+      "env": {},
+      "targets": { "claude": true, "codex": false, "omp": false }
+    },
+    {
+      "name": "codebase-memory-mcp",
+      "transport": "stdio",
+      "command": "{{HOME}}/bin/codebase-memory-mcp-managed",
+      "args": [],
+      "env": {},
+      "targets": { "claude": false, "codex": true, "omp": true },
+      "_comment": "Claude side stays registered via install.sh's `claude mcp add --scope user` into ~/.claude.json — see the top-level _comment."
+    },
+    {
+      "name": "serena",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["-p", "3.13", "serena-agent==1.5.3", "start-mcp-server", "--project-from-cwd", "--context", "claude-code"],
+      "env": {},
+      "targets": { "claude": false, "codex": true, "omp": true },
+      "targetOverrides": {
+        "codex": {
+          "args": ["-p", "3.13", "serena-agent==1.5.3", "start-mcp-server", "--project-from-cwd", "--context", "codex"]
+        },
+        "omp": {
+          "args": ["-p", "3.13", "serena-agent==1.5.3", "start-mcp-server", "--project-from-cwd", "--context", "codex"],
+          "_comment": "No 'omp' context exists in the serena-agent package (spike S4-S5 enumerated its fixed context set — see lib/targets/omp-mcp.js's SERENA_CONTEXT constant). 'codex' is the closest fit: both are headless, tool-calling coding-agent CLIs."
+        }
+      },
+      "_comment": "Claude side stays registered via install.sh's `claude mcp add --scope user` into ~/.claude.json — see the top-level _comment."
+    },
+    {
+      "name": "context7",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@1.0.14"],
+      "env": {},
+      "targets": { "claude": false, "codex": true, "omp": false }
+    },
+    {
+      "name": "playwright",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@0.0.32"],
+      "env": {},
+      "targets": { "claude": false, "codex": true, "omp": false }
+    },
+    {
+      "name": "notion-mcp",
+      "transport": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "env": {},
+      "targets": { "claude": false, "codex": true, "omp": false }
+    }
+  ]
+}

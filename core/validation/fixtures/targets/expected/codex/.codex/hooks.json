@@ -1,0 +1,80 @@
+{
+  "PreToolUse": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:demo\" \"hooks/pre-demo.js\" \"standard,strict\" --harness codex"
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": "Write|Edit|apply_patch",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"post:demo\" \"hooks/post-demo.js\" \"standard,strict\" --harness codex"
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"prompt:demo\" \"hooks/prompt-demo.js\" \"standard,strict\" --harness codex"
+        }
+      ]
+    }
+  ],
+  "PreCompact": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:compact-demo\" \"hooks/pre-compact-demo.js\" \"standard,strict\" --harness codex"
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"stop:demo\" \"hooks/stop-demo.js\" \"standard,strict\" --harness codex"
+        }
+      ]
+    }
+  ],
+  "SessionStart": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"session:demo\" \"hooks/session-demo.js\" \"standard,strict\" --harness codex"
+        }
+      ]
+    }
+  ],
+  "SessionEnd": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"sessionend:demo\" \"hooks/sessionend-demo.js\" \"standard,strict\" --harness codex",
+          "timeout": 3
+        }
+      ]
+    }
+  ]
+}

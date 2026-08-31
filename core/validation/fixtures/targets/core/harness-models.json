@@ -1,0 +1,4 @@
+{
+  "codex": { "sonnet": "gpt-5.1-codex" },
+  "omp": { "sonnet": "anthropic/claude-sonnet-5" }
+}

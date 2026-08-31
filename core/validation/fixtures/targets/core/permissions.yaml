@@ -1,0 +1,17 @@
+# Minimal permission layer for the T15 targets golden suite fixture — NOT
+# the real core/permissions.yaml. One allow (a plain execpolicy-expressible
+# Bash prefix) plus one hook-enforced deny: a curl-pipe-to-shell installer
+# pattern, which has no execpolicy/omp-declarative equivalent (a pipe defeats
+# the token-exact prefix matcher — see to-codex.js's toExecpolicyTokens) and
+# is also explicitly marked `enforce: [hook]` so both generators surface it
+# as something only a PreToolUse/tool_call hook can enforce.
+
+allow:
+  - pattern: "Bash(git status *)"
+
+deny:
+  - pattern: "Bash(curl * | sh)"
+    reason: "installer scripts piped into a shell have no execpolicy prefix match"
+    enforce: [hook]
+
+defaultMode: auto

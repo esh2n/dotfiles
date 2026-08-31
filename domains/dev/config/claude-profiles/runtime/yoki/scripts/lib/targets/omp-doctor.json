@@ -1,0 +1,21 @@
+{
+  "_comment": "Paths a doctor/health-check pass should confirm omp can actually read after `gen.js --target omp` runs. Sourced from spike S4-S5 (a) 'omp-native paths' + 'Claude Code compatibility provider' discovery tables — {home} is $PI_CODING_AGENT_DIR or ~/.omp/agent (task's --out), {claudeHome} is $CLAUDE_CONFIG_DIR or ~/.claude, {userHome} is the OS home directory. omp reads the Claude/Codex paths on its own (skills/commands/CLAUDE.md), so this generator writes nothing for them and this list exists only so a probe can verify they are still readable, not to imply the generator owns them.",
+  "generated": [
+    "{home}/config.yml",
+    "{home}/yoki-hooks.json",
+    "{home}/RULES.md",
+    "{home}/agents",
+    "{home}/extensions/yoki-bridge.ts",
+    "{home}/mcp.json"
+  ],
+  "readOnlyByOmpItself": [
+    "{claudeHome}/CLAUDE.md",
+    "{claudeHome}/skills",
+    "{claudeHome}/commands",
+    "{userHome}/.codex/skills"
+  ],
+  "notReadByOmp": [
+    "{claudeHome}/rules",
+    "{claudeHome}/agents"
+  ]
+}

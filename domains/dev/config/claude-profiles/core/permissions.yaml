@@ -1,0 +1,88 @@
+# Core permission layer — allow list.
+#
+# Source of truth for `permissions.allow` across every harness (Claude Code,
+# Codex, omp). Converted at apply time by
+# runtime/yoki/scripts/lib/permissions/{to-claude,to-codex,to-omp}.js.
+# Moved verbatim from core/settings.layer.json permissions.allow (T8) — see
+# scratchpad spike S3 §2b for the per-entry Codex/omp mapping.
+#
+# Schema: allow: [ {pattern, reason?} ], deny: [ {pattern, reason?, enforce?} ],
+# defaultMode. Patterns use Claude Code's exact permission syntax
+# (Bash(prefix *), Edit(glob), tool names).
+
+allow:
+  - pattern: "Read(**)"
+  - pattern: "Grep(**)"
+  - pattern: "LS(**)"
+  - pattern: "TodoRead(**)"
+  - pattern: "TodoWrite(**)"
+  - pattern: "Task(**)"
+  - pattern: "WebSearch"
+  - pattern: "NotebookRead(**)"
+  - pattern: "Bash(git status *)"
+  - pattern: "Bash(git log *)"
+  - pattern: "Bash(git diff *)"
+  - pattern: "Bash(git show *)"
+  - pattern: "Bash(git branch *)"
+  - pattern: "Bash(git remote *)"
+  - pattern: "Bash(git fetch *)"
+  - pattern: "Bash(git stash list *)"
+  - pattern: "Bash(git worktree list *)"
+  - pattern: "Bash(git rev-parse *)"
+  - pattern: "Bash(git merge-base *)"
+  - pattern: "Bash(git ls-files *)"
+  - pattern: "Bash(git blame *)"
+  - pattern: "Bash(git shortlog *)"
+  - pattern: "Bash(git describe *)"
+  - pattern: "Bash(git config --get *)"
+  - pattern: "Bash(git tag -l *)"
+  - pattern: "Bash(gh pr view *)"
+  - pattern: "Bash(gh pr list *)"
+  - pattern: "Bash(gh pr diff *)"
+  - pattern: "Bash(gh pr checks *)"
+  - pattern: "Bash(gh issue view *)"
+  - pattern: "Bash(gh issue list *)"
+  - pattern: "Bash(gh repo view *)"
+  - pattern: "Bash(gh api *)"
+  - pattern: "Bash(gh run view *)"
+  - pattern: "Bash(gh run list *)"
+  - pattern: "Bash(ls *)"
+  - pattern: "Bash(eza *)"
+  - pattern: "Bash(cat *)"
+  - pattern: "Bash(bat *)"
+  - pattern: "Bash(head *)"
+  - pattern: "Bash(tail *)"
+  - pattern: "Bash(wc *)"
+  - pattern: "Bash(which *)"
+  - pattern: "Bash(pwd)"
+  - pattern: "Bash(whoami)"
+  - pattern: "Bash(env)"
+  - pattern: "Bash(tree *)"
+  - pattern: "Bash(find *)"
+  - pattern: "Bash(fd *)"
+  - pattern: "Bash(rg *)"
+  - pattern: "Bash(grep *)"
+  - pattern: "Bash(jq *)"
+  - pattern: "Bash(yq *)"
+  - pattern: "Bash(date *)"
+  - pattern: "Bash(mkdir *)"
+  - pattern: "Bash(echo *)"
+  - pattern: "Bash(sort *)"
+  - pattern: "Bash(readlink *)"
+  - pattern: "Bash(basename *)"
+  - pattern: "Bash(dirname *)"
+  - pattern: "Bash(realpath *)"
+  - pattern: "Bash(* --version)"
+  - pattern: "Bash(* --help)"
+  - pattern: "Bash(npx *)"
+  - pattern: "Bash(node *)"
+  - pattern: "Bash(ghq *)"
+  - pattern: "Bash(mise *)"
+  - pattern: "Edit(./**)"
+  - pattern: "Edit(~/.claude/**)"
+  - pattern: "Edit(~/.config/**)"
+  - pattern: "WebFetch(domain:*)"
+
+deny: []
+
+defaultMode: auto

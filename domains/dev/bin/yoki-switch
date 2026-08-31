@@ -98,6 +98,7 @@ fi
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 CURSOR_DIR="${CURSOR_DIR:-$HOME/.cursor}"
 CODEX_DIR="${CODEX_DIR:-$HOME/.codex}"
+OMP_AGENT_DIR="${OMP_AGENT_DIR:-$HOME/.omp/agent}"
 PERSONAL_DIR="$PROFILES_DIR/personal"
 CORE_DIR="$PROFILES_DIR/core"
 PACKS_DIR="$PROFILES_DIR/packs"
@@ -176,12 +177,60 @@ merge_settings() {
         [[ -f "$PACKS_DIR/$p/settings.layer.json" ]] && pack_layers+=("$PACKS_DIR/$p/settings.layer.json")
     done
 
+    # -------------------------------------------------------------------
+    # Permissions (T8): source of truth is permissions.yaml per layer, not
+    # the settings.layer.json/settings.personal.json JSON files above — see
+    # core/permissions.yaml and personal/permissions.yaml. A pack may add
+    # packs/<name>/permissions.yaml; missing files are treated as an empty
+    # layer (lib/permissions/parse.js). to-claude.js loads + dedupes
+    # core → enabled packs → personal (union semantics, same precedence as
+    # the settings merge below) and prints
+    # {settings:{allow,deny,defaultMode}, hookEnforced:[...]} on stdout.
+    # -------------------------------------------------------------------
+    if ! command -v node >/dev/null 2>&1; then
+        log_error "merge_settings requires node (for lib/permissions/to-claude.js) — none found on PATH."
+        exit 1
+    fi
+
+    local -a perm_sources=("$CORE_DIR/permissions.yaml")
+    for p in "${packs[@]+"${packs[@]}"}"; do
+        [[ -f "$PACKS_DIR/$p/permissions.yaml" ]] && perm_sources+=("$PACKS_DIR/$p/permissions.yaml")
+    done
+    perm_sources+=("$PERSONAL_DIR/permissions.yaml")
+
+    local perm_json
+    if ! perm_json="$(node "$RUNTIME_DIR/scripts/lib/permissions/to-claude.js" --sources "${perm_sources[@]}")"; then
+        log_error "Failed to convert permissions.yaml layers via lib/permissions/to-claude.js"
+        exit 1
+    fi
+
+    # -------------------------------------------------------------------
+    # MCP servers (T13): source of truth is mcp.json per layer, not the
+    # settings.layer.json `mcpServers` key above — see core/mcp.json and
+    # personal/mcp.json. A pack may add packs/<name>/mcp.json; missing files
+    # are treated as an empty layer (lib/mcp-inventory/source.js). The
+    # claude.js writer loads + merges core → enabled packs → personal (later
+    # layer wins by name, same precedence as everything else here) and
+    # prints the settings.json `mcpServers` object on stdout.
+    # -------------------------------------------------------------------
+    local -a mcp_sources=("$CORE_DIR/mcp.json")
+    for p in "${packs[@]+"${packs[@]}"}"; do
+        [[ -f "$PACKS_DIR/$p/mcp.json" ]] && mcp_sources+=("$PACKS_DIR/$p/mcp.json")
+    done
+    mcp_sources+=("$PERSONAL_DIR/mcp.json")
+
+    local mcp_json
+    if ! mcp_json="$(node "$RUNTIME_DIR/scripts/lib/mcp-inventory/writers/claude.js" --sources "${mcp_sources[@]}")"; then
+        log_error "Failed to convert mcp.json layers via lib/mcp-inventory/writers/claude.js"
+        exit 1
+    fi
+
     local dotfiles_parent
     dotfiles_parent="$(dirname "${DOTFILES_ROOT:-$HOME/dotfiles}")"
 
     # Precedence: personal wins every scalar/object key, packs win over core
-    # (core is defaults). deny is a UNION across all layers (each layer is
-    # self-maintained; deny-more is safer).
+    # (core is defaults). permissions.allow/deny come from $perm above
+    # (already unioned + deduped across layers by to-claude.js).
     # hooks: personal entries run FIRST — guards (git-guard) must see the
     # original command before any rewriter hooks (rtk-rewrite) touch it.
     # Enabled-pack hooks (e.g. go-guard) run between personal and core.
@@ -189,23 +238,20 @@ merge_settings() {
     # $layer first, $personal last, so .[1:-1] is exactly the pack layers
     # regardless of how many packs contributed a settings.layer.json (zero
     # packs collapses to the original 2-file core+personal behavior).
-    jq -s '
+    jq -s --argjson perm "$perm_json" --argjson mcp "$mcp_json" '
       .[0] as $layer | .[-1] as $personal | (.[1:-1]) as $packs |
       (reduce $packs[] as $p ({}; . * $p)) as $packsMerged |
       ($layer * $packsMerged * $personal) |
-      .permissions.allow = (
-        ($layer.permissions.allow // []) + ($packsMerged.permissions.allow // []) + ($personal.permissions.allow // []) | unique
-      ) |
-      .permissions.deny = (
-        ($layer.permissions.deny // []) + ($packsMerged.permissions.deny // []) + ($personal.permissions.deny // []) | unique
-      ) |
+      .permissions.allow = $perm.settings.allow |
+      .permissions.deny = $perm.settings.deny |
+      .permissions.defaultMode = $perm.settings.defaultMode |
       .hooks = (
         ($personal.hooks // {}) as $ph | ($packsMerged.hooks // {}) as $pkh | ($layer.hooks // {}) as $lh |
         ($ph | keys) + ($pkh | keys) + ($lh | keys) | unique |
         map(. as $k | {($k): (($ph[$k] // []) + ($pkh[$k] // []) + ($lh[$k] // []))}) |
         add // {}
       ) |
-      .mcpServers = (($layer.mcpServers // {}) + ($packsMerged.mcpServers // {}) + ($personal.mcpServers // {})) |
+      .mcpServers = $mcp |
       .enabledPlugins = (($layer.enabledPlugins // {}) + ($packsMerged.enabledPlugins // {}) + ($personal.enabledPlugins // {})) |
       .extraKnownMarketplaces = (
         ($layer.extraKnownMarketplaces // {}) + ($packsMerged.extraKnownMarketplaces // {}) + ($personal.extraKnownMarketplaces // {})
@@ -216,6 +262,12 @@ merge_settings() {
       | sed "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT:-$HOME/dotfiles}|g" \
       | sed "s|{{HOME}}|${HOME}|g" \
       > "$tmp"
+
+    # pre-permission-guard.js's hook-enforced deny set — written where the
+    # hook reads it (<CLAUDE_DIR>/.yoki/permissions.json), independent of
+    # settings.json itself.
+    mkdir -p "$CLAUDE_DIR/.yoki"
+    jq -n --argjson perm "$perm_json" '{deny: $perm.hookEnforced}' > "$CLAUDE_DIR/.yoki/permissions.json"
 
     # Runtime-owned keys: Claude Code itself writes .autoMode (environment,
     # soft_deny) into settings.json; no layer carries it, so a plain rewrite
@@ -312,53 +364,108 @@ link_cursor_rules() {
 }
 
 # -----------------------------------------------------------------------------
-# link_codex_ports: skills that ship a Codex port → ~/.codex
-#   <layer>/skills/<skill>/codex/SKILL.md
-#     → ~/.codex/skills/<skill>   (directory symlink → the codex/ dir; Codex
-#       0.147 skips a symlinked SKILL.md but follows a symlinked skill dir,
-#       so the dir is linked and the file stays real. Edits are live.)
-#   Codex 0.117+ removed custom prompts entirely (deprecated in favor of
-#   Skills; confirmed by an OpenAI maintainer — no plans to reintroduce).
-#   There is no ~/.codex/prompts install step: skills are the only mechanism,
-#   invoked via @mention, the /skills menu, or autonomously by the model.
-# Skipped when Codex is not installed on this machine.
+# apply_target_generator: builds the codex/omp targets via the shared
+# lib/targets/gen.js generator (task T9/T10), superseding the old
+# link_codex_ports() (which only ever ported codex/SKILL.md symlinks —
+# codex.js's buildSkillOperations()/decideSkillSymlink() reproduces exactly
+# that ~/.codex/skills/<name> symlink, idempotently replacing whatever is
+# there, so nothing is lost by removing it here).
+#
+# Skipped (one info line) when the target's home dir does not exist yet —
+# mirrors link_codex_ports()'s old "$CODEX_DIR" guard: a fresh machine that
+# has never touched Codex/omp should not get ~/.codex or ~/.omp/agent
+# created out of thin air just because `yoki-switch apply` ran.
 # -----------------------------------------------------------------------------
-link_codex_ports() {
-    local packs=("$@")
-    [[ -d "$CODEX_DIR" ]] || return 0
+apply_target_generator() {
+    local target="$1" out_dir="$2" dry_run="$3"; shift 3
+    local -a packs=("$@")
 
-    local -a sources=("$CORE_DIR/skills")
+    if [[ ! -d "$out_dir" ]]; then
+        log_info "${target}: $out_dir does not exist — skipping (not installed on this machine)"
+        return 0
+    fi
+
+    if ! command -v node >/dev/null 2>&1; then
+        log_error "apply --target ${target} requires node (for lib/targets/gen.js) — none found on PATH."
+        exit 1
+    fi
+
+    local -a sources=("$CORE_DIR")
     local p
     for p in "${packs[@]+"${packs[@]}"}"; do
-        sources+=("$PACKS_DIR/$p/skills")
+        sources+=("$PACKS_DIR/$p")
     done
-    sources+=("$PERSONAL_DIR/skills")
+    sources+=("$PERSONAL_DIR")
 
-    local src port dir name count=0
-    for src in "${sources[@]}"; do
-        [[ -d "$src" ]] || continue
-        for port in "$src"/*/codex/SKILL.md; do
-            [[ -f "$port" ]] || continue
-            dir="$(dirname "$port")"
-            name="$(basename "$(dirname "$dir")")"
-            mkdir -p "$CODEX_DIR/skills"
-            [[ -d "$CODEX_DIR/skills/$name" && ! -L "$CODEX_DIR/skills/$name" ]] \
-                && rm -rf "$CODEX_DIR/skills/$name"
-            ln -sfn "$dir" "$CODEX_DIR/skills/$name"
-            ((count++)) || true
-        done
-    done
+    local sources_csv
+    sources_csv="$(IFS=,; echo "${sources[*]}")"
 
-    if [[ $count -gt 0 ]]; then
-        log_success "Codex: linked $count skill port(s) → ~/.codex/skills/"
+    local -a gen_args=(--target "$target" --sources "$sources_csv" --out "$out_dir")
+    [[ "$dry_run" == 1 ]] && gen_args+=(--dry-run)
+
+    if ! node "$RUNTIME_DIR/scripts/lib/targets/gen.js" "${gen_args[@]}"; then
+        log_error "${target}: gen.js failed"
+        exit 1
+    fi
+
+    if [[ "$dry_run" != 1 ]]; then
+        log_success "${target}: applied via lib/targets/gen.js → $out_dir"
     fi
     return 0
 }
 
+# Returns 0 iff $1 is present among the remaining args (the resolved
+# --target list).
+_target_requested() {
+    local want="$1"; shift
+    local t
+    for t in "$@"; do
+        [[ "$t" == "$want" ]] && return 0
+    done
+    return 1
+}
+
 # -----------------------------------------------------------------------------
-# apply: rebuild ~/.claude from core + enabled packs + personal
+# apply: rebuild the requested target(s) from core + enabled packs + personal.
+#   --target claude|codex|omp   Restrict to this target (repeatable). With no
+#                               --target at all, every target runs (today's
+#                               default: claude + codex + omp).
+#   --dry-run                   Forwarded to lib/targets/gen.js for the
+#                               codex/omp targets, which prints the planned
+#                               operations without writing them. The
+#                               ~/.claude merge has no dry-run mode of its
+#                               own, so the "claude" target is skipped
+#                               entirely (with a note) rather than partially
+#                               simulated.
 # -----------------------------------------------------------------------------
 apply() {
+    local -a targets=()
+    local dry_run=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --target)
+                shift
+                [[ $# -ge 1 ]] || { log_error "Usage: ${PROG} apply --target <claude|codex|omp>"; exit 1; }
+                case "$1" in
+                    claude|codex|omp) targets+=("$1") ;;
+                    *) log_error "Unknown --target: $1 (expected claude, codex, or omp)"; exit 1 ;;
+                esac
+                shift
+                ;;
+            --dry-run)
+                dry_run=1
+                shift
+                ;;
+            *)
+                log_error "Usage: ${PROG} apply [--target claude|codex|omp]... [--dry-run]"
+                exit 1
+                ;;
+        esac
+    done
+
+    [[ ${#targets[@]} -eq 0 ]] && targets=(claude codex omp)
+
     local -a packs=()
     while IFS= read -r p; do
         [[ -n "$p" ]] || continue
@@ -369,28 +476,68 @@ apply() {
         fi
     done < <(enabled_packs)
 
-    log_info "Applying: core + packs(${packs[*]:-none}) + personal"
+    if _target_requested claude "${targets[@]}"; then
+        if [[ "$dry_run" == 1 ]]; then
+            log_info "claude: dry-run has no effect on this target (no dry-run mode) — skipping"
+        else
+            log_info "Applying: core + packs(${packs[*]:-none}) + personal"
 
-    merge_settings "${packs[@]+"${packs[@]}"}"
-    log_success "Merged settings.json (core + packs + personal, personal wins)"
+            merge_settings "${packs[@]+"${packs[@]}"}"
+            log_success "Merged settings.json (core + packs + personal, personal wins)"
 
-    merge_claude_md
-    log_success "Merged CLAUDE.md (core + personal)"
+            merge_claude_md
+            log_success "Merged CLAUDE.md (core + personal)"
 
-    local dir
-    for dir in "${MERGE_DIRS[@]}"; do
-        merge_dir "$dir" "${packs[@]+"${packs[@]}"}"
+            local dir
+            for dir in "${MERGE_DIRS[@]}"; do
+                merge_dir "$dir" "${packs[@]+"${packs[@]}"}"
+            done
+
+            link_cursor_rules
+
+            # Legacy marker no longer used; keep it pointing at the new scheme
+            echo "packs" > "$CLAUDE_DIR/.claude-profile"
+
+            echo ""
+            log_success "Applied. Enabled packs: ${packs[*]:-none}"
+            log_info "Restart claude-cli to apply changes"
+        fi
+    fi
+
+    if _target_requested codex "${targets[@]}"; then
+        apply_target_generator codex "$CODEX_DIR" "$dry_run" "${packs[@]+"${packs[@]}"}"
+    fi
+
+    if _target_requested omp "${targets[@]}"; then
+        apply_target_generator omp "$OMP_AGENT_DIR" "$dry_run" "${packs[@]+"${packs[@]}"}"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# doctor: health-check the claude/codex/omp/artifact targets (task T14).
+# Mostly implemented in Node (lib/doctor.js) — this wrapper just resolves the
+# same directories apply() uses and forwards --json.
+# -----------------------------------------------------------------------------
+doctor() {
+    local json_flag=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json) json_flag=(--json); shift ;;
+            *) log_error "Usage: ${PROG} doctor [--json]"; exit 1 ;;
+        esac
     done
 
-    link_cursor_rules
-    link_codex_ports "${packs[@]+"${packs[@]}"}"
+    if ! command -v node >/dev/null 2>&1; then
+        log_error "doctor requires node (for lib/doctor.js) — none found on PATH."
+        exit 1
+    fi
 
-    # Legacy marker no longer used; keep it pointing at the new scheme
-    echo "packs" > "$CLAUDE_DIR/.claude-profile"
-
-    echo ""
-    log_success "Applied. Enabled packs: ${packs[*]:-none}"
-    log_info "Restart claude-cli to apply changes"
+    node "$RUNTIME_DIR/scripts/lib/doctor.js" \
+        --dotfiles-root "${DOTFILES_ROOT:-$HOME/dotfiles}" \
+        --claude-dir "$CLAUDE_DIR" \
+        --codex-dir "$CODEX_DIR" \
+        --omp-dir "$OMP_AGENT_DIR" \
+        "${json_flag[@]+"${json_flag[@]}"}"
 }
 
 # -----------------------------------------------------------------------------
@@ -478,7 +625,12 @@ case "${1:-}" in
         interactive
         ;;
     apply)
-        apply
+        shift
+        apply "$@"
+        ;;
+    doctor)
+        shift
+        doctor "$@"
         ;;
     pack)
         case "${2:-}" in
@@ -530,7 +682,14 @@ case "${1:-}" in
         echo "Usage: ${PROG} [command]"
         echo ""
         echo "  (no args)                     Interactive pack selection, then apply"
-        echo "  apply                         Rebuild ~/.claude from core + enabled packs + personal"
+        echo "  apply [--target T]... [--dry-run]"
+        echo "                                Rebuild target(s) from core + enabled packs + personal."
+        echo "                                T is one of: claude codex omp. Repeat --target to pick"
+        echo "                                several; with none given, all three run. --dry-run"
+        echo "                                forwards to lib/targets/gen.js for codex/omp (prints the"
+        echo "                                planned operations, writes nothing)."
+        echo "  doctor [--json]               Health-check claude/codex/omp/artifact targets;"
+        echo "                                one line per check, exit 1 iff any check fails."
         echo "  pack list                     Show enabled/available packs"
         echo "  pack enable <pack>...         Enable pack(s) and apply"
         echo "  pack disable <pack>...        Disable pack(s) and apply"

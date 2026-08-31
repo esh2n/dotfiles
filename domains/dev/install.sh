@@ -175,21 +175,19 @@ if has_command "claude"; then
 fi
 
 # ~/.codex/config.toml contains machine-local trust and hook state, so it is
-# intentionally not replaced wholesale by the tracked template. Reconcile MCP
-# entries through the Codex CLI to preserve that local state.
+# intentionally not replaced wholesale by the tracked template — hooks,
+# rules, agents, skill ports, AND MCP server registration (task T13: the
+# canonical mcp.json inventory's `[mcp_servers.<name>]` tables, appended
+# into config.toml's managed block) all come from the generator now. A
+# server already declared outside that managed block (e.g. a leftover
+# `codex mcp add` entry from before this migration) is left alone and
+# reported rather than overwritten — see
+# lib/mcp-inventory/writers/codex.js.
 if has_command "codex"; then
-    if ! codex mcp get codebase-memory-mcp >/dev/null 2>&1; then
-        log_info "Registering Codebase-Memory MCP for Codex..."
-        codex mcp add codebase-memory-mcp -- \
-            "${HOME}/bin/codebase-memory-mcp-managed" || \
-            log_warn "Failed to register Codebase-Memory MCP for Codex"
-    fi
-
-    if ! codex mcp get serena >/dev/null 2>&1; then
-        log_info "Registering Serena MCP for Codex..."
-        codex mcp add serena -- uvx -p 3.13 serena-agent==1.5.3 \
-            start-mcp-server --project-from-cwd --context codex || \
-            log_warn "Failed to register Serena MCP for Codex"
+    yoki_switch="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
+    if [[ -x "$yoki_switch" ]]; then
+        log_info "Applying Codex config (hooks/rules/agents/skills/mcp)..."
+        bash "$yoki_switch" apply --target codex || log_warn "yoki-switch apply --target codex failed (non-critical)"
     fi
 fi
 

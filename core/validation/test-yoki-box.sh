@@ -112,14 +112,27 @@ run_yoki_box_checks() {
         "${DOTFILES_ROOT}/domains/dev/config/claude-profiles:ro" "$out"
     assert_lacks    "case8: never mounts the whole repo" " ${DOTFILES_ROOT} " "$out"
 
+    # codex now carries spec.yaml.in too (task T15) — it mounts the same
+    # three read-only paths yclaude does, so it can run
+    # `yoki-switch apply --target codex` against the real dotfiles layers.
     out="$(invoke ycodex)"
-    assert_contains "case9: codex gets its own kit" "${KITS}/agents/codex" "$out"
-    assert_lacks    "case10: self-contained kit mounts nothing" "claude-profiles:ro" "$out"
+    # Templated now (spec.yaml.in), so — like yclaude's own agent kit — the
+    # repo path never appears literally: it is rendered to a temp dir first
+    # (case15-18 below cover that machinery). "yoki-kits/codex-" is
+    # render_kit's own naming (basename of spec.yaml.in's parent dir), so it
+    # still proves codex got ITS OWN kit, not just the posture kit.
+    assert_contains "case9: codex gets its own kit" "yoki-kits/codex-" "$out"
+    assert_contains "case10: codex kit mounts claude-profiles read-only" \
+        "${DOTFILES_ROOT}/domains/dev/config/claude-profiles:ro" "$out"
+    assert_contains "case11: codex kit mounts core/ read-only" \
+        "${DOTFILES_ROOT}/core:ro" "$out"
+    assert_contains "case12: codex kit mounts domains/dev/bin/ read-only" \
+        "${DOTFILES_ROOT}/domains/dev/bin:ro" "$out"
 
     out="$(invoke ygemini)"
-    assert_contains "case11: agent without a kit still gets a posture" \
+    assert_contains "case13: agent without a kit still gets a posture" \
         "${KITS}/postures/guarded" "$out"
-    assert_lacks    "case12: agent without a kit gets no agent kit" "agents/" "$out"
+    assert_lacks    "case14: agent without a kit gets no agent kit" "agents/" "$out"
 
     # --- rendered kit --------------------------------------------------------
     # The templated kit is rendered to a temp dir at launch, never installed.
@@ -127,24 +140,52 @@ run_yoki_box_checks() {
     rendered="$(invoke yclaude | tr ' ' '\n' | grep 'yoki-kits' | head -1)"
     TOTAL=$((TOTAL + 1))
     if [[ -n "$rendered" && -f "${rendered}/spec.yaml" ]]; then
-        log_success "PASS: case13: kit is rendered outside the repo"
+        log_success "PASS: case15: kit is rendered outside the repo"
         PASSED=$((PASSED + 1))
     else
-        log_error "FAIL: case13: kit is rendered outside the repo (got '$rendered')"
+        log_error "FAIL: case15: kit is rendered outside the repo (got '$rendered')"
         FAILED=$((FAILED + 1))
     fi
 
     if [[ -f "${rendered}/spec.yaml" ]]; then
-        assert_lacks "case14: no placeholder survives rendering" \
+        assert_lacks "case16: no placeholder survives rendering" \
             "{{" "$(cat "${rendered}/spec.yaml")"
-        assert_contains "case15: DOTFILES_ROOT is substituted" \
+        assert_contains "case17: DOTFILES_ROOT is substituted" \
             "$DOTFILES_ROOT" "$(cat "${rendered}/spec.yaml")"
         TOTAL=$((TOTAL + 1))
         if sbx kit validate "$rendered" >/dev/null 2>&1; then
-            log_success "PASS: case16: rendered kit passes sbx kit validate"
+            log_success "PASS: case18: rendered kit passes sbx kit validate"
             PASSED=$((PASSED + 1))
         else
-            log_error "FAIL: case16: rendered kit passes sbx kit validate"
+            log_error "FAIL: case18: rendered kit passes sbx kit validate"
+            FAILED=$((FAILED + 1))
+        fi
+    fi
+
+    # The omp kit renders too — same templated-kit machinery, exercised
+    # separately from yclaude above because omp isn't an sbx-builtin agent
+    # (it runs on the `shell` base per SBX_BUILTIN_AGENTS), which is exactly
+    # the path a kit-rendering regression could hide behind.
+    local omp_rendered
+    omp_rendered="$(invoke yomp | tr ' ' '\n' | grep 'yoki-kits' | head -1)"
+    TOTAL=$((TOTAL + 1))
+    if [[ -n "$omp_rendered" && -f "${omp_rendered}/spec.yaml" ]]; then
+        log_success "PASS: case19: omp kit is rendered outside the repo"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: case19: omp kit is rendered outside the repo (got '$omp_rendered')"
+        FAILED=$((FAILED + 1))
+    fi
+
+    if [[ -f "${omp_rendered}/spec.yaml" ]]; then
+        assert_lacks "case20: no placeholder survives rendering the omp kit" \
+            "{{" "$(cat "${omp_rendered}/spec.yaml")"
+        TOTAL=$((TOTAL + 1))
+        if sbx kit validate "$omp_rendered" >/dev/null 2>&1; then
+            log_success "PASS: case21: rendered omp kit passes sbx kit validate"
+            PASSED=$((PASSED + 1))
+        else
+            log_error "FAIL: case21: rendered omp kit passes sbx kit validate"
             FAILED=$((FAILED + 1))
         fi
     fi
@@ -160,20 +201,20 @@ run_yoki_box_checks() {
         [[ -e "${tpl%.in}" ]] && stray="${stray} ${tpl%.in}"
     done < <(find "${KITS}" -name 'spec.yaml.in')
     if [[ -z "$stray" ]]; then
-        log_success "PASS: case17: rendering writes no spec.yaml into the repo"
+        log_success "PASS: case22: rendering writes no spec.yaml into the repo"
         PASSED=$((PASSED + 1))
     else
-        log_error "FAIL: case17: rendered artifact left in the repo:${stray}"
+        log_error "FAIL: case22: rendered artifact left in the repo:${stray}"
         FAILED=$((FAILED + 1))
     fi
 
     # --- argument handling ---------------------------------------------------
     out="$(invoke yclaude -- --continue)"
-    assert_contains "case18: args after -- reach the agent" "-- --continue" "$out"
+    assert_contains "case23: args after -- reach the agent" "-- --continue" "$out"
 
-    assert_fails "case19: unknown option is rejected" "unknown option" \
+    assert_fails "case24: unknown option is rejected" "unknown option" \
         bash "${BIN}/yclaude" --bogus
-    assert_fails "case20: yoki-box must be invoked through a symlink" \
+    assert_fails "case25: yoki-box must be invoked through a symlink" \
         "invoke through a symlink" bash "${BIN}/yoki-box"
 
     # --- unattended ----------------------------------------------------------
@@ -184,15 +225,15 @@ run_yoki_box_checks() {
     unattended_out=$(YOKI_BOX_DRY_RUN=1 YOKI_UNATTENDED=1 \
         bash "${BIN}/yclaude" -d 2>&1) || status=$?
     if [[ "$status" -ne 0 ]] && grep -qF "unattended session" <<< "$unattended_out"; then
-        log_success "PASS: case21: direct mode is refused in an unattended session"
+        log_success "PASS: case26: direct mode is refused in an unattended session"
         PASSED=$((PASSED + 1))
     else
-        log_error "FAIL: case21: direct mode is refused in an unattended session (exit $status)"
+        log_error "FAIL: case26: direct mode is refused in an unattended session (exit $status)"
         FAILED=$((FAILED + 1))
     fi
 
     out="$(YOKI_BOX_DRY_RUN=1 YOKI_UNATTENDED=1 bash "${BIN}/yclaude" 2>/dev/null)"
-    assert_contains "case22: guarded mode still runs when unattended" "--clone" "$out"
+    assert_contains "case27: guarded mode still runs when unattended" "--clone" "$out"
 
     # --- installation ---------------------------------------------------------
     # The whole interface is symlinks to yoki-box, and the installer used to
@@ -218,10 +259,10 @@ run_yoki_box_checks() {
     " >/dev/null 2>&1 || true
 
     if [[ -L "${fake_home}/bin/ytool" && -e "${fake_home}/bin/tool" ]]; then
-        log_success "PASS: case23: installer links symlinked launchers, not just files"
+        log_success "PASS: case28: installer links symlinked launchers, not just files"
         PASSED=$((PASSED + 1))
     else
-        log_error "FAIL: case23: installer links symlinked launchers, not just files"
+        log_error "FAIL: case28: installer links symlinked launchers, not just files"
         log_error "  ~/bin contents: $(ls "${fake_home}/bin" 2>&1 | tr '\n' ' ')"
         FAILED=$((FAILED + 1))
     fi

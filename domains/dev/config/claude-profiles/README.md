@@ -49,6 +49,7 @@ yoki-switch pack list           # 有効/利用可能パックの一覧
 yoki-switch pack enable kotlin  # パックを有効化して適用
 yoki-switch pack disable kotlin # 無効化して適用
 yoki-switch apply               # 選択を変えずに再合成
+yoki-switch doctor              # claude/codex/omp/artifact をヘルスチェック
 ```
 
 - 各パックは `skills/ agents/ commands/ rules/ workflows/`(任意で `hooks/` と
@@ -57,6 +58,109 @@ yoki-switch apply               # 選択を変えずに再合成
   「パックが hook を持つ場合」を参照。
 - マシンごとの選択は `~/.claude/.claude-packs`(git 管理外)。初回は
   `packs.default` から複製される。
+
+## Targets
+
+`~/.claude` は core/packs/personal をそのままマージした結果だが、Codex CLI
+(`~/.codex`) と omp (`~/.omp/agent`) は設定フォーマットが別物なので、同じ
+3層ソースから**変換して生成**する。この変換を担うのが
+`runtime/yoki/scripts/lib/targets/{codex,omp}.js`(`gen.js` 経由で実行、
+task T9/T10)で、`yoki-switch apply` が内部で呼び出す:
+
+```bash
+yoki-switch apply                     # claude + codex + omp をすべて再生成
+yoki-switch apply --target omp        # omp だけ再生成(--target は繰り返し指定可)
+yoki-switch apply --target codex --target omp
+yoki-switch apply --target codex --dry-run   # 書き込まず、計画した操作を表示
+```
+
+- 各ターゲットの `--out` はその CLI のホームディレクトリ
+  (`~/.codex`、`~/.omp/agent`)。ホームディレクトリが**存在しない**マシンでは
+  そのターゲットを1行のinfoログでスキップする(そのCLIを一度も使っていない
+  = インストールされていない、とみなす。`~/.codex`や`~/.omp/agent`をゼロから
+  作ったりはしない)。
+- `--dry-run` は codex/omp のジェネレータにそのまま渡り、書き込みをせず
+  計画した操作(`write`/`symlink`/`merge-json`/`remove` 等)を標準出力に
+  列挙する。`claude` ターゲットにはdry-runモードが無いため、`--dry-run` と
+  同時に指定されると1行の注記を出してそのターゲットだけスキップする。
+
+### managed-block / marker 規約
+
+Codex/ompのホームディレクトリには hook 状態やユーザー自身の追記
+(`~/.codex/config.toml` の `[projects.*]` など)が同居している。生成物は
+それらを壊さないよう、**マーカーで区切った自分のブロックだけ**を
+置き換える(`runtime/yoki/scripts/lib/targets/managed-block.js` の
+`extractBlock`/`wrapBlock` が共通実装):
+
+- `config.toml`: `# yoki:begin` 〜 `# yoki:end`
+- `AGENTS.md` / `RULES.md`: `<!-- yoki:begin -->` 〜 `<!-- yoki:end -->`
+- `hooks.json`: マーカーではなくグループ単位でマージ
+  (`codex-hooks-merge.js`)。yoki以外が追加したフックグループは
+  そのまま先頭に残し、yoki自身の旧グループだけを差し替える
+- スキル/コマンドの symlink (`~/.codex/skills/<name>` など)は
+  `.yoki/codex-manifest.json` で自分が置いたものだけを記録し、
+  `--prune` 実行時に元ソースが消えたものだけ削除する
+
+マーカーブロックの外、`[projects.*]`のような**マシンローカルな追記は
+決して上書きされない** — 2回目以降の `apply` も、その部分は
+バイト単位で不変(冪等性のテストは
+`core/validation/test-yoki-switch-targets.sh` 参照)。
+
+### doctor
+
+`yoki-switch doctor [--json]`(実体は `runtime/yoki/scripts/lib/doctor.js`、
+task T14)は4ターゲットの実際の状態を読むだけの診断コマンドで、何も書き込まない。
+1チェック1行、`[ok|warn|fail] <target> <check> — <hint>` を出力し、
+**`fail` が1件でもあれば終了コード1**(`warn` は0のまま)。
+
+- **claude**: `~/.claude` のマージdirシンボリックリンクが解決するか、
+  `settings.json` がパースできるか、そこから参照される hook スクリプトが
+  存在し実行可能か、`.yoki/permissions.json` が存在するか
+- **codex**: `codex --version`(`< 0.150.0` で warn = Interrupt hook 未対応、
+  `< 0.147.0` で fail)、`~/.codex` の有無、`[features] hooks = true`、
+  自分が生成した `hooks.json` グループの有無、**その全ハンドラの
+  `[hooks.state]` 信頼ハッシュを再計算して一致するか**(ズレていたら
+  「codex exec で無言スキップされる、yoki-switch apply を実行」と案内)、
+  yoki以外のフォアングループの一覧、`codex execpolicy check` による
+  `rules/yoki.rules` の構文チェック(バイナリが無ければ warn でスキップ)、
+  `default_permissions` と `sandbox_mode` のトップレベル衝突、
+  `core/harness-models.json` の codex tier が `~/.codex/models_cache.json`
+  に実在するか(warn)、skills symlink の解決、`~/.agents/skills` のリンク数
+- **omp**: `omp --version`(`< 18.0.4` で warn)、拡張シンボリックリンクの
+  解決、`config.yml` が(symlinkでなく)生成済みの実ファイルか、
+  `yoki-hooks.json` のパース、`omp-doctor.json` に列挙されたプローブ対象
+  パスの可読性、`functions.zsh` の `omp()` ラッパーに
+  `--no-extensions -e` があるか
+- **artifact**: `yoki-artifact` が入っていれば `yoki-artifact doctor` に
+  委譲、無ければ1行 `ok` でスキップ
+
+`hooks.json` は Codex 実機では `{"hooks": {<Event>: [...]}}` の
+ラップ形式で書かれる(spike S1+S2 Appendix C の実測ハッシュで確認済み)。
+`codex-hooks-merge.js` 自身の生成物・テストは今のところラップ無しの
+フラット形式を前提にしているため、`doctor.js` はどちらの形も読めるように
+`unwrapHooksJson()` で吸収している — 生成側とdoctor側で前提が食い違って
+いること自体は既知の不一致として残っており、直すなら生成側(T9)の仕事。
+
+`lib/test/doctor.test.js` は純粋な部分(バージョン比較、
+`[hooks.state]` の信頼ドリフト検出、`default_permissions`/`sandbox_mode`
+衝突検出)をテキスト/一時ホームだけでテストし、実際の `codex`/`omp`
+バイナリや `yoki-artifact` には依存しない。
+
+### 4つ目のターゲットを足す場合
+
+1. `runtime/yoki/scripts/lib/targets/<name>.js` を作り、`codex.js`/`omp.js`
+   と同じ形の `plan({sources, out, home, env, prune, dotfilesRoot})` を
+   export する(戻り値は `{target, out, home, sources, operations,
+   warnings}`、`operations` の各要素は `{kind, destinationPath,
+   sourcePath?, content?, layer}`)
+2. `gen.js` の `TARGETS` マップに登録し、必要なら `defaultOutFor()` に
+   デフォルトの `--out` を追加
+3. `yoki-switch` の `apply()` に `--target <name>` の分岐と、そのCLIの
+   ホームディレクトリ変数(`<NAME>_DIR` のように環境変数で上書き可能に)
+   を追加。既存の `apply_target_generator()` はターゲット名と `--out` を
+   渡すだけで動くので、専用ロジックを書く必要はない
+4. マシンローカルな追記を壊さないターゲットなら、上記の managed-block
+   規約に沿ってマーカーで自分のブロックを区切る
 
 ## プロジェクト単位の設定 (.yoki.json)
 

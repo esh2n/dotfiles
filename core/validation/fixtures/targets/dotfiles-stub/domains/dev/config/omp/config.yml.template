@@ -1,0 +1,20 @@
+# Fixture stub for the T15 targets golden suite — mirrors the shape of the
+# real domains/dev/config/omp/config.yml.template just enough for
+# lib/targets/omp-config-yml.js's renderConfigYml() to have something to
+# read (tools.approvalMode/approval.eval, modelRoles.default, and the four
+# runtime-owned bootstrap keys). Not the real template.
+
+tools:
+  approvalMode: yolo
+  approval:
+    eval: prompt
+
+modelRoles:
+  default: anthropic/claude-fable-5
+
+symbolPreset: unicode
+composer:
+  shape: box
+theme:
+  light: light
+setupVersion: 2

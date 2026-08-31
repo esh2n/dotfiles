@@ -1,19 +1,28 @@
-# omp (oh-my-pi) global settings. The generated config.yml is mutable runtime
-# state; this template is the cross-machine baseline managed by dotfiles.
+# omp (oh-my-pi) global settings — cross-machine baseline for
+# lib/targets/omp.js (task T10). `~/.omp/agent/config.yml` used to be a
+# symlink straight to this file, so omp itself mutated it in place; the
+# generator now writes a real file there instead. This template stays the
+# source for:
+#   - modelRoles.default and tools.approval.eval (below) — passed through /
+#     merged as-is, nothing else can express them.
+#   - symbolPreset / composer / theme / setupVersion — the bootstrap values
+#     used only when `~/.omp/agent/config.yml` doesn't exist yet as a real
+#     file; once omp has written its own (theme changes, setupVersion
+#     bumps, …), the generator carries those forward instead of resetting
+#     them here on every re-run.
+# `bash.patterns` and the rest of `tools.approval` are NOT declared here —
+# they are generated from permissions.yaml via
+# runtime/yoki/scripts/lib/permissions/to-omp.js so that file stays the one
+# source of truth across every harness.
 
 tools:
-  # Untrusted repositories belong in the sandbox (yomp). The yoki-guard
-  # extension remains the authority for deterministic command restrictions.
+  # Untrusted repositories belong in the sandbox (yomp). `tools.approval.eval`
+  # has no Claude permission equivalent (no `eval` tool exists there), so it
+  # can't come from permissions.yaml/to-omp.js — bash.patterns only gates the
+  # `bash` tool, not a shell `eval` can spawn as a subprocess (omp changelog).
   approvalMode: yolo
   approval:
     eval: prompt
-
-bash:
-  patterns:
-    - match: "git push --force*"
-      approval: deny
-    - match: "git push -f*"
-      approval: deny
 
 modelRoles:
   default: anthropic/claude-fable-5

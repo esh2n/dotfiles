@@ -13,6 +13,13 @@
  * normalized shape (once per fanned-out payload for a multi-file patch),
  * and the collected result is translated back into that harness's wire
  * format (see `../lib/harness/response`) before this process exits.
+ *
+ * `--if "<Tool>(<prefix>*)"` (also anywhere in argv) restricts execution to
+ * payloads matching that Claude-style pattern (see `../lib/hook-if-match`).
+ * Claude Code evaluates a hook's `if:` field itself and never passes this;
+ * it exists for harnesses whose own hooks.json has no per-handler condition
+ * (Codex — see `../lib/targets/codex.js`), so the generated command carries
+ * the condition as an explicit flag instead.
  */
 
 'use strict';
@@ -24,6 +31,7 @@ const { isHookEnabled, isDryRun } = require('../lib/hook-flags');
 const { buildPreToolUseAdditionalContext } = require('./pretooluse-visible-output');
 const { normalizePayload } = require('../lib/harness/payload');
 const { translateResponse, combineDecisions } = require('../lib/harness/response');
+const { matchesIf } = require('../lib/hook-if-match');
 
 const MAX_STDIN = 1024 * 1024;
 const KNOWN_HARNESSES = new Set(['claude', 'codex', 'omp']);
@@ -58,6 +66,32 @@ function extractHarnessFlag(argv) {
 function resolveHarness(flagValue) {
   const candidate = String(flagValue || process.env.YOKI_HARNESS || 'claude').trim().toLowerCase();
   return KNOWN_HARNESSES.has(candidate) ? candidate : 'claude';
+}
+
+// Pulls `--if <pattern>` (or `--if=pattern`) out of argv, same convention as
+// extractHarnessFlag. Claude Code evaluates a hook's `if:` field itself
+// before invoking the command, so Claude call sites never pass this; it
+// exists so a Codex-targeted hooks.json entry (see lib/targets/codex.js) can
+// carry the same condition the Claude settings layer declared declaratively.
+function extractIfFlag(argv) {
+  const args = argv.slice();
+  let ifPattern;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--if') {
+      ifPattern = args[i + 1];
+      args.splice(i, 2);
+      break;
+    }
+    const eq = /^--if=(.*)$/.exec(args[i]);
+    if (eq) {
+      ifPattern = eq[1];
+      args.splice(i, 1);
+      break;
+    }
+  }
+
+  return { ifPattern, rest: args };
 }
 
 function readStdinRaw() {
@@ -270,7 +304,7 @@ function buildClaudeOutputFromDecision(decision, event) {
 // schema, run the hook once per fanned-out payload, translate each result
 // into a canonical decision, combine them (first deny wins), then render the
 // combined decision back into the target harness's wire format.
-function runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, truncated, hookModule, hasRunExport, sanitizeEcho }) {
+function runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, truncated, hookModule, hasRunExport, sanitizeEcho, ifPattern }) {
   let rawEvent;
   try {
     rawEvent = raw.trim() ? JSON.parse(raw) : {};
@@ -289,9 +323,13 @@ function runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, trunca
     return;
   }
 
-  const payloads = normalized.payload !== null
+  const allPayloads = normalized.payload !== null
     ? [normalized.payload]
     : (normalized.meta && Array.isArray(normalized.meta.payloads) ? normalized.meta.payloads : []);
+
+  // Same semantics as Claude's own `if:` evaluation: a payload the condition
+  // rejects behaves as though this hook never fanned out to it at all.
+  const payloads = ifPattern ? allPayloads.filter(p => matchesIf(ifPattern, p)) : allPayloads;
 
   if (payloads.length === 0) {
     // Echoing the raw event with exit 0 is "no opinion", which is only an
@@ -407,8 +445,9 @@ function buildDryRunPreview(hookId, relScriptPath, profilesCsv, raw) {
 }
 
 async function main() {
-  const { harness: harnessArg, rest: positional } = extractHarnessFlag(process.argv.slice(2));
+  const { harness: harnessArg, rest: afterHarness } = extractHarnessFlag(process.argv.slice(2));
   const harness = resolveHarness(harnessArg);
+  const { ifPattern, rest: positional } = extractIfFlag(afterHarness);
   const [hookId, relScriptPath, profilesCsv] = positional;
   const { raw, truncated } = await readStdinRaw();
 
@@ -477,8 +516,23 @@ async function main() {
   }
 
   if (harness !== 'claude') {
-    runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, truncated, hookModule, hasRunExport, sanitizeEcho });
+    runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, truncated, hookModule, hasRunExport, sanitizeEcho, ifPattern });
     return;
+  }
+
+  // Claude never sends --if (it evaluates `if:` itself before invoking the
+  // command), but honor it anyway if present rather than special-case it away.
+  if (ifPattern) {
+    let claudePayload;
+    try {
+      claudePayload = raw.trim() ? JSON.parse(raw) : {};
+    } catch {
+      claudePayload = {};
+    }
+    if (!matchesIf(ifPattern, claudePayload)) {
+      exitWithStdout(sanitizeEcho(raw), 0);
+      return;
+    }
   }
 
   // The Claude path runs the very same invocation mechanics as the harness

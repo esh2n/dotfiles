@@ -1,0 +1,18 @@
+{
+  "_comment": "Vocabulary substitution table for the Codex AGENTS.md managed block (lib/targets/codex.js). Applied longest-key-first over CLAUDE.layer.md + CLAUDE.personal.md + no-paths rules text. An unknown term is left untouched.",
+  "Claude Code": "Codex",
+  "claude code": "codex",
+  "Claude Desktop": "Codex",
+  "~/.claude/": "~/.codex/",
+  "~/.claude": "~/.codex",
+  "settings.json": "config.toml",
+  "settings.local.json": "config.toml",
+  "Workflow tool": "yoki-graph runner",
+  "Workflow script": "yoki-graph script",
+  "Artifact tool": "yoki-artifact",
+  "CLAUDE.md": "AGENTS.md",
+  "SlashCommand": "skill",
+  "slash command": "skill",
+  "subagent": "sub-agent",
+  "TodoWrite tool": "task tracking"
+}

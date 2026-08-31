@@ -1,0 +1,6 @@
+# Personal layer contributes nothing extra in this fixture — core alone
+# already carries the allow/deny this suite needs.
+
+allow: []
+deny: []
+defaultMode: auto

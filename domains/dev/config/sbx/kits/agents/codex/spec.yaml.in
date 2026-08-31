@@ -3,39 +3,77 @@ kind: mixin
 name: yoki-codex
 requires:
   agent: codex
-displayName: yoki base tools for Codex
+displayName: yoki harness for Codex
 description: >-
-  Fills the same base-image gaps the Claude kit fills, so a sandboxed Codex
-  session has the same shell and toolchain manager as a sandboxed Claude one.
+  Fills the gaps in the sandbox base image and wires ~/.codex to the same
+  claude-profiles layers (core + packs + personal) the host uses, so a
+  sandboxed Codex session gets the same hooks/rules/agents/skills parity
+  yoki-claude already has (task T15 closes the gap yoki-claude's kit left
+  open — see yoki-pi's/yoki-omp's kits for the same shape a generation
+  earlier).
 
-# Deliberately NOT a .template: unlike yoki-claude this kit embeds no host
-# path, because nothing in claude-profiles/ applies to Codex. yoki-box keys the
-# read-only dotfiles mounts off the presence of a spec.yaml.template, so a kit
-# written as a plain spec.yaml gets no mounts — which is correct here.
+# Rendered by yoki-box at launch, into a temp dir, and never installed as a
+# file — same reasoning as the claude kit's spec.yaml.in: {{DOTFILES_ROOT}}
+# is a literal path belonging to one checkout, and a sandbox mounts the repo
+# at its HOST path, so a generated artifact would be wrong the moment
+# yoki-box runs from a worktree. The `.in` suffix (not `.template`) keeps
+# core/config/manager.sh from generating it. This kit now embeds a host
+# path — previously it did not, and was a plain spec.yaml (yoki-box keys the
+# read-only dotfiles mounts off spec.yaml.in's presence, so converting it is
+# what turns the mounts on below).
 #
 # Measured on the Codex base image 2026-08-15 (Ubuntu, user `agent`, home
-# /home/agent, codex-cli 0.146.0): node, git, jq and rg are PRESENT; zsh, mise
-# and fd are MISSING — the same three gaps as the Claude image, so the install
-# list is identical.
+# /home/agent, codex-cli 0.146.0): node, git, jq and rg are PRESENT; zsh,
+# mise and fd are MISSING — the same three gaps as the Claude image, so the
+# install list is identical.
 #
-# What this kit does NOT do, and why:
+# WHAT THIS KIT WRITES, AND WHAT IT DELIBERATELY DOES NOT
 #
-# 1. It does not write ~/.codex/config.toml. sbx already writes one at create
-#    time ("yolo mode": approval_policy = "never", sandbox_mode =
-#    "danger-full-access") and that same file carries the mcp-gateway server
-#    with its `Bearer proxy-managed` header. Overwriting it would silently cut
-#    MCP off. CODEX_HOME is set to /home/agent/.codex.
+# 1. `yoki-switch apply --target codex` in startup (below) runs ONLY the
+#    codex generator (lib/targets/gen.js via yoki-switch's
+#    apply_target_generator) — never the plain `yoki-switch apply` the
+#    claude kit runs, which would also attempt the ~/.claude merge_settings
+#    step. That step is harmless here (~/.claude does not exist in a Codex
+#    sandbox, so `apply`'s claude branch would just run merge_settings
+#    against a fresh $CLAUDE_DIR — wasted work, not wrong), but --target
+#    codex says precisely what this kit needs and nothing else.
 #
-# 2. It therefore leaves Codex more permissive than Claude in the same posture.
-#    Claude runs `auto` — a classifier reviews every action — because a microVM
-#    stops destruction but not disclosure (/run/sandbox/source is readable and
-#    the Balanced policy allows 192 domains). Codex has no config-level
-#    equivalent of `auto`: `on-request` leaves the decision to the model, which
-#    a prompt injection simply declines to use, and `untrusted` asks about
-#    everything. The nearest real equivalent is the `--approve-for-me` launch
-#    flag (automatic review). Left unwired because sbx's own launch arguments
-#    for the codex agent are not introspectable, so overriding them here would
-#    be guesswork. Pass it yourself when it matters:
+# 2. It does NOT overwrite ~/.codex/config.toml wholesale. sbx already
+#    writes one at create time ("yolo mode": approval_policy = "never",
+#    sandbox_mode = "danger-full-access") and that same file carries the
+#    mcp-gateway server with its `Bearer proxy-managed` header — clobbering
+#    it would silently cut MCP off. codex-config-toml.js's managed-block
+#    writer only ever touches the `# yoki:begin`/`# yoki:end` block it owns,
+#    leaving sbx's `sandbox_mode`/`approval_policy` lines and the
+#    `[mcp_servers.*]` tables outside it untouched.
+#
+#    That same top-level `sandbox_mode = "danger-full-access"` line is also
+#    why the generator's own conflict rule matters here specifically: Codex
+#    rejects `default_permissions` combined with a top-level `sandbox_mode`
+#    (spike S3 §1), so codex-config-toml.js's hasConflictingTopLevelKey()
+#    detects it ahead of the managed block and skips writing
+#    `default_permissions = "yoki"` (and the whole permissions/hooks-state
+#    block) entirely, with a warning, rather than writing a config Codex
+#    would silently misinterpret. Verified directly (core/validation/
+#    test-targets-golden.sh) by running the generator against a config.toml
+#    fixture that carries the exact `sandbox_mode = "danger-full-access"`
+#    line sbx writes: default_permissions stays absent and sbx's own lines
+#    survive byte-for-byte. Net effect: inside this sandbox, Codex keeps
+#    running under sbx's own yolo-mode permissions — the yoki execpolicy
+#    rules/filesystem-deny table this kit would otherwise install don't
+#    apply here, on top of point 3 below.
+#
+# 3. It therefore leaves Codex more permissive than Claude in the same
+#    posture even where the managed block DOES get written. Claude runs
+#    `auto` — a classifier reviews every action — because a microVM stops
+#    destruction but not disclosure (/run/sandbox/source is readable and the
+#    Balanced policy allows 192 domains). Codex has no config-level
+#    equivalent of `auto`: `on-request` leaves the decision to the model,
+#    which a prompt injection simply declines to use, and `untrusted` asks
+#    about everything. The nearest real equivalent is the `--approve-for-me`
+#    launch flag (automatic review). Left unwired because sbx's own launch
+#    arguments for the codex agent are not introspectable, so overriding
+#    them here would be guesswork. Pass it yourself when it matters:
 #        ycodex -- --approve-for-me
 #    or layer a profile: put yoki.config.toml under $CODEX_HOME and run
 #        ycodex -- -p yoki
@@ -62,3 +100,24 @@ setup:
     - command: curl -fsSL https://mise.run | sh
       user: "1000"
       description: Install mise as the agent user so toolchains land in /home/agent
+
+  startup:
+    # yoki-switch is fully portable — CLAUDE_DIR/CODEX_DIR/OMP_AGENT_DIR and
+    # DOTFILES_ROOT are all overridable and it contains no uname checks — so
+    # it rebuilds ~/.codex here exactly as `apply --target codex` does on
+    # the host. `--target codex` restricts it to that one generator (see
+    # point 1 above) — never plain `apply`, which the claude kit uses
+    # because it needs the ~/.claude merge too.
+    - command:
+        - sh
+        - -c
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply --target codex
+      user: "1000"
+      description: Rebuild ~/.codex from core + packs + personal via lib/targets/gen.js
+    # Packs are NOT enabled here, same as the claude kit and for the same
+    # reason: they default to OFF on a fresh machine and a sandbox is a
+    # fresh machine every time. The enabled set is a machine-local choice
+    # (~/.claude/.claude-packs on the HOST, not in the repo), so yoki-box's
+    # sync_packs() reads it after the sandbox is created and re-runs
+    # `yoki-switch pack enable` for exactly that set — see domains/dev/bin/
+    # yoki-box.

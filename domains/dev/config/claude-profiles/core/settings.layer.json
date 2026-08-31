@@ -1,80 +1,4 @@
 {
-  "permissions": {
-    "defaultMode": "auto",
-    "allow": [
-      "Read(**)",
-      "Grep(**)",
-      "LS(**)",
-      "TodoRead(**)",
-      "TodoWrite(**)",
-      "Task(**)",
-      "WebSearch",
-      "NotebookRead(**)",
-      "Bash(git status *)",
-      "Bash(git log *)",
-      "Bash(git diff *)",
-      "Bash(git show *)",
-      "Bash(git branch *)",
-      "Bash(git remote *)",
-      "Bash(git fetch *)",
-      "Bash(git stash list *)",
-      "Bash(git worktree list *)",
-      "Bash(git rev-parse *)",
-      "Bash(git merge-base *)",
-      "Bash(git ls-files *)",
-      "Bash(git blame *)",
-      "Bash(git shortlog *)",
-      "Bash(git describe *)",
-      "Bash(git config --get *)",
-      "Bash(git tag -l *)",
-      "Bash(gh pr view *)",
-      "Bash(gh pr list *)",
-      "Bash(gh pr diff *)",
-      "Bash(gh pr checks *)",
-      "Bash(gh issue view *)",
-      "Bash(gh issue list *)",
-      "Bash(gh repo view *)",
-      "Bash(gh api *)",
-      "Bash(gh run view *)",
-      "Bash(gh run list *)",
-      "Bash(ls *)",
-      "Bash(eza *)",
-      "Bash(cat *)",
-      "Bash(bat *)",
-      "Bash(head *)",
-      "Bash(tail *)",
-      "Bash(wc *)",
-      "Bash(which *)",
-      "Bash(pwd)",
-      "Bash(whoami)",
-      "Bash(env)",
-      "Bash(tree *)",
-      "Bash(find *)",
-      "Bash(fd *)",
-      "Bash(rg *)",
-      "Bash(grep *)",
-      "Bash(jq *)",
-      "Bash(yq *)",
-      "Bash(date *)",
-      "Bash(mkdir *)",
-      "Bash(echo *)",
-      "Bash(sort *)",
-      "Bash(readlink *)",
-      "Bash(basename *)",
-      "Bash(dirname *)",
-      "Bash(realpath *)",
-      "Bash(* --version)",
-      "Bash(* --help)",
-      "Bash(npx *)",
-      "Bash(node *)",
-      "Bash(ghq *)",
-      "Bash(mise *)",
-      "Edit(./**)",
-      "Edit(~/.claude/**)",
-      "Edit(~/.config/**)",
-      "WebFetch(domain:*)"
-    ]
-  },
   "env": {
     "YOKI_ROOT": "{{DOTFILES_ROOT}}/domains/dev/config/claude-profiles/runtime/yoki",
     "CLAUDE_PLUGIN_ROOT": "{{DOTFILES_ROOT}}/domains/dev/config/claude-profiles/runtime/yoki",
@@ -85,18 +9,26 @@
   "enabledPlugins": {
     "rust-analyzer-lsp@claude-plugins-official": true
   },
-  "mcpServers": {
-    "figma-remote": {
-      "url": "https://mcp.figma.com/mcp",
-      "type": "http"
-    },
-    "figma-desktop": {
-      "url": "http://127.0.0.1:3845/mcp",
-      "type": "http"
-    }
-  },
   "hooks": {
     "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:permission-guard\" \"scripts/hooks/pre-permission-guard.js\" \"minimal,standard,strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:permission-guard\" \"scripts/hooks/pre-permission-guard.js\" \"minimal,standard,strict\""
+          }
+        ]
+      },
       {
         "matcher": "Bash",
         "hooks": [
@@ -142,6 +74,16 @@
           {
             "type": "command",
             "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:webfetch-websearch:delegate-warn\" \"scripts/hooks/pre-webfetch-websearch-delegate-warn.js\" \"standard,strict\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:rules-context\" \"scripts/hooks/pre-rules-context.js\" \"standard,strict\"",
             "timeout": 5
           }
         ]

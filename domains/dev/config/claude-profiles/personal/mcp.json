@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "ecc.mcp.v1",
+  "_comment": "Personal MCP server overrides/additions — same schema as core/mcp.json (task T13). A server named here entirely replaces a core/pack server of the same name (personal always wins, per core/rules/README.md); nothing personal-specific exists yet.",
+  "servers": []
+}

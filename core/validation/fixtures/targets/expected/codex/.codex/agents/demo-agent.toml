@@ -1,0 +1,4 @@
+name = "demo-agent"
+description = "Fixture demo agent for the T15 targets golden suite"
+model = "gpt-5.1-codex"
+developer_instructions = "Investigate the demo scenario end to end.\n\nTools available to you: Read, Bash."

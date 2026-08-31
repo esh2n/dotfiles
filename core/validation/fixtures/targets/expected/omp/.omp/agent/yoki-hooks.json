@@ -1,0 +1,81 @@
+{
+  "tool_call": [
+    {
+      "kind": "js",
+      "id": "pre:demo",
+      "script": "hooks/pre-demo.js",
+      "profiles": [
+        "standard",
+        "strict"
+      ],
+      "matcher": "bash"
+    }
+  ],
+  "tool_result": [
+    {
+      "kind": "js",
+      "id": "post:demo",
+      "script": "hooks/post-demo.js",
+      "profiles": [
+        "standard",
+        "strict"
+      ],
+      "matcher": "write|edit"
+    }
+  ],
+  "before_agent_start": [
+    {
+      "kind": "js",
+      "id": "prompt:demo",
+      "script": "hooks/prompt-demo.js",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    }
+  ],
+  "session_before_compact": [
+    {
+      "kind": "js",
+      "id": "pre:compact-demo",
+      "script": "hooks/pre-compact-demo.js",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    }
+  ],
+  "session_stop": [
+    {
+      "kind": "js",
+      "id": "stop:demo",
+      "script": "hooks/stop-demo.js",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    }
+  ],
+  "session_start": [
+    {
+      "kind": "js",
+      "id": "session:demo",
+      "script": "hooks/session-demo.js",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    }
+  ],
+  "session_shutdown": [
+    {
+      "kind": "js",
+      "id": "sessionend:demo",
+      "script": "hooks/sessionend-demo.js",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    }
+  ]
+}

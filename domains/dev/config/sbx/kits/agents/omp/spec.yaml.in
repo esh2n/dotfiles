@@ -57,14 +57,33 @@ setup:
       user: "1000"
       description: Rebuild ~/.claude (also what yoki-guard reads its rules from)
 
-    # Links config.yml, models.yml and extensions/ into ~/.omp/agent.
-    # bash, not sh: startup commands run under dash, and both files are bash.
+    # models.yml/lsp.yml are plain repo files lib/targets/omp.js never
+    # touches (no generator equivalent — see gen.js/omp.js) — link them
+    # directly. Previously this was a side effect of calling
+    # link_omp_resources (core/config/manager.sh), which also fired
+    # `yoki-switch apply --target omp` itself as its own last step; that
+    # call is now made explicitly below instead (task T15), so this step
+    # only does the plain file linking. `$HOME`, not `{{HOME}}`: this must
+    # resolve to the SANDBOX user's home (/home/agent) at runtime, not the
+    # host's — render_kit's `{{HOME}}` substitution bakes in the host's own
+    # $HOME instead, which would be wrong here.
     - command:
-        - bash
+        - sh
         - -c
-        - . {{DOTFILES_ROOT}}/core/utils/common.sh && . {{DOTFILES_ROOT}}/core/config/manager.sh && link_omp_resources {{DOTFILES_ROOT}}/domains/dev/config/omp
+        - mkdir -p "$HOME/.omp/agent" && for f in models.yml lsp.yml; do [ -f "{{DOTFILES_ROOT}}/domains/dev/config/omp/$f" ] && ln -sfn "{{DOTFILES_ROOT}}/domains/dev/config/omp/$f" "$HOME/.omp/agent/$f"; done
       user: "1000"
-      description: Wire ~/.omp/agent to the repo's omp config
+      description: Ensure ~/.omp/agent exists and link models.yml/lsp.yml (no generator equivalent)
+
+    # Rebuilds ~/.omp/agent's config.yml/RULES.md/agents/yoki-hooks.json/
+    # mcp.json/extensions from core + packs + personal via lib/targets/
+    # gen.js — called directly here now (same shape as the codex kit's own
+    # startup), instead of implicitly through link_omp_resources.
+    - command:
+        - sh
+        - -c
+        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply --target omp
+      user: "1000"
+      description: Rebuild ~/.omp/agent from core + packs + personal via lib/targets/gen.js
 
     # NOT DONE HERE: authentication. omp uses subscription OAuth / API keys and
     # the credential store (~/.omp/agent/agent.db) is host runtime state,

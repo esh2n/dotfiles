@@ -119,6 +119,8 @@ run_all_checks() {
     local suites=(
         portability
         merge-settings
+        yoki-switch-targets
+        targets-golden
         git-guard
         unattended-guard
         correction-distill
@@ -177,6 +179,22 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         "merge-settings")
             source "${SCRIPT_DIR}/test-merge-settings.sh"
             run_merge_settings_checks
+            ;;
+        "yoki-switch-targets")
+            if ! command -v node >/dev/null 2>&1; then
+                log_error "yoki-switch-targets requires node (for lib/targets/gen.js) — none found on PATH."
+                exit 1
+            fi
+            source "${SCRIPT_DIR}/test-yoki-switch-targets.sh"
+            run_yoki_switch_targets_checks
+            ;;
+        "targets-golden")
+            if ! command -v node >/dev/null 2>&1; then
+                log_error "targets-golden requires node (for lib/targets/gen.js) — none found on PATH."
+                exit 1
+            fi
+            source "${SCRIPT_DIR}/test-targets-golden.sh"
+            run_targets_golden_checks
             ;;
         "git-guard")
             source "${SCRIPT_DIR}/test-git-guard.sh"
@@ -243,7 +261,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 [pre|post|portability|merge-settings|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|pi-yoki-guard|omp-yoki-bridge|harness-adapter|yoki-artifact|suggest-compact|workday-calc]"
+            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|pi-yoki-guard|omp-yoki-bridge|harness-adapter|yoki-artifact|suggest-compact|workday-calc]"
             echo "       (no args runs every self-contained regression suite)"
             exit 1
             ;;

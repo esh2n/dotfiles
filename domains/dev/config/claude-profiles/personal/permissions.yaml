@@ -1,0 +1,127 @@
+# Personal permission layer — deny list.
+#
+# Source of truth for `permissions.deny` across every harness (Claude Code,
+# Codex, omp). Converted at apply time by
+# runtime/yoki/scripts/lib/permissions/{to-claude,to-codex,to-omp}.js.
+# Moved verbatim from personal/settings.personal.json permissions.deny (T8) —
+# see scratchpad spike S3 §2a for the per-entry Codex/omp mapping.
+#
+# `enforce: [hook]` marks the entries the S3 spike found inexpressible as a
+# native Codex execpolicy rule or filesystem permission (shell redirections,
+# wildcard rm targets, and the write side of in-workspace secret-file globs)
+# — those also get a Claude-side PreToolUse hook
+# (runtime/yoki/scripts/hooks/pre-permission-guard.js) as defense in depth,
+# since the declarative permission match alone is the only enforcement for
+# every other entry here.
+#
+# Edit(**/.env) and Edit(**/.env.*) are new (T8): the moved list already
+# denied Read on env files but had no Edit-side glob, so an agent could
+# write to `.env` even though it could not read it back. Both are
+# hook-enforced for the same in-workspace-write reason as the *.pem/*.key
+# rows below.
+
+deny:
+  - pattern: "Read(**.env)"
+  - pattern: "Read(**.env.*)"
+  - pattern: "Read(**/.env)"
+  - pattern: "Read(**/.env.*)"
+  - pattern: "Read(~/.aws/credentials)"
+  - pattern: "Read(~/.aws/config)"
+  - pattern: "Read(~/.azure/**)"
+  - pattern: "Read(~/.gcp/**)"
+  - pattern: "Read(~/.ssh/id_*)"
+  - pattern: "Read(~/.ssh/*_rsa)"
+  - pattern: "Read(~/.ssh/*_ecdsa)"
+  - pattern: "Read(~/.ssh/*_ed25519)"
+  - pattern: "Read(**/*.pem)"
+  - pattern: "Read(**/*.key)"
+  - pattern: "Bash(rm -rf /)"
+  - pattern: "Bash(rm -rf ~)"
+  - pattern: "Bash(rm -rf /*)"
+    reason: "wildcard rm target — Codex sees this as an opaque shell script, not a rule-matchable prefix"
+    enforce: [hook]
+  - pattern: "Bash(rm -rf ~/*)"
+    reason: "wildcard rm target — same as rm -rf /*"
+    enforce: [hook]
+  - pattern: "Bash(sudo rm *)"
+  - pattern: "Bash(sudo dd *)"
+  - pattern: "Bash(sudo mkfs *)"
+  - pattern: "Bash(sudo fdisk *)"
+  - pattern: "Bash(sudo mount *)"
+  - pattern: "Bash(sudo umount *)"
+  - pattern: "Bash(dd *)"
+  - pattern: "Bash(mkfs *)"
+  - pattern: "Bash(fdisk *)"
+  - pattern: "Bash(> /dev/*)"
+    reason: "shell redirection — no execpolicy rule can see inside it"
+    enforce: [hook]
+  - pattern: "Bash(>> /dev/*)"
+    reason: "shell redirection — no execpolicy rule can see inside it"
+    enforce: [hook]
+  - pattern: "Bash(sudo passwd *)"
+  - pattern: "Bash(sudo -i *)"
+  - pattern: "Bash(sudo su *)"
+  - pattern: "Bash(git push --force *)"
+  - pattern: "Bash(git push -f *)"
+  - pattern: "Bash(git reset --hard *)"
+  - pattern: "Bash(git checkout -- .)"
+  - pattern: "Bash(git clean -fd *)"
+  - pattern: "Bash(git clean -f *)"
+  - pattern: "Bash(rm -rf .git)"
+  - pattern: "Bash(terraform destroy *)"
+  - pattern: "Bash(terragrunt destroy *)"
+  - pattern: "Bash(az account clear *)"
+  - pattern: "Bash(az logout *)"
+  - pattern: "Bash(az group delete *)"
+  - pattern: "Bash(az vm delete *)"
+  - pattern: "Bash(az storage account delete *)"
+  - pattern: "Bash(gcloud auth revoke *)"
+  - pattern: "Bash(gcloud projects delete *)"
+  - pattern: "Bash(gcloud compute instances delete *)"
+  - pattern: "Bash(gcloud sql instances delete *)"
+  - pattern: "Bash(kubectl delete namespace *)"
+  - pattern: "Bash(kubectl delete all *)"
+  - pattern: "Bash(helm uninstall *)"
+  - pattern: "Bash(az keyvault secret show *)"
+  - pattern: "Bash(gcloud secrets versions access *)"
+  - pattern: "Bash(kubectl get secrets *)"
+  - pattern: "Bash(npm publish *)"
+  - pattern: "Bash(cargo publish *)"
+  - pattern: "Bash(deno publish *)"
+  - pattern: "Bash(dotnet nuget push *)"
+  - pattern: "Bash(docker system prune *)"
+  - pattern: "Bash(kill -9 *)"
+  - pattern: "Edit(/etc/**)"
+  - pattern: "Edit(/usr/**)"
+  - pattern: "Edit(/var/**)"
+  - pattern: "Edit(/opt/**)"
+  - pattern: "Edit(/bin/**)"
+  - pattern: "Edit(/sbin/**)"
+  - pattern: "Edit(/lib/**)"
+  - pattern: "Edit(/boot/**)"
+  - pattern: "Edit(/proc/**)"
+  - pattern: "Edit(/sys/**)"
+  - pattern: "Edit(/dev/**)"
+  - pattern: "Edit(~/.ssh/id_*)"
+  - pattern: "Edit(~/.ssh/*_rsa)"
+  - pattern: "Edit(~/.ssh/*_ecdsa)"
+  - pattern: "Edit(~/.ssh/*_ed25519)"
+  - pattern: "Edit(~/.aws/credentials)"
+  - pattern: "Edit(~/.azure/**)"
+  - pattern: "Edit(~/.gcp/**)"
+  - pattern: "Edit(**/*.pem)"
+    reason: "in-workspace write side not enforced by Codex's filesystem deny (append test went through)"
+    enforce: [hook]
+  - pattern: "Edit(**/*.key)"
+    reason: "in-workspace write side not enforced by Codex's filesystem deny (append test went through)"
+    enforce: [hook]
+  - pattern: "Edit(**/.env)"
+    reason: "write side of the Read(**/.env) deny above — new in T8"
+    enforce: [hook]
+  - pattern: "Edit(**/.env.*)"
+    reason: "write side of the Read(**/.env.*) deny above — new in T8"
+    enforce: [hook]
+
+allow: []
+
+defaultMode: auto
