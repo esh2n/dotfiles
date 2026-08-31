@@ -814,9 +814,26 @@ async function main() {
 // `node bin/capture.mjs ...` でも `bin/ui-capture`(node capture.mjs を
 // exec するだけ)でも process.argv[1] はこのファイル自身のパスになるので
 // isMain は true のまま。
+//
+// ~/.claude/skills/ui-capture はこのリポジトリへのディレクトリ symlink
+// (SKILL.md 参照)。実運用では process.argv[1] がその symlink 越しのパスに
+// なるため、素の文字列比較(path.resolve だけ)だと symlink 解決前後で
+// 食い違い、isMain が false のまま main() が一切走らず exit 0 で黙って
+// 何もしない — 最悪の壊れ方(silent success)になる。symlink を辿った実体
+// パスどうしで比較する。argv[1] が無い・存在しないパスを指す場合は
+// realpathSync が投げるので、raw な値へ落として比較を続ける。
+function realOrSelf(p) {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
 const isMain =
   process.argv[1] !== undefined &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  realOrSelf(path.resolve(process.argv[1])) ===
+    fs.realpathSync(fileURLToPath(import.meta.url));
 
 if (isMain) {
   main()

@@ -204,6 +204,53 @@ describe("ui-capture bin/capture.mjs", () => {
     fs.rmSync(dryOut, { recursive: true, force: true });
   });
 
+  // ~/.claude/skills/ui-capture -> このリポジトリ という symlink 越しに
+  // 実運用で呼ばれる経路を再現する回帰テスト。以前は entrypoint ガードが
+  // process.argv[1] を symlink 解決せずに比較していたため isMain が false
+  // のまま main() が一切走らず、stdout が空・exit 0 で黙って何もしなかった
+  // (最悪の壊れ方: silent success)。bin/ 全体への symlink を張り、その
+  // symlink 越しの capture.mjs を直接 spawn して main() が実際に走ることを
+  // 確認する。playwright は解決不要(dry-run はそこへ到達する前に return
+  // する)なので resolvable ガードは要らない。
+  test("runs main when invoked through a symlinked bin dir", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ui-capture-symlink-"));
+    const realBinDir = path.dirname(CAPTURE_BIN);
+    const linkDir = path.join(tmp, "bin-link");
+    fs.symlinkSync(realBinDir, linkDir);
+    const scenarioPath = path.join(tmp, "scenario.json");
+    fs.writeFileSync(scenarioPath, JSON.stringify({ steps: [{ goto: "/" }] }));
+    const result = await new Promise((resolve) => {
+      const child = spawn(
+        process.execPath,
+        [
+          path.join(linkDir, "capture.mjs"),
+          "--dry-run",
+          "--url",
+          "http://127.0.0.1:9",
+          "--scenario",
+          scenarioPath,
+          "--out",
+          path.join(tmp, "out"),
+        ],
+        { env: { ...process.env, UI_CAPTURE_PLAYWRIGHT: PLAYWRIGHT_PATH } },
+      );
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+      child.on("close", (status) => {
+        resolve({ status, stdout, stderr });
+      });
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /"dryRun": true/);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
+
   test("shot + gif scenario produces valid files and a JSON summary", async (t) => {
     if (!resolvable) {
       t.skip("playwright not resolvable");
