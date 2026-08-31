@@ -3,7 +3,16 @@
  * Executes a hook script only when enabled by ECC hook profile flags.
  *
  * Usage:
- *   node run-with-flags.js <hookId> <scriptRelativePath> [profilesCsv]
+ *   node run-with-flags.js <hookId> <scriptRelativePath> [profilesCsv] [--harness <claude|codex|omp>]
+ *
+ * `--harness` may appear anywhere in argv and is stripped before the
+ * positional args are read, so existing Claude Code call sites (which never
+ * pass it) are unaffected. When it names a non-Claude harness, the incoming
+ * stdin event is normalized into Claude's hook schema (see
+ * `../lib/harness/payload`), the hook runs unmodified against that
+ * normalized shape (once per fanned-out payload for a multi-file patch),
+ * and the collected result is translated back into that harness's wire
+ * format (see `../lib/harness/response`) before this process exits.
  */
 
 'use strict';
@@ -13,8 +22,43 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { isHookEnabled, isDryRun } = require('../lib/hook-flags');
 const { buildPreToolUseAdditionalContext } = require('./pretooluse-visible-output');
+const { normalizePayload } = require('../lib/harness/payload');
+const { translateResponse, combineDecisions } = require('../lib/harness/response');
 
 const MAX_STDIN = 1024 * 1024;
+const KNOWN_HARNESSES = new Set(['claude', 'codex', 'omp']);
+
+// Pulls `--harness <value>` (or `--harness=value`) out of argv wherever it
+// appears, returning the raw value found (if any) plus the remaining args in
+// their original order so `<hookId> <scriptRelativePath> [profilesCsv]`
+// parsing is unaffected by where the flag was placed.
+function extractHarnessFlag(argv) {
+  const args = argv.slice();
+  let harness;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--harness') {
+      harness = args[i + 1];
+      args.splice(i, 2);
+      break;
+    }
+    const eq = /^--harness=(.*)$/.exec(args[i]);
+    if (eq) {
+      harness = eq[1];
+      args.splice(i, 1);
+      break;
+    }
+  }
+
+  return { harness, rest: args };
+}
+
+// Unknown/missing values fail open to 'claude' rather than reject the call —
+// a hook runner must never become the reason a tool call is blocked.
+function resolveHarness(flagValue) {
+  const candidate = String(flagValue || process.env.YOKI_HARNESS || 'claude').trim().toLowerCase();
+  return KNOWN_HARNESSES.has(candidate) ? candidate : 'claude';
+}
 
 function readStdinRaw() {
   return new Promise(resolve => {
@@ -59,25 +103,33 @@ function exitWithStdout(text, exitCode) {
   process.stdout.write(text, () => process.exit(exitCode));
 }
 
-function resolveHookResult(raw, output) {
+// `opts.emitStderr` (default true) preserves the original side effect of
+// flushing `output.stderr` to this process's real stderr immediately; the
+// non-Claude harness bridge passes `false` so it can hold the text and feed
+// it through translateResponse instead (the returned `stderr` field carries
+// it either way).
+function resolveHookResult(raw, output, opts = {}) {
+  const emitStderr = opts.emitStderr !== false;
+
   if (typeof output === 'string' || Buffer.isBuffer(output)) {
-    return { stdout: String(output), exitCode: 0 };
+    return { stdout: String(output), exitCode: 0, stderr: '' };
   }
 
   if (output && typeof output === 'object') {
-    writeStderr(output.stderr);
+    const stderrText = typeof output.stderr === 'string' ? output.stderr : '';
+    if (emitStderr) writeStderr(output.stderr);
     const exitCode = Number.isInteger(output.exitCode) ? output.exitCode : 0;
 
     if (Object.prototype.hasOwnProperty.call(output, 'additionalContext')) {
-      return { stdout: buildPreToolUseAdditionalContext(output.additionalContext), exitCode };
+      return { stdout: buildPreToolUseAdditionalContext(output.additionalContext), exitCode, stderr: stderrText };
     }
     if (Object.prototype.hasOwnProperty.call(output, 'stdout')) {
-      return { stdout: String(output.stdout ?? ''), exitCode };
+      return { stdout: String(output.stdout ?? ''), exitCode, stderr: stderrText };
     }
-    return { stdout: exitCode === 0 ? raw : '', exitCode };
+    return { stdout: exitCode === 0 ? raw : '', exitCode, stderr: stderrText };
   }
 
-  return { stdout: raw, exitCode: 0 };
+  return { stdout: raw, exitCode: 0, stderr: '' };
 }
 
 function resolveLegacySpawnStdout(raw, result) {
@@ -91,6 +143,186 @@ function resolveLegacySpawnStdout(raw, result) {
   }
 
   return '';
+}
+
+// Sets env vars for the duration of `fn`, restoring (or deleting, if unset
+// before) each one afterward. Used to expose YOKI_HARNESS /
+// CLAUDE_HOOK_EVENT_NAME to a require()'d hook's run() without leaking them
+// into the parent process's env once that call returns.
+function withTempEnv(extraEnv, fn) {
+  const keys = Object.keys(extraEnv);
+  const saved = {};
+  for (const key of keys) {
+    saved[key] = Object.prototype.hasOwnProperty.call(process.env, key) ? process.env[key] : undefined;
+    process.env[key] = extraEnv[key];
+  }
+  try {
+    return fn();
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+}
+
+// Runs one hook invocation (require() fast path or legacy spawnSync) against
+// an already Claude-shaped payload, mirroring the claude-path execution below
+// but returning {stdout, exitCode, stderr} instead of writing/exiting, so the
+// non-Claude harness bridge can translate the result before emitting it.
+function runHookOnce(rawForHook, ctx) {
+  const { hookModule, hasRunExport, hookId, pluginRoot, scriptPath, truncated, extraEnv } = ctx;
+
+  if (hasRunExport && hookModule && typeof hookModule.run === 'function') {
+    return withTempEnv(extraEnv, () => {
+      try {
+        const output = hookModule.run(rawForHook, {
+          hookId,
+          pluginRoot,
+          scriptPath,
+          truncated,
+          maxStdin: MAX_STDIN
+        });
+        return resolveHookResult(rawForHook, output, { emitStderr: false });
+      } catch (runErr) {
+        process.stderr.write(`[Hook] run() error for ${hookId}: ${runErr.message}\n`);
+        return { stdout: rawForHook, exitCode: 0, stderr: '' };
+      }
+    });
+  }
+
+  const result = spawnSync(process.execPath, [scriptPath], {
+    input: rawForHook,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      CLAUDE_PLUGIN_ROOT: pluginRoot,
+      YOKI_PLUGIN_ROOT: pluginRoot,
+      YOKI_HOOK_ID: hookId,
+      YOKI_HOOK_INPUT_TRUNCATED: truncated ? '1' : '0',
+      YOKI_HOOK_INPUT_MAX_BYTES: String(MAX_STDIN),
+      ...extraEnv
+    },
+    cwd: process.cwd(),
+    timeout: 30000
+  });
+
+  const stdout = resolveLegacySpawnStdout(rawForHook, result);
+  const stderrText = typeof result.stderr === 'string' ? result.stderr : '';
+
+  if (result.error || result.signal || result.status === null) {
+    const failureDetail = result.error ? result.error.message : result.signal ? `terminated by signal ${result.signal}` : 'missing exit status';
+    return {
+      stdout,
+      exitCode: 1,
+      stderr: stderrText || `[Hook] legacy hook execution failed for ${hookId}: ${failureDetail}`
+    };
+  }
+
+  return { stdout, exitCode: Number.isInteger(result.status) ? result.status : 0, stderr: stderrText };
+}
+
+// Re-renders a combined canonical decision (T2's combineDecisions output)
+// as a Claude-shaped hook response, so it can be fed back through
+// translateResponse to get the final harness-specific wire format. Only
+// PreToolUse/PostToolUse ever fan out into several payloads (see
+// ../lib/harness/payload), so the hookSpecificOutput encoding below is
+// always the correct shape to round-trip through.
+function buildClaudeOutputFromDecision(decision, event) {
+  const canonical = decision || {};
+  const hookSpecificOutput = {};
+  let hasHookSpecificOutput = false;
+
+  if (canonical.blocked) {
+    hookSpecificOutput.permissionDecision = canonical.permissionDecision || 'deny';
+    hasHookSpecificOutput = true;
+    if (canonical.reason) hookSpecificOutput.permissionDecisionReason = canonical.reason;
+  }
+  if (canonical.additionalContext) {
+    hookSpecificOutput.additionalContext = canonical.additionalContext;
+    hasHookSpecificOutput = true;
+  }
+  if (canonical.updatedInput && typeof canonical.updatedInput === 'object') {
+    hookSpecificOutput.updatedInput = canonical.updatedInput;
+    hasHookSpecificOutput = true;
+  }
+
+  const payload = {};
+  if (hasHookSpecificOutput) {
+    payload.hookSpecificOutput = Object.assign({ hookEventName: event }, hookSpecificOutput);
+  }
+  if (canonical.systemMessage) payload.systemMessage = canonical.systemMessage;
+  if (canonical.suppressOutput !== undefined) payload.suppressOutput = canonical.suppressOutput;
+
+  return {
+    stdout: Object.keys(payload).length > 0 ? JSON.stringify(payload) : '',
+    exitCode: 0,
+    stderr: ''
+  };
+}
+
+// Non-Claude harness bridge: normalize the raw event into Claude's hook
+// schema, run the hook once per fanned-out payload, translate each result
+// into a canonical decision, combine them (first deny wins), then render the
+// combined decision back into the target harness's wire format.
+function runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, truncated, hookModule, hasRunExport, sanitizeEcho }) {
+  let rawEvent;
+  try {
+    rawEvent = raw.trim() ? JSON.parse(raw) : {};
+  } catch (parseErr) {
+    process.stderr.write(`[Hook] failed to parse ${harness} stdin for ${hookId}: ${parseErr.message}\n`);
+    exitWithStdout(sanitizeEcho(raw), 0);
+    return;
+  }
+
+  let normalized;
+  try {
+    normalized = normalizePayload(rawEvent, harness);
+  } catch (normalizeErr) {
+    process.stderr.write(`[Hook] normalizePayload failed for ${hookId}: ${normalizeErr.message}\n`);
+    exitWithStdout(sanitizeEcho(raw), 0);
+    return;
+  }
+
+  const payloads = normalized.payload !== null
+    ? [normalized.payload]
+    : (normalized.meta && Array.isArray(normalized.meta.payloads) ? normalized.meta.payloads : []);
+
+  if (payloads.length === 0) {
+    exitWithStdout(sanitizeEcho(raw), 0);
+    return;
+  }
+
+  const decisions = [];
+  let event = '';
+
+  for (const payloadItem of payloads) {
+    const rawForHook = JSON.stringify(payloadItem);
+    event = typeof payloadItem.hook_event_name === 'string' ? payloadItem.hook_event_name : event;
+
+    const runResult = runHookOnce(rawForHook, {
+      hookModule,
+      hasRunExport,
+      hookId,
+      pluginRoot,
+      scriptPath,
+      truncated,
+      extraEnv: { YOKI_HARNESS: harness, CLAUDE_HOOK_EVENT_NAME: event }
+    });
+
+    const translated = translateResponse(
+      { stdout: runResult.stdout, exitCode: runResult.exitCode, stderr: runResult.stderr, event },
+      harness
+    );
+    decisions.push(translated.decision);
+  }
+
+  const combined = combineDecisions(decisions);
+  const synthetic = buildClaudeOutputFromDecision(combined, event);
+  const final = translateResponse(Object.assign({}, synthetic, { event }), harness);
+
+  writeStderr(final.stderr);
+  exitWithStdout(final.stdout, final.exitCode);
 }
 
 function getPluginRoot() {
@@ -142,7 +374,9 @@ function buildDryRunPreview(hookId, relScriptPath, profilesCsv, raw) {
 }
 
 async function main() {
-  const [, , hookId, relScriptPath, profilesCsv] = process.argv;
+  const { harness: harnessArg, rest: positional } = extractHarnessFlag(process.argv.slice(2));
+  const harness = resolveHarness(harnessArg);
+  const [hookId, relScriptPath, profilesCsv] = positional;
   const { raw, truncated } = await readStdinRaw();
 
   // Oversized payloads: never echo the truncated string — a JSON document
@@ -207,6 +441,11 @@ async function main() {
       process.stderr.write(`[Hook] require() failed for ${hookId}: ${requireErr.message}\n`);
       // Fall through to legacy spawnSync path
     }
+  }
+
+  if (harness !== 'claude') {
+    runHarnessBridge({ raw, harness, hookId, pluginRoot, scriptPath, truncated, hookModule, hasRunExport, sanitizeEcho });
+    return;
   }
 
   if (hookModule && typeof hookModule.run === 'function') {

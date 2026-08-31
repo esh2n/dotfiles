@@ -1,0 +1,17 @@
+{
+  "event": "tool_approval_requested",
+  "payload": {
+    "type": "tool_approval_requested",
+    "sessionId": "01a05687-b3a9-7252-afa3-3e96e06cfdaf",
+    "toolName": "bash",
+    "toolCallId": "call_approval_1",
+    "reason": "destructive command",
+    "approvalMode": "on-request"
+  },
+  "ctx": {
+    "session_id": "01a05687-b3a9-7252-afa3-3e96e06cfdaf",
+    "session_file": "/private/tmp/.../sessions/2026-08-31T06-35-29-065Z_01a05687-b3a9-7252-afa3-3e96e06cfdaf.jsonl",
+    "cwd": "/private/tmp/claude-501/.../omp-probe",
+    "model": "gpt-5.4-mini"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "session_id": "01a05683-d934-7703-941b-f75053a7f8a8",
+  "turn_id": "01a05683-d94b-73f1-826d-42e990e3533b",
+  "transcript_path": "/private/tmp/claude-501/-Users-esh2n-go-github-com-esh2n-dotfiles/12ee2d68-0b5c-4d73-a188-66dc93819e73/scratchpad/s1s2/codex-home/sessions/2026/08/31/rollout-2026-08-31T15-31-16-01a05683-d934-7703-941b-f75053a7f8a8.jsonl",
+  "cwd": "/private/tmp/claude-501/-Users-esh2n-go-github-com-esh2n-dotfiles/12ee2d68-0b5c-4d73-a188-66dc93819e73/scratchpad/s1s2/proj",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-5.6-sol",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "apply_patch",
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Add File: a.txt\n+alpha\n*** End Patch"
+  },
+  "tool_use_id": "exec-9c683ebb-5923-4972-9e3a-94bc8912395e"
+}

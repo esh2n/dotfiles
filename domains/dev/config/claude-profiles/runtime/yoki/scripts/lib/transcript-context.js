@@ -90,12 +90,24 @@ function extractUsageTokens(record) {
  * @param {string} transcriptPath - Absolute path to the transcript JSONL.
  * @param {object} [options]
  * @param {number} [options.tailBytes] - How many trailing bytes to scan.
+ * @param {string} [harness] - Harness id ('claude'|'codex'|'omp'). Omitted or
+ *   'claude' keeps this function's original tail-scan behavior byte-identical
+ *   for existing callers (none of whom pass a harness today); any other value
+ *   delegates to `harness/session.js`'s `readUsage`, which knows each
+ *   harness's own session-file format (#T3).
  * @returns {{ tokens: number, model: string } | null} Latest context size, or
  *   null when the transcript is missing, unreadable, or has no usage records.
  */
-function readLatestContextTokens(transcriptPath, options = {}) {
+function readLatestContextTokens(transcriptPath, options = {}, harness) {
   if (typeof transcriptPath !== 'string' || !transcriptPath) {
     return null;
+  }
+
+  if (harness && harness !== 'claude') {
+    const { readUsage } = require('./harness/session');
+    const usage = readUsage(transcriptPath, harness);
+    if (!usage) return null;
+    return { tokens: usage.contextTokens, model: usage.model };
   }
 
   const tailBytes = Number.isInteger(options.tailBytes) && options.tailBytes > 0 ? options.tailBytes : DEFAULT_TRANSCRIPT_TAIL_BYTES;
@@ -135,8 +147,15 @@ function readLatestContextTokens(transcriptPath, options = {}) {
  * 1M when the model id carries the `[1m]` marker, or when the observed token
  * count already exceeds the standard 200k window (covers logs that drop the
  * suffix); otherwise the standard 200k window.
+ *
+ * @param {string} [harness] - Harness id. Omitted or 'claude' is byte-identical
+ *   to this function's original behavior. Other harnesses have no `[1m]`-style
+ *   model marker of their own (Codex/omp model ids never carry it), so for
+ *   them this delegates to the same numeric-threshold fallback below rather
+ *   than checking a Claude-specific string — there is nothing else in
+ *   `harness/session.js`'s `readUsage` result (no window field) to delegate to.
  */
-function resolveContextWindowTokens(tokens, model) {
+function resolveContextWindowTokens(tokens, model, harness) {
   // Explicit window override wins: 400k models (e.g. Opus 4.x) match neither the
   // 200k default nor the 1M marker and would otherwise report ~double usage (#2290).
   // Honor ECC's own knob and Claude Code's native CLAUDE_CODE_AUTO_COMPACT_WINDOW.
@@ -146,7 +165,8 @@ function resolveContextWindowTokens(tokens, model) {
     return envWindow;
   }
 
-  if (typeof model === 'string' && model.includes(LARGE_WINDOW_MODEL_MARKER)) {
+  const isClaude = !harness || harness === 'claude';
+  if (isClaude && typeof model === 'string' && model.includes(LARGE_WINDOW_MODEL_MARKER)) {
     return LARGE_CONTEXT_WINDOW_TOKENS;
   }
 

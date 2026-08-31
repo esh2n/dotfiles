@@ -1,0 +1,14 @@
+{
+  "session_id": "01a0568b-74b4-74a2-8755-13c1c1cdd3de",
+  "turn_id": "01a0568b-c65f-76e1-893b-f68bf1d2e887",
+  "transcript_path": "/private/tmp/claude-501/-Users-esh2n-go-github-com-esh2n-dotfiles/12ee2d68-0b5c-4d73-a188-66dc93819e73/scratchpad/s1s2/codex-home/sessions/2026/08/31/rollout-2026-08-31T15-39-35-01a0568b-74b4-74a2-8755-13c1c1cdd3de.jsonl",
+  "agent_transcript_path": "/private/tmp/claude-501/-Users-esh2n-go-github-com-esh2n-dotfiles/12ee2d68-0b5c-4d73-a188-66dc93819e73/scratchpad/s1s2/codex-home/sessions/2026/08/31/rollout-2026-08-31T15-39-55-01a0568b-c62a-7c81-800c-1e1194acb251.jsonl",
+  "cwd": "/private/tmp/claude-501/-Users-esh2n-go-github-com-esh2n-dotfiles/12ee2d68-0b5c-4d73-a188-66dc93819e73/scratchpad/s1s2/proj",
+  "hook_event_name": "SubagentStop",
+  "model": "gpt-5.6-sol",
+  "permission_mode": "bypassPermissions",
+  "stop_hook_active": false,
+  "agent_id": "01a0568b-c62a-7c81-800c-1e1194acb251",
+  "agent_type": "default",
+  "last_assistant_message": "pong"
+}

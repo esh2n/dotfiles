@@ -1,0 +1,17 @@
+{
+  "event": "tool_call",
+  "payload": {
+    "type": "tool_call",
+    "toolName": "edit",
+    "toolCallId": "call_edit_hashline",
+    "input": {
+      "input": "[a.txt#1a2b]\nsome content\n[b.txt#3c4d]\nmore content\n"
+    }
+  },
+  "ctx": {
+    "session_id": "01a05687-b3a9-7252-afa3-3e96e06cfdaf",
+    "session_file": "/private/tmp/.../sessions/2026-08-31T06-35-29-065Z_01a05687-b3a9-7252-afa3-3e96e06cfdaf.jsonl",
+    "cwd": "/private/tmp/claude-501/.../omp-probe",
+    "model": "gpt-5.4-mini"
+  }
+}

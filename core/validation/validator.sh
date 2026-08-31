@@ -108,11 +108,61 @@ run_validation() {
 }
 
 # -----------------------------------------------------------------------------
+# Default (no-args) run: every self-contained regression suite, in one pass.
+# -----------------------------------------------------------------------------
+# Excludes "pre"/"post" (real sudo/internet/brew checks against this machine,
+# not a repeatable regression suite) and "workday-calc" (needs `uv`, a skill
+# runtime dependency rather than a harness/hook one). Each suite is re-run as
+# its own case invocation of this same script, so the default run and e.g.
+# `validator.sh harness-adapter` on its own always do exactly the same thing.
+run_all_checks() {
+    local suites=(
+        portability
+        merge-settings
+        git-guard
+        unattended-guard
+        correction-distill
+        worktree-guard
+        yoki-box
+        pi-yoki-guard
+        omp-yoki-bridge
+        harness-adapter
+        suggest-compact
+    )
+
+    local overall_failed=0
+    local suite status
+    for suite in "${suites[@]}"; do
+        echo "============================================================"
+        log_info "Suite: $suite"
+        echo "============================================================"
+        status=0
+        "${BASH_SOURCE[0]}" "$suite" || status=$?
+        if [[ "$status" -ne 0 ]]; then
+            overall_failed=1
+            log_error "Suite failed: $suite"
+        fi
+        echo ""
+    done
+
+    if [[ "$overall_failed" -ne 0 ]]; then
+        log_error "One or more suites failed."
+        return 1
+    fi
+
+    log_success "All suites passed."
+    return 0
+}
+
+# -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     case "${1:-}" in
+        "")
+            run_all_checks
+            ;;
         "pre")
             check_requirements
             ;;
@@ -151,6 +201,30 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-pi-yoki-guard.sh"
             run_pi_yoki_guard_checks
             ;;
+        "omp-yoki-bridge")
+            source "${SCRIPT_DIR}/test-omp-yoki-bridge.sh"
+            run_omp_yoki_bridge_checks
+            ;;
+        "harness-adapter")
+            if ! command -v node >/dev/null 2>&1; then
+                log_error "harness-adapter requires node (for \`node --test\` and the real hook runners) — none found on PATH."
+                exit 1
+            fi
+
+            node_unit_status=0
+            node --test \
+                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/harness/test/**/*.test.js" \
+                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/runtime/yoki/scripts/hooks/test/**/*.test.js" \
+                || node_unit_status=$?
+
+            source "${SCRIPT_DIR}/test-harness-adapter.sh"
+            node_contract_status=0
+            run_harness_adapter_checks || node_contract_status=$?
+
+            if [[ "$node_unit_status" -ne 0 || "$node_contract_status" -ne 0 ]]; then
+                exit 1
+            fi
+            ;;
         "suggest-compact")
             source "${SCRIPT_DIR}/test-suggest-compact.sh"
             run_suggest_compact_checks
@@ -159,7 +233,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 {pre|post|portability|merge-settings|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|pi-yoki-guard|suggest-compact|workday-calc}"
+            echo "Usage: $0 [pre|post|portability|merge-settings|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|pi-yoki-guard|omp-yoki-bridge|harness-adapter|suggest-compact|workday-calc]"
+            echo "       (no args runs every self-contained regression suite)"
             exit 1
             ;;
     esac

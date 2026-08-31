@@ -1,0 +1,15 @@
+{
+  "event": "tool_call",
+  "payload": {
+    "type": "tool_call",
+    "toolName": "read",
+    "toolCallId": "call_read_1",
+    "input": { "path": "a.txt" }
+  },
+  "ctx": {
+    "session_id": "01a05687-b3a9-7252-afa3-3e96e06cfdaf",
+    "session_file": "/private/tmp/.../sessions/2026-08-31T06-35-29-065Z_01a05687-b3a9-7252-afa3-3e96e06cfdaf.jsonl",
+    "cwd": "/private/tmp/claude-501/.../omp-probe",
+    "model": "gpt-5.4-mini"
+  }
+}
