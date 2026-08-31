@@ -39,6 +39,7 @@ Makefile.local
 docker-compose.local.yml
 config.local.*
 .yoki.json
+.ui-capture.json
 *.local.json
 *.local.yaml
 *.local.yml
