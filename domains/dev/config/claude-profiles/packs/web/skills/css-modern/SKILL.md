@@ -98,3 +98,5 @@ component — collapses to this:
 - `frontend-craft` — visual direction and implementation constraints
 - `human-interface-guidelines` — cognitive/a11y evaluation
 - `ui-ux-pro-max` — palette, font pairing, style search
+- `css-cascade` — cascade resolution order and specificity mechanism
+- `css-units` — relative-unit resolution and zoom-safe fluid typography
