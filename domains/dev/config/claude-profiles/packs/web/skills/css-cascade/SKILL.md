@@ -227,6 +227,7 @@ indication of where focus is.
 ## Related
 
 - `css-modern` — modern syntax replacements for legacy CSS idioms
+- `css-units` — relative-unit resolution and zoom-safe fluid typography
 - `defensive-css` — content/environment robustness intent table
 - `web-platform-reviewer` — the agent that enforces cascade hygiene on diffs
 </content>

@@ -46,7 +46,7 @@ React keeps JSX-level a11y and hooks; this agent owns CSS files, the cascade, de
    - `browserslist` key in `package.json`, or a `.browserslistrc` file → browser-support lane; run syntax checks against it.
    - Optional `.yoki.json` `"web"` block (`{"css": "...", "tokens": "<path>", "spacingOwner": "layout"|"component"}`) — if present, use it to resolve which naming convention, token source, and spacing-ownership rule apply.
    - State explicitly, at the top of the review, which methodology-layer lanes are enabled and which are skipped (and why — no config detected). Universal-layer findings (cascade hygiene, Defensive CSS, animation performance, semantic HTML, browser syntax) always run regardless of detection.
-3. Read `skill: css-modern`, `skill: defensive-css`, and `skill: css-cascade` before reviewing — they hold the legacy-to-modern replacement table, the Defensive CSS intent table, and the cascade-resolution mechanism this review is built on.
+3. Read `skill: css-modern`, `skill: defensive-css`, `skill: css-cascade`, and `skill: css-units` before reviewing — they hold the legacy-to-modern replacement table, the Defensive CSS intent table, the cascade-resolution mechanism, and the unit-resolution mechanism this review is built on.
 4. Run diagnostic commands available in the project (stylelint, html-validate) — see Diagnostic Commands below.
 5. Focus on modified `.css`/`.scss`/`.html` files, plus `<style>` blocks and CSS-in-JS objects inside component files the diff touches (`.tsx`/`.vue`/`.svelte`/`.astro` — the extension filters above do not catch these, so list them with `git diff --name-only` and grep for `<style` / `styled.` / `css\``), and read surrounding context — including the existing cascade for the selectors touched — before commenting.
 6. Begin review.
@@ -72,6 +72,8 @@ Every finding line states, in one sentence, **why it visibly breaks** — this c
 - **Heading order violation**: `<h1>` followed by `<h3>` with no `<h2>`. Why it visibly breaks: screen-reader users navigate by heading level and lose the document outline.
 - **Landmark misuse**: multiple unlabeled `<nav>`/`<main>`, or interactive content outside any landmark. Why it visibly breaks: landmark navigation (a primary screen-reader workflow) can no longer distinguish sections.
 - **Interaction chain without `:focus-visible`** (`:hover`/`:active` styled while focus is not, or `outline: none` with no replacement). Why it visibly breaks: keyboard users lose all visual indication of where focus is — see `skill: css-cascade`'s LVFHA ordering.
+- **Root or body `font-size` in `px`** (or any text size in `px` on `html`/`:root`). Why it visibly breaks: the user's default-font-size preference is silently ignored across the whole page — page zoom still works, the setting does not. See `skill: css-units`.
+- **Fluid `font-size` whose preferred term has no `rem`/`em` component** (`clamp(1rem, 2vw, 2rem)`, `font-size: 2vw`). Why it visibly breaks: at 200% zoom the viewport term does not grow, so the text does not either — fails WCAG 1.4.4. See `skill: css-units`.
 
 ### CRITICAL -- Cascade Hygiene
 
@@ -96,6 +98,11 @@ Apply the intent table from `skill: defensive-css` to the diff. For each violate
 
 - **Syntax not covered by the project's browserslist**, or not Baseline widely available, used without a fallback (`@supports`, `var()` fallback, progressive enhancement). Why it visibly breaks: the feature silently no-ops or throws a parse error on a browser the project claims to support, and nothing in CI catches it.
 - **Unsupported selector inside a shared, comma-separated selector list** without `:is()`/`:where()` or an `@supports selector()` gate (e.g. `input.invalid, input:user-invalid {}`). Why it visibly breaks: an unrecognized entry invalidates the *whole* ruleset on browsers that don't support it, not just that entry — every selector in the list stops matching. Note `:has()` is not a forgiving selector list (spec changed 2023); treat it like a plain list, not like `:is()`.
+
+### HIGH -- Units
+
+- **`line-height` with `em`/`px` on a container**. Why it visibly breaks: it is computed once on the parent and inherited as a fixed length; a larger-font child gets a line-height smaller than its own text — overlapping lines. Use unitless `line-height`. See `skill: css-units`.
+- **`font-size` in `em` on a component that nests itself** (lists, trees, comment threads, nested cards). Why it visibly breaks: the value compounds per level (16 → 12.8 → 10.24px) instead of staying constant; use `rem`. See `skill: css-units`.
 
 ### HIGH (methodology-gated) -- Only when the corresponding methodology is detected
 
@@ -168,4 +175,4 @@ Always include the file path and line number. Quote the offending declaration/se
 ## Related
 
 - Agents: `code-reviewer` (generic project-wide review), `react-reviewer` (JSX a11y and hooks, invoked alongside on `.tsx` + `.css` changes), `e2e-runner` (rendered-DOM verification: contrast, focus, overflow, axe)
-- Skills: `skill: css-modern` (legacy-to-modern syntax replacement table), `skill: defensive-css` (content/environment robustness intent table), `skill: css-cascade` (cascade resolution order and specificity mechanism)
+- Skills: `skill: css-modern` (legacy-to-modern syntax replacement table), `skill: defensive-css` (content/environment robustness intent table), `skill: css-cascade` (cascade resolution order and specificity mechanism), `skill: css-units` (relative-unit resolution and zoom-safe fluid typography)
