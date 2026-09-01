@@ -71,14 +71,18 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
   ```
   yoki-graph run review --backend codex --args '{"range":"origin/main...HEAD"}'
   ```
-  `args: { range?: string, model?: string }`。`range` 省略時は worktree vs
-  `origin/main` の merge-base(未 push のコミット+未コミット変更を両方含む)。
+  `args: { range?: string, model?: string, providers?: array }`。`range`
+  省略時は worktree vs `origin/main` の merge-base(未 push のコミット+
+  未コミット変更を両方含む)。`providers` は **Claude Code から起動する
+  ときだけ**意味を持つ(後述「Claude Code から Codex/omp レーンを混ぜる」)
+  — yoki-graph から起動する場合は `--backend` が全レーンを決めるので不要。
 
 - **research** — 複数角度の調査、根拠つき統合
   ```
   yoki-graph run research --backend omp --args '{"question":"..."}'
   ```
-  `args: { question: string, context?: string, model?: string, language?: string }`
+  `args: { question: string, context?: string, model?: string,
+  language?: string, providers?: array }`
 
 - **implement** — 合意済みタスクリストのバッチ実行(依存波・ファイル重複
   バッチ・per-task verify+retry・最終ゲート・任意 delivery)
@@ -153,8 +157,17 @@ ID はそのまま通る。
 - 進捗行・journal・`--json` イベント・`status` はすべて**解決後の ID**を出す:
   `→ review:security (codex gpt-5.6-sol) [Review]`。`--model-map` や
   呼び出しごとの `model` が絡むと "sonnet" という表示は何も特定しないため。
-- ラン終了時にモデル別の表(calls / tokens / wall)が出る。`run.json` にも
-  入るので `yoki-graph status <runId>` で後から同じ表を見られる。
+- ラン終了時にモデル別の表(calls / tokens / cached / wall)が出る。
+  `run.json` にも入るので `yoki-graph status <runId>` で後から同じ表を見られる。
+  行のキーは **backend + 解決後の ID**。backend 列は複数 backend を混ぜた
+  ランでだけ出る(単一 backend のランの表は従来どおり)。表と usage 行は
+  **JSON の result より前**に出る — result は数千行になり得るので、後ろに
+  置くと TTY では流れ、リダイレクトしたログでは最下部に埋もれるため。
+- `cached` は「入力のうちキャッシュから供給された分」。**`tokens` には
+  足さない**。codex の `cached_input_tokens` は `input_tokens` の
+  部分集合(足すと二重計上 — 実際に 4.1M のランが 7.46M と報告された)、
+  omp の `cacheRead` は `input` と互いに素でレコード自身の `totalTokens` に
+  既に含まれる。向きが逆なので backend ごとに扱いを変えている。
 
 ## 進捗の見かた
 
@@ -167,8 +180,10 @@ ID はそのまま通る。
   増え、実行中の tool 呼び出し数を伝える `agent-progress` イベントが増えた
   (codex は `--json` の item イベント、omp は json モードのイベント列から
   数える。mock は合成値を1回だけ返す)。
-- `yoki-graph status <runId> --watch` は journal を2秒ごとに読み直して同じ
-  状態行を描き、ランが終わったら通常の `status` 出力を出して終了する。
+- `yoki-graph status <runId> --watch` は2秒ごとに journal の**追記分だけ**を
+  読んで同じ状態行を描き(全文再読み込みではないので、長いランでも1tickの
+  コストが増えていかない)、ランが終わったら通常の `status` 出力を出して
+  終了する。ファイルが短くなったら(切り詰め・ローテート)全文を読み直す。
 
 ## guard / 日次キャップ
 
@@ -193,6 +208,102 @@ ID はそのまま通る。
   `agent()` はどのバックエンドも呼ばずプレースホルダを返すだけなので、
   backend 固有の実行を検証したことにはならない点に注意。
 - 拒否されると exit code 1、標準出力に理由(トークン消費の目安つき)が出る。
+
+## 1つのランで backend を混ぜる(呼び出しごとの backend)
+
+`--backend` はランの既定値。呼び出し1つだけ別の backend に振るには
+`agent(prompt, { backend: 'omp' })`。1つのランで codex と omp のレーンを
+混ぜられる。
+
+| 呼び出しごと | ラン全体で共有 |
+| --- | --- |
+| backend モジュール(argv・実行・usage の読み方・schema ネイティブ対応) | 同時実行セマフォは**1つ**。混ぜても並列度は倍にならない |
+| モデル解決(その backend の tier マップで引く。`sonnet` の実 ID は codex と omp で違う) | journal / ロック / `--resume` の index 列 |
+| sandbox の既定値と表現方法 | 実行キャップ(agent 呼び出し数・トークン・wall) |
+
+存在しない backend 名は**致命的エラー**でランごと止まる(`null` に
+落とさない)。`{backend: 'codexx'}` が黙って `null` になると「その
+プロバイダは何も見つけなかった」と区別がつかず、しかも全レーンで同時に
+そうなるため。
+
+## `yoki-agent`(1回だけのバックエンド呼び出し)
+
+`domains/dev/bin/yoki-agent` は **`agent()` を1回だけ**実行する CLI。
+中身は yoki-graph とまったく同じ経路(api.js の `agent()`)を通るので、
+モデル解決・スキーマ検証とリトライ・タイムアウト・journal・実行キャップ・
+usage 計上のすべてがワークフロー内の1呼び出しと同一に振る舞う。
+
+```
+yoki-agent --backend codex|omp|mock [--model <tier|id>] [--schema <f.json>]
+    [--sandbox read-only|workspace-write|danger-full-access] [--cwd <dir>]
+    [--effort <level>] [--agent-type <name>] [--timeout <ms>] [--retries N]
+    [--model-map <tier>=<id>,...] [--label <text>] [--mock <file>] [--dry-run]
+    --prompt-file <file> [--json]
+```
+
+- **exit code**: `0` 成功 / `1` 使い方の誤り(必須フラグ欠落、prompt や
+  schema が読めない、未知の backend、綴りを間違えた tier)/ `2` バックエンド
+  失敗(spawn 失敗・非ゼロ終了・リトライ後のタイムアウト・キャップ超過)/
+  `3` リトライ後もスキーマを満たさなかった。
+- `--json` を付けると **stdout は結果 JSON だけ**(そのままパースできる)。
+  解決後のモデル・トークン・cached・所要時間を1行にまとめたフッターは
+  stderr に出る。付けない場合は結果もフッターも stdout。
+- `YOKI_AGENT_MOCK=<fixture.json>` を立てると、要求された backend が何であれ
+  mock に差し替わる(codex/omp が入っていない機体でレーンの配線を試すため)。
+  フッターは `backend=mock (requested codex)` と出るので、モックのランを
+  本物と取り違えることはない。
+- **日次キャップ(`workflow-guard.sh` と共有するワークフロー起動カウンタ)は
+  消費しない**。codex レーンを6本持つ review 1本は「ワークフロー起動1回」で
+  あって7回ではない。ラン単位の実行キャップ(`graphMaxAgentCalls` など)は
+  従来どおり効く。
+- PATH に無い機体もあるので、シェルから叩くときは
+  `"$(cd -P ~/.claude/skills/yoki-graph && cd ../../../../.. && pwd)/bin/yoki-agent"`
+  で解決できる(下のレーンの proxy prompt もこの手順を踏む)。
+
+## Claude Code から Codex/omp レーンを混ぜる
+
+**これは Claude Code 内で使う機能**で、yoki-graph の CLI 機能ではない。
+`review` / `research` / `design-review` に `providers` 引数が増えた:
+
+```js
+Workflow({ name: 'review', args: { providers: ['claude', 'codex'] } })
+Workflow({ name: 'research', args: {
+  question: '…',
+  providers: ['claude', { provider: 'codex', model: 'gpt-5.6-sol' }],
+} })
+```
+
+- 既定は `["claude"]`。**指定しなければ挙動は従来と完全に同じ** —
+  ラベルも prompt も agent() の呼び出し列(= journal と `--resume` の
+  prefix)も変わらない。
+- 指定するとレーンが「次元 × プロバイダ」に増える。review なら
+  `review:security` に加えて `review:security@codex/opus` が走る。
+- **なぜ proxy が要るか**: Claude Code は codex/omp を自分で起動できず、
+  yoki-graph には(意図的に)claude backend が無い。そこで橋渡しとして
+  安い Claude subagent(haiku・effort low)を1つ立て、それが
+  ①レーンの prompt を mktemp のファイルに**逐語で**書き出し、
+  ②`yoki-agent --backend <p> --model <m> --schema <f> --sandbox read-only
+  --prompt-file <f> --json` を1回だけ実行し、
+  ③その JSON を**一切言い換えずそのまま**返す。
+  非ゼロ終了なら `{ok:false, error, exitCode, stderrTail}` を返す。
+  proxy は運搬役であって評価者ではない — 別プロバイダの意見を得るのが
+  目的なので、要約・再スコアリング・並べ替え・自前回答はすべて禁止。
+- **失敗したレーンは落ちる。ただし黙っては落ちない**: `log()` に
+  `review:tests@codex/sonnet: dropped — codex exec exited 1 — exit 2` の
+  ような1行が出る。捏造した所見で埋めることはしない。
+- **Verify とマージ**: 検証(adversarial verify)は必ず Claude 側で回す —
+  プロバイダに自分の審判をさせない。確定した所見は
+  **file + line + title**(research は claim + source、design-review は
+  claim)で重複排除し、**和集合**を残す: 両者が挙げた所見は
+  `providers: ["claude","codex"]` を持つ1件にまとめ、片方しか挙げなかった
+  所見はそのまま残る。所見には `provider` / `model` が付き、返り値には
+  プロバイダ別にまとめた `by_provider` が入る。
+- **ヘルパの正本は `core/workflows/lib/lanes.js`**。Workflow スクリプトは
+  モジュールを持たない(`require`/`import`/fs いずれも不可 — 両ランタイムとも
+  固定のグローバルだけを注入した素の async 関数に body をコンパイルする)ため、
+  3本のスクリプトに**同一の本文をインライン複製**している。直すときは
+  lanes.js を先に直してから3本に貼り直す(`lanes.test.js` が
+  4つのコピーのバイト一致を検査していて、ズレると落ちる)。
 
 ## sandbox(agent() ごとの書き込み権限)
 
@@ -224,7 +335,11 @@ yoki state ファイルと同じ解決)に
 `{gen, index, key, label, phase, status, result, tokens?, tokensSource?,
 usage?, durationMs}` が追記される。`index` は呼び出しの到着順、`gen` は
 その runId に対する何回目の実行か、`key` は
-`sha256(prompt + JSON(opts))`(スクリプトが付けた `label` も含む)。
+`sha256(prompt + JSON(opts + 解決後の backend + 解決後の model))`
+(スクリプトが付けた `label` も含む)。`opts.model` だけでは足りない —
+省略されてランの `--model` を継ぐことも、`--model-map` で意味が変わる
+tier 名であることもあるため。これが無かった頃は、`--model` を差し替えて
+`--resume` すると**別のモデルが出した答え**が再生されていた。
 
 - `yoki-graph run` の標準出力/`--json` は `run.json`(name/backend/args/cwd/
   status/error/usage)とこの journal をそのまま反映したイベントストリーム。
@@ -241,6 +356,8 @@ usage?, durationMs}` が追記される。`index` は呼び出しの到着順、
 - したがって `--args` を変えて同じ runId に `--resume` しても安全:
   変わった呼び出し以降はライブで走り直る。逆に、**変えていない**ランを
   再開すると全件が再生されてバックエンドは1回も起動しない。
+  `--model` / `--model-map` / 呼び出しごとの `{backend}` を変えた場合も
+  同じで、影響を受けた呼び出しから先はライブで走り直る。
 - 失敗した呼び出し(`status: "error"`)は再生されない — 再開すると再試行
   される。リトライ行(`status: "retry"`)も再生対象外。
 
@@ -275,11 +392,12 @@ usage?, durationMs}` が追記される。`index` は呼び出しの到着順、
   既定15分。超えた子プロセスは SIGKILL され、`timedOut: true` で journal に
   記録される(タイムアウトは一時障害扱いなのでリトライ対象)。
 - **トークン**: 各バックエンド自身の出力から読む — codex は `--json` の
-  `turn.completed` の usage、claude は `--output-format json` の `usage` と
-  `total_cost_usd`、omp は assistant レコードの `usage`。報告が無い場合だけ
-  出力長からの**推定**にフォールバックし、`tokensSource: "estimated"` と
-  明示する(黙って 0 にはしない)。ラン終了時に
-  `tokens: N (X reported, Y estimated)` の1行が出る。
+  `turn.completed` の usage、omp は assistant レコードの `usage`。報告が
+  無い場合だけ出力長からの**推定**にフォールバックし、
+  `tokensSource: "estimated"` と明示する(黙って 0 にはしない)。ラン終了時に
+  `tokens: N (X reported, Y estimated) — over K agent calls — M cached` の
+  1行が出る。codex の課金対象は `input + output` のみで、キャッシュ分は
+  加算しない(上の「モデルの指定と表示」参照)。
 
 ## 同一 runId の同時実行はロックで防ぐ
 

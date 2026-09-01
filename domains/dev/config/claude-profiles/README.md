@@ -317,6 +317,35 @@ Claude Code の中ではネイティブの Workflow tool が唯一のサポー�
 `claude -p` を叩くのはそれと二重の非サポート経路になるため
 (`--backend claude` はその旨を名指しで拒否する)。
 
+`--backend` はランの既定値で、呼び出し1つだけ別の backend に振ることも
+できる(`agent(prompt, { backend: 'omp' })`)。1つのランで codex と omp の
+レーンを混ぜられ、モデル解決・sandbox・usage の読み方は呼び出しごと、
+同時実行セマフォ・journal・実行キャップはラン全体で共有する。
+
+### yoki-agent
+
+`domains/dev/bin/yoki-agent` は **`agent()` を1回だけ**実行する CLI。中身は
+yoki-graph とまったく同じ経路を通るので、モデル解決・スキーマ検証・
+リトライ・journal・実行キャップ・usage 計上がワークフロー内の1呼び出しと
+同一に振る舞う。
+
+```bash
+yoki-agent --backend codex --model sonnet --schema lane.json \
+    --sandbox read-only --prompt-file lane.txt --json
+```
+
+exit code は `0` 成功 / `1` 使い方の誤り / `2` バックエンド失敗 /
+`3` リトライ後もスキーマ不一致。`--json` のとき stdout は結果 JSON だけで、
+解決後のモデルと usage のフッターは stderr に出る。
+
+これがあることで、Claude Code の `review` / `research` / `design-review` に
+`providers: ["claude","codex"]` を渡してレーンをプロバイダごとに増やせる
+(Claude Code は codex/omp を自分では起動できないので、安い Claude
+subagent が運搬役として yoki-agent を叩き、返ってきた JSON を逐語で返す)。
+確定した所見は file+line+title で重複排除して**和集合**を残し、
+`provider` / `model` が付く。詳細は `core/skills/yoki-graph/SKILL.md` の
+「Claude Code から Codex/omp レーンを混ぜる」。
+
 ### yoki-loop
 
 Codex/omp には Claude Code の `/loop` に相当するセッション内蔵の定期実行が

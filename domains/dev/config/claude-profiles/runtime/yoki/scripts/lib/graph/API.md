@@ -60,6 +60,11 @@ access from the script body itself (only through `agent()`).
     the backend for the tiers that accept it (omp has `--thinking`; codex
     has no such flag, so the value is folded into the prompt preamble and
     the comment in backends/codex.js says so).
+  - `opts.backend` — `'codex' | 'omp' | 'mock'`, overriding the run's
+    `--backend` for THIS call. Omitted = the run's backend. See "Per-call
+    backends" below; this option is yoki-graph's own, with no Workflow-tool
+    counterpart (inside Claude Code the equivalent is a provider lane — see
+    `core/workflows/lib/lanes.js`).
   - `opts.isolation: 'worktree'` — run this one agent() call inside a fresh
     `git worktree`, auto-removed after if the tree is clean.
   - `opts.sandbox` — `'read-only' | 'workspace-write' | 'danger-full-access'`.
@@ -190,6 +195,60 @@ unknown value, and `backends/claude.js` is gone from disk. The same decision
 removed `--harness claude` from yoki-loop, where Claude Code's own `/loop`
 and scheduled routines already cover the need.
 
+### Per-call backends
+
+`--backend` sets the run's default; `agent(prompt, {backend: 'omp'})`
+overrides it for one call, so a single run can mix codex and omp lanes.
+What is shared and what is per call:
+
+| per call | shared by the run |
+| --- | --- |
+| the backend module (`buildArgv`, `run`, `extractText`, `extractUsage`, `supportsSchemaNatively`) | the concurrency limiter — ONE semaphore, so a mixed run does not get double the machine load |
+| model resolution, against THAT backend's tier map (`sonnet` is a different id on codex than on omp) | the journal, the run lock, `--resume`'s index sequence |
+| the sandbox default and how it is expressed | the agent-call / token / wall-clock caps (budget.js) |
+| the usage reader, and therefore the token semantics | the `run.json` totals and the per-model table |
+
+The resolution lives in `backends/index.js` rather than in runner.js because
+api.js needs it too and may not require runner.js (which requires api.js).
+
+An unknown per-call backend is FATAL, not a lane that resolves to `null`:
+`parallel()`/`pipeline()` re-raise it the way they re-raise a budget breach.
+A typo'd `{backend: 'codexx'}` degrading to `null` would look exactly like
+"that provider found nothing", in every lane at once.
+
+`yoki-agent` (`domains/dev/bin/yoki-agent`, implemented in `agent-cli.js`)
+runs exactly ONE such call from the command line, through this same
+`agent()`. It is what a Claude Code provider lane shells out to, since
+Claude Code cannot spawn codex/omp itself:
+
+```
+yoki-agent --backend codex|omp|mock [--model <tier|id>] [--schema <f.json>]
+    [--sandbox read-only|workspace-write|danger-full-access] [--cwd <dir>]
+    [--effort <level>] [--agent-type <name>] [--timeout <ms>] [--retries N]
+    [--model-map <tier>=<id>,...] [--label <text>] [--mock <file>] [--dry-run]
+    --prompt-file <file> [--json]
+```
+
+Exit codes — the contract a lane's transport agent branches on: `0` ok,
+`1` usage (bad flags, unreadable prompt/schema, unknown backend, misspelled
+model tier), `2` backend error (spawn failure, non-zero exit, timeout after
+retries, or a budget breach), `3` schema validation failed after the one
+retry. Under `--json` stdout is the result and nothing else, so the caller
+can parse it whole; the one-line footer (resolved model, tokens, cached,
+duration) goes to stderr.
+
+`YOKI_AGENT_MOCK=<fixture.json>` reroutes ANY requested backend to the mock
+one with that fixture — how a provider lane is exercised without codex/omp
+installed. The footer still names the backend that was asked for
+(`backend=mock (requested codex)`), so a mock run is never mistakable for a
+real one.
+
+The daily WORKFLOW cap (guard.js, shared with workflow-guard.sh) is
+deliberately NOT charged per `yoki-agent` call: one review with six codex
+lanes is one workflow launch, not seven, and a five-launch day would
+otherwise be spent inside a single run. The per-run budget caps (budget.js)
+ARE charged, through the same `assertWithinCaps` every workflow call uses.
+
 ## `--resume`: an index-ordered prefix replay
 
 `--resume <runId>` does NOT look results up by key. It replays the longest
@@ -197,7 +256,7 @@ PREFIX of this run's `agent()` calls that still matches the journal:
 
 1. Every `agent()` call gets an `index` — its position in this run's arrival
    order — recorded in the journal alongside its `key`
-   (`sha256(prompt + NUL + JSON(opts))`).
+   (`sha256(prompt + NUL + JSON(opts + resolved backend + resolved model))`).
 2. A resumed run walks its own calls 0, 1, 2, … and replays call *i* only
    while the journal holds a completed (`status: 'ok'`) entry at index *i*
    whose key matches. Replaying costs nothing: no process is spawned and the
@@ -214,6 +273,13 @@ lanes that send the same prompt under different labels are different work),
 while an auto-generated one (`(unlabeled)`, `agent-<n>`) is stripped — it
 embeds arrival order, which interleaves nondeterministically under
 concurrency, so keeping it would miss the replay on every rerun.
+
+The key also carries what the RUNNER resolved — the per-call backend and the
+concrete model id — not just what the script typed. `opts.model` cannot
+stand in for them: it is often absent (the call inherits the run's
+`--model`) or a tier name whose meaning `--model-map` can redefine. Without
+this, a resume that changed `--model`, `--model-map` or a call's `{backend}`
+replayed the answer a DIFFERENT model produced, which is not the same work.
 
 Failed and retried calls are never replayed: a resumed run retries them.
 
@@ -252,11 +318,18 @@ without editing `core/harness-models.json`.
 Resolution happens in the runner, not the backend, because the RESOLVED id is
 what has to be visible: every `agent-start`/`agent-end`/`agent-progress`
 event carries `backend` and `model` (plus `modelTier` on start), every
-journal entry records `model`, and the end of a run prints a per-model table
-of calls, tokens and model-seconds (`journal.usageByModel()`, also stored in
-`run.json` so `yoki-graph status` can reprint it). A progress line reading
-"sonnet" says nothing about which model actually ran once `--model-map` or a
-per-call override is in play.
+journal entry records both, and the end of a run prints a per-model table of
+calls, tokens, cached tokens and model-seconds (`journal.usageByModel()`,
+also stored in `run.json` so `yoki-graph status` can reprint it). A progress
+line reading "sonnet" says nothing about which model actually ran once
+`--model-map` or a per-call override is in play.
+
+The table's rows are keyed by BACKEND + resolved id, and the backend column
+appears only when a run actually mixed backends — a mixed run must not blur
+two CLIs' spend into one row, and a single-backend run gains no noise. The
+accounting is printed BEFORE the JSON result, not after: a workflow result
+runs to thousands of lines, and a table below it is scrolled off a TTY and
+buried at the bottom of a redirected log.
 
 ## Live progress
 
@@ -323,11 +396,26 @@ rather than silently reported as an ordinary crash.
 Each backend reads its own primary source, off the RAW envelope before
 `extractText` unwraps it:
 
-| backend | source |
-| --- | --- |
-| codex | `turn.completed` events in the `--json` stream (summed); falls back to a rollout `token_count` record's `total_token_usage` |
-| omp | an assistant record's `usage` (`{input, output, cacheRead, cacheWrite, totalTokens, cost}` — omp's camelCase names, pinned by spike S4-S5-omp.md and read the same way by `lib/harness/session.js`); `cost` is the only USD figure any backend reports |
-| mock | none — nothing is spawned |
+| backend | source | what counts as spend |
+| --- | --- | --- |
+| codex | `turn.completed` events in the `--json` stream (summed); falls back to a rollout `token_count` record's `total_token_usage` | `input_tokens + output_tokens`. The cached counts are **excluded** |
+| omp | an assistant record's `usage` (`{input, output, cacheRead, cacheWrite, totalTokens, cost}` — omp's camelCase names, pinned by spike S4-S5-omp.md and read the same way by `lib/harness/session.js`); `cost` is the only USD figure any backend reports | the record's own `totalTokens`, which **includes** `cacheRead`/`cacheWrite` |
+| mock | none — nothing is spawned | — |
+
+**The two backends treat cached tokens oppositely, and that is not a bug.**
+In codex's accounting `cached_input_tokens` is the cached PART of
+`input_tokens` — a subset, not an extra charge — so adding it double-counted
+every cached prefix: a real review run reported 7.46M tokens against a true
+~4.1M, because e.g. `{input 77961, cached 57856, output 884}` was booked as
+136701 instead of 78845. In omp's, `input` is ~2 tokens beside a 50k
+`cacheRead` and the record's own `totalTokens` equals
+`input+output+cacheRead+cacheWrite`, so its cached counts are disjoint from
+its input and DO belong in the total.
+
+Either way the cached number is kept and reported separately — as its own
+`cached` column in the per-model table and its own `N cached` clause in the
+usage line — never folded into `tokens`. How much of the input was served
+from cache is worth seeing; it just is not a second charge.
 
 When a backend reports nothing, the call is charged an explicit ESTIMATE
 (~4 characters per token) labelled `tokensSource: 'estimated'`, never a
