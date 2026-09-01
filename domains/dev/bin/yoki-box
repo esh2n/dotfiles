@@ -2,7 +2,7 @@
 # Run a coding agent inside a Docker Sandboxes microVM, provisioned with the
 # yoki harness. Invoked through its symlinks, never by this name:
 #
-#   yclaude / ycodex / ypi / ...       run that agent in a sandbox
+#   yclaude / ycodex / yomp / ...       run that agent in a sandbox
 #   yfetch                             pull a sandbox's branches to the host
 #
 # The `y` prefix is the whole interface: `claude` is the host, `yclaude` is the
@@ -198,7 +198,7 @@ do_run() {
     args+=("${DOTFILES_ROOT}/domains/dev/bin:ro")
     args+=("${DOTFILES_ROOT}/domains/dev/config/claude-profiles:ro")
     # Plus the agent's own config directory when the repo carries one, so an
-    # agent that keeps settings outside claude-profiles (pi does) needs no
+    # agent that keeps settings outside claude-profiles (omp does) needs no
     # change here. Adding an agent stays: one symlink, one kit, one config dir.
     [ -d "${DOTFILES_ROOT}/domains/dev/config/${agent}" ] \
       && args+=("${DOTFILES_ROOT}/domains/dev/config/${agent}:ro")

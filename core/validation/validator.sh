@@ -126,7 +126,6 @@ run_all_checks() {
         correction-distill
         worktree-guard
         yoki-box
-        pi-yoki-guard
         omp-yoki-bridge
         harness-adapter
         yoki-artifact
@@ -217,10 +216,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-yoki-box.sh"
             run_yoki_box_checks
             ;;
-        "pi-yoki-guard")
-            source "${SCRIPT_DIR}/test-pi-yoki-guard.sh"
-            run_pi_yoki_guard_checks
-            ;;
         "omp-yoki-bridge")
             source "${SCRIPT_DIR}/test-omp-yoki-bridge.sh"
             run_omp_yoki_bridge_checks
@@ -271,7 +266,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|pi-yoki-guard|omp-yoki-bridge|harness-adapter|yoki-artifact|yoki-graph|suggest-compact|workday-calc]"
+            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|omp-yoki-bridge|harness-adapter|yoki-artifact|yoki-graph|suggest-compact|workday-calc]"
             echo "       (no args runs every self-contained regression suite)"
             exit 1
             ;;

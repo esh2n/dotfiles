@@ -27,6 +27,12 @@
     "discord"
     # codex ships as a cask only — there is no `codex` formula, so listing it
     # under brews made `brew bundle` fail and left the install unmanaged.
+    # Minimum 0.147.0 (yoki's trust-hash format assumes it), recommended
+    # 0.150.0+ (adds the Interrupt hook event; see
+    # claude-profiles/runtime/yoki/scripts/lib/doctor.js and
+    # lib/targets/codex.js's EVENT_MIN_CODEX_VERSION, and
+    # claude-profiles/README.md's doctor section). `yoki-switch doctor`
+    # warns/fails below these floors with the exact fix: `brew upgrade --cask codex`.
     "codex"
     # microVM sandbox for coding agents. docker/tap is casks-only too (same
     # trap as codex); the tap is trusted by core/utils/homebrew.sh.

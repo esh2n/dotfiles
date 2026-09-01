@@ -116,8 +116,16 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
 - **claude**: `~/.claude` のマージdirシンボリックリンクが解決するか、
   `settings.json` がパースできるか、そこから参照される hook スクリプトが
   存在し実行可能か、`.yoki/permissions.json` が存在するか
-- **codex**: `codex --version`(`< 0.150.0` で warn = Interrupt hook 未対応、
-  `< 0.147.0` で fail)、`~/.codex` の有無、`[features] hooks = true`、
+- **codex**: `codex --version`(最低 `0.147.0`、推奨 `0.150.0`
+  以上 — `0.147.0` 未満は fail、`0.147.0`〜`0.150.0`未満は warn = Interrupt
+  hook 未対応。どちらのメッセージにも更新コマンドそのもの
+  `brew upgrade --cask codex` を出す。`gen.js`側(`lib/targets/codex.js`の
+  `plan()`、task T32)も同じ`codex --version`を apply 時に一度読んで
+  plan結果に`codexVersion`としてキャッシュし、設定レイヤーに
+  `Interrupt`フックが宣言されていてもインストール済みバージョンが
+  `0.150.0`未満(またはバージョン不明)なら warning 付きでスキップする —
+  `hooks.json`に未対応イベントを書いて `codex exec` に無言で無視させない
+  ため)、`~/.codex` の有無、`[features] hooks = true`、
   自分が生成した `hooks.json` グループの有無、**その全ハンドラの
   `[hooks.state]` 信頼ハッシュを再計算して一致するか**(ズレていたら
   「codex exec で無言スキップされる、yoki-switch apply を実行」と案内)、
@@ -145,6 +153,72 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
 `[hooks.state]` の信頼ドリフト検出、`default_permissions`/`sandbox_mode`
 衝突検出)をテキスト/一時ホームだけでテストし、実際の `codex`/`omp`
 バイナリや `yoki-artifact` には依存しない。
+
+### どのファイルがマシンローカルか
+
+`apply` は基本的に「毎回丸ごと再生成」だが、マーカーブロックの外や
+ジェネレータが関知しない部分にはこのマシンだけの状態が残り続ける。
+2回目以降の `apply` でこれらが失われないことは
+`core/validation/test-yoki-switch-targets.sh` の冪等性テストで担保している:
+
+- `~/.claude/.claude-packs` — このマシンで有効なパックの選択(git管理外。
+  初回は `packs.default` から複製)
+- `~/.claude/settings.local.json` — マシン固有設定(レイヤ優先順位の
+  `personal` の次、プロジェクト設定の手前)
+- `~/.codex/config.toml` のマーカーブロック外(`[projects.*]` などCodex
+  自身が書く設定、および手で追記した内容)
+- `~/.codex/models_cache.json` / ログイン状態 — `doctor` は読んで
+  診断に使うだけで、生成器はどちらも一切書かない
+- `~/.omp/agent/config.yml` の `symbolPreset`/`composer`/`theme`/
+  `setupVersion` の4キー — omp自身が実行時に書き換える値なので、
+  それ以外を毎回丸ごと再生成する `omp-config-yml.js` もこの4つだけは
+  既存ファイルから引き継ぐ
+- `<out>/.yoki/codex-manifest.json` / `<out>/.yoki/omp-manifest.json` —
+  このマシンで最後に `apply` が置いた生成物の記録(`--prune` 専用、
+  コミット対象外)
+- `~/.config/yoki-artifact/config.json` — `baseUrl`/`clientId` のみ。
+  client secret はここには書かず `secretCommand` 経由で毎回引く
+
+### yoki-graph
+
+`core/workflows/*.js`(Claude Code の Workflow tool が実行するのと同じ
+スクリプト)を Codex/omp からも起動するための CLI
+(`domains/dev/bin/yoki-graph`、実体は `runtime/yoki/scripts/lib/graph/`)。
+Claude Code の中ではネイティブの Workflow tool がそのまま本来の経路で、
+yoki-graph に切り替える必要はない — Workflow tool を持たない harness から
+同じグラフを動かしたいとき、または `--resume`/`status` でランを直接
+触りたいときに使う。詳細なコマンド一覧・ワークフロー別の引数は
+`core/skills/yoki-graph/SKILL.md` を参照:
+
+```bash
+yoki-graph run review --backend codex --args '{"range":"origin/main...HEAD"}'
+yoki-graph list
+yoki-graph status <runId>
+```
+
+### yoki-loop
+
+Codex/omp には Claude Code の `/loop` に相当するセッション内蔵の定期実行が
+無いため、その代わりに launchd/cron から呼ばれる外側のheadlessランナーを
+`domains/dev/bin/yoki-loop` として用意している。詳細は後述の
+「Loop レイヤー(task T19)」を参照。
+
+### yoki-artifact
+
+`writeup`/`eli5`/`show-me` などが作った HTML 1枚を、Claude/Codex/ompの
+どこから呼んでも同じ private URL に発行・更新できる CLI
+(`domains/dev/bin/yoki-artifact`、実体は
+`core/skills/yoki-artifact/bin/yoki-artifact.mjs`)。Claude Code内で完結する
+1回きりのページはネイティブの Artifact tool の方が手数が少ない —
+yoki-artifact を選ぶのは Artifact tool を持たない harness から公開したい、
+同じページを複数harnessから更新し続けたい、コメントをCLIから読み書き
+したいときだけ。使い方の全体は `core/skills/yoki-artifact/SKILL.md`。
+
+**初期設定はマシンごとに一度だけ必要**: Cloudflare Workers + R2 + D1 +
+Access を立てる手作業(Zero Trust オンボーディング、IdP登録など)と、
+そこから先の自動セットアップ(`worker/scripts/setup.mjs`)に分かれる。
+手順は `core/skills/yoki-artifact/worker/SETUP.md` を参照— この手作業を
+飛ばすと自動セットアップは必ず失敗するので、必ず上から順に読むこと。
 
 ### 4つ目のターゲットを足す場合
 

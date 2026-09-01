@@ -9,8 +9,7 @@ description: >-
   claude-profiles layers (core + packs + personal) the host uses, so a
   sandboxed Codex session gets the same hooks/rules/agents/skills parity
   yoki-claude already has (task T15 closes the gap yoki-claude's kit left
-  open — see yoki-pi's/yoki-omp's kits for the same shape a generation
-  earlier).
+  open — see yoki-omp's kit for the same shape a generation earlier).
 
 # Rendered by yoki-box at launch, into a temp dir, and never installed as a
 # file — same reasoning as the claude kit's spec.yaml.in: {{DOTFILES_ROOT}}

@@ -62,6 +62,11 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'AI Agents',
+					translations: { ja: 'AI Agents' },
+					items: [{ label: 'yoki ハーネス', slug: 'ai/yoki' }],
+				},
+				{
 					label: 'Terminal',
 					translations: { ja: 'Terminal' },
 					items: [

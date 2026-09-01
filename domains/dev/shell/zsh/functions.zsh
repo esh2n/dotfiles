@@ -2492,25 +2492,6 @@ claude-unattended() {
 }
 
 # Toggle auto mode for claude (persisted to ~/.claude/.auto-mode)
-# -----------------------------------------------------------------------------
-# pi wrapper — same shape as the claude one above
-# -----------------------------------------------------------------------------
-# pi is an npm global under ~/.local, not a nix package: nixpkgs does not carry
-# @earendil-works/pi-coding-agent, and agent CLIs in this repo are installed
-# out-of-band anyway (claude the same way). So the reproducibility this can
-# offer is a named install command instead of a "command not found".
-#
-# The yoki guard extension lives in domains/dev/config/pi/extensions and is
-# installed by yoki-switch/manager.sh, not by this function.
-pi() {
-    local pi_bin="${HOME}/.local/bin/pi"
-    if [[ ! -x "$pi_bin" ]]; then
-        echo "\033[31mpi not found at ${pi_bin}. Run: npm install -g --prefix ~/.local @earendil-works/pi-coding-agent\033[0m" >&2
-        return 1
-    fi
-    "$pi_bin" "$@"
-}
-
 claude-auto() {
     local flag="$HOME/.claude/.auto-mode"
     case "${1:-}" in
@@ -3062,8 +3043,9 @@ _chooks_profile() {
     echo "Takes effect on next Claude Code session."
 }
 
-# omp (oh-my-pi) is the daily driver for non-Claude models; pi is retired but
-# its wiring stays dormant. The wrapper pins the security posture:
+# omp (oh-my-pi) is the daily driver for non-Claude models; the earlier
+# pi-coding-agent wiring it replaced (2026-08-24) has been removed. The
+# wrapper pins the security posture:
 # --no-extensions stops repo-local .omp/ extensions from auto-executing on
 # session start (omp runs them by design, issue #8678), while the explicit -e
 # keeps the yoki bridge loaded — explicit paths survive --no-extensions.

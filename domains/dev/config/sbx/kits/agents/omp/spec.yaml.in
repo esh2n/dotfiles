@@ -16,8 +16,8 @@ description: >-
 # design positions, not gaps (upstream issue #8678 closed as by-design). The
 # yoki-guard extension carries the git rules across, but the layer that stands
 # between an agent and `rm -rf` does NOT exist on the omp side, and a
-# repo-local extension runs before any guard can see it. Same conclusion as
-# the pi kit: omp needs the VM MORE than Claude Code does, not less.
+# repo-local extension runs before any guard can see it. So: omp needs the VM
+# MORE than Claude Code does, not less.
 
 permissions:
   network:
