@@ -18,6 +18,9 @@ const {
   unwrapHooksJson,
   checkCodexHooksShape,
   checkCodexTrustPort,
+  checkCodexConfigLoads,
+  checkCodexHooksEnv,
+  extractLoadError,
   checkStateHomeRelocation,
   extractHookCommands,
   extractHookScriptRefs,
@@ -188,6 +191,91 @@ test('checkCodexHooksShape: a missing or empty hooks.json warns rather than fail
 test('checkCodexHooksShape: what the generator writes today passes it', () => {
   const generated = { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js x --harness codex' }] }] };
   assert.equal(checkCodexHooksShape(mergeHooksJson({}, generated)).status, 'ok');
+});
+
+// ---------------------------------------------------------------------------
+// config-check / hooks-env: the two failures a real apply produced that every
+// existing check read straight past.
+// ---------------------------------------------------------------------------
+
+test('extractLoadError: keeps the "Caused by" line, which is the one naming the table', () => {
+  const message = extractLoadError({
+    status: 1,
+    stderr: 'Error: failed to load bootstrap configuration\n\nCaused by:\n    url is not supported for stdio\n    in `mcp_servers.notion-mcp`\n',
+    stdout: '',
+  });
+  assert.match(message, /failed to load bootstrap configuration/);
+  assert.match(message, /url is not supported for stdio/);
+});
+
+test('extractLoadError: falls back to the exit status when the command said nothing', () => {
+  assert.match(extractLoadError({ status: 3, stderr: '', stdout: '' }), /exited 3/);
+});
+
+test('checkCodexConfigLoads: a config.toml codex refuses to load FAILS with the reason', function (t) {
+  const codexDir = makeTmpDir('yoki-doctor-config-check-');
+  try {
+    writeFile(path.join(codexDir, 'config.toml'), '[features]\nhooks = true\n\n[features]\nmulti_agent = true\n');
+    const check = checkCodexConfigLoads(codexDir);
+    if (check.status === 'warn' && /not found on PATH/.test(check.hint)) {
+      t.skip('codex not installed on this machine');
+      return;
+    }
+    assert.equal(check.status, 'fail');
+    assert.equal(check.check, 'config-check');
+    assert.match(check.hint, /codex config\.toml does not load:/);
+  } finally {
+    fs.rmSync(codexDir, { recursive: true, force: true });
+  }
+});
+
+test('checkCodexConfigLoads: a config.toml the generator would produce loads', function (t) {
+  const codexDir = makeTmpDir('yoki-doctor-config-check-ok-');
+  try {
+    writeFile(
+      path.join(codexDir, 'config.toml'),
+      '[features]\nhooks = true\n\n[mcp_servers.n]\nurl = "https://example.invalid/mcp"\n'
+    );
+    const check = checkCodexConfigLoads(codexDir);
+    if (check.status === 'warn' && /not found on PATH/.test(check.hint)) {
+      t.skip('codex not installed on this machine');
+      return;
+    }
+    assert.equal(check.status, 'ok');
+  } finally {
+    fs.rmSync(codexDir, { recursive: true, force: true });
+  }
+});
+
+test('checkCodexHooksEnv: a command still carrying ${YOKI_ROOT} FAILS', () => {
+  const hooksJson = {
+    PreToolUse: [{
+      matcher: 'Bash',
+      hooks: [{ type: 'command', command: '"${YOKI_NODE:-node}" "${YOKI_ROOT}/scripts/hooks/run-with-flags.js" "pre:x" "hooks/x.js" --harness codex' }],
+    }],
+  };
+  const check = checkCodexHooksEnv(hooksJson);
+  assert.equal(check.status, 'fail');
+  assert.equal(check.check, 'hooks-env');
+  assert.match(check.hint, /codex does not set these for hook processes/);
+  assert.match(check.hint, /yoki-switch apply --target codex/);
+});
+
+test('checkCodexHooksEnv: absolute commands pass, and ${YOKI_NODE:-node} is not an offender', () => {
+  const hooksJson = {
+    PreToolUse: [{
+      matcher: 'Bash',
+      hooks: [{ type: 'command', command: '"${YOKI_NODE:-node}" "/opt/yoki/scripts/hooks/run-with-flags.js" "pre:x" "hooks/x.js" --harness codex' }],
+    }],
+  };
+  assert.equal(checkCodexHooksEnv(hooksJson).status, 'ok');
+});
+
+test('checkCodexHooksEnv: a FOREIGN hook using ~ is not our business', () => {
+  const hooksJson = {
+    SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: "bash '~/.codex/herdr-agent-state.sh' session" }] }],
+  };
+  assert.equal(checkCodexHooksEnv(hooksJson).status, 'ok');
 });
 
 // ---------------------------------------------------------------------------

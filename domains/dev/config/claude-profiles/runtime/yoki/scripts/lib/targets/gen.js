@@ -31,6 +31,7 @@ const os = require('os');
 
 const { assertWithinTrustedRoot, isWithinRoot } = require('../path-safety');
 const { manifestPathFor, manifestDestinations } = require('./manifest');
+const { assertValidCodexConfigToml } = require('./codex-config-toml');
 const codexTarget = require('./codex');
 const ompTarget = require('./omp');
 
@@ -225,6 +226,11 @@ function applyOp(op, ctx) {
   const dest = assertWithinTrustedRoot(op.destinationPath, root, op.kind);
 
   if (op.kind === 'write' || op.kind === 'toml-block') {
+    // Last line of defence before a config.toml Codex cannot load reaches
+    // disk. `applyManagedBlock` already ran the same check while planning;
+    // this repeats it against the exact bytes about to be written, because
+    // that is the artifact whose breakage costs the user a working Codex.
+    if (op.kind === 'toml-block') assertValidCodexConfigToml(op.content, dest);
     ensureParentDir(dest);
     writeFileAtomic(dest, op.content);
     return;

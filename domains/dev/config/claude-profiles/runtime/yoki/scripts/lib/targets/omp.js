@@ -110,8 +110,8 @@ function partitionGuardFloor(guardFloor) {
  * manifest states it and the bridge honours it; the hardcoded pair survives
  * only as the fallback for a machine whose manifest predates this field.
  */
-function buildHooksOperation({ settingsLayers, out, home, guardFloor }) {
-  const { generated, warnings, skipped } = buildYokiHooksJson(settingsLayers, { home });
+function buildHooksOperation({ settingsLayers, out, home, yokiRoot, pluginRoot, claudeDir, guardFloor }) {
+  const { generated, warnings, skipped } = buildYokiHooksJson(settingsLayers, { home, yokiRoot, pluginRoot, claudeDir });
 
   const { applicable, unsupported } = partitionGuardFloor(guardFloor || []);
   for (const entry of unsupported) {
@@ -299,7 +299,15 @@ function plan(options) {
   const convertedPermissions = convertPermissions(content.permissionsFiles);
 
   const guardFloor = resolveGuardFloor(content.permissionsFiles, home);
-  const hooks = buildHooksOperation({ settingsLayers: content.settingsLayers, out: outResolved, home, guardFloor });
+  const hooks = buildHooksOperation({
+    settingsLayers: content.settingsLayers,
+    out: outResolved,
+    home,
+    yokiRoot,
+    pluginRoot: options.pluginRoot || env.CLAUDE_PLUGIN_ROOT || yokiRoot,
+    claudeDir: options.claudeDir || path.join(home, '.claude'),
+    guardFloor,
+  });
   operations.push(hooks.op);
   warnings.push(...hooks.warnings);
   skipped.push(...hooks.skipped);

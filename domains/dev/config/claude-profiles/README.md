@@ -107,6 +107,26 @@ Codex/ompのホームディレクトリには hook 状態やユーザー自身�
 バイト単位で不変(冪等性のテストは
 `core/validation/test-yoki-switch-targets.sh` 参照)。
 
+ただし `config.toml` では、**マーカーは TOML の名前空間を分けない**。
+同じ `[table]` を1ファイル内で2回宣言するのは不正で、ブロック内に書いた
+`[features]` がブロック外の `[features]` と衝突した瞬間、Codex は
+`failed to load bootstrap configuration … duplicate key` で**起動そのものを
+拒否する**(実機の初回 apply で発生)。そのため
+`codex-config-toml.js` はブロックを描画する前にファイルの外側を走査し、
+既に存在するテーブルは**再宣言せず、そこへ自分のキーだけを upsert する**
+(`mergeOwnedTables`。所有キーは `OWNED_TABLE_KEYS` — `features.hooks` /
+`features.multi_agent` / `agents.*` / `shell_environment_policy.set` の
+`YOKI_*`・`CLAUDE_PLUGIN_ROOT`、および `[permissions.yoki*]` 全体)。
+手で足した `PATH_EXTRA` のような**所有外のキーは位置ごと不変**で、
+マージしたことは plan の `info` に `merged into existing [table]` として出る。
+
+さらに、書き込み前に組み上がったTOMLを検証する
+(`assertValidCodexConfigToml` — `gen.js` の書き込み時にも再実行):
+テーブルヘッダ重複・同一テーブル内のキー重複・`[mcp_servers.*]` の
+`url` と `command` の同時宣言(Codexは `command` があれば stdio と解釈し
+`url is not supported for stdio` で落ちる)を検出したら、**書かずに
+どのテーブルが問題かを名指しして失敗する**。
+
 ### doctor
 
 `yoki-switch doctor [--json]`(実体は `runtime/yoki/scripts/lib/doctor.js`、
@@ -127,8 +147,21 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
   `0.150.0`未満(またはバージョン不明)なら warning 付きでスキップする —
   `hooks.json`に未対応イベントを書いて `codex exec` に無言で無視させない
   ため)、`~/.codex` の有無、`[features] hooks = true`、
+  **`config.toml` がそもそも Codex にロードできるか**(`config-check` —
+  `CODEX_HOME=<codexDir> codex features list` を実行し、非ゼロ終了なら
+  `codex config.toml does not load: <理由>` で fail。上の各チェックは
+  自前の正規表現で読むので、`[features]` の重複ヘッダや `url` と `command`
+  を同時に持つ `[mcp_servers.*]` のような「Codexが起動すらできない」状態を
+  1つも検出できなかった — これが唯一、本物のローダーに聞くチェック。
+  バイナリが無ければ warn でスキップ)、
   **`hooks.json` がCodexの読むラップ形式か**(`hooks-shape` — フラット形式は
   fail。パースは通るがCodexはhookを1つも実行しない)、
+  **hook コマンドが絶対パスになっているか**(`hooks-env` — Codex は hook
+  プロセスに `[shell_environment_policy.set]` を渡さない(あれはシェルツール用)
+  ので、`${YOKI_ROOT}` が残ったコマンドは素の端末で
+  `Cannot find module '/scripts/hooks/run-with-flags.js'` で死ぬ。
+  生成時に展開する(`codex-hooks-merge.js` の `expandCommandPaths`)ため、
+  残っていたら fail。`${YOKI_NODE:-node}` は既定値を持つので対象外)、
   自分が生成した `hooks.json` グループの有無、**その全ハンドラの
   `[hooks.state]` 信頼ハッシュを再計算して一致するか**(ズレていたら
   「codex exec で無言スキップされる、yoki-switch apply を実行」と案内)、

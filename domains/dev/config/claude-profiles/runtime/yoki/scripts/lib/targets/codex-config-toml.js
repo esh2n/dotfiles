@@ -11,14 +11,54 @@
  * already declares a top-level `default_permissions` or `sandbox_mode`
  * outside the block, ours is not emitted (S3 §1: "Don't combine with
  * `sandbox_mode`") and the caller gets a warning to surface via `doctor`.
+ *
+ * TABLE HEADERS ARE THE OTHER HALF OF THAT SAME HAZARD, and cost a working
+ * Codex install to learn: a `[features]` header emitted inside the block on
+ * a machine whose file already declared `[features] hooks = true` OUTSIDE it
+ * makes Codex refuse to start entirely —
+ *
+ *     Error: failed to load bootstrap configuration
+ *     Caused by: config.toml:4:2: duplicate key
+ *
+ * TOML allows a table to be declared exactly once per file, and "inside the
+ * managed block" is not a separate namespace. So before rendering, every
+ * table this block wants to emit is checked against the foreign half of the
+ * file: one that already exists there is NOT emitted a second time — our
+ * keys are upserted into the existing table in place (`mergeOwnedTables`),
+ * and the plan says `merged into existing [table]`. Only the keys listed in
+ * OWNED_TABLE_KEYS are touched; a `PATH` a user put in
+ * `[shell_environment_policy.set]` by hand survives untouched.
+ *
+ * And because "the generator must not produce a file Codex cannot load" is
+ * the actual requirement — of which the duplicate header was one instance —
+ * the assembled text is validated before it is written
+ * (`assertValidCodexConfigToml`, also called by gen.js at write time).
  */
 
 const { extractBlock, wrapBlock } = require('./managed-block');
+const { splitSections, joinSections, parseKeyLine, nameOf, readTables, validateStructure } = require('./codex-toml-lite');
 
 const BLOCK_START = '# yoki:begin';
 const BLOCK_END = '# yoki:end';
 const CONFLICT_KEYS_RE = /^\s*(default_permissions|sandbox_mode)\s*=/;
 const TABLE_HEADER_RE = /^\s*\[/;
+
+/**
+ * The keys this block owns inside a table it SHARES with the rest of the
+ * file, keyed by the table's comparable name (codex-toml-lite's `nameOf`).
+ * On a merge, exactly these are replaced/appended; every other key in the
+ * table is left where and as it was.
+ *
+ * A table NOT listed here is one the block is the sole author of
+ * (`[permissions.yoki*]`, `[hooks.state."…"]`, `[mcp_servers.*]`), so on the
+ * (rare) occasion one already exists outside the block, our body replaces
+ * its body wholesale — see `upsertSection`.
+ */
+const OWNED_TABLE_KEYS = new Map([
+  [nameOf(['features']), ['hooks', 'multi_agent']],
+  [nameOf(['agents']), ['enabled', 'max_concurrent_threads_per_session']],
+  [nameOf(['shell_environment_policy', 'set']), ['YOKI_ROOT', 'CLAUDE_PLUGIN_ROOT', 'YOKI_HOOK_PROFILE', 'YOKI_HARNESS']],
+]);
 
 function toTomlString(value) {
   return JSON.stringify(String(value));
@@ -126,15 +166,181 @@ function removeHookStateSections(rest, keysToRemove) {
   return kept.join('\n');
 }
 
+/** The trailing run of blank lines of a section body — the separator before
+ * the next header, kept so a merge never changes the file's spacing. */
+function trailingBlankLines(lines) {
+  let start = lines.length;
+  while (start > 0 && lines[start - 1].trim() === '') start -= 1;
+  return lines.slice(start);
+}
+
+function withoutTrailingBlankLines(lines) {
+  return lines.slice(0, lines.length - trailingBlankLines(lines).length);
+}
+
+/**
+ * Rewrites one EXISTING (foreign) table body so it carries our keys, without
+ * disturbing anything else in it.
+ *
+ * - a key we own that is already there is replaced IN PLACE (so the file's
+ *   own ordering and any comment line around it survives)
+ * - a key we own that is missing is appended at the end of the body, before
+ *   the blank line that separates it from the next header
+ * - a key we do NOT own is never read, moved, or rewritten
+ *
+ * `ownedKeys === null` means the block is the table's sole author, so the
+ * body is replaced wholesale.
+ *
+ * @param {string[]} existingLines the foreign table's body lines
+ * @param {string[]} ourLines the body lines the block wanted to emit
+ * @param {string[]|null} ownedKeys
+ * @returns {string[]} the new body lines
+ */
+function upsertSection(existingLines, ourLines, ownedKeys) {
+  const trailing = trailingBlankLines(existingLines);
+  if (ownedKeys === null) return [...ourLines, ...trailing];
+
+  const owned = new Set(ownedKeys.map(key => nameOf([key])));
+  const ourByKey = new Map();
+  const ourExtras = [];
+  for (const line of ourLines) {
+    const key = parseKeyLine(line);
+    if (key === null) ourExtras.push(line);
+    else ourByKey.set(key, line);
+  }
+
+  const placed = new Set();
+  const out = [];
+  for (const line of existingLines) {
+    const key = parseKeyLine(line);
+    if (key !== null && owned.has(key)) {
+      // Ours to write: replace it, or drop it when this apply no longer
+      // emits that key (a second copy of an owned key is dropped too — it
+      // would be a duplicate-key config load failure either way).
+      if (ourByKey.has(key) && !placed.has(key)) {
+        out.push(ourByKey.get(key));
+        placed.add(key);
+      }
+      continue;
+    }
+    out.push(line);
+  }
+
+  const missing = [...ourByKey.entries()].filter(([key]) => !placed.has(key)).map(([, line]) => line);
+  const additions = [...missing, ...ourExtras];
+  if (additions.length > 0) out.splice(out.length - trailingBlankLines(out).length, 0, ...additions);
+  return out;
+}
+
+/** @returns {string[]|null} the keys we own in `parts`'s table, or null when
+ * the block is that table's sole author (replace the whole body). */
+function ownedKeysFor(parts) {
+  const owned = OWNED_TABLE_KEYS.get(nameOf(parts));
+  return owned === undefined ? null : owned;
+}
+
+/**
+ * The duplicate-header fix. Every `[table]` the block wants to emit that the
+ * foreign half of the file ALREADY declares is removed from the block and
+ * upserted into that existing table instead.
+ *
+ * @param {string} blockContent from buildManagedBlockContent
+ * @param {string} foreignText everything outside the managed block
+ * @returns {{blockContent: string, foreignText: string, merged: string[]}}
+ *   `merged` lists the header text of each table that was merged rather than
+ *   re-emitted, for the plan's `info` lines.
+ */
+function mergeOwnedTables(blockContent, foreignText) {
+  const foreignSections = splitSections(foreignText || '');
+  const indexByName = new Map();
+  foreignSections.forEach((section, index) => {
+    if (section.name !== null && !indexByName.has(section.name)) indexByName.set(section.name, index);
+  });
+
+  const kept = [];
+  const merged = [];
+  for (const section of splitSections(blockContent)) {
+    if (section.name === null || !indexByName.has(section.name)) {
+      kept.push(section);
+      continue;
+    }
+    const target = foreignSections[indexByName.get(section.name)];
+    target.lines = upsertSection(target.lines, withoutTrailingBlankLines(section.lines), ownedKeysFor(section.parts));
+    merged.push(section.display);
+  }
+
+  return {
+    blockContent: joinSections(kept).replace(/\n+$/, ''),
+    foreignText: joinSections(foreignSections),
+    merged,
+  };
+}
+
+/**
+ * Codex infers an MCP server's transport from the KEYS of its table, not
+ * from a `type` field: a `command` (even `command = ""`) means stdio, and a
+ * `url` alongside it is then rejected with `url is not supported for stdio`;
+ * neither key at all is `invalid transport`. Both were verified against
+ * codex-cli 0.152.0. See lib/mcp-inventory/writers/codex.js, which is what
+ * must not emit the pair in the first place.
+ */
+function validateMcpServerTables(tables) {
+  const errors = [];
+  for (const table of tables) {
+    if (table.arrayOfTables || !Array.isArray(table.parts)) continue;
+    if (table.parts.length !== 2 || table.parts[0] !== 'mcp_servers') continue;
+
+    const hasUrl = table.keys.has('url');
+    const hasCommand = table.keys.has('command');
+    if (hasUrl && hasCommand) {
+      errors.push(
+        `${table.display} at line ${table.line} declares both "url" and "command" — codex reads a command as stdio and then rejects the url ` +
+        '("url is not supported for stdio"); an http server must declare url only'
+      );
+    } else if (!hasUrl && !hasCommand) {
+      errors.push(`${table.display} at line ${table.line} declares neither "url" nor "command" — codex fails with "invalid transport"`);
+    }
+  }
+  return errors;
+}
+
+/**
+ * @param {string} text the assembled config.toml content
+ * @returns {string[]} everything that would stop Codex loading the file
+ */
+function validateCodexConfigToml(text) {
+  return [...validateStructure(text), ...validateMcpServerTables(readTables(text))];
+}
+
+/**
+ * The guard: a config.toml Codex cannot load must never reach disk, because
+ * the failure mode is "codex is unusable until a human edits the file by
+ * hand", with nothing pointing at what to edit.
+ *
+ * @param {string} text
+ * @param {string} [destinationPath] named in the message
+ * @throws {Error} when the text would not load
+ */
+function assertValidCodexConfigToml(text, destinationPath) {
+  const errors = validateCodexConfigToml(text);
+  if (errors.length === 0) return;
+  throw new Error(
+    `codex: refusing to write ${destinationPath || 'config.toml'} — the generated TOML would not load:\n` +
+    errors.map(err => `  - ${err}`).join('\n')
+  );
+}
+
 /**
  * @param {string} existingText current `~/.codex/config.toml` content (empty string if absent)
  * @param {string} blockContent from buildManagedBlockContent
  * @param {Set<string>} ownedHookStateKeys keys this apply is about to (re-)emit
- * @returns {{content: string, warnings: string[]}}
+ * @param {{destinationPath?: string}} [options]
+ * @returns {{content: string, warnings: string[], info: string[]}}
  */
-function applyManagedBlock(existingText, blockContent, ownedHookStateKeys) {
+function applyManagedBlock(existingText, blockContent, ownedHookStateKeys, options = {}) {
   const { after } = extractBlock(existingText || '', BLOCK_START, BLOCK_END);
   const warnings = [];
+  const info = [];
 
   if (hasConflictingTopLevelKey(after)) {
     warnings.push(
@@ -142,19 +348,31 @@ function applyManagedBlock(existingText, blockContent, ownedHookStateKeys) {
       'the yoki permissions block was NOT written (S3: do not combine default_permissions with sandbox_mode). Remove the ' +
       'conflicting key by hand, then re-run.'
     );
-    return { content: existingText || '', warnings };
+    return { content: existingText || '', warnings, info };
   }
 
   const cleanedAfter = removeHookStateSections(after, ownedHookStateKeys);
-  const content = wrapBlock(BLOCK_START, BLOCK_END, blockContent, cleanedAfter);
-  return { content, warnings };
+  const mergedTables = mergeOwnedTables(blockContent, cleanedAfter);
+  for (const display of mergedTables.merged) {
+    info.push(`codex: config.toml ${display} already exists outside the managed block — merged into existing ${display} (no duplicate header emitted)`);
+  }
+
+  const content = wrapBlock(BLOCK_START, BLOCK_END, mergedTables.blockContent, mergedTables.foreignText);
+  assertValidCodexConfigToml(content, options.destinationPath);
+  return { content, warnings, info };
 }
 
 module.exports = {
   BLOCK_START,
   BLOCK_END,
+  OWNED_TABLE_KEYS,
   buildManagedBlockContent,
   hasConflictingTopLevelKey,
   removeHookStateSections,
+  upsertSection,
+  mergeOwnedTables,
+  validateMcpServerTables,
+  validateCodexConfigToml,
+  assertValidCodexConfigToml,
   applyManagedBlock,
 };

@@ -21,10 +21,17 @@ set -euo pipefail
 # wrong for testing this checkout's own code).
 #
 # Seeds CODEX_DIR with foreign content a real machine would already have —
-# a herdr-style hooks.json group and a config.toml with a [projects] trust
-# table plus an unrelated [hooks.state] entry — and asserts:
+# a herdr-style hooks.json group, and a config.toml with a [projects] trust
+# table, an unrelated [hooks.state] entry, AND three tables the managed
+# block itself emits ([features], [agents], a bare [hooks.state]) — and
+# asserts:
 #   1. that foreign content survives byte-for-byte
 #   2. that yoki's own managed block/hook group is present alongside it
+#   2b. that no table header is ever emitted twice, that the shared tables
+#      are merged key-by-key, and — where codex is installed — that the
+#      result actually loads (`codex features list`)
+#   2c. that no generated hook command still references ${YOKI_ROOT} etc,
+#      which codex does not set for hook processes
 #   3. that a second run is idempotent (identical file tree, not just "ran
 #      again without error")
 #   4. that a target whose home dir does not exist is skipped rather than
@@ -96,6 +103,18 @@ JSON
     # on first trust prompt) and an unrelated [hooks.state] entry (what a
     # herdr-style tool might have written) — both live OUTSIDE the
     # `# yoki:begin`/`# yoki:end` managed block and must never be touched.
+    #
+    # It ALSO declares three tables the managed block itself wants to emit:
+    # `[features]`, `[agents]` and a bare `[hooks.state]`. That is the real
+    # state the first `apply --target codex` on this machine met, and the
+    # block emitting its own `[features]` on top of it made Codex refuse to
+    # start entirely (`failed to load bootstrap configuration … duplicate
+    # key`) — a duplicate table is not legal TOML no matter which side of a
+    # comment marker it sits on. `[shell_environment_policy.set] PATH_EXTRA`
+    # belongs to nobody but the user: it pins that a merge writes ONLY the
+    # keys yoki owns. (Every key here is one Codex itself accepts — the
+    # whole point of the scenario is that the result still LOADS, which the
+    # `codex features list` assertion below actually checks.)
     cat > "$FIXTURE/codex/config.toml" <<'TOML'
 [projects."/repo"]
 trust_level = "trusted"
@@ -103,7 +122,34 @@ trust_level = "trusted"
 [hooks.state."herdr-manual-entry"]
 trusted_hash = "deadbeef"
 enabled = true
+
+[features]
+hooks = true
+
+[agents]
+enabled = false
+
+[shell_environment_policy.set]
+PATH_EXTRA = "/opt/homebrew/bin"
+
+[hooks.state]
 TOML
+}
+
+# Every plain `[table]` header that appears more than once in a file — the
+# exact condition Codex's config loader rejects.
+duplicate_toml_headers() {
+    grep -E '^\[[^][]+\]$' "$1" | sort | uniq -d
+}
+
+# The keys of one `[table]` section, in file order (header excluded).
+toml_section_keys() {
+    local file="$1" header="$2"
+    awk -v header="$header" '
+        $0 == header { inside = 1; next }
+        /^\[/ { inside = 0 }
+        inside && /=/ { sub(/[[:space:]]*=.*/, ""); print }
+    ' "$file"
 }
 
 # -----------------------------------------------------------------------------
@@ -182,6 +228,50 @@ run_yoki_switch_targets_checks() {
         jq -e --arg cmd "$FOREIGN_HERDR_COMMAND" '.hooks.SessionStart[0].hooks[0].command == $cmd' \
             "$FIXTURE/codex/hooks.json"
 
+    # 2b. No duplicate table header — the failure that made Codex unusable
+    #     after the first real apply on this machine. A table the file
+    #     already declared outside the block must be MERGED, not re-emitted.
+    assert_eq_text "codex/config.toml: no table header appears twice" \
+        "" "$(duplicate_toml_headers "$FIXTURE/codex/config.toml")"
+    assert_eq_text "codex/config.toml: [features] carries the foreign key and ours, once each" \
+        "hooks
+multi_agent" "$(toml_section_keys "$FIXTURE/codex/config.toml" '[features]')"
+    assert_true "codex/config.toml: [features] multi_agent is ours" \
+        grep -qF 'multi_agent = true' "$FIXTURE/codex/config.toml"
+    assert_eq_text "codex/config.toml: [agents] takes our keys, once each" \
+        "enabled
+max_concurrent_threads_per_session" "$(toml_section_keys "$FIXTURE/codex/config.toml" '[agents]')"
+    assert_true "codex/config.toml: [agents] enabled overwritten with ours (was false by hand)" \
+        grep -qF 'enabled = true' "$FIXTURE/codex/config.toml"
+    assert_true "codex/config.toml: a key yoki does not own is left untouched" \
+        grep -qF 'PATH_EXTRA = "/opt/homebrew/bin"' "$FIXTURE/codex/config.toml"
+    assert_true "codex/config.toml: YOKI_HARNESS merged into the existing [shell_environment_policy.set]" \
+        grep -qF 'YOKI_HARNESS = "codex"' "$FIXTURE/codex/config.toml"
+    assert_contains "the plan reports the merge instead of silently rewriting the table" \
+        "merged into existing [features]" "$output"
+
+    # 2c. Every generated hook command must be runnable with an EMPTY
+    #     environment: codex does not hand a hook process
+    #     [shell_environment_policy.set], so an unexpanded ${YOKI_ROOT}
+    #     resolves to nothing and node dies on `/scripts/hooks/...`.
+    assert_eq_text "codex/hooks.json: no yoki command references \${YOKI_ROOT}/\${CLAUDE_PLUGIN_ROOT}/~" \
+        "" "$(jq -r '[.hooks[][] | .hooks[]?.command
+                     | select(test("--harness codex"))
+                     | select(test("\\$\\{?YOKI_ROOT|\\$\\{?CLAUDE_PLUGIN_ROOT|(^|[ \"'\''=])~/"))]
+                    | .[]' "$FIXTURE/codex/hooks.json")"
+    assert_true "codex/hooks.json: \${YOKI_NODE:-node} is kept (it carries its own default)" \
+        jq -e '[.hooks[][] | .hooks[]?.command | select(test("YOKI_NODE:-node"))] | length > 0' \
+            "$FIXTURE/codex/hooks.json"
+
+    # 2d. The only check that reads config.toml the way Codex does. Skipped
+    #     (not failed) where codex is not installed — CI and other machines.
+    if command -v codex >/dev/null 2>&1; then
+        assert_true "codex: the generated config.toml actually loads (codex features list)" \
+            env CODEX_HOME="$FIXTURE/codex" codex features list
+    else
+        log_warn "SKIP: codex not installed — cannot verify the generated config.toml loads"
+    fi
+
     assert_true "omp/agent/config.yml: written" \
         test -f "$FIXTURE/omp/agent/config.yml"
     assert_true "omp/agent/RULES.md: yoki managed block present" \
@@ -224,6 +314,8 @@ run_yoki_switch_targets_checks() {
         grep -qF 'trust_level = "trusted"' "$FIXTURE/codex/config.toml"
     assert_true "codex/config.toml: foreign [hooks.state] entry still present after 2 runs" \
         grep -qF '[hooks.state."herdr-manual-entry"]' "$FIXTURE/codex/config.toml"
+    assert_eq_text "codex/config.toml: still no duplicate table header after 2 runs" \
+        "" "$(duplicate_toml_headers "$FIXTURE/codex/config.toml")"
     assert_true "codex/config.toml: foreign trusted_hash still present after 2 runs" \
         grep -qF 'trusted_hash = "deadbeef"' "$FIXTURE/codex/config.toml"
     assert_true "codex/hooks.json: foreign SessionStart group still exact match after 2 runs" \

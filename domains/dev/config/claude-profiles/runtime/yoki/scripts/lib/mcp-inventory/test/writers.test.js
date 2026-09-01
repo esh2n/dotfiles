@@ -365,26 +365,86 @@ test('writers/codex.js: golden output — stdio and http tables, codex targetOve
     toml,
     [
       '[mcp_servers.serena]',
-      'type = "stdio"',
       'command = "uvx"',
       'args = ["-p", "3.13", "serena-agent==1.5.3", "start-mcp-server", "--project-from-cwd", "--context", "codex"]',
       '',
       '[mcp_servers.codebase-memory-mcp]',
-      'type = "stdio"',
       'command = "{{HOME}}/bin/codebase-memory-mcp-managed"',
       'args = []',
     ].join('\n')
   );
 });
 
-test('writers/codex.js: an http server matches the working config.toml.template shape (command = "")', () => {
-  const toml = toTomlTable({ name: 'notion-mcp', transport: 'http', url: 'https://mcp.notion.com/mcp' });
-  assert.equal(toml, '[mcp_servers.notion-mcp]\ncommand = ""\ntype = "http"\nurl = "https://mcp.notion.com/mcp"');
+/** The keys a rendered `[mcp_servers.<name>]` table assigns, sub-tables
+ * excluded — what Codex actually infers the transport from. */
+function topLevelKeysOf(toml) {
+  const keys = [];
+  for (const line of toml.split('\n').slice(1)) {
+    if (line.startsWith('[')) break;
+    const m = /^([A-Za-z0-9_-]+)\s*=/.exec(line);
+    if (m) keys.push(m[1]);
+  }
+  return keys;
+}
+
+// Regression (real apply, codex-cli 0.152.0): the http table used to carry
+// `command = ""` + `type = "http"` alongside `url`, and the empty command
+// alone made Codex read it as stdio — `failed to load bootstrap
+// configuration: url is not supported for stdio in mcp_servers.notion-mcp`,
+// i.e. the whole CLI refused to start. The key SET is the assertion here,
+// not just the presence of url: an extra key is exactly what broke it.
+test('writers/codex.js: an http server emits url and nothing else — no command/args/env/type', () => {
+  const toml = toTomlTable({ name: 'notion-mcp', transport: 'http', url: 'https://mcp.notion.com/mcp', env: { FOO: '${FOO}' } });
+  assert.equal(toml, '[mcp_servers.notion-mcp]\nurl = "https://mcp.notion.com/mcp"');
+  assert.deepEqual(topLevelKeysOf(toml), ['url']);
+  assert.ok(!toml.includes('env'));
+});
+
+test('writers/codex.js: an stdio server emits command/args and no url', () => {
+  const toml = toTomlTable({ name: 'x', transport: 'stdio', command: 'x', args: ['-a'], env: {} });
+  assert.deepEqual(topLevelKeysOf(toml), ['command', 'args']);
+  assert.ok(!toml.includes('url'));
+});
+
+test('writers/codex.js: declared http extras are emitted, undeclared ones are not', () => {
+  const toml = toTomlTable({
+    name: 'n',
+    transport: 'http',
+    url: 'https://x/mcp',
+    bearer_token_env_var: 'N_TOKEN',
+    startup_timeout_sec: 30,
+    enabled: false,
+    http_headers: { 'X-A': 'b' },
+  });
+  assert.equal(
+    toml,
+    [
+      '[mcp_servers.n]',
+      'url = "https://x/mcp"',
+      'bearer_token_env_var = "N_TOKEN"',
+      'startup_timeout_sec = 30',
+      'enabled = false',
+      '[mcp_servers.n.http_headers]',
+      'X-A = "b"',
+    ].join('\n')
+  );
+  assert.ok(!toTomlTable({ name: 'n', transport: 'http', url: 'https://x/mcp' }).includes('bearer_token_env_var'));
 });
 
 test('writers/codex.js: a server env table is appended as [mcp_servers.<name>.env]', () => {
   const toml = toTomlTable({ name: 'x', transport: 'stdio', command: 'x', args: [], env: { FOO: '${FOO}' } });
-  assert.equal(toml, '[mcp_servers.x]\ntype = "stdio"\ncommand = "x"\nargs = []\n[mcp_servers.x.env]\nFOO = "${FOO}"');
+  assert.equal(toml, '[mcp_servers.x]\ncommand = "x"\nargs = []\n[mcp_servers.x.env]\nFOO = "${FOO}"');
+});
+
+test('writers/codex.js: every rendered table passes the url-XOR-command check the generator enforces', () => {
+  const { validateMcpServerTables } = require('../../targets/codex-config-toml');
+  const { readTables } = require('../../targets/codex-toml-lite');
+  const servers = [
+    ...SAMPLE_SERVERS,
+    { name: 'notion-mcp', transport: 'http', url: 'https://mcp.notion.com/mcp', env: {}, targets: { claude: false, codex: true, omp: false } },
+  ];
+  const { toml } = buildMcpServersToml(servers, '');
+  assert.deepEqual(validateMcpServerTables(readTables(toml)), []);
 });
 
 test('findServerNamesInText: finds every [mcp_servers.<name>] table header', () => {

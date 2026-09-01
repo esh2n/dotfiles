@@ -23,6 +23,7 @@ const {
   collectHookStateEntries,
   isWrappedHooksJson,
   hookEventsOf,
+  UNEXPANDED_PATH_VAR_RE,
 } = require('./targets/codex-hooks-merge');
 const { computeHandlerHash, eventLabelFor, hookStateKey } = require('./targets/codex-trust');
 const { stateHome } = require('./state-home');
@@ -358,8 +359,10 @@ function listEntries(dirPath) {
   }
 }
 
-function runCommand(cmd, args) {
-  const proc = spawnSync(cmd, args, { encoding: 'utf8' });
+function runCommand(cmd, args, extraEnv) {
+  const options = { encoding: 'utf8' };
+  if (extraEnv) options.env = { ...process.env, ...extraEnv };
+  const proc = spawnSync(cmd, args, options);
   if (proc.error) return { ok: false, error: proc.error };
   return { ok: proc.status === 0, status: proc.status, stdout: proc.stdout || '', stderr: proc.stderr || '' };
 }
@@ -729,6 +732,83 @@ function checkCodexFeaturesHooks(configTomlText) {
   return result('ok', 'codex', 'features-hooks', 'true');
 }
 
+/**
+ * The one check that reads the file the way Codex itself does. Every
+ * structural check above inspects config.toml with this repo's own regexes;
+ * none of them would have caught a duplicated `[features]` header, or an
+ * `[mcp_servers.*]` table mixing `url` with `command`, both of which stop
+ * the CLI from starting AT ALL:
+ *
+ *     Error: failed to load bootstrap configuration
+ *     Caused by: config.toml:4:2: duplicate key
+ *     Caused by: url is not supported for stdio in `mcp_servers.notion-mcp`
+ *
+ * `codex features list` is the cheapest non-interactive subcommand that
+ * still loads the full bootstrap config (verified on codex-cli 0.152.0: it
+ * exits 0 printing the feature table, and non-zero on either failure above).
+ * CODEX_HOME points it at the directory being examined, so doctor reports on
+ * that config.toml rather than whichever one the ambient environment names.
+ */
+function extractLoadError(run) {
+  const lines = `${run.stderr || ''}\n${run.stdout || ''}`
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return `codex exited ${run.status}`;
+  // The first line is the generic "Error: failed to load bootstrap
+  // configuration"; the line after "Caused by:" is the one naming the table.
+  const causedByIndex = lines.findIndex(line => line.startsWith('Caused by'));
+  const cause = causedByIndex >= 0 ? lines[causedByIndex + 1] : null;
+  return cause ? `${lines[0]} (${cause})` : lines[0];
+}
+
+function checkCodexConfigLoads(codexDir) {
+  const run = runCommand('codex', ['features', 'list'], { CODEX_HOME: codexDir });
+  if (!run.ok && run.error) {
+    return result('warn', 'codex', 'config-check', 'codex not found on PATH — skipped');
+  }
+  if (run.ok) {
+    return result('ok', 'codex', 'config-check', `config.toml loads (codex features list, CODEX_HOME=${codexDir})`);
+  }
+  return result('fail', 'codex', 'config-check', `codex config.toml does not load: ${extractLoadError(run)}`);
+}
+
+/**
+ * `[shell_environment_policy.set]` configures the SHELL TOOL's environment,
+ * not the environment Codex spawns hook processes in — so a hook command
+ * still carrying `${YOKI_ROOT}` runs with it unset and dies with
+ * `Cannot find module '/scripts/hooks/run-with-flags.js'`, on every hook,
+ * with nothing in the session to say so. The generator expands those roots
+ * at generation time (codex-hooks-merge.js's expandCommandPaths); this is
+ * the check that says when a hooks.json predates that fix.
+ */
+function checkCodexHooksEnv(hooksJson) {
+  if (!hooksJson) return result('warn', 'codex', 'hooks-env', 'hooks.json not found or unreadable');
+
+  const offenders = [];
+  for (const [eventName, groups] of Object.entries(hookEventsOf(hooksJson))) {
+    if (!Array.isArray(groups)) continue;
+    for (const group of groups) {
+      for (const handler of (group && group.hooks) || []) {
+        const command = handler && handler.command;
+        // Only our own commands: a foreign tool's hook is not ours to
+        // rewrite, and `yoki-switch apply` would not change it.
+        if (!isYokiCodexCommand(command)) continue;
+        if (UNEXPANDED_PATH_VAR_RE.test(command)) offenders.push(`${eventName}: ${command}`);
+      }
+    }
+  }
+
+  if (offenders.length === 0) return result('ok', 'codex', 'hooks-env', 'all hook commands use absolute paths');
+  return result(
+    'fail',
+    'codex',
+    'hooks-env',
+    `${offenders.length} hook command(s) still reference \${YOKI_ROOT}/\${CLAUDE_PLUGIN_ROOT}/~ — codex does not set these for hook processes, so they fail to start; ` +
+    `run yoki-switch apply --target codex. First: ${offenders[0]}`
+  );
+}
+
 function checkCodexPermissionsConflict(configTomlText) {
   if (hasPermissionsConflict(configTomlText)) {
     return result('fail', 'codex', 'permissions-conflict', 'config.toml declares both default_permissions and sandbox_mode at the top level — Codex refuses to load this combination (S3 §1)');
@@ -894,10 +974,12 @@ function checkCodexTarget({ codexDir, home, dotfilesRoot, claudeDir }) {
   const hooksJson = unwrapHooksJson(rawHooksJson);
 
   results.push(checkCodexFeaturesHooks(configTomlText));
+  results.push(checkCodexConfigLoads(codexDir));
   results.push(checkCodexHooksShape(rawHooksJson));
 
   const groupsCheck = checkCodexHooksGroups(hooksJson);
   results.push(groupsCheck.check);
+  results.push(checkCodexHooksEnv(hooksJson));
   results.push(checkCodexTrustDrift({ hooksJson, hooksJsonPath, configTomlText }));
   results.push(checkCodexTrustPort({ hooksJson, hooksJsonPath, configTomlText }));
   results.push(checkCodexForeignGroups(groupsCheck.foreignGroups));
@@ -1270,6 +1352,9 @@ module.exports = {
   unwrapHooksJson,
   checkCodexHooksShape,
   checkCodexTrustPort,
+  checkCodexConfigLoads,
+  checkCodexHooksEnv,
+  extractLoadError,
   extractHookCommands,
   extractHookScriptRefs,
   // per-target orchestrators, exported for tests with temp homes

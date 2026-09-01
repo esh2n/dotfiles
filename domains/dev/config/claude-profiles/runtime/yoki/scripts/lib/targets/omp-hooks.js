@@ -50,6 +50,7 @@
 const path = require('path');
 const { translateMatcher } = require('./omp-tool-names');
 const { parseBashWrapperCommand } = require('./bash-wrapper-hook');
+const { expandCommandPaths } = require('./codex-hooks-merge');
 
 /** Claude event name -> omp event name, for every event that has one. */
 const EVENT_MAP = new Map([
@@ -198,6 +199,11 @@ function translateEventGroups(claudeEventName, rawGroups, options = {}) {
       }
 
       const spec = { ...parsed };
+      // Same reason as codex-hooks-merge.js's expandCommandPaths: the omp
+      // extension resolves a script path itself, so an unexpanded
+      // `${YOKI_ROOT}` would reach it as a literal directory name.
+      spec.script = expandCommandPaths(spec.script, options);
+      if (Array.isArray(spec.args)) spec.args = spec.args.map(arg => expandCommandPaths(arg, options));
       if (matcher !== undefined) spec.matcher = matcher;
       const ms = timeoutMs(handler.timeout);
       if (ms !== undefined) spec.timeout = ms;

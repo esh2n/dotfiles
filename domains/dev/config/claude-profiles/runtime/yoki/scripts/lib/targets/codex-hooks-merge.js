@@ -118,6 +118,46 @@ function translateCommand(command) {
   return `${command} --harness codex`;
 }
 
+/** `${VAR}` / `$VAR` for the two variables the settings layers use as path
+ * roots. `${YOKI_NODE:-node}` is deliberately NOT matched: it carries its
+ * own default, so it resolves with or without the environment. */
+const YOKI_ROOT_RE = /\$\{YOKI_ROOT\}|\$YOKI_ROOT\b/g;
+const PLUGIN_ROOT_RE = /\$\{CLAUDE_PLUGIN_ROOT\}|\$CLAUDE_PLUGIN_ROOT\b/g;
+const CLAUDE_DIR_RE = /(^|[\s"'=])~\/\.claude\//g;
+
+/**
+ * Bakes path roots into a hook command at GENERATION time.
+ *
+ * A Codex hook process does not inherit `[shell_environment_policy.set]` —
+ * that block configures the SHELL TOOL's environment, not the environment
+ * Codex spawns hooks in. So a command carrying `"${YOKI_ROOT}/scripts/hooks/
+ * run-with-flags.js"` runs with YOKI_ROOT unset in a plain terminal and dies
+ * with `Cannot find module '/scripts/hooks/run-with-flags.js'` — silently,
+ * as far as the session is concerned. The bash guards were unaffected only
+ * because `parseBashWrapperCommand` already resolved their `~/` to an
+ * absolute path, which is exactly the treatment every other command needs.
+ *
+ * @param {string} command
+ * @param {{yokiRoot?: string, pluginRoot?: string, claudeDir?: string, home?: string}} options
+ * @returns {string}
+ */
+function expandCommandPaths(command, options = {}) {
+  const yokiRoot = options.yokiRoot;
+  const pluginRoot = options.pluginRoot || options.yokiRoot;
+  const claudeDir = options.claudeDir || (options.home ? path.join(options.home, '.claude') : null);
+
+  let out = String(command);
+  if (yokiRoot) out = out.replace(YOKI_ROOT_RE, yokiRoot);
+  if (pluginRoot) out = out.replace(PLUGIN_ROOT_RE, pluginRoot);
+  if (claudeDir) out = out.replace(CLAUDE_DIR_RE, (_m, lead) => `${lead}${claudeDir}/`);
+  return out;
+}
+
+/** Every path-root variable this generator must have expanded away before a
+ * command is written — the assertion doctor.js's `hooks-env` check and the
+ * generator tests both read. */
+const UNEXPANDED_PATH_VAR_RE = /\$\{YOKI_ROOT\}|\$YOKI_ROOT\b|\$\{CLAUDE_PLUGIN_ROOT\}|\$CLAUDE_PLUGIN_ROOT\b|(?:^|[\s"'=])~\//;
+
 function appendIfFlag(command, ifClause) {
   if (!ifClause) return command;
   return `${command} --if ${JSON.stringify(String(ifClause))}`;
@@ -193,7 +233,7 @@ function translateEventGroups(eventName, rawGroups, options = {}) {
         continue;
       }
 
-      const translated = { type: 'command', command: appendIfFlag(command, handler.if) };
+      const translated = { type: 'command', command: expandCommandPaths(appendIfFlag(command, handler.if), options) };
       if (handler.async !== undefined) translated.async = handler.async;
       translated.timeout = eventName === 'SessionEnd' ? 3 : handler.timeout;
       if (translated.timeout === undefined) delete translated.timeout;
@@ -365,6 +405,8 @@ function collectHookStateEntries(mergedHooksJson, hooksJsonAbsPath) {
 
 module.exports = {
   KNOWN_EVENTS,
+  UNEXPANDED_PATH_VAR_RE,
+  expandCommandPaths,
   runBashHookCommand,
   isRunnerCommand,
   isYokiCodexCommand,

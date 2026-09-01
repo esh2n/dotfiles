@@ -6,8 +6,24 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { buildGeneratedGroups, mergeHooksJson, collectHookStateEntries, translateMatcher, isWrappedHooksJson } = require('../codex-hooks-merge');
-const { buildManagedBlockContent, applyManagedBlock, hasConflictingTopLevelKey } = require('../codex-config-toml');
+const {
+  buildGeneratedGroups,
+  mergeHooksJson,
+  collectHookStateEntries,
+  translateMatcher,
+  isWrappedHooksJson,
+  expandCommandPaths,
+  UNEXPANDED_PATH_VAR_RE,
+} = require('../codex-hooks-merge');
+const {
+  buildManagedBlockContent,
+  applyManagedBlock,
+  hasConflictingTopLevelKey,
+  mergeOwnedTables,
+  validateCodexConfigToml,
+  assertValidCodexConfigToml,
+} = require('../codex-config-toml');
+const { readTables, splitSections, joinSections } = require('../codex-toml-lite');
 const { agentMarkdownToToml } = require('../codex-agents');
 const { hasPathsFrontmatter, buildAgentsMdBlockContent, applyAgentsMdBlock, substituteVocab } = require('../codex-agents-md');
 const { decideSkillSymlink, commandToSkill, commandNameFromRelPath } = require('../codex-skills');
@@ -110,6 +126,65 @@ test('buildGeneratedGroups: Workflow matcher has no Codex equivalent and is skip
   const { generated, warnings } = buildGeneratedGroups([{ hooks: { PreToolUse: [{ matcher: 'Workflow', hooks: [RUNNER_HOOK.hooks[0]] }] } }]);
   assert.equal(generated.PreToolUse, undefined);
   assert.ok(warnings.some(w => /Workflow/.test(w)));
+});
+
+// ---------------------------------------------------------------------------
+// (1b) path roots are baked in at generation time
+// ---------------------------------------------------------------------------
+//
+// Codex does NOT give a hook process the `[shell_environment_policy.set]`
+// environment — that block configures the shell tool. A command carrying
+// `"${YOKI_ROOT}/scripts/hooks/run-with-flags.js"` therefore ran with
+// YOKI_ROOT unset and died with
+// `Cannot find module '/scripts/hooks/run-with-flags.js'`, on 18 of the
+// generated hooks, invisibly. Only the bash guards worked, because their
+// `~/` had already been resolved to an absolute path.
+
+const GEN_OPTIONS = { yokiRoot: '/opt/yoki', pluginRoot: '/opt/plugins', home: '/home/exampleperson' };
+
+test('buildGeneratedGroups: ${YOKI_ROOT} is expanded to an absolute path', () => {
+  const { generated } = buildGeneratedGroups([{ hooks: { PreToolUse: [RUNNER_HOOK] } }], GEN_OPTIONS);
+  const command = generated.PreToolUse[0].hooks[0].command;
+  assert.ok(command.includes('"/opt/yoki/scripts/hooks/run-with-flags.js"'));
+  assert.ok(!command.includes('${YOKI_ROOT}'));
+});
+
+test('buildGeneratedGroups: ${YOKI_NODE:-node} is left alone — it carries its own default', () => {
+  const { generated } = buildGeneratedGroups([{ hooks: { PreToolUse: [RUNNER_HOOK] } }], GEN_OPTIONS);
+  assert.ok(generated.PreToolUse[0].hooks[0].command.startsWith('"${YOKI_NODE:-node}"'));
+});
+
+test('buildGeneratedGroups: ${CLAUDE_PLUGIN_ROOT} and ~/.claude/ are expanded too', () => {
+  const hook = {
+    matcher: 'Bash',
+    hooks: [{
+      type: 'command',
+      command: '"${YOKI_NODE:-node}" "${CLAUDE_PLUGIN_ROOT}/scripts/hooks/run-with-flags.js" "pre:x" "~/.claude/hooks/x.js" "standard"',
+    }],
+  };
+  const { generated } = buildGeneratedGroups([{ hooks: { PreToolUse: [hook] } }], GEN_OPTIONS);
+  const command = generated.PreToolUse[0].hooks[0].command;
+  assert.ok(command.includes('"/opt/plugins/scripts/hooks/run-with-flags.js"'));
+  assert.ok(command.includes('"/home/exampleperson/.claude/hooks/x.js"'));
+});
+
+test('buildGeneratedGroups: no generated command carries an unexpanded path root', () => {
+  const layers = [{
+    hooks: {
+      PreToolUse: [RUNNER_HOOK, WRAPPER_BASH_HOOK],
+      SessionStart: [RUNNER_HOOK],
+    },
+  }];
+  const { generated } = buildGeneratedGroups(layers, GEN_OPTIONS);
+  const commands = Object.values(generated).flatMap(groups => groups.flatMap(g => g.hooks.map(h => h.command)));
+  assert.ok(commands.length >= 3);
+  for (const command of commands) {
+    assert.equal(UNEXPANDED_PATH_VAR_RE.test(command), false, `unexpanded path root in: ${command}`);
+  }
+});
+
+test('expandCommandPaths: leaves a command alone when no root is known', () => {
+  assert.equal(expandCommandPaths('"${YOKI_ROOT}/x.js"', {}), '"${YOKI_ROOT}/x.js"');
 });
 
 test('translateMatcher: Edit|Write|MultiEdit in any order maps to Write|Edit|apply_patch', () => {
@@ -425,6 +500,191 @@ test('applyManagedBlock: removes older [hooks.state] entries for our keys living
   const { content } = applyManagedBlock(existing, sampleBlock(), new Set(['/Users/exampleperson/.codex/hooks.json:pre_tool_use:0:0']));
   assert.ok(!content.includes('sha256:stale'));
   assert.ok(content.includes('[projects."/repo"]'));
+});
+
+// ---------------------------------------------------------------------------
+// (2b) config.toml — never a duplicate table header
+// ---------------------------------------------------------------------------
+//
+// The regression these pin cost a working Codex install: the block emitted
+// `[features]` into a file that already declared `[features] hooks = true`
+// outside it, and codex refused to start at all —
+// `failed to load bootstrap configuration … config.toml:N: duplicate key`.
+// "Inside the managed block" is not a separate TOML namespace.
+
+/** The real ~/.codex/config.toml shape that broke: codex's own [projects]
+ * trust table, a hand/other-tool `[features]`, an `[agents]` that disagrees
+ * with ours, and a bare `[hooks.state]` header. */
+function foreignConfigToml() {
+  return [
+    '[projects."/Users/exampleperson/go/src/repo"]',
+    'trust_level = "trusted"',
+    '',
+    '[tui.model_availability_nux]',
+    '"gpt-5.5" = 2',
+    '',
+    '[features]',
+    'hooks = true',
+    '',
+    '[agents]',
+    'enabled = false',
+    '',
+    '[shell_environment_policy.set]',
+    'PATH_EXTRA = "/opt/homebrew/bin"',
+    '',
+    '[hooks.state]',
+    '',
+  ].join('\n');
+}
+
+/** Every plain `[table]` header in `text`, in file order. */
+function headersOf(text) {
+  return (text.match(/^\[[^[\]]+\]$/gm) || []);
+}
+
+function duplicateHeadersOf(text) {
+  const seen = new Set();
+  const dupes = [];
+  for (const header of headersOf(text)) {
+    if (seen.has(header)) dupes.push(header);
+    seen.add(header);
+  }
+  return dupes;
+}
+
+test('applyManagedBlock: a table the foreign half already declares is merged, not re-emitted', () => {
+  const { content, info } = applyManagedBlock(foreignConfigToml(), sampleBlock(), new Set());
+
+  assert.deepEqual(duplicateHeadersOf(content), []);
+  assert.deepEqual(validateCodexConfigToml(content), []);
+  // The block itself no longer carries the shared headers…
+  const block = content.slice(0, content.indexOf('# yoki:end'));
+  assert.ok(!block.includes('[features]'));
+  assert.ok(!block.includes('[agents]'));
+  assert.ok(!block.includes('[shell_environment_policy.set]'));
+  // …and every merge is reported, so the plan says where the keys went.
+  assert.equal(info.filter(line => line.includes('merged into existing')).length, 3);
+  assert.ok(info.some(line => line.includes('[features]')));
+});
+
+test('applyManagedBlock: our keys are upserted into the existing table and foreign keys survive', () => {
+  const { content } = applyManagedBlock(foreignConfigToml(), sampleBlock(), new Set());
+  const sections = new Map(splitSections(content).filter(s => s.display).map(s => [s.display, s.lines]));
+
+  // features: ours replaces the foreign value in place, the missing one is appended
+  assert.deepEqual(sections.get('[features]').filter(Boolean), ['hooks = true', 'multi_agent = true']);
+  // agents: the foreign `enabled = false` becomes ours, in place
+  assert.deepEqual(sections.get('[agents]').filter(Boolean), ['enabled = true', 'max_concurrent_threads_per_session = 4']);
+  // shell_environment_policy.set: a key we don't own keeps its place, and
+  // ours are appended after it rather than replacing the table
+
+  assert.deepEqual(
+    sections.get('[shell_environment_policy.set]').filter(Boolean),
+    [
+      'PATH_EXTRA = "/opt/homebrew/bin"',
+      'YOKI_ROOT = "/yoki-root"',
+      'CLAUDE_PLUGIN_ROOT = "/yoki-root"',
+      'YOKI_HOOK_PROFILE = "standard"',
+      'YOKI_HARNESS = "codex"',
+    ]
+  );
+  // and nothing else in the foreign half moved
+  assert.ok(content.includes('[projects."/Users/exampleperson/go/src/repo"]\ntrust_level = "trusted"'));
+  assert.ok(content.includes('[tui.model_availability_nux]\n"gpt-5.5" = 2'));
+  assert.ok(content.includes('[hooks.state]'));
+});
+
+test('applyManagedBlock: merging is idempotent — a second and third apply change nothing', () => {
+  const once = applyManagedBlock(foreignConfigToml(), sampleBlock(), new Set()).content;
+  const twice = applyManagedBlock(once, sampleBlock(), new Set()).content;
+  const thrice = applyManagedBlock(twice, sampleBlock(), new Set()).content;
+  assert.equal(twice, once);
+  assert.equal(thrice, once);
+  assert.deepEqual(duplicateHeadersOf(thrice), []);
+});
+
+test('applyManagedBlock: a bare [hooks.state] outside the block does not collide with our [hooks.state."key"] entries', () => {
+  const entries = [{ key: '/h/.codex/hooks.json:pre_tool_use:0:0', trustedHash: 'sha256:aaa' }];
+  const { content } = applyManagedBlock(foreignConfigToml(), sampleBlock(entries), new Set(entries.map(e => e.key)));
+  assert.deepEqual(validateCodexConfigToml(content), []);
+  assert.ok(content.includes('[hooks.state."/h/.codex/hooks.json:pre_tool_use:0:0"]'));
+  assert.ok(content.includes('\n[hooks.state]\n'));
+});
+
+test('mergeOwnedTables: a table only WE declare is still emitted in the block', () => {
+  const merged = mergeOwnedTables('[features]\nhooks = true\n', '[projects."/repo"]\ntrust_level = "trusted"\n');
+  assert.ok(merged.blockContent.includes('[features]'));
+  assert.deepEqual(merged.merged, []);
+});
+
+// ---------------------------------------------------------------------------
+// (2c) the write guard: a config.toml codex cannot load must never be written
+// ---------------------------------------------------------------------------
+
+test('validateCodexConfigToml: reports a duplicate table header with both line numbers', () => {
+  const errors = validateCodexConfigToml('[features]\nhooks = true\n\n[features]\nmulti_agent = true\n');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /duplicate table header \[features\] at line 4 .* line 1/);
+});
+
+test('validateCodexConfigToml: reports a duplicate key inside one table', () => {
+  const errors = validateCodexConfigToml('[features]\nhooks = true\nhooks = false\n');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /duplicate key "hooks" in \[features\]/);
+});
+
+test('validateCodexConfigToml: a duplicated top-level key is caught too', () => {
+  const errors = validateCodexConfigToml('default_permissions = "yoki"\ndefault_permissions = "x"\n');
+  assert.match(errors[0], /duplicate key "default_permissions" at the top level/);
+});
+
+test('validateCodexConfigToml: [[array-of-tables]] may legally repeat', () => {
+  assert.deepEqual(validateCodexConfigToml('[[profile]]\nname = "a"\n\n[[profile]]\nname = "b"\n'), []);
+});
+
+test('validateCodexConfigToml: a bracket inside a multi-line array is not read as a header', () => {
+  const text = '[mcp_servers.x]\ncommand = "x"\nargs = [\n  "--flag",\n  "[not-a-table]",\n]\n';
+  assert.deepEqual(validateCodexConfigToml(text), []);
+});
+
+test('validateCodexConfigToml: an mcp server declaring both url and command is refused', () => {
+  const errors = validateCodexConfigToml('[mcp_servers.notion-mcp]\ncommand = ""\ntype = "http"\nurl = "https://mcp.notion.com/mcp"\n');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /both "url" and "command"/);
+});
+
+test('validateCodexConfigToml: an mcp server declaring neither url nor command is refused', () => {
+  const errors = validateCodexConfigToml('[mcp_servers.n]\nenabled = true\n');
+  assert.match(errors[0], /neither "url" nor "command"/);
+});
+
+test('assertValidCodexConfigToml: throws naming the destination and every problem', () => {
+  assert.throws(
+    () => assertValidCodexConfigToml('[features]\nhooks = true\n\n[features]\nhooks = false\n', '/h/.codex/config.toml'),
+    err => {
+      assert.match(err.message, /refusing to write \/h\/\.codex\/config\.toml/);
+      assert.match(err.message, /duplicate table header \[features\]/);
+      return true;
+    }
+  );
+});
+
+test('applyManagedBlock: refuses to produce a file whose FOREIGN half already duplicates a table', () => {
+  // Nothing this generator can merge away: the duplicate is entirely outside
+  // the block, so the honest outcome is a refusal that names it.
+  const broken = '[features]\nhooks = true\n\n[projects."/repo"]\ntrust_level = "trusted"\n\n[features]\nmulti_agent = false\n';
+  assert.throws(() => applyManagedBlock(broken, sampleBlock(), new Set()), /duplicate table header \[features\]/);
+});
+
+test('splitSections/joinSections round-trip config.toml byte-for-byte', () => {
+  const text = foreignConfigToml();
+  assert.equal(joinSections(splitSections(text)), text);
+});
+
+test('readTables: keys of an [mcp_servers.<name>] table are read for the shape check', () => {
+  const tables = readTables('[mcp_servers.serena]\ncommand = "uvx"\nargs = []\n');
+  const server = tables.find(t => t.display === '[mcp_servers.serena]');
+  assert.deepEqual([...server.keys.keys()], ['command', 'args']);
 });
 
 // ---------------------------------------------------------------------------

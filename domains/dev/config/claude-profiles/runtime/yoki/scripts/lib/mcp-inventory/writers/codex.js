@@ -6,11 +6,28 @@
  * `lib/targets/codex-config-toml.js` via T9's `toml-block` op — see
  * `buildRulesAndConfigOperations` in `lib/targets/codex.js` for the wiring).
  *
- * Field shape mirrors the hand-written entries this repo already ships in
- * `domains/dev/config/codex/config.toml.template` (an http server sets an
- * empty `command = ""` alongside `type = "http"` and `url` — kept exactly
- * as that already-working config does it, rather than guessing at a
- * different shape).
+ * TRANSPORT IS INFERRED FROM THE KEYS, NOT DECLARED. Codex decides how to
+ * launch a server by what its table contains: a `command` means stdio, a
+ * `url` means http. There is no `type` key. So the two key sets are
+ * mutually exclusive and this writer emits one or the other:
+ *
+ *   http  -> url (+ bearer_token_env_var / http_headers / the timeout and
+ *            enablement keys, when the source declares them)
+ *   stdio -> command, args (+ [mcp_servers.<name>.env] when non-empty)
+ *
+ * Mixing them is not merely redundant, it is fatal: a table carrying
+ * `command = ""` + `type = "http"` + `url` (the shape this file emitted
+ * before, copied from an old hand-written config.toml.template) makes Codex
+ * refuse to start the whole CLI —
+ *
+ *     Error: failed to load bootstrap configuration
+ *     Caused by: url is not supported for stdio
+ *                in `mcp_servers.notion-mcp`
+ *
+ * — because the empty `command` alone is enough to select stdio. Verified
+ * against codex-cli 0.152.0, as is the converse (`url` only: loads).
+ * `lib/targets/codex-config-toml.js`'s validateMcpServerTables re-checks the
+ * url-XOR-command invariant over the assembled file before it is written.
  *
  * A same-named `[mcp_servers.<name>]` table already declared OUTSIDE the
  * managed block (a hand-added server, or a pre-T13 `codex mcp add` entry)
@@ -39,27 +56,65 @@ function applyCodexOverride(server) {
   return applyTargetOverride(server, HARNESS_ID);
 }
 
+/** Optional Codex keys an http server may carry, emitted verbatim (and only
+ * when the source declares them) rather than defaulted — a value Codex would
+ * choose itself is better left unwritten than guessed at here. */
+const HTTP_STRING_KEYS = ['bearer_token_env_var'];
+const NUMERIC_KEYS = ['startup_timeout_sec', 'tool_timeout_sec'];
+const BOOLEAN_KEYS = ['enabled'];
+const STRING_LIST_KEYS = ['enabled_tools', 'disabled_tools'];
+
+function tomlStringList(values) {
+  return `[${values.map(tomlString).join(', ')}]`;
+}
+
+/** The keys shared by both transports, appended after the transport's own. */
+function optionalLines(server) {
+  const lines = [];
+  for (const key of NUMERIC_KEYS) {
+    if (typeof server[key] === 'number' && Number.isFinite(server[key])) lines.push(`${key} = ${server[key]}`);
+  }
+  for (const key of BOOLEAN_KEYS) {
+    if (typeof server[key] === 'boolean') lines.push(`${key} = ${server[key]}`);
+  }
+  for (const key of STRING_LIST_KEYS) {
+    if (Array.isArray(server[key])) lines.push(`${key} = ${tomlStringList(server[key])}`);
+  }
+  return lines;
+}
+
 /** @param {object} server a resolved server (after 'codex' targetOverrides) */
 function toTomlTable(server) {
   const lines = [`[mcp_servers.${server.name}]`];
+  const subTables = [];
 
   if (server.transport === 'http') {
-    lines.push('command = ""');
-    lines.push('type = "http"');
+    // url ONLY — see the file header: a `command` key of any value, empty
+    // included, makes Codex read the table as stdio and reject the url.
     lines.push(`url = ${tomlString(server.url)}`);
+    for (const key of HTTP_STRING_KEYS) {
+      if (typeof server[key] === 'string' && server[key]) lines.push(`${key} = ${tomlString(server[key])}`);
+    }
+    lines.push(...optionalLines(server));
+
+    const headerEntries = Object.entries(server.http_headers || {});
+    if (headerEntries.length) {
+      subTables.push(`[mcp_servers.${server.name}.http_headers]`);
+      for (const [key, value] of headerEntries) subTables.push(`${key} = ${tomlString(value)}`);
+    }
   } else {
-    lines.push('type = "stdio"');
     lines.push(`command = ${tomlString(server.command)}`);
     lines.push(`args = [${(server.args || []).map(tomlString).join(', ')}]`);
+    lines.push(...optionalLines(server));
+
+    const envEntries = Object.entries(server.env || {});
+    if (envEntries.length) {
+      subTables.push(`[mcp_servers.${server.name}.env]`);
+      for (const [key, value] of envEntries) subTables.push(`${key} = ${tomlString(value)}`);
+    }
   }
 
-  const envEntries = Object.entries(server.env || {});
-  if (envEntries.length) {
-    lines.push(`[mcp_servers.${server.name}.env]`);
-    for (const [key, value] of envEntries) lines.push(`${key} = ${tomlString(value)}`);
-  }
-
-  return lines.join('\n');
+  return [...lines, ...subTables].join('\n');
 }
 
 const MCP_TABLE_HEADER_RE = /^\[mcp_servers\.([^\].\s]+)\]/gm;

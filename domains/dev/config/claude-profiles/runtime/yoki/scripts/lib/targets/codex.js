@@ -238,8 +238,8 @@ function verifyGuardFloor({ merged, guardFloor }) {
   return { warnings, skipped };
 }
 
-function buildHooksOperations({ settingsLayers, out, yokiRoot, home, guardFloor }) {
-  const { generated, warnings, skipped } = buildGeneratedGroups(settingsLayers, { yokiRoot, home });
+function buildHooksOperations({ settingsLayers, out, yokiRoot, pluginRoot, claudeDir, home, guardFloor }) {
+  const { generated, warnings, skipped } = buildGeneratedGroups(settingsLayers, { yokiRoot, pluginRoot, claudeDir, home });
   const hooksJsonPath = path.join(out, 'hooks.json');
   const existing = readJsonIfExists(hooksJsonPath) || {};
   const merged = mergeHooksJson(existing, generated);
@@ -285,13 +285,19 @@ function buildRulesAndConfigOperations({ permissionsFiles, out, hookStateEntries
     mcpServersToml,
   });
   const ownedKeys = new Set(hookStateEntries.map(e => e.key));
-  const { content: configTomlContent, warnings } = applyManagedBlock(existingConfigToml, blockContent, ownedKeys);
+  const { content: configTomlContent, warnings, info } = applyManagedBlock(
+    existingConfigToml,
+    blockContent,
+    ownedKeys,
+    { destinationPath: configTomlPath }
+  );
   const configOp = { kind: 'toml-block', destinationPath: configTomlPath, content: configTomlContent, layer: 'generated' };
 
   return {
     rulesOp,
     configOp,
     warnings: [...warnings, ...mcpWarnings],
+    info,
     hookEnforced: converted.hookEnforced,
     guardDeny: converted.guardDeny,
   };
@@ -442,7 +448,20 @@ function plan(options) {
   warnings.push(...versionGate.warnings);
 
   const guardFloor = resolveGuardFloor(content.permissionsFiles, home);
-  const hooks = buildHooksOperations({ settingsLayers: versionGate.settingsLayers, out: outResolved, yokiRoot, home, guardFloor });
+  // Derived from `home`, never from a CLAUDE_DIR in the environment: the
+  // bash-wrapper guards' own `~/` expansion (bash-wrapper-hook.js) already
+  // uses `home`, and the two must name the same directory or a translated
+  // guard and a `~/.claude/…` command would resolve differently.
+  const claudeDir = options.claudeDir || path.join(home, '.claude');
+  const hooks = buildHooksOperations({
+    settingsLayers: versionGate.settingsLayers,
+    out: outResolved,
+    yokiRoot,
+    pluginRoot,
+    claudeDir,
+    home,
+    guardFloor,
+  });
   operations.push(hooks.op);
   warnings.push(...hooks.warnings);
   skipped.push(...hooks.skipped);
@@ -464,6 +483,7 @@ function plan(options) {
   });
   operations.push(rulesAndConfig.rulesOp, rulesAndConfig.configOp);
   warnings.push(...rulesAndConfig.warnings);
+  info.push(...(rulesAndConfig.info || []));
 
   // No per-entry warning any more: every one of these is written to
   // `<out>/.yoki/permissions.json` below and enforced by
