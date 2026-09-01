@@ -33,6 +33,17 @@ set -euo pipefail
 # the real pre-permission-guard.js, which on omp is the ONLY thing that can
 # enforce a Read/Edit/WebFetch deny (config.yml has no key for one).
 #
+# HERMETIC BY CONSTRUCTION. Every scenario is driven from a throwaway $WORK,
+# and the node runner is launched with HOME and OMP_AGENT_DIR redirected there
+# too. Without that, the scenarios that deliberately unset YOKI_HOOKS_MANIFEST
+# (to exercise the default manifest path) resolved it to the REAL
+# ~/.omp/agent/yoki-hooks.json, so on any machine that had actually run
+# `yoki-switch apply --target omp` the installed manifest's `floor` pulled the
+# real ~/.claude/hooks/git-guard.sh into the run and 7 checks flipped to FAIL
+# against unchanged code. Scenario 1b pins that shut from the other side: a
+# hostile, real-looking manifest is planted under the fake HOME and must lose
+# to both the explicit YOKI_HOOKS_MANIFEST and the OMP_AGENT_DIR default.
+#
 # Usage: ./test-omp-yoki-bridge.sh
 # -----------------------------------------------------------------------------
 
@@ -98,6 +109,20 @@ if echo "$payload" | grep -q 'manifest-marker'; then
 fi
 STUB
     chmod +x "$WORK/hooks/manifest-guard.sh"
+
+    # A guard that must NEVER run: it is reachable only through the hostile
+    # manifest planted under the fake HOME (scenario 1b). It denies on the
+    # SAME markers the stubs above do, with its own reason, so "the wrong
+    # manifest was read" shows up as a wrong reason rather than as silence.
+    mkdir -p "$WORK/hostile"
+    cat > "$WORK/hostile/hostile-guard.sh" <<'STUB'
+#!/usr/bin/env bash
+payload="$(cat)"
+if echo "$payload" | grep -qE 'hostile-marker|manifest-marker|git push --force'; then
+    echo '{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"HOSTILE: real-home manifest leaked"}}'
+fi
+STUB
+    chmod +x "$WORK/hostile/hostile-guard.sh"
 
     # session_stop stubs, referenced by a manifest below
     mkdir -p "$WORK/session-hooks"
@@ -205,6 +230,54 @@ const capturedLines = () => readFileSync(capture, "utf8").split("\n").filter(Boo
     // registered and must be a pure no-op (no crash, no opinion).
     const r5 = await call("session_stop", { type: "session_stop", turn_id: 1, stop_hook_active: false });
     check("session_stop: no fallback hooks -> no opinion (undefined)", r5 === undefined, JSON.stringify(r5));
+}
+
+// ---------------------------------------------------------------------------
+// 1b. MACHINE ISOLATION. A real-looking manifest is planted at
+//     $HOME/.omp/agent/yoki-hooks.json (floor + its own tool_call guard —
+//     exactly the shape `yoki-switch apply --target omp` installs). It must
+//     never be consulted: not when YOKI_HOOKS_MANIFEST names a manifest
+//     outright, and not when only OMP_AGENT_DIR points the default elsewhere.
+//     This is the regression a real `yoki-switch apply` caused — the suite
+//     read the machine's installed manifest and its floor pulled the real
+//     ~/.claude/hooks/git-guard.sh into scenarios 1 and 2.
+// ---------------------------------------------------------------------------
+{
+    // (a) an explicit YOKI_HOOKS_MANIFEST beats the planted HOME manifest
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_OWN_GUARD_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?hostile-home-explicit");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+
+    const hostile = await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "h1", input: { command: "echo hostile-marker" } }, ctx);
+    check("an explicit manifest wins over a real-looking one under HOME", hostile === undefined, JSON.stringify(hostile));
+
+    const fixture = (await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "h2", input: { command: "echo manifest-marker" } }, ctx)) as { reason?: string } | undefined;
+    check("the fixture manifest's guard is what ran", (fixture?.reason ?? "").includes("stub: manifest guard"), JSON.stringify(fixture));
+}
+{
+    // (b) with no explicit manifest, the default is OMP_AGENT_DIR's — the same
+    //     directory yoki-switch generates into — never HOME's.
+    const savedAgentDir = process.env.OMP_AGENT_DIR!;
+    process.env.OMP_AGENT_DIR = process.env.GUARD_AGENT_DIR_WITH_MANIFEST!;
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    delete process.env.YOKI_HOOKS_MANIFEST;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?hostile-home-agent-dir");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+
+    const r = (await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "h3", input: { command: "echo manifest-marker" } }, ctx)) as { block?: boolean; reason?: string } | undefined;
+    check(
+        "the default manifest comes from OMP_AGENT_DIR, not HOME",
+        r?.block === true && (r?.reason ?? "").includes("stub: manifest guard"),
+        JSON.stringify(r),
+    );
+    // Restored for scenario 7, which spawns the real pre-permission-guard.js
+    // and resolves its permissions.json out of this same variable.
+    process.env.OMP_AGENT_DIR = savedAgentDir;
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +588,30 @@ RUNNER
     printf '{"deny": [{"pattern": "Read(**/id_ed25519)", "reason": "private keys"}]}\n' \
         > "$omp_agent_dir/.yoki/permissions.json"
 
+    # Scenario 1b: the machine's own state, simulated. A fake HOME carrying a
+    # manifest in exactly the place and shape `yoki-switch apply --target omp`
+    # installs one (top-level `floor` + a registered tool_call bash guard),
+    # wired to the hostile guard so any leak is loud. HOME is redirected to
+    # this directory for the whole node run, so homedir() inside the extension
+    # resolves here and never to the developer's real ~.
+    local fake_home="$WORK/fake-home"
+    mkdir -p "$fake_home/.omp/agent" "$fake_home/.claude/hooks"
+    printf '{"floor": ["%s"], "tool_call": [{"id": "hostile", "kind": "bash", "script": "%s"}], "session_stop": [{"id": "hostile-stop", "kind": "bash", "script": "%s"}]}\n' \
+        "$WORK/hostile/hostile-guard.sh" "$WORK/hostile/hostile-guard.sh" "$WORK/hostile/hostile-guard.sh" \
+        > "$fake_home/.omp/agent/yoki-hooks.json"
+    # The floor's scripts are also placed where the HOME fallback would look,
+    # so a leak cannot be masked by existsSync() dropping them.
+    cp "$WORK/hostile/hostile-guard.sh" "$fake_home/.claude/hooks/git-guard.sh"
+    cp "$WORK/hostile/hostile-guard.sh" "$fake_home/.claude/hooks/unattended-guard.sh"
+
+    # An OMP_AGENT_DIR whose yoki-hooks.json is the benign fixture — proves the
+    # default manifest path follows OMP_AGENT_DIR (where yoki-switch writes it)
+    # rather than $HOME.
+    local agent_dir_with_manifest="$WORK/omp-agent-with-manifest"
+    mkdir -p "$agent_dir_with_manifest"
+    printf '{"tool_call": [{"id": "manifest-guard", "kind": "bash", "script": "%s"}]}\n' \
+        "$WORK/hooks/manifest-guard.sh" > "$agent_dir_with_manifest/yoki-hooks.json"
+
     local permission_manifest="$WORK/permission-manifest.json"
     printf '{"tool_call": [{"id": "pre:permission-guard", "kind": "js", "script": "scripts/hooks/pre-permission-guard.js", "profiles": ["minimal", "standard", "strict"]}]}\n' \
         > "$permission_manifest"
@@ -537,7 +634,8 @@ RUNNER
     export GUARD_FLOOR_SATISFIED_MANIFEST="$floor_satisfied_manifest"
     export GUARD_FLOOR_ABSENT_SCRIPT_MANIFEST="$floor_absent_script_manifest"
     export GUARD_PERMISSION_MANIFEST="$permission_manifest"
-    export GUARD_DENIED_PATH="$WORK/fake-home/.ssh/id_ed25519"
+    export GUARD_AGENT_DIR_WITH_MANIFEST="$agent_dir_with_manifest"
+    export GUARD_DENIED_PATH="$fake_home/.ssh/id_ed25519"
     # Read by pre-permission-guard.js itself (spawned as a grandchild of this
     # runner), which is why it is exported rather than passed as an arg.
     export OMP_AGENT_DIR="$omp_agent_dir"
@@ -546,8 +644,15 @@ RUNNER
     # set -e is active for the whole file; guard the capture with `|| status=$?`
     # rather than a bare assignment so a non-zero exit from the runner doesn't
     # kill this function before the PASS/FAIL lines below get parsed.
+    # HOME is redirected for the node run ONLY (a bare `export HOME` here would
+    # leak into every later suite the validator runs in this same shell). With
+    # it redirected, every homedir()-derived default inside the extension — the
+    # manifest path when YOKI_HOOKS_MANIFEST is unset, ~/.claude/hooks when
+    # YOKI_HOOKS_DIR is unset — resolves under $WORK, so the developer's real
+    # ~/.omp/agent/yoki-hooks.json and ~/.claude/hooks are unreachable and
+    # `yoki-switch apply` on this machine cannot change the result.
     local node_output node_status=0
-    node_output="$(node --experimental-strip-types "$WORK/runner.mts" 2> >(grep -v ExperimentalWarning >&2))" || node_status=$?
+    node_output="$(HOME="$fake_home" node --experimental-strip-types "$WORK/runner.mts" 2> >(grep -v ExperimentalWarning >&2))" || node_status=$?
 
     echo "$node_output"
 

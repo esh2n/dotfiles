@@ -24,7 +24,11 @@
  *      file only has to parse that JSON off stdout and combine verdicts
  *      across the hooks registered for one event (first deny wins).
  *
- * The hook list is NOT hard-coded: it is read from ~/.omp/agent/yoki-hooks.json
+ * The hook list is NOT hard-coded: it is read from
+ * <OMP_AGENT_DIR>/yoki-hooks.json (~/.omp/agent/yoki-hooks.json by default —
+ * the directory yoki-switch generates into, honoured under the same env name
+ * so writer and reader never diverge; YOKI_HOOKS_MANIFEST names the file
+ * outright and wins over both)
  * (an {event: [{id, kind, script, args?, profiles?, timeout?}]} map the
  * generator produces from the composed hook config), falling back to today's
  * two bash guards — git-guard.sh, unattended-guard.sh — on tool_call when
@@ -75,9 +79,20 @@ const EVENTS = [
 
 type OmpEvent = (typeof EVENTS)[number];
 
-/** The generated hook manifest. YOKI_HOOKS_MANIFEST redirects it (test seam,
- *  same escape hatch as YOKI_HOOKS_DIR below). */
-const HOOKS_MANIFEST_PATH = process.env.YOKI_HOOKS_MANIFEST || join(homedir(), ".omp", "agent", "yoki-hooks.json");
+/** omp's agent directory. OMP_AGENT_DIR is the same knob yoki-switch (which
+ *  WRITES the manifest into this directory) and pre-permission-guard.js (which
+ *  reads `<OMP_AGENT_DIR>/.yoki/permissions.json` out of it) already honour —
+ *  reading it here keeps the writer and the reader pointed at one directory on
+ *  a machine that has redirected it. Without this the bridge would silently
+ *  read ~/.omp/agent while the generator wrote somewhere else. */
+const OMP_AGENT_DIR = process.env.OMP_AGENT_DIR || join(homedir(), ".omp", "agent");
+
+/** The generated hook manifest. YOKI_HOOKS_MANIFEST redirects the file itself
+ *  (test seam, same escape hatch as YOKI_HOOKS_DIR below) and wins over
+ *  OMP_AGENT_DIR — an explicit path is never overridden by a directory
+ *  default, so a real installed manifest cannot leak into a run that named
+ *  the manifest it wants. */
+const HOOKS_MANIFEST_PATH = process.env.YOKI_HOOKS_MANIFEST || join(OMP_AGENT_DIR, "yoki-hooks.json");
 
 /** Installed personal hooks (symlinks into the repo via yoki-switch), used
  *  only for the fallback when the manifest is absent. */
