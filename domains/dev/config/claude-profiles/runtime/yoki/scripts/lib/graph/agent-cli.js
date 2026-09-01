@@ -8,7 +8,7 @@
  *       [--schema <file.json>] [--sandbox read-only|workspace-write|danger-full-access]
  *       [--cwd <dir>] [--effort low|medium|high|xhigh|max] [--agent-type <name>]
  *       [--timeout <ms>] [--retries N] [--model-map <tier>=<id>,...]
- *       [--label <text>] [--mock <file>] [--dry-run]
+ *       [--label <text>] [--mock <file>] [--run-id <id>] [--dry-run]
  *       --prompt-file <file> [--json]
  *
  * This is NOT a second implementation of `agent()`. It builds the same run
@@ -27,7 +27,7 @@
  *   1  usage error — bad or missing flags, unreadable prompt/schema file,
  *      unknown backend or model tier
  *   2  backend error — the call failed (spawn failure, non-zero exit,
- *      timeout after retries) or the daily guard denied it
+ *      timeout after retries), or a per-run budget cap was already spent
  *   3  schema validation failed after the one retry api.js allows
  *
  * `--json` prints ONLY the result on stdout (the footer goes to stderr), so
@@ -70,6 +70,7 @@ const USAGE = `usage: yoki-agent --backend codex|omp|mock --prompt-file <file> [
   --model-map <t>=<id>,… tier overrides for this call
   --label <text>         journal/progress label (default: yoki-agent)
   --mock <file>          fixture file for --backend mock
+  --run-id <id>          journal this call under an existing run id
   --dry-run              resolve everything, spawn nothing
   --json                 print only the result on stdout; footer to stderr
 
@@ -230,7 +231,7 @@ async function run(argv, deps = {}) {
     return 2;
   }
 
-  const entry = lastOkEntry(journal, plan.runId);
+  const entry = lastOkEntry(journal);
   if (result === null || result === undefined) {
     const failure = lastErrorEntry(journal);
     stderr.write(`yoki-agent: backend call failed${failure && failure.error ? `: ${failure.error}` : ''}\n`);
