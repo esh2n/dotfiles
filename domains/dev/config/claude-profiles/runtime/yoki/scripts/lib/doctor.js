@@ -18,6 +18,7 @@ const { spawnSync } = require('child_process');
 
 const { readJsonIfExists } = require('./targets/layers');
 const { groupIsOurs, collectHookStateEntries } = require('./targets/codex-hooks-merge');
+const externalLinks = require('./external-links');
 
 /** `readJsonIfExists` throws on a parse error (by design, for the "does
  * this parse" checks) — this wraps it for the supporting lookups below
@@ -394,7 +395,108 @@ function checkClaudePermissionsJson(claudeDir) {
   }
 }
 
-function checkClaudeTarget({ claudeDir, yokiRoot }) {
+// ---------------------------------------------------------------------------
+// claude target: external-links.yaml (task T35)
+// ---------------------------------------------------------------------------
+
+/** Enabled-pack names from `<claudeDir>/.claude-packs` (yoki-switch's own
+ * PACKS_FILE) — same "blank/# lines ignored" format as `enabled_packs()`.
+ * An unreadable/missing file just means no packs to check. */
+function readEnabledPacks(claudeDir) {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(claudeDir, '.claude-packs'), 'utf8');
+  } catch {
+    return [];
+  }
+  return text
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l !== '' && !l.startsWith('#'));
+}
+
+/** One declared external link vs. this machine's actual filesystem state:
+ * ok (linked, target exists) / warn (src missing on this machine, or not
+ * yet linked at all — `yoki-switch apply` hasn't run since it was
+ * declared) / fail (dest exists but is a regular file/dir, or a symlink
+ * pointing somewhere else). */
+function checkExternalLinkEntry(entry) {
+  const checkName = `external-link:${entry.dest}`;
+  const purposeSuffix = entry.purpose ? ` (${entry.purpose})` : '';
+
+  if (!fs.existsSync(entry.srcExpanded)) {
+    return result('warn', 'claude', checkName, `src missing on this machine: ${entry.srcExpanded}${purposeSuffix}`);
+  }
+
+  let lst;
+  try {
+    lst = fs.lstatSync(entry.destPath);
+  } catch {
+    return result('warn', 'claude', checkName, `not yet linked at ${entry.destPath} — run yoki-switch apply`);
+  }
+
+  if (!lst.isSymbolicLink()) {
+    return result('fail', 'claude', checkName, `${entry.destPath} exists but is not a symlink — remove it and re-run yoki-switch apply`);
+  }
+
+  let linkTarget;
+  try {
+    linkTarget = fs.readlinkSync(entry.destPath);
+  } catch (err) {
+    return result('fail', 'claude', checkName, `${entry.destPath}: ${err.message}`);
+  }
+
+  const resolvedTarget = path.resolve(path.dirname(entry.destPath), linkTarget);
+  const resolvedSrc = path.resolve(entry.srcExpanded);
+  if (resolvedTarget !== resolvedSrc) {
+    return result('fail', 'claude', checkName, `${entry.destPath} points to ${resolvedTarget}, expected ${resolvedSrc}`);
+  }
+
+  return result('ok', 'claude', checkName, `${entry.destPath} -> ${resolvedSrc}`);
+}
+
+/**
+ * Re-reads the same layered external-links.yaml declarations
+ * link_external_resources() consumed at apply time (core -> enabled packs
+ * -> personal) and checks each against this machine's actual state.
+ * `dotfilesRoot`/`home` missing (e.g. an older caller/test) degrades to a
+ * single skipped warning rather than throwing.
+ */
+function checkClaudeExternalLinks(dotfilesRoot, claudeDir, home) {
+  if (!dotfilesRoot) {
+    return [result('warn', 'claude', 'external-links', 'skipped — dotfilesRoot not provided')];
+  }
+
+  const profilesDir = path.join(dotfilesRoot, 'domains', 'dev', 'config', 'claude-profiles');
+  const coreDir = path.join(profilesDir, 'core');
+  const packsDir = path.join(profilesDir, 'packs');
+  const personalDir = path.join(profilesDir, 'personal');
+
+  if (!fs.existsSync(coreDir)) {
+    return [result('warn', 'claude', 'external-links', `skipped — claude-profiles not found at ${profilesDir}`)];
+  }
+
+  const sources = [path.join(coreDir, 'external-links.yaml')];
+  for (const p of readEnabledPacks(claudeDir)) {
+    const packFile = path.join(packsDir, p, 'external-links.yaml');
+    if (fs.existsSync(packFile)) sources.push(packFile);
+  }
+  sources.push(path.join(personalDir, 'external-links.yaml'));
+
+  let entries;
+  try {
+    entries = externalLinks.loadAndResolve(sources, { home, claudeDir });
+  } catch (err) {
+    return [result('fail', 'claude', 'external-links', err.message)];
+  }
+
+  if (entries.length === 0) {
+    return [result('ok', 'claude', 'external-links', 'no external links declared')];
+  }
+  return entries.map(checkExternalLinkEntry);
+}
+
+function checkClaudeTarget({ claudeDir, yokiRoot, dotfilesRoot, home }) {
   if (!fs.existsSync(claudeDir)) {
     return [result('warn', 'claude', 'home', `${claudeDir} does not exist — skipping claude checks`)];
   }
@@ -406,6 +508,7 @@ function checkClaudeTarget({ claudeDir, yokiRoot }) {
     settingsCheck.check,
     checkClaudeHookScripts(claudeDir, yokiRoot, settingsCheck.settings),
     checkClaudePermissionsJson(claudeDir),
+    ...checkClaudeExternalLinks(dotfilesRoot, claudeDir, home || os.homedir()),
   ];
 }
 
@@ -791,7 +894,7 @@ function runDoctor(options = {}) {
   const ompAgentDir = options.ompAgentDir || path.join(home, '.omp', 'agent');
 
   return [
-    ...checkClaudeTarget({ claudeDir, yokiRoot }),
+    ...checkClaudeTarget({ claudeDir, yokiRoot, dotfilesRoot, home }),
     ...checkCodexTarget({ codexDir, home, dotfilesRoot }),
     ...checkOmpTarget({ ompAgentDir, claudeDir, home, dotfilesRoot, yokiRoot }),
     ...checkArtifactTarget({ dotfilesRoot }),
@@ -867,6 +970,10 @@ module.exports = {
   checkCodexTarget,
   checkOmpTarget,
   checkArtifactTarget,
+  // T35: external-links.yaml checks, exported for tests
+  readEnabledPacks,
+  checkExternalLinkEntry,
+  checkClaudeExternalLinks,
 };
 
 if (require.main === module) {

@@ -1,0 +1,29 @@
+# External links (T35): git-tracked symlinks must be relative and stay
+# INSIDE the repository. Anything that points into $HOME or is
+# machine/account specific is declared here instead and linked at APPLY
+# TIME — see yoki-switch's link_external_resources(), called from apply()
+# right after the MERGE_DIRS staging loop.
+#
+# Schema: one `- {dest: ..., src: ..., purpose: ...}` flow-mapping entry
+# per line (parsed by runtime/yoki/scripts/lib/external-links.js — the
+# same tiny-YAML-subset approach as permissions.yaml/parse.js, no real
+# YAML dependency).
+#
+#   dest    — relative to a ~/.claude merge-dir staging tree, i.e.
+#             "<merge-dir>/<rest>" (see yoki-switch's MERGE_DIRS). Resolves
+#             to <CLAUDE_DIR>/.<merge-dir>-merged/<rest>, so it appears
+#             through the existing ~/.claude/<merge-dir> symlink exactly
+#             like everything else staged there.
+#   src     — $HOME-relative (leading `~`) or an absolute path. Never a
+#             repo-relative path — that would defeat the point of this file.
+#   purpose — free text, surfaced by `yoki-switch doctor` when src is
+#             missing on this machine.
+#
+# A missing `src` is not an error: `yoki-switch apply` skips that one link
+# with a single info line, and `yoki-switch doctor` reports it as a warn
+# (see doctor.js's checkClaudeExternalLinks). core/ and packs/<name>/ may
+# each carry their own external-links.yaml too — every declared layer is
+# unioned at apply time, same precedence as everything else (core, then
+# enabled packs, then personal).
+
+- {dest: commands/prompts, src: ~/.config/prompts/global, purpose: prompt-save skill が保存する共有プロンプト}

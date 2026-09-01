@@ -130,6 +130,7 @@ run_all_checks() {
         harness-adapter
         yoki-artifact
         yoki-graph
+        yoki-loop
         suggest-compact
     )
 
@@ -258,6 +259,15 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-yoki-graph.sh"
             run_yoki_graph_checks
             ;;
+        "yoki-loop")
+            if ! command -v node >/dev/null 2>&1; then
+                log_error "yoki-loop requires node (for \`node --test\` and the real CLI) — none found on PATH."
+                exit 1
+            fi
+
+            source "${SCRIPT_DIR}/test-yoki-loop.sh"
+            run_yoki_loop_checks
+            ;;
         "suggest-compact")
             source "${SCRIPT_DIR}/test-suggest-compact.sh"
             run_suggest_compact_checks
@@ -266,7 +276,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|omp-yoki-bridge|harness-adapter|yoki-artifact|yoki-graph|suggest-compact|workday-calc]"
+            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|omp-yoki-bridge|harness-adapter|yoki-artifact|yoki-graph|yoki-loop|suggest-compact|workday-calc]"
             echo "       (no args runs every self-contained regression suite)"
             exit 1
             ;;

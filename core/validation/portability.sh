@@ -96,6 +96,124 @@ assert_file_exists() {
     fi
 }
 
+# -----------------------------------------------------------------------------
+# Symlink safety (task T35): every git-tracked symlink must be RELATIVE and
+# stay INSIDE the repository. Anything that needs to point into $HOME or is
+# machine/account specific belongs in an external-links.yaml layer instead
+# (personal/external-links.yaml + yoki-switch's link_external_resources()),
+# linked at apply time rather than committed as a real symlink.
+# -----------------------------------------------------------------------------
+
+# Normalizes a slash-separated relative path (may contain "." / ".."
+# components) without touching the filesystem — the shell equivalent of
+# Python's os.path.normpath / Node's path.posix.normalize. A result that is
+# ".." or starts with "../" means the path climbs above wherever it started
+# (here: above the repo root, since every input is repo-root-relative).
+# Written without negative array indices (`${arr[-1]}`) — macOS ships bash
+# 3.2, which lacks them.
+_normalize_relpath() {
+    local input="$1"
+    local -a parts=()
+    local n=0
+    local seg
+    local old_ifs="$IFS"
+    IFS='/'
+    for seg in $input; do
+        case "$seg" in
+            ""|".") ;;
+            "..")
+                if [[ $n -gt 0 && "${parts[$((n - 1))]}" != ".." ]]; then
+                    n=$((n - 1))
+                else
+                    parts[$n]=".."
+                    n=$((n + 1))
+                fi
+                ;;
+            *)
+                parts[$n]="$seg"
+                n=$((n + 1))
+                ;;
+        esac
+    done
+    IFS="$old_ifs"
+
+    local out="" i
+    for ((i = 0; i < n; i++)); do
+        if [[ -z "$out" ]]; then
+            out="${parts[$i]}"
+        else
+            out="$out/${parts[$i]}"
+        fi
+    done
+    printf '%s' "$out"
+}
+
+# Enumerates every git-tracked symlink (`git ls-files -s` mode 120000) and
+# fails one whose target is absolute, starts with `~`, or — once resolved
+# against the link's own directory — escapes the repo root via `..`.
+check_tracked_symlinks_safe() {
+    log_info "--- 9. Tracked symlinks: relative targets that stay inside the repo ---"
+
+    local checked=0
+    local rel target link_dir normalized
+    while IFS= read -r rel; do
+        [[ -n "$rel" ]] || continue
+
+        # The index still lists it (still tracked) but the worktree copy is
+        # gone — an uncommitted `rm`/`git rm` pending a later commit. Nothing
+        # on disk to mis-resolve; skip rather than fabricate a verdict from
+        # an empty readlink.
+        if [[ ! -L "$DOTFILES_ROOT/$rel" ]]; then
+            log_warn "SKIP: $rel (indexed as a symlink, but not one in the worktree — pending removal?)"
+            continue
+        fi
+
+        target="$(readlink "$DOTFILES_ROOT/$rel")"
+        checked=$((checked + 1))
+        TOTAL=$((TOTAL + 1))
+
+        # core/validation/fixtures/targets/expected encodes a fake absolute
+        # path this way for the targets-golden suite — not a real hazard.
+        if [[ "$target" == "__FIXTURES_ROOT__" || "$target" == __FIXTURES_ROOT__/* ]]; then
+            log_success "PASS: $rel — fixture placeholder target"
+            PASSED=$((PASSED + 1))
+            continue
+        fi
+
+        if [[ "$target" == /* ]]; then
+            log_error "FAIL: $rel — symlink target is absolute: $target"
+            FAILED=$((FAILED + 1))
+            continue
+        fi
+
+        if [[ "$target" == "~"* ]]; then
+            log_error "FAIL: $rel — symlink target starts with ~: $target"
+            FAILED=$((FAILED + 1))
+            continue
+        fi
+
+        link_dir="$(dirname "$rel")"
+        if [[ "$link_dir" == "." ]]; then
+            normalized="$(_normalize_relpath "$target")"
+        else
+            normalized="$(_normalize_relpath "$link_dir/$target")"
+        fi
+
+        if [[ "$normalized" == ".." || "$normalized" == ../* ]]; then
+            log_error "FAIL: $rel — symlink target escapes the repo root: $target"
+            FAILED=$((FAILED + 1))
+            continue
+        fi
+
+        log_success "PASS: $rel — relative target stays inside the repo"
+        PASSED=$((PASSED + 1))
+    done < <(git -C "$DOTFILES_ROOT" ls-files -s | awk '$1 == "120000" { print $4 }')
+
+    if [[ "$checked" -eq 0 ]]; then
+        log_warn "No tracked symlinks found — nothing to check"
+    fi
+}
+
 assert_env_var_used() {
     local file="$1"
     local var_name="$2"
@@ -183,6 +301,9 @@ run_portability_checks() {
     assert_file_exists \
         "$DOTFILES_ROOT/.env.example" \
         ".env.example should exist for required env vars"
+
+    echo ""
+    check_tracked_symlinks_safe
 
     echo ""
     log_info "=== Results ==="

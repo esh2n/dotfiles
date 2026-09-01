@@ -111,6 +111,17 @@ YAML
         ln -sfn "$real_mcp_inventory_lib" "$profiles/runtime/yoki/scripts/lib/mcp-inventory"
     fi
 
+    # apply() also shells out to lib/external-links.js (task T35) via
+    # link_external_resources() — symlink it in for the same reason. No
+    # external-links.yaml fixture files are created below, so this resolves
+    # to an empty layer set on every call (nothing to link, nothing to warn
+    # about) — that codepath is covered by lib/test/external-links.test.js
+    # and lib/test/doctor.test.js instead of here.
+    local real_external_links_lib="$DOTFILES_ROOT/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/external-links.js"
+    if [[ -f "$real_external_links_lib" ]]; then
+        ln -sfn "$real_external_links_lib" "$profiles/runtime/yoki/scripts/lib/external-links.js"
+    fi
+
     # mcp.json (T13): a minimal core/personal layer pair — this fixture's own
     # data, not the real repo's — asserted against below (mirrors the
     # permissions.yaml fixture above).

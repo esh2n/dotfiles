@@ -347,6 +347,62 @@ merge_dir() {
 }
 
 # -----------------------------------------------------------------------------
+# link_external_resources: apply-time linking for machine/account-specific
+# targets declared in external-links.yaml (task T35).
+#
+# Principle: a git-tracked symlink must be relative and stay inside the
+# repository. Anything that needs to point into $HOME or is otherwise
+# machine/account specific (e.g. core/commands/prompts used to be a tracked
+# symlink to /Users/<account>/.config/prompts/global) is declared in
+# core/packs/<name>/personal/external-links.yaml instead and linked here,
+# at apply time — never committed as a real symlink.
+#
+# Parsing/resolution lives in lib/external-links.js (same "tiny YAML subset,
+# no dependency" approach as lib/permissions/parse.js); this just resolves
+# the layer file list, shells out, and does the actual ln -sfn/skip per
+# resolved entry. Must run AFTER the MERGE_DIRS staging loop: a dest like
+# "commands/prompts" lands inside a staging dir (.commands-merged) that
+# merge_dir() already rebuilt for this apply, and link_external_resources
+# only adds to it rather than wiping it.
+# -----------------------------------------------------------------------------
+link_external_resources() {
+    local -a packs=("$@")
+
+    if ! command -v node >/dev/null 2>&1; then
+        log_error "link_external_resources requires node (for lib/external-links.js) — none found on PATH."
+        exit 1
+    fi
+
+    local -a link_sources=("$CORE_DIR/external-links.yaml")
+    local p
+    for p in "${packs[@]+"${packs[@]}"}"; do
+        [[ -f "$PACKS_DIR/$p/external-links.yaml" ]] && link_sources+=("$PACKS_DIR/$p/external-links.yaml")
+    done
+    link_sources+=("$PERSONAL_DIR/external-links.yaml")
+
+    local links_json
+    if ! links_json="$(node "$RUNTIME_DIR/scripts/lib/external-links.js" --sources "${link_sources[@]}" --claude-dir "$CLAUDE_DIR" --home "$HOME")"; then
+        log_error "Failed to resolve external-links.yaml layers via lib/external-links.js"
+        exit 1
+    fi
+
+    local count=0
+    local dest src_expanded dest_path
+    while IFS=$'\t' read -r dest src_expanded dest_path; do
+        [[ -n "$dest" ]] || continue
+        if [[ -e "$src_expanded" || -L "$src_expanded" ]]; then
+            mkdir -p "$(dirname "$dest_path")"
+            ln -sfn "$src_expanded" "$dest_path"
+            ((count++)) || true
+        else
+            log_info "external-link: $dest -> $src_expanded not found on this machine — skipped (see 'yoki-switch doctor')"
+        fi
+    done < <(printf '%s' "$links_json" | jq -r '.[] | [.dest, .srcExpanded, .destPath] | @tsv')
+
+    log_success "External links: $count linked"
+}
+
+# -----------------------------------------------------------------------------
 # link_cursor_rules: vendored ECC cursor rules → ~/.cursor/rules
 # -----------------------------------------------------------------------------
 link_cursor_rules() {
@@ -493,6 +549,8 @@ apply() {
                 merge_dir "$dir" "${packs[@]+"${packs[@]}"}"
             done
 
+            link_external_resources "${packs[@]+"${packs[@]}"}"
+
             link_cursor_rules
 
             # Legacy marker no longer used; keep it pointing at the new scheme
@@ -517,19 +575,44 @@ apply() {
 # doctor: health-check the claude/codex/omp/artifact targets (task T14).
 # Mostly implemented in Node (lib/doctor.js) — this wrapper just resolves the
 # same directories apply() uses and forwards --json.
+#
+# `doctor --prepush [base]` (task T35) is a different mode entirely: instead
+# of reading this machine's ~/.claude/~/.codex/~/.omp state, it scans this
+# branch's own diff against `base` (default `main`) for secrets, e-mail
+# addresses, hardcoded home paths, and unsafe tracked symlinks before you
+# push. Delegates straight to lib/prepush-scan.js.
 # -----------------------------------------------------------------------------
 doctor() {
     local json_flag=()
+    local prepush=0
+    local prepush_base="main"
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --json) json_flag=(--json); shift ;;
-            *) log_error "Usage: ${PROG} doctor [--json]"; exit 1 ;;
+            --prepush)
+                prepush=1
+                shift
+                if [[ $# -gt 0 && "$1" != --* ]]; then
+                    prepush_base="$1"
+                    shift
+                fi
+                ;;
+            *) log_error "Usage: ${PROG} doctor [--json] [--prepush [base]]"; exit 1 ;;
         esac
     done
 
     if ! command -v node >/dev/null 2>&1; then
-        log_error "doctor requires node (for lib/doctor.js) — none found on PATH."
+        log_error "doctor requires node (for lib/doctor.js / lib/prepush-scan.js) — none found on PATH."
         exit 1
+    fi
+
+    if [[ "$prepush" == 1 ]]; then
+        node "$RUNTIME_DIR/scripts/lib/prepush-scan.js" \
+            --repo-root "${DOTFILES_ROOT:-$HOME/dotfiles}" \
+            --base "$prepush_base" \
+            "${json_flag[@]+"${json_flag[@]}"}"
+        return $?
     fi
 
     node "$RUNTIME_DIR/scripts/lib/doctor.js" \
@@ -690,6 +773,9 @@ case "${1:-}" in
         echo "                                planned operations, writes nothing)."
         echo "  doctor [--json]               Health-check claude/codex/omp/artifact targets;"
         echo "                                one line per check, exit 1 iff any check fails."
+        echo "  doctor --prepush [base]       Scan this branch's diff against 'base' (default"
+        echo "                                main) for secrets/e-mails/home-paths/unsafe symlinks"
+        echo "                                before pushing; exit 1 on any hit."
         echo "  pack list                     Show enabled/available packs"
         echo "  pack enable <pack>...         Enable pack(s) and apply"
         echo "  pack disable <pack>...        Disable pack(s) and apply"

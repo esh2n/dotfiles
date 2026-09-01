@@ -11,29 +11,28 @@
 // Both return findings as plain frozen objects with a 1-based line number;
 // neither ever returns the matched secret itself.
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+// The pattern shapes are shared with the T35 prepush scanner
+// (runtime/yoki/scripts/lib/prepush-scan.js) via one JSON file rather than
+// duplicated — this CLI is ESM, that runtime is CJS, so a single data file
+// both `import`/`require` is simpler than a shared module. import.meta.url
+// resolves through any symlink this file is reached by (a skill directory
+// symlinked into ~/.claude/skills, the domains/dev/bin/yoki-artifact
+// symlink — see the isMain check below for the same reasoning), so this
+// relative path is stable regardless of how the CLI was invoked.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SECRET_PATTERNS_PATH = path.resolve(__dirname, "../../../../../runtime/yoki/scripts/lib/secret-patterns.json");
+
+function loadSecretRules() {
+  const defs = JSON.parse(readFileSync(SECRET_PATTERNS_PATH, "utf8"));
+  return defs.map((d) => Object.freeze({ id: d.id, label: d.label, re: new RegExp(d.source, d.flags) }));
+}
+
 /** Frozen so a caller cannot reorder or extend the rule set at runtime. */
-export const SECRET_RULES = Object.freeze([
-  Object.freeze({ id: "openai-key", label: "OpenAI-style API key", re: /sk-[A-Za-z0-9]{20,}/g }),
-  Object.freeze({ id: "github-token", label: "GitHub token", re: /gh[pousr]_[A-Za-z0-9]{30,}/g }),
-  Object.freeze({ id: "github-pat", label: "GitHub fine-grained PAT", re: /github_pat_[A-Za-z0-9_]{20,}/g }),
-  Object.freeze({ id: "aws-access-key", label: "AWS access key id", re: /AKIA[0-9A-Z]{16}/g }),
-  Object.freeze({ id: "slack-token", label: "Slack token", re: /xox[baprs]-[A-Za-z0-9-]{10,}/g }),
-  Object.freeze({
-    id: "private-key",
-    label: "private key block",
-    re: /-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
-  }),
-  Object.freeze({
-    id: "jwt",
-    label: "JSON Web Token",
-    re: /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/g,
-  }),
-  Object.freeze({
-    id: "credential-query",
-    label: "credential in a query string",
-    re: /[?&](?:password|token)=[^\s&"'<>]+/gi,
-  }),
-]);
+export const SECRET_RULES = Object.freeze(loadSecretRules());
 
 /** Hosts the Worker's artifact CSP actually allows. Path-scoped where the CSP is. */
 export const ALLOWED_HOSTS = Object.freeze([

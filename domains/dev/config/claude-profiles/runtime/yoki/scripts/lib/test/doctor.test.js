@@ -20,6 +20,9 @@ const {
   checkClaudeTarget,
   checkCodexTarget,
   checkOmpTarget,
+  readEnabledPacks,
+  checkExternalLinkEntry,
+  checkClaudeExternalLinks,
 } = require('../doctor');
 const { computeHandlerHash } = require('../targets/codex-trust');
 
@@ -590,5 +593,245 @@ test('checkOmpTarget: ~/.omp/agent missing entirely -> a single warn, no throw a
     assert.equal(findCheck(results, 'config-yml'), undefined);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// external-links.yaml (task T35)
+// ---------------------------------------------------------------------------
+
+function makeFakeProfiles(root) {
+  const profilesDir = path.join(root, 'domains', 'dev', 'config', 'claude-profiles');
+  fs.mkdirSync(path.join(profilesDir, 'core'), { recursive: true });
+  fs.mkdirSync(path.join(profilesDir, 'personal'), { recursive: true });
+  fs.mkdirSync(path.join(profilesDir, 'packs'), { recursive: true });
+  return profilesDir;
+}
+
+test('readEnabledPacks reads .claude-packs, ignoring blank lines and # comments', () => {
+  const claudeDir = makeTmpDir('yoki-doctor-enabled-packs-');
+  try {
+    writeFile(path.join(claudeDir, '.claude-packs'), '# comment\n\ngo\ntypescript\n');
+    assert.deepEqual(readEnabledPacks(claudeDir), ['go', 'typescript']);
+  } finally {
+    fs.rmSync(claudeDir, { recursive: true, force: true });
+  }
+});
+
+test('readEnabledPacks returns [] when .claude-packs does not exist', () => {
+  const claudeDir = makeTmpDir('yoki-doctor-enabled-packs-missing-');
+  try {
+    assert.deepEqual(readEnabledPacks(claudeDir), []);
+  } finally {
+    fs.rmSync(claudeDir, { recursive: true, force: true });
+  }
+});
+
+test('checkExternalLinkEntry: ok when the dest symlink resolves to the (existing) src', () => {
+  const home = makeTmpDir('yoki-doctor-extlink-ok-home-');
+  const claudeDir = makeTmpDir('yoki-doctor-extlink-ok-claude-');
+  try {
+    const srcFile = path.join(home, '.config', 'prompts', 'global');
+    writeFile(srcFile, '# a prompt\n');
+    const destPath = path.join(claudeDir, '.commands-merged', 'prompts');
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.symlinkSync(srcFile, destPath);
+
+    const entry = { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: 'p', srcExpanded: srcFile, destPath };
+    const check = checkExternalLinkEntry(entry);
+    assert.equal(check.status, 'ok');
+    assert.equal(check.check, 'external-link:commands/prompts');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(claudeDir, { recursive: true, force: true });
+  }
+});
+
+test('checkExternalLinkEntry: warn when src is missing on this machine', () => {
+  const home = makeTmpDir('yoki-doctor-extlink-missing-src-');
+  try {
+    const entry = {
+      dest: 'commands/prompts',
+      src: '~/.config/prompts/global',
+      purpose: 'shared prompts',
+      srcExpanded: path.join(home, '.config', 'prompts', 'global'),
+      destPath: path.join(home, '.claude', '.commands-merged', 'prompts'),
+    };
+    const check = checkExternalLinkEntry(entry);
+    assert.equal(check.status, 'warn');
+    assert.match(check.hint, /src missing on this machine/);
+    assert.match(check.hint, /shared prompts/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkExternalLinkEntry: warn when src exists but apply has not linked it yet', () => {
+  const home = makeTmpDir('yoki-doctor-extlink-not-linked-');
+  try {
+    const srcFile = path.join(home, '.config', 'prompts', 'global');
+    writeFile(srcFile, '# a prompt\n');
+    const entry = {
+      dest: 'commands/prompts',
+      src: '~/.config/prompts/global',
+      purpose: '',
+      srcExpanded: srcFile,
+      destPath: path.join(home, '.claude', '.commands-merged', 'prompts'), // never created
+    };
+    const check = checkExternalLinkEntry(entry);
+    assert.equal(check.status, 'warn');
+    assert.match(check.hint, /not yet linked/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkExternalLinkEntry: fail when dest exists but is a regular file/dir, not a symlink', () => {
+  const home = makeTmpDir('yoki-doctor-extlink-not-symlink-');
+  try {
+    const srcFile = path.join(home, '.config', 'prompts', 'global');
+    writeFile(srcFile, '# a prompt\n');
+    const destPath = path.join(home, '.claude', '.commands-merged', 'prompts');
+    writeFile(destPath, 'a real file, not a symlink\n');
+
+    const entry = { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: '', srcExpanded: srcFile, destPath };
+    const check = checkExternalLinkEntry(entry);
+    assert.equal(check.status, 'fail');
+    assert.match(check.hint, /exists but is not a symlink/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkExternalLinkEntry: fail when dest is a symlink pointing somewhere else', () => {
+  const home = makeTmpDir('yoki-doctor-extlink-wrong-target-');
+  try {
+    const srcFile = path.join(home, '.config', 'prompts', 'global');
+    writeFile(srcFile, '# a prompt\n');
+    const otherFile = path.join(home, 'somewhere-else');
+    writeFile(otherFile, 'not the right target\n');
+    const destPath = path.join(home, '.claude', '.commands-merged', 'prompts');
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.symlinkSync(otherFile, destPath);
+
+    const entry = { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: '', srcExpanded: srcFile, destPath };
+    const check = checkExternalLinkEntry(entry);
+    assert.equal(check.status, 'fail');
+    assert.match(check.hint, /points to/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkClaudeExternalLinks: no external-links.yaml anywhere -> a single ok', () => {
+  const root = makeTmpDir('yoki-doctor-extlinks-none-');
+  const home = makeTmpDir('yoki-doctor-extlinks-none-home-');
+  try {
+    const profilesDir = makeFakeProfiles(root);
+    const claudeDir = path.join(home, '.claude');
+    fs.mkdirSync(claudeDir, { recursive: true });
+
+    const results = checkClaudeExternalLinks(root, claudeDir, home);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].status, 'ok');
+    assert.equal(results[0].check, 'external-links');
+    void profilesDir;
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkClaudeExternalLinks: reads core -> enabled packs -> personal, in that precedence', () => {
+  const root = makeTmpDir('yoki-doctor-extlinks-layers-');
+  const home = makeTmpDir('yoki-doctor-extlinks-layers-home-');
+  try {
+    const profilesDir = makeFakeProfiles(root);
+    const claudeDir = path.join(home, '.claude');
+    fs.mkdirSync(claudeDir, { recursive: true });
+    writeFile(path.join(claudeDir, '.claude-packs'), 'go\n');
+
+    writeFile(path.join(profilesDir, 'core', 'external-links.yaml'), '- {dest: commands/from-core, src: ~/.from-core}\n');
+    fs.mkdirSync(path.join(profilesDir, 'packs', 'go'), { recursive: true });
+    writeFile(path.join(profilesDir, 'packs', 'go', 'external-links.yaml'), '- {dest: commands/from-pack, src: ~/.from-pack}\n');
+    writeFile(path.join(profilesDir, 'personal', 'external-links.yaml'), '- {dest: commands/from-personal, src: ~/.from-personal}\n');
+
+    const results = checkClaudeExternalLinks(root, claudeDir, home);
+    const names = results.map(r => r.check).sort();
+    assert.deepEqual(names, ['external-link:commands/from-core', 'external-link:commands/from-pack', 'external-link:commands/from-personal']);
+    // none of the srcs exist on this fake machine -> every entry warns, not fails/throws
+    assert.ok(results.every(r => r.status === 'warn'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkClaudeExternalLinks: a disabled pack\'s external-links.yaml is not consulted', () => {
+  const root = makeTmpDir('yoki-doctor-extlinks-disabled-pack-');
+  const home = makeTmpDir('yoki-doctor-extlinks-disabled-pack-home-');
+  try {
+    const profilesDir = makeFakeProfiles(root);
+    const claudeDir = path.join(home, '.claude');
+    fs.mkdirSync(claudeDir, { recursive: true });
+    // .claude-packs deliberately does not list "go"
+
+    fs.mkdirSync(path.join(profilesDir, 'packs', 'go'), { recursive: true });
+    writeFile(path.join(profilesDir, 'packs', 'go', 'external-links.yaml'), '- {dest: commands/from-pack, src: ~/.from-pack}\n');
+
+    const results = checkClaudeExternalLinks(root, claudeDir, home);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].status, 'ok'); // no core/personal entries, disabled pack's entry not read
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkClaudeExternalLinks: degrades to a warn (not a throw) when dotfilesRoot is not provided', () => {
+  const results = checkClaudeExternalLinks(undefined, '/whatever/.claude', '/whatever');
+  assert.equal(results.length, 1);
+  assert.equal(results[0].status, 'warn');
+});
+
+test('checkClaudeExternalLinks: a malformed external-links.yaml reports a fail, not a throw', () => {
+  const root = makeTmpDir('yoki-doctor-extlinks-malformed-');
+  const home = makeTmpDir('yoki-doctor-extlinks-malformed-home-');
+  try {
+    const profilesDir = makeFakeProfiles(root);
+    const claudeDir = path.join(home, '.claude');
+    fs.mkdirSync(claudeDir, { recursive: true });
+    writeFile(path.join(profilesDir, 'personal', 'external-links.yaml'), 'not a valid entry\n');
+
+    const results = checkClaudeExternalLinks(root, claudeDir, home);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].status, 'fail');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkClaudeTarget: folds external-links checks into its own result list', () => {
+  const home = makeTmpDir('yoki-doctor-claude-extlinks-integration-');
+  const yokiRoot = makeTmpDir('yoki-doctor-claude-extlinks-yokiroot-');
+  try {
+    const claudeDir = path.join(home, '.claude');
+    for (const dir of ['skills', 'hooks', 'scripts', 'commands', 'agents', 'rules', 'workflows']) {
+      fs.mkdirSync(path.join(claudeDir, dir), { recursive: true });
+    }
+    writeFile(path.join(claudeDir, '.yoki', 'permissions.json'), JSON.stringify({ deny: [] }));
+
+    const dotfilesRoot = makeTmpDir('yoki-doctor-claude-extlinks-root-');
+    const profilesDir = makeFakeProfiles(dotfilesRoot);
+    writeFile(path.join(profilesDir, 'personal', 'external-links.yaml'), '- {dest: commands/prompts, src: ~/.config/prompts/global}\n');
+
+    const results = checkClaudeTarget({ claudeDir, yokiRoot, dotfilesRoot, home });
+    assert.equal(findCheck(results, 'external-link:commands/prompts').status, 'warn');
+
+    fs.rmSync(dotfilesRoot, { recursive: true, force: true });
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(yokiRoot, { recursive: true, force: true });
   }
 });
