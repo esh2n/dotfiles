@@ -231,3 +231,107 @@ test('tokensSpent sums only entries carrying a numeric tokens field', () => {
     assert.equal(j.tokensSpent(), 150);
   });
 });
+
+// ---------------------------------------------------------------------------
+// JournalTail — the incremental reader `status --watch` polls with
+// ---------------------------------------------------------------------------
+
+test('JournalTail parses only the bytes appended since the last read', () => {
+  withTempStateHome(({ Journal, JournalTail, journalPath }) => {
+    const j = new Journal('tail-run');
+    j.append({ index: 0, key: 'a', label: 'a', status: 'ok', result: 1 });
+
+    const tail = new JournalTail('tail-run');
+    assert.equal(tail.read().length, 1);
+    const afterFirst = tail.offset;
+    assert.ok(afterFirst > 0);
+
+    // Nothing new: the file is not re-parsed, and the same entries come back.
+    assert.equal(tail.read().length, 1);
+    assert.equal(tail.offset, afterFirst);
+
+    j.append({ index: 1, key: 'b', label: 'b', status: 'ok', result: 2 });
+    const entries = tail.read();
+    assert.equal(entries.length, 2);
+    assert.equal(entries[1].label, 'b');
+    assert.ok(tail.offset > afterFirst, 'the offset did not advance past the appended line');
+    assert.ok(fs.existsSync(journalPath('tail-run')));
+  });
+});
+
+test('JournalTail holds back a partial trailing line instead of dropping it', () => {
+  withTempStateHome(({ JournalTail, journalPath, runDir }) => {
+    const file = journalPath('partial-run');
+    fs.mkdirSync(runDir('partial-run'), { recursive: true });
+    // A writer caught mid-append: the last line has no terminating newline.
+    fs.writeFileSync(file, `${JSON.stringify({ index: 0, status: 'ok', label: 'a' })}\n{"index":1,"stat`);
+
+    const tail = new JournalTail('partial-run');
+    assert.equal(tail.read().length, 1, 'the half-written line was parsed as an entry');
+
+    // The rest arrives; the entry is completed, not lost.
+    fs.appendFileSync(file, 'us":"ok","label":"b"}\n');
+    const entries = tail.read();
+    assert.equal(entries.length, 2);
+    assert.equal(entries[1].label, 'b');
+  });
+});
+
+test('JournalTail re-reads from zero when the file shrinks (truncated or rotated)', () => {
+  withTempStateHome(({ Journal, JournalTail, journalPath }) => {
+    const j = new Journal('trunc-run');
+    j.append({ index: 0, key: 'a', label: 'long-entry-aaaaaaaaaaaaaaaaaaaa', status: 'ok', result: 1 });
+    j.append({ index: 1, key: 'b', label: 'long-entry-bbbbbbbbbbbbbbbbbbbb', status: 'ok', result: 2 });
+
+    const tail = new JournalTail('trunc-run');
+    assert.equal(tail.read().length, 2);
+
+    // Something replaced the file with a shorter one. The offset now points
+    // past the end, so nothing about the old position can be trusted.
+    fs.writeFileSync(journalPath('trunc-run'), `${JSON.stringify({ index: 0, status: 'ok', label: 'fresh' })}\n`);
+    const entries = tail.read();
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].label, 'fresh');
+  });
+});
+
+test('JournalTail returns nothing, not a throw, before the journal exists', () => {
+  withTempStateHome(({ JournalTail }) => {
+    assert.deepEqual(new JournalTail('never-written').read(), []);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// callKey's execution identity: the resolved backend and model
+// ---------------------------------------------------------------------------
+
+test('callKey folds in the RESOLVED backend and model — a replay must not cross models', () => {
+  withTempStateHome(({ callKey }) => {
+    const base = callKey('p', { label: 'lane' });
+    // No execution info: byte-identical to the old two-argument form, so an
+    // existing caller and an existing journal are unaffected.
+    assert.equal(callKey('p', { label: 'lane' }, {}), base);
+    assert.equal(callKey('p', { label: 'lane' }, { backend: '', model: undefined }), base);
+
+    const onCodex = callKey('p', { label: 'lane' }, { backend: 'codex', model: 'gpt-5.5' });
+    assert.notEqual(onCodex, base);
+    assert.equal(onCodex, callKey('p', { label: 'lane' }, { backend: 'codex', model: 'gpt-5.5' }));
+
+    // Same prompt, same opts, different model: NOT the same work. This is
+    // the bug the key used to have — `--model-map` could be repointed and a
+    // resume would still hand back the old model's answer.
+    assert.notEqual(onCodex, callKey('p', { label: 'lane' }, { backend: 'codex', model: 'gpt-5.6-sol' }));
+    // Same model id, different backend: also not the same work.
+    assert.notEqual(onCodex, callKey('p', { label: 'lane' }, { backend: 'omp', model: 'gpt-5.5' }));
+  });
+});
+
+test('callKey\'s execution keys cannot be spoofed by a script option of the same name', () => {
+  withTempStateHome(({ callKey }) => {
+    // The script writing `agent(p, {backend: 'codex'})` and the runner
+    // resolving backend 'omp' must not collide into one key.
+    const a = callKey('p', { backend: 'codex' }, { backend: 'omp' });
+    const b = callKey('p', { backend: 'omp' }, { backend: 'codex' });
+    assert.notEqual(a, b);
+  });
+});

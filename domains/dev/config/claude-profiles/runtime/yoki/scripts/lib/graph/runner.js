@@ -133,18 +133,13 @@ function compileScript(source) {
  * second, unsupported one — which may move to metered billing. The refusal
  * names the alternative rather than reporting an unknown-backend error, so
  * a stale `--backend claude` invocation is told what to do instead.
+ *
+ * The registry itself lives in backends/index.js so api.js can resolve a
+ * PER-CALL `agent(prompt, {backend})` override without requiring this file
+ * (which requires api.js — a cycle). Re-exported here unchanged, so every
+ * existing caller and test still reaches it as `runner.loadBackend`.
  */
-const CLAUDE_BACKEND_REFUSAL = 'the claude backend was removed — inside Claude Code use the native Workflow tool; yoki-graph backends are codex, omp, mock';
-
-function loadBackend(name) {
-  switch (name) {
-    case 'claude': throw new Error(CLAUDE_BACKEND_REFUSAL);
-    case 'codex': return require('./backends/codex');
-    case 'omp': return require('./backends/omp');
-    case 'mock': return require('./backends/mock');
-    default: throw new Error(`unknown backend "${name}" (expected codex|omp|mock)`);
-  }
-}
+const { loadBackend, CLAUDE_BACKEND_REFUSAL } = require('./backends');
 
 /** `run <name|path>` resolution: an explicit path (contains a path
  *  separator, or resolves to an existing file as given) wins; otherwise

@@ -13,6 +13,7 @@ const worktree = require('./worktree');
 const retry = require('./retry');
 const budgetLib = require('./budget');
 const models = require('./models');
+const backends = require('./backends');
 
 /**
  * Fallback per-agent wall-clock ceiling, used when neither the call nor the
@@ -27,7 +28,9 @@ const DEFAULT_AGENT_TIMEOUT_MS = 15 * 60 * 1000;
  * @param {object} ctx
  * @param {string} ctx.runId
  * @param {import('./journal').Journal} ctx.journal
- * @param {object} ctx.backend - one of backends/{claude,codex,omp,mock}.js
+ * @param {object} ctx.backend - the run-level default backend module (one of
+ *   backends/{codex,omp,mock}.js). A single `agent()` call can override it
+ *   with `{backend: 'codex'|'omp'|'mock'}`; see `backendFor` below.
  * @param {string} ctx.cwd - default working directory for agent() calls
  * @param {string} [ctx.model] - run-level default model tier/id
  * @param {string} [ctx.effort] - run-level default effort
@@ -69,10 +72,28 @@ function createApi(ctx) {
     replaying: !!ctx.resume,
   };
   const caps = ctx.caps || budgetLib.resolveCaps(ctx.cwd);
-  const backendName = (ctx.backend && ctx.backend.name) || 'mock';
+  const runBackendName = (ctx.backend && ctx.backend.name) || 'mock';
   const modelOptions = { overrides: ctx.modelMap || {}, harnessModels: ctx.harnessModels };
   const startedAt = Number.isFinite(ctx.startedAt) ? ctx.startedAt : Date.now();
+  // ONE limiter for the whole run, shared across backends: a mixed
+  // codex+omp run must not get twice the concurrency (and twice the machine
+  // load) just because it spread its calls over two CLIs.
   const limiter = makeLimiter(ctx.concurrency || 4);
+
+  /**
+   * The backend module this ONE call runs on: `agent(prompt, {backend})`
+   * overrides the run-level `--backend` (MP1). Resolved per call rather than
+   * captured once, so a single run can mix codex and omp lanes — each with
+   * its own model map, its own schema-native support and its own usage
+   * reader — while sharing this run's limiter, journal, caps and progress.
+   */
+  function backendFor(opts) {
+    const requested = typeof opts.backend === 'string' ? opts.backend.trim() : '';
+    if (!requested || requested === runBackendName) {
+      return { name: runBackendName, module: ctx.backend };
+    }
+    return { name: requested, module: backends.loadBackend(requested) };
+  }
 
   function phase(title) {
     state.currentPhase = String(title);
@@ -88,6 +109,11 @@ function createApi(ctx) {
     const normalizedOpts = { ...opts, agentType };
     delete normalizedOpts.subagent_type;
     const effPhase = opts.phase || state.currentPhase;
+    // Per-call `backend` wins over the run's `--backend`, and the model is
+    // resolved against THAT backend's tier map: `sonnet` is a different id
+    // on codex than on omp, so resolving against the run backend would have
+    // handed a codex id to omp in a mixed run.
+    const { name: backendName, module: backend } = backendFor(opts);
     // Per-call `model` wins over the run's `--model`. Resolved HERE rather
     // than inside the backend so the id the backend will actually be given
     // is what every event, journal line and status row reports — a progress
@@ -97,7 +123,12 @@ function createApi(ctx) {
     const model = resolvedModel.id || undefined;
     const effort = opts.effort || ctx.effort;
     const label = opts.label || '(unlabeled)';
-    const key = callKey(prompt, normalizedOpts);
+    // The RESOLVED backend and model are part of the call's identity, not
+    // just of its display: the same prompt answered by gpt-5.4-mini and by
+    // gpt-5.6-sol is not the same work, so a `--resume` that changed
+    // `--model`/`--model-map`/`{backend}` must re-run the call instead of
+    // replaying a result some other model produced.
+    const key = callKey(prompt, normalizedOpts, { backend: backendName, model });
     const index = state.callIndex;
     state.callIndex += 1;
 
@@ -160,7 +191,7 @@ function createApi(ctx) {
       const usage = newUsageAccumulator();
       let timedOut = false;
       const callBackend = async (promptText) => {
-        const res = await retry.withRetry(() => ctx.backend.run({
+        const res = await retry.withRetry(() => backend.run({
           prompt: promptText,
           model,
           effort,
@@ -209,15 +240,15 @@ function createApi(ctx) {
           },
         });
         durationMs += res.durationMs || 0;
-        recordUsage(usage, ctx.backend, res.raw);
-        return ctx.backend.extractText(res.raw);
+        recordUsage(usage, backend, res.raw);
+        return backend.extractText(res.raw);
       };
 
       let result;
       try {
         if (opts.schema) {
           const outcome = await runWithSchema(callBackend, prompt, opts.schema, {
-            nativeSchema: !!ctx.backend.supportsSchemaNatively,
+            nativeSchema: !!backend.supportsSchemaNatively,
           });
           result = outcome.result;
         } else {
@@ -276,11 +307,15 @@ function createApi(ctx) {
   }
 
   // parallel()/pipeline() swallow a lane's failure into `null` by contract
-  // (API.md) — but NOT a cap breach. A budget error that degrades to null is
-  // a cap the runaway loop keeps running past: the loop reads null, logs it,
-  // and calls agent() again. Re-raising ends the run instead.
+  // (API.md) — but NOT a cap breach, and NOT an unresolvable per-call
+  // backend. A budget error that degrades to null is a cap the runaway loop
+  // keeps running past: the loop reads null, logs it, and calls agent()
+  // again. A typo'd `{backend: 'codexx'}` that degrades to null is
+  // indistinguishable from "that provider found nothing", in every lane at
+  // once. Both re-raise and end the run instead.
   function rethrowIfFatal(err) {
     if (err instanceof budgetLib.BudgetExceededError) throw err;
+    if (err && err.fatal) throw err;
   }
 
   async function parallel(thunks) {

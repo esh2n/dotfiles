@@ -53,15 +53,34 @@ function journalPath(runId, env = process.env) {
  *  miss the replay every time. */
 const AUTO_LABEL = /^(?:\(unlabeled\)|agent-\d+)$/;
 
-/** sha256(prompt + NUL + JSON(opts)) — stable across process restarts, which
- *  is the whole point: it is the resume replay key. A label the *script*
- *  chose is part of the caller's identity and stays in the key (two lanes
- *  that send the same prompt under different labels are different work);
- *  an auto-generated one is stripped. */
-function callKey(prompt, opts = {}) {
+/**
+ * sha256(prompt + NUL + JSON(opts + resolved execution)) — stable across
+ * process restarts, which is the whole point: it is the resume replay key.
+ *
+ * A label the *script* chose is part of the caller's identity and stays in
+ * the key (two lanes that send the same prompt under different labels are
+ * different work); an auto-generated one is stripped.
+ *
+ * `execution` carries what the RUNNER resolved rather than what the script
+ * typed: the per-call backend and the concrete model id. Both belong in the
+ * key because they change the work, not just its display. `opts.model` alone
+ * cannot stand in for them — it is often absent (the call inherits the run's
+ * `--model`) or a tier name whose meaning `--model-map` can redefine — so a
+ * key built from opts only would replay gpt-5.4-mini's answer to a run that
+ * has since been pointed at gpt-5.6-sol. Undefined/empty entries are left
+ * out, so a caller that passes none hashes exactly as before.
+ *
+ * @param {string} prompt
+ * @param {object} [opts] the script's own `agent()` options
+ * @param {{backend?: string, model?: string}} [execution] runner-resolved
+ */
+function callKey(prompt, opts = {}, execution = {}) {
   const { label, ...identity } = opts || {};
   const explicit = typeof label === 'string' ? label.trim() : '';
   if (explicit && !AUTO_LABEL.test(explicit)) identity.label = explicit;
+  // Prefixed names so a script option can never collide with them.
+  if (execution && execution.backend) identity['@backend'] = String(execution.backend);
+  if (execution && execution.model) identity['@model'] = String(execution.model);
   const h = crypto.createHash('sha256');
   h.update(String(prompt));
   h.update('\0');
@@ -187,11 +206,38 @@ class Journal {
   /** Per-run totals for the end-of-run line: how many tokens, how many of
    *  them measured vs. estimated, and USD when a backend reported it. */
   usageTotals() {
-    const totals = {
-      calls: 0, tokens: 0, reportedTokens: 0, estimatedTokens: 0,
-      inputTokens: 0, outputTokens: 0, costUsd: 0, hasCost: false,
-    };
-    for (const entry of this.readAll()) {
+    return usageTotalsFrom(this.readAll());
+  }
+
+  /**
+   * Per-model totals for the end-of-run table. See `usageByModelFrom`.
+   */
+  usageByModel() {
+    return usageByModelFrom(this.readAll());
+  }
+
+  readAll() {
+    if (!fs.existsSync(this.file)) return [];
+    return parseEntries(fs.readFileSync(this.file, 'utf8'));
+  }
+}
+
+/**
+ * The three journal summaries as PURE functions over an already-parsed
+ * entry list, with the `Journal` methods above as thin wrappers.
+ *
+ * `yoki-graph status` used to materialize `readAll()` for its counts and
+ * then call `usageTotals()` and `usageByModel()`, each of which re-read and
+ * re-parsed the whole file: three synchronous full reads and three JSON.parse
+ * passes over the same NDJSON per invocation, growing with the run's length.
+ * cli.js now parses once and calls these.
+ */
+function usageTotalsFrom(entries) {
+  const totals = {
+    calls: 0, tokens: 0, reportedTokens: 0, estimatedTokens: 0,
+    inputTokens: 0, outputTokens: 0, cachedTokens: 0, costUsd: 0, hasCost: false,
+  };
+  for (const entry of entries) {
       if (!entry || entry.status !== 'ok') continue;
       totals.calls += 1;
       const tokens = typeof entry.tokens === 'number' ? entry.tokens : 0;
@@ -201,52 +247,127 @@ class Journal {
         totals.reportedTokens += (entry.usage && entry.usage.reportedTokens) || 0;
         totals.estimatedTokens += (entry.usage && entry.usage.estimatedTokens) || 0;
       } else totals.reportedTokens += tokens;
-      if (entry.usage) {
-        totals.inputTokens += entry.usage.inputTokens || 0;
-        totals.outputTokens += entry.usage.outputTokens || 0;
-        if (typeof entry.usage.costUsd === 'number') {
-          totals.costUsd += entry.usage.costUsd;
-          totals.hasCost = true;
-        }
+    if (entry.usage) {
+      totals.inputTokens += entry.usage.inputTokens || 0;
+      totals.outputTokens += entry.usage.outputTokens || 0;
+      totals.cachedTokens += entry.usage.cacheRead || 0;
+      if (typeof entry.usage.costUsd === 'number') {
+        totals.costUsd += entry.usage.costUsd;
+        totals.hasCost = true;
       }
     }
-    return totals;
+  }
+  return totals;
+}
+
+/**
+ * Per-model totals for the end-of-run table: how many calls each RESOLVED
+ * model id took, what they cost in tokens, how much of their input was
+ * served from cache, and how long they spent in the backend. Keyed by
+ * BACKEND + resolved id rather than the tier the script asked for —
+ * "sonnet: 12 calls" does not say which model actually ran, a `--model-map`
+ * override or a per-call `model` makes them differ, and a mixed-backend run
+ * (MP1) can send the same id to two CLIs whose spend should not blur into
+ * one row.
+ *
+ * `cached` is informational, never added into `tokens`: on codex it is a
+ * subset of the input already counted, on omp it is disjoint and the
+ * backend's own total already includes it (see backends/codex.js's note and
+ * API.md's token-accounting table).
+ *
+ * Wall time is the sum of each call's own backend duration, so a run whose
+ * lanes ran concurrently reports more model-seconds than the run took —
+ * which is the number that matters when comparing two models.
+ */
+function usageByModelFrom(entries) {
+  const rows = new Map();
+  for (const entry of entries) {
+    if (!entry || entry.status !== 'ok') continue;
+    const model = entry.model || '(unreported)';
+    const backend = entry.backend || '';
+    const key = `${backend}\u0000${model}`;
+    if (!rows.has(key)) rows.set(key, { backend, model, calls: 0, tokens: 0, cached: 0, wallMs: 0 });
+    const row = rows.get(key);
+    row.calls += 1;
+    if (typeof entry.tokens === 'number') row.tokens += entry.tokens;
+    if (entry.usage && typeof entry.usage.cacheRead === 'number') row.cached += entry.usage.cacheRead;
+    if (typeof entry.durationMs === 'number') row.wallMs += entry.durationMs;
+  }
+  return [...rows.values()].sort((a, b) => b.tokens - a.tokens
+    || a.backend.localeCompare(b.backend)
+    || a.model.localeCompare(b.model));
+}
+
+function parseEntries(text) {
+  return String(text)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(Boolean);
+}
+
+/**
+ * An incremental reader for one run's journal, for `status --watch`.
+ *
+ * Each poll used to call `readAll()`: a synchronous read and JSON.parse of
+ * the ENTIRE growing NDJSON file, every two seconds, so the cost of watching
+ * grew with the run's total length instead of with what had appeared since
+ * the last tick — and blocked the event loop while it did.
+ *
+ * This keeps a byte offset and parses only the bytes appended since. A
+ * partial trailing line (the writer is mid-append) is held back and re-read
+ * next tick rather than parsed and dropped. If the file ever gets SHORTER
+ * than the offset — truncated, rotated, or a fresh run reusing the id — the
+ * offset is meaningless and everything is re-read from zero.
+ */
+class JournalTail {
+  constructor(runId, env = process.env) {
+    this.file = journalPath(runId, env);
+    this.offset = 0;
+    this.pending = '';   // partial last line, not yet terminated by \n
+    this.entries = [];
   }
 
-  /**
-   * Per-model totals for the end-of-run table: how many calls each RESOLVED
-   * model id took, what they cost in tokens, and how long they spent in the
-   * backend. Keyed by the resolved id rather than the tier the script asked
-   * for — "sonnet: 12 calls" does not say which model actually ran, and a
-   * `--model-map` override or a per-call `model` makes them differ.
-   *
-   * Wall time is the sum of each call's own backend duration, so a run whose
-   * lanes ran concurrently reports more model-seconds than the run took —
-   * which is the number that matters when comparing two models.
-   */
-  usageByModel() {
-    const rows = new Map();
-    for (const entry of this.readAll()) {
-      if (!entry || entry.status !== 'ok') continue;
-      const model = entry.model || '(unreported)';
-      if (!rows.has(model)) rows.set(model, { model, calls: 0, tokens: 0, wallMs: 0 });
-      const row = rows.get(model);
-      row.calls += 1;
-      if (typeof entry.tokens === 'number') row.tokens += entry.tokens;
-      if (typeof entry.durationMs === 'number') row.wallMs += entry.durationMs;
+  /** Every entry seen so far, including this poll's new ones. */
+  read() {
+    let stat;
+    try {
+      stat = fs.statSync(this.file);
+    } catch {
+      return this.entries; // not written yet — nothing to add
     }
-    return [...rows.values()].sort((a, b) => b.tokens - a.tokens || a.model.localeCompare(b.model));
-  }
+    if (stat.size < this.offset) {
+      // Truncated/rotated: the offset points past the end, so nothing about
+      // the old position is trustworthy. Full re-read.
+      this.offset = 0;
+      this.pending = '';
+      this.entries = [];
+    }
+    if (stat.size === this.offset) return this.entries;
 
-  readAll() {
-    if (!fs.existsSync(this.file)) return [];
-    return fs.readFileSync(this.file, 'utf8')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .filter(Boolean);
+    const fd = fs.openSync(this.file, 'r');
+    try {
+      const length = stat.size - this.offset;
+      const buffer = Buffer.allocUnsafe(length);
+      const bytes = fs.readSync(fd, buffer, 0, length, this.offset);
+      this.offset += bytes;
+      const chunk = this.pending + buffer.toString('utf8', 0, bytes);
+      const lastNewline = chunk.lastIndexOf('\n');
+      if (lastNewline === -1) {
+        this.pending = chunk;
+        return this.entries;
+      }
+      this.pending = chunk.slice(lastNewline + 1);
+      this.entries.push(...parseEntries(chunk.slice(0, lastNewline)));
+    } finally {
+      fs.closeSync(fd);
+    }
+    return this.entries;
   }
 }
 
-module.exports = { Journal, callKey, runDir, journalPath, stateRoot, AUTO_LABEL };
+module.exports = {
+  Journal, callKey, runDir, journalPath, stateRoot, AUTO_LABEL,
+  usageTotalsFrom, usageByModelFrom, parseEntries, JournalTail,
+};
