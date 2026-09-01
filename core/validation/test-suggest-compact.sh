@@ -110,6 +110,19 @@ run_suggest_compact_checks() {
         log_error "FAIL: case8: ttl sweep"; FAILED=$((FAILED + 1))
     fi
 
+    # 9. codex payload (#T17): YOKI_HARNESS=codex reads the rollout's own
+    # token_count record through harness/session.js's readUsage instead of
+    # the Claude tail-scan, and still fires the same context-size suggestion.
+    local codex_rollout
+    codex_rollout="$work/rollout-codex.jsonl"
+    cat > "$codex_rollout" <<'EOF'
+{"type":"turn_context","payload":{"model":"gpt-5.1-codex-max"}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":165000,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":50}}}}
+EOF
+    sid="testsessioncodex"
+    transcript="$codex_rollout"
+    check "case9: codex payload fires via harness/session.js readUsage" "165k tokens" "$(YOKI_HARNESS=codex run_hook)"
+
     echo ""
     log_info "=== Results ==="
     echo ""

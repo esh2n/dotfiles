@@ -1,0 +1,50 @@
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * yoki-loop — headless runner for claude/codex/omp under launchd or cron
+ * (task T19). Zero-dependency node launcher: this file only resolves
+ * DOTFILES_ROOT (same real-path trick `yoki-switch` uses, so it works
+ * through the domains/dev/bin symlink layout) and hands off to the actual
+ * implementation in
+ * runtime/yoki/scripts/lib/loop/cli.js.
+ *
+ * See `yoki-switch pack list` / the claude-profiles README's "Loop layer"
+ * section for what this gives Codex/omp that Claude Code already has via
+ * `/loop`.
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+function resolveDotfilesRoot() {
+  if (process.env.DOTFILES_ROOT) return process.env.DOTFILES_ROOT;
+  const real = fs.realpathSync(__filename);
+  // <root>/domains/dev/bin/yoki-loop -> <root>
+  return path.resolve(path.dirname(real), '..', '..', '..');
+}
+
+const dotfilesRoot = resolveDotfilesRoot();
+const cliPath = path.join(
+  dotfilesRoot,
+  'domains',
+  'dev',
+  'config',
+  'claude-profiles',
+  'runtime',
+  'yoki',
+  'scripts',
+  'lib',
+  'loop',
+  'cli.js'
+);
+
+let cli;
+try {
+  cli = require(cliPath);
+} catch (err) {
+  process.stderr.write(`yoki-loop: could not load ${cliPath}: ${err.message}\n`);
+  process.exit(1);
+}
+
+process.exitCode = cli.main(process.argv.slice(2), { dotfilesRoot });

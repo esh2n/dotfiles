@@ -20,6 +20,18 @@
  * The context lists the newest few comments and always advances the cursor
  * past *all* of them, so the same comment is announced once per machine, not
  * once per prompt.
+ *
+ * Delivery itself goes through ../lib/pending-context.js (T18) rather than
+ * this hook's own hookSpecificOutput: a batch of unread comments is
+ * `enqueue()`d into the session's pending-context queue, and
+ * prompt-pending-context.js is the one place that later `drain()`s it and
+ * emits additionalContext. That indirection is what makes this hook
+ * harness-agnostic — SessionStart/UserPromptSubmit both fire here on every
+ * harness, but only UserPromptSubmit reliably has a place downstream to
+ * surface the result, so the queue is the one delivery path all of them
+ * share. The cursor logic above is unchanged by this: it still advances past
+ * every entry the moment it is formatted, regardless of when (or whether)
+ * prompt-pending-context.js has drained it yet.
  */
 
 'use strict';
@@ -27,6 +39,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { enqueue } = require('../lib/pending-context');
 
 const MAX_STDIN = 1024 * 1024;
 const EVENTS = new Set(['SessionStart', 'UserPromptSubmit']);
@@ -161,8 +174,15 @@ function formatContext(entries) {
   return lines.join('\n');
 }
 
-function buildOutput(event, additionalContext) {
-  return JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext } });
+/** Session identity for the pending-context queue — same chain
+ * prompt-pending-context.js resolves the *drain* side with, so both agree on
+ * which file a given session's comments end up in even when a payload
+ * happens to omit session_id. */
+function resolveSessionId(input) {
+  const fromPayload = input && typeof input.session_id === 'string' ? input.session_id.trim() : '';
+  if (fromPayload) return fromPayload;
+  const fromEnv = String(process.env.YOKI_SESSION_ID || process.env.CLAUDE_SESSION_ID || '').trim();
+  return fromEnv || 'default';
 }
 
 /** "Nothing to say." Deliberately an empty stdout rather than an echo of the
@@ -174,8 +194,9 @@ const SILENT = Object.freeze({ stdout: '', exitCode: 0 });
 
 function run(rawInput) {
   let event = '';
+  let input = null;
   try {
-    const input = typeof rawInput === 'string' ? JSON.parse(rawInput) : rawInput;
+    input = typeof rawInput === 'string' ? JSON.parse(rawInput) : rawInput;
     event = String((input && input.hook_event_name) || '');
   } catch {
     return SILENT;
@@ -199,6 +220,16 @@ function run(rawInput) {
   const additionalContext = formatContext(entries);
   if (!additionalContext) return SILENT;
 
+  const session = { harness: process.env.YOKI_HARNESS || 'claude', sessionId: resolveSessionId(input) };
+  try {
+    enqueue(session, { source: 'artifact-comments', text: additionalContext });
+  } catch (err) {
+    // The comments are still sitting unread in the inbox (the cursor has not
+    // advanced yet), so a failed enqueue is retried whole on the next call
+    // rather than silently dropping the batch.
+    return { stdout: '', exitCode: 0, stderr: `[Hook] artifact-comments: could not enqueue pending context: ${err.message}` };
+  }
+
   let stderr = '';
   try {
     writeCursor(cursorFile, lines.length);
@@ -208,7 +239,7 @@ function run(rawInput) {
     stderr = `[Hook] artifact-comments: could not advance ${cursorFile}: ${err.message}`;
   }
 
-  return { stdout: buildOutput(event, additionalContext), exitCode: 0, stderr };
+  return { stdout: '', exitCode: 0, stderr };
 }
 
 if (require.main === module) {
@@ -231,4 +262,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { run, formatContext, inboxPaths, readCursor, MAX_SHOWN, MAX_BODY_CHARS };
+module.exports = { run, formatContext, inboxPaths, readCursor, resolveSessionId, MAX_SHOWN, MAX_BODY_CHARS };

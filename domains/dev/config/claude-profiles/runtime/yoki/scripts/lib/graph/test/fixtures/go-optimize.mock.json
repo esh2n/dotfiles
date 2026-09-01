@@ -1,0 +1,45 @@
+{
+  "resolve": {
+    "repoRoot": "/tmp/yoki-graph-go-optimize-repo",
+    "scratchDir": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest",
+    "goVersionFloor": "1.23",
+    "goEnvVersion": "go1.23.0",
+    "pkgTarget": "./internal/foo",
+    "benchmarks": ["BenchmarkFoo"]
+  },
+  "profile": {
+    "baselineFile": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest/baseline.txt",
+    "cpuProfile": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest/cpu_base.out",
+    "memProfile": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest/mem_base.out",
+    "hotspots": [
+      { "function": "encode", "file": "internal/foo/foo.go:10", "kind": "cpu", "flatPercent": 40, "cumPercent": 60, "hypothesis": "map lookup plus allocation per iteration in encode()" }
+    ]
+  },
+  "propose:allocation": {
+    "angle": "allocation",
+    "summary": "reuse a pooled buffer instead of allocating one per call",
+    "files": ["internal/foo/foo.go"],
+    "correctnessOk": true,
+    "diff": "--- a/internal/foo/foo.go\n+++ b/internal/foo/foo.go\n@@ encode\n-buf := make([]byte, 0, 64)\n+buf := bufPool.Get().([]byte)[:0]\n",
+    "benchOutputFile": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest/candidates/allocation/candidate.txt",
+    "cpuProfileFile": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest/candidates/allocation/cpu_cand.out",
+    "worktreePath": "/tmp/yoki-graph-go-optimize-repo/.claude/worktrees/graph-x-1"
+  },
+  "propose:algorithmic": {
+    "angle": "algorithmic",
+    "summary": "replace the map lookup with a sorted-slice binary search",
+    "files": ["internal/foo/foo.go"],
+    "correctnessOk": false,
+    "failureReason": "go vet failed: unused import \"sort\""
+  },
+  "gate": {
+    "results": [
+      { "angle": "allocation", "statsOk": true, "deltaPercent": -12.5, "pValue": 0.01, "mechanismConfirmed": true, "accepted": true, "evidence": "benchstat: -12.5% p=0.010 n=10; pprof -diff_base shows encode() flat% reduced" }
+    ]
+  },
+  "verify:allocation": { "accept": true, "reason": "genuinely on the hot path per the profile; the pooled-buffer change is small and readable" },
+  "deliver": {
+    "reportPath": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest/report.md",
+    "rejectedPath": "/tmp/yoki-graph-go-optimize-repo/.claude/.cache/go-optimize/latest/rejected.md"
+  }
+}

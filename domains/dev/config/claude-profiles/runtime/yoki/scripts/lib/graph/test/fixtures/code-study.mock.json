@@ -1,0 +1,16 @@
+{
+  "map": {
+    "layout": "organized by feature under src/, one dir per feature",
+    "entry_points": [{ "question_index": 0, "paths": ["src/x/handler.go"] }],
+    "unavailable": ""
+  },
+  "read:q0": {
+    "answer": "X works by dispatching to handler.go's Process function, which validates then writes to the store",
+    "evidence": [{ "claim": "Process validates input before writing", "location": "src/x/handler.go:42", "load_bearing": true }],
+    "not_found": []
+  },
+  "check": {
+    "results": [{ "location": "src/x/handler.go:42", "holds": true, "reason": "" }]
+  },
+  "report": "src/x/handler.go's Process function validates input, then writes to the store (src/x/handler.go:42)."
+}

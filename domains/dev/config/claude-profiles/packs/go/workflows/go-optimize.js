@@ -12,6 +12,12 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
+// arg note: Propose's isolation:'worktree' calls (one per angle) create a
+// real `git worktree` off `cwd`'s HEAD regardless of backend — the runner
+// (worktree.js), not this script, owns that; it only requires `cwd` to be
+// inside a real git repo. Verify's agentType:'go-perf-reviewer' resolves
+// the same way on every backend (see review.js's arg note).
 // args: { pkg: string (required — import path or dir, e.g. "./internal/codec" or "./..."),
 //         bench?: string (regex passed to `go test -bench`; narrows which existing
 //                 benchmark(s) to target — it does NOT authorize writing a new one),

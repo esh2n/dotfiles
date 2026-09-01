@@ -295,6 +295,25 @@ test('PreCompact plain-text summary becomes {summary} on omp session_before_comp
   assert.deepEqual(JSON.parse(result.stdout), { summary: 'compacted: dropped 40 old tool results' });
 });
 
+test('PreCompact stdout JSON {summary} (T18: pre-compact.js on omp) passes straight through', () => {
+  const input = { stdout: JSON.stringify({ summary: 'compaction summary from pre-compact.js' }), exitCode: 0, stderr: '', event: 'PreCompact' };
+
+  const result = translateResponse(input, 'omp');
+  assert.deepEqual(JSON.parse(result.stdout), { summary: 'compaction summary from pre-compact.js' });
+});
+
+test('PreCompact {summary} JSON outranks additionalContext/plainText/systemMessage when somehow all are present', () => {
+  const input = {
+    stdout: JSON.stringify({ summary: 'the real summary', systemMessage: 'a decoy' }),
+    exitCode: 0,
+    stderr: '',
+    event: 'PreCompact',
+  };
+
+  const result = translateResponse(input, 'omp');
+  assert.deepEqual(JSON.parse(result.stdout), { summary: 'the real summary' });
+});
+
 test('PreCompact plain text is passed through unchanged on codex (not a Stop-family event)', () => {
   const input = { stdout: 'compacted: dropped 40 old tool results', exitCode: 0, stderr: '', event: 'PreCompact' };
 

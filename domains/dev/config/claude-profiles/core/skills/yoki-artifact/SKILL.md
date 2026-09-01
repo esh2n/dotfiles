@@ -115,6 +115,11 @@ yoki-artifact seen    <channel> <comment-id>
 「Claude に送る」を選んだもの)。それ以外のコメントは人同士の会話で、
 呼ばれていないのに割り込まない。
 
+コメントが求めている対応が単発の編集を超えて、設計の再検討や実装のやり
+直しに相当するなら、その場で片付けずに `yoki-graph run review` や
+`yoki-graph run design-review`(yoki-graph スキル参照)のようなワークフロー
+に渡してから戻ってくる。
+
 ### 4. writeup のページを渡す
 
 writeup-kit の publish に専用のターゲットがある:

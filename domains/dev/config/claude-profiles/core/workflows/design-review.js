@@ -10,6 +10,9 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
+// arg note: target as a URL relies on the subagent's own web-fetch tool
+// (backend-specific); a file path or inline text works identically everywhere.
 // args: { target: string (file path, URL, or inline design text), model?: string, language?: string }
 // Model tiers: lanes -> MODEL (sonnet), except the security lane -> opus
 // (misses cost the most, findings are report-only). Verify + synthesize ->

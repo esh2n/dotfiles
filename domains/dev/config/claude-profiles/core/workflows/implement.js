@@ -11,6 +11,11 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
+// arg note: the Deliver-phase prompt tells the subagent to "load the
+// natural-japanese skill (Skill tool)" for Japanese PR text — that tool name
+// is Claude-Code-specific; on codex/omp the instruction is just inert prose
+// (no Skill tool to invoke), it does not fail the call or the run.
 // args: { tasks?: [{id,title,spec,files?,deps?}], tasksFile?: string,
 //         rules?: [path], docs?: [path], model?: string, max_retry?: number,
 //         delivery?: 'none' | 'commit' | 'draft-pr', deliveryBranch?: boolean }

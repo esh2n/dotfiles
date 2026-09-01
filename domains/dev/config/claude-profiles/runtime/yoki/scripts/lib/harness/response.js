@@ -80,6 +80,12 @@ function parseClaudeHookOutput({ stdout, exitCode, stderr, event } = {}) {
     exit2Reason,
     jsonStopBlocked: false,
     plainText: undefined,
+    // Top-level `summary` (T18): pre-compact.js prints `{summary: <text>}`
+    // directly on PreCompact when YOKI_HARNESS=omp — there is no
+    // hookSpecificOutput.additionalContext channel for PreCompact on Claude,
+    // so this is its own field rather than reusing additionalContext. Only
+    // buildOmpPayload's session_before_compact case reads it.
+    summary: undefined,
   };
 
   const parsed = safeParseJson(stdout);
@@ -88,6 +94,7 @@ function parseClaudeHookOutput({ stdout, exitCode, stderr, event } = {}) {
     return effects;
   }
 
+  effects.summary = nonEmptyString(parsed.summary);
   effects.systemMessage = nonEmptyString(parsed.systemMessage);
   if (typeof parsed.suppressOutput === 'boolean') effects.suppressOutput = parsed.suppressOutput;
 
@@ -226,7 +233,10 @@ function buildOmpPayload(effects) {
   }
 
   if (category === 'session_before_compact') {
-    const summary = effects.additionalContext || effects.plainText || effects.systemMessage;
+    // pre-compact.js's own {summary} JSON (T18) is the primary source; the
+    // other three are pre-T18 fallbacks kept for a hook that only ever spoke
+    // Claude's shapes (additionalContext / plain stdout / systemMessage).
+    const summary = effects.summary || effects.additionalContext || effects.plainText || effects.systemMessage;
     return summary ? { summary } : {};
   }
 

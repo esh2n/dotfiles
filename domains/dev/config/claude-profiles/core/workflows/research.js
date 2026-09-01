@@ -10,6 +10,10 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
+// arg note: Search names "WebSearch/WebFetch" by name — advisory prompt
+// text; each backend's subagent uses whatever web-search tool it actually
+// has, the runner does not translate tool names between backends.
 // args: { question: string, context?: string, model?: string, language?: string }
 // Model tiers: plan/search -> MODEL (sonnet); verify + synthesize -> session
 // model + high effort (judgment stays on the caller's tier).

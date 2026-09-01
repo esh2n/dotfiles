@@ -1,0 +1,10 @@
+{
+  "impl:t1": {
+    "status": "done",
+    "files_touched": ["pkg/x.go"],
+    "test_evidence": "go test ./pkg/... : ok (3 tests)",
+    "notes": "implemented exactly per spec, no scope creep"
+  },
+  "verify:t1": { "ok": true, "problems": [] },
+  "gate": { "ok": true, "summary": "lint/typecheck/tests all passed", "commands": ["go vet ./...", "go test ./..."] }
+}

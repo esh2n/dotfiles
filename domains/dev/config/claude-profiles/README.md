@@ -162,6 +162,41 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
 4. マシンローカルな追記を壊さないターゲットなら、上記の managed-block
    規約に沿ってマーカーで自分のブロックを区切る
 
+## Loop レイヤー(task T19)
+
+Claude Code は `/loop`(このリポジトリの core skill)でセッション内蔵の
+定期実行ができるが、Codex CLI と omp にはそれに相当するものがない —
+どちらもワンショットの headless 実行(`codex exec` / `omp -p`)しか持たず、
+「30分ごとに動かし続ける」仕組みはハーネスの外に自分で用意する必要がある。
+`domains/dev/bin/yoki-loop` がその外側の仕組み。node launcher(ゼロ依存、
+実体は `runtime/yoki/scripts/lib/loop/*.js`)で、launchd(macOS)や cron
+から呼ばれる前提の headless ランナー:
+
+```bash
+yoki-loop run demo --harness codex --cwd . --prompt "check CI" --dry-run
+#   claude|codex|omp ごとに、そのCLIのheadlessコマンドを組み立てて実行
+#   (claude: -p --output-format json、codex: exec --json、stdinでprompt、
+#   omp: -p --mode json --no-extensions -e <yoki-bridge.ts> でguardを維持)
+#   --model はcore/harness-models.jsonで tier -> harness別モデルIDに変換
+#   --resume はそのloop名の最後のsessionId(runs.jsonlから)を渡す
+#   --prompt-from-artifact-inbox は yoki-artifact の未読コメントを
+#   "Address these artifact comments: …" に整形して渡し、既読化する
+
+yoki-loop install demo --harness codex --cwd . --prompt "check CI" --every 30m
+#   ~/Library/LaunchAgents/dev.yoki.loop.demo.plist を書くだけ
+#   (launchctl bootstrap は実行せず、コマンドを表示するだけ)
+yoki-loop uninstall demo   # plistを消してbootoutコマンドを表示
+yoki-loop status [demo]    # 直近の実行(runs.jsonl)と次回実行の推定時刻
+yoki-loop list             # インストール済みloop一覧
+```
+
+- 実行ごとに `~/.local/state/yoki/loop/<name>/runs.jsonl` に1行追記
+  (`{ts, harness, cmd, exit, durationMs, sessionId}`)。`.yoki.json` の
+  `loopDailyCap`(既定24、`workflowDailyCap` と同じ思想)を超えると
+  `run` はエラーで止まる — `--dry-run` はこのcapの対象外
+- `install` は plist を書いて `launchctl bootstrap gui/$UID <plist>` を
+  **表示するだけ**(実行しない)。実際に有効化するかはユーザーの判断
+
 ## プロジェクト単位の設定 (.yoki.json)
 
 プロジェクトのルート(または祖先ディレクトリ)に `.yoki.json` を置くと、
@@ -174,7 +209,8 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
   "langs": ["go", "typescript"],
   "allowMainBranchWork": true,
   "unattended": false,
-  "workflowDailyCap": 5
+  "workflowDailyCap": 5,
+  "loopDailyCap": 24
 }
 ```
 
@@ -189,6 +225,7 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
 - `unattended`: 無人実行中とみなし、ガードレール自身の書き換えを禁止する
   (unattended-guard.sh)。`YOKI_UNATTENDED=1` と同じ意味
 - `workflowDailyCap`: Workflow の1日あたり起動上限(既定5)
+- `loopDailyCap`: `yoki-loop`(Loop レイヤー)の1日あたり実行上限(既定24)
 - `langs`: このプロジェクトが使う言語pack名。packはマシン単位でしか
   有効化できない(ハーネス制約)ため自動切替はできないが、宣言したpackが
   無効ならセッション開始時に有効化コマンドが提示される

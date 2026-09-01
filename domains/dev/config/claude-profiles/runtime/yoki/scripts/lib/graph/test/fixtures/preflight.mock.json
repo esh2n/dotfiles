@@ -1,0 +1,19 @@
+{
+  "collect-diff": {
+    "diff_file": "/tmp/yoki-graph-preflight.patch",
+    "base": "main",
+    "branch": "feature/x",
+    "files_changed": 2,
+    "intent": "refactor the retry helper"
+  },
+  "review:code": {
+    "findings": [
+      { "file": "pkg/bar.go", "line": 5, "title": "unused variable", "detail": "variable x is assigned but never read", "category": "code", "confidence": 7, "importance": 6, "fix_hint": "remove the unused declaration" }
+    ]
+  },
+  "review:security": { "findings": [] },
+  "review:tests": { "findings": [] },
+  "judge": { "verdicts": [{ "index": 1, "accept": true, "reason": "matches the diff, mechanical fix" }] },
+  "apply-fixes": { "applied": ["removed unused variable in pkg/bar.go"], "skipped": [] },
+  "lint-and-mark": { "lint_ok": true, "lint_summary": "go vet passed", "marker": ".claude/.cache/preflight/feature_x.pass" }
+}

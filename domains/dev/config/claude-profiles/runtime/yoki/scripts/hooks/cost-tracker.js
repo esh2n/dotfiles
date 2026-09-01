@@ -33,6 +33,39 @@
  *     - summing the full transcript double-counts work done across
  *       `--resume` boundaries while `cost.total_cost_usd` is per-process.
  *   Absent a writer, behavior is unchanged.
+ *
+ * Cross-harness support (#T17): the session file is located through
+ * `lib/harness/session.js`'s `resolveSessionFile(payload, harness, env)`
+ * (`harness = process.env.YOKI_HARNESS || 'claude'`, set by run-with-flags —
+ * absent under Claude, so this is a no-op there). For Claude the row schema,
+ * the transcript-sum-of-every-turn behavior, and the harness-cost cache
+ * override above are all unchanged. For Codex and omp:
+ *   - Codex rollout JSONL's `token_count` records carry both a per-turn
+ *     `last_token_usage` delta (what `harness/session.js`'s `readUsage` uses
+ *     for the compact-signal, current-context-size use case) and a running
+ *     `total_token_usage` — already the cumulative session total, verified
+ *     against a real rollout file (`total_token_usage.input_tokens` at turn N
+ *     equals the sum of every turn's own `last_token_usage.input_tokens` up
+ *     to N). Cost tracking wants that cumulative total, so `readUsage` isn't
+ *     reused here; `readCodexCumulativeUsage` below reads `total_token_usage`
+ *     from the newest `token_count` record directly.
+ *   - omp session JSONL's per-assistant-message `usage.{input,output,
+ *     cacheRead,cacheWrite}` are per-turn deltas, not cumulative (verified
+ *     against a real session file — each entry's numbers are comparable in
+ *     magnitude to the previous, not growing monotonically the way a running
+ *     total would). `sumOmpUsageFromSession` below sums every assistant
+ *     message's own usage, mirroring `sumUsageFromTranscript`'s approach for
+ *     Claude, so the row is a true session-to-date total there too.
+ *   - Both Codex and omp's normalized Stop-equivalent payload
+ *     (`harness/payload.js`) carries `model` directly (Codex passes it
+ *     through unchanged off the raw event; omp's `ompCommon()` copies
+ *     `ctx.model`), so `input.model` is preferred over whatever the session
+ *     file itself says, per-harness usage above being sourced there mainly to
+ *     avoid re-deriving a model name Claude's own Stop payload never carries.
+ *   - Cost is priced through `lib/cost-estimate.js`'s `estimateHarnessCost`,
+ *     which prices by exact harness model id (not Claude's fuzzy tier-name
+ *     substring match) and returns `null` — never `NaN` — for an unpriced or
+ *     unrecognized model.
  */
 
 'use strict';
@@ -40,8 +73,9 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { ensureDir, appendFile, getClaudeDir } = require('../lib/utils');
-const { sanitizeSessionId } = require('../lib/session-bridge');
+const { ensureDir, appendFile, getClaudeDir, sanitizeSessionId } = require('../lib/utils');
+const { resolveSessionFile } = require('../lib/harness/session');
+const { estimateHarnessCost } = require('../lib/cost-estimate');
 
 const HARNESS_COST_MAX_AGE_SECONDS = 300;
 
@@ -128,6 +162,99 @@ function sumUsageFromTranscript(transcriptPath) {
   return { inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, model };
 }
 
+/**
+ * Scan a Codex rollout JSONL and return the newest `token_count` record's
+ * `total_token_usage` — already the session-cumulative total (see file
+ * header), so this reads rather than sums. Model comes from the newest
+ * `turn_context` record seen, as a fallback for callers that don't already
+ * have `model` off the Stop payload itself.
+ * Returns { inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, model }
+ * or null when the file is unreadable or carries no `token_count` record.
+ */
+function readCodexCumulativeUsage(rolloutPath) {
+  let content;
+  try {
+    content = fs.readFileSync(rolloutPath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  let model = 'unknown';
+  let total = null;
+
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue;
+    let entry;
+    try { entry = JSON.parse(line); } catch { continue; }
+
+    if (entry.type === 'turn_context' && entry.payload && typeof entry.payload.model === 'string') {
+      model = entry.payload.model;
+    }
+
+    if (entry.type === 'event_msg' && entry.payload && entry.payload.type === 'token_count') {
+      const info = entry.payload.info;
+      if (info && info.total_token_usage && typeof info.total_token_usage === 'object') {
+        total = info.total_token_usage;
+      }
+    }
+  }
+
+  if (!total) return null;
+
+  return {
+    inputTokens:      toNumber(total.input_tokens),
+    outputTokens:     toNumber(total.output_tokens),
+    cacheWriteTokens: toNumber(total.cache_write_input_tokens),
+    cacheReadTokens:  toNumber(total.cached_input_tokens),
+    model
+  };
+}
+
+/**
+ * Scan an omp session JSONL and sum token usage across every assistant
+ * message — each message's `usage.{input,output,cacheRead,cacheWrite}` is a
+ * per-turn delta, not a running total (see file header), so this sums rather
+ * than reads the newest one, mirroring `sumUsageFromTranscript` above.
+ * Returns { inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, model }
+ * or null when the file is unreadable or carries no assistant usage record.
+ */
+function sumOmpUsageFromSession(sessionFilePath) {
+  let content;
+  try {
+    content = fs.readFileSync(sessionFilePath, 'utf8');
+  } catch {
+    return null;
+  }
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheWriteTokens = 0;
+  let cacheReadTokens = 0;
+  let model = 'unknown';
+  let found = false;
+
+  for (const line of content.split('\n')) {
+    if (!line.trim()) continue;
+    let entry;
+    try { entry = JSON.parse(line); } catch { continue; }
+
+    if (entry.type !== 'message') continue;
+    const message = entry.message;
+    if (!message || message.role !== 'assistant' || !message.usage) continue;
+
+    const u = message.usage;
+    inputTokens      += toNumber(u.input);
+    outputTokens     += toNumber(u.output);
+    cacheWriteTokens += toNumber(u.cacheWrite);
+    cacheReadTokens  += toNumber(u.cacheRead);
+    found = true;
+
+    if (typeof message.model === 'string' && message.model) model = message.model;
+  }
+
+  return found ? { inputTokens, outputTokens, cacheWriteTokens, cacheReadTokens, model } : null;
+}
+
 // 1MB, matching the other Stop hooks. The Stop payload carries
 // last_assistant_message, which routinely exceeded the old 64KB cap and
 // made this hook echo a JSON document cut mid-stream (#2090).
@@ -149,10 +276,16 @@ process.stdin.on('data', chunk => {
 process.stdin.on('end', () => {
   try {
     const input = raw.trim() ? JSON.parse(raw) : {};
+    const harness = process.env.YOKI_HARNESS || 'claude';
 
-    const transcriptPath = (typeof input.transcript_path === 'string' && input.transcript_path)
-      ? input.transcript_path
-      : process.env.CLAUDE_TRANSCRIPT_PATH || null;
+    // resolveSessionFile returns payload.transcript_path verbatim for
+    // 'claude' (identical to the old direct field read); the
+    // CLAUDE_TRANSCRIPT_PATH env fallback below only ever applied to Claude,
+    // so it stays Claude-only rather than moving into resolveSessionFile.
+    let transcriptPath = resolveSessionFile(input, harness, process.env);
+    if (!transcriptPath && harness === 'claude') {
+      transcriptPath = process.env.CLAUDE_TRANSCRIPT_PATH || null;
+    }
 
     const sessionId =
       sanitizeSessionId(input.session_id) ||
@@ -162,7 +295,13 @@ process.stdin.on('end', () => {
 
     let usageTotals = null;
     if (transcriptPath && fs.existsSync(transcriptPath)) {
-      usageTotals = sumUsageFromTranscript(transcriptPath);
+      if (harness === 'codex') {
+        usageTotals = readCodexCumulativeUsage(transcriptPath);
+      } else if (harness === 'omp') {
+        usageTotals = sumOmpUsageFromSession(transcriptPath);
+      } else {
+        usageTotals = sumUsageFromTranscript(transcriptPath);
+      }
     }
 
     const {
@@ -170,26 +309,40 @@ process.stdin.on('end', () => {
       outputTokens = 0,
       cacheWriteTokens = 0,
       cacheReadTokens = 0,
-      model = 'unknown'
+      model: modelFromSession = 'unknown'
     } = usageTotals || {};
 
-    const rates = getRates(model);
-    const transcriptCostUsd = Math.round((
-      (inputTokens      / 1e6) * rates.in +
-      (outputTokens     / 1e6) * rates.out +
-      (cacheWriteTokens / 1e6) * rates.cacheWrite +
-      (cacheReadTokens  / 1e6) * rates.cacheRead
-    ) * 1e6) / 1e6;
+    // Codex/omp's normalized Stop-equivalent payload carries `model` directly
+    // (harness/payload.js); Claude's Stop payload never does, so this is a
+    // no-op for it and `model` keeps coming from the transcript as before.
+    const modelFromPayload = typeof input.model === 'string' && input.model ? input.model : '';
+    const model = modelFromPayload || modelFromSession;
 
-    // Prefer the harness's authoritative `cost.total_cost_usd` when the
-    // statusline has written it to the per-session cache (see contract in
-    // the file header). The harness number reflects API-billed truth
-    // (correct rates, 1h-cache 2x, >200K tier 2x) and is per-process so it
-    // does not drift across `--resume`. Cache miss → transcript-sum.
-    const harnessCost = readHarnessCost(sessionId, HARNESS_COST_MAX_AGE_SECONDS);
-    const estimatedCostUsd = harnessCost !== null
-      ? Math.round(harnessCost * 1e6) / 1e6
-      : transcriptCostUsd;
+    let estimatedCostUsd;
+
+    if (harness === 'claude') {
+      const rates = getRates(model);
+      const transcriptCostUsd = Math.round((
+        (inputTokens      / 1e6) * rates.in +
+        (outputTokens     / 1e6) * rates.out +
+        (cacheWriteTokens / 1e6) * rates.cacheWrite +
+        (cacheReadTokens  / 1e6) * rates.cacheRead
+      ) * 1e6) / 1e6;
+
+      // Prefer the harness's authoritative `cost.total_cost_usd` when the
+      // statusline has written it to the per-session cache (see contract in
+      // the file header). The harness number reflects API-billed truth
+      // (correct rates, 1h-cache 2x, >200K tier 2x) and is per-process so it
+      // does not drift across `--resume`. Cache miss → transcript-sum.
+      const harnessCost = readHarnessCost(sessionId, HARNESS_COST_MAX_AGE_SECONDS);
+      estimatedCostUsd = harnessCost !== null
+        ? Math.round(harnessCost * 1e6) / 1e6
+        : transcriptCostUsd;
+    } else {
+      // Codex/omp price by exact model id (lib/cost-estimate.js); null for an
+      // unpriced or unrecognized model — never a guessed number, never NaN.
+      estimatedCostUsd = estimateHarnessCost(harness, model, inputTokens, outputTokens);
+    }
 
     const metricsDir = path.join(getClaudeDir(), 'metrics');
     ensureDir(metricsDir);
@@ -198,6 +351,7 @@ process.stdin.on('end', () => {
       timestamp:          new Date().toISOString(),
       session_id:         sessionId,
       transcript_path:    transcriptPath || '',
+      harness,
       model,
       input_tokens:       inputTokens,
       output_tokens:      outputTokens,

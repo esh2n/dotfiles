@@ -13,6 +13,12 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
+// arg note: Gate's "world" claims ask the subagent to use WebSearch/WebFetch
+// by name — advisory prompt text only; each backend's subagent uses
+// whatever web-search tool it actually has (or none), the runner does not
+// translate tool names, and a claim that cannot be searched just stays
+// "unverified" rather than failing the run.
 // args: {
 //   question: string,
 //   context?: string,

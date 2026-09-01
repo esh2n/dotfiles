@@ -13,6 +13,14 @@
 //   50), then every 25 calls past it. A weak proxy on its own — a few large
 //   reads can fill the window in very few calls — kept as a fallback for
 //   transcripts without usage records.
+//
+// Cross-harness (#T17): the session file is located through
+// `lib/harness/session.js`'s `resolveSessionFile(payload, harness, env)`
+// (`harness = process.env.YOKI_HARNESS || 'claude'`, set by run-with-flags —
+// absent under Claude, so this resolves to the same `payload.transcript_path`
+// the hook always read, byte-identical). The resolved harness is then passed
+// through to `readLatestContextTokens`, which already knows (#T3) to read
+// Codex/omp's own session-file usage record for anything other than 'claude'.
 
 const fs = require('fs');
 const os = require('os');
@@ -25,6 +33,7 @@ const {
   computeContextBucket,
   formatWindowLabel
 } = require('../lib/transcript-context');
+const { resolveSessionFile } = require('../lib/harness/session');
 
 const MAX_STDIN = 1024 * 1024;
 const DEFAULT_THRESHOLD = 50;
@@ -99,12 +108,12 @@ function sweepStaleState(tempDir, keepFiles) {
 // Primary signal. Returns a suggestion string when the session has crossed
 // into a new context bucket, null when silent (no transcript, below
 // threshold, disabled via COMPACT_CONTEXT_THRESHOLD=0, or already fired).
-function contextSuggestion(transcriptPath, bucketFile) {
+function contextSuggestion(transcriptPath, bucketFile, harness) {
   try {
-    const usage = readLatestContextTokens(transcriptPath);
+    const usage = readLatestContextTokens(transcriptPath, {}, harness);
     if (!usage) return null;
 
-    const windowTokens = resolveContextWindowTokens(usage.tokens, usage.model);
+    const windowTokens = resolveContextWindowTokens(usage.tokens, usage.model, harness);
     const threshold = resolveContextThreshold(process.env, windowTokens);
     if (threshold <= 0) return null;
 
@@ -128,6 +137,7 @@ function contextSuggestion(transcriptPath, bucketFile) {
 function run(rawInput) {
   try {
     const input = typeof rawInput === 'string' ? JSON.parse(rawInput) : rawInput;
+    const harness = process.env.YOKI_HARNESS || 'claude';
     const sessionId = safeSessionId(input.session_id);
     const counterFile = path.join(os.tmpdir(), `${COUNTER_PREFIX}${sessionId}`);
     const bucketFile = path.join(os.tmpdir(), `${BUCKET_PREFIX}${sessionId}`);
@@ -136,8 +146,10 @@ function run(rawInput) {
 
     const messages = [];
 
-    const transcriptPath = typeof input.transcript_path === 'string' ? input.transcript_path : '';
-    const fromContext = contextSuggestion(transcriptPath, bucketFile);
+    // resolveSessionFile returns payload.transcript_path verbatim for
+    // 'claude' — identical to the old direct field read.
+    const transcriptPath = resolveSessionFile(input, harness, process.env) || '';
+    const fromContext = contextSuggestion(transcriptPath, bucketFile, harness);
     if (fromContext) messages.push(fromContext);
 
     const count = bumpCount(counterFile);

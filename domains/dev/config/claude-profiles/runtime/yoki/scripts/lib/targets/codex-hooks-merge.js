@@ -33,7 +33,11 @@ const { parseBashWrapperCommand } = require('./bash-wrapper-hook');
 /** Claude Code hook event names Codex has a same-named equivalent for
  * (S1+S2 §1.1; PermissionRequest/PreCompact/PostCompact are real Codex
  * events but unreachable from `codex exec` — still passed through 1:1 when
- * a layer declares them, since the TUI does reach them). */
+ * a layer declares them, since the TUI does reach them). PostCompact is
+ * included alongside PreCompact (T18) so a future TUI-reachable PostCompact
+ * hook can pick up whatever pre-compact.js queued into
+ * ../pending-context.js the moment compaction actually finishes, instead of
+ * waiting for the next UserPromptSubmit. */
 const KNOWN_EVENTS = new Set([
   'PreToolUse',
   'PostToolUse',
@@ -42,6 +46,7 @@ const KNOWN_EVENTS = new Set([
   'SessionEnd',
   'UserPromptSubmit',
   'PreCompact',
+  'PostCompact',
   'SubagentStart',
   'SubagentStop',
 ]);

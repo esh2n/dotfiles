@@ -1,0 +1,17 @@
+{
+  "scan:skills": {
+    "area": "skills",
+    "items": [{ "name": "foo-skill", "verdict": "keep", "evidence": "actively used, frontmatter fresh" }]
+  },
+  "scan:hooks": {
+    "area": "hooks",
+    "items": [{ "name": "old-hook.js", "verdict": "drop-candidate", "evidence": "not wired in settings.json hooks section" }]
+  },
+  "scan:mcp": { "area": "mcp", "items": [] },
+  "scan:memory": {
+    "area": "memory",
+    "items": [{ "name": "stale-pointer", "verdict": "fix", "evidence": "memory file points at a deleted target file" }]
+  },
+  "scan:freshness": { "area": "freshness", "items": [] },
+  "synthesize": "Drop old-hook.js (unwired). Fix the stale memory pointer. Everything else looks healthy."
+}

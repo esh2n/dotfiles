@@ -9,6 +9,12 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
+// arg note: every agentType (code-reviewer, security-reviewer,
+// go-perf-reviewer, <lang>-reviewer) resolves the same way on every backend
+// — backends/common.js's resolveAgentPreamble looks up <name>.md across
+// personal/core/pack agent dirs regardless of backend; a name with no
+// matching file just drops that lane's specialization (never errors).
 // args: { range?: string, model?: string }
 //   range: e.g. "origin/main...HEAD". Default: worktree vs merge-base with
 //          origin/main (covers unpushed commits AND uncommitted changes).

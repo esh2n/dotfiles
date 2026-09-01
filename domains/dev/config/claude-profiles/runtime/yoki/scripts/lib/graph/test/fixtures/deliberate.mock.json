@@ -1,0 +1,28 @@
+{
+  "reframe": {
+    "candidates": [
+      "should we use X or Y",
+      "how much does the choice cost to reverse later",
+      "what does the team already know how to operate"
+    ],
+    "real_question": "which option is cheaper to reverse if it turns out wrong",
+    "why": "the two options score similarly on features; reversibility is what actually differs"
+  },
+  "criteria": {
+    "criteria": [
+      { "name": "reversibility", "meaning": "cost to undo if this turns out wrong" },
+      { "name": "operability", "meaning": "does the team already know how to run this" }
+    ]
+  },
+  "option-1": { "title": "Option 1: the simplest thing", "sketch": "use the existing queue as-is", "claims": [] },
+  "option-2": { "title": "Option 2: borrowed analogy", "sketch": "model it like a cache invalidation problem", "claims": [] },
+  "option-3": { "title": "Option 3: inverse of a past failure", "sketch": "avoid the coupling that broke the last migration", "claims": [] },
+  "option-4": { "title": "Option 4: remove a constraint", "sketch": "assume no backward-compat requirement", "claims": [] },
+  "option-5": { "title": "Option 5: the radical version", "sketch": "rewrite the subsystem from scratch", "claims": [] },
+  "converge-r1": {
+    "ranking": [{ "title": "Option 1: the simplest thing", "score_note": "highest reversibility, lowest operability risk" }],
+    "recommendation": "Option 1: the simplest thing, revisited in 3 months"
+  },
+  "challenge-r1": { "objections": [] },
+  "synthesize": "Recommendation: Option 1 (use the existing queue as-is). It is the cheapest to reverse and the team already knows how to operate it."
+}

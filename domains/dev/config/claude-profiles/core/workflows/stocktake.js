@@ -8,6 +8,7 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
 // args: { model?: string, language?: string }
 // Model tiers: scanners -> MODEL (sonnet) at low effort (read-only inventory
 // work); synthesize -> session model (judgment stays on the caller's tier).
@@ -51,7 +52,7 @@ const SCANNERS = [
   },
   {
     key: 'memory',
-    prompt: `Assess the memory systems for overlap and rot: (a) ~/.claude/projects/*/memory (curated file memory) — count entries, flag pointers whose target file no longer exists; (b) ~/.claude/homunculus — observations vs corrections.jsonl volume, whether any instincts were ever produced; (c) ~/.claude-mem — DB/log sizes; (d) ~/.claude/session-data — stale .tmp accumulation; (e) grilling round cache — run `find . ~/.claude -maxdepth 4 -type d -path '*/.claude/.cache/grilling/*' -mindepth 1 2>/dev/null` from the current repo and flag every slug directory whose mtime is older than 60 days as a drop-candidate (the grilling skill prunes these itself on start, so leftovers mean the skill has not run there recently); a slug dir that still holds round-<n>.md but no transcript.md is an abandoned grilling — report it as 'fix'. Report sizes and drop candidates. Report only — delete nothing.`,
+    prompt: `Assess the memory systems for overlap and rot: (a) ~/.claude/projects/*/memory (curated file memory) — count entries, flag pointers whose target file no longer exists; (b) ~/.claude/homunculus — observations vs corrections.jsonl volume, whether any instincts were ever produced; (c) ~/.claude-mem — DB/log sizes; (d) ~/.claude/session-data — stale .tmp accumulation; (e) grilling round cache — run \`find . ~/.claude -maxdepth 4 -type d -path '*/.claude/.cache/grilling/*' -mindepth 1 2>/dev/null\` from the current repo and flag every slug directory whose mtime is older than 60 days as a drop-candidate (the grilling skill prunes these itself on start, so leftovers mean the skill has not run there recently); a slug dir that still holds round-<n>.md but no transcript.md is an abandoned grilling — report it as 'fix'. Report sizes and drop candidates. Report only — delete nothing.`,
   },
   {
     key: 'freshness',

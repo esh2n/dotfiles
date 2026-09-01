@@ -11,6 +11,7 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
 // args: { model?: string } — finder-tier model override, defaults to 'sonnet'.
 // Model tiers: collect -> haiku + low effort (mechanical); finders -> MODEL,
 // except the security finder -> opus (misses cost the most, findings are

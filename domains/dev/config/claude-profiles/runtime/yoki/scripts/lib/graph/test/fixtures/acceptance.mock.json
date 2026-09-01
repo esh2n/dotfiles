@@ -1,0 +1,24 @@
+{
+  "ground": {
+    "criteria": [
+      { "id": "c1", "text": "Feature X works end to end" },
+      { "id": "c2", "text": "Errors are handled and surfaced" }
+    ],
+    "verification": {
+      "commands": ["npm test"],
+      "notes": "a test near the code counts as evidence; nothing else is recorded as manual"
+    }
+  },
+  "evidence:1": {
+    "rows": [
+      { "id": "c1", "status": "automated", "evidence": "test/feature-x.test.js:10", "reasoning": "asserts the end-to-end behavior" },
+      { "id": "c2", "status": "missing", "evidence": "", "reasoning": "no test or doc covers error handling" }
+    ]
+  },
+  "verify:c1": { "holds": true, "reason": "confirmed by reading the test", "corrected_status": "automated" },
+  "gaps": {
+    "gaps": [{ "what": "c2 has no evidence", "why_it_matters": "errors could fail silently in production", "suggested_next_step": "add an error-path test" }],
+    "decisions": []
+  },
+  "report": "Verdict: cannot ship yet — c2 (error handling) has no evidence. c1 is automated (test/feature-x.test.js:10)."
+}

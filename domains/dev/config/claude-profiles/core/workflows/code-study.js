@@ -10,6 +10,10 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
+// arg note: "target" as a URL relies on the subagent's own web-fetch tool
+// (name/availability is backend-specific, not something this script or the
+// runner controls) — a local path always works identically on every backend.
 // args: {
 //   target: string,            // repo URL, or a path on this machine
 //   questions: string[],       // what the study must answer (1-6)

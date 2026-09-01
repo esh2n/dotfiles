@@ -7,7 +7,7 @@
   "~/.claude": "~/.codex",
   "settings.json": "config.toml",
   "settings.local.json": "config.toml",
-  "Workflow tool": "yoki-graph runner",
+  "Workflow tool": "yoki-graph (see the yoki-graph skill)",
   "Workflow script": "yoki-graph script",
   "Artifact tool": "yoki-artifact",
   "CLAUDE.md": "AGENTS.md",

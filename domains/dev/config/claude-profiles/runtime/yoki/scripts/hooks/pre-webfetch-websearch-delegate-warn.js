@@ -12,12 +12,27 @@
 // pre-edit-write-suggest-compact.js to size context. That record reflects
 // whichever agent (main session or subagent) is about to make this tool
 // call, so a subagent already running on a cheaper model stays silent.
+//
+// Cross-harness (#T17): the session file is located through
+// `lib/harness/session.js`'s `resolveSessionFile(payload, harness, env)`
+// (`harness = process.env.YOKI_HARNESS || 'claude'`, set by run-with-flags —
+// absent under Claude, so this resolves to the same `payload.transcript_path`
+// the hook always read, byte-identical), and `readLatestContextTokens` is
+// passed that harness so it reads Codex/omp's own session-file usage record
+// (#T3) instead of the Claude-only tail-scan.
 
 const MAX_STDIN = 1024 * 1024;
 const { buildPreToolUseAdditionalContext } = require('./pretooluse-visible-output');
 const { readLatestContextTokens } = require('../lib/transcript-context');
+const { resolveSessionFile } = require('../lib/harness/session');
 
-const EXPENSIVE_MODEL_MARKERS = ['fable', 'mythos', 'opus'];
+// Claude's own tier names, plus the Codex/omp model ids that
+// `core/harness-models.json` maps to the opus tier as of 2026-08:
+// codex.opus = "gpt-5.1-codex-max" (matched via "codex-max"; not "opus"
+// itself), omp.opus = "anthropic/claude-fable-5" (already matched by
+// "fable"). Doctor validates harness-models.json against each harness's own
+// model listing — if the opus tier's id ever changes there, update this too.
+const EXPENSIVE_MODEL_MARKERS = ['fable', 'mythos', 'opus', 'codex-max'];
 
 function isExpensiveModel(model) {
   if (typeof model !== 'string' || !model) return false;
@@ -35,8 +50,11 @@ function run(rawInput) {
       return typeof rawInput === 'string' ? rawInput : JSON.stringify(rawInput);
     }
 
-    const transcriptPath = typeof input.transcript_path === 'string' ? input.transcript_path : '';
-    const usage = readLatestContextTokens(transcriptPath);
+    const harness = process.env.YOKI_HARNESS || 'claude';
+    // resolveSessionFile returns payload.transcript_path verbatim for
+    // 'claude' — identical to the old direct field read.
+    const transcriptPath = resolveSessionFile(input, harness, process.env) || '';
+    const usage = readLatestContextTokens(transcriptPath, {}, harness);
     const model = usage ? usage.model : '';
 
     if (isExpensiveModel(model)) {

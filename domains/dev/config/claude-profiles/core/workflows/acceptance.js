@@ -11,6 +11,7 @@ export const meta = {
   ],
 }
 
+// backends: claude, codex, omp (via yoki-graph)
 // args: {
 //   criteria?: [{ id: string, text: string }],  // explicit list
 //   criteriaFile?: string,                      // or a file to read them from
