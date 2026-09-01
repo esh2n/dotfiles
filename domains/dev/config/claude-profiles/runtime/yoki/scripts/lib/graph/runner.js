@@ -16,6 +16,7 @@ const os = require('os');
 const crypto = require('crypto');
 
 const { createApi } = require('./api');
+const { runBodyInWorker } = require('./worker-host');
 const { Journal, runDir } = require('./journal');
 const guard = require('./guard');
 const lock = require('./lock');
@@ -116,6 +117,15 @@ function compileScript(source) {
 
   return {
     meta,
+    // The raw body string, handed to the worker so it can compile it inside a
+    // `node:vm` context (see worker-source.js / worker-host.js). This is the
+    // path executeScript uses now — the body runs in an isolated, killable
+    // worker rather than in the host realm.
+    body,
+    // The in-process AsyncFunction path is kept for the direct unit test that
+    // exercises it (test/runner.test.js) — it is no longer how a full run
+    // executes, but it is a cheap, dependency-free way to assert the compile
+    // step accepts a bare top-level `return`/`await`.
     async run(apiGlobals) {
       return fn(
         apiGlobals.args, apiGlobals.phase, apiGlobals.log, apiGlobals.agent,
@@ -178,6 +188,20 @@ function generateRunId() {
   return `run-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 }
 
+/**
+ * Run-level idle watchdog ceiling (ms): terminate the worker after this long
+ * with no agent() activity. Off by default (Infinity) so it never changes an
+ * existing run; enable per invocation via `options.idleTimeoutMs` or the
+ * `YOKI_GRAPH_IDLE_MS` env var. `0`/negative means "no watchdog", the same
+ * convention budget.js's caps use. This is the piece that makes §2-8's
+ * "detection cannot stop anything" false: the watchdog can now actually kill.
+ */
+function resolveIdleMs(options, env = process.env) {
+  const raw = options && options.idleTimeoutMs !== undefined ? options.idleTimeoutMs : env.YOKI_GRAPH_IDLE_MS;
+  const n = budgetLib.normalizeCap(raw);
+  return n === undefined ? Infinity : n;
+}
+
 function writeRunMeta(runId, meta) {
   const dir = runDir(runId);
   fs.mkdirSync(dir, { recursive: true });
@@ -219,6 +243,10 @@ function readRunMeta(runId) {
  * @param {number} [options.maxWallMs] budget cap override
  * @param {number} [options.lockStaleMs] run-lock takeover age (ms)
  * @param {object} [options.modelMap] `--model-map` tier overrides for this run
+ * @param {number} [options.idleTimeoutMs] terminate the worker after this long
+ *   with no agent() activity (run-level idle watchdog); Infinity/0 disables it
+ * @param {AbortSignal} [options.signal] abort -> terminate the worker; the run
+ *   ends as an ordinary error rather than an unhandled crash
  * @param {string} [options._parentRunId] internal: set when this call is a
  *   `workflow()` nested invocation, to (a) skip the guard cap (it already
  *   ran for the top-level launch) and (b) refuse a further nested call.
@@ -302,7 +330,23 @@ async function executeScript(options) {
   let error;
   let result;
   try {
-    result = await compiled.run(apiGlobals);
+    // The body runs in an isolated, killable worker (worker-host.js), NOT in
+    // this realm. `apiGlobals` (createApi) still owns every effect — the worker
+    // reaches agent()/workflow()/phase()/log() through an RPC seam and the host
+    // logic is unchanged. Determinism (Date/Math) is enforced inside the vm and
+    // can no longer be written around; a runaway or wedged body is terminated on
+    // the wall-time cap, an abort, or the idle watchdog, and surfaces here as an
+    // ordinary run error.
+    result = await runBodyInWorker({
+      body: compiled.body,
+      api: apiGlobals,
+      args,
+      budgetTotal: Number.isFinite(caps.maxTokens) ? caps.maxTokens : null,
+      journal,
+      maxWallMs: caps.maxWallMs,
+      idleTimeoutMs: resolveIdleMs(options),
+      signal: options.signal,
+    });
   } catch (err) {
     status = 'error';
     error = err.message;

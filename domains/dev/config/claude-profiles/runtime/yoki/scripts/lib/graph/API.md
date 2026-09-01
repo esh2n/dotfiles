@@ -152,10 +152,12 @@ access from the script body itself (only through `agent()`).
   the same way its own CLI does (`~/.claude/workflows/<name>.js`) or accepts
   `{scriptPath}`.
 - Restricted natives, per the skill ("Date.now()/Math.random()/argless `new
-  Date()`... throw — they would break resume"): yoki-graph shadows `Date`
-  and `Math` inside the executed script body only (not the host process) so
-  `Date.now()`, `new Date()` with no arguments, and `Math.random()` throw;
-  `new Date(x)` and every other `Math.*` member still work.
+  Date()`... throw — they would break resume"): enforced inside the vm realm the
+  body runs in (see "Execution mechanism" below), not the host process, so
+  `Date.now()`, `new Date()` with no arguments, and `Math.random()` throw while
+  `new Date(x)` and every other `Math.*` member still work — and, unlike the old
+  shims, the body cannot write around them (`Math` is frozen; the real `Date`
+  lives in a closure it cannot name).
 
 ## Return value
 
@@ -163,34 +165,79 @@ Whatever the script's top-level `return` produces (or `undefined` if it
 never returns) is the run's result — printed as the human summary / final
 `--json` NDJSON event, and stored in the run's journal metadata.
 
-## Execution mechanism (chosen)
+## Execution mechanism (chosen): an isolated, killable worker (D4)
 
-`new Function` via the `AsyncFunction` constructor
-(`Object.getPrototypeOf(async function(){}).constructor`), **not** a
-temp-file ESM wrapper. Rationale:
+The body runs inside a `node:worker_threads` Worker whose code builds a
+`node:vm` context and executes the body there — NOT as an in-process
+`AsyncFunction` in the host realm, which is what it used to be. The change
+(decision D4) closes three problems that the same-realm design could not,
+each named in the prior-art comparison (§2-7/§2-8):
 
-1. Scripts use a bare top-level `return` inside their body (see above) —
-   illegal in an ES module or a classic `<script>`-shaped file. Wrapping the
-   body as the source of an `AsyncFunction` makes that `return` a normal
-   function return, and top-level `await` "just works" because the function
-   is async — with zero string surgery beyond stripping the leading
-   `export const meta = {...}` declaration.
-2. Globals are passed as **named parameters**, not `globalThis` mutation:
-   `new AsyncFunction('args','phase','log','agent','parallel','pipeline',
-   'budget','workflow','Date','Math', body)`, invoked with the concrete
-   per-run implementations (plus the restricted `Date`/`Math` shims) as
-   arguments. Parameter shadowing means the function body's references to
-   `Date`/`Math`/`agent`/etc. resolve to what yoki-graph hands in, without
-   ever touching the actual Node process's globals — safe for concurrent
-   runs in the same process (e.g. `node --test`) and there is nothing to
-   clean up afterward.
-3. `meta` is extracted separately (regex for the balanced
-   `export const meta = { ... }` block, evaluated with the very same
-   `AsyncFunction`/`Function` trick since the skill requires it to be a pure
-   literal) before the body is compiled, so `--dry-run`/`list`/`status` can
-   read `meta.name`/`meta.phases` without executing anything.
+- **Determinism was bypassable.** The old `Date`/`Math` shims were named
+  parameters, so a body could write `globalThis.Date = …` and read a live
+  clock around them. Now `Date`/`Math` come from the vm realm itself and a
+  one-line prelude neuters them IN the realm (reassign `Math.random` then
+  freeze `Math`; lexically shadow `Date` with a `RestrictedDate` and replace
+  the realm's own global `Date` with it, keeping the real constructor in a
+  closure the body can never name). There is nothing to inject over and
+  nothing to write around — the allow/deny list is exactly api.js's
+  (`Date.now()`, argless `new Date()`, `Math.random()` throw; `new Date(x)`,
+  `Date.parse`, `Date.UTC`, `Date()` without `new`, every other `Math.*` work).
+- **A runaway body could not be stopped.** A `while (true) {}` inside an
+  `await` cannot be killed by an in-process `vm` timeout. `worker.terminate()`
+  can, so the host arms three terminators — the `graphMaxWallMs` wall-time cap,
+  an explicit `AbortSignal`, and a run-level idle watchdog (`YOKI_GRAPH_IDLE_MS`
+  / `idleTimeoutMs`, off by default) that resets on every `agent()` call. A
+  terminate surfaces as an ordinary run error carrying the journal's last state,
+  not a hung process. (The per-agent timeout and the in-`agent()` budget caps
+  still apply on top, for the common case of a loop that DOES call `agent()`.)
+- **The body shared the host realm.** The vm context is a fresh realm with no
+  `require`, `process`, `module`, `Buffer` or host `globalThis`, and
+  `codeGeneration: { strings: false, wasm: false }` makes `eval`/`new Function`
+  throw — so a host `Function` captured off an injected global cannot compile
+  anything. This is a determinism/accident boundary, not a security boundary
+  against a hostile author: every workflow here is repo-managed.
 
-See `runner.js` (`compileScript`) for the implementation.
+How the pieces fit:
+
+1. **The body is compiled unchanged.** `compileScript` still strips the whole
+   `export const meta = {...}` block (so the body never sees `meta`) and the
+   remaining body — bare top-level `return`/`await` and all — is wrapped as
+   `(async () => { <prelude> \n <body> })()` and run with `vm.Script.runInContext`.
+   `meta` is extracted separately (balanced-brace scan + `Function` literal
+   eval) so `--dry-run`/`list`/`status` read `meta.name`/`meta.phases` without
+   executing anything.
+2. **The 7 globals are an RPC seam.** Only `parallel`/`pipeline` run in the
+   worker (they orchestrate script closures the host cannot see); they call the
+   `agent` stub, so every effect leaves through one channel. `agent` and
+   `workflow` post `{type:'call', callId, method, payload}` to the host and
+   await a `{type:'response', ok|error, value, fatal, spent}`. `phase`/`log`/
+   `console` post fire-and-forget `{type:'emit', …}` messages, ordered ahead of
+   any following `agent` call because a MessagePort preserves post order — which
+   is what keeps `phase()`-then-`agent()` resolving to the right ambient phase.
+   The **host keeps every bit of the old logic unchanged** (backend spawn,
+   journal, worktree, guard, budget, models, progress, gate): the RPC handler
+   just calls the same `createApi(ctx)` object the in-process runner always
+   built. So `callKey`, the journal shape, the event stream, resume's index
+   sequence, per-call model/backend, caps, retry and the lock all cross the
+   boundary untouched.
+3. **Values cross by structured clone, not JSON.** The result and args ride
+   `postMessage`/`workerData`, so `budget.remaining()` returning `Infinity`
+   survives (a JSON round-trip would flatten it to `null`). Agent opts are plain
+   JSON already; a schema result is a plain object the host parsed. `budget` is
+   a synchronous mirror in the worker: `total` is fixed at spawn and `spent()`
+   tracks the `spent` the host stamps on every response, so there is one counter.
+
+Why worker_threads + vm and not Bun: the prior art that isolates the body
+(pi-subagents) uses exactly this pair; the other (codex-dynamic-workflows) uses
+a Bun child process, which would add a hard Bun runtime dependency. yoki-graph's
+standing constraint is Node-stdlib-only, zero external deps — `worker_threads`
+and `vm` are both stdlib, so this is the isolation mechanism that keeps that
+promise.
+
+See `worker-source.js` (the in-worker vm + RPC stubs), `worker-host.js` (the
+host-side dispatch + terminators) and `runner.js` (`compileScript`,
+`executeScript`) for the implementation.
 
 ## Backends
 
