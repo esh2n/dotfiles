@@ -845,3 +845,79 @@ test('gen.js CLI plan(): --dry-run --json shape has target/out/sources/operation
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// guard floor (permissions.yaml `guardFloor:`)
+//
+// Codex has no `floor` field of its own — the floor hooks arrive as ordinary
+// translated `run-bash-hook.js "<abs path>"` commands — so this target's job
+// is to notice when a declared one did NOT survive translation, instead of
+// shipping a hooks.json that quietly runs one guard fewer.
+// ---------------------------------------------------------------------------
+
+const { verifyGuardFloor } = codexTarget;
+
+function floorEntry(hook, event = 'PreToolUse', matcher = 'Bash') {
+  return { hook, event, matcher, scriptPath: `/home/u/.claude/hooks/${hook}` };
+}
+
+function mergedWith(event, ...scriptPaths) {
+  return {
+    hooks: {
+      [event]: [
+        {
+          matcher: 'Bash',
+          hooks: scriptPaths.map(p => ({
+            type: 'command',
+            command: `"\${YOKI_NODE:-node}" "/yoki/scripts/hooks/run-bash-hook.js" --harness codex "${p}"`,
+          })),
+        },
+      ],
+    },
+  };
+}
+
+test('verifyGuardFloor: every declared hook present in hooks.json -> nothing reported', () => {
+  const guardFloor = [floorEntry('git-guard.sh'), floorEntry('unattended-guard.sh')];
+  const merged = mergedWith('PreToolUse', '/home/u/.claude/hooks/git-guard.sh', '/home/u/.claude/hooks/unattended-guard.sh');
+  const { warnings, skipped } = verifyGuardFloor({ merged, guardFloor });
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(skipped, []);
+});
+
+test('verifyGuardFloor: a floor hook missing from hooks.json is warned AND skipped-listed', () => {
+  const guardFloor = [floorEntry('git-guard.sh'), floorEntry('unattended-guard.sh')];
+  const merged = mergedWith('PreToolUse', '/home/u/.claude/hooks/git-guard.sh');
+  const { warnings, skipped } = verifyGuardFloor({ merged, guardFloor });
+
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /unattended-guard\.sh/);
+  assert.match(warnings[0], /guard floor/);
+  assert.deepEqual(skipped, [
+    {
+      target: 'codex',
+      event: 'PreToolUse',
+      matcher: 'Bash',
+      command: '/home/u/.claude/hooks/unattended-guard.sh',
+      reason: 'declared in permissions.yaml guardFloor but absent from the generated hooks.json — codex would run below the guard floor',
+    },
+  ]);
+});
+
+test('verifyGuardFloor: the hook registered on a DIFFERENT event does not satisfy the floor', () => {
+  const guardFloor = [floorEntry('git-guard.sh', 'PreToolUse')];
+  const merged = mergedWith('PostToolUse', '/home/u/.claude/hooks/git-guard.sh');
+  const { warnings } = verifyGuardFloor({ merged, guardFloor });
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /"git-guard\.sh" \(PreToolUse\)/);
+});
+
+test('verifyGuardFloor: an empty hooks.json fails every declared entry', () => {
+  const guardFloor = [floorEntry('git-guard.sh'), floorEntry('unattended-guard.sh')];
+  assert.equal(verifyGuardFloor({ merged: {}, guardFloor }).warnings.length, 2);
+});
+
+test('verifyGuardFloor: no floor declared -> nothing to check', () => {
+  const merged = mergedWith('PreToolUse', '/home/u/.claude/hooks/git-guard.sh');
+  assert.deepEqual(verifyGuardFloor({ merged, guardFloor: [] }), { warnings: [], skipped: [] });
+});

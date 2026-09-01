@@ -171,10 +171,14 @@ export async function startApiServer(options = {}) {
           version: comment.version,
           parent_id: comment.parent_id ?? comment.id,
           author: "agent via owner@example.test",
+          // The agent's byline is a role, not a person, so it is never
+          // pseudonymised — the display value is the same string.
+          author_display: "agent via owner@example.test",
           body: payload.body,
           created_at: now,
           resolved_at: null,
           resolved_by: null,
+          resolved_by_display: null,
           to_agent: false,
           agent_seen_at: null,
         };
@@ -197,7 +201,12 @@ export async function startApiServer(options = {}) {
   };
 }
 
-/** A comment row shaped like worker/src/comments.mjs serializeComment(). */
+/**
+ * A comment row shaped like worker/src/comments.mjs serializeComment().
+ *
+ * The owner view, which is what the CLI's service token gets: both the address
+ * and the pseudonym. A non-owner would receive `author_display` alone.
+ */
 export function makeComment(overrides = {}) {
   return {
     id: "c1",
@@ -205,10 +214,12 @@ export function makeComment(overrides = {}) {
     version: 1,
     parent_id: null,
     author: "reader@example.test",
+    author_display: "viewer-0f1e2d3c",
     body: "please fix the heading",
     created_at: "2026-08-30T10:00:00.000Z",
     resolved_at: null,
     resolved_by: null,
+    resolved_by_display: null,
     to_agent: true,
     agent_seen_at: null,
     ...overrides,

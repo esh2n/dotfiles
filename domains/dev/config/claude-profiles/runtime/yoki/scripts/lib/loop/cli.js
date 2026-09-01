@@ -305,6 +305,12 @@ function printStatusFor(name, ctx) {
   } else {
     for (const row of recent) {
       stdout.write(`  ${row.ts} ${row.harness} exit=${row.exit} ${row.durationMs}ms session=${row.sessionId || '-'}\n`);
+      // The recorded argv, prompt already fingerprinted by the runner (see
+      // state.promptPlaceholder) — status shows the placeholder, never the
+      // prompt, because the log itself never held the prompt.
+      const argv = Array.isArray(row.cmd) ? row.cmd : [];
+      const stdinNote = row.prompt && !argv.includes(row.prompt) ? ` <stdin ${row.prompt}>` : '';
+      if (argv.length) stdout.write(`    ${argv.join(' ')}${stdinNote}\n`);
     }
   }
 

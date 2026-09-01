@@ -76,7 +76,7 @@ access from the script body itself (only through `agent()`).
     | backend | `read-only` | `workspace-write` / `danger-full-access` |
     | --- | --- | --- |
     | codex | `-s read-only` (native) | `-s <mode>` |
-    | claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash` | no extra flag (the CLI's own default) |
+    | claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash,Task` | no extra flag (the CLI's own default) |
     | omp | `--tools read,grep,glob,web_search` (allow-list) | no extra flag |
     | mock | n/a — nothing is spawned | n/a |
 

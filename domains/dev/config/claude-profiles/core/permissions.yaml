@@ -85,4 +85,26 @@ allow:
 
 deny: []
 
+# Guard floor — the hooks that must be registered on EVERY harness, whatever
+# else a target's generator does or does not manage to translate.
+#
+# This lives here, in the same layered source as the permissions, because the
+# alternative was each target hardcoding filenames: extensions/yoki-bridge.ts
+# carried "git-guard.sh" and "unattended-guard.sh" as a literal array, so
+# raising the floor meant editing the omp bridge rather than declaring it
+# once. Targets now read this list — omp writes it into yoki-hooks.json's
+# top-level `floor`, codex checks the generated hooks.json against it, and
+# `yoki doctor` fails when either is missing an entry.
+#
+# A later layer (a pack, personal) may ADD entries; nothing subtracts. The
+# floor is expressed in Claude Code's own event/matcher vocabulary, which is
+# what every target's translator already takes as input.
+guardFloor:
+  - hook: git-guard.sh
+    event: PreToolUse
+    matcher: Bash
+  - hook: unattended-guard.sh
+    event: PreToolUse
+    matcher: "Bash|Write|Edit"
+
 defaultMode: auto

@@ -23,6 +23,7 @@ const os = require('os');
 const path = require('path');
 
 const { convert: convertPermissions } = require('../permissions/to-omp');
+const { resolveGuardFloor } = require('../permissions/parse');
 const { readJsonIfExists, readTextIfExists, findSettingsFile, listMarkdownFilesFlat, listMarkdownFilesRecursive } = require('./layers');
 const { buildYokiHooksJson } = require('./omp-hooks');
 const { renderConfigYml } = require('./omp-config-yml');
@@ -85,9 +86,47 @@ function discoverLayerContent(layerRoots) {
   return { settingsLayers, permissionsFiles, agentFiles, ruleFiles };
 }
 
-function buildHooksOperation({ settingsLayers, out, home }) {
+/** The floor entries this target can express. yoki-bridge.ts applies the
+ * floor to `tool_call` — the omp event PreToolUse maps to — so a floor entry
+ * declared on any other event has nowhere to go here and is reported rather
+ * than silently written into a `floor` array the bridge would apply to the
+ * wrong event. */
+function partitionGuardFloor(guardFloor) {
+  const applicable = [];
+  const unsupported = [];
+  for (const entry of guardFloor) {
+    if (!entry.event || entry.event === 'PreToolUse') applicable.push(entry);
+    else unsupported.push(entry);
+  }
+  return { applicable, unsupported };
+}
+
+/**
+ * `yoki-hooks.json` carries the per-event hook specs AND a top-level `floor`
+ * array of absolute script paths. The floor is what extensions/yoki-bridge.ts
+ * refuses to run below: before it was written here, the bridge hardcoded
+ * "git-guard.sh"/"unattended-guard.sh", so the declared floor and the
+ * enforced floor were two different lists that could drift apart. Now the
+ * manifest states it and the bridge honours it; the hardcoded pair survives
+ * only as the fallback for a machine whose manifest predates this field.
+ */
+function buildHooksOperation({ settingsLayers, out, home, guardFloor }) {
   const { generated, warnings, skipped } = buildYokiHooksJson(settingsLayers, { home });
-  const content = `${JSON.stringify(generated, null, 2)}\n`;
+
+  const { applicable, unsupported } = partitionGuardFloor(guardFloor || []);
+  for (const entry of unsupported) {
+    warnings.push(`omp: guardFloor hook "${entry.hook}" is declared on ${entry.event}, which has no omp floor equivalent (the floor applies to tool_call) — not written to yoki-hooks.json`);
+    skipped.push({
+      target: 'omp',
+      event: entry.event,
+      matcher: entry.matcher || '',
+      command: entry.hook,
+      reason: 'guardFloor entries are only enforceable on PreToolUse/tool_call by yoki-bridge.ts',
+    });
+  }
+
+  const manifest = applicable.length > 0 ? { floor: applicable.map(e => e.scriptPath), ...generated } : generated;
+  const content = `${JSON.stringify(manifest, null, 2)}\n`;
   const op = { kind: 'write', destinationPath: path.join(out, 'yoki-hooks.json'), content, layer: 'generated' };
   return { op, warnings, skipped };
 }
@@ -224,7 +263,8 @@ function plan(options) {
   const skipped = [];
   const operations = [];
 
-  const hooks = buildHooksOperation({ settingsLayers: content.settingsLayers, out: outResolved, home });
+  const guardFloor = resolveGuardFloor(content.permissionsFiles, home);
+  const hooks = buildHooksOperation({ settingsLayers: content.settingsLayers, out: outResolved, home, guardFloor });
   operations.push(hooks.op);
   warnings.push(...hooks.warnings);
   skipped.push(...hooks.skipped);

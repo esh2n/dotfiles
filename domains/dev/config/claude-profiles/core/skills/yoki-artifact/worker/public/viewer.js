@@ -94,13 +94,23 @@ async function renderIndex() {
 
 // --- artifact view --------------------------------------------------------
 
+// The API sends `author` only to the owner and `author_display` — a per-channel
+// pseudonym — to everyone. Falling back the other way round would show the
+// owner pseudonyms on their own page, when they are the one person entitled to
+// read the addresses.
+function who(raw, display) {
+  return raw ?? display ?? "unknown";
+}
+
 function commentNode(comment, { onChanged }) {
   const meta = el("div", { class: "comment-meta" }, [
-    el("span", { text: comment.author }),
+    el("span", { text: who(comment.author, comment.author_display) }),
     el("span", { text: localTime(comment.created_at) }),
     el("span", { text: `v${comment.version}` }),
     comment.to_agent ? el("span", { class: "badge", text: "for agent" }) : null,
-    comment.resolved_at ? el("span", { class: "badge", text: `resolved by ${comment.resolved_by}` }) : null,
+    comment.resolved_at
+      ? el("span", { class: "badge", text: `resolved by ${who(comment.resolved_by, comment.resolved_by_display)}` })
+      : null,
   ]);
   const actions = el("div", { class: "compose-actions" }, [
     el("button", {

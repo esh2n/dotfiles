@@ -1019,3 +1019,217 @@ test('checkClaudeTarget: folds external-links checks into its own result list', 
     fs.rmSync(yokiRoot, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// guard floor
+//
+// The floor is declared once (permissions.yaml `guardFloor:`) and enforced
+// per target: codex must carry each floor hook in hooks.json, omp must state
+// it in yoki-hooks.json's `floor` with the scripts actually executable.
+// Doctor re-reads the DECLARATION rather than trusting either target's
+// output to describe itself — catching output that has drifted from the
+// declaration is the whole point.
+// ---------------------------------------------------------------------------
+
+const {
+  resolveDeclaredGuardFloor,
+  hookCommandsForEvent,
+  checkCodexGuardFloor,
+  checkOmpGuardFloor,
+} = require('../doctor');
+
+const FLOOR_YAML =
+  'allow: []\ndeny: []\nguardFloor:\n' +
+  '  - hook: git-guard.sh\n    event: PreToolUse\n    matcher: Bash\n' +
+  '  - hook: unattended-guard.sh\n    event: PreToolUse\n    matcher: "Bash|Write|Edit"\ndefaultMode: auto\n';
+
+/** A dotfilesRoot whose claude-profiles core layer declares the two guards,
+ *  plus a claudeDir with the hook scripts installed and executable. */
+function buildFloorFixture(home, options = {}) {
+  const dotfilesRoot = path.join(home, 'dotfiles');
+  const claudeDir = path.join(home, '.claude');
+  const profilesDir = path.join(dotfilesRoot, 'domains', 'dev', 'config', 'claude-profiles');
+
+  writeFile(path.join(profilesDir, 'core', 'permissions.yaml'), options.coreYaml || FLOOR_YAML);
+  if (options.personalYaml) writeFile(path.join(profilesDir, 'personal', 'permissions.yaml'), options.personalYaml);
+
+  for (const hook of options.installedHooks || ['git-guard.sh', 'unattended-guard.sh']) {
+    const script = path.join(claudeDir, 'hooks', hook);
+    writeFile(script, '#!/usr/bin/env bash\n');
+    fs.chmodSync(script, options.mode === undefined ? 0o755 : options.mode);
+  }
+
+  return { dotfilesRoot, claudeDir, home };
+}
+
+function scriptPathIn(home, hook) {
+  return path.join(home, '.claude', 'hooks', hook);
+}
+
+function bashHookCommand(scriptPath) {
+  return `"\${YOKI_NODE:-node}" "/yoki/scripts/hooks/run-bash-hook.js" --harness codex "${scriptPath}"`;
+}
+
+test('resolveDeclaredGuardFloor: reads guardFloor from core and the enabled packs and personal', () => {
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-floor-resolve-'));
+  try {
+    const { dotfilesRoot, claudeDir } = buildFloorFixture(home, {
+      personalYaml: 'allow: []\ndeny: []\nguardFloor:\n  - hook: secrets-guard.sh\n    event: PreToolUse\n    matcher: Bash\ndefaultMode: auto\n',
+    });
+    writeFile(path.join(claudeDir, '.claude-packs'), 'go\n');
+    writeFile(
+      path.join(dotfilesRoot, 'domains', 'dev', 'config', 'claude-profiles', 'packs', 'go', 'permissions.yaml'),
+      'allow: []\ndeny: []\nguardFloor:\n  - hook: go-guard.sh\n    event: PreToolUse\n    matcher: Bash\ndefaultMode: auto\n'
+    );
+
+    const floor = resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home });
+    assert.deepEqual(floor.map(e => e.hook), ['git-guard.sh', 'unattended-guard.sh', 'go-guard.sh', 'secrets-guard.sh']);
+    assert.equal(floor[0].scriptPath, scriptPathIn(home, 'git-guard.sh'));
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('resolveDeclaredGuardFloor: null when there is no claude-profiles to read', () => {
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-floor-noprofiles-'));
+  try {
+    assert.equal(resolveDeclaredGuardFloor({ dotfilesRoot: home, claudeDir: path.join(home, '.claude'), home }), null);
+    assert.equal(resolveDeclaredGuardFloor({ dotfilesRoot: null, claudeDir: '/x', home }), null);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('hookCommandsForEvent: flattens every group\'s command strings for one event', () => {
+  const hooksJson = {
+    PreToolUse: [{ matcher: 'Bash', hooks: [{ command: 'a' }, { notACommand: true }] }, { matcher: 'Bash', hooks: [{ command: 'b' }] }],
+  };
+  assert.deepEqual(hookCommandsForEvent(hooksJson, 'PreToolUse'), ['a', 'b']);
+  assert.deepEqual(hookCommandsForEvent(hooksJson, 'Stop'), []);
+  assert.deepEqual(hookCommandsForEvent(null, 'PreToolUse'), []);
+});
+
+test('checkCodexGuardFloor: ok when hooks.json carries every declared floor hook', () => {
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-codex-floor-ok-'));
+  try {
+    const { dotfilesRoot, claudeDir } = buildFloorFixture(home);
+    const floor = resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home });
+    const hooksJson = {
+      PreToolUse: [
+        {
+          matcher: 'Bash',
+          hooks: floor.map(e => ({ type: 'command', command: bashHookCommand(e.scriptPath) })),
+        },
+      ],
+    };
+    const check = checkCodexGuardFloor(hooksJson, floor);
+    assert.equal(check.status, 'ok');
+    assert.match(check.hint, /2 floor hook/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkCodexGuardFloor: FAILS when a declared floor hook is absent from hooks.json', () => {
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-codex-floor-missing-'));
+  try {
+    const { dotfilesRoot, claudeDir } = buildFloorFixture(home);
+    const floor = resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home });
+    const hooksJson = {
+      PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: bashHookCommand(floor[0].scriptPath) }] }],
+    };
+    const check = checkCodexGuardFloor(hooksJson, floor);
+    assert.equal(check.status, 'fail');
+    assert.match(check.hint, /unattended-guard\.sh/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkCodexGuardFloor: an unreadable declaration is a skip, an empty one is ok', () => {
+  assert.equal(checkCodexGuardFloor({}, null).status, 'warn');
+  assert.equal(checkCodexGuardFloor({}, []).status, 'ok');
+});
+
+test('checkOmpGuardFloor: ok when the manifest floor matches and every script is executable', () => {
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-omp-floor-ok-'));
+  try {
+    const { dotfilesRoot, claudeDir } = buildFloorFixture(home);
+    const floor = resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home });
+    const ompAgentDir = path.join(home, '.omp', 'agent');
+    writeFile(path.join(ompAgentDir, 'yoki-hooks.json'), JSON.stringify({ floor: floor.map(e => e.scriptPath), tool_call: [] }));
+
+    const check = checkOmpGuardFloor(ompAgentDir, floor);
+    assert.equal(check.status, 'ok');
+    assert.match(check.hint, /2 floor script/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkOmpGuardFloor: FAILS when the manifest has no floor at all', () => {
+  // The regression: a manifest written before the field existed makes
+  // yoki-bridge.ts fall back to its two hardcoded names, so a floor raised
+  // in permissions.yaml would silently not apply to omp.
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-omp-floor-none-'));
+  try {
+    const { dotfilesRoot, claudeDir } = buildFloorFixture(home);
+    const floor = resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home });
+    const ompAgentDir = path.join(home, '.omp', 'agent');
+    writeFile(path.join(ompAgentDir, 'yoki-hooks.json'), JSON.stringify({ tool_call: [] }));
+
+    const check = checkOmpGuardFloor(ompAgentDir, floor);
+    assert.equal(check.status, 'fail');
+    assert.match(check.hint, /no top-level "floor"/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkOmpGuardFloor: FAILS when a declared hook is missing from the manifest floor', () => {
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-omp-floor-partial-'));
+  try {
+    const { dotfilesRoot, claudeDir } = buildFloorFixture(home);
+    const floor = resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home });
+    const ompAgentDir = path.join(home, '.omp', 'agent');
+    writeFile(path.join(ompAgentDir, 'yoki-hooks.json'), JSON.stringify({ floor: [floor[0].scriptPath] }));
+
+    const check = checkOmpGuardFloor(ompAgentDir, floor);
+    assert.equal(check.status, 'fail');
+    assert.match(check.hint, /unattended-guard\.sh/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkOmpGuardFloor: FAILS when a listed floor script is not executable', () => {
+  // yoki-bridge.ts drops a floor script it cannot run, so a non-executable
+  // one is a floor that is quietly one guard short.
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-omp-floor-noexec-'));
+  try {
+    const { dotfilesRoot, claudeDir } = buildFloorFixture(home, { mode: 0o644 });
+    const floor = resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home });
+    const ompAgentDir = path.join(home, '.omp', 'agent');
+    writeFile(path.join(ompAgentDir, 'yoki-hooks.json'), JSON.stringify({ floor: floor.map(e => e.scriptPath) }));
+
+    const check = checkOmpGuardFloor(ompAgentDir, floor);
+    assert.equal(check.status, 'fail');
+    assert.match(check.hint, /not executable/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkOmpGuardFloor: an unreadable manifest or declaration is a warn, not a verdict', () => {
+  const home = fs.realpathSync(makeTmpDir('yoki-doctor-omp-floor-skip-'));
+  try {
+    const ompAgentDir = path.join(home, '.omp', 'agent');
+    assert.equal(checkOmpGuardFloor(ompAgentDir, []).status, 'warn');
+
+    writeFile(path.join(ompAgentDir, 'yoki-hooks.json'), JSON.stringify({ tool_call: [] }));
+    assert.equal(checkOmpGuardFloor(ompAgentDir, null).status, 'warn');
+    assert.equal(checkOmpGuardFloor(ompAgentDir, []).status, 'ok');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});

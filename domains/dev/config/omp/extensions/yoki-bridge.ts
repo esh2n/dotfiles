@@ -30,9 +30,18 @@
  * two bash guards — git-guard.sh, unattended-guard.sh — on tool_call when
  * that file is absent or unreadable, so a machine that has only run
  * yoki-switch (and not the generator) still gets the guard it has today.
- * Those same two are ALSO re-added when a manifest IS present but registers
- * no tool_call bash guard at all (withFallbackGuards): a manifest may add
- * protection, never remove the floor.
+ *
+ * The floor those guards represent is DECLARED, not hardcoded: a generated
+ * manifest carries a top-level `floor` array of absolute hook-script paths,
+ * built from the `guardFloor:` block in the layered permissions.yaml. When
+ * it is there, that array IS the floor, and every entry tool_call does not
+ * already register is put back (withDeclaredFloor) — raising the floor is
+ * an edit to permissions.yaml rather than an edit to this file. The two
+ * literal filenames below survive only for a manifest written before that
+ * field existed (or for no manifest at all), where the older, coarser rule
+ * applies: any tool_call bash guard at all is taken as the generator's own
+ * translation of the same settings layers (withFallbackGuards). Either way
+ * a manifest may add protection and never remove the floor.
  *
  * Fails OPEN everywhere: every hook invocation is wrapped, a broken/slow/
  * missing hook resolves to "no opinion" (null), and every registered handler
@@ -45,7 +54,7 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 
@@ -75,8 +84,10 @@ const HOOKS_MANIFEST_PATH = process.env.YOKI_HOOKS_MANIFEST || join(homedir(), "
 const HOOKS_DIR = process.env.YOKI_HOOKS_DIR || join(homedir(), ".claude", "hooks");
 
 /** Today's guard set, consulted in this order (first deny wins) when no
- *  manifest has been generated yet. Both are PreToolUse-only, so the
- *  fallback populates tool_call and nothing else. */
+ *  manifest has been generated yet, or when a manifest predates the `floor`
+ *  field. Both are PreToolUse-only, so the fallback populates tool_call and
+ *  nothing else. A manifest that declares `floor` overrides this list
+ *  entirely — these names are the last resort, not the definition. */
 const FALLBACK_BASH_HOOKS = ["git-guard.sh", "unattended-guard.sh"];
 
 /** The runtime the two runner scripts live in. Baked into settings.json's
@@ -109,6 +120,13 @@ interface HookSpec {
 
 type HooksByEvent = Partial<Record<OmpEvent, HookSpec[]>>;
 
+/** A parsed manifest: the per-event specs plus the declared guard floor
+ *  (absolute script paths; empty when the manifest predates the field). */
+interface Manifest {
+	hooks: HooksByEvent;
+	floor: string[];
+}
+
 function isHookKind(value: unknown): value is HookKind {
 	return value === "js" || value === "bash";
 }
@@ -135,9 +153,17 @@ function toHookSpec(value: unknown): HookSpec | null {
 	return spec;
 }
 
+/** Absolute paths from the manifest's top-level `floor`. A non-string entry
+ *  is dropped rather than fatal, matching toHookSpec's defensive stance: one
+ *  malformed entry must not cost us the entries that did parse. */
+function toFloorPaths(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return value.filter((p): p is string => typeof p === "string" && p.length > 0);
+}
+
 /** Returns null (not {}) when the file is absent, unreadable, or malformed,
  *  so the caller can tell "nothing configured" apart from "fall back". */
-function loadHooksManifest(): HooksByEvent | null {
+function loadHooksManifest(): Manifest | null {
 	let raw: string;
 	try {
 		raw = readFileSync(HOOKS_MANIFEST_PATH, "utf8");
@@ -153,14 +179,23 @@ function loadHooksManifest(): HooksByEvent | null {
 	}
 	if (!parsed || typeof parsed !== "object") return null;
 
-	const result: HooksByEvent = {};
+	const hooks: HooksByEvent = {};
 	for (const event of EVENTS) {
 		const list = (parsed as Record<string, unknown>)[event];
 		if (!Array.isArray(list)) continue;
 		const specs = list.map(toHookSpec).filter((s): s is HookSpec => s !== null);
-		if (specs.length > 0) result[event] = specs;
+		if (specs.length > 0) hooks[event] = specs;
 	}
-	return result;
+	return { hooks, floor: toFloorPaths((parsed as Record<string, unknown>).floor) };
+}
+
+/** One bash spec per floor script, dropping any that is not installed on
+ *  this machine — the same existsSync gate the fallback applies, for the
+ *  same reason: spawning a path that isn't there buys nothing. */
+function floorSpecs(paths: string[]): HookSpec[] {
+	return paths
+		.map((script) => ({ id: basename(script).replace(/\.sh$/, ""), kind: "bash" as const, script }))
+		.filter((spec) => existsSync(spec.script));
 }
 
 function fallbackHooksByEvent(): HooksByEvent {
@@ -182,6 +217,21 @@ function fallbackHooksByEvent(): HooksByEvent {
  *  tool_call in that case. A manifest that DOES ship bash guards is trusted
  *  as-is: it is the generator's translation of the same settings layers, and
  *  prepending duplicates would run every guard twice. */
+/** The declared-floor rule: every floor script tool_call does not already
+ *  register is prepended. Unlike withFallbackGuards below, this compares
+ *  SCRIPT PATHS rather than asking "is there any bash guard at all" — the
+ *  manifest names exactly which scripts the floor consists of, so a manifest
+ *  that ships one guard and drops another is caught instead of passing on
+ *  the strength of the one it kept. A script already registered is not
+ *  duplicated. */
+function withDeclaredFloor(hooks: HooksByEvent, floor: string[]): HooksByEvent {
+	const toolCall = hooks.tool_call ?? [];
+	const alreadyRegistered = new Set(toolCall.filter((spec) => spec.kind === "bash").map((spec) => spec.script));
+	const missing = floorSpecs(floor.filter((script) => !alreadyRegistered.has(script)));
+	if (missing.length === 0) return hooks;
+	return { ...hooks, tool_call: [...missing, ...toolCall] };
+}
+
 function withFallbackGuards(manifest: HooksByEvent): HooksByEvent {
 	const toolCall = manifest.tool_call ?? [];
 	if (toolCall.some((spec) => spec.kind === "bash")) return manifest;
@@ -195,7 +245,10 @@ function withFallbackGuards(manifest: HooksByEvent): HooksByEvent {
 function resolveHooksByEvent(): HooksByEvent {
 	if (!YOKI_ROOT) return {}; // nothing to spawn — fail open across every event
 	const manifest = loadHooksManifest();
-	return manifest === null ? fallbackHooksByEvent() : withFallbackGuards(manifest);
+	if (manifest === null) return fallbackHooksByEvent();
+	return manifest.floor.length > 0
+		? withDeclaredFloor(manifest.hooks, manifest.floor)
+		: withFallbackGuards(manifest.hooks);
 }
 
 // ---------------------------------------------------------------------------

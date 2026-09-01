@@ -69,9 +69,12 @@ function ompGuardPath(homeDir) {
  * and it is a real restriction rather than a note in a doc comment.
  *
  * `Bash` is on the list because a shell is a write tool: leaving it enabled
- * would make the whole restriction cosmetic.
+ * would make the whole restriction cosmetic. `Task` is on it for the same
+ * reason at one remove — a subagent does not inherit this argv, so a
+ * read-only run that can still spawn one has an unrestricted write path.
+ * (This mirrors omp's allow-list, which deliberately omits `task`.)
  */
-const CLAUDE_READ_ONLY_DENIED_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
+const CLAUDE_READ_ONLY_DENIED_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task'];
 
 /**
  * omp's tool-restriction flag is `--tools=<value>` ("Comma-separated list of

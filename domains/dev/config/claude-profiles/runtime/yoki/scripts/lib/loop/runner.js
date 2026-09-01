@@ -76,7 +76,9 @@ function formatArgvLine(cmd, args) {
  * @param {object} [deps] injectable collaborators (tests) — `spawn`,
  *   `writeOut`
  * @returns {object} `{dryRun: true, cmd, args, line}` for a dry run, or
- *   `{dryRun: false, row, stdout, stderr}` for a real one
+ *   `{dryRun: false, row, stdout, stderr}` for a real one. `--dry-run`
+ *   prints the real prompt: that goes to the terminal of the person who
+ *   typed it, not to a log on disk.
  */
 function run(options, deps = {}) {
   const {
@@ -148,10 +150,16 @@ function run(options, deps = {}) {
   const exit = typeof result.status === 'number' ? result.status : result.signal ? -1 : 1;
   const sessionId = extractSessionId(harness, stdout);
 
+  // The prompt never lands in the log as text: `cmd` keeps every flag
+  // verbatim with the prompt argument swapped for its fingerprint, and
+  // `prompt` carries the same fingerprint for codex, whose prompt goes on
+  // stdin and so never appears in argv at all. See state.promptPlaceholder
+  // for why a plaintext `~/.local/state` log is the wrong home for it.
   const row = {
     ts: now().toISOString(),
     harness,
-    cmd: [cmd, ...args],
+    cmd: state.redactPromptArgv([cmd, ...args], prompt),
+    prompt: state.promptPlaceholder(prompt),
     exit,
     durationMs,
     sessionId,

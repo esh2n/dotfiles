@@ -137,12 +137,44 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
   `rules/yoki.rules` の構文チェック(バイナリが無ければ warn でスキップ)、
   `default_permissions` と `sandbox_mode` のトップレベル衝突、
   `core/harness-models.json` の codex tier が `~/.codex/models_cache.json`
-  に実在するか(warn)、skills symlink の解決、`~/.agents/skills` のリンク数
+  に実在するか(warn)、skills symlink の解決、`~/.agents/skills` のリンク数、
+  **guard floor** が `hooks.json` に全て入っているか(`guard-floor` — 欠けたら
+  fail)
 - **omp**: `omp --version`(`< 18.0.4` で warn)、拡張シンボリックリンクの
   解決、`config.yml` が(symlinkでなく)生成済みの実ファイルか、
-  `yoki-hooks.json` のパース、`omp-doctor.json` に列挙されたプローブ対象
-  パスの可読性、`functions.zsh` の `omp()` ラッパーに
+  `yoki-hooks.json` のパース、**その `floor` が宣言どおりで各スクリプトが
+  実行可能か**(`guard-floor` — 欠けたら fail)、`omp-doctor.json` に列挙された
+  プローブ対象パスの可読性、`functions.zsh` の `omp()` ラッパーに
   `--no-extensions -e` があるか
+
+### guard floor — 「どのハーネスでも必ず動く hook」の宣言
+
+どの生成物にも必ず入っていなければならない hook は
+`core/permissions.yaml` の `guardFloor:` で宣言する:
+
+```yaml
+guardFloor:
+  - hook: git-guard.sh
+    event: PreToolUse
+    matcher: Bash
+  - hook: unattended-guard.sh
+    event: PreToolUse
+    matcher: "Bash|Write|Edit"
+```
+
+以前はこの2つのファイル名が `extensions/yoki-bridge.ts` に直書きされていた
+ため、床を上げるにはブリッジを編集する必要があった。現在は宣言が唯一の
+出所で、各ターゲットはそれを読む:
+
+| target | 扱い |
+| --- | --- |
+| omp | `yoki-hooks.json` のトップレベル `floor`(絶対パスの配列)に書き出し、`yoki-bridge.ts` が「tool_call に無い floor スクリプトを戻す」ために使う |
+| codex | `hooks.json` は通常の hook 変換で floor を運ぶので、**入っているかを検証**し、欠けていれば warning + `skipped` |
+| claude | ネイティブの `settings.json` hooks がそのまま床 |
+
+パック/personal レイヤーは **追加のみ**できる(和集合。取り除く経路は無い)。
+`floor` を持たない古い `yoki-hooks.json` に対してだけ、ブリッジは従来どおり
+2つのハードコード名にフォールバックする。
 - **artifact**: `yoki-artifact` が入っていれば `yoki-artifact doctor` に
   委譲、無ければ1行 `ok` でスキップ
 
@@ -412,7 +444,12 @@ yoki-loop list             # インストール済みloop一覧
 ```
 
 - 実行ごとに `~/.local/state/yoki/loop/<name>/runs.jsonl` に1行追記
-  (`{ts, harness, cmd, exit, durationMs, sessionId}`)。`.yoki.json` の
+  (`{ts, harness, cmd, prompt, exit, durationMs, sessionId}`)。
+  **プロンプト本文はログに残さない**: `cmd` のプロンプト引数(と codex の
+  stdin プロンプト)は `<prompt sha256:<先頭12hex> len:<n>>` に置換され、
+  他の argv 要素はそのまま。`status` もこの placeholder を表示する
+  (`--prompt-from-artifact-inbox` のプロンプトは第三者が書く上、
+  runs.jsonl は平文の追記ログなので)。`.yoki.json` の
   `loopDailyCap`(既定24、`workflowDailyCap` と同じ思想)を超えると
   `run` はエラーで止まる — `--dry-run` はこのcapの対象外
 - `install` は plist を書いて `launchctl bootstrap gui/$UID <plist>` を
@@ -443,7 +480,7 @@ loop の実行は定義上「誰も見ていないエージェント実行」な
 | harness | `read-only` の表現 | `workspace-write` / `danger-full-access` |
 | --- | --- | --- |
 | codex | `-s read-only`(ネイティブ) | `-s <mode>` |
-| claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash` | 追加フラグ無し(CLI既定) |
+| claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash,Task` | 追加フラグ無し(CLI既定) |
 | omp | `--tools read,grep,glob,web_search`(許可リスト) | 追加フラグ無し |
 
 不正な値はどのハーネスでもエラー。これは

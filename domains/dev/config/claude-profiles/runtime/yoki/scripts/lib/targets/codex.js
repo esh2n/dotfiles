@@ -15,6 +15,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const { convert: convertPermissions } = require('../permissions/to-codex');
+const { resolveGuardFloor } = require('../permissions/parse');
 const {
   readJsonIfExists,
   readTextIfExists,
@@ -193,14 +194,66 @@ function discoverLayerContent(layerRoots) {
   return { settingsLayers, permissionsFiles, claudeLayerMd, claudePersonalMd, agentFiles, commandFiles, ruleFiles, skillsByName };
 }
 
-function buildHooksOperations({ settingsLayers, out, yokiRoot, home }) {
+/**
+ * The guard floor (permissions.yaml's `guardFloor:`) has no dedicated place
+ * in Codex's hooks.json — the floor hooks arrive through the ordinary
+ * settings-layer translation, as `run-bash-hook.js --harness codex
+ * "<abs path>"` commands. So this target's job is not to inject them but to
+ * CHECK them: if a floor hook did not survive translation (a layer stopped
+ * declaring it, a command shape the translator can't read, a merge that
+ * dropped it), that is a protection downgrade the plan has to say out loud
+ * rather than a hooks.json that quietly runs one guard fewer.
+ *
+ * The declared script path is matched against the merged command strings
+ * because that is what the command carries — parseBashWrapperCommand already
+ * expanded the wrapper's `~/` against the same `home` resolveGuardFloor uses.
+ * Only the entry's own event is searched: a floor hook registered on some
+ * other event is not the floor being honoured.
+ */
+function verifyGuardFloor({ merged, guardFloor }) {
+  const warnings = [];
+  const skipped = [];
+
+  for (const entry of guardFloor) {
+    const event = entry.event || 'PreToolUse';
+    const groups = (merged && merged.hooks && merged.hooks[event]) || [];
+    const present = groups.some(group =>
+      (Array.isArray(group.hooks) ? group.hooks : []).some(
+        handler => typeof handler.command === 'string' && handler.command.includes(entry.scriptPath)
+      )
+    );
+    if (present) continue;
+
+    const reason = `declared in permissions.yaml guardFloor but absent from the generated hooks.json — codex would run below the guard floor`;
+    warnings.push(`codex: guard floor hook "${entry.hook}" (${event}) — ${reason}`);
+    skipped.push({
+      target: 'codex',
+      event,
+      matcher: entry.matcher || '',
+      command: entry.scriptPath,
+      reason,
+    });
+  }
+
+  return { warnings, skipped };
+}
+
+function buildHooksOperations({ settingsLayers, out, yokiRoot, home, guardFloor }) {
   const { generated, warnings, skipped } = buildGeneratedGroups(settingsLayers, { yokiRoot, home });
   const hooksJsonPath = path.join(out, 'hooks.json');
   const existing = readJsonIfExists(hooksJsonPath) || {};
   const merged = mergeHooksJson(existing, generated);
   const op = { kind: 'merge-json', destinationPath: hooksJsonPath, content: merged, layer: 'generated' };
   const hookStateEntries = collectHookStateEntries(merged, hooksJsonPath);
-  return { op, hookStateEntries, warnings, skipped };
+
+  const floorCheck = verifyGuardFloor({ merged, guardFloor: guardFloor || [] });
+
+  return {
+    op,
+    hookStateEntries,
+    warnings: [...warnings, ...floorCheck.warnings],
+    skipped: [...skipped, ...floorCheck.skipped],
+  };
 }
 
 function buildRulesAndConfigOperations({ permissionsFiles, out, hookStateEntries, yokiRoot, pluginRoot, hookProfile, mcpServers }) {
@@ -349,7 +402,8 @@ function plan(options) {
   const versionGate = filterVersionGatedEvents(content.settingsLayers, codexVersion);
   warnings.push(...versionGate.warnings);
 
-  const hooks = buildHooksOperations({ settingsLayers: versionGate.settingsLayers, out: outResolved, yokiRoot, home });
+  const guardFloor = resolveGuardFloor(content.permissionsFiles, home);
+  const hooks = buildHooksOperations({ settingsLayers: versionGate.settingsLayers, out: outResolved, yokiRoot, home, guardFloor });
   operations.push(hooks.op);
   warnings.push(...hooks.warnings);
   skipped.push(...hooks.skipped);
@@ -407,4 +461,5 @@ module.exports = {
   compareVersions,
   isEventSupportedByVersion,
   filterVersionGatedEvents,
+  verifyGuardFloor,
 };

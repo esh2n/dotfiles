@@ -14,14 +14,27 @@
  *     - pattern: "Bash(rm -rf /*)"
  *       reason: "optional text"
  *       enforce: [hook]
+ *   guardFloor:
+ *     - hook: git-guard.sh
+ *       event: PreToolUse
+ *       matcher: Bash
  *   defaultMode: auto
  *
- * `allow`/`deny` may also be the empty-list form (`allow: []`). Blank lines
+ * `guardFloor` is the set of hooks that must be registered on EVERY harness,
+ * declared here in the same layered source as the permissions rather than
+ * hardcoded in each target's generator (the omp bridge used to carry the two
+ * filenames as a literal). A layer may only ADD to the floor: it is unioned
+ * across layers, never subtracted, so a pack or the personal layer can raise
+ * the bar and none of them can quietly lower it.
+ *
+ * `allow`/`deny`/`guardFloor` may also be the empty-list form (`allow: []`).
+ * Blank lines
  * and full-line `#` comments are ignored; there is no inline-comment or
  * multi-line-string support because the files this parses never need it.
  */
 
 const fs = require('fs');
+const path = require('path');
 
 function stripQuotes(value) {
   const v = value.trim();
@@ -44,15 +57,18 @@ function parseInlineArray(value) {
     .filter(part => part.length > 0);
 }
 
+const LIST_KEYS = new Set(['allow', 'deny', 'guardFloor']);
+
 /**
  * @param {string} text raw file content
  * @returns {{allow: Array<{pattern:string, reason?:string, enforce?:string[]}>,
  *            deny: Array<{pattern:string, reason?:string, enforce?:string[]}>,
+ *            guardFloor: Array<{hook:string, event?:string, matcher?:string, reason?:string}>,
  *            defaultMode?: string}}
  */
 function parseYamlPermissions(text) {
-  const result = { allow: [], deny: [], defaultMode: undefined };
-  let currentKey = null; // 'allow' | 'deny' | null
+  const result = { allow: [], deny: [], guardFloor: [], defaultMode: undefined };
+  let currentKey = null; // 'allow' | 'deny' | 'guardFloor' | null
   let currentEntry = null;
 
   const lines = String(text ?? '').split(/\r?\n/);
@@ -71,7 +87,7 @@ function parseYamlPermissions(text) {
       const [, key, rest] = topMatch;
       currentEntry = null;
 
-      if (key === 'allow' || key === 'deny') {
+      if (LIST_KEYS.has(key)) {
         currentKey = key;
         if (rest.trim() === '[]') {
           result[key] = [];
@@ -92,11 +108,41 @@ function parseYamlPermissions(text) {
     // List item start: "  - pattern: ..."
     const itemMatch = /^\s*-\s*pattern:\s*(.+)$/.exec(rawLine);
     if (itemMatch) {
-      if (!currentKey) {
+      if (currentKey !== 'allow' && currentKey !== 'deny') {
         throw new Error(`permissions.yaml:${lineNo + 1}: "- pattern:" outside an allow/deny block`);
       }
       currentEntry = { pattern: stripQuotes(itemMatch[1]) };
       result[currentKey].push(currentEntry);
+      continue;
+    }
+
+    // guardFloor item start: "  - hook: git-guard.sh"
+    const hookMatch = /^\s*-\s*hook:\s*(.+)$/.exec(rawLine);
+    if (hookMatch) {
+      if (currentKey !== 'guardFloor') {
+        throw new Error(`permissions.yaml:${lineNo + 1}: "- hook:" outside a guardFloor block`);
+      }
+      currentEntry = { hook: stripQuotes(hookMatch[1]) };
+      result[currentKey].push(currentEntry);
+      continue;
+    }
+
+    // Nested guardFloor fields: "    event: PreToolUse" / "    matcher: Bash"
+    const eventMatch = /^\s*event:\s*(.+)$/.exec(rawLine);
+    if (eventMatch) {
+      if (!currentEntry) {
+        throw new Error(`permissions.yaml:${lineNo + 1}: "event:" outside a list entry`);
+      }
+      currentEntry.event = stripQuotes(eventMatch[1]);
+      continue;
+    }
+
+    const matcherMatch = /^\s*matcher:\s*(.+)$/.exec(rawLine);
+    if (matcherMatch) {
+      if (!currentEntry) {
+        throw new Error(`permissions.yaml:${lineNo + 1}: "matcher:" outside a list entry`);
+      }
+      currentEntry.matcher = stripQuotes(matcherMatch[1]);
       continue;
     }
 
@@ -135,7 +181,7 @@ function loadLayer(filePath) {
     text = fs.readFileSync(filePath, 'utf8');
   } catch (err) {
     if (err && err.code === 'ENOENT') {
-      return { allow: [], deny: [], defaultMode: undefined };
+      return { allow: [], deny: [], guardFloor: [], defaultMode: undefined };
     }
     throw err;
   }
@@ -177,22 +223,50 @@ function dedupeEntries(entries) {
 }
 
 /**
+ * Unions guardFloor entries across layers, deduping on the whole triple
+ * (hook + event + matcher) rather than on the hook name alone: the same
+ * script legitimately appears twice when a layer wants it on a second event
+ * or a wider matcher. There is deliberately no removal path — a later layer
+ * can only add — which is what makes "the floor" a floor.
+ */
+function dedupeGuardFloor(entries) {
+  const seen = new Set();
+  const out = [];
+
+  for (const entry of entries) {
+    if (!entry || !entry.hook) continue;
+    const key = `${entry.hook}\u0000${entry.event || ''}\u0000${entry.matcher || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const copy = { hook: entry.hook };
+    if (entry.event) copy.event = entry.event;
+    if (entry.matcher) copy.matcher = entry.matcher;
+    if (entry.reason) copy.reason = entry.reason;
+    out.push(copy);
+  }
+
+  return out;
+}
+
+/**
  * Merges permission layers in priority order (core, then packs, then
  * personal — same precedence as yoki-switch's settings merge). allow/deny
- * are unions (dedupe by pattern); the last layer that sets defaultMode wins.
+ * and guardFloor are unions (dedupe by pattern / by hook+event+matcher); the
+ * last layer that sets defaultMode wins.
  *
- * @param {Array<{allow:Array, deny:Array, defaultMode?:string}>} layers
+ * @param {Array<{allow:Array, deny:Array, guardFloor?:Array, defaultMode?:string}>} layers
  */
 function mergeLayers(layers) {
   const allow = dedupeEntries(layers.flatMap(l => l.allow || []));
   const deny = dedupeEntries(layers.flatMap(l => l.deny || []));
+  const guardFloor = dedupeGuardFloor(layers.flatMap(l => l.guardFloor || []));
 
   let defaultMode;
   for (const layer of layers) {
     if (layer.defaultMode) defaultMode = layer.defaultMode;
   }
 
-  return { allow, deny, defaultMode: defaultMode || 'auto' };
+  return { allow, deny, guardFloor, defaultMode: defaultMode || 'auto' };
 }
 
 /** Convenience: load + merge a list of permissions.yaml file paths in order. */
@@ -200,10 +274,31 @@ function loadAndMerge(filePaths) {
   return mergeLayers(filePaths.map(loadLayer));
 }
 
+/**
+ * The declared guard floor for a set of layers, as absolute paths to the
+ * installed hook scripts. Every target resolves the floor the same way —
+ * `<home>/.claude/hooks/<hook>` is where yoki-switch installs (symlinks)
+ * them on every machine — so a target never has to know which scripts the
+ * floor names.
+ *
+ * @param {string[]} filePaths permissions.yaml paths, layer order
+ * @param {string} home
+ * @returns {Array<{hook:string, event?:string, matcher?:string, scriptPath:string}>}
+ */
+function resolveGuardFloor(filePaths, home) {
+  const { guardFloor } = loadAndMerge(filePaths);
+  return guardFloor.map(entry => ({
+    ...entry,
+    scriptPath: path.join(home, '.claude', 'hooks', entry.hook),
+  }));
+}
+
 module.exports = {
   parseYamlPermissions,
   loadLayer,
   dedupeEntries,
+  dedupeGuardFloor,
   mergeLayers,
   loadAndMerge,
+  resolveGuardFloor,
 };

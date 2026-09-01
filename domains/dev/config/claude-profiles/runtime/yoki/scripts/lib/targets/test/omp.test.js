@@ -584,3 +584,104 @@ test('the personal layer bash guards survive plan()+apply() into yoki-hooks.json
     fs.rmSync(home, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------
+// guard floor: yoki-hooks.json's top-level `floor`
+//
+// The floor used to live in extensions/yoki-bridge.ts as a hardcoded pair of
+// filenames. It is now declared in the layered permissions.yaml and written
+// into the manifest the bridge reads, so raising it is an edit to the source
+// of truth rather than to the bridge.
+// ---------------------------------------------------------------------------
+
+/** The fixture repo, with `guardFloor:` appended to the core layer. */
+function buildFixtureRepoWithFloor(root, floorYaml) {
+  const { core, personal } = buildFixtureRepo(root);
+  const permsPath = path.join(core, 'permissions.yaml');
+  writeFile(permsPath, `${fs.readFileSync(permsPath, 'utf8')}${floorYaml}`);
+  return { core, personal };
+}
+
+function planManifest(planResult, out) {
+  const op = planResult.operations.find(o => o.destinationPath === path.join(out, 'yoki-hooks.json'));
+  assert.ok(op, 'the plan must write yoki-hooks.json');
+  return JSON.parse(op.content);
+}
+
+test('plan(): a declared guardFloor becomes yoki-hooks.json\'s top-level floor, as absolute paths', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepoWithFloor(
+      root,
+      'guardFloor:\n  - hook: git-guard.sh\n    event: PreToolUse\n    matcher: Bash\n  - hook: unattended-guard.sh\n    event: PreToolUse\n    matcher: "Bash|Write|Edit"\n'
+    );
+
+    const manifest = planManifest(ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} }), out);
+    assert.deepEqual(manifest.floor, [
+      path.join(home, '.claude', 'hooks', 'git-guard.sh'),
+      path.join(home, '.claude', 'hooks', 'unattended-guard.sh'),
+    ]);
+    // The per-event map is untouched by the addition.
+    assert.ok(Array.isArray(manifest.tool_call));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plan(): a personal layer may ADD to the floor', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepoWithFloor(
+      root,
+      'guardFloor:\n  - hook: git-guard.sh\n    event: PreToolUse\n    matcher: Bash\n'
+    );
+    writeFile(
+      path.join(personal, 'permissions.yaml'),
+      'allow: []\ndeny: []\nguardFloor:\n  - hook: secrets-guard.sh\n    event: PreToolUse\n    matcher: Bash\ndefaultMode: auto\n'
+    );
+
+    const manifest = planManifest(ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} }), out);
+    assert.deepEqual(manifest.floor, [
+      path.join(home, '.claude', 'hooks', 'git-guard.sh'),
+      path.join(home, '.claude', 'hooks', 'secrets-guard.sh'),
+    ]);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plan(): no guardFloor declared -> no floor key at all (the pre-field manifest shape)', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const manifest = planManifest(ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} }), out);
+    assert.ok(!('floor' in manifest), 'an undeclared floor must not become an empty array the bridge would trust');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plan(): a floor entry on an event omp cannot express is reported, never silently written', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepoWithFloor(
+      root,
+      'guardFloor:\n  - hook: git-guard.sh\n    event: PreToolUse\n    matcher: Bash\n  - hook: stop-guard.sh\n    event: Stop\n    matcher: "*"\n'
+    );
+
+    const planResult = ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} });
+    const manifest = planManifest(planResult, out);
+
+    // Only the expressible entry lands in `floor` — yoki-bridge.ts applies
+    // the floor to tool_call, so a Stop-only guard there would be wrong.
+    assert.deepEqual(manifest.floor, [path.join(home, '.claude', 'hooks', 'git-guard.sh')]);
+    assert.ok(planResult.warnings.some(w => w.includes('stop-guard.sh')), planResult.warnings.join('\n'));
+    assert.ok(planResult.skipped.some(s => s.command === 'stop-guard.sh' && s.event === 'Stop'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});

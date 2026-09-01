@@ -117,9 +117,12 @@ test('claude backend: sandbox defaults to read-only and denies every write tool'
   const i = args.indexOf('--disallowedTools');
   assert.ok(i !== -1, 'the default must actually restrict the run');
   const denied = args[i + 1].split(',');
-  for (const tool of ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash']) {
+  for (const tool of ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task']) {
     assert.ok(denied.includes(tool), `${tool} must be denied`);
   }
+  // Task is on the list because a subagent gets its own argv: a read-only
+  // call that can still spawn one is one hop from full write access.
+  assert.deepEqual(denied, ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task']);
 });
 
 test('claude backend: a script that writes asks for it per call', () => {

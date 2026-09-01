@@ -238,3 +238,104 @@ test('an explicit YOKI_UNATTENDED=0 in the caller\'s env cannot disarm the guard
   // A loop run is unattended by definition; the flag is not negotiable per run.
   assert.equal(runner.childEnv({ YOKI_UNATTENDED: '0' }).YOKI_UNATTENDED, '1');
 });
+
+// ---------------------------------------------------------------------------
+// the prompt never reaches runs.jsonl in cleartext
+// ---------------------------------------------------------------------------
+
+const SECRET_PROMPT = 'audit acme-corp/billing: ssh key rotation for alice@example.com';
+
+function readRawLog(env) {
+  return fs.readFileSync(state.runsPath('demo', env), 'utf8');
+}
+
+test('claude: the recorded row carries a prompt fingerprint, not the prompt', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const { row } = runner.run(
+        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
+        { spawn: okSpawn(JSON.stringify({ session_id: 'sess-1' })) }
+      );
+      const placeholder = state.promptPlaceholder(SECRET_PROMPT);
+      assert.deepEqual(row.cmd, ['claude', '-p', placeholder, '--output-format', 'json']);
+      assert.equal(row.prompt, placeholder);
+      // The file on disk, not just the in-memory row.
+      const raw = readRawLog(env);
+      assert.ok(!raw.includes('acme-corp'), 'runs.jsonl must not hold the prompt text');
+      assert.ok(!raw.includes('alice@example.com'));
+      assert.ok(raw.includes(placeholder));
+    });
+  });
+});
+
+test('omp: the trailing prompt positional is fingerprinted too, flags stay verbatim', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const { row } = runner.run(
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: SECRET_PROMPT, sandbox: 'read-only', dotfilesRoot, env },
+        { spawn: okSpawn('{}') }
+      );
+      assert.equal(row.cmd[row.cmd.length - 1], state.promptPlaceholder(SECRET_PROMPT));
+      assert.ok(row.cmd.includes('--no-extensions'), 'the guard flags must survive redaction');
+      assert.ok(row.cmd.includes('--tools'));
+      assert.ok(!readRawLog(env).includes('acme-corp'));
+    });
+  });
+});
+
+test('codex: the stdin prompt is fingerprinted in the row prompt field', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      let sawStdin = null;
+      const { row } = runner.run(
+        { name: 'demo', harness: 'codex', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
+        {
+          spawn: (cmd, args, opts) => {
+            sawStdin = opts.input;
+            return { status: 0, signal: null, stdout: '{}', stderr: '' };
+          },
+        }
+      );
+      // The harness still receives the real prompt — only the log is redacted.
+      assert.equal(sawStdin, SECRET_PROMPT);
+      assert.equal(row.prompt, state.promptPlaceholder(SECRET_PROMPT));
+      assert.equal(row.cmd[row.cmd.length - 1], '-'); // argv had nothing to redact
+      assert.ok(!readRawLog(env).includes('acme-corp'));
+    });
+  });
+});
+
+test('the same prompt fingerprints identically across runs; a changed one does not', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const first = runner.run(
+        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
+        { spawn: okSpawn('{}') }
+      ).row;
+      const second = runner.run(
+        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
+        { spawn: okSpawn('{}') }
+      ).row;
+      const changed = runner.run(
+        { name: 'demo', harness: 'claude', cwd: '.', prompt: `${SECRET_PROMPT}!`, dotfilesRoot, env },
+        { spawn: okSpawn('{}') }
+      ).row;
+      assert.equal(first.prompt, second.prompt);
+      assert.notEqual(first.prompt, changed.prompt);
+    });
+  });
+});
+
+test('--dry-run still prints the real prompt: that goes to a terminal, not a log', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      let printed = '';
+      runner.run(
+        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dryRun: true, dotfilesRoot, env },
+        { spawn: () => { throw new Error('must not spawn'); }, writeOut: (t) => { printed += t; } }
+      );
+      assert.ok(printed.includes('acme-corp'));
+      assert.deepEqual(state.readRuns('demo', env), []);
+    });
+  });
+});

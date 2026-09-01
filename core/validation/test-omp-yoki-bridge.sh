@@ -24,8 +24,11 @@ set -euo pipefail
 # broken-hooks fail-open, the yoki-hooks.json-absent fallback, the
 # fallback-guard FLOOR (a manifest that registers no tool_call bash guard must
 # not disarm git-guard/unattended-guard — a manifest may add protection, never
-# remove it), a manifest that ships its own bash guard being used as-is, and
-# per-hook argv passthrough.
+# remove it), a manifest that ships its own bash guard being used as-is, the
+# DECLARED floor (a manifest's top-level `floor` array, generated from
+# permissions.yaml's guardFloor:, is honoured per script — while a manifest
+# with no `floor` still falls back to the two hardcoded names), and per-hook
+# argv passthrough.
 #
 # Usage: ./test-omp-yoki-bridge.sh
 # -----------------------------------------------------------------------------
@@ -279,6 +282,62 @@ const capturedLines = () => readFileSync(capture, "utf8").split("\n").filter(Boo
     check("a manifest with its own bash guard is used as-is (fallback not prepended)", notFallback === undefined, JSON.stringify(notFallback));
 }
 
+// 4d. DECLARED FLOOR. A manifest with a top-level `floor` array states the
+//     floor itself (the generator writes it from permissions.yaml's
+//     `guardFloor:`), so the check becomes per-script rather than "is there
+//     any bash guard at all". This manifest ships its own bash guard AND
+//     names git-guard.sh in `floor` without registering it: the coarser
+//     no-floor rule (4c) would accept it as-is; the declared floor must put
+//     git-guard.sh back.
+{
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_FLOOR_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?floor-manifest");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+
+    const reAdded = (await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t1", input: { command: "git push --force origin main" } }, ctx)) as { block?: boolean; reason?: string } | undefined;
+    check(
+        "a declared floor re-adds a floor script the manifest omitted",
+        reAdded?.block === true && (reAdded?.reason ?? "").includes("stub: force push"),
+        JSON.stringify(reAdded),
+    );
+
+    const own = (await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t2", input: { command: "echo manifest-marker" } }, ctx)) as { block?: boolean } | undefined;
+    check("the manifest's own guard still runs alongside the re-added floor", own?.block === true, JSON.stringify(own));
+}
+
+// 4e. A floor script the manifest ALREADY registers is not added a second
+//     time — the floor is a minimum, not a duplicate-everything rule.
+{
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_FLOOR_SATISFIED_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?floor-satisfied-manifest");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+
+    writeFileSync(capture, "");
+    const benign = await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t1", input: { command: "ls -la" } }, ctx);
+    check("a satisfied floor still allows a benign call", benign === undefined, JSON.stringify(benign));
+    check("a floor script the manifest already registers runs exactly once", capturedLines().length === 1, String(capturedLines().length));
+}
+
+// 4f. A floor entry naming a script that is not installed on this machine is
+//     dropped rather than spawned — the same existsSync gate the fallback
+//     applies, for the same fail-open reason.
+{
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_FLOOR_ABSENT_SCRIPT_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?floor-absent-script-manifest");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+    const r = await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t1", input: { command: "git push --force origin main" } }, ctx);
+    check("an uninstalled floor script is dropped, not spawned (fails open)", r === undefined, JSON.stringify(r));
+}
+
 // ---------------------------------------------------------------------------
 // 5. session_stop: continue passthrough — plain, with additionalContext, and
 //    a hard block — via a manifest-registered bash hook.
@@ -387,6 +446,23 @@ RUNNER
     printf '{"tool_call": [{"id": "manifest-guard", "kind": "bash", "script": "%s"}]}\n' \
         "$WORK/hooks/manifest-guard.sh" > "$own_guard_manifest"
 
+    # Same manifest, but DECLARING a floor that names a script it does not
+    # register — the generated shape (a top-level `floor` array of absolute
+    # paths, written from permissions.yaml's guardFloor:).
+    local floor_manifest="$WORK/floor-manifest.json"
+    printf '{"floor": ["%s"], "tool_call": [{"id": "manifest-guard", "kind": "bash", "script": "%s"}]}\n' \
+        "$WORK/hooks/git-guard.sh" "$WORK/hooks/manifest-guard.sh" > "$floor_manifest"
+
+    # A manifest whose tool_call already satisfies its own declared floor.
+    local floor_satisfied_manifest="$WORK/floor-satisfied-manifest.json"
+    printf '{"floor": ["%s"], "tool_call": [{"id": "git-guard", "kind": "bash", "script": "%s"}]}\n' \
+        "$WORK/hooks/git-guard.sh" "$WORK/hooks/git-guard.sh" > "$floor_satisfied_manifest"
+
+    # A floor naming a script that is not installed on this machine.
+    local floor_absent_script_manifest="$WORK/floor-absent-script-manifest.json"
+    printf '{"floor": ["%s"], "tool_call": []}\n' \
+        "$WORK/hooks/not-installed.sh" > "$floor_absent_script_manifest"
+
     export GUARD_EXT="$EXT"
     export GUARD_HOOKS="$WORK/hooks"
     export GUARD_BROKEN="$WORK/broken-hooks"
@@ -401,6 +477,9 @@ RUNNER
     export GUARD_STOP_NOARGS_MANIFEST="$stop_noargs_manifest"
     export GUARD_JS_ONLY_MANIFEST="$js_only_manifest"
     export GUARD_OWN_GUARD_MANIFEST="$own_guard_manifest"
+    export GUARD_FLOOR_MANIFEST="$floor_manifest"
+    export GUARD_FLOOR_SATISFIED_MANIFEST="$floor_satisfied_manifest"
+    export GUARD_FLOOR_ABSENT_SCRIPT_MANIFEST="$floor_absent_script_manifest"
 
     # set -e is active for the whole file; guard the capture with `|| status=$?`
     # rather than a bare assignment so a non-zero exit from the runner doesn't

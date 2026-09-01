@@ -1,4 +1,8 @@
 {
+  "floor": [
+    "__RUN_HOME__/.claude/hooks/git-guard.sh",
+    "__RUN_HOME__/.claude/hooks/unattended-guard.sh"
+  ],
   "tool_call": [
     {
       "kind": "js",

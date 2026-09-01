@@ -29,11 +29,14 @@ const DEFAULT_SANDBOX = 'read-only';
  * does have `--disallowedTools, --disallowed-tools <tools...>` ("Comma or
  * space-separated list of tool names to deny"). Denying every filesystem-
  * mutating tool — `Bash` included, since a shell is a write tool — is how
- * `read-only` is enforced here. `opts.sandbox` used to be accepted and
- * discarded by this backend, which made the codex backend's read-only
- * default a property of one harness rather than of the graph API.
+ * `read-only` is enforced here. `Task` is denied too: a subagent is spawned
+ * with its own argv and does not inherit this one, so leaving it enabled
+ * would leave a read-only call one hop away from full write access.
+ * `opts.sandbox` used to be accepted and discarded by this backend, which
+ * made the codex backend's read-only default a property of one harness
+ * rather than of the graph API.
  */
-const READ_ONLY_DENIED_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
+const READ_ONLY_DENIED_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task'];
 
 function resolveSandbox(sandbox) {
   if (sandbox === undefined || sandbox === null || sandbox === '') return DEFAULT_SANDBOX;

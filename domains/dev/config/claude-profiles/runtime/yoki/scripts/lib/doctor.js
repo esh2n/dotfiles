@@ -26,6 +26,7 @@ const {
 } = require('./targets/codex-hooks-merge');
 const { computeHandlerHash, eventLabelFor, hookStateKey } = require('./targets/codex-trust');
 const { stateHome } = require('./state-home');
+const { resolveGuardFloor } = require('./permissions/parse');
 const externalLinks = require('./external-links');
 
 /** `readJsonIfExists` throws on a parse error (by design, for the "does
@@ -804,7 +805,79 @@ function checkAgentsSkillsCount(home) {
   return result('ok', 'codex', 'agents-skills-count', `${entries.length} link(s) in ${dirPath}`);
 }
 
-function checkCodexTarget({ codexDir, home, dotfilesRoot }) {
+/**
+ * The guard floor as DECLARED — `guardFloor:` in the layered
+ * permissions.yaml (core -> enabled packs -> personal), the same source and
+ * the same layer order the generators read. Doctor resolves it here rather
+ * than trusting either target's output to describe itself: the whole point
+ * of the check is catching a target whose output no longer matches the
+ * declaration.
+ *
+ * @returns {Array<{hook:string, event?:string, matcher?:string, scriptPath:string}>|null}
+ *   null when the declaration cannot be located at all (no dotfilesRoot, no
+ *   claude-profiles checkout) — reported as a skipped warning, not a
+ *   failure, since there is nothing to compare against.
+ */
+function resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home }) {
+  if (!dotfilesRoot) return null;
+
+  const profilesDir = path.join(dotfilesRoot, 'domains', 'dev', 'config', 'claude-profiles');
+  const coreFile = path.join(profilesDir, 'core', 'permissions.yaml');
+  if (!fs.existsSync(coreFile)) return null;
+
+  const sources = [coreFile];
+  for (const pack of readEnabledPacks(claudeDir)) {
+    const packFile = path.join(profilesDir, 'packs', pack, 'permissions.yaml');
+    if (fs.existsSync(packFile)) sources.push(packFile);
+  }
+  const personalFile = path.join(profilesDir, 'personal', 'permissions.yaml');
+  if (fs.existsSync(personalFile)) sources.push(personalFile);
+
+  try {
+    return resolveGuardFloor(sources, home);
+  } catch {
+    return null;
+  }
+}
+
+/** Every hook command string registered for `event` in an unwrapped
+ * hooks.json — what a floor script's absolute path would appear inside. */
+function hookCommandsForEvent(hooksJson, event) {
+  const groups = (hooksJson && hooksJson[event]) || [];
+  const commands = [];
+  for (const group of Array.isArray(groups) ? groups : []) {
+    for (const handler of Array.isArray(group.hooks) ? group.hooks : []) {
+      if (typeof handler.command === 'string') commands.push(handler.command);
+    }
+  }
+  return commands;
+}
+
+/** Codex has no `floor` field of its own: the floor hooks reach hooks.json
+ * as ordinary translated commands, so the check is that each declared one is
+ * actually there. A missing entry means codex is running with fewer guards
+ * than the source says every harness must have — a fail, not a warning. */
+function checkCodexGuardFloor(hooksJson, guardFloor) {
+  if (guardFloor === null) {
+    return result('warn', 'codex', 'guard-floor', 'could not read the declared guardFloor — skipped');
+  }
+  if (guardFloor.length === 0) {
+    return result('ok', 'codex', 'guard-floor', 'no guard floor declared');
+  }
+
+  const missing = guardFloor.filter(entry => {
+    const event = entry.event || 'PreToolUse';
+    return !hookCommandsForEvent(hooksJson, event).some(command => command.includes(entry.scriptPath));
+  });
+
+  if (missing.length > 0) {
+    const names = missing.map(e => `${e.hook} (${e.event || 'PreToolUse'})`).join(', ');
+    return result('fail', 'codex', 'guard-floor', `missing from hooks.json: ${names} — run yoki-switch apply --target codex`);
+  }
+  return result('ok', 'codex', 'guard-floor', `${guardFloor.length} floor hook(s) registered`);
+}
+
+function checkCodexTarget({ codexDir, home, dotfilesRoot, claudeDir }) {
   const results = [checkCodexVersion()];
 
   if (!fs.existsSync(codexDir)) {
@@ -830,6 +903,7 @@ function checkCodexTarget({ codexDir, home, dotfilesRoot }) {
   results.push(checkCodexForeignGroups(groupsCheck.foreignGroups));
   results.push(checkCodexExecpolicy(codexDir));
   results.push(checkCodexPermissionsConflict(configTomlText));
+  results.push(checkCodexGuardFloor(hooksJson, resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home })));
   results.push(checkCodexModels(dotfilesRoot, codexDir));
   results.push(checkCodexSkillsDirs(codexDir, home));
   results.push(checkAgentsSkillsCount(home));
@@ -904,6 +978,53 @@ function checkOmpYokiHooksJson(ompAgentDir) {
  * own, so they should exist even though this target never writes them)
  * lists. `notReadByOmp` is documentation only (omp deliberately never reads
  * those paths) and is not probed. */
+/** omp's manifest states its own floor (`yoki-hooks.json`'s top-level
+ * `floor`), which extensions/yoki-bridge.ts reads instead of its hardcoded
+ * pair. Two ways that goes wrong, both failures: the field is absent (the
+ * bridge silently drops back to the two literal filenames, so raising the
+ * floor in permissions.yaml would have no effect on omp), or a listed script
+ * is not executable (the bridge drops it and the floor is quietly one guard
+ * short). A declared entry missing from the manifest is the same downgrade
+ * from the other direction. */
+function checkOmpGuardFloor(ompAgentDir, guardFloor) {
+  const manifestPath = path.join(ompAgentDir, 'yoki-hooks.json');
+  const parsed = readJsonSafe(manifestPath);
+  if (!parsed) {
+    return result('warn', 'omp', 'guard-floor', `${manifestPath} not found or unreadable — run yoki-switch apply --target omp`);
+  }
+
+  const floor = Array.isArray(parsed.floor) ? parsed.floor.filter(v => typeof v === 'string' && v) : [];
+
+  if (floor.length === 0) {
+    // Nothing to compare against is a skip, not a verdict: doctor never
+    // fails a machine for missing a floor it could not read.
+    if (guardFloor === null) {
+      return result('warn', 'omp', 'guard-floor', 'could not read the declared guardFloor — skipped');
+    }
+    if (guardFloor.length === 0) {
+      return result('ok', 'omp', 'guard-floor', 'no guard floor declared');
+    }
+    return result(
+      'fail',
+      'omp',
+      'guard-floor',
+      `${manifestPath} has no top-level "floor" — yoki-bridge.ts would fall back to its hardcoded guard pair; run yoki-switch apply --target omp`
+    );
+  }
+
+  const missing = (guardFloor || []).filter(entry => !floor.includes(entry.scriptPath));
+  if (missing.length > 0) {
+    return result('fail', 'omp', 'guard-floor', `declared but absent from the manifest floor: ${missing.map(e => e.hook).join(', ')} — run yoki-switch apply --target omp`);
+  }
+
+  const notExecutable = floor.filter(script => !isExecutable(script));
+  if (notExecutable.length > 0) {
+    return result('fail', 'omp', 'guard-floor', `floor script(s) not executable: ${notExecutable.join(', ')}`);
+  }
+
+  return result('ok', 'omp', 'guard-floor', `${floor.length} floor script(s) present and executable`);
+}
+
 function checkOmpDoctorProbePaths({ ompDoctorJsonPath, ompAgentDir, claudeDir, home }) {
   const spec = readJsonSafe(ompDoctorJsonPath);
   if (!spec) return result('warn', 'omp', 'doctor-probe-paths', `${ompDoctorJsonPath} not found or unreadable`);
@@ -949,6 +1070,7 @@ function checkOmpTarget({ ompAgentDir, claudeDir, home, dotfilesRoot, yokiRoot }
   results.push(checkOmpExtensionSymlink(ompAgentDir));
   results.push(checkOmpConfigYml(ompAgentDir));
   results.push(checkOmpYokiHooksJson(ompAgentDir));
+  results.push(checkOmpGuardFloor(ompAgentDir, resolveDeclaredGuardFloor({ dotfilesRoot, claudeDir, home })));
   results.push(checkOmpDoctorProbePaths({
     ompDoctorJsonPath: path.join(yokiRoot, 'scripts', 'lib', 'targets', 'omp-doctor.json'),
     ompAgentDir,
@@ -1076,7 +1198,7 @@ function runDoctor(options = {}) {
 
   return [
     ...checkClaudeTarget({ claudeDir, yokiRoot, dotfilesRoot, home }),
-    ...checkCodexTarget({ codexDir, home, dotfilesRoot }),
+    ...checkCodexTarget({ codexDir, home, dotfilesRoot, claudeDir }),
     ...checkOmpTarget({ ompAgentDir, claudeDir, home, dotfilesRoot, yokiRoot }),
     ...checkArtifactTarget({ dotfilesRoot }),
     checkStateHomeRelocation({ home, env: options.env }),
@@ -1156,6 +1278,11 @@ module.exports = {
   checkOmpTarget,
   checkArtifactTarget,
   checkStateHomeRelocation,
+  // guard-floor checks, exported for tests
+  resolveDeclaredGuardFloor,
+  hookCommandsForEvent,
+  checkCodexGuardFloor,
+  checkOmpGuardFloor,
   // T35: external-links.yaml checks, exported for tests
   readEnabledPacks,
   checkExternalLinkEntry,

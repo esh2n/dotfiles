@@ -219,6 +219,32 @@ assert_path_absent() {
     fi
 }
 
+# _mtime_of <path> — epoch mtime, BSD stat first then GNU. Both are
+# lstat-by-default, so a dangling symlink is reported, never followed.
+_mtime_of() {
+    stat -f '%m' "$1" 2>/dev/null || stat -c '%Y' "$1" 2>/dev/null || echo "?"
+}
+
+# tree_mtimes <dir> — "<relative path><TAB><epoch mtime>" for the directory
+# itself and everything under it, LC_ALL=C sorted.
+#
+# Complements common.sh's tree_manifest() (content hashes) for the
+# `apply --dry-run` untouched-tree assertion: a rewrite that happens to
+# reproduce the same bytes still moves the file's mtime, and merge_dir()'s
+# wipe-and-restage moves the staging DIRECTORY's mtime even when every entry
+# comes back identical. Directories are included for exactly that reason.
+tree_mtimes() {
+    local dir="$1"
+    [[ -d "$dir" ]] || return 0
+    (
+        cd "$dir" || return 0
+        printf '.\t%s\n' "$(_mtime_of .)"
+        find . -mindepth 1 | LC_ALL=C sort | while IFS= read -r f; do
+            printf '%s\t%s\n' "${f#./}" "$(_mtime_of "$f")"
+        done
+    )
+}
+
 assert_jq_true() {
     local description="$1" filter="$2" file="$3"
     TOTAL=$((TOTAL + 1))
@@ -315,6 +341,112 @@ run_merge_settings_checks() {
         printf '%s\n' "$output" | grep -i 'external' | sed 's/^/       /' || true
         FAILED=$((FAILED + 1))
     fi
+
+    # -------------------------------------------------------------------
+    # apply --dry-run, claude target: prints the plan, writes NOTHING under
+    # CLAUDE_DIR. The fixture has just been applied for real above, so the
+    # planned output must also come out byte-identical ("(no change)") —
+    # that is what proves the plan is the real merge run against a throwaway
+    # CLAUDE_DIR rather than a hand-written description of it.
+    # -------------------------------------------------------------------
+    local before_tree before_mtimes after_tree after_mtimes
+    before_tree="$(tree_manifest "$FIXTURE_CLAUDE")"
+    before_mtimes="$(tree_mtimes "$FIXTURE_CLAUDE")"
+
+    local dry_output dry_status=0
+    dry_output=$(DOTFILES_ROOT="$FIXTURE" CLAUDE_DIR="$FIXTURE_CLAUDE" CURSOR_DIR="$FIXTURE/cursor" \
+        bash "$CLAUDE_SWITCH" apply --target claude --dry-run 2>&1) || dry_status=$?
+
+    after_tree="$(tree_manifest "$FIXTURE_CLAUDE")"
+    after_mtimes="$(tree_mtimes "$FIXTURE_CLAUDE")"
+
+    TOTAL=$((TOTAL + 1))
+    if [[ "$dry_status" -eq 0 ]]; then
+        log_success "PASS: dry-run: apply --target claude --dry-run exits 0"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: dry-run: apply --target claude --dry-run exited $dry_status"
+        echo "$dry_output" | sed 's/^/       /'
+        FAILED=$((FAILED + 1))
+    fi
+
+    assert_eq_text "dry-run: CLAUDE_DIR file tree is byte-identical afterwards" \
+        "$before_tree" "$after_tree"
+    assert_eq_text "dry-run: CLAUDE_DIR mtimes (files and dirs) are unchanged afterwards" \
+        "$before_mtimes" "$after_mtimes"
+
+    assert_contains "dry-run: plan says nothing is written" \
+        "Plan only" "$dry_output"
+    assert_contains "dry-run: plan reports the settings.json diff section" \
+        "--- settings.json ---" "$dry_output"
+    assert_contains "dry-run: plan reports the CLAUDE.md diff section" \
+        "--- CLAUDE.md ---" "$dry_output"
+    assert_contains "dry-run: plan reports the permissions.json diff section" \
+        "--- .yoki/permissions.json ---" "$dry_output"
+    assert_contains "dry-run: plan reports the external links section" \
+        "--- external links ---" "$dry_output"
+    assert_contains "dry-run: plan lists a staging dir from MERGE_DIRS with per-layer counts" \
+        ".skills-merged" "$dry_output"
+    assert_contains "dry-run: plan names the external link that would be linked" \
+        "commands/shared-prompts" "$dry_output"
+    assert_contains "dry-run: plan names the external link that would be skipped" \
+        "agents/absent" "$dry_output"
+    assert_lacks "dry-run: the claude target is planned, not skipped as unsupported" \
+        "no dry-run mode" "$dry_output"
+
+    # Re-running the plan over an already-applied tree must find nothing to
+    # change: three "(no change)" lines, one per diffed file.
+    TOTAL=$((TOTAL + 1))
+    local no_change_count
+    no_change_count="$(printf '%s\n' "$dry_output" | grep -cF '(no change)' || true)"
+    if [[ "$no_change_count" == "3" ]]; then
+        log_success "PASS: dry-run: right after an apply the plan reports no change to all 3 files"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: dry-run: expected 3 '(no change)' lines, got $no_change_count"
+        echo "$dry_output" | sed 's/^/       /'
+        FAILED=$((FAILED + 1))
+    fi
+
+    # ...and a real pending change must show up as a real diff, still
+    # without touching CLAUDE_DIR.
+    cat > "$FIXTURE/domains/dev/config/claude-profiles/personal/settings.personal.json" <<'JSON'
+{
+  "model": "dry-run-model",
+  "env": { "FOO": "personal" },
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [ { "type": "command", "command": "personal-hook" } ] }
+    ]
+  }
+}
+JSON
+
+    local pending_output pending_status=0
+    pending_output=$(DOTFILES_ROOT="$FIXTURE" CLAUDE_DIR="$FIXTURE_CLAUDE" CURSOR_DIR="$FIXTURE/cursor" \
+        bash "$CLAUDE_SWITCH" apply --target claude --dry-run 2>&1) || pending_status=$?
+
+    TOTAL=$((TOTAL + 1))
+    if [[ "$pending_status" -eq 0 ]]; then
+        log_success "PASS: dry-run: exits 0 even when the diff is non-empty"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: dry-run: exited $pending_status on a non-empty diff (a diff is the report, not a failure)"
+        echo "$pending_output" | sed 's/^/       /'
+        FAILED=$((FAILED + 1))
+    fi
+
+    assert_contains "dry-run: the pending settings.json change appears as an added line" \
+        '+  "model": "dry-run-model"' "$pending_output"
+    assert_contains "dry-run: the current settings.json value appears as a removed line" \
+        '-  "model": "personal-model"' "$pending_output"
+
+    assert_jq_eq "dry-run: the pending change was NOT written to CLAUDE_DIR/settings.json" \
+        '.model' "personal-model" "$settings"
+    assert_eq_text "dry-run: CLAUDE_DIR file tree still unchanged after planning a real change" \
+        "$before_tree" "$(tree_manifest "$FIXTURE_CLAUDE")"
+    assert_eq_text "dry-run: CLAUDE_DIR mtimes still unchanged after planning a real change" \
+        "$before_mtimes" "$(tree_mtimes "$FIXTURE_CLAUDE")"
 
     cleanup_fixture
     trap - RETURN

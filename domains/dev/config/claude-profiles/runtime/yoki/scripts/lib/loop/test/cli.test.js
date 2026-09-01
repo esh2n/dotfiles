@@ -364,3 +364,73 @@ test('main: status <name> reports run history and an estimated next fire time', 
     });
   });
 });
+
+test('main: status shows the prompt fingerprint the runner recorded, never the prompt', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      cli.main(['install', 'demo', '--harness', 'claude', '--cwd', '.', '--prompt', 'a', '--every', '30m'], {
+        dotfilesRoot,
+        env,
+        stdout: makeIO().stdout,
+        stderr: makeIO().stderr,
+      });
+      const prompt = 'sweep acme-corp/billing for stale credentials';
+      const placeholder = state.promptPlaceholder(prompt);
+      // Exactly the row shape runner.run writes.
+      state.appendRun(
+        'demo',
+        {
+          ts: '2026-01-01T00:00:00.000Z',
+          harness: 'claude',
+          cmd: state.redactPromptArgv(['claude', '-p', prompt, '--output-format', 'json'], prompt),
+          prompt: placeholder,
+          exit: 0,
+          durationMs: 5,
+          sessionId: 's1',
+        },
+        env
+      );
+
+      const io = makeIO();
+      assert.equal(cli.main(['status', 'demo'], { dotfilesRoot, env, stdout: io.stdout, stderr: io.stderr }), 0);
+      const text = io.out.join('');
+      assert.ok(text.includes(placeholder), 'status must show the placeholder');
+      assert.ok(!text.includes('acme-corp'), 'status must not show the prompt');
+      // The rest of the argv is still there to read.
+      assert.match(text, /claude -p .* --output-format json/);
+    });
+  });
+});
+
+test('main: status notes a codex stdin prompt, whose argv carries no prompt token', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      cli.main(['install', 'demo', '--harness', 'codex', '--cwd', '.', '--prompt', 'a', '--every', '30m'], {
+        dotfilesRoot,
+        env,
+        stdout: makeIO().stdout,
+        stderr: makeIO().stderr,
+      });
+      const placeholder = state.promptPlaceholder('sweep acme-corp/billing');
+      state.appendRun(
+        'demo',
+        {
+          ts: '2026-01-01T00:00:00.000Z',
+          harness: 'codex',
+          cmd: ['codex', 'exec', '--skip-git-repo-check', '-C', '.', '-s', 'read-only', '--json', '-'],
+          prompt: placeholder,
+          exit: 0,
+          durationMs: 5,
+          sessionId: 's1',
+        },
+        env
+      );
+
+      const io = makeIO();
+      cli.main(['status', 'demo'], { dotfilesRoot, env, stdout: io.stdout, stderr: io.stderr });
+      const text = io.out.join('');
+      assert.ok(text.includes(`<stdin ${placeholder}>`));
+      assert.ok(!text.includes('acme-corp'));
+    });
+  });
+});

@@ -3,10 +3,12 @@
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 
 import {
   COMMENT_ACTIONS,
   canActOnComments,
+  displayAuthor,
   handleListComments,
   handlePostComment,
   handleReplyComment,
@@ -186,7 +188,8 @@ describe("posting", () => {
       store,
       now: NOW,
     });
-    assert.equal(comment.author, "viewer@example.com");
+    assert.equal(comment.author, undefined, "a viewer never gets an address back, not even their own");
+    assert.match(comment.author_display, /^viewer-[0-9a-f]{8}$/);
     assert.equal(comment.body, "needs a legend");
     assert.equal(comment.version, 2, "defaults to the latest version");
     assert.equal(comment.to_agent, true);
@@ -300,6 +303,118 @@ describe("reply, resolve and seen", () => {
       handleResolveComment({ params: { id: "nope" }, identity: owner, config, store: seeded(), now: NOW }),
       (err) => err.status === 404 && err.code === "no_such_comment",
     );
+  });
+});
+
+describe("author privacy", () => {
+  /** Two channels sharing one viewer — what the per-channel salt is for. */
+  function seededPair(comments = []) {
+    const artifact = (channel, title) => ({
+      channel,
+      title,
+      owner: OWNER_EMAIL,
+      latest_version: 1,
+      created_at: "2026-08-31T10:00:00.000Z",
+      updated_at: "2026-08-31T11:00:00.000Z",
+      revoked_at: null,
+    });
+    const version = (channel) => ({
+      channel,
+      version: 1,
+      sha256: "a",
+      bytes: 1,
+      label: null,
+      note: null,
+      created_at: "2026-08-31T10:00:00.000Z",
+    });
+    return fakeStore({
+      artifacts: [artifact("notes", "Notes"), artifact("board", "Board")],
+      versions: [version("notes"), version("board")],
+      viewers: { notes: ["viewer@example.com"], board: ["viewer@example.com"] },
+      comments,
+    });
+  }
+
+  const list = (identity, store, channel = "notes") =>
+    handleListComments({
+      url: new URL(`https://host.example/api/artifacts/${channel}/comments`),
+      params: { channel },
+      identity,
+      config,
+      store,
+    });
+
+  /** The pseudonym worked out independently of the implementation. */
+  const pseudonym = (email, channel) =>
+    `viewer-${createHash("sha256").update(`${email}${channel}`).digest("hex").slice(0, 8)}`;
+
+  test("a viewer gets a per-channel pseudonym and no address at all", async () => {
+    const { comments } = await list(viewer, seededPair([rootComment]));
+    assert.equal(comments.length, 1);
+    assert.match(comments[0].author_display, /^viewer-[0-9a-f]{8}$/);
+    assert.equal(comments[0].author_display, pseudonym("viewer@example.com", "notes"));
+    assert.equal("author" in comments[0], false, "the key is absent, not blank");
+  });
+
+  test("the owner gets the address alongside the pseudonym", async () => {
+    const { comments } = await list(owner, seededPair([rootComment]));
+    assert.equal(comments[0].author, "viewer@example.com");
+    assert.equal(comments[0].author_display, pseudonym("viewer@example.com", "notes"));
+  });
+
+  test("the same person is the same pseudonym across comments and across requests", async () => {
+    const store = seededPair([
+      rootComment,
+      { ...rootComment, id: "c2", created_at: "2026-08-31T11:40:00.000Z", to_agent: 0 },
+    ]);
+    const first = await list(viewer, store);
+    const second = await list(viewer, store);
+    const displays = [...first.comments, ...second.comments].map((comment) => comment.author_display);
+    assert.equal(new Set(displays).size, 1, "one person, one pseudonym");
+    assert.equal(displays.length, 4);
+  });
+
+  test("the same person is a different pseudonym on another channel", async () => {
+    const store = seededPair([rootComment, { ...rootComment, id: "c2", channel: "board" }]);
+    const here = await list(viewer, store, "notes");
+    const there = await list(viewer, store, "board");
+    assert.notEqual(here.comments[0].author_display, there.comments[0].author_display);
+    assert.equal(there.comments[0].author_display, pseudonym("viewer@example.com", "board"));
+  });
+
+  test("the agent's byline is a role, so it reaches everyone verbatim", async () => {
+    const agentReply = {
+      ...rootComment,
+      id: "c2",
+      parent_id: "c1",
+      author: `agent via ${OWNER_EMAIL}`,
+      to_agent: 0,
+    };
+    const store = seededPair([rootComment, agentReply]);
+    for (const [name, identity] of [["viewer", viewer], ["owner", owner]]) {
+      const { comments } = await list(identity, store);
+      const reply = comments.find((comment) => comment.id === "c2");
+      assert.equal(reply.author_display, `agent via ${OWNER_EMAIL}`, `${name} sees the agent byline`);
+    }
+    assert.equal(await displayAuthor(`agent via ${OWNER_EMAIL}`, "notes"), `agent via ${OWNER_EMAIL}`);
+  });
+
+  test("the resolver's address is held back the same way the author's is", async () => {
+    const store = seededPair([rootComment]);
+    await handleResolveComment({ params: { id: "c1" }, identity: owner, config, store, now: NOW });
+
+    const asOwner = await list(owner, store);
+    assert.equal(asOwner.comments[0].resolved_by, OWNER_EMAIL);
+    assert.equal(asOwner.comments[0].resolved_by_display, pseudonym(OWNER_EMAIL, "notes"));
+
+    const asViewer = await list(viewer, store);
+    assert.equal("resolved_by" in asViewer.comments[0], false);
+    assert.match(asViewer.comments[0].resolved_by_display, /^viewer-[0-9a-f]{8}$/);
+  });
+
+  test("an unresolved comment reports no resolver, not a pseudonym of null", async () => {
+    const { comments } = await list(viewer, seededPair([rootComment]));
+    assert.equal(comments[0].resolved_by_display, null);
   });
 });
 

@@ -138,6 +138,12 @@ PACKS_DEFAULT="$PROFILES_DIR/packs.default"
 # Components merged across core + enabled packs + personal (personal wins)
 MERGE_DIRS=(skills hooks scripts commands agents rules workflows)
 
+# Dry-run plan mode (`apply --dry-run`, claude target). While this is 1 the
+# script must not write a single byte under $CLAUDE_DIR: the claude build runs
+# against a throwaway CLAUDE_DIR (see apply_claude_plan) and enabled_packs()
+# reads packs.default in place instead of seeding $CLAUDE_DIR/.claude-packs.
+PLAN_MODE=0
+
 # -----------------------------------------------------------------------------
 # pack helpers
 # -----------------------------------------------------------------------------
@@ -147,6 +153,14 @@ available_packs() {
 
 enabled_packs() {
     if [[ ! -f "$PACKS_FILE" ]]; then
+        # dry-run: report the selection a real apply WOULD seed, without
+        # creating $CLAUDE_DIR/.claude-packs (or $CLAUDE_DIR itself) here.
+        if [[ "$PLAN_MODE" == 1 ]]; then
+            if [[ -f "$PACKS_DEFAULT" ]]; then
+                grep -vE '^\s*(#|$)' "$PACKS_DEFAULT" 2>/dev/null | sort -u || true
+            fi
+            return 0
+        fi
         if [[ -f "$PACKS_DEFAULT" ]]; then
             mkdir -p "$CLAUDE_DIR"
             cp "$PACKS_DEFAULT" "$PACKS_FILE"
@@ -423,6 +437,12 @@ link_external_resources() {
             mkdir -p "$(dirname "$dest_path")"
             ln -sfn "$src_expanded" "$dest_path"
             ((count++)) || true
+            # A real apply stays quiet about the entries that just worked;
+            # `apply --dry-run` has to name them, since "what would be linked
+            # vs skipped" is the whole point of the report.
+            if [[ "$PLAN_MODE" == 1 ]]; then
+                log_info "external-link: $dest -> $src_expanded — would be linked"
+            fi
         else
             log_info "external-link: $dest -> $src_expanded not found on this machine — skipped (see 'yoki-switch doctor')"
         fi
@@ -446,6 +466,162 @@ link_cursor_rules() {
         ((count++)) || true
     done
     log_success "Cursor: linked $count rules → ~/.cursor/rules/"
+}
+
+# -----------------------------------------------------------------------------
+# apply --dry-run, claude target: print the plan, write nothing under
+# $CLAUDE_DIR.
+#
+# Nothing below re-implements the merge. The "would-be" output is produced by
+# running the SAME merge_settings / merge_claude_md / merge_dir /
+# link_external_resources against a throwaway CLAUDE_DIR under mktemp -d, and
+# the report is a diff of those outputs against the ones the real $CLAUDE_DIR
+# holds today. So the plan cannot drift from what an apply actually does: if
+# the merge changes, the plan changes with it.
+#
+# The real directory is only ever READ, and only for two things: the diffs,
+# and seeding settings.json into the sandbox (merge_settings carries
+# .autoMode over from the previous output — without that seed every dry run
+# would report a spurious autoMode removal).
+# -----------------------------------------------------------------------------
+PLAN_SANDBOX=""
+
+plan_cleanup() {
+    if [[ -n "$PLAN_SANDBOX" && -d "$PLAN_SANDBOX" ]]; then
+        rm -rf "$PLAN_SANDBOX"
+    fi
+    PLAN_SANDBOX=""
+}
+
+# plan_stage_counts <staging dir> — classify the staged symlinks by the layer
+# they resolve to. Counts the WINNERS (merge_dir has already applied the
+# personal > packs > core overwrite), so the per-layer numbers add up to the
+# entry count the staging dir would actually have.
+plan_stage_counts() {
+    local stage="$1"
+    local core=0 pack=0 personal=0 other=0 total=0
+    local item target
+    for item in "$stage"/*; do
+        [[ -e "$item" || -L "$item" ]] || continue
+        total=$((total + 1))
+        target="$(readlink "$item" 2>/dev/null || true)"
+        case "$target" in
+            "$PERSONAL_DIR"/*) personal=$((personal + 1)) ;;
+            "$PACKS_DIR"/*)    pack=$((pack + 1)) ;;
+            "$CORE_DIR"/*)     core=$((core + 1)) ;;
+            *)                 other=$((other + 1)) ;;
+        esac
+    done
+    printf 'core %-4d packs %-4d personal %-4d other %-4d => %d entries' \
+        "$core" "$pack" "$personal" "$other" "$total"
+}
+
+# plan_diff <label> <current file> <planned file> — `diff -u` of what is
+# installed now against what an apply would install. A non-empty diff is the
+# report, never a failure, so this always returns 0.
+plan_diff() {
+    local label="$1" current="$2" planned="$3"
+    echo ""
+    log_info "--- $label ---"
+
+    if [[ ! -f "$planned" ]]; then
+        log_warn "  planned output not produced: $planned"
+        return 0
+    fi
+
+    local current_side="$current"
+    [[ -f "$current_side" ]] || current_side="/dev/null"
+
+    if diff -q "$current_side" "$planned" >/dev/null 2>&1; then
+        echo "  (no change)"
+        return 0
+    fi
+
+    diff -u -L "current  $current" -L "planned  $current" "$current_side" "$planned" || true
+    return 0
+}
+
+apply_claude_plan() {
+    local -a packs=("$@")
+    local real_claude_dir="$CLAUDE_DIR"
+    local real_cursor_dir="$CURSOR_DIR"
+    local real_packs_file="$PACKS_FILE"
+
+    PLAN_SANDBOX="$(mktemp -d)"
+    # EXIT rather than RETURN: merge_settings and friends `exit 1` on a bad
+    # layer, and errexit can end the script mid-build too — both must still
+    # take the sandbox with them.
+    trap plan_cleanup EXIT
+
+    local sandbox_claude="$PLAN_SANDBOX/claude"
+    mkdir -p "$sandbox_claude"
+
+    if [[ -f "$real_claude_dir/settings.json" ]]; then
+        cp "$real_claude_dir/settings.json" "$sandbox_claude/settings.json"
+    fi
+    if [[ -f "$real_packs_file" ]]; then
+        cp "$real_packs_file" "$sandbox_claude/.claude-packs"
+    fi
+
+    # Everything from here to the restore below writes into the sandbox only.
+    CLAUDE_DIR="$sandbox_claude"
+    CURSOR_DIR="$PLAN_SANDBOX/cursor"
+    PACKS_FILE="$sandbox_claude/.claude-packs"
+
+    merge_settings "${packs[@]+"${packs[@]}"}"
+    merge_claude_md
+
+    local dir
+    local -a stage_lines=()
+    for dir in "${MERGE_DIRS[@]}"; do
+        # merge_dir's own "Merged X: N items" line reads like something
+        # happened; the report prints the per-layer breakdown instead.
+        merge_dir "$dir" "${packs[@]+"${packs[@]}"}" >/dev/null
+        stage_lines+=("$(printf '  %-20s %s' \
+            ".${dir}-merged" "$(plan_stage_counts "$CLAUDE_DIR/.${dir}-merged")")")
+    done
+
+    local ext_out
+    if ! ext_out="$(link_external_resources "${packs[@]+"${packs[@]}"}" 2>&1)"; then
+        CLAUDE_DIR="$real_claude_dir"
+        CURSOR_DIR="$real_cursor_dir"
+        PACKS_FILE="$real_packs_file"
+        log_error "dry-run: could not resolve external-links.yaml layers"
+        printf '%s\n' "$ext_out" | sed 's/^/  /'
+        exit 1
+    fi
+
+    local planned_settings="$CLAUDE_DIR/settings.json"
+    local planned_claude_md="$CLAUDE_DIR/CLAUDE.md"
+    local planned_permissions="$CLAUDE_DIR/.yoki/permissions.json"
+
+    CLAUDE_DIR="$real_claude_dir"
+    CURSOR_DIR="$real_cursor_dir"
+    PACKS_FILE="$real_packs_file"
+
+    log_info "=== ${PROG} apply --dry-run (target: claude) ==="
+    log_info "Plan only — nothing is written under $CLAUDE_DIR"
+    log_info "Would apply: core + packs(${packs[*]:-none}) + personal"
+
+    echo ""
+    log_info "--- staging dirs (each rebuilt from scratch) ---"
+    printf '%s\n' "${stage_lines[@]+"${stage_lines[@]}"}"
+
+    plan_diff "settings.json" "$CLAUDE_DIR/settings.json" "$planned_settings"
+    plan_diff "CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "$planned_claude_md"
+    plan_diff ".yoki/permissions.json" "$CLAUDE_DIR/.yoki/permissions.json" "$planned_permissions"
+
+    echo ""
+    log_info "--- external links ---"
+    printf '%s\n' "$ext_out" | sed 's/^/  /'
+
+    echo ""
+    log_info "Rebuilt on apply but not diffed here: $CURSOR_DIR/rules, $CLAUDE_DIR/.claude-profile"
+    log_success "Dry run complete — $CLAUDE_DIR untouched."
+
+    plan_cleanup
+    trap - EXIT
+    return 0
 }
 
 # -----------------------------------------------------------------------------
@@ -515,13 +691,14 @@ _target_requested() {
 #   --target claude|codex|omp   Restrict to this target (repeatable). With no
 #                               --target at all, every target runs (today's
 #                               default: claude + codex + omp).
-#   --dry-run                   Forwarded to lib/targets/gen.js for the
-#                               codex/omp targets, which prints the planned
-#                               operations without writing them. The
-#                               ~/.claude merge has no dry-run mode of its
-#                               own, so the "claude" target is skipped
-#                               entirely (with a note) rather than partially
-#                               simulated.
+#   --dry-run                   Print the planned operations, write nothing.
+#                               Forwarded to lib/targets/gen.js for the
+#                               codex/omp targets; the claude target builds
+#                               into a throwaway CLAUDE_DIR and reports the
+#                               staging-dir counts plus a diff per generated
+#                               file (see apply_claude_plan). Exit status is
+#                               0 even when the diffs are non-empty — a diff
+#                               is the report, not a failure.
 # -----------------------------------------------------------------------------
 apply() {
     local -a targets=()
@@ -551,6 +728,10 @@ apply() {
 
     [[ ${#targets[@]} -eq 0 ]] && targets=(claude codex omp)
 
+    # Must be set before enabled_packs() runs below: seeding .claude-packs
+    # from packs.default is itself a write under $CLAUDE_DIR.
+    [[ "$dry_run" == 1 ]] && PLAN_MODE=1
+
     local -a packs=()
     while IFS= read -r p; do
         [[ -n "$p" ]] || continue
@@ -563,7 +744,7 @@ apply() {
 
     if _target_requested claude "${targets[@]}"; then
         if [[ "$dry_run" == 1 ]]; then
-            log_info "claude: dry-run has no effect on this target (no dry-run mode) — skipping"
+            apply_claude_plan "${packs[@]+"${packs[@]}"}"
         else
             log_info "Applying: core + packs(${packs[*]:-none}) + personal"
 
@@ -802,8 +983,11 @@ case "${1:-}" in
         echo "                                Rebuild target(s) from core + enabled packs + personal."
         echo "                                T is one of: claude codex omp. Repeat --target to pick"
         echo "                                several; with none given, all three run. --dry-run"
-        echo "                                forwards to lib/targets/gen.js for codex/omp (prints the"
-        echo "                                planned operations, writes nothing)."
+        echo "                                prints the plan and writes nothing: staging-dir counts"
+        echo "                                per layer plus a diff of settings.json / CLAUDE.md /"
+        echo "                                .yoki/permissions.json and the external links for the"
+        echo "                                claude target, and lib/targets/gen.js's planned"
+        echo "                                operations for codex/omp."
         echo "  doctor [--json]               Health-check claude/codex/omp/artifact targets;"
         echo "                                one line per check, exit 1 iff any check fails."
         echo "  doctor --prepush [base]       Scan this branch's diff against 'base' (default"

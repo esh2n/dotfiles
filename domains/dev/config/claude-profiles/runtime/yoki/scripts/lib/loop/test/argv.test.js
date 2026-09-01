@@ -93,6 +93,10 @@ test('claude: --sandbox read-only denies every write tool instead of being ignor
   }
   // A shell is a write tool — leaving Bash enabled would make this cosmetic.
   assert.ok(denied.split(',').includes('Bash'));
+  // A subagent does not inherit this argv, so Task is a write path too —
+  // the same reason omp's read-only allow-list omits `task`.
+  assert.ok(denied.split(',').includes('Task'), 'Task must be denied: a subagent would not inherit the restriction');
+  assert.deepEqual(denied.split(','), ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task']);
 });
 
 test('claude: workspace-write (the default) adds no restriction flag', () => {

@@ -10,6 +10,19 @@ import { assertChannel, requirePositional } from "./validate.mjs";
 
 const JSON_CONTENT_TYPE = "application/json";
 
+/**
+ * Whoever the Worker was willing to name.
+ *
+ * `author` is sent only to the owner; a non-owner identity gets
+ * `author_display`, a per-channel pseudonym, and no `author` key at all. The
+ * CLI normally runs as the pinned service token and so sees addresses, but it
+ * must not depend on that — `--json` hands the rows through untouched, and this
+ * line is the only place that has to pick one.
+ */
+function authorOf(comment) {
+  return comment.author ?? comment.author_display ?? "unknown";
+}
+
 function commentLine(comment) {
   const marks = [
     comment.to_agent ? "to-agent" : null,
@@ -18,7 +31,7 @@ function commentLine(comment) {
     comment.parent_id ? "reply" : null,
   ].filter(Boolean);
   const body = comment.body.replace(/\s+/g, " ").trim();
-  return `${comment.created_at}  ${comment.id}  ${comment.author}` +
+  return `${comment.created_at}  ${comment.id}  ${authorOf(comment)}` +
     `${marks.length > 0 ? `  [${marks.join(", ")}]` : ""}\n    ${body}`;
 }
 
@@ -44,7 +57,10 @@ export async function cmdReply({ client, positionals }) {
   });
   return Object.freeze({
     json: Object.freeze({ channel, comment: body?.comment ?? null }),
-    lines: [`replied to ${id} as ${body?.comment?.author ?? "the agent"} (${body?.comment?.id ?? "?"})`],
+    lines: [
+      `replied to ${id} as ${body?.comment?.author ?? body?.comment?.author_display ?? "the agent"}` +
+        ` (${body?.comment?.id ?? "?"})`,
+    ],
   });
 }
 

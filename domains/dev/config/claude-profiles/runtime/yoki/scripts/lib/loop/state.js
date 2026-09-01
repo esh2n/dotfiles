@@ -13,10 +13,61 @@
  * second counter file could drift from it.
  */
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const { stateHome } = require('../state-home');
+
+/**
+ * A loop's prompt is the one field in a run row that is neither metadata nor
+ * ours to keep: `--prompt-from-artifact-inbox` prompts are written by
+ * artifact viewers, and hand-written ones routinely name repos, people and
+ * in-flight work. `runs.jsonl` is a plaintext append-only log under
+ * `~/.local/state`, read back by `yoki-loop status` and swept up by any
+ * backup or sync that watches that directory — so the prompt is recorded as
+ * a fingerprint instead of as text.
+ *
+ * The placeholder is `<prompt sha256:<first 12 hex> len:<n>>`: enough to
+ * tell two runs apart, to confirm a loop is still firing the prompt it was
+ * installed with, and to match a row against a prompt you still hold — and
+ * not enough to reconstruct one. `len` counts JS string units (characters
+ * for the BMP), which is what makes an unchanged prompt recognisable at a
+ * glance without revealing it.
+ *
+ * @param {string} prompt
+ * @returns {string} the placeholder — stable for a given prompt.
+ */
+function promptPlaceholder(prompt) {
+  const text = String(prompt ?? '');
+  const digest = crypto.createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 12);
+  return `<prompt sha256:${digest} len:${text.length}>`;
+}
+
+/**
+ * Replaces exactly the argv elements that ARE the prompt with
+ * `promptPlaceholder(prompt)`, leaving every other token verbatim — the
+ * recorded `cmd` stays a faithful record of how the harness was invoked
+ * (flags, model, sandbox, resume id) minus the one secret in it.
+ *
+ * Matching is by whole-token equality, not substring: claude and omp both
+ * pass the prompt as its own argv element (`-p <prompt>` / the trailing
+ * positional), and a flag that merely happens to contain the prompt's text
+ * is not the prompt. codex puts the prompt on stdin, so its argv has
+ * nothing to redact — the row's `prompt` field carries the placeholder for
+ * that case (and, harmlessly, for the other two).
+ *
+ * @param {string[]} argv
+ * @param {string} prompt
+ * @returns {string[]} a new array; the input is not mutated.
+ */
+function redactPromptArgv(argv, prompt) {
+  const text = String(prompt ?? '');
+  const tokens = Array.isArray(argv) ? argv.map((token) => String(token)) : [];
+  if (!text) return tokens;
+  const placeholder = promptPlaceholder(text);
+  return tokens.map((token) => (token === text ? placeholder : token));
+}
 
 function loopDir(name, env = process.env) {
   return path.join(stateHome(env), 'yoki', 'loop', name);
@@ -54,7 +105,10 @@ function readRuns(name, env = process.env) {
 /**
  * @param {string} name
  * @param {object} row must already carry every field yoki-loop records
- *   (ts, harness, cmd, exit, durationMs, sessionId)
+ *   (ts, harness, cmd, prompt, exit, durationMs, sessionId). `cmd` and
+ *   `prompt` must already be redacted — see `redactPromptArgv`; this
+ *   function writes what it is given, so the redaction belongs upstream in
+ *   runner.js where the prompt is still in hand.
  */
 function appendRun(name, row, env = process.env) {
   const file = runsPath(name, env);
@@ -98,6 +152,8 @@ function checkDailyCap(runs, cap, now = new Date()) {
 
 module.exports = {
   stateHome,
+  promptPlaceholder,
+  redactPromptArgv,
   loopDir,
   runsPath,
   readRuns,

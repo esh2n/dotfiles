@@ -292,6 +292,66 @@ describe("comment flow through the API", () => {
     const after = await (await call("/api/artifacts")).json();
     assert.equal(after.artifacts[0].unread_agent_comments, 0);
   });
+
+  /**
+   * Read against the wire, not the handler return value: a leak that only
+   * showed up once the object was serialised would slip past a unit test.
+   */
+  test("nothing a non-owner receives carries another reader's address", async () => {
+    const { call } = harness();
+    await call("/api/artifacts/notes", publishBody("<h1>one</h1>", { "x-yoki-title": "Notes" }));
+    await call("/api/artifacts/notes/viewers", jsonPost({ add: ["viewer@example.com", "second@example.com"] }));
+
+    // One thread carrying every kind of byline the column ever holds: a
+    // reader's address, the agent's role, and a resolution by the owner.
+    const { comment } = await (
+      await call("/api/artifacts/notes/comments", {
+        ...jsonPost({ body: "the axis labels are cut off", to_agent: true }),
+        token: viewerToken,
+      })
+    ).json();
+    await call(`/api/comments/${comment.id}/reply`, { ...jsonPost({ body: "fixed in v2" }), token: serviceToken });
+    await call(`/api/comments/${comment.id}/resolve`, jsonPost({}));
+
+    const paths = ["/api/artifacts/notes", "/api/artifacts/notes/versions", "/api/artifacts/notes/comments"];
+    for (const path of paths) {
+      const raw = await (await call(path, { token: viewerToken })).text();
+      for (const reader of ["viewer@example.com", "second@example.com"]) {
+        assert.equal(raw.includes(reader), false, `${path} named ${reader}`);
+      }
+    }
+
+    const thread = await (await call("/api/artifacts/notes/comments", { token: viewerToken })).text();
+    // The owner's own address is not a secret here — the deployment prints it
+    // in the agent's byline on purpose, so a reader knows who is answering —
+    // but it must be the only address the payload contains.
+    assert.deepEqual(
+      [...new Set(thread.match(/[\w.+-]+@[\w.-]+\.\w+/g) ?? [])],
+      [OWNER_EMAIL],
+      "the only address left is the one inside the agent byline",
+    );
+    assert.match(thread, new RegExp(`agent via ${OWNER_EMAIL}`));
+
+    // Both rows carry the same created_at from the fixed clock, so pick them
+    // by their place in the thread rather than by list order.
+    const rows = JSON.parse(thread).comments;
+    assert.equal(rows.length, 2);
+    for (const row of rows) {
+      assert.equal("author" in row, false);
+      assert.equal("resolved_by" in row, false);
+    }
+    const root = rows.find((row) => row.parent_id === null);
+    const reply = rows.find((row) => row.parent_id !== null);
+    assert.match(root.author_display, /^viewer-[0-9a-f]{8}$/);
+    assert.match(root.resolved_by_display, /^viewer-[0-9a-f]{8}$/);
+    assert.equal(reply.author_display, `agent via ${OWNER_EMAIL}`);
+
+    // The same request as the owner is the control: the addresses are there.
+    const asOwner = JSON.parse(await (await call("/api/artifacts/notes/comments")).text());
+    const ownerRoot = asOwner.comments.find((row) => row.parent_id === null);
+    assert.equal(ownerRoot.author, "viewer@example.com");
+    assert.equal(ownerRoot.resolved_by, OWNER_EMAIL);
+  });
 });
 
 describe("the viewer shell", () => {

@@ -14,4 +14,16 @@ deny:
     reason: "installer scripts piped into a shell have no execpolicy prefix match"
     enforce: [hook]
 
+# The guard floor, in the same shape as the real core layer: the two bash
+# guards every harness must register whatever else its generator manages to
+# translate. Present here so the golden covers omp's `floor` array and
+# codex's floor verification, not just the allow/deny conversion.
+guardFloor:
+  - hook: git-guard.sh
+    event: PreToolUse
+    matcher: Bash
+  - hook: unattended-guard.sh
+    event: PreToolUse
+    matcher: "Bash|Write|Edit"
+
 defaultMode: auto

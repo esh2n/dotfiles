@@ -93,7 +93,12 @@ export async function cmdWatch({
       lines:
         first.length === 0
           ? [`no new agent comments on ${channels.join(", ")}`]
-          : first.map((entry) => `${entry.channel}  ${entry.comment.id}  ${entry.comment.author}`),
+          : first.map(
+              (entry) =>
+                // `author` reaches the owner only; a non-owner poll gets the
+                // per-channel pseudonym in `author_display` instead.
+                `${entry.channel}  ${entry.comment.id}  ${entry.comment.author ?? entry.comment.author_display ?? "unknown"}`,
+            ),
     });
   }
 

@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -86,4 +87,52 @@ test('checkDailyCap: overCap is true once count reaches cap', () => {
   const now = new Date('2026-08-31T12:00:00.000Z');
   assert.deepEqual(state.checkDailyCap(runs, 2, now), { overCap: true, count: 2, cap: 2 });
   assert.deepEqual(state.checkDailyCap(runs, 3, now), { overCap: false, count: 2, cap: 3 });
+});
+
+// ---------------------------------------------------------------------------
+// prompt redaction
+// ---------------------------------------------------------------------------
+
+test('promptPlaceholder: <prompt sha256:<12 hex> len:<n>>, and never the prompt', () => {
+  const prompt = 'triage acme-corp/billing and ping @alice about the outage';
+  const placeholder = state.promptPlaceholder(prompt);
+  assert.match(placeholder, /^<prompt sha256:[0-9a-f]{12} len:\d+>$/);
+  const digest = crypto.createHash('sha256').update(prompt, 'utf8').digest('hex').slice(0, 12);
+  assert.equal(placeholder, `<prompt sha256:${digest} len:${prompt.length}>`);
+  assert.ok(!placeholder.includes('acme-corp'));
+  assert.ok(!placeholder.includes('alice'));
+});
+
+test('promptPlaceholder: stable for the same prompt, different for a different one', () => {
+  assert.equal(state.promptPlaceholder('same'), state.promptPlaceholder('same'));
+  assert.notEqual(state.promptPlaceholder('same'), state.promptPlaceholder('other'));
+  // Same length, different text — the hash, not the length, separates them.
+  assert.notEqual(state.promptPlaceholder('aaaa'), state.promptPlaceholder('bbbb'));
+});
+
+test('redactPromptArgv: swaps only the prompt token, keeps every other one verbatim', () => {
+  const prompt = 'check CI for secret-project';
+  const argv = ['claude', '-p', prompt, '--output-format', 'json', '--model', 'sonnet'];
+  const redacted = state.redactPromptArgv(argv, prompt);
+  assert.deepEqual(redacted, [
+    'claude',
+    '-p',
+    state.promptPlaceholder(prompt),
+    '--output-format',
+    'json',
+    '--model',
+    'sonnet',
+  ]);
+  assert.ok(!redacted.join(' ').includes('secret-project'));
+  // The input array is untouched — the caller still holds the real argv.
+  assert.equal(argv[2], prompt);
+});
+
+test('redactPromptArgv: a flag that merely contains the prompt as a substring stays verbatim', () => {
+  const redacted = state.redactPromptArgv(['omp', '--tools', 'read,grep', 'read the log'], 'read');
+  assert.deepEqual(redacted, ['omp', '--tools', 'read,grep', 'read the log']);
+});
+
+test('redactPromptArgv: an empty prompt has nothing to redact', () => {
+  assert.deepEqual(state.redactPromptArgv(['codex', 'exec', '-'], ''), ['codex', 'exec', '-']);
 });

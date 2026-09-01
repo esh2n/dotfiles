@@ -4,6 +4,11 @@
 // `to_agent` marks a comment as addressed to the agent; the CLI polls
 // `?to_agent=1&since=<ISO>` with a service token and calls /seen once it has
 // picked the comment up, which is what drives the owner index's unread count.
+//
+// Authorship is told two different ways depending on who is asking. The owner
+// runs the deployment and already holds the viewer list, so they get the real
+// addresses. Everyone else gets a pseudonym and no raw address at all: being
+// shared one page is not a reason to learn who else was shared it.
 
 import { badRequest, forbidden, notFound, readJsonBody } from "./http.mjs";
 import { identityKey, isOwner } from "./auth.mjs";
@@ -61,17 +66,57 @@ function requireCommentAction(action, identity, context) {
   }
 }
 
-export function serializeComment(row) {
+/**
+ * True only for a stored label that is itself an address.
+ *
+ * The other two labels this column ever holds — `agent via <owner>` and
+ * `service:<name>` — are roles, not people, and stay legible to everyone: a
+ * reader has to be able to tell the agent's replies from a stranger's.
+ */
+function isAddressLabel(label) {
+  return typeof label === "string" && /^[^\s@]+@[^\s@]+$/.test(label);
+}
+
+/**
+ * The pseudonym a non-owner sees instead of an address.
+ *
+ * The channel is hashed in alongside the address so the same person is a
+ * different `viewer-…` on every artifact. Without that salt, one reader who
+ * worked out which pseudonym was whom on one page would recognise that person
+ * on every other page they were ever shared, which is the leak the pseudonym
+ * exists to prevent. Truncating to 8 hex characters keeps the label readable;
+ * it is a label, not a secret, and the address is never sent alongside it.
+ */
+export async function displayAuthor(label, channel) {
+  if (!isAddressLabel(label)) return label;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${label}${channel}`));
+  const head = new Uint8Array(digest).subarray(0, 4);
+  return `viewer-${Array.from(head, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * @param owner  true when the caller is the owner (or the pinned service
+ *               token). Defaults to false so a call site that forgets to pass
+ *               it discloses less, never more.
+ */
+export async function serializeComment(row, { owner = false } = {}) {
+  const channel = row.channel;
+  const resolvedBy = row.resolved_by ?? null;
   return {
     id: row.id,
-    channel: row.channel,
+    channel,
     version: row.version,
     parent_id: row.parent_id ?? null,
-    author: row.author,
+    // Omitted rather than blanked for a non-owner: a client that reads
+    // `author` gets nothing to render, instead of a plausible-looking empty
+    // string it might print as the author.
+    ...(owner ? { author: row.author } : {}),
+    author_display: await displayAuthor(row.author, channel),
     body: row.body,
     created_at: row.created_at,
     resolved_at: row.resolved_at ?? null,
-    resolved_by: row.resolved_by ?? null,
+    ...(owner ? { resolved_by: resolvedBy } : {}),
+    resolved_by_display: resolvedBy === null ? null : await displayAuthor(resolvedBy, channel),
     to_agent: row.to_agent === 1 || row.to_agent === true,
     agent_seen_at: row.agent_seen_at ?? null,
   };
@@ -123,40 +168,43 @@ async function loadCommentContext({ id, store, config, identity }) {
   // the revoke must not be a way back in — reply/resolve/seen all land here.
   // The owner (and the CLI's service identity, which isOwner() covers) still
   // sees revoked channels, which is what `seen` needs.
+  const owner = isOwner(identity, config);
   const context = await loadArtifactContext({
     store,
     config,
     identity,
     channel: comment.channel,
-    includeRevoked: isOwner(identity, config),
+    includeRevoked: owner,
   });
-  return { comment, ...context };
+  return { comment, owner, ...context };
 }
 
 // --- handlers -------------------------------------------------------------
 
 export async function handleListComments({ url, params, identity, config, store }) {
+  const owner = isOwner(identity, config);
   const { channel, viewers } = await loadArtifactContext({
     store,
     config,
     identity,
     channel: params.channel,
-    includeRevoked: isOwner(identity, config),
+    includeRevoked: owner,
   });
   requireCommentAction("read", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true });
   const since = normalizeSince(url.searchParams.get("since"));
   const toAgentOnly = url.searchParams.get("to_agent") === "1";
   const rows = await store.listComments({ channel, since, toAgentOnly });
-  return { channel, comments: rows.map(serializeComment) };
+  return { channel, comments: await Promise.all(rows.map((row) => serializeComment(row, { owner }))) };
 }
 
 export async function handlePostComment({ request, params, identity, config, store, now = new Date() }) {
+  const owner = isOwner(identity, config);
   const { channel, artifact, viewers } = await loadArtifactContext({
     store,
     config,
     identity,
     channel: params.channel,
-    includeRevoked: isOwner(identity, config),
+    includeRevoked: owner,
   });
   requireCommentAction("post", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true });
 
@@ -185,11 +233,11 @@ export async function handlePostComment({ request, params, identity, config, sto
     to_agent: payload.to_agent === true || payload.to_agent === 1 ? 1 : 0,
   };
   await store.insertComment(row);
-  return { comment: serializeComment({ ...row, resolved_at: null, resolved_by: null, agent_seen_at: null }) };
+  return { comment: await serializeComment({ ...row, resolved_at: null, resolved_by: null, agent_seen_at: null }, { owner }) };
 }
 
 export async function handleReplyComment({ request, params, identity, config, store, now = new Date() }) {
-  const { comment, channel, viewers } = await loadCommentContext({ id: params.id, store, config, identity });
+  const { comment, channel, viewers, owner } = await loadCommentContext({ id: params.id, store, config, identity });
   requireCommentAction("reply", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true, comment });
 
   const payload = await readJsonBody(request);
@@ -205,28 +253,28 @@ export async function handleReplyComment({ request, params, identity, config, st
     to_agent: 0,
   };
   await store.insertComment(row);
-  return { comment: serializeComment({ ...row, resolved_at: null, resolved_by: null, agent_seen_at: null }) };
+  return { comment: await serializeComment({ ...row, resolved_at: null, resolved_by: null, agent_seen_at: null }, { owner }) };
 }
 
 export async function handleResolveComment({ params, identity, config, store, now = new Date() }) {
-  const { comment, viewers } = await loadCommentContext({ id: params.id, store, config, identity });
+  const { comment, viewers, owner } = await loadCommentContext({ id: params.id, store, config, identity });
   requireCommentAction("resolve", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true, comment });
   if (comment.resolved_at) {
     // Idempotent: the first resolution stands.
-    return { comment: serializeComment(comment) };
+    return { comment: await serializeComment(comment, { owner }) };
   }
   const resolvedAt = now.toISOString();
   await store.resolveComment({ id: comment.id, resolvedAt, resolvedBy: identity.label });
-  return { comment: serializeComment({ ...comment, resolved_at: resolvedAt, resolved_by: identity.label }) };
+  return { comment: await serializeComment({ ...comment, resolved_at: resolvedAt, resolved_by: identity.label }, { owner }) };
 }
 
 export async function handleSeenComment({ params, identity, config, store, now = new Date() }) {
-  const { comment, viewers } = await loadCommentContext({ id: params.id, store, config, identity });
+  const { comment, viewers, owner } = await loadCommentContext({ id: params.id, store, config, identity });
   requireCommentAction("seen", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true, comment });
   if (comment.agent_seen_at) {
-    return { comment: serializeComment(comment) };
+    return { comment: await serializeComment(comment, { owner }) };
   }
   const seenAt = now.toISOString();
   await store.markCommentSeen({ id: comment.id, seenAt });
-  return { comment: serializeComment({ ...comment, agent_seen_at: seenAt }) };
+  return { comment: await serializeComment({ ...comment, agent_seen_at: seenAt }, { owner }) };
 }

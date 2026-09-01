@@ -6,7 +6,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { parseYamlPermissions, loadLayer, dedupeEntries, mergeLayers, loadAndMerge } = require('../parse');
+const {
+  parseYamlPermissions,
+  loadLayer,
+  dedupeEntries,
+  dedupeGuardFloor,
+  mergeLayers,
+  loadAndMerge,
+  resolveGuardFloor,
+} = require('../parse');
 
 test('parseYamlPermissions: allow/deny entries with reason and enforce', () => {
   const text = `
@@ -76,7 +84,7 @@ test('parseYamlPermissions: pattern outside a block throws', () => {
 test('loadLayer: missing file yields an empty layer', () => {
   const missing = path.join(os.tmpdir(), 'does-not-exist-permissions.yaml');
   const result = loadLayer(missing);
-  assert.deepEqual(result, { allow: [], deny: [], defaultMode: undefined });
+  assert.deepEqual(result, { allow: [], deny: [], guardFloor: [], defaultMode: undefined });
 });
 
 test('loadLayer: reads and parses a real file', () => {
@@ -137,4 +145,104 @@ test('loadAndMerge: a missing pack layer is treated as empty, not an error', () 
   const merged = loadAndMerge([core, missingPack]);
   assert.deepEqual(merged.allow, [{ pattern: 'A' }]);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
+// guardFloor
+// ---------------------------------------------------------------------------
+
+test('parseYamlPermissions: guardFloor entries carry hook, event and matcher', () => {
+  const text = `
+allow: []
+deny: []
+guardFloor:
+  - hook: git-guard.sh
+    event: PreToolUse
+    matcher: Bash
+  - hook: unattended-guard.sh
+    event: PreToolUse
+    matcher: "Bash|Write|Edit"
+defaultMode: auto
+`;
+  const result = parseYamlPermissions(text);
+  assert.deepEqual(result.guardFloor, [
+    { hook: 'git-guard.sh', event: 'PreToolUse', matcher: 'Bash' },
+    { hook: 'unattended-guard.sh', event: 'PreToolUse', matcher: 'Bash|Write|Edit' },
+  ]);
+});
+
+test('parseYamlPermissions: a file with no guardFloor block yields an empty floor', () => {
+  const result = parseYamlPermissions('allow:\n  - pattern: "Bash(ls *)"\ndeny: []\ndefaultMode: auto\n');
+  assert.deepEqual(result.guardFloor, []);
+});
+
+test('parseYamlPermissions: guardFloor: [] is the explicit empty form', () => {
+  const result = parseYamlPermissions('allow: []\ndeny: []\nguardFloor: []\ndefaultMode: auto\n');
+  assert.deepEqual(result.guardFloor, []);
+});
+
+test('parseYamlPermissions: "- hook:" outside a guardFloor block throws', () => {
+  assert.throws(() => parseYamlPermissions('allow:\n  - hook: git-guard.sh\n'), /outside a guardFloor block/);
+});
+
+test('parseYamlPermissions: "- pattern:" inside guardFloor throws', () => {
+  assert.throws(() => parseYamlPermissions('guardFloor:\n  - pattern: "Bash(ls)"\n'), /outside an allow\/deny block/);
+});
+
+test('dedupeGuardFloor: dedupes the whole hook+event+matcher triple, not the hook alone', () => {
+  const entries = [
+    { hook: 'git-guard.sh', event: 'PreToolUse', matcher: 'Bash' },
+    { hook: 'git-guard.sh', event: 'PreToolUse', matcher: 'Bash' },
+    // Same script, wider matcher — a real second registration, kept.
+    { hook: 'git-guard.sh', event: 'PreToolUse', matcher: 'Write|Edit' },
+  ];
+  assert.deepEqual(dedupeGuardFloor(entries), [
+    { hook: 'git-guard.sh', event: 'PreToolUse', matcher: 'Bash' },
+    { hook: 'git-guard.sh', event: 'PreToolUse', matcher: 'Write|Edit' },
+  ]);
+});
+
+test('mergeLayers: a later layer may ADD to the floor and can never subtract', () => {
+  const core = { allow: [], deny: [], guardFloor: [{ hook: 'git-guard.sh', event: 'PreToolUse', matcher: 'Bash' }] };
+  const personal = { allow: [], deny: [], guardFloor: [{ hook: 'secrets-guard.sh', event: 'PreToolUse', matcher: 'Bash' }] };
+  const merged = mergeLayers([core, personal]);
+  assert.deepEqual(merged.guardFloor.map(e => e.hook), ['git-guard.sh', 'secrets-guard.sh']);
+
+  // A personal layer that declares an empty floor does not remove core's.
+  const withEmptyPersonal = mergeLayers([core, { allow: [], deny: [], guardFloor: [] }]);
+  assert.deepEqual(withEmptyPersonal.guardFloor.map(e => e.hook), ['git-guard.sh']);
+});
+
+test('mergeLayers: layers with no guardFloor key at all merge to an empty floor', () => {
+  assert.deepEqual(mergeLayers([{ allow: [], deny: [] }]).guardFloor, []);
+});
+
+test('resolveGuardFloor: resolves each hook to <home>/.claude/hooks/<hook>', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-permissions-floor-'));
+  const core = path.join(dir, 'core.yaml');
+  fs.writeFileSync(
+    core,
+    'allow: []\ndeny: []\nguardFloor:\n  - hook: git-guard.sh\n    event: PreToolUse\n    matcher: Bash\ndefaultMode: auto\n',
+    'utf8'
+  );
+
+  const floor = resolveGuardFloor([core, path.join(dir, 'missing.yaml')], '/home/u');
+  assert.deepEqual(floor, [
+    {
+      hook: 'git-guard.sh',
+      event: 'PreToolUse',
+      matcher: 'Bash',
+      scriptPath: path.join('/home/u', '.claude', 'hooks', 'git-guard.sh'),
+    },
+  ]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('resolveGuardFloor: the shipped core layer declares the two bash guards', () => {
+  // The point of the guardFloor key: the floor is stated in the layered
+  // source, not hardcoded in each target's generator.
+  const coreFile = path.resolve(__dirname, '..', '..', '..', '..', '..', '..', 'core', 'permissions.yaml');
+  const floor = resolveGuardFloor([coreFile], '/home/u');
+  assert.deepEqual(floor.map(e => e.hook).sort(), ['git-guard.sh', 'unattended-guard.sh']);
+  for (const entry of floor) assert.equal(entry.event, 'PreToolUse');
 });
