@@ -274,6 +274,46 @@ JSON
     [[ "$STATUS" -eq 0 && "$OUT" == "{}" ]] && pass "omp: SessionStart -> no opinion ({})" \
         || fail "omp: SessionStart -> no opinion" "status=$STATUS out=$OUT"
 
+    # -------------------------------------------------------------------
+    # 6. Codex read-side deny (Gap B). Codex has no dedicated read tool — a
+    #    file read shells out as `cat`/`sed`/… (tool_name "Bash"), so a
+    #    Read(glob) deny is enforced only by pre-permission-guard parsing the
+    #    command. This drives the REAL runner + REAL hook against a codex
+    #    <CODEX_DIR>/.yoki/permissions.json, the same file lib/targets/codex.js
+    #    writes, and asserts the shell read of a denied path is blocked while a
+    #    benign read passes.
+    # -------------------------------------------------------------------
+    local codex_dir="$WORK/codex-home"
+    mkdir -p "$codex_dir/.yoki"
+    printf '{"deny":[{"pattern":"Read(**/.env)","reason":"env files"}]}\n' > "$codex_dir/.yoki/permissions.json"
+
+    local codex_read_deny="$WORK/codex_read_deny.json"
+    cat > "$codex_read_deny" <<JSON
+{"session_id":"s1","transcript_path":"/tmp/t.jsonl","cwd":"$PROJ","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat .env"}}
+JSON
+    local codex_read_ok="$WORK/codex_read_ok.json"
+    cat > "$codex_read_ok" <<JSON
+{"session_id":"s1","transcript_path":"/tmp/t.jsonl","cwd":"$PROJ","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cat README.md"}}
+JSON
+
+    run_permission_guard() {
+        local harness="$1" payload_file="$2"
+        STATUS=0
+        OUT="$(CLAUDE_PLUGIN_ROOT="$YOKI_ROOT_DIR" YOKI_HOOK_PROFILE=standard CODEX_DIR="$codex_dir" \
+            node "$RUN_WITH_FLAGS" "pre:permission-guard" "scripts/hooks/pre-permission-guard.js" "minimal,standard,strict" \
+            --harness "$harness" < "$payload_file" 2>&1)" || STATUS=$?
+    }
+
+    run_permission_guard codex "$codex_read_deny"
+    [[ "$STATUS" -eq 0 && "$OUT" == *'"permissionDecision":"deny"'* && "$OUT" == *"Read(**/.env)"* ]] \
+        && pass "codex: shell read of a denied path (cat .env) -> deny" \
+        || fail "codex: shell read of a denied path -> deny" "status=$STATUS out=$OUT"
+
+    run_permission_guard codex "$codex_read_ok"
+    [[ "$STATUS" -eq 0 && -z "$OUT" ]] \
+        && pass "codex: shell read of an undenied path (cat README.md) -> allow" \
+        || fail "codex: shell read of an undenied path -> allow" "status=$STATUS out=$OUT"
+
     echo ""
     log_info "=== Results ==="
     echo ""

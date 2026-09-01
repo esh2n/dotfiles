@@ -91,6 +91,20 @@ test('codex Bash PreToolUse/PostToolUse stay Bash', () => {
   assert.equal(postOut.tool_response, 'hi\n');
 });
 
+test('codex file read (cat/sed) normalizes to a Bash tool call with the command intact', () => {
+  // Codex has no dedicated read tool — a file read shells out as Bash
+  // (scratchpad/codex-read-tool-spike.md). The command string must survive
+  // normalization verbatim so pre-permission-guard can parse its path args.
+  const raw = {
+    session_id: 's1', cwd: '/repo', hook_event_name: 'PreToolUse',
+    tool_name: 'Bash', tool_input: { command: "sed -n '1,200p' ./.env" },
+  };
+  const { payload, meta } = normalizePayload(raw, 'codex');
+  assert.equal(meta.harness, 'codex');
+  assert.equal(payload.tool_name, 'Bash');
+  assert.equal(payload.tool_input.command, "sed -n '1,200p' ./.env");
+});
+
 test('codex apply_patch Add File becomes a single Write payload', () => {
   const raw = fixture('codex', 'pre_tool_use_apply_patch_add');
   const { payload, meta } = normalizePayload(raw, 'codex');

@@ -27,6 +27,12 @@
  * the ONLY enforcement for those patterns — which is why it gates the read
  * side (Read/Glob/Grep/LS) and WebFetch too, not just Bash and the writers.
  *
+ * A `Read(glob)` deny additionally covers a read-shaped Bash command
+ * (`cat`/`sed`/`head`/… <path>): Codex has no dedicated read tool, so a file
+ * read shells out as a Bash exec (scratchpad codex-read-tool-spike), and the
+ * path arguments are parsed out of the command and matched against the same
+ * Read patterns (readCommandPaths).
+ *
  * A missing or unreadable file fails open (exitCode 0): a guard that itself
  * crashes must never become the reason the harness blocks every tool call.
  *
@@ -162,6 +168,131 @@ function matchPath(pattern, filePath) {
 }
 
 /**
+ * Read-shaped shell commands whose non-flag arguments name files being read.
+ * On Codex a file read is emitted as a Bash exec of one of these (there is no
+ * dedicated read tool — see scratchpad/codex-read-tool-spike.md: `cat x.txt`,
+ * `sed -n '1,200p' ./x.txt`, `rg …`), so a `Read(glob)` deny can only be
+ * enforced there by parsing the command. omp reads arrive as a `read` tool
+ * with a `path`, handled by toolCallPath — this covers the harnesses that
+ * shell out instead.
+ */
+const READ_COMMANDS = new Set([
+  'cat', 'head', 'tail', 'less', 'more', 'sed', 'awk', 'nl', 'tac', 'rev',
+  'od', 'xxd', 'hexdump', 'strings', 'base64', 'bat',
+]);
+
+/** Expands a leading `~/` (or a bare `~`) to the guard's own home dir, so a
+ * token like `~/.ssh/id_ed25519` compares against a `~/`-rooted pattern
+ * (globToRegExp expands the pattern side the same way). */
+function expandHome(token) {
+  if (token === '~') return os.homedir();
+  if (token.startsWith('~/')) return path.join(os.homedir(), token.slice(2));
+  return token;
+}
+
+/** Splits a command string into pipeline/list segments on unquoted `|`,
+ * `||`, `&&`, `;` and newlines, so each segment is one simple command whose
+ * first word is the program name. Quotes are preserved for the tokenizer. */
+function splitShellSegments(command) {
+  const segments = [];
+  let cur = '';
+  let quote = null;
+  for (let i = 0; i < command.length; i += 1) {
+    const c = command[i];
+    if (quote) {
+      cur += c;
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      cur += c;
+      quote = c;
+      continue;
+    }
+    if (c === '\n' || c === ';') {
+      segments.push(cur);
+      cur = '';
+      continue;
+    }
+    if ((c === '&' && command[i + 1] === '&') || (c === '|' && command[i + 1] === '|')) {
+      segments.push(cur);
+      cur = '';
+      i += 1;
+      continue;
+    }
+    if (c === '|' || c === '&') {
+      segments.push(cur);
+      cur = '';
+      continue;
+    }
+    cur += c;
+  }
+  segments.push(cur);
+  return segments;
+}
+
+/** Whitespace-splits a single segment into tokens, honouring single/double
+ * quotes and stripping the quote characters (no expansion — a security guard
+ * matches the literal path the shell would open). */
+function tokenizeSegment(segment) {
+  const tokens = [];
+  let cur = '';
+  let quote = null;
+  let has = false;
+  for (let i = 0; i < segment.length; i += 1) {
+    const c = segment[i];
+    if (quote) {
+      if (c === quote) quote = null;
+      else cur += c;
+      has = true;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      has = true;
+      continue;
+    }
+    if (/\s/.test(c)) {
+      if (has) {
+        tokens.push(cur);
+        cur = '';
+        has = false;
+      }
+      continue;
+    }
+    cur += c;
+    has = true;
+  }
+  if (has) tokens.push(cur);
+  return tokens;
+}
+
+/**
+ * The file paths a read-shaped Bash command opens: for every segment whose
+ * program is a READ_COMMANDS entry, its non-flag argument tokens (with a
+ * leading `~/` expanded). Flags (`-n`, `--`) and any glued value are skipped;
+ * a stray non-path token (e.g. sed's `'1,200p'` script) is harmless — it
+ * cannot match a specific path deny glob. Returns [] for a non-string or a
+ * command that reads nothing.
+ */
+function readCommandPaths(command) {
+  if (typeof command !== 'string' || command.trim() === '') return [];
+  const paths = [];
+  for (const segment of splitShellSegments(command)) {
+    const tokens = tokenizeSegment(segment);
+    if (tokens.length === 0) continue;
+    const program = path.basename(tokens[0]);
+    if (!READ_COMMANDS.has(program)) continue;
+    for (let i = 1; i < tokens.length; i += 1) {
+      const tok = tokens[i];
+      if (tok === '' || tok.startsWith('-')) continue; // flag or its option value
+      paths.push(expandHome(tok));
+    }
+  }
+  return paths;
+}
+
+/**
  * `WebFetch(domain:example.com)` against a tool call's URL, matching Claude's
  * own rule: the pattern names a HOST, so it is compared to the URL's hostname
  * and nothing else (never the path, never the raw URL text — `domain:evil.com`
@@ -282,9 +413,23 @@ function run(rawInput) {
     }
 
     const family = classified.tool === 'Edit' ? WRITE_TOOLS : classified.tool === 'Read' ? READ_TOOLS : null;
-    if (!family || !family.has(toolName)) continue;
-    if (matchPath(classified.inner, toolCallPath(toolInput))) {
-      return denyResult(entry.pattern);
+    if (!family) continue;
+    if (family.has(toolName)) {
+      if (matchPath(classified.inner, toolCallPath(toolInput))) {
+        return denyResult(entry.pattern);
+      }
+      continue;
+    }
+    // A Read(glob) deny also covers a read-shaped Bash command. On Codex a
+    // file read shells out as `cat`/`sed`/… (there is no dedicated read
+    // tool — scratchpad/codex-read-tool-spike.md), so parsing the command's
+    // path arguments is the only way the hook can enforce a Read deny there.
+    if (classified.tool === 'Read' && toolName === 'Bash') {
+      for (const readPath of readCommandPaths(toolInput.command)) {
+        if (matchPath(classified.inner, readPath)) {
+          return denyResult(entry.pattern);
+        }
+      }
     }
   }
 
@@ -300,4 +445,5 @@ module.exports = {
   classifyPattern,
   loadDenyPatterns,
   resolvePermissionsFile,
+  readCommandPaths,
 };

@@ -376,3 +376,73 @@ test('globToRegExp: "**/" matches zero or more directories', () => {
   assert.ok(re.test('a/b/c.pem'));
   assert.ok(!re.test('a.key'));
 });
+
+// ---------------------------------------------------------------------------
+// Read-shaped Bash commands (Gap B). On Codex a file read shells out as
+// `cat`/`sed`/… (no dedicated read tool — scratchpad/codex-read-tool-spike.md),
+// so a Read(glob) deny is enforced by parsing the command's path arguments.
+// ---------------------------------------------------------------------------
+
+test('readCommandPaths: extracts the file argument of a read-shaped command', () => {
+  assert.deepEqual(hook.readCommandPaths('cat x.txt'), ['x.txt']);
+  assert.deepEqual(hook.readCommandPaths("sed -n '1,200p' ./x.txt"), ['1,200p', './x.txt']);
+  assert.deepEqual(hook.readCommandPaths('head -n 5 a.txt'), ['5', 'a.txt']);
+});
+
+test('readCommandPaths: splits a pipeline/list and only reads from read commands', () => {
+  // pwd + rg are not read commands here; only the sed segment yields a path.
+  assert.deepEqual(hook.readCommandPaths('pwd && rg --files | sed -n 1,10p package.json'), ['1,10p', 'package.json']);
+  assert.deepEqual(hook.readCommandPaths('echo hi'), []);
+  assert.deepEqual(hook.readCommandPaths(''), []);
+  assert.deepEqual(hook.readCommandPaths(undefined), []);
+});
+
+test('readCommandPaths: expands a leading ~/ to the home dir', () => {
+  assert.deepEqual(hook.readCommandPaths('cat ~/.ssh/known_hosts'), [path.join(os.homedir(), '.ssh/known_hosts')]);
+});
+
+test('Bash read of a denied path (cat .env) is blocked by a Read(**) glob', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(**/.env)', reason: 'env files' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('Bash', { command: 'cat .env' })), 'Read(**/.env)');
+    isDeny(hook.run(payload('Bash', { command: 'sed -n 1,5p ./.env' })), 'Read(**/.env)');
+  });
+});
+
+test('Bash read of a denied secret file (cat server.pem) is blocked', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(**/*.pem)' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('Bash', { command: 'cat certs/server.pem' })), 'Read(**/*.pem)');
+  });
+});
+
+test('Bash read of a ~/-rooted denied path is blocked (token ~ expanded)', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(~/.ssh/*_ed25519)' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('Bash', { command: 'cat ~/.ssh/id_ed25519' })), 'Read(~/.ssh/*_ed25519)');
+  });
+});
+
+test('Bash command that reads nothing denied is passed through', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(**/.env)' }]);
+  withClaudeDir(claudeDir, () => {
+    const raw = payload('Bash', { command: 'cat README.md' });
+    isPassthrough(hook.run(raw), raw);
+    // A non-read command touching a denied name is not a read -> not blocked here.
+    const raw2 = payload('Bash', { command: 'ls -la .env' });
+    isPassthrough(hook.run(raw2), raw2);
+  });
+});
+
+test('Bash read deny does not fire when only Edit(...) patterns are configured', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Edit(**/.env)' }]);
+  withClaudeDir(claudeDir, () => {
+    const raw = payload('Bash', { command: 'cat .env' });
+    isPassthrough(hook.run(raw), raw);
+  });
+});
