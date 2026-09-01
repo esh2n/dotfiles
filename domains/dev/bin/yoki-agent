@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+'use strict';
+
+// Thin node launcher for yoki-agent — runs exactly ONE graph backend call
+// (codex exec / omp headless / mock) through the same code path yoki-graph's
+// agent() uses, so a lane run from here and a lane run inside a workflow are
+// the same call. All the actual logic lives in
+// domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/graph/agent-cli.js;
+// this file only has to find that path reliably regardless of how it was
+// invoked — directly, or through the ~/bin symlink the dotfiles linker makes
+// from this exact file (same reasoning as the yoki-graph launcher:
+// `fs.realpathSync` resolves the symlink chain back to this file's real
+// location, from which the path to lib/graph/agent-cli.js is fixed).
+
+const fs = require('fs');
+const path = require('path');
+
+const realFile = fs.realpathSync(process.argv[1]);
+const binDir = path.dirname(realFile); // .../domains/dev/bin
+const cliPath = path.join(
+  binDir, '..', 'config', 'claude-profiles', 'runtime', 'yoki', 'scripts', 'lib', 'graph', 'agent-cli.js',
+);
+
+require(cliPath).main();
