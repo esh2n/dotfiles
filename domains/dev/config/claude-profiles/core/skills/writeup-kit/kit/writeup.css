@@ -884,6 +884,18 @@ hr {
   white-space: nowrap;
 }
 
+/* A table treats width:100% as a minimum: a cell token with no break
+   opportunity (a file path, a `path:line` citation) widens its column's
+   min-content, and once the columns' min-contents sum past the 45em
+   measure the table bleeds out of the page — the narrow-screen scroll
+   guard below 640px never sees it. `anywhere` (unlike break-word) lets
+   these tokens split AND counts the split into min-content, which is
+   what actually keeps the table at the column width. */
+.wu-compare td code,
+.wu-table td code {
+  overflow-wrap: anywhere;
+}
+
 .wu-compare tr:last-child td,
 .wu-table tbody tr:hover td {
   background: var(--wu-rule-soft);
