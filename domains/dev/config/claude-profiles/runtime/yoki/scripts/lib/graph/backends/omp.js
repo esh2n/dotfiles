@@ -29,28 +29,55 @@ const supportsSchemaNatively = false;
 
 const BRIDGE_EXTENSION = '~/.omp/agent/extensions/yoki-bridge.ts';
 
+const SANDBOX_MODES = ['read-only', 'workspace-write', 'danger-full-access'];
+
+/** Same default as the codex backend — see backends/codex.js and API.md. */
+const DEFAULT_SANDBOX = 'read-only';
+
+/**
+ * omp's tool-restriction flag is `--tools=<value>` ("Comma-separated list of
+ * tools to enable (default: all)", `command omp --help`, omp 18.0.4) — an
+ * allow-list, so read-only enables only the reading tools. Ids are omp's own
+ * builtin tool names (lib/targets/omp-tool-names.js, derived from the
+ * binary's BUILTIN_TOOLS registry). `task` is excluded on purpose: a
+ * subagent would not inherit the restriction.
+ */
+const READ_ONLY_TOOLS = ['read', 'grep', 'glob', 'web_search'];
+
 function expandHome(p) {
   const os = require('os');
   return p.startsWith('~') ? p.replace(/^~/, os.homedir()) : p;
 }
 
+function resolveSandbox(sandbox) {
+  if (sandbox === undefined || sandbox === null || sandbox === '') return DEFAULT_SANDBOX;
+  const mode = String(sandbox);
+  if (!SANDBOX_MODES.includes(mode)) {
+    throw new Error(`omp backend: unknown sandbox "${mode}" (expected one of ${SANDBOX_MODES.join(', ')})`);
+  }
+  return mode;
+}
+
 /** Pure argv builder — `prompt` here is whatever schema.js has already
  *  decided the final prompt text should be (schema instruction/retry
  *  folded in upstream); this backend never appends its own schema text. */
-function buildArgv({ prompt, model, agentType }) {
+function buildArgv({ prompt, model, agentType, sandbox }) {
   const resolvedModel = resolveModel('omp', model);
   const preamble = agentType ? resolveAgentPreamble(agentType) : '';
   const finalPrompt = preamble ? `${preamble}\n\n${prompt}` : prompt;
   const args = ['-p', '--mode', 'json'];
   if (resolvedModel) args.push('--model', resolvedModel);
+  // workspace-write / danger-full-access add no flag: omp's default is
+  // already its full builtin tool set, and there is nothing wider to grant.
+  if (resolveSandbox(sandbox) === 'read-only') args.push('--tools', READ_ONLY_TOOLS.join(','));
   args.push('--no-extensions', '-e', expandHome(BRIDGE_EXTENSION), finalPrompt);
   return { cmd: 'omp', args };
 }
 
-async function run({ prompt, model, effort, agentType, cwd, timeoutMs }) {
+async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox }) {
   // effort: omp has --thinking=<level> (off/minimal/low/medium/high/xhigh/max/auto)
   // per `omp --help` — map our tiers straight through, they share the vocabulary.
-  const { args } = buildArgv({ prompt, model, agentType });
+  const { args } = buildArgv({ prompt, model, agentType, sandbox });
   if (effort) args.push('--thinking', effort);
   const started = Date.now();
   const { stdout, stderr, code } = await spawnCollect('omp', args, { cwd, timeoutMs });
@@ -75,4 +102,14 @@ function extractText(raw) {
   return raw;
 }
 
-module.exports = { name, supportsSchemaNatively, buildArgv, run, extractText };
+module.exports = {
+  name,
+  supportsSchemaNatively,
+  buildArgv,
+  run,
+  extractText,
+  resolveSandbox,
+  SANDBOX_MODES,
+  DEFAULT_SANDBOX,
+  READ_ONLY_TOOLS,
+};

@@ -6,7 +6,7 @@
 // picked the comment up, which is what drives the owner index's unread count.
 
 import { badRequest, forbidden, notFound, readJsonBody } from "./http.mjs";
-import { isOwner } from "./auth.mjs";
+import { identityKey, isOwner } from "./auth.mjs";
 import { loadArtifactContext } from "./access.mjs";
 
 export const MAX_COMMENT_LENGTH = 8000;
@@ -17,21 +17,30 @@ export const COMMENT_ACTIONS = Object.freeze(["read", "post", "reply", "resolve"
 /**
  * The authorization matrix, as one pure function.
  *
- *            | owner / service token | listed viewer        | anyone else
+ *            | owner / pinned token  | listed viewer        | anyone else
  *   read     | yes                   | yes                  | no
  *   post     | yes                   | yes                  | no
  *   reply    | yes                   | yes                  | no
  *   resolve  | yes                   | only own comment     | no
  *   seen     | yes                   | no                   | no
+ *
+ * "owner" here means OWNER_EMAIL or the pinned SERVICE_TOKEN_NAME — a service
+ * token that is not the pinned one lands in the "listed viewer / anyone else"
+ * columns like any other identity, so it can never mark comments seen.
  */
-export function canActOnComments(action, identity, { ownerEmail, viewers = [], comment = null, reader = null } = {}) {
+export function canActOnComments(
+  action,
+  identity,
+  { ownerEmail, serviceTokenName = null, viewers = [], comment = null, reader = null } = {},
+) {
   if (!COMMENT_ACTIONS.includes(action)) return false;
-  const owner = isOwner(identity, ownerEmail);
+  const owner = isOwner(identity, { ownerEmail, serviceTokenName });
   if (owner) return true;
   // `reader` lets a caller reuse an access decision already made upstream.
+  const key = identityKey(identity);
   const isReader =
     reader === null
-      ? viewers.some((email) => String(email).trim().toLowerCase() === identity?.email)
+      ? key !== null && viewers.some((email) => String(email).trim().toLowerCase() === key)
       : reader === true;
   if (!isReader) return false;
   switch (action) {
@@ -119,7 +128,7 @@ async function loadCommentContext({ id, store, config, identity }) {
     config,
     identity,
     channel: comment.channel,
-    includeRevoked: isOwner(identity, config.ownerEmail),
+    includeRevoked: isOwner(identity, config),
   });
   return { comment, ...context };
 }
@@ -132,9 +141,9 @@ export async function handleListComments({ url, params, identity, config, store 
     config,
     identity,
     channel: params.channel,
-    includeRevoked: isOwner(identity, config.ownerEmail),
+    includeRevoked: isOwner(identity, config),
   });
-  requireCommentAction("read", identity, { ownerEmail: config.ownerEmail, viewers, reader: true });
+  requireCommentAction("read", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true });
   const since = normalizeSince(url.searchParams.get("since"));
   const toAgentOnly = url.searchParams.get("to_agent") === "1";
   const rows = await store.listComments({ channel, since, toAgentOnly });
@@ -147,9 +156,9 @@ export async function handlePostComment({ request, params, identity, config, sto
     config,
     identity,
     channel: params.channel,
-    includeRevoked: isOwner(identity, config.ownerEmail),
+    includeRevoked: isOwner(identity, config),
   });
-  requireCommentAction("post", identity, { ownerEmail: config.ownerEmail, viewers, reader: true });
+  requireCommentAction("post", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true });
 
   const payload = await readJsonBody(request);
   const body = assertBody(payload.body);
@@ -181,7 +190,7 @@ export async function handlePostComment({ request, params, identity, config, sto
 
 export async function handleReplyComment({ request, params, identity, config, store, now = new Date() }) {
   const { comment, channel, viewers } = await loadCommentContext({ id: params.id, store, config, identity });
-  requireCommentAction("reply", identity, { ownerEmail: config.ownerEmail, viewers, reader: true, comment });
+  requireCommentAction("reply", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true, comment });
 
   const payload = await readJsonBody(request);
   const body = assertBody(payload.body);
@@ -201,7 +210,7 @@ export async function handleReplyComment({ request, params, identity, config, st
 
 export async function handleResolveComment({ params, identity, config, store, now = new Date() }) {
   const { comment, viewers } = await loadCommentContext({ id: params.id, store, config, identity });
-  requireCommentAction("resolve", identity, { ownerEmail: config.ownerEmail, viewers, reader: true, comment });
+  requireCommentAction("resolve", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true, comment });
   if (comment.resolved_at) {
     // Idempotent: the first resolution stands.
     return { comment: serializeComment(comment) };
@@ -213,7 +222,7 @@ export async function handleResolveComment({ params, identity, config, store, no
 
 export async function handleSeenComment({ params, identity, config, store, now = new Date() }) {
   const { comment, viewers } = await loadCommentContext({ id: params.id, store, config, identity });
-  requireCommentAction("seen", identity, { ownerEmail: config.ownerEmail, viewers, reader: true, comment });
+  requireCommentAction("seen", identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers, reader: true, comment });
   if (comment.agent_seen_at) {
     return { comment: serializeComment(comment) };
   }

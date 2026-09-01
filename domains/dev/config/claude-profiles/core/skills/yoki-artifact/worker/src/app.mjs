@@ -58,7 +58,7 @@ export async function handleRequest(request, env, deps = {}) {
       fetchImpl: deps.fetchImpl ?? fetch,
       now: now.getTime(),
     });
-    assertCsrf(request, identity);
+    assertCsrf(request, identity, config);
 
     const limiter = deps.rateLimiter ?? sharedRateLimiter;
     const verdict = limiter.check(`${identity.kind}:${identity.id}`, now.getTime());

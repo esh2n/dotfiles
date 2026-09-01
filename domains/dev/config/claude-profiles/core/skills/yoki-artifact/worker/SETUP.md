@@ -174,6 +174,13 @@ export OWNER_EMAIL=you@example.com         # 唯一の書き込み権限者
 - 内容は Access グループ `yoki-artifact-viewers` の include に反映される。
   リストから消したアドレスは次回実行でグループからも消える
 
+日常の共有は `viewers.json` の編集ではなく **`yoki-artifact share`**（5-7）を
+使う。ただし `setup.mjs` はグループの include を `viewers.json` で**丸ごと
+置き換える**。`share` で足したアドレスを恒久的に残したいなら
+`viewers.json` にも書いておくこと。書き忘れると次の `setup.mjs` 実行で
+Access グループから消える（D1 側の viewers 行は残るので、
+「Worker は許すが Access が弾く」状態になる）。
+
 ### 5-3. 実行
 
 ```sh
@@ -201,9 +208,10 @@ node scripts/setup.mjs
 8. Allow ポリシー（`OWNER_EMAIL` + `yoki-artifact-viewers` グループ）と
    Service Auth ポリシー（サービストークン）を作成
 9. `wrangler.toml` の `[vars]` に `ACCESS_AUD` / `ACCESS_TEAM_DOMAIN` /
-   `OWNER_EMAIL` を書き込み
+   `OWNER_EMAIL` / `SERVICE_TOKEN_NAME` を書き込み
 10. `pnpm exec wrangler deploy`（本物の `ACCESS_AUD` を載せて再デプロイ）
 11. `~/.config/yoki-artifact/config.json` を書き込み
+    （`accessGroupId` と `serviceTokenClientId` を含む）
 
 ### 5-4. 何度実行してもよい
 
@@ -211,7 +219,8 @@ node scripts/setup.mjs
 `[skip] ... already exists` と表示する。壊れた途中状態から再実行して続きを
 やらせるのが正しい直し方。
 
-`ACCESS_AUD` が既に `wrangler.toml` と一致していれば、9 と 10 も飛ばす。
+`ACCESS_AUD` と `SERVICE_TOKEN_NAME` が既に `wrangler.toml` と一致していれば、
+9 と 10 も飛ばす。
 
 ### 5-5. サービストークンの secret
 
@@ -222,10 +231,87 @@ Cloudflare 側からも二度と読めない。
 - CLI から使うときは `YOKI_ARTIFACT_CLIENT_SECRET` に入れる
 - `~/.config/yoki-artifact/config.json` には **client id しか書かない**。
   secret はどのファイルにも書かれない
-- 無くしたらローテーション（Zero Trust → Access → Service Auth で
-  `yoki-artifact-cli` を削除 → `setup.mjs` を再実行）
+- 無くしたらローテーション（下記 5-6）
 
-### 5-6. `ACCESS_AUD` を secret にしたい場合
+### 5-6. `SERVICE_TOKEN_NAME` — オーナー権限を持つトークンの固定
+
+**何を固定するか。** Worker はサービストークンの JWT に入る `common_name`
+クレーム（Access はここにトークンの **Client ID** を入れる）を
+`SERVICE_TOKEN_NAME` var と突き合わせ、**一致したときだけ** そのトークンを
+オーナー扱いする。`setup.mjs` が `yoki-artifact-cli` の `client_id` を
+`wrangler.toml` の `[vars]` に書き込む。
+
+これが無かった頃は「Access を通ったサービストークンなら何でもオーナー」
+だったので、同じ Access アプリに 2 本目のサービストークンを足すだけで、
+publish / revoke / share / 全チャンネル閲覧 / コメント既読化まで通ってしまった。
+エッジの Service Auth ポリシーは token_id を 1 本に固定しているが、
+**そのポリシーを人が編集すれば増やせる**。Worker 側でも固定する。
+
+**未設定のときの挙動（fail-closed）。** `SERVICE_TOKEN_NAME` が空、または
+`REPLACE-...` のままなら、**どのサービストークンもオーナーにならない**。
+人間のログインは今までどおり動くが、CLI は publish / revoke / share で 403
+`not_owner` を返し、CSRF の免除も外れる。
+
+> **既存デプロイを更新するときの注意**: この var を入れずにデプロイすると
+> CLI が 403 で止まる。**Worker のデプロイと `setup.mjs` の再実行はセットで
+> 行う**（`node scripts/setup.mjs` が var を書いて再デプロイまでやる）。
+> 黙って全サービストークンを通し続けるより、止まって直すほうを選んでいる。
+
+**ローテーション手順**（secret を無くした / 漏らしたとき）:
+
+1. Zero Trust → Access → Service Auth で `yoki-artifact-cli` を削除
+2. `node scripts/setup.mjs` を再実行
+   （新しいトークンを作り、新しい `client_id` を `SERVICE_TOKEN_NAME` に
+   書いて再デプロイし、Service Auth ポリシーも張り直す）
+3. stderr に一度だけ出る新しい secret を 1Password に保存し、
+   `YOKI_ARTIFACT_CLIENT_SECRET` を差し替える
+
+古いトークンは削除された時点でエッジでも Worker でも通らなくなる。
+
+### 5-7. `yoki-artifact share` と Access グループ
+
+閲覧者の許可は **2 つのリストが揃って初めて**成立する。
+
+| リスト | 実体 | 誰が見るか |
+| --- | --- | --- |
+| D1 の `viewers` 行 | Worker 内の `canRead()` | Worker |
+| Access グループ `yoki-artifact-viewers` | アカウント全体の Access グループ | Cloudflare のエッジ |
+
+D1 だけ更新しても意味がない。**Access が Worker に到達する前に弾く**ので、
+共有相手はページを開けない。逆に Access グループだけ更新すると、エッジは
+通すが Worker が 403 を返す。
+
+そこで `yoki-artifact share` / `unshare` が**唯一の入口**として両方を更新する。
+
+1. D1 を更新（`POST /api/artifacts/:channel/viewers`）
+2. Access グループを read-modify-write で更新
+   （`GET` → include をマージ → `PUT`。メール以外の include ルールは
+   そのまま保持し、`name` / `exclude` / `require` も維持する）
+
+そのために CLI が必要とするもの:
+
+```sh
+export CLOUDFLARE_API_TOKEN=...     # 4 で作ったトークン（環境変数のみ）
+export CLOUDFLARE_ACCOUNT_ID=...    # 未設定なら config.json の accountId
+```
+
+- Access グループの ID は `~/.config/yoki-artifact/config.json` の
+  **`accessGroupId`**。これは `setup.mjs` が書く。古い config で欠けている
+  場合は `node scripts/setup.mjs` を再実行すれば入る
+  （一時的に `YOKI_ARTIFACT_ACCESS_GROUP_ID` で上書きもできる）
+
+**3 つのどれかが欠けている / Cloudflare が拒否したときは、`share` は
+exit 2 で止まり、手でやる手順をそのまま印字する。**「D1 は更新済み」である
+ことも明示する。黙って 200 を返して「共有できたつもり」にはさせない。
+印字される選択肢は 3 つ:
+
+1. `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` を入れて同じコマンドを
+   再実行する（D1 側は冪等なので安全）
+2. `worker/viewers.json` を直して `node scripts/setup.mjs`
+3. ダッシュボード: Zero Trust → Access → Access Groups →
+   `yoki-artifact-viewers` に Emails の include ルールを足す／消す
+
+### 5-8. `ACCESS_AUD` を secret にしたい場合
 
 `setup.mjs` は `ACCESS_AUD` を `wrangler.toml` の `[vars]` に書く。AUD は
 公開識別子（署名検証の対象であって、鍵ではない）なので既定はこれでよい。
@@ -282,7 +368,10 @@ cat ~/.config/yoki-artifact/config.json
 ```
 
 - `accessAud` が `REPLACE-...` でない実 UUID になっている
+- `accessGroupId` が入っている（`share` / `unshare` がこれを読む。5-7）
 - `workerUrl` が `https://yoki-artifact.<subdomain>.workers.dev`
+- `wrangler.toml` の `SERVICE_TOKEN_NAME` が `REPLACE-...` でなく、
+  `serviceTokenClientId` と同じ値になっている（5-6）
 - そのURLをブラウザで開くと Cloudflare Access のログイン画面が出て、Google か
   GitHub でログインでき、`OWNER_EMAIL` のアカウントなら一覧が見える
 - 許可していないアドレスでログインすると Access が弾く（Worker まで来ない）

@@ -6,6 +6,11 @@
 // $YOKI_ARTIFACT_CLIENT_SECRET or from running `secretCommand` (a keychain /
 // 1Password read), so a plaintext service-token secret never lands on disk.
 // Nothing in this module logs or returns the secret in a diagnostic string.
+//
+// `accessGroupId` and `accountId` are written by worker/scripts/setup.mjs and
+// read back here so `share`/`unshare` can update the Cloudflare Access group
+// as well as the D1 viewer list. They are optional: a config written before
+// that existed still loads, and the commands that need them say so.
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -104,6 +109,12 @@ export function loadConfig(env = process.env) {
   const fileUrl = stringField(fromFile.baseUrl, "baseUrl", file);
   const fileClientId = stringField(fromFile.clientId, "clientId", file);
   const secretCommand = stringField(fromFile.secretCommand, "secretCommand", file);
+  // Written by worker/scripts/setup.mjs. `share`/`unshare` need it to keep the
+  // Cloudflare Access group in step with the D1 viewer list; every other
+  // command ignores it, so it stays optional and is never required here.
+  const envGroupId = env.YOKI_ARTIFACT_ACCESS_GROUP_ID?.trim();
+  const accessGroupId = envGroupId || stringField(fromFile.accessGroupId, "accessGroupId", file);
+  const accountId = stringField(fromFile.accountId, "accountId", file);
 
   const rawBaseUrl = envUrl || fileUrl;
   if (!rawBaseUrl) {
@@ -124,11 +135,14 @@ export function loadConfig(env = process.env) {
     baseUrl: normalizeBaseUrl(rawBaseUrl, envUrl ? "YOKI_ARTIFACT_URL" : `"baseUrl" in ${file}`),
     clientId,
     secretCommand,
+    accessGroupId: accessGroupId ?? null,
+    accountId: accountId ?? null,
     file,
     fileExists,
     sources: Object.freeze({
       baseUrl: envUrl ? "env" : "file",
       clientId: envClientId ? "env" : "file",
+      accessGroupId: envGroupId ? "env" : "file",
     }),
   });
 }

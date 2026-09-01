@@ -61,9 +61,8 @@ access from the script body itself (only through `agent()`).
     it, otherwise it's advisory metadata folded into the prompt preamble).
   - `opts.isolation: 'worktree'` — run this one agent() call inside a fresh
     `git worktree`, auto-removed after if the tree is clean.
-  - `opts.sandbox` — `'read-only' | 'workspace-write' | 'danger-full-access'`,
-    for backends that have a sandbox concept (today: codex's `-s`). **Defaults
-    to `'read-only'`** — the backend tool's own default — so a call only gets
+  - `opts.sandbox` — `'read-only' | 'workspace-write' | 'danger-full-access'`.
+    **Defaults to `'read-only'`** on every real backend, so a call only gets
     filesystem write authority when the script asks for it. Set
     `sandbox: 'workspace-write'` on the calls that actually edit, commit, or
     run a build (implement.js's Implement/Delivery, preflight.js's auto-fix,
@@ -71,7 +70,20 @@ access from the script body itself (only through `agent()`).
     researching calls, whose prompts are assembled from untrusted material
     (diff hunks, fetched pages, artifact comments). `isolation: 'worktree'`
     does NOT imply it: a worktree call that writes still passes it explicitly.
-    Backends without a sandbox concept (claude, omp, mock) ignore the option.
+
+    How each backend enforces it:
+
+    | backend | `read-only` | `workspace-write` / `danger-full-access` |
+    | --- | --- | --- |
+    | codex | `-s read-only` (native) | `-s <mode>` |
+    | claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash` | no extra flag (the CLI's own default) |
+    | omp | `--tools read,grep,glob,web_search` (allow-list) | no extra flag |
+    | mock | n/a — nothing is spawned | n/a |
+
+    An unknown value is a hard error on every backend, never a silent
+    widening. claude and omp used to accept `opts.sandbox` and discard it,
+    which made the read-only default a property of one harness instead of
+    the API; the flag now reaches all three.
   - `opts.agentType` — the actual field name used by scripts (review.js:
     `agentType: 'code-reviewer'`/`'security-reviewer'`/`'go-perf-reviewer'`
     etc.; go-optimize.js: `agentType: 'go-perf-reviewer'`). **Note**: the

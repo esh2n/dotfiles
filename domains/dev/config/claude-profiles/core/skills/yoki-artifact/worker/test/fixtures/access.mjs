@@ -7,6 +7,8 @@ export const TEAM_DOMAIN = "yoki-test.cloudflareaccess.com";
 export const ISSUER = `https://${TEAM_DOMAIN}`;
 export const AUD = "0123456789abcdef0123456789abcdef";
 export const OWNER_EMAIL = "owner@example.com";
+/** The Client ID Access puts in `common_name` for the CLI's service token. */
+export const SERVICE_TOKEN_NAME = "yoki-cli.example.access";
 
 const encoder = new TextEncoder();
 
@@ -41,7 +43,7 @@ export function personClaims({ email = OWNER_EMAIL, nowSec = Math.floor(Date.now
 }
 
 /** Service-token claims: `common_name` set, `sub` empty, no email. */
-export function serviceClaims({ commonName = "yoki-cli.example.access", nowSec = Math.floor(Date.now() / 1000), aud = AUD, iss = ISSUER, ttlSec = 3600 } = {}) {
+export function serviceClaims({ commonName = SERVICE_TOKEN_NAME, nowSec = Math.floor(Date.now() / 1000), aud = AUD, iss = ISSUER, ttlSec = 3600 } = {}) {
   return { aud, iss, common_name: commonName, sub: "", iat: nowSec, exp: nowSec + ttlSec, type: "app" };
 }
 
@@ -62,6 +64,9 @@ export function testEnv(overrides = {}) {
     ACCESS_TEAM_DOMAIN: TEAM_DOMAIN,
     ACCESS_AUD: AUD,
     OWNER_EMAIL: OWNER_EMAIL,
+    // A provisioned deployment pins its CLI token. Cases that need the
+    // unpinned (pre-fix, or un-migrated) deployment override this with "".
+    SERVICE_TOKEN_NAME: SERVICE_TOKEN_NAME,
     ASSETS: {
       fetch: async () => new Response("<!doctype html><title>shell</title>", { status: 200 }),
     },

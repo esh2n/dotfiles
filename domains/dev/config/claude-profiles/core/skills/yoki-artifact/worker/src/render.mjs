@@ -55,7 +55,7 @@ export function parseVersion(raw) {
  * checks what was published before revoking.
  */
 export function revokedIsVisible(request, identity, config) {
-  return isOwner(identity, config.ownerEmail) && request.headers.get(INCLUDE_REVOKED_HEADER) === "1";
+  return isOwner(identity, config) && request.headers.get(INCLUDE_REVOKED_HEADER) === "1";
 }
 
 export async function handleRender({ request, params, identity, config, store, blobs, logger = console }) {
@@ -74,7 +74,7 @@ export async function handleRender({ request, params, identity, config, store, b
   }
 
   const viewers = await store.listViewers(channel);
-  if (!canRead(identity, { ownerEmail: config.ownerEmail, viewers })) {
+  if (!canRead(identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers })) {
     throw forbidden("not_a_viewer", "You do not have access to this artifact.");
   }
 

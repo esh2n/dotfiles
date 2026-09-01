@@ -64,6 +64,9 @@ const fullState = (overrides = {}) => ({
     ACCESS_AUD: "aud-1",
     ACCESS_TEAM_DOMAIN: PARAMS.teamDomain,
     OWNER_EMAIL: PARAMS.ownerEmail,
+    // The owner pin is the service token's CLIENT ID, not its name — that is
+    // what Access puts in the JWT `common_name` claim.
+    SERVICE_TOKEN_NAME: "client-1",
   },
   ...overrides,
 });
@@ -141,6 +144,16 @@ describe("planSetup on an empty account", () => {
       ACCESS_AUD: { $ref: "access-app", path: "aud" },
       ACCESS_TEAM_DOMAIN: PARAMS.teamDomain,
       OWNER_EMAIL: PARAMS.ownerEmail,
+      SERVICE_TOKEN_NAME: { $ref: "service-token", path: "client_id" },
+    });
+  });
+
+  // The Worker compares SERVICE_TOKEN_NAME against the JWT `common_name`
+  // claim, which Access fills with the token's Client ID.
+  test("SERVICE_TOKEN_NAME pins the service token by its client id", () => {
+    assert.deepEqual(step(plan, "wrangler-vars").values.SERVICE_TOKEN_NAME, {
+      $ref: "service-token",
+      path: "client_id",
     });
   });
 
@@ -150,6 +163,12 @@ describe("planSetup on an empty account", () => {
     assert.equal(values.clientSecretEnv, "YOKI_ARTIFACT_CLIENT_SECRET");
     const serialised = JSON.stringify(plan);
     assert.ok(!/client_secret|secret"\s*:/.test(serialised), "no plan step carries a secret value");
+  });
+
+  // Without this the CLI's `share` has no way to reach the Access group, and
+  // the D1 viewer list and the edge allow-list drift apart silently.
+  test("the local config records the Access group id for share/unshare", () => {
+    assert.deepEqual(step(plan, "user-config").values.accessGroupId, { $ref: "viewers-group", path: "id" });
   });
 });
 
@@ -166,6 +185,22 @@ describe("planSetup is idempotent", () => {
     assert.equal(step(plan, "d1-database").known.uuid, "db-1");
     assert.equal(step(plan, "wrangler-database-id").skip, "already set");
     assert.match(step(plan, "service-token").skip, /already exists/);
+  });
+
+  test("a deployment that predates the owner pin gets SERVICE_TOKEN_NAME written", () => {
+    const stale = fullState({
+      wranglerVars: {
+        database_id: "db-1",
+        ACCESS_AUD: "aud-1",
+        ACCESS_TEAM_DOMAIN: PARAMS.teamDomain,
+        OWNER_EMAIL: PARAMS.ownerEmail,
+        SERVICE_TOKEN_NAME: null,
+      },
+    });
+    const plan = planSetup(stale, PARAMS);
+    assert.equal(step(plan, "wrangler-vars").skip, null);
+    assert.equal(step(plan, "wrangler-vars").values.SERVICE_TOKEN_NAME, "client-1");
+    assert.equal(step(plan, "redeploy-worker").skip, null, "the pin only takes effect after a redeploy");
   });
 
   test("a stale ACCESS_AUD in wrangler.toml is repatched and redeployed", () => {
@@ -337,6 +372,7 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
         'ACCESS_TEAM_DOMAIN = "REPLACE-team.cloudflareaccess.com"',
         'ACCESS_AUD = "REPLACE-access-application-aud"',
         'OWNER_EMAIL = "REPLACE-owner@example.com"',
+        'SERVICE_TOKEN_NAME = "REPLACE-service-token-client-id"',
         "",
       ].join("\n"),
     );
@@ -398,11 +434,13 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
       ACCESS_AUD: "aud-9",
       ACCESS_TEAM_DOMAIN: PARAMS.teamDomain,
       OWNER_EMAIL: PARAMS.ownerEmail,
+      SERVICE_TOKEN_NAME: "client-9",
     });
 
     const config = JSON.parse(readFileSync(h.paths.userConfig, "utf8"));
     assert.equal(config.accessAud, "aud-9");
     assert.equal(config.serviceTokenClientId, "client-9");
+    assert.equal(config.accessGroupId, "g-9", "share/unshare reads the group id from here");
     assert.ok(!JSON.stringify(config).includes("s3cret"), "the secret is never written to disk");
     assert.equal(results.get("service-token").client_secret, "s3cret-shown-once");
     rmSync(h.dir, { recursive: true, force: true });
@@ -418,6 +456,7 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
     ]);
     const config = JSON.parse(readFileSync(h.paths.userConfig, "utf8"));
     assert.equal(config.accessAud, "aud-1", "the AUD comes from the existing application");
+    assert.equal(config.accessGroupId, "g-1", "and the group id from the existing group");
     rmSync(h.dir, { recursive: true, force: true });
   });
 
@@ -536,6 +575,7 @@ describe("wrangler.toml edits", () => {
     'ACCESS_TEAM_DOMAIN = "REPLACE-team.cloudflareaccess.com"',
     'ACCESS_AUD = "REPLACE-access-application-aud"',
     'OWNER_EMAIL = "REPLACE-owner@example.com"',
+    'SERVICE_TOKEN_NAME = "REPLACE-service-token-client-id"',
     "",
     "[observability]",
     "enabled = true",
@@ -555,6 +595,7 @@ describe("wrangler.toml edits", () => {
       ACCESS_AUD: "aud-1",
       ACCESS_TEAM_DOMAIN: "REPLACE-team.cloudflareaccess.com",
       OWNER_EMAIL: "owner@example.com",
+      SERVICE_TOKEN_NAME: "REPLACE-service-token-client-id",
     });
     assert.match(patched, /\[observability\]\nenabled = true/);
   });

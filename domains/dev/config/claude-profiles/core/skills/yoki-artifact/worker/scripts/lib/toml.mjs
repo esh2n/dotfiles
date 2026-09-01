@@ -46,5 +46,6 @@ export function readWranglerValues(toml) {
     ACCESS_AUD: pick("ACCESS_AUD"),
     ACCESS_TEAM_DOMAIN: pick("ACCESS_TEAM_DOMAIN"),
     OWNER_EMAIL: pick("OWNER_EMAIL"),
+    SERVICE_TOKEN_NAME: pick("SERVICE_TOKEN_NAME"),
   });
 }

@@ -172,3 +172,69 @@ test('a nonzero exit is recorded, not thrown', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// unattended posture: a loop run IS an unattended agent run, so every child
+// must carry YOKI_UNATTENDED=1 — that flag is what arms
+// hooks/unattended-guard.sh, which `exit 0`s (does nothing) without it.
+// ---------------------------------------------------------------------------
+
+function captureChildOptions(runOptions, env, dotfilesRoot) {
+  let childOptions = null;
+  runner.run(
+    { cwd: '.', prompt: 'hi', dotfilesRoot, env, ...runOptions },
+    {
+      spawn: (cmd, args, options) => {
+        childOptions = options;
+        return { status: 0, signal: null, stdout: '{}', stderr: '' };
+      },
+    }
+  );
+  return childOptions;
+}
+
+test('every spawned child gets YOKI_UNATTENDED=1 in its environment', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const options = captureChildOptions({ name: 'demo', harness: 'claude' }, env, dotfilesRoot);
+      assert.equal(options.env.YOKI_UNATTENDED, '1');
+    });
+  });
+});
+
+test('the unattended flag is set on every harness, not just codex', () => {
+  for (const harness of ['claude', 'codex', 'omp']) {
+    withTempHome((env) => {
+      withTempDotfilesRoot((dotfilesRoot) => {
+        const options = captureChildOptions({ name: `demo-${harness}`, harness }, env, dotfilesRoot);
+        assert.equal(options.env.YOKI_UNATTENDED, '1', `${harness} child must be unattended`);
+      });
+    });
+  }
+});
+
+test('the rest of the runner environment is inherited, not replaced, by the unattended flag', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const options = captureChildOptions(
+        { name: 'demo', harness: 'claude' },
+        { ...env, SOME_EXISTING_VAR: 'kept' },
+        dotfilesRoot
+      );
+      assert.equal(options.env.SOME_EXISTING_VAR, 'kept');
+      assert.equal(options.env.YOKI_UNATTENDED, '1');
+    });
+  });
+});
+
+test('childEnv never mutates the runner\'s own environment object', () => {
+  const original = { PATH: '/bin' };
+  const child = runner.childEnv(original);
+  assert.equal(child.YOKI_UNATTENDED, '1');
+  assert.equal(original.YOKI_UNATTENDED, undefined);
+});
+
+test('an explicit YOKI_UNATTENDED=0 in the caller\'s env cannot disarm the guard', () => {
+  // A loop run is unattended by definition; the flag is not negotiable per run.
+  assert.equal(runner.childEnv({ YOKI_UNATTENDED: '0' }).YOKI_UNATTENDED, '1');
+});

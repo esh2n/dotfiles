@@ -71,16 +71,24 @@ build_seeded_fixture() {
     # A foreign (non-yoki) hooks.json group — mergeHooksJson must keep this
     # byte-for-byte and only replace/append yoki's OWN previously-generated
     # groups (codex-hooks-merge.js groupIsOurs()).
+    #
+    # Written in the WRAPPED `{"hooks": {<Event>: [...]}}` shape — the only
+    # shape Codex reads, and the shape the real ~/.codex/hooks.json on this
+    # machine has. A flat top-level event map parses fine but Codex finds no
+    # hooks in it and runs none, so the generator must both emit and keep
+    # reading the wrapped form.
     cat > "$FIXTURE/codex/hooks.json" <<JSON
 {
-  "SessionStart": [
-    {
-      "matcher": "*",
-      "hooks": [
-        { "type": "command", "command": "${FOREIGN_HERDR_COMMAND}" }
-      ]
-    }
-  ]
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "${FOREIGN_HERDR_COMMAND}" }
+        ]
+      }
+    ]
+  }
 }
 JSON
 
@@ -147,7 +155,11 @@ run_yoki_switch_targets_checks() {
     # 1. Foreign content preserved byte-for-byte.
     assert_true "codex/hooks.json: foreign SessionStart group preserved" \
         jq -e --arg cmd "$FOREIGN_HERDR_COMMAND" \
-            '.SessionStart[0].hooks[0].command == $cmd' "$FIXTURE/codex/hooks.json"
+            '.hooks.SessionStart[0].hooks[0].command == $cmd' "$FIXTURE/codex/hooks.json"
+    # The shape itself: a flat top-level event map is a file codex ignores.
+    assert_true "codex/hooks.json: written in Codex's wrapped {\"hooks\":{…}} shape" \
+        jq -e '(.hooks | type) == "object" and (.PreToolUse == null) and (.SessionStart == null)' \
+            "$FIXTURE/codex/hooks.json"
 
     assert_true "codex/config.toml: foreign [projects] table preserved" \
         grep -qF '[projects."/repo"]' "$FIXTURE/codex/config.toml"
@@ -164,10 +176,10 @@ run_yoki_switch_targets_checks() {
     assert_true "codex/config.toml: yoki default_permissions set inside block" \
         grep -qF 'default_permissions = "yoki"' "$FIXTURE/codex/config.toml"
     assert_true "codex/hooks.json: a generated (--harness codex) group is present alongside the foreign one" \
-        jq -e '[.[][] | .hooks[]?.command | select(test("--harness codex"))] | length > 0' \
+        jq -e '[.hooks[][] | .hooks[]?.command | select(test("--harness codex"))] | length > 0' \
             "$FIXTURE/codex/hooks.json"
     assert_true "codex/hooks.json: foreign group still comes first in its event" \
-        jq -e --arg cmd "$FOREIGN_HERDR_COMMAND" '.SessionStart[0].hooks[0].command == $cmd' \
+        jq -e --arg cmd "$FOREIGN_HERDR_COMMAND" '.hooks.SessionStart[0].hooks[0].command == $cmd' \
             "$FIXTURE/codex/hooks.json"
 
     assert_true "omp/agent/config.yml: written" \
@@ -216,7 +228,7 @@ run_yoki_switch_targets_checks() {
         grep -qF 'trusted_hash = "deadbeef"' "$FIXTURE/codex/config.toml"
     assert_true "codex/hooks.json: foreign SessionStart group still exact match after 2 runs" \
         jq -e --arg cmd "$FOREIGN_HERDR_COMMAND" \
-            '.SessionStart[0].hooks[0].command == $cmd' "$FIXTURE/codex/hooks.json"
+            '.hooks.SessionStart[0].hooks[0].command == $cmd' "$FIXTURE/codex/hooks.json"
 
     cleanup_fixture
     trap - RETURN

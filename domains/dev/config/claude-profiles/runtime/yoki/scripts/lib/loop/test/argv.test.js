@@ -4,7 +4,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 
-const { buildCommand, ompGuardPath, resolveSandbox, DEFAULT_SANDBOX } = require('../argv');
+const {
+  buildCommand,
+  ompGuardPath,
+  resolveSandbox,
+  DEFAULT_SANDBOX,
+  CLAUDE_READ_ONLY_DENIED_TOOLS,
+  OMP_READ_ONLY_TOOLS,
+} = require('../argv');
 
 test('claude: minimal argv (no model, no resume)', () => {
   const { cmd, args, stdin } = buildCommand({ harness: 'claude', prompt: 'hello', cwd: '/repo' });
@@ -77,12 +84,64 @@ test('codex: an unknown --sandbox value is rejected, never silently passed to co
   assert.equal(resolveSandbox(''), 'workspace-write');
 });
 
-test('claude/omp ignore --sandbox — neither has such a flag', () => {
-  const c = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'read-only' });
-  assert.deepEqual(c.args, ['-p', 'p', '--output-format', 'json']);
-  const o = buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'read-only' });
-  assert.ok(!o.args.includes('-s'));
-  assert.ok(!o.args.includes('read-only'));
+test('claude: --sandbox read-only denies every write tool instead of being ignored', () => {
+  const { args } = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'read-only' });
+  const denied = args[args.indexOf('--disallowedTools') + 1];
+  assert.ok(args.includes('--disallowedTools'), 'read-only must reach the claude argv');
+  for (const tool of CLAUDE_READ_ONLY_DENIED_TOOLS) {
+    assert.ok(denied.split(',').includes(tool), `${tool} must be denied`);
+  }
+  // A shell is a write tool — leaving Bash enabled would make this cosmetic.
+  assert.ok(denied.split(',').includes('Bash'));
+});
+
+test('claude: workspace-write (the default) adds no restriction flag', () => {
+  const dflt = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo' });
+  assert.deepEqual(dflt.args, ['-p', 'p', '--output-format', 'json']);
+  const explicit = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'workspace-write' });
+  assert.ok(!explicit.args.includes('--disallowedTools'));
+});
+
+test('omp: --sandbox read-only restricts the tool allow-list instead of being ignored', () => {
+  const { args } = buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'read-only' });
+  const enabled = args[args.indexOf('--tools') + 1].split(',');
+  assert.deepEqual(enabled, OMP_READ_ONLY_TOOLS);
+  for (const writeTool of ['write', 'edit', 'bash', 'ast_edit', 'task']) {
+    assert.ok(!enabled.includes(writeTool), `${writeTool} must not be enabled read-only`);
+  }
+  // The guard extension and the prompt still come last, unchanged.
+  assert.equal(args[args.length - 1], 'p');
+  assert.ok(args.includes('--no-extensions'));
+});
+
+test('omp: workspace-write (the default) adds no --tools restriction', () => {
+  const dflt = buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u' });
+  assert.ok(!dflt.args.includes('--tools'));
+  const explicit = buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'workspace-write' });
+  assert.ok(!explicit.args.includes('--tools'));
+});
+
+test('an unknown --sandbox is rejected on claude and omp too, not just codex', () => {
+  assert.throws(() => buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'yolo' }), /unknown --sandbox "yolo"/);
+  assert.throws(
+    () => buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'yolo' }),
+    /unknown --sandbox "yolo"/
+  );
+});
+
+test('no harness silently accepts-and-discards --sandbox read-only', () => {
+  // The regression this pins: `yoki-loop install inbox --harness omp
+  // --sandbox read-only` used to validate the flag and then run with full
+  // write access. Every harness must show read-only somewhere in its argv.
+  const cases = [
+    buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'read-only' }),
+    buildCommand({ harness: 'codex', prompt: 'p', cwd: '/repo', sandbox: 'read-only' }),
+    buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'read-only' }),
+  ];
+  for (const { cmd, args } of cases) {
+    const restricted = args.includes('-s') || args.includes('--disallowedTools') || args.includes('--tools');
+    assert.ok(restricted, `${cmd} must express read-only in its argv`);
+  }
 });
 
 test('omp: minimal argv keeps the guard flags and puts the prompt last', () => {

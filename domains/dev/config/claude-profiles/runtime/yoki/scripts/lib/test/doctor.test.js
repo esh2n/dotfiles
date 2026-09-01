@@ -14,7 +14,11 @@ const {
   parseFeaturesHooks,
   hasPermissionsConflict,
   detectTrustDrift,
+  validateTrustHashPort,
   unwrapHooksJson,
+  checkCodexHooksShape,
+  checkCodexTrustPort,
+  checkStateHomeRelocation,
   extractHookCommands,
   extractHookScriptRefs,
   checkClaudeTarget,
@@ -25,6 +29,7 @@ const {
   checkClaudeExternalLinks,
 } = require('../doctor');
 const { computeHandlerHash } = require('../targets/codex-trust');
+const { mergeHooksJson } = require('../targets/codex-hooks-merge');
 
 function makeTmpDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -152,6 +157,37 @@ test('unwrapHooksJson passes through a flat {EventName: [...]} shape unchanged',
 test('unwrapHooksJson passes null/undefined through', () => {
   assert.equal(unwrapHooksJson(null), null);
   assert.equal(unwrapHooksJson(undefined), undefined);
+});
+
+// ---------------------------------------------------------------------------
+// checkCodexHooksShape: the flat shape is a FAIL, not a tolerated variant —
+// codex reads only `{"hooks": {...}}` and silently runs nothing otherwise,
+// so accepting both would make doctor unable to answer "did it work?".
+// ---------------------------------------------------------------------------
+
+test('checkCodexHooksShape: the wrapped shape codex actually reads is ok', () => {
+  const check = checkCodexHooksShape({ hooks: { SessionStart: [{ hooks: [{ command: 'x' }] }] } });
+  assert.equal(check.status, 'ok');
+  assert.equal(check.check, 'hooks-shape');
+});
+
+test('checkCodexHooksShape: a flat event map FAILS and says codex ignores it', () => {
+  const check = checkCodexHooksShape({ SessionStart: [{ hooks: [{ command: 'x' }] }] });
+  assert.equal(check.status, 'fail');
+  assert.match(check.hint, /not in Codex's wrapped \{"hooks":\{…\}\} shape/);
+  assert.match(check.hint, /codex ignores it/);
+  assert.match(check.hint, /yoki-switch apply/);
+});
+
+test('checkCodexHooksShape: a missing or empty hooks.json warns rather than failing', () => {
+  assert.equal(checkCodexHooksShape(null).status, 'warn');
+  assert.equal(checkCodexHooksShape(undefined).status, 'warn');
+  assert.equal(checkCodexHooksShape({}).status, 'warn');
+});
+
+test('checkCodexHooksShape: what the generator writes today passes it', () => {
+  const generated = { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js x --harness codex' }] }] };
+  assert.equal(checkCodexHooksShape(mergeHooksJson({}, generated)).status, 'ok');
 });
 
 // ---------------------------------------------------------------------------
@@ -382,9 +418,157 @@ test('checkCodexTarget: trust-drift/features-hooks/permissions-conflict against 
     const results = checkCodexTarget({ codexDir, home, dotfilesRoot });
 
     assert.equal(findCheck(results, 'features-hooks').status, 'ok');
+    assert.equal(findCheck(results, 'hooks-shape').status, 'ok');
     assert.equal(findCheck(results, 'hooks-groups').status, 'ok');
     assert.equal(findCheck(results, 'trust-drift').status, 'ok');
     assert.equal(findCheck(results, 'permissions-conflict').status, 'fail');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(dotfilesRoot, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// validateTrustHashPort: the ONE non-tautological check on the ported hash.
+// trust-drift compares our port against our port; this compares it against a
+// hash Codex itself wrote for a hook yoki did not generate.
+// ---------------------------------------------------------------------------
+
+const FOREIGN_HANDLER = { type: 'command', command: 'bash /opt/herdr/agent-state.sh session', timeout: 10 };
+
+test('validateTrustHashPort: a Codex-written entry for a FOREIGN hook corroborates the port', () => {
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
+  const hooksJson = { SessionStart: [{ hooks: [FOREIGN_HANDLER] }] };
+  const codexWrote = computeHandlerHash({ eventLabel: 'session_start', handler: FOREIGN_HANDLER });
+  const storedStates = new Map([[`${hooksJsonPath}:session_start:0:0`, codexWrote]]);
+
+  const { checked, mismatched } = validateTrustHashPort({ hooksJson, hooksJsonPath, storedStates });
+  assert.equal(checked, 1);
+  assert.deepEqual(mismatched, []);
+});
+
+test('validateTrustHashPort: a disagreement with Codex\'s own stored hash is reported', () => {
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
+  const hooksJson = { SessionStart: [{ hooks: [FOREIGN_HANDLER] }] };
+  const storedStates = new Map([[`${hooksJsonPath}:session_start:0:0`, 'sha256:what-codex-actually-computed']]);
+
+  const { checked, mismatched } = validateTrustHashPort({ hooksJson, hooksJsonPath, storedStates });
+  assert.equal(checked, 1);
+  assert.deepEqual(mismatched, [`${hooksJsonPath}:session_start:0:0`]);
+});
+
+test('validateTrustHashPort: our OWN handlers are not counted — hashing them proves nothing', () => {
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
+  const ours = ourHandler('scripts/hooks/foo.js');
+  const hooksJson = { PreToolUse: [{ matcher: 'Bash', hooks: [ours] }] };
+  const storedStates = new Map([
+    [`${hooksJsonPath}:pre_tool_use:0:0`, computeHandlerHash({ eventLabel: 'pre_tool_use', matcher: 'Bash', handler: ours })],
+  ]);
+
+  assert.equal(validateTrustHashPort({ hooksJson, hooksJsonPath, storedStates }).checked, 0);
+});
+
+test('validateTrustHashPort: a foreign hook Codex never trusted is skipped, not counted as a match', () => {
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
+  const hooksJson = { SessionStart: [{ hooks: [FOREIGN_HANDLER] }] };
+  assert.equal(validateTrustHashPort({ hooksJson, hooksJsonPath, storedStates: new Map() }).checked, 0);
+});
+
+test('checkCodexTrustPort: says so when there is nothing to corroborate the port', () => {
+  const check = checkCodexTrustPort({ hooksJson: {}, hooksJsonPath: '/h/hooks.json', configTomlText: '' });
+  assert.equal(check.status, 'warn');
+  assert.match(check.hint, /no Codex-written trust entry/);
+});
+
+test('checkCodexTrustPort: a mismatch names both readings rather than asserting one', () => {
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
+  const check = checkCodexTrustPort({
+    hooksJson: { SessionStart: [{ hooks: [FOREIGN_HANDLER] }] },
+    hooksJsonPath,
+    configTomlText: [`[hooks.state."${hooksJsonPath}:session_start:0:0"]`, 'trusted_hash = "sha256:different"'].join('\n'),
+  });
+  assert.equal(check.status, 'warn');
+  assert.match(check.hint, /has diverged from Codex/);
+  assert.match(check.hint, /changed since Codex trusted it/);
+});
+
+// ---------------------------------------------------------------------------
+// checkStateHomeRelocation
+// ---------------------------------------------------------------------------
+
+test('checkStateHomeRelocation: no XDG override means nothing moved', () => {
+  const home = makeTmpDir('yoki-doctor-state-');
+  try {
+    const check = checkStateHomeRelocation({ home, env: { HOME: home } });
+    assert.equal(check.status, 'ok');
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('checkStateHomeRelocation: XDG set with an empty legacy dir is ok', () => {
+  const home = makeTmpDir('yoki-doctor-state2-');
+  const xdg = makeTmpDir('yoki-doctor-xdg2-');
+  try {
+    const check = checkStateHomeRelocation({ home, env: { HOME: home, XDG_STATE_HOME: xdg } });
+    assert.equal(check.status, 'ok');
+    assert.match(check.hint, /nothing left at/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(xdg, { recursive: true, force: true });
+  }
+});
+
+test('checkStateHomeRelocation: run history stranded at the pre-XDG path is warned about, never moved', () => {
+  const home = makeTmpDir('yoki-doctor-state3-');
+  const xdg = makeTmpDir('yoki-doctor-xdg3-');
+  try {
+    const legacyGraph = path.join(home, '.local', 'state', 'yoki', 'graph', 'run-1');
+    fs.mkdirSync(legacyGraph, { recursive: true });
+    writeFile(path.join(legacyGraph, 'journal.jsonl'), '{"kind":"start"}\n');
+
+    const check = checkStateHomeRelocation({ home, env: { HOME: home, XDG_STATE_HOME: xdg } });
+    assert.equal(check.status, 'warn');
+    assert.match(check.hint, /graph/);
+    assert.match(check.hint, /daily-cap counters start from zero/);
+    // doctor reports; it does not relocate the user's history for them.
+    assert.ok(fs.existsSync(path.join(legacyGraph, 'journal.jsonl')));
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(xdg, { recursive: true, force: true });
+  }
+});
+
+test('checkCodexTarget: a FLAT hooks.json is a fail, even when every trust hash matches', () => {
+  // The exact state a pre-fix yoki left behind: hashes agree with the file's
+  // content, so trust-drift is happy — but codex reads no hooks out of it and
+  // runs none. Without the shape check, doctor reports a healthy install.
+  const home = makeTmpDir('yoki-doctor-codex-flat-home-');
+  const codexDir = path.join(home, '.codex');
+  const dotfilesRoot = makeTmpDir('yoki-doctor-codex-flat-dotfiles-');
+  try {
+    fs.mkdirSync(codexDir, { recursive: true });
+
+    const handler = ourHandler('scripts/hooks/foo.js');
+    const hooksJsonPath = path.join(codexDir, 'hooks.json');
+    writeFile(hooksJsonPath, JSON.stringify({ PreToolUse: [{ matcher: 'Bash', hooks: [handler] }] }));
+
+    const goodHash = computeHandlerHash({ eventLabel: 'pre_tool_use', matcher: 'Bash', handler });
+    const key = `${hooksJsonPath}:pre_tool_use:0:0`;
+    writeFile(
+      path.join(codexDir, 'config.toml'),
+      ['[features]', 'hooks = true', '', `[hooks.state."${key}"]`, `trusted_hash = "${goodHash}"`].join('\n')
+    );
+
+    const results = checkCodexTarget({ codexDir, home, dotfilesRoot });
+
+    const shape = findCheck(results, 'hooks-shape');
+    assert.equal(shape.status, 'fail');
+    assert.match(shape.hint, /codex ignores it/);
+    // Everything else still looks fine — which is exactly why the shape check
+    // has to exist as its own fail.
+    assert.equal(findCheck(results, 'trust-drift').status, 'ok');
+    assert.equal(findCheck(results, 'hooks-groups').status, 'ok');
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(dotfilesRoot, { recursive: true, force: true });

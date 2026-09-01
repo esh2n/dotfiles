@@ -251,6 +251,29 @@ test('main: install writes a plist and prints the bootstrap command, never runs 
   });
 });
 
+test('main: install puts YOKI_UNATTENDED=1 in the plist EnvironmentVariables', () => {
+  // launchd hands the job a near-empty environment, so the flag that arms
+  // hooks/unattended-guard.sh has to be written into the plist itself —
+  // otherwise the guard is inert for exactly the runs it exists for.
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const io = makeIO();
+      cli.main(
+        ['install', 'demo', '--harness', 'codex', '--cwd', '.', '--prompt', 'hi', '--every', '30m'],
+        { dotfilesRoot, env, stdout: io.stdout, stderr: io.stderr }
+      );
+      const xml = fs.readFileSync(plist.plistPath('demo', env.HOME), 'utf8');
+      assert.match(
+        xml,
+        /<key>EnvironmentVariables<\/key>[\s\S]*<key>YOKI_UNATTENDED<\/key>\s*<string>1<\/string>/
+      );
+      // PATH/HOME are still there — the flag is added, not substituted for them.
+      assert.match(xml, /<key>PATH<\/key>/);
+      assert.match(xml, /<key>HOME<\/key>/);
+    });
+  });
+});
+
 test('main: install requires --every', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {

@@ -17,16 +17,26 @@
  * is left alone rather than overwritten — the caller surfaces the resulting
  * warning through gen.js's `plan().warnings`, same as every other codex.js
  * warning.
+ *
+ * NAMING — a writer selects servers by HARNESS_ID (the id this subsystem's
+ * readers/ also use), not by naming an mcp.json `targets.<key>` directly:
+ * the two spellings coincide for codex but not for Claude Code (`claude` in
+ * the data, `claude-code` as the id), and lib/mcp-inventory/source.js's
+ * TARGET_KEY_TO_HARNESS_ID is the only place they are reconciled.
  */
+
+const { isTargetedAt, applyTargetOverride } = require('../source');
+
+/** This writer's harness id — the same id readers/codex.js stamps. */
+const HARNESS_ID = 'codex';
 
 function tomlString(value) {
   return JSON.stringify(String(value));
 }
 
-/** Applies this server's 'codex' targetOverrides, if any. */
+/** Applies this server's Codex targetOverrides, if any. */
 function applyCodexOverride(server) {
-  const override = server.targetOverrides && server.targetOverrides.codex;
-  return override ? { ...server, ...override } : server;
+  return applyTargetOverride(server, HARNESS_ID);
 }
 
 /** @param {object} server a resolved server (after 'codex' targetOverrides) */
@@ -78,7 +88,7 @@ function buildMcpServersToml(mergedServers, existingOutsideBlock) {
   const tables = [];
 
   for (const server of mergedServers) {
-    if (!server.targets || server.targets.codex !== true) continue;
+    if (!isTargetedAt(server, HARNESS_ID)) continue;
 
     if (conflicting.has(server.name)) {
       warnings.push(
@@ -93,4 +103,4 @@ function buildMcpServersToml(mergedServers, existingOutsideBlock) {
   return { toml: tables.join('\n\n'), warnings };
 }
 
-module.exports = { toTomlTable, applyCodexOverride, findServerNamesInText, buildMcpServersToml };
+module.exports = { HARNESS_ID, toTomlTable, applyCodexOverride, findServerNamesInText, buildMcpServersToml };

@@ -96,9 +96,12 @@ function createApi(ctx) {
           effort,
           schema: opts.schema,
           agentType,
-          // Backends that have a sandbox concept (codex) default to their
-          // own least-privilege mode; only a script that actually writes
-          // asks for more, per call. See backends/codex.js's DEFAULT_SANDBOX.
+          // Every real backend defaults to its own least-privilege mode;
+          // only a script that actually writes asks for more, per call.
+          // codex has a native `-s`; claude and omp express read-only
+          // through their tool-restriction flags (--disallowedTools /
+          // --tools) rather than ignoring the option. See each backend's
+          // DEFAULT_SANDBOX.
           sandbox: opts.sandbox,
           cwd: effectiveCwd,
           opts: normalizedOpts,

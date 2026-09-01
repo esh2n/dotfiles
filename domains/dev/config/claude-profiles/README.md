@@ -127,10 +127,13 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
   `0.150.0`未満(またはバージョン不明)なら warning 付きでスキップする —
   `hooks.json`に未対応イベントを書いて `codex exec` に無言で無視させない
   ため)、`~/.codex` の有無、`[features] hooks = true`、
+  **`hooks.json` がCodexの読むラップ形式か**(`hooks-shape` — フラット形式は
+  fail。パースは通るがCodexはhookを1つも実行しない)、
   自分が生成した `hooks.json` グループの有無、**その全ハンドラの
   `[hooks.state]` 信頼ハッシュを再計算して一致するか**(ズレていたら
   「codex exec で無言スキップされる、yoki-switch apply を実行」と案内)、
-  yoki以外のフォアングループの一覧、`codex execpolicy check` による
+  **ポートしたハッシュ関数自体がCodexの実装と一致しているか**
+  (`trust-port` — 後述)、yoki以外のフォアングループの一覧、`codex execpolicy check` による
   `rules/yoki.rules` の構文チェック(バイナリが無ければ warn でスキップ)、
   `default_permissions` と `sandbox_mode` のトップレベル衝突、
   `core/harness-models.json` の codex tier が `~/.codex/models_cache.json`
@@ -144,11 +147,58 @@ task T14)は4ターゲットの実際の状態を読むだけの診断コマン�
   委譲、無ければ1行 `ok` でスキップ
 
 `hooks.json` は Codex 実機では `{"hooks": {<Event>: [...]}}` の
-ラップ形式で書かれる(spike S1+S2 Appendix C の実測ハッシュで確認済み)。
-`codex-hooks-merge.js` 自身の生成物・テストは今のところラップ無しの
-フラット形式を前提にしているため、`doctor.js` はどちらの形も読めるように
-`unwrapHooksJson()` で吸収している — 生成側とdoctor側で前提が食い違って
-いること自体は既知の不一致として残っており、直すなら生成側(T9)の仕事。
+ラップ形式で書かれる(spike S1+S2 Appendix C の実測ハッシュ、および実機の
+`~/.codex/hooks.json` そのもので確認済み)。`codex-hooks-merge.js` の
+`mergeHooksJson()` はこのラップ形式で書き出し、ディスク上に古いフラット形式が
+残っていれば読み取り時に吸収して同じ場所へ移行する(foreign group と
+`hooks` 以外のトップレベルキーは保持)。`[hooks.state]` のキー形式
+`<abs hooks.json>:<snake_event>:<group>:<handler>` はラップの有無で変わらない
+(group/handler の位置は同じ)。
+
+フラット形式のファイルは JSON としてはパースできてしまい、他のチェックも
+すべて通る一方で Codex は hook を1つも実行しない — トラストハッシュ機構が
+防ごうとしている「無言スキップ」そのものなので、`doctor.js` の
+`hooks-shape` チェックはこれを **fail** として報告する
+(`codex hooks.json is not in Codex's wrapped {"hooks":{…}} shape — codex
+ignores it; run yoki-switch apply`)。`unwrapHooksJson()` はフラットな
+ファイルについても group/trust の情報を出せるようにするためだけに残して
+あり、形式の可否を判断するのは `hooks-shape` の方。
+
+#### `trust-drift` と `trust-port` の違い
+
+`trust-drift` は「いま `hooks.json` にある定義から再計算したハッシュ」と
+「`config.toml` に保存されているハッシュ」を比べる。どちらも
+`codex-trust.js` の**同じポート実装**が出した値なので、これが検出できるのは
+「同じ実装を2回適用した結果のズレ」だけ — ポート自体がCodexの本物の
+`command_hook_hash` からズレていた場合は構造的に検出できない
+(両辺が同じバグを共有する)。
+
+`trust-port` はその穴を埋める。yokiが書いていない**フォアングループ**
+(herdr など)のうち、Codex自身が `[hooks.state]` にハッシュを書いた
+エントリを探し、こちらのポートで再計算して比べる — 両辺の出所が別なので
+これは本物の照合になる。実機では herdr の `session_start:0:0` 1件が
+これに該当し、`ok codex trust-port | ported hash matches 1 Codex-written
+entry(ies)` が出る。不一致は warn(「ポートがズレた」のか「そのフォアン
+hookがCodexに信頼された後で変更された」のか区別できないため、両方の
+読みを文面に出す)。照合対象が1件も無い場合も warn で、
+「ポートを裏付けているのは `codex-trust.test.js` だけ」と明示する。
+
+#### `apply()` の原子性 (gen.js)
+
+`apply()` はトランザクションではない — 書き込み先はユーザーの実物の
+`~/.codex` / `~/.omp/agent` で、巻き戻す先が無い。代わりに3つを保証する:
+
+1. すべての書き込みは**同一ディレクトリ内の一時ファイル + rename**
+   (`<dest>.yoki-tmp-<pid>` → `fs.renameSync`)。中断しても「古い方」か
+   「新しい方」のどちらかで、途中まで書けたファイルは残らない
+2. 相互依存する2ファイルの**順序**: `config.toml`(信頼ハッシュ)→
+   `hooks.json` → その他 → manifest が最後。ハッシュが先なら、中断時に
+   残るのは「まだ存在しないhookの信頼エントリ」で、Codexはそれを無視して
+   **前の(信頼済みの)hooks.json を動かし続ける** — 実質no-op。逆順だと
+   「新しいhooks.jsonが未信頼」= 無言スキップ状態になる
+3. 途中で失敗したら、**すでに更新済みのファイルを全部名前で列挙**して
+   例外メッセージに載せる。manifest は書かない(書けば、実際には書かれて
+   いない宛先を `--prune` の削除候補として主張してしまう)
 
 `lib/test/doctor.test.js` は純粋な部分(バージョン比較、
 `[hooks.state]` の信頼ドリフト検出、`default_permissions`/`sandbox_mode`
@@ -367,6 +417,39 @@ yoki-loop list             # インストール済みloop一覧
   `run` はエラーで止まる — `--dry-run` はこのcapの対象外
 - `install` は plist を書いて `launchctl bootstrap gui/$UID <plist>` を
   **表示するだけ**(実行しない)。実際に有効化するかはユーザーの判断
+
+### 無人実行の姿勢 (YOKI_UNATTENDED)
+
+loop の実行は定義上「誰も見ていないエージェント実行」なので、
+`YOKI_UNATTENDED=1` は**常に**立つ:
+
+- `lib/loop/runner.js` が spawn する子プロセスの env に必ず入れる
+  (`runner.childEnv`)。ターミナルから手で `yoki-loop run` した場合も同じ —
+  起動したのが人間でも、走っているのは無人エージェントだから
+- `lib/loop/cli.js` の `install` は plist の `EnvironmentVariables` にも
+  `YOKI_UNATTENDED=1` を書く。launchd はほぼ空の環境でジョブを起動するので、
+  ランナー自身のプロセスにもフラグが要る
+
+これが `hooks/unattended-guard.sh` を有効化する唯一のスイッチ
+(フラグが無いと guard は即 `exit 0` して何もしない)。
+`.yoki.json` の `"unattended": true` は同じ意味の宣言。
+
+### `--sandbox` は3ハーネスすべてに効く
+
+`--sandbox` は codex 固有ではない。既定は `workspace-write`(loop は
+リポジトリでの常設作業が目的)だが、`read-only` を指定したときに黙って
+無視するハーネスは無い:
+
+| harness | `read-only` の表現 | `workspace-write` / `danger-full-access` |
+| --- | --- | --- |
+| codex | `-s read-only`(ネイティブ) | `-s <mode>` |
+| claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash` | 追加フラグ無し(CLI既定) |
+| omp | `--tools read,grep,glob,web_search`(許可リスト) | 追加フラグ無し |
+
+不正な値はどのハーネスでもエラー。これは
+`--prompt-from-artifact-inbox`(プロンプトを書くのは第三者のビューア)と
+`--sandbox read-only` を組み合わせたときの「読んで報告はするが書かない」
+という約束を、codex だけでなく全ハーネスで成り立たせるため。
 
 ## プロジェクト単位の設定 (.yoki.json)
 

@@ -6,10 +6,17 @@
  * directly off core/settings.layer.json (see lib/permissions/to-claude.js
  * for the analogous permissions migration this mirrors).
  *
- * Only `targets.claude === true` servers are emitted — see core/mcp.json's
- * top-level `_comment` for why codebase-memory-mcp/serena keep that false
- * (they stay registered via install.sh's `claude mcp add` into
+ * Only servers targeting this harness are emitted — see core/mcp.json's
+ * top-level `_comment` for why codebase-memory-mcp/serena keep that flag
+ * false (they stay registered via install.sh's `claude mcp add` into
  * ~/.claude.json, a separate mechanism this writer must not duplicate).
+ *
+ * NAMING — the harness has two spellings: `claude-code` is its id inside
+ * this subsystem (HARNESS_ID below, matching readers/claude-code.js and
+ * collect.js's DEFAULT_READERS), while the mcp.json data spells the flag
+ * `targets.claude`. lib/mcp-inventory/source.js's TARGET_KEY_TO_HARNESS_ID
+ * is the only place the two are reconciled; this writer asks through
+ * `isTargetedAt` / `applyTargetOverride` and never names `targets.claude`.
  *
  * `{{HOME}}` is left untouched here (unlike writers/codex.js and
  * writers/omp.js): yoki-switch's merge_settings() sed-substitutes the whole
@@ -18,7 +25,10 @@
  * `{{HOME}}`-bearing value in the settings layers.
  */
 
-const { loadAndMerge } = require('../source');
+const { loadAndMerge, isTargetedAt, applyTargetOverride } = require('../source');
+
+/** This writer's harness id — the same id readers/claude-code.js stamps. */
+const HARNESS_ID = 'claude-code';
 
 /**
  * @param {object} server a resolved server (after any 'claude' targetOverrides)
@@ -38,10 +48,9 @@ function toClaudeEntry(server) {
   return entry;
 }
 
-/** Applies this server's 'claude' targetOverrides, if any. */
+/** Applies this server's Claude Code targetOverrides, if any. */
 function applyClaudeOverride(server) {
-  const override = server.targetOverrides && server.targetOverrides.claude;
-  return override ? { ...server, ...override } : server;
+  return applyTargetOverride(server, HARNESS_ID);
 }
 
 /**
@@ -52,7 +61,7 @@ function applyClaudeOverride(server) {
 function buildMcpServers(mergedServers) {
   const result = {};
   for (const server of mergedServers) {
-    if (!server.targets || server.targets.claude !== true) continue;
+    if (!isTargetedAt(server, HARNESS_ID)) continue;
     const effective = applyClaudeOverride(server);
     result[effective.name] = toClaudeEntry(effective);
   }
@@ -65,7 +74,7 @@ function convert(filePaths) {
   return buildMcpServers(loadAndMerge(filePaths));
 }
 
-module.exports = { toClaudeEntry, applyClaudeOverride, buildMcpServers, convert };
+module.exports = { HARNESS_ID, toClaudeEntry, applyClaudeOverride, buildMcpServers, convert };
 
 // -----------------------------------------------------------------------------
 // CLI: node claude.js --sources <core.json> [<pack.json>...] <personal.json>

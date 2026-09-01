@@ -105,6 +105,101 @@ test('codex backend: agent() opts.sandbox reaches buildArgv through run()', asyn
   assert.equal(captured[1][captured[1].indexOf('-s') + 1], 'workspace-write');
 });
 
+// claude and omp used to take no sandbox argument at all: `opts.sandbox` was
+// accepted by api.js, passed down, and dropped on the floor — so the
+// least-privilege default was a property of the codex backend rather than of
+// the graph API. Both now enforce read-only through their own CLI's
+// tool-restriction flag.
+
+test('claude backend: sandbox defaults to read-only and denies every write tool', () => {
+  assert.equal(claude.DEFAULT_SANDBOX, 'read-only');
+  const { args } = claude.buildArgv({ prompt: 'p' });
+  const i = args.indexOf('--disallowedTools');
+  assert.ok(i !== -1, 'the default must actually restrict the run');
+  const denied = args[i + 1].split(',');
+  for (const tool of ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash']) {
+    assert.ok(denied.includes(tool), `${tool} must be denied`);
+  }
+});
+
+test('claude backend: a script that writes asks for it per call', () => {
+  const { args } = claude.buildArgv({ prompt: 'p', sandbox: 'workspace-write' });
+  assert.ok(!args.includes('--disallowedTools'));
+});
+
+test('claude backend: an unknown sandbox is a hard error, never a silent widening', () => {
+  assert.throws(() => claude.buildArgv({ prompt: 'p', sandbox: 'yolo' }), /unknown sandbox "yolo"/);
+  assert.equal(claude.resolveSandbox(''), 'read-only');
+  assert.equal(claude.resolveSandbox(undefined), 'read-only');
+});
+
+test('omp backend: sandbox defaults to read-only via the --tools allow-list', () => {
+  assert.equal(omp.DEFAULT_SANDBOX, 'read-only');
+  const { args } = omp.buildArgv({ prompt: 'p' });
+  const i = args.indexOf('--tools');
+  assert.ok(i !== -1, 'the default must actually restrict the run');
+  const enabled = args[i + 1].split(',');
+  for (const writeTool of ['write', 'edit', 'bash', 'task']) {
+    assert.ok(!enabled.includes(writeTool), `${writeTool} must not be enabled read-only`);
+  }
+  // The bridge extension and the prompt still come last.
+  assert.ok(args.includes('--no-extensions'));
+  assert.equal(args[args.length - 1], 'p');
+});
+
+test('omp backend: a script that writes asks for it per call', () => {
+  const { args } = omp.buildArgv({ prompt: 'p', sandbox: 'workspace-write' });
+  assert.ok(!args.includes('--tools'));
+});
+
+test('omp backend: an unknown sandbox is a hard error, never a silent widening', () => {
+  assert.throws(() => omp.buildArgv({ prompt: 'p', sandbox: 'yolo' }), /unknown sandbox "yolo"/);
+  assert.equal(omp.resolveSandbox(''), 'read-only');
+});
+
+test('every real backend expresses read-only in its argv — none accepts and discards it', () => {
+  const argvs = [
+    claude.buildArgv({ prompt: 'p', sandbox: 'read-only' }).args,
+    codex.buildArgv({ cwd: '/repo', sandbox: 'read-only' }).args,
+    omp.buildArgv({ prompt: 'p', sandbox: 'read-only' }).args,
+  ];
+  for (const args of argvs) {
+    assert.ok(
+      args.includes('-s') || args.includes('--disallowedTools') || args.includes('--tools'),
+      `argv must carry a restriction: ${args.join(' ')}`
+    );
+  }
+});
+
+test('claude/omp backends: agent() opts.sandbox reaches buildArgv through run()', async () => {
+  const { createApi } = require('../api');
+  for (const backendModule of [claude, omp]) {
+    const captured = [];
+    const backend = {
+      name: backendModule.name,
+      supportsSchemaNatively: backendModule.supportsSchemaNatively,
+      run: async (call) => {
+        captured.push(backendModule.buildArgv({ prompt: call.prompt, cwd: call.cwd, sandbox: call.sandbox }).args);
+        return { raw: 'ok', durationMs: 1, exitCode: 0 };
+      },
+      extractText: (raw) => raw,
+    };
+    const api = createApi({
+      runId: 'r1',
+      journal: { getCached: () => undefined, append: () => {}, tokensSpent: () => 0 },
+      backend,
+      cwd: '/repo',
+      emit: () => {},
+    });
+    await api.agent('read something', { label: 'reader' });
+    await api.agent('write something', { label: 'writer', sandbox: 'workspace-write' });
+
+    const restrictionFlag = backendModule === claude ? '--disallowedTools' : '--tools';
+    assert.ok(captured[0].includes(restrictionFlag), `${backendModule.name}: default call must be restricted`);
+    assert.ok(!captured[1].includes(restrictionFlag), `${backendModule.name}: workspace-write call must not be`);
+  }
+});
+
 test('codex backend: --output-schema <tmpfile> is added natively when a schema is given', () => {
   const { args } = codex.buildArgv({ model: 'sonnet', cwd: '/repo', schema: { type: 'object' }, schemaFilePath: '/tmp/schema-123.json' });
   const i = args.indexOf('--output-schema');

@@ -29,6 +29,8 @@ import { nodeVersionOk } from "../bin/lib/node-version.mjs";
 import { FALLBACK_HINTS, HINT_LINE_LIMIT, setupHints } from "../bin/lib/cmd-doctor.mjs";
 import { openUrl } from "../bin/lib/open-url.mjs";
 import { cmdWatch, isFatalWatchError } from "../bin/lib/cmd-watch.mjs";
+import { cmdShare, cmdUnshare } from "../bin/lib/cmd-artifacts.mjs";
+import { mergeInclude, resolveAccessGroupTarget } from "../bin/lib/access-group.mjs";
 import { networkError } from "../bin/lib/errors.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -530,12 +532,17 @@ describe("artifact commands", () => {
     assert.equal(versions.code, 0, versions.stderr);
     assert.equal(JSON.parse(versions.stdout).versions.length, 1);
 
+    // No Cloudflare credentials in this environment, so the D1 half succeeds
+    // and the command refuses to call that a success — exit 2 with the manual
+    // step. The "access group" suite below covers the happy path.
     const share = await runCli(["share", "demo-crud", "--to", "a@b.test", "--to", "c@d.test", "--json"]);
-    assert.equal(share.code, 0, share.stderr);
-    assert.deepEqual(JSON.parse(share.stdout).viewers.sort(), ["a@b.test", "c@d.test"]);
+    assert.equal(share.code, 2, share.stderr);
+    const sharePayload = JSON.parse(share.stdout);
+    assert.deepEqual(sharePayload.viewers.sort(), ["a@b.test", "c@d.test"]);
+    assert.equal(sharePayload.access_group.updated, false);
 
     const unshare = await runCli(["unshare", "demo-crud", "--to", "a@b.test", "--json"]);
-    assert.equal(unshare.code, 0, unshare.stderr);
+    assert.equal(unshare.code, 2, unshare.stderr);
     assert.deepEqual(JSON.parse(unshare.stdout).viewers, ["c@d.test"]);
 
     const revoke = await runCli(["revoke", "demo-crud", "--json"]);
@@ -559,6 +566,206 @@ describe("artifact commands", () => {
     const result = await runCli(["versions", "no-such-channel"]);
     assert.equal(result.code, 2);
     assert.match(result.stderr, /no such artifact/);
+  });
+});
+
+// Viewer access needs the D1 rows AND the Cloudflare Access group to agree.
+// These cases drive cmdShare/cmdUnshare in-process so the Cloudflare API can
+// be a mock: nothing here reaches api.cloudflare.com.
+describe("share / unshare keep the Access group in step", () => {
+  const GROUP_ID = "group-abc";
+  const ACCOUNT_ID = "acct-xyz";
+  const CONFIG_FILE = "/nowhere/config.json";
+  const API_BASE = "https://api.cloudflare.com/client/v4";
+  const GROUP_URL = `${API_BASE}/accounts/${ACCOUNT_ID}/access/groups/${GROUP_ID}`;
+
+  // An include list with a rule that is NOT an email — a read-modify-write
+  // that loses this would quietly revoke someone's access.
+  const FOREIGN_RULE = Object.freeze({ github: { name: "org/team" } });
+  const group = (emails, extra = {}) => ({
+    id: GROUP_ID,
+    name: "yoki-artifact-viewers",
+    include: [FOREIGN_RULE, ...emails.map((email) => ({ email: { email } }))],
+    exclude: [{ email: { email: "banned@example.test" } }],
+    require: [],
+    ...extra,
+  });
+
+  function fakeClient(viewers) {
+    const calls = [];
+    return {
+      calls,
+      viewerUrl: (channel) => `https://artifacts.example.test/a/${channel}`,
+      async request(method, pathname, options = {}) {
+        calls.push({ method, pathname, body: options.body ? JSON.parse(options.body) : null });
+        return { status: 200, body: { channel: "demo", viewers } };
+      },
+    };
+  }
+
+  /** A stand-in for the Cloudflare REST API. `fail` short-circuits one verb. */
+  function cloudflare(initial, { fail = null } = {}) {
+    const calls = [];
+    let state = initial;
+    const reply = (status, payload) => ({
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(payload),
+    });
+    return {
+      calls,
+      current: () => state,
+      impl: async (url, init) => {
+        const body = init.body ? JSON.parse(init.body) : null;
+        calls.push({ url: String(url), method: init.method, body, authorization: init.headers.authorization });
+        if (fail === init.method) {
+          return reply(403, { success: false, errors: [{ code: 10000, message: "Authentication error" }] });
+        }
+        if (init.method === "GET") return reply(200, { success: true, result: state });
+        state = { ...state, ...body };
+        return reply(200, { success: true, result: state });
+      },
+    };
+  }
+
+  const context = (overrides = {}) => ({
+    positionals: ["demo"],
+    flags: { to: ["new@example.test"] },
+    config: { file: CONFIG_FILE, accessGroupId: GROUP_ID, accountId: ACCOUNT_ID },
+    env: { CLOUDFLARE_API_TOKEN: "cf-token", CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID },
+    ...overrides,
+  });
+
+  test("share adds the email and preserves every foreign include rule", async () => {
+    const client = fakeClient(["old@example.test", "new@example.test"]);
+    const cf = cloudflare(group(["old@example.test"]));
+    const result = await cmdShare(context({ client, fetchImpl: cf.impl }));
+
+    assert.equal(result.exitCode ?? 0, 0, result.lines.join("\n"));
+    // D1 first, unchanged from before this fix.
+    assert.deepEqual(client.calls, [
+      { method: "POST", pathname: "/api/artifacts/demo/viewers", body: { add: ["new@example.test"] } },
+    ]);
+    // Then a read-modify-write against the one group.
+    assert.deepEqual(cf.calls.map((call) => `${call.method} ${call.url}`), [
+      `GET ${GROUP_URL}`,
+      `PUT ${GROUP_URL}`,
+    ]);
+    assert.equal(cf.calls[0].authorization, "Bearer cf-token");
+    const put = cf.calls[1].body;
+    assert.deepEqual(put.include, [
+      FOREIGN_RULE,
+      { email: { email: "old@example.test" } },
+      { email: { email: "new@example.test" } },
+    ]);
+    assert.equal(put.name, "yoki-artifact-viewers", "the PUT replaces the whole group, so the name must survive");
+    assert.deepEqual(put.exclude, [{ email: { email: "banned@example.test" } }]);
+    assert.deepEqual(put.require, []);
+    assert.equal(result.json.access_group.updated, true);
+  });
+
+  test("share is a no-op PUT when the email is already in the group", async () => {
+    const client = fakeClient(["new@example.test"]);
+    const cf = cloudflare(group(["new@example.test"]));
+    const result = await cmdShare(context({ client, fetchImpl: cf.impl }));
+
+    assert.equal(result.exitCode ?? 0, 0);
+    assert.deepEqual(cf.calls.map((call) => call.method), ["GET"], "nothing to write");
+    assert.equal(result.json.access_group.unchanged, true);
+  });
+
+  test("unshare removes only that email", async () => {
+    const client = fakeClient(["stays@example.test"]);
+    const cf = cloudflare(group(["stays@example.test", "goes@example.test"]));
+    const result = await cmdUnshare(
+      context({ client, fetchImpl: cf.impl, flags: { to: ["goes@example.test"] } }),
+    );
+
+    assert.equal(result.exitCode ?? 0, 0, result.lines.join("\n"));
+    assert.deepEqual(client.calls[0].body, { remove: ["goes@example.test"] });
+    assert.deepEqual(cf.calls[1].body.include, [FOREIGN_RULE, { email: { email: "stays@example.test" } }]);
+  });
+
+  // The whole point of the fix: a partial application is never silent.
+  for (const [name, env, expected] of [
+    ["no API token", { CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID }, /CLOUDFLARE_API_TOKEN/],
+    ["no account id", { CLOUDFLARE_API_TOKEN: "cf-token" }, /CLOUDFLARE_ACCOUNT_ID/],
+    ["nothing at all", {}, /CLOUDFLARE_API_TOKEN/],
+  ]) {
+    test(`${name} exits 2, having still written D1, and prints the manual step`, async () => {
+      const client = fakeClient(["new@example.test"]);
+      const calls = [];
+      const result = await cmdShare(
+        context({
+          client,
+          env,
+          // config.accountId is not set either, so the account really is unknown
+          config: { file: CONFIG_FILE, accessGroupId: GROUP_ID, accountId: null },
+          fetchImpl: async (...args) => {
+            calls.push(args);
+            throw new Error("the Cloudflare API must not be called");
+          },
+        }),
+      );
+
+      assert.equal(result.exitCode, 2);
+      assert.equal(client.calls.length, 1, "the D1 write still happened");
+      assert.equal(calls.length, 0);
+      const text = result.lines.join("\n");
+      assert.match(text, /D1 viewer list for "demo" WAS updated/);
+      assert.match(text, expected);
+      assert.match(text, /yoki-artifact share demo --to new@example\.test/);
+      assert.match(text, /node scripts\/setup\.mjs/);
+      assert.match(text, /Zero Trust → Access → Access Groups/);
+      assert.match(text, /yoki-artifact-viewers/);
+      assert.equal(result.json.access_group.updated, false);
+      assert.ok(result.json.manual_steps.length > 0);
+    });
+  }
+
+  test("a missing accessGroupId names the config file it should come from", async () => {
+    const client = fakeClient([]);
+    const result = await cmdShare(
+      context({ client, config: { file: CONFIG_FILE, accessGroupId: null, accountId: ACCOUNT_ID } }),
+    );
+    assert.equal(result.exitCode, 2);
+    assert.match(result.lines.join("\n"), new RegExp(`"accessGroupId" in ${CONFIG_FILE}`));
+  });
+
+  test("a Cloudflare API error exits 2 and names the refusal", async () => {
+    const client = fakeClient(["new@example.test"]);
+    const cf = cloudflare(group([]), { fail: "GET" });
+    const result = await cmdShare(context({ client, fetchImpl: cf.impl }));
+
+    assert.equal(result.exitCode, 2);
+    assert.equal(client.calls.length, 1, "D1 was already written before Cloudflare refused");
+    assert.match(result.lines.join("\n"), /Authentication error/);
+    assert.match(result.json.access_group.error, /failed \(403\)/);
+  });
+
+  test("a refusal on the PUT is reported too, not swallowed by the GET succeeding", async () => {
+    const client = fakeClient(["new@example.test"]);
+    const cf = cloudflare(group([]), { fail: "PUT" });
+    const result = await cmdShare(context({ client, fetchImpl: cf.impl }));
+    assert.equal(result.exitCode, 2);
+    assert.deepEqual(cf.calls.map((call) => call.method), ["GET", "PUT"]);
+  });
+
+  test("mergeInclude is order-stable and idempotent (unit)", () => {
+    const include = [FOREIGN_RULE, { email: { email: "a@x.test" } }];
+    assert.deepEqual(mergeInclude(include, { add: ["a@x.test"] }), include, "adding a member twice changes nothing");
+    assert.deepEqual(mergeInclude(include, { add: ["B@X.test"] }), [...include, { email: { email: "b@x.test" } }]);
+    assert.deepEqual(mergeInclude(include, { remove: ["A@x.test"] }), [FOREIGN_RULE]);
+    assert.deepEqual(mergeInclude(include, { remove: ["nobody@x.test"] }), include);
+    assert.deepEqual(mergeInclude(undefined, { add: ["a@x.test"] }), [{ email: { email: "a@x.test" } }]);
+  });
+
+  test("resolveAccessGroupTarget falls back to the account id in config (unit)", () => {
+    const config = { file: CONFIG_FILE, accessGroupId: GROUP_ID, accountId: ACCOUNT_ID };
+    const target = resolveAccessGroupTarget({ env: { CLOUDFLARE_API_TOKEN: "t" }, config });
+    assert.equal(target.ok, true);
+    assert.equal(target.accountId, ACCOUNT_ID);
+    assert.equal(resolveAccessGroupTarget({ env: {}, config }).ok, false);
   });
 });
 

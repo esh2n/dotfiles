@@ -37,6 +37,12 @@ const SANDBOX_MODES = ['read-only', 'workspace-write', 'danger-full-access'];
  * written by artifact viewers: pairing that with `--sandbox read-only` gives
  * an unattended launchd job that can read and report but not edit, and there
  * was previously no way to ask for it.
+ *
+ * That promise only holds if every harness honours the flag. codex has a
+ * native `-s`; claude and omp do not, so read-only is expressed there
+ * through each CLI's own tool-restriction flag (see the two build functions
+ * below). The flag is never accepted-and-discarded on any harness — a
+ * silently-full-write job is the one outcome this option exists to prevent.
  */
 const DEFAULT_SANDBOX = 'workspace-write';
 
@@ -54,10 +60,38 @@ function ompGuardPath(homeDir) {
   return path.join(homeDir || os.homedir(), YOKI_BRIDGE_RELATIVE);
 }
 
-function buildClaudeCommand({ prompt, model, resumeSessionId }) {
+/**
+ * Claude Code has no `-s`-style sandbox flag, but it does have
+ * `--disallowedTools` (confirmed in `claude --help` on this machine:
+ * "`--disallowedTools, --disallowed-tools <tools...>` Comma or
+ * space-separated list of tool names to deny"). Denying every tool that can
+ * change the filesystem is the closest thing it has to codex's `read-only`,
+ * and it is a real restriction rather than a note in a doc comment.
+ *
+ * `Bash` is on the list because a shell is a write tool: leaving it enabled
+ * would make the whole restriction cosmetic.
+ */
+const CLAUDE_READ_ONLY_DENIED_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
+
+/**
+ * omp's tool-restriction flag is `--tools=<value>` ("Comma-separated list of
+ * tools to enable (default: all)", `command omp --help`, omp 18.0.4) — an
+ * allow-list, so a read-only run enables only the tools that read. Names are
+ * omp's own builtin tool ids (see lib/targets/omp-tool-names.js, derived
+ * from the binary's BUILTIN_TOOLS registry). `task` is deliberately absent:
+ * a subagent would not inherit this restriction.
+ */
+const OMP_READ_ONLY_TOOLS = ['read', 'grep', 'glob', 'web_search'];
+
+function buildClaudeCommand({ prompt, model, resumeSessionId, sandbox }) {
   const args = ['-p', prompt, '--output-format', 'json'];
   if (model) args.push('--model', model);
   if (resumeSessionId) args.push('--resume', resumeSessionId);
+  const mode = resolveSandbox(sandbox);
+  // workspace-write and danger-full-access both mean "the harness's own
+  // default capability" here — claude has nothing narrower than read-only to
+  // express, and nothing wider than its own default to grant.
+  if (mode === 'read-only') args.push('--disallowedTools', CLAUDE_READ_ONLY_DENIED_TOOLS.join(','));
   return { cmd: 'claude', args, stdin: null };
 }
 
@@ -69,9 +103,11 @@ function buildCodexCommand({ prompt, cwd, model, resumeSessionId, sandbox }) {
   return { cmd: 'codex', args, stdin: prompt };
 }
 
-function buildOmpCommand({ prompt, model, homeDir }) {
+function buildOmpCommand({ prompt, model, homeDir, sandbox }) {
   const args = ['-p', '--mode', 'json'];
   if (model) args.push('--model', model);
+  const mode = resolveSandbox(sandbox);
+  if (mode === 'read-only') args.push('--tools', OMP_READ_ONLY_TOOLS.join(','));
   args.push('--no-extensions', '-e', ompGuardPath(homeDir), prompt);
   return { cmd: 'omp', args, stdin: null };
 }
@@ -86,8 +122,13 @@ function buildOmpCommand({ prompt, model, homeDir }) {
  * @param {string} [opts.resumeSessionId] omitted entirely when falsy
  * @param {string} [opts.homeDir] override for `os.homedir()` (tests)
  * @param {'read-only'|'workspace-write'|'danger-full-access'} [opts.sandbox]
- *   codex only (`-s`); defaults to `workspace-write` — see DEFAULT_SANDBOX.
- *   claude and omp have no equivalent flag and ignore it.
+ *   defaults to `workspace-write` — see DEFAULT_SANDBOX. Every harness
+ *   honours it; none of them ignores it silently:
+ *     codex  `-s <mode>` (native)
+ *     claude `--disallowedTools <write tools>` on read-only
+ *     omp    `--tools <read tools>` on read-only
+ *   `workspace-write` and `danger-full-access` add no flag on claude/omp:
+ *   neither CLI has a capability wider than its own default to grant.
  * @returns {{cmd: string, args: string[], stdin: string|null}}
  */
 function buildCommand(opts) {
@@ -98,4 +139,12 @@ function buildCommand(opts) {
   throw new Error(`yoki-loop: unknown harness "${harness}" (expected claude, codex, or omp)`);
 }
 
-module.exports = { buildCommand, ompGuardPath, resolveSandbox, SANDBOX_MODES, DEFAULT_SANDBOX };
+module.exports = {
+  buildCommand,
+  ompGuardPath,
+  resolveSandbox,
+  SANDBOX_MODES,
+  DEFAULT_SANDBOX,
+  CLAUDE_READ_ONLY_DENIED_TOOLS,
+  OMP_READ_ONLY_TOOLS,
+};

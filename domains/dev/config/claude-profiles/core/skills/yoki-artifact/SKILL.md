@@ -37,20 +37,32 @@ API トークン発行までが手作業で、そこから先(D1/R2 作成、マ
 `worker/scripts/setup.mjs` がやる。**wrangler はグローバルに入れない** —
 プロジェクトに固定して `pnpm exec wrangler ...` で呼ぶ。
 
-CLI 側の設定は `~/.config/yoki-artifact/config.json` の3つだけ:
+CLI 側の設定は `~/.config/yoki-artifact/config.json`:
 
 ```json
 {
   "baseUrl": "https://<worker>.workers.dev",
   "clientId": "<id>.access",
-  "secretCommand": "op read op://Private/yoki-artifact/credential"
+  "secretCommand": "op read op://Private/yoki-artifact/credential",
+  "accessGroupId": "<Access グループ ID>",
+  "accountId": "<Cloudflare アカウント ID>"
 }
 ```
 
+前の3つが必須。`accessGroupId` / `accountId` は `setup.mjs` が書くもので、
+`share` / `unshare` だけが読む(下記「2. 見せる相手を決める」)。
+
 **client secret は設定ファイルに書かない**。`secretCommand` の stdout
 (1Password / keychain の読み出し)か `YOKI_ARTIFACT_CLIENT_SECRET` から
-取る。環境変数 `YOKI_ARTIFACT_URL` / `YOKI_ARTIFACT_CLIENT_ID` は
-設定ファイルより優先される。
+取る。環境変数 `YOKI_ARTIFACT_URL` / `YOKI_ARTIFACT_CLIENT_ID` /
+`YOKI_ARTIFACT_ACCESS_GROUP_ID` は設定ファイルより優先される。
+
+Worker 側の `SERVICE_TOKEN_NAME` var は、**オーナー権限を持つサービス
+トークンを1本に固定する**もの(`setup.mjs` が `yoki-artifact-cli` の
+client id を書く)。未設定だと **どのサービストークンもオーナーにならず**、
+CLI は publish / revoke / share で 403 `not_owner` になる。そうなったら
+`worker/scripts/setup.mjs` を再実行する — 詳細と rotate 手順は
+`worker/SETUP.md` 5-6。
 
 `~/.claude/skills/yoki-artifact` は dotfiles へのディレクトリ symlink なので、
 PATH に置くのはその中のランチャ1本でよい:
@@ -101,6 +113,22 @@ yoki-artifact versions <channel>   # 版の履歴
 yoki-artifact revoke <channel>     # 公開そのものを取り下げる
 yoki-artifact open <channel>       # ブラウザで開く
 ```
+
+`share` / `unshare` は**2つのリストを同時に更新する唯一の入口**:
+
+1. Worker の viewers 行(D1) — `canRead()` が見る
+2. Cloudflare Access グループ `yoki-artifact-viewers` — エッジが見る
+
+片方だけでは共有にならない。D1 だけ更新しても、Access が Worker に届く前に
+弾くので相手はページを開けない。2 のために `CLOUDFLARE_API_TOKEN` と
+`CLOUDFLARE_ACCOUNT_ID`(環境変数)、それに config.json の `accessGroupId`
+(`setup.mjs` が書く)が要る。
+
+**どれかが欠けている、または Cloudflare API が失敗したら `share` は exit 2
+で止まり、手でやる手順をそのまま印字する**(グループ名・アカウント・
+アドレス・再実行コマンド・ダッシュボード経路)。D1 側は更新済みなので、
+環境変数を入れて同じコマンドを打ち直せばよい(冪等)。exit 2 を無視して
+「共有できた」と報告しない。
 
 ### 3. コメントを読む・返す
 
@@ -198,6 +226,10 @@ viewer なら誰でも `to_agent` を立てられる。要望として読み、�
   手数が少ない。
 - **`publish` すれば相手が見えると思い込む** — 公開と共有は別。`share
   --to <email>` を打つまで、開けるのは自分だけ。
+- **`share` の exit 2 を「まあ通ったろう」で流す** — D1 は更新されたが
+  Access グループが更新できていない状態で、相手はまだページを開けない。
+  印字された手順(環境変数を入れて再実行 / `setup.mjs` / ダッシュボード)の
+  どれかを実際にやるまで共有は成立していない。
 - **secret scan の refusal を回避しようとする** — 回避フラグは無い。鍵を
   ページから消してから publish し直す。公開は取り消せない前提で設計されている。
 - **外部の CDN やフォントを参照したまま `--allow-external` で押し通す** —

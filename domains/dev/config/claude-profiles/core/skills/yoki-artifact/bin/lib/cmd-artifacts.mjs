@@ -4,6 +4,13 @@
 
 import { assertChannel, assertEmails, requirePositional } from "./validate.mjs";
 import { openUrl } from "./open-url.mjs";
+import { EXIT } from "./errors.mjs";
+import {
+  VIEWERS_GROUP_NAME,
+  manualAccessGroupSteps,
+  resolveAccessGroupTarget,
+  syncAccessGroup,
+} from "./access-group.mjs";
 
 const JSON_CONTENT_TYPE = "application/json";
 
@@ -66,7 +73,23 @@ export async function cmdRevoke({ client, positionals }) {
   });
 }
 
-async function changeViewers({ client, positionals, flags }, command, field) {
+/**
+ * `share` / `unshare` — the ONE entry point for viewer access.
+ *
+ * Two lists have to agree or the result is a lie: the D1 rows the Worker
+ * checks, and the Cloudflare Access group the edge checks. This updates D1
+ * first (that is the authoritative record and the call has not changed), then
+ * the Access group.
+ *
+ * When the Access half cannot be done — no API token, no account, no group id,
+ * or Cloudflare refused — the command exits 2 and prints the exact manual step.
+ * It never reports plain success for a half-applied change.
+ */
+async function changeViewers(
+  { client, positionals, flags, config = null, env = process.env, fetchImpl = fetch },
+  command,
+  field,
+) {
   const channel = channelArg(positionals, command);
   const emails = assertEmails(flags.to, command);
   const { body } = await client.request("POST", `/api/artifacts/${encodeURIComponent(channel)}/viewers`, {
@@ -74,11 +97,65 @@ async function changeViewers({ client, positionals, flags }, command, field) {
     contentType: JSON_CONTENT_TYPE,
   });
   const viewers = Array.isArray(body?.viewers) ? body.viewers : [];
+  const head = [
+    `${channel}: ${field === "add" ? "shared with" : "unshared from"} ${emails.join(", ")}`,
+    `viewers: ${viewers.length === 0 ? "(none)" : viewers.join(", ")}`,
+  ];
+  const base = { channel, viewers, [field]: emails };
+  const configFile = config?.file ?? "~/.config/yoki-artifact/config.json";
+
+  const refuse = ({ missing = [], cause = null, accountId = null }) => {
+    const steps = manualAccessGroupSteps({
+      command,
+      channel,
+      emails: [...emails],
+      configFile,
+      accountId,
+      missing,
+      cause,
+    });
+    return Object.freeze({
+      exitCode: EXIT.network,
+      json: Object.freeze({
+        ...base,
+        access_group: Object.freeze({ updated: false, missing: Object.freeze([...missing]), error: cause }),
+        manual_steps: Object.freeze(steps.filter((line) => line !== "")),
+      }),
+      lines: [...head, ...steps],
+    });
+  };
+
+  const target = resolveAccessGroupTarget({ env, config });
+  if (!target.ok) return refuse({ missing: [...target.missing], accountId: target.accountId });
+
+  let group;
+  try {
+    group = await syncAccessGroup({
+      apiToken: target.apiToken,
+      accountId: target.accountId,
+      groupId: target.groupId,
+      add: field === "add" ? emails : [],
+      remove: field === "remove" ? emails : [],
+      fetchImpl,
+    });
+  } catch (cause) {
+    return refuse({ cause: cause?.message ?? String(cause), accountId: target.accountId });
+  }
+
   return Object.freeze({
-    json: Object.freeze({ channel, viewers, [field]: emails }),
+    json: Object.freeze({
+      ...base,
+      access_group: Object.freeze({
+        updated: true,
+        id: target.groupId,
+        unchanged: group.unchanged,
+        emails: group.emails,
+      }),
+    }),
     lines: [
-      `${channel}: ${field === "add" ? "shared with" : "unshared from"} ${emails.join(", ")}`,
-      `viewers: ${viewers.length === 0 ? "(none)" : viewers.join(", ")}`,
+      ...head,
+      `Access group ${VIEWERS_GROUP_NAME}: ${group.unchanged ? "already in sync" : "updated"} ` +
+        `(${group.emails.length === 0 ? "no emails" : group.emails.join(", ")})`,
     ],
   });
 }

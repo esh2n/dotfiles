@@ -235,11 +235,23 @@ export function planSetup(existing, { accountId, teamDomain, ownerEmail, viewers
   const app = byName(state.accessApps, ACCESS_APP_NAME);
   const appId = app ? app.id : pathRef("access-app", "id");
   const aud = app ? app.aud : ref("access-app", "aud");
+  // The Worker pins its owner service token by the JWT `common_name` claim,
+  // and Access puts the token's CLIENT ID there — not the token's name — so
+  // SERVICE_TOKEN_NAME is written from client_id, matching what auth.mjs
+  // compares against.
+  const token = byName(state.serviceTokens, SERVICE_TOKEN_NAME);
+  const serviceTokenClientId = token ? token.client_id : ref("service-token", "client_id");
+  // The CLI reads this to keep the Access group in step with the D1 viewer
+  // list on `share` / `unshare`, so it must land in the user config.
+  const group = byName(state.accessGroups, VIEWERS_GROUP_NAME);
+  const accessGroupId = group ? group.id : ref("viewers-group", "id");
   const varsInSync =
     Boolean(app) &&
+    Boolean(token) &&
     state.wranglerVars?.ACCESS_AUD === app.aud &&
     state.wranglerVars?.ACCESS_TEAM_DOMAIN === teamDomain &&
-    state.wranglerVars?.OWNER_EMAIL === ownerEmail;
+    state.wranglerVars?.OWNER_EMAIL === ownerEmail &&
+    state.wranglerVars?.SERVICE_TOKEN_NAME === token.client_id;
 
   const steps = [
     ...d1Steps(state, accountId),
@@ -260,9 +272,14 @@ export function planSetup(existing, { accountId, teamDomain, ownerEmail, viewers
     ...policySteps(state, accountId, appId, ownerEmail),
     fileStep({
       id: "wrangler-vars",
-      describe: "wrangler.toml [vars]: ACCESS_AUD, ACCESS_TEAM_DOMAIN, OWNER_EMAIL",
+      describe: "wrangler.toml [vars]: ACCESS_AUD, ACCESS_TEAM_DOMAIN, OWNER_EMAIL, SERVICE_TOKEN_NAME",
       writer: "wrangler-vars",
-      values: { ACCESS_AUD: aud, ACCESS_TEAM_DOMAIN: teamDomain, OWNER_EMAIL: ownerEmail },
+      values: {
+        ACCESS_AUD: aud,
+        ACCESS_TEAM_DOMAIN: teamDomain,
+        OWNER_EMAIL: ownerEmail,
+        SERVICE_TOKEN_NAME: serviceTokenClientId,
+      },
       skip: varsInSync ? "already set" : null,
     }),
     execStep({
@@ -282,7 +299,8 @@ export function planSetup(existing, { accountId, teamDomain, ownerEmail, viewers
         teamDomain,
         ownerEmail,
         accessAud: aud,
-        serviceTokenClientId: ref("service-token", "client_id"),
+        accessGroupId,
+        serviceTokenClientId,
         clientSecretEnv: CLIENT_SECRET_ENV,
       },
     }),

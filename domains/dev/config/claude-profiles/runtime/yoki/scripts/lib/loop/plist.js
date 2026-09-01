@@ -65,7 +65,9 @@ function envDictXml(envVars) {
  * @param {number} opts.intervalSeconds `StartInterval`
  * @param {string} opts.stdoutPath
  * @param {string} opts.stderrPath
- * @param {{PATH: string, HOME: string}} opts.env `EnvironmentVariables`
+ * @param {{PATH: string, HOME: string, YOKI_UNATTENDED?: string}} opts.env
+ *   `EnvironmentVariables` — cli.js always includes `YOKI_UNATTENDED=1`, see
+ *   its comment at the buildPlistXml call site.
  * @returns {string} the complete plist XML document
  */
 function buildPlistXml({ name, programArguments, intervalSeconds, stdoutPath, stderrPath, env }) {

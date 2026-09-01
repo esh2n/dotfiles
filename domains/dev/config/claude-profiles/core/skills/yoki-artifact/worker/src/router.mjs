@@ -17,6 +17,7 @@
 //   POST /api/comments/:id/resolve | /reply | /seen
 
 import { forbidden, misconfigured } from "./http.mjs";
+import { isPinnedService } from "./auth.mjs";
 import { handleRender } from "./render.mjs";
 import { serveShell } from "./shell.mjs";
 import {
@@ -40,10 +41,21 @@ export const CSRF_HEADER = "x-yoki-csrf";
 const SAFE_METHODS = new Set(["GET", "HEAD"]);
 const PLACEHOLDER_PREFIX = "REPLACE-";
 
+/** An unset or still-templated var reads as absent rather than as a value. */
+function optionalVar(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed === "" || trimmed.startsWith(PLACEHOLDER_PREFIX) ? null : trimmed;
+}
+
 /**
  * Read and validate the environment. Missing or still-templated vars are a
  * deployment fault: fail every request loudly instead of serving something
  * that cannot verify an identity.
+ *
+ * SERVICE_TOKEN_NAME is deliberately NOT in REQUIRED_VARS: an existing
+ * deployment that has not re-run scripts/setup.mjs must keep serving people,
+ * it just stops treating any service token as the owner (see isPinnedService).
  */
 export function readConfig(env) {
   const missing = REQUIRED_VARS.filter((name) => {
@@ -57,6 +69,7 @@ export function readConfig(env) {
     teamDomain: env.ACCESS_TEAM_DOMAIN.trim(),
     aud: env.ACCESS_AUD.trim(),
     ownerEmail: env.OWNER_EMAIL.trim().toLowerCase(),
+    serviceTokenName: optionalVar(env.SERVICE_TOKEN_NAME),
   });
 }
 
@@ -123,12 +136,17 @@ export function matchRoute(method, pathname) {
 
 /**
  * Mutations must be same-origin. Browsers state that in `Sec-Fetch-Site`; the
- * CLI (a service token) has no ambient cookie to abuse, and anything else must
- * prove it is script by sending the CSRF header a form cannot set.
+ * CLI (the pinned service token) has no ambient cookie to abuse, and anything
+ * else must prove it is script by sending the CSRF header a form cannot set.
+ *
+ * The exemption is for the PINNED service token only. Any other service
+ * identity — a second token added to the same Access application — goes
+ * through the normal check, and so does every request when SERVICE_TOKEN_NAME
+ * is unset.
  */
-export function assertCsrf(request, identity) {
+export function assertCsrf(request, identity, config) {
   if (SAFE_METHODS.has(request.method)) return;
-  if (identity.kind === "service") return;
+  if (isPinnedService(identity, config?.serviceTokenName)) return;
   const site = request.headers.get("sec-fetch-site");
   if (site !== null) {
     if (site !== "same-origin") {

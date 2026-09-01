@@ -6,6 +6,12 @@
  * groups (herdr, or any other tool's) byte-for-byte in place — spike
  * S1+S2 §3 "Recommendation".
  *
+ * The file is written in the shape Codex reads: the event map WRAPPED under
+ * a top-level `hooks` key (`{"hooks": {"<Event>": [{matcher?, hooks: […]}]}}`).
+ * `buildGeneratedGroups` still works in the flat `<Event> -> groups` map
+ * internally — the wrap happens once, in `mergeHooksJson`, which is also
+ * where a pre-wrap flat file on disk is read and migrated.
+ *
  * Hook commands that already go through `run-with-flags.js` or
  * `run-bash-hook.js` are portable as-is: they are the commands whose payload
  * gets normalized into the shape the hook script actually expects (see
@@ -251,28 +257,74 @@ function buildGeneratedGroups(settingsLayers, options = {}) {
 }
 
 /**
+ * True for the shape Codex ACTUALLY reads: the event map nested under a
+ * top-level `hooks` key. Verified against the real, already-trusted
+ * `~/.codex/hooks.json` on this machine (a herdr `SessionStart` group under
+ * `{"hooks": {...}}`, whose `[hooks.state]` entry Codex itself wrote) — a
+ * flat `{"<Event>": [...]}` file parses fine but Codex finds no hooks in it
+ * and silently runs none, which is exactly the failure the trust-hash
+ * machinery exists to prevent. `doctor.js` fails on the flat shape rather
+ * than accepting it.
+ *
+ * @param {*} parsed parsed hooks.json content
+ */
+function isWrappedHooksJson(parsed) {
+  return Boolean(
+    parsed && typeof parsed === 'object' && !Array.isArray(parsed) &&
+    parsed.hooks && typeof parsed.hooks === 'object' && !Array.isArray(parsed.hooks)
+  );
+}
+
+/**
+ * The `<Event> -> groups` map inside a hooks.json, whichever shape the file
+ * is in. `Event` names never collide with the `hooks` wrapper key
+ * (KNOWN_EVENTS has no `hooks` entry), so the two shapes are unambiguous.
+ *
+ * @param {*} parsed parsed hooks.json content (wrapped or flat)
+ * @returns {Record<string, Array<object>>}
+ */
+function hookEventsOf(parsed) {
+  if (isWrappedHooksJson(parsed)) return parsed.hooks;
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  return {};
+}
+
+/**
  * Merges `generated` groups into `existing` hooks.json content: within each
  * event, foreign groups (anything not recognizably ours) keep their
  * position and order; our own previously-generated groups are dropped and
  * replaced by the freshly generated ones, appended at the end.
  *
+ * The result is always in the WRAPPED shape Codex itself writes and reads —
+ * `{"hooks": {"<Event>": [{matcher?, hooks: […]}]}}` — see
+ * `isWrappedHooksJson` for why. A flat `existing` (what yoki wrote before
+ * this was fixed) is still read correctly, so the first `apply` after this
+ * change migrates the file in place instead of duplicating every group.
+ * Foreign TOP-LEVEL keys of a wrapped file (anything Codex may add beside
+ * `hooks`) are preserved, for the same reason foreign groups are.
+ *
  * @param {object} existing parsed existing hooks.json (or `{}`)
  * @param {Record<string, Array<object>>} generated from buildGeneratedGroups
- * @returns {object} the merged hooks.json content
+ * @returns {{hooks: Record<string, Array<object>>}} the merged hooks.json content
  */
 function mergeHooksJson(existing, generated) {
-  const result = {};
-  const eventNames = new Set([...Object.keys(existing || {}), ...Object.keys(generated)]);
+  const existingEvents = hookEventsOf(existing) || {};
+  const extras = isWrappedHooksJson(existing)
+    ? Object.fromEntries(Object.entries(existing).filter(([key]) => key !== 'hooks'))
+    : {};
+
+  const mergedEvents = {};
+  const eventNames = new Set([...Object.keys(existingEvents), ...Object.keys(generated)]);
 
   for (const eventName of eventNames) {
-    const existingGroups = Array.isArray(existing && existing[eventName]) ? existing[eventName] : [];
+    const existingGroups = Array.isArray(existingEvents[eventName]) ? existingEvents[eventName] : [];
     const foreignGroups = existingGroups.filter(g => !groupIsOurs(g));
     const newGroups = generated[eventName] || [];
     const finalGroups = [...foreignGroups, ...newGroups];
-    if (finalGroups.length > 0) result[eventName] = finalGroups;
+    if (finalGroups.length > 0) mergedEvents[eventName] = finalGroups;
   }
 
-  return result;
+  return { hooks: mergedEvents, ...extras };
 }
 
 /**
@@ -281,15 +333,24 @@ function mergeHooksJson(existing, generated) {
  * ahead of ours in the same event correctly shifts our indices (S1+S2 §2.2,
  * §2.3 point 4a in the S1+S2 recommendation).
  *
- * @param {object} mergedHooksJson
+ * Indices are read off the WRAPPED content (`mergeHooksJson`'s output), the
+ * same bytes Codex itself indexes — the group/handler positions are
+ * identical either way, but taking them from the wrapped object is what
+ * keeps "what we hash" and "what we write" the same object rather than two
+ * shapes that happen to agree. A flat map is still accepted so a caller
+ * holding a pre-wrap file gets real entries instead of a silent zero.
+ *
+ * @param {{hooks?: Record<string, Array<object>>}|Record<string, Array<object>>} mergedHooksJson
  * @param {string} hooksJsonAbsPath absolute path of the destination hooks.json
  * @returns {Array<{key: string, trustedHash: string}>}
  */
 function collectHookStateEntries(mergedHooksJson, hooksJsonAbsPath) {
   const entries = [];
-  for (const eventName of Object.keys(mergedHooksJson)) {
+  const events = hookEventsOf(mergedHooksJson);
+  for (const eventName of Object.keys(events)) {
     const eventLabel = eventLabelFor(eventName);
-    const groups = mergedHooksJson[eventName];
+    const groups = events[eventName];
+    if (!Array.isArray(groups)) continue;
     groups.forEach((group, groupIndex) => {
       (group.hooks || []).forEach((handler, handlerIndex) => {
         if (!isYokiCodexCommand(handler.command)) return; // only trust our own handlers
@@ -311,6 +372,8 @@ module.exports = {
   translateMatcher,
   translateCommand,
   buildGeneratedGroups,
+  isWrappedHooksJson,
+  hookEventsOf,
   mergeHooksJson,
   collectHookStateEntries,
 };

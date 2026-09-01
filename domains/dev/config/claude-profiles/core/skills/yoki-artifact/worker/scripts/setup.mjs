@@ -23,7 +23,13 @@ import { homedir } from "node:os";
 
 import { createApi, discover } from "./lib/cf-api.mjs";
 import { isMain, runCli } from "./lib/cli.mjs";
-import { CLIENT_SECRET_ENV, USER_CONFIG_DIR, USER_CONFIG_FILE, VIEWERS_FILE } from "./lib/constants.mjs";
+import {
+  CLIENT_SECRET_ENV,
+  USER_CONFIG_DIR,
+  USER_CONFIG_FILE,
+  VIEWERS_FILE,
+  VIEWERS_GROUP_NAME,
+} from "./lib/constants.mjs";
 import { SetupError, parseArgs, readEnvironment, readViewersFile } from "./lib/env.mjs";
 import { EMPTY_STATE, planSetup } from "./lib/plan.mjs";
 import { manualAccessAppSteps } from "./lib/manual-steps.mjs";
@@ -77,6 +83,17 @@ function reportServiceToken(results, io) {
   io.err("");
 }
 
+/**
+ * The Access group id goes into config.json so `yoki-artifact share/unshare`
+ * can update the edge allow-list itself, instead of leaving it to the next
+ * setup run. Without it the CLI refuses (exit 2) and prints the manual step.
+ */
+function reportViewersGroup(results, io) {
+  const group = results.get("viewers-group");
+  if (!group?.id) return;
+  io.out(`Access group ${VIEWERS_GROUP_NAME}: ${group.id} (recorded as accessGroupId)`);
+}
+
 export async function main(argv = process.argv.slice(2), io = { out: console.log, err: console.error }) {
   const flags = parseArgs(argv);
   if (flags.help) {
@@ -108,6 +125,7 @@ export async function main(argv = process.argv.slice(2), io = { out: console.log
     },
   });
   reportServiceToken(results, io);
+  reportViewersGroup(results, io);
   io.out(`wrote ${dirs.userConfig}`);
   return 0;
 }

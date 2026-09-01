@@ -6,10 +6,25 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { loadLayer, loadAndMerge, resolveHome } = require('../source');
-const { buildMcpServers: buildClaudeMcpServers, convert: convertClaude } = require('../writers/claude');
-const { buildMcpServersToml, toTomlTable, findServerNamesInText } = require('../writers/codex');
-const { buildOmpMcpServers, toOmpEntry } = require('../writers/omp');
+const {
+  loadLayer,
+  loadAndMerge,
+  resolveHome,
+  TARGET_KEY_TO_HARNESS_ID,
+  HARNESS_ID_TO_TARGET_KEY,
+  harnessIdForTargetKey,
+  targetKeyForHarnessId,
+  isTargetedAt,
+  applyTargetOverride,
+} = require('../source');
+const claudeWriter = require('../writers/claude');
+const codexWriter = require('../writers/codex');
+const ompWriter = require('../writers/omp');
+const claudeReader = require('../readers/claude-code');
+const { DEFAULT_READERS } = require('../collect');
+const { buildMcpServers: buildClaudeMcpServers, convert: convertClaude } = claudeWriter;
+const { buildMcpServersToml, toTomlTable, findServerNamesInText } = codexWriter;
+const { buildOmpMcpServers, toOmpEntry } = ompWriter;
 
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -19,6 +34,142 @@ function writeJson(filePath, value) {
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-inventory-test-'));
 }
+
+// -----------------------------------------------------------------------------
+// source.js: the ONE place the mcp.json `targets.<key>` spelling and the
+// internal harness id are reconciled (`claude` vs `claude-code`)
+// -----------------------------------------------------------------------------
+
+test('target key <-> harness id: the table round-trips in both directions', () => {
+  for (const [targetKey, harnessId] of Object.entries(TARGET_KEY_TO_HARNESS_ID)) {
+    assert.equal(harnessIdForTargetKey(targetKey), harnessId);
+    assert.equal(targetKeyForHarnessId(harnessId), targetKey);
+  }
+  for (const [harnessId, targetKey] of Object.entries(HARNESS_ID_TO_TARGET_KEY)) {
+    assert.equal(TARGET_KEY_TO_HARNESS_ID[targetKey], harnessId);
+  }
+  // The split that motivated the table: two spellings, one harness.
+  assert.equal(harnessIdForTargetKey('claude'), 'claude-code');
+  assert.equal(targetKeyForHarnessId('claude-code'), 'claude');
+});
+
+test('an unknown target key / harness id is a clear error, never a silent no-op', () => {
+  assert.throws(() => harnessIdForTargetKey('cluade'), /unknown mcp\.json target key "cluade"/);
+  assert.throws(() => harnessIdForTargetKey('claude-code'), /unknown mcp\.json target key/); // id, not a key
+  assert.throws(() => targetKeyForHarnessId('claude'), /unknown mcp harness id "claude"/); // key, not an id
+  assert.throws(() => targetKeyForHarnessId(undefined), /unknown mcp harness id/);
+
+  const server = { name: 'x', targets: { claude: true }, targetOverrides: { claude: { command: 'y' } } };
+  assert.throws(() => isTargetedAt(server, 'claude'), /unknown mcp harness id/);
+  assert.throws(() => applyTargetOverride(server, 'claude'), /unknown mcp harness id/);
+});
+
+test('loadLayer: a misspelled targets key throws instead of silently disabling the server', () => {
+  const dir = makeTmpDir();
+  try {
+    const filePath = path.join(dir, 'mcp.json');
+    writeJson(filePath, {
+      schemaVersion: 'ecc.mcp.v1',
+      servers: [{
+        name: 'x',
+        transport: 'stdio',
+        command: 'x',
+        args: [],
+        env: {},
+        targets: { 'claude-code': true, codex: false, omp: false }, // internal id used as a data key
+      }],
+    });
+    assert.throws(() => loadLayer(filePath), /targets\.claude-code is not a known target key/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('loadLayer: a misspelled targetOverrides key throws too; `_comment` keys are allowed', () => {
+  const dir = makeTmpDir();
+  try {
+    const badPath = path.join(dir, 'bad.json');
+    writeJson(badPath, {
+      schemaVersion: 'ecc.mcp.v1',
+      servers: [{
+        name: 'x', transport: 'stdio', command: 'x', args: [], env: {},
+        targets: { claude: true, codex: false, omp: false },
+        targetOverrides: { cluade: { command: 'y' } },
+      }],
+    });
+    assert.throws(() => loadLayer(badPath), /targetOverrides\.cluade is not a known target key/);
+
+    const okPath = path.join(dir, 'ok.json');
+    writeJson(okPath, {
+      schemaVersion: 'ecc.mcp.v1',
+      servers: [{
+        name: 'x', transport: 'stdio', command: 'x', args: [], env: {},
+        targets: { claude: true, codex: false, omp: false, _comment: 'why' },
+      }],
+    });
+    assert.equal(loadLayer(okPath).servers.length, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the claude writer registers under the same harness id the claude reader stamps', () => {
+  assert.equal(claudeWriter.HARNESS_ID, 'claude-code');
+  assert.equal(claudeWriter.HARNESS_ID, claudeReader.HARNESS_ID);
+  assert.ok(Object.hasOwn(DEFAULT_READERS, claudeWriter.HARNESS_ID),
+    `DEFAULT_READERS should be keyed by "${claudeWriter.HARNESS_ID}"`);
+
+  // Empirical: what the reader actually stamps on a record.
+  const dir = makeTmpDir();
+  try {
+    const configPath = path.join(dir, '.claude.json');
+    writeJson(configPath, { mcpServers: { x: { type: 'stdio', command: 'x', args: [] } } });
+    const [record] = claudeReader.readClaudeCodeMcp({ userConfigPath: configPath });
+    assert.equal(record.source.harness, claudeWriter.HARNESS_ID);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('every writer HARNESS_ID is a known harness id in the mapping table', () => {
+  for (const writer of [claudeWriter, codexWriter, ompWriter]) {
+    assert.equal(typeof writer.HARNESS_ID, 'string');
+    assert.ok(Object.hasOwn(HARNESS_ID_TO_TARGET_KEY, writer.HARNESS_ID),
+      `writer harness id "${writer.HARNESS_ID}" is not in HARNESS_ID_TO_TARGET_KEY`);
+  }
+  assert.equal(targetKeyForHarnessId(codexWriter.HARNESS_ID), 'codex');
+  assert.equal(targetKeyForHarnessId(ompWriter.HARNESS_ID), 'omp');
+});
+
+test('the user-facing targets.claude flag still selects the Claude Code writer, in core/mcp.json too', () => {
+  const on = { name: 'on', transport: 'stdio', command: 'on', args: [], env: {}, targets: { claude: true, codex: false, omp: false } };
+  const off = { name: 'off', transport: 'stdio', command: 'off', args: [], env: {}, targets: { claude: false, codex: true, omp: true } };
+  assert.deepEqual(Object.keys(buildClaudeMcpServers([on, off])), ['on']);
+  assert.equal(isTargetedAt(on, claudeWriter.HARNESS_ID), true);
+  assert.equal(isTargetedAt(off, claudeWriter.HARNESS_ID), false);
+
+  // ...and against the real layer: emitted set === servers whose targets.claude is true.
+  const repoRoot = path.resolve(__dirname, '..', '..', '..', '..', '..', '..');
+  const coreServers = loadLayer(path.join(repoRoot, 'core', 'mcp.json')).servers;
+  const expected = coreServers.filter(s => s.targets && s.targets.claude === true).map(s => s.name);
+  assert.ok(expected.length > 0, 'core/mcp.json should still target Claude Code for at least one server');
+  assert.deepEqual(Object.keys(buildClaudeMcpServers(coreServers)), expected);
+});
+
+test('targetOverrides are looked up by harness id via the same table', () => {
+  const server = {
+    name: 'serena',
+    transport: 'stdio',
+    command: 'uvx',
+    args: ['--context', 'claude-code'],
+    env: {},
+    targets: { claude: true, codex: true, omp: true },
+    targetOverrides: { claude: { args: ['--context', 'claude'] }, codex: { args: ['--context', 'codex'] } },
+  };
+  assert.deepEqual(applyTargetOverride(server, claudeWriter.HARNESS_ID).args, ['--context', 'claude']);
+  assert.deepEqual(applyTargetOverride(server, codexWriter.HARNESS_ID).args, ['--context', 'codex']);
+  assert.deepEqual(applyTargetOverride(server, ompWriter.HARNESS_ID).args, ['--context', 'claude-code']); // no omp override
+});
 
 // -----------------------------------------------------------------------------
 // source.js: load / merge / secret-reference rule

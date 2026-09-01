@@ -17,7 +17,15 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const { readJsonIfExists } = require('./targets/layers');
-const { groupIsOurs, collectHookStateEntries } = require('./targets/codex-hooks-merge');
+const {
+  groupIsOurs,
+  isYokiCodexCommand,
+  collectHookStateEntries,
+  isWrappedHooksJson,
+  hookEventsOf,
+} = require('./targets/codex-hooks-merge');
+const { computeHandlerHash, eventLabelFor, hookStateKey } = require('./targets/codex-trust');
+const { stateHome } = require('./state-home');
 const externalLinks = require('./external-links');
 
 /** `readJsonIfExists` throws on a parse error (by design, for the "does
@@ -37,14 +45,17 @@ function readJsonSafe(filePath) {
  * `hooks` key — confirmed against a real, already-trusted `hooks.state`
  * entry (spike S1+S2 Appendix C: the herdr `SessionStart` hash matches only
  * when hashed from `parsed.hooks.SessionStart`, not `parsed.SessionStart`).
- * `codex-hooks-merge.js`'s own generator/tests operate on the unwrapped
- * shape directly, so accept both here rather than assume either is "the"
- * format this doctor will ever see on disk. */
+ * `codex-hooks-merge.js` now WRITES that shape, so the flat shape on disk
+ * means the file predates the fix (or something else wrote it) and Codex is
+ * running none of its hooks. This unwrap exists so the group/trust checks
+ * can still say something useful about such a file; the shape itself is
+ * judged separately and strictly by `checkCodexHooksShape` — never silently
+ * accepted here. */
 function unwrapHooksJson(parsed) {
-  if (parsed && typeof parsed === 'object' && parsed.hooks && typeof parsed.hooks === 'object') {
-    return parsed.hooks;
-  }
-  return parsed;
+  // `null` means "not found or unreadable" to every caller below — keep it
+  // distinguishable from an empty-but-present hooks.json.
+  if (parsed === null || parsed === undefined) return parsed;
+  return hookEventsOf(parsed);
 }
 
 const CLAUDE_MERGE_DIRS = ['skills', 'hooks', 'scripts', 'commands', 'agents', 'rules', 'workflows'];
@@ -206,6 +217,62 @@ function detectTrustDrift({ hooksJson, hooksJsonPath, storedStates }) {
   }
 
   return { total: expected.length, missing, drifted };
+}
+
+// ---------------------------------------------------------------------------
+// pure helper: is our PORT of Codex's hash function still right?
+// ---------------------------------------------------------------------------
+
+/**
+ * `detectTrustDrift` compares one output of `codex-trust.js`'s port against
+ * another output of the same port — it can only catch drift between two
+ * applications of the port, never a case where the port itself has diverged
+ * from Codex's real `command_hook_hash`. That is a structural hole: the hash
+ * is what pre-trusts every yoki handler without a human clicking trust, so a
+ * port bug means hooks are silently skipped and doctor reports `ok`.
+ *
+ * The one piece of independent ground truth available on a real machine is a
+ * FOREIGN hook — one yoki did not write (herdr's, say) — that already has a
+ * `[hooks.state]` entry Codex itself computed and stored. Recomputing that
+ * entry with our port and comparing is a genuine cross-check: both sides no
+ * longer come from the same implementation.
+ *
+ * A mismatch has two possible causes and this cannot tell them apart:
+ * either the port has diverged, or that foreign hook's definition changed
+ * since Codex trusted it (in which case Codex is refusing to run it too).
+ * Both are worth surfacing, so the caller reports a mismatch as a warning
+ * naming both readings rather than asserting one.
+ *
+ * @param {{hooksJson: object, hooksJsonPath: string, storedStates: Map<string,string>}} args
+ *   `hooksJson` is the EVENT MAP (already unwrapped).
+ * @returns {{checked: number, mismatched: string[]}} `checked` counts the
+ *   foreign handlers that had a Codex-written entry to compare against.
+ */
+function validateTrustHashPort({ hooksJson, hooksJsonPath, storedStates }) {
+  const events = hookEventsOf(hooksJson);
+  const mismatched = [];
+  let checked = 0;
+
+  for (const eventName of Object.keys(events)) {
+    const groups = events[eventName];
+    if (!Array.isArray(groups)) continue;
+    const eventLabel = eventLabelFor(eventName);
+    groups.forEach((group, groupIndex) => {
+      (group.hooks || []).forEach((handler, handlerIndex) => {
+        // Only handlers we did NOT write: ours were hashed by this same port,
+        // so comparing them proves nothing.
+        if (isYokiCodexCommand(handler && handler.command)) return;
+        const key = hookStateKey(hooksJsonPath, eventLabel, groupIndex, handlerIndex);
+        const stored = storedStates.get(key);
+        if (stored === undefined) return; // Codex never trusted this one — nothing to compare
+        checked++;
+        const ours = computeHandlerHash({ eventLabel, matcher: group.matcher, handler });
+        if (ours !== stored) mismatched.push(key);
+      });
+    });
+  }
+
+  return { checked, mismatched };
 }
 
 // ---------------------------------------------------------------------------
@@ -536,6 +603,33 @@ function checkCodexVersion() {
   return result('ok', 'codex', 'version', versionText);
 }
 
+/**
+ * The one check that can tell a working hooks.json from one Codex silently
+ * ignores. Codex reads ONLY the wrapped `{"hooks": {<Event>: [...]}}` shape
+ * (verified against the real `~/.codex/hooks.json` whose herdr group Codex
+ * itself trusted); a flat `{<Event>: [...]}` file parses, passes every other
+ * check here, and fires nothing. So it is a `fail`, not a tolerated variant.
+ *
+ * @param {*} parsedHooksJson the RAW parsed hooks.json (never unwrapped)
+ */
+function checkCodexHooksShape(parsedHooksJson) {
+  if (parsedHooksJson === null || parsedHooksJson === undefined) {
+    return result('warn', 'codex', 'hooks-shape', 'hooks.json not found or unreadable');
+  }
+  if (isWrappedHooksJson(parsedHooksJson)) {
+    return result('ok', 'codex', 'hooks-shape', 'wrapped {"hooks":{…}}');
+  }
+  if (typeof parsedHooksJson === 'object' && !Array.isArray(parsedHooksJson) && Object.keys(parsedHooksJson).length === 0) {
+    return result('warn', 'codex', 'hooks-shape', 'hooks.json is empty — run yoki-switch apply');
+  }
+  return result(
+    'fail',
+    'codex',
+    'hooks-shape',
+    'codex hooks.json is not in Codex\'s wrapped {"hooks":{…}} shape — codex ignores it; run yoki-switch apply'
+  );
+}
+
 function checkCodexHooksGroups(hooksJson) {
   if (hooksJson === null) {
     return { check: result('warn', 'codex', 'hooks-groups', 'hooks.json not found or unreadable'), ourGroupCount: 0, foreignGroups: [] };
@@ -589,6 +683,42 @@ function checkCodexTrustDrift({ hooksJson, hooksJsonPath, configTomlText }) {
     );
   }
   return result('ok', 'codex', 'trust-drift', `${total} trust hash(es) match`);
+}
+
+/**
+ * The only non-tautological evidence doctor can offer that
+ * `codex-trust.js`'s port still matches Codex's real hash function — see
+ * `validateTrustHashPort`. Without it, trust-drift compares the port against
+ * itself and would report `ok` on a systematically wrong port.
+ */
+function checkCodexTrustPort({ hooksJson, hooksJsonPath, configTomlText }) {
+  if (hooksJson === null) {
+    return result('warn', 'codex', 'trust-port', 'skipped — hooks.json not found or unreadable');
+  }
+  const storedStates = parseHooksStateFromToml(configTomlText);
+  const { checked, mismatched } = validateTrustHashPort({ hooksJson, hooksJsonPath, storedStates });
+
+  if (checked === 0) {
+    return result(
+      'warn',
+      'codex',
+      'trust-port',
+      'no Codex-written trust entry to check the ported hash function against — ' +
+        'the port is corroborated only by lib/targets/test/codex-trust.test.js'
+    );
+  }
+  if (mismatched.length > 0) {
+    return result(
+      'warn',
+      'codex',
+      'trust-port',
+      `${mismatched.length}/${checked} Codex-written trust hash(es) disagree with yoki's ported hash function ` +
+        `(${mismatched.slice(0, 2).join(', ')}${mismatched.length > 2 ? ', …' : ''}) — ` +
+        'either lib/targets/codex-trust.js has diverged from Codex (yoki\'s own pre-trusting is then unreliable) ' +
+        'or that foreign hook changed since Codex trusted it (Codex is skipping it too)'
+    );
+  }
+  return result('ok', 'codex', 'trust-port', `ported hash matches ${checked} Codex-written entry(ies)`);
 }
 
 function checkCodexFeaturesHooks(configTomlText) {
@@ -687,13 +817,16 @@ function checkCodexTarget({ codexDir, home, dotfilesRoot }) {
     ? fs.readFileSync(path.join(codexDir, 'config.toml'), 'utf8')
     : '';
   const hooksJsonPath = path.join(codexDir, 'hooks.json');
-  const hooksJson = unwrapHooksJson(readJsonSafe(hooksJsonPath));
+  const rawHooksJson = readJsonSafe(hooksJsonPath);
+  const hooksJson = unwrapHooksJson(rawHooksJson);
 
   results.push(checkCodexFeaturesHooks(configTomlText));
+  results.push(checkCodexHooksShape(rawHooksJson));
 
   const groupsCheck = checkCodexHooksGroups(hooksJson);
   results.push(groupsCheck.check);
   results.push(checkCodexTrustDrift({ hooksJson, hooksJsonPath, configTomlText }));
+  results.push(checkCodexTrustPort({ hooksJson, hooksJsonPath, configTomlText }));
   results.push(checkCodexForeignGroups(groupsCheck.foreignGroups));
   results.push(checkCodexExecpolicy(codexDir));
   results.push(checkCodexPermissionsConflict(configTomlText));
@@ -885,6 +1018,54 @@ function defaultDotfilesRoot(yokiRoot) {
  *   ompAgentDir?: string, yokiRoot?: string, dotfilesRoot?: string}} options
  * @returns {Array<{status: 'ok'|'warn'|'fail', target: string, check: string, hint: string}>}
  */
+// ---------------------------------------------------------------------------
+// state home
+// ---------------------------------------------------------------------------
+
+/**
+ * `lib/state-home.js` consolidated five state paths onto one XDG resolution.
+ * `lib/graph/journal.js` was the odd one out: it ignored `XDG_STATE_HOME`
+ * entirely, so on a machine that sets that variable its run journals sat
+ * under `~/.local/state/yoki/graph` while every other state file had already
+ * moved. Fixing it forward relocates the graph journals — and with them
+ * `yoki-graph`'s resume cache and run history — with no migration step.
+ *
+ * Nothing here moves data: a state directory is the user's, and silently
+ * copying run history somewhere else is not doctor's call. It just refuses
+ * to let the relocation be invisible, which is the actual finding.
+ */
+function checkStateHomeRelocation({ home, env }) {
+  const environment = env || process.env;
+  const effective = stateHome(environment);
+  const legacy = path.join(home, '.local', 'state');
+
+  if (path.resolve(effective) === path.resolve(legacy)) {
+    return result('ok', 'yoki', 'state-home', effective);
+  }
+
+  const strandedGraph = path.join(legacy, 'yoki', 'graph');
+  const stranded = [];
+  for (const [label, dir] of [['graph', strandedGraph], ['loop', path.join(legacy, 'yoki', 'loop')]]) {
+    try {
+      if (fs.existsSync(dir) && fs.readdirSync(dir).length > 0) stranded.push(`${label} (${dir})`);
+    } catch {
+      // unreadable is not evidence of content — say nothing about it
+    }
+  }
+
+  if (stranded.length === 0) {
+    return result('ok', 'yoki', 'state-home', `${effective} (XDG_STATE_HOME); nothing left at ${legacy}`);
+  }
+  return result(
+    'warn',
+    'yoki',
+    'state-home',
+    `state now resolves to ${effective}, but run history is still at the pre-XDG location: ${stranded.join(', ')} — ` +
+      'yoki-graph resume cache / yoki-loop history and daily-cap counters start from zero at the new path; ' +
+      'move or delete the old directory deliberately'
+  );
+}
+
 function runDoctor(options = {}) {
   const home = options.home || os.homedir();
   const yokiRoot = options.yokiRoot || defaultYokiRoot();
@@ -898,6 +1079,7 @@ function runDoctor(options = {}) {
     ...checkCodexTarget({ codexDir, home, dotfilesRoot }),
     ...checkOmpTarget({ ompAgentDir, claudeDir, home, dotfilesRoot, yokiRoot }),
     ...checkArtifactTarget({ dotfilesRoot }),
+    checkStateHomeRelocation({ home, env: options.env }),
   ];
 }
 
@@ -962,7 +1144,10 @@ module.exports = {
   parseFeaturesHooks,
   hasPermissionsConflict,
   detectTrustDrift,
+  validateTrustHashPort,
   unwrapHooksJson,
+  checkCodexHooksShape,
+  checkCodexTrustPort,
   extractHookCommands,
   extractHookScriptRefs,
   // per-target orchestrators, exported for tests with temp homes
@@ -970,6 +1155,7 @@ module.exports = {
   checkCodexTarget,
   checkOmpTarget,
   checkArtifactTarget,
+  checkStateHomeRelocation,
   // T35: external-links.yaml checks, exported for tests
   readEnabledPacks,
   checkExternalLinkEntry,

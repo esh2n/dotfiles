@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { buildGeneratedGroups, mergeHooksJson, collectHookStateEntries, translateMatcher } = require('../codex-hooks-merge');
+const { buildGeneratedGroups, mergeHooksJson, collectHookStateEntries, translateMatcher, isWrappedHooksJson } = require('../codex-hooks-merge');
 const { buildManagedBlockContent, applyManagedBlock, hasConflictingTopLevelKey } = require('../codex-config-toml');
 const { agentMarkdownToToml } = require('../codex-agents');
 const { hasPathsFrontmatter, buildAgentsMdBlockContent, applyAgentsMdBlock, substituteVocab } = require('../codex-agents-md');
@@ -120,38 +120,88 @@ test('translateMatcher: Edit|Write|MultiEdit in any order maps to Write|Edit|app
   assert.equal(translateMatcher('WebFetch|WebSearch'), 'WebFetch|WebSearch'); // pass-through, no rule for it
 });
 
-test('mergeHooksJson: a foreign (herdr) group is preserved byte-for-byte and ours is appended after it', () => {
+// --- hooks.json SHAPE ------------------------------------------------------
+// Codex reads ONLY `{"hooks": {<Event>: [...]}}` — the real ~/.codex/hooks.json
+// (whose herdr group Codex itself trusted, see codex-trust.test.js) has exactly
+// that structure. A flat top-level event map parses but fires nothing, which is
+// the silent-skip failure the whole trust-hash mechanism exists to prevent.
+
+test('mergeHooksJson: output is the wrapped {"hooks": {...}} shape Codex actually reads', () => {
+  const generated = { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'node run-with-flags.js x --harness codex' }] }] };
+  const merged = mergeHooksJson({}, generated);
+
+  assert.equal(typeof merged.hooks, 'object');
+  assert.equal(merged.SessionStart, undefined, 'events must NOT sit at the top level');
+  assert.equal(merged.hooks.SessionStart.length, 1);
+  assert.ok(isWrappedHooksJson(merged));
+});
+
+test('mergeHooksJson: an existing WRAPPED file is merged in place (foreign group kept, ours appended)', () => {
   const herdrGroup = { matcher: '*', hooks: [{ type: 'command', command: "bash '/Users/exampleperson/.codex/herdr-agent-state.sh' session" }] };
-  const existing = { SessionStart: [herdrGroup] };
+  const existing = { hooks: { SessionStart: [herdrGroup] } };
   const generated = { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'node run-with-flags.js x y z --harness codex' }] }] };
 
   const merged = mergeHooksJson(existing, generated);
-  assert.equal(merged.SessionStart.length, 2);
-  assert.deepEqual(merged.SessionStart[0], herdrGroup); // untouched, still first
-  assert.match(merged.SessionStart[1].hooks[0].command, /--harness codex/);
+  assert.equal(merged.hooks.SessionStart.length, 2);
+  assert.deepEqual(merged.hooks.SessionStart[0], herdrGroup); // untouched, still first
+  assert.match(merged.hooks.SessionStart[1].hooks[0].command, /--harness codex/);
+});
+
+test('mergeHooksJson: a pre-wrap FLAT file on disk migrates to wrapped without duplicating anything', () => {
+  // What yoki itself wrote before the shape was fixed: the first apply after
+  // the fix must read it, keep the foreign group, replace our own, and write
+  // the wrapped shape — not stack a second copy under `hooks`.
+  const herdrGroup = { matcher: '*', hooks: [{ type: 'command', command: 'bash herdr.sh' }] };
+  const ourOldGroup = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js old --harness codex' }] };
+  const existingFlat = { PreToolUse: [herdrGroup, ourOldGroup] };
+  const generated = { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js new --harness codex' }] }] };
+
+  const merged = mergeHooksJson(existingFlat, generated);
+  assert.ok(isWrappedHooksJson(merged));
+  assert.equal(merged.PreToolUse, undefined);
+  assert.equal(merged.hooks.PreToolUse.length, 2);
+  assert.deepEqual(merged.hooks.PreToolUse[0], herdrGroup);
+  assert.match(merged.hooks.PreToolUse[1].hooks[0].command, /new/);
 });
 
 test('mergeHooksJson: re-running drops our OWN previous group instead of duplicating it', () => {
   const ourOldGroup = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js old --harness codex' }] };
   const herdrGroup = { matcher: '*', hooks: [{ type: 'command', command: 'bash herdr.sh' }] };
-  const existing = { PreToolUse: [herdrGroup, ourOldGroup] };
+  const existing = { hooks: { PreToolUse: [herdrGroup, ourOldGroup] } };
   const generated = { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js new --harness codex' }] }] };
 
   const merged = mergeHooksJson(existing, generated);
-  assert.equal(merged.PreToolUse.length, 2);
-  assert.deepEqual(merged.PreToolUse[0], herdrGroup);
-  assert.match(merged.PreToolUse[1].hooks[0].command, /new/);
+  assert.equal(merged.hooks.PreToolUse.length, 2);
+  assert.deepEqual(merged.hooks.PreToolUse[0], herdrGroup);
+  assert.match(merged.hooks.PreToolUse[1].hooks[0].command, /new/);
 });
 
-test('collectHookStateEntries: indices are read off the FINAL merged hooks.json, so a foreign group ahead of ours shifts our index', () => {
+test('mergeHooksJson: a foreign TOP-LEVEL key of a wrapped file is preserved, like a foreign group', () => {
+  const existing = { hooks: {}, someFutureCodexKey: { keep: 'me' } };
+  const merged = mergeHooksJson(existing, {});
+  assert.deepEqual(merged.someFutureCodexKey, { keep: 'me' });
+});
+
+test('collectHookStateEntries: indices are read off the FINAL merged (wrapped) hooks.json, so a foreign group ahead of ours shifts our index', () => {
   const herdrGroup = { matcher: '*', hooks: [{ type: 'command', command: 'bash herdr.sh' }] };
   const ours = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js x --harness codex' }] };
-  const merged = { PreToolUse: [herdrGroup, ours] };
+  const merged = mergeHooksJson({ hooks: { PreToolUse: [herdrGroup] } }, { PreToolUse: [ours] });
 
   const entries = collectHookStateEntries(merged, '/Users/exampleperson/.codex/hooks.json');
   assert.equal(entries.length, 1);
+  // Key format is unchanged by the wrap: <abs hooks.json>:<snake_event>:<group>:<handler>
   assert.equal(entries[0].key, '/Users/exampleperson/.codex/hooks.json:pre_tool_use:1:0'); // group index 1, not 0
   assert.match(entries[0].trustedHash, /^sha256:[0-9a-f]{64}$/);
+});
+
+test('collectHookStateEntries: the wrapped and flat forms of the same content produce identical keys and hashes', () => {
+  const ours = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js x --harness codex', timeout: 5 }] };
+  const flat = { PreToolUse: [ours] };
+  const wrapped = { hooks: flat };
+  assert.deepEqual(
+    collectHookStateEntries(wrapped, '/Users/exampleperson/.codex/hooks.json'),
+    collectHookStateEntries(flat, '/Users/exampleperson/.codex/hooks.json')
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -230,7 +280,7 @@ test('plan(): an installed codexVersion below 0.150.0 drops Interrupt from hooks
 
     gen.apply(belowPlan);
     const hooksJsonBelow = JSON.parse(fs.readFileSync(path.join(out, 'hooks.json'), 'utf8'));
-    assert.equal(hooksJsonBelow.Interrupt, undefined);
+    assert.equal(hooksJsonBelow.hooks.Interrupt, undefined);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(home, { recursive: true, force: true });
@@ -251,8 +301,8 @@ test('plan(): an installed codexVersion at/above 0.150.0 emits Interrupt into ho
 
     gen.apply(abovePlan);
     const hooksJsonAbove = JSON.parse(fs.readFileSync(path.join(out, 'hooks.json'), 'utf8'));
-    assert.equal(hooksJsonAbove.Interrupt.length, 1);
-    assert.match(hooksJsonAbove.Interrupt[0].hooks[0].command, /--harness codex/);
+    assert.equal(hooksJsonAbove.hooks.Interrupt.length, 1);
+    assert.match(hooksJsonAbove.hooks.Interrupt[0].hooks[0].command, /--harness codex/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(home, { recursive: true, force: true });
@@ -536,10 +586,13 @@ test('end-to-end: plan()+apply() writes every artifact and stays fully contained
   try {
     const { core, personal } = buildFixtureRepo(root);
 
-    // Pre-seed a foreign (herdr-style) SessionStart hook the apply must preserve.
+    // Pre-seed a foreign (herdr-style) SessionStart hook the apply must
+    // preserve — in the WRAPPED shape Codex itself writes.
     fs.mkdirSync(out, { recursive: true });
     fs.writeFileSync(path.join(out, 'hooks.json'), JSON.stringify({
-      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: "bash '/Users/exampleperson/.codex/herdr-agent-state.sh' session", timeout: 10 }] }],
+      hooks: {
+        SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: "bash '/Users/exampleperson/.codex/herdr-agent-state.sh' session", timeout: 10 }] }],
+      },
     }));
 
     const planResult = codexTarget.plan({ sources: [core, personal], out, home, env: {} });
@@ -548,12 +601,13 @@ test('end-to-end: plan()+apply() writes every artifact and stays fully contained
 
     gen.apply(planResult);
 
-    // (1) hooks.json: foreign group preserved, ours appended
+    // (1) hooks.json: wrapped shape, foreign group preserved, ours appended
     const hooksJson = JSON.parse(fs.readFileSync(path.join(out, 'hooks.json'), 'utf8'));
-    assert.equal(hooksJson.SessionStart.length, 1); // herdr's group; the fixture shipped no SessionStart hook of our own
-    assert.match(hooksJson.SessionStart[0].hooks[0].command, /herdr-agent-state\.sh/);
-    assert.equal(hooksJson.PreToolUse.length, 1);
-    assert.match(hooksJson.PreToolUse[0].hooks[0].command, /--harness codex/);
+    assert.ok(isWrappedHooksJson(hooksJson), 'written hooks.json must be in the shape codex reads');
+    assert.equal(hooksJson.hooks.SessionStart.length, 1); // herdr's group; the fixture shipped no SessionStart hook of our own
+    assert.match(hooksJson.hooks.SessionStart[0].hooks[0].command, /herdr-agent-state\.sh/);
+    assert.equal(hooksJson.hooks.PreToolUse.length, 1);
+    assert.match(hooksJson.hooks.PreToolUse[0].hooks[0].command, /--harness codex/);
 
     // (2) config.toml
     const configToml = fs.readFileSync(path.join(out, 'config.toml'), 'utf8');
@@ -595,7 +649,7 @@ test('end-to-end: plan()+apply() writes every artifact and stays fully contained
     const secondPlan = codexTarget.plan({ sources: [core, personal], out, home, env: {} });
     gen.apply(secondPlan);
     const hooksJsonAgain = JSON.parse(fs.readFileSync(path.join(out, 'hooks.json'), 'utf8'));
-    assert.equal(hooksJsonAgain.PreToolUse.length, 1); // not duplicated
+    assert.equal(hooksJsonAgain.hooks.PreToolUse.length, 1); // not duplicated
     const configTomlAgain = fs.readFileSync(path.join(out, 'config.toml'), 'utf8');
     assert.equal((configTomlAgain.match(/# yoki:begin/g) || []).length, 1);
     assert.equal((configTomlAgain.match(/\[mcp_servers\.context7\]/g) || []).length, 1); // not duplicated
@@ -622,6 +676,154 @@ test('end-to-end: a [mcp_servers.<name>] table already declared outside the mana
     const configToml = fs.readFileSync(path.join(out, 'config.toml'), 'utf8');
     assert.match(configToml, /command = "hand-added"/); // untouched
     assert.equal((configToml.match(/\[mcp_servers\.context7\]/g) || []).length, 1); // not duplicated inside our block
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// gen.js apply(): atomicity and ordering
+//
+// apply() cannot be a transaction (the destinations are the user's real
+// ~/.codex), so what it owes is: no half-written file, a safe order for the
+// two mutually-dependent ones, and an audible failure that says how far it
+// got.
+// ---------------------------------------------------------------------------
+
+test('apply(): config.toml (trust hashes) is written BEFORE hooks.json, and the manifest last', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const planResult = codexTarget.plan({ sources: [core, personal], out, home, env: {} });
+
+    const order = [];
+    gen.apply(planResult, {
+      applyOp: (op) => { order.push(path.basename(op.destinationPath)); },
+    });
+
+    const configIdx = order.indexOf('config.toml');
+    const hooksIdx = order.indexOf('hooks.json');
+    assert.ok(configIdx !== -1 && hooksIdx !== -1);
+    assert.ok(
+      configIdx < hooksIdx,
+      'hashes before hooks: an interruption then leaves trust entries for hooks that do not exist yet, ' +
+        'which codex ignores — the reverse leaves the new hooks untrusted and silently skipped'
+    );
+    // The manifest is written after the op loop, so it never appears in it.
+    assert.ok(!order.includes('codex-manifest.json'));
+    assert.ok(fs.existsSync(path.join(out, '.yoki', 'codex-manifest.json')));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('apply(): sortOpsForApply keeps unrelated ops in their original relative order', () => {
+  const ops = [
+    { kind: 'merge-json', destinationPath: '/o/hooks.json' },
+    { kind: 'write', destinationPath: '/o/agents/a.md' },
+    { kind: 'toml-block', destinationPath: '/o/config.toml' },
+    { kind: 'write', destinationPath: '/o/agents/b.md' },
+  ];
+  const sorted = gen.sortOpsForApply(ops).map(op => op.destinationPath);
+  assert.deepEqual(sorted, ['/o/config.toml', '/o/hooks.json', '/o/agents/a.md', '/o/agents/b.md']);
+  // The caller's array is not mutated.
+  assert.equal(ops[0].destinationPath, '/o/hooks.json');
+});
+
+test('apply(): a failure mid-run names every file already updated and skips the manifest', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const planResult = codexTarget.plan({ sources: [core, personal], out, home, env: {} });
+
+    // Fail exactly between config.toml and hooks.json — the pair whose drift
+    // is the whole reason the ordering exists.
+    const done = [];
+    assert.throws(
+      () => gen.apply(planResult, {
+        applyOp: (op) => {
+          if (path.basename(op.destinationPath) === 'hooks.json') throw new Error('ENOSPC: simulated disk failure');
+          done.push(op.destinationPath);
+        },
+      }),
+      (err) => {
+        assert.match(err.message, /ENOSPC: simulated disk failure/);
+        assert.match(err.message, /stopped at merge-json .*hooks\.json/);
+        assert.match(err.message, /1 file\(s\) already updated/);
+        assert.match(err.message, /config\.toml/);
+        assert.match(err.message, /re-run `yoki-switch apply` to finish/);
+        assert.deepEqual(err.appliedDestinations, done);
+        return true;
+      }
+    );
+
+    assert.ok(
+      !fs.existsSync(path.join(out, '.yoki', 'codex-manifest.json')),
+      'a manifest written after a failed apply would claim destinations that were never written'
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('apply(): a failed write leaves the PREVIOUS file intact and no temp file behind', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    fs.mkdirSync(out, { recursive: true });
+    const dest = path.join(out, 'config.toml');
+    fs.writeFileSync(dest, 'previous content\n', 'utf8');
+
+    // fs.renameSync fails after the temp file exists — the destination must
+    // still hold the old bytes, not a truncated new write.
+    const realRename = fs.renameSync;
+    fs.renameSync = () => { throw new Error('EXDEV: simulated rename failure'); };
+    try {
+      assert.throws(() => gen.writeFileAtomic(dest, 'new content\n'), /EXDEV/);
+    } finally {
+      fs.renameSync = realRename;
+    }
+
+    assert.equal(fs.readFileSync(dest, 'utf8'), 'previous content\n');
+    assert.deepEqual(
+      fs.readdirSync(out).filter(f => f.includes('yoki-tmp')),
+      [],
+      'a failed write must not leave a temp file behind'
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('apply(): every write goes through a same-directory temp file + rename', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    fs.mkdirSync(out, { recursive: true });
+    const dest = path.join(out, 'hooks.json');
+    const tmpPaths = [];
+    const realRename = fs.renameSync;
+    fs.renameSync = (from, to) => { tmpPaths.push([from, to]); return realRename(from, to); };
+    try {
+      gen.applyOp(
+        { kind: 'merge-json', destinationPath: dest, content: { hooks: {} } },
+        { out, home }
+      );
+    } finally {
+      fs.renameSync = realRename;
+    }
+
+    assert.equal(tmpPaths.length, 1);
+    const [from, to] = tmpPaths[0];
+    // `to` is the realpath'd destination (path-safety resolves symlinks such
+    // as macOS's /var -> /private/var), so compare by basename, not literally.
+    assert.equal(path.basename(to), 'hooks.json');
+    // Same directory: a cross-filesystem rename is not atomic.
+    assert.equal(path.dirname(from), path.dirname(to));
+    assert.match(path.basename(from), /^hooks\.json\.yoki-tmp-\d+$/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(dest, 'utf8')), { hooks: {} });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(home, { recursive: true, force: true });

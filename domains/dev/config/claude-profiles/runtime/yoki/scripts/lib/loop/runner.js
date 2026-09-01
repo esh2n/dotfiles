@@ -25,6 +25,27 @@ const state = require('./state');
 
 class DailyCapError extends Error {}
 
+/**
+ * Every child a loop spawns is BY DEFINITION unattended — that is what
+ * yoki-loop is: a launchd-driven agent run with nobody watching. So
+ * `YOKI_UNATTENDED=1` is set unconditionally here rather than left to the
+ * caller's environment, which is what arms `hooks/unattended-guard.sh` (the
+ * one control that stops an agent editing its own guardrails, and which
+ * `exit 0`s immediately when the flag is absent). Without this the guard was
+ * inert for exactly the runs it was written for.
+ *
+ * It is set on the runner side, not only in the launchd plist, so a manual
+ * `yoki-loop run <name>` from a terminal is guarded identically — the run is
+ * still an unattended agent even when a human typed the command that started
+ * it.
+ *
+ * @param {NodeJS.ProcessEnv} env the runner's own environment
+ * @returns {NodeJS.ProcessEnv} the child's environment
+ */
+function childEnv(env) {
+  return { ...env, YOKI_UNATTENDED: '1' };
+}
+
 /** Shell-quotes one argv token for the human-readable `--dry-run` line —
  *  cosmetic only; the real run never goes through a shell. */
 function shellQuote(token) {
@@ -114,6 +135,7 @@ function run(options, deps = {}) {
     input: stdin != null ? stdin : undefined,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    env: childEnv(env),
   });
   const durationMs = Date.now() - startedAt;
 
@@ -139,4 +161,4 @@ function run(options, deps = {}) {
   return { dryRun: false, row, stdout, stderr };
 }
 
-module.exports = { run, DailyCapError, formatArgvLine, shellQuote };
+module.exports = { run, DailyCapError, formatArgvLine, shellQuote, childEnv };

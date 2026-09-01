@@ -212,7 +212,16 @@ function cmdInstall(name, options, rawFlagArgv, ctx) {
     intervalSeconds,
     stdoutPath,
     stderrPath,
-    env: { PATH: env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin', HOME: home },
+    // YOKI_UNATTENDED=1 belongs in the plist as well as in runner.js's own
+    // child env (see runner.childEnv): launchd starts `yoki-loop run` with a
+    // near-empty environment, and the flag has to be true for the RUNNER
+    // process too — not just its harness child — so any hook or guard the
+    // runner itself triggers sees an unattended run.
+    env: {
+      PATH: env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin',
+      HOME: home,
+      YOKI_UNATTENDED: '1',
+    },
   });
 
   const filePath = plist.plistPath(name, home);

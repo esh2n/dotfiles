@@ -18,7 +18,7 @@ export async function loadArtifactContext({ store, config, identity, channel, in
     throw notFound("no_such_artifact", "That artifact does not exist.");
   }
   const viewers = await store.listViewers(name);
-  const readable = canRead(identity, { ownerEmail: config.ownerEmail, viewers });
+  const readable = canRead(identity, { ownerEmail: config.ownerEmail, serviceTokenName: config.serviceTokenName, viewers });
   if (!readable) {
     throw forbidden("not_a_viewer", "You do not have access to this artifact.");
   }
@@ -31,6 +31,6 @@ export async function loadArtifactContext({ store, config, identity, channel, in
 
 /** Owner-only variant used by the write endpoints. */
 export async function loadOwnedArtifactContext({ store, config, identity, channel }) {
-  requireOwner(identity, config.ownerEmail);
+  requireOwner(identity, config);
   return await loadArtifactContext({ store, config, identity, channel, includeRevoked: true });
 }

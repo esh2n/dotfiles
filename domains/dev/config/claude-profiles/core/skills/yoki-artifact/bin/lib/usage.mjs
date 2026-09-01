@@ -25,12 +25,22 @@ host outside the artifact CSP allowlist (--allow-external downgrades the last
 one to a warning). A writeup-kit page is additionally run through
 writeup-kit's self-check when that skill is installed.
 
+share / unshare update BOTH lists that decide viewer access: the Worker's own
+viewer rows, and the Cloudflare Access group "yoki-artifact-viewers" that
+admits people at the edge. The second needs CLOUDFLARE_API_TOKEN and
+CLOUDFLARE_ACCOUNT_ID in the environment plus "accessGroupId" in the config
+file (written by worker/scripts/setup.mjs). Without them — or if Cloudflare
+refuses — the command exits 2 and prints the exact manual step; the viewer-row
+change has already been made and is safe to re-run.
+
 Configuration (~/.config/yoki-artifact/config.json):
   { "baseUrl": "https://...", "clientId": "...<id>.access",
-    "secretCommand": "op read op://Private/yoki-artifact/credential" }
+    "secretCommand": "op read op://Private/yoki-artifact/credential",
+    "accessGroupId": "...", "accountId": "..." }
 
 Environment overrides (these win over the file):
-  YOKI_ARTIFACT_URL, YOKI_ARTIFACT_CLIENT_ID, YOKI_ARTIFACT_CLIENT_SECRET
+  YOKI_ARTIFACT_URL, YOKI_ARTIFACT_CLIENT_ID, YOKI_ARTIFACT_CLIENT_SECRET,
+  YOKI_ARTIFACT_ACCESS_GROUP_ID
 
 The client secret is never read from, or written to, the config file.
 

@@ -89,7 +89,7 @@ function declaredLength(request) {
 // --- handlers -------------------------------------------------------------
 
 export async function handlePublish({ request, url, params, identity, config, store, blobs, now = new Date() }) {
-  requireOwner(identity, config.ownerEmail);
+  requireOwner(identity, config);
   const channel = assertChannel(params.channel);
 
   const contentType = (request.headers.get("content-type") ?? "").toLowerCase();
@@ -128,13 +128,13 @@ export async function handlePublish({ request, url, params, identity, config, st
 }
 
 export async function handleListArtifacts({ identity, config, store }) {
-  requireOwner(identity, config.ownerEmail);
+  requireOwner(identity, config);
   const rows = await store.listArtifacts();
   return { artifacts: rows.map(serializeArtifact) };
 }
 
 export async function handleGetArtifact({ params, identity, config, store }) {
-  const owner = isOwner(identity, config.ownerEmail);
+  const owner = isOwner(identity, config);
   const { channel, artifact, viewers } = await loadArtifactContext({
     store,
     config,
@@ -157,7 +157,7 @@ export async function handleListVersions({ params, identity, config, store }) {
     config,
     identity,
     channel: params.channel,
-    includeRevoked: isOwner(identity, config.ownerEmail),
+    includeRevoked: isOwner(identity, config),
   });
   const versions = await store.listVersions(channel);
   return { channel, versions: versions.map(serializeVersion) };

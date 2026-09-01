@@ -39,10 +39,14 @@ export const COMMANDS = Object.freeze({
   watch: cmdWatch,
 });
 
+/** The config travels with the client: `share` needs `accessGroupId` from it. */
 function connect(env, fetchImpl) {
   const config = loadConfig(env);
   const { secret } = resolveSecret(config, env);
-  return createClient({ baseUrl: config.baseUrl, clientId: config.clientId, secret, fetchImpl });
+  return {
+    config,
+    client: createClient({ baseUrl: config.baseUrl, clientId: config.clientId, secret, fetchImpl }),
+  };
 }
 
 export async function run({ argv, env = process.env, stdout, stderr, fetchImpl = fetch } = {}) {
@@ -71,7 +75,8 @@ export async function run({ argv, env = process.env, stdout, stderr, fetchImpl =
     }
     // connect() throws before the handler runs when the config or the secret
     // is unusable, so no command has to re-check them.
-    result = await handler({ client: connect(env, fetchImpl), flags, positionals, env, print, stderr });
+    const { client, config } = connect(env, fetchImpl);
+    result = await handler({ client, config, flags, positionals, env, print, stderr, fetchImpl });
   }
 
   if (asJson) {

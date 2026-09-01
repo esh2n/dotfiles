@@ -13,12 +13,22 @@
  * writer's output on top of whatever `~/.omp/agent/mcp.json` already has —
  * a hand-added third server is preserved untouched (only the servers this
  * writer emits are overwritten).
+ *
+ * NAMING — a writer selects servers by HARNESS_ID (the id this subsystem's
+ * readers/ also use), not by naming an mcp.json `targets.<key>` directly:
+ * the two spellings coincide for omp but not for Claude Code (`claude` in
+ * the data, `claude-code` as the id), and lib/mcp-inventory/source.js's
+ * TARGET_KEY_TO_HARNESS_ID is the only place they are reconciled.
  */
 
-/** Applies this server's 'omp' targetOverrides, if any. */
+const { isTargetedAt, applyTargetOverride } = require('../source');
+
+/** This writer's harness id. */
+const HARNESS_ID = 'omp';
+
+/** Applies this server's omp targetOverrides, if any. */
 function applyOmpOverride(server) {
-  const override = server.targetOverrides && server.targetOverrides.omp;
-  return override ? { ...server, ...override } : server;
+  return applyTargetOverride(server, HARNESS_ID);
 }
 
 /** @param {object} server a resolved server (after 'omp' targetOverrides) */
@@ -46,11 +56,11 @@ function toOmpEntry(server) {
 function buildOmpMcpServers(mergedServers) {
   const result = {};
   for (const server of mergedServers) {
-    if (!server.targets || server.targets.omp !== true) continue;
+    if (!isTargetedAt(server, HARNESS_ID)) continue;
     const effective = applyOmpOverride(server);
     result[effective.name] = toOmpEntry(effective);
   }
   return result;
 }
 
-module.exports = { toOmpEntry, applyOmpOverride, buildOmpMcpServers };
+module.exports = { HARNESS_ID, toOmpEntry, applyOmpOverride, buildOmpMcpServers };

@@ -191,13 +191,21 @@ export async function verifyAccessJwt(token, { teamDomain, aud, fetchImpl = fetc
 export function identityFromClaims(claims) {
   const commonName = typeof claims.common_name === "string" ? claims.common_name.trim() : "";
   if (commonName !== "") {
-    return Object.freeze({ kind: "service", id: commonName, email: null, label: `service:${commonName}` });
+    // `common_name` is carried through under its own name, not just folded
+    // into `id`, because the owner check pins one exact service token by it.
+    return Object.freeze({
+      kind: "service",
+      id: commonName,
+      common_name: commonName,
+      email: null,
+      label: `service:${commonName}`,
+    });
   }
   const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
   if (email === "") {
     throw forbidden("no_identity", "Access token carries neither an email nor a service-token name.");
   }
-  return Object.freeze({ kind: "human", id: email, email, label: email });
+  return Object.freeze({ kind: "human", id: email, common_name: null, email, label: email });
 }
 
 /** Verify the request's Access header and return its identity. */
@@ -219,23 +227,79 @@ export async function authenticate(request, config, { fetchImpl = fetch, now = D
   return identityFromClaims(claims);
 }
 
-/** Owner = the configured OWNER_EMAIL, or any service token (the agent/CLI). */
-export function isOwner(identity, ownerEmail) {
+/**
+ * The authorization policy, normalised.
+ *
+ * Every predicate below takes the deployment config (`{ ownerEmail,
+ * serviceTokenName }`, plus `viewers` where a channel is in play). A bare
+ * `ownerEmail` string is still accepted and reads as "no service token is
+ * pinned" — the fail-closed answer — so a call site that was not updated can
+ * only ever grant less, never more.
+ */
+function ownerPolicy(policy) {
+  if (typeof policy !== "object" || policy === null) {
+    return { ownerEmail: typeof policy === "string" ? policy : null, serviceTokenName: null };
+  }
+  return { ownerEmail: policy.ownerEmail ?? null, serviceTokenName: policy.serviceTokenName ?? null };
+}
+
+/**
+ * True only for THE service token this deployment provisioned.
+ *
+ * Access pins one `token_id` in the Service Auth policy at the edge, but a
+ * second service token added to the same application also reaches the Worker —
+ * and used to be treated here as a full owner. So the Worker pins the token
+ * itself, by the `common_name` claim (Access puts the token's Client ID
+ * there), against the SERVICE_TOKEN_NAME var that scripts/setup.mjs writes.
+ *
+ * FAIL-CLOSED: when SERVICE_TOKEN_NAME is unset — an older deployment that has
+ * not re-run scripts/setup.mjs — NO service identity is an owner. The CLI then
+ * gets a loud, recoverable 403 on publish/revoke/share instead of the Worker
+ * silently handing owner rights to whatever service token turns up.
+ */
+export function isPinnedService(identity, serviceTokenName) {
+  if (!identity || identity.kind !== "service") return false;
+  const pinned = typeof serviceTokenName === "string" ? serviceTokenName.trim() : "";
+  if (pinned === "") return false;
+  const commonName = typeof identity.common_name === "string" ? identity.common_name.trim() : "";
+  return commonName !== "" && commonName === pinned;
+}
+
+/** What the viewer list is matched against: an email, or a service common_name. */
+export function identityKey(identity) {
+  if (!identity) return null;
+  if (identity.kind === "human") return typeof identity.email === "string" ? identity.email : null;
+  if (identity.kind === "service") return typeof identity.id === "string" ? identity.id.trim().toLowerCase() : null;
+  return null;
+}
+
+/** Owner = the configured OWNER_EMAIL, or the one pinned service token. */
+export function isOwner(identity, policy) {
   if (!identity) return false;
-  if (identity.kind === "service") return true;
+  const { ownerEmail, serviceTokenName } = ownerPolicy(policy);
+  if (identity.kind === "service") return isPinnedService(identity, serviceTokenName);
   return typeof ownerEmail === "string" && identity.email === ownerEmail.trim().toLowerCase();
 }
 
-/** A person may read a channel if they own it or are listed in `viewers`. */
-export function canRead(identity, { ownerEmail, viewers = [] }) {
-  if (isOwner(identity, ownerEmail)) return true;
-  if (!identity || identity.kind !== "human") return false;
-  return viewers.some((email) => String(email).trim().toLowerCase() === identity.email);
+/**
+ * An identity may read a channel if it owns it or is listed in `viewers`.
+ *
+ * A non-pinned service token falls through to the viewer list like anyone
+ * else. That list holds email addresses (the API validates that) while a
+ * service `common_name` is a Cloudflare-issued Client ID, so in practice a
+ * stray service token reads nothing — viewer-level, never owner-level.
+ */
+export function canRead(identity, policy) {
+  if (isOwner(identity, policy)) return true;
+  const key = identityKey(identity);
+  if (key === null) return false;
+  const viewers = policy?.viewers ?? [];
+  return viewers.some((email) => String(email).trim().toLowerCase() === key);
 }
 
-/** Only the owner (or a service token) may publish, revoke or share. */
-export function canWrite(identity, ownerEmail) {
-  return isOwner(identity, ownerEmail);
+/** Only the owner (or the pinned service token) may publish, revoke or share. */
+export function canWrite(identity, policy) {
+  return isOwner(identity, policy);
 }
 
 export function requireRead(identity, context) {
@@ -244,8 +308,8 @@ export function requireRead(identity, context) {
   }
 }
 
-export function requireOwner(identity, ownerEmail) {
-  if (!canWrite(identity, ownerEmail)) {
+export function requireOwner(identity, policy) {
+  if (!canWrite(identity, policy)) {
     throw forbidden("not_owner", "Only the owner of this deployment can do that.");
   }
 }

@@ -1,12 +1,15 @@
 'use strict';
 
 const { normalizeServerEntry, buildInventory } = require('./canonical-mcp');
-const { readClaudeCodeMcp } = require('./readers/claude-code');
+const { readClaudeCodeMcp, HARNESS_ID: CLAUDE_CODE_HARNESS_ID } = require('./readers/claude-code');
 const { readCodexMcp } = require('./readers/codex');
 const { readOpencodeMcp } = require('./readers/opencode');
 
+// Keyed by harness id — the same ids the writers/ use. Claude Code is spelled
+// `claude-code` here and `targets.claude` in the mcp.json layers; source.js's
+// TARGET_KEY_TO_HARNESS_ID is the only place those two spellings are joined.
 const DEFAULT_READERS = Object.freeze({
-  'claude-code': readClaudeCodeMcp,
+  [CLAUDE_CODE_HARNESS_ID]: readClaudeCodeMcp,
   codex: readCodexMcp,
   opencode: readOpencodeMcp
 });

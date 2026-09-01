@@ -36,9 +36,16 @@ database_id = "00000000-0000-0000-0000-000000000000"
 
 # Placeholders — set the real values before deploying (`wrangler deploy --var`
 # or by editing this block). They are configuration, not secrets: the Access
-# AUD and team domain are public identifiers. src/index.mjs refuses to serve
-# anything if one of them is empty.
+# AUD, the team domain and a service-token Client ID are public identifiers.
+# src/index.mjs refuses to serve anything if one of the first three is empty.
+#
+# SERVICE_TOKEN_NAME pins WHICH service token is the owner. Access puts the
+# token's Client ID in the JWT's `common_name` claim, so this holds the Client
+# ID of the `yoki-artifact-cli` token — scripts/setup.mjs writes it. Left at
+# the placeholder, no service token is an owner at all (fail-closed): the CLI
+# gets 403 on publish/revoke/share until setup.mjs is re-run.
 [vars]
 ACCESS_TEAM_DOMAIN = "REPLACE-team.cloudflareaccess.com"
 ACCESS_AUD = "REPLACE-access-application-aud"
 OWNER_EMAIL = "REPLACE-owner@example.com"
+SERVICE_TOKEN_NAME = "REPLACE-service-token-client-id"

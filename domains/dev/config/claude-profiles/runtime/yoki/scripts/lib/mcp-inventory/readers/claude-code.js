@@ -4,6 +4,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// This harness's id inside mcp-inventory. The mcp.json layers spell the same
+// harness `targets.claude` (the user-facing key); lib/mcp-inventory/source.js's
+// TARGET_KEY_TO_HARNESS_ID is the only place the two spellings are reconciled.
+const HARNESS_ID = 'claude-code';
+
 // Claude Code stores MCP servers under "mcpServers" in ~/.claude.json (user
 // scope) and in project-local .mcp.json files (project scope). Each entry:
 //   { type: "stdio"|"http"|"sse", command, args[], env{}, url }
@@ -42,7 +47,7 @@ function readMcpServersBlock(filePath, scope) {
 
   return Object.entries(block)
     .map(([name, raw]) => mapClaudeServer(name, raw, {
-      harness: 'claude-code',
+      harness: HARNESS_ID,
       scope,
       configPath: filePath
     }))
@@ -68,6 +73,7 @@ function readClaudeCodeMcp(options = {}) {
 }
 
 module.exports = {
+  HARNESS_ID,
   readClaudeCodeMcp,
   mapClaudeServer
 };

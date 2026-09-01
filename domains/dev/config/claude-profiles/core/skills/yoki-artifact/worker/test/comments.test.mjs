@@ -14,14 +14,32 @@ import {
   handleSeenComment,
   replyAuthor,
 } from "../src/comments.mjs";
-import { OWNER_EMAIL } from "./fixtures/access.mjs";
+import { OWNER_EMAIL, SERVICE_TOKEN_NAME } from "./fixtures/access.mjs";
 import { fakeStore } from "./fixtures/fake-bindings.mjs";
 
-const config = { teamDomain: "team.cloudflareaccess.com", aud: "aud", ownerEmail: OWNER_EMAIL };
-const owner = { kind: "human", id: OWNER_EMAIL, email: OWNER_EMAIL, label: OWNER_EMAIL };
-const viewer = { kind: "human", id: "viewer@example.com", email: "viewer@example.com", label: "viewer@example.com" };
-const stranger = { kind: "human", id: "nobody@example.com", email: "nobody@example.com", label: "nobody@example.com" };
-const service = { kind: "service", id: "yoki-cli", email: null, label: "service:yoki-cli" };
+const config = {
+  teamDomain: "team.cloudflareaccess.com",
+  aud: "aud",
+  ownerEmail: OWNER_EMAIL,
+  serviceTokenName: SERVICE_TOKEN_NAME,
+};
+const owner = { kind: "human", id: OWNER_EMAIL, common_name: null, email: OWNER_EMAIL, label: OWNER_EMAIL };
+const viewer = { kind: "human", id: "viewer@example.com", common_name: null, email: "viewer@example.com", label: "viewer@example.com" };
+const stranger = { kind: "human", id: "nobody@example.com", common_name: null, email: "nobody@example.com", label: "nobody@example.com" };
+const service = {
+  kind: "service",
+  id: SERVICE_TOKEN_NAME,
+  common_name: SERVICE_TOKEN_NAME,
+  email: null,
+  label: `service:${SERVICE_TOKEN_NAME}`,
+};
+const otherService = {
+  kind: "service",
+  id: "someone-else.access",
+  common_name: "someone-else.access",
+  email: null,
+  label: "service:someone-else.access",
+};
 
 const NOW = new Date("2026-08-31T12:00:00.000Z");
 
@@ -70,13 +88,21 @@ function jsonRequest(body) {
 }
 
 describe("authorization matrix", () => {
-  const context = (comment = null) => ({ ownerEmail: OWNER_EMAIL, viewers: ["viewer@example.com"], comment });
+  const context = (comment = null) => ({
+    ownerEmail: OWNER_EMAIL,
+    serviceTokenName: SERVICE_TOKEN_NAME,
+    viewers: ["viewer@example.com"],
+    comment,
+  });
 
   const expectations = [
     ["owner", owner, { read: true, post: true, reply: true, resolve: true, seen: true }],
-    ["service token", service, { read: true, post: true, reply: true, resolve: true, seen: true }],
+    ["pinned service token", service, { read: true, post: true, reply: true, resolve: true, seen: true }],
     ["listed viewer", viewer, { read: true, post: true, reply: true, resolve: true, seen: false }],
     ["stranger", stranger, { read: false, post: false, reply: false, resolve: false, seen: false }],
+    // A second token on the same Access application is not the owner, so it
+    // cannot mark comments seen and drain the owner's unread count.
+    ["another service token", otherService, { read: false, post: false, reply: false, resolve: false, seen: false }],
   ];
 
   for (const [name, identity, allowed] of expectations) {
