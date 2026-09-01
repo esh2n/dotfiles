@@ -1,0 +1,9 @@
+{
+  "session_id": "01a05683-d934-7703-941b-f75053a7f8a8",
+  "transcript_path": "/private/tmp/claude-501/-Users-esh2n-go-github-com-esh2n-dotfiles/12ee2d68-0b5c-4d73-a188-66dc93819e73/scratchpad/s1s2/codex-home/sessions/2026/08/31/rollout-2026-08-31T15-31-16-01a05683-d934-7703-941b-f75053a7f8a8.jsonl",
+  "cwd": "/private/tmp/claude-501/-Users-esh2n-go-github-com-esh2n-dotfiles/12ee2d68-0b5c-4d73-a188-66dc93819e73/scratchpad/s1s2/proj",
+  "hook_event_name": "SessionStart",
+  "model": "gpt-5.6-sol",
+  "permission_mode": "bypassPermissions",
+  "source": "startup"
+}

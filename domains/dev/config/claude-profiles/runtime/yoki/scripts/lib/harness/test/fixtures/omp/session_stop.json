@@ -1,0 +1,17 @@
+{
+  "event": "session_stop",
+  "payload": {
+    "type": "session_stop",
+    "turn_id": 2,
+    "session_id": "01a0568a-0622-735f-98ea-1903fada89ea",
+    "session_file": "/private/tmp/.../sessions/2026-08-31T06-38-01-250Z_01a0568a-0622-735f-98ea-1903fada89ea.jsonl",
+    "stop_hook_active": false,
+    "signal": "AbortSignal(aborted=false)"
+  },
+  "ctx": {
+    "session_id": "01a0568a-0622-735f-98ea-1903fada89ea",
+    "session_file": "/private/tmp/.../sessions/2026-08-31T06-38-01-250Z_01a0568a-0622-735f-98ea-1903fada89ea.jsonl",
+    "cwd": "/private/tmp/claude-501/.../omp-probe",
+    "model": "gpt-5.4-mini"
+  }
+}

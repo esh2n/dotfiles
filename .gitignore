@@ -234,8 +234,5 @@ domains/dev/config/claude/.cache/
 domains/dev/config/claude/workflows
 domains/dev/config/git/identity-guard
 
-# pi-subagents runtime artifacts (per-run transcripts and mission state)
-.pi-subagents/
-
 # writeup-kit ships vendored runtime bundles (elk, lindera) on purpose
 !domains/dev/config/claude-profiles/core/skills/writeup-kit/vendor/
