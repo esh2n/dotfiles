@@ -106,6 +106,8 @@ domains/system/userstyles/gen/
 **/dropdown_windows.json
 **/sessions/
 **/session*
+# yoki runtime sources are code, not session state
+!domains/dev/config/claude-profiles/runtime/yoki/scripts/**/session*
 
 # Tmux plugins and generated files
 **/tmux/plugins/
