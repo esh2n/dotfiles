@@ -1,22 +1,70 @@
 {
   "plan-angles": {
     "angles": [
-      { "key": "a1", "goal": "find primary sources on the claim" },
-      { "key": "a2", "goal": "find counter-evidence" }
+      {
+        "key": "a1",
+        "goal": "find primary sources on the claim"
+      },
+      {
+        "key": "a2",
+        "goal": "find counter-evidence"
+      }
     ]
   },
   "search:a1": {
     "findings": [
-      { "claim": "the API rate limit is 60 req/min", "source": "https://example.com/docs/1", "confidence": 8, "load_bearing": true }
+      {
+        "claim": "the API rate limit is 60 req/min",
+        "source": "https://example.com/docs/1",
+        "confidence": 8,
+        "load_bearing": true
+      }
     ],
-    "unknowns": ["exact burst allowance is undocumented"]
+    "unknowns": [
+      "exact burst allowance is undocumented"
+    ]
   },
   "search:a2": {
     "findings": [
-      { "claim": "a community post disputes the limit", "source": "https://example.com/forum/2", "confidence": 4, "load_bearing": false }
+      {
+        "claim": "a community post disputes the limit",
+        "source": "https://example.com/forum/2",
+        "confidence": 4,
+        "load_bearing": false
+      }
     ],
     "unknowns": []
   },
-  "verify:a1": { "holds": true, "reason": "confirmed by opening the docs page", "corrected": "" },
-  "synthesize": "The API rate limit is 60 requests/minute per the official docs (unverified: exact burst allowance)."
+  "verify:a1": {
+    "holds": true,
+    "reason": "confirmed by opening the docs page",
+    "corrected": ""
+  },
+  "synthesize": "The API rate limit is 60 requests/minute per the official docs (unverified: exact burst allowance).",
+  "search:a1@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": [
+        {
+          "claim": "the API rate limit is 60 req/min",
+          "source": "https://example.com/docs/1",
+          "confidence": 7,
+          "load_bearing": true
+        },
+        {
+          "claim": "the limit is per API key, not per IP",
+          "source": "https://example.com/docs/9",
+          "confidence": 8,
+          "load_bearing": false
+        }
+      ],
+      "unknowns": []
+    }
+  },
+  "search:a2@codex/sonnet": {
+    "ok": false,
+    "error": "codex exec timed out",
+    "exitCode": 2,
+    "stderrTail": "killed after 900000ms"
+  }
 }

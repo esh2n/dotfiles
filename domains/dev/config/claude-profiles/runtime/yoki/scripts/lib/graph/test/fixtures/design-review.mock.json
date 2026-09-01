@@ -3,23 +3,102 @@
     "source_kind": "inline",
     "design_summary": "Add a write-through cache in front of the lookup path; no schema change.",
     "design_text": "Design: add a write-through cache in front of the lookup path. On write, update the store then the cache. On read, check the cache first, fall back to the store on miss. No rollback plan is specified.",
-    "grounding": [{ "doc": "README.md", "constraint": "use conventional commits" }],
+    "grounding": [
+      {
+        "doc": "README.md",
+        "constraint": "use conventional commits"
+      }
+    ],
     "missing": [],
     "checklists": []
   },
   "lane:conventions": {
     "findings": [
-      { "claim": "the design has no rollback plan", "severity_confidence": 8, "importance": 8, "doc_ref": "", "load_bearing": false }
+      {
+        "claim": "the design has no rollback plan",
+        "severity_confidence": 8,
+        "importance": 8,
+        "doc_ref": "",
+        "load_bearing": false
+      }
     ],
-    "open_questions": ["should the cache be shared across regions or per-instance?"]
+    "open_questions": [
+      "should the cache be shared across regions or per-instance?"
+    ]
   },
-  "lane:architecture": { "findings": [], "open_questions": [] },
-  "lane:security": { "findings": [], "open_questions": [] },
-  "lane:wording": { "findings": [], "open_questions": [] },
-  "lane:release": { "findings": [], "open_questions": [] },
-  "verify:conventions": { "verdict": "confirmed", "reason": "the design text has no rollback section" },
+  "lane:architecture": {
+    "findings": [],
+    "open_questions": []
+  },
+  "lane:security": {
+    "findings": [],
+    "open_questions": []
+  },
+  "lane:wording": {
+    "findings": [],
+    "open_questions": []
+  },
+  "lane:release": {
+    "findings": [],
+    "open_questions": []
+  },
+  "verify:conventions": {
+    "verdict": "confirmed",
+    "reason": "the design text has no rollback section"
+  },
   "synthesize": {
     "verdict": "proceed-with-changes",
     "report": "Verdict: proceed with changes — add a rollback plan before implementation. No other blocking findings."
+  },
+  "lane:conventions@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": [
+        {
+          "claim": "the design has no rollback plan",
+          "severity_confidence": 7,
+          "importance": 8,
+          "doc_ref": "",
+          "load_bearing": false
+        }
+      ],
+      "open_questions": []
+    }
+  },
+  "lane:security@codex/opus": {
+    "ok": true,
+    "result": {
+      "findings": [
+        {
+          "claim": "cache entries are not scoped per tenant",
+          "severity_confidence": 7,
+          "importance": 7,
+          "doc_ref": "",
+          "load_bearing": false
+        }
+      ],
+      "open_questions": []
+    }
+  },
+  "lane:architecture@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": [],
+      "open_questions": []
+    }
+  },
+  "lane:wording@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": [],
+      "open_questions": []
+    }
+  },
+  "lane:release@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": [],
+      "open_questions": []
+    }
   }
 }

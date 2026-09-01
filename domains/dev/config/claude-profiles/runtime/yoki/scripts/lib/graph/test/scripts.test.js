@@ -243,6 +243,189 @@ for (const spec of SCRIPTS) {
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Provider lanes (MP3): the same three scripts under
+//     providers: ["claude", "codex"].
+// ---------------------------------------------------------------------------
+//
+// The codex lanes are still run through the mock backend here — what is
+// being tested is the WORKFLOW's half of the bridge (a second lane per
+// dimension, the transport envelope unwrapped, provider-tagged findings,
+// cross-provider dedupe that keeps the union, a failed lane dropped with a
+// note instead of faked), not whether `codex exec` works. yoki-agent's own
+// half is pinned by test/agent-cli.test.js, and the helper that joins them
+// by test/lanes.test.js.
+//
+// Each script's fixture carries `<label>@codex/<tier>` entries holding the
+// `{ok, result}` envelope the transport subagent would have returned.
+
+/** Every agent-start label the run emitted, in order. */
+function labelsOf(events) {
+  return events.filter((e) => e.type === 'agent-start').map((e) => e.label);
+}
+
+function logsOf(events) {
+  return events.filter((e) => e.type === 'log').map((e) => e.message);
+}
+
+async function runWithProviders(spec, providers, cwd) {
+  const events = [];
+  const result = await runner.executeScript({
+    scriptPath: spec.scriptPath,
+    args: { ...spec.args, providers },
+    backendName: 'mock',
+    cwd,
+    mockFile: fixture(spec.name),
+    emit: (e) => events.push(e),
+  });
+  return { result, events };
+}
+
+const REVIEW_SPEC = SCRIPTS.find((s) => s.name === 'review');
+const RESEARCH_SPEC = SCRIPTS.find((s) => s.name === 'research');
+const DESIGN_REVIEW_SPEC = SCRIPTS.find((s) => s.name === 'design-review');
+
+test('review with providers ["claude","codex"]: one lane per dimension per provider, findings tagged, union kept', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-providers-'));
+  try {
+    const { result, events } = await runWithProviders(REVIEW_SPEC, ['claude', 'codex'], cwd);
+    assert.equal(result.status, 'ok', result.error);
+    const labels = labelsOf(events);
+
+    // Every dimension ran twice — once natively, once through a transport
+    // agent whose label names the provider and the model it was pointed at.
+    assert.ok(labels.includes('review:correctness'), 'the claude lane label changed');
+    assert.ok(labels.includes('review:correctness@codex/sonnet'), 'no codex lane for correctness');
+    // The security dimension keeps its own opus tier when routed to codex.
+    assert.ok(labels.includes('review:security@codex/opus'));
+
+    const findings = result.result.findings;
+    // pkg/foo.go was found by BOTH providers with the same title -> one
+    // finding carrying both attributions, not two rows.
+    const shared = findings.find((f) => f.file === 'pkg/foo.go');
+    assert.ok(shared, 'the finding both providers reported disappeared');
+    assert.deepEqual(shared.providers.sort(), ['claude', 'codex']);
+
+    // pkg/bar.go was found by codex ONLY -> the union keeps it.
+    const codexOnly = findings.find((f) => f.file === 'pkg/bar.go');
+    assert.ok(codexOnly, 'the finding only codex reported was dropped — this is not a union');
+    assert.deepEqual(codexOnly.providers, ['codex']);
+    assert.equal(codexOnly.provider, 'codex');
+    assert.match(codexOnly.tag, /\[codex\]/);
+    assert.equal(findings.length, 2);
+
+    // Grouped by provider: a shared finding appears under both, so a group
+    // reads as "what this provider saw".
+    assert.deepEqual(Object.keys(result.result.by_provider).sort(), ['claude', 'codex']);
+    assert.equal(result.result.by_provider.claude.length, 1);
+    assert.equal(result.result.by_provider.codex.length, 2);
+
+    // Metrics are keyed per provider once there is more than one.
+    assert.ok(result.result.metrics['correctness@claude']);
+    assert.ok(result.result.metrics['correctness@codex']);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: a provider lane whose yoki-agent call failed is dropped with a visible note, never faked', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-providers-'));
+  try {
+    const { result, events } = await runWithProviders(REVIEW_SPEC, ['claude', 'codex'], cwd);
+    assert.equal(result.status, 'ok', result.error);
+    // The fixture's `review:tests@codex/sonnet` entry is {ok:false, exitCode:2}.
+    const note = logsOf(events).find((m) => m.includes('review:tests@codex/sonnet'));
+    assert.ok(note, 'the dropped lane was silent — a reader cannot tell coverage was lost');
+    assert.match(note, /dropped/);
+    assert.match(note, /codex exec exited 1/);
+    assert.match(note, /exit 2/);
+    // And it contributed nothing: no invented finding stands in for it.
+    assert.equal(result.result.metrics['tests@codex'].total, 0);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review with the default providers is unchanged: same labels, same journal shape', () => withIsolatedState(async () => {
+  const cwdA = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-default-a-'));
+  const cwdB = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-default-b-'));
+  try {
+    // No `providers` at all vs. an explicit ["claude"] — the two must be the
+    // same run, and neither may mention a transport.
+    const bare = [];
+    const bareRun = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: REVIEW_SPEC.args, backendName: 'mock',
+      cwd: cwdA, mockFile: fixture('review'), emit: (e) => bare.push(e),
+    });
+    const { result: explicit, events } = await runWithProviders(REVIEW_SPEC, ['claude'], cwdB);
+
+    assert.equal(bareRun.status, 'ok', bareRun.error);
+    assert.equal(explicit.status, 'ok');
+    assert.deepEqual(labelsOf(events), labelsOf(bare));
+    assert.ok(!labelsOf(bare).some((l) => l.includes('@')), 'a default run grew a provider lane');
+    assert.deepEqual(explicit.result.findings, bareRun.result.findings);
+    // Dimension-keyed metrics, exactly as before providers existed.
+    assert.ok(bareRun.result.metrics.correctness);
+    assert.ok(explicit.result.metrics.correctness);
+  } finally {
+    fs.rmSync(cwdA, { recursive: true, force: true });
+    fs.rmSync(cwdB, { recursive: true, force: true });
+  }
+}));
+
+test('research with providers ["claude","codex"]: searchers fan out per provider and claims dedupe on claim+source', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-providers-'));
+  try {
+    const { result, events } = await runWithProviders(RESEARCH_SPEC, ['claude', 'codex'], cwd);
+    assert.equal(result.status, 'ok', result.error);
+    const labels = labelsOf(events);
+    assert.ok(labels.includes('search:a1'));
+    assert.ok(labels.includes('search:a1@codex/sonnet'));
+    assert.ok(labels.includes('search:a2@codex/sonnet'));
+
+    const claims = result.result.findings;
+    const shared = claims.find((f) => f.claim.includes('60 req/min'));
+    assert.ok(shared);
+    assert.deepEqual(shared.providers.sort(), ['claude', 'codex']);
+    // A source only codex opened survives.
+    const codexOnly = claims.find((f) => f.claim.includes('per API key'));
+    assert.ok(codexOnly, 'the claim only codex found was dropped');
+    assert.deepEqual(codexOnly.providers, ['codex']);
+    assert.equal(claims.length, 3);
+
+    assert.deepEqual(Object.keys(result.result.by_provider).sort(), ['claude', 'codex']);
+    // The failed a2 codex lane is reported, not silently empty.
+    assert.ok(logsOf(events).some((m) => /search:a2@codex\/sonnet: dropped/.test(m)));
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('design-review with providers ["claude","codex"]: panel lanes fan out and claims merge across providers', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-providers-'));
+  try {
+    const { result, events } = await runWithProviders(DESIGN_REVIEW_SPEC, ['claude', 'codex'], cwd);
+    assert.equal(result.status, 'ok', result.error);
+    const labels = labelsOf(events);
+    assert.ok(labels.includes('lane:conventions'));
+    assert.ok(labels.includes('lane:conventions@codex/sonnet'));
+    assert.ok(labels.includes('lane:security@codex/opus'));
+
+    const findings = result.result.findings;
+    const shared = findings.find((f) => f.claim.includes('rollback'));
+    assert.ok(shared);
+    assert.deepEqual(shared.providers.sort(), ['claude', 'codex']);
+    assert.match(shared.tag, /\[claude\+codex\]/);
+    const codexOnly = findings.find((f) => f.claim.includes('per tenant'));
+    assert.ok(codexOnly, 'the finding only codex raised was dropped');
+    assert.deepEqual(codexOnly.providers, ['codex']);
+    assert.equal(findings.length, 2);
+    assert.deepEqual(Object.keys(result.result.by_provider).sort(), ['claude', 'codex']);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+// ---------------------------------------------------------------------------
 // 2. codex/omp argv-capture: review + research, no process ever spawned.
 // ---------------------------------------------------------------------------
 //

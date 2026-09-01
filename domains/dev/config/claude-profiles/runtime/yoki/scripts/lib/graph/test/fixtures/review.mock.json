@@ -3,20 +3,100 @@
     "diff_file": "/tmp/yoki-graph-review.patch",
     "files_changed": 3,
     "intent": "add a caching layer in front of the lookup path",
-    "langs": ["go"],
+    "langs": [
+      "go"
+    ],
     "touches": [],
     "checklists": []
   },
   "grounding": "none",
   "review:correctness": {
     "findings": [
-      { "file": "pkg/foo.go", "line": 42, "title": "possible nil dereference", "detail": "ptr may be nil when the cache misses", "confidence": 8, "importance": 8 }
+      {
+        "file": "pkg/foo.go",
+        "line": 42,
+        "title": "possible nil dereference",
+        "detail": "ptr may be nil when the cache misses",
+        "confidence": 8,
+        "importance": 8
+      }
     ]
   },
-  "review:security": { "findings": [] },
-  "review:performance": { "findings": [] },
-  "review:tests": { "findings": [] },
-  "review:simplification": { "findings": [] },
-  "review:lang:go": { "findings": [] },
-  "verify:pkg/foo.go": { "verdict": "confirmed", "reason": "read the code — the nil check is missing on the cache-miss path" }
+  "review:security": {
+    "findings": []
+  },
+  "review:performance": {
+    "findings": []
+  },
+  "review:tests": {
+    "findings": []
+  },
+  "review:simplification": {
+    "findings": []
+  },
+  "review:lang:go": {
+    "findings": []
+  },
+  "verify:pkg/foo.go": {
+    "verdict": "confirmed",
+    "reason": "read the code — the nil check is missing on the cache-miss path"
+  },
+  "review:correctness@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": [
+        {
+          "file": "pkg/foo.go",
+          "line": 42,
+          "title": "possible nil dereference",
+          "detail": "codex saw the same missing nil check",
+          "confidence": 7,
+          "importance": 8
+        }
+      ]
+    }
+  },
+  "review:security@codex/opus": {
+    "ok": true,
+    "result": {
+      "findings": [
+        {
+          "file": "pkg/bar.go",
+          "line": 7,
+          "title": "hardcoded token",
+          "detail": "an API token is inlined in the source",
+          "confidence": 9,
+          "importance": 9
+        }
+      ]
+    }
+  },
+  "review:performance@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": []
+    }
+  },
+  "review:tests@codex/sonnet": {
+    "ok": false,
+    "error": "codex exec exited 1",
+    "exitCode": 2,
+    "stderrTail": "codex: not logged in"
+  },
+  "review:simplification@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": []
+    }
+  },
+  "review:lang:go@codex/sonnet": {
+    "ok": true,
+    "result": {
+      "findings": []
+    }
+  },
+  "verify:pkg/bar.go": {
+    "verdict": "confirmed",
+    "reason": "read the file — the token is inlined"
+  }
 }
