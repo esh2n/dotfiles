@@ -225,3 +225,154 @@ test('status: a runId is required', () => {
     assert.throws(() => cli.cmdStatus([], {}), /usage: yoki-graph status <runId>/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// status --watch: the final report, and how the journal is read while polling
+// ---------------------------------------------------------------------------
+
+/** A stream stand-in that keeps everything written to it. */
+function capture() {
+  return { text: '', isTTY: false, write(chunk) { this.text += String(chunk); return true; } };
+}
+
+/**
+ * `withEnv` restores the environment in a synchronous `finally`, so an async
+ * body would run its awaits with the overrides already gone (`cmdWatch`
+ * would then read the REAL ~/.local/state between polls). This variant
+ * awaits the body before restoring.
+ */
+async function withEnvAsync(overrides, fn) {
+  const saved = new Map();
+  for (const [key, value] of Object.entries(overrides)) {
+    saved.set(key, Object.prototype.hasOwnProperty.call(process.env, key) ? process.env[key] : undefined);
+    process.env[key] = value;
+  }
+  for (const mod of ['../journal', '../runner', '../cli']) delete require.cache[require.resolve(mod)];
+  const cli = require('../cli');
+  try {
+    return await fn({ cli, runner: require('../runner'), journalLib: require('../journal') });
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    for (const mod of ['../journal', '../runner', '../cli']) delete require.cache[require.resolve(mod)];
+  }
+}
+
+test('watch: the final status report goes to the WATCH stream, and says what it found', async () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cli-state-'));
+  try {
+    seedRun(stateHome, 'run-watch', { name: 'review', status: 'ok', backend: 'codex' }, [
+      { key: 'k1', index: 0, label: 'a', status: 'ok', result: 1, tokens: 120, tokensSource: 'reported', model: 'gpt-5.5', backend: 'codex', durationMs: 1000 },
+      { key: 'k2', index: 1, label: 'b', status: 'error', error: 'boom', model: 'gpt-5.5', backend: 'codex' },
+    ]);
+    await withEnvAsync({ YOKI_STATE_HOME: stateHome }, async ({ cli }) => {
+      const stream = capture();
+      // Everything the run prints must land HERE. Before cmdStatus took an
+      // injectable stream the final report went straight to the real
+      // process.stdout, so this assertion could not be written at all — the
+      // watch line's own "running 0" was the only thing a test could see,
+      // and deleting the final report entirely would still have passed.
+      const real = process.stdout.write;
+      const leaked = [];
+      process.stdout.write = (chunk) => { leaked.push(String(chunk)); return true; };
+      try {
+        await cli.cmdWatch(['run-watch'], {}, { stream, isTty: false, intervalMs: 0, maxPolls: 3 });
+      } finally {
+        process.stdout.write = real;
+      }
+      assert.equal(leaked.join(''), '', 'the final status report leaked to the real stdout');
+      assert.match(stream.text, /run: review \(run-watch\)/);
+      assert.match(stream.text, /agent calls: 2 \(1 ok, 1 error, 0 retried\)/);
+      assert.match(stream.text, /tokens: 120 \(120 reported, 0 estimated\)/);
+      assert.match(stream.text, /gpt-5\.5/, 'the per-model table is missing from the final report');
+      // And the live line was rendered before it.
+      assert.ok(stream.text.indexOf('running 0') < stream.text.indexOf('run: review'));
+    });
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test('watch: a still-running run keeps polling and only reports once it finishes', async () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cli-state-'));
+  try {
+    const runDir = path.join(stateHome, 'yoki', 'graph', 'run-live');
+    seedRun(stateHome, 'run-live', { name: 'review', status: 'running', backend: 'mock' }, [
+      { key: 'k1', index: 0, label: 'a', status: 'ok', result: 1, tokens: 10 },
+    ]);
+    await withEnvAsync({ YOKI_STATE_HOME: stateHome }, async ({ cli }) => {
+      const stream = capture();
+      let polls = 0;
+      const real = process.stdout.write;
+      process.stdout.write = () => true;
+      try {
+        await cli.cmdWatch(['run-live'], {}, {
+          stream,
+          isTty: false,
+          intervalMs: 0,
+          maxPolls: 4,
+          sleep: async () => {
+            polls += 1;
+            if (polls === 2) {
+              // A second call lands mid-watch, then the run ends.
+              fs.appendFileSync(path.join(runDir, 'journal.jsonl'),
+                `${JSON.stringify({ key: 'k2', index: 1, label: 'b', status: 'ok', result: 2, tokens: 20 })}\n`);
+              fs.writeFileSync(path.join(runDir, 'run.json'),
+                JSON.stringify({ name: 'review', status: 'ok', backend: 'mock' }));
+            }
+          },
+        });
+      } finally {
+        process.stdout.write = real;
+      }
+      // The entry appended between polls is in the final report: the
+      // incremental tail picked it up rather than the loop caching poll 1's
+      // read forever.
+      assert.match(stream.text, /agent calls: 2 \(2 ok, 0 error, 0 retried\)/);
+      assert.match(stream.text, /tokens: 30 /);
+    });
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The end-of-run tables
+// ---------------------------------------------------------------------------
+
+test('formatModelTable prints a cached column and hides the backend column for a single-backend run', () => {
+  withEnv({}, ({ cli }) => {
+    const table = cli.formatModelTable([
+      { backend: 'codex', model: 'gpt-5.5', calls: 3, tokens: 5000, cached: 4000, wallMs: 61000 },
+      { backend: 'codex', model: 'gpt-5.4-mini', calls: 1, tokens: 900, cached: 0, wallMs: 1000 },
+    ]);
+    assert.match(table, /model +calls +tokens +cached +wall/);
+    assert.doesNotMatch(table, /backend/, 'one backend needs no backend column');
+    assert.match(table, /gpt-5\.5 +3 +5000 +4000 +1m01s/);
+  });
+});
+
+test('formatModelTable adds a backend column once a run mixed backends', () => {
+  withEnv({}, ({ cli }) => {
+    const table = cli.formatModelTable([
+      { backend: 'codex', model: 'gpt-5.5', calls: 1, tokens: 100, cached: 10, wallMs: 1000 },
+      { backend: 'omp', model: 'claude-sonnet-5', calls: 1, tokens: 50, cached: 0, wallMs: 1000 },
+    ]);
+    assert.match(table, /model +backend +calls +tokens +cached +wall/);
+    assert.match(table, /codex/);
+    assert.match(table, /omp/);
+  });
+});
+
+test('formatUsage reports cached tokens beside the total, never folded into it', () => {
+  withEnv({}, ({ cli }) => {
+    const line = cli.formatUsage({
+      calls: 2, tokens: 120, reportedTokens: 120, estimatedTokens: 0,
+      cachedTokens: 57856, costUsd: 0, hasCost: false,
+    });
+    assert.match(line, /tokens: 120 \(120 reported, 0 estimated\)/);
+    assert.match(line, /57856 cached/);
+  });
+});

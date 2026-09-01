@@ -153,6 +153,12 @@ async function cmdRun(rest, flags) {
 
   printer.finish();
   if (!flags.json) {
+    // Accounting BEFORE the payload, deliberately: `result` is an arbitrary
+    // workflow return value (review's findings run to thousands of lines),
+    // and a per-model table printed after it is scrolled away on a TTY and
+    // buried at the bottom of a redirected log. The numbers a caller checks
+    // first — runId, status, tokens, per-model spend — stay at a fixed
+    // distance from the top of the summary.
     process.stdout.write(`\nrunId: ${result.runId}\nstatus: ${result.status}\n`);
     if (result.usage) process.stdout.write(`${formatUsage(result.usage)}\n`);
     if (result.byModel && result.byModel.length) process.stdout.write(formatModelTable(result.byModel));
@@ -172,22 +178,39 @@ function numberFlag(value) {
 }
 
 /**
- * Per-model breakdown for the end of a run: which models actually ran, how
- * many calls each took, and what they cost in tokens and model-seconds.
- * Keyed by the RESOLVED id, so a run that mixed a tier default with a
- * per-call override shows both rows rather than one blurred total.
+ * Per-model breakdown for the end of a run: which models actually ran on
+ * which backend, how many calls each took, and what they cost in tokens and
+ * model-seconds. Keyed by the RESOLVED id, so a run that mixed a tier
+ * default with a per-call override shows both rows rather than one blurred
+ * total; the backend column appears only when a run actually mixed backends
+ * (MP1's per-call `{backend}`), so a single-backend run's table is unchanged.
+ *
+ * `cached` is how much of the input was served from cache. It is reported
+ * beside the token count rather than inside it: on codex those tokens are a
+ * SUBSET of the input already counted (adding them double-counted a whole
+ * run — see backends/codex.js), on omp they are disjoint and the backend's
+ * own total already includes them.
  */
 function formatModelTable(rows) {
   const pad = (text, width) => String(text).padEnd(width);
-  const modelWidth = Math.max(5, ...rows.map((r) => r.model.length));
-  const lines = [`\n${pad('model', modelWidth)}  calls    tokens      wall`];
+  const backends = new Set(rows.map((r) => r.backend || ''));
+  const showBackend = backends.size > 1;
+  const modelWidth = Math.max(5, ...rows.map((r) => String(r.model).length));
+  const backendWidth = showBackend ? Math.max(7, ...rows.map((r) => String(r.backend || '').length)) : 0;
+  const header = [pad('model', modelWidth)];
+  if (showBackend) header.push(pad('backend', backendWidth));
+  header.push('calls', '   tokens', '   cached', '     wall');
+  const lines = [`\n${header.join('  ')}`];
   for (const row of rows) {
-    lines.push([
-      pad(row.model, modelWidth),
+    const cells = [pad(row.model, modelWidth)];
+    if (showBackend) cells.push(pad(row.backend || '', backendWidth));
+    cells.push(
       String(row.calls).padStart(5),
       String(row.tokens).padStart(9),
+      String(row.cached || 0).padStart(9),
       progress.formatElapsed(row.wallMs).padStart(9),
-    ].join('  '));
+    );
+    lines.push(cells.join('  '));
   }
   return `${lines.join('\n')}\n`;
 }
@@ -198,6 +221,8 @@ function formatModelTable(rows) {
 function formatUsage(usage) {
   const parts = [`tokens: ${usage.tokens} (${usage.reportedTokens} reported, ${usage.estimatedTokens} estimated)`];
   parts.push(`over ${usage.calls} agent call${usage.calls === 1 ? '' : 's'}`);
+  // Never folded into `tokens`: see formatModelTable's note and API.md.
+  if (usage.cachedTokens) parts.push(`${usage.cachedTokens} cached`);
   if (usage.hasCost) parts.push(`cost: $${usage.costUsd.toFixed(4)}`);
   return parts.join(' — ');
 }
@@ -217,36 +242,50 @@ function cmdList(flags) {
   }
 }
 
-function cmdStatus(rest, flags) {
+/**
+ * `deps.stream` (default `process.stdout`) makes the report capturable —
+ * `cmdWatch` prints its final report through this, and a test can assert
+ * what that report actually contained instead of it leaking to the real
+ * stdout unasserted.
+ *
+ * The journal is read and parsed exactly ONCE here. It used to be three
+ * times: `readAll()` for the counts, then `usageTotals()` and
+ * `usageByModel()`, each re-reading the whole file synchronously.
+ */
+function cmdStatus(rest, flags, deps = {}) {
   const runId = rest[0];
   if (!runId) throw new Error('usage: yoki-graph status <runId>');
+  const stream = deps.stream || process.stdout;
   const meta = runner.readRunMeta(runId);
-  const journal = new journalLib.Journal(runId);
-  const entries = journal.readAll();
+  const entries = deps.entries || new journalLib.Journal(runId).readAll();
+  const counts = { agentCalls: 0, ok: 0, errors: 0, retries: 0 };
+  for (const entry of entries) {
+    if (entry.status === 'retry') { counts.retries += 1; continue; }
+    counts.agentCalls += 1;
+    if (entry.status === 'ok') counts.ok += 1;
+    else if (entry.status === 'error') counts.errors += 1;
+  }
   const payload = {
     runId,
     meta,
-    agentCalls: entries.filter((e) => e.status !== 'retry').length,
-    ok: entries.filter((e) => e.status === 'ok').length,
-    errors: entries.filter((e) => e.status === 'error').length,
-    retries: entries.filter((e) => e.status === 'retry').length,
-    usage: journal.usageTotals(),
-    byModel: journal.usageByModel(),
+    ...counts,
+    usage: journalLib.usageTotalsFrom(entries),
+    byModel: journalLib.usageByModelFrom(entries),
     entries,
   };
   if (flags.json) {
-    process.stdout.write(`${JSON.stringify(payload)}\n`);
+    stream.write(`${JSON.stringify(payload)}\n`);
     return;
   }
   if (!meta) {
-    process.stdout.write(`no run found with id ${runId} (looked in ${journalLib.runDir(runId)})\n`);
+    stream.write(`no run found with id ${runId} (looked in ${journalLib.runDir(runId)})\n`);
     process.exitCode = 1;
     return;
   }
-  process.stdout.write(`run: ${meta.name} (${runId})\nstatus: ${meta.status}\nbackend: ${meta.backend}\nagent calls: ${payload.agentCalls} (${payload.ok} ok, ${payload.errors} error, ${payload.retries} retried)\n`);
-  process.stdout.write(`${formatUsage(payload.usage)}\n`);
-  if (payload.byModel.length) process.stdout.write(formatModelTable(payload.byModel));
-  if (meta.error) process.stdout.write(`error: ${meta.error}\n`);
+  stream.write(`run: ${meta.name} (${runId})\nstatus: ${meta.status}\nbackend: ${meta.backend}\nagent calls: ${payload.agentCalls} (${payload.ok} ok, ${payload.errors} error, ${payload.retries} retried)\n`);
+  stream.write(`${formatUsage(payload.usage)}\n`);
+  if (payload.byModel.length) stream.write(formatModelTable(payload.byModel));
+  if (meta.error) stream.write(`error: ${meta.error}\n`);
 }
 
 /**
@@ -303,7 +342,12 @@ async function cmdWatch(rest, flags, deps = {}) {
   const maxPolls = Number.isFinite(deps.maxPolls) ? deps.maxPolls : Infinity;
   const isTty = deps.isTty === undefined ? !!stream.isTTY : deps.isTty;
 
+  // One tailer for the whole loop: each poll parses only the bytes appended
+  // since the last one (journal.js's JournalTail), instead of re-reading and
+  // re-parsing the entire growing NDJSON every two seconds.
+  const tail = new journalLib.JournalTail(runId);
   let lastWidth = 0;
+  let entries = [];
   for (let poll = 0; poll < maxPolls; poll += 1) {
     const meta = runner.readRunMeta(runId);
     if (!meta) {
@@ -311,7 +355,7 @@ async function cmdWatch(rest, flags, deps = {}) {
       process.exitCode = 1;
       return;
     }
-    const entries = new journalLib.Journal(runId).readAll();
+    entries = tail.read();
     const state = watchSnapshot(runId, meta, entries);
     const line = progress.renderStatus(state);
     if (isTty) {
@@ -323,7 +367,11 @@ async function cmdWatch(rest, flags, deps = {}) {
     }
     if (state.finished) {
       if (isTty && lastWidth) stream.write(`\r${' '.repeat(lastWidth)}\r`);
-      cmdStatus([runId], { ...flags, watch: false });
+      // Through the SAME stream the watch line went to, and reusing the
+      // entries this loop already parsed: the final report used to go
+      // straight to the real process.stdout, so a test could neither
+      // capture it nor tell whether it had been printed at all.
+      cmdStatus([runId], { ...flags, watch: false }, { stream, entries });
       return;
     }
     // eslint-disable-next-line no-await-in-loop
