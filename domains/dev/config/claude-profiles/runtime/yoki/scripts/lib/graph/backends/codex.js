@@ -19,7 +19,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError } = require('./common');
+const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError, makeLineSplitter } = require('./common');
 const { toStrictJsonSchema } = require('../schema');
 
 const name = 'codex';
@@ -67,7 +67,37 @@ function buildPrompt(prompt, agentType) {
   return preamble ? `${preamble}\n\n${prompt}` : prompt;
 }
 
-async function run({ prompt, model, effort, schema, agentType, cwd, timeoutMs, sandbox }) {
+/**
+ * Does this `codex exec --json` event represent the agent STARTING a tool
+ * call? Counting begins-only (never the matching end) keeps the number a
+ * count of tool calls rather than of events, and covers both event
+ * vocabularies the stream uses: the newer `item.started` items whose type
+ * names a command/tool/patch, and the older `msg.type` `*_begin` names.
+ */
+function isToolCallEvent(evt) {
+  if (!evt || typeof evt !== 'object') return false;
+  const msgType = evt.msg && typeof evt.msg.type === 'string' ? evt.msg.type : '';
+  if (/^(exec_command|mcp_tool_call|patch_apply|web_search)_begin$/.test(msgType)) return true;
+  if (evt.type === 'item.started' && evt.item && typeof evt.item.type === 'string') {
+    return /command|tool|file_change|patch|web_search/.test(evt.item.type);
+  }
+  return false;
+}
+
+/** Count tool-call starts as the stream arrives; report each increment. */
+function makeProgressCounter(onProgress) {
+  if (typeof onProgress !== 'function') return undefined;
+  let toolCalls = 0;
+  return makeLineSplitter((line) => {
+    let evt;
+    try { evt = JSON.parse(line); } catch { return; }
+    if (!isToolCallEvent(evt)) return;
+    toolCalls += 1;
+    onProgress({ toolCalls });
+  });
+}
+
+async function run({ prompt, model, effort, schema, agentType, cwd, timeoutMs, sandbox, onProgress }) {
   let schemaFilePath = null;
   if (schema) {
     schemaFilePath = path.join(os.tmpdir(), `yoki-graph-codex-schema-${crypto.randomBytes(6).toString('hex')}.json`);
@@ -90,7 +120,9 @@ async function run({ prompt, model, effort, schema, agentType, cwd, timeoutMs, s
       agentType,
     );
     const started = Date.now();
-    const { stdout, stderr, code, timedOut } = await spawnCollect('codex', args, { cwd, input: promptText, timeoutMs });
+    const { stdout, stderr, code, timedOut } = await spawnCollect('codex', args, {
+      cwd, input: promptText, timeoutMs, onData: makeProgressCounter(onProgress),
+    });
     const durationMs = Date.now() - started;
     if (timedOut) throw timeoutError('codex exec', timeoutMs);
     if (code !== 0 && !stdout.trim()) {
@@ -199,6 +231,8 @@ module.exports = {
   run,
   extractText,
   extractUsage,
+  isToolCallEvent,
+  makeProgressCounter,
   resolveSandbox,
   SANDBOX_MODES,
   DEFAULT_SANDBOX,

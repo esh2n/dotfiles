@@ -12,8 +12,9 @@
  *       [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
  *       [--mock <file>] [--timeout <ms>] [--retries N]
  *       [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
+ *       [--model-map <tier>=<id>,...]
  *   yoki-graph list
- *   yoki-graph status <runId>
+ *   yoki-graph status <runId> [--watch]
  */
 
 const fs = require('fs');
@@ -21,6 +22,8 @@ const path = require('path');
 
 const runner = require('./runner');
 const journalLib = require('./journal');
+const models = require('./models');
+const progress = require('./progress');
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -28,7 +31,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith('--')) { out._.push(a); continue; }
     const key = a.slice(2);
-    const BOOLEAN_FLAGS = new Set(['dry-run', 'json']);
+    const BOOLEAN_FLAGS = new Set(['dry-run', 'json', 'watch']);
     if (BOOLEAN_FLAGS.has(key)) { out[key] = true; continue; }
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) { out[key] = true; continue; }
@@ -58,55 +61,65 @@ function readArgsValue(flags) {
   return undefined;
 }
 
-/** Human-readable one-line-per-phase/agent progress printer, or NDJSON when
- *  `--json` was passed — both mirror the journal event shape 1:1. */
-function makeEmitter({ json }) {
-  return (event) => {
-    if (json) {
-      process.stdout.write(`${JSON.stringify(event)}\n`);
-      return;
+/**
+ * The permanent, one-per-event human line: everything that should still be
+ * in the scrollback after the run. Returns null for events that only belong
+ * in the live status line (an agent starting, a tool-call tick) — those are
+ * folded into progress.js's status instead of printed one by one.
+ */
+function humanLine(event) {
+  const ts = (event.ts || '').slice(11, 19); // HH:MM:SS
+  switch (event.type) {
+    case 'run-start':
+      return `[${ts}] ▶ ${event.name} (run ${event.runId}, backend ${event.backend})\n`;
+    case 'phase':
+      return `[${ts}] ── ${event.title} ──\n`;
+    case 'log':
+      return `[${ts}] ${event.message}\n`;
+    case 'agent-start':
+      // The resolved model id, not the tier the script asked for: two
+      // lanes reading "sonnet" can be running different models once
+      // --model-map or a per-call model is in play.
+      return `[${ts}]   → ${event.label}${event.model ? ` (${[event.backend, event.model].filter(Boolean).join(' ')})` : ''}${event.phase ? ` [${event.phase}]` : ''}\n`;
+    case 'agent-progress':
+      return null; // live-only: folded into the status line
+    case 'agent-cached':
+      return `[${ts}]   ✓ ${event.label} (replayed #${event.index}, --resume)\n`;
+    case 'resume-diverged':
+      return `[${ts}] ↯ resume diverged at call #${event.index} (${event.label}) — everything from here runs live\n`;
+    case 'agent-retry':
+      return `[${ts}]   ↻ ${event.label} retry ${event.attempt}/${event.retries} in ${event.delayMs}ms: ${event.error}\n`;
+    case 'agent-end': {
+      const mark = event.status === 'ok' ? '✓' : event.status === 'dry-run' ? '·' : '✗';
+      const model = event.model ? ` (${event.model})` : '';
+      return `[${ts}]   ${mark} ${event.label}${model}${event.error ? `: ${event.error}` : ''}\n`;
     }
-    const ts = (event.ts || '').slice(11, 19); // HH:MM:SS
-    switch (event.type) {
-      case 'run-start':
-        process.stdout.write(`[${ts}] ▶ ${event.name} (run ${event.runId}, backend ${event.backend})\n`);
-        break;
-      case 'phase':
-        process.stdout.write(`[${ts}] ── ${event.title} ──\n`);
-        break;
-      case 'log':
-        process.stdout.write(`[${ts}] ${event.message}\n`);
-        break;
-      case 'agent-start':
-        process.stdout.write(`[${ts}]   → ${event.label}${event.phase ? ` [${event.phase}]` : ''}\n`);
-        break;
-      case 'agent-cached':
-        process.stdout.write(`[${ts}]   ✓ ${event.label} (replayed #${event.index}, --resume)\n`);
-        break;
-      case 'resume-diverged':
-        process.stdout.write(`[${ts}] ↯ resume diverged at call #${event.index} (${event.label}) — everything from here runs live\n`);
-        break;
-      case 'agent-retry':
-        process.stdout.write(`[${ts}]   ↻ ${event.label} retry ${event.attempt}/${event.retries} in ${event.delayMs}ms: ${event.error}\n`);
-        break;
-      case 'agent-end': {
-        const mark = event.status === 'ok' ? '✓' : event.status === 'dry-run' ? '·' : '✗';
-        process.stdout.write(`[${ts}]   ${mark} ${event.label}${event.error ? `: ${event.error}` : ''}\n`);
-        break;
-      }
-      case 'guard-denied':
-        process.stdout.write(`[${ts}] ✗ ${event.message}\n`);
-        break;
-      case 'run-locked':
-        process.stdout.write(`[${ts}] ✗ ${event.message}\n`);
-        break;
-      case 'run-end':
-        process.stdout.write(`[${ts}] ${event.status === 'ok' ? '■ done' : `■ ${event.status}${event.error ? `: ${event.error}` : ''}`}\n`);
-        break;
-      default:
-        process.stdout.write(`[${ts}] ${event.type}\n`);
-    }
-  };
+    case 'guard-denied':
+    case 'run-locked':
+      return `[${ts}] ✗ ${event.message}\n`;
+    case 'run-end':
+      return `[${ts}] ${event.status === 'ok' ? '■ done' : `■ ${event.status}${event.error ? `: ${event.error}` : ''}`}\n`;
+    default:
+      return `[${ts}] ${event.type}\n`;
+  }
+}
+
+/**
+ * `--json` writes the NDJSON event stream verbatim (the machine source of
+ * truth). Otherwise events go through progress.js, which prints the
+ * permanent lines above and — on a TTY — keeps a live status line beneath
+ * them. Off a TTY there is no status line: a `\r` redraw in a log file is
+ * one unreadable line.
+ */
+function makeEmitter({ json, stream = process.stdout, isTty }) {
+  if (json) {
+    return {
+      emit: (event) => { stream.write(`${JSON.stringify(event)}\n`); },
+      finish: () => {},
+    };
+  }
+  const renderer = progress.createRenderer({ stream, isTty, lineFor: humanLine });
+  return { emit: (event) => renderer.handle(event), finish: () => renderer.finish() };
 }
 
 async function cmdRun(rest, flags) {
@@ -116,7 +129,7 @@ async function cmdRun(rest, flags) {
   const cwd = flags.cwd ? path.resolve(flags.cwd) : process.cwd();
   const scriptPath = runner.resolveScriptPath(target, cwd);
   const args = readArgsValue(flags);
-  const emit = makeEmitter({ json: !!flags.json });
+  const printer = makeEmitter({ json: !!flags.json });
 
   const result = await runner.executeScript({
     scriptPath,
@@ -125,7 +138,7 @@ async function cmdRun(rest, flags) {
     cwd,
     runId: flags.resume,
     dryRun: !!flags['dry-run'],
-    emit,
+    emit: printer.emit,
     concurrency: flags.concurrency ? Number(flags.concurrency) : undefined,
     model: flags.model,
     effort: flags.effort,
@@ -135,11 +148,14 @@ async function cmdRun(rest, flags) {
     maxAgentCalls: numberFlag(flags['max-agent-calls']),
     maxTokens: numberFlag(flags['max-tokens']),
     maxWallMs: numberFlag(flags['max-wall-ms']),
+    modelMap: models.parseModelMap(typeof flags['model-map'] === 'string' ? flags['model-map'] : ''),
   });
 
+  printer.finish();
   if (!flags.json) {
     process.stdout.write(`\nrunId: ${result.runId}\nstatus: ${result.status}\n`);
     if (result.usage) process.stdout.write(`${formatUsage(result.usage)}\n`);
+    if (result.byModel && result.byModel.length) process.stdout.write(formatModelTable(result.byModel));
     if (result.status === 'ok') {
       process.stdout.write(`result: ${JSON.stringify(result.result, null, 2)}\n`);
     } else if (result.error) {
@@ -153,6 +169,27 @@ function numberFlag(value) {
   if (value === undefined || value === true) return undefined;
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Per-model breakdown for the end of a run: which models actually ran, how
+ * many calls each took, and what they cost in tokens and model-seconds.
+ * Keyed by the RESOLVED id, so a run that mixed a tier default with a
+ * per-call override shows both rows rather than one blurred total.
+ */
+function formatModelTable(rows) {
+  const pad = (text, width) => String(text).padEnd(width);
+  const modelWidth = Math.max(5, ...rows.map((r) => r.model.length));
+  const lines = [`\n${pad('model', modelWidth)}  calls    tokens      wall`];
+  for (const row of rows) {
+    lines.push([
+      pad(row.model, modelWidth),
+      String(row.calls).padStart(5),
+      String(row.tokens).padStart(9),
+      progress.formatElapsed(row.wallMs).padStart(9),
+    ].join('  '));
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 /** One line of end-of-run accounting. Measured and estimated tokens are
@@ -194,6 +231,7 @@ function cmdStatus(rest, flags) {
     errors: entries.filter((e) => e.status === 'error').length,
     retries: entries.filter((e) => e.status === 'retry').length,
     usage: journal.usageTotals(),
+    byModel: journal.usageByModel(),
     entries,
   };
   if (flags.json) {
@@ -207,7 +245,90 @@ function cmdStatus(rest, flags) {
   }
   process.stdout.write(`run: ${meta.name} (${runId})\nstatus: ${meta.status}\nbackend: ${meta.backend}\nagent calls: ${payload.agentCalls} (${payload.ok} ok, ${payload.errors} error, ${payload.retries} retried)\n`);
   process.stdout.write(`${formatUsage(payload.usage)}\n`);
+  if (payload.byModel.length) process.stdout.write(formatModelTable(payload.byModel));
   if (meta.error) process.stdout.write(`error: ${meta.error}\n`);
+}
+
+/**
+ * Rebuild the live view of a run from its journal, without having produced
+ * it. The journal is the same record `run` writes as it goes, so the same
+ * `progress.js` state can be folded from it — which is what makes
+ * `status --watch` show the same status line as the run's own terminal.
+ *
+ * Journal lines are in COMPLETION order, so the reconstruction pairs each
+ * entry's `index` with a synthetic start rather than assuming arrival order:
+ * a call with an entry is finished, and a call whose index is below the
+ * highest seen but has no entry is still running.
+ */
+function watchSnapshot(runId, meta, entries) {
+  const state = progress.createState();
+  state.runId = runId;
+  state.name = meta && meta.name;
+  state.backend = meta && meta.backend;
+  const seen = new Map();
+  for (const entry of entries) {
+    if (!entry || entry.status === 'retry') continue;
+    seen.set(entry.index, entry);
+    if (entry.phase) state.phaseTitle = entry.phase;
+  }
+  for (const entry of seen.values()) {
+    if (entry.status === 'error') state.failed += 1;
+    else state.done += 1;
+  }
+  const highest = entries.reduce((max, e) => (Number.isInteger(e.index) && e.index > max ? e.index : max), -1);
+  for (let index = 0; index <= highest; index += 1) {
+    if (seen.has(index)) continue;
+    // Started but not yet recorded. Its label/model are not in the journal
+    // (nothing is written until the call settles), so it shows as pending.
+    state.running.set(index, { label: `#${index}`, model: null, startedAt: Date.now(), toolCalls: 0 });
+  }
+  const status = meta && meta.status;
+  state.finished = status !== undefined && status !== 'running';
+  state.status = status;
+  return state;
+}
+
+/**
+ * `yoki-graph status <runId> --watch` — re-render every `intervalMs` until
+ * the run's own `run.json` stops saying "running", then print the same
+ * final report `status` prints. Injectable clock/sleep/stream so the loop is
+ * testable without waiting.
+ */
+async function cmdWatch(rest, flags, deps = {}) {
+  const runId = rest[0];
+  if (!runId) throw new Error('usage: yoki-graph status <runId> --watch');
+  const stream = deps.stream || process.stdout;
+  const intervalMs = Number.isFinite(deps.intervalMs) ? deps.intervalMs : 2000;
+  const sleep = deps.sleep || ((ms) => new Promise((r) => { setTimeout(r, ms); }));
+  const maxPolls = Number.isFinite(deps.maxPolls) ? deps.maxPolls : Infinity;
+  const isTty = deps.isTty === undefined ? !!stream.isTTY : deps.isTty;
+
+  let lastWidth = 0;
+  for (let poll = 0; poll < maxPolls; poll += 1) {
+    const meta = runner.readRunMeta(runId);
+    if (!meta) {
+      stream.write(`no run found with id ${runId} (looked in ${journalLib.runDir(runId)})\n`);
+      process.exitCode = 1;
+      return;
+    }
+    const entries = new journalLib.Journal(runId).readAll();
+    const state = watchSnapshot(runId, meta, entries);
+    const line = progress.renderStatus(state);
+    if (isTty) {
+      const padded = line.length < lastWidth ? line + ' '.repeat(lastWidth - line.length) : line;
+      stream.write(`\r${padded}`);
+      lastWidth = line.length;
+    } else {
+      stream.write(`${line}\n`);
+    }
+    if (state.finished) {
+      if (isTty && lastWidth) stream.write(`\r${' '.repeat(lastWidth)}\r`);
+      cmdStatus([runId], { ...flags, watch: false });
+      return;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(intervalMs);
+  }
 }
 
 async function main() {
@@ -217,9 +338,12 @@ async function main() {
   try {
     if (cmd === 'run') await cmdRun(positional, flags);
     else if (cmd === 'list') cmdList(flags);
-    else if (cmd === 'status') cmdStatus(positional, flags);
+    else if (cmd === 'status') {
+      if (flags.watch) await cmdWatch(positional, flags);
+      else cmdStatus(positional, flags);
+    }
     else {
-      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId>\n');
+      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--watch]\n');
       if (cmd) process.exitCode = 1;
     }
   } catch (err) {
@@ -231,4 +355,7 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { parseArgs, makeEmitter, cmdRun, cmdList, cmdStatus, main, formatUsage, numberFlag };
+module.exports = {
+  parseArgs, makeEmitter, humanLine, cmdRun, cmdList, cmdStatus, cmdWatch, watchSnapshot, main,
+  formatUsage, formatModelTable, numberFlag,
+};

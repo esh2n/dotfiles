@@ -45,8 +45,13 @@ function buildArgv({ mockFile, label }) {
   return { cmd: 'mock', args: ['--mock', mockFile || '(none)', '--label', label || '(none)'] };
 }
 
-async function run({ prompt, opts = {}, schema, mockFile }) {
+async function run({ prompt, opts = {}, schema, mockFile, onProgress }) {
   const fixture = loadFixture(mockFile);
+  // Synthetic progress: nothing is spawned, so there is no event stream to
+  // count. One tick is still reported so the live-progress path (api.js's
+  // agent-progress event -> the renderer) is exercised in every offline
+  // end-to-end test rather than only against a real CLI.
+  if (typeof onProgress === 'function') onProgress({ toolCalls: 1 });
   const key = opts.label || prompt;
   const started = Date.now();
   let value;

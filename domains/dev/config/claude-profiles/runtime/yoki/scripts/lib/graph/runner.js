@@ -20,6 +20,15 @@ const { Journal, runDir } = require('./journal');
 const guard = require('./guard');
 const lock = require('./lock');
 const budgetLib = require('./budget');
+const modelsLib = require('./models');
+const { findRepoRootFrom } = require('./backends/common');
+
+/** The dotfiles checkout this runner is installed from — where
+ *  core/harness-models.json lives. Resolved once per run and handed to
+ *  api.js, so model resolution never re-walks the tree per agent() call. */
+function repoRoot() {
+  return findRepoRootFrom(__dirname);
+}
 
 /** `~/.claude/workflows`, the harness's own installed workflow directory.
  *  `YOKI_WORKFLOWS_DIR` overrides it — the injection seam that lets `list`
@@ -213,6 +222,7 @@ function readRunMeta(runId) {
  * @param {number} [options.maxTokens] budget cap override
  * @param {number} [options.maxWallMs] budget cap override
  * @param {number} [options.lockStaleMs] run-lock takeover age (ms)
+ * @param {object} [options.modelMap] `--model-map` tier overrides for this run
  * @param {string} [options._parentRunId] internal: set when this call is a
  *   `workflow()` nested invocation, to (a) skip the guard cap (it already
  *   ran for the top-level launch) and (b) refuse a further nested call.
@@ -221,7 +231,7 @@ async function executeScript(options) {
   const {
     scriptPath, args, backendName, cwd = process.cwd(), dryRun = false,
     emit = () => {}, concurrency, model, effort, mockFile, timeoutMs, retries,
-    retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, _parentRunId,
+    retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, modelMap, _parentRunId,
   } = options;
   const runId = options.runId || generateRunId();
   const isResume = !!options.runId;
@@ -261,6 +271,7 @@ async function executeScript(options) {
     runId, journal, backend, cwd, model, effort, mockFile, dryRun,
     resume: isResume, concurrency, emit, timeoutMs,
     caps, startedAt, retries, retryBaseDelayMs, retryMaxDelayMs, sleep,
+    modelMap, harnessModels: modelsLib.loadHarnessModels(repoRoot()),
     args,
     runChildWorkflow: _parentRunId
       ? undefined
@@ -269,7 +280,7 @@ async function executeScript(options) {
         const childResult = await executeScript({
           scriptPath: childPath, args: childArgs, backendName, cwd, dryRun, emit,
           concurrency, model, effort, mockFile, timeoutMs, retries,
-          retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs,
+          retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, modelMap,
           maxAgentCalls: options.maxAgentCalls, maxTokens: options.maxTokens,
           maxWallMs: options.maxWallMs, _parentRunId: runId,
         });
@@ -283,7 +294,13 @@ async function executeScript(options) {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
     startedAt: new Date().toISOString(), status: 'running',
   });
-  emit({ type: 'run-start', runId, name: compiled.meta.name, backend: backendName, ts: new Date().toISOString() });
+  emit({
+    type: 'run-start', runId, name: compiled.meta.name, backend: backendName,
+    // The declared phase titles: the live status line reports "phase 2/5"
+    // and cannot know the denominator from the phase() calls alone.
+    phases: Array.isArray(compiled.meta.phases) ? compiled.meta.phases.map((p) => p && p.title).filter(Boolean) : [],
+    ts: new Date().toISOString(),
+  });
 
   let status = 'ok';
   let error;
@@ -298,13 +315,15 @@ async function executeScript(options) {
   }
 
   const usage = journal.usageTotals();
+  const byModel = journal.usageByModel();
   writeRunMeta(runId, {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
-    startedAt: readRunMeta(runId)?.startedAt, finishedAt: new Date().toISOString(), status, error, usage,
+    startedAt: readRunMeta(runId)?.startedAt, finishedAt: new Date().toISOString(),
+    status, error, usage, byModel,
   });
-  emit({ type: 'run-end', runId, status, error, result, usage, ts: new Date().toISOString() });
+  emit({ type: 'run-end', runId, status, error, result, usage, byModel, ts: new Date().toISOString() });
 
-  return { runId, meta: compiled.meta, status, result, error, usage };
+  return { runId, meta: compiled.meta, status, result, error, usage, byModel };
 }
 
 module.exports = {

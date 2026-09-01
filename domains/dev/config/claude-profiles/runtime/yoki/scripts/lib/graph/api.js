@@ -12,6 +12,7 @@ const { runWithSchema, SchemaValidationError } = require('./schema');
 const worktree = require('./worktree');
 const retry = require('./retry');
 const budgetLib = require('./budget');
+const models = require('./models');
 
 /**
  * Fallback per-agent wall-clock ceiling, used when neither the call nor the
@@ -46,6 +47,8 @@ const DEFAULT_AGENT_TIMEOUT_MS = 15 * 60 * 1000;
  * @param {number} [ctx.retryMaxDelayMs]
  * @param {(ms:number) => Promise<void>} [ctx.sleep] - injected in tests
  * @param {number} [ctx.startedAt] - run start (ms) for the wall-clock cap
+ * @param {object} [ctx.modelMap] - parsed `--model-map` tier overrides
+ * @param {object|null} [ctx.harnessModels] - parsed core/harness-models.json
  */
 function createApi(ctx) {
   const state = {
@@ -54,6 +57,9 @@ function createApi(ctx) {
     // Position of the next agent() call in arrival order. This is what
     // resume replays against — see journal.js's header.
     callIndex: 0,
+    // index -> last reported live tool-call count, so agent-progress is
+    // emitted only when the number actually moves.
+    toolCalls: new Map(),
     // Calls actually dispatched (replayed ones are free), counted against
     // the agent-call cap.
     liveCalls: 0,
@@ -63,6 +69,8 @@ function createApi(ctx) {
     replaying: !!ctx.resume,
   };
   const caps = ctx.caps || budgetLib.resolveCaps(ctx.cwd);
+  const backendName = (ctx.backend && ctx.backend.name) || 'mock';
+  const modelOptions = { overrides: ctx.modelMap || {}, harnessModels: ctx.harnessModels };
   const startedAt = Number.isFinite(ctx.startedAt) ? ctx.startedAt : Date.now();
   const limiter = makeLimiter(ctx.concurrency || 4);
 
@@ -80,7 +88,13 @@ function createApi(ctx) {
     const normalizedOpts = { ...opts, agentType };
     delete normalizedOpts.subagent_type;
     const effPhase = opts.phase || state.currentPhase;
-    const model = opts.model || ctx.model;
+    // Per-call `model` wins over the run's `--model`. Resolved HERE rather
+    // than inside the backend so the id the backend will actually be given
+    // is what every event, journal line and status row reports — a progress
+    // line reading "sonnet" tells you nothing about which model ran.
+    const requestedModel = opts.model || ctx.model;
+    const resolvedModel = models.resolve(backendName, requestedModel, modelOptions);
+    const model = resolvedModel.id || undefined;
     const effort = opts.effort || ctx.effort;
     const label = opts.label || '(unlabeled)';
     const key = callKey(prompt, normalizedOpts);
@@ -90,7 +104,10 @@ function createApi(ctx) {
     if (state.replaying) {
       const cached = ctx.journal.replayAt(index, key);
       if (cached) {
-        ctx.emit({ type: 'agent-cached', runId: ctx.runId, label, phase: effPhase, index, ts: nowIso() });
+        ctx.emit({
+          type: 'agent-cached', runId: ctx.runId, label, phase: effPhase, index,
+          backend: backendName, model: cached.model || model, ts: nowIso(),
+        });
         return cached.result;
       }
       // First divergence: this call, and every call after it, runs live.
@@ -108,12 +125,18 @@ function createApi(ctx) {
     });
     state.liveCalls += 1;
 
-    ctx.emit({ type: 'agent-start', runId: ctx.runId, label, phase: effPhase, model, index, ts: nowIso() });
+    ctx.emit({
+      type: 'agent-start', runId: ctx.runId, label, phase: effPhase, index,
+      backend: backendName, model, modelTier: resolvedModel.tier, ts: nowIso(),
+    });
 
     if (ctx.dryRun) {
       const { placeholderFor } = require('./schema');
       const result = opts.schema ? placeholderFor(opts.schema) : `[dry-run] ${label}: ${prompt.slice(0, 120)}`;
-      ctx.emit({ type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index, status: 'dry-run', ts: nowIso() });
+      ctx.emit({
+        type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index,
+        backend: backendName, model, status: 'dry-run', ts: nowIso(),
+      });
       return result;
     }
 
@@ -145,15 +168,25 @@ function createApi(ctx) {
           agentType,
           // Every real backend defaults to its own least-privilege mode;
           // only a script that actually writes asks for more, per call.
-          // codex has a native `-s`; claude and omp express read-only
-          // through their tool-restriction flags (--disallowedTools /
-          // --tools) rather than ignoring the option. See each backend's
-          // DEFAULT_SANDBOX.
+          // codex has a native `-s`; omp expresses read-only through its
+          // own --tools allow-list rather than ignoring the option. See
+          // each backend's DEFAULT_SANDBOX.
           sandbox: opts.sandbox,
           cwd: effectiveCwd,
           opts: normalizedOpts,
           mockFile: ctx.mockFile,
           timeoutMs: timeoutFor(opts, ctx),
+          // Live tool-call counting: each backend parses its own event
+          // stream as it arrives and calls this whenever the count moves,
+          // so a long-running lane shows activity instead of a frozen line.
+          onProgress: ({ toolCalls }) => {
+            if (state.toolCalls.get(index) === toolCalls) return;
+            state.toolCalls.set(index, toolCalls);
+            ctx.emit({
+              type: 'agent-progress', runId: ctx.runId, label, phase: effPhase, index,
+              backend: backendName, model, toolCalls, ts: nowIso(),
+            });
+          },
         }), {
           retries: ctx.retries,
           baseDelayMs: ctx.retryBaseDelayMs,
@@ -170,7 +203,8 @@ function createApi(ctx) {
             });
             ctx.emit({
               type: 'agent-retry', runId: ctx.runId, label, phase: effPhase, index,
-              attempt, retries: maxRetries, delayMs, error: error.message, ts: nowIso(),
+              backend: backendName, model, attempt, retries: maxRetries, delayMs,
+              error: error.message, ts: nowIso(),
             });
           },
         });
@@ -195,10 +229,13 @@ function createApi(ctx) {
         if (err instanceof SchemaValidationError) {
           ctx.journal.append({
             key, index, label, phase: effPhase, status: 'error', durationMs,
-            ...settled,
+            backend: backendName, model, ...settled,
             error: err.message, raw: String(err.raw || '').slice(0, 20000),
           });
-          ctx.emit({ type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index, status: 'error', error: err.message, ts: nowIso() });
+          ctx.emit({
+            type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index,
+            backend: backendName, model, status: 'error', error: err.message, ts: nowIso(),
+          });
           throw err; // hard-fail: schema validation failed after one retry
         }
         // Any other backend failure (spawn error, terminal non-zero exit, a
@@ -206,19 +243,24 @@ function createApi(ctx) {
         // agent() resolves to null rather than rejecting.
         ctx.journal.append({
           key, index, label, phase: effPhase, status: 'error', durationMs,
-          ...settled, timedOut, error: err.message,
+          backend: backendName, model, ...settled, timedOut, error: err.message,
         });
-        ctx.emit({ type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index, status: 'error', timedOut, error: err.message, ts: nowIso() });
+        ctx.emit({
+          type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index,
+          backend: backendName, model, status: 'error', timedOut, error: err.message, ts: nowIso(),
+        });
         return null;
       }
 
       const settled = settleUsage(usage);
       ctx.journal.append({
-        key, index, label, phase: effPhase, status: 'ok', result, durationMs, ...settled,
+        key, index, label, phase: effPhase, status: 'ok', result, durationMs,
+        backend: backendName, model, ...settled,
       });
       ctx.emit({
         type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index, status: 'ok',
-        tokens: settled.tokens, tokensSource: settled.tokensSource, ts: nowIso(),
+        backend: backendName, model, tokens: settled.tokens,
+        tokensSource: settled.tokensSource, durationMs, ts: nowIso(),
       });
       return result;
     } finally {

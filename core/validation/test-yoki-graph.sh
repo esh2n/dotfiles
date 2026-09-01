@@ -24,6 +24,10 @@ set -euo pipefail
 #      identical rerun replays every call and spawns none, while a rerun
 #      whose args change the first call's prompt replays nothing — not even
 #      the later calls whose prompts are byte-identical to recorded ones.
+#   5. Model visibility and refusals through the real CLI: `--backend claude`
+#      is refused by name, a misspelled `--model` tier is refused with the
+#      valid tiers listed, and every agent event carries the RESOLVED model
+#      id rather than the tier the script asked for.
 #
 # Nothing here touches the real ~/.claude/workflows, ~/.claude/.cache, or
 # ~/.local/state: every CLI invocation runs under its own temp HOME.
@@ -83,6 +87,17 @@ assert_contains() {
         fail "$description"
         log_error "  wanted: $needle"
         log_error "  got:    $(head -3 <<< "$haystack")"
+    fi
+}
+
+assert_not_contains() {
+    local description="$1" needle="$2" haystack="$3"
+    if grep -qF -- "$needle" <<< "$haystack"; then
+        fail "$description"
+        log_error "  did not want: $needle"
+        log_error "  got:          $(head -3 <<< "$haystack")"
+    else
+        pass "$description"
     fi
 }
 
@@ -172,6 +187,34 @@ run_cli_with() {
             --args "$json_args" --cwd "$repo" --json "$@" \
         > "$stdout" 2> "$stderr" || CLI_STATUS=$?
     return 0
+}
+
+# Runs an arbitrary workflow FILE (not the `review` name) so a check can use
+# a script written for it. review.js sets `model` on every agent() call, so a
+# run-level `--model` never reaches a call there — the wrong shape for
+# asserting run-level model resolution.
+run_cli_script() {
+    local home="$1" repo="$2" stdout="$3" stderr="$4" script="$5" backend="$6"
+    shift 6
+    CLI_STATUS=0
+    env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR -u WORKFLOW_GUARD_DISABLED -u YOKI_WORKFLOW_DAILY_CAP \
+        YOKI_WORKFLOW_DAILY_CAP=20 \
+        HOME="$home" \
+        node "$GRAPH_BIN" run "$script" --backend "$backend" --cwd "$repo" --json "$@" \
+        > "$stdout" 2> "$stderr" || CLI_STATUS=$?
+    return 0
+}
+
+# A two-call workflow with no per-call model, so the run-level --model is
+# what every call uses.
+write_plain_workflow() {
+    cat > "$1" <<'WORKFLOW'
+export const meta = { name: 'plain', description: 'two calls, no per-call model', phases: [{ title: 'A' }] }
+phase('A')
+const a = await agent('one', { label: 'a' })
+const b = await agent('two', { label: 'b' })
+return [a, b]
+WORKFLOW
 }
 
 count_events() {
@@ -318,11 +361,73 @@ check_resume_replay() {
         "$(jq -c 'select(.type == "resume-diverged")' "$out3" | head -n 1)" '.index' "0"
 }
 
+# The claude backend was removed (Claude Code's own Workflow tool is the
+# supported path there), and a model TIER that does not exist must be
+# reported with the valid ones rather than passed through to the backend.
+check_refusals() {
+    local repo="${FIXTURE_DIR}/repo-refuse" home="${FIXTURE_DIR}/home-refuse"
+    local out="${FIXTURE_DIR}/refuse.out" err="${FIXTURE_DIR}/refuse.err"
+
+    make_temp_repo "$repo"
+    setup_fake_home "$home"
+
+    local script="${FIXTURE_DIR}/plain.js"
+    write_plain_workflow "$script"
+
+    run_cli_script "$home" "$repo" "$out" "$err" "$script" claude
+    assert_eq "case21: --backend claude exits non-zero" "1" "$CLI_STATUS"
+    assert_contains "case22: the refusal points at the native Workflow tool" \
+        "native Workflow tool" "$(cat "$out" "$err")"
+    assert_not_contains "case22b: the script never runs under a refused backend" \
+        '"type":"run-start"' "$(cat "$out")"
+
+    run_cli_script "$home" "$repo" "$out" "$err" "$script" codex --model sonnett
+    assert_eq "case23: a misspelled --model tier exits non-zero" "1" "$CLI_STATUS"
+    # --json escapes the quotes around the bad tier, so match on the parsed
+    # error rather than on the raw line.
+    assert_contains "case23b: the refusal names the bad tier and the valid ones" \
+        'unknown model tier' "$(jq -r 'select(.type == "run-end").error' "$out" 2>/dev/null)"
+    assert_contains "case23d: ...listing the tiers that would have worked" \
+        'valid tiers: haiku, opus, sonnet' "$(jq -r 'select(.type == "run-end").error' "$out" 2>/dev/null)"
+
+    # A concrete id must still pass straight through, unvalidated.
+    run_cli_script "$home" "$repo" "$out" "$err" "$script" codex --model gpt-5.5 --dry-run
+    assert_json_field "case23c: a concrete model id passes through untouched" \
+        "$(jq -c 'select(.type == "agent-start")' "$out" | head -n 1)" '.model' "gpt-5.5"
+}
+
+# The point of resolving the tier in the runner rather than inside a backend:
+# what every event reports is the model that will actually run.
+check_model_visibility() {
+    local repo="${FIXTURE_DIR}/repo-model" home="${FIXTURE_DIR}/home-model"
+    local out="${FIXTURE_DIR}/model.out" err="${FIXTURE_DIR}/model.err"
+
+    make_temp_repo "$repo"
+    setup_fake_home "$home"
+
+    run_cli_with "$home" "$repo" "$out" "$err" '{"range":"HEAD~1..HEAD"}' \
+        --model-map 'sonnet=pinned-sonnet,haiku=pinned-haiku,opus=pinned-opus'
+    assert_eq "case24: a run with --model-map exits 0" "0" "$CLI_STATUS"
+
+    local models
+    models="$(jq -rc 'select(.type == "agent-start") | .model' "$out" 2>/dev/null | sort -u | tr '\n' ' ')"
+    assert_eq "case25: every agent-start carries the mapped model id, not the tier" \
+        "pinned-haiku pinned-opus pinned-sonnet " "$models"
+
+    local run_end
+    run_end="$(jq -c 'select(.type == "run-end")' "$out" 2>/dev/null | tail -n 1)"
+    assert_json_field "case26: run-end carries a per-model breakdown" "$run_end" '.byModel | length' "3"
+    assert_json_field "case27: each row counts that model's calls" "$run_end" \
+        '[.byModel[] | select(.model == "pinned-opus")][0].calls' "2"
+}
+
 run_e2e_checks() {
     check_node_unit_suite
     check_review_run
     check_guard_cap
     check_resume_replay
+    check_refusals
+    check_model_visibility
     check_validator_wiring
 }
 

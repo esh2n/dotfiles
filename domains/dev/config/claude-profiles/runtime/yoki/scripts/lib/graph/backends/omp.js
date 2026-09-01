@@ -22,7 +22,7 @@
  * by this file.
  */
 
-const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError } = require('./common');
+const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError, makeLineSplitter } = require('./common');
 
 const name = 'omp';
 const supportsSchemaNatively = false;
@@ -74,13 +74,46 @@ function buildArgv({ prompt, model, agentType, sandbox }) {
   return { cmd: 'omp', args };
 }
 
-async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox }) {
+/**
+ * A tool call in omp's `--mode json` event stream. Two carriers, because a
+ * headless run emits assistant/tool records rather than a dedicated
+ * lifecycle event: a record whose own `type` names a tool call, and an
+ * assistant message whose content blocks include a `tool_use`. Ends
+ * (`toolResult`) are not counted, so the number stays a count of calls.
+ */
+function countToolCalls(evt) {
+  if (!evt || typeof evt !== 'object') return 0;
+  if (typeof evt.type === 'string' && /^tool_(call|use)$/.test(evt.type)) return 1;
+  const message = evt.message;
+  if (message && Array.isArray(message.content)) {
+    return message.content.filter((block) => block && block.type === 'tool_use').length;
+  }
+  return 0;
+}
+
+/** Count tool calls as the stream arrives; report each increment. */
+function makeProgressCounter(onProgress) {
+  if (typeof onProgress !== 'function') return undefined;
+  let toolCalls = 0;
+  return makeLineSplitter((line) => {
+    let evt;
+    try { evt = JSON.parse(line); } catch { return; }
+    const found = countToolCalls(evt);
+    if (!found) return;
+    toolCalls += found;
+    onProgress({ toolCalls });
+  });
+}
+
+async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox, onProgress }) {
   // effort: omp has --thinking=<level> (off/minimal/low/medium/high/xhigh/max/auto)
   // per `omp --help` — map our tiers straight through, they share the vocabulary.
   const { args } = buildArgv({ prompt, model, agentType, sandbox });
   if (effort) args.push('--thinking', effort);
   const started = Date.now();
-  const { stdout, stderr, code, timedOut } = await spawnCollect('omp', args, { cwd, timeoutMs });
+  const { stdout, stderr, code, timedOut } = await spawnCollect('omp', args, {
+    cwd, timeoutMs, onData: makeProgressCounter(onProgress),
+  });
   const durationMs = Date.now() - started;
   if (timedOut) throw timeoutError('omp', timeoutMs);
   if (code !== 0 && !stdout.trim()) {
@@ -183,6 +216,8 @@ module.exports = {
   run,
   extractText,
   extractUsage,
+  countToolCalls,
+  makeProgressCounter,
   resolveSandbox,
   SANDBOX_MODES,
   DEFAULT_SANDBOX,

@@ -50,11 +50,12 @@ access from the script body itself (only through `agent()`).
   - `opts.label` — display label, also namespaces the journal/resume key.
   - `opts.phase` — explicit phase-group override (races inside
     `parallel()`/`pipeline()` otherwise).
-  - `opts.model` — `'haiku' | 'sonnet' | 'opus'`, or a backend-native model
-    id passed straight through. Omitted = inherit the run's `--model`
-    (itself defaulted to sonnet by yoki-graph, matching every script's own
-    `const MODEL = (A && A.model) || 'sonnet'` convention for the *script's*
-    model tier — the run's own default is analogous, one level up).
+  - `opts.model` — `'haiku' | 'sonnet' | 'opus'` (or a backend-specific role
+    key from `core/harness-models.json`, e.g. omp's `review`/`scout`), or a
+    backend-native model id passed straight through. Omitted = inherit the
+    run's `--model`. See "Model resolution" below: a tier that the backend's
+    map does not have is an ERROR listing the valid tiers, not a value passed
+    on to the CLI.
   - `opts.effort` — `'low'|'medium'|'high'|'xhigh'|'max'`, passed through to
     the backend for the tiers that accept it (omp has `--thinking`; codex
     has no such flag, so the value is folded into the prompt preamble and
@@ -224,6 +225,65 @@ the file). Applied oldest generation first, each generation overrides its own
 indices and truncates anything past its highest one: what it wrote below its
 divergence point was replayed and confirmed, what sits above the last index
 it reached is stale, because it changed the upstream and never got there.
+
+## Model resolution
+
+One place resolves a tier to a model id: `lib/graph/models.js`, called by
+`agent()` before the backend is invoked. Precedence is per-call
+`agent({model})` > the run's `--model` > nothing (the backend's own default).
+
+| input | result |
+| --- | --- |
+| a tier in the backend's map (`sonnet`, or omp's `review`) | the mapped id |
+| a tier the map does not have (`sonnett`) | **error**, listing the valid tiers |
+| a concrete id (`gpt-5.5`, `anthropic/claude-sonnet-5`) | passed through |
+| anything, on a backend with no map (mock) | passed through |
+
+"Shaped like a tier" is a bare lowercase word — every real model id carries a
+digit, a dash or a provider prefix. Getting that wrong in the safe direction
+only means an unknown id reaches the backend, which reports it; the shared
+reader's old behaviour of passing `sonnett` through meant `codex -m sonnett`
+failed far from the typo.
+
+`--model-map haiku=gpt-5.4-mini,sonnet=gpt-5.5` layers over the file's map
+for one run: it overrides an existing tier and can add one the file lacks,
+without editing `core/harness-models.json`.
+
+Resolution happens in the runner, not the backend, because the RESOLVED id is
+what has to be visible: every `agent-start`/`agent-end`/`agent-progress`
+event carries `backend` and `model` (plus `modelTier` on start), every
+journal entry records `model`, and the end of a run prints a per-model table
+of calls, tokens and model-seconds (`journal.usageByModel()`, also stored in
+`run.json` so `yoki-graph status` can reprint it). A progress line reading
+"sonnet" says nothing about which model actually ran once `--model-map` or a
+per-call override is in play.
+
+## Live progress
+
+The `--json` NDJSON stream is the machine-readable source of truth. It gained
+`model`, `backend`, `modelTier`, `index` and `phases` fields, plus one new
+event: `agent-progress`, emitted whenever a running agent's tool-call count
+moves. Each backend counts that from its own stream as it arrives —
+`spawnCollect`'s `onData` feeds complete lines to a per-backend counter
+(codex's `exec_command_begin`/`item.started` events, omp's `tool_use` blocks;
+the mock backend reports one synthetic tick so the whole path is exercised
+offline). A counter that throws is swallowed: progress is advisory and must
+never fail the agent it reports on.
+
+For a human, `progress.js` folds the same events into one compact status:
+
+    phase 2/5 Review — running 3 / done 7 / failed 0 — [security gpt-5.6-sol 41s +3 tools] …
+
+On a TTY that line is redrawn in place with `\r`, with phase headers, logs
+and finished agents scrolling past above it. Off a TTY there is no status
+line at all — a carriage-return redraw in a log file is one unreadable line —
+so the same events print one per line, as before.
+
+`yoki-graph status <runId> --watch` re-renders the same status every 2s by
+folding the run's journal, until `run.json` stops saying `running`, then
+prints the ordinary `status` report. The journal is in COMPLETION order, so
+the reconstruction pairs entries by `index`: a call with no entry below the
+highest index seen is still in flight.
 
 ## Execution caps, retry and timeouts
 

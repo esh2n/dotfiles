@@ -213,6 +213,31 @@ class Journal {
     return totals;
   }
 
+  /**
+   * Per-model totals for the end-of-run table: how many calls each RESOLVED
+   * model id took, what they cost in tokens, and how long they spent in the
+   * backend. Keyed by the resolved id rather than the tier the script asked
+   * for — "sonnet: 12 calls" does not say which model actually ran, and a
+   * `--model-map` override or a per-call `model` makes them differ.
+   *
+   * Wall time is the sum of each call's own backend duration, so a run whose
+   * lanes ran concurrently reports more model-seconds than the run took —
+   * which is the number that matters when comparing two models.
+   */
+  usageByModel() {
+    const rows = new Map();
+    for (const entry of this.readAll()) {
+      if (!entry || entry.status !== 'ok') continue;
+      const model = entry.model || '(unreported)';
+      if (!rows.has(model)) rows.set(model, { model, calls: 0, tokens: 0, wallMs: 0 });
+      const row = rows.get(model);
+      row.calls += 1;
+      if (typeof entry.tokens === 'number') row.tokens += entry.tokens;
+      if (typeof entry.durationMs === 'number') row.wallMs += entry.durationMs;
+    }
+    return [...rows.values()].sort((a, b) => b.tokens - a.tokens || a.model.localeCompare(b.model));
+  }
+
   readAll() {
     if (!fs.existsSync(this.file)) return [];
     return fs.readFileSync(this.file, 'utf8')

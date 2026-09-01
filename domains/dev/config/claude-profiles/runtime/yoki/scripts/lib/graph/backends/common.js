@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * Shared helpers for the four backends: model-tier resolution through
+ * Shared helpers for the three backends: model-tier resolution through
  * core/harness-models.json, subagent_type/agentType preamble resolution
- * from an agent definition file, and a small spawn-and-collect-stdout
- * wrapper used by the three real backends.
+ * from an agent definition file, and a spawn-and-collect-stdout wrapper —
+ * with live line-splitting for progress — used by the two real backends.
  */
 
 const fs = require('fs');
@@ -48,12 +48,16 @@ function loadHarnessModels() {
 }
 
 /**
- * Resolve `opts.model` for a given backend, through the shared reader in
- * lib/harness-models.js. `claude` speaks the tier vocabulary natively
- * (haiku/sonnet/opus are valid `--model` aliases), so it is returned
- * unchanged; `codex`/`omp` look the value up in that file's per-backend map,
- * and anything absent from the map passes through untouched (already a
- * concrete model id, or the caller's problem to resolve).
+ * Resolve `opts.model` through the shared reader in lib/harness-models.js:
+ * `codex`/`omp` look the value up in that file's per-backend map, and
+ * anything absent passes through untouched.
+ *
+ * In a real run api.js has ALREADY resolved the tier (see lib/graph/models.js,
+ * which additionally rejects a misspelled tier instead of passing it
+ * through) and hands the backend a concrete id, so this call is a
+ * pass-through there. It stays because each backend's `buildArgv` is also
+ * called directly — by its own unit tests and by the argv-shape assertions
+ * in test/scripts.test.js — with a bare tier name.
  */
 function resolveModel(backendName, model) {
   return sharedModels.resolveModel(backendName, model, loadHarnessModels());
@@ -140,6 +144,26 @@ function timeoutError(what, timeoutMs) {
 }
 
 /**
+ * Feed complete stdout LINES to `onLine` as they arrive, buffering the
+ * partial tail. Both real backends stream newline-delimited JSON events, and
+ * a chunk boundary lands mid-line often enough that parsing chunks directly
+ * would drop events at random. Returns a `push(chunk)` function.
+ */
+function makeLineSplitter(onLine) {
+  let buffer = '';
+  return (chunk) => {
+    buffer += chunk;
+    let nl = buffer.indexOf('\n');
+    while (nl !== -1) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (line) onLine(line);
+      nl = buffer.indexOf('\n');
+    }
+  };
+}
+
+/**
  * Spawn `cmd argv` with `input` written to stdin (then stdin closed — see
  * the codex backend's own note on why closing stdin matters) and collect
  * stdout/stderr as strings. Resolves `{ stdout, stderr, code, timedOut }`
@@ -151,7 +175,7 @@ function timeoutError(what, timeoutMs) {
  * looked to the caller exactly like an ordinary crash with no stdout, so it
  * was reported as a generic failure and never classified as retryable.
  */
-function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs } = {}) {
+function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs, onData } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, argv, { cwd, env: env || process.env });
     let stdout = '';
@@ -166,7 +190,13 @@ function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs } = {}) {
         child.kill('SIGKILL');
       }, timeoutMs);
     }
-    child.stdout.on('data', (d) => { stdout += d.toString('utf8'); });
+    child.stdout.on('data', (d) => {
+      const text = d.toString('utf8');
+      stdout += text;
+      // Live progress must never be able to fail the call: a bad counter in
+      // a backend would otherwise take down the agent it was reporting on.
+      if (onData) { try { onData(text); } catch { /* progress is advisory */ } }
+    });
     child.stderr.on('data', (d) => { stderr += d.toString('utf8'); });
     child.on('error', (err) => {
       settled = true;
@@ -201,6 +231,7 @@ module.exports = {
   stripFrontmatter,
   BUILTIN_PREAMBLES,
   spawnCollect,
+  makeLineSplitter,
   timeoutError,
   loadHarnessModels,
   harnessModelsPath,

@@ -50,8 +50,9 @@ yoki-graph run <name|path> --backend codex|omp|mock
     [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
     [--mock <file>] [--timeout <ms>] [--retries N]
     [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
+    [--model-map <tier>=<id>,...]
 yoki-graph list
-yoki-graph status <runId>
+yoki-graph status <runId> [--watch]
 ```
 
 `<name>` は `~/.claude/workflows/<name>.js`(=`core/workflows/` からインストール
@@ -137,6 +138,37 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
   budget?: {maxProposals?, maxRounds?}, delivery?: 'draft' | 'commit' | 'pr',
   runId?: string }`。`go-optimize` が `yoki-graph list` に出ないマシンでは
   `yoki-switch pack enable go` が先。
+
+## モデルの指定と表示
+
+優先順は **呼び出しごとの `agent({model})` > run の `--model` > バックエンド
+既定**。tier(`haiku`/`sonnet`/`opus`、omp の `review`/`scout`)は
+`core/harness-models.json` で実 ID に解決され、`gpt-5.5` のような具体的な
+ID はそのまま通る。
+
+- **存在しない tier はエラー**(有効な tier を並べて拒否)。以前は素通りして
+  `codex -m sonnett` が typo から遠い場所で落ちていた。
+- `--model-map haiku=gpt-5.4-mini,sonnet=gpt-5.5` でその run だけ上書き
+  (ファイルに無い tier を足すこともできる)。
+- 進捗行・journal・`--json` イベント・`status` はすべて**解決後の ID**を出す:
+  `→ review:security (codex gpt-5.6-sol) [Review]`。`--model-map` や
+  呼び出しごとの `model` が絡むと "sonnet" という表示は何も特定しないため。
+- ラン終了時にモデル別の表(calls / tokens / wall)が出る。`run.json` にも
+  入るので `yoki-graph status <runId>` で後から同じ表を見られる。
+
+## 進捗の見かた
+
+- **TTY**: 恒久的な行(phase 見出し・log・終わった agent)はそのまま流れ、
+  その下に1行のライブ状態が `\r` で更新される:
+  `phase 2/5 Review — running 3 / done 7 / failed 0 — [security gpt-5.6-sol 41s +3 tools]`
+- **パイプ/ファイル**: ライブ行は出さず、イベント1件=1行(ログに `\r` の
+  再描画を残さないため)。
+- `--json` は従来どおり NDJSON。`model` / `backend` / `index` / `phases` が
+  増え、実行中の tool 呼び出し数を伝える `agent-progress` イベントが増えた
+  (codex は `--json` の item イベント、omp は json モードのイベント列から
+  数える。mock は合成値を1回だけ返す)。
+- `yoki-graph status <runId> --watch` は journal を2秒ごとに読み直して同じ
+  状態行を描き、ランが終わったら通常の `status` 出力を出して終了する。
 
 ## guard / 日次キャップ
 
