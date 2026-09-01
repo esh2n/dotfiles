@@ -105,6 +105,35 @@ function toFilesystemDenyEntries(merged) {
 }
 
 /**
+ * The same absolute/`~`-rooted `Read(...)` denies `toFilesystemDenyEntries`
+ * writes into `[permissions.yoki.filesystem]`, as full `{pattern, reason}`
+ * guard entries.
+ *
+ * These are carried by BOTH layers on Codex, not moved between them. The
+ * filesystem table is the declarative layer; it is authoritative only while
+ * Codex is actually consulting it. Under
+ * `--dangerously-bypass-approvals-and-sandbox` that table is off, while hooks
+ * still run — a PreToolUse `permissionDecision: deny` is honoured even in
+ * `bypassPermissions` mode (measured on codex-cli 0.152.0, see the
+ * codex-read-deny spike). Combined with the fact that Codex has no dedicated
+ * read tool — a file read shells out as `cat`/`sed`, which the filesystem
+ * table does not gate at all — the hook is the layer that survives, so it has
+ * to know these patterns too or `cat ~/.ssh/id_ed25519` goes unguarded.
+ *
+ * @returns {Array<{pattern:string, reason:string}>}
+ */
+function toFilesystemReadDeny(merged) {
+  const expressed = new Set(toFilesystemDenyEntries(merged));
+  const out = [];
+  for (const entry of merged.deny) {
+    const m = READ_SECRET_PATTERN_RE.exec(entry.pattern);
+    if (!m || !expressed.has(m[1])) continue;
+    out.push({ pattern: entry.pattern, reason: entry.reason || '' });
+  }
+  return out;
+}
+
+/**
  * @returns {string} the `[permissions.yoki]` TOML table (S3 §4b), extending
  * ":workspace" with filesystem read-denies for the secret-path entries.
  */
@@ -171,10 +200,15 @@ function convert(filePaths) {
   // unexpressible — dedupe by pattern.
   const hookEnforced = mergeGuardDeny(hookEnforcedDeny(merged), rulesHookEnforced);
 
-  // What the guard actually enforces on Codex: the above PLUS every deny
-  // neither yoki.rules nor [permissions.yoki.filesystem] expresses.
+  // What the guard actually enforces on Codex: the above, PLUS every deny
+  // neither yoki.rules nor [permissions.yoki.filesystem] expresses, PLUS the
+  // absolute/`~`-rooted Read denies the filesystem table DOES express —
+  // defense in depth, because that table is off under
+  // --dangerously-bypass-approvals-and-sandbox (and never gated a shell
+  // `cat` in the first place) while hooks keep running. See
+  // toFilesystemReadDeny.
   const unexpressible = toUnexpressibleDeny(merged);
-  const guardDeny = mergeGuardDeny(hookEnforced, unexpressible);
+  const guardDeny = mergeGuardDeny(hookEnforced, unexpressible, toFilesystemReadDeny(merged));
 
   return {
     rules,
@@ -185,7 +219,7 @@ function convert(filePaths) {
   };
 }
 
-module.exports = { toRules, toFilesystemDenyEntries, toPermissionsToml, toUnexpressibleDeny, convert };
+module.exports = { toRules, toFilesystemDenyEntries, toFilesystemReadDeny, toPermissionsToml, toUnexpressibleDeny, convert };
 
 if (require.main === module) {
   const args = process.argv.slice(2);

@@ -446,3 +446,20 @@ test('Bash read deny does not fire when only Edit(...) patterns are configured',
     isPassthrough(hook.run(raw), raw);
   });
 });
+
+test('codex harness: a shell read of ~/.ssh/id_ed25519 is blocked via CODEX_DIR permissions', () => {
+  // End state of the Gap B follow-up: to-codex.js now unions the ~-rooted
+  // Read denies (previously [permissions.yoki.filesystem]-only) into
+  // guardDeny, so the hook is the layer that still enforces them when the
+  // native table is off (--dangerously-bypass-approvals-and-sandbox) and for
+  // shell reads, which that table never gated.
+  const codexDir = freshClaudeDir();
+  writePermissions(codexDir, [{ pattern: 'Read(~/.ssh/id_*)', reason: 'private keys' }]);
+  withEnv({ YOKI_HARNESS: 'codex', CODEX_DIR: codexDir }, () => {
+    isDeny(hook.run(payload('Bash', { command: 'cat ~/.ssh/id_ed25519' })), 'Read(~/.ssh/id_*)');
+    isDeny(hook.run(payload('Bash', { command: `cat ${path.join(os.homedir(), '.ssh/id_ed25519')}` })), 'Read(~/.ssh/id_*)');
+    // A non-secret read under the same harness still passes.
+    const raw = payload('Bash', { command: 'cat ~/.ssh/known_hosts' });
+    isPassthrough(hook.run(raw), raw);
+  });
+});

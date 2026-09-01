@@ -858,7 +858,7 @@ test('plan(): the denies neither yoki.rules nor the filesystem table expresses g
       [
         'allow: []',
         'deny:',
-        '  - pattern: "Read(~/.ssh/id_*)"',       // fs table covers the read side
+        '  - pattern: "Read(~/.ssh/id_*)"',       // fs table AND the guard (both layers)
         '  - pattern: "Edit(~/.ssh/id_*)"',       // nothing covers the write side
         '  - pattern: "Read(**/.env)"',           // workspace glob, not in the fs table
         '  - pattern: "Bash(rm -rf /)"',          // a plain execpolicy prefix rule
@@ -875,9 +875,16 @@ test('plan(): the denies neither yoki.rules nor the filesystem table expresses g
     const perms = JSON.parse(fs.readFileSync(path.join(out, '.yoki', 'permissions.json'), 'utf8'));
     assert.deepEqual(
       new Set(perms.deny.map(e => e.pattern)),
-      new Set(['Bash(rm -rf /*)', 'Edit(~/.ssh/id_*)', 'Read(**/.env)']),
-      'Read(~/.ssh/id_*) is in [permissions.yoki.filesystem] and Bash(rm -rf /) is a rule — neither needs the guard'
+      new Set(['Bash(rm -rf /*)', 'Edit(~/.ssh/id_*)', 'Read(**/.env)', 'Read(~/.ssh/id_*)']),
+      'Bash(rm -rf /) is a plain execpolicy rule so the guard does not need it; ' +
+        'Read(~/.ssh/id_*) IS in [permissions.yoki.filesystem] but is carried here too — ' +
+        'that table is off under --dangerously-bypass-approvals-and-sandbox and never gated a ' +
+        'shell `cat` (codex reads shell out as Bash), while hook denies still fire in bypass mode'
     );
+
+    // ...and it is NOT moved out of the declarative layer: both still carry it.
+    const configToml = fs.readFileSync(path.join(out, 'config.toml'), 'utf8');
+    assert.match(configToml, /"~\/\.ssh\/id_\*" = "deny"/);
 
     assert.deepEqual(planResult.warnings.filter(w => /native execpolicy\/filesystem equivalent/.test(w)), []);
     assert.ok(planResult.info.some(line => /enforced by pre-permission-guard on codex/.test(line)), planResult.info.join('\n'));

@@ -7,6 +7,10 @@
     {
       "pattern": "Edit(**/*.pem)",
       "reason": "in-workspace write side of a secret-file glob"
+    },
+    {
+      "pattern": "Read(~/.ssh/id_*)",
+      "reason": "private keys"
     }
   ]
 }

@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { toRules, toFilesystemDenyEntries, toPermissionsToml, toUnexpressibleDeny } = require('../to-codex');
+const { toRules, toFilesystemDenyEntries, toFilesystemReadDeny, toPermissionsToml, toUnexpressibleDeny, convert } = require('../to-codex');
 
 test('toRules: a plain Bash prefix deny becomes a forbidden prefix_rule', () => {
   const merged = { allow: [], deny: [{ pattern: 'Bash(git reset --hard *)', reason: 'no hard reset' }] };
@@ -131,4 +131,62 @@ test('toUnexpressibleDeny: a Read(**…) workspace glob IS reported (the fs tabl
 test('toUnexpressibleDeny: Bash denies are left to toRules, which reports its own', () => {
   const merged = { deny: [{ pattern: 'Bash(rm -rf /)' }, { pattern: 'Bash(rm -rf /*)' }] };
   assert.deepEqual(toUnexpressibleDeny(merged), []);
+});
+
+// ---------------------------------------------------------------------------
+// Secret-read denies are carried by BOTH Codex layers (defense in depth): the
+// declarative [permissions.yoki.filesystem] table AND the guard deny list.
+// The table is off under --dangerously-bypass-approvals-and-sandbox and never
+// gated a shell `cat` (codex has no read tool — reads shell out as Bash),
+// while hook denies still fire in bypass mode, so the hook must know them too.
+// ---------------------------------------------------------------------------
+
+test('toFilesystemReadDeny: returns the ~-rooted Read denies with their reasons', () => {
+  const merged = {
+    allow: [],
+    deny: [
+      { pattern: 'Read(~/.ssh/id_*)', reason: 'private keys' },
+      { pattern: 'Read(~/.aws/credentials)', reason: 'cloud creds' },
+    ],
+  };
+  assert.deepEqual(toFilesystemReadDeny(merged), [
+    { pattern: 'Read(~/.ssh/id_*)', reason: 'private keys' },
+    { pattern: 'Read(~/.aws/credentials)', reason: 'cloud creds' },
+  ]);
+});
+
+test('toFilesystemReadDeny: a workspace **-glob Read is excluded (not a filesystem-table row)', () => {
+  const merged = { allow: [], deny: [{ pattern: 'Read(**/.env)', reason: 'env' }] };
+  assert.deepEqual(toFilesystemReadDeny(merged), []);
+});
+
+test('convert: a ~-rooted Read deny reaches guardDeny AND stays in the filesystem table', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-to-codex-'));
+  const layer = path.join(dir, 'permissions.yaml');
+  fs.writeFileSync(layer, [
+    'allow: []',
+    'deny:',
+    '  - pattern: "Read(~/.ssh/id_*)"',
+    '    reason: "private keys"',
+    '  - pattern: "Read(**/.env)"',
+    '    reason: "env files"',
+    '',
+  ].join('\n'), 'utf8');
+
+  const out = convert([layer]);
+  const patterns = out.guardDeny.map(e => e.pattern);
+
+  // Layer 1: the hook now enforces it too (the layer that survives bypass).
+  assert.ok(patterns.includes('Read(~/.ssh/id_*)'), `guardDeny=${JSON.stringify(patterns)}`);
+  assert.equal(out.guardDeny.find(e => e.pattern === 'Read(~/.ssh/id_*)').reason, 'private keys');
+  // The workspace glob is still there (it always was).
+  assert.ok(patterns.includes('Read(**/.env)'));
+
+  // Layer 2: NOT moved — the declarative filesystem table still carries it.
+  assert.match(out.permissions, /"~\/\.ssh\/id_\*" = "deny"/);
+  // ...and the workspace glob still is not a filesystem-table row.
+  assert.ok(!out.permissions.includes('**/.env'));
 });
