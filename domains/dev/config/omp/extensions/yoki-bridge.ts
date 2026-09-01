@@ -14,7 +14,11 @@
  *      `payload` is omp's own event object untouched (normalizePayload()
  *      reads fields like payload.toolName / payload.input directly, so
  *      renaming anything here would break it).
- *   2. For every hook registered for that event, spawn
+ *   2. For every hook registered for that event whose `matcher` covers the
+ *      tool being called (a tool_call/tool_result spec's `matcher` is a
+ *      `|`-separated set of omp tool names; a missing/`*`/empty matcher, and
+ *      every session-scoped event, matches all — see matcherMatchesTool),
+ *      spawn
  *        node <YOKI_ROOT>/scripts/hooks/run-with-flags.js --harness omp <id> <script>
  *      (kind:'js') or
  *        node <YOKI_ROOT>/scripts/hooks/run-bash-hook.js --harness omp <hook.sh>
@@ -131,6 +135,14 @@ interface HookSpec {
 	args?: string[];
 	profiles?: string[];
 	timeout?: number;
+	/** tool_call/tool_result only — a `|`-separated set of omp tool names
+	 *  (e.g. `"bash"`, `"read|grep|glob"`) the generator translated from the
+	 *  Claude matcher (lib/targets/omp-hooks.js). A missing/`*`/empty matcher
+	 *  means "every tool". dispatch() runs a spec on a tool event ONLY when
+	 *  its matcher matches the tool being called (matcherMatchesTool); the
+	 *  fallback/floor guards carry no matcher and so still run on every tool
+	 *  call. */
+	matcher?: string;
 }
 
 type HooksByEvent = Partial<Record<OmpEvent, HookSpec[]>>;
@@ -164,6 +176,9 @@ function toHookSpec(value: unknown): HookSpec | null {
 	}
 	if (typeof record.timeout === "number" && Number.isFinite(record.timeout) && record.timeout > 0) {
 		spec.timeout = record.timeout;
+	}
+	if (typeof record.matcher === "string" && record.matcher.length > 0) {
+		spec.matcher = record.matcher;
 	}
 	return spec;
 }
@@ -398,6 +413,44 @@ function asNonEmptyString(value: unknown): string | undefined {
 	return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+/** The omp tool being called, read straight off the event payload — the same
+ *  `payload.toolName` field normalizePayload('omp', …) keys the run-with-flags
+ *  envelope on. Returns undefined for a non-tool event (which carries no
+ *  toolName) or a malformed payload, in which case matcherMatchesTool fails
+ *  open. */
+function resolveOmpToolName(payload: unknown): string | undefined {
+	if (payload && typeof payload === "object") {
+		const name = (payload as Record<string, unknown>).toolName;
+		if (typeof name === "string" && name.length > 0) return name;
+	}
+	return undefined;
+}
+
+/** Whether a spec registered for a tool event should run for `toolName`.
+ *  `matcher` is the `|`-separated set of omp tool names the generator wrote
+ *  (lib/targets/omp-hooks.js); a missing/`*`/empty matcher means "every tool"
+ *  (the fallback and floor guards carry none, so they keep running on every
+ *  tool call). Matching is case-insensitive. FAILS OPEN: an unresolvable tool
+ *  name or any parse error runs the hook — a guard must never be silently
+ *  skipped because its matcher could not be read. Exported for unit tests. */
+export function matcherMatchesTool(matcher: string | undefined, toolName: string | undefined): boolean {
+	try {
+		if (matcher === undefined || matcher === null) return true;
+		const raw = String(matcher).trim();
+		if (raw === "" || raw === "*") return true;
+		const set = raw
+			.split("|")
+			.map((s) => s.trim().toLowerCase())
+			.filter(Boolean);
+		if (set.length === 0 || set.includes("*")) return true;
+		const tool = typeof toolName === "string" ? toolName.trim().toLowerCase() : "";
+		if (tool === "") return true; // no tool name to gate on -> fail open
+		return set.includes(tool);
+	} catch {
+		return true;
+	}
+}
+
 /** Runs every hook registered for `event` in order (personal guards first,
  *  matching PreToolUse ordering elsewhere) and combines their verdicts.
  *  Returns undefined for "no opinion" everywhere, matching what an omp
@@ -415,10 +468,18 @@ async function dispatch(
 		return undefined;
 	}
 
+	// Run a spec only when its matcher covers the tool being called. For a
+	// non-tool event resolveOmpToolName is undefined and every spec's matcher
+	// (`*`/none) passes, so this is a no-op there. The fallback/floor guards
+	// carry no matcher and so still run on every tool call — the guard floor
+	// is not dropped.
+	const toolName = resolveOmpToolName(payload);
+	const specs = hooks.filter((spec) => matcherMatchesTool(spec.matcher, toolName));
+
 	switch (event) {
 		case "tool_call": {
 			let input: unknown;
-			for (const spec of hooks) {
+			for (const spec of specs) {
 				const r = await runHook(ctx, spec, envelope);
 				if (r?.block === true) return { block: true, reason: asNonEmptyString(r.reason) ?? "blocked by yoki guard" };
 				if (r && "input" in r && r.input !== undefined) input = r.input;
@@ -428,7 +489,7 @@ async function dispatch(
 
 		case "tool_result": {
 			let content: string | undefined;
-			for (const spec of hooks) {
+			for (const spec of specs) {
 				const r = await runHook(ctx, spec, envelope);
 				if (r?.isError === true) return { content: asNonEmptyString(r.content) ?? "", isError: true };
 				const c = asNonEmptyString(r?.content);
@@ -439,7 +500,7 @@ async function dispatch(
 
 		case "session_stop": {
 			const contexts: string[] = [];
-			for (const spec of hooks) {
+			for (const spec of specs) {
 				const r = await runHook(ctx, spec, envelope);
 				if (r?.decision === "block") return { decision: "block", reason: asNonEmptyString(r.reason) ?? "" };
 				const c = asNonEmptyString(r?.additionalContext);
@@ -450,7 +511,7 @@ async function dispatch(
 
 		case "before_agent_start": {
 			const contents: string[] = [];
-			for (const spec of hooks) {
+			for (const spec of specs) {
 				const r = await runHook(ctx, spec, envelope);
 				const message = r?.message;
 				const content =
@@ -462,7 +523,7 @@ async function dispatch(
 
 		case "session_before_compact": {
 			const summaries: string[] = [];
-			for (const spec of hooks) {
+			for (const spec of specs) {
 				const r = await runHook(ctx, spec, envelope);
 				const s = asNonEmptyString(r?.summary);
 				if (s) summaries.push(s);
@@ -474,7 +535,7 @@ async function dispatch(
 			// session_start, session_shutdown, tool_approval_requested: the
 			// spike defines no return contract for these — run every hook for
 			// its side effects (logging, warn-once markers) and report nothing.
-			for (const spec of hooks) {
+			for (const spec of specs) {
 				await runHook(ctx, spec, envelope);
 			}
 			return undefined;

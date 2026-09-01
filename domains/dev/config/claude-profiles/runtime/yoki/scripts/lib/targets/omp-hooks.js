@@ -39,12 +39,19 @@
  *     omp — translateMatcher('Workflow') already returns null since
  *     "Workflow" isn't a Claude tool name omp-tool-names.js knows)
  *
- * `matcher`/`timeout` (in ms — omp's `ctx.setTimeout` wants milliseconds,
- * unlike Claude/Codex's seconds-based `timeout` field) and `if` are not
- * consumed by yoki-bridge.ts yet (dispatch() runs every hook registered for
- * an event unconditionally); they are still emitted here per the T10 spec
- * so a later bridge update can start honoring them without another
- * generator change, exactly like the already-inert `if` field.
+ * `matcher` (a `|`-separated set of omp tool names, e.g. `"bash"`,
+ * `"read|grep|glob"`, or absent for a session-scoped event) IS now consumed:
+ * yoki-bridge.ts's dispatch() runs a tool_call/tool_result spec only when its
+ * matcher covers the tool being called (matcherMatchesTool), so a `read`
+ * tool_call no longer spawns a `bash`-matcher guard. A missing/`*`/empty
+ * matcher still means "every tool", which is why the fallback/floor guards
+ * (emitted without a matcher) keep running on every call.
+ *
+ * `timeout` (in ms — omp's `ctx.setTimeout` wants milliseconds, unlike
+ * Claude/Codex's seconds-based `timeout` field) and `if` are still not
+ * consumed by yoki-bridge.ts yet; they are emitted here per the T10 spec so a
+ * later bridge update can start honoring them without another generator
+ * change, exactly like the already-inert `if` field.
  */
 
 const path = require('path');

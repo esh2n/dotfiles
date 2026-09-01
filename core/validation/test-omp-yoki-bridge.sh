@@ -523,6 +523,58 @@ async function callSessionStop(manifestEnv: string, tag: string): Promise<Sessio
     check("tool_call: a benign bash call is unaffected by the path deny set", bash === undefined, JSON.stringify(bash));
 }
 
+// ---------------------------------------------------------------------------
+// 8. MATCHER GATING. A tool_call spec runs only for the tool(s) its matcher
+//    names — the fix for the bridge spawning every tool_call guard on every
+//    tool. A `bash`-matcher guard fires on a bash call and is skipped on a
+//    read call (if it were not skipped it would deny, because the read
+//    payload carries the same 'manifest-marker' the guard trips on).
+// ---------------------------------------------------------------------------
+{
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_BASH_MATCHER_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?bash-matcher-manifest");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+
+    const onBash = (await handlers["tool_call"]!(
+        { type: "tool_call", toolName: "bash", toolCallId: "m1", input: { command: "echo manifest-marker" } },
+        ctx,
+    )) as { block?: boolean; reason?: string } | undefined;
+    check(
+        "matcher: a bash-matcher guard fires on a bash tool_call",
+        onBash?.block === true && (onBash?.reason ?? "").includes("stub: manifest guard"),
+        JSON.stringify(onBash),
+    );
+
+    const onRead = await handlers["tool_call"]!(
+        { type: "tool_call", toolName: "read", toolCallId: "m2", input: { path: "manifest-marker" } },
+        ctx,
+    );
+    check("matcher: a bash-matcher guard does NOT fire on a read tool_call", onRead === undefined, JSON.stringify(onRead));
+}
+
+// ---------------------------------------------------------------------------
+// 8b. Unit tests for the exported matcherMatchesTool helper (imported from
+//     the same extension module, run under --experimental-strip-types).
+// ---------------------------------------------------------------------------
+{
+    const mod = (await import(EXT_PATH + "?matcher-helper")) as {
+        matcherMatchesTool: (m: string | undefined, t: string | undefined) => boolean;
+    };
+    const mm = mod.matcherMatchesTool;
+    check("matcherMatchesTool: bash matcher matches bash", mm("bash", "bash") === true);
+    check("matcherMatchesTool: bash matcher rejects read", mm("bash", "read") === false);
+    check("matcherMatchesTool: set matcher matches a member", mm("read|grep|glob", "grep") === true);
+    check("matcherMatchesTool: set matcher rejects a non-member", mm("read|grep|glob", "bash") === false);
+    check("matcherMatchesTool: undefined matcher matches all", mm(undefined, "bash") === true);
+    check("matcherMatchesTool: '*' matcher matches all", mm("*", "read") === true);
+    check("matcherMatchesTool: empty matcher matches all", mm("", "read") === true);
+    check("matcherMatchesTool: case-insensitive both sides", mm("Bash", "bash") === true && mm("bash", "BASH") === true);
+    check("matcherMatchesTool: no tool name fails open", mm("bash", undefined) === true);
+}
+
 console.log("passed=" + passed + " failed=" + failed);
 process.exit(failed === 0 ? 0 : 1);
 RUNNER
@@ -562,6 +614,13 @@ RUNNER
     local own_guard_manifest="$WORK/own-guard-manifest.json"
     printf '{"tool_call": [{"id": "manifest-guard", "kind": "bash", "script": "%s"}]}\n' \
         "$WORK/hooks/manifest-guard.sh" > "$own_guard_manifest"
+
+    # Same guard, but carrying a `matcher: "bash"` (the shape omp-hooks.js
+    # translates PreToolUse(Bash) into) — dispatch must run it on a `bash`
+    # tool_call and skip it on a `read` one.
+    local bash_matcher_manifest="$WORK/bash-matcher-manifest.json"
+    printf '{"tool_call": [{"id": "manifest-guard", "kind": "bash", "script": "%s", "matcher": "bash"}]}\n' \
+        "$WORK/hooks/manifest-guard.sh" > "$bash_matcher_manifest"
 
     # Same manifest, but DECLARING a floor that names a script it does not
     # register — the generated shape (a top-level `floor` array of absolute
@@ -630,6 +689,7 @@ RUNNER
     export GUARD_STOP_NOARGS_MANIFEST="$stop_noargs_manifest"
     export GUARD_JS_ONLY_MANIFEST="$js_only_manifest"
     export GUARD_OWN_GUARD_MANIFEST="$own_guard_manifest"
+    export GUARD_BASH_MATCHER_MANIFEST="$bash_matcher_manifest"
     export GUARD_FLOOR_MANIFEST="$floor_manifest"
     export GUARD_FLOOR_SATISFIED_MANIFEST="$floor_satisfied_manifest"
     export GUARD_FLOOR_ABSENT_SCRIPT_MANIFEST="$floor_absent_script_manifest"
