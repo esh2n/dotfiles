@@ -21,15 +21,26 @@ function withTempStateHome(fn) {
   }
 }
 
-test('callKey is stable for the same prompt+opts and ignores label', () => {
+test('callKey is stable for the same prompt+opts+label, and a script-chosen label is part of identity', () => {
   withTempStateHome(({ callKey }) => {
     const a = callKey('do it', { model: 'sonnet', label: 'first-label' });
-    const b = callKey('do it', { model: 'sonnet', label: 'a-totally-different-label' });
-    assert.equal(a, b);
+    assert.equal(a, callKey('do it', { model: 'sonnet', label: 'first-label' }));
+    // Two lanes sending the same prompt under different labels are different
+    // work — a label the script chose is identity, not decoration.
+    assert.notEqual(a, callKey('do it', { model: 'sonnet', label: 'a-totally-different-label' }));
     const c = callKey('do it', { model: 'opus', label: 'first-label' });
     assert.notEqual(a, c);
     const d = callKey('a different prompt', { model: 'sonnet' });
     assert.notEqual(a, d);
+  });
+});
+
+test('callKey ignores an auto-generated label — it embeds arrival order, which is not stable', () => {
+  withTempStateHome(({ callKey }) => {
+    const bare = callKey('do it', { model: 'sonnet' });
+    assert.equal(callKey('do it', { model: 'sonnet', label: '(unlabeled)' }), bare);
+    assert.equal(callKey('do it', { model: 'sonnet', label: 'agent-7' }), bare);
+    assert.equal(callKey('do it', { model: 'sonnet', label: '   ' }), bare);
   });
 });
 
@@ -90,33 +101,124 @@ test('Journal append/readAll round-trips entries in order', () => {
   });
 });
 
-test('Journal getCached returns only status=ok entries, and the LATEST one for a repeated key', () => {
+test('replayAt returns an entry only when index AND key both match, and only for status ok', () => {
   withTempStateHome(({ Journal }) => {
     const j = new Journal('test-run-2');
-    j.append({ key: 'k1', label: 'a', status: 'error', error: 'first try failed' });
-    assert.equal(j.getCached('k1'), undefined);
-    j.append({ key: 'k1', label: 'a', status: 'ok', result: 'recovered' });
-    assert.equal(j.getCached('k1').result, 'recovered');
+    j.append({ key: 'k0', index: 0, status: 'ok', result: 'zero' });
+    j.append({ key: 'k1', index: 1, status: 'error', error: 'first try failed' });
+    assert.equal(j.replayAt(0, 'k0').result, 'zero');
+    // right key, wrong position: NOT the same work
+    assert.equal(j.replayAt(1, 'k0'), undefined);
+    // right position, wrong key: the call changed
+    assert.equal(j.replayAt(0, 'k-other'), undefined);
+    // failures are never replayed — a resumed run retries them
+    assert.equal(j.replayAt(1, 'k1'), undefined);
   });
 });
 
-test('Journal.loadForResume tolerates a truncated/corrupt trailing line', () => {
+test('replayAt ignores retry lines: they share the index but never become replayable', () => {
+  withTempStateHome(({ Journal }) => {
+    const j = new Journal('test-run-retry');
+    j.append({ key: 'k0', index: 0, status: 'ok', result: 'zero' });
+    j.append({ key: 'k1', index: 1, status: 'retry', attempt: 1, error: '429' });
+    j.append({ key: 'k1', index: 1, status: 'ok', result: 'one' });
+    assert.equal(j.replayAt(1, 'k1').result, 'one');
+    assert.equal(j.loadReplaySequence().size, 2);
+  });
+});
+
+test('a later generation that stopped early invalidates the earlier one\'s stale tail', () => {
+  withTempStateHome(({ Journal }) => {
+    // Generation 0 recorded calls 0..3. Generation 1 resumed, replayed 0-1,
+    // diverged at 2 and got no further than call 2. A third run must NOT
+    // replay generation 0's call 3: it was computed from an upstream
+    // generation 1 has already replaced.
+    const first = new Journal('test-run-generations');
+    first.append({ key: 'a', index: 0, status: 'ok', result: 0 });
+    first.append({ key: 'b', index: 1, status: 'ok', result: 1 });
+    first.append({ key: 'c', index: 2, status: 'ok', result: 2 });
+    first.append({ key: 'd', index: 3, status: 'ok', result: 3 });
+
+    const second = new Journal('test-run-generations');
+    second.append({ key: 'c2', index: 2, status: 'ok', result: 'new-2' });
+    assert.equal(second.generation(), 1, 'each run against a runId is its own generation');
+
+    const third = new Journal('test-run-generations');
+    assert.equal(third.replayAt(0, 'a').result, 0);
+    assert.equal(third.replayAt(1, 'b').result, 1);
+    assert.equal(third.replayAt(2, 'c2').result, 'new-2');
+    assert.equal(third.replayAt(3, 'd'), undefined);
+    assert.equal(third.loadReplaySequence().size, 3);
+  });
+});
+
+test('within one generation, out-of-order completion does not break the replay sequence', () => {
+  withTempStateHome(({ Journal }) => {
+    // Concurrent agent() calls finish out of order, so the journal's LINE
+    // order is completion order while `index` is arrival order. A sequence
+    // read that trusted line order dropped whichever call finished first.
+    const j = new Journal('test-run-concurrent');
+    j.append({ key: 'b', index: 1, status: 'ok', result: 'one' });
+    j.append({ key: 'a', index: 0, status: 'ok', result: 'zero' });
+    j.append({ key: 'c', index: 2, status: 'ok', result: 'two' });
+
+    const fresh = new Journal('test-run-concurrent');
+    assert.equal(fresh.loadReplaySequence().size, 3);
+    assert.equal(fresh.replayAt(0, 'a').result, 'zero');
+    assert.equal(fresh.replayAt(1, 'b').result, 'one');
+    assert.equal(fresh.replayAt(2, 'c').result, 'two');
+  });
+});
+
+test('an older journal with no index at all replays by file order', () => {
+  withTempStateHome(({ Journal }) => {
+    const j = new Journal('test-run-legacy');
+    j.append({ key: 'k0', status: 'ok', result: 'zero' });
+    j.append({ key: 'k1', status: 'error', error: 'skipped' });
+    j.append({ key: 'k2', status: 'ok', result: 'one' });
+    const fresh = new Journal('test-run-legacy');
+    assert.equal(fresh.replayAt(0, 'k0').result, 'zero');
+    assert.equal(fresh.replayAt(1, 'k2').result, 'one');
+  });
+});
+
+test('loadReplaySequence tolerates a truncated/corrupt trailing line', () => {
   withTempStateHome(({ Journal, journalPath }) => {
     const j = new Journal('test-run-3');
-    j.append({ key: 'k1', label: 'a', status: 'ok', result: 'fine' });
-    fs.appendFileSync(journalPath('test-run-3'), '{"key":"k2","status":"ok","result": incomplete-json\n');
-    const map = j.loadForResume();
-    assert.equal(map.get('k1').result, 'fine');
-    assert.equal(map.has('k2'), false);
+    j.append({ key: 'k1', index: 0, status: 'ok', result: 'fine' });
+    fs.appendFileSync(journalPath('test-run-3'), '{"key":"k2","index":1,"status":"ok","result": incomplete-json\n');
+    const fresh = new Journal('test-run-3');
+    assert.equal(fresh.replayAt(0, 'k1').result, 'fine');
+    assert.equal(fresh.replayAt(1, 'k2'), undefined);
   });
 });
 
-test('a fresh run with no journal file yet has no cached entries and zero tokens spent', () => {
+test('a fresh run with no journal file yet has nothing to replay and zero tokens spent', () => {
   withTempStateHome(({ Journal }) => {
     const j = new Journal('never-run-before');
-    assert.equal(j.getCached('anything'), undefined);
+    assert.equal(j.replayAt(0, 'anything'), undefined);
     assert.equal(j.tokensSpent(), 0);
     assert.deepEqual(j.readAll(), []);
+    assert.equal(j.usageTotals().tokens, 0);
+  });
+});
+
+test('usageTotals splits reported from estimated tokens and sums reported cost', () => {
+  withTempStateHome(({ Journal }) => {
+    const j = new Journal('test-run-usage');
+    j.append({ key: 'a', index: 0, status: 'ok', result: 1, tokens: 100, tokensSource: 'reported', usage: { inputTokens: 60, outputTokens: 40, costUsd: 0.25 } });
+    j.append({ key: 'b', index: 1, status: 'ok', result: 2, tokens: 25, tokensSource: 'estimated', usage: { estimatedTokens: 25 } });
+    j.append({ key: 'c', index: 2, status: 'ok', result: 3, tokens: 70, tokensSource: 'mixed', usage: { reportedTokens: 50, estimatedTokens: 20 } });
+    j.append({ key: 'd', index: 3, status: 'error', error: 'boom', tokens: 9, tokensSource: 'reported' });
+    const totals = j.usageTotals();
+    assert.equal(totals.calls, 3); // the failed call is not an "ok" call
+    assert.equal(totals.tokens, 195);
+    assert.equal(totals.reportedTokens, 150);
+    assert.equal(totals.estimatedTokens, 45);
+    assert.equal(totals.costUsd, 0.25);
+    assert.equal(totals.hasCost, true);
+    // ...but budget.spent() still counts what the failed call really burned.
+    assert.equal(j.tokensSpent(), 204);
   });
 });
 

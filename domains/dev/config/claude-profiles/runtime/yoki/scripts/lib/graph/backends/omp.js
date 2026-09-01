@@ -22,7 +22,7 @@
  * by this file.
  */
 
-const { resolveModel, resolveAgentPreamble, spawnCollect } = require('./common');
+const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError } = require('./common');
 
 const name = 'omp';
 const supportsSchemaNatively = false;
@@ -80,12 +80,86 @@ async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox }
   const { args } = buildArgv({ prompt, model, agentType, sandbox });
   if (effort) args.push('--thinking', effort);
   const started = Date.now();
-  const { stdout, stderr, code } = await spawnCollect('omp', args, { cwd, timeoutMs });
+  const { stdout, stderr, code, timedOut } = await spawnCollect('omp', args, { cwd, timeoutMs });
   const durationMs = Date.now() - started;
+  if (timedOut) throw timeoutError('omp', timeoutMs);
   if (code !== 0 && !stdout.trim()) {
     throw new Error(`omp exited ${code}: ${stderr.trim().slice(0, 2000)}`);
   }
   return { raw: stdout, stderr, durationMs, exitCode: code };
+}
+
+/**
+ * Token usage from omp's own records.
+ *
+ * The field names are omp's, pinned by spike S4-S5-omp.md (omp 18.0.4) and
+ * already read the same way by `lib/harness/session.js`: an assistant turn
+ * carries `message.usage.{input, output, cacheRead, cacheWrite,
+ * totalTokens, reasoningTokens, cost}` — camelCase, unlike claude's and
+ * codex's snake_case, so this cannot share their reader.
+ *
+ * Two carriers are accepted because `omp -p --mode json`'s single result
+ * object and the session JSONL it writes are not the same envelope, and only
+ * the session-file shape is spike-verified:
+ * - a `usage` block on the result object (or nested under `message`), and
+ * - a JSONL stream of `{"type":"message","message":{"role":"assistant",
+ *   "usage":{...}}}` records, whose usages are summed.
+ * Anything else returns null, which api.js reports as an explicit estimate
+ * rather than a silent zero.
+ */
+function extractUsage(raw) {
+  const text = String(raw);
+  const direct = usageFromObject(safeParse(text));
+  if (direct) return direct;
+
+  let summed = null;
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const record = safeParse(trimmed);
+    if (!record || record.type !== 'message') continue;
+    const one = usageFromObject(record);
+    if (!one) continue;
+    summed = summed ? {
+      inputTokens: summed.inputTokens + one.inputTokens,
+      outputTokens: summed.outputTokens + one.outputTokens,
+      cacheRead: summed.cacheRead + one.cacheRead,
+      cacheWrite: summed.cacheWrite + one.cacheWrite,
+      totalTokens: summed.totalTokens + one.totalTokens,
+      ...(one.costUsd === undefined && summed.costUsd === undefined
+        ? {}
+        : { costUsd: (summed.costUsd || 0) + (one.costUsd || 0) }),
+    } : one;
+  }
+  return summed;
+}
+
+function safeParse(text) {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function usageFromObject(obj) {
+  if (!obj) return null;
+  const usage = (obj.usage && typeof obj.usage === 'object' && obj.usage)
+    || (obj.message && obj.message.usage && typeof obj.message.usage === 'object' && obj.message.usage);
+  if (!usage) return null;
+  const num = (v) => (Number.isFinite(v) ? v : 0);
+  const inputTokens = num(usage.input);
+  const outputTokens = num(usage.output);
+  const cacheRead = num(usage.cacheRead);
+  const cacheWrite = num(usage.cacheWrite);
+  const totalTokens = Number.isFinite(usage.totalTokens)
+    ? usage.totalTokens
+    : inputTokens + outputTokens + cacheRead + cacheWrite;
+  if (totalTokens <= 0) return null;
+  const cost = usage.cost;
+  const costUsd = typeof cost === 'number' ? cost : (cost && typeof cost.total === 'number' ? cost.total : undefined);
+  return { inputTokens, outputTokens, cacheRead, cacheWrite, totalTokens, ...(costUsd === undefined ? {} : { costUsd }) };
 }
 
 /** `omp -p --mode json` prints a single JSON result object; pull its text
@@ -108,6 +182,7 @@ module.exports = {
   buildArgv,
   run,
   extractText,
+  extractUsage,
   resolveSandbox,
   SANDBOX_MODES,
   DEFAULT_SANDBOX,

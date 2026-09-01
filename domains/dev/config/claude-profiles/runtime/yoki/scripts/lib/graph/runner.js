@@ -18,6 +18,8 @@ const crypto = require('crypto');
 const { createApi } = require('./api');
 const { Journal, runDir } = require('./journal');
 const guard = require('./guard');
+const lock = require('./lock');
+const budgetLib = require('./budget');
 
 /** `~/.claude/workflows`, the harness's own installed workflow directory.
  *  `YOKI_WORKFLOWS_DIR` overrides it — the injection seam that lets `list`
@@ -195,7 +197,12 @@ function readRunMeta(runId) {
  * @param {string} [options.model]
  * @param {string} [options.effort]
  * @param {string} [options.mockFile]
- * @param {number} [options.timeoutMs]
+ * @param {number} [options.timeoutMs] per-agent timeout default (ms)
+ * @param {number} [options.retries] transient-failure retries per backend call
+ * @param {number} [options.maxAgentCalls] budget cap override (see budget.js)
+ * @param {number} [options.maxTokens] budget cap override
+ * @param {number} [options.maxWallMs] budget cap override
+ * @param {number} [options.lockStaleMs] run-lock takeover age (ms)
  * @param {string} [options._parentRunId] internal: set when this call is a
  *   `workflow()` nested invocation, to (a) skip the guard cap (it already
  *   ran for the top-level launch) and (b) refuse a further nested call.
@@ -203,7 +210,8 @@ function readRunMeta(runId) {
 async function executeScript(options) {
   const {
     scriptPath, args, backendName, cwd = process.cwd(), dryRun = false,
-    emit = () => {}, concurrency, model, effort, mockFile, timeoutMs, _parentRunId,
+    emit = () => {}, concurrency, model, effort, mockFile, timeoutMs, retries,
+    retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, _parentRunId,
   } = options;
   const runId = options.runId || generateRunId();
   const isResume = !!options.runId;
@@ -221,9 +229,28 @@ async function executeScript(options) {
     }
   }
 
+  // One live process per runId. Two `--resume <same id>` runs would otherwise
+  // interleave journal lines, so each one's prefix replay would see the
+  // other's writes, and whichever finished last would own run.json.
+  let held;
+  try {
+    held = lock.acquire(runId, lockStaleMs === undefined ? {} : { staleMs: lockStaleMs });
+  } catch (err) {
+    emit({ type: 'run-locked', runId, message: err.message, ts: new Date().toISOString() });
+    return { runId, meta: compiled.meta, status: 'locked', error: err.message };
+  }
+
+  const caps = budgetLib.resolveCaps(cwd, {
+    maxAgentCalls: options.maxAgentCalls,
+    maxTokens: options.maxTokens,
+    maxWallMs: options.maxWallMs,
+  });
+  const startedAt = Date.now();
+
   const ctx = {
     runId, journal, backend, cwd, model, effort, mockFile, dryRun,
     resume: isResume, concurrency, emit, timeoutMs,
+    caps, startedAt, retries, retryBaseDelayMs, retryMaxDelayMs, sleep,
     args,
     runChildWorkflow: _parentRunId
       ? undefined
@@ -231,7 +258,10 @@ async function executeScript(options) {
         const childPath = resolveScriptPath(nameOrRef, cwd);
         const childResult = await executeScript({
           scriptPath: childPath, args: childArgs, backendName, cwd, dryRun, emit,
-          concurrency, model, effort, mockFile, timeoutMs, _parentRunId: runId,
+          concurrency, model, effort, mockFile, timeoutMs, retries,
+          retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs,
+          maxAgentCalls: options.maxAgentCalls, maxTokens: options.maxTokens,
+          maxWallMs: options.maxWallMs, _parentRunId: runId,
         });
         if (childResult.status === 'error') throw new Error(childResult.error || 'child workflow failed');
         return childResult.result;
@@ -253,15 +283,18 @@ async function executeScript(options) {
   } catch (err) {
     status = 'error';
     error = err.message;
+  } finally {
+    held.release();
   }
 
+  const usage = journal.usageTotals();
   writeRunMeta(runId, {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
-    startedAt: readRunMeta(runId)?.startedAt, finishedAt: new Date().toISOString(), status, error,
+    startedAt: readRunMeta(runId)?.startedAt, finishedAt: new Date().toISOString(), status, error, usage,
   });
-  emit({ type: 'run-end', runId, status, error, result, ts: new Date().toISOString() });
+  emit({ type: 'run-end', runId, status, error, result, usage, ts: new Date().toISOString() });
 
-  return { runId, meta: compiled.meta, status, result, error };
+  return { runId, meta: compiled.meta, status, result, error, usage };
 }
 
 module.exports = {

@@ -116,13 +116,21 @@ access from the script body itself (only through `agent()`).
   multi-stage script in this repo uses this (research/acceptance/
   design-review/review all pipeline a "produce findings" stage into a
   "verify findings" stage per item).
+  - `opts.timeoutMs` — wall-clock ceiling for this one call. Falls back to
+    the run's `--timeout`, then to a 15-minute default; `0` disables it.
+    A child that runs past it is SIGKILLed, journaled with `timedOut: true`,
+    and (being a transient failure) retried. See "Execution caps, retry and
+    timeouts" below.
 - `budget: {total: number|null, spent(): number, remaining(): number}` — not
   used by any script in this repo today, but is part of the documented
-  surface (turn-level token budget from a "+500k"-style directive). Since
-  yoki-graph runs outside a Claude Code turn there is no such directive to
-  read; `budget.total` is always `null` and `remaining()` is always
-  `Infinity`, matching the skill's own "no target set" behavior. `spent()`
-  sums the (best-effort) token counts recorded in this run's journal.
+  surface (turn-level token budget from a "+500k"-style directive). There is
+  no Claude Code turn directive to read outside a turn, so the numbers come
+  from this run's own token cap instead: `total` is `graphMaxTokens` when one
+  is configured (else `null`), `remaining()` is the real headroom under it
+  (else `Infinity`), and `spent()` sums the token counts recorded in this
+  run's journal. `remaining()` used to be a hardcoded `Infinity`, which made
+  `while (budget.remaining() > 0) await agent(...)` an unbounded loop with
+  nothing to stop it — see the caps section below.
 - `workflow(nameOrRef, args?): Promise<any>` — run another workflow inline
   and return its result; nesting is one level only (a child calling
   `workflow()` throws). Not used by any script in this repo today; supported
@@ -169,6 +177,135 @@ temp-file ESM wrapper. Rationale:
    read `meta.name`/`meta.phases` without executing anything.
 
 See `runner.js` (`compileScript`) for the implementation.
+
+## `--resume`: an index-ordered prefix replay
+
+`--resume <runId>` does NOT look results up by key. It replays the longest
+PREFIX of this run's `agent()` calls that still matches the journal:
+
+1. Every `agent()` call gets an `index` — its position in this run's arrival
+   order — recorded in the journal alongside its `key`
+   (`sha256(prompt + NUL + JSON(opts))`).
+2. A resumed run walks its own calls 0, 1, 2, … and replays call *i* only
+   while the journal holds a completed (`status: 'ok'`) entry at index *i*
+   whose key matches. Replaying costs nothing: no process is spawned and the
+   agent-call cap is not charged.
+3. The FIRST mismatch ends the replay for good (a `resume-diverged` event is
+   emitted with the index). Everything from there on runs live — including
+   calls whose own prompt is byte-identical to a recorded one, because their
+   upstream changed and a result computed from a different upstream is not
+   the same work.
+
+The key is label-aware in the way codex-dynamic-workflows' is: a label the
+*script* chose is part of the caller's identity and stays in the key (two
+lanes that send the same prompt under different labels are different work),
+while an auto-generated one (`(unlabeled)`, `agent-<n>`) is stripped — it
+embeds arrival order, which interleaves nondeterministically under
+concurrency, so keeping it would miss the replay on every rerun.
+
+Failed and retried calls are never replayed: a resumed run retries them.
+
+**Generations, not file order.** `agent()` calls complete out of order under
+concurrency, so a journal's LINE order is completion order while `index` is
+arrival order. Each `executeScript` invocation against a runId therefore
+stamps its entries with a `gen` number (one more than the highest already in
+the file). Applied oldest generation first, each generation overrides its own
+indices and truncates anything past its highest one: what it wrote below its
+divergence point was replayed and confirmed, what sits above the last index
+it reached is stale, because it changed the upstream and never got there.
+
+## Execution caps, retry and timeouts
+
+`guard.js`'s daily cap limits how many runs start in a day; it does nothing
+about one run that never stops. Three per-run caps do (`budget.js`):
+
+| cap | `.yoki.json` | CLI flag | env | default |
+| --- | --- | --- | --- | --- |
+| `agent()` calls | `graphMaxAgentCalls` | `--max-agent-calls` | `YOKI_GRAPH_MAX_AGENT_CALLS` | 1000 |
+| tokens | `graphMaxTokens` | `--max-tokens` | `YOKI_GRAPH_MAX_TOKENS` | none |
+| wall clock (ms) | `graphMaxWallMs` | `--max-wall-ms` | `YOKI_GRAPH_MAX_WALL_MS` | none |
+
+Resolution is CLI flag > `.yoki.json` (searched upward from `cwd`, the same
+file and the same reader the daily cap uses) > env > default; `0` disables a
+cap. A breach throws `BudgetExceededError` from `agent()` and ends the run:
+`parallel()`/`pipeline()` fold an ordinary lane failure into `null` but
+re-raise this one, because a cap that degrades to `null` is a cap the runaway
+loop keeps running past. Caps apply in `--dry-run` too.
+
+**Backend retry** (`retry.js`) is a separate layer from schema.js's retry:
+schema.js retries a MODEL whose output violated the shape, this retries a
+PROCESS that failed. A transient failure — 429, an explicit 5xx, a timeout
+kill, `EPIPE`/`ECONNRESET`, "overloaded" — is retried with exponential
+backoff (500ms, 1s, 2s, … capped at 5s), up to `--retries N` (default 2)
+per backend invocation. Anything else fails on the first attempt: retrying
+`spawn codex ENOENT` three times only costs wall time. Each retry is
+journaled as its own `status: 'retry'` line (invisible to the resume prefix,
+which only replays `ok`) and emitted as an `agent-retry` event.
+
+**Timeouts**: `opts.timeoutMs` > the run's `--timeout` > 15 minutes. The
+child is SIGKILLed and `spawnCollect` reports `timedOut: true`, which the
+backend turns into an error marked `transient` — so a wedged call is retried
+rather than silently reported as an ordinary crash.
+
+## Token accounting
+
+Each backend reads its own primary source, off the RAW envelope before
+`extractText` unwraps it:
+
+| backend | source |
+| --- | --- |
+| codex | `turn.completed` events in the `--json` stream (summed); falls back to a rollout `token_count` record's `total_token_usage` |
+| claude | the `--output-format json` envelope's `usage` block plus `total_cost_usd` — the only USD figure any backend reports |
+| omp | an assistant record's `usage` (`{input, output, cacheRead, cacheWrite, totalTokens, cost}` — omp's camelCase names, pinned by spike S4-S5-omp.md and read the same way by `lib/harness/session.js`) |
+| mock | none — nothing is spawned |
+
+When a backend reports nothing, the call is charged an explicit ESTIMATE
+(~4 characters per token) labelled `tokensSource: 'estimated'`, never a
+silent zero: a zero looks like a free call. A journal entry carries `tokens`,
+`tokensSource` (`reported` | `estimated` | `mixed`) and a `usage` breakdown;
+the run's `run-end` event, `run.json` and `yoki-graph status` report the
+totals with measured and estimated kept apart, so the numbers can be
+reconciled against the cost tracker without mixing the two.
+
+Reading usage off the unwrapped answer text (the previous behaviour) could
+not work for claude at all — `result` is a bare string with no usage block —
+so `budget.spent()` sat silently at zero.
+
+## Run lock
+
+One live process per runId. `<runDir>/lock` is created with the `wx` flag
+(atomic; no check-then-create race) holding `{pid, host, startedAt, token}`.
+A second `--resume` on the same id returns `status: 'locked'` and exits 1
+without running a line of the script. A lock is stale — and taken over —
+when its pid is gone on this host, or after an hour regardless of host (a
+foreign pid says nothing about liveness here). `token` makes release safe: a
+process only removes the lock it wrote.
+
+## Schema: strict on the wire, loose for validation
+
+Workflow scripts declare LOOSE schemas (optional properties absent from
+`required`). OpenAI-style structured output — `codex exec --output-schema` —
+requires the strict form: `additionalProperties: false` everywhere and every
+property in `required`. Writing the loose schema out verbatim was either a
+rejection or a silent downgrade.
+
+`schema.js`'s `toStrictJsonSchema` builds a strict COPY for the wire:
+optional properties become nullable (widening an `enum` too, since
+`type: [X, 'null']` with an enum listing only the original values is
+unsatisfiable), `$defs`/`definitions`/`patternProperties` are treated as maps
+of subschemas rather than schema nodes, and a schema-valued
+`additionalProperties` is preserved instead of being forced to `false`
+(forcing it would restrict the model to `{}`). The caller's schema is not
+mutated, and validation still runs against it — so what a script sees is
+exactly what it declared. `stripNullOptionals` then drops the explicit nulls
+a strict-mode model returns for absent optional properties, before
+validating. Backends without native schema support (omp) keep the
+prompt-embedded fallback unchanged.
+
+Mechanisms in this section were re-implemented from the designs described in
+`six-ddc/codex-dynamic-workflows` (strict schema conversion, generic retry,
+run lock, execution caps) and `tintinweb/pi-subagents` (index-ordered prefix
+replay); no code was copied from either.
 
 ## Backend-neutrality audit (T21)
 

@@ -41,7 +41,8 @@ yoki-graph run <name|path> --backend claude|codex|omp|mock
     [--args '<json>' | --args-file <f>] [--cwd <dir>]
     [--resume <runId>] [--dry-run] [--json] [--concurrency N]
     [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
-    [--mock <file>] [--timeout <ms>]
+    [--mock <file>] [--timeout <ms>] [--retries N]
+    [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
 yoki-graph list
 yoki-graph status <runId>
 ```
@@ -174,26 +175,78 @@ await agent(prompt, { label: 'impl:t1', sandbox: 'workspace-write' })
 - `claude` / `omp` バックエンドには対応するフラグが無いので、この option は
   無視される。
 
-## journal の読み方
+## journal の読み方 / `--resume` は prefix 再生
 
 `agent()` 呼び出し1回につき1行、
 `~/.local/state/yoki/graph/<runId>/journal.jsonl`
 (`YOKI_STATE_HOME` があればそちら配下、なければ `XDG_STATE_HOME` — 他の
 yoki state ファイルと同じ解決)に
-`{key, label, phase, status, result, tokens?, durationMs}` が追記される。
-`key` は `sha256(prompt + JSON(opts))` — 同じ呼び出しは常に同じ key になり、
-これが `--resume` のキャッシュキー。
+`{gen, index, key, label, phase, status, result, tokens?, tokensSource?,
+usage?, durationMs}` が追記される。`index` は呼び出しの到着順、`gen` は
+その runId に対する何回目の実行か、`key` は
+`sha256(prompt + JSON(opts))`(スクリプトが付けた `label` も含む)。
 
 - `yoki-graph run` の標準出力/`--json` は `run.json`(name/backend/args/cwd/
-  status/error)とこの journal をそのまま反映したイベントストリーム。
+  status/error/usage)とこの journal をそのまま反映したイベントストリーム。
   `--json` なら1行1 JSON(NDJSON)、素の実行なら人間向けの進捗行。
 - `yoki-graph status <runId> [--json]` で run.json + journal 集計
-  (`agentCalls`/`ok`/`errors`)を見る。
-- `--resume <runId>` で同じ runId を渡すと、journal に `status: "ok"` で
-  残っている呼び出しはそのままキャッシュから返り、新規/変化した呼び出しと
-  それ以降だけが実際に走る。**args を変えて同じ runId を再利用すると、
-  変わっていない呼び出しは古い結果のまま返る**点に注意 — 別の入力で
-  やり直すなら新しい runId(省略してデフォルトで自動採番)で走らせる。
+  (`agentCalls`/`ok`/`errors`/`retries`/`usage`)を見る。
+- **`--resume <runId>` は「順序つき prefix の再生」**であって key 引きの
+  キャッシュではない。再開したランは自分の呼び出しを 0, 1, 2, … と辿り、
+  journal の同じ位置に同じ key の完了エントリがある間だけ再生する。最初に
+  食い違った呼び出しから先は**すべて実行される** — 途中の入力が変われば
+  下流の結果は別物なので、prompt が同一でも古い結果は再利用しない。
+  食い違った位置は `resume-diverged` イベント(素の実行では `↯ resume
+  diverged at call #N`)で出る。
+- したがって `--args` を変えて同じ runId に `--resume` しても安全:
+  変わった呼び出し以降はライブで走り直る。逆に、**変えていない**ランを
+  再開すると全件が再生されてバックエンドは1回も起動しない。
+- 失敗した呼び出し(`status: "error"`)は再生されない — 再開すると再試行
+  される。リトライ行(`status: "retry"`)も再生対象外。
+
+## 実行キャップ(暴走防止)
+
+日次キャップ(前節)は「その日の起動回数」の上限で、**1回のランの暴走は
+止めない**。ラン単位の上限はこの3つ:
+
+| cap | `.yoki.json` | CLI | 既定 |
+| --- | --- | --- | --- |
+| `agent()` 呼び出し数 | `graphMaxAgentCalls` | `--max-agent-calls` | 1000 |
+| トークン | `graphMaxTokens` | `--max-tokens` | 無制限 |
+| 実行時間(ms) | `graphMaxWallMs` | `--max-wall-ms` | 無制限 |
+
+- 解決順は CLI フラグ → `.yoki.json`(`cwd` から上に探索)→ 環境変数
+  (`YOKI_GRAPH_MAX_AGENT_CALLS` など)→ 既定値。値 `0` はそのキャップの無効化。
+- 超過は**ハードフェイル**(ランが `status: error` で終わる)。`parallel()` /
+  `pipeline()` は普通の失敗を `null` に畳むが、キャップ超過だけは畳まずに
+  再送出する — `null` に落としたら暴走ループはそのまま回り続けてしまう。
+- `budget.total` / `budget.remaining()` は `graphMaxTokens` を設定していれば
+  実数を返す(未設定なら `null` / `Infinity`)。再生された呼び出しは
+  `agent()` 呼び出し数を消費しない。
+
+## リトライ・タイムアウト・トークン計上
+
+- **リトライ**: バックエンドの一時障害(429、5xx、timeout、EPIPE/ECONNRESET
+  など)は指数バックオフ(500ms → 1s → …、上限5s)で既定2回まで再試行する
+  (`--retries N`)。`ENOENT` や不正なフラグのような「やり直しても同じ」失敗は
+  1回で諦める。再試行は journal に `status: "retry"` として残る。
+  これはスキーマ違反のリトライ(schema.js が1回だけ行う)とは別の層。
+- **タイムアウト**: `agent(prompt, { timeoutMs })` > `--timeout <ms>` >
+  既定15分。超えた子プロセスは SIGKILL され、`timedOut: true` で journal に
+  記録される(タイムアウトは一時障害扱いなのでリトライ対象)。
+- **トークン**: 各バックエンド自身の出力から読む — codex は `--json` の
+  `turn.completed` の usage、claude は `--output-format json` の `usage` と
+  `total_cost_usd`、omp は assistant レコードの `usage`。報告が無い場合だけ
+  出力長からの**推定**にフォールバックし、`tokensSource: "estimated"` と
+  明示する(黙って 0 にはしない)。ラン終了時に
+  `tokens: N (X reported, Y estimated)` の1行が出る。
+
+## 同一 runId の同時実行はロックで防ぐ
+
+`<runDir>/lock` に pid/host/token を書いて排他する。同じ runId に2つ目の
+`--resume` を掛けると `status: locked` / exit 1 で拒否され、スクリプトは
+1行も走らない。プロセスが死んで残ったロックは、pid が居ない(同一ホスト)
+か1時間経過で自動的に奪われる。
 
 ## delivery(commit / draft-pr)のルール
 
@@ -229,9 +282,15 @@ delivery 選択を得てから `--args` に載せる。
   返すだけで、backend ごとの argv や実行結果の違いはここでは見えない。
 - **`WORKFLOW_GUARD_DISABLED=1` を常時 export する** — 日次キャップという
   暴走防止そのものを恒久的に無効化してしまう。単発の起動のときだけ付ける。
-- **同じ `runId` に `--resume` しつつ `--args` を変える** — journal の
-  キャッシュキーは prompt+opts のハッシュなので、変わっていない呼び出しは
-  古い結果のまま返ってくる。入力を変えたら新しい runId で走らせる。
+- **`--resume` を「変わっていない呼び出しは古い結果が返る」ものとして扱う** —
+  prefix 再生なので、食い違った位置から先はすべて走り直る。`--args` を変えた
+  再開でも下流に古い結果は混ざらない。
+- **`status: locked` を「壊れた」と読む** — 同じ runId を別プロセスが
+  掴んでいるだけ。終わるのを待つか、その pid が本当に死んでいるなら
+  `<runDir>/lock` を消す(放っておいても1時間で stale になる)。
+- **`tokensSource: "estimated"` の数字をコストトラッカーと突き合わせる** —
+  バックエンドが usage を報告しなかった呼び出しの推定値なので、実測と
+  混ぜて集計しない(表示も reported / estimated を分けている)。
 - **Claude Code の「セッション内初回起動は1回だけ拒否」を CLI でも期待する** —
   yoki-graph にそのリトライループは無い(前節参照)。効くのは日次キャップ
   だけなので、初回起動がいきなり拒否されることはない(キャップ超過時を除く)。

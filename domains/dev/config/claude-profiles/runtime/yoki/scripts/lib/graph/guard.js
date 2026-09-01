@@ -121,4 +121,10 @@ function checkAndRecord(cwd) {
   }
 }
 
-module.exports = { checkAndRecord, resolveCap, readCount, countFile, capMessage, stateDir, today };
+module.exports = {
+  checkAndRecord, resolveCap, readCount, countFile, capMessage, stateDir, today,
+  // Shared with budget.js so the per-run execution caps read the SAME
+  // `.yoki.json` (same upward search, same malformed-file posture) the daily
+  // cap does, rather than growing a second config reader beside it.
+  findYokiConfig,
+};

@@ -159,16 +159,19 @@ test('status: reports the run meta and counts ok/error agent calls from the jour
   const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cli-state-'));
   try {
     seedRun(stateHome, 'run-1', { name: 'review', status: 'ok', backend: 'mock' }, [
-      { key: 'k1', label: 'a', status: 'ok', result: 1 },
-      { key: 'k2', label: 'b', status: 'error', error: 'boom' },
-      { key: 'k3', label: 'c', status: 'ok', result: 3 },
+      { key: 'k1', index: 0, label: 'a', status: 'ok', result: 1, tokens: 120, tokensSource: 'reported' },
+      { key: 'k2', index: 1, label: 'b', status: 'retry', attempt: 1, error: '429 rate limited' },
+      { key: 'k2', index: 1, label: 'b', status: 'error', error: 'boom' },
+      { key: 'k3', index: 2, label: 'c', status: 'ok', result: 3, tokens: 30, tokensSource: 'estimated' },
     ]);
     withEnv({ YOKI_STATE_HOME: stateHome }, ({ cli }) => {
       const out = captureStdout(() => cli.cmdStatus(['run-1'], {}));
       assert.match(out, /run: review \(run-1\)/);
       assert.match(out, /status: ok/);
       assert.match(out, /backend: mock/);
-      assert.match(out, /agent calls: 3 \(2 ok, 1 error\)/);
+      // The retry line is counted separately, not as a fourth agent call.
+      assert.match(out, /agent calls: 3 \(2 ok, 1 error, 1 retried\)/);
+      assert.match(out, /tokens: 150 \(120 reported, 30 estimated\) — over 2 agent calls/);
     });
   } finally {
     fs.rmSync(stateHome, { recursive: true, force: true });

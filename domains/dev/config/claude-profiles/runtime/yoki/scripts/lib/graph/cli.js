@@ -10,7 +10,8 @@
  *       [--args '<json>' | --args-file <f>] [--cwd <dir>]
  *       [--resume <runId>] [--dry-run] [--json] [--concurrency N]
  *       [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
- *       [--mock <file>] [--timeout <ms>]
+ *       [--mock <file>] [--timeout <ms>] [--retries N]
+ *       [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
  *   yoki-graph list
  *   yoki-graph status <runId>
  */
@@ -80,7 +81,13 @@ function makeEmitter({ json }) {
         process.stdout.write(`[${ts}]   → ${event.label}${event.phase ? ` [${event.phase}]` : ''}\n`);
         break;
       case 'agent-cached':
-        process.stdout.write(`[${ts}]   ✓ ${event.label} (cached, --resume)\n`);
+        process.stdout.write(`[${ts}]   ✓ ${event.label} (replayed #${event.index}, --resume)\n`);
+        break;
+      case 'resume-diverged':
+        process.stdout.write(`[${ts}] ↯ resume diverged at call #${event.index} (${event.label}) — everything from here runs live\n`);
+        break;
+      case 'agent-retry':
+        process.stdout.write(`[${ts}]   ↻ ${event.label} retry ${event.attempt}/${event.retries} in ${event.delayMs}ms: ${event.error}\n`);
         break;
       case 'agent-end': {
         const mark = event.status === 'ok' ? '✓' : event.status === 'dry-run' ? '·' : '✗';
@@ -88,6 +95,9 @@ function makeEmitter({ json }) {
         break;
       }
       case 'guard-denied':
+        process.stdout.write(`[${ts}] ✗ ${event.message}\n`);
+        break;
+      case 'run-locked':
         process.stdout.write(`[${ts}] ✗ ${event.message}\n`);
         break;
       case 'run-end':
@@ -120,18 +130,39 @@ async function cmdRun(rest, flags) {
     model: flags.model,
     effort: flags.effort,
     mockFile: flags.mock ? path.resolve(flags.mock) : undefined,
-    timeoutMs: flags.timeout ? Number(flags.timeout) : undefined,
+    timeoutMs: numberFlag(flags.timeout),
+    retries: numberFlag(flags.retries),
+    maxAgentCalls: numberFlag(flags['max-agent-calls']),
+    maxTokens: numberFlag(flags['max-tokens']),
+    maxWallMs: numberFlag(flags['max-wall-ms']),
   });
 
   if (!flags.json) {
     process.stdout.write(`\nrunId: ${result.runId}\nstatus: ${result.status}\n`);
+    if (result.usage) process.stdout.write(`${formatUsage(result.usage)}\n`);
     if (result.status === 'ok') {
       process.stdout.write(`result: ${JSON.stringify(result.result, null, 2)}\n`);
     } else if (result.error) {
       process.stdout.write(`error: ${result.error}\n`);
     }
   }
-  if (result.status === 'error' || result.status === 'denied') process.exitCode = 1;
+  if (result.status === 'error' || result.status === 'denied' || result.status === 'locked') process.exitCode = 1;
+}
+
+function numberFlag(value) {
+  if (value === undefined || value === true) return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** One line of end-of-run accounting. Measured and estimated tokens are
+ *  reported separately on purpose: a total that silently mixes them cannot
+ *  be reconciled against the cost tracker. */
+function formatUsage(usage) {
+  const parts = [`tokens: ${usage.tokens} (${usage.reportedTokens} reported, ${usage.estimatedTokens} estimated)`];
+  parts.push(`over ${usage.calls} agent call${usage.calls === 1 ? '' : 's'}`);
+  if (usage.hasCost) parts.push(`cost: $${usage.costUsd.toFixed(4)}`);
+  return parts.join(' — ');
 }
 
 function cmdList(flags) {
@@ -158,9 +189,11 @@ function cmdStatus(rest, flags) {
   const payload = {
     runId,
     meta,
-    agentCalls: entries.length,
+    agentCalls: entries.filter((e) => e.status !== 'retry').length,
     ok: entries.filter((e) => e.status === 'ok').length,
     errors: entries.filter((e) => e.status === 'error').length,
+    retries: entries.filter((e) => e.status === 'retry').length,
+    usage: journal.usageTotals(),
     entries,
   };
   if (flags.json) {
@@ -172,7 +205,8 @@ function cmdStatus(rest, flags) {
     process.exitCode = 1;
     return;
   }
-  process.stdout.write(`run: ${meta.name} (${runId})\nstatus: ${meta.status}\nbackend: ${meta.backend}\nagent calls: ${payload.agentCalls} (${payload.ok} ok, ${payload.errors} error)\n`);
+  process.stdout.write(`run: ${meta.name} (${runId})\nstatus: ${meta.status}\nbackend: ${meta.backend}\nagent calls: ${payload.agentCalls} (${payload.ok} ok, ${payload.errors} error, ${payload.retries} retried)\n`);
+  process.stdout.write(`${formatUsage(payload.usage)}\n`);
   if (meta.error) process.stdout.write(`error: ${meta.error}\n`);
 }
 
@@ -197,4 +231,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { parseArgs, makeEmitter, cmdRun, cmdList, cmdStatus, main };
+module.exports = { parseArgs, makeEmitter, cmdRun, cmdList, cmdStatus, main, formatUsage, numberFlag };

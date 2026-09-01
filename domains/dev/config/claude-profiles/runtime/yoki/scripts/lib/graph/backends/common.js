@@ -126,11 +126,30 @@ function resolveAgentPreamble(agentType, env = process.env) {
 }
 
 /**
+ * The error a backend raises when its child was killed for running past the
+ * per-agent timeout. Marked `transient` so retry.js retries it (a model that
+ * wedged once often does not wedge again) and `timedOut` so api.js can
+ * journal the distinction between "took too long" and "failed".
+ */
+function timeoutError(what, timeoutMs) {
+  const err = new Error(`${what} timed out after ${timeoutMs}ms and was killed`);
+  err.code = 'ETIMEDOUT';
+  err.transient = true;
+  err.timedOut = true;
+  return err;
+}
+
+/**
  * Spawn `cmd argv` with `input` written to stdin (then stdin closed — see
  * the codex backend's own note on why closing stdin matters) and collect
- * stdout/stderr as strings. Resolves `{ stdout, stderr, code }` even on a
- * non-zero exit (callers decide what a failure means); rejects only if the
- * process itself could not be spawned.
+ * stdout/stderr as strings. Resolves `{ stdout, stderr, code, timedOut }`
+ * even on a non-zero exit (callers decide what a failure means); rejects
+ * only if the process itself could not be spawned.
+ *
+ * `timedOut` is the flag that makes a killed child distinguishable from a
+ * child that chose to exit non-zero: without it, a SIGKILL at the timeout
+ * looked to the caller exactly like an ordinary crash with no stdout, so it
+ * was reported as a generic failure and never classified as retryable.
  */
 function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs } = {}) {
   return new Promise((resolve, reject) => {
@@ -138,10 +157,13 @@ function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs } = {}) {
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let timedOut = false;
     let timer;
     if (timeoutMs) {
       timer = setTimeout(() => {
-        if (!settled) child.kill('SIGKILL');
+        if (settled) return;
+        timedOut = true;
+        child.kill('SIGKILL');
       }, timeoutMs);
     }
     child.stdout.on('data', (d) => { stdout += d.toString('utf8'); });
@@ -154,7 +176,7 @@ function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs } = {}) {
     child.on('close', (code) => {
       settled = true;
       if (timer) clearTimeout(timer);
-      resolve({ stdout, stderr, code });
+      resolve({ stdout, stderr, code, timedOut });
     });
     // stdin gets its own error listener BEFORE anything is written to it. A
     // Writable with zero 'error' listeners turns an EPIPE/ENOENT into an
@@ -179,6 +201,7 @@ module.exports = {
   stripFrontmatter,
   BUILTIN_PREAMBLES,
   spawnCollect,
+  timeoutError,
   loadHarnessModels,
   harnessModelsPath,
   findRepoRootFrom,

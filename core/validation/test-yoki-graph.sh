@@ -20,6 +20,10 @@ set -euo pipefail
 #      counter is pre-filled at the cap, asserting the guard denies the
 #      launch (guard.js — the same counter file workflow-guard.sh's real
 #      PreToolUse hook shares) before the script ever runs.
+#   4. `--resume` through the real CLI, asserting it is a PREFIX replay: an
+#      identical rerun replays every call and spawns none, while a rerun
+#      whose args change the first call's prompt replays nothing — not even
+#      the later calls whose prompts are byte-identical to recorded ones.
 #
 # Nothing here touches the real ~/.claude/workflows, ~/.claude/.cache, or
 # ~/.local/state: every CLI invocation runs under its own temp HOME.
@@ -154,6 +158,26 @@ run_cli() {
     return 0
 }
 
+# Same, but the caller supplies the --args value and any extra flags (e.g.
+# --resume <runId>) — used by the resume checks below, which need to vary the
+# args to force a divergence.
+run_cli_with() {
+    local home="$1" repo="$2" stdout="$3" stderr="$4" json_args="$5"
+    shift 5
+    CLI_STATUS=0
+    env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR -u WORKFLOW_GUARD_DISABLED -u YOKI_WORKFLOW_DAILY_CAP \
+        YOKI_WORKFLOW_DAILY_CAP=20 \
+        HOME="$home" \
+        node "$GRAPH_BIN" run review --backend mock --mock "$REVIEW_FIXTURE" \
+            --args "$json_args" --cwd "$repo" --json "$@" \
+        > "$stdout" 2> "$stderr" || CLI_STATUS=$?
+    return 0
+}
+
+count_events() {
+    jq -c "select(.type == \"$2\")" "$1" 2>/dev/null | wc -l | tr -d ' '
+}
+
 # -----------------------------------------------------------------------------
 # Checks
 # -----------------------------------------------------------------------------
@@ -260,10 +284,45 @@ check_validator_wiring() {
     fi
 }
 
+# `--resume` is a prefix replay, not a key-addressed cache. Through the real
+# CLI: an identical rerun replays every call and spawns none; a rerun whose
+# args changed the FIRST call's prompt replays nothing at all, even though
+# every later call is byte-identical to one the journal already holds.
+check_resume_replay() {
+    local repo="${FIXTURE_DIR}/repo-resume" home="${FIXTURE_DIR}/home-resume"
+    local out1="${FIXTURE_DIR}/resume1.out" out2="${FIXTURE_DIR}/resume2.out"
+    local out3="${FIXTURE_DIR}/resume3.out" err="${FIXTURE_DIR}/resume.err"
+    local run_id calls
+
+    make_temp_repo "$repo"
+    setup_fake_home "$home"
+
+    run_cli_with "$home" "$repo" "$out1" "$err" '{"range":"HEAD~1..HEAD"}'
+    run_id="$(jq -r 'select(.type == "run-start").runId' "$out1" 2>/dev/null | head -n 1)"
+    calls="$(count_events "$out1" agent-start)"
+    if [[ -z "$run_id" || "$calls" == "0" ]]; then
+        fail "case15: the first run makes agent calls and reports a runId"
+        log_error "  stderr: $(head -3 "$err")"
+        return
+    fi
+    pass "case15: the first run makes agent calls and reports a runId"
+
+    run_cli_with "$home" "$repo" "$out2" "$err" '{"range":"HEAD~1..HEAD"}' --resume "$run_id"
+    assert_eq "case16: an identical --resume replays every call" "$calls" "$(count_events "$out2" agent-cached)"
+    assert_eq "case17: an identical --resume runs nothing live" "0" "$(count_events "$out2" agent-start)"
+
+    run_cli_with "$home" "$repo" "$out3" "$err" '{"range":"HEAD~2..HEAD"}' --resume "$run_id"
+    assert_eq "case18: changing the first call's prompt replays nothing" "0" "$(count_events "$out3" agent-cached)"
+    assert_eq "case19: ...and every later call runs live, not from the cache" "$calls" "$(count_events "$out3" agent-start)"
+    assert_json_field "case20: the divergence is reported at the call it happened on" \
+        "$(jq -c 'select(.type == "resume-diverged")' "$out3" | head -n 1)" '.index' "0"
+}
+
 run_e2e_checks() {
     check_node_unit_suite
     check_review_run
     check_guard_cap
+    check_resume_replay
     check_validator_wiring
 }
 

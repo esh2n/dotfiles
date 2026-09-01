@@ -152,3 +152,113 @@ test('runWithSchema: nativeSchema=true skips the append-instruction step but sti
   await runWithSchema(callBackend, 'plain prompt', schema, { nativeSchema: true });
   assert.equal(seenPrompt, 'plain prompt'); // no "Respond ONLY with JSON..." text appended
 });
+
+// ---------------------------------------------------------------------------
+// toStrictJsonSchema / stripNullOptionals — the loose->strict conversion the
+// codex backend puts on the wire while validation stays on the loose schema.
+// ---------------------------------------------------------------------------
+
+const { toStrictJsonSchema, stripNullOptionals } = require('../schema');
+
+test('toStrictJsonSchema closes every object and requires every property', () => {
+  const loose = {
+    type: 'object',
+    required: ['verdict'],
+    properties: {
+      verdict: { type: 'string', enum: ['pass', 'fail'] },
+      note: { type: 'string' },
+    },
+  };
+  const strict = toStrictJsonSchema(loose);
+  assert.equal(strict.additionalProperties, false);
+  assert.deepEqual(strict.required, ['verdict', 'note']);
+  // A property that was genuinely required keeps its exact shape...
+  assert.deepEqual(strict.properties.verdict, { type: 'string', enum: ['pass', 'fail'] });
+  // ...and one that was optional becomes nullable, so "required" costs the
+  // caller nothing semantically.
+  assert.deepEqual(strict.properties.note.type, ['string', 'null']);
+  // The caller's own schema is untouched.
+  assert.deepEqual(loose.required, ['verdict']);
+  assert.equal(loose.properties.note.type, 'string');
+});
+
+test('toStrictJsonSchema recurses through properties and array items', () => {
+  const strict = toStrictJsonSchema({
+    type: 'object',
+    required: ['findings'],
+    properties: {
+      findings: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['file'],
+          properties: { file: { type: 'string' }, line: { type: 'integer' } },
+        },
+      },
+      meta: { type: 'object', properties: { runId: { type: 'string' } } },
+    },
+  });
+  const item = strict.properties.findings.items;
+  assert.equal(item.additionalProperties, false);
+  assert.deepEqual(item.required, ['file', 'line']);
+  assert.deepEqual(item.properties.line.type, ['integer', 'null']);
+  // A nested object that was itself optional is nullable AND strict inside.
+  const meta = strict.properties.meta;
+  assert.ok(meta.type.includes('null'));
+  assert.equal(meta.additionalProperties, false);
+  assert.deepEqual(meta.required, ['runId']);
+});
+
+test('toStrictJsonSchema widens an optional enum to accept null too', () => {
+  // type: [X, 'null'] with an enum that still lists only the original values
+  // is a schema nothing can satisfy with null.
+  const strict = toStrictJsonSchema({
+    type: 'object',
+    properties: { severity: { type: 'string', enum: ['low', 'high'] } },
+  });
+  assert.deepEqual(strict.properties.severity.enum, ['low', 'high', null]);
+  assert.deepEqual(strict.properties.severity.type, ['string', 'null']);
+});
+
+test('toStrictJsonSchema keeps a schema-valued additionalProperties instead of forcing false', () => {
+  // Forcing `false` here would silently restrict the model to `{}`.
+  const strict = toStrictJsonSchema({ type: 'object', additionalProperties: { type: 'string' } });
+  assert.deepEqual(strict.additionalProperties, { type: 'string' });
+});
+
+test('toStrictJsonSchema treats $defs as a map of subschemas, not as a node', () => {
+  const strict = toStrictJsonSchema({
+    type: 'object',
+    required: ['x'],
+    properties: { x: { $ref: '#/$defs/thing' } },
+    $defs: { thing: { type: 'object', required: ['a'], properties: { a: { type: 'string' }, b: { type: 'string' } } } },
+  });
+  assert.ok(Object.prototype.hasOwnProperty.call(strict.$defs, 'thing'));
+  assert.deepEqual(strict.$defs.thing.required, ['a', 'b']);
+  assert.equal(strict.$defs.thing.additionalProperties, false);
+});
+
+test('stripNullOptionals removes nulled optional properties but keeps required ones', () => {
+  const schema = {
+    type: 'object',
+    required: ['verdict'],
+    properties: { verdict: { type: 'string' }, note: { type: 'string' } },
+  };
+  assert.deepEqual(stripNullOptionals({ verdict: 'pass', note: null }, schema), { verdict: 'pass' });
+  // A null in a REQUIRED property is a real validation failure and must survive.
+  assert.deepEqual(stripNullOptionals({ verdict: null }, schema), { verdict: null });
+});
+
+test('runWithSchema accepts a strict-mode answer whose optional fields came back null', () => {
+  const schema = {
+    type: 'object',
+    required: ['verdict'],
+    properties: { verdict: { type: 'string' }, note: { type: 'string' } },
+  };
+  let attempts = 0;
+  const callBackend = async () => { attempts += 1; return '{"verdict":"pass","note":null}'; };
+  return runWithSchema(callBackend, 'p', schema, { nativeSchema: true }).then((outcome) => {
+    assert.equal(attempts, 1, 'a nulled optional must not cost a retry');
+    assert.deepEqual(outcome.result, { verdict: 'pass' });
+  });
+});

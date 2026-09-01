@@ -202,6 +202,120 @@ function placeholderFor(schema) {
 }
 
 /**
+ * Rewrite a loose JSON Schema into the strict form OpenAI-style structured
+ * output requires: every object node gets `additionalProperties: false` and
+ * a `required` listing ALL of its properties. A property that was optional
+ * in the caller's schema is made nullable in the strict copy, so the model
+ * can satisfy "required" without the caller's own semantics changing.
+ *
+ * This is a copy made for the wire only — `validate()` keeps running against
+ * the caller's original loose schema, so what a script sees is exactly what
+ * it declared. `codex exec --output-schema` is the consumer (see
+ * backends/codex.js); the schemas the workflow scripts in this repo declare
+ * are loose (optional properties absent from `required`), and handing those
+ * to a strict-mode endpoint is either a rejection or a silent downgrade.
+ *
+ * `$defs`/`definitions`/`patternProperties` are maps of name -> subschema
+ * rather than schema nodes, so their VALUES are converted and their keys are
+ * left alone — otherwise a definition literally named "properties" would be
+ * mistaken for this node's own property map.
+ */
+const SCHEMA_MAP_KEYS = new Set(['$defs', 'definitions', 'patternProperties']);
+
+function toStrictJsonSchema(schema) {
+  if (Array.isArray(schema)) return schema.map(toStrictJsonSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+
+  const required = new Set(Array.isArray(schema.required) ? schema.required.filter((k) => typeof k === 'string') : []);
+  const out = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'properties') out[key] = strictProperties(value, required);
+    else if (SCHEMA_MAP_KEYS.has(key)) out[key] = strictSchemaMap(value);
+    else out[key] = toStrictJsonSchema(value);
+  }
+
+  const types = Array.isArray(out.type) ? out.type : [out.type];
+  const isObjectNode = types.includes('object') || (out.properties && typeof out.properties === 'object');
+  if (isObjectNode) {
+    // A schema-valued `additionalProperties` (a Record<string, T> map) is
+    // left as it is: forcing it to `false` would quietly restrict the model
+    // to `{}` and produce empty objects that fail loose validation later.
+    const mapValued = out.additionalProperties !== null && typeof out.additionalProperties === 'object';
+    if (!mapValued) out.additionalProperties = false;
+    if (out.properties && typeof out.properties === 'object') {
+      out.required = Object.keys(out.properties);
+    }
+  }
+  return out;
+}
+
+function strictProperties(properties, required) {
+  if (!properties || typeof properties !== 'object') return properties;
+  const out = {};
+  for (const [name, sub] of Object.entries(properties)) {
+    const strict = toStrictJsonSchema(sub);
+    out[name] = required.has(name) ? strict : nullableSchema(strict);
+  }
+  return out;
+}
+
+function strictSchemaMap(value) {
+  if (!value || typeof value !== 'object') return value;
+  const out = {};
+  for (const [name, sub] of Object.entries(value)) out[name] = toStrictJsonSchema(sub);
+  return out;
+}
+
+function allowsNull(schema) {
+  if (!schema || typeof schema !== 'object') return false;
+  const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+  return types.includes('null');
+}
+
+/** Widen a subschema to also accept `null`. An `enum` has to be widened too:
+ *  `type: [X, 'null']` with an enum that still lists only the original
+ *  values is a schema nothing can satisfy with null. */
+function nullableSchema(schema) {
+  if (allowsNull(schema)) return schema;
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return { anyOf: [schema, { type: 'null' }] };
+  }
+  const out = { ...schema };
+  if (Array.isArray(out.enum) && !out.enum.includes(null)) out.enum = [...out.enum, null];
+  if (out.type === undefined) return { anyOf: [out, { type: 'null' }] };
+  out.type = Array.isArray(out.type) ? [...out.type, 'null'] : [out.type, 'null'];
+  return out;
+}
+
+/**
+ * Drop properties whose value is `null` and which the LOOSE schema does not
+ * require. The strict copy above makes optional properties nullable, so a
+ * strict-mode model answers "I have nothing for this" as an explicit null —
+ * which the loose schema, where that property is `{type: 'string'}`, would
+ * then reject. Removing it restores exactly the shape the script declared.
+ * Required properties keep their nulls: those are real validation failures
+ * and must be reported.
+ */
+function stripNullOptionals(value, schema) {
+  if (value === null || typeof value !== 'object' || !schema || typeof schema !== 'object') return value;
+  if (Array.isArray(value)) {
+    const itemSchema = schema.items && !Array.isArray(schema.items) ? schema.items : null;
+    if (!itemSchema) return value;
+    return value.map((item) => stripNullOptionals(item, itemSchema));
+  }
+  const properties = schema.properties;
+  if (!properties || typeof properties !== 'object') return value;
+  const required = new Set(Array.isArray(schema.required) ? schema.required : []);
+  const out = {};
+  for (const [key, propertyValue] of Object.entries(value)) {
+    const propertySchema = properties[key];
+    if (propertyValue === null && propertySchema && !required.has(key)) continue;
+    out[key] = propertySchema ? stripNullOptionals(propertyValue, propertySchema) : propertyValue;
+  }
+  return out;
+}
+
+/**
  * Run the append/extract/validate/retry-once/hard-fail pipeline.
  *
  * @param {(promptText: string, attempt: number) => Promise<string>} callBackend
@@ -223,7 +337,10 @@ async function runWithSchema(callBackend, prompt, schema, opts = {}) {
     // eslint-disable-next-line no-await-in-loop
     const raw = await callBackend(promptText, attempt);
     lastRaw = raw;
-    const obj = extractFirstJSONObject(raw);
+    const extracted = extractFirstJSONObject(raw);
+    // A strict-schema backend (codex --output-schema) answers absent optional
+    // properties with an explicit null — see toStrictJsonSchema above.
+    const obj = extracted !== null ? stripNullOptionals(extracted, schema) : null;
     const { ok, errors } = obj !== null
       ? validate(obj, schema)
       : { ok: false, errors: ['no JSON object found in output'] };
@@ -247,4 +364,6 @@ module.exports = {
   validate,
   placeholderFor,
   runWithSchema,
+  toStrictJsonSchema,
+  stripNullOptionals,
 };

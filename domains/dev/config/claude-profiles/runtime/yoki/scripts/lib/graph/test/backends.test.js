@@ -397,3 +397,151 @@ test('omp backend: a file-defined agentType folds its stripped body into the pro
     assert.equal(`${preamble}\n\nthe task`, 'YOU ARE A SPECIALIST.\n\nthe task');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Usage accounting — read from each backend's OWN primary source, not guessed
+// from the answer text. See each extractUsage's doc comment for the shape and
+// where it was pinned.
+// ---------------------------------------------------------------------------
+
+test('claude backend: extractUsage reads the envelope usage block and total_cost_usd', () => {
+  const raw = JSON.stringify({
+    type: 'result',
+    result: 'the answer',
+    total_cost_usd: 0.0421,
+    usage: {
+      input_tokens: 120,
+      cache_creation_input_tokens: 40,
+      cache_read_input_tokens: 900,
+      output_tokens: 310,
+    },
+  });
+  const usage = claude.extractUsage(raw);
+  assert.equal(usage.totalTokens, 1370);
+  assert.equal(usage.inputTokens, 120);
+  assert.equal(usage.outputTokens, 310);
+  assert.equal(usage.cacheRead, 900);
+  assert.equal(usage.costUsd, 0.0421);
+});
+
+test('claude backend: extractUsage on the UNWRAPPED answer text reports nothing (the old silent-zero bug)', () => {
+  // extractText hands back `result`, a bare string; usage only exists on the
+  // envelope, which is why api.js reads usage BEFORE unwrapping.
+  assert.equal(claude.extractUsage('the answer'), null);
+  assert.equal(claude.extractUsage('not json at all'), null);
+});
+
+test('codex backend: extractUsage sums turn.completed usage across turns', () => {
+  const raw = [
+    JSON.stringify({ type: 'item.completed', item: { text: 'thinking' } }),
+    JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 100, cached_input_tokens: 50, output_tokens: 20 } }),
+    JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 0, output_tokens: 5 } }),
+  ].join('\n');
+  const usage = codex.extractUsage(raw);
+  assert.equal(usage.totalTokens, 185);
+  assert.equal(usage.inputTokens, 110);
+  assert.equal(usage.outputTokens, 25);
+  assert.equal(usage.cacheRead, 50);
+});
+
+test('codex backend: extractUsage falls back to the rollout token_count record', () => {
+  const raw = JSON.stringify({
+    type: 'event_msg',
+    payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 7, cached_input_tokens: 3, output_tokens: 2 } } },
+  });
+  assert.equal(codex.extractUsage(raw).totalTokens, 12);
+  assert.equal(codex.extractUsage('nothing usable here'), null);
+});
+
+test('omp backend: extractUsage reads omp\'s camelCase usage block', () => {
+  const raw = JSON.stringify({
+    text: 'the answer',
+    usage: { input: 200, output: 60, cacheRead: 10, cacheWrite: 5, totalTokens: 275, cost: 0.003 },
+  });
+  const usage = omp.extractUsage(raw);
+  assert.equal(usage.totalTokens, 275);
+  assert.equal(usage.inputTokens, 200);
+  assert.equal(usage.costUsd, 0.003);
+});
+
+test('omp backend: extractUsage sums assistant records when handed a session-shaped JSONL stream', () => {
+  const raw = [
+    JSON.stringify({ type: 'title', title: 'x' }),
+    JSON.stringify({ type: 'message', message: { role: 'assistant', usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 15 } } }),
+    JSON.stringify({ type: 'message', message: { role: 'toolResult' } }),
+    JSON.stringify({ type: 'message', message: { role: 'assistant', usage: { input: 4, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 5 } } }),
+  ].join('\n');
+  assert.equal(omp.extractUsage(raw).totalTokens, 20);
+  assert.equal(omp.extractUsage('plain text answer'), null);
+});
+
+test('every real backend exposes extractUsage; the mock deliberately does not', () => {
+  for (const backend of [claude, codex, omp]) {
+    assert.equal(typeof backend.extractUsage, 'function', `${backend.name} has no extractUsage`);
+  }
+  // The mock spawns nothing and has no provider to report usage — api.js
+  // charges its output an explicitly-labelled estimate instead.
+  assert.equal(mock.extractUsage, undefined);
+});
+
+// ---------------------------------------------------------------------------
+// Strict schema on the wire (codex), timeout kills
+// ---------------------------------------------------------------------------
+
+test('codex backend: the --output-schema file holds the STRICT copy, not the loose schema', async () => {
+  const { spawnCollect } = require('../backends/common');
+  const loose = {
+    type: 'object',
+    required: ['verdict'],
+    properties: { verdict: { type: 'string' }, note: { type: 'string' } },
+  };
+  // Intercept the spawn so nothing runs, but read the schema file the
+  // backend wrote before it is cleaned up.
+  const commonModule = require('../backends/common');
+  const realSpawn = commonModule.spawnCollect;
+  let written;
+  commonModule.spawnCollect = async (cmd, args) => {
+    const i = args.indexOf('--output-schema');
+    written = JSON.parse(fs.readFileSync(args[i + 1], 'utf8'));
+    return { stdout: '{"verdict":"pass"}', stderr: '', code: 0, timedOut: false };
+  };
+  // codex.js captured spawnCollect at require time, so re-require it fresh
+  // against the patched module.
+  delete require.cache[require.resolve('../backends/codex')];
+  const patchedCodex = require('../backends/codex');
+  try {
+    await patchedCodex.run({ prompt: 'p', cwd: '/tmp', schema: loose });
+  } finally {
+    commonModule.spawnCollect = realSpawn;
+    delete require.cache[require.resolve('../backends/codex')];
+    require('../backends/codex');
+  }
+  assert.equal(written.additionalProperties, false);
+  assert.deepEqual(written.required, ['verdict', 'note']);
+  assert.deepEqual(written.properties.note.type, ['string', 'null']);
+  assert.deepEqual(loose.required, ['verdict'], 'the caller\'s schema must not be mutated');
+  assert.equal(typeof spawnCollect, 'function');
+});
+
+test('spawnCollect flags a child it killed at the timeout, so a kill is not read as a crash', async () => {
+  const { spawnCollect } = require('../backends/common');
+  const res = await spawnCollect(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { timeoutMs: 60 });
+  assert.equal(res.timedOut, true);
+});
+
+test('spawnCollect leaves timedOut false for a child that exits on its own', async () => {
+  const { spawnCollect } = require('../backends/common');
+  const res = await spawnCollect(process.execPath, ['-e', 'process.stdout.write("hi")'], { timeoutMs: 30000 });
+  assert.equal(res.timedOut, false);
+  assert.equal(res.stdout, 'hi');
+});
+
+test('timeoutError is marked transient and timedOut so retry.js retries it', () => {
+  const { timeoutError } = require('../backends/common');
+  const { isTransient } = require('../retry');
+  const err = timeoutError('codex exec', 900000);
+  assert.equal(err.code, 'ETIMEDOUT');
+  assert.equal(err.timedOut, true);
+  assert.equal(isTransient(err), true);
+  assert.match(err.message, /codex exec timed out after 900000ms/);
+});

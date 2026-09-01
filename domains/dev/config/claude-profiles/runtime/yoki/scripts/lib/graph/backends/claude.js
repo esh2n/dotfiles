@@ -9,7 +9,7 @@
  * (also confirmed present in `claude --help`) instead of a preamble.
  */
 
-const { resolveModel, resolveAgentPreamble, spawnCollect } = require('./common');
+const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError } = require('./common');
 
 const name = 'claude';
 const supportsSchemaNatively = true;
@@ -83,12 +83,42 @@ function buildArgv({ prompt, model, effort, schema, agentType, cwd, sandbox }) {
 async function run({ prompt, model, effort, schema, agentType, cwd, timeoutMs, sandbox }) {
   const { args } = buildArgv({ prompt, model, effort, schema, agentType, cwd, sandbox });
   const started = Date.now();
-  const { stdout, stderr, code } = await spawnCollect('claude', args, { cwd, timeoutMs });
+  const { stdout, stderr, code, timedOut } = await spawnCollect('claude', args, { cwd, timeoutMs });
   const durationMs = Date.now() - started;
+  if (timedOut) throw timeoutError('claude -p', timeoutMs);
   if (code !== 0 && !stdout.trim()) {
     throw new Error(`claude -p exited ${code}: ${stderr.trim().slice(0, 2000)}`);
   }
   return { raw: stdout, stderr, durationMs, exitCode: code };
+}
+
+/**
+ * Token usage and cost from `claude -p --output-format json`'s own envelope
+ * — the primary source. The envelope carries `usage.{input_tokens,
+ * cache_creation_input_tokens, cache_read_input_tokens, output_tokens}` (the
+ * same four fields lib/harness/session.js reads out of a transcript record)
+ * plus `total_cost_usd`, the only USD figure any backend here reports.
+ *
+ * Returns null when stdout is not that envelope, so api.js can fall back to
+ * an explicitly-labelled estimate rather than reporting a silent zero — the
+ * failure mode this replaced, since the old extractor ran on the UNWRAPPED
+ * `result` string, where no `usage` block exists at all.
+ */
+function extractUsage(raw) {
+  let obj;
+  try { obj = JSON.parse(raw); } catch { return null; }
+  if (!obj || typeof obj !== 'object') return null;
+  const usage = obj.usage && typeof obj.usage === 'object' ? obj.usage : null;
+  const costUsd = typeof obj.total_cost_usd === 'number' ? obj.total_cost_usd : undefined;
+  if (!usage) return costUsd === undefined ? null : { totalTokens: 0, costUsd };
+  const num = (v) => (Number.isFinite(v) ? v : 0);
+  const inputTokens = num(usage.input_tokens);
+  const cacheWrite = num(usage.cache_creation_input_tokens);
+  const cacheRead = num(usage.cache_read_input_tokens);
+  const outputTokens = num(usage.output_tokens);
+  const totalTokens = inputTokens + cacheWrite + cacheRead + outputTokens;
+  if (totalTokens <= 0 && costUsd === undefined) return null;
+  return { inputTokens, outputTokens, cacheRead, cacheWrite, totalTokens, ...(costUsd === undefined ? {} : { costUsd }) };
 }
 
 /** Pull the human-readable/inner text out of claude's --output-format json
@@ -111,6 +141,7 @@ module.exports = {
   buildArgv,
   run,
   extractText,
+  extractUsage,
   resolveAgentPreamble,
   resolveSandbox,
   SANDBOX_MODES,

@@ -19,7 +19,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { resolveModel, resolveAgentPreamble, spawnCollect } = require('./common');
+const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError } = require('./common');
+const { toStrictJsonSchema } = require('../schema');
 
 const name = 'codex';
 const supportsSchemaNatively = true;
@@ -70,7 +71,14 @@ async function run({ prompt, model, effort, schema, agentType, cwd, timeoutMs, s
   let schemaFilePath = null;
   if (schema) {
     schemaFilePath = path.join(os.tmpdir(), `yoki-graph-codex-schema-${crypto.randomBytes(6).toString('hex')}.json`);
-    fs.writeFileSync(schemaFilePath, JSON.stringify(schema));
+    // STRICT copy on the wire, loose schema for validation: OpenAI-style
+    // structured output requires additionalProperties:false and every key in
+    // `required`, and the workflow scripts in this repo all declare loose
+    // schemas with genuinely optional properties. Writing those out verbatim
+    // meant codex either rejected the schema or ignored the optionality —
+    // see schema.js's toStrictJsonSchema. What the script gets back is still
+    // checked against the schema the script itself wrote.
+    fs.writeFileSync(schemaFilePath, JSON.stringify(toStrictJsonSchema(schema)));
   }
   try {
     const { args } = buildArgv({ model, cwd, schema, schemaFilePath, agentType, sandbox });
@@ -82,8 +90,9 @@ async function run({ prompt, model, effort, schema, agentType, cwd, timeoutMs, s
       agentType,
     );
     const started = Date.now();
-    const { stdout, stderr, code } = await spawnCollect('codex', args, { cwd, input: promptText, timeoutMs });
+    const { stdout, stderr, code, timedOut } = await spawnCollect('codex', args, { cwd, input: promptText, timeoutMs });
     const durationMs = Date.now() - started;
+    if (timedOut) throw timeoutError('codex exec', timeoutMs);
     if (code !== 0 && !stdout.trim()) {
       throw new Error(`codex exec exited ${code}: ${stderr.trim().slice(0, 2000)}`);
     }
@@ -116,12 +125,80 @@ function extractText(raw) {
   return lastText !== null ? lastText : raw;
 }
 
+/**
+ * Token usage from `codex exec --json`'s own event stream — the primary
+ * source, not a guess from the answer's length.
+ *
+ * Two shapes, both real:
+ * - `{"type":"turn.completed","usage":{"input_tokens","cached_input_tokens",
+ *   "output_tokens"}}` — the exec stream's per-turn total. Summed across
+ *   turns, because one `codex exec` can take several.
+ * - `{"type":"event_msg","payload":{"type":"token_count","info":{
+ *   "total_token_usage":{...}}}}` — the rollout-file record shape (the same
+ *   keys lib/harness/session.js reads, pinned there to spike S1-S2). Used
+ *   only when no `turn.completed` arrived, and read as an absolute session
+ *   total rather than summed.
+ *
+ * Returns null when neither is present; api.js then falls back to an
+ * explicitly-labelled estimate rather than silently reporting zero.
+ */
+function extractUsage(raw) {
+  let summed = null;
+  let lastTotal = null;
+  for (const line of String(raw).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let evt;
+    try { evt = JSON.parse(trimmed); } catch { continue; }
+    if (!evt || typeof evt !== 'object') continue;
+
+    if (evt.type === 'turn.completed' && evt.usage && typeof evt.usage === 'object') {
+      summed = addUsage(summed, evt.usage);
+      continue;
+    }
+    const payload = evt.payload;
+    if (payload && payload.type === 'token_count' && payload.info) {
+      const info = payload.info.total_token_usage || payload.info.last_token_usage;
+      if (info && typeof info === 'object') lastTotal = normalizeCodexUsage(info);
+    }
+  }
+  return summed || lastTotal;
+}
+
+function normalizeCodexUsage(usage) {
+  const inputTokens = numberOr(usage.input_tokens, 0);
+  const cacheRead = numberOr(usage.cached_input_tokens, 0);
+  const cacheWrite = numberOr(usage.cache_write_input_tokens, 0);
+  const outputTokens = numberOr(usage.output_tokens, 0);
+  const totalTokens = inputTokens + cacheRead + cacheWrite + outputTokens;
+  if (totalTokens <= 0) return null;
+  return { inputTokens, outputTokens, cacheRead, cacheWrite, totalTokens };
+}
+
+function addUsage(acc, usage) {
+  const next = normalizeCodexUsage(usage);
+  if (!next) return acc;
+  if (!acc) return next;
+  return {
+    inputTokens: acc.inputTokens + next.inputTokens,
+    outputTokens: acc.outputTokens + next.outputTokens,
+    cacheRead: acc.cacheRead + next.cacheRead,
+    cacheWrite: acc.cacheWrite + next.cacheWrite,
+    totalTokens: acc.totalTokens + next.totalTokens,
+  };
+}
+
+function numberOr(value, fallback) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 module.exports = {
   name,
   supportsSchemaNatively,
   buildArgv,
   run,
   extractText,
+  extractUsage,
   resolveSandbox,
   SANDBOX_MODES,
   DEFAULT_SANDBOX,
