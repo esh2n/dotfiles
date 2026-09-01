@@ -1,9 +1,9 @@
 {
   "_comment": "Claude model-tier -> per-harness model id, used when porting agents/*.md frontmatter `model:` to a harness that does not share Claude's model names (lib/targets/codex.js agents/*.toml generation, lib/targets/omp-agents.js agents/*.md generation). Best-known defaults as of 2026-08 — doctor should validate these against the harness's own model listing (for Codex: ~/.codex/models_cache.json) and flag drift rather than trust this file blindly.",
   "codex": {
-    "haiku": "gpt-5.1-codex-mini",
-    "sonnet": "gpt-5.1-codex",
-    "opus": "gpt-5.1-codex-max"
+    "haiku": "gpt-5.4-mini",
+    "sonnet": "gpt-5.5",
+    "opus": "gpt-5.6-sol"
   },
   "omp": {
     "_comment": "omp model ids are '<provider>/<model-id>' (spike S4-S5). haiku/sonnet/opus feed agents/*.md frontmatter `model:` the same way as the codex map above; review/scout are omp modelRoles (config.yml modelRoles.<role>) with no Claude-tier equivalent — review defaults to sonnet (personal CLAUDE.md: 'delegate to subagents (default sonnet)'), scout to haiku (cheap/fast lookups). Not omp-native role names (verified absent from the config.yml schema and BUNDLED_AGENTS in the 18.0.4 binary strings dump) — a local convention this dotfiles setup defines for its own agents to reference.",
