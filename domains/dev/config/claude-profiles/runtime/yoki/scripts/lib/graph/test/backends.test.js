@@ -341,10 +341,28 @@ test('codex backend: extractUsage sums turn.completed usage across turns', () =>
     JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, cached_input_tokens: 0, output_tokens: 5 } }),
   ].join('\n');
   const usage = codex.extractUsage(raw);
-  assert.equal(usage.totalTokens, 185);
+  // 110 input + 25 output. The 50 cached tokens are NOT added: codex's
+  // `cached_input_tokens` is the cached PART of `input_tokens`, not a
+  // separate charge beside it.
+  assert.equal(usage.totalTokens, 135);
   assert.equal(usage.inputTokens, 110);
   assert.equal(usage.outputTokens, 25);
   assert.equal(usage.cacheRead, 50);
+});
+
+test('codex backend: cached input tokens are a subset of input, never added on top', () => {
+  // The numbers from the first real `--backend codex` review run, whose
+  // total came out 7.46M against a true ~4.1M because every cached prefix
+  // was booked twice.
+  const raw = JSON.stringify({
+    type: 'turn.completed',
+    usage: { input_tokens: 77961, cached_input_tokens: 57856, output_tokens: 884 },
+  });
+  const usage = codex.extractUsage(raw);
+  assert.equal(usage.totalTokens, 78845, 'input + output only');
+  assert.notEqual(usage.totalTokens, 136701, 'the old input + cached + output double-count');
+  // Still reported, as information: how much of the input was cached.
+  assert.equal(usage.cacheRead, 57856);
 });
 
 test('codex backend: extractUsage falls back to the rollout token_count record', () => {
@@ -352,8 +370,22 @@ test('codex backend: extractUsage falls back to the rollout token_count record',
     type: 'event_msg',
     payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 7, cached_input_tokens: 3, output_tokens: 2 } } },
   });
-  assert.equal(codex.extractUsage(raw).totalTokens, 12);
+  assert.equal(codex.extractUsage(raw).totalTokens, 9); // 7 input + 2 output; the 3 cached are inside the 7
   assert.equal(codex.extractUsage('nothing usable here'), null);
+});
+
+test('omp backend: cached tokens ARE part of the total — omp\'s cacheRead is disjoint from its input', () => {
+  // A real omp assistant record (omp 18.0.4): input is 2 tokens next to a
+  // 50k cacheRead, and the record's own totalTokens equals the sum of all
+  // four — so unlike codex, omp's cached counts are additional, not a
+  // subset. The two backends are handled differently on purpose.
+  const raw = JSON.stringify({
+    text: 'x',
+    usage: { input: 2, output: 1222, cacheRead: 50524, cacheWrite: 6922, totalTokens: 58670 },
+  });
+  const usage = omp.extractUsage(raw);
+  assert.equal(usage.totalTokens, 58670);
+  assert.equal(2 + 1222 + 50524 + 6922, 58670, 'omp\'s own total is the sum of all four');
 });
 
 test('omp backend: extractUsage reads omp\'s camelCase usage block', () => {

@@ -197,12 +197,34 @@ function extractUsage(raw) {
   return summed || lastTotal;
 }
 
+/**
+ * One codex usage block -> this repo's common usage shape.
+ *
+ * `totalTokens` is `input_tokens + output_tokens` and deliberately does NOT
+ * add the cached counts. In OpenAI/codex accounting `cached_input_tokens`
+ * (and `cache_write_input_tokens`) are a SUBSET of `input_tokens` — the part
+ * of the same prompt that was served from cache — not a separate charge on
+ * top of it. Adding them double-counted every cached prefix: a real review
+ * run reported 7.46M tokens where the true figure was ~4.1M, because e.g.
+ * `{input 77961, output 884, cacheRead 57856}` was booked as 136701 instead
+ * of 78845.
+ *
+ * `cacheRead`/`cacheWrite` are still returned, as INFORMATION: how much of
+ * the input was cached is worth seeing (the per-model table prints it in its
+ * own "cached" column), it just is not extra spend.
+ *
+ * omp is the opposite case and stays as it is — see backends/omp.js: there
+ * `input` is ~2 tokens next to a 50k `cacheRead`, and the record's own
+ * `totalTokens` equals `input+output+cacheRead+cacheWrite`, so omp's cached
+ * counts are disjoint from its input and DO belong in the total. API.md
+ * records the difference.
+ */
 function normalizeCodexUsage(usage) {
   const inputTokens = numberOr(usage.input_tokens, 0);
   const cacheRead = numberOr(usage.cached_input_tokens, 0);
   const cacheWrite = numberOr(usage.cache_write_input_tokens, 0);
   const outputTokens = numberOr(usage.output_tokens, 0);
-  const totalTokens = inputTokens + cacheRead + cacheWrite + outputTokens;
+  const totalTokens = inputTokens + outputTokens;
   if (totalTokens <= 0) return null;
   return { inputTokens, outputTokens, cacheRead, cacheWrite, totalTokens };
 }
