@@ -151,7 +151,10 @@ YOKI_SCHEMA
  */
 const unwrapLane = (envelope, label) => {
   if (!envelope) return { result: null, note: `${label}: transport agent returned nothing` }
-  if (envelope.ok === false || !envelope.result) {
+  // `== null` and not `!envelope.result`: a lane whose schema is a bare
+  // boolean or number could legitimately answer `false` or `0`, and reading
+  // that as "the transport lost the payload" would drop a good lane.
+  if (envelope.ok === false || envelope.result === undefined || envelope.result === null) {
     const bits = [envelope.error || 'no result']
     if (envelope.exitCode !== undefined && envelope.exitCode !== null) bits.push(`exit ${envelope.exitCode}`)
     if (envelope.stderrTail) bits.push(String(envelope.stderrTail).slice(0, 200))

@@ -39,6 +39,7 @@ const { execFileSync } = require('child_process');
 const runner = require('../runner');
 const codexBackend = require('../backends/codex');
 const ompBackend = require('../backends/omp');
+const mockBackend = require('../backends/mock');
 
 const PROFILES_ROOT = path.resolve(__dirname, '..', '..', '..', '..', '..', '..');
 const CORE_WORKFLOWS = path.join(PROFILES_ROOT, 'core', 'workflows');
@@ -345,6 +346,81 @@ test('review: a provider lane whose yoki-agent call failed is dropped with a vis
   }
 }));
 
+/**
+ * The invariant that matters most and is easiest to break silently: with
+ * `providers` absent, no agent() PROMPT may differ from what it was before
+ * providers existed. callKey hashes the prompt, so a changed prompt breaks
+ * `--resume` for that call against every journal written before the upgrade
+ * — permanently, and with no error to notice.
+ *
+ * Labels cannot catch it. research.js and design-review.js both feed their
+ * per-lane records into a LATER `synthesize` prompt, so a provider field
+ * added to those records rewrites a prompt while every label stays
+ * identical. Both scripts shipped exactly that until this test existed.
+ *
+ * Nor can comparing two runs of the current code (no `providers` vs an
+ * explicit `["claude"]`): both normalize to the same single-Claude lane and
+ * are therefore identically wrong. The assertion has to name the thing that
+ * must be absent — provider attribution — not compare the code to itself.
+ */
+function stubMockPrompts() {
+  const original = mockBackend.run;
+  const prompts = [];
+  mockBackend.run = async (call) => {
+    prompts.push({ label: (call.opts && call.opts.label) || '', prompt: call.prompt });
+    return original(call);
+  };
+  return { prompts, restore() { mockBackend.run = original; } };
+}
+
+async function promptsFor(spec, args) {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-prompts-'));
+  const stub = stubMockPrompts();
+  try {
+    const result = await runner.executeScript({
+      scriptPath: spec.scriptPath, args, backendName: 'mock', cwd, mockFile: fixture(spec.name),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    return stub.prompts;
+  } finally {
+    stub.restore();
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+// The shapes provider attribution takes in a prompt: a JSON field on a
+// per-lane record, or the trailing "this ran on more than one provider"
+// instruction. None of them may appear when nobody asked for providers.
+const PROVIDER_MARKERS = [/"provider"\s*:/, /"providers"\s*:/, /more than one model provider/, /@codex|@omp/];
+
+for (const spec of [REVIEW_SPEC, RESEARCH_SPEC, DESIGN_REVIEW_SPEC]) {
+  test(`${spec.name}: with providers absent, no prompt mentions a provider at all`, () => withIsolatedState(async () => {
+    for (const args of [spec.args, { ...spec.args, providers: ['claude'] }]) {
+      // eslint-disable-next-line no-await-in-loop
+      const prompts = await promptsFor(spec, args);
+      assert.ok(prompts.length > 0, 'no prompt was captured');
+      for (const { label, prompt } of prompts) {
+        for (const marker of PROVIDER_MARKERS) {
+          assert.doesNotMatch(prompt, marker,
+            `${spec.name}'s "${label}" prompt gained provider attribution on the default path — `
+            + 'callKey hashes the prompt, so --resume against any older journal is now broken for this call');
+        }
+      }
+    }
+  }));
+}
+
+test('research/design-review DO carry provider attribution into synthesize once providers are named', () => withIsolatedState(async () => {
+  for (const spec of [RESEARCH_SPEC, DESIGN_REVIEW_SPEC]) {
+    // eslint-disable-next-line no-await-in-loop
+    const prompts = await promptsFor(spec, { ...spec.args, providers: ['claude', 'codex'] });
+    const synth = prompts.find((p) => p.label === 'synthesize');
+    assert.ok(synth, `${spec.name} made no synthesize call`);
+    assert.match(synth.prompt, /more than one model provider/,
+      `${spec.name}'s synthesizer was not told the material came from two providers`);
+  }
+}));
+
 test('review with the default providers is unchanged: same labels, same journal shape', () => withIsolatedState(async () => {
   const cwdA = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-default-a-'));
   const cwdB = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-default-b-'));
@@ -576,3 +652,49 @@ for (const backendModule of [codexBackend, ompBackend]) {
     }
   }));
 }
+
+/**
+ * A claim two lanes both raise, where one lane's copy is CONFIRMED and the
+ * other's comes back `unverified`. The merge used to take the whole
+ * higher-C+I record, so the unverified copy could overwrite the confirmed
+ * one — and `unverified` findings are explicitly excluded from the verdict
+ * ("Derive the verdict from the weight of the CONFIRMED findings only"). A
+ * defect a provider actually confirmed would silently stop counting.
+ */
+test('design-review: a confirmed claim is never downgraded by an unverified duplicate', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-downgrade-'));
+  const mockFile = path.join(cwd, 'downgrade.mock.json');
+  const claim = 'the cache has no rollback plan';
+  // conventions raises it at C8/I8 and its verify CONFIRMS.
+  // architecture raises the same claim HIGHER, at C9/I9, and its verify
+  // comes back unverified — the exact collision.
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: {
+      source_kind: 'inline', design_summary: 'a cache design', design_text: 'a cache design',
+      grounding: [], missing: [], checklists: [],
+    },
+    'lane:conventions': { findings: [{ claim, severity_confidence: 8, importance: 8, doc_ref: '', load_bearing: true }], open_questions: [] },
+    'lane:architecture': { findings: [{ claim, severity_confidence: 9, importance: 9, doc_ref: '', load_bearing: true }], open_questions: [] },
+    'lane:security': { findings: [], open_questions: [] },
+    'lane:wording': { findings: [], open_questions: [] },
+    'lane:release': { findings: [], open_questions: [] },
+    'verify:conventions': { verdict: 'confirmed', reason: 'the design text has no rollback section' },
+    'verify:architecture': { verdict: 'unverified', reason: 'could not establish it from the design text' },
+    synthesize: { verdict: 'proceed', report: 'r' },
+  }));
+  try {
+    const result = await runner.executeScript({
+      scriptPath: DESIGN_REVIEW_SPEC.scriptPath, args: { target: 'a cache design' },
+      backendName: 'mock', cwd, mockFile,
+    });
+    assert.equal(result.status, 'ok', result.error);
+    assert.equal(result.result.findings.length, 1, 'the confirmed claim left the confirmed set');
+    assert.equal(result.result.unverified.length, 0, 'the confirmed claim was downgraded to unverified');
+    assert.match(result.result.findings[0].tag, /\[verified\]/);
+    // The code-enforced floor can only fire on a CONFIRMED finding, so the
+    // downgrade also used to let a C9/I9 defect through as "proceed".
+    assert.equal(result.result.verdict, 'proceed-with-changes');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));

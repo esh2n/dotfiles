@@ -148,7 +148,10 @@ YOKI_SCHEMA
  */
 const unwrapLane = (envelope, label) => {
   if (!envelope) return { result: null, note: `${label}: transport agent returned nothing` }
-  if (envelope.ok === false || !envelope.result) {
+  // `== null` and not `!envelope.result`: a lane whose schema is a bare
+  // boolean or number could legitimately answer `false` or `0`, and reading
+  // that as "the transport lost the payload" would drop a good lane.
+  if (envelope.ok === false || envelope.result === undefined || envelope.result === null) {
     const bits = [envelope.error || 'no result']
     if (envelope.exitCode !== undefined && envelope.exitCode !== null) bits.push(`exit ${envelope.exitCode}`)
     if (envelope.stderrTail) bits.push(String(envelope.stderrTail).slice(0, 200))
@@ -353,8 +356,16 @@ for (const r of lanes) {
     // independently is evidence, not a duplicate to discard.
     const providers = prev.providers.includes(providerOf(r)) ? prev.providers : [...prev.providers, providerOf(r)]
     const lane = prev.lane.split('+').includes(r.lane) ? prev.lane : `${prev.lane}+${entry.lane}`
-    if (entry.C + entry.I > prev.C + prev.I) byClaim.set(key, { ...entry, lane, providers })
-    else byClaim.set(key, { ...prev, lane, providers })
+    // The verdict merges SEPARATELY from the text. Taking the whole
+    // higher-C+I record meant a claim one lane had CONFIRMED could be
+    // downgraded to `unverified` — and out of the weighed set entirely —
+    // just because a duplicate from another lane scored higher on C+I while
+    // its own verification came back unsettled. Evidence that exists does
+    // not stop existing because a second look was inconclusive.
+    const verified = prev.verified || entry.verified
+    const unverified = !verified && (prev.unverified || entry.unverified)
+    const winner = entry.C + entry.I > prev.C + prev.I ? entry : prev
+    byClaim.set(key, { ...winner, lane, providers, verified, unverified })
   }
 }
 const merged = [...byClaim.values()].sort((a, b) => (b.C + b.I) - (a.C + a.I))
@@ -364,6 +375,15 @@ const findings = merged.filter((f) => !f.unverified)
 const unverifiedFindings = merged.filter((f) => f.unverified)
 const questions = [...new Map(lanes.flatMap((r) => r.open_questions.map((q) => [norm(q), { lane: r.lane, q }])).map(([k, v]) => [k, v])).values()]
 log(`confirmed ${findings.length} finding(s), ${unverifiedFindings.length} unverified, ${questions.length} open question(s) across ${lanes.length} lanes`)
+
+// The findings JSON goes into the synthesize PROMPT, and callKey hashes the
+// prompt. Carrying `providers` on the default single-Claude path would change
+// that prompt for every existing run — so a pre-existing journal's
+// `synthesize` entry could never replay again — while telling the model
+// nothing it does not already know.
+const forPrompt = (list) => JSON.stringify(
+  PROVIDERS.length > 1 ? list : list.map(({ providers, ...rest }) => rest),
+)
 
 const REPORT_SCHEMA = {
   type: 'object', required: ['verdict', 'report'],
@@ -381,8 +401,8 @@ ${ctx.design_summary}
 GROUNDING:
 ${GROUNDING}
 
-Confirmed findings (JSON): ${JSON.stringify(findings).slice(0, 20000)}
-Unverified findings — the verifier could neither confirm nor refute these (JSON): ${JSON.stringify(unverifiedFindings).slice(0, 8000)}
+Confirmed findings (JSON): ${forPrompt(findings).slice(0, 20000)}
+Unverified findings — the verifier could neither confirm nor refute these (JSON): ${forPrompt(unverifiedFindings).slice(0, 8000)}
 Open-question candidates (JSON): ${JSON.stringify(questions).slice(0, 8000)}
 Grounding docs NOT found: ${(ctx.missing || []).join(', ') || 'none'}
 

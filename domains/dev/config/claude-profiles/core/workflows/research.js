@@ -149,7 +149,10 @@ YOKI_SCHEMA
  */
 const unwrapLane = (envelope, label) => {
   if (!envelope) return { result: null, note: `${label}: transport agent returned nothing` }
-  if (envelope.ok === false || !envelope.result) {
+  // `== null` and not `!envelope.result`: a lane whose schema is a bare
+  // boolean or number could legitimately answer `false` or `0`, and reading
+  // that as "the transport lost the payload" would drop a good lane.
+  if (envelope.ok === false || envelope.result === undefined || envelope.result === null) {
     const bits = [envelope.error || 'no result']
     if (envelope.exitCode !== undefined && envelope.exitCode !== null) bits.push(`exit ${envelope.exitCode}`)
     if (envelope.stderrTail) bits.push(String(envelope.stderrTail).slice(0, 200))
@@ -274,7 +277,11 @@ const summary = await agent(
 ${CONTEXT ? `Reader context: ${CONTEXT}` : ''}
 Material (JSON): ${JSON.stringify(clean.map((r) => ({
     angle: r.angle,
-    provider: providerOf(r),
+    // Only when there is something to attribute. Unconditionally naming the
+    // provider would change the synthesize PROMPT on the default
+    // single-Claude path — and the prompt is what callKey hashes, so a
+    // pre-existing journal's `synthesize` entry could never replay again.
+    ...(PROVIDERS.length > 1 ? { provider: providerOf(r) } : {}),
     findings: r.findings.map((f) => ({ claim: f.claim, source: f.source, confidence: f.confidence })),
     verified: (r.verified || []).map((v) => ({ claim: v.claim, holds: v.verdict && v.verdict.holds, corrected: v.verdict && v.verdict.corrected })),
     unknowns: r.unknowns,
