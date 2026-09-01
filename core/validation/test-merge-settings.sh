@@ -112,15 +112,33 @@ YAML
     fi
 
     # apply() also shells out to lib/external-links.js (task T35) via
-    # link_external_resources() — symlink it in for the same reason. No
-    # external-links.yaml fixture files are created below, so this resolves
-    # to an empty layer set on every call (nothing to link, nothing to warn
-    # about) — that codepath is covered by lib/test/external-links.test.js
-    # and lib/test/doctor.test.js instead of here.
+    # link_external_resources() — symlink it in for the same reason.
     local real_external_links_lib="$DOTFILES_ROOT/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/external-links.js"
     if [[ -f "$real_external_links_lib" ]]; then
         ln -sfn "$real_external_links_lib" "$profiles/runtime/yoki/scripts/lib/external-links.js"
     fi
+
+    # ...and real external-links.yaml layers, so the BASH half of that feature
+    # is exercised end to end: node JSON -> jq @tsv -> read loop -> ln -sfn.
+    # lib/test/external-links.test.js covers the JS functions in-process and
+    # lib/test/doctor.test.js the read path, but neither drives the field
+    # order, the TSV split, or the actual symlink side effect.
+    #
+    # `core prompts` has a space in it deliberately: the read loop splits on
+    # TAB, and a path with a space is what naive whitespace splitting breaks.
+    mkdir -p "$FIXTURE/srcs/core prompts" "$FIXTURE/srcs/personal-prompts"
+    : > "$FIXTURE/srcs/core prompts/one.md"
+    : > "$FIXTURE/srcs/personal-prompts/two.md"
+
+    cat > "$profiles/core/external-links.yaml" <<YAML
+- {dest: commands/shared-prompts, src: $FIXTURE/srcs/core prompts, purpose: core layer}
+- {dest: skills/only-core, src: $FIXTURE/srcs/core prompts, purpose: core-only entry}
+- {dest: agents/absent, src: $FIXTURE/srcs/not-on-this-machine, purpose: src missing here}
+YAML
+
+    cat > "$profiles/personal/external-links.yaml" <<YAML
+- {dest: commands/shared-prompts, src: $FIXTURE/srcs/personal-prompts, purpose: personal overrides core}
+YAML
 
     # mcp.json (T13): a minimal core/personal layer pair — this fixture's own
     # data, not the real repo's — asserted against below (mirrors the
@@ -164,6 +182,40 @@ assert_jq_eq() {
     else
         log_error "FAIL: $description (expected '$expected', got '$actual')"
         FAILED=$((FAILED + 1))
+    fi
+}
+
+assert_symlink_target() {
+    local description="$1" link="$2" expected="$3"
+    TOTAL=$((TOTAL + 1))
+
+    if [[ ! -L "$link" ]]; then
+        log_error "FAIL: $description ($link is not a symlink)"
+        FAILED=$((FAILED + 1))
+        return 0
+    fi
+
+    local actual
+    actual="$(readlink "$link")"
+    if [[ "$actual" == "$expected" ]]; then
+        log_success "PASS: $description"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: $description (expected '$expected', got '$actual')"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+assert_path_absent() {
+    local description="$1" target="$2"
+    TOTAL=$((TOTAL + 1))
+
+    if [[ -e "$target" || -L "$target" ]]; then
+        log_error "FAIL: $description ($target exists)"
+        FAILED=$((FAILED + 1))
+    else
+        log_success "PASS: $description"
+        PASSED=$((PASSED + 1))
     fi
 }
 
@@ -245,6 +297,24 @@ run_merge_settings_checks() {
         '.mcpServers["core-server"].url' "https://core.example/mcp" "$settings"
     assert_jq_eq "mcpServers.personal-server: from personal/mcp.json" \
         '.mcpServers["personal-server"].command' "personal-cmd" "$settings"
+
+    # External links (T35): link_external_resources() end to end.
+    assert_symlink_target "external-link: personal layer wins the same dest" \
+        "$FIXTURE_CLAUDE/.commands-merged/shared-prompts" "$FIXTURE/srcs/personal-prompts"
+    assert_symlink_target "external-link: a core-only entry is linked, space in src survives the TSV split" \
+        "$FIXTURE_CLAUDE/.skills-merged/only-core" "$FIXTURE/srcs/core prompts"
+    assert_path_absent "external-link: an entry whose src is absent on this machine is skipped, not linked" \
+        "$FIXTURE_CLAUDE/.agents-merged/absent"
+
+    TOTAL=$((TOTAL + 1))
+    if printf '%s\n' "$output" | grep -q "External links: 2 linked"; then
+        log_success "PASS: external-link: apply reports exactly the 2 resolvable links"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: external-link: apply did not report 'External links: 2 linked'"
+        printf '%s\n' "$output" | grep -i 'external' | sed 's/^/       /' || true
+        FAILED=$((FAILED + 1))
+    fi
 
     cleanup_fixture
     trap - RETURN

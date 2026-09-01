@@ -17,7 +17,10 @@ const {
   allowedCategoriesAt,
   symlinkTargetIssue,
   parseAddedLines,
-  parseAddedOrRenamedFiles,
+  parseTouchedFiles,
+  parseNumstat,
+  hasTextExtension,
+  headSymlinkTarget,
   runPrepushScan,
 } = require('../prepush-scan');
 
@@ -243,17 +246,108 @@ test('parseAddedLines handles multiple files in one diff', () => {
   assert.deepEqual(added.map(a => a.file), ['a.txt', 'b.txt']);
 });
 
-// ---------------------------------------------------------------------------
-// pure helper: parseAddedOrRenamedFiles (git diff --name-status)
-// ---------------------------------------------------------------------------
+test('parseAddedLines does not mistake an added line starting with "++ " for a file header', () => {
+  // The exact repro: a doc/patch fixture whose own added content quotes a
+  // diff. `++ b/secrets.env` reaches the parser as `+++ b/secrets.env`.
+  const diff = [
+    'diff --git a/doc.md b/doc.md',
+    '--- /dev/null',
+    '+++ b/doc.md',
+    '@@ -0,0 +1,5 @@',
+    '+AKIAIOSFODNN7EXAMPLE',
+    '+++ b/secrets.env',
+    '+AKIAIOSFODNN7EXAMPLE',
+    '++ /dev/null',
+    '+AKIAIOSFODNN7EXAMPLE',
+  ].join('\n');
 
-test('parseAddedOrRenamedFiles keeps Added and Renamed-to paths, drops Modified/Deleted', () => {
-  const nameStatus = ['A\tnew-file.txt', 'M\tchanged.txt', 'D\tremoved.txt', 'R100\told-name.txt\tnew-name.txt'].join('\n');
-  assert.deepEqual(parseAddedOrRenamedFiles(nameStatus), ['new-file.txt', 'new-name.txt']);
+  const added = parseAddedLines(diff);
+  assert.deepEqual(
+    added.map(a => [a.file, a.line, a.text]),
+    [
+      ['doc.md', 1, 'AKIAIOSFODNN7EXAMPLE'],
+      ['doc.md', 2, '++ b/secrets.env'], // scanned as content, attributed to doc.md
+      ['doc.md', 3, 'AKIAIOSFODNN7EXAMPLE'],
+      ['doc.md', 4, '+ /dev/null'], // "++ /dev/null" must not blank out currentFile
+      ['doc.md', 5, 'AKIAIOSFODNN7EXAMPLE'],
+    ]
+  );
 });
 
-test('parseAddedOrRenamedFiles tolerates trailing blank lines', () => {
-  assert.deepEqual(parseAddedOrRenamedFiles('A\tfoo.txt\n\n'), ['foo.txt']);
+test('parseAddedLines does not mistake a removed line starting with "-- " for a file header', () => {
+  const diff = [
+    'diff --git a/doc.md b/doc.md',
+    '--- a/doc.md',
+    '+++ b/doc.md',
+    '@@ -1,2 +1,1 @@',
+    '--- a/quoted.txt',
+    '+kept',
+  ].join('\n');
+  assert.deepEqual(parseAddedLines(diff).map(a => [a.file, a.line, a.text]), [['doc.md', 1, 'kept']]);
+});
+
+test('parseAddedLines still honours a real "+++ /dev/null" header (deleted file) after a hunk', () => {
+  const diff = [
+    'diff --git a/kept.txt b/kept.txt',
+    '--- a/kept.txt',
+    '+++ b/kept.txt',
+    '@@ -0,0 +1 @@',
+    '+in kept',
+    'diff --git a/gone.txt b/gone.txt',
+    '--- a/gone.txt',
+    '+++ /dev/null',
+    '@@ -1 +0,0 @@',
+    '-bye',
+  ].join('\n');
+  assert.deepEqual(parseAddedLines(diff).map(a => [a.file, a.text]), [['kept.txt', 'in kept']]);
+});
+
+// ---------------------------------------------------------------------------
+// pure helper: parseTouchedFiles (git diff --name-status)
+// ---------------------------------------------------------------------------
+
+test('parseTouchedFiles keeps Added, Modified, Typechanged and Renamed-to paths, drops Deleted', () => {
+  const nameStatus = [
+    'A\tnew-file.txt',
+    'M\tchanged.txt',
+    'T\tnow-a-symlink',
+    'D\tremoved.txt',
+    'R100\told-name.txt\tnew-name.txt',
+    'C75\tsource.txt\tcopy.txt',
+  ].join('\n');
+  assert.deepEqual(parseTouchedFiles(nameStatus), [
+    'new-file.txt',
+    'changed.txt',
+    'now-a-symlink',
+    'new-name.txt',
+    'copy.txt',
+  ]);
+});
+
+test('parseTouchedFiles tolerates trailing blank lines', () => {
+  assert.deepEqual(parseTouchedFiles('A\tfoo.txt\n\n'), ['foo.txt']);
+});
+
+// ---------------------------------------------------------------------------
+// pure helpers: binary-text guard (parseNumstat / hasTextExtension)
+// ---------------------------------------------------------------------------
+
+test('parseNumstat reads counts, binary markers and rename records from -z output', () => {
+  const numstat = ['3\t1\tsrc/a.js\0', '-\t-\tassets/logo.png\0', '2\t0\0old/name.md\0new/name.md\0'].join('');
+  assert.deepEqual(parseNumstat(numstat), [
+    { added: '3', deleted: '1', path: 'src/a.js' },
+    { added: '-', deleted: '-', path: 'assets/logo.png' },
+    { added: '2', deleted: '0', path: 'new/name.md' },
+  ]);
+});
+
+test('hasTextExtension covers the reviewable-source extensions and excludes vendored binaries', () => {
+  for (const p of ['a.js', 'a.mjs', 'a.ts', 'a.sh', 'a.md', 'a.json', 'a.yaml', 'a.yml', 'a.toml', 'a.nix', 'a.html', 'a.css', 'a.txt', 'a.zsh', 'DIR/B.JSON']) {
+    assert.equal(hasTextExtension(p), true, p);
+  }
+  for (const p of ['logo.png', 'font.woff2', 'clip.mp4', 'blob.bin', 'archive.tar.gz', 'no-extension']) {
+    assert.equal(hasTextExtension(p), false, p);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -302,9 +396,12 @@ test('runPrepushScan: secrets, e-mail, home paths, and an unsafe tracked symlink
     assert.deepEqual(categories, ['email', 'home-path', 'openai-key', 'symlink-absolute']);
     assert.ok(findings.every(f => f.status === 'fail'));
 
-    // main itself has none of this — the range is base-relative, not repo-wide.
+    // Standing on main itself, the same scan sees none of it — the range is
+    // base-relative, not repo-wide. (Scanning `main...HEAD` from main is the
+    // empty range; the hits above live only on the branch.)
+    git(repoRoot, ['checkout', '-q', 'main']);
     const mainFindings = runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH });
-    assert.ok(mainFindings.length > 0); // sanity: the fixture above actually produced hits
+    assert.deepEqual(mainFindings, []);
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }
@@ -408,6 +505,145 @@ test('runPrepushScan reports nothing for a clean diff', () => {
 
     const findings = runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH });
     assert.deepEqual(findings, []);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('runPrepushScan reads symlinks from HEAD: an uncommitted rm/replace cannot clear the hit', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-symlink-head-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    fs.writeFileSync(path.join(repoRoot, 'README.md'), 'hello\n');
+    commit(repoRoot, 'init');
+    git(repoRoot, ['branch', '-m', 'main']);
+
+    git(repoRoot, ['checkout', '-q', '-b', 'feature']);
+    fs.symlinkSync('/etc/passwd', path.join(repoRoot, 'bad-link'));
+    commit(repoRoot, 'commit an unsafe symlink');
+
+    assert.deepEqual(
+      runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH }),
+      [{ status: 'fail', file: 'bad-link', line: 0, category: 'symlink-absolute' }]
+    );
+
+    // The committed object is what `git push` sends: swapping the worktree
+    // copy for a harmless regular file must not turn this into an all-clear.
+    fs.unlinkSync(path.join(repoRoot, 'bad-link'));
+    fs.writeFileSync(path.join(repoRoot, 'bad-link'), 'harmless placeholder\n');
+    assert.deepEqual(
+      runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH }),
+      [{ status: 'fail', file: 'bad-link', line: 0, category: 'symlink-absolute' }]
+    );
+
+    // ...and deleting it outright likewise leaves the committed hazard.
+    fs.unlinkSync(path.join(repoRoot, 'bad-link'));
+    assert.deepEqual(
+      runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH }),
+      [{ status: 'fail', file: 'bad-link', line: 0, category: 'symlink-absolute' }]
+    );
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('runPrepushScan flags a typechange (T) into a symlink and a repointed (M) symlink, not just added ones', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-symlink-tm-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    fs.mkdirSync(path.join(repoRoot, 'sub'));
+    fs.writeFileSync(path.join(repoRoot, 'sub', 'regular.txt'), 'plain file\n');
+    fs.writeFileSync(path.join(repoRoot, 'sub', 'inside.txt'), 'target\n');
+    fs.symlinkSync('inside.txt', path.join(repoRoot, 'sub', 'safe-link'));
+    commit(repoRoot, 'init');
+    git(repoRoot, ['branch', '-m', 'main']);
+
+    git(repoRoot, ['checkout', '-q', '-b', 'feature']);
+    // T: a tracked regular file becomes a symlink to an absolute path.
+    fs.unlinkSync(path.join(repoRoot, 'sub', 'regular.txt'));
+    fs.symlinkSync('/etc/hosts', path.join(repoRoot, 'sub', 'regular.txt'));
+    // M: an existing safe relative symlink is repointed out of the repo.
+    fs.unlinkSync(path.join(repoRoot, 'sub', 'safe-link'));
+    fs.symlinkSync('../../../secrets', path.join(repoRoot, 'sub', 'safe-link'));
+    commit(repoRoot, 'convert a file to a symlink and repoint an existing one');
+
+    const findings = runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH });
+    assert.deepEqual(
+      findings.map(f => [f.file, f.category]).sort(),
+      [
+        ['sub/regular.txt', 'symlink-absolute'],
+        ['sub/safe-link', 'symlink-escape'],
+      ]
+    );
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('headSymlinkTarget returns the committed target and null for a non-symlink', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-headsym-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    fs.mkdirSync(path.join(repoRoot, 'nested'));
+    fs.writeFileSync(path.join(repoRoot, 'nested', 'file.txt'), 'x\n');
+    fs.symlinkSync('/etc/passwd', path.join(repoRoot, 'nested', 'link'));
+    commit(repoRoot, 'init');
+
+    assert.equal(headSymlinkTarget(repoRoot, 'nested/link'), '/etc/passwd');
+    assert.equal(headSymlinkTarget(repoRoot, 'nested/file.txt'), null);
+    assert.equal(headSymlinkTarget(repoRoot, 'nested/missing'), null);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('runPrepushScan fails a text-extension file git classifies as binary (it bypasses the line scan)', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-binary-text-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    fs.writeFileSync(path.join(repoRoot, 'README.md'), 'hello\n');
+    commit(repoRoot, 'init');
+    git(repoRoot, ['branch', '-m', 'main']);
+
+    git(repoRoot, ['checkout', '-q', '-b', 'feature']);
+    // A stray NUL is enough for git to call the whole file binary — the diff
+    // then carries no `+` lines at all, so this secret is invisible to the
+    // text scan. Exactly how a committed .js file once hid its own diff.
+    fs.writeFileSync(
+      path.join(repoRoot, 'lib.js'),
+      // NUL written as an escape so this test file itself stays text.
+      `const sep = "\u0000";\nconst key = "sk-abcdefghijklmnopqrstuvwx";\n`
+    );
+    // a real binary asset must NOT be flagged
+    fs.writeFileSync(path.join(repoRoot, 'logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02]));
+    commit(repoRoot, 'add a NUL-bearing js file and a png');
+
+    const findings = runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH });
+    assert.deepEqual(findings, [{ status: 'fail', file: 'lib.js', line: 0, category: 'binary-text' }]);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('runPrepushScan does NOT flag binary-text when the range repairs a NUL-bearing file', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-binary-text-fix-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    // base already carries the damaged file...
+    fs.writeFileSync(path.join(repoRoot, 'lib.js'), 'const sep = "\u0000";\n');
+    commit(repoRoot, 'init with a NUL-bearing file');
+    git(repoRoot, ['branch', '-m', 'main']);
+
+    // ...and this branch fixes it. `git diff --numstat` still says `-\t-`
+    // (the OLD side is binary), so the finding must be gated on HEAD's blob.
+    git(repoRoot, ['checkout', '-q', '-b', 'feature']);
+    fs.writeFileSync(path.join(repoRoot, 'lib.js'), 'const sep = "\\u0000";\n');
+    commit(repoRoot, 'replace the literal NUL with an escape');
+
+    const numstat = git(repoRoot, ['diff', '--numstat', 'main...HEAD']);
+    assert.match(numstat, /^-\t-\tlib\.js$/m, 'precondition: git still reports the pair as binary');
+
+    assert.deepEqual(runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH }), []);
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }

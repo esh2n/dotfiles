@@ -88,21 +88,51 @@ test('loadLayer parses a real file on disk', () => {
 // dedupeEntries
 // ---------------------------------------------------------------------------
 
-test('dedupeEntries drops an identical (dest, src) pair from a later layer, keeping the first', () => {
+test('dedupeEntries collapses a dest re-declared by a later layer to one entry', () => {
   const entries = [
     { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: 'core' },
-    { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: 'personal override attempt' },
+    { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: 'personal restates it' },
   ];
-  assert.deepEqual(dedupeEntries(entries), [{ dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: 'core' }]);
+  assert.deepEqual(dedupeEntries(entries), [
+    { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: 'personal restates it' },
+  ]);
 });
 
-test('dedupeEntries keeps entries whose dest OR src differs', () => {
+test('dedupeEntries keeps entries with distinct dests, including two dests sharing one src', () => {
   const entries = [
     { dest: 'commands/a', src: '~/a', purpose: '' },
-    { dest: 'commands/a', src: '~/b', purpose: '' },
     { dest: 'commands/c', src: '~/a', purpose: '' },
+    { dest: 'skills/d', src: '~/b', purpose: '' },
   ];
   assert.equal(dedupeEntries(entries).length, 3);
+});
+
+test('dedupeEntries: a later layer WINS the same dest with a different src', () => {
+  // Two survivors here meant one dest with two srcs: doctor.js derives its
+  // check name from dest alone, so it reported an `ok` and a `fail` under the
+  // same name forever, while apply's `ln -sfn` silently kept the last one.
+  const entries = [
+    { dest: 'commands/prompts', src: '~/core-src', purpose: 'core' },
+    { dest: 'commands/prompts', src: '~/personal-src', purpose: 'personal override' },
+  ];
+  assert.deepEqual(dedupeEntries(entries), [
+    { dest: 'commands/prompts', src: '~/personal-src', purpose: 'personal override' },
+  ]);
+});
+
+test('dedupeEntries: an override keeps the position the dest was first declared at', () => {
+  const entries = [
+    { dest: 'commands/a', src: '~/core-a', purpose: 'core' },
+    { dest: 'skills/b', src: '~/core-b', purpose: 'core' },
+    { dest: 'commands/a', src: '~/personal-a', purpose: 'personal' },
+  ];
+  assert.deepEqual(
+    dedupeEntries(entries).map(e => [e.dest, e.src]),
+    [
+      ['commands/a', '~/personal-a'],
+      ['skills/b', '~/core-b'],
+    ]
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -131,6 +161,38 @@ test('resolveDestPath supports a nested rest path', () => {
 
 test('resolveDestPath rejects a dest with no "/"', () => {
   assert.throws(() => resolveDestPath('/home/exampleperson/.claude', 'commands'), /must be "<merge-dir>\/<rest>"/);
+  assert.throws(() => resolveDestPath('/home/exampleperson/.claude', 'commands/'), /must be "<merge-dir>\/<rest>"/);
+});
+
+test('resolveDestPath refuses to escape the merge dir via ".." — apply auto-links whatever it returns', () => {
+  const claudeDir = '/home/exampleperson/.claude';
+  assert.throws(
+    () => resolveDestPath(claudeDir, 'commands/../../../../.ssh/authorized_keys'),
+    /must not contain a "\.\." segment/
+  );
+  assert.throws(() => resolveDestPath(claudeDir, '../evil'), /must not contain a "\.\." segment/);
+  assert.throws(() => resolveDestPath(claudeDir, 'commands/a/../b/../../../c'), /must not contain a "\.\." segment/);
+});
+
+test('resolveDestPath rejects an absolute dest', () => {
+  assert.throws(
+    () => resolveDestPath('/home/exampleperson/.claude', '/etc/cron.d/evil'),
+    /must be relative to a merge dir, not absolute/
+  );
+});
+
+test('loadAndResolve surfaces a containment violation from any layer rather than linking it', () => {
+  const dir = makeTmpDir('yoki-external-links-escape-');
+  try {
+    const pack = path.join(dir, 'pack.yaml');
+    fs.writeFileSync(pack, '- {dest: commands/../../../../.ssh/authorized_keys, src: ~/tmp/evil, purpose: x}\n');
+    assert.throws(
+      () => loadAndResolve([pack], { home: '/home/exampleperson', claudeDir: '/home/exampleperson/.claude' }),
+      /must not contain a "\.\." segment/
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('resolveEntry attaches srcExpanded and destPath without touching the original fields', () => {

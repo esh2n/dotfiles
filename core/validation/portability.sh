@@ -117,6 +117,20 @@ _normalize_relpath() {
     local n=0
     local seg
     local old_ifs="$IFS"
+
+    # Globbing MUST be off for the unquoted `$input` word-split below: with it
+    # on, each `/`-separated segment is also pathname-expanded against the CWD,
+    # so a target like `*/../../x` expands `*` into several words and the `..`
+    # segments pop those instead of climbing — the escape check then passes a
+    # path that really does resolve above the repo root. (`local -` is bash
+    # 4.4+; macOS ships bash 3.2, hence the manual save/restore.)
+    local glob_was_on=0
+    case "$-" in
+        *f*) ;;
+        *) glob_was_on=1 ;;
+    esac
+    set -f
+
     IFS='/'
     for seg in $input; do
         case "$seg" in
@@ -136,6 +150,9 @@ _normalize_relpath() {
         esac
     done
     IFS="$old_ifs"
+    if [[ "$glob_was_on" -eq 1 ]]; then
+        set +f
+    fi
 
     local out="" i
     for ((i = 0; i < n; i++)); do
@@ -148,47 +165,59 @@ _normalize_relpath() {
     printf '%s' "$out"
 }
 
-# Enumerates every git-tracked symlink (`git ls-files -s` mode 120000) and
-# fails one whose target is absolute, starts with `~`, or — once resolved
-# against the link's own directory — escapes the repo root via `..`.
-check_tracked_symlinks_safe() {
-    log_info "--- 9. Tracked symlinks: relative targets that stay inside the repo ---"
+# Enumerates every git-tracked symlink in <repo_root> and judges its target,
+# printing one TAB-separated record per link:
+#
+#   <verdict>\t<rel>\t<target>
+#
+# verdict: missing (indexed but not a symlink on disk) | fixture | absolute |
+#          home | escape | ok
+#
+# Split out from the reporting loop so the suite can drive it against a
+# throwaway fixture repo (check_symlink_scan_fixture below) instead of only
+# against this checkout, which happens to contain no unsafe link.
+_scan_tracked_symlinks() {
+    local repo_root="$1"
+    local entry mode rel target link_dir normalized
 
-    local checked=0
-    local rel target link_dir normalized
-    while IFS= read -r rel; do
+    # `git ls-files -s -z` emits "<mode> SP <oid> SP <stage> TAB <path>" NUL-
+    # terminated. Split on the TAB, never on whitespace: awk's default field
+    # splitting yielded only the first token of a path containing a space
+    # ("bad link" -> "bad"), and without -z git C-quotes non-ASCII paths
+    # ("m\303\251chant"). Either way the path did not resolve on disk and the
+    # link fell through to a SKIP warning — a fail-open on exactly the links
+    # this check exists to catch.
+    while IFS= read -r -d '' entry; do
+        mode="${entry%% *}"
+        [[ "$mode" == "120000" ]] || continue
+        rel="${entry#*$'\t'}"
         [[ -n "$rel" ]] || continue
 
         # The index still lists it (still tracked) but the worktree copy is
         # gone — an uncommitted `rm`/`git rm` pending a later commit. Nothing
-        # on disk to mis-resolve; skip rather than fabricate a verdict from
+        # on disk to mis-resolve; report rather than fabricate a verdict from
         # an empty readlink.
-        if [[ ! -L "$DOTFILES_ROOT/$rel" ]]; then
-            log_warn "SKIP: $rel (indexed as a symlink, but not one in the worktree — pending removal?)"
+        if [[ ! -L "$repo_root/$rel" ]]; then
+            printf 'missing\t%s\t\n' "$rel"
             continue
         fi
 
-        target="$(readlink "$DOTFILES_ROOT/$rel")"
-        checked=$((checked + 1))
-        TOTAL=$((TOTAL + 1))
+        target="$(readlink "$repo_root/$rel")"
 
         # core/validation/fixtures/targets/expected encodes a fake absolute
         # path this way for the targets-golden suite — not a real hazard.
         if [[ "$target" == "__FIXTURES_ROOT__" || "$target" == __FIXTURES_ROOT__/* ]]; then
-            log_success "PASS: $rel — fixture placeholder target"
-            PASSED=$((PASSED + 1))
+            printf 'fixture\t%s\t%s\n' "$rel" "$target"
             continue
         fi
 
         if [[ "$target" == /* ]]; then
-            log_error "FAIL: $rel — symlink target is absolute: $target"
-            FAILED=$((FAILED + 1))
+            printf 'absolute\t%s\t%s\n' "$rel" "$target"
             continue
         fi
 
         if [[ "$target" == "~"* ]]; then
-            log_error "FAIL: $rel — symlink target starts with ~: $target"
-            FAILED=$((FAILED + 1))
+            printf 'home\t%s\t%s\n' "$rel" "$target"
             continue
         fi
 
@@ -200,18 +229,153 @@ check_tracked_symlinks_safe() {
         fi
 
         if [[ "$normalized" == ".." || "$normalized" == ../* ]]; then
-            log_error "FAIL: $rel — symlink target escapes the repo root: $target"
-            FAILED=$((FAILED + 1))
+            printf 'escape\t%s\t%s\n' "$rel" "$target"
             continue
         fi
 
-        log_success "PASS: $rel — relative target stays inside the repo"
-        PASSED=$((PASSED + 1))
-    done < <(git -C "$DOTFILES_ROOT" ls-files -s | awk '$1 == "120000" { print $4 }')
+        printf 'ok\t%s\t%s\n' "$rel" "$target"
+    done < <(git -C "$repo_root" ls-files -s -z)
+}
+
+# Fails a tracked symlink whose target is absolute, starts with `~`, or — once
+# resolved against the link's own directory — escapes the repo root via `..`.
+check_tracked_symlinks_safe() {
+    log_info "--- 9. Tracked symlinks: relative targets that stay inside the repo ---"
+
+    local checked=0
+    local verdict rel target
+    while IFS=$'\t' read -r verdict rel target; do
+        [[ -n "$verdict" ]] || continue
+
+        if [[ "$verdict" == "missing" ]]; then
+            log_warn "SKIP: $rel (indexed as a symlink, but not one in the worktree — pending removal?)"
+            continue
+        fi
+
+        checked=$((checked + 1))
+        TOTAL=$((TOTAL + 1))
+
+        case "$verdict" in
+            fixture)
+                log_success "PASS: $rel — fixture placeholder target"
+                PASSED=$((PASSED + 1))
+                ;;
+            absolute)
+                log_error "FAIL: $rel — symlink target is absolute: $target"
+                FAILED=$((FAILED + 1))
+                ;;
+            home)
+                log_error "FAIL: $rel — symlink target starts with ~: $target"
+                FAILED=$((FAILED + 1))
+                ;;
+            escape)
+                log_error "FAIL: $rel — symlink target escapes the repo root: $target"
+                FAILED=$((FAILED + 1))
+                ;;
+            *)
+                log_success "PASS: $rel — relative target stays inside the repo"
+                PASSED=$((PASSED + 1))
+                ;;
+        esac
+    done < <(_scan_tracked_symlinks "$DOTFILES_ROOT")
 
     if [[ "$checked" -eq 0 ]]; then
         log_warn "No tracked symlinks found — nothing to check"
     fi
+}
+
+# Drives _scan_tracked_symlinks against a throwaway repo whose unsafe links are
+# named the way the old awk-based enumeration silently dropped them: with a
+# space, and with non-ASCII characters (git C-quotes those without -z).
+check_symlink_scan_fixture() {
+    log_info "--- 10. Tracked symlink scan: fixture repo (paths with spaces / non-ASCII) ---"
+
+    if ! command -v git >/dev/null 2>&1; then
+        log_warn "SKIP: git not on PATH"
+        return 0
+    fi
+
+    local tmp
+    tmp="$(mktemp -d)"
+    mkdir -p "$tmp/nested"
+    : > "$tmp/nested/inside.txt"
+    ln -s /etc/passwd "$tmp/nested/bad link"
+    ln -s /etc/passwd "$tmp/nested/méchant link"
+    ln -s inside.txt "$tmp/nested/good link"
+    git -C "$tmp" init -q >/dev/null 2>&1
+    git -C "$tmp" add -A >/dev/null 2>&1
+
+    local scan
+    scan="$(_scan_tracked_symlinks "$tmp")"
+    /bin/rm -rf "$tmp"
+
+    local case_desc expected
+    while IFS='|' read -r case_desc expected; do
+        [[ -n "$case_desc" ]] || continue
+        TOTAL=$((TOTAL + 1))
+        if printf '%s\n' "$scan" | grep -qF -- "$expected"; then
+            log_success "PASS: $case_desc"
+            PASSED=$((PASSED + 1))
+        else
+            log_error "FAIL: $case_desc (no '$expected' record in scan output)"
+            printf '%s\n' "$scan" | sed 's/^/       /'
+            FAILED=$((FAILED + 1))
+        fi
+    done <<EOF
+symlink named with a space is enumerated and judged absolute|absolute	nested/bad link	/etc/passwd
+symlink named with non-ASCII characters is enumerated and judged absolute|absolute	nested/méchant link	/etc/passwd
+safe relative symlink is judged ok|ok	nested/good link	inside.txt
+EOF
+}
+
+# -----------------------------------------------------------------------------
+# A tracked source file holding a literal NUL byte makes git classify it as
+# BINARY: `git diff`/`git show` render it as "Binary files ... differ", so
+# every future change to it ships unreviewable, and lib/prepush-scan.js's
+# added-line secret scan sees no `+` lines for it at all (its own binary-text
+# category is the per-push half of this same rule). A NUL that is genuinely
+# wanted as a separator belongs in the source as an escape (`\0` / `\u0000`),
+# which keeps the file text.
+# -----------------------------------------------------------------------------
+check_no_nul_in_text_files() {
+    log_info "--- 11. Tracked text files: no literal NUL bytes ---"
+    TOTAL=$((TOTAL + 1))
+
+    if ! command -v node >/dev/null 2>&1; then
+        log_warn "SKIP: node not on PATH (needed to scan for NUL bytes)"
+        return 0
+    fi
+
+    local offenders
+    offenders="$(git -C "$DOTFILES_ROOT" ls-files -z | node -e '
+const fs = require("fs");
+const path = require("path");
+const root = process.argv[1];
+// Text-like extensions only: a vendored binary or image is expected to hold
+// NUL bytes. Kept in sync with TEXT_EXTENSIONS in
+// runtime/yoki/scripts/lib/prepush-scan.js.
+const exts = new Set([".js", ".mjs", ".ts", ".sh", ".md", ".json", ".yaml",
+  ".yml", ".toml", ".nix", ".html", ".css", ".txt", ".zsh"]);
+for (const rel of fs.readFileSync(0).toString("utf8").split("\u0000")) {
+  if (!rel) continue;
+  if (!exts.has(path.extname(rel).toLowerCase())) continue;
+  let data;
+  try { data = fs.readFileSync(path.join(root, rel)); } catch { continue; }
+  if (data.includes(0)) process.stdout.write(rel + "\n");
+}
+' "$DOTFILES_ROOT")"
+
+    if [[ -n "$offenders" ]]; then
+        log_error "FAIL: tracked text files contain a literal NUL byte (git treats them as binary — use a \\0 / \\u0000 escape)"
+        printf '%s\n' "$offenders" | head -20 | while IFS= read -r line; do
+            echo "       $line"
+        done
+        FAILED=$((FAILED + 1))
+        return 1
+    fi
+
+    log_success "PASS: no tracked text file contains a literal NUL byte"
+    PASSED=$((PASSED + 1))
 }
 
 assert_env_var_used() {
@@ -304,6 +468,12 @@ run_portability_checks() {
 
     echo ""
     check_tracked_symlinks_safe
+
+    echo ""
+    check_symlink_scan_fixture
+
+    echo ""
+    check_no_nul_in_text_files || true
 
     echo ""
     log_info "=== Results ==="

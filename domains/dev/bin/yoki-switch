@@ -15,13 +15,30 @@ set -euo pipefail
 # everything-claude-code, now maintained independently — see runtime/yoki/ORIGIN).
 # -----------------------------------------------------------------------------
 
+# The checkout this script physically lives in, resolved through whatever
+# symlink it was invoked as (claude-switch, ~/bin/yoki-switch, ...). Prints
+# the root, or nothing when the realpath cannot be resolved.
+#
+# Two callers with different triggers need this same value: the unconditional
+# resolution below (only when DOTFILES_ROOT is unset) and --here (which must
+# override an already-exported DOTFILES_ROOT). Keeping one implementation is
+# the point — the realpath fallback chain and the `../../..` climb both encode
+# this file's own location, and a fix applied to one copy silently left the
+# other stale.
+_yoki_root_from_self() {
+    local real
+    real="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c "import os; print(os.path.realpath('${BASH_SOURCE[0]}'))" 2>/dev/null || echo "")"
+    [[ -n "$real" ]] || return 0
+    # Script is at $DOTFILES_ROOT/domains/dev/bin/yoki-switch
+    # (claude-switch in the same dir is a permanent symlink alias to it)
+    (cd "$(dirname "$real")/../../.." 2>/dev/null && pwd) || true
+}
+
 # Resolve DOTFILES_ROOT from script's own location (works via symlink)
 if [[ -z "${DOTFILES_ROOT:-}" ]]; then
-    SCRIPT_REALPATH="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c "import os; print(os.path.realpath('${BASH_SOURCE[0]}'))" 2>/dev/null || echo "")"
-    if [[ -n "$SCRIPT_REALPATH" ]]; then
-        # Script is at $DOTFILES_ROOT/domains/dev/bin/yoki-switch
-        # (claude-switch in the same dir is a permanent symlink alias to it)
-        DOTFILES_ROOT="$(cd "$(dirname "$SCRIPT_REALPATH")/../../.." && pwd)"
+    _self_root="$(_yoki_root_from_self)"
+    if [[ -n "$_self_root" ]]; then
+        DOTFILES_ROOT="$_self_root"
     fi
 fi
 
@@ -45,12 +62,9 @@ done
 set -- "${_argv[@]+"${_argv[@]}"}"
 
 if [[ "$REDIRECTED_FROM" == "--here" ]]; then
-    _here_real="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c "import os; print(os.path.realpath('${BASH_SOURCE[0]}'))" 2>/dev/null || echo "")"
-    if [[ -n "$_here_real" ]]; then
-        _here_root="$(cd "$(dirname "$_here_real")/../../.." 2>/dev/null && pwd || true)"
-        if [[ -n "$_here_root" && -d "${_here_root}/domains/dev/config/claude-profiles" ]]; then
-            DOTFILES_ROOT="$_here_root"
-        fi
+    _here_root="$(_yoki_root_from_self)"
+    if [[ -n "$_here_root" && -d "${_here_root}/domains/dev/config/claude-profiles" ]]; then
+        DOTFILES_ROOT="$_here_root"
     fi
 fi
 
