@@ -94,12 +94,18 @@ function extractMeta(source) {
   return { meta, metaEnd: braceStart + literal.length };
 }
 
-const BODY_PARAM_NAMES = ['args', 'phase', 'log', 'agent', 'parallel', 'pipeline', 'budget', 'workflow', 'Date', 'Math'];
+const BODY_PARAM_NAMES = ['args', 'phase', 'log', 'agent', 'parallel', 'pipeline', 'budget', 'workflow'];
 
 /**
- * Compile a script's source into `{ meta, run(apiGlobals) }`. See API.md
- * "Execution mechanism" for why this is an AsyncFunction built from named
- * parameters rather than an ESM `import()`.
+ * Compile a script's source into `{ meta, body }`. The body is executed by the
+ * worker (worker-source.js / worker-host.js), which compiles it a second time
+ * inside a `node:vm` context — that is the only path a full run takes now.
+ *
+ * The `new AsyncFunction(...)` here does NOT produce the code that runs; it is
+ * a cheap, synchronous PARSE CHECK that fails fast with a clear
+ * "script body failed to compile" error before a worker is ever spawned, and
+ * confirms the yoki dialect (a bare top-level `return`/`await`, illegal in a
+ * real ESM/script) parses. The compiled function is intentionally discarded.
  */
 function compileScript(source) {
   const { meta, metaEnd } = extractMeta(source);
@@ -108,32 +114,14 @@ function compileScript(source) {
   const body = source.slice(bodyStart);
 
   const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
-  let fn;
   try {
-    fn = new AsyncFunction(...BODY_PARAM_NAMES, body);
+    // eslint-disable-next-line no-new
+    new AsyncFunction(...BODY_PARAM_NAMES, body);
   } catch (err) {
     throw new Error(`script body failed to compile: ${err.message}`);
   }
 
-  return {
-    meta,
-    // The raw body string, handed to the worker so it can compile it inside a
-    // `node:vm` context (see worker-source.js / worker-host.js). This is the
-    // path executeScript uses now — the body runs in an isolated, killable
-    // worker rather than in the host realm.
-    body,
-    // The in-process AsyncFunction path is kept for the direct unit test that
-    // exercises it (test/runner.test.js) — it is no longer how a full run
-    // executes, but it is a cheap, dependency-free way to assert the compile
-    // step accepts a bare top-level `return`/`await`.
-    async run(apiGlobals) {
-      return fn(
-        apiGlobals.args, apiGlobals.phase, apiGlobals.log, apiGlobals.agent,
-        apiGlobals.parallel, apiGlobals.pipeline, apiGlobals.budget, apiGlobals.workflow,
-        apiGlobals.Date, apiGlobals.Math,
-      );
-    },
-  };
+  return { meta, body };
 }
 
 /**
@@ -186,20 +174,6 @@ function listWorkflows() {
 
 function generateRunId() {
   return `run-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-}
-
-/**
- * Run-level idle watchdog ceiling (ms): terminate the worker after this long
- * with no agent() activity. Off by default (Infinity) so it never changes an
- * existing run; enable per invocation via `options.idleTimeoutMs` or the
- * `YOKI_GRAPH_IDLE_MS` env var. `0`/negative means "no watchdog", the same
- * convention budget.js's caps use. This is the piece that makes §2-8's
- * "detection cannot stop anything" false: the watchdog can now actually kill.
- */
-function resolveIdleMs(options, env = process.env) {
-  const raw = options && options.idleTimeoutMs !== undefined ? options.idleTimeoutMs : env.YOKI_GRAPH_IDLE_MS;
-  const n = budgetLib.normalizeCap(raw);
-  return n === undefined ? Infinity : n;
 }
 
 function writeRunMeta(runId, meta) {
@@ -288,6 +262,7 @@ async function executeScript(options) {
     maxAgentCalls: options.maxAgentCalls,
     maxTokens: options.maxTokens,
     maxWallMs: options.maxWallMs,
+    idleTimeoutMs: options.idleTimeoutMs,
   });
   const startedAt = Date.now();
 
@@ -344,7 +319,7 @@ async function executeScript(options) {
       budgetTotal: Number.isFinite(caps.maxTokens) ? caps.maxTokens : null,
       journal,
       maxWallMs: caps.maxWallMs,
-      idleTimeoutMs: resolveIdleMs(options),
+      idleTimeoutMs: caps.idleTimeoutMs,
       signal: options.signal,
     });
   } catch (err) {

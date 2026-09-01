@@ -31,6 +31,25 @@ const os = require('os');
 const path = require('path');
 
 const runner = require('../runner');
+const mockBackend = require('../backends/mock');
+const { runBodyInWorker } = require('../worker-host');
+const { Journal } = require('../journal');
+
+/** Run `fn` with the mock backend's run() delayed by `delayMs` per call, so a
+ *  script that makes real agent() calls takes measurable wall time — the setup
+ *  the idle-watchdog reset tests need (the vm has no setTimeout of its own). */
+async function withSlowMock(delayMs, fn) {
+  const real = mockBackend.run;
+  mockBackend.run = async (params) => {
+    await new Promise((r) => setTimeout(r, delayMs));
+    return real(params);
+  };
+  try {
+    return await fn();
+  } finally {
+    mockBackend.run = real;
+  }
+}
 
 function withIsolatedState(fn) {
   const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-isolation-state-'));
@@ -99,6 +118,60 @@ test('a body cannot bypass the Date/Math determinism policy, and cannot reach th
   assert.equal(typeof Math.random(), 'number', 'the host Math.random still works');
 }));
 
+test('no prototype/constructor walk from the exposed Date reaches a live clock', () => withIsolatedState(async (cwd) => {
+  // The exact bypass strings from the review: `Date.prototype.constructor` and
+  // an instance's `.constructor` both used to name the unrestricted real Date,
+  // recovering a live clock while `Date.now()`/argless `new Date()` throw.
+  const scriptPath = writeScript(cwd, 'ctor.js', `
+    const out = {}
+    try { out.protoCtor = new Date.prototype.constructor().getTime() } catch (e) { out.protoCtor = 'threw' }
+    try { out.instCtor = new (new Date(2020, 0, 1)).constructor().getTime() } catch (e) { out.instCtor = 'threw' }
+    // The prototype's constructor back-reference must be the restricted shadow,
+    // not a second live clock, and an instance must resolve to the same.
+    out.protoCtorIsDate = (Date.prototype.constructor === Date)
+    out.instCtorIsDate = (new Date(2020, 0, 1).constructor === Date)
+    // Object.getPrototypeOf walk from an instance lands on Date.prototype, whose
+    // constructor is the shadow — one more argless construction attempt.
+    try {
+      const proto = Object.getPrototypeOf(new Date(2020, 0, 1))
+      out.getProtoCtor = new proto.constructor().getTime()
+    } catch (e) { out.getProtoCtor = 'threw' }
+    // A legitimate parse still works after all the tampering above.
+    out.parsed = new Date('2020-01-01T00:00:00Z').getUTCFullYear()
+    out.fromMs = new Date(0).getUTCFullYear()
+    return out
+  `);
+  const result = await runner.executeScript({ scriptPath, args: {}, backendName: 'mock', cwd });
+  assert.equal(result.status, 'ok', result.error);
+  assert.equal(result.result.protoCtor, 'threw', 'new Date.prototype.constructor() must not reach a live clock');
+  assert.equal(result.result.instCtor, 'threw', 'new (new Date(x)).constructor() must not reach a live clock');
+  assert.equal(result.result.getProtoCtor, 'threw', 'getPrototypeOf(...).constructor must not reach a live clock');
+  assert.equal(result.result.protoCtorIsDate, true, 'Date.prototype.constructor must be the restricted Date');
+  assert.equal(result.result.instCtorIsDate, true, 'an instance.constructor must be the restricted Date');
+  assert.equal(result.result.parsed, 2020, 'new Date(string) must still parse');
+  assert.equal(result.result.fromMs, 1970, 'new Date(ms) must still work');
+}));
+
+test('Math cannot be un-frozen or reached via constructor/getPrototypeOf to recover live randomness', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'mathwalk.js', `
+    const out = {}
+    // Math is a namespace object; its constructor chain leads only to Object,
+    // never to a fresh live Math.random.
+    try { out.ctorRandom = Math.constructor.random ? Math.constructor.random() : 'no-random' } catch (e) { out.ctorRandom = 'threw' }
+    try { out.protoRandom = (Object.getPrototypeOf(Math).random ? Object.getPrototypeOf(Math).random() : 'no-random') } catch (e) { out.protoRandom = 'threw' }
+    // Direct call still throws; frozen so it cannot be put back.
+    try { out.direct = Math.random() } catch (e) { out.direct = 'threw' }
+    out.ctorIsObject = (Math.constructor === Object)
+    return out
+  `);
+  const result = await runner.executeScript({ scriptPath, args: {}, backendName: 'mock', cwd });
+  assert.equal(result.status, 'ok', result.error);
+  assert.equal(result.result.direct, 'threw', 'Math.random() must throw');
+  assert.equal(result.result.ctorRandom, 'no-random', 'Math.constructor must not carry a live random');
+  assert.equal(result.result.protoRandom, 'no-random', 'getPrototypeOf(Math) must not carry a live random');
+  assert.equal(result.result.ctorIsObject, true, 'Math.constructor is Object, not a live-random source');
+}));
+
 // ---------------------------------------------------------------------------
 // 2. Killability
 // ---------------------------------------------------------------------------
@@ -128,10 +201,93 @@ test('an idle body making no agent activity is killed by the run-level watchdog'
   assert.match(result.error, /idle watchdog/);
 }));
 
+test('an actively-progressing body is NOT killed by the idle watchdog: agent() traffic resets it', () => withIsolatedState(async (cwd) => {
+  // Five agent() calls at 120ms each ≈ 600ms of wall time, well past the 350ms
+  // idle window — but each call re-arms the watchdog (handleAgent's armIdle), so
+  // no single gap between activity exceeds it and the run completes. If that
+  // reset regressed (armIdle dropped from handleAgent), the spawn-time timer
+  // would fire mid-run and this would fail.
+  const scriptPath = writeScript(cwd, 'busy.js', `
+    let n = 0
+    for (let i = 0; i < 5; i++) { await agent('work ' + i, { label: 'w' + i }); n += 1 }
+    return n
+  `);
+  const result = await withSlowMock(120, () => runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, idleTimeoutMs: 350,
+  }));
+  assert.equal(result.status, 'ok', result.error);
+  assert.equal(result.result, 5);
+}));
+
+test('a workflow() call re-arms the idle watchdog so a nested child making progress is not killed', async () => {
+  // Directly at the worker-host seam (no child-spawn timing variance): a stub
+  // api whose agent() and workflow() each take ~200ms. With a 350ms idle window,
+  // the warmup agent() consumes most of one window; the workflow() must open a
+  // FRESH window (handleWorkflow's armIdle) or the timer from the warmup fires
+  // into the still-progressing workflow and kills the run (warmup+workflow ≈
+  // 400ms > 350ms, while each single leg stays under the window).
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const api = {
+    agent: async () => { await sleep(200); return 'agent-ok'; },
+    workflow: async () => { await sleep(200); return 'child-done'; },
+    phase: () => {},
+    log: () => {},
+  };
+  const journal = { spent: () => 0, tokensSpent: () => 0, append() {} };
+  const body = "await agent('warmup', { label: 'w' }); const r = await workflow('child'); return r";
+  const result = await runBodyInWorker({
+    body, api, args: {}, budgetTotal: null, journal, idleTimeoutMs: 350,
+  });
+  assert.equal(result, 'child-done');
+});
+
+test('phase()->agent() attribution survives the RPC boundary: each call carries its ambient phase', () => withIsolatedState(async (cwd) => {
+  // phase() is a fire-and-forget emit and agent() is a separate call across the
+  // MessagePort; the emit-before-call order must make agent() read the phase set
+  // just before it. Assert it on both the agent-start events and the journal.
+  const scriptPath = writeScript(cwd, 'phases.js', `
+    phase('A')
+    await agent('one', { label: 'a' })
+    phase('B')
+    await agent('two', { label: 'b' })
+    return 1
+  `);
+  const events = [];
+  const result = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, emit: (e) => events.push(e),
+  });
+  assert.equal(result.status, 'ok', result.error);
+
+  const startA = events.find((e) => e.type === 'agent-start' && e.label === 'a');
+  const startB = events.find((e) => e.type === 'agent-start' && e.label === 'b');
+  assert.equal(startA.phase, 'A', "the first call's agent-start must be tagged phase A");
+  assert.equal(startB.phase, 'B', "the second call's agent-start must be tagged phase B");
+
+  const entries = new Journal(result.runId).readAll().filter((e) => e.status === 'ok');
+  const entryA = entries.find((e) => e.label === 'a');
+  const entryB = entries.find((e) => e.label === 'b');
+  assert.equal(entryA.phase, 'A', "the first call's journal entry must record phase A");
+  assert.equal(entryB.phase, 'B', "the second call's journal entry must record phase B");
+}));
+
 test('an explicit abort terminates the worker and ends the run as an error, not a crash', () => withIsolatedState(async (cwd) => {
   const scriptPath = writeScript(cwd, 'abortme.js', 'while (true) {}\nreturn 1');
   const controller = new AbortController();
   setTimeout(() => controller.abort(), 100);
+  const result = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, signal: controller.signal,
+  });
+  assert.equal(result.status, 'error');
+  assert.match(result.error, /aborted/);
+}));
+
+test('a signal already aborted at call time ends the run as an error, not a crash', () => withIsolatedState(async (cwd) => {
+  // The worker's error/exit listeners are attached before the pre-aborted
+  // early-return, so a startup 'error' in the terminate window cannot escape as
+  // an unhandled event and crash the host.
+  const scriptPath = writeScript(cwd, 'prealtorted.js', 'while (true) {}\nreturn 1');
+  const controller = new AbortController();
+  controller.abort();
   const result = await runner.executeScript({
     scriptPath, args: {}, backendName: 'mock', cwd, signal: controller.signal,
   });

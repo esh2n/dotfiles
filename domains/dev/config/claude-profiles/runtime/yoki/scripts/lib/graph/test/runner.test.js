@@ -61,13 +61,22 @@ test('extractMeta parses a pure-literal export const meta, tolerating nested bra
   assert.equal(meta.phases.length, 2);
 });
 
-test('compileScript supports a top-level `return` and top-level `await` (illegal in a real ESM/script)', async () => {
+test('compileScript accepts a top-level `return` and top-level `await` (illegal in a real ESM/script)', () => {
   const source = `export const meta = { name: 'x', description: 'y' }
   const v = await Promise.resolve(41)
   return v + 1`;
+  // compileScript's parse check must accept the yoki dialect without throwing;
+  // it returns the raw body (executed by the worker, not here — see runner.js).
   const compiled = runner.compileScript(source);
-  const result = await compiled.run({ args: undefined, phase: () => {}, log: () => {}, agent: async () => null, parallel: async (t) => Promise.all(t.map((x) => x())), pipeline: async (items) => items, budget: { total: null }, workflow: async () => {}, Date, Math });
-  assert.equal(result, 42);
+  assert.equal(compiled.meta.name, 'x');
+  assert.match(compiled.body, /await Promise\.resolve\(41\)/);
+  assert.match(compiled.body, /return v \+ 1/);
+});
+
+test('compileScript rejects a body that does not parse, with a clear error', () => {
+  const source = `export const meta = { name: 'x', description: 'y' }
+  const = broken(`;
+  assert.throws(() => runner.compileScript(source), /script body failed to compile/);
 });
 
 test('compileScript throws a clear error when there is no `export const meta`', () => {

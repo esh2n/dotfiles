@@ -87,6 +87,25 @@ test('resolveCaps: run option > .yoki.json > env, and 0 means "no cap"', () => {
   }
 });
 
+test('resolveCaps resolves the idle-watchdog cap through the same option>.yoki.json>env>default order', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-idlecaps-'));
+  try {
+    assert.equal(budgetLib.resolveCaps(dir, {}, {}).idleTimeoutMs, Infinity, 'off by default');
+    assert.equal(budgetLib.resolveCaps(dir, {}, {}).sources.idleTimeoutMs, 'default');
+
+    fs.writeFileSync(path.join(dir, '.yoki.json'), JSON.stringify({ graphIdleTimeoutMs: 5000 }));
+    const fromConfig = budgetLib.resolveCaps(dir, {}, { YOKI_GRAPH_IDLE_MS: '99' });
+    assert.equal(fromConfig.idleTimeoutMs, 5000, '.yoki.json graphIdleTimeoutMs beats the env var');
+    assert.equal(fromConfig.sources.idleTimeoutMs, '.yoki.json');
+
+    const withOption = budgetLib.resolveCaps(dir, { idleTimeoutMs: 1234 }, {});
+    assert.equal(withOption.idleTimeoutMs, 1234, 'the run option beats .yoki.json');
+    assert.equal(withOption.sources.idleTimeoutMs, 'option');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('assertWithinCaps names which cap was hit and the numbers behind it', () => {
   const caps = { maxAgentCalls: 2, maxTokens: 100, maxWallMs: 1000 };
   assert.doesNotThrow(() => budgetLib.assertWithinCaps(caps, { callsMade: 1, tokensSpent: 99, elapsedMs: 999 }));
@@ -232,6 +251,43 @@ return [a, b, c]`);
   });
   assert.equal(second.status, 'ok', second.error);
   assert.deepEqual(second.result, first.result);
+}));
+
+test('on --resume, budget.spent() is correct on the body FIRST read, before any agent() call', () => withIsolatedState(async (cwd) => {
+  // The worker's spent mirror is seeded from the journal at spawn, so a resumed
+  // run that reads budget.spent() before its first (replayed) agent() call sees
+  // the prior spend — not 0, the full wrong budget the review flagged.
+  const scriptPath = path.join(cwd, 'seed.js');
+  fs.writeFileSync(scriptPath, `export const meta = { name: 'seed', description: 'd' }
+const firstCheck = budget.spent()
+await agent('one', { label: 'a' })
+await agent('two', { label: 'b' })
+return { firstCheck }`);
+
+  const first = await runner.executeScript({ scriptPath, args: {}, backendName: 'mock', cwd, maxTokens: 100000 });
+  assert.equal(first.status, 'ok', first.error);
+  assert.equal(first.result.firstCheck, 0, 'a fresh run has spent nothing at its first check');
+  const priorSpend = new Journal(first.runId).tokensSpent();
+  assert.ok(priorSpend > 0, 'the first run must have spent tokens');
+
+  const second = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, runId: first.runId, maxTokens: 100000,
+  });
+  assert.equal(second.status, 'ok', second.error);
+  assert.equal(second.result.firstCheck, priorSpend,
+    'resumed run: budget.spent() reflects prior spend from the very first read, not 0');
+}));
+
+test('journal.spent() mirrors tokensSpent() incrementally, without double counting', () => withIsolatedState(async () => {
+  const j = new Journal('run-spent-unit');
+  assert.equal(j.spent(), 0, 'an empty journal has spent 0');
+  j.append({ index: 0, key: 'k0', status: 'ok', tokens: 100 });
+  j.append({ index: 1, key: 'k1', status: 'ok', tokens: 250 });
+  j.append({ index: 1, key: 'k1', status: 'retry' }); // no tokens field — must not shift the total
+  assert.equal(j.spent(), 350, 'spent() tracks appended tokens incrementally');
+  assert.equal(j.spent(), j.tokensSpent(), 'the O(1) mirror equals the full-scan source of truth');
+  // A fresh reader lazily seeds from one full scan and agrees — no drift.
+  assert.equal(new Journal('run-spent-unit').spent(), 350);
 }));
 
 // ---------------------------------------------------------------------------

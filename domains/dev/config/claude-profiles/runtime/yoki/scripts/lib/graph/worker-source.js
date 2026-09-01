@@ -51,8 +51,12 @@
  *     replaced with it — closing `new globalThis.Date()` as a way around the
  *     lexical shadow. The real constructor is captured in a closure the body
  *     can never name, so `globalThis.Date = anything` cannot reach a live
- *     clock. This mirrors api.js's makeRestrictedDate/makeRestrictedMath allow
- *     /deny exactly (Date.now / argless `new Date()` / Math.random throw;
+ *     clock. The prototype's `.constructor` back-reference is ALSO repointed at
+ *     `RestrictedDate` (it otherwise still named the live clock, reachable as
+ *     `Date.prototype.constructor` or `(new Date(x)).constructor`), so no
+ *     prototype/constructor walk from the exposed `Date` reaches a live clock.
+ *     The allow/deny list matches what yoki-graph has always enforced
+ *     (Date.now / argless `new Date()` / Math.random throw;
  *     `new Date(x)`, `Date.parse`, `Date.UTC`, `Date()` without `new` and every
  *     other `Math.*` still work) — only now it is not bypassable.
  *
@@ -72,6 +76,13 @@ const DETERMINISM_PRELUDE =
   + ' return new RealDate(...args);'
   + ' }'
   + ' RestrictedDate.prototype = RealDate.prototype;'
+  // Sever the last live-clock back-reference: `RealDate.prototype.constructor`
+  // still points at the unrestricted RealDate, so `new Date.prototype.constructor()`
+  // and `new (new Date(2020,0,1)).constructor()` would otherwise recover a live
+  // clock. Point it at RestrictedDate (whose zero-arg path throws) instead. This
+  // is the vm realm's own Date.prototype, not the host's, so nothing outside the
+  // sandbox is touched.
+  + ' RealDate.prototype.constructor = RestrictedDate;'
   + ' RestrictedDate.now = RealDate.now;'
   + ' RestrictedDate.parse = RealDate.parse.bind(RealDate);'
   + ' RestrictedDate.UTC = RealDate.UTC.bind(RealDate);'
@@ -102,8 +113,13 @@ const pending = new Map();
  * counter, not a second tally, so it cannot drift. Between responses it cannot
  * be stale in any way the script can observe: tokens accrue only through
  * agents, and an agent's response is the only thing the script waits on.
+ *
+ * Seeded from the host at spawn (workerData.spentTotal) so budget.spent()/
+ * remaining() is correct from the body's FIRST read — before any RPC round
+ * trip. On --resume the journal already carries prior spend, so an unseeded
+ * mirror would report 0 (the full, wrong budget) on the first check.
  */
-let spentMirror = 0;
+let spentMirror = typeof workerData.spentTotal === "number" ? workerData.spentTotal : 0;
 
 function callHost(method, payload) {
   return new Promise(function (resolve, reject) {
@@ -238,11 +254,21 @@ async function main() {
 
   const context = vm.createContext(sandbox, {
     name: "workflow",
-    // The load-bearing defense: eval("…") and Function("…") throw EvalError
-    // inside the realm, so even a host closure captured off an injected global
-    // (agent.constructor === the host Function) cannot compile anything. It
-    // does not touch vm.Script compiled from OUT here, which is how the body
-    // and prelude get in.
+    // Blocks vm-NATIVE code generation: eval("…") and new Function("…") that
+    // resolve to THIS context's realm throw EvalError, so a body cannot compile
+    // a string into running code the ordinary way. It does not touch vm.Script
+    // compiled from OUT here, which is how the body and prelude get in.
+    //
+    // What it does NOT block: the injected globals (agent, parallel, …, console,
+    // budget, args) are created in the worker thread's OWN realm, so their
+    // constructor chain (agent.constructor, or args.constructor.constructor)
+    // resolves to that outer realm's unrestricted Function, whose codeGeneration
+    // is not disabled — a determined body can compile through it and reach the
+    // worker's process/require. That is out of scope on purpose: this is a
+    // determinism/accident boundary, not a security boundary against a hostile
+    // author (see the file header) — every workflow here is repo-managed, so the
+    // threat is "my own bug", not "an adversary". Do not lean on this as a
+    // sandbox for untrusted code.
     codeGeneration: { strings: false, wasm: false },
   });
 

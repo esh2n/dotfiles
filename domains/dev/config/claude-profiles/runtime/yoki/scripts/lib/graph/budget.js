@@ -31,6 +31,11 @@ const CAP_KEYS = [
   { name: 'maxAgentCalls', configKey: 'graphMaxAgentCalls', envKey: 'YOKI_GRAPH_MAX_AGENT_CALLS', fallback: DEFAULT_MAX_AGENT_CALLS },
   { name: 'maxTokens', configKey: 'graphMaxTokens', envKey: 'YOKI_GRAPH_MAX_TOKENS', fallback: Infinity },
   { name: 'maxWallMs', configKey: 'graphMaxWallMs', envKey: 'YOKI_GRAPH_MAX_WALL_MS', fallback: Infinity },
+  // Run-level idle watchdog ceiling (ms): terminate the worker after this long
+  // with no agent() activity. Off by default (Infinity). Resolved through the
+  // same four-source order as its siblings, so it can be set via .yoki.json
+  // (`graphIdleTimeoutMs`), not only the run option / env var.
+  { name: 'idleTimeoutMs', configKey: 'graphIdleTimeoutMs', envKey: 'YOKI_GRAPH_IDLE_MS', fallback: Infinity },
 ];
 
 class BudgetExceededError extends Error {

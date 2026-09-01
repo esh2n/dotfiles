@@ -435,8 +435,6 @@ function createApi(ctx) {
     phase,
     budget,
     workflow,
-    Date: makeRestrictedDate(),
-    Math: makeRestrictedMath(),
   };
 }
 
@@ -463,37 +461,6 @@ function nowIso() {
   // The runner's OWN clock, not the sandboxed script's — restricting Date is
   // a script-facing rule (see API.md), not a rule on yoki-graph itself.
   return new Date().toISOString();
-}
-
-function makeRestrictedDate() {
-  const RealDate = Date;
-  function RestrictedDate(...args) {
-    if (!new.target) return RealDate(...args); // Date() called without `new` — timestamp string, harmless
-    if (args.length === 0) {
-      throw new Error("new Date() with no arguments is unavailable in workflow scripts (would break --resume) — pass timestamps via args instead");
-    }
-    return new RealDate(...args);
-  }
-  RestrictedDate.prototype = RealDate.prototype;
-  RestrictedDate.now = () => {
-    throw new Error('Date.now() is unavailable in workflow scripts (would break --resume) — pass timestamps via args instead');
-  };
-  RestrictedDate.parse = RealDate.parse.bind(RealDate);
-  RestrictedDate.UTC = RealDate.UTC.bind(RealDate);
-  return RestrictedDate;
-}
-
-function makeRestrictedMath() {
-  return new Proxy(Math, {
-    get(target, prop, receiver) {
-      if (prop === 'random') {
-        return () => {
-          throw new Error('Math.random() is unavailable in workflow scripts (would break --resume) — vary the agent prompt/label by index instead');
-        };
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-  });
 }
 
 /** `opts.timeoutMs` per call, else the run's `--timeout`, else the 15-minute

@@ -179,24 +179,30 @@ each named in the prior-art comparison (§2-7/§2-8):
   one-line prelude neuters them IN the realm (reassign `Math.random` then
   freeze `Math`; lexically shadow `Date` with a `RestrictedDate` and replace
   the realm's own global `Date` with it, keeping the real constructor in a
-  closure the body can never name). There is nothing to inject over and
-  nothing to write around — the allow/deny list is exactly api.js's
+  closure the body can never name, and repointing `Date.prototype.constructor`
+  at the restricted shadow so no prototype/constructor walk recovers the live
+  clock). There is nothing to inject over and nothing to write around — the
+  allow/deny list is the one yoki-graph has always enforced
   (`Date.now()`, argless `new Date()`, `Math.random()` throw; `new Date(x)`,
   `Date.parse`, `Date.UTC`, `Date()` without `new`, every other `Math.*` work).
 - **A runaway body could not be stopped.** A `while (true) {}` inside an
   `await` cannot be killed by an in-process `vm` timeout. `worker.terminate()`
   can, so the host arms three terminators — the `graphMaxWallMs` wall-time cap,
-  an explicit `AbortSignal`, and a run-level idle watchdog (`YOKI_GRAPH_IDLE_MS`
-  / `idleTimeoutMs`, off by default) that resets on every `agent()` call. A
+  an explicit `AbortSignal`, and a run-level idle watchdog (`graphIdleTimeoutMs`
+  / `YOKI_GRAPH_IDLE_MS` / `idleTimeoutMs`, off by default) that resets on every
+  `agent()` and `workflow()` call. A
   terminate surfaces as an ordinary run error carrying the journal's last state,
   not a hung process. (The per-agent timeout and the in-`agent()` budget caps
   still apply on top, for the common case of a loop that DOES call `agent()`.)
 - **The body shared the host realm.** The vm context is a fresh realm with no
   `require`, `process`, `module`, `Buffer` or host `globalThis`, and
-  `codeGeneration: { strings: false, wasm: false }` makes `eval`/`new Function`
-  throw — so a host `Function` captured off an injected global cannot compile
-  anything. This is a determinism/accident boundary, not a security boundary
-  against a hostile author: every workflow here is repo-managed.
+  `codeGeneration: { strings: false, wasm: false }` makes vm-native
+  `eval`/`new Function` throw. It does NOT close every escape: an injected
+  global's `.constructor` chain resolves to the worker thread's own realm, whose
+  `Function` is not disabled, so a determined body could still compile through it
+  and reach `process`/`require`. That is out of scope on purpose — this is a
+  determinism/accident boundary, not a security boundary against a hostile
+  author: every workflow here is repo-managed.
 
 How the pieces fit:
 

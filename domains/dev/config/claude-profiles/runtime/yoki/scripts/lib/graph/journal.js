@@ -109,6 +109,7 @@ class Journal {
     this.dir = runDir(runId);
     this.file = journalPath(runId);
     this._replay = null; // Map<index, entry> — loaded lazily, only for resume
+    this._spent = undefined; // O(1) running token total — see spent()
   }
 
   ensureDir() {
@@ -195,6 +196,27 @@ class Journal {
     if (this._replay && stamped.status === 'ok' && Number.isInteger(stamped.index)) {
       this._replay.set(stamped.index, stamped);
     }
+    // Keep the O(1) spent mirror in step. Only when it has already been seeded:
+    // if it hasn't, the next spent() call does a full scan that includes this
+    // entry, so incrementing here too would double-count.
+    if (this._spent !== undefined && typeof stamped.tokens === 'number') {
+      this._spent += stamped.tokens;
+    }
+  }
+
+  /**
+   * O(1) running total of tokens spent this run — the same number
+   * `tokensSpent()` computes, but without re-reading and re-parsing the whole
+   * journal on every read. Lazily seeded from ONE full `tokensSpent()` scan
+   * (so a resumed run counts the prior generations' spend), then kept in step
+   * by `append()`. The worker host stamps this on every RPC response so the
+   * script's `budget.spent()` mirror stays in sync without an O(n) scan per
+   * call. `tokensSpent()` stays the source of truth (this seed, and the
+   * per-call `assertWithinCaps` check).
+   */
+  spent() {
+    if (this._spent === undefined) this._spent = this.tokensSpent();
+    return this._spent;
   }
 
   /**

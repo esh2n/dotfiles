@@ -52,7 +52,11 @@ function runBodyInWorker(opts) {
   return new Promise(function (resolve, reject) {
     const worker = new Worker(WORKER_SOURCE, {
       eval: true,
-      workerData: { body: body, args: args, budgetTotal: budgetTotal },
+      // spentTotal seeds the worker's budget.spent()/remaining() mirror so it is
+      // correct from the body's FIRST read — before any agent()/workflow() RPC
+      // round-trip. It matters on --resume, where the journal already carries
+      // real spend from a prior invocation.
+      workerData: { body: body, args: args, budgetTotal: budgetTotal, spentTotal: journal.spent() },
     });
 
     let settled = false;
@@ -87,25 +91,14 @@ function runBodyInWorker(opts) {
     function terminate(message) { finishErr(new Error(message)); }
     function onAbort() { terminate('the workflow was aborted'); }
 
-    if (signal) {
-      if (signal.aborted) { onAbort(); return; }
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
-    if (Number.isFinite(maxWallMs) && maxWallMs > 0) {
-      wallTimer = setTimeout(function () {
-        // Same wording as budget.js's assertWithinCaps so either the in-agent
-        // cap or this terminator satisfies a "wall-clock cap reached" assertion.
-        terminate('graph budget: wall-clock cap reached (' + maxWallMs + 'ms) — the workflow body was terminated');
-      }, maxWallMs);
-      if (wallTimer.unref) wallTimer.unref();
-    }
-    armIdle();
-
     function respond(callId, ok, value, error, fatal) {
       if (settled) return;
       worker.postMessage({
         type: 'response', callId: callId, ok: ok, value: value,
-        error: error, fatal: fatal, spent: journal.tokensSpent(),
+        // journal.spent() is an O(1) running total (journal.js), not a full
+        // re-read+parse of the journal per RPC — so stamping the worker's
+        // budget mirror on every response is not an O(n)-per-call cost.
+        error: error, fatal: fatal, spent: journal.spent(),
       });
     }
 
@@ -120,6 +113,11 @@ function runBodyInWorker(opts) {
     }
 
     async function handleWorkflow(callId, payload) {
+      // A nested workflow() is real activity too: it spawns and awaits a whole
+      // child run (its own agent() calls), during which the parent worker is
+      // blocked on this RPC. Without re-arming, the parent's idle watchdog would
+      // fire and kill a run that is actively progressing through its child.
+      armIdle();
       try {
         const value = await api.workflow(payload.nameOrRef, payload.args);
         respond(callId, true, value);
@@ -128,6 +126,12 @@ function runBodyInWorker(opts) {
       }
     }
 
+    // The worker's lifecycle listeners are attached BEFORE the pre-aborted
+    // early-return below: the Worker is already spawning asynchronously, so it
+    // could emit 'error' during startup even in the aborted path — and an
+    // 'error' event with no listener throws out of the host process (Node's
+    // default EventEmitter behaviour), crashing the whole run rather than
+    // failing this one call.
     worker.on('message', function (message) {
       if (!message || settled) return;
       switch (message.type) {
@@ -159,6 +163,22 @@ function runBodyInWorker(opts) {
       // worker itself (settled is already true by then).
       if (!settled) finishErr(new Error('the workflow worker exited unexpectedly (code ' + code + ')'));
     });
+
+    // Listeners are live now, so a pre-aborted signal can terminate cleanly
+    // without leaving an 'error' event unhandled.
+    if (signal) {
+      if (signal.aborted) { onAbort(); return; }
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    if (Number.isFinite(maxWallMs) && maxWallMs > 0) {
+      wallTimer = setTimeout(function () {
+        // Same wording as budget.js's assertWithinCaps so either the in-agent
+        // cap or this terminator satisfies a "wall-clock cap reached" assertion.
+        terminate('graph budget: wall-clock cap reached (' + maxWallMs + 'ms) — the workflow body was terminated');
+      }, maxWallMs);
+      if (wallTimer.unref) wallTimer.unref();
+    }
+    armIdle();
   });
 }
 
