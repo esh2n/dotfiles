@@ -212,6 +212,7 @@ function readRunMeta(runId) {
  * @param {string} [options.effort]
  * @param {string} [options.mockFile]
  * @param {number} [options.timeoutMs] per-agent timeout default (ms)
+ * @param {number} [options.gateTimeoutMs] per-`opts.gate` timeout default (ms)
  * @param {number} [options.retries] transient-failure retries per backend call
  * @param {number} [options.maxAgentCalls] budget cap override (see budget.js)
  * @param {number} [options.maxTokens] budget cap override
@@ -225,8 +226,8 @@ function readRunMeta(runId) {
 async function executeScript(options) {
   const {
     scriptPath, args, backendName, cwd = process.cwd(), dryRun = false,
-    emit = () => {}, concurrency, model, effort, mockFile, timeoutMs, retries,
-    retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, modelMap, _parentRunId,
+    emit = () => {}, concurrency, model, effort, mockFile, timeoutMs, gateTimeoutMs,
+    retries, retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, modelMap, _parentRunId,
   } = options;
   const runId = options.runId || generateRunId();
   const isResume = !!options.runId;
@@ -264,7 +265,7 @@ async function executeScript(options) {
 
   const ctx = {
     runId, journal, backend, cwd, model, effort, mockFile, dryRun,
-    resume: isResume, concurrency, emit, timeoutMs,
+    resume: isResume, concurrency, emit, timeoutMs, gateTimeoutMs,
     caps, startedAt, retries, retryBaseDelayMs, retryMaxDelayMs, sleep,
     modelMap, harnessModels: modelsLib.loadHarnessModels(repoRoot()),
     args,
@@ -274,7 +275,7 @@ async function executeScript(options) {
         const childPath = resolveScriptPath(nameOrRef, cwd);
         const childResult = await executeScript({
           scriptPath: childPath, args: childArgs, backendName, cwd, dryRun, emit,
-          concurrency, model, effort, mockFile, timeoutMs, retries,
+          concurrency, model, effort, mockFile, timeoutMs, gateTimeoutMs, retries,
           retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, modelMap,
           maxAgentCalls: options.maxAgentCalls, maxTokens: options.maxTokens,
           maxWallMs: options.maxWallMs, _parentRunId: runId,

@@ -67,6 +67,16 @@ access from the script body itself (only through `agent()`).
     `core/workflows/lib/lanes.js`).
   - `opts.isolation: 'worktree'` — run this one agent() call inside a fresh
     `git worktree`, auto-removed after if the tree is clean.
+  - `opts.gate` — a shell command run AFTER this call returns, whose exit
+    code decides whether the result stands. Exit 0 passes the result through
+    untouched; any non-zero exit — or a kill at the timeout — fails the call
+    exactly as a terminal backend failure does: journaled `status: 'error'`
+    with the gate record, emitted as a failing `agent-end`, and `agent()`
+    resolving to `null`. See "Command gates" below.
+  - `opts.gateTimeoutMs` — ceiling for `opts.gate` only. Falls back to the
+    run's `--gate-timeout`, then to 10 minutes; `0` disables it. Separate
+    from `opts.timeoutMs` on purpose: a five-minute agent call and a
+    fifteen-minute test suite are unrelated ceilings.
   - `opts.sandbox` — `'read-only' | 'workspace-write' | 'danger-full-access'`.
     **Defaults to `'read-only'`** on every real backend, so a call only gets
     filesystem write authority when the script asks for it. Set
@@ -360,9 +370,12 @@ buried at the bottom of a redirected log.
 ## Live progress
 
 The `--json` NDJSON stream is the machine-readable source of truth. It gained
-`model`, `backend`, `modelTier`, `index` and `phases` fields, plus one new
-event: `agent-progress`, emitted whenever a running agent's tool-call count
-moves. Each backend counts that from its own stream as it arrives —
+`model`, `backend`, `modelTier`, `index` and `phases` fields, plus two extra
+events: `agent-progress`, emitted whenever a running agent's tool-call count
+moves, and `agent-gate` (`status: 'pass'|'fail'` plus
+`gate: {command, exitCode, ms, killed}`), emitted once for a call that had an
+`opts.gate`. The same `gate` object is repeated on that call's `agent-end`
+and in its journal entry, so a run can be audited from the journal alone. Each backend counts that from its own stream as it arrives —
 `spawnCollect`'s `onData` feeds complete lines to a per-backend counter
 (codex's `exec_command_begin`/`item.started` events, omp's `tool_use` blocks;
 the mock backend reports one synthetic tick so the whole path is exercised
@@ -372,6 +385,13 @@ never fail the agent it reports on.
 For a human, `progress.js` folds the same events into one compact status:
 
     phase 2/5 Review — running 3 / done 7 / failed 0 — [security gpt-5.6-sol 41s +3 tools] …
+
+A gate run prints its own permanent line —
+
+    [10:20:42]   ⛨ gate gate: npm test → pass (12s)
+
+— with `fail (exit 1)` or `fail (timed out)` in place of `pass`, and a
+`gate-failed N` counter joins the status line once one has failed.
 
 On a TTY that line is redrawn in place with `\r`, with phase headers, logs
 and finished agents scrolling past above it. Off a TTY there is no status
@@ -412,10 +432,95 @@ per backend invocation. Anything else fails on the first attempt: retrying
 journaled as its own `status: 'retry'` line (invisible to the resume prefix,
 which only replays `ok`) and emitted as an `agent-retry` event.
 
+**Gate timeouts**: `opts.gateTimeoutMs` > the run's `--gate-timeout` > 10
+minutes. The command is SIGKILLed and the gate fails with `killed: true` —
+and, unlike an agent timeout, is NOT retried (see "Command gates" above).
+
 **Timeouts**: `opts.timeoutMs` > the run's `--timeout` > 15 minutes. The
 child is SIGKILLed and `spawnCollect` reports `timedOut: true`, which the
 backend turns into an error marked `transient` — so a wedged call is retried
 rather than silently reported as an ordinary crash.
+
+## Command gates
+
+`agent(prompt, { gate: 'npm test' })` runs one shell command after the agent
+call returns and lets its **exit code**, not a model's summary of it, decide
+whether the result stands.
+
+Why it exists: a workflow's "Gate" phase asks a model to run the build and
+report whether it passed, which makes the model the one deciding what
+"passed" means. An exit code is the same answer every time, costs nothing,
+and cannot be talked out of a failure by a persuasive diff. The two are not
+alternatives — the model keeps the half that needs reasoning (which failures
+matter, what is missing a test, whether a category is even configured), the
+gate owns the half that is a number.
+
+**Where it runs.** In the tree the agent actually wrote: `effectiveCwd` — the
+agent's `git worktree` when the call used `isolation: 'worktree'`, otherwise
+the run's `cwd`. This is the whole reason the gate lives inside `agent()`
+rather than in the script: an isolated call's worktree is removed in that
+call's own `finally`, so this is the last (and only) moment at which
+`npm test` can mean "the code this agent just wrote" rather than "whatever is
+in the main tree".
+
+**When it runs.** After the backend call and after schema validation — a
+schema failure still rejects first, because a gate verifies work and there is
+no work to verify if the shape is wrong, and the reader should see the schema
+error rather than a gate error standing in front of it. A call that already
+failed never reaches its gate.
+
+**Failure.** Non-zero exit, a timeout kill, or a command this machine cannot
+start, all produce the same outcome: the journal gets `status: 'error'`
+carrying `gate: {command, exitCode, ms, killed}` and an `error` holding the
+command's own output tail, an `agent-end` with `status: 'error'` is emitted,
+and `agent()` resolves to `null`. Because only `ok` entries replay, a
+`--resume` re-runs a gate-failed call instead of handing back a result no
+gate ever accepted — fix the tree, resume, and the same call runs again.
+
+A gate failure is explicitly marked **non-transient**, so retry.js never
+re-runs it: its timeout message contains "timed out", which the transient
+pattern list would otherwise match, and re-running a ten-minute hung suite
+buys another ten minutes of the same verdict. A gate is a verdict on work
+already done; the identical command against the identical tree cannot change
+its mind.
+
+**`killed` vs `exitCode`.** A child killed at the timeout reports no exit code
+of its own, so `killed` — not the code — is what separates "ran out of time"
+from "chose to exit 0". Both fields are journaled.
+
+**The key.** `opts.gate` is part of the call key like every other opt, and
+deliberately so: a result recorded without a gate was never verified by one,
+and a result recorded under a different gate cleared a different bar. Neither
+is reusable, so changing (or adding) a gate makes `--resume` re-run the call.
+
+**Execution shape.** A plain `cmd arg arg` line (quotes supported) is split
+into an argv and spawned directly, so `npm test` and `go vet ./...` involve no
+shell. Only a command with genuine shell syntax — `&&`, a pipe, a redirect, a
+glob, `$VAR`, backticks — falls back to `sh -c`. The split is about
+predictability, not containment: both routes run with the operator's full
+privileges.
+
+> **Trust boundary.** A gate string is **workflow-authored**: it may come from
+> a workflow script (`core/workflows`, a pack's `workflows` directory,
+> `~/.claude/workflows`) or from the `args` an operator typed at launch, and
+> nowhere else. It must NEVER be assembled from model output, a diff hunk, a
+> file the run read, a fetched page, or any other untrusted material.
+> `agent()` does not sanitize it and cannot — a gate is by definition an
+> arbitrary project command, and sanitizing it would only make an
+> injection-shaped string fail confusingly instead of safely.
+
+**In this repo's workflows** (all three keep their model judgment; the gate is
+added alongside it, never instead of it):
+
+| workflow | gated call | command |
+| --- | --- | --- |
+| `implement.js` | Gate phase (`gate`) | `args.gateCommand`, off by default |
+| `preflight.js` | Gate phase (`lint-and-mark`) | `args.gateCommand`, off by default |
+| `go-optimize.js` | Propose (per worktree candidate) | `args.gateCommand`, defaulting to `go build ./... && go vet ./...` |
+
+implement and preflight run against any project and have no command they
+could safely guess, so they stay off unless the caller names one; go-optimize
+only ever runs against a Go package, so it can name its own.
 
 ## Token accounting
 

@@ -10,6 +10,7 @@
 const { callKey } = require('./journal');
 const { runWithSchema, SchemaValidationError } = require('./schema');
 const worktree = require('./worktree');
+const gateLib = require('./gate');
 const retry = require('./retry');
 const budgetLib = require('./budget');
 const models = require('./models');
@@ -44,6 +45,9 @@ const DEFAULT_AGENT_TIMEOUT_MS = 15 * 60 * 1000;
  *   global. Absent/throws when this context is itself already a child (one
  *   level of nesting only).
  * @param {number} [ctx.timeoutMs] - run-level per-agent timeout default
+ * @param {number} [ctx.gateTimeoutMs] - run-level `opts.gate` timeout default
+ * @param {(command:string, options:object) => Promise<object>} [ctx.runGate]
+ *   injectable gate executor (tests); defaults to gate.js's `run`.
  * @param {object} [ctx.caps] - budget.js caps; defaults applied when absent
  * @param {number} [ctx.retries] - transient-failure retries per backend call
  * @param {number} [ctx.retryBaseDelayMs]
@@ -132,11 +136,21 @@ function createApi(ctx) {
     const model = resolvedModel.id || undefined;
     const effort = opts.effort || ctx.effort;
     const label = opts.label || '(unlabeled)';
+    // A workflow-authored shell command (see gate.js's trust boundary) run
+    // after this call returns, whose exit code decides whether the result
+    // stands. Blank/absent means no gate — the default for every call.
+    const gateCommand = typeof opts.gate === 'string' && opts.gate.trim() ? opts.gate.trim() : null;
     // The RESOLVED backend and model are part of the call's identity, not
     // just of its display: the same prompt answered by gpt-5.4-mini and by
     // gpt-5.6-sol is not the same work, so a `--resume` that changed
     // `--model`/`--model-map`/`{backend}` must re-run the call instead of
     // replaying a result some other model produced.
+    //
+    // `opts.gate` rides along inside `normalizedOpts` and is therefore part
+    // of the key by construction — which is the behaviour we want and a
+    // journal.test.js case pins: a result recorded WITHOUT a gate was never
+    // verified by one, and a result recorded under a DIFFERENT gate was
+    // verified against a different bar, so neither is reusable for this call.
     const key = callKey(prompt, normalizedOpts, { backend: backendName, model });
     const index = state.callIndex;
     state.callIndex += 1;
@@ -293,14 +307,59 @@ function createApi(ctx) {
       }
 
       const settled = settleUsage(usage);
+
+      // ---- gate -----------------------------------------------------------
+      // Run AFTER the backend call (and after schema validation, which has
+      // already thrown if the shape was wrong: the reader should see the
+      // schema error, not a gate error standing in front of it) and BEFORE
+      // the `finally` below removes the worktree — `effectiveCwd` is that
+      // worktree while it still exists, which is the only moment at which
+      // `npm test` means "the code this agent just wrote" rather than
+      // "whatever is in the main tree".
+      let gateRecord;
+      if (gateCommand) {
+        const outcome = await (ctx.runGate || gateLib.run)(gateCommand, {
+          cwd: effectiveCwd,
+          timeoutMs: gateTimeoutFor(opts, ctx),
+        });
+        gateRecord = gateLib.toRecord(outcome);
+        ctx.emit({
+          type: 'agent-gate', runId: ctx.runId, label, phase: effPhase, index,
+          backend: backendName, model, status: outcome.ok ? 'pass' : 'fail',
+          gate: gateRecord, ts: nowIso(),
+        });
+        if (!outcome.ok) {
+          // Failing the agent, not just noting it: an unverified result that
+          // still resolves is a gate nobody enforced. This takes the same
+          // route as any other terminal backend failure — journaled
+          // `status: 'error'` (so `--resume` will NOT replay it and the call
+          // re-runs), emitted as a failing `agent-end`, and resolving to
+          // `null` per agent()'s documented contract.
+          const err = new gateLib.GateFailureError(gateLib.failureMessage(outcome), gateRecord);
+          ctx.journal.append({
+            key, index, label, phase: effPhase, status: 'error', durationMs,
+            backend: backendName, model, ...settled,
+            gate: gateRecord, timedOut: err.timedOut, error: err.message,
+          });
+          ctx.emit({
+            type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index,
+            backend: backendName, model, status: 'error', timedOut: err.timedOut,
+            gate: gateRecord, error: err.message, ts: nowIso(),
+          });
+          return null;
+        }
+      }
+
       ctx.journal.append({
         key, index, label, phase: effPhase, status: 'ok', result, durationMs,
         backend: backendName, model, ...settled,
+        ...(gateRecord ? { gate: gateRecord } : {}),
       });
       ctx.emit({
         type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index, status: 'ok',
         backend: backendName, model, tokens: settled.tokens,
-        tokensSource: settled.tokensSource, durationMs, ts: nowIso(),
+        tokensSource: settled.tokensSource, durationMs,
+        ...(gateRecord ? { gate: gateRecord } : {}), ts: nowIso(),
       });
       return result;
     } finally {
@@ -445,6 +504,17 @@ function timeoutFor(opts, ctx) {
   return ms > 0 ? ms : undefined;
 }
 
+/** `opts.gateTimeoutMs` per call, else the run's `gateTimeoutMs`, else
+ *  gate.js's 10-minute default. `0` or negative means "no timeout"
+ *  explicitly — the same convention `timeoutFor` uses. Kept separate from
+ *  the agent timeout on purpose: a five-minute agent call and a fifteen-
+ *  minute test suite are unrelated ceilings, and sharing one number would
+ *  make tightening the agent's leash silently truncate the verification. */
+function gateTimeoutFor(opts, ctx) {
+  const chosen = [opts.gateTimeoutMs, ctx.gateTimeoutMs].find((v) => Number.isFinite(v));
+  return chosen === undefined ? gateLib.DEFAULT_GATE_TIMEOUT_MS : chosen;
+}
+
 function newUsageAccumulator() {
   return {
     reportedTokens: 0, estimatedTokens: 0,
@@ -522,5 +592,6 @@ module.exports = {
   makeLimiter,
   estimateTokens,
   timeoutFor,
+  gateTimeoutFor,
   DEFAULT_AGENT_TIMEOUT_MS,
 };

@@ -62,6 +62,13 @@ const AUTO_LABEL = /^(?:\(unlabeled\)|agent-\d+)$/;
  * the key (two lanes that send the same prompt under different labels are
  * different work); an auto-generated one is stripped.
  *
+ * Everything else in `opts` is identity by default, and that default is
+ * load-bearing for `opts.gate`: a result recorded WITHOUT a gate was never
+ * verified by one, and a result recorded under a DIFFERENT gate cleared a
+ * different bar. Neither is reusable, so adding or changing a gate must miss
+ * the replay — which it does, for free, by riding along here. Do not "tidy"
+ * gate out of the hashed identity.
+ *
  * `execution` carries what the RUNNER resolved rather than what the script
  * typed: the per-call backend and the concrete model id. Both belong in the
  * key because they change the work, not just its display. `opts.model` alone

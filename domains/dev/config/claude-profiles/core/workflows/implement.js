@@ -18,7 +18,18 @@ export const meta = {
 // (no Skill tool to invoke), it does not fail the call or the run.
 // args: { tasks?: [{id,title,spec,files?,deps?}], tasksFile?: string,
 //         rules?: [path], docs?: [path], model?: string, max_retry?: number,
-//         delivery?: 'none' | 'commit' | 'draft-pr', deliveryBranch?: boolean }
+//         delivery?: 'none' | 'commit' | 'draft-pr', deliveryBranch?: boolean,
+//         gateCommand?: string }
+// gateCommand: the project's own quality command (e.g. "npm test",
+// "go build ./... && go vet ./...", "make check"). When given it is attached
+// to the Gate-phase call as a real `gate`: yoki-graph runs it after that
+// agent returns, and a non-zero exit fails the call — so the delivery
+// precondition below becomes an exit code rather than a model's summary of
+// one. The model check stays alongside it for the half that needs reasoning
+// (which failures matter, what is missing a test). Absent by default: this
+// workflow is project-agnostic and has no command it could safely guess.
+// TRUST: the string is executed as a shell command with the operator's
+// privileges — it comes from the launch args, never from model output.
 // delivery: 'commit' commits on whatever branch is already checked out — no
 // branch is created and HEAD never moves. 'draft-pr' still needs a branch to
 // push and open a PR from, so it keeps creating/switching to impl/<id>.
@@ -41,6 +52,7 @@ const TASKS_FILE = (A && A.tasksFile) || ''
 const RULES = (A && A.rules) || []
 const DOCS = (A && A.docs) || []
 let TASKS = (A && Array.isArray(A.tasks)) ? A.tasks : []
+const GATE_COMMAND = (A && typeof A.gateCommand === 'string' && A.gateCommand.trim()) ? A.gateCommand.trim() : ''
 const DELIVERY_MODES = ['none', 'commit', 'draft-pr']
 const DELIVERY_RAW = (A && A.delivery) || 'none'
 const DELIVERY = DELIVERY_MODES.includes(DELIVERY_RAW) ? DELIVERY_RAW : 'none'
@@ -223,8 +235,16 @@ If a category is not configured in this project, say so explicitly rather than r
   // NOTE: 判定段は opus 明示 (esh2n 承認 2026-08-17 — 未指定はセッションモデルを継承してしまう)
   // report-only for the repo's source, but lint/typecheck/test runners write
   // their own build and coverage caches — that needs the workspace.
-  { label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, model: 'opus', effort: 'high', sandbox: 'workspace-write' },
+  {
+    label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, model: 'opus', effort: 'high', sandbox: 'workspace-write',
+    // The mechanical half, when the caller named a command: its exit code
+    // decides, and a failure turns this whole call into a failure (gate=null
+    // below), which is exactly what `gatePassed` already treats as "do not
+    // deliver". Omitted -> the model's judgment alone, as before.
+    ...(GATE_COMMAND ? { gate: GATE_COMMAND } : {}),
+  },
 )
+if (GATE_COMMAND && !gate) log(`command gate failed: ${GATE_COMMAND} — nothing will be delivered`)
 
 const tasks = [...results.values()]
 log(`implemented ${tasks.filter((t) => t.status === 'done').length}/${tasks.length} task(s); gate ${gate && gate.ok ? 'passed' : 'needs attention'}`)

@@ -48,7 +48,7 @@ yoki-graph run <name|path> --backend codex|omp|mock
     [--args '<json>' | --args-file <f>] [--cwd <dir>]
     [--resume <runId>] [--dry-run] [--json] [--concurrency N]
     [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
-    [--mock <file>] [--timeout <ms>] [--retries N]
+    [--mock <file>] [--timeout <ms>] [--gate-timeout <ms>] [--retries N]
     [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
     [--model-map <tier>=<id>,...]
 yoki-graph list
@@ -91,14 +91,17 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
   ```
   `args: { tasks?: [{id,title,spec,files?,deps?}], tasksFile?: string,
   rules?: [path], docs?: [path], model?: string, max_retry?: number,
-  delivery?: 'none' | 'commit' | 'draft-pr', deliveryBranch?: boolean }`
+  delivery?: 'none' | 'commit' | 'draft-pr', deliveryBranch?: boolean,
+  gateCommand?: string }`。`gateCommand` を渡すと Gate 段にコマンド gate が
+  付き、その終了コードが delivery の前提になる(下の gate 節)。
 
 - **preflight** — PR前のローカル品質ゲート(fan-out review → judge → 自動
   修正 → lint/build ゲート)
   ```
   yoki-graph run preflight --backend codex
   ```
-  `args: { model?: string }`
+  `args: { model?: string, gateCommand?: string }`。`gateCommand` を渡すと
+  Gate 段にコマンド gate が付き、非0なら pass marker を書かない。
 
 - **design-review** — 設計/spec をプロジェクトの実態に照らして精査
   ```
@@ -140,7 +143,8 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
   ```
   `args: { pkg: string (必須), bench?: string, threshold?: number,
   budget?: {maxProposals?, maxRounds?}, delivery?: 'draft' | 'commit' | 'pr',
-  runId?: string }`。`go-optimize` が `yoki-graph list` に出ないマシンでは
+  runId?: string, gateCommand?: string | false }`。`gateCommand` の既定は
+  `go build ./... && go vet ./...` で、候補ごとの worktree の中で走る。。`go-optimize` が `yoki-graph list` に出ないマシンでは
   `yoki-switch pack enable go` が先。
 
 ## モデルの指定と表示
@@ -179,7 +183,8 @@ ID はそのまま通る。
 - `--json` は従来どおり NDJSON。`model` / `backend` / `index` / `phases` が
   増え、実行中の tool 呼び出し数を伝える `agent-progress` イベントが増えた
   (codex は `--json` の item イベント、omp は json モードのイベント列から
-  数える。mock は合成値を1回だけ返す)。
+  数える。mock は合成値を1回だけ返す)。`opts.gate` を持つ呼び出しは
+  `agent-gate`(`status` と `gate: {command, exitCode, ms, killed}`)も出す。
 - `yoki-graph status <runId> --watch` は2秒ごとに journal の**追記分だけ**を
   読んで同じ状態行を描き(全文再読み込みではないので、長いランでも1tickの
   コストが増えていかない)、ランが終わったら通常の `status` 出力を出して
@@ -356,6 +361,55 @@ await agent(prompt, { label: 'impl:t1', sandbox: 'workspace-write' })
   表現する。`workspace-write` / `danger-full-access` は omp では追加フラグ
   無し(それ自身の既定より広い権限が無いため)。
 
+## gate(agent() ごとのコマンド検証)
+
+```js
+await agent(prompt, { label: 'gate', gate: 'npm test' })
+```
+
+`agent()` が返った**あと**にシェルコマンドを1回走らせ、その終了コードで
+結果の採否を決める。exit 0 ならそのまま通し、非0(またはタイムアウトで
+kill)なら**バックエンド失敗と同じ扱い** — journal に `status: "error"` と
+`gate: {command, exitCode, ms, killed}` が残り、`agent-end` は error、
+`agent()` は `null` を返す。
+
+- **走る場所**は「そのエージェントが実際に書いたツリー」:
+  `isolation: 'worktree'` ならその worktree、そうでなければランの `cwd`。
+  worktree は呼び出しの `finally` で片付くので、ここが
+  「`npm test` が“今書かれたコード”を意味する」最後の瞬間になる。
+- **走る順番**は backend 呼び出し → schema 検証 → gate。schema 違反は
+  先に throw する(形が違うなら検証すべき成果物がまだ無い)。
+- **リトライしない**。gate は済んだ仕事に対する判定で、同じツリーに同じ
+  コマンドを当て直しても答えは変わらない。タイムアウト時のメッセージは
+  "timed out" を含むため、明示的に非一時障害として印を付けてある。
+- **key に入る**ので、gate を足した/変えた呼び出しは `--resume` で再生
+  されず走り直る(検証されていない結果・別の基準を通った結果は再利用
+  しない)。失敗した gate も `status: "error"` なので再開時に再実行される。
+- タイムアウトは `gateTimeoutMs` > `--gate-timeout <ms>` > 既定10分。
+  エージェント本体の `timeoutMs` とは別枠。
+- `npm test` のような素のコマンドは argv に分割して直接 spawn する。
+  `&&` / パイプ / リダイレクト / glob / `$VAR` を含むときだけ `sh -c`。
+- 進捗行: `⛨ gate gate: npm test → pass (12s)` / `→ fail (exit 1)` /
+  `→ fail (timed out)`。`--json` では `agent-gate` イベント。
+
+> **信頼境界**: gate 文字列は**ワークフロー側が書いたもの**(ワークフロー
+> スクリプト、または起動時に人が渡した `args`)に限る。モデルの出力・diff
+> hunk・読み込んだファイル・取得したページから組み立ててはならない。
+> オペレータの権限でそのまま実行される。
+
+モデル判定を置き換えるものではなく**併用**する: 「どの失敗が効くか」
+「テストが無い」といった判断はモデル、ビルド/lint/テストの合否は gate。
+
+| workflow | 付く呼び出し | コマンド |
+| --- | --- | --- |
+| `implement.js` | Gate 段(`gate`) | `args.gateCommand`、既定オフ |
+| `preflight.js` | Gate 段(`lint-and-mark`) | `args.gateCommand`、既定オフ |
+| `go-optimize.js` | Propose(候補 worktree ごと) | `args.gateCommand`、既定 `go build ./... && go vet ./...` |
+
+implement / preflight はどのプロジェクトでも走るので既定のコマンドを
+決め打ちできない。go-optimize は Go パッケージ専用なので既定を持つ
+(`gateCommand: false` で無効化)。
+
 ## journal の読み方 / `--resume` は prefix 再生
 
 `agent()` 呼び出し1回につき1行、
@@ -419,7 +473,8 @@ tier 名であることもあるため。これが無かった頃は、`--model`
   1回で諦める。再試行は journal に `status: "retry"` として残る。
   これはスキーマ違反のリトライ(schema.js が1回だけ行う)とは別の層。
 - **タイムアウト**: `agent(prompt, { timeoutMs })` > `--timeout <ms>` >
-  既定15分。超えた子プロセスは SIGKILL され、`timedOut: true` で journal に
+  既定15分。`opts.gate` のタイムアウトはこれとは別枠(`gateTimeoutMs` >
+  `--gate-timeout <ms>` > 既定10分、リトライ対象外)。超えた子プロセスは SIGKILL され、`timedOut: true` で journal に
   記録される(タイムアウトは一時障害扱いなのでリトライ対象)。
 - **トークン**: 各バックエンド自身の出力から読む — codex は `--json` の
   `turn.completed` の usage、omp は assistant レコードの `usage`。報告が

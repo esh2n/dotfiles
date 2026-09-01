@@ -31,6 +31,11 @@ function createState() {
     running: new Map(), // index -> {label, model, startedAt, toolCalls}
     done: 0,
     failed: 0,
+    // Agents whose `opts.gate` command exited non-zero (or was killed at its
+    // timeout). Counted separately from `failed` — which they also become —
+    // because "the model answered but the build is broken" and "the backend
+    // died" are different things to see at a glance.
+    gateFailed: 0,
     replayed: 0,
     finished: false,
     status: null,
@@ -68,6 +73,15 @@ function foldEvent(state, event, now = Date.now()) {
     case 'agent-progress': {
       const entry = state.running.get(event.index);
       if (entry) entry.toolCalls = event.toolCalls || 0;
+      break;
+    }
+    case 'agent-gate': {
+      // Emitted between the backend call and `agent-end`, so the entry is
+      // still in `running` and the status line can say the lane moved from
+      // "waiting on a model" to "waiting on a command".
+      const entry = state.running.get(event.index);
+      if (entry) entry.gate = event.status === 'pass' ? 'pass' : 'fail';
+      if (event.status !== 'pass') state.gateFailed += 1;
       break;
     }
     case 'agent-cached':
@@ -109,6 +123,7 @@ function renderStatus(state, now = Date.now()) {
     parts.push(state.name);
   }
   parts.push(`running ${state.running.size} / done ${state.done} / failed ${state.failed}`);
+  if (state.gateFailed) parts.push(`gate-failed ${state.gateFailed}`);
   if (state.replayed) parts.push(`replayed ${state.replayed}`);
 
   const inFlight = [...state.running.values()].slice(0, MAX_RUNNING_SHOWN).map((entry) => {
@@ -116,6 +131,7 @@ function renderStatus(state, now = Date.now()) {
     if (entry.model) bits.push(entry.model);
     bits.push(formatElapsed(now - entry.startedAt));
     if (entry.toolCalls) bits.push(`+${entry.toolCalls} tools`);
+    if (entry.gate) bits.push(`gate:${entry.gate}`);
     return `[${bits.join(' ')}]`;
   });
   const hidden = state.running.size - inFlight.length;

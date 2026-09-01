@@ -12,12 +12,24 @@ export const meta = {
 }
 
 // backends: claude, codex, omp (via yoki-graph)
-// args: { model?: string } — finder-tier model override, defaults to 'sonnet'.
+// args: { model?: string, gateCommand?: string }
+// model: finder-tier model override, defaults to 'sonnet'.
+// gateCommand: the project's own lint/typecheck/test command (e.g.
+// "pnpm typecheck", "go vet ./...", "make lint"). When given it is attached
+// to the Gate-phase call as a real `gate` — yoki-graph runs it after that
+// agent returns and a non-zero exit fails the call, so the pass marker is
+// never written on the strength of a model's say-so alone. The prompt's own
+// detect-and-run instructions stay for the reasoning half (what is NOT
+// configured, which new files lack tests). Absent by default: this workflow
+// runs against any project and has no command it could safely guess.
+// TRUST: the string is executed as a shell command with the operator's
+// privileges — it comes from the launch args, never from model output.
 // Model tiers: collect -> haiku + low effort (mechanical); finders -> MODEL,
 // except the security finder -> opus (misses cost the most, findings are
 // report-only so noise is tolerable); judge -> session model + high effort —
 // nothing a cheap finder claims is applied to the tree unjudged.
 const MODEL = (args && args.model) || 'sonnet'
+const GATE_COMMAND = (args && typeof args.gateCommand === 'string' && args.gateCommand.trim()) ? args.gateCommand.trim() : ''
 
 phase('Collect')
 
@@ -199,9 +211,16 @@ const gate = await agent(
    hash=$(git diff --no-ext-diff --no-color $(git merge-base origin/${ctx.base} HEAD 2>/dev/null || git merge-base ${ctx.base} HEAD) | shasum -a 256 | cut -d' ' -f1)
    mkdir -p .claude/.cache/preflight && echo "$hash" > ".claude/.cache/preflight/$(git branch --show-current | tr '/' '_').pass"
 Return via StructuredOutput.`,
-  // runs the project's lint/typecheck (build caches) and writes the pass marker.
-  { label: 'lint-and-mark', phase: 'Gate', schema: GATE_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
+  {
+    // runs the project's lint/typecheck (build caches) and writes the pass marker.
+    label: 'lint-and-mark', phase: 'Gate', schema: GATE_SCHEMA, model: MODEL, sandbox: 'workspace-write',
+    // Runs after the agent, in the same tree it just checked: a marker
+    // written while the caller's own command exits non-zero is a lie, and a
+    // failed gate nulls this call so `status` below reports 'attention'.
+    ...(GATE_COMMAND ? { gate: GATE_COMMAND } : {}),
+  },
 )
+if (GATE_COMMAND && !gate) log(`command gate failed: ${GATE_COMMAND} — no pass marker was recorded`)
 
 return {
   status: gate && gate.lint_ok && !String(gate.marker).startsWith('skipped') ? 'passed' : 'attention',

@@ -10,7 +10,7 @@
  *       [--args '<json>' | --args-file <f>] [--cwd <dir>]
  *       [--resume <runId>] [--dry-run] [--json] [--concurrency N]
  *       [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
- *       [--mock <file>] [--timeout <ms>] [--retries N]
+ *       [--mock <file>] [--timeout <ms>] [--gate-timeout <ms>] [--retries N]
  *       [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
  *       [--model-map <tier>=<id>,...]
  *   yoki-graph list
@@ -78,6 +78,15 @@ function humanLine(event) {
       return `[${ts}]   ✓ ${event.label} (replayed #${event.index}, --resume)\n`;
     case 'resume-diverged':
       return `[${ts}] ↯ resume diverged at call #${event.index} (${event.label}) — everything from here runs live\n`;
+    case 'agent-gate': {
+      // The mechanical half of a verification, printed as its own permanent
+      // line: which command ran, whether it passed, and how long it cost.
+      // A reader scanning the log for "why was this rejected" should find
+      // the exit-code verdict without having to open the JSON stream.
+      const g = event.gate || {};
+      const verdict = event.status === 'pass' ? 'pass' : (g.killed ? 'fail (timed out)' : `fail (exit ${g.exitCode})`);
+      return `[${ts}]   ⛨ ${event.label} gate: ${g.command} → ${verdict} (${progress.formatElapsed(g.ms || 0)})\n`;
+    }
     case 'agent-retry':
       return `[${ts}]   ↻ ${event.label} retry ${event.attempt}/${event.retries} in ${event.delayMs}ms: ${event.error}\n`;
     case 'agent-end': {
@@ -135,6 +144,7 @@ async function cmdRun(rest, flags) {
     effort: flags.effort,
     mockFile: flags.mock ? path.resolve(flags.mock) : undefined,
     timeoutMs: numberFlag(flags.timeout),
+    gateTimeoutMs: numberFlag(flags['gate-timeout']),
     retries: numberFlag(flags.retries),
     maxAgentCalls: numberFlag(flags['max-agent-calls']),
     maxTokens: numberFlag(flags['max-tokens']),

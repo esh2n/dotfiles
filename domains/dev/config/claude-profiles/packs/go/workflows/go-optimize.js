@@ -23,7 +23,22 @@ export const meta = {
 //                 benchmark(s) to target — it does NOT authorize writing a new one),
 //         threshold?: number (percent improvement required, default 5),
 //         budget?: { maxProposals?: number (default 4), maxRounds?: number (default 1) },
-//         delivery?: 'draft' | 'commit' | 'pr' (default 'draft'), runId?: string }
+//         delivery?: 'draft' | 'commit' | 'pr' (default 'draft'), runId?: string,
+//         gateCommand?: string | false }
+//
+// gateCommand: the compile-level check each Propose candidate must clear,
+// run by yoki-graph INSIDE that candidate's own worktree the moment its
+// agent returns and before the worktree is torn down. Defaults to
+// `go build ./... && go vet ./...` — this workflow only ever runs against a
+// Go package, so unlike the project-agnostic workflows it can name its own
+// gate. Pass a different command to widen or narrow it, or `false`/'' to
+// turn it off. It does NOT replace the prompt's correctness gate: the
+// script still requires `correctnessOk` (which additionally covers
+// `go test -race`, too slow to repeat here) and still reads the agent's
+// failureReason. What the command adds is that a candidate claiming a clean
+// build cannot BE the one deciding whether the build is clean.
+// TRUST: executed as a shell command with the operator's privileges — it
+// comes from this file or the launch args, never from model output.
 //
 // Contract: workflows may only commit/open a PR when the CALLER explicitly chose
 // that delivery mode at launch (global rule) — this workflow never asks mid-run,
@@ -64,11 +79,15 @@ const DELIVERY_MODES = ['draft', 'commit', 'pr']
 const DELIVERY_RAW = (A && A.delivery) || 'draft'
 const DELIVERY = DELIVERY_MODES.includes(DELIVERY_RAW) ? DELIVERY_RAW : 'draft'
 if (DELIVERY_RAW !== DELIVERY) log(`unknown delivery "${DELIVERY_RAW}" — falling back to "draft" (no commit)`)
+const GATE_DEFAULT = 'go build ./... && go vet ./...'
+const GATE_COMMAND = (A && A.gateCommand === false) || (A && A.gateCommand === '')
+  ? ''
+  : ((A && typeof A.gateCommand === 'string' && A.gateCommand.trim()) ? A.gateCommand.trim() : GATE_DEFAULT)
 const RUN_ID = (A && A.runId) || 'latest'
 const MODEL = (A && A.model) || 'sonnet'
 
 if (!PKG) { log('go-optimize requires args.pkg (import path or dir)'); return { error: 'no pkg' } }
-log(`resolved args: pkg=${PKG} bench=${BENCH || '(none — auto-pick)'} threshold=${THRESHOLD}% budget=${JSON.stringify(BUDGET)} delivery=${DELIVERY} runId=${RUN_ID}`)
+log(`resolved args: pkg=${PKG} bench=${BENCH || '(none — auto-pick)'} threshold=${THRESHOLD}% budget=${JSON.stringify(BUDGET)} delivery=${DELIVERY} runId=${RUN_ID} gate=${GATE_COMMAND || '(off)'}`)
 
 phase('Resolve')
 
@@ -254,10 +273,18 @@ const proposals = await parallel(angles.map((a) => () =>
     // write in one — that is asked for separately, and here it must be: this
     // stage edits code, builds, and runs the benchmark.
     sandbox: 'workspace-write',
+    // Runs in THIS candidate's worktree, while it still exists — the only
+    // moment `go build` can mean "the code this proposal wrote" rather than
+    // "whatever is in the main tree". A candidate that does not compile
+    // resolves to null and is dropped below, alongside the ones that failed
+    // their own correctness gate.
+    ...(GATE_COMMAND ? { gate: GATE_COMMAND } : {}),
   }),
 ))
 
 const validProposals = proposals.filter(Boolean)
+const dropped = proposals.length - validProposals.length
+if (dropped && GATE_COMMAND) log(`${dropped} proposal(s) dropped before scoring (agent failure or \`${GATE_COMMAND}\` non-zero in their worktree)`)
 for (const p of validProposals) {
   if (!p.correctnessOk) log(`propose:${p.angle} rejected at correctness gate — ${p.failureReason || '(no reason given)'}`)
 }

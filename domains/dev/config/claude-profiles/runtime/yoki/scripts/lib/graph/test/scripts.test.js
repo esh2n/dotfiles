@@ -151,7 +151,11 @@ const SCRIPTS = [
   {
     name: 'implement',
     scriptPath: path.join(CORE_WORKFLOWS, 'implement.js'),
-    args: { tasks: [{ id: 't1', title: 'Add feature', spec: 'Implement feature X', files: ['pkg/x.go'] }] },
+    // `gateCommand` attaches a real command gate to the Gate-phase call:
+    // `true` exits 0, so the run must reach exactly the same final return it
+    // reached before gates existed. The failing-gate half is covered in
+    // gate.test.js against `agent()` directly.
+    args: { tasks: [{ id: 't1', title: 'Add feature', spec: 'Implement feature X', files: ['pkg/x.go'] }], gateCommand: 'true' },
     assertResult(r) {
       assert.equal(r.tasks.length, 1);
       assert.equal(r.tasks[0].status, 'done');
@@ -164,7 +168,7 @@ const SCRIPTS = [
   {
     name: 'preflight',
     scriptPath: path.join(CORE_WORKFLOWS, 'preflight.js'),
-    args: {},
+    args: { gateCommand: 'true' },
     assertResult(r) {
       assert.equal(r.status, 'passed');
       assert.equal(r.branch, 'feature/x');
@@ -216,7 +220,11 @@ const SCRIPTS = [
   {
     name: 'go-optimize',
     scriptPath: path.join(GO_WORKFLOWS, 'go-optimize.js'),
-    args: { pkg: './internal/foo' },
+    // The default gate here is `go build ./... && go vet ./...`, which the
+    // throwaway one-README repo below has nothing to compile — so this run
+    // overrides it with a command that exits 0. What the override still
+    // exercises is the wiring: the gate runs inside each Propose worktree.
+    args: { pkg: './internal/foo', gateCommand: 'true' },
     needsGitRepo: true,
     assertResult(r) {
       assert.equal(r.pkg, './internal/foo');
@@ -251,6 +259,63 @@ for (const spec of SCRIPTS) {
     }
   }));
 }
+
+// ---------------------------------------------------------------------------
+// 1a. The `gate` wiring inside those same scripts.
+// ---------------------------------------------------------------------------
+
+test('implement/preflight run their Gate-phase command gate and pass it', () => withIsolatedState(async () => {
+  for (const [name, args] of [
+    ['implement', { tasks: [{ id: 't1', title: 'Add feature', spec: 'Implement feature X' }], gateCommand: 'true' }],
+    ['preflight', { gateCommand: 'true' }],
+  ]) {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-scripts-gate-'));
+    try {
+      const events = [];
+      const result = await runner.executeScript({
+        scriptPath: path.join(CORE_WORKFLOWS, `${name}.js`),
+        args,
+        backendName: 'mock',
+        cwd,
+        mockFile: fixture(name),
+        emit: (e) => events.push(e),
+      });
+      assert.equal(result.status, 'ok', result.error);
+      const gates = events.filter((e) => e.type === 'agent-gate');
+      assert.equal(gates.length, 1, `${name} attaches exactly one command gate`);
+      assert.equal(gates[0].status, 'pass');
+      assert.equal(gates[0].gate.command, 'true');
+      assert.equal(gates[0].gate.exitCode, 0);
+      // The gated call is the one the phase is named after, and it still
+      // returned its structured answer rather than being nulled.
+      assert.equal(gates[0].phase, 'Gate');
+      const end = events.find((e) => e.type === 'agent-end' && e.index === gates[0].index);
+      assert.equal(end.status, 'ok');
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  }
+}));
+
+test('a workflow given no gateCommand attaches no gate at all (unchanged default behaviour)', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-scripts-nogate-'));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: path.join(CORE_WORKFLOWS, 'preflight.js'),
+      args: {},
+      backendName: 'mock',
+      cwd,
+      mockFile: fixture('preflight'),
+      emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    assert.equal(result.result.status, 'passed');
+    assert.equal(events.some((e) => e.type === 'agent-gate'), false);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
 
 // ---------------------------------------------------------------------------
 // 1b. Provider lanes (MP3): the same three scripts under

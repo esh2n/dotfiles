@@ -67,7 +67,9 @@ const piped = await pipeline(
 )
 const par = await parallel([
   () => agent('parallel A', { label: 'parA', agentType: 'general-purpose' }),
-  () => agent('parallel B', { label: 'parB', isolation: 'worktree' }),
+  // isolation + a command gate: the gate runs inside parB's worktree, and
+  // \`true\` exits 0 so the result passes through untouched.
+  () => agent('parallel B', { label: 'parB', isolation: 'worktree', gate: 'true', gateTimeoutMs: 30000 }),
 ])
 const child = await workflow({ scriptPath: args.childPath }, { n: 21 })
 return {
@@ -124,6 +126,9 @@ test('every documented global works together in one script (mock backend, no exe
     assert.ok(!fs.existsSync(path.join(repo, '.claude', 'worktrees')) || fs.readdirSync(path.join(repo, '.claude', 'worktrees')).length === 0);
     assert.ok(events.some((e) => e.type === 'phase' && e.title === 'Plan'));
     assert.ok(events.some((e) => e.type === 'phase' && e.title === 'Work'));
+    const gated = events.find((e) => e.type === 'agent-gate');
+    assert.equal(gated.label, 'parB');
+    assert.equal(gated.status, 'pass');
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });
   }
