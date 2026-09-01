@@ -145,11 +145,11 @@ test('resolveHome: substitutes {{HOME}} in command/args/env/url and inside targe
     targets: { claude: false, codex: true, omp: true },
     targetOverrides: { omp: { command: '{{HOME}}/bin/alt' } },
   }];
-  const [resolved] = resolveHome(servers, '/Users/esh2n');
-  assert.equal(resolved.command, '/Users/esh2n/bin/codebase-memory-mcp-managed');
-  assert.deepEqual(resolved.args, ['--root', '/Users/esh2n/repos']);
-  assert.equal(resolved.env.X, '/Users/esh2n/x');
-  assert.equal(resolved.targetOverrides.omp.command, '/Users/esh2n/bin/alt');
+  const [resolved] = resolveHome(servers, '/Users/exampleperson');
+  assert.equal(resolved.command, '/Users/exampleperson/bin/codebase-memory-mcp-managed');
+  assert.deepEqual(resolved.args, ['--root', '/Users/exampleperson/repos']);
+  assert.equal(resolved.env.X, '/Users/exampleperson/x');
+  assert.equal(resolved.targetOverrides.omp.command, '/Users/exampleperson/bin/alt');
 });
 
 // -----------------------------------------------------------------------------

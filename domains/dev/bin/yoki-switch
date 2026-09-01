@@ -30,7 +30,12 @@ fi
 # typed. Behavior is identical either way; this is cosmetic only.
 PROG="$(basename "${0:-yoki-switch}")"
 
-# --here: apply the checkout this script came from, even if it is a worktree.
+# --here: use the checkout this script came from, even if it is a worktree.
+# Applies to every subcommand (apply, doctor, pack ...): DOTFILES_ROOT is
+# re-derived from the script's own realpath and takes precedence over an
+# inherited DOTFILES_ROOT — the login shell exports the main checkout's path
+# machine-wide, so without this a worktree's `yoki-switch --here doctor`
+# would still run the main checkout's runtime/yoki code.
 REDIRECTED_FROM=""
 declare -a _argv=()
 for _a in "$@"; do
@@ -38,6 +43,16 @@ for _a in "$@"; do
     _argv+=("$_a")
 done
 set -- "${_argv[@]+"${_argv[@]}"}"
+
+if [[ "$REDIRECTED_FROM" == "--here" ]]; then
+    _here_real="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c "import os; print(os.path.realpath('${BASH_SOURCE[0]}'))" 2>/dev/null || echo "")"
+    if [[ -n "$_here_real" ]]; then
+        _here_root="$(cd "$(dirname "$_here_real")/../../.." 2>/dev/null && pwd || true)"
+        if [[ -n "$_here_root" && -d "${_here_root}/domains/dev/config/claude-profiles" ]]; then
+            DOTFILES_ROOT="$_here_root"
+        fi
+    fi
+fi
 
 # ~/.claude/settings.json bakes DOTFILES_ROOT into YOKI_ROOT and
 # CLAUDE_PLUGIN_ROOT as absolute paths, so applying from a git worktree leaves
@@ -615,8 +630,12 @@ doctor() {
         return $?
     fi
 
+    # --yoki-root pins the runtime being checked to this checkout's copy
+    # (doctor.js would otherwise take its own location, which is the same
+    # thing, but making it explicit keeps --here's meaning in one place).
     node "$RUNTIME_DIR/scripts/lib/doctor.js" \
         --dotfiles-root "${DOTFILES_ROOT:-$HOME/dotfiles}" \
+        --yoki-root "$RUNTIME_DIR" \
         --claude-dir "$CLAUDE_DIR" \
         --codex-dir "$CODEX_DIR" \
         --omp-dir "$OMP_AGENT_DIR" \

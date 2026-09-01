@@ -262,6 +262,7 @@ describe("publish safety gates", () => {
   });
 
   test("a password in a query string exits 4", async () => {
+    // fixture for this CLI's own scanner — yoki-prepush: allow credential-query
     const file = writePage("qs.html", PAGE.replace("<h1>hello</h1>", '<a href="/x?password=hunter2">x</a>'));
     const result = await runCli(["publish", file, "--channel", "demo-secret"]);
     assert.equal(result.code, 4);

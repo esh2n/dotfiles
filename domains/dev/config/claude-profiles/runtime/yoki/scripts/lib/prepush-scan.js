@@ -16,7 +16,22 @@
  *
  * One line per hit: `[fail] <file>:<line> <category>` — never the matched
  * text itself (this is a scanner, not a leak of the very thing it caught).
- * Exit 1 iff any hit. `--json` prints the finding list instead.
+ * Exit 1 iff any `[fail]` hit. `--json` prints the finding list instead.
+ *
+ * Allow markers — for a hit that is deliberate (a fixture that must stay
+ * byte-exact, the scanner's own test data):
+ *
+ *   yoki-prepush: allow <category>[,<category>…]
+ *     on the hit line itself or on the line immediately before it. Plain
+ *     text inside any comment syntax (`//`, `#`, `*`, `--`, `<!--`).
+ *   yoki-prepush: allow-file <category>[,<category>…]
+ *     anywhere in the first 5 lines of the file; covers every hit of those
+ *     categories in that file.
+ *
+ * An allowed hit is reported as `[allow] <file>:<line> <category>` and
+ * never fails the scan. Markers are read from the file as committed at
+ * HEAD (the same content the diff describes), so a marker on a line that
+ * is not itself part of the diff still counts.
  */
 
 const fs = require('fs');
@@ -36,12 +51,33 @@ function loadSecretRules(patternsPath = SECRET_PATTERNS_PATH) {
 }
 
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-const ALLOWED_EMAIL_RE = /noreply|no-reply|example/i;
+const NOREPLY_EMAIL_RE = /noreply|no-reply/i;
 
-// /Users/<name>/ or /home/<name>/ — an allow-listed account name (sbx docs'
-// generic "agent" home) is not a real person's machine and is not a hit.
+// RFC 2606 / RFC 6761 names reserved for documentation and testing: an
+// address under one of these can never reach a real mailbox, so it is not
+// personal data and not a hit.
+const RESERVED_EMAIL_TLDS = new Set(['test', 'example', 'invalid', 'localhost']);
+const RESERVED_EMAIL_DOMAINS = new Set(['example.com', 'example.org', 'example.net']);
+
+/** @returns {boolean} true when `address` is a noreply/reserved-domain address (not a hit) */
+function isReservedEmail(address) {
+  if (NOREPLY_EMAIL_RE.test(address)) return true;
+  const domain = address.slice(address.lastIndexOf('@') + 1).toLowerCase();
+  const tld = domain.slice(domain.lastIndexOf('.') + 1);
+  if (RESERVED_EMAIL_TLDS.has(tld)) return true;
+  for (const reserved of RESERVED_EMAIL_DOMAINS) {
+    if (domain === reserved || domain.endsWith(`.${reserved}`)) return true;
+  }
+  return false;
+}
+
+// /Users/<name>/ or /home/<name>/ — an allow-listed account name is not a
+// real person's machine and is not a hit: `agent` is the sbx docs' generic
+// sandbox home, `exampleperson` is this repo's designated fixture account
+// (the home-path counterpart of example.com — use it wherever a test just
+// needs some home directory).
 const HOME_PATH_RE = /\/(?:Users|home)\/([A-Za-z0-9_.-]+)\//g;
-const HOME_PATH_ALLOWLIST = new Set(['agent']);
+const HOME_PATH_ALLOWLIST = new Set(['agent', 'exampleperson']);
 
 /** @returns {string[]} category ids hit by this one added line, deduped */
 function scanLine(line, secretRules) {
@@ -55,7 +91,7 @@ function scanLine(line, secretRules) {
   const emailRe = new RegExp(EMAIL_RE.source, EMAIL_RE.flags);
   let m;
   while ((m = emailRe.exec(line))) {
-    if (!ALLOWED_EMAIL_RE.test(m[0])) categories.add('email');
+    if (!isReservedEmail(m[0])) categories.add('email');
   }
 
   const homeRe = new RegExp(HOME_PATH_RE.source, HOME_PATH_RE.flags);
@@ -64,6 +100,53 @@ function scanLine(line, secretRules) {
   }
 
   return [...categories];
+}
+
+// ---------------------------------------------------------------------------
+// allow markers
+// ---------------------------------------------------------------------------
+
+const ALLOW_MARKER_RE = /yoki-prepush:\s*allow(-file)?\s+([A-Za-z0-9_-]+(?:\s*,\s*[A-Za-z0-9_-]+)*)/g;
+const ALLOW_FILE_HEAD_LINES = 5;
+
+/**
+ * Every `yoki-prepush: allow …` / `allow-file …` marker on one line.
+ * @returns {Array<{scope:'line'|'file', categories:string[]}>}
+ */
+function parseAllowMarkers(text) {
+  const markers = [];
+  const re = new RegExp(ALLOW_MARKER_RE.source, ALLOW_MARKER_RE.flags);
+  let m;
+  while ((m = re.exec(text))) {
+    markers.push({
+      scope: m[1] ? 'file' : 'line',
+      categories: m[2].split(',').map(c => c.trim().toLowerCase()).filter(Boolean),
+    });
+  }
+  return markers;
+}
+
+/**
+ * Categories allowed for a hit at 1-based `lineNo` of a file whose content
+ * is `lines`: `allow-file` markers in the first 5 lines, plus `allow`
+ * markers on the line itself or the line immediately before it.
+ * @returns {Set<string>}
+ */
+function allowedCategoriesAt(lines, lineNo) {
+  const allowed = new Set();
+  const head = lines.slice(0, ALLOW_FILE_HEAD_LINES);
+  for (const text of head) {
+    for (const marker of parseAllowMarkers(text)) {
+      if (marker.scope === 'file') marker.categories.forEach(c => allowed.add(c));
+    }
+  }
+  for (const idx of [lineNo - 1, lineNo - 2]) {
+    if (idx < 0 || idx >= lines.length) continue;
+    for (const marker of parseAllowMarkers(lines[idx])) {
+      if (marker.scope === 'line') marker.categories.forEach(c => allowed.add(c));
+    }
+  }
+  return allowed;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,22 +251,42 @@ function result(status, file, line, category) {
   return { status, file, line, category };
 }
 
+/** Lines of `relPath` as committed at HEAD, or [] when it is not there (deleted, binary). */
+function headFileLines(repoRoot, relPath) {
+  const proc = spawnSync('git', ['-C', repoRoot, 'show', `HEAD:${relPath}`], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (proc.error || proc.status !== 0) return [];
+  return proc.stdout.split('\n');
+}
+
 /**
- * @param {{repoRoot:string, base?:string, secretPatternsPath?:string}} options
- * @returns {Array<{status:'fail', file:string, line:number, category:string}>}
+ * @param {{repoRoot:string, base?:string, secretPatternsPath?:string,
+ *   readFileLines?: (repoRoot:string, relPath:string) => string[]}} options
+ * @returns {Array<{status:'fail'|'allow', file:string, line:number, category:string}>}
  */
 function runPrepushScan(options) {
   const repoRoot = options.repoRoot;
   const base = options.base || 'main';
   const range = `${base}...HEAD`;
   const secretRules = loadSecretRules(options.secretPatternsPath || SECRET_PATTERNS_PATH);
+  const readFileLines = options.readFileLines || headFileLines;
 
   const findings = [];
+  const fileLinesCache = new Map();
+  const linesOf = file => {
+    if (!fileLinesCache.has(file)) fileLinesCache.set(file, readFileLines(repoRoot, file));
+    return fileLinesCache.get(file);
+  };
 
   const diffText = runGit(repoRoot, ['diff', range, '--unified=0', '--no-color']);
   for (const { file, line, text } of parseAddedLines(diffText)) {
-    for (const category of scanLine(text, secretRules)) {
-      findings.push(result('fail', file, line, category));
+    const categories = scanLine(text, secretRules);
+    if (categories.length === 0) continue;
+    const allowed = allowedCategoriesAt(linesOf(file), line);
+    for (const category of categories) {
+      findings.push(result(allowed.has(category) ? 'allow' : 'fail', file, line, category));
     }
   }
 
@@ -250,20 +353,29 @@ function main() {
     return;
   }
 
+  const fails = findings.filter(f => f.status === 'fail');
+  const allows = findings.filter(f => f.status === 'allow');
+
   if (options.json) {
     process.stdout.write(`${JSON.stringify(findings, null, 2)}\n`);
-  } else if (findings.length === 0) {
-    process.stdout.write(`[ok] no hits in diff ${options.base}...HEAD\n`);
   } else {
-    for (const f of findings) process.stdout.write(`${formatLine(f)}\n`);
+    for (const f of allows) process.stdout.write(`${formatLine(f)}\n`);
+    for (const f of fails) process.stdout.write(`${formatLine(f)}\n`);
+    if (fails.length === 0) {
+      const suffix = allows.length > 0 ? ` (${allows.length} allowed)` : '';
+      process.stdout.write(`[ok] no hits in diff ${options.base}...HEAD${suffix}\n`);
+    }
   }
 
-  process.exit(findings.length > 0 ? 1 : 0);
+  process.exit(fails.length > 0 ? 1 : 0);
 }
 
 module.exports = {
   loadSecretRules,
   scanLine,
+  isReservedEmail,
+  parseAllowMarkers,
+  allowedCategoriesAt,
   symlinkTargetIssue,
   parseAddedLines,
   parseAddedOrRenamedFiles,

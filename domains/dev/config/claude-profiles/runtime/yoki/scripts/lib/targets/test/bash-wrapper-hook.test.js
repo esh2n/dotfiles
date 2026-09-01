@@ -7,7 +7,7 @@ const path = require('path');
 
 const { parseBashWrapperCommand, looksLikeBashWrapper } = require('../bash-wrapper-hook');
 
-const HOME = '/home/u';
+const HOME = '/home/exampleperson';
 
 function wrapper(name, args = '') {
   const tail = args ? ` ${args}` : '';
@@ -16,7 +16,7 @@ function wrapper(name, args = '') {
 
 test('parses the personal settings layer wrapper into an absolute script path', () => {
   assert.deepEqual(parseBashWrapperCommand(wrapper('git-guard.sh'), { home: HOME }), {
-    script: '/home/u/.claude/hooks/git-guard.sh',
+    script: '/home/exampleperson/.claude/hooks/git-guard.sh',
     args: [],
     name: 'git-guard',
   });
@@ -24,7 +24,7 @@ test('parses the personal settings layer wrapper into an absolute script path', 
 
 test('carries trailing argv through (herdr-agent-state.sh session)', () => {
   assert.deepEqual(parseBashWrapperCommand(wrapper('herdr-agent-state.sh', 'session'), { home: HOME }), {
-    script: '/home/u/.claude/hooks/herdr-agent-state.sh',
+    script: '/home/exampleperson/.claude/hooks/herdr-agent-state.sh',
     args: ['session'],
     name: 'herdr-agent-state',
   });
@@ -33,7 +33,7 @@ test('carries trailing argv through (herdr-agent-state.sh session)', () => {
 test('accepts the terser `bash -n "$h" && exec bash "$h"` form too', () => {
   const cmd = `bash -c 'h=~/.claude/hooks/unattended-guard.sh; bash -n "$h" && exec bash "$h";'`;
   const parsed = parseBashWrapperCommand(cmd, { home: HOME });
-  assert.equal(parsed.script, '/home/u/.claude/hooks/unattended-guard.sh');
+  assert.equal(parsed.script, '/home/exampleperson/.claude/hooks/unattended-guard.sh');
 });
 
 test('an absolute hook path is left alone', () => {

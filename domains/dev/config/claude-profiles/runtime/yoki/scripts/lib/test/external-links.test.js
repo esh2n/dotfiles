@@ -110,37 +110,37 @@ test('dedupeEntries keeps entries whose dest OR src differs', () => {
 // ---------------------------------------------------------------------------
 
 test('expandHome expands a leading ~ and ~/, passes absolute paths through', () => {
-  assert.equal(expandHome('~', '/home/x'), '/home/x');
-  assert.equal(expandHome('~/.config/prompts/global', '/home/x'), path.join('/home/x', '.config/prompts/global'));
-  assert.equal(expandHome('/already/absolute', '/home/x'), '/already/absolute');
+  assert.equal(expandHome('~', '/home/exampleperson'), '/home/exampleperson');
+  assert.equal(expandHome('~/.config/prompts/global', '/home/exampleperson'), path.join('/home/exampleperson', '.config/prompts/global'));
+  assert.equal(expandHome('/already/absolute', '/home/exampleperson'), '/already/absolute');
 });
 
 test('resolveDestPath lands "commands/prompts" in the commands staging dir', () => {
   assert.equal(
-    resolveDestPath('/home/x/.claude', 'commands/prompts'),
-    path.join('/home/x/.claude', '.commands-merged', 'prompts')
+    resolveDestPath('/home/exampleperson/.claude', 'commands/prompts'),
+    path.join('/home/exampleperson/.claude', '.commands-merged', 'prompts')
   );
 });
 
 test('resolveDestPath supports a nested rest path', () => {
   assert.equal(
-    resolveDestPath('/home/x/.claude', 'skills/foo/bar'),
-    path.join('/home/x/.claude', '.skills-merged', 'foo/bar')
+    resolveDestPath('/home/exampleperson/.claude', 'skills/foo/bar'),
+    path.join('/home/exampleperson/.claude', '.skills-merged', 'foo/bar')
   );
 });
 
 test('resolveDestPath rejects a dest with no "/"', () => {
-  assert.throws(() => resolveDestPath('/home/x/.claude', 'commands'), /must be "<merge-dir>\/<rest>"/);
+  assert.throws(() => resolveDestPath('/home/exampleperson/.claude', 'commands'), /must be "<merge-dir>\/<rest>"/);
 });
 
 test('resolveEntry attaches srcExpanded and destPath without touching the original fields', () => {
   const entry = { dest: 'commands/prompts', src: '~/.config/prompts/global', purpose: 'p' };
-  const resolved = resolveEntry(entry, { home: '/home/x', claudeDir: '/home/x/.claude' });
+  const resolved = resolveEntry(entry, { home: '/home/exampleperson', claudeDir: '/home/exampleperson/.claude' });
   assert.equal(resolved.dest, 'commands/prompts');
   assert.equal(resolved.src, '~/.config/prompts/global');
   assert.equal(resolved.purpose, 'p');
-  assert.equal(resolved.srcExpanded, path.join('/home/x', '.config/prompts/global'));
-  assert.equal(resolved.destPath, path.join('/home/x/.claude', '.commands-merged', 'prompts'));
+  assert.equal(resolved.srcExpanded, path.join('/home/exampleperson', '.config/prompts/global'));
+  assert.equal(resolved.destPath, path.join('/home/exampleperson/.claude', '.commands-merged', 'prompts'));
 });
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ test('loadAndResolve unions layers in order and dedupes identical entries across
       )
     );
 
-    const resolved = loadAndResolve([core, personal], { home: '/home/x', claudeDir: '/home/x/.claude' });
+    const resolved = loadAndResolve([core, personal], { home: '/home/exampleperson', claudeDir: '/home/exampleperson/.claude' });
     assert.equal(resolved.length, 2);
     assert.equal(resolved[0].dest, 'commands/prompts');
     assert.equal(resolved[1].dest, 'skills/extra');
@@ -176,8 +176,8 @@ test('loadAndResolve treats a missing layer file as empty rather than throwing',
     const personal = path.join(dir, 'personal.yaml');
     fs.writeFileSync(personal, '- {dest: commands/prompts, src: ~/x}\n');
     const resolved = loadAndResolve([path.join(dir, 'core-does-not-exist.yaml'), personal], {
-      home: '/home/x',
-      claudeDir: '/home/x/.claude',
+      home: '/home/exampleperson',
+      claudeDir: '/home/exampleperson/.claude',
     });
     assert.equal(resolved.length, 1);
   } finally {

@@ -35,9 +35,9 @@ test('buildPlistXml: golden document for a simple loop', () => {
     name: 'demo',
     programArguments: ['/usr/local/bin/node', '/repo/domains/dev/bin/yoki-loop', 'run', 'demo', '--harness', 'codex'],
     intervalSeconds: 1800,
-    stdoutPath: '/home/u/.local/state/yoki/loop/demo/stdout.log',
-    stderrPath: '/home/u/.local/state/yoki/loop/demo/stderr.log',
-    env: { PATH: '/usr/bin:/bin', HOME: '/home/u' },
+    stdoutPath: '/home/exampleperson/.local/state/yoki/loop/demo/stdout.log',
+    stderrPath: '/home/exampleperson/.local/state/yoki/loop/demo/stderr.log',
+    env: { PATH: '/usr/bin:/bin', HOME: '/home/exampleperson' },
   });
 
   assert.equal(
@@ -60,15 +60,15 @@ test('buildPlistXml: golden document for a simple loop', () => {
     <key>StartInterval</key>
     <integer>1800</integer>
     <key>StandardOutPath</key>
-    <string>/home/u/.local/state/yoki/loop/demo/stdout.log</string>
+    <string>/home/exampleperson/.local/state/yoki/loop/demo/stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/home/u/.local/state/yoki/loop/demo/stderr.log</string>
+    <string>/home/exampleperson/.local/state/yoki/loop/demo/stderr.log</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
         <string>/usr/bin:/bin</string>
         <key>HOME</key>
-        <string>/home/u</string>
+        <string>/home/exampleperson</string>
     </dict>
     <key>RunAtLoad</key>
     <false/>

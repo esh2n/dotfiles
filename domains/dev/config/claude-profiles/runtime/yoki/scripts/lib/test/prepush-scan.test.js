@@ -1,4 +1,6 @@
 'use strict';
+// yoki-prepush: allow-file openai-key,aws-access-key,private-key,jwt,email,home-path
+// (the fixtures below have to look like the real thing to exercise the regexes)
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,6 +12,9 @@ const { spawnSync } = require('child_process');
 const {
   loadSecretRules,
   scanLine,
+  isReservedEmail,
+  parseAllowMarkers,
+  allowedCategoriesAt,
   symlinkTargetIssue,
   parseAddedLines,
   parseAddedOrRenamedFiles,
@@ -49,18 +54,112 @@ test('scanLine flags a real-looking e-mail but not noreply/example addresses', (
   assert.deepEqual(scanLine('see user@example.com for the template', rules), []);
 });
 
-test('scanLine flags /Users/<name>/ and /home/<name>/ but not the sbx-docs "agent" allow-list', () => {
+test('isReservedEmail: reserved testing TLDs and example.com/.org/.net are not hits', () => {
+  for (const address of [
+    'a@b.test',
+    'someone@corp.example',
+    'x@host.invalid',
+    'root@localhost.localhost',
+    'Viewer@Example.COM',
+    'owner@sub.example.org',
+    'ops@example.net',
+    'noreply@github.com',
+    'no-reply@service.io',
+  ]) {
+    assert.equal(isReservedEmail(address), true, address);
+  }
+});
+
+test('isReservedEmail: a real-looking domain is still a hit, including look-alikes of the reserved names', () => {
+  for (const address of [
+    'someone.personal@mailhost.dev',
+    'b@x.io',
+    'me@example.io',
+    'me@testing.dev',
+    'me@example.com.evil.dev',
+    'me@notexample.com',
+  ]) {
+    assert.equal(isReservedEmail(address), false, address);
+  }
+});
+
+test('scanLine treats reserved-TLD and example.* addresses as non-hits by default', () => {
   const rules = loadSecretRules(SECRET_PATTERNS_PATH);
-  assert.deepEqual(scanLine('path: /Users/exampleperson/.config/prompts/global', rules), ['home-path']);
-  assert.deepEqual(scanLine('path: /home/exampleperson/.config', rules), ['home-path']);
+  assert.deepEqual(scanLine('share --to a@b.test --to c@d.test', rules), []);
+  assert.deepEqual(scanLine('viewer: Owner@Example.com', rules), []);
+  assert.deepEqual(scanLine('viewer: b@x.io', rules), ['email']);
+});
+
+test('scanLine flags /Users/<name>/ and /home/<name>/ but not the allow-listed fixture accounts', () => {
+  const rules = loadSecretRules(SECRET_PATTERNS_PATH);
+  assert.deepEqual(scanLine('path: /Users/somebody/.config/prompts/global', rules), ['home-path']);
+  assert.deepEqual(scanLine('path: /home/somebody/.config', rules), ['home-path']);
   assert.deepEqual(scanLine('sandboxed HOME is /Users/agent/ in the container', rules), []);
   assert.deepEqual(scanLine('sandboxed HOME is /home/agent/ in the container', rules), []);
+  assert.deepEqual(scanLine("fixture: '/Users/exampleperson/.codex/hooks.json'", rules), []);
+  assert.deepEqual(scanLine('HOME: /home/exampleperson/', rules), []);
 });
 
 test('scanLine returns multiple categories for one line without duplicates', () => {
   const rules = loadSecretRules(SECRET_PATTERNS_PATH);
-  const hit = scanLine('email someone.personal@mailhost.dev lives at /Users/exampleperson/', rules);
+  const hit = scanLine('email someone.personal@mailhost.dev lives at /Users/somebody/', rules);
   assert.deepEqual(hit.sort(), ['email', 'home-path']);
+});
+
+// ---------------------------------------------------------------------------
+// pure helpers: allow markers
+// ---------------------------------------------------------------------------
+
+test('parseAllowMarkers reads one or more categories from any comment syntax', () => {
+  assert.deepEqual(parseAllowMarkers('const x = 1; // yoki-prepush: allow home-path'), [
+    { scope: 'line', categories: ['home-path'] },
+  ]);
+  assert.deepEqual(parseAllowMarkers('# yoki-prepush: allow email, home-path'), [
+    { scope: 'line', categories: ['email', 'home-path'] },
+  ]);
+  assert.deepEqual(parseAllowMarkers(' * yoki-prepush: allow openai-key,jwt'), [
+    { scope: 'line', categories: ['openai-key', 'jwt'] },
+  ]);
+  assert.deepEqual(parseAllowMarkers('-- yoki-prepush: allow credential-query'), [
+    { scope: 'line', categories: ['credential-query'] },
+  ]);
+  assert.deepEqual(parseAllowMarkers('<!-- yoki-prepush: allow email -->'), [
+    { scope: 'line', categories: ['email'] },
+  ]);
+  assert.deepEqual(parseAllowMarkers('// yoki-prepush: allow-file email,home-path'), [
+    { scope: 'file', categories: ['email', 'home-path'] },
+  ]);
+  assert.deepEqual(parseAllowMarkers('nothing to see here'), []);
+  assert.deepEqual(parseAllowMarkers('yoki-prepush: allow'), []); // no category → not a marker
+});
+
+test('allowedCategoriesAt: same-line and immediately-preceding-line markers apply, farther ones do not', () => {
+  const lines = [
+    'line 1',
+    '// yoki-prepush: allow home-path',
+    'const home = "/Users/somebody/";',
+    'const other = "/Users/somebody/";',
+    'const key = "x"; // yoki-prepush: allow openai-key',
+  ];
+  assert.deepEqual([...allowedCategoriesAt(lines, 3)], ['home-path']); // preceding line
+  assert.deepEqual([...allowedCategoriesAt(lines, 4)], []); // two lines away: not covered
+  assert.deepEqual([...allowedCategoriesAt(lines, 5)], ['openai-key']); // same line
+  assert.deepEqual([...allowedCategoriesAt(lines, 1)], []);
+});
+
+test('allowedCategoriesAt: allow-file within the first 5 lines covers the whole file, later ones do not', () => {
+  const early = ['#!/bin/sh', '# yoki-prepush: allow-file email,home-path', '', '', '', 'x', 'y'];
+  assert.deepEqual([...allowedCategoriesAt(early, 7)].sort(), ['email', 'home-path']);
+  assert.deepEqual([...allowedCategoriesAt(early, 1)].sort(), ['email', 'home-path']);
+
+  const late = ['', '', '', '', '', '# yoki-prepush: allow-file email', 'x'];
+  assert.deepEqual([...allowedCategoriesAt(late, 7)], []);
+
+  // an inline `allow` in the head does not become file-wide, and an
+  // `allow-file` on the hit line does not act as an inline marker.
+  const mixed = ['// yoki-prepush: allow email', '', '', '', '', 'x // yoki-prepush: allow-file jwt'];
+  assert.deepEqual([...allowedCategoriesAt(mixed, 6)], []);
+  assert.deepEqual([...allowedCategoriesAt(mixed, 1)], ['email']);
 });
 
 test('scanLine finds nothing in an ordinary line', () => {
@@ -192,7 +291,7 @@ test('runPrepushScan: secrets, e-mail, home paths, and an unsafe tracked symlink
       [
         'const key = "sk-abcdefghijklmnopqrstuvwx";',
         'const owner = "someone.personal@mailhost.dev";',
-        'const home = "/Users/exampleperson/.config";',
+        'const home = "/Users/somebody/.config";',
       ].join('\n') + '\n'
     );
     fs.symlinkSync('/etc/passwd', path.join(repoRoot, 'bad-link'));
@@ -206,6 +305,90 @@ test('runPrepushScan: secrets, e-mail, home paths, and an unsafe tracked symlink
     // main itself has none of this — the range is base-relative, not repo-wide.
     const mainFindings = runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH });
     assert.ok(mainFindings.length > 0); // sanity: the fixture above actually produced hits
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('runPrepushScan: marked hits come back as [allow], unmarked ones as [fail]', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-allow-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    fs.writeFileSync(path.join(repoRoot, 'README.md'), 'hello\n');
+    commit(repoRoot, 'init');
+    git(repoRoot, ['branch', '-m', 'main']);
+
+    git(repoRoot, ['checkout', '-q', '-b', 'feature']);
+    fs.writeFileSync(
+      path.join(repoRoot, 'fixtures.js'),
+      [
+        '// yoki-prepush: allow-file openai-key',
+        'const key = "sk-abcdefghijklmnopqrstuvwx";',
+        '// the byte-exact command the golden hash was produced from',
+        '// yoki-prepush: allow home-path',
+        'const home = "/Users/somebody/.config";',
+        'const leak = "someone.else@mailhost.dev";',
+        'const mail = "someone.personal@mailhost.dev"; // yoki-prepush: allow email',
+        'const other = "/Users/somebody/.local";',
+      ].join('\n') + '\n'
+    );
+    commit(repoRoot, 'add fixtures with markers');
+
+    const findings = runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH });
+    assert.deepEqual(
+      findings.map(f => [f.status, f.line, f.category]),
+      [
+        ['allow', 2, 'openai-key'],
+        ['allow', 5, 'home-path'], // preceding-line marker
+        ['fail', 6, 'email'], // two lines under the home-path marker, and a different category anyway
+        ['allow', 7, 'email'], // same-line marker
+        ['fail', 8, 'home-path'], // the same-line marker above covers email only
+      ]
+    );
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('runPrepushScan: a marker on a line that is not part of the diff still covers the added line after it', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-allow-ctx-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    fs.writeFileSync(path.join(repoRoot, 'app.js'), ['// yoki-prepush: allow home-path', 'const a = 1;'].join('\n') + '\n');
+    commit(repoRoot, 'init');
+    git(repoRoot, ['branch', '-m', 'main']);
+
+    git(repoRoot, ['checkout', '-q', '-b', 'feature']);
+    fs.writeFileSync(
+      path.join(repoRoot, 'app.js'),
+      ['// yoki-prepush: allow home-path', 'const home = "/Users/somebody/";', 'const a = 1;'].join('\n') + '\n'
+    );
+    commit(repoRoot, 'insert a marked line under a pre-existing marker');
+
+    const findings = runPrepushScan({ repoRoot, base: 'main', secretPatternsPath: SECRET_PATTERNS_PATH });
+    assert.deepEqual(findings.map(f => [f.status, f.line, f.category]), [['allow', 2, 'home-path']]);
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test('runPrepushScan: the CLI exits 0 with [allow] lines when every hit is marked', () => {
+  const repoRoot = makeTmpDir('yoki-prepush-scan-allow-cli-');
+  try {
+    git(repoRoot, ['init', '-q']);
+    fs.writeFileSync(path.join(repoRoot, 'README.md'), 'hello\n');
+    commit(repoRoot, 'init');
+    git(repoRoot, ['branch', '-m', 'main']);
+
+    git(repoRoot, ['checkout', '-q', '-b', 'feature']);
+    fs.writeFileSync(path.join(repoRoot, 'a.sh'), '# yoki-prepush: allow-file home-path\nHOME=/Users/somebody/\n');
+    commit(repoRoot, 'marked hit');
+
+    const proc = spawnSync(process.execPath, [path.join(__dirname, '..', 'prepush-scan.js'), '--repo-root', repoRoot], {
+      encoding: 'utf8',
+    });
+    assert.equal(proc.status, 0, proc.stderr);
+    assert.equal(proc.stdout, '[allow] a.sh:2 home-path\n[ok] no hits in diff main...HEAD (1 allowed)\n');
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }

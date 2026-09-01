@@ -195,7 +195,7 @@ describe("planSetup is idempotent", () => {
   });
 
   test("groupEmails normalises whatever the API returned", () => {
-    assert.deepEqual(groupEmails({ include: [{ email: { email: " B@x.io " } }, { everyone: {} }] }), ["b@x.io"]);
+    assert.deepEqual(groupEmails({ include: [{ email: { email: " B@x.test " } }, { everyone: {} }] }), ["b@x.test"]);
     assert.deepEqual(groupEmails(null), []);
   });
 });
@@ -514,14 +514,14 @@ describe("input validation at the boundary", () => {
     const path = join(dir, "viewers.json");
     assert.deepEqual(readViewersFile(path), []);
     assert.throws(() => readViewersFile(path, { required: true }), /could not read the viewer list/);
-    writeFileSync(path, '["a@x.io"]');
-    assert.deepEqual(readViewersFile(path), ["a@x.io"]);
+    writeFileSync(path, '["a@x.test"]');
+    assert.deepEqual(readViewersFile(path), ["a@x.test"]);
     rmSync(dir, { recursive: true, force: true });
   });
 
   test("the viewer list is validated, deduplicated and sorted", () => {
-    assert.deepEqual(parseViewers('["B@x.io","a@x.io","b@x.io"]'), ["a@x.io", "b@x.io"]);
-    assert.deepEqual(parseViewers('{"viewers":["a@x.io"]}'), ["a@x.io"]);
+    assert.deepEqual(parseViewers('["B@x.test","a@x.test","b@x.test"]'), ["a@x.test", "b@x.test"]);
+    assert.deepEqual(parseViewers('{"viewers":["a@x.test"]}'), ["a@x.test"]);
     assert.throws(() => parseViewers('["not-an-email"]'), /not an email address/);
     assert.throws(() => parseViewers("{"), /not valid JSON/);
   });

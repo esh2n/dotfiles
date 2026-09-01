@@ -29,6 +29,12 @@ set -euo pipefail
 #      again without error")
 #   4. that a target whose home dir does not exist is skipped rather than
 #      created out of thin air
+#   5. that `--here` makes every subcommand (doctor included, not just
+#      apply) resolve DOTFILES_ROOT from the script's own checkout even
+#      when the environment carries a different DOTFILES_ROOT — the login
+#      shell exports the main checkout's path machine-wide, which used to
+#      make a worktree's `yoki-switch --here doctor` run the main
+#      checkout's runtime/yoki code
 #
 # Usage: ./test-yoki-switch-targets.sh
 # -----------------------------------------------------------------------------
@@ -56,7 +62,7 @@ cleanup_fixture() {
     FIXTURE=""
 }
 
-FOREIGN_HERDR_COMMAND="bash '/Users/tester/.codex/herdr-agent-state.sh' session"
+FOREIGN_HERDR_COMMAND="bash '/Users/exampleperson/.codex/herdr-agent-state.sh' session"
 
 build_seeded_fixture() {
     FIXTURE="$(mktemp -d)"
@@ -254,6 +260,54 @@ run_yoki_switch_targets_checks() {
         bash -c "echo \"\$0\" | grep -qi 'omp.*skip'" "$output"
 
     /bin/rm -rf "$missing"
+    trap - RETURN
+
+    # --- scenario 3: --here wins over an inherited DOTFILES_ROOT ----------
+    # A scratch checkout carrying its own copy of yoki-switch and a marker
+    # prepush-scan.js that only prints a sentinel. DOTFILES_ROOT in the
+    # environment deliberately points at THIS checkout (the shape of the
+    # machine-wide export): with --here the scratch runtime must run, so the
+    # sentinel must be what comes out.
+    local scratch sentinel
+    # pwd -P: yoki-switch derives its root through `cd … && pwd`, so compare
+    # against the resolved path (macOS mktemp hands out /var/…, a symlink to
+    # /private/var/…).
+    scratch="$(cd "$(mktemp -d)" && pwd -P)"
+    sentinel="YOKI_SWITCH_HERE_SCRATCH_RUNTIME_$$"
+    trap '/bin/rm -rf "$scratch"' RETURN
+    mkdir -p "$scratch/domains/dev/bin" \
+             "$scratch/domains/dev/config/claude-profiles/core" \
+             "$scratch/domains/dev/config/claude-profiles/packs" \
+             "$scratch/domains/dev/config/claude-profiles/personal" \
+             "$scratch/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib" \
+             "$scratch/home/claude"
+    cp "$YOKI_SWITCH" "$scratch/domains/dev/bin/yoki-switch"
+    cat > "$scratch/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/prepush-scan.js" <<JS
+process.stdout.write('${sentinel} ' + process.argv.slice(2).join(' ') + '\\n');
+JS
+
+    if ! output=$(DOTFILES_ROOT="$DOTFILES_ROOT" \
+                  YOKI_ROOT="$YOKI_ROOT_PIN" \
+                  CLAUDE_PLUGIN_ROOT="$YOKI_ROOT_PIN" \
+                  CLAUDE_DIR="$scratch/home/claude" \
+                  HOME="$scratch/home" \
+                  bash "$scratch/domains/dev/bin/yoki-switch" --here doctor --prepush HEAD 2>&1); then
+        log_error "FAIL: --here doctor --prepush HEAD from a scratch checkout exited non-zero"
+        echo "$output" | sed 's/^/       /'
+        FAILED=$((FAILED + 1)); TOTAL=$((TOTAL + 1))
+    else
+        TOTAL=$((TOTAL + 1)); PASSED=$((PASSED + 1))
+        log_success "PASS: --here doctor --prepush HEAD from a scratch checkout exits 0"
+    fi
+
+    assert_true "--here doctor: ran the scratch checkout's prepush-scan.js, not the inherited DOTFILES_ROOT's" \
+        bash -c 'echo "$0" | grep -qF "$1"' "$output" "$sentinel"
+    assert_true "--here doctor: passed the scratch checkout as --repo-root" \
+        bash -c 'echo "$0" | grep -qF -- "--repo-root $1"' "$output" "$scratch"
+    assert_true "--here doctor: forwarded the base ref" \
+        bash -c 'echo "$0" | grep -qF -- "--base HEAD"' "$output"
+
+    /bin/rm -rf "$scratch"
     trap - RETURN
 
     echo ""

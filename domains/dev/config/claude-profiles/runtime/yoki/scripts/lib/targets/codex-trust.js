@@ -13,11 +13,9 @@
  * installer can compute it deterministically and never needs a human to
  * click "trust" in the TUI. Reproduced byte-for-byte against the existing
  * herdr entry in `~/.codex/config.toml` (see codex-trust.test.js and S1+S2
- * §2.3):
- *
- *   input : {"event_name":"session_start","hooks":[{"async":false,
- *            "command":"bash '/Users/esh2n/.codex/herdr-agent-state.sh'
- *            session","timeout":10,"type":"command"}]}
+ * §2.3). The account name inside the command is part of the hashed bytes,
+ * so it cannot be swapped for a placeholder (yoki-prepush: allow home-path):
+ *   input : {"event_name":"session_start","hooks":[{"async":false,"command":"bash '/Users/esh2n/.codex/herdr-agent-state.sh' session","timeout":10,"type":"command"}]}
  *   hash  : sha256:34637d171b45f4595a9a8f510e6091670f0e98e4f14c6581b6a4fd947cc49cd5
  */
 

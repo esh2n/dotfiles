@@ -106,21 +106,21 @@ test('parseHooksStateFromToml reads trusted_hash out of quoted [hooks.state."<ke
     '[projects."/repo"]',
     'trust_level = "trusted"',
     '',
-    '[hooks.state."/Users/esh2n/.codex/hooks.json:session_start:0:0"]',
+    '[hooks.state."/Users/exampleperson/.codex/hooks.json:session_start:0:0"]',
     'trusted_hash = "sha256:34637d171b45f4595a9a8f510e6091670f0e98e4f14c6581b6a4fd947cc49cd5"',
     'enabled = true',
     '',
-    '[hooks.state."/Users/esh2n/.codex/hooks.json:pre_tool_use:1:0"]',
+    '[hooks.state."/Users/exampleperson/.codex/hooks.json:pre_tool_use:1:0"]',
     'trusted_hash = "sha256:deadbeef"',
   ].join('\n');
 
   const states = parseHooksStateFromToml(text);
   assert.equal(states.size, 2);
   assert.equal(
-    states.get('/Users/esh2n/.codex/hooks.json:session_start:0:0'),
+    states.get('/Users/exampleperson/.codex/hooks.json:session_start:0:0'),
     'sha256:34637d171b45f4595a9a8f510e6091670f0e98e4f14c6581b6a4fd947cc49cd5'
   );
-  assert.equal(states.get('/Users/esh2n/.codex/hooks.json:pre_tool_use:1:0'), 'sha256:deadbeef');
+  assert.equal(states.get('/Users/exampleperson/.codex/hooks.json:pre_tool_use:1:0'), 'sha256:deadbeef');
 });
 
 test('parseHooksStateFromToml stops attributing hashes once a different table header appears', () => {
@@ -167,7 +167,7 @@ function ourHandler(scriptRelPath) {
 test('detectTrustDrift: matching stored hash for every owned entry -> no drift', () => {
   const handler = ourHandler('scripts/hooks/foo.js');
   const hooksJson = { PreToolUse: [{ matcher: 'Bash', hooks: [handler] }] };
-  const hooksJsonPath = '/Users/esh2n/.codex/hooks.json';
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
   const expectedHash = computeHandlerHash({ eventLabel: 'pre_tool_use', matcher: 'Bash', handler });
   const storedStates = new Map([[`${hooksJsonPath}:pre_tool_use:0:0`, expectedHash]]);
 
@@ -180,7 +180,7 @@ test('detectTrustDrift: matching stored hash for every owned entry -> no drift',
 test('detectTrustDrift: stored hash does not match the recomputed one -> drifted', () => {
   const handler = ourHandler('scripts/hooks/foo.js');
   const hooksJson = { PreToolUse: [{ matcher: 'Bash', hooks: [handler] }] };
-  const hooksJsonPath = '/Users/esh2n/.codex/hooks.json';
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
   const key = `${hooksJsonPath}:pre_tool_use:0:0`;
   const storedStates = new Map([[key, 'sha256:stale-hash-from-before-an-edit']]);
 
@@ -193,7 +193,7 @@ test('detectTrustDrift: stored hash does not match the recomputed one -> drifted
 test('detectTrustDrift: no [hooks.state] entry at all for an owned handler -> missing', () => {
   const handler = ourHandler('scripts/hooks/foo.js');
   const hooksJson = { PreToolUse: [{ matcher: 'Bash', hooks: [handler] }] };
-  const hooksJsonPath = '/Users/esh2n/.codex/hooks.json';
+  const hooksJsonPath = '/Users/exampleperson/.codex/hooks.json';
   const key = `${hooksJsonPath}:pre_tool_use:0:0`;
 
   const { total, missing, drifted } = detectTrustDrift({ hooksJson, hooksJsonPath, storedStates: new Map() });
@@ -203,7 +203,7 @@ test('detectTrustDrift: no [hooks.state] entry at all for an owned handler -> mi
 });
 
 test('detectTrustDrift: a foreign (non-yoki) handler is never counted', () => {
-  const foreign = { command: "bash '/Users/esh2n/.codex/herdr-agent-state.sh' session", timeout: 10 };
+  const foreign = { command: "bash '/Users/exampleperson/.codex/herdr-agent-state.sh' session", timeout: 10 };
   const hooksJson = { SessionStart: [{ hooks: [foreign] }] };
   const { total } = detectTrustDrift({ hooksJson, hooksJsonPath: '/x', storedStates: new Map() });
   assert.equal(total, 0);

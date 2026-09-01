@@ -53,22 +53,22 @@ test('parseRunnerCommand: run-with-flags.js -> {kind:js, id, script, profiles}',
 });
 
 test('parseRunnerCommand: the personal bash wrapper -> {kind:bash, id, script} (absolute)', () => {
-  const parsed = parseRunnerCommand(WRAPPER_BASH_HOOK.hooks[0].command, { home: '/home/u' });
-  assert.deepEqual(parsed, { kind: 'bash', id: 'git-guard', script: '/home/u/.claude/hooks/git-guard.sh' });
+  const parsed = parseRunnerCommand(WRAPPER_BASH_HOOK.hooks[0].command, { home: '/home/exampleperson' });
+  assert.deepEqual(parsed, { kind: 'bash', id: 'git-guard', script: '/home/exampleperson/.claude/hooks/git-guard.sh' });
 });
 
 test('parseRunnerCommand: wrapper args are preserved', () => {
   const cmd = "bash -c 'h=~/.claude/hooks/herdr-agent-state.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\" session; fi; echo x >&2'";
-  assert.deepEqual(parseRunnerCommand(cmd, { home: '/home/u' }), {
+  assert.deepEqual(parseRunnerCommand(cmd, { home: '/home/exampleperson' }), {
     kind: 'bash',
     id: 'herdr-agent-state',
-    script: '/home/u/.claude/hooks/herdr-agent-state.sh',
+    script: '/home/exampleperson/.claude/hooks/herdr-agent-state.sh',
     args: ['session'],
   });
 });
 
 test('parseRunnerCommand: an unrecognized command is not portable (null)', () => {
-  assert.equal(parseRunnerCommand(UNRECOGNIZED_HOOK.hooks[0].command, { home: '/home/u' }), null);
+  assert.equal(parseRunnerCommand(UNRECOGNIZED_HOOK.hooks[0].command, { home: '/home/exampleperson' }), null);
 });
 
 test('timeoutMs: seconds -> milliseconds, non-positive/non-numeric -> undefined', () => {
@@ -128,16 +128,16 @@ test('buildYokiHooksJson: Workflow matcher has no omp tool equivalent and is ski
 });
 
 test('buildYokiHooksJson: a personal bash-wrapper guard becomes a kind:bash tool_call spec, not a dropped guard', () => {
-  const { generated, warnings, skipped } = buildYokiHooksJson([{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }], { home: '/home/u' });
+  const { generated, warnings, skipped } = buildYokiHooksJson([{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }], { home: '/home/exampleperson' });
   assert.deepEqual(generated.tool_call, [
-    { kind: 'bash', id: 'git-guard', script: '/home/u/.claude/hooks/git-guard.sh', matcher: 'bash' },
+    { kind: 'bash', id: 'git-guard', script: '/home/exampleperson/.claude/hooks/git-guard.sh', matcher: 'bash' },
   ]);
   assert.deepEqual(warnings, []);
   assert.deepEqual(skipped, []);
 });
 
 test('buildYokiHooksJson: an unrecognized command is reported as skipped with a reason', () => {
-  const { generated, skipped } = buildYokiHooksJson([{ hooks: { PreToolUse: [UNRECOGNIZED_HOOK] } }], { home: '/home/u' });
+  const { generated, skipped } = buildYokiHooksJson([{ hooks: { PreToolUse: [UNRECOGNIZED_HOOK] } }], { home: '/home/exampleperson' });
   assert.equal(generated.tool_call, undefined);
   assert.equal(skipped.length, 1);
   assert.equal(skipped[0].target, 'omp');
@@ -146,7 +146,7 @@ test('buildYokiHooksJson: an unrecognized command is reported as skipped with a 
 });
 
 test('buildYokiHooksJson: a hook under an event omp has no equivalent for is listed as skipped, not just warned', () => {
-  const { skipped } = buildYokiHooksJson([{ hooks: { SubagentStop: [WRAPPER_BASH_HOOK] } }], { home: '/home/u' });
+  const { skipped } = buildYokiHooksJson([{ hooks: { SubagentStop: [WRAPPER_BASH_HOOK] } }], { home: '/home/exampleperson' });
   assert.equal(skipped.length, 1);
   assert.equal(skipped[0].event, 'SubagentStop');
   assert.match(skipped[0].reason, /no known omp equivalent/);
@@ -313,7 +313,7 @@ test('agentMarkdownToOmp: an agent with no mappable tools and no model tier omit
 // ---------------------------------------------------------------------------
 
 const SAMPLE_MCP_SERVERS = [
-  { name: 'codebase-memory-mcp', transport: 'stdio', command: '/Users/esh2n/bin/codebase-memory-mcp-managed', args: [], env: {}, targets: { claude: false, codex: true, omp: true } },
+  { name: 'codebase-memory-mcp', transport: 'stdio', command: '/Users/exampleperson/bin/codebase-memory-mcp-managed', args: [], env: {}, targets: { claude: false, codex: true, omp: true } },
   {
     name: 'serena',
     transport: 'stdio',
@@ -332,7 +332,7 @@ test('buildMcpJson: task T13 canonical servers (targets.omp === true), foreign e
   const existing = { mcpServers: { 'my-custom-server': { type: 'stdio', command: 'foo' } } };
   const result = buildMcpJson(existing, SAMPLE_MCP_SERVERS);
   assert.equal(result.mcpServers['my-custom-server'].command, 'foo'); // untouched
-  assert.equal(result.mcpServers['codebase-memory-mcp'].command, '/Users/esh2n/bin/codebase-memory-mcp-managed');
+  assert.equal(result.mcpServers['codebase-memory-mcp'].command, '/Users/exampleperson/bin/codebase-memory-mcp-managed');
   assert.equal(result.mcpServers.serena.command, 'uvx');
   assert.ok(result.mcpServers.serena.args.includes('serena-agent==1.5.3'));
   assert.ok(result.mcpServers.serena.args.includes('codex')); // omp targetOverrides applied
@@ -444,7 +444,7 @@ test('end-to-end: plan()+apply() writes every artifact and replaces a symlinked 
     // (6) mcp.json (T13): canonical targets.omp === true servers, resolved
     // against `home`, claude-only server (figma-remote) excluded.
     const mcpJson = JSON.parse(fs.readFileSync(path.join(out, 'mcp.json'), 'utf8'));
-    assert.equal(mcpJson.mcpServers['codebase-memory-mcp'].command, '/Users/esh2n/bin/codebase-memory-mcp-managed');
+    assert.equal(mcpJson.mcpServers['codebase-memory-mcp'].command, '/Users/exampleperson/bin/codebase-memory-mcp-managed');
     assert.ok(mcpJson.mcpServers.serena.args.includes('codex'));
     assert.ok(!('figma-remote' in mcpJson.mcpServers));
   } finally {

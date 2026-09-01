@@ -12,18 +12,18 @@ const {
 } = require('../codex-trust');
 
 // Ground truth from scratchpad spike S1+S2 Appendix C — the existing herdr
-// entry in ~/.codex/config.toml, read (never modified) during the spike:
-//
+// entry in ~/.codex/config.toml, read (never modified) during the spike,
+// quoted verbatim (the key itself is not hashed — yoki-prepush: allow home-path):
 //   [hooks.state."/Users/esh2n/.codex/hooks.json:session_start:0:0"]
 //   trusted_hash = "sha256:34637d171b45f4595a9a8f510e6091670f0e98e4f14c6581b6a4fd947cc49cd5"
 //
-// reproduced by the spike's trusthash.py from the exact input:
-//   {"event_name":"session_start","hooks":[{"async":false,
-//    "command":"bash '/Users/esh2n/.codex/herdr-agent-state.sh' session",
-//    "timeout":10,"type":"command"}]}
+// reproduced by the spike's trusthash.py from the exact input — the command
+// string is part of the hashed bytes, so it stays (yoki-prepush: allow home-path):
+//   {"event_name":"session_start","hooks":[{"async":false,"command":"bash '/Users/esh2n/.codex/herdr-agent-state.sh' session","timeout":10,"type":"command"}]}
 const HERDR_HASH = 'sha256:34637d171b45f4595a9a8f510e6091670f0e98e4f14c6581b6a4fd947cc49cd5';
-const HERDR_COMMAND = "bash '/Users/esh2n/.codex/herdr-agent-state.sh' session";
-const HERDR_JSON = '{"event_name":"session_start","hooks":[{"async":false,"command":"bash \'/Users/esh2n/.codex/herdr-agent-state.sh\' session","timeout":10,"type":"command"}]}';
+// Codex produced HERDR_HASH for exactly these bytes; a placeholder account name would change the hash.
+const HERDR_COMMAND = "bash '/Users/esh2n/.codex/herdr-agent-state.sh' session"; // yoki-prepush: allow home-path
+const HERDR_JSON = '{"event_name":"session_start","hooks":[{"async":false,"command":"bash \'/Users/esh2n/.codex/herdr-agent-state.sh\' session","timeout":10,"type":"command"}]}'; // yoki-prepush: allow home-path
 
 test('computeHandlerHash reproduces the herdr session_start hash byte-for-byte', () => {
   const hash = computeHandlerHash({
@@ -99,8 +99,8 @@ test('computeHandlerHash includes the matcher when the group set one', () => {
 
 test('hookStateKey formats <key_source>:<event_label>:<group_index>:<handler_index>', () => {
   assert.equal(
-    hookStateKey('/Users/esh2n/.codex/hooks.json', 'session_start', 0, 0),
-    '/Users/esh2n/.codex/hooks.json:session_start:0:0'
+    hookStateKey('/Users/exampleperson/.codex/hooks.json', 'session_start', 0, 0),
+    '/Users/exampleperson/.codex/hooks.json:session_start:0:0'
   );
 });
 

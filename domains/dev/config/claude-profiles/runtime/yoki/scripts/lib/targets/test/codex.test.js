@@ -49,12 +49,12 @@ test('buildGeneratedGroups: a run-with-flags.js hook becomes a Codex group with 
 test('buildGeneratedGroups: a personal bash-wrapper guard is translated through run-bash-hook.js, not dropped', () => {
   const { generated, warnings, skipped } = buildGeneratedGroups(
     [{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }],
-    { yokiRoot: '/opt/yoki', home: '/home/u' }
+    { yokiRoot: '/opt/yoki', home: '/home/exampleperson' }
   );
   assert.equal(generated.PreToolUse.length, 1);
   assert.equal(
     generated.PreToolUse[0].hooks[0].command,
-    '"${YOKI_NODE:-node}" "/opt/yoki/scripts/hooks/run-bash-hook.js" --harness codex "/home/u/.claude/hooks/git-guard.sh"'
+    '"${YOKI_NODE:-node}" "/opt/yoki/scripts/hooks/run-bash-hook.js" --harness codex "/home/exampleperson/.claude/hooks/git-guard.sh"'
   );
   assert.deepEqual(warnings, []);
   assert.deepEqual(skipped, []);
@@ -63,10 +63,10 @@ test('buildGeneratedGroups: a personal bash-wrapper guard is translated through 
 test('buildGeneratedGroups: a translated wrapper guard is recognized as ours (trust entry + regenerable group)', () => {
   const { generated } = buildGeneratedGroups(
     [{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }],
-    { yokiRoot: '/opt/yoki', home: '/home/u' }
+    { yokiRoot: '/opt/yoki', home: '/home/exampleperson' }
   );
   const merged = mergeHooksJson({}, generated);
-  const entries = collectHookStateEntries(merged, '/home/u/.codex/hooks.json');
+  const entries = collectHookStateEntries(merged, '/home/exampleperson/.codex/hooks.json');
   assert.equal(entries.length, 1, 'a translated guard must get a [hooks.state] trust entry like any other yoki hook');
 });
 
@@ -80,15 +80,15 @@ test('buildGeneratedGroups: wrapper args are carried through to run-bash-hook.js
   };
   const { generated } = buildGeneratedGroups(
     [{ hooks: { PreToolUse: [withArgs] } }],
-    { yokiRoot: '/opt/yoki', home: '/home/u' }
+    { yokiRoot: '/opt/yoki', home: '/home/exampleperson' }
   );
-  assert.match(generated.PreToolUse[0].hooks[0].command, /run-bash-hook\.js" --harness codex "\/home\/u\/\.claude\/hooks\/herdr-agent-state\.sh" "session"$/);
+  assert.match(generated.PreToolUse[0].hooks[0].command, /run-bash-hook\.js" --harness codex "\/home\/exampleperson\/\.claude\/hooks\/herdr-agent-state\.sh" "session"$/);
 });
 
 test('buildGeneratedGroups: an unrecognized command is reported as skipped with a reason, never silently dropped', () => {
   const { generated, warnings, skipped } = buildGeneratedGroups(
     [{ hooks: { PreToolUse: [UNRECOGNIZED_HOOK] } }],
-    { yokiRoot: '/opt/yoki', home: '/home/u' }
+    { yokiRoot: '/opt/yoki', home: '/home/exampleperson' }
   );
   assert.equal(generated.PreToolUse, undefined);
   assert.equal(skipped.length, 1);
@@ -100,7 +100,7 @@ test('buildGeneratedGroups: an unrecognized command is reported as skipped with 
 });
 
 test('buildGeneratedGroups: a wrapper guard with no yokiRoot is skipped (reported), not shipped broken', () => {
-  const { generated, skipped } = buildGeneratedGroups([{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }], { home: '/home/u' });
+  const { generated, skipped } = buildGeneratedGroups([{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }], { home: '/home/exampleperson' });
   assert.equal(generated.PreToolUse, undefined);
   assert.equal(skipped.length, 1);
   assert.match(skipped[0].reason, /YOKI_ROOT/);
@@ -121,7 +121,7 @@ test('translateMatcher: Edit|Write|MultiEdit in any order maps to Write|Edit|app
 });
 
 test('mergeHooksJson: a foreign (herdr) group is preserved byte-for-byte and ours is appended after it', () => {
-  const herdrGroup = { matcher: '*', hooks: [{ type: 'command', command: "bash '/Users/esh2n/.codex/herdr-agent-state.sh' session" }] };
+  const herdrGroup = { matcher: '*', hooks: [{ type: 'command', command: "bash '/Users/exampleperson/.codex/herdr-agent-state.sh' session" }] };
   const existing = { SessionStart: [herdrGroup] };
   const generated = { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'node run-with-flags.js x y z --harness codex' }] }] };
 
@@ -148,9 +148,9 @@ test('collectHookStateEntries: indices are read off the FINAL merged hooks.json,
   const ours = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node run-with-flags.js x --harness codex' }] };
   const merged = { PreToolUse: [herdrGroup, ours] };
 
-  const entries = collectHookStateEntries(merged, '/Users/esh2n/.codex/hooks.json');
+  const entries = collectHookStateEntries(merged, '/Users/exampleperson/.codex/hooks.json');
   assert.equal(entries.length, 1);
-  assert.equal(entries[0].key, '/Users/esh2n/.codex/hooks.json:pre_tool_use:1:0'); // group index 1, not 0
+  assert.equal(entries[0].key, '/Users/exampleperson/.codex/hooks.json:pre_tool_use:1:0'); // group index 1, not 0
   assert.match(entries[0].trustedHash, /^sha256:[0-9a-f]{64}$/);
 });
 
@@ -365,14 +365,14 @@ test('hasConflictingTopLevelKey: false once the key is inside a [table]', () => 
 
 test('applyManagedBlock: removes older [hooks.state] entries for our keys living outside the block', () => {
   const existing = [
-    '[hooks.state."/Users/esh2n/.codex/hooks.json:pre_tool_use:0:0"]',
+    '[hooks.state."/Users/exampleperson/.codex/hooks.json:pre_tool_use:0:0"]',
     'trusted_hash = "sha256:stale"',
     '',
     '[projects."/repo"]',
     'trust_level = "trusted"',
     '',
   ].join('\n');
-  const { content } = applyManagedBlock(existing, sampleBlock(), new Set(['/Users/esh2n/.codex/hooks.json:pre_tool_use:0:0']));
+  const { content } = applyManagedBlock(existing, sampleBlock(), new Set(['/Users/exampleperson/.codex/hooks.json:pre_tool_use:0:0']));
   assert.ok(!content.includes('sha256:stale'));
   assert.ok(content.includes('[projects."/repo"]'));
 });
@@ -539,7 +539,7 @@ test('end-to-end: plan()+apply() writes every artifact and stays fully contained
     // Pre-seed a foreign (herdr-style) SessionStart hook the apply must preserve.
     fs.mkdirSync(out, { recursive: true });
     fs.writeFileSync(path.join(out, 'hooks.json'), JSON.stringify({
-      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: "bash '/Users/esh2n/.codex/herdr-agent-state.sh' session", timeout: 10 }] }],
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: "bash '/Users/exampleperson/.codex/herdr-agent-state.sh' session", timeout: 10 }] }],
     }));
 
     const planResult = codexTarget.plan({ sources: [core, personal], out, home, env: {} });
