@@ -24,9 +24,23 @@ const RUNNER_HOOK = {
   }],
 };
 
-const RAW_BASH_HOOK = {
+// The personal layer's real shape (see personal/settings.personal.json).
+const WRAPPER_BASH_HOOK = {
   matcher: 'Bash',
-  hooks: [{ type: 'command', command: "bash -c 'h=~/.claude/hooks/git-guard.sh; exec bash \"$h\"'" }],
+  hooks: [{
+    type: 'command',
+    command: "bash -c 'h=~/.claude/hooks/git-guard.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: git-guard.sh - failing open\" >&2'",
+  }],
+};
+
+const UNRECOGNIZED_HOOK = {
+  matcher: 'Bash',
+  hooks: [{ type: 'command', command: "osascript -e 'display notification \"hi\"'" }],
+};
+
+const UNRECOGNIZED_HOOK_GROUP = {
+  matcher: 'permission_prompt',
+  hooks: [{ type: 'command', command: "osascript -e 'display notification \"hi\"'" }],
 };
 
 // ---------------------------------------------------------------------------
@@ -38,8 +52,23 @@ test('parseRunnerCommand: run-with-flags.js -> {kind:js, id, script, profiles}',
   assert.deepEqual(parsed, { kind: 'js', id: 'pre:x', script: 'scripts/hooks/pre-x.js', profiles: ['standard', 'strict'] });
 });
 
-test('parseRunnerCommand: a raw bash -c command is not portable (null)', () => {
-  assert.equal(parseRunnerCommand(RAW_BASH_HOOK.hooks[0].command), null);
+test('parseRunnerCommand: the personal bash wrapper -> {kind:bash, id, script} (absolute)', () => {
+  const parsed = parseRunnerCommand(WRAPPER_BASH_HOOK.hooks[0].command, { home: '/home/u' });
+  assert.deepEqual(parsed, { kind: 'bash', id: 'git-guard', script: '/home/u/.claude/hooks/git-guard.sh' });
+});
+
+test('parseRunnerCommand: wrapper args are preserved', () => {
+  const cmd = "bash -c 'h=~/.claude/hooks/herdr-agent-state.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\" session; fi; echo x >&2'";
+  assert.deepEqual(parseRunnerCommand(cmd, { home: '/home/u' }), {
+    kind: 'bash',
+    id: 'herdr-agent-state',
+    script: '/home/u/.claude/hooks/herdr-agent-state.sh',
+    args: ['session'],
+  });
+});
+
+test('parseRunnerCommand: an unrecognized command is not portable (null)', () => {
+  assert.equal(parseRunnerCommand(UNRECOGNIZED_HOOK.hooks[0].command, { home: '/home/u' }), null);
 });
 
 test('timeoutMs: seconds -> milliseconds, non-positive/non-numeric -> undefined', () => {
@@ -98,10 +127,29 @@ test('buildYokiHooksJson: Workflow matcher has no omp tool equivalent and is ski
   assert.ok(warnings.some(w => /Workflow/.test(w)));
 });
 
-test('buildYokiHooksJson: a raw bash -c hook is skipped with a warning (not portable)', () => {
-  const { generated, warnings } = buildYokiHooksJson([{ hooks: { PreToolUse: [RAW_BASH_HOOK] } }]);
+test('buildYokiHooksJson: a personal bash-wrapper guard becomes a kind:bash tool_call spec, not a dropped guard', () => {
+  const { generated, warnings, skipped } = buildYokiHooksJson([{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }], { home: '/home/u' });
+  assert.deepEqual(generated.tool_call, [
+    { kind: 'bash', id: 'git-guard', script: '/home/u/.claude/hooks/git-guard.sh', matcher: 'bash' },
+  ]);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(skipped, []);
+});
+
+test('buildYokiHooksJson: an unrecognized command is reported as skipped with a reason', () => {
+  const { generated, skipped } = buildYokiHooksJson([{ hooks: { PreToolUse: [UNRECOGNIZED_HOOK] } }], { home: '/home/u' });
   assert.equal(generated.tool_call, undefined);
-  assert.ok(warnings.some(w => /does not go through run-with-flags/.test(w)));
+  assert.equal(skipped.length, 1);
+  assert.equal(skipped[0].target, 'omp');
+  assert.match(skipped[0].command, /osascript/);
+  assert.match(skipped[0].reason, /not portable/);
+});
+
+test('buildYokiHooksJson: a hook under an event omp has no equivalent for is listed as skipped, not just warned', () => {
+  const { skipped } = buildYokiHooksJson([{ hooks: { SubagentStop: [WRAPPER_BASH_HOOK] } }], { home: '/home/u' });
+  assert.equal(skipped.length, 1);
+  assert.equal(skipped[0].event, 'SubagentStop');
+  assert.match(skipped[0].reason, /no known omp equivalent/);
 });
 
 test('translateMatcher: Write|Edit|MultiEdit -> write|edit (deduped, order-independent)', () => {
@@ -411,7 +459,7 @@ test('end-to-end: plan()+apply() writes every artifact and replaces a symlinked 
   }
 });
 
-test('gen.js CLI plan(): --target omp --dry-run --json shape has target/out/sources/operations/warnings', () => {
+test('gen.js CLI plan(): --target omp --dry-run --json shape has target/out/sources/operations/warnings/skipped', () => {
   const { root, home, out } = makeTmpDirs();
   try {
     const { core, personal } = buildFixtureRepo(root);
@@ -421,6 +469,123 @@ test('gen.js CLI plan(): --target omp --dry-run --json shape has target/out/sour
     assert.ok(Array.isArray(planResult.sources));
     assert.ok(Array.isArray(planResult.operations) && planResult.operations.length > 0);
     assert.ok(Array.isArray(planResult.warnings));
+    assert.ok(Array.isArray(planResult.skipped));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Manifest / --prune parity with codex.js (review finding: omp wrote no
+// manifest at all, so a renamed or deleted agent left a stale
+// ~/.omp/agent/agents/<old>.md behind forever and --prune was a silent no-op).
+// ---------------------------------------------------------------------------
+
+test('apply() writes .yoki/omp-manifest.json listing only the per-agent outputs', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    gen.apply(ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} }));
+
+    const manifestPath = path.join(out, ompTarget.MANIFEST_RELATIVE_PATH);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    assert.deepEqual(
+      new Set(manifest),
+      new Set([path.join(out, 'agents', 'go-reviewer.md'), path.join(out, 'agents', 'claude-worker.md')]),
+      'merged singletons (config.yml/RULES.md/yoki-hooks.json/mcp.json/extensions) are never prune candidates'
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('--prune removes an agent whose source layer no longer provides it, and nothing else', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    gen.apply(ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} }));
+    assert.ok(fs.existsSync(path.join(out, 'agents', 'go-reviewer.md')));
+
+    // The pack that shipped go-reviewer.md is disabled / the file renamed.
+    fs.rmSync(path.join(core, 'agents', 'go-reviewer.md'));
+    fs.rmSync(path.join(root, 'domains', 'dev', 'config', 'pi', 'agents', 'go-reviewer.md'));
+
+    const pruned = ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {}, prune: true });
+    assert.deepEqual(
+      pruned.operations.filter(op => op.kind === 'remove').map(op => op.destinationPath),
+      [path.join(out, 'agents', 'go-reviewer.md')]
+    );
+    gen.apply(pruned);
+
+    assert.equal(fs.existsSync(path.join(out, 'agents', 'go-reviewer.md')), false);
+    assert.ok(fs.existsSync(path.join(out, 'agents', 'claude-worker.md')));
+    assert.ok(fs.existsSync(path.join(out, 'config.yml')));
+    assert.ok(fs.existsSync(path.join(out, 'RULES.md')));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('--prune with no manifest yet is a no-op, not an error', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const planResult = ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {}, prune: true });
+    assert.deepEqual(planResult.operations.filter(op => op.kind === 'remove'), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('--prune refuses a tampered manifest that points outside out, and deletes nothing', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    gen.apply(ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} }));
+
+    const victim = path.join(home, 'Documents');
+    fs.mkdirSync(victim, { recursive: true });
+    fs.writeFileSync(path.join(victim, 'thesis.txt'), 'important', 'utf8');
+
+    const manifestPath = path.join(out, ompTarget.MANIFEST_RELATIVE_PATH);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    fs.writeFileSync(manifestPath, JSON.stringify([...manifest, victim]), 'utf8');
+
+    assert.throws(
+      () => ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {}, prune: true }),
+      /Refusing to prune/
+    );
+    assert.ok(fs.existsSync(path.join(victim, 'thesis.txt')));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('the personal layer bash guards survive plan()+apply() into yoki-hooks.json', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    writeFile(
+      path.join(personal, 'settings.personal.json'),
+      JSON.stringify({ hooks: { PreToolUse: [WRAPPER_BASH_HOOK], Notification: [UNRECOGNIZED_HOOK_GROUP] } })
+    );
+
+    const planResult = ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} });
+    gen.apply(planResult);
+
+    const hooksJson = JSON.parse(fs.readFileSync(path.join(out, 'yoki-hooks.json'), 'utf8'));
+    const guards = hooksJson.tool_call.filter(spec => spec.kind === 'bash');
+    assert.equal(guards.length, 1, 'the personal git-guard must reach omp, not be dropped');
+    assert.equal(guards[0].id, 'git-guard');
+    assert.match(guards[0].script, /\.claude\/hooks\/git-guard\.sh$/);
+
+    // and the untranslatable one is reported, not silently gone
+    assert.ok(planResult.skipped.some(e => /osascript/.test(e.command)));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(home, { recursive: true, force: true });

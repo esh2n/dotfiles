@@ -358,3 +358,99 @@ ask_yes_no() {
         esac
     done
 }
+
+# -----------------------------------------------------------------------------
+# Test Assertions
+# -----------------------------------------------------------------------------
+# Shared by the core/validation/*.sh suites, which all source this file. Each
+# maintains the caller's TOTAL/PASSED/FAILED counters (bash `local` is
+# dynamically scoped, so a suite that declares them inside its own run_*
+# function still gets them updated here). A suite that needs different output
+# may still define its own same-named helper after sourcing — the later
+# definition wins.
+# -----------------------------------------------------------------------------
+
+# assert_true <description> <command…> — passes when the command exits 0.
+assert_true() {
+    local description="$1"; shift
+    TOTAL=$((TOTAL + 1))
+    if "$@" >/dev/null 2>&1; then
+        log_success "PASS: $description"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: $description"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+# assert_eq_text <description> <expected> <actual> [diff_lines]
+# Prints a unified diff (capped at $4, default 40 lines) on failure.
+assert_eq_text() {
+    local description="$1" expected="$2" actual="$3" diff_lines="${4:-40}"
+    TOTAL=$((TOTAL + 1))
+    if [[ "$expected" == "$actual" ]]; then
+        log_success "PASS: $description"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: $description"
+        # `|| true`: diff exits 1 on a difference and head can SIGPIPE it —
+        # under `set -euo pipefail` that would abort the whole suite at the
+        # FIRST failing assertion instead of reporting every one.
+        { diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/       /' | head -"$diff_lines"; } || true
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+# assert_contains <description> <needle> <haystack> — fixed-string search.
+assert_contains() {
+    local description="$1" needle="$2" haystack="$3"
+    TOTAL=$((TOTAL + 1))
+    if grep -qF -- "$needle" <<< "$haystack"; then
+        log_success "PASS: $description"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: $description"
+        log_error "  wanted: $needle"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+# assert_lacks <description> <needle> <haystack> — the inverse.
+assert_lacks() {
+    local description="$1" needle="$2" haystack="$3"
+    TOTAL=$((TOTAL + 1))
+    if grep -qF -- "$needle" <<< "$haystack"; then
+        log_error "FAIL: $description"
+        log_error "  unwanted: $needle"
+        FAILED=$((FAILED + 1))
+    else
+        log_success "PASS: $description"
+        PASSED=$((PASSED + 1))
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Tree Snapshots
+# -----------------------------------------------------------------------------
+
+# tree_manifest <dir> — content-addressed manifest of every file and symlink
+# under <dir>: `relative/path<TAB>FILE:<sha256>` or
+# `relative/path<TAB>SYMLINK:<target>`, one per line, LC_ALL=C sorted.
+#
+# Never dereferences a symlink, deliberately. Plain `diff -r` does: BSD diff
+# follows symlinks even under -r, so a dangling one makes it print "No such
+# file or directory" and STILL exit 0 — a silent false pass. Comparing a
+# symlink by its own target text also avoids walking into real repo skill
+# directories that a fixture merely points at.
+tree_manifest() {
+    local dir="$1"
+    [[ -d "$dir" ]] || return 0
+    ( cd "$dir" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort | while IFS= read -r f; do
+        f="${f#./}"
+        if [[ -L "$f" ]]; then
+            printf '%s\tSYMLINK:%s\n' "$f" "$(readlink "$f")"
+        else
+            printf '%s\tFILE:%s\n' "$f" "$(shasum -a 256 "$f" | awk '{print $1}')"
+        fi
+    done )
+}

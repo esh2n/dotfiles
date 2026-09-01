@@ -66,3 +66,30 @@ test('toPermissionsToml: extends ":workspace" and lists the fs-deny entries', ()
   assert.match(toml, /extends = ":workspace"/);
   assert.match(toml, /"~\/\.aws\/credentials" = "deny"/);
 });
+
+// ---------------------------------------------------------------------------
+// pre-permission-guard.js now reads a trailing '*' as a prefix wildcard. That
+// only matters because these patterns have NO execpolicy equivalent, so the
+// hook is their only enforcement point on Codex and omp — pin that routing so
+// a future execpolicy change cannot quietly move them without notice.
+// ---------------------------------------------------------------------------
+
+test('the trailing-glob deny patterns are routed to hookEnforced, never to yoki.rules', () => {
+  const merged = {
+    allow: [],
+    deny: [
+      { pattern: 'Bash(rm -rf /*)', enforce: ['hook'], reason: 'wildcard rm' },
+      { pattern: 'Bash(rm -rf ~/*)', enforce: ['hook'], reason: 'home wipe' },
+      { pattern: 'Bash(> /dev/*)', enforce: ['hook'], reason: 'redirection' },
+      { pattern: 'Bash(>> /dev/*)', enforce: ['hook'], reason: 'redirection' },
+    ],
+  };
+  const { rules, hookEnforced } = toRules(merged);
+  assert.deepEqual(
+    new Set(hookEnforced.map(e => e.pattern)),
+    new Set(['Bash(rm -rf /*)', 'Bash(rm -rf ~/*)', 'Bash(> /dev/*)', 'Bash(>> /dev/*)'])
+  );
+  for (const pattern of ['rm -rf /*', 'rm -rf ~/*', '> /dev/*', '>> /dev/*']) {
+    assert.ok(!rules.includes(pattern), `${pattern} must not reach yoki.rules — execpolicy cannot express it`);
+  }
+});

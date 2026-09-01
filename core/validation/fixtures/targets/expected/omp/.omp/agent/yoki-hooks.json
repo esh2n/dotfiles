@@ -9,6 +9,19 @@
         "strict"
       ],
       "matcher": "bash"
+    },
+    {
+      "kind": "bash",
+      "id": "git-guard",
+      "script": "__RUN_HOME__/.claude/hooks/git-guard.sh",
+      "matcher": "bash"
+    },
+    {
+      "kind": "bash",
+      "id": "unattended-guard",
+      "script": "__RUN_HOME__/.claude/hooks/unattended-guard.sh",
+      "matcher": "bash",
+      "timeout": 5000
     }
   ],
   "tool_result": [
@@ -65,6 +78,15 @@
         "standard",
         "strict"
       ]
+    },
+    {
+      "kind": "bash",
+      "id": "herdr-agent-state",
+      "script": "__RUN_HOME__/.claude/hooks/herdr-agent-state.sh",
+      "args": [
+        "session"
+      ],
+      "timeout": 5000
     }
   ],
   "session_shutdown": [

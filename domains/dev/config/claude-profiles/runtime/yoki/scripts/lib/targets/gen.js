@@ -19,6 +19,7 @@ const path = require('path');
 const os = require('os');
 
 const { assertWithinTrustedRoot, isWithinRoot } = require('../path-safety');
+const { manifestPathFor, manifestDestinations } = require('./manifest');
 const codexTarget = require('./codex');
 const ompTarget = require('./omp');
 
@@ -137,11 +138,38 @@ function assertParentWithinTrustedRoot(destinationPath, out, home, action) {
   return path.join(trustedParent, path.basename(destinationPath));
 }
 
+/**
+ * `remove` is the one destructive op (`fs.rmSync` recursive), and its
+ * destinations come from a manifest file sitting in the user's home dir that
+ * any process can rewrite. So it gets the STRICTEST root: `out` only, never
+ * the `home` fallback resolveTrustedRoot() allows for the `~/.agents/skills`
+ * symlink ports. `<out>/.yoki/<target>-manifest.json` can only ever list
+ * paths under `out` (lib/targets/manifest.js enforces that on both the read
+ * and the write side), so nothing legitimate is lost.
+ *
+ * Containment is still checked on the PARENT and the basename re-joined,
+ * for the reason assertParentWithinTrustedRoot documents: a `remove` target
+ * may itself BE a symlink pointing deliberately outside the root (omp's
+ * `config.yml -> <repo>/domains/dev/config/omp/config.yml`, which this
+ * generator replaces with a real file), and realpath'ing the leaf would
+ * refuse exactly that case. A parent inside `out` plus a plain basename is
+ * inside `out` by construction.
+ */
+function assertRemoveWithinOut(destinationPath, out) {
+  const parent = path.dirname(destinationPath);
+  const trustedParent = assertWithinTrustedRoot(parent, out, 'remove');
+  const dest = path.join(trustedParent, path.basename(destinationPath));
+  if (!isWithinRoot(parent, out)) {
+    throw new Error(`Refusing to remove outside the install root: '${destinationPath}' is not within '${out}'.`);
+  }
+  return dest;
+}
+
 function applyOp(op, ctx) {
   if (op.kind === 'skip') return;
 
   if (op.kind === 'remove') {
-    const dest = assertParentWithinTrustedRoot(op.destinationPath, ctx.out, ctx.home, op.kind);
+    const dest = assertRemoveWithinOut(op.destinationPath, ctx.out);
     removeIfExists(dest);
     return;
   }
@@ -174,14 +202,15 @@ function applyOp(op, ctx) {
 
 /** Ops with `layer !== 'generated'` come from one specific source-layer file
  * (an agent, a skill, a command) rather than being a merged singleton
- * (hooks.json/config.toml/AGENTS.md/rules/yoki.rules) — those are the ones a
- * later `--prune` run can safely remove once their source disappears. */
+ * (hooks.json/config.toml/AGENTS.md/RULES.md/rules/yoki.rules) — those are
+ * the ones a later `--prune` run can safely remove once their source
+ * disappears. Written for EVERY target (omp's `agents/<name>.md` outputs
+ * have exactly the same staleness problem codex's do); destinations outside
+ * `out` are excluded by manifestDestinations(), which is what keeps
+ * `--prune` unable to delete anywhere but `out`. */
 function writeManifest(planResult) {
-  if (planResult.target !== 'codex') return; // only codex.js emits/reads this manifest today
-  const manifestPath = path.join(planResult.out, codexTarget.MANIFEST_RELATIVE_PATH);
-  const destinations = planResult.operations
-    .filter(op => op.layer !== 'generated' && op.kind !== 'remove')
-    .map(op => op.destinationPath);
+  const manifestPath = manifestPathFor(planResult.out, planResult.target);
+  const destinations = manifestDestinations(planResult.operations, planResult.out);
   ensureParentDir(manifestPath);
   fs.writeFileSync(manifestPath, `${JSON.stringify(destinations, null, 2)}\n`, 'utf8');
 }
@@ -224,6 +253,12 @@ function main() {
     process.stdout.write(`${JSON.stringify(planResult, null, 2)}\n`);
   } else {
     for (const op of planResult.operations) process.stdout.write(`${formatOpLine(op)}\n`);
+    // Every hook command that could not be translated, printed one per line.
+    // A dropped guard is a protection downgrade, so it is never left to a
+    // reader to notice its absence from the op list.
+    for (const entry of planResult.skipped || []) {
+      process.stdout.write(`skipped  ${entry.event}/${entry.matcher}  ${entry.command}  -- ${entry.reason}\n`);
+    }
     for (const warning of planResult.warnings) process.stderr.write(`warning: ${warning}\n`);
   }
 

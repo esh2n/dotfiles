@@ -38,11 +38,24 @@ function toBashPatterns(entries, action) {
   return patterns;
 }
 
+/**
+ * Deny wins, always. `Read(**)` and a bare `Read` collapse to the same
+ * `approval` key (and omp-tool-names.js collapses several more — LS and Read
+ * are both `read`, TodoRead/TodoWrite are both `todo`), so allow and deny
+ * really can collide here even though today's shipped permissions.yaml files
+ * happen not to. Every sibling converter resolves that collision deny-first
+ * (to-codex.js emits "forbidden > prompt > allow"; to-claude.js leans on
+ * Claude Code's own deny-wins; yoki-bridge.ts combines with "first deny
+ * wins") — writing an allow over an existing deny here would make omp the
+ * one target where a deny reads as enforced but silently is not.
+ */
 function toToolApproval(entries, action, approval) {
   for (const entry of entries) {
     const toolOnly = TOOL_ONLY_RE.exec(entry.pattern) || BARE_TOOL_RE.exec(entry.pattern);
     if (!toolOnly) continue;
-    approval[toolOnly[1]] = action;
+    const name = toolOnly[1];
+    if (approval[name] === 'deny' && action !== 'deny') continue; // never downgrade a deny
+    approval[name] = action;
   }
 }
 
@@ -68,9 +81,11 @@ function toUnexpressible(entries, action) {
 function convertMerged(merged) {
   const bashPatterns = [...toBashPatterns(merged.deny, 'deny'), ...toBashPatterns(merged.allow, 'allow')];
 
+  // allow first, deny last — combined with the "never downgrade a deny"
+  // guard in toToolApproval, a tool named in both lists resolves to deny.
   const approval = {};
-  toToolApproval(merged.deny, 'deny', approval);
   toToolApproval(merged.allow, 'allow', approval);
+  toToolApproval(merged.deny, 'deny', approval);
 
   const unexpressible = [...toUnexpressible(merged.deny, 'deny'), ...toUnexpressible(merged.allow, 'allow')];
 

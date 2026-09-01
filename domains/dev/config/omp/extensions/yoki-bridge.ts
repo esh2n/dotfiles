@@ -25,11 +25,14 @@
  *      across the hooks registered for one event (first deny wins).
  *
  * The hook list is NOT hard-coded: it is read from ~/.omp/agent/yoki-hooks.json
- * (an {event: [{id, kind, script, profiles?, timeout?}]} map a later phase
- * generates from the composed hook config), falling back to today's two
- * bash guards — git-guard.sh, unattended-guard.sh — on tool_call only when
+ * (an {event: [{id, kind, script, args?, profiles?, timeout?}]} map the
+ * generator produces from the composed hook config), falling back to today's
+ * two bash guards — git-guard.sh, unattended-guard.sh — on tool_call when
  * that file is absent or unreadable, so a machine that has only run
  * yoki-switch (and not the generator) still gets the guard it has today.
+ * Those same two are ALSO re-added when a manifest IS present but registers
+ * no tool_call bash guard at all (withFallbackGuards): a manifest may add
+ * protection, never remove the floor.
  *
  * Fails OPEN everywhere: every hook invocation is wrapped, a broken/slow/
  * missing hook resolves to "no opinion" (null), and every registered handler
@@ -97,6 +100,9 @@ interface HookSpec {
 	id: string;
 	kind: HookKind;
 	script: string;
+	/** kind:'bash' only — the extra argv the wrapped .sh expects (the
+	 *  personal layer's `exec bash "$h" session` form). */
+	args?: string[];
 	profiles?: string[];
 	timeout?: number;
 }
@@ -117,6 +123,9 @@ function toHookSpec(value: unknown): HookSpec | null {
 	if (typeof id !== "string" || typeof script !== "string" || !isHookKind(kind)) return null;
 
 	const spec: HookSpec = { id, kind, script };
+	if (Array.isArray(record.args) && record.args.every((a) => typeof a === "string")) {
+		spec.args = record.args as string[];
+	}
 	if (Array.isArray(record.profiles) && record.profiles.every((p) => typeof p === "string")) {
 		spec.profiles = record.profiles as string[];
 	}
@@ -164,9 +173,29 @@ function fallbackHooksByEvent(): HooksByEvent {
 	return specs.length > 0 ? { tool_call: specs } : {};
 }
 
+/** A manifest must never REDUCE protection below the fallback. The fallback
+ *  set is the tool_call bash guard chain (git-guard.sh, unattended-guard.sh);
+ *  if a generated manifest carries no tool_call bash guard at all — because
+ *  the generator could not translate them, or because it wrote an empty
+ *  object — taking the manifest at face value would silently disarm guards
+ *  that were running a minute earlier. So they are put back at the front of
+ *  tool_call in that case. A manifest that DOES ship bash guards is trusted
+ *  as-is: it is the generator's translation of the same settings layers, and
+ *  prepending duplicates would run every guard twice. */
+function withFallbackGuards(manifest: HooksByEvent): HooksByEvent {
+	const toolCall = manifest.tool_call ?? [];
+	if (toolCall.some((spec) => spec.kind === "bash")) return manifest;
+
+	const fallback = fallbackHooksByEvent().tool_call ?? [];
+	if (fallback.length === 0) return manifest;
+
+	return { ...manifest, tool_call: [...fallback, ...toolCall] };
+}
+
 function resolveHooksByEvent(): HooksByEvent {
 	if (!YOKI_ROOT) return {}; // nothing to spawn — fail open across every event
-	return loadHooksManifest() ?? fallbackHooksByEvent();
+	const manifest = loadHooksManifest();
+	return manifest === null ? fallbackHooksByEvent() : withFallbackGuards(manifest);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +258,7 @@ function buildArgs(spec: HookSpec): string[] {
 		if (spec.profiles && spec.profiles.length > 0) args.push(spec.profiles.join(","));
 		return args;
 	}
-	return [RUN_BASH_HOOK, "--harness", "omp", spec.script];
+	return [RUN_BASH_HOOK, "--harness", "omp", spec.script, ...(spec.args ?? [])];
 }
 
 /** Resolves to the hook's parsed JSON result, or null for "no opinion".

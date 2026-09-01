@@ -23,9 +23,20 @@ const RUNNER_HOOK = {
   hooks: [{ type: 'command', command: '"${YOKI_NODE:-node}" "${YOKI_ROOT}/scripts/hooks/run-with-flags.js" "pre:x" "hooks/x.js" "standard,strict"' }],
 };
 
-const RAW_BASH_HOOK = {
+// The personal layer's real shape (see personal/settings.personal.json).
+const WRAPPER_BASH_HOOK = {
   matcher: 'Bash',
-  hooks: [{ type: 'command', command: "bash -c 'h=~/.claude/hooks/git-guard.sh; exec bash \"$h\"'" }],
+  hooks: [{
+    type: 'command',
+    command: "bash -c 'h=~/.claude/hooks/git-guard.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: git-guard.sh - failing open\" >&2'",
+  }],
+};
+
+// Not a runner call and not the wrapper shape either — must be reported as
+// skipped, never silently dropped.
+const UNRECOGNIZED_HOOK = {
+  matcher: 'Bash',
+  hooks: [{ type: 'command', command: "osascript -e 'display notification \"hi\"'" }],
 };
 
 test('buildGeneratedGroups: a run-with-flags.js hook becomes a Codex group with --harness codex appended', () => {
@@ -35,11 +46,64 @@ test('buildGeneratedGroups: a run-with-flags.js hook becomes a Codex group with 
   assert.equal(warnings.length, 0);
 });
 
-test('buildGeneratedGroups: a raw bash -c hook is skipped with a warning (not portable)', () => {
-  const { generated, warnings } = buildGeneratedGroups([{ hooks: { PreToolUse: [RAW_BASH_HOOK] } }]);
+test('buildGeneratedGroups: a personal bash-wrapper guard is translated through run-bash-hook.js, not dropped', () => {
+  const { generated, warnings, skipped } = buildGeneratedGroups(
+    [{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }],
+    { yokiRoot: '/opt/yoki', home: '/home/u' }
+  );
+  assert.equal(generated.PreToolUse.length, 1);
+  assert.equal(
+    generated.PreToolUse[0].hooks[0].command,
+    '"${YOKI_NODE:-node}" "/opt/yoki/scripts/hooks/run-bash-hook.js" --harness codex "/home/u/.claude/hooks/git-guard.sh"'
+  );
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(skipped, []);
+});
+
+test('buildGeneratedGroups: a translated wrapper guard is recognized as ours (trust entry + regenerable group)', () => {
+  const { generated } = buildGeneratedGroups(
+    [{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }],
+    { yokiRoot: '/opt/yoki', home: '/home/u' }
+  );
+  const merged = mergeHooksJson({}, generated);
+  const entries = collectHookStateEntries(merged, '/home/u/.codex/hooks.json');
+  assert.equal(entries.length, 1, 'a translated guard must get a [hooks.state] trust entry like any other yoki hook');
+});
+
+test('buildGeneratedGroups: wrapper args are carried through to run-bash-hook.js', () => {
+  const withArgs = {
+    matcher: 'Bash',
+    hooks: [{
+      type: 'command',
+      command: "bash -c 'h=~/.claude/hooks/herdr-agent-state.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\" session; fi; echo \"nope\" >&2'",
+    }],
+  };
+  const { generated } = buildGeneratedGroups(
+    [{ hooks: { PreToolUse: [withArgs] } }],
+    { yokiRoot: '/opt/yoki', home: '/home/u' }
+  );
+  assert.match(generated.PreToolUse[0].hooks[0].command, /run-bash-hook\.js" --harness codex "\/home\/u\/\.claude\/hooks\/herdr-agent-state\.sh" "session"$/);
+});
+
+test('buildGeneratedGroups: an unrecognized command is reported as skipped with a reason, never silently dropped', () => {
+  const { generated, warnings, skipped } = buildGeneratedGroups(
+    [{ hooks: { PreToolUse: [UNRECOGNIZED_HOOK] } }],
+    { yokiRoot: '/opt/yoki', home: '/home/u' }
+  );
   assert.equal(generated.PreToolUse, undefined);
+  assert.equal(skipped.length, 1);
+  assert.equal(skipped[0].target, 'codex');
+  assert.equal(skipped[0].event, 'PreToolUse');
+  assert.match(skipped[0].command, /osascript/);
+  assert.match(skipped[0].reason, /not portable/);
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /does not go through run-with-flags/);
+});
+
+test('buildGeneratedGroups: a wrapper guard with no yokiRoot is skipped (reported), not shipped broken', () => {
+  const { generated, skipped } = buildGeneratedGroups([{ hooks: { PreToolUse: [WRAPPER_BASH_HOOK] } }], { home: '/home/u' });
+  assert.equal(generated.PreToolUse, undefined);
+  assert.equal(skipped.length, 1);
+  assert.match(skipped[0].reason, /YOKI_ROOT/);
 });
 
 test('buildGeneratedGroups: Workflow matcher has no Codex equivalent and is skipped with a warning', () => {

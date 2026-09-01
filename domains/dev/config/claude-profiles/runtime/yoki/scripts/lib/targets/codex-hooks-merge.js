@@ -6,17 +6,29 @@
  * groups (herdr, or any other tool's) byte-for-byte in place — spike
  * S1+S2 §3 "Recommendation".
  *
- * Only hook commands that already go through `run-with-flags.js` or
- * `run-bash-hook.js` are portable: they are the only commands whose payload
+ * Hook commands that already go through `run-with-flags.js` or
+ * `run-bash-hook.js` are portable as-is: they are the commands whose payload
  * gets normalized into the shape the hook script actually expects (see
- * ../harness/payload.js). A raw one-off `bash -c '...'` hook (this repo's
- * personal git-guard.sh/mcp-audit.sh/etc — see personal/settings.personal.json)
- * reads Claude's own stdin shape directly and has no such normalization, so
- * it is left out of the Codex output with a warning rather than shipped
- * broken.
+ * ../harness/payload.js).
+ *
+ * The personal layer's bash-wrapper guards (`bash -c 'h=~/.claude/hooks/
+ * git-guard.sh; bash -n "$h" && exec bash "$h"'` — see
+ * personal/settings.personal.json) are ALSO translated, by rewriting them
+ * into the equivalent `run-bash-hook.js --harness codex <hook.sh>` call,
+ * which performs the same syntax gate plus the payload/response translation
+ * Codex needs. Dropping them (the behaviour before bash-wrapper-hook.js
+ * existed) silently removed git-guard.sh / unattended-guard.sh from the
+ * Codex target — a protection downgrade relative to Claude Code.
+ *
+ * Anything else (the `osascript` notification hooks, a future ad-hoc
+ * one-liner) is reported in the plan's `skipped` list with a reason — never
+ * silently dropped, and never guessed at and shipped broken.
  */
 
+const path = require('path');
+
 const { eventLabelFor, computeHandlerHash, hookStateKey } = require('./codex-trust');
+const { parseBashWrapperCommand } = require('./bash-wrapper-hook');
 
 /** Claude Code hook event names Codex has a same-named equivalent for
  * (S1+S2 §1.1; PermissionRequest/PreCompact/PostCompact are real Codex
@@ -94,30 +106,77 @@ function appendIfFlag(command, ifClause) {
   return `${command} --if ${JSON.stringify(String(ifClause))}`;
 }
 
+/** Same `"${YOKI_NODE:-node}" "<abs script>"` shape core/settings.layer.json
+ * uses for every runner hook, so the generated command is indistinguishable
+ * (to isYokiCodexCommand and to a human reading hooks.json) from one a
+ * settings layer wrote itself. */
+function runBashHookCommand(yokiRoot, script, args) {
+  const runner = path.join(yokiRoot, 'scripts', 'hooks', 'run-bash-hook.js');
+  const tail = args && args.length > 0 ? ` ${args.map(a => `"${a}"`).join(' ')}` : '';
+  return `"\${YOKI_NODE:-node}" "${runner}" --harness codex "${script}"${tail}`;
+}
+
 /**
  * @param {Array<{event: string, matcher: string, hooks: Array<object>}>} rawGroups
  *   flattened groups from every layer's settings `hooks[event]`, in layer order
  * @param {string} eventName Claude event name (also the Codex event name)
- * @returns {{groups: Array<object>, warnings: string[]}}
+ * @param {{yokiRoot?: string, home?: string}} [options] `yokiRoot` locates
+ *   run-bash-hook.js for a translated bash-wrapper guard; without it those
+ *   guards cannot be rewritten and are reported as skipped instead.
+ * @returns {{groups: Array<object>, warnings: string[],
+ *   skipped: Array<{target:string, event:string, matcher:string,
+ *     command:string, reason:string}>}}
  */
-function translateEventGroups(eventName, rawGroups) {
+function translateEventGroups(eventName, rawGroups, options = {}) {
   const groups = [];
   const warnings = [];
+  const skipped = [];
+
+  const skip = (matcher, command, reason) => {
+    skipped.push({
+      target: 'codex',
+      event: eventName,
+      matcher: String(matcher === undefined || matcher === null ? '' : matcher),
+      command: String(command === undefined || command === null ? '' : command),
+      reason,
+    });
+    warnings.push(`codex: ${eventName}/${matcher} — skipped: ${reason}`);
+  };
 
   for (const group of rawGroups) {
+    const groupHandlers = Array.isArray(group.hooks) ? group.hooks : [];
     const matcher = translateMatcher(group.matcher);
     if (matcher === null) {
-      warnings.push(`codex: ${eventName} matcher "${group.matcher}" has no Codex equivalent (no Workflow tool) — group skipped`);
+      const reason = `${eventName} matcher "${group.matcher}" has no Codex equivalent (no Workflow tool)`;
+      for (const handler of groupHandlers) skip(group.matcher, handler && handler.command, reason);
       continue;
     }
 
     const hooks = [];
-    for (const handler of Array.isArray(group.hooks) ? group.hooks : []) {
-      if (!isRunnerCommand(handler.command)) {
-        warnings.push(`codex: ${eventName}/${matcher} hook "${String(handler.command).slice(0, 60)}..." does not go through run-with-flags.js/run-bash-hook.js — skipped (not portable to Codex's payload shape)`);
+    for (const handler of groupHandlers) {
+      let command = null;
+      if (isRunnerCommand(handler.command)) {
+        command = translateCommand(handler.command);
+      } else {
+        const wrapper = parseBashWrapperCommand(handler.command, options);
+        if (wrapper && options.yokiRoot) {
+          command = runBashHookCommand(options.yokiRoot, wrapper.script, wrapper.args);
+        } else if (wrapper) {
+          skip(group.matcher, handler.command, 'personal bash-wrapper guard cannot be rewritten: no YOKI_ROOT resolved for run-bash-hook.js');
+          continue;
+        }
+      }
+
+      if (command === null) {
+        skip(
+          group.matcher,
+          handler.command,
+          "command is neither a run-with-flags.js/run-bash-hook.js invocation nor the personal bash-wrapper form — not portable to Codex's payload shape"
+        );
         continue;
       }
-      const translated = { type: 'command', command: appendIfFlag(translateCommand(handler.command), handler.if) };
+
+      const translated = { type: 'command', command: appendIfFlag(command, handler.if) };
       if (handler.async !== undefined) translated.async = handler.async;
       translated.timeout = eventName === 'SessionEnd' ? 3 : handler.timeout;
       if (translated.timeout === undefined) delete translated.timeout;
@@ -127,16 +186,19 @@ function translateEventGroups(eventName, rawGroups) {
     if (hooks.length > 0) groups.push({ matcher, hooks });
   }
 
-  return { groups, warnings };
+  return { groups, warnings, skipped };
 }
 
 /**
  * @param {Array<{hooks?: Record<string, Array<object>>}>} settingsLayers
  *   parsed settings.layer.json/settings.personal.json contents, in layer order
- * @returns {{generated: Record<string, Array<object>>, warnings: string[]}}
+ * @param {{yokiRoot?: string, home?: string}} [options]
+ * @returns {{generated: Record<string, Array<object>>, warnings: string[],
+ *   skipped: Array<object>}}
  */
-function buildGeneratedGroups(settingsLayers) {
+function buildGeneratedGroups(settingsLayers, options = {}) {
   const warnings = [];
+  const skipped = [];
   const generated = {};
 
   const eventsSeen = new Set();
@@ -147,21 +209,34 @@ function buildGeneratedGroups(settingsLayers) {
   }
 
   for (const eventName of eventsSeen) {
+    const rawGroups = settingsLayers.flatMap(layer => ((layer && layer.hooks && layer.hooks[eventName]) || []));
+
     if (!KNOWN_EVENTS.has(eventName)) {
-      if (eventName === 'Notification') {
-        warnings.push('codex: Notification is not a Codex hook event (see codex-notify.js / config.toml `notify`) — skipped');
-      } else {
-        warnings.push(`codex: hook event "${eventName}" has no known Codex equivalent — skipped`);
+      const reason = eventName === 'Notification'
+        ? 'Notification is not a Codex hook event (see codex-notify.js / config.toml `notify`)'
+        : `hook event "${eventName}" has no known Codex equivalent`;
+      warnings.push(`codex: ${reason} — skipped`);
+      for (const group of rawGroups) {
+        for (const handler of Array.isArray(group.hooks) ? group.hooks : []) {
+          skipped.push({
+            target: 'codex',
+            event: eventName,
+            matcher: String(group.matcher === undefined || group.matcher === null ? '' : group.matcher),
+            command: String((handler && handler.command) || ''),
+            reason,
+          });
+        }
       }
       continue;
     }
-    const rawGroups = settingsLayers.flatMap(layer => ((layer && layer.hooks && layer.hooks[eventName]) || []));
-    const { groups, warnings: groupWarnings } = translateEventGroups(eventName, rawGroups);
+
+    const { groups, warnings: groupWarnings, skipped: groupSkipped } = translateEventGroups(eventName, rawGroups, options);
     warnings.push(...groupWarnings);
+    skipped.push(...groupSkipped);
     if (groups.length > 0) generated[eventName] = groups;
   }
 
-  return { generated, warnings };
+  return { generated, warnings, skipped };
 }
 
 /**
@@ -218,6 +293,7 @@ function collectHookStateEntries(mergedHooksJson, hooksJsonAbsPath) {
 
 module.exports = {
   KNOWN_EVENTS,
+  runBashHookCommand,
   isRunnerCommand,
   isYokiCodexCommand,
   groupIsOurs,

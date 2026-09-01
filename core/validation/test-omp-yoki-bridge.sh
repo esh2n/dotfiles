@@ -21,8 +21,11 @@ set -euo pipefail
 # Covers: handler registration for all 8 events, tool_call deny propagation
 # from git-guard, benign allow, hashline/apply_patch multi-path fan-out,
 # session_stop continue passthrough (plain, additionalContext, and block),
-# broken-hooks fail-open, and the yoki-hooks.json-absent fallback (plus a
-# manifest-present-overrides-fallback sanity check).
+# broken-hooks fail-open, the yoki-hooks.json-absent fallback, the
+# fallback-guard FLOOR (a manifest that registers no tool_call bash guard must
+# not disarm git-guard/unattended-guard — a manifest may add protection, never
+# remove it), a manifest that ships its own bash guard being used as-is, and
+# per-hook argv passthrough.
 #
 # Usage: ./test-omp-yoki-bridge.sh
 # -----------------------------------------------------------------------------
@@ -77,6 +80,19 @@ STUB
     printf 'this is not bash {{{' > "$WORK/broken-hooks/unattended-guard.sh"
     chmod +x "$WORK/broken-hooks/"*.sh
 
+    # A guard that lives ONLY in a manifest — denies on its own marker, and
+    # notably NOT on git-guard's 'git push --force'. Used to prove a manifest
+    # that ships its own tool_call bash guard is taken as-is (the fallback is
+    # not also prepended, which would run every guard twice).
+    cat > "$WORK/hooks/manifest-guard.sh" <<'STUB'
+#!/usr/bin/env bash
+payload="$(cat)"
+if echo "$payload" | grep -q 'manifest-marker'; then
+    echo '{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"stub: manifest guard"}}'
+fi
+STUB
+    chmod +x "$WORK/hooks/manifest-guard.sh"
+
     # session_stop stubs, referenced by a manifest below
     mkdir -p "$WORK/session-hooks"
     printf '#!/usr/bin/env bash\ncat > /dev/null\n' > "$WORK/session-hooks/silent.sh"
@@ -84,6 +100,14 @@ STUB
         > "$WORK/session-hooks/context.sh"
     printf '#!/usr/bin/env bash\ncat > /dev/null\necho '\''{"decision":"block","reason":"stub: stop blocked"}'\''\n' \
         > "$WORK/session-hooks/block.sh"
+    # Reports back the argv it was handed, so a manifest entry's `args` can be
+    # proven to reach the .sh unchanged (the personal layer's
+    # `exec bash "$h" session` form).
+    cat > "$WORK/session-hooks/argecho.sh" <<'STUB'
+#!/usr/bin/env bash
+cat > /dev/null
+printf '{"hookSpecificOutput":{"additionalContext":"stub: argv=%s"}}\n' "$*"
+STUB
     chmod +x "$WORK/session-hooks/"*.sh
 
     export GUARD_CAPTURE="$WORK/capture.jsonl"
@@ -207,8 +231,11 @@ const capturedLines = () => readFileSync(capture, "utf8").split("\n").filter(Boo
 }
 
 // ---------------------------------------------------------------------------
-// 4. yoki-hooks.json present with an EMPTY tool_call list overrides the
-//    fallback entirely — the manifest, once it exists, is authoritative.
+// 4. FALLBACK FLOOR. A manifest that registers no tool_call bash guard must
+//    NOT disarm the installed ones. Before this, any manifest that merely
+//    parsed — `{}` included — replaced the fallback wholesale, so generating
+//    yoki-hooks.json silently removed git-guard.sh / unattended-guard.sh from
+//    omp: a protection downgrade caused by running the generator.
 // ---------------------------------------------------------------------------
 {
     process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
@@ -217,8 +244,39 @@ const capturedLines = () => readFileSync(capture, "utf8").split("\n").filter(Boo
     const mod = await import(EXT_PATH + "?empty-manifest");
     mod.default(fakePi);
     const ctx = makeCtx();
-    const r = await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t1", input: { command: "git push --force origin main" } }, ctx);
-    check("a present manifest overrides the fallback even when empty", r === undefined, JSON.stringify(r));
+    const r = (await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t1", input: { command: "git push --force origin main" } }, ctx)) as { block?: boolean } | undefined;
+    check("an empty manifest does NOT disarm the fallback bash guards", r?.block === true, JSON.stringify(r));
+}
+
+// 4b. Same floor, with a manifest that registers a js hook on tool_call but
+//     still no bash guard — the js hook is a different kind of hook and can
+//     never stand in for the guards.
+{
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_JS_ONLY_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?js-only-manifest");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+    const r = (await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t1", input: { command: "git push --force origin main" } }, ctx)) as { block?: boolean } | undefined;
+    check("a js-only tool_call manifest does NOT disarm the fallback bash guards", r?.block === true, JSON.stringify(r));
+}
+
+// 4c. A manifest that DOES ship its own tool_call bash guard is authoritative:
+//     the fallback is not also prepended (that would run every guard twice).
+{
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_OWN_GUARD_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?own-guard-manifest");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+
+    const own = (await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t1", input: { command: "echo manifest-marker" } }, ctx)) as { block?: boolean; reason?: string } | undefined;
+    check("a manifest's own bash guard runs", own?.block === true && (own?.reason ?? "").includes("stub: manifest guard"), JSON.stringify(own));
+
+    const notFallback = await handlers["tool_call"]!({ type: "tool_call", toolName: "bash", toolCallId: "t2", input: { command: "git push --force origin main" } }, ctx);
+    check("a manifest with its own bash guard is used as-is (fallback not prepended)", notFallback === undefined, JSON.stringify(notFallback));
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +326,27 @@ async function callSessionStop(manifestEnv: string, tag: string): Promise<Sessio
     );
 }
 
+// ---------------------------------------------------------------------------
+// 6. A manifest entry's `args` reach the .sh unchanged — the personal layer's
+//    `exec bash "$h" session` wrapper form, which omp-hooks.js now translates
+//    into {kind:'bash', script, args:['session']}.
+// ---------------------------------------------------------------------------
+{
+    const withArgs = await callSessionStop("GUARD_STOP_ARGS_MANIFEST", "stop-args");
+    check(
+        "manifest args are passed through to the hook script",
+        withArgs?.additionalContext === "stub: argv=session",
+        JSON.stringify(withArgs),
+    );
+
+    const noArgs = await callSessionStop("GUARD_STOP_NOARGS_MANIFEST", "stop-noargs");
+    check(
+        "a spec with no args passes none",
+        noArgs?.additionalContext === "stub: argv=",
+        JSON.stringify(noArgs),
+    );
+}
+
 console.log("passed=" + passed + " failed=" + failed);
 process.exit(failed === 0 ? 0 : 1);
 RUNNER
@@ -290,6 +369,24 @@ RUNNER
     printf '{"session_stop": [{"id": "stub-block", "kind": "bash", "script": "%s"}]}\n' \
         "$WORK/session-hooks/block.sh" > "$stop_block_manifest"
 
+    local stop_args_manifest="$WORK/stop-args.json"
+    printf '{"session_stop": [{"id": "stub-args", "kind": "bash", "script": "%s", "args": ["session"]}]}\n' \
+        "$WORK/session-hooks/argecho.sh" > "$stop_args_manifest"
+
+    local stop_noargs_manifest="$WORK/stop-noargs.json"
+    printf '{"session_stop": [{"id": "stub-noargs", "kind": "bash", "script": "%s"}]}\n' \
+        "$WORK/session-hooks/argecho.sh" > "$stop_noargs_manifest"
+
+    # tool_call registered, but with a js hook only — still no bash guard.
+    local js_only_manifest="$WORK/js-only-manifest.json"
+    printf '{"tool_call": [{"id": "noop", "kind": "js", "script": "scripts/hooks/does-not-exist.js"}]}\n' \
+        > "$js_only_manifest"
+
+    # tool_call with its OWN bash guard — authoritative, fallback not added.
+    local own_guard_manifest="$WORK/own-guard-manifest.json"
+    printf '{"tool_call": [{"id": "manifest-guard", "kind": "bash", "script": "%s"}]}\n' \
+        "$WORK/hooks/manifest-guard.sh" > "$own_guard_manifest"
+
     export GUARD_EXT="$EXT"
     export GUARD_HOOKS="$WORK/hooks"
     export GUARD_BROKEN="$WORK/broken-hooks"
@@ -300,6 +397,10 @@ RUNNER
     export GUARD_STOP_SILENT_MANIFEST="$stop_silent_manifest"
     export GUARD_STOP_CONTEXT_MANIFEST="$stop_context_manifest"
     export GUARD_STOP_BLOCK_MANIFEST="$stop_block_manifest"
+    export GUARD_STOP_ARGS_MANIFEST="$stop_args_manifest"
+    export GUARD_STOP_NOARGS_MANIFEST="$stop_noargs_manifest"
+    export GUARD_JS_ONLY_MANIFEST="$js_only_manifest"
+    export GUARD_OWN_GUARD_MANIFEST="$own_guard_manifest"
 
     # set -e is active for the whole file; guard the capture with `|| status=$?`
     # rather than a bare assignment so a non-zero exit from the runner doesn't

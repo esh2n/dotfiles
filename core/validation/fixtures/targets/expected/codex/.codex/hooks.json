@@ -8,6 +8,20 @@
           "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:demo\" \"hooks/pre-demo.js\" \"standard,strict\" --harness codex"
         }
       ]
+    },
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"/opt/yoki-golden-fixture/yoki-root/scripts/hooks/run-bash-hook.js\" --harness codex \"__RUN_HOME__/.claude/hooks/git-guard.sh\""
+        },
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"/opt/yoki-golden-fixture/yoki-root/scripts/hooks/run-bash-hook.js\" --harness codex \"__RUN_HOME__/.claude/hooks/unattended-guard.sh\"",
+          "timeout": 5
+        }
+      ]
     }
   ],
   "PostToolUse": [
@@ -61,6 +75,16 @@
         {
           "type": "command",
           "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"session:demo\" \"hooks/session-demo.js\" \"standard,strict\" --harness codex"
+        }
+      ]
+    },
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "\"${YOKI_NODE:-node}\" \"/opt/yoki-golden-fixture/yoki-root/scripts/hooks/run-bash-hook.js\" --harness codex \"__RUN_HOME__/.claude/hooks/herdr-agent-state.sh\" \"session\"",
+          "timeout": 5
         }
       ]
     }

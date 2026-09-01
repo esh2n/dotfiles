@@ -8,13 +8,23 @@
  * this file has no foreign owner to preserve alongside ours — it is yoki's
  * own manifest — so it is written wholesale on every run rather than merged.
  *
- * Only hook commands that already go through `run-with-flags.js` or
- * `run-bash-hook.js` are portable (same rule as Codex): they are the only
+ * Hook commands that already go through `run-with-flags.js` or
+ * `run-bash-hook.js` are portable as-is (same rule as Codex): they are the
  * commands whose payload gets normalized into the shape the hook script
- * actually expects. A raw one-off `bash -c '...'` hook (this repo's personal
- * git-guard.sh/mcp-audit.sh/etc — see personal/settings.personal.json) reads
- * Claude's own stdin shape directly and has no such normalization, so it is
- * left out with a warning rather than shipped broken.
+ * actually expects.
+ *
+ * The personal layer's bash-wrapper guards (`bash -c 'h=~/.claude/hooks/
+ * git-guard.sh; bash -n "$h" && exec bash "$h"'` — see
+ * personal/settings.personal.json) are ALSO translated, into
+ * `{kind:'bash', script, args}` specs, which yoki-bridge.ts dispatches
+ * through `run-bash-hook.js --harness omp`. Dropping them (the behaviour
+ * before bash-wrapper-hook.js existed) silently removed git-guard.sh /
+ * unattended-guard.sh from the omp target — a protection downgrade relative
+ * to Claude Code, not a cosmetic gap.
+ *
+ * Anything else (the `osascript` notification hooks, a future ad-hoc
+ * one-liner) is reported in the plan's `skipped` list with a reason — never
+ * silently dropped, and never guessed at and shipped broken.
  *
  * Event mapping (per task spec):
  *   PreToolUse -> tool_call            PostToolUse -> tool_result
@@ -39,6 +49,7 @@
 
 const path = require('path');
 const { translateMatcher } = require('./omp-tool-names');
+const { parseBashWrapperCommand } = require('./bash-wrapper-hook');
 
 /** Claude event name -> omp event name, for every event that has one. */
 const EVENT_MAP = new Map([
@@ -76,11 +87,15 @@ function quotedTokens(command) {
 }
 
 /**
+ * @param {string} command
+ * @param {{home?: string}} [options] `home` expands the wrapper's `~/…`
+ *   hook path (test seam; defaults to the real home dir).
  * @returns {{kind:'js', id:string, script:string, profiles?:string[]}|
- *   {kind:'bash', id:string, script:string}|null} null when `command` isn't
- *   a run-with-flags.js/run-bash-hook.js invocation (not portable).
+ *   {kind:'bash', id:string, script:string, args?:string[]}|null} null when
+ *   `command` is neither a run-with-flags.js/run-bash-hook.js invocation nor
+ *   the personal layer's `bash -c '…exec bash "$h"…'` wrapper.
  */
-function parseRunnerCommand(command) {
+function parseRunnerCommand(command, options = {}) {
   const tokens = quotedTokens(command);
 
   if (RUN_WITH_FLAGS_RE.test(command)) {
@@ -104,6 +119,15 @@ function parseRunnerCommand(command) {
     return { kind: 'bash', id: path.basename(script).replace(/\.sh$/, ''), script };
   }
 
+  // The personal layer's bash wrapper: run the same .sh through
+  // run-bash-hook.js instead of dropping the guard entirely.
+  const wrapper = parseBashWrapperCommand(command, options);
+  if (wrapper) {
+    const spec = { kind: 'bash', id: wrapper.name, script: wrapper.script };
+    if (wrapper.args.length > 0) spec.args = wrapper.args;
+    return spec;
+  }
+
   return null;
 }
 
@@ -121,32 +145,55 @@ function timeoutMs(handlerTimeoutSeconds) {
  * @param {string} claudeEventName
  * @param {Array<{matcher:string, hooks:Array<object>}>} rawGroups flattened
  *   groups from every layer's settings `hooks[claudeEventName]`, layer order
- * @returns {{specs: Array<object>, warnings: string[]}}
+ * @param {{home?: string}} [options] `home` expands a bash-wrapper hook's
+ *   leading `~/` (test seam; defaults to the real home dir)
+ * @returns {{specs: Array<object>, warnings: string[],
+ *   skipped: Array<{target:string, event:string, matcher:string,
+ *     command:string, reason:string}>}}
  */
-function translateEventGroups(claudeEventName, rawGroups) {
+function translateEventGroups(claudeEventName, rawGroups, options = {}) {
   const specs = [];
   const warnings = [];
+  const skipped = [];
   const isToolEvent = TOOL_EVENTS.has(claudeEventName);
 
+  const skip = (matcher, command, reason) => {
+    skipped.push({
+      target: 'omp',
+      event: claudeEventName,
+      matcher: String(matcher === undefined || matcher === null ? '' : matcher),
+      command: String(command === undefined || command === null ? '' : command),
+      reason,
+    });
+    warnings.push(`omp: ${claudeEventName}/${matcher} — skipped: ${reason}`);
+  };
+
   for (const group of rawGroups) {
+    const groupHandlers = Array.isArray(group.hooks) ? group.hooks : [];
     let matcher;
     if (claudeEventName === 'Notification') {
       if (group.matcher !== 'permission_prompt') {
-        warnings.push(`omp: Notification matcher "${group.matcher}" has no omp event equivalent (only "permission_prompt" -> tool_approval_requested) — group skipped`);
+        const reason = `Notification matcher "${group.matcher}" has no omp event equivalent (only "permission_prompt" -> tool_approval_requested)`;
+        for (const handler of groupHandlers) skip(group.matcher, handler && handler.command, reason);
         continue;
       }
     } else if (isToolEvent) {
       matcher = translateMatcher(group.matcher);
       if (matcher === null) {
-        warnings.push(`omp: ${claudeEventName} matcher "${group.matcher}" has no omp tool equivalent — group skipped`);
+        const reason = `${claudeEventName} matcher "${group.matcher}" has no omp tool equivalent`;
+        for (const handler of groupHandlers) skip(group.matcher, handler && handler.command, reason);
         continue;
       }
     }
 
-    for (const handler of Array.isArray(group.hooks) ? group.hooks : []) {
-      const parsed = parseRunnerCommand(handler.command);
+    for (const handler of groupHandlers) {
+      const parsed = parseRunnerCommand(handler.command, options);
       if (!parsed) {
-        warnings.push(`omp: ${claudeEventName}/${group.matcher} hook "${String(handler.command).slice(0, 60)}..." does not go through run-with-flags.js/run-bash-hook.js — skipped (not portable to omp's payload shape)`);
+        skip(
+          group.matcher,
+          handler.command,
+          "command is neither a run-with-flags.js/run-bash-hook.js invocation nor the personal bash-wrapper form — not portable to omp's payload shape"
+        );
         continue;
       }
 
@@ -159,16 +206,21 @@ function translateEventGroups(claudeEventName, rawGroups) {
     }
   }
 
-  return { specs, warnings };
+  return { specs, warnings, skipped };
 }
 
 /**
  * @param {Array<{hooks?: Record<string, Array<object>>}>} settingsLayers
  *   parsed settings.layer.json/settings.personal.json contents, layer order
- * @returns {{generated: Record<string, Array<object>>, warnings: string[]}}
+ * @param {{home?: string}} [options]
+ * @returns {{generated: Record<string, Array<object>>, warnings: string[],
+ *   skipped: Array<object>}} `skipped` lists every hook command that could
+ *   NOT be translated, so gen.js can print it — a dropped guard must stay
+ *   visible in the plan output rather than disappearing quietly.
  */
-function buildYokiHooksJson(settingsLayers) {
+function buildYokiHooksJson(settingsLayers, options = {}) {
   const warnings = [];
+  const skipped = [];
   const generated = {};
 
   const claudeEventsSeen = new Set();
@@ -178,20 +230,34 @@ function buildYokiHooksJson(settingsLayers) {
 
   for (const claudeEventName of claudeEventsSeen) {
     const ompEventName = claudeEventName === 'Notification' ? 'tool_approval_requested' : EVENT_MAP.get(claudeEventName);
+    const rawGroups = settingsLayers.flatMap(layer => ((layer && layer.hooks && layer.hooks[claudeEventName]) || []));
+
     if (!ompEventName) {
-      warnings.push(`omp: hook event "${claudeEventName}" has no known omp equivalent — skipped`);
+      const reason = `hook event "${claudeEventName}" has no known omp equivalent`;
+      warnings.push(`omp: ${reason} — skipped`);
+      for (const group of rawGroups) {
+        for (const handler of Array.isArray(group.hooks) ? group.hooks : []) {
+          skipped.push({
+            target: 'omp',
+            event: claudeEventName,
+            matcher: String(group.matcher === undefined || group.matcher === null ? '' : group.matcher),
+            command: String((handler && handler.command) || ''),
+            reason,
+          });
+        }
+      }
       continue;
     }
 
-    const rawGroups = settingsLayers.flatMap(layer => ((layer && layer.hooks && layer.hooks[claudeEventName]) || []));
-    const { specs, warnings: groupWarnings } = translateEventGroups(claudeEventName, rawGroups);
+    const { specs, warnings: groupWarnings, skipped: groupSkipped } = translateEventGroups(claudeEventName, rawGroups, options);
     warnings.push(...groupWarnings);
+    skipped.push(...groupSkipped);
     if (specs.length > 0) {
       generated[ompEventName] = [...(generated[ompEventName] || []), ...specs];
     }
   }
 
-  return { generated, warnings };
+  return { generated, warnings, skipped };
 }
 
 module.exports = {

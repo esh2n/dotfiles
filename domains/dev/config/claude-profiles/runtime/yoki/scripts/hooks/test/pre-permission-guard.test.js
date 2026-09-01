@@ -44,7 +44,7 @@ function isPassthrough(result, raw) {
   assert.equal(result, raw);
 }
 
-test('Bash: an exact-match deny pattern (rm -rf /*) blocks the literal command', () => {
+test('Bash: a trailing-glob deny pattern (rm -rf /*) blocks the literal command', () => {
   const claudeDir = freshClaudeDir();
   writePermissions(claudeDir, [{ pattern: 'Bash(rm -rf /*)', reason: 'wildcard' }]);
   withClaudeDir(claudeDir, () => {
@@ -53,11 +53,39 @@ test('Bash: an exact-match deny pattern (rm -rf /*) blocks the literal command',
   });
 });
 
-test('Bash: the exact-match pattern does not block a different command with the same prefix', () => {
+// The whole point of the pattern: a trailing '*' glued to the last token is a
+// PREFIX wildcard. Read as an exact match it fired on nothing real, and since
+// to-codex.js cannot express these as execpolicy tokens, this hook is their
+// only enforcement point on Codex and omp.
+test('Bash: rm -rf /* blocks a real destructive command under / (prefix wildcard)', () => {
   const claudeDir = freshClaudeDir();
   writePermissions(claudeDir, [{ pattern: 'Bash(rm -rf /*)' }]);
   withClaudeDir(claudeDir, () => {
-    const raw = payload('Bash', { command: 'rm -rf /tmp/foo' });
+    isDeny(hook.run(payload('Bash', { command: 'rm -rf /etc/foo' })), 'Bash(rm -rf /*)');
+  });
+});
+
+test('Bash: > /dev/* blocks a raw device redirect', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Bash(> /dev/*)' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('Bash', { command: '> /dev/sda' })), 'Bash(> /dev/*)');
+  });
+});
+
+test('Bash: rm -rf ~/* blocks a home-directory wipe', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Bash(rm -rf ~/*)' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('Bash', { command: 'rm -rf ~/x' })), 'Bash(rm -rf ~/*)');
+  });
+});
+
+test('Bash: a trailing-glob pattern still does not match a command outside its prefix', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Bash(rm -rf /*)' }]);
+  withClaudeDir(claudeDir, () => {
+    const raw = payload('Bash', { command: 'rm -rf ./build' });
     isPassthrough(hook.run(raw), raw);
   });
 });
@@ -158,9 +186,24 @@ test('malformed stdin (not JSON) passes through unchanged', () => {
   assert.equal(result, 'not json at all');
 });
 
-test('matchBash: a trailing literal glob token (not " *") is an exact match only', () => {
+test('matchBash: a trailing "*" glued to the last token is a prefix wildcard', () => {
   assert.equal(hook.matchBash('rm -rf ~/*', 'rm -rf ~/*'), true);
-  assert.equal(hook.matchBash('rm -rf ~/*', 'rm -rf ~/foo'), false);
+  assert.equal(hook.matchBash('rm -rf ~/*', 'rm -rf ~/foo'), true);
+  assert.equal(hook.matchBash('rm -rf ~/*', 'rm -rf /foo'), false);
+  assert.equal(hook.matchBash('rm -rf /*', 'rm -rf /etc/foo'), true);
+  assert.equal(hook.matchBash('> /dev/*', '> /dev/sda'), true);
+  assert.equal(hook.matchBash('>> /dev/*', '>> /dev/null'), true);
+});
+
+test('matchBash: " *" keeps word-boundary semantics (a prefix star is not a bare prefix)', () => {
+  assert.equal(hook.matchBash('git push *', 'git push'), true);
+  assert.equal(hook.matchBash('git push *', 'git push --force'), true);
+  assert.equal(hook.matchBash('git push *', 'git pushx'), false);
+});
+
+test('matchBash: a pattern with no trailing star stays an exact match', () => {
+  assert.equal(hook.matchBash('shutdown now', 'shutdown now'), true);
+  assert.equal(hook.matchBash('shutdown now', 'shutdown now -h'), false);
 });
 
 test('globToRegExp: "**/" matches zero or more directories', () => {

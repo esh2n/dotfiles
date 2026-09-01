@@ -16,12 +16,45 @@ const REPO_ROOT = path.join(__dirname, '..', '..', '..', '..', '..', '..', '..',
 // personal/permissions.yaml's header comment) — the write side of the
 // Read(**/.env*) denies, which the pre-migration settings.personal.json
 // never had. Everything else in the new deny list must be exactly the old
-// 82 entries; the regression below pins that against git HEAD.
+// 82 entries; the regression below pins that against the pre-migration copy.
 const INTENTIONAL_NEW_DENY_ENTRIES = ['Edit(**/.env)', 'Edit(**/.env.*)'];
 
-function readJsonAtHead(repoRelativePath) {
-  const raw = execFileSync('git', ['show', `HEAD:${repoRelativePath}`], { cwd: REPO_ROOT, encoding: 'utf8' });
-  return JSON.parse(raw);
+/**
+ * The pre-migration copy of a settings file: the NEWEST commit touching it
+ * that still carries a `permissions` key.
+ *
+ * `git show HEAD:<path>` was the original implementation, which only worked
+ * while HEAD was still the migration commit itself — once anything landed on
+ * top, HEAD no longer had the moved lists and both regressions below failed
+ * with "Cannot read properties of undefined". Walking the file's own history
+ * for the last commit that still had the key keeps the regression pinned to
+ * the content it was written to guard, at any HEAD.
+ *
+ * @returns {object|null} null when no such commit is reachable (a shallow
+ *   clone, or the file's history was rewritten) — the caller skips rather
+ *   than failing, since there is then nothing to compare against.
+ */
+function readJsonBeforeMigration(repoRelativePath) {
+  let revisions;
+  try {
+    revisions = execFileSync('git', ['log', '--format=%H', '--', repoRelativePath], { cwd: REPO_ROOT, encoding: 'utf8' })
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+  } catch {
+    return null;
+  }
+
+  for (const revision of revisions) {
+    let parsed;
+    try {
+      parsed = JSON.parse(execFileSync('git', ['show', `${revision}:${repoRelativePath}`], { cwd: REPO_ROOT, encoding: 'utf8' }));
+    } catch {
+      continue;
+    }
+    if (parsed && parsed.permissions) return parsed;
+  }
+  return null;
 }
 
 test('toClaudeSettings: maps entries to their pattern strings only', () => {
@@ -85,18 +118,19 @@ test('convert: exactly 8 deny entries are hook-enforced', () => {
 // Regression: to-claude.js must reproduce the moved settings lists exactly.
 // Reads core/settings.layer.json's permissions.allow and
 // personal/settings.personal.json's permissions.deny at their pre-migration
-// git HEAD content (this change removes those keys from the JSON files in
-// the same commit range, so `git show HEAD:...` is the only place the
-// original lists still exist) and checks nothing was lost or reworded in
-// the move to permissions.yaml. The only allowed difference is the two
-// intentional new deny entries documented above (T8): every entry from
-// git HEAD must survive, and every entry that does NOT come from git HEAD
-// must be one of those two.
+// content (the migration removed those keys from the JSON files, so git
+// history is the only place the original lists still exist — see
+// readJsonBeforeMigration) and checks nothing was lost or reworded in the
+// move to permissions.yaml. The only allowed difference is the two
+// intentional new deny entries documented above (T8): every pre-migration
+// entry must survive, and every entry that is NOT pre-migration must be one
+// of those two.
 // -----------------------------------------------------------------------------
-test('regression: core allow list is byte-identical to git HEAD settings.layer.json', () => {
-  const before = readJsonAtHead('domains/dev/config/claude-profiles/core/settings.layer.json');
+test('regression: core allow list is byte-identical to the pre-migration settings.layer.json', (t) => {
+  const before = readJsonBeforeMigration('domains/dev/config/claude-profiles/core/settings.layer.json');
+  if (!before) return t.skip('no reachable commit still carries settings.layer.json permissions (shallow clone?)');
   const originalAllow = before.permissions.allow;
-  assert.ok(Array.isArray(originalAllow) && originalAllow.length > 0, 'git HEAD settings.layer.json must still carry the pre-migration allow list');
+  assert.ok(Array.isArray(originalAllow) && originalAllow.length > 0, 'the pre-migration settings.layer.json must still carry the allow list');
 
   const merged = loadAndMerge([CORE_YAML, PERSONAL_YAML]);
   const newAllow = toClaudeSettings(merged).allow;
@@ -105,10 +139,11 @@ test('regression: core allow list is byte-identical to git HEAD settings.layer.j
   assert.equal(newAllow.length, originalAllow.length, 'allow list must not gain or lose entries');
 });
 
-test('regression: personal deny list is a superset of git HEAD settings.personal.json, plus exactly the 2 documented additions', () => {
-  const before = readJsonAtHead('domains/dev/config/claude-profiles/personal/settings.personal.json');
+test('regression: personal deny list is a superset of the pre-migration settings.personal.json, plus exactly the 2 documented additions', (t) => {
+  const before = readJsonBeforeMigration('domains/dev/config/claude-profiles/personal/settings.personal.json');
+  if (!before) return t.skip('no reachable commit still carries settings.personal.json permissions (shallow clone?)');
   const originalDeny = before.permissions.deny;
-  assert.ok(Array.isArray(originalDeny) && originalDeny.length > 0, 'git HEAD settings.personal.json must still carry the pre-migration deny list');
+  assert.ok(Array.isArray(originalDeny) && originalDeny.length > 0, 'the pre-migration settings.personal.json must still carry the deny list');
 
   const merged = loadAndMerge([CORE_YAML, PERSONAL_YAML]);
   const newDeny = toClaudeSettings(merged).deny;

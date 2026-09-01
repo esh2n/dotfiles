@@ -29,12 +29,13 @@ const { agentMarkdownToToml } = require('./codex-agents');
 const { hasPathsFrontmatter, buildAgentsMdBlockContent, applyAgentsMdBlock } = require('./codex-agents-md');
 const { decideSkillSymlink, commandToSkill } = require('./codex-skills');
 const { extractBlock } = require('./managed-block');
+const { manifestRelativePath, manifestPathFor, buildPruneOperations } = require('./manifest');
 const { loadAndMerge: loadAndMergeMcp, resolveHome: resolveMcpHome } = require('../mcp-inventory/source');
 const { buildMcpServersToml } = require('../mcp-inventory/writers/codex');
 
 const vocab = require('./vocab.json');
 
-const MANIFEST_RELATIVE_PATH = path.join('.yoki', 'codex-manifest.json');
+const MANIFEST_RELATIVE_PATH = manifestRelativePath('codex');
 
 /** YOKI_ROOT as derived from this file's own location, used when the caller
  * doesn't override it: `.../runtime/yoki/scripts/lib/targets/codex.js` ->
@@ -92,14 +93,14 @@ function discoverLayerContent(layerRoots) {
   return { settingsLayers, permissionsFiles, claudeLayerMd, claudePersonalMd, agentFiles, commandFiles, ruleFiles, skillsByName };
 }
 
-function buildHooksOperations({ settingsLayers, out }) {
-  const { generated, warnings } = buildGeneratedGroups(settingsLayers);
+function buildHooksOperations({ settingsLayers, out, yokiRoot, home }) {
+  const { generated, warnings, skipped } = buildGeneratedGroups(settingsLayers, { yokiRoot, home });
   const hooksJsonPath = path.join(out, 'hooks.json');
   const existing = readJsonIfExists(hooksJsonPath) || {};
   const merged = mergeHooksJson(existing, generated);
   const op = { kind: 'merge-json', destinationPath: hooksJsonPath, content: merged, layer: 'generated' };
   const hookStateEntries = collectHookStateEntries(merged, hooksJsonPath);
-  return { op, hookStateEntries, warnings };
+  return { op, hookStateEntries, warnings, skipped };
 }
 
 function buildRulesAndConfigOperations({ permissionsFiles, out, hookStateEntries, yokiRoot, pluginRoot, hookProfile, mcpServers }) {
@@ -193,17 +194,17 @@ function buildCommandSkillOperations({ commandFiles, out }) {
  * destinations a source layer no longer provides (a deleted agent, a
  * renamed command, a skill dropped from a disabled pack). The always-present
  * singleton targets (hooks.json/config.toml/AGENTS.md/rules) are merged in
- * place instead of replaced, so they are never candidates for pruning. */
-function buildPruneOperations({ out, prunableDestinations, prune }) {
-  if (!prune) return [];
-  const manifestPath = path.join(out, MANIFEST_RELATIVE_PATH);
-  const previous = readJsonIfExists(manifestPath);
-  if (!Array.isArray(previous)) return [];
-
-  const current = new Set(prunableDestinations);
-  return previous
-    .filter(destinationPath => !current.has(destinationPath))
-    .map(destinationPath => ({ kind: 'remove', destinationPath, layer: 'generated' }));
+ * place instead of replaced, so they are never candidates for pruning; so
+ * are the `~/.agents/skills/<name>` ports, which live outside `out` and are
+ * therefore deliberately excluded from the manifest (see ./manifest.js). */
+function buildCodexPruneOperations({ out, prunableDestinations, prune }) {
+  return buildPruneOperations({
+    manifestPath: manifestPathFor(out, 'codex'),
+    out,
+    prunableDestinations,
+    prune,
+    readJsonIfExists,
+  });
 }
 
 /**
@@ -231,11 +232,13 @@ function plan(options) {
   const content = discoverLayerContent(layerRoots);
 
   const warnings = [];
+  const skipped = [];
   const operations = [];
 
-  const hooks = buildHooksOperations({ settingsLayers: content.settingsLayers, out: outResolved });
+  const hooks = buildHooksOperations({ settingsLayers: content.settingsLayers, out: outResolved, yokiRoot, home });
   operations.push(hooks.op);
   warnings.push(...hooks.warnings);
+  skipped.push(...hooks.skipped);
 
   // T13: canonical mcp.json inventory, core→packs→personal merged and
   // {{HOME}}-resolved (no subsequent sed pass for this target, unlike
@@ -275,9 +278,9 @@ function plan(options) {
   operations.push(...commandSkillOps);
 
   const prunableDestinations = [...agentOps, ...skillOps, ...commandSkillOps].map(op => op.destinationPath);
-  operations.push(...buildPruneOperations({ out: outResolved, prunableDestinations, prune: Boolean(options.prune) }));
+  operations.push(...buildCodexPruneOperations({ out: outResolved, prunableDestinations, prune: Boolean(options.prune) }));
 
-  return { target: 'codex', out: outResolved, home, sources: layerRoots, operations, warnings };
+  return { target: 'codex', out: outResolved, home, sources: layerRoots, operations, warnings, skipped };
 }
 
 module.exports = { plan, MANIFEST_RELATIVE_PATH, defaultYokiRoot };

@@ -49,18 +49,35 @@ function classifyPattern(pattern) {
 }
 
 /**
- * Claude's Bash pattern matching, as used by this repo's permission lists:
- * a pattern ending in " *" (space then star) is a prefix — the command must
- * equal the text before it, or start with that text plus a space. Anything
- * else (no trailing " *", or a bare trailing "*" glued to the last token
- * like "rm -rf /*") is an exact match of the whole command text — Claude
- * does no shell expansion when comparing.
+ * Bash pattern matching for this repo's `enforce: [hook]` deny list.
+ *
+ * Two prefix forms, and they mean different things:
+ *   - `"git push *"` — space then star: a WORD-boundary prefix. The command
+ *     must equal `git push`, or start with `git push ` — never `git pushx`.
+ *   - `"rm -rf /*"` — star glued to the last token: a plain prefix. The
+ *     command must start with `rm -rf /`, which is the only reading that
+ *     makes the pattern mean anything: `rm -rf /etc/foo` is precisely the
+ *     command it exists to stop.
+ *
+ * Treating the second form as an exact match (the behaviour before this
+ * comment) made the guard fire only on the literal text `rm -rf /*` and
+ * never on a real command — and since to-codex.js's toExecpolicyTokens()
+ * returns null for exactly these glob patterns, this hook is their ONLY
+ * enforcement point on Codex and omp. The repo's sibling matcher
+ * lib/hook-if-match.js parseIfPattern() already reads a trailing `*` as a
+ * prefix wildcard; this now agrees with it.
+ *
+ * Anything with no trailing star stays an exact match of the whole command
+ * text — no shell expansion is performed when comparing.
  */
 function matchBash(pattern, command) {
   const cmd = String(command || '').trim();
   if (pattern.endsWith(' *')) {
     const prefix = pattern.slice(0, -2);
     return cmd === prefix || cmd.startsWith(`${prefix} `);
+  }
+  if (pattern.endsWith('*')) {
+    return cmd.startsWith(pattern.slice(0, -1));
   }
   return cmd === pattern;
 }

@@ -95,48 +95,9 @@ TOML
 # -----------------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------------
-assert_true() {
-    local description="$1"; shift
-    TOTAL=$((TOTAL + 1))
-    if "$@" >/dev/null 2>&1; then
-        log_success "PASS: $description"
-        PASSED=$((PASSED + 1))
-    else
-        log_error "FAIL: $description"
-        FAILED=$((FAILED + 1))
-    fi
-}
-
-assert_eq_text() {
-    local description="$1" expected="$2" actual="$3"
-    TOTAL=$((TOTAL + 1))
-    if [[ "$expected" == "$actual" ]]; then
-        log_success "PASS: $description"
-        PASSED=$((PASSED + 1))
-    else
-        log_error "FAIL: $description"
-        diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/       /' | head -40
-        FAILED=$((FAILED + 1))
-    fi
-}
-
-# Content-addressed snapshot of every file/symlink under $1, relative path
-# + (sha256 of file content | symlink target) per line, sorted — a plain
-# `diff -r` would dereference symlinks pointing outside the fixture
-# (real repo skill dirs), which is unnecessary work and, worse, would
-# report "different" on a dangling one; this only ever looks at what the
-# fixture itself owns.
-snapshot_tree() {
-    local dir="$1"
-    [[ -d "$dir" ]] || return 0
-    ( cd "$dir" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort | while IFS= read -r f; do
-        if [[ -L "$f" ]]; then
-            printf '%s\tSYMLINK:%s\n' "$f" "$(readlink "$f")"
-        else
-            printf '%s\tFILE:%s\n' "$f" "$(shasum -a 256 "$f" | awk '{print $1}')"
-        fi
-    done )
-}
+# assert_true / assert_eq_text / assert_contains / assert_lacks and the
+# symlink-safe tree_manifest() live in core/utils/common.sh (sourced above),
+# shared with test-targets-golden.sh and the other validation suites.
 
 run_yoki_switch() {
     # $1 = fixture root, remaining args = yoki-switch argv (after `apply`)
@@ -213,8 +174,8 @@ run_yoki_switch_targets_checks() {
     # 3. Idempotent second run: identical file tree, not just "ran again
     #    without error".
     local snap1_codex snap1_omp
-    snap1_codex="$(snapshot_tree "$FIXTURE/codex")"
-    snap1_omp="$(snapshot_tree "$FIXTURE/omp/agent")"
+    snap1_codex="$(tree_manifest "$FIXTURE/codex")"
+    snap1_omp="$(tree_manifest "$FIXTURE/omp/agent")"
 
     if ! output=$(run_yoki_switch "$FIXTURE" --target codex --target omp 2>&1); then
         log_error "FAIL: second yoki-switch apply --target codex --target omp exited non-zero"
@@ -226,8 +187,8 @@ run_yoki_switch_targets_checks() {
     fi
 
     local snap2_codex snap2_omp
-    snap2_codex="$(snapshot_tree "$FIXTURE/codex")"
-    snap2_omp="$(snapshot_tree "$FIXTURE/omp/agent")"
+    snap2_codex="$(tree_manifest "$FIXTURE/codex")"
+    snap2_omp="$(tree_manifest "$FIXTURE/omp/agent")"
 
     assert_eq_text "codex/: second run produces an identical file tree (idempotent)" \
         "$snap1_codex" "$snap2_codex"

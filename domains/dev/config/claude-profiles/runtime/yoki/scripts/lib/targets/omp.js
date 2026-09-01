@@ -29,11 +29,14 @@ const { renderConfigYml } = require('./omp-config-yml');
 const { buildRulesMdBlockContent, applyRulesMdBlock } = require('./omp-rules-md');
 const { agentMarkdownToOmp } = require('./omp-agents');
 const { buildMcpJson } = require('./omp-mcp');
+const { manifestRelativePath, manifestPathFor, buildPruneOperations } = require('./manifest');
 const { loadAndMerge: loadAndMergeMcp, resolveHome: resolveMcpHome } = require('../mcp-inventory/source');
 
 const YOKI_BRIDGE_SOURCE_RELATIVE = path.join('domains', 'dev', 'config', 'omp', 'extensions', 'yoki-bridge.ts');
 const CONFIG_YML_TEMPLATE_RELATIVE = path.join('domains', 'dev', 'config', 'omp', 'config.yml.template');
 const PI_AGENTS_RELATIVE = path.join('domains', 'dev', 'config', 'pi', 'agents');
+
+const MANIFEST_RELATIVE_PATH = manifestRelativePath('omp');
 
 /** YOKI_ROOT as derived from this file's own location, used when the caller
  * doesn't override it: `.../runtime/yoki/scripts/lib/targets/omp.js` ->
@@ -84,11 +87,11 @@ function discoverLayerContent(layerRoots) {
   return { settingsLayers, permissionsFiles, agentFiles, ruleFiles };
 }
 
-function buildHooksOperation({ settingsLayers, out }) {
-  const { generated, warnings } = buildYokiHooksJson(settingsLayers);
+function buildHooksOperation({ settingsLayers, out, home }) {
+  const { generated, warnings, skipped } = buildYokiHooksJson(settingsLayers, { home });
   const content = `${JSON.stringify(generated, null, 2)}\n`;
   const op = { kind: 'write', destinationPath: path.join(out, 'yoki-hooks.json'), content, layer: 'generated' };
-  return { op, warnings };
+  return { op, warnings, skipped };
 }
 
 /** `fs.lstatSync` (never `statSync`, which would dereference the symlink
@@ -191,9 +194,21 @@ function buildMcpOperation({ out, layerRoots, home }) {
   return { kind: 'write', destinationPath: mcpJsonPath, content, layer: 'generated' };
 }
 
+/** See ./manifest.js — same contract codex.js uses, against
+ * `<out>/.yoki/omp-manifest.json`. */
+function buildOmpPruneOperations({ out, prunableDestinations, prune }) {
+  return buildPruneOperations({
+    manifestPath: manifestPathFor(out, 'omp'),
+    out,
+    prunableDestinations,
+    prune,
+    readJsonIfExists,
+  });
+}
+
 /**
  * @param {{sources: string[], out: string, home?: string, env?: NodeJS.ProcessEnv,
- *   yokiRoot?: string, dotfilesRoot?: string}} options
+ *   yokiRoot?: string, dotfilesRoot?: string, prune?: boolean}} options
  * @returns {{target: 'omp', out: string, home: string, sources: string[],
  *   operations: Array<object>, warnings: string[]}}
  */
@@ -219,11 +234,13 @@ function plan(options) {
   const harnessModelsOmp = (modelMapJson && modelMapJson.omp) || {};
 
   const warnings = [];
+  const skipped = [];
   const operations = [];
 
-  const hooks = buildHooksOperation({ settingsLayers: content.settingsLayers, out: outResolved });
+  const hooks = buildHooksOperation({ settingsLayers: content.settingsLayers, out: outResolved, home });
   operations.push(hooks.op);
   warnings.push(...hooks.warnings);
+  skipped.push(...hooks.skipped);
 
   const configYml = buildConfigYmlOperations({
     out: outResolved,
@@ -236,18 +253,27 @@ function plan(options) {
 
   operations.push(buildRulesMdOperation({ ruleFiles: content.ruleFiles, out: outResolved }));
 
-  operations.push(...buildAgentOperations({
+  const agentOps = buildAgentOperations({
     agentFiles: content.agentFiles,
     out: outResolved,
     dotfilesRoot,
     modelMap: harnessModelsOmp,
-  }));
+  });
+  operations.push(...agentOps);
 
   operations.push(buildExtensionOperation({ out: outResolved, dotfilesRoot }));
 
   operations.push(buildMcpOperation({ out: outResolved, layerRoots, home }));
 
-  return { target: 'omp', out: outResolved, home, sources: layerRoots, operations, warnings };
+  // Parity with codex.js: `agents/<name>.md` is the one per-source-file
+  // output this target writes, so a renamed/deleted agent (or a disabled
+  // pack that shipped one) leaves a stale file behind unless `--prune` can
+  // see what the last run produced. Everything else here is a merged
+  // singleton (layer 'generated') and is never a prune candidate.
+  const prunableDestinations = agentOps.map(op => op.destinationPath);
+  operations.push(...buildOmpPruneOperations({ out: outResolved, prunableDestinations, prune: Boolean(options.prune) }));
+
+  return { target: 'omp', out: outResolved, home, sources: layerRoots, operations, warnings, skipped };
 }
 
-module.exports = { plan, defaultYokiRoot, defaultDotfilesRoot };
+module.exports = { plan, MANIFEST_RELATIVE_PATH, defaultYokiRoot, defaultDotfilesRoot };

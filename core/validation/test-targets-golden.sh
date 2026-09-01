@@ -19,6 +19,14 @@ set -euo pipefail
 # to-shell installer pattern — no execpolicy/omp-declarative equivalent,
 # also explicitly `enforce: [hook]`).
 #
+# The personal layer additionally ships the bash-wrapper guards the real
+# personal/settings.personal.json uses (`bash -c 'h=~/.claude/hooks/<g>.sh;
+# … exec bash "$h" [args]'`), one of them with argv, plus ONE deliberately
+# untranslatable hook (an osascript notification). Those pin the two halves of
+# the guard-distribution contract: every wrapper guard must REACH codex and
+# omp (via run-bash-hook.js), and anything that cannot be translated must show
+# up as a `skipped` line in the plan output rather than vanishing.
+#
 # Portability: two absolute-path families would otherwise leak into the
 # generated content and make a byte-for-byte diff fail on every other
 # checkout/machine — this fixture's own absolute path (varies per checkout)
@@ -30,7 +38,7 @@ set -euo pipefail
 # symlinks even under -r (verified: a dangling symlink makes it print "No
 # such file or directory" and still exit 0 — a silent false pass), so
 # symlinks are compared by their own target text instead, the same
-# discipline test-yoki-switch-targets.sh's snapshot_tree already uses. What
+# discipline core/utils/common.sh's tree_manifest() implements. What
 # WOULD vary from run to run regardless (env.YOKI_ROOT/CLAUDE_PLUGIN_ROOT,
 # which the real environment sets — see core/settings.layer.json) is pinned
 # to fixed literal strings via explicit env vars on the gen.js invocation,
@@ -71,14 +79,27 @@ TOTAL=0
 # Helpers
 # -----------------------------------------------------------------------------
 
-# Literal (non-regex) two-pair substitution over stdin -> stdout.
+# Literal (non-regex) two-pair substitution over stdin -> stdout, plus one
+# regex pass over config.toml's `trusted_hash = "sha256:<64hex>"` values.
+#
+# The hash pass is needed because a hook trust hash is computed over the hook
+# command TEXT, and a translated personal bash guard's command now embeds the
+# absolute path of the run's ephemeral home
+# (".../run-home/.claude/hooks/git-guard.sh"). Substituting __RUN_HOME__ into
+# the file content cannot reach a hash that was computed before the
+# substitution, so the digest would differ on every run and the golden could
+# never match. hooks.json itself IS still compared byte-for-byte (after
+# normalization), so what the hash is derived FROM stays pinned here; that the
+# derivation is correct is covered by lib/targets/test/codex-trust.test.js and
+# doctor.js's detectTrustDrift tests.
 normalize_text() {
     local find1="$1" repl1="$2" find2="$3" repl2="$4"
     python3 -c '
-import sys
+import re, sys
 find1, repl1, find2, repl2 = sys.argv[1:5]
 data = sys.stdin.read()
 data = data.replace(find1, repl1).replace(find2, repl2)
+data = re.sub(r"(trusted_hash = \"sha256:)[0-9a-f]{64}(\")", r"\1__TRUSTED_HASH__\2", data)
 sys.stdout.write(data)
 ' "$find1" "$repl1" "$find2" "$repl2"
 }
@@ -110,73 +131,10 @@ materialize_normalized_tree() {
     done < <(cd "$src_root" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort)
 }
 
-# Content-addressed manifest of a tree already fully normalized (both the
-# freshly-materialized actual tree and the checked-in expected/ tree are, by
-# construction) — relative path + (sha256 of content | symlink target), one
-# per line, sorted. Never dereferences a symlink, unlike plain `diff -r`.
-build_manifest() {
-    local dir="$1"
-    [[ -d "$dir" ]] || return 0
-    ( cd "$dir" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort | while IFS= read -r f; do
-        f="${f#./}"
-        if [[ -L "$f" ]]; then
-            printf '%s\tSYMLINK:%s\n' "$f" "$(readlink "$f")"
-        else
-            printf '%s\tFILE:%s\n' "$f" "$(shasum -a 256 "$f" | awk '{print $1}')"
-        fi
-    done )
-}
-
-assert_eq_text() {
-    local description="$1" expected="$2" actual="$3"
-    TOTAL=$((TOTAL + 1))
-    if [[ "$expected" == "$actual" ]]; then
-        log_success "PASS: $description"
-        PASSED=$((PASSED + 1))
-    else
-        log_error "FAIL: $description"
-        diff <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sed 's/^/       /' | head -60
-        FAILED=$((FAILED + 1))
-    fi
-}
-
-assert_true() {
-    local description="$1"; shift
-    TOTAL=$((TOTAL + 1))
-    if "$@" >/dev/null 2>&1; then
-        log_success "PASS: $description"
-        PASSED=$((PASSED + 1))
-    else
-        log_error "FAIL: $description"
-        FAILED=$((FAILED + 1))
-    fi
-}
-
-assert_lacks() {
-    local description="$1" needle="$2" haystack="$3"
-    TOTAL=$((TOTAL + 1))
-    if grep -qF -- "$needle" <<< "$haystack"; then
-        log_error "FAIL: $description"
-        log_error "  unwanted: $needle"
-        FAILED=$((FAILED + 1))
-    else
-        log_success "PASS: $description"
-        PASSED=$((PASSED + 1))
-    fi
-}
-
-assert_contains() {
-    local description="$1" needle="$2" haystack="$3"
-    TOTAL=$((TOTAL + 1))
-    if grep -qF -- "$needle" <<< "$haystack"; then
-        log_success "PASS: $description"
-        PASSED=$((PASSED + 1))
-    else
-        log_error "FAIL: $description"
-        log_error "  wanted: $needle"
-        FAILED=$((FAILED + 1))
-    fi
-}
+# tree_manifest / assert_eq_text / assert_true / assert_lacks / assert_contains
+# all live in core/utils/common.sh (sourced above) and are shared with
+# test-yoki-switch-targets.sh — tree_manifest() is the symlink-safe tree
+# snapshot both suites compare with.
 
 # Runs gen.js for one target against the fixture sources, into a freshly
 # materialized $home. Always exits 0 (or 1) itself; STATUS/OUTPUT are set as
@@ -233,8 +191,8 @@ run_one_target_golden() {
     fi
 
     assert_eq_text "${target}: produced home tree matches fixtures/targets/expected/${target}" \
-        "$(build_manifest "${EXPECTED_DIR}/${target}")" \
-        "$(build_manifest "$normalized")"
+        "$(tree_manifest "${EXPECTED_DIR}/${target}")" \
+        "$(tree_manifest "$normalized")"
 }
 
 # -----------------------------------------------------------------------------
@@ -263,6 +221,105 @@ run_targets_golden_checks() {
 
     # --- omp: everything lands under ~/.omp/agent -----------------------
     run_one_target_golden omp "${WORK}/omp-home" "${WORK}/omp-home/.omp/agent" "$WORK"
+
+    # -------------------------------------------------------------------
+    # Personal bash guards must REACH both foreign harnesses. The fixture's
+    # personal layer ships the same `bash -c 'h=~/.claude/hooks/<g>.sh; …
+    # exec bash "$h"'` wrapper personal/settings.personal.json uses. Before
+    # bash-wrapper-hook.js these were dropped with a warning, which silently
+    # removed git-guard.sh / unattended-guard.sh from codex and omp — a
+    # protection downgrade relative to Claude Code, so it is asserted
+    # explicitly here and not left to the tree diff alone.
+    #
+    # The fixture also ships ONE deliberately untranslatable hook (an
+    # osascript notification): it must show up as a `skipped` line in the
+    # plan output on both targets, never disappear quietly.
+    # -------------------------------------------------------------------
+    local codex_hooks_json omp_hooks_json
+    codex_hooks_json="$(cat "${WORK}/codex-home/.codex/hooks.json" 2>/dev/null || true)"
+    omp_hooks_json="$(cat "${WORK}/omp-home/.omp/agent/yoki-hooks.json" 2>/dev/null || true)"
+
+    assert_contains "codex: git-guard.sh is dispatched through run-bash-hook.js --harness codex" \
+        'run-bash-hook.js\" --harness codex \"'"${WORK}/codex-home/.claude/hooks/git-guard.sh" "$codex_hooks_json"
+    assert_contains "codex: unattended-guard.sh reaches the target too" \
+        "${WORK}/codex-home/.claude/hooks/unattended-guard.sh" "$codex_hooks_json"
+    assert_contains "codex: a wrapper hook's own argv survives translation" \
+        'herdr-agent-state.sh\" \"session\"' "$codex_hooks_json"
+
+    assert_contains "omp: git-guard.sh becomes a kind:bash spec" '"kind": "bash"' "$omp_hooks_json"
+    assert_contains "omp: git-guard.sh script path is absolute" \
+        "${WORK}/omp-home/.claude/hooks/git-guard.sh" "$omp_hooks_json"
+    assert_contains "omp: unattended-guard.sh reaches the target too" \
+        "unattended-guard.sh" "$omp_hooks_json"
+    assert_contains "omp: a wrapper hook's own argv survives translation" '"session"' "$omp_hooks_json"
+
+    run_gen codex "${WORK}/skip-codex-home" "${WORK}/skip-codex-home/.codex"
+    assert_contains "codex: the untranslatable osascript hook is listed as skipped, not dropped" \
+        "skipped" "$OUTPUT"
+    assert_contains "codex: the skipped line names the command" "osascript" "$OUTPUT"
+
+    run_gen omp "${WORK}/skip-omp-home" "${WORK}/skip-omp-home/.omp/agent"
+    assert_contains "omp: the untranslatable osascript hook is listed as skipped, not dropped" \
+        "skipped" "$OUTPUT"
+    assert_contains "omp: the skipped line names the command" "osascript" "$OUTPUT"
+
+    # -------------------------------------------------------------------
+    # omp manifest/prune parity with codex: agents/<name>.md is tracked in
+    # .yoki/omp-manifest.json, and --prune removes an agent whose source is
+    # gone. A manifest entry pointing OUTSIDE --out is refused outright
+    # (nothing deleted), since --prune is a recursive delete driven by a
+    # file any process with a shell can rewrite.
+    # -------------------------------------------------------------------
+    local prune_home="${WORK}/prune-home"
+    local prune_out="${prune_home}/.omp/agent"
+    run_gen omp "$prune_home" "$prune_out"
+    assert_true "omp: .yoki/omp-manifest.json is written (codex parity)" \
+        test -f "${prune_out}/.yoki/omp-manifest.json"
+
+    printf 'stale\n' > "${prune_out}/agents/orphan.md"
+    python3 - "$prune_out" <<'PY'
+import json, sys, os
+out = sys.argv[1]
+manifest_path = os.path.join(out, '.yoki', 'omp-manifest.json')
+with open(manifest_path) as fh:
+    entries = json.load(fh)
+entries.append(os.path.join(out, 'agents', 'orphan.md'))
+with open(manifest_path, 'w') as fh:
+    json.dump(entries, fh)
+PY
+    run_gen omp "$prune_home" "$prune_out" --prune
+    assert_true "omp: --prune removes an agent the sources no longer provide" \
+        test ! -e "${prune_out}/agents/orphan.md"
+    assert_true "omp: --prune leaves the generated singletons alone" \
+        test -f "${prune_out}/config.yml"
+
+    local hostile_home="${WORK}/hostile-home"
+    local hostile_out="${hostile_home}/.omp/agent"
+    run_gen omp "$hostile_home" "$hostile_out"
+    mkdir -p "${hostile_home}/Documents"
+    printf 'important\n' > "${hostile_home}/Documents/thesis.txt"
+    python3 - "$hostile_out" "${hostile_home}/Documents" <<'PY'
+import json, sys, os
+out, victim = sys.argv[1], sys.argv[2]
+manifest_path = os.path.join(out, '.yoki', 'omp-manifest.json')
+with open(manifest_path) as fh:
+    entries = json.load(fh)
+entries.append(victim)
+with open(manifest_path, 'w') as fh:
+    json.dump(entries, fh)
+PY
+    run_gen omp "$hostile_home" "$hostile_out" --prune
+    TOTAL=$((TOTAL + 1))
+    if [[ "$STATUS" -ne 0 ]]; then
+        log_success "PASS: omp: a manifest entry outside --out makes --prune fail closed"
+        PASSED=$((PASSED + 1))
+    else
+        log_error "FAIL: omp: a manifest entry outside --out makes --prune fail closed (exit 0)"
+        FAILED=$((FAILED + 1))
+    fi
+    assert_contains "omp: the refusal names the offending entry" "Refusing to prune" "$OUTPUT"
+    assert_true "omp: nothing outside --out was deleted" \
+        test -f "${hostile_home}/Documents/thesis.txt"
 
     # -------------------------------------------------------------------
     # T15 item (1): sbx writes ~/.codex/config.toml at sandbox create time
