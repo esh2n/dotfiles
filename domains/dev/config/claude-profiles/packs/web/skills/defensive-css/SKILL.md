@@ -92,3 +92,4 @@ accessible name).
 - `css-modern` — modern syntax replacements for legacy CSS idioms
 - `web-platform-reviewer` — the agent that enforces this table on diffs
 - `storybook-guidelines` (react pack) — where the stress fixtures live as stories
+- `css-cascade` — cascade resolution order and specificity mechanism

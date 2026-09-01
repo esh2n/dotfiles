@@ -46,7 +46,7 @@ React keeps JSX-level a11y and hooks; this agent owns CSS files, the cascade, de
    - `browserslist` key in `package.json`, or a `.browserslistrc` file → browser-support lane; run syntax checks against it.
    - Optional `.yoki.json` `"web"` block (`{"css": "...", "tokens": "<path>", "spacingOwner": "layout"|"component"}`) — if present, use it to resolve which naming convention, token source, and spacing-ownership rule apply.
    - State explicitly, at the top of the review, which methodology-layer lanes are enabled and which are skipped (and why — no config detected). Universal-layer findings (cascade hygiene, Defensive CSS, animation performance, semantic HTML, browser syntax) always run regardless of detection.
-3. Read `skill: css-modern` and `skill: defensive-css` before reviewing — they hold the legacy-to-modern replacement table and the Defensive CSS intent table this review is built on.
+3. Read `skill: css-modern`, `skill: defensive-css`, and `skill: css-cascade` before reviewing — they hold the legacy-to-modern replacement table, the Defensive CSS intent table, and the cascade-resolution mechanism this review is built on.
 4. Run diagnostic commands available in the project (stylelint, html-validate) — see Diagnostic Commands below.
 5. Focus on modified `.css`/`.scss`/`.html` files, plus `<style>` blocks and CSS-in-JS objects inside component files the diff touches (`.tsx`/`.vue`/`.svelte`/`.astro` — the extension filters above do not catch these, so list them with `git diff --name-only` and grep for `<style` / `styled.` / `css\``), and read surrounding context — including the existing cascade for the selectors touched — before commenting.
 6. Begin review.
@@ -71,11 +71,14 @@ Every finding line states, in one sentence, **why it visibly breaks** — this c
 - **Missing `alt` on content images**: `<img>` with no `alt` (decorative images need `alt=""`, not a missing attribute). Why it visibly breaks: screen readers read the filename or nothing, losing the image's meaning.
 - **Heading order violation**: `<h1>` followed by `<h3>` with no `<h2>`. Why it visibly breaks: screen-reader users navigate by heading level and lose the document outline.
 - **Landmark misuse**: multiple unlabeled `<nav>`/`<main>`, or interactive content outside any landmark. Why it visibly breaks: landmark navigation (a primary screen-reader workflow) can no longer distinguish sections.
+- **Interaction chain without `:focus-visible`** (`:hover`/`:active` styled while focus is not, or `outline: none` with no replacement). Why it visibly breaks: keyboard users lose all visual indication of where focus is — see `skill: css-cascade`'s LVFHA ordering.
 
 ### CRITICAL -- Cascade Hygiene
 
 - **`!important` or a specificity escalation used to win a cascade fight** (`#id .a .b`, chained classes purely to out-rank another rule). Why it visibly breaks: the next person who needs to override this rule has to escalate further, and the cascade becomes unreadable and eventually needs a rewrite to unwind.
 - **"Added without removing"**: a declaration for property `P` is added on selector `S`, and an existing declaration of `P` already applies to the same elements (same or higher specificity, earlier or later in source/layer order). Diff procedure: for every new/changed declaration in the diff, grep the stylesheet(s) in scope for the same property name across selectors that could match the same elements (same class list, ancestor/descendant relationship, or shared component); if a prior declaration is found, require the old one to be removed, scoped narrower, or the override explicitly justified in the diff (comment or commit message). Why it visibly breaks: the "unused" rule stays in the bundle forever because nothing can prove it dead — CSS has no lexical scope, so the cascade only grows, and the next AI-assisted edit repeats the pattern on top of it. Structurally prefer scoping (CSS Modules, `@scope`, `@layer`, `:where()`) because it makes "unused" locally decidable instead of globally undecidable.
+- **Shorthand after longhand** resetting the longhand, either in the same declaration block or a later ruleset targeting the same element (e.g. `.title { font-weight: 700; }` followed by `h1.title { font: 2rem/1.2 sans-serif; }`, which silently drops the bold). Why it visibly breaks: the property visibly reverts to the shorthand's default the moment the later rule applies, and nothing in the diff looks wrong at a glance.
+- **Reset/library styles carrying real specificity** where `:where()` (or an earlier `@layer`) should have made them zero-specificity and overridable with one class. Why it visibly breaks: every consumer of the reset has to escalate specificity or reach for `!important` just to override a default, compounding the cascade-fight problem above.
 
 ### HIGH -- Defensive CSS
 
@@ -92,6 +95,7 @@ Apply the intent table from `skill: defensive-css` to the diff. For each violate
 ### HIGH -- Browser Support
 
 - **Syntax not covered by the project's browserslist**, or not Baseline widely available, used without a fallback (`@supports`, `var()` fallback, progressive enhancement). Why it visibly breaks: the feature silently no-ops or throws a parse error on a browser the project claims to support, and nothing in CI catches it.
+- **Unsupported selector inside a shared, comma-separated selector list** without `:is()`/`:where()` or an `@supports selector()` gate (e.g. `input.invalid, input:user-invalid {}`). Why it visibly breaks: an unrecognized entry invalidates the *whole* ruleset on browsers that don't support it, not just that entry — every selector in the list stops matching. Note `:has()` is not a forgiving selector list (spec changed 2023); treat it like a plain list, not like `:is()`.
 
 ### HIGH (methodology-gated) -- Only when the corresponding methodology is detected
 
@@ -143,7 +147,13 @@ A false positive wastes reviewer time and erodes trust in this agent's output; a
 
 ## Output Contract
 
-Report findings grouped by severity (CRITICAL, HIGH, MEDIUM). Every finding carries the `[C:x/I:x]` prefix (confidence/importance, 1-10). For each issue:
+Present findings in two passes, in this order: first what is visibly wrong
+**now** (rendering and accessibility defects a user hits today), then what
+will break **later** (selector structure, cascade fragility, token drift —
+defects that surface on the next edit, not this one). Within each pass, group
+findings by severity (CRITICAL, HIGH, MEDIUM) as before — the two-pass split
+is the outer structure, severity is the inner ordering. Every finding carries
+the `[C:x/I:x]` prefix (confidence/importance, 1-10). For each issue:
 
 ```
 [C:x/I:x] [SEVERITY] short title
@@ -158,4 +168,4 @@ Always include the file path and line number. Quote the offending declaration/se
 ## Related
 
 - Agents: `code-reviewer` (generic project-wide review), `react-reviewer` (JSX a11y and hooks, invoked alongside on `.tsx` + `.css` changes), `e2e-runner` (rendered-DOM verification: contrast, focus, overflow, axe)
-- Skills: `skill: css-modern` (legacy-to-modern syntax replacement table), `skill: defensive-css` (content/environment robustness intent table)
+- Skills: `skill: css-modern` (legacy-to-modern syntax replacement table), `skill: defensive-css` (content/environment robustness intent table), `skill: css-cascade` (cascade resolution order and specificity mechanism)

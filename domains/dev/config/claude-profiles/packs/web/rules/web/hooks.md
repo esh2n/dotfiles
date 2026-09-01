@@ -90,6 +90,43 @@ requiring `runtime/yoki/scripts/lib/hook-flags.js` directly (via
 itself uses, so gating behavior (profile precedence, `.yoki.json`,
 `YOKI_DISABLED_HOOKS`) is identical either way.
 
+## Recommended stylelint rules (not imposed)
+
+This hook never applies these itself — it only runs whatever config a
+project already has (see "Project config or nothing" above). If a project
+wants stronger cascade/browser-support enforcement than its own config gives
+it, these are the rules worth adding, with the trap each one closes:
+
+- `declaration-block-no-shorthand-property-overrides` — catches a shorthand
+  silently resetting a longhand written earlier in the *same* declaration
+  block (e.g. `font:` after `font-weight:`).
+- `declaration-block-no-redundant-longhand-properties` — flags all-longhand
+  declarations that could collapse into one shorthand, the inverse trap.
+- `shorthand-property-no-redundant-values` — flags edge-count shorthand
+  values that repeat what a shorter form would already express (e.g.
+  `margin: 1px 1px 1px 1px` instead of `margin: 1px`).
+- `no-descending-specificity` — flags a selector with lower specificity
+  appearing after one with higher specificity that matches the same
+  elements, the classic silent-override setup.
+- `selector-max-id` (`0`) — bans ID selectors in stylesheets, removing the
+  most common source of specificity escalation.
+- `selector-max-specificity` (e.g. `"0,3,0"`) — caps specificity outright so
+  cascade fights get resolved with `@layer`/`:where()` instead of another
+  escalation.
+- `selector-pseudo-class-no-unknown` — catches a typo'd or unsupported
+  pseudo-class before it silently invalidates a selector list.
+- `declaration-property-value-no-unknown` — catches a property/value pair
+  that doesn't parse, before it silently no-ops in the browser.
+- `declaration-no-important` — bans `!important` outright, forcing cascade
+  fights through layers/specificity instead.
+- `plugin/no-unsupported-browser-features`
+  (`stylelint-no-unsupported-browser-features`, reads `browserslist`) —
+  flags syntax the project's own declared browser matrix doesn't support.
+- `stylelint-value-no-unknown-custom-properties` — flags `var(--x)` where
+  `--x` is never defined anywhere in scope, the static half of the
+  "undefined custom property" Defensive CSS intent (see `skill:
+  defensive-css`).
+
 ## Tools
 
 - `stylelint`, `html-validate`: not installed by this pack — they are
