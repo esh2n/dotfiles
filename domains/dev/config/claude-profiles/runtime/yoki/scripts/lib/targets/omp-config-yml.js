@@ -129,8 +129,16 @@ function renderConfigYml(opts) {
 
   const mergedApproval = mergeToolsApproval(templateApproval, convertedPermissions.tools.approval, warnings);
 
+  // Deny entries with no config.yml equivalent are NOT a warning any more:
+  // omp.js writes them to `<out>/.yoki/permissions.json` and
+  // hooks/pre-permission-guard.js enforces them on the tool_call event, so
+  // the plan reports that once as an info line instead of ~40 warnings that
+  // nothing was going to act on. An unexpressible ALLOW still warns — no
+  // guard can grant a permission, so omp really does fall back to its own
+  // approvalMode for those calls.
   for (const entry of convertedPermissions.unexpressible || []) {
-    warnings.push(`omp: "${entry.pattern}" has no bash.patterns/tools.approval equivalent — enforce via the tool_call extension (yoki-bridge.ts) instead (${entry.reason || 'see spike S3'})`);
+    if (entry.action === 'deny') continue;
+    warnings.push(`omp: allow "${entry.pattern}" has no bash.patterns/tools.approval equivalent — omp falls back to its own approvalMode for these calls`);
   }
 
   const sections = [

@@ -152,7 +152,7 @@ function inspectExistingConfigYml(configYmlPath) {
  * `remove` op ahead of the `write` so the symlink is replaced by a real
  * file rather than written through to its target.
  */
-function buildConfigYmlOperations({ out, dotfilesRoot, permissionsFiles, harnessModelsOmp }) {
+function buildConfigYmlOperations({ out, dotfilesRoot, convertedPermissions, harnessModelsOmp }) {
   const configYmlPath = path.join(out, 'config.yml');
   const templatePath = path.join(dotfilesRoot, CONFIG_YML_TEMPLATE_RELATIVE);
   const templateText = readTextIfExists(templatePath) || '';
@@ -160,7 +160,6 @@ function buildConfigYmlOperations({ out, dotfilesRoot, permissionsFiles, harness
   const info = inspectExistingConfigYml(configYmlPath);
   const existingConfigText = info.exists ? readTextIfExists(configYmlPath) : null;
 
-  const convertedPermissions = convertPermissions(permissionsFiles);
   const { content, warnings } = renderConfigYml({
     templateText,
     existingConfigText,
@@ -176,6 +175,37 @@ function buildConfigYmlOperations({ out, dotfilesRoot, permissionsFiles, harness
   ops.push({ kind: 'write', destinationPath: configYmlPath, content, layer: 'generated' });
 
   return { ops, warnings };
+}
+
+/**
+ * `<out>/.yoki/permissions.json` — the deny list hooks/pre-permission-guard.js
+ * reads when it runs under `YOKI_HARNESS=omp` (same `{deny:[{pattern,reason}]}`
+ * shape yoki-switch writes at `<CLAUDE_DIR>/.yoki/permissions.json` for
+ * Claude Code).
+ *
+ * Its contents are NOT a second copy of permissions.yaml: to-omp.js's
+ * `guardDeny` is the `enforce: [hook]` subset unioned with exactly the deny
+ * patterns config.yml cannot express (every `Read(...)`/`Edit(...)`/
+ * `WebFetch(domain:...)` glob). Before this file existed the guard read
+ * Claude's copy and therefore enforced only the hook-tagged subset, so on omp
+ * a path-shaped deny was declared and unenforced — the config.yml render
+ * warned about each one and nothing acted on the warning.
+ */
+function buildGuardPermissionsOperation({ out, convertedPermissions }) {
+  const deny = convertedPermissions.guardDeny || [];
+  const content = `${JSON.stringify({ deny }, null, 2)}\n`;
+  const op = {
+    kind: 'write',
+    destinationPath: path.join(out, '.yoki', 'permissions.json'),
+    content,
+    layer: 'generated',
+  };
+
+  const info = deny.length > 0
+    ? [`omp: ${deny.length} deny pattern(s) with no config.yml equivalent are enforced by pre-permission-guard on omp (written to ${op.destinationPath})`]
+    : [];
+
+  return { op, info };
 }
 
 function buildRulesMdOperation({ ruleFiles, out }) {
@@ -260,8 +290,13 @@ function plan(options) {
   const harnessModelsOmp = (modelMapJson && modelMapJson.omp) || {};
 
   const warnings = [];
+  const info = [];
   const skipped = [];
   const operations = [];
+
+  // Converted once and shared: config.yml renders the expressible half,
+  // .yoki/permissions.json carries the deny half that is not expressible.
+  const convertedPermissions = convertPermissions(content.permissionsFiles);
 
   const guardFloor = resolveGuardFloor(content.permissionsFiles, home);
   const hooks = buildHooksOperation({ settingsLayers: content.settingsLayers, out: outResolved, home, guardFloor });
@@ -272,11 +307,15 @@ function plan(options) {
   const configYml = buildConfigYmlOperations({
     out: outResolved,
     dotfilesRoot,
-    permissionsFiles: content.permissionsFiles,
+    convertedPermissions,
     harnessModelsOmp,
   });
   operations.push(...configYml.ops);
   warnings.push(...configYml.warnings);
+
+  const guardPermissions = buildGuardPermissionsOperation({ out: outResolved, convertedPermissions });
+  operations.push(guardPermissions.op);
+  info.push(...guardPermissions.info);
 
   operations.push(buildRulesMdOperation({ ruleFiles: content.ruleFiles, out: outResolved }));
 
@@ -299,7 +338,7 @@ function plan(options) {
   const prunableDestinations = agentOps.map(op => op.destinationPath);
   operations.push(...buildOmpPruneOperations({ out: outResolved, prunableDestinations, prune: Boolean(options.prune) }));
 
-  return { target: 'omp', out: outResolved, home, sources: layerRoots, operations, warnings, skipped };
+  return { target: 'omp', out: outResolved, home, sources: layerRoots, operations, warnings, info, skipped };
 }
 
 module.exports = { plan, MANIFEST_RELATIVE_PATH, defaultYokiRoot, defaultDotfilesRoot };

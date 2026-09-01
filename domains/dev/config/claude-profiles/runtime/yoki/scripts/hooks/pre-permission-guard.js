@@ -1,16 +1,32 @@
 'use strict';
 
 /**
- * PreToolUse(Bash|Write|Edit|MultiEdit): denies the deny-list entries that
- * are marked `enforce: [hook]` in permissions.yaml (T8) — patterns the S3
- * spike found a declarative permission match alone cannot be trusted for
- * everywhere yoki runs (shell redirection, wildcard rm targets, the write
- * side of in-workspace secret-file globs). Runs in Claude Code too, as
- * defense in depth on top of Claude's own permission match.
+ * PreToolUse(Bash|Write|Edit|MultiEdit|Read|Glob|Grep|LS|WebFetch): denies
+ * the deny-list entries the running harness cannot enforce declaratively on
+ * its own.
  *
- * Reads `<CLAUDE_DIR>/.yoki/permissions.json` — written by
- * `lib/permissions/to-claude.js`'s hookEnforcedDeny() output at
- * `yoki-switch apply` time, as `{"deny": [{"pattern": "...", "reason": "..."}]}`.
+ * WHICH entries those are is decided per harness at `yoki-switch apply` time
+ * and handed to this hook as a file; this hook only matches. The file is
+ * always `<harness dir>/.yoki/permissions.json`, shaped
+ * `{"deny": [{"pattern": "...", "reason": "..."}]}`:
+ *
+ *   claude -> `<CLAUDE_DIR>/.yoki/permissions.json` (yoki-switch, from
+ *             lib/permissions/to-claude.js's hookEnforcedDeny) — just the
+ *             `enforce: [hook]` subset, since every other pattern IS a
+ *             Claude permission rule Claude Code enforces itself.
+ *   omp    -> `<OMP_AGENT_DIR>/.yoki/permissions.json` (lib/targets/omp.js)
+ *             — that subset PLUS every path/domain-shaped deny, because
+ *             config.yml has no key for `Read(...)`/`Edit(...)`/
+ *             `WebFetch(domain:...)` at all.
+ *   codex  -> `<CODEX_DIR>/.yoki/permissions.json` (lib/targets/codex.js) —
+ *             that subset PLUS the denies neither yoki.rules nor
+ *             `[permissions.yoki.filesystem]` expresses (the `Edit(...)`
+ *             rows, the `Read(**…)` workspace globs).
+ *
+ * So on the two foreign harnesses this hook is not defense in depth, it is
+ * the ONLY enforcement for those patterns — which is why it gates the read
+ * side (Read/Glob/Grep/LS) and WebFetch too, not just Bash and the writers.
+ *
  * A missing or unreadable file fails open (exitCode 0): a guard that itself
  * crashes must never become the reason the harness blocks every tool call.
  *
@@ -22,14 +38,31 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-function resolveClaudeDir() {
-  return process.env.CLAUDE_DIR || path.join(os.homedir(), '.claude');
+/**
+ * The `.yoki/permissions.json` this harness's `yoki-switch apply` wrote.
+ * `YOKI_HARNESS` is set by hooks/run-with-flags.js for every non-Claude
+ * harness; the per-harness dir env vars are the same ones yoki-switch itself
+ * uses (`CLAUDE_DIR`/`CODEX_DIR`/`OMP_AGENT_DIR` — see domains/dev/bin/
+ * yoki-switch), so a redirected apply and a redirected guard read the same
+ * place. An unknown harness value falls back to the Claude path rather than
+ * to no file at all: the hook-tagged subset is correct everywhere.
+ */
+function resolvePermissionsFile(env = process.env) {
+  const harness = String(env.YOKI_HARNESS || 'claude').trim().toLowerCase();
+  const home = os.homedir();
+
+  if (harness === 'omp') {
+    return path.join(env.OMP_AGENT_DIR || path.join(home, '.omp', 'agent'), '.yoki', 'permissions.json');
+  }
+  if (harness === 'codex') {
+    return path.join(env.CODEX_DIR || env.CODEX_HOME || path.join(home, '.codex'), '.yoki', 'permissions.json');
+  }
+  return path.join(env.CLAUDE_DIR || path.join(home, '.claude'), '.yoki', 'permissions.json');
 }
 
 /** Loads the hook-enforced deny list. Any error (missing file, bad JSON,
  * wrong shape) yields an empty list — fail open. */
-function loadDenyPatterns(claudeDir) {
-  const file = path.join(claudeDir, '.yoki', 'permissions.json');
+function loadDenyPatterns(file) {
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (!parsed || !Array.isArray(parsed.deny)) return [];
@@ -128,6 +161,59 @@ function matchPath(pattern, filePath) {
   return re.test(filePath) || re.test(path.basename(filePath));
 }
 
+/**
+ * `WebFetch(domain:example.com)` against a tool call's URL, matching Claude's
+ * own rule: the pattern names a HOST, so it is compared to the URL's hostname
+ * and nothing else (never the path, never the raw URL text — `domain:evil.com`
+ * must not match `https://ok.example/?r=evil.com`). A `*` in the pattern is a
+ * wildcard within the host, reusing globToRegExp: `/` cannot appear in a
+ * hostname, so its "star does not cross a slash" rule is a no-op here.
+ *
+ * A URL that does not parse matches nothing — an unparseable URL is not a
+ * host this pattern was written about, and guessing would deny by accident.
+ */
+function matchDomain(inner, url) {
+  const m = /^domain:(.*)$/.exec(inner);
+  if (!m) return false;
+  let hostname;
+  try {
+    hostname = new URL(String(url)).hostname;
+  } catch {
+    return false;
+  }
+  if (!hostname) return false;
+  return globToRegExp(m[1]).test(hostname);
+}
+
+/**
+ * Which tool calls a pattern's tool name applies to — Claude Code's own
+ * grouping, which this hook has to reproduce exactly or it would enforce a
+ * different rule than the settings.json it was generated alongside:
+ *
+ *   Edit(glob)  gates every WRITE-side tool (Edit, MultiEdit, Write, …)
+ *   Read(glob)  gates every READ-side tool (Read, Glob, Grep, LS, …)
+ *
+ * A tool call outside both families (Task, TodoWrite) reaches no path
+ * pattern at all.
+ */
+const WRITE_TOOLS = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
+const READ_TOOLS = new Set(['Read', 'Glob', 'Grep', 'LS', 'NotebookRead']);
+
+/** Every tool name this hook has a matcher for. Anything else passes through
+ * untouched rather than being compared against patterns that cannot describe
+ * it. */
+const GATED_TOOLS = new Set(['Bash', ...WRITE_TOOLS, ...READ_TOOLS, 'WebFetch']);
+
+/**
+ * The path a tool call operates on. `file_path` is Claude's Read/Edit/Write
+ * field; `path` is what Glob/Grep/LS use AND what omp's own read/write tools
+ * send (lib/harness/payload.js forwards omp's `input` verbatim for the read
+ * side), so both are checked rather than assuming one harness's spelling.
+ */
+function toolCallPath(toolInput) {
+  return toolInput.file_path || toolInput.path || toolInput.notebook_path || '';
+}
+
 function parseInput(rawInput) {
   if (typeof rawInput !== 'string') return rawInput && typeof rawInput === 'object' ? rawInput : null;
   if (!rawInput.trim()) return null;
@@ -163,13 +249,13 @@ function run(rawInput) {
   if (!input) return passthrough(rawInput);
 
   const toolName = String(input.tool_name || input.tool || '');
-  if (!/^(Bash|Write|Edit|MultiEdit)$/.test(toolName)) {
+  if (!GATED_TOOLS.has(toolName)) {
     return passthrough(rawInput);
   }
 
   let denyEntries;
   try {
-    denyEntries = loadDenyPatterns(resolveClaudeDir());
+    denyEntries = loadDenyPatterns(resolvePermissionsFile());
   } catch {
     return passthrough(rawInput);
   }
@@ -181,22 +267,37 @@ function run(rawInput) {
     const classified = classifyPattern(entry.pattern);
     if (!classified) continue;
 
-    if (toolName === 'Bash' && classified.tool === 'Bash') {
-      if (matchBash(classified.inner, toolInput.command)) {
+    if (classified.tool === 'Bash') {
+      if (toolName === 'Bash' && matchBash(classified.inner, toolInput.command)) {
         return denyResult(entry.pattern);
       }
       continue;
     }
 
-    if (toolName !== 'Bash' && classified.tool === 'Edit') {
-      const filePath = toolInput.file_path || toolInput.path || '';
-      if (matchPath(classified.inner, filePath)) {
+    if (classified.tool === 'WebFetch') {
+      if (toolName === 'WebFetch' && matchDomain(classified.inner, toolInput.url)) {
         return denyResult(entry.pattern);
       }
+      continue;
+    }
+
+    const family = classified.tool === 'Edit' ? WRITE_TOOLS : classified.tool === 'Read' ? READ_TOOLS : null;
+    if (!family || !family.has(toolName)) continue;
+    if (matchPath(classified.inner, toolCallPath(toolInput))) {
+      return denyResult(entry.pattern);
     }
   }
 
   return passthrough(rawInput);
 }
 
-module.exports = { run, matchBash, matchPath, globToRegExp, classifyPattern, loadDenyPatterns };
+module.exports = {
+  run,
+  matchBash,
+  matchPath,
+  matchDomain,
+  globToRegExp,
+  classifyPattern,
+  loadDenyPatterns,
+  resolvePermissionsFile,
+};

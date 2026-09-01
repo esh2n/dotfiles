@@ -30,6 +30,15 @@
         ]
       },
       {
+        "matcher": "Read|Glob|Grep|LS|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" \"${YOKI_ROOT}/scripts/hooks/run-with-flags.js\" \"pre:permission-guard\" \"scripts/hooks/pre-permission-guard.js\" \"minimal,standard,strict\""
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {

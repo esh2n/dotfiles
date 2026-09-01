@@ -27,8 +27,11 @@ set -euo pipefail
 # remove it), a manifest that ships its own bash guard being used as-is, the
 # DECLARED floor (a manifest's top-level `floor` array, generated from
 # permissions.yaml's guardFloor:, is honoured per script — while a manifest
-# with no `floor` still falls back to the two hardcoded names), and per-hook
-# argv passthrough.
+# with no `floor` still falls back to the two hardcoded names), per-hook
+# argv passthrough, and the path-deny set: a `read` tool_call of a path
+# denied in <OMP_AGENT_DIR>/.yoki/permissions.json is blocked end to end by
+# the real pre-permission-guard.js, which on omp is the ONLY thing that can
+# enforce a Read/Edit/WebFetch deny (config.yml has no key for one).
 #
 # Usage: ./test-omp-yoki-bridge.sh
 # -----------------------------------------------------------------------------
@@ -406,6 +409,47 @@ async function callSessionStop(manifestEnv: string, tag: string): Promise<Sessio
     );
 }
 
+// ---------------------------------------------------------------------------
+// 7. PATH DENIES END TO END. omp's config.yml has no key for a `Read(...)` /
+//    `Edit(...)` / `WebFetch(domain:...)` deny, so on omp the only thing that
+//    can enforce one is pre-permission-guard.js reading
+//    ~/.omp/agent/.yoki/permissions.json (written by lib/targets/omp.js).
+//    This drives the REAL hook through the REAL runner via the extension: a
+//    read of a denied path must be blocked, a read of anything else must not,
+//    and a Bash call must still behave exactly as before.
+// ---------------------------------------------------------------------------
+{
+    process.env.YOKI_HOOKS_DIR = process.env.GUARD_HOOKS!;
+    process.env.YOKI_HOOKS_MANIFEST = process.env.GUARD_PERMISSION_MANIFEST!;
+    const { handlers, fakePi } = loadExtension();
+    const mod = await import(EXT_PATH + "?permission-manifest");
+    mod.default(fakePi);
+    const ctx = makeCtx();
+
+    const deniedPath = process.env.GUARD_DENIED_PATH!;
+    const denied = (await handlers["tool_call"]!(
+        { type: "tool_call", toolName: "read", toolCallId: "p1", input: { path: deniedPath } },
+        ctx,
+    )) as { block?: boolean; reason?: string } | undefined;
+    check(
+        "tool_call: a read of a denied path is blocked by pre-permission-guard",
+        denied?.block === true && (denied?.reason ?? "").includes("Read("),
+        JSON.stringify(denied),
+    );
+
+    const allowed = await handlers["tool_call"]!(
+        { type: "tool_call", toolName: "read", toolCallId: "p2", input: { path: "/tmp/omp-bridge-test/notes.md" } },
+        ctx,
+    );
+    check("tool_call: a read of an undenied path is allowed", allowed === undefined, JSON.stringify(allowed));
+
+    const bash = await handlers["tool_call"]!(
+        { type: "tool_call", toolName: "bash", toolCallId: "p3", input: { command: "ls -la" } },
+        ctx,
+    );
+    check("tool_call: a benign bash call is unaffected by the path deny set", bash === undefined, JSON.stringify(bash));
+}
+
 console.log("passed=" + passed + " failed=" + failed);
 process.exit(failed === 0 ? 0 : 1);
 RUNNER
@@ -463,6 +507,18 @@ RUNNER
     printf '{"floor": ["%s"], "tool_call": []}\n' \
         "$WORK/hooks/not-installed.sh" > "$floor_absent_script_manifest"
 
+    # Scenario 7: the real pre-permission-guard.js on tool_call, reading the
+    # real generated file shape from a throwaway OMP_AGENT_DIR. The deny is a
+    # basename glob so the fixture needs no real ~/.ssh.
+    local omp_agent_dir="$WORK/omp-agent"
+    mkdir -p "$omp_agent_dir/.yoki"
+    printf '{"deny": [{"pattern": "Read(**/id_ed25519)", "reason": "private keys"}]}\n' \
+        > "$omp_agent_dir/.yoki/permissions.json"
+
+    local permission_manifest="$WORK/permission-manifest.json"
+    printf '{"tool_call": [{"id": "pre:permission-guard", "kind": "js", "script": "scripts/hooks/pre-permission-guard.js", "profiles": ["minimal", "standard", "strict"]}]}\n' \
+        > "$permission_manifest"
+
     export GUARD_EXT="$EXT"
     export GUARD_HOOKS="$WORK/hooks"
     export GUARD_BROKEN="$WORK/broken-hooks"
@@ -480,6 +536,12 @@ RUNNER
     export GUARD_FLOOR_MANIFEST="$floor_manifest"
     export GUARD_FLOOR_SATISFIED_MANIFEST="$floor_satisfied_manifest"
     export GUARD_FLOOR_ABSENT_SCRIPT_MANIFEST="$floor_absent_script_manifest"
+    export GUARD_PERMISSION_MANIFEST="$permission_manifest"
+    export GUARD_DENIED_PATH="$WORK/fake-home/.ssh/id_ed25519"
+    # Read by pre-permission-guard.js itself (spawned as a grandchild of this
+    # runner), which is why it is exported rather than passed as an arg.
+    export OMP_AGENT_DIR="$omp_agent_dir"
+    export YOKI_HOOK_PROFILE="${YOKI_HOOK_PROFILE:-standard}"
 
     # set -e is active for the whole file; guard the capture with `|| status=$?`
     # rather than a bare assignment so a non-zero exit from the runner doesn't

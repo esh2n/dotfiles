@@ -13,6 +13,7 @@
  */
 
 const { loadAndMerge } = require('./parse');
+const { hookEnforcedDeny, mergeGuardDeny } = require('./guard-deny');
 
 const BASH_PATTERN_RE = /^Bash\((.+)\)$/;
 const READ_SECRET_PATTERN_RE = /^Read\((.+)\)$/;
@@ -125,29 +126,66 @@ function toPermissionsToml(merged) {
   return lines.join('\n');
 }
 
+/**
+ * Deny entries neither half of the Codex mapping expresses.
+ *
+ * `toRules` covers the `Bash(...)` denies it can tokenize (and reports the
+ * rest as hook-enforced itself); `toFilesystemDenyEntries` covers the
+ * absolute/`~`-rooted `Read(...)` denies. What is left over:
+ *
+ *   - `Read(**…)` workspace globs — deliberately excluded from the
+ *     filesystem table (they need a workspace-relative form; see
+ *     toFilesystemDenyEntries).
+ *   - EVERY `Edit(...)` deny. The filesystem table is built from `Read(...)`
+ *     patterns only, so `Edit(/etc/**)`, `Edit(~/.ssh/id_*)` and friends had
+ *     no expression on Codex at all unless permissions.yaml happened to tag
+ *     them `enforce: [hook]` — the four `*.pem`/`*.key`/`.env` rows did, the
+ *     other seventeen did not.
+ *   - anything else pattern-shaped (`WebFetch(domain:...)`).
+ *
+ * These are exactly the patterns hooks/pre-permission-guard.js has to carry
+ * on Codex, so they are unioned into the guard deny list below.
+ *
+ * @returns {Array<{pattern:string, reason:string}>}
+ */
+function toUnexpressibleDeny(merged) {
+  const expressedByFilesystem = new Set(
+    toFilesystemDenyEntries(merged).map(inner => `Read(${inner})`)
+  );
+
+  const out = [];
+  for (const entry of merged.deny) {
+    if (BASH_PATTERN_RE.test(entry.pattern)) continue; // toRules owns these
+    if (expressedByFilesystem.has(entry.pattern)) continue;
+    out.push({ pattern: entry.pattern, reason: entry.reason || '' });
+  }
+  return out;
+}
+
 function convert(filePaths) {
   const merged = loadAndMerge(filePaths);
   const { rules, hookEnforced: rulesHookEnforced } = toRules(merged);
-  const yamlHookEnforced = merged.deny
-    .filter(entry => Array.isArray(entry.enforce) && entry.enforce.includes('hook'))
-    .map(entry => ({ pattern: entry.pattern, reason: entry.reason || '' }));
 
   // Union: an entry can be hook-enforced because the yaml says so (enforce:
   // [hook]) and/or because to-codex.js's own execpolicy translation found it
   // unexpressible — dedupe by pattern.
-  const byPattern = new Map();
-  for (const e of [...yamlHookEnforced, ...rulesHookEnforced]) {
-    if (!byPattern.has(e.pattern)) byPattern.set(e.pattern, e);
-  }
+  const hookEnforced = mergeGuardDeny(hookEnforcedDeny(merged), rulesHookEnforced);
+
+  // What the guard actually enforces on Codex: the above PLUS every deny
+  // neither yoki.rules nor [permissions.yoki.filesystem] expresses.
+  const unexpressible = toUnexpressibleDeny(merged);
+  const guardDeny = mergeGuardDeny(hookEnforced, unexpressible);
 
   return {
     rules,
     permissions: toPermissionsToml(merged),
-    hookEnforced: [...byPattern.values()],
+    hookEnforced,
+    unexpressible,
+    guardDeny,
   };
 }
 
-module.exports = { toRules, toFilesystemDenyEntries, toPermissionsToml, convert };
+module.exports = { toRules, toFilesystemDenyEntries, toPermissionsToml, toUnexpressibleDeny, convert };
 
 if (require.main === module) {
   const args = process.argv.slice(2);

@@ -8,15 +8,27 @@ const path = require('path');
 
 const hook = require('../pre-permission-guard.js');
 
-function withClaudeDir(claudeDir, fn) {
-  const saved = Object.prototype.hasOwnProperty.call(process.env, 'CLAUDE_DIR') ? process.env.CLAUDE_DIR : undefined;
-  process.env.CLAUDE_DIR = claudeDir;
+/** Sets env vars for the duration of `fn`, restoring (or deleting) each one
+ * afterwards — YOKI_HARNESS plus the per-harness dir vars the hook resolves
+ * its permissions.json from. */
+function withEnv(vars, fn) {
+  const saved = {};
+  for (const key of Object.keys(vars)) {
+    saved[key] = Object.prototype.hasOwnProperty.call(process.env, key) ? process.env[key] : undefined;
+    process.env[key] = vars[key];
+  }
   try {
     return fn();
   } finally {
-    if (saved === undefined) delete process.env.CLAUDE_DIR;
-    else process.env.CLAUDE_DIR = saved;
+    for (const key of Object.keys(vars)) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
   }
+}
+
+function withClaudeDir(claudeDir, fn) {
+  return withEnv({ CLAUDE_DIR: claudeDir }, fn);
 }
 
 function writePermissions(claudeDir, denyEntries) {
@@ -154,12 +166,164 @@ test('a non-matching file passes through untouched', () => {
   });
 });
 
-test('a tool this hook does not gate (Read) always passes through', () => {
+// Claude's own grouping: an Edit(...) rule gates the WRITE-side tools only.
+// A Read of a path an Edit pattern names is not what that pattern denies —
+// the read side has its own Read(...) rows.
+test('a Read is not matched against an Edit(...) deny pattern', () => {
   const claudeDir = freshClaudeDir();
   writePermissions(claudeDir, [{ pattern: 'Edit(**/*.pem)' }]);
   withClaudeDir(claudeDir, () => {
     const raw = payload('Read', { file_path: '/repo/server.pem' });
     isPassthrough(hook.run(raw), raw);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Read(...) / WebFetch(domain:...) patterns. On Claude these are defense in
+// depth over Claude's own permission match; on omp and codex the guard is
+// their ONLY enforcement point, which is why the hook gates the read side at
+// all (it used to return early for every tool but Bash/Write/Edit/MultiEdit).
+// ---------------------------------------------------------------------------
+
+test('Read: a Read(...) deny blocks the Read tool', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(**/*.pem)', reason: 'secret' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('Read', { file_path: '/repo/certs/server.pem' })), 'Read(**/*.pem)');
+  });
+});
+
+test('Read: Glob, Grep and LS are gated by the same Read(...) pattern', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(**/*.key)' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('Glob', { path: '/repo/id.key' })), 'Read(**/*.key)');
+    isDeny(hook.run(payload('Grep', { path: '/repo/id.key', pattern: 'BEGIN' })), 'Read(**/*.key)');
+    isDeny(hook.run(payload('LS', { path: '/repo/id.key' })), 'Read(**/*.key)');
+  });
+});
+
+test('Read: an Edit/Write call is NOT matched against a Read(...) pattern', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(**/*.pem)' }]);
+  withClaudeDir(claudeDir, () => {
+    const raw = payload('Write', { file_path: '/repo/server.pem' });
+    isPassthrough(hook.run(raw), raw);
+  });
+});
+
+test('WebFetch: domain:<host> is matched against the URL host, not the whole URL', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'WebFetch(domain:evil.example)' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('WebFetch', { url: 'https://evil.example/page' })), 'WebFetch(domain:evil.example)');
+
+    // The host appearing anywhere else in the URL is not the host.
+    const raw = payload('WebFetch', { url: 'https://ok.example/?ref=evil.example' });
+    isPassthrough(hook.run(raw), raw);
+  });
+});
+
+test('WebFetch: a wildcard host matches a subdomain, and an unparseable URL matches nothing', () => {
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'WebFetch(domain:*.internal.example)' }]);
+  withClaudeDir(claudeDir, () => {
+    isDeny(hook.run(payload('WebFetch', { url: 'https://wiki.internal.example/x' })), 'WebFetch(domain:*.internal.example)');
+    const raw = payload('WebFetch', { url: 'not a url' });
+    isPassthrough(hook.run(raw), raw);
+  });
+});
+
+test('matchDomain: host-only comparison, wildcards allowed, junk URLs never match', () => {
+  assert.equal(hook.matchDomain('domain:example.com', 'https://example.com/a/b'), true);
+  assert.equal(hook.matchDomain('domain:example.com', 'https://sub.example.com/'), false);
+  assert.equal(hook.matchDomain('domain:*', 'https://anything.test/'), true);
+  assert.equal(hook.matchDomain('domain:example.com', ''), false);
+  assert.equal(hook.matchDomain('example.com', 'https://example.com/'), false); // not a domain: pattern
+});
+
+// ---------------------------------------------------------------------------
+// Per-harness permissions.json. The hook-tagged subset is all Claude Code
+// needs (it enforces every other pattern itself), but omp has no declarative
+// path permission list at all and codex expresses only the READ side of the
+// secret paths — so each harness gets its own file, and the hook has to read
+// the one belonging to the harness it is running under.
+// ---------------------------------------------------------------------------
+
+test('resolvePermissionsFile: one path per harness, each overridable by its dir env var', () => {
+  assert.equal(
+    hook.resolvePermissionsFile({ YOKI_HARNESS: 'omp', OMP_AGENT_DIR: '/tmp/omp-agent' }),
+    path.join('/tmp/omp-agent', '.yoki', 'permissions.json')
+  );
+  assert.equal(
+    hook.resolvePermissionsFile({ YOKI_HARNESS: 'codex', CODEX_DIR: '/tmp/codex' }),
+    path.join('/tmp/codex', '.yoki', 'permissions.json')
+  );
+  assert.equal(
+    hook.resolvePermissionsFile({ CLAUDE_DIR: '/tmp/claude' }),
+    path.join('/tmp/claude', '.yoki', 'permissions.json')
+  );
+  // Unknown harness -> the Claude path, never "no file": the hook-tagged
+  // subset is correct on every harness.
+  assert.equal(
+    hook.resolvePermissionsFile({ YOKI_HARNESS: 'something-new', CLAUDE_DIR: '/tmp/claude' }),
+    path.join('/tmp/claude', '.yoki', 'permissions.json')
+  );
+  assert.equal(hook.resolvePermissionsFile({ YOKI_HARNESS: 'omp' }), path.join(os.homedir(), '.omp', 'agent', '.yoki', 'permissions.json'));
+});
+
+test('omp: a Read of ~/.ssh/id_ed25519 is denied from the omp permissions file', () => {
+  const ompDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-permission-guard-omp-'));
+  writePermissions(ompDir, [{ pattern: 'Read(~/.ssh/id_*)', reason: 'private keys' }]);
+  // Claude's own file deliberately does NOT carry this row — that is the
+  // whole point: under YOKI_HARNESS=omp the hook must read omp's file.
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, []);
+
+  withEnv({ YOKI_HARNESS: 'omp', OMP_AGENT_DIR: ompDir, CLAUDE_DIR: claudeDir }, () => {
+    const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
+    isDeny(hook.run(payload('Read', { path: keyPath })), 'Read(~/.ssh/id_*)');
+  });
+});
+
+test('omp: the same Read passes through when only Claude\'s file carries the deny', () => {
+  const ompDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-permission-guard-omp-'));
+  writePermissions(ompDir, []);
+  const claudeDir = freshClaudeDir();
+  writePermissions(claudeDir, [{ pattern: 'Read(~/.ssh/id_*)' }]);
+
+  withEnv({ YOKI_HARNESS: 'omp', OMP_AGENT_DIR: ompDir, CLAUDE_DIR: claudeDir }, () => {
+    const raw = payload('Read', { path: path.join(os.homedir(), '.ssh', 'id_ed25519') });
+    isPassthrough(hook.run(raw), raw);
+  });
+});
+
+test('omp: a WebFetch domain deny in the omp file is enforced', () => {
+  const ompDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-permission-guard-omp-'));
+  writePermissions(ompDir, [{ pattern: 'WebFetch(domain:secrets.example)' }]);
+  withEnv({ YOKI_HARNESS: 'omp', OMP_AGENT_DIR: ompDir }, () => {
+    isDeny(hook.run(payload('WebFetch', { url: 'https://secrets.example/dump' })), 'WebFetch(domain:secrets.example)');
+  });
+});
+
+test('omp: Bash matching is unaffected by the harness switch', () => {
+  const ompDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-permission-guard-omp-'));
+  writePermissions(ompDir, [{ pattern: 'Bash(rm -rf /*)' }]);
+  withEnv({ YOKI_HARNESS: 'omp', OMP_AGENT_DIR: ompDir }, () => {
+    isDeny(hook.run(payload('Bash', { command: 'rm -rf /etc/foo' })), 'Bash(rm -rf /*)');
+    const raw = payload('Bash', { command: 'rm -rf ./build' });
+    isPassthrough(hook.run(raw), raw);
+  });
+});
+
+test('codex: the deny list comes from CODEX_DIR', () => {
+  const codexDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-permission-guard-codex-'));
+  writePermissions(codexDir, [{ pattern: 'Edit(~/.ssh/id_*)', reason: 'write side' }]);
+  withEnv({ YOKI_HARNESS: 'codex', CODEX_DIR: codexDir }, () => {
+    isDeny(
+      hook.run(payload('Write', { file_path: path.join(os.homedir(), '.ssh', 'id_ed25519') })),
+      'Edit(~/.ssh/id_*)'
+    );
   });
 });
 

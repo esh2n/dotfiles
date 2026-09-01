@@ -13,6 +13,16 @@ deny:
   - pattern: "Bash(curl * | sh)"
     reason: "installer scripts piped into a shell have no execpolicy prefix match"
     enforce: [hook]
+  # Two path denies, one per shape, so the golden covers what each target can
+  # and cannot express declaratively — and therefore what lands in
+  # <out>/.yoki/permissions.json for pre-permission-guard.js.
+  #   Read(~/…)  -> codex expresses it in [permissions.yoki.filesystem];
+  #                 omp has no equivalent at all, so only omp guards it.
+  #   Edit(**/…) -> neither target expresses it, so BOTH guard it.
+  - pattern: "Read(~/.ssh/id_*)"
+    reason: "private keys"
+  - pattern: "Edit(**/*.pem)"
+    reason: "in-workspace write side of a secret-file glob"
 
 # The guard floor, in the same shape as the real core layer: the two bash
 # guards every harness must register whatever else its generator manages to

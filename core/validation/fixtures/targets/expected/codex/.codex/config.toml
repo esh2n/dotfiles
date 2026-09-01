@@ -8,6 +8,7 @@ notify = ["node", "/opt/yoki-golden-fixture/yoki-root/scripts/hooks/codex-notify
 extends = ":workspace"
 
 [permissions.yoki.filesystem]
+"~/.ssh/id_*" = "deny"
 
 [features]
 hooks = true

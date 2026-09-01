@@ -355,7 +355,24 @@ function buildFixtureRepo(root) {
   const personal = path.join(root, 'personal');
 
   writeFile(path.join(core, 'settings.layer.json'), JSON.stringify({ hooks: { PreToolUse: [RUNNER_HOOK] } }));
-  writeFile(path.join(core, 'permissions.yaml'), 'allow:\n  - pattern: "WebSearch"\ndeny:\n  - pattern: "Bash(git push --force *)"\ndefaultMode: auto\n');
+  // The deny list deliberately mixes the two halves: a Bash pattern
+  // config.yml CAN express (bash.patterns) and two path globs it cannot,
+  // which is what .yoki/permissions.json exists to carry.
+  writeFile(
+    path.join(core, 'permissions.yaml'),
+    [
+      'allow:',
+      '  - pattern: "WebSearch"',
+      'deny:',
+      '  - pattern: "Bash(git push --force *)"',
+      '  - pattern: "Read(~/.ssh/id_*)"',
+      '  - pattern: "Edit(**/*.pem)"',
+      '    reason: "in-workspace write side"',
+      '    enforce: [hook]',
+      'defaultMode: auto',
+      '',
+    ].join('\n')
+  );
   writeFile(path.join(core, 'harness-models.json'), JSON.stringify({ omp: { sonnet: 'anthropic/claude-sonnet-5', review: 'anthropic/claude-sonnet-5', scout: 'anthropic/claude-haiku-5' } }));
   writeFile(path.join(core, 'agents', 'go-reviewer.md'), '---\nname: go-reviewer\ndescription: Go reviewer\nmodel: sonnet\ntools: ["Read", "Grep"]\n---\n\nReview Go code.');
   writeFile(path.join(core, 'agents', 'python-reviewer.md'), '---\nname: python-reviewer\ndescription: Python reviewer\n---\n\nReview Python code.');
@@ -447,6 +464,54 @@ test('end-to-end: plan()+apply() writes every artifact and replaces a symlinked 
     assert.equal(mcpJson.mcpServers['codebase-memory-mcp'].command, '/Users/exampleperson/bin/codebase-memory-mcp-managed');
     assert.ok(mcpJson.mcpServers.serena.args.includes('codex'));
     assert.ok(!('figma-remote' in mcpJson.mcpServers));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// <out>/.yoki/permissions.json. omp's config.yml has no key for a path or
+// domain deny, so before this file every `Read(...)`/`Edit(...)`/
+// `WebFetch(domain:...)` row was declared in permissions.yaml, warned about
+// at apply time, and enforced by nothing on omp.
+// ---------------------------------------------------------------------------
+
+test('plan(): path/domain denies are written to .yoki/permissions.json for pre-permission-guard', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const planResult = ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} });
+    gen.apply(planResult);
+
+    const perms = JSON.parse(fs.readFileSync(path.join(out, '.yoki', 'permissions.json'), 'utf8'));
+    assert.deepEqual(
+      new Set(perms.deny.map(e => e.pattern)),
+      new Set(['Edit(**/*.pem)', 'Read(~/.ssh/id_*)']),
+      'the Bash deny is expressed in config.yml bash.patterns and needs no guard entry'
+    );
+    assert.equal(perms.deny.find(e => e.pattern === 'Edit(**/*.pem)').reason, 'in-workspace write side');
+
+    // The config.yml render no longer warns about them — the plan states
+    // once that the guard has them.
+    assert.deepEqual(planResult.warnings.filter(w => /has no bash\.patterns/.test(w)), []);
+    assert.ok(planResult.info.some(line => /enforced by pre-permission-guard on omp/.test(line)), planResult.info.join('\n'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plan(): an unexpressible ALLOW still warns — no guard can grant a permission', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    writeFile(path.join(personal, 'permissions.yaml'), 'allow:\n  - pattern: "Edit(./**)"\ndeny: []\ndefaultMode: auto\n');
+    const planResult = ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {} });
+
+    assert.ok(planResult.warnings.some(w => /allow "Edit\(\.\/\*\*\)"/.test(w)), planResult.warnings.join('\n'));
+    const perms = planResult.operations.find(op => op.destinationPath === path.join(out, '.yoki', 'permissions.json'));
+    assert.ok(!perms.content.includes('Edit(./**)'));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(home, { recursive: true, force: true });

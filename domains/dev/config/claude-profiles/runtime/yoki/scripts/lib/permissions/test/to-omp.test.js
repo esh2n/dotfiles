@@ -41,8 +41,53 @@ test('convertMerged: path-glob Edit/Read entries are neither bash.patterns nor t
   );
   for (const entry of result.unexpressible) {
     assert.equal(entry.action, 'deny');
-    assert.match(entry.reason, /tool_call extension/);
+    assert.equal(entry.reason, entry.pattern === 'Edit(**/*.pem)' ? 'secret' : '');
+    assert.match(entry.note, /pre-permission-guard/);
   }
+});
+
+// ---------------------------------------------------------------------------
+// guardDeny: what lib/targets/omp.js writes to <out>/.yoki/permissions.json.
+// This is the half that used to be lost — an unexpressible deny warned at
+// apply time and was then enforced by nothing, so on omp `Read(~/.ssh/id_*)`
+// was declared and open.
+// ---------------------------------------------------------------------------
+
+test('convertMerged: guardDeny carries every unexpressible deny, not just the enforce:[hook] subset', () => {
+  const merged = {
+    allow: [],
+    deny: [
+      { pattern: 'Read(~/.ssh/id_*)' },
+      { pattern: 'Edit(**/*.pem)', reason: 'secret', enforce: ['hook'] },
+      { pattern: 'Bash(rm -rf /*)', reason: 'wildcard', enforce: ['hook'] },
+      { pattern: 'Bash(git clean -fd *)' },
+    ],
+  };
+  const { guardDeny } = convertMerged(merged);
+
+  assert.deepEqual(
+    new Set(guardDeny.map(e => e.pattern)),
+    new Set(['Read(~/.ssh/id_*)', 'Edit(**/*.pem)', 'Bash(rm -rf /*)']),
+    'the plain Bash deny is expressed in bash.patterns and needs no guard entry'
+  );
+  assert.equal(guardDeny.find(e => e.pattern === 'Edit(**/*.pem)').reason, 'secret');
+});
+
+test('convertMerged: an unexpressible ALLOW never becomes a guard deny', () => {
+  const { guardDeny, unexpressible } = convertMerged({
+    allow: [{ pattern: 'Edit(./**)' }, { pattern: 'WebFetch(domain:*)' }],
+    deny: [],
+  });
+  assert.equal(unexpressible.length, 2);
+  assert.deepEqual(guardDeny, []);
+});
+
+test('convertMerged: a pattern that is both enforce:[hook] and unexpressible appears once', () => {
+  const { guardDeny } = convertMerged({
+    allow: [],
+    deny: [{ pattern: 'Edit(**/.env)', reason: 'write side', enforce: ['hook'] }],
+  });
+  assert.deepEqual(guardDeny, [{ pattern: 'Edit(**/.env)', reason: 'write side' }]);
 });
 
 test('convertMerged: an entry with no pattern text at all (WebFetch(domain:*)) is unexpressible, not silently dropped', () => {

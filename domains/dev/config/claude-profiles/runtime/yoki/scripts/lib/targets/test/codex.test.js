@@ -581,6 +581,52 @@ function makeTmpDirs() {
   return { root, home, out: path.join(home, '.codex') };
 }
 
+// ---------------------------------------------------------------------------
+// <out>/.yoki/permissions.json. Codex's own two mechanisms cover the Bash
+// denies (yoki.rules) and the READ side of the absolute secret paths
+// ([permissions.yoki.filesystem]) — nothing else. Every Edit(...) row and
+// every Read(**…) workspace glob was therefore declared and unenforced unless
+// permissions.yaml happened to tag it `enforce: [hook]`.
+// ---------------------------------------------------------------------------
+
+test('plan(): the denies neither yoki.rules nor the filesystem table expresses go to .yoki/permissions.json', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    writeFile(
+      path.join(personal, 'permissions.yaml'),
+      [
+        'allow: []',
+        'deny:',
+        '  - pattern: "Read(~/.ssh/id_*)"',       // fs table covers the read side
+        '  - pattern: "Edit(~/.ssh/id_*)"',       // nothing covers the write side
+        '  - pattern: "Read(**/.env)"',           // workspace glob, not in the fs table
+        '  - pattern: "Bash(rm -rf /)"',          // a plain execpolicy prefix rule
+        '  - pattern: "Bash(rm -rf /*)"',         // no execpolicy equivalent
+        '    enforce: [hook]',
+        'defaultMode: auto',
+        '',
+      ].join('\n')
+    );
+
+    const planResult = codexTarget.plan({ sources: [core, personal], out, home, env: {}, codexVersion: null });
+    gen.apply(planResult);
+
+    const perms = JSON.parse(fs.readFileSync(path.join(out, '.yoki', 'permissions.json'), 'utf8'));
+    assert.deepEqual(
+      new Set(perms.deny.map(e => e.pattern)),
+      new Set(['Bash(rm -rf /*)', 'Edit(~/.ssh/id_*)', 'Read(**/.env)']),
+      'Read(~/.ssh/id_*) is in [permissions.yoki.filesystem] and Bash(rm -rf /) is a rule — neither needs the guard'
+    );
+
+    assert.deepEqual(planResult.warnings.filter(w => /native execpolicy\/filesystem equivalent/.test(w)), []);
+    assert.ok(planResult.info.some(line => /enforced by pre-permission-guard on codex/.test(line)), planResult.info.join('\n'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('end-to-end: plan()+apply() writes every artifact and stays fully contained under --home', () => {
   const { root, home, out } = makeTmpDirs();
   try {

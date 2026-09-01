@@ -1,0 +1,16 @@
+{
+  "deny": [
+    {
+      "pattern": "Bash(curl * | sh)",
+      "reason": "installer scripts piped into a shell have no execpolicy prefix match"
+    },
+    {
+      "pattern": "Read(~/.ssh/id_*)",
+      "reason": "private keys"
+    },
+    {
+      "pattern": "Edit(**/*.pem)",
+      "reason": "in-workspace write side of a secret-file glob"
+    }
+  ]
+}

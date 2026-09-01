@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { toRules, toFilesystemDenyEntries, toPermissionsToml } = require('../to-codex');
+const { toRules, toFilesystemDenyEntries, toPermissionsToml, toUnexpressibleDeny } = require('../to-codex');
 
 test('toRules: a plain Bash prefix deny becomes a forbidden prefix_rule', () => {
   const merged = { allow: [], deny: [{ pattern: 'Bash(git reset --hard *)', reason: 'no hard reset' }] };
@@ -92,4 +92,43 @@ test('the trailing-glob deny patterns are routed to hookEnforced, never to yoki.
   for (const pattern of ['rm -rf /*', 'rm -rf ~/*', '> /dev/*', '>> /dev/*']) {
     assert.ok(!rules.includes(pattern), `${pattern} must not reach yoki.rules — execpolicy cannot express it`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// toUnexpressibleDeny: the denies NEITHER yoki.rules NOR
+// [permissions.yoki.filesystem] carries. Codex's filesystem table is built
+// from Read(...) patterns only, so every Edit(...) row had no expression at
+// all unless permissions.yaml happened to tag it `enforce: [hook]` — the four
+// *.pem/*.key/.env rows did, the other seventeen did not. Those are what
+// lib/targets/codex.js hands pre-permission-guard.js.
+// ---------------------------------------------------------------------------
+
+test('toUnexpressibleDeny: an Edit(...) deny has no Codex expression and is reported', () => {
+  const merged = {
+    deny: [
+      { pattern: 'Edit(/etc/**)' },
+      { pattern: 'Edit(~/.ssh/id_*)', reason: 'private keys' },
+    ],
+  };
+  assert.deepEqual(toUnexpressibleDeny(merged), [
+    { pattern: 'Edit(/etc/**)', reason: '' },
+    { pattern: 'Edit(~/.ssh/id_*)', reason: 'private keys' },
+  ]);
+});
+
+test('toUnexpressibleDeny: a Read deny already in the filesystem table is NOT repeated', () => {
+  const merged = { deny: [{ pattern: 'Read(~/.aws/credentials)' }] };
+  assert.deepEqual(toFilesystemDenyEntries(merged), ['~/.aws/credentials']);
+  assert.deepEqual(toUnexpressibleDeny(merged), []);
+});
+
+test('toUnexpressibleDeny: a Read(**…) workspace glob IS reported (the fs table skips it)', () => {
+  const merged = { deny: [{ pattern: 'Read(**/.env)' }] };
+  assert.deepEqual(toFilesystemDenyEntries(merged), []);
+  assert.deepEqual(toUnexpressibleDeny(merged), [{ pattern: 'Read(**/.env)', reason: '' }]);
+});
+
+test('toUnexpressibleDeny: Bash denies are left to toRules, which reports its own', () => {
+  const merged = { deny: [{ pattern: 'Bash(rm -rf /)' }, { pattern: 'Bash(rm -rf /*)' }] };
+  assert.deepEqual(toUnexpressibleDeny(merged), []);
 });

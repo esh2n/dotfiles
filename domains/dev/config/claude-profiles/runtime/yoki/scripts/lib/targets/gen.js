@@ -362,6 +362,10 @@ function main() {
     for (const entry of planResult.skipped || []) {
       process.stdout.write(`skipped  ${entry.event}/${entry.matcher}  ${entry.command}  -- ${entry.reason}\n`);
     }
+    // `info` is the counterpart to `warnings`: something the plan DID handle,
+    // reported so the reader knows it was handled (the guard-enforced deny
+    // set) rather than left to infer it from the absence of a warning.
+    for (const line of planResult.info || []) process.stdout.write(`info  ${line}\n`);
     for (const warning of planResult.warnings) process.stderr.write(`warning: ${warning}\n`);
   }
 

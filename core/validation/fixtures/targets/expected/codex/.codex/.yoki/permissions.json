@@ -1,0 +1,12 @@
+{
+  "deny": [
+    {
+      "pattern": "Bash(curl * | sh)",
+      "reason": "installer scripts piped into a shell have no execpolicy prefix match"
+    },
+    {
+      "pattern": "Edit(**/*.pem)",
+      "reason": "in-workspace write side of a secret-file glob"
+    }
+  ]
+}

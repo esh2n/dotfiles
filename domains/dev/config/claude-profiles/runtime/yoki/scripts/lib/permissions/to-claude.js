@@ -15,6 +15,7 @@
  */
 
 const { loadAndMerge } = require('./parse');
+const { hookEnforcedDeny } = require('./guard-deny');
 
 /**
  * @param {{allow: Array<{pattern:string}>, deny: Array<{pattern:string}>, defaultMode?: string}} merged
@@ -35,14 +36,12 @@ function toClaudeSettings(merged) {
  * everywhere they run. Written to <CLAUDE_DIR>/.yoki/permissions.json by
  * yoki-switch at apply time.
  *
- * @param {{deny: Array<{pattern:string, reason?:string, enforce?:string[]}>}} merged
- * @returns {Array<{pattern:string, reason:string}>}
+ * The Claude target needs nothing beyond this subset: every other pattern in
+ * permissions.yaml IS a Claude permission rule, enforced by Claude Code
+ * itself. The codex/omp targets union this with the patterns their own
+ * converter cannot express — see ./guard-deny.js, which owns the definition
+ * this re-exports.
  */
-function hookEnforcedDeny(merged) {
-  return merged.deny
-    .filter(entry => Array.isArray(entry.enforce) && entry.enforce.includes('hook'))
-    .map(entry => ({ pattern: entry.pattern, reason: entry.reason || '' }));
-}
 
 /**
  * Loads + merges the given permissions.yaml files and returns both the

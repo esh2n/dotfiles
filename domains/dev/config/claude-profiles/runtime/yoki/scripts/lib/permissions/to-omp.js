@@ -15,14 +15,20 @@
  *     `input.command` the same way pre-permission-guard.js does for Claude.
  *   - tools.approval: a name → "allow"|"deny" map for tool-level patterns
  *     that have no arguments to match (`Read(**)`, `Task(**)`, ...).
- *   - unexpressible: everything else (path-glob Edit/Read denies) — omp has
- *     no filesystem-permission layer like Codex's, so these can only be
- *     enforced by the same `tool_call` extension matching `input.path`,
- *     which is exactly what the hook-enforced set already needs; listed
- *     here so the extension's own doc/tests can point at one source.
+ *   - unexpressible: everything else (path-glob Edit/Read denies,
+ *     `WebFetch(domain:...)`) — omp has no filesystem-permission layer like
+ *     Codex's, so these can only be enforced by a `tool_call` hook matching
+ *     `input.path` / `input.url`.
+ *   - guardDeny: the deny half of that, unioned with the `enforce: [hook]`
+ *     entries — the list lib/targets/omp.js writes to
+ *     `<out>/.yoki/permissions.json` for hooks/pre-permission-guard.js to
+ *     enforce. Before this existed only the `enforce: [hook]` subset reached
+ *     the guard, so on omp every `Read(...)`/`Edit(...)`/`WebFetch(...)` deny
+ *     that permissions.yaml did not explicitly tag was unenforced.
  */
 
 const { loadAndMerge } = require('./parse');
+const { hookEnforcedDeny, mergeGuardDeny } = require('./guard-deny');
 
 const BASH_PATTERN_RE = /^Bash\((.+)\)$/;
 const TOOL_ONLY_RE = /^([A-Za-z]+)\(\*\*\)$/; // e.g. Read(**), Grep(**), Task(**)
@@ -69,7 +75,10 @@ function toUnexpressible(entries, action) {
     out.push({
       pattern: entry.pattern,
       action,
-      reason: 'omp has no declarative path/domain permission list; enforce via the tool_call extension (yoki-guard.ts) matching input.path/input.url',
+      reason: entry.reason || '',
+      note: action === 'deny'
+        ? 'omp has no declarative path/domain permission list; enforced by pre-permission-guard on the tool_call event instead'
+        : 'omp has no declarative path/domain permission list; omp falls back to its own approvalMode for these calls',
     });
   }
   return out;
@@ -89,10 +98,19 @@ function convertMerged(merged) {
 
   const unexpressible = [...toUnexpressible(merged.deny, 'deny'), ...toUnexpressible(merged.allow, 'allow')];
 
+  // Only the DENY half is enforceable by a guard hook: an unexpressible
+  // allow (`Edit(./**)`, `WebFetch(domain:*)`) just means omp falls back to
+  // its own approvalMode for those calls, which is a prompt, not a hole.
+  const guardDeny = mergeGuardDeny(
+    hookEnforcedDeny(merged),
+    unexpressible.filter(e => e.action === 'deny').map(e => ({ pattern: e.pattern, reason: e.reason }))
+  );
+
   return {
     bash: { patterns: bashPatterns },
     tools: { approval },
     unexpressible,
+    guardDeny,
   };
 }
 

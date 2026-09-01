@@ -288,7 +288,45 @@ function buildRulesAndConfigOperations({ permissionsFiles, out, hookStateEntries
   const { content: configTomlContent, warnings } = applyManagedBlock(existingConfigToml, blockContent, ownedKeys);
   const configOp = { kind: 'toml-block', destinationPath: configTomlPath, content: configTomlContent, layer: 'generated' };
 
-  return { rulesOp, configOp, warnings: [...warnings, ...mcpWarnings], hookEnforced: converted.hookEnforced };
+  return {
+    rulesOp,
+    configOp,
+    warnings: [...warnings, ...mcpWarnings],
+    hookEnforced: converted.hookEnforced,
+    guardDeny: converted.guardDeny,
+  };
+}
+
+/**
+ * `<out>/.yoki/permissions.json` — the deny list hooks/pre-permission-guard.js
+ * reads when it runs under `YOKI_HARNESS=codex`, in the same
+ * `{deny:[{pattern,reason}]}` shape yoki-switch writes for Claude Code and
+ * omp.js writes for omp.
+ *
+ * to-codex.js's `guardDeny` is the `enforce: [hook]` subset unioned with
+ * every deny NEITHER `rules/yoki.rules` NOR `[permissions.yoki.filesystem]`
+ * expresses — most of the `Edit(...)` rows, and the `Read(**…)` workspace
+ * globs the filesystem table deliberately leaves out. Those were declared and
+ * unenforced on Codex before this file: the filesystem table only carries the
+ * READ side of the secret paths, so nothing stopped a write to
+ * `~/.ssh/id_ed25519` unless permissions.yaml happened to tag that row
+ * `enforce: [hook]`.
+ */
+function buildGuardPermissionsOperation({ out, guardDeny }) {
+  const deny = guardDeny || [];
+  const content = `${JSON.stringify({ deny }, null, 2)}\n`;
+  const op = {
+    kind: 'write',
+    destinationPath: path.join(out, '.yoki', 'permissions.json'),
+    content,
+    layer: 'generated',
+  };
+
+  const info = deny.length > 0
+    ? [`codex: ${deny.length} deny pattern(s) with no execpolicy/filesystem equivalent are enforced by pre-permission-guard on codex (written to ${op.destinationPath})`]
+    : [];
+
+  return { op, info };
 }
 
 function buildAgentOperations({ agentFiles, out, layerRoots }) {
@@ -391,6 +429,7 @@ function plan(options) {
   const content = discoverLayerContent(layerRoots);
 
   const warnings = [];
+  const info = [];
   const skipped = [];
   const operations = [];
 
@@ -425,9 +464,15 @@ function plan(options) {
   });
   operations.push(rulesAndConfig.rulesOp, rulesAndConfig.configOp);
   warnings.push(...rulesAndConfig.warnings);
-  for (const entry of rulesAndConfig.hookEnforced) {
-    warnings.push(`codex: "${entry.pattern}" has no native execpolicy/filesystem equivalent — enforce via a PreToolUse hook instead (${entry.reason || 'see spike S3 §4c'})`);
-  }
+
+  // No per-entry warning any more: every one of these is written to
+  // `<out>/.yoki/permissions.json` below and enforced by
+  // hooks/pre-permission-guard.js under YOKI_HARNESS=codex, so the plan says
+  // so once rather than repeating "enforce via a hook instead" for each row
+  // while the hook already does.
+  const guardPermissions = buildGuardPermissionsOperation({ out: outResolved, guardDeny: rulesAndConfig.guardDeny });
+  operations.push(guardPermissions.op);
+  info.push(...guardPermissions.info);
 
   const agentOps = buildAgentOperations({ agentFiles: content.agentFiles, out: outResolved, layerRoots });
   operations.push(...agentOps);
@@ -448,7 +493,7 @@ function plan(options) {
   const prunableDestinations = [...agentOps, ...skillOps, ...commandSkillOps].map(op => op.destinationPath);
   operations.push(...buildCodexPruneOperations({ out: outResolved, prunableDestinations, prune: Boolean(options.prune) }));
 
-  return { target: 'codex', out: outResolved, home, sources: layerRoots, operations, warnings, skipped, codexVersion };
+  return { target: 'codex', out: outResolved, home, sources: layerRoots, operations, warnings, info, skipped, codexVersion };
 }
 
 module.exports = {
