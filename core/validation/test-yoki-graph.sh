@@ -42,6 +42,7 @@ source "${DOTFILES_ROOT}/core/utils/common.sh"
 PROFILES_ROOT="${DOTFILES_ROOT}/domains/dev/config/claude-profiles"
 LIB_GRAPH="${PROFILES_ROOT}/runtime/yoki/scripts/lib/graph"
 GRAPH_BIN="${DOTFILES_ROOT}/domains/dev/bin/yoki-graph"
+AGENT_BIN="${DOTFILES_ROOT}/domains/dev/bin/yoki-agent"
 REVIEW_WORKFLOW="${PROFILES_ROOT}/core/workflows/review.js"
 REVIEW_FIXTURE="${LIB_GRAPH}/test/fixtures/review.mock.json"
 
@@ -421,6 +422,167 @@ check_model_visibility() {
         '[.byModel[] | select(.model == "pinned-opus")][0].calls' "2"
 }
 
+# The end-of-run summary must put the accounting BEFORE the payload: a
+# workflow result runs to thousands of lines, and a per-model table printed
+# after it is scrolled off a TTY and buried at the bottom of a redirected log.
+check_summary_order() {
+    local repo="${FIXTURE_DIR}/repo-order" home="${FIXTURE_DIR}/home-order"
+    local out="${FIXTURE_DIR}/order.out" err="${FIXTURE_DIR}/order.err"
+
+    make_temp_repo "$repo"
+    setup_fake_home "$home"
+
+    # No --json: this is the human summary path.
+    CLI_STATUS=0
+    env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR -u WORKFLOW_GUARD_DISABLED -u YOKI_WORKFLOW_DAILY_CAP \
+        YOKI_WORKFLOW_DAILY_CAP=20 HOME="$home" \
+        node "$GRAPH_BIN" run review --backend mock --mock "$REVIEW_FIXTURE" \
+            --args '{"range":"HEAD~1..HEAD"}' --cwd "$repo" \
+        > "$out" 2> "$err" || CLI_STATUS=$?
+    assert_eq "case28: a non-json run exits 0" "0" "$CLI_STATUS"
+
+    local table_line result_line
+    table_line="$(grep -n '^model' "$out" | head -n 1 | cut -d: -f1)"
+    result_line="$(grep -n '^result:' "$out" | head -n 1 | cut -d: -f1)"
+    if [[ -n "$table_line" && -n "$result_line" && "$table_line" -lt "$result_line" ]]; then
+        pass "case29: the per-model table is printed before the JSON result"
+    else
+        fail "case29: the per-model table is printed before the JSON result"
+        log_error "  table at line ${table_line:-<missing>}, result at line ${result_line:-<missing>}"
+    fi
+    assert_contains "case30: the table carries a cached column" "cached" "$(sed -n "${table_line}p" "$out")"
+}
+
+# -----------------------------------------------------------------------------
+# yoki-agent (MP2): one backend call from the command line, through the SAME
+# api.js agent() the workflows use. The exit-code contract is what MP3's
+# transport subagent branches on, so it is pinned here through the real
+# launcher (domains/dev/bin/yoki-agent), not just in the node unit suite.
+# -----------------------------------------------------------------------------
+
+# Runs the yoki-agent launcher with a scrubbed HOME. Sets CLI_STATUS.
+run_agent() {
+    local home="$1" stdout="$2" stderr="$3"
+    shift 3
+    CLI_STATUS=0
+    env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR -u YOKI_AGENT_MOCK \
+        HOME="$home" \
+        node "$AGENT_BIN" "$@" > "$stdout" 2> "$stderr" || CLI_STATUS=$?
+    return 0
+}
+
+check_yoki_agent() {
+    local home="${FIXTURE_DIR}/home-agent" dir="${FIXTURE_DIR}/agent"
+    local out="${FIXTURE_DIR}/agent.out" err="${FIXTURE_DIR}/agent.err"
+    mkdir -p "$home" "$dir"
+
+    printf 'review this diff' > "${dir}/p.txt"
+    printf '{"type":"object","required":["findings"],"properties":{"findings":{"type":"array","items":{"type":"object"}}}}' > "${dir}/s.json"
+    printf '{"lane":{"findings":[{"file":"pkg/foo.go","title":"nil deref"}]}}' > "${dir}/fix.json"
+    printf '{"lane":{"nope":1}}' > "${dir}/bad.json"
+
+    if [[ ! -x "$AGENT_BIN" ]]; then
+        fail "case31: domains/dev/bin/yoki-agent exists and is executable"
+        return
+    fi
+    pass "case31: domains/dev/bin/yoki-agent exists and is executable"
+
+    # --json: stdout is ONE parseable JSON document (what the transport
+    # subagent hands back verbatim), and the footer is on stderr.
+    run_agent "$home" "$out" "$err" \
+        --backend mock --mock "${dir}/fix.json" --label lane \
+        --schema "${dir}/s.json" --sandbox read-only --prompt-file "${dir}/p.txt" --json
+    assert_eq "case32: a mock-backend call exits 0" "0" "$CLI_STATUS"
+    assert_json_field "case33: --json puts only the result JSON on stdout" \
+        "$(cat "$out")" '.findings[0].file' "pkg/foo.go"
+    assert_contains "case34: the footer goes to stderr and names the backend" \
+        "yoki-agent: backend=mock" "$(cat "$err")"
+
+    # The footer reports the RESOLVED model, not the tier that was asked for.
+    run_agent "$home" "$out" "$err" \
+        --backend mock --mock "${dir}/fix.json" --label lane \
+        --model sonnet --model-map 'sonnet=pinned-id' --prompt-file "${dir}/p.txt"
+    assert_eq "case35: a run with --model-map exits 0" "0" "$CLI_STATUS"
+    assert_contains "case36: the footer reports the resolved model id" \
+        "model=pinned-id" "$(cat "$out")"
+
+    # YOKI_AGENT_MOCK reroutes a real backend to mock — how a provider lane
+    # is exercised without codex/omp installed — and says so.
+    CLI_STATUS=0
+    env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR \
+        HOME="$home" YOKI_AGENT_MOCK="${dir}/fix.json" \
+        node "$AGENT_BIN" --backend codex --model sonnet --label lane \
+            --schema "${dir}/s.json" --prompt-file "${dir}/p.txt" --json \
+        > "$out" 2> "$err" || CLI_STATUS=$?
+    assert_eq "case37: YOKI_AGENT_MOCK reroutes codex to the mock backend" "0" "$CLI_STATUS"
+    assert_contains "case38: ...and the footer never hides that it was a mock" \
+        "backend=mock (requested codex)" "$(cat "$err")"
+
+    # Exit 1: usage.
+    run_agent "$home" "$out" "$err" --backend mock
+    assert_eq "case39: a missing --prompt-file exits 1" "1" "$CLI_STATUS"
+    assert_contains "case40: ...and prints the usage text" "usage: yoki-agent" "$(cat "$err")"
+
+    run_agent "$home" "$out" "$err" --backend claude --prompt-file "${dir}/p.txt"
+    assert_eq "case41: --backend claude exits 1" "1" "$CLI_STATUS"
+    assert_contains "case42: ...pointing at the native Workflow tool" \
+        "native Workflow tool" "$(cat "$err")"
+
+    run_agent "$home" "$out" "$err" --backend codex --model sonnett --prompt-file "${dir}/p.txt"
+    assert_eq "case43: a misspelled --model tier exits 1" "1" "$CLI_STATUS"
+    assert_contains "case44: ...listing the tiers that would have worked" \
+        "valid tiers: haiku, opus, sonnet" "$(cat "$err")"
+
+    # Exit 2: the backend call failed. PATH is scrubbed to a directory with
+    # only `node` in it, so `codex` cannot be spawned at all — a real backend
+    # failure with no process actually reaching a provider.
+    local emptybin="${FIXTURE_DIR}/emptybin"
+    mkdir -p "$emptybin"
+    ln -sf "$(command -v node)" "${emptybin}/node"
+    CLI_STATUS=0
+    env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR -u YOKI_AGENT_MOCK \
+        HOME="$home" PATH="$emptybin" \
+        "${emptybin}/node" "$AGENT_BIN" --backend codex --model sonnet \
+            --retries 0 --prompt-file "${dir}/p.txt" --json \
+        > "$out" 2> "$err" || CLI_STATUS=$?
+    assert_eq "case45: an unspawnable backend exits 2" "2" "$CLI_STATUS"
+    assert_eq "case46: ...and prints no result on stdout" "" "$(cat "$out")"
+    assert_contains "case47: ...reporting it as a backend failure" \
+        "backend call failed" "$(cat "$err")"
+
+    # Exit 3: the answer never satisfied the schema, even after the retry.
+    run_agent "$home" "$out" "$err" \
+        --backend mock --mock "${dir}/bad.json" --label lane \
+        --schema "${dir}/s.json" --prompt-file "${dir}/p.txt" --json
+    assert_eq "case48: a schema that never validates exits 3" "3" "$CLI_STATUS"
+    assert_eq "case49: ...and prints no result on stdout" "" "$(cat "$out")"
+    assert_contains "case50: ...naming the validation failure" \
+        "schema validation failed after retry" "$(cat "$err")"
+}
+
+# A provider lane's transport prompt tells a Claude subagent to run
+# `yoki-agent` with a specific flag set. If the CLI's flag names drift from
+# the helper's command line, nothing in the node suite catches it — the
+# helper is asserted against itself there. Asserted statically here, against
+# the CLI's own usage text.
+check_lane_cli_contract() {
+    local lanes="${PROFILES_ROOT}/core/workflows/lib/lanes.js"
+    local usage flag
+
+    usage="$(node -e "process.stdout.write(require('${LIB_GRAPH}/agent-cli.js').USAGE)")"
+    for flag in --backend --model --schema --sandbox --prompt-file --json; do
+        if grep -qF -- "$flag" "$lanes" && grep -qF -- "$flag" <<< "$usage"; then
+            continue
+        fi
+        fail "case51: the transport prompt's ${flag} exists in yoki-agent's usage"
+        return
+    done
+    pass "case51: every flag the transport prompt passes exists in yoki-agent's usage"
+
+    assert_contains "case52: yoki-agent documents the exit-code contract the lanes branch on" \
+        "0 ok, 1 usage, 2 backend error, 3 schema failure after retry" "$usage"
+}
+
 run_e2e_checks() {
     check_node_unit_suite
     check_review_run
@@ -428,6 +590,9 @@ run_e2e_checks() {
     check_resume_replay
     check_refusals
     check_model_visibility
+    check_summary_order
+    check_yoki_agent
+    check_lane_cli_contract
     check_validator_wiring
 }
 
