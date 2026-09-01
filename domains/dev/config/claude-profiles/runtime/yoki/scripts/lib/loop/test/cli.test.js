@@ -215,7 +215,7 @@ test('main: --prompt-from-artifact-inbox with nothing unread skips the run (exit
     withTempDotfilesRoot((dotfilesRoot) => {
       const io = makeIO();
       const code = cli.main(
-        ['run', 'demo', '--harness', 'claude', '--cwd', '.', '--prompt-from-artifact-inbox', '--dry-run'],
+        ['run', 'demo', '--harness', 'omp', '--cwd', '.', '--prompt-from-artifact-inbox', '--dry-run'],
         { dotfilesRoot, env, stdout: io.stdout, stderr: io.stderr }
       );
       assert.equal(code, 0);
@@ -326,7 +326,7 @@ test('main: uninstall on a name with no plist is a no-op, not an error', () => {
 test('main: list reports installed loop names', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
-      cli.main(['install', 'alpha', '--harness', 'claude', '--cwd', '.', '--prompt', 'a', '--every', '1h'], {
+      cli.main(['install', 'alpha', '--harness', 'omp', '--cwd', '.', '--prompt', 'a', '--every', '1h'], {
         dotfilesRoot,
         env,
         stdout: makeIO().stdout,
@@ -343,7 +343,7 @@ test('main: list reports installed loop names', () => {
 test('main: status <name> reports run history and an estimated next fire time', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
-      cli.main(['install', 'demo', '--harness', 'claude', '--cwd', '.', '--prompt', 'a', '--every', '30m'], {
+      cli.main(['install', 'demo', '--harness', 'omp', '--cwd', '.', '--prompt', 'a', '--every', '30m'], {
         dotfilesRoot,
         env,
         stdout: makeIO().stdout,
@@ -351,7 +351,7 @@ test('main: status <name> reports run history and an estimated next fire time', 
       });
       state.appendRun(
         'demo',
-        { ts: '2026-01-01T00:00:00.000Z', harness: 'claude', cmd: ['claude'], exit: 0, durationMs: 5, sessionId: 's1' },
+        { ts: '2026-01-01T00:00:00.000Z', harness: 'omp', cmd: ['omp'], exit: 0, durationMs: 5, sessionId: 's1' },
         env
       );
 
@@ -368,7 +368,7 @@ test('main: status <name> reports run history and an estimated next fire time', 
 test('main: status shows the prompt fingerprint the runner recorded, never the prompt', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
-      cli.main(['install', 'demo', '--harness', 'claude', '--cwd', '.', '--prompt', 'a', '--every', '30m'], {
+      cli.main(['install', 'demo', '--harness', 'omp', '--cwd', '.', '--prompt', 'a', '--every', '30m'], {
         dotfilesRoot,
         env,
         stdout: makeIO().stdout,
@@ -381,8 +381,8 @@ test('main: status shows the prompt fingerprint the runner recorded, never the p
         'demo',
         {
           ts: '2026-01-01T00:00:00.000Z',
-          harness: 'claude',
-          cmd: state.redactPromptArgv(['claude', '-p', prompt, '--output-format', 'json'], prompt),
+          harness: 'omp',
+          cmd: state.redactPromptArgv(['omp', '-p', prompt, '--mode', 'json'], prompt),
           prompt: placeholder,
           exit: 0,
           durationMs: 5,
@@ -397,7 +397,7 @@ test('main: status shows the prompt fingerprint the runner recorded, never the p
       assert.ok(text.includes(placeholder), 'status must show the placeholder');
       assert.ok(!text.includes('acme-corp'), 'status must not show the prompt');
       // The rest of the argv is still there to read.
-      assert.match(text, /claude -p .* --output-format json/);
+      assert.match(text, /omp -p .* --mode json/);
     });
   });
 });

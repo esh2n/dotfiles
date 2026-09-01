@@ -117,13 +117,23 @@ function compileScript(source) {
   };
 }
 
+/**
+ * `claude` is deliberately absent. yoki-graph exists to run these scripts
+ * from harnesses that have no Workflow tool; inside Claude Code the native
+ * Workflow tool is the supported path, and shelling out to `claude -p` is a
+ * second, unsupported one — which may move to metered billing. The refusal
+ * names the alternative rather than reporting an unknown-backend error, so
+ * a stale `--backend claude` invocation is told what to do instead.
+ */
+const CLAUDE_BACKEND_REFUSAL = 'the claude backend was removed — inside Claude Code use the native Workflow tool; yoki-graph backends are codex, omp, mock';
+
 function loadBackend(name) {
   switch (name) {
-    case 'claude': return require('./backends/claude');
+    case 'claude': throw new Error(CLAUDE_BACKEND_REFUSAL);
     case 'codex': return require('./backends/codex');
     case 'omp': return require('./backends/omp');
     case 'mock': return require('./backends/mock');
-    default: throw new Error(`unknown backend "${name}" (expected claude|codex|omp|mock)`);
+    default: throw new Error(`unknown backend "${name}" (expected codex|omp|mock)`);
   }
 }
 
@@ -302,6 +312,7 @@ module.exports = {
   extractMeta,
   scanBalancedBraces,
   loadBackend,
+  CLAUDE_BACKEND_REFUSAL,
   resolveScriptPath,
   listWorkflows,
   executeScript,

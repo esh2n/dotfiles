@@ -6,7 +6,7 @@
  * Code. See API.md for the script-facing surface and runner.js for the
  * execution engine this dispatches into.
  *
- *   yoki-graph run <name|path> --backend claude|codex|omp|mock
+ *   yoki-graph run <name|path> --backend codex|omp|mock
  *       [--args '<json>' | --args-file <f>] [--cwd <dir>]
  *       [--resume <runId>] [--dry-run] [--json] [--concurrency N]
  *       [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
@@ -111,7 +111,7 @@ function makeEmitter({ json }) {
 
 async function cmdRun(rest, flags) {
   const target = rest[0];
-  if (!target) throw new Error('usage: yoki-graph run <name|path> --backend claude|codex|omp|mock [...]');
+  if (!target) throw new Error('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]');
   const backendName = flags.backend || 'mock';
   const cwd = flags.cwd ? path.resolve(flags.cwd) : process.cwd();
   const scriptPath = runner.resolveScriptPath(target, cwd);
@@ -219,7 +219,7 @@ async function main() {
     else if (cmd === 'list') cmdList(flags);
     else if (cmd === 'status') cmdStatus(positional, flags);
     else {
-      process.stdout.write('usage: yoki-graph run <name|path> --backend claude|codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId>\n');
+      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId>\n');
       if (cmd) process.exitCode = 1;
     }
   } catch (err) {

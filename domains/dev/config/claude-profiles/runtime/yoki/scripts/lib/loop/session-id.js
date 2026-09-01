@@ -1,12 +1,10 @@
 'use strict';
 
 /**
- * Session-id extraction from each harness's headless JSON stdout (task T19
- * spec: "sessionId (parsed from the JSON stream: claude `session_id`, codex
- * thread id, omp `{type:'session'}` header)").
+ * Session-id extraction from each harness's headless JSON stdout: codex's
+ * thread id, omp's `{type:'session'}` header.
  *
- * claude `-p --output-format json` prints one JSON object to stdout with a
- * top-level `session_id`. codex and omp `--json`/`--mode json` stream
+ * codex and omp `--json`/`--mode json` stream
  * newline-delimited JSON events; both are scanned line by line for the
  * first event carrying the relevant id. No spike report backs the exact
  * codex/omp event shapes the way `lib/harness/session.js` is pinned to
@@ -30,22 +28,6 @@ function parseJsonLines(text) {
   return records;
 }
 
-function extractClaudeSessionId(stdout) {
-  const trimmed = String(stdout || '').trim();
-  if (!trimmed) return null;
-  try {
-    const parsed = JSON.parse(trimmed);
-    return typeof parsed?.session_id === 'string' && parsed.session_id ? parsed.session_id : null;
-  } catch {
-    // Fall back to a line scan in case stdout carries extra log lines
-    // around the single JSON result object.
-    for (const record of parseJsonLines(trimmed)) {
-      if (typeof record?.session_id === 'string' && record.session_id) return record.session_id;
-    }
-    return null;
-  }
-}
-
 function extractCodexThreadId(stdout) {
   for (const record of parseJsonLines(stdout)) {
     const direct = record?.thread_id;
@@ -66,12 +48,11 @@ function extractOmpSessionId(stdout) {
 }
 
 /**
- * @param {'claude'|'codex'|'omp'} harness
+ * @param {'codex'|'omp'} harness
  * @param {string} stdout the child process's captured stdout
  * @returns {string|null}
  */
 function extractSessionId(harness, stdout) {
-  if (harness === 'claude') return extractClaudeSessionId(stdout);
   if (harness === 'codex') return extractCodexThreadId(stdout);
   if (harness === 'omp') return extractOmpSessionId(stdout);
   return null;

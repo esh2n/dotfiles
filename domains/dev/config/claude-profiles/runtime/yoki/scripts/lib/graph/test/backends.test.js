@@ -6,7 +6,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const claude = require('../backends/claude');
 const codex = require('../backends/codex');
 const omp = require('../backends/omp');
 const mock = require('../backends/mock');
@@ -14,39 +13,6 @@ const mock = require('../backends/mock');
 // ---------------------------------------------------------------------------
 // argv construction only — NO process is ever spawned in this section.
 // ---------------------------------------------------------------------------
-
-test('claude backend: base argv shape', () => {
-  const { cmd, args } = claude.buildArgv({ prompt: 'hello there', model: 'sonnet', cwd: '/tmp' });
-  assert.equal(cmd, 'claude');
-  assert.deepEqual(args.slice(0, 4), ['-p', 'hello there', '--output-format', 'json']);
-  assert.ok(args.includes('--model'));
-  assert.equal(args[args.indexOf('--model') + 1], 'sonnet');
-});
-
-test('claude backend: --json-schema is added natively when a schema is given', () => {
-  const schema = { type: 'object', required: ['ok'] };
-  const { args } = claude.buildArgv({ prompt: 'p', model: 'opus', schema });
-  const i = args.indexOf('--json-schema');
-  assert.ok(i !== -1);
-  assert.deepEqual(JSON.parse(args[i + 1]), schema);
-});
-
-test('claude backend: --agent is used for agentType instead of a text preamble', () => {
-  const { args } = claude.buildArgv({ prompt: 'p', agentType: 'code-reviewer' });
-  const i = args.indexOf('--agent');
-  assert.ok(i !== -1);
-  assert.equal(args[i + 1], 'code-reviewer');
-});
-
-test('claude backend: --effort passed through when given', () => {
-  const { args } = claude.buildArgv({ prompt: 'p', effort: 'high' });
-  assert.equal(args[args.indexOf('--effort') + 1], 'high');
-});
-
-test('claude backend: extractText unwraps the --output-format json envelope', () => {
-  assert.equal(claude.extractText('{"type":"result","result":"the answer"}'), 'the answer');
-  assert.equal(claude.extractText('not json'), 'not json');
-});
 
 test('codex backend: base argv shape — --skip-git-repo-check, -C <cwd>, read-only, --json, stdin ("-")', () => {
   // a concrete model id (not a haiku/sonnet/opus tier) passes straight
@@ -105,37 +71,6 @@ test('codex backend: agent() opts.sandbox reaches buildArgv through run()', asyn
   assert.equal(captured[1][captured[1].indexOf('-s') + 1], 'workspace-write');
 });
 
-// claude and omp used to take no sandbox argument at all: `opts.sandbox` was
-// accepted by api.js, passed down, and dropped on the floor — so the
-// least-privilege default was a property of the codex backend rather than of
-// the graph API. Both now enforce read-only through their own CLI's
-// tool-restriction flag.
-
-test('claude backend: sandbox defaults to read-only and denies every write tool', () => {
-  assert.equal(claude.DEFAULT_SANDBOX, 'read-only');
-  const { args } = claude.buildArgv({ prompt: 'p' });
-  const i = args.indexOf('--disallowedTools');
-  assert.ok(i !== -1, 'the default must actually restrict the run');
-  const denied = args[i + 1].split(',');
-  for (const tool of ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task']) {
-    assert.ok(denied.includes(tool), `${tool} must be denied`);
-  }
-  // Task is on the list because a subagent gets its own argv: a read-only
-  // call that can still spawn one is one hop from full write access.
-  assert.deepEqual(denied, ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task']);
-});
-
-test('claude backend: a script that writes asks for it per call', () => {
-  const { args } = claude.buildArgv({ prompt: 'p', sandbox: 'workspace-write' });
-  assert.ok(!args.includes('--disallowedTools'));
-});
-
-test('claude backend: an unknown sandbox is a hard error, never a silent widening', () => {
-  assert.throws(() => claude.buildArgv({ prompt: 'p', sandbox: 'yolo' }), /unknown sandbox "yolo"/);
-  assert.equal(claude.resolveSandbox(''), 'read-only');
-  assert.equal(claude.resolveSandbox(undefined), 'read-only');
-});
-
 test('omp backend: sandbox defaults to read-only via the --tools allow-list', () => {
   assert.equal(omp.DEFAULT_SANDBOX, 'read-only');
   const { args } = omp.buildArgv({ prompt: 'p' });
@@ -162,45 +97,41 @@ test('omp backend: an unknown sandbox is a hard error, never a silent widening',
 
 test('every real backend expresses read-only in its argv — none accepts and discards it', () => {
   const argvs = [
-    claude.buildArgv({ prompt: 'p', sandbox: 'read-only' }).args,
     codex.buildArgv({ cwd: '/repo', sandbox: 'read-only' }).args,
     omp.buildArgv({ prompt: 'p', sandbox: 'read-only' }).args,
   ];
   for (const args of argvs) {
     assert.ok(
-      args.includes('-s') || args.includes('--disallowedTools') || args.includes('--tools'),
+      args.includes('-s') || args.includes('--tools'),
       `argv must carry a restriction: ${args.join(' ')}`
     );
   }
 });
 
-test('claude/omp backends: agent() opts.sandbox reaches buildArgv through run()', async () => {
+test('omp backend: agent() opts.sandbox reaches buildArgv through run()', async () => {
   const { createApi } = require('../api');
-  for (const backendModule of [claude, omp]) {
-    const captured = [];
-    const backend = {
-      name: backendModule.name,
-      supportsSchemaNatively: backendModule.supportsSchemaNatively,
-      run: async (call) => {
-        captured.push(backendModule.buildArgv({ prompt: call.prompt, cwd: call.cwd, sandbox: call.sandbox }).args);
-        return { raw: 'ok', durationMs: 1, exitCode: 0 };
-      },
-      extractText: (raw) => raw,
-    };
-    const api = createApi({
-      runId: 'r1',
-      journal: { getCached: () => undefined, append: () => {}, tokensSpent: () => 0 },
-      backend,
-      cwd: '/repo',
-      emit: () => {},
-    });
-    await api.agent('read something', { label: 'reader' });
-    await api.agent('write something', { label: 'writer', sandbox: 'workspace-write' });
+  const captured = [];
+  const backend = {
+    name: omp.name,
+    supportsSchemaNatively: omp.supportsSchemaNatively,
+    run: async (call) => {
+      captured.push(omp.buildArgv({ prompt: call.prompt, cwd: call.cwd, sandbox: call.sandbox }).args);
+      return { raw: 'ok', durationMs: 1, exitCode: 0 };
+    },
+    extractText: (raw) => raw,
+  };
+  const api = createApi({
+    runId: 'r1',
+    journal: { replayAt: () => undefined, append: () => {}, tokensSpent: () => 0 },
+    backend,
+    cwd: '/repo',
+    emit: () => {},
+  });
+  await api.agent('read something', { label: 'reader' });
+  await api.agent('write something', { label: 'writer', sandbox: 'workspace-write' });
 
-    const restrictionFlag = backendModule === claude ? '--disallowedTools' : '--tools';
-    assert.ok(captured[0].includes(restrictionFlag), `${backendModule.name}: default call must be restricted`);
-    assert.ok(!captured[1].includes(restrictionFlag), `${backendModule.name}: workspace-write call must not be`);
-  }
+  assert.ok(captured[0].includes('--tools'), 'default call must be restricted');
+  assert.ok(!captured[1].includes('--tools'), 'workspace-write call must not be');
 });
 
 test('codex backend: --output-schema <tmpfile> is added natively when a schema is given', () => {
@@ -255,8 +186,7 @@ test('omp backend: agentType folds into the prompt as a preamble (no --agent fla
   assert.match(finalPrompt, /the task$/);
 });
 
-test('claude/codex both support schema natively; omp/mock differ as documented', () => {
-  assert.equal(claude.supportsSchemaNatively, true);
+test('codex supports schema natively; omp/mock differ as documented', () => {
   assert.equal(codex.supportsSchemaNatively, true);
   assert.equal(omp.supportsSchemaNatively, false);
   assert.equal(mock.supportsSchemaNatively, true);
@@ -404,33 +334,6 @@ test('omp backend: a file-defined agentType folds its stripped body into the pro
 // where it was pinned.
 // ---------------------------------------------------------------------------
 
-test('claude backend: extractUsage reads the envelope usage block and total_cost_usd', () => {
-  const raw = JSON.stringify({
-    type: 'result',
-    result: 'the answer',
-    total_cost_usd: 0.0421,
-    usage: {
-      input_tokens: 120,
-      cache_creation_input_tokens: 40,
-      cache_read_input_tokens: 900,
-      output_tokens: 310,
-    },
-  });
-  const usage = claude.extractUsage(raw);
-  assert.equal(usage.totalTokens, 1370);
-  assert.equal(usage.inputTokens, 120);
-  assert.equal(usage.outputTokens, 310);
-  assert.equal(usage.cacheRead, 900);
-  assert.equal(usage.costUsd, 0.0421);
-});
-
-test('claude backend: extractUsage on the UNWRAPPED answer text reports nothing (the old silent-zero bug)', () => {
-  // extractText hands back `result`, a bare string; usage only exists on the
-  // envelope, which is why api.js reads usage BEFORE unwrapping.
-  assert.equal(claude.extractUsage('the answer'), null);
-  assert.equal(claude.extractUsage('not json at all'), null);
-});
-
 test('codex backend: extractUsage sums turn.completed usage across turns', () => {
   const raw = [
     JSON.stringify({ type: 'item.completed', item: { text: 'thinking' } }),
@@ -476,7 +379,7 @@ test('omp backend: extractUsage sums assistant records when handed a session-sha
 });
 
 test('every real backend exposes extractUsage; the mock deliberately does not', () => {
-  for (const backend of [claude, codex, omp]) {
+  for (const backend of [codex, omp]) {
     assert.equal(typeof backend.extractUsage, 'function', `${backend.name} has no extractUsage`);
   }
   // The mock spawns nothing and has no provider to report usage — api.js

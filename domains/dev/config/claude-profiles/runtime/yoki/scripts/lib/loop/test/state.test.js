@@ -37,8 +37,8 @@ test('readRuns: [] when the file does not exist yet', () => {
 
 test('appendRun + readRuns: round-trips one JSON row per line, in order', () => {
   withTempHome((env) => {
-    const row1 = { ts: '2026-01-01T00:00:00.000Z', harness: 'claude', cmd: ['claude', '-p', 'a'], exit: 0, durationMs: 10, sessionId: 's1' };
-    const row2 = { ts: '2026-01-01T00:01:00.000Z', harness: 'claude', cmd: ['claude', '-p', 'b'], exit: 1, durationMs: 20, sessionId: null };
+    const row1 = { ts: '2026-01-01T00:00:00.000Z', harness: 'omp', cmd: ['omp', '-p', 'a'], exit: 0, durationMs: 10, sessionId: 's1' };
+    const row2 = { ts: '2026-01-01T00:01:00.000Z', harness: 'omp', cmd: ['omp', '-p', 'b'], exit: 1, durationMs: 20, sessionId: null };
     state.appendRun('demo', row1, env);
     state.appendRun('demo', row2, env);
     assert.deepEqual(state.readRuns('demo', env), [row1, row2]);
@@ -112,13 +112,13 @@ test('promptPlaceholder: stable for the same prompt, different for a different o
 
 test('redactPromptArgv: swaps only the prompt token, keeps every other one verbatim', () => {
   const prompt = 'check CI for secret-project';
-  const argv = ['claude', '-p', prompt, '--output-format', 'json', '--model', 'sonnet'];
+  const argv = ['omp', '-p', prompt, '--mode', 'json', '--model', 'sonnet'];
   const redacted = state.redactPromptArgv(argv, prompt);
   assert.deepEqual(redacted, [
-    'claude',
+    'omp',
     '-p',
     state.promptPlaceholder(prompt),
-    '--output-format',
+    '--mode',
     'json',
     '--model',
     'sonnet',

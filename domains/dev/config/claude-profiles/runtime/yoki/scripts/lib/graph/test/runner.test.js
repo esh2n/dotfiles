@@ -204,3 +204,37 @@ test('the daily-cap guard denies a run once the cap is reached', () => withIsola
     delete process.env.YOKI_WORKFLOW_DAILY_CAP;
   }
 }));
+
+// ---------------------------------------------------------------------------
+// The claude backend was removed: inside Claude Code the native Workflow tool
+// is the supported path, so shelling out to `claude -p` was a second,
+// unsupported one. The refusal names the alternative instead of reporting an
+// unknown value, so a stale `--backend claude` invocation is told what to do.
+// ---------------------------------------------------------------------------
+
+test('--backend claude is refused by name, pointing at the native Workflow tool', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'x.js', `export const meta = { name: 'x', description: 'd' }
+return 1`);
+  await assert.rejects(
+    () => runner.executeScript({ scriptPath, args: {}, backendName: 'claude', cwd }),
+    (err) => {
+      assert.match(err.message, /claude backend was removed/);
+      assert.match(err.message, /native Workflow tool/);
+      assert.match(err.message, /codex, omp, mock/);
+      return true;
+    },
+  );
+  assert.throws(() => runner.loadBackend('claude'), /claude backend was removed/);
+  assert.equal(runner.CLAUDE_BACKEND_REFUSAL.includes('native Workflow tool'), true);
+}));
+
+test('an unrecognised backend still gets the generic message, listing only what remains', () => {
+  assert.throws(() => runner.loadBackend('gemini'), /unknown backend "gemini" \(expected codex\|omp\|mock\)/);
+  assert.equal(typeof runner.loadBackend('codex').run, 'function');
+  assert.equal(typeof runner.loadBackend('omp').run, 'function');
+  assert.equal(typeof runner.loadBackend('mock').run, 'function');
+});
+
+test('backends/claude.js is gone from disk, not merely unreferenced', () => {
+  assert.equal(fs.existsSync(path.join(__dirname, '..', 'backends', 'claude.js')), false);
+});

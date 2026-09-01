@@ -58,38 +58,42 @@ test('real run: appends a runs.jsonl row with the parsed sessionId', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
       const result = runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: 'hi', dotfilesRoot, env },
-        { spawn: okSpawn(JSON.stringify({ session_id: 'sess-1' })) }
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: 'hi', dotfilesRoot, env },
+        // omp's session id arrives as a `{type:'session'}` header line, not
+        // as a top-level field on a single result object.
+        { spawn: okSpawn(JSON.stringify({ type: 'session', sessionId: 'sess-1' })) }
       );
       assert.equal(result.dryRun, false);
       assert.equal(result.row.sessionId, 'sess-1');
       assert.equal(result.row.exit, 0);
-      assert.equal(result.row.harness, 'claude');
+      assert.equal(result.row.harness, 'omp');
       assert.deepEqual(state.readRuns('demo', env), [result.row]);
     });
   });
 });
 
 test('--resume: passes the previous run\'s sessionId into the built argv', () => {
+  // codex is the harness that carries a resume id (`resume <thread>`); omp's
+  // headless argv has no resume form at all.
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
       runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: 'first', dotfilesRoot, env },
-        { spawn: okSpawn(JSON.stringify({ session_id: 'sess-1' })) }
+        { name: 'demo', harness: 'codex', cwd: '.', prompt: 'first', dotfilesRoot, env },
+        { spawn: okSpawn(JSON.stringify({ thread_id: 'sess-1' })) }
       );
 
       let seenArgs = null;
       runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: 'second', resume: true, dotfilesRoot, env },
+        { name: 'demo', harness: 'codex', cwd: '.', prompt: 'second', resume: true, dotfilesRoot, env },
         {
           spawn: (cmd, args) => {
             seenArgs = args;
-            return { status: 0, signal: null, stdout: JSON.stringify({ session_id: 'sess-2' }), stderr: '' };
+            return { status: 0, signal: null, stdout: JSON.stringify({ thread_id: 'sess-2' }), stderr: '' };
           },
         }
       );
-      assert.ok(seenArgs.includes('--resume'));
-      assert.equal(seenArgs[seenArgs.indexOf('--resume') + 1], 'sess-1');
+      assert.ok(seenArgs.includes('resume'));
+      assert.equal(seenArgs[seenArgs.indexOf('resume') + 1], 'sess-1');
     });
   });
 });
@@ -99,7 +103,7 @@ test('--resume with no prior run: omits the resume flag entirely', () => {
     withTempDotfilesRoot((dotfilesRoot) => {
       let seenArgs = null;
       runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: 'first', resume: true, dotfilesRoot, env },
+        { name: 'demo', harness: 'codex', cwd: '.', prompt: 'first', resume: true, dotfilesRoot, env },
         {
           spawn: (cmd, args) => {
             seenArgs = args;
@@ -107,7 +111,7 @@ test('--resume with no prior run: omits the resume flag entirely', () => {
           },
         }
       );
-      assert.ok(!seenArgs.includes('--resume'));
+      assert.ok(!seenArgs.includes('resume'));
     });
   });
 });
@@ -138,7 +142,7 @@ test('--model resolves through core/harness-models.json', () => {
 test('daily cap: refuses the run once today\'s count reaches the cap, and appends nothing', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
-      const opts = { name: 'demo', harness: 'claude', cwd: '.', prompt: 'hi', maxRuns: 1, dotfilesRoot, env };
+      const opts = { name: 'demo', harness: 'omp', cwd: '.', prompt: 'hi', maxRuns: 1, dotfilesRoot, env };
       runner.run(opts, { spawn: okSpawn('{}') });
 
       assert.throws(() => runner.run(opts, { spawn: okSpawn('{}') }), runner.DailyCapError);
@@ -150,7 +154,7 @@ test('daily cap: refuses the run once today\'s count reaches the cap, and append
 test('daily cap: --dry-run is never blocked by the cap', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
-      const opts = { name: 'demo', harness: 'claude', cwd: '.', prompt: 'hi', maxRuns: 1, dotfilesRoot, env };
+      const opts = { name: 'demo', harness: 'omp', cwd: '.', prompt: 'hi', maxRuns: 1, dotfilesRoot, env };
       runner.run(opts, { spawn: okSpawn('{}') });
 
       assert.doesNotThrow(() =>
@@ -164,7 +168,7 @@ test('a nonzero exit is recorded, not thrown', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
       const result = runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: 'hi', dotfilesRoot, env },
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: 'hi', dotfilesRoot, env },
         { spawn: () => ({ status: 1, signal: null, stdout: '{}', stderr: 'boom' }) }
       );
       assert.equal(result.row.exit, 1);
@@ -196,14 +200,14 @@ function captureChildOptions(runOptions, env, dotfilesRoot) {
 test('every spawned child gets YOKI_UNATTENDED=1 in its environment', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
-      const options = captureChildOptions({ name: 'demo', harness: 'claude' }, env, dotfilesRoot);
+      const options = captureChildOptions({ name: 'demo', harness: 'omp' }, env, dotfilesRoot);
       assert.equal(options.env.YOKI_UNATTENDED, '1');
     });
   });
 });
 
 test('the unattended flag is set on every harness, not just codex', () => {
-  for (const harness of ['claude', 'codex', 'omp']) {
+  for (const harness of ['codex', 'omp']) {
     withTempHome((env) => {
       withTempDotfilesRoot((dotfilesRoot) => {
         const options = captureChildOptions({ name: `demo-${harness}`, harness }, env, dotfilesRoot);
@@ -217,7 +221,7 @@ test('the rest of the runner environment is inherited, not replaced, by the unat
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
       const options = captureChildOptions(
-        { name: 'demo', harness: 'claude' },
+        { name: 'demo', harness: 'omp' },
         { ...env, SOME_EXISTING_VAR: 'kept' },
         dotfilesRoot
       );
@@ -249,15 +253,17 @@ function readRawLog(env) {
   return fs.readFileSync(state.runsPath('demo', env), 'utf8');
 }
 
-test('claude: the recorded row carries a prompt fingerprint, not the prompt', () => {
+test('omp: the recorded row carries a prompt fingerprint, not the prompt', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
       const { row } = runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
         { spawn: okSpawn(JSON.stringify({ session_id: 'sess-1' })) }
       );
       const placeholder = state.promptPlaceholder(SECRET_PROMPT);
-      assert.deepEqual(row.cmd, ['claude', '-p', placeholder, '--output-format', 'json']);
+      assert.equal(row.cmd[0], 'omp');
+      assert.ok(row.cmd.includes(placeholder), 'the argv must carry the placeholder, not the prompt');
+      assert.ok(!row.cmd.includes(SECRET_PROMPT));
       assert.equal(row.prompt, placeholder);
       // The file on disk, not just the in-memory row.
       const raw = readRawLog(env);
@@ -309,15 +315,15 @@ test('the same prompt fingerprints identically across runs; a changed one does n
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {
       const first = runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
         { spawn: okSpawn('{}') }
       ).row;
       const second = runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: SECRET_PROMPT, dotfilesRoot, env },
         { spawn: okSpawn('{}') }
       ).row;
       const changed = runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: `${SECRET_PROMPT}!`, dotfilesRoot, env },
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: `${SECRET_PROMPT}!`, dotfilesRoot, env },
         { spawn: okSpawn('{}') }
       ).row;
       assert.equal(first.prompt, second.prompt);
@@ -331,7 +337,7 @@ test('--dry-run still prints the real prompt: that goes to a terminal, not a log
     withTempDotfilesRoot((dotfilesRoot) => {
       let printed = '';
       runner.run(
-        { name: 'demo', harness: 'claude', cwd: '.', prompt: SECRET_PROMPT, dryRun: true, dotfilesRoot, env },
+        { name: 'demo', harness: 'omp', cwd: '.', prompt: SECRET_PROMPT, dryRun: true, dotfilesRoot, env },
         { spawn: () => { throw new Error('must not spawn'); }, writeOut: (t) => { printed += t; } }
       );
       assert.ok(printed.includes('acme-corp'));

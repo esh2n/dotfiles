@@ -25,8 +25,13 @@ const state = require('./state');
 const plist = require('./plist');
 const inbox = require('./inbox');
 const runner = require('./runner');
+const argvLib = require('./argv');
 
-const VALID_HARNESSES = new Set(['claude', 'codex', 'omp']);
+// `claude` is deliberately not here: Claude Code has native /loop and
+// scheduled routines, so a headless `claude -p` loop was a second,
+// unsupported path to the same thing. It is refused BY NAME below rather
+// than falling into the generic unknown-value message.
+const VALID_HARNESSES = new Set(['codex', 'omp']);
 const LAUNCH_AGENTS_DIR_SEGMENTS = ['Library', 'LaunchAgents'];
 const STATUS_RUN_LIMIT = 10;
 
@@ -154,8 +159,9 @@ function resolvePrompt(options, env) {
 function cmdRun(name, options, ctx) {
   const { dotfilesRoot, env, stdout, stderr } = ctx;
 
+  if (options.harness === 'claude') throw usageError(argvLib.CLAUDE_HARNESS_REFUSAL);
   if (!options.harness || !VALID_HARNESSES.has(options.harness)) {
-    throw usageError('yoki-loop run: --harness must be one of claude, codex, omp');
+    throw usageError('yoki-loop run: --harness must be one of codex, omp');
   }
   if (!options.cwd) throw usageError('yoki-loop run: --cwd is required');
 

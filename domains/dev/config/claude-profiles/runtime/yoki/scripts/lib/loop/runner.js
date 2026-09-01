@@ -61,7 +61,7 @@ function formatArgvLine(cmd, args) {
 /**
  * @param {object} options
  * @param {string} options.name loop name (state directory / plist label)
- * @param {'claude'|'codex'|'omp'} options.harness
+ * @param {'codex'|'omp'} options.harness
  * @param {string} options.cwd
  * @param {string} options.prompt
  * @param {string} [options.model] a tier or a concrete model id

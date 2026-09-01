@@ -10,9 +10,8 @@
  * for it, kept so callers (runner.js, its tests) need not know where the
  * shared reader lives.
  *
- * Claude has no entry in that file — its own `--model` already accepts the
- * tier names (haiku/sonnet/opus) or a full model id, so a `claude` harness
- * always passes the given value straight through.
+ * A tier with no entry for the harness passes straight through, on the
+ * assumption that it is already a concrete model id.
  */
 
 const { loadHarnessModels, resolveModel, clearCache } = require('../harness-models');

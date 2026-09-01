@@ -109,8 +109,8 @@ function markConsumed(totalLines, env = process.env, now = new Date()) {
  * The prompt for `--prompt-from-artifact-inbox`.
  *
  * Every word here is a security control, because this string is the ENTIRE
- * prompt of an unattended run (launchd → `yoki-loop run` → `claude -p` /
- * `codex exec`), and the comment bodies inside it are written by whoever the
+ * prompt of an unattended run (launchd → `yoki-loop run` → `codex exec` /
+ * `omp -p`), and the comment bodies inside it are written by whoever the
  * artifact was shared with. So it is framed exactly the way
  * hooks/artifact-comments.js frames the same bodies, through the same
  * lib/untrusted-text.js helpers: bodies escaped and length-capped inside

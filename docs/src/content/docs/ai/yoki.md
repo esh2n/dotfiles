@@ -67,9 +67,9 @@ Claude Code はほぼ全機能をネイティブに持つ基準点。Codex と o
 | Rules | `~/.claude/rules` を直接使用 | `AGENTS.md` ブロックに `paths:` frontmatter の無い rule だけ埋め込み | `RULES.md` マネージドブロック（omp は `~/.claude/rules` を読まないため） |
 | 通知 | `Notification` hook | `config.toml` の `notify` | `tool_approval_requested`（`permission_prompt` matcher のみ） |
 | ステータス行 | `personal/scripts/statusline.sh` | **非対応** — 書き込み先となるstatus line自体が無い | `config.yml` の `statusLine.leftSegments`/`rightSegments` で近似 |
-| Workflow（yoki-graph） | ネイティブ Workflow tool | `yoki-graph run --backend codex` | `yoki-graph run --backend omp` |
+| Workflow（yoki-graph） | ネイティブ Workflow tool（yoki-graph に `claude` backend は無い） | `yoki-graph run --backend codex` | `yoki-graph run --backend omp` |
 | Artifact（yoki-artifact） | ネイティブ Artifact tool | `yoki-artifact` CLI（harnessを問わず共通） | `yoki-artifact` CLI（harnessを問わず共通） |
-| 定期実行（yoki-loop） | `/loop`（セッション内蔵） | `yoki-loop`（launchd/cronから呼ぶ外側のheadlessランナー） | `yoki-loop`（同左） |
+| 定期実行（yoki-loop） | `/loop`（セッション内蔵。yoki-loop に `claude` harness は無い） | `yoki-loop`（launchd/cronから呼ぶ外側のheadlessランナー） | `yoki-loop`（同左） |
 | `Interrupt` hook | ネイティブ | `codex >= 0.150.0` のみ（古い場合は警告付きでhooks.jsonから除外） | **非対応** |
 | `PermissionRequest` | ネイティブ | イベント自体はあるが **headless の `codex exec` からは届かない**（TUIのみ到達可能） | 相当する `tool_approval_requested` はあるが、**headless（`-p`）にはTTYが無く割り込み系イベントは届かない** |
 | プロジェクトローカル設定の自動読み込み | `.claude/settings.json` / `.yoki.json` | `.codex/` は信頼プロンプトを経由（Codex側仕様） | **非対応な前提として扱う** — `.omp/` は omp 18.0.4 で信頼プロンプト無しに自動読み込みされるため、生成器は意図的にプロジェクト直下の `.omp/` へは何も書かない |

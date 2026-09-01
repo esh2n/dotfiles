@@ -312,6 +312,11 @@ yoki-graph list
 yoki-graph status <runId>
 ```
 
+backend は `codex` / `omp` / `mock` の3つ。`claude` backend は削除した —
+Claude Code の中ではネイティブの Workflow tool が唯一のサポート経路で、
+`claude -p` を叩くのはそれと二重の非サポート経路になるため
+(`--backend claude` はその旨を名指しで拒否する)。
+
 ### yoki-loop
 
 Codex/omp には Claude Code の `/loop` に相当するセッション内蔵の定期実行が
@@ -456,9 +461,10 @@ Claude Code は `/loop`(このリポジトリの core skill)でセッション�
 
 ```bash
 yoki-loop run demo --harness codex --cwd . --prompt "check CI" --dry-run
-#   claude|codex|omp ごとに、そのCLIのheadlessコマンドを組み立てて実行
-#   (claude: -p --output-format json、codex: exec --json、stdinでprompt、
+#   codex|omp ごとに、そのCLIのheadlessコマンドを組み立てて実行
+#   (codex: exec --json、stdinでprompt、
 #   omp: -p --mode json --no-extensions -e <yoki-bridge.ts> でguardを維持)
+#   --harness claude は無い: Claude Code は /loop と定期実行を自前で持つ
 #   --model はcore/harness-models.jsonで tier -> harness別モデルIDに変換
 #   --resume はそのloop名の最後のsessionId(runs.jsonlから)を渡す
 #   --prompt-from-artifact-inbox は yoki-artifact の未読コメントを
@@ -504,7 +510,7 @@ loop の実行は定義上「誰も見ていないエージェント実行」な
 (フラグが無いと guard は即 `exit 0` して何もしない)。
 `.yoki.json` の `"unattended": true` は同じ意味の宣言。
 
-### `--sandbox` は3ハーネスすべてに効く
+### `--sandbox` は両ハーネスに効く
 
 `--sandbox` は codex 固有ではない。既定は `workspace-write`(loop は
 リポジトリでの常設作業が目的)だが、`read-only` を指定したときに黙って
@@ -513,7 +519,6 @@ loop の実行は定義上「誰も見ていないエージェント実行」な
 | harness | `read-only` の表現 | `workspace-write` / `danger-full-access` |
 | --- | --- | --- |
 | codex | `-s read-only`(ネイティブ) | `-s <mode>` |
-| claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash,Task` | 追加フラグ無し(CLI既定) |
 | omp | `--tools read,grep,glob,web_search`(許可リスト) | 追加フラグ無し |
 
 不正な値はどのハーネスでもエラー。これは

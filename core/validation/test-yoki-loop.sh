@@ -120,7 +120,7 @@ check_dry_run_argv() {
     local home="${FIXTURE_DIR}/home-dry"
     mkdir -p "$home"
 
-    local codex_out claude_out
+    local codex_out omp_out claude_rc claude_out
     codex_out="$(HOME="$home" "$LOOP_BIN" run demo --harness codex --cwd . --prompt 'hi' --dry-run 2>&1)" || {
         fail "case2: yoki-loop run --dry-run (codex) exits 0"
         log_error "$codex_out"
@@ -130,9 +130,25 @@ check_dry_run_argv() {
     assert_contains "case3: codex argv keeps --skip-git-repo-check and prompt-on-stdin" \
         "codex exec --skip-git-repo-check -C . -s workspace-write --json -" "$codex_out"
 
-    claude_out="$(HOME="$home" "$LOOP_BIN" run demo --harness claude --cwd . --prompt 'hi' --dry-run 2>&1)" || true
-    assert_contains "case4: claude argv is -p <prompt> --output-format json" \
-        "claude -p hi --output-format json" "$claude_out"
+    omp_out="$(HOME="$home" "$LOOP_BIN" run demo --harness omp --cwd . --prompt 'hi' --dry-run 2>&1)" || true
+    assert_contains "case4: omp argv keeps the bridge extension and the trailing prompt" \
+        "omp -p --mode json --no-extensions -e" "$omp_out"
+
+    # The claude harness was removed: Claude Code has native /loop and
+    # scheduled routines, so a headless `claude -p` loop was a second,
+    # unsupported path to the same thing. The refusal must NAME that
+    # alternative, so an existing plist is told what to switch to rather than
+    # just being rejected.
+    claude_rc=0
+    claude_out="$(HOME="$home" "$LOOP_BIN" run demo --harness claude --cwd . --prompt 'hi' --dry-run 2>&1)" || claude_rc=$?
+    if [[ "$claude_rc" -ne 0 ]]; then
+        pass "case4b: --harness claude exits non-zero"
+    else
+        fail "case4b: --harness claude exits non-zero"
+    fi
+    assert_contains "case4c: the refusal points at Claude Code's own /loop" \
+        "native /loop" "$claude_out"
+    assert_not_contains "case4d: no claude argv is printed" "claude -p hi" "$claude_out"
 }
 
 # The sandbox flag exists so an unattended inbox-driven loop can be installed

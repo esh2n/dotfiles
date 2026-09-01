@@ -262,10 +262,18 @@ return await agent('go', { label: 'one' })`);
     raw: JSON.stringify({ type: 'result', result: 'answer', total_cost_usd: 0.5, usage: { input_tokens: 300, output_tokens: 200 } }),
     durationMs: 1, exitCode: 0,
   }), async () => {
-    // Borrow the claude envelope reader: what is under test is api.js
-    // preferring a backend's own numbers over an estimate.
+    // A stand-in extractUsage: what is under test is api.js preferring a
+    // backend's own numbers over an estimate, not any one backend's reader.
     const realExtract = mockBackend.extractUsage;
-    mockBackend.extractUsage = require('../backends/claude').extractUsage;
+    mockBackend.extractUsage = (raw) => {
+      const obj = JSON.parse(raw);
+      return {
+        inputTokens: obj.usage.input_tokens,
+        outputTokens: obj.usage.output_tokens,
+        totalTokens: obj.usage.input_tokens + obj.usage.output_tokens,
+        costUsd: obj.total_cost_usd,
+      };
+    };
     try {
       return await runner.executeScript({ scriptPath, args: {}, backendName: 'mock', cwd, emit: (e) => events.push(e) });
     } finally {

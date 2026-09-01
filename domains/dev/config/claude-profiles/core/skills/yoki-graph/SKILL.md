@@ -20,6 +20,13 @@ Workflow tool と同一 — スクリプトを書くのはこのスキルの仕�
   同じグラフを起動したいとき
 - CLI から `--resume` / `--json` / `status` でランを直接触りたいとき
 
+backend は `codex` / `omp` / `mock` の3つ。**`claude` backend は無い** —
+Claude Code の中ではネイティブの Workflow tool が唯一のサポート経路で、
+`claude -p` を叩くのはそれと二重の非サポート経路になる(かつ従量課金に
+移る可能性がある)ため。`--backend claude` を渡すとその旨を名指しで拒否して
+exit 1 になる。同じ理由で yoki-loop からも `--harness claude` を外した
+(Claude Code は `/loop` と定期実行を自前で持つ)。
+
 ## いつワークフロー、いつ単発 subagent か
 
 `core/CLAUDE.layer.md`(Expensive-Model Delegation)の原則そのまま:
@@ -37,7 +44,7 @@ Workflow tool と同一 — スクリプトを書くのはこのスキルの仕�
 ## コマンド
 
 ```
-yoki-graph run <name|path> --backend claude|codex|omp|mock
+yoki-graph run <name|path> --backend codex|omp|mock
     [--args '<json>' | --args-file <f>] [--cwd <dir>]
     [--resume <runId>] [--dry-run] [--json] [--concurrency N]
     [--model haiku|sonnet|opus|<id>] [--effort low|medium|high|xhigh|max]
@@ -75,7 +82,7 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
 - **implement** — 合意済みタスクリストのバッチ実行(依存波・ファイル重複
   バッチ・per-task verify+retry・最終ゲート・任意 delivery)
   ```
-  yoki-graph run implement --backend claude --args '{"tasksFile":"tasks.md","delivery":"none"}'
+  yoki-graph run implement --backend codex --args '{"tasksFile":"tasks.md","delivery":"none"}'
   ```
   `args: { tasks?: [{id,title,spec,files?,deps?}], tasksFile?: string,
   rules?: [path], docs?: [path], model?: string, max_retry?: number,
@@ -96,7 +103,7 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
 
 - **acceptance** — 実装済みの完了判定(基準ごとの証拠マッピング + 敵対的検証)
   ```
-  yoki-graph run acceptance --backend claude --args '{"criteriaFile":"acceptance.md","scope":"..."}'
+  yoki-graph run acceptance --backend codex --args '{"criteriaFile":"acceptance.md","scope":"..."}'
   ```
   `args: { criteria?: [{id,text}], criteriaFile?: string, scope?: string,
   out?: string, language?: string, model?: string }`
@@ -117,14 +124,14 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
 
 - **stocktake** — `~/.claude` の定期棚卸し(skills/hooks/MCP/memory、report-only)
   ```
-  yoki-graph run stocktake --backend claude
+  yoki-graph run stocktake --backend omp
   ```
   `args: { model?: string, language?: string }`
 
 - **go-optimize**(go pack 有効時のみ)— pprof 起点の Go 性能最適化提案、
   worktree 隔離 + benchstat ゲート
   ```
-  yoki-graph run go-optimize --backend claude --args '{"pkg":"./internal/codec"}'
+  yoki-graph run go-optimize --backend codex --args '{"pkg":"./internal/codec"}'
   ```
   `args: { pkg: string (必須), bench?: string, threshold?: number,
   budget?: {maxProposals?, maxRounds?}, delivery?: 'draft' | 'commit' | 'pr',
@@ -155,9 +162,8 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
   backend 固有の実行を検証したことにはならない点に注意。
 - 拒否されると exit code 1、標準出力に理由(トークン消費の目安つき)が出る。
 
-## sandbox(codex backend の書き込み権限)
+## sandbox(agent() ごとの書き込み権限)
 
-`--backend codex` のとき、`agent()` は `codex exec -s <sandbox>` で走る。
 **デフォルトは `read-only`**(codex 自身のデフォルトと同じ)。
 書き込む呼び出しだけがスクリプト側で明示的に要求する:
 
@@ -172,8 +178,10 @@ await agent(prompt, { label: 'impl:t1', sandbox: 'workspace-write' })
 - 実際に `workspace-write` を要求しているのは、編集・コミット・ビルド/テスト
   実行・レポート書き出しの段だけ。レビュー/調査/検証の段は read-only のまま
   — これらのプロンプトは diff hunk や取得した外部テキストで組み立てられる。
-- `claude` / `omp` バックエンドには対応するフラグが無いので、この option は
-  無視される。
+- どのバックエンドも黙って無視しない: codex は `-s <mode>`(ネイティブ)、
+  omp は `--tools read,grep,glob,web_search` の許可リストで read-only を
+  表現する。`workspace-write` / `danger-full-access` は omp では追加フラグ
+  無し(それ自身の既定より広い権限が無いため)。
 
 ## journal の読み方 / `--resume` は prefix 再生
 
@@ -267,7 +275,8 @@ delivery 選択を得てから `--args` に載せる。
 ## よくある失敗
 
 - **Claude Code の中なのに yoki-graph に切り替える** — ネイティブの
-  Workflow tool がそのまま使える。harness をまたぐ必要が無いなら回り道。
+  Workflow tool がそのまま使える。harness をまたぐ必要が無いなら回り道で、
+  そもそも `--backend claude` は存在しない(拒否される)。
 - **`--args` に文字列化した JSON を二重にエスケープして渡す** — 各
   スクリプトは `typeof A === 'string'` なら自分で `JSON.parse` する保険を
   持っているが、それに頼らず `--args '<JSON>'` はそのまま JSON として渡す。

@@ -9,26 +9,32 @@ const {
   ompGuardPath,
   resolveSandbox,
   DEFAULT_SANDBOX,
-  CLAUDE_READ_ONLY_DENIED_TOOLS,
+  CLAUDE_HARNESS_REFUSAL,
   OMP_READ_ONLY_TOOLS,
 } = require('../argv');
 
-test('claude: minimal argv (no model, no resume)', () => {
-  const { cmd, args, stdin } = buildCommand({ harness: 'claude', prompt: 'hello', cwd: '/repo' });
-  assert.equal(cmd, 'claude');
-  assert.deepEqual(args, ['-p', 'hello', '--output-format', 'json']);
-  assert.equal(stdin, null);
+// The claude harness was removed: Claude Code has native /loop and scheduled
+// routines, so a headless `claude -p` loop was a second, unsupported path to
+// the same thing. The refusal names that alternative rather than reporting
+// an unknown value, because an existing plist needs to be told what to use.
+test('claude: refused by name, pointing at Claude Code\'s own /loop', () => {
+  assert.throws(
+    () => buildCommand({ harness: 'claude', prompt: 'hello', cwd: '/repo' }),
+    (err) => {
+      assert.match(err.message, /claude harness was removed/);
+      assert.match(err.message, /native \/loop/);
+      assert.match(err.message, /codex and omp/);
+      return true;
+    },
+  );
+  assert.equal(CLAUDE_HARNESS_REFUSAL, 'yoki-loop: the claude harness was removed — Claude Code has native /loop and scheduled routines; yoki-loop harnesses are codex and omp');
 });
 
-test('claude: adds --model and --resume when given', () => {
-  const { args } = buildCommand({
-    harness: 'claude',
-    prompt: 'hello',
-    cwd: '/repo',
-    model: 'claude-sonnet-5',
-    resumeSessionId: 'sess-1',
-  });
-  assert.deepEqual(args, ['-p', 'hello', '--output-format', 'json', '--model', 'claude-sonnet-5', '--resume', 'sess-1']);
+test('an unrecognised harness still gets the generic message, listing only what remains', () => {
+  assert.throws(
+    () => buildCommand({ harness: 'gemini', prompt: 'hello', cwd: '/repo' }),
+    /unknown harness "gemini" \(expected codex or omp\)/
+  );
 });
 
 test('codex: minimal argv puts the prompt on stdin, not argv, with a trailing "-"', () => {
@@ -84,28 +90,6 @@ test('codex: an unknown --sandbox value is rejected, never silently passed to co
   assert.equal(resolveSandbox(''), 'workspace-write');
 });
 
-test('claude: --sandbox read-only denies every write tool instead of being ignored', () => {
-  const { args } = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'read-only' });
-  const denied = args[args.indexOf('--disallowedTools') + 1];
-  assert.ok(args.includes('--disallowedTools'), 'read-only must reach the claude argv');
-  for (const tool of CLAUDE_READ_ONLY_DENIED_TOOLS) {
-    assert.ok(denied.split(',').includes(tool), `${tool} must be denied`);
-  }
-  // A shell is a write tool — leaving Bash enabled would make this cosmetic.
-  assert.ok(denied.split(',').includes('Bash'));
-  // A subagent does not inherit this argv, so Task is a write path too —
-  // the same reason omp's read-only allow-list omits `task`.
-  assert.ok(denied.split(',').includes('Task'), 'Task must be denied: a subagent would not inherit the restriction');
-  assert.deepEqual(denied.split(','), ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task']);
-});
-
-test('claude: workspace-write (the default) adds no restriction flag', () => {
-  const dflt = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo' });
-  assert.deepEqual(dflt.args, ['-p', 'p', '--output-format', 'json']);
-  const explicit = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'workspace-write' });
-  assert.ok(!explicit.args.includes('--disallowedTools'));
-});
-
 test('omp: --sandbox read-only restricts the tool allow-list instead of being ignored', () => {
   const { args } = buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'read-only' });
   const enabled = args[args.indexOf('--tools') + 1].split(',');
@@ -125,8 +109,7 @@ test('omp: workspace-write (the default) adds no --tools restriction', () => {
   assert.ok(!explicit.args.includes('--tools'));
 });
 
-test('an unknown --sandbox is rejected on claude and omp too, not just codex', () => {
-  assert.throws(() => buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'yolo' }), /unknown --sandbox "yolo"/);
+test('an unknown --sandbox is rejected on omp too, not just codex', () => {
   assert.throws(
     () => buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'yolo' }),
     /unknown --sandbox "yolo"/
@@ -138,12 +121,11 @@ test('no harness silently accepts-and-discards --sandbox read-only', () => {
   // --sandbox read-only` used to validate the flag and then run with full
   // write access. Every harness must show read-only somewhere in its argv.
   const cases = [
-    buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'read-only' }),
     buildCommand({ harness: 'codex', prompt: 'p', cwd: '/repo', sandbox: 'read-only' }),
     buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'read-only' }),
   ];
   for (const { cmd, args } of cases) {
-    const restricted = args.includes('-s') || args.includes('--disallowedTools') || args.includes('--tools');
+    const restricted = args.includes('-s') || args.includes('--tools');
     assert.ok(restricted, `${cmd} must express read-only in its argv`);
   }
 });

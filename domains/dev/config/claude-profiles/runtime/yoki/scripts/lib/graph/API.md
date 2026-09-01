@@ -56,9 +56,9 @@ access from the script body itself (only through `agent()`).
     `const MODEL = (A && A.model) || 'sonnet'` convention for the *script's*
     model tier — the run's own default is analogous, one level up).
   - `opts.effort` — `'low'|'medium'|'high'|'xhigh'|'max'`, passed through to
-    the backend for the tiers that accept it (claude has `--effort`; codex
-    and omp accept reasoning-effort override too where the model supports
-    it, otherwise it's advisory metadata folded into the prompt preamble).
+    the backend for the tiers that accept it (omp has `--thinking`; codex
+    has no such flag, so the value is folded into the prompt preamble and
+    the comment in backends/codex.js says so).
   - `opts.isolation: 'worktree'` — run this one agent() call inside a fresh
     `git worktree`, auto-removed after if the tree is clean.
   - `opts.sandbox` — `'read-only' | 'workspace-write' | 'danger-full-access'`.
@@ -76,14 +76,17 @@ access from the script body itself (only through `agent()`).
     | backend | `read-only` | `workspace-write` / `danger-full-access` |
     | --- | --- | --- |
     | codex | `-s read-only` (native) | `-s <mode>` |
-    | claude | `--disallowedTools Edit,Write,MultiEdit,NotebookEdit,Bash,Task` | no extra flag (the CLI's own default) |
     | omp | `--tools read,grep,glob,web_search` (allow-list) | no extra flag |
     | mock | n/a — nothing is spawned | n/a |
 
     An unknown value is a hard error on every backend, never a silent
-    widening. claude and omp used to accept `opts.sandbox` and discard it,
-    which made the read-only default a property of one harness instead of
-    the API; the flag now reaches all three.
+    widening. omp used to accept `opts.sandbox` and discard it, which made
+    the read-only default a property of one harness rather than of the API.
+  - `opts.timeoutMs` — wall-clock ceiling for this one call. Falls back to
+    the run's `--timeout`, then to a 15-minute default; `0` disables it.
+    A child that runs past it is SIGKILLed, journaled with `timedOut: true`,
+    and (being a transient failure) retried. See "Execution caps, retry and
+    timeouts" below.
   - `opts.agentType` — the actual field name used by scripts (review.js:
     `agentType: 'code-reviewer'`/`'security-reviewer'`/`'go-perf-reviewer'`
     etc.; go-optimize.js: `agentType: 'go-perf-reviewer'`). **Note**: the
@@ -116,11 +119,6 @@ access from the script body itself (only through `agent()`).
   multi-stage script in this repo uses this (research/acceptance/
   design-review/review all pipeline a "produce findings" stage into a
   "verify findings" stage per item).
-  - `opts.timeoutMs` — wall-clock ceiling for this one call. Falls back to
-    the run's `--timeout`, then to a 15-minute default; `0` disables it.
-    A child that runs past it is SIGKILLed, journaled with `timedOut: true`,
-    and (being a transient failure) retried. See "Execution caps, retry and
-    timeouts" below.
 - `budget: {total: number|null, spent(): number, remaining(): number}` — not
   used by any script in this repo today, but is part of the documented
   surface (turn-level token budget from a "+500k"-style directive). There is
@@ -177,6 +175,19 @@ temp-file ESM wrapper. Rationale:
    read `meta.name`/`meta.phases` without executing anything.
 
 See `runner.js` (`compileScript`) for the implementation.
+
+## Backends
+
+`codex`, `omp` and `mock`. There is deliberately no `claude` backend:
+yoki-graph exists to run these scripts from harnesses that have NO Workflow
+tool, and inside Claude Code the native Workflow tool is the supported path.
+Driving `claude -p` from here was a second, unsupported route to the same
+result — one that may move to metered billing — so `--backend claude` is
+refused by name ("inside Claude Code use the native Workflow tool;
+yoki-graph backends are codex, omp, mock") rather than reported as an
+unknown value, and `backends/claude.js` is gone from disk. The same decision
+removed `--harness claude` from yoki-loop, where Claude Code's own `/loop`
+and scheduled routines already cover the need.
 
 ## `--resume`: an index-ordered prefix replay
 
@@ -255,8 +266,7 @@ Each backend reads its own primary source, off the RAW envelope before
 | backend | source |
 | --- | --- |
 | codex | `turn.completed` events in the `--json` stream (summed); falls back to a rollout `token_count` record's `total_token_usage` |
-| claude | the `--output-format json` envelope's `usage` block plus `total_cost_usd` — the only USD figure any backend reports |
-| omp | an assistant record's `usage` (`{input, output, cacheRead, cacheWrite, totalTokens, cost}` — omp's camelCase names, pinned by spike S4-S5-omp.md and read the same way by `lib/harness/session.js`) |
+| omp | an assistant record's `usage` (`{input, output, cacheRead, cacheWrite, totalTokens, cost}` — omp's camelCase names, pinned by spike S4-S5-omp.md and read the same way by `lib/harness/session.js`); `cost` is the only USD figure any backend reports |
 | mock | none — nothing is spawned |
 
 When a backend reports nothing, the call is charged an explicit ESTIMATE
@@ -268,8 +278,9 @@ totals with measured and estimated kept apart, so the numbers can be
 reconciled against the cost tracker without mixing the two.
 
 Reading usage off the unwrapped answer text (the previous behaviour) could
-not work for claude at all — `result` is a bare string with no usage block —
-so `budget.spent()` sat silently at zero.
+not work at all for a backend whose envelope carries the usage block and
+whose `extractText` returns a bare answer string, so `budget.spent()` sat
+silently at zero.
 
 ## Run lock
 
@@ -314,8 +325,8 @@ Every script that ships in this repo — the 9 under `core/workflows/` plus
 surface above for Claude-Code-only assumptions (subagent_type/model-tier
 names, tool availability inside `agent()` calls, absolute paths, reliance on
 the Workflow tool's own arg delivery). **Result: none of these 10 scripts
-needed a functional change to run under `yoki-graph` on any of the three real
-backends.** Every construct they use is already mapped generically:
+needed a functional change to run under `yoki-graph` on either real
+backend.** Every construct they use is already mapped generically:
 
 - Model tiers (`'haiku'|'sonnet'|'opus'`) resolve per backend through
   `core/harness-models.json` (`backends/common.js` `resolveModel`) — scripts
@@ -328,8 +339,8 @@ backends.** Every construct they use is already mapped generically:
   are the only scripts that use this.
 - `schema` enforcement is backend-uniform via `schema.js`'s
   append-instruction/extract/validate/retry-once/hard-fail pipeline, whether
-  the backend enforces it natively (claude, codex) or the instruction is
-  folded into the prompt (omp).
+  the backend enforces it natively (codex) or the instruction is folded into
+  the prompt (omp).
 - `opts.isolation: 'worktree'` (`go-optimize.js`'s Propose phase) is a
   runner-level feature (`worktree.js`, real `git worktree` off `cwd`'s HEAD)
   that doesn't touch the backend at all.
@@ -341,7 +352,7 @@ backends.** Every construct they use is already mapped generically:
   unactionable instruction degrades to an `unknowns`/`unverified` entry
   (scripts already model that path) rather than failing the call. Each
   affected script carries a one-line arg-note documenting this; see the
-  `// backends: claude, codex, omp (via yoki-graph)` comment block each
+  `// backends: codex, omp (via yoki-graph)` comment block each
   script now carries right after its `meta` object.
 
 The one real defect found was **not** a backend-portability issue:

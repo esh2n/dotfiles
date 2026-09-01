@@ -50,12 +50,11 @@ function promptPlaceholder(prompt) {
  * recorded `cmd` stays a faithful record of how the harness was invoked
  * (flags, model, sandbox, resume id) minus the one secret in it.
  *
- * Matching is by whole-token equality, not substring: claude and omp both
- * pass the prompt as its own argv element (`-p <prompt>` / the trailing
- * positional), and a flag that merely happens to contain the prompt's text
- * is not the prompt. codex puts the prompt on stdin, so its argv has
- * nothing to redact — the row's `prompt` field carries the placeholder for
- * that case (and, harmlessly, for the other two).
+ * Matching is by whole-token equality, not substring: omp passes the prompt
+ * as its own argv element (the trailing positional), and a flag that merely
+ * happens to contain the prompt's text is not the prompt. codex puts the
+ * prompt on stdin, so its argv has nothing to redact — the row's `prompt`
+ * field carries the placeholder for that case (and, harmlessly, for omp).
  *
  * @param {string[]} argv
  * @param {string} prompt

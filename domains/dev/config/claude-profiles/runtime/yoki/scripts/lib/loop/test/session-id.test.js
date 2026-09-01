@@ -5,19 +5,6 @@ const assert = require('node:assert/strict');
 
 const { extractSessionId } = require('../session-id');
 
-test('claude: extracts top-level session_id from the single JSON result object', () => {
-  const stdout = JSON.stringify({ type: 'result', session_id: 'abc-123', result: 'done' });
-  assert.equal(extractSessionId('claude', stdout), 'abc-123');
-});
-
-test('claude: null when session_id is absent', () => {
-  assert.equal(extractSessionId('claude', JSON.stringify({ result: 'done' })), null);
-});
-
-test('claude: null on unparsable stdout', () => {
-  assert.equal(extractSessionId('claude', 'not json at all'), null);
-});
-
 test('codex: finds a top-level thread_id in an NDJSON stream', () => {
   const stdout = [
     JSON.stringify({ type: 'thread.started', thread_id: 'thread-42' }),

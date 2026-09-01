@@ -1,14 +1,20 @@
 'use strict';
 
 /**
- * Per-harness headless command construction for yoki-loop (task T19 spec):
+ * Per-harness headless command construction for yoki-loop:
  *
- *   claude: claude -p <prompt> --output-format json [--model m] [--resume <id>]
  *   codex:  codex exec --skip-git-repo-check -C <cwd> -s <sandbox>
  *           --json [-m m] [resume <id>] -        (prompt on stdin, stdin closed —
  *           the S1 spike found `codex exec` hangs without EOF on stdin)
  *   omp:    omp -p --mode json [--model m] --no-extensions
  *           -e ~/.omp/agent/extensions/yoki-bridge.ts <prompt>
+ *
+ * `claude` was a third harness here and is deliberately gone: Claude Code
+ * has its own `/loop` and scheduled routines, so driving it through a
+ * headless `claude -p` was a second, unsupported path to the same thing —
+ * one that may move to metered billing. `--harness claude` is refused by
+ * name (see CLAUDE_HARNESS_REFUSAL) rather than reported as an unknown
+ * value, so an existing launchd plist is told what to use instead.
  *
  * `buildCommand` returns `{cmd, args, stdin}` — `stdin` is the string to
  * write to the child's stdin (then close it) or `null` when the prompt goes
@@ -39,10 +45,10 @@ const SANDBOX_MODES = ['read-only', 'workspace-write', 'danger-full-access'];
  * was previously no way to ask for it.
  *
  * That promise only holds if every harness honours the flag. codex has a
- * native `-s`; claude and omp do not, so read-only is expressed there
- * through each CLI's own tool-restriction flag (see the two build functions
- * below). The flag is never accepted-and-discarded on any harness — a
- * silently-full-write job is the one outcome this option exists to prevent.
+ * native `-s`; omp does not, so read-only is expressed there through its own
+ * tool-restriction flag (see the build functions below). The flag is never
+ * accepted-and-discarded on any harness — a silently-full-write job is the
+ * one outcome this option exists to prevent.
  */
 const DEFAULT_SANDBOX = 'workspace-write';
 
@@ -61,20 +67,12 @@ function ompGuardPath(homeDir) {
 }
 
 /**
- * Claude Code has no `-s`-style sandbox flag, but it does have
- * `--disallowedTools` (confirmed in `claude --help` on this machine:
- * "`--disallowedTools, --disallowed-tools <tools...>` Comma or
- * space-separated list of tool names to deny"). Denying every tool that can
- * change the filesystem is the closest thing it has to codex's `read-only`,
- * and it is a real restriction rather than a note in a doc comment.
- *
- * `Bash` is on the list because a shell is a write tool: leaving it enabled
- * would make the whole restriction cosmetic. `Task` is on it for the same
- * reason at one remove — a subagent does not inherit this argv, so a
- * read-only run that can still spawn one has an unrestricted write path.
- * (This mirrors omp's allow-list, which deliberately omits `task`.)
+ * The refusal `--harness claude` gets. Named rather than folded into the
+ * unknown-harness message: a user reaching for it has a working intent
+ * (run this prompt on a schedule against Claude) that Claude Code answers
+ * natively, so the error points at that instead of just rejecting a value.
  */
-const CLAUDE_READ_ONLY_DENIED_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'Task'];
+const CLAUDE_HARNESS_REFUSAL = 'yoki-loop: the claude harness was removed — Claude Code has native /loop and scheduled routines; yoki-loop harnesses are codex and omp';
 
 /**
  * omp's tool-restriction flag is `--tools=<value>` ("Comma-separated list of
@@ -85,18 +83,6 @@ const CLAUDE_READ_ONLY_DENIED_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEd
  * a subagent would not inherit this restriction.
  */
 const OMP_READ_ONLY_TOOLS = ['read', 'grep', 'glob', 'web_search'];
-
-function buildClaudeCommand({ prompt, model, resumeSessionId, sandbox }) {
-  const args = ['-p', prompt, '--output-format', 'json'];
-  if (model) args.push('--model', model);
-  if (resumeSessionId) args.push('--resume', resumeSessionId);
-  const mode = resolveSandbox(sandbox);
-  // workspace-write and danger-full-access both mean "the harness's own
-  // default capability" here — claude has nothing narrower than read-only to
-  // express, and nothing wider than its own default to grant.
-  if (mode === 'read-only') args.push('--disallowedTools', CLAUDE_READ_ONLY_DENIED_TOOLS.join(','));
-  return { cmd: 'claude', args, stdin: null };
-}
 
 function buildCodexCommand({ prompt, cwd, model, resumeSessionId, sandbox }) {
   const args = ['exec', '--skip-git-repo-check', '-C', cwd, '-s', resolveSandbox(sandbox), '--json'];
@@ -117,7 +103,7 @@ function buildOmpCommand({ prompt, model, homeDir, sandbox }) {
 
 /**
  * @param {object} opts
- * @param {'claude'|'codex'|'omp'} opts.harness
+ * @param {'codex'|'omp'} opts.harness
  * @param {string} opts.prompt
  * @param {string} opts.cwd
  * @param {string} [opts.model] already-resolved model id (see models.js);
@@ -125,21 +111,20 @@ function buildOmpCommand({ prompt, model, homeDir, sandbox }) {
  * @param {string} [opts.resumeSessionId] omitted entirely when falsy
  * @param {string} [opts.homeDir] override for `os.homedir()` (tests)
  * @param {'read-only'|'workspace-write'|'danger-full-access'} [opts.sandbox]
- *   defaults to `workspace-write` — see DEFAULT_SANDBOX. Every harness
- *   honours it; none of them ignores it silently:
+ *   defaults to `workspace-write` — see DEFAULT_SANDBOX. Both harnesses
+ *   honour it; neither ignores it silently:
  *     codex  `-s <mode>` (native)
- *     claude `--disallowedTools <write tools>` on read-only
  *     omp    `--tools <read tools>` on read-only
- *   `workspace-write` and `danger-full-access` add no flag on claude/omp:
- *   neither CLI has a capability wider than its own default to grant.
+ *   `workspace-write` and `danger-full-access` add no flag on omp: it has no
+ *   capability wider than its own default to grant.
  * @returns {{cmd: string, args: string[], stdin: string|null}}
  */
 function buildCommand(opts) {
   const { harness } = opts;
-  if (harness === 'claude') return buildClaudeCommand(opts);
+  if (harness === 'claude') throw new Error(CLAUDE_HARNESS_REFUSAL);
   if (harness === 'codex') return buildCodexCommand(opts);
   if (harness === 'omp') return buildOmpCommand(opts);
-  throw new Error(`yoki-loop: unknown harness "${harness}" (expected claude, codex, or omp)`);
+  throw new Error(`yoki-loop: unknown harness "${harness}" (expected codex or omp)`);
 }
 
 module.exports = {
@@ -148,6 +133,6 @@ module.exports = {
   resolveSandbox,
   SANDBOX_MODES,
   DEFAULT_SANDBOX,
-  CLAUDE_READ_ONLY_DENIED_TOOLS,
+  CLAUDE_HARNESS_REFUSAL,
   OMP_READ_ONLY_TOOLS,
 };
