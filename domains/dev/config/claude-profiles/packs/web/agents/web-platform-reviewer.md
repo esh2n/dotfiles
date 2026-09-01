@@ -101,7 +101,7 @@ Apply the intent table from `skill: defensive-css` to the diff. For each violate
 
 ### HIGH -- Units
 
-- **`line-height` with `em`/`px` on a container**. Why it visibly breaks: it is computed once on the parent and inherited as a fixed length; a larger-font child gets a line-height smaller than its own text — overlapping lines. Use unitless `line-height`. See `skill: css-units`.
+- **`line-height` with `em`/`px`/`%` on a container**. Why it visibly breaks: it is computed once on the parent and inherited as a fixed length; a larger-font child gets a line-height smaller than its own text — overlapping lines. Use unitless `line-height`. See `skill: css-units`.
 - **`font-size` in `em` on a component that nests itself** (lists, trees, comment threads, nested cards). Why it visibly breaks: the value compounds per level (16 → 12.8 → 10.24px) instead of staying constant; use `rem`. See `skill: css-units`.
 
 ### HIGH (methodology-gated) -- Only when the corresponding methodology is detected

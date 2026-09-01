@@ -127,7 +127,7 @@ it, these are the rules worth adding, with the trap each one closes:
   "undefined custom property" Defensive CSS intent (see `skill:
   defensive-css`).
 - `declaration-property-unit-disallowed-list` with `{ "font-size": ["px"],
-  "line-height": ["px", "em"] }` — closes the fixed-root-font and
+  "line-height": ["px", "em", "%"] }` — closes the fixed-root-font and
   inherited-line-height traps (see `skill: css-units`).
 - `unit-disallowed-list` with `["vh"]` as a warning-level suggestion for
   mobile-facing projects, pointing to `svh`/`dvh` instead.

@@ -71,14 +71,34 @@ in `em`.
 
 ## line-height
 
-`line-height: 1.2em` (or a `px` value) is computed once, on the parent, and
-inherited to children as that fixed **length**. A child with a larger
+`line-height: 1.2em` (or a `px` or `%` value) is computed once, on the parent,
+and inherited to children as that fixed **length**. A child with a larger
 font-size than the parent then gets a line-height smaller than its own
-text — overlapping lines.
+text — overlapping lines. Body at 16px with `line-height: 1.2em` computes to
+19.2px; a child at `font-size: 2em` (32px) still inherits 19.2px.
 
 Unitless `line-height: 1.5` inherits as a **ratio**, not a computed length —
-each descendant recomputes `1.5 * its own font-size`. Always write
-`line-height` unitless.
+each descendant recomputes `1.5 * its own font-size` (the 32px child gets
+48px). Always write `line-height` unitless.
+
+This is not a line-height special case; it is the general rule of
+inheritance: children inherit the **computed value**. For `1.2em` or `120%`
+the computed value is a length, so that length is what travels. For a bare
+number the computed value is the number itself, so the ratio travels and is
+re-applied per element. `%` is the one people forget — it behaves exactly
+like `em` here.
+
+Two related points:
+
+- `line-height: normal` (the default) is font-dependent — roughly 1.2, but
+  it differs per font, so a fallback font changes your line spacing. Write
+  the number explicitly. Note the `font` shorthand resets `line-height` to
+  `normal` unless you write it as `font: 1rem/1.5 …` (see `skill:
+  css-cascade`).
+- Sizing guidance: body text around `1.5`, headings `1.1`–`1.2`. WCAG 1.4.12
+  (Text Spacing) requires the layout to survive line-height raised to 1.5×
+  the font-size, so a body value below that is both a readability and a
+  conformance problem.
 
 ## Unit-by-Job Table
 
@@ -176,8 +196,9 @@ this check.
 - **`em` on `font-size` in a component that nests itself** (lists, trees,
   comment threads, nested cards) — compounds per level instead of staying
   constant; use `rem`.
-- **`line-height` written in `px`/`em`** — inherits as a fixed length; a
-  larger-font child gets overlapping lines.
+- **`line-height` written in `px`/`em`/`%`** — inherits as a fixed length; a
+  larger-font child gets overlapping lines. Only a bare number inherits as
+  a ratio.
 - **Assuming `:root`'s font-size moves `@media` breakpoints** — media-query
   `em`/`rem` always resolves against the browser default, not `:root`.
 - **`100vh` for a mobile hero/section** — overflows or jumps as browser
