@@ -167,7 +167,7 @@ bash skills/continuous-learning-v2/scripts/migrate-homunculus.sh
 > repo's history, so every cycle would have short-circuited even if started —
 > and nothing started it. `config.json`'s `observer` block was read by no code.
 >
-> The live learning path is instead **correction-driven**: `correction-detect`
+> The live learning path is instead **correction-driven**: the `prompt:correction-detect` UserPromptSubmit hook
 > records your corrections, and `correction-distill` (opt-in via
 > `CORRECTION_DISTILL=1`) drafts rule proposals from them. What remains useful
 > here is the instinct store and its CLI — `/instinct-status`, `/evolve` and

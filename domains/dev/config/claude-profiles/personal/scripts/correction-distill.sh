@@ -2,7 +2,7 @@
 # Headless correction distiller: turn a just-recorded correction into a draft
 # rule update under ~/.claude/homunculus/drafts/.
 #
-# Launched in the background by correction-detect.sh AFTER a correction was
+# Launched in the background by prompt-correction-detect.js AFTER a correction was
 # recorded, so it inherits that hook's per-session debounce and daily cap.
 # Safety:
 #   - opt-in: runs only when CORRECTION_DISTILL=1 (caller checks it too)

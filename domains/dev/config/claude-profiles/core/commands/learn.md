@@ -6,7 +6,7 @@ description: "Extract reusable patterns from the session, self-evaluate quality 
 
 Analyze the current session, extract patterns worth saving as skills, run them through a quality gate, and save to the right location (Global vs Project).
 
-Relationship: `/learn` is the distillation step of correction-driven learning. The `correction-detect` Stop hook records user corrections to `~/.claude/homunculus/corrections.jsonl`; this command turns them (and anything else worth keeping from the session) into durable skills/rules.
+Relationship: `/learn` is the distillation step of correction-driven learning. The `prompt:correction-detect` UserPromptSubmit hook records user corrections to `~/.claude/homunculus/corrections.jsonl`; this command turns them (and anything else worth keeping from the session) into durable skills/rules.
 
 ## When to Use
 

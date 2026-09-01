@@ -22,7 +22,7 @@ yoki hooks run through the `run-with-flags.js` runner with profile levels:
 
 ## Learning
 
-Learning is correction-driven: the `correction-detect` Stop hook records user
+Learning is correction-driven: the `prompt:correction-detect` UserPromptSubmit hook records user
 corrections to `~/.claude/homunculus/corrections.jsonl`. Distill them with:
 - `/learn` — extract patterns from current session
 - `/instinct-status` — view learned instincts

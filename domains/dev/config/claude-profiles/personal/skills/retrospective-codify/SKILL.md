@@ -248,4 +248,4 @@ message: Set/Map のサイズは .size プロパティを使う。
 
 - `writing-skills` — 新規 skill を書くときのテンプレと TDD フロー
 - `update-config` — settings.json / permissions の変更が必要な場合
-- 自動検出は correction-detect hook + `/learn`、手動での棚卸しは本 skill が担当
+- 自動検出は `prompt:correction-detect` UserPromptSubmit hook + `/learn`、手動での棚卸しは本 skill が担当
