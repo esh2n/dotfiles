@@ -483,15 +483,17 @@ describe("secretCommand", () => {
 
   test("the secret is read from the configured command, quoting included", async () => {
     // A path with a space proves the tokenizer's quote handling end to end.
+    // The script is run through /bin/sh on purpose: exec-ing a freshly created
+    // executable trips macOS's first-launch assessment, which can stall for
+    // minutes inside sandboxed shells and blow the secretCommand timeout.
     const dir = path.join(home, "secret bin");
     fs.mkdirSync(dir, { recursive: true });
     const script = path.join(dir, "print-secret.sh");
-    fs.writeFileSync(script, `#!/bin/sh\nprintf '%s\\n' "$1"\n`, "utf8");
-    fs.chmodSync(script, 0o755);
+    fs.writeFileSync(script, `printf '%s\\n' "$1"\n`, "utf8");
     writeConfig({
       baseUrl: server.baseUrl,
       clientId: CLIENT_ID,
-      secretCommand: `"${script}" ${CLIENT_SECRET}`,
+      secretCommand: `/bin/sh "${script}" ${CLIENT_SECRET}`,
     });
 
     const result = await runCli(["list", "--json"], { env: env() });
