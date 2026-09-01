@@ -188,8 +188,17 @@ const SCRIPTS = [
     args: {},
     assertResult(r) {
       assert.equal(r.intent, 'add a caching layer in front of the lookup path');
-      assert.equal(r.findings.length, 1);
-      assert.equal(r.findings[0].file, 'pkg/foo.go');
+      // TWO DIFFERENT defects at the same file:line, raised by two dimension
+      // lanes. The confirmed-finding dedupe key is file + line + normalized
+      // title exactly so both survive; under the old file:line key one of
+      // them silently vanished, and nothing exercised it. Asserted on the
+      // DEFAULT single-provider path, because that is where the old key was
+      // wrong too.
+      assert.equal(r.findings.length, 2);
+      assert.ok(r.findings.every((f) => f.file === 'pkg/foo.go' && f.line === 42),
+        'the fixture no longer puts two findings on one line');
+      assert.deepEqual(r.findings.map((f) => f.title).sort(),
+        ['possible nil dereference', 'unchecked error return']);
       assert.equal(r.unverified.length, 0);
       assert.ok(r.metrics.correctness);
     },
@@ -300,11 +309,20 @@ test('review with providers ["claude","codex"]: one lane per dimension per provi
     assert.ok(labels.includes('review:security@codex/opus'));
 
     const findings = result.result.findings;
-    // pkg/foo.go was found by BOTH providers with the same title -> one
-    // finding carrying both attributions, not two rows.
-    const shared = findings.find((f) => f.file === 'pkg/foo.go');
+    // pkg/foo.go:42 "possible nil dereference" was found by BOTH providers
+    // with the same title -> one finding carrying both attributions.
+    const shared = findings.find((f) => f.title === 'possible nil dereference');
     assert.ok(shared, 'the finding both providers reported disappeared');
     assert.deepEqual(shared.providers.sort(), ['claude', 'codex']);
+
+    // A DIFFERENT defect at the same file:line survives beside it — the
+    // dedupe key carries the normalized title. Across providers this is not
+    // cosmetic: collapsing by file:line would throw away exactly the second
+    // opinion the providers were added for.
+    const sameLine = findings.filter((f) => f.file === 'pkg/foo.go' && f.line === 42);
+    assert.equal(sameLine.length, 2, 'two different defects on one line collapsed into one');
+    assert.deepEqual(sameLine.map((f) => f.title).sort(),
+      ['possible nil dereference', 'unchecked error return']);
 
     // pkg/bar.go was found by codex ONLY -> the union keeps it.
     const codexOnly = findings.find((f) => f.file === 'pkg/bar.go');
@@ -312,12 +330,12 @@ test('review with providers ["claude","codex"]: one lane per dimension per provi
     assert.deepEqual(codexOnly.providers, ['codex']);
     assert.equal(codexOnly.provider, 'codex');
     assert.match(codexOnly.tag, /\[codex\]/);
-    assert.equal(findings.length, 2);
+    assert.equal(findings.length, 3);
 
     // Grouped by provider: a shared finding appears under both, so a group
     // reads as "what this provider saw".
     assert.deepEqual(Object.keys(result.result.by_provider).sort(), ['claude', 'codex']);
-    assert.equal(result.result.by_provider.claude.length, 1);
+    assert.equal(result.result.by_provider.claude.length, 2);
     assert.equal(result.result.by_provider.codex.length, 2);
 
     // Metrics are keyed per provider once there is more than one.
@@ -341,6 +359,64 @@ test('review: a provider lane whose yoki-agent call failed is dropped with a vis
     assert.match(note, /exit 2/);
     // And it contributed nothing: no invented finding stands in for it.
     assert.equal(result.result.metrics['tests@codex'].total, 0);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('research: a claim both providers reached is VERIFIED ONCE, and still credited to both', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-providers-'));
+  try {
+    const { result, events } = await runWithProviders(RESEARCH_SPEC, ['claude', 'codex'], cwd);
+    assert.equal(result.status, 'ok', result.error);
+    // Both `search:a1` lanes return the same load-bearing claim from the
+    // same source. Verification is the expensive stage — opus at high
+    // effort, opening the source itself — and the two copies produce the
+    // same prompt under the same label, i.e. literally the same call. It
+    // used to be launched twice.
+    const verifies = labelsOf(events).filter((l) => l.startsWith('verify:'));
+    assert.deepEqual(verifies, ['verify:a1'],
+      'the shared claim was verified once per provider instead of once');
+
+    // The merge still credits both providers — deduping the verification
+    // must not cost the attribution that makes a second provider worth it.
+    const shared = result.result.findings.find((f) => /60 req\/min/.test(f.claim));
+    assert.ok(shared, 'the shared claim disappeared');
+    assert.deepEqual(shared.providers.sort(), ['claude', 'codex']);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: a misspelled provider stops the run instead of quietly halving the coverage', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-providers-'));
+  try {
+    const { result, events } = await runWithProviders(REVIEW_SPEC, ['claude', 'codexx'], cwd);
+    // It used to be dropped: the run then executed the claude lanes only,
+    // which is byte-for-byte what the default looks like — no error, and no
+    // "providers:" log line either, since a single-claude list does not
+    // trigger one. A reviewer told they got two providers got one.
+    assert.equal(result.status, 'error', 'an unknown provider ran anyway');
+    assert.match(result.error, /codexx/);
+    assert.match(result.error, /claude, codex, omp, mock/);
+    assert.equal(labelsOf(events).length, 0, 'lanes ran before the bad arg was refused');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: a provider lane answered by a fixture is delivered but announced as mock', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-providers-'));
+  try {
+    const { result, events } = await runWithProviders(REVIEW_SPEC, ['claude', 'codex'], cwd);
+    assert.equal(result.status, 'ok', result.error);
+    // The fixture's `review:performance@codex/sonnet` result carries the
+    // `_mock: true` stamp yoki-agent adds when --allow-mock rerouted the
+    // call. Without the announcement, canned findings read exactly like
+    // "codex reviewed this and found nothing".
+    const note = logsOf(events).find((m) => m.includes('review:performance@codex/sonnet'));
+    assert.ok(note, 'a fixture-served lane was reported as if the provider had answered');
+    assert.match(note, /MOCK/);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }

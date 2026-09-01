@@ -52,6 +52,9 @@ const DEFAULT_AGENT_TIMEOUT_MS = 15 * 60 * 1000;
  * @param {number} [ctx.startedAt] - run start (ms) for the wall-clock cap
  * @param {object} [ctx.modelMap] - parsed `--model-map` tier overrides
  * @param {object|null} [ctx.harnessModels] - parsed core/harness-models.json
+ * @param {number} [ctx.startIndex] - arrival-order position of this
+ *   context's FIRST agent() call; defaults to 0. Used by yoki-agent to
+ *   continue an existing run's journal sequence under `--run-id`.
  */
 function createApi(ctx) {
   const state = {
@@ -59,7 +62,13 @@ function createApi(ctx) {
     worktreeCounter: 0,
     // Position of the next agent() call in arrival order. This is what
     // resume replays against — see journal.js's header.
-    callIndex: 0,
+    //
+    // A run normally starts at 0. `ctx.startIndex` lets a caller that is
+    // journaling into an EXISTING run continue the sequence instead —
+    // yoki-agent with `--run-id <existing>`, whose fresh context otherwise
+    // began at 0 again and wrote a second entry claiming index 0, colliding
+    // with the first rather than following it.
+    callIndex: Number.isInteger(ctx.startIndex) && ctx.startIndex > 0 ? ctx.startIndex : 0,
     // index -> last reported live tool-call count, so agent-progress is
     // emitted only when the number actually moves.
     toolCalls: new Map(),

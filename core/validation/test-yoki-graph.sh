@@ -257,7 +257,10 @@ check_review_run() {
 
     assert_json_field "case4: the run ends ok" "$run_end" '.status' "ok"
     assert_json_field "case5: the result carries a findings array" "$run_end" '.result.findings | type' "array"
-    assert_json_field "case6: the fixture's one confirmed finding survives review+verify" "$run_end" '.result.findings | length' "1"
+    # Two: the fixture puts two DIFFERENT defects on the same file:line, so
+    # this also pins the file+line+title dedupe key against a regression to
+    # the old file:line key, which collapsed them into one.
+    assert_json_field "case6: both confirmed findings survive review+verify" "$run_end" '.result.findings | length' "2"
     assert_json_field "case7: the finding names the file the fixture reported" "$run_end" '.result.findings[0].file' "pkg/foo.go"
 }
 
@@ -418,8 +421,10 @@ check_model_visibility() {
     local run_end
     run_end="$(jq -c 'select(.type == "run-end")' "$out" 2>/dev/null | tail -n 1)"
     assert_json_field "case26: run-end carries a per-model breakdown" "$run_end" '.byModel | length' "3"
+    # opus runs the security review lane plus one verify per confirmed
+    # finding, and the fixture now carries two.
     assert_json_field "case27: each row counts that model's calls" "$run_end" \
-        '[.byModel[] | select(.model == "pinned-opus")][0].calls' "2"
+        '[.byModel[] | select(.model == "pinned-opus")][0].calls' "3"
 }
 
 # The end-of-run summary must put the accounting BEFORE the payload: a
@@ -506,17 +511,51 @@ check_yoki_agent() {
     assert_contains "case36: the footer reports the resolved model id" \
         "model=pinned-id" "$(cat "$out")"
 
+    # A base64 payload is what a provider lane actually passes: untrusted
+    # text that must never occupy a command or instruction position.
+    run_agent "$home" "$out" "$err" \
+        --backend mock --mock "${dir}/fix.json" --label lane --json \
+        --schema-base64 "$(base64 < "${dir}/s.json" | tr -d '\n')" \
+        --prompt-base64 "$(printf 'review; rm -rf / $(whoami)' | base64 | tr -d '\n')"
+    assert_eq "case36a: --prompt-base64/--schema-base64 exit 0" "0" "$CLI_STATUS"
+    assert_json_field "case36b: ...and produce the same result JSON" \
+        "$(cat "$out")" '.findings[0].file' "pkg/foo.go"
+
+    run_agent "$home" "$out" "$err" \
+        --backend mock --mock "${dir}/fix.json" --prompt-base64 'not base64!!'
+    assert_eq "case36c: a malformed --prompt-base64 exits 1" "1" "$CLI_STATUS"
+
     # YOKI_AGENT_MOCK reroutes a real backend to mock — how a provider lane
-    # is exercised without codex/omp installed — and says so.
+    # is exercised without codex/omp installed — but ONLY together with
+    # --allow-mock, and the result itself says so.
     CLI_STATUS=0
     env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR \
         HOME="$home" YOKI_AGENT_MOCK="${dir}/fix.json" \
-        node "$AGENT_BIN" --backend codex --model sonnet --label lane \
+        node "$AGENT_BIN" --backend codex --model sonnet --label lane --allow-mock \
             --schema "${dir}/s.json" --prompt-file "${dir}/p.txt" --json \
         > "$out" 2> "$err" || CLI_STATUS=$?
-    assert_eq "case37: YOKI_AGENT_MOCK reroutes codex to the mock backend" "0" "$CLI_STATUS"
+    assert_eq "case37: YOKI_AGENT_MOCK + --allow-mock reroutes codex to the mock backend" "0" "$CLI_STATUS"
     assert_contains "case38: ...and the footer never hides that it was a mock" \
         "backend=mock (requested codex)" "$(cat "$err")"
+    assert_json_field "case38a: ...and the RESULT itself carries the mock marker" \
+        "$(cat "$out")" '._mock' "true"
+
+    # Without --allow-mock the environment variable is ignored outright: an
+    # env var anything can set must never substitute a provider's answer.
+    # PATH is scrubbed so the real codex call cannot spawn.
+    local nomockbin="${FIXTURE_DIR}/nomockbin"
+    mkdir -p "$nomockbin"
+    ln -sf "$(command -v node)" "${nomockbin}/node"
+    CLI_STATUS=0
+    env -u YOKI_STATE_HOME -u YOKI_GRAPH_GUARD_STATE_DIR \
+        HOME="$home" PATH="$nomockbin" YOKI_AGENT_MOCK="${dir}/fix.json" \
+        "${nomockbin}/node" "$AGENT_BIN" --backend codex --model sonnet --retries 0 \
+            --schema "${dir}/s.json" --prompt-file "${dir}/p.txt" --json \
+        > "$out" 2> "$err" || CLI_STATUS=$?
+    assert_eq "case38b: YOKI_AGENT_MOCK alone does NOT substitute a result" "2" "$CLI_STATUS"
+    assert_eq "case38c: ...and prints no fixture on stdout" "" "$(cat "$out")"
+    assert_contains "case38d: ...saying loudly that it was ignored" \
+        "--allow-mock was not passed" "$(cat "$err")"
 
     # Exit 1: usage.
     run_agent "$home" "$out" "$err" --backend mock
@@ -532,6 +571,19 @@ check_yoki_agent() {
     assert_eq "case43: a misspelled --model tier exits 1" "1" "$CLI_STATUS"
     assert_contains "case44: ...listing the tiers that would have worked" \
         "valid tiers: haiku, opus, sonnet" "$(cat "$err")"
+
+    # A model id reaches a command line, so it must be an identifier.
+    run_agent "$home" "$out" "$err" --backend mock --mock "${dir}/fix.json" \
+        --model 'sonnet; rm -rf /' --prompt-file "${dir}/p.txt"
+    assert_eq "case44a: a --model carrying shell syntax exits 1" "1" "$CLI_STATUS"
+    assert_contains "case44b: ...naming it as an invalid name" \
+        "is not a valid name" "$(cat "$err")"
+
+    # An unrecognized flag is a usage error, not something quietly ignored.
+    run_agent "$home" "$out" "$err" --backend mock --mock "${dir}/fix.json" \
+        --prompt-file "${dir}/p.txt" --jsonn
+    assert_eq "case44c: an unknown flag exits 1" "1" "$CLI_STATUS"
+    assert_contains "case44d: ...naming the flag" "unknown flag: --jsonn" "$(cat "$err")"
 
     # Exit 2: the backend call failed. PATH is scrubbed to a directory with
     # only `node` in it, so `codex` cannot be spawned at all — a real backend
@@ -570,7 +622,7 @@ check_lane_cli_contract() {
     local usage flag
 
     usage="$(node -e "process.stdout.write(require('${LIB_GRAPH}/agent-cli.js').USAGE)")"
-    for flag in --backend --model --schema --sandbox --prompt-file --json; do
+    for flag in --backend --model --schema-base64 --sandbox --prompt-base64 --json; do
         if grep -qF -- "$flag" "$lanes" && grep -qF -- "$flag" <<< "$usage"; then
             continue
         fi
@@ -578,6 +630,33 @@ check_lane_cli_contract() {
         return
     done
     pass "case51: every flag the transport prompt passes exists in yoki-agent's usage"
+
+    # The untrusted payload must not be pasted into the transport's own
+    # instructions: it travels base64, so the prompt file flag has no place
+    # in the lane helper any more.
+    if grep -qF -- "--prompt-file" "$lanes"; then
+        fail "case51a: the transport prompt no longer writes the payload to a file"
+    else
+        pass "case51a: the transport prompt no longer writes the payload to a file"
+    fi
+    # The command the transport is actually told to run: least privilege by
+    # default, and the payload as a base64 argument rather than as text.
+    local lane_prompt
+    lane_prompt="$(node -e "process.stdout.write(require('${lanes}').providerLane({provider:'codex',model:'gpt-5.6-sol',prompt:'SECRET-PAYLOAD-MARKER',schema:{type:'object'},label:'l',phase:'P'}).prompt)")"
+    if grep -qiF -- "mktemp" <<< "$lane_prompt"; then
+        fail "case51b: the transport agent is not told to create scratch files"
+    else
+        pass "case51b: the transport agent is not told to create scratch files"
+    fi
+    assert_contains "case51c: the provider call runs read-only by default" \
+        "--sandbox read-only" "$lane_prompt"
+    assert_contains "case51d: the payload travels as --prompt-base64" \
+        "--prompt-base64 <PROMPT_B64>" "$lane_prompt"
+    if grep -qF -- "SECRET-PAYLOAD-MARKER" <<< "$lane_prompt"; then
+        fail "case51e: the untrusted payload never appears as readable text"
+    else
+        pass "case51e: the untrusted payload never appears as readable text"
+    fi
 
     assert_contains "case52: yoki-agent documents the exit-code contract the lanes branch on" \
         "0 ok, 1 usage, 2 backend error, 3 schema failure after retry" "$usage"

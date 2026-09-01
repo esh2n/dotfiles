@@ -222,26 +222,52 @@ runs exactly ONE such call from the command line, through this same
 Claude Code cannot spawn codex/omp itself:
 
 ```
-yoki-agent --backend codex|omp|mock [--model <tier|id>] [--schema <f.json>]
+yoki-agent --backend codex|omp|mock [--model <tier|id>]
+    [--schema <f.json> | --schema-base64 <b64>]
     [--sandbox read-only|workspace-write|danger-full-access] [--cwd <dir>]
     [--effort <level>] [--agent-type <name>] [--timeout <ms>] [--retries N]
-    [--model-map <tier>=<id>,...] [--label <text>] [--mock <file>] [--dry-run]
-    --prompt-file <file> [--json]
+    [--model-map <tier>=<id>,...] [--label <text>] [--mock <file>]
+    [--allow-mock] [--run-id <id>] [--dry-run]
+    (--prompt-file <file> | --prompt-base64 <b64>) [--json]
 ```
 
 Exit codes — the contract a lane's transport agent branches on: `0` ok,
-`1` usage (bad flags, unreadable prompt/schema, unknown backend, misspelled
-model tier), `2` backend error (spawn failure, non-zero exit, timeout after
-retries, or a budget breach), `3` schema validation failed after the one
-retry. Under `--json` stdout is the result and nothing else, so the caller
-can parse it whole; the one-line footer (resolved model, tokens, cached,
-duration) goes to stderr.
+`1` usage (bad, unknown or missing flags, unreadable/undecodable prompt or
+schema, unknown backend, misspelled model tier, a `--model`/`--backend`
+outside `^[A-Za-z0-9._:/-]{1,64}$`), `2` backend error (spawn failure,
+non-zero exit, timeout after retries, or a budget breach), `3` schema
+validation failed after the one retry. Under `--json` stdout is the result
+and nothing else, so the caller can parse it whole; the one-line footer
+(resolved model, tokens, cached, duration) goes to stderr. An unrecognized
+flag is a usage error rather than something silently ignored: `--jsonn` used
+to run WITHOUT `--json` and look like an ordinary run.
+
+`--prompt-base64` / `--schema-base64` are what a provider lane uses. The
+lane's payload is untrusted text and its caller is a haiku-tier transport
+subagent, so the payload must never sit anywhere it could read as an
+instruction or as shell syntax: base64 in argv is decoded here, after argv
+is already fixed, and it needs no scratch file — which is what lets the
+transport run with no write authority at all. Anything that is not exactly
+base64 is refused (`Buffer.from` silently drops stray characters, so a
+mangled argument would otherwise decode to plausible garbage).
 
 `YOKI_AGENT_MOCK=<fixture.json>` reroutes ANY requested backend to the mock
 one with that fixture — how a provider lane is exercised without codex/omp
-installed. The footer still names the backend that was asked for
-(`backend=mock (requested codex)`), so a mock run is never mistakable for a
-real one.
+installed — but ONLY together with `--allow-mock`. The environment variable
+alone does nothing and the run says on stderr that it ignored it: a `.envrc`
+in the repository under review, or a stale export from testing, must not be
+able to turn a second-provider security review into attacker-chosen findings,
+and "codex found nothing" is exactly what an empty fixture looks like. When
+a substitution IS authorized the footer names the backend that was asked for
+(`backend=mock (requested codex)`) AND the printed result carries
+`"_mock": true` — the footer is on stderr, which a `--json` caller discards,
+so the marker has to ride on the same channel as the result.
+
+`--run-id <existing>` journals the call into an existing run: its `index`
+continues that journal's sequence instead of restarting at 0, and the footer
+and exit code describe only the call just made (they used to pick the last
+`ok` entry in the whole journal, so a failure could be reported with an
+earlier, successful call's model and tokens).
 
 The daily WORKFLOW cap (guard.js, shared with workflow-guard.sh) is
 deliberately NOT charged per `yoki-agent` call: one review with six codex

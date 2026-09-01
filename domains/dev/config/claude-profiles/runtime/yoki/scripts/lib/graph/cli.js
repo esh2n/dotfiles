@@ -24,22 +24,13 @@ const runner = require('./runner');
 const journalLib = require('./journal');
 const models = require('./models');
 const progress = require('./progress');
+const { parseArgs: parseArgv, numberFlag } = require('./args');
 
-function parseArgs(argv) {
-  const out = { _: [] };
-  for (let i = 0; i < argv.length; i += 1) {
-    const a = argv[i];
-    if (!a.startsWith('--')) { out._.push(a); continue; }
-    const key = a.slice(2);
-    const BOOLEAN_FLAGS = new Set(['dry-run', 'json', 'watch']);
-    if (BOOLEAN_FLAGS.has(key)) { out[key] = true; continue; }
-    const value = argv[i + 1];
-    if (value === undefined || value.startsWith('--')) { out[key] = true; continue; }
-    out[key] = value;
-    i += 1;
-  }
-  return out;
-}
+/** The flags of this CLI that never take a value. Everything else is
+ *  `--key value`; see args.js, which agent-cli.js parses with too. */
+const BOOLEAN_FLAGS = ['dry-run', 'json', 'watch'];
+
+const parseArgs = (argv) => parseArgv(argv, BOOLEAN_FLAGS);
 
 function fail(message) {
   process.stderr.write(`yoki-graph: ${message}\n`);
@@ -169,12 +160,6 @@ async function cmdRun(rest, flags) {
     }
   }
   if (result.status === 'error' || result.status === 'denied' || result.status === 'locked') process.exitCode = 1;
-}
-
-function numberFlag(value) {
-  if (value === undefined || value === true) return undefined;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : undefined;
 }
 
 /**

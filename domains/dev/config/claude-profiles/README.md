@@ -332,16 +332,23 @@ yoki-graph とまったく同じ経路を通るので、モデル解決・スキ
 ```bash
 yoki-agent --backend codex --model sonnet --schema lane.json \
     --sandbox read-only --prompt-file lane.txt --json
+# レーンが使う渡し方(信用できないテキストを引数として渡す)
+yoki-agent --backend codex --model sonnet --schema-base64 "$b64schema" \
+    --sandbox read-only --prompt-base64 "$b64prompt" --json
 ```
 
-exit code は `0` 成功 / `1` 使い方の誤り / `2` バックエンド失敗 /
-`3` リトライ後もスキーマ不一致。`--json` のとき stdout は結果 JSON だけで、
-解決後のモデルと usage のフッターは stderr に出る。
+exit code は `0` 成功 / `1` 使い方の誤り(知らないフラグを含む)/
+`2` バックエンド失敗 / `3` リトライ後もスキーマ不一致。`--json` のとき
+stdout は結果 JSON だけで、解決後のモデルと usage のフッターは stderr。
+`YOKI_AGENT_MOCK` は `--allow-mock` と併用したときだけ効き、そのときは
+結果 JSON に `"_mock": true` が付く。
 
 これがあることで、Claude Code の `review` / `research` / `design-review` に
 `providers: ["claude","codex"]` を渡してレーンをプロバイダごとに増やせる
 (Claude Code は codex/omp を自分では起動できないので、安い Claude
-subagent が運搬役として yoki-agent を叩き、返ってきた JSON を逐語で返す)。
+subagent が運搬役として yoki-agent を1回だけ叩き、返ってきた JSON を逐語で
+返す。レーンの prompt は base64 の引数で渡すので、運搬役の指示文には
+信用できないテキストが1文字も載らず、書き込み権限も要らない)。
 確定した所見は file+line+title で重複排除して**和集合**を残し、
 `provider` / `model` が付く。詳細は `core/skills/yoki-graph/SKILL.md` の
 「Claude Code から Codex/omp レーンを混ぜる」。

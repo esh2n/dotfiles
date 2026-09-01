@@ -23,7 +23,16 @@
     ]
   },
   "review:security": {
-    "findings": []
+    "findings": [
+      {
+        "file": "pkg/foo.go",
+        "line": 42,
+        "title": "unchecked error return",
+        "detail": "the cache write's error is discarded on the same line as the nil deref",
+        "confidence": 7,
+        "importance": 6
+      }
+    ]
   },
   "review:performance": {
     "findings": []
@@ -74,7 +83,8 @@
   "review:performance@codex/sonnet": {
     "ok": true,
     "result": {
-      "findings": []
+      "findings": [],
+      "_mock": true
     }
   },
   "review:tests@codex/sonnet": {

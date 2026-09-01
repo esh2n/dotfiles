@@ -234,24 +234,41 @@ ID はそのまま通る。
 usage 計上のすべてがワークフロー内の1呼び出しと同一に振る舞う。
 
 ```
-yoki-agent --backend codex|omp|mock [--model <tier|id>] [--schema <f.json>]
+yoki-agent --backend codex|omp|mock [--model <tier|id>]
+    [--schema <f.json> | --schema-base64 <b64>]
     [--sandbox read-only|workspace-write|danger-full-access] [--cwd <dir>]
     [--effort <level>] [--agent-type <name>] [--timeout <ms>] [--retries N]
-    [--model-map <tier>=<id>,...] [--label <text>] [--mock <file>] [--dry-run]
-    --prompt-file <file> [--json]
+    [--model-map <tier>=<id>,...] [--label <text>] [--mock <file>]
+    [--allow-mock] [--run-id <id>] [--dry-run]
+    (--prompt-file <file> | --prompt-base64 <b64>) [--json]
 ```
 
-- **exit code**: `0` 成功 / `1` 使い方の誤り(必須フラグ欠落、prompt や
-  schema が読めない、未知の backend、綴りを間違えた tier)/ `2` バックエンド
-  失敗(spawn 失敗・非ゼロ終了・リトライ後のタイムアウト・キャップ超過)/
-  `3` リトライ後もスキーマを満たさなかった。
+- **exit code**: `0` 成功 / `1` 使い方の誤り(必須フラグ欠落、**知らない
+  フラグ**、prompt や schema が読めない/base64 として壊れている、未知の
+  backend、綴りを間違えた tier、`^[A-Za-z0-9._:/-]{1,64}$` に合わない
+  `--model` / `--backend`)/ `2` バックエンド失敗(spawn 失敗・非ゼロ終了・
+  リトライ後のタイムアウト・キャップ超過)/ `3` リトライ後もスキーマを
+  満たさなかった。`--jsonn` のようなタイポは黙って無視されない。
 - `--json` を付けると **stdout は結果 JSON だけ**(そのままパースできる)。
   解決後のモデル・トークン・cached・所要時間を1行にまとめたフッターは
   stderr に出る。付けない場合は結果もフッターも stdout。
-- `YOKI_AGENT_MOCK=<fixture.json>` を立てると、要求された backend が何であれ
-  mock に差し替わる(codex/omp が入っていない機体でレーンの配線を試すため)。
-  フッターは `backend=mock (requested codex)` と出るので、モックのランを
-  本物と取り違えることはない。
+- `--prompt-base64` / `--schema-base64` がレーンの実際の渡し方。レーンの
+  payload は信用できないテキスト(diff・設計文書・取得したページ)で、
+  呼び出し元は haiku の運搬 subagent なので、**payload が指示やシェル構文
+  として読まれうる位置に置かれてはいけない**。base64 は argv が確定した
+  あとで yoki-agent が復号するため、途中でだれも解釈しないし、一時ファイル
+  も要らない(だから運搬役に書き込み権限が要らない)。
+- `--run-id <既存>` で既存ランの journal に追記できる。`index` は既存の
+  続きから振られ、フッターと exit code は**今回の呼び出しだけ**を報告する。
+- `YOKI_AGENT_MOCK=<fixture.json>` は **`--allow-mock` と併用したときだけ**
+  効き、要求された backend が何であれ mock に差し替わる(codex/omp が
+  入っていない機体でレーンの配線を試すため)。環境変数だけでは何も起きず、
+  無視したことを stderr に出す — レビュー対象リポジトリの `.envrc` や
+  検証の消し忘れ export が、別プロバイダのレビュー結果を差し替えられては
+  ならない(空の fixture は「codex は何も見つけなかった」と見分けがつかない)。
+  差し替えたときはフッターに `backend=mock (requested codex)` が出るうえ、
+  **stdout の結果自体に `"_mock": true` が付く**(フッターは stderr なので
+  `--json` の呼び出し元には届かない)。
 - **日次キャップ(`workflow-guard.sh` と共有するワークフロー起動カウンタ)は
   消費しない**。codex レーンを6本持つ review 1本は「ワークフロー起動1回」で
   あって7回ではない。ラン単位の実行キャップ(`graphMaxAgentCalls` など)は
@@ -278,19 +295,32 @@ Workflow({ name: 'research', args: {
   prefix)も変わらない。
 - 指定するとレーンが「次元 × プロバイダ」に増える。review なら
   `review:security` に加えて `review:security@codex/opus` が走る。
+- **知らないプロバイダ名・変なモデル id はランを止める(fatal)**。以前は
+  黙って捨てていたので、`["claude","codeex"]` は claude だけのランになり、
+  それは既定のランと見分けがつかなかった(ログ行すら出ない)。「2社で見た」
+  と思っている読み手に1社の結果を渡すのが、この機能がいちばん避けたい
+  失敗。モデル id は `^[A-Za-z0-9._:/-]{1,64}$` に限る — コマンドラインに
+  そのまま乗る値なので、空白や `;` が入ると1つのコマンドが2つになる。
 - **なぜ proxy が要るか**: Claude Code は codex/omp を自分で起動できず、
   yoki-graph には(意図的に)claude backend が無い。そこで橋渡しとして
-  安い Claude subagent(haiku・effort low)を1つ立て、それが
-  ①レーンの prompt を mktemp のファイルに**逐語で**書き出し、
-  ②`yoki-agent --backend <p> --model <m> --schema <f> --sandbox read-only
-  --prompt-file <f> --json` を1回だけ実行し、
-  ③その JSON を**一切言い換えずそのまま**返す。
-  非ゼロ終了なら `{ok:false, error, exitCode, stderrTail}` を返す。
+  安い Claude subagent(haiku・effort low・**sandbox は read-only**)を
+  1つ立て、それが `yoki-agent --backend <p> --model <m> --schema-base64
+  <b64> --sandbox read-only --prompt-base64 <b64> --json` を
+  **1回だけ、それ以外は何もせず**実行し、返ってきた JSON を**一切言い換えず
+  そのまま**返す。非ゼロ終了なら `{ok:false, error, exitCode, stderrTail}`。
   proxy は運搬役であって評価者ではない — 別プロバイダの意見を得るのが
   目的なので、要約・再スコアリング・並べ替え・自前回答はすべて禁止。
+- **payload は base64 の引数で渡す**。以前は proxy の指示文の中に固定の
+  `<<<YOKI_PROMPT` 区切りで貼り付けていたので、payload の中に
+  `YOKI_PROMPT` の行と新しい手順を書けば、ランで最弱のモデルに対する
+  トップレベルの指示として読めてしまった。いまは指示文に入るのは
+  `[A-Za-z0-9+/=]` だけで、ブロックは**呼び出しごとに変わる fence**で
+  囲み、payload がその fence を含んでいたらレーンの生成自体を拒否する。
+  一時ファイルを作らないので proxy に書き込み権限も要らない。
 - **失敗したレーンは落ちる。ただし黙っては落ちない**: `log()` に
   `review:tests@codex/sonnet: dropped — codex exec exited 1 — exit 2` の
-  ような1行が出る。捏造した所見で埋めることはしない。
+  ような1行が出る。捏造した所見で埋めることはしない。fixture で答えた
+  レーン(`--allow-mock`)も `MOCK RESULT` として1行出る。
 - **Verify とマージ**: 検証(adversarial verify)は必ず Claude 側で回す —
   プロバイダに自分の審判をさせない。確定した所見は
   **file + line + title**(research は claim + source、design-review は
