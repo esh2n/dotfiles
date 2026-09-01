@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { StringDecoder } = require('string_decoder');
 const { stateHome } = require('../state-home');
 
 /** `YOKI_STATE_HOME` (documented in core/skills/yoki-graph/SKILL.md as the
@@ -324,9 +325,23 @@ function parseEntries(text) {
 class JournalTail {
   constructor(runId, env = process.env) {
     this.file = journalPath(runId, env);
+    this.reset();
+  }
+
+  reset() {
     this.offset = 0;
     this.pending = '';   // partial last line, not yet terminated by \n
     this.entries = [];
+    // Two different partial things have to be held across polls, and they
+    // are not the same thing. `pending` is a partial LINE (the writer has
+    // not appended its \n yet). The decoder holds a partial CHARACTER: a
+    // read at an arbitrary byte offset can land in the middle of a
+    // multi-byte UTF-8 sequence, and journal entries are full of Japanese
+    // (labels, results, log messages). Decoding each chunk with
+    // `buffer.toString('utf8')` would turn that split character into U+FFFD
+    // and corrupt the line; StringDecoder carries the leftover bytes into
+    // the next chunk instead.
+    this.decoder = new StringDecoder('utf8');
   }
 
   /** Every entry seen so far, including this poll's new ones. */
@@ -340,9 +355,7 @@ class JournalTail {
     if (stat.size < this.offset) {
       // Truncated/rotated: the offset points past the end, so nothing about
       // the old position is trustworthy. Full re-read.
-      this.offset = 0;
-      this.pending = '';
-      this.entries = [];
+      this.reset();
     }
     if (stat.size === this.offset) return this.entries;
 
@@ -352,7 +365,7 @@ class JournalTail {
       const buffer = Buffer.allocUnsafe(length);
       const bytes = fs.readSync(fd, buffer, 0, length, this.offset);
       this.offset += bytes;
-      const chunk = this.pending + buffer.toString('utf8', 0, bytes);
+      const chunk = this.pending + this.decoder.write(buffer.subarray(0, bytes));
       const lastNewline = chunk.lastIndexOf('\n');
       if (lastNewline === -1) {
         this.pending = chunk;

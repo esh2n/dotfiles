@@ -335,3 +335,38 @@ test('callKey\'s execution keys cannot be spoofed by a script option of the same
     assert.notEqual(a, b);
   });
 });
+
+test('JournalTail keeps multi-byte characters intact across a chunk boundary', () => {
+  withTempStateHome(({ Journal, JournalTail, journalPath, runDir }) => {
+    const j = new Journal('utf8-run');
+    j.append({ index: 0, key: 'a', label: 'レビュー', status: 'ok', result: '日本語の結果' });
+
+    // Read the file in two pieces whose split point lands INSIDE a
+    // multi-byte character, the way a poll landing mid-append would.
+    // Decoding each piece with buffer.toString('utf8') turns the split
+    // character into U+FFFD; the tail must not.
+    const file = journalPath('utf8-run');
+    const whole = fs.readFileSync(file);
+    // Split one byte INTO the first multi-byte sequence, not at an
+    // arbitrary midpoint that would land on an ASCII boundary and prove
+    // nothing.
+    let half = -1;
+    for (let i = 0; i < whole.length; i += 1) {
+      if (whole[i] >= 0xc0) { half = i + 1; break; }
+    }
+    assert.ok(half > 0, 'the fixture has no multi-byte character to split');
+    fs.mkdirSync(runDir('split-run'), { recursive: true });
+    const splitFile = journalPath('split-run');
+    fs.writeFileSync(splitFile, whole.subarray(0, half));
+
+    const tail = new JournalTail('split-run');
+    tail.read(); // no complete line yet — the last line has no newline
+    fs.appendFileSync(splitFile, whole.subarray(half));
+    const entries = tail.read();
+
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].label, 'レビュー');
+    assert.equal(entries[0].result, '日本語の結果');
+    assert.ok(!JSON.stringify(entries).includes('�'), 'a character was mangled at the chunk boundary');
+  });
+});
