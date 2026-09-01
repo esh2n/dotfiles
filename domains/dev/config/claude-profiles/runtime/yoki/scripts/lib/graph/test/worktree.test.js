@@ -24,10 +24,10 @@ function makeTempRepo() {
   return dir;
 }
 
-test('create() makes a worktree under .claude/worktrees/graph-<runId>-<n>', () => {
+test('create() makes a worktree under .claude/worktrees/graph-<runId>-<n>', async () => {
   const repo = makeTempRepo();
   try {
-    const wt = worktree.create(repo, 'runXYZ', 1);
+    const wt = await worktree.create(repo, 'runXYZ', 1);
     // Compare against wt.repoRoot (git's own realpath'd view), not the raw
     // `repo` var — on macOS /tmp is a symlink to /private/tmp, and `git
     // rev-parse --show-toplevel` resolves it, so a literal `repo`-based
@@ -36,17 +36,17 @@ test('create() makes a worktree under .claude/worktrees/graph-<runId>-<n>', () =
     assert.ok(fs.existsSync(wt.path));
     assert.ok(fs.existsSync(path.join(wt.path, 'README.md')));
     assert.equal(wt.branch, 'graph/runXYZ-1');
-    worktree.cleanup(wt);
+    await worktree.cleanup(wt);
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });
   }
 });
 
-test('cleanup() removes a clean worktree and its branch', () => {
+test('cleanup() removes a clean worktree and its branch', async () => {
   const repo = makeTempRepo();
   try {
-    const wt = worktree.create(repo, 'runABC', 1);
-    const outcome = worktree.cleanup(wt);
+    const wt = await worktree.create(repo, 'runABC', 1);
+    const outcome = await worktree.cleanup(wt);
     assert.equal(outcome.removed, true);
     assert.equal(fs.existsSync(wt.path), false);
     const branches = execFileSync('git', ['branch', '--list', wt.branch], { cwd: repo, encoding: 'utf8' });
@@ -56,12 +56,12 @@ test('cleanup() removes a clean worktree and its branch', () => {
   }
 });
 
-test('cleanup() KEEPS a dirty worktree and reports its path instead of discarding work', () => {
+test('cleanup() KEEPS a dirty worktree and reports its path instead of discarding work', async () => {
   const repo = makeTempRepo();
   try {
-    const wt = worktree.create(repo, 'runDIRTY', 1);
+    const wt = await worktree.create(repo, 'runDIRTY', 1);
     fs.writeFileSync(path.join(wt.path, 'new-file.txt'), 'uncommitted work\n');
-    const outcome = worktree.cleanup(wt);
+    const outcome = await worktree.cleanup(wt);
     assert.equal(outcome.removed, false);
     assert.equal(outcome.path, wt.path);
     assert.ok(fs.existsSync(wt.path)); // still there — nothing was discarded
@@ -73,24 +73,57 @@ test('cleanup() KEEPS a dirty worktree and reports its path instead of discardin
   }
 });
 
-test('create() throws a clear error outside a git repository', () => {
+test('create() rejects with a clear error outside a git repository', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-wt-notgit-'));
   try {
-    assert.throws(() => worktree.create(dir, 'run1', 1), /requires a git repository/);
+    await assert.rejects(() => worktree.create(dir, 'run1', 1), /requires a git repository/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('isClean reports true for an untouched worktree and false once modified', () => {
+test('isClean reports true for an untouched worktree and false once modified', async () => {
   const repo = makeTempRepo();
   try {
-    const wt = worktree.create(repo, 'runCLEANCHECK', 1);
-    assert.equal(worktree.isClean(wt.path), true);
+    const wt = await worktree.create(repo, 'runCLEANCHECK', 1);
+    assert.equal(await worktree.isClean(wt.path), true);
     fs.writeFileSync(path.join(wt.path, 'README.md'), 'changed\n');
-    assert.equal(worktree.isClean(wt.path), false);
+    assert.equal(await worktree.isClean(wt.path), false);
     sh('git', ['checkout', '--', 'README.md'], wt.path);
-    worktree.cleanup(wt);
+    await worktree.cleanup(wt);
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+});
+
+test('git calls do not block the event loop — timers keep firing during create/cleanup', async () => {
+  // The point of the async rewrite: parallel()/pipeline() run several
+  // agent() calls at once, and execFileSync inside one of them froze the
+  // whole JS thread — including the stdout drain of every other in-flight
+  // backend child process. A repeating timer is the cheapest proof that the
+  // loop stayed alive across the git work.
+  const repo = makeTempRepo();
+  let ticks = 0;
+  const timer = setInterval(() => { ticks += 1; }, 1);
+  try {
+    const wt = await worktree.create(repo, 'runLOOP', 1);
+    await worktree.isClean(wt.path);
+    await worktree.cleanup(wt);
+  } finally {
+    clearInterval(timer);
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+  assert.ok(ticks > 0, 'the event loop never ran during the git calls — they are still synchronous');
+});
+
+test('concurrent create() calls interleave instead of serializing', async () => {
+  const repo = makeTempRepo();
+  try {
+    const wts = await Promise.all([1, 2, 3].map((n) => worktree.create(repo, 'runPAR', n)));
+    assert.equal(new Set(wts.map((w) => w.path)).size, 3);
+    for (const wt of wts) assert.ok(fs.existsSync(wt.path));
+    const outcomes = await Promise.all(wts.map((wt) => worktree.cleanup(wt)));
+    assert.deepEqual(outcomes.map((o) => o.removed), [true, true, true]);
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });
   }

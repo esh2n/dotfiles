@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 
-const { buildCommand, ompGuardPath } = require('../argv');
+const { buildCommand, ompGuardPath, resolveSandbox, DEFAULT_SANDBOX } = require('../argv');
 
 test('claude: minimal argv (no model, no resume)', () => {
   const { cmd, args, stdin } = buildCommand({ harness: 'claude', prompt: 'hello', cwd: '/repo' });
@@ -53,6 +53,36 @@ test('codex: -m and resume land before the trailing "-"', () => {
     'thread-9',
     '-',
   ]);
+});
+
+// --- sandbox ---------------------------------------------------------------
+// A loop is standing work in a repo, so workspace-write stays the default —
+// but it is now a default rather than a hardcoded flag, so an unattended
+// inbox-driven loop (whose prompt is written by artifact viewers) can be
+// installed read-only.
+
+test('codex: --sandbox narrows the run; workspace-write stays the default', () => {
+  assert.equal(DEFAULT_SANDBOX, 'workspace-write');
+  const { args } = buildCommand({ harness: 'codex', prompt: 'p', cwd: '/repo', sandbox: 'read-only' });
+  assert.equal(args[args.indexOf('-s') + 1], 'read-only');
+  const dflt = buildCommand({ harness: 'codex', prompt: 'p', cwd: '/repo' });
+  assert.equal(dflt.args[dflt.args.indexOf('-s') + 1], 'workspace-write');
+});
+
+test('codex: an unknown --sandbox value is rejected, never silently passed to codex', () => {
+  assert.throws(
+    () => buildCommand({ harness: 'codex', prompt: 'p', cwd: '/repo', sandbox: 'yolo' }),
+    /unknown --sandbox "yolo"/
+  );
+  assert.equal(resolveSandbox(''), 'workspace-write');
+});
+
+test('claude/omp ignore --sandbox — neither has such a flag', () => {
+  const c = buildCommand({ harness: 'claude', prompt: 'p', cwd: '/repo', sandbox: 'read-only' });
+  assert.deepEqual(c.args, ['-p', 'p', '--output-format', 'json']);
+  const o = buildCommand({ harness: 'omp', prompt: 'p', cwd: '/repo', homeDir: '/home/u', sandbox: 'read-only' });
+  assert.ok(!o.args.includes('-s'));
+  assert.ok(!o.args.includes('read-only'));
 });
 
 test('omp: minimal argv keeps the guard flags and puts the prompt last', () => {

@@ -12,9 +12,7 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 
-const TIERS = new Set(['haiku', 'sonnet', 'opus']);
-
-let harnessModelsCache;
+const sharedModels = require('../../harness-models');
 
 function findRepoRootFrom(startDir) {
   let dir = startDir;
@@ -27,46 +25,38 @@ function findRepoRootFrom(startDir) {
   return null;
 }
 
+/**
+ * The dotfiles checkout this file is running from. Unlike the loop layer —
+ * whose CLI is handed a `dotfilesRoot` — a graph backend has no caller that
+ * knows it, so it is discovered from `__dirname`. `agentDirs()` below needs
+ * the same answer, which is why the walk stays here rather than moving into
+ * the shared model reader.
+ */
+function repoRoot() {
+  return findRepoRootFrom(__dirname);
+}
+
 /** Absolute path to core/harness-models.json in this dotfiles checkout, or
  *  null if this file isn't running from inside that checkout (e.g. some
  *  future standalone install) — callers must treat that as "pass through". */
 function harnessModelsPath() {
-  const repoRoot = findRepoRootFrom(__dirname);
-  if (!repoRoot) return null;
-  return path.join(repoRoot, 'domains', 'dev', 'config', 'claude-profiles', 'core', 'harness-models.json');
+  return sharedModels.harnessModelsPath(repoRoot());
 }
 
 function loadHarnessModels() {
-  if (harnessModelsCache !== undefined) return harnessModelsCache;
-  harnessModelsCache = null;
-  const file = harnessModelsPath();
-  if (file && fs.existsSync(file)) {
-    try {
-      harnessModelsCache = JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch {
-      harnessModelsCache = null; // malformed file -> pass through, never crash a run
-    }
-  }
-  return harnessModelsCache;
+  return sharedModels.loadHarnessModels(repoRoot());
 }
 
 /**
- * Resolve `opts.model` for a given backend. `claude` speaks the tier
- * vocabulary natively (haiku/sonnet/opus are valid `--model` aliases), so it
- * is returned unchanged. `codex`/`omp` look the tier up in
- * core/harness-models.json's per-backend map; a tier with no map entry, a
- * missing file, or a value that isn't one of the three known tiers, is
- * passed through untouched (already a concrete model id, or the caller's
- * problem to resolve).
+ * Resolve `opts.model` for a given backend, through the shared reader in
+ * lib/harness-models.js. `claude` speaks the tier vocabulary natively
+ * (haiku/sonnet/opus are valid `--model` aliases), so it is returned
+ * unchanged; `codex`/`omp` look the value up in that file's per-backend map,
+ * and anything absent from the map passes through untouched (already a
+ * concrete model id, or the caller's problem to resolve).
  */
 function resolveModel(backendName, model) {
-  if (!model) return model;
-  if (backendName === 'claude' || backendName === 'mock') return model;
-  if (!TIERS.has(model)) return model;
-  const models = loadHarnessModels();
-  const backendMap = models && models[backendName];
-  if (backendMap && backendMap[model]) return backendMap[model];
-  return model;
+  return sharedModels.resolveModel(backendName, model, loadHarnessModels());
 }
 
 const BUILTIN_PREAMBLES = {
@@ -87,11 +77,17 @@ function stripFrontmatter(body) {
  * first of all (the harness's own merged view, when this is run from an
  * installed harness rather than a bare checkout).
  */
-function agentDirs() {
+function agentDirs(env = process.env) {
+  // YOKI_AGENT_DIRS (a PATH-style list) replaces the discovered layers
+  // outright — the injection seam that makes the file-lookup branch of
+  // resolveAgentPreamble testable without depending on which agents happen
+  // to be installed on the machine running the tests.
+  const override = typeof env.YOKI_AGENT_DIRS === 'string' ? env.YOKI_AGENT_DIRS.trim() : '';
+  if (override) return override.split(path.delimiter).filter(Boolean);
   const dirs = [path.join(os.homedir(), '.claude', 'agents')];
-  const repoRoot = findRepoRootFrom(__dirname);
-  if (repoRoot) {
-    const profiles = path.join(repoRoot, 'domains', 'dev', 'config', 'claude-profiles');
+  const root = repoRoot();
+  if (root) {
+    const profiles = path.join(root, 'domains', 'dev', 'config', 'claude-profiles');
     dirs.push(path.join(profiles, 'personal', 'agents'));
     dirs.push(path.join(profiles, 'core', 'agents'));
     const packsDir = path.join(profiles, 'packs');
@@ -113,10 +109,10 @@ function agentDirs() {
  * layered agent directories (personal wins), with its frontmatter stripped.
  * Returns '' when nothing is found (the caller logs that as a fallback).
  */
-function resolveAgentPreamble(agentType) {
+function resolveAgentPreamble(agentType, env = process.env) {
   if (!agentType) return '';
   if (BUILTIN_PREAMBLES[agentType]) return BUILTIN_PREAMBLES[agentType];
-  for (const dir of agentDirs()) {
+  for (const dir of agentDirs(env)) {
     const file = path.join(dir, `${agentType}.md`);
     if (fs.existsSync(file)) {
       try {
@@ -160,6 +156,15 @@ function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs } = {}) {
       if (timer) clearTimeout(timer);
       resolve({ stdout, stderr, code });
     });
+    // stdin gets its own error listener BEFORE anything is written to it. A
+    // Writable with zero 'error' listeners turns an EPIPE/ENOENT into an
+    // uncaught exception that kills the whole node process — which would
+    // break every other concurrently-running agent() call, and would break
+    // this function's own contract ("rejects only if the process itself
+    // could not be spawned"). The spawn failure is already reported through
+    // child.on('error'); the stdin error is that same failure seen from the
+    // other end, so it is swallowed here rather than reported twice.
+    child.stdin.on('error', () => { /* see child.on('error') above */ });
     if (typeof input === 'string') {
       child.stdin.write(input);
     }
@@ -170,6 +175,9 @@ function spawnCollect(cmd, argv, { cwd, input, env, timeoutMs } = {}) {
 module.exports = {
   resolveModel,
   resolveAgentPreamble,
+  agentDirs,
+  stripFrontmatter,
+  BUILTIN_PREAMBLES,
   spawnCollect,
   loadHarnessModels,
   harnessModelsPath,

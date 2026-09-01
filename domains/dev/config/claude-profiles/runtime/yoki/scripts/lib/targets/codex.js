@@ -12,6 +12,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const { convert: convertPermissions } = require('../permissions/to-codex');
 const {
@@ -36,6 +37,105 @@ const { buildMcpServersToml } = require('../mcp-inventory/writers/codex');
 const vocab = require('./vocab.json');
 
 const MANIFEST_RELATIVE_PATH = manifestRelativePath('codex');
+
+/** Hook events this generator knows how to translate (codex-hooks-merge.js's
+ * `KNOWN_EVENTS`) but that only exist on Codex CLI versions at/after a given
+ * floor — keyed here rather than in codex-hooks-merge.js because gating
+ * needs the installed `codex --version`, which that module (pure
+ * translation, no shell-out) never sees. `Interrupt` (T32) shipped in
+ * 0.150.0; see `core/README.md`'s Targets section and `homebrew.nix`'s
+ * codex cask comment for the same floor. */
+const EVENT_MIN_CODEX_VERSION = Object.freeze({
+  Interrupt: '0.150.0',
+});
+
+/** First `x.y.z` triple in arbitrary `codex --version` output
+ * (`"codex-cli 0.150.0"`), or null when none is present — mirrors
+ * `doctor.js`'s `parseSemver` (kept separate to avoid a cross-module
+ * dependency for one regex). */
+function parseCodexVersion(text) {
+  const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(text == null ? '' : text));
+  return m ? `${m[1]}.${m[2]}.${m[3]}` : null;
+}
+
+/** -1/0/1 comparing two `x.y.z` version strings; null when either fails to
+ * parse as three dot-separated integers. */
+function compareVersions(a, b) {
+  const pa = String(a || '').split('.').map(Number);
+  const pb = String(b || '').split('.').map(Number);
+  if (pa.length !== 3 || pb.length !== 3 || pa.some(Number.isNaN) || pb.some(Number.isNaN)) return null;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+/** Runs `codex --version` and returns the parsed `x.y.z`, or null when the
+ * binary is missing, exits non-zero, or prints something unparseable —
+ * treated the same as "installed version unknown" by
+ * `isEventSupportedByVersion` below, never thrown. */
+function detectInstalledCodexVersion() {
+  let proc;
+  try {
+    proc = spawnSync('codex', ['--version'], { encoding: 'utf8' });
+  } catch {
+    return null;
+  }
+  if (!proc || proc.error || proc.status !== 0) return null;
+  return parseCodexVersion(`${proc.stdout || ''}${proc.stderr || ''}`);
+}
+
+/** True when `eventName` has no version floor, or the installed version
+ * meets it. An unknown installed version (codex missing, or unparseable
+ * `--version` output) is treated as NOT meeting a floor — conservative, so
+ * a hook this generator cannot confirm Codex will honor is skipped (with a
+ * warning) rather than silently shipped into hooks.json. */
+function isEventSupportedByVersion(eventName, installedVersion) {
+  const minVersion = EVENT_MIN_CODEX_VERSION[eventName];
+  if (!minVersion) return true;
+  if (!installedVersion) return false;
+  const cmp = compareVersions(installedVersion, minVersion);
+  return cmp !== null && cmp >= 0;
+}
+
+/**
+ * Drops hook groups for version-gated events (`EVENT_MIN_CODEX_VERSION`)
+ * the installed Codex CLI doesn't support yet, from a COPY of each settings
+ * layer (coding-style.md: never mutate) — everything else in the layer
+ * passes through untouched. One warning per stripped event per layer, so a
+ * dropped `Interrupt` hook is reported the same way an unrecognized command
+ * is (see codex-hooks-merge.js's own `skip()`), never silently absent from
+ * the plan.
+ *
+ * @param {Array<object>} settingsLayers parsed settings.layer/personal.json
+ * @param {string|null} installedVersion from detectInstalledCodexVersion() /
+ *   the `codexVersion` plan() override
+ * @returns {{settingsLayers: Array<object>, warnings: string[]}}
+ */
+function filterVersionGatedEvents(settingsLayers, installedVersion) {
+  const warnings = [];
+  const filtered = settingsLayers.map(layer => {
+    if (!layer || !layer.hooks) return layer;
+    let changed = false;
+    const hooks = {};
+    for (const [eventName, groups] of Object.entries(layer.hooks)) {
+      if (
+        Object.prototype.hasOwnProperty.call(EVENT_MIN_CODEX_VERSION, eventName)
+        && !isEventSupportedByVersion(eventName, installedVersion)
+      ) {
+        changed = true;
+        const minVersion = EVENT_MIN_CODEX_VERSION[eventName];
+        warnings.push(
+          `codex: "${eventName}" hook requires codex >= ${minVersion} (installed: ${installedVersion || 'unknown'}) — skipped; run \`brew upgrade --cask codex\` to enable it`
+        );
+        continue;
+      }
+      hooks[eventName] = groups;
+    }
+    return changed ? { ...layer, hooks } : layer;
+  });
+  return { settingsLayers: filtered, warnings };
+}
 
 /** YOKI_ROOT as derived from this file's own location, used when the caller
  * doesn't override it: `.../runtime/yoki/scripts/lib/targets/codex.js` ->
@@ -209,8 +309,14 @@ function buildCodexPruneOperations({ out, prunableDestinations, prune }) {
 
 /**
  * @param {{sources: string[], out: string, home?: string, env?: NodeJS.ProcessEnv,
- *   yokiRoot?: string, pluginRoot?: string, prune?: boolean}} options
- * @returns {{target: 'codex', out: string, sources: string[], operations: Array<object>, warnings: string[]}}
+ *   yokiRoot?: string, pluginRoot?: string, prune?: boolean, codexVersion?: string|null}} options
+ *   `codexVersion` overrides the `codex --version` shell-out (tests only;
+ *   normally left undefined so `detectInstalledCodexVersion()` runs).
+ * @returns {{target: 'codex', out: string, sources: string[], operations: Array<object>,
+ *   warnings: string[], codexVersion: string|null}} `codexVersion` is the
+ *   version this plan gated version-restricted events against, cached here
+ *   so a caller (doctor, a re-apply) never needs to shell out again for the
+ *   same plan.
  */
 function plan(options) {
   const { sources, out } = options;
@@ -235,7 +341,15 @@ function plan(options) {
   const skipped = [];
   const operations = [];
 
-  const hooks = buildHooksOperations({ settingsLayers: content.settingsLayers, out: outResolved, yokiRoot, home });
+  // T32: `codex --version` read once here and cached on the returned plan —
+  // gates version-restricted events (currently just Interrupt, >= 0.150.0)
+  // before they ever reach buildGeneratedGroups, so an old installed CLI
+  // gets a warning instead of a hooks.json entry it silently never fires.
+  const codexVersion = options.codexVersion !== undefined ? options.codexVersion : detectInstalledCodexVersion();
+  const versionGate = filterVersionGatedEvents(content.settingsLayers, codexVersion);
+  warnings.push(...versionGate.warnings);
+
+  const hooks = buildHooksOperations({ settingsLayers: versionGate.settingsLayers, out: outResolved, yokiRoot, home });
   operations.push(hooks.op);
   warnings.push(...hooks.warnings);
   skipped.push(...hooks.skipped);
@@ -280,7 +394,17 @@ function plan(options) {
   const prunableDestinations = [...agentOps, ...skillOps, ...commandSkillOps].map(op => op.destinationPath);
   operations.push(...buildCodexPruneOperations({ out: outResolved, prunableDestinations, prune: Boolean(options.prune) }));
 
-  return { target: 'codex', out: outResolved, home, sources: layerRoots, operations, warnings, skipped };
+  return { target: 'codex', out: outResolved, home, sources: layerRoots, operations, warnings, skipped, codexVersion };
 }
 
-module.exports = { plan, MANIFEST_RELATIVE_PATH, defaultYokiRoot };
+module.exports = {
+  plan,
+  MANIFEST_RELATIVE_PATH,
+  defaultYokiRoot,
+  // pure helpers, exported for tests (T32 version gate)
+  EVENT_MIN_CODEX_VERSION,
+  parseCodexVersion,
+  compareVersions,
+  isEventSupportedByVersion,
+  filterVersionGatedEvents,
+};

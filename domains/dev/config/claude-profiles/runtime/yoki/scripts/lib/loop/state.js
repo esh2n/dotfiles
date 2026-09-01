@@ -16,11 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 
-/** @returns {string} `~/.local/state` (or `$XDG_STATE_HOME`) */
-function stateHome(env = process.env) {
-  const xdg = typeof env.XDG_STATE_HOME === 'string' ? env.XDG_STATE_HOME.trim() : '';
-  return xdg || path.join(env.HOME || '', '.local', 'state');
-}
+const { stateHome } = require('../state-home');
 
 function loopDir(name, env = process.env) {
   return path.join(stateHome(env), 'yoki', 'loop', name);

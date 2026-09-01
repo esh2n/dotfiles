@@ -7,6 +7,8 @@
  *
  * Commands:
  *   run <name>        build + run (or --dry-run print) the headless command
+ *                      (`--sandbox read-only|workspace-write|danger-full-access`
+ *                       narrows or widens a codex run; default workspace-write)
  *   install <name>    write a launchd plist; print, never run, the
  *                      `launchctl bootstrap` command
  *   uninstall <name>  remove the plist; print the `launchctl bootout` command
@@ -60,6 +62,9 @@ function parseFlags(argv, startIndex, options) {
         break;
       case '--model':
         options.model = argv[++i];
+        break;
+      case '--sandbox':
+        options.sandbox = argv[++i];
         break;
       case '--resume':
         options.resume = true;
@@ -167,6 +172,7 @@ function cmdRun(name, options, ctx) {
       cwd: options.cwd,
       prompt,
       model: options.model,
+      sandbox: options.sandbox,
       resume: !!options.resume,
       maxRuns: options.maxRuns,
       dryRun: !!options.dryRun,

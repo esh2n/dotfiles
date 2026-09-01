@@ -44,6 +44,8 @@ function formatArgvLine(cmd, args) {
  * @param {string} options.cwd
  * @param {string} options.prompt
  * @param {string} [options.model] a tier or a concrete model id
+ * @param {'read-only'|'workspace-write'|'danger-full-access'} [options.sandbox]
+ *   `--sandbox`; codex only, defaults to workspace-write (see argv.js)
  * @param {boolean} [options.resume] resume the last stored session for this loop
  * @param {number} [options.maxRuns] `--max-runs`, the CLI-level cap override
  * @param {boolean} [options.dryRun]
@@ -62,6 +64,7 @@ function run(options, deps = {}) {
     cwd,
     prompt,
     model,
+    sandbox,
     resume = false,
     maxRuns,
     dryRun = false,
@@ -96,6 +99,7 @@ function run(options, deps = {}) {
     cwd,
     model: resolvedModel,
     resumeSessionId,
+    sandbox,
   });
 
   if (dryRun) {

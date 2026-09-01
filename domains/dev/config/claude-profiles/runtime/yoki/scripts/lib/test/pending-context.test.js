@@ -146,6 +146,81 @@ test('a truncated final line does not cost the entries that parsed', () => {
   assert.deepEqual(pendingContext.drain(session, env), ['good line']);
 });
 
+// --- concurrent enqueue during a drain -------------------------------------
+// artifact-comments.js (enqueue) and prompt-pending-context.js (drain) are two
+// separate matcher groups on the SAME UserPromptSubmit event, and the harness
+// runs one event's hooks as concurrent processes — so an enqueue can land in
+// the middle of a drain. It used to be lost forever: drain read the file, then
+// unlinked it whole, taking any line appended in between, and the enqueuing
+// hook had already advanced its inbox cursor past those comments. drain now
+// claims the file with an atomic rename first, so a racing enqueue creates a
+// fresh queue file that the claim cannot touch.
+
+test('an enqueue racing a drain survives — the claimed file is not the one it appends to', () => {
+  const env = freshEnv();
+  const session = { harness: 'claude', sessionId: 's1' };
+  const file = pendingContext.queuePath(session, env);
+
+  pendingContext.enqueue(session, { source: 'a', text: 'already queued' }, env);
+
+  // Fire the racing enqueue at the exact moment drain() has claimed and is
+  // reading the file — the window that used to swallow it.
+  const realRead = fs.readFileSync;
+  let raced = false;
+  fs.readFileSync = function patched(target, ...rest) {
+    if (!raced && typeof target === 'string' && target.startsWith(`${file}.draining-`)) {
+      raced = true;
+      pendingContext.enqueue(session, { source: 'b', text: 'arrived mid-drain' }, env);
+    }
+    return realRead.call(this, target, ...rest);
+  };
+  let drained;
+  try {
+    drained = pendingContext.drain(session, env);
+  } finally {
+    fs.readFileSync = realRead;
+  }
+
+  assert.equal(raced, true, 'the patched read never saw a claimed file — drain is not claiming by rename');
+  assert.deepEqual(drained, ['already queued']);
+  // The racing item is still on disk and comes back on the next drain.
+  assert.equal(fs.existsSync(file), true);
+  assert.deepEqual(pendingContext.drain(session, env), ['arrived mid-drain']);
+});
+
+test('drain leaves no claimed temp file behind, even for an unreadable claim', () => {
+  const env = freshEnv();
+  const session = { harness: 'claude', sessionId: 's1' };
+  const file = pendingContext.queuePath(session, env);
+  pendingContext.enqueue(session, { text: 'one' }, env);
+
+  const realRead = fs.readFileSync;
+  fs.readFileSync = function patched(target, ...rest) {
+    if (typeof target === 'string' && target.startsWith(`${file}.draining-`)) {
+      throw Object.assign(new Error('EIO'), { code: 'EIO' });
+    }
+    return realRead.call(this, target, ...rest);
+  };
+  try {
+    assert.throws(() => pendingContext.drain(session, env), /EIO/);
+  } finally {
+    fs.readFileSync = realRead;
+  }
+
+  const leftovers = fs.readdirSync(path.dirname(file)).filter((f) => f.includes('.draining-'));
+  assert.deepEqual(leftovers, []);
+});
+
+test('two drains racing the same queue: one gets the items, the other gets [] — never a double delivery', () => {
+  const env = freshEnv();
+  const session = { harness: 'claude', sessionId: 's1' };
+  pendingContext.enqueue(session, { text: 'only once' }, env);
+
+  const first = pendingContext.drain(session, env);
+  const second = pendingContext.drain(session, env);
+  assert.deepEqual([first, second].sort((a, b) => b.length - a.length), [['only once'], []]);
+});
+
 test('drain defaults to process.env when no env override is passed', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-pending-context-'));
   const saved = Object.prototype.hasOwnProperty.call(process.env, 'XDG_STATE_HOME')

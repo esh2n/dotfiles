@@ -34,7 +34,6 @@ const { loadAndMerge: loadAndMergeMcp, resolveHome: resolveMcpHome } = require('
 
 const YOKI_BRIDGE_SOURCE_RELATIVE = path.join('domains', 'dev', 'config', 'omp', 'extensions', 'yoki-bridge.ts');
 const CONFIG_YML_TEMPLATE_RELATIVE = path.join('domains', 'dev', 'config', 'omp', 'config.yml.template');
-const PI_AGENTS_RELATIVE = path.join('domains', 'dev', 'config', 'pi', 'agents');
 
 const MANIFEST_RELATIVE_PATH = manifestRelativePath('omp');
 
@@ -47,10 +46,9 @@ function defaultYokiRoot() {
 
 /** DOTFILES_ROOT derived from yokiRoot when neither `--dotfiles-root` nor
  * $DOTFILES_ROOT is given: `.../domains/dev/config/claude-profiles/runtime/
- * yoki` -> the repo root six levels up. Needed to locate the two
- * repo-relative sources this target reads outside the layered
- * `--sources` roots: config.yml.template and the pi agents to dedupe
- * against (see buildAgentOperations). */
+ * yoki` -> the repo root six levels up. Needed to locate the repo-relative
+ * sources this target reads outside the layered `--sources` roots:
+ * config.yml.template and the yoki-bridge extension. */
 function defaultDotfilesRoot(yokiRoot) {
   return path.resolve(yokiRoot, '..', '..', '..', '..', '..', '..');
 }
@@ -149,10 +147,8 @@ function buildRulesMdOperation({ ruleFiles, out }) {
   return { kind: 'write', destinationPath: rulesMdPath, content, layer: 'generated' };
 }
 
-/** claude-profiles agents/*.md (later layer wins), plus pi's reviewer
- * agents ONLY for a basename no claude-profiles layer already ships — they
- * are ancestors of the same ideas, not a second copy (task spec). */
-function buildAgentOperations({ agentFiles, out, dotfilesRoot, modelMap }) {
+/** claude-profiles agents/*.md, later layer wins. */
+function buildAgentOperations({ agentFiles, out, modelMap }) {
   const byName = new Map();
   for (const f of agentFiles) byName.set(path.basename(f.relPath, '.md'), f); // later layer wins
 
@@ -161,15 +157,6 @@ function buildAgentOperations({ agentFiles, out, dotfilesRoot, modelMap }) {
     const markdown = readTextIfExists(f.absPath);
     const content = agentMarkdownToOmp(name, markdown, modelMap);
     ops.push({ kind: 'write', destinationPath: path.join(out, 'agents', `${name}.md`), content, layer: f.layer });
-  }
-
-  const piAgentsDir = path.join(dotfilesRoot, PI_AGENTS_RELATIVE);
-  for (const f of listMarkdownFilesFlat(piAgentsDir)) {
-    const name = path.basename(f.relPath, '.md');
-    if (byName.has(name)) continue; // same idea already ported from claude-profiles — no duplicate
-    const markdown = readTextIfExists(f.absPath);
-    const content = agentMarkdownToOmp(name, markdown, modelMap);
-    ops.push({ kind: 'write', destinationPath: path.join(out, 'agents', `${name}.md`), content, layer: piAgentsDir });
   }
 
   return ops;
@@ -256,7 +243,6 @@ function plan(options) {
   const agentOps = buildAgentOperations({
     agentFiles: content.agentFiles,
     out: outResolved,
-    dotfilesRoot,
     modelMap: harnessModelsOmp,
   });
   operations.push(...agentOps);

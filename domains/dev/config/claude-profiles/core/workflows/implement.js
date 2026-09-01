@@ -172,7 +172,8 @@ const runOne = async (id) => {
   let impl = null
   let verdict = null
   while (attempt <= MAX_RETRY) {
-    impl = await agent(implPrompt(t, feedback, prev), { label: `impl:${id}${attempt ? `#${attempt + 1}` : ''}`, phase: 'Implement', schema: IMPL_SCHEMA, model: MODEL })
+    // the one stage that edits code; its reviewer below reads the diff read-only.
+    impl = await agent(implPrompt(t, feedback, prev), { label: `impl:${id}${attempt ? `#${attempt + 1}` : ''}`, phase: 'Implement', schema: IMPL_SCHEMA, model: MODEL, sandbox: 'workspace-write' })
     if (!impl || impl.status === 'blocked') break
     const touched = (impl.files_touched || []).filter(Boolean)
     verdict = await agent(
@@ -220,7 +221,9 @@ const gate = await agent(
 If a category is not configured in this project, say so explicitly rather than reporting a silent pass. Fix nothing and do NOT commit — this is report-only.`,
   // Judgment stage delivery depends on: session model (no override), high effort.
   // NOTE: 判定段は opus 明示 (esh2n 承認 2026-08-17 — 未指定はセッションモデルを継承してしまう)
-  { label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, model: 'opus', effort: 'high' },
+  // report-only for the repo's source, but lint/typecheck/test runners write
+  // their own build and coverage caches — that needs the workspace.
+  { label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, model: 'opus', effort: 'high', sandbox: 'workspace-write' },
 )
 
 const tasks = [...results.values()]
@@ -293,7 +296,8 @@ ${useBranch
     : 'HEAD invariant: run `git branch --show-current` before and after delivery and confirm they match. This mode must never leave HEAD on a different branch than it started on — no checkout, no branch creation, not even temporarily.'}
 On any git or gh command failure, stop that step and report exactly what already succeeded (fail-open reporting) — do not retry failed git/gh commands.
 Return via StructuredOutput: {branch, commits: [one short description per commit actually made], pr_url (include only if a PR was actually created)}.`,
-    { label: 'deliver', phase: 'Deliver', schema: DELIVER_SCHEMA, model: MODEL },
+    // commits/branches/pushes — writing is the whole job of this stage.
+    { label: 'deliver', phase: 'Deliver', schema: DELIVER_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
   )
   log(`delivery: branch=${(delivery && delivery.branch) || (useBranch ? branch : '(current branch)')} commits=${(delivery && delivery.commits && delivery.commits.length) || 0}${delivery && delivery.pr_url ? ` pr=${delivery.pr_url}` : ''}`)
 }

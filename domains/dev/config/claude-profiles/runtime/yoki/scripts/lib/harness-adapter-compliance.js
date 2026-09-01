@@ -1,5 +1,30 @@
 'use strict';
 
+/**
+ * Cross-harness compliance matrix: one record per harness or comparison
+ * runtime, describing how much of yoki's harness/loop/graph surface each
+ * one actually gets (`ADAPTER_RECORDS` below). This module is the source of
+ * truth — `docs/architecture/harness-adapter-compliance.md`'s generated
+ * table (between the `<!-- harness-adapter-compliance:matrix-start -->` /
+ * `:matrix-end` markers) is derived from it, never edited by hand.
+ *
+ * Regenerate the doc after touching a record:
+ *
+ *   node -e "
+ *     const fs = require('fs');
+ *     const path = require('path');
+ *     const m = require('./harness-adapter-compliance');
+ *     const docPath = path.join(__dirname, '..', '..', 'docs', 'architecture', 'harness-adapter-compliance.md');
+ *     const src = fs.readFileSync(docPath, 'utf8');
+ *     const start = src.indexOf(m.MATRIX_BLOCK_START) + m.MATRIX_BLOCK_START.length;
+ *     const end = src.indexOf(m.MATRIX_BLOCK_END);
+ *     fs.writeFileSync(docPath, src.slice(0, start) + '\n\n' + m.renderMarkdownTable() + '\n\n' + src.slice(end));
+ *   "
+ *
+ * (run from this file's own directory: `scripts/lib/`). `validateDocumentation()`
+ * fails when the checked-in markdown has drifted from `ADAPTER_RECORDS`.
+ */
+
 const fs = require('fs');
 const path = require('path');
 
@@ -74,27 +99,97 @@ const ADAPTER_RECORDS = Object.freeze([
   {
     id: 'codex',
     harness: 'Codex',
-    state: 'Instruction-backed',
+    state: 'Adapter-backed',
     supported_assets: [
-      '`AGENTS.md`',
-      'Codex plugin metadata',
-      'skills',
-      'MCP reference config',
-      'command patterns',
+      'hooks via `hooks.json` (9 events reachable from `codex exec`, translated by `codex-hooks-merge.js`) + `[hooks.state]` trust-hash upsert in `config.toml`',
+      '`rules/yoki.rules` (execpolicy, from `lib/permissions/to-codex.js`)',
+      '`[permissions.yoki*]` tables + `default_permissions = "yoki"` in `config.toml`',
+      '`agents/*.toml` (converted from claude-profiles `agents/*.md`)',
+      '`AGENTS.md` managed block (`# yoki:begin`/`:end`-equivalent marker pair)',
+      'skills via `~/.agents/skills/<name>` symlinks, or `~/.codex/skills/<name>` for a skill shipping a `codex/` port',
+      'commands converted 1:1 into `cmd-<name>` skills (Codex has no slash-command format of its own)',
+      '`notify` wired to `scripts/hooks/codex-notify.js`',
+      'yoki-graph (`yoki-graph run <name> --backend codex`)',
+      'yoki-artifact (same CLI as every other harness)',
+      'yoki-loop (`yoki-loop run <name> --harness codex`, `codex exec --json`)',
     ],
-    unsupported_surfaces: ['Native hook enforcement and Claude slash-command semantics are not equivalent'],
+    unsupported_surfaces: [
+      'no statusline surface to write into (unlike omp)',
+      'the `auto` approval-mode classifier is Codex-native policy — yoki hooks cannot see or override it',
+      '`PermissionRequest` is a real Codex hook event but unreachable from headless `codex exec` — only the interactive TUI reaches it',
+      'no native Workflow or Artifact tool — yoki-graph and yoki-artifact exist specifically to cover this gap',
+    ],
     install_or_onramp: [
-      '`./install.sh --profile minimal --target codex`',
-      'repo-local `AGENTS.md` review',
+      '`yoki-switch apply --target codex`',
+      '`yoki-switch doctor` to verify `~/.codex` state without writing',
     ],
-    verification_commands: ['`npm run harness:audit -- --format json`'],
-    risk_notes: ['Treat hooks as policy text unless a native Codex hook surface exists.'],
-    last_verified_at: '2026-05-12',
-    owner: 'ECC maintainers',
+    verification_commands: [
+      '`bash core/validation/validator.sh yoki-switch-targets`',
+      '`bash core/validation/validator.sh targets-golden`',
+      '`node --test domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/test/codex.test.js`',
+    ],
+    risk_notes: [
+      'Only the marker block in `config.toml`/`AGENTS.md` and the hooks.json group yoki owns are ever rewritten; a hand-added `[projects.*]` entry or a foreign hook group is preserved byte-for-byte.',
+      '`Interrupt` is gated on `codex --version >= 0.150.0`; an older install gets a warning and the hook is dropped rather than silently ignored by Codex.',
+    ],
+    last_verified_at: '2026-08-31',
+    owner: 'yoki maintainers',
     source_docs: [
-      '.codex-plugin/plugin.json',
-      'AGENTS.md',
-      'scripts/lib/install-targets/codex-home.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/codex.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/codex-hooks-merge.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/codex-config-toml.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/codex-agents-md.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/codex-skills.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/harness/payload.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/doctor.js',
+    ],
+  },
+  {
+    id: 'omp',
+    harness: 'omp',
+    state: 'Adapter-backed',
+    supported_assets: [
+      '`yoki-bridge.ts` extension symlinked into `~/.omp/agent/extensions/`, dispatching every yoki hook event omp exposes',
+      '`yoki-hooks.json` manifest (7 mapped events + `tool_approval_requested`)',
+      '`config.yml` layered from a repo template plus generated permissions/model overrides — replaces a hand-symlinked `config.yml` with a real generated file',
+      '`RULES.md` managed block — omp does not read `~/.claude/rules` on its own',
+      '`agents/*.md` (converted from claude-profiles `agents/*.md`) — omp does not read `~/.claude/agents` on its own',
+      'statusLine leftSegments/rightSegments approximating `personal/scripts/statusline.sh`',
+      'MCP servers via `mcp.json`',
+      'yoki-graph (`yoki-graph run <name> --backend omp`)',
+      'yoki-artifact (same CLI as every other harness)',
+      'yoki-loop (`yoki-loop run <name> --harness omp`, `omp -p --mode json --no-extensions -e <yoki-bridge.ts>` to keep the guard live)',
+    ],
+    unsupported_surfaces: [
+      'a project-level `.omp/` directory auto-loads with no trust prompt on omp 18.0.4 (`ctx.isProjectTrusted()` is hard-wired `true`) — this generator only ever writes under `~/.omp/agent`, never a project `.omp/`, specifically because of this',
+      'no interactive-input hook event is reachable in headless mode (`omp -p`) — there is no TTY to satisfy an elicitation request outside the TUI',
+      'skills/commands/CLAUDE.md are read by omp directly from `~/.claude/*` — nothing is generated for them here, unlike Codex',
+      'no native Workflow or Artifact tool — yoki-graph and yoki-artifact exist specifically to cover this gap',
+    ],
+    install_or_onramp: [
+      '`yoki-switch apply --target omp`',
+      '`yoki-switch doctor` to verify `~/.omp/agent` state without writing',
+    ],
+    verification_commands: [
+      '`bash core/validation/validator.sh omp-yoki-bridge`',
+      '`bash core/validation/validator.sh targets-golden`',
+      '`node --test domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/test/omp.test.js`',
+    ],
+    risk_notes: [
+      'omp throws on an uncaught extension error (fail-closed by default); every path in `yoki-bridge.ts` is wrapped try/catch to fail open instead, so a bug in one hook cannot brick the session.',
+      'the zsh `omp()` wrapper always injects `--no-extensions -e ~/.omp/agent/extensions/yoki-bridge.ts` so a repo-local `.omp/` cannot silently swap in unreviewed extensions; escape hatches are `YOKI_OMP_ALL_EXTENSIONS=1` or `command omp`.',
+    ],
+    last_verified_at: '2026-08-31',
+    owner: 'yoki maintainers',
+    source_docs: [
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/omp.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/omp-hooks.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/omp-config-yml.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/omp-rules-md.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/omp-agents.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/harness/payload.js',
+      'domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/doctor.js',
+      'domains/dev/config/omp/extensions/yoki-bridge.ts',
     ],
   },
   {

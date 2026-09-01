@@ -154,11 +154,32 @@ merge される)を指す。パス区切りを含む/`.js` で終わる引数は
   backend 固有の実行を検証したことにはならない点に注意。
 - 拒否されると exit code 1、標準出力に理由(トークン消費の目安つき)が出る。
 
+## sandbox(codex backend の書き込み権限)
+
+`--backend codex` のとき、`agent()` は `codex exec -s <sandbox>` で走る。
+**デフォルトは `read-only`**(codex 自身のデフォルトと同じ)。
+書き込む呼び出しだけがスクリプト側で明示的に要求する:
+
+```js
+await agent(prompt, { label: 'impl:t1', sandbox: 'workspace-write' })
+```
+
+- 値は `read-only` / `workspace-write` / `danger-full-access`。未知の値は
+  黙って広げずエラーになる。
+- `isolation: 'worktree'` は書き込み権限を**含まない** — scratch worktree で
+  編集する呼び出しは `sandbox` も明示する(go-optimize.js の Propose 参照)。
+- 実際に `workspace-write` を要求しているのは、編集・コミット・ビルド/テスト
+  実行・レポート書き出しの段だけ。レビュー/調査/検証の段は read-only のまま
+  — これらのプロンプトは diff hunk や取得した外部テキストで組み立てられる。
+- `claude` / `omp` バックエンドには対応するフラグが無いので、この option は
+  無視される。
+
 ## journal の読み方
 
 `agent()` 呼び出し1回につき1行、
 `~/.local/state/yoki/graph/<runId>/journal.jsonl`
-(`YOKI_STATE_HOME` があればそちら配下)に
+(`YOKI_STATE_HOME` があればそちら配下、なければ `XDG_STATE_HOME` — 他の
+yoki state ファイルと同じ解決)に
 `{key, label, phase, status, result, tokens?, durationMs}` が追記される。
 `key` は `sha256(prompt + JSON(opts))` — 同じ呼び出しは常に同じ key になり、
 これが `--resume` のキャッシュキー。

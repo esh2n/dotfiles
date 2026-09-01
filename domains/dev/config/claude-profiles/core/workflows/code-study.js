@@ -207,7 +207,8 @@ Structure:
 Rules: a claim refuted by the citation check is either dropped or rewritten to what the check actually found.
 Never write about what was not read. No decoration. No praise.
 ${OUT ? `Also write the report to ${OUT}.` : ''}`,
-  { label: 'report', phase: 'Report', model: MODEL },
+  // reads only, unless the caller asked for the report on disk.
+  { label: 'report', phase: 'Report', model: MODEL, ...(OUT ? { sandbox: 'workspace-write' } : {}) },
 )
 
 return {

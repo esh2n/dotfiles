@@ -358,6 +358,7 @@ function buildFixtureRepo(root) {
   writeFile(path.join(core, 'permissions.yaml'), 'allow:\n  - pattern: "WebSearch"\ndeny:\n  - pattern: "Bash(git push --force *)"\ndefaultMode: auto\n');
   writeFile(path.join(core, 'harness-models.json'), JSON.stringify({ omp: { sonnet: 'anthropic/claude-sonnet-5', review: 'anthropic/claude-sonnet-5', scout: 'anthropic/claude-haiku-5' } }));
   writeFile(path.join(core, 'agents', 'go-reviewer.md'), '---\nname: go-reviewer\ndescription: Go reviewer\nmodel: sonnet\ntools: ["Read", "Grep"]\n---\n\nReview Go code.');
+  writeFile(path.join(core, 'agents', 'python-reviewer.md'), '---\nname: python-reviewer\ndescription: Python reviewer\n---\n\nReview Python code.');
   writeFile(path.join(core, 'rules', 'common', 'git-workflow.md'), '---\n---\n# Git Workflow\n\nCommit often.');
   writeFile(path.join(core, 'rules', 'go', 'coding-style.md'), '---\npaths:\n  - "**/*.go"\n---\n# Go Style\n\nHandle errors.');
   writeFile(path.join(core, 'mcp.json'), JSON.stringify({
@@ -369,12 +370,9 @@ function buildFixtureRepo(root) {
   writeFile(path.join(personal, 'permissions.yaml'), 'allow: []\ndeny: []\ndefaultMode: auto\n');
 
   // The repo-relative sources omp.js reads via dotfilesRoot rather than
-  // --sources: config.yml.template, extensions/yoki-bridge.ts, and pi's
-  // agents (one duplicate of a claude-profiles agent, one unique).
+  // --sources: config.yml.template and extensions/yoki-bridge.ts.
   writeFile(path.join(root, 'domains', 'dev', 'config', 'omp', 'config.yml.template'), TEMPLATE);
   writeFile(path.join(root, 'domains', 'dev', 'config', 'omp', 'extensions', 'yoki-bridge.ts'), '// yoki-bridge\n');
-  writeFile(path.join(root, 'domains', 'dev', 'config', 'pi', 'agents', 'go-reviewer.md'), '---\nname: go-reviewer\ndescription: pi ancestor\n---\n\npi body.');
-  writeFile(path.join(root, 'domains', 'dev', 'config', 'pi', 'agents', 'claude-worker.md'), '---\nname: claude-worker\ndescription: external CLI worker\n---\n\nRun claude as a subprocess.');
 
   return { core, personal };
 }
@@ -433,13 +431,9 @@ test('end-to-end: plan()+apply() writes every artifact and replaces a symlinked 
     assert.ok(!rulesMd.includes('Handle errors.'));
     assert.ok(rulesMd.includes(POINTER_LINE));
 
-    // (4) agents: claude-profiles wins over pi's duplicate go-reviewer.md,
-    // pi's unique claude-worker.md is ported.
+    // (4) agents: claude-profiles agent is rendered.
     const goReviewer = fs.readFileSync(path.join(out, 'agents', 'go-reviewer.md'), 'utf8');
     assert.match(goReviewer, /Review Go code\./);
-    assert.ok(!goReviewer.includes('pi body.'));
-    const claudeWorker = fs.readFileSync(path.join(out, 'agents', 'claude-worker.md'), 'utf8');
-    assert.match(claudeWorker, /Run claude as a subprocess\./);
 
     // (5) extensions/yoki-bridge.ts symlink
     assert.equal(
@@ -492,7 +486,7 @@ test('apply() writes .yoki/omp-manifest.json listing only the per-agent outputs'
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.deepEqual(
       new Set(manifest),
-      new Set([path.join(out, 'agents', 'go-reviewer.md'), path.join(out, 'agents', 'claude-worker.md')]),
+      new Set([path.join(out, 'agents', 'go-reviewer.md'), path.join(out, 'agents', 'python-reviewer.md')]),
       'merged singletons (config.yml/RULES.md/yoki-hooks.json/mcp.json/extensions) are never prune candidates'
     );
   } finally {
@@ -510,7 +504,6 @@ test('--prune removes an agent whose source layer no longer provides it, and not
 
     // The pack that shipped go-reviewer.md is disabled / the file renamed.
     fs.rmSync(path.join(core, 'agents', 'go-reviewer.md'));
-    fs.rmSync(path.join(root, 'domains', 'dev', 'config', 'pi', 'agents', 'go-reviewer.md'));
 
     const pruned = ompTarget.plan({ sources: [core, personal], out, home, dotfilesRoot: root, env: {}, prune: true });
     assert.deepEqual(
@@ -520,7 +513,7 @@ test('--prune removes an agent whose source layer no longer provides it, and not
     gen.apply(pruned);
 
     assert.equal(fs.existsSync(path.join(out, 'agents', 'go-reviewer.md')), false);
-    assert.ok(fs.existsSync(path.join(out, 'agents', 'claude-worker.md')));
+    assert.ok(fs.existsSync(path.join(out, 'agents', 'python-reviewer.md')));
     assert.ok(fs.existsSync(path.join(out, 'config.yml')));
     assert.ok(fs.existsSync(path.join(out, 'RULES.md')));
   } finally {

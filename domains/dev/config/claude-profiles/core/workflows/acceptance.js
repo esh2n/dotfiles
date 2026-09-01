@@ -262,7 +262,9 @@ Structure:
 Rules: state only what the evidence supports. Where a coverage claim was refuted, say so and give the refutation. Never present an unrun check as passing. No padding, no praise.
 ${OUT ? `Write the report to ${OUT} as well as returning it.` : ''}`,
   // Judgment stage: pinned to opus, high effort.
-  { label: 'report', phase: 'Report', model: 'opus', effort: 'high' },
+  // Everything else in this workflow reads. This stage only writes when the
+  // caller asked for a file, so the authority is requested only then.
+  { label: 'report', phase: 'Report', model: 'opus', effort: 'high', ...(OUT ? { sandbox: 'workspace-write' } : {}) },
 )
 
 return {

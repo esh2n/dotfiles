@@ -77,7 +77,9 @@ function createApi(ctx) {
     let wt = null;
     if (opts.isolation === 'worktree') {
       state.worktreeCounter += 1;
-      wt = worktree.create(ctx.cwd, ctx.runId, state.worktreeCounter);
+      // awaited, not sync: several agent() calls run concurrently and a
+      // blocking `git worktree add` would stall all of them (see worktree.js).
+      wt = await worktree.create(ctx.cwd, ctx.runId, state.worktreeCounter);
       effectiveCwd = wt.path;
     }
 
@@ -94,6 +96,10 @@ function createApi(ctx) {
           effort,
           schema: opts.schema,
           agentType,
+          // Backends that have a sandbox concept (codex) default to their
+          // own least-privilege mode; only a script that actually writes
+          // asks for more, per call. See backends/codex.js's DEFAULT_SANDBOX.
+          sandbox: opts.sandbox,
           cwd: effectiveCwd,
           opts: normalizedOpts,
           mockFile: ctx.mockFile,
@@ -142,7 +148,8 @@ function createApi(ctx) {
     } finally {
       release();
       if (wt) {
-        const outcome = worktree.cleanup(wt);
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await worktree.cleanup(wt);
         if (!outcome.removed) {
           log(`worktree left in place (dirty): ${outcome.path}`);
         }

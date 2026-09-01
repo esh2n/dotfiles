@@ -94,7 +94,8 @@ const resolved = await agent(
 5. Resolve args.pkg="${PKG}" to a valid go test package pattern (it may already be one, e.g. "./internal/codec" or "./...", or a bare import path — normalize to the form \`go test\` accepts from the repo root).
 6. List ALL benchmarks in that package: go test -list 'Benchmark.*' <resolved pkg pattern>. Return the benchmark function names only (drop the trailing "ok  ..." summary line and any "no test files" noise). An empty result is valid and expected when the package has no benchmarks — return an empty array, do not error.
 Return via StructuredOutput.`,
-  { label: 'resolve', phase: 'Resolve', schema: RESOLVE_SCHEMA, model: 'haiku', effort: 'low' },
+  // creates the scratch dir under .claude/.cache and runs `go test -list`.
+  { label: 'resolve', phase: 'Resolve', schema: RESOLVE_SCHEMA, model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
 )
 
 if (!resolved || !resolved.scratchDir || !resolved.pkgTarget) {
@@ -137,7 +138,8 @@ if (!targetBenchPattern) {
     `This Go package (${resolved.pkgTarget}) has no benchmark ${BENCH ? `matching "${BENCH}"` : ''} to optimize (${benchSelectionNote}). Read the package's exported/hot-path functions and write ONE concrete proposal for a benchmark worth adding — do NOT write or edit any code, this is a proposal only.
 Cover: which function/path to benchmark and why it plausibly matters (called in a loop, on a request path, allocates, etc.), a sketch of the Benchmark* function (signature, b.N/b.Loop() usage, setup outside the timed loop), and what -benchmem would reveal.
 Save the proposal as markdown to "${resolved.scratchDir}/no-benchmark-proposal.md" (create the dir if needed — it should already exist) and return its path plus the proposal text.`,
-    { label: 'propose-benchmark', phase: 'Resolve', schema: PROPOSAL_SCHEMA, model: MODEL },
+    // writes the proposal markdown into the scratch dir.
+    { label: 'propose-benchmark', phase: 'Resolve', schema: PROPOSAL_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
   )
   log(`wrote benchmark proposal: ${(proposal && proposal.proposalPath) || '(not written)'}`)
   return {
@@ -189,7 +191,8 @@ Scratch dir (already exists): ${resolved.scratchDir}
 3. go tool pprof -top -alloc_space "${resolved.scratchDir}/mem_base.out" — identify the top allocation hot spots.
 4. For each hot spot worth pursuing (do not list everything — pick the handful that plausibly explain most of the cost), write a concrete hypothesis of the MECHANISM (e.g. "map lookup + allocation per iteration in encode()", not "encode is slow").
 Return via StructuredOutput: baselineFile/cpuProfile/memProfile as the absolute paths above, plus hotspots.`,
-  { label: 'profile', phase: 'Profile', schema: PROFILE_SCHEMA, model: MODEL },
+  // runs the baseline benchmark and writes cpu/mem profiles to the scratch dir.
+  { label: 'profile', phase: 'Profile', schema: PROFILE_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
 )
 
 if (!profile || !profile.baselineFile || !(profile.hotspots || []).length) {
@@ -247,6 +250,10 @@ Return via StructuredOutput: angle="${a.key}", summary, files, correctnessOk, an
 const proposals = await parallel(angles.map((a) => () =>
   agent(proposePrompt(a), {
     label: `propose:${a.key}`, phase: 'Propose', schema: PROPOSE_SCHEMA, model: MODEL, isolation: 'worktree',
+    // isolation:'worktree' gives it a scratch checkout, not the authority to
+    // write in one — that is asked for separately, and here it must be: this
+    // stage edits code, builds, and runs the benchmark.
+    sandbox: 'workspace-write',
   }),
 ))
 
@@ -298,7 +305,8 @@ For EACH candidate:
 2. If statsOk and the improvement meets the threshold with p<0.05: run go tool pprof -top -diff_base=${profile.cpuProfile} <candidate.cpuProfileFile> and check whether the function(s) named in that candidate's relevant hypothesis (match by angle/summary against the hot spot hypotheses above) appear with a negative delta (i.e. cost went down in the candidate). Set mechanismConfirmed accordingly.
 3. accepted = statsOk && pValue<0.05 && |deltaPercent| >= ${THRESHOLD} (in the improving direction) && mechanismConfirmed. When accepted=false, set a concrete rejectReason (e.g. "p=0.34 not significant", "delta -3.1% below 5% threshold", "mechanism not confirmed: hypothesized function still at same flat% in diff").
 Return via StructuredOutput: one result per candidate, same angle keys as given.`,
-    { label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, model: 'haiku', effort: 'low' },
+    // `go run golang.org/x/perf/cmd/benchstat@latest` populates the module cache.
+    { label: 'gate', phase: 'Gate', schema: GATE_SCHEMA, model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
   )
   gateResults = (gate && gate.results) || []
 }
@@ -390,7 +398,9 @@ const delivery = await agent(
 ${deliverSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 Constraints: this repo's git-guard permits commit/push on a feature branch only. Do NOT push to main or master, and NEVER force-push, regardless of what goes wrong. On any git/gh command failure, stop that step and report exactly what already succeeded — do not retry failed git/gh commands.
 Return via StructuredOutput: {reportPath, rejectedPath, branch (only if one was created), commits: [one short description per commit actually made], pr_url (only if a PR was actually created)}.`,
-  { label: 'deliver', phase: 'Deliver', schema: DELIVER_SCHEMA, model: MODEL },
+  // writes the report and (in commit/pr modes) commits — the verify stage
+  // above stays read-only, since it only argues about an already-captured diff.
+  { label: 'deliver', phase: 'Deliver', schema: DELIVER_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
 )
 
 log(`delivered: report=${(delivery && delivery.reportPath) || '(not written)'} accepted=${accepted.length} rejected=${rejected.length}${delivery && delivery.branch ? ` branch=${delivery.branch}` : ''}${delivery && delivery.pr_url ? ` pr=${delivery.pr_url}` : ''}`)

@@ -155,6 +155,128 @@ test('collectHookStateEntries: indices are read off the FINAL merged hooks.json,
 });
 
 // ---------------------------------------------------------------------------
+// (1b) codex --version gate (T32): Interrupt (Codex >= 0.150.0) is a known
+// event, but only emitted when the installed CLI actually supports it.
+// ---------------------------------------------------------------------------
+
+const INTERRUPT_HOOK = {
+  matcher: '*',
+  hooks: [{ type: 'command', command: '"${YOKI_NODE:-node}" "${YOKI_ROOT}/scripts/hooks/run-with-flags.js" "pre:interrupt" "hooks/interrupt.js" "standard,strict"' }],
+};
+
+test('buildGeneratedGroups: Interrupt is a known hook event, translated like any other', () => {
+  const { generated, warnings } = buildGeneratedGroups([{ hooks: { Interrupt: [INTERRUPT_HOOK] } }]);
+  assert.equal(generated.Interrupt.length, 1);
+  assert.match(generated.Interrupt[0].hooks[0].command, / --harness codex$/);
+  assert.ok(!warnings.some(w => /no known Codex equivalent/.test(w)));
+});
+
+test('parseCodexVersion: extracts the first x.y.z triple from arbitrary output, null when absent', () => {
+  assert.equal(codexTarget.parseCodexVersion('codex-cli 0.150.0'), '0.150.0');
+  assert.equal(codexTarget.parseCodexVersion('nonsense'), null);
+  assert.equal(codexTarget.parseCodexVersion(''), null);
+});
+
+test('compareVersions: -1/0/1, null on anything unparseable', () => {
+  assert.equal(codexTarget.compareVersions('0.147.0', '0.150.0'), -1);
+  assert.equal(codexTarget.compareVersions('0.150.0', '0.147.0'), 1);
+  assert.equal(codexTarget.compareVersions('0.150.0', '0.150.0'), 0);
+  assert.equal(codexTarget.compareVersions('not-a-version', '0.150.0'), null);
+});
+
+test('isEventSupportedByVersion: Interrupt requires >= 0.150.0; an unknown version is treated conservatively; ungated events are always supported', () => {
+  assert.equal(codexTarget.isEventSupportedByVersion('Interrupt', '0.149.9'), false);
+  assert.equal(codexTarget.isEventSupportedByVersion('Interrupt', '0.150.0'), true);
+  assert.equal(codexTarget.isEventSupportedByVersion('Interrupt', '0.150.1'), true);
+  assert.equal(codexTarget.isEventSupportedByVersion('Interrupt', null), false);
+  assert.equal(codexTarget.isEventSupportedByVersion('Stop', null), true);
+});
+
+test('filterVersionGatedEvents: strips Interrupt below the floor with a warning naming the brew upgrade command, leaves other events and the input untouched', () => {
+  const layers = [{ hooks: { Interrupt: [INTERRUPT_HOOK], PreToolUse: [RUNNER_HOOK] } }];
+  const { settingsLayers, warnings } = codexTarget.filterVersionGatedEvents(layers, '0.147.0');
+
+  assert.equal(settingsLayers[0].hooks.Interrupt, undefined);
+  assert.deepEqual(settingsLayers[0].hooks.PreToolUse, [RUNNER_HOOK]);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /"Interrupt" hook requires codex >= 0\.150\.0 \(installed: 0\.147\.0\)/);
+  assert.match(warnings[0], /brew upgrade --cask codex/);
+  assert.ok(layers[0].hooks.Interrupt, 'input layer must not be mutated');
+});
+
+test('filterVersionGatedEvents: an unknown installed version reports "installed: unknown"', () => {
+  const { warnings } = codexTarget.filterVersionGatedEvents([{ hooks: { Interrupt: [INTERRUPT_HOOK] } }], null);
+  assert.match(warnings[0], /installed: unknown/);
+});
+
+test('filterVersionGatedEvents: keeps Interrupt at/above the floor, no warning', () => {
+  const layers = [{ hooks: { Interrupt: [INTERRUPT_HOOK] } }];
+  const { settingsLayers, warnings } = codexTarget.filterVersionGatedEvents(layers, '0.150.0');
+  assert.deepEqual(settingsLayers[0].hooks.Interrupt, [INTERRUPT_HOOK]);
+  assert.equal(warnings.length, 0);
+});
+
+test('plan(): an installed codexVersion below 0.150.0 drops Interrupt from hooks.json and warns; codexVersion is cached on the plan', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const settingsPath = path.join(core, 'settings.layer.json');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    fs.writeFileSync(settingsPath, JSON.stringify({ ...settings, hooks: { ...settings.hooks, Interrupt: [INTERRUPT_HOOK] } }));
+
+    const belowPlan = codexTarget.plan({ sources: [core, personal], out, home, env: {}, codexVersion: '0.147.0' });
+    assert.equal(belowPlan.codexVersion, '0.147.0');
+    assert.ok(belowPlan.warnings.some(w => /"Interrupt" hook requires codex >= 0\.150\.0/.test(w)));
+
+    gen.apply(belowPlan);
+    const hooksJsonBelow = JSON.parse(fs.readFileSync(path.join(out, 'hooks.json'), 'utf8'));
+    assert.equal(hooksJsonBelow.Interrupt, undefined);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plan(): an installed codexVersion at/above 0.150.0 emits Interrupt into hooks.json', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const settingsPath = path.join(core, 'settings.layer.json');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    fs.writeFileSync(settingsPath, JSON.stringify({ ...settings, hooks: { ...settings.hooks, Interrupt: [INTERRUPT_HOOK] } }));
+
+    const abovePlan = codexTarget.plan({ sources: [core, personal], out, home, env: {}, codexVersion: '0.150.0' });
+    assert.equal(abovePlan.codexVersion, '0.150.0');
+    assert.ok(!abovePlan.warnings.some(w => /"Interrupt" hook requires codex/.test(w)));
+
+    gen.apply(abovePlan);
+    const hooksJsonAbove = JSON.parse(fs.readFileSync(path.join(out, 'hooks.json'), 'utf8'));
+    assert.equal(hooksJsonAbove.Interrupt.length, 1);
+    assert.match(hooksJsonAbove.Interrupt[0].hooks[0].command, /--harness codex/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('plan(): an unresolvable installed version (codexVersion: null) is treated conservatively and drops Interrupt', () => {
+  const { root, home, out } = makeTmpDirs();
+  try {
+    const { core, personal } = buildFixtureRepo(root);
+    const settingsPath = path.join(core, 'settings.layer.json');
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    fs.writeFileSync(settingsPath, JSON.stringify({ ...settings, hooks: { ...settings.hooks, Interrupt: [INTERRUPT_HOOK] } }));
+
+    const planResult = codexTarget.plan({ sources: [core, personal], out, home, env: {}, codexVersion: null });
+    assert.equal(planResult.codexVersion, null);
+    assert.ok(planResult.warnings.some(w => /installed: unknown/.test(w)));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // (2) config.toml managed block
 // ---------------------------------------------------------------------------
 

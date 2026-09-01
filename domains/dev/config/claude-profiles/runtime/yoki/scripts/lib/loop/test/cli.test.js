@@ -148,6 +148,52 @@ test('main: run --dry-run prints argv and exits 0', () => {
   });
 });
 
+test('main: --sandbox reaches the built codex argv (the unattended-inbox lockdown)', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const io = makeIO();
+      const code = cli.main(
+        ['run', 'demo', '--harness', 'codex', '--cwd', '.', '--prompt', 'hi', '--sandbox', 'read-only', '--dry-run'],
+        { dotfilesRoot, env, stdout: io.stdout, stderr: io.stderr }
+      );
+      assert.equal(code, 0);
+      assert.match(io.out.join(''), /-s read-only/);
+      assert.doesNotMatch(io.out.join(''), /workspace-write/);
+    });
+  });
+});
+
+test('main: an unknown --sandbox value fails the run instead of widening it', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const io = makeIO();
+      const code = cli.main(
+        ['run', 'demo', '--harness', 'codex', '--cwd', '.', '--prompt', 'hi', '--sandbox', 'yolo', '--dry-run'],
+        { dotfilesRoot, env, stdout: io.stdout, stderr: io.stderr }
+      );
+      assert.notEqual(code, 0);
+      assert.match(io.err.join(''), /unknown --sandbox "yolo"/);
+    });
+  });
+});
+
+test('main: install forwards --sandbox verbatim into the plist ProgramArguments', () => {
+  withTempHome((env) => {
+    withTempDotfilesRoot((dotfilesRoot) => {
+      const io = makeIO();
+      const code = cli.main(
+        ['install', 'demo', '--harness', 'codex', '--cwd', '/repo', '--prompt-from-artifact-inbox',
+          '--sandbox', 'read-only', '--every', '30m'],
+        { dotfilesRoot, env, stdout: io.stdout, stderr: io.stderr }
+      );
+      assert.equal(code, 0);
+      const xml = fs.readFileSync(plist.plistPath('demo', env.HOME), 'utf8');
+      assert.match(xml, /<string>--sandbox<\/string>/);
+      assert.match(xml, /<string>read-only<\/string>/);
+    });
+  });
+});
+
 test('main: run with a missing --harness is a usage error (exit 2)', () => {
   withTempHome((env) => {
     withTempDotfilesRoot((dotfilesRoot) => {

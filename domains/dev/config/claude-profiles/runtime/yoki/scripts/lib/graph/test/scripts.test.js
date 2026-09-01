@@ -256,7 +256,7 @@ for (const spec of SCRIPTS) {
 function stubBackendRun(backendModule, fixtureByLabel) {
   const original = backendModule.run;
   const captured = [];
-  backendModule.run = async ({ prompt, model, effort, schema, agentType, cwd, opts = {} }) => {
+  backendModule.run = async ({ prompt, model, effort, schema, agentType, cwd, sandbox, opts = {} }) => {
     const label = opts.label || prompt;
     let args;
     if (backendModule.name === 'codex') {
@@ -268,7 +268,7 @@ function stubBackendRun(backendModule, fixtureByLabel) {
         schemaFilePath = path.join(os.tmpdir(), `yoki-graph-argv-capture-schema-${Math.random().toString(16).slice(2)}.json`);
         fs.writeFileSync(schemaFilePath, JSON.stringify(schema));
       }
-      ({ args } = backendModule.buildArgv({ model, cwd, schema, schemaFilePath, agentType }));
+      ({ args } = backendModule.buildArgv({ model, cwd, schema, schemaFilePath, agentType, sandbox }));
       if (schemaFilePath) { try { fs.unlinkSync(schemaFilePath); } catch { /* best-effort */ } }
     } else {
       // omp.js's own run(): buildArgv, then --thinking is appended for
@@ -325,7 +325,17 @@ for (const backendModule of [codexBackend, ompBackend]) {
       const collect = stub.captured.find((c) => c.label === 'collect-diff');
       assert.ok(collect, 'collect-diff call was not routed through the stubbed backend');
       if (backendModule.name === 'codex') {
+        // Sandbox authority is per call, not per run. collect-diff writes the
+        // mktemp patch file and says so; every reviewer lane — the calls whose
+        // prompts are built out of those untrusted diff hunks — lands on
+        // codex's own read-only default instead of the blanket
+        // workspace-write this backend used to hardcode for everything.
         assert.deepEqual(collect.args.slice(0, 6), ['exec', '--skip-git-repo-check', '-C', cwd, '-s', 'workspace-write']);
+        const lanes = stub.captured.filter((c) => c.label !== 'collect-diff');
+        assert.ok(lanes.length > 0, 'no non-collect calls were captured');
+        for (const call of lanes) {
+          assert.equal(call.args[call.args.indexOf('-s') + 1], 'read-only', `${call.label} was not read-only`);
+        }
         assert.ok(collect.args.includes('--output-schema')); // collect-diff carries COLLECT_SCHEMA
         assert.equal(collect.args[collect.args.length - 1], '-');
         const security = stub.captured.find((c) => c.label === 'review:security');

@@ -1,8 +1,9 @@
 'use strict';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
+const { stateHome } = require('./state-home');
 
 /**
  * Cross-harness "say this to the model next turn" mailbox (T18).
@@ -22,20 +23,21 @@ const path = require('path');
  *
  * One file per (harness, session):
  * `${XDG_STATE_HOME:-~/.local/state}/yoki/pending-context/<harness>-<sessionId>.jsonl`.
- * Each line is `{source, text, queued_at, expires_at?}`. `drain()` reads
- * every line, drops anything already expired, deletes the file, and returns
- * the surviving text — an item is delivered at most once, the same
- * at-most-once contract artifact-comments.js's own inbox cursor keeps.
+ * Each line is `{source, text, queued_at, expires_at?}`. `drain()` claims
+ * the file with an atomic rename, reads every line, drops anything already
+ * expired, and returns the surviving text — an item is delivered at most
+ * once, the same at-most-once contract artifact-comments.js's own inbox
+ * cursor keeps, and (see `drain()`) at least once even under a concurrent
+ * enqueue.
  */
 
 const QUEUE_RELATIVE_DIR = path.join('yoki', 'pending-context');
 
-/** Honours XDG_STATE_HOME, defaulting to ~/.local/state — same resolution
- * hooks/artifact-comments.js uses, so both agree on the state root. */
+/** Honours XDG_STATE_HOME, defaulting to ~/.local/state — the one shared
+ * resolver in lib/state-home.js, so every module that writes under the
+ * state root agrees on where it is. */
 function stateDir(env) {
-  const environment = env && typeof env === 'object' ? env : process.env;
-  const xdg = typeof environment.XDG_STATE_HOME === 'string' ? environment.XDG_STATE_HOME.trim() : '';
-  return xdg || path.join(environment.HOME || os.homedir() || '', '.local', 'state');
+  return stateHome(env);
 }
 
 // Both segments land in a filename built from caller-supplied strings (a
@@ -106,19 +108,55 @@ function enqueue(session, entry, env) {
  * is dropped silently. A missing queue file means nothing was ever queued:
  * `[]`, not an error.
  *
+ * CLAIMING IS ATOMIC. The queue file is `rename()`d to a unique sibling
+ * first, and only that claimed copy is read and deleted. `rename(2)` is
+ * atomic on POSIX, so exactly one concurrent drain can win the file, and —
+ * the reason this matters — a concurrent `enqueue()` racing this call either
+ * lands in the claimed file before the rename (and is returned here) or
+ * `appendFileSync`-creates a fresh queue file after it, which this call
+ * never touches and the next drain delivers. The previous read-then-unlink
+ * shape lost any line appended between the two syscalls: it was written to
+ * the file this call then deleted whole. That loss was permanent, since
+ * hooks/artifact-comments.js advances its inbox cursor as soon as enqueue()
+ * returns and never re-enqueues a delivered batch. Both hooks are
+ * registered on the same UserPromptSubmit event in core/settings.layer.json
+ * and Claude Code runs one event's hooks as concurrent processes, so the
+ * window was reachable in normal operation.
+ *
+ * The trade-off, stated plainly: a hard crash (SIGKILL) in the microseconds
+ * between the rename and the unlink leaves an orphan `<queue>.draining-*`
+ * file that no later drain reads, so its items are lost — where the old
+ * shape would have left the original file and redelivered them. That is a
+ * far narrower and far less likely window than the concurrent-hook race it
+ * replaces, and the orphan is named for what it is, so an operator looking
+ * at the queue directory can see and read it.
+ *
  * @param {{harness?: string, sessionId?: string}} session
  * @param {NodeJS.ProcessEnv} [env]
  * @returns {string[]}
  */
 function drain(session, env) {
   const file = queuePath(session, env);
+  const claimed = `${file}.draining-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+
+  try {
+    fs.renameSync(file, claimed);
+  } catch (err) {
+    if (err && err.code === 'ENOENT') return []; // nothing queued, or another drain won it
+    throw err;
+  }
 
   let raw;
   try {
-    raw = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    if (err && err.code === 'ENOENT') return [];
-    throw err;
+    raw = fs.readFileSync(claimed, 'utf8');
+  } finally {
+    // The claimed copy is this call's alone — deleting it can never take a
+    // line that arrived after the rename, because those go to a new file.
+    try {
+      fs.unlinkSync(claimed);
+    } catch (err) {
+      if (err && err.code !== 'ENOENT') throw err;
+    }
   }
 
   const now = nowEpochSeconds();
@@ -134,12 +172,6 @@ function drain(session, env) {
     if (!record || typeof record.text !== 'string' || !record.text) continue;
     if (Number.isFinite(record.expires_at) && record.expires_at < now) continue; // dropped: expired
     texts.push(record.text);
-  }
-
-  try {
-    fs.unlinkSync(file);
-  } catch (err) {
-    if (!err || err.code !== 'ENOENT') throw err;
   }
 
   return texts;

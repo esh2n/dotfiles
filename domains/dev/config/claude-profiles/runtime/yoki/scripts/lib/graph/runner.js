@@ -19,8 +19,13 @@ const { createApi } = require('./api');
 const { Journal, runDir } = require('./journal');
 const guard = require('./guard');
 
-function workflowsDir() {
-  return path.join(os.homedir(), '.claude', 'workflows');
+/** `~/.claude/workflows`, the harness's own installed workflow directory.
+ *  `YOKI_WORKFLOWS_DIR` overrides it — the injection seam that lets `list`
+ *  and `resolveScriptPath` be tested against a fixture directory instead of
+ *  whatever happens to be installed on the machine running the tests. */
+function workflowsDir(env = process.env) {
+  const override = typeof env.YOKI_WORKFLOWS_DIR === 'string' ? env.YOKI_WORKFLOWS_DIR.trim() : '';
+  return override || path.join(os.homedir(), '.claude', 'workflows');
 }
 
 /**

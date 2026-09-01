@@ -4,7 +4,7 @@
  * Per-harness headless command construction for yoki-loop (task T19 spec):
  *
  *   claude: claude -p <prompt> --output-format json [--model m] [--resume <id>]
- *   codex:  codex exec --skip-git-repo-check -C <cwd> -s workspace-write
+ *   codex:  codex exec --skip-git-repo-check -C <cwd> -s <sandbox>
  *           --json [-m m] [resume <id>] -        (prompt on stdin, stdin closed —
  *           the S1 spike found `codex exec` hangs without EOF on stdin)
  *   omp:    omp -p --mode json [--model m] --no-extensions
@@ -27,6 +27,29 @@ const path = require('path');
 
 const YOKI_BRIDGE_RELATIVE = path.join('.omp', 'agent', 'extensions', 'yoki-bridge.ts');
 
+const SANDBOX_MODES = ['read-only', 'workspace-write', 'danger-full-access'];
+
+/**
+ * A loop's whole point is standing work in a repo — "run the morning triage
+ * every hour" — so unlike a graph agent() call, workspace-write stays the
+ * default here. It is a default rather than a hardcoded flag because the
+ * riskiest loop of all is `--prompt-from-artifact-inbox`, whose prompt is
+ * written by artifact viewers: pairing that with `--sandbox read-only` gives
+ * an unattended launchd job that can read and report but not edit, and there
+ * was previously no way to ask for it.
+ */
+const DEFAULT_SANDBOX = 'workspace-write';
+
+/** @throws when `sandbox` is not one of `codex exec -s`'s accepted values. */
+function resolveSandbox(sandbox) {
+  if (sandbox === undefined || sandbox === null || sandbox === '') return DEFAULT_SANDBOX;
+  const mode = String(sandbox);
+  if (!SANDBOX_MODES.includes(mode)) {
+    throw new Error(`yoki-loop: unknown --sandbox "${mode}" (expected one of ${SANDBOX_MODES.join(', ')})`);
+  }
+  return mode;
+}
+
 function ompGuardPath(homeDir) {
   return path.join(homeDir || os.homedir(), YOKI_BRIDGE_RELATIVE);
 }
@@ -38,8 +61,8 @@ function buildClaudeCommand({ prompt, model, resumeSessionId }) {
   return { cmd: 'claude', args, stdin: null };
 }
 
-function buildCodexCommand({ prompt, cwd, model, resumeSessionId }) {
-  const args = ['exec', '--skip-git-repo-check', '-C', cwd, '-s', 'workspace-write', '--json'];
+function buildCodexCommand({ prompt, cwd, model, resumeSessionId, sandbox }) {
+  const args = ['exec', '--skip-git-repo-check', '-C', cwd, '-s', resolveSandbox(sandbox), '--json'];
   if (model) args.push('-m', model);
   if (resumeSessionId) args.push('resume', resumeSessionId);
   args.push('-');
@@ -62,6 +85,9 @@ function buildOmpCommand({ prompt, model, homeDir }) {
  *   omitted entirely when falsy
  * @param {string} [opts.resumeSessionId] omitted entirely when falsy
  * @param {string} [opts.homeDir] override for `os.homedir()` (tests)
+ * @param {'read-only'|'workspace-write'|'danger-full-access'} [opts.sandbox]
+ *   codex only (`-s`); defaults to `workspace-write` — see DEFAULT_SANDBOX.
+ *   claude and omp have no equivalent flag and ignore it.
  * @returns {{cmd: string, args: string[], stdin: string|null}}
  */
 function buildCommand(opts) {
@@ -72,4 +98,4 @@ function buildCommand(opts) {
   throw new Error(`yoki-loop: unknown harness "${harness}" (expected claude, codex, or omp)`);
 }
 
-module.exports = { buildCommand, ompGuardPath };
+module.exports = { buildCommand, ompGuardPath, resolveSandbox, SANDBOX_MODES, DEFAULT_SANDBOX };

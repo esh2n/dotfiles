@@ -40,7 +40,8 @@ const ctx = await agent(
 3. Save: git diff --no-ext-diff --no-color $base_commit HEAD > $(mktemp -t preflight).patch — return that path. Do not print the diff.
 4. files_changed from git diff --stat. Infer intent from branch name + last 5 commit subjects.
 Return via StructuredOutput.`,
-  { label: 'collect-diff', phase: 'Collect', schema: COLLECT_SCHEMA, model: 'haiku', effort: 'low' },
+  // writes the mktemp patch file — the review lanes that read it do not.
+  { label: 'collect-diff', phase: 'Collect', schema: COLLECT_SCHEMA, model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
 )
 
 if (!ctx || !ctx.files_changed) {
@@ -172,7 +173,8 @@ if (accepted.length > 0) {
     `Apply these judge-accepted code-review fixes to the working tree (Edit tool). Fix ONLY what is listed; never touch security-related behavior. Skip anything ambiguous rather than guessing. Do NOT commit.
 ${accepted.map((f, i) => `${i + 1}. ${f.file}${f.line ? ':' + f.line : ''} — ${f.title}: ${f.detail}${f.fix_hint ? ' | hint: ' + f.fix_hint : ''}`).join('\n')}
 Return applied/skipped lists (short descriptions).`,
-    { label: 'apply-fixes', phase: 'Fix', schema: FIX_SCHEMA, model: MODEL },
+    // edits the working tree — one of the two calls here that legitimately writes.
+    { label: 'apply-fixes', phase: 'Fix', schema: FIX_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
   )
   fixed = (fix && fix.applied) || []
   log(`applied ${fixed.length} fix(es)`)
@@ -197,7 +199,8 @@ const gate = await agent(
    hash=$(git diff --no-ext-diff --no-color $(git merge-base origin/${ctx.base} HEAD 2>/dev/null || git merge-base ${ctx.base} HEAD) | shasum -a 256 | cut -d' ' -f1)
    mkdir -p .claude/.cache/preflight && echo "$hash" > ".claude/.cache/preflight/$(git branch --show-current | tr '/' '_').pass"
 Return via StructuredOutput.`,
-  { label: 'lint-and-mark', phase: 'Gate', schema: GATE_SCHEMA, model: MODEL },
+  // runs the project's lint/typecheck (build caches) and writes the pass marker.
+  { label: 'lint-and-mark', phase: 'Gate', schema: GATE_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
 )
 
 return {

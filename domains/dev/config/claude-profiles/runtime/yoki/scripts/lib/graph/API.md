@@ -61,6 +61,17 @@ access from the script body itself (only through `agent()`).
     it, otherwise it's advisory metadata folded into the prompt preamble).
   - `opts.isolation: 'worktree'` — run this one agent() call inside a fresh
     `git worktree`, auto-removed after if the tree is clean.
+  - `opts.sandbox` — `'read-only' | 'workspace-write' | 'danger-full-access'`,
+    for backends that have a sandbox concept (today: codex's `-s`). **Defaults
+    to `'read-only'`** — the backend tool's own default — so a call only gets
+    filesystem write authority when the script asks for it. Set
+    `sandbox: 'workspace-write'` on the calls that actually edit, commit, or
+    run a build (implement.js's Implement/Delivery, preflight.js's auto-fix,
+    go-optimize.js's Propose/Verify); leave it off for reviewing, reading and
+    researching calls, whose prompts are assembled from untrusted material
+    (diff hunks, fetched pages, artifact comments). `isolation: 'worktree'`
+    does NOT imply it: a worktree call that writes still passes it explicitly.
+    Backends without a sandbox concept (claude, omp, mock) ignore the option.
   - `opts.agentType` — the actual field name used by scripts (review.js:
     `agentType: 'code-reviewer'`/`'security-reviewer'`/`'go-perf-reviewer'`
     etc.; go-optimize.js: `agentType: 'go-perf-reviewer'`). **Note**: the

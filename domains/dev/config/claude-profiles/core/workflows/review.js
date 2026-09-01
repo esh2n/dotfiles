@@ -75,7 +75,10 @@ Steps:
 6. List touches: grep the diff for what it touches — network (outbound HTTP/gRPC/external SDK calls), queue (channels, queues, topics, consumers, producers), metrics (metric registration or labels), health (/health /ready /live endpoints or probe config). Only what the diff actually contains; empty array is fine.
 7. Run: ls ~/.claude/skills/*/references/review-checklist.md 2>/dev/null — return the paths it prints in checklists (empty array when it prints nothing). Do NOT read them.
 Return via StructuredOutput.`,
-    { label: 'collect-diff', phase: 'Collect', schema: COLLECT_SCHEMA, model: 'haiku', effort: 'low' },
+    // The only call in this workflow that writes anything (the mktemp patch
+    // file); every reviewer lane below reads that file and runs read-only,
+    // which matters because a lane's prompt is built from diff hunks.
+    { label: 'collect-diff', phase: 'Collect', schema: COLLECT_SCHEMA, model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
   ),
   () => agent(
     `Produce a compact grounding digest of this repository's own documented decisions, for code reviewers.

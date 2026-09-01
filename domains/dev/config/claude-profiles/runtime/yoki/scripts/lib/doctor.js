@@ -425,10 +425,10 @@ function checkCodexVersion() {
   }
   const versionText = `${version.major}.${version.minor}.${version.patch}`;
   if (isAtLeast(versionText, CODEX_MIN_ERROR_VERSION) === false) {
-    return result('fail', 'codex', 'version', `${versionText} < ${CODEX_MIN_ERROR_VERSION} — trust-hash format assumed by this doctor may not apply; upgrade codex`);
+    return result('fail', 'codex', 'version', `${versionText} < ${CODEX_MIN_ERROR_VERSION} — trust-hash format assumed by this doctor may not apply; run \`brew upgrade --cask codex\``);
   }
   if (isAtLeast(versionText, CODEX_MIN_WARN_VERSION) === false) {
-    return result('warn', 'codex', 'version', `${versionText} < ${CODEX_MIN_WARN_VERSION} — no Interrupt hook; upgrade codex when convenient`);
+    return result('warn', 'codex', 'version', `${versionText} < ${CODEX_MIN_WARN_VERSION} — no Interrupt hook; run \`brew upgrade --cask codex\` when convenient`);
   }
   return result('ok', 'codex', 'version', versionText);
 }

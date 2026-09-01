@@ -37,7 +37,12 @@ const { parseBashWrapperCommand } = require('./bash-wrapper-hook');
  * included alongside PreCompact (T18) so a future TUI-reachable PostCompact
  * hook can pick up whatever pre-compact.js queued into
  * ../pending-context.js the moment compaction actually finishes, instead of
- * waiting for the next UserPromptSubmit. */
+ * waiting for the next UserPromptSubmit. `Interrupt` (T32) only exists on
+ * Codex >= 0.150.0 — a settings-layer hook declared on it is still
+ * recognized and translated here, but `../codex.js`'s `plan()` additionally
+ * gates it against the installed `codex --version` and drops it (with a
+ * warning) on an older CLI, since an unrecognized event key in hooks.json
+ * would otherwise be silently ignored by Codex itself rather than reported. */
 const KNOWN_EVENTS = new Set([
   'PreToolUse',
   'PostToolUse',
@@ -49,6 +54,7 @@ const KNOWN_EVENTS = new Set([
   'PostCompact',
   'SubagentStart',
   'SubagentStop',
+  'Interrupt',
 ]);
 
 const MATCHER_MAP = new Map([
