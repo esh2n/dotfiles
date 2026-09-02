@@ -1,0 +1,42 @@
+# Seed for ~/.codex/config.toml, copied ONCE by domains/dev/install.sh's
+# ensure_codex_config when the live file does not exist yet. It is never
+# re-applied: the live file carries yoki's `# yoki:begin` managed block and
+# codex's own hook trust hashes, which a second copy would discard.
+#
+# Keep only settings that are genuinely machine-local starting points here.
+# Anything yoki owns belongs in the claude-profiles layers instead:
+#   - MCP servers        -> claude-profiles/{core,personal}/mcp.json
+#   - hooks / rules      -> claude-profiles layers, via yoki-switch
+#   - permissions        -> claude-profiles/*/permissions.yaml
+# yoki refuses to manage an `[mcp_servers.<name>]` it finds declared outside
+# its block ("left alone, not regenerated"), so a server listed both here and
+# in mcp.json silently stops following the canonical inventory.
+
+hide_agent_reasoning = true
+network_access = true
+model = "gpt-5-codex"
+
+[tools]
+web_search = true
+
+# Codex-only servers, absent from the canonical mcp.json inventory. figma
+# reads a key from the environment rather than a literal (mcp.json rejects
+# literal secrets outright, which is why this entry never moved there).
+[mcp_servers.figma]
+command = "npx"
+args = ["tsx", "./.tmp/mcp/FigmaMCP/src/index.ts"]
+[mcp_servers.figma.env]
+FIGMA_API_KEY = ""
+
+[mcp_servers.container-use]
+command = "container-use"
+args = ["stdio"]
+
+[mcp_servers.terraform]
+command = "/go/bin/terraform-mcp-server"
+args = ["stdio"]
+
+# Add your trusted project paths here
+# Example:
+# [projects."/path/to/your/project"]
+# trust_level = "trusted"
