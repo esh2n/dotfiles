@@ -809,4 +809,31 @@ PBEOF
     log_success "Updated tmux-pane-border colors"
 fi
 
+# Update Orca Theme (ADE)
+# Orca keeps every setting in one app-state JSON (profiles/<id>/orca-data.json)
+# with no CLI/IPC/deep-link to change themes (verified 2026-09: CLI reference
+# has no settings command; orca:// is pairing-only). The running app is the
+# storage authority — its debounced writes clobber external edits — so this
+# section only applies when Orca is closed. Terminal palettes ride on Orca's
+# Warp-theme auto-discovery of ~/.warp* : the same themes/<name>.yaml Warp
+# uses is selectable in Orca by its yaml `name:` field (one-time import via
+# Settings -> Terminal -> Import themes from Warp).
+ORCA_SUPPORT_DIR="$HOME/Library/Application Support/orca"
+if [[ -f "$ORCA_SUPPORT_DIR/orca-profile-index.json" ]]; then
+    if pgrep -xq "Orca"; then
+        log_warn "Orca is running — theme not applied (Orca overwrites external settings edits). Quit Orca and re-run theme-switch, or switch in-app."
+    else
+        ORCA_WARP_NAME=""
+        if [[ -n "${WARP_THEME_FILE:-}" && -f "$WARP_THEME_FILE" ]]; then
+            ORCA_WARP_NAME="$(sed -n "s/^name:[[:space:]]*[\"']\{0,1\}\([^\"']*\)[\"']\{0,1\}[[:space:]]*$/\1/p" "$WARP_THEME_FILE" | head -1)"
+        fi
+        if ORCA_OUT="$(python3 "$DOTFILES_ROOT/domains/system/bin/orca-theme-apply.py" "$ORCA_SUPPORT_DIR" "$VARIANT" "$ORCA_WARP_NAME" 2>&1)"; then
+            log_success "Updated Orca theme ($ORCA_OUT)"
+            [[ -z "$ORCA_WARP_NAME" ]] && log_info "Orca: no Warp theme name for '$THEME' — only UI light/dark was set"
+        else
+            log_warn "Orca theme update failed: $ORCA_OUT"
+        fi
+    fi
+fi
+
 log_success "Theme switched successfully!"
