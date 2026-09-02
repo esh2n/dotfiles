@@ -173,6 +173,11 @@ export OWNER_EMAIL=you@example.com         # 唯一の書き込み権限者
 - `--viewers <path>` で別のファイルを指定できる
 - 内容は Access グループ `yoki-artifact-viewers` の include に反映される。
   リストから消したアドレスは次回実行でグループからも消える
+- **`OWNER_EMAIL` は常にグループの include に含まれる**（作成時も更新時も）。
+  Cloudflare の API は include が空のグループを 400
+  （`include field should not be empty`）で拒否するため、閲覧者ゼロでも
+  グループはオーナー 1 人で作られる。あとで `viewers.json` を空にしても
+  同じ理由で失敗しない
 
 日常の共有は `viewers.json` の編集ではなく **`yoki-artifact share`**（5-7）を
 使う。ただし `setup.mjs` はグループの include を `viewers.json` で**丸ごと

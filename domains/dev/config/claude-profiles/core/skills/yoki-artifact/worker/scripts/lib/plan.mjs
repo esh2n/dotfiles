@@ -176,22 +176,27 @@ function accessAppStep(existing, accountId) {
   });
 }
 
-function viewersGroupStep(existing, accountId, viewers) {
+function viewersGroupStep(existing, accountId, viewers, ownerEmail) {
   const found = byName(existing.accessGroups, VIEWERS_GROUP_NAME);
-  const body = { name: VIEWERS_GROUP_NAME, include: emailInclude(viewers) };
+  // The owner is always a member. Verified live 2026-09: the API rejects a
+  // group with an empty include (`include field should not be empty`), so a
+  // missing/emptied viewers.json must still yield a valid body — and unioning
+  // the owner on both the create and update paths guarantees that.
+  const members = [...new Set([ownerEmail.trim().toLowerCase(), ...viewers])].sort();
+  const body = { name: VIEWERS_GROUP_NAME, include: emailInclude(members) };
   if (!found) {
     return apiStep({
       id: "viewers-group",
-      describe: `Access group "${VIEWERS_GROUP_NAME}" (${viewers.length} viewer(s))`,
+      describe: `Access group "${VIEWERS_GROUP_NAME}" (owner + ${viewers.length} viewer(s))`,
       method: "POST",
       path: `/accounts/${accountId}/access/groups`,
       body,
     });
   }
-  const unchanged = sameMembers(groupEmails(found), viewers);
+  const unchanged = sameMembers(groupEmails(found), members);
   return apiStep({
     id: "viewers-group",
-    describe: `Access group "${VIEWERS_GROUP_NAME}": update members (${viewers.length})`,
+    describe: `Access group "${VIEWERS_GROUP_NAME}": update members (owner + ${viewers.length})`,
     method: "PUT",
     path: `/accounts/${accountId}/access/groups/${found.id}`,
     body,
@@ -292,7 +297,7 @@ export function planSetup(existing, { accountId, teamDomain, ownerEmail, viewers
       ...wrangler("deploy"),
     }),
     accessAppStep(state, accountId),
-    viewersGroupStep(state, accountId, viewers),
+    viewersGroupStep(state, accountId, viewers, ownerEmail),
     serviceTokenStep(state, accountId),
     ...policySteps(state, accountId, appId, ownerEmail),
     fileStep({

@@ -55,7 +55,12 @@ const fullState = (overrides = {}) => ({
     { id: "p-2", name: "yoki-artifact-service-auth" },
   ],
   accessGroups: [
-    { id: "g-1", name: VIEWERS_GROUP_NAME, include: [{ email: { email: "viewer@example.com" } }] },
+    // The owner is always a member (the API rejects an empty include).
+    {
+      id: "g-1",
+      name: VIEWERS_GROUP_NAME,
+      include: [{ email: { email: "owner@example.com" } }, { email: { email: "viewer@example.com" } }],
+    },
   ],
   serviceTokens: [{ id: "t-1", name: SERVICE_TOKEN_NAME, client_id: "client-1" }],
   workersSubdomain: "esh2n",
@@ -153,9 +158,28 @@ describe("planSetup on an empty account", () => {
     assert.equal(step(plan, "service-token").body.name, "yoki-artifact-cli");
   });
 
-  test("the viewers group is built from the local JSON list", () => {
-    assert.deepEqual(step(plan, "viewers-group").body.include, [{ email: { email: "viewer@example.com" } }]);
+  test("the viewers group is the local JSON list plus the owner, always", () => {
+    assert.deepEqual(step(plan, "viewers-group").body.include, [
+      { email: { email: "owner@example.com" } },
+      { email: { email: "viewer@example.com" } },
+    ]);
     assert.equal(step(plan, "viewers-group").method, "POST");
+  });
+
+  // Verified live 2026-09: POST /access/groups with an empty include is a 400
+  // (`include field should not be empty`), so "no viewers.json" must not
+  // produce an empty group body.
+  test("zero viewers still yields a valid, owner-only group", () => {
+    const emptyPlan = planSetup(EMPTY_STATE, { ...PARAMS, viewers: [] });
+    assert.deepEqual(step(emptyPlan, "viewers-group").body.include, [{ email: { email: "owner@example.com" } }]);
+  });
+
+  test("emptying viewers.json later shrinks the group to the owner, not to nothing", () => {
+    const emptyPlan = planSetup(fullState(), { ...PARAMS, viewers: [] });
+    const group = step(emptyPlan, "viewers-group");
+    assert.equal(group.method, "PUT");
+    assert.equal(group.skip, null);
+    assert.deepEqual(group.body.include, [{ email: { email: "owner@example.com" } }]);
   });
 
   test("ACCESS_AUD is written from the application, not invented", () => {
@@ -241,7 +265,7 @@ describe("planSetup is idempotent", () => {
     assert.equal(group.method, "PUT");
     assert.equal(group.path, `/accounts/${ACCOUNT}/access/groups/g-1`);
     assert.equal(group.skip, null);
-    assert.equal(group.body.include.length, 2);
+    assert.equal(group.body.include.length, 3, "owner + the two viewers");
   });
 
   test("an unchanged viewer list leaves the group alone", () => {
