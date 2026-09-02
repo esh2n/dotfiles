@@ -140,7 +140,9 @@ const SCRIPTS = [
   {
     name: 'design-review',
     scriptPath: path.join(CORE_WORKFLOWS, 'design-review.js'),
-    args: { target: 'a write-through cache design, see fixture design_text' },
+    // The target IS the design text (source_kind "text"): the script embeds
+    // it into the lane prompts itself — no agent transcription round-trip.
+    args: { target: 'Design: add a write-through cache in front of the lookup path. On write, update the store then the cache. On read, check the cache first, fall back to the store on miss. No rollback plan is specified.' },
     assertResult(r) {
       assert.equal(r.verdict, 'proceed-with-changes');
       assert.equal(r.findings.length, 1);
@@ -811,7 +813,7 @@ test('design-review: a confirmed claim is never downgraded by an unverified dupl
   // comes back unverified — the exact collision.
   fs.writeFileSync(mockFile, JSON.stringify({
     gather: {
-      source_kind: 'inline', design_summary: 'a cache design', design_text: 'a cache design',
+      source_kind: 'text', design_summary: 'a write-through cache design for the lookup path with no rollback plan specified',
       grounding: [], missing: [], checklists: [],
     },
     'lane:conventions': { findings: [{ claim, severity_confidence: 8, importance: 8, doc_ref: '', load_bearing: true }], open_questions: [] },
@@ -835,6 +837,80 @@ test('design-review: a confirmed claim is never downgraded by an unverified dupl
     // The code-enforced floor can only fire on a CONFIRMED finding, so the
     // downgrade also used to let a C9/I9 defect through as "proceed".
     assert.equal(result.result.verdict, 'proceed-with-changes');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+/**
+ * The 2026-09-02 fabrication incident, pinned: an ingest agent that could not
+ * fill the gather schema truthfully was schema-retried into submitting
+ * placeholder garbage, which then flowed to all 11 downstream agents
+ * unchecked. The fix is an `error` escape hatch plus abort gates in the
+ * script — these tests prove each gate actually cuts the panel off.
+ */
+async function runDesignReviewGate(mockFile) {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-ingest-gate-'));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: DESIGN_REVIEW_SPEC.scriptPath, args: DESIGN_REVIEW_SPEC.args,
+      backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    return { result, events };
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+/** No panel lane, verifier, or synthesizer may start once ingest is refused. */
+function assertPanelNeverStarted(events) {
+  const labels = labelsOf(events);
+  assert.deepEqual(labels, ['gather'],
+    `agents ran past the ingest gate: ${labels.join(', ')}`);
+}
+
+test('design-review: an ingest error aborts the run before any panel lane starts', () => withIsolatedState(async () => {
+  const { result, events } = await runDesignReviewGate(fixture('design-review-error'));
+  assert.equal(result.status, 'ok', result.error);
+  assert.equal(result.result.error, 'cannot read target');
+  assertPanelNeverStarted(events);
+}));
+
+test('design-review: a too-short design_summary is refused as suspected fabrication', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-short-summary-'));
+  const mockFile = path.join(cwd, 'short-summary.mock.json');
+  // The incident's exact shape: schema-passing garbage ("test") in the
+  // summary field, submitted under retry pressure.
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: { source_kind: 'text', design_summary: 'test', grounding: [], missing: [], checklists: [] },
+  }));
+  try {
+    const { result, events } = await runDesignReviewGate(mockFile);
+    assert.equal(result.status, 'ok', result.error);
+    assert.match(result.result.error, /too short/);
+    assert.match(result.result.error, /suspected placeholder/);
+    assertPanelNeverStarted(events);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('design-review: a file target with no design_path aborts — the panel cannot re-read a design nobody located', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-no-path-'));
+  const mockFile = path.join(cwd, 'no-path.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: {
+      source_kind: 'file',
+      design_summary: 'a design read from a file whose path the ingest agent failed to return',
+      grounding: [], missing: [], checklists: [],
+    },
+  }));
+  try {
+    const { result, events } = await runDesignReviewGate(mockFile);
+    assert.equal(result.status, 'ok', result.error);
+    assert.match(result.result.error, /no design_path/);
+    assertPanelNeverStarted(events);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }

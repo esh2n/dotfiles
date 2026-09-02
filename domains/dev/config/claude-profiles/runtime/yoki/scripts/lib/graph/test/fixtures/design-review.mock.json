@@ -1,8 +1,7 @@
 {
   "gather": {
-    "source_kind": "inline",
+    "source_kind": "text",
     "design_summary": "Add a write-through cache in front of the lookup path; no schema change.",
-    "design_text": "Design: add a write-through cache in front of the lookup path. On write, update the store then the cache. On read, check the cache first, fall back to the store on miss. No rollback plan is specified.",
     "grounding": [
       {
         "doc": "README.md",
