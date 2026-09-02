@@ -50,6 +50,7 @@ If a package has no benchmark to run, say so and stop — do not fabricate a mea
 - **verified** — the full 5-part chain above was run and the result matches the claimed mechanism.
 - **unverified** — anything else, including every `static`-mode finding, a `measure`-mode finding where the chain was only partially run, or one where benchstat showed no significant delta (p >= 0.05) or the pprof diff didn't confirm the mechanism.
 - A performance claim without the evidence chain is reported as **unverified, never as fact.** Do not use words like "will improve" or "is faster" for an unverified finding — use "is expected to" / "candidate for" instead.
+- Never quote the value of a secret, key, or token in a finding — show only its file:line location.
 
 ## Version awareness
 
