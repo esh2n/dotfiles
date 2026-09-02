@@ -85,7 +85,7 @@ Performance (allocation, GC, lock contention, mutex-vs-atomic, Pool fit, hot-pat
 
 ## Diagnostic Commands
 
-Static/parse-only — these read and type-check the source without executing package code or `init()`/`main()`:
+Static/parse-only in the pure-Go case — these read and type-check the source without executing `init()`/`main()`. Caveat (same standard as the rust-reviewer's `build.rs` rule): on a package that uses cgo, all four invoke the C toolchain with the package's own `#cgo` CFLAGS/LDFLAGS — diff-controlled input driving a compiler is execution, not static analysis. For a diff touching cgo directives or C sources, skip them and name the command in the finding instead, unless `YOKI_REVIEW_EXEC=1` is set:
 
 ```bash
 go vet ./...
