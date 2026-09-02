@@ -13,6 +13,15 @@ yoki is organized in three layers:
 - **Loop** — time-axis automation (/loop, cron routines, correction-detect)
 - **Graph** — multi-agent control flow as Workflow scripts (`~/.claude/workflows/`)
 
+## ワークフロー(yoki-graph)
+
+ワークフローは目的ではなく手段。review / research / implement のように、独立
+したレーンを並べて突き合わせること自体に価値がある多角レビュー・調査・実装なら
+yoki-graph のグラフを回す
+(Claude Code は Workflow tool、Codex/omp は `yoki-graph` CLI が同じスクリプトを走らせる)。
+1パスで終わる軽い仕事にまで持ち出す必要はない。使えるグラフの一覧と選び分けは
+yoki-graph スキルにある。
+
 ## Hook Profiles
 
 yoki hooks run through the `run-with-flags.js` runner with profile levels:

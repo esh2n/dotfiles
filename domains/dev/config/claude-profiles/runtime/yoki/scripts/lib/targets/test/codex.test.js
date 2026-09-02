@@ -733,6 +733,42 @@ test('substituteVocab: applies every entry, longest key first', () => {
   assert.equal(substituteVocab('Use Claude Code and edit ~/.claude/rules', vocab), 'Use Codex and edit ~/.codex/rules');
 });
 
+// The yoki-graph discoverability paragraph lives in the ONE always-on layer
+// that reaches all three harnesses: Claude Code reads core/CLAUDE.layer.md
+// through ~/.claude/CLAUDE.md, omp reads that same file directly (its
+// `claude` discovery provider — see omp-rules-md.js's header), and Codex
+// gets it vocab-substituted into ~/.codex/AGENTS.md. Only the Codex path
+// rewrites anything, so only it can render the paragraph into nonsense —
+// hence a rendering assertion here rather than a prose review.
+const REAL_LAYER_MD = path.join(__dirname, '..', '..', '..', '..', '..', '..', 'core', 'CLAUDE.layer.md');
+const REAL_VOCAB = require('../vocab.json');
+
+test('CLAUDE.layer.md ships the yoki-graph paragraph: means-not-goal, the three named graphs, no mandatory language', () => {
+  const layer = fs.readFileSync(REAL_LAYER_MD, 'utf8');
+  const section = layer.split(/^## /m).find((s) => s.startsWith('ワークフロー(yoki-graph)'));
+  assert.ok(section, 'core/CLAUDE.layer.md has no "## ワークフロー(yoki-graph)" section');
+  assert.match(section, /目的ではなく手段/);           // a means, not a goal
+  assert.match(section, /review \/ research \/ implement/); // only the three representatives
+  assert.match(section, /軽い仕事にまで持ち出す必要はない/); // light work does not need one
+  assert.match(section, /yoki-graph スキル/);           // points at the full catalog
+  assert.ok(!/必ず/.test(section), 'the paragraph must not use mandatory language ("必ず")');
+});
+
+test('the yoki-graph paragraph renders correctly on Codex too (no "Claude Code は Workflow tool" leaking through)', () => {
+  const layer = fs.readFileSync(REAL_LAYER_MD, 'utf8');
+  const section = `## ${layer.split(/^## /m).find((s) => s.startsWith('ワークフロー(yoki-graph)'))}`;
+  const rendered = substituteVocab(section, REAL_VOCAB);
+
+  // Claude side: the native tool is named.
+  assert.match(section, /Claude Code は Workflow tool、Codex\/omp は `yoki-graph` CLI/);
+  // Codex side: one harness, one entry point — the clause collapses.
+  assert.match(rendered, /\(Codex は `yoki-graph` CLI が同じスクリプトを走らせる\)/);
+  assert.ok(!rendered.includes('Claude Code'), 'Codex rendering still names Claude Code');
+  assert.ok(!rendered.includes('Workflow tool'), 'Codex rendering still names a tool Codex does not have');
+  // The pointer at the catalog must survive substitution on both sides.
+  assert.match(rendered, /yoki-graph スキル/);
+});
+
 test('buildAgentsMdBlockContent + applyAgentsMdBlock: concatenates CLAUDE*.md and no-paths rules, substitutes vocab, preserves the rest', () => {
   const vocab = { 'Claude Code': 'Codex' };
   const block = buildAgentsMdBlockContent({

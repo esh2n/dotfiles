@@ -1,0 +1,13 @@
+# Codex skill interface manifest. Rides along with the skill directory,
+# which yoki-switch symlinks to ~/.agents/skills/yoki-graph (lib/targets/
+# codex-skills.js decideSkillSymlink — this skill ships no codex/ port, so
+# the generic directory is what Codex sees).
+#
+# Shape deliberately matches core/skills/code-graph-exploration/agents/
+# openai.yaml: an `interface` block and nothing else. Invocation policy is
+# carried in SKILL.md's frontmatter description, not in a manifest key we
+# cannot validate offline against Codex's schema.
+interface:
+  display_name: "yoki-graph"
+  short_description: "Run a multi-agent workflow graph (review / research / implement)"
+  default_prompt: "Use $yoki-graph to run a multi-agent review of this branch"

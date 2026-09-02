@@ -303,8 +303,11 @@ hookがCodexに信頼された後で変更された」のか区別できない�
 Claude Code の中ではネイティブの Workflow tool がそのまま本来の経路で、
 yoki-graph に切り替える必要はない — Workflow tool を持たない harness から
 同じグラフを動かしたいとき、または `--resume`/`status` でランを直接
-触りたいときに使う。詳細なコマンド一覧・ワークフロー別の引数は
-`core/skills/yoki-graph/SKILL.md` を参照:
+触りたいときに使う。どのグラフがあるかのカタログは
+`core/skills/yoki-graph/SKILL.md`(表は `<!-- catalog:begin -->` / `:end` の
+管理ブロックで、各スクリプトの `meta` から
+`runtime/yoki/scripts/lib/graph/catalog.js` が生成する — 手で書き換えない)。
+詳細なコマンド一覧・ワークフロー別の引数は同スキルの `references/cli.md`:
 
 ```bash
 yoki-graph run review --backend codex --args '{"range":"origin/main...HEAD"}'
@@ -350,8 +353,9 @@ subagent が運搬役として yoki-agent を1回だけ叩き、返ってきた 
 返す。レーンの prompt は base64 の引数で渡すので、運搬役の指示文には
 信用できないテキストが1文字も載らず、書き込み権限も要らない)。
 確定した所見は file+line+title で重複排除して**和集合**を残し、
-`provider` / `model` が付く。詳細は `core/skills/yoki-graph/SKILL.md` の
-「Claude Code から Codex/omp レーンを混ぜる」。
+`provider` / `model` が付く。単発 CLI そのものの仕様は
+`core/skills/yoki-agent/SKILL.md`、レーンの配線は
+`core/skills/yoki-graph/references/providers.md`。
 
 ### yoki-loop
 

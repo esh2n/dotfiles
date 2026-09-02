@@ -637,6 +637,36 @@ apply_claude_plan() {
 # has never touched Codex/omp should not get ~/.codex or ~/.omp/agent
 # created out of thin air just because `yoki-switch apply` ran.
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# build_workflow_catalog: re-render the "which workflow when" table in
+# core/skills/yoki-graph/SKILL.md from the workflow scripts' own `meta`
+# (lib/graph/catalog.js) BEFORE any target installs that skill, so the
+# installed skill can never describe a catalog the repo no longer ships.
+#
+# Writes only when the rendered table differs, so a normal apply leaves the
+# checkout's git status untouched. Never fatal: a machine without node still
+# gets its old (checked-in, test-verified) table — the freshness gate that
+# actually enforces this is `validator.sh yoki-graph`, not apply.
+# -----------------------------------------------------------------------------
+build_workflow_catalog() {
+    local dry_run="$1"
+    local catalog_js="$RUNTIME_DIR/scripts/lib/graph/catalog.js"
+
+    [[ -f "$catalog_js" ]] || return 0
+    command -v node >/dev/null 2>&1 || return 0
+
+    local mode=--write
+    [[ "$dry_run" == 1 ]] && mode=--check
+
+    local out
+    if out="$(node "$catalog_js" "$mode" --profiles-root "$PROFILES_DIR" 2>&1)"; then
+        [[ "$out" == "catalog: up to date" ]] || log_info "$out"
+    else
+        log_warn "yoki-graph $out" >&2
+    fi
+    return 0
+}
+
 apply_target_generator() {
     local target="$1" out_dir="$2" dry_run="$3"; shift 3
     local -a packs=("$@")
@@ -741,6 +771,9 @@ apply() {
             log_warn "Enabled pack not found, skipping: $p"
         fi
     done < <(enabled_packs)
+
+    # Before any target copies core/skills/yoki-graph anywhere.
+    build_workflow_catalog "$dry_run"
 
     if _target_requested claude "${targets[@]}"; then
         if [[ "$dry_run" == 1 ]]; then
