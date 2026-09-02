@@ -1,6 +1,6 @@
 ---
 name: yoki-agent
-description: 単発で Codex / omp に 1 つの仕事を投げる CLI。ユーザーが「yoki-agent で」「Codex にも聞いて」「omp に投げて」と明示したときに使う。多角レビューや調査を並列で回したいなら単発ではなくグラフ(yoki-graph スキル)。
+description: 単発で Codex / omp に 1 つの仕事を投げる CLI。ユーザーに名指しで頼まれたときだけ使う — 「yoki-agent で」「Codex にも聞いて」「omp に投げて」。自分から選ぶスキルではない。多角レビューや調査を並列で回したいなら単発ではなくグラフ(yoki-graph スキル)。
 ---
 
 # yoki-agent

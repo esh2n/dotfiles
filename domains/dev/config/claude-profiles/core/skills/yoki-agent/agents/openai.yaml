@@ -1,11 +1,12 @@
 # Codex skill interface manifest. Rides along with the skill directory,
 # which yoki-switch symlinks to ~/.agents/skills/yoki-agent.
+#
+# Shape deliberately matches core/skills/code-graph-exploration/agents/
+# openai.yaml: an `interface` block and nothing else. The explicit-only
+# contract ("use only when the user asks for it by name") lives in
+# SKILL.md's frontmatter description, which is the surface both harnesses
+# actually read.
 interface:
   display_name: "yoki-agent"
-  short_description: "Send one single-shot job to a Codex or omp backend"
+  short_description: "Send one single-shot job to a Codex or omp backend, when asked for by name"
   default_prompt: "Use $yoki-agent to ask codex this one question"
-policy:
-  # Explicit-invocation only: this is the single-shot escape hatch, not a
-  # default route. It runs when the user names it ("yoki-agent で",
-  # "Codex にも聞いて"), never on the model's own initiative.
-  allow_implicit_invocation: false
