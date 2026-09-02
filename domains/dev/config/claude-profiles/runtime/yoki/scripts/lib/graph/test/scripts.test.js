@@ -759,6 +759,115 @@ test('review: a ts+go mixed diff keeps ts performance on the generic lane and ad
 }));
 
 /**
+ * Fabrication-defense degradations on the lang-scan and cleanup paths: a
+ * scan that errored, or returned a path the reviewed (untrusted) repo could
+ * have shaped, must degrade visibly to generic-dimensions-only review — and
+ * a diff_file that is not the mktemp *.patch shape must never reach the
+ * cleanup agent's `rm -f`.
+ */
+test('review: lang-scan {error} completes with generic dimensions only, and logs the degradation', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-langscan-err-'));
+  const mockFile = path.join(cwd, 'langscan-err.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      diff_file: '/tmp/yoki-graph-langscan-err.patch', files_changed: 1,
+      intent: 'add a helper', langs: ['go'], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    // The scan's own error hatch: no root resolvable — no paths, real or fake.
+    'lang-scan': { error: 'cannot resolve the harness checkout root' },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    assert.ok(logsOf(events).some((m) => /lang-scan failed: cannot resolve the harness checkout root/.test(m)),
+      'a failed lang-scan was never logged — a reader cannot tell specialized review was skipped');
+    const labels = labelsOf(events);
+    assert.ok(labels.includes('review:correctness'), 'the generic dimensions were dropped along with the specialists');
+    assert.ok(!labels.some((l) => l.startsWith('review:lang:') || l.startsWith('review:perf:')),
+      'a specialist lane ran despite the scan having returned only {error}');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: a lang-scan entry with a relative path is rejected and its lane dropped, both logged', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-langscan-rel-'));
+  const mockFile = path.join(cwd, 'langscan-rel.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      diff_file: '/tmp/yoki-graph-langscan-rel.patch', files_changed: 1,
+      intent: 'add a cache', langs: ['go'], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    // Relative path: resolved against the lane's cwd — the reviewed repo —
+    // it would make the lane Read a file the untrusted repo controls.
+    'lang-scan': { lang_reviewers: [{ lang: 'go', exists: true, path: 'packs/go/agents/go-reviewer.md' }] },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    assert.ok(logsOf(events).some((m) => /lang-scan: rejected malformed path for go/.test(m)),
+      'the malformed path was filtered without saying so');
+    assert.ok(logsOf(events).some((m) => /lang:go: no reviewer definition file found/.test(m)),
+      'the resulting lane drop was not logged');
+    assert.ok(!labelsOf(events).includes('review:lang:go'),
+      'a lane ran on a relative — reviewed-repo-resolvable — definition path');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: a diff_file outside the mktemp *.patch shape skips cleanup with a log, never reaching rm', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cleanup-gate-'));
+  const mockFile = path.join(cwd, 'cleanup-gate.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      // Ends in .patch and is absolute, but carries a shell metacharacter —
+      // spliced into `rm -f` it would be two commands, not one path.
+      diff_file: '/tmp/foo; rm -rf /tmp/x.patch', files_changed: 1,
+      intent: 'add a helper', langs: [], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    'lang-scan': { lang_reviewers: [] },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    assert.ok(!labelsOf(events).includes('cleanup-diff'),
+      'the cleanup agent was launched with a metacharacter-bearing rm target');
+    assert.ok(logsOf(events).some((m) => /cleanup-diff skipped/.test(m)),
+      'the skipped cleanup was silent — a leaked temp file with no trace of why');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+/**
  * The invariant that matters most and is easiest to break silently: with
  * `providers` absent, no agent() PROMPT may differ from what it was before
  * providers existed. callKey hashes the prompt, so a changed prompt breaks
