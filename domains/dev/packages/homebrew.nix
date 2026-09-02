@@ -37,6 +37,12 @@
     # microVM sandbox for coding agents. docker/tap is casks-only too (same
     # trap as codex); the tap is trusted by core/utils/homebrew.sh.
     "docker/tap/sbx"
+    # Grok Bot (x.ai/bot, signed+built by Anysphere) — AI teammates desktop
+    # app. Cask lives in homebrew-cask core; the app self-updates. First
+    # install on a machine that already has the DMG-installed app needs
+    # `brew install --cask grok-bot --adopt` once. No dotfile-manageable
+    # config: ~/.grokbot mixes app state with daemon credentials.
+    "grok-bot"
     # Orca ADE (worktree IDE for coding agents, onorca.dev). MUST stay
     # tap-qualified: the untapped homebrew/cask "orca" is Plotly's chart
     # renderer, a different app. Tap trusted by core/utils/homebrew.sh.
