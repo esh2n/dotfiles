@@ -1,0 +1,11 @@
+# Codex skill interface manifest. Rides along with the skill directory,
+# which yoki-switch symlinks to ~/.agents/skills/yoki-agent.
+interface:
+  display_name: "yoki-agent"
+  short_description: "Send one single-shot job to a Codex or omp backend"
+  default_prompt: "Use $yoki-agent to ask codex this one question"
+policy:
+  # Explicit-invocation only: this is the single-shot escape hatch, not a
+  # default route. It runs when the user names it ("yoki-agent で",
+  # "Codex にも聞いて"), never on the model's own initiative.
+  allow_implicit_invocation: false
