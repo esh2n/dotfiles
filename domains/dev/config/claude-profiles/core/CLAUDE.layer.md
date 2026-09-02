@@ -19,8 +19,10 @@ yoki is organized in three layers:
 したレーンを並べて突き合わせること自体に価値がある多角レビュー・調査・実装なら
 yoki-graph のグラフを回す
 (Claude Code は Workflow tool、Codex/omp は `yoki-graph` CLI が同じスクリプトを走らせる)。
-1パスで終わる軽い仕事にまで持ち出す必要はない。使えるグラフの一覧と選び分けは
-yoki-graph スキルにある。
+並列化だけならネイティブのサブエージェントでもできるが、多角作業は yoki-graph を
+優先する — 指摘の検証(verify)フェーズ・重複排除・予算上限・resume・進捗の可視化が
+グラフ側に付いているため。1パスで終わる軽い仕事にまで持ち出す必要はない。
+使えるグラフの一覧と選び分けは yoki-graph スキルにある。
 
 ## Hook Profiles
 
