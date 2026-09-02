@@ -401,6 +401,12 @@ if (NON_CLAUDE_PROVIDERS.length) log(`diff content will be sent to ${NON_CLAUDE_
 // running list of vulnerabilities this repo has found and NOT yet fixed —
 // the one dimension whose payload is worse to leak than the diff alone.
 const EXTERNAL_SECURITY_LANE = (args && args.externalSecurityLane) === true
+// A truthy-but-not-`true` value (1, "true", {}) is treated as false by the
+// strict check above — warn instead of silently ignoring it, so a caller who
+// passed `"true"` learns why security never left claude.
+if (args && args.externalSecurityLane && !EXTERNAL_SECURITY_LANE) {
+  log(`externalSecurityLane=${JSON.stringify(args.externalSecurityLane)} ignored — only boolean true enables external security lanes; security stays claude-only`)
+}
 
 // Language lanes: specialized reviewer agents catch what generic dimensions
 // structurally miss (borrow checker, goroutine leaks, RSC boundaries, ...).
@@ -528,7 +534,10 @@ Return prose under 2000 chars covering: conventions (naming, layout, error handl
   () => agent(
     `Find which of this harness's language-reviewer agent definition files actually exist, by absolute path. This runs against whatever repo happens to be the current directory, so resolve the harness checkout itself rather than assuming it.
 Steps:
-1. Resolve the harness checkout root: ROOT="$(cd -P ~/.claude/skills/yoki-graph 2>/dev/null && cd ../../.. && pwd)". If that command fails or ROOT is empty, stop and return only the \`error\` field.
+1. Resolve the harness checkout root — take the FIRST candidate that is a directory containing a packs/ subdirectory:
+   a. ROOT="$(cd -P "$YOKI_ROOT/../.." 2>/dev/null && pwd)" — $YOKI_ROOT is set by settings env on every machine, including codex/omp targets where ~/.claude/skills does not exist.
+   b. ROOT="$(cd -P ~/.claude/skills/yoki-graph 2>/dev/null && cd ../../.. && pwd)" — the Claude Code skill symlink hop, kept as fallback.
+   If neither candidate has a packs/ subdirectory, stop and return only the \`error\` field.
 2. Run: ls "$ROOT"/packs/*/agents/*.md 2>/dev/null
 3. For each of these lang=filename pairs, check whether a file with that exact basename appears in the listing above: ${LANG_REVIEWER_FILENAMES}. Do NOT read any file's contents — existence and absolute path only.
 4. Do the same check for these lang=filename pairs — per-language PERFORMANCE reviewers, expected to exist for only a few languages today: ${PERF_REVIEWER_FILENAMES}.
@@ -563,9 +572,19 @@ if (!GROUNDING) log('no repo grounding found — reviewers run without documente
 // specialist for anyone" rather than aborting the whole review.
 const langScan = langScanRaw && typeof langScanRaw === 'object' ? langScanRaw : {}
 if (langScan.error) log(`lang-scan failed: ${langScan.error} — language lanes run with no specialist definitions`)
+// Path shape gate: every accepted path is spliced into a lane prompt as a
+// Read instruction, and the reviewed repo is untrusted — a relative or
+// wrong-basename path from a confused/fabricated scan would point a lane's
+// Read INSIDE the repo under review. Accept only an absolute path whose
+// basename is exactly the definition file this map's lang expects.
+const isSafeDefPath = (e, expectedBasename) => {
+  const ok = typeof e.path === 'string' && e.path.startsWith('/') && e.path.endsWith('/' + expectedBasename)
+  if (!ok) log(`lang-scan: rejected malformed path for ${e.lang} (${JSON.stringify(String(e.path)).slice(0, 120)}) — expected an absolute path ending in /${expectedBasename}`)
+  return ok
+}
 const langReviewerPaths = new Map(
   (Array.isArray(langScan.lang_reviewers) ? langScan.lang_reviewers : [])
-    .filter((e) => e && e.exists && typeof e.path === 'string' && e.path)
+    .filter((e) => e && e.exists && LANG_REVIEWERS[e.lang] && isSafeDefPath(e, `${LANG_REVIEWERS[e.lang]}.md`))
     .map((e) => [e.lang, e.path]),
 )
 // Same shape, for per-language performance reviewers (R3). Absence here is
@@ -574,7 +593,7 @@ const langReviewerPaths = new Map(
 // lane loop below.
 const perfReviewerPaths = new Map(
   (Array.isArray(langScan.perf_reviewers) ? langScan.perf_reviewers : [])
-    .filter((e) => e && e.exists && typeof e.path === 'string' && e.path)
+    .filter((e) => e && e.exists && LANG_REVIEWERS[e.lang] && isSafeDefPath(e, `${e.lang}-perf-reviewer.md`))
     .map((e) => [e.lang, e.path]),
 )
 
@@ -731,9 +750,16 @@ const runReviewLane = ({ d, p }) => {
     return agent(reviewerPrompt(d), {
       label: `review:${d.key}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: d.model || MODEL,
       sandbox: 'read-only',
-      // A dimension's agentType (e.g. security-reviewer) may hold Write/Edit
-      // in its own tool grant, but this is a detection lane, not a fix lane —
-      // sandbox pins it to read-only regardless of what the persona carries.
+      // What the explicit `read-only` actually buys: on the codex/omp
+      // backends it is translated into those CLIs' own read-only flags
+      // (backends/*.js buildArgv), so pinning it here guards against a
+      // future default change there. On the claude branch it is intent
+      // documentation, not enforcement — what stops a detection lane from
+      // writing is the harness's own permission layer, even when the
+      // dimension's agentType (e.g. security-reviewer) carries Write/Edit
+      // in its tool grant. Adding these explicit opts changed each call's
+      // journaled signature once, invalidating pre-change runs' --resume
+      // prefix one time; runs started since resume normally.
       ...(d.agentType ? { agentType: d.agentType } : {}),
     })
   }
@@ -844,10 +870,24 @@ const rows = confirmed.map((f) => ({
 // Final metrics/report step: every lane above is done reading the diff, so
 // delete the scratch file collect-diff created with mktemp (A8) — nothing
 // else in this workflow still needs it, and it should not outlive the run.
-await agent(
-  `Delete the temporary diff file at ${ctx.diff_file} (rm -f). Cleanup only — do not read or act on its contents.`,
-  { label: 'cleanup-diff', phase: 'Verify', model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
-)
+// ctx.diff_file is model-supplied (collect-diff's StructuredOutput) and is
+// spliced into an `rm -f` run under workspace-write, so it is gated to the
+// one shape collect-diff can legitimately produce: an absolute path ending
+// in .patch with no whitespace or shell metacharacters. Anything else skips
+// cleanup with a log rather than aiming an rm at a fabricated path. Note
+// the early-return paths above (collect error, empty diff, missing fields)
+// skip cleanup entirely — accepted: on those paths either no diff file was
+// written or the run is already failing, and a leaked mktemp file is the
+// smaller problem.
+const DIFF_FILE_RE = /^\/[^\s;|&$'"\`]+\.patch$/
+if (DIFF_FILE_RE.test(ctx.diff_file)) {
+  await agent(
+    `Delete the temporary diff file at ${ctx.diff_file} (rm -f). Cleanup only — do not read or act on its contents.`,
+    { label: 'cleanup-diff', phase: 'Verify', model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
+  )
+} else {
+  log(`cleanup-diff skipped: diff_file ${JSON.stringify(String(ctx.diff_file)).slice(0, 120)} does not match the expected mktemp *.patch shape`)
+}
 return {
   intent: ctx.intent,
   findings: rows,
