@@ -52,6 +52,15 @@ description: 多角の並列レビュー・調査・実装をワークフロー(
 `~/.claude/workflows/` へインストールされる(`yoki-switch pack enable go`)。
 この機体で実際に何が入っているかは `yoki-graph list`。
 
+`review` の operability レーンは、diff が operational surface(network / queue /
+metrics / health)に触れていて、**かつ** pattern checklist
+(`~/.claude/skills/*/references/review-checklist.md`)が1つ以上導入されている機体で
+のみ起動する意図された設計 — どちらか一方でも欠ければ黙ってスキップされる。
+
+review が読み込むレビュアー agent 定義(`core/agents/*-reviewer.md`,
+`packs/*/agents/*-reviewer.md`)の最低要件は
+`core/docs/reviewer-requirements.md` — 新しいレビュアーを書く前に必ず参照。
+
 ## 起動する
 
 **Claude Code の中では、ネイティブの Workflow tool がこれまでどおり本来の

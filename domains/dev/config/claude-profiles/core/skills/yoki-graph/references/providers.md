@@ -36,7 +36,9 @@ Workflow({ name: 'research', args: {
   ラベルも prompt も agent() の呼び出し列(= journal と `--resume` の
   prefix)も変わらない。
 - 指定するとレーンが「次元 × プロバイダ」に増える。review なら
-  `review:security` に加えて `review:security@codex/opus` が走る。
+  `review:correctness` に加えて `review:correctness@codex/sonnet` が走る
+  — ただし `security` 次元だけは例外(下の「security 次元は既定で claude
+  だけ」を参照)。
 - **知らないプロバイダ名・変なモデル id はランを止める(fatal)**。以前は
   黙って捨てていたので、`["claude","codeex"]` は claude だけのランになり、
   それは既定のランと見分けがつかなかった(ログ行すら出ない)。「2社で見た」
@@ -70,6 +72,36 @@ Workflow({ name: 'research', args: {
   `providers: ["claude","codex"]` を持つ1件にまとめ、片方しか挙げなかった
   所見はそのまま残る。所見には `provider` / `model` が付き、返り値には
   プロバイダ別にまとめた `by_provider` が入る。
+- **agentType はレーンに転送しない**: `agent(prompt, {backend: 'codex',
+  agentType: 'security-reviewer'})` のように**直接** backend を渡す呼び出しなら
+  `backends/common.js` の `resolveAgentPreamble` が backend を問わず同じ
+  `<name>.md` を引く。しかし `review.js` 自身の provider レーン(この節の
+  proxy 機構)はその経路を通らない — `code-reviewer` / `security-reviewer`
+  のような次元の agentType は **claude 側のレーンにしか渡さない**。非
+  claude 側は persona をプロンプト本文だけで組み立てる(次元名は元々
+  reviewerPrompt に入っている)。理由は、別プロバイダに振る目的が
+  「Claude 用にこのリポジトリが用意したチェックリストの模倣」ではなく
+  **そのプロバイダ自身の判断**を得ることだから — 定義ファイルを転送すれば
+  それが失われる。
+- **security 次元は既定で claude だけ**: `review` の `providers` に非
+  claude を入れても、`security` レーンは既定では**そのプロバイダに回らない**
+  ——`externalSecurityLane: true` を明示したときだけ回る。他の次元は
+  `providers` が増えれば素直に倍になるのに対し、security だけ別扱いなのは、
+  そのレーンの payload が「差分」に加えて「そのプロバイダ自身が見つけた、
+  まだ直っていない具体的な脆弱性のリスト」を含むから — 未修正コードの
+  具体的な exploit map を、パッチが出る前に社外(そのプロバイダ自身の
+  インフラ)で生成・送信させることになる。この判断を踏まえた上でだけ
+  opt-in する。
+  ```js
+  Workflow({ name: 'review', args: {
+    providers: ['claude', 'codex'],
+    externalSecurityLane: true, // opt-in: security も codex に回す
+  } })
+  ```
+  フラグなしのランは、ランの開始時点で非 claude プロバイダを含むかどうかに
+  関わらず `log()` に `diff content will be sent to codex` のような1行を出す
+  — 差分そのものがどのプロバイダに流れるかは security 次元の除外と無関係に
+  常に見えるようにする。
 - **ヘルパの正本は `core/workflows/lib/lanes.js`**。Workflow スクリプトは
   モジュールを持たない(`require`/`import`/fs いずれも不可 — 両ランタイムとも
   固定のグローバルだけを注入した素の async 関数に body をコンパイルする)ため、

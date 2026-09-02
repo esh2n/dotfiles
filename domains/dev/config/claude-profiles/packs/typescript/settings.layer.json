@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${YOKI_NODE:-node}\" ~/.claude/hooks/ts-lint-post-edit.js",
+            "timeout": 40
+          }
+        ]
+      }
+    ]
+  }
+}
