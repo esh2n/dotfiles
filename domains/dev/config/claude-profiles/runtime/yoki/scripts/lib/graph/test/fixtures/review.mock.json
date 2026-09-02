@@ -10,6 +10,11 @@
     "checklists": []
   },
   "grounding": "none",
+  "lang-scan": {
+    "lang_reviewers": [
+      { "lang": "go", "exists": true, "path": "/repo/packs/go/agents/go-reviewer.md" }
+    ]
+  },
   "review:correctness": {
     "findings": [
       {

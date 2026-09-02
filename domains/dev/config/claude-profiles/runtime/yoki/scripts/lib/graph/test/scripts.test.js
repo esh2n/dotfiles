@@ -369,12 +369,20 @@ test('review with providers ["claude","codex"]: one lane per dimension per provi
     assert.equal(result.status, 'ok', result.error);
     const labels = labelsOf(events);
 
-    // Every dimension ran twice — once natively, once through a transport
-    // agent whose label names the provider and the model it was pointed at.
+    // Every OTHER dimension ran twice — once natively, once through a
+    // transport agent whose label names the provider and the model it was
+    // pointed at. `security` is the one exception (A5): it stays
+    // claude-only by default, so no `review:security@codex/...` lane runs
+    // even though `providers` names codex — see the two tests right below
+    // this one for that exclusion pinned on its own.
     assert.ok(labels.includes('review:correctness'), 'the claude lane label changed');
     assert.ok(labels.includes('review:correctness@codex/sonnet'), 'no codex lane for correctness');
-    // The security dimension keeps its own opus tier when routed to codex.
-    assert.ok(labels.includes('review:security@codex/opus'));
+    assert.ok(!labels.includes('review:security@codex/opus'),
+      'security ran on codex with no externalSecurityLane flag');
+    assert.ok(labels.includes('review:security'), 'the claude security lane itself was skipped too');
+    // The run-start warning names every non-claude provider before any lane
+    // sends it anything, security-lane exclusion or not.
+    assert.ok(logsOf(events).some((m) => m === 'diff content will be sent to codex'));
 
     const findings = result.result.findings;
     // pkg/foo.go:42 "possible nil dereference" was found by BOTH providers
@@ -383,32 +391,79 @@ test('review with providers ["claude","codex"]: one lane per dimension per provi
     assert.ok(shared, 'the finding both providers reported disappeared');
     assert.deepEqual(shared.providers.sort(), ['claude', 'codex']);
 
-    // A DIFFERENT defect at the same file:line survives beside it — the
-    // dedupe key carries the normalized title. Across providers this is not
-    // cosmetic: collapsing by file:line would throw away exactly the second
-    // opinion the providers were added for.
+    // The claude-only security finding survives beside it — the dedupe key
+    // carries the normalized title, so a different defect at the same
+    // file:line is never collapsed into the shared one.
     const sameLine = findings.filter((f) => f.file === 'pkg/foo.go' && f.line === 42);
     assert.equal(sameLine.length, 2, 'two different defects on one line collapsed into one');
     assert.deepEqual(sameLine.map((f) => f.title).sort(),
       ['possible nil dereference', 'unchecked error return']);
+    const claudeOnlySecurity = findings.find((f) => f.title === 'unchecked error return');
+    assert.deepEqual(claudeOnlySecurity.providers, ['claude'],
+      'the security finding gained a codex attribution it never earned');
 
-    // pkg/bar.go was found by codex ONLY -> the union keeps it.
-    const codexOnly = findings.find((f) => f.file === 'pkg/bar.go');
-    assert.ok(codexOnly, 'the finding only codex reported was dropped — this is not a union');
-    assert.deepEqual(codexOnly.providers, ['codex']);
-    assert.equal(codexOnly.provider, 'codex');
-    assert.match(codexOnly.tag, /\[codex\]/);
-    assert.equal(findings.length, 3);
+    // pkg/bar.go is the fixture's `review:security@codex/opus` finding —
+    // with that lane never running, the union has nothing to keep here.
+    assert.ok(!findings.some((f) => f.file === 'pkg/bar.go'),
+      'a security finding reached the result with no externalSecurityLane flag');
+    assert.equal(findings.length, 2);
 
     // Grouped by provider: a shared finding appears under both, so a group
-    // reads as "what this provider saw".
+    // reads as "what this provider saw". Codex's group no longer carries a
+    // security finding of its own.
     assert.deepEqual(Object.keys(result.result.by_provider).sort(), ['claude', 'codex']);
     assert.equal(result.result.by_provider.claude.length, 2);
-    assert.equal(result.result.by_provider.codex.length, 2);
+    assert.equal(result.result.by_provider.codex.length, 1);
 
-    // Metrics are keyed per provider once there is more than one.
+    // Metrics are keyed per provider once there is more than one — and
+    // security's codex metric key does not exist at all, because that lane
+    // never ran (not because it ran and reported nothing).
     assert.ok(result.result.metrics['correctness@claude']);
     assert.ok(result.result.metrics['correctness@codex']);
+    assert.ok(result.result.metrics['security@claude']);
+    assert.equal(result.result.metrics['security@codex'], undefined,
+      'a metrics entry exists for a security lane that never ran');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+// A5: security is excluded from non-claude providers by default because its
+// lane sends both the diff and the resulting list of specific, unpatched
+// vulnerabilities to that provider's own service — set explicitly per run
+// with `externalSecurityLane: true` once that trade-off has been weighed.
+test('review: security is excluded from every non-claude provider without externalSecurityLane', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-security-lane-'));
+  try {
+    const { result, events } = await runWithProviders(REVIEW_SPEC, ['claude', 'codex'], cwd);
+    assert.equal(result.status, 'ok', result.error);
+    assert.ok(!labelsOf(events).includes('review:security@codex/opus'),
+      'security×codex ran without the externalSecurityLane flag');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: externalSecurityLane: true stands up the security×codex lane', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-security-lane-flag-'));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath,
+      args: { ...REVIEW_SPEC.args, providers: ['claude', 'codex'], externalSecurityLane: true },
+      backendName: 'mock',
+      cwd,
+      mockFile: fixture(REVIEW_SPEC.name),
+      emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    assert.ok(labelsOf(events).includes('review:security@codex/opus'),
+      'security×codex did not run with externalSecurityLane: true');
+    // And its finding (pkg/bar.go, codex-only) is actually delivered, not
+    // just launched and discarded.
+    const codexOnly = result.result.findings.find((f) => f.file === 'pkg/bar.go');
+    assert.ok(codexOnly, 'the security×codex finding was launched but its finding never arrived');
+    assert.deepEqual(codexOnly.providers, ['codex']);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
@@ -485,6 +540,219 @@ test('review: a provider lane answered by a fixture is delivered but announced a
     const note = logsOf(events).find((m) => m.includes('review:performance@codex/sonnet'));
     assert.ok(note, 'a fixture-served lane was reported as if the provider had answered');
     assert.match(note, /MOCK/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+/**
+ * R1+A4: language-lane routing no longer goes through agentType (which
+ * resolves against ~/.claude/agents — a view of only the packs ENABLED on
+ * this machine), so a language detected in the diff whose reviewer
+ * definition file the Collect-phase `lang-scan` agent did NOT find must
+ * drop its lane instead of silently falling back to a bare persona prompt —
+ * and, unlike the old agentType path, this has to be visible in the log on
+ * every provider branch, not just the non-claude transport's own per-call
+ * `note`.
+ */
+test('review: a detected language with no reviewer definition file drops its lane and logs it', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-missing-lang-'));
+  const mockFile = path.join(cwd, 'missing-lang.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      diff_file: '/tmp/yoki-graph-missing-lang.patch', files_changed: 1,
+      intent: 'add a helper', langs: ['python'], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    // No entry for "python" — the scan ran fine but found no definition file.
+    'lang-scan': { lang_reviewers: [{ lang: 'python', exists: false, path: '' }] },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    const note = logsOf(events).find((m) => m.includes('lang:python'));
+    assert.ok(note, 'the dropped language lane was never logged — a reader cannot tell specialized review was skipped');
+    assert.match(note, /dropped/);
+    // And the lane genuinely never ran — this is a real drop, not just a note.
+    assert.ok(!labelsOf(events).some((l) => l.startsWith('review:lang:')),
+      'a language lane with no reviewer definition file still ran');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+/**
+ * R2/A1: both review providers independently flagged that `css` was in the
+ * langs enum with no reviewer mapping, so `web-platform-reviewer` was never
+ * reachable — a css-only or css-alongside-TS diff silently got zero
+ * specialized review. Fixed by LANG_REVIEWERS['css'] = 'web-platform-reviewer'
+ * riding the same T1 lang-scan mechanism every other language uses. These
+ * two tests pin the lane actually standing up, not just the schema entry.
+ */
+test('review: a css-only diff stands up the review:lang:css lane', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-css-only-'));
+  const mockFile = path.join(cwd, 'css-only.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      diff_file: '/tmp/yoki-graph-css-only.patch', files_changed: 1,
+      intent: 'restyle the nav bar', langs: ['css'], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    'lang-scan': { lang_reviewers: [{ lang: 'css', exists: true, path: '/fake/root/packs/web/agents/web-platform-reviewer.md' }] },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+    'review:lang:css': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    assert.ok(labelsOf(events).includes('review:lang:css'),
+      'a css-only diff never stood up the web-platform-reviewer lane');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: a TS+css mixed diff stands up both review:lang:typescript and review:lang:css lanes', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-ts-css-'));
+  const mockFile = path.join(cwd, 'ts-css.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      diff_file: '/tmp/yoki-graph-ts-css.patch', files_changed: 2,
+      intent: 'add a component and its stylesheet', langs: ['typescript', 'css'], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    'lang-scan': {
+      lang_reviewers: [
+        { lang: 'typescript', exists: true, path: '/fake/root/packs/typescript/agents/typescript-reviewer.md' },
+        { lang: 'css', exists: true, path: '/fake/root/packs/web/agents/web-platform-reviewer.md' },
+      ],
+    },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+    'review:lang:typescript': { findings: [] },
+    'review:lang:css': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    const labels = labelsOf(events);
+    assert.ok(labels.includes('review:lang:typescript'), 'the typescript lane did not run alongside css');
+    assert.ok(labels.includes('review:lang:css'), 'a TS+css mixed diff never stood up the web-platform-reviewer lane');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+/**
+ * R3: the performance dimension used to SWAP its whole agentType to
+ * go-perf-reviewer whenever Go was detected — on a mixed-language diff that
+ * silently dropped every other language's performance review, since the one
+ * `performance` lane covers the whole diff, not a per-file split. Fixed by
+ * running the generic `performance` lane unconditionally and adding a
+ * perf:<lang> lane per detected language that has a perf reviewer definition
+ * file, via the same lang-scan mechanism as the `lang:` lanes (T1). These two
+ * tests pin: a Go diff gets BOTH lanes, and a ts+go mixed diff leaves ts's
+ * performance review on the generic lane (no perf:typescript lane is
+ * invented, and the generic lane is not swapped away).
+ */
+test('review: a Go diff stands up both the generic performance lane and perf:go', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-perf-go-'));
+  const mockFile = path.join(cwd, 'perf-go.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      diff_file: '/tmp/yoki-graph-perf-go.patch', files_changed: 1,
+      intent: 'add a cache lookup helper', langs: ['go'], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    'lang-scan': {
+      lang_reviewers: [{ lang: 'go', exists: true, path: '/fake/root/packs/go/agents/go-reviewer.md' }],
+      perf_reviewers: [{ lang: 'go', exists: true, path: '/fake/root/packs/go/agents/go-perf-reviewer.md' }],
+    },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+    'review:lang:go': { findings: [] },
+    'review:perf:go': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    const labels = labelsOf(events);
+    assert.ok(labels.includes('review:performance'), 'the generic performance lane was swapped away instead of kept');
+    assert.ok(labels.includes('review:perf:go'), 'go detected with a perf reviewer definition file never stood up perf:go');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('review: a ts+go mixed diff keeps ts performance on the generic lane and adds only perf:go', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-perf-mixed-'));
+  const mockFile = path.join(cwd, 'perf-mixed.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'collect-diff': {
+      diff_file: '/tmp/yoki-graph-perf-mixed.patch', files_changed: 2,
+      intent: 'add a Go cache behind a TypeScript client', langs: ['typescript', 'go'], touches: [], checklists: [],
+    },
+    grounding: 'none',
+    'lang-scan': {
+      lang_reviewers: [
+        { lang: 'typescript', exists: true, path: '/fake/root/packs/typescript/agents/typescript-reviewer.md' },
+        { lang: 'go', exists: true, path: '/fake/root/packs/go/agents/go-reviewer.md' },
+      ],
+      // Only go has a perf reviewer definition file today — typescript's
+      // scan entry comes back exists:false, exactly like a real scan.
+      perf_reviewers: [
+        { lang: 'typescript', exists: false, path: '' },
+        { lang: 'go', exists: true, path: '/fake/root/packs/go/agents/go-perf-reviewer.md' },
+      ],
+    },
+    'review:correctness': { findings: [] },
+    'review:security': { findings: [] },
+    'review:performance': { findings: [] },
+    'review:tests': { findings: [] },
+    'review:simplification': { findings: [] },
+    'review:lang:typescript': { findings: [] },
+    'review:lang:go': { findings: [] },
+    'review:perf:go': { findings: [] },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: REVIEW_SPEC.scriptPath, args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    const labels = labelsOf(events);
+    // The generic lane is the one place ts's performance review still runs —
+    // it must survive, not be swapped for the go specialist.
+    assert.ok(labels.includes('review:performance'), 'the generic performance lane (carrying ts) was swapped away');
+    assert.ok(labels.includes('review:perf:go'), 'go with a perf reviewer definition file never stood up perf:go');
+    assert.ok(!labels.includes('review:perf:typescript'), 'a perf lane was invented for a language with no perf reviewer definition file');
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
@@ -734,11 +1002,17 @@ for (const backendModule of [codexBackend, ompBackend]) {
         // codex's own read-only default instead of the blanket
         // workspace-write this backend used to hardcode for everything.
         assert.deepEqual(collect.args.slice(0, 6), ['exec', '--skip-git-repo-check', '-C', cwd, '-s', 'workspace-write']);
-        const lanes = stub.captured.filter((c) => c.label !== 'collect-diff');
+        // cleanup-diff (A8) is the one other call allowed to write: it only
+        // deletes the mktemp scratch file collect-diff created, it never
+        // reads the untrusted diff hunks the read-only rule below exists for.
+        const lanes = stub.captured.filter((c) => c.label !== 'collect-diff' && c.label !== 'cleanup-diff');
         assert.ok(lanes.length > 0, 'no non-collect calls were captured');
         for (const call of lanes) {
           assert.equal(call.args[call.args.indexOf('-s') + 1], 'read-only', `${call.label} was not read-only`);
         }
+        const cleanup = stub.captured.find((c) => c.label === 'cleanup-diff');
+        assert.ok(cleanup, 'cleanup-diff call was not routed through the stubbed backend');
+        assert.equal(cleanup.args[cleanup.args.indexOf('-s') + 1], 'workspace-write', 'cleanup-diff must be able to delete the scratch file');
         assert.ok(collect.args.includes('--output-schema')); // collect-diff carries COLLECT_SCHEMA
         assert.equal(collect.args[collect.args.length - 1], '-');
         const security = stub.captured.find((c) => c.label === 'review:security');

@@ -18,6 +18,10 @@ unrelated code, change business logic, or redesign architecture.
 
 役割分担: 検出は review workflow の security レーン、是正（Write/Edit）はこの agent。
 
+検出レーンとして呼ばれたときは read-only sandbox 下で動く。この agent 定義が
+Write/Edit を保有していても、レーンの sandbox 設定が書き込みを封じる。是正は
+人間の明示依頼による別呼び出しのみ。
+
 ## Reporting Threshold
 
 Score every finding: **C** = confidence (1-10), **I** = importance (1-10).
