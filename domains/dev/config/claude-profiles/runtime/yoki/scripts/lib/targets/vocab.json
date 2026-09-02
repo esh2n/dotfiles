@@ -1,5 +1,5 @@
 {
-  "_comment": "Vocabulary substitution table for the Codex AGENTS.md managed block (lib/targets/codex.js). Applied longest-key-first over CLAUDE.layer.md + CLAUDE.personal.md + no-paths rules text. An unknown term is left untouched.",
+  "_comment": "Vocabulary substitution table for the Codex AGENTS.md managed block (lib/targets/codex.js). Applied longest-key-first over CLAUDE.layer.md + CLAUDE.personal.md + no-paths rules text. An unknown term is left untouched. Most keys are single terms; the one clause-length key exists because a sentence that names BOTH harnesses ('Claude Code は …、Codex/omp は …') renders as a contradiction once 'Claude Code' becomes 'Codex' — collapsing the whole clause is the only substitution that reads correctly on Codex. Longest-key-first ordering makes it win over the plain 'Workflow tool' entry. If the source sentence is reworded the key stops matching and the rendering degrades to merely redundant, never wrong.",
   "Claude Code": "Codex",
   "claude code": "codex",
   "Claude Desktop": "Codex",
@@ -7,6 +7,7 @@
   "~/.claude": "~/.codex",
   "settings.json": "config.toml",
   "settings.local.json": "config.toml",
+  "Claude Code は Workflow tool、Codex/omp は `yoki-graph` CLI": "Codex は `yoki-graph` CLI",
   "Workflow tool": "yoki-graph (see the yoki-graph skill)",
   "Workflow script": "yoki-graph script",
   "Artifact tool": "yoki-artifact",
