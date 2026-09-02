@@ -107,8 +107,8 @@ R2 を有効化しないまま `setup.mjs` を実行すると、バケット作�
 
 ダッシュボード → **My Profile → API Tokens → Create Token**。テンプレート
 **"Edit Cloudflare Workers"** を選ぶと Workers Scripts と Workers R2 Storage の
-編集権限が入るので、そこに D1 と Access の 2 つを足すのがいちばん速い
-（Create Custom Token から手で 5 つ選んでもよい）。必要な権限は次のとおり。
+編集権限が入るので、そこに D1 と Access 系を足すのがいちばん速い
+（Create Custom Token から手で 6 つ選んでもよい）。必要な権限は次のとおり。
 
 | 種別 | 権限 | 何に使うか |
 | --- | --- | --- |
@@ -116,7 +116,14 @@ R2 を有効化しないまま `setup.mjs` を実行すると、バケット作�
 | Account | **Workers R2 Storage: Edit** | R2 バケット作成 |
 | Account | **D1: Edit**（D1 Write） | D1 データベース作成、`d1 migrations apply --remote` |
 | Account | **Access: Apps and Policies: Edit**（Write） | Access アプリケーションとポリシーの作成 |
-| Account | **Access: Organizations, Identity Providers, and Groups: Edit**（Write） | Access グループとサービストークンの作成 |
+| Account | **Access: Organizations, Identity Providers, and Groups: Edit**（Write） | Access グループの作成 |
+| Account | **Access: Service Tokens: Edit** | サービストークン `yoki-artifact-cli` の作成。**無いとサービストークン作成が 403 で落ちる**（実機確認済み） |
+
+日本語 UI のダッシュボードでは Access の権限がさらに細かく分かれている
+（Access: Apps / Access: Policies / Access: Identity Providers /
+Access: Organizations / Access: Groups / Access: Service Tokens）。その場合は
+上の表に対応する **Apps・Policies・Groups・Service Tokens の Edit** を選ぶ。
+Service Tokens は独立した権限で、他の Access 権限には含まれない。
 
 - **Account Resources** は対象のアカウントに限定する
 - 有効期限は付けてよい。切れたら再発行して環境変数を差し替えるだけ
