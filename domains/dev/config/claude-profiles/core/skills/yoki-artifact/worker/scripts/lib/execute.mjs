@@ -12,7 +12,7 @@ import { dirname } from "node:path";
 
 import { ApiError } from "./cf-api.mjs";
 import { SetupError } from "./env.mjs";
-import { PATH_REF_RE, isRef } from "./plan.mjs";
+import { PATH_REF_RE, SUBDOMAIN_PLACEHOLDER, isRef } from "./plan.mjs";
 import { patchTopLevelKey, patchVars } from "./toml.mjs";
 
 /** Replace every `ref` in a value with what the referenced step returned. */
@@ -41,6 +41,30 @@ export function resolvePath(path, results) {
     }
     return encodeURIComponent(value);
   });
+}
+
+/**
+ * Retry an api step with its declared fallback body. Verified live 2026-09:
+ * POST /access/apps with a worker destination 400s (12130) on some accounts,
+ * while the self_hosted + workers.dev-hostname form succeeds — so a rejected
+ * body is retried automatically instead of stopping the run. The subdomain is
+ * fetched here when discovery could not read it (`subdomainPath` is set).
+ */
+async function runFallback(step, rejection, { api, io, results }) {
+  io.err(`  rejected: ${rejection.message}`);
+  io.out(`  ${step.fallback.describe}`);
+  const body = { ...resolve(step.fallback.body, results) };
+  if (step.fallback.subdomainPath && String(body.domain).includes(SUBDOMAIN_PLACEHOLDER)) {
+    const subdomain = (await api.call("GET", step.fallback.subdomainPath))?.subdomain;
+    if (typeof subdomain !== "string" || subdomain.trim() === "") {
+      throw new SetupError(
+        `the workers.dev subdomain could not be read (GET ${step.fallback.subdomainPath})`,
+        "The fallback hostname cannot be built without it. Deploy the Worker once, or create the Access application by hand.",
+      );
+    }
+    body.domain = body.domain.replace(SUBDOMAIN_PLACEHOLDER, subdomain.trim());
+  }
+  return api.call(step.method, resolvePath(step.path, results), body);
 }
 
 function runCommand(step, { cwd, io, spawn }) {
@@ -102,8 +126,19 @@ export async function runPlan(plan, { api, paths, io, spawn = spawnSync, onApiEr
       try {
         results.set(step.id, await api.call(step.method, resolvePath(step.path, results), body));
       } catch (err) {
-        if (onApiError && err instanceof ApiError) onApiError(step, err);
-        throw err;
+        if (err instanceof ApiError && err.isValidation && step.fallback) {
+          try {
+            results.set(step.id, await runFallback(step, err, { api, io, results }));
+          } catch (fallbackErr) {
+            // Both forms failed (or the fallback could not even be built):
+            // hand the step over so the manual dashboard steps get printed.
+            if (onApiError) onApiError(step, fallbackErr);
+            throw fallbackErr;
+          }
+        } else {
+          if (onApiError && err instanceof ApiError) onApiError(step, err);
+          throw err;
+        }
       }
     } else if (step.kind === "exec") {
       runCommand(step, { cwd: paths.cwd, io, spawn });

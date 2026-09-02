@@ -202,7 +202,12 @@ node scripts/setup.mjs
 4. `pnpm exec wrangler deploy` — **Access アプリケーションは Worker を
    destination に指定するので、先に Worker が存在している必要がある**
 5. Access アプリケーション作成（`destinations: [{type:"worker",
-   worker_id:"yoki-artifact"}]`）
+   worker_id:"yoki-artifact"}]`）。この形が 400（`12130 worker_id ... is
+   invalid`）で拒否されるアカウントでは、自動で
+   `type:"self_hosted"` + `domain:"yoki-artifact.<subdomain>.workers.dev"`
+   の形にフォールバックして作り直す（subdomain は
+   `GET /accounts/:id/workers/subdomain` で取る）。両方拒否されたときだけ
+   ダッシュボード手順を印字して停止する（7 参照）
 6. Access グループ `yoki-artifact-viewers` 作成／更新
 7. サービストークン `yoki-artifact-cli` 作成
 8. Allow ポリシー（`OWNER_EMAIL` + `yoki-artifact-viewers` グループ）と
@@ -350,14 +355,16 @@ pnpm exec wrangler secret put ACCESS_AUD
 
 ---
 
-## 6. 初回に必ず確認すること（S7 で UNVERIFIED のまま）
+## 6. 初回に必ず確認すること
 
-S7 の spike では実機確認できておらず、**初回セットアップで確かめる**と決めた
-項目がある。想定どおりでなければ止まるので、黙って進めないこと。
+S7 の spike で UNVERIFIED だった項目のうち、1 は 2026-09 の実機セットアップで
+確認済み。2 はデプロイごとに確認する。
 
-1. **`destinations` の worker 指定が API で通るか**
-   通らなければ `setup.mjs` はダッシュボード手順を stderr に印字して停止する
-   （下記 7 参照）。
+1. **`destinations` の worker 指定が API で通るか — 実機確認済み**
+   このアカウントでは 400（`12130 worker_id "yoki-artifact" is invalid`）で
+   拒否され、`self_hosted` + workers.dev hostname の形は通った。`setup.mjs` は
+   この順で自動フォールバックする。両方拒否された場合のみダッシュボード手順を
+   stderr に印字して停止する（下記 7 参照）。
 2. **`Cf-Access-Jwt-Assertion` が Worker まで届くか**
    Static Assets のルーターは `ctx.access` を渡さないので、認証はこのヘッダー
    の検証だけが頼り。デプロイ後にブラウザで開き、401
@@ -370,8 +377,10 @@ S7 の spike では実機確認できておらず、**初回セットアップ�
 
 ## 7. Access アプリケーションが API で作れなかったとき
 
-`setup.mjs` は Cloudflare がリクエストの形を拒否した場合、推測で作り直さずに
-ダッシュボードでの手順を印字して終了する。表示どおりに
+`setup.mjs` は worker destination の形が拒否されると、まず workers.dev
+hostname の形（`self_hosted` + `domain`）で自動的に作り直す。**両方**
+拒否された場合だけ、推測を重ねずにダッシュボードでの手順を印字して終了する。
+表示どおりに
 
 1. Zero Trust → Access → Applications → Add an application → Self-hosted
 2. 名前は `yoki-artifact`、destination に Worker `yoki-artifact` を選ぶ

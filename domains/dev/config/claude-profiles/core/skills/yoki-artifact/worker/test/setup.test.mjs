@@ -117,6 +117,25 @@ describe("planSetup on an empty account", () => {
     assert.equal(step(plan, "access-app").body.http_only_cookie_attribute, true);
   });
 
+  // Verified live 2026-09: the worker destination can 400 (12130), and the
+  // self_hosted + workers.dev hostname form is what those accounts accept.
+  test("the Access application declares the workers.dev-hostname fallback", () => {
+    const { fallback } = step(plan, "access-app");
+    assert.equal(fallback.body.type, "self_hosted");
+    assert.equal(fallback.body.http_only_cookie_attribute, true);
+    assert.equal(fallback.body.destinations, undefined, "the fallback must not repeat the rejected shape");
+    // EMPTY_STATE knows no subdomain, so the hostname carries a placeholder
+    // and the executor is told where to fetch the real value.
+    assert.equal(fallback.body.domain, "yoki-artifact.<workers-subdomain>.workers.dev");
+    assert.equal(fallback.subdomainPath, `/accounts/${ACCOUNT}/workers/subdomain`);
+  });
+
+  test("a discovered subdomain lands in the fallback hostname directly", () => {
+    const { fallback } = step(planSetup(fullState({ accessApps: [] }), PARAMS), "access-app");
+    assert.equal(fallback.body.domain, "yoki-artifact.esh2n.workers.dev");
+    assert.equal(fallback.subdomainPath, null, "no extra GET is needed when discovery already read it");
+  });
+
   test("the Allow policy admits the owner and the viewers group", () => {
     const { body } = step(plan, "allow-policy");
     assert.equal(body.decision, "allow");
@@ -319,6 +338,11 @@ describe("--dry-run rendering", () => {
     assert.match(text, /<service-token\.client_id>/);
   });
 
+  test("the access-app step shows its workers.dev-hostname fallback", () => {
+    assert.match(text, /on a rejected body \(400\/422\): retry as self_hosted with the workers\.dev hostname/);
+    assert.match(text, /"domain": "yoki-artifact\.<workers-subdomain>\.workers\.dev"/);
+  });
+
   test("skipped steps say why", () => {
     assert.match(renderPlan(planSetup(fullState(), PARAMS)), /\[skip\].*already exists/);
   });
@@ -395,7 +419,8 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
       api: {
         async call(method, path, body) {
           calls.push({ method, path, body });
-          const response = responses[`${method} ${path}`];
+          const entry = responses[`${method} ${path}`];
+          const response = typeof entry === "function" ? entry({ method, path, body }) : entry;
           if (response instanceof Error) throw response;
           return response ?? null;
         },
@@ -460,22 +485,80 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
     rmSync(h.dir, { recursive: true, force: true });
   });
 
-  test("a rejected worker destination hands the step to the manual fallback", async () => {
-    const rejection = new ApiError("POST /access/apps failed (400): 1000: invalid destinations", {
+  const workerRejection = () =>
+    new ApiError('POST /access/apps failed (400): 12130: worker_id "yoki-artifact" is invalid', {
       status: 400,
-      errors: [{ code: 1000, message: "invalid destinations" }],
+      errors: [{ code: 12130, message: 'worker_id "yoki-artifact" is invalid' }],
     });
-    const h = harness({ ...CREATED, "POST /accounts/acct-1/access/apps": rejection });
+
+  // The live failure of 2026-09: the worker destination 400s, the hostname
+  // form succeeds — the run must carry on with the fallback's result.
+  test("a rejected worker destination retries with the workers.dev hostname", async () => {
+    const h = harness({
+      ...CREATED,
+      "POST /accounts/acct-1/access/apps": ({ body }) => {
+        if (body.destinations) return workerRejection();
+        return { id: "app-9", name: ACCESS_APP_NAME, aud: "aud-9" };
+      },
+      "GET /accounts/acct-1/workers/subdomain": { subdomain: "esh2n" },
+    });
+    const results = await runPlan(planSetup(EMPTY_STATE, PARAMS), h);
+
+    const appCalls = h.calls.filter((c) => c.path === "/accounts/acct-1/access/apps");
+    assert.equal(appCalls.length, 2, "the rejected form is retried exactly once");
+    assert.deepEqual(appCalls[1].body, {
+      name: ACCESS_APP_NAME,
+      type: "self_hosted",
+      domain: "yoki-artifact.esh2n.workers.dev",
+      session_duration: "24h",
+      http_only_cookie_attribute: true,
+    });
+    assert.ok(
+      h.calls.some((c) => c.method === "GET" && c.path === "/accounts/acct-1/workers/subdomain"),
+      "the subdomain is fetched, not guessed",
+    );
+    assert.equal(results.get("access-app").aud, "aud-9", "later steps see the fallback's application");
+    const config = JSON.parse(readFileSync(h.paths.userConfig, "utf8"));
+    assert.equal(config.accessAud, "aud-9");
+    rmSync(h.dir, { recursive: true, force: true });
+  });
+
+  test("both forms rejected hands the step to the manual fallback", async () => {
+    const h = harness({
+      ...CREATED,
+      "POST /accounts/acct-1/access/apps": () => workerRejection(),
+      "GET /accounts/acct-1/workers/subdomain": { subdomain: "esh2n" },
+    });
     const seen = [];
     await assert.rejects(
       runPlan(planSetup(EMPTY_STATE, PARAMS), {
         ...h,
         onApiError: (step, err) => seen.push([step.id, err.isValidation]),
       }),
-      /invalid destinations/,
+      /worker_id "yoki-artifact" is invalid/,
     );
     assert.deepEqual(seen, [["access-app", true]]);
+    const appCalls = h.calls.filter((c) => c.path === "/accounts/acct-1/access/apps");
+    assert.equal(appCalls.length, 2, "the hostname form was tried before giving up");
     assert.match(manualAccessAppSteps({ ownerEmail: PARAMS.ownerEmail }), /Zero Trust > Access > Applications/);
+    rmSync(h.dir, { recursive: true, force: true });
+  });
+
+  test("an unreadable subdomain fails the fallback loudly instead of guessing", async () => {
+    const h = harness({
+      ...CREATED,
+      "POST /accounts/acct-1/access/apps": () => workerRejection(),
+      // no GET workers/subdomain route: the fake returns null
+    });
+    const seen = [];
+    await assert.rejects(
+      runPlan(planSetup(EMPTY_STATE, PARAMS), {
+        ...h,
+        onApiError: (step) => seen.push(step.id),
+      }),
+      /subdomain could not be read/,
+    );
+    assert.deepEqual(seen, ["access-app"], "the manual fallback still gets its chance");
     rmSync(h.dir, { recursive: true, force: true });
   });
 

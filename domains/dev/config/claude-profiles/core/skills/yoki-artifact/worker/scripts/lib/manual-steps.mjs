@@ -1,9 +1,10 @@
-// manual-steps.mjs — the dashboard fallback.
+// manual-steps.mjs — the dashboard fallback of last resort.
 //
-// S7 left the Access `destinations` enum UNVERIFIED: a Worker-level
-// application may not be creatable through the API on this account. Rather
-// than guess at another shape, setup prints these steps and stops, so the
-// operator finishes the one part that needs a human and re-runs.
+// Verified live 2026-09: the worker-destination form can 400 (12130), and
+// execute.mjs then automatically retries with the workers.dev-hostname form.
+// These steps are printed only when BOTH forms were rejected (or the
+// subdomain for the hostname could not be read), so the operator finishes
+// the one part that needs a human and re-runs.
 
 import {
   ACCESS_APP_NAME,
@@ -18,7 +19,8 @@ import {
 export function manualAccessAppSteps({ ownerEmail }) {
   return [
     "",
-    "The API would not create the Access application with a Worker destination.",
+    "The API would not create the Access application — neither the Worker",
+    "destination nor the workers.dev-hostname form was accepted.",
     "Create it once by hand in the dashboard, then re-run this script — it will",
     "find the application by name and carry on:",
     "",

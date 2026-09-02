@@ -121,7 +121,12 @@ export async function main(argv = process.argv.slice(2), io = { out: console.log
     paths: dirs,
     io,
     onApiError: (step, err) => {
-      if (step.id === "access-app" && err.isValidation) io.err(manualAccessAppSteps({ ownerEmail: env.ownerEmail }));
+      // For access-app the executor has already retried the workers.dev
+      // hostname fallback by the time an error reaches here: a validation
+      // failure (or a fallback that could not be built — not an ApiError)
+      // means the automated path is exhausted, so print the dashboard steps.
+      const exhausted = typeof err.isValidation === "boolean" ? err.isValidation : true;
+      if (step.id === "access-app" && exhausted) io.err(manualAccessAppSteps({ ownerEmail: env.ownerEmail }));
     },
   });
   reportServiceToken(results, io);
