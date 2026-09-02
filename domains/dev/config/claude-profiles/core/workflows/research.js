@@ -352,8 +352,12 @@ if (PROVIDERS.length > 1 || PROVIDERS[0].provider !== 'claude') {
 }
 
 phase('Plan')
+// `required` deliberately empty: an agent that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the abort gates right after the call.
 const PLAN_SCHEMA = {
-  type: 'object', required: ['angles'],
+  type: 'object', required: [],
   properties: { angles: { type: 'array', maxItems: 5, items: {
     type: 'object', required: ['key', 'goal'],
     properties: { key: { type: 'string' }, goal: { type: 'string', description: 'what this angle must find out' } },

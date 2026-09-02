@@ -40,9 +40,13 @@ if (!CRITERIA.length && !CRITERIA_FILE) {
 
 phase('Ground')
 
+// `required` deliberately empty: an agent that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the abort gates right after the call.
 const GROUND_SCHEMA = {
   type: 'object',
-  required: ['criteria', 'verification'],
+  required: [],
   properties: {
     criteria: {
       type: 'array', maxItems: 40,
@@ -86,6 +90,13 @@ if (ground && ground.error) { log(`grounding failed: ${ground.error}`); return {
 if (!ground || !ground.criteria || !ground.criteria.length) {
   log('grounding found no criteria')
   return { error: 'no criteria found' }
+}
+// Presence gate for the formerly-required verification block: every later
+// stage interpolates its commands/notes, so proceeding without it would
+// judge coverage against an undefined standard.
+if (!ground.verification) {
+  log('grounding returned no verification info')
+  return { error: 'grounding returned no verification info' }
 }
 log(`criteria: ${ground.criteria.length} / verification commands: ${(ground.verification.commands || []).length}`)
 

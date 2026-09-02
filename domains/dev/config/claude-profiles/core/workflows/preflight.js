@@ -33,9 +33,13 @@ const GATE_COMMAND = (args && typeof args.gateCommand === 'string' && args.gateC
 
 phase('Collect')
 
+// `required` deliberately empty: an agent that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the abort gates right after the call.
 const COLLECT_SCHEMA = {
   type: 'object',
-  required: ['diff_file', 'base', 'branch', 'files_changed'],
+  required: [],
   properties: {
     diff_file: { type: 'string' },
     base: { type: 'string' },
@@ -65,6 +69,13 @@ if (ctx && ctx.error) {
 if (!ctx || !ctx.files_changed) {
   log('No branch diff found — nothing to preflight.')
   return { status: 'empty' }
+}
+// Presence gate for the formerly-required fields the later stages
+// interpolate (reviewer/judge prompts read ctx.diff_file, the Gate prompt
+// and the result read ctx.base/ctx.branch).
+if (!ctx.diff_file || !ctx.base || !ctx.branch) {
+  log('collect-diff returned an incomplete result (missing diff_file/base/branch) — aborting')
+  return { status: 'error', error: 'collect-diff returned an incomplete result (missing diff_file/base/branch)' }
 }
 log(`branch=${ctx.branch} base=${ctx.base} files=${ctx.files_changed}`)
 

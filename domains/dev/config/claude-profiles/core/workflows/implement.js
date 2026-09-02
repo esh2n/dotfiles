@@ -60,8 +60,13 @@ if (DELIVERY_RAW !== DELIVERY) log(`unknown delivery "${DELIVERY_RAW}" — falli
 
 phase('Load')
 
+// Top-level `required` deliberately empty: an agent that cannot read the
+// task file truthfully must be able to answer `{error}` alone instead of
+// being schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the `!TASKS.length` gate right after the call. The per-task
+// required stays: a task the agent DID extract must carry id/title/spec.
 const TASKS_SCHEMA = {
-  type: 'object', required: ['tasks'],
+  type: 'object', required: [],
   properties: { tasks: { type: 'array', items: {
     type: 'object', required: ['id', 'title', 'spec'],
     properties: {

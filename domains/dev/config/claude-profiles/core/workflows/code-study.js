@@ -49,9 +49,13 @@ Discipline:
 
 phase('Map')
 
+// `required` deliberately empty: an agent that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the abort gates right after the call.
 const MAP_SCHEMA = {
   type: 'object',
-  required: ['layout', 'entry_points'],
+  required: [],
   properties: {
     layout: { type: 'string', description: 'how the codebase is organised, in a few sentences' },
     entry_points: {
@@ -86,7 +90,9 @@ ${RULES}`,
   { label: 'map', phase: 'Map', schema: MAP_SCHEMA, model: MODEL },
 )
 if (map && map.error) { log(`mapping failed: ${map.error}`); return { error: String(map.error) } }
-if (!map || !map.entry_points) { log('mapping failed'); return { error: 'no map' } }
+// layout joins the gate: it is interpolated into every Read/Report prompt,
+// so proceeding without it would hand the lanes "Layout: undefined".
+if (!map || !map.entry_points || !map.layout) { log('mapping failed'); return { error: 'no map' } }
 log(`layout: ${(map.layout || '').slice(0, 120)}`)
 if (map.unavailable) log(`unavailable: ${map.unavailable}`)
 

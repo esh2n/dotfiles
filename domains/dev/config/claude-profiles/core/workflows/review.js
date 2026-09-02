@@ -360,9 +360,13 @@ if (PROVIDERS.length > 1 || PROVIDERS[0].provider !== 'claude') {
 
 phase('Collect')
 
+// `required` deliberately empty: an agent that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the abort gates right after the call.
 const COLLECT_SCHEMA = {
   type: 'object',
-  required: ['diff_file', 'files_changed', 'intent', 'langs', 'touches', 'checklists'],
+  required: [],
   properties: {
     diff_file: { type: 'string', description: 'absolute path of the saved diff' },
     files_changed: { type: 'integer' },
@@ -419,6 +423,13 @@ if (ctx && ctx.error) { log(`collect-diff failed: ${ctx.error}`); return { error
 if (!ctx || !ctx.files_changed) {
   log('No changes to review.')
   return { findings: [], metrics: {} }
+}
+// Presence gate for the formerly-required fields the lanes interpolate:
+// proceeding with undefined would hand every reviewer a prompt naming no
+// diff file and no intent.
+if (!ctx.diff_file || !ctx.intent) {
+  log('collect-diff returned an incomplete result (missing diff_file/intent) — aborting')
+  return { error: 'collect-diff returned an incomplete result (missing diff_file/intent)' }
 }
 log(`diff saved: ${ctx.diff_file} (${ctx.files_changed} files)`)
 
