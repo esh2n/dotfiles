@@ -203,6 +203,9 @@ describe("planSetup on an empty account", () => {
   test("the local config records the client id and never the secret", () => {
     const { values } = step(plan, "user-config");
     assert.deepEqual(values.serviceTokenClientId, { $ref: "service-token", path: "client_id" });
+    // The CLI reads `clientId`/`baseUrl`; both spellings must be written.
+    assert.deepEqual(values.clientId, values.serviceTokenClientId);
+    assert.deepEqual(values.baseUrl, values.workerUrl);
     assert.equal(values.clientSecretEnv, "YOKI_ARTIFACT_CLIENT_SECRET");
     const serialised = JSON.stringify(plan);
     assert.ok(!/client_secret|secret"\s*:/.test(serialised), "no plan step carries a secret value");
@@ -338,6 +341,7 @@ describe("discover reads the account without mutating it", () => {
   test("a planned worker URL comes from the discovered subdomain", async () => {
     const withSubdomain = planSetup(fullState(), PARAMS);
     assert.equal(step(withSubdomain, "user-config").values.workerUrl, "https://yoki-artifact.esh2n.workers.dev");
+    assert.equal(step(withSubdomain, "user-config").values.baseUrl, "https://yoki-artifact.esh2n.workers.dev");
     const without = planSetup(fullState({ workersSubdomain: null }), PARAMS);
     assert.equal(step(without, "user-config").values.workerUrl, null);
   });
@@ -489,6 +493,7 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
     const config = JSON.parse(readFileSync(h.paths.userConfig, "utf8"));
     assert.equal(config.accessAud, "aud-9");
     assert.equal(config.serviceTokenClientId, "client-9");
+    assert.equal(config.clientId, "client-9", "the CLI reads the canonical spelling");
     assert.equal(config.accessGroupId, "g-9", "share/unshare reads the group id from here");
     assert.ok(!JSON.stringify(config).includes("s3cret"), "the secret is never written to disk");
     assert.equal(results.get("service-token").client_secret, "s3cret-shown-once");

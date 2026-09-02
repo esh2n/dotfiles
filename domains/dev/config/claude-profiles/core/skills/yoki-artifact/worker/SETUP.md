@@ -221,7 +221,8 @@ node scripts/setup.mjs
    `OWNER_EMAIL` / `SERVICE_TOKEN_NAME` を書き込み
 10. `pnpm exec wrangler deploy`（本物の `ACCESS_AUD` を載せて再デプロイ）
 11. `~/.config/yoki-artifact/config.json` を書き込み
-    （`accessGroupId` と `serviceTokenClientId` を含む）
+    （CLI が読む `baseUrl` / `clientId` と、別名の `workerUrl` /
+    `serviceTokenClientId`、`accessGroupId` を含む）
 
 ### 5-4. 何度実行してもよい
 
@@ -406,7 +407,9 @@ cat ~/.config/yoki-artifact/config.json
 
 - `accessAud` が `REPLACE-...` でない実 UUID になっている
 - `accessGroupId` が入っている（`share` / `unshare` がこれを読む。5-7）
-- `workerUrl` が `https://yoki-artifact.<subdomain>.workers.dev`
+- `baseUrl`（と別名の `workerUrl`）が
+  `https://yoki-artifact.<subdomain>.workers.dev`
+- `clientId`（と別名の `serviceTokenClientId`）が入っている
 - `wrangler.toml` の `SERVICE_TOKEN_NAME` が `REPLACE-...` でなく、
   `serviceTokenClientId` と同じ値になっている（5-6）
 - そのURLをブラウザで開くと Cloudflare Access のログイン画面が出て、Google か

@@ -325,11 +325,16 @@ export function planSetup(existing, { accountId, teamDomain, ownerEmail, viewers
       values: {
         accountId,
         workerName: WORKER_NAME,
+        // `baseUrl` and `clientId` are the canonical keys the CLI's config
+        // loader reads; `workerUrl` and `serviceTokenClientId` are kept as
+        // aliases for anything already reading the original spellings.
+        baseUrl: workerUrl(state.workersSubdomain),
         workerUrl: workerUrl(state.workersSubdomain),
         teamDomain,
         ownerEmail,
         accessAud: aud,
         accessGroupId,
+        clientId: serviceTokenClientId,
         serviceTokenClientId,
         clientSecretEnv: CLIENT_SECRET_ENV,
       },

@@ -106,8 +106,14 @@ export function loadConfig(env = process.env) {
 
   const envUrl = env.YOKI_ARTIFACT_URL?.trim();
   const envClientId = env.YOKI_ARTIFACT_CLIENT_ID?.trim();
-  const fileUrl = stringField(fromFile.baseUrl, "baseUrl", file);
-  const fileClientId = stringField(fromFile.clientId, "clientId", file);
+  // worker/scripts/setup.mjs historically wrote only `workerUrl` and
+  // `serviceTokenClientId`; it now writes both spellings, and the loader
+  // accepts either so a config written by any setup version still publishes.
+  const fileUrl =
+    stringField(fromFile.baseUrl, "baseUrl", file) ?? stringField(fromFile.workerUrl, "workerUrl", file);
+  const fileClientId =
+    stringField(fromFile.clientId, "clientId", file) ??
+    stringField(fromFile.serviceTokenClientId, "serviceTokenClientId", file);
   const secretCommand = stringField(fromFile.secretCommand, "secretCommand", file);
   // Written by worker/scripts/setup.mjs. `share`/`unshare` need it to keep the
   // Cloudflare Access group in step with the D1 viewer list; every other
