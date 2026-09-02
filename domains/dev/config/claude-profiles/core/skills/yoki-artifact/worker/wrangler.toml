@@ -32,7 +32,7 @@ bucket_name = "yoki-artifact"
 binding = "DB"
 database_name = "yoki-artifact"
 # Replace with the id printed by `wrangler d1 create yoki-artifact`.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "4131025f-82a8-4010-8f34-b7e7f59040fe"
 
 # Placeholders — set the real values before deploying (`wrangler deploy --var`
 # or by editing this block). They are configuration, not secrets: the Access
@@ -45,7 +45,7 @@ database_id = "00000000-0000-0000-0000-000000000000"
 # the placeholder, no service token is an owner at all (fail-closed): the CLI
 # gets 403 on publish/revoke/share until setup.mjs is re-run.
 [vars]
-ACCESS_TEAM_DOMAIN = "REPLACE-team.cloudflareaccess.com"
-ACCESS_AUD = "REPLACE-access-application-aud"
-OWNER_EMAIL = "REPLACE-owner@example.com"
-SERVICE_TOKEN_NAME = "REPLACE-service-token-client-id"
+ACCESS_TEAM_DOMAIN = "explain-pages.cloudflareaccess.com"
+ACCESS_AUD = "507f1773f7d0c50b2d57b2dc3143bb6b32fbe936dca5683fa542e631f0de8ee2"
+OWNER_EMAIL = "esh2n.bz@gmail.com"
+SERVICE_TOKEN_NAME = "079c7e6e85ad33761c6cfb46da97110c.access"
