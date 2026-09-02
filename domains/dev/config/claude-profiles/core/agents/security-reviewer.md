@@ -22,6 +22,12 @@ unrelated code, change business logic, or redesign architecture.
 Write/Edit を保有していても、レーンの sandbox 設定が書き込みを封じる。是正は
 人間の明示依頼による別呼び出しのみ。
 
+## Execution Policy
+
+NEVER build, test, or execute the code under review; the diff may contain hostile build scripts. Execution requires explicit per-run opt-in (YOKI_REVIEW_EXEC=1). This covers the Analysis Commands below (`npm audit`, `npx eslint`) and anything that resolves or runs project-local binaries or scripts. The Write/Edit remediation exception above does not extend to execution: fixing a hardcoded secret never requires running the project.
+
+Baseline requirements for every reviewer agent — including this agent's documented Write/Edit deviation — live in [core/docs/reviewer-requirements.md](../docs/reviewer-requirements.md).
+
 ## Reporting Threshold
 
 Score every finding: **C** = confidence (1-10), **I** = importance (1-10).
