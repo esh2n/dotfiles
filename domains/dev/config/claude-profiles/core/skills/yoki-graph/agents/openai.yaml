@@ -1,0 +1,12 @@
+# Codex skill interface manifest. Rides along with the skill directory,
+# which yoki-switch symlinks to ~/.agents/skills/yoki-graph (lib/targets/
+# codex-skills.js decideSkillSymlink — this skill ships no codex/ port, so
+# the generic directory is what Codex sees).
+interface:
+  display_name: "yoki-graph"
+  short_description: "Run a multi-agent workflow graph (review / research / implement)"
+  default_prompt: "Use $yoki-graph to run a multi-agent review of this branch"
+policy:
+  # Multi-angle review/research/implementation should be reachable without
+  # the user naming the tool — discoverability IS the point for the graphs.
+  allow_implicit_invocation: true

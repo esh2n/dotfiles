@@ -331,6 +331,61 @@ check_validator_wiring() {
     fi
 }
 
+# The "which workflow when" table in core/skills/yoki-graph/SKILL.md is
+# rendered from the scripts' own `meta`, never hand-maintained. Three things
+# must hold for that to actually prevent drift: the markers exist, the
+# checked-in table matches the scripts TODAY, and a mismatch is genuinely
+# detected (a --check that can only ever pass is worthless). The last one is
+# proved against a throwaway profiles root that symlinks the real workflow
+# dirs but carries a gutted SKILL.md.
+check_catalog_freshness() {
+    local catalog_js="${LIB_GRAPH}/catalog.js"
+    local skill_md="${PROFILES_ROOT}/core/skills/yoki-graph/SKILL.md"
+
+    if grep -qF '<!-- catalog:begin -->' "$skill_md" && grep -qF '<!-- catalog:end -->' "$skill_md"; then
+        pass "case53: yoki-graph SKILL.md carries the managed catalog markers"
+    else
+        fail "case53: yoki-graph SKILL.md carries the managed catalog markers"
+    fi
+
+    if node "$catalog_js" --check --profiles-root "$PROFILES_ROOT" >/dev/null 2>&1; then
+        pass "case54: the checked-in catalog table matches core/workflows + packs/*/workflows"
+    else
+        fail "case54: the checked-in catalog table matches core/workflows + packs/*/workflows"
+        log_error "  regenerate: node ${catalog_js} --write"
+    fi
+
+    local stale_root="${FIXTURE_DIR}/stale-profiles"
+    mkdir -p "${stale_root}/core/skills/yoki-graph"
+    ln -s "${PROFILES_ROOT}/core/workflows" "${stale_root}/core/workflows"
+    ln -s "${PROFILES_ROOT}/packs" "${stale_root}/packs"
+    # Same file, emptied block: only the table differs from what the scripts say.
+    awk '
+        /<!-- catalog:begin -->/ { print; skip = 1; next }
+        /<!-- catalog:end -->/   { skip = 0 }
+        !skip { print }
+    ' "$skill_md" > "${stale_root}/core/skills/yoki-graph/SKILL.md"
+
+    if node "$catalog_js" --check --profiles-root "$stale_root" >/dev/null 2>&1; then
+        fail "case55: a stale catalog table is detected (--check exits non-zero)"
+    else
+        pass "case55: a stale catalog table is detected (--check exits non-zero)"
+    fi
+
+    if node "$catalog_js" --write --profiles-root "$stale_root" >/dev/null 2>&1 \
+        && node "$catalog_js" --check --profiles-root "$stale_root" >/dev/null 2>&1; then
+        pass "case56: --write repairs a stale table"
+    else
+        fail "case56: --write repairs a stale table"
+    fi
+
+    if grep -qF 'lib/graph/catalog.js' "${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"; then
+        pass "case57: yoki-switch apply rebuilds the catalog before installing"
+    else
+        fail "case57: yoki-switch apply rebuilds the catalog before installing"
+    fi
+}
+
 # `--resume` is a prefix replay, not a key-addressed cache. Through the real
 # CLI: an identical rerun replays every call and spawns none; a rerun whose
 # args changed the FIRST call's prompt replays nothing at all, even though
@@ -673,6 +728,7 @@ run_e2e_checks() {
     check_yoki_agent
     check_lane_cli_contract
     check_validator_wiring
+    check_catalog_freshness
 }
 
 run_yoki_graph_checks() {
