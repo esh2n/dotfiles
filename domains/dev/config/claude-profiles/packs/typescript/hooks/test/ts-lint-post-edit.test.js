@@ -372,6 +372,50 @@ test('package.json "prettier" key counts as a config hit', () => {
   }
 });
 
+test('findConfigDir does not walk past the nearest .git boundary', () => {
+  const root = mkTmpDir('ts-guard-gitstop-');
+  try {
+    // outer/  biome.json           <- an unrelated checkout's config
+    // outer/repo/.git              <- the edited file's repo boundary
+    // outer/repo/src/              <- walk starts here
+    const repo = path.join(root, 'repo');
+    const inner = path.join(repo, 'src');
+    fs.mkdirSync(inner, { recursive: true });
+    fs.mkdirSync(path.join(repo, '.git'));
+    fs.writeFileSync(path.join(root, 'biome.json'), '{}');
+
+    assert.equal(findConfigDir(inner, ['biome.json', 'biome.jsonc', '.biomerc'], null), null);
+    // But a config INSIDE the boundary dir itself is still found — the stop
+    // happens after checking the repo root, not before.
+    fs.writeFileSync(path.join(repo, 'biome.json'), '{}');
+    assert.equal(findConfigDir(inner, ['biome.json', 'biome.jsonc', '.biomerc'], null), repo);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('resolveLocalBin does not resolve a binary from a checkout above the nearest .git', () => {
+  const root = mkTmpDir('ts-guard-binstop-');
+  try {
+    const repo = path.join(root, 'repo');
+    const inner = path.join(repo, 'src');
+    fs.mkdirSync(inner, { recursive: true });
+    fs.mkdirSync(path.join(repo, '.git'));
+    const outerBin = path.join(root, 'node_modules', '.bin');
+    fs.mkdirSync(outerBin, { recursive: true });
+    fs.writeFileSync(path.join(outerBin, 'biome'), '#!/bin/sh\n');
+
+    assert.equal(resolveLocalBin(inner, 'biome'), null);
+    // A binary inside the boundary repo is still preferred and found.
+    const repoBin = path.join(repo, 'node_modules', '.bin');
+    fs.mkdirSync(repoBin, { recursive: true });
+    fs.writeFileSync(path.join(repoBin, 'biome'), '#!/bin/sh\n');
+    assert.equal(resolveLocalBin(inner, 'biome'), path.join(repoBin, 'biome'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('resolveLocalBin returns null when nothing local exists', () => {
   const root = mkTmpDir('ts-guard-nolocalbin-');
   try {

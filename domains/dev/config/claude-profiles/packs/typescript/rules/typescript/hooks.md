@@ -42,7 +42,10 @@ follows the project's own configuration, most specific first:
 
 Binary resolution prefers the project's own `node_modules/.bin/<tool>`
 (walked up from the config directory) over a bare name on `PATH`, same
-technique as `web-css-lint-post-edit.js`.
+technique as `web-css-lint-post-edit.js`. Both walks — config discovery and
+binary resolution — stop at the nearest `.git` (after checking that
+directory itself), so an unrelated checkout higher in the tree can never
+supply the config or the binary.
 
 ### Latency budget and fail-open
 

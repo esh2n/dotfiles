@@ -23,6 +23,22 @@
  * web-guard's one-time hints: this hook only ever prints when a tool
  * actually ran and produced output that mentions the edited file).
  *
+ * Threat model — why this hook may execute project-local tools while the
+ * review workflow's lanes must not: it fires on a file the agent just
+ * edited in the user's OWN working tree — a project the user chose to open
+ * and whose toolchain they already run — whereas a review lane runs against
+ * a branch diff the user did NOT write, where a package.json script or a
+ * config-file import is attacker-controlled input. Same commands, different
+ * provenance. Two consequences worth stating: (1) codex/omp targets
+ * warn-skip this hook at translation time (its registration is not a
+ * run-with-flags.js/run-bash-hook.js form — lib/targets/codex-hooks-merge.js
+ * / omp-hooks.js), so there is no post-edit lint parity there; (2) unlike
+ * the web pack's "project config or nothing" rule
+ * (web-css-lint-post-edit.js), tiers 3-4 deliberately fall back to
+ * biome/oxlint with no project config — owner-adjudicated divergence: a
+ * formatter's defaults are safe to apply on the user's own edit where a
+ * linter's imposed rule set is not.
+ *
  * Registration note: this hook does NOT go through run-with-flags.js — see
  * packs/go/hooks/go-guard-post-edit.js and packs/go/rules/golang/hooks.md
  * ("Why these hooks don't go through run-with-flags.js") for why: pack-owned
@@ -121,6 +137,10 @@ function findConfigDir(startDir, configFiles, pkgKey) {
         }
       }
     }
+    // Stop at the repo boundary (checking the boundary dir itself first): a
+    // walk that escaped the nearest .git could adopt an unrelated outer
+    // checkout's config.
+    if (fs.existsSync(path.join(dir, '.git'))) break;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -140,6 +160,9 @@ function resolveLocalBin(startDir, binName) {
   for (let i = 0; i < MAX_WALK; i++) {
     const candidate = path.join(dir, 'node_modules', '.bin', exe);
     if (fs.existsSync(candidate)) return candidate;
+    // Same repo-boundary stop as findConfigDir: never resolve a binary out
+    // of a different checkout above this one.
+    if (fs.existsSync(path.join(dir, '.git'))) break;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;

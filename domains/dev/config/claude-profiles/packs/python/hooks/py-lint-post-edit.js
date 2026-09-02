@@ -23,6 +23,21 @@
  * printed to stderr with a `[py-guard]` prefix only when there is something
  * to report.
  *
+ * Threat model — why this hook may run a tool against the edited file while
+ * the review workflow's lanes must not: it fires on a file the agent just
+ * edited in the user's OWN working tree — a project the user chose to open
+ * and whose pyproject/ruff config they already own — whereas a review lane
+ * runs against a branch diff the user did NOT write, where project config
+ * and scripts are attacker-controlled input. Same command, different
+ * provenance. Two consequences worth stating: (1) codex/omp targets
+ * warn-skip this hook at translation time (its registration is not a
+ * run-with-flags.js/run-bash-hook.js form — lib/targets/codex-hooks-merge.js
+ * / omp-hooks.js), so there is no post-edit lint parity there; (2) unlike
+ * the web pack's "project config or nothing" rule
+ * (web-css-lint-post-edit.js), ruff format/check run even with no project
+ * config — owner-adjudicated divergence: a formatter's defaults are safe to
+ * apply on the user's own edit where a linter's imposed rule set is not.
+ *
  * Registration note: this hook does NOT go through run-with-flags.js — see
  * packs/go/hooks/go-guard-post-edit.js and packs/go/rules/golang/hooks.md
  * ("Why these hooks don't go through run-with-flags.js") for why: pack-owned
