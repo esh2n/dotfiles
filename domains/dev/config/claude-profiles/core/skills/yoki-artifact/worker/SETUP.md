@@ -49,7 +49,14 @@ wrangler はグローバルに入れない。S7 の前提どおりプロジェ�
 
 Access のログイン画面に出す ID プロバイダーを 2 つ登録する。どちらも
 「先に相手側で OAuth アプリを作り、その Client ID / Secret を Cloudflare に
-貼る」という同じ形になる。
+貼る」という同じ形になる。なお、既定の **One-time PIN**（メールに届く
+ワンタイムコード）だけでも運用は成立する — Google / GitHub はあとから
+追加でき、追加してもここまでの構築をやり直す必要はない。
+
+IdP の登録画面は Zero Trust → **Integrations → Identity providers**
+（旧 UI の Settings → Authentication → Login methods は廃止された。
+直接リンク:
+`https://one.dash.cloudflare.com/?to=/:account/integrations/identity-providers`）。
 
 Cloudflare 側が要求するリダイレクト URI は **両方とも同じ**:
 
@@ -71,7 +78,7 @@ https://<team>.cloudflareaccess.com/cdn-cgi/access/callback
    - Authorized JavaScript origins: `https://<team>.cloudflareaccess.com`
    - Authorized redirect URIs: `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback`
 4. 発行された **Client ID** と **Client secret** を控える
-5. Zero Trust → **Settings → Authentication → Login methods → Add new → Google**
+5. Zero Trust → **Integrations → Identity providers → Add new → Google**
    に貼り、**Test** で緑になることを確認する
 
 ### 2-2. GitHub
@@ -82,7 +89,7 @@ https://<team>.cloudflareaccess.com/cdn-cgi/access/callback
      `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback`
 2. **Client ID** を控え、**Generate a new client secret** で secret を発行して
    控える（secret はこの一度しか表示されない）
-3. Zero Trust → **Settings → Authentication → Login methods → Add new → GitHub**
+3. Zero Trust → **Integrations → Identity providers → Add new → GitHub**
    に貼り、**Test** で緑になることを確認する
 
 > GitHub の IdP はメールアドレスを返す。Access のポリシーはメールで判定する
