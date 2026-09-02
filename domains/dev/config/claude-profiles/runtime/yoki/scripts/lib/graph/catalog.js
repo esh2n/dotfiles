@@ -27,6 +27,10 @@ const fs = require('fs');
 const path = require('path');
 
 const { extractMeta } = require('./runner');
+// tmp+rename, so an interrupted `yoki-switch apply` can never leave a
+// half-written SKILL.md in the checkout. Reused rather than re-implemented:
+// gen.js is the canonical atomic write for every file yoki generates.
+const { writeFileAtomic } = require('../targets/gen');
 
 const CATALOG_BEGIN = '<!-- catalog:begin -->';
 const CATALOG_END = '<!-- catalog:end -->';
@@ -190,7 +194,7 @@ function writeCatalog(root = profilesRoot()) {
   const markdown = fs.readFileSync(file, 'utf8');
   const next = applyCatalogBlock(markdown, renderCatalogTable(readCatalog(root)));
   if (next === markdown) return { changed: false, path: file };
-  fs.writeFileSync(file, next);
+  writeFileAtomic(file, next);
   return { changed: true, path: file };
 }
 
@@ -211,8 +215,22 @@ module.exports = {
 if (require.main === module) {
   const argv = process.argv.slice(2);
   const mode = argv.find((a) => a === '--check' || a === '--write' || a === '--print') || '--check';
+  // A bare or empty `--profiles-root` must NOT silently fall back to the
+  // real checkout: the very next thing --write does is rewrite a tracked
+  // source file, so a mistyped flag would edit the very repo the caller
+  // was steering away from.
   const rootIdx = argv.indexOf('--profiles-root');
-  const root = rootIdx !== -1 && argv[rootIdx + 1] ? path.resolve(argv[rootIdx + 1]) : profilesRoot();
+  let root;
+  if (rootIdx === -1) {
+    root = profilesRoot();
+  } else {
+    const value = argv[rootIdx + 1];
+    if (!value || value.startsWith('--')) {
+      process.stderr.write('catalog: --profiles-root requires a directory path\n');
+      process.exit(1);
+    }
+    root = path.resolve(value);
+  }
 
   try {
     if (mode === '--print') {

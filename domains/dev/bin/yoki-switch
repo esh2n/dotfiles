@@ -662,7 +662,7 @@ build_workflow_catalog() {
     if out="$(node "$catalog_js" "$mode" --profiles-root "$PROFILES_DIR" 2>&1)"; then
         [[ "$out" == "catalog: up to date" ]] || log_info "$out"
     else
-        log_warn "yoki-graph catalog: $out"
+        log_warn "yoki-graph $out" >&2
     fi
     return 0
 }
