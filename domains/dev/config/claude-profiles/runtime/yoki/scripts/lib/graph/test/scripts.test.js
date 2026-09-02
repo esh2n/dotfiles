@@ -725,8 +725,10 @@ test('review: a ts+go mixed diff keeps ts performance on the generic lane and ad
         { lang: 'typescript', exists: true, path: '/fake/root/packs/typescript/agents/typescript-reviewer.md' },
         { lang: 'go', exists: true, path: '/fake/root/packs/go/agents/go-reviewer.md' },
       ],
-      // Only go has a perf reviewer definition file today — typescript's
-      // scan entry comes back exists:false, exactly like a real scan.
+      // The fixture models a checkout where only go ships a perf reviewer
+      // definition file, so typescript's scan entry comes back exists:false.
+      // (Which languages actually have one is a property of the installed
+      // packs, not of this test — the scan is mocked here on purpose.)
       perf_reviewers: [
         { lang: 'typescript', exists: false, path: '' },
         { lang: 'go', exists: true, path: '/fake/root/packs/go/agents/go-perf-reviewer.md' },
