@@ -128,6 +128,7 @@ run_all_checks() {
         yoki-box
         omp-yoki-bridge
         harness-adapter
+        pack-hooks
         yoki-artifact
         yoki-graph
         yoki-loop
@@ -263,6 +264,25 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
                 exit 1
             fi
             ;;
+        "pack-hooks")
+            if ! command -v node >/dev/null 2>&1; then
+                log_error "pack-hooks requires node (for \`node --test\` over the pack hook suites) — none found on PATH."
+                exit 1
+            fi
+
+            # Pack-owned hook unit suites. These live under
+            # packs/<name>/hooks/test/ (plus the go pack's hooks/*.test.mjs),
+            # OUTSIDE runtime/yoki — so the harness-adapter case's globs never
+            # reach them, and until this suite existed no validator.sh pass ran
+            # them at all: a pack hook regression (a broken fail-open, a walk
+            # that escapes the repo) shipped without ever failing CI. Both
+            # patterns are handed to node's own glob expansion, same as the
+            # harness-adapter case above; a new pack's hooks/test/*.test.js is
+            # picked up with no validator change.
+            node --test \
+                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/packs/*/hooks/test/**/*.test.js" \
+                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/packs/*/hooks/*.test.mjs"
+            ;;
         "yoki-artifact")
             if ! command -v node >/dev/null 2>&1; then
                 log_error "yoki-artifact requires node (the CLI, the fake Worker and both \`node --test\` suites) — none found on PATH."
@@ -298,7 +318,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|omp-yoki-bridge|harness-adapter|yoki-artifact|yoki-graph|yoki-loop|suggest-compact|workday-calc]"
+            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|yoki-box|omp-yoki-bridge|harness-adapter|pack-hooks|yoki-artifact|yoki-graph|yoki-loop|suggest-compact|workday-calc]"
             echo "       (no args runs every self-contained regression suite)"
             exit 1
             ;;
