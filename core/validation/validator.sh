@@ -183,11 +183,33 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             ;;
         "yoki-switch-targets")
             if ! command -v node >/dev/null 2>&1; then
-                log_error "yoki-switch-targets requires node (for lib/targets/gen.js) — none found on PATH."
+                log_error "yoki-switch-targets requires node (for \`node --test\` and lib/targets/gen.js) — none found on PATH."
                 exit 1
             fi
+
+            # lib/targets/*.test.js are the module-level unit suites behind
+            # everything the end-to-end checks below exercise (hook
+            # translation, config.toml/AGENTS.md managed blocks, the
+            # Claude->Codex vocabulary substitution, skill symlink
+            # decisions). They had no runner: the golden suite diffs whole
+            # generated trees and this suite drives gen.js against the real
+            # sources, so a broken unit contract only ever surfaced
+            # indirectly, and a unit test with no end-to-end consequence
+            # never ran in CI at all. Same shape as the harness-adapter
+            # case above: unit suite and contract suite both run, either
+            # one failing fails the case.
+            node_unit_status=0
+            node --test \
+                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/test/"*.test.js \
+                || node_unit_status=$?
+
             source "${SCRIPT_DIR}/test-yoki-switch-targets.sh"
-            run_yoki_switch_targets_checks
+            targets_contract_status=0
+            run_yoki_switch_targets_checks || targets_contract_status=$?
+
+            if [[ "$node_unit_status" -ne 0 || "$targets_contract_status" -ne 0 ]]; then
+                exit 1
+            fi
             ;;
         "targets-golden")
             if ! command -v node >/dev/null 2>&1; then
