@@ -52,6 +52,9 @@ description: 多角の並列レビュー・調査・実装をワークフロー(
 `~/.claude/workflows/` へインストールされる(`yoki-switch pack enable go`)。
 この機体で実際に何が入っているかは `yoki-graph list`。
 
+`review` の operability レーンは pattern checklist(`~/.claude/skills/*/references/review-checklist.md`)が
+1つ以上導入されている機体でのみ起動する意図された設計 — 未導入なら黙ってスキップされる。
+
 ## 起動する
 
 **Claude Code の中では、ネイティブの Workflow tool がこれまでどおり本来の
