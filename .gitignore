@@ -229,6 +229,11 @@ domains/dev/config/claude/.auto-mode
 # Lock files
 domains/dev/config/claude/version-cache.json.lock
 
+# orca runtime state (~/.orca is a symlink into the repo; allowlist what we own)
+domains/dev/config/orca/*
+!domains/dev/config/orca/keybindings.json
+!domains/dev/config/orca/README.md
+
 # herdr runtime state
 **/herdr/*.log
 **/herdr/*.sock

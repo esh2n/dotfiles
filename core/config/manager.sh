@@ -216,6 +216,11 @@ link_domain() {
                 elif [[ "$dirname" == "warp" ]]; then
                     local target="${HOME}/.warp"
                     link_file "$config_dir" "$target"
+                # orca (ADE) reads ~/.orca — same non-XDG pattern as warp.
+                # orcaは~/.orcaを読むためwarpと同じ扱いにする
+                elif [[ "$dirname" == "orca" ]]; then
+                    local target="${HOME}/.orca"
+                    link_file "$config_dir" "$target"
                 # vscode directory - link settings.json to Application Support on macOS
                 elif [[ "$dirname" == "vscode" ]]; then
                     local target="${HOME}/.config/${dirname}"

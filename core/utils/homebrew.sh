@@ -22,6 +22,7 @@ trust_brew_taps() {
         noborus/tap
         docker/tap
         can1357/tap
+        stablyai/orca
         fayazara/tap
     )
 

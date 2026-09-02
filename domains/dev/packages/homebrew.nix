@@ -37,5 +37,10 @@
     # microVM sandbox for coding agents. docker/tap is casks-only too (same
     # trap as codex); the tap is trusted by core/utils/homebrew.sh.
     "docker/tap/sbx"
+    # Orca ADE (worktree IDE for coding agents, onorca.dev). MUST stay
+    # tap-qualified: the untapped homebrew/cask "orca" is Plotly's chart
+    # renderer, a different app. Tap trusted by core/utils/homebrew.sh.
+    # The app self-updates on the stable channel regardless of brew pinning.
+    "stablyai/orca/orca"
   ];
 }
