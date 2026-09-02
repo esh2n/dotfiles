@@ -222,8 +222,142 @@ test('status: an unknown runId says where it looked and exits non-zero', () => {
 
 test('status: a runId is required', () => {
   withEnv({}, ({ cli }) => {
-    assert.throws(() => cli.cmdStatus([], {}), /usage: yoki-graph status <runId>/);
+    assert.throws(() => cli.cmdStatus([], {}), /usage: yoki-graph status <runId> \[--once\|--watch\]/);
   });
+});
+
+// ---------------------------------------------------------------------------
+// status flag parsing and one-shot-vs-watch routing (through main + argv)
+//
+// These drive `main` the way a shell does — argv in, exit code and streams
+// out — so they catch the two demo bugs the direct cmdStatus/cmdWatch unit
+// tests could not: `--once` being consumed as the runId when it precedes the
+// positional, and `status` defaulting to a blocking watch instead of one shot.
+// ---------------------------------------------------------------------------
+
+/** Fail rather than hang: reject if `p` has not settled within `ms`. */
+function withTimeout(p, ms, label) {
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} did not finish within ${ms}ms — it blocked`)), ms);
+  });
+  return Promise.race([p, guard]).finally(() => clearTimeout(timer));
+}
+
+/** Run `cli.main()` with the given `status` argv, capturing stdout+stderr and
+ *  the resulting exit code without letting either leak or the loop block. */
+async function runStatusMain(cli, args) {
+  const savedArgv = process.argv;
+  const savedExit = process.exitCode;
+  const real = { out: process.stdout.write, err: process.stderr.write };
+  let text = '';
+  process.stdout.write = (chunk) => { text += String(chunk); return true; };
+  process.stderr.write = (chunk) => { text += String(chunk); return true; };
+  process.argv = ['node', 'cli.js', 'status', ...args];
+  process.exitCode = undefined;
+  let exitCode;
+  try {
+    await withTimeout(cli.main(), 5000, `status ${args.join(' ')}`);
+    exitCode = process.exitCode;
+  } finally {
+    process.stdout.write = real.out;
+    process.stderr.write = real.err;
+    process.argv = savedArgv;
+    process.exitCode = savedExit;
+  }
+  return { text, exitCode };
+}
+
+test('parseArgs: --once is a boolean flag before OR after the runId (never eats it)', () => {
+  withEnv({}, ({ cli }) => {
+    const after = cli.parseArgs(['run-1', '--once']);
+    assert.deepEqual(after._, ['run-1']);
+    assert.equal(after.once, true);
+    // The demo bug: `--once` ahead of the positional swallowed `run-1` as its
+    // value, leaving no runId. As a declared boolean it must not.
+    const before = cli.parseArgs(['--once', 'run-1']);
+    assert.deepEqual(before._, ['run-1']);
+    assert.equal(before.once, true);
+  });
+});
+
+test('status <runId>: defaults to a single render and exits 0 (does not watch)', async () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cli-state-'));
+  try {
+    seedRun(stateHome, 'run-once', { name: 'review', status: 'ok', backend: 'mock' }, [
+      { key: 'k1', index: 0, label: 'a', status: 'ok', result: 1, tokens: 10, tokensSource: 'reported' },
+    ]);
+    await withEnvAsync({ YOKI_STATE_HOME: stateHome }, async ({ cli }) => {
+      const { text, exitCode } = await runStatusMain(cli, ['run-once']);
+      assert.match(text, /run: review \(run-once\)/);
+      assert.match(text, /agent calls: 1 \(1 ok, 0 error, 0 retried\)/);
+      assert.notEqual(exitCode, 1);
+    });
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test('status <runId> --once: same one-shot render, and works with the flag first too', async () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cli-state-'));
+  try {
+    seedRun(stateHome, 'run-once2', { name: 'review', status: 'ok', backend: 'mock' }, [
+      { key: 'k1', index: 0, label: 'a', status: 'ok', result: 1, tokens: 10, tokensSource: 'reported' },
+    ]);
+    await withEnvAsync({ YOKI_STATE_HOME: stateHome }, async ({ cli }) => {
+      const trailing = await runStatusMain(cli, ['run-once2', '--once']);
+      assert.match(trailing.text, /run: review \(run-once2\)/);
+      assert.notEqual(trailing.exitCode, 1);
+      // Flag ahead of the runId used to print the usage error instead.
+      const leading = await runStatusMain(cli, ['--once', 'run-once2']);
+      assert.match(leading.text, /run: review \(run-once2\)/);
+      assert.doesNotMatch(leading.text, /usage: yoki-graph status/);
+      assert.notEqual(leading.exitCode, 1);
+    });
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test('status <runId> --watch: an already-finished run renders once and exits without polling', async () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cli-state-'));
+  try {
+    // run.json is already `ok`, so cmdWatch's first poll sees `finished` and
+    // returns before its (real, 2s) sleep — the timeout guard proves it.
+    seedRun(stateHome, 'run-done', { name: 'review', status: 'ok', backend: 'mock' }, [
+      { key: 'k1', index: 0, label: 'a', status: 'ok', result: 1, tokens: 10, tokensSource: 'reported' },
+    ]);
+    await withEnvAsync({ YOKI_STATE_HOME: stateHome }, async ({ cli }) => {
+      const { text, exitCode } = await runStatusMain(cli, ['run-done', '--watch']);
+      assert.match(text, /run: review \(run-done\)/);
+      assert.match(text, /agent calls: 1 \(1 ok, 0 error, 0 retried\)/);
+      assert.notEqual(exitCode, 1);
+    });
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test('status with no id, and status <unknown>, exit non-zero and never block', async () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-cli-state-'));
+  try {
+    await withEnvAsync({ YOKI_STATE_HOME: stateHome }, async ({ cli }) => {
+      const noId = await runStatusMain(cli, []);
+      assert.match(noId.text, /usage: yoki-graph status <runId>/);
+      assert.equal(noId.exitCode, 1);
+
+      const unknown = await runStatusMain(cli, ['ghost']);
+      assert.match(unknown.text, /no run found with id ghost/);
+      assert.equal(unknown.exitCode, 1);
+
+      // And --watch on a missing id must not enter the poll loop either.
+      const watchUnknown = await runStatusMain(cli, ['ghost', '--watch']);
+      assert.match(watchUnknown.text, /no run found with id ghost/);
+      assert.equal(watchUnknown.exitCode, 1);
+    });
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -451,11 +451,15 @@ and finished agents scrolling past above it. Off a TTY there is no status
 line at all — a carriage-return redraw in a log file is one unreadable line —
 so the same events print one per line, as before.
 
-`yoki-graph status <runId> --watch` re-renders the same status every 2s by
-folding the run's journal, until `run.json` stops saying `running`, then
-prints the ordinary `status` report. The journal is in COMPLETION order, so
-the reconstruction pairs entries by `index`: a call with no entry below the
-highest index seen is still in flight.
+`yoki-graph status <runId>` (or the explicit `--once`) renders one fold-up of
+the run and exits — a status check never blocks. `--watch` instead re-renders
+the same status every 2s by folding the run's journal, until `run.json` stops
+saying `running`, then prints the ordinary `status` report. The journal is in
+COMPLETION order, so the reconstruction pairs entries by `index`: a call with
+no entry below the highest index seen is still in flight. `--once` and
+`--watch` are boolean flags accepted in any position; a missing or unknown
+runId prints usage / "no run found" and exits non-zero without entering the
+watch loop.
 
 ## Execution caps, retry and timeouts
 

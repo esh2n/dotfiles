@@ -52,7 +52,7 @@ yoki-graph run <name|path> --backend codex|omp|mock
     [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
     [--model-map <tier>=<id>,...]
 yoki-graph list
-yoki-graph status <runId> [--watch]
+yoki-graph status <runId> [--once|--watch]
 ```
 
 `<name>` は `~/.claude/workflows/<name>.js`(=`core/workflows/` からインストール
@@ -185,6 +185,10 @@ ID はそのまま通る。
   (codex は `--json` の item イベント、omp は json モードのイベント列から
   数える。mock は合成値を1回だけ返す)。`opts.gate` を持つ呼び出しは
   `agent-gate`(`status` と `gate: {command, exitCode, ms, killed}`)も出す。
+- `yoki-graph status <runId>`(または明示の `--once`)は1回だけ描画して終了する
+  ワンショット。runId が無い/未知なら usage・`no run found` を出して非0で終了し、
+  watch ループには入らない(ハングしない)。`--once` / `--watch` はどの位置でも
+  効くブールフラグ。
 - `yoki-graph status <runId> --watch` は2秒ごとに journal の**追記分だけ**を
   読んで同じ状態行を描き(全文再読み込みではないので、長いランでも1tickの
   コストが増えていかない)、ランが終わったら通常の `status` 出力を出して

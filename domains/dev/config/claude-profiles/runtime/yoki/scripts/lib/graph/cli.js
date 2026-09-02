@@ -14,7 +14,7 @@
  *       [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
  *       [--model-map <tier>=<id>,...]
  *   yoki-graph list
- *   yoki-graph status <runId> [--watch]
+ *   yoki-graph status <runId> [--once|--watch]
  */
 
 const fs = require('fs');
@@ -28,7 +28,7 @@ const { parseArgs: parseArgv, numberFlag } = require('./args');
 
 /** The flags of this CLI that never take a value. Everything else is
  *  `--key value`; see args.js, which agent-cli.js parses with too. */
-const BOOLEAN_FLAGS = ['dry-run', 'json', 'watch'];
+const BOOLEAN_FLAGS = ['dry-run', 'json', 'watch', 'once'];
 
 const parseArgs = (argv) => parseArgv(argv, BOOLEAN_FLAGS);
 
@@ -249,7 +249,7 @@ function cmdList(flags) {
  */
 function cmdStatus(rest, flags, deps = {}) {
   const runId = rest[0];
-  if (!runId) throw new Error('usage: yoki-graph status <runId>');
+  if (!runId) throw new Error('usage: yoki-graph status <runId> [--once|--watch]');
   const stream = deps.stream || process.stdout;
   const meta = runner.readRunMeta(runId);
   const entries = deps.entries || new journalLib.Journal(runId).readAll();
@@ -382,11 +382,17 @@ async function main() {
     if (cmd === 'run') await cmdRun(positional, flags);
     else if (cmd === 'list') cmdList(flags);
     else if (cmd === 'status') {
+      // `--watch` polls until the run's run.json stops saying "running".
+      // Everything else — a bare `status <runId>` and the documented
+      // `--once` — renders exactly one fold-up and exits, so a status check
+      // never hangs. `--once` is accepted as an explicit no-op alias for the
+      // default (it is in BOOLEAN_FLAGS, so it parses in any position rather
+      // than swallowing the runId as its value).
       if (flags.watch) await cmdWatch(positional, flags);
       else cmdStatus(positional, flags);
     }
     else {
-      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--watch]\n');
+      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--once|--watch]\n');
       if (cmd) process.exitCode = 1;
     }
   } catch (err) {
