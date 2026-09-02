@@ -47,9 +47,16 @@ if (GROUNDING.length) {
   ground = await agent(
     `Read these paths and produce a compact facts digest (English, <= 40 lines): what exists, key names/shapes, constraints visible in code or docs. Facts only — no opinions, no proposals.
 Paths: ${GROUNDING.join(', ')}
-The digest will be handed to every later agent as ground truth about the repo.`,
+The digest will be handed to every later agent as ground truth about the repo.
+If you cannot read the paths, reply with a single line starting with "ERROR:" and the reason — NEVER invent a digest; a fabricated ground truth is worse than failure.`,
     { label: 'scout', phase: 'Ground', model: MODEL },
   ) || ''
+  // The digest is handed to EVERY later agent as ground truth — a scout that
+  // could not read must stop the run, not seed it with an invented repo.
+  if (String(ground).trim().startsWith('ERROR:')) {
+    log(`grounding scout failed: ${String(ground).trim()}`)
+    return { error: String(ground).trim() }
+  }
 } else {
   log('no grounding paths — skipping scout')
 }

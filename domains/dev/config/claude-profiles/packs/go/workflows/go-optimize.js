@@ -101,6 +101,7 @@ const RESOLVE_SCHEMA = {
     goEnvVersion: { type: 'string', description: 'output of `go env GOVERSION`' },
     pkgTarget: { type: 'string', description: 'the resolved go test package pattern for args.pkg (e.g. "./internal/codec")' },
     benchmarks: { type: 'array', items: { type: 'string' }, description: 'ALL benchmark function names from `go test -list \'Benchmark.*\'` on pkgTarget, unfiltered by args.bench' },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully (e.g. not a git repo, no Go toolchain): the reason, one line' },
   },
 }
 
@@ -112,11 +113,16 @@ const resolved = await agent(
 4. Run: go env GOVERSION
 5. Resolve args.pkg="${PKG}" to a valid go test package pattern (it may already be one, e.g. "./internal/codec" or "./...", or a bare import path — normalize to the form \`go test\` accepts from the repo root).
 6. List ALL benchmarks in that package: go test -list 'Benchmark.*' <resolved pkg pattern>. Return the benchmark function names only (drop the trailing "ok  ..." summary line and any "no test files" noise). An empty result is valid and expected when the package has no benchmarks — return an empty array, do not error.
-Return via StructuredOutput.`,
+Return via StructuredOutput.
+If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
   // creates the scratch dir under .claude/.cache and runs `go test -list`.
   { label: 'resolve', phase: 'Resolve', schema: RESOLVE_SCHEMA, model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
 )
 
+if (resolved && resolved.error) {
+  log(`resolve failed: ${resolved.error}`)
+  return { error: String(resolved.error) }
+}
 if (!resolved || !resolved.scratchDir || !resolved.pkgTarget) {
   log('could not resolve pkg/scratch dir — aborting')
   return { error: 'resolve failed' }

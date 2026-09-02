@@ -42,6 +42,7 @@ const COLLECT_SCHEMA = {
     branch: { type: 'string' },
     files_changed: { type: 'integer' },
     intent: { type: 'string' },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully: the reason, one line' },
   },
 }
 
@@ -51,11 +52,16 @@ const ctx = await agent(
 2. base_commit=$(git merge-base origin/<base> HEAD 2>/dev/null || git merge-base <base> HEAD)
 3. Save: git diff --no-ext-diff --no-color $base_commit HEAD > $(mktemp -t preflight).patch — return that path. Do not print the diff.
 4. files_changed from git diff --stat. Infer intent from branch name + last 5 commit subjects.
-Return via StructuredOutput.`,
+Return via StructuredOutput.
+If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
   // writes the mktemp patch file — the review lanes that read it do not.
   { label: 'collect-diff', phase: 'Collect', schema: COLLECT_SCHEMA, model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
 )
 
+if (ctx && ctx.error) {
+  log(`collect-diff failed: ${ctx.error}`)
+  return { status: 'error', error: String(ctx.error) }
+}
 if (!ctx || !ctx.files_changed) {
   log('No branch diff found — nothing to preflight.')
   return { status: 'empty' }

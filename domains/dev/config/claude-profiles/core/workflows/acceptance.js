@@ -64,6 +64,7 @@ const GROUND_SCHEMA = {
         notes: { type: 'string', description: 'conventions that decide what counts as evidence here' },
       },
     },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully: the reason, one line' },
   },
 }
 
@@ -77,9 +78,11 @@ ${CRITERIA.length ? `They were given explicitly:\n${JSON.stringify(CRITERIA)}` :
 
 ${SCOPE ? `What was built: ${SCOPE}` : ''}
 
-Read files. Do not run builds or tests in this phase. Return via StructuredOutput.`,
+Read files. Do not run builds or tests in this phase. Return via StructuredOutput.
+If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
   { label: 'ground', phase: 'Ground', schema: GROUND_SCHEMA, model: MODEL },
 )
+if (ground && ground.error) { log(`grounding failed: ${ground.error}`); return { error: String(ground.error) } }
 if (!ground || !ground.criteria || !ground.criteria.length) {
   log('grounding found no criteria')
   return { error: 'no criteria found' }

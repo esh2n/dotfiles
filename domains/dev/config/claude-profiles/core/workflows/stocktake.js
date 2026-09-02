@@ -34,6 +34,7 @@ const SCAN_SCHEMA = {
         },
       },
     },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully: the reason, one line' },
   },
 }
 
@@ -61,9 +62,17 @@ const SCANNERS = [
 ]
 
 const scans = await parallel(SCANNERS.map((s) => () =>
-  agent(`${s.prompt}\nSet area="${s.key}". Return every item you judged via StructuredOutput. This is a read-only audit — change nothing.`,
+  agent(`${s.prompt}\nSet area="${s.key}". Return every item you judged via StructuredOutput. This is a read-only audit — change nothing.\nIf you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
     { label: `scan:${s.key}`, phase: 'Scan', schema: SCAN_SCHEMA, model: MODEL, effort: 'low' }),
 ))
+
+// A scan that reported an honest failure must not be synthesized into a
+// keep/drop report as if it observed anything — abort with its reason.
+const scanErr = scans.filter(Boolean).find((s) => s.error)
+if (scanErr) {
+  log(`scan failed: [${scanErr.area || '?'}] ${scanErr.error}`)
+  return { error: `scan:${scanErr.area || '?'} — ${String(scanErr.error)}` }
+}
 
 phase('Synthesize')
 const found = scans.filter(Boolean)

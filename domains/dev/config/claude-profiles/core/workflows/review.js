@@ -382,6 +382,7 @@ const COLLECT_SCHEMA = {
       items: { type: 'string' },
       description: 'absolute paths of installed pattern review checklists that actually exist (empty array if none)',
     },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully: the reason, one line' },
   },
 }
 
@@ -399,7 +400,8 @@ Steps:
 5. List langs present in the diff by extension (.go=go / .ts,.js=typescript / .tsx,.jsx=react and typescript / .py=python / .rs=rust / .kt,.kts=kotlin / .java=java / .c,.cc,.cpp,.cxx,.h,.hpp=cpp / .dart=flutter / .sql or migration files=sql).
 6. List touches: grep the diff for what it touches — network (outbound HTTP/gRPC/external SDK calls), queue (channels, queues, topics, consumers, producers), metrics (metric registration or labels), health (/health /ready /live endpoints or probe config). Only what the diff actually contains; empty array is fine.
 7. Run: ls ~/.claude/skills/*/references/review-checklist.md 2>/dev/null — return the paths it prints in checklists (empty array when it prints nothing). Do NOT read them.
-Return via StructuredOutput.`,
+Return via StructuredOutput.
+If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
     // The only call in this workflow that writes anything (the mktemp patch
     // file); every reviewer lane below reads that file and runs read-only,
     // which matters because a lane's prompt is built from diff hunks.
@@ -413,6 +415,7 @@ Return prose under 2000 chars covering: conventions (naming, layout, error handl
   ),
 ])
 
+if (ctx && ctx.error) { log(`collect-diff failed: ${ctx.error}`); return { error: String(ctx.error) } }
 if (!ctx || !ctx.files_changed) {
   log('No changes to review.')
   return { findings: [], metrics: {} }

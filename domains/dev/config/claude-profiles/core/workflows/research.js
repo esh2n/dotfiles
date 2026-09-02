@@ -357,15 +357,18 @@ const PLAN_SCHEMA = {
   properties: { angles: { type: 'array', maxItems: 5, items: {
     type: 'object', required: ['key', 'goal'],
     properties: { key: { type: 'string' }, goal: { type: 'string', description: 'what this angle must find out' } },
-  } } },
+  } },
+  error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully: the reason, one line' } },
 }
 const plan = await agent(
   `Decompose this research question into 3-5 independent search angles (different aspects or search modalities, minimal overlap).
 Question: ${QUESTION}
 ${CONTEXT ? `Context: ${CONTEXT}` : ''}
-Return angles via StructuredOutput. No searching yet.`,
+Return angles via StructuredOutput. No searching yet.
+If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
   { label: 'plan-angles', phase: 'Plan', schema: PLAN_SCHEMA, model: MODEL },
 )
+if (plan && plan.error) { log(`planning failed: ${plan.error}`); return { error: String(plan.error) } }
 if (!plan || !plan.angles || !plan.angles.length) { log('planning failed'); return { error: 'no angles' } }
 log(`angles: ${plan.angles.map((a) => a.key).join(', ')}`)
 
