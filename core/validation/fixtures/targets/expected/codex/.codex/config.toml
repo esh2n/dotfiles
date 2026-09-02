@@ -14,8 +14,7 @@ extends = ":workspace"
 hooks = true
 multi_agent = true
 
-[agents]
-enabled = true
+[features.multi_agent_v2]
 max_concurrent_threads_per_session = 4
 
 [shell_environment_policy.set]

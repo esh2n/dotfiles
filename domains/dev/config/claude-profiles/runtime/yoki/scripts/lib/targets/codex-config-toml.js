@@ -2,12 +2,36 @@
 
 /**
  * `~/.codex/config.toml` managed block: a `# yoki:begin` / `# yoki:end`
- * section placed at the TOP of the file, because Codex requires top-level
+ * section placed near the TOP of the file, because Codex requires top-level
  * keys (`default_permissions`, `notify`) to precede any `[table]` header
  * (spike S3 §1, run 4: a misplaced `default_permissions` silently became
  * `features.default_permissions` and failed config load).
  *
- * Everything outside the block is preserved byte-for-byte. If the file
+ * WHICH IS ALSO WHY THE BLOCK IS NOT FIRST. The block's own body ENDS in
+ * tables (`[hooks.state."…"]`, `[mcp_servers.*]`), and in TOML a `key =
+ * value` belongs to whatever header precedes it — so a top-level key the
+ * user keeps after `# yoki:end` is not top-level at all, it is read as a
+ * field of the block's LAST table. Unknown fields there are dropped without
+ * a word, so `model = "gpt-5-codex"` after the block loaded as nothing and
+ * `codex doctor` reported `model <default>`. Hoisting it by hand did not
+ * help either: an earlier version of this file read only `extractBlock`'s
+ * `after`, so anything above `# yoki:begin` was deleted on the next apply.
+ * Between the two there was no position in the file where a top-level key
+ * both took effect and survived.
+ *
+ * The layout that resolves it, and what `applyManagedBlock` assembles:
+ *
+ *     <foreign preamble>   the user's top-level keys, hoisted above us
+ *     # yoki:begin … # yoki:end
+ *     <foreign tables>     everything from their first [table] header on
+ *
+ * Both halves keep their keys top-level, since the first header in the file
+ * is still one of ours. A top-level key the BLOCK emits itself (`notify`) is
+ * stripped from that preamble with a warning — two top-level assignments of
+ * one key is a duplicate-key config load failure, so one of them has to go,
+ * and the block's is the one wired to `codex-notify.js`.
+ *
+ * Everything outside the block is otherwise preserved as it was. If the file
  * already declares a top-level `default_permissions` or `sandbox_mode`
  * outside the block, ours is not emitted (S3 §1: "Don't combine with
  * `sandbox_mode`") and the caller gets a warning to surface via `doctor`.
@@ -36,7 +60,7 @@
  */
 
 const { extractBlock, wrapBlock } = require('./managed-block');
-const { splitSections, joinSections, parseKeyLine, nameOf, readTables, validateStructure } = require('./codex-toml-lite');
+const { splitSections, joinSections, parseKeyLine, nameOf, displayName, readTables, validateStructure } = require('./codex-toml-lite');
 
 const BLOCK_START = '# yoki:begin';
 const BLOCK_END = '# yoki:end';
@@ -56,9 +80,21 @@ const TABLE_HEADER_RE = /^\s*\[/;
  */
 const OWNED_TABLE_KEYS = new Map([
   [nameOf(['features']), ['hooks', 'multi_agent']],
-  [nameOf(['agents']), ['enabled', 'max_concurrent_threads_per_session']],
+  [nameOf(['features', 'multi_agent_v2']), ['max_concurrent_threads_per_session']],
   [nameOf(['shell_environment_policy', 'set']), ['YOKI_ROOT', 'CLAUDE_PLUGIN_ROOT', 'YOKI_HOOK_PROFILE', 'YOKI_HARNESS']],
 ]);
+
+/**
+ * Top-level keys the block assigns itself, so a copy of one left in the
+ * foreign preamble must be dropped rather than hoisted alongside it: TOML
+ * allows a key to be assigned once per table, the top level included, and
+ * Codex refuses to load the file otherwise.
+ *
+ * `default_permissions` is deliberately NOT here — a foreign copy of that one
+ * (or of `sandbox_mode`) is a conflict this generator declines to resolve at
+ * all, see hasConflictingTopLevelKey.
+ */
+const OWNED_TOP_LEVEL_KEYS = ['notify'];
 
 function toTomlString(value) {
   return JSON.stringify(String(value));
@@ -96,8 +132,7 @@ function buildManagedBlockContent(opts) {
     'hooks = true',
     'multi_agent = true',
     '',
-    '[agents]',
-    'enabled = true',
+    '[features.multi_agent_v2]',
     'max_concurrent_threads_per_session = 4',
     '',
     '[shell_environment_policy.set]',
@@ -232,6 +267,63 @@ function upsertSection(existingLines, ourLines, ownedKeys) {
   return out;
 }
 
+/** Drops the blank lines at both ends of a text, so composing the three
+ * parts of the file never depends on how many the previous apply left. */
+function trimBlankEdges(text) {
+  return String(text == null ? '' : text)
+    .replace(/^(?:[ \t]*\r?\n)+/, '')
+    .replace(/(?:\r?\n[ \t]*)+$/, '');
+}
+
+/** The foreign half of the file, both sides of the block joined back into
+ * one text in file order. `before` used to be discarded here, which deleted
+ * whatever the user had hoisted above `# yoki:begin`. */
+function joinForeign(before, after) {
+  const head = trimBlankEdges(before);
+  const tail = String(after == null ? '' : after);
+  if (!head) return tail;
+  if (!tail.trim()) return head;
+  return `${head}\n\n${tail}`;
+}
+
+/**
+ * Splits the foreign half at its FIRST `[table]` header — the boundary the
+ * new layout needs: the preamble's keys are top-level and belong above the
+ * block, while everything from that header on is already inside a table of
+ * its own and belongs below it.
+ *
+ * @param {string} text
+ * @returns {{preambleLines: string[], tablesText: string}}
+ */
+function splitForeignAtFirstTable(text) {
+  const [preamble, ...tables] = splitSections(text || '');
+  return { preambleLines: preamble.lines, tablesText: joinSections(tables) };
+}
+
+/**
+ * Removes the block's own top-level keys from the foreign preamble.
+ *
+ * @param {string[]} preambleLines
+ * @returns {{kept: string[], dropped: string[]}} `dropped` names the keys, for
+ *   the warning that tells the user which of their lines stopped being used.
+ */
+function stripOwnedTopLevelKeys(preambleLines) {
+  const owned = new Set(OWNED_TOP_LEVEL_KEYS.map(key => nameOf([key])));
+  const kept = [];
+  const dropped = [];
+
+  for (const line of preambleLines) {
+    const key = parseKeyLine(line);
+    if (key !== null && owned.has(key)) {
+      dropped.push(displayName(key));
+      continue;
+    }
+    kept.push(line);
+  }
+
+  return { kept, dropped };
+}
+
 /** @returns {string[]|null} the keys we own in `parts`'s table, or null when
  * the block is that table's sole author (replace the whole body). */
 function ownedKeysFor(parts) {
@@ -338,11 +430,13 @@ function assertValidCodexConfigToml(text, destinationPath) {
  * @returns {{content: string, warnings: string[], info: string[]}}
  */
 function applyManagedBlock(existingText, blockContent, ownedHookStateKeys, options = {}) {
-  const { after } = extractBlock(existingText || '', BLOCK_START, BLOCK_END);
+  const { before, after } = extractBlock(existingText || '', BLOCK_START, BLOCK_END);
   const warnings = [];
   const info = [];
 
-  if (hasConflictingTopLevelKey(after)) {
+  const foreign = joinForeign(before, after);
+
+  if (hasConflictingTopLevelKey(foreign)) {
     warnings.push(
       'codex: config.toml already declares a top-level default_permissions/sandbox_mode outside the managed block — ' +
       'the yoki permissions block was NOT written (S3: do not combine default_permissions with sandbox_mode). Remove the ' +
@@ -351,13 +445,29 @@ function applyManagedBlock(existingText, blockContent, ownedHookStateKeys, optio
     return { content: existingText || '', warnings, info };
   }
 
-  const cleanedAfter = removeHookStateSections(after, ownedHookStateKeys);
-  const mergedTables = mergeOwnedTables(blockContent, cleanedAfter);
+  const cleanedForeign = removeHookStateSections(foreign, ownedHookStateKeys);
+  const { preambleLines, tablesText } = splitForeignAtFirstTable(cleanedForeign);
+  const { kept, dropped } = stripOwnedTopLevelKeys(preambleLines);
+  for (const key of dropped) {
+    warnings.push(
+      `codex: config.toml declared a top-level "${key}" outside the managed block — dropped, because the block assigns ` +
+      `its own and TOML allows one assignment per key (two would fail config load). Configure it through the ` +
+      'claude-profiles layers instead.'
+    );
+  }
+
+  const mergedTables = mergeOwnedTables(blockContent, tablesText);
   for (const display of mergedTables.merged) {
     info.push(`codex: config.toml ${display} already exists outside the managed block — merged into existing ${display} (no duplicate header emitted)`);
   }
 
-  const content = wrapBlock(BLOCK_START, BLOCK_END, mergedTables.blockContent, mergedTables.foreignText);
+  // The preamble goes ABOVE the block: the block ends in tables, which would
+  // otherwise swallow these keys — see the file header.
+  const preamble = trimBlankEdges(kept.join('\n'));
+  const content =
+    (preamble ? `${preamble}\n\n` : '') +
+    wrapBlock(BLOCK_START, BLOCK_END, mergedTables.blockContent, mergedTables.foreignText);
+
   assertValidCodexConfigToml(content, options.destinationPath);
   return { content, warnings, info };
 }
@@ -366,9 +476,13 @@ module.exports = {
   BLOCK_START,
   BLOCK_END,
   OWNED_TABLE_KEYS,
+  OWNED_TOP_LEVEL_KEYS,
   buildManagedBlockContent,
   hasConflictingTopLevelKey,
   removeHookStateSections,
+  joinForeign,
+  splitForeignAtFirstTable,
+  stripOwnedTopLevelKeys,
   upsertSection,
   mergeOwnedTables,
   validateMcpServerTables,
