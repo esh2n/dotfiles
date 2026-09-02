@@ -140,7 +140,9 @@ const SCRIPTS = [
   {
     name: 'design-review',
     scriptPath: path.join(CORE_WORKFLOWS, 'design-review.js'),
-    args: { target: 'a write-through cache design, see fixture design_text' },
+    // The target IS the design text (source_kind "text"): the script embeds
+    // it into the lane prompts itself — no agent transcription round-trip.
+    args: { target: 'Design: add a write-through cache in front of the lookup path. On write, update the store then the cache. On read, check the cache first, fall back to the store on miss. No rollback plan is specified.' },
     assertResult(r) {
       assert.equal(r.verdict, 'proceed-with-changes');
       assert.equal(r.findings.length, 1);
@@ -214,6 +216,7 @@ const SCRIPTS = [
     assertResult(r) {
       assert.equal(r.drop_candidates.length, 1);
       assert.equal(r.fix_items.length, 1);
+      assert.deepEqual(r.unscanned, []);
       assert.match(r.report, /old-hook\.js/);
     },
   },
@@ -811,7 +814,7 @@ test('design-review: a confirmed claim is never downgraded by an unverified dupl
   // comes back unverified — the exact collision.
   fs.writeFileSync(mockFile, JSON.stringify({
     gather: {
-      source_kind: 'inline', design_summary: 'a cache design', design_text: 'a cache design',
+      source_kind: 'text', design_summary: 'a write-through cache design for the lookup path with no rollback plan specified',
       grounding: [], missing: [], checklists: [],
     },
     'lane:conventions': { findings: [{ claim, severity_confidence: 8, importance: 8, doc_ref: '', load_bearing: true }], open_questions: [] },
@@ -835,6 +838,278 @@ test('design-review: a confirmed claim is never downgraded by an unverified dupl
     // The code-enforced floor can only fire on a CONFIRMED finding, so the
     // downgrade also used to let a C9/I9 defect through as "proceed".
     assert.equal(result.result.verdict, 'proceed-with-changes');
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+/**
+ * The 2026-09-02 fabrication incident, pinned: an ingest agent that could not
+ * fill the gather schema truthfully was schema-retried into submitting
+ * placeholder garbage, which then flowed to all 11 downstream agents
+ * unchecked. The fix is an `error` escape hatch plus abort gates in the
+ * script — these tests prove each gate actually cuts the panel off.
+ */
+async function runDesignReviewGate(mockFile, args = DESIGN_REVIEW_SPEC.args) {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-ingest-gate-'));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: DESIGN_REVIEW_SPEC.scriptPath, args,
+      backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    return { result, events };
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}
+
+/** No panel lane, verifier, or synthesizer may start once ingest is refused. */
+function assertPanelNeverStarted(events) {
+  const labels = labelsOf(events);
+  assert.deepEqual(labels, ['gather'],
+    `agents ran past the ingest gate: ${labels.join(', ')}`);
+}
+
+test('design-review: an ingest error aborts the run before any panel lane starts', () => withIsolatedState(async () => {
+  const { result, events } = await runDesignReviewGate(fixture('design-review-error'));
+  assert.equal(result.status, 'ok', result.error);
+  assert.equal(result.result.error, 'cannot read target');
+  assertPanelNeverStarted(events);
+}));
+
+test('design-review: a too-short design_summary is refused as suspected fabrication', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-short-summary-'));
+  const mockFile = path.join(cwd, 'short-summary.mock.json');
+  // The incident's exact shape: schema-passing garbage ("test") in the
+  // summary field, submitted under retry pressure.
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: { source_kind: 'text', design_summary: 'test', grounding: [], missing: [], checklists: [] },
+  }));
+  try {
+    const { result, events } = await runDesignReviewGate(mockFile);
+    assert.equal(result.status, 'ok', result.error);
+    assert.match(result.result.error, /too short/);
+    assert.match(result.result.error, /suspected placeholder/);
+    assertPanelNeverStarted(events);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('design-review: a file target with no design_path aborts — the panel cannot re-read a design nobody located', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-no-path-'));
+  const mockFile = path.join(cwd, 'no-path.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: {
+      source_kind: 'file',
+      design_summary: 'a design read from a file whose path the ingest agent failed to return',
+      grounding: [], missing: [], checklists: [],
+    },
+  }));
+  try {
+    const { result, events } = await runDesignReviewGate(mockFile);
+    assert.equal(result.status, 'ok', result.error);
+    assert.match(result.result.error, /no design_path/);
+    assertPanelNeverStarted(events);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+/**
+ * source_kind is cross-checked in CODE against what TARGET itself reads as.
+ * An omitted or wrong classification used to fall through to the text
+ * branch, presenting a bare file path to every lane as "DESIGN TEXT
+ * (verbatim, authoritative)".
+ */
+const GATE_SUMMARY = 'a long enough faithful summary of the cache design under review';
+
+test('design-review: a source_kind contradicting the target itself is refused', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-kind-mismatch-'));
+  const mockFile = path.join(cwd, 'mismatch.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: { source_kind: 'text', design_summary: GATE_SUMMARY, grounding: [], missing: [], checklists: [] },
+  }));
+  try {
+    // The target is unmistakably a file path — a "text" classification would
+    // hand the lanes the path itself as the design.
+    const { result, events } = await runDesignReviewGate(mockFile, { target: '/tmp/some-design.md' });
+    assert.equal(result.status, 'ok', result.error);
+    assert.match(result.result.error, /reads as "file"/);
+    assertPanelNeverStarted(events);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('design-review: a missing source_kind is refused instead of falling through to the text branch', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-kind-missing-'));
+  const mockFile = path.join(cwd, 'missing-kind.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: { design_summary: GATE_SUMMARY, grounding: [], missing: [], checklists: [] },
+  }));
+  try {
+    const { result, events } = await runDesignReviewGate(mockFile);
+    assert.equal(result.status, 'ok', result.error);
+    assert.match(result.result.error, /invalid source_kind/);
+    assertPanelNeverStarted(events);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('design-review: a relative design_path is refused — lanes would resolve it differently', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-relative-path-'));
+  const mockFile = path.join(cwd, 'relative.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: { source_kind: 'file', design_path: 'docs/design.md', design_summary: GATE_SUMMARY, grounding: [], missing: [], checklists: [] },
+  }));
+  try {
+    const { result, events } = await runDesignReviewGate(mockFile, { target: '/tmp/some-design.md' });
+    assert.equal(result.status, 'ok', result.error);
+    assert.match(result.result.error, /not absolute/);
+    assertPanelNeverStarted(events);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('design-review: a lane that cannot read the design is dropped with a visible note, never faked', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-lane-error-'));
+  const mockFile = path.join(cwd, 'lane-error.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: { source_kind: 'text', design_summary: GATE_SUMMARY, grounding: [], missing: [], checklists: [] },
+    'lane:conventions': { error: 'cannot read the design file' },
+    'lane:architecture': { findings: [], open_questions: [] },
+    'lane:security': { findings: [], open_questions: [] },
+    'lane:wording': { findings: [], open_questions: [] },
+    'lane:release': { findings: [], open_questions: [] },
+    synthesize: { verdict: 'proceed', report: 'r' },
+  }));
+  try {
+    const { result, events } = await runDesignReviewGate(mockFile);
+    assert.equal(result.status, 'ok', result.error);
+    const note = logsOf(events).find((m) => m.includes('lane:conventions'));
+    assert.ok(note, 'the dropped lane was silent — a reader cannot tell coverage was lost');
+    assert.match(note, /dropped — cannot read the design file/);
+    assert.equal(result.result.findings.length, 0);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+test('design-review: a url target skips the non-claude transport lanes with a note (their sandboxes have no network)', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-url-skip-'));
+  const mockFile = path.join(cwd, 'url-skip.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    gather: { source_kind: 'url', design_summary: GATE_SUMMARY, grounding: [], missing: [], checklists: [] },
+    'lane:conventions': { findings: [], open_questions: [] },
+    'lane:architecture': { findings: [], open_questions: [] },
+    'lane:security': { findings: [], open_questions: [] },
+    'lane:wording': { findings: [], open_questions: [] },
+    'lane:release': { findings: [], open_questions: [] },
+    synthesize: { verdict: 'proceed', report: 'r' },
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: DESIGN_REVIEW_SPEC.scriptPath,
+      args: { target: 'https://example.com/design', providers: ['claude', 'codex'] },
+      backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    const labels = labelsOf(events);
+    assert.ok(labels.includes('lane:conventions'), 'the claude lanes must still run');
+    assert.ok(!labels.some((l) => l.includes('@codex')), 'a codex lane ran against a url it cannot fetch');
+    const note = logsOf(events).find((m) => /skipped — url target/.test(m));
+    assert.ok(note, 'the skipped transport lanes left no visible note');
+    assert.match(note, /@codex/);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+}));
+
+// ---------------------------------------------------------------------------
+// 4. The anti-fabrication escape hatch, one row per workflow.
+// ---------------------------------------------------------------------------
+//
+// Every first-stage/ingest prompt PROMISES "return only the `error` field";
+// each row proves the schema actually ACCEPTS an error-only answer and the
+// script aborts with that reason. This is exactly the test that catches a
+// `required` list quietly tightening again: an error-only entry then fails
+// loose validation, is retried once with "missing required property ..."
+// folded into the prompt — the 2026-09-02 incident's exact pressure, now
+// applied to the honest answer — and the run errors out instead of aborting
+// cleanly.
+
+const HATCH_MSG = 'cannot fill this truthfully';
+const HATCH = [
+  { name: 'research', label: 'plan-angles', args: { question: 'q?' } },
+  { name: 'review', label: 'collect-diff', args: {} },
+  { name: 'acceptance', label: 'ground', args: { criteria: [{ id: 'c1', text: 'x' }] } },
+  { name: 'code-study', label: 'map', args: { target: 't', questions: ['q'] } },
+  {
+    name: 'preflight', label: 'collect-diff', args: {},
+    expect(r) { assert.equal(r.status, 'error'); assert.equal(r.error, HATCH_MSG); },
+  },
+  { name: 'implement', label: 'load-tasks', args: { tasksFile: '/tmp/tasks.md' } },
+  { name: 'go-optimize', label: 'resolve', args: { pkg: './x' }, dir: GO_WORKFLOWS },
+  { name: 'design-review', label: 'gather', args: { target: 'a design text target' } },
+  // deliberate's grounding scout has no schema: its hatch is the "ERROR:"
+  // text sentinel, gated the same way.
+  {
+    name: 'deliberate', label: 'scout',
+    args: { question: 'q?', grounding: ['README.md'] },
+    entry: `ERROR: ${HATCH_MSG}`,
+    expect(r) { assert.equal(r.error, `ERROR: ${HATCH_MSG}`); },
+  },
+];
+
+for (const spec of HATCH) {
+  test(`${spec.name}: the ${spec.label} escape hatch accepts an error-only answer and aborts the run`, () => withIsolatedState(async () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-hatch-'));
+    const mockFile = path.join(cwd, 'hatch.mock.json');
+    fs.writeFileSync(mockFile, JSON.stringify({ [spec.label]: spec.entry || { error: HATCH_MSG } }));
+    try {
+      const result = await runner.executeScript({
+        scriptPath: path.join(spec.dir || CORE_WORKFLOWS, `${spec.name}.js`),
+        args: spec.args, backendName: 'mock', cwd, mockFile,
+      });
+      assert.equal(result.status, 'ok', result.error);
+      if (spec.expect) spec.expect(result.result);
+      else assert.equal(result.result.error, HATCH_MSG);
+    } finally {
+      fs.rmSync(cwd, { recursive: true, force: true });
+    }
+  }));
+}
+
+test('stocktake: a failed scan is dropped with its reason — the other areas still get audited', () => withIsolatedState(async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-stocktake-drop-'));
+  const mockFile = path.join(cwd, 'drop.mock.json');
+  fs.writeFileSync(mockFile, JSON.stringify({
+    'scan:skills': { error: 'cannot read ~/.claude/skills' },
+    'scan:hooks': { area: 'hooks', items: [{ name: 'old-hook.js', verdict: 'drop-candidate', evidence: 'not wired' }] },
+    'scan:mcp': { area: 'mcp', items: [] },
+    'scan:memory': { area: 'memory', items: [] },
+    'scan:freshness': { area: 'freshness', items: [] },
+    synthesize: 'report body',
+  }));
+  try {
+    const events = [];
+    const result = await runner.executeScript({
+      scriptPath: path.join(CORE_WORKFLOWS, 'stocktake.js'),
+      args: {}, backendName: 'mock', cwd, mockFile, emit: (e) => events.push(e),
+    });
+    assert.equal(result.status, 'ok', result.error);
+    // NOT aborted: the four good areas still produce the report...
+    assert.equal(result.result.error, undefined);
+    assert.deepEqual(result.result.drop_candidates, ['[hooks] old-hook.js — not wired']);
+    // ...and the failed one is named with its reason, attributed by the
+    // script's own scanner key, both in the result and in a log line.
+    assert.deepEqual(result.result.unscanned, ['[skills] cannot read ~/.claude/skills']);
+    assert.ok(logsOf(events).some((m) => /not scanned — \[skills\] cannot read/.test(m)));
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }

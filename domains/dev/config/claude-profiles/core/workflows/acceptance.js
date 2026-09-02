@@ -40,9 +40,13 @@ if (!CRITERIA.length && !CRITERIA_FILE) {
 
 phase('Ground')
 
+// `required` deliberately empty: an agent that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the abort gates right after the call.
 const GROUND_SCHEMA = {
   type: 'object',
-  required: ['criteria', 'verification'],
+  required: [],
   properties: {
     criteria: {
       type: 'array', maxItems: 40,
@@ -64,6 +68,7 @@ const GROUND_SCHEMA = {
         notes: { type: 'string', description: 'conventions that decide what counts as evidence here' },
       },
     },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully: the reason, one line' },
   },
 }
 
@@ -77,12 +82,21 @@ ${CRITERIA.length ? `They were given explicitly:\n${JSON.stringify(CRITERIA)}` :
 
 ${SCOPE ? `What was built: ${SCOPE}` : ''}
 
-Read files. Do not run builds or tests in this phase. Return via StructuredOutput.`,
+Read files. Do not run builds or tests in this phase. Return via StructuredOutput.
+If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
   { label: 'ground', phase: 'Ground', schema: GROUND_SCHEMA, model: MODEL },
 )
+if (ground && ground.error) { log(`grounding failed: ${ground.error}`); return { error: String(ground.error) } }
 if (!ground || !ground.criteria || !ground.criteria.length) {
   log('grounding found no criteria')
   return { error: 'no criteria found' }
+}
+// Presence gate for the formerly-required verification block: every later
+// stage interpolates its commands/notes, so proceeding without it would
+// judge coverage against an undefined standard.
+if (!ground.verification) {
+  log('grounding returned no verification info')
+  return { error: 'grounding returned no verification info' }
 }
 log(`criteria: ${ground.criteria.length} / verification commands: ${(ground.verification.commands || []).length}`)
 

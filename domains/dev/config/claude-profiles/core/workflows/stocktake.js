@@ -17,9 +17,13 @@ const LANGUAGE = (args && args.language) || 'Japanese'
 
 phase('Scan')
 
+// `required` deliberately empty: a scanner that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced in code right after the parallel scan.
 const SCAN_SCHEMA = {
   type: 'object',
-  required: ['area', 'items'],
+  required: [],
   properties: {
     area: { type: 'string' },
     items: {
@@ -34,6 +38,7 @@ const SCAN_SCHEMA = {
         },
       },
     },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully: the reason, one line' },
   },
 }
 
@@ -61,21 +66,37 @@ const SCANNERS = [
 ]
 
 const scans = await parallel(SCANNERS.map((s) => () =>
-  agent(`${s.prompt}\nSet area="${s.key}". Return every item you judged via StructuredOutput. This is a read-only audit — change nothing.`,
+  agent(`${s.prompt}\nSet area="${s.key}". Return every item you judged via StructuredOutput. This is a read-only audit — change nothing.\nIf you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
     { label: `scan:${s.key}`, phase: 'Scan', schema: SCAN_SCHEMA, model: MODEL, effort: 'low' }),
 ))
 
+// A scan that reported an honest failure (or returned no items at all, or
+// whose agent died) is DROPPED, not synthesized as if it observed anything —
+// but on a report-only stocktake one failing area must not discard the four
+// good ones, so the run continues and the report names the unaudited areas
+// with their reasons. Areas come from SCANNERS by index — the script's own
+// ground truth about who was asked, not the model's claimed `area`.
+const unscanned = []
+const found = []
+scans.forEach((s, i) => {
+  const key = SCANNERS[i].key
+  if (!s) unscanned.push(`[${key}] scanner agent failed`)
+  else if (s.error) unscanned.push(`[${key}] ${String(s.error)}`)
+  else if (!Array.isArray(s.items)) unscanned.push(`[${key}] scanner returned no items`)
+  else found.push(s)
+})
+for (const u of unscanned) log(`not scanned — ${u}`)
+
 phase('Synthesize')
-const found = scans.filter(Boolean)
 const drops = found.flatMap((s) => s.items.filter((i) => i.verdict === 'drop-candidate').map((i) => `[${s.area}] ${i.name} — ${i.evidence}`))
 const fixes = found.flatMap((s) => s.items.filter((i) => i.verdict === 'fix').map((i) => `[${s.area}] ${i.name} — ${i.evidence}`))
 
 const summary = await agent(
   `Merge this stocktake into a short prioritized report, written in ${LANGUAGE}. Group by area, lead with what to delete and why, then what to fix. Be specific; no padding.
-DROP CANDIDATES:\n${drops.join('\n') || '(none)'}\nFIX:\n${fixes.join('\n') || '(none)'}`,
+DROP CANDIDATES:\n${drops.join('\n') || '(none)'}\nFIX:\n${fixes.join('\n') || '(none)'}${unscanned.length ? `\nNOT SCANNED (state these as unaudited areas — do not guess at their contents):\n${unscanned.join('\n')}` : ''}`,
   // Judgment stage: pinned to sonnet.
   { label: 'synthesize', phase: 'Synthesize', model: 'sonnet' },
 )
 
-log(`stocktake: ${drops.length} drop candidate(s), ${fixes.length} fix item(s)`)
-return { report: summary, drop_candidates: drops, fix_items: fixes }
+log(`stocktake: ${drops.length} drop candidate(s), ${fixes.length} fix item(s)${unscanned.length ? `, ${unscanned.length} area(s) not scanned` : ''}`)
+return { report: summary, drop_candidates: drops, fix_items: fixes, unscanned }

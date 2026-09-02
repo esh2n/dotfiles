@@ -49,9 +49,13 @@ Discipline:
 
 phase('Map')
 
+// `required` deliberately empty: an agent that cannot fill these fields
+// truthfully must be able to answer `{error}` alone instead of being
+// schema-retried into fabrication (2026-09-02 incident); presence is
+// enforced by the abort gates right after the call.
 const MAP_SCHEMA = {
   type: 'object',
-  required: ['layout', 'entry_points'],
+  required: [],
   properties: {
     layout: { type: 'string', description: 'how the codebase is organised, in a few sentences' },
     entry_points: {
@@ -65,6 +69,7 @@ const MAP_SCHEMA = {
       },
     },
     unavailable: { type: 'string', description: 'anything that could not be reached, and why' },
+    error: { type: 'string', description: 'set ONLY when the required fields cannot be filled truthfully (e.g. the whole target is unreachable): the reason, one line' },
   },
 }
 
@@ -80,10 +85,14 @@ ${QUESTIONS.map((q, i) => `${i}. ${q}`).join('\n')}
 Job: grasp how the repository is organised, then for each question list the files and directories that, once read, would answer it.
 A local path: read it directly. A URL: fetch contents via the hosting API or raw files.
 Whatever could not be reached (private, deleted, moved elsewhere) goes in unavailable.
+If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.
 ${RULES}`,
   { label: 'map', phase: 'Map', schema: MAP_SCHEMA, model: MODEL },
 )
-if (!map || !map.entry_points) { log('mapping failed'); return { error: 'no map' } }
+if (map && map.error) { log(`mapping failed: ${map.error}`); return { error: String(map.error) } }
+// layout joins the gate: it is interpolated into every Read/Report prompt,
+// so proceeding without it would hand the lanes "Layout: undefined".
+if (!map || !map.entry_points || !map.layout) { log('mapping failed'); return { error: 'no map' } }
 log(`layout: ${(map.layout || '').slice(0, 120)}`)
 if (map.unavailable) log(`unavailable: ${map.unavailable}`)
 
