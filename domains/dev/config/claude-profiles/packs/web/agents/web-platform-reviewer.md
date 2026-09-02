@@ -50,7 +50,7 @@ React keeps JSX-level a11y and hooks; this agent owns CSS files, the cascade, de
    - `browserslist` key in `package.json`, or a `.browserslistrc` file → browser-support lane; run syntax checks against it.
    - Optional `.yoki.json` `"web"` block (`{"css": "...", "tokens": "<path>", "spacingOwner": "layout"|"component"}`) — if present, use it to resolve which naming convention, token source, and spacing-ownership rule apply.
    - State explicitly, at the top of the review, which methodology-layer lanes are enabled and which are skipped (and why — no config detected). Universal-layer findings (cascade hygiene, Defensive CSS, animation performance, semantic HTML, browser syntax) always run regardless of detection.
-3. Read `skill: css-modern`, `skill: defensive-css`, `skill: css-cascade`, and `skill: css-units` before reviewing — they hold the legacy-to-modern replacement table, the Defensive CSS intent table, the cascade-resolution mechanism, and the unit-resolution mechanism this review is built on.
+3. Read `skill: css-modern`, `skill: defensive-css`, `skill: css-cascade`, `skill: css-units`, and `skill: css-flow` before reviewing — they hold the legacy-to-modern replacement table, the Defensive CSS intent table, the cascade-resolution mechanism, the unit-resolution mechanism, and the margin-collapse/spacing-pattern mechanism this review is built on.
 4. Run diagnostic commands available in the project (stylelint, html-validate) — see Diagnostic Commands below.
 5. Focus on modified `.css`/`.scss`/`.html` files, plus `<style>` blocks and CSS-in-JS objects inside component files the diff touches (`.tsx`/`.vue`/`.svelte`/`.astro` — the extension filters above do not catch these, so list them with `git diff --name-only` and grep for `<style` / `styled.` / `css\``), and read surrounding context — including the existing cascade for the selectors touched — before commenting.
 6. Begin review.
@@ -120,6 +120,11 @@ Apply the intent table from `skill: defensive-css` to the diff. For each violate
 
 Anything in `skill: css-modern`'s replacement table used where the "current form" column applies and the "legacy form is still right" exception does not. Cite the row.
 
+### MEDIUM -- Flow and Spacing
+
+- **Sibling spacing via double-direction margins or first-child reset hacks** (`margin-top` on every item + `:first-child { margin-top: 0 }`, or margin-top and margin-bottom both carrying inter-item spacing). Why it visibly breaks: the first/last item's spacing depends on collapse context, and moving an item between containers changes the gaps. Fix: parent `gap` or `.stack > :where(* + *)`. See `skill: css-flow`.
+- **Collapse-dependent spacing moved into a flex/grid container** — a diff that adds `display: flex|grid` to a parent whose children still carry block-direction margins sized for collapse. Why it visibly breaks: margins stop collapsing inside flex/grid, so every gap roughly doubles the moment the layout ships. See `skill: css-flow`.
+
 ### MEDIUM -- Duplication / Dead Code
 
 - **Duplicated selectors or declarations**: the same selector declared twice in one file/layer, or the same property/value pair repeated across near-identical selectors that could share a class.
@@ -179,4 +184,4 @@ Always include the file path and line number. Quote the offending declaration/se
 ## Related
 
 - Agents: `code-reviewer` (generic project-wide review), `react-reviewer` (JSX a11y and hooks, invoked alongside on `.tsx` + `.css` changes), `e2e-runner` (rendered-DOM verification: contrast, focus, overflow, axe)
-- Skills: `skill: css-modern` (legacy-to-modern syntax replacement table), `skill: defensive-css` (content/environment robustness intent table), `skill: css-cascade` (cascade resolution order and specificity mechanism), `skill: css-units` (relative-unit resolution and zoom-safe fluid typography)
+- Skills: `skill: css-modern` (legacy-to-modern syntax replacement table), `skill: defensive-css` (content/environment robustness intent table), `skill: css-cascade` (cascade resolution order and specificity mechanism), `skill: css-units` (relative-unit resolution and zoom-safe fluid typography), `skill: css-flow` (margin collapse mechanism and spacing patterns)
