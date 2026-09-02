@@ -379,10 +379,36 @@ check_catalog_freshness() {
         fail "case56: --write repairs a stale table"
     fi
 
-    if grep -qF 'lib/graph/catalog.js' "${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"; then
-        pass "case57: yoki-switch apply rebuilds the catalog before installing"
+    # Deliberately NOT a substring grep for "catalog.js": that also matches
+    # the function's own comment block and its `local catalog_js=` line, so
+    # deleting the actual call would still pass. Assert the CALL STATEMENT,
+    # and assert it runs before the first target dispatch — the ordering is
+    # the whole point (a target that installs the skill must never copy a
+    # table older than the scripts).
+    local switch_bin="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
+    local call_line dispatch_line
+    call_line="$(grep -nE '^[[:space:]]*build_workflow_catalog "\$dry_run"' "$switch_bin" | head -1 | cut -d: -f1)"
+    dispatch_line="$(grep -nE '^[[:space:]]*if _target_requested ' "$switch_bin" | head -1 | cut -d: -f1)"
+
+    if [[ -n "$call_line" ]]; then
+        pass "case57: apply() actually calls build_workflow_catalog"
     else
-        fail "case57: yoki-switch apply rebuilds the catalog before installing"
+        fail "case57: apply() actually calls build_workflow_catalog"
+    fi
+
+    if [[ -n "$call_line" && -n "$dispatch_line" && "$call_line" -lt "$dispatch_line" ]]; then
+        pass "case58: ...before the first target installs the skill"
+    else
+        fail "case58: ...before the first target installs the skill"
+        log_error "  call=${call_line:-none} dispatch=${dispatch_line:-none}"
+    fi
+
+    # The generator must refuse a valueless --profiles-root rather than
+    # falling back to the real checkout and then WRITING it.
+    if node "$catalog_js" --write --profiles-root >/dev/null 2>&1; then
+        fail "case59: a valueless --profiles-root is refused (never writes the real checkout)"
+    else
+        pass "case59: a valueless --profiles-root is refused (never writes the real checkout)"
     fi
 }
 

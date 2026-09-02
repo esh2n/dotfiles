@@ -166,6 +166,34 @@ test('real layers: every shipped workflow has a parseable meta with name, descri
   assert.equal(entries.find((e) => e.name === 'go-optimize').pack, 'go');
 });
 
+// The frontmatter `description` is the discovery surface — it is what a
+// harness matches a user's request against before the body is ever read —
+// and it enumerates the graphs by name. That enumeration is hand-written,
+// sits directly above a GENERATED table, and is exactly the kind of list
+// this generator exists to stop drifting. It stays hand-written (the
+// wording around the names is doing real triggering work), so it is pinned
+// here instead: add a workflow without naming it in the description and
+// this fails.
+test('real layers: the yoki-graph frontmatter description names every workflow in the catalog', () => {
+  const md = fs.readFileSync(catalog.skillMdPath(REAL_ROOT), 'utf8');
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md);
+  assert.ok(fm, 'yoki-graph SKILL.md has no frontmatter');
+  const description = /^description:\s*(.+)$/m.exec(fm[1]);
+  assert.ok(description, 'yoki-graph frontmatter has no description');
+
+  const missing = [];
+  for (const { name } of catalog.readCatalog(REAL_ROOT)) {
+    // Whole-token match: a bare `review` must not be satisfied by the
+    // `review` inside `design-review`.
+    const token = new RegExp(`(?<![a-z-])${name}(?![a-z-])`);
+    if (!token.test(description[1])) missing.push(name);
+  }
+  assert.deepEqual(
+    missing,
+    [],
+    `the yoki-graph frontmatter description does not name: ${missing.join(', ')}`,
+  );
+});
 test('real layers: the SKILL.md catalog block is up to date (regenerate with catalog.js --write)', () => {
   const { fresh, path: file, expected, actual } = catalog.checkCatalog(REAL_ROOT);
   assert.ok(
