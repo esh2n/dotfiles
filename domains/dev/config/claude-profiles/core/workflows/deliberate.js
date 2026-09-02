@@ -53,9 +53,16 @@ If you cannot read the paths, reply with a single line starting with "ERROR:" an
   ) || ''
   // The digest is handed to EVERY later agent as ground truth — a scout that
   // could not read must stop the run, not seed it with an invented repo.
-  if (String(ground).trim().startsWith('ERROR:')) {
+  // Tolerant sentinel match: models decorate ("**ERROR:", "> ERROR:") and
+  // case drifts, so up to 4 leading non-word chars and any case count.
+  if (/^\W{0,4}ERROR:/i.test(String(ground).trim())) {
     log(`grounding scout failed: ${String(ground).trim()}`)
     return { error: String(ground).trim() }
+  }
+  // A backend failure resolves the agent to null -> '' above: say so instead
+  // of silently running the whole deliberation without the requested facts.
+  if (!String(ground).trim()) {
+    log('grounding scout returned nothing — continuing WITHOUT repo facts for the requested paths')
   }
 } else {
   log('no grounding paths — skipping scout')
