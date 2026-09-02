@@ -411,6 +411,31 @@ describe("config and env precedence", () => {
     assert.equal(server.requests.at(-1).path, "/api/artifacts");
   });
 
+  // worker/scripts/setup.mjs used to write only these spellings, and a fresh
+  // setup could not publish at all (hit live 2026-09). The loader now falls
+  // back workerUrl -> baseUrl and serviceTokenClientId -> clientId.
+  test("a config with only the setup spellings still works", async () => {
+    writeConfig({ workerUrl: server.baseUrl, serviceTokenClientId: CLIENT_ID });
+    const result = await runCli(["list", "--json"], {
+      env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(JSON.parse(result.stdout).ok, true);
+  });
+
+  test("the canonical keys win over the setup-spelling aliases", async () => {
+    writeConfig({
+      baseUrl: server.baseUrl,
+      workerUrl: "https://wrong.invalid",
+      clientId: CLIENT_ID,
+      serviceTokenClientId: "wrong-client-id",
+    });
+    const result = await runCli(["list", "--json"], {
+      env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
+    });
+    assert.equal(result.code, 0, result.stderr);
+  });
+
   test("no configuration at all exits 1 and names the file", async () => {
     const result = await runCli(["list"], { env: env() });
     assert.equal(result.code, 1);

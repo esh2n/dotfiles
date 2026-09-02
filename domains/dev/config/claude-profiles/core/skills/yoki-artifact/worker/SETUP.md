@@ -49,7 +49,14 @@ wrangler はグローバルに入れない。S7 の前提どおりプロジェ�
 
 Access のログイン画面に出す ID プロバイダーを 2 つ登録する。どちらも
 「先に相手側で OAuth アプリを作り、その Client ID / Secret を Cloudflare に
-貼る」という同じ形になる。
+貼る」という同じ形になる。なお、既定の **One-time PIN**（メールに届く
+ワンタイムコード）だけでも運用は成立する — Google / GitHub はあとから
+追加でき、追加してもここまでの構築をやり直す必要はない。
+
+IdP の登録画面は Zero Trust → **Integrations → Identity providers**
+（旧 UI の Settings → Authentication → Login methods は廃止された。
+直接リンク:
+`https://one.dash.cloudflare.com/?to=/:account/integrations/identity-providers`）。
 
 Cloudflare 側が要求するリダイレクト URI は **両方とも同じ**:
 
@@ -71,7 +78,7 @@ https://<team>.cloudflareaccess.com/cdn-cgi/access/callback
    - Authorized JavaScript origins: `https://<team>.cloudflareaccess.com`
    - Authorized redirect URIs: `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback`
 4. 発行された **Client ID** と **Client secret** を控える
-5. Zero Trust → **Settings → Authentication → Login methods → Add new → Google**
+5. Zero Trust → **Integrations → Identity providers → Add new → Google**
    に貼り、**Test** で緑になることを確認する
 
 ### 2-2. GitHub
@@ -82,7 +89,7 @@ https://<team>.cloudflareaccess.com/cdn-cgi/access/callback
      `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback`
 2. **Client ID** を控え、**Generate a new client secret** で secret を発行して
    控える（secret はこの一度しか表示されない）
-3. Zero Trust → **Settings → Authentication → Login methods → Add new → GitHub**
+3. Zero Trust → **Integrations → Identity providers → Add new → GitHub**
    に貼り、**Test** で緑になることを確認する
 
 > GitHub の IdP はメールアドレスを返す。Access のポリシーはメールで判定する
@@ -107,8 +114,8 @@ R2 を有効化しないまま `setup.mjs` を実行すると、バケット作�
 
 ダッシュボード → **My Profile → API Tokens → Create Token**。テンプレート
 **"Edit Cloudflare Workers"** を選ぶと Workers Scripts と Workers R2 Storage の
-編集権限が入るので、そこに D1 と Access の 2 つを足すのがいちばん速い
-（Create Custom Token から手で 5 つ選んでもよい）。必要な権限は次のとおり。
+編集権限が入るので、そこに D1 と Access 系を足すのがいちばん速い
+（Create Custom Token から手で 6 つ選んでもよい）。必要な権限は次のとおり。
 
 | 種別 | 権限 | 何に使うか |
 | --- | --- | --- |
@@ -116,7 +123,14 @@ R2 を有効化しないまま `setup.mjs` を実行すると、バケット作�
 | Account | **Workers R2 Storage: Edit** | R2 バケット作成 |
 | Account | **D1: Edit**（D1 Write） | D1 データベース作成、`d1 migrations apply --remote` |
 | Account | **Access: Apps and Policies: Edit**（Write） | Access アプリケーションとポリシーの作成 |
-| Account | **Access: Organizations, Identity Providers, and Groups: Edit**（Write） | Access グループとサービストークンの作成 |
+| Account | **Access: Organizations, Identity Providers, and Groups: Edit**（Write） | Access グループの作成 |
+| Account | **Access: Service Tokens: Edit** | サービストークン `yoki-artifact-cli` の作成。**無いとサービストークン作成が 403 で落ちる**（実機確認済み） |
+
+日本語 UI のダッシュボードでは Access の権限がさらに細かく分かれている
+（Access: Apps / Access: Policies / Access: Identity Providers /
+Access: Organizations / Access: Groups / Access: Service Tokens）。その場合は
+上の表に対応する **Apps・Policies・Groups・Service Tokens の Edit** を選ぶ。
+Service Tokens は独立した権限で、他の Access 権限には含まれない。
 
 - **Account Resources** は対象のアカウントに限定する
 - 有効期限は付けてよい。切れたら再発行して環境変数を差し替えるだけ
@@ -173,6 +187,11 @@ export OWNER_EMAIL=you@example.com         # 唯一の書き込み権限者
 - `--viewers <path>` で別のファイルを指定できる
 - 内容は Access グループ `yoki-artifact-viewers` の include に反映される。
   リストから消したアドレスは次回実行でグループからも消える
+- **`OWNER_EMAIL` は常にグループの include に含まれる**（作成時も更新時も）。
+  Cloudflare の API は include が空のグループを 400
+  （`include field should not be empty`）で拒否するため、閲覧者ゼロでも
+  グループはオーナー 1 人で作られる。あとで `viewers.json` を空にしても
+  同じ理由で失敗しない
 
 日常の共有は `viewers.json` の編集ではなく **`yoki-artifact share`**（5-7）を
 使う。ただし `setup.mjs` はグループの include を `viewers.json` で**丸ごと
@@ -202,7 +221,12 @@ node scripts/setup.mjs
 4. `pnpm exec wrangler deploy` — **Access アプリケーションは Worker を
    destination に指定するので、先に Worker が存在している必要がある**
 5. Access アプリケーション作成（`destinations: [{type:"worker",
-   worker_id:"yoki-artifact"}]`）
+   worker_id:"yoki-artifact"}]`）。この形が 400（`12130 worker_id ... is
+   invalid`）で拒否されるアカウントでは、自動で
+   `type:"self_hosted"` + `domain:"yoki-artifact.<subdomain>.workers.dev"`
+   の形にフォールバックして作り直す（subdomain は
+   `GET /accounts/:id/workers/subdomain` で取る）。両方拒否されたときだけ
+   ダッシュボード手順を印字して停止する（7 参照）
 6. Access グループ `yoki-artifact-viewers` 作成／更新
 7. サービストークン `yoki-artifact-cli` 作成
 8. Allow ポリシー（`OWNER_EMAIL` + `yoki-artifact-viewers` グループ）と
@@ -211,7 +235,8 @@ node scripts/setup.mjs
    `OWNER_EMAIL` / `SERVICE_TOKEN_NAME` を書き込み
 10. `pnpm exec wrangler deploy`（本物の `ACCESS_AUD` を載せて再デプロイ）
 11. `~/.config/yoki-artifact/config.json` を書き込み
-    （`accessGroupId` と `serviceTokenClientId` を含む）
+    （CLI が読む `baseUrl` / `clientId` と、別名の `workerUrl` /
+    `serviceTokenClientId`、`accessGroupId` を含む）
 
 ### 5-4. 何度実行してもよい
 
@@ -350,14 +375,16 @@ pnpm exec wrangler secret put ACCESS_AUD
 
 ---
 
-## 6. 初回に必ず確認すること（S7 で UNVERIFIED のまま）
+## 6. 初回に必ず確認すること
 
-S7 の spike では実機確認できておらず、**初回セットアップで確かめる**と決めた
-項目がある。想定どおりでなければ止まるので、黙って進めないこと。
+S7 の spike で UNVERIFIED だった項目のうち、1 は 2026-09 の実機セットアップで
+確認済み。2 はデプロイごとに確認する。
 
-1. **`destinations` の worker 指定が API で通るか**
-   通らなければ `setup.mjs` はダッシュボード手順を stderr に印字して停止する
-   （下記 7 参照）。
+1. **`destinations` の worker 指定が API で通るか — 実機確認済み**
+   このアカウントでは 400（`12130 worker_id "yoki-artifact" is invalid`）で
+   拒否され、`self_hosted` + workers.dev hostname の形は通った。`setup.mjs` は
+   この順で自動フォールバックする。両方拒否された場合のみダッシュボード手順を
+   stderr に印字して停止する（下記 7 参照）。
 2. **`Cf-Access-Jwt-Assertion` が Worker まで届くか**
    Static Assets のルーターは `ctx.access` を渡さないので、認証はこのヘッダー
    の検証だけが頼り。デプロイ後にブラウザで開き、401
@@ -370,8 +397,10 @@ S7 の spike では実機確認できておらず、**初回セットアップ�
 
 ## 7. Access アプリケーションが API で作れなかったとき
 
-`setup.mjs` は Cloudflare がリクエストの形を拒否した場合、推測で作り直さずに
-ダッシュボードでの手順を印字して終了する。表示どおりに
+`setup.mjs` は worker destination の形が拒否されると、まず workers.dev
+hostname の形（`self_hosted` + `domain`）で自動的に作り直す。**両方**
+拒否された場合だけ、推測を重ねずにダッシュボードでの手順を印字して終了する。
+表示どおりに
 
 1. Zero Trust → Access → Applications → Add an application → Self-hosted
 2. 名前は `yoki-artifact`、destination に Worker `yoki-artifact` を選ぶ
@@ -392,7 +421,9 @@ cat ~/.config/yoki-artifact/config.json
 
 - `accessAud` が `REPLACE-...` でない実 UUID になっている
 - `accessGroupId` が入っている（`share` / `unshare` がこれを読む。5-7）
-- `workerUrl` が `https://yoki-artifact.<subdomain>.workers.dev`
+- `baseUrl`（と別名の `workerUrl`）が
+  `https://yoki-artifact.<subdomain>.workers.dev`
+- `clientId`（と別名の `serviceTokenClientId`）が入っている
 - `wrangler.toml` の `SERVICE_TOKEN_NAME` が `REPLACE-...` でなく、
   `serviceTokenClientId` と同じ値になっている（5-6）
 - そのURLをブラウザで開くと Cloudflare Access のログイン画面が出て、Google か

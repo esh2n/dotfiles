@@ -55,7 +55,12 @@ const fullState = (overrides = {}) => ({
     { id: "p-2", name: "yoki-artifact-service-auth" },
   ],
   accessGroups: [
-    { id: "g-1", name: VIEWERS_GROUP_NAME, include: [{ email: { email: "viewer@example.com" } }] },
+    // The owner is always a member (the API rejects an empty include).
+    {
+      id: "g-1",
+      name: VIEWERS_GROUP_NAME,
+      include: [{ email: { email: "owner@example.com" } }, { email: { email: "viewer@example.com" } }],
+    },
   ],
   serviceTokens: [{ id: "t-1", name: SERVICE_TOKEN_NAME, client_id: "client-1" }],
   workersSubdomain: "esh2n",
@@ -117,6 +122,25 @@ describe("planSetup on an empty account", () => {
     assert.equal(step(plan, "access-app").body.http_only_cookie_attribute, true);
   });
 
+  // Verified live 2026-09: the worker destination can 400 (12130), and the
+  // self_hosted + workers.dev hostname form is what those accounts accept.
+  test("the Access application declares the workers.dev-hostname fallback", () => {
+    const { fallback } = step(plan, "access-app");
+    assert.equal(fallback.body.type, "self_hosted");
+    assert.equal(fallback.body.http_only_cookie_attribute, true);
+    assert.equal(fallback.body.destinations, undefined, "the fallback must not repeat the rejected shape");
+    // EMPTY_STATE knows no subdomain, so the hostname carries a placeholder
+    // and the executor is told where to fetch the real value.
+    assert.equal(fallback.body.domain, "yoki-artifact.<workers-subdomain>.workers.dev");
+    assert.equal(fallback.subdomainPath, `/accounts/${ACCOUNT}/workers/subdomain`);
+  });
+
+  test("a discovered subdomain lands in the fallback hostname directly", () => {
+    const { fallback } = step(planSetup(fullState({ accessApps: [] }), PARAMS), "access-app");
+    assert.equal(fallback.body.domain, "yoki-artifact.esh2n.workers.dev");
+    assert.equal(fallback.subdomainPath, null, "no extra GET is needed when discovery already read it");
+  });
+
   test("the Allow policy admits the owner and the viewers group", () => {
     const { body } = step(plan, "allow-policy");
     assert.equal(body.decision, "allow");
@@ -134,9 +158,28 @@ describe("planSetup on an empty account", () => {
     assert.equal(step(plan, "service-token").body.name, "yoki-artifact-cli");
   });
 
-  test("the viewers group is built from the local JSON list", () => {
-    assert.deepEqual(step(plan, "viewers-group").body.include, [{ email: { email: "viewer@example.com" } }]);
+  test("the viewers group is the local JSON list plus the owner, always", () => {
+    assert.deepEqual(step(plan, "viewers-group").body.include, [
+      { email: { email: "owner@example.com" } },
+      { email: { email: "viewer@example.com" } },
+    ]);
     assert.equal(step(plan, "viewers-group").method, "POST");
+  });
+
+  // Verified live 2026-09: POST /access/groups with an empty include is a 400
+  // (`include field should not be empty`), so "no viewers.json" must not
+  // produce an empty group body.
+  test("zero viewers still yields a valid, owner-only group", () => {
+    const emptyPlan = planSetup(EMPTY_STATE, { ...PARAMS, viewers: [] });
+    assert.deepEqual(step(emptyPlan, "viewers-group").body.include, [{ email: { email: "owner@example.com" } }]);
+  });
+
+  test("emptying viewers.json later shrinks the group to the owner, not to nothing", () => {
+    const emptyPlan = planSetup(fullState(), { ...PARAMS, viewers: [] });
+    const group = step(emptyPlan, "viewers-group");
+    assert.equal(group.method, "PUT");
+    assert.equal(group.skip, null);
+    assert.deepEqual(group.body.include, [{ email: { email: "owner@example.com" } }]);
   });
 
   test("ACCESS_AUD is written from the application, not invented", () => {
@@ -160,6 +203,9 @@ describe("planSetup on an empty account", () => {
   test("the local config records the client id and never the secret", () => {
     const { values } = step(plan, "user-config");
     assert.deepEqual(values.serviceTokenClientId, { $ref: "service-token", path: "client_id" });
+    // The CLI reads `clientId`/`baseUrl`; both spellings must be written.
+    assert.deepEqual(values.clientId, values.serviceTokenClientId);
+    assert.deepEqual(values.baseUrl, values.workerUrl);
     assert.equal(values.clientSecretEnv, "YOKI_ARTIFACT_CLIENT_SECRET");
     const serialised = JSON.stringify(plan);
     assert.ok(!/client_secret|secret"\s*:/.test(serialised), "no plan step carries a secret value");
@@ -222,7 +268,7 @@ describe("planSetup is idempotent", () => {
     assert.equal(group.method, "PUT");
     assert.equal(group.path, `/accounts/${ACCOUNT}/access/groups/g-1`);
     assert.equal(group.skip, null);
-    assert.equal(group.body.include.length, 2);
+    assert.equal(group.body.include.length, 3, "owner + the two viewers");
   });
 
   test("an unchanged viewer list leaves the group alone", () => {
@@ -295,6 +341,7 @@ describe("discover reads the account without mutating it", () => {
   test("a planned worker URL comes from the discovered subdomain", async () => {
     const withSubdomain = planSetup(fullState(), PARAMS);
     assert.equal(step(withSubdomain, "user-config").values.workerUrl, "https://yoki-artifact.esh2n.workers.dev");
+    assert.equal(step(withSubdomain, "user-config").values.baseUrl, "https://yoki-artifact.esh2n.workers.dev");
     const without = planSetup(fullState({ workersSubdomain: null }), PARAMS);
     assert.equal(step(without, "user-config").values.workerUrl, null);
   });
@@ -317,6 +364,11 @@ describe("--dry-run rendering", () => {
   test("run-time values print as readable placeholders", () => {
     assert.match(text, /<access-app\.aud>/);
     assert.match(text, /<service-token\.client_id>/);
+  });
+
+  test("the access-app step shows its workers.dev-hostname fallback", () => {
+    assert.match(text, /on a rejected body \(400\/422\): retry as self_hosted with the workers\.dev hostname/);
+    assert.match(text, /"domain": "yoki-artifact\.<workers-subdomain>\.workers\.dev"/);
   });
 
   test("skipped steps say why", () => {
@@ -395,7 +447,8 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
       api: {
         async call(method, path, body) {
           calls.push({ method, path, body });
-          const response = responses[`${method} ${path}`];
+          const entry = responses[`${method} ${path}`];
+          const response = typeof entry === "function" ? entry({ method, path, body }) : entry;
           if (response instanceof Error) throw response;
           return response ?? null;
         },
@@ -440,6 +493,7 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
     const config = JSON.parse(readFileSync(h.paths.userConfig, "utf8"));
     assert.equal(config.accessAud, "aud-9");
     assert.equal(config.serviceTokenClientId, "client-9");
+    assert.equal(config.clientId, "client-9", "the CLI reads the canonical spelling");
     assert.equal(config.accessGroupId, "g-9", "share/unshare reads the group id from here");
     assert.ok(!JSON.stringify(config).includes("s3cret"), "the secret is never written to disk");
     assert.equal(results.get("service-token").client_secret, "s3cret-shown-once");
@@ -460,22 +514,80 @@ describe("running a plan (API, child process and filesystem all faked)", () => {
     rmSync(h.dir, { recursive: true, force: true });
   });
 
-  test("a rejected worker destination hands the step to the manual fallback", async () => {
-    const rejection = new ApiError("POST /access/apps failed (400): 1000: invalid destinations", {
+  const workerRejection = () =>
+    new ApiError('POST /access/apps failed (400): 12130: worker_id "yoki-artifact" is invalid', {
       status: 400,
-      errors: [{ code: 1000, message: "invalid destinations" }],
+      errors: [{ code: 12130, message: 'worker_id "yoki-artifact" is invalid' }],
     });
-    const h = harness({ ...CREATED, "POST /accounts/acct-1/access/apps": rejection });
+
+  // The live failure of 2026-09: the worker destination 400s, the hostname
+  // form succeeds — the run must carry on with the fallback's result.
+  test("a rejected worker destination retries with the workers.dev hostname", async () => {
+    const h = harness({
+      ...CREATED,
+      "POST /accounts/acct-1/access/apps": ({ body }) => {
+        if (body.destinations) return workerRejection();
+        return { id: "app-9", name: ACCESS_APP_NAME, aud: "aud-9" };
+      },
+      "GET /accounts/acct-1/workers/subdomain": { subdomain: "esh2n" },
+    });
+    const results = await runPlan(planSetup(EMPTY_STATE, PARAMS), h);
+
+    const appCalls = h.calls.filter((c) => c.path === "/accounts/acct-1/access/apps");
+    assert.equal(appCalls.length, 2, "the rejected form is retried exactly once");
+    assert.deepEqual(appCalls[1].body, {
+      name: ACCESS_APP_NAME,
+      type: "self_hosted",
+      domain: "yoki-artifact.esh2n.workers.dev",
+      session_duration: "24h",
+      http_only_cookie_attribute: true,
+    });
+    assert.ok(
+      h.calls.some((c) => c.method === "GET" && c.path === "/accounts/acct-1/workers/subdomain"),
+      "the subdomain is fetched, not guessed",
+    );
+    assert.equal(results.get("access-app").aud, "aud-9", "later steps see the fallback's application");
+    const config = JSON.parse(readFileSync(h.paths.userConfig, "utf8"));
+    assert.equal(config.accessAud, "aud-9");
+    rmSync(h.dir, { recursive: true, force: true });
+  });
+
+  test("both forms rejected hands the step to the manual fallback", async () => {
+    const h = harness({
+      ...CREATED,
+      "POST /accounts/acct-1/access/apps": () => workerRejection(),
+      "GET /accounts/acct-1/workers/subdomain": { subdomain: "esh2n" },
+    });
     const seen = [];
     await assert.rejects(
       runPlan(planSetup(EMPTY_STATE, PARAMS), {
         ...h,
         onApiError: (step, err) => seen.push([step.id, err.isValidation]),
       }),
-      /invalid destinations/,
+      /worker_id "yoki-artifact" is invalid/,
     );
     assert.deepEqual(seen, [["access-app", true]]);
+    const appCalls = h.calls.filter((c) => c.path === "/accounts/acct-1/access/apps");
+    assert.equal(appCalls.length, 2, "the hostname form was tried before giving up");
     assert.match(manualAccessAppSteps({ ownerEmail: PARAMS.ownerEmail }), /Zero Trust > Access > Applications/);
+    rmSync(h.dir, { recursive: true, force: true });
+  });
+
+  test("an unreadable subdomain fails the fallback loudly instead of guessing", async () => {
+    const h = harness({
+      ...CREATED,
+      "POST /accounts/acct-1/access/apps": () => workerRejection(),
+      // no GET workers/subdomain route: the fake returns null
+    });
+    const seen = [];
+    await assert.rejects(
+      runPlan(planSetup(EMPTY_STATE, PARAMS), {
+        ...h,
+        onApiError: (step) => seen.push(step.id),
+      }),
+      /subdomain could not be read/,
+    );
+    assert.deepEqual(seen, ["access-app"], "the manual fallback still gets its chance");
     rmSync(h.dir, { recursive: true, force: true });
   });
 

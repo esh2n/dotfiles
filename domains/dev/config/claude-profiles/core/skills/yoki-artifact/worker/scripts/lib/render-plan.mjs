@@ -31,6 +31,10 @@ export function renderStep(step, index) {
   if (step.kind === "api") {
     lines.push(indent(`${step.method} ${API_BASE}${step.path}`));
     if (step.body) lines.push(indent(JSON.stringify(describeValue(step.body), null, 2)));
+    if (step.fallback) {
+      lines.push(indent(`on a rejected body (400/422): ${step.fallback.describe}`));
+      lines.push(indent(JSON.stringify(describeValue(step.fallback.body), null, 2), "      "));
+    }
   } else if (step.kind === "exec") {
     lines.push(indent(`$ ${step.command} ${step.args.join(" ")}`));
   } else if (step.kind === "file") {

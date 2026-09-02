@@ -43,8 +43,8 @@ export const isRef = (value) => Boolean(value) && typeof value === "object" && t
 export const pathRef = (stepId, path) => `{${stepId}.${path}}`;
 export const PATH_REF_RE = /\{([a-z0-9-]+)\.([a-z0-9_]+)\}/gi;
 
-const apiStep = ({ id, describe, method, path, body = null, skip = null, known = null }) =>
-  freeze({ id, kind: "api", describe, method, path, body, skip, known });
+const apiStep = ({ id, describe, method, path, body = null, skip = null, known = null, fallback = null }) =>
+  freeze({ id, kind: "api", describe, method, path, body, skip, known, fallback });
 
 const execStep = ({ id, describe, command, args, skip = null }) =>
   freeze({ id, kind: "exec", describe, command, args: freeze([...args]), skip, known: null });
@@ -127,8 +127,19 @@ function r2Step(existing, accountId) {
   });
 }
 
+/**
+ * Placeholder for the workers.dev subdomain when discovery could not read it
+ * (a dry run, or the GET failed). The executor substitutes the real value
+ * after fetching `subdomainPath`.
+ */
+export const SUBDOMAIN_PLACEHOLDER = "<workers-subdomain>";
+
 function accessAppStep(existing, accountId) {
   const found = byName(existing.accessApps, ACCESS_APP_NAME);
+  const subdomain =
+    typeof existing.workersSubdomain === "string" && existing.workersSubdomain.trim() !== ""
+      ? existing.workersSubdomain.trim()
+      : null;
   return apiStep({
     id: "access-app",
     describe: `Access application "${ACCESS_APP_NAME}" (worker destination)`,
@@ -137,8 +148,9 @@ function accessAppStep(existing, accountId) {
     body: {
       name: ACCESS_APP_NAME,
       type: "self_hosted",
-      // S7 flagged this enum UNVERIFIED. execute.mjs prints the manual
-      // dashboard steps instead of guessing if the API rejects it.
+      // Verified live 2026-09: some accounts reject this with 400 12130
+      // (`worker_id … is invalid`). The fallback below then retries with the
+      // workers.dev-hostname form, which is what those accounts accept.
       destinations: [{ type: "worker", worker_id: WORKER_NAME }],
       session_duration: SESSION_DURATION,
       app_launcher_visible: false,
@@ -146,27 +158,45 @@ function accessAppStep(existing, accountId) {
       http_only_cookie_attribute: true,
       skip_interstitial: false,
     },
+    fallback: freeze({
+      describe: "retry as self_hosted with the workers.dev hostname",
+      body: freeze({
+        name: ACCESS_APP_NAME,
+        type: "self_hosted",
+        domain: `${WORKER_NAME}.${subdomain ?? SUBDOMAIN_PLACEHOLDER}.workers.dev`,
+        session_duration: SESSION_DURATION,
+        http_only_cookie_attribute: true,
+      }),
+      // Only set when the subdomain is not known yet: the executor GETs it
+      // before retrying, so the fallback hostname is never guessed.
+      subdomainPath: subdomain ? null : `/accounts/${accountId}/workers/subdomain`,
+    }),
     skip: found ? "already exists" : null,
     known: found,
   });
 }
 
-function viewersGroupStep(existing, accountId, viewers) {
+function viewersGroupStep(existing, accountId, viewers, ownerEmail) {
   const found = byName(existing.accessGroups, VIEWERS_GROUP_NAME);
-  const body = { name: VIEWERS_GROUP_NAME, include: emailInclude(viewers) };
+  // The owner is always a member. Verified live 2026-09: the API rejects a
+  // group with an empty include (`include field should not be empty`), so a
+  // missing/emptied viewers.json must still yield a valid body — and unioning
+  // the owner on both the create and update paths guarantees that.
+  const members = [...new Set([ownerEmail.trim().toLowerCase(), ...viewers])].sort();
+  const body = { name: VIEWERS_GROUP_NAME, include: emailInclude(members) };
   if (!found) {
     return apiStep({
       id: "viewers-group",
-      describe: `Access group "${VIEWERS_GROUP_NAME}" (${viewers.length} viewer(s))`,
+      describe: `Access group "${VIEWERS_GROUP_NAME}" (owner + ${viewers.length} viewer(s))`,
       method: "POST",
       path: `/accounts/${accountId}/access/groups`,
       body,
     });
   }
-  const unchanged = sameMembers(groupEmails(found), viewers);
+  const unchanged = sameMembers(groupEmails(found), members);
   return apiStep({
     id: "viewers-group",
-    describe: `Access group "${VIEWERS_GROUP_NAME}": update members (${viewers.length})`,
+    describe: `Access group "${VIEWERS_GROUP_NAME}": update members (owner + ${viewers.length})`,
     method: "PUT",
     path: `/accounts/${accountId}/access/groups/${found.id}`,
     body,
@@ -267,7 +297,7 @@ export function planSetup(existing, { accountId, teamDomain, ownerEmail, viewers
       ...wrangler("deploy"),
     }),
     accessAppStep(state, accountId),
-    viewersGroupStep(state, accountId, viewers),
+    viewersGroupStep(state, accountId, viewers, ownerEmail),
     serviceTokenStep(state, accountId),
     ...policySteps(state, accountId, appId, ownerEmail),
     fileStep({
@@ -295,11 +325,16 @@ export function planSetup(existing, { accountId, teamDomain, ownerEmail, viewers
       values: {
         accountId,
         workerName: WORKER_NAME,
+        // `baseUrl` and `clientId` are the canonical keys the CLI's config
+        // loader reads; `workerUrl` and `serviceTokenClientId` are kept as
+        // aliases for anything already reading the original spellings.
+        baseUrl: workerUrl(state.workersSubdomain),
         workerUrl: workerUrl(state.workersSubdomain),
         teamDomain,
         ownerEmail,
         accessAud: aud,
         accessGroupId,
+        clientId: serviceTokenClientId,
         serviceTokenClientId,
         clientSecretEnv: CLIENT_SECRET_ENV,
       },
