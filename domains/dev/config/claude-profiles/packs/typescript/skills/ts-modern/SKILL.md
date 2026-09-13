@@ -1,6 +1,6 @@
 ---
 name: ts-modern
-description: Use when writing or reviewing TypeScript or JavaScript and a legacy idiom appears — `as` casts or wide annotations that lose inference, try/finally cleanup, `slice().sort()` mutation dances, `JSON.parse(JSON.stringify(x))` cloning, `reduce` grouping boilerplate, hand-built deferred promises, `require`, bare `fs`/`path` imports, axios for a plain HTTP call, or filter-based set intersection. Covers satisfies, using, toSorted, structuredClone, groupBy, node: imports.
+description: "Use when writing or reviewing TypeScript or JavaScript and a legacy idiom appears — `as` casts or wide annotations that lose inference, try/finally cleanup, `slice().sort()` mutation dances, `JSON.parse(JSON.stringify(x))` cloning, `reduce` grouping boilerplate, hand-built deferred promises, `require`, bare `fs`/`path` imports, axios for a plain HTTP call, or filter-based set intersection. Covers satisfies, using, toSorted, structuredClone, groupBy, node: imports."
 metadata:
   verified: 2026-08
 ---
