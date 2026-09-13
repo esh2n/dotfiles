@@ -15,6 +15,7 @@
  *       [--model-map <tier>=<id>,...]
  *   yoki-graph list
  *   yoki-graph status <runId> [--once|--watch]
+ *   yoki-graph top [--state-home <dir>] [--once] [--columns <path>]
  */
 
 const fs = require('fs');
@@ -24,6 +25,7 @@ const runner = require('./runner');
 const journalLib = require('./journal');
 const models = require('./models');
 const progress = require('./progress');
+const top = require('./top');
 const { parseArgs: parseArgv, numberFlag } = require('./args');
 
 /** The flags of this CLI that never take a value. Everything else is
@@ -410,8 +412,12 @@ async function main() {
       if (flags.watch) await cmdWatch(positional, flags);
       else cmdStatus(positional, flags);
     }
+    // The kubectl-style live viewer over every run under the state root.
+    // `--once` (or a non-TTY stdout) prints one snapshot and exits — the
+    // scriptable path, same convention as `status --once`.
+    else if (cmd === 'top') await top.cmdTop(positional, flags);
     else {
-      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--once|--watch]\n');
+      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--once|--watch]\n       yoki-graph top [--state-home <dir>] [--once] [--columns <path>]\n');
       if (cmd) process.exitCode = 1;
     }
   } catch (err) {

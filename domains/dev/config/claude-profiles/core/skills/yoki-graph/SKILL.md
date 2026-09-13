@@ -82,6 +82,7 @@ yoki-graph run research  --backend omp   --args '{"question":"…"}'
 yoki-graph run implement --backend codex --args '{"tasksFile":"tasks.md","delivery":"none"}'
 yoki-graph list
 yoki-graph status <runId> [--once|--watch]
+yoki-graph top [--state-home <dir>] [--once] [--columns <path>]
 ```
 
 backend は `codex` / `omp` / `mock` の3つ。**`claude` backend は無い** —
@@ -106,7 +107,7 @@ exit 1 になる。同じ理由で yoki-loop からも `--harness claude` を外
 | --- | --- |
 | 全フラグ、ワークフロー別の `args` と起動例、delivery のルール、よくある失敗 | [references/cli.md](references/cli.md) |
 | モデル tier の解決、`--model-map`、モデル別 usage 表 | [references/model-map.md](references/model-map.md) |
-| 進捗行の読み方、`--json` イベント、`status --watch` | [references/status.md](references/status.md) |
+| 進捗行の読み方、`--json` イベント、`status --watch`、全ラン横断の `top` | [references/status.md](references/status.md) |
 | 日次キャップ(guard)、ラン単位の実行キャップ、リトライ/タイムアウト/トークン計上 | [references/budget.md](references/budget.md) |
 | 1ランでの backend 混在、Claude Code から Codex/omp レーンを混ぜる `providers` | [references/providers.md](references/providers.md) |
 | `sandbox`(呼び出しごとの書き込み権限)と `gate`(コマンド検証) | [references/gate.md](references/gate.md) |
