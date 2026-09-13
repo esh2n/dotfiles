@@ -31,8 +31,11 @@ const CONTEXT = (A && A.context) || ''
 const OUT = (A && A.out) || ''
 const LANGUAGE = (A && A.language) || "the language the reader's own project uses"
 const MODEL = (A && A.model) || 'sonnet'
-if (!TARGET) { log('code-study requires args.target'); return { error: 'no target' } }
-if (!QUESTIONS.length) { log('code-study requires args.questions'); return { error: 'no questions' } }
+// Aborts throw: a run that never got to do its real work must end as
+// status error (the runner records a thrown body as status:'error'), not
+// as a status-ok result that happens to carry an `error` field.
+if (!TARGET) { throw new Error('code-study requires args.target') }
+if (!QUESTIONS.length) { throw new Error('code-study requires args.questions') }
 
 // NOTE: the discipline is identical in every phase, so it lives in one place.
 //       "Say you could not find it" is load-bearing: a study that quietly fills
@@ -89,10 +92,10 @@ If you cannot fill the required fields truthfully, return only the \`error\` fie
 ${RULES}`,
   { label: 'map', phase: 'Map', schema: MAP_SCHEMA, model: MODEL },
 )
-if (map && map.error) { log(`mapping failed: ${map.error}`); return { error: String(map.error) } }
+if (map && map.error) { throw new Error(`mapping failed: ${map.error}`) }
 // layout joins the gate: it is interpolated into every Read/Report prompt,
 // so proceeding without it would hand the lanes "Layout: undefined".
-if (!map || !map.entry_points || !map.layout) { log('mapping failed'); return { error: 'no map' } }
+if (!map || !map.entry_points || !map.layout) { throw new Error('mapping failed: no usable map — the study never started') }
 log(`layout: ${(map.layout || '').slice(0, 120)}`)
 if (map.unavailable) log(`unavailable: ${map.unavailable}`)
 

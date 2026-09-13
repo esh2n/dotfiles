@@ -38,7 +38,10 @@ const GROUNDING = (A && Array.isArray(A.grounding)) ? A.grounding : []
 const EVIDENCE = (A && A.evidence) === 'never' ? 'never' : 'auto'
 const MODEL = (A && A.model) || 'sonnet'
 const LANGUAGE = (A && A.language) || 'Japanese'
-if (!QUESTION) { log('deliberate requires args.question'); return { error: 'no question' } }
+// Aborts throw: a run that never got to do its real work must end as
+// status error (the runner records a thrown body as status:'error'), not
+// as a status-ok result that happens to carry an `error` field.
+if (!QUESTION) { throw new Error('deliberate requires args.question') }
 
 // ---- Ground: repo facts digest (optional) ----
 phase('Ground')
@@ -56,8 +59,7 @@ If you cannot read the paths, reply with a single line starting with "ERROR:" an
   // Tolerant sentinel match: models decorate ("**ERROR:", "> ERROR:") and
   // case drifts, so up to 4 leading non-word chars and any case count.
   if (/^\W{0,4}ERROR:/i.test(String(ground).trim())) {
-    log(`grounding scout failed: ${String(ground).trim()}`)
-    return { error: String(ground).trim() }
+    throw new Error(`grounding scout failed: ${String(ground).trim()}`)
   }
   // A backend failure resolves the agent to null -> '' above: say so instead
   // of silently running the whole deliberation without the requested facts.
@@ -132,7 +134,9 @@ ${BASE}`,
     { label: `option-${i + 1}`, phase: 'Diverge', schema: OPTION_SCHEMA, model: MODEL },
   ),
 ))).filter(Boolean)
-if (!options.length) { log('diverge produced nothing'); return { error: 'no options' } }
+// Every diverge lane failed (backend errors resolve agent() to null): there
+// is nothing to deliberate over, so the run is an error, not an empty ok.
+if (!options.length) { throw new Error('diverge produced no options — every option lane failed') }
 const criteria = (await criteriaPromise) || { criteria: [] }
 
 // ---- Gate: evidence toll before convergence (repo claims -> code reader, world claims -> web) ----

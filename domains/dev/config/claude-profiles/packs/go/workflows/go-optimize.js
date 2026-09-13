@@ -86,7 +86,10 @@ const GATE_COMMAND = (A && A.gateCommand === false) || (A && A.gateCommand === '
 const RUN_ID = (A && A.runId) || 'latest'
 const MODEL = (A && A.model) || 'sonnet'
 
-if (!PKG) { log('go-optimize requires args.pkg (import path or dir)'); return { error: 'no pkg' } }
+// Aborts throw: a run that never got to do its real work must end as
+// status error (the runner records a thrown body as status:'error'), not
+// as a status-ok result that happens to carry an `error` field.
+if (!PKG) { throw new Error('go-optimize requires args.pkg (import path or dir)') }
 log(`resolved args: pkg=${PKG} bench=${BENCH || '(none — auto-pick)'} threshold=${THRESHOLD}% budget=${JSON.stringify(BUDGET)} delivery=${DELIVERY} runId=${RUN_ID} gate=${GATE_COMMAND || '(off)'}`)
 
 phase('Resolve')
@@ -124,14 +127,12 @@ If you cannot fill the required fields truthfully, return only the \`error\` fie
 )
 
 if (resolved && resolved.error) {
-  log(`resolve failed: ${resolved.error}`)
-  return { error: String(resolved.error) }
+  throw new Error(`resolve failed: ${resolved.error}`)
 }
 // repoRoot joins the gate: the Profile and Deliver prompts interpolate it,
 // so proceeding without it would send agents to run commands "from undefined".
 if (!resolved || !resolved.scratchDir || !resolved.pkgTarget || !resolved.repoRoot) {
-  log('could not resolve repo root / pkg / scratch dir — aborting')
-  return { error: 'resolve failed' }
+  throw new Error('resolve failed: could not resolve repo root / pkg / scratch dir')
 }
 log(`repo=${resolved.repoRoot} pkg=${resolved.pkgTarget} go.mod floor=${resolved.goVersionFloor} go env=${resolved.goEnvVersion} benchmarks found=${(resolved.benchmarks || []).length}`)
 
@@ -226,9 +227,10 @@ Return via StructuredOutput: baselineFile/cpuProfile/memProfile as the absolute 
   { label: 'profile', phase: 'Profile', schema: PROFILE_SCHEMA, model: MODEL, sandbox: 'workspace-write' },
 )
 
+// No baseline means nothing downstream can measure against — an error run,
+// not an ok one. The profile lane's own output stays in the journal.
 if (!profile || !profile.baselineFile || !(profile.hotspots || []).length) {
-  log('profiling produced no usable baseline/hotspots — aborting')
-  return { error: 'profile failed', profile }
+  throw new Error('profiling produced no usable baseline/hotspots — nothing to optimize against')
 }
 log(`baseline saved: ${profile.baselineFile} — ${profile.hotspots.length} hotspot(s) identified`)
 

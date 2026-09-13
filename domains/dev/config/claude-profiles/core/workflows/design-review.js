@@ -30,7 +30,10 @@ if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
 const TARGET = (A && A.target) || ''
 const MODEL = (A && A.model) || 'sonnet'
 const LANGUAGE = (A && A.language) || 'Japanese'
-if (!TARGET) { log('design-review requires args.target (path, URL, or design text)'); return { error: 'no target' } }
+// Aborts throw: a run that never got to do its real work must end as
+// status error (the runner records a thrown body as status:'error'), not
+// as a status-ok result that happens to carry an `error` field.
+if (!TARGET) { throw new Error('design-review requires args.target (path, URL, or design text)') }
 
 // --- provider-lane helpers (canonical copy: core/workflows/lib/lanes.js) ---
 
@@ -434,31 +437,29 @@ const CODE_KIND = /^https?:\/\//i.test(TRIMMED_TARGET) ? 'url'
 // Abort gates — fabrication guards. A schema-passing but dishonest ingest is
 // the one failure everything downstream inherits, so it is stopped HERE, in
 // code, before any panel lane spends a token on it.
-if (!ctx) { log('could not resolve the design target'); return { error: 'unresolved target' } }
-if (ctx.error) { log(`ingest failed: ${ctx.error}`); return { error: String(ctx.error) } }
-if (!ctx.design_summary) { log('could not resolve the design target'); return { error: 'unresolved target' } }
+// The gates THROW: an aborted ingest means the panel never ran, and the
+// runner must record that run as status:'error' — not as a status-ok
+// result that happens to carry an `error` field.
+if (!ctx) { throw new Error('ingest failed: could not resolve the design target') }
+if (ctx.error) { throw new Error(`ingest failed: ${ctx.error}`) }
+if (!ctx.design_summary) { throw new Error('ingest failed: could not resolve the design target (no design_summary)') }
 if (!['file', 'url', 'text'].includes(ctx.source_kind)) {
-  log(`ingest returned invalid source_kind ${JSON.stringify(ctx.source_kind)} — aborting`)
-  return { error: `ingest returned invalid source_kind ${JSON.stringify(ctx.source_kind)} — refusing to guess what the review target was` }
+  throw new Error(`ingest returned invalid source_kind ${JSON.stringify(ctx.source_kind)} — refusing to guess what the review target was`)
 }
 if (CODE_KIND !== 'unknown' && ctx.source_kind !== CODE_KIND) {
-  log(`ingest classified the target as "${ctx.source_kind}" but it reads as "${CODE_KIND}" — aborting`)
-  return { error: `ingest classified the target as "${ctx.source_kind}" but the target itself reads as "${CODE_KIND}" — refusing a review whose subject is in doubt` }
+  throw new Error(`ingest classified the target as "${ctx.source_kind}" but the target itself reads as "${CODE_KIND}" — refusing a review whose subject is in doubt`)
 }
 if (ctx.source_kind === 'file' && !ctx.design_path) {
-  log('file target but ingest returned no design_path — aborting')
-  return { error: 'ingest returned no design_path for a file target — refusing to run a panel on a design nobody can re-read' }
+  throw new Error('ingest returned no design_path for a file target — refusing to run a panel on a design nobody can re-read')
 }
 // String-wise only — the realm has no fs, so existence cannot be checked
 // here. A lane that cannot Read the path answers through LANE_SCHEMA's
 // `error` channel below and is dropped with a visible note.
 if (ctx.source_kind === 'file' && !String(ctx.design_path).startsWith('/')) {
-  log(`design_path ${JSON.stringify(ctx.design_path)} is not absolute — aborting`)
-  return { error: `design_path ${JSON.stringify(ctx.design_path)} is not absolute — refusing to point the panel at a path that may resolve differently per lane` }
+  throw new Error(`design_path ${JSON.stringify(ctx.design_path)} is not absolute — refusing to point the panel at a path that may resolve differently per lane`)
 }
 if (String(ctx.design_summary).trim().length < 40) {
-  log(`design_summary is only ${String(ctx.design_summary).trim().length} chars — suspected schema-pressure fabrication, aborting`)
-  return { error: `design_summary is only ${String(ctx.design_summary).trim().length} chars — too short to be a faithful summary; suspected placeholder from schema-retry pressure, aborting before the panel` }
+  throw new Error(`design_summary is only ${String(ctx.design_summary).trim().length} chars — too short to be a faithful summary; suspected placeholder from schema-retry pressure, aborting before the panel`)
 }
 const GROUNDING = (ctx.grounding || []).map((g) => `- [${g.doc}] ${g.constraint}`).join('\n') || '(no project docs found — say so instead of assuming rules)'
 // Lanes and verify read the design ITSELF, not only the gather agent's summary

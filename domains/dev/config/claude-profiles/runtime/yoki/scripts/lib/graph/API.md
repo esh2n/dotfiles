@@ -15,8 +15,13 @@ description required; whenToUse, phases optional — phases entries are
 `{title, detail}`, optionally `{model}`). The rest of the file is a plain
 async script body: top-level `await` and top-level `return <value>` are both
 used throughout (`research.js` returns `{report, unknowns}`, `implement.js`
-returns a `{tasks, schedule, gate, delivery, note}` object, several scripts
-`return { error: '...' }` early). Top-level `return` is not legal in a real
+returns a `{tasks, schedule, gate, delivery, note}` object, `review.js`
+returns an empty-but-honest `{findings: [], metrics: {}}` early when there
+is nothing to review). A run whose real work never STARTED — missing args,
+a failed first-stage/ingest agent — `throw`s instead of returning an
+`{error}` object, so the runner records it as `status: 'error'` rather
+than a status-ok run that quietly did nothing; only legitimately-empty
+results return early. Top-level `return` is not legal in a real
 ES module or classic script — the Workflow tool therefore must run the body
 as a function, not `import()` it directly. See "Execution mechanism" below
 for how yoki-graph reproduces this.
@@ -122,14 +127,14 @@ access from the script body itself (only through `agent()`).
     to skip a call in a headless CLI run, so that half never applies; a
     terminal backend failure (process spawn error, non-zero exit with no
     usable output) resolves the call to `null` rather than rejecting, so a
-    script's own `if (!x) { log(...); return {error: ...} }` early-exits
-    keep working unmodified. A *schema validation* failure that survives one
+    script's own `if (!x) { throw new Error(...) }` abort gates keep
+    working unmodified. A *schema validation* failure that survives one
     retry is architecturally different (schema.js's own "hard-fail after
     that" contract) and **rejects** the `agent()` promise instead — a script
     that asked for structured output and got none has no sane fallback value
     to hand back, and every schema-using script already treats "no object
-    back" as fatal to that phase (`if (!plan || !plan.angles...) { return
-    {error...} }`), so a reject just short-circuits earlier there while a
+    back" as fatal to that phase (`if (!plan || !plan.angles...) { throw
+    ... }`), so a reject just short-circuits earlier there while a
     script that WOULD catch it (none currently do) still can.
 - `parallel(thunks: Array<() => Promise<any>>): Promise<any[]>` — a barrier;
   every element of the result array is non-null on success, `null` where a

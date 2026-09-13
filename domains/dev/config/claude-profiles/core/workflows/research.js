@@ -31,7 +31,10 @@ const QUESTION = (A && A.question) || ''
 const CONTEXT = (A && A.context) || ''
 const MODEL = (A && A.model) || 'sonnet'
 const LANGUAGE = (A && A.language) || 'Japanese'
-if (!QUESTION) { log('research requires args.question'); return { error: 'no question' } }
+// Aborts throw: a run that never got to do its real work must end as
+// status error (the runner records a thrown body as status:'error'), not
+// as a status-ok result that happens to carry an `error` field.
+if (!QUESTION) { throw new Error('research requires args.question') }
 
 // --- provider-lane helpers (canonical copy: core/workflows/lib/lanes.js) ---
 
@@ -393,8 +396,8 @@ Return angles via StructuredOutput. No searching yet.
 If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
   { label: 'plan-angles', phase: 'Plan', schema: PLAN_SCHEMA, model: MODEL },
 )
-if (plan && plan.error) { log(`planning failed: ${plan.error}`); return { error: String(plan.error) } }
-if (!plan || !plan.angles || !plan.angles.length) { log('planning failed'); return { error: 'no angles' } }
+if (plan && plan.error) { throw new Error(`planning failed: ${plan.error}`) }
+if (!plan || !plan.angles || !plan.angles.length) { throw new Error('planning failed: no angles — the search phase never started') }
 log(`angles: ${plan.angles.map((a) => a.key).join(', ')}`)
 
 const FINDINGS_SCHEMA = {

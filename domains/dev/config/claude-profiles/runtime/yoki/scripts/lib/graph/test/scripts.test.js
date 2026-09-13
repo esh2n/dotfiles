@@ -1258,8 +1258,10 @@ function assertPanelNeverStarted(events) {
 
 test('design-review: an ingest error aborts the run before any panel lane starts', () => withIsolatedState(async () => {
   const { result, events } = await runDesignReviewGate(fixture('design-review-error'));
-  assert.equal(result.status, 'ok', result.error);
-  assert.equal(result.result.error, 'cannot read target');
+  // The abort is a run-level error: the panel never ran, so the run must
+  // not report ok with an `error` field tucked inside its result.
+  assert.equal(result.status, 'error');
+  assert.match(result.error, /cannot read target/);
   assertPanelNeverStarted(events);
 }));
 
@@ -1273,9 +1275,9 @@ test('design-review: a too-short design_summary is refused as suspected fabricat
   }));
   try {
     const { result, events } = await runDesignReviewGate(mockFile);
-    assert.equal(result.status, 'ok', result.error);
-    assert.match(result.result.error, /too short/);
-    assert.match(result.result.error, /suspected placeholder/);
+    assert.equal(result.status, 'error');
+    assert.match(result.error, /too short/);
+    assert.match(result.error, /suspected placeholder/);
     assertPanelNeverStarted(events);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
@@ -1294,8 +1296,8 @@ test('design-review: a file target with no design_path aborts — the panel cann
   }));
   try {
     const { result, events } = await runDesignReviewGate(mockFile);
-    assert.equal(result.status, 'ok', result.error);
-    assert.match(result.result.error, /no design_path/);
+    assert.equal(result.status, 'error');
+    assert.match(result.error, /no design_path/);
     assertPanelNeverStarted(events);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
@@ -1320,8 +1322,8 @@ test('design-review: a source_kind contradicting the target itself is refused', 
     // The target is unmistakably a file path — a "text" classification would
     // hand the lanes the path itself as the design.
     const { result, events } = await runDesignReviewGate(mockFile, { target: '/tmp/some-design.md' });
-    assert.equal(result.status, 'ok', result.error);
-    assert.match(result.result.error, /reads as "file"/);
+    assert.equal(result.status, 'error');
+    assert.match(result.error, /reads as "file"/);
     assertPanelNeverStarted(events);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
@@ -1336,8 +1338,8 @@ test('design-review: a missing source_kind is refused instead of falling through
   }));
   try {
     const { result, events } = await runDesignReviewGate(mockFile);
-    assert.equal(result.status, 'ok', result.error);
-    assert.match(result.result.error, /invalid source_kind/);
+    assert.equal(result.status, 'error');
+    assert.match(result.error, /invalid source_kind/);
     assertPanelNeverStarted(events);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
@@ -1352,8 +1354,8 @@ test('design-review: a relative design_path is refused — lanes would resolve i
   }));
   try {
     const { result, events } = await runDesignReviewGate(mockFile, { target: '/tmp/some-design.md' });
-    assert.equal(result.status, 'ok', result.error);
-    assert.match(result.result.error, /not absolute/);
+    assert.equal(result.status, 'error');
+    assert.match(result.error, /not absolute/);
     assertPanelNeverStarted(events);
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
@@ -1425,8 +1427,13 @@ test('design-review: a url target skips the non-claude transport lanes with a no
 // `required` list quietly tightening again: an error-only entry then fails
 // loose validation, is retried once with "missing required property ..."
 // folded into the prompt — the 2026-09-02 incident's exact pressure, now
-// applied to the honest answer — and the run errors out instead of aborting
-// cleanly.
+// applied to the honest answer — and the run then fails with a schema
+// validation message instead of the hatch's own reason, which is exactly
+// what the HATCH_MSG assertion below refuses.
+//
+// Both failure shapes end as status:'error' on purpose: a run that never
+// got to do its real work must not report ok. What distinguishes the clean
+// abort is its MESSAGE — the hatch reason, verbatim.
 
 const HATCH_MSG = 'cannot fill this truthfully';
 const HATCH = [
@@ -1434,10 +1441,7 @@ const HATCH = [
   { name: 'review', label: 'collect-diff', args: {} },
   { name: 'acceptance', label: 'ground', args: { criteria: [{ id: 'c1', text: 'x' }] } },
   { name: 'code-study', label: 'map', args: { target: 't', questions: ['q'] } },
-  {
-    name: 'preflight', label: 'collect-diff', args: {},
-    expect(r) { assert.equal(r.status, 'error'); assert.equal(r.error, HATCH_MSG); },
-  },
+  { name: 'preflight', label: 'collect-diff', args: {} },
   { name: 'implement', label: 'load-tasks', args: { tasksFile: '/tmp/tasks.md' } },
   { name: 'go-optimize', label: 'resolve', args: { pkg: './x' }, dir: GO_WORKFLOWS },
   { name: 'design-review', label: 'gather', args: { target: 'a design text target' } },
@@ -1447,12 +1451,11 @@ const HATCH = [
     name: 'deliberate', label: 'scout',
     args: { question: 'q?', grounding: ['README.md'] },
     entry: `ERROR: ${HATCH_MSG}`,
-    expect(r) { assert.equal(r.error, `ERROR: ${HATCH_MSG}`); },
   },
 ];
 
 for (const spec of HATCH) {
-  test(`${spec.name}: the ${spec.label} escape hatch accepts an error-only answer and aborts the run`, () => withIsolatedState(async () => {
+  test(`${spec.name}: the ${spec.label} escape hatch accepts an error-only answer and errors the run`, () => withIsolatedState(async () => {
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-graph-hatch-'));
     const mockFile = path.join(cwd, 'hatch.mock.json');
     fs.writeFileSync(mockFile, JSON.stringify({ [spec.label]: spec.entry || { error: HATCH_MSG } }));
@@ -1461,9 +1464,13 @@ for (const spec of HATCH) {
         scriptPath: path.join(spec.dir || CORE_WORKFLOWS, `${spec.name}.js`),
         args: spec.args, backendName: 'mock', cwd, mockFile,
       });
-      assert.equal(result.status, 'ok', result.error);
-      if (spec.expect) spec.expect(result.result);
-      else assert.equal(result.result.error, HATCH_MSG);
+      // A run whose real work never started must SAY so: the script throws,
+      // the runner records status:'error' with the honest reason — never a
+      // status-ok result that happens to carry an `error` field (the shape
+      // that made a fully-failed run print "■ done / status: ok").
+      assert.equal(result.status, 'error', `expected an error run, got ${result.status}`);
+      assert.ok(String(result.error).includes(HATCH_MSG),
+        `the run error lost the hatch reason: ${result.error}`);
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
