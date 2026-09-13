@@ -18,13 +18,13 @@
  * security boundary against a hostile script: every workflow this runs is
  * repo-managed, so the threat is "my own bug", not "an adversarial author".
  *
- * The 7 documented globals (agent, parallel, pipeline, phase, log, budget,
- * workflow) are the ONLY things injected on top of the realm's own built-ins,
- * plus `args`, a frozen read-only `runInfo` ({runId} — what a provider lane
- * derives its yoki-agent `--run-id` from), `meta` is deliberately NOT
- * injected (yoki strips the whole `export const meta = {...}` block from the
- * body, as it always has, so the body never referenced it), and a frozen
- * minimal `console` mapped to `log`.
+ * The 8 documented globals (agent, parallel, pipeline, phase, log, budget,
+ * workflow, escalate) are the ONLY things injected on top of the realm's own
+ * built-ins, plus `args`, a frozen read-only `runInfo` ({runId} — what a
+ * provider lane derives its yoki-agent `--run-id` from), `meta` is
+ * deliberately NOT injected (yoki strips the whole `export const meta = {...}`
+ * block from the body, as it always has, so the body never referenced it), and
+ * a frozen minimal `console` mapped to `log`.
  *
  * agent/workflow are RPC stubs: each call posts `{type:'call', callId, method,
  * payload}` to the host and awaits a `{type:'response', ...}` — the host keeps
@@ -155,7 +155,7 @@ function emit(method, payload) {
 }
 
 /* ------------------------------------------------------------------ *
- * The 7 globals (+ console)
+ * The 8 globals (+ console)
  * ------------------------------------------------------------------ */
 
 function agent(prompt, opts) {
@@ -220,6 +220,21 @@ function workflow(nameOrRef, args) {
   return callHost("workflow", { nameOrRef: nameOrRef, args: args });
 }
 
+function escalate(question, opts) {
+  // Enqueue-and-return: this defers a decision to the frontier consult role
+  // without blocking or auto-spending — the host only writes a pending
+  // record and emits an escalation event. Validation surfaced here so a typo
+  // stops the script at the call, not as an opaque host rejection.
+  if (typeof question !== "string" || question.trim() === "") {
+    return Promise.reject(new Error("escalate(question) requires a non-empty string question"));
+  }
+  const options = opts === undefined || opts === null ? {} : opts;
+  if (typeof options !== "object" || Array.isArray(options)) {
+    return Promise.reject(new Error("escalate(question, opts) expects opts to be an object"));
+  }
+  return callHost("escalate", { question: question, opts: options });
+}
+
 const budget = Object.freeze({
   total: BUDGET_TOTAL,
   spent: function () { return spentMirror; },
@@ -249,6 +264,7 @@ async function main() {
     phase: phase,
     log: log,
     workflow: workflow,
+    escalate: escalate,
     budget: budget,
     console: makeConsole(),
     args: workerData.args,

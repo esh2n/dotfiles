@@ -118,6 +118,17 @@ function runBodyInWorker(opts) {
       }
     }
 
+    async function handleEscalate(callId, payload) {
+      // No armIdle: escalate() only enqueues a record and returns — it never
+      // waits on a model, so it is not the activity the watchdog measures.
+      try {
+        const value = api.escalate(payload.question, payload.opts || {});
+        respond(callId, true, value);
+      } catch (error) {
+        respond(callId, false, undefined, messageOf(error), isFatalError(error));
+      }
+    }
+
     async function handleWorkflow(callId, payload) {
       // A nested workflow() is real activity too: it spawns and awaits a whole
       // child run (its own agent() calls), during which the parent worker is
@@ -143,6 +154,7 @@ function runBodyInWorker(opts) {
       switch (message.type) {
         case 'call':
           if (message.method === 'agent') { void handleAgent(message.callId, message.payload); return; }
+          if (message.method === 'escalate') { void handleEscalate(message.callId, message.payload); return; }
           if (message.method === 'workflow') { void handleWorkflow(message.callId, message.payload); return; }
           respond(message.callId, false, undefined, 'unknown host call "' + message.method + '"', true);
           return;

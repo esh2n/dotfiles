@@ -178,6 +178,18 @@ access from the script body itself (only through `agent()`).
   because the skill documents it as core surface. yoki-graph resolves a name
   the same way its own CLI does (`~/.claude/workflows/<name>.js`) or accepts
   `{scriptPath}`.
+- `escalate(question, opts?): Promise<{escalated: true, id: string}>` — defer
+  a hard decision to the frontier `consult` role WITHOUT blocking or
+  auto-spending. It only ENQUEUES a pending record (escalate.js) and emits an
+  `escalation` event; it never calls the frontier model. The lane gets the id
+  back and continues. A human later runs `yoki-graph escalate run <id>`, which
+  is the gate and the spend authorization. `opts`: `context` (extra material
+  for the reviewer), `role` (default `consult`), `label`. Must be `await`ed —
+  it is an RPC to the host. This is the human-gated async pattern from
+  model-tier-escalation-design (LangGraph interrupt+checkpoint prior art):
+  the three properties — the main lane never stalls, the frontier is never
+  auto-billed, and the pending consult is visible (a 🔸 line, and
+  `yoki-graph escalate list`) — hold at once.
 - Restricted natives, per the skill ("Date.now()/Math.random()/argless `new
   Date()`... throw — they would break resume"): enforced inside the vm realm the
   body runs in (see "Execution mechanism" below), not the host process, so

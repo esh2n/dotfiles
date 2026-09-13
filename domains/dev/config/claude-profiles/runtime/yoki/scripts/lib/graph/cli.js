@@ -24,14 +24,18 @@ const path = require('path');
 const runner = require('./runner');
 const journalLib = require('./journal');
 const models = require('./models');
+const rolesLib = require('./roles');
+const escalateLib = require('./escalate');
 const progress = require('./progress');
 const render = require('./top-render');
 const top = require('./top');
+const { createApi } = require('./api');
+const { findRepoRootFrom } = require('./backends/common');
 const { parseArgs: parseArgv, numberFlag } = require('./args');
 
 /** The flags of this CLI that never take a value. Everything else is
  *  `--key value`; see args.js, which agent-cli.js parses with too. */
-const BOOLEAN_FLAGS = ['dry-run', 'json', 'watch', 'once', 'wide'];
+const BOOLEAN_FLAGS = ['dry-run', 'json', 'watch', 'once', 'wide', 'all'];
 
 const parseArgs = (argv) => parseArgv(argv, BOOLEAN_FLAGS);
 
@@ -97,6 +101,10 @@ function humanLine(event) {
       const model = event.model ? ` (${event.model})` : '';
       return `[${ts}]   ${mark} ${event.label}${model}${event.error ? `: ${event.error}` : ''}\n`;
     }
+    case 'escalation':
+      // The main lane deferred a decision to the frontier consult queue and
+      // kept going. Not a failure — a 🔸 marker the human acts on later.
+      return `[${ts}]   🔸 escalated${event.label ? ` ${event.label}` : ''} → ${event.role} (run \`yoki-graph escalate run ${event.id}\`)\n`;
     case 'guard-denied':
     case 'run-locked':
       return `[${ts}] ✗ ${event.message}\n`;
@@ -439,6 +447,78 @@ async function cmdWatch(rest, flags, deps = {}) {
   }
 }
 
+/**
+ * `yoki-graph escalate <list|show|run>` — the human-gated consult queue.
+ *
+ * `list`  — pending escalations (or `--all` for every status), oldest first.
+ * `show <id>` — one record in full.
+ * `run <id>` — dispatch the escalation to its role (default `consult`),
+ *   write the answer back, mark it answered/failed. Running this command IS
+ *   the gate and the spend authorization; `--backend`/`--model` override the
+ *   role for one dispatch (used by tests to avoid a real frontier call).
+ */
+async function cmdEscalate(rest, flags) {
+  const sub = rest[0];
+  if (sub === 'list' || sub === undefined) {
+    const records = escalateLib.list(process.env, flags.all ? {} : { status: 'pending' });
+    if (flags.json) { process.stdout.write(`${JSON.stringify(records)}\n`); return; }
+    if (!records.length) { process.stdout.write('no pending escalations\n'); return; }
+    for (const r of records) {
+      const q = r.question.length > 72 ? `${r.question.slice(0, 69)}...` : r.question;
+      process.stdout.write(`${r.status.padEnd(8)} ${r.id}  [${r.role}]  ${q}\n`);
+    }
+    return;
+  }
+  if (sub === 'show') {
+    const record = escalateLib.get(rest[1]);
+    if (!record) throw new Error(`escalation "${rest[1]}" not found`);
+    process.stdout.write(`${JSON.stringify(record, null, 2)}\n`);
+    return;
+  }
+  if (sub === 'run') {
+    const id = rest[1];
+    if (!id) throw new Error('usage: yoki-graph escalate run <id> [--backend <b>] [--model <m>]');
+    const record = escalateLib.get(id);
+    if (!record) throw new Error(`escalation "${id}" not found`);
+    if (record.status !== 'pending') {
+      process.stdout.write(`escalation ${id} is already ${record.status}; nothing to do\n`);
+      return;
+    }
+    const repoRoot = findRepoRootFrom(__dirname);
+    const runId = runner.generateRunId();
+    const printer = makeEmitter({ json: !!flags.json });
+    const api = createApi({
+      runId,
+      journal: new journalLib.Journal(runId),
+      backend: runner.loadBackend('mock'), // role/flags pick the real backend per call
+      cwd: flags.cwd ? path.resolve(flags.cwd) : process.cwd(),
+      emit: printer.emit,
+      harnessModels: models.loadHarnessModels(repoRoot),
+      harnessRoles: rolesLib.loadHarnessRoles(repoRoot),
+      modelMap: models.parseModelMap(typeof flags['model-map'] === 'string' ? flags['model-map'] : ''),
+    });
+    const prompt = record.context
+      ? `${record.question}\n\n<context>\n${record.context}\n</context>`
+      : record.question;
+    // The human is asking the frontier now; if they did not force a backend,
+    // the record's role (default 'consult') decides which model answers.
+    const opts = { label: `escalate:${id}`, role: record.role };
+    if (flags.backend) opts.backend = flags.backend;
+    if (flags.model) opts.model = flags.model;
+    const answer = await api.agent(prompt, opts);
+    printer.finish();
+    const status = answer == null ? 'failed' : 'answered';
+    escalateLib.update(id, { status, answer: answer == null ? null : answer, answeredBy: opts.backend || record.role });
+    if (!flags.json) {
+      process.stdout.write(`\nescalation ${id}: ${status}\n`);
+      if (answer != null) process.stdout.write(`${typeof answer === 'string' ? answer : JSON.stringify(answer, null, 2)}\n`);
+    }
+    if (status === 'failed') process.exitCode = 1;
+    return;
+  }
+  throw new Error('usage: yoki-graph escalate <list|show <id>|run <id>>');
+}
+
 async function main() {
   const [, , cmd, ...rest] = process.argv;
   const flags = parseArgs(rest);
@@ -460,8 +540,9 @@ async function main() {
     // `--once` (or a non-TTY stdout) prints one snapshot and exits — the
     // scriptable path, same convention as `status --once`.
     else if (cmd === 'top') await top.cmdTop(positional, flags);
+    else if (cmd === 'escalate') await cmdEscalate(positional, flags);
     else {
-      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list [--json|--wide]\n       yoki-graph status <runId> [--once|--watch]\n       yoki-graph top [--state-home <dir>] [--once] [--columns <path>]\n');
+      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|deepseek|local|mock [...]\n       yoki-graph list [--json|--wide]\n       yoki-graph status <runId> [--once|--watch]\n       yoki-graph top [--state-home <dir>] [--once] [--columns <path>]\n       yoki-graph escalate <list [--all]|show <id>|run <id>>\n');
       if (cmd) process.exitCode = 1;
     }
   } catch (err) {
@@ -474,6 +555,6 @@ if (require.main === module) {
 }
 
 module.exports = {
-  parseArgs, makeEmitter, humanLine, cmdRun, cmdList, cmdStatus, cmdWatch, watchSnapshot, main,
+  parseArgs, makeEmitter, humanLine, cmdRun, cmdList, cmdStatus, cmdWatch, cmdEscalate, watchSnapshot, main,
   formatUsage, formatModelTable, numberFlag,
 };

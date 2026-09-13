@@ -15,6 +15,7 @@ const retry = require('./retry');
 const budgetLib = require('./budget');
 const models = require('./models');
 const roles = require('./roles');
+const escalateLib = require('./escalate');
 const backends = require('./backends');
 
 /**
@@ -449,6 +450,30 @@ function createApi(ctx) {
     return ctx.runChildWorkflow(nameOrRef, childArgs);
   }
 
+  /**
+   * Defer a hard decision to the frontier `consult` role WITHOUT blocking or
+   * auto-spending. `escalate()` only ENQUEUES a pending record (escalate.js)
+   * and emits an `escalation` event; it never calls the frontier model. The
+   * main lane gets the id back and carries on. A human later runs
+   * `yoki-graph escalate run <id>`, which is the gate and the spend
+   * authorization. Returns `{ escalated: true, id }`.
+   */
+  function escalate(question, opts = {}) {
+    const record = escalateLib.enqueue({
+      question,
+      context: opts.context,
+      role: opts.role || 'consult',
+      runId: ctx.runId,
+      label: opts.label || null,
+      source: opts.source || 'workflow',
+    });
+    ctx.emit({
+      type: 'escalation', runId: ctx.runId, id: record.id, role: record.role,
+      label: opts.label || null, status: 'pending', ts: nowIso(),
+    });
+    return { escalated: true, id: record.id };
+  }
+
   return {
     args: ctx.args,
     agent,
@@ -458,6 +483,7 @@ function createApi(ctx) {
     phase,
     budget,
     workflow,
+    escalate,
   };
 }
 

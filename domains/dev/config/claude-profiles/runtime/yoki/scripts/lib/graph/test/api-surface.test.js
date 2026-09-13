@@ -3,7 +3,8 @@
 /**
  * API surface smoke test: one inline workflow that touches every global
  * documented in API.md (args, phase, log, agent() with every opts key,
- * parallel, pipeline, budget, workflow, and the restricted Date/Math), run
+ * parallel, pipeline, budget, workflow, escalate, and the restricted
+ * Date/Math), run
  * end to end through runner.executeScript against the mock backend.
  *
  * Uses isolated state dirs — see runner.test.js's header comment.
@@ -72,8 +73,10 @@ const par = await parallel([
   () => agent('parallel B', { label: 'parB', isolation: 'worktree', gate: 'true', gateTimeoutMs: 30000 }),
 ])
 const child = await workflow({ scriptPath: args.childPath }, { n: 21 })
+// escalate(): enqueue-and-return, no model call — the main lane keeps going.
+const esc = await escalate('is dropping the $200 plan safe?', { label: 'plan-cost', role: 'consult' })
 return {
-  plan, piped, par, child,
+  plan, piped, par, child, esc,
   budgetTotal: budget.total,
   budgetRemainingIsInfinity: budget.remaining() === Infinity,
   dateMathStillWork: { max: Math.max(1, 2), fixedDate: new Date(2020, 0, 1).getFullYear() },
@@ -129,6 +132,14 @@ test('every documented global works together in one script (mock backend, no exe
     const gated = events.find((e) => e.type === 'agent-gate');
     assert.equal(gated.label, 'parB');
     assert.equal(gated.status, 'pass');
+
+    // escalate() reached the host through its RPC stub: it returned an id and
+    // emitted an escalation event, without any agent-start for that call.
+    assert.equal(result.result.esc.escalated, true);
+    assert.match(result.result.esc.id, /^esc-/);
+    const escEvt = events.find((e) => e.type === 'escalation');
+    assert.equal(escEvt.role, 'consult');
+    assert.equal(escEvt.id, result.result.esc.id);
   } finally {
     fs.rmSync(repo, { recursive: true, force: true });
   }
