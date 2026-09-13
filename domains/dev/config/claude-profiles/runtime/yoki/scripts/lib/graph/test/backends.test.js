@@ -531,6 +531,54 @@ test('omp backend: run() refuses a header-only stream on a non-zero exit (auth f
   );
 });
 
+// The real stderr of omp 18.0.4 dying at anthropic auth (captured live,
+// 2026-09-13): six numbered bun source-context lines and a caret pointer
+// ABOVE the `error:` line, two `at ...` frames below it. The two lines a
+// person can act on are the `error:` line and the plain `Use /login...`
+// line — everything else is the interpreter showing its own throw site.
+const OMP_AUTH_STDERR = fs.readFileSync(path.join(__dirname, 'fixtures', 'omp-auth-error.stderr.txt'), 'utf8');
+
+test('summarizeStderr: bun source-context and stack frames drop, the error: and prose lines survive', () => {
+  const { summarizeStderr } = require('../backends/common');
+  const summary = summarizeStderr(OMP_AUTH_STDERR);
+  const lines = summary.split('\n');
+  assert.equal(lines[0], 'error: No API key found for anthropic.');
+  assert.match(summary, /Use \/login, set an API key environment variable/);
+  assert.ok(!/\d+\s*\|/.test(summary), `source-context lines leaked into: ${summary}`);
+  assert.ok(!/\bat #?\w+ \(/.test(summary), `stack frames leaked into: ${summary}`);
+  assert.ok(summary.length <= 300, `summary is ${summary.length} chars, over the ~300 display cap`);
+});
+
+test('summarizeStderr: all-noise stderr falls back to the raw text instead of an empty message', () => {
+  const { summarizeStderr } = require('../backends/common');
+  const noise = '  123 | const x = 1\n        ^\n      at f (/x:1:1)\n';
+  assert.equal(summarizeStderr(noise), noise.trim().slice(0, 300));
+  assert.equal(summarizeStderr(''), '');
+});
+
+test('omp backend: an auth-failure exit surfaces the summarized stderr, with the full dump kept on err.raw', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-fake-omp-auth-'));
+  const fake = path.join(dir, 'omp');
+  const stderrFixture = path.join(dir, 'auth-error.stderr.txt');
+  fs.writeFileSync(stderrFixture, OMP_AUTH_STDERR);
+  fs.writeFileSync(fake, `#!/bin/sh\nprintf '%s\\n' '${OMP_V3_HEADER_ONLY.trim().replace(/'/g, "'\\''")}'\ncat '${stderrFixture}' >&2\nexit 1\n`);
+  fs.chmodSync(fake, 0o755);
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${dir}${path.delimiter}${oldPath}`;
+  t.after(() => { process.env.PATH = oldPath; fs.rmSync(dir, { recursive: true, force: true }); });
+  const err = await omp.run({ prompt: 'p', cwd: dir, timeoutMs: 30000 }).then(
+    () => assert.fail('run() resolved on an auth-failure exit'),
+    (e) => e,
+  );
+  // The displayed message: exit code + the two meaningful lines, no bun noise.
+  assert.match(err.message, /^omp exited 1: error: No API key found for anthropic\./);
+  assert.match(err.message, /Use \/login/);
+  assert.ok(!err.message.includes('768684'), `bun source dump leaked into the message: ${err.message}`);
+  assert.ok(!/\bat #?\w+ \(/.test(err.message), `stack frames leaked into the message: ${err.message}`);
+  // The debug copy: the raw stderr, complete, for api.js to journal.
+  assert.equal(err.raw, OMP_AUTH_STDERR);
+});
+
 test('omp backend: run() still resolves when a non-zero exit left a usable v3 answer on stdout', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-fake-omp-ok-'));
   const fake = path.join(dir, 'omp');
