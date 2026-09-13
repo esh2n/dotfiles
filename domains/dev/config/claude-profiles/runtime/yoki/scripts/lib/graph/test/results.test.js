@@ -186,3 +186,35 @@ test('an old-format journal (inline results, pre-gen lines) replays unchanged', 
   assert.equal(resumed.result.r, 'recorded answer', 'the old-format entry must replay, not re-run');
   assert.ok(events.some((e) => e.type === 'agent-cached'));
 }));
+
+// ---------------------------------------------------------------------------
+// `status --json` resolves resultRef back to an inline result
+// ---------------------------------------------------------------------------
+
+test('status --json inlines a separated result; a missing side file becomes a resultError note', () => withIsolatedState(async (cwd) => {
+  const cli = require('../cli');
+  const scriptPath = writeScript(cwd, 'flow.js', ONE_CALL);
+  const fixture = path.join(cwd, 'fixture.json');
+  fs.writeFileSync(fixture, JSON.stringify({ call: BIG }));
+
+  const run = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, mockFile: fixture,
+  });
+  assert.equal(run.status, 'ok');
+
+  const capture = () => ({ text: '', write(chunk) { this.text += chunk; return true; } });
+  const withJson = capture();
+  cli.cmdStatus([run.runId], { json: true }, { stream: withJson });
+  const payload = JSON.parse(withJson.text);
+  const okEntry = payload.entries.find((e) => e.status === 'ok');
+  assert.ok(okEntry.resultRef, 'provenance: the ref should still be visible');
+  assert.equal(okEntry.result, run.result.r, 'status --json must hand consumers the inline result');
+
+  fs.rmSync(path.join(runDir(run.runId), 'results'), { recursive: true, force: true });
+  const withMissing = capture();
+  cli.cmdStatus([run.runId], { json: true }, { stream: withMissing });
+  const degraded = JSON.parse(withMissing.text).entries.find((e) => e.status === 'ok');
+  assert.ok(!('result' in degraded));
+  assert.match(degraded.resultError, /missing or unreadable/);
+  assert.ok(degraded.resultRef, 'the ref must survive so the reader can see what was lost');
+}));

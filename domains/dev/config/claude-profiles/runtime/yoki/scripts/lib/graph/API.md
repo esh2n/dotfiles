@@ -378,6 +378,19 @@ replayed the answer a DIFFERENT model produced, which is not the same work.
 
 Failed and retried calls are never replayed: a resumed run retries them.
 
+**Large results live beside the journal, not in it.** An `ok` entry whose
+`result` JSON exceeds 2,048 bytes is written to
+`<runDir>/results/<index>-<key prefix>.json` and the journal line carries
+`resultRef` instead — the journal is read whole on every scan, and a review
+run's findings would otherwise make every one of those scans pay for them.
+Replay resolves the ref transparently; a missing or unreadable side file
+demotes that entry to a replay miss (the run goes live from there, it does
+not error), and old journals with inline results are read unchanged.
+`yoki-graph status <runId> --json` resolves `resultRef` back to an inline
+`result` before printing, so machine consumers see the same shape as before;
+an unresolvable ref keeps `resultRef` and adds a `resultError` note instead
+of failing the status.
+
 **Generations, not file order.** `agent()` calls complete out of order under
 concurrency, so a journal's LINE order is completion order while `index` is
 arrival order. Each `executeScript` invocation against a runId therefore

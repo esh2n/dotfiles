@@ -274,6 +274,19 @@ function cmdStatus(rest, flags, deps = {}) {
     entries,
   };
   if (flags.json) {
+    // `status --json` is the machine view, and its consumers read
+    // `entries[].result` — so a `resultRef` line (journal.js's separated
+    // large result) is resolved back to the inline result here, where the
+    // one-off cost is paid by the status call, not by every journal scan.
+    // An unresolvable ref (side file deleted, corrupted) keeps the ref and
+    // says what happened instead of failing the whole status.
+    payload.entries = entries.map((entry) => {
+      if (!entry || !entry.resultRef) return entry;
+      const loaded = journal.loadResult(entry);
+      return loaded.ok
+        ? { ...entry, result: loaded.result }
+        : { ...entry, resultError: `result file ${entry.resultRef} is missing or unreadable` };
+    });
     stream.write(`${JSON.stringify(payload)}\n`);
     return;
   }
