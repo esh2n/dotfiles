@@ -151,6 +151,11 @@ const RUN_COLUMN_DEFS = {
   tokens: { width: 8, align: 'right' },
   lanes: { width: 7, align: 'right' },
   id: { width: 28 },
+  // Off by default (not in DEFAULT_RUN_COLUMNS): the session that launched
+  // the run (runner.js's runScope, e.g. `pi-<sessionId>`), blank when the run
+  // is unscoped. Opt in via top-columns.json to tell same-machine sessions
+  // apart in the global `yoki-graph top`.
+  scope: { width: 16 },
 };
 
 /** Every column a lane row can carry. `model` renders `backend/model`. */
@@ -455,6 +460,7 @@ function runCellValue(key, view, now) {
       return total ? `${done}/${total}` : '';
     }
     case 'id': return view.runId;
+    case 'scope': return (view.meta && typeof view.meta.scope === 'string' && view.meta.scope) || '';
     default: return '';
   }
 }
@@ -571,7 +577,7 @@ function renderLaneRow(lane, view, laneColumns, now, paint) {
  *  `elapsed` reads AGE — the kubectl word for exactly this column. */
 const COLUMN_LABELS = {
   status: '', name: 'NAME', backend: 'BACKEND', phase: 'PHASE',
-  elapsed: 'AGE', tokens: 'TOKENS', lanes: 'LANES', id: 'ID',
+  elapsed: 'AGE', tokens: 'TOKENS', lanes: 'LANES', id: 'ID', scope: 'SCOPE',
   label: 'LANE', model: 'MODEL', tick: 'TICK', bar: 'PROGRESS',
 };
 

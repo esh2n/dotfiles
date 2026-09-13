@@ -121,6 +121,10 @@ class RunView {
     this.liveness = 'unknown';
     this.children = [];
     this.laneLabel = null;
+    // The session scope run.json was stamped with (runner.js's runScope), or
+    // null when unscoped. The pi widget filters top-level runs on it so each
+    // session sees only what it launched; top/status/resume ignore it.
+    this.scope = null;
   }
 
   refresh(now = Date.now(), hostname = os.hostname()) {
@@ -133,6 +137,7 @@ class RunView {
       fold.foldTopEvent(this.state, entries[this.consumed]);
     }
     this.meta = readMeta(this.dir);
+    this.scope = this.meta && typeof this.meta.scope === 'string' ? this.meta.scope : null;
     this.liveness = livenessOf(this.meta, this.dir, hostname, now);
   }
 }

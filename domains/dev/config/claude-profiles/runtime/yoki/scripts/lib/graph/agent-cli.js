@@ -72,7 +72,7 @@ const { createApi } = require('./api');
 const { Journal, runDir, RUN_ID_RE } = require('./journal');
 const { createEventSink } = require('./events');
 const lockLib = require('./lock');
-const { writeRunMeta, readRunMeta } = require('./runner');
+const { writeRunMeta, readRunMeta, runScope } = require('./runner');
 const { SchemaValidationError } = require('./schema');
 const backends = require('./backends');
 const budgetLib = require('./budget');
@@ -309,7 +309,7 @@ async function executeLocked({ plan, flags, stdout, stderr }) {
   const metaBase = {
     name: 'yoki-agent', backend: plan.backendName, model: plan.resolvedModel.id || undefined,
     args: { label: plan.label, ...(plan.sandbox ? { sandbox: plan.sandbox } : {}) },
-    cwd: plan.cwd, startedAt: startedAtIso,
+    cwd: plan.cwd, startedAt: startedAtIso, scope: runScope(),
   };
   try {
     writeRunMeta(plan.runId, { ...metaBase, status: 'running' });

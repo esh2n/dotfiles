@@ -183,6 +183,26 @@ function generateRunId() {
 const RUN_META_THROTTLE_MS = 2000;
 
 /**
+ * Optional session scope stamped into run.json so a viewer can filter to the
+ * runs one session started. Set through `YOKI_RUN_SCOPE` by whoever launches
+ * the run — today the pi widget extension, which stamps `pi-<sessionId>` so
+ * each pi shows only its own workflows (`yoki-graph top` stays global).
+ *
+ * The value becomes a comparison key the widget matches and a field in a
+ * whole-file-rewritten run.json, so it is validated TIGHT: printable id
+ * characters only, 1..128 long. A value that does not match is IGNORED — the
+ * run stays unscoped rather than trusting a stray control byte or an
+ * unbounded string. An absent or empty variable is simply unscoped. Only the
+ * widget reads the field; top/status/resume ignore it (backward compatible
+ * with every run.json written before this existed).
+ */
+const RUN_SCOPE_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+function runScope(env = process.env) {
+  const raw = env && typeof env.YOKI_RUN_SCOPE === 'string' ? env.YOKI_RUN_SCOPE : '';
+  return RUN_SCOPE_RE.test(raw) ? raw : undefined;
+}
+
+/**
  * run.json is rewritten wholesale — and, with `lastEventAt`, repeatedly
  * during a run — while `status`/`status --watch` read it from another
  * process at any moment. Write-then-rename (same directory, so the rename
@@ -340,7 +360,7 @@ async function executeScript(options) {
 
   runMeta = {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
-    startedAt: new Date().toISOString(), status: 'running',
+    startedAt: new Date().toISOString(), status: 'running', scope: runScope(),
   };
   writeRunMeta(runId, runMeta);
   lastMetaWriteAt = Date.now();
@@ -386,7 +406,7 @@ async function executeScript(options) {
   runMeta = {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
     startedAt: readRunMeta(runId)?.startedAt, finishedAt: new Date().toISOString(),
-    status, error, usage, byModel, lastEventAt: runMeta.lastEventAt,
+    status, error, usage, byModel, lastEventAt: runMeta.lastEventAt, scope: runScope(),
   };
   writeRunMeta(runId, runMeta);
   // run-end forces one more run.json write through the tee, stamping the
@@ -409,5 +429,6 @@ module.exports = {
   generateRunId,
   writeRunMeta,
   readRunMeta,
+  runScope,
   workflowsDir,
 };

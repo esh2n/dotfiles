@@ -127,6 +127,61 @@ test('executeScript runs a script end to end against the mock backend', () => wi
   assert.ok(greetEntry.durationMs >= 0);
 }));
 
+// ---------------------------------------------------------------------------
+// Session scope stamping (YOKI_RUN_SCOPE -> run.json.scope)
+// ---------------------------------------------------------------------------
+
+test('runScope: accepts the id charset, rejects everything else', () => {
+  assert.equal(runner.runScope({ YOKI_RUN_SCOPE: 'pi-abc123' }), 'pi-abc123');
+  assert.equal(runner.runScope({ YOKI_RUN_SCOPE: 'pi-9f8e:main.v2_x' }), 'pi-9f8e:main.v2_x');
+  assert.equal(runner.runScope({ YOKI_RUN_SCOPE: 'x'.repeat(128) }), 'x'.repeat(128));
+  assert.equal(runner.runScope({}), undefined, 'absent -> unscoped');
+  assert.equal(runner.runScope({ YOKI_RUN_SCOPE: '' }), undefined, 'empty -> unscoped');
+  assert.equal(runner.runScope({ YOKI_RUN_SCOPE: 'has space' }), undefined, 'space rejected');
+  assert.equal(runner.runScope({ YOKI_RUN_SCOPE: 'bad\nnewline' }), undefined, 'control byte rejected');
+  assert.equal(runner.runScope({ YOKI_RUN_SCOPE: 'x'.repeat(129) }), undefined, 'over 128 rejected');
+});
+
+function withScopeEnv(value, fn) {
+  const prev = process.env.YOKI_RUN_SCOPE;
+  if (value === undefined) delete process.env.YOKI_RUN_SCOPE; else process.env.YOKI_RUN_SCOPE = value;
+  return Promise.resolve(fn()).finally(() => {
+    if (prev === undefined) delete process.env.YOKI_RUN_SCOPE; else process.env.YOKI_RUN_SCOPE = prev;
+  });
+}
+
+test('executeScript stamps run.json.scope from a valid YOKI_RUN_SCOPE', () => withIsolatedState((cwd) => {
+  const scriptPath = writeScript(cwd, 'scoped.js', `export const meta = { name: 'scoped', description: 'd' }
+    return { ok: true }`);
+  return withScopeEnv('pi-sess-01', async () => {
+    const result = await runner.executeScript({ scriptPath, args: {}, backendName: 'mock', cwd });
+    assert.equal(result.status, 'ok');
+    assert.equal(runner.readRunMeta(result.runId).scope, 'pi-sess-01');
+  });
+}));
+
+test('executeScript leaves run.json unscoped when YOKI_RUN_SCOPE is absent', () => withIsolatedState((cwd) => {
+  const scriptPath = writeScript(cwd, 'unscoped.js', `export const meta = { name: 'unscoped', description: 'd' }
+    return { ok: true }`);
+  return withScopeEnv(undefined, async () => {
+    const result = await runner.executeScript({ scriptPath, args: {}, backendName: 'mock', cwd });
+    const meta = runner.readRunMeta(result.runId);
+    assert.equal(meta.scope, undefined);
+    assert.ok(!('scope' in meta), 'no scope key when unscoped');
+  });
+}));
+
+test('executeScript ignores an invalid YOKI_RUN_SCOPE (stays unscoped)', () => withIsolatedState((cwd) => {
+  const scriptPath = writeScript(cwd, 'badscope.js', `export const meta = { name: 'badscope', description: 'd' }
+    return { ok: true }`);
+  return withScopeEnv('not a valid scope!', async () => {
+    const result = await runner.executeScript({ scriptPath, args: {}, backendName: 'mock', cwd });
+    const meta = runner.readRunMeta(result.runId);
+    assert.equal(meta.scope, undefined);
+    assert.ok(!('scope' in meta), 'invalid value must not leak into run.json');
+  });
+}));
+
 test('--resume replays a cached agent() call instead of invoking the backend again', () => withIsolatedState(async (cwd) => {
   const scriptPath = writeScript(cwd, 'flow2.js', `export const meta = { name: 'flow2', description: 'd' }
     const r = await agent('expensive call', { label: 'once' })
