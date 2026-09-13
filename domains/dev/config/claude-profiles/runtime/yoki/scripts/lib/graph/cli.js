@@ -13,7 +13,7 @@
  *       [--mock <file>] [--timeout <ms>] [--gate-timeout <ms>] [--retries N]
  *       [--max-agent-calls N] [--max-tokens N] [--max-wall-ms N]
  *       [--model-map <tier>=<id>,...]
- *   yoki-graph list
+ *   yoki-graph list [--json|--wide]
  *   yoki-graph status <runId> [--once|--watch]
  *   yoki-graph top [--state-home <dir>] [--once] [--columns <path>]
  */
@@ -25,12 +25,13 @@ const runner = require('./runner');
 const journalLib = require('./journal');
 const models = require('./models');
 const progress = require('./progress');
+const render = require('./top-render');
 const top = require('./top');
 const { parseArgs: parseArgv, numberFlag } = require('./args');
 
 /** The flags of this CLI that never take a value. Everything else is
  *  `--key value`; see args.js, which agent-cli.js parses with too. */
-const BOOLEAN_FLAGS = ['dry-run', 'json', 'watch', 'once'];
+const BOOLEAN_FLAGS = ['dry-run', 'json', 'watch', 'once', 'wide'];
 
 const parseArgs = (argv) => parseArgv(argv, BOOLEAN_FLAGS);
 
@@ -227,18 +228,61 @@ function formatUsage(usage) {
   return parts.join(' — ');
 }
 
-function cmdList(flags) {
+/**
+ * `yoki-graph list [--json|--wide]` — the workflow catalogue.
+ *
+ * On a TTY the listing is a two-column table: bold name, description
+ * clipped to the terminal width (first line only, `…` marks the cut) —
+ * a catalogue is for choosing, and choosing needs aligned names more
+ * than it needs every word of every description. `--wide` restores the
+ * full-text `name\tdescription` form, and a non-TTY stream ALWAYS gets
+ * that form untouched: `list | grep`-style pipelines never see padding,
+ * truncation or an escape byte. Column arithmetic is top-render's
+ * display-cell math, so 全角 descriptions clip cleanly, and ANSI (bold,
+ * dim) wraps only cells top-render has already sanitized and padded.
+ *
+ * Injectable deps (tests): `stream`, `isTty`, `width`, `env`.
+ */
+function cmdList(flags, deps = {}) {
+  const stream = deps.stream || process.stdout;
+  const env = deps.env || process.env;
+  const isTty = deps.isTty === undefined ? !!process.stdout.isTTY : deps.isTty;
   const items = runner.listWorkflows();
   if (flags.json) {
-    process.stdout.write(`${JSON.stringify(items)}\n`);
+    stream.write(`${JSON.stringify(items)}\n`);
     return;
   }
   if (!items.length) {
-    process.stdout.write(`no workflows found in ${runner.workflowsDir()}\n`);
+    stream.write(`no workflows found in ${runner.workflowsDir()}\n`);
     return;
   }
+  if (!isTty || flags.wide) {
+    for (const item of items) {
+      stream.write(`${item.name}\t${item.description}\n`);
+    }
+    return;
+  }
+  const width = Number.isFinite(deps.width) ? deps.width
+    : (Number.isFinite(process.stdout.columns) && process.stdout.columns >= 20 ? process.stdout.columns : 80);
+  const color = !(typeof env.NO_COLOR === 'string' && env.NO_COLOR !== '');
+  const paint = color ? render.createAnsiPaint() : null;
+  const nameWidth = Math.min(
+    28,
+    Math.max(4, ...items.map((item) => render.displayWidth(render.sanitizeText(item.name)))),
+  );
+  const descWidth = Math.max(8, width - nameWidth - 2);
   for (const item of items) {
-    process.stdout.write(`${item.name}\t${item.description}\n`);
+    // First line only: a description is a sentence for the table, the rest
+    // is the workflow file's own business (`--wide` shows everything).
+    const firstLine = String(item.description || '').split('\n', 1)[0];
+    const nameCell = render.padCell(item.name, nameWidth, 'left');
+    const descCell = render.truncateToWidth(render.sanitizeText(firstLine), descWidth);
+    const name = paint ? paint('bold', nameCell) : nameCell;
+    // An unparseable workflow's "(unparseable: …)" note reads as a warning,
+    // not as a description.
+    const descRole = item.error ? 'warning' : 'dim';
+    const desc = paint ? paint(descRole, descCell) : descCell;
+    stream.write(`${name}  ${desc}\n`);
   }
 }
 
@@ -417,7 +461,7 @@ async function main() {
     // scriptable path, same convention as `status --once`.
     else if (cmd === 'top') await top.cmdTop(positional, flags);
     else {
-      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--once|--watch]\n       yoki-graph top [--state-home <dir>] [--once] [--columns <path>]\n');
+      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list [--json|--wide]\n       yoki-graph status <runId> [--once|--watch]\n       yoki-graph top [--state-home <dir>] [--once] [--columns <path>]\n');
       if (cmd) process.exitCode = 1;
     }
   } catch (err) {
