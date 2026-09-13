@@ -32,6 +32,12 @@ access from the script body itself (only through `agent()`).
   may deliver args as a JSON string — yoki-graph's CLI (`--args`/`--args-file`)
   always parses JSON itself and hands the script the parsed value, but the
   scripts' own guard makes a string-args path safe either way.
+- `runInfo` — frozen `{ runId }` identifying the current run. yoki-graph
+  only: the native Workflow tool injects no such global, so a script that
+  must run in both harnesses reaches it through `typeof runInfo` (the
+  provider-lane helper in core/workflows/lib/lanes.js is the pattern — it
+  derives each lane's yoki-agent `--run-id` from it, and simply omits the
+  flag where runInfo does not exist).
 - `phase(title: string): void` — starts a progress group; matched against
   `meta.phases[].title` by exact string equality for display purposes only.
 - `log(message: string): void` — a narrator line, printed above/around the

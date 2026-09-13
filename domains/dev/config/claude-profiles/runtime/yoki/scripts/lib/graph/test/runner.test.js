@@ -247,3 +247,23 @@ test('an unrecognised backend still gets the generic message, listing only what 
 test('backends/claude.js is gone from disk, not merely unreferenced', () => {
   assert.equal(fs.existsSync(path.join(__dirname, '..', 'backends', 'claude.js')), false);
 });
+
+// ---------------------------------------------------------------------------
+// runInfo — the body-visible run identity
+// ---------------------------------------------------------------------------
+
+test('the body sees a frozen runInfo.runId matching the run it belongs to', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'runinfo.js', `export const meta = { name: 'ri', description: 'd' }
+    // Freezing is part of the contract: a body must not be able to redirect
+    // every lane's derived --run-id by reassigning the field.
+    let frozen = true
+    try { runInfo.runId = 'hijacked' } catch { /* strict mode throws */ }
+    if (runInfo.runId === 'hijacked') frozen = false
+    return { id: runInfo.runId, frozen }`);
+  const result = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd,
+  });
+  assert.equal(result.status, 'ok', result.error);
+  assert.equal(result.result.id, result.runId);
+  assert.equal(result.result.frozen, true);
+}));

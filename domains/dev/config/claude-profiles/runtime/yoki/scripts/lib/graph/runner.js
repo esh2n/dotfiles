@@ -95,7 +95,7 @@ function extractMeta(source) {
   return { meta, metaEnd: braceStart + literal.length };
 }
 
-const BODY_PARAM_NAMES = ['args', 'phase', 'log', 'agent', 'parallel', 'pipeline', 'budget', 'workflow'];
+const BODY_PARAM_NAMES = ['args', 'phase', 'log', 'agent', 'parallel', 'pipeline', 'budget', 'workflow', 'runInfo'];
 
 /**
  * Compile a script's source into `{ meta, body }`. The body is executed by the
@@ -357,6 +357,7 @@ async function executeScript(options) {
       body: compiled.body,
       api: apiGlobals,
       args,
+      runId,
       budgetTotal: Number.isFinite(caps.maxTokens) ? caps.maxTokens : null,
       journal,
       maxWallMs: caps.maxWallMs,

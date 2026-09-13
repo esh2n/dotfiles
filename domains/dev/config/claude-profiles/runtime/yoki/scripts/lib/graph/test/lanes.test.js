@@ -397,3 +397,58 @@ test('a fixture-served lane is delivered but loudly marked, never mistaken for t
   // The caller's `if (note) log(note)` is what makes it visible in the run.
   assert.ok(mocked.note.length > 0);
 });
+
+// ---------------------------------------------------------------------------
+// The lane's derived --run-id (runInfo)
+// ---------------------------------------------------------------------------
+
+/** Run `fn` with the yoki-graph worker global `runInfo` in place. The lanes
+ *  module reads it via `typeof runInfo`, which resolves through globalThis
+ *  here exactly as it resolves through the vm sandbox in a real run. */
+function withRunInfo(runId, fn) {
+  global.runInfo = Object.freeze({ runId });
+  try {
+    return fn();
+  } finally {
+    delete global.runInfo;
+  }
+}
+
+test('under yoki-graph the transport command carries a findable, label-derived --run-id', () => {
+  withRunInfo('run-1757e0-abcd', () => {
+    const lane = lanes.providerLane({
+      provider: 'codex', model: 'gpt-5.6-sol', prompt: 'p',
+      label: 'review:security', phase: 'P',
+    });
+    // `:`, `@` and `/` from the full label are collapsed to `-`: the id is a
+    // directory name and a word on a command line (yoki-agent's RUN_ID_RE).
+    assert.equal(lane.runId, 'run-1757e0-abcd-lane-review-security-codex-gpt-5.6-sol');
+    assert.match(lane.prompt, new RegExp(`--backend codex --model gpt-5\\.6-sol --run-id ${lane.runId} --sandbox read-only`));
+    assert.match(lane.runId, /^[A-Za-z0-9._-]{1,128}$/, 'the derived id must satisfy yoki-agent --run-id validation');
+  });
+});
+
+test('the derived --run-id is stable across reruns of the same run (resume-safe) and capped in length', () => {
+  const build = () => withRunInfo('run-1', () => lanes.providerLane({
+    provider: 'omp', prompt: 'p', label: 'research:web', phase: 'P',
+  }));
+  // Same runId in, same prompt out — a lane's callKey must not move between
+  // a run and its own --resume.
+  assert.equal(build().prompt, build().prompt);
+
+  withRunInfo(`run-${'x'.repeat(120)}`, () => {
+    const lane = lanes.providerLane({
+      provider: 'codex', prompt: 'p', label: 'a-very-long-lane-label-indeed', phase: 'P',
+    });
+    assert.ok(lane.runId.length <= 128, `derived id is ${lane.runId.length} chars`);
+    assert.match(lane.runId, /^[A-Za-z0-9._-]+$/);
+  });
+});
+
+test('outside yoki-graph (no runInfo global) the command carries no --run-id, as before', () => {
+  const lane = lanes.providerLane({
+    provider: 'codex', model: 'gpt-5.6-sol', prompt: 'p', label: 'l', phase: 'P',
+  });
+  assert.equal(lane.runId, '');
+  assert.doesNotMatch(lane.prompt, /--run-id/);
+});

@@ -20,9 +20,11 @@
  *
  * The 7 documented globals (agent, parallel, pipeline, phase, log, budget,
  * workflow) are the ONLY things injected on top of the realm's own built-ins,
- * plus `args`, `meta` is deliberately NOT injected (yoki strips the whole
- * `export const meta = {...}` block from the body, as it always has, so the
- * body never referenced it), and a frozen minimal `console` mapped to `log`.
+ * plus `args`, a frozen read-only `runInfo` ({runId} — what a provider lane
+ * derives its yoki-agent `--run-id` from), `meta` is deliberately NOT
+ * injected (yoki strips the whole `export const meta = {...}` block from the
+ * body, as it always has, so the body never referenced it), and a frozen
+ * minimal `console` mapped to `log`.
  *
  * agent/workflow are RPC stubs: each call posts `{type:'call', callId, method,
  * payload}` to the host and awaits a `{type:'response', ...}` — the host keeps
@@ -250,6 +252,13 @@ async function main() {
     budget: budget,
     console: makeConsole(),
     args: workerData.args,
+    // Read-only identity of the run this body belongs to. Frozen because a
+    // body that could reassign runInfo.runId would silently redirect every
+    // lane's derived --run-id. An empty-string runId (a host that passed
+    // none) is deliberate: \`runInfo.runId || fallback\` stays a one-liner in
+    // script code, and the native Workflow tool has no runInfo global at all
+    // — scripts must reach it via \`typeof runInfo\` (see lanes.js).
+    runInfo: Object.freeze({ runId: typeof workerData.runId === "string" ? workerData.runId : "" }),
   };
 
   const context = vm.createContext(sandbox, {
