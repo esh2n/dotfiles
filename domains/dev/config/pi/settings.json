@@ -1,0 +1,18 @@
+{
+  "defaultProvider": "lmstudio",
+  "defaultModel": "qwen/qwen3.8-27b",
+  "enabledModels": [
+    "lmstudio/**"
+  ],
+  "defaultThinkingLevel": "medium",
+  "showCacheMissNotices": true,
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 24000
+  },
+  "packages": [
+    "https://github.com/dimk90/pi-context-view",
+    "https://github.com/Ahm3tJ4f/pi-undo",
+    "https://github.com/sting8k/pi-vcc"
+  ]
+}
