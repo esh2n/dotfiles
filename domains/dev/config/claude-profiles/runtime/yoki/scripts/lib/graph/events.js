@@ -55,6 +55,10 @@
  * the run is live (the writer can be mid-append) — journal.js's JournalTail
  * already holds a partial line back until it completes, and works unchanged
  * when pointed at an events.ndjson.
+ *
+ * Reserved event type: `needs-human` — a lane blocked on a human decision.
+ * No emitter produces it yet; readers (top-fold.js) already accept it, so
+ * the emitting side can land without a viewer release.
  */
 
 const fs = require('fs');
