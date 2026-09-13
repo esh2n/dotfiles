@@ -12,5 +12,14 @@
     "opus": "anthropic/claude-fable-5",
     "review": "anthropic/claude-sonnet-5",
     "scout": "anthropic/claude-haiku-5"
+  },
+  "deepseek": {
+    "_comment": "DeepSeek cloud tiers (2026-09 current docs). flash = cheap/fast main tier; pro = higher capability. Reasoning is a MODE (reasoning_effort), not a separate model id, so there is no reasoner tier. These are the ids passed to the deepseek backend's OpenAI-compatible /chat/completions.",
+    "flash": "deepseek-flash",
+    "pro": "deepseek-v4-pro"
+  },
+  "local": {
+    "_comment": "Local OpenAI-compatible server tiers (LM Studio). qwen = Qwen3.8-27B, the deterministic/offline tier. Model id must match what LM Studio has loaded; override per machine with YOKI_LOCAL_MODEL.",
+    "qwen": "qwen/qwen3.8-27b"
   }
 }

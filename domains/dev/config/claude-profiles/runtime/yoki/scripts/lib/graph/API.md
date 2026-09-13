@@ -71,11 +71,26 @@ access from the script body itself (only through `agent()`).
     the backend for the tiers that accept it (omp has `--thinking`; codex
     has no such flag, so the value is folded into the prompt preamble and
     the comment in backends/codex.js says so).
-  - `opts.backend` — `'codex' | 'omp' | 'mock'`, overriding the run's
-    `--backend` for THIS call. Omitted = the run's backend. See "Per-call
-    backends" below; this option is yoki-graph's own, with no Workflow-tool
-    counterpart (inside Claude Code the equivalent is a provider lane — see
-    `core/workflows/lib/lanes.js`).
+  - `opts.backend` — `'codex' | 'omp' | 'deepseek' | 'local' | 'mock'`,
+    overriding the run's `--backend` for THIS call. Omitted = the run's
+    backend (or the role's, if `opts.role` is set). See "Per-call backends"
+    below; this option is yoki-graph's own, with no Workflow-tool counterpart
+    (inside Claude Code the equivalent is a provider lane — see
+    `core/workflows/lib/lanes.js`). `deepseek` (cloud DeepSeek) and `local`
+    (LM Studio / any OpenAI-compatible endpoint) are raw single LLM calls —
+    no tools, no filesystem — for the "raw model opinion" lanes (review,
+    research, adjudicate, escalate consult); a lane that must edit files
+    picks `codex`/`omp`.
+  - `opts.role` — a role name from `core/harness-roles.json` (`main` |
+    `consult` | `deterministic`, extensible), the omp `modelRoles`
+    equivalent. A role names `{backend, model, effort?}` one level above the
+    tier map, so a lane says `agent(p, {role: 'consult'})` and follows
+    whatever the role currently points at — the frontier consult target is
+    swapped in ONE file, not per script. `opts.backend`/`opts.model`/
+    `opts.effort` still win over the role's defaults; the role only fills in
+    what the call did not pin. An unknown role name is a FATAL error (like an
+    unknown backend), never a silent fall-through to the run default. See
+    "Role resolution" below.
   - `opts.isolation: 'worktree'` — run this one agent() call inside a fresh
     `git worktree`, auto-removed after if the tree is clean.
   - `opts.gate` — a shell command run AFTER this call returns, whose exit
@@ -104,6 +119,7 @@ access from the script body itself (only through `agent()`).
     | --- | --- | --- |
     | codex | `-s read-only` (native) | `-s <mode>` |
     | omp | `--tools read,grep,glob,web_search` (allow-list) | no extra flag |
+    | deepseek / local | n/a — a raw LLM call has no tools or filesystem; the option is accepted and ignored | n/a |
     | mock | n/a — nothing is spawned | n/a |
 
     An unknown value is a hard error on every backend, never a silent
@@ -258,16 +274,27 @@ host-side dispatch + terminators) and `runner.js` (`compileScript`,
 
 ## Backends
 
-`codex`, `omp` and `mock`. There is deliberately no `claude` backend:
-yoki-graph exists to run these scripts from harnesses that have NO Workflow
-tool, and inside Claude Code the native Workflow tool is the supported path.
-Driving `claude -p` from here was a second, unsupported route to the same
-result — one that may move to metered billing — so `--backend claude` is
-refused by name ("inside Claude Code use the native Workflow tool;
-yoki-graph backends are codex, omp, mock") rather than reported as an
-unknown value, and `backends/claude.js` is gone from disk. The same decision
-removed `--harness claude` from yoki-loop, where Claude Code's own `/loop`
-and scheduled routines already cover the need.
+`codex`, `omp`, `deepseek`, `local` and `mock`. There is deliberately no
+`claude` backend: yoki-graph exists to run these scripts from harnesses that
+have NO Workflow tool, and inside Claude Code the native Workflow tool is the
+supported path. Driving `claude -p` from here was a second, unsupported route
+to the same result — one that may move to metered billing — so
+`--backend claude` is refused by name ("inside Claude Code use the native
+Workflow tool; yoki-graph backends are codex, omp, deepseek, local, mock")
+rather than reported as an unknown value, and `backends/claude.js` is gone
+from disk. The same decision removed `--harness claude` from yoki-loop, where
+Claude Code's own `/loop` and scheduled routines already cover the need.
+
+`codex` and `omp` are full coding agents (spawned CLIs with tools, a working
+directory and a sandbox). `deepseek` and `local` are the opposite: a single
+OpenAI-compatible `POST /chat/completions`, no process, no tools, no
+filesystem — one shared core (`backends/openai-compat.js`) with two endpoint
+configs (`backends/deepseek.js` = cloud DeepSeek via `DEEPSEEK_API_KEY`;
+`backends/local.js` = LM Studio on `localhost:1234`). They are the cheap/fast
+and free/offline tiers for lanes that only need a model's opinion. Their key
+comes from the process env (`op run --env-file` injects it — see the
+api-key-management decision record); a missing cloud key is a clear error
+naming `op run`, not a raw 401.
 
 ### Per-call backends
 
@@ -443,6 +470,32 @@ two CLIs' spend into one row, and a single-backend run gains no noise. The
 accounting is printed BEFORE the JSON result, not after: a workflow result
 runs to thousands of lines, and a table below it is scrolled off a TTY and
 buried at the bottom of a redirected log.
+
+## Role resolution
+
+A layer ABOVE model resolution: `lib/graph/roles.js` maps a role name to
+`{backend, model, effort?}` from `core/harness-roles.json` — the omp
+`modelRoles` equivalent. Where a tier answers "which model on THIS backend", a
+role answers "which backend AND which tier" for a kind of work. The shipped
+roles:
+
+| role | backend | model (tier) | effort | for |
+| --- | --- | --- | --- | --- |
+| `main` | `deepseek` | `flash` | — | everyday execution, cheap and fast |
+| `consult` | `codex` | `opus` | `high` | the frontier architect — complex judgment, swappable |
+| `deterministic` | `local` | `qwen` | — | offline / reproducible, free local inference |
+
+Precedence in `agent()`: an explicit `opts.backend`/`opts.model`/`opts.effort`
+each win over the role's value, which wins over the run's `--backend`/
+`--model`/`--effort`. So `agent(p, {role:'consult'})` runs on codex+opus+high,
+but `agent(p, {role:'consult', model:'sonnet'})` keeps the codex backend and
+high effort while overriding just the model. The point is indirection: the
+frontier consult target moves in ONE file, and every `role:'consult'` lane
+follows. An unknown role is FATAL (like an unknown backend) — a typo silently
+routing hard questions to the cheap main model would be an expensive,
+invisible mistake. The resolved `backend`/`model` (and `role` on start) still
+appear in every event and the per-model table, so a role never hides which
+model actually ran.
 
 ## Live progress
 

@@ -16,9 +16,9 @@
  * a stale `--backend claude` invocation is told what to do instead.
  */
 
-const CLAUDE_BACKEND_REFUSAL = 'the claude backend was removed — inside Claude Code use the native Workflow tool; yoki-graph backends are codex, omp, mock';
+const CLAUDE_BACKEND_REFUSAL = 'the claude backend was removed — inside Claude Code use the native Workflow tool; yoki-graph backends are codex, omp, deepseek, local, mock';
 
-const BACKEND_NAMES = ['codex', 'omp', 'mock'];
+const BACKEND_NAMES = ['codex', 'omp', 'deepseek', 'local', 'mock'];
 
 /**
  * A backend name that cannot be resolved is a SCRIPT bug, not a lane
@@ -42,6 +42,8 @@ function loadBackend(name) {
     case 'claude': throw new UnknownBackendError(CLAUDE_BACKEND_REFUSAL);
     case 'codex': return require('./codex');
     case 'omp': return require('./omp');
+    case 'deepseek': return require('./deepseek');
+    case 'local': return require('./local');
     case 'mock': return require('./mock');
     default: throw new UnknownBackendError(`unknown backend "${name}" (expected ${BACKEND_NAMES.join('|')})`);
   }

@@ -284,7 +284,7 @@ return 1`);
     (err) => {
       assert.match(err.message, /claude backend was removed/);
       assert.match(err.message, /native Workflow tool/);
-      assert.match(err.message, /codex, omp, mock/);
+      assert.match(err.message, /codex, omp, deepseek, local, mock/);
       return true;
     },
   );
@@ -293,9 +293,11 @@ return 1`);
 }));
 
 test('an unrecognised backend still gets the generic message, listing only what remains', () => {
-  assert.throws(() => runner.loadBackend('gemini'), /unknown backend "gemini" \(expected codex\|omp\|mock\)/);
+  assert.throws(() => runner.loadBackend('gemini'), /unknown backend "gemini" \(expected codex\|omp\|deepseek\|local\|mock\)/);
   assert.equal(typeof runner.loadBackend('codex').run, 'function');
   assert.equal(typeof runner.loadBackend('omp').run, 'function');
+  assert.equal(typeof runner.loadBackend('deepseek').run, 'function');
+  assert.equal(typeof runner.loadBackend('local').run, 'function');
   assert.equal(typeof runner.loadBackend('mock').run, 'function');
 });
 
