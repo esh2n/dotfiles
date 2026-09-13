@@ -702,6 +702,57 @@ test('a --run-id that could escape the state tree is a usage error', () => withI
 }));
 
 // ---------------------------------------------------------------------------
+// The run lock: one live process per runId, exactly as runner.js
+// ---------------------------------------------------------------------------
+
+test('a held run lock refuses the call with exit 2, leaving the journal untouched', () => withIsolatedState(async (dir) => {
+  const { promptFile, fixtureFile } = scaffold(dir, { fixture: { lane: 'answer' } });
+  const runId = 'agent-cli-locked-run';
+  const lockLib = require('../lock');
+  const held = lockLib.acquire(runId);
+  const argv = [
+    '--backend', 'mock', '--mock', fixtureFile, '--label', 'lane',
+    '--run-id', runId, '--prompt-file', promptFile,
+  ];
+  try {
+    const stderr = capture();
+    const code = await agentCli.run(argv, { stdout: capture(), stderr, env: {} });
+    assert.equal(code, 2);
+    assert.match(stderr.text, /already active/);
+    // Refused BEFORE anything touched the run: no journal entry, no run.json.
+    assert.deepEqual(new Journal(runId).readAll(), [], 'the refused call was journaled anyway');
+    const journalLib = require('../journal');
+    assert.ok(!fs.existsSync(path.join(journalLib.runDir(runId), 'run.json')), 'the refused call wrote run.json');
+  } finally {
+    held.release();
+  }
+  // Once the holder is gone the same invocation goes through.
+  assert.equal(await agentCli.run(argv, { stdout: capture(), stderr: capture(), env: {} }), 0);
+}));
+
+test('two concurrent calls on one lane-derived run id: exactly one runs, the other is refused', () => withIsolatedState(async (dir) => {
+  // The scenario the lock exists for: lane run ids are DETERMINISTIC
+  // (`<runId>-lane-<label>`), so a workflow that double-fires the same lane
+  // command starts two yoki-agent processes on the same runDir.
+  const { promptFile, fixtureFile } = scaffold(dir, { fixture: { lane: 'answer' } });
+  const argv = [
+    '--backend', 'mock', '--mock', fixtureFile, '--label', 'lane',
+    '--run-id', 'run-x-lane-review-security-codex', '--prompt-file', promptFile,
+  ];
+  const errs = [capture(), capture()];
+  const codes = await Promise.all([
+    agentCli.run(argv, { stdout: capture(), stderr: errs[0], env: {} }),
+    agentCli.run(argv, { stdout: capture(), stderr: errs[1], env: {} }),
+  ]);
+  assert.deepEqual([...codes].sort(), [0, 2], `expected one ok and one refusal, got ${codes.join(',')}`);
+  const refused = errs[codes.indexOf(2)];
+  assert.match(refused.text, /already active/);
+  // The winner's journal holds exactly its own single entry.
+  const entries = new Journal('run-x-lane-review-security-codex').readAll();
+  assert.equal(entries.filter((e) => e.status === 'ok').length, 1);
+}));
+
+// ---------------------------------------------------------------------------
 // The daily-cap exemption
 // ---------------------------------------------------------------------------
 

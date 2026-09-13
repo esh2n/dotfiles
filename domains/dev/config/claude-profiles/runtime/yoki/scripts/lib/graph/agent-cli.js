@@ -37,7 +37,8 @@
  *      prompt or schema, unknown backend, unknown model tier, a model or
  *      backend name outside the allowed alphabet
  *   2  backend error — the call failed (spawn failure, non-zero exit,
- *      timeout after retries), or a per-run budget cap was already spent
+ *      timeout after retries), a per-run budget cap was already spent, or
+ *      another live process holds this run id's lock
  *   3  schema validation failed after the one retry api.js allows
  *
  * `--json` prints ONLY the result on stdout (the footer goes to stderr), so
@@ -68,8 +69,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { createApi } = require('./api');
-const { Journal, runDir } = require('./journal');
+const { Journal, runDir, RUN_ID_RE } = require('./journal');
 const { createEventSink } = require('./events');
+const lockLib = require('./lock');
 const { writeRunMeta, readRunMeta } = require('./runner');
 const { SchemaValidationError } = require('./schema');
 const backends = require('./backends');
@@ -133,14 +135,10 @@ const KNOWN_FLAGS = new Set([
  */
 const NAME_RE = /^[A-Za-z0-9._:\/-]{1,64}$/;
 
-/**
- * The shape a `--run-id` may take. Stricter than NAME_RE on purpose: a run
- * id becomes a DIRECTORY NAME under the state home (journal.js's runDir), so
- * `/` and `..` — legitimate inside a model id — would let a run id climb out
- * of the graph state tree. Every id yoki generates (`run-…`, `agent-…`, a
- * lane's `<runId>-lane-<label>`) fits comfortably inside 128 characters.
- */
-const RUN_ID_RE = /^[A-Za-z0-9._-]{1,128}$/;
+// The shape a `--run-id` may take is journal.js's RUN_ID_RE (a run id
+// becomes a directory name; runDir() itself enforces it as the backstop).
+// Checked here too so a bad id is a USAGE error (exit 1) with the flag
+// named, before anything is locked, journaled or spawned.
 
 const parseArgs = (argv) => parseArgv(argv, BOOLEAN_FLAGS);
 
@@ -258,6 +256,35 @@ async function run(argv, deps = {}) {
   }
   for (const warning of plan.warnings) stderr.write(`yoki-agent: ${warning}\n`);
 
+  // The same one-live-process-per-runId exclusion runner.js takes, and for
+  // the same reason (lock.js's header): the journal's index sequence, the
+  // event stream's seq and run.json are all single-writer state. It matters
+  // HERE because lane-derived run ids are deterministic — two transports
+  // running the same lane command concurrently would otherwise share one
+  // runDir. Taken BEFORE anything below reads or writes the run directory,
+  // so a refused call leaves the journal exactly as it found it.
+  let held;
+  try {
+    held = lockLib.acquire(plan.runId);
+  } catch (err) {
+    stderr.write(`yoki-agent: ${err.message}\n`);
+    return 2;
+  }
+  try {
+    return await executeLocked({ plan, flags, stdout, stderr });
+  } finally {
+    held.release();
+  }
+}
+
+/**
+ * The call itself, from journal read to footer — everything that touches the
+ * run directory, and therefore everything that must happen under the run
+ * lock `run()` holds around this.
+ *
+ * @returns {Promise<number>} the process exit code
+ */
+async function executeLocked({ plan, flags, stdout, stderr }) {
   const journal = new Journal(plan.runId);
   // Where THIS invocation's entries start, in both senses. `startIndex`
   // continues the run's arrival-order sequence instead of restarting at 0
