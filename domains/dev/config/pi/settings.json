@@ -1,7 +1,7 @@
 {
   "defaultProvider": "lmstudio",
   "defaultModel": "qwen/qwen3.8-27b",
-  "enabledModels": ["lmstudio/*"],
+  "enabledModels": ["lmstudio/**"],
   "defaultThinkingLevel": "medium",
   "compaction": {
     "enabled": true,
