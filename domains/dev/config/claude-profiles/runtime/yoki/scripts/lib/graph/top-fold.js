@@ -102,10 +102,16 @@ function foldTopEvent(state, line) {
   }
   if (Number.isInteger(line.seq)) {
     const gen = Number.isInteger(line.gen) ? line.gen : 1;
-    // Within one generation seq increments by exactly 1; across a reopen it
-    // continues from the previous writer's count (events.js). Either way a
-    // jump of more than 1 means lines were lost or never written.
-    if (state.lastSeq && line.seq > state.lastSeq + 1) state.seqGaps += 1;
+    // The only lossless step is `lastSeq + 1`: within one generation seq
+    // increments by exactly 1, and a healthy sequential reopen CONTINUES
+    // the count under a bumped gen (events.js). Everything else means
+    // lines are unaccounted for — a forward jump (a broken sink dropped
+    // writes), and equally a REWIND: events.js's readTailState restarts
+    // seq at 1 with a best-effort gen bump when it could not parse the
+    // previous writer's tail, and that unparsed tail is exactly the loss
+    // this counter exists to surface. The very first line folded is exempt
+    // (lastSeq 0): a skip-ahead attach starts mid-count on purpose.
+    if (state.lastSeq && line.seq !== state.lastSeq + 1) state.seqGaps += 1;
     state.lastSeq = line.seq;
     state.lastGen = gen;
   }
@@ -144,7 +150,10 @@ function foldTopEvent(state, line) {
       lane.toolCalls = Number.isFinite(line.toolCalls) ? line.toolCalls : lane.toolCalls;
       // A tick after a retry announcement means the next attempt is really
       // underway — the ↻ marker should not outlive the stall it reports.
+      // The needs-human flag clears for the same reason: activity from the
+      // lane means the block it announced has been resolved.
       lane.retrying = false;
+      lane.needsHuman = false;
       break;
     }
     case 'agent-retry': {
@@ -167,6 +176,7 @@ function foldTopEvent(state, line) {
       });
       lane.status = 'cached';
       lane.endedTs = ts;
+      lane.needsHuman = false; // a settled lane no longer waits on anyone
       break;
     }
     case 'agent-end': {
@@ -177,6 +187,7 @@ function foldTopEvent(state, line) {
       lane.status = line.status === 'error' ? 'error' : 'ok';
       lane.endedTs = ts;
       lane.retrying = false;
+      lane.needsHuman = false; // a settled lane no longer waits on anyone
       if (Number.isFinite(line.durationMs)) lane.durationMs = line.durationMs;
       else if (Number.isFinite(lane.startedTs)) lane.durationMs = ts - lane.startedTs;
       if (Number.isFinite(line.tokens)) {

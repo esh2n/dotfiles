@@ -136,6 +136,56 @@ test('needs-human (reserved type): accepted, flags the lane, and hoists it first
   assert.equal(lanes[1].label, 'first');
 });
 
+test('seq reset under a gen bump (unreadable tail) is counted as loss', () => {
+  // events.js readTailState: when the previous writer's tail cannot be
+  // parsed, the new writer restarts seq at 1 and best-effort bumps gen to
+  // 2 — the unparsed tail is unaccounted-for history, and the fold must
+  // say so instead of treating the rewind as a fresh start.
+  const state = createTopState();
+  foldAll(state, envelopes([
+    { type: 'run-start', name: 'x', backend: 'mock', phases: [] },
+    { type: 'agent-start', index: 0, label: 'a' },
+    { type: 'agent-end', index: 0, label: 'a', status: 'ok', durationMs: 1 },
+  ], { gen: 1, startSeq: 1 }));
+  assert.equal(state.seqGaps, 0);
+  foldAll(state, envelopes([
+    { type: 'agent-start', index: 1, label: 'b' },
+  ], { gen: 2, startSeq: 1, startTs: 9000 }));
+  assert.equal(state.seqGaps, 1);
+  assert.equal(state.lastSeq, 1);
+  assert.equal(state.lastGen, 2);
+  // A rewind WITHOUT a gen bump (a corrupt writer) is loss all the same.
+  foldTopEvent(state, { v: 1, seq: 1, gen: 2, ts: 9999, type: 'log', message: 'again' });
+  assert.equal(state.seqGaps, 2);
+});
+
+test('needs-human clears on the lane\'s next sign of life or settlement', () => {
+  const flagged = (index, extra = []) => {
+    const state = createTopState();
+    foldAll(state, envelopes([
+      { type: 'agent-start', index: 0, label: 'lane' },
+      { type: 'needs-human', index: 0, label: 'lane' },
+      ...extra,
+    ]));
+    return state.lanes.get(0).needsHuman;
+  };
+  assert.equal(flagged(0), true); // stays flagged while nothing happens
+  // Activity (a tool tick) or settlement (end / replay) means the block
+  // was resolved — same symmetry as the retrying marker.
+  assert.equal(flagged(0, [{ type: 'agent-progress', index: 0, label: 'lane', toolCalls: 2 }]), false);
+  assert.equal(flagged(0, [{ type: 'agent-end', index: 0, label: 'lane', status: 'ok', durationMs: 1 }]), false);
+  assert.equal(flagged(0, [{ type: 'agent-cached', index: 0, label: 'lane' }]), false);
+  // And the hoist follows the flag back down.
+  const state = createTopState();
+  foldAll(state, envelopes([
+    { type: 'agent-start', index: 0, label: 'first' },
+    { type: 'agent-start', index: 1, label: 'blocked' },
+    { type: 'needs-human', index: 1, label: 'blocked' },
+    { type: 'agent-progress', index: 1, label: 'blocked', toolCalls: 1 },
+  ]));
+  assert.equal(laneList(state)[0].label, 'first');
+});
+
 test('completedSiblings: ok lanes with real durations only — errors and replays are no prior', () => {
   const state = createTopState();
   foldAll(state, envelopes([
