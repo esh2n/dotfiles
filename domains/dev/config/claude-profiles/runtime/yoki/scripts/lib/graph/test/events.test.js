@@ -281,7 +281,10 @@ test('resume NEVER reads events.ndjson: a corrupted event stream changes nothing
     'not json at all\n{"v":1,"seq":1,"type":"agent-end","result":"a lie"}\n');
   // A rerun against a CHANGED fixture: only a journal replay can produce the
   // original answer, so getting it back proves events.ndjson was never read.
+  // (The mock backend caches fixtures by path — drop it, or the rerun would
+  // still serve the first answer even if it wrongly ran live.)
   fs.writeFileSync(fixture, JSON.stringify({ greet: 'second answer' }));
+  require('../backends/mock').clearFixtureCache();
 
   const events = [];
   const resumed = await runner.executeScript({

@@ -47,6 +47,31 @@ function journalPath(runId, env = process.env) {
   return path.join(runDir(runId, env), 'journal.jsonl');
 }
 
+/**
+ * Above this many BYTES of JSON, an ok entry's `result` moves out of the
+ * journal line into its own file under `<runDir>/results/`, and the line
+ * carries `resultRef: "results/<index>-<key prefix>.json"` instead.
+ *
+ * Why: the journal is read WHOLE — every `spent()` seed, `status` call and
+ * replay load parses every line — and a review workflow's findings run to
+ * hundreds of KB per call, so carrying them inline made every O(journal)
+ * operation O(results). Below the threshold the result stays inline on
+ * purpose: most calls are small, and an extra file per "ok" would triple the
+ * IO of a normal run for nothing.
+ *
+ * The threshold is a WRITE-side choice, not a format break: readers accept
+ * both shapes forever (`loadResult`), so an old journal replays unchanged
+ * and a new journal read by old code merely sees no `result` on its biggest
+ * lines — which only resume consumed, via this file.
+ */
+const INLINE_RESULT_MAX_BYTES = 2048;
+
+/** The only shape a resultRef may take. It is a path fragment joined under
+ *  the run's own directory, and it normally comes from this file's own
+ *  writes — but journals are plain text on disk, so a mangled or hand-edited
+ *  ref must never be able to point a replay outside the runDir. */
+const RESULT_REF_RE = /^results\/[A-Za-z0-9._-]+\.json$/;
+
 /** Labels yoki-graph invents rather than the script choosing them. These
  *  must stay OUT of the key: they are derived from arrival order, which
  *  interleaves nondeterministically when calls run concurrently, so keeping
@@ -190,7 +215,8 @@ class Journal {
   }
 
   append(entry) {
-    const stamped = Number.isInteger(entry.gen) ? entry : { ...entry, gen: this.generation() };
+    let stamped = Number.isInteger(entry.gen) ? entry : { ...entry, gen: this.generation() };
+    stamped = this._externalizeResult(stamped);
     this.ensureDir();
     fs.appendFileSync(this.file, `${JSON.stringify(stamped)}\n`);
     if (this._replay && stamped.status === 'ok' && Number.isInteger(stamped.index)) {
@@ -201,6 +227,54 @@ class Journal {
     // entry, so incrementing here too would double-count.
     if (this._spent !== undefined && typeof stamped.tokens === 'number') {
       this._spent += stamped.tokens;
+    }
+  }
+
+  /**
+   * Move an ok entry's oversized `result` into `<runDir>/results/` and hand
+   * back the entry with `resultRef` in its place (see INLINE_RESULT_MAX_BYTES
+   * for why, and for why small results stay inline). Only "ok" entries carry
+   * a `result`; retry/error lines pass through untouched.
+   *
+   * If the side file cannot be written, the entry keeps its inline result:
+   * losing a recorded result to an IO hiccup would silently cost a replay,
+   * and one oversized journal line is the strictly smaller harm.
+   */
+  _externalizeResult(entry) {
+    if (entry.status !== 'ok' || !('result' in entry)) return entry;
+    const json = JSON.stringify(entry.result);
+    if (typeof json !== 'string' || Buffer.byteLength(json, 'utf8') <= INLINE_RESULT_MAX_BYTES) return entry;
+    const key = typeof entry.key === 'string' ? entry.key.slice(0, 12) : 'nokey';
+    const index = Number.isInteger(entry.index) ? entry.index : 0;
+    const ref = `results/${index}-${key}.json`;
+    try {
+      fs.mkdirSync(path.join(this.dir, 'results'), { recursive: true });
+      fs.writeFileSync(path.join(this.dir, ref), json);
+    } catch {
+      return entry;
+    }
+    const { result, ...rest } = entry;
+    return { ...rest, resultRef: ref };
+  }
+
+  /**
+   * The recorded result of a replayable entry, resolving `resultRef` back to
+   * its side file. Returns `{ ok: true, result }`, or `{ ok: false }` when
+   * the entry's result is UNRECOVERABLE — the ref's file is missing,
+   * unreadable, unparseable, or the ref itself is malformed. The caller must
+   * treat `ok: false` exactly like a key mismatch at that index: stop
+   * replaying and run live from here — an entry whose result is gone is not
+   * an error, it is simply not a cache hit.
+   */
+  loadResult(entry) {
+    if (!entry || typeof entry !== 'object') return { ok: false };
+    if (!('resultRef' in entry)) return { ok: true, result: entry.result };
+    const ref = entry.resultRef;
+    if (typeof ref !== 'string' || !RESULT_REF_RE.test(ref)) return { ok: false };
+    try {
+      return { ok: true, result: JSON.parse(fs.readFileSync(path.join(this.dir, ref), 'utf8')) };
+    } catch {
+      return { ok: false };
     }
   }
 
@@ -412,4 +486,5 @@ class JournalTail {
 module.exports = {
   Journal, callKey, runDir, journalPath, stateRoot, AUTO_LABEL,
   usageTotalsFrom, usageByModelFrom, parseEntries, JournalTail,
+  INLINE_RESULT_MAX_BYTES,
 };
