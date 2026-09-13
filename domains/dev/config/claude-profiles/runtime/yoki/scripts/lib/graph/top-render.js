@@ -477,5 +477,5 @@ module.exports = {
   RUN_COLUMN_DEFS, LANE_COLUMN_DEFS, DEFAULT_RUN_COLUMNS, DEFAULT_LANE_COLUMNS,
   renderBar, BAR_RAMP,
   renderRunRow, renderLaneRow, renderScreen,
-  runCellValue, laneCellValue, laneIcon, RUN_ICONS,
+  runCellValue, laneCellValue, laneIcon, RUN_ICONS, laneCounts,
 };
