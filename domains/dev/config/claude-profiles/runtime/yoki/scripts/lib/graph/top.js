@@ -270,16 +270,23 @@ async function cmdTop(rest, flags, deps = {}) {
   const { columns, warnings } = loadColumns(columnsPath, !!flags.columns);
   for (const warning of warnings) stderr.write(`yoki-graph top: ${warning}\n`);
 
+  // Color only when a human is looking AND has not opted out: a TTY without
+  // NO_COLOR (https://no-color.org — set and non-empty means off). The
+  // renderer itself stays pure — the paint function is a parameter, and a
+  // piped/`--once`-into-a-file screen carries not one escape byte.
+  const paint = isTty && !(typeof env.NO_COLOR === 'string' && env.NO_COLOR !== '')
+    ? render.createAnsiPaint() : undefined;
+
   const views = new Map();
 
   if (flags.once || !isTty) {
     const tree = buildViews(views, env, null, now(), hostname);
-    stream.write(render.renderScreen(tree, columns, now(), { hint: null }));
+    stream.write(render.renderScreen(tree, columns, now(), { hint: null, paint }));
     return;
   }
 
   await liveLoop({
-    views, env, columns, stream, now, hostname,
+    views, env, columns, cellPaint: paint, stream, now, hostname,
     stdin: deps.stdin, stderr, proc: deps.proc, watch: deps.watch,
     safetyIntervalMs: deps.safetyIntervalMs,
   });
@@ -307,7 +314,7 @@ async function cmdTop(rest, flags, deps = {}) {
  * `safetyIntervalMs` are injectable so the failure paths are testable.
  */
 function liveLoop({
-  views, env, columns, stream, now, hostname,
+  views, env, columns, cellPaint, stream, now, hostname,
   stdin = process.stdin, stderr = process.stderr, proc = process,
   watch = fs.watch, safetyIntervalMs = SAFETY_INTERVAL_MS,
 }) {
@@ -362,7 +369,7 @@ function liveLoop({
       refreshAll = false;
       dirty.clear();
       syncRunWatchers();
-      const text = render.renderScreen(tree, columns, now());
+      const text = render.renderScreen(tree, columns, now(), { paint: cellPaint });
       if (text === lastFrame) return;
       lastFrame = text;
       // Home the cursor and repaint over the old frame, erasing each line's

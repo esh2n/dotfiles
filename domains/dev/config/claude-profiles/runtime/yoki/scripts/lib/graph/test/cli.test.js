@@ -127,6 +127,94 @@ test('list: an unparseable workflow is reported, not swallowed, and never breaks
   }
 });
 
+/** A writable fake stream for cmdList's injectable deps. */
+function fakeStream() {
+  const chunks = [];
+  return { chunks, write: (c) => { chunks.push(String(c)); return true; }, text: () => chunks.join('') };
+}
+
+test('list on a TTY: two aligned columns, description clipped to the width', () => {
+  const dir = tempWorkflowsDir({
+    'alpha.js': "export const meta = { name: 'alpha', description: 'the first one, with a very long tail that must be clipped' }\nreturn 1",
+    'beta-longer-name.js': "export const meta = { name: 'beta-longer-name', description: '二行目は\\nテーブルに出ない' }\nreturn 2",
+  });
+  try {
+    withEnv({ YOKI_WORKFLOWS_DIR: dir }, ({ cli }) => {
+      const stream = fakeStream();
+      cli.cmdList({}, { stream, isTty: true, width: 40, env: { NO_COLOR: '1' } });
+      const lines = stream.text().split('\n').filter(Boolean);
+      // Names padded to one shared column; no tabs on the rich path.
+      assert.ok(!stream.text().includes('\t'));
+      const render = require('../top-render');
+      // Widest name is beta-longer-name (16 cells): every description
+      // starts at column 18, and every line fits the given width.
+      const alphaLine = lines.find((l) => l.startsWith('alpha'));
+      const betaLine = lines.find((l) => l.startsWith('beta-longer-name'));
+      assert.equal(alphaLine.indexOf('the first'), 18, alphaLine);
+      assert.equal(betaLine.indexOf('二行目は'), 18, betaLine);
+      for (const line of lines) {
+        assert.ok(render.displayWidth(line) <= 40, `${JSON.stringify(line)} exceeds the terminal width`);
+      }
+      // Clip marked, second description line gone.
+      assert.match(stream.text(), /…/);
+      assert.doesNotMatch(stream.text(), /テーブルに出ない/);
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('list on a TTY with color: bold names, dim descriptions; NO_COLOR strips every escape', () => {
+  const dir = tempWorkflowsDir({
+    'alpha.js': "export const meta = { name: 'alpha', description: 'the first one' }\nreturn 1",
+  });
+  try {
+    withEnv({ YOKI_WORKFLOWS_DIR: dir }, ({ cli }) => {
+      const colored = fakeStream();
+      cli.cmdList({}, { stream: colored, isTty: true, width: 60, env: {} });
+      assert.ok(colored.text().includes('\x1b[1malpha'), colored.text());
+      assert.ok(colored.text().includes('\x1b[2m'), 'description dimmed');
+      const plain = fakeStream();
+      cli.cmdList({}, { stream: plain, isTty: true, width: 60, env: { NO_COLOR: '1' } });
+      assert.ok(!plain.text().includes('\x1b'), plain.text());
+      // Same text either way once the escapes are stripped.
+      assert.equal(colored.text().replace(/\x1b\[[0-9;]*m/g, ''), plain.text());
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('list --wide keeps the full tab-separated text even on a TTY', () => {
+  const dir = tempWorkflowsDir({
+    'alpha.js': "export const meta = { name: 'alpha', description: 'the first one, never clipped however long it runs on and on' }\nreturn 1",
+  });
+  try {
+    withEnv({ YOKI_WORKFLOWS_DIR: dir }, ({ cli }) => {
+      const stream = fakeStream();
+      cli.cmdList({ wide: true }, { stream, isTty: true, width: 20, env: {} });
+      assert.equal(stream.text(), 'alpha\tthe first one, never clipped however long it runs on and on\n');
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('list off a TTY is the historical pipe-safe form — no padding, no escapes', () => {
+  const dir = tempWorkflowsDir({
+    'alpha.js': "export const meta = { name: 'alpha', description: 'the first one' }\nreturn 1",
+  });
+  try {
+    withEnv({ YOKI_WORKFLOWS_DIR: dir }, ({ cli }) => {
+      const stream = fakeStream();
+      cli.cmdList({}, { stream, isTty: false, width: 60, env: {} });
+      assert.equal(stream.text(), 'alpha\tthe first one\n');
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('list: an empty or missing workflows dir says so instead of printing nothing', () => {
   const dir = tempWorkflowsDir({});
   try {

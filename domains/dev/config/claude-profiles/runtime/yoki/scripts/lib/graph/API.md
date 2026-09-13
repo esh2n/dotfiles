@@ -512,7 +512,15 @@ The design constraints, each load-bearing:
 - **Coalesced painting.** Redraw requests within 100ms collapse into one
   paint, and a frame identical to the previous one is not written at all.
 - **Non-TTY / `--once` prints one snapshot and exits 0** — the first-class
-  path for scripts and tests, with no ANSI in it.
+  path for scripts and tests. Off a TTY the snapshot carries no ANSI at
+  all; `--once` on a TTY keeps the colors described below.
+- **kubectl-style presentation.** A dim column-header row
+  (`NAME BACKEND PHASE AGE TOKENS LANES`) labels the run table, `AGE`
+  uses kubectl's form (`2m13s`, `1h04m`), and on a TTY the status icons
+  are colored by state (running=cyan, ok=green, error=red, stale=yellow)
+  with header/footer dimmed — data cells stay the terminal's normal text
+  color, and color is applied only after sanitize/truncate/pad
+  (`NO_COLOR` disables it entirely).
 
 The lane progress bar (⣀⣄⣤⣦⣶⣷⣿) is an ESTIMATE and says so by
 construction (top-estimate.js, import-free): the prior is the log-median

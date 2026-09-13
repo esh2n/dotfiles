@@ -40,6 +40,14 @@ import { join } from "node:path";
 //   component form is pull-rendered (`render(width): string[]`), so watch
 //   events update state and call tui.requestRender(); passing `undefined`
 //   as content removes the widget. Teardown on "session_shutdown".
+//   The factory's second argument is pi's Theme (modes/interactive/theme/
+//   theme.d.ts): `fg(color, text)` wraps text in the theme's ANSI for a
+//   semantic color name ("accent" | "success" | "error" | "warning" |
+//   "dim" | …). widget-lines.js's widgetLinesRich takes a paint callback
+//   and applies it only AFTER sanitize/truncate/pad, so theme escapes are
+//   never measured as display cells; the roles it uses are mapped to those
+//   theme colors below. NO_COLOR (set and non-empty) drops the paint
+//   entirely — the widget then renders the same layout in plain text.
 
 const WIDGET_KEY = "yoki-graph";
 
@@ -60,6 +68,11 @@ interface RunViewLike {
   children: RunViewLike[];
 }
 
+/** What widget-lines needs from the caller to color a finished cell —
+ *  structural, so an older yoki checkout without the rich renderer (or a
+ *  paintless call) still typechecks. */
+type WidgetPaint = (role: string, text: string) => string;
+
 interface GraphMods {
   graphRoot(env: NodeJS.ProcessEnv): string;
   buildViews(
@@ -70,6 +83,47 @@ interface GraphMods {
     host: string,
   ): RunViewLike[];
   widgetLines(views: RunViewLike[], width: number, now: number): string[];
+  /** Themed, aligned layout (newer yoki); absent on older checkouts —
+   *  the loader keeps the plain widgetLines as the fallback. */
+  widgetLinesRich?(views: RunViewLike[], width: number, now: number, paint?: WidgetPaint): string[];
+}
+
+/** The subset of pi's Theme the paint callback uses — structural on
+ *  purpose (the concrete Theme class is an internal d.ts path). */
+interface ThemeLike {
+  fg?(color: string, text: string): string;
+}
+
+/** widget-lines roles → pi semantic theme colors. The names coincide
+ *  today, but the mapping is explicit so a widget-lines role can never
+ *  silently reach theme.fg as an unknown color name. */
+const ROLE_COLORS: Record<string, string> = {
+  accent: "accent",
+  success: "success",
+  error: "error",
+  warning: "warning",
+  dim: "dim",
+};
+
+/**
+ * Theme-backed paint for widgetLinesRich, or null for plain output.
+ * Null when the user opted out (NO_COLOR set and non-empty) or the theme
+ * cannot color; any theme.fg throw degrades to the plain cell — a color
+ * problem must never cost the widget its text.
+ */
+function makePaint(theme: ThemeLike | undefined): WidgetPaint | null {
+  const noColor = process.env.NO_COLOR;
+  if (typeof noColor === "string" && noColor !== "") return null;
+  if (!theme || typeof theme.fg !== "function") return null;
+  return (role, text) => {
+    const color = ROLE_COLORS[role];
+    if (!color || !text) return text;
+    try {
+      return theme.fg!(color, text);
+    } catch {
+      return text;
+    }
+  };
 }
 
 /**
@@ -96,8 +150,13 @@ function loadGraphMods(): GraphMods | null {
       // own relative requires (./journal, ./top-fold, …) resolve in place.
       const req = createRequire(join(libDir, "_pi-widget-loader.js"));
       const top = req("./top.js") as Pick<GraphMods, "graphRoot" | "buildViews">;
-      const widget = req("./widget-lines.js") as Pick<GraphMods, "widgetLines">;
-      return { graphRoot: top.graphRoot, buildViews: top.buildViews, widgetLines: widget.widgetLines };
+      const widget = req("./widget-lines.js") as Pick<GraphMods, "widgetLines" | "widgetLinesRich">;
+      return {
+        graphRoot: top.graphRoot,
+        buildViews: top.buildViews,
+        widgetLines: widget.widgetLines,
+        widgetLinesRich: typeof widget.widgetLinesRich === "function" ? widget.widgetLinesRich : undefined,
+      };
     } catch (err) {
       console.error(`yoki-graph-widget disabled: failed to load ${libDir} (${err instanceof Error ? err.message : String(err)})`);
       return null;
@@ -215,17 +274,22 @@ export default function (pi: ExtensionAPI) {
       syncRunWatchers();
       if (activeViews.length && !widgetSet) {
         const lib = mods;
-        ui.setWidget(WIDGET_KEY, (tui: { requestRender(force?: boolean): void }) => {
+        ui.setWidget(WIDGET_KEY, (tui: { requestRender(force?: boolean): void }, theme?: ThemeLike) => {
           // The component is pull-rendered: pi asks for lines at its own
           // redraw moments with the CURRENT width, so resize costs nothing
           // extra. Watch events land as requestRender() calls, and the
           // render itself is guarded — a render throw inside pi's TUI loop
           // must degrade to an empty widget, never crash the agent.
           requestRender = () => tui.requestRender();
+          const paint = makePaint(theme);
           return {
             render: (width: number): string[] => {
               try {
-                return lib.widgetLines(activeViews, width, Date.now());
+                // Rich (themed, aligned, bars) when this yoki checkout has
+                // it; plain widgetLines otherwise — same visibility rules.
+                return lib.widgetLinesRich
+                  ? lib.widgetLinesRich(activeViews, width, Date.now(), paint ?? undefined)
+                  : lib.widgetLines(activeViews, width, Date.now());
               } catch {
                 return [];
               }
