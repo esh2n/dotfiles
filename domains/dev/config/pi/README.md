@@ -35,7 +35,7 @@ Extensions adapted from [earlyaidopters/marks-pi-harness](https://github.com/ear
 (MIT), rules aligned with yoki conventions; `yoki-graph-widget.ts` is
 yoki-native (display logic lives in the yoki repo, see below).
 
-## Install (manual for now)
+## Install
 
 Pin pi to 0.84.x — the 0.85 series has an open local-model streaming
 regression (earendil-works/pi#9216):
@@ -44,7 +44,22 @@ regression (earendil-works/pi#9216):
 npm install -g @earendil-works/pi-coding-agent@0.84.4
 ```
 
-Link config into `~/.pi/agent/` (idempotent):
+Config linking is managed by the dotfiles link machinery, not by hand
+(`link_pi_resources()` in `core/config/manager.sh`, invoked by the standard
+link flow — same mechanism as omp). One command, idempotent:
+
+```sh
+bash "$HOME/go/github.com/esh2n/dotfiles/core/config/manager.sh" link dev
+```
+
+It links `settings.json` / `models.json` / `AGENTS.md` and each
+`extensions/*.ts` file-by-file into `~/.pi/agent/` (never the directory —
+your own `~/.pi/agent/extensions/*.ts` and `pi install`ed extensions stay
+untouched), and sweeps dangling links that point into this repo's pi dir.
+Regression suite: `core/validation/validator.sh pi-links`.
+
+<details>
+<summary>Manual fallback (environments without the dotfiles link machinery)</summary>
 
 ```sh
 PI_SRC="$HOME/go/github.com/esh2n/dotfiles/domains/dev/config/pi"
@@ -54,6 +69,8 @@ ln -sf "$PI_SRC/models.json"   ~/.pi/agent/models.json
 ln -sf "$PI_SRC/AGENTS.md"     ~/.pi/agent/AGENTS.md
 for f in "$PI_SRC"/extensions/*.ts; do ln -sf "$f" ~/.pi/agent/extensions/"$(basename "$f")"; done
 ```
+
+</details>
 
 LM Studio side: load `qwen/qwen3.8-27b` with context ≥ 64K (131072 current),
 then `lms server start`.
@@ -82,12 +99,8 @@ Design constraints:
   runDir, coalesced to one refresh per 500ms; the only timer is a 5s
   safety tick (dead-watcher net; also keeps elapsed columns moving).
 
-Link it like the other extensions (already covered by the `for f in
-"$PI_SRC"/extensions/*.ts` loop above, or individually):
-
-```sh
-ln -sf "$PI_SRC/extensions/yoki-graph-widget.ts" ~/.pi/agent/extensions/yoki-graph-widget.ts
-```
+Linked like the other extensions — `link_pi_resources()` picks up every
+`extensions/*.ts` automatically; no per-file step needed.
 
 Manual verification (the extension is IO glue around tested pure code, so
 this is the remaining check):
