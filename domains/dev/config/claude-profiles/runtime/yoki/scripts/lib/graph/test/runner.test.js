@@ -267,3 +267,17 @@ test('the body sees a frozen runInfo.runId matching the run it belongs to', () =
   assert.equal(result.result.id, result.runId);
   assert.equal(result.result.frozen, true);
 }));
+
+test('writeRunMeta lands atomically: correct content, no tmp file left behind', () => withIsolatedState(async () => {
+  const meta = { name: 'atomic', status: 'running', args: { 日本語: true } };
+  runner.writeRunMeta('atomic-meta-run', meta);
+  assert.deepEqual(runner.readRunMeta('atomic-meta-run'), meta);
+  // The write goes through tmp+rename (same dir) so a concurrent reader
+  // never sees a truncated run.json; the tmp name must not survive.
+  const { runDir } = require('../journal');
+  const leftovers = fs.readdirSync(runDir('atomic-meta-run')).filter((f) => f.includes('tmp'));
+  assert.deepEqual(leftovers, []);
+  // A rewrite (the run finishing, a lastEventAt refresh) replaces it whole.
+  runner.writeRunMeta('atomic-meta-run', { ...meta, status: 'ok' });
+  assert.equal(runner.readRunMeta('atomic-meta-run').status, 'ok');
+}));

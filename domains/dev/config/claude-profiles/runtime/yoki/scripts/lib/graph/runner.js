@@ -182,10 +182,20 @@ function generateRunId() {
  *  observe buys nothing and costs a whole-file rewrite per event. */
 const RUN_META_THROTTLE_MS = 2000;
 
+/**
+ * run.json is rewritten wholesale — and, with `lastEventAt`, repeatedly
+ * during a run — while `status`/`status --watch` read it from another
+ * process at any moment. Write-then-rename (same directory, so the rename
+ * is atomic on POSIX) means a reader sees the whole old file or the whole
+ * new one, never a truncated JSON mid-rewrite. readRunMeta's parse-to-null
+ * stays anyway: it also covers hand-edited or partially-synced files.
+ */
 function writeRunMeta(runId, meta) {
   const dir = runDir(runId);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify(meta, null, 2));
+  const tmp = path.join(dir, `.run.json.tmp-${process.pid}`);
+  fs.writeFileSync(tmp, JSON.stringify(meta, null, 2));
+  fs.renameSync(tmp, path.join(dir, 'run.json'));
 }
 
 function readRunMeta(runId) {
