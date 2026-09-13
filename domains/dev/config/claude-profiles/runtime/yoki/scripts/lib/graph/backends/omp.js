@@ -15,6 +15,35 @@
  * spec's example, in case a caller shells out to this backend's printed
  * command line directly.
  *
+ * ## Output format: v3 NDJSON event stream, with old-format fallback
+ *
+ * omp 18.0.4's `--mode json` does NOT print a single JSON result object —
+ * it prints one JSON event per line, opened by a `{"type":"session",
+ * "version":3,...}` header and followed by agent_start / turn_start /
+ * message_start / message_update (text_start, text_delta, text_end,
+ * toolcall_start, toolcall_delta, toolcall_end) / message_end /
+ * tool_execution_start / tool_execution_end / turn_end / agent_end
+ * (fixtures: test/fixtures/omp-v3-{simple,tool}.ndjson, captured live from
+ * omp 18.0.4). The pre-v3 assumption ("single JSON result object") made
+ * extractText hand back the FIRST parseable thing on stdout — the session
+ * header — as the lane's answer, which then sailed through any schema whose
+ * `required` list is empty and degraded whole graph runs silently
+ * ("planning failed / no angles" with every lane nominally ok).
+ *
+ * Both formats are still accepted on purpose: the first non-empty stdout
+ * line deciding v3 vs old keeps this backend working if the machine's omp
+ * is ever rolled back to a pre-stream release — the old single-object and
+ * session-JSONL readers below are unchanged, only gated behind "not a v3
+ * stream".
+ *
+ * Junk defense: in v3 mode extractText returns null (never the raw stream)
+ * when no assistant text was found, and run() refuses to treat a
+ * header-only stream as success on a non-zero exit — so an omp that dies
+ * after printing the session header (auth failure does exactly this)
+ * surfaces as a backend error (agent() resolves null, journal gets an
+ * `error` line) instead of a session header masquerading as an answer.
+ * There is structurally no path that returns the header as a result.
+ *
  * `omp --help` on this machine has no schema/structured-output flag, so
  * schema is ALWAYS enforced via schema.js's prompt-embedded fallback
  * (supportsSchemaNatively = false) — the prompt gets the "respond ONLY
@@ -75,14 +104,22 @@ function buildArgv({ prompt, model, agentType, sandbox }) {
 }
 
 /**
- * A tool call in omp's `--mode json` event stream. Two carriers, because a
- * headless run emits assistant/tool records rather than a dedicated
- * lifecycle event: a record whose own `type` names a tool call, and an
- * assistant message whose content blocks include a `tool_use`. Ends
- * (`toolResult`) are not counted, so the number stays a count of calls.
+ * A tool call in omp's `--mode json` event stream, counted begins-only so
+ * the number stays a count of calls, not of events.
+ *
+ * v3 (omp 18.0.4): exactly one `tool_execution_start` per call. It is the
+ * ONLY v3 shape counted — the same call also appears as an assistant
+ * message whose content block has type `toolCall` (in message_start AND
+ * message_end) and as toolcall_start/toolcall_end message_updates, so
+ * counting any of those too would book one call several times. v3's block
+ * type is `toolCall` (camelCase), which the old `tool_use` block filter
+ * below deliberately does not match — that filter stays as-is for the
+ * pre-stream format, where an assistant record's `tool_use` blocks were
+ * the only carrier.
  */
 function countToolCalls(evt) {
   if (!evt || typeof evt !== 'object') return 0;
+  if (evt.type === 'tool_execution_start') return 1;
   if (typeof evt.type === 'string' && /^tool_(call|use)$/.test(evt.type)) return 1;
   const message = evt.message;
   if (message && Array.isArray(message.content)) {
@@ -116,10 +153,68 @@ async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox, 
   });
   const durationMs = Date.now() - started;
   if (timedOut) throw timeoutError('omp', timeoutMs);
-  if (code !== 0 && !stdout.trim()) {
+  // On a non-zero exit, stdout only counts as a salvageable result if it
+  // actually contains an answer. omp prints the v3 session header BEFORE it
+  // authenticates, so a run that dies at auth exits 1 with one header line
+  // on stdout — under the old `!stdout.trim()` test that line suppressed
+  // the error and the header itself became the lane's "answer". A v3
+  // stream must carry at least one assistant message to stand in for the
+  // exit code; anything else propagates the failure.
+  if (code !== 0 && (!stdout.trim() || (isV3Stream(stdout) && !hasAssistantText(stdout)))) {
     throw new Error(`omp exited ${code}: ${stderr.trim().slice(0, 2000)}`);
   }
   return { raw: stdout, stderr, durationMs, exitCode: code };
+}
+
+/**
+ * The stream-format switch: omp 18.0.4's `--mode json` opens with a
+ * `{"type":"session","version":3,...}` line; the pre-stream format never
+ * printed such a header. Decided from the first non-empty line only, so a
+ * rollback to an old omp keeps taking the old readers below.
+ */
+function isV3Stream(raw) {
+  for (const line of String(raw).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const evt = safeParse(trimmed);
+    return !!evt && evt.type === 'session';
+  }
+  return false;
+}
+
+/**
+ * Walk a v3 stream's assistant `message_end` events. Only message_end:
+ * the same assistant message also rides in message_start (with a zeroed
+ * usage block), turn_end and agent_end — folding any of those in would
+ * double- or triple-count both text and tokens. Yields the parsed event's
+ * `message` object per assistant message_end, in stream order.
+ */
+function* assistantMessageEnds(raw) {
+  for (const line of String(raw).split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const evt = safeParse(trimmed);
+    if (!evt || evt.type !== 'message_end') continue;
+    const message = evt.message;
+    if (message && message.role === 'assistant') yield message;
+  }
+}
+
+/** Concatenated text blocks of one message, or null when it has none
+ *  (a toolCall-only assistant message has no text block at all). */
+function messageText(message) {
+  if (!Array.isArray(message.content)) return null;
+  const parts = message.content
+    .filter((block) => block && block.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text);
+  return parts.length ? parts.join('\n') : null;
+}
+
+function hasAssistantText(raw) {
+  for (const message of assistantMessageEnds(raw)) {
+    if (messageText(message) !== null) return true;
+  }
+  return false;
 }
 
 /**
@@ -131,10 +226,20 @@ async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox, 
  * totalTokens, reasoningTokens, cost}` — camelCase, unlike claude's and
  * codex's snake_case, so this cannot share their reader.
  *
- * Two carriers are accepted because `omp -p --mode json`'s single result
- * object and the session JSONL it writes are not the same envelope, and only
- * the session-file shape is spike-verified:
- * - a `usage` block on the result object (or nested under `message`), and
+ * v3 stream: usage is summed over assistant `message_end` events. Each one
+ * carries that API call's own disjoint usage (a tool-using run's read turn
+ * showed input 29081, its answer turn input 1161 + cacheRead 28160 — not
+ * cumulative), so the sum is the run's true total, while the copies of the
+ * same message in message_start (zeroed), turn_end and agent_end are
+ * skipped to avoid double counting.
+ *
+ * Addition rule (opposite of codex — see backends/codex.js
+ * normalizeCodexUsage and API.md): omp's cacheRead/cacheWrite are DISJOINT
+ * from input, and its own totalTokens = input + output + cacheRead +
+ * cacheWrite, so cached counts DO belong in the total here.
+ *
+ * The two pre-stream carriers are kept for the old-format fallback:
+ * - a `usage` block on the single result object (or under `message`), and
  * - a JSONL stream of `{"type":"message","message":{"role":"assistant",
  *   "usage":{...}}}` records, whose usages are summed.
  * Anything else returns null, which api.js reports as an explicit estimate
@@ -142,6 +247,15 @@ async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox, 
  */
 function extractUsage(raw) {
   const text = String(raw);
+  if (isV3Stream(text)) {
+    let summed = null;
+    for (const message of assistantMessageEnds(text)) {
+      const one = usageFromObject({ usage: message.usage });
+      if (!one) continue;
+      summed = summed ? addUsage(summed, one) : one;
+    }
+    return summed;
+  }
   const direct = usageFromObject(safeParse(text));
   if (direct) return direct;
 
@@ -153,18 +267,23 @@ function extractUsage(raw) {
     if (!record || record.type !== 'message') continue;
     const one = usageFromObject(record);
     if (!one) continue;
-    summed = summed ? {
-      inputTokens: summed.inputTokens + one.inputTokens,
-      outputTokens: summed.outputTokens + one.outputTokens,
-      cacheRead: summed.cacheRead + one.cacheRead,
-      cacheWrite: summed.cacheWrite + one.cacheWrite,
-      totalTokens: summed.totalTokens + one.totalTokens,
-      ...(one.costUsd === undefined && summed.costUsd === undefined
-        ? {}
-        : { costUsd: (summed.costUsd || 0) + (one.costUsd || 0) }),
-    } : one;
+    summed = summed ? addUsage(summed, one) : one;
   }
   return summed;
+}
+
+/** Merge two already-normalized usage objects (see usageFromObject). */
+function addUsage(a, b) {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cacheRead: a.cacheRead + b.cacheRead,
+    cacheWrite: a.cacheWrite + b.cacheWrite,
+    totalTokens: a.totalTokens + b.totalTokens,
+    ...(a.costUsd === undefined && b.costUsd === undefined
+      ? {}
+      : { costUsd: (a.costUsd || 0) + (b.costUsd || 0) }),
+  };
 }
 
 function safeParse(text) {
@@ -195,9 +314,32 @@ function usageFromObject(obj) {
   return { inputTokens, outputTokens, cacheRead, cacheWrite, totalTokens, ...(costUsd === undefined ? {} : { costUsd }) };
 }
 
-/** `omp -p --mode json` prints a single JSON result object; pull its text
- *  field, falling back to the raw string for any other shape. */
+/**
+ * The final answer out of omp's stdout.
+ *
+ * v3 stream: the concatenated `content[].type === "text"` blocks of the
+ * LAST assistant `message_end` that has any (a run that ends on a tool
+ * call leaves a trailing text-less assistant message; the last message
+ * WITH text is the answer). Returns null — never the raw stream — when no
+ * assistant text exists at all: the raw fallback is exactly what used to
+ * hand the session header (or a headers-only aborted stream) downstream as
+ * a lane's "answer", so in v3 mode the junk path is closed structurally
+ * and a null lands in agent()'s normal no-result error handling.
+ *
+ * Old format (pre-stream omp, kept for rollback): a single JSON result
+ * object whose text/result/message field is the answer, with the raw
+ * string as the fallback for any other shape — unchanged, because that
+ * format had no header line to leak.
+ */
 function extractText(raw) {
+  if (isV3Stream(raw)) {
+    let last = null;
+    for (const message of assistantMessageEnds(raw)) {
+      const text = messageText(message);
+      if (text !== null) last = text;
+    }
+    return last;
+  }
   try {
     const obj = JSON.parse(raw);
     if (obj && typeof obj.text === 'string') return obj.text;
@@ -216,6 +358,7 @@ module.exports = {
   run,
   extractText,
   extractUsage,
+  isV3Stream,
   countToolCalls,
   makeProgressCounter,
   resolveSandbox,

@@ -410,6 +410,142 @@ test('omp backend: extractUsage sums assistant records when handed a session-sha
   assert.equal(omp.extractUsage('plain text answer'), null);
 });
 
+// ---------------------------------------------------------------------------
+// omp 18.0.4 v3 NDJSON event stream. The two fixtures are VERBATIM stdout of
+// `omp -p --mode json --no-extensions -e <bridge> <prompt>` on omp 18.0.4
+// (2026-09-13): omp-v3-simple.ndjson is a plain answer, omp-v3-tool.ndjson a
+// run that makes one `read` tool call before answering. They pin the event
+// vocabulary the backend now parses — regenerate them from a live omp if the
+// stream format moves again, don't hand-edit.
+// ---------------------------------------------------------------------------
+
+const OMP_V3_SIMPLE = fs.readFileSync(path.join(__dirname, 'fixtures', 'omp-v3-simple.ndjson'), 'utf8');
+const OMP_V3_TOOL = fs.readFileSync(path.join(__dirname, 'fixtures', 'omp-v3-tool.ndjson'), 'utf8');
+const OMP_V3_HEADER_ONLY = '{"type":"session","version":3,"id":"01a0","timestamp":"2026-09-13T00:00:00.000Z","cwd":"/tmp"}\n';
+
+test('omp backend: v3 stream — extractText returns the assistant answer, not the session header', () => {
+  assert.equal(omp.extractText(OMP_V3_SIMPLE), 'OK');
+});
+
+test('omp backend: v3 stream — the LAST text-bearing assistant message_end wins after tool calls', () => {
+  // The tool fixture has TWO assistant message_ends: a text-less toolCall
+  // message (stopReason toolUse) and then the real answer.
+  assert.equal(omp.extractText(OMP_V3_TOOL), 'FIXTURE-MAGIC-42');
+});
+
+test('omp backend: v3 junk defense — a header-only stream yields null, never the raw stream', () => {
+  // This is the observed failure mode of the pre-v3 reader: omp prints the
+  // session header BEFORE authenticating, so an auth failure leaves exactly
+  // this on stdout — and the old extractText handed it back as the lane's
+  // "answer", which passed any schema with an empty `required` list and
+  // degraded whole graph runs silently. null routes it into agent()'s
+  // normal backend-error handling instead.
+  assert.equal(omp.extractText(OMP_V3_HEADER_ONLY), null);
+  assert.equal(omp.extractUsage(OMP_V3_HEADER_ONLY), null);
+});
+
+test('omp backend: v3 stream with events but no assistant text is also null, not raw', () => {
+  const raw = [
+    OMP_V3_HEADER_ONLY.trim(),
+    JSON.stringify({ type: 'agent_start' }),
+    JSON.stringify({ type: 'turn_start' }),
+    JSON.stringify({ type: 'message_end', message: { role: 'user', content: [{ type: 'text', text: 'hi' }] } }),
+  ].join('\n');
+  assert.equal(omp.extractText(raw), null);
+});
+
+test('omp backend: v3 usage — per-call message_end usages are summed; start/turn_end/agent_end copies are not', () => {
+  // The tool fixture's two assistant message_ends carry disjoint per-call
+  // usage (29081+32=29113 for the read turn; 1161+11+28160=29332 for the
+  // answer turn). The same messages ride again in message_start (zeroed),
+  // turn_end and agent_end — the total proves none of those copies is
+  // double-counted, and that omp's disjoint cacheRead stays in the total.
+  const usage = omp.extractUsage(OMP_V3_TOOL);
+  assert.equal(usage.totalTokens, 29113 + 29332);
+  assert.equal(usage.inputTokens, 29081 + 1161);
+  assert.equal(usage.outputTokens, 32 + 11);
+  assert.equal(usage.cacheRead, 28160);
+  assert.ok(usage.costUsd > 0);
+});
+
+test('omp backend: v3 usage — the simple fixture reads the single message_end, cost included', () => {
+  const usage = omp.extractUsage(OMP_V3_SIMPLE);
+  assert.equal(usage.totalTokens, 33568);
+  assert.equal(usage.inputTokens, 33563);
+  assert.equal(usage.outputTokens, 5);
+  assert.equal(usage.costUsd, 0.16796500000000003);
+});
+
+test('omp backend: v3 tool calls — tool_execution_start counts once; toolCall blocks and updates do not', () => {
+  // One real read call appears in the stream as: message_start + message_end
+  // with a `toolCall` content block, toolcall_start/delta/end updates, AND
+  // one tool_execution_start/_end pair. The counter must report exactly 1.
+  const progress = [];
+  const feed = omp.makeProgressCounter(({ toolCalls }) => progress.push(toolCalls));
+  feed(OMP_V3_TOOL);
+  assert.deepEqual(progress, [1]);
+
+  const none = [];
+  const feedSimple = omp.makeProgressCounter(({ toolCalls }) => none.push(toolCalls));
+  feedSimple(OMP_V3_SIMPLE);
+  assert.deepEqual(none, []);
+});
+
+test('omp backend: countToolCalls keeps the old-format carriers for rollback', () => {
+  assert.equal(omp.countToolCalls({ type: 'tool_call' }), 1);
+  assert.equal(omp.countToolCalls({ type: 'tool_execution_start' }), 1);
+  assert.equal(omp.countToolCalls({ type: 'tool_execution_end' }), 0);
+  assert.equal(omp.countToolCalls({ message: { content: [{ type: 'tool_use' }, { type: 'text' }] } }), 1);
+});
+
+test('omp backend: isV3Stream keys on the first non-empty line only', () => {
+  assert.equal(omp.isV3Stream(OMP_V3_SIMPLE), true);
+  assert.equal(omp.isV3Stream(OMP_V3_HEADER_ONLY), true);
+  // old single-result-object format and session FILES (which open with a
+  // "title" record, and whose message records the old JSONL reader handles)
+  // must keep taking the old path.
+  assert.equal(omp.isV3Stream(JSON.stringify({ text: 'answer', usage: {} })), false);
+  assert.equal(omp.isV3Stream(`${JSON.stringify({ type: 'title', title: 'x' })}\n${OMP_V3_HEADER_ONLY}`), false);
+});
+
+test('omp backend: old single-object format still extracts through the fallback path', () => {
+  assert.equal(omp.extractText(JSON.stringify({ text: 'the answer' })), 'the answer');
+  assert.equal(omp.extractText(JSON.stringify({ result: 'r' })), 'r');
+  assert.equal(omp.extractText('plain text'), 'plain text');
+});
+
+test('omp backend: run() refuses a header-only stream on a non-zero exit (auth failure shape)', async (t) => {
+  // A fake `omp` on PATH reproduces the auth-failure shape byte-for-byte:
+  // session header on stdout, error on stderr, exit 1. Under the old
+  // `code !== 0 && !stdout.trim()` test the header line masked the failure.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-fake-omp-'));
+  const fake = path.join(dir, 'omp');
+  fs.writeFileSync(fake, `#!/bin/sh\nprintf '%s\\n' '${OMP_V3_HEADER_ONLY.trim().replace(/'/g, "'\\''")}'\necho 'error: No API key found for anthropic.' >&2\nexit 1\n`);
+  fs.chmodSync(fake, 0o755);
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${dir}${path.delimiter}${oldPath}`;
+  t.after(() => { process.env.PATH = oldPath; fs.rmSync(dir, { recursive: true, force: true }); });
+  await assert.rejects(
+    () => omp.run({ prompt: 'p', cwd: dir, timeoutMs: 30000 }),
+    /omp exited 1: error: No API key found/
+  );
+});
+
+test('omp backend: run() still resolves when a non-zero exit left a usable v3 answer on stdout', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-fake-omp-ok-'));
+  const fake = path.join(dir, 'omp');
+  const fixture = path.join(dir, 'stream.ndjson');
+  fs.writeFileSync(fixture, OMP_V3_SIMPLE);
+  fs.writeFileSync(fake, `#!/bin/sh\ncat '${fixture}'\nexit 1\n`);
+  fs.chmodSync(fake, 0o755);
+  const oldPath = process.env.PATH;
+  process.env.PATH = `${dir}${path.delimiter}${oldPath}`;
+  t.after(() => { process.env.PATH = oldPath; fs.rmSync(dir, { recursive: true, force: true }); });
+  const res = await omp.run({ prompt: 'p', cwd: dir, timeoutMs: 30000 });
+  assert.equal(res.exitCode, 1);
+  assert.equal(omp.extractText(res.raw), 'OK');
+});
+
 test('every real backend exposes extractUsage; the mock deliberately does not', () => {
   for (const backend of [codex, omp]) {
     assert.equal(typeof backend.extractUsage, 'function', `${backend.name} has no extractUsage`);
