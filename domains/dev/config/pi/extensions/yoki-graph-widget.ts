@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, hostname } from "node:os";
@@ -51,6 +52,36 @@ import { join } from "node:path";
 
 const WIDGET_KEY = "yoki-graph";
 
+/** The env var runner.js/agent-cli.js read to stamp a run's originating
+ *  session into run.json. Setting it here (and inheriting it into pi's bash
+ *  children) is what lets the widget show only the runs THIS pi launched. */
+const SCOPE_ENV = "YOKI_RUN_SCOPE";
+
+/** Charset for a scope value, mirrored from runner.js's runScope: the value
+ *  becomes a run.json field and a filter key, so anything outside this is
+ *  rejected in favour of a random id. */
+const RUN_SCOPE_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+
+/**
+ * This pi session's scope, `pi-<sessionId>`. pi exposes no `ctx.sessionId`
+ * (verified against 0.84.4 dist/core/extensions/types.d.ts and
+ * session-manager.d.ts) — the stable per-session id is
+ * `ctx.sessionManager.getSessionId()`. When that is unavailable (older pi) or
+ * yields something the scope charset would reject, fall back to a random id so
+ * the session is always scoped to a unique value rather than silently sharing
+ * an unscoped view with every other session on the machine. session_start
+ * re-fires on resume/fork, so a forked session re-derives its own scope.
+ */
+function sessionScope(ctx: ExtensionContext): string {
+  let id = "";
+  try {
+    const mgr = ctx.sessionManager as { getSessionId?: () => string } | undefined;
+    if (mgr && typeof mgr.getSessionId === "function") id = mgr.getSessionId() || "";
+  } catch { /* fall through to a random id */ }
+  const scope = `pi-${id}`;
+  return RUN_SCOPE_RE.test(scope) ? scope : `pi-${randomUUID()}`;
+}
+
 /** One refresh per watch burst: a run emitting many events.ndjson appends
  *  in quick succession costs one re-read + one redraw request. */
 const COALESCE_MS = 500;
@@ -82,10 +113,10 @@ interface GraphMods {
     now: number,
     host: string,
   ): RunViewLike[];
-  widgetLines(views: RunViewLike[], width: number, now: number): string[];
+  widgetLines(views: RunViewLike[], width: number, now: number, selfScope?: string): string[];
   /** Themed, aligned layout (newer yoki); absent on older checkouts —
    *  the loader keeps the plain widgetLines as the fallback. */
-  widgetLinesRich?(views: RunViewLike[], width: number, now: number, paint?: WidgetPaint): string[];
+  widgetLinesRich?(views: RunViewLike[], width: number, now: number, paint?: WidgetPaint, selfScope?: string): string[];
 }
 
 /** The subset of pi's Theme the paint callback uses — structural on
@@ -171,6 +202,7 @@ export default function (pi: ExtensionAPI) {
   let loadFailed = false; // one stderr line total, not one per session_start
   let ui: ExtensionContext["ui"] | null = null;
   let running = false;
+  let selfScope: string | undefined; // this pi session's YOKI_RUN_SCOPE
   const host = hostname();
 
   // Persistent across refreshes: each RunView holds an incremental FileTail
@@ -288,8 +320,8 @@ export default function (pi: ExtensionAPI) {
                 // Rich (themed, aligned, bars) when this yoki checkout has
                 // it; plain widgetLines otherwise — same visibility rules.
                 return lib.widgetLinesRich
-                  ? lib.widgetLinesRich(activeViews, width, Date.now(), paint ?? undefined)
-                  : lib.widgetLines(activeViews, width, Date.now());
+                  ? lib.widgetLinesRich(activeViews, width, Date.now(), paint ?? undefined, selfScope)
+                  : lib.widgetLines(activeViews, width, Date.now(), selfScope);
               } catch {
                 return [];
               }
@@ -336,6 +368,12 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     try {
       stop(false); // session_start also fires on reload/new/resume — re-arm cleanly
+      // Stamp this session's scope into the environment BEFORE the tui guard:
+      // runs launched from pi's bash tool (a child process) inherit it and
+      // land in run.json with this session's scope, whether or not a widget
+      // is drawn. Re-derived on every session_start, so resume/fork rescopes.
+      selfScope = sessionScope(ctx);
+      process.env[SCOPE_ENV] = selfScope;
       if (ctx.mode !== "tui") return; // a bottom widget only means something on a TTY
       if (!mods && !loadFailed) {
         mods = loadGraphMods();
@@ -363,6 +401,13 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", () => {
+    try {
+      // Stop stamping runs with a scope that no longer has a live widget.
+      // A reload/replacement fires session_start next, which re-sets it; a
+      // real quit leaves the env clean for whatever the shell does after pi.
+      if (process.env[SCOPE_ENV] === selfScope) delete process.env[SCOPE_ENV];
+      selfScope = undefined;
+    } catch { /* env cleanup must never throw into pi */ }
     try { stop(true); } catch { /* teardown must never throw into pi */ }
   });
 }
