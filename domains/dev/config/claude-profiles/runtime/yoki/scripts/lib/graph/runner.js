@@ -23,6 +23,7 @@ const guard = require('./guard');
 const lock = require('./lock');
 const budgetLib = require('./budget');
 const modelsLib = require('./models');
+const rolesLib = require('./roles');
 const { findRepoRootFrom } = require('./backends/common');
 
 /** The dotfiles checkout this runner is installed from — where
@@ -336,6 +337,7 @@ async function executeScript(options) {
     resume: isResume, concurrency, emit, timeoutMs, gateTimeoutMs,
     caps, startedAt, retries, retryBaseDelayMs, retryMaxDelayMs, sleep,
     modelMap, harnessModels: modelsLib.loadHarnessModels(repoRoot()),
+    harnessRoles: rolesLib.loadHarnessRoles(repoRoot()),
     args,
     runChildWorkflow: _parentRunId
       ? undefined

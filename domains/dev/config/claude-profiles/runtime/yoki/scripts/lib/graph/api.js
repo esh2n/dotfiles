@@ -14,6 +14,7 @@ const gateLib = require('./gate');
 const retry = require('./retry');
 const budgetLib = require('./budget');
 const models = require('./models');
+const roles = require('./roles');
 const backends = require('./backends');
 
 /**
@@ -100,12 +101,12 @@ function createApi(ctx) {
    * its own model map, its own schema-native support and its own usage
    * reader — while sharing this run's limiter, journal, caps and progress.
    */
-  function backendFor(opts) {
-    const requested = typeof opts.backend === 'string' ? opts.backend.trim() : '';
-    if (!requested || requested === runBackendName) {
+  function backendFor(requested) {
+    const name = typeof requested === 'string' ? requested.trim() : '';
+    if (!name || name === runBackendName) {
       return { name: runBackendName, module: ctx.backend };
     }
-    return { name: requested, module: backends.loadBackend(requested) };
+    return { name, module: backends.loadBackend(name) };
   }
 
   function phase(title) {
@@ -122,19 +123,28 @@ function createApi(ctx) {
     const normalizedOpts = { ...opts, agentType };
     delete normalizedOpts.subagent_type;
     const effPhase = opts.phase || state.currentPhase;
-    // Per-call `backend` wins over the run's `--backend`, and the model is
-    // resolved against THAT backend's tier map: `sonnet` is a different id
-    // on codex than on omp, so resolving against the run backend would have
-    // handed a codex id to omp in a mixed run.
-    const { name: backendName, module: backend } = backendFor(opts);
-    // Per-call `model` wins over the run's `--model`. Resolved HERE rather
-    // than inside the backend so the id the backend will actually be given
-    // is what every event, journal line and status row reports — a progress
-    // line reading "sonnet" tells you nothing about which model ran.
-    const requestedModel = opts.model || ctx.model;
+    // A `role` names (backend, model, effort) one level above the tier map —
+    // the omp modelRoles equivalent (roles.js). The call's own explicit
+    // backend/model/effort still win over the role's defaults; the role only
+    // fills in what the call did not pin. An unknown role throws (fatal) here
+    // rather than silently falling back to the run default.
+    const roleDefaults = roles.resolve(opts.role, ctx.harnessRoles);
+    // Per-call `backend` wins over the role, which wins over the run's
+    // `--backend`; and the model is resolved against THAT backend's tier map:
+    // `sonnet` is a different id on codex than on omp, so resolving against
+    // the run backend would have handed a codex id to omp in a mixed run.
+    const backendRequested = (typeof opts.backend === 'string' && opts.backend.trim())
+      || (roleDefaults && roleDefaults.backend) || '';
+    const { name: backendName, module: backend } = backendFor(backendRequested);
+    // Per-call `model` wins over the role, which wins over the run's
+    // `--model`. Resolved HERE rather than inside the backend so the id the
+    // backend will actually be given is what every event, journal line and
+    // status row reports — a progress line reading "sonnet" tells you nothing
+    // about which model ran.
+    const requestedModel = opts.model || (roleDefaults && roleDefaults.model) || ctx.model;
     const resolvedModel = models.resolve(backendName, requestedModel, modelOptions);
     const model = resolvedModel.id || undefined;
-    const effort = opts.effort || ctx.effort;
+    const effort = opts.effort || (roleDefaults && roleDefaults.effort) || ctx.effort;
     const label = opts.label || '(unlabeled)';
     // A workflow-authored shell command (see gate.js's trust boundary) run
     // after this call returns, whose exit code decides whether the result
@@ -189,7 +199,8 @@ function createApi(ctx) {
 
     ctx.emit({
       type: 'agent-start', runId: ctx.runId, label, phase: effPhase, index,
-      backend: backendName, model, modelTier: resolvedModel.tier, ts: nowIso(),
+      backend: backendName, model, modelTier: resolvedModel.tier,
+      ...(roleDefaults ? { role: opts.role } : {}), ts: nowIso(),
     });
 
     if (ctx.dryRun) {

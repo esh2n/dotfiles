@@ -1,0 +1,6 @@
+{
+  "_comment": "Role -> agent routing for yoki-graph — the omp modelRoles equivalent. Each role names a backend and a model tier (resolved through harness-models.json) plus an optional effort. A workflow lane says agent(p, {role}) and follows whatever the role points at, so the frontier consult target is swappable in ONE place. agent()'s explicit backend/model/effort override a role. Resolver: lib/graph/roles.js.",
+  "main": { "backend": "deepseek", "model": "flash" },
+  "consult": { "backend": "codex", "model": "opus", "effort": "high" },
+  "deterministic": { "backend": "local", "model": "qwen" }
+}
