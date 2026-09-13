@@ -62,9 +62,11 @@ If you cannot fill the required fields truthfully, return only the \`error\` fie
   { label: 'collect-diff', phase: 'Collect', schema: COLLECT_SCHEMA, model: 'haiku', effort: 'low', sandbox: 'workspace-write' },
 )
 
+// Aborts throw — the runner records a thrown body as status:'error'. The
+// no-diff return below stays a status-ok `{status:'empty'}` on purpose: the
+// collect DID run, there was just nothing to preflight.
 if (ctx && ctx.error) {
-  log(`collect-diff failed: ${ctx.error}`)
-  return { status: 'error', error: String(ctx.error) }
+  throw new Error(`collect-diff failed: ${ctx.error}`)
 }
 if (!ctx || !ctx.files_changed) {
   log('No branch diff found — nothing to preflight.')
@@ -74,8 +76,7 @@ if (!ctx || !ctx.files_changed) {
 // interpolate (reviewer/judge prompts read ctx.diff_file, the Gate prompt
 // and the result read ctx.base/ctx.branch).
 if (!ctx.diff_file || !ctx.base || !ctx.branch) {
-  log('collect-diff returned an incomplete result (missing diff_file/base/branch) — aborting')
-  return { status: 'error', error: 'collect-diff returned an incomplete result (missing diff_file/base/branch)' }
+  throw new Error('collect-diff returned an incomplete result (missing diff_file/base/branch)')
 }
 log(`branch=${ctx.branch} base=${ctx.base} files=${ctx.files_changed}`)
 

@@ -306,6 +306,10 @@ function createApi(ctx) {
         ctx.journal.append({
           key, index, label, phase: effPhase, status: 'error', durationMs,
           backend: backendName, model, ...settled, timedOut, error: err.message,
+          // err.message may be a display-shaped summary (see backends/common.js
+          // backendExitError); the full stderr rides on err.raw and is kept
+          // here so the journal stays the complete debug record.
+          ...(err.raw ? { raw: String(err.raw).slice(0, 20000) } : {}),
         });
         ctx.emit({
           type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index,

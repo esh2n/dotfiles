@@ -568,7 +568,11 @@ If you cannot complete this truthfully, return only the \`error\` field explaini
   ),
 ])
 
-if (ctx && ctx.error) { log(`collect-diff failed: ${ctx.error}`); return { error: String(ctx.error) } }
+// Aborts throw — the runner records a thrown body as status:'error'. A
+// review that never read a diff must not end as a status-ok run. The
+// no-changes return below stays ok on purpose: the work WAS done, the
+// result is just empty.
+if (ctx && ctx.error) { throw new Error(`collect-diff failed: ${ctx.error}`) }
 if (!ctx || !ctx.files_changed) {
   log('No changes to review.')
   return { findings: [], metrics: {} }
@@ -577,8 +581,7 @@ if (!ctx || !ctx.files_changed) {
 // proceeding with undefined would hand every reviewer a prompt naming no
 // diff file and no intent.
 if (!ctx.diff_file || !ctx.intent) {
-  log('collect-diff returned an incomplete result (missing diff_file/intent) — aborting')
-  return { error: 'collect-diff returned an incomplete result (missing diff_file/intent)' }
+  throw new Error('collect-diff returned an incomplete result (missing diff_file/intent)')
 }
 log(`diff saved: ${ctx.diff_file} (${ctx.files_changed} files)`)
 

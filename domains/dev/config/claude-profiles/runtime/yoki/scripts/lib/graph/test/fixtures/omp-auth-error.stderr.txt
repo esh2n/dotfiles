@@ -1,0 +1,13 @@
+768679 | ` + `Use /login, set an API key environment variable, or create ${Fo()}
+768680 | 
+768681 | ` + "Then use /model to select a model.");
+768682 |       }
+768683 |       const o = await this.#se.getApiKey(this.model, this.sessionId);
+768684 |         throw new Error(`No API key found for ${this.model.provider}.
+                       ^
+error: No API key found for anthropic.
+
+Use /login, set an API key environment variable, or create /Users/esh2n/.omp/agent/agent.db
+      at #Gs (/$bunfs/root/omp-darwin-arm64:768684:15)
+      at async prompt (/$bunfs/root/omp-darwin-arm64:768594:25)
+

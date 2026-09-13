@@ -144,6 +144,54 @@ function timeoutError(what, timeoutMs) {
 }
 
 /**
+ * Interpreter noise a backend's stderr carries around the message that
+ * matters. Bun (which omp is compiled with) prints, before its `error:`
+ * line, a source-context dump of the throw site — numbered source lines
+ * (`768684 |   throw new Error(...)`), a caret column pointer — and, after
+ * it, `at ...` stack frames pointing into the bundled binary. None of that
+ * is actionable for the person reading a lane failure; the `error:` line
+ * and the plain-prose lines beside it are.
+ */
+const STDERR_NOISE_RES = [
+  /^\s*\d+\s*\|/, // bun source-context line: `768684 |   throw new Error(...)`
+  /^\s*\^+\s*$/, // the caret column pointer printed under the context
+  /^\s*at\s/, // stack frames: `at #Gs (/$bunfs/root/omp-darwin-arm64:768684:15)`
+];
+
+/**
+ * Boil a backend's stderr down to the lines a human can act on: drop the
+ * interpreter's source-context and stack-frame noise, start at the first
+ * `error:` line when one exists (the context dump PRECEDES it), and cap the
+ * result at `maxLen` characters. Display-shaping only — callers that keep a
+ * debug copy must keep the raw stderr themselves (see backendExitError).
+ * Falls back to the raw text (capped) when filtering would leave nothing,
+ * so a message is never summarized into silence.
+ */
+function summarizeStderr(stderr, maxLen = 300) {
+  const raw = String(stderr || '').trim();
+  const lines = raw
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() && !STDERR_NOISE_RES.some((re) => re.test(line)));
+  const firstError = lines.findIndex((line) => /^\s*error\b[:\s]/i.test(line));
+  const kept = firstError > 0 ? lines.slice(firstError) : lines;
+  const summary = kept.join('\n').trim();
+  return (summary || raw).slice(0, maxLen);
+}
+
+/**
+ * The error a backend raises for a terminal non-zero exit. The MESSAGE is
+ * the summarized stderr (what run.json, the events and the CLI failure line
+ * show); the FULL stderr rides along as `err.raw`, which api.js journals so
+ * the complete dump stays available for debugging.
+ */
+function backendExitError(what, code, stderr) {
+  const err = new Error(`${what} exited ${code}: ${summarizeStderr(stderr)}`);
+  err.raw = String(stderr || '');
+  return err;
+}
+
+/**
  * Feed complete stdout LINES to `onLine` as they arrive, buffering the
  * partial tail. Both real backends stream newline-delimited JSON events, and
  * a chunk boundary lands mid-line often enough that parsing chunks directly
@@ -233,6 +281,8 @@ module.exports = {
   spawnCollect,
   makeLineSplitter,
   timeoutError,
+  summarizeStderr,
+  backendExitError,
   loadHarnessModels,
   harnessModelsPath,
   findRepoRootFrom,

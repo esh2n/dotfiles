@@ -33,9 +33,11 @@ const SCOPE = (A && A.scope) || ''
 const OUT = (A && A.out) || ''
 const LANGUAGE = (A && A.language) || "the language the project's own docs are written in"
 const MODEL = (A && A.model) || 'sonnet'
+// Aborts throw: a run that never got to do its real work must end as
+// status error (the runner records a thrown body as status:'error'), not
+// as a status-ok result that happens to carry an `error` field.
 if (!CRITERIA.length && !CRITERIA_FILE) {
-  log('acceptance requires args.criteria or args.criteriaFile')
-  return { error: 'no criteria' }
+  throw new Error('acceptance requires args.criteria or args.criteriaFile')
 }
 
 phase('Ground')
@@ -86,17 +88,15 @@ Read files. Do not run builds or tests in this phase. Return via StructuredOutpu
 If you cannot fill the required fields truthfully, return only the \`error\` field explaining why — NEVER submit placeholder or dummy values; fabrication is worse than failure.`,
   { label: 'ground', phase: 'Ground', schema: GROUND_SCHEMA, model: MODEL },
 )
-if (ground && ground.error) { log(`grounding failed: ${ground.error}`); return { error: String(ground.error) } }
+if (ground && ground.error) { throw new Error(`grounding failed: ${ground.error}`) }
 if (!ground || !ground.criteria || !ground.criteria.length) {
-  log('grounding found no criteria')
-  return { error: 'no criteria found' }
+  throw new Error('grounding found no criteria — the check phase never started')
 }
 // Presence gate for the formerly-required verification block: every later
 // stage interpolates its commands/notes, so proceeding without it would
 // judge coverage against an undefined standard.
 if (!ground.verification) {
-  log('grounding returned no verification info')
-  return { error: 'grounding returned no verification info' }
+  throw new Error('grounding returned no verification info')
 }
 log(`criteria: ${ground.criteria.length} / verification commands: ${(ground.verification.commands || []).length}`)
 

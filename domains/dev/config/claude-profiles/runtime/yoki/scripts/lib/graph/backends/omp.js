@@ -51,7 +51,7 @@
  * by this file.
  */
 
-const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError, makeLineSplitter } = require('./common');
+const { resolveModel, resolveAgentPreamble, spawnCollect, timeoutError, makeLineSplitter, backendExitError } = require('./common');
 
 const name = 'omp';
 const supportsSchemaNatively = false;
@@ -160,8 +160,12 @@ async function run({ prompt, model, effort, agentType, cwd, timeoutMs, sandbox, 
   // the error and the header itself became the lane's "answer". A v3
   // stream must carry at least one assistant message to stand in for the
   // exit code; anything else propagates the failure.
+  // backendExitError summarizes the stderr for display (omp is compiled
+  // with bun, whose auth failure prints numbered source-context lines and
+  // `at ...` frames around the two lines that matter) and keeps the full
+  // dump on err.raw for the journal.
   if (code !== 0 && (!stdout.trim() || (isV3Stream(stdout) && !hasAssistantText(stdout)))) {
-    throw new Error(`omp exited ${code}: ${stderr.trim().slice(0, 2000)}`);
+    throw backendExitError('omp', code, stderr);
   }
   return { raw: stdout, stderr, durationMs, exitCode: code };
 }
