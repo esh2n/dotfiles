@@ -189,11 +189,23 @@ link_pi_resources() {
                       \( -type f -o -type l \) -print0)
     fi
 
+    # themes/ mirrors the extensions rule: FILE BY FILE, never the directory.
+    # pi writes its own files into ~/.pi/agent/themes (a user can save a theme
+    # from inside pi), so a directory link would capture those under the repo.
+    if [[ -d "${src_dir}/themes" ]]; then
+        ensure_dir "${pi_home}/themes"
+        local theme_f
+        while IFS= read -r -d '' theme_f; do
+            link_file "$theme_f" "${pi_home}/themes/$(basename "$theme_f")"
+        done < <(find "${src_dir}/themes" -mindepth 1 -maxdepth 1 -name '*.json' \
+                      \( -type f -o -type l \) -print0)
+    fi
+
     # Sweep dangling repo-made links (see function comment for the two-part
     # ownership test). agents/ no longer exists in the repo but may still
     # hold 2026-08 era links on this machine.
     local sweep_dir link target
-    for sweep_dir in "$pi_home" "${pi_home}/extensions" "${pi_home}/agents"; do
+    for sweep_dir in "$pi_home" "${pi_home}/extensions" "${pi_home}/themes" "${pi_home}/agents"; do
         [[ -d "$sweep_dir" ]] || continue
         while IFS= read -r -d '' link; do
             target="$(readlink "$link")" || continue
