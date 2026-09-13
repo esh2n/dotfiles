@@ -145,6 +145,69 @@ test('close() on a broken sink resolves instead of hanging', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Sequential reopen — a workflow retry reuses a lane's deterministic runDir
+// ---------------------------------------------------------------------------
+
+test('a reopened sink continues seq from the last complete line, under the next gen', async () => {
+  const dir = tmpDir('yoki-events-');
+  const first = createEventSink(dir, { runId: 'r' });
+  first.emit({ type: 'agent-start' });
+  first.emit({ type: 'agent-end' });
+  await first.close();
+
+  const second = createEventSink(dir, { runId: 'r' });
+  second.emit({ type: 'agent-start' });
+  second.emit({ type: 'agent-end' });
+  await second.close();
+
+  const lines = readEnvelopes(dir);
+  // seq stays the file-wide ordering key across reopens; gen says which
+  // writer produced each line.
+  assert.deepEqual(lines.map((l) => l.seq), [1, 2, 3, 4]);
+  assert.deepEqual(lines.map((l) => l.gen), [1, 1, 2, 2]);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a reopen over a torn final line terminates it and numbers itself past the last COMPLETE line', async () => {
+  const dir = tmpDir('yoki-events-');
+  const first = createEventSink(dir, { runId: 'r' });
+  first.emit({ type: 'agent-start' });
+  await first.close();
+  // A previous writer died mid-append: half a line, no newline.
+  fs.appendFileSync(eventsPath(dir), '{"v":1,"seq":2,"gen":1,"type":"agent-e');
+
+  const second = createEventSink(dir, { runId: 'r' });
+  second.emit({ type: 'agent-end' });
+  await second.close();
+
+  const raw = fs.readFileSync(eventsPath(dir), 'utf8');
+  const parsed = raw.split('\n').filter(Boolean).map((l) => {
+    try { return JSON.parse(l); } catch { return null; }
+  });
+  // The torn line is now its own (unparseable, skippable) line rather than
+  // spliced into the new writer's first line.
+  assert.equal(parsed.filter(Boolean).length, 2);
+  const last = parsed.filter(Boolean)[1];
+  assert.equal(last.seq, 2, 'seq must continue from the last complete line, ignoring the torn one');
+  assert.equal(last.gen, 2);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('an unreadable tail restarts seq at 1 but bumps gen, so a reader sees the boundary', async () => {
+  const dir = tmpDir('yoki-events-');
+  fs.writeFileSync(eventsPath(dir), 'complete garbage line\nand another one\n');
+  const sink = createEventSink(dir, { runId: 'r' });
+  sink.emit({ type: 'run-start' });
+  await sink.close();
+
+  const lines = fs.readFileSync(eventsPath(dir), 'utf8').split('\n').filter(Boolean);
+  const last = JSON.parse(lines[lines.length - 1]);
+  assert.equal(last.seq, 1);
+  assert.equal(last.gen, 2);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
 // Torn-line tolerance — JournalTail pointed at events.ndjson
 // ---------------------------------------------------------------------------
 
