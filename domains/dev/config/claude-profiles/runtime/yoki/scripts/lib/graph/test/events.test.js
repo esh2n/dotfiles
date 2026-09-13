@@ -23,7 +23,8 @@ const os = require('os');
 const path = require('path');
 
 const { createEventSink, eventsPath } = require('../events');
-const { JournalTail } = require('../journal');
+const { JournalTail, Journal, runDir } = require('../journal');
+const runner = require('../runner');
 
 function tmpDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -176,3 +177,140 @@ test('JournalTail holds a torn events line back until its newline arrives', asyn
   assert.equal(second[1].message, '日本語の途中まだ続く');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// ---------------------------------------------------------------------------
+// The runner tee — end to end against the mock backend
+// ---------------------------------------------------------------------------
+
+/** Isolated state per test — see runner.test.js's header comment. */
+function withIsolatedState(fn) {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-events-state-'));
+  const guardDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-events-guard-'));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'yoki-events-cwd-'));
+  const prevStateHome = process.env.YOKI_STATE_HOME;
+  const prevGuardDir = process.env.YOKI_GRAPH_GUARD_STATE_DIR;
+  process.env.YOKI_STATE_HOME = stateHome;
+  process.env.YOKI_GRAPH_GUARD_STATE_DIR = guardDir;
+  return Promise.resolve(fn(cwd)).finally(() => {
+    if (prevStateHome === undefined) delete process.env.YOKI_STATE_HOME; else process.env.YOKI_STATE_HOME = prevStateHome;
+    if (prevGuardDir === undefined) delete process.env.YOKI_GRAPH_GUARD_STATE_DIR; else process.env.YOKI_GRAPH_GUARD_STATE_DIR = prevGuardDir;
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(guardDir, { recursive: true, force: true });
+    fs.rmSync(cwd, { recursive: true, force: true });
+  });
+}
+
+function writeScript(dir, name, content) {
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, content);
+  return file;
+}
+
+const TEE_SCRIPT = `export const meta = { name: 'tee-flow', description: 'd' }
+phase('P1')
+const r = await agent('hi', { label: 'greet' })
+return { r }`;
+
+test('a run tees its events into events.ndjson without changing the journal', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'flow.js', TEE_SCRIPT);
+  const fixture = path.join(cwd, 'fixture.json');
+  fs.writeFileSync(fixture, JSON.stringify({ greet: 'hello!' }));
+
+  const emitted = [];
+  const result = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, mockFile: fixture, emit: (e) => emitted.push(e),
+  });
+  assert.equal(result.status, 'ok');
+
+  const dir = runDir(result.runId);
+  const lines = readEnvelopes(dir);
+  const order = lines.map((l) => l.type);
+  const expected = ['run-start', 'agent-start', 'agent-end', 'run-end'];
+  const positions = expected.map((t) => order.indexOf(t));
+  for (let i = 0; i < expected.length; i += 1) {
+    assert.ok(positions[i] !== -1, `events.ndjson has no ${expected[i]} event (saw: ${order.join(', ')})`);
+    if (i > 0) assert.ok(positions[i] > positions[i - 1], `${expected[i]} must come after ${expected[i - 1]}`);
+  }
+  // Everything the CLI emitter saw is in the file — the tee drops nothing.
+  assert.equal(lines.length, emitted.length);
+  for (const line of lines) {
+    assert.equal(line.v, 1);
+    assert.equal(line.runId, result.runId);
+  }
+  const seqs = lines.map((l) => l.seq);
+  assert.deepEqual(seqs, Array.from({ length: lines.length }, (_, i) => i + 1));
+
+  // The journal is untouched by the tee: one ok line for the one agent()
+  // call, carrying no envelope fields — journal.jsonl stays exactly what
+  // resume replays, nothing more.
+  const entries = new Journal(result.runId).readAll();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].status, 'ok');
+  assert.equal(entries[0].label, 'greet');
+  assert.ok(!('v' in entries[0]) && !('seq' in entries[0]), 'envelope fields leaked into the journal');
+}));
+
+test('run.json carries lastEventAt, and the final write stamps it beside the final status', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'flow.js', TEE_SCRIPT);
+  const fixture = path.join(cwd, 'fixture.json');
+  fs.writeFileSync(fixture, JSON.stringify({ greet: 'hello!' }));
+
+  const result = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, mockFile: fixture,
+  });
+  const meta = runner.readRunMeta(result.runId);
+  assert.equal(meta.status, 'ok');
+  assert.equal(typeof meta.lastEventAt, 'number');
+  assert.ok(meta.lastEventAt <= Date.now());
+}));
+
+test('resume NEVER reads events.ndjson: a corrupted event stream changes nothing about replay', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'flow.js', TEE_SCRIPT);
+  const fixture = path.join(cwd, 'fixture.json');
+  fs.writeFileSync(fixture, JSON.stringify({ greet: 'first answer' }));
+
+  const first = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, mockFile: fixture,
+  });
+  assert.equal(first.status, 'ok');
+
+  // Vandalize the event stream — garbage bytes, then a plausible-looking but
+  // lying line. If any resume path parsed this file, the replay below would
+  // either fail or return the lie.
+  fs.writeFileSync(path.join(runDir(first.runId), 'events.ndjson'),
+    'not json at all\n{"v":1,"seq":1,"type":"agent-end","result":"a lie"}\n');
+  // A rerun against a CHANGED fixture: only a journal replay can produce the
+  // original answer, so getting it back proves events.ndjson was never read.
+  fs.writeFileSync(fixture, JSON.stringify({ greet: 'second answer' }));
+
+  const events = [];
+  const resumed = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd, mockFile: fixture,
+    runId: first.runId, emit: (e) => events.push(e),
+  });
+  assert.equal(resumed.status, 'ok');
+  assert.equal(resumed.result.r, 'first answer', 'replay must come from journal.jsonl alone');
+  assert.ok(events.some((e) => e.type === 'agent-cached'), 'the call must be replayed, not re-run');
+}));
+
+test('a guard-denied run still lands its refusal in the event stream', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'flow.js', TEE_SCRIPT);
+  // A zero daily cap denies the very first top-level run.
+  const prevCap = process.env.YOKI_WORKFLOW_DAILY_CAP;
+  process.env.YOKI_WORKFLOW_DAILY_CAP = '0';
+  let result;
+  try {
+    result = await runner.executeScript({
+      scriptPath, args: {}, backendName: 'mock', cwd,
+    });
+  } finally {
+    if (prevCap === undefined) delete process.env.YOKI_WORKFLOW_DAILY_CAP;
+    else process.env.YOKI_WORKFLOW_DAILY_CAP = prevCap;
+  }
+  assert.equal(result.status, 'denied');
+  const lines = readEnvelopes(runDir(result.runId));
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].type, 'guard-denied');
+  // No run.json for a denied run — exactly as before the tee existed.
+  assert.equal(runner.readRunMeta(result.runId), null);
+}));
