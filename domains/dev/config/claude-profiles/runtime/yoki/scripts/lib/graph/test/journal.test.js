@@ -370,3 +370,30 @@ test('JournalTail keeps multi-byte characters intact across a chunk boundary', (
     assert.ok(!JSON.stringify(entries).includes('�'), 'a character was mangled at the chunk boundary');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Run-id validation: runDir() is the backstop for every path consumer
+// ---------------------------------------------------------------------------
+
+test('runDir refuses an id that could escape the graph state tree', () => {
+  const journalLib = require('../journal');
+  for (const bad of ['../escape', 'a/b', '..', '.', '', 'a'.repeat(129), 'sp ace', 'id\n']) {
+    assert.throws(() => journalLib.runDir(bad), /invalid run id/, `runDir accepted ${JSON.stringify(bad)}`);
+  }
+  // Every consumer funnels through runDir, so Journal and JournalTail are
+  // covered without their own checks.
+  assert.throws(() => new journalLib.Journal('../escape'), /invalid run id/);
+  assert.throws(() => new journalLib.JournalTail('../escape'), /invalid run id/);
+  // The ids yoki itself mints all pass.
+  for (const good of ['run-1757e0-abcd', 'agent-1-ff', 'run-1-lane-review-security-codex-gpt-5.6-sol']) {
+    assert.ok(journalLib.RUN_ID_RE.test(good), good);
+  }
+});
+
+test('the CLI validates a caller-supplied runId on every command that takes one', () => {
+  const cli = require('../cli');
+  const stream = { text: '', write(chunk) { this.text += chunk; return true; } };
+  assert.throws(() => cli.cmdStatus(['../escape'], {}, { stream }), /invalid run id/);
+  assert.rejects(cli.cmdWatch(['../escape'], {}, { stream }), /invalid run id/);
+  assert.rejects(cli.cmdRun(['whatever'], { resume: '../escape' }), /invalid run id/);
+});

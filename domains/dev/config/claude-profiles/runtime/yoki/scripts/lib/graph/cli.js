@@ -125,6 +125,9 @@ function makeEmitter({ json, stream = process.stdout, isTty }) {
 async function cmdRun(rest, flags) {
   const target = rest[0];
   if (!target) throw new Error('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]');
+  // runDir() enforces this anyway (journal.js's backstop); checking here too
+  // names the flag while nothing has been resolved, locked or journaled yet.
+  if (flags.resume) journalLib.assertValidRunId(flags.resume);
   const backendName = flags.backend || 'mock';
   const cwd = flags.cwd ? path.resolve(flags.cwd) : process.cwd();
   const scriptPath = runner.resolveScriptPath(target, cwd);
@@ -250,9 +253,11 @@ function cmdList(flags) {
 function cmdStatus(rest, flags, deps = {}) {
   const runId = rest[0];
   if (!runId) throw new Error('usage: yoki-graph status <runId> [--once|--watch]');
+  journalLib.assertValidRunId(runId); // see cmdRun — runDir() backstops this
   const stream = deps.stream || process.stdout;
   const meta = runner.readRunMeta(runId);
-  const entries = deps.entries || new journalLib.Journal(runId).readAll();
+  const journal = new journalLib.Journal(runId);
+  const entries = deps.entries || journal.readAll();
   const counts = { agentCalls: 0, ok: 0, errors: 0, retries: 0 };
   for (const entry of entries) {
     if (entry.status === 'retry') { counts.retries += 1; continue; }
@@ -331,6 +336,7 @@ function watchSnapshot(runId, meta, entries) {
 async function cmdWatch(rest, flags, deps = {}) {
   const runId = rest[0];
   if (!runId) throw new Error('usage: yoki-graph status <runId> --watch');
+  journalLib.assertValidRunId(runId); // see cmdRun — runDir() backstops this
   const stream = deps.stream || process.stdout;
   const intervalMs = Number.isFinite(deps.intervalMs) ? deps.intervalMs : 2000;
   const sleep = deps.sleep || ((ms) => new Promise((r) => { setTimeout(r, ms); }));

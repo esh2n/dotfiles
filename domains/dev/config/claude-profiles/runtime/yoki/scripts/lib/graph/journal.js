@@ -39,8 +39,33 @@ function stateRoot(env = process.env) {
   return override || stateHome(env);
 }
 
+/**
+ * The only shape a run id may take, shared by every path that turns one into
+ * a file system location. Stricter than a model id's alphabet on purpose: a
+ * run id becomes a DIRECTORY NAME under the state home, so `/` — legitimate
+ * inside a model id — would let an id climb out of the graph state tree,
+ * and the lookahead refuses the two names (`.` and `..`) the dot otherwise
+ * lets through whole. Every id yoki mints (`run-…`, `agent-…`, a lane's
+ * `<runId>-lane-<label>`) fits comfortably inside 128 characters.
+ */
+const RUN_ID_RE = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,128}$/;
+
+/** Refuse an id that could not safely become a directory name. Called by
+ *  `runDir` itself, so EVERY consumer — Journal, JournalTail, the run lock,
+ *  run.json reads/writes, event sinks — is covered without each caller
+ *  remembering to check; callers that want a friendlier failure (a usage
+ *  error, an exit code) validate earlier too, and the double check is
+ *  harmless. */
+function assertValidRunId(runId) {
+  const id = String(runId);
+  if (!RUN_ID_RE.test(id)) {
+    throw new Error(`invalid run id ${JSON.stringify(runId)} — a run id must match ${String(RUN_ID_RE)} (it becomes a directory name under the graph state home)`);
+  }
+  return id;
+}
+
 function runDir(runId, env = process.env) {
-  return path.join(stateRoot(env), 'yoki', 'graph', String(runId));
+  return path.join(stateRoot(env), 'yoki', 'graph', assertValidRunId(runId));
 }
 
 function journalPath(runId, env = process.env) {
@@ -486,5 +511,5 @@ class JournalTail {
 module.exports = {
   Journal, callKey, runDir, journalPath, stateRoot, AUTO_LABEL,
   usageTotalsFrom, usageByModelFrom, parseEntries, JournalTail,
-  INLINE_RESULT_MAX_BYTES,
+  INLINE_RESULT_MAX_BYTES, RUN_ID_RE, assertValidRunId,
 };
