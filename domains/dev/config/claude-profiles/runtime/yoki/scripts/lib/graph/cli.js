@@ -15,6 +15,7 @@
  *       [--model-map <tier>=<id>,...]
  *   yoki-graph list
  *   yoki-graph status <runId> [--once|--watch]
+ *   yoki-graph top [--state-home <dir>] [--once] [--columns <path>]
  */
 
 const fs = require('fs');
@@ -24,6 +25,7 @@ const runner = require('./runner');
 const journalLib = require('./journal');
 const models = require('./models');
 const progress = require('./progress');
+const top = require('./top');
 const { parseArgs: parseArgv, numberFlag } = require('./args');
 
 /** The flags of this CLI that never take a value. Everything else is
@@ -125,6 +127,9 @@ function makeEmitter({ json, stream = process.stdout, isTty }) {
 async function cmdRun(rest, flags) {
   const target = rest[0];
   if (!target) throw new Error('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]');
+  // runDir() enforces this anyway (journal.js's backstop); checking here too
+  // names the flag while nothing has been resolved, locked or journaled yet.
+  if (flags.resume) journalLib.assertValidRunId(flags.resume);
   const backendName = flags.backend || 'mock';
   const cwd = flags.cwd ? path.resolve(flags.cwd) : process.cwd();
   const scriptPath = runner.resolveScriptPath(target, cwd);
@@ -250,9 +255,11 @@ function cmdList(flags) {
 function cmdStatus(rest, flags, deps = {}) {
   const runId = rest[0];
   if (!runId) throw new Error('usage: yoki-graph status <runId> [--once|--watch]');
+  journalLib.assertValidRunId(runId); // see cmdRun — runDir() backstops this
   const stream = deps.stream || process.stdout;
   const meta = runner.readRunMeta(runId);
-  const entries = deps.entries || new journalLib.Journal(runId).readAll();
+  const journal = new journalLib.Journal(runId);
+  const entries = deps.entries || journal.readAll();
   const counts = { agentCalls: 0, ok: 0, errors: 0, retries: 0 };
   for (const entry of entries) {
     if (entry.status === 'retry') { counts.retries += 1; continue; }
@@ -269,6 +276,19 @@ function cmdStatus(rest, flags, deps = {}) {
     entries,
   };
   if (flags.json) {
+    // `status --json` is the machine view, and its consumers read
+    // `entries[].result` — so a `resultRef` line (journal.js's separated
+    // large result) is resolved back to the inline result here, where the
+    // one-off cost is paid by the status call, not by every journal scan.
+    // An unresolvable ref (side file deleted, corrupted) keeps the ref and
+    // says what happened instead of failing the whole status.
+    payload.entries = entries.map((entry) => {
+      if (!entry || !entry.resultRef) return entry;
+      const loaded = journal.loadResult(entry);
+      return loaded.ok
+        ? { ...entry, result: loaded.result }
+        : { ...entry, resultError: `result file ${entry.resultRef} is missing or unreadable` };
+    });
     stream.write(`${JSON.stringify(payload)}\n`);
     return;
   }
@@ -331,6 +351,7 @@ function watchSnapshot(runId, meta, entries) {
 async function cmdWatch(rest, flags, deps = {}) {
   const runId = rest[0];
   if (!runId) throw new Error('usage: yoki-graph status <runId> --watch');
+  journalLib.assertValidRunId(runId); // see cmdRun — runDir() backstops this
   const stream = deps.stream || process.stdout;
   const intervalMs = Number.isFinite(deps.intervalMs) ? deps.intervalMs : 2000;
   const sleep = deps.sleep || ((ms) => new Promise((r) => { setTimeout(r, ms); }));
@@ -391,8 +412,12 @@ async function main() {
       if (flags.watch) await cmdWatch(positional, flags);
       else cmdStatus(positional, flags);
     }
+    // The kubectl-style live viewer over every run under the state root.
+    // `--once` (or a non-TTY stdout) prints one snapshot and exits — the
+    // scriptable path, same convention as `status --once`.
+    else if (cmd === 'top') await top.cmdTop(positional, flags);
     else {
-      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--once|--watch]\n');
+      process.stdout.write('usage: yoki-graph run <name|path> --backend codex|omp|mock [...]\n       yoki-graph list\n       yoki-graph status <runId> [--once|--watch]\n       yoki-graph top [--state-home <dir>] [--once] [--columns <path>]\n');
       if (cmd) process.exitCode = 1;
     }
   } catch (err) {

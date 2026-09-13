@@ -23,3 +23,28 @@
   コストが増えていかない)、ランが終わったら通常の `status` 出力を出して
   終了する。ファイルが短くなったら(切り詰め・ローテート)全文を読み直す。
 
+
+## `yoki-graph top` — 全ラン横断のライブビューア
+
+- `yoki-graph top [--state-home <dir>] [--once] [--columns <path>]`。state
+  ルート配下の**全ラン**を kubectl 風に一覧する: ヘッダ(active/done と現在
+  時刻) → ランごとのブロック(ラン行 + レーン行) → フッタ(合計トークン)。
+- ラン行: `状態 name backend phase 2/5 経過 tokens レーン done/total`。状態は
+  ▶ running / ● ok / ✗ error / **⚠ stale**(run.json が running のまま lock の
+  pid が死んでいる — 落ちたラン)。
+- レーン行: `状態 label phase backend/model 経過 tick tokens 進捗バー`。
+  ◉ running / ● ok / ✗ error / ↻ retry 中 / ○ cached(replay) / 🔸 needs-human。
+  進捗バーは同一ラン内の**完了済み兄弟レーン**の (durationMs, toolCalls) の
+  対数中央値を事前分布にした推定で、表示は 0.85 でキャップ。兄弟が 0 本なら
+  バーは出ない(嘘の % を出さない)。
+- lane 由来のラン(runId に `-lane-` を含む、yoki-agent が作るもの)は親ランの
+  ブロック内にレーン行としてネストされる。
+- 表示状態は各ランの `events.ndjson` の畳み込み**のみ**から作る(journal は
+  読まない)。データ読みはポーリングせず fs.watch 駆動 + 5秒に1回の安全網。
+  再描画は 100ms で合流し、前回と同一画面なら書かない。
+- **非 TTY または `--once`** はスナップショットを1回印字して exit 0 —
+  スクリプトから読む一級経路。
+- 列は `~/.config/yoki-graph/top-columns.json`(または `--columns <path>`)で
+  選択・順序・幅・右寄せを上書きできる。壊れた JSON・未知の key は警告1行で
+  既定にフォールバックし、起動は失敗しない。書式は
+  runtime/yoki/scripts/lib/graph/API.md の「top の列スキーマ」参照。

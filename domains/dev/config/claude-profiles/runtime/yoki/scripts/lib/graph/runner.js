@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const { createApi } = require('./api');
 const { runBodyInWorker } = require('./worker-host');
 const { Journal, runDir } = require('./journal');
+const { createEventSink } = require('./events');
 const guard = require('./guard');
 const lock = require('./lock');
 const budgetLib = require('./budget');
@@ -94,7 +95,7 @@ function extractMeta(source) {
   return { meta, metaEnd: braceStart + literal.length };
 }
 
-const BODY_PARAM_NAMES = ['args', 'phase', 'log', 'agent', 'parallel', 'pipeline', 'budget', 'workflow'];
+const BODY_PARAM_NAMES = ['args', 'phase', 'log', 'agent', 'parallel', 'pipeline', 'budget', 'workflow', 'runInfo'];
 
 /**
  * Compile a script's source into `{ meta, body }`. The body is executed by the
@@ -176,10 +177,25 @@ function generateRunId() {
   return `run-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 }
 
+/** How often `lastEventAt` may rewrite run.json. Two seconds matches the
+ *  `status --watch` poll interval — a fresher stamp than the poller can
+ *  observe buys nothing and costs a whole-file rewrite per event. */
+const RUN_META_THROTTLE_MS = 2000;
+
+/**
+ * run.json is rewritten wholesale — and, with `lastEventAt`, repeatedly
+ * during a run — while `status`/`status --watch` read it from another
+ * process at any moment. Write-then-rename (same directory, so the rename
+ * is atomic on POSIX) means a reader sees the whole old file or the whole
+ * new one, never a truncated JSON mid-rewrite. readRunMeta's parse-to-null
+ * stays anyway: it also covers hand-edited or partially-synced files.
+ */
 function writeRunMeta(runId, meta) {
   const dir = runDir(runId);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify(meta, null, 2));
+  const tmp = path.join(dir, `.run.json.tmp-${process.pid}`);
+  fs.writeFileSync(tmp, JSON.stringify(meta, null, 2));
+  fs.renameSync(tmp, path.join(dir, 'run.json'));
 }
 
 function readRunMeta(runId) {
@@ -228,7 +244,7 @@ function readRunMeta(runId) {
 async function executeScript(options) {
   const {
     scriptPath, args, backendName, cwd = process.cwd(), dryRun = false,
-    emit = () => {}, concurrency, model, effort, mockFile, timeoutMs, gateTimeoutMs,
+    emit: emitBase = () => {}, concurrency, model, effort, mockFile, timeoutMs, gateTimeoutMs,
     retries, retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, modelMap, _parentRunId,
   } = options;
   const runId = options.runId || generateRunId();
@@ -239,10 +255,38 @@ async function executeScript(options) {
   const journal = new Journal(runId);
   const backend = loadBackend(backendName);
 
+  // The ONE tee point for this run's events: everything the run narrates goes
+  // to the caller's emitter (cli.js's human/NDJSON printer) exactly as before,
+  // AND to <runDir>/events.ndjson (events.js) — a durable record a status
+  // page or a second terminal can tail without having been the process that
+  // ran it. `run.json` additionally carries `lastEventAt` (epoch ms) as a
+  // cheap liveness signal, updated on every event but WRITTEN at most once
+  // per two seconds: run.json is a whole-file rewrite, and a chatty run's
+  // agent-progress ticks must not turn it into a per-event fsync storm. The
+  // final state always lands, because `run-end` forces a write and the
+  // end-of-run writeRunMeta below carries the field too. Events before the
+  // first writeRunMeta (guard-denied / run-locked) reach the event stream but
+  // touch no run.json — a denied run has never had one, and inventing a
+  // nameless one for it would make `status` report a half-run.
+  const sink = createEventSink(runDir(runId), { runId });
+  let runMeta = null;
+  let lastMetaWriteAt = 0;
+  const emit = (event) => {
+    emitBase(event);
+    sink.emit(event);
+    if (!runMeta) return;
+    runMeta.lastEventAt = Date.now();
+    if (event.type === 'run-end' || runMeta.lastEventAt - lastMetaWriteAt >= RUN_META_THROTTLE_MS) {
+      lastMetaWriteAt = runMeta.lastEventAt;
+      try { writeRunMeta(runId, runMeta); } catch { /* liveness metadata only — never fail the run over it */ }
+    }
+  };
+
   if (!_parentRunId && !dryRun) {
     const decision = guard.checkAndRecord(cwd);
     if (!decision.allowed) {
       emit({ type: 'guard-denied', runId, message: decision.message, ts: new Date().toISOString() });
+      await sink.close();
       return { runId, meta: compiled.meta, status: 'denied', error: decision.message };
     }
   }
@@ -255,6 +299,7 @@ async function executeScript(options) {
     held = lock.acquire(runId, lockStaleMs === undefined ? {} : { staleMs: lockStaleMs });
   } catch (err) {
     emit({ type: 'run-locked', runId, message: err.message, ts: new Date().toISOString() });
+    await sink.close();
     return { runId, meta: compiled.meta, status: 'locked', error: err.message };
   }
 
@@ -276,8 +321,12 @@ async function executeScript(options) {
       ? undefined
       : async (nameOrRef, childArgs) => {
         const childPath = resolveScriptPath(nameOrRef, cwd);
+        // The child gets the CALLER's emitter, not this run's tee: the child
+        // executeScript builds its own sink under its own runId, so each
+        // events.ndjson holds exactly one run's events (single writer, one
+        // runId per file) instead of the parent's file interleaving both.
         const childResult = await executeScript({
-          scriptPath: childPath, args: childArgs, backendName, cwd, dryRun, emit,
+          scriptPath: childPath, args: childArgs, backendName, cwd, dryRun, emit: emitBase,
           concurrency, model, effort, mockFile, timeoutMs, gateTimeoutMs, retries,
           retryBaseDelayMs, retryMaxDelayMs, sleep, lockStaleMs, modelMap,
           maxAgentCalls: options.maxAgentCalls, maxTokens: options.maxTokens,
@@ -289,10 +338,12 @@ async function executeScript(options) {
   };
   const apiGlobals = createApi(ctx);
 
-  writeRunMeta(runId, {
+  runMeta = {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
     startedAt: new Date().toISOString(), status: 'running',
-  });
+  };
+  writeRunMeta(runId, runMeta);
+  lastMetaWriteAt = Date.now();
   emit({
     type: 'run-start', runId, name: compiled.meta.name, backend: backendName,
     // The declared phase titles: the live status line reports "phase 2/5"
@@ -316,6 +367,7 @@ async function executeScript(options) {
       body: compiled.body,
       api: apiGlobals,
       args,
+      runId,
       budgetTotal: Number.isFinite(caps.maxTokens) ? caps.maxTokens : null,
       journal,
       maxWallMs: caps.maxWallMs,
@@ -331,12 +383,16 @@ async function executeScript(options) {
 
   const usage = journal.usageTotals();
   const byModel = journal.usageByModel();
-  writeRunMeta(runId, {
+  runMeta = {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
     startedAt: readRunMeta(runId)?.startedAt, finishedAt: new Date().toISOString(),
-    status, error, usage, byModel,
-  });
+    status, error, usage, byModel, lastEventAt: runMeta.lastEventAt,
+  };
+  writeRunMeta(runId, runMeta);
+  // run-end forces one more run.json write through the tee, stamping the
+  // final lastEventAt beside the final status.
   emit({ type: 'run-end', runId, status, error, result, usage, byModel, ts: new Date().toISOString() });
+  await sink.close();
 
   return { runId, meta: compiled.meta, status, result, error, usage, byModel };
 }

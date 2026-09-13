@@ -255,6 +255,24 @@ const providerLane = ({ provider, model, prompt, schema, label, phase, sandbox }
     throw new Error(`providerLane: invalid sandbox ${JSON.stringify(mode)} — valid: ${LANE_SANDBOXES.join(', ')}`)
   }
   const fullLabel = laneLabel(label, provider, modelId)
+  // The run id the lane's yoki-agent call journals under: the CURRENT run's
+  // id plus this lane's sanitized label, so the lane's run.json/journal/
+  // events land somewhere `yoki-graph status <runId>-lane-<label>` can find
+  // — instead of under a generated id nobody can guess. `runInfo` is a
+  // yoki-graph worker global (worker-source.js); the native Workflow tool
+  // injects no such global, and `typeof` keeps the reference from being a
+  // ReferenceError there — the flag is simply omitted and yoki-agent
+  // generates its own id, as it always did. The sanitized alphabet matches
+  // yoki-agent's RUN_ID_RE: the id becomes both a directory name and a word
+  // on the transport's command line, so nothing outside [A-Za-z0-9._-] may
+  // survive into it.
+  // NOTE: adding --run-id changed the transport prompt, so callKey changes
+  // and a pre-change run's --resume re-runs its provider lanes live — a
+  // one-time cost, same as any other prompt edit.
+  const laneHostRunId = typeof runInfo === 'object' && runInfo && typeof runInfo.runId === 'string' ? runInfo.runId : ''
+  const laneRunId = laneHostRunId
+    ? `${laneHostRunId}-lane-${fullLabel.replace(/[^A-Za-z0-9._-]+/g, '-')}`.slice(0, 128)
+    : ''
   const promptB64 = laneBase64(prompt)
   const schemaB64 = schema ? laneBase64(JSON.stringify(schema)) : ''
   const fence = laneFence([fullLabel, provider, modelId, mode, schemaB64, String(String(prompt).length)])
@@ -272,7 +290,7 @@ Steps, in order:
    [ -n "$YOKI_AGENT" ] || YOKI_AGENT="$(cd -P ~/.claude/skills/yoki-graph && cd ../../../../.. && pwd)/bin/yoki-agent"
    If neither exists, stop and return {"ok": false, "error": "yoki-agent not found on PATH or under the harness checkout", "exitCode": 127}.
 1. Run exactly this command, exactly once, replacing each <...> placeholder with the base64 token from the block of the same name below. Every token is ONE unbroken word on ONE line between its fence markers: paste it whole, add no quotes, no line breaks, no shell expansion, no editing. Create no files. Run nothing else.
-   "$YOKI_AGENT" --backend ${provider}${modelId ? ` --model ${modelId}` : ''}${schema ? ' --schema-base64 <SCHEMA_B64>' : ''} --sandbox ${mode} --prompt-base64 <PROMPT_B64> --json
+   "$YOKI_AGENT" --backend ${provider}${modelId ? ` --model ${modelId}` : ''}${laneRunId ? ` --run-id ${laneRunId}` : ''}${schema ? ' --schema-base64 <SCHEMA_B64>' : ''} --sandbox ${mode} --prompt-base64 <PROMPT_B64> --json
 2. If it exited 0: parse the JSON it printed on stdout and return {"ok": true, "result": <that JSON, verbatim>}.
    VERBATIM means: same fields, same values, same order, nothing added, nothing dropped, nothing reworded, nothing re-scored, nothing re-ranked, nothing merged. You did not do this work — you carried it. If the JSON looks wrong to you, carry it anyway.
 3. If it exited non-zero: return {"ok": false, "error": "<one line: what failed>", "exitCode": <the exit code>, "stderrTail": "<last 500 characters of stderr>"}.
@@ -295,6 +313,9 @@ ${fence}
     model: modelId,
     sandbox: mode,
     label: fullLabel,
+    // Empty outside yoki-graph (no runInfo global): the provider call then
+    // runs under a yoki-agent-generated id instead of a findable one.
+    runId: laneRunId,
     prompt: transportPrompt,
     opts: {
       label: fullLabel,

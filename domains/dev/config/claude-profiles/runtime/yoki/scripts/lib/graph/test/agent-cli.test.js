@@ -606,6 +606,153 @@ test('a failure under a reused --run-id reports ITS OWN call, never the earlier 
 }));
 
 // ---------------------------------------------------------------------------
+// run.json + events.ndjson: a yoki-agent run is a findable run
+// ---------------------------------------------------------------------------
+
+test('a run gets run.json and events.ndjson, and `yoki-graph status` finds it', () => withIsolatedState(async (dir) => {
+  const { promptFile, fixtureFile } = scaffold(dir, { fixture: { lane: 'answer' } });
+  const runId = 'agent-cli-findable-run';
+  const code = await agentCli.run([
+    '--backend', 'mock', '--mock', fixtureFile, '--label', 'lane',
+    '--run-id', runId, '--cwd', dir, '--prompt-file', promptFile,
+  ], { stdout: capture(), stderr: capture(), env: {} });
+  assert.equal(code, 0);
+
+  const journalLib = require('../journal');
+  const meta = JSON.parse(fs.readFileSync(path.join(journalLib.runDir(runId), 'run.json'), 'utf8'));
+  assert.equal(meta.name, 'yoki-agent');
+  assert.equal(meta.backend, 'mock');
+  assert.equal(meta.status, 'ok');
+  assert.equal(meta.cwd, dir);
+  assert.ok(meta.startedAt && meta.finishedAt);
+  assert.ok(meta.usage && meta.usage.calls === 1);
+
+  // The emit-discard is gone: the call's own lifecycle events are on disk,
+  // envelope-wrapped, in order.
+  const events = fs.readFileSync(path.join(journalLib.runDir(runId), 'events.ndjson'), 'utf8')
+    .split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  const types = events.map((e) => e.type);
+  assert.ok(types.includes('agent-start'), `no agent-start in ${types.join(', ')}`);
+  assert.ok(types.includes('agent-end'));
+  assert.ok(types.indexOf('agent-start') < types.indexOf('agent-end'));
+  for (const event of events) {
+    assert.equal(event.v, 1);
+    assert.equal(event.runId, runId);
+  }
+
+  // And the status command — the reason the run.json exists — recognizes it.
+  const cli = require('../cli');
+  const stream = capture();
+  cli.cmdStatus([runId], {}, { stream });
+  assert.match(stream.text, /run: yoki-agent \(agent-cli-findable-run\)/);
+  assert.match(stream.text, /status: ok/);
+  assert.match(stream.text, /agent calls: 1 \(1 ok, 0 error, 0 retried\)/);
+}));
+
+test('a failed call finishes its run.json with status error and the cause', () => withIsolatedState(async (dir) => {
+  const { promptFile } = scaffold(dir, {});
+  const runId = 'agent-cli-failed-run';
+  const original = codexBackend.run;
+  codexBackend.run = async () => { throw new Error('codex exec exited 1: not logged in'); };
+  let code;
+  try {
+    code = await agentCli.run([
+      '--backend', 'codex', '--label', 'lane',
+      '--run-id', runId, '--prompt-file', promptFile,
+    ], { stdout: capture(), stderr: capture(), env: {} });
+  } finally {
+    codexBackend.run = original;
+  }
+  assert.equal(code, 2);
+  const journalLib = require('../journal');
+  const meta = JSON.parse(fs.readFileSync(path.join(journalLib.runDir(runId), 'run.json'), 'utf8'));
+  assert.equal(meta.status, 'error');
+  assert.match(meta.error, /codex exec exited 1/);
+}));
+
+test('a reused --run-id keeps its original startedAt across calls', () => withIsolatedState(async (dir) => {
+  const { promptFile, fixtureFile } = scaffold(dir, { fixture: { lane: 'answer' } });
+  const runId = 'agent-cli-startedat-run';
+  const argv = (label) => [
+    '--backend', 'mock', '--mock', fixtureFile, '--label', label,
+    '--run-id', runId, '--prompt-file', promptFile,
+  ];
+  const journalLib = require('../journal');
+  const metaFile = path.join(journalLib.runDir(runId), 'run.json');
+  assert.equal(await agentCli.run(argv('first'), { stdout: capture(), stderr: capture(), env: {} }), 0);
+  const firstStartedAt = JSON.parse(fs.readFileSync(metaFile, 'utf8')).startedAt;
+  await new Promise((r) => { setTimeout(r, 5); });
+  assert.equal(await agentCli.run(argv('second'), { stdout: capture(), stderr: capture(), env: {} }), 0);
+  const after = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+  assert.equal(after.startedAt, firstStartedAt, 'the second call restarted the run clock');
+  assert.equal(after.usage.calls, 2);
+}));
+
+test('a --run-id that could escape the state tree is a usage error', () => withIsolatedState(async (dir) => {
+  const { promptFile, fixtureFile } = scaffold(dir, { fixture: { lane: 'answer' } });
+  for (const bad of ['../escape', 'a/b', 'a'.repeat(129), 'sp ace']) {
+    const stderr = capture();
+    const code = await agentCli.run([
+      '--backend', 'mock', '--mock', fixtureFile, '--label', 'lane',
+      '--run-id', bad, '--prompt-file', promptFile,
+    ], { stdout: capture(), stderr, env: {} });
+    assert.equal(code, 1, `--run-id ${JSON.stringify(bad)} was accepted`);
+    assert.match(stderr.text, /--run-id/, `no run-id usage error for ${JSON.stringify(bad)}`);
+  }
+}));
+
+// ---------------------------------------------------------------------------
+// The run lock: one live process per runId, exactly as runner.js
+// ---------------------------------------------------------------------------
+
+test('a held run lock refuses the call with exit 2, leaving the journal untouched', () => withIsolatedState(async (dir) => {
+  const { promptFile, fixtureFile } = scaffold(dir, { fixture: { lane: 'answer' } });
+  const runId = 'agent-cli-locked-run';
+  const lockLib = require('../lock');
+  const held = lockLib.acquire(runId);
+  const argv = [
+    '--backend', 'mock', '--mock', fixtureFile, '--label', 'lane',
+    '--run-id', runId, '--prompt-file', promptFile,
+  ];
+  try {
+    const stderr = capture();
+    const code = await agentCli.run(argv, { stdout: capture(), stderr, env: {} });
+    assert.equal(code, 2);
+    assert.match(stderr.text, /already active/);
+    // Refused BEFORE anything touched the run: no journal entry, no run.json.
+    assert.deepEqual(new Journal(runId).readAll(), [], 'the refused call was journaled anyway');
+    const journalLib = require('../journal');
+    assert.ok(!fs.existsSync(path.join(journalLib.runDir(runId), 'run.json')), 'the refused call wrote run.json');
+  } finally {
+    held.release();
+  }
+  // Once the holder is gone the same invocation goes through.
+  assert.equal(await agentCli.run(argv, { stdout: capture(), stderr: capture(), env: {} }), 0);
+}));
+
+test('two concurrent calls on one lane-derived run id: exactly one runs, the other is refused', () => withIsolatedState(async (dir) => {
+  // The scenario the lock exists for: lane run ids are DETERMINISTIC
+  // (`<runId>-lane-<label>`), so a workflow that double-fires the same lane
+  // command starts two yoki-agent processes on the same runDir.
+  const { promptFile, fixtureFile } = scaffold(dir, { fixture: { lane: 'answer' } });
+  const argv = [
+    '--backend', 'mock', '--mock', fixtureFile, '--label', 'lane',
+    '--run-id', 'run-x-lane-review-security-codex', '--prompt-file', promptFile,
+  ];
+  const errs = [capture(), capture()];
+  const codes = await Promise.all([
+    agentCli.run(argv, { stdout: capture(), stderr: errs[0], env: {} }),
+    agentCli.run(argv, { stdout: capture(), stderr: errs[1], env: {} }),
+  ]);
+  assert.deepEqual([...codes].sort(), [0, 2], `expected one ok and one refusal, got ${codes.join(',')}`);
+  const refused = errs[codes.indexOf(2)];
+  assert.match(refused.text, /already active/);
+  // The winner's journal holds exactly its own single entry.
+  const entries = new Journal('run-x-lane-review-security-codex').readAll();
+  assert.equal(entries.filter((e) => e.status === 'ok').length, 1);
+}));
+
+// ---------------------------------------------------------------------------
 // The daily-cap exemption
 // ---------------------------------------------------------------------------
 

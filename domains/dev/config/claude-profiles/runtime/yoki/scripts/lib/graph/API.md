@@ -32,6 +32,12 @@ access from the script body itself (only through `agent()`).
   may deliver args as a JSON string — yoki-graph's CLI (`--args`/`--args-file`)
   always parses JSON itself and hands the script the parsed value, but the
   scripts' own guard makes a string-args path safe either way.
+- `runInfo` — frozen `{ runId }` identifying the current run. yoki-graph
+  only: the native Workflow tool injects no such global, so a script that
+  must run in both harnesses reaches it through `typeof runInfo` (the
+  provider-lane helper in core/workflows/lib/lanes.js is the pattern — it
+  derives each lane's yoki-agent `--run-id` from it, and simply omits the
+  flag where runInfo does not exist).
 - `phase(title: string): void` — starts a progress group; matched against
   `meta.phases[].title` by exact string equality for display purposes only.
 - `log(message: string): void` — a narrator line, printed above/around the
@@ -372,6 +378,19 @@ replayed the answer a DIFFERENT model produced, which is not the same work.
 
 Failed and retried calls are never replayed: a resumed run retries them.
 
+**Large results live beside the journal, not in it.** An `ok` entry whose
+`result` JSON exceeds 2,048 bytes is written to
+`<runDir>/results/<index>-<key prefix>.json` and the journal line carries
+`resultRef` instead — the journal is read whole on every scan, and a review
+run's findings would otherwise make every one of those scans pay for them.
+Replay resolves the ref transparently; a missing or unreadable side file
+demotes that entry to a replay miss (the run goes live from there, it does
+not error), and old journals with inline results are read unchanged.
+`yoki-graph status <runId> --json` resolves `resultRef` back to an inline
+`result` before printing, so machine consumers see the same shape as before;
+an unresolvable ref keeps `resultRef` and adds a `resultError` note instead
+of failing the status.
+
 **Generations, not file order.** `agent()` calls complete out of order under
 concurrency, so a journal's LINE order is completion order while `index` is
 arrival order. Each `executeScript` invocation against a runId therefore
@@ -460,6 +479,76 @@ no entry below the highest index seen is still in flight. `--once` and
 `--watch` are boolean flags accepted in any position; a missing or unknown
 runId prints usage / "no run found" and exits non-zero without entering the
 watch loop.
+
+## `yoki-graph top` — the cross-run live viewer
+
+`yoki-graph top [--state-home <dir>] [--once] [--columns <path>]` shows every
+run under the graph state root at once, kubectl-style: a header (active/done
+counts, clock), one block per run (run row + lane rows), a footer (token
+total, `q quit`). Lane-derived runs (`<runId>-lane-<label>`, the ids
+yoki-agent journals a provider lane under) nest inside their parent's block
+instead of listing as runs of their own.
+
+Run row: `state name backend phase 2/5 elapsed tokens lanes-done/total` —
+state is ▶ running / ● ok / ✗ error / **⚠ stale** (run.json still says
+`running` but the lock's pid is dead: the run died without writing its final
+status). Lane row: `state label phase backend/model elapsed ticks tokens
+bar` — ◉ running / ● ok / ✗ error / ↻ retrying / ○ cached (replayed) /
+🔸 needs-human (reserved event type, accepted before anything emits it).
+
+The design constraints, each load-bearing:
+
+- **Single state source.** Everything displayed folds from the run's
+  `events.ndjson` (top-fold.js, wrapping progress.js's `foldEvent`);
+  journal.jsonl is never read — that file belongs to resume. The only
+  non-event inputs are the two things a stream cannot know about its own
+  writer: run.json's `status`, and whether the lock's pid is still alive.
+- **No polling.** The state root and every runDir are `fs.watch`ed; files
+  are read when a watch fires, incrementally (journal.js's `FileTail`:
+  partial-line carry, truncation reset, and a 2MB skip-ahead so attaching
+  to a huge events file starts at its tail). One 5-second safety tick
+  re-checks everything in case a watcher silently died — that is the only
+  timer.
+- **Coalesced painting.** Redraw requests within 100ms collapse into one
+  paint, and a frame identical to the previous one is not written at all.
+- **Non-TTY / `--once` prints one snapshot and exits 0** — the first-class
+  path for scripts and tests, with no ANSI in it.
+
+The lane progress bar (⣀⣄⣤⣦⣶⣷⣿) is an ESTIMATE and says so by
+construction (top-estimate.js, import-free): the prior is the log-median
+`(durationMs, toolCalls)` of the SAME run's completed lanes, the current
+lane's time- and tick-fractions against that prior are averaged, and the
+display caps at 0.85 so a bar never claims completion. Zero finished
+siblings means NO bar — elapsed time only, never an invented percentage.
+(The approach conceptually follows kimi-code's published design notes;
+the implementation is independent.)
+
+### top の列スキーマ (`top-columns.json`)
+
+Both row layouts are data, overridable per machine at
+`~/.config/yoki-graph/top-columns.json` (or `--columns <path>`): column
+choice, order, width and alignment. Widths are DISPLAY cells — full-width
+(日本語) text is measured and truncated by terminal cells, with `…` marking
+a cut.
+
+```json
+{
+  "v": 1,
+  "run":  [ { "key": "status" }, { "key": "name", "width": 24 },
+            { "key": "phase" }, { "key": "elapsed" },
+            { "key": "tokens", "align": "right" }, { "key": "lanes" } ],
+  "lane": [ { "key": "status" }, { "key": "label", "width": 28 },
+            { "key": "model" }, { "key": "elapsed" },
+            { "key": "tick" }, { "key": "bar", "width": 16 } ]
+}
+```
+
+Documented keys — run rows: `status`, `name`, `backend`, `phase`,
+`elapsed`, `tokens`, `lanes`, `id`; lane rows: `status`, `label`, `phase`,
+`backend`, `model` (renders `backend/model`), `elapsed`, `tick`, `tokens`,
+`bar`. An unknown key, a malformed entry, an unknown `v` or unparseable
+JSON each degrade to the defaults with ONE warning line on stderr — a
+stale config file must never keep the viewer from starting.
 
 ## Execution caps, retry and timeouts
 

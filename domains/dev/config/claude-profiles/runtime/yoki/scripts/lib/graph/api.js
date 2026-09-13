@@ -157,12 +157,20 @@ function createApi(ctx) {
 
     if (state.replaying) {
       const cached = ctx.journal.replayAt(index, key);
-      if (cached) {
+      // A matching entry replays only if its result is still recoverable: a
+      // large result lives in a `results/` side file (journal.js's
+      // resultRef), and a deleted or corrupted side file makes the entry a
+      // miss — the same treatment as a key mismatch, and for the same
+      // reason: replaying cannot hand back what no longer exists, and every
+      // later entry was computed downstream of this one, so the run goes
+      // live from here rather than erroring out.
+      const loaded = cached ? ctx.journal.loadResult(cached) : { ok: false };
+      if (cached && loaded.ok) {
         ctx.emit({
           type: 'agent-cached', runId: ctx.runId, label, phase: effPhase, index,
           backend: backendName, model: cached.model || model, ts: nowIso(),
         });
-        return cached.result;
+        return loaded.result;
       }
       // First divergence: this call, and every call after it, runs live.
       state.replaying = false;

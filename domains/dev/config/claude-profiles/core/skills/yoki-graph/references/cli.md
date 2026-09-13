@@ -14,6 +14,7 @@ yoki-graph run <name|path> --backend codex|omp|mock
     [--model-map <tier>=<id>,...]
 yoki-graph list
 yoki-graph status <runId> [--once|--watch]
+yoki-graph top [--state-home <dir>] [--once] [--columns <path>]
 ```
 
 `<name>` は `~/.claude/workflows/<name>.js`(=`core/workflows/` からインストール

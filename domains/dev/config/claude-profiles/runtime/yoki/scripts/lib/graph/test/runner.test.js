@@ -247,3 +247,37 @@ test('an unrecognised backend still gets the generic message, listing only what 
 test('backends/claude.js is gone from disk, not merely unreferenced', () => {
   assert.equal(fs.existsSync(path.join(__dirname, '..', 'backends', 'claude.js')), false);
 });
+
+// ---------------------------------------------------------------------------
+// runInfo — the body-visible run identity
+// ---------------------------------------------------------------------------
+
+test('the body sees a frozen runInfo.runId matching the run it belongs to', () => withIsolatedState(async (cwd) => {
+  const scriptPath = writeScript(cwd, 'runinfo.js', `export const meta = { name: 'ri', description: 'd' }
+    // Freezing is part of the contract: a body must not be able to redirect
+    // every lane's derived --run-id by reassigning the field.
+    let frozen = true
+    try { runInfo.runId = 'hijacked' } catch { /* strict mode throws */ }
+    if (runInfo.runId === 'hijacked') frozen = false
+    return { id: runInfo.runId, frozen }`);
+  const result = await runner.executeScript({
+    scriptPath, args: {}, backendName: 'mock', cwd,
+  });
+  assert.equal(result.status, 'ok', result.error);
+  assert.equal(result.result.id, result.runId);
+  assert.equal(result.result.frozen, true);
+}));
+
+test('writeRunMeta lands atomically: correct content, no tmp file left behind', () => withIsolatedState(async () => {
+  const meta = { name: 'atomic', status: 'running', args: { 日本語: true } };
+  runner.writeRunMeta('atomic-meta-run', meta);
+  assert.deepEqual(runner.readRunMeta('atomic-meta-run'), meta);
+  // The write goes through tmp+rename (same dir) so a concurrent reader
+  // never sees a truncated run.json; the tmp name must not survive.
+  const { runDir } = require('../journal');
+  const leftovers = fs.readdirSync(runDir('atomic-meta-run')).filter((f) => f.includes('tmp'));
+  assert.deepEqual(leftovers, []);
+  // A rewrite (the run finishing, a lastEventAt refresh) replaces it whole.
+  runner.writeRunMeta('atomic-meta-run', { ...meta, status: 'ok' });
+  assert.equal(runner.readRunMeta('atomic-meta-run').status, 'ok');
+}));

@@ -136,6 +136,88 @@ assert_canonical_checkout() {
     return 1
 }
 
+# pi (local LLM lane, task feat/pi-local-llm) keeps configuration and runtime
+# state in one directory (~/.pi/agent), so it cannot be symlinked wholesale —
+# that would take auth.json and every saved session with it. Link only what
+# this repo owns: settings.json, models.json, AGENTS.md, and each .ts under
+# extensions/.
+#
+# extensions/ is linked FILE BY FILE, never as a directory: pi discovers each
+# file there, and the directory also holds files this repo does NOT own — the
+# user's hand-written extensions (orca-*.ts) and anything `pi install` adds.
+# A directory symlink would silently shadow or destroy those.
+#
+# Stale-link sweep: a symlink under ~/.pi/agent (top level, extensions/, and
+# the retired agents/) is removed only when BOTH hold: its target lies under a
+# .../domains/dev/config/pi/ directory (i.e. this repo made it — orca-*.ts and
+# `pi install`ed links are never touched) AND the target no longer exists
+# (the repo file was removed or renamed). This also retires the 2026-08 era
+# links (prompts, agents/*.md, yoki-guard.ts) on machines that never ran
+# core/scripts/uninstall-pi.sh.
+#
+# ABSOLUTE PATH CONVENTION: call this (and link_file generally) with an
+# absolute src_dir. link_file writes the source path into the symlink
+# verbatim, so a relative path here produces links that dangle from any other
+# cwd — that incident is why the guard below refuses instead of trusting the
+# caller. link_domain passes ${DOTFILES_ROOT}-based paths, which are absolute.
+# piは~/.pi/agentを読む。実行時の状態が同居するため、ディレクトリごとでは
+# なくファイル単位でリンクする（extensions/ には手元の orca-*.ts が同居する
+# ためディレクトリリンクは不可）。dotfiles の pi ディレクトリを指す壊れた
+# リンクだけを掃除し、他のファイルには触れない。
+link_pi_resources() {
+    local src_dir="$1"
+    local pi_home="${HOME}/.pi/agent"
+
+    if [[ "$src_dir" != /* ]]; then
+        log_error "link_pi_resources: src_dir must be absolute (got: ${src_dir})"
+        return 1
+    fi
+
+    ensure_dir "$pi_home"
+
+    local f
+    for f in settings.json models.json AGENTS.md; do
+        [[ -f "${src_dir}/${f}" ]] && link_file "${src_dir}/${f}" "${pi_home}/${f}"
+    done
+
+    if [[ -d "${src_dir}/extensions" ]]; then
+        ensure_dir "${pi_home}/extensions"
+        local ext
+        while IFS= read -r -d '' ext; do
+            link_file "$ext" "${pi_home}/extensions/$(basename "$ext")"
+        done < <(find "${src_dir}/extensions" -mindepth 1 -maxdepth 1 -name '*.ts' \
+                      \( -type f -o -type l \) -print0)
+    fi
+
+    # Sweep dangling repo-made links (see function comment for the two-part
+    # ownership test). agents/ no longer exists in the repo but may still
+    # hold 2026-08 era links on this machine.
+    local sweep_dir link target
+    for sweep_dir in "$pi_home" "${pi_home}/extensions" "${pi_home}/agents"; do
+        [[ -d "$sweep_dir" ]] || continue
+        while IFS= read -r -d '' link; do
+            target="$(readlink "$link")" || continue
+            [[ "$target" == */domains/dev/config/pi/* ]] || continue
+            [[ -e "$link" ]] && continue
+            rm -f "$link"
+            log_info "Removed stale pi link: ${link} -> ${target}"
+        done < <(find "$sweep_dir" -mindepth 1 -maxdepth 1 -type l -print0)
+    done
+
+    # Before this function was restored, link_domain's generic branch linked
+    # the whole config dir to ~/.config/pi — dead weight (pi has no XDG
+    # lookup). Drop it, but only when it points at this repo's pi dir.
+    if [[ -L "${HOME}/.config/pi" ]]; then
+        target="$(readlink "${HOME}/.config/pi")"
+        if [[ "$target" == "$src_dir" || "$target" == */domains/dev/config/pi ]]; then
+            rm -f "${HOME}/.config/pi"
+            log_info "Removed dead-weight link: ${HOME}/.config/pi -> ${target}"
+        fi
+    fi
+
+    return 0
+}
+
 # omp reads ~/.omp/agent — that directory holds runtime state (agent.db,
 # sessions, logs) next to configuration, so link the children we own rather
 # than the directory. models.yml/lsp.yml are static reference data omp only
@@ -198,6 +280,14 @@ link_domain() {
                 if [[ "$dirname" == "claude" ]]; then
                     local target="${HOME}/.claude"
                     link_file "$config_dir" "$target"
+                # pi reads ~/.pi/agent — it has no XDG lookup, so ~/.config/pi
+                # would be dead weight. That directory also holds runtime state
+                # (auth.json, sessions/, git/, npm/), so link the children we
+                # own rather than the directory (file-by-file for extensions/).
+                # piは~/.pi/agentを読む。実行時の状態も同居するため、
+                # ディレクトリごとではなくファイル単位でリンクする。
+                elif [[ "$dirname" == "pi" ]]; then
+                    link_pi_resources "$config_dir"
                 # omp reads ~/.omp/agent — it has no XDG lookup, so ~/.config/omp
                 # would be dead weight. That directory also holds runtime state
                 # (auth.json, sessions/, git/, npm/), so link the children we

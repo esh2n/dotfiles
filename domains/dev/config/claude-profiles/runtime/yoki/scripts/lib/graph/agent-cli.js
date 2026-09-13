@@ -37,7 +37,8 @@
  *      prompt or schema, unknown backend, unknown model tier, a model or
  *      backend name outside the allowed alphabet
  *   2  backend error — the call failed (spawn failure, non-zero exit,
- *      timeout after retries), or a per-run budget cap was already spent
+ *      timeout after retries), a per-run budget cap was already spent, or
+ *      another live process holds this run id's lock
  *   3  schema validation failed after the one retry api.js allows
  *
  * `--json` prints ONLY the result on stdout (the footer goes to stderr), so
@@ -68,7 +69,10 @@ const path = require('path');
 const crypto = require('crypto');
 
 const { createApi } = require('./api');
-const { Journal } = require('./journal');
+const { Journal, runDir, RUN_ID_RE } = require('./journal');
+const { createEventSink } = require('./events');
+const lockLib = require('./lock');
+const { writeRunMeta, readRunMeta } = require('./runner');
 const { SchemaValidationError } = require('./schema');
 const backends = require('./backends');
 const budgetLib = require('./budget');
@@ -96,6 +100,8 @@ const USAGE = `usage: yoki-agent --backend codex|omp|mock (--prompt-file <f> | -
   --mock <file>          fixture file for --backend mock
   --allow-mock           let YOKI_AGENT_MOCK reroute this call to a fixture
   --run-id <id>          journal this call under an existing run id
+                         (the run gets a run.json and an events.ndjson, so
+                         \`yoki-graph status <id>\` can find it)
   --dry-run              resolve everything, spawn nothing
   --json                 print only the result on stdout; footer to stderr
 
@@ -128,6 +134,11 @@ const KNOWN_FLAGS = new Set([
  * yoki-agent is reachable from a shell, not only from a lane.
  */
 const NAME_RE = /^[A-Za-z0-9._:\/-]{1,64}$/;
+
+// The shape a `--run-id` may take is journal.js's RUN_ID_RE (a run id
+// becomes a directory name; runDir() itself enforces it as the backstop).
+// Checked here too so a bad id is a USAGE error (exit 1) with the flag
+// named, before anything is locked, journaled or spawned.
 
 const parseArgs = (argv) => parseArgv(argv, BOOLEAN_FLAGS);
 
@@ -245,6 +256,35 @@ async function run(argv, deps = {}) {
   }
   for (const warning of plan.warnings) stderr.write(`yoki-agent: ${warning}\n`);
 
+  // The same one-live-process-per-runId exclusion runner.js takes, and for
+  // the same reason (lock.js's header): the journal's index sequence, the
+  // event stream's seq and run.json are all single-writer state. It matters
+  // HERE because lane-derived run ids are deterministic — two transports
+  // running the same lane command concurrently would otherwise share one
+  // runDir. Taken BEFORE anything below reads or writes the run directory,
+  // so a refused call leaves the journal exactly as it found it.
+  let held;
+  try {
+    held = lockLib.acquire(plan.runId);
+  } catch (err) {
+    stderr.write(`yoki-agent: ${err.message}\n`);
+    return 2;
+  }
+  try {
+    return await executeLocked({ plan, flags, stdout, stderr });
+  } finally {
+    held.release();
+  }
+}
+
+/**
+ * The call itself, from journal read to footer — everything that touches the
+ * run directory, and therefore everything that must happen under the run
+ * lock `run()` holds around this.
+ *
+ * @returns {Promise<number>} the process exit code
+ */
+async function executeLocked({ plan, flags, stdout, stderr }) {
   const journal = new Journal(plan.runId);
   // Where THIS invocation's entries start, in both senses. `startIndex`
   // continues the run's arrival-order sequence instead of restarting at 0
@@ -253,6 +293,38 @@ async function run(argv, deps = {}) {
   // following it). `entriesBefore` is the file position everything below
   // reads from, so the footer can only ever describe the call just made.
   const entriesBefore = journal.readAll();
+
+  // The same observability every workflow run gets, so `yoki-graph status
+  // <runId>` works for a run this CLI created — before this, a lane-invoked
+  // call left an orphan runDir (journal, no run.json) that `status` reported
+  // as "no run found", and its progress events were discarded outright.
+  // A REUSED --run-id keeps its original startedAt: the run began when its
+  // first call did, and each later call only moves its status forward.
+  // What run.json's `args` deliberately does NOT carry is the prompt: a
+  // lane's prompt is a few hundred KB of base64-carried untrusted text, and
+  // run.json is metadata, not payload — the prompt is recoverable from the
+  // journal's caller if it matters.
+  const priorMeta = readRunMeta(plan.runId);
+  const startedAtIso = (priorMeta && priorMeta.startedAt) || new Date().toISOString();
+  const metaBase = {
+    name: 'yoki-agent', backend: plan.backendName, model: plan.resolvedModel.id || undefined,
+    args: { label: plan.label, ...(plan.sandbox ? { sandbox: plan.sandbox } : {}) },
+    cwd: plan.cwd, startedAt: startedAtIso,
+  };
+  try {
+    writeRunMeta(plan.runId, { ...metaBase, status: 'running' });
+  } catch { /* observability only — the call itself must still run */ }
+  const sink = createEventSink(runDir(plan.runId), { runId: plan.runId });
+  const finalize = async (status, error) => {
+    try {
+      writeRunMeta(plan.runId, {
+        ...metaBase, finishedAt: new Date().toISOString(), status, error,
+        usage: journal.usageTotals(), byModel: journal.usageByModel(),
+      });
+    } catch { /* same rule as above */ }
+    await sink.close();
+  };
+
   const ctx = {
     runId: plan.runId,
     journal,
@@ -264,7 +336,10 @@ async function run(argv, deps = {}) {
     dryRun: plan.dryRun,
     resume: false,
     concurrency: 1,
-    emit: () => {}, // a single call has no progress tree worth drawing
+    // A single call has no progress tree worth drawing on the terminal, but
+    // its events DO go to the run's events.ndjson — that stream is what a
+    // `status`/tail reader of a lane-created run sees.
+    emit: (event) => sink.emit(event),
     timeoutMs: plan.timeoutMs,
     retries: plan.retries,
     caps: budgetLib.resolveCaps(plan.cwd),
@@ -291,9 +366,11 @@ async function run(argv, deps = {}) {
     if (err instanceof SchemaValidationError) {
       stderr.write(`yoki-agent: schema validation failed after retry: ${err.message}\n`);
       if (err.raw) stderr.write(`${String(err.raw).slice(0, 2000)}\n`);
+      await finalize('error', `schema validation failed after retry: ${err.message}`);
       return 3;
     }
     stderr.write(`yoki-agent: ${err.message}\n`);
+    await finalize('error', err.message);
     return 2;
   }
 
@@ -324,6 +401,10 @@ async function run(argv, deps = {}) {
     exitCode,
   });
   (flags.json ? stderr : stdout).write(footer);
+  await finalize(
+    exitCode === 0 ? 'ok' : 'error',
+    exitCode === 0 ? undefined : ((errorEntry && errorEntry.error) || 'backend call failed'),
+  );
   return exitCode;
 }
 
@@ -417,8 +498,13 @@ function buildPlan(flags, env) {
     backend.resolveSandbox(sandbox); // throws with the valid modes listed
   }
 
+  const requestedRunId = optionalString(flags, 'run-id');
+  if (requestedRunId && !RUN_ID_RE.test(requestedRunId)) {
+    throw new UsageError(`--run-id ${JSON.stringify(requestedRunId)} is not a valid run id — must match ${String(RUN_ID_RE)}`);
+  }
+
   return {
-    runId: optionalString(flags, 'run-id') || generateRunId(),
+    runId: requestedRunId || generateRunId(),
     requestedBackend,
     backendName,
     // True only when a backend the caller did NOT ask for is answering.

@@ -36,6 +36,9 @@ const budgetLib = require('./budget');
  * @param {string} opts.body                 the script body (meta already stripped)
  * @param {object} opts.api                  createApi(ctx) — the host globals
  * @param {*} opts.args                       args value for the script
+ * @param {string} [opts.runId]               this run's id, exposed to the body
+ *   as the read-only `runInfo.runId` global (a lane derives its yoki-agent
+ *   `--run-id` from it — see core/workflows/lib/lanes.js)
  * @param {number|null} opts.budgetTotal      token cap for the worker's `budget.total`
  * @param {import('./journal').Journal} opts.journal
  * @param {number} [opts.maxWallMs]           finite -> terminate the run at this age
@@ -45,7 +48,7 @@ const budgetLib = require('./budget');
  */
 function runBodyInWorker(opts) {
   const {
-    body, api, args, budgetTotal, journal,
+    body, api, args, runId, budgetTotal, journal,
     maxWallMs, idleTimeoutMs, signal,
   } = opts;
 
@@ -56,7 +59,10 @@ function runBodyInWorker(opts) {
       // correct from the body's FIRST read — before any agent()/workflow() RPC
       // round-trip. It matters on --resume, where the journal already carries
       // real spend from a prior invocation.
-      workerData: { body: body, args: args, budgetTotal: budgetTotal, spentTotal: journal.spent() },
+      workerData: {
+        body: body, args: args, runId: runId,
+        budgetTotal: budgetTotal, spentTotal: journal.spent(),
+      },
     });
 
     let settled = false;

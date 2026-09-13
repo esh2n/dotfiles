@@ -4,9 +4,13 @@
 # symlinks this repo used to place into it (task T34).
 # -----------------------------------------------------------------------------
 # pi (@earendil-works/pi-coding-agent) was retired on 2026-08-24 in favor of
-# omp; the repo-owned wiring (domains/dev/config/pi/, link_pi_resources() in
-# core/config/manager.sh, the pi() shell wrapper, the ypi sbx entry point) is
-# gone. What is left is whatever pi itself put on this machine, and this repo
+# omp; the repo-owned wiring of that era (the old domains/dev/config/pi/
+# tree, the pi() shell wrapper, the ypi sbx entry point) is gone. pi was
+# later revived as the local-LLM lane (2026-09) with a new config set and a
+# restored link_pi_resources() in core/config/manager.sh — run this script
+# only if you are removing pi from a machine entirely, not to clean up the
+# 2026-08 links (the restored link_pi_resources() sweeps those itself).
+# What is left is whatever pi itself put on this machine, and this repo
 # never touches that automatically — running this script is opt-in and
 # manual, exactly once, on each machine that ever ran pi.
 #

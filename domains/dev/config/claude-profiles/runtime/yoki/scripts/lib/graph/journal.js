@@ -39,13 +39,63 @@ function stateRoot(env = process.env) {
   return override || stateHome(env);
 }
 
+/**
+ * The only shape a run id may take, shared by every path that turns one into
+ * a file system location. Stricter than a model id's alphabet on purpose: a
+ * run id becomes a DIRECTORY NAME under the state home, so `/` — legitimate
+ * inside a model id — would let an id climb out of the graph state tree,
+ * and the lookahead refuses the two names (`.` and `..`) the dot otherwise
+ * lets through whole. Every id yoki mints (`run-…`, `agent-…`, a lane's
+ * `<runId>-lane-<label>`) fits comfortably inside 128 characters.
+ */
+const RUN_ID_RE = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,128}$/;
+
+/** Refuse an id that could not safely become a directory name. Called by
+ *  `runDir` itself, so EVERY consumer — Journal, JournalTail, the run lock,
+ *  run.json reads/writes, event sinks — is covered without each caller
+ *  remembering to check; callers that want a friendlier failure (a usage
+ *  error, an exit code) validate earlier too, and the double check is
+ *  harmless. */
+function assertValidRunId(runId) {
+  const id = String(runId);
+  if (!RUN_ID_RE.test(id)) {
+    throw new Error(`invalid run id ${JSON.stringify(runId)} — a run id must match ${String(RUN_ID_RE)} (it becomes a directory name under the graph state home)`);
+  }
+  return id;
+}
+
 function runDir(runId, env = process.env) {
-  return path.join(stateRoot(env), 'yoki', 'graph', String(runId));
+  return path.join(stateRoot(env), 'yoki', 'graph', assertValidRunId(runId));
 }
 
 function journalPath(runId, env = process.env) {
   return path.join(runDir(runId, env), 'journal.jsonl');
 }
+
+/**
+ * Above this many BYTES of JSON, an ok entry's `result` moves out of the
+ * journal line into its own file under `<runDir>/results/`, and the line
+ * carries `resultRef: "results/<index>-<key prefix>.json"` instead.
+ *
+ * Why: the journal is read WHOLE — every `spent()` seed, `status` call and
+ * replay load parses every line — and a review workflow's findings run to
+ * hundreds of KB per call, so carrying them inline made every O(journal)
+ * operation O(results). Below the threshold the result stays inline on
+ * purpose: most calls are small, and an extra file per "ok" would triple the
+ * IO of a normal run for nothing.
+ *
+ * The threshold is a WRITE-side choice, not a format break: readers accept
+ * both shapes forever (`loadResult`), so an old journal replays unchanged
+ * and a new journal read by old code merely sees no `result` on its biggest
+ * lines — which only resume consumed, via this file.
+ */
+const INLINE_RESULT_MAX_BYTES = 2048;
+
+/** The only shape a resultRef may take. It is a path fragment joined under
+ *  the run's own directory, and it normally comes from this file's own
+ *  writes — but journals are plain text on disk, so a mangled or hand-edited
+ *  ref must never be able to point a replay outside the runDir. */
+const RESULT_REF_RE = /^results\/[A-Za-z0-9._-]+\.json$/;
 
 /** Labels yoki-graph invents rather than the script choosing them. These
  *  must stay OUT of the key: they are derived from arrival order, which
@@ -190,7 +240,8 @@ class Journal {
   }
 
   append(entry) {
-    const stamped = Number.isInteger(entry.gen) ? entry : { ...entry, gen: this.generation() };
+    let stamped = Number.isInteger(entry.gen) ? entry : { ...entry, gen: this.generation() };
+    stamped = this._externalizeResult(stamped);
     this.ensureDir();
     fs.appendFileSync(this.file, `${JSON.stringify(stamped)}\n`);
     if (this._replay && stamped.status === 'ok' && Number.isInteger(stamped.index)) {
@@ -201,6 +252,54 @@ class Journal {
     // entry, so incrementing here too would double-count.
     if (this._spent !== undefined && typeof stamped.tokens === 'number') {
       this._spent += stamped.tokens;
+    }
+  }
+
+  /**
+   * Move an ok entry's oversized `result` into `<runDir>/results/` and hand
+   * back the entry with `resultRef` in its place (see INLINE_RESULT_MAX_BYTES
+   * for why, and for why small results stay inline). Only "ok" entries carry
+   * a `result`; retry/error lines pass through untouched.
+   *
+   * If the side file cannot be written, the entry keeps its inline result:
+   * losing a recorded result to an IO hiccup would silently cost a replay,
+   * and one oversized journal line is the strictly smaller harm.
+   */
+  _externalizeResult(entry) {
+    if (entry.status !== 'ok' || !('result' in entry)) return entry;
+    const json = JSON.stringify(entry.result);
+    if (typeof json !== 'string' || Buffer.byteLength(json, 'utf8') <= INLINE_RESULT_MAX_BYTES) return entry;
+    const key = typeof entry.key === 'string' ? entry.key.slice(0, 12) : 'nokey';
+    const index = Number.isInteger(entry.index) ? entry.index : 0;
+    const ref = `results/${index}-${key}.json`;
+    try {
+      fs.mkdirSync(path.join(this.dir, 'results'), { recursive: true });
+      fs.writeFileSync(path.join(this.dir, ref), json);
+    } catch {
+      return entry;
+    }
+    const { result, ...rest } = entry;
+    return { ...rest, resultRef: ref };
+  }
+
+  /**
+   * The recorded result of a replayable entry, resolving `resultRef` back to
+   * its side file. Returns `{ ok: true, result }`, or `{ ok: false }` when
+   * the entry's result is UNRECOVERABLE — the ref's file is missing,
+   * unreadable, unparseable, or the ref itself is malformed. The caller must
+   * treat `ok: false` exactly like a key mismatch at that index: stop
+   * replaying and run live from here — an entry whose result is gone is not
+   * an error, it is simply not a cache hit.
+   */
+  loadResult(entry) {
+    if (!entry || typeof entry !== 'object') return { ok: false };
+    if (!('resultRef' in entry)) return { ok: true, result: entry.result };
+    const ref = entry.resultRef;
+    if (typeof ref !== 'string' || !RESULT_REF_RE.test(ref)) return { ok: false };
+    try {
+      return { ok: true, result: JSON.parse(fs.readFileSync(path.join(this.dir, ref), 'utf8')) };
+    } catch {
+      return { ok: false };
     }
   }
 
@@ -338,7 +437,7 @@ function parseEntries(text) {
 }
 
 /**
- * An incremental reader for one run's journal, for `status --watch`.
+ * An incremental reader for one growing NDJSON file.
  *
  * Each poll used to call `readAll()`: a synchronous read and JSON.parse of
  * the ENTIRE growing NDJSON file, every two seconds, so the cost of watching
@@ -350,10 +449,23 @@ function parseEntries(text) {
  * next tick rather than parsed and dropped. If the file ever gets SHORTER
  * than the offset — truncated, rotated, or a fresh run reusing the id — the
  * offset is meaningless and everything is re-read from zero.
+ *
+ * `options.skipTailBytes` bounds how much of an ALREADY-LARGE file a fresh
+ * reader will swallow: when the first contact (or a post-truncation re-read)
+ * finds more than that many bytes, the reader jumps to the final
+ * `skipTailBytes` and discards everything up to the next newline, so a
+ * viewer attaching to a long-lived run pays for its tail, not its history.
+ * The discarded half-line can never be mistaken for an entry — it is cut
+ * BEFORE parsing, not left for JSON.parse to reject, because a boundary cut
+ * could in principle land on a spot that still parses as valid JSON of the
+ * wrong shape. Zero (the default) disables the skip: journal consumers
+ * (resume, watch) genuinely need every line.
  */
-class JournalTail {
-  constructor(runId, env = process.env) {
-    this.file = journalPath(runId, env);
+class FileTail {
+  constructor(file, options = {}) {
+    this.file = file;
+    this.skipTailBytes = Number.isFinite(options.skipTailBytes) && options.skipTailBytes > 0
+      ? options.skipTailBytes : 0;
     this.reset();
   }
 
@@ -371,6 +483,9 @@ class JournalTail {
     // and corrupt the line; StringDecoder carries the leftover bytes into
     // the next chunk instead.
     this.decoder = new StringDecoder('utf8');
+    // True while a skip-ahead has landed mid-line: everything up to the
+    // next newline belongs to a line whose head was never read.
+    this.skipping = false;
   }
 
   /** Every entry seen so far, including this poll's new ones. */
@@ -386,6 +501,12 @@ class JournalTail {
       // the old position is trustworthy. Full re-read.
       this.reset();
     }
+    if (this.offset === 0 && this.skipTailBytes && stat.size > this.skipTailBytes) {
+      // First contact with a file that is already large: start near the end
+      // instead of ingesting megabytes of history (see the class header).
+      this.offset = stat.size - this.skipTailBytes;
+      this.skipping = true;
+    }
     if (stat.size === this.offset) return this.entries;
 
     const fd = fs.openSync(this.file, 'r');
@@ -394,7 +515,18 @@ class JournalTail {
       const buffer = Buffer.allocUnsafe(length);
       const bytes = fs.readSync(fd, buffer, 0, length, this.offset);
       this.offset += bytes;
-      const chunk = this.pending + this.decoder.write(buffer.subarray(0, bytes));
+      let chunk = this.pending + this.decoder.write(buffer.subarray(0, bytes));
+      if (this.skipping) {
+        const firstNewline = chunk.indexOf('\n');
+        if (firstNewline === -1) {
+          // Still inside the line the skip cut into — a single line longer
+          // than this chunk. Keep discarding until its newline arrives.
+          this.pending = '';
+          return this.entries;
+        }
+        chunk = chunk.slice(firstNewline + 1);
+        this.skipping = false;
+      }
       const lastNewline = chunk.lastIndexOf('\n');
       if (lastNewline === -1) {
         this.pending = chunk;
@@ -409,7 +541,20 @@ class JournalTail {
   }
 }
 
+/**
+ * FileTail bound to one run's journal — the incremental reader
+ * `status --watch` polls with. Kept as its own name (not a call-site
+ * `new FileTail(journalPath(...))`) because every existing consumer and test
+ * reaches the journal through the runId, never through a path.
+ */
+class JournalTail extends FileTail {
+  constructor(runId, env = process.env) {
+    super(journalPath(runId, env));
+  }
+}
+
 module.exports = {
   Journal, callKey, runDir, journalPath, stateRoot, AUTO_LABEL,
-  usageTotalsFrom, usageByModelFrom, parseEntries, JournalTail,
+  usageTotalsFrom, usageByModelFrom, parseEntries, FileTail, JournalTail,
+  INLINE_RESULT_MAX_BYTES, RUN_ID_RE, assertValidRunId,
 };
