@@ -56,6 +56,37 @@ for f in "$PI_SRC"/extensions/*.ts; do ln -sf "$f" ~/.pi/agent/extensions/"$(bas
 LM Studio side: load `qwen/qwen3.8-27b` with context ≥ 64K (131072 current),
 then `lms server start`.
 
+## Third-party extensions (installed via `pi install`, recorded in settings.json)
+
+Selected from a community recommendation list after per-repo resident-cost
+verification (registerTool count + per-turn injections read from source):
+
+| Extension | Why it made the cut | Resident cost |
+|---|---|---|
+| [dimk90/pi-context-view](https://github.com/dimk90/pi-context-view) | `/context usage` / `/context injections` — the audit instrument for this lane's 1K-token budget. TUI-only | 0 |
+| [Ahm3tJ4f/pi-undo](https://github.com/Ahm3tJ4f/pi-undo) | Message-level shadow-git undo/redo — insurance for an erratic local model | 0 (hooks only) |
+| [sting8k/pi-vcc](https://github.com/sting8k/pi-vcc) | Structured compaction **without an LLM call** (30–470ms). Core compaction summarizes with the model itself — minutes at 8 tok/s locally | 1 tool (~500 tok), accepted |
+
+Evaluated and NOT installed (resident cost or single-instance mismatch):
+pi-web-access (~1.5–2K tok; research is the cloud lane's job), pi-lens
+(~2.3K tok + per-turn injection), pi-add-dir (unbounded per-turn AGENTS.md
+injection), rpiv-ask-user-question (~1.2K tok init), pi-btw / swarm-family
+(parallel LLM requests serialize on one LM Studio instance and concurrent
+requests invalidate each other's KV cache — lmstudio-bug-tracker#2320),
+plannotator / pi-session-recall (cloud-lane value). "Swarm" has no canonical
+implementation — it is several community extensions sharing a name.
+
+## Measured on this machine (M4 Pro 64GB, 2026-09-13)
+
+- Decode ≈ 8.2 tok/s (thinking included, wall-clock) — dense-27B physics
+- Cold prefill ≈ 120 tok/s: every resident 1K tokens costs ~8s of cold TTFT
+- **Prompt cache works for this model**: identical-prefix TTFT 36.9s → 3.0s
+  (~12x). The "hybrid attention gets no cache" report did not reproduce on
+  qwen3_5 arch. Conditions: serial requests only, /v1 endpoint
+- `showCacheMissNotices: true` is set but cannot fire against LM Studio
+  (its /v1 usage reports no cached_tokens — lmstudio-bug-tracker#2390);
+  it becomes useful the moment a cloud provider is added to models.json
+
 ## Known issues tracked upstream
 
 - earendil-works/pi#8567 — qwen-chat-template always selects xhigh thinking;
