@@ -175,3 +175,87 @@ test('top --once with an empty state root prints a complete empty screen and ret
   assert.match(out, /0 active \/ 0 done/);
   assert.match(out, /\(no runs\)/);
 }));
+
+// ---------------------------------------------------------------------------
+// Live loop exit paths and watcher recovery (injected proc/watch/stdin)
+// ---------------------------------------------------------------------------
+
+const { EventEmitter } = require('node:events');
+
+function fakeTty() {
+  const frames = [];
+  const stream = { write: (c) => { frames.push(String(c)); return true; }, isTTY: true };
+  const stdin = new EventEmitter();
+  stdin.isTTY = true;
+  stdin.setRawMode = () => {};
+  stdin.resume = () => {};
+  stdin.pause = () => {};
+  const proc = new EventEmitter();
+  proc.exits = [];
+  proc.exit = (code) => { proc.exits.push(code); };
+  return { frames, stream, stdin, proc };
+}
+
+const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+test('live view: SIGTERM restores the terminal (alt-screen exit) before exiting', () => withIsolatedState(async () => {
+  const runId = 'run-live-1';
+  runner.writeRunMeta(runId, { name: 'live', backend: 'mock', status: 'ok', startedAt: new Date().toISOString() });
+  const { frames, stream, stdin, proc } = fakeTty();
+  const done = top.cmdTop([], {}, { stream, isTty: true, stdin, proc });
+  await sleep(200);
+  proc.emit('SIGTERM');
+  await done;
+  const joined = frames.join('');
+  // The restore sequence is the LAST thing written — the shell gets its
+  // screen back no matter how the viewer went down.
+  assert.ok(joined.endsWith('\x1b[?25h\x1b[?1049l'), JSON.stringify(joined.slice(-40)));
+  assert.deepEqual(proc.exits, [143]); // 128 + SIGTERM(15)
+  // cleanup unhooked its handlers: nothing of ours is left on the process.
+  assert.equal(proc.listenerCount('SIGTERM') + proc.listenerCount('SIGINT') + proc.listenerCount('exit'), 0);
+}));
+
+test('live view: an errored run watcher is dropped and re-attached; the root watcher via the safety tick', () => withIsolatedState(async () => {
+  const runId = 'run-live-2';
+  runner.writeRunMeta(runId, { name: 'live2', backend: 'mock', status: 'ok', startedAt: new Date().toISOString() });
+  const runPath = runDir(runId);
+  const graphRootDir = path.dirname(runPath);
+
+  // fs.watch stub: records every attach, hands back inert emitters whose
+  // 'error' we can fire on demand.
+  const watchers = [];
+  const watch = (dir, cb) => {
+    const w = new EventEmitter();
+    w.dir = dir;
+    w.closed = false;
+    w.close = () => { w.closed = true; };
+    w.cb = cb;
+    watchers.push(w);
+    return w;
+  };
+  const { stream, stdin, proc } = fakeTty();
+  const done = top.cmdTop([], {}, {
+    stream, isTty: true, stdin, proc, watch, safetyIntervalMs: 60,
+  });
+  await sleep(150); // first paint: root + run watcher attached
+  const rootW = watchers.find((w) => w.dir === graphRootDir);
+  const runW = watchers.find((w) => w.dir === runPath);
+  assert.ok(rootW && runW, watchers.map((w) => w.dir).join(', '));
+
+  runW.emit('error', new Error('fsevents died'));
+  rootW.emit('error', new Error('fsevents died'));
+  // The error path closes the dead handles immediately…
+  assert.ok(runW.closed && rootW.closed);
+  // …and within one safety tick (+ paint) both are watching again through
+  // FRESH handles: the run watcher via the paint's sync, the root via the
+  // tick's `if (!rootWatcher) watchRoot()`.
+  await sleep(300);
+  const freshRun = watchers.filter((w) => w.dir === runPath && !w.closed);
+  const freshRoot = watchers.filter((w) => w.dir === graphRootDir && !w.closed);
+  assert.equal(freshRun.length, 1, 'run watcher not re-attached');
+  assert.equal(freshRoot.length, 1, 'root watcher not re-attached');
+  // The re-attached run watcher is live: an event through it still paints.
+  stdin.emit('data', 'q');
+  await done;
+  assert.deepEqual(proc.exits, []); // a normal quit never calls exit()
+}));

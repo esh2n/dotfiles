@@ -278,11 +278,39 @@ async function cmdTop(rest, flags, deps = {}) {
     return;
   }
 
-  await liveLoop({ views, env, columns, stream, now, hostname, stdin: deps.stdin });
+  await liveLoop({
+    views, env, columns, stream, now, hostname,
+    stdin: deps.stdin, stderr, proc: deps.proc, watch: deps.watch,
+    safetyIntervalMs: deps.safetyIntervalMs,
+  });
 }
 
-/** The interactive loop: watchers in, coalesced frames out, `q` to leave. */
-function liveLoop({ views, env, columns, stream, now, hostname, stdin = process.stdin }) {
+/**
+ * The interactive loop: watchers in, coalesced frames out, `q` to leave.
+ *
+ * Terminal restoration is guaranteed on EVERY exit path, because a viewer
+ * that leaves the user's shell trapped in the alternate screen with raw
+ * input is worse than any bug it might have crashed on:
+ *
+ *  - `cleanup()` is idempotent and is the single exit point (q key,
+ *    signals, internal failure).
+ *  - SIGINT/SIGTERM/SIGHUP run cleanup, then exit with the conventional
+ *    128+signum code.
+ *  - every async entry point (paint, watch callbacks, the safety tick, the
+ *    key handler) is wrapped: an exception cleans up, prints ONE line to
+ *    stderr and exits non-zero instead of unwinding past the alt screen.
+ *  - a process 'exit' listener is the last resort: it synchronously
+ *    restores the terminal even if cleanup never ran (a process.exit from
+ *    elsewhere), and tolerates an already-destroyed stream.
+ *
+ * `watch` (default fs.watch), `proc` (default process), `stderr` and
+ * `safetyIntervalMs` are injectable so the failure paths are testable.
+ */
+function liveLoop({
+  views, env, columns, stream, now, hostname,
+  stdin = process.stdin, stderr = process.stderr, proc = process,
+  watch = fs.watch, safetyIntervalMs = SAFETY_INTERVAL_MS,
+}) {
   return new Promise((resolve) => {
     let lastFrame = '';
     let lastPaintAt = 0;
@@ -293,6 +321,39 @@ function liveLoop({ views, env, columns, stream, now, hostname, stdin = process.
     let rootWatcher = null;
     let safety = null;
     let closed = false;
+    let restored = false;
+
+    /** Put the terminal back — raw mode off, cursor shown, alternate
+     *  screen left. Idempotent and throw-free: this also runs from the
+     *  process 'exit' listener, where the stream may already be destroyed
+     *  and a throw would turn an orderly exit into a crash. */
+    function restoreTerminal() {
+      if (restored) return;
+      restored = true;
+      try {
+        if (stdin.isTTY && typeof stdin.setRawMode === 'function') stdin.setRawMode(false);
+      } catch { /* stdin already gone */ }
+      try {
+        // Leave the alternate screen and restore the cursor — the shell's
+        // scrollback comes back exactly as it was before `top` started.
+        stream.write('\x1b[?25h\x1b[?1049l');
+      } catch { /* stream already gone */ }
+    }
+
+    /** Wrap an async entry point (timer, watcher, key handler): a throw
+     *  inside one must restore the terminal and report, never unwind into
+     *  nowhere with the alt screen still active. */
+    function guarded(fn) {
+      return (...args) => {
+        try {
+          fn(...args);
+        } catch (err) {
+          cleanup();
+          try { stderr.write(`yoki-graph top: ${err && err.message ? err.message : err}\n`); } catch { /* stderr gone */ }
+          proc.exitCode = 1;
+        }
+      };
+    }
 
     function paint() {
       paintTimer = null;
@@ -309,34 +370,43 @@ function liveLoop({ views, env, columns, stream, now, hostname, stdin = process.
       // a full clear-screen per frame flickers on slower terminals.
       stream.write(`\x1b[H${text.replace(/\n/g, '\x1b[K\n')}\x1b[J`);
     }
+    const guardedPaint = guarded(paint);
 
     /** Coalesce paint requests: at most one paint per MIN_PAINT_INTERVAL_MS,
      *  the trailing request deferred, never dropped. */
     function schedulePaint() {
       if (closed || paintTimer) return;
       const wait = Math.max(0, lastPaintAt + MIN_PAINT_INTERVAL_MS - now());
-      paintTimer = setTimeout(paint, wait);
+      paintTimer = setTimeout(guardedPaint, wait);
       if (typeof paintTimer.unref === 'function') paintTimer.unref();
     }
 
     /** Watch every known runDir; drop watchers for pruned runs. A runDir
      *  watch fires for events.ndjson appends, run.json renames and lock
-     *  create/delete alike — all of them mean "this run needs re-reading". */
+     *  create/delete alike — all of them mean "this run needs re-reading".
+     *  An errored watcher is closed and REMOVED from the registry, so the
+     *  next sync (every paint, and at latest the safety tick's refreshAll
+     *  paint) attaches a fresh one instead of trusting a dead handle. */
     function syncRunWatchers() {
       for (const [runId, watcher] of [...runWatchers]) {
         if (!views.has(runId)) {
-          watcher.close();
+          try { watcher.close(); } catch { /* already closed */ }
           runWatchers.delete(runId);
         }
       }
       for (const runId of views.keys()) {
         if (runWatchers.has(runId)) continue;
         try {
-          const watcher = fs.watch(views.get(runId).dir, () => {
+          const watcher = watch(views.get(runId).dir, guarded(() => {
             dirty.add(runId);
             schedulePaint();
-          });
-          watcher.on('error', () => { /* covered by the safety tick */ });
+          }));
+          watcher.on('error', guarded(() => {
+            try { watcher.close(); } catch { /* already closed */ }
+            runWatchers.delete(runId);
+            dirty.add(runId);
+            schedulePaint(); // re-read now; that paint's sync re-attaches
+          }));
           runWatchers.set(runId, watcher);
         } catch { /* runDir vanished between discovery and watch — safety tick re-syncs */ }
       }
@@ -344,11 +414,20 @@ function liveLoop({ views, env, columns, stream, now, hostname, stdin = process.
 
     function watchRoot() {
       try {
-        rootWatcher = fs.watch(graphRoot(env), () => {
+        const watcher = watch(graphRoot(env), guarded(() => {
           refreshAll = true; // a new/removed runDir — re-discover everything
           schedulePaint();
-        });
-        rootWatcher.on('error', () => { /* covered by the safety tick */ });
+        }));
+        watcher.on('error', guarded(() => {
+          try { watcher.close(); } catch { /* already closed */ }
+          // Null the handle so the safety tick's `if (!rootWatcher)`
+          // re-attaches it — a dead watcher held here would satisfy that
+          // check forever while watching nothing.
+          if (rootWatcher === watcher) rootWatcher = null;
+          refreshAll = true;
+          schedulePaint();
+        }));
+        rootWatcher = watcher;
       } catch { /* root not created yet — the safety tick retries */ }
     }
 
@@ -357,23 +436,38 @@ function liveLoop({ views, env, columns, stream, now, hostname, stdin = process.
       closed = true;
       if (paintTimer) clearTimeout(paintTimer);
       clearInterval(safety);
-      if (rootWatcher) rootWatcher.close();
-      for (const watcher of runWatchers.values()) watcher.close();
-      if (stdin.isTTY && typeof stdin.setRawMode === 'function') stdin.setRawMode(false);
+      if (rootWatcher) { try { rootWatcher.close(); } catch { /* already closed */ } }
+      for (const watcher of runWatchers.values()) { try { watcher.close(); } catch { /* already closed */ } }
       stdin.removeListener('data', onKey);
-      stdin.pause();
-      // Leave the alternate screen and restore the cursor — the shell's
-      // scrollback comes back exactly as it was before `top` started.
-      stream.write('\x1b[?25h\x1b[?1049l');
+      try { stdin.pause(); } catch { /* stdin gone */ }
+      for (const [signal, handler] of signalHandlers) proc.removeListener(signal, handler);
+      proc.removeListener('exit', restoreTerminal);
+      restoreTerminal();
       resolve();
     }
 
-    function onKey(data) {
+    const onKey = guarded((data) => {
       const key = String(data);
       // `q` is the documented key; Ctrl-C arrives as raw ETX (0x03) in
       // raw mode — the terminal no longer turns it into SIGINT for us.
       if (key === 'q' || key === 'Q' || key === '\u0003') cleanup();
-    }
+    });
+
+    // A signal must restore the terminal BEFORE the process dies — the
+    // default disposition would kill us mid-alt-screen. Exit with the
+    // conventional 128+signum so callers can still tell how we went.
+    const SIGNAL_CODES = { SIGHUP: 129, SIGINT: 130, SIGTERM: 143 };
+    const signalHandlers = Object.entries(SIGNAL_CODES).map(([signal, code]) => {
+      const handler = () => {
+        cleanup();
+        proc.exit(code);
+      };
+      proc.on(signal, handler);
+      return [signal, handler];
+    });
+    // Last resort: someone else calls process.exit() while we are live.
+    // 'exit' allows only synchronous work — restoreTerminal is exactly that.
+    proc.on('exit', restoreTerminal);
 
     // Alternate screen + hidden cursor for the duration of the viewer.
     stream.write('\x1b[?1049h\x1b[?25l\x1b[H\x1b[2J');
@@ -385,13 +479,14 @@ function liveLoop({ views, env, columns, stream, now, hostname, stdin = process.
     // The safety tick: re-discover and re-read EVERYTHING at a human
     // timescale, so a dead watcher (or a root that appeared after startup)
     // degrades to a 5s-latency view instead of a frozen one. It also keeps
-    // the elapsed columns moving between events. If the root watcher never
-    // attached, retry it here.
-    safety = setInterval(() => {
+    // the elapsed columns moving between events. A missing root watcher is
+    // re-attached here; missing RUN watchers are re-attached by the paint
+    // this tick schedules (syncRunWatchers runs on every paint).
+    safety = setInterval(guarded(() => {
       refreshAll = true;
       if (!rootWatcher) watchRoot();
       schedulePaint();
-    }, SAFETY_INTERVAL_MS);
+    }), safetyIntervalMs);
     if (typeof safety.unref === 'function') safety.unref();
 
     schedulePaint();
