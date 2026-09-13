@@ -302,6 +302,47 @@ test('JournalTail returns nothing, not a throw, before the journal exists', () =
 });
 
 // ---------------------------------------------------------------------------
+// FileTail's skipTailBytes — the attach-to-a-large-file path `top` uses
+// ---------------------------------------------------------------------------
+
+test('FileTail with skipTailBytes: first contact with a large file starts at its tail, on a line boundary', () => {
+  withTempStateHome(({ FileTail }, dir) => {
+    const file = path.join(dir, 'big.ndjson');
+    const lines = [];
+    for (let i = 0; i < 200; i += 1) lines.push(JSON.stringify({ seq: i, pad: 'x'.repeat(50) }));
+    fs.writeFileSync(file, `${lines.join('\n')}\n`);
+
+    // A window that lands mid-file — and, virtually certainly, mid-line.
+    const tail = new FileTail(file, { skipTailBytes: 1000 });
+    const entries = tail.read();
+    assert.ok(entries.length > 0 && entries.length < 200, `read ${entries.length} of 200`);
+    // The cut line's remainder was discarded BEFORE parsing, so the first
+    // entry is a complete line, and the run of seqs is contiguous to 199.
+    for (let i = 1; i < entries.length; i += 1) {
+      assert.equal(entries[i].seq, entries[i - 1].seq + 1);
+    }
+    assert.equal(entries[entries.length - 1].seq, 199);
+
+    // Later appends flow incrementally, exactly as without the skip.
+    // (read() returns the same growing array, so take the count first.)
+    const before = entries.length;
+    fs.appendFileSync(file, `${JSON.stringify({ seq: 200 })}\n`);
+    const after = tail.read();
+    assert.equal(after.length, before + 1);
+    assert.equal(after[after.length - 1].seq, 200);
+  });
+});
+
+test('FileTail with skipTailBytes: a small file is read whole — the skip never fires below the threshold', () => {
+  withTempStateHome(({ FileTail }, dir) => {
+    const file = path.join(dir, 'small.ndjson');
+    fs.writeFileSync(file, `${JSON.stringify({ seq: 0 })}\n${JSON.stringify({ seq: 1 })}\n`);
+    const entries = new FileTail(file, { skipTailBytes: 2 * 1024 * 1024 }).read();
+    assert.deepEqual(entries.map((e) => e.seq), [0, 1]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // callKey's execution identity: the resolved backend and model
 // ---------------------------------------------------------------------------
 

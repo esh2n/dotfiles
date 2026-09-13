@@ -437,7 +437,7 @@ function parseEntries(text) {
 }
 
 /**
- * An incremental reader for one run's journal, for `status --watch`.
+ * An incremental reader for one growing NDJSON file.
  *
  * Each poll used to call `readAll()`: a synchronous read and JSON.parse of
  * the ENTIRE growing NDJSON file, every two seconds, so the cost of watching
@@ -449,10 +449,23 @@ function parseEntries(text) {
  * next tick rather than parsed and dropped. If the file ever gets SHORTER
  * than the offset — truncated, rotated, or a fresh run reusing the id — the
  * offset is meaningless and everything is re-read from zero.
+ *
+ * `options.skipTailBytes` bounds how much of an ALREADY-LARGE file a fresh
+ * reader will swallow: when the first contact (or a post-truncation re-read)
+ * finds more than that many bytes, the reader jumps to the final
+ * `skipTailBytes` and discards everything up to the next newline, so a
+ * viewer attaching to a long-lived run pays for its tail, not its history.
+ * The discarded half-line can never be mistaken for an entry — it is cut
+ * BEFORE parsing, not left for JSON.parse to reject, because a boundary cut
+ * could in principle land on a spot that still parses as valid JSON of the
+ * wrong shape. Zero (the default) disables the skip: journal consumers
+ * (resume, watch) genuinely need every line.
  */
-class JournalTail {
-  constructor(runId, env = process.env) {
-    this.file = journalPath(runId, env);
+class FileTail {
+  constructor(file, options = {}) {
+    this.file = file;
+    this.skipTailBytes = Number.isFinite(options.skipTailBytes) && options.skipTailBytes > 0
+      ? options.skipTailBytes : 0;
     this.reset();
   }
 
@@ -470,6 +483,9 @@ class JournalTail {
     // and corrupt the line; StringDecoder carries the leftover bytes into
     // the next chunk instead.
     this.decoder = new StringDecoder('utf8');
+    // True while a skip-ahead has landed mid-line: everything up to the
+    // next newline belongs to a line whose head was never read.
+    this.skipping = false;
   }
 
   /** Every entry seen so far, including this poll's new ones. */
@@ -485,6 +501,12 @@ class JournalTail {
       // the old position is trustworthy. Full re-read.
       this.reset();
     }
+    if (this.offset === 0 && this.skipTailBytes && stat.size > this.skipTailBytes) {
+      // First contact with a file that is already large: start near the end
+      // instead of ingesting megabytes of history (see the class header).
+      this.offset = stat.size - this.skipTailBytes;
+      this.skipping = true;
+    }
     if (stat.size === this.offset) return this.entries;
 
     const fd = fs.openSync(this.file, 'r');
@@ -493,7 +515,18 @@ class JournalTail {
       const buffer = Buffer.allocUnsafe(length);
       const bytes = fs.readSync(fd, buffer, 0, length, this.offset);
       this.offset += bytes;
-      const chunk = this.pending + this.decoder.write(buffer.subarray(0, bytes));
+      let chunk = this.pending + this.decoder.write(buffer.subarray(0, bytes));
+      if (this.skipping) {
+        const firstNewline = chunk.indexOf('\n');
+        if (firstNewline === -1) {
+          // Still inside the line the skip cut into — a single line longer
+          // than this chunk. Keep discarding until its newline arrives.
+          this.pending = '';
+          return this.entries;
+        }
+        chunk = chunk.slice(firstNewline + 1);
+        this.skipping = false;
+      }
       const lastNewline = chunk.lastIndexOf('\n');
       if (lastNewline === -1) {
         this.pending = chunk;
@@ -508,8 +541,20 @@ class JournalTail {
   }
 }
 
+/**
+ * FileTail bound to one run's journal — the incremental reader
+ * `status --watch` polls with. Kept as its own name (not a call-site
+ * `new FileTail(journalPath(...))`) because every existing consumer and test
+ * reaches the journal through the runId, never through a path.
+ */
+class JournalTail extends FileTail {
+  constructor(runId, env = process.env) {
+    super(journalPath(runId, env));
+  }
+}
+
 module.exports = {
   Journal, callKey, runDir, journalPath, stateRoot, AUTO_LABEL,
-  usageTotalsFrom, usageByModelFrom, parseEntries, JournalTail,
+  usageTotalsFrom, usageByModelFrom, parseEntries, FileTail, JournalTail,
   INLINE_RESULT_MAX_BYTES, RUN_ID_RE, assertValidRunId,
 };
