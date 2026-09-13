@@ -44,8 +44,11 @@
 const { formatElapsed } = require('./progress');
 const {
   sanitizeText, truncateToWidth, laneIcon, laneCounts, RUN_ICONS,
+  displayWidth, padCell, renderBar, segmentBar, truncateSegments, paintSegments,
+  runStatusRole, laneStatusRole, formatTokens,
 } = require('./top-render');
-const { laneList } = require('./top-fold');
+const { laneList, completedSiblings } = require('./top-fold');
+const { estimateProgress } = require('./top-estimate');
 
 /** Body lines (everything under the header) are capped here. 8 keeps the
  *  widget at most 9 rows — roughly a quarter of an 80x24 terminal — and the
@@ -183,4 +186,258 @@ function widgetLines(views, width, now) {
   return [header, ...body].map((line) => truncateToWidth(line, cols));
 }
 
-module.exports = { widgetLines, isActiveLane, isActiveRun, MAX_BODY_LINES, DEFAULT_WIDTH };
+// ---------------------------------------------------------------------------
+// Rich layout (widgetLinesRich) — the themed, aligned form the pi widget
+// actually shows. Same visibility/overflow/sanitation contract as
+// widgetLines above; what changes is presentation:
+//
+//   yoki-graph ▶ 1 run                                Σ 12.4k tok
+//   ▶ review  検証 2/3  1m39s  ━━━━━━━━━━  1/3
+//     ◉ sec-review   ⣿⣿⣤    45%   12t  1m34s
+//     🔸 judge                       4t  2m40s
+//
+//  - every line is a list of {role, text} SEGMENTS; all width arithmetic
+//    (padding, truncation) runs on the plain text, and `paint(role, text)`
+//    wraps finished cells only afterwards — an ANSI byte can never be
+//    counted as a display cell or sheared by the truncation;
+//  - color marks STATE and CHROME only (icons by state, bars, dimmed
+//    numerals); labels and names stay the terminal's normal text color;
+//  - lane rows are columnar: label column sized to the widest active label,
+//    numeric columns right-aligned, so ticks and elapsed line up vertically;
+//  - a running lane shows a braille bar + estimated % ONLY when the run has
+//    finished sibling lanes to base the estimate on (top-estimate's rule:
+//    zero siblings means no bar, never an invented percentage);
+//  - the run row carries a proportional segment bar of its lane states
+//    (done / error / in flight, largest-remainder cell allocation);
+//  - the header gains the active runs' token total, right-aligned — one
+//    information line, not a list of fragments.
+//
+// The plain widgetLines above is unchanged and remains the no-theme
+// fallback; identity paint on this function is the colorless rich layout.
+// ---------------------------------------------------------------------------
+
+/** Braille estimate bar width (cells) in a lane row. */
+const RICH_BAR_WIDTH = 5;
+/** Proportional lane-state bar width (cells) in a run row. */
+const RICH_SEGMENT_BAR_WIDTH = 10;
+/** Label column bounds — sized to content between these. */
+const RICH_LABEL_MIN = 4;
+const RICH_LABEL_MAX = 22;
+
+function seg(role, text) { return { role, text }; }
+
+/** Drop trailing blank segments and right-trim the last one, so alignment
+ *  padding never leaves invisible spaces at the end of a widget line. */
+function trimSegments(segments) {
+  const kept = [...segments];
+  while (kept.length && !kept[kept.length - 1].text.trim()) kept.pop();
+  if (kept.length) {
+    const last = kept.length - 1;
+    kept[last] = { ...kept[last], text: kept[last].text.replace(/\s+$/, '') };
+  }
+  return kept;
+}
+
+/** Everything a rich lane row renders, gathered BEFORE layout so the label
+ *  column can be sized to the widest label across the whole widget. */
+function laneDescriptor(lane, state, now) {
+  const elapsedMs = Number.isFinite(lane.durationMs)
+    ? lane.durationMs
+    : (Number.isFinite(lane.startedTs)
+      ? Math.max(0, (Number.isFinite(lane.endedTs) ? lane.endedTs : now) - lane.startedTs)
+      : null);
+  // Same discipline as top-render's bar cell: only a RUNNING lane, and only
+  // when finished siblings exist — estimateProgress answers null otherwise.
+  // A needs-human lane additionally shows NO bar even while nominally
+  // running: it is waiting on the person reading this widget, and a
+  // percentage crawling forward under 🔸 would say the opposite.
+  const fraction = lane.status === 'running' && !lane.needsHuman
+    ? estimateProgress(
+      { elapsedMs: elapsedMs === null ? 0 : elapsedMs, toolCalls: lane.toolCalls },
+      completedSiblings(state, lane.index),
+    )
+    : null;
+  return {
+    icon: laneIcon(lane),
+    role: laneStatusRole(lane),
+    label: sanitizeText(lane.label || `#${lane.index}`),
+    fraction,
+    toolCalls: lane.toolCalls || 0,
+    elapsed: laneElapsed(lane, now),
+    must: Boolean(lane.needsHuman),
+  };
+}
+
+/** Rich mirror of childEntries: a nested lane run's active lanes as
+ *  descriptors, lane-suffix labelling and the alive-but-silent placeholder
+ *  included. */
+function childDescriptors(child, now) {
+  const lanes = laneList(child.state).filter(isActiveLane);
+  if (!lanes.length) {
+    if (!isActiveRun(child)) return [];
+    return [{
+      icon: '◉', role: 'accent',
+      label: sanitizeText(child.laneLabel || child.runId),
+      fraction: null, toolCalls: 0, elapsed: '', must: false,
+    }];
+  }
+  return lanes.map((lane) => {
+    const label = !lane.label || lane.label === 'yoki-agent' ? child.laneLabel : lane.label;
+    return laneDescriptor({ ...lane, label }, child.state, now);
+  });
+}
+
+/** `done / error / in-flight` proportional bar over a run's lanes and
+ *  nested lane runs — the at-a-glance composition of the fan-out. */
+function runSegmentBar(view) {
+  let ok = 0;
+  let failed = 0;
+  let moving = 0;
+  for (const lane of view.state.lanes.values()) {
+    if (lane.status === 'ok' || lane.status === 'cached') ok += 1;
+    else if (lane.status === 'error') failed += 1;
+    else moving += 1;
+  }
+  for (const child of view.children || []) {
+    if (child.liveness === 'ok') ok += 1;
+    else if (child.liveness === 'error') failed += 1;
+    else moving += 1;
+  }
+  return segmentBar([
+    { role: 'success', count: ok },
+    { role: 'error', count: failed },
+    { role: 'accent', count: moving },
+  ], RICH_SEGMENT_BAR_WIDTH);
+}
+
+function runLineSegments(view, now) {
+  const p = view.state.progress;
+  const icon = RUN_ICONS[view.liveness] || RUN_ICONS.unknown;
+  const name = sanitizeText(p.name || (view.meta && view.meta.name) || view.runId);
+  const segs = [seg(runStatusRole(view.liveness), icon), seg(null, ` ${name}`)];
+  if (p.phases.length || p.phaseTitle) {
+    const counter = p.phases.length ? `${p.phaseIndex}/${p.phases.length}` : '';
+    segs.push(seg(null, `  ${[sanitizeText(p.phaseTitle || ''), counter].filter(Boolean).join(' ')}`));
+  }
+  const elapsed = runElapsed(view.state, now);
+  if (elapsed) segs.push(seg('dim', `  ${elapsed}`));
+  const { done, total } = laneCounts(view);
+  if (total) {
+    const bar = runSegmentBar(view);
+    if (bar.length) {
+      segs.push(seg(null, '  '));
+      segs.push(...bar);
+    }
+    segs.push(seg('dim', `  ${done}/${total}`));
+  }
+  return segs;
+}
+
+function laneLineSegments(d, labelWidth, hasBarColumn) {
+  const segs = [
+    seg(null, '  '),
+    // Icon cell is 2 display cells (🔸 is double-width) plus a fixed
+    // 1-space gap, so single- and double-width icons leave the label
+    // column at the same offset.
+    seg(d.role, padCell(d.icon, 2)),
+    seg(null, ' '),
+    seg(null, padCell(d.label, labelWidth)),
+  ];
+  if (hasBarColumn) {
+    const has = Number.isFinite(d.fraction);
+    segs.push(seg(null, '  '));
+    segs.push(seg('accent', padCell(has ? renderBar(d.fraction, RICH_BAR_WIDTH) : '', RICH_BAR_WIDTH)));
+    segs.push(seg('dim', padCell(has ? `${Math.round(d.fraction * 100)}%` : '', 4, 'right')));
+  }
+  segs.push(seg('dim', `  ${padCell(d.toolCalls ? `${d.toolCalls}t` : '', 5, 'right')}`));
+  segs.push(seg('dim', `  ${padCell(d.elapsed || '', 7, 'right')}`));
+  return trimSegments(segs);
+}
+
+/** One information line: brand + active-run count on the left, the active
+ *  runs' token total on the right edge — dropped when it cannot fit. */
+function headerSegments(count, totalTokens, cols) {
+  const left = [
+    seg('dim', 'yoki-graph '),
+    seg('accent', '▶'),
+    seg(null, ` ${count} run${count === 1 ? '' : 's'}`),
+  ];
+  const tok = formatTokens(totalTokens);
+  if (!tok) return left;
+  const right = `Σ ${tok} tok`;
+  const gap = cols
+    - left.reduce((sum, s) => sum + displayWidth(s.text), 0)
+    - displayWidth(right);
+  if (gap < 2) return left;
+  return [...left, seg(null, ' '.repeat(gap)), seg('dim', right)];
+}
+
+/**
+ * The themed widget content: same inputs and same visibility/overflow rules
+ * as widgetLines, plus `paint(role, text) -> string` for color. Pass no
+ * paint (or an identity) and the output is plain text with the rich layout.
+ *
+ * @param {Array<object>} views buildViews output (top-level run views)
+ * @param {number} width available display cells
+ * @param {number} now epoch ms
+ * @param {(role: string, text: string) => string} [paint]
+ * @returns {string[]} [] when no run is active
+ */
+function widgetLinesRich(views, width, now, paint) {
+  const cols = Number.isFinite(width) && width >= 1 ? Math.floor(width) : DEFAULT_WIDTH;
+  const active = (Array.isArray(views) ? views : []).filter(isActiveRun);
+  if (!active.length) return [];
+
+  let totalTokens = 0;
+  const blocks = [];
+  for (const view of active) {
+    totalTokens += view.state.tokens || 0;
+    const laneDescs = [];
+    for (const lane of laneList(view.state)) {
+      if (isActiveLane(lane)) laneDescs.push(laneDescriptor(lane, view.state, now));
+    }
+    for (const child of view.children || []) {
+      totalTokens += (child.state && child.state.tokens) || 0;
+      laneDescs.push(...childDescriptors(child, now));
+    }
+    blocks.push({ view, laneDescs });
+  }
+
+  const allDescs = blocks.flatMap((b) => b.laneDescs);
+  const labelWidth = Math.min(
+    RICH_LABEL_MAX,
+    Math.max(RICH_LABEL_MIN, ...allDescs.map((d) => displayWidth(d.label)), 0),
+  );
+  const hasBarColumn = allDescs.some((d) => Number.isFinite(d.fraction));
+
+  const entries = [];
+  for (const { view, laneDescs } of blocks) {
+    entries.push({ segments: runLineSegments(view, now), must: false });
+    for (const d of laneDescs) {
+      entries.push({ segments: laneLineSegments(d, labelWidth, hasBarColumn), must: d.must });
+    }
+  }
+
+  // Same overflow selection as widgetLines: needs-human lines first, the
+  // rest in reading order, last slot becomes the more-line.
+  let body;
+  if (entries.length <= MAX_BODY_LINES) {
+    body = entries.map((e) => e.segments);
+  } else {
+    const cap = MAX_BODY_LINES - 1;
+    const keep = new Set();
+    entries.forEach((e, i) => { if (e.must && keep.size < cap) keep.add(i); });
+    entries.forEach((e, i) => { if (!keep.has(i) && keep.size < cap) keep.add(i); });
+    body = entries.filter((_, i) => keep.has(i)).map((e) => e.segments);
+    body.push([seg('dim', `… and ${entries.length - keep.size} more`)]);
+  }
+
+  return [headerSegments(active.length, totalTokens, cols), ...body]
+    .map((segments) => paintSegments(truncateSegments(segments, cols), paint));
+}
+
+module.exports = {
+  widgetLines, widgetLinesRich, isActiveLane, isActiveRun,
+  MAX_BODY_LINES, DEFAULT_WIDTH,
+  RICH_BAR_WIDTH, RICH_SEGMENT_BAR_WIDTH, RICH_LABEL_MAX,
+};
