@@ -65,6 +65,57 @@ test('padCell pads by display cells so mixed-width columns align', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Control-character sanitation (labels/names are external text)
+// ---------------------------------------------------------------------------
+
+/** Any raw C0 (incl. ESC), DEL or C1 byte — what must never reach a cell. */
+// eslint-disable-next-line no-control-regex
+const RAW_CONTROL_RE = /[\x00-\x1F\x7F\x80-\x9F]/;
+
+test('sanitizeText: C0/DEL/C1 become U+FFFD, tab becomes one space, ESC dies with its sequence', () => {
+  assert.equal(render.sanitizeText('a\tb'), 'a b');
+  assert.equal(render.sanitizeText('a\x00b\x1Fc\x7Fd\x9Be'), 'a�b�c�d�e');
+  // OSC terminal-retitle and CSI clear-screen: the ESC (and BEL) are
+  // replaced, so no terminal will ever interpret the remainder.
+  const osc = render.sanitizeText('\x1b]0;pwned\x07x');
+  const csi = render.sanitizeText('\x1b[2Jx');
+  assert.ok(!RAW_CONTROL_RE.test(osc), JSON.stringify(osc));
+  assert.ok(!RAW_CONTROL_RE.test(csi), JSON.stringify(csi));
+  assert.ok(!osc.includes('\x1b') && !csi.includes('\x1b'));
+});
+
+test('a hostile label renders with no raw control characters and stays one line', () => {
+  const state = foldedState([
+    { type: 'run-start', name: 'evil\x1b[2Jrun', backend: 'mock', phases: [] },
+    { type: 'agent-start', index: 0, label: '\x1b]0;pwned\x07lane\nsecond' },
+  ]);
+  const { columns } = render.resolveColumns(null);
+  const view = runView({ state });
+  const laneRow = render.renderLaneRow(state.lanes.get(0), view, columns.lane, 2000);
+  const runRow = render.renderRunRow(view, columns.run, 2000);
+  for (const row of [laneRow, runRow]) {
+    assert.ok(!RAW_CONTROL_RE.test(row), JSON.stringify(row));
+    assert.ok(!row.includes('\x1b'), JSON.stringify(row));
+    assert.ok(!row.includes('\n'), 'an embedded newline must not split the row');
+  }
+});
+
+test('width arithmetic runs on the SANITIZED string, not the raw one', () => {
+  // Raw: ESC + "]0;pwned" + BEL + "abc" = 13 chars; sanitized:
+  // "�]0;pwned�abc" = 13 cells. A 13-cell column must hold it
+  // exactly (no truncation) and every cell after sanitation is printable.
+  const label = '\x1b]0;pwned\x07abc';
+  const cell = render.padCell(label, 13, 'left');
+  assert.equal(cell, '�]0;pwned�abc');
+  assert.equal(render.displayWidth(cell), 13);
+  // And truncating a string that sanitizes to something wider still lands
+  // exactly on budget, with no raw control byte surviving the cut.
+  const cut = render.padCell(`${label}日本語`, 10, 'left');
+  assert.ok(!RAW_CONTROL_RE.test(cut));
+  assert.equal(render.displayWidth(cut), 10);
+});
+
+// ---------------------------------------------------------------------------
 // Progress bar
 // ---------------------------------------------------------------------------
 

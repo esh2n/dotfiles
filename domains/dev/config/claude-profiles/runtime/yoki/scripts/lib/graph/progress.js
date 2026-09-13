@@ -113,6 +113,12 @@ function formatElapsed(ms) {
  * The compact one-line status. Each in-flight agent shows its label, the
  * RESOLVED model id (not the tier the script asked for — that is the whole
  * point of showing it) and how long it has been running.
+ *
+ * TODO: labels and phase titles are rendered unsanitized here — a control
+ * character in a workflow-authored label reaches the invoker's OWN
+ * terminal (self-harm at worst; this line never renders other runs).
+ * top-render.js's `sanitizeText` is the shared scrubber to adopt when this
+ * renderer is next touched.
  */
 function renderStatus(state, now = Date.now()) {
   const parts = [];

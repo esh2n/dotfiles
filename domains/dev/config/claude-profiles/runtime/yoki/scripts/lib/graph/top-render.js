@@ -34,6 +34,35 @@ const { laneList, completedSiblings } = require('./top-fold');
 // ---------------------------------------------------------------------------
 
 /**
+ * Control characters that must never reach the terminal: C0 (0x00-0x1F),
+ * DEL (0x7F) and C1 (0x80-0x9F). ESC is in C0, so stripping the set kills
+ * every ANSI CSI/OSC sequence wholesale — which is the point: lane labels,
+ * run names and phase titles are WORKFLOW-AUTHORED (and, through a lane's
+ * payload, can carry attacker-influenced text), and a label containing
+ * `\x1b]0;…\x07` would otherwise retitle the viewer's terminal, or worse,
+ * from inside a status screen. Tab becomes one space (it is layout, not an
+ * attack, but a raw tab would still shear the columns); everything else in
+ * the set becomes U+FFFD, visibly marking that something was removed
+ * rather than silently splicing the remainder together.
+ */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS_RE = /[\x00-\x08\x0A-\x1F\x7F\x80-\x9F]/g;
+
+/**
+ * The one sanitation point for external text on its way into a cell. Runs
+ * BEFORE any width arithmetic, so truncation and padding measure the
+ * replaced string, never the raw one.
+ *
+ * TODO: progress.js's live status line renders the same external labels
+ * unsanitized — only into the invoker's own terminal (self-harm at worst,
+ * no cross-run exposure), but it should share this function once it is
+ * touched for other reasons.
+ */
+function sanitizeText(text) {
+  return String(text).replace(/\t/g, ' ').replace(CONTROL_CHARS_RE, '�');
+}
+
+/**
  * Code-point ranges rendered two cells wide by monospace terminals: the
  * Unicode East Asian Wide (W) and Fullwidth (F) blocks, plus the emoji
  * blocks macOS terminals draw double-width. Ambiguous-width characters
@@ -95,9 +124,12 @@ function truncateToWidth(text, width) {
   return `${out}…`;
 }
 
-/** Truncate-then-pad to exactly `width` cells; `align: 'right'` pads left. */
+/** Sanitize-then-truncate-then-pad to exactly `width` cells; `align:
+ *  'right'` pads left. Every cell — and therefore every piece of external
+ *  text — funnels through here, so this is the choke point where control
+ *  characters die BEFORE any width is measured. */
 function padCell(text, width, align) {
-  const cut = truncateToWidth(text, width);
+  const cut = truncateToWidth(sanitizeText(text), width);
   const pad = ' '.repeat(Math.max(0, width - displayWidth(cut)));
   return align === 'right' ? pad + cut : cut + pad;
 }
@@ -440,7 +472,7 @@ function renderScreen(views, columns, now, options = {}) {
 }
 
 module.exports = {
-  displayWidth, truncateToWidth, padCell, charWidth,
+  displayWidth, truncateToWidth, padCell, charWidth, sanitizeText,
   resolveColumns, defaultColumns,
   RUN_COLUMN_DEFS, LANE_COLUMN_DEFS, DEFAULT_RUN_COLUMNS, DEFAULT_LANE_COLUMNS,
   renderBar, BAR_RAMP,
