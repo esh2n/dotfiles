@@ -77,6 +77,57 @@ function runElapsed(state, now) {
   return formatElapsed(Math.max(0, end - state.startTs));
 }
 
+// ---------------------------------------------------------------------------
+// Session scoping — the widget shows only the runs THIS session launched.
+//
+// Every pi session stamps its runs with a scope (runner.js's runScope, fed by
+// YOKI_RUN_SCOPE = `pi-<sessionId>` from the widget extension) and passes its
+// own scope in as `selfScope`. Runs carrying a different scope, and every
+// UNSCOPED run (an older run.json, a Claude Code lane, a `yoki-graph run` from
+// a plain shell), belong to "elsewhere" — summarised in one line, not drawn
+// row by row, because `yoki-graph top` is the global view by design. When
+// selfScope is empty the widget is unscoped and behaves exactly as before:
+// every active run is mine, nothing is elsewhere.
+// ---------------------------------------------------------------------------
+
+/** True when a run — or any of its nested lane runs — has a lane flagged
+ *  needs-human. That is the one elsewhere signal worth interrupting for. */
+function runNeedsHuman(view) {
+  for (const lane of view.state.lanes.values()) if (lane.needsHuman) return true;
+  for (const child of view.children || []) {
+    if (!child.state) continue;
+    for (const lane of child.state.lanes.values()) if (lane.needsHuman) return true;
+  }
+  return false;
+}
+
+/** Split active runs into this session's and everyone else's. */
+function scopePartition(active, selfScope) {
+  if (!selfScope) return { mine: active, elsewhere: [] };
+  const mine = [];
+  const elsewhere = [];
+  for (const view of active) {
+    if (view.scope === selfScope) mine.push(view);
+    else elsewhere.push(view);
+  }
+  return { mine, elsewhere };
+}
+
+/**
+ * The single trailing line summarising runs live in OTHER sessions, as a
+ * {role, text} pair, or null when there are none. Warning + 🔸 when any of
+ * them needs a human (it must catch the eye even though it is not this
+ * session's run); a dim `…` line otherwise.
+ */
+function elsewhereLine(elsewhere) {
+  if (!elsewhere.length) return null;
+  const n = elsewhere.length;
+  const tail = `+${n} run${n === 1 ? '' : 's'} elsewhere (yoki-graph top)`;
+  return elsewhere.some(runNeedsHuman)
+    ? { role: 'warning', text: `🔸 ${tail}` }
+    : { role: 'dim', text: `… ${tail}` };
+}
+
 /** `▶ name  phase 2/5  3m12s  lanes 3/4` — fields that have nothing to say
  *  are dropped rather than rendered empty, so a run that has not announced
  *  phases yet is `▶ name  12s` and not a row of stray separators. */
@@ -151,16 +202,26 @@ function childEntries(child, now) {
  * @param {Array<object>} views buildViews output (top-level run views)
  * @param {number} width available display cells
  * @param {number} now epoch ms
- * @returns {string[]} [] when no run is active — the caller's cue to remove
+ * @param {string} [selfScope] this session's YOKI_RUN_SCOPE; only runs
+ *   carrying it are drawn, the rest fold into one "elsewhere" line. Empty or
+ *   omitted disables scoping (every active run is drawn — the legacy shape).
+ * @returns {string[]} [] when nothing to show — the caller's cue to remove
  *   the widget entirely rather than render an empty frame
  */
-function widgetLines(views, width, now) {
+function widgetLines(views, width, now, selfScope) {
   const cols = Number.isFinite(width) && width >= 1 ? Math.floor(width) : DEFAULT_WIDTH;
   const active = (Array.isArray(views) ? views : []).filter(isActiveRun);
-  if (!active.length) return [];
+  const { mine, elsewhere } = scopePartition(active, selfScope);
+  const elLine = elsewhereLine(elsewhere);
+
+  // Nothing of this session's is running: stay hidden UNLESS another session
+  // has a needs-human run, in which case that one line is the whole widget.
+  if (!mine.length) {
+    return elLine && elLine.role === 'warning' ? [truncateToWidth(elLine.text, cols)] : [];
+  }
 
   const entries = [];
-  for (const view of active) {
+  for (const view of mine) {
     entries.push({ text: runLine(view, now), must: false });
     // laneList already hoists needs-human lanes to the front of the run's
     // block; the `must` flag additionally shields them from the overflow cut.
@@ -182,7 +243,11 @@ function widgetLines(views, width, now) {
     body.push(`… and ${entries.length - keep.size} more`);
   }
 
-  const header = `yoki-graph ▶ ${active.length} run${active.length === 1 ? '' : 's'}`;
+  // The elsewhere summary is a distinct always-visible tail, kept OUTSIDE the
+  // mine body cap so a busy fan-out cannot bury it.
+  if (elLine) body.push(elLine.text);
+
+  const header = `yoki-graph ▶ ${mine.length} run${mine.length === 1 ? '' : 's'}`;
   return [header, ...body].map((line) => truncateToWidth(line, cols));
 }
 
@@ -381,16 +446,27 @@ function headerSegments(count, totalTokens, cols) {
  * @param {number} width available display cells
  * @param {number} now epoch ms
  * @param {(role: string, text: string) => string} [paint]
- * @returns {string[]} [] when no run is active
+ * @param {string} [selfScope] this session's YOKI_RUN_SCOPE — see widgetLines
+ * @returns {string[]} [] when nothing to show
  */
-function widgetLinesRich(views, width, now, paint) {
+function widgetLinesRich(views, width, now, paint, selfScope) {
   const cols = Number.isFinite(width) && width >= 1 ? Math.floor(width) : DEFAULT_WIDTH;
   const active = (Array.isArray(views) ? views : []).filter(isActiveRun);
-  if (!active.length) return [];
+  const { mine, elsewhere } = scopePartition(active, selfScope);
+  const elLine = elsewhereLine(elsewhere);
+
+  // Same rule as widgetLines: hidden when nothing of this session's runs,
+  // except a single warning line when another session needs a human.
+  if (!mine.length) {
+    if (elLine && elLine.role === 'warning') {
+      return [paintSegments(truncateSegments([seg('warning', elLine.text)], cols), paint)];
+    }
+    return [];
+  }
 
   let totalTokens = 0;
   const blocks = [];
-  for (const view of active) {
+  for (const view of mine) {
     totalTokens += view.state.tokens || 0;
     const laneDescs = [];
     for (const lane of laneList(view.state)) {
@@ -432,12 +508,17 @@ function widgetLinesRich(views, width, now, paint) {
     body.push([seg('dim', `… and ${entries.length - keep.size} more`)]);
   }
 
-  return [headerSegments(active.length, totalTokens, cols), ...body]
+  // The elsewhere summary is a distinct always-visible tail, kept OUTSIDE the
+  // mine body cap so a busy fan-out cannot bury it.
+  if (elLine) body.push([seg(elLine.role, elLine.text)]);
+
+  return [headerSegments(mine.length, totalTokens, cols), ...body]
     .map((segments) => paintSegments(truncateSegments(segments, cols), paint));
 }
 
 module.exports = {
   widgetLines, widgetLinesRich, isActiveLane, isActiveRun,
+  scopePartition, elsewhereLine, runNeedsHuman,
   MAX_BODY_LINES, DEFAULT_WIDTH,
   RICH_BAR_WIDTH, RICH_SEGMENT_BAR_WIDTH, RICH_LABEL_MAX,
 };

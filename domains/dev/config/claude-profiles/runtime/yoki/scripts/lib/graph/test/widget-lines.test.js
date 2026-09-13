@@ -11,7 +11,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { widgetLines, MAX_BODY_LINES } = require('../widget-lines');
+const { widgetLines, widgetLinesRich, MAX_BODY_LINES } = require('../widget-lines');
 const { displayWidth } = require('../top-render');
 const { createTopState, foldTopEvent } = require('../top-fold');
 
@@ -227,4 +227,103 @@ test('widgetLines: a finished silent child adds no row', () => {
     runView({ runId: 'run-1-lane-done', laneLabel: 'done', liveness: 'ok' }),
   ];
   assert.equal(widgetLines([parent], 120, NOW).length, 3);
+});
+
+// ---------------------------------------------------------------------------
+// Session scoping — the widget shows only THIS session's runs
+// ---------------------------------------------------------------------------
+
+/** A running run with a name and a given scope, no lanes. */
+function scopedRun(runId, name, scope) {
+  return runView({
+    runId, scope,
+    state: foldedState([{ type: 'run-start', name }]),
+  });
+}
+
+/** A running run whose single lane is flagged needs-human. */
+function needsHumanRun(runId, name, scope) {
+  return runView({
+    runId, scope,
+    state: foldedState([
+      { type: 'run-start', name },
+      { type: 'agent-start', index: 0, label: 'judge' },
+      { type: 'needs-human', index: 0, label: 'judge' },
+    ]),
+  });
+}
+
+test('widgetLines: no selfScope shows every active run (legacy behavior)', () => {
+  const a = scopedRun('r1', 'alpha', 'pi-a');
+  const b = scopedRun('r2', 'beta', 'pi-b');
+  const lines = widgetLines([a, b], 120, NOW);
+  assert.equal(lines[0], 'yoki-graph ▶ 2 runs');
+  assert.ok(!lines.some((l) => l.includes('elsewhere')), 'no elsewhere line without a scope');
+});
+
+test('widgetLines: with selfScope only my runs get rows; others fold into one line', () => {
+  const mine = scopedRun('r1', 'mine', 'pi-me');
+  const other = scopedRun('r2', 'theirs', 'pi-other');
+  const unscoped = scopedRun('r3', 'legacy', null); // older run.json / Claude Code lane
+  const lines = widgetLines([mine, other, unscoped], 120, NOW, 'pi-me');
+  assert.equal(lines[0], 'yoki-graph ▶ 1 run', 'header counts only my runs');
+  assert.ok(lines[1].startsWith('▶ mine'));
+  assert.ok(!lines.some((l) => l.includes('theirs') || l.includes('legacy')), 'other runs never get rows');
+  assert.equal(lines[lines.length - 1], '… +2 runs elsewhere (yoki-graph top)');
+});
+
+test('widgetLines: elsewhere line is singular for one other run', () => {
+  const mine = scopedRun('r1', 'mine', 'pi-me');
+  const other = scopedRun('r2', 'theirs', 'pi-other');
+  const lines = widgetLines([mine, other], 120, NOW, 'pi-me');
+  assert.equal(lines[lines.length - 1], '… +1 run elsewhere (yoki-graph top)');
+});
+
+test('widgetLines: a needs-human run elsewhere turns the summary into a 🔸 warning', () => {
+  const mine = scopedRun('r1', 'mine', 'pi-me');
+  const other = needsHumanRun('r2', 'theirs', 'pi-other');
+  const lines = widgetLines([mine, other], 120, NOW, 'pi-me');
+  assert.equal(lines[lines.length - 1], '🔸 +1 run elsewhere (yoki-graph top)');
+});
+
+test('widgetLines: all runs elsewhere and none need a human -> hidden ([])', () => {
+  const other = scopedRun('r2', 'theirs', 'pi-other');
+  const unscoped = scopedRun('r3', 'legacy', null);
+  assert.deepEqual(widgetLines([other, unscoped], 120, NOW, 'pi-me'), []);
+});
+
+test('widgetLines: no runs of mine but one elsewhere needs a human -> single 🔸 line', () => {
+  const other = needsHumanRun('r2', 'theirs', 'pi-other');
+  const quiet = scopedRun('r3', 'calm', 'pi-third');
+  const lines = widgetLines([other, quiet], 120, NOW, 'pi-me');
+  assert.deepEqual(lines, ['🔸 +2 runs elsewhere (yoki-graph top)']);
+});
+
+test('widgetLines: a needs-human lane in a child run elsewhere still warns', () => {
+  const parent = scopedRun('r2', 'theirs', 'pi-other');
+  parent.children = [
+    runView({
+      runId: 'r2-lane-sec', laneLabel: 'sec', scope: 'pi-other',
+      state: foldedState([
+        { type: 'agent-start', index: 0, label: 'sec' },
+        { type: 'needs-human', index: 0, label: 'sec' },
+      ]),
+    }),
+  ];
+  const lines = widgetLines([parent], 120, NOW, 'pi-me');
+  assert.deepEqual(lines, ['🔸 +1 run elsewhere (yoki-graph top)']);
+});
+
+test('widgetLinesRich: elsewhere summary renders (plain layout) with 🔸 when needed', () => {
+  const mine = scopedRun('r1', 'mine', 'pi-me');
+  const other = needsHumanRun('r2', 'theirs', 'pi-other');
+  const lines = widgetLinesRich([mine, other], 120, NOW, undefined, 'pi-me');
+  assert.ok(lines[0].startsWith('yoki-graph'), 'header present');
+  assert.equal(lines[lines.length - 1], '🔸 +1 run elsewhere (yoki-graph top)');
+});
+
+test('widgetLinesRich: mine empty + needs-human elsewhere is a single warning line', () => {
+  const other = needsHumanRun('r2', 'theirs', 'pi-other');
+  const lines = widgetLinesRich([other], 120, NOW, undefined, 'pi-me');
+  assert.deepEqual(lines, ['🔸 +1 run elsewhere (yoki-graph top)']);
 });
