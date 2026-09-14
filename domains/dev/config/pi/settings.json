@@ -2,6 +2,7 @@
   "defaultProvider": "lmstudio",
   "defaultModel": "qwen/qwen3.8-27b",
   "enabledModels": [
+    "deepseek/**",
     "lmstudio/**"
   ],
   "defaultThinkingLevel": "medium",
@@ -13,7 +14,12 @@
   "packages": [
     "https://github.com/dimk90/pi-context-view",
     "https://github.com/Ahm3tJ4f/pi-undo",
-    "https://github.com/sting8k/pi-vcc"
+    "https://github.com/sting8k/pi-vcc",
+    "https://github.com/nicobailon/pi-web-access",
+    "https://github.com/juicesharp/rpiv-ask-user-question",
+    "https://github.com/itisbryan/pi-add-dir",
+    "https://github.com/apmantza/pi-lens",
+    "https://github.com/dbachelder/pi-btw"
   ],
   "lastChangelogVersion": "0.84.4",
   "theme": "unkai"
