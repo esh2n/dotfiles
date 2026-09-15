@@ -1,0 +1,49 @@
+# LiteLLM proxy — front-agnostic measuring gateway for the model tiers.
+#
+# Every front (pi / DSH / codex) points its base_url at this proxy; the proxy
+# routes each alias to its provider and records TTFT / tokens / cost /
+# prefix-cache-hit on /metrics (Prometheus) — front-independent, so the
+# measurement survives a front swap. Decision record: writeup store
+# yoki/2026-09-16-observability-proxy-litellm.
+#
+# Keys are NEVER written here: `api_key: os.environ/<VAR>` reads them from the
+# process env, which `op run --env-file litellm.env` injects at launch (the
+# op:// references live in litellm.env — pointers, not secrets). See README.md.
+
+model_list:
+  # main — everyday default. DeepSeek Flash (cheap/fast).
+  # `deepseek/` is the provider prefix; the id after it (deepseek-flash) is
+  # passed straight through to api.deepseek.com, which is the current model id.
+  - model_name: main
+    litellm_params:
+      model: deepseek/deepseek-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  # complex — the frontier architect. Astra = gpt-6-astra, a plain OpenAI API
+  # model (verified: /v1/chat/completions, standard key, no allowlist). An
+  # unknown-to-LiteLLM id under `openai/` passes through unmodified.
+  - model_name: complex
+    litellm_params:
+      model: openai/gpt-6-astra
+      api_key: os.environ/OPENAI_API_KEY
+
+  # deterministic — local Qwen on LM Studio (free, offline, reproducible).
+  # api_base / api_key come from LM_STUDIO_API_BASE / LM_STUDIO_API_KEY (set in
+  # litellm.env). Under Docker on a Mac the base MUST be host.docker.internal
+  # (the container's localhost is not the host); native pip run uses localhost.
+  - model_name: deterministic
+    litellm_params:
+      model: lm_studio/qwen/qwen3.8-27b
+
+litellm_settings:
+  # Free OSS Prometheus exporter — this is the whole point of the proxy.
+  callbacks: ["prometheus"]
+  # /metrics is bearer-auth'd by default since v1.85.0. This is a single-user
+  # local proxy, so scraping without the master key is fine; flip to true (and
+  # scrape with the master key) if the port is ever exposed.
+  require_auth_for_metrics_endpoint: false
+
+general_settings:
+  # Protects the proxy's admin/OpenAI surface. Any secret works; kept in op
+  # for consistency (litellm.env resolves it). Not a provider key.
+  master_key: os.environ/LITELLM_MASTER_KEY

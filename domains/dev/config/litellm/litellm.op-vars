@@ -1,0 +1,22 @@
+# op:// references — POINTERS, not secrets. Safe to commit: `op run --env-file
+# litellm.op-vars` resolves these to real values and injects them into the
+# child process env only; plaintext never touches disk or this file. NEVER put
+# a resolved key here.
+#
+# CONFIRM the vault/item coordinates below against your 1Password (item names
+# assumed `deepseek` / `openai` / `litellm` in the `Private` vault, field
+# `credential`). Adjust if yours differ.
+
+DEEPSEEK_API_KEY=op://Private/deepseek/credential
+OPENAI_API_KEY=op://Private/openai/credential
+
+# Proxy master key — any secret. Store one in op (item `litellm`), or replace
+# this line with a literal like LITELLM_MASTER_KEY=sk-local-<random> for a
+# purely local proxy.
+LITELLM_MASTER_KEY=op://Private/litellm/credential
+
+# LM Studio local endpoint. host.docker.internal = the Mac host as seen from
+# inside the Docker container. If running LiteLLM natively (pip/uv), change to
+# http://localhost:1234/v1.
+LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1
+LM_STUDIO_API_KEY=lm-studio
