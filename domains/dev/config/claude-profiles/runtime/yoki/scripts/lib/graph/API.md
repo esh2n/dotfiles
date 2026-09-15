@@ -755,6 +755,7 @@ Each backend reads its own primary source, off the RAW envelope before
 | --- | --- | --- |
 | codex | `turn.completed` events in the `--json` stream (summed); falls back to a rollout `token_count` record's `total_token_usage` | `input_tokens + output_tokens`. The cached counts are **excluded** |
 | omp | an assistant record's `usage` (`{input, output, cacheRead, cacheWrite, totalTokens, cost}` — omp's camelCase names, pinned by spike S4-S5-omp.md and read the same way by `lib/harness/session.js`); `cost` is the only USD figure any backend reports | the record's own `totalTokens`, which **includes** `cacheRead`/`cacheWrite` |
+| deepseek / local | the response's OpenAI `usage` block (`prompt_tokens`, `completion_tokens`, `total_tokens`, and DeepSeek's `prompt_cache_hit_tokens`) | `prompt_tokens + completion_tokens`; cache-hit is **excluded** (a subset of prompt, like codex). deepseek prices it (cache-hit/miss/output at their own rates); local is free |
 | mock | none — nothing is spawned | — |
 
 **The two backends treat cached tokens oppositely, and that is not a bug.**
@@ -784,6 +785,35 @@ Reading usage off the unwrapped answer text (the previous behaviour) could
 not work at all for a backend whose envelope carries the usage block and
 whose `extractText` returns a bare answer string, so `budget.spent()` sat
 silently at zero.
+
+### Serving metrics (deepseek/local lanes)
+
+The openai-compat backends additionally capture **client-side serving
+metrics** on every call — at **zero extra token cost** (they read the SAME
+request's timing and usage; nothing is generated twice). Per call, a
+`metrics` object is attached to the `agent-end` (`ok`) event and journal
+entry:
+
+- `prefixHitRate` — DeepSeek's `prompt_cache_hit_tokens / prompt_tokens`; the
+  50× cache-hit-vs-miss price gap makes this the number worth watching. Free
+  from the usage block, no streaming needed.
+- `decodeTokPerSec`, `promptTokens`, `completionTokens`, `totalMs` — from
+  usage + total latency, always available.
+- `ttftMs` / `prefillMs` / `decodeMs` — the prefill-vs-decode SPLIT, which a
+  single non-streaming response cannot yield. Measured only when
+  `YOKI_LLM_METRICS=1` turns on SSE streaming (`stream_options.include_usage`
+  keeps the token counts); still no extra tokens. `ttftMeasured` says which
+  regime produced the row.
+
+`journal.metricsSummary()` aggregates these across a run (average TTFT and
+decode over the calls that reported them, token-weighted prefix-hit rate),
+surfaced on the `run-end` event, the run result, and one `metrics:` line in
+`yoki-graph run`'s summary. It is `null` — and omitted — when no lane reported
+metrics (a codex/omp-only run), so those runs are unchanged. This is the
+Mac-friendly answer to serving observability: vLLM's Prometheus panel is
+richer but has no Metal backend on Apple Silicon, and its distinctive metrics
+(queue time, waiting count, batch throughput) carry no information at the
+single-user concurrency=1 these lanes run at.
 
 ## Run lock
 

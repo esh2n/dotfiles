@@ -345,6 +345,12 @@ class Journal {
     return usageByModelFrom(this.readAll());
   }
 
+  /** Aggregated per-call serving metrics for the end-of-run summary, or null
+   *  when no call reported any. See `metricsSummaryFrom`. */
+  metricsSummary() {
+    return metricsSummaryFrom(this.readAll());
+  }
+
   readAll() {
     if (!fs.existsSync(this.file)) return [];
     return parseEntries(fs.readFileSync(this.file, 'utf8'));
@@ -425,6 +431,42 @@ function usageByModelFrom(entries) {
   return [...rows.values()].sort((a, b) => b.tokens - a.tokens
     || a.backend.localeCompare(b.backend)
     || a.model.localeCompare(b.model));
+}
+
+/**
+ * Aggregate the per-call client-side serving metrics (openai-compat backends'
+ * `metrics` field) across a run's `ok` entries into one summary. Averages are
+ * taken only over calls that actually carry each field, so a mixed run (some
+ * lanes on codex/omp, which report no metrics; some on deepseek/local, which
+ * do) reports the local/cloud lanes' numbers without codex's absence dragging
+ * them to zero. Returns null when NO call reported metrics — there is nothing
+ * to show, and a row of zeros would read as "0 tok/s", a lie.
+ */
+function metricsSummaryFrom(entries) {
+  let samples = 0;
+  let ttftSum = 0; let ttftN = 0;
+  let decodeSum = 0; let decodeN = 0;
+  let promptTok = 0; let cacheHitTok = 0; let cacheN = 0;
+  for (const entry of entries) {
+    if (!entry || entry.status !== 'ok' || !entry.metrics) continue;
+    const m = entry.metrics;
+    samples += 1;
+    if (m.ttftMeasured && Number.isFinite(m.ttftMs)) { ttftSum += m.ttftMs; ttftN += 1; }
+    if (Number.isFinite(m.decodeTokPerSec)) { decodeSum += m.decodeTokPerSec; decodeN += 1; }
+    if (Number.isFinite(m.promptTokens) && Number.isFinite(m.cacheHitTokens)) {
+      promptTok += m.promptTokens; cacheHitTok += m.cacheHitTokens; cacheN += 1;
+    }
+  }
+  if (samples === 0) return null;
+  return {
+    samples,
+    avgTtftMs: ttftN > 0 ? ttftSum / ttftN : null,
+    ttftSamples: ttftN,
+    avgDecodeTokPerSec: decodeN > 0 ? decodeSum / decodeN : null,
+    // Token-weighted, not a mean of ratios: the honest hit rate over the run
+    // is total cached prompt tokens / total prompt tokens.
+    prefixHitRate: cacheN > 0 && promptTok > 0 ? cacheHitTok / promptTok : null,
+  };
 }
 
 function parseEntries(text) {
@@ -555,6 +597,6 @@ class JournalTail extends FileTail {
 
 module.exports = {
   Journal, callKey, runDir, journalPath, stateRoot, AUTO_LABEL,
-  usageTotalsFrom, usageByModelFrom, parseEntries, FileTail, JournalTail,
+  usageTotalsFrom, usageByModelFrom, metricsSummaryFrom, parseEntries, FileTail, JournalTail,
   INLINE_RESULT_MAX_BYTES, RUN_ID_RE, assertValidRunId,
 };

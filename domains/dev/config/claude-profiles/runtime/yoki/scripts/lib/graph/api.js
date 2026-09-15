@@ -232,6 +232,11 @@ function createApi(ctx) {
       // reflect the full cost this call incurred, not just its last attempt.
       let durationMs = 0;
       const usage = newUsageAccumulator();
+      // Client-side serving metrics (TTFT/decode/prefix-hit), when the backend
+      // reports them (the openai-compat deepseek/local backends do). The LAST
+      // attempt's metrics win — a schema/transient retry ran a whole fresh
+      // request, so its timing is the one that produced the result kept.
+      let lastMetrics = null;
       let timedOut = false;
       const callBackend = async (promptText) => {
         const res = await retry.withRetry(() => backend.run({
@@ -284,6 +289,7 @@ function createApi(ctx) {
         });
         durationMs += res.durationMs || 0;
         recordUsage(usage, backend, res.raw);
+        if (res.metrics) lastMetrics = res.metrics;
         return backend.extractText(res.raw);
       };
 
@@ -378,12 +384,14 @@ function createApi(ctx) {
         key, index, label, phase: effPhase, status: 'ok', result, durationMs,
         backend: backendName, model, ...settled,
         ...(gateRecord ? { gate: gateRecord } : {}),
+        ...(lastMetrics ? { metrics: lastMetrics } : {}),
       });
       ctx.emit({
         type: 'agent-end', runId: ctx.runId, label, phase: effPhase, index, status: 'ok',
         backend: backendName, model, tokens: settled.tokens,
         tokensSource: settled.tokensSource, durationMs,
-        ...(gateRecord ? { gate: gateRecord } : {}), ts: nowIso(),
+        ...(gateRecord ? { gate: gateRecord } : {}),
+        ...(lastMetrics ? { metrics: lastMetrics } : {}), ts: nowIso(),
       });
       return result;
     } finally {

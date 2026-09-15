@@ -29,6 +29,26 @@ function chatBody({ content, reasoning, usage }) {
   return obj;
 }
 
+// A fake fetch whose response body is an SSE stream (an async generator of
+// Uint8Array chunks), for the metrics/streaming path. `deltas` are content
+// pieces; an optional final usage chunk is appended when `usage` is given.
+function fakeStreamingFetch({ deltas, usage, status = 200, gapMs = 0 }, capture) {
+  const enc = new TextEncoder();
+  return async (url, init) => {
+    if (capture) { capture.url = url; capture.init = init; capture.body = JSON.parse(init.body); }
+    async function* body() {
+      for (const piece of deltas) {
+        if (gapMs) await new Promise((r) => setTimeout(r, gapMs));
+        yield enc.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: piece } }] })}\n`);
+      }
+      yield enc.encode(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n`);
+      if (usage) yield enc.encode(`data: ${JSON.stringify({ choices: [], usage })}\n`);
+      yield enc.encode('data: [DONE]\n');
+    }
+    return { ok: status >= 200 && status < 300, status, body: body() };
+  };
+}
+
 // ---------------------------------------------------------------------------
 // registry
 // ---------------------------------------------------------------------------
@@ -216,3 +236,94 @@ test('extractUsage: returns null when there is no usable usage block', () => {
   assert.equal(deepseek.extractUsage(JSON.stringify({ choices: [] })), null);
   assert.equal(deepseek.extractUsage(JSON.stringify(chatBody({ content: 'x', usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } }))), null);
 });
+
+// ---------------------------------------------------------------------------
+// metrics: computeMetrics (pure) + baseline (non-streaming) + TTFT (streaming)
+// ---------------------------------------------------------------------------
+
+test('computeMetrics: with a measured TTFT, prefill/decode split and tok/s are computed', () => {
+  const usage = { inputTokens: 1000, outputTokens: 100, cacheRead: 400 };
+  const m = oai.computeMetrics({ ttftMs: 500, totalMs: 2500 }, usage);
+  assert.equal(m.ttftMeasured, true);
+  assert.equal(m.ttftMs, 500);
+  assert.equal(m.prefillMs, 500);
+  assert.equal(m.decodeMs, 2000); // 2500 - 500
+  assert.equal(m.completionTokens, 100);
+  assert.ok(Math.abs(m.decodeTokPerSec - 50) < 1e-9, `got ${m.decodeTokPerSec}`); // 100 tok / 2s
+  assert.ok(Math.abs(m.prefixHitRate - 0.4) < 1e-9); // 400/1000
+});
+
+test('computeMetrics: without a TTFT (baseline), prefill/decode stay null and tok/s degrades to whole-request rate', () => {
+  const usage = { inputTokens: 200, outputTokens: 40, cacheRead: 0 };
+  const m = oai.computeMetrics({ totalMs: 4000 }, usage); // no ttftMs
+  assert.equal(m.ttftMeasured, false);
+  assert.equal(m.ttftMs, null);
+  assert.equal(m.prefillMs, null);
+  assert.equal(m.decodeMs, null);
+  assert.ok(Math.abs(m.decodeTokPerSec - 10) < 1e-9, `got ${m.decodeTokPerSec}`); // 40 tok / 4s
+  assert.equal(m.prefixHitRate, 0); // 0/200
+});
+
+test('computeMetrics: no usage leaves token-derived fields null, timing still stands', () => {
+  const m = oai.computeMetrics({ ttftMs: 300, totalMs: 900 }, null);
+  assert.equal(m.ttftMs, 300);
+  assert.equal(m.decodeMs, 600);
+  assert.equal(m.completionTokens, null);
+  assert.equal(m.decodeTokPerSec, null);
+  assert.equal(m.prefixHitRate, null);
+});
+
+test('metricsStreamingEnabled: only YOKI_LLM_METRICS=1 turns on streaming', () => {
+  assert.equal(oai.metricsStreamingEnabled({}), false);
+  assert.equal(oai.metricsStreamingEnabled({ YOKI_LLM_METRICS: '0' }), false);
+  assert.equal(oai.metricsStreamingEnabled({ YOKI_LLM_METRICS: '1' }), true);
+});
+
+test('run (non-streaming baseline): attaches metrics from usage + total latency, no TTFT, ONE request', () => withStreamCount(async (count) => {
+  const fetchImpl = fakeFetch({ body: chatBody({
+    content: 'answer', usage: { prompt_tokens: 500, completion_tokens: 50, total_tokens: 550, prompt_cache_hit_tokens: 100 },
+  }) });
+  const res = await deepseek.run({ prompt: 'p', model: 'deepseek-flash', env: { DEEPSEEK_API_KEY: 'sk' }, fetchImpl, captureMetrics: false });
+  assert.ok(res.metrics, 'baseline run must still carry metrics');
+  assert.equal(res.metrics.ttftMeasured, false);
+  assert.equal(res.metrics.completionTokens, 50);
+  assert.equal(res.metrics.promptTokens, 500);
+  assert.ok(Math.abs(res.metrics.prefixHitRate - 0.2) < 1e-9); // 100/500
+  // text is still the ordinary non-streaming body — extractText works unchanged
+  assert.equal(deepseek.extractText(res.raw), 'answer');
+}));
+
+test('run (streaming): reassembles the answer, measures a real TTFT, costs no extra request', () => {
+  return (async () => {
+    const capture = {};
+    const fetchImpl = fakeStreamingFetch({
+      deltas: ['Hel', 'lo ', 'world'],
+      usage: { prompt_tokens: 300, completion_tokens: 3, total_tokens: 303, prompt_cache_hit_tokens: 300 },
+      gapMs: 5,
+    }, capture);
+    const res = await deepseek.run({ prompt: 'p', model: 'deepseek-flash', env: { DEEPSEEK_API_KEY: 'sk' }, fetchImpl, captureMetrics: true });
+    // streaming request was asked for, with usage in the final chunk
+    assert.equal(capture.body.stream, true);
+    assert.deepEqual(capture.body.stream_options, { include_usage: true });
+    // deltas reassembled into the same non-streaming shape
+    assert.equal(deepseek.extractText(res.raw), 'Hello world');
+    // real TTFT measured, and it is < total
+    assert.equal(res.metrics.ttftMeasured, true);
+    assert.ok(res.metrics.ttftMs >= 0);
+    assert.ok(res.metrics.totalMs >= res.metrics.ttftMs);
+    assert.equal(res.metrics.completionTokens, 3);
+    assert.ok(Math.abs(res.metrics.prefixHitRate - 1) < 1e-9); // fully cached: 300/300
+  })();
+});
+
+test('run (streaming): the env flag YOKI_LLM_METRICS=1 selects the streaming path', () => {
+  return (async () => {
+    const capture = {};
+    const fetchImpl = fakeStreamingFetch({ deltas: ['x'], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }, capture);
+    await deepseek.run({ prompt: 'p', model: 'deepseek-flash', env: { DEEPSEEK_API_KEY: 'sk', YOKI_LLM_METRICS: '1' }, fetchImpl });
+    assert.equal(capture.body.stream, true);
+  })();
+});
+
+// tiny helper so the baseline test reads symmetrically with the streaming ones
+function withStreamCount(fn) { return fn(0); }

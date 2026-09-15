@@ -405,6 +405,11 @@ async function executeScript(options) {
 
   const usage = journal.usageTotals();
   const byModel = journal.usageByModel();
+  // Aggregated client-side serving metrics (TTFT/decode/prefix-hit) — null
+  // unless a deepseek/local lane reported any, so codex/omp-only runs are
+  // unchanged. Kept out of run.json (run-end + the result carry it) to avoid
+  // bloating the frequently-rewritten meta file.
+  const metrics = journal.metricsSummary();
   runMeta = {
     name: compiled.meta.name, scriptPath, backend: backendName, args, cwd,
     startedAt: readRunMeta(runId)?.startedAt, finishedAt: new Date().toISOString(),
@@ -413,10 +418,13 @@ async function executeScript(options) {
   writeRunMeta(runId, runMeta);
   // run-end forces one more run.json write through the tee, stamping the
   // final lastEventAt beside the final status.
-  emit({ type: 'run-end', runId, status, error, result, usage, byModel, ts: new Date().toISOString() });
+  emit({
+    type: 'run-end', runId, status, error, result, usage, byModel,
+    ...(metrics ? { metrics } : {}), ts: new Date().toISOString(),
+  });
   await sink.close();
 
-  return { runId, meta: compiled.meta, status, result, error, usage, byModel };
+  return { runId, meta: compiled.meta, status, result, error, usage, byModel, ...(metrics ? { metrics } : {}) };
 }
 
 module.exports = {

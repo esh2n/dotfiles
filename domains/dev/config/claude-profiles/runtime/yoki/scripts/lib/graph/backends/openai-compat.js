@@ -35,24 +35,39 @@ const { resolveModel, resolveAgentPreamble, timeoutError } = require('./common')
  * a non-2xx means. A network failure is marked `transient` so retry.js
  * retries it; a timeout is raised through common.js's `timeoutError` (also
  * transient + timedOut) so it is classified exactly like a codex/omp kill.
+ *
+ * `captureMetrics` upgrades the request to SSE streaming so the arrival time
+ * of the first generated token (TTFT) can be measured — the one client-side
+ * metric that a single non-streaming response cannot yield. It costs NO extra
+ * tokens: streaming delivers the same generation incrementally, and
+ * `stream_options.include_usage` only appends a final numeric chunk. The
+ * streamed deltas are reassembled into the SAME response-body shape a
+ * non-streaming call returns, so `extractText`/`extractUsage` are unchanged;
+ * `metrics: { ttftMs, totalMs }` rides alongside. Everything measurable
+ * WITHOUT streaming (total latency, token counts, cache-hit) stays available
+ * on the default non-streaming path, which is byte-for-byte the old behaviour.
  */
 async function chatCompletion(opts) {
   const {
     baseUrl, apiKey, model, messages,
     reasoningEffort, jsonMode, samplingParams, timeoutMs, fetchImpl, label,
+    captureMetrics,
   } = opts;
   const doFetch = fetchImpl || (typeof globalThis !== 'undefined' ? globalThis.fetch : undefined);
   if (typeof doFetch !== 'function') {
     throw new Error('openai-compat backend: global fetch is unavailable — Node 18+ is required, or pass a fetchImpl');
   }
   const url = `${String(baseUrl).replace(/\/+$/, '')}/chat/completions`;
-  const body = { model, messages, stream: false };
+  const body = { model, messages, stream: !!captureMetrics };
   // DeepSeek exposes reasoning as a MODE via reasoning_effort (low/high/max),
   // not a separate model id. Passing it to an endpoint that ignores it (LM
   // Studio) is harmless — an unknown field is dropped, not an error.
   if (reasoningEffort) body.reasoning_effort = reasoningEffort;
   if (jsonMode) body.response_format = { type: 'json_object' };
   if (samplingParams && typeof samplingParams === 'object') Object.assign(body, samplingParams);
+  // Ask for the usage block in the terminal SSE chunk — without this, a
+  // streamed response carries no token counts at all.
+  if (captureMetrics) body.stream_options = { include_usage: true };
 
   const controller = new AbortController();
   let timer;
@@ -61,6 +76,7 @@ async function chatCompletion(opts) {
     timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   }
   let res;
+  const startedAt = Date.now();
   try {
     res = await doFetch(url, {
       method: 'POST',
@@ -71,6 +87,12 @@ async function chatCompletion(opts) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+    if (captureMetrics && res.ok) {
+      const streamed = await readSseStream(res.body, startedAt);
+      return { ok: true, status: res.status, text: streamed.text, metrics: { ttftMs: streamed.ttftMs, totalMs: Date.now() - startedAt } };
+    }
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, text };
   } catch (err) {
     if (timedOut) throw timeoutError(label || 'openai-compat', timeoutMs);
     // A DNS/connection failure is usually momentary; let retry.js try again.
@@ -79,8 +101,123 @@ async function chatCompletion(opts) {
   } finally {
     if (timer) clearTimeout(timer);
   }
-  const text = await res.text();
-  return { ok: res.ok, status: res.status, text };
+}
+
+/**
+ * Consume an OpenAI-style SSE stream (`data: {...}\n` lines, terminated by
+ * `data: [DONE]`), timing the first token and reassembling the full answer
+ * into a single non-streaming-shaped response body so the rest of the
+ * pipeline is oblivious to how it arrived.
+ *
+ * `startedAt` is the request-send timestamp; TTFT is the delta to the first
+ * chunk carrying ANY generated text (content OR reasoning_content — for a
+ * reasoning model the chain-of-thought is the first thing generated, so that
+ * is the honest "time to first token"). Only `content` is accumulated into
+ * the answer; `reasoning_content` is dropped, matching `extractText`.
+ */
+async function readSseStream(bodyStream, startedAt) {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
+  let finishReason = null;
+  let usage = null;
+  let ttftMs = null;
+  for await (const chunk of iterateBytes(bodyStream)) {
+    buffer += decoder.decode(chunk, { stream: true });
+    let nl;
+    // eslint-disable-next-line no-cond-assign
+    while ((nl = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line || !line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (data === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(data); } catch { continue; }
+      if (evt.usage && typeof evt.usage === 'object') usage = evt.usage;
+      const choice = evt.choices && evt.choices[0];
+      if (!choice) continue;
+      const delta = choice.delta || {};
+      const hasText = (typeof delta.content === 'string' && delta.content.length)
+        || (typeof delta.reasoning_content === 'string' && delta.reasoning_content.length);
+      if (hasText && ttftMs === null) ttftMs = Date.now() - startedAt;
+      if (typeof delta.content === 'string') content += delta.content;
+      if (choice.finish_reason) finishReason = choice.finish_reason;
+    }
+  }
+  const reassembled = { choices: [{ message: { role: 'assistant', content }, finish_reason: finishReason }] };
+  if (usage) reassembled.usage = usage;
+  return { text: JSON.stringify(reassembled), ttftMs };
+}
+
+/** Iterate a fetch response body as byte chunks, tolerating both a Node/undici
+ *  async-iterable stream and a WHATWG ReadableStream (getReader) — and a plain
+ *  async iterable, which is what the tests inject. */
+async function* iterateBytes(bodyStream) {
+  if (!bodyStream) return;
+  if (typeof bodyStream[Symbol.asyncIterator] === 'function') {
+    for await (const chunk of bodyStream) yield chunk;
+    return;
+  }
+  if (typeof bodyStream.getReader === 'function') {
+    const reader = bodyStream.getReader();
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop
+      const { done, value } = await reader.read();
+      if (done) return;
+      if (value) yield value;
+    }
+  }
+}
+
+/**
+ * Turn raw client-side timing + a usage block into the metrics the user asked
+ * to see. Pure and side-effect-free so it is unit-testable without a network.
+ *
+ * With a measured TTFT (streaming), prefill and decode split cleanly:
+ * prefill ≈ TTFT (queue is ~0 single-user), decode = total − TTFT, and
+ * decode tok/s = completion_tokens / decode_seconds. Without it (non-streaming
+ * baseline), TTFT/prefill/decode stay null and `decodeTokPerSec` degrades to
+ * the whole-request rate (completion_tokens / total_seconds), flagged by
+ * `ttftMeasured: false`. Prefix-cache-hit rate and the token counts come from
+ * the usage block and need no streaming at all.
+ */
+function computeMetrics({ ttftMs = null, totalMs = null } = {}, usage = null) {
+  const completionTokens = usage && Number.isFinite(usage.outputTokens) ? usage.outputTokens : null;
+  const promptTokens = usage && Number.isFinite(usage.inputTokens) ? usage.inputTokens : null;
+  const cacheHitTokens = usage && Number.isFinite(usage.cacheRead) ? usage.cacheRead : null;
+  const ttftMeasured = Number.isFinite(ttftMs);
+  const total = Number.isFinite(totalMs) ? totalMs : null;
+  const prefillMs = ttftMeasured ? ttftMs : null;
+  const decodeMs = ttftMeasured && total !== null ? Math.max(0, total - ttftMs) : null;
+  let decodeTokPerSec = null;
+  if (completionTokens && completionTokens > 0) {
+    if (decodeMs !== null && decodeMs > 0) decodeTokPerSec = completionTokens / (decodeMs / 1000);
+    else if (total !== null && total > 0) decodeTokPerSec = completionTokens / (total / 1000);
+  }
+  const prefixHitRate = promptTokens && promptTokens > 0 && cacheHitTokens !== null
+    ? cacheHitTokens / promptTokens : null;
+  return {
+    ttftMeasured,
+    ttftMs: ttftMeasured ? ttftMs : null,
+    totalMs: total,
+    prefillMs,
+    decodeMs,
+    promptTokens,
+    completionTokens,
+    cacheHitTokens,
+    decodeTokPerSec,
+    prefixHitRate,
+  };
+}
+
+/** Whether metrics streaming is enabled for this run. Default OFF so ordinary
+ *  runs are the proven non-streaming path; `YOKI_LLM_METRICS=1` turns on the
+ *  TTFT-measuring streaming path. The cheap baseline metrics (total latency,
+ *  token counts, cache-hit) are attached either way, so "off" still measures —
+ *  it just cannot split prefill from decode. */
+function metricsStreamingEnabled(env = process.env) {
+  return String(env.YOKI_LLM_METRICS || '') === '1';
 }
 
 /** Pull the assistant message text from a chat-completions response body.
@@ -178,11 +315,13 @@ function makeBackend(config) {
 
   async function run({
     prompt, model, effort, schema, agentType, timeoutMs, fetchImpl, env,
+    captureMetrics,
     // sandbox/cwd/opts/mockFile/onProgress are accepted for interface parity
     // and ignored: a raw completion has no tools, no working directory and no
     // live tool-call stream to count.
   }) {
-    const { baseUrl, apiKey, model: defaultModel } = resolveEndpoint(env);
+    const resolvedEnv = env || process.env;
+    const { baseUrl, apiKey, model: defaultModel } = resolveEndpoint(resolvedEnv);
     if (config.apiKeyEnv && !apiKey) {
       throw new Error(
         `${name} backend: ${config.apiKeyEnv} is not set — start yoki-graph via `
@@ -194,11 +333,16 @@ function makeBackend(config) {
     // is an idempotent safety net for buildArgv-style direct callers/tests.
     const resolvedModel = resolveModel(name, model) || defaultModel;
     const messages = buildMessages(prompt, agentType);
+    // Stream (to measure TTFT) only when explicitly enabled; a caller can force
+    // it per-call, otherwise the run-wide env flag decides. Off = the proven
+    // non-streaming path, still fully metered minus the prefill/decode split.
+    const stream = captureMetrics !== undefined ? !!captureMetrics : metricsStreamingEnabled(resolvedEnv);
     const started = Date.now();
-    const { ok, status, text } = await chatCompletion({
+    const { ok, status, text, metrics: timing } = await chatCompletion({
       baseUrl, apiKey, model: resolvedModel, messages,
       reasoningEffort: effort, jsonMode: !!schema,
       samplingParams: config.samplingParams, timeoutMs, fetchImpl, label: name,
+      captureMetrics: stream,
     });
     const durationMs = Date.now() - started;
     if (!ok) {
@@ -207,7 +351,15 @@ function makeBackend(config) {
       if (status === 429 || status >= 500) err.transient = true;
       throw err;
     }
-    return { raw: text, durationMs, exitCode: 0 };
+    // Metrics are computed from client-side timing + the response's own usage
+    // block — no extra request, no extra tokens. `timing` carries the measured
+    // TTFT only on the streaming path; otherwise total latency stands in.
+    const usage = extractUsage(text, config.priceTable);
+    const metrics = computeMetrics(
+      timing || { totalMs: durationMs },
+      usage,
+    );
+    return { raw: text, durationMs, exitCode: 0, metrics };
   }
 
   return {
@@ -222,4 +374,7 @@ function makeBackend(config) {
   };
 }
 
-module.exports = { makeBackend, chatCompletion, extractText, extractUsage };
+module.exports = {
+  makeBackend, chatCompletion, extractText, extractUsage,
+  computeMetrics, readSseStream, metricsStreamingEnabled,
+};

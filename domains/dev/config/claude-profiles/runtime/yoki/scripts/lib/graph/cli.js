@@ -176,6 +176,7 @@ async function cmdRun(rest, flags) {
     // distance from the top of the summary.
     process.stdout.write(`\nrunId: ${result.runId}\nstatus: ${result.status}\n`);
     if (result.usage) process.stdout.write(`${formatUsage(result.usage)}\n`);
+    if (result.metrics) process.stdout.write(`${formatMetrics(result.metrics)}\n`);
     if (result.byModel && result.byModel.length) process.stdout.write(formatModelTable(result.byModel));
     if (result.status === 'ok') {
       process.stdout.write(`result: ${JSON.stringify(result.result, null, 2)}\n`);
@@ -233,6 +234,17 @@ function formatUsage(usage) {
   // Never folded into `tokens`: see formatModelTable's note and API.md.
   if (usage.cachedTokens) parts.push(`${usage.cachedTokens} cached`);
   if (usage.hasCost) parts.push(`cost: $${usage.costUsd.toFixed(4)}`);
+  return parts.join(' — ');
+}
+
+/** One line of end-of-run serving metrics (openai-compat deepseek/local
+ *  lanes). TTFT is shown only when a streaming run measured it
+ *  (YOKI_LLM_METRICS=1); otherwise just decode rate and prefix-cache hit. */
+function formatMetrics(m) {
+  const parts = [`metrics: ${m.samples} call${m.samples === 1 ? '' : 's'}`];
+  if (m.avgTtftMs != null) parts.push(`TTFT ~${(m.avgTtftMs / 1000).toFixed(2)}s`);
+  if (m.avgDecodeTokPerSec != null) parts.push(`decode ~${m.avgDecodeTokPerSec.toFixed(1)} tok/s`);
+  if (m.prefixHitRate != null) parts.push(`prefix-cache ${(m.prefixHitRate * 100).toFixed(0)}%`);
   return parts.join(' — ');
 }
 
@@ -556,5 +568,5 @@ if (require.main === module) {
 
 module.exports = {
   parseArgs, makeEmitter, humanLine, cmdRun, cmdList, cmdStatus, cmdWatch, cmdEscalate, watchSnapshot, main,
-  formatUsage, formatModelTable, numberFlag,
+  formatUsage, formatMetrics, formatModelTable, numberFlag,
 };

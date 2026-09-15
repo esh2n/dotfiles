@@ -438,3 +438,50 @@ test('the CLI validates a caller-supplied runId on every command that takes one'
   assert.rejects(cli.cmdWatch(['../escape'], {}, { stream }), /invalid run id/);
   assert.rejects(cli.cmdRun(['whatever'], { resume: '../escape' }), /invalid run id/);
 });
+
+test('metricsSummaryFrom: averages TTFT/decode over reporting calls and token-weights prefix-hit', () => {
+  const { metricsSummaryFrom } = require('../journal');
+  const entries = [
+    { status: 'ok', metrics: { ttftMeasured: true, ttftMs: 400, decodeTokPerSec: 40, promptTokens: 1000, cacheHitTokens: 500 } },
+    { status: 'ok', metrics: { ttftMeasured: true, ttftMs: 600, decodeTokPerSec: 60, promptTokens: 1000, cacheHitTokens: 100 } },
+    // a codex/omp lane: 'ok' but no metrics — must not drag the averages down
+    { status: 'ok', tokens: 999 },
+    // an error entry is ignored
+    { status: 'error', metrics: { ttftMeasured: true, ttftMs: 9999, decodeTokPerSec: 1 } },
+  ];
+  const s = metricsSummaryFrom(entries);
+  assert.equal(s.samples, 2);
+  assert.equal(s.avgTtftMs, 500); // (400+600)/2
+  assert.equal(s.avgDecodeTokPerSec, 50); // (40+60)/2
+  assert.ok(Math.abs(s.prefixHitRate - 0.3) < 1e-9); // (500+100)/(1000+1000)
+});
+
+test('metricsSummaryFrom: baseline (no TTFT) leaves avgTtftMs null but still reports decode/prefix', () => {
+  const { metricsSummaryFrom } = require('../journal');
+  const s = metricsSummaryFrom([
+    { status: 'ok', metrics: { ttftMeasured: false, ttftMs: null, decodeTokPerSec: 25, promptTokens: 200, cacheHitTokens: 0 } },
+  ]);
+  assert.equal(s.samples, 1);
+  assert.equal(s.avgTtftMs, null);
+  assert.equal(s.ttftSamples, 0);
+  assert.equal(s.avgDecodeTokPerSec, 25);
+  assert.equal(s.prefixHitRate, 0);
+});
+
+test('metricsSummaryFrom: null when no call reported metrics (codex/omp-only run)', () => {
+  const { metricsSummaryFrom } = require('../journal');
+  assert.equal(metricsSummaryFrom([{ status: 'ok', tokens: 5 }, { status: 'error' }]), null);
+  assert.equal(metricsSummaryFrom([]), null);
+});
+
+test('formatMetrics: shows TTFT only when measured', () => {
+  const cli = require('../cli');
+  const withT = cli.formatMetrics({ samples: 2, avgTtftMs: 500, avgDecodeTokPerSec: 50, prefixHitRate: 0.3 });
+  assert.match(withT, /2 calls/);
+  assert.match(withT, /TTFT ~0\.50s/);
+  assert.match(withT, /decode ~50\.0 tok\/s/);
+  assert.match(withT, /prefix-cache 30%/);
+  const noT = cli.formatMetrics({ samples: 1, avgTtftMs: null, avgDecodeTokPerSec: 25, prefixHitRate: 0 });
+  assert.doesNotMatch(noT, /TTFT/);
+  assert.match(noT, /decode ~25\.0 tok\/s/);
+});
