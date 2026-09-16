@@ -49,6 +49,33 @@ Proxy comes up on `http://localhost:4000`; scrape `http://localhost:4000/metrics
 Native (pip/uv) alternative is at the bottom of `start.sh` — it avoids the
 Docker `host.docker.internal` hop for the local tier.
 
+### Interactive vs headless op
+
+`op run` needs to unlock 1Password. Two ways:
+
+- **Interactive (at the machine):** enable 1Password app → Settings →
+  Developer → "Integrate with 1Password CLI", then `op run` gets a Touch ID
+  popup. Works only when you're physically at the Mac to approve biometrics.
+- **Headless (away, no biometric) — the durable path:** a **1Password service
+  account token**. `op run` automatically uses `OP_SERVICE_ACCOUNT_TOKEN` when
+  it's in the env, with no prompt — so `./start.sh` runs unattended and
+  "being away from the machine" stops blocking it. One-time setup (do it once,
+  at the machine):
+  1. Create a service account at `1password.com` → Developer → Service
+     Accounts, granting **read-only** access to just the vault holding these
+     keys (e.g. a dedicated `LLM-Keys` vault, per the api-key-management
+     design — scope it narrow, per-machine tokens).
+  2. Store the token itself where the shell can read it at launch WITHOUT
+     op (it's the bootstrap secret): the macOS Keychain, or your shell's
+     secret store. Do **not** commit it and do **not** put it in
+     `litellm.op-vars`.
+  3. Export it before running: `export OP_SERVICE_ACCOUNT_TOKEN="$(<keychain
+     read>)"` then `./start.sh`. `op` resolves the op:// refs headlessly.
+
+  Note: the service-account token is the one secret that can't itself come
+  from op (chicken-and-egg), so it lives in the OS keychain. Everything else
+  (the provider keys) stays as op:// references.
+
 Pin the image tag first: check the latest stable at
 `github.com/BerriAI/litellm/pkgs/container/litellm` and set `LITELLM_IMAGE` in
 `start.sh` (the `v1.90.2` there is a placeholder).
