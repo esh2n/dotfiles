@@ -105,7 +105,10 @@ JSON
     # `# yoki:begin`/`# yoki:end` managed block and must never be touched.
     #
     # It ALSO declares three tables the managed block itself wants to emit:
-    # `[features]`, `[agents]` and a bare `[hooks.state]`. That is the real
+    # `[features]`, `[features.multi_agent_v2]` and a bare `[hooks.state]`.
+    # It further keeps a top-level `model` AFTER those tables, the way a
+    # hand-written config does: hoisting it above the block is the only way
+    # it stays top-level, since the block's own body ends in tables. That is the real
     # state the first `apply --target codex` on this machine met, and the
     # block emitting its own `[features]` on top of it made Codex refuse to
     # start entirely (`failed to load bootstrap configuration … duplicate
@@ -116,6 +119,8 @@ JSON
     # whole point of the scenario is that the result still LOADS, which the
     # `codex features list` assertion below actually checks.)
     cat > "$FIXTURE/codex/config.toml" <<'TOML'
+model = "gpt-5-codex"
+
 [projects."/repo"]
 trust_level = "trusted"
 
@@ -126,8 +131,8 @@ enabled = true
 [features]
 hooks = true
 
-[agents]
-enabled = false
+[features.multi_agent_v2]
+max_concurrent_threads_per_session = 2
 
 [shell_environment_policy.set]
 PATH_EXTRA = "/opt/homebrew/bin"
@@ -238,11 +243,14 @@ run_yoki_switch_targets_checks() {
 multi_agent" "$(toml_section_keys "$FIXTURE/codex/config.toml" '[features]')"
     assert_true "codex/config.toml: [features] multi_agent is ours" \
         grep -qF 'multi_agent = true' "$FIXTURE/codex/config.toml"
-    assert_eq_text "codex/config.toml: [agents] takes our keys, once each" \
-        "enabled
-max_concurrent_threads_per_session" "$(toml_section_keys "$FIXTURE/codex/config.toml" '[agents]')"
-    assert_true "codex/config.toml: [agents] enabled overwritten with ours (was false by hand)" \
-        grep -qF 'enabled = true' "$FIXTURE/codex/config.toml"
+    assert_eq_text "codex/config.toml: [features.multi_agent_v2] takes our key, once" \
+        "max_concurrent_threads_per_session" \
+        "$(toml_section_keys "$FIXTURE/codex/config.toml" '[features.multi_agent_v2]')"
+    assert_true "codex/config.toml: multi_agent_v2 thread cap overwritten with ours (was 2 by hand)" \
+        grep -qF 'max_concurrent_threads_per_session = 4' "$FIXTURE/codex/config.toml"
+    assert_true "codex/config.toml: a foreign top-level key is hoisted ABOVE the block, so it stays top-level" \
+        test "$(grep -n 'model = "gpt-5-codex"' "$FIXTURE/codex/config.toml" | cut -d: -f1)" \
+             -lt "$(grep -n '# yoki:begin' "$FIXTURE/codex/config.toml" | cut -d: -f1)"
     assert_true "codex/config.toml: a key yoki does not own is left untouched" \
         grep -qF 'PATH_EXTRA = "/opt/homebrew/bin"' "$FIXTURE/codex/config.toml"
     assert_true "codex/config.toml: YOKI_HARNESS merged into the existing [shell_environment_policy.set]" \

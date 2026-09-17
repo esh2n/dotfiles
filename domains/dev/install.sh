@@ -174,8 +174,35 @@ if has_command "claude"; then
     fi
 fi
 
+# Seed ~/.codex/config.toml (= the repo's domains/dev/config/codex/config.toml
+# through the ~/.codex symlink) from the tracked default when it is missing.
+#
+# The seed is named `config.toml.default`, NOT `.template`, and that is the
+# whole point: core/config/manager.sh's template pass renders every
+# `*.template` under domains/ with an unconditional `cp`, so while this file
+# carried that suffix, every installer run overwrote the live config —
+# discarding yoki's managed block along with codex's own hook trust hashes,
+# and restoring whatever stale MCP entries the seed still held. Same
+# seed-once shape as installer.sh's ensure_warp_settings: never clobber a
+# file that already exists.
+ensure_codex_config() {
+    local codex_dir="${DOTFILES_ROOT}/domains/dev/config/codex"
+    local live="${codex_dir}/config.toml"
+    local seed="${codex_dir}/config.toml.default"
+
+    if [[ -f "$live" ]]; then
+        return 0
+    fi
+    if [[ ! -f "$seed" ]]; then
+        log_warn "Codex config seed not found: $seed"
+        return 0
+    fi
+    cp "$seed" "$live"
+    log_success "Seeded Codex config from default: $live"
+}
+
 # ~/.codex/config.toml contains machine-local trust and hook state, so it is
-# intentionally not replaced wholesale by the tracked template — hooks,
+# intentionally not replaced wholesale by the tracked default — hooks,
 # rules, agents, skill ports, AND MCP server registration (task T13: the
 # canonical mcp.json inventory's `[mcp_servers.<name>]` tables, appended
 # into config.toml's managed block) all come from the generator now. A
@@ -184,6 +211,8 @@ fi
 # reported rather than overwritten — see
 # lib/mcp-inventory/writers/codex.js.
 if has_command "codex"; then
+    ensure_codex_config
+
     yoki_switch="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
     if [[ -x "$yoki_switch" ]]; then
         log_info "Applying Codex config (hooks/rules/agents/skills/mcp)..."
