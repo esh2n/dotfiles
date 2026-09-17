@@ -13,7 +13,9 @@
           "id": "main",
           "name": "main — DeepSeek Flash (proxy, measured)",
           "reasoning": true,
-          "input": ["text"],
+          "input": [
+            "text"
+          ],
           "contextWindow": 131072,
           "maxTokens": 8192,
           "compat": {
@@ -24,7 +26,9 @@
           "id": "deterministic",
           "name": "deterministic — local Qwen (proxy, measured)",
           "reasoning": true,
-          "input": ["text"],
+          "input": [
+            "text"
+          ],
           "contextWindow": 131072,
           "maxTokens": 32768,
           "compat": {
@@ -37,6 +41,19 @@
             "high": null,
             "xhigh": null,
             "max": null
+          }
+        },
+        {
+          "id": "complex",
+          "name": "complex — DeepSeek V4 Pro (proxy, measured)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "compat": {
+            "thinkingFormat": "deepseek"
           }
         }
       ]
@@ -55,7 +72,9 @@
           "id": "qwen/qwen3.8-27b",
           "name": "Qwen3.8 27B (LM Studio, MLX 8bit)",
           "reasoning": true,
-          "input": ["text"],
+          "input": [
+            "text"
+          ],
           "contextWindow": 131072,
           "maxTokens": 32768,
           "compat": {
