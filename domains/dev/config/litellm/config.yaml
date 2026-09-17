@@ -44,6 +44,9 @@ litellm_settings:
   require_auth_for_metrics_endpoint: false
 
 general_settings:
-  # Protects the proxy's admin/OpenAI surface. Any secret works; kept in op
-  # for consistency (litellm.env resolves it). Not a provider key.
-  master_key: os.environ/LITELLM_MASTER_KEY
+  # Loopback gateway key — a NON-SECRET local constant, like LM Studio's
+  # apiKey:"lmstudio". The proxy binds to 127.0.0.1 only and the real provider
+  # secret (DeepSeek) is op-injected and never leaves the proxy, so this value
+  # is not sensitive: it is the shared token every local front (pi/dsh) presents.
+  # Safe to commit; rotate only if you ever expose the port off loopback.
+  master_key: sk-local-proxy

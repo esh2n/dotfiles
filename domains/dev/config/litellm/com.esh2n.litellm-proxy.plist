@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Deploy to ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist and load with:
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist
+     Keeps the local LiteLLM measuring proxy always-on at login. The wrapper it
+     runs injects secrets from a 1Password service account via the login Keychain
+     (see litellm-up.sh); no secret lives in this plist. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.esh2n.litellm-proxy</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/esh2n/.config/litellm/litellm-up.sh</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <!-- Gentle retry: if a start fails (e.g. 1Password briefly throttled or
+       offline), wait this long before relaunching instead of hammering. -->
+  <key>ThrottleInterval</key>
+  <integer>120</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/esh2n/Library/Logs/litellm-proxy.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/esh2n/Library/Logs/litellm-proxy.log</string>
+</dict>
+</plist>

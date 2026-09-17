@@ -3,20 +3,22 @@
 # child process env only; plaintext never touches disk or this file. NEVER put
 # a resolved key here.
 #
-# CONFIRM the vault/item coordinates below against your 1Password (item names
-# assumed `deepseek` / `openai` / `litellm` in the `Private` vault, field
-# `credential`). Adjust if yours differ.
+# Resolved by a 1Password SERVICE ACCOUNT (headless, no Touch ID): the wrapper
+# reads OP_SERVICE_ACCOUNT_TOKEN from the macOS login Keychain, then `op run`
+# authenticates with it. The service account is scoped read-only to the
+# `llm-automation` vault only (items: deepseek, litellm — field `credential`).
 
-DEEPSEEK_API_KEY=op://Private/deepseek/credential
-OPENAI_API_KEY=op://Private/openai/credential
+# Only the high-value provider secret is op-injected. The proxy's master_key is
+# a non-secret loopback constant set directly in config.yaml (not here).
+DEEPSEEK_API_KEY=op://llm-automation/deepseek/credential
 
-# Proxy master key — any secret. Store one in op (item `litellm`), or replace
-# this line with a literal like LITELLM_MASTER_KEY=sk-local-<random> for a
-# purely local proxy.
-LITELLM_MASTER_KEY=op://Private/litellm/credential
+# complex/Astra tier is not wired yet (no OpenAI key on this service account).
+# A literal placeholder keeps LiteLLM startup happy; the `complex` route stays
+# unused until an openai item is added to llm-automation and referenced here.
+OPENAI_API_KEY=unset-placeholder
 
 # LM Studio local endpoint. host.docker.internal = the Mac host as seen from
-# inside the Docker container. If running LiteLLM natively (pip/uv), change to
+# inside the Docker container. If running LiteLLM natively, change to
 # http://localhost:1234/v1.
 LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1
 LM_STUDIO_API_KEY=lm-studio
