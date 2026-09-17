@@ -1,5 +1,46 @@
 {
   "providers": {
+    "proxy": {
+      "baseUrl": "http://localhost:4000/v1",
+      "api": "openai-completions",
+      "apiKey": "sk-local-proxy",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "maxTokensField": "max_tokens"
+      },
+      "models": [
+        {
+          "id": "main",
+          "name": "main — DeepSeek Flash (proxy, measured)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 8192,
+          "compat": {
+            "thinkingFormat": "deepseek"
+          }
+        },
+        {
+          "id": "deterministic",
+          "name": "deterministic — local Qwen (proxy, measured)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 131072,
+          "maxTokens": 32768,
+          "compat": {
+            "thinkingFormat": "qwen-chat-template"
+          },
+          "thinkingLevelMap": {
+            "minimal": null,
+            "low": null,
+            "medium": "medium",
+            "high": null,
+            "xhigh": null,
+            "max": null
+          }
+        }
+      ]
+    },
     "lmstudio": {
       "baseUrl": "http://localhost:1234/v1",
       "api": "openai-completions",

@@ -1,9 +1,10 @@
 {
-  "defaultProvider": "lmstudio",
-  "defaultModel": "qwen/qwen3.8-27b",
+  "defaultProvider": "proxy",
+  "defaultModel": "main",
   "enabledModels": [
     "deepseek/**",
-    "lmstudio/**"
+    "lmstudio/**",
+    "proxy/**"
   ],
   "defaultThinkingLevel": "medium",
   "showCacheMissNotices": true,
