@@ -1,0 +1,65 @@
+{
+  "system": "You are a precise local model for deterministic tasks. Follow the output format exactly. When asked to output only JSON, emit compact JSON with no prose and no markdown fences.",
+  "prompts": [
+    {
+      "id": "json-extract",
+      "category": "structured",
+      "user": "Extract the person's name and age as JSON with keys \"name\" and \"age\" from: 'Taro is 28 years old.' Output only JSON.",
+      "check": { "type": "json_fields", "fields": { "name": "Taro", "age": 28 } }
+    },
+    {
+      "id": "tool-args",
+      "category": "tool",
+      "user": "The user says: 'set a timer for 5 minutes'. Output only a JSON tool call of the form {\"tool\":\"set_timer\",\"seconds\":<number>}.",
+      "check": { "type": "json_fields", "fields": { "tool": "set_timer", "seconds": 300 } }
+    },
+    {
+      "id": "csv-to-json",
+      "category": "structured",
+      "user": "Convert this CSV to a JSON array of objects with keys id and name. Output only JSON.\nid,name\n1,alice\n2,bob",
+      "check": { "type": "json_array_len", "len": 2 }
+    },
+    {
+      "id": "classify-sentiment",
+      "category": "classification",
+      "user": "Classify the sentiment as exactly one lowercase word (positive, negative, or neutral). Output only that word: 'This is the worst purchase I have ever made.'",
+      "check": { "type": "equals", "value": "negative" }
+    },
+    {
+      "id": "enum-route",
+      "category": "classification",
+      "user": "Route this message to exactly one of [billing, technical, sales]. Output only the label: 'My credit card was charged twice this month.'",
+      "check": { "type": "equals", "value": "billing" }
+    },
+    {
+      "id": "yes-no",
+      "category": "instruction",
+      "user": "Answer with only YES or NO: Is 21 a prime number?",
+      "check": { "type": "equals", "value": "NO" }
+    },
+    {
+      "id": "exact-format",
+      "category": "instruction",
+      "user": "Output exactly the following line and nothing else: STATUS=OK",
+      "check": { "type": "equals", "value": "STATUS=OK" }
+    },
+    {
+      "id": "extract-number",
+      "category": "extraction",
+      "user": "Output only the number mentioned: 'The answer to everything is 42.'",
+      "check": { "type": "equals", "value": "42" }
+    },
+    {
+      "id": "math-factorial",
+      "category": "reasoning",
+      "user": "Compute 5 factorial. Output only the resulting number.",
+      "check": { "type": "equals", "value": "120" }
+    },
+    {
+      "id": "code-edit-nil",
+      "category": "code",
+      "user": "Add a guard that returns 0 when s is nil at the start of this Go function. Output only the code, no fences, no prose:\nfunc Len(s *string) int { return len(*s) }",
+      "check": { "type": "contains", "value": "== nil" }
+    }
+  ]
+}
