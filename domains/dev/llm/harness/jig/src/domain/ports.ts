@@ -4,7 +4,8 @@
  * (`cli/`). The core depends on these abstractions; nothing here imports infra.
  */
 
-import type { SettingsFragment } from "./compose/settings";
+import type { JsonObject } from "./compose/merge";
+import type { DecisionProvider } from "./decision/provider";
 
 export interface Logger {
   debug(message: string, meta?: Record<string, unknown>): void;
@@ -39,7 +40,7 @@ export interface ProcessRunner {
 
 /** The composed output of one profile, handed to each target for writing. */
 export interface ComposedProfile {
-  readonly settings: SettingsFragment;
+  readonly settings: JsonObject;
 }
 
 /**
@@ -58,4 +59,10 @@ export interface Ports {
   readonly clock: Clock;
   readonly fs: FileSystem;
   readonly proc: ProcessRunner;
+  /**
+   * Where judgments come from. In a harness this is the loopback client of the
+   * judgment service; in tests it is a deterministic provider. The core only
+   * ever sees this interface, never the model vendor or a credential.
+   */
+  readonly decision: DecisionProvider;
 }

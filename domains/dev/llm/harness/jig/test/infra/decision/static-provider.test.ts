@@ -28,4 +28,36 @@ describe("StaticProvider", () => {
     expect(await provider.bool({ prompt: "?" }, {})).toEqual({ value: true, confidence: 0.95 });
     expect(await provider.score({ prompt: "?" }, {})).toEqual({ value: 0.3, confidence: 0.5 });
   });
+
+  test("batch answers come back in the order they were asked", async () => {
+    const provider = new StaticProvider({
+      bools: [
+        { value: true, confidence: 0.9 },
+        { value: false, confidence: 0.8 },
+      ],
+    });
+
+    expect(await provider.boolBatch({ material: "m", prompts: ["a", "b"] }, {})).toEqual([
+      { value: true, confidence: 0.9 },
+      { value: false, confidence: 0.8 },
+    ]);
+  });
+
+  test("without batch answers the single bool answer is reused for every question", async () => {
+    const provider = new StaticProvider({ bool: { value: true, confidence: 0.95 } });
+
+    expect(await provider.boolBatch({ material: "m", prompts: ["a", "b", "c"] }, {})).toEqual([
+      { value: true, confidence: 0.95 },
+      { value: true, confidence: 0.95 },
+      { value: true, confidence: 0.95 },
+    ]);
+  });
+
+  test("a batch answer count that does not match the prompts is an error", async () => {
+    const provider = new StaticProvider({ bools: [{ value: true, confidence: 1 }] });
+
+    await expect(provider.boolBatch({ material: "m", prompts: ["a", "b"] }, {})).rejects.toThrow(
+      /1 batch answers for 2 prompts/,
+    );
+  });
 });

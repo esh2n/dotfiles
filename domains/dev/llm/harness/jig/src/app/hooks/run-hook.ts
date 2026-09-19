@@ -1,8 +1,8 @@
 import {
   type Decision,
-  decide,
   type HookProfile,
   type ToolCall,
+  decide,
 } from "../../domain/hooks/decision";
 import type { Logger } from "../../domain/ports";
 

@@ -21,20 +21,53 @@ export interface DecisionContext {
 export interface ChoiceQuery<T extends string> {
   readonly prompt: string;
   readonly options: readonly T[];
+  /**
+   * Optional description per option. Kept separate from `options` because
+   * TypeSafe's Choice REQUIRES a `criteria` record (label -> description) and a
+   * bare label rarely carries the meaning the judgment needs: "complex" says
+   * nothing, "hard design or debugging, one model is not enough" does. A
+   * provider that cannot use descriptions (a rule provider) may ignore this; a
+   * provider that requires them must fail loudly when an option has none.
+   */
+  readonly criteria?: Readonly<Record<T, string>>;
 }
 
 export interface BoolQuery {
+  /** The question. For a single yes/no this is also the material judged, since there is nothing else. */
   readonly prompt: string;
+}
+
+/**
+ * Many yes/no questions about ONE body of material.
+ *
+ * Exists because the judgment models jig talks to evaluate a set of questions
+ * against a shared state in a single round trip (TypeSafe: up to 32 questions,
+ * answered in parallel, and the docs state adding questions barely changes
+ * latency). Asking per item costs one round trip per item for the same answer.
+ */
+export interface BoolBatchQuery {
+  /** The material every question is judged against. Sent once, not per item. */
+  readonly material: string;
+  /** One question per item, in order. Judgments come back in the same order. */
+  readonly prompts: readonly string[];
 }
 
 export interface ScoreQuery {
   readonly prompt: string;
+  /** Optional rubric, ordered worst -> best. TypeSafe's Score requires 2-32 levels. */
+  readonly criteria?: readonly string[];
 }
 
 export interface DecisionProvider {
   readonly name: string;
   choice<T extends string>(query: ChoiceQuery<T>, context: DecisionContext): Promise<Decided<T>>;
   bool(query: BoolQuery, context: DecisionContext): Promise<Decided<boolean>>;
+  /**
+   * The same yes/no judgment for many items at once, against one material. A
+   * provider that cannot batch answers them one by one and returns the same
+   * array, so callers do not branch on the capability.
+   */
+  boolBatch(query: BoolBatchQuery, context: DecisionContext): Promise<readonly Decided<boolean>[]>;
   score(query: ScoreQuery, context: DecisionContext): Promise<Decided<number>>;
 }
 

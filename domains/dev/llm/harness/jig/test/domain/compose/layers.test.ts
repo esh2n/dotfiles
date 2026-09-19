@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import {
-  type ComposeInput,
-  composeSettings,
-  selectLayers,
-} from "../../../src/domain/compose/layers";
+import { type LayerSelectionInput, selectLayers } from "../../../src/domain/compose/layers";
 
-const base: ComposeInput = {
+const base: LayerSelectionInput = {
   core: { env: { CORE: "1" } },
   packs: [
     { name: "typescript", settings: { ts: true } },
@@ -15,42 +11,41 @@ const base: ComposeInput = {
   enabled: [],
 };
 
+const packNames = (selection: ReturnType<typeof selectLayers>): string[] =>
+  selection.packs.map((pack) => pack.name);
+
 describe("selectLayers", () => {
-  test("core only when no packs are enabled", () => {
-    expect(selectLayers(base).map((l) => l.name)).toEqual(["core"]);
+  test("core carries through, no packs when none are enabled", () => {
+    const selection = selectLayers(base);
+    expect(selection.core).toEqual({ env: { CORE: "1" } });
+    expect(selection.packs).toEqual([]);
+    expect(selection.personal).toBeUndefined();
   });
 
   test("includes enabled packs and excludes disabled ones", () => {
-    const layers = selectLayers({ ...base, enabled: ["go"] });
-    expect(layers.map((l) => l.name)).toEqual(["core", "go"]);
+    expect(packNames(selectLayers({ ...base, enabled: ["go"] }))).toEqual(["go"]);
   });
 
-  test("packs keep their definition order regardless of enabled order", () => {
-    const layers = selectLayers({ ...base, enabled: ["rust", "typescript"] });
-    expect(layers.map((l) => l.name)).toEqual(["core", "typescript", "rust"]);
+  test("packs are ordered alphabetically by name, not by definition order", () => {
+    expect(packNames(selectLayers({ ...base, enabled: ["rust", "typescript"] }))).toEqual([
+      "rust",
+      "typescript",
+    ]);
   });
 
-  test("personal is appended last when provided", () => {
-    const layers = selectLayers({ ...base, enabled: ["go"], personal: { me: true } });
-    expect(layers.map((l) => l.name)).toEqual(["core", "go", "personal"]);
+  test("personal is carried through when provided", () => {
+    const selection = selectLayers({ ...base, enabled: ["go"], personal: { me: true } });
+    expect(selection.personal).toEqual({ me: true });
   });
 
-  test("an enabled pack that does not exist is a loud error", () => {
-    expect(() => selectLayers({ ...base, enabled: ["nope"] })).toThrow(/unknown pack: nope/);
+  test("an enabled name with no pack definition is reported as skipped, not thrown", () => {
+    const selection = selectLayers({ ...base, enabled: ["nope", "go"] });
+    expect(selection.skipped).toEqual(["nope"]);
+    expect(packNames(selection)).toEqual(["go"]);
   });
-});
 
-describe("composeSettings", () => {
-  test("merges core, enabled packs, and personal end to end", () => {
-    const merged = composeSettings({
-      core: { hooks: { PreToolUse: [{ m: "core" }] }, env: { A: "1" } },
-      packs: [{ name: "ts", settings: { hooks: { PostToolUse: [{ m: "ts" }] } } }],
-      enabled: ["ts"],
-      personal: { env: { A: "2" } },
-    });
-    expect(merged).toEqual({
-      hooks: { PreToolUse: [{ m: "core" }], PostToolUse: [{ m: "ts" }] },
-      env: { A: "2" },
-    });
+  test("a name listed twice is merged once", () => {
+    const selection = selectLayers({ ...base, enabled: ["go", "go"] });
+    expect(packNames(selection)).toEqual(["go"]);
   });
 });

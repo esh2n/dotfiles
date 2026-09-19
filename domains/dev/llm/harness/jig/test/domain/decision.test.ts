@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decide, type ToolCall } from "../../src/domain/hooks/decision";
+import { type ToolCall, decide } from "../../src/domain/hooks/decision";
 
 const bash = (command: string): ToolCall => ({ tool: "Bash", input: { command } });
 

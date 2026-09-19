@@ -5,7 +5,7 @@
  * downstream rather than silently becoming an empty string.
  */
 
-import type { Json } from "./settings";
+import type { Json } from "./merge";
 
 export type TemplateVars = Readonly<Record<string, string>>;
 

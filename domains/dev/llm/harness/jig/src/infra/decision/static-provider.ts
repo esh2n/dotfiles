@@ -1,4 +1,5 @@
 import type {
+  BoolBatchQuery,
   BoolQuery,
   ChoiceQuery,
   Decided,
@@ -10,6 +11,11 @@ import type {
 export interface StaticAnswers {
   readonly choice?: { readonly value: string; readonly confidence: number };
   readonly bool?: Decided<boolean>;
+  /**
+   * Answers for `boolBatch`, in the order asked. When absent, the single `bool`
+   * answer is reused for every question — that is what a rule provider does.
+   */
+  readonly bools?: readonly Decided<boolean>[];
   readonly score?: Decided<number>;
 }
 
@@ -38,6 +44,23 @@ export class StaticProvider implements DecisionProvider {
     if (this.answers.bool === undefined)
       throw new Error("static provider: no bool answer configured");
     return this.answers.bool;
+  }
+
+  async boolBatch(
+    query: BoolBatchQuery,
+    _context: DecisionContext,
+  ): Promise<readonly Decided<boolean>[]> {
+    const answers = this.answers.bools;
+    if (answers !== undefined) {
+      if (answers.length !== query.prompts.length) {
+        throw new Error(
+          `static provider: ${answers.length} batch answers for ${query.prompts.length} prompts`,
+        );
+      }
+      return answers;
+    }
+    const single = await this.bool({ prompt: "" }, {});
+    return query.prompts.map(() => single);
   }
 
   async score(_query: ScoreQuery, _context: DecisionContext): Promise<Decided<number>> {

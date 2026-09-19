@@ -9,6 +9,19 @@ export type Tier = "main" | "complex" | "deterministic";
 
 export const TIERS: readonly Tier[] = ["main", "complex", "deterministic"];
 
+/**
+ * What each tier is for, in the words the decision model judges by. A bare tier
+ * name carries no meaning for the judgment ("complex" could be anything), and
+ * TypeSafe's Choice requires a description per option anyway — so these
+ * descriptions are the input to the decision, not decoration.
+ */
+export const TIER_CRITERIA: Readonly<Record<Tier, string>> = {
+  main: "routine work: ordinary edits, searches, explanations, small fixes",
+  complex: "hard work: design, architecture, subtle debugging, long-horizon planning",
+  deterministic:
+    "mechanical work: formatting, renames, boilerplate, restating what is already known",
+};
+
 export interface SelectTierOptions {
   readonly threshold?: number;
   readonly fallback?: Tier;
@@ -29,7 +42,11 @@ export async function selectTier(
   const threshold = options.threshold ?? 0.6;
   const fallback = options.fallback ?? "main";
   const decided = await provider.choice<Tier>(
-    { prompt: `Which tier fits this request?\n${request}`, options: TIERS },
+    {
+      prompt: `Which tier fits this request?\n${request}`,
+      options: TIERS,
+      criteria: TIER_CRITERIA,
+    },
     context,
   );
   return gate(decided, threshold, fallback);
