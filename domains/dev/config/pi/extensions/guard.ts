@@ -1,58 +1,110 @@
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // Blast-radius guard for the local lane — the pi-side counterpart of yoki's
 // git-guard.sh (hooks are Claude Code-only; pi needs its own enforcement).
-// Adapted from earlyaidopters/marks-pi-harness (MIT), rules aligned with
-// the yoki git conventions.
 //
-// Two tiers:
-//  - HARD: never allowed, no confirmation offered (yoki NEVER rules)
-//  - CONFIRM: destructive enough to require interactive approval;
-//    denied by default when running headless
+// This no longer embeds its own rules. The CANONICAL rule data lives in
+// `domains/dev/llm/harness/policy/guard-rules.json` and the CANONICAL
+// evaluator is jig's `src/domain/policy` (parse.ts / evaluate.ts) — this
+// file is a small, deliberately duplicated re-implementation of that
+// evaluator (pi and jig are separate deployables, so no cross-package
+// import), kept in sync by hand if the shared schema changes.
+//
+// Two tiers, same as before:
+//  - deny: never allowed, no confirmation offered
+//  - confirm: destructive enough to require interactive approval; denied by
+//    default when running headless
 
-const HARD: Array<{ re: RegExp; why: string }> = [
-  { re: /\bgit\s+push\b(?=.*\b(main|master)\b)/, why: "pushing to main/master is forbidden (yoki git conventions)" },
-  { re: /\bgit\s+push\s+[^|;&]*(--force|\s-f\b)/, why: "force push is forbidden (yoki git conventions)" },
-  { re: /--no-verify\b/, why: "bypassing hooks is forbidden — fix the failure instead" },
-  // Ruled 2026-09-20: deny on every harness, matching git-guard.sh — the
-  // earlier confirm tier here was drift, not intent.
-  { re: /\bgit\s+reset\s+--hard\b/, why: "discards uncommitted work (yoki git conventions)" },
-  { re: /\bgit\s+clean\s+-[a-z]*f/, why: "deletes untracked files (yoki git conventions)" },
-  { re: /\blms\s+load\b/, why: "loading a second model would exhaust unified memory on this machine" },
-  { re: /\bmlx_vlm\.server|mlx-vlm.*serve/, why: "second model server — can exhaust memory and crash this machine" },
-];
+type GuardTier = "deny" | "confirm";
+interface GuardRule {
+  readonly id: string;
+  readonly tier: GuardTier;
+  readonly tools: readonly string[];
+  readonly match: RegExp;
+  readonly why: string;
+  readonly profiles: readonly string[];
+}
 
-const CONFIRM: Array<{ re: RegExp; why: string }> = [
-  { re: /\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b/i, why: "recursive force delete" },
-  { re: /\bkill(all)?\b.*-9|\bpkill\b/, why: "force-killing processes" },
-  { re: /\bsudo\b/, why: "privilege escalation" },
-  { re: /curl[^|]*\|\s*(ba|z)?sh|wget[^|]*\|\s*(ba|z)?sh/, why: "piping remote script to shell" },
-  { re: /\bchmod\s+-R\s+777\b/, why: "world-writable permissions" },
-  { re: /\b(mkfs|diskutil\s+erase|dd\s+.*of=\/dev)/i, why: "disk-level destruction" },
-  { re: /\b(shutdown|reboot|halt)\b/, why: "system power control" },
-  { re: /rm\s+[^|;&]*(package-lock\.json|\.lock\b)/, why: "deleting lock files to silence errors" },
-];
+const PROFILES = ["minimal", "standard", "strict"] as const;
+type HookProfile = (typeof PROFILES)[number];
+
+function resolveProfile(env: NodeJS.ProcessEnv): HookProfile {
+  const raw = env.JIG_HOOK_PROFILE ?? env.YOKI_HOOK_PROFILE;
+  return (PROFILES as readonly string[]).includes(raw ?? "") ? (raw as HookProfile) : "standard";
+}
+
+function policyPath(): string {
+  return process.env.JIG_POLICY_FILE ?? join(homedir(), ".config", "jig", "policy", "guard-rules.json");
+}
+
+type Loaded = { readonly rules: readonly GuardRule[] } | { readonly error: string };
+
+// Read once, at the first tool_call (not at module load — the env may not be
+// settled yet), then cached for the rest of the process.
+let cache: { readonly path: string; readonly loaded: Loaded } | undefined;
+
+function loadPolicy(path: string): Loaded {
+  if (cache !== undefined && cache.path === path) return cache.loaded;
+
+  let loaded: Loaded;
+  try {
+    const doc = JSON.parse(readFileSync(path, "utf8")) as {
+      rules: Array<{
+        id: string;
+        tier: GuardTier;
+        tools: string[];
+        match: string;
+        why: string;
+        profiles: string[];
+      }>;
+    };
+    loaded = { rules: doc.rules.map((r) => ({ ...r, match: new RegExp(r.match) })) };
+  } catch (err) {
+    loaded = { error: err instanceof Error ? err.message : String(err) };
+  }
+
+  cache = { path, loaded };
+  return loaded;
+}
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     if (event.toolName !== "bash" && event.toolName !== "bash_background") return;
     const cmd: string = (event.input as any)?.command ?? "";
+    const profile = resolveProfile(process.env);
+    const path = policyPath();
 
-    for (const rule of HARD) {
-      if (!rule.re.test(cmd)) continue;
+    const loaded = loadPolicy(path);
+    if ("error" in loaded) {
       return {
         block: true,
         reason:
-          `Blocked: ${rule.why}. This is a hard rule — do not retry or work around it with a variant. ` +
+          `jig guard policy unreadable at ${path} (${loaded.error}) — fix the link ` +
+          `(manager.sh link_jig_policy) or set JIG_POLICY_FILE`,
+      };
+    }
+
+    const matches = (rule: GuardRule) =>
+      rule.tools.includes("shell") && rule.profiles.includes(profile) && rule.match.test(cmd);
+
+    const denyRule = loaded.rules.find((r) => r.tier === "deny" && matches(r));
+    if (denyRule) {
+      return {
+        block: true,
+        reason:
+          `Blocked: ${denyRule.why}. This is a hard rule — do not retry or work around it with a variant. ` +
           `State what you wanted to do and why, and let the user decide.`,
       };
     }
 
-    for (const rule of CONFIRM) {
-      if (!rule.re.test(cmd)) continue;
+    const confirmRule = loaded.rules.find((r) => r.tier === "confirm" && matches(r));
+    if (confirmRule) {
       let ok = false;
       try {
-        ok = await ctx.ui.confirm(`Guarded command (${rule.why})`, cmd.slice(0, 300));
+        ok = await ctx.ui.confirm(`Guarded command (${confirmRule.why})`, cmd.slice(0, 300));
       } catch {
         ok = false; // headless: deny by default
       }
@@ -60,7 +112,7 @@ export default function (pi: ExtensionAPI) {
         return {
           block: true,
           reason:
-            `Blocked: ${rule.why}. Do not retry this command or work around the block with a variant. ` +
+            `Blocked: ${confirmRule.why}. Do not retry this command or work around the block with a variant. ` +
             `Explain to the user what you wanted to do and why, and let them decide.`,
         };
       }

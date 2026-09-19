@@ -4,6 +4,7 @@ import {
   type ToolCall,
   decide,
 } from "../../domain/hooks/decision";
+import type { GuardPolicy } from "../../domain/policy/types";
 import type { Logger } from "../../domain/ports";
 
 export interface RunHookDeps {
@@ -11,12 +12,18 @@ export interface RunHookDeps {
 }
 
 /**
- * Application use-case: apply the guard rules to a tool call and record the
- * outcome. Depends only on the `Logger` port and pure domain logic — no IO of
- * its own — so it is tested with a fake logger and plain values.
+ * Application use-case: apply the shared guard policy to a tool call and
+ * record the outcome. Depends only on the `Logger` port and pure domain
+ * logic — no IO of its own — so it is tested with a fake logger and plain
+ * values.
  */
-export function runHook(call: ToolCall, profile: HookProfile, deps: RunHookDeps): Decision {
-  const decision = decide(call, profile);
+export function runHook(
+  call: ToolCall,
+  profile: HookProfile,
+  policy: GuardPolicy,
+  deps: RunHookDeps,
+): Decision {
+  const decision = decide(call, profile, policy);
   deps.logger.debug("hook.decision", {
     tool: call.tool,
     profile,

@@ -274,6 +274,12 @@ link_dsh_resources() {
     [[ -f "${src_dir}/settings.yaml" ]] && \
         link_file "${src_dir}/settings.yaml" "${dsh_home}/settings.yaml"
 
+    # hooks.claude.json wires dsh into jig's PreToolUse hook via the
+    # @deepseek-ai/dsh-hooks-claude-code bridge (see profiles/{proxy,headless}/
+    # cordis.patch.yml, id: hooks-claude, whose configPath points here).
+    [[ -f "${src_dir}/hooks.claude.json" ]] && \
+        link_file "${src_dir}/hooks.claude.json" "${dsh_home}/hooks.claude.json"
+
     if [[ -d "${src_dir}/profiles" ]]; then
         local prof_dir prof
         for prof_dir in "${src_dir}/profiles/"*/; do
@@ -301,6 +307,30 @@ link_dsh_resources() {
             log_info "Removed stale dsh link: ${link} -> ${target}"
         done < <(find "$sweep_dir" -mindepth 1 -maxdepth 1 -type l -print0)
     done
+}
+
+# jig's shared guard policy — domains/dev/llm/harness/policy/guard-rules.json
+# — is the single source of command-pattern deny/confirm rules read by both
+# jig's own PreToolUse hook (JIG_POLICY_FILE, default ~/.config/jig/policy)
+# and pi's extensions/guard.ts loader. Unlike pi/dsh, where runtime state
+# cohabits with repo-owned files (so those link file-by-file), this
+# directory is wholly owned by this repo — nothing else ever writes into it
+# — so a directory symlink is the correct (and simplest) choice here.
+# jigの共有ガードポリシー(guard-rules.json)は、jig自身のPreToolUseフックと
+# piのguard.tsローダーの両方が読む、コマンドパターンのdeny/confirmルールの
+# 唯一の情報源。piやdshと違いこのディレクトリは完全にリポジトリが所有する
+# ため(実行時状態は同居しない)、ディレクトリごとのシンボリックリンクで
+# 問題ない。
+link_jig_policy() {
+    local src_dir="$1"
+    local jig_policy_home="${HOME}/.config/jig/policy"
+
+    if [[ "$src_dir" != /* ]]; then
+        log_error "link_jig_policy: src_dir must be absolute (got: ${src_dir})"
+        return 1
+    fi
+
+    link_file "$src_dir" "$jig_policy_home"
 }
 
 link_omp_resources() {
@@ -408,7 +438,16 @@ link_domain() {
             fi
         done
     fi
-    
+
+    # jig's shared guard policy lives at domains/dev/llm/harness/policy, not
+    # under domains/dev/config/, so it cannot ride the config loop above the
+    # way pi/omp/dsh do. Link it directly for the "dev" domain only, guarded
+    # by the directory actually existing (older checkouts from before Phase 1
+    # guard-policy unification won't have it).
+    if [[ "$domain" == "dev" ]] && [[ -d "${DOTFILES_ROOT}/domains/dev/llm/harness/policy" ]]; then
+        link_jig_policy "${DOTFILES_ROOT}/domains/dev/llm/harness/policy"
+    fi
+
     # 2. Link Home Files (~)
     if [[ -d "${domain_path}/home" ]]; then
         # Use find to handle hidden files and avoid glob expansion issues

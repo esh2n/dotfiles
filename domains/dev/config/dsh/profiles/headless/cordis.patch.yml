@@ -4,9 +4,20 @@
 # must also go through the local LiteLLM proxy (measurement plane), not a
 # direct provider connection. See profiles/proxy/cordis.patch.yml for the
 # override semantics.
+#
+# hooks-claude wires dsh into jig's own PreToolUse hook via the official
+# @deepseek-ai/dsh-hooks-claude-code bridge, pointed at ~/.dsh/hooks.claude.json
+# (symlinked from ../../hooks.claude.json by manager.sh link_dsh_resources).
+# Same policy as the proxy profile — see profiles/proxy/cordis.patch.yml for
+# the override semantics and the unverified-bridge caveat.
 - insert:
     - id: agent-default-model
       name: '@deepseek-ai/dsh-agent-default-model'
       config:
         provider: local-proxy
         model: main
+    - id: hooks-claude
+      name: '@deepseek-ai/dsh-hooks-claude-code'
+      config:
+        configPath: !!js require('os').homedir() + '/.dsh/hooks.claude.json'
+        projectDir: '.'

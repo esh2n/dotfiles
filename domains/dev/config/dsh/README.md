@@ -43,8 +43,30 @@ Remote from a phone = SSH tunnel to `127.0.0.1:3080` (no cloud). Sessions are
 event-sourced JSONL server-side, so phone↔PC continuity is "both hit the same
 `dsh web` over the tunnel."
 
+## Guard hook (Phase 1 guard-policy unification)
+
+`hooks.claude.json` wires dsh into jig's own PreToolUse hook via the official
+`@deepseek-ai/dsh-hooks-claude-code` bridge — the third front (alongside
+Claude Code and pi) to read the single shared guard policy at
+`domains/dev/llm/harness/policy/guard-rules.json`. The cordis row (id:
+`hooks-claude`, added to both `profiles/proxy/cordis.patch.yml` and
+`profiles/headless/cordis.patch.yml`) points `configPath` at
+`~/.dsh/hooks.claude.json`, symlinked there by `link_dsh_resources`. That
+file's `PreToolUse` command runs
+`bun .../domains/dev/llm/harness/jig/src/cli/jig.ts hooks pre-tool-use` — the
+same evaluator Claude Code's hook and pi's `extensions/guard.ts` use.
+
 ## Confirm at first run (unverified points)
 
+- **The hooks-claude bridge itself** — unverified end to end: whether
+  `@deepseek-ai/dsh-hooks-claude-code` expects `hooks.claude.json`'s
+  top-level `hooks.PreToolUse` shape (mirrors Claude Code's own
+  `settings.json`) or something else, whether dsh's bash tool is literally
+  named `Bash` (the `matcher` value) or differently, and what field names
+  dsh's own PreToolUse payload carries — jig's hook expects
+  `tool_name`/`tool_input`, Claude Code's convention. Fix
+  `hooks.claude.json` and the `matcher` once dsh's actual hook payload is
+  seen.
 - **`baseURL` suffix** — `http://localhost:4000/v1` vs bare `:4000`. If model
   calls 404 on `/chat/completions`, flip it. (LiteLLM serves both in most
   setups.)
