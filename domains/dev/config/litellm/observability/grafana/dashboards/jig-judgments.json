@@ -1,0 +1,145 @@
+{
+  "uid": "jig-judgments",
+  "title": "Judgment service (jig) — what jev costs",
+  "description": "jev is called directly by the jig judgment service, not through LiteLLM, so its spend never appears on the gateway dashboard. This is that missing half: tokens the judgment model reported, judgments served, and how long they took. Counters live in the service process and are reset when launchd restarts it, which is exactly why Prometheus stores them.",
+  "tags": ["jig", "llm", "cost"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "直近24時間の判定トークン",
+      "description": "`jig_judgment_tokens_total` の増分。判定モデルが自分で報告した値なので、こちらで数え直したものではない。",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(increase(jig_judgment_tokens_total[24h]))", "legendFormat": "24h" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "直近24時間の判定回数",
+      "description": "エンドポイント全体。ハーネスが1回判断を求めるたびに1つ増える。",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(increase(jig_judgment_requests_total[24h]))", "legendFormat": "24h" }],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "判断できなかった割合（24時間）",
+      "description": "`provider_error` は「モデルが答えられなかった」＝上流障害。`bad_request` は呼び出し側の誤りなのでここには入れない。",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(jig_judgment_requests_total{outcome=\"provider_error\"}[24h])) / clamp_min(sum(increase(jig_judgment_requests_total[24h])), 1)",
+          "legendFormat": "失敗率"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.01 }, { "color": "red", "value": 0.05 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "判定モデル別の入力トークン（24時間）",
+      "description": "モデルを差し替えたときの比較はここで読む。`model` ラベルは実際に応答したモデル。",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model) (increase(jig_judgment_tokens_total{direction=\"input\"}[24h]))",
+          "legendFormat": "{{model}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "トークンの推移（入力 / 出力）",
+      "description": "入力が判定の材料、出力が判定そのもの。batched な判定では1往復で最大32問を賄うので、回数よりトークンの方が費用に効く。",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (direction) (increase(jig_judgment_tokens_total[$__rate_interval]))",
+          "legendFormat": "{{direction}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "判定回数の推移（エンドポイント別 / 結果別）",
+      "description": "`kind` は decide（呼び出し側の問い）/ tier（階層の判断）/ compact（圧縮で残す項目の判断）。",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind, outcome) (increase(jig_judgment_requests_total[$__rate_interval]))",
+          "legendFormat": "{{kind}} / {{outcome}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "判定の所要時間 p95（エンドポイント別）",
+      "description": "判定1回がハーネスの待ち時間になる。`tier-router` は auto のとき毎プロンプトでここを通るので、この数字がそのまま体感速度。",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(jig_judgment_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95 {{kind}}"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.5, sum by (le, kind) (rate(jig_judgment_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50 {{kind}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "1回の判定あたりの入力トークン",
+      "description": "判断が高価になっていないかを見る。材料が長い質問（圧縮の判定は材料が長い）ほどこの値が上がる。",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (increase(jig_judgment_tokens_total{direction=\"input\"}[$__rate_interval])) / clamp_min(sum by (kind) (increase(jig_judgment_requests_total{outcome=\"ok\"}[$__rate_interval])), 1)",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } }
+    }
+  ]
+}

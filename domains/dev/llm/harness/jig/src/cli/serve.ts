@@ -23,6 +23,7 @@ import type {
 } from "../domain/decision/remote";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
 import { createTypesafeClient, typesafeKeyFromEnv } from "../infra/decision/typesafe-client";
+import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../infra/metrics/registry";
 
 /** A JSON reply: the endpoint's own body, or the shared error envelope. */
 export type HttpResponse<Body> = {
@@ -108,6 +109,12 @@ export interface ServeDecisionOptions {
   readonly clock?: AnswerDecisionDeps["clock"];
   /** Compaction options, for tests and for an operator changing the caution level. */
   readonly compaction?: AnswerCompactionDeps["options"];
+  /**
+   * Where the service's own counters live. Pass one when the caller also feeds it
+   * (the provider's token usage is reported to the caller, not to this function),
+   * so `/metrics` and the usage hook share a single registry.
+   */
+  readonly metrics?: MetricsRegistry;
 }
 
 export interface RunningDecisionService {
@@ -120,6 +127,28 @@ function json(status: number, body: unknown): Response {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+/** The metric families this service owns, with the help text an operator reads. */
+function describeMetrics(metrics: MetricsRegistry): void {
+  metrics.describe(
+    "jig_judgment_requests_total",
+    "Judgment requests served, by endpoint and outcome. bad_request is a caller's bug, provider_error is an unmade judgment.",
+  );
+  metrics.describe(
+    "jig_judgment_seconds",
+    "Wall time the service spent producing an answer, by endpoint. Includes the model call.",
+  );
+  metrics.describe(
+    "jig_judgment_tokens_total",
+    "Tokens the judgment model reported, by model and direction. This is what the judgment service costs.",
+  );
+}
+
+function outcomeOf(status: number): string {
+  if (status === 200) return "ok";
+  if (status === 400) return "bad_request";
+  return "provider_error";
 }
 
 /**
@@ -137,6 +166,9 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
     ...(options.compaction === undefined ? {} : { options: options.compaction }),
   };
 
+  const metrics = options.metrics ?? new MetricsRegistry();
+  describeMetrics(metrics);
+
   const routes = new Set(["/decide", "/tier", "/compact"]);
 
   const server = Bun.serve({
@@ -147,6 +179,13 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
 
       if (request.method === "GET" && pathname === "/health") {
         return json(200, { ok: true, provider: options.provider.name });
+      }
+      if (request.method === "GET" && pathname === "/metrics") {
+        // Prometheus 3.0 fails the scrape outright without a parsable type.
+        return new Response(metrics.render(), {
+          status: 200,
+          headers: { "content-type": METRICS_CONTENT_TYPE },
+        });
       }
       if (request.method !== "POST" || !routes.has(pathname)) {
         return new Response("not found", { status: 404 });
@@ -162,11 +201,19 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
       // Three endpoints, one provider: `/decide` answers a caller's own typed
       // question, `/tier` answers jig's tier question, `/compact` answers jig's
       // keep-or-drop question — so no harness has to restate either one.
+      const kind = pathname.slice(1);
+      const startedAt = performance.now();
       let response: HttpResponse<unknown>;
       if (pathname === "/tier") response = await respondToTier(body, options.provider, deps);
       else if (pathname === "/compact") {
         response = await respondToCompaction(body, options.provider, compactionDeps);
       } else response = await respondToDecision(body, options.provider, deps);
+
+      metrics.increment("jig_judgment_requests_total", {
+        kind,
+        outcome: outcomeOf(response.status),
+      });
+      metrics.observe("jig_judgment_seconds", (performance.now() - startedAt) / 1000, { kind });
       return json(response.status, response.body);
     },
   });

@@ -6,6 +6,7 @@ import {
 } from "../../src/cli/serve";
 import { StaticProvider } from "../../src/infra/decision/static-provider";
 import { TypesafeError } from "../../src/infra/decision/typesafe-client";
+import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../../src/infra/metrics/registry";
 
 describe("respondToDecision", () => {
   test("a judgment is 200 with the judgment as the body", async () => {
@@ -186,6 +187,57 @@ describe("serveDecisionService", () => {
       });
 
       expect(response.status).toBe(502);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("/metrics announces the text format and counts what was served", async () => {
+    const metrics = new MetricsRegistry();
+    const service = serveDecisionService({
+      provider: new StaticProvider({ bool: { value: true, confidence: 0.9 } }),
+      port: 0,
+      metrics,
+    });
+
+    try {
+      await fetch(`${service.url}/decide`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ op: "bool", query: { prompt: "is this allowed?" }, context: {} }),
+      });
+      await fetch(`${service.url}/decide`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ op: "nonsense" }),
+      });
+
+      const response = await fetch(`${service.url}/metrics`);
+      expect(response.status).toBe(200);
+      // Prometheus 3.0 refuses a scrape whose Content-Type is missing or unparsable.
+      expect(response.headers.get("content-type")).toBe(METRICS_CONTENT_TYPE);
+
+      const text = await response.text();
+      expect(text).toContain('jig_judgment_requests_total{kind="decide",outcome="ok"} 1');
+      expect(text).toContain('jig_judgment_requests_total{kind="decide",outcome="bad_request"} 1');
+      expect(text).toContain("# TYPE jig_judgment_seconds histogram");
+      expect(text).toContain('jig_judgment_seconds_count{kind="decide"} 2');
+      expect(text.endsWith("\n")).toBe(true);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("the token counter is shared with the registry the service renders", async () => {
+    const metrics = new MetricsRegistry();
+    const service = serveDecisionService({ provider: new StaticProvider({}), port: 0, metrics });
+
+    try {
+      // This is what the provider's usage hook does in `jig serve`.
+      metrics.countTokens("jev-1.13.0", "input", 407);
+
+      const text = await (await fetch(`${service.url}/metrics`)).text();
+      expect(text).toContain('jig_judgment_tokens_total{direction="input",model="jev-1.13.0"} 407');
     } finally {
       service.stop();
     }

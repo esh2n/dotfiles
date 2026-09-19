@@ -31,6 +31,17 @@ scrape_configs:
         labels:
           layer: llm-gateway
 
+  # The jig judgment service. jev is called by this process directly, NOT through
+  # the gateway, so its tokens never show up under the litellm job — this scrape
+  # is the only place jev's cost becomes a time series. Loopback-only service, no
+  # credentials to send.
+  - job_name: jig
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:4100"]
+        labels:
+          layer: judgment-service
+
   # Prometheus itself, so a dashboard can show whether scraping is healthy.
   - job_name: prometheus
     metrics_path: /metrics

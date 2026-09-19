@@ -5,6 +5,7 @@ import { createHttpDecisionClient } from "../infra/decision/http-decision-client
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
 import { ConsoleLogger } from "../infra/logger/console-logger";
+import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
@@ -80,10 +81,21 @@ export async function main(argv: readonly string[]): Promise<number> {
     case "serve": {
       const port =
         Number.parseInt(process.env.JIG_DECISION_PORT ?? "", 10) || DEFAULT_DECISION_PORT;
-      const provider = buildJudgmentProvider(process.env, (usage) =>
-        ports.logger.info("decision.usage", { ...usage }),
-      );
-      serveDecisionService({ provider, port, logger: ports.logger, clock: ports.clock });
+      // One registry for the process: the provider's usage hook feeds the same
+      // counters that `/metrics` renders, so what Prometheus scrapes is the spend.
+      const metrics = new MetricsRegistry();
+      const provider = buildJudgmentProvider(process.env, (usage) => {
+        ports.logger.info("decision.usage", { ...usage });
+        metrics.countTokens(usage.model, "input", usage.input_tokens);
+        metrics.countTokens(usage.model, "output", usage.output_tokens);
+      });
+      serveDecisionService({
+        provider,
+        port,
+        logger: ports.logger,
+        clock: ports.clock,
+        metrics,
+      });
       // The service is meant to live until launchd stops it: never resolve, so
       // the entrypoint's `process.exit` below is never reached.
       return await new Promise<never>(() => {});

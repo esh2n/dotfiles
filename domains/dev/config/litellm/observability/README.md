@@ -28,6 +28,25 @@ harness talks to this one boundary, so the numbers survive a harness swap. That
 also means the harness that sent a request has to be recovered from a label —
 which works, because it is there (`user_agent`).
 
+### The other spender: the judgment service
+
+The `jig` judgment service calls jev **directly**, not through the gateway, so
+jev's tokens do not appear under the `litellm` job no matter how long you look.
+It exposes its own `/metrics` on `127.0.0.1:4100` and is scraped by the `jig` job
+in `prometheus/prometheus.yml`; the dashboard is
+<http://127.0.0.1:3000/d/jig-judgments>.
+
+| Metric | What it answers |
+|---|---|
+| `jig_judgment_tokens_total{model,direction}` | What the judgment model costs, per model — the number that decides whether a model swap was worth it |
+| `jig_judgment_requests_total{kind,outcome}` | How often a harness asks, and whether the answer came back (`provider_error` = the model did not answer) |
+| `jig_judgment_seconds{kind}` | How long a judgment takes — this is the latency a harness waits for |
+
+The numbers come from the same registry the service's usage hook fills, so a
+scrape and a log line can never disagree. They are process-local and reset when
+launchd restarts the service (a deploy, a crash); Prometheus storing them is what
+makes a restart comparable to the weeks before it.
+
 ## Run it
 
 ```bash
@@ -39,6 +58,7 @@ cd ~/.config/litellm/observability     # the deployed copy; this is what runs
 ```
 
 - Dashboard: <http://127.0.0.1:3000/d/litellm-gateway>
+- Judgment service: <http://127.0.0.1:3000/d/jig-judgments>
 - Raw numbers: <http://127.0.0.1:9090/graph>
 - Scrape health: <http://127.0.0.1:9090/targets>
 
