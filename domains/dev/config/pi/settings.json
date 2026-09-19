@@ -17,7 +17,8 @@
     "https://github.com/Ahm3tJ4f/pi-undo",
     "https://github.com/sting8k/pi-vcc",
     "https://github.com/dbachelder/pi-btw",
-    "npm:@plannotator/pi-extension"
+    "npm:@plannotator/pi-extension",
+    "npm:pi-web-access"
   ],
   "lastChangelogVersion": "0.84.4",
   "theme": "unkai"

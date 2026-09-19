@@ -172,19 +172,24 @@ verification (registerTool count + per-turn injections read from source):
 | [sting8k/pi-vcc](https://github.com/sting8k/pi-vcc) | Structured compaction **without an LLM call** (30–470ms). Core compaction summarizes with the model itself — minutes at 8 tok/s locally | 1 tool (~500 tok), accepted |
 | [dbachelder/pi-btw](https://github.com/dbachelder/pi-btw) | Side conversations; added with the proxy tiers | not re-measured |
 | [@plannotator/pi-extension](https://www.npmjs.com/package/@plannotator/pi-extension) | Plan/code review UI; added with the proxy tiers | not re-measured |
+| [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) | `web_search` / `fetch_content`. Zero-config through Exa MCP (no key); Jina Reader needs no key, other providers take keys in `~/.pi/agent/web-search.json` | ~2K tok |
 
-The last two are in `settings.json` but their resident cost has not been
+The last three are in `settings.json` but their resident cost has not been
 re-measured since the proxy tiers were added — treat the cost column as
 verified for the first three only.
 
 Evaluated and NOT installed (resident cost or single-instance mismatch):
-pi-web-access (~1.5–2K tok; research is the cloud lane's job), pi-lens
-(~2.3K tok + per-turn injection), pi-add-dir (unbounded per-turn AGENTS.md
-injection), rpiv-ask-user-question (~1.2K tok init), pi-session-recall.
-Their earlier rejection of pi-btw / swarm-family rested on a single LM Studio
-instance (parallel requests invalidating each other's KV cache),
-which no longer applies to the proxy tiers. "Swarm" has no canonical
+pi-lens (~2.3K tok + per-turn injection), pi-add-dir (unbounded per-turn
+AGENTS.md injection), rpiv-ask-user-question (~1.2K tok init),
+pi-session-recall. Their earlier rejection of pi-btw / swarm-family rested on
+a single LM Studio instance (parallel requests invalidating each other's KV
+cache), which no longer applies to the proxy tiers. "Swarm" has no canonical
 implementation — it is several community extensions sharing a name.
+
+pi-web-access was rejected when this lane was local-only: 2K resident tokens
+is ~16s of cold prefill at 8 tok/s. With `main` on the proxy that cost is a
+cached prefix instead (2K tokens ≈ $0.00006/turn at Flash cache-hit rates),
+so it was installed on 2026-09-19 and verified with a live `web_search` call.
 
 ## Measured on this machine (M4 Pro 64GB, 2026-09-13)
 
