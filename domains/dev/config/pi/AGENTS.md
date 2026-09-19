@@ -9,6 +9,11 @@ here is paid for on every turn; keep it short.
 - Design and configuration work: state the facts you verified, then ask before
   changing anything that is not already agreed.
 - If a file contradicts the request, say so instead of silently picking one.
+- Research before building a mechanism (hooks, compaction, cost tracking,
+  symlinks, config composition, ...): find current industry practice — vendor
+  docs, de facto standards, what well-known practitioners do — then present
+  the options and trade-offs for approval before writing code. Never "I know
+  how this should work".
 
 ## Editing
 
