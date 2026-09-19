@@ -12,6 +12,7 @@
  * in `app/decision/*`, which is where it is tested.
  */
 
+import { timingSafeEqual } from "node:crypto";
 import { type AnswerCompactionDeps, answerCompaction } from "../app/compaction/answer-compaction";
 import type { CompactionResult } from "../app/compaction/compact";
 import { type AnswerDecisionDeps, answerDecision } from "../app/decision/answer-decision";
@@ -22,6 +23,7 @@ import type {
   RemoteDecisionResponse,
 } from "../domain/decision/remote";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
+import { ensureDecisionToken, tokenFilePath } from "../infra/decision/token-file";
 import { createTypesafeClient, typesafeKeyFromEnv } from "../infra/decision/typesafe-client";
 
 /** A JSON reply: the endpoint's own body, or the shared error envelope. */
@@ -122,11 +124,37 @@ function json(status: number, body: unknown): Response {
   });
 }
 
+const UNAUTHORIZED: RemoteDecisionErrorResponse = {
+  op: "error",
+  error: { kind: "unauthorized", message: "missing or invalid bearer token" },
+};
+
+/**
+ * Constant-time bearer check: a length mismatch is rejected before comparison
+ * (`timingSafeEqual` requires equal-length buffers, and unequal length is
+ * itself not a judgment's answer to have to time-hide from every caller — a
+ * caller with no credential at all learns nothing from this branch that the
+ * 401 doesn't already tell it).
+ */
+function isAuthorized(header: string | null, token: string): boolean {
+  if (header === null || !header.startsWith("Bearer ")) return false;
+  const presented = Buffer.from(header.slice("Bearer ".length), "utf8");
+  const expected = Buffer.from(token, "utf8");
+  return presented.length === expected.length && timingSafeEqual(presented, expected);
+}
+
 /**
  * Serve the decision endpoint. Bind to the loopback only: this process holds a
- * credential, so nothing outside the machine has any business reaching it.
+ * credential, so nothing outside the machine has any business reaching it —
+ * and since any other local process can still open a loopback socket, `/decide`,
+ * `/tier` and `/compact` also require a bearer token read from a 0600 file
+ * (`../infra/decision/token-file.ts`). `/health` stays open: it reveals nothing
+ * a caller could use.
  */
-export function serveDecisionService(options: ServeDecisionOptions): RunningDecisionService {
+export function serveDecisionService(
+  options: ServeDecisionOptions,
+  env: Record<string, string | undefined> = process.env,
+): RunningDecisionService {
   const hostname = options.hostname ?? "127.0.0.1";
   const deps: AnswerDecisionDeps = {
     ...(options.logger === undefined ? {} : { logger: options.logger }),
@@ -138,6 +166,9 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
   };
 
   const routes = new Set(["/decide", "/tier", "/compact"]);
+  // Kicked off now, at server start, so the token file exists (0600, created or
+  // reused) before the first request rather than being generated lazily on it.
+  const token = ensureDecisionToken(tokenFilePath(env));
 
   const server = Bun.serve({
     port: options.port,
@@ -150,6 +181,10 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
       }
       if (request.method !== "POST" || !routes.has(pathname)) {
         return new Response("not found", { status: 404 });
+      }
+
+      if (!isAuthorized(request.headers.get("authorization"), await token)) {
+        return json(401, UNAUTHORIZED);
       }
 
       let body: unknown;

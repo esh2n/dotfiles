@@ -10,6 +10,13 @@
 # The `op read` is time-boxed so a throttled or unreachable 1Password fails fast
 # and launchd retries, instead of hanging forever and blocking recovery.
 #
+# Authentication: `/decide`, `/tier` and `/compact` require `Authorization:
+# Bearer <token>`, where the token lives in a 0600 file this process creates
+# (or reuses) on start — default `~/Library/Application Support/jig/decision.token`,
+# overridable via JIG_DECISION_TOKEN_FILE. This defends against another local
+# user reaching the loopback port; it is not a defense against same-uid
+# malware, which could read the token file directly. `/health` stays open.
+#
 # Deployed to ~/.config/jig; launched by
 # ~/Library/LaunchAgents/com.esh2n.jig-decision.plist. Source: dotfiles repo.
 set -euo pipefail

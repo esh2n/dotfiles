@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   type FetchLike,
   createHttpDecisionClient,
 } from "../../../src/infra/decision/http-decision-client";
 import { RemoteDecisionError } from "../../../src/infra/decision/remote-provider";
+
+/** A temp token file holding `content` (or no file at all, when omitted). */
+function tempTokenFile(content?: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "jig-decision-client-token-"));
+  const path = join(dir, "decision.token");
+  if (content !== undefined) writeFileSync(path, content, { mode: 0o600 });
+  return path;
+}
 
 interface Captured {
   readonly url: string;
@@ -81,5 +92,65 @@ describe("createHttpDecisionClient", () => {
     await expect(
       client({ op: "bool", query: { prompt: "?" }, context: {} }),
     ).rejects.toBeInstanceOf(RemoteDecisionError);
+  });
+
+  test("attaches the token file's contents as a bearer header", async () => {
+    const tokenFilePath = tempTokenFile("sekret-token");
+    const { calls, fetch } = fakeFetch({
+      text: JSON.stringify({ op: "bool", value: true, confidence: 0.5 }),
+    });
+    const client = createHttpDecisionClient({
+      url: "http://127.0.0.1:4100/decide",
+      fetch,
+      tokenFilePath,
+    });
+
+    await client({ op: "bool", query: { prompt: "?" }, context: {} });
+
+    const headers = calls[0]?.init?.headers as Record<string, string>;
+    expect(headers.authorization).toBe("Bearer sekret-token");
+  });
+
+  test("re-reads the token file on every call", async () => {
+    const tokenFilePath = tempTokenFile("first-token");
+    const { calls, fetch } = fakeFetch({
+      text: JSON.stringify({ op: "bool", value: true, confidence: 0.5 }),
+    });
+    const client = createHttpDecisionClient({
+      url: "http://127.0.0.1:4100/decide",
+      fetch,
+      tokenFilePath,
+    });
+
+    await client({ op: "bool", query: { prompt: "?" }, context: {} });
+    writeFileSync(tokenFilePath, "second-token", { mode: 0o600 });
+    await client({ op: "bool", query: { prompt: "?" }, context: {} });
+
+    const headers = calls.map(
+      (call) => (call.init?.headers as Record<string, string>).authorization,
+    );
+    expect(headers).toEqual(["Bearer first-token", "Bearer second-token"]);
+  });
+
+  test("sends no authorization header when the token file is missing, and warns once", async () => {
+    const tokenFilePath = tempTokenFile(); // no file written
+    const { calls, fetch } = fakeFetch({
+      text: JSON.stringify({ op: "bool", value: true, confidence: 0.5 }),
+    });
+    const warnings: unknown[][] = [];
+    const client = createHttpDecisionClient({
+      url: "http://127.0.0.1:4100/decide",
+      fetch,
+      tokenFilePath,
+      logger: { warn: (...args: unknown[]) => warnings.push(args) },
+    });
+
+    await client({ op: "bool", query: { prompt: "?" }, context: {} });
+    await client({ op: "bool", query: { prompt: "?" }, context: {} });
+
+    for (const call of calls) {
+      expect((call.init?.headers as Record<string, string>).authorization).toBeUndefined();
+    }
+    expect(warnings).toHaveLength(1);
   });
 });
