@@ -1,0 +1,18 @@
+{
+  "_comment": "Claude-hooks-format PreToolUse wiring for dsh, consumed via the '@deepseek-ai/dsh-hooks-claude-code' cordis row (see profiles/{proxy,headless}/cordis.patch.yml, id: hooks-claude) whose configPath points here. The command invokes jig's own PreToolUse hook — the same evaluator Claude Code and pi's guard.ts use — so all three fronts read one shared guard policy (domains/dev/llm/harness/policy/guard-rules.json).",
+  "_absolutePath": "The jig invocation below is an absolute main-checkout path on purpose: this is a personal, single-machine dotfiles repo (see domains/dev/config/claude-profiles/personal/hooks/ for the same convention on the Claude Code side), not something meant to be portable across machines.",
+  "_unverified": "UNVERIFIED until dsh first runs: whether the bridge expects this exact top-level 'hooks' object (mirroring Claude Code's own settings.json hooks.PreToolUse shape) or a different wrapper, whether dsh's bash tool name matches the 'Bash' matcher Claude Code uses, and what field names dsh's own PreToolUse payload carries (jig's hook expects tool_name/tool_input, per Claude Code's convention). See domains/dev/config/dsh/README.md, 'Confirm at first run'.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun /Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/llm/harness/jig/src/cli/jig.ts hooks pre-tool-use"
+          }
+        ]
+      }
+    ]
+  }
+}
