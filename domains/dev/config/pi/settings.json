@@ -2,8 +2,6 @@
   "defaultProvider": "proxy",
   "defaultModel": "main",
   "enabledModels": [
-    "deepseek/**",
-    "lmstudio/**",
     "proxy/**"
   ],
   "defaultThinkingLevel": "medium",
