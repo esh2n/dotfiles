@@ -3,7 +3,6 @@
   "defaultModel": "main",
   "enabledModels": [
     "deepseek/**",
-    "lmstudio/**",
     "proxy/**"
   ],
   "defaultThinkingLevel": "medium",
