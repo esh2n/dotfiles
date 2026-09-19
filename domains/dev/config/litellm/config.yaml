@@ -19,13 +19,14 @@ model_list:
       model: deepseek/deepseek-flash
       api_key: os.environ/DEEPSEEK_API_KEY
 
-  # complex — the frontier architect. Astra = gpt-6-astra, a plain OpenAI API
-  # model (verified: /v1/chat/completions, standard key, no allowlist). An
-  # unknown-to-LiteLLM id under `openai/` passes through unmodified.
+  # complex — near-frontier architect. DeepSeek V4 Pro: same DeepSeek key as
+  # main (no new secret), OpenAI-compatible so it proxies + measures cleanly,
+  # per-token but cheap. Swap to a true-frontier per-token route (Astra/Fable)
+  # here later if needed.
   - model_name: complex
     litellm_params:
-      model: openai/gpt-6-astra
-      api_key: os.environ/OPENAI_API_KEY
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
 
   # deterministic — local Qwen on LM Studio (free, offline, reproducible).
   # api_base / api_key come from LM_STUDIO_API_BASE / LM_STUDIO_API_KEY (set in

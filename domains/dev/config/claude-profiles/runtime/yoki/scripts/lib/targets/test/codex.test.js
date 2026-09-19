@@ -20,6 +20,7 @@ const {
   applyManagedBlock,
   hasConflictingTopLevelKey,
   mergeOwnedTables,
+  splitForeignAtFirstTable,
   validateCodexConfigToml,
   assertValidCodexConfigToml,
 } = require('../codex-config-toml');
@@ -513,8 +514,8 @@ test('applyManagedBlock: removes older [hooks.state] entries for our keys living
 // "Inside the managed block" is not a separate TOML namespace.
 
 /** The real ~/.codex/config.toml shape that broke: codex's own [projects]
- * trust table, a hand/other-tool `[features]`, an `[agents]` that disagrees
- * with ours, and a bare `[hooks.state]` header. */
+ * trust table, a hand/other-tool `[features]`, a `[features.multi_agent_v2]`
+ * that disagrees with ours, and a bare `[hooks.state]` header. */
 function foreignConfigToml() {
   return [
     '[projects."/Users/exampleperson/go/src/repo"]',
@@ -526,8 +527,8 @@ function foreignConfigToml() {
     '[features]',
     'hooks = true',
     '',
-    '[agents]',
-    'enabled = false',
+    '[features.multi_agent_v2]',
+    'max_concurrent_threads_per_session = 2',
     '',
     '[shell_environment_policy.set]',
     'PATH_EXTRA = "/opt/homebrew/bin"',
@@ -560,7 +561,7 @@ test('applyManagedBlock: a table the foreign half already declares is merged, no
   // The block itself no longer carries the shared headers…
   const block = content.slice(0, content.indexOf('# yoki:end'));
   assert.ok(!block.includes('[features]'));
-  assert.ok(!block.includes('[agents]'));
+  assert.ok(!block.includes('[features.multi_agent_v2]'));
   assert.ok(!block.includes('[shell_environment_policy.set]'));
   // …and every merge is reported, so the plan says where the keys went.
   assert.equal(info.filter(line => line.includes('merged into existing')).length, 3);
@@ -573,8 +574,8 @@ test('applyManagedBlock: our keys are upserted into the existing table and forei
 
   // features: ours replaces the foreign value in place, the missing one is appended
   assert.deepEqual(sections.get('[features]').filter(Boolean), ['hooks = true', 'multi_agent = true']);
-  // agents: the foreign `enabled = false` becomes ours, in place
-  assert.deepEqual(sections.get('[agents]').filter(Boolean), ['enabled = true', 'max_concurrent_threads_per_session = 4']);
+  // features.multi_agent_v2: the foreign `max_concurrent_threads_per_session = 2` becomes ours, in place
+  assert.deepEqual(sections.get('[features.multi_agent_v2]').filter(Boolean), ['max_concurrent_threads_per_session = 4']);
   // shell_environment_policy.set: a key we don't own keeps its place, and
   // ours are appended after it rather than replacing the table
 
@@ -615,6 +616,86 @@ test('mergeOwnedTables: a table only WE declare is still emitted in the block', 
   const merged = mergeOwnedTables('[features]\nhooks = true\n', '[projects."/repo"]\ntrust_level = "trusted"\n');
   assert.ok(merged.blockContent.includes('[features]'));
   assert.deepEqual(merged.merged, []);
+});
+
+// ---------------------------------------------------------------------------
+// (2b') the block is not FIRST — a foreign top-level key has to outrank it
+// ---------------------------------------------------------------------------
+//
+// The block's body ends in tables, so a top-level key left after
+// `# yoki:end` is read as a field of the last one and silently dropped:
+// `model = "gpt-5-codex"` loaded as nothing and `codex doctor` reported
+// `model <default>`. Hoisting it by hand hit the mirror-image bug — the
+// content above `# yoki:begin` was discarded on the next apply.
+
+/** A config.toml in the shape that lost the user's settings: base keys at
+ * the top level, then tables. */
+function foreignWithTopLevelKeys() {
+  return [
+    'hide_agent_reasoning = true',
+    'model = "gpt-5-codex"',
+    '',
+    '[tools]',
+    'web_search = true',
+    '',
+  ].join('\n');
+}
+
+/** The assignment lines of `text` up to (excluding) its first `[table]`
+ * header — the file's real top-level keys, block and foreign alike. */
+function preambleKeyLinesOf(text) {
+  return splitForeignAtFirstTable(text).preambleLines.filter(line => /^\s*[^#\s]+\s*=/.test(line));
+}
+
+test('applyManagedBlock: foreign top-level keys are hoisted ABOVE the block so they stay top-level', () => {
+  const { content } = applyManagedBlock(foreignWithTopLevelKeys(), sampleBlock(), new Set());
+
+  assert.deepEqual(validateCodexConfigToml(content), []);
+  // they now precede every table header in the file, ours included
+  assert.deepEqual(preambleKeyLinesOf(content), [
+    'hide_agent_reasoning = true',
+    'model = "gpt-5-codex"',
+    'default_permissions = "yoki"',
+    'notify = ["node", "/yoki-root/scripts/hooks/codex-notify.js"]',
+  ]);
+  assert.ok(content.indexOf('model = "gpt-5-codex"') < content.indexOf('# yoki:begin'));
+  // and the top-level table really is where codex will read them
+  const top = readTables(content)[0];
+  assert.ok(top.keys.has('model'));
+  assert.ok(top.keys.has('hide_agent_reasoning'));
+  // the block still owns the first header, so ITS top-level keys are top-level too
+  assert.ok(top.keys.has('default_permissions'));
+});
+
+test('applyManagedBlock: content above # yoki:begin survives the next apply', () => {
+  const once = applyManagedBlock(foreignWithTopLevelKeys(), sampleBlock(), new Set()).content;
+  const twice = applyManagedBlock(once, sampleBlock(), new Set());
+
+  assert.equal(twice.content, once);
+  assert.ok(twice.content.includes('model = "gpt-5-codex"'));
+  assert.equal(applyManagedBlock(twice.content, sampleBlock(), new Set()).content, once);
+});
+
+test('applyManagedBlock: a foreign top-level notify is dropped with a warning, never duplicated', () => {
+  const existing = ['notify = ["bash", "-lc", "afplay /System/Library/Sounds/Ping.aiff"]', 'model = "gpt-5-codex"', ''].join('\n');
+  const { content, warnings } = applyManagedBlock(existing, sampleBlock(), new Set());
+
+  // a second top-level `notify` would be a duplicate-key config load failure
+  assert.deepEqual(validateCodexConfigToml(content), []);
+  assert.ok(!content.includes('afplay'));
+  assert.ok(content.includes('codex-notify.js'));
+  assert.ok(content.includes('model = "gpt-5-codex"')); // the key we don't own is kept
+  assert.equal(warnings.filter(line => line.includes('top-level "notify"')).length, 1);
+});
+
+test('applyManagedBlock: a key after a foreign [table] header stays in that table, not hoisted', () => {
+  const existing = '[tools]\nweb_search = true\n';
+  const { content } = applyManagedBlock(existing, sampleBlock(), new Set());
+
+  // nothing to hoist, so the block keeps the top of the file
+  assert.ok(content.startsWith('# yoki:begin\n'));
+  assert.deepEqual(readTables(content).find(t => t.display === '[tools]').keys.has('web_search'), true);
+  assert.ok(content.includes('[tools]\nweb_search = true'));
 });
 
 // ---------------------------------------------------------------------------

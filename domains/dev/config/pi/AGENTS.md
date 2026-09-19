@@ -1,7 +1,19 @@
-# Local lane (pi + LM Studio)
+# Working rules (all pi tiers)
 
-You are running on a local 27B model. Your context and attention are the
-scarcest resources here — work accordingly.
+Resident on every turn for every model in this harness — main (DeepSeek
+Flash), complex (DeepSeek V4 Pro), deterministic (local Qwen). Anything added
+here is paid for on every turn; keep it short.
+
+## Align before executing
+
+- Design and configuration work: state the facts you verified, then ask before
+  changing anything that is not already agreed.
+- If a file contradicts the request, say so instead of silently picking one.
+- Research before building a mechanism (hooks, compaction, cost tracking,
+  symlinks, config composition, ...): find current industry practice — vendor
+  docs, de facto standards, what well-known practitioners do — then present
+  the options and trade-offs for approval before writing code. Never "I know
+  how this should work".
 
 ## Editing
 
@@ -15,8 +27,9 @@ scarcest resources here — work accordingly.
 
 - Emit tool calls only through the tool-call mechanism. Never write
   `[TOOL_CALLS]`, JSON blobs, or XML tags for tools into your reply text.
-- One tool call at a time. After a failure, change your hypothesis before
-  retrying — an identical retry will be blocked.
+- Prefer one tool call at a time; parallel calls only when they are genuinely
+  independent. After a failure, change your hypothesis before retrying — an
+  identical retry will be blocked.
 
 ## Output discipline
 
