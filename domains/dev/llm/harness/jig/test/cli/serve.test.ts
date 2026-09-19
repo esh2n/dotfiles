@@ -131,6 +131,66 @@ describe("serveDecisionService", () => {
     }
   });
 
+  test("/compact answers keep-or-drop for the items it is given", async () => {
+    const provider = new StaticProvider({
+      bools: [
+        { value: false, confidence: 0.85 },
+        { value: true, confidence: 0.9 },
+      ],
+    });
+    const service = serveDecisionService({ provider, port: 0 });
+
+    try {
+      const response = await fetch(`${service.url}/compact`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          items: ["a", "b", "c", "d", "e"].map((id) => ({ id, summary: `item ${id}` })),
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { kept: { id: string }[] };
+      expect(body.kept.map((item) => item.id)).toEqual(["a", "c", "d", "e"]);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("/compact with nothing to judge is a bad-request", async () => {
+    const service = serveDecisionService({ provider: new StaticProvider({}), port: 0 });
+
+    try {
+      const response = await fetch(`${service.url}/compact`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ items: [] }),
+      });
+
+      expect(response.status).toBe(400);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("/compact reports an unmade judgment as an upstream failure", async () => {
+    const service = serveDecisionService({ provider: new StaticProvider({}), port: 0 });
+
+    try {
+      const response = await fetch(`${service.url}/compact`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          items: ["a", "b", "c", "d", "e"].map((id) => ({ id, summary: `item ${id}` })),
+        }),
+      });
+
+      expect(response.status).toBe(502);
+    } finally {
+      service.stop();
+    }
+  });
+
   test("anything but POST /decide is not found", async () => {
     const service = serveDecisionService({ provider: new StaticProvider({}), port: 0 });
 

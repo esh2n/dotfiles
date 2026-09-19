@@ -12,6 +12,8 @@
  * in `app/decision/*`, which is where it is tested.
  */
 
+import { type AnswerCompactionDeps, answerCompaction } from "../app/compaction/answer-compaction";
+import type { CompactionResult } from "../app/compaction/compact";
 import { type AnswerDecisionDeps, answerDecision } from "../app/decision/answer-decision";
 import { type AnswerTierDeps, type TierDecision, answerTier } from "../app/decision/answer-tier";
 import type { DecisionProvider } from "../domain/decision/provider";
@@ -30,6 +32,7 @@ export type HttpResponse<Body> = {
 
 export type DecisionHttpResponse = HttpResponse<RemoteDecisionResponse>;
 export type TierHttpResponse = HttpResponse<TierDecision>;
+export type CompactionHttpResponse = HttpResponse<CompactionResult>;
 
 /**
  * Application result -> HTTP. A malformed request is the caller's bug (400); a
@@ -68,6 +71,24 @@ export async function respondToTier(
   };
 }
 
+/**
+ * Application result -> HTTP for the compaction endpoint. Same mapping rule: a
+ * malformed item list is the caller's bug, a judgment that could not be made is
+ * an upstream failure (the caller then keeps its context as it is).
+ */
+export async function respondToCompaction(
+  body: unknown,
+  provider: DecisionProvider,
+  deps: AnswerCompactionDeps = {},
+): Promise<CompactionHttpResponse> {
+  const result = await answerCompaction(body, provider, deps);
+  if (result.ok) return { status: 200, body: result.result };
+  return {
+    status: result.kind === "bad-request" ? 400 : 502,
+    body: { op: "error", error: { kind: result.kind, message: result.message } },
+  };
+}
+
 /** The service's own composition root: build the credentialed provider exactly once. */
 export function buildJudgmentProvider(
   env: Record<string, string | undefined> = process.env,
@@ -85,6 +106,8 @@ export interface ServeDecisionOptions {
   readonly hostname?: string;
   readonly logger?: AnswerDecisionDeps["logger"];
   readonly clock?: AnswerDecisionDeps["clock"];
+  /** Compaction options, for tests and for an operator changing the caution level. */
+  readonly compaction?: AnswerCompactionDeps["options"];
 }
 
 export interface RunningDecisionService {
@@ -109,6 +132,12 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
     ...(options.logger === undefined ? {} : { logger: options.logger }),
     ...(options.clock === undefined ? {} : { clock: options.clock }),
   };
+  const compactionDeps: AnswerCompactionDeps = {
+    ...deps,
+    ...(options.compaction === undefined ? {} : { options: options.compaction }),
+  };
+
+  const routes = new Set(["/decide", "/tier", "/compact"]);
 
   const server = Bun.serve({
     port: options.port,
@@ -119,7 +148,7 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
       if (request.method === "GET" && pathname === "/health") {
         return json(200, { ok: true, provider: options.provider.name });
       }
-      if (request.method !== "POST" || (pathname !== "/decide" && pathname !== "/tier")) {
+      if (request.method !== "POST" || !routes.has(pathname)) {
         return new Response("not found", { status: 404 });
       }
 
@@ -130,13 +159,14 @@ export function serveDecisionService(options: ServeDecisionOptions): RunningDeci
         body = undefined;
       }
 
-      // Two endpoints, one provider: `/decide` answers a caller's own typed
-      // question, `/tier` answers jig's tier question so no harness has to
-      // restate it.
-      const response =
-        pathname === "/tier"
-          ? await respondToTier(body, options.provider, deps)
-          : await respondToDecision(body, options.provider, deps);
+      // Three endpoints, one provider: `/decide` answers a caller's own typed
+      // question, `/tier` answers jig's tier question, `/compact` answers jig's
+      // keep-or-drop question — so no harness has to restate either one.
+      let response: HttpResponse<unknown>;
+      if (pathname === "/tier") response = await respondToTier(body, options.provider, deps);
+      else if (pathname === "/compact") {
+        response = await respondToCompaction(body, options.provider, compactionDeps);
+      } else response = await respondToDecision(body, options.provider, deps);
       return json(response.status, response.body);
     },
   });
