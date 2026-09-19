@@ -9,6 +9,7 @@ import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
 import { buildJudgmentProvider, serveDecisionService } from "./serve";
+import { tier } from "./tier";
 
 const VERSION = "0.0.0";
 
@@ -64,6 +65,18 @@ export async function main(argv: readonly string[]): Promise<number> {
       process.stderr.write(result.stderr);
       return result.code;
     }
+    case "tier": {
+      const stdin = await new Response(Bun.stdin.stream()).text();
+      const threshold = Number.parseFloat(process.env.JIG_TIER_THRESHOLD ?? "");
+      const result = await tier(stdin, ports.decision, {
+        logger: ports.logger,
+        clock: ports.clock,
+        ...(Number.isFinite(threshold) ? { options: { threshold } } : {}),
+      });
+      process.stdout.write(result.stdout);
+      process.stderr.write(result.stderr);
+      return result.code;
+    }
     case "serve": {
       const port =
         Number.parseInt(process.env.JIG_DECISION_PORT ?? "", 10) || DEFAULT_DECISION_PORT;
@@ -76,7 +89,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       return await new Promise<never>(() => {});
     }
     default:
-      process.stdout.write("usage: jig <version | hooks pre-tool-use | decide | serve>\n");
+      process.stdout.write("usage: jig <version | hooks pre-tool-use | decide | tier | serve>\n");
       return command === undefined ? 0 : 1;
   }
 }

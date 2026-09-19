@@ -93,6 +93,44 @@ describe("serveDecisionService", () => {
     }
   });
 
+  test("/tier answers with the tier jig's own question decided", async () => {
+    const provider = new StaticProvider({ choice: { value: "complex", confidence: 0.8 } });
+    const service = serveDecisionService({ provider, port: 0 });
+
+    try {
+      const response = await fetch(`${service.url}/tier`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ request: "design a new subsystem" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        tier: "complex",
+        confidence: 0.8,
+        source: "decided",
+      });
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("/tier with an empty request is a bad-request", async () => {
+    const service = serveDecisionService({ provider: new StaticProvider({}), port: 0 });
+
+    try {
+      const response = await fetch(`${service.url}/tier`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ request: "" }),
+      });
+
+      expect(response.status).toBe(400);
+    } finally {
+      service.stop();
+    }
+  });
+
   test("anything but POST /decide is not found", async () => {
     const service = serveDecisionService({ provider: new StaticProvider({}), port: 0 });
 

@@ -7,7 +7,7 @@ resident-context budget:
 |---|---|---|
 | `main` | DeepSeek Flash | LiteLLM proxy, `localhost:4000` |
 | `complex` | DeepSeek V4 Pro | same proxy — design decisions, ambiguous bugs, large reviews |
-| `deterministic` | Qwen3.8-27B | LM Studio, `localhost:1234` |
+| `deterministic` | Qwen3.8-27B | same proxy → LM Studio (free, offline, reproducible) |
 
 Started as the local-only driver for Qwen3.8-27B; the proxy tiers were added
 later. Claude Code and omp keep their roles — pi exists to squeeze the most
@@ -15,6 +15,24 @@ quality out of each model with the thinnest possible resident context.
 
 Decision record: writeup store `local-llm/2026-09-13-local-llm-yoki-integration-decision.html`
 (pi 選定・拡張選定の根拠と却下案はそちら)。
+
+## One door per model — no direct LM Studio entry
+
+Every tier goes through the proxy, including the local one. `models.json` has no
+`lmstudio/*` provider, and that is deliberate. The same Qwen3.8 27B used to be
+reachable two ways — the proxy alias `deterministic`, and a direct
+`localhost:1234` entry — and traffic through the direct entry is invisible to the
+dashboard: no TTFT, no tokens, no cost, and no way afterwards to tell which door
+a session used. Because the point of this lane is measuring which model to use,
+the direct entry was removed on 2026-09-19. The cost is real and accepted: with
+the proxy (Docker) down, the local model is not selectable at all.
+
+The local tier's wire settings moved with the removal. `qwen-chat-template`
+thinking, `supportsReasoningEffort: false` and the official Qwen sampling params
+(`temperature 1.0`, `top_p 0.95`, `top_k 20`) now sit on the `deterministic`
+alias, so closing the direct door did not silently change how the local model is
+called. None of that has been exercised through the proxy yet (0 requests at the
+time of writing) — the first measured local request is what confirms it.
 
 ## Design constraint — the 1K-token budget
 
@@ -36,8 +54,7 @@ decides how much a session may carry; the model does not.
 |---|---|---|---|
 | `main` | 1,000,000 | 200,000 | proxy `/v1/models`: `max_input_tokens: 1000000` |
 | `complex` | 1,000,000 | 500,000 | same |
-| `deterministic` | 131,072 | 80% = 104,857 | LM Studio's loaded context |
-| `lmstudio/qwen3.8-27b` | 131,072 | 80% = 104,857 | LM Studio's loaded context |
+| `deterministic` | 131,072 | 80% = 104,857 | the proxy reports LM Studio's loaded context |
 
 Why the split: Codex CLI ships `model_context_window` and
 `model_auto_compact_token_limit` as two keys, and Claude Code has an
@@ -57,13 +74,14 @@ backstop (window − reserve); the extension fires far earlier.
 
 | File | Role |
 |---|---|
-| `models.json` | proxy tiers (`main` Flash / `complex` V4 Pro, both declaring the 1M window the proxy reports) + LM Studio provider with Qwen3.8-27B compat (`qwen-chat-template` thinking, `thinkingLevelMap` pins medium — upstream #8567 otherwise always picks xhigh), official sampling params |
-| `settings.json` | proxy-first default (`main`), lmstudio provider enabled, compaction reserve 16k |
+| `models.json` | all three tiers as proxy aliases: `main` (Flash), `complex` (V4 Pro), `deterministic` (Qwen3.8-27B via LM Studio), each declaring the window the proxy reports. The local alias also carries `qwen-chat-template` thinking, `thinkingLevelMap` pinning medium (upstream #8567 otherwise always picks xhigh) and the official Qwen sampling params. No direct provider — see "One door per model" |
+| `settings.json` | proxy-first default (`main`), `enabledModels` limited to the proxy tiers, compaction reserve 16k |
 | `AGENTS.md` | ~1.6KB resident instructions shared by all tiers (align-before-executing, stale-edit, tool-call, output discipline, git rules) |
 | `extensions/freshness.ts` | Blocks stale-file edits, failed-edit retries without re-read, 3x identical-call loops. Resident cost 0 |
 | `extensions/compactor.ts` | Caps tool results at 30k chars (spill to `~/.local/state/pi/spill/`), proactive compaction at a per-model limit (main 200k, complex 500k, otherwise 80% of the declared window). Resident cost 0 |
 | `extensions/guard.ts` | pi-side counterpart of yoki git-guard: hard-blocks push-to-main / force-push / --no-verify / second-model loads; confirms rm -rf etc. Resident cost 0 |
 | `extensions/gate.ts` | `/goal` + `/gate` + `goal_complete` — completion refused until gates pass, gates not rerun on unchanged workspace. Resident cost: 1 tool schema |
+| `extensions/tier-router.ts` | `/tier [auto\|off\|<tier>]`; in `auto`, asks jig's judgment service (`POST 127.0.0.1:4100/tier`) which tier a prompt needs and switches the model before the loop runs. OFF by default (a judgment call is spent per prompt): `/tier auto` for the session, `PI_TIER_ROUTER=auto` for the default. Service down = keeps the current model, never blocks. Resident cost 0 |
 | `extensions/yoki-graph-widget.ts` | Live yoki-graph run progress in the below-editor widget slot; appears only while a run is active, event-driven (fs.watch + 500ms coalesce, 5s safety tick). Resident cost 0 |
 
 Extensions adapted from [earlyaidopters/marks-pi-harness](https://github.com/earlyaidopters/marks-pi-harness)
@@ -81,6 +99,7 @@ npm install -g @earendil-works/pi-coding-agent@latest
 History: 0.84.x was held back for upstream #9216 (0.85.x local streaming
 "terminated" + auto-compaction not re-triggering after the first run). On
 2026-09-19 a one-turn smoke test of **0.85.1** against `lmstudio/qwen3.8-27b`
+(the direct entry, removed since — see "One door per model")
 on this machine passed, so 0.85.1 is installed. The issue is still open and
 was reported after 0.85.1 shipped (Windows + Ollama, GGUF quant — not this
 machine's macOS + LM Studio MLX setup), so neither symptom is fixed by a
