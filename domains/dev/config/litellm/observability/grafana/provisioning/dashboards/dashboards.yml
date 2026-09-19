@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# Dashboards are files in this repo, not rows in Grafana's database. That keeps
+# one source of truth for what a dashboard shows and makes changes reviewable
+# in git — the same reason the alert thresholds live in alerts.yml.
+providers:
+  - name: litellm-gateway
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    # Grafana re-reads the directory on this interval, so editing the JSON in
+    # the repo shows up without restarting the container.
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

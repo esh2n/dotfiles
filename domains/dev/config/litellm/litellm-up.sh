@@ -10,7 +10,7 @@
 # launchd retries, instead of hanging forever and blocking recovery.
 #
 # The proxy's master_key is a NON-SECRET loopback constant baked into config.yaml
-# (127.0.0.1 only), so no key needs distributing to the fronts. Only the
+# (127.0.0.1 only), so no key needs distributing to the agent harnesses. Only the
 # high-value DeepSeek key is fetched here.
 #
 # Deployed to ~/.config/litellm; launched by

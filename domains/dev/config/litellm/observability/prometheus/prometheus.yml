@@ -1,0 +1,38 @@
+# Prometheus scrape config for the local LLM gateway.
+#
+# One job, one target: the LiteLLM proxy's Prometheus exporter. LiteLLM exposes
+# these counters from process memory, so this scrape is what turns a value that
+# dies on restart into a stored time series.
+#
+# No credentials anywhere: the gateway sets
+# `require_auth_for_metrics_endpoint: false` because it is a loopback-only,
+# single-user proxy (see ../config.yaml). Nothing secret is needed to scrape.
+
+global:
+  # 15s matches the gateway's own resolution: short enough that a 1-minute
+  # request burst is visible, long enough that a day is a few MB of samples.
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    gateway: litellm-local
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: litellm
+    # The trailing slash matters: `/metrics` answers 307 and `/metrics/` answers
+    # 200 (measured). Scrape the final URL directly rather than relying on
+    # redirect handling.
+    metrics_path: /metrics/
+    static_configs:
+      - targets: ["host.docker.internal:4000"]
+        labels:
+          layer: llm-gateway
+
+  # Prometheus itself, so a dashboard can show whether scraping is healthy.
+  - job_name: prometheus
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -1,0 +1,17 @@
+apiVersion: 1
+
+# Grafana talks to Prometheus over the compose network, not through the host
+# port: the datasource URL is the service name. Anonymous viewer access is
+# enough because nothing here is edited in the UI (see docker-compose.yml).
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 15s
+      # Keeps range queries aligned with the scrape interval instead of
+      # interpolating across gaps.
+      httpMethod: POST

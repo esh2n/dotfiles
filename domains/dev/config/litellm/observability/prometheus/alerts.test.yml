@@ -1,0 +1,116 @@
+# Unit tests for the alert rules — run with:
+#
+#   docker run --rm -v "$PWD/prometheus":/p --entrypoint promtool \
+#     prom/prometheus:v3.14.0 test rules /p/alerts.test.yml
+#
+# Why this file exists: a rule that loads and evaluates without error is not the
+# same as a rule that fires when it should. `promtool` feeds synthetic counter
+# series in and asserts both directions — that the alert fires, AND that the
+# guard conditions stop it from firing. The second half is the part no amount of
+# staring at a healthy `/api/v1/rules` page would ever confirm.
+#
+# The annotation strings are pinned exactly (promtool requires it), so a change
+# to what an alert says is a deliberate change to this file.
+
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # --- DailyCostHigh ------------------------------------------------------
+  # Rate of $0.25/min holds for 30m => ~$7.5 in the window, over the $5 line.
+  - interval: 1m
+    input_series:
+      - series: 'litellm_spend_metric_total{model="deepseek-flash"}'
+        values: '0+0.25x60'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: DailyCostHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              layer: llm-gateway
+            exp_annotations:
+              summary: 'LLM ゲートウェイの直近24時間の費用が $5 を超えました（現在 7.5000 ドル）'
+              action: './status.sh で モデル別の内訳 を見る。complex（DeepSeek V4 Pro）への 振り分けが増えていないかを確認する。'
+              caveat: '費用は proxy のプロセス内カウンタなので、proxy を再起動すると 0 に戻る。increase() はリセットを検出して補正するが、再起動の 前後で取りこぼした分（最大で次のスクレイプまでの15秒）は数えない。'
+
+  # The measured baseline is ~$0.0625/min ($90/day would be needed to reach $5
+  # in 24h... this rate is ~$0.09/hour), which must NOT fire.
+  - interval: 1m
+    input_series:
+      - series: 'litellm_spend_metric_total{model="deepseek-flash"}'
+        values: '0+0.0625x60'
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: DailyCostHigh
+        exp_alerts: []
+
+  # --- FailureRateHigh ----------------------------------------------------
+  # 10 successes/min and 10 failures/min = 50% failure rate, well over the
+  # traffic floor, so it fires.
+  - interval: 1m
+    input_series:
+      - series: 'litellm_deployment_success_responses_total{requested_model="main",user_agent="pi"}'
+        values: '0+10x60'
+      - series: 'litellm_deployment_failure_responses_total{api_provider="",requested_model="",user_agent="None"}'
+        values: '0+10x60'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: FailureRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              layer: llm-gateway
+            exp_annotations:
+              summary: 'LLM ゲートウェイの失敗率が 5% を超えています（現在 50%）'
+              action: './status.sh で失敗の内訳を見てから ~/Library/Logs/litellm-proxy.log を 確認する。プロバイダ側の鍵・レート制限か、ローカルモデル（LM Studio）が 落ちているかを切り分ける。'
+              caveat: '失敗カウンタは model / user_agent ラベルが空なので、失敗率は全体でしか 出せない。どのモデルが失敗しているかはログで見る。'
+
+  # Same 50% rate but only 0.02 req/min: the traffic floor must hold it back.
+  # Without the floor this is "100% failure" on a quiet night.
+  - interval: 1m
+    input_series:
+      - series: 'litellm_deployment_success_responses_total{requested_model="main",user_agent="pi"}'
+        values: '0+0.02x60'
+      - series: 'litellm_deployment_failure_responses_total{api_provider="",requested_model="",user_agent="None"}'
+        values: '0+0.02x60'
+    alert_rule_test:
+      - eval_time: 45m
+        alertname: FailureRateHigh
+        exp_alerts: []
+
+  # --- TTFTDegraded -------------------------------------------------------
+  # 25 hours at a 0.75s mean, then a jump to 4.00s. Over the 3s floor AND well
+  # over twice the trailing baseline, so it fires.
+  - interval: 1m
+    input_series:
+      - series: 'litellm_llm_api_time_to_first_token_metric_sum{requested_model="main"}'
+        values: '0+0.75x1440 1080+4x120'
+      - series: 'litellm_llm_api_time_to_first_token_metric_count{requested_model="main"}'
+        values: '0+1x1560'
+    alert_rule_test:
+      - eval_time: 1520m
+        alertname: TTFTDegraded
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              layer: llm-gateway
+            exp_annotations:
+              summary: '最初の文字が出るまでの時間（TTFT）が普段の2倍を超えています（現在 4.00 秒）'
+              action: './status.sh でモデル別の TTFT を見る。1つのモデルだけ遅いなら プロバイダ側、deterministic だけ遅いなら LM Studio の モデルロードが疑わしい。'
+              caveat: '24時間分のデータが溜まるまではベースラインが出ないため、このルールは 発火しない（データ無し＝警告無しで安全側）。'
+
+  # A steady 0.75s for 25 hours is stable: no baseline drift, so no alert. This
+  # is also the case that guards against the rule firing on ordinary noise.
+  - interval: 1m
+    input_series:
+      - series: 'litellm_llm_api_time_to_first_token_metric_sum{requested_model="main"}'
+        values: '0+0.75x1560'
+      - series: 'litellm_llm_api_time_to_first_token_metric_count{requested_model="main"}'
+        values: '0+1x1560'
+    alert_rule_test:
+      - eval_time: 1520m
+        alertname: TTFTDegraded
+        exp_alerts: []

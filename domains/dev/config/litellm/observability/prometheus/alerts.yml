@@ -1,0 +1,136 @@
+# Alert rules for the local LLM gateway.
+#
+# Every rule answers "what do I do next", not "a number moved": each annotation
+# names the command or the log file to look at. A dashboard you have to stare at
+# to notice a problem is not the same as an alert that tells you one exists.
+#
+# Thresholds are PROVISIONAL. They were set from the one baseline that exists
+# today (see the rationale on each rule) and should be re-derived after a week of
+# real traffic. `status.sh` prints the current values, which is the cheapest way
+# to see whether a threshold is still in the right place.
+#
+# Reload after editing without restarting the container:
+#   curl -X POST http://127.0.0.1:9090/-/reload
+
+groups:
+  - name: litellm-gateway
+    rules:
+      # --- 1. Daily cost -------------------------------------------------
+      # Rolling 24h, not calendar day: no timezone arithmetic, and it is the
+      # window that answers "did today get more expensive than yesterday".
+      #
+      # Baseline: the gateway has spent $1.09 in total since it was set up, at
+      # roughly $0.5/day. $5 is ~10x that, so it fires on a real change in usage
+      # or on a model swap to something pricier — not on ordinary noise.
+      - alert: DailyCostHigh
+        expr: sum(increase(litellm_spend_metric_total[24h])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          layer: llm-gateway
+        annotations:
+          summary: 'LLM ゲートウェイの直近24時間の費用が $5 を超えました（現在 {{ $value | printf "%.4f" }} ドル）'
+          action: >-
+            ./status.sh で モデル別の内訳 を見る。complex（DeepSeek V4 Pro）への
+            振り分けが増えていないかを確認する。
+          caveat: >-
+            費用は proxy のプロセス内カウンタなので、proxy を再起動すると
+            0 に戻る。increase() はリセットを検出して補正するが、再起動の
+            前後で取りこぼした分（最大で次のスクレイプまでの15秒）は数えない。
+
+      # --- 2. Failure rate ----------------------------------------------
+      # Denominator is success + failure, both summed, because the two counters
+      # do not share a label set (failures carry empty model/user_agent labels —
+      # measured, see README). The `and` clause is a traffic floor: without it,
+      # 1 failure out of 1 request during a quiet night reads as 100%.
+      - alert: FailureRateHigh
+        expr: |
+          (
+            sum(rate(litellm_deployment_failure_responses_total[15m]))
+            /
+            clamp_min(
+              sum(rate(litellm_deployment_success_responses_total[15m]))
+              + sum(rate(litellm_deployment_failure_responses_total[15m])),
+              0.0001)
+            > 0.05
+          )
+          and
+          (
+            sum(rate(litellm_deployment_success_responses_total[15m]))
+            + sum(rate(litellm_deployment_failure_responses_total[15m]))
+            > 0.0034
+          )
+        for: 15m
+        labels:
+          severity: warning
+          layer: llm-gateway
+        annotations:
+          summary: "LLM ゲートウェイの失敗率が 5% を超えています（現在 {{ $value | humanizePercentage }}）"
+          action: >-
+            ./status.sh で失敗の内訳を見てから ~/Library/Logs/litellm-proxy.log を
+            確認する。プロバイダ側の鍵・レート制限か、ローカルモデル（LM Studio）が
+            落ちているかを切り分ける。
+          caveat: >-
+            失敗カウンタは model / user_agent ラベルが空なので、失敗率は全体でしか
+            出せない。どのモデルが失敗しているかはログで見る。
+
+      # --- 3. TTFT degradation -------------------------------------------
+      # Two conditions must hold: an absolute floor (3s; the measured mean today
+      # is 0.71s, so 3s means something is genuinely wrong) AND 2x the trailing
+      # 24h baseline. The floor stops a fast baseline from making a 0.4s -> 0.9s
+      # wobble fire; the ratio stops an absolute threshold from becoming
+      # meaningless if normal latency drifts upward.
+      #
+      # Known limitation: a PERMANENT slowdown eventually raises the 24h baseline
+      # until the rule stops firing. This rule catches a change, not a slow
+      # erosion — the dashboard is the tool for the latter.
+      - alert: TTFTDegraded
+        expr: |
+          (
+            sum(rate(litellm_llm_api_time_to_first_token_metric_sum[10m]))
+            / clamp_min(sum(rate(litellm_llm_api_time_to_first_token_metric_count[10m])), 0.0001)
+            > 3
+          )
+          and
+          (
+            sum(rate(litellm_llm_api_time_to_first_token_metric_sum[10m]))
+            / clamp_min(sum(rate(litellm_llm_api_time_to_first_token_metric_count[10m])), 0.0001)
+            >
+            2 * (
+              sum(rate(litellm_llm_api_time_to_first_token_metric_sum[24h] offset 10m))
+              / clamp_min(sum(rate(litellm_llm_api_time_to_first_token_metric_count[24h] offset 10m)), 0.0001)
+            )
+          )
+          and
+          (sum(rate(litellm_llm_api_time_to_first_token_metric_count[10m])) > 0.0033)
+        for: 10m
+        labels:
+          severity: warning
+          layer: llm-gateway
+        annotations:
+          summary: '最初の文字が出るまでの時間（TTFT）が普段の2倍を超えています（現在 {{ $value | printf "%.2f" }} 秒）'
+          action: >-
+            ./status.sh でモデル別の TTFT を見る。1つのモデルだけ遅いなら
+            プロバイダ側、deterministic だけ遅いなら LM Studio の
+            モデルロードが疑わしい。
+          caveat: >-
+            24時間分のデータが溜まるまではベースラインが出ないため、このルールは
+            発火しない（データ無し＝警告無しで安全側）。
+
+      # --- Not enabled: gateway unreachable -------------------------------
+      # `up` is the single most actionable signal this stack has (nothing works
+      # while it is 0), but it is outside the three alerts that were asked for,
+      # so it ships commented out. Uncomment to enable.
+      #
+      # - alert: GatewayDown
+      #   expr: up{job="litellm"} == 0
+      #   for: 5m
+      #   labels:
+      #     severity: critical
+      #     layer: llm-gateway
+      #   annotations:
+      #     summary: "LLM ゲートウェイに到達できません（計測も停止中）"
+      #     action: >-
+      #       launchctl print gui/$(id -u)/com.esh2n.litellm-proxy で状態を見て、
+      #       必要なら launchctl kickstart -k gui/$(id -u)/com.esh2n.litellm-proxy。
+      #       1Password が throttled なら数分待つ（wrapper は timeout 60 で fail-fast する）。
