@@ -1,0 +1,45 @@
+# DeepSeek Harness (dsh) — model/provider settings plane.
+# Symlink to ~/.dsh/settings.yaml. Re-read per request (no restart needed).
+# Managed by the Web Models page too; hand-editing round-trips untouched keys.
+#
+# DSH is one of the two fronts (with pi) pointed at the local LiteLLM proxy so
+# both are measured on the same plane and the better one is chosen with data.
+# DSH holds ONLY the proxy's key — the DeepSeek/OpenAI keys live on the proxy,
+# so nothing provider-secret lands here. Decision record: writeup store
+# yoki/2026-09-16-observability-proxy-litellm.
+
+llm-pi-ai:
+  providers:
+    # One custom route -> the local LiteLLM proxy (OpenAI-compatible).
+    local-proxy:
+      displayName: LiteLLM (local)
+      api: openai-completions           # LiteLLM speaks OpenAI Chat Completions
+      baseURL: http://localhost:4000/v1 # confirm /v1 vs bare :4000 against the running proxy
+      apiKeyEnv: LITELLM_API_KEY         # the PROXY master key, injected via `op run` (never on disk)
+
+      # localhost gateways: pi-ai treats an unknown URL as OpenAI itself and
+      # sends fields LiteLLM may reject — these two are the usual fixes and
+      # have no UI field, so they must live here.
+      compat:
+        supportsDeveloperRole: false     # system prompt as `system`, not `developer`
+        maxTokensField: max_tokens       # if the proxy rejects max_completion_tokens
+
+      models:
+        # main -> proxy alias that maps to deepseek-flash
+        - id: main
+          name: main (DeepSeek Flash)
+          reasoningEfforts:
+            off:
+            high: high
+            max: max
+          compat:
+            thinkingFormat: deepseek      # makes `off` actually stop thinking
+
+        # complex -> proxy alias that maps to gpt-6-astra (Astra)
+        - id: complex
+          name: complex (Astra)
+
+        # deterministic -> proxy alias that maps to local qwen
+        - id: deterministic
+          name: deterministic (local Qwen)
+          # add `input: [text, image]` if this qwen build is vision-capable
