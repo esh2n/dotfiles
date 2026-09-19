@@ -1,0 +1,80 @@
+# Observability stack for the local LLM gateway (LiteLLM).
+#
+# Two components with different jobs, which is why they have different lifetimes:
+#
+#   prometheus — scrapes the gateway and STORES the numbers. LiteLLM keeps its
+#                counters in process memory and loses them on every restart, so
+#                Prometheus is the only thing that makes history survive. It is
+#                therefore resident (`restart: unless-stopped`).
+#   grafana    — renders what Prometheus stored. It stores nothing itself, so it
+#                is safe to stop, and it is behind the "ui" profile: a plain
+#                `docker compose up -d` starts Prometheus only.
+#
+# Both ports bind 127.0.0.1. The gateway's own port is published to loopback
+# only, and reaching it from a container goes through OrbStack's
+# host.docker.internal proxy — measured, not assumed (see README).
+#
+# Run it through start.sh / stop.sh / status.sh rather than calling compose
+# directly, so the flags and the health checks stay in one place.
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: litellm-prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # 90 days: long enough to compare a model swap against the weeks before it.
+      - --storage.tsdb.retention.time=90d
+      - --web.listen-address=0.0.0.0:9090
+      # Lets status.sh and the README's "tune a threshold" flow reload the rules
+      # with `POST /-/reload` instead of restarting the container. Safe because
+      # the port is loopback-only.
+      - --web.enable-lifecycle
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:13.2.2
+    container_name: litellm-grafana
+    profiles: ["ui"]
+    # `no`, not `unless-stopped`: the decision was Prometheus resident and Grafana
+    # on demand, and a restart policy would quietly turn that into "resident
+    # forever after the first --ui". With `no`, Grafana runs while you asked for
+    # it and comes back only when asked. Change this line to `unless-stopped` if
+    # you would rather it always be there.
+    restart: "no"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      # Anonymous read-only access: this is a single-user loopback service, and
+      # it removes the default admin/admin credential entirely. Dashboards are
+      # provisioned from ./grafana/dashboards, so nothing needs UI write access.
+      # To edit in the UI instead, see README "ダッシュボードを UI で編集したい".
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # No outbound telemetry: this stack is local-first, like the gateway.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_DATE_FORMATS_DEFAULT_TIMEZONE: "Asia/Tokyo"
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:

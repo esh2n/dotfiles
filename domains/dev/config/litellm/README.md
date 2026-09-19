@@ -1,10 +1,10 @@
-# LiteLLM — front-agnostic measuring proxy
+# LiteLLM — harness-agnostic measuring proxy
 
-One local OpenAI-compatible gateway that every front (pi / DeepSeek Harness /
+One local OpenAI-compatible gateway that every agent harness (pi / DeepSeek Harness /
 codex) points its `base_url` at. It routes three tier aliases to their
 providers and records **TTFT / decode tok/s / tokens / cost / prefix-cache-hit**
-on a Prometheus `/metrics` endpoint — front-independent, so the measurement
-survives swapping the front. This is how you decide, with data, which model
+on a Prometheus `/metrics/` endpoint — harness-independent, so the measurement
+survives swapping the harness. This is how you decide, with data, which model
 belongs in each tier and whether pi or DSH is the better daily driver.
 
 Decision record: writeup store `yoki/2026-09-16-observability-proxy-litellm`.
@@ -18,8 +18,8 @@ Decision record: writeup store `yoki/2026-09-16-observability-proxy-litellm`.
 | `complex` | OpenAI | `gpt-6-astra` (Astra) | hard judgment / design |
 | `deterministic` | LM Studio (local) | `qwen/qwen3.8-27b` | reproducible / offline / free |
 
-A front calls the proxy with `model` = one of these aliases; the proxy picks
-the provider. Switch tiers by switching the alias — no per-front provider
+A harness calls the proxy with `model` = one of these aliases; the proxy picks
+the provider. Switch tiers by switching the alias — no per-harness provider
 config.
 
 ## Keys — never on disk
@@ -80,9 +80,9 @@ Pin the image tag first: check the latest stable at
 `github.com/BerriAI/litellm/pkgs/container/litellm` and set `LITELLM_IMAGE` in
 `start.sh` (the `v1.90.2` there is a placeholder).
 
-## Point a front at it
+## Point a harness at it
 
-Each front just sets its OpenAI base_url to the proxy and uses a tier alias as
+Each harness just sets its OpenAI base_url to the proxy and uses a tier alias as
 the model:
 
 - **pi** — in `models.json`, add a provider with `baseUrl:
@@ -96,11 +96,27 @@ the model:
 
 ## Metrics
 
-Prometheus at `/metrics` (free OSS). Key series: `…time_to_first_token…`
-(TTFT), input/output token counters, `litellm_spend_metric` (cost),
-`litellm_cache_hits/misses`. Point a Prometheus/Grafana or just `curl
-/metrics | grep` at it to compare tiers. LiteLLM also exports OTel (GenAI
-semconv, `gen_ai.*`) to any collector — enable later if you want traces too.
+Prometheus exporter at `/metrics/` (the trailing slash matters: `/metrics`
+answers 307). Key series, all measured against this proxy rather than taken from
+docs: `litellm_llm_api_time_to_first_token_metric_{sum,count}` (TTFT),
+`litellm_{input,output}_tokens_metric_total`, `litellm_spend_metric_total`
+(cost, carries `model` and `user_agent`), `litellm_deployment_{success,failure}_responses_total`.
+There is **no** `litellm_cache_hits_metric_total` — only misses — so cache-hit
+behaviour has to be read from `litellm_input_cached_tokens_metric_total`.
+
+**The numbers are unreadable straight off `/metrics/` for two reasons**: the
+counters live in process memory and die on restart, and nothing tells you when a
+value has moved. Both are handled by [`observability/`](observability/) —
+Prometheus stores the series and Grafana plus three alert rules make them
+readable:
+
+```bash
+cd ~/.config/litellm/observability && ./start.sh --ui   # then ./status.sh
+```
+
+For a one-off look, `curl -s localhost:4000/metrics/ | grep …` still works.
+LiteLLM can also export OTel (GenAI semconv, `gen_ai.*`) to a collector; that is
+an option for traces later, not something this stack uses today.
 
 ## Notes / caveats
 
