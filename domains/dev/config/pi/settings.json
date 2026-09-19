@@ -19,6 +19,6 @@
     "npm:@plannotator/pi-extension",
     "npm:pi-web-access"
   ],
-  "lastChangelogVersion": "0.84.4",
+  "lastChangelogVersion": "0.85.1",
   "theme": "unkai"
 }
