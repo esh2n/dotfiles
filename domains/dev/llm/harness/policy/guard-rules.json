@@ -4,138 +4,238 @@
     {
       "id": "git-force-push",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bgit\\s+push\\b[^|;&]*(--force|\\s-f\\b)",
       "why": "force push is never recoverable",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-push-main-master",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bgit\\s+push\\b(?=.*\\b(main|master)\\b)",
       "why": "pushing to main/master by command pattern bypasses the PR workflow",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-no-verify",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "--no-verify\\b",
       "why": "bypassing hooks is forbidden — fix the failure instead",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-commit-dash-n",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bgit\\s+commit\\b[^|;&]*\\s-n\\b",
       "why": "-n on git commit is short for --no-verify and skips hooks",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-reset-hard",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bgit\\s+reset\\s+--hard\\b",
       "why": "discards uncommitted work irrecoverably",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-clean-force",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bgit\\s+clean\\s+-[a-z]*f",
       "why": "deletes untracked files irrecoverably",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-checkout-dot",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bgit\\s+checkout\\s+--\\s+\\.",
       "why": "discards all working-tree changes",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "lms-load",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\blms\\s+load\\b",
       "why": "loading a second model would exhaust unified memory on this machine",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "mlx-vlm-serve",
       "tier": "deny",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bmlx_vlm\\.server|mlx-vlm.*serve",
       "why": "a second model server can exhaust memory and crash this machine",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "rm-recursive-force",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\brm\\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\\b",
       "why": "recursive force delete",
-      "profiles": ["standard", "strict"]
+      "profiles": [
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "sudo",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bsudo\\b",
       "why": "privilege escalation",
-      "profiles": ["strict"]
+      "profiles": [
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "kill-force",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bkill(all)?\\b.*-9|\\bpkill\\b",
       "why": "force-killing processes",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "curl-pipe-shell",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "curl[^|]*\\|\\s*(ba|z)?sh|wget[^|]*\\|\\s*(ba|z)?sh",
       "why": "piping a remote script straight to a shell",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "chmod-777-recursive",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\bchmod\\s+-R\\s+777\\b",
       "why": "world-writable permissions",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "disk-destruction",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\b(mkfs|diskutil\\s+erase|dd\\s+.*of=/dev)",
       "why": "disk-level destruction",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "system-power-control",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "\\b(shutdown|reboot|halt)\\b",
       "why": "system power control",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "rm-lock-files",
       "tier": "confirm",
-      "tools": ["shell"],
+      "tools": [
+        "shell"
+      ],
       "match": "rm\\s+[^|;&]*(package-lock\\.json|\\.lock\\b)",
       "why": "deleting lock files to silence errors",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     }
   ]
 }

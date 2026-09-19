@@ -59,7 +59,7 @@ describe("the real guard-rules.json", () => {
     expect(decision.kind).toBe("ask");
   });
 
-  test("sudo ls is allowed at standard but asks at strict", () => {
+  test("sudo asks from standard up, allowed only at minimal", () => {
     const policy = parsePolicy(JSON.parse(readFileSync(REAL_POLICY_PATH, "utf8")));
     const standard = evaluate(
       policy.rules,
@@ -71,7 +71,15 @@ describe("the real guard-rules.json", () => {
       { tool: "Bash", input: { command: "sudo ls" } },
       "strict",
     );
-    expect(standard.kind).toBe("allow");
+    const minimal = evaluate(
+      policy.rules,
+      { tool: "Bash", input: { command: "sudo ls" } },
+      "minimal",
+    );
+    // Ruling 2026-09-20: pi always confirmed sudo before unification, so the
+    // shared policy must not weaken it — strength unifies upward.
+    expect(minimal.kind).toBe("allow");
+    expect(standard.kind).toBe("ask");
     expect(strict.kind).toBe("ask");
   });
 });
