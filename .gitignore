@@ -218,11 +218,19 @@ domains/dev/config/claude/teams/
 
 # Claude Code runtime state. ~/.claude is a symlink into this repo, so anything
 # the CLI writes at runtime lands in the working tree. daemon/ holds a control
-# key and uploads/ holds pasted images — neither belongs in git.
+# key, uploads/ holds pasted images, feedback/drafts/ holds unsent feedback
+# payloads that quote session and request ids — none of them belongs in git.
 domains/dev/config/claude/daemon/
+domains/dev/config/claude/daemon.lock
 domains/dev/config/claude/daemon.log
+domains/dev/config/claude/daemon.status.json
+domains/dev/config/claude/feedback/drafts/
 domains/dev/config/claude/jobs/
 domains/dev/config/claude/uploads/
+
+# pi subagent artifacts (transcripts and outputs of one run, written next to
+# the session that started them)
+.pi-subagents/
 
 # Zed editor state
 **/zed/prompts/prompts-library-db.0.mdb/lock.mdb

@@ -12,6 +12,13 @@
 # a non-secret loopback constant set directly in config.yaml (not here).
 DEEPSEEK_API_KEY=op://llm-automation/deepseek/credential
 
+# TypeSafe (Jev) decision model. Same vault-level service-account grant as the
+# items above (verified 2026-08-24: `op read` on this pointer resolves through the
+# `litellm-op-token` SA). Consumed by the jig judgment service
+# (domains/dev/config/jig/jig-decision-up.sh), which reads it once at login and
+# answers every harnesses' judgments over the loopback — harnesses never see it.
+TYPESAFE_API_KEY=op://llm-automation/typesafe/credential
+
 # complex/Astra tier is not wired yet (no OpenAI key on this service account).
 # A literal placeholder keeps LiteLLM startup happy; the `complex` route stays
 # unused until an openai item is added to llm-automation and referenced here.
