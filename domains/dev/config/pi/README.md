@@ -1,9 +1,17 @@
-# pi — local LLM lane
+# pi — three-tier lane
 
-pi (@earendil-works/pi-coding-agent) configured as the **local-only driver**
-for Qwen3.8-27B on LM Studio. This is not the main harness — Claude Code and
-omp keep their roles; pi exists to squeeze the most quality out of a local
-27B model with the thinnest possible resident context.
+pi (@earendil-works/pi-coding-agent) drives three model tiers behind one
+resident-context budget:
+
+| Tier | Model | Endpoint |
+|---|---|---|
+| `main` | DeepSeek Flash | LiteLLM proxy, `localhost:4000` |
+| `complex` | DeepSeek V4 Pro | same proxy — design decisions, ambiguous bugs, large reviews |
+| `deterministic` | Qwen3.8-27B | LM Studio, `localhost:1234` |
+
+Started as the local-only driver for Qwen3.8-27B; the proxy tiers were added
+later. Claude Code and omp keep their roles — pi exists to squeeze the most
+quality out of each model with the thinnest possible resident context.
 
 Decision record: writeup store `local-llm/2026-09-13-local-llm-yoki-integration-decision.html`
 (pi 選定・拡張選定の根拠と却下案はそちら)。
@@ -18,15 +26,42 @@ tool schema or per-turn injection? If yes, it needs to beat gate.ts's
 value-per-token. Skills, web-search tools, subagent tools, and per-turn
 status injections were evaluated and rejected — see the decision record.
 
+## Context budget — window vs compaction limit
+
+`models.json` declares the window the model actually has. The compaction limit
+is a **separate, lower number**, owned by `extensions/compactor.ts`. The tier
+decides how much a session may carry; the model does not.
+
+| Tier | Declared window | Compaction limit | Source |
+|---|---|---|---|
+| `main` | 1,000,000 | 200,000 | proxy `/v1/models`: `max_input_tokens: 1000000` |
+| `complex` | 1,000,000 | 500,000 | same |
+| `deterministic` | 131,072 | 80% = 104,857 | LM Studio's loaded context |
+| `lmstudio/qwen3.8-27b` | 131,072 | 80% = 104,857 | LM Studio's loaded context |
+
+Why the split: Codex CLI ships `model_context_window` and
+`model_auto_compact_token_limit` as two keys, and Claude Code has an
+`autoCompactWindow` setting (100K–1M) independent of the model window.
+Declaring the real window keeps pi's own token accounting honest, while the
+compaction limit stays a policy choice. 200k is the boundary at which Claude
+Code compacts 200K-window models; quality degrades well before a claimed
+window fills (RULER; Chroma "context rot"), so 1M is declared but never used
+as a working size. The status line reads `ctx 57%/200k` — a reading above
+100% means the proactive compaction did not fire, which is the visible
+failure mode to watch after a pi upgrade.
+
+`compaction.reserveTokens: 16384` in `settings.json` is only pi's own
+backstop (window − reserve); the extension fires far earlier.
+
 ## Files
 
 | File | Role |
 |---|---|
-| `models.json` | LM Studio provider + Qwen3.8-27B compat (`qwen-chat-template` thinking, `thinkingLevelMap` pins medium — upstream #8567 otherwise always picks xhigh), official sampling params |
-| `settings.json` | lmstudio-only model list, compaction reserve 24k |
-| `AGENTS.md` | ~1KB resident instructions for the local lane (stale-edit, tool-call, output discipline, git rules) |
+| `models.json` | proxy tiers (`main` Flash / `complex` V4 Pro, both declaring the 1M window the proxy reports) + LM Studio provider with Qwen3.8-27B compat (`qwen-chat-template` thinking, `thinkingLevelMap` pins medium — upstream #8567 otherwise always picks xhigh), official sampling params |
+| `settings.json` | proxy-first default (`main`), lmstudio provider enabled, compaction reserve 16k |
+| `AGENTS.md` | ~1.6KB resident instructions shared by all tiers (align-before-executing, stale-edit, tool-call, output discipline, git rules) |
 | `extensions/freshness.ts` | Blocks stale-file edits, failed-edit retries without re-read, 3x identical-call loops. Resident cost 0 |
-| `extensions/compactor.ts` | Caps tool results at 30k chars (spill to `~/.local/state/pi/spill/`), proactive compact at 80%. Resident cost 0 |
+| `extensions/compactor.ts` | Caps tool results at 30k chars (spill to `~/.local/state/pi/spill/`), proactive compaction at a per-model limit (main 200k, complex 500k, otherwise 80% of the declared window). Resident cost 0 |
 | `extensions/guard.ts` | pi-side counterpart of yoki git-guard: hard-blocks push-to-main / force-push / --no-verify / second-model loads; confirms rm -rf etc. Resident cost 0 |
 | `extensions/gate.ts` | `/goal` + `/gate` + `goal_complete` — completion refused until gates pass, gates not rerun on unchanged workspace. Resident cost: 1 tool schema |
 | `extensions/yoki-graph-widget.ts` | Live yoki-graph run progress in the below-editor widget slot; appears only while a run is active, event-driven (fs.watch + 500ms coalesce, 5s safety tick). Resident cost 0 |
@@ -37,8 +72,19 @@ yoki-native (display logic lives in the yoki repo, see below).
 
 ## Install
 
-Pin pi to 0.84.x — the 0.85 series has an open local-model streaming
-regression (earendil-works/pi#9216):
+Install the latest release — this lane carries no version pin:
+
+```sh
+npm install -g @earendil-works/pi-coding-agent@latest
+```
+
+History: 0.84.x was held back for upstream #9216 (0.85.x local streaming
+"terminated" + auto-compaction not re-triggering after the first run). On
+2026-09-19 a one-turn smoke test of **0.85.1** against `lmstudio/qwen3.8-27b`
+on this machine passed, so 0.85.1 is installed. The issue is still open and
+was reported after 0.85.1 shipped (Windows + Ollama, GGUF quant — not this
+machine's macOS + LM Studio MLX setup), so neither symptom is fixed by a
+newer release yet. Roll back if either shows up:
 
 ```sh
 npm install -g @earendil-works/pi-coding-agent@0.84.4
@@ -124,14 +170,20 @@ verification (registerTool count + per-turn injections read from source):
 | [dimk90/pi-context-view](https://github.com/dimk90/pi-context-view) | `/context usage` / `/context injections` — the audit instrument for this lane's 1K-token budget. TUI-only | 0 |
 | [Ahm3tJ4f/pi-undo](https://github.com/Ahm3tJ4f/pi-undo) | Message-level shadow-git undo/redo — insurance for an erratic local model | 0 (hooks only) |
 | [sting8k/pi-vcc](https://github.com/sting8k/pi-vcc) | Structured compaction **without an LLM call** (30–470ms). Core compaction summarizes with the model itself — minutes at 8 tok/s locally | 1 tool (~500 tok), accepted |
+| [dbachelder/pi-btw](https://github.com/dbachelder/pi-btw) | Side conversations; added with the proxy tiers | not re-measured |
+| [@plannotator/pi-extension](https://www.npmjs.com/package/@plannotator/pi-extension) | Plan/code review UI; added with the proxy tiers | not re-measured |
+
+The last two are in `settings.json` but their resident cost has not been
+re-measured since the proxy tiers were added — treat the cost column as
+verified for the first three only.
 
 Evaluated and NOT installed (resident cost or single-instance mismatch):
 pi-web-access (~1.5–2K tok; research is the cloud lane's job), pi-lens
 (~2.3K tok + per-turn injection), pi-add-dir (unbounded per-turn AGENTS.md
-injection), rpiv-ask-user-question (~1.2K tok init), pi-btw / swarm-family
-(parallel LLM requests serialize on one LM Studio instance and concurrent
-requests invalidate each other's KV cache — lmstudio-bug-tracker#2320),
-plannotator / pi-session-recall (cloud-lane value). "Swarm" has no canonical
+injection), rpiv-ask-user-question (~1.2K tok init), pi-session-recall.
+Their earlier rejection of pi-btw / swarm-family rested on a single LM Studio
+instance (parallel requests invalidating each other's KV cache),
+which no longer applies to the proxy tiers. "Swarm" has no canonical
 implementation — it is several community extensions sharing a name.
 
 ## Measured on this machine (M4 Pro 64GB, 2026-09-13)
@@ -149,5 +201,8 @@ implementation — it is several community extensions sharing a name.
 
 - earendil-works/pi#8567 — qwen-chat-template always selects xhigh thinking;
   worked around via `thinkingLevelMap` in models.json
-- earendil-works/pi#9216 — 0.85.x stream "terminated" with local qwen3.8;
-  reason for the 0.84.4 pin. Re-test on the next 0.85 patch
+- earendil-works/pi#9216 — 0.85.x stream "terminated" with local qwen3.8,
+  plus auto-compaction not re-triggering after the first run. Still open;
+  0.85.1 passed a one-turn smoke test here (see Install). The re-trigger half
+  is untested against our 200k/500k limits: if `ctx` climbs past 100% of the
+  limit without a second compaction, roll back to 0.84.4

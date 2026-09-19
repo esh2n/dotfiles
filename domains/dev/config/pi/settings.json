@@ -10,7 +10,7 @@
   "showCacheMissNotices": true,
   "compaction": {
     "enabled": true,
-    "reserveTokens": 24000
+    "reserveTokens": 16384
   },
   "packages": [
     "https://github.com/dimk90/pi-context-view",
