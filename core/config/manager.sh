@@ -251,6 +251,58 @@ link_pi_resources() {
 # ompは~/.omp/agentを読む。実行時の状態が同居するため、
 # ディレクトリごとではなく管理下の項目だけをリンクする。
 # config.ymlとextensions/以下はT12で`yoki-switch apply --target omp`に一本化。
+# dsh reads $DSH_HOME (default ~/.dsh) — no XDG lookup, and that directory
+# holds runtime state (profiles/ are pnpm workspaces dsh scaffolds itself,
+# plus .credentials.yaml and sessions), so never link it wholesale. Link only
+# what this repo owns: settings.yaml, and each profile's cordis.patch.yml —
+# and the patch only into a profile directory dsh has already created (this
+# function never creates profile dirs; `dsh` owns that scaffold).
+# dshは$DSH_HOME(既定~/.dsh)を読む。プロファイルはdsh自身が作るpnpm workspace
+# なので、リポジトリが持つファイルだけを個別リンクし、ディレクトリごとは
+# リンクしない。profileのpatchはdshが該当profileを作成済みの場合のみ。
+link_dsh_resources() {
+    local src_dir="$1"
+    local dsh_home="${DSH_HOME:-${HOME}/.dsh}"
+
+    if [[ "$src_dir" != /* ]]; then
+        log_error "link_dsh_resources: src_dir must be absolute (got: ${src_dir})"
+        return 1
+    fi
+
+    ensure_dir "$dsh_home"
+
+    [[ -f "${src_dir}/settings.yaml" ]] && \
+        link_file "${src_dir}/settings.yaml" "${dsh_home}/settings.yaml"
+
+    if [[ -d "${src_dir}/profiles" ]]; then
+        local prof_dir prof
+        for prof_dir in "${src_dir}/profiles/"*/; do
+            [[ -d "$prof_dir" ]] || continue
+            prof="$(basename "$prof_dir")"
+            if [[ -d "${dsh_home}/profiles/${prof}" && -f "${prof_dir}cordis.patch.yml" ]]; then
+                link_file "${prof_dir}cordis.patch.yml" "${dsh_home}/profiles/${prof}/cordis.patch.yml"
+            else
+                [[ -d "${dsh_home}/profiles/${prof}" ]] || \
+                    log_info "dsh profile '${prof}' not scaffolded on this machine; skipping its patch"
+            fi
+        done
+    fi
+
+    # Sweep dangling links this repo made (same two-part ownership test as
+    # link_pi_resources: target under domains/dev/config/dsh/ AND now gone).
+    local sweep_dir link target
+    for sweep_dir in "$dsh_home" "${dsh_home}/profiles/"*/; do
+        [[ -d "$sweep_dir" ]] || continue
+        while IFS= read -r -d '' link; do
+            target="$(readlink "$link")" || continue
+            [[ "$target" == */domains/dev/config/dsh/* ]] || continue
+            [[ -e "$link" ]] && continue
+            rm -f "$link"
+            log_info "Removed stale dsh link: ${link} -> ${target}"
+        done < <(find "$sweep_dir" -mindepth 1 -maxdepth 1 -type l -print0)
+    done
+}
+
 link_omp_resources() {
     local src_dir="$1"
     local omp_home="${HOME}/.omp/agent"
@@ -308,6 +360,11 @@ link_domain() {
                 # ディレクトリごとではなく管理下の項目だけをリンクする。
                 elif [[ "$dirname" == "omp" ]]; then
                     link_omp_resources "$config_dir"
+                # dsh reads ~/.dsh (runtime state cohabits) — link only the
+                # files this repo owns, never the directory.
+                # dshは~/.dshを読む。実行時状態が同居するためファイル単位。
+                elif [[ "$dirname" == "dsh" ]]; then
+                    link_dsh_resources "$config_dir"
                 # serena directory should be linked to ~/.serena instead of ~/.config/serena
                 # serenaディレクトリは特別に~/.serenaにリンクする
                 elif [[ "$dirname" == "serena" ]]; then

@@ -2,7 +2,6 @@
   "defaultProvider": "proxy",
   "defaultModel": "main",
   "enabledModels": [
-    "deepseek/**",
     "proxy/**"
   ],
   "defaultThinkingLevel": "medium",

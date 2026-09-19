@@ -14,14 +14,16 @@ const HARD: Array<{ re: RegExp; why: string }> = [
   { re: /\bgit\s+push\b(?=.*\b(main|master)\b)/, why: "pushing to main/master is forbidden (yoki git conventions)" },
   { re: /\bgit\s+push\s+[^|;&]*(--force|\s-f\b)/, why: "force push is forbidden (yoki git conventions)" },
   { re: /--no-verify\b/, why: "bypassing hooks is forbidden — fix the failure instead" },
+  // Ruled 2026-09-20: deny on every harness, matching git-guard.sh — the
+  // earlier confirm tier here was drift, not intent.
+  { re: /\bgit\s+reset\s+--hard\b/, why: "discards uncommitted work (yoki git conventions)" },
+  { re: /\bgit\s+clean\s+-[a-z]*f/, why: "deletes untracked files (yoki git conventions)" },
   { re: /\blms\s+load\b/, why: "loading a second model would exhaust unified memory on this machine" },
   { re: /\bmlx_vlm\.server|mlx-vlm.*serve/, why: "second model server — can exhaust memory and crash this machine" },
 ];
 
 const CONFIRM: Array<{ re: RegExp; why: string }> = [
   { re: /\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b/i, why: "recursive force delete" },
-  { re: /\bgit\s+reset\s+--hard\b/, why: "discards uncommitted work" },
-  { re: /\bgit\s+clean\s+-[a-z]*f/, why: "deletes untracked files" },
   { re: /\bkill(all)?\b.*-9|\bpkill\b/, why: "force-killing processes" },
   { re: /\bsudo\b/, why: "privilege escalation" },
   { re: /curl[^|]*\|\s*(ba|z)?sh|wget[^|]*\|\s*(ba|z)?sh/, why: "piping remote script to shell" },

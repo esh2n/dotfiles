@@ -45,8 +45,12 @@ export type RemoteDecisionResponse =
   | { readonly op: "score"; readonly value: number; readonly confidence: number };
 
 export interface RemoteDecisionErrorBody {
-  /** `bad-request` = the caller asked something malformed; `provider-error` = the judgment failed. */
-  readonly kind: "bad-request" | "provider-error";
+  /**
+   * `bad-request` = the caller asked something malformed; `provider-error` = the
+   * judgment failed; `unauthorized` = the caller's bearer token was missing or
+   * wrong.
+   */
+  readonly kind: "bad-request" | "provider-error" | "unauthorized";
   readonly message: string;
 }
 
@@ -178,7 +182,8 @@ export function readErrorResponse(value: unknown): RemoteDecisionErrorBody | und
   if (!isRecord(value) || value.op !== "error") return undefined;
   const error = isRecord(value.error) ? value.error : undefined;
   if (error === undefined) return undefined;
-  const kind = error.kind === "bad-request" ? "bad-request" : "provider-error";
+  const kind =
+    error.kind === "bad-request" || error.kind === "unauthorized" ? error.kind : "provider-error";
   const message = typeof error.message === "string" ? error.message : "judgment service failed";
   return { kind, message };
 }

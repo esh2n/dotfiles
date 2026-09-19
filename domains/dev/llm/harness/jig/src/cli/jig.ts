@@ -24,8 +24,9 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 
 /** Composition root: build the concrete adapters and hand them to use-cases. */
 export function buildPorts(): Ports {
+  const logger = new ConsoleLogger((process.env.JIG_LOG_LEVEL as LogLevel | undefined) ?? "info");
   return {
-    logger: new ConsoleLogger((process.env.JIG_LOG_LEVEL as LogLevel | undefined) ?? "info"),
+    logger,
     clock: new SystemClock(),
     fs: new BunFileSystem(),
     proc: new BunProcessRunner(),
@@ -36,6 +37,7 @@ export function buildPorts(): Ports {
     decision: new RemoteDecisionProvider({
       client: createHttpDecisionClient({
         url: process.env.JIG_DECISION_URL ?? DEFAULT_DECISION_URL,
+        logger,
       }),
     }),
   };

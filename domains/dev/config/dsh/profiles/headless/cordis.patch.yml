@@ -1,0 +1,12 @@
+# User patch layer for the `headless` profile — symlinked to
+# ~/.dsh/profiles/headless/cordis.patch.yml by manager.sh link_dsh_resources.
+# Same default-model override as the proxy profile: one-shot headless runs
+# must also go through the local LiteLLM proxy (measurement plane), not a
+# direct provider connection. See profiles/proxy/cordis.patch.yml for the
+# override semantics.
+- insert:
+    - id: agent-default-model
+      name: '@deepseek-ai/dsh-agent-default-model'
+      config:
+        provider: local-proxy
+        model: main

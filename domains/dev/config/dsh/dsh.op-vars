@@ -1,0 +1,8 @@
+# op:// references — POINTERS, not secrets. Safe to commit. `op run --env-file
+# dsh.op-vars` resolves these into the child env only; plaintext never on disk.
+#
+# DSH only needs the PROXY's key (LiteLLM master key) — the DeepSeek/OpenAI
+# provider keys live on the proxy, not here. Same op item as the proxy's
+# LITELLM_MASTER_KEY. Confirm the coordinate against your 1Password.
+
+LITELLM_API_KEY=op://Private/litellm/credential
