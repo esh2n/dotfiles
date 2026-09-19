@@ -54,7 +54,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     case "hooks": {
       if (subcommand === "pre-tool-use") {
         const stdin = await new Response(Bun.stdin.stream()).text();
-        process.stdout.write(preToolUse(stdin, ports));
+        process.stdout.write(await preToolUse(stdin, ports));
         return 0;
       }
       ports.logger.error("unknown hook subcommand", { subcommand });
