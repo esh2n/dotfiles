@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { convertToLlm, type ExtensionAPI, type ExtensionContext, serializeConversation } from "@earendil-works/pi-coding-agent";
 
 // compaction-judgment — let jig decide which items a compaction keeps.
@@ -65,6 +68,29 @@ function serviceBase(): string {
   return configured.replace(/\/(decide|tier|compact)$/, "").replace(/\/$/, "");
 }
 
+const DEFAULT_TOKEN_FILE = join(homedir(), "Library/Application Support/jig/decision.token");
+
+/**
+ * The judgment service's bearer token, read from the same file the service and
+ * every other consumer share. Never throws: a missing or unreadable file just
+ * means the request goes out with no `authorization` header, and the service's
+ * 401 is handled the same as any other judgment failure below.
+ */
+async function decisionToken(): Promise<string | undefined> {
+  const path = process.env.JIG_DECISION_TOKEN_FILE ?? DEFAULT_TOKEN_FILE;
+  try {
+    const trimmed = (await readFile(path, "utf8")).trim();
+    return trimmed === "" ? undefined : trimmed;
+  } catch {
+    return undefined;
+  }
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await decisionToken();
+  return token === undefined ? {} : { authorization: `Bearer ${token}` };
+}
+
 function textParts(content: unknown): string[] {
   if (typeof content === "string") return [content];
   if (!Array.isArray(content)) return [];
@@ -129,7 +155,7 @@ async function askKeepOrDrop(
   const abort = signal === undefined ? timeout : AbortSignal.any([signal, timeout]);
   const response = await fetch(`${serviceBase()}/compact`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ items }),
     signal: abort,
   });

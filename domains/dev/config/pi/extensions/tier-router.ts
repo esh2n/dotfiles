@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 // tier-router — ask jig which tier a request needs, and switch the model.
@@ -41,6 +44,29 @@ function serviceBase(): string {
   return configured.replace(/\/(decide|tier)$/, "").replace(/\/$/, "");
 }
 
+const DEFAULT_TOKEN_FILE = join(homedir(), "Library/Application Support/jig/decision.token");
+
+/**
+ * The judgment service's bearer token, read from the same file the service and
+ * every other consumer share. Never throws: a missing or unreadable file just
+ * means the request goes out with no `authorization` header, and the service's
+ * 401 is handled the same as any other judgment failure below.
+ */
+async function decisionToken(): Promise<string | undefined> {
+  const path = process.env.JIG_DECISION_TOKEN_FILE ?? DEFAULT_TOKEN_FILE;
+  try {
+    const trimmed = (await readFile(path, "utf8")).trim();
+    return trimmed === "" ? undefined : trimmed;
+  } catch {
+    return undefined;
+  }
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await decisionToken();
+  return token === undefined ? {} : { authorization: `Bearer ${token}` };
+}
+
 function readDecision(body: unknown): TierDecision {
   if (typeof body !== "object" || body === null) throw new Error("tier service replied with no body");
   const record = body as Record<string, unknown>;
@@ -61,7 +87,7 @@ function readDecision(body: unknown): TierDecision {
 async function askTier(request: string, timeoutMs: number): Promise<TierDecision> {
   const response = await fetch(`${serviceBase()}/tier`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ request }),
     signal: AbortSignal.timeout(timeoutMs),
   });
