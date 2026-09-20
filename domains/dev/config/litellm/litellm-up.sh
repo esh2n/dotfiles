@@ -9,9 +9,10 @@
 # The op read is time-boxed so a throttled/unreachable 1Password fails fast and
 # launchd retries, instead of hanging forever and blocking recovery.
 #
-# The proxy's master_key is a NON-SECRET loopback constant baked into config.yaml
-# (127.0.0.1 only), so no key needs distributing to the agent harnesses. Only the
-# high-value DeepSeek key is fetched here.
+# The proxy's master_key is a real secret (rotated 2026-09-20 off the old
+# committed constant): resolved here from op://llm-automation/litellm/credential
+# the same way as the provider key. Consumers fetch it through their own op
+# paths (pi: !op read in models.json; dsh: op run --env-file dsh.op-vars).
 #
 # Deployed to ~/.config/litellm; launched by
 # ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist. Source: dotfiles repo.
@@ -31,9 +32,11 @@ export OP_SERVICE_ACCOUNT_TOKEN
 # 2) wait for the container runtime (OrbStack) to be ready — launchd may fire first
 until docker info >/dev/null 2>&1; do sleep 3; done
 
-# 3) resolve the ONE provider secret, time-boxed (fail fast -> launchd retries)
+# 3) resolve the secrets, time-boxed (fail fast -> launchd retries)
 DEEPSEEK_API_KEY="$(timeout 60 op read op://llm-automation/deepseek/credential)"
 export DEEPSEEK_API_KEY
+LITELLM_MASTER_KEY="$(timeout 60 op read op://llm-automation/litellm/credential)"
+export LITELLM_MASTER_KEY
 
 # 4) clear any stale container, then run in the FOREGROUND so launchd owns it.
 #    Non-secret values are inline; the secret is passed through from the env
@@ -42,6 +45,7 @@ docker rm -f "$NAME" >/dev/null 2>&1 || true
 exec docker run --rm --name "$NAME" -p 127.0.0.1:4000:4000 \
   -v "$CFG_DIR/config.yaml":/app/config.yaml \
   -e DEEPSEEK_API_KEY \
+  -e LITELLM_MASTER_KEY \
   -e OPENAI_API_KEY=unset-placeholder \
   -e LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1 \
   -e LM_STUDIO_API_KEY=lm-studio \

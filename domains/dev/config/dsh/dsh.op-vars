@@ -5,4 +5,7 @@
 # provider keys live on the proxy, not here. Same op item as the proxy's
 # LITELLM_MASTER_KEY. Confirm the coordinate against your 1Password.
 
-LITELLM_API_KEY=op://Private/litellm/credential
+# llm-automation vault (not Private): same item the proxy itself resolves at
+# launch, and the vault the headless service-account path can read — one key,
+# one place. (The earlier Private/ coordinate predated the rotation ruling.)
+LITELLM_API_KEY=op://llm-automation/litellm/credential

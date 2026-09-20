@@ -45,9 +45,10 @@ litellm_settings:
   require_auth_for_metrics_endpoint: false
 
 general_settings:
-  # Loopback gateway key — a NON-SECRET local constant, like LM Studio's
-  # apiKey:"lmstudio". The proxy binds to 127.0.0.1 only and the real provider
-  # secret (DeepSeek) is op-injected and never leaves the proxy, so this value
-  # is not sensitive: it is the shared token every local front (pi/dsh) presents.
-  # Safe to commit; rotate only if you ever expose the port off loopback.
-  master_key: sk-local-proxy
+  # Gateway master key — a REAL secret since 2026-09-20 (ruling: the old
+  # committed constant assumed loopback-only, but the observability stack
+  # documents container-reachable paths to this gateway, so the trust boundary
+  # is no longer "same uid on loopback" alone). Resolved at launch by
+  # litellm-up.sh from op://llm-automation/litellm/credential via the same
+  # service-account path as the provider key. Never commit a literal here.
+  master_key: os.environ/LITELLM_MASTER_KEY
