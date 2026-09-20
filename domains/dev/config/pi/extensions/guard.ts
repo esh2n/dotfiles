@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-// Blast-radius guard for the local lane — the pi-side counterpart of yoki's
-// git-guard.sh (hooks are Claude Code-only; pi needs its own enforcement).
+// Blast-radius guard for the local lane (hooks are Claude Code-only; pi needs
+// its own enforcement).
 //
 // This no longer embeds its own rules. The CANONICAL rule data lives in
 // `domains/dev/llm/harness/policy/guard-rules.json` and the CANONICAL

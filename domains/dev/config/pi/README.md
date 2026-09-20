@@ -79,15 +79,13 @@ backstop (window − reserve); the extension fires far earlier.
 | `AGENTS.md` | ~1.6KB resident instructions shared by all tiers (align-before-executing, stale-edit, tool-call, output discipline, git rules) |
 | `extensions/freshness.ts` | Blocks stale-file edits, failed-edit retries without re-read, 3x identical-call loops. Resident cost 0 |
 | `extensions/compactor.ts` | Caps tool results at 30k chars (spill to `~/.local/state/pi/spill/`), proactive compaction at a per-model limit (main 200k, complex 500k, otherwise 80% of the declared window). Resident cost 0 |
-| `extensions/guard.ts` | pi-side counterpart of yoki git-guard: hard-blocks push-to-main / force-push / --no-verify / second-model loads; confirms rm -rf etc. Resident cost 0 |
+| `extensions/guard.ts` | pi's own blast-radius guard: hard-blocks push-to-main / force-push / --no-verify / second-model loads; confirms rm -rf etc. Resident cost 0 |
 | `extensions/gate.ts` | `/goal` + `/gate` + `goal_complete` — completion refused until gates pass, gates not rerun on unchanged workspace. Resident cost: 1 tool schema |
 | `extensions/tier-router.ts` | `/tier [auto\|off\|<tier>]`; in `auto`, asks jig's judgment service (`POST 127.0.0.1:4100/tier`) which tier a prompt needs and switches the model before the loop runs. OFF by default (a judgment call is spent per prompt): `/tier auto` for the session, `PI_TIER_ROUTER=auto` for the default. Service down = keeps the current model, never blocks. Resident cost 0 |
 | `extensions/compaction-judgment.ts` | `/compact-judgment [on\|off]`; asks the judgment service (`POST /compact`) which of the items a compaction is about to summarize are worth keeping, and gives only those to the summarizer (`ctx.model`, its own `complete()` call). OFF by default and inert until the per-item question discriminates — measured against the live model it answers "keep" for every item, so it falls through to pi's own compaction. Resident cost 0 |
-| `extensions/yoki-graph-widget.ts` | Live yoki-graph run progress in the below-editor widget slot; appears only while a run is active, event-driven (fs.watch + 500ms coalesce, 5s safety tick). Resident cost 0 |
 
 Extensions adapted from [earlyaidopters/marks-pi-harness](https://github.com/earlyaidopters/marks-pi-harness)
-(MIT), rules aligned with yoki conventions; `yoki-graph-widget.ts` is
-yoki-native (display logic lives in the yoki repo, see below).
+(MIT).
 
 ## Install
 
@@ -141,44 +139,6 @@ for f in "$PI_SRC"/extensions/*.ts; do ln -sf "$f" ~/.pi/agent/extensions/"$(bas
 LM Studio side: load `qwen/qwen3.8-27b` with context ≥ 64K (131072 current),
 then `lms server start`.
 
-## yoki-graph widget (`extensions/yoki-graph-widget.ts`)
-
-Shows live yoki-graph run progress under pi's prompt: header
-(`yoki-graph ▶ N runs`), one row per active run
-(`▶ name  phase 2/5  3m12s  lanes 3/4`), rows for ACTIVE lanes only
-(`◉ label  12t  1m02s`; `↻` retrying, `🔸` needs-human — never cut by the
-8-line cap, overflow folds into `… and N more`). When no run is active the
-widget is removed entirely — zero lines occupied.
-
-Design constraints:
-
-- **Zero model-context cost** — no tool, no message injection; UI APIs and
-  lifecycle events only. Safe for the 1K-token budget by construction.
-- **Display logic lives in the yoki repo** — the extension resolves
-  `$YOKI_ROOT` (fallback: the default dotfiles checkout path) and requires
-  `scripts/lib/graph/{top.js,widget-lines.js}`; folding/nesting/liveness
-  are the exact code `yoki-graph top` uses, tested by
-  `node --test lib/graph/test/*.test.js` (see `widget-lines.test.js`).
-  Resolution failure disables the extension with one stderr line — pi
-  always starts.
-- **Event-driven** — fs.watch on the graph state root and each active
-  runDir, coalesced to one refresh per 500ms; the only timer is a 5s
-  safety tick (dead-watcher net; also keeps elapsed columns moving).
-
-Linked like the other extensions — `link_pi_resources()` picks up every
-`extensions/*.ts` automatically; no per-file step needed.
-
-Manual verification (the extension is IO glue around tested pure code, so
-this is the remaining check):
-
-1. Start `pi` in any directory (TUI mode).
-2. In another shell, start a yoki-graph run, e.g.
-   `yoki-graph run ~/.claude/workflows/review.mjs -- --target HEAD` (any
-   graph works; `--state-home` must NOT be overridden or pi won't see it).
-3. Within ~1s the widget appears below the editor and updates as lanes
-   start/tick/finish. `🔸` rows (needs-human) always stay visible.
-4. When the run finishes (or is killed), the widget disappears within ~5s.
-5. Quit pi — no stray fs watchers remain (the process exits cleanly).
 
 ## Third-party extensions (installed via `pi install`, recorded in settings.json)
 
