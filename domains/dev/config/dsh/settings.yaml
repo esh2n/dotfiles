@@ -11,6 +11,7 @@
 llm-pi-ai:
   providers:
     # One custom route -> the local LiteLLM proxy (OpenAI-compatible).
+    # BEGIN jig:tiers (generated — edit policy/tiers.json, then jig apply)
     local-proxy:
       displayName: LiteLLM (local)
       api: openai-completions           # LiteLLM speaks OpenAI Chat Completions
@@ -43,3 +44,4 @@ llm-pi-ai:
         - id: deterministic
           name: deterministic (local Qwen)
           # add `input: [text, image]` if this qwen build is vision-capable
+    # END jig:tiers
