@@ -307,9 +307,9 @@ const UNAUTHORIZED: RemoteDecisionErrorResponse = {
 /**
  * Write down one skill judgment for the log `jig report skills` reads.
  *
- * The request body carries the front (`{ front: "pi", prompt }`) because the service
+ * The request body carries the harness (`{ harness: "pi", prompt }`) because the service
  * cannot work it out: every harness posts the same shape over the same loopback socket.
- * An unlabelled request is recorded as `unknown` rather than attributed to a front whose
+ * An unlabelled request is recorded as `unknown` rather than attributed to a harness whose
  * numbers it would then distort.
  *
  * A failed judgment is written down too — with `error` instead of a skill — because "the
@@ -327,9 +327,9 @@ async function recordSkillDecision(
   const requestBody =
     typeof request === "object" && request !== null ? (request as Record<string, unknown>) : {};
   const prompt = typeof requestBody.prompt === "string" ? requestBody.prompt : "";
-  const rawFront = typeof requestBody.front === "string" ? requestBody.front.trim() : "";
-  const front = rawFront === "" ? "unknown" : rawFront;
-  const identity = { at, front, promptHash: promptHash(prompt), promptChars: prompt.length };
+  const rawHarness = typeof requestBody.harness === "string" ? requestBody.harness.trim() : "";
+  const harness = rawHarness === "" ? "unknown" : rawHarness;
+  const identity = { at, harness, promptHash: promptHash(prompt), promptChars: prompt.length };
 
   const body = response.body;
   const decision =

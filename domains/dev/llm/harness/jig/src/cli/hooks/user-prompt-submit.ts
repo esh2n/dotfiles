@@ -52,12 +52,12 @@ function isDisabled(env: Record<string, string | undefined>): boolean {
  *
  * The hook cannot discover it: by the time it runs, all it has is a prompt on stdin, and
  * the same binary is wired into more than one harness. The wrapper knows, so the wrapper
- * says (`JIG_FRONT=claude`). `unknown` is the honest default — attributing an unlabelled
- * invocation to a front would put a harness's numbers in another's.
+ * says (`JIG_HARNESS=claude`). `unknown` is the honest default — attributing an unlabelled
+ * invocation to a harness would put a harness's numbers in another's.
  */
-function frontOf(env: Record<string, string | undefined>): string {
-  const front = env.JIG_FRONT?.trim();
-  return front === undefined || front === "" ? "unknown" : front;
+function harnessOf(env: Record<string, string | undefined>): string {
+  const harness = env.JIG_HARNESS?.trim();
+  return harness === undefined || harness === "" ? "unknown" : harness;
 }
 
 /**
@@ -111,7 +111,7 @@ export async function userPromptSubmit(
     const decided = await selectSkill(prompt, candidates, deps.provider, {}, options);
     await deps.record({
       at: new Date().toISOString(),
-      front: frontOf(env),
+      harness: harnessOf(env),
       promptHash: promptHash(prompt),
       promptChars: prompt.length,
       candidates: candidates.length,
@@ -132,7 +132,7 @@ export async function userPromptSubmit(
     await deps
       .record({
         at: new Date().toISOString(),
-        front: frontOf(env),
+        harness: harnessOf(env),
         promptHash: promptHash(prompt),
         promptChars: prompt.length,
         error: message,

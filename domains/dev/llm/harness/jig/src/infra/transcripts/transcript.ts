@@ -2,21 +2,21 @@
  * Reading skill usage out of the harnesses' own session transcripts.
  *
  * Two formats, one parser. They differ in field names, not in what they say, and a
- * parser per front would mean two places to fix when a harness renames something — so
+ * parser per harness would mean two places to fix when a harness renames something — so
  * the shapes are read side by side, and a line that matches neither is skipped rather
  * than guessed at. The one thing this deliberately does NOT do is resolve symlinks: a
  * read of `~/.claude/.skills-merged/<name>/SKILL.md` and a read of the repo path it
  * points at both name the same skill by directory name, which is all the report needs.
  *
- * The transcripts are the record the fronts already keep. Nothing here is installed in
- * a front, so a harness that stops writing a field shows up as a smaller number rather
+ * The transcripts are the record the harnesses already keep. Nothing here is installed in
+ * a harness, so a harness that stops writing a field shows up as a smaller number rather
  * than as a broken hook.
  */
 
 import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { type Front, type SkillTurn, skillNameFromPath } from "../../domain/skills/usage";
+import { type Harness, type SkillTurn, skillNameFromPath } from "../../domain/skills/usage";
 
 /** The router's own reminder, with the confidence it reported. */
 const REMINDER = /matches the "([^"]+)" skill \(judgment confidence ([0-9.]+)\)/;
@@ -30,9 +30,9 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
  * Which harness wrote the line. Claude Code marks every entry with `parentUuid` and its
  * hook context arrives as an `attachment`; pi writes `type`-tagged entries. Anything
  * else is reported as `unknown` rather than being filed under a guess — a format change
- * should be visible in the report, not silently averaged into one front's numbers.
+ * should be visible in the report, not silently averaged into one harness's numbers.
  */
-function frontOf(entry: Record<string, unknown>): Front {
+function harnessOf(entry: Record<string, unknown>): Harness {
   // `parentUuid` is present on every Claude Code line — null on the first one — so the
   // test is presence, not a string type check.
   if (entry.type === "attachment" || "parentUuid" in entry) return "claude";
@@ -47,19 +47,19 @@ function timestampOf(entry: Record<string, unknown>): string {
 }
 
 /** Whether this entry is a user prompt, as opposed to a tool result or a system note. */
-function isPrompt(entry: Record<string, unknown>, front: Front): boolean {
+function isPrompt(entry: Record<string, unknown>, harness: Harness): boolean {
   const message = asRecord(entry.message);
   if (message === undefined || message.role !== "user") return false;
-  // Each front has one entry type that carries a prompt; anything else with role "user"
+  // Each harness has one entry type that carries a prompt; anything else with role "user"
   // is a tool result or a system note. An unrecognized format is exempt from this check
   // on purpose: its prompts still count, and land in the report's own `unknown` row,
   // which is how a changed format becomes visible instead of silent.
-  if (front !== "unknown") {
-    const carrier = front === "pi" ? "message" : "user";
+  if (harness !== "unknown") {
+    const carrier = harness === "pi" ? "message" : "user";
     if (entry.type !== carrier) return false;
   }
 
-  // Both fronts carry the text as either a bare string or a list of parts; pi uses the
+  // Both harnesses carry the text as either a bare string or a list of parts; pi uses the
   // list even for a plain prompt, so "a string means a prompt" would miss every one of them.
   const content = message.content;
   if (typeof content === "string") return content.trim() !== "";
@@ -72,11 +72,11 @@ interface Injection {
   readonly confidence: number;
 }
 
-/** The router's reminder, from either front's carrier for hook context. */
-function injectionOf(entry: Record<string, unknown>, front: Front): Injection | undefined {
+/** The router's reminder, from either harness's carrier for hook context. */
+function injectionOf(entry: Record<string, unknown>, harness: Harness): Injection | undefined {
   let text: string | undefined;
 
-  if (front === "claude" && entry.type === "attachment") {
+  if (harness === "claude" && entry.type === "attachment") {
     const attachment = asRecord(entry.attachment);
     if (attachment?.type === "hook_additional_context" && Array.isArray(attachment.content)) {
       text = attachment.content
@@ -86,7 +86,7 @@ function injectionOf(entry: Record<string, unknown>, front: Front): Injection | 
   }
 
   if (
-    front === "pi" &&
+    harness === "pi" &&
     entry.type === "custom_message" &&
     entry.customType === "jig-skill-router"
   ) {
@@ -102,7 +102,7 @@ function injectionOf(entry: Record<string, unknown>, front: Front): Injection | 
 }
 
 /** Every file this entry opened through a read tool, in call order. */
-function readPathsOf(entry: Record<string, unknown>, front: Front): readonly string[] {
+function readPathsOf(entry: Record<string, unknown>, harness: Harness): readonly string[] {
   const message = asRecord(entry.message);
   const content = message?.content;
   if (!Array.isArray(content)) return [];
@@ -112,14 +112,14 @@ function readPathsOf(entry: Record<string, unknown>, front: Front): readonly str
     const call = asRecord(part);
     if (call === undefined) continue;
 
-    if (front === "claude" && entry.type === "assistant" && call.type === "tool_use") {
+    if (harness === "claude" && entry.type === "assistant" && call.type === "tool_use") {
       if (call.name !== "Read") continue;
       const input = asRecord(call.input);
       if (typeof input?.file_path === "string") paths.push(input.file_path);
       continue;
     }
 
-    if (front === "pi" && message?.role === "assistant" && call.type === "toolCall") {
+    if (harness === "pi" && message?.role === "assistant" && call.type === "toolCall") {
       if (call.name !== "read") continue;
       const args = asRecord(call.arguments);
       if (typeof args?.path === "string") paths.push(args.path);
@@ -130,7 +130,7 @@ function readPathsOf(entry: Record<string, unknown>, front: Front): readonly str
 }
 
 interface TurnBuilder {
-  readonly front: Front;
+  readonly harness: Harness;
   readonly at: string;
   injected: string | undefined;
   confidence: number | undefined;
@@ -161,7 +161,7 @@ export function parseSkillTurns(
     if (current === undefined) return;
     turns.push({
       session,
-      front: current.front,
+      harness: current.harness,
       at: current.at,
       injected: current.injected,
       confidence: current.confidence,
@@ -182,15 +182,15 @@ export function parseSkillTurns(
     const entry = asRecord(parsed);
     if (entry === undefined) continue;
 
-    const front = frontOf(entry);
+    const harness = harnessOf(entry);
     const sidechain = entry.isSidechain === true;
-    const injected = injectionOf(entry, front);
-    const paths = readPathsOf(entry, front);
+    const injected = injectionOf(entry, harness);
+    const paths = readPathsOf(entry, harness);
 
-    if (!sidechain && isPrompt(entry, front)) {
+    if (!sidechain && isPrompt(entry, harness)) {
       flush();
       current = {
-        front,
+        harness,
         at: timestampOf(entry),
         injected: undefined,
         confidence: undefined,
@@ -199,7 +199,7 @@ export function parseSkillTurns(
     }
     if (current === undefined && (injected !== undefined || paths.length > 0)) {
       current = {
-        front,
+        harness,
         at: timestampOf(entry),
         injected: undefined,
         confidence: undefined,

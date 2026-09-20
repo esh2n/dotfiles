@@ -7,7 +7,7 @@
  * filesystem, so any report can be rendered in a test.
  */
 
-import type { Front, SkillUsageReport, UsageTotals } from "../domain/skills/usage";
+import type { Harness, SkillUsageReport, UsageTotals } from "../domain/skills/usage";
 
 export interface ReportArgs {
   /** How far back to read. Session trees hold years of files; the default is recent. */
@@ -67,21 +67,21 @@ function renderTotals(totals: UsageTotals, indent: string): string[] {
   );
 }
 
-function renderFronts(report: SkillUsageReport): string[] {
-  const fronts: readonly Front[] = ["pi", "claude", "unknown"];
-  const present = fronts.filter((front) => report.byFront.has(front));
+function renderHarnesses(report: SkillUsageReport): string[] {
+  const harnesses: readonly Harness[] = ["pi", "claude", "unknown"];
+  const present = harnesses.filter((harness) => report.byHarness.has(harness));
   if (present.length === 0) return [];
 
   const lines = [
     "",
-    "by front",
-    `  ${"front".padEnd(10)}${"turns".padStart(6)}${"followed".padStart(10)}${"ignored".padStart(9)}${"other".padStart(7)}${"unscouted".padStart(11)}`,
+    "by harness",
+    `  ${"harness".padEnd(10)}${"turns".padStart(6)}${"followed".padStart(10)}${"ignored".padStart(9)}${"other".padStart(7)}${"unscouted".padStart(11)}`,
   ];
-  for (const front of present) {
-    const totals = report.byFront.get(front);
+  for (const harness of present) {
+    const totals = report.byHarness.get(harness);
     if (totals === undefined) continue;
     lines.push(
-      `  ${front.padEnd(10)}${String(totals.turns).padStart(6)}${String(totals.followed).padStart(10)}${String(totals.ignored).padStart(9)}${String(totals.substituted).padStart(7)}${String(totals.unrouted).padStart(11)}`,
+      `  ${harness.padEnd(10)}${String(totals.turns).padStart(6)}${String(totals.followed).padStart(10)}${String(totals.ignored).padStart(9)}${String(totals.substituted).padStart(7)}${String(totals.unrouted).padStart(11)}`,
     );
   }
   return lines;
@@ -107,14 +107,14 @@ function renderSkills(report: SkillUsageReport): string[] {
 /** The report as an operator reads it. `files` is the number of sessions considered. */
 export function renderSkillUsage(report: SkillUsageReport, args: ReportArgs): string {
   if (args.json)
-    return `${JSON.stringify({ ...report, byFront: Object.fromEntries(report.byFront) })}\n`;
+    return `${JSON.stringify({ ...report, byHarness: Object.fromEntries(report.byHarness) })}\n`;
 
   const lines = [
     `jig skill usage — ${report.sessions} session files touched in the last ${args.days} days`,
     `turns read: ${report.totals.turns}${timing(report)}`,
     "",
     ...renderTotals(report.totals, "  "),
-    ...renderFronts(report),
+    ...renderHarnesses(report),
     ...renderSkills(report),
     "",
     "every prompt in the window counts, including automated sessions;",

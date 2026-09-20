@@ -3069,3 +3069,48 @@ omp() {
     fi
     "$omp_bin" --no-extensions -e "$guard" "$@"
 }
+
+# pi (local-lane coding agent) talks to the local LiteLLM proxy, whose master
+# key is an op-managed secret (not a committed constant). Resolving that key
+# per request from inside pi's own child process is fragile — pi's subprocess
+# cannot always reach the login Keychain the service-account token lives in.
+# So resolve it ONCE here, in the interactive shell that can reach the
+# Keychain, and hand pi a plain LITELLM_API_KEY; models.json reads "$LITELLM_API_KEY".
+# proxy-key.sh is headless (Keychain service-account token -> op read).
+pi() {
+    local pi_bin key
+    pi_bin="$(whence -p pi)" || {
+        echo "\033[31mpi not found on PATH\033[0m" >&2
+        return 1
+    }
+    key="$("${DOTFILES_ROOT:?DOTFILES_ROOT unset — source the dev shell init}/domains/dev/config/litellm/proxy-key.sh" 2>/dev/null)" || {
+        echo "\033[33mproxy key unresolved — starting pi WITHOUT LITELLM_API_KEY (proxy models will fail to auth)\033[0m" >&2
+        "$pi_bin" "$@"
+        return
+    }
+    LITELLM_API_KEY="$key" "$pi_bin" "$@"
+}
+
+# litellm-restart — restart the local LiteLLM proxy (launchd-managed Docker
+# container) after a config or key change. Uses the modern launchctl service
+# API (kickstart -k), the same one `brew services restart` uses, not the
+# retired load/unload -w. Run this after rotating the proxy key — the running
+# container holds the OLD key until it is restarted.
+litellm-restart() {
+    local label="com.esh2n.litellm-proxy"
+    launchctl kickstart -k "gui/$(id -u)/${label}" || {
+        echo "\033[31mfailed to kickstart ${label} — is it loaded? (launchctl print gui/$(id -u)/${label})\033[0m" >&2
+        return 1
+    }
+    echo "restarting ${label}…"
+    local i
+    for i in $(seq 1 20); do
+        sleep 2
+        if curl -fs -o /dev/null "http://127.0.0.1:4000/health" 2>/dev/null; then
+            echo "\033[32mproxy healthy at http://127.0.0.1:4000\033[0m"
+            return 0
+        fi
+    done
+    echo "\033[33mproxy did not report healthy within ~40s — check ~/Library/Logs/litellm-proxy.log\033[0m" >&2
+    return 1
+}

@@ -5,7 +5,7 @@
  * The format knowledge stays outside (the caller passes `parse`), because which fields a
  * harness writes is an infrastructure fact and this use-case is the same one either way.
  * Nothing here writes, injects or judges: it answers "what happened" from a record the
- * fronts already keep, so running it can never change what is being measured.
+ * harnesses already keep, so running it can never change what is being measured.
  */
 
 import type { SkillTurn, SkillUsageReport } from "../../domain/skills/usage";
@@ -14,7 +14,7 @@ import { summarizeSkillUsage } from "../../domain/skills/usage";
 export interface SkillUsageDeps {
   /** Session files to read, in any order; the summary sorts nothing by file. */
   readonly files: readonly string[];
-  /** One session file's contents into turns. Where a front's field names are known. */
+  /** One session file's contents into turns. Where a harness's field names are known. */
   readonly parse: (text: string, session: string) => readonly SkillTurn[];
   readonly read: (path: string) => Promise<string>;
 }

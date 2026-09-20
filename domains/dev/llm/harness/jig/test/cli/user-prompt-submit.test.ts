@@ -114,11 +114,11 @@ describe("userPromptSubmit", () => {
     expect(first[0]?.promptHash).not.toBe(different[0]?.promptHash);
   });
 
-  test("labels the line with the front its wrapper declared", async () => {
+  test("labels the line with the harness its wrapper declared", async () => {
     const recorded: RouterLogEntry[] = [];
     await userPromptSubmit(
       JSON.stringify({ prompt: "決定記録をまとめて" }),
-      deps({ value: "writeup", confidence: 0.9 }, recorded, { JIG_FRONT: "claude" }),
+      deps({ value: "writeup", confidence: 0.9 }, recorded, { JIG_HARNESS: "claude" }),
     );
 
     const anonymous: RouterLogEntry[] = [];
@@ -128,8 +128,8 @@ describe("userPromptSubmit", () => {
     );
 
     // The wrapper knows which harness it runs in; the hook cannot, so it never guesses.
-    expect(recorded[0]?.front).toBe("claude");
-    expect(anonymous[0]?.front).toBe("unknown");
+    expect(recorded[0]?.harness).toBe("claude");
+    expect(anonymous[0]?.harness).toBe("unknown");
   });
 
   test("a failing judgment leaves the prompt untouched and is recorded", async () => {

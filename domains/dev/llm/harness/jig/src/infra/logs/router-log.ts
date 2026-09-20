@@ -12,7 +12,7 @@
  * the router client-side (it asks the service's generic `/decide` endpoint, which cannot
  * know the question was about skills), while a harness that calls `/skill` has the
  * service decide. Splitting the log by who decided is what keeps exactly one line per
- * prompt instead of two. `front` says which path it was.
+ * prompt instead of two. `harness` says which path it was.
  */
 
 import { createHash } from "node:crypto";

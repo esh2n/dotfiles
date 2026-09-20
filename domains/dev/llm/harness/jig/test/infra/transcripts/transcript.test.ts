@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findTranscripts, parseSkillTurns } from "../../../src/infra/transcripts/transcript";
 
-/** Every fixture below is the shape the front actually writes, trimmed to what is read. */
+/** Every fixture below is the shape the harness actually writes, trimmed to what is read. */
 const KNOWN = new Set(["writeup", "go-modern"]);
 
 const CLAUDE_PROMPT =
@@ -64,7 +64,7 @@ describe("parseSkillTurns", () => {
     const turns = parseSkillTurns(text, "/sessions/claude.jsonl", KNOWN);
 
     expect(turns).toHaveLength(1);
-    expect(turns[0]?.front).toBe("claude");
+    expect(turns[0]?.harness).toBe("claude");
     expect(turns[0]?.injected).toBe("writeup");
     expect(turns[0]?.confidence).toBe(0.92);
     expect(turns[0]?.read).toEqual(["writeup"]);
@@ -111,7 +111,7 @@ describe("parseSkillTurns", () => {
     const turns = parseSkillTurns(text, "/sessions/pi.jsonl", KNOWN);
 
     expect(turns).toHaveLength(1);
-    expect(turns[0]?.front).toBe("pi");
+    expect(turns[0]?.harness).toBe("pi");
     expect(turns[0]?.injected).toBe("go-modern");
     expect(turns[0]?.read).toEqual(["go-modern"]);
   });
@@ -165,7 +165,7 @@ describe("parseSkillTurns", () => {
     expect(turns).toHaveLength(1);
   });
 
-  it("files a line whose shape matches neither front under unknown", () => {
+  it("files a line whose shape matches neither harness under unknown", () => {
     const turns = parseSkillTurns(
       '{"type":"other","message":{"role":"user","content":"hi"},"timestamp":"2026-09-20T03:00:00.000Z"}',
       "/sessions/other.jsonl",
@@ -173,7 +173,7 @@ describe("parseSkillTurns", () => {
     );
 
     expect(turns).toHaveLength(1);
-    expect(turns[0]?.front).toBe("unknown");
+    expect(turns[0]?.harness).toBe("unknown");
   });
 
   it("skips malformed lines instead of failing the report", () => {

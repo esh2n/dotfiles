@@ -9,8 +9,8 @@ import { SystemClock } from "../infra/clock/system-clock";
 import { createHttpDecisionClient } from "../infra/decision/http-decision-client";
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
-import { appendRouterLog } from "../infra/logs/router-log";
 import { ConsoleLogger } from "../infra/logger/console-logger";
+import { appendRouterLog } from "../infra/logs/router-log";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
@@ -61,7 +61,7 @@ function resolveStateDir(): string {
 }
 
 /**
- * Where the fronts keep their session transcripts. Two directories, because the fronts
+ * Where the harnesses keep their session transcripts. Two directories, because the harnesses
  * are two programs; each honors its own override first (`PI_CODING_AGENT_SESSION_DIR`,
  * `CLAUDE_CONFIG_DIR`) so a moved session tree keeps working, then jig's override.
  */
@@ -225,7 +225,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | apply [--target pi|dsh|litellm|all] [--write]>\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
-          "  report skills [--days N] [--json] reads both fronts' session transcripts and\n" +
+          "  report skills [--days N] [--json] reads both harnesses' session transcripts and\n" +
           "  shows what the router injected against what the model actually opened.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +

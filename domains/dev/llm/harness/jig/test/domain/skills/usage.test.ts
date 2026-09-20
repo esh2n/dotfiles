@@ -47,7 +47,7 @@ describe("skillNameFromPath", () => {
 function turn(overrides: Partial<SkillTurn> = {}): SkillTurn {
   return {
     session: "/sessions/a.jsonl",
-    front: "pi",
+    harness: "pi",
     at: "2026-09-20T00:00:00.000Z",
     injected: undefined,
     confidence: undefined,
@@ -96,16 +96,16 @@ describe("summarizeSkillUsage", () => {
     ]);
   });
 
-  it("keeps per-front totals that add up to the whole", () => {
+  it("keeps per-harness totals that add up to the whole", () => {
     const report = summarizeSkillUsage([
-      turn({ front: "pi", injected: "writeup", read: ["writeup"] }),
-      turn({ front: "claude", injected: undefined, read: [] }),
-      turn({ front: "unknown", injected: undefined, read: ["go-modern"] }),
+      turn({ harness: "pi", injected: "writeup", read: ["writeup"] }),
+      turn({ harness: "claude", injected: undefined, read: [] }),
+      turn({ harness: "unknown", injected: undefined, read: ["go-modern"] }),
     ]);
 
-    expect(report.byFront.get("pi")?.turns).toBe(1);
-    expect(report.byFront.get("claude")?.silent).toBe(1);
-    expect(report.byFront.get("unknown")?.unrouted).toBe(1);
+    expect(report.byHarness.get("pi")?.turns).toBe(1);
+    expect(report.byHarness.get("claude")?.silent).toBe(1);
+    expect(report.byHarness.get("unknown")?.unrouted).toBe(1);
   });
 
   it("sorts skills by opened, then by name", () => {

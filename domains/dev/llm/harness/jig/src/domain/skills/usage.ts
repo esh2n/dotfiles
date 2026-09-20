@@ -5,7 +5,7 @@
  * question that decides the router's future: whether the injected skill came back. Both
  * harnesses already record that — the reminder the router injects and the file the model
  * then opens are entries their session transcripts carry — so this measures a record
- * that exists rather than asking each front to carry a new instrument.
+ * that exists rather than asking each harness to carry a new instrument.
  *
  * The unit is the TURN, not the event. "Injected and never opened" and "opened without
  * being injected" are statements about one request; counted apart they lose the pairing
@@ -21,16 +21,16 @@
  */
 
 /**
- * Which front recorded the turn. `unknown` is a real answer: a transcript whose shape
- * matches neither front is reported under its own name rather than averaged into one
- * front's numbers, so a harness changing its format shows up instead of distorting a rate.
+ * Which harness recorded the turn. `unknown` is a real answer: a transcript whose shape
+ * matches neither harness is reported under its own name rather than averaged into one
+ * harness's numbers, so a harness changing its format shows up instead of distorting a rate.
  */
-export type Front = "claude" | "pi" | "unknown";
+export type Harness = "claude" | "pi" | "unknown";
 
 export interface SkillTurn {
   /** Session file the turn came from, so a surprising number can be opened and read. */
   readonly session: string;
-  readonly front: Front;
+  readonly harness: Harness;
   /** ISO timestamp of the first entry belonging to the turn. */
   readonly at: string;
   /**
@@ -111,7 +111,7 @@ export interface UsageTotals {
 export interface SkillUsageReport {
   readonly sessions: number;
   readonly totals: UsageTotals;
-  readonly byFront: ReadonlyMap<Front, UsageTotals>;
+  readonly byHarness: ReadonlyMap<Harness, UsageTotals>;
   /** Every skill that was injected or opened, most-opened first. */
   readonly skills: readonly SkillUsageRow[];
   readonly from: string;
@@ -157,7 +157,7 @@ export function summarizeSkillUsage(
   turns: readonly SkillTurn[],
 ): Omit<SkillUsageReport, "sessions"> {
   const rows = new Map<string, MutableRow>();
-  const byFront = new Map<Front, UsageTotals>();
+  const byHarness = new Map<Harness, UsageTotals>();
   let totals = EMPTY;
 
   const rowOf = (skill: string): MutableRow => {
@@ -176,7 +176,7 @@ export function summarizeSkillUsage(
     seenSessions.add(turn.session);
     const outcome = outcomeOf(turn);
     totals = add(totals, outcome);
-    byFront.set(turn.front, add(byFront.get(turn.front) ?? EMPTY, outcome));
+    byHarness.set(turn.harness, add(byHarness.get(turn.harness) ?? EMPTY, outcome));
 
     if (turn.at !== "") {
       if (from === "" || turn.at < from) from = turn.at;
@@ -199,5 +199,5 @@ export function summarizeSkillUsage(
     .map(([skill, row]): SkillUsageRow => ({ skill, ...row }))
     .sort((left, right) => right.opened - left.opened || left.skill.localeCompare(right.skill));
 
-  return { totals, byFront, skills, from, to };
+  return { totals, byHarness, skills, from, to };
 }

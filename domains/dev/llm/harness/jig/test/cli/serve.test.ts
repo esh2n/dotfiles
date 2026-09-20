@@ -492,7 +492,7 @@ describe("the /skill path's router log", () => {
     return { service, token };
   }
 
-  test("records the judgment with the front that asked for it", async () => {
+  test("records the judgment with the harness that asked for it", async () => {
     const entries: RouterLogEntry[] = [];
     const { service, token } = await startSkillService(
       new StaticProvider({ choice: { value: "writeup", confidence: 0.9 } }),
@@ -503,12 +503,12 @@ describe("the /skill path's router log", () => {
       const response = await fetch(`${service.url}/skill`, {
         method: "POST",
         headers: authed(token),
-        body: JSON.stringify({ front: "pi", prompt: "決定記録をまとめて" }),
+        body: JSON.stringify({ harness: "pi", prompt: "決定記録をまとめて" }),
       });
 
       expect(response.status).toBe(200);
       expect(entries).toHaveLength(1);
-      expect(entries[0]?.front).toBe("pi");
+      expect(entries[0]?.harness).toBe("pi");
       expect(entries[0]?.skill).toBe("writeup");
       expect(entries[0]?.source).toBe("decided");
       expect(entries[0]?.promptHash).toMatch(/^[0-9a-f]{12}$/);
@@ -518,7 +518,7 @@ describe("the /skill path's router log", () => {
     }
   });
 
-  test("records an unlabelled request as unknown rather than as some front", async () => {
+  test("records an unlabelled request as unknown rather than as some harness", async () => {
     const entries: RouterLogEntry[] = [];
     const { service, token } = await startSkillService(
       new StaticProvider({ choice: { value: "none", confidence: 0.9 } }),
@@ -532,7 +532,7 @@ describe("the /skill path's router log", () => {
         body: JSON.stringify({ prompt: "今日の天気を教えて" }),
       });
 
-      expect(entries[0]?.front).toBe("unknown");
+      expect(entries[0]?.harness).toBe("unknown");
       expect(entries[0]?.skill).toBeNull();
     } finally {
       service.stop();
@@ -554,11 +554,11 @@ describe("the /skill path's router log", () => {
       const response = await fetch(`${service.url}/skill`, {
         method: "POST",
         headers: authed(token),
-        body: JSON.stringify({ front: "pi", prompt: "決定記録をまとめて" }),
+        body: JSON.stringify({ harness: "pi", prompt: "決定記録をまとめて" }),
       });
 
       expect(response.status).toBe(502);
-      expect(entries[0]?.front).toBe("pi");
+      expect(entries[0]?.harness).toBe("pi");
       expect(String(entries[0]?.error)).toContain("refused");
     } finally {
       service.stop();

@@ -3,14 +3,14 @@
  *
  * The shape is shared by both writers (the Claude Code hook deciding client-side and the
  * judgment service answering `/skill`) so that a report can read either without knowing
- * which path produced the line. `front` is the harness the judgment was made for, and it
+ * which path produced the line. `harness` is the harness the judgment was made for, and it
  * is a plain string rather than an enum on purpose: it names whoever asked, and a new
  * harness must be able to appear in this log without a jig release.
  */
 export interface RouterLogEntry {
   readonly at: string;
   /** Which harness this judgment was made for (`claude`, `pi`, `dsh`, …). */
-  readonly front: string;
+  readonly harness: string;
   /** Twelve hex characters identifying the prompt, so repeats can be grouped. */
   readonly promptHash: string;
   readonly promptChars: number;

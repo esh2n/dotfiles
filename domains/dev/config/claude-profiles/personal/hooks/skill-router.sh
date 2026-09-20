@@ -32,5 +32,5 @@ fi
 [[ -x "$bun_bin" ]] || exit 0
 [[ -f "$JIG_DIR/src/cli/jig.ts" ]] || exit 0
 
-out="$(JIG_FRONT=claude "$bun_bin" "$JIG_DIR/src/cli/jig.ts" hooks user-prompt-submit 2>/dev/null)" || exit 0
+out="$(JIG_HARNESS=claude "$bun_bin" "$JIG_DIR/src/cli/jig.ts" hooks user-prompt-submit 2>/dev/null)" || exit 0
 printf '%s' "$out"
