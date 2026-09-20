@@ -54,6 +54,16 @@
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Bash|Write|Edit|MultiEdit|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "bash -c 'b=$(command -v bun || echo \"$HOME/.local/share/mise/installs/bun/1.3.13/bin/bun\"); exec \"$b\" \"$HOME/go/github.com/esh2n/dotfiles/domains/dev/llm/harness/jig/src/cli/jig.ts\" hooks pre-tool-use --harness claude'"
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
