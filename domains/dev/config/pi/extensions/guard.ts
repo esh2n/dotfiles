@@ -1,20 +1,11 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  resolveAuditPath,
-  resolvePolicyPath,
-  resolveProfile,
-} from "../../../llm/harness/jig/src/app/hooks/environment";
-import {
-  type LoadedPolicy,
-  policyHash,
-  runHook,
-} from "../../../llm/harness/jig/src/app/hooks/run-hook";
+import type { LoadedPolicy } from "../../../llm/harness/jig/src/app/hooks/run-hook";
 import type { Decision, ToolCall } from "../../../llm/harness/jig/src/domain/hooks/decision";
-import { parsePolicy } from "../../../llm/harness/jig/src/domain/policy/parse";
 import type { Principal } from "../../../llm/harness/jig/src/domain/policy/request";
 import type { AuditLog, Logger } from "../../../llm/harness/jig/src/domain/ports";
-import { JsonlAuditLog } from "../../../llm/harness/jig/src/infra/audit/jsonl-audit";
 
 // pi's connection to the shared guard.
 //
@@ -25,10 +16,15 @@ import { JsonlAuditLog } from "../../../llm/harness/jig/src/infra/audit/jsonl-au
 // no screen), silence for an allow. The rules live in
 // `domains/dev/llm/harness/policy/guard-rules.json`; the reading of a
 // command (what actually runs, wrappers peeled, `$()` looked into) lives
-// in jig's `domain/subject`. Both are imported here, not copied: pi loads
-// extensions through jiti, which resolves this symlink to its real path,
-// so relative imports into the jig tree — and `unbash` from jig's own
-// node_modules — work in-process.
+// in jig's `domain/subject`. Both are imported here, not copied.
+//
+// How the import works: pi loads `~/.pi/agent/extensions/guard.ts`, a
+// symlink into this repo, through jiti — which resolves relative imports
+// against the symlink's directory, not the real one. So the jig tree is
+// located from this file's real path at runtime and loaded with a dynamic
+// import (jiti handles the TypeScript; `unbash` resolves from jig's own
+// node_modules, so the main checkout needs `bun install` there). The
+// static imports above are types only and vanish at load.
 //
 // pi has no permission layer of its own, so this extension is the only
 // thing between the model and the shell. Three consequences:
@@ -40,7 +36,40 @@ import { JsonlAuditLog } from "../../../llm/harness/jig/src/infra/audit/jsonl-au
 //  - it keeps its own time budget, because pi has none: a guard that
 //    hangs would hang the session.
 
-export { resolveProfile, resolvePolicyPath };
+type Environment = typeof import("../../../llm/harness/jig/src/app/hooks/environment");
+type RunHook = typeof import("../../../llm/harness/jig/src/app/hooks/run-hook");
+type Parse = typeof import("../../../llm/harness/jig/src/domain/policy/parse");
+type Audit = typeof import("../../../llm/harness/jig/src/infra/audit/jsonl-audit");
+
+interface Jig {
+  readonly env: Environment;
+  readonly hook: RunHook;
+  readonly parse: Parse;
+  readonly audit: Audit;
+}
+
+/** jig's source tree, found from where this file really lives. */
+const JIG_SRC = join(
+  dirname(realpathSync(fileURLToPath(import.meta.url))),
+  "..",
+  "..",
+  "..",
+  "llm",
+  "harness",
+  "jig",
+  "src",
+);
+
+let jigModules: Promise<Jig> | undefined;
+function jig(): Promise<Jig> {
+  jigModules ??= (async () => ({
+    env: (await import(join(JIG_SRC, "app", "hooks", "environment.ts"))) as Environment,
+    hook: (await import(join(JIG_SRC, "app", "hooks", "run-hook.ts"))) as RunHook,
+    parse: (await import(join(JIG_SRC, "domain", "policy", "parse.ts"))) as Parse,
+    audit: (await import(join(JIG_SRC, "infra", "audit", "jsonl-audit.ts"))) as Audit,
+  }))();
+  return jigModules;
+}
 
 /** Above this the guard gives up and blocks, rather than hanging pi. */
 const TIME_BUDGET_MS = 5_000;
@@ -56,12 +85,16 @@ type Loaded = LoadedPolicy | { readonly error: string };
 // materially worse failure mode than the file being permanently missing.
 let cache: { readonly path: string; readonly loaded: LoadedPolicy } | undefined;
 
-export function loadPolicy(path: string): Loaded {
+export async function loadPolicy(path: string): Promise<Loaded> {
   if (cache !== undefined && cache.path === path) return cache.loaded;
 
   try {
+    const { parse, hook } = await jig();
     const text = readFileSync(path, "utf8");
-    const loaded: LoadedPolicy = { policy: parsePolicy(JSON.parse(text)), hash: policyHash(text) };
+    const loaded: LoadedPolicy = {
+      policy: parse.parsePolicy(JSON.parse(text)),
+      hash: hook.policyHash(text),
+    };
     cache = { path, loaded };
     return loaded;
   } catch (err) {
@@ -80,8 +113,9 @@ const silentLogger: Logger = {
 const clock = { now: () => new Date() };
 
 let audit: AuditLog | undefined;
-function auditLog(): AuditLog {
-  audit ??= new JsonlAuditLog(resolveAuditPath(process.env));
+async function auditLog(): Promise<AuditLog> {
+  const { audit: infra, env } = await jig();
+  audit ??= new infra.JsonlAuditLog(env.resolveAuditPath(process.env));
   return audit;
 }
 
@@ -137,17 +171,18 @@ function summary(input: unknown): string {
  * translate the call, ask jig, translate the answer.
  */
 export interface GuardDeps {
-  readonly audit: AuditLog;
+  readonly audit?: AuditLog;
   readonly budgetMs?: number;
 }
 
 export async function guardToolCall(
   event: GuardEvent,
   ctx: GuardContext,
-  deps: GuardDeps = { audit: auditLog() },
+  deps: GuardDeps = {},
 ): Promise<GuardOutcome> {
-  const path = resolvePolicyPath(process.env);
-  const loaded = loadPolicy(path);
+  const { env, hook } = await jig();
+  const path = env.resolvePolicyPath(process.env);
+  const loaded = await loadPolicy(path);
   if ("error" in loaded) {
     return {
       block: true,
@@ -166,15 +201,16 @@ export async function guardToolCall(
   };
   const principal: Principal = {
     harness: "pi",
-    profile: resolveProfile(process.env),
+    profile: env.resolveProfile(process.env),
     cwd: ctx.cwd,
     ...(ctx.sessionManager === undefined ? {} : { sessionId: ctx.sessionManager.getSessionId() }),
   };
 
   let decision: Decision;
   try {
+    const audit = deps.audit ?? (await auditLog());
     decision = await withBudget(
-      runHook(call, principal, loaded, { logger: silentLogger, clock, audit: deps.audit }),
+      hook.runHook(call, principal, loaded, { logger: silentLogger, clock, audit }),
       deps.budgetMs ?? TIME_BUDGET_MS,
     );
   } catch (err) {

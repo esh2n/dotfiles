@@ -1,7 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { convertToLlm, type ExtensionAPI, type ExtensionContext, serializeConversation } from "@earendil-works/pi-coding-agent";
+import {
+  type ExtensionAPI,
+  type ExtensionContext,
+  convertToLlm,
+  serializeConversation,
+} from "@earendil-works/pi-coding-agent";
 
 // compaction-judgment — let jig decide which items a compaction keeps.
 //
@@ -166,7 +171,8 @@ async function askKeepOrDrop(
   });
   if (response.status === 404) throw new Error("judgment service has no /compact endpoint");
   const body = (await response.json()) as unknown;
-  if (typeof body !== "object" || body === null) throw new Error("judgment service replied with no body");
+  if (typeof body !== "object" || body === null)
+    throw new Error("judgment service replied with no body");
   const record = body as Partial<CompactAnswer> & { error?: { message?: string } };
   if (!Array.isArray(record.kept) || !Array.isArray(record.decisions)) {
     throw new Error(record.error?.message ?? "judgment service replied without decisions");
@@ -174,7 +180,11 @@ async function askKeepOrDrop(
   return { kept: record.kept, decisions: record.decisions };
 }
 
-function summarizerPrompt(kept: string, dropped: readonly string[], previous: string | undefined): string {
+function summarizerPrompt(
+  kept: string,
+  dropped: readonly string[],
+  previous: string | undefined,
+): string {
   const previousBlock =
     previous === undefined || previous.trim() === ""
       ? ""
@@ -216,7 +226,12 @@ export default function (pi: ExtensionAPI) {
     const response = await ctx.modelRegistry.complete(
       model,
       { messages: [{ role: "user" as const, content: [{ type: "text" as const, text: prompt }] }] },
-      { maxTokens: MAX_SUMMARY_TOKENS, ...(signal === undefined ? {} : { signal }), cacheRetention: "none", sessionId: crypto.randomUUID() },
+      {
+        maxTokens: MAX_SUMMARY_TOKENS,
+        ...(signal === undefined ? {} : { signal }),
+        cacheRetention: "none",
+        sessionId: crypto.randomUUID(),
+      },
     );
     const text = response.content
       .filter((part): part is { type: "text"; text: string } => part.type === "text")
@@ -279,7 +294,9 @@ export default function (pi: ExtensionAPI) {
         serializeConversation(convertToLlm([message] as never)).slice(0, KEPT_CHARS),
       )
       .join("\n");
-    const droppedLines = droppedIndexes.map((index) => clip(items[index]?.summary ?? "", JUDGMENT_CHARS));
+    const droppedLines = droppedIndexes.map((index) =>
+      clip(items[index]?.summary ?? "", JUDGMENT_CHARS),
+    );
 
     try {
       const summary = await summarize(
@@ -304,7 +321,10 @@ export default function (pi: ExtensionAPI) {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      ctx.ui.notify(`compaction: summarizer failed (${message}); using pi's own compaction`, "error");
+      ctx.ui.notify(
+        `compaction: summarizer failed (${message}); using pi's own compaction`,
+        "error",
+      );
       return;
     }
   });

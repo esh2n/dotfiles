@@ -57,7 +57,8 @@ function readSkillPick(value: unknown): SkillPick {
 
 /** Read the service's reply. Throws only on a shape this extension cannot trust. */
 export function readSkillDecision(body: unknown): SkillDecision {
-  if (typeof body !== "object" || body === null) throw new Error("skill service replied with no body");
+  if (typeof body !== "object" || body === null)
+    throw new Error("skill service replied with no body");
   const record = body as Record<string, unknown>;
   if (!Array.isArray(record.skills)) throw new Error("skill service reply has no skills");
   if (typeof record.passed !== "number") throw new Error("skill service reply has no passed count");
@@ -83,7 +84,8 @@ export function readSkillDecision(body: unknown): SkillDecision {
 export function reminderFor(decision: SkillDecision): string | undefined {
   if (decision.skills.length === 0) return undefined;
   const confidences = decision.skills.map((pick) => pick.confidence.toFixed(2)).join(", ");
-  const count = decision.skills.length === 1 ? "1 skill matches" : `${decision.skills.length} skills match`;
+  const count =
+    decision.skills.length === 1 ? "1 skill matches" : `${decision.skills.length} skills match`;
   return [
     `jig skill router: ${count} this request (judgment confidence ${confidences}).`,
     "Read and follow these before doing the work:",
@@ -137,7 +139,7 @@ export default function (pi: ExtensionAPI) {
   // Opt out, not opt in: `PI_SKILL_ROUTER=off` is the switch, anything else routes.
   // A router that is never exercised cannot be reviewed, and the service counts every
   // judgment it makes (kind `skill`) so the cost shows up on the dashboard.
-  let mode = process.env.PI_SKILL_ROUTER === "off" ? "off" : "on";
+  const mode = process.env.PI_SKILL_ROUTER === "off" ? "off" : "on";
   let announcedFailure = false;
 
   const timeoutMs = Number.parseInt(process.env.PI_SKILL_TIMEOUT_MS ?? "", 10) || 15_000;

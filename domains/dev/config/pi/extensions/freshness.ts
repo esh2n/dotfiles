@@ -1,6 +1,6 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // File-freshness guard for the local 27B lane.
 // Adapted from earlyaidopters/marks-pi-harness (MIT). Small local models'
@@ -19,7 +19,11 @@ let lastCallKey = "";
 let repeatCount = 0;
 
 function mtime(path: string): number | null {
-  try { return statSync(path).mtimeMs; } catch { return null; }
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return null;
+  }
 }
 
 export default function (pi: ExtensionAPI) {

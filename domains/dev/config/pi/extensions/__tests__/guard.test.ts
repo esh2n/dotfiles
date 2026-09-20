@@ -2,8 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { resolveProfile } from "../../../../llm/harness/jig/src/app/hooks/environment";
 import type { AuditEntry } from "../../../../llm/harness/jig/src/domain/policy/audit";
-import { type GuardContext, guardToolCall, loadPolicy, resolveProfile } from "../guard";
+import { type GuardContext, guardToolCall, loadPolicy } from "../guard";
 
 const V1_DOC = {
   version: 1,
@@ -124,21 +125,23 @@ describe("resolveProfile (shared with jig)", () => {
 });
 
 describe("loadPolicy", () => {
-  test("reads a v1 and a v2 document through jig's parser, with the text hash", () => {
-    const v1 = loadPolicy(writeDoc(V1_DOC));
+  test("reads a v1 and a v2 document through jig's parser, with the text hash", async () => {
+    const v1 = await loadPolicy(writeDoc(V1_DOC));
     expect("error" in v1).toBe(false);
     if (!("error" in v1)) {
       expect(v1.policy.version).toBe(1);
       expect(v1.hash).toMatch(/^[0-9a-f]{12}$/);
     }
-    const v2 = loadPolicy(writeDoc(V2_DOC));
+    const v2 = await loadPolicy(writeDoc(V2_DOC));
     if (!("error" in v2)) expect(v2.policy.version).toBe(2);
   });
 
-  test("a malformed document is an error, never a partial policy", () => {
-    expect(loadPolicy(writeDoc({ version: 1, rules: [{ id: "bad" }] }))).toHaveProperty("error");
-    expect(loadPolicy(writeDoc("not json"))).toHaveProperty("error");
-    expect(loadPolicy(join(tmpdir(), "does-not-exist.json"))).toHaveProperty("error");
+  test("a malformed document is an error, never a partial policy", async () => {
+    expect(await loadPolicy(writeDoc({ version: 1, rules: [{ id: "bad" }] }))).toHaveProperty(
+      "error",
+    );
+    expect(await loadPolicy(writeDoc("not json"))).toHaveProperty("error");
+    expect(await loadPolicy(join(tmpdir(), "does-not-exist.json"))).toHaveProperty("error");
   });
 });
 

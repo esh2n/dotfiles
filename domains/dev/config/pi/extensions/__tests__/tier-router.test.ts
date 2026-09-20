@@ -29,9 +29,9 @@ describe("readDecision", () => {
   });
 
   test("an invalid tier throws, quoting the error message from an error-shaped body", () => {
-    expect(() =>
-      readDecision({ error: { message: "no judgment available" } }),
-    ).toThrow("no judgment available");
+    expect(() => readDecision({ error: { message: "no judgment available" } })).toThrow(
+      "no judgment available",
+    );
   });
 
   test("an invalid tier with no error body throws a generic message", () => {

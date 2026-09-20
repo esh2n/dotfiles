@@ -1,6 +1,6 @@
+import { createHash } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { createHash } from "node:crypto";
 
 // Goal mode + verification gates. Adapted from earlyaidopters/marks-pi-harness
 // (MIT). The one deliberate tool-schema cost in this lane (+1 tool):
@@ -18,7 +18,11 @@ let goal: string | null = null;
 let gates: string[] = [];
 let lastFailedHash: string | null = null;
 
-async function run(pi: ExtensionAPI, cmd: string, timeout: number): Promise<{ code: number; out: string }> {
+async function run(
+  pi: ExtensionAPI,
+  cmd: string,
+  timeout: number,
+): Promise<{ code: number; out: string }> {
   try {
     const r: any = await (pi as any).exec("/bin/zsh", ["-lc", cmd], { timeout });
     const code = r?.exitCode ?? r?.code ?? 0;
@@ -33,7 +37,9 @@ async function workspaceHash(pi: ExtensionAPI): Promise<string | null> {
   const head = await run(pi, "git rev-parse HEAD 2>/dev/null", 10_000);
   if (head.code !== 0) return null; // not a git repo — skip unchanged-check
   const status = await run(pi, "git status --porcelain && git diff", 20_000);
-  return createHash("sha256").update(head.out + status.out).digest("hex");
+  return createHash("sha256")
+    .update(head.out + status.out)
+    .digest("hex");
 }
 
 export default function (pi: ExtensionAPI) {
@@ -41,12 +47,24 @@ export default function (pi: ExtensionAPI) {
     description: "Set/show/clear the persistent goal (usage: /goal <text> | /goal clear)",
     handler: async (args, ctx) => {
       const text = (args ?? "").trim();
-      if (text === "clear") { goal = null; lastFailedHash = null; ctx.ui.setStatus("goal", ""); ctx.ui.notify("Goal cleared.", "info"); return; }
-      if (!text) { ctx.ui.notify(goal ? `Goal: ${goal}` : "No goal set. /goal <text>", "info"); return; }
+      if (text === "clear") {
+        goal = null;
+        lastFailedHash = null;
+        ctx.ui.setStatus("goal", "");
+        ctx.ui.notify("Goal cleared.", "info");
+        return;
+      }
+      if (!text) {
+        ctx.ui.notify(goal ? `Goal: ${goal}` : "No goal set. /goal <text>", "info");
+        return;
+      }
       goal = text;
       lastFailedHash = null;
       ctx.ui.setStatus("goal", "goal set");
-      ctx.ui.notify(`Goal set. It will be re-injected every turn until goal_complete passes${gates.length ? ` (${gates.length} gate(s))` : ""}.`, "info");
+      ctx.ui.notify(
+        `Goal set. It will be re-injected every turn until goal_complete passes${gates.length ? ` (${gates.length} gate(s))` : ""}.`,
+        "info",
+      );
     },
   });
 
@@ -54,8 +72,21 @@ export default function (pi: ExtensionAPI) {
     description: "Add a verification gate command (usage: /gate <cmd> | /gate clear | /gate list)",
     handler: async (args, ctx) => {
       const text = (args ?? "").trim();
-      if (text === "clear") { gates = []; lastFailedHash = null; ctx.ui.notify("Gates cleared.", "info"); return; }
-      if (!text || text === "list") { ctx.ui.notify(gates.length ? gates.map((g, i) => `${i + 1}. ${g}`).join(" | ") : "No gates. /gate <cmd>", "info"); return; }
+      if (text === "clear") {
+        gates = [];
+        lastFailedHash = null;
+        ctx.ui.notify("Gates cleared.", "info");
+        return;
+      }
+      if (!text || text === "list") {
+        ctx.ui.notify(
+          gates.length
+            ? gates.map((g, i) => `${i + 1}. ${g}`).join(" | ")
+            : "No gates. /gate <cmd>",
+          "info",
+        );
+        return;
+      }
       gates.push(text);
       ctx.ui.notify(`Gate added (${gates.length} total): ${text}`, "info");
     },
@@ -73,14 +104,23 @@ export default function (pi: ExtensionAPI) {
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
       if (!goal) {
-        return { content: [{ type: "text", text: "No goal is set — nothing to complete." }], details: {} };
+        return {
+          content: [{ type: "text", text: "No goal is set — nothing to complete." }],
+          details: {},
+        };
       }
       if (gates.length) {
         const hash = await workspaceHash(pi);
         if (hash && lastFailedHash && hash === lastFailedHash) {
           return {
-            content: [{ type: "text", text: "Gates NOT rerun: the workspace is unchanged since the last failed gate. Edit source files or tests to address the failure before attempting to finish again." }],
-            isError: true, details: {},
+            content: [
+              {
+                type: "text",
+                text: "Gates NOT rerun: the workspace is unchanged since the last failed gate. Edit source files or tests to address the failure before attempting to finish again.",
+              },
+            ],
+            isError: true,
+            details: {},
           };
         }
         for (const g of gates) {
@@ -89,8 +129,14 @@ export default function (pi: ExtensionAPI) {
             lastFailedHash = hash;
             const out = r.out.length > GATE_OUTPUT_CAP ? r.out.slice(-GATE_OUTPUT_CAP) : r.out;
             return {
-              content: [{ type: "text", text: `GATE FAILED (exit ${r.code}): ${g}\n\n${out}\n\nThe goal is not complete. Fix the failure, then call goal_complete again.` }],
-              isError: true, details: {},
+              content: [
+                {
+                  type: "text",
+                  text: `GATE FAILED (exit ${r.code}): ${g}\n\n${out}\n\nThe goal is not complete. Fix the failure, then call goal_complete again.`,
+                },
+              ],
+              isError: true,
+              details: {},
             };
           }
         }
@@ -100,7 +146,15 @@ export default function (pi: ExtensionAPI) {
       goal = null;
       ctx.ui.setStatus("goal", "");
       ctx.ui.notify(`Goal complete${gates.length ? " (all gates passed)" : ""}: ${done}`, "info");
-      return { content: [{ type: "text", text: `Goal closed${gates.length ? " — all gates passed" : ""}. Evidence: ${params.evidence}` }], details: {} };
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Goal closed${gates.length ? " — all gates passed" : ""}. Evidence: ${params.evidence}`,
+          },
+        ],
+        details: {},
+      };
     },
   });
 
@@ -118,5 +172,9 @@ export default function (pi: ExtensionAPI) {
     };
   });
 
-  pi.on("session_start", async () => { goal = null; gates = []; lastFailedHash = null; });
+  pi.on("session_start", async () => {
+    goal = null;
+    gates = [];
+    lastFailedHash = null;
+  });
 }

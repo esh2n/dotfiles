@@ -1,7 +1,7 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 // Micro-compaction for the pi tiers. Adapted from
 // earlyaidopters/marks-pi-harness (MIT).
@@ -35,7 +35,11 @@ let compacting = false;
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async () => {
-    try { mkdirSync(SPILL_DIR, { recursive: true }); } catch { /* exists */ }
+    try {
+      mkdirSync(SPILL_DIR, { recursive: true });
+    } catch {
+      /* exists */
+    }
   });
 
   pi.on("tool_result", async (event) => {
@@ -46,7 +50,11 @@ export default function (pi: ExtensionAPI) {
       if (block?.type !== "text" || typeof block.text !== "string") continue;
       if (block.text.length <= CAP_CHARS) continue;
       const file = join(SPILL_DIR, `${Date.now()}-${++spillCount}.txt`);
-      try { writeFileSync(file, block.text); } catch { continue; }
+      try {
+        writeFileSync(file, block.text);
+      } catch {
+        continue;
+      }
       block.text =
         block.text.slice(0, CAP_CHARS) +
         `\n\n[output capped at ${CAP_CHARS} of ${block.text.length} chars. ` +
@@ -72,8 +80,13 @@ export default function (pi: ExtensionAPI) {
         "info",
       );
       ctx.compact({
-        onComplete: () => { compacting = false; ctx.ui.notify("Compaction done.", "info"); },
-        onError: () => { compacting = false; },
+        onComplete: () => {
+          compacting = false;
+          ctx.ui.notify("Compaction done.", "info");
+        },
+        onError: () => {
+          compacting = false;
+        },
       });
     }
   });

@@ -74,7 +74,8 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 export function readDecision(body: unknown): TierDecision {
-  if (typeof body !== "object" || body === null) throw new Error("tier service replied with no body");
+  if (typeof body !== "object" || body === null)
+    throw new Error("tier service replied with no body");
   const record = body as Record<string, unknown>;
   if (!isTier(record.tier)) {
     const detail =
@@ -194,7 +195,10 @@ export default function (pi: ExtensionAPI) {
       }
 
       if (!isTier(wanted)) {
-        ctx.ui.notify(`tier-router: unknown mode "${wanted}". Use auto, off, or a tier name.`, "error");
+        ctx.ui.notify(
+          `tier-router: unknown mode "${wanted}". Use auto, off, or a tier name.`,
+          "error",
+        );
         return;
       }
 
