@@ -82,6 +82,15 @@ async function loadPolicy(path: string, fs: Ports["fs"]): Promise<PolicyLoad> {
  *  - a policy file that is missing or fails to parse ALSO becomes "ask",
  *    naming the path and the error, for the same reason: a broken policy
  *    link must never silently become "allow everything".
+ *
+ * When the policy loads fine and simply has no matching rule, this returns
+ * the empty string — NOT an explicit `permissionDecision: "allow"`. In
+ * Claude Code's PreToolUse contract an explicit "allow" BYPASSES the normal
+ * permission system (settings.json ask/deny, interactive prompts) for the
+ * whole call; staying silent means "no opinion" and lets that system run as
+ * it would with no hook at all. Same precedent as
+ * domains/dev/config/claude-profiles/personal/hooks/git-guard.sh (see its
+ * comment near the "Release WITHOUT a permissionDecision" note).
  */
 export async function preToolUse(
   stdin: string,
@@ -118,9 +127,9 @@ export async function preToolUse(
   const call: ToolCall = { tool: payload.tool_name, input: payload.tool_input ?? {} };
   const decision = runHook(call, profile, loaded.policy, { logger: ports.logger });
 
-  return hookOutput(
-    decision.kind === "allow"
-      ? { kind: "allow" }
-      : { kind: decision.kind, reason: decision.reason },
-  );
+  // No matching rule: stay silent toward the permission system rather than
+  // emitting an explicit "allow" (see the doc comment above).
+  if (decision.kind === "allow") return "";
+
+  return hookOutput({ kind: decision.kind, reason: decision.reason });
 }

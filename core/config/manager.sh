@@ -160,6 +160,33 @@ assert_canonical_checkout() {
 # verbatim, so a relative path here produces links that dangle from any other
 # cwd — that incident is why the guard below refuses instead of trusting the
 # caller. link_domain passes ${DOTFILES_ROOT}-based paths, which are absolute.
+#
+# sweep_stale_repo_links: shared by link_pi_resources and link_dsh_resources
+# (and any future per-tool linker with the same shape). A link this repo
+# made is "stale" under a two-part ownership test: its target matches the
+# glob this repo's own linker would have produced (so a link some OTHER
+# tool made, even a dangling one, is never touched), AND the target no
+# longer exists (a live link this repo made is not stale — leave it). Only
+# then is it removed. Was duplicated verbatim in both functions (differing
+# only in the directory list, the ownership glob, and the log label) before
+# this factor-out.
+sweep_stale_repo_links() {
+    local ownership_glob="$1" label="$2"
+    shift 2
+
+    local sweep_dir link target
+    for sweep_dir in "$@"; do
+        [[ -d "$sweep_dir" ]] || continue
+        while IFS= read -r -d '' link; do
+            target="$(readlink "$link")" || continue
+            # shellcheck disable=SC2053 # intentional glob match, not literal
+            [[ "$target" == $ownership_glob ]] || continue
+            [[ -e "$link" ]] && continue
+            rm -f "$link"
+            log_info "Removed stale ${label} link: ${link} -> ${target}"
+        done < <(find "$sweep_dir" -mindepth 1 -maxdepth 1 -type l -print0)
+    done
+}
 # piは~/.pi/agentを読む。実行時の状態が同居するため、ディレクトリごとでは
 # なくファイル単位でリンクする（extensions/ には手元の orca-*.ts が同居する
 # ためディレクトリリンクは不可）。dotfiles の pi ディレクトリを指す壊れた
@@ -201,25 +228,17 @@ link_pi_resources() {
                       \( -type f -o -type l \) -print0)
     fi
 
-    # Sweep dangling repo-made links (see function comment for the two-part
-    # ownership test). agents/ no longer exists in the repo but may still
-    # hold 2026-08 era links on this machine.
-    local sweep_dir link target
-    for sweep_dir in "$pi_home" "${pi_home}/extensions" "${pi_home}/themes" "${pi_home}/agents"; do
-        [[ -d "$sweep_dir" ]] || continue
-        while IFS= read -r -d '' link; do
-            target="$(readlink "$link")" || continue
-            [[ "$target" == */domains/dev/config/pi/* ]] || continue
-            [[ -e "$link" ]] && continue
-            rm -f "$link"
-            log_info "Removed stale pi link: ${link} -> ${target}"
-        done < <(find "$sweep_dir" -mindepth 1 -maxdepth 1 -type l -print0)
-    done
+    # Sweep dangling repo-made links (see sweep_stale_repo_links' comment for
+    # the two-part ownership test). agents/ no longer exists in the repo but
+    # may still hold 2026-08 era links on this machine.
+    sweep_stale_repo_links "*/domains/dev/config/pi/*" "pi" \
+        "$pi_home" "${pi_home}/extensions" "${pi_home}/themes" "${pi_home}/agents"
 
     # Before this function was restored, link_domain's generic branch linked
     # the whole config dir to ~/.config/pi — dead weight (pi has no XDG
     # lookup). Drop it, but only when it points at this repo's pi dir.
     if [[ -L "${HOME}/.config/pi" ]]; then
+        local target
         target="$(readlink "${HOME}/.config/pi")"
         if [[ "$target" == "$src_dir" || "$target" == */domains/dev/config/pi ]]; then
             rm -f "${HOME}/.config/pi"
@@ -295,18 +314,10 @@ link_dsh_resources() {
     fi
 
     # Sweep dangling links this repo made (same two-part ownership test as
-    # link_pi_resources: target under domains/dev/config/dsh/ AND now gone).
-    local sweep_dir link target
-    for sweep_dir in "$dsh_home" "${dsh_home}/profiles/"*/; do
-        [[ -d "$sweep_dir" ]] || continue
-        while IFS= read -r -d '' link; do
-            target="$(readlink "$link")" || continue
-            [[ "$target" == */domains/dev/config/dsh/* ]] || continue
-            [[ -e "$link" ]] && continue
-            rm -f "$link"
-            log_info "Removed stale dsh link: ${link} -> ${target}"
-        done < <(find "$sweep_dir" -mindepth 1 -maxdepth 1 -type l -print0)
-    done
+    # link_pi_resources, shared via sweep_stale_repo_links: target under
+    # domains/dev/config/dsh/ AND now gone).
+    sweep_stale_repo_links "*/domains/dev/config/dsh/*" "dsh" \
+        "$dsh_home" "${dsh_home}/profiles/"*/
 }
 
 # jig's shared guard policy — domains/dev/llm/harness/policy/guard-rules.json

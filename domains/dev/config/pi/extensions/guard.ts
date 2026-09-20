@@ -18,8 +18,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 //  - confirm: destructive enough to require interactive approval; denied by
 //    default when running headless
 
-type GuardTier = "deny" | "confirm";
-interface GuardRule {
+export type GuardTier = "deny" | "confirm";
+
+export interface GuardRule {
   readonly id: string;
   readonly tier: GuardTier;
   readonly tools: readonly string[];
@@ -28,46 +29,155 @@ interface GuardRule {
   readonly profiles: readonly string[];
 }
 
-const PROFILES = ["minimal", "standard", "strict"] as const;
-type HookProfile = (typeof PROFILES)[number];
+export const PROFILES = ["minimal", "standard", "strict"] as const;
+export type HookProfile = (typeof PROFILES)[number];
 
-function resolveProfile(env: NodeJS.ProcessEnv): HookProfile {
+export function resolveProfile(env: NodeJS.ProcessEnv): HookProfile {
   const raw = env.JIG_HOOK_PROFILE ?? env.YOKI_HOOK_PROFILE;
   return (PROFILES as readonly string[]).includes(raw ?? "") ? (raw as HookProfile) : "standard";
 }
 
-function policyPath(): string {
-  return process.env.JIG_POLICY_FILE ?? join(homedir(), ".config", "jig", "policy", "guard-rules.json");
+export function policyPath(): string {
+  return (
+    process.env.JIG_POLICY_FILE ?? join(homedir(), ".config", "jig", "policy", "guard-rules.json")
+  );
 }
 
-type Loaded = { readonly rules: readonly GuardRule[] } | { readonly error: string };
+export interface GuardDoc {
+  readonly rules: readonly GuardRule[];
+}
 
-// Read once, at the first tool_call (not at module load — the env may not be
-// settled yet), then cached for the rest of the process.
-let cache: { readonly path: string; readonly loaded: Loaded } | undefined;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-function loadPolicy(path: string): Loaded {
-  if (cache !== undefined && cache.path === path) return cache.loaded;
+const TIERS: ReadonlySet<string> = new Set<GuardTier>(["deny", "confirm"]);
 
-  let loaded: Loaded;
-  try {
-    const doc = JSON.parse(readFileSync(path, "utf8")) as {
-      rules: Array<{
-        id: string;
-        tier: GuardTier;
-        tools: string[];
-        match: string;
-        why: string;
-        profiles: string[];
-      }>;
-    };
-    loaded = { rules: doc.rules.map((r) => ({ ...r, match: new RegExp(r.match) })) };
-  } catch (err) {
-    loaded = { error: err instanceof Error ? err.message : String(err) };
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string");
+}
+
+/**
+ * Strict validation, mirroring jig's own `src/domain/policy/parse.ts`: ANY
+ * invalid rule fails the WHOLE document (never silently drops or
+ * misinterprets one bad rule), so a malformed shared policy blocks here
+ * exactly as it blocks jig's own hook — instead of this hand-duplicated
+ * evaluator quietly doing less (a mistyped tier never matching, or a
+ * missing `tools`/`profiles` throwing a TypeError out of the `tool_call`
+ * handler, which a fail-open extension host would read as "proceed").
+ */
+export function validateGuardDoc(json: unknown): GuardDoc {
+  if (!isPlainObject(json)) {
+    throw new Error("guard policy: expected a JSON object at the top level");
   }
 
-  cache = { path, loaded };
-  return loaded;
+  const { rules } = json;
+  if (!Array.isArray(rules)) {
+    throw new Error('guard policy: "rules" must be an array');
+  }
+
+  const parsed = rules.map((raw, index): GuardRule => {
+    if (!isPlainObject(raw)) {
+      throw new Error(`guard policy: rules[${index}] must be an object`);
+    }
+
+    const { id, tier, tools, match, why, profiles } = raw;
+
+    if (typeof id !== "string" || id === "") {
+      throw new Error(`guard policy: rules[${index}] is missing a non-empty string "id"`);
+    }
+    const label = `guard policy: rule "${id}"`;
+
+    if (typeof tier !== "string" || !TIERS.has(tier)) {
+      throw new Error(
+        `${label} has unknown tier ${JSON.stringify(tier)} (expected "deny" or "confirm")`,
+      );
+    }
+
+    if (!isStringArray(tools)) {
+      throw new Error(`${label} must have a non-empty "tools" array of strings`);
+    }
+
+    if (typeof match !== "string" || match === "") {
+      throw new Error(`${label} is missing a non-empty string "match"`);
+    }
+    let compiled: RegExp;
+    try {
+      compiled = new RegExp(match);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`${label} has an invalid "match" regex: ${reason}`);
+    }
+
+    if (typeof why !== "string" || why === "") {
+      throw new Error(`${label} is missing a non-empty string "why"`);
+    }
+
+    if (!isStringArray(profiles)) {
+      throw new Error(`${label} must have a non-empty "profiles" array of strings`);
+    }
+
+    return { id, tier: tier as GuardTier, tools, match: compiled, why, profiles };
+  });
+
+  return { rules: parsed };
+}
+
+export interface GuardCommand {
+  readonly tool: string;
+  readonly command: string;
+}
+
+export interface GuardMatch {
+  readonly tier: GuardTier;
+  readonly why: string;
+}
+
+/**
+ * Pure: deny always outranks confirm when both match (mirrors jig's
+ * `src/domain/policy/evaluate.ts`). Returns `undefined` when nothing
+ * matches — the caller decides what "no opinion" means for its host.
+ */
+export function evaluateGuardRules(
+  rules: readonly GuardRule[],
+  input: GuardCommand,
+  profile: HookProfile,
+): GuardMatch | undefined {
+  const matches = (rule: GuardRule) =>
+    rule.tools.includes(input.tool) &&
+    rule.profiles.includes(profile) &&
+    rule.match.test(input.command);
+
+  const deny = rules.find((rule) => rule.tier === "deny" && matches(rule));
+  if (deny !== undefined) return { tier: "deny", why: deny.why };
+
+  const confirm = rules.find((rule) => rule.tier === "confirm" && matches(rule));
+  if (confirm !== undefined) return { tier: "confirm", why: confirm.why };
+
+  return undefined;
+}
+
+type Loaded = GuardDoc | { readonly error: string };
+
+// Read once, at the first tool_call (not at module load — the env may not be
+// settled yet). Only a SUCCESSFUL load is cached, for the rest of the
+// process: a transient read/parse failure (the shared policy symlink
+// briefly unreadable mid `manager.sh link`, say) must retry on the NEXT
+// call rather than hard-blocking every bash call for the rest of the pi
+// session — a cached error here would need a full pi restart to clear, a
+// materially worse failure mode than the file being permanently missing.
+let cache: { readonly path: string; readonly loaded: GuardDoc } | undefined;
+
+export function loadPolicy(path: string): Loaded {
+  if (cache !== undefined && cache.path === path) return cache.loaded;
+
+  try {
+    const doc = validateGuardDoc(JSON.parse(readFileSync(path, "utf8")));
+    cache = { path, loaded: doc };
+    return doc;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export default function (pi: ExtensionAPI) {
@@ -87,36 +197,32 @@ export default function (pi: ExtensionAPI) {
       };
     }
 
-    const matches = (rule: GuardRule) =>
-      rule.tools.includes("shell") && rule.profiles.includes(profile) && rule.match.test(cmd);
+    const match = evaluateGuardRules(loaded.rules, { tool: "shell", command: cmd }, profile);
+    if (match === undefined) return;
 
-    const denyRule = loaded.rules.find((r) => r.tier === "deny" && matches(r));
-    if (denyRule) {
+    if (match.tier === "deny") {
       return {
         block: true,
         reason:
-          `Blocked: ${denyRule.why}. This is a hard rule — do not retry or work around it with a variant. ` +
+          `Blocked: ${match.why}. This is a hard rule — do not retry or work around it with a variant. ` +
           `State what you wanted to do and why, and let the user decide.`,
       };
     }
 
-    const confirmRule = loaded.rules.find((r) => r.tier === "confirm" && matches(r));
-    if (confirmRule) {
-      let ok = false;
-      try {
-        ok = await ctx.ui.confirm(`Guarded command (${confirmRule.why})`, cmd.slice(0, 300));
-      } catch {
-        ok = false; // headless: deny by default
-      }
-      if (!ok) {
-        return {
-          block: true,
-          reason:
-            `Blocked: ${confirmRule.why}. Do not retry this command or work around the block with a variant. ` +
-            `Explain to the user what you wanted to do and why, and let them decide.`,
-        };
-      }
-      return; // user approved this one call — approval is not blanket
+    let ok = false;
+    try {
+      ok = await ctx.ui.confirm(`Guarded command (${match.why})`, cmd.slice(0, 300));
+    } catch {
+      ok = false; // headless: deny by default
     }
+    if (!ok) {
+      return {
+        block: true,
+        reason:
+          `Blocked: ${match.why}. Do not retry this command or work around the block with a variant. ` +
+          `Explain to the user what you wanted to do and why, and let them decide.`,
+      };
+    }
+    return; // user approved this one call — approval is not blanket
   });
 }

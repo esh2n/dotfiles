@@ -65,6 +65,11 @@ async function run(stdin: string): Promise<{
   return out.hookSpecificOutput;
 }
 
+/** For the no-match path, which must emit nothing at all rather than a JSON "allow". */
+async function runRaw(stdin: string): Promise<string> {
+  return preToolUse(stdin, { logger: silentLogger, fs });
+}
+
 beforeEach(() => {
   process.env.JIG_POLICY_FILE = writePolicy(VALID_POLICY);
 });
@@ -79,13 +84,17 @@ afterEach(() => {
 });
 
 describe("preToolUse", () => {
-  test("a benign call is allowed, with no reason attached", async () => {
-    const decision = await run(
+  test("a non-matching call emits no output", async () => {
+    // An explicit "allow" would BYPASS Claude Code's own permission system for
+    // the entire call (settings.json ask/deny, interactive prompts included).
+    // Silence means "no opinion" and lets that system run normally — see
+    // domains/dev/config/claude-profiles/personal/hooks/git-guard.sh around
+    // line 234 for the documented precedent.
+    const out = await runRaw(
       JSON.stringify({ tool_name: "Read", tool_input: { file_path: "/x" } }),
     );
 
-    expect(decision.permissionDecision).toBe("allow");
-    expect(decision.permissionDecisionReason).toBeUndefined();
+    expect(out).toBe("");
   });
 
   test("a force push is denied with the rule's reason", async () => {
@@ -125,11 +134,11 @@ describe("preToolUse", () => {
   test("legacy YOKI_HOOK_PROFILE still applies while the fleet migrates", async () => {
     process.env.YOKI_HOOK_PROFILE = "minimal";
 
-    const decision = await run(
+    const out = await runRaw(
       JSON.stringify({ tool_name: "Bash", tool_input: { command: "rm -rf build" } }),
     );
 
-    expect(decision.permissionDecision).toBe("allow");
+    expect(out).toBe("");
   });
 
   test("an unknown profile value normalizes to standard, not to a wider profile", async () => {
