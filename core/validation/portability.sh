@@ -459,6 +459,46 @@ run_portability_checks() {
     assert_no_hardcoded_user \
         "$DOTFILES_ROOT/domains/dev/config/claude-profiles/personal/skills/workday-input/SKILL.md" \
         "workday-input should use variable paths" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/claude-profiles/core/skills/grilling/codex/SKILL.md" \
+        "grilling codex port should reference \$YOKI_ROOT, not a literal checkout path" || true
+
+    echo ""
+    log_info "--- 7b. launchd job sources + service launchers: No hardcoded user paths ---"
+    # Deployed copies under ~/Library/LaunchAgents carry resolved paths on
+    # purpose (launchd doesn't expand env vars or ~) — these SOURCE plists
+    # use {{HOME}}/{{DOTFILES_ROOT}} placeholders instead, expanded at apply
+    # time by manager.sh's link_launch_agents (install_expanded).
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/litellm/com.esh2n.litellm-proxy.plist" \
+        "litellm-proxy plist source should use {{HOME}} placeholders" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/jig/com.esh2n.jig-decision.plist" \
+        "jig-decision plist source should use {{HOME}}/{{DOTFILES_ROOT}} placeholders" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/litellm/litellm-up.sh" \
+        "litellm-up.sh PATH should use \$(id -un), not a literal username" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/litellm/proxy-key.sh" \
+        "proxy-key.sh PATH should use \$(id -un), not a literal username" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/jig/jig-decision-up.sh" \
+        "jig-decision-up.sh PATH/JIG_DIR should use \$(id -un)/\$DOTFILES_ROOT, not a literal username" || true
+
+    echo ""
+    log_info "--- 7c. dsh sources: No hardcoded user paths ---"
+    # These are deployed as expanded copies too (link_dsh_resources ->
+    # install_expanded), so the source should carry {{DOTFILES_ROOT}}
+    # placeholders rather than a resolved path.
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/dsh/hooks.claude.json" \
+        "dsh hooks.claude.json should use {{DOTFILES_ROOT}}, not a resolved path" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/dsh/profiles/proxy/cordis.patch.yml" \
+        "dsh proxy cordis patch should not hardcode a user path" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/dsh/profiles/headless/cordis.patch.yml" \
+        "dsh headless cordis patch should not hardcode a user path" || true
 
     echo ""
     log_info "--- 8. Documentation ---"
