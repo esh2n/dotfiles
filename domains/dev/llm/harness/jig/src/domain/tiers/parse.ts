@@ -126,12 +126,30 @@ function parseTierPi(value: unknown, label: string): Tier["pi"] {
 
 function parseTierDsh(value: unknown, label: string): Tier["dsh"] {
   const obj = requireObject(value, label);
-  assertKnownKeys(obj, ["name", "reasoningEfforts", "_comment"], label);
+  assertKnownKeys(obj, ["name", "reasoningEfforts", "compat", "_comment"], label);
+
+  let compat: { thinkingFormat?: string } | undefined;
+  if (obj.compat !== undefined) {
+    const compatObj = requireObject(obj.compat, `${label}.compat`);
+    assertKnownKeys(compatObj, ["thinkingFormat"], `${label}.compat`);
+    compat = {
+      ...(compatObj.thinkingFormat === undefined
+        ? {}
+        : {
+            thinkingFormat: requireString(
+              compatObj.thinkingFormat,
+              `${label}.compat.thinkingFormat`,
+            ),
+          }),
+    };
+  }
+
   return {
     name: requireString(obj.name, `${label}.name`),
     ...(obj.reasoningEfforts === undefined
       ? {}
       : { reasoningEfforts: parseEffortMap(obj.reasoningEfforts, `${label}.reasoningEfforts`) }),
+    ...(compat !== undefined ? { compat } : {}),
     ...(parseCommentMap(obj._comment, `${label}._comment`) !== undefined
       ? { _comment: parseCommentMap(obj._comment, `${label}._comment`) }
       : {}),

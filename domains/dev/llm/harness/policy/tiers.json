@@ -54,6 +54,9 @@
           "high": "high",
           "max": "max"
         },
+        "compat": {
+          "thinkingFormat": "deepseek"
+        },
         "_comment": {
           "thinkingFormat": "makes `off` actually stop thinking"
         }

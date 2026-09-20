@@ -50,6 +50,16 @@ export interface TierPiView {
 export interface TierDshView {
   readonly name: string;
   readonly reasoningEfforts?: EffortMap;
+  /**
+   * dsh's OWN compat block — deliberately separate from the shared `compat`
+   * field below. In the real file only `main` carries `compat.thinkingFormat`
+   * (it is the one tier where "off" needs to actually stop thinking); complex
+   * and deterministic don't, even though pi's `compat.thinkingFormat` is set
+   * for all three. That's a real, pre-existing asymmetry between the two
+   * consumers, not a formatting difference, so it is modeled as dsh's own
+   * fact rather than derived from `compat`.
+   */
+  readonly compat?: { readonly thinkingFormat?: string };
   readonly _comment?: Readonly<Record<string, string>>;
 }
 
