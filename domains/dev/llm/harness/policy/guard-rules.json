@@ -2,12 +2,41 @@
   "version": 1,
   "rules": [
     {
+      "id": "guard-policy-protect-write",
+      "tier": "deny",
+      "tools": [
+        "write",
+        "edit"
+      ],
+      "match": "\\.config/jig/policy/|domains/dev/llm/harness/policy/",
+      "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "guard-policy-protect-shell",
+      "tier": "deny",
+      "tools": [
+        "shell"
+      ],
+      "match": "(>|>>|\\btee\\b|\\bsed\\b.*-i|\\bmv\\b|\\bcp\\b|\\brm\\b).*(\\.config/jig/policy|domains/dev/llm/harness/policy)",
+      "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
       "id": "git-force-push",
       "tier": "deny",
       "tools": [
         "shell"
       ],
-      "match": "\\bgit\\s+push\\b[^|;&]*(--force|\\s-f\\b)",
+      "match": "\\bgit(?:\\s+-C\\s+\\S+|\\s+-c\\s+\\S+|\\s+-[a-zA-Z]|\\s+--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?)*\\s+push\\b[^|;&]*(--force|\\s-f\\b)",
       "why": "force push is never recoverable",
       "profiles": [
         "minimal",
@@ -21,7 +50,7 @@
       "tools": [
         "shell"
       ],
-      "match": "\\bgit\\s+push\\b(?=.*\\b(main|master)\\b)",
+      "match": "\\bgit(?:\\s+-C\\s+\\S+|\\s+-c\\s+\\S+|\\s+-[a-zA-Z]|\\s+--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?)*\\s+push\\b(?=.*\\b(main|master)\\b)",
       "why": "pushing to main/master by command pattern bypasses the PR workflow",
       "profiles": [
         "minimal",
@@ -49,7 +78,7 @@
       "tools": [
         "shell"
       ],
-      "match": "\\bgit\\s+commit\\b[^|;&]*\\s-n\\b",
+      "match": "\\bgit(?:\\s+-C\\s+\\S+|\\s+-c\\s+\\S+|\\s+-[a-zA-Z]|\\s+--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?)*\\s+commit\\b[^|;&]*\\s-n\\b",
       "why": "-n on git commit is short for --no-verify and skips hooks",
       "profiles": [
         "minimal",
@@ -63,7 +92,7 @@
       "tools": [
         "shell"
       ],
-      "match": "\\bgit\\s+reset\\s+--hard\\b",
+      "match": "\\bgit(?:\\s+-C\\s+\\S+|\\s+-c\\s+\\S+|\\s+-[a-zA-Z]|\\s+--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?)*\\s+reset\\s+--hard\\b",
       "why": "discards uncommitted work irrecoverably",
       "profiles": [
         "minimal",
@@ -77,7 +106,7 @@
       "tools": [
         "shell"
       ],
-      "match": "\\bgit\\s+clean\\s+-[a-z]*f",
+      "match": "\\bgit(?:\\s+-C\\s+\\S+|\\s+-c\\s+\\S+|\\s+-[a-zA-Z]|\\s+--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?)*\\s+clean\\s+-[a-z]*f",
       "why": "deletes untracked files irrecoverably",
       "profiles": [
         "minimal",
@@ -91,7 +120,7 @@
       "tools": [
         "shell"
       ],
-      "match": "\\bgit\\s+checkout\\s+--\\s+\\.",
+      "match": "\\bgit(?:\\s+-C\\s+\\S+|\\s+-c\\s+\\S+|\\s+-[a-zA-Z]|\\s+--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?)*\\s+checkout\\s+--\\s+\\.",
       "why": "discards all working-tree changes",
       "profiles": [
         "minimal",
@@ -133,7 +162,7 @@
       "tools": [
         "shell"
       ],
-      "match": "\\brm\\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\\b",
+      "match": "\\brm\\s+(?=[^|;&]*(?:-[a-zA-Z]*r[a-zA-Z]*\\b|--recursive\\b))(?=[^|;&]*(?:-[a-zA-Z]*f[a-zA-Z]*\\b|--force\\b))[^|;&]*",
       "why": "recursive force delete",
       "profiles": [
         "standard",
