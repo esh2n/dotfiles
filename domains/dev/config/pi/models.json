@@ -3,7 +3,7 @@
     "proxy": {
       "baseUrl": "http://localhost:4000/v1",
       "api": "openai-completions",
-      "apiKey": "sk-local-proxy",
+      "apiKey": "!op read op://llm-automation/litellm/credential",
       "compat": {
         "supportsDeveloperRole": false,
         "maxTokensField": "max_tokens"

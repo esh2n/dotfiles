@@ -14,10 +14,11 @@
         "baseUrl": "confirm /v1 vs bare :4000 against the running proxy",
         "compat": "localhost gateways: pi-ai treats an unknown URL as OpenAI itself and sends fields LiteLLM may reject — these two are the usual fixes and have no UI field, so they must live here.",
         "supportsDeveloperRole": "system prompt as `system`, not `developer`",
-        "maxTokensField": "if the proxy rejects max_completion_tokens"
+        "maxTokensField": "if the proxy rejects max_completion_tokens",
+        "pi.apiKey": "rotated 2026-09-20: pi resolves the gateway key at auth time via its `!command` apiKey form (docs/models.md 'value resolution'); the literal sk-local-proxy constant is retired. Same op item the proxy and dsh use."
       },
       "pi": {
-        "apiKey": "sk-local-proxy"
+        "apiKey": "!op read op://llm-automation/litellm/credential"
       },
       "dsh": {
         "displayName": "LiteLLM (local)",
@@ -38,7 +39,9 @@
         "apiKeyEnv": "DEEPSEEK_API_KEY"
       },
       "reasoning": true,
-      "input": ["text"],
+      "input": [
+        "text"
+      ],
       "contextWindow": 1000000,
       "maxTokens": 16384,
       "compat": {
@@ -71,7 +74,9 @@
         "apiKeyEnv": "DEEPSEEK_API_KEY"
       },
       "reasoning": true,
-      "input": ["text"],
+      "input": [
+        "text"
+      ],
       "contextWindow": 1000000,
       "maxTokens": 32768,
       "compat": {
@@ -95,7 +100,9 @@
         "model": "qwen/qwen3.8-27b"
       },
       "reasoning": true,
-      "input": ["text"],
+      "input": [
+        "text"
+      ],
       "contextWindow": 131072,
       "maxTokens": 32768,
       "compat": {
