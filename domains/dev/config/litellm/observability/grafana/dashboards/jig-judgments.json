@@ -1,46 +1,203 @@
 {
   "uid": "jig-judgments",
-  "title": "Judgment service (jig) — what jev costs",
-  "description": "jev is called directly by the jig judgment service, not through LiteLLM, so its spend never appears on the gateway dashboard. This is that missing half: tokens the judgment model reported, judgments served, and how long they took. Counters live in the service process and are reset when launchd restarts it, which is exactly why Prometheus stores them.",
-  "tags": ["jig", "llm", "cost"],
+  "title": "jevのコストと使用状況",
+  "description": "jevを呼ぶのにかかったコストと、その使われ方を見るダッシュボード。コストはLiteLLMプロキシが実際のトークン量から計算した額。トークン数はjevが自分で報告した値をそのまま使っている。",
+  "tags": [
+    "jev",
+    "llm",
+    "cost"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
   "refresh": "1m",
-  "time": { "from": "now-24h", "to": "now" },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {},
   "graphTooltip": 1,
   "panels": [
     {
+      "id": 13,
+      "type": "stat",
+      "title": "直近24時間の費用",
+      "description": "jevを呼ぶのにかかった直近24時間ぶんの費用。実際のトークン量からプロキシが計算した額。",
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(litellm_spend_metric_total{model=\"typesafe/jev-1.13.0\"}[24h]))",
+          "legendFormat": "24h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 6
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "費用の累計",
+      "description": "計測を始めてからの費用の合計。",
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "litellm_spend_metric_total{model=\"typesafe/jev-1.13.0\"}",
+          "legendFormat": "24h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 6
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
       "id": 1,
       "type": "stat",
-      "title": "直近24時間の判定トークン",
-      "description": "`jig_judgment_tokens_total` の増分。判定モデルが自分で報告した値なので、こちらで数え直したものではない。",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "refId": "A", "expr": "sum(increase(jig_judgment_tokens_total[24h]))", "legendFormat": "24h" }],
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "title": "直近24時間のトークン数",
+      "description": "jevが使ったトークンの直近24時間ぶん。jevが自分で報告した値で、こちらで数え直してはいない。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(jig_judgment_tokens_total[24h]))",
+          "legendFormat": "24h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     },
     {
       "id": 2,
       "type": "stat",
-      "title": "直近24時間の判定回数",
-      "description": "エンドポイント全体。ハーネスが1回判断を求めるたびに1つ増える。",
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "refId": "A", "expr": "sum(increase(jig_judgment_requests_total[24h]))", "legendFormat": "24h" }],
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "title": "直近24時間の呼び出し回数",
+      "description": "jevに判断を頼んだ回数。1回頼むごとに1つ増える。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(jig_judgment_requests_total[24h]))",
+          "legendFormat": "24h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     },
     {
       "id": 3,
       "type": "stat",
-      "title": "判断できなかった割合（24時間）",
-      "description": "`provider_error` は「モデルが答えられなかった」＝上流障害。`bad_request` は呼び出し側の誤りなのでここには入れない。",
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "答えが返らなかった割合（24時間）",
+      "description": "モデルが答えを返せなかった割合。呼び出し側のミスは含めない。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -48,16 +205,58 @@
           "legendFormat": "失敗率"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.01 }, { "color": "red", "value": 0.05 }] } }, "overrides": [] },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.01
+              },
+              {
+                "color": "red",
+                "value": 0.05
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     },
     {
       "id": 4,
       "type": "stat",
-      "title": "判定モデル別の入力トークン（24時間）",
-      "description": "モデルを差し替えたときの比較はここで読む。`model` ラベルは実際に応答したモデル。",
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "モデル別の入力トークン（24時間）",
+      "description": "モデルを差し替えたときに比べるための内訳。ラベルは実際に応答したモデル。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -65,16 +264,40 @@
           "legendFormat": "{{model}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     },
     {
       "id": 5,
       "type": "timeseries",
-      "title": "トークンの推移（入力 / 出力）",
-      "description": "入力が判定の材料、出力が判定そのもの。batched な判定では1往復で最大32問を賄うので、回数よりトークンの方が費用に効く。",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "トークンの推移（入力・出力）",
+      "description": "入力が判断の材料、出力が答え。1回のやり取りで最大32問までまとめられるので、回数よりトークンのほうが費用に響く。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -82,16 +305,46 @@
           "legendFormat": "{{direction}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 6,
       "type": "timeseries",
-      "title": "判定回数の推移（エンドポイント別 / 結果別）",
-      "description": "`kind` は decide（呼び出し側の問い）/ tier（階層の判断）/ compact（圧縮で残す項目の判断）。",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "呼び出しの推移（用途別・結果別）",
+      "description": "用途は decide（呼び出し側の問い）、tier（どのモデル階層かの判断）、compact（圧縮で何を残すかの判断）。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -99,16 +352,46 @@
           "legendFormat": "{{kind}} / {{outcome}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 7,
       "type": "timeseries",
-      "title": "判定の所要時間 p95（エンドポイント別）",
-      "description": "判定1回がハーネスの待ち時間になる。`tier-router` は auto のとき毎プロンプトでここを通るので、この数字がそのまま体感速度。",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "応答時間 p95（用途別）",
+      "description": "1回の判断ぶんだけハーネスが待つ。tierの自動振り分けは毎プロンプトここを通るので、この値がそのまま体感の速さになる。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -121,16 +404,45 @@
           "legendFormat": "p50 {{kind}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 8,
       "type": "timeseries",
-      "title": "1回の判定あたりの入力トークン",
-      "description": "判断が高価になっていないかを見る。材料が長い質問（圧縮の判定は材料が長い）ほどこの値が上がる。",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "1回あたりの入力トークン（用途別）",
+      "description": "判断が重くなっていないかを見る。材料の長い問い（圧縮の判断など）ほど大きくなる。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -138,16 +450,44 @@
           "legendFormat": "{{kind}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 0,
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 9,
       "type": "timeseries",
-      "title": "階層判断の内訳（決めた階層 / 決めきれなかった）",
-      "description": "`jig_tier_decisions_total`。`source=\"fallback\"` は「判断は走ったが確信が持てず既定（main）のままにした」という意味で、これが増えるほどルーティングは何も決めていない。`tier` ラベルは実際に選ばれた階層。",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "振り分けの内訳（階層別・決めきれず）",
+      "description": "source=fallback は「判断はしたが確信が持てず、既定のmainのままにした」ぶん。増えるほど振り分けは実際には何も決めていない。tierラベルは実際に選ばれた階層。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -155,16 +495,46 @@
           "legendFormat": "{{tier}} / {{source}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 10,
       "type": "timeseries",
-      "title": "圧縮判断の内訳（残した / 捨てた項目数）",
-      "description": "`jig_compaction_items_total`。固定される項目（先頭と直近）も含むため、常に「残した」が大半になる。見るのは「捨てた」が動いているかどうか。",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "圧縮の内訳（残した・捨てた項目数）",
+      "description": "先頭と直近など必ず残す項目も含むので、いつも「残した」が大半になる。見るのは「捨てた」が動いているかどうか。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -172,16 +542,46 @@
           "legendFormat": "{{decision}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 11,
       "type": "stat",
-      "title": "階層を決めきれなかった割合（24時間）",
-      "description": "`source=\"fallback\"` の割合。0 に近いほどルーティングが実際に決めている。1 に近いなら、判断の材料か問いを変える必要がある。",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 29 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "振り分けを決めきれなかった割合（24時間）",
+      "description": "0に近いほど振り分けが実際に効いている。1に近いなら、判断の材料か問いを見直す必要がある。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -189,16 +589,58 @@
           "legendFormat": "fallback"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.25 }, { "color": "red", "value": 0.5 }] } }, "overrides": [] },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.25
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     },
     {
       "id": 12,
       "type": "stat",
-      "title": "圧縮で捨てられた項目の割合（24時間）",
-      "description": "判断された項目のうち捨てられた割合。0 のままなら問いが何も選別していない（＝費用だけ払っている）。判断された項目だけを分母にする。",
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 29 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "圧縮で捨てた割合（24時間）",
+      "description": "判断した項目のうち捨てた割合。0のままなら問いが何も選別していない（＝費用だけ払っている）。分母は判断した項目だけ。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 34
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -206,8 +648,25 @@
           "legendFormat": "dropped"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
     }
   ]
 }

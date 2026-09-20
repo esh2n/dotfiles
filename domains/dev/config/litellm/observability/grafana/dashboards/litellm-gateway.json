@@ -1,14 +1,21 @@
 {
   "uid": "litellm-gateway",
   "title": "LLM gateway (LiteLLM) — cost, speed, failures",
-  "description": "The gateway's own metrics, stored by Prometheus. Read it top-left to bottom-right: what it costs, who is spending it, how fast it answers, what is failing. Each panel's labels are the comparison axes: `requested_model` is the alias the harness asked for (main / complex / deterministic), `model` is what actually served it, `user_agent` is the harness that sent it.",
-  "tags": ["llm", "gateway", "litellm"],
+  "description": "ローカルの LLM ゲートウェイの稼働状況。左上から右下へ、費用・利用元・応答速度・失敗の順。数字はすべて実際に応答したモデル単位で、main / complex などの別名は「振り分けが効いたか」の確認に使う。",
+  "tags": [
+    "llm",
+    "gateway",
+    "litellm"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
   "refresh": "1m",
-  "time": { "from": "now-24h", "to": "now" },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {},
   "graphTooltip": 1,
   "panels": [
@@ -16,120 +23,383 @@
       "id": 1,
       "type": "stat",
       "title": "直近24時間の費用",
-      "description": "alert 1 と同じ式。$5 を超えると DailyCostHigh が発火する。",
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "アラート 1 と同じ式。$5 を超えると DailyCostHigh が発火する。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(increase(litellm_spend_metric_total[24h]))", "legendFormat": "24h" }
+        {
+          "refId": "A",
+          "expr": "sum(increase(litellm_spend_metric_total[24h]))",
+          "legendFormat": "24h"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "area" }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
     },
     {
       "id": 2,
       "type": "stat",
-      "title": "累計費用（proxy 起動中のみ）",
-      "description": "proxy のプロセス内カウンタ。proxy を再起動すると 0 に戻るため、長期の累計はこのパネルでは追えない（履歴は Prometheus 側にある）。",
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "累計費用（過去90日）",
+      "description": "過去90日の合計費用。90日より前の分は含まない。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(litellm_spend_metric_total)", "legendFormat": "累計" }
+        {
+          "refId": "A",
+          "expr": "sum(increase(litellm_spend_metric_total[90d]))",
+          "legendFormat": "累計"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "none", "graphMode": "none" }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none"
+      }
     },
     {
       "id": 3,
       "type": "stat",
       "title": "直近24時間のリクエスト数",
-      "description": "成功したリクエストのみ。失敗は下の「失敗の累計」と「失敗率」を見る。",
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "成功リクエストのみ。失敗は「失敗の累計」「失敗率」を参照。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(increase(litellm_deployment_success_responses_total[24h]))", "legendFormat": "成功" }
+        {
+          "refId": "A",
+          "expr": "sum(increase(litellm_deployment_success_responses_total[24h]))",
+          "legendFormat": "成功"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "none", "graphMode": "area" }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "area"
+      }
     },
     {
       "id": 4,
       "type": "stat",
       "title": "失敗の累計",
-      "description": "失敗カウンタは model / user_agent ラベルが空（実測）なので、どのモデルが失敗したかはここでは分からない。切り分けは ~/Library/Logs/litellm-proxy.log。",
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "失敗したリクエストの累計。どのモデルで失敗したかまでは分けられないので、全体の件数だけを出す。内訳を追うときはログ（~/Library/Logs/litellm-proxy.log）を見る。",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum(litellm_deployment_failure_responses_total)", "legendFormat": "失敗" }
+        {
+          "refId": "A",
+          "expr": "sum(litellm_deployment_failure_responses_total)",
+          "legendFormat": "失敗"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }] } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            },
+            {
+              "color": "orange",
+              "value": 1
+            }
+          ]
+        }
+      }
     },
-
     {
       "id": 5,
       "type": "timeseries",
       "title": "費用の推移（実モデル別）",
-      "description": "ラベルは `model`（実際に応答したモデル）。`requested_model`（別名）は spend の counter には付かないため、別名との対応は main=deepseek-flash / complex=deepseek-v4-pro で読む。",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "実際に応答したモデルごとの費用の推移。別名（main / complex …）とモデルの対応は固定ではないので、この画面だけで対応を決め打ちしない。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (model) (increase(litellm_spend_metric_total[$__rate_interval]))", "legendFormat": "{{model}}" }
+        {
+          "refId": "A",
+          "expr": "sum by (model) (increase(litellm_spend_metric_total[$__rate_interval]))",
+          "legendFormat": "{{model}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "currencyUSD", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 6,
       "type": "timeseries",
-      "title": "リクエスト数（別名別）",
-      "description": "ハーネスが要求した別名。ここで 1 本だけ伸びている＝その振り分けが効いている、という読み方をする。",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "リクエスト数（モデル別・入口別）",
+      "description": "モデル別のリクエスト件数が主軸。別名（入口）も重ねてあり、狙った入口だけが伸びていれば振り分けが効いている。速度や費用を比べる前に、まずここで件数を確認する。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (requested_model) (increase(litellm_deployment_success_responses_total[$__rate_interval]))", "legendFormat": "{{requested_model}}" }
+        {
+          "refId": "A",
+          "expr": "sum by (litellm_model_name) (increase(litellm_deployment_success_responses_total[$__rate_interval]))",
+          "legendFormat": "モデル {{litellm_model_name}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (requested_model) (increase(litellm_deployment_success_responses_total[$__rate_interval]))",
+          "legendFormat": "入口 {{requested_model}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
-
     {
       "id": 7,
       "type": "timeseries",
       "title": "リクエスト数（ハーネス別）",
-      "description": "どのエージェントハーネスから来たか（user_agent）。pi 以外を使い始めると、ここが 2 本以上になる。ハーネス比較はこのパネルが起点。",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "送信元のハーネス（`user_agent`）別。pi 以外を使い始めると系列が増える。ハーネス比較の起点。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (user_agent) (increase(litellm_deployment_success_responses_total[$__rate_interval]))", "legendFormat": "{{user_agent}}" }
+        {
+          "refId": "A",
+          "expr": "sum by (user_agent) (increase(litellm_deployment_success_responses_total[$__rate_interval]))",
+          "legendFormat": "{{user_agent}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 8,
       "type": "timeseries",
-      "title": "TTFT 平均（別名別）",
-      "description": "最初の文字が出るまでの平均秒数。alert 3 はこの全体平均版で、普段の2倍かつ3秒超を見ている。",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "TTFT 平均（モデル別）",
+      "description": "最初の文字が出るまでの平均秒数（モデル別）。アラート 3 は全体平均を見ていて、平常の 2 倍かつ 3 秒超で発火する。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (requested_model) (rate(litellm_llm_api_time_to_first_token_metric_sum[$__rate_interval]))\n/\nsum by (requested_model) (rate(litellm_llm_api_time_to_first_token_metric_count[$__rate_interval]))",
-          "legendFormat": "{{requested_model}}"
+          "expr": "sum by (model) (rate(litellm_llm_api_time_to_first_token_metric_sum[$__rate_interval]))\n/\nsum by (model) (rate(litellm_llm_api_time_to_first_token_metric_count[$__rate_interval]))",
+          "legendFormat": "{{model}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3 }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
-
     {
       "id": 9,
       "type": "timeseries",
       "title": "TTFT 平均（全体）",
-      "description": "モデルをまたいだ全体の平均。モデルを切り替えたときに、ここが上がったか下がったかが最初に見る数字。",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "モデルをまたいだ全体平均。モデル別を見たあとの補助として、全体が動いたかを確認する。構成比で変わるため単独では判断しない。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -137,16 +407,41 @@
           "legendFormat": "全体 TTFT"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 3, "custom": { "fillOpacity": 0 } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "fillOpacity": 0
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
     },
     {
       "id": 10,
       "type": "timeseries",
       "title": "失敗率",
-      "description": "alert 2 と同じ式。分母は成功＋失敗（2つの counter はラベル集合が違うので個別に sum してから足す）。静かな時間帯の 1件/1件 を 100% と読まないよう、トラフィック下限を alert 側に置いてある。",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "全リクエストに対する失敗の割合（アラート 2 と同じ基準）。モデル別には出せない（→「失敗の累計」）。件数が少ない時間帯の 1件/1件 を 100% と誤読しないよう、アラート側で下限件数を設けている。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -158,61 +453,613 @@
         "defaults": {
           "unit": "percentunit",
           "decimals": 2,
-          "custom": { "fillOpacity": 10 },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.05 }] }
+          "custom": {
+            "fillOpacity": 10
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.05
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
     },
-
     {
       "id": 11,
       "type": "timeseries",
-      "title": "生成速度（1トークンあたりの秒）",
-      "description": "TPOT。TTFT が「話し始めるまで」なら、こちらは「話し続ける速さ」。ローカルモデルはここが明確に遅い。",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 29 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "生成速度（tokens/秒・モデル別）",
+      "description": "生成の速さ（モデル別）。TTFT が応答を始めるまでの速さなら、こちらは話し続ける速さ。大きいほど速い（1秒あたりの生成トークン数）。",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 29
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(litellm_deployment_latency_per_output_token_sum[$__rate_interval]))\n/\nclamp_min(sum(rate(litellm_deployment_latency_per_output_token_count[$__rate_interval])), 0.0001)",
-          "legendFormat": "TPOT"
+          "expr": "sum by (litellm_model_name) (rate(litellm_deployment_latency_per_output_token_count[$__rate_interval]))\n/\nclamp_min(sum by (litellm_model_name) (rate(litellm_deployment_latency_per_output_token_sum[$__rate_interval])), 0.0001)",
+          "legendFormat": "{{litellm_model_name}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4 }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 12,
       "type": "timeseries",
-      "title": "トークン消費（別名別）",
-      "description": "入力と出力を別系列で出す。費用が上がったとき、入力（文脈：長い会話・大きなファイル）が増えたのか出力（生成）が増えたのかを切り分ける。",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 29 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "トークン消費（モデル別）",
+      "description": "入力と出力を別々に表示（モデル別）。費用が上がったとき、入力（長い会話・大きなファイル）と出力（生成）のどちらが増えたかを切り分ける。",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 29
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (requested_model) (increase(litellm_input_tokens_metric_total[$__rate_interval]))", "legendFormat": "入力 {{requested_model}}" },
-        { "refId": "B", "expr": "sum by (requested_model) (increase(litellm_output_tokens_metric_total[$__rate_interval]))", "legendFormat": "出力 {{requested_model}}" }
+        {
+          "refId": "A",
+          "expr": "sum by (model) (increase(litellm_input_tokens_metric_total[$__rate_interval]))",
+          "legendFormat": "入力 {{model}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (model) (increase(litellm_output_tokens_metric_total[$__rate_interval]))",
+          "legendFormat": "出力 {{model}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
       "id": 13,
       "type": "timeseries",
-      "title": "入力のうちキャッシュ済みの割合",
-      "description": "注意（実測で数値が矛盾している）: 累計で cached 33,875,072 > input 32,920,135 と、100% を超える値が出ている。LiteLLM の input_tokens と provider の cache-hit トークンが同じ母集団を数えていないため。単独で判断材料にしないこと。",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 29 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "title": "入力のうちキャッシュ済みの割合（モデル別）",
+      "description": "入力のうちキャッシュが効いた割合（モデル別）。計測のずれで 100% を超えることがあるため、単独では判断材料にしない。",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 29
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(litellm_input_cached_tokens_metric_total[$__range]))\n/\nclamp_min(sum(increase(litellm_input_tokens_metric_total[$__range])), 1)",
-          "legendFormat": "キャッシュ率"
+          "expr": "sum by (model) (increase(litellm_input_cached_tokens_metric_total[$__range]))\n/\nclamp_min(sum by (model) (increase(litellm_input_tokens_metric_total[$__range])), 1)",
+          "legendFormat": "{{model}}"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 2 }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "リクエスト総所要（モデル別）",
+      "description": "1 リクエストが返るまでの平均秒数（モデル別）。待ち時間も含めた体感の総時間。内訳は下の 3 パネル（API 所要・オーバーヘッド・キュー待ち）で切り分ける。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model) (rate(litellm_request_total_latency_metric_sum[$__rate_interval]))\n/\nclamp_min(sum by (model) (rate(litellm_request_total_latency_metric_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "{{model}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "LLM API 所要（モデル別）",
+      "description": "モデル（上流 API）の応答だけにかかった平均秒数。総所要との差が自前スタック側の時間。遅さの原因がモデルか自前かの切り分けに使う。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model) (rate(litellm_llm_api_latency_metric_sum[$__rate_interval]))\n/\nclamp_min(sum by (model) (rate(litellm_llm_api_latency_metric_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "{{model}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "プロキシのオーバーヘッド（モデル別）",
+      "description": "プロキシ自身の処理で足された時間（ミリ秒、他パネルは秒なので注意）。ここが大きければ、遅いのはモデルでなく自前のプロキシ側。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (litellm_model_name) (rate(litellm_overhead_latency_metric_sum[$__rate_interval]))\n/\nclamp_min(sum by (litellm_model_name) (rate(litellm_overhead_latency_metric_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "{{litellm_model_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "キュー待ち時間（モデル別）",
+      "description": "処理が始まる前に待った平均秒数（モデル別）。ここが伸びていれば、同時に投げすぎてプロキシがさばき切れていないサイン。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model) (rate(litellm_request_queue_time_seconds_sum[$__rate_interval]))\n/\nclamp_min(sum by (model) (rate(litellm_request_queue_time_seconds_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "{{model}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "jev（tier の振り分けなど）",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "tier 振り分けのフォールバック率",
+      "description": "tier 振り分けのうち、確信度が閾値に届かず安全側（main）に落ちた割合。jev が振り分けを見送った比率で、閾値を調整するときの主指標。高止まりなら閾値が厳しすぎるか、質問がモデルに効いていない。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 54
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(jig_tier_decisions_total{source=\"fallback\"}[$__range]))\n/\nclamp_min(sum(increase(jig_tier_decisions_total[$__range])), 1)",
+          "legendFormat": "フォールバック率"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "jev の呼び出し数（用途別・成否別）",
+      "description": "jev の呼び出し数。用途（decide / tier / compact）と結果（成功・エラー）の内訳。エラーが増えていれば、jev への接続か鍵に問題。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 54
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind, outcome) (increase(jig_judgment_requests_total[$__rate_interval]))",
+          "legendFormat": "{{kind}} / {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "jev トークン消費（用途別）",
+      "description": "jev が消費したトークン（入力・出力）。jev は今 LiteLLM プロキシを通らないため、上の費用パネルに金額が出ない。ここは消費トークン数までで、金額を出すにはプロキシ経由にする必要がある。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 62
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (direction) (increase(jig_judgment_tokens_total[$__rate_interval]))",
+          "legendFormat": "{{direction}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "jev の応答時間 平均（用途別）",
+      "description": "jev が 1 件に答えるまでの平均秒数（モデル呼び出しを含む）。`kind` 別。tier の振り分けはプロンプト送信前に挟まるので、ここが遅いと体感の応答開始も遅れる。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 62
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (rate(jig_judgment_seconds_sum[$__rate_interval]))\n/\nclamp_min(sum by (kind) (rate(jig_judgment_seconds_count[$__rate_interval])), 0.0001)",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "jev の費用（累計）",
+      "description": "jev（判断モデル）の呼び出しにかかった費用の累計。実際に使ったトークンからプロキシが計算した実費。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 70
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "litellm_spend_metric_total{model=\"typesafe/jev-1.13.0\"}",
+          "legendFormat": "累計"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 6
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "jev の費用（推移）",
+      "description": "jev（判断モデル）の費用の推移。実際に使ったトークンからプロキシが計算した実費を時系列で表示する。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 70
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(litellm_spend_metric_total{model=\"typesafe/jev-1.13.0\"}[$__rate_interval]))",
+          "legendFormat": "jev"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 6,
+          "custom": {
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     }
   ]
 }
