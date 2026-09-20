@@ -2,6 +2,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
+import { reportSkillUsage } from "../app/skills/report-usage";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
 import { SystemClock } from "../infra/clock/system-clock";
@@ -12,11 +13,13 @@ import { ConsoleLogger } from "../infra/logger/console-logger";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
+import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { readSkillCatalog } from "../infra/skills/catalog";
 import { applyCli } from "./apply";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
 import { appendRouterLog, userPromptSubmit } from "./hooks/user-prompt-submit";
+import { parseReportArgs, renderSkillUsage } from "./report";
 import { buildJudgmentProvider, serveDecisionService } from "./serve";
 import { tier } from "./tier";
 
@@ -54,6 +57,24 @@ function resolveSkillRoot(env: Record<string, string | undefined> = process.env)
 /** `JIG_STATE_DIR` overrides where the hand-edit-detection manifest lives, for tests. */
 function resolveStateDir(): string {
   return process.env.JIG_STATE_DIR ?? join(homedir(), ".local", "state", "jig");
+}
+
+/**
+ * Where the fronts keep their session transcripts. Two directories, because the fronts
+ * are two programs; each honors its own override first (`PI_CODING_AGENT_SESSION_DIR`,
+ * `CLAUDE_CONFIG_DIR`) so a moved session tree keeps working, then jig's override.
+ */
+function resolveSessionRoots(env: Record<string, string | undefined> = process.env): string[] {
+  const pi =
+    env.JIG_PI_SESSIONS ??
+    env.PI_CODING_AGENT_SESSION_DIR ??
+    join(homedir(), ".pi", "agent", "sessions");
+  const claudeProjects =
+    env.JIG_CLAUDE_PROJECTS ??
+    join(env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
+  return env.JIG_SESSION_ROOTS === undefined
+    ? [pi, claudeProjects]
+    : env.JIG_SESSION_ROOTS.split(":").filter((entry) => entry !== "");
 }
 
 /** Where the harness-side loopback client looks for the judgment service. */
@@ -146,6 +167,29 @@ export async function main(argv: readonly string[]): Promise<number> {
       process.stdout.write(result.stdout);
       return result.code;
     }
+    case "report": {
+      if (subcommand !== "skills") {
+        ports.logger.error("unknown report", { subcommand });
+        return 2;
+      }
+      const parsed = parseReportArgs(argv.slice(2));
+      if ("error" in parsed) {
+        process.stderr.write(`${parsed.error}\n`);
+        return 2;
+      }
+      const since = new Date(Date.now() - parsed.days * 24 * 60 * 60 * 1000);
+      const files = await findTranscripts(resolveSessionRoots(), { since });
+      const known = new Set(
+        (await readSkillCatalog(resolveSkillRoot())).map((skill) => skill.name),
+      );
+      const { report } = await reportSkillUsage({
+        files,
+        parse: (text, session) => parseSkillTurns(text, session, known),
+        read: (path) => Bun.file(path).text(),
+      });
+      process.stdout.write(renderSkillUsage(report, parsed));
+      return 0;
+    }
     case "serve": {
       const port =
         Number.parseInt(process.env.JIG_DECISION_PORT ?? "", 10) || DEFAULT_DECISION_PORT;
@@ -173,9 +217,11 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
     default:
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | apply [--target pi|dsh|litellm|all] [--write]>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | apply [--target pi|dsh|litellm|all] [--write]>\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
+          "  report skills [--days N] [--json] reads both fronts' session transcripts and\n" +
+          "  shows what the router injected against what the model actually opened.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +
