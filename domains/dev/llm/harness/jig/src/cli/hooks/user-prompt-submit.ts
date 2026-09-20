@@ -1,9 +1,8 @@
-import { createHash } from "node:crypto";
-import { appendFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
 import { type SkillCandidate, selectSkill } from "../../app/routing/select-skill";
 import type { DecisionProvider } from "../../domain/decision/provider";
 import type { Logger } from "../../domain/ports";
+import type { RouterLogEntry } from "../../domain/skills/router-log";
+import { promptHash } from "../../infra/logs/router-log";
 
 interface UserPromptSubmitPayload {
   readonly prompt?: unknown;
@@ -18,7 +17,7 @@ export interface SkillRouterDeps {
    * failure that matters (a request that matched nothing, or a judgment below the
    * gate) looks exactly like a router that was never consulted.
    */
-  readonly record: (entry: Record<string, unknown>) => Promise<void>;
+  readonly record: (entry: RouterLogEntry) => Promise<void>;
   readonly logger?: Logger;
   readonly env?: Record<string, string | undefined>;
 }
@@ -49,15 +48,28 @@ function isDisabled(env: Record<string, string | undefined>): boolean {
 }
 
 /**
+ * Which harness this hook is running inside, from the wrapper that invoked it.
+ *
+ * The hook cannot discover it: by the time it runs, all it has is a prompt on stdin, and
+ * the same binary is wired into more than one harness. The wrapper knows, so the wrapper
+ * says (`JIG_FRONT=claude`). `unknown` is the honest default — attributing an unlabelled
+ * invocation to a front would put a harness's numbers in another's.
+ */
+function frontOf(env: Record<string, string | undefined>): string {
+  const front = env.JIG_FRONT?.trim();
+  return front === undefined || front === "" ? "unknown" : front;
+}
+
+/**
  * Identity of the prompt exactly as it arrived. `promptChars` alone cannot tell two
  * prompts apart: a batch of same-length but different requests reads as one prompt
  * whose confidence wandered, and a repeatability claim made on lengths cannot be
  * checked afterwards. Twelve hex characters of SHA-256 are enough to group repeats.
+ *
+ * The hash and the writer live in `infra/log/router-log.ts`, because the judgment service
+ * writes to the same log for the harnesses that call `/skill`; two copies of this function
+ * would make those lines impossible to join to this one's.
  */
-function promptHash(prompt: string): string {
-  return createHash("sha256").update(prompt).digest("hex").slice(0, 12);
-}
-
 /**
  * Claude Code `UserPromptSubmit` hook entrypoint: pick the skill this prompt matches and
  * put it back into the request as context.
@@ -99,6 +111,7 @@ export async function userPromptSubmit(
     const decided = await selectSkill(prompt, candidates, deps.provider, {}, options);
     await deps.record({
       at: new Date().toISOString(),
+      front: frontOf(env),
       promptHash: promptHash(prompt),
       promptChars: prompt.length,
       candidates: candidates.length,
@@ -119,6 +132,7 @@ export async function userPromptSubmit(
     await deps
       .record({
         at: new Date().toISOString(),
+        front: frontOf(env),
         promptHash: promptHash(prompt),
         promptChars: prompt.length,
         error: message,
@@ -126,10 +140,4 @@ export async function userPromptSubmit(
       .catch(() => undefined);
     return "";
   }
-}
-
-/** Append one decision line, creating the log's directory on first use. */
-export async function appendRouterLog(path: string, entry: Record<string, unknown>): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await appendFile(path, `${JSON.stringify(entry)}\n`, "utf8");
 }

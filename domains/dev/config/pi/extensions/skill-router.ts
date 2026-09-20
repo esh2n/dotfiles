@@ -108,7 +108,10 @@ async function askSkill(prompt: string, timeoutMs: number): Promise<SkillDecisio
       "content-type": "application/json",
       ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),
     },
-    body: JSON.stringify({ prompt }),
+    // `front` names the harness the judgment is for. The service cannot work it out —
+    // every front posts this same shape over the same socket — and the router's log
+    // records it so pi's numbers and Claude Code's are not read as one front's.
+    body: JSON.stringify({ front: "pi", prompt }),
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (response.status === 404) throw new Error("judgment service has no /skill endpoint");

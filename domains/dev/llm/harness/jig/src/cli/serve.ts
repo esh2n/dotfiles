@@ -31,9 +31,11 @@ import type {
   RemoteDecisionResponse,
 } from "../domain/decision/remote";
 import type { Logger } from "../domain/ports";
+import type { RouterLogEntry } from "../domain/skills/router-log";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
 import { ensureDecisionToken, tokenFilePath } from "../infra/decision/token-file";
 import { createTypesafeClient, typesafeKeyFromEnv } from "../infra/decision/typesafe-client";
+import { promptHash } from "../infra/logs/router-log";
 import { type JudgmentKind, runWithJudgmentKind } from "../infra/metrics/judgment-kind";
 import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../infra/metrics/registry";
 import { readSkillCatalog } from "../infra/skills/catalog";
@@ -150,6 +152,13 @@ export interface ServeDecisionOptions {
   readonly clock?: AnswerDecisionDeps["clock"];
   /** Compaction options, for tests and for an operator changing the caution level. */
   readonly compaction?: AnswerCompactionDeps["options"];
+  /**
+   * Where skill judgments are written down, one line per request. This is the `/skill`
+   * path's half of the router log (`infra/log/router-log.ts`): a harness that calls this
+   * endpoint decides nothing itself, so if the service does not write the line, no
+   * record of the judgment exists anywhere but the model's own transcript.
+   */
+  readonly recordSkill?: (entry: RouterLogEntry) => Promise<void>;
   /**
    * Where the service's own counters live. Pass one when the caller also feeds it
    * (the provider's token usage is reported to the caller, not to this function),
@@ -274,6 +283,16 @@ function recordDecision(
     return;
   }
 
+  if (kind === "skill") {
+    logger?.info("judgment.skill", {
+      skill: typeof record.skill === "string" ? record.skill : null,
+      source: record.source === "fallback" ? "fallback" : "decided",
+      confidence: typeof record.confidence === "number" ? record.confidence : null,
+      seconds,
+    });
+    return;
+  }
+
   logger?.info("judgment.decide", {
     op: typeof record.op === "string" ? record.op : "unknown",
     seconds,
@@ -284,6 +303,61 @@ const UNAUTHORIZED: RemoteDecisionErrorResponse = {
   op: "error",
   error: { kind: "unauthorized", message: "missing or invalid bearer token" },
 };
+
+/**
+ * Write down one skill judgment for the log `jig report skills` reads.
+ *
+ * The request body carries the front (`{ front: "pi", prompt }`) because the service
+ * cannot work it out: every harness posts the same shape over the same loopback socket.
+ * An unlabelled request is recorded as `unknown` rather than attributed to a front whose
+ * numbers it would then distort.
+ *
+ * A failed judgment is written down too — with `error` instead of a skill — because "the
+ * router was consulted and could not answer" is a different fact from "the router was
+ * never consulted", and only this log can tell them apart.
+ */
+async function recordSkillDecision(
+  record: ((entry: RouterLogEntry) => Promise<void>) | undefined,
+  request: unknown,
+  response: HttpResponse<unknown>,
+  at: string,
+): Promise<void> {
+  if (record === undefined) return;
+
+  const requestBody =
+    typeof request === "object" && request !== null ? (request as Record<string, unknown>) : {};
+  const prompt = typeof requestBody.prompt === "string" ? requestBody.prompt : "";
+  const rawFront = typeof requestBody.front === "string" ? requestBody.front.trim() : "";
+  const front = rawFront === "" ? "unknown" : rawFront;
+  const identity = { at, front, promptHash: promptHash(prompt), promptChars: prompt.length };
+
+  const body = response.body;
+  const decision =
+    typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  const entry: RouterLogEntry =
+    response.status === 200
+      ? {
+          ...identity,
+          skill: typeof decision.skill === "string" ? decision.skill : null,
+          ...(typeof decision.confidence === "number" ? { confidence: decision.confidence } : {}),
+          ...(decision.source === "decided" || decision.source === "fallback"
+            ? { source: decision.source }
+            : {}),
+        }
+      : { ...identity, error: errorMessageOf(body) };
+
+  await record(entry).catch(() => undefined);
+}
+
+/** The message out of the shared error envelope, for a line that could not be answered. */
+function errorMessageOf(body: unknown): string {
+  const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  const error =
+    typeof record.error === "object" && record.error !== null
+      ? (record.error as Record<string, unknown>)
+      : {};
+  return typeof error.message === "string" ? error.message : "skill judgment failed";
+}
 
 /**
  * Constant-time bearer check: a length mismatch is rejected before comparison
@@ -394,6 +468,14 @@ export function serveDecisionService(
       });
       metrics.observe("jig_judgment_seconds", elapsedSeconds, { kind });
       recordDecision(metrics, options.logger, kind, response, elapsedSeconds);
+      if (pathname === "/skill") {
+        await recordSkillDecision(
+          options.recordSkill,
+          body,
+          response,
+          (deps.clock?.now() ?? new Date()).toISOString(),
+        );
+      }
       return json(response.status, response.body);
     },
   });

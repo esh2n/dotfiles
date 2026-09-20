@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { SkillCandidate } from "../../src/app/routing/select-skill";
 import { userPromptSubmit } from "../../src/cli/hooks/user-prompt-submit";
+import type { RouterLogEntry } from "../../src/domain/skills/router-log";
 import { StaticProvider } from "../../src/infra/decision/static-provider";
 
 const candidates: readonly SkillCandidate[] = [
@@ -12,20 +13,24 @@ const candidates: readonly SkillCandidate[] = [
   { name: "writeup", description: "documents that are kept", path: "/skills/writeup/SKILL.md" },
 ];
 
-function deps(choice: { value: string; confidence: number }, recorded: Record<string, unknown>[]) {
+function deps(
+  choice: { value: string; confidence: number },
+  recorded: RouterLogEntry[],
+  env: Record<string, string | undefined> = {},
+) {
   return {
     provider: new StaticProvider({ choice }),
     catalog: async () => candidates,
-    record: async (entry: Record<string, unknown>) => {
+    record: async (entry: RouterLogEntry) => {
       recorded.push(entry);
     },
-    env: {} as Record<string, string | undefined>,
+    env,
   };
 }
 
 describe("userPromptSubmit", () => {
   test("injects the matched skill as context, with its path rather than its body", async () => {
-    const recorded: Record<string, unknown>[] = [];
+    const recorded: RouterLogEntry[] = [];
     const output = await userPromptSubmit(
       JSON.stringify({ prompt: "このページのスクショを撮って" }),
       deps({ value: "ui-capture", confidence: 0.96 }, recorded),
@@ -42,7 +47,7 @@ describe("userPromptSubmit", () => {
   });
 
   test("stays silent when the judgment says nothing applies, but still records it", async () => {
-    const recorded: Record<string, unknown>[] = [];
+    const recorded: RouterLogEntry[] = [];
     const output = await userPromptSubmit(
       JSON.stringify({ prompt: "今日の天気を教えて" }),
       deps({ value: "none", confidence: 0.99 }, recorded),
@@ -53,7 +58,7 @@ describe("userPromptSubmit", () => {
   });
 
   test("stays silent when confidence does not clear the gate", async () => {
-    const recorded: Record<string, unknown>[] = [];
+    const recorded: RouterLogEntry[] = [];
     const output = await userPromptSubmit(
       JSON.stringify({ prompt: "何か" }),
       deps({ value: "ui-capture", confidence: 0.3 }, recorded),
@@ -64,7 +69,7 @@ describe("userPromptSubmit", () => {
   });
 
   test("stays silent on a payload it cannot parse", async () => {
-    const recorded: Record<string, unknown>[] = [];
+    const recorded: RouterLogEntry[] = [];
     expect(
       await userPromptSubmit("{ not json", deps({ value: "ui-capture", confidence: 1 }, recorded)),
     ).toBe("");
@@ -72,7 +77,7 @@ describe("userPromptSubmit", () => {
   });
 
   test("stays silent on an empty prompt rather than spending a judgment", async () => {
-    const recorded: Record<string, unknown>[] = [];
+    const recorded: RouterLogEntry[] = [];
     const output = await userPromptSubmit(
       JSON.stringify({ prompt: "   " }),
       deps({ value: "ui-capture", confidence: 1 }, recorded),
@@ -83,7 +88,7 @@ describe("userPromptSubmit", () => {
   });
 
   test("can be switched off without consulting the judgment", async () => {
-    const recorded: Record<string, unknown>[] = [];
+    const recorded: RouterLogEntry[] = [];
     const off = deps({ value: "ui-capture", confidence: 1 }, recorded);
     off.env = { JIG_SKILL_ROUTER: "off" };
 
@@ -92,9 +97,9 @@ describe("userPromptSubmit", () => {
   });
 
   test("records an identity for the prompt, so repeats can be told from look-alikes", async () => {
-    const first: Record<string, unknown>[] = [];
-    const second: Record<string, unknown>[] = [];
-    const different: Record<string, unknown>[] = [];
+    const first: RouterLogEntry[] = [];
+    const second: RouterLogEntry[] = [];
+    const different: RouterLogEntry[] = [];
     const same = JSON.stringify({ prompt: "同じ依頼" });
 
     await userPromptSubmit(same, deps({ value: "ui-capture", confidence: 0.9 }, first));
@@ -109,8 +114,26 @@ describe("userPromptSubmit", () => {
     expect(first[0]?.promptHash).not.toBe(different[0]?.promptHash);
   });
 
+  test("labels the line with the front its wrapper declared", async () => {
+    const recorded: RouterLogEntry[] = [];
+    await userPromptSubmit(
+      JSON.stringify({ prompt: "決定記録をまとめて" }),
+      deps({ value: "writeup", confidence: 0.9 }, recorded, { JIG_FRONT: "claude" }),
+    );
+
+    const anonymous: RouterLogEntry[] = [];
+    await userPromptSubmit(
+      JSON.stringify({ prompt: "決定記録をまとめて" }),
+      deps({ value: "writeup", confidence: 0.9 }, anonymous),
+    );
+
+    // The wrapper knows which harness it runs in; the hook cannot, so it never guesses.
+    expect(recorded[0]?.front).toBe("claude");
+    expect(anonymous[0]?.front).toBe("unknown");
+  });
+
   test("a failing judgment leaves the prompt untouched and is recorded", async () => {
-    const recorded: Record<string, unknown>[] = [];
+    const recorded: RouterLogEntry[] = [];
     const output = await userPromptSubmit(JSON.stringify({ prompt: "スクショ撮って" }), {
       ...deps({ value: "ui-capture", confidence: 1 }, recorded),
       catalog: async () => {

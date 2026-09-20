@@ -9,16 +9,17 @@ import { SystemClock } from "../infra/clock/system-clock";
 import { createHttpDecisionClient } from "../infra/decision/http-decision-client";
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
+import { appendRouterLog } from "../infra/logs/router-log";
 import { ConsoleLogger } from "../infra/logger/console-logger";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
-import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { readSkillCatalog } from "../infra/skills/catalog";
+import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { applyCli } from "./apply";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
-import { appendRouterLog, userPromptSubmit } from "./hooks/user-prompt-submit";
+import { userPromptSubmit } from "./hooks/user-prompt-submit";
 import { parseReportArgs, renderSkillUsage } from "./report";
 import { buildJudgmentProvider, serveDecisionService } from "./serve";
 import { tier } from "./tier";
@@ -210,6 +211,10 @@ export async function main(argv: readonly string[]): Promise<number> {
         logger: ports.logger,
         clock: ports.clock,
         metrics,
+        // The `/skill` path has no client-side record — the harness that calls it decides
+        // nothing — so the service is the only place that judgment can be written down.
+        recordSkill: (entry) =>
+          appendRouterLog(join(resolveStateDir(), "skill-router.jsonl"), entry),
       });
       // The service is meant to live until launchd stops it: never resolve, so
       // the entrypoint's `process.exit` below is never reached.

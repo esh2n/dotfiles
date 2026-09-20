@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { SkillCandidate } from "../../src/app/routing/select-skill";
 import {
   type RunningDecisionService,
   buildJudgmentProvider,
@@ -18,6 +19,7 @@ import type {
   DecisionProvider,
   ScoreQuery,
 } from "../../src/domain/decision/provider";
+import type { RouterLogEntry } from "../../src/domain/skills/router-log";
 import { StaticProvider } from "../../src/infra/decision/static-provider";
 import { ensureDecisionToken } from "../../src/infra/decision/token-file";
 import { TypesafeError } from "../../src/infra/decision/typesafe-client";
@@ -453,6 +455,111 @@ describe("serveDecisionService", () => {
       expect(
         (await fetch(`${service.url}/other`, { method: "POST", headers: authed(token) })).status,
       ).toBe(404);
+    } finally {
+      service.stop();
+    }
+  });
+});
+
+describe("the /skill path's router log", () => {
+  /** A service whose skill catalog is one skill, so the judgment has something to pick. */
+  async function startSkillService(
+    provider: DecisionProvider,
+    entries: RouterLogEntry[],
+    options: { readonly skillCatalog?: () => Promise<readonly SkillCandidate[]> } = {},
+  ): Promise<{ readonly service: RunningDecisionService; readonly token: string }> {
+    const { env, path } = tempTokenEnv();
+    const token = await ensureDecisionToken(path);
+    const service = serveDecisionService(
+      {
+        provider,
+        port: 0,
+        skillCatalog:
+          options.skillCatalog ??
+          (async () => [
+            {
+              name: "writeup",
+              description: "documents that are kept",
+              path: "/skills/writeup/SKILL.md",
+            },
+          ]),
+        recordSkill: async (entry) => {
+          entries.push(entry);
+        },
+      },
+      env,
+    );
+    return { service, token };
+  }
+
+  test("records the judgment with the front that asked for it", async () => {
+    const entries: RouterLogEntry[] = [];
+    const { service, token } = await startSkillService(
+      new StaticProvider({ choice: { value: "writeup", confidence: 0.9 } }),
+      entries,
+    );
+
+    try {
+      const response = await fetch(`${service.url}/skill`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ front: "pi", prompt: "決定記録をまとめて" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.front).toBe("pi");
+      expect(entries[0]?.skill).toBe("writeup");
+      expect(entries[0]?.source).toBe("decided");
+      expect(entries[0]?.promptHash).toMatch(/^[0-9a-f]{12}$/);
+      expect(entries[0]?.promptChars).toBe("決定記録をまとめて".length);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("records an unlabelled request as unknown rather than as some front", async () => {
+    const entries: RouterLogEntry[] = [];
+    const { service, token } = await startSkillService(
+      new StaticProvider({ choice: { value: "none", confidence: 0.9 } }),
+      entries,
+    );
+
+    try {
+      await fetch(`${service.url}/skill`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ prompt: "今日の天気を教えて" }),
+      });
+
+      expect(entries[0]?.front).toBe("unknown");
+      expect(entries[0]?.skill).toBeNull();
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("records a judgment that failed, which no other record holds", async () => {
+    const entries: RouterLogEntry[] = [];
+    // The endpoint answers 502 when the judgment cannot be made; the log must still say
+    // the router was consulted, because "could not answer" and "never asked" are
+    // different facts about a request the model then handled alone.
+    const { service, token } = await startSkillService(new StaticProvider({}), entries, {
+      skillCatalog: async () => {
+        throw new Error("model refused");
+      },
+    });
+
+    try {
+      const response = await fetch(`${service.url}/skill`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ front: "pi", prompt: "決定記録をまとめて" }),
+      });
+
+      expect(response.status).toBe(502);
+      expect(entries[0]?.front).toBe("pi");
+      expect(String(entries[0]?.error)).toContain("refused");
     } finally {
       service.stop();
     }
