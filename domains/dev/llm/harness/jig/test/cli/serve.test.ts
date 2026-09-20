@@ -72,6 +72,15 @@ describe("buildJudgmentProvider", () => {
   test("builds the credentialed provider when the key is present", () => {
     expect(buildJudgmentProvider({ TYPESAFE_API_KEY: "sk-test" }).name).toBe("jev");
   });
+
+  test("builds the provider in PROXY mode from the proxy key alone", () => {
+    expect(
+      buildJudgmentProvider({
+        JIG_JEV_BASE_URL: "http://localhost:4000/typesafe",
+        JIG_JEV_API_KEY: "sk-litellm-master",
+      }).name,
+    ).toBe("jev");
+  });
 });
 
 /**

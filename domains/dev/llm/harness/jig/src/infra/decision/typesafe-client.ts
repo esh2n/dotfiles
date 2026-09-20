@@ -65,6 +65,32 @@ export function typesafeKeyFromEnv(env: Record<string, string | undefined> = pro
   return key;
 }
 
+/**
+ * Resolve the client's transport config from the environment, so the service can
+ * reach the judgment model one of two ways without the client knowing which.
+ *
+ * PROXY mode (JIG_JEV_BASE_URL set) routes the call through the local LiteLLM
+ * boundary — e.g. `http://localhost:4000/typesafe`, composing
+ * `http://localhost:4000/typesafe/v1/systemone`. It exists so jev traffic is
+ * metered at that boundary and the one downstream `TYPESAFE_API_KEY` lives only
+ * in the proxy: jig then holds JIG_JEV_API_KEY (the proxy's own master key), and
+ * the proxy overwrites the Authorization header with the vendor key on its way
+ * out. DIRECT mode (no base URL) is the fallback — talk to the vendor directly
+ * with `TYPESAFE_API_KEY`, via `typesafeKeyFromEnv`.
+ *
+ * The key is read exactly once here, preserving the service's single-read
+ * property; the missing-key error still comes from `typesafeKeyFromEnv`.
+ */
+export function resolveJudgmentClientConfig(
+  env: Record<string, string | undefined> = process.env,
+): { readonly apiKey: string; readonly baseUrl?: string } {
+  const proxyKey = env.JIG_JEV_API_KEY;
+  const apiKey =
+    proxyKey !== undefined && proxyKey.trim() !== "" ? proxyKey : typesafeKeyFromEnv(env);
+  const baseUrl = env.JIG_JEV_BASE_URL;
+  return baseUrl !== undefined && baseUrl.trim() !== "" ? { apiKey, baseUrl } : { apiKey };
+}
+
 /** Retryable means "the same call could succeed later", not "the call was wrong". */
 function isRetryable(status: number): boolean {
   return status === 429 || status === 529 || status >= 500;

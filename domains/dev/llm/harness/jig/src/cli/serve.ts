@@ -34,7 +34,10 @@ import type { SkillCandidate } from "../domain/skills/candidate";
 import type { RouterLogEntry } from "../domain/skills/router-log";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
 import { ensureDecisionToken, tokenFilePath } from "../infra/decision/token-file";
-import { createTypesafeClient, typesafeKeyFromEnv } from "../infra/decision/typesafe-client";
+import {
+  createTypesafeClient,
+  resolveJudgmentClientConfig,
+} from "../infra/decision/typesafe-client";
 import { promptHash } from "../infra/logs/router-log";
 import { type JudgmentKind, runWithJudgmentKind } from "../infra/metrics/judgment-kind";
 import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../infra/metrics/registry";
@@ -133,13 +136,18 @@ function defaultSkillRoot(): string {
   return join(homedir(), ".claude", ".skills-merged");
 }
 
-/** The service's own composition root: build the credentialed provider exactly once. */
+/**
+ * The service's own composition root: build the credentialed provider exactly
+ * once. Transport (DIRECT to the vendor, or PROXY through the local LiteLLM
+ * boundary) is chosen from the environment by `resolveJudgmentClientConfig`, so
+ * this root stays the single place the key is read.
+ */
 export function buildJudgmentProvider(
   env: Record<string, string | undefined> = process.env,
   onUsage?: (usage: JevUsage) => void,
 ): JevProvider {
   return new JevProvider({
-    client: createTypesafeClient({ apiKey: typesafeKeyFromEnv(env) }),
+    client: createTypesafeClient(resolveJudgmentClientConfig(env)),
     ...(onUsage === undefined ? {} : { onUsage }),
   });
 }

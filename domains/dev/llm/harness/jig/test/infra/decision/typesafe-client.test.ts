@@ -4,6 +4,7 @@ import {
   type FetchLike,
   TypesafeError,
   createTypesafeClient,
+  resolveJudgmentClientConfig,
   typesafeKeyFromEnv,
 } from "../../../src/infra/decision/typesafe-client";
 
@@ -54,6 +55,50 @@ describe("typesafeKeyFromEnv", () => {
 
   test("returns the key when it is set", () => {
     expect(typesafeKeyFromEnv({ TYPESAFE_API_KEY: "sk-test" })).toBe("sk-test");
+  });
+});
+
+describe("resolveJudgmentClientConfig", () => {
+  test("PROXY: JIG_JEV_BASE_URL routes through the proxy with the proxy key", async () => {
+    const config = resolveJudgmentClientConfig({
+      JIG_JEV_BASE_URL: "http://localhost:4000/typesafe",
+      JIG_JEV_API_KEY: "sk-litellm-master",
+      TYPESAFE_API_KEY: "sk-vendor",
+    });
+    expect(config).toEqual({
+      apiKey: "sk-litellm-master",
+      baseUrl: "http://localhost:4000/typesafe",
+    });
+
+    // The composed request lands on the proxy's /v1/systemone with the proxy key,
+    // never the downstream vendor key.
+    const { attempts, fetch } = scriptedFetch([{ status: 200, body: JSON.stringify(ANSWER) }]);
+    await createTypesafeClient({ ...config, fetch })(REQUEST);
+    expect(attempts[0]?.url).toBe("http://localhost:4000/typesafe/v1/systemone");
+    const headers = attempts[0]?.init?.headers as Record<string, string>;
+    expect(headers.authorization).toBe("Bearer sk-litellm-master");
+  });
+
+  test("DIRECT: no base URL falls back to TYPESAFE_API_KEY and the vendor host", async () => {
+    const config = resolveJudgmentClientConfig({ TYPESAFE_API_KEY: "sk-vendor" });
+    expect(config).toEqual({ apiKey: "sk-vendor" });
+
+    const { attempts, fetch } = scriptedFetch([{ status: 200, body: JSON.stringify(ANSWER) }]);
+    await createTypesafeClient({ ...config, fetch })(REQUEST);
+    expect(attempts[0]?.url).toBe("https://api.typesafe.ai/v1/systemone");
+    const headers = attempts[0]?.init?.headers as Record<string, string>;
+    expect(headers.authorization).toBe("Bearer sk-vendor");
+  });
+
+  test("an empty proxy key falls back to the vendor key rather than sending an empty bearer", () => {
+    expect(
+      resolveJudgmentClientConfig({ JIG_JEV_API_KEY: "   ", TYPESAFE_API_KEY: "sk-vendor" }),
+    ).toEqual({ apiKey: "sk-vendor" });
+  });
+
+  test("neither key set raises the existing helpful error", () => {
+    expect(() => resolveJudgmentClientConfig({})).toThrow(/TYPESAFE_API_KEY is not set/);
+    expect(() => resolveJudgmentClientConfig({})).toThrow(/op run --env-file/);
   });
 });
 
