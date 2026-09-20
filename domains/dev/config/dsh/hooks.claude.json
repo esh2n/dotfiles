@@ -9,7 +9,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun /Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/llm/harness/jig/src/cli/jig.ts hooks pre-tool-use"
+            "command": "bun {{DOTFILES_ROOT}}/domains/dev/llm/harness/jig/src/cli/jig.ts hooks pre-tool-use"
           }
         ]
       }

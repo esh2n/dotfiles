@@ -10,7 +10,7 @@
 #
 # Same op item the proxy resolves at launch (op://llm-automation/litellm/credential).
 set -euo pipefail
-export PATH="/etc/profiles/per-user/esh2n/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
+export PATH="/etc/profiles/per-user/$(id -un)/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
 OP_SERVICE_ACCOUNT_TOKEN="$(security find-generic-password -s litellm-op-token -w)"
 export OP_SERVICE_ACCOUNT_TOKEN
 exec timeout 30 op read op://llm-automation/litellm/credential
