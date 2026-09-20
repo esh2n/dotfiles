@@ -22,6 +22,12 @@
 # UNVERIFIED until dsh first runs: the bridge's matcher/payload semantics
 # (see hooks.claude.json's own "_unverified" note) — confirm at first run
 # and fix here if dsh's tool naming or hook payload shape differs.
+#
+# configPath is a literal absolute string (personal-repo absolute-path
+# convention, same as hooks.claude.json's own command), not the `!!js` tag
+# this file used before: a default YAML schema throws on an unknown `!!js`
+# tag and drops the WHOLE patch silently, losing the guard hook and the
+# default-model override together — see the review finding this replaced.
 - insert:
     - id: agent-default-model
       name: '@deepseek-ai/dsh-agent-default-model'
@@ -31,5 +37,5 @@
     - id: hooks-claude
       name: '@deepseek-ai/dsh-hooks-claude-code'
       config:
-        configPath: !!js require('os').homedir() + '/.dsh/hooks.claude.json'
+        configPath: '/Users/esh2n/.dsh/hooks.claude.json'
         projectDir: '.'
