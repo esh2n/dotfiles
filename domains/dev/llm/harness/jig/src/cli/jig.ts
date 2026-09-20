@@ -108,7 +108,11 @@ export function buildPorts(): Ports {
   };
 }
 
-/** How codex should invoke jig: absolute paths only, since no environment reaches a codex hook. */
+/**
+ * How codex should invoke jig: absolute paths only, since no environment is
+ * promised to a codex hook. The mise shim survives bun upgrades, but with
+ * no PATH at all it mangles HOME (observed), so PATH is pinned in front.
+ */
 function codexRegistration(): {
   paths: { hooksJson: string; configToml: string };
   input: { command: string; matcher: string; timeoutSeconds: number };
@@ -120,7 +124,7 @@ function codexRegistration(): {
   return {
     paths: { hooksJson: join(codexHome, "hooks.json"), configToml: join(codexHome, "config.toml") },
     input: {
-      command: `'${bun}' '${jig}' hooks pre-tool-use --harness codex`,
+      command: `/usr/bin/env PATH=/usr/bin:/bin '${bun}' '${jig}' hooks pre-tool-use --harness codex`,
       matcher: "Bash|apply_patch|Write|Edit",
       timeoutSeconds: 10,
     },
