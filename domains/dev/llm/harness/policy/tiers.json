@@ -15,10 +15,10 @@
         "compat": "localhost gateways: pi-ai treats an unknown URL as OpenAI itself and sends fields LiteLLM may reject — these two are the usual fixes and have no UI field, so they must live here.",
         "supportsDeveloperRole": "system prompt as `system`, not `developer`",
         "maxTokensField": "if the proxy rejects max_completion_tokens",
-        "pi.apiKey": "rotated 2026-09-20: pi resolves the gateway key at auth time via its `!command` apiKey form (docs/models.md 'value resolution'); the literal sk-local-proxy constant is retired. Same op item the proxy and dsh use."
+        "pi.apiKey": "resolved at auth time by proxy-key.sh (headless: Keychain service-account token -> op read), so pi never triggers a 1Password desktop approval per message. Absolute path = personal-repo convention. Same op item the proxy uses."
       },
       "pi": {
-        "apiKey": "!op read op://llm-automation/litellm/credential"
+        "apiKey": "!/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/litellm/proxy-key.sh"
       },
       "dsh": {
         "displayName": "LiteLLM (local)",

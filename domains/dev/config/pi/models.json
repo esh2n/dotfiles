@@ -3,7 +3,7 @@
     "proxy": {
       "baseUrl": "http://localhost:4000/v1",
       "api": "openai-completions",
-      "apiKey": "!op read op://llm-automation/litellm/credential",
+      "apiKey": "!/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/litellm/proxy-key.sh",
       "compat": {
         "supportsDeveloperRole": false,
         "maxTokensField": "max_tokens"
