@@ -5,7 +5,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "bash|write|edit|str_replace_editor",
         "hooks": [
           {
             "type": "command",

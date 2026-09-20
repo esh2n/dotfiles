@@ -125,7 +125,30 @@ export function validateGuardDoc(json: unknown): GuardDoc {
 
 export interface GuardCommand {
   readonly tool: string;
+  /** The string a rule's `match` runs against: the shell command, or the file path for write/edit. */
   readonly command: string;
+}
+
+/**
+ * pi tool name -> the abstract `tools` vocabulary rules are written against,
+ * plus the subject to match (mirrors jig's `TOOL_ALIASES` / `subjectFor`).
+ * pi's write/edit tools carry the file path as `path` (not Claude Code's
+ * `file_path`); both are accepted so either payload shape reaches the same
+ * rules. Returns `undefined` for tools the policy has no vocabulary for.
+ */
+export function guardCommandFor(
+  toolName: string,
+  input: Readonly<Record<string, unknown>> | undefined,
+): GuardCommand | undefined {
+  if (toolName === "bash" || toolName === "bash_background") {
+    const command = input?.command;
+    return { tool: "shell", command: typeof command === "string" ? command : "" };
+  }
+  if (toolName === "write" || toolName === "edit") {
+    const filePath = input?.file_path ?? input?.path;
+    return { tool: toolName, command: typeof filePath === "string" ? filePath : "" };
+  }
+  return undefined;
 }
 
 export interface GuardMatch {
@@ -182,8 +205,9 @@ export function loadPolicy(path: string): Loaded {
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
-    if (event.toolName !== "bash" && event.toolName !== "bash_background") return;
-    const cmd: string = (event.input as any)?.command ?? "";
+    const guarded = guardCommandFor(event.toolName, event.input as Record<string, unknown>);
+    if (guarded === undefined) return;
+    const cmd = guarded.command;
     const profile = resolveProfile(process.env);
     const path = policyPath();
 
@@ -197,7 +221,7 @@ export default function (pi: ExtensionAPI) {
       };
     }
 
-    const match = evaluateGuardRules(loaded.rules, { tool: "shell", command: cmd }, profile);
+    const match = evaluateGuardRules(loaded.rules, guarded, profile);
     if (match === undefined) return;
 
     if (match.tier === "deny") {

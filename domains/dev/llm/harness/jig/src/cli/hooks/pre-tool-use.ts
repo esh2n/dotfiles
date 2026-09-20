@@ -85,10 +85,13 @@ async function loadPolicy(path: string, fs: Ports["fs"]): Promise<PolicyLoad> {
  *
  * When the policy loads fine and simply has no matching rule, this returns
  * the empty string — NOT an explicit `permissionDecision: "allow"`. In
- * Claude Code's PreToolUse contract an explicit "allow" BYPASSES the normal
- * permission system (settings.json ask/deny, interactive prompts) for the
- * whole call; staying silent means "no opinion" and lets that system run as
- * it would with no hook at all. Same precedent as
+ * Claude Code's PreToolUse contract an explicit "allow" skips the default
+ * permission PROMPT for the call (settings.json deny/ask permission RULES
+ * are still evaluated, and a blocking hook still beats an allow rule) —
+ * so "allow" would silence the prompt the user relies on for calls no rule
+ * covers. Staying silent means "no opinion" and lets the permission system
+ * run exactly as it would with no hook at all: its rules AND its prompt.
+ * Same precedent as
  * domains/dev/config/claude-profiles/personal/hooks/git-guard.sh (see its
  * comment near the "Release WITHOUT a permissionDecision" note).
  */

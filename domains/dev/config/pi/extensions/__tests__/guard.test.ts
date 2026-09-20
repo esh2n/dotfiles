@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   evaluateGuardRules,
+  guardCommandFor,
   loadPolicy,
   resolveProfile,
   validateGuardDoc,
@@ -170,6 +171,51 @@ describe("evaluateGuardRules", () => {
   test("no rule matches: undefined", () => {
     const match = evaluateGuardRules(rules, { tool: "shell", command: "echo hello" }, "strict");
     expect(match).toBeUndefined();
+  });
+
+  test("a write rule matches pi's write tool by file path", () => {
+    const guarded = guardCommandFor("write", { path: "/x/policy/guard-rules.json", content: "" });
+    expect(guarded).toBeDefined();
+    const match = evaluateGuardRules(rules, guarded as NonNullable<typeof guarded>, "minimal");
+    expect(match).toEqual({ tier: "deny", why: "the policy is not agent-writable" });
+  });
+});
+
+describe("guardCommandFor", () => {
+  test("bash and bash_background map to shell with the command as subject", () => {
+    expect(guardCommandFor("bash", { command: "ls" })).toEqual({ tool: "shell", command: "ls" });
+    expect(guardCommandFor("bash_background", { command: "ls" })).toEqual({
+      tool: "shell",
+      command: "ls",
+    });
+  });
+
+  test("pi's write/edit carry the file path as `path`", () => {
+    expect(guardCommandFor("write", { path: "/a/b.txt", content: "" })).toEqual({
+      tool: "write",
+      command: "/a/b.txt",
+    });
+    expect(guardCommandFor("edit", { path: "/a/b.txt", edits: [] })).toEqual({
+      tool: "edit",
+      command: "/a/b.txt",
+    });
+  });
+
+  test("a Claude Code-shaped `file_path` is accepted too", () => {
+    expect(guardCommandFor("write", { file_path: "/a/b.txt" })).toEqual({
+      tool: "write",
+      command: "/a/b.txt",
+    });
+  });
+
+  test("a missing subject degrades to an empty string, as bash always has", () => {
+    expect(guardCommandFor("bash", {})).toEqual({ tool: "shell", command: "" });
+    expect(guardCommandFor("write", undefined)).toEqual({ tool: "write", command: "" });
+  });
+
+  test("tools the policy has no vocabulary for are not intercepted", () => {
+    expect(guardCommandFor("read", { path: "/a/b.txt" })).toBeUndefined();
+    expect(guardCommandFor("grep", { pattern: "x" })).toBeUndefined();
   });
 });
 
