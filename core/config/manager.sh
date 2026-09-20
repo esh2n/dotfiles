@@ -279,6 +279,25 @@ link_pi_resources() {
 # dshは$DSH_HOME(既定~/.dsh)を読む。プロファイルはdsh自身が作るpnpm workspace
 # なので、リポジトリが持つファイルだけを個別リンクし、ディレクトリごとは
 # リンクしない。profileのpatchはdshが該当profileを作成済みの場合のみ。
+# Deploy a repo file that carries {{HOME}}/{{DOTFILES_ROOT}}/{{USER}}
+# placeholders as an EXPANDED COPY (not a symlink): the hook/cordis contexts
+# that read these files do not expand env vars, and a symlink would hand them
+# the raw {{...}} tokens. Same substitution set as process_template, so the
+# deployed copy is portable — each machine expands to its own paths.
+install_expanded() {
+    local src="$1" dest="$2"
+    [[ -f "$src" ]] || return 0
+    ensure_dir "$(dirname "$dest")"
+    # Break any existing symlink first: a bare `> dest` on a symlink writes
+    # THROUGH it into the repo source. Remove it so we write a fresh regular file.
+    rm -f "$dest"
+    sed -e "s|{{HOME}}|${HOME}|g" \
+        -e "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT}|g" \
+        -e "s|{{USER}}|${USER}|g" \
+        "$src" > "$dest"
+    log_success "Installed (expanded) $src -> $dest"
+}
+
 link_dsh_resources() {
     local src_dir="$1"
     local dsh_home="${DSH_HOME:-${HOME}/.dsh}"
@@ -296,8 +315,9 @@ link_dsh_resources() {
     # hooks.claude.json wires dsh into jig's PreToolUse hook via the
     # @deepseek-ai/dsh-hooks-claude-code bridge (see profiles/{proxy,headless}/
     # cordis.patch.yml, id: hooks-claude, whose configPath points here).
-    [[ -f "${src_dir}/hooks.claude.json" ]] && \
-        link_file "${src_dir}/hooks.claude.json" "${dsh_home}/hooks.claude.json"
+    # Expanded copy, not symlink: the bridge reads the command path literally
+    # and does not expand {{DOTFILES_ROOT}}.
+    install_expanded "${src_dir}/hooks.claude.json" "${dsh_home}/hooks.claude.json"
 
     if [[ -d "${src_dir}/profiles" ]]; then
         local prof_dir prof
@@ -305,7 +325,8 @@ link_dsh_resources() {
             [[ -d "$prof_dir" ]] || continue
             prof="$(basename "$prof_dir")"
             if [[ -d "${dsh_home}/profiles/${prof}" && -f "${prof_dir}cordis.patch.yml" ]]; then
-                link_file "${prof_dir}cordis.patch.yml" "${dsh_home}/profiles/${prof}/cordis.patch.yml"
+                # Expanded copy: cordis does not expand env in configPath.
+                install_expanded "${prof_dir}cordis.patch.yml" "${dsh_home}/profiles/${prof}/cordis.patch.yml"
             else
                 [[ -d "${dsh_home}/profiles/${prof}" ]] || \
                     log_info "dsh profile '${prof}' not scaffolded on this machine; skipping its patch"

@@ -23,11 +23,12 @@
 # (see hooks.claude.json's own "_unverified" note) — confirm at first run
 # and fix here if dsh's tool naming or hook payload shape differs.
 #
-# configPath is a literal absolute string (personal-repo absolute-path
-# convention, same as hooks.claude.json's own command), not the `!!js` tag
-# this file used before: a default YAML schema throws on an unknown `!!js`
-# tag and drops the WHOLE patch silently, losing the guard hook and the
-# default-model override together — see the review finding this replaced.
+# configPath uses the {{HOME}} placeholder, expanded to a real absolute path
+# at deploy time by manager.sh install_expanded (cordis does not expand env
+# vars in this field, so a literal is needed in the DEPLOYED copy — but the
+# source stays portable). This replaced a `!!js require('os').homedir()` tag:
+# a default YAML schema throws on an unknown `!!js` tag and drops the WHOLE
+# patch silently, losing the guard hook and the default-model override.
 - insert:
     - id: agent-default-model
       name: '@deepseek-ai/dsh-agent-default-model'
@@ -37,5 +38,5 @@
     - id: hooks-claude
       name: '@deepseek-ai/dsh-hooks-claude-code'
       config:
-        configPath: '/Users/esh2n/.dsh/hooks.claude.json'
+        configPath: '{{HOME}}/.dsh/hooks.claude.json'
         projectDir: '.'
