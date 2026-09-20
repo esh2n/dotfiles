@@ -22,6 +22,7 @@
   "preferredNotifChannel": "ghostty",
   "skipWorkflowUsageWarning": true,
   "agentPushNotifEnabled": true,
+  "switchModelsOnFlag": true,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/scripts/statusline.sh"
