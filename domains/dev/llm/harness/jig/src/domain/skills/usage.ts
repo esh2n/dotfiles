@@ -34,10 +34,12 @@ export interface SkillTurn {
   /** ISO timestamp of the first entry belonging to the turn. */
   readonly at: string;
   /**
-   * The skill the router put into this request, or `undefined` when nothing was
-   * injected (see the module comment on why a declined request is indistinguishable).
+   * The skills the router put into this request, in the order it ranked them. Empty when
+   * nothing was injected (see the module comment on why a declined request is
+   * indistinguishable).
    */
-  readonly injected: string | undefined;
+  readonly injected: readonly string[];
+  /** The strongest confidence the router reported for `injected`, when it reported one. */
   readonly confidence: number | undefined;
   /** Skills whose file the model opened in this turn, deduplicated, in read order. */
   readonly read: readonly string[];
@@ -91,13 +93,15 @@ export interface SkillUsageRow {
 }
 
 /**
- * How the turns split. The five classes are exhaustive and disjoint, so they add up to
+ * How the turns split. The six classes are exhaustive and disjoint, so they add up to
  * `turns` — a report whose parts do not sum to the whole is a parsing bug, not a finding.
  */
 export interface UsageTotals {
   readonly turns: number;
-  /** Injected, and the model opened the injected skill. */
+  /** One or more injected, and the model opened every injected skill. */
   readonly followed: number;
+  /** Several injected, and the model opened some of them but not all. */
+  readonly partial: number;
   /** Injected, and the model opened nothing at all. */
   readonly ignored: number;
   /** Injected, and the model opened a different skill. */
@@ -121,6 +125,7 @@ export interface SkillUsageReport {
 const EMPTY: UsageTotals = {
   turns: 0,
   followed: 0,
+  partial: 0,
   ignored: 0,
   substituted: 0,
   unrouted: 0,
@@ -128,12 +133,17 @@ const EMPTY: UsageTotals = {
 };
 
 /** One turn's class. Exhaustive by construction, which is what keeps the totals add up. */
-type TurnOutcome = "followed" | "ignored" | "substituted" | "unrouted" | "silent";
+type TurnOutcome = "followed" | "partial" | "ignored" | "substituted" | "unrouted" | "silent";
 
 function outcomeOf(turn: SkillTurn): TurnOutcome {
-  if (turn.injected !== undefined) {
-    if (turn.read.length === 0) return "ignored";
-    return turn.read.includes(turn.injected) ? "followed" : "substituted";
+  if (turn.injected.length > 0) {
+    const opened = new Set(turn.read);
+    const taken = turn.injected.filter((skill) => opened.has(skill)).length;
+    if (taken === 0) return turn.read.length === 0 ? "ignored" : "substituted";
+    // "Followed" for a multi-pick turn means every skill it named was opened. Opening one
+    // of two is its own outcome: it is how an over-eager pick shows up, and counting it as
+    // followed would hide exactly the thing a second pick has to be judged on.
+    return taken === turn.injected.length ? "followed" : "partial";
   }
   return turn.read.length > 0 ? "unrouted" : "silent";
 }
@@ -183,15 +193,15 @@ export function summarizeSkillUsage(
       if (to === "" || turn.at > to) to = turn.at;
     }
 
-    if (turn.injected !== undefined) rowOf(turn.injected).injected += 1;
+    for (const skill of new Set(turn.injected)) rowOf(skill).injected += 1;
 
     // The turn is the unit: opening a skill's body and one of its references in the same
     // request is one use of that skill, not two.
     for (const skill of new Set(turn.read)) {
       const row = rowOf(skill);
       row.opened += 1;
-      if (turn.injected === skill) row.followed += 1;
-      if (turn.injected === undefined) row.unrouted += 1;
+      if (turn.injected.includes(skill)) row.followed += 1;
+      if (turn.injected.length === 0) row.unrouted += 1;
     }
   }
 

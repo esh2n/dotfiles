@@ -39,6 +39,26 @@ const PI_PROMPT =
 const PI_INJECTION =
   '{"type":"custom_message","customType":"jig-skill-router","content":"jig skill router: this request matches the \\"go-modern\\" skill (judgment confidence 1.00).\\nRead /Users/x/.claude/.skills-merged/go-modern/SKILL.md and follow it before doing the work.","display":false,"id":"c1","parentId":"m1","timestamp":"2026-09-20T02:00:06.000Z"}';
 
+/**
+ * The list form the router writes now: one line per skill, strongest first. The single form
+ * above stays a fixture, because sessions written before the router could name more than one
+ * are still on disk and still being read.
+ */
+const PI_INJECTION_LIST = JSON.stringify({
+  type: "custom_message",
+  customType: "jig-skill-router",
+  content: [
+    "jig skill router: 2 skills match this request (judgment confidence 0.95, 0.81).",
+    "Read and follow these before doing the work:",
+    '- "writeup": /Users/x/.claude/.skills-merged/writeup/SKILL.md',
+    '- "go-modern": /Users/x/.claude/.skills-merged/go-modern/SKILL.md',
+  ].join("\n"),
+  display: false,
+  id: "c2",
+  parentId: "m1",
+  timestamp: "2026-09-20T02:00:06.000Z",
+});
+
 function piRead(path: string): string {
   return JSON.stringify({
     type: "message",
@@ -65,7 +85,7 @@ describe("parseSkillTurns", () => {
 
     expect(turns).toHaveLength(1);
     expect(turns[0]?.harness).toBe("claude");
-    expect(turns[0]?.injected).toBe("writeup");
+    expect(turns[0]?.injected).toEqual(["writeup"]);
     expect(turns[0]?.confidence).toBe(0.92);
     expect(turns[0]?.read).toEqual(["writeup"]);
   });
@@ -80,8 +100,8 @@ describe("parseSkillTurns", () => {
     );
 
     expect(turns).toHaveLength(2);
-    expect(turns[0]?.injected).toBe("writeup");
-    expect(turns[1]?.injected).toBeUndefined();
+    expect(turns[0]?.injected).toEqual(["writeup"]);
+    expect(turns[1]?.injected).toEqual([]);
     expect(turns[1]?.read).toEqual([]);
   });
 
@@ -100,6 +120,22 @@ describe("parseSkillTurns", () => {
     expect(turns[0]?.read).toEqual(["go-modern"]);
   });
 
+  it("reads every skill of the list form, in order, with the strongest confidence", () => {
+    const text = [
+      PI_SESSION,
+      PI_PROMPT,
+      PI_INJECTION_LIST,
+      piRead("/Users/x/.claude/.skills-merged/writeup/SKILL.md"),
+      piRead("/Users/x/.claude/.skills-merged/go-modern/SKILL.md"),
+    ].join("\n");
+
+    const turns = parseSkillTurns(text, "/sessions/pi.jsonl", KNOWN);
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.injected).toEqual(["writeup", "go-modern"]);
+    expect(turns[0]?.confidence).toBeCloseTo(0.95);
+    expect(turns[0]?.read).toEqual(["writeup", "go-modern"]);
+  });
   it("reads a pi turn: prompt, injected skill, opened body through the repo path", () => {
     const text = [
       PI_SESSION,
@@ -112,7 +148,7 @@ describe("parseSkillTurns", () => {
 
     expect(turns).toHaveLength(1);
     expect(turns[0]?.harness).toBe("pi");
-    expect(turns[0]?.injected).toBe("go-modern");
+    expect(turns[0]?.injected).toEqual(["go-modern"]);
     expect(turns[0]?.read).toEqual(["go-modern"]);
   });
 

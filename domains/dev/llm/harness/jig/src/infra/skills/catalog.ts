@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { SkillCandidate } from "../../app/routing/select-skill";
+import type { SkillCandidate } from "../../domain/skills/candidate";
 
 /**
  * Read a skills directory (the flat farm a harness lists) into router candidates.

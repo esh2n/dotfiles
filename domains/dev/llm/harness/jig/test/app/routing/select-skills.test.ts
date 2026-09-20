@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { SkillCandidate } from "../../../src/app/routing/select-skill";
 import { selectSkills, skillQuestion } from "../../../src/app/routing/select-skills";
 import type { Decided, DecisionProvider } from "../../../src/domain/decision/provider";
+import type { SkillCandidate } from "../../../src/domain/skills/candidate";
 
 /**
  * A provider that answers one boolean per question from a table keyed by the skill the
@@ -95,7 +95,9 @@ describe("selectSkills", () => {
     // what separates them; `passed` counts what is left after the gate so a saturating
     // batch (everything at 1.0) is visible rather than silently truncated.
     expect(result.picks).toEqual([]);
+    // Yes, but under the gate: a fallback, and the confidence says how close it came.
     expect(result.source).toBe("fallback");
+    expect(result.confidence).toBeCloseTo(0.79);
     expect(result.passed).toBe(0);
   });
 
@@ -130,11 +132,22 @@ describe("selectSkills", () => {
     expect(result.picks.map((pick) => pick.candidate.name)).toEqual(["ui-capture", "writeup"]);
   });
 
+  test("calls a batch that says no to everything an answer, not a fallback", async () => {
+    const result = await selectSkills("今日の天気", candidates, providerFor(new Map()));
+
+    // "Nothing applies" is the judgment answering. Counting it as a fallback would make a
+    // router that declined look like one that could not decide.
+    expect(result.picks).toEqual([]);
+    expect(result.source).toBe("decided");
+    expect(result.confidence).toBeUndefined();
+  });
+
   test("asks nothing when there is nothing to ask about", async () => {
     const provider = providerFor(new Map());
     expect(await selectSkills("何かの依頼", [], provider)).toEqual({
       picks: [],
       passed: 0,
+      confidence: undefined,
       source: "fallback",
     });
     expect(provider.asked).toEqual([]);

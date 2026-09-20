@@ -49,7 +49,7 @@ function turn(overrides: Partial<SkillTurn> = {}): SkillTurn {
     session: "/sessions/a.jsonl",
     harness: "pi",
     at: "2026-09-20T00:00:00.000Z",
-    injected: undefined,
+    injected: [],
     confidence: undefined,
     read: [],
     ...overrides,
@@ -59,16 +59,17 @@ function turn(overrides: Partial<SkillTurn> = {}): SkillTurn {
 describe("summarizeSkillUsage", () => {
   it("classifies every turn exactly once", () => {
     const report = summarizeSkillUsage([
-      turn({ injected: "writeup", read: ["writeup"] }),
-      turn({ injected: "writeup", read: [] }),
-      turn({ injected: "writeup", read: ["go-modern"] }),
-      turn({ injected: undefined, read: ["go-modern"] }),
-      turn({ injected: undefined, read: [] }),
+      turn({ injected: ["writeup"], read: ["writeup"] }),
+      turn({ injected: ["writeup"], read: [] }),
+      turn({ injected: ["writeup"], read: ["go-modern"] }),
+      turn({ injected: [], read: ["go-modern"] }),
+      turn({ injected: [], read: [] }),
     ]);
 
     expect(report.totals).toEqual({
       turns: 5,
       followed: 1,
+      partial: 0,
       ignored: 1,
       substituted: 1,
       unrouted: 1,
@@ -77,18 +78,16 @@ describe("summarizeSkillUsage", () => {
   });
 
   it("counts a skill the model opened several times in one turn once", () => {
-    const report = summarizeSkillUsage([
-      turn({ injected: undefined, read: ["writeup", "writeup"] }),
-    ]);
+    const report = summarizeSkillUsage([turn({ injected: [], read: ["writeup", "writeup"] })]);
     const row = report.skills.find((skill) => skill.skill === "writeup");
     expect(row?.opened).toBe(1);
   });
 
   it("splits each skill into injected, opened, followed and unscouted", () => {
     const report = summarizeSkillUsage([
-      turn({ injected: "writeup", read: ["writeup"] }),
-      turn({ injected: "writeup", read: [] }),
-      turn({ injected: undefined, read: ["writeup"] }),
+      turn({ injected: ["writeup"], read: ["writeup"] }),
+      turn({ injected: ["writeup"], read: [] }),
+      turn({ injected: [], read: ["writeup"] }),
     ]);
 
     expect(report.skills).toEqual([
@@ -98,9 +97,9 @@ describe("summarizeSkillUsage", () => {
 
   it("keeps per-harness totals that add up to the whole", () => {
     const report = summarizeSkillUsage([
-      turn({ harness: "pi", injected: "writeup", read: ["writeup"] }),
-      turn({ harness: "claude", injected: undefined, read: [] }),
-      turn({ harness: "unknown", injected: undefined, read: ["go-modern"] }),
+      turn({ harness: "pi", injected: ["writeup"], read: ["writeup"] }),
+      turn({ harness: "claude", injected: [], read: [] }),
+      turn({ harness: "unknown", injected: [], read: ["go-modern"] }),
     ]);
 
     expect(report.byHarness.get("pi")?.turns).toBe(1);

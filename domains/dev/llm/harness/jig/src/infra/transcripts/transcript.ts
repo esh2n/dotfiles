@@ -18,8 +18,17 @@ import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { type Harness, type SkillTurn, skillNameFromPath } from "../../domain/skills/usage";
 
-/** The router's own reminder, with the confidence it reported. */
-const REMINDER = /matches the "([^"]+)" skill \(judgment confidence ([0-9.]+)\)/;
+/**
+ * The router's reminder, in the two shapes it has been written in.
+ *
+ * The list form is what the router writes now; the single form is what it wrote before
+ * 2026-09-20, when the question could only name one skill. Sessions from before that date are
+ * still on disk and still being read, so both are parsed — a parser that knew only the new
+ * shape would file every older turn as if nothing had been injected.
+ */
+const REMINDER_LIST_NAMES = /^- "([^"]+)": /gm;
+const REMINDER_LIST_CONFIDENCE = /judgment confidence ([0-9., ]+)\)/;
+const REMINDER_SINGLE = /matches the "([^"]+)" skill \(judgment confidence ([0-9.]+)\)/;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
@@ -68,8 +77,8 @@ function isPrompt(entry: Record<string, unknown>, harness: Harness): boolean {
 }
 
 interface Injection {
-  readonly skill: string;
-  readonly confidence: number;
+  readonly skills: readonly string[];
+  readonly confidence: number | undefined;
 }
 
 /** The router's reminder, from either harness's carrier for hook context. */
@@ -94,11 +103,18 @@ function injectionOf(entry: Record<string, unknown>, harness: Harness): Injectio
   }
 
   if (text === undefined) return undefined;
-  const match = REMINDER.exec(text);
-  if (match === null) return undefined;
-  const skill = match[1];
-  if (skill === undefined) return undefined;
-  return { skill, confidence: Number.parseFloat(match[2] ?? "") };
+
+  const skills = [...text.matchAll(REMINDER_LIST_NAMES)].map((match) => match[1] ?? "");
+  if (skills.length > 0) {
+    const reported = REMINDER_LIST_CONFIDENCE.exec(text)?.[1] ?? "";
+    const top = Number.parseFloat(reported.split(",")[0]?.trim() ?? "");
+    return { skills, confidence: Number.isFinite(top) ? top : undefined };
+  }
+
+  const single = REMINDER_SINGLE.exec(text);
+  if (single?.[1] === undefined) return undefined;
+  const confidence = Number.parseFloat(single[2] ?? "");
+  return { skills: [single[1]], confidence: Number.isFinite(confidence) ? confidence : undefined };
 }
 
 /** Every file this entry opened through a read tool, in call order. */
@@ -132,7 +148,7 @@ function readPathsOf(entry: Record<string, unknown>, harness: Harness): readonly
 interface TurnBuilder {
   readonly harness: Harness;
   readonly at: string;
-  injected: string | undefined;
+  injected: readonly string[];
   confidence: number | undefined;
   readonly read: string[];
 }
@@ -192,7 +208,7 @@ export function parseSkillTurns(
       current = {
         harness,
         at: timestampOf(entry),
-        injected: undefined,
+        injected: [],
         confidence: undefined,
         read: [],
       };
@@ -201,7 +217,7 @@ export function parseSkillTurns(
       current = {
         harness,
         at: timestampOf(entry),
-        injected: undefined,
+        injected: [],
         confidence: undefined,
         read: [],
       };
@@ -209,7 +225,7 @@ export function parseSkillTurns(
     if (current === undefined) continue;
 
     if (injected !== undefined) {
-      current.injected = injected.skill;
+      current.injected = injected.skills;
       current.confidence = injected.confidence;
     }
 

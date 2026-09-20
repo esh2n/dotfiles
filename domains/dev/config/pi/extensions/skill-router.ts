@@ -32,47 +32,62 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 // off without touching the list location.
 
 export interface SkillDecision {
-  /** Chosen skill's name, or `null` when nothing should be injected. */
-  readonly skill: string | null;
-  /** Where the chosen skill's body is, so the model can read it. */
-  readonly path: string | null;
-  readonly confidence: number;
+  /** The skills to inject, strongest first. Empty when nothing should be injected. */
+  readonly skills: readonly SkillPick[];
+  /** How many candidates cleared the gate, before the cap. */
+  readonly passed: number;
   readonly source: "decided" | "fallback";
 }
 
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === "string";
+/** One skill to inject, with where its body is and how strongly it was judged. */
+export interface SkillPick {
+  readonly name: string;
+  readonly path: string;
+  readonly confidence: number;
+}
+
+function readSkillPick(value: unknown): SkillPick {
+  if (typeof value !== "object" || value === null) throw new Error("skill pick is not an object");
+  const record = value as Record<string, unknown>;
+  if (typeof record.name !== "string") throw new Error("skill pick has no name");
+  if (typeof record.path !== "string") throw new Error("skill pick has no path");
+  if (typeof record.confidence !== "number") throw new Error("skill pick has no confidence");
+  return { name: record.name, path: record.path, confidence: record.confidence };
 }
 
 /** Read the service's reply. Throws only on a shape this extension cannot trust. */
 export function readSkillDecision(body: unknown): SkillDecision {
   if (typeof body !== "object" || body === null) throw new Error("skill service replied with no body");
   const record = body as Record<string, unknown>;
-  if (!isNullableString(record.skill) || !isNullableString(record.path)) {
-    throw new Error("skill service reply has no skill/path");
-  }
-  if (typeof record.confidence !== "number") throw new Error("skill service reply has no confidence");
+  if (!Array.isArray(record.skills)) throw new Error("skill service reply has no skills");
+  if (typeof record.passed !== "number") throw new Error("skill service reply has no passed count");
   if (record.source !== "decided" && record.source !== "fallback") {
     throw new Error("skill service reply has no source");
   }
   return {
-    skill: record.skill,
-    path: record.path,
-    confidence: record.confidence,
+    skills: record.skills.map(readSkillPick),
+    passed: record.passed,
     source: record.source,
   };
 }
 
 /**
- * The reminder the model receives. It names the skill, says why it appeared, and
- * points at the body rather than carrying it: a body is 1-15k characters, and
- * injecting it would hand back the context the router just freed.
+ * The reminder the model receives. It names each skill, says why they appeared, and points
+ * at the bodies rather than carrying them: a body is 1-15k characters, and injecting one
+ * would hand back the context the router just freed.
+ *
+ * The text is the same one the Claude Code hook writes, down to the `- "<name>": <path>`
+ * lines, because the report reads a turn's injection back out of the transcript by that
+ * shape. Two harnesses wording it differently would be two report formats.
  */
 export function reminderFor(decision: SkillDecision): string | undefined {
-  if (decision.skill === null || decision.path === null) return undefined;
+  if (decision.skills.length === 0) return undefined;
+  const confidences = decision.skills.map((pick) => pick.confidence.toFixed(2)).join(", ");
+  const count = decision.skills.length === 1 ? "1 skill matches" : `${decision.skills.length} skills match`;
   return [
-    `jig skill router: this request matches the "${decision.skill}" skill (judgment confidence ${decision.confidence.toFixed(2)}).`,
-    `Read ${decision.path} and follow it before doing the work.`,
+    `jig skill router: ${count} this request (judgment confidence ${confidences}).`,
+    "Read and follow these before doing the work:",
+    ...decision.skills.map((pick) => `- "${pick.name}": ${pick.path}`),
   ].join("\n");
 }
 
@@ -109,8 +124,8 @@ async function askSkill(prompt: string, timeoutMs: number): Promise<SkillDecisio
       ...(token === undefined ? {} : { authorization: `Bearer ${token}` }),
     },
     // `harness` names the harness the judgment is for. The service cannot work it out —
-    // every front posts this same shape over the same socket — and the router's log
-    // records it so pi's numbers and Claude Code's are not read as one front's.
+    // every harness posts this same shape over the same socket — and the router's log
+    // records it so pi's numbers and Claude Code's are not read as one harness's.
     body: JSON.stringify({ harness: "pi", prompt }),
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -139,7 +154,9 @@ export default function (pi: ExtensionAPI) {
       const decision = await askSkill(prompt, timeoutMs);
       const reminder = reminderFor(decision);
       if (reminder === undefined) return;
-      ctx.ui.setStatus("skill", `${decision.skill} (${decision.confidence.toFixed(2)})`);
+      const [first] = decision.skills;
+      const picked = decision.skills.map((pick) => pick.name).join(", ");
+      ctx.ui.setStatus("skill", `${picked} (${first?.confidence.toFixed(2) ?? "?"})`);
       return {
         message: { customType: "jig-skill-router", content: reminder, display: false },
       };

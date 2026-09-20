@@ -24,13 +24,13 @@ import {
   answerSkill,
 } from "../app/decision/answer-skill";
 import { type AnswerTierDeps, type TierDecision, answerTier } from "../app/decision/answer-tier";
-import type { SkillCandidate } from "../app/routing/select-skill";
 import type { DecisionProvider } from "../domain/decision/provider";
 import type {
   RemoteDecisionErrorResponse,
   RemoteDecisionResponse,
 } from "../domain/decision/remote";
 import type { Logger } from "../domain/ports";
+import type { SkillCandidate } from "../domain/skills/candidate";
 import type { RouterLogEntry } from "../domain/skills/router-log";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
 import { ensureDecisionToken, tokenFilePath } from "../infra/decision/token-file";
@@ -285,9 +285,10 @@ function recordDecision(
 
   if (kind === "skill") {
     logger?.info("judgment.skill", {
-      skill: typeof record.skill === "string" ? record.skill : null,
+      skills: skillsOf(record).join(", "),
+      passed: typeof record.passed === "number" ? record.passed : null,
       source: record.source === "fallback" ? "fallback" : "decided",
-      confidence: typeof record.confidence === "number" ? record.confidence : null,
+      confidence: topConfidenceOf(record) ?? null,
       seconds,
     });
     return;
@@ -338,8 +339,11 @@ async function recordSkillDecision(
     response.status === 200
       ? {
           ...identity,
-          skill: typeof decision.skill === "string" ? decision.skill : null,
-          ...(typeof decision.confidence === "number" ? { confidence: decision.confidence } : {}),
+          skills: skillsOf(decision),
+          ...(typeof decision.passed === "number" ? { passed: decision.passed } : {}),
+          ...(topConfidenceOf(decision) === undefined
+            ? {}
+            : { confidence: topConfidenceOf(decision) }),
           ...(decision.source === "decided" || decision.source === "fallback"
             ? { source: decision.source }
             : {}),
@@ -347,6 +351,27 @@ async function recordSkillDecision(
       : { ...identity, error: errorMessageOf(body) };
 
   await record(entry).catch(() => undefined);
+}
+
+/** The skill names out of a `/skill` answer, strongest first. */
+function skillsOf(decision: Record<string, unknown>): readonly string[] {
+  if (!Array.isArray(decision.skills)) return [];
+  return decision.skills
+    .map((pick) =>
+      typeof pick === "object" && pick !== null
+        ? (pick as Record<string, unknown>).name
+        : undefined,
+    )
+    .filter((name): name is string => typeof name === "string");
+}
+
+/** The strongest confidence in a `/skill` answer, which is the first pick's. */
+function topConfidenceOf(decision: Record<string, unknown>): number | undefined {
+  if (!Array.isArray(decision.skills)) return undefined;
+  const first = decision.skills[0];
+  if (typeof first !== "object" || first === null) return undefined;
+  const confidence = (first as Record<string, unknown>).confidence;
+  return typeof confidence === "number" ? confidence : undefined;
 }
 
 /** The message out of the shared error envelope, for a line that could not be answered. */

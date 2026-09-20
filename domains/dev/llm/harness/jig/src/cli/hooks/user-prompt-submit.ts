@@ -1,6 +1,11 @@
-import { type SkillCandidate, selectSkill } from "../../app/routing/select-skill";
+import {
+  type SelectSkillsOptions,
+  type SkillPick,
+  selectSkills,
+} from "../../app/routing/select-skills";
 import type { DecisionProvider } from "../../domain/decision/provider";
 import type { Logger } from "../../domain/ports";
+import type { SkillCandidate } from "../../domain/skills/candidate";
 import type { RouterLogEntry } from "../../domain/skills/router-log";
 import { promptHash } from "../../infra/logs/router-log";
 
@@ -22,23 +27,28 @@ export interface SkillRouterDeps {
   readonly env?: Record<string, string | undefined>;
 }
 
-export interface SkillRouterOptions {
-  readonly threshold?: number;
-}
+export interface SkillRouterOptions extends SelectSkillsOptions {}
 
 /**
- * The reminder the model receives. It names the skill, says why it appeared, and points
- * at the body rather than carrying it: the body is 1-15k characters, and injecting it
+ * The reminder the model receives. It names each skill, says why they appeared, and points
+ * at the bodies rather than carrying them: a body is 1-15k characters, and injecting one
  * would hand back most of the list tokens this router exists to save. The
  * `disable-model-invocation` refusal message in Claude Code tells a model to ask the
  * user to run the skill by name; this reminder is the other half of that arrangement —
- * the model still gets the instructions, without the skill being listed.
+ * the model still gets the instructions, without the skills being listed.
+ *
+ * The list is written one skill per line so that the report can read it back: the parser
+ * recognises `- "<name>": <path>` lines, which is how a turn's injection is joined to what
+ * the model then opened. Changing this text without changing that parser makes the router
+ * look like it was never consulted.
  */
-function reminder(candidate: SkillCandidate, confidence: number): string {
-  const rounded = confidence.toFixed(2);
+export function reminder(picks: readonly SkillPick[]): string {
+  const confidences = picks.map((pick) => pick.confidence.toFixed(2)).join(", ");
+  const count = picks.length === 1 ? "1 skill matches" : `${picks.length} skills match`;
   return [
-    `jig skill router: this request matches the "${candidate.name}" skill (judgment confidence ${rounded}).`,
-    `Read ${candidate.path} and follow it before doing the work.`,
+    `jig skill router: ${count} this request (judgment confidence ${confidences}).`,
+    "Read and follow these before doing the work:",
+    ...picks.map((pick) => `- "${pick.candidate.name}": ${pick.candidate.path}`),
   ].join("\n");
 }
 
@@ -108,22 +118,25 @@ export async function userPromptSubmit(
 
   try {
     const candidates = await deps.catalog();
-    const decided = await selectSkill(prompt, candidates, deps.provider, {}, options);
+    const judged = await selectSkills(prompt, candidates, deps.provider, {}, options);
     await deps.record({
       at: new Date().toISOString(),
       harness: harnessOf(env),
       promptHash: promptHash(prompt),
       promptChars: prompt.length,
       candidates: candidates.length,
-      skill: decided.value?.name ?? null,
-      confidence: decided.confidence,
-      source: decided.source,
+      skills: judged.picks.map((pick) => pick.candidate.name),
+      passed: judged.passed,
+      // The strongest yes, gate or not: a request the judgment liked at 0.7 and the router
+      // did not act on is what a threshold question is decided from later.
+      ...(judged.confidence === undefined ? {} : { confidence: judged.confidence }),
+      source: judged.source,
     });
-    if (decided.value === undefined) return "";
+    if (judged.picks.length === 0) return "";
     return JSON.stringify({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: reminder(decided.value, decided.confidence),
+        additionalContext: reminder(judged.picks),
       },
     });
   } catch (error) {

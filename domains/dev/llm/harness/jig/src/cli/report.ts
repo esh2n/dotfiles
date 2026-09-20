@@ -43,6 +43,7 @@ export function parseReportArgs(args: readonly string[]): ReportArgs | { readonl
 const LABELS: ReadonlyMap<keyof UsageTotals, string> = new Map([
   ["turns", "turns"],
   ["followed", "followed an injection"],
+  ["partial", "followed only some of it"],
   ["ignored", "ignored the injection"],
   ["substituted", "opened another skill"],
   ["unrouted", "opened one unscouted"],
@@ -75,13 +76,13 @@ function renderHarnesses(report: SkillUsageReport): string[] {
   const lines = [
     "",
     "by harness",
-    `  ${"harness".padEnd(10)}${"turns".padStart(6)}${"followed".padStart(10)}${"ignored".padStart(9)}${"other".padStart(7)}${"unscouted".padStart(11)}`,
+    `  ${"harness".padEnd(10)}${"turns".padStart(6)}${"followed".padStart(10)}${"partial".padStart(9)}${"ignored".padStart(9)}${"other".padStart(7)}${"unscouted".padStart(11)}`,
   ];
   for (const harness of present) {
     const totals = report.byHarness.get(harness);
     if (totals === undefined) continue;
     lines.push(
-      `  ${harness.padEnd(10)}${String(totals.turns).padStart(6)}${String(totals.followed).padStart(10)}${String(totals.ignored).padStart(9)}${String(totals.substituted).padStart(7)}${String(totals.unrouted).padStart(11)}`,
+      `  ${harness.padEnd(10)}${String(totals.turns).padStart(6)}${String(totals.followed).padStart(10)}${String(totals.partial).padStart(9)}${String(totals.ignored).padStart(9)}${String(totals.substituted).padStart(7)}${String(totals.unrouted).padStart(11)}`,
     );
   }
   return lines;

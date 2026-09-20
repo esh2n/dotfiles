@@ -3,7 +3,6 @@ import { mkdtempSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { SkillCandidate } from "../../src/app/routing/select-skill";
 import {
   type RunningDecisionService,
   buildJudgmentProvider,
@@ -19,6 +18,7 @@ import type {
   DecisionProvider,
   ScoreQuery,
 } from "../../src/domain/decision/provider";
+import type { SkillCandidate } from "../../src/domain/skills/candidate";
 import type { RouterLogEntry } from "../../src/domain/skills/router-log";
 import { StaticProvider } from "../../src/infra/decision/static-provider";
 import { ensureDecisionToken } from "../../src/infra/decision/token-file";
@@ -495,7 +495,7 @@ describe("the /skill path's router log", () => {
   test("records the judgment with the harness that asked for it", async () => {
     const entries: RouterLogEntry[] = [];
     const { service, token } = await startSkillService(
-      new StaticProvider({ choice: { value: "writeup", confidence: 0.9 } }),
+      new StaticProvider({ bool: { value: true, confidence: 0.9 } }),
       entries,
     );
 
@@ -509,7 +509,7 @@ describe("the /skill path's router log", () => {
       expect(response.status).toBe(200);
       expect(entries).toHaveLength(1);
       expect(entries[0]?.harness).toBe("pi");
-      expect(entries[0]?.skill).toBe("writeup");
+      expect(entries[0]?.skills).toEqual(["writeup"]);
       expect(entries[0]?.source).toBe("decided");
       expect(entries[0]?.promptHash).toMatch(/^[0-9a-f]{12}$/);
       expect(entries[0]?.promptChars).toBe("決定記録をまとめて".length);
@@ -521,7 +521,7 @@ describe("the /skill path's router log", () => {
   test("records an unlabelled request as unknown rather than as some harness", async () => {
     const entries: RouterLogEntry[] = [];
     const { service, token } = await startSkillService(
-      new StaticProvider({ choice: { value: "none", confidence: 0.9 } }),
+      new StaticProvider({ bool: { value: false, confidence: 0.9 } }),
       entries,
     );
 
@@ -533,7 +533,7 @@ describe("the /skill path's router log", () => {
       });
 
       expect(entries[0]?.harness).toBe("unknown");
-      expect(entries[0]?.skill).toBeNull();
+      expect(entries[0]?.skills).toEqual([]);
     } finally {
       service.stop();
     }

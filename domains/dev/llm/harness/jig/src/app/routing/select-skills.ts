@@ -2,13 +2,12 @@
  * Skill router use-case, multi-pick: ask the decision provider which skills this request
  * needs, up to a small number.
  *
- * Why this exists next to `select-skill.ts` rather than replacing it: a review request is
- * judged on several axes at once (is the layering right, is the domain model right, does
- * the Go hold up), and the single-answer question returns one of them — the other axes are
- * dropped with no record that they were. The single-answer question is also the one that
- * was measured (7/7 and 5/5 and 6/6 `none`s), so it stays until this one has been measured
- * against the same requests; whoever measures last is what the hooks should call, and
- * `JIG_SKILL_SELECT` is what switches between them while that is being decided.
+ * Why this exists as jig's one skill question, and not beside a single-answer one: this
+ * replaced a question that could only name one skill, which returned `none` (0.78, under the
+ * gate) to a review request naming three axes. That question had been measured thin — 18
+ * requests, 7/7 with the description's vocabulary, 5/5 paraphrased, 6/6 `none`s, confidence
+ * 0.93-1.00 on picks — and those numbers travel with it into git history rather than into a
+ * second live question nothing asks.
  *
  * The shape is a batch of yes/no questions rather than a repeated choice: the provider
  * evaluates a batch against one material with the questions judged independently, so the
@@ -53,8 +52,8 @@
  */
 
 import type { DecisionContext, DecisionProvider } from "../../domain/decision/provider";
+import type { SkillCandidate } from "../../domain/skills/candidate";
 import { boundedMaterial } from "../decision/material";
-import type { SkillCandidate } from "./select-skill";
 
 /** One skill the judgment picked, with the confidence it was picked at. */
 export interface SkillPick {
@@ -66,6 +65,15 @@ export interface SelectSkillsResult {
   readonly picks: readonly SkillPick[];
   /** How many candidates cleared the gate, before the cap — a saturating batch shows up here. */
   readonly passed: number;
+  /**
+   * The strongest confidence among the candidates the judgment said yes to, whether or not
+   * it cleared the gate. `undefined` when it said yes to none of them.
+   */
+  readonly confidence: number | undefined;
+  /**
+   * `decided` = the judgment answered (including "nothing applies"); `fallback` = it said
+   * yes to something but not confidently enough to act on.
+   */
   readonly source: "decided" | "fallback";
 }
 
@@ -97,7 +105,11 @@ export async function selectSkills(
 ): Promise<SelectSkillsResult> {
   const threshold = options.threshold ?? 0.8;
   const max = options.max ?? 3;
-  if (candidates.length === 0) return { picks: [], passed: 0, source: "fallback" };
+  if (candidates.length === 0) {
+    // Nothing was asked, so there is no answer to call an answer: `fallback` is the honest
+    // label for "did not act", and it keeps "decided" meaning a judgment was consulted.
+    return { picks: [], passed: 0, confidence: undefined, source: "fallback" };
+  }
 
   const decided = await provider.boolBatch(
     {
@@ -107,16 +119,26 @@ export async function selectSkills(
     context,
   );
 
-  const passed: SkillPick[] = [];
+  const yes: SkillPick[] = [];
   for (let index = 0; index < candidates.length; index++) {
     const candidate = candidates[index];
     const judgment = decided[index];
     if (candidate === undefined || judgment === undefined) continue;
-    if (judgment.value !== true || judgment.confidence < threshold) continue;
-    passed.push({ candidate, confidence: judgment.confidence });
+    if (judgment.value !== true) continue;
+    yes.push({ candidate, confidence: judgment.confidence });
   }
+  yes.sort((left, right) => right.confidence - left.confidence);
 
-  passed.sort((left, right) => right.confidence - left.confidence);
+  const passed = yes.filter((pick) => pick.confidence >= threshold);
   const picks = passed.slice(0, max);
-  return { picks, passed: passed.length, source: picks.length > 0 ? "decided" : "fallback" };
+
+  // "Nothing applies" is an answer, not a failure to answer: a batch that said yes to no
+  // candidate decided. Only "yes, but weakly" is a fallback — the distinction is what lets
+  // a report tell a router that declined from one that could not decide.
+  return {
+    picks,
+    passed: passed.length,
+    confidence: yes[0]?.confidence,
+    source: picks.length > 0 || yes.length === 0 ? "decided" : "fallback",
+  };
 }

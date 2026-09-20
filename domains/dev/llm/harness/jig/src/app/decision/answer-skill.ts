@@ -1,31 +1,39 @@
 /**
- * Application use-case for the skill endpoint: "which skill fits this request?".
+ * Application use-case for the skill endpoint: "which skills does this request need?".
  *
- * The skill question, its per-option criteria and the confidence threshold live in
- * ONE place (`app/routing/select-skill.ts`), which is why this endpoint exists
- * instead of each harness carrying its own wording: two harnesses asking the same
- * question with two slightly different phrasings would be two different judgments.
+ * The question, its per-candidate wording and the confidence threshold live in ONE place
+ * (`app/routing/select-skills.ts`), which is why this endpoint exists instead of each
+ * harness carrying its own wording: two harnesses asking the same question with two
+ * slightly different phrasings would be two different judgments.
  *
  * The catalog is a dependency rather than something this use-case reads, because
  * whether the farm is read per call or cached is a deployment decision: the service
  * is long-lived, so it can hold the list, while a one-shot hook process cannot.
  *
- * `null` is a real answer, not an error: no skill fits, or the judgment was too weak
- * to act on. The caller's job in both cases is to leave the request as it was. The
- * confidence and `source` are returned so a caller can tell "the judgment said
- * nothing applies" from "the judgment did not clear the gate".
+ * An empty list is a real answer, not an error: no skill fits, or the judgment was too weak
+ * to act on. The caller's job in both cases is to leave the request as it was. `passed` and
+ * `source` are returned so a caller can tell "the judgment said nothing applies" from "the
+ * judgment did not clear the gate", and so a batch that answers `true` to everything is
+ * visible instead of reading as a confident pick.
  */
 
 import type { DecisionProvider } from "../../domain/decision/provider";
 import type { Clock, Logger } from "../../domain/ports";
-import { type SelectSkillOptions, type SkillCandidate, selectSkill } from "../routing/select-skill";
+import type { SkillCandidate } from "../../domain/skills/candidate";
+import { type SelectSkillsOptions, selectSkills } from "../routing/select-skills";
+
+/** One skill to inject, with where its body is and how strong the judgment was. */
+export interface SkillPickDecision {
+  readonly name: string;
+  readonly path: string;
+  readonly confidence: number;
+}
 
 export interface SkillDecision {
-  /** The chosen skill's name, or `null` when nothing should be injected. */
-  readonly skill: string | null;
-  /** Where the chosen skill's body is, so a caller can point the model at it. */
-  readonly path: string | null;
-  readonly confidence: number;
+  /** The skills to inject, strongest first. Empty when nothing should be injected. */
+  readonly skills: readonly SkillPickDecision[];
+  /** How many candidates cleared the gate, before the cap. */
+  readonly passed: number;
   readonly source: "decided" | "fallback";
 }
 
@@ -56,10 +64,10 @@ export interface AnswerSkillDeps {
   readonly catalog: () => Promise<readonly SkillCandidate[]>;
   readonly logger?: Logger;
   readonly clock?: Clock;
-  readonly options?: SelectSkillOptions;
+  readonly options?: SelectSkillsOptions;
 }
 
-/** Answer "which skill fits this request?" without throwing: a failure is a value. */
+/** Answer "which skills does this request need?" without throwing: a failure is a value. */
 export async function answerSkill(
   body: unknown,
   provider: DecisionProvider,
@@ -79,13 +87,14 @@ export async function answerSkill(
   const startedAt = deps.clock?.now().getTime();
   try {
     const candidates = await deps.catalog();
-    const gated = await selectSkill(prompt, candidates, provider, {}, deps.options ?? {});
+    const judged = await selectSkills(prompt, candidates, provider, {}, deps.options ?? {});
     const endedAt = deps.clock?.now().getTime();
     deps.logger?.debug("skill.decided", {
-      skill: gated.value?.name ?? null,
+      skills: judged.picks.map((pick) => pick.candidate.name).join(", "),
       candidates: candidates.length,
-      confidence: gated.confidence,
-      source: gated.source,
+      passed: judged.passed,
+      confidence: judged.picks[0]?.confidence ?? null,
+      source: judged.source,
       ...(startedAt === undefined || endedAt === undefined
         ? {}
         : { durationMs: endedAt - startedAt }),
@@ -93,10 +102,13 @@ export async function answerSkill(
     return {
       ok: true,
       decision: {
-        skill: gated.value?.name ?? null,
-        path: gated.value?.path ?? null,
-        confidence: gated.confidence,
-        source: gated.source,
+        skills: judged.picks.map((pick) => ({
+          name: pick.candidate.name,
+          path: pick.candidate.path,
+          confidence: pick.confidence,
+        })),
+        passed: judged.passed,
+        source: judged.source,
       },
     };
   } catch (error) {
