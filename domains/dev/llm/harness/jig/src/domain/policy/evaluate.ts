@@ -23,6 +23,7 @@ const TOOL_ALIASES: Readonly<Record<string, GuardTool>> = {
   Edit: "edit",
   MultiEdit: "edit",
   edit: "edit",
+  str_replace_editor: "edit",
 };
 
 function abstractTool(toolName: string): GuardTool | undefined {
@@ -31,11 +32,13 @@ function abstractTool(toolName: string): GuardTool | undefined {
 
 /**
  * The string a rule's `match` regex runs against: `input.command` for shell
- * rules, `input.file_path` for write/edit rules. Anything else (a wrong or
- * missing field) has nothing to match against, so it can only allow.
+ * rules; for write/edit rules the path, which arrives as `file_path` from
+ * Claude Code and DSH's write/edit but as `path` from pi and DSH's
+ * `str_replace_editor`. Anything else (a wrong or missing field) has
+ * nothing to match against, so it can only allow.
  */
 function subjectFor(tool: GuardTool, input: Readonly<Record<string, unknown>>): string | undefined {
-  const field = tool === "shell" ? input.command : input.file_path;
+  const field = tool === "shell" ? input.command : (input.file_path ?? input.path);
   return typeof field === "string" ? field : undefined;
 }
 

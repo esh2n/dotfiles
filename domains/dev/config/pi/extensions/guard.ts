@@ -1,186 +1,51 @@
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  resolveAuditPath,
+  resolvePolicyPath,
+  resolveProfile,
+} from "../../../llm/harness/jig/src/app/hooks/environment";
+import {
+  type LoadedPolicy,
+  policyHash,
+  runHook,
+} from "../../../llm/harness/jig/src/app/hooks/run-hook";
+import type { Decision, ToolCall } from "../../../llm/harness/jig/src/domain/hooks/decision";
+import { parsePolicy } from "../../../llm/harness/jig/src/domain/policy/parse";
+import type { Principal } from "../../../llm/harness/jig/src/domain/policy/request";
+import type { AuditLog, Logger } from "../../../llm/harness/jig/src/domain/ports";
+import { JsonlAuditLog } from "../../../llm/harness/jig/src/infra/audit/jsonl-audit";
 
-// Blast-radius guard for the local lane (hooks are Claude Code-only; pi needs
-// its own enforcement).
+// pi's connection to the shared guard.
 //
-// This no longer embeds its own rules. The CANONICAL rule data lives in
-// `domains/dev/llm/harness/policy/guard-rules.json` and the CANONICAL
-// evaluator is jig's `src/domain/policy` (parse.ts / evaluate.ts) — this
-// file is a small, deliberately duplicated re-implementation of that
-// evaluator (pi and jig are separate deployables, so no cross-package
-// import), kept in sync by hand if the shared schema changes.
+// This file decides nothing. It reads pi's tool call, stamps who is asking,
+// hands the call to jig's one evaluator (`runHook` → `judge`), and
+// translates the decision into what pi understands: `{ block, reason }`
+// for a deny, a `ctx.ui.confirm` dialog for an ask (a block when there is
+// no screen), silence for an allow. The rules live in
+// `domains/dev/llm/harness/policy/guard-rules.json`; the reading of a
+// command (what actually runs, wrappers peeled, `$()` looked into) lives
+// in jig's `domain/subject`. Both are imported here, not copied: pi loads
+// extensions through jiti, which resolves this symlink to its real path,
+// so relative imports into the jig tree — and `unbash` from jig's own
+// node_modules — work in-process.
 //
-// Two tiers, same as before:
-//  - deny: never allowed, no confirmation offered
-//  - confirm: destructive enough to require interactive approval; denied by
-//    default when running headless
+// pi has no permission layer of its own, so this extension is the only
+// thing between the model and the shell. Three consequences:
+//  - it never throws out of the handler (pi would still block, but with a
+//    stack trace instead of a reason); every failure becomes a block with
+//    a reason that says what to fix;
+//  - it never returns an explicit allow — silence is "no opinion", the
+//    same contract as the CLI hook Claude Code and DSH run;
+//  - it keeps its own time budget, because pi has none: a guard that
+//    hangs would hang the session.
 
-export type GuardTier = "deny" | "confirm";
+export { resolveProfile, resolvePolicyPath };
 
-export interface GuardRule {
-  readonly id: string;
-  readonly tier: GuardTier;
-  readonly tools: readonly string[];
-  readonly match: RegExp;
-  readonly why: string;
-  readonly profiles: readonly string[];
-}
+/** Above this the guard gives up and blocks, rather than hanging pi. */
+const TIME_BUDGET_MS = 5_000;
 
-export const PROFILES = ["minimal", "standard", "strict"] as const;
-export type HookProfile = (typeof PROFILES)[number];
-
-export function resolveProfile(env: NodeJS.ProcessEnv): HookProfile {
-  const raw = env.JIG_HOOK_PROFILE ?? env.YOKI_HOOK_PROFILE;
-  return (PROFILES as readonly string[]).includes(raw ?? "") ? (raw as HookProfile) : "standard";
-}
-
-export function policyPath(): string {
-  return (
-    process.env.JIG_POLICY_FILE ?? join(homedir(), ".config", "jig", "policy", "guard-rules.json")
-  );
-}
-
-export interface GuardDoc {
-  readonly rules: readonly GuardRule[];
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-const TIERS: ReadonlySet<string> = new Set<GuardTier>(["deny", "confirm"]);
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === "string");
-}
-
-/**
- * Strict validation, mirroring jig's own `src/domain/policy/parse.ts`: ANY
- * invalid rule fails the WHOLE document (never silently drops or
- * misinterprets one bad rule), so a malformed shared policy blocks here
- * exactly as it blocks jig's own hook — instead of this hand-duplicated
- * evaluator quietly doing less (a mistyped tier never matching, or a
- * missing `tools`/`profiles` throwing a TypeError out of the `tool_call`
- * handler, which a fail-open extension host would read as "proceed").
- */
-export function validateGuardDoc(json: unknown): GuardDoc {
-  if (!isPlainObject(json)) {
-    throw new Error("guard policy: expected a JSON object at the top level");
-  }
-
-  const { rules } = json;
-  if (!Array.isArray(rules)) {
-    throw new Error('guard policy: "rules" must be an array');
-  }
-
-  const parsed = rules.map((raw, index): GuardRule => {
-    if (!isPlainObject(raw)) {
-      throw new Error(`guard policy: rules[${index}] must be an object`);
-    }
-
-    const { id, tier, tools, match, why, profiles } = raw;
-
-    if (typeof id !== "string" || id === "") {
-      throw new Error(`guard policy: rules[${index}] is missing a non-empty string "id"`);
-    }
-    const label = `guard policy: rule "${id}"`;
-
-    if (typeof tier !== "string" || !TIERS.has(tier)) {
-      throw new Error(
-        `${label} has unknown tier ${JSON.stringify(tier)} (expected "deny" or "confirm")`,
-      );
-    }
-
-    if (!isStringArray(tools)) {
-      throw new Error(`${label} must have a non-empty "tools" array of strings`);
-    }
-
-    if (typeof match !== "string" || match === "") {
-      throw new Error(`${label} is missing a non-empty string "match"`);
-    }
-    let compiled: RegExp;
-    try {
-      compiled = new RegExp(match);
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`${label} has an invalid "match" regex: ${reason}`);
-    }
-
-    if (typeof why !== "string" || why === "") {
-      throw new Error(`${label} is missing a non-empty string "why"`);
-    }
-
-    if (!isStringArray(profiles)) {
-      throw new Error(`${label} must have a non-empty "profiles" array of strings`);
-    }
-
-    return { id, tier: tier as GuardTier, tools, match: compiled, why, profiles };
-  });
-
-  return { rules: parsed };
-}
-
-export interface GuardCommand {
-  readonly tool: string;
-  /** The string a rule's `match` runs against: the shell command, or the file path for write/edit. */
-  readonly command: string;
-}
-
-/**
- * pi tool name -> the abstract `tools` vocabulary rules are written against,
- * plus the subject to match (mirrors jig's `TOOL_ALIASES` / `subjectFor`).
- * pi's write/edit tools carry the file path as `path` (not Claude Code's
- * `file_path`); both are accepted so either payload shape reaches the same
- * rules. Returns `undefined` for tools the policy has no vocabulary for.
- */
-export function guardCommandFor(
-  toolName: string,
-  input: Readonly<Record<string, unknown>> | undefined,
-): GuardCommand | undefined {
-  if (toolName === "bash" || toolName === "bash_background") {
-    const command = input?.command;
-    return { tool: "shell", command: typeof command === "string" ? command : "" };
-  }
-  if (toolName === "write" || toolName === "edit") {
-    const filePath = input?.file_path ?? input?.path;
-    return { tool: toolName, command: typeof filePath === "string" ? filePath : "" };
-  }
-  return undefined;
-}
-
-export interface GuardMatch {
-  readonly tier: GuardTier;
-  readonly why: string;
-}
-
-/**
- * Pure: deny always outranks confirm when both match (mirrors jig's
- * `src/domain/policy/evaluate.ts`). Returns `undefined` when nothing
- * matches — the caller decides what "no opinion" means for its host.
- */
-export function evaluateGuardRules(
-  rules: readonly GuardRule[],
-  input: GuardCommand,
-  profile: HookProfile,
-): GuardMatch | undefined {
-  const matches = (rule: GuardRule) =>
-    rule.tools.includes(input.tool) &&
-    rule.profiles.includes(profile) &&
-    rule.match.test(input.command);
-
-  const deny = rules.find((rule) => rule.tier === "deny" && matches(rule));
-  if (deny !== undefined) return { tier: "deny", why: deny.why };
-
-  const confirm = rules.find((rule) => rule.tier === "confirm" && matches(rule));
-  if (confirm !== undefined) return { tier: "confirm", why: confirm.why };
-
-  return undefined;
-}
-
-type Loaded = GuardDoc | { readonly error: string };
+type Loaded = LoadedPolicy | { readonly error: string };
 
 // Read once, at the first tool_call (not at module load — the env may not be
 // settled yet). Only a SUCCESSFUL load is cached, for the rest of the
@@ -189,64 +54,184 @@ type Loaded = GuardDoc | { readonly error: string };
 // call rather than hard-blocking every bash call for the rest of the pi
 // session — a cached error here would need a full pi restart to clear, a
 // materially worse failure mode than the file being permanently missing.
-let cache: { readonly path: string; readonly loaded: GuardDoc } | undefined;
+let cache: { readonly path: string; readonly loaded: LoadedPolicy } | undefined;
 
 export function loadPolicy(path: string): Loaded {
   if (cache !== undefined && cache.path === path) return cache.loaded;
 
   try {
-    const doc = validateGuardDoc(JSON.parse(readFileSync(path, "utf8")));
-    cache = { path, loaded: doc };
-    return doc;
+    const text = readFileSync(path, "utf8");
+    const loaded: LoadedPolicy = { policy: parsePolicy(JSON.parse(text)), hash: policyHash(text) };
+    cache = { path, loaded };
+    return loaded;
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 
+/** pi's TUI owns the terminal; the guard has nowhere to print, so it stays quiet. */
+const silentLogger: Logger = {
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
+
+const clock = { now: () => new Date() };
+
+let audit: AuditLog | undefined;
+function auditLog(): AuditLog {
+  audit ??= new JsonlAuditLog(resolveAuditPath(process.env));
+  return audit;
+}
+
+function withBudget<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`guard exceeded ${ms}ms`)), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+const STAND_DOWN =
+  "Do not retry this command or work around the block with a variant. " +
+  "Explain to the user what you wanted to do and why, and let them decide.";
+
+/** The subset of pi's extension context the guard reads; narrow so tests can fake it. */
+export interface GuardContext {
+  readonly hasUI: boolean;
+  readonly cwd: string;
+  readonly ui: { confirm(title: string, message: string): Promise<boolean> };
+  readonly sessionManager?: { getSessionId(): string };
+}
+
+export interface GuardEvent {
+  readonly toolName: string;
+  readonly input: unknown;
+}
+
+export type GuardOutcome = { readonly block: true; readonly reason: string } | undefined;
+
+/** What a tool call turns into for the audit line and the confirm dialog. */
+function summary(input: unknown): string {
+  if (typeof input !== "object" || input === null) return "";
+  const record = input as Record<string, unknown>;
+  for (const key of ["command", "file_path", "path", "url"]) {
+    const value = record[key];
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) return value.join(" ");
+  }
+  return "";
+}
+
+/**
+ * The whole adapter, as a function so it can be exercised without pi:
+ * translate the call, ask jig, translate the answer.
+ */
+export interface GuardDeps {
+  readonly audit: AuditLog;
+  readonly budgetMs?: number;
+}
+
+export async function guardToolCall(
+  event: GuardEvent,
+  ctx: GuardContext,
+  deps: GuardDeps = { audit: auditLog() },
+): Promise<GuardOutcome> {
+  const path = resolvePolicyPath(process.env);
+  const loaded = loadPolicy(path);
+  if ("error" in loaded) {
+    return {
+      block: true,
+      reason:
+        `jig guard policy unreadable at ${path} (${loaded.error}) — fix the link ` +
+        "(manager.sh link_jig_policy) or set JIG_POLICY_FILE",
+    };
+  }
+
+  const call: ToolCall = {
+    tool: event.toolName,
+    input:
+      typeof event.input === "object" && event.input !== null
+        ? (event.input as Record<string, unknown>)
+        : {},
+  };
+  const principal: Principal = {
+    harness: "pi",
+    profile: resolveProfile(process.env),
+    cwd: ctx.cwd,
+    ...(ctx.sessionManager === undefined ? {} : { sessionId: ctx.sessionManager.getSessionId() }),
+  };
+
+  let decision: Decision;
+  try {
+    decision = await withBudget(
+      runHook(call, principal, loaded, { logger: silentLogger, clock, audit: deps.audit }),
+      deps.budgetMs ?? TIME_BUDGET_MS,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      block: true,
+      reason: `jig guard failed (${message}); blocking to stay safe. ${STAND_DOWN}`,
+    };
+  }
+
+  switch (decision.kind) {
+    case "allow":
+      return undefined;
+    case "deny":
+      return {
+        block: true,
+        reason: `Blocked: ${decision.reason}. This is a hard rule — ${STAND_DOWN}`,
+      };
+    case "ask": {
+      if (!ctx.hasUI) {
+        return {
+          block: true,
+          reason: `Blocked: ${decision.reason} (needs confirmation, and there is no screen to ask on). ${STAND_DOWN}`,
+        };
+      }
+      let ok = false;
+      try {
+        ok = await ctx.ui.confirm(
+          `Guarded command (${decision.reason})`,
+          summary(event.input).slice(0, 300),
+        );
+      } catch {
+        ok = false;
+      }
+      if (!ok) return { block: true, reason: `Blocked: ${decision.reason}. ${STAND_DOWN}` };
+      return undefined; // user approved this one call — approval is not blanket
+    }
+  }
+}
+
 export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
-    const guarded = guardCommandFor(event.toolName, event.input as Record<string, unknown>);
-    if (guarded === undefined) return;
-    const cmd = guarded.command;
-    const profile = resolveProfile(process.env);
-    const path = policyPath();
-
-    const loaded = loadPolicy(path);
-    if ("error" in loaded) {
-      return {
-        block: true,
-        reason:
-          `jig guard policy unreadable at ${path} (${loaded.error}) — fix the link ` +
-          `(manager.sh link_jig_policy) or set JIG_POLICY_FILE`,
-      };
-    }
-
-    const match = evaluateGuardRules(loaded.rules, guarded, profile);
-    if (match === undefined) return;
-
-    if (match.tier === "deny") {
-      return {
-        block: true,
-        reason:
-          `Blocked: ${match.why}. This is a hard rule — do not retry or work around it with a variant. ` +
-          `State what you wanted to do and why, and let the user decide.`,
-      };
-    }
-
-    let ok = false;
     try {
-      ok = await ctx.ui.confirm(`Guarded command (${match.why})`, cmd.slice(0, 300));
-    } catch {
-      ok = false; // headless: deny by default
+      return await guardToolCall(
+        { toolName: event.toolName, input: event.input },
+        {
+          hasUI: ctx.hasUI,
+          cwd: ctx.cwd,
+          ui: ctx.ui,
+          sessionManager: ctx.sessionManager,
+        },
+      );
+    } catch (err) {
+      // Nothing above should throw; if something does, say so rather than
+      // letting pi report a stack trace as the reason.
+      const message = err instanceof Error ? err.message : String(err);
+      return { block: true, reason: `jig guard crashed (${message}); blocking to stay safe.` };
     }
-    if (!ok) {
-      return {
-        block: true,
-        reason:
-          `Blocked: ${match.why}. Do not retry this command or work around the block with a variant. ` +
-          `Explain to the user what you wanted to do and why, and let them decide.`,
-      };
-    }
-    return; // user approved this one call — approval is not blanket
   });
 }

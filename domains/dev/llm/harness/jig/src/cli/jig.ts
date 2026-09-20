@@ -2,6 +2,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
+import { resolveAuditPath, resolveStateDir } from "../app/hooks/environment";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
@@ -56,11 +57,6 @@ function resolveSkillRoot(env: Record<string, string | undefined> = process.env)
   return env.JIG_SKILL_ROOT ?? join(homedir(), ".claude", ".skills-merged");
 }
 
-/** `JIG_STATE_DIR` overrides where the hand-edit-detection manifest lives, for tests. */
-function resolveStateDir(): string {
-  return process.env.JIG_STATE_DIR ?? join(homedir(), ".local", "state", "jig");
-}
-
 /**
  * Where the harnesses keep their session transcripts. Two directories, because the harnesses
  * are two programs; each honors its own override first (`PI_CODING_AGENT_SESSION_DIR`,
@@ -105,7 +101,7 @@ export function buildPorts(): Ports {
         logger,
       }),
     }),
-    audit: new JsonlAuditLog(join(resolveStateDir(), "guard-audit.jsonl")),
+    audit: new JsonlAuditLog(resolveAuditPath(process.env)),
   };
 }
 
@@ -143,7 +139,7 @@ export async function main(argv: readonly string[]): Promise<number> {
               provider: ports.decision,
               catalog: () => readSkillCatalog(resolveSkillRoot()),
               record: (entry) =>
-                appendRouterLog(join(resolveStateDir(), "skill-router.jsonl"), entry),
+                appendRouterLog(join(resolveStateDir(process.env), "skill-router.jsonl"), entry),
               logger: ports.logger,
             },
             Number.isFinite(threshold) ? { threshold } : {},
@@ -174,7 +170,10 @@ export async function main(argv: readonly string[]): Promise<number> {
       return result.code;
     }
     case "apply": {
-      const applyPorts = createNodeApplyFs({ stateDir: resolveStateDir(), jigVersion: VERSION });
+      const applyPorts = createNodeApplyFs({
+        stateDir: resolveStateDir(process.env),
+        jigVersion: VERSION,
+      });
       const result = await applyCli(argv.slice(1), applyPorts, resolveApplyPaths());
       process.stdout.write(result.stdout);
       return result.code;
@@ -225,7 +224,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         // The `/skill` path has no client-side record — the harness that calls it decides
         // nothing — so the service is the only place that judgment can be written down.
         recordSkill: (entry) =>
-          appendRouterLog(join(resolveStateDir(), "skill-router.jsonl"), entry),
+          appendRouterLog(join(resolveStateDir(process.env), "skill-router.jsonl"), entry),
       });
       // The service is meant to live until launchd stops it: never resolve, so
       // the entrypoint's `process.exit` below is never reached.

@@ -1,7 +1,6 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { resolvePolicyPath, resolveProfile } from "../../app/hooks/environment";
 import { type LoadedPolicy, policyHash, runHook } from "../../app/hooks/run-hook";
-import type { HookProfile, ToolCall } from "../../domain/hooks/decision";
+import type { ToolCall } from "../../domain/hooks/decision";
 import { parsePolicy } from "../../domain/policy/parse";
 import type { Principal } from "../../domain/policy/request";
 import type { Ports } from "../../domain/ports";
@@ -23,27 +22,6 @@ export interface PreToolUseOptions {
    * environment form. Defaults to `claude`, the format's native speaker.
    */
   readonly harness?: string;
-}
-
-const PROFILES: readonly HookProfile[] = ["minimal", "standard", "strict"];
-
-/**
- * JIG_HOOK_PROFILE is the name going forward; YOKI_HOOK_PROFILE is honored
- * while machines still export it. An unrecognized value falls back to
- * "standard" — never to a narrower profile.
- */
-function resolveProfile(env: NodeJS.ProcessEnv): HookProfile {
-  const raw = env.JIG_HOOK_PROFILE ?? env.YOKI_HOOK_PROFILE;
-  return PROFILES.includes(raw as HookProfile) ? (raw as HookProfile) : "standard";
-}
-
-function defaultPolicyPath(): string {
-  return join(homedir(), ".config", "jig", "policy", "guard-rules.json");
-}
-
-/** Where the shared guard policy is read from: JIG_POLICY_FILE, else the machine-linked default. */
-function resolvePolicyPath(env: NodeJS.ProcessEnv): string {
-  return env.JIG_POLICY_FILE ?? defaultPolicyPath();
 }
 
 function hookOutput(decision: { kind: string; reason?: string }): string {
