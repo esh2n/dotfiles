@@ -11,6 +11,7 @@
 llm-pi-ai:
   providers:
     # One custom route -> the local LiteLLM proxy (OpenAI-compatible).
+    # BEGIN jig:tiers (generated — edit policy/tiers.json, then jig apply)
     local-proxy:
       displayName: LiteLLM (local)
       api: openai-completions           # LiteLLM speaks OpenAI Chat Completions
@@ -35,11 +36,17 @@ llm-pi-ai:
           compat:
             thinkingFormat: deepseek      # makes `off` actually stop thinking
 
-        # complex -> proxy alias that maps to gpt-6-astra (Astra)
+        # complex -> proxy alias that maps to deepseek-v4-pro
+        # dsh's hand-written comment still calls this route Astra
+        # (gpt-6-astra); litellm/config.yaml actually routes `complex` to
+        # deepseek/deepseek-v4-pro today (see that file's own comment on the
+        # swap) — pre-existing drift this schema records rather than silently
+        # resolving.
         - id: complex
           name: complex (Astra)
 
-        # deterministic -> proxy alias that maps to local qwen
+        # deterministic -> proxy alias that maps to qwen/qwen3.8-27b
+        # add `input: [text, image]` if this qwen build is vision-capable
         - id: deterministic
           name: deterministic (local Qwen)
-          # add `input: [text, image]` if this qwen build is vision-capable
+    # END jig:tiers

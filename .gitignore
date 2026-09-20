@@ -265,3 +265,4 @@ domains/dev/config/git/identity-guard
 
 # writeup-kit ships vendored runtime bundles (elk, lindera) on purpose
 !domains/dev/config/claude-profiles/core/skills/writeup-kit/vendor/
+.jig-provenance.json
