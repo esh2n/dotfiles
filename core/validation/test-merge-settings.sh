@@ -145,7 +145,7 @@ YAML
     # permissions.yaml fixture above).
     cat > "$profiles/core/mcp.json" <<'JSON'
 {
-  "schemaVersion": "ecc.mcp.v1",
+  "schemaVersion": "jig.mcp.v1",
   "servers": [
     { "name": "core-server", "transport": "http", "url": "https://core.example/mcp", "env": {}, "targets": { "claude": true, "codex": false, "omp": false } }
   ]
@@ -154,7 +154,7 @@ JSON
 
     cat > "$profiles/personal/mcp.json" <<'JSON'
 {
-  "schemaVersion": "ecc.mcp.v1",
+  "schemaVersion": "jig.mcp.v1",
   "servers": [
     { "name": "personal-server", "transport": "stdio", "command": "personal-cmd", "args": [], "env": {}, "targets": { "claude": true, "codex": false, "omp": false } }
   ]

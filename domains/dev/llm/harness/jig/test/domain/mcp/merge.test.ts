@@ -8,7 +8,7 @@ import { mergeMcpLayers } from "../../../src/domain/mcp/merge";
 import type { McpLayer } from "../../../src/domain/mcp/types";
 
 const layer = (servers: McpLayer["servers"]): McpLayer => ({
-  schemaVersion: "ecc.mcp.v1",
+  schemaVersion: "jig.mcp.v1",
   servers,
 });
 
@@ -32,7 +32,7 @@ describe("mergeMcpLayers", () => {
 
   test("[yoki-verified] a missing/empty layer contributes nothing", () => {
     const core = layer([{ name: "a", transport: "stdio", command: "x" }]);
-    const empty: McpLayer = { schemaVersion: "ecc.mcp.v1", servers: [] };
+    const empty: McpLayer = { schemaVersion: "jig.mcp.v1", servers: [] };
     expect(mergeMcpLayers([core, empty]).map((s) => s.name)).toEqual(["a"]);
   });
 });

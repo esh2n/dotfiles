@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import { EMPTY_MCP_LAYER, parseMcpLayer } from "../../../src/domain/mcp/parse";
 
-const validLayer = (servers: unknown[]) => JSON.stringify({ schemaVersion: "ecc.mcp.v1", servers });
+const validLayer = (servers: unknown[]) => JSON.stringify({ schemaVersion: "jig.mcp.v1", servers });
 
 describe("parseMcpLayer", () => {
   test("[yoki-verified] parses a well-formed layer", () => {
@@ -22,7 +22,7 @@ describe("parseMcpLayer", () => {
       },
     ]);
     const result = parseMcpLayer(text, "test.json");
-    expect(result.schemaVersion).toBe("ecc.mcp.v1");
+    expect(result.schemaVersion).toBe("jig.mcp.v1");
     expect(result.servers).toHaveLength(1);
     expect(result.servers[0]?.name).toBe("ctx7");
   });

@@ -1,5 +1,5 @@
 /**
- * Types for the `mcp.json` sidecar — the `ecc.mcp.v1` canonical MCP source
+ * Types for the `mcp.json` sidecar — the `jig.mcp.v1` canonical MCP source
  * of truth (core/mcp.json, packs/<name>/mcp.json, personal/mcp.json),
  * compiled into Claude's settings.json `mcpServers` instead of being read
  * from the settings JSON layers directly.
@@ -8,7 +8,7 @@
  * `runtime/yoki/scripts/lib/mcp-inventory/{source,writers/claude}.js`.
  */
 
-export const MCP_SCHEMA_VERSION = "ecc.mcp.v1";
+export const MCP_SCHEMA_VERSION = "jig.mcp.v1";
 
 export type McpTransport = "stdio" | "http";
 

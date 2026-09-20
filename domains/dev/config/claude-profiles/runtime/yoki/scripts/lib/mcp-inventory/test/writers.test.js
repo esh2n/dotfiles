@@ -69,7 +69,7 @@ test('loadLayer: a misspelled targets key throws instead of silently disabling t
   try {
     const filePath = path.join(dir, 'mcp.json');
     writeJson(filePath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [{
         name: 'x',
         transport: 'stdio',
@@ -90,7 +90,7 @@ test('loadLayer: a misspelled targetOverrides key throws too; `_comment` keys ar
   try {
     const badPath = path.join(dir, 'bad.json');
     writeJson(badPath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [{
         name: 'x', transport: 'stdio', command: 'x', args: [], env: {},
         targets: { claude: true, codex: false, omp: false },
@@ -101,7 +101,7 @@ test('loadLayer: a misspelled targetOverrides key throws too; `_comment` keys ar
 
     const okPath = path.join(dir, 'ok.json');
     writeJson(okPath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [{
         name: 'x', transport: 'stdio', command: 'x', args: [], env: {},
         targets: { claude: true, codex: false, omp: false, _comment: 'why' },
@@ -179,7 +179,7 @@ test('loadLayer: a missing file is an empty layer', () => {
   const dir = makeTmpDir();
   try {
     const layer = loadLayer(path.join(dir, 'nope.json'));
-    assert.deepEqual(layer, { schemaVersion: 'ecc.mcp.v1', servers: [] });
+    assert.deepEqual(layer, { schemaVersion: 'jig.mcp.v1', servers: [] });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -201,7 +201,7 @@ test('loadLayer: a literal secret-shaped value throws — the dropped local Figm
   try {
     const filePath = path.join(dir, 'mcp.json');
     writeJson(filePath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [{
         name: 'figma',
         transport: 'stdio',
@@ -222,7 +222,7 @@ test('loadLayer: a secret-shaped KEY name with a placeholder literal also throws
   try {
     const filePath = path.join(dir, 'mcp.json');
     writeJson(filePath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [{
         name: 'figma',
         transport: 'stdio',
@@ -243,7 +243,7 @@ test('loadLayer: the ${ENV_VAR} reference form for the same key is allowed', () 
   try {
     const filePath = path.join(dir, 'mcp.json');
     writeJson(filePath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [{
         name: 'figma',
         transport: 'stdio',
@@ -266,14 +266,14 @@ test('loadAndMerge: a personal-layer server of the same name entirely replaces c
     const corePath = path.join(dir, 'core.json');
     const personalPath = path.join(dir, 'personal.json');
     writeJson(corePath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [
         { name: 'a', transport: 'stdio', command: 'core-cmd', args: [], env: {}, targets: { claude: true, codex: false, omp: false } },
         { name: 'b', transport: 'http', url: 'https://core.example/mcp', env: {}, targets: { claude: true, codex: false, omp: false } },
       ],
     });
     writeJson(personalPath, {
-      schemaVersion: 'ecc.mcp.v1',
+      schemaVersion: 'jig.mcp.v1',
       servers: [{ name: 'a', transport: 'stdio', command: 'personal-cmd', args: [], env: {}, targets: { claude: true, codex: false, omp: false } }],
     });
 

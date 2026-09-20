@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Reader + merger for the `ecc.mcp.v1` canonical MCP source-of-truth layers
+ * Reader + merger for the `jig.mcp.v1` canonical MCP source-of-truth layers
  * (core/mcp.json, packs/<name>/mcp.json, personal/mcp.json) — task T13's
  * equivalent of `lib/permissions/parse.js` for permissions.yaml. A missing
  * file is treated as an empty layer (a pack need not ship mcp.json).
