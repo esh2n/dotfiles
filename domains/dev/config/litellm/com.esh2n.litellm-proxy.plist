@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Deploy to ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist and load with:
+<!-- Source template: the placeholder tokens below are expanded into a real
+     copy at ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist by
+     `yoki-switch apply` (manager.sh link_launch_agents, via install_expanded) —
+     launchd itself never expands env vars or ~, so do not hand-edit the
+     deployed copy; fix this source and re-apply. Load with:
        launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist
      Keeps the local LiteLLM measuring proxy always-on at login. The wrapper it
      runs injects secrets from a 1Password service account via the login Keychain
@@ -12,7 +16,7 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>/Users/esh2n/.config/litellm/litellm-up.sh</string>
+    <string>{{HOME}}/.config/litellm/litellm-up.sh</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -25,8 +29,8 @@
   <key>ProcessType</key>
   <string>Background</string>
   <key>StandardOutPath</key>
-  <string>/Users/esh2n/Library/Logs/litellm-proxy.log</string>
+  <string>{{HOME}}/Library/Logs/litellm-proxy.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/esh2n/Library/Logs/litellm-proxy.log</string>
+  <string>{{HOME}}/Library/Logs/litellm-proxy.log</string>
 </dict>
 </plist>

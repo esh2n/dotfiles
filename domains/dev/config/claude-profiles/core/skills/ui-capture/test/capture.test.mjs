@@ -4,7 +4,7 @@
 // zero-dependency rule)。テストは環境変数 UI_CAPTURE_PLAYWRIGHT で
 // 既存プロジェクトの node_modules/playwright を指す前提で走る:
 //
-//   UI_CAPTURE_PLAYWRIGHT=/Users/esh2n/go/github.com/esh2n/arekore/apps/viewer/node_modules/playwright \
+//   UI_CAPTURE_PLAYWRIGHT=/path/to/some-project/node_modules/playwright \
 //     node --test test/capture.test.mjs
 //
 // この変数が指すパスに playwright が無い(require できない)場合、全テストを
@@ -25,9 +25,13 @@ import assert from "node:assert/strict";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CAPTURE_BIN = path.join(HERE, "..", "bin", "capture.mjs");
 const LAUNCHER_BIN = path.join(HERE, "..", "bin", "ui-capture");
+// No portable default exists (playwright isn't this skill's own dependency —
+// see the zero-dependency rule above): without the env var, this resolves to
+// a path that deliberately can't require() so playwrightResolvable() below
+// reports false and the suite reports its designed "skip" outcome, the same
+// as any machine that never set UI_CAPTURE_PLAYWRIGHT.
 const PLAYWRIGHT_PATH =
-  process.env.UI_CAPTURE_PLAYWRIGHT ??
-  "/Users/esh2n/go/github.com/esh2n/arekore/apps/viewer/node_modules/playwright";
+  process.env.UI_CAPTURE_PLAYWRIGHT ?? "__UI_CAPTURE_PLAYWRIGHT_NOT_SET__";
 
 // capture.mjs 自身がエクスポートする純関数(Node バージョンガード)を単体で
 // 検証する。プロセスの process.version は non-writable なので、子プロセス

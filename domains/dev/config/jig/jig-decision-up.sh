@@ -22,10 +22,12 @@
 set -euo pipefail
 
 # launchd hands us a minimal PATH; name the tools' real locations.
-export PATH="/etc/profiles/per-user/esh2n/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="/etc/profiles/per-user/$(id -un)/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# Where the jig checkout lives. Set by the plist; overridable for a worktree.
-JIG_DIR="${JIG_DIR:-$HOME/go/github.com/esh2n/dotfiles/domains/dev/llm/harness/jig}"
+# Where the jig checkout lives. Set by the plist (from {{DOTFILES_ROOT}} at
+# apply time); this fallback is only for a manual/ad-hoc run where JIG_DIR
+# isn't exported, and stays portable by never hardcoding a username.
+JIG_DIR="${JIG_DIR:-${DOTFILES_ROOT:-$HOME/go/github.com/$(id -un)/dotfiles}/domains/dev/llm/harness/jig}"
 BUN="${BUN:-$HOME/.local/share/mise/installs/bun/1.3.13/bin/bun}"
 PORT="${JIG_DECISION_PORT:-4100}"
 

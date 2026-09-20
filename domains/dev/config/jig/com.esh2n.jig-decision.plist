@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Deploy to ~/Library/LaunchAgents/com.esh2n.jig-decision.plist and load with:
+<!-- Source template: the placeholder tokens below are expanded into a real
+     copy at ~/Library/LaunchAgents/com.esh2n.jig-decision.plist by
+     `yoki-switch apply` (manager.sh link_launch_agents, via install_expanded) —
+     launchd itself never expands env vars or ~, so do not hand-edit the
+     deployed copy; fix this source and re-apply. Load with:
        launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.esh2n.jig-decision.plist
      Keeps jig's judgment service always-on at login, so every harness (pi, DSH, …)
      can ask for a judgment over the loopback while the key stays in this one
      process. The wrapper it runs resolves the key from 1Password (see
      jig-decision-up.sh); no secret lives in this plist.
 
-     JIG_DIR must point at a checkout that contains jig — the path below is the
-     main working copy. Point it at a worktree only for a deliberate test run. -->
+     JIG_DIR must point at a checkout that contains jig — the DOTFILES_ROOT
+     placeholder below resolves to the main working copy at apply time. Point
+     it at a worktree only for a deliberate test run. -->
 <plist version="1.0">
 <dict>
   <key>Label</key>
@@ -16,12 +21,12 @@
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>/Users/esh2n/.config/jig/jig-decision-up.sh</string>
+    <string>{{HOME}}/.config/jig/jig-decision-up.sh</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
     <key>JIG_DIR</key>
-    <string>/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/llm/harness/jig</string>
+    <string>{{DOTFILES_ROOT}}/domains/dev/llm/harness/jig</string>
     <key>JIG_DECISION_PORT</key>
     <string>4100</string>
   </dict>
@@ -36,8 +41,8 @@
   <key>ProcessType</key>
   <string>Background</string>
   <key>StandardOutPath</key>
-  <string>/Users/esh2n/Library/Logs/jig-decision.log</string>
+  <string>{{HOME}}/Library/Logs/jig-decision.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/esh2n/Library/Logs/jig-decision.log</string>
+  <string>{{HOME}}/Library/Logs/jig-decision.log</string>
 </dict>
 </plist>

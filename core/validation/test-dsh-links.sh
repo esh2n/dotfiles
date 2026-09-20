@@ -9,8 +9,10 @@ set -euo pipefail
 # .credentials.yaml and sessions) next to what this repo owns, so the
 # contract under test is exactly the dangerous part:
 #
-#   - settings.yaml / hooks.claude.json are linked FILE BY FILE
-#   - a profile's cordis.patch.yml is linked only into a profile directory
+#   - settings.yaml is symlinked; hooks.claude.json and each cordis.patch.yml
+#     are EXPANDED COPIES ({{HOME}}/{{DOTFILES_ROOT}} -> real paths), because
+#     the hook/cordis contexts read them literally and can't expand env vars
+#   - a profile's cordis.patch.yml is deployed only into a profile directory
 #     dsh has ALREADY scaffolded — never creates the profile dir itself
 #   - re-running is idempotent
 #   - dangling symlinks are swept ONLY when they point into a
@@ -98,6 +100,22 @@ is_link_to() {
     [[ -L "$dest" && "$(readlink "$dest")" == "$src" && -e "$dest" ]]
 }
 
+# Files carrying {{HOME}}/{{DOTFILES_ROOT}}/{{USER}} placeholders are deployed
+# as EXPANDED COPIES (install_expanded), not symlinks: the hook/cordis contexts
+# read them literally and would choke on raw {{...}}. Assert dest is a real
+# file (not a symlink), holds no leftover placeholder, and equals the source
+# with the same substitution install_expanded applies.
+is_expanded_copy() {
+    local dest="$1" src="$2"
+    [[ -f "$dest" && ! -L "$dest" ]] || return 1
+    grep -q '{{' "$dest" && return 1
+    local expected
+    expected="$(sed -e "s|{{HOME}}|${HOME}|g" \
+                    -e "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT}|g" \
+                    -e "s|{{USER}}|${USER}|g" "$src")"
+    [[ "$(cat "$dest")" == "$expected" ]]
+}
+
 snapshot_links() {
     find "${FAKE_DSH_HOME}" -type l -print0 2>/dev/null \
         | sort -z \
@@ -124,15 +142,15 @@ run_dsh_links_checks() {
 
     check "case2: settings.yaml linked" \
         is_link_to "${FAKE_DSH_HOME}/settings.yaml" "${DSH_SRC}/settings.yaml"
-    check "case3: hooks.claude.json linked" \
-        is_link_to "${FAKE_DSH_HOME}/hooks.claude.json" "${DSH_SRC}/hooks.claude.json"
+    check "case3: hooks.claude.json expanded-copied (not symlink)" \
+        is_expanded_copy "${FAKE_DSH_HOME}/hooks.claude.json" "${DSH_SRC}/hooks.claude.json"
 
-    check "case4: proxy profile patch linked (scaffolded)" \
-        is_link_to "${FAKE_DSH_HOME}/profiles/proxy/cordis.patch.yml" \
-                    "${DSH_SRC}/profiles/proxy/cordis.patch.yml"
-    check "case5: headless profile patch linked (scaffolded)" \
-        is_link_to "${FAKE_DSH_HOME}/profiles/headless/cordis.patch.yml" \
-                    "${DSH_SRC}/profiles/headless/cordis.patch.yml"
+    check "case4: proxy profile patch expanded-copied (scaffolded)" \
+        is_expanded_copy "${FAKE_DSH_HOME}/profiles/proxy/cordis.patch.yml" \
+                         "${DSH_SRC}/profiles/proxy/cordis.patch.yml"
+    check "case5: headless profile patch expanded-copied (scaffolded)" \
+        is_expanded_copy "${FAKE_DSH_HOME}/profiles/headless/cordis.patch.yml" \
+                         "${DSH_SRC}/profiles/headless/cordis.patch.yml"
 
     # --- runtime state ---------------------------------------------------------
     check "case6: runtime .credentials.yaml untouched" \

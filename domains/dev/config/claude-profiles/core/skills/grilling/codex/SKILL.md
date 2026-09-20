@@ -23,9 +23,10 @@ argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 
 1. 開始時に `find .claude/.cache/grilling -mindepth 1 -maxdepth 1 -type d -mtime +60 -exec rm -rf {} +` を実行し、消したことを1行で言え。
 2. ラウンド文書を `.claude/.cache/grilling/<slug>/round-<n>.md` に書け（`<slug>` は対象から作る英小文字ケバブケース。git repo でない場所なら一時ディレクトリ配下に書く）。形式は
-   `/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/grilling/references/round-format.md`
+   `$YOKI_ROOT/../../core/skills/grilling/references/round-format.md`
+   (codex は起動時に `YOKI_ROOT` を設定する — `domains/dev/config/claude-profiles/runtime/yoki` から見た grilling スキルの相対位置)
    を**読んでから**それに従え。散文と機械可読 YAML ブロックの両方を書き、内容を一致させろ。1ラウンド = frontier の問い 3〜6問。構造を比べる問い（位置や経路が争点の問い）には ```diagram を描き、それ以外は一文で済ませろ。
-3. `node /Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/grilling/render/render.mjs serve <round.md>`
+3. `node "$YOKI_ROOT/../../core/skills/grilling/render/render.mjs" serve <round.md>`
    を実行しろ。ページが開き、**全問の提出まで戻らない**。終了を待て。
 4. stdout の集計（`q1: A — メモ`）をそのままラウンド文書の `answer:` 行に写し、`status: answered` にしろ。回答は同ディレクトリの `answers.jsonl` にも残る（最後の行が勝つ）。
 5. 木を更新して次のラウンドへ。frontier が空になり、重要な枝に暗黙の前提が残っていないことを確認してから「共通理解に達しましたか」と聞け。
