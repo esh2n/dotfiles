@@ -174,6 +174,30 @@ describe("applyTiers", () => {
     expect(second.results[0]?.wrote).toBe(false);
   });
 
+  test("--write on a dest that already reads exactly as generated still seeds the manifest (first run, nothing to write)", async () => {
+    const { ports, files, manifest } = fakePorts({
+      [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
+    });
+    // Pre-populate the dest with EXACTLY what pi would generate, but with no
+    // manifest entry yet — as if it were hand-authored to already match.
+    const { toPiModels } = await import("../../../src/domain/tiers/write-pi");
+    const { parseTiers } = await import("../../../src/domain/tiers/parse");
+    files[PI_PATH] = toPiModels(parseTiers(MINIMAL_TIERS)).content;
+
+    const report = await applyTiers(
+      {
+        tiersJsonPath: TIERS_JSON_PATH,
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        options: { targets: ["pi"], write: true },
+      },
+      ports,
+    );
+
+    expect(report.results[0]?.outcome).toBe("noop");
+    expect(report.results[0]?.wrote).toBe(false);
+    expect(manifest[PI_PATH]).toBe(ports.sha256(files[PI_PATH] as string));
+  });
+
   test("a hand-edit conflict aborts: reports conflict, writes nothing", async () => {
     const { ports, files } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     const opts = {

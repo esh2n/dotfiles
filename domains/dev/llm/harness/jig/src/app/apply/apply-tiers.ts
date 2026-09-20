@@ -90,6 +90,28 @@ function outcomeFromPlan(action: PlanAction): TargetOutcome {
   return action;
 }
 
+/**
+ * A "noop" plan means the file already reads exactly as generated — but if
+ * the manifest doesn't yet record that (first apply ever for this dest, or a
+ * hand edit that happened to land back on the generated text), `--write`
+ * should still seed/heal the manifest so a LATER hand edit is correctly
+ * detected as one. No file content changes here — only the out-of-repo
+ * manifest — so this never shows up in `git diff`.
+ */
+async function syncManifestIfUnrecorded(
+  ports: ApplyPorts,
+  destPath: string,
+  generatedContent: string,
+  manifestHash: string | undefined,
+  manifest: Record<string, string>,
+): Promise<void> {
+  const generatedHash = ports.sha256(generatedContent);
+  if (manifestHash !== generatedHash) {
+    manifest[destPath] = generatedHash;
+    await ports.writeManifest(manifest);
+  }
+}
+
 async function applyPi(
   policy: TiersPolicy,
   destPath: string,
@@ -114,6 +136,10 @@ async function applyPi(
   if (write && plan.action === "write") {
     await finishWrite(ports, destPath, generated, tiersJsonPath, tiersJsonText, manifest);
     return { target: "pi", outcome: "write", diff, dropped, wrote: true };
+  }
+
+  if (write && plan.action === "noop") {
+    await syncManifestIfUnrecorded(ports, destPath, generated, manifestHash, manifest);
   }
 
   return {
@@ -182,6 +208,10 @@ async function applyDsh(
   if (write && plan.action === "write") {
     await finishWrite(ports, destPath, generated, tiersJsonPath, tiersJsonText, manifest);
     return { target: "dsh", outcome: "write", diff, dropped, wrote: true };
+  }
+
+  if (write && plan.action === "noop") {
+    await syncManifestIfUnrecorded(ports, destPath, generated, manifestHash, manifest);
   }
 
   return {
