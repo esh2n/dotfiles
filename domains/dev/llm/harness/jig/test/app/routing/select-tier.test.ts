@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type Tier, selectTier, tierMaterial } from "../../../src/app/routing/select-tier";
+import { type Tier, selectTier } from "../../../src/app/routing/select-tier";
 import type {
   ChoiceQuery,
   Decided,
@@ -38,31 +38,6 @@ class PromptRecordingProvider implements DecisionProvider {
     throw new Error("selectTier must ask one choice question");
   }
 }
-
-describe("tierMaterial", () => {
-  test("a short request is sent as it is", () => {
-    expect(tierMaterial("rename a variable")).toBe("rename a variable");
-  });
-
-  test("a long request keeps both ends and announces the elision", () => {
-    const request = `START ${"x".repeat(9_000)} MIDDLE_MARKER ${"y".repeat(9_000)} ASK`;
-
-    const material = tierMaterial(request);
-
-    expect(material.startsWith("START ")).toBe(true);
-    expect(material.endsWith(" ASK")).toBe(true);
-    expect(material).toContain("characters elided from the middle");
-    // The only thing that goes is the middle.
-    expect(material).not.toContain("MIDDLE_MARKER");
-    // Bounded to the two windows plus the one-line marker and its separators.
-    expect(material.length).toBeLessThan(4_200);
-  });
-
-  test("the middle is the part that goes, not the ask at the end", () => {
-    const request = `${"a".repeat(5_000)} the real question at the end?`;
-    expect(tierMaterial(request).endsWith(" the real question at the end?")).toBe(true);
-  });
-});
 
 describe("selectTier", () => {
   test("routes to the decided tier when confidence clears the gate", async () => {

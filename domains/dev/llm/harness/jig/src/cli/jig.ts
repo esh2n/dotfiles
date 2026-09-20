@@ -12,9 +12,11 @@ import { ConsoleLogger } from "../infra/logger/console-logger";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
+import { readSkillCatalog } from "../infra/skills/catalog";
 import { applyCli } from "./apply";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
+import { appendRouterLog, userPromptSubmit } from "./hooks/user-prompt-submit";
 import { buildJudgmentProvider, serveDecisionService } from "./serve";
 import { tier } from "./tier";
 
@@ -42,6 +44,11 @@ function resolveApplyPaths(): { tiersJsonPath: string; destPaths: ApplyTargetPat
       litellm: join(root, "domains", "dev", "config", "litellm", "config.yaml"),
     },
   };
+}
+
+/** Where the skill router reads the list a harness shows. Overridable for tests. */
+function resolveSkillRoot(env: Record<string, string | undefined> = process.env): string {
+  return env.JIG_SKILL_ROOT ?? join(homedir(), ".claude", ".skills-merged");
 }
 
 /** `JIG_STATE_DIR` overrides where the hand-edit-detection manifest lives, for tests. */
@@ -91,6 +98,24 @@ export async function main(argv: readonly string[]): Promise<number> {
       if (subcommand === "pre-tool-use") {
         const stdin = await new Response(Bun.stdin.stream()).text();
         process.stdout.write(await preToolUse(stdin, ports));
+        return 0;
+      }
+      if (subcommand === "user-prompt-submit") {
+        const stdin = await new Response(Bun.stdin.stream()).text();
+        const threshold = Number.parseFloat(process.env.JIG_SKILL_ROUTER_THRESHOLD ?? "");
+        process.stdout.write(
+          await userPromptSubmit(
+            stdin,
+            {
+              provider: ports.decision,
+              catalog: () => readSkillCatalog(resolveSkillRoot()),
+              record: (entry) =>
+                appendRouterLog(join(resolveStateDir(), "skill-router.jsonl"), entry),
+              logger: ports.logger,
+            },
+            Number.isFinite(threshold) ? { threshold } : {},
+          ),
+        );
         return 0;
       }
       ports.logger.error("unknown hook subcommand", { subcommand });
@@ -148,7 +173,9 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
     default:
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | decide | tier | serve | apply [--target pi|dsh|litellm|all] [--write]>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | apply [--target pi|dsh|litellm|all] [--write]>\n" +
+          "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
+          "  it never blocks the prompt (empty output means no opinion).\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +
