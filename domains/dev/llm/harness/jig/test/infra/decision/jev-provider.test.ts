@@ -125,6 +125,27 @@ describe("JevProvider.choice", () => {
     expect(client.calls).toEqual([]);
   });
 
+  test("criteria carrying a key outside options is a request error, not a model call", async () => {
+    const { provider, client } = providerFor(result({}));
+
+    await expect(
+      provider.choice(
+        {
+          prompt: "Which tier?",
+          options: TIERS,
+          // "deterministic" is not one of TIERS: a caller bug, not something
+          // the model should ever be asked to pick from.
+          criteria: { main: "routine", complex: "hard", deterministic: "sneaky" } as Record<
+            (typeof TIERS)[number],
+            string
+          >,
+        },
+        {},
+      ),
+    ).rejects.toThrow(JevRequestError);
+    expect(client.calls).toEqual([]);
+  });
+
   test("rejects an answer that picks something never offered", async () => {
     const { provider } = providerFor(
       result({
@@ -394,5 +415,63 @@ describe("JevProvider.boolBatch", () => {
     await expect(provider.boolBatch({ material: "m", prompts: ["a", "b"] }, {})).rejects.toThrow(
       JevResponseError,
     );
+  });
+
+  test("chunks are dispatched in parallel, not one at a time", async () => {
+    // Three chunks (65 prompts = 32 + 32 + 1), each taking DELAY_MS to
+    // "answer". Sequential dispatch takes >= 3 * DELAY_MS; parallel dispatch
+    // takes roughly one DELAY_MS regardless of chunk count. The margin is
+    // generous (2x one delay) so this is not flaky under load, while still
+    // being far below the 3x a sequential loop would need.
+    const DELAY_MS = 60;
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    const client = async (request: SystemOneRequest): Promise<SystemOneResult> => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+      inFlight--;
+      const answers: Record<string, SystemOneAnswer> = {};
+      for (const id of Object.keys(request.questions)) answers[id] = { type: "noul", noul: 0.9 };
+      return result(answers);
+    };
+    const provider = new JevProvider({ client });
+    const prompts = Array.from({ length: 65 }, (_, index) => `question ${index}`);
+
+    const started = performance.now();
+    const decided = await provider.boolBatch({ material: "m", prompts }, {});
+    const elapsedMs = performance.now() - started;
+
+    expect(decided.length).toBe(65);
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(elapsedMs).toBeLessThan(DELAY_MS * 2);
+  });
+
+  test("chunks dispatched in parallel still keep prompt order in the result", async () => {
+    // Chunk 0 (the slower one) resolves AFTER chunk 1 — order in the
+    // returned array must still follow `prompts`, not resolution order.
+    const client = new QueuedClient([]);
+    const delays = [30, 5];
+    let call = 0;
+    const provider = new JevProvider({
+      client: async (request) => {
+        const index = call++;
+        client.calls.push(request);
+        await new Promise((resolve) => setTimeout(resolve, delays[index]));
+        const answers: Record<string, SystemOneAnswer> = {};
+        for (const id of Object.keys(request.questions)) {
+          answers[id] = { type: "noul", noul: index === 0 ? 0.9 : 0.1 };
+        }
+        return result(answers);
+      },
+    });
+    const prompts = Array.from({ length: 33 }, (_, index) => `question ${index}`);
+
+    const decided = await provider.boolBatch({ material: "m", prompts }, {});
+
+    expect(client.calls.length).toBe(2);
+    expect(decided[0]).toEqual({ value: true, confidence: 0.9 }); // from chunk 0
+    expect(decided[32]).toEqual({ value: false, confidence: 0.9 }); // from chunk 1
   });
 });

@@ -112,13 +112,32 @@ export class JevResponseError extends Error {}
 /** TypeSafe evaluates at most 32 questions in one request (verified in the API schema). */
 const MAX_QUESTIONS_PER_REQUEST = 32;
 
-/** Choice options and their descriptions; falls back to the label as its own description. */
+/**
+ * Choice options and their descriptions; falls back to the label as its own
+ * description. Restricted to `query.options` — a `criteria` key the caller
+ * supplied that is NOT one of `options` is a caller bug (a judgment that
+ * does not match the question must fail, not degrade; see remote.ts's
+ * docstring), so it is rejected here rather than silently forwarded, which
+ * would let the model's answer land outside the options that were asked
+ * about.
+ */
 function criteriaOf<T extends string>(query: ChoiceQuery<T>): Record<T, string> {
-  const criteria: Record<string, string> =
-    query.criteria === undefined
-      ? Object.fromEntries(query.options.map((option) => [option, option]))
-      : { ...query.criteria };
+  if (query.criteria === undefined) {
+    const selfDescribing: Record<string, string> = Object.fromEntries(
+      query.options.map((option) => [option, option]),
+    );
+    return selfDescribing as Record<T, string>;
+  }
 
+  const optionSet = new Set<string>(query.options);
+  const extra = Object.keys(query.criteria).filter((key) => !optionSet.has(key));
+  if (extra.length > 0) {
+    throw new JevRequestError(
+      `choice query criteria has key(s) not in options: ${extra.join(", ")} — options are [${query.options.join(", ")}]`,
+    );
+  }
+
+  const criteria: Record<string, string> = { ...query.criteria };
   const missing = query.options.filter((option) => {
     const description = criteria[option];
     return description === undefined || description.trim() === "";
@@ -254,7 +273,11 @@ export class JevProvider implements DecisionProvider {
       throw new JevResponseError("unreachable: answer type checked in ask()");
 
     assertKeysMatch(answer.probabilities, Object.keys(criteria), "choice probabilities");
-    if (!(answer.choice in criteria)) {
+    // Checked against query.options directly (not just `criteria`, though the
+    // two now always carry the same keys) — the invariant this guards is
+    // "the answer matches the question that was asked", stated in terms of
+    // what the caller asked for.
+    if (!query.options.includes(answer.choice as T)) {
       throw new JevResponseError(`choice "${answer.choice}" is not one of the options asked`);
     }
     return {
@@ -271,26 +294,36 @@ export class JevProvider implements DecisionProvider {
 
   /**
    * Many noul questions against ONE material. Requests are chunked to the wire
-   * limit (32 questions per request); the judgments returned keep the order of
-   * `prompts` across chunk boundaries. Nothing to ask = no request at all.
+   * limit (32 questions per request) and dispatched IN PARALLEL — each chunk is
+   * an independent HTTP call over the same material but a disjoint set of
+   * questions, so only the slowest chunk should gate total latency, not the sum
+   * of all of them. `Promise.all` keeps chunk order in the reassembled array
+   * regardless of which chunk's response arrives first. Nothing to ask = no
+   * request at all.
    */
   async boolBatch(
     query: BoolBatchQuery,
     _context: DecisionContext,
   ): Promise<readonly Decided<boolean>[]> {
-    const decided: Decided<boolean>[] = [];
+    const chunks: string[][] = [];
     for (let start = 0; start < query.prompts.length; start += MAX_QUESTIONS_PER_REQUEST) {
-      const chunk = query.prompts.slice(start, start + MAX_QUESTIONS_PER_REQUEST);
-      const questions: Record<string, SystemOneQuestion> = {};
-      for (let index = 0; index < chunk.length; index++) {
-        questions[`q${index}`] = { type: "noul", instructions: chunk[index] };
-      }
-      const result = await this.send(query.material, questions);
-      for (let index = 0; index < chunk.length; index++) {
-        decided.push(noulToBool(answerFor(result, `q${index}`, "noul"), `q${index}`));
-      }
+      chunks.push(query.prompts.slice(start, start + MAX_QUESTIONS_PER_REQUEST));
     }
-    return decided;
+
+    const perChunk = await Promise.all(
+      chunks.map(async (chunk) => {
+        const questions: Record<string, SystemOneQuestion> = {};
+        for (let index = 0; index < chunk.length; index++) {
+          questions[`q${index}`] = { type: "noul", instructions: chunk[index] };
+        }
+        const result = await this.send(query.material, questions);
+        return chunk.map((_prompt, index) =>
+          noulToBool(answerFor(result, `q${index}`, "noul"), `q${index}`),
+        );
+      }),
+    );
+
+    return perChunk.flat();
   }
 
   async score(query: ScoreQuery, _context: DecisionContext): Promise<Decided<number>> {
