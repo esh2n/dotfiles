@@ -13,10 +13,18 @@
  */
 
 import { timingSafeEqual } from "node:crypto";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { type AnswerCompactionDeps, answerCompaction } from "../app/compaction/answer-compaction";
 import type { CompactionResult } from "../app/compaction/compact";
 import { type AnswerDecisionDeps, answerDecision } from "../app/decision/answer-decision";
+import {
+  type AnswerSkillDeps,
+  type SkillDecision,
+  answerSkill,
+} from "../app/decision/answer-skill";
 import { type AnswerTierDeps, type TierDecision, answerTier } from "../app/decision/answer-tier";
+import type { SkillCandidate } from "../app/routing/select-skill";
 import type { DecisionProvider } from "../domain/decision/provider";
 import type {
   RemoteDecisionErrorResponse,
@@ -28,6 +36,7 @@ import { ensureDecisionToken, tokenFilePath } from "../infra/decision/token-file
 import { createTypesafeClient, typesafeKeyFromEnv } from "../infra/decision/typesafe-client";
 import { type JudgmentKind, runWithJudgmentKind } from "../infra/metrics/judgment-kind";
 import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../infra/metrics/registry";
+import { readSkillCatalog } from "../infra/skills/catalog";
 
 /** A JSON reply: the endpoint's own body, or the shared error envelope. */
 export type HttpResponse<Body> = {
@@ -38,6 +47,7 @@ export type HttpResponse<Body> = {
 export type DecisionHttpResponse = HttpResponse<RemoteDecisionResponse>;
 export type TierHttpResponse = HttpResponse<TierDecision>;
 export type CompactionHttpResponse = HttpResponse<CompactionResult>;
+export type SkillHttpResponse = HttpResponse<SkillDecision>;
 
 /**
  * Application result -> HTTP. A malformed request is the caller's bug (400); a
@@ -94,6 +104,33 @@ export async function respondToCompaction(
   };
 }
 
+/**
+ * Application result -> HTTP for the skill endpoint. Same mapping rule as the other
+ * judgments: a malformed request is the caller's bug, a skill that could not be
+ * judged is an upstream failure (the caller then injects nothing at all).
+ */
+export async function respondToSkill(
+  body: unknown,
+  provider: DecisionProvider,
+  deps: AnswerSkillDeps,
+): Promise<SkillHttpResponse> {
+  const result = await answerSkill(body, provider, deps);
+  if (result.ok) return { status: 200, body: result.decision };
+  return {
+    status: result.kind === "bad-request" ? 400 : 502,
+    body: { op: "error", error: { kind: result.kind, message: result.message } },
+  };
+}
+
+/**
+ * Where the skill endpoint reads the list a harness shows. Matches the hook's own
+ * default (`cli/jig.ts`): the merged farm Claude Code renders from, which on this
+ * machine is every profile's skills.
+ */
+function defaultSkillRoot(): string {
+  return join(homedir(), ".claude", ".skills-merged");
+}
+
 /** The service's own composition root: build the credentialed provider exactly once. */
 export function buildJudgmentProvider(
   env: Record<string, string | undefined> = process.env,
@@ -119,6 +156,12 @@ export interface ServeDecisionOptions {
    * so `/metrics` and the usage hook share a single registry.
    */
   readonly metrics?: MetricsRegistry;
+  /**
+   * The skill list the skill endpoint chooses from. Read per call by default, since
+   * the farm changes when skills are installed; a caller that knows better can pass
+   * a cached reader.
+   */
+  readonly skillCatalog?: () => Promise<readonly SkillCandidate[]>;
 }
 
 export interface RunningDecisionService {
@@ -277,11 +320,16 @@ export function serveDecisionService(
     ...deps,
     ...(options.compaction === undefined ? {} : { options: options.compaction }),
   };
+  const skillDeps: AnswerSkillDeps = {
+    ...deps,
+    catalog:
+      options.skillCatalog ?? (() => readSkillCatalog(env.JIG_SKILL_ROOT ?? defaultSkillRoot())),
+  };
 
   const metrics = options.metrics ?? new MetricsRegistry();
   describeMetrics(metrics);
 
-  const routes = new Set(["/decide", "/tier", "/compact"]);
+  const routes = new Set(["/decide", "/tier", "/compact", "/skill"]);
   // Kicked off now, at server start, so the token file exists (0600, created or
   // reused) before the first request rather than being generated lazily on it.
   const token = ensureDecisionToken(tokenFilePath(env));
@@ -332,6 +380,7 @@ export function serveDecisionService(
       // request existed — labels its token counts with the endpoint that spent them.
       const response = await runWithJudgmentKind(kind as JudgmentKind, async () => {
         if (pathname === "/tier") return respondToTier(body, options.provider, deps);
+        if (pathname === "/skill") return respondToSkill(body, options.provider, skillDeps);
         if (pathname === "/compact") {
           return respondToCompaction(body, options.provider, compactionDeps);
         }

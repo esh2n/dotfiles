@@ -18,7 +18,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 
-export type JudgmentKind = "decide" | "tier" | "compact";
+export type JudgmentKind = "decide" | "tier" | "compact" | "skill";
 
 const storage = new AsyncLocalStorage<JudgmentKind>();
 

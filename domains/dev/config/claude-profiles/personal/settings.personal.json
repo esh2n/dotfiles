@@ -139,6 +139,15 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'h=~/.claude/hooks/skill-router.sh; if bash -n \"$h\" 2>/dev/null; then exec bash \"$h\"; fi; echo \"[hook] syntax check failed: skill-router.sh - failing open\" >&2'",
+            "timeout": 20
+          }
+        ]
       }
     ],
     "SessionStart": [
