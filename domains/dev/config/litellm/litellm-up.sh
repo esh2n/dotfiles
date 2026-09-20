@@ -19,7 +19,7 @@
 set -euo pipefail
 
 # launchd hands us a minimal PATH; name the tools' real locations.
-export PATH="/etc/profiles/per-user/esh2n/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="/etc/profiles/per-user/$(id -un)/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 CFG_DIR="$HOME/.config/litellm"
 IMAGE="ghcr.io/berriai/litellm:v1.90.2"
