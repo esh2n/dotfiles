@@ -165,9 +165,9 @@ class UserListResponse(BaseModel):
 ```python
 # app/dependencies.py
 from typing import Annotated, AsyncGenerator
+import jwt  # PyJWT — python-jose is effectively unmaintained; use PyJWT instead
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -201,7 +201,7 @@ async def get_current_user(
         if subject is None:
             raise credentials_exception
         user_id = int(subject)
-    except (JWTError, TypeError, ValueError):
+    except (jwt.PyJWTError, TypeError, ValueError):
         raise credentials_exception
 
     user = await db.get(User, user_id)
@@ -309,8 +309,9 @@ async def login(
 # app/services/user_service.py
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
-from passlib.context import CryptContext
+import jwt  # PyJWT
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -319,7 +320,9 @@ from app.config import settings
 from app.models.user import User
 from app.schemas.user import UserCreate, UserUpdate
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# passlib (last release 2020) breaks with bcrypt 4.x and python-jose is
+# unmaintained; use pwdlib for hashing and PyJWT for tokens.
+password_hash = PasswordHash((BcryptHasher(),))
 
 
 class DuplicateUserError(Exception):
@@ -338,7 +341,7 @@ class UserService:
         user = User(
             email=payload.email,
             username=payload.username,
-            hashed_password=pwd_context.hash(payload.password),
+            hashed_password=password_hash.hash(payload.password),
         )
         self.db.add(user)
         try:
@@ -375,7 +378,7 @@ class UserService:
 
     async def authenticate(self, email: str, password: str) -> str | None:
         user = await self.get_by_email(email)
-        if user is None or not pwd_context.verify(password, user.hashed_password):
+        if user is None or not password_hash.verify(password, user.hashed_password):
             return None
         expire = datetime.now(timezone.utc) + timedelta(
             minutes=settings.access_token_expire_minutes
@@ -395,7 +398,10 @@ class UserService:
 
 ```python
 # tests/conftest.py
-import pytest_asyncio
+# This repo's rule: anyio for async tests, never pytest-asyncio.
+# Async fixtures are plain `async def` under `@pytest.fixture`; test modules
+# opt in with `pytestmark = pytest.mark.anyio`.
+import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -409,7 +415,12 @@ engine = create_async_engine(TEST_DATABASE_URL)
 TestingSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"  # pin backend; omit to also run under trio if supported
+
+
+@pytest.fixture(autouse=True)
 async def setup_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -418,14 +429,14 @@ async def setup_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def db_session():
     async with TestingSessionLocal() as session:
         yield session
         await session.rollback()
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def client(db_session: AsyncSession):
     app = create_app()
 
@@ -440,7 +451,7 @@ async def client(db_session: AsyncSession):
         yield ac
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def registered_user(client: AsyncClient) -> dict:
     resp = await client.post("/users/", json={
         "email": "test@example.com",
@@ -452,7 +463,7 @@ async def registered_user(client: AsyncClient) -> dict:
     return resp.json()
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def auth_token(client: AsyncClient, registered_user: dict) -> str:
     resp = await client.post("/users/token", data={
         "username": "test@example.com",
@@ -462,7 +473,7 @@ async def auth_token(client: AsyncClient, registered_user: dict) -> str:
     return resp.json()["access_token"]
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def auth_client(client: AsyncClient, auth_token: str) -> AsyncClient:
     client.headers.update({"Authorization": f"Bearer {auth_token}"})
     return client

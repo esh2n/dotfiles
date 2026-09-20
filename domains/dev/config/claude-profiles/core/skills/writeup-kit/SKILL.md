@@ -41,11 +41,11 @@ A skill that produces a page looks for the kit in this order:
 - `references/` — `components.md` (full component table + HTML shapes),
   `kinds.md` (the 8 page types and their required sections), `page-contract.md`
   (store layout, meta contract, self-check table, Markdown mapping, publish)
-- `bin/` — *arrives in M2–M4*: `render-diagram`, `lint`, `self-check`,
-  `build`, `serve`, `publish`, `to-md`, `rerender-figures` (bulk re-render of
-  stored diagram figures after a kit/renderer upgrade)
-- `vendor/` — *arrives in M2–M4*: `elk.bundled.js` (graph layout),
-  lindera wasm + dictionary (Japanese tokenizer for the lint gate)
+- `bin/` — `render-diagram`, `lint`, `self-check`, `build`, `serve`,
+  `publish`, `to-md`, `rerender-figures` (bulk re-render of stored diagram
+  figures after a kit/renderer upgrade)
+- `vendor/` — `elk` (graph layout), `lindera` wasm + dictionary (Japanese
+  tokenizer for the lint gate)
 
 ## Quick Reference
 

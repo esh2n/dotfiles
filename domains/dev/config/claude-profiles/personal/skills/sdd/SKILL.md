@@ -311,10 +311,10 @@ worktree_path=$(pwd)
 # meta.md の branch と worktree フィールドを更新
 ```
 
-**worktree-start スキルとの連携:**
+**タスクと worktree の紐づけ手順:**
 1. `/sdd init` でタスク作成
-2. `worktree-start` でworktree作成
-3. meta.md の branch/worktree を自動更新
+2. worktree を作成（`git worktree add` 等）
+3. meta.md の branch/worktree を更新
 4. `/sdd clarify` → `/sdd design` → `/sdd tasks` → `/sdd implement`
 
 ## ADR (Architecture Decision Records)

@@ -113,8 +113,11 @@ Each skill is evaluated against this checklist:
 - [ ] Content overlap with other skills checked
 - [ ] Overlap with MEMORY.md / CLAUDE.md checked
 - [ ] Freshness of technical references verified (use WebSearch if tool names / CLI flags / APIs are present)
-- [ ] Usage frequency considered
 ```
+
+> **Not a retire criterion:** usage frequency / low usage. A dynamic router
+> (jev) selects skills per prompt, so a rarely-picked skill is not thereby
+> defective. Retire only for a concrete defect (see the verdict table).
 
 Verdict criteria:
 
@@ -123,7 +126,7 @@ Verdict criteria:
 | Keep | Useful and current |
 | Improve | Worth keeping, but specific improvements needed |
 | Update | Referenced technology is outdated (verify with WebSearch) |
-| Retire | Low quality, stale, or cost-asymmetric |
+| Retire | Defect-only: stale/broken references, near-empty content, or true duplication (NOT low usage) |
 | Merge into [X] | Substantial overlap with another skill; name the merge target |
 
 Evaluation is **holistic AI judgment** — not a numeric rubric. Guiding dimensions:

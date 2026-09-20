@@ -202,8 +202,8 @@ func TestParallel(t *testing.T) {
         {"case3", "input3"},
     }
 
+    // Go 1.22+: the per-iteration `tt := tt` copy is no longer needed.
     for _, tt := range tests {
-        tt := tt // Capture range variable
         t.Run(tt.name, func(t *testing.T) {
             t.Parallel() // Run subtests in parallel
             result := Process(tt.input)
@@ -389,7 +389,7 @@ func BenchmarkProcess(b *testing.B) {
     data := generateTestData(1000)
     b.ResetTimer() // Don't count setup time
 
-    for i := 0; i < b.N; i++ {
+    for b.Loop() { // Go 1.24+: replaces `for i := 0; i < b.N; i++`
         Process(data)
     }
 }
@@ -409,7 +409,7 @@ func BenchmarkSort(b *testing.B) {
             data := generateRandomSlice(size)
             b.ResetTimer()
 
-            for i := 0; i < b.N; i++ {
+            for b.Loop() { // Go 1.24+: replaces `for i := 0; i < b.N; i++`
                 // Make a copy to avoid sorting already sorted data
                 tmp := make([]int, len(data))
                 copy(tmp, data)
@@ -427,7 +427,7 @@ func BenchmarkStringConcat(b *testing.B) {
     parts := []string{"hello", "world", "foo", "bar", "baz"}
 
     b.Run("plus", func(b *testing.B) {
-        for i := 0; i < b.N; i++ {
+        for b.Loop() { // Go 1.24+: replaces `for i := 0; i < b.N; i++`
             var s string
             for _, p := range parts {
                 s += p
@@ -437,7 +437,7 @@ func BenchmarkStringConcat(b *testing.B) {
     })
 
     b.Run("builder", func(b *testing.B) {
-        for i := 0; i < b.N; i++ {
+        for b.Loop() { // Go 1.24+: replaces `for i := 0; i < b.N; i++`
             var sb strings.Builder
             for _, p := range parts {
                 sb.WriteString(p)
@@ -447,7 +447,7 @@ func BenchmarkStringConcat(b *testing.B) {
     })
 
     b.Run("join", func(b *testing.B) {
-        for i := 0; i < b.N; i++ {
+        for b.Loop() { // Go 1.24+: replaces `for i := 0; i < b.N; i++`
             _ = strings.Join(parts, "")
         }
     })
@@ -692,7 +692,7 @@ test:
     - uses: actions/checkout@v4
     - uses: actions/setup-go@v5
       with:
-        go-version: '1.22'
+        go-version: '1.25'  # keep current; b.Loop() requires 1.24+
 
     - name: Run tests
       run: go test -race -coverprofile=coverage.out ./...

@@ -51,13 +51,13 @@ export class ItemsPage {
 
   async goto() {
     await this.page.goto('/items')
-    await this.page.waitForLoadState('networkidle')
+    // Web-first readiness check instead of the discouraged 'networkidle'
+    await this.searchInput.waitFor({ state: 'visible' })
   }
 
   async search(query: string) {
     await this.searchInput.fill(query)
     await this.page.waitForResponse(resp => resp.url().includes('/api/search'))
-    await this.page.waitForLoadState('networkidle')
   }
 
   async getItemCount() {
@@ -186,9 +186,8 @@ await page.waitForResponse(resp => resp.url().includes('/api/data'))
 // Bad: click during animation
 await page.click('[data-testid="menu-item"]')
 
-// Good: wait for stability
-await page.locator('[data-testid="menu-item"]').waitFor({ state: 'visible' })
-await page.waitForLoadState('networkidle')
+// Good: wait for stability with a web-first assertion, then auto-waiting click
+await expect(page.locator('[data-testid="menu-item"]')).toBeVisible()
 await page.locator('[data-testid="menu-item"]').click()
 ```
 
@@ -205,13 +204,11 @@ await page.locator('[data-testid="chart"]').screenshot({ path: 'artifacts/chart.
 ### Traces
 
 ```typescript
-await browser.startTracing(page, {
-  path: 'artifacts/trace.json',
-  screenshots: true,
-  snapshots: true,
+test('records a trace', async ({ page, context }) => {
+  await context.tracing.start({ screenshots: true, snapshots: true })
+  // ... test actions ...
+  await context.tracing.stop({ path: 'artifacts/trace.zip' })
 })
-// ... test actions ...
-await browser.stopTracing()
 ```
 
 ### Video
