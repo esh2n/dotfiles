@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import { resolveAuditPath, resolveStateDir } from "../app/hooks/environment";
 import { reportSkillUsage } from "../app/skills/report-usage";
@@ -19,6 +21,7 @@ import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { readSkillCatalog } from "../infra/skills/catalog";
 import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { applyCli } from "./apply";
+import { codexCli } from "./codex";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
 import { userPromptSubmit } from "./hooks/user-prompt-submit";
@@ -105,6 +108,25 @@ export function buildPorts(): Ports {
   };
 }
 
+/** How codex should invoke jig: absolute paths only, since no environment reaches a codex hook. */
+function codexRegistration(): {
+  paths: { hooksJson: string; configToml: string };
+  input: { command: string; matcher: string; timeoutSeconds: number };
+} {
+  const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
+  const shim = join(homedir(), ".local", "share", "mise", "shims", "bun");
+  const bun = existsSync(shim) ? shim : process.execPath;
+  const jig = fileURLToPath(import.meta.url);
+  return {
+    paths: { hooksJson: join(codexHome, "hooks.json"), configToml: join(codexHome, "config.toml") },
+    input: {
+      command: `'${bun}' '${jig}' hooks pre-tool-use --harness codex`,
+      matcher: "Bash|apply_patch|Write|Edit",
+      timeoutSeconds: 10,
+    },
+  };
+}
+
 /** `--harness <name>` after a hook subcommand: who the adapter says is calling. */
 function harnessFlag(argv: readonly string[]): string | undefined {
   const at = argv.indexOf("--harness");
@@ -178,6 +200,18 @@ export async function main(argv: readonly string[]): Promise<number> {
       process.stdout.write(result.stdout);
       return result.code;
     }
+    case "codex": {
+      const { paths, input } = codexRegistration();
+      const applyPorts = createNodeApplyFs({
+        stateDir: resolveStateDir(process.env),
+        jigVersion: VERSION,
+      });
+      const result = await codexCli(argv.slice(1), applyPorts, paths, input, (text) => {
+        Bun.TOML.parse(text);
+      });
+      process.stdout.write(result.stdout);
+      return result.code;
+    }
     case "report": {
       if (subcommand !== "skills") {
         ports.logger.error("unknown report", { subcommand });
@@ -232,7 +266,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
     default:
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | apply [--target pi|dsh|litellm|all] [--write]>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write]>\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
           "  report skills [--days N] [--json] reads both harnesses' session transcripts and\n" +
