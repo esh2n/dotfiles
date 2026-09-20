@@ -5,7 +5,9 @@ import { parsePolicy } from "../../../src/domain/policy/parse";
 import type { GuardRule } from "../../../src/domain/policy/types";
 
 function rules(...overrides: Array<Record<string, unknown>>): readonly GuardRule[] {
-  return parsePolicy({ version: 1, rules: overrides }).rules;
+  const policy = parsePolicy({ version: 1, rules: overrides });
+  if (policy.version !== 1) throw new Error("fixture is v1");
+  return policy.rules;
 }
 
 const bash = (command: string): ToolCall => ({ tool: "Bash", input: { command } });

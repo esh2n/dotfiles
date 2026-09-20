@@ -1,14 +1,28 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { runHook } from "../../app/hooks/run-hook";
+import { type LoadedPolicy, policyHash, runHook } from "../../app/hooks/run-hook";
 import type { HookProfile, ToolCall } from "../../domain/hooks/decision";
 import { parsePolicy } from "../../domain/policy/parse";
-import type { GuardPolicy } from "../../domain/policy/types";
+import type { Principal } from "../../domain/policy/request";
 import type { Ports } from "../../domain/ports";
 
 interface PreToolUsePayload {
   tool_name?: string;
   tool_input?: Record<string, unknown>;
+  session_id?: string;
+  cwd?: string;
+  permission_mode?: string;
+}
+
+/** What the adapter knows about who is calling that the payload does not say. */
+export interface PreToolUseOptions {
+  /**
+   * The harness name stamped on every judgment (`claude`, `dsh`, …). No
+   * harness sends it, and DSH's bridge speaks Claude Code's payload format,
+   * so the registration passes it (`--harness dsh`); `JIG_HARNESS` is the
+   * environment form. Defaults to `claude`, the format's native speaker.
+   */
+  readonly harness?: string;
 }
 
 const PROFILES: readonly HookProfile[] = ["minimal", "standard", "strict"];
@@ -43,7 +57,7 @@ function hookOutput(decision: { kind: string; reason?: string }): string {
 }
 
 type PolicyLoad =
-  | { readonly kind: "ok"; readonly policy: GuardPolicy }
+  | { readonly kind: "ok"; readonly loaded: LoadedPolicy }
   | { readonly kind: "error"; readonly message: string };
 
 // Cached by resolved path: the normal CLI invocation is one hook call per
@@ -58,7 +72,10 @@ async function loadPolicy(path: string, fs: Ports["fs"]): Promise<PolicyLoad> {
   let result: PolicyLoad;
   try {
     const text = await fs.read(path);
-    result = { kind: "ok", policy: parsePolicy(JSON.parse(text)) };
+    result = {
+      kind: "ok",
+      loaded: { policy: parsePolicy(JSON.parse(text)), hash: policyHash(text) },
+    };
   } catch (error) {
     result = { kind: "error", message: error instanceof Error ? error.message : String(error) };
   }
@@ -97,10 +114,12 @@ async function loadPolicy(path: string, fs: Ports["fs"]): Promise<PolicyLoad> {
  */
 export async function preToolUse(
   stdin: string,
-  ports: Pick<Ports, "logger" | "fs">,
+  ports: Pick<Ports, "logger" | "fs" | "clock"> & { readonly audit?: Ports["audit"] },
+  options: PreToolUseOptions = {},
 ): Promise<string> {
   const profile = resolveProfile(process.env);
   const policyPath = resolvePolicyPath(process.env);
+  const harness = options.harness ?? process.env.JIG_HARNESS ?? "claude";
 
   let payload: PreToolUsePayload;
   try {
@@ -128,7 +147,20 @@ export async function preToolUse(
   }
 
   const call: ToolCall = { tool: payload.tool_name, input: payload.tool_input ?? {} };
-  const decision = runHook(call, profile, loaded.policy, { logger: ports.logger });
+  const principal: Principal = {
+    harness,
+    profile,
+    ...(typeof payload.session_id === "string" ? { sessionId: payload.session_id } : {}),
+    ...(typeof payload.cwd === "string" ? { cwd: payload.cwd } : {}),
+    ...(typeof payload.permission_mode === "string"
+      ? { permissionMode: payload.permission_mode }
+      : {}),
+  };
+  const decision = await runHook(call, principal, loaded.loaded, {
+    logger: ports.logger,
+    clock: ports.clock,
+    ...(ports.audit === undefined ? {} : { audit: ports.audit }),
+  });
 
   // No matching rule: stay silent toward the permission system rather than
   // emitting an explicit "allow" (see the doc comment above).

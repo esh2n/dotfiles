@@ -14,6 +14,8 @@ const silentLogger: Logger = {
 };
 
 const fs = new BunFileSystem();
+const clock = { now: () => new Date("2026-09-21T00:00:00Z") };
+const ports = { logger: silentLogger, fs, clock };
 
 const VALID_POLICY = {
   version: 1,
@@ -59,7 +61,7 @@ async function run(stdin: string): Promise<{
   permissionDecision: string;
   permissionDecisionReason?: string;
 }> {
-  const out = JSON.parse(await preToolUse(stdin, { logger: silentLogger, fs })) as {
+  const out = JSON.parse(await preToolUse(stdin, ports)) as {
     hookSpecificOutput: { permissionDecision: string; permissionDecisionReason?: string };
   };
   return out.hookSpecificOutput;
@@ -67,7 +69,7 @@ async function run(stdin: string): Promise<{
 
 /** For the no-match path, which must emit nothing at all rather than a JSON "allow". */
 async function runRaw(stdin: string): Promise<string> {
-  return preToolUse(stdin, { logger: silentLogger, fs });
+  return preToolUse(stdin, ports);
 }
 
 beforeEach(() => {
@@ -193,5 +195,126 @@ describe("preToolUse", () => {
     );
 
     expect(decision.permissionDecision).toBe("ask");
+  });
+});
+
+describe("preToolUse with a v2 policy", () => {
+  const V2_POLICY = {
+    version: 2,
+    floor: [
+      {
+        id: "floor-mkfs",
+        action: "shell.exec",
+        subject: { program: "mkfs(\\..+)?" },
+        why: "formats a disk",
+      },
+    ],
+    rules: [
+      {
+        id: "ask-sudo-pi",
+        effect: "ask",
+        action: "shell.exec",
+        subject: { program: "sudo" },
+        why: "sudo on pi asks",
+        profiles: ["standard", "strict"],
+        principals: ["pi"],
+      },
+      {
+        id: "forbid-rm-rf",
+        effect: "forbid",
+        action: "shell.exec",
+        subject: { program: "rm", argv: "(^|\\s)-[a-zA-Z]*(r[a-zA-Z]*f|f[a-zA-Z]*r)\\b" },
+        why: "recursive force delete",
+        profiles: ["minimal", "standard", "strict"],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    process.env.JIG_POLICY_FILE = writePolicy(V2_POLICY);
+  });
+
+  afterEach(() => {
+    // biome-ignore lint/performance/noDelete: assigning undefined stores the string "undefined" in process.env
+    delete process.env.JIG_HARNESS;
+  });
+
+  test("grep for 'rm -rf' is no longer a false positive", async () => {
+    const out = await runRaw(
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: 'grep "rm -rf" notes.md' } }),
+    );
+    expect(out).toBe("");
+  });
+
+  test("sudo rm -rf is denied through the wrapper", async () => {
+    const decision = await run(
+      JSON.stringify({ tool_name: "Bash", tool_input: { command: "sudo rm -rf /tmp/x" } }),
+    );
+    expect(decision.permissionDecision).toBe("deny");
+    expect(decision.permissionDecisionReason).toBe("recursive force delete");
+  });
+
+  test("the harness is stamped from the option, else the environment, else claude", async () => {
+    const stdin = JSON.stringify({ tool_name: "Bash", tool_input: { command: "sudo ls" } });
+    // Default principal is claude: the pi-only rule stays silent.
+    expect(await preToolUse(stdin, ports)).toBe("");
+    // `--harness pi` (the option) activates it.
+    const viaOption = JSON.parse(await preToolUse(stdin, ports, { harness: "pi" })) as {
+      hookSpecificOutput: { permissionDecision: string };
+    };
+    expect(viaOption.hookSpecificOutput.permissionDecision).toBe("ask");
+    // JIG_HARNESS (the environment) does too.
+    process.env.JIG_HARNESS = "pi";
+    const viaEnv = JSON.parse(await preToolUse(stdin, ports)) as {
+      hookSpecificOutput: { permissionDecision: string };
+    };
+    expect(viaEnv.hookSpecificOutput.permissionDecision).toBe("ask");
+  });
+
+  test("the floor holds for every harness", async () => {
+    const stdin = JSON.stringify({
+      tool_name: "Bash",
+      tool_input: { command: "mkfs.ext4 /dev/sda1" },
+    });
+    for (const harness of ["claude", "pi", "dsh", "codex"]) {
+      const out = JSON.parse(await preToolUse(stdin, ports, { harness })) as {
+        hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
+      };
+      expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+      expect(out.hookSpecificOutput.permissionDecisionReason).toBe("formats a disk");
+    }
+  });
+
+  test("every judgment is appended to the audit log with principal and policy hash", async () => {
+    const entries: unknown[] = [];
+    const audit = { append: async (entry: unknown) => void entries.push(entry) };
+    const stdin = JSON.stringify({
+      tool_name: "Bash",
+      tool_input: { command: "sudo rm -rf /tmp/x" },
+      session_id: "s-1",
+      cwd: "/work",
+      permission_mode: "default",
+    });
+    await preToolUse(stdin, { ...ports, audit }, { harness: "dsh" });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      ts: "2026-09-21T00:00:00.000Z",
+      principal: {
+        harness: "dsh",
+        profile: "standard",
+        sessionId: "s-1",
+        cwd: "/work",
+        permissionMode: "default",
+      },
+      tool: "Bash",
+      action: "shell.exec",
+      decision: "deny",
+      rule: "forbid-rm-rf",
+      source: "rule",
+      extraction: { kind: "resolved" },
+    });
+    const policy = (entries[0] as { policy: { version: number; hash: string } }).policy;
+    expect(policy.version).toBe(2);
+    expect(policy.hash).toMatch(/^[0-9a-f]{12}$/);
   });
 });

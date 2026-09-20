@@ -5,6 +5,7 @@ import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
+import { JsonlAuditLog } from "../infra/audit/jsonl-audit";
 import { SystemClock } from "../infra/clock/system-clock";
 import { createHttpDecisionClient } from "../infra/decision/http-decision-client";
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
@@ -104,7 +105,14 @@ export function buildPorts(): Ports {
         logger,
       }),
     }),
+    audit: new JsonlAuditLog(join(resolveStateDir(), "guard-audit.jsonl")),
   };
+}
+
+/** `--harness <name>` after a hook subcommand: who the adapter says is calling. */
+function harnessFlag(argv: readonly string[]): string | undefined {
+  const at = argv.indexOf("--harness");
+  return at === -1 ? undefined : argv[at + 1];
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
@@ -119,7 +127,10 @@ export async function main(argv: readonly string[]): Promise<number> {
     case "hooks": {
       if (subcommand === "pre-tool-use") {
         const stdin = await new Response(Bun.stdin.stream()).text();
-        process.stdout.write(await preToolUse(stdin, ports));
+        const harness = harnessFlag(argv);
+        process.stdout.write(
+          await preToolUse(stdin, ports, harness === undefined ? {} : { harness }),
+        );
         return 0;
       }
       if (subcommand === "user-prompt-submit") {

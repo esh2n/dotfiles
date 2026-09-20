@@ -32,7 +32,9 @@ const REAL_POLICY_PATH = join(
 );
 
 function loadRealPolicy(): GuardPolicy {
-  return parsePolicy(JSON.parse(readFileSync(REAL_POLICY_PATH, "utf8")));
+  const policy = parsePolicy(JSON.parse(readFileSync(REAL_POLICY_PATH, "utf8")));
+  if (policy.version !== 1) throw new Error("the live policy is still v1; Phase 2 migrates it");
+  return policy;
 }
 
 function shellCall(command: string): ToolCall {

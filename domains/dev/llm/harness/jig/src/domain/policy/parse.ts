@@ -10,7 +10,8 @@
  */
 
 import type { HookProfile } from "../hooks/decision";
-import type { GuardPolicy, GuardRule, GuardTier, GuardTool } from "./types";
+import type { GuardPolicy, GuardRule, GuardTier, GuardTool, Policy } from "./types";
+import { parsePolicyV2 } from "./v2/parse";
 
 const TIERS: ReadonlySet<string> = new Set<GuardTier>(["deny", "confirm"]);
 const TOOLS: ReadonlySet<string> = new Set<GuardTool>(["shell", "write", "edit"]);
@@ -89,15 +90,21 @@ function parseRule(raw: unknown, index: number): GuardRule {
   };
 }
 
-/** Parse and strictly validate an already-`JSON.parse`d guard policy document. */
-export function parsePolicy(json: unknown): GuardPolicy {
+/**
+ * Parse and strictly validate an already-`JSON.parse`d guard policy
+ * document, whichever version it is. v2 is handled by `./v2/parse`; this
+ * function stays the one entry point so loaders never branch on version.
+ */
+export function parsePolicy(json: unknown): Policy {
   if (!isPlainObject(json)) {
     throw new Error("guard policy: expected a JSON object at the top level");
   }
 
+  if (json.version === 2) return parsePolicyV2(json);
+
   if (json.version !== 1) {
     throw new Error(
-      `guard policy: unsupported version ${JSON.stringify(json.version)} (expected 1)`,
+      `guard policy: unsupported version ${JSON.stringify(json.version)} (expected 1 or 2)`,
     );
   }
 

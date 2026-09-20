@@ -6,6 +6,7 @@
 
 import type { JsonObject } from "./compose/merge";
 import type { DecisionProvider } from "./decision/provider";
+import type { AuditEntry } from "./policy/audit";
 
 export interface Logger {
   debug(message: string, meta?: Record<string, unknown>): void;
@@ -16,6 +17,11 @@ export interface Logger {
 
 export interface Clock {
   now(): Date;
+}
+
+/** Where guard judgments are recorded, one entry per judgment, append-only. */
+export interface AuditLog {
+  append(entry: AuditEntry): Promise<void>;
 }
 
 export interface FileSystem {
@@ -65,4 +71,6 @@ export interface Ports {
    * ever sees this interface, never the model vendor or a credential.
    */
   readonly decision: DecisionProvider;
+  /** Where guard judgments are recorded. */
+  readonly audit: AuditLog;
 }

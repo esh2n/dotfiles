@@ -9,7 +9,15 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { parsePolicy } from "../../../src/domain/policy/parse";
+import { parsePolicy as parseAny } from "../../../src/domain/policy/parse";
+import type { GuardPolicy } from "../../../src/domain/policy/types";
+
+/** The v1 view: these cases pin the v1 schema, so a v2 result would be a test bug. */
+function parsePolicy(json: unknown): GuardPolicy {
+  const policy = parseAny(json);
+  if (policy.version !== 1) throw new Error(`expected a v1 policy, got version ${policy.version}`);
+  return policy;
+}
 
 function validRule(overrides: Record<string, unknown> = {}) {
   return {
@@ -64,8 +72,9 @@ describe("parsePolicy", () => {
     expect(() => parsePolicy("nope")).toThrow(/expected a JSON object/);
   });
 
-  test("[policy-verified] version must be exactly 1", () => {
-    expect(() => parsePolicy({ version: 2, rules: [] })).toThrow(/unsupported version/);
+  test("[policy-verified] version must be 1 (2 is the v2 parser's; anything else is refused)", () => {
+    expect(parseAny({ version: 2, rules: [] }).version).toBe(2);
+    expect(() => parsePolicy({ version: 3, rules: [] })).toThrow(/unsupported version/);
     expect(() => parsePolicy({ version: "1", rules: [] })).toThrow(/unsupported version/);
     expect(() => parsePolicy({ rules: [] })).toThrow(/unsupported version/);
   });

@@ -12,6 +12,7 @@
  */
 
 import type { HookProfile } from "../hooks/decision";
+import type { PolicyV2 } from "./v2/types";
 
 /** "deny" never proceeds; "confirm" asks for interactive approval. */
 export type GuardTier = "deny" | "confirm";
@@ -34,8 +35,11 @@ export interface GuardRule {
   readonly profiles: readonly HookProfile[];
 }
 
-/** The parsed `guard-rules.json` document. */
+/** The parsed v1 `guard-rules.json` document. */
 export interface GuardPolicy {
   readonly version: 1;
   readonly rules: readonly GuardRule[];
 }
+
+/** Either version of the document; `version` discriminates. See `./v2/types` for v2. */
+export type Policy = GuardPolicy | PolicyV2;

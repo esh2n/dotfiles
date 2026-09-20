@@ -11,9 +11,9 @@
 import { describe, expect, test } from "bun:test";
 import { type ToolCall, decide } from "../../src/domain/hooks/decision";
 import { parsePolicy } from "../../src/domain/policy/parse";
-import type { GuardPolicy } from "../../src/domain/policy/types";
+import type { Policy } from "../../src/domain/policy/types";
 
-const FIXTURE_POLICY: GuardPolicy = parsePolicy({
+const FIXTURE_POLICY: Policy = parsePolicy({
   version: 1,
   rules: [
     {
