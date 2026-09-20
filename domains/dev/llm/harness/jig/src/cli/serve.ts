@@ -22,9 +22,11 @@ import type {
   RemoteDecisionErrorResponse,
   RemoteDecisionResponse,
 } from "../domain/decision/remote";
+import type { Logger } from "../domain/ports";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
 import { ensureDecisionToken, tokenFilePath } from "../infra/decision/token-file";
 import { createTypesafeClient, typesafeKeyFromEnv } from "../infra/decision/typesafe-client";
+import { type JudgmentKind, runWithJudgmentKind } from "../infra/metrics/judgment-kind";
 import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../infra/metrics/registry";
 
 /** A JSON reply: the endpoint's own body, or the shared error envelope. */
@@ -143,7 +145,15 @@ function describeMetrics(metrics: MetricsRegistry): void {
   );
   metrics.describe(
     "jig_judgment_tokens_total",
-    "Tokens the judgment model reported, by model and direction. This is what the judgment service costs.",
+    "Tokens the judgment model reported, by endpoint, model and direction. This is what the judgment service costs.",
+  );
+  metrics.describe(
+    "jig_tier_decisions_total",
+    "Tier judgments by the tier that came back and whether it was decided or the confidence gate fell back. A fallback is the model declining to route, so the fallback rate is the number to watch.",
+  );
+  metrics.describe(
+    "jig_compaction_items_total",
+    "Items a compaction judgment kept or dropped. All-kept means the judgment ran and changed nothing, which is the signal that the question stopped discriminating.",
   );
 }
 
@@ -152,6 +162,79 @@ function outcomeOf(status: number): string {
   if (status === 400) return "bad_request";
   if (status === 401) return "unauthorized";
   return "provider_error";
+}
+
+/**
+ * Turn one answered request into the numbers and the log line that make its
+ * behaviour reviewable after the fact.
+ *
+ * Counters answer "is this getting worse" across days; the log line answers "what
+ * exactly happened here" for one request, which is what a report of "routing made
+ * a bad choice at 14:20" needs. Both are written for every request because the
+ * interesting cases (a fallback, a judgment that dropped nothing) look like
+ * nothing at all from the outside.
+ */
+function recordDecision(
+  metrics: MetricsRegistry,
+  logger: Logger | undefined,
+  kind: string,
+  response: HttpResponse<unknown>,
+  elapsedSeconds: number,
+): void {
+  const seconds = Number(elapsedSeconds.toFixed(3));
+  if (response.status !== 200) {
+    logger?.warn("judgment.failed", {
+      kind,
+      status: response.status,
+      outcome: outcomeOf(response.status),
+      seconds,
+    });
+    return;
+  }
+
+  const body = response.body;
+  const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+
+  if (kind === "tier") {
+    const tier = typeof record.tier === "string" ? record.tier : "unknown";
+    const source = record.source === "fallback" ? "fallback" : "decided";
+    metrics.increment("jig_tier_decisions_total", { tier, source });
+    logger?.info("judgment.tier", {
+      tier,
+      source,
+      confidence: typeof record.confidence === "number" ? record.confidence : null,
+      seconds,
+    });
+    return;
+  }
+
+  if (kind === "compact") {
+    const decisions = Array.isArray(record.decisions) ? record.decisions : [];
+    const dropped = decisions.filter(
+      (decision) =>
+        typeof decision === "object" &&
+        decision !== null &&
+        (decision as Record<string, unknown>).kept === false,
+    ).length;
+    metrics.increment(
+      "jig_compaction_items_total",
+      { decision: "kept" },
+      decisions.length - dropped,
+    );
+    metrics.increment("jig_compaction_items_total", { decision: "dropped" }, dropped);
+    logger?.info("judgment.compact", {
+      judged: decisions.length,
+      dropped,
+      removedAll: decisions.length > 0 && dropped === decisions.length,
+      seconds,
+    });
+    return;
+  }
+
+  logger?.info("judgment.decide", {
+    op: typeof record.op === "string" ? record.op : "unknown",
+    seconds,
+  });
 }
 
 const UNAUTHORIZED: RemoteDecisionErrorResponse = {
@@ -245,17 +328,23 @@ export function serveDecisionService(
       // keep-or-drop question — so no harness has to restate either one.
       const kind = pathname.slice(1);
       const startedAt = performance.now();
-      let response: HttpResponse<unknown>;
-      if (pathname === "/tier") response = await respondToTier(body, options.provider, deps);
-      else if (pathname === "/compact") {
-        response = await respondToCompaction(body, options.provider, compactionDeps);
-      } else response = await respondToDecision(body, options.provider, deps);
+      // Inside the kind scope, so the provider's usage hook — composed before this
+      // request existed — labels its token counts with the endpoint that spent them.
+      const response = await runWithJudgmentKind(kind as JudgmentKind, async () => {
+        if (pathname === "/tier") return respondToTier(body, options.provider, deps);
+        if (pathname === "/compact") {
+          return respondToCompaction(body, options.provider, compactionDeps);
+        }
+        return respondToDecision(body, options.provider, deps);
+      });
 
+      const elapsedSeconds = (performance.now() - startedAt) / 1000;
       metrics.increment("jig_judgment_requests_total", {
         kind,
         outcome: outcomeOf(response.status),
       });
-      metrics.observe("jig_judgment_seconds", (performance.now() - startedAt) / 1000, { kind });
+      metrics.observe("jig_judgment_seconds", elapsedSeconds, { kind });
+      recordDecision(metrics, options.logger, kind, response, elapsedSeconds);
       return json(response.status, response.body);
     },
   });

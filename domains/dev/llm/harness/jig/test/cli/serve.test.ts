@@ -9,9 +9,19 @@ import {
   respondToDecision,
   serveDecisionService,
 } from "../../src/cli/serve";
+import type {
+  BoolBatchQuery,
+  BoolQuery,
+  ChoiceQuery,
+  Decided,
+  DecisionContext,
+  DecisionProvider,
+  ScoreQuery,
+} from "../../src/domain/decision/provider";
 import { StaticProvider } from "../../src/infra/decision/static-provider";
 import { ensureDecisionToken } from "../../src/infra/decision/token-file";
 import { TypesafeError } from "../../src/infra/decision/typesafe-client";
+import { currentJudgmentKind } from "../../src/infra/metrics/judgment-kind";
 import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../../src/infra/metrics/registry";
 
 describe("respondToDecision", () => {
@@ -62,6 +72,52 @@ describe("buildJudgmentProvider", () => {
   });
 });
 
+/**
+ * Records which request's kind was in scope when the provider was called: twice per
+ * call, before and after an awaited suspension, because a kind that survives the
+ * call but not the `await` would be attributed to the wrong endpoint in production.
+ * The method that was called is recorded too — the three endpoints share one
+ * provider instance, so the method is what ties an observation to its request.
+ */
+class KindRecordingProvider implements DecisionProvider {
+  readonly name = "kind-recorder";
+  readonly observations: { readonly method: string; readonly kind: string | undefined }[] = [];
+
+  private async note(method: string): Promise<void> {
+    this.observations.push({ method, kind: currentJudgmentKind() });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    this.observations.push({ method, kind: currentJudgmentKind() });
+  }
+
+  async choice<T extends string>(
+    query: ChoiceQuery<T>,
+    _context: DecisionContext,
+  ): Promise<Decided<T>> {
+    await this.note("choice");
+    const first = query.options[0];
+    if (first === undefined) throw new Error("no options");
+    return { value: first, confidence: 1 };
+  }
+
+  async bool(_query: BoolQuery, _context: DecisionContext): Promise<Decided<boolean>> {
+    await this.note("bool");
+    return { value: true, confidence: 1 };
+  }
+
+  async boolBatch(
+    query: BoolBatchQuery,
+    _context: DecisionContext,
+  ): Promise<readonly Decided<boolean>[]> {
+    await this.note("boolBatch");
+    return query.prompts.map(() => ({ value: false, confidence: 1 }));
+  }
+
+  async score(_query: ScoreQuery, _context: DecisionContext): Promise<Decided<number>> {
+    await this.note("score");
+    return { value: 0, confidence: 1 };
+  }
+}
+
 /** A fresh temp token file path and the env override that points `serveDecisionService` at it. */
 function tempTokenEnv(): { readonly env: Record<string, string>; readonly path: string } {
   const dir = mkdtempSync(join(tmpdir(), "jig-decision-token-"));
@@ -73,7 +129,7 @@ function tempTokenEnv(): { readonly env: Record<string, string>; readonly path: 
 
 /** Start a service with a known token (pre-written, so the service reuses it) for tests to send. */
 async function startAuthedService(
-  provider: StaticProvider,
+  provider: DecisionProvider,
   options: { readonly metrics?: MetricsRegistry } = {},
 ): Promise<{ readonly service: RunningDecisionService; readonly token: string }> {
   const { env, path } = tempTokenEnv();
@@ -266,11 +322,124 @@ describe("serveDecisionService", () => {
     const { service } = await startAuthedService(new StaticProvider({}), { metrics });
 
     try {
-      // This is what the provider's usage hook does in `jig serve`.
-      metrics.countTokens("jev-1.13.0", "input", 407);
+      // This is what the provider's usage hook does in `jig serve`, kind included.
+      metrics.countTokens("jev-1.13.0", "input", 407, "tier");
 
       const text = await (await fetch(`${service.url}/metrics`)).text();
-      expect(text).toContain('jig_judgment_tokens_total{direction="input",model="jev-1.13.0"} 407');
+      expect(text).toContain(
+        'jig_judgment_tokens_total{direction="input",kind="tier",model="jev-1.13.0"} 407',
+      );
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("a tier judgment is counted by the tier it chose", async () => {
+    const metrics = new MetricsRegistry();
+    const provider = new StaticProvider({ choice: { value: "complex", confidence: 0.9 } });
+    const { service, token } = await startAuthedService(provider, { metrics });
+
+    try {
+      const response = await fetch(`${service.url}/tier`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ request: "refactor the parser" }),
+      });
+      expect(response.status).toBe(200);
+
+      const text = await (await fetch(`${service.url}/metrics`)).text();
+      expect(text).toContain('jig_tier_decisions_total{source="decided",tier="complex"} 1');
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("a weak tier judgment is counted as a fallback, not as the tier it named", async () => {
+    const metrics = new MetricsRegistry();
+    const provider = new StaticProvider({ choice: { value: "complex", confidence: 0.2 } });
+    const { service, token } = await startAuthedService(provider, { metrics });
+
+    try {
+      await fetch(`${service.url}/tier`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ request: "refactor the parser" }),
+      });
+
+      const text = await (await fetch(`${service.url}/metrics`)).text();
+      expect(text).toContain('jig_tier_decisions_total{source="fallback",tier="main"} 1');
+      expect(text).not.toContain('source="decided",tier="complex"');
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("a compaction judgment is counted by kept and dropped, pinned items included", async () => {
+    const metrics = new MetricsRegistry();
+    const provider = new StaticProvider({
+      bools: [
+        { value: true, confidence: 0.9 },
+        { value: false, confidence: 0.9 },
+      ],
+    });
+    const { service, token } = await startAuthedService(provider, { metrics });
+
+    try {
+      // a is pinned (first), d and e are pinned (most recent two); b is judged
+      // reproducible (dropped) and c is not (kept).
+      await fetch(`${service.url}/compact`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({
+          items: ["a", "b", "c", "d", "e"].map((id) => ({ id, summary: `item ${id}` })),
+        }),
+      });
+
+      const text = await (await fetch(`${service.url}/metrics`)).text();
+      expect(text).toContain('jig_compaction_items_total{decision="dropped"} 1');
+      expect(text).toContain('jig_compaction_items_total{decision="kept"} 4');
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("each request judges in its own kind scope, even when three overlap", async () => {
+    const provider = new KindRecordingProvider();
+    const { service, token } = await startAuthedService(provider);
+
+    try {
+      const answers = await Promise.all([
+        fetch(`${service.url}/tier`, {
+          method: "POST",
+          headers: authed(token),
+          body: JSON.stringify({ request: "route me" }),
+        }),
+        fetch(`${service.url}/compact`, {
+          method: "POST",
+          headers: authed(token),
+          // Five items so one is actually judged: with two, both are pinned and
+          // no question is asked, which would prove nothing about the scope.
+          body: JSON.stringify({
+            items: ["a", "b", "c", "d", "e"].map((id) => ({ id, summary: `item ${id}` })),
+          }),
+        }),
+        fetch(`${service.url}/decide`, {
+          method: "POST",
+          headers: authed(token),
+          body: JSON.stringify({ op: "bool", query: { prompt: "?" } }),
+        }),
+      ]);
+      expect(answers.map((answer) => answer.status)).toEqual([200, 200, 200]);
+
+      // Six observations, interleaved in whatever order the three requests reach
+      // the provider: each method must see its own request's kind, both before and
+      // after its await — a shared or leaked scope shows up as the wrong kind here.
+      expect(provider.observations.length).toBe(6);
+      const kindsFor = (method: string) =>
+        provider.observations.filter((o) => o.method === method).map((o) => o.kind);
+      expect(kindsFor("choice")).toEqual(["tier", "tier"]);
+      expect(kindsFor("boolBatch")).toEqual(["compact", "compact"]);
+      expect(kindsFor("bool")).toEqual(["decide", "decide"]);
     } finally {
       service.stop();
     }

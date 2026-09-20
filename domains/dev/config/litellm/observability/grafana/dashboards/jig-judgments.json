@@ -140,6 +140,74 @@
       ],
       "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [] },
       "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "階層判断の内訳（決めた階層 / 決めきれなかった）",
+      "description": "`jig_tier_decisions_total`。`source=\"fallback\"` は「判断は走ったが確信が持てず既定（main）のままにした」という意味で、これが増えるほどルーティングは何も決めていない。`tier` ラベルは実際に選ばれた階層。",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tier, source) (increase(jig_tier_decisions_total[$__rate_interval]))",
+          "legendFormat": "{{tier}} / {{source}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "圧縮判断の内訳（残した / 捨てた項目数）",
+      "description": "`jig_compaction_items_total`。固定される項目（先頭と直近）も含むため、常に「残した」が大半になる。見るのは「捨てた」が動いているかどうか。",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (decision) (increase(jig_compaction_items_total[$__rate_interval]))",
+          "legendFormat": "{{decision}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "階層を決めきれなかった割合（24時間）",
+      "description": "`source=\"fallback\"` の割合。0 に近いほどルーティングが実際に決めている。1 に近いなら、判断の材料か問いを変える必要がある。",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 29 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(jig_tier_decisions_total{source=\"fallback\"}[24h])) / clamp_min(sum(increase(jig_tier_decisions_total[24h])), 1)",
+          "legendFormat": "fallback"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.25 }, { "color": "red", "value": 0.5 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "圧縮で捨てられた項目の割合（24時間）",
+      "description": "判断された項目のうち捨てられた割合。0 のままなら問いが何も選別していない（＝費用だけ払っている）。判断された項目だけを分母にする。",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 29 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(jig_compaction_items_total{decision=\"dropped\"}[24h])) / clamp_min(sum(increase(jig_compaction_items_total[24h])), 1)",
+          "legendFormat": "dropped"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } }
     }
   ]
 }

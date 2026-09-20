@@ -19,12 +19,16 @@ import { convertToLlm, type ExtensionAPI, type ExtensionContext, serializeConver
 // exactly as the official custom-compaction example does; `usage` is returned so
 // the session's token totals stay honest.
 //
-// OFF by default: one judgment call is spent per compaction, so turning it on is
-// the user's decision (`/compact-judgment on`, or PI_COMPACT_JUDGMENT=on to make it
-// the default). Measured against the live judgment model, the question it asks
-// currently drops a 31k-char file read and a byte-identical repeat of it
-// (confidence 0.95/0.94) and a 48-char `ls` (0.66), while keeping an ask (0.88) and
-// a conclusion (0.94) — one round trip for all of them.
+// ON by default (opt out with `/compact-judgment off` or PI_COMPACT_JUDGMENT=off):
+// one judgment call is spent per compaction, and the numbers say when that is worth
+// it. The judgment itself costs 1,761 input + 264 output tokens for a 20-item
+// history (0.3s), and it is capped per item (`JUDGMENT_CHARS = 200`), so its cost
+// tracks the number of items and not the size of the history. What it buys is the
+// dropped items' full text not reaching the summarizer: measured live, a 31k-char
+// file read and a byte-identical repeat of it were dropped (confidence 0.95/0.94)
+// while an ask (0.88) and a conclusion (0.94) were kept. Dropping small items only
+// costs more than it saves — `jig_compaction_items_total` and the notice this
+// extension posts are what tell the two cases apart.
 //
 // Every failure path returns undefined, which means "let pi do its normal
 // compaction" — this extension can slow compaction down but cannot lose context by
@@ -195,7 +199,9 @@ ${kept}
 }
 
 export default function (pi: ExtensionAPI) {
-  let enabled = process.env.PI_COMPACT_JUDGMENT === "on";
+  // Opt out, not opt in: `PI_COMPACT_JUDGMENT=off` is the switch, and anything else
+  // (including unset) judges. Every failure path still hands compaction back to pi.
+  let enabled = process.env.PI_COMPACT_JUDGMENT !== "off";
   let announcedFailure = false;
 
   const timeoutMs = Number.parseInt(process.env.PI_COMPACT_JUDGMENT_TIMEOUT_MS ?? "", 10) || 30_000;

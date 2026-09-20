@@ -16,10 +16,16 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 // down, routing silently keeps the current model — never blocks a prompt, never
 // throws into pi's extension loader.
 //
-// OFF by default. Money is spent per request (one judgment call), so the
-// automatic path is opt-in: `/tier auto` for the session, or PI_TIER_ROUTER=auto
-// to make it the default. `/tier <main|complex|deterministic>` forces a tier and
-// stops asking; `/tier off` returns to whatever the model was.
+// ON by default: every user prompt is judged, because a tier that is never asked
+// for is a tier nobody can review. `/tier off` returns to whatever the model was,
+// and `PI_TIER_ROUTER=off` makes that the default. `/tier <main|complex|
+// deterministic>` forces a tier and stops asking.
+//
+// Measured cost of the judgment itself: 391 input tokens for a 39-character prompt,
+// 4,959 for a 7,917-character one — the whole prompt is the judgment's material, so
+// the cost grows with the prompt. A weak judgment does not switch anything (the
+// service returns `main` with `source: "fallback"`, which the service counts
+// separately, so a routing that is not really deciding is visible).
 //
 // Resident cost: one HTTP call per user prompt in `auto`, nothing at all in `off`
 // or when a tier is forced. No tools, no per-turn context injection.
@@ -96,7 +102,10 @@ async function askTier(request: string, timeoutMs: number): Promise<TierDecision
 }
 
 export default function (pi: ExtensionAPI) {
-  let mode: Mode = process.env.PI_TIER_ROUTER === "auto" ? "auto" : "off";
+  // Opt out, not opt in: `PI_TIER_ROUTER=off` is the switch, and anything else
+  // (including unset) routes. A tier decision that is never exercised cannot be
+  // judged, and the service counts every judgment it makes.
+  let mode: Mode = process.env.PI_TIER_ROUTER === "off" ? "off" : "auto";
   let announcedFailure = false;
 
   const providerId = process.env.PI_TIER_PROVIDER ?? "proxy";

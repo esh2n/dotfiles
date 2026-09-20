@@ -107,9 +107,19 @@ export class MetricsRegistry {
     histogram.count += 1;
   }
 
-  /** Token usage as reported by the provider: the number that is money. */
-  countTokens(model: string, direction: "input" | "output", tokens: number): void {
-    this.increment("jig_judgment_tokens_total", { model, direction }, tokens);
+  /**
+   * Token usage as reported by the provider: the number that is money. Labelled by
+   * the endpoint that spent it (`kind`) so a cost question can be answered per
+   * decision type — a per-prompt tier judgment and a per-compaction judgment are
+   * paid for by different things and have to be justified separately.
+   */
+  countTokens(
+    model: string,
+    direction: "input" | "output",
+    tokens: number,
+    kind = "unknown",
+  ): void {
+    this.increment("jig_judgment_tokens_total", { model, direction, kind }, tokens);
   }
 
   render(): string {

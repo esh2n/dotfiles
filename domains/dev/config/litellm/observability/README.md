@@ -38,9 +38,13 @@ in `prometheus/prometheus.yml`; the dashboard is
 
 | Metric | What it answers |
 |---|---|
-| `jig_judgment_tokens_total{model,direction}` | What the judgment model costs, per model — the number that decides whether a model swap was worth it |
+| `jig_judgment_tokens_total{kind,model,direction}` | What the judgment model costs, per endpoint and model. `kind` is what makes the two decisions separately justifiable: a per-prompt tier judgment and a per-compaction judgment are paid for by different things |
 | `jig_judgment_requests_total{kind,outcome}` | How often a harness asks, and whether the answer came back (`provider_error` = the model did not answer) |
 | `jig_judgment_seconds{kind}` | How long a judgment takes — this is the latency a harness waits for |
+| `jig_tier_decisions_total{tier,source}` | Which tier came back, and whether the judgment decided it or fell back because it was unsure (`source="fallback"`). The fallback rate is the number to watch: a routing that never decides is money spent to keep the default |
+| `jig_compaction_items_total{decision}` | How many items a compaction judgment kept or dropped. All-kept means the judgment ran and selected nothing |
+
+Each judgment also writes one line to the service log (`~/Library/Logs/jig-decision.log`): `judgment.tier` carries tier, source, confidence and seconds; `judgment.compact` carries how many items were judged and dropped; `judgment.failed` carries the endpoint and status when a judgment could not be made. The log is per event, the metrics are per period — a report of "routing chose badly at 14:20" needs the former, "is this getting worse" needs the latter.
 
 The numbers come from the same registry the service's usage hook fills, so a
 scrape and a log line can never disagree. They are process-local and reset when

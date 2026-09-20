@@ -9,6 +9,7 @@ import { createHttpDecisionClient } from "../infra/decision/http-decision-client
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
 import { ConsoleLogger } from "../infra/logger/console-logger";
+import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { applyCli } from "./apply";
@@ -127,9 +128,12 @@ export async function main(argv: readonly string[]): Promise<number> {
       // counters that `/metrics` renders, so what Prometheus scrapes is the spend.
       const metrics = new MetricsRegistry();
       const provider = buildJudgmentProvider(process.env, (usage) => {
-        ports.logger.info("decision.usage", { ...usage });
-        metrics.countTokens(usage.model, "input", usage.input_tokens);
-        metrics.countTokens(usage.model, "output", usage.output_tokens);
+        // The kind comes from the async context of the request being served, so
+        // these counts answer per-endpoint cost and not just total spend.
+        const kind = currentJudgmentKind() ?? "unknown";
+        ports.logger.info("decision.usage", { ...usage, kind });
+        metrics.countTokens(usage.model, "input", usage.input_tokens, kind);
+        metrics.countTokens(usage.model, "output", usage.output_tokens, kind);
       });
       serveDecisionService({
         provider,

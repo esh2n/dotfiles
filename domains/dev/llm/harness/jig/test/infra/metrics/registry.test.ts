@@ -63,19 +63,23 @@ describe("MetricsRegistry", () => {
     expect(order).toEqual(["0.1", "0.25", "0.5", "1", "2", "5", "10", "30", "+Inf"]);
   });
 
-  test("token usage is counted per model and direction", () => {
+  test("token usage is counted per endpoint, model and direction", () => {
     const metrics = new MetricsRegistry();
     metrics.describe("jig_judgment_tokens_total", "Tokens the judgment model reported.");
-    metrics.countTokens("jev-1.13.0", "input", 407);
-    metrics.countTokens("jev-1.13.0", "input", 100);
-    metrics.countTokens("jev-1.13.0", "output", 41);
+    metrics.countTokens("jev-1.13.0", "input", 407, "tier");
+    metrics.countTokens("jev-1.13.0", "input", 100, "tier");
+    metrics.countTokens("jev-1.13.0", "output", 41, "tier");
+    metrics.countTokens("jev-1.13.0", "input", 1761, "compact");
 
     const rendered = metrics.render();
     expect(rendered).toContain(
-      'jig_judgment_tokens_total{direction="input",model="jev-1.13.0"} 507',
+      'jig_judgment_tokens_total{direction="input",kind="tier",model="jev-1.13.0"} 507',
     );
     expect(rendered).toContain(
-      'jig_judgment_tokens_total{direction="output",model="jev-1.13.0"} 41',
+      'jig_judgment_tokens_total{direction="input",kind="compact",model="jev-1.13.0"} 1761',
+    );
+    expect(rendered).toContain(
+      'jig_judgment_tokens_total{direction="output",kind="tier",model="jev-1.13.0"} 41',
     );
   });
 
