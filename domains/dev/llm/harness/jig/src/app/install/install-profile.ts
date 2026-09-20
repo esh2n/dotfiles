@@ -23,6 +23,10 @@ export interface InstallDeps {
  * Still missing on purpose (no premature ports): where the sidecars come from
  * (permissions.yaml is compiled by infra), the template pass, the `.autoMode`
  * carry-over, and the symlink/merge-dir part of `apply`.
+ *
+ * Not yet wired to a CLI command — this is staged ahead of the `install` /
+ * `apply --target claude` command that will call it, on purpose, not an
+ * oversight.
  */
 export async function installProfile(
   input: InstallInput,
