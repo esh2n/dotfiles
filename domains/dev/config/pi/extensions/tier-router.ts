@@ -67,7 +67,7 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token === undefined ? {} : { authorization: `Bearer ${token}` };
 }
 
-function readDecision(body: unknown): TierDecision {
+export function readDecision(body: unknown): TierDecision {
   if (typeof body !== "object" || body === null) throw new Error("tier service replied with no body");
   const record = body as Record<string, unknown>;
   if (!isTier(record.tier)) {
