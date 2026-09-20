@@ -382,6 +382,26 @@ link_omp_resources() {
     fi
 }
 
+# Deploy this repo's launchd job definitions (domains/dev/config/*/*.plist,
+# e.g. the litellm proxy and jig decision services) to ~/Library/LaunchAgents
+# as EXPANDED COPIES, never symlinks: launchd does not expand env vars or ~,
+# so a symlinked plist would hand it the raw {{HOME}}/{{DOTFILES_ROOT}}
+# tokens. install_expanded resolves those to this machine's real paths, the
+# same mechanism link_dsh_resources uses for hooks.claude.json. Loading/
+# reloading the service (launchctl bootout/bootstrap) is a deliberate,
+# separate step this never performs.
+link_launch_agents() {
+    local domain_path="$1"
+    local agents_dir="${HOME}/Library/LaunchAgents"
+    local plist
+
+    [[ -d "${domain_path}/config" ]] || return 0
+
+    while IFS= read -r -d '' plist; do
+        install_expanded "$plist" "${agents_dir}/$(basename "$plist")"
+    done < <(find "${domain_path}/config" -mindepth 2 -maxdepth 2 -name '*.plist' -print0 2>/dev/null)
+}
+
 # Link all files in a domain
 link_domain() {
     assert_canonical_checkout || return 1
@@ -478,6 +498,13 @@ link_domain() {
     # guard-policy unification won't have it).
     if [[ "$domain" == "dev" ]] && [[ -d "${DOTFILES_ROOT}/domains/dev/llm/harness/policy" ]]; then
         link_jig_policy "${DOTFILES_ROOT}/domains/dev/llm/harness/policy"
+    fi
+
+    # Deploy launchd job definitions owned by this domain (see
+    # link_launch_agents above) — "dev" only, same guard style as
+    # link_jig_policy just above.
+    if [[ "$domain" == "dev" ]]; then
+        link_launch_agents "$domain_path"
     fi
 
     # 2. Link Home Files (~)
