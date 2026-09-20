@@ -13,6 +13,9 @@ interface PreToolUsePayload {
   permission_mode?: string;
 }
 
+/** Harnesses whose hook protocol carries an `ask`; every other one gets a deny instead. */
+const CAN_ASK: ReadonlySet<string> = new Set(["claude", "dsh"]);
+
 /** What the adapter knows about who is calling that the payload does not say. */
 export interface PreToolUseOptions {
   /**
@@ -143,6 +146,16 @@ export async function preToolUse(
   // No matching rule: stay silent toward the permission system rather than
   // emitting an explicit "allow" (see the doc comment above).
   if (decision.kind === "allow") return "";
+
+  // codex has no "ask": its dispatcher rejects the value and, worse, treats
+  // the rejection as a hook failure and lets the call through. A question
+  // it cannot ask becomes a refusal it can act on — never an allow.
+  if (decision.kind === "ask" && !CAN_ASK.has(harness)) {
+    return hookOutput({
+      kind: "deny",
+      reason: `${decision.reason} (needs confirmation, which ${harness} cannot ask for)`,
+    });
+  }
 
   return hookOutput({ kind: decision.kind, reason: decision.reason });
 }

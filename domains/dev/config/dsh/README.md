@@ -43,30 +43,35 @@ Remote from a phone = SSH tunnel to `127.0.0.1:3080` (no cloud). Sessions are
 event-sourced JSONL server-side, so phone↔PC continuity is "both hit the same
 `dsh web` over the tunnel."
 
-## Guard hook (Phase 1 guard-policy unification)
+## Guard hook
 
-`hooks.claude.json` wires dsh into jig's own PreToolUse hook via the official
-`@deepseek-ai/dsh-hooks-claude-code` bridge — the third front (alongside
-Claude Code and pi) to read the single shared guard policy at
-`domains/dev/llm/harness/policy/guard-rules.json`. The cordis row (id:
-`hooks-claude`, added to both `profiles/proxy/cordis.patch.yml` and
-`profiles/headless/cordis.patch.yml`) points `configPath` at
-`~/.dsh/hooks.claude.json`, symlinked there by `link_dsh_resources`. That
-file's `PreToolUse` command runs
-`bun .../domains/dev/llm/harness/jig/src/cli/jig.ts hooks pre-tool-use` — the
-same evaluator Claude Code's hook and pi's `extensions/guard.ts` use.
+`hooks.claude.json` wires dsh into jig's PreToolUse hook via the official
+`@deepseek-ai/dsh-hooks-claude-code` bridge, so dsh reads the same shared
+guard policy (`domains/dev/llm/harness/policy/guard-rules.json`) through the
+same evaluator as pi's `extensions/guard.ts` and Claude Code's hook. The
+cordis row (id: `hooks-claude`, in both `profiles/proxy/cordis.patch.yml`
+and `profiles/headless/cordis.patch.yml`) points `configPath` at
+`~/.dsh/hooks.claude.json`, installed there by `link_dsh_resources`
+(`install_expanded`: a copy with `{{DOTFILES_ROOT}}` resolved, not a
+symlink). The command is
+`bun .../jig/src/cli/jig.ts hooks pre-tool-use --harness dsh` with a 10s
+`timeout`; `--harness dsh` stamps who is asking on every judgment.
+
+Verified against the bridge's source (2026-09-21): the matcher is split on
+`|` and compared to tool names exactly (dsh's are `bash`, `write`, `edit`,
+`str_replace_editor`); the payload is Claude Code's shape
+(`tool_name`/`tool_input`/`session_id`/`cwd`); `hook.timeout` is honored.
+Two things to know: the bridge treats a crashed or overrunning hook as no
+opinion (fails open), and `str_replace_editor` sends `path` rather than
+`file_path` — jig reads both.
+
+Redeploy after editing: run `link_dsh_resources` from the **main
+checkout** (manager.sh recomputes `DOTFILES_ROOT` from its own location, so
+sourcing it from a worktree writes a wrong path), or `yoki-switch apply`.
+The main checkout's jig needs `bun install --frozen-lockfile` once.
 
 ## Confirm at first run (unverified points)
 
-- **The hooks-claude bridge itself** — unverified end to end: whether
-  `@deepseek-ai/dsh-hooks-claude-code` expects `hooks.claude.json`'s
-  top-level `hooks.PreToolUse` shape (mirrors Claude Code's own
-  `settings.json`) or something else, whether dsh's bash tool is literally
-  named `Bash` (the `matcher` value) or differently, and what field names
-  dsh's own PreToolUse payload carries — jig's hook expects
-  `tool_name`/`tool_input`, Claude Code's convention. Fix
-  `hooks.claude.json` and the `matcher` once dsh's actual hook payload is
-  seen.
 - **`baseURL` suffix** — `http://localhost:4000/v1` vs bare `:4000`. If model
   calls 404 on `/chat/completions`, flip it. (LiteLLM serves both in most
   setups.)

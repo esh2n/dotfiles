@@ -211,13 +211,13 @@ describe("preToolUse with a v2 policy", () => {
     ],
     rules: [
       {
-        id: "ask-sudo-pi",
+        id: "ask-sudo-dsh",
         effect: "ask",
         action: "shell.exec",
         subject: { program: "sudo" },
-        why: "sudo on pi asks",
+        why: "sudo on dsh asks",
         profiles: ["standard", "strict"],
-        principals: ["pi"],
+        principals: ["dsh"],
       },
       {
         id: "forbid-rm-rf",
@@ -256,15 +256,15 @@ describe("preToolUse with a v2 policy", () => {
 
   test("the harness is stamped from the option, else the environment, else claude", async () => {
     const stdin = JSON.stringify({ tool_name: "Bash", tool_input: { command: "sudo ls" } });
-    // Default principal is claude: the pi-only rule stays silent.
+    // Default principal is claude: the dsh-only rule stays silent.
     expect(await preToolUse(stdin, ports)).toBe("");
-    // `--harness pi` (the option) activates it.
-    const viaOption = JSON.parse(await preToolUse(stdin, ports, { harness: "pi" })) as {
+    // `--harness dsh` (the option) activates it.
+    const viaOption = JSON.parse(await preToolUse(stdin, ports, { harness: "dsh" })) as {
       hookSpecificOutput: { permissionDecision: string };
     };
     expect(viaOption.hookSpecificOutput.permissionDecision).toBe("ask");
     // JIG_HARNESS (the environment) does too.
-    process.env.JIG_HARNESS = "pi";
+    process.env.JIG_HARNESS = "dsh";
     const viaEnv = JSON.parse(await preToolUse(stdin, ports)) as {
       hookSpecificOutput: { permissionDecision: string };
     };
@@ -316,5 +316,50 @@ describe("preToolUse with a v2 policy", () => {
     const policy = (entries[0] as { policy: { version: number; hash: string } }).policy;
     expect(policy.version).toBe(2);
     expect(policy.hash).toMatch(/^[0-9a-f]{12}$/);
+  });
+});
+
+describe("preToolUse for codex", () => {
+  beforeEach(() => {
+    process.env.JIG_POLICY_FILE = writePolicy(VALID_POLICY);
+  });
+
+  test("an ask degrades to a deny with a reason, never to an allow", async () => {
+    const stdin = JSON.stringify({ tool_name: "Bash", tool_input: { command: "rm -rf /tmp/x" } });
+    const out = JSON.parse(await preToolUse(stdin, ports, { harness: "codex" })) as {
+      hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
+    };
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain(
+      "rm -rf requires confirmation",
+    );
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain("cannot ask");
+  });
+
+  test("claude and dsh keep the ask", async () => {
+    const stdin = JSON.stringify({ tool_name: "Bash", tool_input: { command: "rm -rf /tmp/x" } });
+    for (const harness of ["claude", "dsh"]) {
+      const out = JSON.parse(await preToolUse(stdin, ports, { harness })) as {
+        hookSpecificOutput: { permissionDecision: string };
+      };
+      expect(out.hookSpecificOutput.permissionDecision).toBe("ask");
+    }
+  });
+
+  test("apply_patch is judged per file", async () => {
+    process.env.JIG_POLICY_FILE = writePolicy({
+      version: 2,
+      floor: [
+        { id: "f", action: "fs.write", subject: { path: "(^|/)\\.git/hooks/" }, why: "git hooks" },
+      ],
+      rules: [],
+    });
+    const patch = "*** Begin Patch\n*** Add File: .git/hooks/pre-commit\n+exit 0\n*** End Patch";
+    const stdin = JSON.stringify({ tool_name: "apply_patch", tool_input: { command: patch } });
+    const out = JSON.parse(await preToolUse(stdin, ports, { harness: "codex" })) as {
+      hookSpecificOutput: { permissionDecision: string; permissionDecisionReason: string };
+    };
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toBe("git hooks");
   });
 });

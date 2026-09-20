@@ -18,6 +18,7 @@
  * `domain/policy/v2/evaluate.ts` (structured subject, floor, mode).
  */
 
+import { applyPatchText, fanOut } from "../policy/apply-patch";
 import { evaluate } from "../policy/evaluate";
 import type { Judgment } from "../policy/judgment";
 import { type Principal, requestFor } from "../policy/request";
@@ -36,8 +37,9 @@ export interface ToolCall {
   readonly input: Readonly<Record<string, unknown>>;
 }
 
-/** Judge a tool call: the decision, and how it was reached. */
-export function judge(call: ToolCall, principal: Principal, policy: Policy): Judgment {
+const RANK: Readonly<Record<Decision["kind"], number>> = { allow: 0, ask: 1, deny: 2 };
+
+function judgeOne(call: ToolCall, principal: Principal, policy: Policy): Judgment {
   if (policy.version === 1) {
     const decision = evaluate(policy.rules, call, principal.profile);
     return { decision, source: decision.kind === "allow" ? "none" : "rule" };
@@ -45,6 +47,31 @@ export function judge(call: ToolCall, principal: Principal, policy: Policy): Jud
   const request = requestFor(call);
   if (request === undefined) return { decision: { kind: "allow" }, source: "out-of-scope" };
   return judgeV2(policy, request, principal);
+}
+
+/**
+ * Judge a tool call: the decision, and how it was reached. codex's
+ * `apply_patch` is judged per file it touches (see `../policy/apply-patch`),
+ * the strictest verdict winning; a patch that names no file is left alone.
+ */
+export function judge(call: ToolCall, principal: Principal, policy: Policy): Judgment {
+  const patch = applyPatchText(call);
+  if (patch === undefined) return judgeOne(call, principal, policy);
+
+  const calls = fanOut(patch);
+  if (calls.length === 0) return { decision: { kind: "allow" }, source: "out-of-scope" };
+  let worst: Judgment | undefined;
+  const touched: string[] = [];
+  for (const part of calls) {
+    const judgment = judgeOne(part, principal, policy);
+    touched.push(...(judgment.subject ?? []));
+    if (worst === undefined || RANK[judgment.decision.kind] > RANK[worst.decision.kind]) {
+      worst = judgment;
+    }
+  }
+  return worst === undefined
+    ? { decision: { kind: "allow" }, source: "out-of-scope" }
+    : { ...worst, action: "fs.write", subject: [...new Set(touched)] };
 }
 
 /** Decide whether a tool call may proceed, per the shared guard policy. */
