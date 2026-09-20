@@ -91,6 +91,24 @@ describe("userPromptSubmit", () => {
     expect(recorded).toEqual([]);
   });
 
+  test("records an identity for the prompt, so repeats can be told from look-alikes", async () => {
+    const first: Record<string, unknown>[] = [];
+    const second: Record<string, unknown>[] = [];
+    const different: Record<string, unknown>[] = [];
+    const same = JSON.stringify({ prompt: "同じ依頼" });
+
+    await userPromptSubmit(same, deps({ value: "ui-capture", confidence: 0.9 }, first));
+    await userPromptSubmit(same, deps({ value: "ui-capture", confidence: 0.9 }, second));
+    await userPromptSubmit(
+      JSON.stringify({ prompt: "同じ依頼 " }),
+      deps({ value: "ui-capture", confidence: 0.9 }, different),
+    );
+
+    expect(String(first[0]?.promptHash)).toMatch(/^[0-9a-f]{12}$/);
+    expect(first[0]?.promptHash).toBe(second[0]?.promptHash);
+    expect(first[0]?.promptHash).not.toBe(different[0]?.promptHash);
+  });
+
   test("a failing judgment leaves the prompt untouched and is recorded", async () => {
     const recorded: Record<string, unknown>[] = [];
     const output = await userPromptSubmit(JSON.stringify({ prompt: "スクショ撮って" }), {

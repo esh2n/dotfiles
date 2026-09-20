@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { type SkillCandidate, selectSkill } from "../../app/routing/select-skill";
@@ -48,6 +49,16 @@ function isDisabled(env: Record<string, string | undefined>): boolean {
 }
 
 /**
+ * Identity of the prompt exactly as it arrived. `promptChars` alone cannot tell two
+ * prompts apart: a batch of same-length but different requests reads as one prompt
+ * whose confidence wandered, and a repeatability claim made on lengths cannot be
+ * checked afterwards. Twelve hex characters of SHA-256 are enough to group repeats.
+ */
+function promptHash(prompt: string): string {
+  return createHash("sha256").update(prompt).digest("hex").slice(0, 12);
+}
+
+/**
  * Claude Code `UserPromptSubmit` hook entrypoint: pick the skill this prompt matches and
  * put it back into the request as context.
  *
@@ -88,6 +99,7 @@ export async function userPromptSubmit(
     const decided = await selectSkill(prompt, candidates, deps.provider, {}, options);
     await deps.record({
       at: new Date().toISOString(),
+      promptHash: promptHash(prompt),
       promptChars: prompt.length,
       candidates: candidates.length,
       skill: decided.value?.name ?? null,
@@ -105,7 +117,12 @@ export async function userPromptSubmit(
     const message = error instanceof Error ? error.message : String(error);
     deps.logger?.warn("skill-router.failed", { reason: message });
     await deps
-      .record({ at: new Date().toISOString(), promptChars: prompt.length, error: message })
+      .record({
+        at: new Date().toISOString(),
+        promptHash: promptHash(prompt),
+        promptChars: prompt.length,
+        error: message,
+      })
       .catch(() => undefined);
     return "";
   }
