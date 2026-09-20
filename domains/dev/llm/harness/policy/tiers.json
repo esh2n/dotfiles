@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "_comment": "Canonical model-tier table. domains/dev/config/pi/models.json, dsh/settings.yaml's local-proxy provider block, and litellm/config.yaml's model_list are all generated from this file by jig (`src/domain/tiers/` + `bun src/cli/jig.ts apply`, run from domains/dev/llm/harness/jig). Edit THIS file, then `jig apply`; never hand-edit a generated file directly except inside dsh's settings.yaml `# BEGIN jig:tiers` / `# END jig:tiers` markers, which jig also refuses to touch by hand once it owns them. Decision record: writeup store yoki/2026-09-16-observability-proxy-litellm; unified in the harness-parity plan, Phase 2.",
+  "connections": {
+    "proxy": {
+      "baseUrl": "http://localhost:4000/v1",
+      "api": "openai-completions",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "maxTokensField": "max_tokens"
+      },
+      "_comment": {
+        "api": "LiteLLM speaks OpenAI Chat Completions",
+        "baseUrl": "confirm /v1 vs bare :4000 against the running proxy",
+        "compat": "localhost gateways: pi-ai treats an unknown URL as OpenAI itself and sends fields LiteLLM may reject — these two are the usual fixes and have no UI field, so they must live here.",
+        "supportsDeveloperRole": "system prompt as `system`, not `developer`",
+        "maxTokensField": "if the proxy rejects max_completion_tokens"
+      },
+      "pi": {
+        "apiKey": "sk-local-proxy"
+      },
+      "dsh": {
+        "displayName": "LiteLLM (local)",
+        "apiKeyEnv": "LITELLM_API_KEY",
+        "_comment": {
+          "apiKeyEnv": "the PROXY master key, injected via `op run` (never on disk)"
+        }
+      }
+    }
+  },
+  "tiers": {
+    "main": {
+      "alias": "main",
+      "displayName": "DeepSeek Flash",
+      "backend": {
+        "provider": "deepseek",
+        "model": "deepseek-flash",
+        "apiKeyEnv": "DEEPSEEK_API_KEY"
+      },
+      "reasoning": true,
+      "input": ["text"],
+      "contextWindow": 1000000,
+      "maxTokens": 16384,
+      "compat": {
+        "thinkingFormat": "deepseek"
+      },
+      "pi": {
+        "name": "main — DeepSeek Flash (proxy, measured)"
+      },
+      "dsh": {
+        "name": "main (DeepSeek Flash)",
+        "reasoningEfforts": {
+          "off": null,
+          "high": "high",
+          "max": "max"
+        },
+        "_comment": {
+          "thinkingFormat": "makes `off` actually stop thinking"
+        }
+      }
+    },
+    "complex": {
+      "alias": "complex",
+      "displayName": "DeepSeek V4 Pro",
+      "backend": {
+        "provider": "deepseek",
+        "model": "deepseek-v4-pro",
+        "apiKeyEnv": "DEEPSEEK_API_KEY"
+      },
+      "reasoning": true,
+      "input": ["text"],
+      "contextWindow": 1000000,
+      "maxTokens": 32768,
+      "compat": {
+        "thinkingFormat": "deepseek"
+      },
+      "pi": {
+        "name": "complex — DeepSeek V4 Pro (proxy, measured)"
+      },
+      "dsh": {
+        "name": "complex (Astra)",
+        "_comment": {
+          "name": "dsh's hand-written comment still calls this route Astra (gpt-6-astra); litellm/config.yaml actually routes `complex` to deepseek/deepseek-v4-pro today (see that file's own comment on the swap) — pre-existing drift this schema records rather than silently resolving."
+        }
+      }
+    },
+    "deterministic": {
+      "alias": "deterministic",
+      "displayName": "local Qwen",
+      "backend": {
+        "provider": "lm_studio",
+        "model": "qwen/qwen3.8-27b"
+      },
+      "reasoning": true,
+      "input": ["text"],
+      "contextWindow": 131072,
+      "maxTokens": 32768,
+      "compat": {
+        "thinkingFormat": "qwen-chat-template",
+        "supportsReasoningEffort": false
+      },
+      "thinkingLevelMap": {
+        "minimal": null,
+        "low": null,
+        "medium": "medium",
+        "high": null,
+        "xhigh": null,
+        "max": null
+      },
+      "samplingParams": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 20
+      },
+      "pi": {
+        "name": "deterministic — local Qwen (proxy, measured)"
+      },
+      "dsh": {
+        "name": "deterministic (local Qwen)",
+        "_comment": {
+          "name": "add `input: [text, image]` if this qwen build is vision-capable"
+        }
+      }
+    }
+  }
+}
