@@ -15,10 +15,10 @@
         "compat": "localhost gateways: pi-ai treats an unknown URL as OpenAI itself and sends fields LiteLLM may reject — these two are the usual fixes and have no UI field, so they must live here.",
         "supportsDeveloperRole": "system prompt as `system`, not `developer`",
         "maxTokensField": "if the proxy rejects max_completion_tokens",
-        "pi.apiKey": "resolved at auth time by proxy-key.sh (headless: Keychain service-account token -> op read), so pi never triggers a 1Password desktop approval per message. Absolute path = personal-repo convention. Same op item the proxy uses."
+        "pi.apiKey": "env interpolation: the `pi` shell wrapper (domains/dev/shell/zsh/functions.zsh) resolves the op-managed proxy key ONCE at launch and exports LITELLM_API_KEY, so pi never spawns a key-reader in a subprocess that cannot reach the Keychain. Launch pi via that wrapper, not the raw binary."
       },
       "pi": {
-        "apiKey": "!/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/litellm/proxy-key.sh"
+        "apiKey": "$LITELLM_API_KEY"
       },
       "dsh": {
         "displayName": "LiteLLM (local)",
