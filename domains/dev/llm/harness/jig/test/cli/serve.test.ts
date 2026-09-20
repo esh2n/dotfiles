@@ -166,10 +166,11 @@ describe("serveDecisionService", () => {
   });
 
   test("/compact answers keep-or-drop for the items it is given", async () => {
+    // b is reproducible (dropped), c is not (kept); a, d and e are pinned.
     const provider = new StaticProvider({
       bools: [
-        { value: false, confidence: 0.85 },
-        { value: true, confidence: 0.9 },
+        { value: true, confidence: 0.85 },
+        { value: false, confidence: 0.9 },
       ],
     });
     const { service, token } = await startAuthedService(provider);

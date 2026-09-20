@@ -10,8 +10,8 @@ describe("answerCompaction", () => {
   test("judges the middle items and pins the first and the last two", async () => {
     const provider = new StaticProvider({
       bools: [
-        { value: false, confidence: 0.9 },
-        { value: true, confidence: 0.95 },
+        { value: true, confidence: 0.9 },
+        { value: false, confidence: 0.95 },
       ],
     });
 
@@ -19,6 +19,7 @@ describe("answerCompaction", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    // b is reproducible (dropped), c is not (kept), a/d/e are pinned.
     expect(result.result.kept.map((item) => item.id)).toEqual(["a", "c", "d", "e"]);
     expect(result.result.decisions).toEqual([
       { id: "a", kept: true, confidence: 1, source: "pinned" },
@@ -32,8 +33,8 @@ describe("answerCompaction", () => {
   test("a weakly answered item is kept, because the safe side is keeping", async () => {
     const provider = new StaticProvider({
       bools: [
-        { value: false, confidence: 0.55 },
-        { value: true, confidence: 0.9 },
+        { value: true, confidence: 0.55 },
+        { value: false, confidence: 0.9 },
       ],
     });
 
@@ -50,7 +51,8 @@ describe("answerCompaction", () => {
   });
 
   test("an explicitly pinned item is never asked about", async () => {
-    // One answer for one question: this passes only if the pinned item was excluded.
+    // One answer for one question (b): this passes only if the pinned item was
+    // excluded from the batch. b is reproducible, so it is the one that goes.
     const provider = new StaticProvider({ bools: [{ value: true, confidence: 0.9 }] });
 
     const result = await answerCompaction(
@@ -68,15 +70,15 @@ describe("answerCompaction", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.result.kept.map((item) => item.id)).toEqual(["a", "b", "c", "d", "e"]);
+    expect(result.result.kept.map((item) => item.id)).toEqual(["a", "c", "d", "e"]);
     expect(result.result.decisions[2]?.source).toBe("pinned");
   });
 
   test("the caller cannot set the threshold — how cautious to be is not a caller's parameter", async () => {
     const provider = new StaticProvider({
       bools: [
-        { value: false, confidence: 0.55 },
-        { value: true, confidence: 0.9 },
+        { value: true, confidence: 0.55 },
+        { value: false, confidence: 0.9 },
       ],
     });
 

@@ -19,11 +19,12 @@ import { convertToLlm, type ExtensionAPI, type ExtensionContext, serializeConver
 // exactly as the official custom-compaction example does; `usage` is returned so
 // the session's token totals stay honest.
 //
-// OFF by default: measured against the live judgment model, the per-item question
-// currently answers "keep" for everything (0.61-0.70, including byte-identical
-// duplicates of a 31k-char tool result), so the extension would spend one judgment
-// call per compaction and then hand the work back to pi anyway. Turn it on with
-// PI_COMPACT_JUDGMENT=on or `/compact-judgment on` once the question discriminates.
+// OFF by default: one judgment call is spent per compaction, so turning it on is
+// the user's decision (`/compact-judgment on`, or PI_COMPACT_JUDGMENT=on to make it
+// the default). Measured against the live judgment model, the question it asks
+// currently drops a 31k-char file read and a byte-identical repeat of it
+// (confidence 0.95/0.94) and a 48-char `ls` (0.66), while keeping an ask (0.88) and
+// a conclusion (0.94) — one round trip for all of them.
 //
 // Every failure path returns undefined, which means "let pi do its normal
 // compaction" — this extension can slow compaction down but cannot lose context by

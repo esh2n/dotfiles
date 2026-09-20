@@ -59,15 +59,18 @@ describe("compact", () => {
   });
 
   test("always pins the first item and the most recent N", async () => {
-    const provider = new ScriptedProvider([{ value: false, confidence: 0.9 }]);
+    const provider = new ScriptedProvider([{ value: true, confidence: 0.9 }]);
     const items = [item("a"), item("b"), item("c"), item("d")];
 
     const result = await compact(items, provider, { preserveRecent: 2 });
 
-    // a (first) + c, d (most recent 2) are pinned; only b is asked, and dropped.
+    // a (first) + c, d (most recent 2) are pinned; only b is asked, and it is
+    // reproducible, so it goes.
     expect(result.kept.map((i) => i.id)).toEqual(["a", "c", "d"]);
     expect(provider.batches.length).toBe(1);
-    expect(provider.batches[0]?.prompts).toEqual(['Keep item "b" verbatim?']);
+    expect(provider.batches[0]?.prompts).toEqual([
+      'Is item "b" reproducible by running the same tool call again? Answer true only for a tool result whose content the same command or read would produce again; answer false for anything that is not a tool result.',
+    ]);
   });
 
   test("judges every candidate in one batch, with the item list as the material", async () => {
@@ -90,19 +93,17 @@ describe("compact", () => {
 
     expect(provider.batches.length).toBe(1);
     const batch = provider.batches[0];
-    expect(batch?.prompts).toEqual([
-      'Keep item "x" verbatim?',
-      'Keep item "y" verbatim?',
-      'Keep item "z" verbatim?',
-    ]);
+    expect(batch?.prompts.length).toBe(3);
+    expect(batch?.prompts[0]).toContain('Is item "x" reproducible');
     // The material is the whole list, so the model sees the surroundings of the item it judges.
     expect(batch?.material).toContain("[pin0] (pinned) pin0");
     expect(batch?.material).toContain("[x] the failing test output");
-    expect(result.kept.map((i) => i.id)).toEqual(["pin0", "x", "z", "r1", "r2"]);
+    // x and z are reproducible (dropped), y is not (kept), pinned items always stay.
+    expect(result.kept.map((i) => i.id)).toEqual(["pin0", "y", "r1", "r2"]);
   });
 
-  test("drops a non-pinned item the provider confidently rejects", async () => {
-    const provider = new ScriptedProvider([{ value: false, confidence: 0.95 }]);
+  test("drops a non-pinned item the provider confidently calls reproducible", async () => {
+    const provider = new ScriptedProvider([{ value: true, confidence: 0.95 }]);
     const items = [item("pin0"), item("x"), item("r1"), item("r2")];
 
     const result = await compact(items, provider, { preserveRecent: 2 });
@@ -116,8 +117,22 @@ describe("compact", () => {
     });
   });
 
+  test("an item the model says is not reproducible is kept", async () => {
+    const provider = new ScriptedProvider([{ value: false, confidence: 0.9 }]);
+    const items = [item("pin0"), item("x"), item("r1"), item("r2")];
+
+    const result = await compact(items, provider, { preserveRecent: 2 });
+
+    expect(result.decisions.find((d) => d.id === "x")).toEqual({
+      id: "x",
+      kept: true,
+      confidence: 0.9,
+      source: "decided",
+    });
+  });
+
   test("keeps an item when the provider is unsure (conservative fallback)", async () => {
-    const provider = new ScriptedProvider([{ value: false, confidence: 0.2 }]);
+    const provider = new ScriptedProvider([{ value: true, confidence: 0.2 }]);
     const items = [item("pin0"), item("x"), item("r1"), item("r2")];
 
     const result = await compact(items, provider, { preserveRecent: 2 });
@@ -131,7 +146,7 @@ describe("compact", () => {
   });
 
   test("the default threshold is 0.6, so a 0.55 judgment is 'unsure' and the item is kept", async () => {
-    const provider = new ScriptedProvider([{ value: false, confidence: 0.55 }]);
+    const provider = new ScriptedProvider([{ value: true, confidence: 0.55 }]);
     const items = [item("pin0"), item("x"), item("r1"), item("r2")];
 
     const result = await compact(items, provider, { preserveRecent: 2 });

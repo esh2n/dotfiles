@@ -30,11 +30,22 @@ export interface CompactionResult {
  * bare question, and one round trip covers up to 32 items instead of one round
  * trip per item.
  *
- * Each judgment is gated by confidence with the safe fallback being *keep* (never
- * lose context on a weak judgment). The default threshold is 0.6, not 0.5: when a
- * provider derives confidence from a probability (noul), the threshold IS the dead
- * band `1-T < p < T`, so 0.5 would mean "every judgment is good enough" and the
- * conservative fallback could never fire.
+ * The question is whether an item is REPRODUCIBLE — whether re-running what
+ * produced it would produce it again. The obvious wording ("keep item X
+ * verbatim?") was measured against the live judgment model and answers keep for
+ * everything (0.59-0.77 on every item, including a byte-identical duplicate of a
+ * 31k-char tool result), so it spends a judgment and decides nothing. Asking for
+ * reproducibility instead answers the question that matters — a tool result whose
+ * command can be re-run is the material worth dropping, an ask or a conclusion is
+ * not — at confidence 0.69-0.95 on the same input, in the same single round trip.
+ *
+ * The answer therefore INVERTS: `true` means reproducible, i.e. droppable. Each
+ * judgment is gated by confidence with the safe fallback being *keep* (never lose
+ * context on a weak judgment), so an unsure answer about reproducibility keeps the
+ * item. The default threshold is 0.6, not 0.5: when a provider derives confidence
+ * from a probability (noul), the threshold IS the dead band `1-T < p < T`, so 0.5
+ * would mean "every judgment is good enough" and the conservative fallback could
+ * never fire.
  *
  * The pin-recent + per-item keep-decision + threshold shape is adapted from the
  * reference project github.com/tamaratran/fast-jev-compaction (MIT) — its design,
@@ -65,7 +76,7 @@ export async function compact(
       : await provider.boolBatch(
           {
             material: materialOf(items),
-            prompts: candidates.map((item) => `Keep item "${item.id}" verbatim?`),
+            prompts: candidates.map((item) => reproducibilityQuestion(item.id)),
           },
           {},
         );
@@ -91,17 +102,28 @@ export async function compact(
       );
     }
 
-    const gated = gate(decided, threshold, true);
+    // `true` = reproducible = droppable, so the safe fallback is `false` (keep).
+    const gated = gate(decided, threshold, false);
     decisions.push({
       id: item.id,
-      kept: gated.value,
+      kept: !gated.value,
       confidence: gated.confidence,
       source: gated.source,
     });
-    if (gated.value) kept.push(item);
+    if (!gated.value) kept.push(item);
   }
 
   return { kept, decisions };
+}
+
+/**
+ * The question one item is judged by, in the wording that was measured to
+ * discriminate. It says what to answer for the cases the material cannot settle
+ * (anything that is not a tool result), because a model left to guess about an ask
+ * drops the ask.
+ */
+function reproducibilityQuestion(id: string): string {
+  return `Is item "${id}" reproducible by running the same tool call again? Answer true only for a tool result whose content the same command or read would produce again; answer false for anything that is not a tool result.`;
 }
 
 /**
