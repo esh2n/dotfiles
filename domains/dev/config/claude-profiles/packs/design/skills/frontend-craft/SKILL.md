@@ -1,6 +1,8 @@
 ---
 name: frontend-craft
 description: Build distinctive, production-grade UI — pick a bold visual direction (avoid generic AI aesthetics), then implement under strict constraints (Tailwind, motion, accessibility, interaction rules). Use when creating or reviewing web components, pages, or applications. For cognitive/a11y evaluation use human-interface-guidelines; for React structure use react-patterns; for style/palette/font search use ui-ux-pro-max.
+metadata:
+  namespaces: [web/ui]
 ---
 
 # Frontend Craft

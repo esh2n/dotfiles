@@ -2,6 +2,8 @@
 name: workday-input
 description: "Chrome経由でWorkdayの勤怠入力画面に勤務時間を入力する。workday-calcで算出したデータを使用。claude --chrome で実行。"
 disable-model-invocation: true
+metadata:
+  namespaces: [work]
 ---
 
 # Workday Input — 勤怠入力

@@ -2,6 +2,7 @@
 name: kotlin-testing
 description: Kotlin testing patterns with Kotest, MockK, coroutine testing, property-based testing, and Kover coverage. Follows TDD methodology with idiomatic Kotlin practices.
 metadata:
+  namespaces: [lang/jvm, practice]
   origin: ECC
 ---
 

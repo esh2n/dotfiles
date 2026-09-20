@@ -1,6 +1,8 @@
 ---
 name: yoki-graph
 description: 多角の並列レビュー・調査・実装をワークフロー(グラフ)で回すときのカタログと起動方法。どのグラフがあるか(review / research / implement / preflight / design-review / acceptance / code-study / deliberate / stocktake / go-optimize)、いま必要かどうか、どう起動するかを決めるときに読む。Claude Code ではネイティブの Workflow tool、Codex / omp からは `yoki-graph` CLI が同じスクリプトを走らせる。「多角でレビューして」「並列で調べて」「codex から review 回して」「ワークフロー何がある？」やランの status/journal を見るときも。
+metadata:
+  namespaces: [agent]
 ---
 
 # yoki-graph

@@ -2,6 +2,7 @@
 name: go-modern
 description: Use when writing or reviewing Go code and a pre-1.21 idiom shows up — `v := v` loop-variable copies, hand-rolled contains/keys/sort helpers, `if a > b` min/max, `log.Printf` for structured output, channel or callback iteration, `math/rand.Seed`, `for i := 0; i < b.N; i++` benchmarks, `interface{}`/reflection where generics fit, or `omitempty` on structs and time.Time. Maps each to the current stdlib or language form and says when the old form is still correct.
 metadata:
+  namespaces: [lang/go]
   verified: 2026-08
 ---
 

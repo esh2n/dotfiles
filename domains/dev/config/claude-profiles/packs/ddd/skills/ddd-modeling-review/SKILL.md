@@ -1,6 +1,8 @@
 ---
 name: ddd-modeling-review
 description: Use when reviewing or implementing a Domain-Driven Design codebase, deciding aggregate boundaries, value objects, entities, sum types, domain events, factories, repositories or domain services, when drawing or questioning a bounded context, integrating a legacy or external model (context mapping, anti-corruption layer, shared kernel), when code and expert vocabulary have drifted apart, when triaging how much modeling a subdomain deserves, or when a schema, tenant-isolation or error-taxonomy question has domain implications.
+metadata:
+  namespaces: [arch/patterns]
 ---
 
 # DDD Modeling Review

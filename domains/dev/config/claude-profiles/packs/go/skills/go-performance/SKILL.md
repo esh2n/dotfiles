@@ -2,6 +2,7 @@
 name: go-performance
 description: Use when optimizing Go code, profiling with pprof, writing or reading benchmarks, tuning GOGC/GOMEMLIMIT/GOMAXPROCS, chasing allocations, GC pauses, latency, or throughput, or asked "why is this slow" — judgment for what to measure, which knob to reach for, and what to label verified vs unverified.
 metadata:
+  namespaces: [lang/go]
   verified: 2026-08
 ---
 

@@ -1,6 +1,8 @@
 ---
 name: storybook-guidelines
 description: Comprehensive Storybook story creation guidelines. Covers story structure, naming conventions, and visual testing patterns. Reference this skill when creating Storybook stories for components with conditional rendering or complex UI states.
+metadata:
+  namespaces: [web/react]
 ---
 
 # Storybook Guidelines

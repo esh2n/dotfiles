@@ -3,6 +3,8 @@ name: prompt-save
 description: "Save the current conversation pattern as a reusable prompt template. Prompts are stored in ~/.config/prompts/ (tool-agnostic, works with Claude Code, Cursor, Obsidian). Use after a good conversation to capture the pattern for reuse."
 disable-model-invocation: true
 argument-hint: "[name] [--project <project-name>]"
+metadata:
+  namespaces: [agent]
 ---
 
 # Save Prompt

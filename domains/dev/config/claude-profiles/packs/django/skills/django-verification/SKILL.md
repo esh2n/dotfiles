@@ -2,6 +2,7 @@
 name: django-verification
 description: "Verification loop for Django projects: migrations, linting, tests with coverage, security scans, and deployment readiness checks before release or PR."
 metadata:
+  namespaces: [lang/python, practice]
   origin: ECC
 ---
 

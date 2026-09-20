@@ -2,6 +2,7 @@
 name: go-concurrency
 description: Use when writing or reviewing goroutines, channels, sync primitives, context cancellation, worker pools, or anything touching leaks, races, deadlocks, or lock contention in Go. Covers channel/mutex/atomic choice, ownership and lifetime discipline, the Go memory model, and version-gated concurrency APIs (1.22-1.27).
 metadata:
+  namespaces: [lang/go]
   verified: 2026-08
 ---
 

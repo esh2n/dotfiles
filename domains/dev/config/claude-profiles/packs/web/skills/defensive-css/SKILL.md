@@ -2,6 +2,7 @@
 name: defensive-css
 description: Use when writing or reviewing CSS and content or environment risk appears — long/short/missing text, empty lists, extreme image aspect ratios, flex/grid children without wrap, undefined custom properties, narrow viewports, missing background images. Covers gap over margin, @container over @media, overflow-wrap/text-overflow, object-fit, flex-wrap, auto-fill over auto-fit, background-repeat, var() fallbacks, min-width:0 on flex children, scrollbar-gutter.
 metadata:
+  namespaces: [lang/css]
   verified: 2026-09
 ---
 

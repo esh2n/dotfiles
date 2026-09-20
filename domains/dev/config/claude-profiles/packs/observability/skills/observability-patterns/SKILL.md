@@ -1,6 +1,8 @@
 ---
 name: observability-patterns
 description: Use when instrumenting a service with logs/metrics/traces, designing SLOs and alerts, reviewing metric label cardinality, choosing a trace sampling strategy, or building a dashboard — deciding what to page on vs ticket, which signal answers a given debugging question, or why a metrics/logging bill spiked.
+metadata:
+  namespaces: [platform/infra]
 ---
 
 # Observability Patterns

@@ -1,6 +1,8 @@
 ---
 name: morning-brief
 description: "Daily morning briefing - collects trending topics across tech, AI, politics, gaming, finance, design, business, hardware, and more. Outputs structured digest with analysis and personal insights."
+metadata:
+  namespaces: [work]
 ---
 
 # Morning Brief - Daily Intelligence Digest

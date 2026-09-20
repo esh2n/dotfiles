@@ -2,6 +2,8 @@
 name: sdd
 description: Spec-Driven Development workflow. Use when starting a new feature, bugfix, or any task that benefits from structured specification before implementation. Manages tasks and specs in ~/.config/work/{org}/{repo}/tasks/. Subcommands - init, clarify, research, design, tasks, implement, validate, status, list.
 argument-hint: "init|clarify|research|design|tasks|implement|validate|status|list [task-name]"
+metadata:
+  namespaces: [practice]
 ---
 
 # Spec-Driven Development (SDD)

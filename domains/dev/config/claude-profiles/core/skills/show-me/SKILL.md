@@ -1,6 +1,8 @@
 ---
 name: show-me
 description: Use when the user says 「見せて」「図にして」「今の話を絵で」「どこが変わる？」「構造を一瞥したい」, "show me", or "/show-me", or when an explanation of code flow, component structure, or a diff would be clearer as a compact in-chat view than prose. Not for a durable document (use writeup), a design interview (use grilling), or a request to make a concept easy for a non-expert — 「わかりやすく」「かみ砕いて」 without a code or structure to point at is eli5.
+metadata:
+  namespaces: [doc]
 ---
 
 # show-me

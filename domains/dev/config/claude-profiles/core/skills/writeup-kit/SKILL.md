@@ -1,6 +1,8 @@
 ---
 name: writeup-kit
 description: Shared design kit (CSS tokens, 20 role-named components, page template, diagram IR contract, self-check rules) read by the writeup, grilling, eli5 and show-me skills whenever they produce an HTML page. Not invoked directly by users.
+metadata:
+  namespaces: [doc]
 ---
 
 # writeup-kit

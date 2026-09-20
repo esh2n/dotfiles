@@ -1,6 +1,8 @@
 ---
 name: keymap-help
 description: "Neovimのキーバインドを調べる。「このキーなんだっけ？」「dotfilesでカスタムしたやつ何だっけ？」に答える。実行時にアクティブなdistro(lazyvim/nvchad/astrovim/custom)を自動判定し、headless nvimで全キーマップを実ダンプ、dotfilesで自作したものは★で区別。どのディレクトリからでも実行可能。nvimのキーマップ/keymap/keybinding/ショートカットを聞かれたら使う。"
+metadata:
+  namespaces: [work]
 ---
 
 # keymap-help — Neovim キーマップヘルパー

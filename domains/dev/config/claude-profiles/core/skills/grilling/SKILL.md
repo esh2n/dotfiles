@@ -1,6 +1,8 @@
 ---
 name: grilling
 description: Relentless design interview that grills a plan, spec, or decision until you and the user reach shared understanding. Use when the user types /grilling, says "grill me", "詰めて", "この決定を深掘りして", "設計を詰めたい", "プランの穴を突いて", "この判断をストレステストして", or hands over a draft design and asks what is missing. Not for writing the document itself — a 決定記録 or any page that is kept and revisited belongs to writeup, even when the request says 決定記録, a quick in-chat view (use show-me), or a beginner picture explainer (use eli5).
+metadata:
+  namespaces: [practice]
 ---
 
 # grilling

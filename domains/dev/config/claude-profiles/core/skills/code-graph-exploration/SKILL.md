@@ -1,6 +1,8 @@
 ---
 name: code-graph-exploration
 description: Choose between code-graph, LSP, search, and direct file reading when investigating a repository. Use for impact analysis, call paths, dependency or implementation tracing, dead-code checks, cross-package architecture, unfamiliar large repositories, or when deciding whether Codebase-Memory graph evidence is appropriate. Prefer repository-local instructions when they define another graph/index workflow.
+metadata:
+  namespaces: [practice]
 ---
 
 # Code Graph Exploration

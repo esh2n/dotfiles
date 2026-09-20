@@ -1,6 +1,8 @@
 ---
 name: dopa-shorts
 description: "文章(記事・ドキュメント・ニュース)を縦ショート動画(9:16 mp4)に変換する。ずんだもん解説風の立ち絵テンプレとキネティックタイポテンプレ、VOICEVOX/CoeFont/sayのボイス切替対応。「この記事をショート動画にして」「ずんだもん解説にして」「縦動画にして」で使う。個人・内輪視聴用。"
+metadata:
+  namespaces: [doc]
 ---
 
 # dopa-shorts — 文章→縦ショート動画

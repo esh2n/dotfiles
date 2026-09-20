@@ -1,6 +1,8 @@
 ---
 name: sql-tuning
 description: Use when a query is slow, an EXPLAIN plan needs interpretation, designing or pruning indexes, diagnosing lock contention or hotspots, paginating large tables, or writing a schema migration for PostgreSQL or Cloud Spanner — judgment for reading plans, choosing index shape, and sequencing safe schema changes.
+metadata:
+  namespaces: [platform/infra]
 ---
 
 # SQL Tuning

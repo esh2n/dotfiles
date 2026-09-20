@@ -1,6 +1,8 @@
 ---
 name: cloudflare-patterns
 description: Use when building or reviewing Cloudflare Workers projects — choosing between KV, D1, Durable Objects, R2, or Queues for storage, designing a cache strategy, debugging CPU-time-limit errors or a package that breaks at deploy, deciding Workers vs Pages Functions, or diagnosing wrangler dev vs production divergence.
+metadata:
+  namespaces: [platform/infra]
 ---
 
 # Cloudflare Patterns

@@ -1,6 +1,8 @@
 ---
 name: k8s-patterns
 description: Use when writing or reviewing Kubernetes manifests, debugging pod failures (CrashLoopBackOff, ImagePullBackOff, OOMKilled, Pending), triaging a rollout, or reviewing manifests for missing resource limits, probes, PodDisruptionBudget, image pinning, or security context.
+metadata:
+  namespaces: [platform/infra]
 ---
 
 # Kubernetes Patterns

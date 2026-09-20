@@ -2,6 +2,7 @@
 name: ai-regression-testing
 description: Use when an AI agent has modified API routes or backend logic, when a fixed bug needs a regression guard, or when reviewing AI-written code for blind spots — the same model writing and reviewing code misses systematic errors that only automated regression tests catch.
 metadata:
+  namespaces: [practice]
   origin: ECC
 ---
 

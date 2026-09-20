@@ -1,6 +1,8 @@
 ---
 name: workday-calc
 description: "SlackとGitHubのactivityから勤務時間を算出する。デフォルト(9:30-19:00)をベースに、Slackの最初/最後のメッセージ時刻とGitHubのcommit時刻で早出・残業を補正。各日の作業メモ（何をしていたか）もSlackメッセージとcommit履歴から抽出。結果をファイルに保存。"
+metadata:
+  namespaces: [work]
 ---
 
 # Workday Calc — 勤務時間算出

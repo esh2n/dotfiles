@@ -1,6 +1,8 @@
 ---
 name: clean-architecture
 description: Use when designing service structure, reviewing layer boundaries and dependency direction, deciding where business logic belongs, judging whether an abstraction or interface is architecturally justified, resolving whether a use case may return an ORM entity or read an HTTP request, naming or placing ports and adapters, or deciding whether a project is worth layering at all.
+metadata:
+  namespaces: [arch/patterns]
 ---
 
 # Clean Architecture

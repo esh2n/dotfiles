@@ -1,6 +1,8 @@
 ---
 name: writeup
 description: Use when the user wants a document that is kept and revisited rather than a one-off chat answer — a decision record (決定記録), design doc (設計), research summary (調査まとめ), reference roundup (参考資料まとめ), PBI doc (PBI 資料), picture explainer (絵解き), work note (作業メモ), or meeting minutes (議事録). Triggers include "まとめて", "設計書にして", "決定記録を残して", "資料にして", "writeup", "/writeup", and a research/design-review/acceptance/deliberate workflow that returned a Markdown report worth keeping. Not for a single in-chat visual answer (use show-me), a beginner picture explainer (use eli5), or a grilling interview round. Also not writeup when the text is headed somewhere else — Notion, a 社内 wiki, Slack, スライド, a PR description, or a repo README — even when the request says まとめて or 議事録.
+metadata:
+  namespaces: [doc]
 ---
 
 # writeup

@@ -1,6 +1,8 @@
 ---
 name: event-driven-patterns
 description: Use when designing or reviewing asynchronous message-driven systems — publishing or consuming events, choosing topic/queue topology, adding a transactional outbox, deciding between saga choreography and orchestration, introducing CQRS or a read model, evolving an event schema, or debugging duplicate processing, out-of-order delivery, lost events, oversized payloads, or a filling dead-letter queue.
+metadata:
+  namespaces: [arch/patterns]
 ---
 
 # Event-Driven Patterns

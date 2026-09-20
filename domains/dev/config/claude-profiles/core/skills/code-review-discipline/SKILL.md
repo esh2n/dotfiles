@@ -2,6 +2,7 @@
 name: code-review-discipline
 description: Meta-discipline for how to judge and how to review code and design — not language rules, but the reasoning stance behind a review. Use when reviewing someone else's code, self-reviewing your own work before shipping, deciding whether a design decision is sound, weighing a trade-off, proposing an approach for approval, or judging AI/bot review comments. Applies in any language or project.
 metadata:
+  namespaces: [practice]
   origin: extracted
 ---
 

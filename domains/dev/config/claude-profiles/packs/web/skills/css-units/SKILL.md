@@ -2,6 +2,7 @@
 name: css-units
 description: Use when writing or reviewing CSS and a unit-choice question comes up — px vs rem vs em, why a nested component's font keeps shrinking, `line-height` overlapping on a bigger-font child, a fixed root `font-size`, `100vh` jumping or overflowing on mobile, or a fluid `clamp()`/`calc()` value that ignores the user's zoom/font-size setting. Covers em/rem resolution, the em-compounding trap, unitless line-height, the small/large/dynamic viewport unit family, container query units, and WCAG 1.4.4 zoom-safe fluid typography.
 metadata:
+  namespaces: [lang/css]
   verified: 2026-09
 ---
 

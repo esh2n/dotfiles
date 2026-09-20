@@ -6,6 +6,8 @@ description: >
   is on. Appends learning feedback (natural phrasing, grammar, alternatives with
   nuance, vocabulary, JP/EN mix detection, assertiveness) to the end of responses.
   Inspired by Nani!? translation approach — multiple alternatives with JP nuance explanations.
+metadata:
+  namespaces: [work]
 ---
 
 When this skill is active, append a `---` separator and an **English Coach** section at the end of every response.

@@ -2,6 +2,7 @@
 name: css-modern
 description: Use when writing or reviewing CSS and a legacy idiom appears — 100vh on mobile, viewport media queries for component layout, !important or specificity escalation, hex/rgba with Sass darken, JS class toggling to style a parent, div-based modals, scroll listeners, margin-left/right, duplicated grid tracks. Covers nesting, container queries, :has(), logical properties, dvh/svh, subgrid, @layer, OKLCH, popover, view transitions, text-wrap, :user-valid.
 metadata:
+  namespaces: [lang/css]
   verified: 2026-08
 ---
 

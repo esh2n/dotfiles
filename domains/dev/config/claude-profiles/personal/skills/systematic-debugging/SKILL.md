@@ -1,6 +1,8 @@
 ---
 name: systematic-debugging
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - enforces root cause investigation before attempting solutions, prevents guess-and-check thrashing
+metadata:
+  namespaces: [practice]
 ---
 
 # Systematic Debugging

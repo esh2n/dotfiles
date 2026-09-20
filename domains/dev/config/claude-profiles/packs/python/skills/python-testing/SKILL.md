@@ -2,6 +2,7 @@
 name: python-testing
 description: Use when writing or reviewing Python tests — pytest marker/conftest conventions, anyio-based async testing (not pytest-asyncio), mocking discipline, parametrization idioms, and coverage invocation for this repo.
 metadata:
+  namespaces: [lang/python, practice]
   origin: ECC
 ---
 

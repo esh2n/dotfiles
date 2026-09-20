@@ -2,6 +2,8 @@
 name: strategic-compact
 description: Suggests manual context compaction at logical task boundaries (research→plan, milestone→next phase) instead of arbitrary auto-compaction. Use when a long session approaches context limits, when switching phases or tasks, or when deciding whether /compact would lose important context.
 origin: ECC (restored 2026-08-05, rewired for yoki runtime)
+metadata:
+  namespaces: [agent]
 ---
 
 # Strategic Compact Skill

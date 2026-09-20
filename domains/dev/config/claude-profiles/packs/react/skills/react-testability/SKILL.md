@@ -1,6 +1,8 @@
 ---
 name: react-testability
 description: "Comprehensive React component coding guidelines, refactoring principles, and architectural patterns. **CRITICAL**: Focuses on patterns AI commonly fails to implement correctly, especially testability, props control, and component responsibility separation. Reference this skill when implementing or refactoring React components."
+metadata:
+  namespaces: [web/react]
 ---
 
 # Coding Guidelines - What AI Gets Wrong

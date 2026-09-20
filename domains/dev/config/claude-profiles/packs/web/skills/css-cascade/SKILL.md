@@ -2,6 +2,7 @@
 name: css-cascade
 description: Use when writing or reviewing CSS and a cascade-resolution question comes up — which declaration wins, why an override didn't apply, `!important` fights, `@layer` ordering, a shorthand silently resetting a longhand, an `:is()`/`:has()` selector list, edge-count shorthand values (padding/margin/inset), inheritance keywords (inherit/initial/unset/revert), or missing `:focus-visible` in a hover/active chain. Covers the full cascade sort order, the three-column specificity model, forgiving vs non-forgiving selector lists, and @supports feature queries.
 metadata:
+  namespaces: [lang/css]
   verified: 2026-09
 ---
 

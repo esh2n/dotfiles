@@ -2,6 +2,7 @@
 name: css-flow
 description: Use when writing or reviewing CSS and boxes in normal flow don't space the way it looks like they should — margins that don't add up, spacing that changes when a layout becomes flex/grid, "fixing" a gap with padding without knowing why, or choosing between margin, gap, and the stack pattern for inter-item spacing. Covers margin collapse (when it happens, the resulting value, and where it's structurally blocked), the flex/grid refactor trap, and current spacing patterns (gap, the stack pattern, single-direction margins).
 metadata:
+  namespaces: [lang/css]
   verified: 2026-09
 ---
 

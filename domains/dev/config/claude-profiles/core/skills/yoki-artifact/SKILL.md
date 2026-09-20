@@ -1,6 +1,8 @@
 ---
 name: yoki-artifact
 description: Use when the user wants to publish an HTML page to a private URL, share a page with someone, or read and reply to comments left on a published page — works the same from Claude Code, Codex and omp. Symptoms include 「このページを共有して」「URL にして」「コメント見て」「返信して」, a request to hand a writeup / eli5 / show-me page to another person, or a follow-up on a page that was already published.
+metadata:
+  namespaces: [doc]
 ---
 
 # yoki-artifact

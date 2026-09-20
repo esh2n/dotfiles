@@ -1,6 +1,8 @@
 ---
 name: gcp-patterns
 description: Use when designing or reviewing GCP infrastructure — IAM role/service-account grants, Pub/Sub topics and subscriptions, Cloud Run vs GKE deployment choices, Terraform-managed GCP resources, gcloud scripts, or debugging quota errors, retry storms, or an unexpectedly large GCP bill.
+metadata:
+  namespaces: [platform/infra]
 ---
 
 # GCP Patterns

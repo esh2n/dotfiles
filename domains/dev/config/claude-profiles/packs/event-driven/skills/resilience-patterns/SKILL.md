@@ -1,6 +1,8 @@
 ---
 name: resilience-patterns
 description: Use when setting timeouts or retry policy for a network call, adding a circuit breaker, deciding queue or buffer sizing, placing a rate limiter, designing fallback and degraded behavior, isolating thread or connection pools, or writing liveness and readiness checks — and when diagnosing cascading failure, retry storms, thundering herds, latency collapse under load, OOM from an unbounded queue, or pods restarting because a dependency is down.
+metadata:
+  namespaces: [arch/patterns]
 ---
 
 # Resilience Patterns
