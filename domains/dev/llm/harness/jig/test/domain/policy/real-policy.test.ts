@@ -16,25 +16,26 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { HookProfile, ToolCall } from "../../../src/domain/hooks/decision";
-import { evaluate } from "../../../src/domain/policy/evaluate";
+import { type HookProfile, type ToolCall, judge } from "../../../src/domain/hooks/decision";
 import { parsePolicy } from "../../../src/domain/policy/parse";
-import type { GuardPolicy } from "../../../src/domain/policy/types";
+import type { Policy } from "../../../src/domain/policy/types";
 
-const REAL_POLICY_PATH = join(
-  import.meta.dir,
-  "..",
-  "..",
-  "..",
-  "..",
-  "policy",
-  "guard-rules.json",
-);
+/**
+ * The file under test is the real one. `JIG_REAL_POLICY_FILE` points the
+ * suite at a candidate instead — how a migrated document is proven against
+ * this table before a human swaps it in (the agents cannot write the real
+ * file; that protection is itself one of the rules).
+ */
+const REAL_POLICY_PATH =
+  process.env.JIG_REAL_POLICY_FILE ??
+  join(import.meta.dir, "..", "..", "..", "..", "policy", "guard-rules.json");
 
-function loadRealPolicy(): GuardPolicy {
-  const policy = parsePolicy(JSON.parse(readFileSync(REAL_POLICY_PATH, "utf8")));
-  if (policy.version !== 1) throw new Error("the live policy is still v1; Phase 2 migrates it");
-  return policy;
+function loadRealPolicy(): Policy {
+  return parsePolicy(JSON.parse(readFileSync(REAL_POLICY_PATH, "utf8")));
+}
+
+function decide(policy: Policy, call: ToolCall, profile: HookProfile): "allow" | "deny" | "ask" {
+  return judge(call, { harness: "test", profile }, policy).decision.kind;
 }
 
 function shellCall(command: string): ToolCall {
@@ -53,22 +54,22 @@ describe("the real guard-rules.json", () => {
 
   test("sudo asks from standard up, allowed only at minimal", () => {
     const policy = loadRealPolicy();
-    const standard = evaluate(policy.rules, shellCall("sudo ls"), "standard");
-    const strict = evaluate(policy.rules, shellCall("sudo ls"), "strict");
-    const minimal = evaluate(policy.rules, shellCall("sudo ls"), "minimal");
     // Ruling 2026-09-20: pi always confirmed sudo before unification, so the
     // shared policy must not weaken it — strength unifies upward.
-    expect(minimal.kind).toBe("allow");
-    expect(standard.kind).toBe("ask");
-    expect(strict.kind).toBe("ask");
+    expect(decide(policy, shellCall("sudo ls"), "minimal")).toBe("allow");
+    expect(decide(policy, shellCall("sudo ls"), "standard")).toBe("ask");
+    expect(decide(policy, shellCall("sudo ls"), "strict")).toBe("ask");
   });
 });
+
+type Outcome = "allow" | "deny" | "ask";
 
 interface Case {
   readonly label: string;
   readonly call: ToolCall;
   readonly profile: HookProfile;
-  readonly expected: "allow" | "deny" | "ask";
+  /** One outcome for both versions, or one per version where v2 deliberately changes it. */
+  readonly expected: Outcome | { readonly v1: Outcome; readonly v2: Outcome };
 }
 
 const CASES: readonly Case[] = [
@@ -344,24 +345,24 @@ const CASES: readonly Case[] = [
 
   // --- disk-destruction ---
   {
-    label: "diskutil erase asks at standard",
+    label: "diskutil erase asks at standard (v1); v2 puts it on the floor: deny",
     call: shellCall("diskutil eraseDisk JHFS+ x disk2"),
     profile: "standard",
-    expected: "ask",
+    expected: { v1: "ask", v2: "deny" },
   },
   {
-    label: "dd of=/dev/... asks at standard",
+    label: "dd of=/dev/... asks at standard (v1); v2 puts it on the floor: deny",
     call: shellCall("dd if=image.iso of=/dev/disk2"),
     profile: "standard",
-    expected: "ask",
+    expected: { v1: "ask", v2: "deny" },
   },
 
   // --- system-power-control ---
   {
-    label: "shutdown asks at standard",
+    label: "shutdown asks at standard (v1); v2 puts it on the floor: deny",
     call: shellCall("shutdown -h now"),
     profile: "standard",
-    expected: "ask",
+    expected: { v1: "ask", v2: "deny" },
   },
 
   // --- rm-lock-files ---
@@ -371,13 +372,106 @@ const CASES: readonly Case[] = [
     profile: "standard",
     expected: "ask",
   },
+
+  // --- what v2 changes: false positives gone, floor added, wrappers seen through ---
+  {
+    label: "v2: grep for the text 'rm -rf' is a grep",
+    call: shellCall('grep "rm -rf" notes.md'),
+    profile: "standard",
+    expected: { v1: "ask", v2: "allow" },
+  },
+  {
+    label: "v2: writing the word sudo into a note is not an escalation",
+    call: shellCall('echo "use sudo here" > notes.txt'),
+    profile: "standard",
+    expected: { v1: "ask", v2: "allow" },
+  },
+  {
+    label: "v2: the word --no-verify in a commit message is not a flag",
+    call: shellCall("printf '%s' 'never use --no-verify' > NOTES.md"),
+    profile: "standard",
+    expected: { v1: "deny", v2: "allow" },
+  },
+  {
+    label: "v2: a force push behind timeout is still a force push",
+    call: shellCall("timeout 60 git push --force origin feature"),
+    profile: "standard",
+    expected: "deny",
+  },
+  {
+    label: "v2: rm -rf of the home directory is on the floor even at minimal",
+    call: shellCall("rm -rf ~"),
+    profile: "minimal",
+    expected: { v1: "allow", v2: "deny" },
+  },
+  {
+    label: "v2: rm -rf / behind sudo is on the floor",
+    call: shellCall("sudo rm -rf /"),
+    profile: "standard",
+    expected: { v1: "ask", v2: "deny" },
+  },
+  {
+    label: "v2: rm -rf of a project directory is still only a question",
+    call: shellCall("rm -rf ./node_modules"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "v2: mkfs is on the floor",
+    call: shellCall("mkfs.ext4 /dev/sda1"),
+    profile: "minimal",
+    expected: { v1: "ask", v2: "deny" },
+  },
+  {
+    label: "v2: writing a git hook is on the floor",
+    call: shellCall("echo 'exit 0' > .git/hooks/pre-commit"),
+    profile: "minimal",
+    expected: { v1: "allow", v2: "deny" },
+  },
+  {
+    label: "v2: writing a git hook through the Write tool is on the floor",
+    call: writeCall("/work/repo/.git/hooks/post-checkout"),
+    profile: "minimal",
+    expected: { v1: "allow", v2: "deny" },
+  },
+  {
+    label: "v2: moving core.hooksPath away is forbidden like --no-verify",
+    call: shellCall("git -c core.hooksPath=/dev/null commit -m wip"),
+    profile: "standard",
+    expected: { v1: "allow", v2: "deny" },
+  },
+  {
+    label: "v2: a command that hands off to unseen code is a question",
+    call: shellCall("cat urls.txt | xargs rm"),
+    profile: "standard",
+    expected: { v1: "allow", v2: "ask" },
+  },
+  {
+    label: "v2: a delete hidden in a command substitution is still a question",
+    call: shellCall("echo $(rm -rf /tmp/x)"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "v2: pi's path key reaches the policy-protection rule",
+    call: { tool: "edit", input: { path: "/Users/x/.config/jig/policy/guard-rules.json" } },
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "v2: an ordinary variable-bearing command is not a question in denylist mode",
+    call: shellCall("cd $HOME/work && bun test"),
+    profile: "standard",
+    expected: "allow",
+  },
 ];
 
 describe("the real guard-rules.json — every rule, at least once", () => {
+  const policy = loadRealPolicy();
   for (const { label, call, profile, expected } of CASES) {
-    test(label, () => {
-      const policy = loadRealPolicy();
-      expect(evaluate(policy.rules, call, profile).kind).toBe(expected);
+    const want = typeof expected === "string" ? expected : expected[`v${policy.version}`];
+    test(`${label} [v${policy.version}]`, () => {
+      expect(decide(policy, call, profile)).toBe(want);
     });
   }
 });
