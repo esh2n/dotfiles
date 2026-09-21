@@ -10,19 +10,25 @@
     {
       "id": "floor-policy-write",
       "action": "fs.write",
-      "subject": { "path": "\\.config/jig/policy/|domains/dev/llm/harness/policy/" },
+      "subject": {
+        "path": "\\.config/jig/policy/|domains/dev/llm/harness/policy/"
+      },
       "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
     },
     {
       "id": "floor-policy-edit",
       "action": "fs.edit",
-      "subject": { "path": "\\.config/jig/policy/|domains/dev/llm/harness/policy/" },
+      "subject": {
+        "path": "\\.config/jig/policy/|domains/dev/llm/harness/policy/"
+      },
       "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
     },
     {
       "id": "floor-policy-redirect",
       "action": "shell.exec",
-      "subject": { "path": "\\.config/jig/policy/|domains/dev/llm/harness/policy/" },
+      "subject": {
+        "path": "\\.config/jig/policy/|domains/dev/llm/harness/policy/"
+      },
       "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
     },
     {
@@ -55,7 +61,9 @@
     {
       "id": "floor-mkfs",
       "action": "shell.exec",
-      "subject": { "program": "mkfs(\\..+)?|mke2fs|mkswap|newfs(_.+)?|wipefs" },
+      "subject": {
+        "program": "mkfs(\\..+)?|mke2fs|mkswap|newfs(_.+)?|wipefs"
+      },
       "why": "formats or wipes a filesystem"
     },
     {
@@ -70,7 +78,10 @@
     {
       "id": "floor-dd-block-device",
       "action": "shell.exec",
-      "subject": { "program": "dd", "argv": "(?:^|\\s)of=/dev/" },
+      "subject": {
+        "program": "dd",
+        "argv": "(?:^|\\s)of=/dev/"
+      },
       "why": "writes raw bytes to a block device"
     },
     {
@@ -82,31 +93,42 @@
     {
       "id": "floor-power",
       "action": "shell.exec",
-      "subject": { "program": "shutdown|reboot|halt|poweroff" },
+      "subject": {
+        "program": "shutdown|reboot|halt|poweroff"
+      },
       "why": "system power control"
     },
     {
       "id": "floor-git-hooks-write",
       "action": "fs.write",
-      "subject": { "path": "(^|/)\\.git/hooks/" },
+      "subject": {
+        "path": "(^|/)\\.git/hooks/"
+      },
       "why": "a git hook runs arbitrary code on the next commit"
     },
     {
       "id": "floor-git-hooks-edit",
       "action": "fs.edit",
-      "subject": { "path": "(^|/)\\.git/hooks/" },
+      "subject": {
+        "path": "(^|/)\\.git/hooks/"
+      },
       "why": "a git hook runs arbitrary code on the next commit"
     },
     {
       "id": "floor-git-hooks-redirect",
       "action": "shell.exec",
-      "subject": { "path": "(^|/)\\.git/hooks/" },
+      "subject": {
+        "path": "(^|/)\\.git/hooks/"
+      },
       "why": "a git hook runs arbitrary code on the next commit"
     },
     {
       "id": "floor-git-hooks-shell-write",
       "action": "shell.exec",
-      "subject": { "program": "tee|mv|cp|install|ln|rsync", "argv": "(^|/|\\s)\\.git/hooks/" },
+      "subject": {
+        "program": "tee|mv|cp|install|ln|rsync",
+        "argv": "(^|/|\\s)\\.git/hooks/"
+      },
       "why": "a git hook runs arbitrary code on the next commit"
     }
   ],
@@ -120,7 +142,11 @@
         "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*push\\b.*(?:--force|(?:^|\\s)-f\\b)"
       },
       "why": "force push is never recoverable",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-push-main-master",
@@ -131,23 +157,41 @@
         "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*push\\b(?=.*\\b(?:main|master)\\b)"
       },
       "why": "pushing to main/master by command pattern bypasses the PR workflow",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-no-verify",
       "effect": "forbid",
       "action": "shell.exec",
-      "subject": { "program": "git", "argv": "(?:^|\\s)--no-verify\\b" },
+      "subject": {
+        "program": "git",
+        "argv": "(?:^|\\s)--no-verify\\b"
+      },
       "why": "bypassing hooks is forbidden — fix the failure instead",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-hooks-path-override",
       "effect": "forbid",
       "action": "shell.exec",
-      "subject": { "program": "git", "argv": "(?:^|\\s)-c\\s+core\\.hooksPath=|(?:^|\\s)config\\b.*\\bcore\\.hooksPath\\b" },
+      "subject": {
+        "program": "git",
+        "argv": "(?:^|\\s)-c\\s+core\\.hooksPath=|(?:^|\\s)config\\b.*\\bcore\\.hooksPath\\b"
+      },
       "why": "pointing core.hooksPath elsewhere skips the repository's hooks",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-commit-dash-n",
@@ -158,7 +202,11 @@
         "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*commit\\b.*(?:^|\\s)-n\\b"
       },
       "why": "-n on git commit is short for --no-verify and skips hooks",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-reset-hard",
@@ -169,7 +217,11 @@
         "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*reset\\b.*(?:^|\\s)--hard\\b"
       },
       "why": "discards uncommitted work irrecoverably",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-clean-force",
@@ -180,7 +232,11 @@
         "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*clean\\b.*(?:^|\\s)(?:-[a-zA-Z]*f[a-zA-Z]*|--force)(?:\\s|$)"
       },
       "why": "deletes untracked files irrecoverably",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "git-checkout-dot",
@@ -191,31 +247,55 @@
         "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*checkout\\s+--\\s+\\.(?:\\s|$)"
       },
       "why": "discards all working-tree changes",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "lms-load",
       "effect": "forbid",
       "action": "shell.exec",
-      "subject": { "program": "lms", "argv": "^load\\b" },
+      "subject": {
+        "program": "lms",
+        "argv": "^load\\b"
+      },
       "why": "loading a second model would exhaust unified memory on this machine",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "mlx-vlm-serve",
       "effect": "forbid",
       "action": "shell.exec",
-      "subject": { "program": "mlx-vlm|mlx_vlm", "argv": "\\bserve(r)?\\b" },
+      "subject": {
+        "program": "mlx-vlm|mlx_vlm",
+        "argv": "\\bserve(r)?\\b"
+      },
       "why": "a second model server can exhaust memory and crash this machine",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "mlx-vlm-server-module",
       "effect": "forbid",
       "action": "shell.exec",
-      "subject": { "argv": "\\bmlx_vlm\\.server\\b" },
+      "subject": {
+        "argv": "\\bmlx_vlm\\.server\\b"
+      },
       "why": "a second model server can exhaust memory and crash this machine",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "rm-recursive-force",
@@ -226,15 +306,23 @@
         "argv": "(?=.*(?:^|\\s)(?:-[a-zA-Z]*r[a-zA-Z]*|--recursive)\\b)(?=.*(?:^|\\s)(?:-[a-zA-Z]*f[a-zA-Z]*|--force)\\b)"
       },
       "why": "recursive force delete",
-      "profiles": ["standard", "strict"]
+      "profiles": [
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "sudo",
       "effect": "ask",
       "action": "shell.exec",
-      "subject": { "program": "sudo|doas" },
+      "subject": {
+        "program": "sudo|doas"
+      },
       "why": "privilege escalation",
-      "profiles": ["standard", "strict"]
+      "profiles": [
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "kill-force",
@@ -245,15 +333,25 @@
         "argv": "(?:^|\\s)-(?:9|KILL|SIGKILL)\\b|(?:^|\\s)-s\\s+(?:9|KILL|SIGKILL)\\b"
       },
       "why": "force-killing processes",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "pkill",
       "effect": "ask",
       "action": "shell.exec",
-      "subject": { "program": "pkill" },
+      "subject": {
+        "program": "pkill"
+      },
       "why": "force-killing processes",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "curl-pipe-shell",
@@ -261,7 +359,25 @@
       "action": "shell.exec",
       "match": "\\b(?:curl|wget)\\b[^|]*\\|\\s*(?:ba|z|da)?sh\\b",
       "why": "piping a remote script straight to a shell",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "find-exec",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "find",
+        "argv": "(^|\\s)-(exec|execdir|ok|okdir|delete)(\\s|$)"
+      },
+      "why": "find runs a command per match (or deletes); the guard cannot see what each match becomes",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "chmod-777-recursive",
@@ -272,15 +388,26 @@
         "argv": "(?=.*(?:^|\\s)-[a-zA-Z]*R)(?=.*(?:^|\\s)777\\b)"
       },
       "why": "world-writable permissions",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     },
     {
       "id": "rm-lock-files",
       "effect": "ask",
       "action": "shell.exec",
-      "subject": { "program": "rm", "argv": "package-lock\\.json|\\.lock\\b" },
+      "subject": {
+        "program": "rm",
+        "argv": "package-lock\\.json|\\.lock\\b"
+      },
       "why": "deleting lock files to silence errors",
-      "profiles": ["minimal", "standard", "strict"]
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     }
   ]
 }
