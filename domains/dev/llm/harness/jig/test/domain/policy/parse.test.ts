@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parsePolicy } from "../../../src/domain/policy/parse";
 import type { Policy } from "../../../src/domain/policy/types";
 
-function v2(overrides: Record<string, unknown> = {}): Policy {
+function build(overrides: Record<string, unknown> = {}): Policy {
   const policy = parsePolicy({ version: 1, rules: [], ...overrides });
   if (policy.version !== 1) throw new Error("expected the guard policy");
   return policy;
@@ -20,9 +20,9 @@ function rule(overrides: Record<string, unknown> = {}): Record<string, unknown> 
   };
 }
 
-describe("parsePolicy v2", () => {
+describe("parsePolicy", () => {
   test("parses the documented shape", () => {
-    const policy = v2({
+    const policy = build({
       floor: [
         {
           id: "floor-rm-root",
@@ -53,7 +53,7 @@ describe("parsePolicy v2", () => {
   });
 
   test("mode defaults to denylist for every action", () => {
-    expect(Object.values(v2().mode)).toEqual([
+    expect(Object.values(build().mode)).toEqual([
       "denylist",
       "denylist",
       "denylist",
@@ -63,75 +63,87 @@ describe("parsePolicy v2", () => {
   });
 
   test("a forbid or ask must say why; a permit need not", () => {
-    expect(() => v2({ rules: [rule({ why: undefined })] })).toThrow(/must carry a "why"/);
-    expect(() => v2({ rules: [rule({ effect: "ask", why: undefined })] })).toThrow(
+    expect(() => build({ rules: [rule({ why: undefined })] })).toThrow(/must carry a "why"/);
+    expect(() => build({ rules: [rule({ effect: "ask", why: undefined })] })).toThrow(
       /must carry a "why"/,
     );
     expect(
-      v2({ rules: [rule({ effect: "permit", why: undefined })] }).rules[0]?.why,
+      build({ rules: [rule({ effect: "permit", why: undefined })] }).rules[0]?.why,
     ).toBeUndefined();
   });
 
   test("a rule needs a subject or a match", () => {
-    expect(() => v2({ rules: [rule({ subject: undefined })] })).toThrow(
+    expect(() => build({ rules: [rule({ subject: undefined })] })).toThrow(
       /needs a "subject" or a "match"/,
     );
     expect(
-      v2({ rules: [rule({ subject: undefined, match: "--force" })] }).rules[0]?.match,
+      build({ rules: [rule({ subject: undefined, match: "--force" })] }).rules[0]?.match,
     ).toBeInstanceOf(RegExp);
   });
 
   test("unknown effect, action, profile, mode, subject field are refused", () => {
-    expect(() => v2({ rules: [rule({ effect: "deny" })] })).toThrow(/unknown effect "deny"/);
-    expect(() => v2({ rules: [rule({ action: "shell" })] })).toThrow(/unknown action "shell"/);
-    expect(() => v2({ rules: [rule({ profiles: ["max"] })] })).toThrow(/unknown profile "max"/);
-    expect(() => v2({ mode: { shell: "open" } })).toThrow(/expected denylist or allowlist/);
-    expect(() => v2({ mode: { gui: "denylist" } })).toThrow(/unknown key "gui"/);
-    expect(() => v2({ rules: [rule({ subject: { command: "git" } })] })).toThrow(
+    expect(() => build({ rules: [rule({ effect: "deny" })] })).toThrow(/unknown effect "deny"/);
+    expect(() => build({ rules: [rule({ action: "shell" })] })).toThrow(/unknown action "shell"/);
+    expect(() => build({ rules: [rule({ profiles: ["max"] })] })).toThrow(/unknown profile "max"/);
+    expect(() => build({ mode: { shell: "open" } })).toThrow(/expected denylist or allowlist/);
+    expect(() => build({ mode: { gui: "denylist" } })).toThrow(/unknown key "gui"/);
+    expect(() => build({ rules: [rule({ subject: { command: "git" } })] })).toThrow(
       /unknown subject field "command"/,
     );
-    expect(() => v2({ rules: [rule({ subject: {} })] })).toThrow(/empty "subject"/);
+    expect(() => build({ rules: [rule({ subject: {} })] })).toThrow(/empty "subject"/);
   });
 
   test("regexes are compiled at parse time; a bad one is a parse error", () => {
-    expect(() => v2({ rules: [rule({ subject: { program: "git", argv: "(" } })] })).toThrow(
+    expect(() => build({ rules: [rule({ subject: { program: "git", argv: "(" } })] })).toThrow(
       /invalid "subject.argv" regex/,
     );
-    expect(() => v2({ rules: [rule({ subject: { program: "(" } })] })).toThrow(
+    expect(() => build({ rules: [rule({ subject: { program: "(" } })] })).toThrow(
       /invalid "subject.program" regex/,
     );
-    expect(() => v2({ rules: [rule({ match: "[" })] })).toThrow(/invalid "match" regex/);
+    expect(() => build({ rules: [rule({ match: "[" })] })).toThrow(/invalid "match" regex/);
   });
 
   test("principals is optional but must be a non-empty list of names when present", () => {
-    expect(v2({ rules: [rule({ principals: ["pi", "dsh"] })] }).rules[0]?.principals).toEqual([
+    expect(build({ rules: [rule({ principals: ["pi", "dsh"] })] }).rules[0]?.principals).toEqual([
       "pi",
       "dsh",
     ]);
-    expect(() => v2({ rules: [rule({ principals: [] })] })).toThrow(/principals/);
-    expect(() => v2({ rules: [rule({ principals: "pi" })] })).toThrow(/principals/);
+    expect(() => build({ rules: [rule({ principals: [] })] })).toThrow(/principals/);
+    expect(() => build({ rules: [rule({ principals: "pi" })] })).toThrow(/principals/);
   });
 
   test("a floor rule carries no effect, profiles or principals: it is forbid, everywhere", () => {
     const floor = { id: "f", action: "shell.exec", subject: { program: "mkfs" }, why: "no" };
-    expect(v2({ floor: [floor] }).floor[0]?.why).toBe("no");
-    expect(() => v2({ floor: [{ ...floor, effect: "forbid" }] })).toThrow(
+    expect(build({ floor: [floor] }).floor[0]?.why).toBe("no");
+    expect(() => build({ floor: [{ ...floor, effect: "forbid" }] })).toThrow(
       /must not carry "effect"/,
     );
-    expect(() => v2({ floor: [{ ...floor, profiles: ["strict"] }] })).toThrow(
+    expect(() => build({ floor: [{ ...floor, profiles: ["strict"] }] })).toThrow(
       /must not carry "profiles"/,
     );
-    expect(() => v2({ floor: [{ ...floor, why: undefined }] })).toThrow(
+    expect(() => build({ floor: [{ ...floor, why: undefined }] })).toThrow(
       /missing a non-empty string "why"/,
     );
   });
 
   test("ids are unique across floor and rules", () => {
     expect(() =>
-      v2({
+      build({
         floor: [{ id: "dup", action: "shell.exec", subject: { program: "mkfs" }, why: "no" }],
         rules: [rule({ id: "dup" })],
       }),
     ).toThrow(/duplicate rule id "dup"/);
+  });
+});
+
+describe("version tolerance during migration", () => {
+  test("version 2 is accepted as a deprecated alias, normalized to 1", () => {
+    const parsed = parsePolicy({ version: 2, rules: [rule()] });
+    expect(parsed.version).toBe(1);
+  });
+
+  test("an unsupported version is refused", () => {
+    expect(() => parsePolicy({ version: 3, rules: [] })).toThrow(/unsupported version/);
+    expect(() => parsePolicy({ rules: [] })).toThrow(/unsupported version/);
   });
 });

@@ -198,9 +198,18 @@ function parseMode(raw: unknown): Readonly<Record<Action, Mode>> {
   return mode;
 }
 
-/** Parse and strictly validate an already-`JSON.parse`d guard policy document. */
+/**
+ * Parse and strictly validate an already-`JSON.parse`d guard policy document.
+ *
+ * The one format jig has is version 1. Version 2 is accepted as a deprecated
+ * alias for the identical format: an earlier build mislabeled this format as
+ * "2", and a live file may still carry that number until it is changed to 1
+ * by hand (the policy is not agent-writable, so the number cannot be bumped
+ * from inside a session). Accepting both means the running guard never breaks
+ * on the transition; the file's own number is cosmetic.
+ */
 export function parsePolicy(json: Record<string, unknown>): Policy {
-  if (json.version !== 1) {
+  if (json.version !== 1 && json.version !== 2) {
     throw new Error(
       `guard policy: unsupported version ${JSON.stringify(json.version)} (expected 1)`,
     );
