@@ -453,6 +453,24 @@ const CASES: readonly Case[] = [
     expected: "ask",
   },
   {
+    label: "v2: find -exec asks (matches Claude Code and Gemini CLI); plain find is allowed",
+    call: shellCall("find . -name '*.log' -exec rm {} \\;"),
+    profile: "standard",
+    expected: { v1: "allow", v2: "ask" },
+  },
+  {
+    label: "v2: find -delete asks too",
+    call: shellCall("find . -name '*.log' -delete"),
+    profile: "standard",
+    expected: { v1: "allow", v2: "ask" },
+  },
+  {
+    label: "v2: find without -exec is allowed",
+    call: shellCall("find . -name '*.log'"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
     label: "v2: python -c is an ordinary program call in denylist mode",
     call: shellCall("python3 -c 'print(1)'"),
     profile: "standard",
