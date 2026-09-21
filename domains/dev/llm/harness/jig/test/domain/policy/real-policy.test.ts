@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type HookProfile, type ToolCall, judge } from "../../../src/domain/hooks/decision";
 import { parsePolicy } from "../../../src/domain/policy/parse";
+import { MCP_EDIT_TOOLS } from "../../../src/domain/policy/request";
 import type { Policy } from "../../../src/domain/policy/types";
 
 /**
@@ -52,6 +53,11 @@ function editCall(filePath: string): ToolCall {
 
 function readCall(filePath: string): ToolCall {
   return { tool: "Read", input: { file_path: filePath } };
+}
+
+/** An MCP tool call carrying serena's `relative_path` field. */
+function mcpCall(tool: string, relativePath: string): ToolCall {
+  return { tool, input: { relative_path: relativePath } };
 }
 
 describe("the real guard-rules.json", () => {
@@ -625,6 +631,34 @@ const CASES: readonly Case[] = [
     profile: "standard",
     expected: "allow",
   },
+
+  // --- MCP-driven edits get the fs.edit rules: serena's write tools route to
+  //     fs.edit (via relative_path), so they can't slip a guarded path past
+  //     the floor the way a raw mcp.call would ---
+  {
+    label: "serena replace_content on the guard policy is on the floor (bypass closed)",
+    call: mcpCall("mcp__serena__replace_content", "domains/dev/llm/harness/policy/guard-rules.json"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "serena replace_symbol_body on a repo .env asks",
+    call: mcpCall("mcp__serena__replace_symbol_body", "packages/api/.env"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "serena editing an ordinary source file is allowed (no friction)",
+    call: mcpCall("mcp__serena__replace_content", "domains/dev/llm/harness/jig/src/foo.ts"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "a serena READ tool is not routed to fs.edit (stays an ungated mcp.call)",
+    call: mcpCall("mcp__serena__find_symbol", "domains/dev/llm/harness/policy/guard-rules.json"),
+    profile: "standard",
+    expected: "allow",
+  },
 ];
 
 describe("the real guard-rules.json — every rule, at least once", () => {
@@ -634,4 +668,46 @@ describe("the real guard-rules.json — every rule, at least once", () => {
       expect(decide(policy, call, profile)).toBe(expected);
     });
   }
+});
+
+// Routing an MCP edit tool to fs.edit (request.ts) only protects if Claude
+// Code actually fires jig's hook for that tool. That gate is a matcher in the
+// shipped settings.personal.json, a second place that must list every routed
+// tool. If the two drift, the hole reopens with no other test failing — so
+// pin them together here, reading the real file so the assertion can't go
+// stale against it.
+describe("[yoki-fixture] Claude Code PreToolUse matcher covers every routed MCP edit tool", () => {
+  test("settings.personal.json fires jig for each MCP_EDIT_TOOLS tool", () => {
+    const settingsPath = join(
+      import.meta.dir,
+      "..",
+      "..",
+      "..",
+      "..",
+      "..",
+      "..",
+      "config",
+      "claude-profiles",
+      "personal",
+      "settings.personal.json",
+    );
+    let raw: string;
+    try {
+      raw = readFileSync(settingsPath, "utf8");
+    } catch {
+      return; // fixture unreachable from this checkout layout — skip, don't fail closed
+    }
+    const settings = JSON.parse(raw) as {
+      hooks?: { PreToolUse?: { matcher?: string; hooks?: { command?: string }[] }[] };
+    };
+    const groups = settings.hooks?.PreToolUse ?? [];
+    const jigGroup = groups.find((g) =>
+      (g.hooks ?? []).some((h) => (h.command ?? "").includes("hooks pre-tool-use")),
+    );
+    expect(jigGroup).toBeDefined();
+    const matcher = new RegExp(jigGroup?.matcher ?? "(?!)");
+    for (const tool of MCP_EDIT_TOOLS) {
+      expect(matcher.test(tool)).toBe(true);
+    }
+  });
 });

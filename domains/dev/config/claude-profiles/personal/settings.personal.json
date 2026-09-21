@@ -54,7 +54,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Write|Edit|MultiEdit|WebFetch",
+        "matcher": "Bash|Write|Edit|MultiEdit|WebFetch|mcp__serena__(replace_symbol_body|insert_after_symbol|insert_before_symbol|replace_content|safe_delete_symbol)",
         "hooks": [
           {
             "type": "command",

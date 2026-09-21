@@ -56,6 +56,24 @@ const EDIT_TOOLS = new Set([
 ]);
 const FETCH_TOOLS = new Set(["WebFetch", "web_fetch", "fetch"]);
 
+/**
+ * MCP file-editing tools routed to fs.edit so the fs.edit rules (the floor,
+ * the credential/secret ask) govern MCP-driven edits too. Without this a
+ * serena `replace_content` writes a guarded path — a shell rc, a repo secret,
+ * the guard policy itself — straight past the fs rules, because it arrives as
+ * an mcp.call the policy can only match by tool NAME (no argument access), so
+ * the path it targets is invisible. An injected "use serena to write ~/.zshrc"
+ * would otherwise slip the shell-rc floor. All five carry the target file as
+ * `relative_path`.
+ */
+export const MCP_EDIT_TOOLS = new Set([
+  "mcp__serena__replace_symbol_body",
+  "mcp__serena__insert_after_symbol",
+  "mcp__serena__insert_before_symbol",
+  "mcp__serena__replace_content",
+  "mcp__serena__safe_delete_symbol",
+]);
+
 function stringField(
   input: Readonly<Record<string, unknown>>,
   ...keys: string[]
@@ -93,6 +111,7 @@ export function actionOf(tool: string): Action | undefined {
   if (WRITE_TOOLS.has(tool)) return "fs.write";
   if (EDIT_TOOLS.has(tool)) return "fs.edit";
   if (FETCH_TOOLS.has(tool)) return "net.fetch";
+  if (MCP_EDIT_TOOLS.has(tool)) return "fs.edit";
   if (tool.startsWith("mcp__")) return "mcp.call";
   return undefined;
 }
@@ -110,7 +129,8 @@ export function requestFor(call: ToolCall): Request | undefined {
       return shellRequest(call.input);
     case "fs.write":
     case "fs.edit": {
-      const path = stringField(call.input, "file_path", "path");
+      // `relative_path` is serena's field for the MCP edit tools routed here.
+      const path = stringField(call.input, "file_path", "path", "relative_path");
       return path === undefined ? undefined : { action, path };
     }
     case "net.fetch": {
