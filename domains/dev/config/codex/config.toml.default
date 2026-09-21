@@ -16,6 +16,19 @@ hide_agent_reasoning = true
 network_access = true
 model = "gpt-5-codex"
 
+# Stage-1 native sandbox (design-v2 §5, D-19). The shell tool runs under
+# Seatbelt with write confined to the workspace; codex's own model calls (the
+# LiteLLM proxy) are outside this boundary, so they are unaffected. Network
+# for the shell is off by default — a shell command that needs the network is
+# denied rather than allowed silently. codex forbids `sandbox_mode` together
+# with `default_permissions`, so this replaces yoki's `[permissions.yoki]`
+# block: the same denies (~/.aws, ~/.ssh, ...) are enforced by jig's
+# registered hook and its v2 policy, so protection moves to jig, not away.
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = false
+
 [tools]
 web_search = true
 
