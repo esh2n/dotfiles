@@ -13,17 +13,15 @@
  *
  * The rules themselves live in the data file
  * `domains/dev/llm/harness/policy/guard-rules.json`, parsed by
- * `domain/policy/parse.ts`. A v1 document is matched by
- * `domain/policy/evaluate.ts` (regex over the raw string); a v2 document by
- * `domain/policy/v2/evaluate.ts` (structured subject, floor, mode).
+ * `domain/policy/parse.ts` and matched by `domain/policy/evaluate.ts`
+ * (structured subject, floor, mode).
  */
 
 import { applyPatchText, fanOut } from "../policy/apply-patch";
-import { evaluate } from "../policy/evaluate";
+import { evaluatePolicy } from "../policy/evaluate";
 import type { Judgment } from "../policy/judgment";
 import { type Principal, requestFor } from "../policy/request";
 import type { Policy } from "../policy/types";
-import { judgeV2 } from "../policy/v2/evaluate";
 
 export type HookProfile = "minimal" | "standard" | "strict";
 
@@ -40,13 +38,9 @@ export interface ToolCall {
 const RANK: Readonly<Record<Decision["kind"], number>> = { allow: 0, ask: 1, deny: 2 };
 
 function judgeOne(call: ToolCall, principal: Principal, policy: Policy): Judgment {
-  if (policy.version === 1) {
-    const decision = evaluate(policy.rules, call, principal.profile);
-    return { decision, source: decision.kind === "allow" ? "none" : "rule" };
-  }
   const request = requestFor(call);
   if (request === undefined) return { decision: { kind: "allow" }, source: "out-of-scope" };
-  return judgeV2(policy, request, principal);
+  return evaluatePolicy(policy, request, principal);
 }
 
 /**

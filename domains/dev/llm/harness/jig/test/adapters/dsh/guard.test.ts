@@ -12,7 +12,7 @@ import {
 import type { AuditEntry } from "../../../src/domain/policy/audit";
 
 const POLICY = {
-  version: 2,
+  version: 1,
   floor: [
     {
       id: "floor-git-hooks-write",

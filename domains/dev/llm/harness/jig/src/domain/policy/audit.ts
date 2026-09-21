@@ -25,7 +25,7 @@ export interface AuditEntry {
   readonly reason?: string;
   readonly rule?: string;
   readonly source: Judgment["source"];
-  readonly policy: { readonly version: 1 | 2; readonly hash: string };
+  readonly policy: { readonly version: 1; readonly hash: string };
   readonly extraction?: { readonly kind: string; readonly detail?: string };
 }
 
@@ -33,7 +33,7 @@ export interface AuditContext {
   readonly ts: string;
   readonly principal: Principal;
   readonly tool: string;
-  readonly policy: { readonly version: 1 | 2; readonly hash: string };
+  readonly policy: { readonly version: 1; readonly hash: string };
 }
 
 /** Build the line for one judgment. Pure. */

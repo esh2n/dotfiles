@@ -44,7 +44,7 @@ describe("apply_patch fan-out", () => {
 
 describe("judge on apply_patch", () => {
   const policy = parsePolicy({
-    version: 2,
+    version: 1,
     floor: [
       {
         id: "floor-git-hooks",

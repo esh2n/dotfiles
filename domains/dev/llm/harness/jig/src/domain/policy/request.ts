@@ -11,7 +11,7 @@
 
 import type { HookProfile, ToolCall } from "../hooks/decision";
 import { type Extraction, fromArgv, fromString } from "../subject";
-import type { Action } from "./v2/types";
+import type { Action } from "./types";
 
 /** Who is asking. Stamped by the adapter; no harness sends it on its own. */
 export interface Principal {

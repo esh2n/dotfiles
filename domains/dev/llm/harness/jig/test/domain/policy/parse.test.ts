@@ -1,138 +1,137 @@
-/**
- * Strict validation for the shared guard policy document. Cases tagged
- * [policy-verified] pin the schema described in the Phase 1 guard-policy
- * unification spec: `version` must be 1, every rule needs id/tier/tools/
- * match/why/profiles, tier is "deny"|"confirm", tools are drawn from
- * "shell"|"write"|"edit", profiles from "minimal"|"standard"|"strict", and
- * an invalid regex in `match` is a parse-time error, not an evaluate-time
- * surprise.
- */
-
 import { describe, expect, test } from "bun:test";
-import { parsePolicy as parseAny } from "../../../src/domain/policy/parse";
-import type { GuardPolicy } from "../../../src/domain/policy/types";
+import { parsePolicy } from "../../../src/domain/policy/parse";
+import type { Policy } from "../../../src/domain/policy/types";
 
-/** The v1 view: these cases pin the v1 schema, so a v2 result would be a test bug. */
-function parsePolicy(json: unknown): GuardPolicy {
-  const policy = parseAny(json);
-  if (policy.version !== 1) throw new Error(`expected a v1 policy, got version ${policy.version}`);
+function v2(overrides: Record<string, unknown> = {}): Policy {
+  const policy = parsePolicy({ version: 1, rules: [], ...overrides });
+  if (policy.version !== 1) throw new Error("expected the guard policy");
   return policy;
 }
 
-function validRule(overrides: Record<string, unknown> = {}) {
+function rule(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    id: "git-force-push",
-    tier: "deny",
-    tools: ["shell"],
-    match: "\\bgit\\s+push\\b.*--force",
-    why: "force push is never recoverable",
-    profiles: ["minimal", "standard", "strict"],
+    id: "deny-force-push",
+    effect: "forbid",
+    action: "shell.exec",
+    subject: { program: "git", argv: "^push\\b.*--force" },
+    why: "force push is not recoverable",
+    profiles: ["standard", "strict"],
     ...overrides,
   };
 }
 
-describe("parsePolicy", () => {
-  test("[policy-verified] parses a well-formed policy", () => {
-    const policy = parsePolicy({ version: 1, rules: [validRule()] });
-    expect(policy.version).toBe(1);
-    expect(policy.rules).toHaveLength(1);
-    expect(policy.rules[0]?.id).toBe("git-force-push");
-    expect(policy.rules[0]?.tier).toBe("deny");
-    expect(policy.rules[0]?.tools).toEqual(["shell"]);
-    expect(policy.rules[0]?.why).toBe("force push is never recoverable");
-    expect(policy.rules[0]?.profiles).toEqual(["minimal", "standard", "strict"]);
-  });
-
-  test("[policy-verified] compiles match into a real RegExp", () => {
-    const policy = parsePolicy({ version: 1, rules: [validRule()] });
-    expect(policy.rules[0]?.match).toBeInstanceOf(RegExp);
-    expect(policy.rules[0]?.match.test("git push --force origin main")).toBe(true);
-    expect(policy.rules[0]?.match.test("git status")).toBe(false);
-  });
-
-  test("[policy-verified] an empty rules array is valid", () => {
-    const policy = parsePolicy({ version: 1, rules: [] });
-    expect(policy.rules).toEqual([]);
-  });
-
-  test("[policy-verified] a confirm-tier, single-profile rule parses", () => {
-    const policy = parsePolicy({
-      version: 1,
+describe("parsePolicy v2", () => {
+  test("parses the documented shape", () => {
+    const policy = v2({
+      floor: [
+        {
+          id: "floor-rm-root",
+          action: "shell.exec",
+          subject: { program: "rm", argv: "(^|\\s)-[a-zA-Z]*r[a-zA-Z]*f?\\s+/(\\s|$)" },
+          why: "recursive delete of /",
+        },
+      ],
+      mode: { shell: "denylist", fs: "allowlist" },
       rules: [
-        validRule({ id: "sudo", tier: "confirm", match: "\\bsudo\\b", profiles: ["strict"] }),
+        rule(),
+        rule({ id: "permit-ls", effect: "permit", subject: { program: "ls" }, why: undefined }),
       ],
     });
-    expect(policy.rules[0]?.tier).toBe("confirm");
-    expect(policy.rules[0]?.profiles).toEqual(["strict"]);
+    expect(policy.floor).toHaveLength(1);
+    expect(policy.floor[0]?.id).toBe("floor-rm-root");
+    expect(policy.mode).toEqual({
+      "shell.exec": "denylist",
+      "fs.write": "allowlist",
+      "fs.edit": "allowlist",
+      "net.fetch": "denylist",
+      "mcp.call": "denylist",
+    });
+    expect(policy.rules).toHaveLength(2);
+    expect(policy.rules[0]?.subject?.argv).toBeInstanceOf(RegExp);
+    expect(policy.rules[0]?.subject?.program?.source).toBe("^(?:git)$");
+    expect(policy.rules[1]?.effect).toBe("permit");
   });
 
-  test("[policy-verified] top level must be an object", () => {
-    expect(() => parsePolicy(null)).toThrow(/expected a JSON object/);
-    expect(() => parsePolicy([])).toThrow(/expected a JSON object/);
-    expect(() => parsePolicy("nope")).toThrow(/expected a JSON object/);
+  test("mode defaults to denylist for every action", () => {
+    expect(Object.values(v2().mode)).toEqual([
+      "denylist",
+      "denylist",
+      "denylist",
+      "denylist",
+      "denylist",
+    ]);
   });
 
-  test("[policy-verified] version must be 1 (2 is the v2 parser's; anything else is refused)", () => {
-    expect(parseAny({ version: 2, rules: [] }).version).toBe(2);
-    expect(() => parsePolicy({ version: 3, rules: [] })).toThrow(/unsupported version/);
-    expect(() => parsePolicy({ version: "1", rules: [] })).toThrow(/unsupported version/);
-    expect(() => parsePolicy({ rules: [] })).toThrow(/unsupported version/);
+  test("a forbid or ask must say why; a permit need not", () => {
+    expect(() => v2({ rules: [rule({ why: undefined })] })).toThrow(/must carry a "why"/);
+    expect(() => v2({ rules: [rule({ effect: "ask", why: undefined })] })).toThrow(
+      /must carry a "why"/,
+    );
+    expect(
+      v2({ rules: [rule({ effect: "permit", why: undefined })] }).rules[0]?.why,
+    ).toBeUndefined();
   });
 
-  test('[policy-verified] "rules" must be an array', () => {
-    expect(() => parsePolicy({ version: 1, rules: "nope" })).toThrow(/"rules" must be an array/);
-    expect(() => parsePolicy({ version: 1 })).toThrow(/"rules" must be an array/);
+  test("a rule needs a subject or a match", () => {
+    expect(() => v2({ rules: [rule({ subject: undefined })] })).toThrow(
+      /needs a "subject" or a "match"/,
+    );
+    expect(
+      v2({ rules: [rule({ subject: undefined, match: "--force" })] }).rules[0]?.match,
+    ).toBeInstanceOf(RegExp);
   });
 
-  test("[policy-verified] a rule must be an object", () => {
-    expect(() => parsePolicy({ version: 1, rules: ["nope"] })).toThrow(
-      /rules\[0\] must be an object/,
+  test("unknown effect, action, profile, mode, subject field are refused", () => {
+    expect(() => v2({ rules: [rule({ effect: "deny" })] })).toThrow(/unknown effect "deny"/);
+    expect(() => v2({ rules: [rule({ action: "shell" })] })).toThrow(/unknown action "shell"/);
+    expect(() => v2({ rules: [rule({ profiles: ["max"] })] })).toThrow(/unknown profile "max"/);
+    expect(() => v2({ mode: { shell: "open" } })).toThrow(/expected denylist or allowlist/);
+    expect(() => v2({ mode: { gui: "denylist" } })).toThrow(/unknown key "gui"/);
+    expect(() => v2({ rules: [rule({ subject: { command: "git" } })] })).toThrow(
+      /unknown subject field "command"/,
+    );
+    expect(() => v2({ rules: [rule({ subject: {} })] })).toThrow(/empty "subject"/);
+  });
+
+  test("regexes are compiled at parse time; a bad one is a parse error", () => {
+    expect(() => v2({ rules: [rule({ subject: { program: "git", argv: "(" } })] })).toThrow(
+      /invalid "subject.argv" regex/,
+    );
+    expect(() => v2({ rules: [rule({ subject: { program: "(" } })] })).toThrow(
+      /invalid "subject.program" regex/,
+    );
+    expect(() => v2({ rules: [rule({ match: "[" })] })).toThrow(/invalid "match" regex/);
+  });
+
+  test("principals is optional but must be a non-empty list of names when present", () => {
+    expect(v2({ rules: [rule({ principals: ["pi", "dsh"] })] }).rules[0]?.principals).toEqual([
+      "pi",
+      "dsh",
+    ]);
+    expect(() => v2({ rules: [rule({ principals: [] })] })).toThrow(/principals/);
+    expect(() => v2({ rules: [rule({ principals: "pi" })] })).toThrow(/principals/);
+  });
+
+  test("a floor rule carries no effect, profiles or principals: it is forbid, everywhere", () => {
+    const floor = { id: "f", action: "shell.exec", subject: { program: "mkfs" }, why: "no" };
+    expect(v2({ floor: [floor] }).floor[0]?.why).toBe("no");
+    expect(() => v2({ floor: [{ ...floor, effect: "forbid" }] })).toThrow(
+      /must not carry "effect"/,
+    );
+    expect(() => v2({ floor: [{ ...floor, profiles: ["strict"] }] })).toThrow(
+      /must not carry "profiles"/,
+    );
+    expect(() => v2({ floor: [{ ...floor, why: undefined }] })).toThrow(
+      /missing a non-empty string "why"/,
     );
   });
 
-  test("[policy-verified] a rule needs a non-empty string id", () => {
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ id: "" })] })).toThrow(/"id"/);
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ id: undefined })] })).toThrow(
-      /"id"/,
-    );
-  });
-
-  test("[policy-verified] an unknown tier throws, naming the rule", () => {
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ tier: "warn" })] })).toThrow(
-      /rule "git-force-push" has unknown tier "warn"/,
-    );
-  });
-
-  test("[policy-verified] tools must be a non-empty array of known tools", () => {
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ tools: [] })] })).toThrow(
-      /non-empty "tools" array/,
-    );
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ tools: ["network"] })] })).toThrow(
-      /unknown tool "network"/,
-    );
-  });
-
-  test("[policy-verified] match must be a non-empty string", () => {
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ match: "" })] })).toThrow(/"match"/);
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ match: 42 })] })).toThrow(/"match"/);
-  });
-
-  test("[policy-verified] an invalid match regex is a parse error", () => {
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ match: "(unclosed" })] })).toThrow(
-      /invalid "match" regex/,
-    );
-  });
-
-  test("[policy-verified] why must be a non-empty string", () => {
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ why: "" })] })).toThrow(/"why"/);
-  });
-
-  test("[policy-verified] profiles must be a non-empty array of known profiles", () => {
-    expect(() => parsePolicy({ version: 1, rules: [validRule({ profiles: [] })] })).toThrow(
-      /non-empty "profiles" array/,
-    );
+  test("ids are unique across floor and rules", () => {
     expect(() =>
-      parsePolicy({ version: 1, rules: [validRule({ profiles: ["relaxed"] })] }),
-    ).toThrow(/unknown profile "relaxed"/);
+      v2({
+        floor: [{ id: "dup", action: "shell.exec", subject: { program: "mkfs" }, why: "no" }],
+        rules: [rule({ id: "dup" })],
+      }),
+    ).toThrow(/duplicate rule id "dup"/);
   });
 });

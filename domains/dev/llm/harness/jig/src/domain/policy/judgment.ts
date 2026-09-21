@@ -6,7 +6,7 @@
  */
 
 import type { Decision } from "../hooks/decision";
-import type { Action } from "./v2/types";
+import type { Action } from "./types";
 
 export type JudgmentSource =
   /** A floor rule: forbid regardless of profile, principal or mode. */

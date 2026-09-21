@@ -11,7 +11,7 @@ const entry = (decision: AuditEntry["decision"]): AuditEntry => ({
   tool: "Bash",
   decision,
   source: decision === "allow" ? "none" : "rule",
-  policy: { version: 2, hash: "abcdef012345" },
+  policy: { version: 1, hash: "abcdef012345" },
 });
 
 describe("JsonlAuditLog", () => {

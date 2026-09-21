@@ -29,9 +29,9 @@ const POLICY_TEXT = JSON.stringify({
   rules: [
     {
       id: "git-force-push",
-      tier: "deny",
-      tools: ["shell"],
-      match: "\\bgit\\s+push\\b[^|;&]*(--force|\\s-f\\b)",
+      effect: "forbid",
+      action: "shell.exec",
+      subject: { program: "git", argv: "push\\b.*(--force|(^|\\s)-f\\b)" },
       why: "force push is never allowed",
       profiles: ["minimal", "standard", "strict"],
     },

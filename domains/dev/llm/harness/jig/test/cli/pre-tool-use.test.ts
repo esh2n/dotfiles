@@ -22,25 +22,25 @@ const VALID_POLICY = {
   rules: [
     {
       id: "git-force-push",
-      tier: "deny",
-      tools: ["shell"],
-      match: "\\bgit\\s+push\\b[^|;&]*(--force|\\s-f\\b)",
+      effect: "forbid",
+      action: "shell.exec",
+      subject: { program: "git", argv: "push\\b.*(--force|(^|\\s)-f\\b)" },
       why: "force push is never allowed",
       profiles: ["minimal", "standard", "strict"],
     },
     {
       id: "rm-recursive-force",
-      tier: "confirm",
-      tools: ["shell"],
-      match: "\\brm\\s+-rf\\b",
+      effect: "ask",
+      action: "shell.exec",
+      subject: { program: "rm", argv: "(^|\\s)-[a-zA-Z]*(r[a-zA-Z]*f|f[a-zA-Z]*r)\\b" },
       why: "rm -rf requires confirmation",
       profiles: ["standard", "strict"],
     },
     {
       id: "sudo",
-      tier: "confirm",
-      tools: ["shell"],
-      match: "\\bsudo\\b",
+      effect: "ask",
+      action: "shell.exec",
+      subject: { program: "sudo" },
       why: "sudo requires confirmation",
       profiles: ["strict"],
     },
@@ -200,7 +200,7 @@ describe("preToolUse", () => {
 
 describe("preToolUse with a v2 policy", () => {
   const V2_POLICY = {
-    version: 2,
+    version: 1,
     floor: [
       {
         id: "floor-mkfs",
@@ -316,7 +316,7 @@ describe("preToolUse with a v2 policy", () => {
       extraction: { kind: "resolved" },
     });
     const policy = (entries[0] as { policy: { version: number; hash: string } }).policy;
-    expect(policy.version).toBe(2);
+    expect(policy.version).toBe(1);
     expect(policy.hash).toMatch(/^[0-9a-f]{12}$/);
   });
 });
@@ -350,7 +350,7 @@ describe("preToolUse for codex", () => {
 
   test("apply_patch is judged per file", async () => {
     process.env.JIG_POLICY_FILE = writePolicy({
-      version: 2,
+      version: 1,
       floor: [
         { id: "f", action: "fs.write", subject: { path: "(^|/)\\.git/hooks/" }, why: "git hooks" },
       ],

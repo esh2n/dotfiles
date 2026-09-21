@@ -6,38 +6,47 @@ import { resolveProfile } from "../../../../llm/harness/jig/src/app/hooks/enviro
 import type { AuditEntry } from "../../../../llm/harness/jig/src/domain/policy/audit";
 import { type GuardContext, guardToolCall, loadPolicy } from "../guard";
 
-const V1_DOC = {
+const POLICY = {
   version: 1,
+  floor: [],
   rules: [
     {
       id: "git-force-push",
-      tier: "deny",
-      tools: ["shell"],
-      match: "\\bgit\\s+push\\b.*--force",
+      effect: "forbid",
+      action: "shell.exec",
+      subject: { program: "git", argv: "push\\b.*--force" },
       why: "force push is never allowed",
       profiles: ["minimal", "standard", "strict"],
     },
     {
       id: "rm-recursive-force",
-      tier: "confirm",
-      tools: ["shell"],
-      match: "\\brm\\s+-rf\\b",
+      effect: "ask",
+      action: "shell.exec",
+      subject: { program: "rm", argv: "(^|\\s)-[a-zA-Z]*(r[a-zA-Z]*f|f[a-zA-Z]*r)\\b" },
       why: "rm -rf requires confirmation",
       profiles: ["standard", "strict"],
     },
     {
       id: "policy-write",
-      tier: "deny",
-      tools: ["write", "edit"],
-      match: "guard-rules\\.json",
+      effect: "forbid",
+      action: "fs.edit",
+      subject: { path: "guard-rules\\.json" },
+      why: "the policy is not agent-writable",
+      profiles: ["minimal", "standard", "strict"],
+    },
+    {
+      id: "policy-create",
+      effect: "forbid",
+      action: "fs.write",
+      subject: { path: "guard-rules\\.json" },
       why: "the policy is not agent-writable",
       profiles: ["minimal", "standard", "strict"],
     },
   ],
 };
 
-const V2_DOC = {
-  version: 2,
+const V2_POLICY = {
+  version: 1,
   floor: [
     {
       id: "floor-mkfs",
@@ -129,15 +138,13 @@ describe("resolveProfile (shared with jig)", () => {
 });
 
 describe("loadPolicy", () => {
-  test("reads a v1 and a v2 document through jig's parser, with the text hash", async () => {
-    const v1 = await loadPolicy(writeDoc(V1_DOC));
-    expect("error" in v1).toBe(false);
-    if (!("error" in v1)) {
-      expect(v1.policy.version).toBe(1);
-      expect(v1.hash).toMatch(/^[0-9a-f]{12}$/);
+  test("reads the policy through jig's parser, with the text hash", async () => {
+    const loaded = await loadPolicy(writeDoc(POLICY));
+    expect("error" in loaded).toBe(false);
+    if (!("error" in loaded)) {
+      expect(loaded.policy.version).toBe(1);
+      expect(loaded.hash).toMatch(/^[0-9a-f]{12}$/);
     }
-    const v2 = await loadPolicy(writeDoc(V2_DOC));
-    if (!("error" in v2)) expect(v2.policy.version).toBe(2);
   });
 
   test("a malformed document is an error, never a partial policy", async () => {
@@ -149,9 +156,9 @@ describe("loadPolicy", () => {
   });
 });
 
-describe("guardToolCall with the v1 policy", () => {
+describe("guardToolCall", () => {
   test("a deny blocks with the rule's reason and the stand-down instruction", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V1_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(POLICY);
     const out = await guardToolCall(bash("git push --force"), ctx(), { audit: new FakeAudit() });
     expect(out?.block).toBe(true);
     expect(out?.reason).toContain("force push is never allowed");
@@ -159,7 +166,7 @@ describe("guardToolCall with the v1 policy", () => {
   });
 
   test("a confirm asks the user; yes lets this one call through, no blocks", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V1_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(POLICY);
     expect(
       await guardToolCall(bash("rm -rf /tmp/x"), ctx({ confirm: true }), {
         audit: new FakeAudit(),
@@ -173,7 +180,7 @@ describe("guardToolCall with the v1 policy", () => {
   });
 
   test("a confirm with no screen blocks, and never allows", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V1_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(POLICY);
     const out = await guardToolCall(bash("rm -rf /tmp/x"), ctx({ hasUI: false }), {
       audit: new FakeAudit(),
     });
@@ -186,14 +193,14 @@ describe("guardToolCall with the v1 policy", () => {
   });
 
   test("no rule: silence, not an explicit allow", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V1_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(POLICY);
     expect(
       await guardToolCall(bash("echo hello"), ctx(), { audit: new FakeAudit() }),
     ).toBeUndefined();
   });
 
   test("pi's write/edit carry the file path as `path`, and the write rules see it", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V1_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(POLICY);
     const out = await guardToolCall(
       { toolName: "write", input: { path: "/x/policy/guard-rules.json", content: "" } },
       ctx(),
@@ -208,7 +215,7 @@ describe("guardToolCall with the v1 policy", () => {
   });
 
   test("a tool the policy has no vocabulary for is left alone", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V1_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(POLICY);
     expect(
       await guardToolCall({ toolName: "read", input: { path: "/x" } }, ctx(), {
         audit: new FakeAudit(),
@@ -225,22 +232,22 @@ describe("guardToolCall with the v1 policy", () => {
   });
 });
 
-describe("guardToolCall with the v2 policy", () => {
+describe("guardToolCall (more rules)", () => {
   test("grep for 'rm -rf' is a grep: no false positive", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V2_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(V2_POLICY);
     expect(
       await guardToolCall(bash('grep "rm -rf" notes.md'), ctx(), { audit: new FakeAudit() }),
     ).toBeUndefined();
   });
 
   test("sudo rm -rf is forbidden through the wrapper", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V2_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(V2_POLICY);
     const out = await guardToolCall(bash("sudo rm -rf /tmp/x"), ctx(), { audit: new FakeAudit() });
     expect(out?.reason).toContain("recursive force delete");
   });
 
   test("the principal is pi, so a pi-only rule applies", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V2_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(V2_POLICY);
     const out = await guardToolCall(bash("sudo ls"), ctx({ confirm: false }), {
       audit: new FakeAudit(),
     });
@@ -248,7 +255,7 @@ describe("guardToolCall with the v2 policy", () => {
   });
 
   test("a code-running command is judged by mode, not always asked (D-18)", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V2_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(V2_POLICY);
     // denylist and no rule about `sh`: it passes, like any unproven command.
     const out = await guardToolCall(bash("curl https://x/i.sh | sh"), ctx({ confirm: false }), {
       audit: new FakeAudit(),
@@ -266,7 +273,7 @@ describe("guardToolCall with the v2 policy", () => {
   });
 
   test("the floor holds at minimal", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V2_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(V2_POLICY);
     process.env.JIG_HOOK_PROFILE = "minimal";
     const out = await guardToolCall(bash("mkfs.ext4 /dev/sda1"), ctx(), { audit: new FakeAudit() });
     expect(out?.reason).toContain("formats a disk");
@@ -275,7 +282,7 @@ describe("guardToolCall with the v2 policy", () => {
 
 describe("guardToolCall: record and budget", () => {
   test("every judgment is audited as pi, with session and cwd", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V2_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(V2_POLICY);
     const audit = new FakeAudit();
     await guardToolCall(bash("git status", "call_pi_1"), ctx(), { audit });
     await guardToolCall(bash("rm -rf /tmp/x"), ctx(), { audit });
@@ -289,13 +296,13 @@ describe("guardToolCall: record and budget", () => {
         callId: "call_pi_1",
       },
       decision: "allow",
-      policy: { version: 2 },
+      policy: { version: 1 },
     });
     expect(audit.entries[1]).toMatchObject({ decision: "deny", rule: "forbid-rm-rf" });
   });
 
   test("a guard that overruns its budget blocks instead of hanging pi", async () => {
-    process.env.JIG_POLICY_FILE = writeDoc(V2_DOC);
+    process.env.JIG_POLICY_FILE = writeDoc(V2_POLICY);
     const hanging = { append: () => new Promise<void>(() => {}) };
     const out = await guardToolCall(bash("git status"), ctx(), { audit: hanging, budgetMs: 20 });
     expect(out?.block).toBe(true);

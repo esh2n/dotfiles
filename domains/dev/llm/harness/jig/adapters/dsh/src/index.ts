@@ -43,6 +43,8 @@ import { JsonlAuditLog } from "../../../src/infra/audit/jsonl-audit";
 
 /** `ToolExecution` from @deepseek-ai/dsh-tools, the fields read here. */
 export interface DshToolExecution {
+  /** dsh's per-call id (ToolExecution.callId); stamped on the audit line. */
+  readonly callId?: string;
   readonly name: string;
   readonly arguments: unknown;
   readonly agent?: {
@@ -134,6 +136,7 @@ function principalOf(exec: DshToolExecution, env: NodeJS.ProcessEnv): Principal 
   return {
     harness: "dsh",
     profile: resolveProfile(env),
+    ...(exec.callId === undefined ? {} : { callId: exec.callId }),
     ...(header?.id === undefined ? {} : { sessionId: header.id }),
     ...(header?.cwd === undefined ? {} : { cwd: header.cwd }),
     ...(meta?.origin === "subagent" && meta.parentSession !== undefined

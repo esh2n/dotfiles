@@ -1,45 +1,79 @@
 /**
- * Types for the shared guard policy — `domains/dev/llm/harness/policy/guard-rules.json`,
- * the single source of command-pattern guard rules consumed by jig's own
- * PreToolUse hook and, outside this repo, by pi's `extensions/guard.ts`
- * loader. JSON (not YAML) on purpose: both consumers parse it with zero
- * dependencies, under Bun and under Node.
+ * The guard policy: rules written as "who, what operation, on what" instead of a
+ * regex over a raw string.
  *
- * Only pattern-expressible rules live here. Contextual guards — real branch
- * detection, the PR preflight gate, git identity checks — stay in
- * `domains/dev/config/claude-profiles/personal/hooks/git-guard.sh` and are
- * out of scope for this policy.
+ * The shape follows Cedar's principal / action / resource: an `effect`
+ * (forbid beats ask beats permit), an `action` (the operation family, one
+ * vocabulary for every harness), a structured `subject` matched against
+ * what subject extraction proved or suspected, and optional `principals`
+ * (which harness the rule applies to). `match`, the v1 raw-string regex, is
+ * kept for migration and for suspicion-side matching.
+ *
+ * Two things live outside `rules`. `floor` holds forbids that no profile,
+ * mode or adapter setting can switch off — the last line before the
+ * sandbox. `mode` says, per action, whether an unmatched call is allowed
+ * (`denylist`, today's behavior) or must be covered by a permit rule
+ * (`allowlist`, the staged destination).
  */
 
 import type { HookProfile } from "../hooks/decision";
-import type { PolicyV2 } from "./v2/types";
 
-/** "deny" never proceeds; "confirm" asks for interactive approval. */
-export type GuardTier = "deny" | "confirm";
+export type Effect = "forbid" | "ask" | "permit";
 
-/**
- * The abstract tool vocabulary a rule's `tools` field is written against.
- * Each consuming harness maps its own tool names onto these three — see
- * `TOOL_ALIASES` in `./evaluate`.
- */
-export type GuardTool = "shell" | "write" | "edit";
+export type Action = "shell.exec" | "fs.write" | "fs.edit" | "net.fetch" | "mcp.call";
 
-/** One parsed, ready-to-evaluate rule. `match` is compiled once at parse time. */
-export interface GuardRule {
+export const ACTIONS: readonly Action[] = [
+  "shell.exec",
+  "fs.write",
+  "fs.edit",
+  "net.fetch",
+  "mcp.call",
+];
+
+export type Mode = "denylist" | "allowlist";
+
+/** What a rule is matched against. Every field is optional; all present fields must hold. */
+export interface SubjectPattern {
+  /**
+   * Program basename, as a regex anchored to the whole name: `git` matches
+   * `/usr/bin/git` and nothing else, `mkfs(\..+)?` matches every mkfs
+   * variant. shell.exec; the server name for mcp.call.
+   */
+  readonly program?: RegExp;
+  /** Regex over the arguments joined by single spaces. shell.exec; tool name for mcp.call. */
+  readonly argv?: RegExp;
+  /** Regex over the path: the file for fs.*, a redirect target for shell.exec. */
+  readonly path?: RegExp;
+  /** Regex over the host for net.fetch. */
+  readonly host?: RegExp;
+}
+
+export interface Rule {
   readonly id: string;
-  readonly tier: GuardTier;
-  readonly tools: readonly GuardTool[];
-  readonly match: RegExp;
-  readonly why: string;
-  /** Which hook profiles this rule is active in — set membership, not a hierarchy. */
+  readonly effect: Effect;
+  readonly action: Action;
+  readonly subject: SubjectPattern | undefined;
+  /** Raw-string regex (the command, the path, the url). Compat with v1. */
+  readonly match: RegExp | undefined;
+  /** Required for forbid and ask: codex fails open on a deny without a reason. */
+  readonly why: string | undefined;
   readonly profiles: readonly HookProfile[];
+  /** Harness names this rule applies to; undefined means all. */
+  readonly principals: readonly string[] | undefined;
 }
 
-/** The parsed v1 `guard-rules.json` document. */
-export interface GuardPolicy {
+/** A forbid that ignores profiles, principals and mode. */
+export interface FloorRule {
+  readonly id: string;
+  readonly action: Action;
+  readonly subject: SubjectPattern | undefined;
+  readonly match: RegExp | undefined;
+  readonly why: string;
+}
+
+export interface Policy {
   readonly version: 1;
-  readonly rules: readonly GuardRule[];
+  readonly floor: readonly FloorRule[];
+  readonly mode: Readonly<Record<Action, Mode>>;
+  readonly rules: readonly Rule[];
 }
-
-/** Either version of the document; `version` discriminates. See `./v2/types` for v2. */
-export type Policy = GuardPolicy | PolicyV2;

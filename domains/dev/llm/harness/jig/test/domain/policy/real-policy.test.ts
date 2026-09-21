@@ -68,8 +68,7 @@ interface Case {
   readonly label: string;
   readonly call: ToolCall;
   readonly profile: HookProfile;
-  /** One outcome for both versions, or one per version where v2 deliberately changes it. */
-  readonly expected: Outcome | { readonly v1: Outcome; readonly v2: Outcome };
+  readonly expected: Outcome;
 }
 
 const CASES: readonly Case[] = [
@@ -348,13 +347,13 @@ const CASES: readonly Case[] = [
     label: "diskutil erase asks at standard (v1); v2 puts it on the floor: deny",
     call: shellCall("diskutil eraseDisk JHFS+ x disk2"),
     profile: "standard",
-    expected: { v1: "ask", v2: "deny" },
+    expected: "deny",
   },
   {
     label: "dd of=/dev/... asks at standard (v1); v2 puts it on the floor: deny",
     call: shellCall("dd if=image.iso of=/dev/disk2"),
     profile: "standard",
-    expected: { v1: "ask", v2: "deny" },
+    expected: "deny",
   },
 
   // --- system-power-control ---
@@ -362,7 +361,7 @@ const CASES: readonly Case[] = [
     label: "shutdown asks at standard (v1); v2 puts it on the floor: deny",
     call: shellCall("shutdown -h now"),
     profile: "standard",
-    expected: { v1: "ask", v2: "deny" },
+    expected: "deny",
   },
 
   // --- rm-lock-files ---
@@ -375,121 +374,121 @@ const CASES: readonly Case[] = [
 
   // --- what v2 changes: false positives gone, floor added, wrappers seen through ---
   {
-    label: "v2: grep for the text 'rm -rf' is a grep",
+    label: "grep for the text 'rm -rf' is a grep",
     call: shellCall('grep "rm -rf" notes.md'),
     profile: "standard",
-    expected: { v1: "ask", v2: "allow" },
+    expected: "allow",
   },
   {
-    label: "v2: writing the word sudo into a note is not an escalation",
+    label: "writing the word sudo into a note is not an escalation",
     call: shellCall('echo "use sudo here" > notes.txt'),
     profile: "standard",
-    expected: { v1: "ask", v2: "allow" },
+    expected: "allow",
   },
   {
-    label: "v2: the word --no-verify in a commit message is not a flag",
+    label: "the word --no-verify in a commit message is not a flag",
     call: shellCall("printf '%s' 'never use --no-verify' > NOTES.md"),
     profile: "standard",
-    expected: { v1: "deny", v2: "allow" },
+    expected: "allow",
   },
   {
-    label: "v2: a force push behind timeout is still a force push",
+    label: "a force push behind timeout is still a force push",
     call: shellCall("timeout 60 git push --force origin feature"),
     profile: "standard",
     expected: "deny",
   },
   {
-    label: "v2: rm -rf of the home directory is on the floor even at minimal",
+    label: "rm -rf of the home directory is on the floor even at minimal",
     call: shellCall("rm -rf ~"),
     profile: "minimal",
-    expected: { v1: "allow", v2: "deny" },
+    expected: "deny",
   },
   {
-    label: "v2: rm -rf / behind sudo is on the floor",
+    label: "rm -rf / behind sudo is on the floor",
     call: shellCall("sudo rm -rf /"),
     profile: "standard",
-    expected: { v1: "ask", v2: "deny" },
+    expected: "deny",
   },
   {
-    label: "v2: rm -rf of a project directory is still only a question",
+    label: "rm -rf of a project directory is still only a question",
     call: shellCall("rm -rf ./node_modules"),
     profile: "standard",
     expected: "ask",
   },
   {
-    label: "v2: mkfs is on the floor",
+    label: "mkfs is on the floor",
     call: shellCall("mkfs.ext4 /dev/sda1"),
     profile: "minimal",
-    expected: { v1: "ask", v2: "deny" },
+    expected: "deny",
   },
   {
-    label: "v2: writing a git hook is on the floor",
+    label: "writing a git hook is on the floor",
     call: shellCall("echo 'exit 0' > .git/hooks/pre-commit"),
     profile: "minimal",
-    expected: { v1: "allow", v2: "deny" },
+    expected: "deny",
   },
   {
-    label: "v2: writing a git hook through the Write tool is on the floor",
+    label: "writing a git hook through the Write tool is on the floor",
     call: writeCall("/work/repo/.git/hooks/post-checkout"),
     profile: "minimal",
-    expected: { v1: "allow", v2: "deny" },
+    expected: "deny",
   },
   {
-    label: "v2: moving core.hooksPath away is forbidden like --no-verify",
+    label: "moving core.hooksPath away is forbidden like --no-verify",
     call: shellCall("git -c core.hooksPath=/dev/null commit -m wip"),
     profile: "standard",
-    expected: { v1: "allow", v2: "deny" },
+    expected: "deny",
   },
   {
-    label: "v2: handing a plain rm to xargs is allowed (D-18); only what is forbidden is caught",
+    label: "handing a plain rm to xargs is allowed (D-18); only what is forbidden is caught",
     call: shellCall("cat urls.txt | xargs rm"),
     profile: "standard",
     expected: "allow",
   },
   {
-    label: "v2: handing rm -rf to xargs is still a question",
+    label: "handing rm -rf to xargs is still a question",
     call: shellCall("cat urls.txt | xargs rm -rf"),
     profile: "standard",
     expected: "ask",
   },
   {
-    label: "v2: find -exec asks (matches Claude Code and Gemini CLI); plain find is allowed",
+    label: "find -exec asks (matches Claude Code and Gemini CLI); plain find is allowed",
     call: shellCall("find . -name '*.log' -exec rm {} \\;"),
     profile: "standard",
-    expected: { v1: "allow", v2: "ask" },
+    expected: "ask",
   },
   {
-    label: "v2: find -delete asks too",
+    label: "find -delete asks too",
     call: shellCall("find . -name '*.log' -delete"),
     profile: "standard",
-    expected: { v1: "allow", v2: "ask" },
+    expected: "ask",
   },
   {
-    label: "v2: find without -exec is allowed",
+    label: "find without -exec is allowed",
     call: shellCall("find . -name '*.log'"),
     profile: "standard",
     expected: "allow",
   },
   {
-    label: "v2: python -c is an ordinary program call in denylist mode",
+    label: "python -c is an ordinary program call in denylist mode",
     call: shellCall("python3 -c 'print(1)'"),
     profile: "standard",
     expected: "allow",
   },
   {
-    label: "v2: a delete hidden in a command substitution is still a question",
+    label: "a delete hidden in a command substitution is still a question",
     call: shellCall("echo $(rm -rf /tmp/x)"),
     profile: "standard",
     expected: "ask",
   },
   {
-    label: "v2: pi's path key reaches the policy-protection rule",
+    label: "pi's path key reaches the policy-protection rule",
     call: { tool: "edit", input: { path: "/Users/x/.config/jig/policy/guard-rules.json" } },
     profile: "minimal",
     expected: "deny",
   },
   {
-    label: "v2: an ordinary variable-bearing command is not a question in denylist mode",
+    label: "an ordinary variable-bearing command is not a question in denylist mode",
     call: shellCall("cd $HOME/work && bun test"),
     profile: "standard",
     expected: "allow",
@@ -499,9 +498,8 @@ const CASES: readonly Case[] = [
 describe("the real guard-rules.json — every rule, at least once", () => {
   const policy = loadRealPolicy();
   for (const { label, call, profile, expected } of CASES) {
-    const want = typeof expected === "string" ? expected : expected[`v${policy.version}`];
-    test(`${label} [v${policy.version}]`, () => {
-      expect(decide(policy, call, profile)).toBe(want);
+    test(label, () => {
+      expect(decide(policy, call, profile)).toBe(expected);
     });
   }
 });
