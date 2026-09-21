@@ -659,6 +659,45 @@ const CASES: readonly Case[] = [
     profile: "standard",
     expected: "allow",
   },
+
+  // --- mcp.call: destructive infra tools ask by name (no argument access; a
+  //     harness that cannot ask, e.g. codex, falls back to deny) ---
+  {
+    label: "terraform MCP triggering a run asks",
+    call: { tool: "mcp__terraform__action_run", input: {} },
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "terraform MCP deleting a workspace asks",
+    call: { tool: "mcp__terraform__delete_workspace_safely", input: {} },
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "terraform MCP reading workspaces is not gated",
+    call: { tool: "mcp__terraform__list_workspaces", input: {} },
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "container-use MCP running a command asks (arbitrary code exec)",
+    call: { tool: "mcp__container-use__environment_run_cmd", input: {} },
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "container-use MCP opening an environment is not gated",
+    call: { tool: "mcp__container-use__environment_open", input: {} },
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "container-use MCP metadata-only write is not gated",
+    call: { tool: "mcp__container-use__environment_update_metadata", input: {} },
+    profile: "standard",
+    expected: "allow",
+  },
 ];
 
 describe("the real guard-rules.json — every rule, at least once", () => {

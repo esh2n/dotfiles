@@ -129,7 +129,14 @@ function codexRegistration(): {
     paths: { hooksJson: join(codexHome, "hooks.json"), configToml: join(codexHome, "config.toml") },
     input: {
       command: `/usr/bin/env PATH=/usr/bin:/bin '${bun}' '${jig}' hooks pre-tool-use --harness codex`,
-      matcher: "Bash|apply_patch|Write|Edit",
+      // The MCP tails let jig see the destructive Terraform/container-use tool
+      // calls the ask-mcp-* rules judge; read-only MCP tools stay unmatched and
+      // untaxed. (Whether codex fires PreToolUse for MCP at all is confirmed
+      // per-deployment before this is relied on — see the codex MCP note.)
+      matcher:
+        "Bash|apply_patch|Write|Edit" +
+        "|mcp__terraform__(create_|delete_|update_|attach_|detach_|action_run|add_team_member|grant_team_access|force_unlock_workspace)" +
+        "|mcp__container-use__environment_(create|config|run_cmd|file_edit|file_write|file_delete|checkpoint|add_service)",
       timeoutSeconds: 10,
     },
   };

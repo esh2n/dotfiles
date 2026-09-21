@@ -584,6 +584,34 @@
         "standard",
         "strict"
       ]
+    },
+    {
+      "id": "ask-mcp-terraform-mutation",
+      "effect": "ask",
+      "action": "mcp.call",
+      "subject": {
+        "program": "terraform",
+        "argv": "^(create_|delete_|update_|attach_|detach_|action_run|add_team_member|grant_team_access|force_unlock_workspace)"
+      },
+      "why": "an MCP call that mutates Terraform Cloud infrastructure (trigger a run, delete or rewrite workspaces, variables or policy sets) — a human confirms; a harness that cannot ask falls back to deny",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-mcp-container-use-exec",
+      "effect": "ask",
+      "action": "mcp.call",
+      "subject": {
+        "program": "container-use",
+        "argv": "^environment_(create|config|run_cmd|file_edit|file_write|file_delete|checkpoint|add_service)$"
+      },
+      "why": "an MCP call that runs code in or mutates a container-use environment (run_cmd and config execute arbitrary commands, checkpoint pushes an image) — a human confirms; a harness that cannot ask falls back to deny",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
     }
   ]
 }
