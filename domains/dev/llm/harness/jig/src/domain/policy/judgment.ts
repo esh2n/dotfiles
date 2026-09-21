@@ -13,8 +13,6 @@ export type JudgmentSource =
   | "floor"
   /** An ordinary rule. */
   | "rule"
-  /** Subject extraction found a carrier (`eval`, `xargs`, `sh` from stdin, …). */
-  | "carrier"
   /** allowlist mode and the call could not be proven or was not covered by a permit rule. */
   | "allowlist"
   /** No rule spoke. */

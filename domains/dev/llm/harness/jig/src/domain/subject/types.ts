@@ -84,7 +84,7 @@ export interface ExtractionLimits {
   readonly maxNodes: number;
   /** How many transparent wrappers may be peeled from one command. */
   readonly maxWrapperDepth: number;
-  /** How deep `sh -c '…'` literal payloads are re-read. */
+  /** How deep `sh -c '…'` literal payloads are re-read (Codex and OpenHands stop at 8 too). */
   readonly maxShellDepth: number;
 }
 
@@ -93,5 +93,5 @@ export const DEFAULT_LIMITS: ExtractionLimits = {
   maxMillis: 50,
   maxNodes: 50_000,
   maxWrapperDepth: 8,
-  maxShellDepth: 2,
+  maxShellDepth: 8,
 };

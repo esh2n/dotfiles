@@ -5,9 +5,17 @@
  *   1. floor      — forbid, ignoring profile, principal and mode
  *   2. forbid     — active rules; matched against suspicion (lenient reading)
  *   3. ask        — active rules; also against suspicion
- *   4. carrier    — subject extraction saw code it cannot read: ask
- *   5. mode       — allowlist: allowed only when proven and covered by a
+ *   4. mode       — allowlist: allowed only when proven and covered by a
  *                   permit rule; denylist: allowed
+ *
+ * A command that hands code to another program (`python -c`, `xargs`,
+ * `eval`, `curl | sh`) is not a class of its own here: like any command the
+ * reader cannot prove, it is judged by what was seen (forbid and ask on
+ * suspicion) and by the mode. Every harness surveyed — Claude Code, Codex,
+ * Gemini CLI, OpenHands — does the same, and adds only narrow, named rules
+ * on top (`find -exec`, `curl | sh`), which belong in the policy file, not
+ * in code. The design's earlier "always ask" for these commands was
+ * withdrawn on 2026-09-21 (D-18).
  *
  * "Active" means the rule lists the principal's profile and, when it names
  * principals, the principal's harness.
@@ -140,6 +148,16 @@ function judgment(
   };
 }
 
+/** Why a permit cannot be granted: what stopped the strict reading. */
+function unprovenReason(request: Request): string {
+  if (request.action !== "shell.exec") return "jig: could not read the request";
+  const x = request.extraction;
+  if (x.kind === "unresolved") return `jig: could not read the command (${x.reason.detail})`;
+  if (x.kind === "carrier")
+    return `jig: ${x.carrier} runs code the guard cannot read (${x.detail})`;
+  return "jig: could not read the command";
+}
+
 function isActive(rule: RuleV2, principal: Principal): boolean {
   if (!rule.profiles.includes(principal.profile)) return false;
   return rule.principals === undefined || rule.principals.includes(principal.harness);
@@ -170,19 +188,10 @@ export function judgeV2(policy: PolicyV2, request: Request, principal: Principal
     return judgment(request, { kind: "ask", reason: ask.why ?? ask.id }, "rule", ask.id);
   }
 
-  if (request.action === "shell.exec" && request.extraction.kind === "carrier") {
-    const { carrier, detail } = request.extraction;
-    return judgment(request, { kind: "ask", reason: `jig: ${carrier} — ${detail}` }, "carrier");
-  }
-
   if (policy.mode[request.action] === "allowlist") {
     const commands = proven(request);
     if (commands === undefined) {
-      const reason =
-        request.action === "shell.exec" && request.extraction.kind === "unresolved"
-          ? `jig: could not read the command (${request.extraction.reason.detail})`
-          : "jig: could not read the command";
-      return judgment(request, { kind: "ask", reason }, "allowlist");
+      return judgment(request, { kind: "ask", reason: unprovenReason(request) }, "allowlist");
     }
     const permits = active.filter((rule) => rule.effect === "permit");
     const covered =

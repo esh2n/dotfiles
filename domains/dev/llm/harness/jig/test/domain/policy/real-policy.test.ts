@@ -441,10 +441,22 @@ const CASES: readonly Case[] = [
     expected: { v1: "allow", v2: "deny" },
   },
   {
-    label: "v2: a command that hands off to unseen code is a question",
+    label: "v2: handing a plain rm to xargs is allowed (D-18); only what is forbidden is caught",
     call: shellCall("cat urls.txt | xargs rm"),
     profile: "standard",
-    expected: { v1: "allow", v2: "ask" },
+    expected: "allow",
+  },
+  {
+    label: "v2: handing rm -rf to xargs is still a question",
+    call: shellCall("cat urls.txt | xargs rm -rf"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "v2: python -c is an ordinary program call in denylist mode",
+    call: shellCall("python3 -c 'print(1)'"),
+    profile: "standard",
+    expected: "allow",
   },
   {
     label: "v2: a delete hidden in a command substitution is still a question",

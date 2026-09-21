@@ -257,10 +257,15 @@ describe("sh -c with a literal payload is read through", () => {
   test("codex's bash -lc form", () => {
     expect(resolvedPrograms(read("bash -lc 'ls && git push --force'"))).toEqual(["ls", "git"]);
   });
-  test("two levels are read; a third is a question", () => {
+  test("nested shells are read up to the depth cap; one deeper is a question", () => {
+    expect(DEFAULT_LIMITS.maxShellDepth).toBe(8);
     expect(resolvedPrograms(read(`bash -c "sh -c 'ls'"`))).toEqual(["ls"]);
-    const x = read(`bash -c "sh -c \\"sh -c 'ls'\\""`);
-    expect(x.kind).toBe("carrier");
+    const two = `bash -c "sh -c 'ls'"`;
+    const three = `bash -c "sh -c \\"sh -c 'ls'\\""`;
+    const capped = { ...LIMITS, maxShellDepth: 2 };
+    expect(fromString(two, capped).kind).toBe("resolved");
+    expect(fromString(three, capped).kind).toBe("carrier");
+    expect(fromString(three, LIMITS).kind).toBe("resolved");
   });
   test("the payload is read strictly too", () => {
     const x = read("bash -c 'ls $(rm -rf /)'");
