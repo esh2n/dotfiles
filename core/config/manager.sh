@@ -312,12 +312,28 @@ link_dsh_resources() {
     [[ -f "${src_dir}/settings.yaml" ]] && \
         link_file "${src_dir}/settings.yaml" "${dsh_home}/settings.yaml"
 
-    # hooks.claude.json wires dsh into jig's PreToolUse hook via the
-    # @deepseek-ai/dsh-hooks-claude-code bridge (see profiles/{proxy,headless}/
-    # cordis.patch.yml, id: hooks-claude, whose configPath points here).
-    # Expanded copy, not symlink: the bridge reads the command path literally
-    # and does not expand {{DOTFILES_ROOT}}.
+    # hooks.claude.json is kept installed for the @deepseek-ai/dsh-hooks-claude-code
+    # bridge, but the profiles no longer compose that bridge: the guard is
+    # jig's own cordis plugin (below). Expanded copy, not symlink: the bridge
+    # reads the command path literally and does not expand {{DOTFILES_ROOT}}.
     install_expanded "${src_dir}/hooks.claude.json" "${dsh_home}/hooks.claude.json"
+
+    # jig-guard: build jig's dsh plugin (plain JS, dsh loads no TypeScript)
+    # and link it into every scaffolded profile's node_modules, where dsh
+    # resolves out-of-tree plugins (dsh README: "Bundles ... resolve from the
+    # dsh installation first, then from the profile's own node_modules").
+    # `pnpm add link:` is what `dsh plugin --profile <p> add` forwards to;
+    # calling pnpm directly avoids booting dsh just to install a dependency.
+    local plugin_dir="${DOTFILES_ROOT}/domains/dev/llm/harness/jig/adapters/dsh"
+    local plugin_built=0
+    if [[ -f "${plugin_dir}/src/index.ts" ]] && command -v bun >/dev/null 2>&1; then
+        if (cd "${plugin_dir}" && bun run build >/dev/null 2>&1); then
+            plugin_built=1
+            log_success "Built jig dsh plugin -> ${plugin_dir}/lib/index.js"
+        else
+            log_warn "jig dsh plugin build failed (${plugin_dir}); profiles will not compose jig-guard"
+        fi
+    fi
 
     if [[ -d "${src_dir}/profiles" ]]; then
         local prof_dir prof
@@ -327,6 +343,13 @@ link_dsh_resources() {
             if [[ -d "${dsh_home}/profiles/${prof}" && -f "${prof_dir}cordis.patch.yml" ]]; then
                 # Expanded copy: cordis does not expand env in configPath.
                 install_expanded "${prof_dir}cordis.patch.yml" "${dsh_home}/profiles/${prof}/cordis.patch.yml"
+                if [[ "$plugin_built" == 1 ]] && command -v pnpm >/dev/null 2>&1; then
+                    if (cd "${dsh_home}/profiles/${prof}" && pnpm add "link:${plugin_dir}" >/dev/null 2>&1); then
+                        log_success "Linked jig dsh plugin into profile '${prof}'"
+                    else
+                        log_warn "pnpm add link:${plugin_dir} failed in profile '${prof}'"
+                    fi
+                fi
             else
                 [[ -d "${dsh_home}/profiles/${prof}" ]] || \
                     log_info "dsh profile '${prof}' not scaffolded on this machine; skipping its patch"

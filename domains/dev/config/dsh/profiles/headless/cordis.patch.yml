@@ -5,24 +5,23 @@
 # direct provider connection. See profiles/proxy/cordis.patch.yml for the
 # override semantics.
 #
-# hooks-claude wires dsh into jig's own PreToolUse hook via the official
-# @deepseek-ai/dsh-hooks-claude-code bridge, pointed at ~/.dsh/hooks.claude.json
-# (symlinked from ../../hooks.claude.json by manager.sh link_dsh_resources).
-# Same policy as the proxy profile — see profiles/proxy/cordis.patch.yml for
-# the override semantics and the unverified-bridge caveat.
+# jig-guard is jig's own cordis plugin (domains/dev/llm/harness/jig/adapters/dsh,
+# built to lib/index.js and linked into this profile's node_modules by
+# manager.sh link_dsh_resources). It sits on dsh's `tools/pre-execute`
+# waterfall, so every tool call (bash, write, edit, str_replace_editor and
+# every MCP tool) goes through the same evaluator and policy pi, Claude Code
+# and codex use. A crashed or overrunning guard denies; it never lets a call
+# through. It replaced the @deepseek-ai/dsh-hooks-claude-code bridge, which
+# treated a failed hook as "no opinion" and saw neither MCP calls nor which
+# agent was asking.
 #
-# configPath uses the {{HOME}} placeholder, expanded at deploy time by
-# manager.sh install_expanded (cordis does not expand env in this field).
-# It replaced a `!!js` tag that a default YAML schema would drop silently —
-# see profiles/proxy/cordis.patch.yml for the full note.
 - insert:
     - id: agent-default-model
       name: '@deepseek-ai/dsh-agent-default-model'
       config:
         provider: local-proxy
         model: main
-    - id: hooks-claude
-      name: '@deepseek-ai/dsh-hooks-claude-code'
+    - id: jig-guard
+      name: '@esh2n/jig-dsh-guard'
       config:
-        configPath: '{{HOME}}/.dsh/hooks.claude.json'
-        projectDir: '.'
+        timeoutMs: 10000

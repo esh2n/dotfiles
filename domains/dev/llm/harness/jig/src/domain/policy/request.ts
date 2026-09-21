@@ -22,6 +22,8 @@ export interface Principal {
   readonly cwd?: string;
   /** The harness's own permission mode, when it reports one (Claude Code, codex). */
   readonly permissionMode?: string;
+  /** For a subagent: the session it was delegated from (DSH reports this). */
+  readonly parentSessionId?: string;
 }
 
 export type Request =

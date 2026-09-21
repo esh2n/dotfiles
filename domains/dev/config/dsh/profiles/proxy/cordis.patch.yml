@@ -11,32 +11,23 @@
 # user patch layer; if dsh rejects `insert` for an existing id, check the dsh
 # README for the dedicated override op.
 #
-# hooks-claude wires dsh into jig's own PreToolUse hook via the official
-# @deepseek-ai/dsh-hooks-claude-code bridge, pointed at ~/.dsh/hooks.claude.json
-# (symlinked from ../../hooks.claude.json by manager.sh link_dsh_resources).
-# That file's PreToolUse command runs the SAME evaluator Claude Code and
-# pi's guard.ts use, against the SAME shared policy
-# (domains/dev/llm/harness/policy/guard-rules.json) — Phase 1 guard-policy
-# unification's third front.
+# jig-guard is jig's own cordis plugin (domains/dev/llm/harness/jig/adapters/dsh,
+# built to lib/index.js and linked into this profile's node_modules by
+# manager.sh link_dsh_resources). It sits on dsh's `tools/pre-execute`
+# waterfall, so every tool call (bash, write, edit, str_replace_editor and
+# every MCP tool) goes through the same evaluator and policy pi, Claude Code
+# and codex use. A crashed or overrunning guard denies; it never lets a call
+# through. It replaced the @deepseek-ai/dsh-hooks-claude-code bridge, which
+# treated a failed hook as "no opinion" and saw neither MCP calls nor which
+# agent was asking.
 #
-# UNVERIFIED until dsh first runs: the bridge's matcher/payload semantics
-# (see hooks.claude.json's own "_unverified" note) — confirm at first run
-# and fix here if dsh's tool naming or hook payload shape differs.
-#
-# configPath uses the {{HOME}} placeholder, expanded to a real absolute path
-# at deploy time by manager.sh install_expanded (cordis does not expand env
-# vars in this field, so a literal is needed in the DEPLOYED copy — but the
-# source stays portable). This replaced a `!!js require('os').homedir()` tag:
-# a default YAML schema throws on an unknown `!!js` tag and drops the WHOLE
-# patch silently, losing the guard hook and the default-model override.
 - insert:
     - id: agent-default-model
       name: '@deepseek-ai/dsh-agent-default-model'
       config:
         provider: local-proxy
         model: main
-    - id: hooks-claude
-      name: '@deepseek-ai/dsh-hooks-claude-code'
+    - id: jig-guard
+      name: '@esh2n/jig-dsh-guard'
       config:
-        configPath: '{{HOME}}/.dsh/hooks.claude.json'
-        projectDir: '.'
+        timeoutMs: 10000
