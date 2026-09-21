@@ -150,6 +150,8 @@ export interface GuardContext {
 export interface GuardEvent {
   readonly toolName: string;
   readonly input: unknown;
+  /** pi's per-call id (event.toolCallId); stamped on the audit line. */
+  readonly toolCallId?: string;
 }
 
 export type GuardOutcome = { readonly block: true; readonly reason: string } | undefined;
@@ -204,6 +206,7 @@ export async function guardToolCall(
     profile: env.resolveProfile(process.env),
     cwd: ctx.cwd,
     ...(ctx.sessionManager === undefined ? {} : { sessionId: ctx.sessionManager.getSessionId() }),
+    ...(event.toolCallId === undefined ? {} : { callId: event.toolCallId }),
   };
 
   let decision: Decision;
@@ -255,7 +258,11 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     try {
       return await guardToolCall(
-        { toolName: event.toolName, input: event.input },
+        {
+          toolName: event.toolName,
+          input: event.input,
+          toolCallId: (event as { toolCallId?: string }).toolCallId,
+        },
         {
           hasUI: ctx.hasUI,
           cwd: ctx.cwd,

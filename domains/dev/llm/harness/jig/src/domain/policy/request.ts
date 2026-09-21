@@ -24,6 +24,14 @@ export interface Principal {
   readonly permissionMode?: string;
   /** For a subagent: the session it was delegated from (DSH reports this). */
   readonly parentSessionId?: string;
+  /**
+   * The harness's own id for this one tool call (`tool_use_id` on Claude Code
+   * and codex, `toolCallId` on pi, `callId` on DSH). Stamped so the audit log
+   * can be reconciled against the harness's own transcript — a call the
+   * harness recorded but the audit did not is a call the guard never judged
+   * (`jig report guard-coverage`).
+   */
+  readonly callId?: string;
 }
 
 export type Request =

@@ -11,6 +11,8 @@ interface PreToolUsePayload {
   session_id?: string;
   cwd?: string;
   permission_mode?: string;
+  /** Claude Code and codex both name the per-call id `tool_use_id`. */
+  tool_use_id?: string;
 }
 
 /** Harnesses whose hook protocol carries an `ask`; every other one gets a deny instead. */
@@ -136,6 +138,7 @@ export async function preToolUse(
     ...(typeof payload.permission_mode === "string"
       ? { permissionMode: payload.permission_mode }
       : {}),
+    ...(typeof payload.tool_use_id === "string" ? { callId: payload.tool_use_id } : {}),
   };
   const decision = await runHook(call, principal, loaded.loaded, {
     logger: ports.logger,

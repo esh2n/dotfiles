@@ -79,7 +79,12 @@ const exec = (
   tool: string,
   args: unknown,
   agent?: DshToolExecution["agent"],
-): DshToolExecution => ({ name: tool, arguments: args, ...(agent ? { agent } : {}) });
+): DshToolExecution => ({
+  name: tool,
+  arguments: args,
+  callId: "call_00_abc",
+  ...(agent ? { agent } : {}),
+});
 const agent = (id: string, cwd: string, parent?: string): DshToolExecution["agent"] => ({
   session: { header: { id, cwd } },
   ...(parent ? { meta: { origin: "subagent" as const, parentSession: parent } } : {}),
@@ -171,6 +176,7 @@ describe("guardExecution", () => {
         cwd: "/work",
         parentSessionId: "s-parent",
         permissionMode: "workspace-write",
+        callId: "call_00_abc",
       },
       tool: "bash",
       decision: "allow",

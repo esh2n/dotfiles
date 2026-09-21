@@ -4,12 +4,14 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
+import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveStateDir } from "../app/hooks/environment";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
 import { JsonlAuditLog } from "../infra/audit/jsonl-audit";
 import { SystemClock } from "../infra/clock/system-clock";
+import { readAudit, readClaudeCalls, readCodexCalls } from "../infra/coverage/read-calls";
 import { createHttpDecisionClient } from "../infra/decision/http-decision-client";
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
@@ -23,6 +25,7 @@ import { readSkillCatalog } from "../infra/skills/catalog";
 import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { applyCli } from "./apply";
 import { codexCli } from "./codex";
+import { parseCoverageArgs, renderCoverage } from "./coverage";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
 import { userPromptSubmit } from "./hooks/user-prompt-submit";
@@ -218,6 +221,28 @@ export async function main(argv: readonly string[]): Promise<number> {
       return result.code;
     }
     case "report": {
+      if (subcommand === "guard-coverage") {
+        const parsed = parseCoverageArgs(argv.slice(2));
+        if ("error" in parsed) {
+          process.stderr.write(`${parsed.error}\n`);
+          return 2;
+        }
+        const since = new Date(Date.now() - parsed.days * 24 * 60 * 60 * 1000);
+        const claudeRoot = join(
+          process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"),
+          "projects",
+        );
+        const codexRoot = join(process.env.CODEX_HOME ?? join(homedir(), ".codex"), "sessions");
+        const result = await reportCoverage({
+          readAudit: () => readAudit(resolveAuditPath(process.env), since),
+          readRecorded: async () => [
+            ...(await readClaudeCalls(claudeRoot, since)),
+            ...(await readCodexCalls(codexRoot, since)),
+          ],
+        });
+        process.stdout.write(renderCoverage(result, parsed));
+        return 0;
+      }
       if (subcommand !== "skills") {
         ports.logger.error("unknown report", { subcommand });
         return 2;
@@ -273,7 +298,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
     default:
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write]>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write]>\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
           "  report skills [--days N] [--json] reads both harnesses' session transcripts and\n" +

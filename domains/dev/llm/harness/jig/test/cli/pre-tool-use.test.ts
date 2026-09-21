@@ -294,6 +294,7 @@ describe("preToolUse with a v2 policy", () => {
       session_id: "s-1",
       cwd: "/work",
       permission_mode: "default",
+      tool_use_id: "toolu_abc123",
     });
     await preToolUse(stdin, { ...ports, audit }, { harness: "dsh" });
     expect(entries).toHaveLength(1);
@@ -305,6 +306,7 @@ describe("preToolUse with a v2 policy", () => {
         sessionId: "s-1",
         cwd: "/work",
         permissionMode: "default",
+        callId: "toolu_abc123",
       },
       tool: "Bash",
       action: "shell.exec",
