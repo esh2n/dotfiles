@@ -698,6 +698,135 @@ const CASES: readonly Case[] = [
     profile: "standard",
     expected: "allow",
   },
+
+  // --- destructive cloud CLIs ask (shell path; parity with what Claude Code
+  //     kept natively and pi/DSH had lost). Reads stay allowed. ---
+  {
+    label: "terraform destroy asks (shell path, mirrors the MCP rule)",
+    call: shellCall("terraform destroy -auto-approve"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "terragrunt destroy asks",
+    call: shellCall("terragrunt destroy"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "terraform plan is not gated",
+    call: shellCall("terraform plan"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "gcloud deleting a project asks",
+    call: shellCall("gcloud projects delete my-proj"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "gcloud listing instances is not gated",
+    call: shellCall("gcloud compute instances list"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "aws removing a bucket asks",
+    call: shellCall("aws s3 rb s3://my-bucket --force"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "aws terminating an instance asks",
+    call: shellCall("aws ec2 terminate-instances --instance-ids i-0abc"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "aws s3 ls is not gated",
+    call: shellCall("aws s3 ls"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "az deleting a resource group asks",
+    call: shellCall("az group delete --name rg1 --yes"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "kubectl deleting a namespace asks",
+    call: shellCall("kubectl delete namespace prod"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "kubectl deleting one named pod is not gated",
+    call: shellCall("kubectl delete pod my-pod"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "helm uninstall asks",
+    call: shellCall("helm uninstall my-release"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "npm publish asks",
+    call: shellCall("npm publish"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "cargo publish asks",
+    call: shellCall("cargo publish"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "pnpm publish asks (the user's default package manager)",
+    call: shellCall("pnpm publish --access public"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "npm install is not a publish",
+    call: shellCall("npm install lodash"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "dotnet nuget push asks",
+    call: shellCall("dotnet nuget push pkg.1.0.0.nupkg -k KEY -s https://api.nuget.org/v3/index.json"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "fdisk is on the floor (partition-table edit, like mkfs)",
+    call: shellCall("fdisk /dev/disk0"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "parted is on the floor too",
+    call: shellCall("parted /dev/sda"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "writing ~/.azure credentials is forbidden",
+    call: editCall("/Users/x/.azure/accessTokens.json"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "writing gcloud's real credential store is forbidden",
+    call: writeCall("/Users/x/.config/gcloud/credentials.db"),
+    profile: "minimal",
+    expected: "deny",
+  },
 ];
 
 describe("the real guard-rules.json — every rule, at least once", () => {

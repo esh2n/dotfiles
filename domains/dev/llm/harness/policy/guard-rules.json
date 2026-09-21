@@ -93,6 +93,14 @@
       "why": "a shell redirect to a raw block device overwrites the disk; /dev/null, /dev/stdout and friends are unaffected"
     },
     {
+      "id": "floor-partition-tool",
+      "action": "shell.exec",
+      "subject": {
+        "program": "fdisk|sfdisk|cfdisk|parted|gpart"
+      },
+      "why": "editing the partition table irreversibly destroys data, like mkfs; no everyday use in a coding session"
+    },
+    {
       "id": "floor-fork-bomb",
       "action": "shell.exec",
       "match": "\\w+\\s*\\(\\s*\\)\\s*\\{[^}]*\\|\\s*\\w+\\s*&[^}]*\\}\\s*;\\s*\\w+",
@@ -455,7 +463,7 @@
       "effect": "forbid",
       "action": "fs.write",
       "subject": {
-        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
       },
       "why": "home credential file — writing it plants a poisoned credential the machine trusts",
       "profiles": [
@@ -469,7 +477,7 @@
       "effect": "forbid",
       "action": "fs.edit",
       "subject": {
-        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
       },
       "why": "home credential file — writing it plants a poisoned credential the machine trusts",
       "profiles": [
@@ -483,7 +491,7 @@
       "effect": "forbid",
       "action": "shell.exec",
       "subject": {
-        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
       },
       "why": "home credential file — writing it plants a poisoned credential the machine trusts",
       "profiles": [
@@ -498,7 +506,7 @@
       "action": "shell.exec",
       "subject": {
         "program": "tee|mv|cp|install|ln|rsync|truncate|dd",
-        "argv": "(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+        "argv": "(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
       },
       "why": "home credential file — writing it plants a poisoned credential the machine trusts",
       "profiles": [
@@ -580,6 +588,118 @@
         "path": "(?:^|/)(?:\\.github/workflows/[^/]+\\.ya?ml|\\.gitlab-ci\\.yml|\\.circleci/config\\.yml|azure-pipelines\\.yml|\\.woodpecker\\.yml|Jenkinsfile)$"
       },
       "why": "CI config runs on every push — confirm the change",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-terraform-destroy-shell",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "terraform|terragrunt",
+        "argv": "(?:^|\\s)destroy\\b"
+      },
+      "why": "terraform/terragrunt destroy tears down real infrastructure — confirm (shell path; the Terraform Cloud MCP path is ask-mcp-terraform-mutation)",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-gcloud-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "gcloud",
+        "argv": "\\b(?:projects\\s+delete|compute\\s+instances\\s+delete|sql\\s+instances\\s+delete)\\b"
+      },
+      "why": "deletes live Google Cloud infrastructure or data — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-aws-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "aws",
+        "argv": "\\b(?:s3\\s+rb|ec2\\s+terminate-instances|rds\\s+delete-db-(?:instance|cluster)|cloudformation\\s+delete-stack|eks\\s+delete-cluster|dynamodb\\s+delete-table)\\b"
+      },
+      "why": "deletes live AWS infrastructure or data (bucket, instance, database, stack, cluster) — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-az-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "az",
+        "argv": "\\b(?:group\\s+delete|vm\\s+delete|storage\\s+account\\s+delete)\\b"
+      },
+      "why": "deletes live Azure infrastructure (a resource group delete takes everything in it) — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-kubectl-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "kubectl",
+        "argv": "\\bdelete\\s+(?:namespace|all|--all|-A)\\b"
+      },
+      "why": "wipes a whole namespace or every matched resource in a live cluster — confirm (deleting a single named resource is not gated)",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-helm-uninstall",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "helm",
+        "argv": "^uninstall\\b"
+      },
+      "why": "removes an entire deployed release from the cluster — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-package-publish",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "npm|pnpm|yarn|cargo|deno",
+        "argv": "^publish\\b"
+      },
+      "why": "publishing to a public registry is outward-facing and near-irreversible — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-nuget-push",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "dotnet",
+        "argv": "\\bnuget\\s+push\\b"
+      },
+      "why": "pushes a package to a public NuGet feed — outward-facing and near-irreversible — confirm",
       "profiles": [
         "standard",
         "strict"
