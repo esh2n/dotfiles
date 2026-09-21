@@ -46,6 +46,14 @@ function writeCall(filePath: string): ToolCall {
   return { tool: "Write", input: { file_path: filePath } };
 }
 
+function editCall(filePath: string): ToolCall {
+  return { tool: "Edit", input: { file_path: filePath } };
+}
+
+function readCall(filePath: string): ToolCall {
+  return { tool: "Read", input: { file_path: filePath } };
+}
+
 describe("the real guard-rules.json", () => {
   test("parses clean", () => {
     const text = readFileSync(REAL_POLICY_PATH, "utf8");
@@ -490,6 +498,99 @@ const CASES: readonly Case[] = [
   {
     label: "an ordinary variable-bearing command is not a question in denylist mode",
     call: shellCall("cd $HOME/work && bun test"),
+    profile: "standard",
+    expected: "allow",
+  },
+  // --- fs.write/fs.edit: shell rc is a floor (persistence via every new shell) ---
+  {
+    label: "editing ~/.zshrc is on the floor",
+    call: editCall("/Users/x/.zshrc"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "writing ~/.config/fish/config.fish is on the floor",
+    call: writeCall("/Users/x/.config/fish/config.fish"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "appending to ~/.bashrc via a redirect is on the floor",
+    call: shellCall("echo eval-evil >> ~/.bashrc"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "editing the repo's own zsh source (not the home file) is allowed",
+    call: editCall("/repo/domains/dev/config/zsh/zshrc"),
+    profile: "standard",
+    expected: "allow",
+  },
+
+  // --- fs.write/fs.edit: home credential files are forbidden ---
+  {
+    label: "writing ~/.aws/credentials is forbidden",
+    call: writeCall("/Users/x/.aws/credentials"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "cp onto ~/.ssh/authorized_keys is forbidden",
+    call: shellCall("cp key ~/.ssh/authorized_keys"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "editing ~/.npmrc is forbidden",
+    call: editCall("/Users/x/.npmrc"),
+    profile: "minimal",
+    expected: "deny",
+  },
+
+  // --- fs.write/fs.edit: repo secret-shaped files ask (a human decides) ---
+  {
+    label: "writing a project .env asks",
+    call: writeCall("/proj/.env"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "writing .env.production asks",
+    call: writeCall("/proj/.env.production"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "writing .env.example (a template) is allowed",
+    call: writeCall("/proj/.env.example"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "writing a .pem asks",
+    call: writeCall("/proj/certs/server.pem"),
+    profile: "standard",
+    expected: "ask",
+  },
+
+  // --- fs.write/fs.edit: CI config asks (supply-chain blast radius) ---
+  {
+    label: "editing a GitHub Actions workflow asks",
+    call: editCall("/proj/.github/workflows/ci.yml"),
+    profile: "standard",
+    expected: "ask",
+  },
+  {
+    label: "editing a Jenkinsfile asks",
+    call: editCall("/proj/Jenkinsfile"),
+    profile: "standard",
+    expected: "ask",
+  },
+
+  // --- fs.read is NOT gated: reads are the sandbox's boundary, not the guard's ---
+  {
+    label: "reading ~/.aws/credentials is not gated by the guard (sandbox's job)",
+    call: readCall("/Users/x/.aws/credentials"),
     profile: "standard",
     expected: "allow",
   },
