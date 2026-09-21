@@ -171,44 +171,67 @@ do_run() {
   [ "$mode" = direct ] && posture_kit="${KITS}/postures/guarded"
   [ -d "$posture_kit" ] || die "no kit for mode '$mode' at $posture_kit"
 
-  local -a args=(run --no-share-skills)
-  # --no-share-skills is not optional: sbx otherwise mounts a host-side skills
-  # store read-write over ~/.claude/skills, and yoki-switch cannot replace a
-  # mount point ("Device or resource busy"). It is also the cross-sandbox write
-  # hole flagged in the security docs.
+  # --skills=off (sbx 0.43's tri-state flag; --no-share-skills is its
+  # deprecated alias): sbx otherwise mounts a host-side skills store
+  # read-write over ~/.claude/skills, and yoki-switch cannot replace a mount
+  # point ("Device or resource busy"). It is also the cross-sandbox write hole
+  # flagged in the security docs.
+  local -a args=(run --skills=off)
 
   [ "$mode" != direct ] && args+=(--clone)
-
-  local base="$agent"
-  case " ${SBX_BUILTIN_AGENTS} " in
-    *" ${agent} "*) ;;
-    *) base=shell; note "'${agent}' is not an sbx built-in; running on the shell base" ;;
-  esac
-  args+=("$base" .)
 
   # A kit written as spec.yaml.in embeds literal host paths — that is the only
   # reason not to write it as plain YAML — so it needs the repo mounted. A kit
   # written as a plain spec.yaml is self-contained and gets nothing. Mount only
-  # the three paths yoki-switch reads, never the whole repo, which would also
-  # expose ~1.7GB of past session transcripts under domains/dev/config/claude/
-  # to whatever is running in the box.
+  # the paths the kits read, never the whole repo, which would also expose
+  # ~1.7GB of past session transcripts under domains/dev/config/claude/ to
+  # whatever is running in the box.
   local agent_kit="${KITS}/agents/${agent}"
+  local agent_kit_kind=""
   if [ -f "${agent_kit}/spec.yaml.in" ]; then
-    args+=("${DOTFILES_ROOT}/core:ro")
-    args+=("${DOTFILES_ROOT}/domains/dev/bin:ro")
-    args+=("${DOTFILES_ROOT}/domains/dev/config/claude-profiles:ro")
-    # Plus the agent's own config directory when the repo carries one, so an
-    # agent that keeps settings outside claude-profiles (omp does) needs no
-    # change here. Adding an agent stays: one symlink, one kit, one config dir.
-    [ -d "${DOTFILES_ROOT}/domains/dev/config/${agent}" ] \
-      && args+=("${DOTFILES_ROOT}/domains/dev/config/${agent}:ro")
+    agent_kit_kind="$(awk '/^kind:/ {print $2; exit}' "${agent_kit}/spec.yaml.in")"
     agent_kit="$(render_kit "${agent_kit}/spec.yaml.in")"
-  elif [ ! -f "${agent_kit}/spec.yaml" ]; then
+  elif [ -f "${agent_kit}/spec.yaml" ]; then
+    agent_kit_kind="$(awk '/^kind:/ {print $2; exit}' "${agent_kit}/spec.yaml")"
+  else
     agent_kit=""
   fi
 
+  # A `kind: sandbox` agent kit (pi) IS the base: it names its own image and
+  # entrypoint, so it takes the place an sbx built-in agent name would.
+  local base="$agent"
+  if [ "$agent_kit_kind" = sandbox ]; then
+    base="$agent_kit"
+  else
+    case " ${SBX_BUILTIN_AGENTS} " in
+      *" ${agent} "*) ;;
+      *) base=shell; note "'${agent}' is not an sbx built-in; running on the shell base" ;;
+    esac
+  fi
+  args+=("$base" .)
+
+  if [ -n "$agent_kit" ]; then
+    args+=("${DOTFILES_ROOT}/core:ro")
+    args+=("${DOTFILES_ROOT}/domains/dev/bin:ro")
+    args+=("${DOTFILES_ROOT}/domains/dev/config/claude-profiles:ro")
+    # jig's policy and evaluator: pi's guard extension imports the evaluator
+    # from here (pinned unbash included, from jig's own node_modules), and the
+    # kits point JIG_POLICY_FILE at the policy on this mount.
+    args+=("${DOTFILES_ROOT}/domains/dev/llm/harness:ro")
+    # Plus the agent's own config directory when the repo carries one, so an
+    # agent that keeps settings outside claude-profiles (pi, omp) needs no
+    # change here. Adding an agent stays: one symlink, one kit, one config dir.
+    [ -d "${DOTFILES_ROOT}/domains/dev/config/${agent}" ] \
+      && args+=("${DOTFILES_ROOT}/domains/dev/config/${agent}:ro")
+    # jig's audit log, read-write at its host path: every judgment made inside
+    # the sandbox lands in the same guard-audit.jsonl the host's harnesses
+    # write to (the kits set JIG_STATE_DIR to this path).
+    mkdir -p "${HOME}/.local/state/jig"
+    args+=("${HOME}/.local/state/jig")
+  fi
+
   args+=(--kit "$posture_kit")
-  [ -n "$agent_kit" ] && args+=(--kit "$agent_kit")
+  [ -n "$agent_kit" ] && [ "$agent_kit_kind" != sandbox ] && args+=(--kit "$agent_kit")
 
   # Everything after -- belongs to the agent, not to us.
   [ $# -gt 0 ] && args+=(-- "$@")
