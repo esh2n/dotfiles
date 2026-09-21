@@ -104,3 +104,16 @@ setup:
         - "mkdir -p ~/.config/jig && umask 077 && printf \"%s\" \"${JIG_DECISION_TOKEN:-proxy-managed}\" > ~/.config/jig/decision.token"
       user: "1000"
       description: Write the judgment-service token sentinel where the extensions look
+    # Drop the host's `packages` list: those are TUI/viewer extensions
+    # (pi-vcc, pi-btw, @plannotator/...) that a headless `pi -p` does not use,
+    # and some build native modules (node-pty) the shell image cannot compile.
+    # The guard and router extensions load from the linked extensions/ dir, not
+    # from packages, so they are kept. Replace the settings.json symlink with a
+    # trimmed copy, same technique as models.json above.
+    - command:
+        - bash
+        - -lc
+        - "node -e 'const fs=require(\"fs\"),p=process.env.HOME+\"/.pi/agent/settings.json\",s=JSON.parse(fs.readFileSync(\"{{DOTFILES_ROOT}}/domains/dev/config/pi/settings.json\",\"utf8\"));delete s.packages;fs.rmSync(p,{force:true});fs.writeFileSync(p,JSON.stringify(s,null,2))'"
+      user: "1000"
+      description: Drop host TUI extension packages a headless sandbox does not need
+
