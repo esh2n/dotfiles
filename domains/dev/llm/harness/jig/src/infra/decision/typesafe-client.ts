@@ -137,6 +137,11 @@ export function createTypesafeClient(options: TypesafeClientOptions): SystemOneC
           headers: {
             "content-type": "application/json",
             authorization: `Bearer ${options.apiKey}`,
+            // In proxy mode these calls transit the LiteLLM gateway, which
+            // buckets traffic by user-agent. Without this the judgment service
+            // shows up as harness "none", mixed in with real harnesses; name
+            // it so jev's own load is separable from pi/dsh/claude/codex.
+            "user-agent": "jig-judgment",
           },
           body: JSON.stringify(request),
           signal: AbortSignal.timeout(timeoutMs),

@@ -77,6 +77,8 @@ describe("resolveJudgmentClientConfig", () => {
     expect(attempts[0]?.url).toBe("http://localhost:4000/typesafe/v1/systemone");
     const headers = attempts[0]?.init?.headers as Record<string, string>;
     expect(headers.authorization).toBe("Bearer sk-litellm-master");
+    // Named so the gateway attributes judgment traffic instead of "none".
+    expect(headers["user-agent"]).toBe("jig-judgment");
   });
 
   test("DIRECT: no base URL falls back to TYPESAFE_API_KEY and the vendor host", async () => {

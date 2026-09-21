@@ -30,10 +30,16 @@ which works, because it is there (`user_agent`).
 
 ### The other spender: the judgment service
 
-The `jig` judgment service calls jev **directly**, not through the gateway, so
-jev's tokens do not appear under the `litellm` job no matter how long you look.
-It exposes its own `/metrics` on `127.0.0.1:4100` and is scraped by the `jig` job
-in `prometheus/prometheus.yml`; the dashboard is
+The `jig` judgment service has two modes (`typesafe-client.ts`). In DIRECT mode
+it calls jev at `api.typesafe.ai`, bypassing this gateway. In PROXY mode — the
+live deployment, `JIG_JEV_BASE_URL` pointed at the gateway's `/typesafe` — the
+calls transit this gateway (route `/typesafe/v1/systemone`,
+`api_provider="typesafe"`), so they DO appear under the `litellm` job; they carry
+`user_agent="jig-judgment"` so they stay separable from real harnesses rather
+than pooling under `none`.
+
+Either way, jig also exposes its own `/metrics` on `127.0.0.1:4100`, scraped by
+the `jig` job in `prometheus/prometheus.yml`; the dashboard is
 <http://127.0.0.1:3000/d/jig-judgments>.
 
 | Metric | What it answers |
