@@ -83,9 +83,13 @@ describe("[yoki-fixture] real core+personal permissions.yaml", () => {
     expect(new Set(settings.deny).size).toBe(settings.deny.length);
     expect(settings.defaultMode).toBe("auto");
 
-    // The 8 patterns yoki's own suite pins as hook-enforced (see
-    // permissions/test/to-claude.test.js) must still all be hook-enforced here.
-    const expectedHookEnforced = [
+    // The 8 patterns yoki once pinned as hook-enforced have moved to jig's
+    // guard policy (floor-rm-root-home-system, floor-write-block-device,
+    // ask-secret-file-*, ask-env-*), which judges the real command across
+    // every harness. They are gone from permissions.yaml entirely — so the
+    // Claude-side hook subset is now empty and none of them appears in the
+    // declarative deny either.
+    const migratedToJig = [
       "Bash(rm -rf /*)",
       "Bash(rm -rf ~/*)",
       "Bash(> /dev/*)",
@@ -95,11 +99,15 @@ describe("[yoki-fixture] real core+personal permissions.yaml", () => {
       "Edit(**/.env)",
       "Edit(**/.env.*)",
     ];
-    const hookEnforced = new Set(hookEnforcedDeny(merged).map((e) => e.pattern));
-    for (const pattern of expectedHookEnforced) {
-      expect(hookEnforced.has(pattern)).toBe(true);
+    expect(hookEnforcedDeny(merged)).toEqual([]);
+    const deny = new Set(settings.deny);
+    for (const pattern of migratedToJig) {
+      expect(deny.has(pattern)).toBe(false);
     }
-    expect(hookEnforced.size).toBe(expectedHookEnforced.length);
+    // The read-side secret denies stay in permissions.yaml — jig does not gate
+    // fs.read (a `cat` bypasses it; that boundary is the sandbox's job).
+    expect(deny.has("Read(**/*.pem)")).toBe(true);
+    expect(deny.has("Read(**/.env)")).toBe(true);
 
     // The guard floor declares the two bash guards (guardFloor is unioned,
     // never subtracted).

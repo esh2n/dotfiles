@@ -363,6 +363,37 @@ const CASES: readonly Case[] = [
     profile: "standard",
     expected: "deny",
   },
+  {
+    label: "a redirect onto a raw block device is on the floor (replaces yoki's > /dev/*)",
+    call: shellCall("echo x > /dev/disk2"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "appending onto a raw block device is on the floor too",
+    call: shellCall("cat img.bin >> /dev/rdisk0"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "a redirect onto /dev/sda is on the floor (Linux block device)",
+    call: shellCall("echo x > /dev/sda"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    // The precision yoki's `> /dev/*` glob lacked: /dev/null is not a disk.
+    label: "a redirect to /dev/null is not a block-device write",
+    call: shellCall("noisy-build > /dev/null 2>&1"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "a redirect to /dev/stdout is not a block-device write",
+    call: shellCall("printf hi > /dev/stdout"),
+    profile: "standard",
+    expected: "allow",
+  },
 
   // --- system-power-control ---
   {

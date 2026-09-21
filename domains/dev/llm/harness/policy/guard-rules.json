@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 1,
   "mode": {
     "shell": "denylist",
     "fs": "denylist",
@@ -85,6 +85,14 @@
       "why": "writes raw bytes to a block device"
     },
     {
+      "id": "floor-write-block-device",
+      "action": "shell.exec",
+      "subject": {
+        "path": "/dev/(?:r?disk[0-9]|sd[a-z]|nvme[0-9]|vd[a-z]|hd[a-z]|mmcblk[0-9]|xvd[a-z])"
+      },
+      "why": "a shell redirect to a raw block device overwrites the disk; /dev/null, /dev/stdout and friends are unaffected"
+    },
+    {
       "id": "floor-fork-bomb",
       "action": "shell.exec",
       "match": "\\w+\\s*\\(\\s*\\)\\s*\\{[^}]*\\|\\s*\\w+\\s*&[^}]*\\}\\s*;\\s*\\w+",
@@ -130,6 +138,39 @@
         "argv": "(^|/|\\s)\\.git/hooks/"
       },
       "why": "a git hook runs arbitrary code on the next commit"
+    },
+    {
+      "id": "floor-shell-rc-write",
+      "action": "fs.write",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)$"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
+    },
+    {
+      "id": "floor-shell-rc-edit",
+      "action": "fs.edit",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)$"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
+    },
+    {
+      "id": "floor-shell-rc-redirect",
+      "action": "shell.exec",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)$"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
+    },
+    {
+      "id": "floor-shell-rc-shell-write",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tee|mv|cp|install|ln|rsync|truncate|dd",
+        "argv": "(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
     }
   ],
   "rules": [
@@ -405,6 +446,141 @@
       "why": "deleting lock files to silence errors",
       "profiles": [
         "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-write",
+      "effect": "forbid",
+      "action": "fs.write",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-edit",
+      "effect": "forbid",
+      "action": "fs.edit",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-redirect",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-shell-write",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tee|mv|cp|install|ln|rsync|truncate|dd",
+        "argv": "(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-env-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)\\.env(?:\\.(?!example|sample|template|dist|schema)[^/]+)?$"
+      },
+      "why": "a .env holds secrets — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-env-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)\\.env(?:\\.(?!example|sample|template|dist|schema)[^/]+)?$"
+      },
+      "why": "a .env holds secrets — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-secret-file-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)(?:[^/]+\\.pem|[^/]+\\.key|id_rsa[^/]*|id_ed25519[^/]*)$"
+      },
+      "why": "key/cert file — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-secret-file-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)(?:[^/]+\\.pem|[^/]+\\.key|id_rsa[^/]*|id_ed25519[^/]*)$"
+      },
+      "why": "key/cert file — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-ci-config-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)(?:\\.github/workflows/[^/]+\\.ya?ml|\\.gitlab-ci\\.yml|\\.circleci/config\\.yml|azure-pipelines\\.yml|\\.woodpecker\\.yml|Jenkinsfile)$"
+      },
+      "why": "CI config runs on every push — confirm the change",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-ci-config-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)(?:\\.github/workflows/[^/]+\\.ya?ml|\\.gitlab-ci\\.yml|\\.circleci/config\\.yml|azure-pipelines\\.yml|\\.woodpecker\\.yml|Jenkinsfile)$"
+      },
+      "why": "CI config runs on every push — confirm the change",
+      "profiles": [
         "standard",
         "strict"
       ]

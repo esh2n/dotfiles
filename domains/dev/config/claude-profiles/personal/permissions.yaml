@@ -6,19 +6,20 @@
 # Moved verbatim from personal/settings.personal.json permissions.deny (T8) —
 # see scratchpad spike S3 §2a for the per-entry Codex/omp mapping.
 #
-# `enforce: [hook]` marks the entries the S3 spike found inexpressible as a
-# native Codex execpolicy rule or filesystem permission (shell redirections,
+# The `enforce: [hook]` entries the S3 spike added (shell redirections,
 # wildcard rm targets, and the write side of in-workspace secret-file globs)
-# — those also get a Claude-side PreToolUse hook
-# (runtime/yoki/scripts/hooks/pre-permission-guard.js) as defense in depth,
-# since the declarative permission match alone is the only enforcement for
-# every other entry here.
-#
-# Edit(**/.env) and Edit(**/.env.*) are new (T8): the moved list already
-# denied Read on env files but had no Edit-side glob, so an agent could
-# write to `.env` even though it could not read it back. Both are
-# hook-enforced for the same in-workspace-write reason as the *.pem/*.key
-# rows below.
+# have moved to jig's guard policy (domains/dev/llm/harness/policy/guard-rules.json),
+# which judges the actual command across every harness rather than glob-matching
+# a raw string on Claude Code alone:
+#   - `rm -rf /*` / `rm -rf ~/*`   -> floor-rm-root-home-system (subject-aware, all harnesses)
+#   - `> /dev/*` / `>> /dev/*`     -> floor-write-block-device (precise: /dev/disk*, sd*, nvme*,
+#                                     not /dev/null — the false positive yoki's glob carried)
+#   - Edit(**/*.pem|*.key|.env*)   -> ask-secret-file-* / ask-env-* (ASK, not deny: repo-local
+#                                     secret files are false-positive-prone, so a human decides;
+#                                     unattended adapters fall back ask->deny)
+# The pre-permission-guard.js hook now has no Claude-side subset to enforce and
+# is retired with the rest of yoki. Every entry that remains below IS a native
+# Claude permission rule (and its Codex/omp equivalent) enforced declaratively.
 
 deny:
   - pattern: "Read(**.env)"
@@ -37,12 +38,6 @@ deny:
   - pattern: "Read(**/*.key)"
   - pattern: "Bash(rm -rf /)"
   - pattern: "Bash(rm -rf ~)"
-  - pattern: "Bash(rm -rf /*)"
-    reason: "wildcard rm target — Codex sees this as an opaque shell script, not a rule-matchable prefix"
-    enforce: [hook]
-  - pattern: "Bash(rm -rf ~/*)"
-    reason: "wildcard rm target — same as rm -rf /*"
-    enforce: [hook]
   - pattern: "Bash(sudo rm *)"
   - pattern: "Bash(sudo dd *)"
   - pattern: "Bash(sudo mkfs *)"
@@ -52,12 +47,6 @@ deny:
   - pattern: "Bash(dd *)"
   - pattern: "Bash(mkfs *)"
   - pattern: "Bash(fdisk *)"
-  - pattern: "Bash(> /dev/*)"
-    reason: "shell redirection — no execpolicy rule can see inside it"
-    enforce: [hook]
-  - pattern: "Bash(>> /dev/*)"
-    reason: "shell redirection — no execpolicy rule can see inside it"
-    enforce: [hook]
   - pattern: "Bash(sudo passwd *)"
   - pattern: "Bash(sudo -i *)"
   - pattern: "Bash(sudo su *)"
@@ -109,18 +98,6 @@ deny:
   - pattern: "Edit(~/.aws/credentials)"
   - pattern: "Edit(~/.azure/**)"
   - pattern: "Edit(~/.gcp/**)"
-  - pattern: "Edit(**/*.pem)"
-    reason: "in-workspace write side not enforced by Codex's filesystem deny (append test went through)"
-    enforce: [hook]
-  - pattern: "Edit(**/*.key)"
-    reason: "in-workspace write side not enforced by Codex's filesystem deny (append test went through)"
-    enforce: [hook]
-  - pattern: "Edit(**/.env)"
-    reason: "write side of the Read(**/.env) deny above — new in T8"
-    enforce: [hook]
-  - pattern: "Edit(**/.env.*)"
-    reason: "write side of the Read(**/.env.*) deny above — new in T8"
-    enforce: [hook]
 
 allow: []
 
