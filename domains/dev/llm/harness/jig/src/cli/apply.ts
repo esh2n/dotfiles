@@ -8,6 +8,7 @@
  * so it is testable with any fake `ApplyPorts` and any paths.
  */
 
+import { type ClaudeApplyPaths, applyClaudeSettings } from "../app/apply/apply-claude";
 import {
   ALL_APPLY_TARGETS,
   type ApplyTarget,
@@ -49,11 +50,16 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
   if (targetName === "all") {
     return { targets: ALL_APPLY_TARGETS, write };
   }
+  // "claude" is deliberately not folded into "all" this phase — see
+  // apply-tiers.ts's ApplyTarget comment: it never runs through applyTiers.
+  if (targetName === "claude") {
+    return { targets: ["claude"], write };
+  }
   if ((ALL_APPLY_TARGETS as readonly string[]).includes(targetName)) {
     return { targets: [targetName as ApplyTarget], write };
   }
   return {
-    error: `unknown --target ${JSON.stringify(targetName)} (expected pi, dsh, litellm, or all)`,
+    error: `unknown --target ${JSON.stringify(targetName)} (expected pi, dsh, litellm, claude, or all)`,
   };
 }
 
@@ -87,11 +93,29 @@ function isBlockedWriteFailure(result: TargetResult, wroteRequested: boolean): b
 export async function applyCli(
   args: readonly string[],
   ports: ApplyPorts,
-  paths: { readonly tiersJsonPath: string; readonly destPaths: ApplyTargetPaths },
+  paths: {
+    readonly tiersJsonPath: string;
+    readonly destPaths: ApplyTargetPaths;
+    /** Only needed for `--target claude`; the pi/dsh/litellm path never touches it. */
+    readonly claudePaths?: ClaudeApplyPaths;
+  },
 ): Promise<ApplyCliResult> {
   const parsed = parseArgs(args);
   if ("error" in parsed) {
     return { stdout: `jig apply: ${parsed.error}\n`, code: 2 };
+  }
+
+  // "claude" never reaches applyTiers (see ApplyTarget's comment) — dispatch
+  // it here instead, on its own dry-run-only path.
+  if (parsed.targets.length === 1 && parsed.targets[0] === "claude") {
+    if (paths.claudePaths === undefined) {
+      return { stdout: "jig apply: --target claude is not configured for this invocation\n", code: 2 };
+    }
+    const result = await applyClaudeSettings(paths.claudePaths, ports, parsed.write);
+    // Never a "conflict" outcome for claude (no hand-edit-manifest tracking
+    // yet), and a refused --write is informational, same as litellm's — so
+    // this path always exits 0.
+    return { stdout: `${formatResult(result)}\n`, code: 0 };
   }
 
   const report = await applyTiers(

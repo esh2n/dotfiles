@@ -19,7 +19,15 @@ import { toLitellmModelList } from "../../domain/tiers/write-litellm";
 import { toPiModels } from "../../domain/tiers/write-pi";
 import type { ApplyPorts } from "./ports";
 
-export type ApplyTarget = "pi" | "dsh" | "litellm";
+/**
+ * "claude" is a valid `ApplyTarget` so `TargetResult`/`formatResult` can be
+ * reused verbatim by `apply-claude.ts` — but it is deliberately NOT in
+ * `ALL_APPLY_TARGETS`: `applyTiers`'s loop below only ever iterates that
+ * constant, so claude never runs through this pi/dsh/litellm machinery.
+ * `cli/apply.ts` dispatches "claude" to `applyClaudeSettings` on a separate
+ * path before `applyTiers` is even called.
+ */
+export type ApplyTarget = "pi" | "dsh" | "litellm" | "claude";
 export const ALL_APPLY_TARGETS: readonly ApplyTarget[] = ["pi", "dsh", "litellm"];
 
 export interface ApplyTargetPaths {

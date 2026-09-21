@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { ClaudeApplyPaths } from "../app/apply/apply-claude";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveStateDir } from "../app/hooks/environment";
@@ -55,6 +56,35 @@ function resolveApplyPaths(): { tiersJsonPath: string; destPaths: ApplyTargetPat
       pi: join(root, "domains", "dev", "config", "pi", "models.json"),
       dsh: join(root, "domains", "dev", "config", "dsh", "settings.yaml"),
       litellm: join(root, "domains", "dev", "config", "litellm", "config.yaml"),
+    },
+  };
+}
+
+/**
+ * Paths `jig apply --target claude` reads — the same three `claude-profiles`
+ * layer roots yoki-switch's `merge_settings()` reads, under the same
+ * `JIG_APPLY_ROOT`-overridable root `resolveApplyRoot()` uses for pi/dsh/
+ * litellm, plus the real `~/.claude` (or `$CLAUDE_CONFIG_DIR`) for
+ * `.claude-packs` and the reference settings.json this dry-run diffs
+ * against. Never written to by this increment — see apply-claude.ts.
+ */
+function resolveClaudeApplyPaths(): ClaudeApplyPaths {
+  const root = resolveApplyRoot();
+  const profilesDir = join(root, "domains", "dev", "config", "claude-profiles");
+  const claudeDir = process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+  const dotfilesRoot = process.env.DOTFILES_ROOT ?? root;
+  return {
+    packsFile: join(claudeDir, ".claude-packs"),
+    packsDefaultFile: join(profilesDir, "packs.default"),
+    coreDir: join(profilesDir, "core"),
+    packsDir: join(profilesDir, "packs"),
+    personalDir: join(profilesDir, "personal"),
+    destSettingsPath: join(claudeDir, "settings.json"),
+    templateVars: {
+      HOME: homedir(),
+      DOTFILES_ROOT: dotfilesRoot,
+      USER: process.env.USER ?? "",
+      DOTFILES_PARENT: dirname(dotfilesRoot),
     },
   };
 }
@@ -211,7 +241,10 @@ export async function main(argv: readonly string[]): Promise<number> {
         stateDir: resolveStateDir(process.env),
         jigVersion: VERSION,
       });
-      const result = await applyCli(argv.slice(1), applyPorts, resolveApplyPaths());
+      const result = await applyCli(argv.slice(1), applyPorts, {
+        ...resolveApplyPaths(),
+        claudePaths: resolveClaudeApplyPaths(),
+      });
       process.stdout.write(result.stdout);
       return result.code;
     }
@@ -305,7 +338,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
     default:
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write]>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|claude|all] [--write] | codex register [--write]>\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
           "  report skills [--days N] [--json] reads both harnesses' session transcripts and\n" +
@@ -314,6 +347,9 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +
           "  target's config.yaml change by hand after reviewing the diff.\n" +
+          "  claude composes settings.json from claude-profiles' core/packs/personal layers (same\n" +
+          "  layers yoki-switch reads) and diffs it against the real settings.json — dry-run only\n" +
+          "  this phase, --write is always refused; not part of --target all yet.\n" +
           "  Machine delivery is unchanged: this writes the repo files jig's existing symlink\n" +
           "  machinery already points pi/dsh at — it does not itself install or symlink anything.\n",
       );
