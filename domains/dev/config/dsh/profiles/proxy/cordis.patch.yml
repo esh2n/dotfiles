@@ -7,10 +7,6 @@
 # session starts on the local LiteLLM proxy and lands on the measurement
 # plane. The provider/model ids come from settings.yaml (local-proxy / main).
 #
-# Confirm at first run: the base patch documents rows-by-id override for the
-# user patch layer; if dsh rejects `insert` for an existing id, check the dsh
-# README for the dedicated override op.
-#
 # jig-guard is jig's own cordis plugin (domains/dev/llm/harness/jig/adapters/dsh,
 # built to lib/index.js and linked into this profile's node_modules by
 # manager.sh link_dsh_resources). It sits on dsh's `tools/pre-execute`
@@ -21,12 +17,17 @@
 # treated a failed hook as "no opinion" and saw neither MCP calls nor which
 # agent was asking.
 #
+# Replace-by-id (a top-level `- id:` row with `config:`): dsh-app-boot's
+# applyEntryPatches treats a row WITHOUT `insert` as an override of the
+# existing entry of that id, replacing its whole config. `insert` is
+# append-only — inserting an id that dsh-base already composes fails boot
+# with "duplicate loader entry id" (seen 2026-09-21).
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: local-proxy
+    model: main
 - insert:
-    - id: agent-default-model
-      name: '@deepseek-ai/dsh-agent-default-model'
-      config:
-        provider: local-proxy
-        model: main
     - id: jig-guard
       name: '@esh2n/jig-dsh-guard'
       config:

@@ -15,12 +15,17 @@
 # treated a failed hook as "no opinion" and saw neither MCP calls nor which
 # agent was asking.
 #
+# Replace-by-id (a top-level `- id:` row with `config:`): dsh-app-boot's
+# applyEntryPatches treats a row WITHOUT `insert` as an override of the
+# existing entry of that id, replacing its whole config. `insert` is
+# append-only — inserting an id that dsh-base already composes fails boot
+# with "duplicate loader entry id" (seen 2026-09-21).
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: local-proxy
+    model: main
 - insert:
-    - id: agent-default-model
-      name: '@deepseek-ai/dsh-agent-default-model'
-      config:
-        provider: local-proxy
-        model: main
     - id: jig-guard
       name: '@esh2n/jig-dsh-guard'
       config:
