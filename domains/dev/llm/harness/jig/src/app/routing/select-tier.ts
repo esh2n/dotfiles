@@ -29,6 +29,16 @@ export interface SelectTierOptions {
 }
 
 /**
+ * The gated answer plus what the model actually said: on a fallback `value`
+ * is the safe tier while `chosen` is the tier the judgment preferred. The log
+ * needs both, or "why was this never routed to deterministic?" has no data.
+ */
+export interface TierChoice extends Gated<Tier> {
+  readonly chosen: Tier;
+  readonly probabilities?: Readonly<Record<string, number>>;
+}
+
+/**
  * Model selector use-case: ask the decision provider which tier fits the request,
  * gated by confidence. A low-confidence answer falls back to `main` (cheap and
  * safe) rather than betting an expensive tier on a weak judgment. Depends only on
@@ -39,7 +49,7 @@ export async function selectTier(
   provider: DecisionProvider,
   context: DecisionContext = {},
   options: SelectTierOptions = {},
-): Promise<Gated<Tier>> {
+): Promise<TierChoice> {
   const threshold = options.threshold ?? 0.6;
   const fallback = options.fallback ?? "main";
   const decided = await provider.choice<Tier>(
@@ -50,5 +60,9 @@ export async function selectTier(
     },
     context,
   );
-  return gate(decided, threshold, fallback);
+  return {
+    ...gate(decided, threshold, fallback),
+    chosen: decided.value,
+    ...(decided.probabilities === undefined ? {} : { probabilities: decided.probabilities }),
+  };
 }

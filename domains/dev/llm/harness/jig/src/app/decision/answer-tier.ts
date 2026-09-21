@@ -20,6 +20,10 @@ export interface TierDecision {
   readonly tier: Tier;
   readonly confidence: number;
   readonly source: "decided" | "fallback";
+  /** The tier the judgment preferred, which differs from `tier` on a fallback. */
+  readonly chosen: Tier;
+  readonly probabilities?: Readonly<Record<string, number>>;
+  readonly durationMs?: number;
 }
 
 export type AnswerTierResult =
@@ -78,7 +82,16 @@ export async function answerTier(
     });
     return {
       ok: true,
-      decision: { tier: gated.value, confidence: gated.confidence, source: gated.source },
+      decision: {
+        tier: gated.value,
+        confidence: gated.confidence,
+        source: gated.source,
+        chosen: gated.chosen,
+        ...(gated.probabilities === undefined ? {} : { probabilities: gated.probabilities }),
+        ...(startedAt === undefined || endedAt === undefined
+          ? {}
+          : { durationMs: endedAt - startedAt }),
+      },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

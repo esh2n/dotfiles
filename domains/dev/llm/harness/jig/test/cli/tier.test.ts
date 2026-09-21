@@ -14,6 +14,7 @@ describe("tier", () => {
       tier: "deterministic",
       confidence: 0.9,
       source: "decided",
+      chosen: "deterministic",
     });
   });
 

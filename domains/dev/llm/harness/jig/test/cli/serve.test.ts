@@ -18,6 +18,7 @@ import type {
   DecisionProvider,
   ScoreQuery,
 } from "../../src/domain/decision/provider";
+import type { TierLogEntry } from "../../src/domain/routing/tier-log";
 import type { SkillCandidate } from "../../src/domain/skills/candidate";
 import type { RouterLogEntry } from "../../src/domain/skills/router-log";
 import { StaticProvider } from "../../src/infra/decision/static-provider";
@@ -210,6 +211,7 @@ describe("serveDecisionService", () => {
         tier: "complex",
         confidence: 0.8,
         source: "decided",
+        chosen: "complex",
       });
     } finally {
       service.stop();
@@ -663,6 +665,77 @@ describe("serveDecisionService authentication", () => {
       expect(response.status).toBe(502);
     } finally {
       second.stop();
+    }
+  });
+});
+
+describe("the /tier path's decision log", () => {
+  async function startTierService(
+    provider: DecisionProvider,
+    entries: TierLogEntry[],
+  ): Promise<{ readonly service: RunningDecisionService; readonly token: string }> {
+    const { env, path } = tempTokenEnv();
+    const token = await ensureDecisionToken(path);
+    const service = serveDecisionService(
+      {
+        provider,
+        port: 0,
+        recordTier: async (entry) => {
+          entries.push(entry);
+        },
+      },
+      env,
+    );
+    return { service, token };
+  }
+
+  test("records what the judgment preferred, what was returned, and for which request", async () => {
+    const entries: TierLogEntry[] = [];
+    const { service, token } = await startTierService(
+      new StaticProvider({ choice: { value: "deterministic", confidence: 0.55 } }),
+      entries,
+    );
+    try {
+      const response = await fetch(`${service.url}/tier`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ harness: "pi", request: "rename foo to bar in\nevery file" }),
+      });
+      expect(response.status).toBe(200);
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toMatchObject({
+        harness: "pi",
+        promptPreview: "rename foo to bar in",
+        promptChars: "rename foo to bar in\nevery file".length,
+        tier: "main",
+        chosen: "deterministic",
+        confidence: 0.55,
+        source: "fallback",
+      });
+      expect(entries[0]?.promptHash).toMatch(/^[0-9a-f]{12}$/);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("a failed judgment is written down with its error", async () => {
+    const entries: TierLogEntry[] = [];
+    const { service, token } = await startTierService(
+      new StaticProvider({ choice: { value: "main", confidence: 0.9 } }),
+      entries,
+    );
+    try {
+      await fetch(`${service.url}/tier`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ request: "" }),
+      });
+      expect(entries).toHaveLength(1);
+      expect(entries[0]?.harness).toBe("unknown");
+      expect(entries[0]?.error).toContain("empty");
+      expect(entries[0]?.tier).toBeUndefined();
+    } finally {
+      service.stop();
     }
   });
 });

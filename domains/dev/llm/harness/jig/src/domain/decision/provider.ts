@@ -12,6 +12,12 @@
 export interface Decided<T> {
   readonly value: T;
   readonly confidence: number;
+  /**
+   * The full distribution over the options, when the provider has one (a
+   * choice answered by jev). Carried so a log can show how close the runner-up
+   * came; never used to decide — `value` and `confidence` are the answer.
+   */
+  readonly probabilities?: Readonly<Record<string, number>>;
 }
 
 export interface DecisionContext {

@@ -10,7 +10,7 @@ describe("answerTier", () => {
 
     expect(result).toEqual({
       ok: true,
-      decision: { tier: "complex", confidence: 0.81, source: "decided" },
+      decision: { tier: "complex", confidence: 0.81, source: "decided", chosen: "complex" },
     });
   });
 
@@ -22,7 +22,7 @@ describe("answerTier", () => {
     // 0.51 is inside the dead band (1 - 0.6 = 0.4 .. 0.6), so the safe side wins.
     expect(result).toEqual({
       ok: true,
-      decision: { tier: "main", confidence: 0.51, source: "fallback" },
+      decision: { tier: "main", confidence: 0.51, source: "fallback", chosen: "complex" },
     });
   });
 
@@ -35,7 +35,7 @@ describe("answerTier", () => {
 
     expect(result).toEqual({
       ok: true,
-      decision: { tier: "complex", confidence: 0.51, source: "decided" },
+      decision: { tier: "complex", confidence: 0.51, source: "decided", chosen: "complex" },
     });
   });
 

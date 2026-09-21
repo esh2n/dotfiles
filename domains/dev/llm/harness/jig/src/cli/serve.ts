@@ -30,6 +30,7 @@ import type {
   RemoteDecisionResponse,
 } from "../domain/decision/remote";
 import type { Logger } from "../domain/ports";
+import { type TierLogEntry, promptPreview } from "../domain/routing/tier-log";
 import type { SkillCandidate } from "../domain/skills/candidate";
 import type { RouterLogEntry } from "../domain/skills/router-log";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
@@ -167,6 +168,8 @@ export interface ServeDecisionOptions {
    * record of the judgment exists anywhere but the model's own transcript.
    */
   readonly recordSkill?: (entry: RouterLogEntry) => Promise<void>;
+  /** Where tier judgments are written down, one line per `/tier` request (`infra/logs/tier-log.ts`). */
+  readonly recordTier?: (entry: TierLogEntry) => Promise<void>;
   /**
    * Where the service's own counters live. Pass one when the caller also feeds it
    * (the provider's token usage is reported to the caller, not to this function),
@@ -325,6 +328,57 @@ const UNAUTHORIZED: RemoteDecisionErrorResponse = {
  * router was consulted and could not answer" is a different fact from "the router was
  * never consulted", and only this log can tell them apart.
  */
+/**
+ * Write down one tier judgment. Like the skill log, the harness comes from the
+ * request body (`{ harness: "pi", request }`) or is `unknown`; a failure is
+ * written with `error`, because "asked and could not answer" and "never asked"
+ * must stay distinguishable.
+ */
+async function recordTierDecision(
+  record: ((entry: TierLogEntry) => Promise<void>) | undefined,
+  request: unknown,
+  response: HttpResponse<unknown>,
+  at: string,
+): Promise<void> {
+  if (record === undefined) return;
+  const requestBody =
+    typeof request === "object" && request !== null ? (request as Record<string, unknown>) : {};
+  const prompt = typeof requestBody.request === "string" ? requestBody.request : "";
+  const rawHarness = typeof requestBody.harness === "string" ? requestBody.harness.trim() : "";
+  const identity = {
+    at,
+    harness: rawHarness === "" ? "unknown" : rawHarness,
+    promptHash: promptHash(prompt),
+    promptChars: prompt.length,
+    promptPreview: promptPreview(prompt),
+  };
+  const body = response.body;
+  const decision =
+    typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
+  if (response.status !== 200) {
+    const error = decision.error;
+    const message =
+      typeof error === "object" && error !== null && "message" in error
+        ? String((error as { message: unknown }).message)
+        : `status ${response.status}`;
+    await record({ ...identity, error: message });
+    return;
+  }
+  await record({
+    ...identity,
+    ...(typeof decision.tier === "string" ? { tier: decision.tier } : {}),
+    ...(typeof decision.chosen === "string" ? { chosen: decision.chosen } : {}),
+    ...(typeof decision.confidence === "number" ? { confidence: decision.confidence } : {}),
+    ...(decision.source === "fallback" || decision.source === "decided"
+      ? { source: decision.source }
+      : {}),
+    ...(typeof decision.probabilities === "object" && decision.probabilities !== null
+      ? { probabilities: decision.probabilities as Record<string, number> }
+      : {}),
+    ...(typeof decision.durationMs === "number" ? { durationMs: decision.durationMs } : {}),
+  });
+}
+
 async function recordSkillDecision(
   record: ((entry: RouterLogEntry) => Promise<void>) | undefined,
   request: unknown,
@@ -501,6 +555,14 @@ export function serveDecisionService(
       });
       metrics.observe("jig_judgment_seconds", elapsedSeconds, { kind });
       recordDecision(metrics, options.logger, kind, response, elapsedSeconds);
+      if (pathname === "/tier") {
+        await recordTierDecision(
+          options.recordTier,
+          body,
+          response,
+          (deps.clock?.now() ?? new Date()).toISOString(),
+        );
+      }
       if (pathname === "/skill") {
         await recordSkillDecision(
           options.recordSkill,

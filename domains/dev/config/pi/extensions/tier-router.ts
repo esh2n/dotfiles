@@ -95,7 +95,7 @@ async function askTier(request: string, timeoutMs: number): Promise<TierDecision
   const response = await fetch(`${serviceBase()}/tier`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify({ request }),
+    body: JSON.stringify({ harness: "pi", request }),
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (response.status === 404) throw new Error("judgment service has no /tier endpoint");

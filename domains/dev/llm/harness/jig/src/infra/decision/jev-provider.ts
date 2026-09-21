@@ -283,6 +283,7 @@ export class JevProvider implements DecisionProvider {
     return {
       value: answer.choice as T,
       confidence: assertProbability(answer.confidence, "confidence"),
+      probabilities: answer.probabilities,
     };
   }
 

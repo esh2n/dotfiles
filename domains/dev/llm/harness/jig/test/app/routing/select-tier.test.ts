@@ -43,7 +43,12 @@ describe("selectTier", () => {
   test("routes to the decided tier when confidence clears the gate", async () => {
     const provider = new StaticProvider({ choice: { value: "complex", confidence: 0.9 } });
     const result = await selectTier("prove a theorem", provider);
-    expect(result).toEqual({ value: "complex", confidence: 0.9, source: "decided" });
+    expect(result).toEqual({
+      value: "complex",
+      confidence: 0.9,
+      source: "decided",
+      chosen: "complex",
+    });
   });
 
   test("asks about the bounded material, not the whole request", async () => {
@@ -73,6 +78,11 @@ describe("selectTier", () => {
       {},
       { threshold: 0.5, fallback: "main" },
     );
-    expect(result).toEqual({ value: "deterministic", confidence: 0.55, source: "decided" });
+    expect(result).toEqual({
+      value: "deterministic",
+      confidence: 0.55,
+      source: "decided",
+      chosen: "deterministic",
+    });
   });
 });

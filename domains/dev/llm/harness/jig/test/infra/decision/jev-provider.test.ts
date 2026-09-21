@@ -59,7 +59,11 @@ describe("JevProvider.choice", () => {
       {},
     );
 
-    expect(decided).toEqual({ value: "complex", confidence: 0.9 });
+    expect(decided).toEqual({
+      value: "complex",
+      confidence: 0.9,
+      probabilities: { main: 0.1, complex: 0.9 },
+    });
     expect(client.calls).toEqual([
       {
         state: "Which tier fits this request?",

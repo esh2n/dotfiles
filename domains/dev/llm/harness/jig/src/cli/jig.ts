@@ -15,6 +15,7 @@ import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
 import { ConsoleLogger } from "../infra/logger/console-logger";
 import { appendRouterLog } from "../infra/logs/router-log";
+import { appendTierLog } from "../infra/logs/tier-log";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
@@ -261,6 +262,8 @@ export async function main(argv: readonly string[]): Promise<number> {
         metrics,
         // The `/skill` path has no client-side record — the harness that calls it decides
         // nothing — so the service is the only place that judgment can be written down.
+        recordTier: (entry) =>
+          appendTierLog(join(resolveStateDir(process.env), "tier-router.jsonl"), entry),
         recordSkill: (entry) =>
           appendRouterLog(join(resolveStateDir(process.env), "skill-router.jsonl"), entry),
       });
