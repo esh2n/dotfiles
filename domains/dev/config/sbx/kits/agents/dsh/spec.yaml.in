@@ -63,17 +63,29 @@ setup:
     # dsh's profile tree and the jig-guard plugin, linked from the checkout by
     # the same manager.sh function the host uses. link_dsh_resources builds the
     # plugin (bun) and pnpm-links it into each profile, exactly as on the host.
-    - command: 'bash -lc ''source "{{DOTFILES_ROOT}}/core/config/manager.sh" >/dev/null 2>&1 || true; link_dsh_resources "{{DOTFILES_ROOT}}/domains/dev/config/dsh"'''
+    - command:
+        - bash
+        - -lc
+        - "source \"{{DOTFILES_ROOT}}/core/config/manager.sh\" >/dev/null 2>&1 || true; link_dsh_resources \"{{DOTFILES_ROOT}}/domains/dev/config/dsh\""
       user: "1000"
       description: Install dsh profiles and build/link jig-guard from the dotfiles checkout
     # dsh's LiteLLM provider must name the host as the sandbox sees it. The
     # host's settings.yaml points at localhost:4000; rewrite the deployed copy.
-    - command: 'if [ -f ~/.dsh/settings.yaml ]; then sed -i "s#http://localhost:4000#http://host.docker.internal:4000#g" ~/.dsh/settings.yaml; fi'
+    - command:
+        - bash
+        - -lc
+        - "if [ -f ~/.dsh/settings.yaml ]; then sed -i \"s#http://localhost:4000#http://host.docker.internal:4000#g\" ~/.dsh/settings.yaml; fi"
       user: "1000"
       description: Point dsh's LiteLLM provider at host.docker.internal
-    - command: 'mkdir -p ~/.config/jig && umask 077 && printf "%s" "${JIG_DECISION_TOKEN:-proxy-managed}" > ~/.config/jig/decision.token'
+    - command:
+        - bash
+        - -lc
+        - "mkdir -p ~/.config/jig && umask 077 && printf \"%s\" \"${JIG_DECISION_TOKEN:-proxy-managed}\" > ~/.config/jig/decision.token"
       user: "1000"
       description: Write the judgment-service token sentinel
-    - command: 'printf "%s" "${LITELLM_API_KEY:-proxy-managed}" > /dev/null'
+    - command:
+        - bash
+        - -lc
+        - "printf \"%s\" \"${LITELLM_API_KEY:-proxy-managed}\" > /dev/null"
       user: "1000"
       description: Touch the LiteLLM sentinel so a missing binding fails loudly at create, not mid-run

@@ -82,16 +82,25 @@ setup:
   startup:
     # pi's config, extensions and AGENTS.md: the same symlinks the host has,
     # made by the same manager.sh function, against the mounted checkout.
-    - command: 'bash -lc ''source "{{DOTFILES_ROOT}}/core/config/manager.sh" >/dev/null 2>&1 || true; link_pi_resources "{{DOTFILES_ROOT}}/domains/dev/config/pi"'''
+    - command:
+        - bash
+        - -lc
+        - "source \"{{DOTFILES_ROOT}}/core/config/manager.sh\" >/dev/null 2>&1 || true; link_pi_resources \"{{DOTFILES_ROOT}}/domains/dev/config/pi\""
       user: "1000"
       description: Link pi's settings, models, AGENTS.md and extensions from the dotfiles checkout
     # models.json must name the host as the sandbox sees it. The host file is
     # linked by the step above; this replaces the link with a rewritten copy.
-    - command: 'mkdir -p ~/.pi/agent && sed "s#http://localhost:4000#http://host.docker.internal:4000#g" "{{DOTFILES_ROOT}}/domains/dev/config/pi/models.json" > ~/.pi/agent/models.json.sbx && rm -f ~/.pi/agent/models.json && mv ~/.pi/agent/models.json.sbx ~/.pi/agent/models.json'
+    - command:
+        - bash
+        - -lc
+        - "mkdir -p ~/.pi/agent && sed \"s#http://localhost:4000#http://host.docker.internal:4000#g\" \"{{DOTFILES_ROOT}}/domains/dev/config/pi/models.json\" > ~/.pi/agent/models.json.sbx && rm -f ~/.pi/agent/models.json && mv ~/.pi/agent/models.json.sbx ~/.pi/agent/models.json"
       user: "1000"
       description: Point pi's LiteLLM provider at host.docker.internal
     # The judgment-service token file the extensions read; its content is the
     # sentinel, which the egress proxy swaps on the way to localhost:4100.
-    - command: 'mkdir -p ~/.config/jig && umask 077 && printf "%s" "${JIG_DECISION_TOKEN:-proxy-managed}" > ~/.config/jig/decision.token'
+    - command:
+        - bash
+        - -lc
+        - "mkdir -p ~/.config/jig && umask 077 && printf \"%s\" \"${JIG_DECISION_TOKEN:-proxy-managed}\" > ~/.config/jig/decision.token"
       user: "1000"
       description: Write the judgment-service token sentinel where the extensions look
