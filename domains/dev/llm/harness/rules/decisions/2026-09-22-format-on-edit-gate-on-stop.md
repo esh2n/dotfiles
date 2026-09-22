@@ -9,7 +9,7 @@ Status: accepted — 公開リポジトリの主流と各ハーネスの仕組�
 ## Decision
 
 - Claude Code: 整形は編集ごと(PostToolUse)、編集したファイルだけ、無音(exit 0)。型検査と lint は Stop の関門で、`stop_hook_active` を見て二度目は止め、出力は末尾だけに切り詰める。型の言語では LSP plugin の診断を編集ごとに受け、Stop の `tsc` はその後ろ盾。
-- pi: `tool_result` で編集ごとに整形。関門は `agent_settled` で、回数の上限を自前で持つ。
+- pi: `tool_result` で編集ごとに整形。関門は `agent_before_settle`(0.87.0 で追加。`{ continue: true }` で次のリクエストを一回強制できる。`agent_settled` は強制できない)で、回数の上限を自前で持つ。
 - DSH: `tools/post-execute` で編集ごとに整形。`agent/turn-stopping` の関門は連続ブロックの上限がないので、必ず自前で止める。
 - Codex: 指示(AGENTS.md)で「変更を終えたら formatter を一度、その後テストを再実行しない」。
 
