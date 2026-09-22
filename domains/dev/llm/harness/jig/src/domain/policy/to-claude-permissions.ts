@@ -132,7 +132,9 @@ function unescapeSourceSlashes(source: string): string {
 
 function convertPathToGlob(rawSource: string): string | undefined {
   const source = unescapeSourceSlashes(rawSource);
-  return anchoredDirLiteralGlob(source) ?? homeAnchoredLiteral(source) ?? anchoredExactLiteral(source);
+  return (
+    anchoredDirLiteralGlob(source) ?? homeAnchoredLiteral(source) ?? anchoredExactLiteral(source)
+  );
 }
 
 function denyOrAllow(effect: Effect, values: readonly string[]): Classification {
@@ -141,7 +143,10 @@ function denyOrAllow(effect: Effect, values: readonly string[]): Classification 
 
 function classifyShell(effect: Effect, subject: SubjectPattern): Classification {
   if (subject.program === undefined) {
-    return { kind: "hookOnly", reason: "shell.exec rule has no subject.program to anchor a Bash prefix" };
+    return {
+      kind: "hookOnly",
+      reason: "shell.exec rule has no subject.program to anchor a Bash prefix",
+    };
   }
   const programs = literalProgramNames(subject.program.source);
   if (programs === undefined) {
@@ -157,7 +162,8 @@ function classifyShell(effect: Effect, subject: SubjectPattern): Classification 
     if (words === undefined) {
       return {
         kind: "hookOnly",
-        reason: "subject.argv regex is too complex for a literal Bash prefix (only a `^`-anchored literal word sequence converts)",
+        reason:
+          "subject.argv regex is too complex for a literal Bash prefix (only a `^`-anchored literal word sequence converts)",
       };
     }
     suffixWords = words;
@@ -167,7 +173,11 @@ function classifyShell(effect: Effect, subject: SubjectPattern): Classification 
   return denyOrAllow(effect, values);
 }
 
-function classifyFs(effect: Effect, action: "fs.write" | "fs.edit", subject: SubjectPattern): Classification {
+function classifyFs(
+  effect: Effect,
+  action: "fs.write" | "fs.edit",
+  subject: SubjectPattern,
+): Classification {
   if (subject.path === undefined) {
     return { kind: "hookOnly", reason: `${action} rule has no subject.path to convert to a glob` };
   }
@@ -175,7 +185,8 @@ function classifyFs(effect: Effect, action: "fs.write" | "fs.edit", subject: Sub
   if (glob === undefined) {
     return {
       kind: "hookOnly",
-      reason: "subject.path regex is not a recognized literal/glob shape (anchored literal or `(?:^|/)name$` only)",
+      reason:
+        "subject.path regex is not a recognized literal/glob shape (anchored literal or `(?:^|/)name$` only)",
     };
   }
   const tool = action === "fs.write" ? "Write" : "Edit";
@@ -189,7 +200,10 @@ function classifyRule(
   match: RegExp | undefined,
 ): Classification {
   if (effect === "ask") {
-    return { kind: "hookOnly", reason: 'effect "ask" has no native form — Claude Code has no ask list' };
+    return {
+      kind: "hookOnly",
+      reason: 'effect "ask" has no native form — Claude Code has no ask list',
+    };
   }
   if (match !== undefined) {
     return { kind: "hookOnly", reason: 'raw "match" (string) rule has no native prefix/glob form' };
@@ -199,7 +213,10 @@ function classifyRule(
   }
   if (action === "shell.exec") return classifyShell(effect, subject);
   if (action === "fs.write" || action === "fs.edit") return classifyFs(effect, action, subject);
-  return { kind: "hookOnly", reason: `action "${action}" has no native form in scope (net.fetch/mcp.call stay hook-only)` };
+  return {
+    kind: "hookOnly",
+    reason: `action "${action}" has no native form in scope (net.fetch/mcp.call stay hook-only)`,
+  };
 }
 
 function convertOne(

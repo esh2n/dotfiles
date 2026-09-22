@@ -47,7 +47,9 @@ describe("toClaudePermissions", () => {
   });
 
   test("floor rules are always treated as forbid", () => {
-    const policy = build({ floor: [floor({ id: "floor-power", subject: { program: "poweroff" } })] });
+    const policy = build({
+      floor: [floor({ id: "floor-power", subject: { program: "poweroff" } })],
+    });
     const result = toClaudePermissions(policy);
     expect(result.deny).toEqual(["Bash(poweroff *)"]);
   });
@@ -158,7 +160,9 @@ describe("toClaudePermissions", () => {
 
   test("effect permit converts to an allow entry, not a deny", () => {
     const policy = build({
-      rules: [rule({ id: "permit-ls", effect: "permit", why: undefined, subject: { program: "ls" } })],
+      rules: [
+        rule({ id: "permit-ls", effect: "permit", why: undefined, subject: { program: "ls" } }),
+      ],
     });
     const result = toClaudePermissions(policy);
     expect(result.deny).toEqual([]);
@@ -189,7 +193,9 @@ describe("toClaudePermissions", () => {
     });
     const result = toClaudePermissions(policy);
     expect(result.deny).toEqual([]);
-    expect(result.hookOnly).toEqual([{ id: "fork-bomb", reason: expect.stringContaining("match") }]);
+    expect(result.hookOnly).toEqual([
+      { id: "fork-bomb", reason: expect.stringContaining("match") },
+    ]);
   });
 
   test("dedupes identical generated deny entries from different rules", () => {

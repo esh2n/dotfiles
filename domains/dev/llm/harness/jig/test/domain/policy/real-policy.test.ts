@@ -702,7 +702,10 @@ const CASES: readonly Case[] = [
   //     the floor the way a raw mcp.call would ---
   {
     label: "serena replace_content on the guard policy is on the floor (bypass closed)",
-    call: mcpCall("mcp__serena__replace_content", "domains/dev/llm/harness/policy/guard-rules.json"),
+    call: mcpCall(
+      "mcp__serena__replace_content",
+      "domains/dev/llm/harness/policy/guard-rules.json",
+    ),
     profile: "minimal",
     expected: "deny",
   },
@@ -864,7 +867,9 @@ const CASES: readonly Case[] = [
   },
   {
     label: "dotnet nuget push asks",
-    call: shellCall("dotnet nuget push pkg.1.0.0.nupkg -k KEY -s https://api.nuget.org/v3/index.json"),
+    call: shellCall(
+      "dotnet nuget push pkg.1.0.0.nupkg -k KEY -s https://api.nuget.org/v3/index.json",
+    ),
     profile: "standard",
     expected: "ask",
   },
