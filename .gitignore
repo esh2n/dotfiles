@@ -9,6 +9,8 @@ log/
 # Security - Never commit these
 **/auth.json
 **/credentials.json
+**/credentials.yaml
+**/credentials.yml
 **/*secret*.json
 # Not a secret itself — a JSON list of the REGEX SHAPES that catch one
 # (openai-key, github-token, ...), shared by yoki-artifact's scan.mjs and
