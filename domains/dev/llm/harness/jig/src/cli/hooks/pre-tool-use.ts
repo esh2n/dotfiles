@@ -1,5 +1,10 @@
-import { resolvePolicyPath, resolveProfile } from "../../app/hooks/environment";
+import {
+  resolvePolicyPath,
+  resolveProfile,
+  resolveSessionsPath,
+} from "../../app/hooks/environment";
 import { type LoadedPolicy, policyHash, runHook } from "../../app/hooks/run-hook";
+import { sessionModel } from "../../app/hooks/session-model";
 import type { ToolCall } from "../../domain/hooks/decision";
 import { parsePolicy } from "../../domain/policy/parse";
 import type { Principal } from "../../domain/policy/request";
@@ -130,10 +135,23 @@ export async function preToolUse(
   }
 
   const call: ToolCall = { tool: payload.tool_name, input: payload.tool_input ?? {} };
+  // The session's model is not on this payload and cannot be: Claude Code
+  // sends `model` only with `SessionStart` (see the doc quote in
+  // `domain/hooks/session.ts`). `jig hooks session-start` wrote it down; this
+  // looks it up by session id. The lookup cannot fail loudly — an absent or
+  // unreadable log just leaves the model unknown, exactly as before it existed.
+  const model =
+    typeof payload.session_id === "string"
+      ? await sessionModel(payload.session_id, {
+          fs: ports.fs,
+          path: resolveSessionsPath(process.env),
+        })
+      : undefined;
   const principal: Principal = {
     harness,
     profile,
     ...(typeof payload.session_id === "string" ? { sessionId: payload.session_id } : {}),
+    ...(model === undefined ? {} : { model }),
     ...(typeof payload.cwd === "string" ? { cwd: payload.cwd } : {}),
     ...(typeof payload.permission_mode === "string"
       ? { permissionMode: payload.permission_mode }

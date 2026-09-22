@@ -36,3 +36,12 @@ export function resolveStateDir(env: Env): string {
 export function resolveAuditPath(env: Env): string {
   return join(resolveStateDir(env), "guard-audit.jsonl");
 }
+
+/**
+ * Where each session's model is recorded at `SessionStart` and read back on
+ * every `PreToolUse`. Derived from the state dir like the audit log, so the
+ * writer and the reader — two different processes — agree without being told.
+ */
+export function resolveSessionsPath(env: Env): string {
+  return join(resolveStateDir(env), "sessions.jsonl");
+}

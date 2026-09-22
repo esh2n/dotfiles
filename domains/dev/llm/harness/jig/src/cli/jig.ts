@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
-import { resolveAuditPath, resolveStateDir } from "../app/hooks/environment";
+import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
@@ -23,6 +23,7 @@ import { BunFileSystem } from "../infra/fs/bun-fs";
 import { commandExists, createPrompter, spawnHarness } from "../infra/interactive/prompter";
 import { ConsoleLogger } from "../infra/logger/console-logger";
 import { appendRouterLog } from "../infra/logs/router-log";
+import { appendSessionLog } from "../infra/logs/session-log";
 import { appendTierLog } from "../infra/logs/tier-log";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { MetricsRegistry } from "../infra/metrics/registry";
@@ -35,6 +36,7 @@ import { codexCli } from "./codex";
 import { parseCoverageArgs, renderCoverage } from "./coverage";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
+import { sessionStart } from "./hooks/session-start";
 import { userPromptSubmit } from "./hooks/user-prompt-submit";
 import { interactive } from "./interactive";
 import { parseReportArgs, renderSkillUsage } from "./report";
@@ -200,6 +202,20 @@ export async function main(argv: readonly string[]): Promise<number> {
         );
         return 0;
       }
+      if (subcommand === "session-start") {
+        const stdin = await new Response(Bun.stdin.stream()).text();
+        const harness = harnessFlag(argv);
+        // Nothing is written to stdout: Claude Code treats a SessionStart
+        // hook's stdout as context for the model, and this hook's business is
+        // with the log, not with Claude.
+        await sessionStart(stdin, {
+          record: (entry) => appendSessionLog(resolveSessionsPath(process.env), entry),
+          clock: ports.clock,
+          logger: ports.logger,
+          ...(harness === undefined ? {} : { harness }),
+        });
+        return 0;
+      }
       if (subcommand === "user-prompt-submit") {
         const stdin = await new Response(Bun.stdin.stream()).text();
         const threshold = Number.parseFloat(process.env.JIG_SKILL_ROUTER_THRESHOLD ?? "");
@@ -359,12 +375,15 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks session-start | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
           "  without --pr the box holds no credentials and its work leaves only by\n" +
           "  box fetch <name>, which pulls into refs/remotes/sandbox-<name>/*.\n" +
+          "  hooks session-start [--harness claude] records the session's model to sessions.jsonl;\n" +
+          "  Claude Code sends `model` only on SessionStart, so a PreToolUse judgment can only\n" +
+          "  learn which model is calling by looking it up there. Prints nothing, never fails.\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
           "  report skills [--days N] [--json] reads both harnesses' session transcripts and\n" +

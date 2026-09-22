@@ -2,3 +2,9 @@ node_modules/
 dist/
 *.log
 adapters/*/lib/
+
+# The repo root ignores `**/session*` as runtime session state. jig's session
+# handling is source, not state — same carve-out the yoki runtime already has
+# for `scripts/**/session*`. A nested .gitignore overrides the parent's rule,
+# so this keeps src/ and test/ tracked without loosening the root pattern.
+!**/session*

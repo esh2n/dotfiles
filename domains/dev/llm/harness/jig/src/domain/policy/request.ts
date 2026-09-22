@@ -25,6 +25,22 @@ export interface Principal {
   /** For a subagent: the session it was delegated from (DSH reports this). */
   readonly parentSessionId?: string;
   /**
+   * The model the calling session runs on, when it is known. No harness sends
+   * it with a tool call: Claude Code carries `model` only on `SessionStart`
+   * ("Only `SessionStart` hooks can receive a `model` field" —
+   * https://code.claude.com/docs/en/hooks.md), so the adapter looks it up by
+   * `sessionId` in the log that hook writes, and it is `undefined` whenever
+   * the session was never recorded or the harness omitted the field.
+   *
+   * It is a fact about the caller, so it belongs here with the rest of them,
+   * and it reaches the audit log for free (`AuditEntry` embeds the principal):
+   * every judgment now says which model asked. The rules themselves cannot
+   * match on it — `Rule` narrows by `profiles` and `principals` (harness
+   * names) only — and deliberately so: nothing about the policy schema changed
+   * to carry this.
+   */
+  readonly model?: string;
+  /**
    * The harness's own id for this one tool call (`tool_use_id` on Claude Code
    * and codex, `toolCallId` on pi, `callId` on DSH). Stamped so the audit log
    * can be reconciled against the harness's own transcript — a call the

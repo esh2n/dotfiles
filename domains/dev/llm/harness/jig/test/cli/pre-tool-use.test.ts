@@ -321,6 +321,87 @@ describe("preToolUse with a v2 policy", () => {
   });
 });
 
+describe("preToolUse and the calling session's model", () => {
+  // Claude Code sends `model` only on SessionStart, never on PreToolUse, so
+  // the model reaches a judgment by being looked up in the log
+  // `jig hooks session-start` writes. It lands on the principal, which the
+  // audit entry embeds — so every judgment records which model asked.
+  function writeSessions(...lines: readonly Record<string, unknown>[]): string {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "sessions.jsonl"),
+      lines.map((line) => `${JSON.stringify(line)}\n`).join(""),
+    );
+    return dir;
+  }
+
+  async function auditFor(stdin: string): Promise<{ principal: { model?: string } }> {
+    const entries: unknown[] = [];
+    const audit = { append: async (entry: unknown) => void entries.push(entry) };
+    await preToolUse(stdin, { ...ports, audit });
+    return entries[0] as { principal: { model?: string } };
+  }
+
+  afterEach(() => {
+    // biome-ignore lint/performance/noDelete: assigning undefined stores the string "undefined" in process.env
+    delete process.env.JIG_STATE_DIR;
+  });
+
+  test("the recorded model reaches the audit entry's principal", async () => {
+    process.env.JIG_STATE_DIR = writeSessions({
+      session_id: "s-1",
+      model: "claude-opus-5",
+      harness: "claude",
+      recorded_at: "2026-09-22T09:00:00.000Z",
+      source: "startup",
+    });
+
+    const entry = await auditFor(
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "git push --force" },
+        session_id: "s-1",
+      }),
+    );
+
+    expect(entry.principal.model).toBe("claude-opus-5");
+  });
+
+  test("a session that was never recorded judges the same, with no model", async () => {
+    process.env.JIG_STATE_DIR = writeSessions({
+      session_id: "someone-else",
+      model: "claude-opus-5",
+      harness: "claude",
+      recorded_at: "2026-09-22T09:00:00.000Z",
+    });
+
+    const entry = await auditFor(
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "git push --force" },
+        session_id: "s-unknown",
+      }),
+    );
+
+    expect(entry.principal).not.toHaveProperty("model");
+  });
+
+  test("a missing sessions log never changes a decision", async () => {
+    process.env.JIG_STATE_DIR = tempDir();
+
+    const decision = await run(
+      JSON.stringify({
+        tool_name: "Bash",
+        tool_input: { command: "git push --force" },
+        session_id: "s-1",
+      }),
+    );
+
+    expect(decision.permissionDecision).toBe("deny");
+    expect(decision.permissionDecisionReason).toMatch(/force push/);
+  });
+});
+
 describe("preToolUse for codex", () => {
   beforeEach(() => {
     process.env.JIG_POLICY_FILE = writePolicy(VALID_POLICY);
