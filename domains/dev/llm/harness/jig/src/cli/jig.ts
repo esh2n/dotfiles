@@ -4,17 +4,23 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
+import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveStateDir } from "../app/hooks/environment";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
 import { JsonlAuditLog } from "../infra/audit/jsonl-audit";
+import { createGitRunner } from "../infra/box/git-cli";
+import { createJigSourceReader } from "../infra/box/jig-source";
+import { createKitWriter } from "../infra/box/kit-writer";
+import { createSbxRunner } from "../infra/box/sbx-cli";
 import { SystemClock } from "../infra/clock/system-clock";
 import { readAudit, readClaudeCalls, readCodexCalls } from "../infra/coverage/read-calls";
 import { createHttpDecisionClient } from "../infra/decision/http-decision-client";
 import { RemoteDecisionProvider } from "../infra/decision/remote-provider";
 import { BunFileSystem } from "../infra/fs/bun-fs";
+import { commandExists, createPrompter, spawnHarness } from "../infra/interactive/prompter";
 import { ConsoleLogger } from "../infra/logger/console-logger";
 import { appendRouterLog } from "../infra/logs/router-log";
 import { appendTierLog } from "../infra/logs/tier-log";
@@ -24,11 +30,13 @@ import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { readSkillCatalog } from "../infra/skills/catalog";
 import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { applyCli } from "./apply";
+import { type BoxCliContext, boxCli } from "./box";
 import { codexCli } from "./codex";
 import { parseCoverageArgs, renderCoverage } from "./coverage";
 import { decide } from "./decide";
 import { preToolUse } from "./hooks/pre-tool-use";
 import { userPromptSubmit } from "./hooks/user-prompt-submit";
+import { interactive } from "./interactive";
 import { parseReportArgs, renderSkillUsage } from "./report";
 import { buildJudgmentProvider, serveDecisionService } from "./serve";
 import { tier } from "./tier";
@@ -109,6 +117,32 @@ export function buildPorts(): Ports {
       }),
     }),
     audit: new JsonlAuditLog(resolveAuditPath(process.env)),
+  };
+}
+
+/** Composition root for `jig box`: the sbx, kit, source and git adapters. */
+function buildBoxPorts(): BoxPorts {
+  return {
+    sbx: createSbxRunner(),
+    kit: createKitWriter(),
+    source: createJigSourceReader(),
+    git: createGitRunner(new BunProcessRunner()),
+  };
+}
+
+/**
+ * Where the box commands find everything outside the process. The posture
+ * mixins live in the repo next to the rest of the sbx configuration and are
+ * resolved from the same root `jig apply` uses, so a checkout moved or copied
+ * anywhere still finds its own.
+ */
+function boxContext(env: Record<string, string | undefined> = process.env): BoxCliContext {
+  const postures = join(resolveApplyRoot(), "domains", "dev", "config", "sbx", "kits", "postures");
+  return {
+    cwd: process.cwd(),
+    postureKits: { guarded: join(postures, "guarded"), connected: join(postures, "connected") },
+    dryRun: env.JIG_BOX_DRY_RUN === "1",
+    noAttach: env.JIG_BOX_NO_ATTACH === "1",
   };
 }
 
@@ -227,6 +261,11 @@ export async function main(argv: readonly string[]): Promise<number> {
       process.stdout.write(result.stdout);
       return result.code;
     }
+    case "box": {
+      const result = await boxCli(argv.slice(1), buildBoxPorts(), boxContext());
+      process.stdout.write(result.stdout);
+      return result.code;
+    }
     case "report": {
       if (subcommand === "guard-coverage") {
         const parsed = parseCoverageArgs(argv.slice(2));
@@ -303,9 +342,29 @@ export async function main(argv: readonly string[]): Promise<number> {
       // the entrypoint's `process.exit` below is never reached.
       return await new Promise<never>(() => {});
     }
-    default:
+    default: {
+      // No arguments on a terminal is the interactive entry point: the
+      // question "which harness, and host or box" is the one worth asking,
+      // and it is the only one jig asks. Piped or scripted, with no terminal
+      // to prompt on, this stays the usage text it has always been.
+      if (command === undefined && process.stdin.isTTY === true) {
+        const result = await interactive({
+          prompt: createPrompter(),
+          which: commandExists,
+          spawn: spawnHarness,
+          box: buildBoxPorts(),
+          context: boxContext(),
+        });
+        process.stdout.write(result.stdout);
+        return result.code;
+      }
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write]>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write] | box <new|list|resume|fetch|rm>>\n" +
+          "  run with no arguments on a terminal for the interactive entry point:\n" +
+          "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
+          "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
+          "  without --pr the box holds no credentials and its work leaves only by\n" +
+          "  box fetch <name>, which pulls into refs/remotes/sandbox-<name>/*.\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
           "  report skills [--days N] [--json] reads both harnesses' session transcripts and\n" +
@@ -318,6 +377,7 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  machinery already points pi/dsh at — it does not itself install or symlink anything.\n",
       );
       return command === undefined ? 0 : 1;
+    }
   }
 }
 
