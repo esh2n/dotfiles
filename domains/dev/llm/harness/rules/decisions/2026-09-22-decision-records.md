@@ -1,6 +1,6 @@
 # 決定はリポジトリ内の Markdown に記録し、AGENTS.md の一行で縛り、検査できるものは検査に変換する
 
-Status: accepted — 2026-09-22 ユーザー裁定「ok」
+Status: accepted — 記録はリポジトリ内の Markdown、拘束は AGENTS.md の一行と機械の検査に分ける（2026-09-22）
 
 ## Problem
 
