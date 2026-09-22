@@ -51,3 +51,5 @@
 - [Which yoki capabilities has jig replaced, and what still requires yoki-switch today?](2026-09-21-yoki-jig-coverage.md) — ディスクに設定を書く処理は全て yoki-switch/manager.sh 頼みのまま。jig の permission/MCP コンパイラは構築・テスト済みだが CLI 入口が無く、配線されていない (2026-09-21)
 - [一本の workflow スクリプトが五ハーネスで動くか](2026-09-22-workflow-script-portability.md) — CC と pi は一本、omp は 10 行のシム、Codex は不可（部下が親の fork）、DSH 未検証 (2026-09-22)
 - [SDD は良い実践か流行か](2026-09-22-spec-driven-development-evidence.md) — 一律の SDD は不支持。四社が大きさで gate、実践者は「小さい仕事に大槌」、統制実験は否定側。大きく曖昧な仕事だけ短い SPEC、既定は詰めて短い決定記録 (2026-09-22)
+- [モデルが読むファイル(CLAUDE.md/SKILL.md/hook/判定モデル問い)は英語か日本語か](2026-09-23-model-facing-language.md) — ベンダーはどちらも指示していない。M-IFEval で8モデル全部が英語よりJA指示追従が11〜20pt低い、Claude Codeのthinking要約はJA/KO設定でも英語優勢(84.5%)、GitHub実地では日本1位の採用率でも指示ファイルの約95%は英語。人間向け記録は日本語のまま (2026-09-23)
+- [自宅ローカルLLMサーバーを他マシン/スマホから安全に使う2026年の作り方](2026-09-23-local-llm-across-home-machines.md) — LM StudioのLAN直bindは0.3.x系に認証が無く0.4.24でもheadless認証トグルが効かず非推奨。LiteLLM proxyだけをtailnet越しに公開しLM Studioはloopbackのまま(既存のop鍵管理+Prometheus境界を拡張)が最有力、Tailscale Serve直結が次点 (2026-09-23)
