@@ -1,6 +1,6 @@
 # MCP の一覧は業界評価とユースケース適合で決め、使われていない物は案内の仕組みを直す
 
-Status: accepted — 要否の軸は業界評価とユースケース適合の二つ。使用回数は「使いこなせていない」検知にだけ使う（2026-09-22）。案内の仕組みと pi・omp への届け方は調査後に追記する
+Status: accepted — 要否の軸は業界評価とユースケース適合の二つ。使用回数は「使いこなせていない」検知にだけ使う。届け方は各ハーネスの読み込み方（遅延か eager か）で決め、使わせる仕組みは強制しない（2026-09-22）
 
 ## Problem
 
@@ -25,7 +25,7 @@ Status: accepted — 要否の軸は業界評価とユースケース適合の�
 
 ## Consequences
 
-- Claude Code は tool search（既定 on、Anthropic の測定で文脈 85% 削減・精度 49→74%）でツール定義を遅延読み込みするが、Codex には無く手動の `enabled_tools` と出力上限だけ。omp・DSH は調査中。定義の費用はハーネスごとに違う。
+- Claude Code は tool search（既定 on、Anthropic の測定で文脈 85% 削減・精度 49→74%）でツール定義を遅延読み込みするが、Codex には無く手動の `enabled_tools` と出力上限だけ。omp は本体が遅延、DSH は eager、pi は拡張次第（pi-mcp-adapter は遅延）。定義の費用はハーネスごとに違う。
 - MCP の元は `mcp/` 一つ。生成器が各ハーネスの形に翻訳し、`~/.claude.json` には触らない（config-layout の決定）。初回の移行で `claude mcp remove` を手で行う。
 - 測定: 案内を入れた後の呼び出し回数を jig の監査 jsonl で見る。ベンダー主張（codebase-memory の 99%、claude-mem の 10 倍）は独立の検証が無い。
 - 前例なし: serena・context7・codebase-memory を名指しで評価した実践者の記事は見つかっていない（GitHub MCP への評だけ）。
