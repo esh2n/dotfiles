@@ -113,6 +113,26 @@ setup:
         - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply --target codex
       user: "1000"
       description: Rebuild ~/.codex from core + packs + personal via lib/targets/gen.js
+    # Second layer: sbx writes `sandbox_mode = "danger-full-access"` at create
+    # time (its "yolo mode", see point 2 above), which switches Codex's OWN
+    # sandbox off inside the VM. The microVM is the boundary; Codex's
+    # workspace-write sandbox is defense-in-depth under it, so turn it back
+    # on. Only that one line is rewritten — the rest of config.toml (the
+    # mcp-gateway table with its proxy-managed bearer) is left exactly as sbx
+    # wrote it, for the reason point 2 gives. Shell network stays on inside
+    # the VM because the VM's egress allowlist is what governs it; Codex's
+    # own `network_access = false` would just block the allowlisted egress a
+    # second time.
+    - command:
+        - sh
+        - -c
+        - |
+          f="$HOME/.codex/config.toml"
+          sed -i 's/^sandbox_mode = "danger-full-access"/sandbox_mode = "workspace-write"/' "$f"
+          grep -q '^\[sandbox_workspace_write\]' "$f" || printf '\n[sandbox_workspace_write]\nnetwork_access = true\n' >> "$f"
+          grep -n '^sandbox_mode' "$f"
+      user: "1000"
+      description: Turn Codex's own workspace-write sandbox back on inside the VM (sbx defaults it off)
     # Packs are NOT enabled here, same as the claude kit and for the same
     # reason: they default to OFF on a fresh machine and a sandbox is a
     # fresh machine every time. The enabled set is a machine-local choice

@@ -42,8 +42,11 @@ permissions:
 
 setup:
   install:
-    - command: apt-get update && apt-get install -y zsh fd-find
-      description: The only base-image gaps besides mise (fd ships as fd-find on Ubuntu)
+    - command: apt-get update && apt-get install -y zsh fd-find bubblewrap socat
+      description: >-
+        Base-image gaps besides mise (fd ships as fd-find on Ubuntu), plus
+        bubblewrap and socat, which Claude Code's own Bash sandbox needs on
+        Linux — the second layer under the microVM boundary (see startup)
     - command: curl -fsSL https://mise.run | sh
       user: "1000"
       description: Install mise as the agent user so toolchains land in /home/agent
@@ -58,6 +61,54 @@ setup:
         - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply
       user: "1000"
       description: Rebuild ~/.claude from core + packs + personal
+    # Second layer: turn Claude Code's OWN Bash sandbox on inside the VM. The
+    # microVM is the boundary; this is defense-in-depth under it, the same
+    # layering Anthropic's sandbox docs recommend. Inside the VM the mechanism
+    # is bubblewrap (installed above). Verified 2026-09-22 on sbx v0.43.0:
+    # bwrap 0.11.1 runs unprivileged as `agent` (userns enabled), and TLS
+    # through the VM's mitm proxy verifies under bwrap (curl 200, verify=0),
+    # so Claude Code's sandbox has what it needs here. Fail closed if
+    # bubblewrap is missing rather than silently running unsandboxed. The
+    # network allowlist mirrors this kit's own `permissions.network.allow`
+    # above so the two layers agree instead of one silently blocking what the
+    # other permits.
+    #
+    # Two things found while verifying, both outside this kit's control and
+    # both inputs to the `jig box` replacement for yoki-box:
+    #   1. `sbx create --clone` plus read-only mounts of subdirectories of the
+    #      same repo path (what yoki-box's guarded/connected modes do) hangs
+    #      the startup phase indefinitely on v0.43.0 — bisected: the same
+    #      kits and mounts finish in under a minute without --clone, and
+    #      --clone alone finishes too. Do not layer sub-mounts over a clone.
+    #   2. sbx now mounts its own agent-skills dir read-only at
+    #      ~/.claude/skills, so `yoki-switch apply` above fails at the point
+    #      where it swaps that dir for a symlink ("Device or resource busy"),
+    #      and the dispatcher stops there — this python3 step then never
+    #      runs. The settings it writes were verified by running it by hand.
+    - command:
+        - python3
+        - -c
+        - |
+          import json, os
+          p = os.path.expanduser("~/.claude/settings.json")
+          s = json.load(open(p)) if os.path.exists(p) else {}
+          s["sandbox"] = {
+            "enabled": True,
+            "failIfUnavailable": True,
+            "allowUnsandboxedCommands": False,
+            "network": {
+              "allowedDomains": [
+                "ports.ubuntu.com", "archive.ubuntu.com", "security.ubuntu.com",
+                "mise.run", "mise.jdx.dev",
+                "github.com", "objects.githubusercontent.com",
+                "release-assets.githubusercontent.com",
+              ],
+            },
+          }
+          json.dump(s, open(p, "w"), indent=2)
+          print("sandbox enabled inside VM")
+      user: "1000"
+      description: Enable Claude Code's own sandbox (bubblewrap) inside the VM, fail-closed
     # Packs are NOT enabled here. They default to OFF on a fresh machine and a
     # sandbox is a fresh machine every time, so without them the sandbox runs
     # with fewer rules and agents than the host (measured: rules 6 -> 2,
