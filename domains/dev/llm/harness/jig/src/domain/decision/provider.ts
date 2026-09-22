@@ -14,8 +14,16 @@ export interface Decided<T> {
   readonly confidence: number;
   /**
    * The full distribution over the options, when the provider has one (a
-   * choice answered by jev). Carried so a log can show how close the runner-up
-   * came; never used to decide — `value` and `confidence` are the answer.
+   * choice answered by jev). `value` and `confidence` remain the provider's own
+   * answer — the argmax and how sure it is — and a caller that only wants an
+   * answer reads those two and nothing else.
+   *
+   * A caller that wants a RANKING rather than an answer reads this: the skill
+   * router's choice mode ranks the options by their probability and gates each
+   * one, which is how a single Choice yields more than one pick (see
+   * `app/routing/select-skills.ts`). It is therefore load-bearing where it is
+   * present, and absent from every provider that has no distribution to give —
+   * so a caller must have a defined behaviour for `undefined`, never assume it.
    */
   readonly probabilities?: Readonly<Record<string, number>>;
 }

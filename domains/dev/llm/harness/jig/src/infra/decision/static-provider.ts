@@ -9,7 +9,16 @@ import type {
 } from "../../domain/decision/provider";
 
 export interface StaticAnswers {
-  readonly choice?: { readonly value: string; readonly confidence: number };
+  readonly choice?: {
+    readonly value: string;
+    readonly confidence: number;
+    /**
+     * Optional, exactly as on the port: a rule provider has no distribution, and
+     * a caller that ranks options must work when there is none. Configured here
+     * so both sides of that branch are reachable offline.
+     */
+    readonly probabilities?: Readonly<Record<string, number>>;
+  };
   readonly bool?: Decided<boolean>;
   /**
    * Answers for `boolBatch`, in the order asked. When absent, the single `bool`
@@ -37,7 +46,11 @@ export class StaticProvider implements DecisionProvider {
     if (!query.options.includes(answer.value as T)) {
       throw new Error(`static provider: answer ${answer.value} not in options`);
     }
-    return { value: answer.value as T, confidence: answer.confidence };
+    return {
+      value: answer.value as T,
+      confidence: answer.confidence,
+      ...(answer.probabilities === undefined ? {} : { probabilities: answer.probabilities }),
+    };
   }
 
   async bool(_query: BoolQuery, _context: DecisionContext): Promise<Decided<boolean>> {

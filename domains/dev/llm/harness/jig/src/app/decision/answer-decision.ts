@@ -51,7 +51,15 @@ export async function dispatchDecision(
   switch (request.op) {
     case "choice": {
       const decided = await provider.choice(request.query, request.context);
-      return { op: "choice", value: decided.value, confidence: decided.confidence };
+      // The distribution is forwarded when the provider has one and the key is
+      // left out entirely when it does not, rather than serialised as `null`:
+      // a client older than the field must see exactly the reply it always saw.
+      return {
+        op: "choice",
+        value: decided.value,
+        confidence: decided.confidence,
+        ...(decided.probabilities === undefined ? {} : { probabilities: decided.probabilities }),
+      };
     }
     case "bool": {
       const decided = await provider.bool(request.query, request.context);

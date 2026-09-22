@@ -39,7 +39,27 @@ export type RemoteDecisionRequest =
  * else — a judgment that does not match the question must fail, not degrade.
  */
 export type RemoteDecisionResponse =
-  | { readonly op: "choice"; readonly value: string; readonly confidence: number }
+  | {
+      readonly op: "choice";
+      readonly value: string;
+      readonly confidence: number;
+      /**
+       * The provider's full distribution over the options that were asked, when it
+       * has one (jev answers a Choice with `probabilities`; a rule provider does
+       * not). Mirrors `Decided.probabilities`, which already carried it in-process
+       * and which this reply used to drop — so a caller behind the service could
+       * see the winner but never the runner-up, and a top-3 over a Choice was not
+       * obtainable at all (`rules/research/skill-selection-experiment/
+       * RESULTS-OFFLINE.md` §1.3, the gap that motivated this field).
+       *
+       * OPTIONAL IN BOTH DIRECTIONS, which is the whole compatibility story: a
+       * service built before this field simply omits it and a client built before
+       * it ignores an unknown key, so neither side has to be upgraded with the
+       * other. A client that needs the distribution must therefore handle its
+       * absence rather than assume it — see `app/routing/select-skills.ts`.
+       */
+      readonly probabilities?: Readonly<Record<string, number>>;
+    }
   | { readonly op: "bool"; readonly value: boolean; readonly confidence: number }
   | { readonly op: "boolBatch"; readonly values: readonly Decided<boolean>[] }
   | { readonly op: "score"; readonly value: number; readonly confidence: number };
@@ -163,6 +183,39 @@ export function requireProbability(value: unknown, what: string): number {
     throw new RemoteDecisionProtocolError(`${what} is not a probability in [0, 1]`);
   }
   return value;
+}
+
+/**
+ * Validate a distribution off the wire, or report that there is none.
+ *
+ * `undefined` is a legitimate answer, not a failure: a service older than the
+ * field, or a provider that has no distribution to give, both send nothing. What
+ * is NOT tolerated is a distribution that does not match the question — a label
+ * outside the options asked, or a value that is not a probability. That is the
+ * same rule the rest of this module runs on (a judgment that does not match the
+ * question must fail, not degrade), and it matters more here than elsewhere:
+ * these numbers are ranked and gated, so a bad key would become a pick.
+ *
+ * Completeness is NOT required. A provider may report only the options it has an
+ * opinion about; a caller ranks what it was given.
+ */
+export function optionalProbabilities(
+  value: unknown,
+  what: string,
+  options?: readonly string[],
+): Readonly<Record<string, number>> | undefined {
+  if (value === undefined) return undefined;
+  const record = requireRecord(value, what);
+  const allowed = options === undefined ? undefined : new Set(options);
+  for (const [label, probability] of Object.entries(record)) {
+    if (allowed !== undefined && !allowed.has(label)) {
+      throw new RemoteDecisionProtocolError(
+        `${what} names "${label}", which is not one of the options asked`,
+      );
+    }
+    requireProbability(probability, `${what}.${label}`);
+  }
+  return record as Record<string, number>;
 }
 
 /** Validate one `Decided<boolean>` off the wire. */

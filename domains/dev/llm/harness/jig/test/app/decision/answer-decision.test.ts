@@ -67,6 +67,30 @@ describe("answerDecision", () => {
       ok: true,
       response: { op: "choice", value: "complex", confidence: 0.8 },
     });
+    // No `probabilities` key at all when the provider has none — a client older than
+    // the field must see the reply it always saw, not one with a null in it.
+    if (result.ok) expect("probabilities" in result.response).toBe(false);
+  });
+
+  test("a provider's distribution reaches the reply instead of being dropped", async () => {
+    const provider = new StaticProvider({
+      choice: { value: "complex", confidence: 0.6, probabilities: { main: 0.4, complex: 0.6 } },
+    });
+
+    const result = await answerDecision(
+      { op: "choice", query: { prompt: "which tier?", options: ["main", "complex"] } },
+      provider,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      response: {
+        op: "choice",
+        value: "complex",
+        confidence: 0.6,
+        probabilities: { main: 0.4, complex: 0.6 },
+      },
+    });
   });
 
   test("a batch with no questions is answered without calling the provider", async () => {

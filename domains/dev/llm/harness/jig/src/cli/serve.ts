@@ -24,6 +24,7 @@ import {
   answerSkill,
 } from "../app/decision/answer-skill";
 import { type AnswerTierDeps, type TierDecision, answerTier } from "../app/decision/answer-tier";
+import { skillQuestionMode } from "../app/routing/select-skills";
 import type { DecisionProvider } from "../domain/decision/provider";
 import type {
   RemoteDecisionErrorResponse,
@@ -499,6 +500,11 @@ export function serveDecisionService(
     ...deps,
     catalog:
       options.skillCatalog ?? (() => readSkillCatalog(env.JIG_SKILL_ROOT ?? defaultSkillRoot())),
+    // Resolved from the same parser the hook uses, so the harnesses that route through
+    // `/skill` (pi, DSH) and the one that decides client-side ask the SAME question. Two
+    // shapes of the skill question running side by side would make the router log a
+    // mixture nothing can be concluded from.
+    options: { question: skillQuestionMode(env) },
   };
 
   const metrics = options.metrics ?? new MetricsRegistry();

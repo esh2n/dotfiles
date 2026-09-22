@@ -28,6 +28,7 @@ import {
   RemoteDecisionProtocolError,
   type RemoteDecisionRequest,
   type RemoteDecisionResponse,
+  optionalProbabilities,
   readErrorResponse,
   requireDecidedBoolean,
   requireProbability,
@@ -83,7 +84,21 @@ export class RemoteDecisionProvider implements DecisionProvider {
         `choice "${reply.value}" is not one of [${query.options.join(", ")}]`,
       );
     }
-    return { value: reply.value as T, confidence: requireConfidence(reply) };
+    // Optional on the wire in both directions: a service that predates the field
+    // sends nothing and this stays the `Decided` it has always returned, with no
+    // `probabilities` key at all. Present, it is validated against the options
+    // that were asked — these numbers get ranked and gated by the caller, so a
+    // label from another question would turn into a pick.
+    const probabilities = optionalProbabilities(
+      reply.probabilities,
+      "choice.probabilities",
+      query.options,
+    );
+    return {
+      value: reply.value as T,
+      confidence: requireConfidence(reply),
+      ...(probabilities === undefined ? {} : { probabilities }),
+    };
   }
 
   async bool(query: BoolQuery, context: DecisionContext): Promise<Decided<boolean>> {

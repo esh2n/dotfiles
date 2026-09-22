@@ -47,6 +47,87 @@ describe("RemoteDecisionProvider", () => {
     ]);
   });
 
+  test("a choice reply carries its distribution through to the caller", async () => {
+    // The gap RESULTS-OFFLINE.md §1.3 found: the winner crossed the wire and the
+    // runner-up did not, so a top-3 over a choice was not obtainable at all.
+    const { client } = clientReturning({
+      op: "choice",
+      value: "writeup",
+      confidence: 0.6,
+      probabilities: { writeup: 0.6, "ui-capture": 0.3, none: 0.1 },
+    });
+    const provider = new RemoteDecisionProvider({ client });
+
+    const decided = await provider.choice(
+      { prompt: "which skill?", options: ["writeup", "ui-capture", "none"] },
+      {},
+    );
+
+    expect(decided).toEqual({
+      value: "writeup",
+      confidence: 0.6,
+      probabilities: { writeup: 0.6, "ui-capture": 0.3, none: 0.1 },
+    });
+  });
+
+  test("a service that sends no distribution still answers, with no probabilities key", async () => {
+    // Old server, new client: the field is optional in both directions, so this is the
+    // reply this provider has always returned and not a degraded one.
+    const { client } = clientReturning({ op: "choice", value: "main", confidence: 0.8 });
+    const provider = new RemoteDecisionProvider({ client });
+
+    const decided = await provider.choice({ prompt: "?", options: ["main", "complex"] }, {});
+
+    expect(decided).toEqual({ value: "main", confidence: 0.8 });
+    expect("probabilities" in decided).toBe(false);
+  });
+
+  test("a distribution naming an option that was not asked about is rejected", async () => {
+    // These numbers are ranked and gated by the caller, so a stray label would become a
+    // pick for a question nobody asked.
+    const { client } = clientReturning({
+      op: "choice",
+      value: "main",
+      confidence: 0.8,
+      probabilities: { main: 0.8, turbo: 0.2 },
+    });
+    const provider = new RemoteDecisionProvider({ client });
+
+    await expect(
+      provider.choice({ prompt: "?", options: ["main", "complex"] }, {}),
+    ).rejects.toThrow(/names "turbo", which is not one of the options asked/);
+  });
+
+  test("a distribution value that is not a probability is rejected", async () => {
+    const { client } = clientReturning({
+      op: "choice",
+      value: "main",
+      confidence: 0.8,
+      probabilities: { main: 0.8, complex: 1.4 },
+    });
+    const provider = new RemoteDecisionProvider({ client });
+
+    await expect(
+      provider.choice({ prompt: "?", options: ["main", "complex"] }, {}),
+    ).rejects.toThrow(RemoteDecisionProtocolError);
+  });
+
+  test("a partial distribution is accepted: a provider may report only what it has", async () => {
+    const { client } = clientReturning({
+      op: "choice",
+      value: "main",
+      confidence: 0.8,
+      probabilities: { main: 0.8 },
+    });
+    const provider = new RemoteDecisionProvider({ client });
+
+    expect(await provider.choice({ prompt: "?", options: ["main", "complex"] }, {})).toEqual({
+      value: "main",
+      confidence: 0.8,
+      probabilities: { main: 0.8 },
+    });
+  });
+
   test("a reply about a different operation is not read as this answer", async () => {
     const { client } = clientReturning({ op: "bool", value: true, confidence: 1 });
     const provider = new RemoteDecisionProvider({ client });

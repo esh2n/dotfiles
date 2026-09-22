@@ -180,6 +180,58 @@ describe("serveDecisionService", () => {
     }
   });
 
+  test("a choice answered over the wire carries its distribution, end to end", async () => {
+    // The whole point of the field: a harness decides client-side through `/decide`, so
+    // the distribution has to survive JSON, not just the in-process `Decided`.
+    const provider = new StaticProvider({
+      choice: { value: "writeup", confidence: 0.55, probabilities: { writeup: 0.55, none: 0.45 } },
+    });
+    const { service, token } = await startAuthedService(provider);
+
+    try {
+      const response = await fetch(`${service.url}/decide`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({
+          op: "choice",
+          query: { prompt: "which skill?", options: ["writeup", "none"] },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        op: "choice",
+        value: "writeup",
+        confidence: 0.55,
+        probabilities: { writeup: 0.55, none: 0.45 },
+      });
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("a provider with no distribution serialises the reply old clients already read", async () => {
+    const provider = new StaticProvider({ choice: { value: "complex", confidence: 0.8 } });
+    const { service, token } = await startAuthedService(provider);
+
+    try {
+      const response = await fetch(`${service.url}/decide`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({
+          op: "choice",
+          query: { prompt: "which tier?", options: ["main", "complex"] },
+        }),
+      });
+
+      const body = (await response.json()) as Record<string, unknown>;
+      expect(body).toEqual({ op: "choice", value: "complex", confidence: 0.8 });
+      expect("probabilities" in body).toBe(false);
+    } finally {
+      service.stop();
+    }
+  });
+
   test("a body that is not JSON is a bad-request, not a crash", async () => {
     const { service, token } = await startAuthedService(new StaticProvider({}));
 
@@ -478,7 +530,10 @@ describe("the /skill path's router log", () => {
   async function startSkillService(
     provider: DecisionProvider,
     entries: RouterLogEntry[],
-    options: { readonly skillCatalog?: () => Promise<readonly SkillCandidate[]> } = {},
+    options: {
+      readonly skillCatalog?: () => Promise<readonly SkillCandidate[]>;
+      readonly env?: Record<string, string>;
+    } = {},
   ): Promise<{ readonly service: RunningDecisionService; readonly token: string }> {
     const { env, path } = tempTokenEnv();
     const token = await ensureDecisionToken(path);
@@ -499,7 +554,7 @@ describe("the /skill path's router log", () => {
           entries.push(entry);
         },
       },
-      env,
+      { ...env, ...options.env },
     );
     return { service, token };
   }
@@ -525,6 +580,60 @@ describe("the /skill path's router log", () => {
       expect(entries[0]?.source).toBe("decided");
       expect(entries[0]?.promptHash).toMatch(/^[0-9a-f]{12}$/);
       expect(entries[0]?.promptChars).toBe("決定記録をまとめて".length);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("asks the batch by default, so the harnesses on /skill keep today's question", async () => {
+    const entries: RouterLogEntry[] = [];
+    // A provider that refuses a choice: the default must not reach that method at all.
+    const { service, token } = await startSkillService(
+      new StaticProvider({ bool: { value: true, confidence: 0.9 } }),
+      entries,
+    );
+
+    try {
+      const response = await fetch(`${service.url}/skill`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ harness: "pi", prompt: "決定記録をまとめて" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(entries[0]?.skills).toEqual(["writeup"]);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("JIG_SKILL_ROUTER_QUESTION=choice makes the service ask the one choice instead", async () => {
+    const entries: RouterLogEntry[] = [];
+    // `bool` is deliberately left unconfigured: StaticProvider throws when asked for one,
+    // so this passes only if the service actually took the choice path.
+    const { service, token } = await startSkillService(
+      new StaticProvider({
+        choice: {
+          value: "writeup",
+          confidence: 0.95,
+          probabilities: { writeup: 0.95, none: 0.05 },
+        },
+      }),
+      entries,
+      { env: { JIG_SKILL_ROUTER_QUESTION: "choice" } },
+    );
+
+    try {
+      const response = await fetch(`${service.url}/skill`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ harness: "pi", prompt: "決定記録をまとめて" }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(entries[0]?.skills).toEqual(["writeup"]);
+      expect(entries[0]?.confidence).toBeCloseTo(0.95);
+      expect(entries[0]?.source).toBe("decided");
     } finally {
       service.stop();
     }
