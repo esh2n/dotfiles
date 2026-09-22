@@ -77,7 +77,7 @@ export const BOX_NETWORK_ALLOW: readonly string[] = [
 /** The PreToolUse matcher jig's guard is registered under inside the box. */
 const CLAUDE_HOOK_MATCHER = "Bash|Read|Write|Edit|MultiEdit|WebFetch";
 
-/** Everything after the bun binary in the hook command; the binary is resolved at startup. */
+/** Everything after the bun binary in the hook command; the binary is resolved at install. */
 const CLAUDE_HOOK_TAIL = `${JIG_HOME}/src/cli/jig.ts hooks pre-tool-use --harness claude`;
 
 export interface RenderAgentKitInput {
@@ -109,9 +109,9 @@ function block(text: string, indent: string): string {
 /**
  * Turn Claude Code's own sandbox on and register jig's guard, by merging into
  * `~/.claude/settings.json` rather than shipping it as a static file: that
- * path is managed by the parent kit, and a static file over a managed path is
- * either overwritten or overwrites the agent's own provisioning. Merging
- * keeps both. Idempotent, because startup commands replay on every restart.
+ * path is written by the parent kit's own install step, and a static file over
+ * it is either overwritten or overwrites the agent's own provisioning. Merging
+ * keeps both, and is written to be idempotent so a re-create converges.
  *
  * `bun` is resolved to an absolute path here, not written as a bare word: the
  * hook runs in whatever environment Claude Code hands it, which is not a
@@ -158,10 +158,15 @@ print("jig: claude sandbox on, guard registered via " + bun)
  *
  * The parent kit's install writes `approval_policy = "never"` and
  * `sandbox_mode = "danger-full-access"` into `~/.codex/config.toml`
- * unconditionally on every create (read out of the sbx binary). The
- * entrypoint this kit sets — `--approve-for-me` — is what actually governs
- * at runtime; this edit is the layer under it, so a future codex that reads
- * the file instead of the flag does not land in yolo mode by default.
+ * unconditionally on every create (read out of the sbx binary, and observed
+ * in a live box). Both are flipped here.
+ *
+ * `approval_policy` is not cosmetic: `--approve-for-me` "routes approval
+ * requests through automatic review", and under `never` the model never
+ * raises one, so there is nothing to route and the flag does nothing.
+ * `on-request` ("the model decides when to ask the user for approval", from
+ * `codex --help`'s `--ask-for-approval` values) is what gives the automatic
+ * review something to answer — unattended, but not unasked.
  *
  * `jig codex register --write` is also what persists hook trust. Codex
  * "requires you to review and trust the exact hook definition … Codex
@@ -182,6 +187,8 @@ function codexSetupScript(): string {
 config="\${CODEX_HOME:-$HOME/.codex}/config.toml"
 if [ -f "$config" ]; then
   sed -i 's/danger-full-access/workspace-write/g' "$config"
+  sed -i 's/^approval_policy = "never"/approval_policy = "on-request"/' "$config"
+  sed -i 's/^# This configuration enables "yolo mode".*/# Reset by jig: workspace-write sandbox, approvals on request./' "$config"
   grep -q '^\\[sandbox_workspace_write\\]' "$config" ||
     printf '\\n[sandbox_workspace_write]\\nnetwork_access = true\\n' >> "$config"
 fi
@@ -189,20 +196,48 @@ bun ${JIG_HOME}/src/cli/jig.ts codex register --write
 `;
 }
 
-/** The install steps both forks share: bun, then jig's dependencies, as the agent user. */
-function sharedInstall(extra: string): string {
+/**
+ * Everything jig does inside the box, as `setup.install` steps.
+ *
+ * All of it is install, none of it is startup, and that is deliberate. sbx's
+ * own claude kit says why, in a comment beside the same choice: "Install
+ * commands are synchronous container PostStart hooks that complete during
+ * create, BEFORE the CLI attaches and launches the interactive `claude`
+ * session. Registering here (rather than only in commands.startup) closes a
+ * race: startup commands are delivered to /etc/durable-startup.d and fired by
+ * a DETACHED dispatcher". Measured: with the guard registration in startup,
+ * `sbx create` returned with no `hooks` key in settings.json at all, and it
+ * appeared only on the next probe — so an agent attaching immediately would
+ * have run its first tool calls unguarded.
+ *
+ * The parent's own writes (settings.json, config.toml) are install steps too,
+ * and the child's run after them — verified by the merged result surviving.
+ * Everything here is written to be idempotent anyway.
+ */
+function jigInstall(steps: readonly string[]): string {
   return `setup:
   install:
-${extra}    - command: npm install -g bun
+${steps.join("")}`;
+}
+
+/** apt, bun, and jig's dependencies — the steps both forks share. */
+function bunSteps(): string {
+  return `    - command: npm install -g bun
       description: The base image has node 22 and npm but no bun, and jig is a bun program.
+    - command: ln -sf "$(npm prefix -g)/bin/bun" /usr/local/bin/bun
+      description: >-
+        npm's global bin is NOT on the PATH that agent hooks get. Measured
+        inside a box, "env -i sh -c 'bun --version'" exits 127, while
+        /usr/local/bin is on that bare PATH. Without this symlink the guard's
+        hook command cannot be resolved — which is exactly what happened the
+        first time.
     - command: chown -R 1000:1000 /home/agent/.local/share/jig /home/agent/.config/jig
       description: Static files arrive root-owned; the agent user has to be able to install into them.
     - command: cd ${JIG_HOME} && bun install --frozen-lockfile
       user: "1000"
       description: >-
-        Install at create time, not at startup: startup commands do not gate
-        the agent's entrypoint, so a guard whose dependencies were still
-        installing would fail open on the session's first tool call.
+        Resolve jig's dependencies before the agent can make a tool call, so
+        the guard is never the thing that is still installing.
 `;
 }
 
@@ -248,24 +283,27 @@ permissions:
     allow:
 ${yamlList(BOX_NETWORK_ALLOW, "      ")}
 
-${sharedInstall(`    - command: apt-get update && apt-get install -y bubblewrap socat
+${jigInstall([
+  `    - command: apt-get update && apt-get install -y bubblewrap socat
       description: >-
         What Claude Code's own Bash sandbox needs on Linux. The microVM is the
-        boundary; this is the second layer under it, enabled in startup below.
-`)}
-  startup:
-    - command:
-        - python3
-        - -c
-        - |
-${block(claudeSettingsScript(), "          ")}
+        boundary; this is the second layer under it, enabled below.
+`,
+  bunSteps(),
+  `    - command: |
+        python3 - <<'JIG_PY'
+${block(claudeSettingsScript(), "        ")}
+        JIG_PY
       user: "1000"
       description: >-
-        Merge into ~/.claude/settings.json — a path the parent kit manages, so
-        it is edited here rather than shipped as a static file. Turns Claude
-        Code's own sandbox on (fail-closed) and puts jig's guard in front of
-        its tools, with bun resolved to an absolute path.
-`;
+        Merge into ~/.claude/settings.json — a path the parent kit writes in
+        its own install step, so it is edited here rather than shipped as a
+        static file. Turns Claude Code's own sandbox on (fail-closed) and puts
+        jig's guard in front of its tools, with bun resolved to an absolute
+        path. Install, not startup: startup is a detached dispatcher and the
+        agent does not wait for it.
+`,
+])}`;
 }
 
 function codexSpec(): string {
@@ -305,7 +343,7 @@ sandbox:
   # the workspace-write sandbox" (codex --help). Unattended like the built-in
   # entrypoint, but inside codex's own sandbox rather than outside it.
   # --dangerously-bypass-hook-trust is deliberately NOT here: jig persists
-  # real hook trust in config.toml (see the startup step).
+  # real hook trust in config.toml (see the install step).
   entrypoint: [codex, "--approve-for-me"]
 
 permissions:
@@ -313,20 +351,19 @@ permissions:
     allow:
 ${yamlList(BOX_NETWORK_ALLOW, "      ")}
 
-${sharedInstall("")}
-  startup:
-    - command:
-        - sh
-        - -c
-        - |
-${block(codexSetupScript(), "          ")}
+${jigInstall([
+  bunSteps(),
+  `    - command: |
+${block(codexSetupScript(), "        ")}
       user: "1000"
       description: >-
-        ~/.codex/config.toml is rewritten by the parent kit on every create, so
-        it is edited here at startup: drop danger-full-access (the entrypoint
-        flag is what governs at runtime; this is the layer under it), then
-        register jig's guard AND persist its hook trust.
-`;
+        ~/.codex/config.toml is written by the parent kit's own install step,
+        so this runs after it and edits in place: drop danger-full-access and
+        approval_policy "never", then register jig's guard AND persist its
+        hook trust. Install, not startup: startup is a detached dispatcher and
+        codex does not wait for it.
+`,
+])}`;
 }
 
 /** Relative path, inside the kit, of the file this agent reads instructions from. */

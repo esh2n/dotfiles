@@ -109,9 +109,43 @@ describe("renderAgentKit", () => {
   test("bun is installed and jig's dependencies are resolved at create time", () => {
     const spec = render("claude")["spec.yaml"] ?? "";
     expect(spec).toContain("npm install -g bun");
-    // In `install`, not `startup`: startup does not gate the agent entrypoint.
-    const install = spec.slice(spec.indexOf("install:"), spec.indexOf("startup:"));
-    expect(install).toContain(`cd ${JIG_HOME} && bun install --frozen-lockfile`);
+    expect(spec).toContain(`cd ${JIG_HOME} && bun install --frozen-lockfile`);
+  });
+
+  test("everything jig does is an install step; nothing is left to startup", () => {
+    // sbx's own claude kit, beside the same choice: "Install commands are
+    // synchronous container PostStart hooks that complete during create,
+    // BEFORE the CLI attaches … startup commands are delivered to
+    // /etc/durable-startup.d and fired by a DETACHED dispatcher". Measured:
+    // with the guard registration in startup, `sbx create` returned with no
+    // `hooks` key in settings.json at all.
+    for (const agent of ["claude", "codex"] as const) {
+      const parsed = Bun.YAML.parse(render(agent)["spec.yaml"] ?? "") as {
+        setup?: Record<string, unknown>;
+      };
+      expect(Object.keys(parsed.setup ?? {})).toEqual(["install"]);
+    }
+  });
+
+  test("bun is linked onto the bare PATH that agent hooks get", () => {
+    // Measured inside a box: npm's global bin is NOT on that PATH
+    // (`env -i sh -c 'bun --version'` exits 127), so without this the guard's
+    // hook command cannot be resolved.
+    for (const agent of ["claude", "codex"] as const) {
+      const spec = render(agent)["spec.yaml"] ?? "";
+      expect(spec).toContain('ln -sf "$(npm prefix -g)/bin/bun" /usr/local/bin/bun');
+      // And it has to happen after npm has put bun somewhere to link from.
+      expect(spec.indexOf("npm install -g bun")).toBeLessThan(spec.indexOf("ln -sf"));
+    }
+  });
+
+  test("jig's own steps run after the dependencies they need", () => {
+    for (const agent of ["claude", "codex"] as const) {
+      const spec = render(agent)["spec.yaml"] ?? "";
+      expect(spec.indexOf("bun install --frozen-lockfile")).toBeLessThan(
+        spec.indexOf(agent === "claude" ? "python3 - <<" : "codex register --write"),
+      );
+    }
   });
 
   test("claude gets bubblewrap and its own sandbox turned on, fail-closed", () => {
@@ -148,6 +182,14 @@ describe("renderAgentKit", () => {
     expect(spec).toContain('"command": bun + " " + ');
     expect(spec).toContain("jig: bun not found — guard NOT registered");
     expect(spec).toContain("sys.exit(1)");
+  });
+
+  test("codex's approval policy is flipped off 'never' too", () => {
+    // Observed in a live box: the parent seeds approval_policy = "never", and
+    // under it the model raises no approval request, so --approve-for-me has
+    // nothing to route and the flag is inert.
+    const spec = render("codex")["spec.yaml"] ?? "";
+    expect(spec).toContain(`sed -i 's/^approval_policy = "never"/approval_policy = "on-request"/'`);
   });
 
   test("codex drops danger-full-access and registers the guard", () => {
