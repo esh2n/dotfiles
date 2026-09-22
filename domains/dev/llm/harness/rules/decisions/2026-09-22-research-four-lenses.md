@@ -2,6 +2,8 @@
 
 Status: accepted — 一社の資料や逸話一件で下した判断が四方向の調査で覆ったため（2026-09-22）
 
+rule: Before any design decision, gather evidence from all four lenses — vendor docs, named practitioners, measured evidence, and public-repo state — cite a URL per claim, and collect negative evidence (deprecations, cost incidents, reverted adoptions) with the same effort as positive. Never use your own code or prior designs as evidence; read subordinates' full output, not summaries.
+
 ## Problem
 
 設計判断を、ベンダー一社の資料、自分の既存コードのコメント、一件の逸話、部下の要約だけで下していた。「根拠のない意見は意味がない」。

@@ -2,6 +2,8 @@
 
 Status: accepted — 外部の記憶基盤に利得の測定がなく害の測定が揃い、手元でも読まれていなかった（2026-09-22）
 
+rule: Write corrections directly into enforced files (AGENTS.md rules, guard-rules.json, lint), never into a separate summarization/memory system; record past work only in in-repo decision notes and plan files. Never adopt an external memory backend (Mem0, Letta, Zep) or an auto-summarizing plugin (claude-mem); keep Claude Code's auto memory as a Claude-only aid only.
+
 ## Problem
 
 セッションをまたいで、修正されたことと過去の作業を次のセッションに引き継ぎたい。方法は「エージェント自身がファイルに書く」流派と「会話から事実を抽出して外部の保存基盤に入れ、検索で引く」流派に分かれる。五つのハーネスのうち記憶の機能を持つのは Claude Code(auto memory、Claude 専用で機械ローカル)だけで、横断の記憶をどうするかも決める必要があった。

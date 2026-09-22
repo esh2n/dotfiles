@@ -2,6 +2,8 @@
 
 Status: accepted — 道具の一覧は既に flake にあり、Linux でも動くことを実測し、mise では持てない道具がある（2026-09-22）
 
+rule: Keep CLI/LSP tool sources in the Nix flake and runtimes in mise; never change this split. Build a separate, Linux-only packages.aarch64-linux.box list for containers (not the full host list) and bake it into sbx templates as a copied Nix closure, never by installing Nix itself inside the container; drop terraform from box (BSL, uncached).
+
 ## Problem
 
 言語の処理系、LSP、CLI の道具を、ホスト(macOS)と容れ物(Docker Sandboxes の Linux arm64 microVM)の両方に、一つの定義から入れたい。ホストでは道具と LSP の約 100 個が Nix の flake(home-manager)にあり、処理系だけが mise にある。

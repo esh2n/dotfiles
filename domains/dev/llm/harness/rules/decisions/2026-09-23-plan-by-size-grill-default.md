@@ -2,6 +2,8 @@
 
 Status: accepted — 五社中四社が大きさで計画を gate し、最も詳しい実践者は多文書の SDD を「小さい仕事に大槌」と報告、人が書く仕様文書の唯一の統制実験は否定側、一律の SDD を捨てたコミットが実在する（2026-09-23）
 
+rule: Default to grilling plus a short decision record; skip planning when the diff fits one sentence, use grilling when it spans files or the method is uncertain, and reserve sdd for large, ambiguous, multi-file work only. For sdd, interview then write one self-contained SPEC (files touched, boundaries, out-of-scope, verification, 3-5 sections) — never Spec Kit's constitution/specify/plan/tasks.
+
 ## Problem
 
 「ちゃんと設計してから進める」をどう実装するか。手元には Spec Kit 型の `sdd` skill（constitution → specify → plan → tasks → implement の多文書）と、chat で証拠を突き合わせて詰める `grilling` があった。SDD は業界で正しい実践とされているのか、既定をどちらにするかを決める。

@@ -2,6 +2,8 @@
 
 Status: accepted — 種類ごとの元ディレクトリと生成器の組が複数ハーネス運用の実践と一致する（2026-09-22）
 
+rule: Keep harness source files under domains/dev/llm/harness/, organized by kind (rules/, skills/, agents/, hooks/, mcp/, policy/, jig/), never a separate personal/ layer. Do all per-harness translation inside the jig apply generator, and never commit its generated output to the repository.
+
 ## Problem
 
 ルール、スキル、サブエージェント、フック、MCP の一覧、権限といった設定の元を、五つのハーネス(Claude Code、Codex、pi、DSH、omp)に届けるための置き方を決める。ハーネスごとに置き場と形式が違い、共有できる部分とできない部分がある。

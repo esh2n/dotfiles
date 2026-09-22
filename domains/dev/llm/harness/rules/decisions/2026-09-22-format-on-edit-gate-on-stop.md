@@ -2,6 +2,8 @@
 
 Status: accepted — 公開リポジトリの主流と各ハーネスの仕組みに合い、編集ごとの整形は文脈を消費しない（2026-09-22）
 
+rule: Format edited files silently on every edit (PostToolUse in Claude Code, tool_result in pi, tools/post-execute in DSH), never at Stop/session-end. Gate type-checking and lint at the response's end (Stop in Claude Code, agent_before_settle in pi, agent/turn-stopping in DSH with a self-imposed retry cap); Codex runs the formatter once via an AGENTS.md instruction.
+
 ## Problem
 
 エージェントが編集したファイルの整形、lint、型検査を、編集ごとのフックで走らせるか、応答の終わり(Stop)でまとめるか、エージェントの外(pre-commit、CI、指示)に置くか、LSP の診断に任せるか。編集ごとの整形で「整形後のファイルを読み直して混乱する往復」が起きたという記録があり、Stop にまとめる案が浮上していた。

@@ -2,6 +2,8 @@
 
 Status: accepted — 記録の元を Markdown にするのは業界の収束と一致し、非公開の出し分けは添付の漏れが構造的なのでビルドを分け、記法は CommonMark 互換で lint を通す（2026-09-22）
 
+rule: Write all records (research, decisions, work notes) as Markdown in git, never hand-written HTML; check rules/research/INDEX.md before researching so established facts aren't re-researched. Build human-facing views twice from the same Markdown — a private site with everything and a public site selecting only publish: true records at the source — using CommonMark notation only (> [!type], :::name), never JSX.
+
 ## Problem
 
 writeup（セッションの調査・判断・勉強の記録を文書にして残し、人に見せる仕組み）の三つの動機に応える。(1) 過去の調査を次のセッションが見つけて再調査しない。(2) 勉強や作業の記録を、スマホでも読める人向けの view で残し、一件ずつ公開できる。(3) AI の書く説明が分かりにくい（自己評価 20/100）。いまの writeup は HTML を `wu-*` 部品で直接書き、`~/.local/share/writeup/{private,work}` のローカル git に貯め、claude.ai Artifact 等へ publish する。

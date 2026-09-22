@@ -2,6 +2,8 @@
 
 Status: accepted — 各ハーネスが goal を持ち、自前の実行系は業界でも生き残っていない（2026-09-22）
 
+rule: Never build a custom loop/execution engine; drive unattended repetition through each harness's native goal feature (Claude Code /goal, Codex /goal, DSH goal, pi-goal, omp goal mode). During any unattended goal run, forbid fs.write/fs.edit to test paths and forbid credential and deploy commands via guard rules, and only run tasks whose success condition is machine-checkable before starting.
+
 ## Problem
 
 エージェントを無人で繰り返し回す(新しい文脈で反復する、定期実行する、長時間自律で走らせる)ことを jig の責務として持つか。持つなら実行系を自前で作るか、ハーネスの機能に任せるか。回すときは必ず goal(完了条件)を指定する、という運用が前提。

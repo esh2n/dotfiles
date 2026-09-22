@@ -2,6 +2,8 @@
 
 Status: accepted — 確認された穴を埋める二本だけ入れ、三重の一本を捨て、成果物置き場になっていた skill を手順だけに戻す（2026-09-22）
 
+rule: Add only obra/superpowers's using-git-worktrees and verification-before-completion skills after reading them in full and recording upstream + pinned commit; drop writing-skills as a duplicate of skill-creator. Move large binary/video assets (e.g. yoki-artifact, dopa-shorts, writeup-kit, grilling) out of skills — a skill holds procedure, never build artifacts or media.
+
 ## Problem
 
 88 本の skill のうち、外から入れる価値がある物はあるか。重複している物、skill の中に大きな資産（動画、バイナリ、ビルド成果物）を抱えている物をどうするか。

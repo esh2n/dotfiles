@@ -2,6 +2,8 @@
 
 Status: accepted — 要否の軸は業界評価とユースケース適合の二つ。使用回数は「使いこなせていない」検知にだけ使う。届け方は各ハーネスの読み込み方（遅延か eager か）で決め、使わせる仕組みは強制しない（2026-09-22）
 
+rule: Keep serena, codebase-memory-mcp, context7, playwright-mcp, figma-remote and notion-mcp as MCP servers, but drop figma-desktop and claude-mem's mcp-search, and never add GitHub MCP (use gh instead) or DB/Linear/Jira MCP (lethal-trifecta risk). Do not force tool use via deny hooks; instead guide usage with rule lines and disable-model-invocation skills, and measure calls via jig's audit log.
+
 ## Problem
 
 八つの MCP サーバーが設定されているが、30 日の実呼び出しは合計 23 回で、五つは 0 回。これを「要らない」の根拠にする案が出たが、判断の軸が誤っていた。何を残し、何を足さず、使われていない物をどうするかを、業界評価とユースケースで決め直す。
