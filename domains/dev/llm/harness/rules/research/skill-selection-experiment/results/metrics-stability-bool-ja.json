@@ -1,0 +1,26 @@
+{
+  "variant": "bool-ja",
+  "cases": 40,
+  "runs": 5,
+  "top1_flip_rate": 0.025,
+  "top1_flipped": 1,
+  "injected_set_flip_by_threshold": {
+    "0.6": {
+      "flipped": 7,
+      "cases": 40,
+      "flip_rate": 0.175
+    },
+    "0.7": {
+      "flipped": 1,
+      "cases": 40,
+      "flip_rate": 0.025
+    },
+    "0.8": {
+      "flipped": 2,
+      "cases": 40,
+      "flip_rate": 0.05
+    }
+  },
+  "max_probability_spread": 0.06,
+  "median_probability_spread": 0.02
+}

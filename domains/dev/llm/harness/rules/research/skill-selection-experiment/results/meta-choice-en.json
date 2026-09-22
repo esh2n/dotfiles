@@ -1,0 +1,13 @@
+{
+  "variant": "choice-en",
+  "n": 200,
+  "catalog": 54,
+  "judgmentCalls": 200,
+  "retries": 0,
+  "wall_s": 13.12,
+  "metrics_delta": {
+    "jig_judgment_requests_total{kind=\"decide\",outcome=\"ok\"}": 200,
+    "jig_judgment_tokens_total{direction=\"input\",kind=\"decide\",model=\"jev-1.13.0\"}": 1321216,
+    "jig_judgment_tokens_total{direction=\"output\",kind=\"decide\",model=\"jev-1.13.0\"}": 111888
+  }
+}
