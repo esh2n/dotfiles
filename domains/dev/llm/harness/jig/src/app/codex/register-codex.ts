@@ -60,8 +60,7 @@ export async function registerCodex(
   const hash = ports.sha256(registration.canonicalIdentity);
   if (configBefore !== undefined && keyDeclaredElsewhere(configBefore, key)) {
     throw new Error(
-      `config.toml already declares [hooks.state."${key}"] outside jig's block; ` +
-        "another tool owns that slot — resolve by hand before registering",
+      `config.toml already declares [hooks.state."${key}"] outside jig's block; another tool owns that slot — resolve by hand before registering`,
     );
   }
   const trust = planTrust(configBefore, [trustTable(key, hash)]);
