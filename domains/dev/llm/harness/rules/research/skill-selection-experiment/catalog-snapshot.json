@@ -1,0 +1,454 @@
+{
+  "taken_at": "2026-09-22",
+  "source": "~/.claude/.skills-merged/*/SKILL.md (frontmatter)",
+  "routable_count": 54,
+  "excluded": [
+    {
+      "name": "prompt-save",
+      "reason": "disable-model-invocation: true"
+    },
+    {
+      "name": "synced",
+      "reason": "no SKILL.md"
+    },
+    {
+      "name": "workday-input",
+      "reason": "disable-model-invocation: true"
+    }
+  ],
+  "catalog_sha256": "7c4b0adf63081f7605d48cb7e685273473238799139d710f21b899dcfd0d3c2e",
+  "skills": [
+    {
+      "dir": "ai-regression-testing",
+      "name": "ai-regression-testing",
+      "description_chars": 268,
+      "description_sha256": "baa2df3e452242ba6c96e5dead04390e18e0cdcf5017a9edca64323b9ff530cc",
+      "description_head": "Use when an AI agent has modified API routes or backend logic, when a fixed bug needs a regression guard, or when review",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/ai-regression-testing"
+    },
+    {
+      "dir": "code-graph-exploration",
+      "name": "code-graph-exploration",
+      "description_chars": 404,
+      "description_sha256": "9a53c30921473ed063cba568ed9776ff417c0c5d9f832847a8713e44d5f70c03",
+      "description_head": "Choose between code-graph, LSP, search, and direct file reading when investigating a repository. Use for impact analysis",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/code-graph-exploration"
+    },
+    {
+      "dir": "code-review-discipline",
+      "name": "code-review-discipline",
+      "description_chars": 390,
+      "description_sha256": "3df80a967cd1230153a50f6556ea6ce807f8c53d3cd7ec9971ebad0d4bea8c2f",
+      "description_head": "Meta-discipline for how to judge and how to review code and design — not language rules, but the reasoning stance behind",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/code-review-discipline"
+    },
+    {
+      "dir": "config-gc",
+      "name": "config-gc",
+      "description_chars": 412,
+      "description_sha256": "efde9848e0705abbc1fee608ee5044336b639fead0f258d2b98be0b7380de86c",
+      "description_head": "Garbage collection for your Claude Code configuration. Periodically scans ~/.claude (skills, memory, hooks, permissions,",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/config-gc"
+    },
+    {
+      "dir": "continuous-learning-v2",
+      "name": "continuous-learning-v2",
+      "description_chars": 235,
+      "description_sha256": "89ea10e059ecddaf9e08e290b8fb09a15212eb3c261fea61887160f90f2c07f3",
+      "description_head": "Instinct-based learning system that observes sessions via hooks, creates atomic instincts with confidence scoring, and e",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/runtime/yoki/skills/continuous-learning-v2"
+    },
+    {
+      "dir": "cost-tracking",
+      "name": "cost-tracking",
+      "description_chars": 226,
+      "description_sha256": "e0edaf4925e693929a279b083741e6ed46c00858d1c4a020b345935822657a11",
+      "description_head": "Track and report Claude Code token usage, spending, and budgets from the local yoki cost-tracker metrics log. Use when t",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/cost-tracking"
+    },
+    {
+      "dir": "css-cascade",
+      "name": "css-cascade",
+      "description_chars": 554,
+      "description_sha256": "fd0e82e052434287fe95fcc32aec4cb427fe171b0b7d4f755bcbf31322c8b53c",
+      "description_head": "Use when writing or reviewing CSS and a cascade-resolution question comes up — which declaration wins, why an override d",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/web/skills/css-cascade"
+    },
+    {
+      "dir": "css-flow",
+      "name": "css-flow",
+      "description_chars": 525,
+      "description_sha256": "c79f84407486d2214ffe15771e0fa847a918e3e114576f5532c0750efd83d468",
+      "description_head": "Use when writing or reviewing CSS and boxes in normal flow don't space the way it looks like they should — margins that ",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/web/skills/css-flow"
+    },
+    {
+      "dir": "css-modern",
+      "name": "css-modern",
+      "description_chars": 452,
+      "description_sha256": "0f08f55b34082d6c0581404a3f6d04429338ff86aa21f992d10a58c8a693e8d2",
+      "description_head": "Use when writing or reviewing CSS and a legacy idiom appears — 100vh on mobile, viewport media queries for component lay",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/web/skills/css-modern"
+    },
+    {
+      "dir": "css-units",
+      "name": "css-units",
+      "description_chars": 522,
+      "description_sha256": "a744acb61d8c2adecff4cc06d7b4eb6c483f951c55f651be5342ffdc4ba388f3",
+      "description_head": "Use when writing or reviewing CSS and a unit-choice question comes up — px vs rem vs em, why a nested component's font k",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/web/skills/css-units"
+    },
+    {
+      "dir": "defense-in-depth",
+      "name": "defense-in-depth",
+      "description_chars": 187,
+      "description_sha256": "c6564bd4b3219aa0e4fcb329c18ec5da8c1c3211dda4e0a603e6a8ce98d56d80",
+      "description_head": "Use when invalid data causes failures deep in execution, requiring validation at multiple system layers - validates at e",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/defense-in-depth"
+    },
+    {
+      "dir": "defensive-css",
+      "name": "defensive-css",
+      "description_chars": 458,
+      "description_sha256": "ba699e5c15683d803819edf0b449555e4a3351d66507351a028f4b1e4d5eeab5",
+      "description_head": "Use when writing or reviewing CSS and content or environment risk appears — long/short/missing text, empty lists, extrem",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/web/skills/defensive-css"
+    },
+    {
+      "dir": "dopa-shorts",
+      "name": "dopa-shorts",
+      "description_chars": 153,
+      "description_sha256": "a28911f8b3b5421b01641cc240c09c539bcb551156ffa01c97d8cf2cf74d0cd1",
+      "description_head": "\"文章(記事・ドキュメント・ニュース)を縦ショート動画(9:16 mp4)に変換する。ずんだもん解説風の立ち絵テンプレとキネティックタイポテンプレ、VOICEVOX/CoeFont/sayのボイス切替対応。「この記事をショート動画にして」「",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/dopa-shorts"
+    },
+    {
+      "dir": "e2e-testing",
+      "name": "e2e-testing",
+      "description_chars": 133,
+      "description_sha256": "7f5c4d22d08a70000e162d3f4f568785c2f01e12064ca8bbc67994a933fa0f75",
+      "description_head": "Playwright E2E testing patterns, Page Object Model, configuration, CI/CD integration, artifact management, and flaky tes",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/typescript/skills/e2e-testing"
+    },
+    {
+      "dir": "eli5",
+      "name": "eli5",
+      "description_chars": 760,
+      "description_sha256": "99053e2893db6606dc8b2b2171b9f06fce8a482c7c29d3959bdef501c7aa8766",
+      "description_head": "Explain a topic like I'm a 5 year old — a dead-simple picture explainer published as an HTML Artifact (big inline-SVG pi",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/eli5"
+    },
+    {
+      "dir": "empirical-prompt-tuning",
+      "name": "empirical-prompt-tuning",
+      "description_chars": 252,
+      "description_sha256": "3fd294c274b2623c727bf3a28f9f4e49bca1d0b5dfffb7143edb889a94902eea",
+      "description_head": "agent 向けテキスト指示（skill / slash command / task プロンプト / CLAUDE.md 節 / コード生成プロンプト）を、バイアスを排した実行者に動かしてもらい、両面（実行者の自己申告 + 指示側メトリク",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/empirical-prompt-tuning"
+    },
+    {
+      "dir": "english-coach",
+      "name": "english-coach",
+      "description_chars": 414,
+      "description_sha256": "fbbf53ebf6d9f720b9dd9c59e7c14e0b3de18ca38d9be17cb291b2247f8a3e42",
+      "description_head": "> Business English coaching. Use when the user writes in English, asks how to phrase something in English, or the englis",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/english-coach"
+    },
+    {
+      "dir": "fastapi-patterns",
+      "name": "fastapi-patterns",
+      "description_chars": 205,
+      "description_sha256": "e7d5d5174ac1d250355282e5b4fbc0382b40019fdc2d218cdd761b44340a4cac",
+      "description_head": "FastAPI best practices covering project structure, Pydantic v2 schemas, dependency injection, async handlers, authentica",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/python/skills/fastapi-patterns"
+    },
+    {
+      "dir": "frontend-slides",
+      "name": "frontend-slides",
+      "description_chars": 311,
+      "description_sha256": "259f4c88199f9281d0590545b02d6bdd9b51fe2c8f7e6e047b90370c626d5a17",
+      "description_head": "Create stunning, animation-rich HTML presentations from scratch or by converting PowerPoint files. Use when the user wan",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/frontend-slides"
+    },
+    {
+      "dir": "go-concurrency",
+      "name": "go-concurrency",
+      "description_chars": 316,
+      "description_sha256": "55d19b80f147be34a84fa973a2942a934ec11af5b27980d399480912127db038",
+      "description_head": "Use when writing or reviewing goroutines, channels, sync primitives, context cancellation, worker pools, or anything tou",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/go/skills/go-concurrency"
+    },
+    {
+      "dir": "go-modern",
+      "name": "go-modern",
+      "description_chars": 464,
+      "description_sha256": "30809e78d82338593967cd3f13d4b655728c8819d9cbcd14b90da55c87569b78",
+      "description_head": "Use when writing or reviewing Go code and a pre-1.21 idiom shows up — `v := v` loop-variable copies, hand-rolled contain",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/go/skills/go-modern"
+    },
+    {
+      "dir": "go-performance",
+      "name": "go-performance",
+      "description_chars": 299,
+      "description_sha256": "ea10163306265ff11bf629d007a0e5eebc653172aecfeeacacba901e624fd96f",
+      "description_head": "Use when optimizing Go code, profiling with pprof, writing or reading benchmarks, tuning GOGC/GOMEMLIMIT/GOMAXPROCS, cha",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/go/skills/go-performance"
+    },
+    {
+      "dir": "golang-patterns",
+      "name": "golang-patterns",
+      "description_chars": 120,
+      "description_sha256": "defec128b5631274ee3dc22d110d739ad19828cf932e769d92725f63c1785f9e",
+      "description_head": "Idiomatic Go patterns, best practices, and conventions for building robust, efficient, and maintainable Go applications.",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/go/skills/golang-patterns"
+    },
+    {
+      "dir": "golang-testing",
+      "name": "golang-testing",
+      "description_chars": 152,
+      "description_sha256": "14ea70c8902305a48b55ff1a2c01c6a6654b9fa70985e7dd76abd1287ec9ddec",
+      "description_head": "Go testing patterns including table-driven tests, subtests, benchmarks, fuzzing, and test coverage. Follows TDD methodol",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/go/skills/golang-testing"
+    },
+    {
+      "dir": "grilling",
+      "name": "grilling",
+      "description_chars": 503,
+      "description_sha256": "aa1c1afc784b1afbe44d1302f06563e1d3a18774f043a93c203512c62c1eef45",
+      "description_head": "Relentless design interview that grills a plan, spec, or decision until you and the user reach shared understanding. Use",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/grilling"
+    },
+    {
+      "dir": "keymap-help",
+      "name": "keymap-help",
+      "description_chars": 225,
+      "description_sha256": "12eda51fe8723f3a730aa2a603ec5897ab37f90feb87aa6518cbe08fbf3dbc5e",
+      "description_head": "\"Neovimのキーバインドを調べる。「このキーなんだっけ？」「dotfilesでカスタムしたやつ何だっけ？」に答える。実行時にアクティブなdistro(lazyvim/nvchad/astrovim/custom)を自動判定し、headl",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/keymap-help"
+    },
+    {
+      "dir": "mcp-server-patterns",
+      "name": "mcp-server-patterns",
+      "description_chars": 203,
+      "description_sha256": "fd3342453d91d1c11ad84a679dbe6080980fa87d342744a913d13c9da198eef5",
+      "description_head": "Build MCP servers with Node/TypeScript SDK — tools, resources, prompts, Zod validation, stdio vs Streamable HTTP. Verify",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/typescript/skills/mcp-server-patterns"
+    },
+    {
+      "dir": "morning-brief",
+      "name": "morning-brief",
+      "description_chars": 196,
+      "description_sha256": "13acf4d8fad5d492754b92704130028059326b8a99d9dc9f4622ce344e68e115",
+      "description_head": "\"Daily morning briefing - collects trending topics across tech, AI, politics, gaming, finance, design, business, hardwar",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/morning-brief"
+    },
+    {
+      "dir": "natural-japanese",
+      "name": "natural-japanese",
+      "description_chars": 685,
+      "description_sha256": "47de73ea3e2272a2e05e5d16dfc4bcd820cea582d0acf33969a8d9bb2e60d7c8",
+      "description_head": "仕事の日本語文書を読みやすくわかりやすく書く・直すためのスキル。議事録（文字起こしからの議事録化を含む）、調査レポート・分析レポート、社内ガイド・マニュアル、リサーチメモ・ディスカッションペーパー・企画書・提案書・報告書・メール、スライド構",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/natural-japanese"
+    },
+    {
+      "dir": "nestjs-patterns",
+      "name": "nestjs-patterns",
+      "description_chars": 153,
+      "description_sha256": "5d0f83521e278d5e6f3290106a312d576e67a97850954f8a973573b9a7589c70",
+      "description_head": "NestJS architecture patterns for modules, controllers, providers, DTO validation, guards, interceptors, config, and prod",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/typescript/skills/nestjs-patterns"
+    },
+    {
+      "dir": "python-testing",
+      "name": "python-testing",
+      "description_chars": 211,
+      "description_sha256": "dad2e13f68f21908ec14b461c162a6cc14ca97ccd6205655e5f68974439e59cc",
+      "description_head": "Use when writing or reviewing Python tests — pytest marker/conftest conventions, anyio-based async testing (not pytest-a",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/python/skills/python-testing"
+    },
+    {
+      "dir": "react-patterns",
+      "name": "react-patterns",
+      "description_chars": 260,
+      "description_sha256": "d5d0a8fb83e6fea33bfae768eb04e85cb7f32e4d9d851647eff269721c493d79",
+      "description_head": "React 18/19 patterns including hooks discipline, server/client component boundaries, Suspense + error boundaries, form a",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/react/skills/react-patterns"
+    },
+    {
+      "dir": "react-performance",
+      "name": "react-performance",
+      "description_chars": 386,
+      "description_sha256": "8f704074ad645f2af8546f393f848cd84f233c400201dbc226f3546a6b32397c",
+      "description_head": "React and Next.js performance optimization patterns adapted from Vercel Engineering's React Best Practices (https://gith",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/react/skills/react-performance"
+    },
+    {
+      "dir": "react-testability",
+      "name": "react-testability",
+      "description_chars": 330,
+      "description_sha256": "b90b26eabd01492d51b964a3ca640efdeff60cdececb3f4d44bc0d0a0f7e4216",
+      "description_head": "\"Comprehensive React component coding guidelines, refactoring principles, and architectural patterns. **CRITICAL**: Focu",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/react/skills/react-testability"
+    },
+    {
+      "dir": "react-testing",
+      "name": "react-testing",
+      "description_chars": 286,
+      "description_sha256": "66df40d311e6cd4ac680129096b701d3ed6f76553cdac1a82a8dae5456b448ea",
+      "description_head": "React component testing with React Testing Library, Vitest/Jest, MSW for network mocking, accessibility assertions with ",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/react/skills/react-testing"
+    },
+    {
+      "dir": "retrospective-codify",
+      "name": "retrospective-codify",
+      "description_chars": 235,
+      "description_sha256": "f63e79f3bd079a029931d86c01ddbfb2051bc9d1ed9c343e0f75ee6873a5ac0a",
+      "description_head": "タスク完了時に「最初に失敗した内容」と「最終的に通った解法」を対応付け、最初に知っておくべきだった知見を ast-grep ルール / skill / CLAUDE.md ルールのいずれかに言語化する。試行錯誤の末にたどり着いた解や、同じ落",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/retrospective-codify"
+    },
+    {
+      "dir": "rust-patterns",
+      "name": "rust-patterns",
+      "description_chars": 135,
+      "description_sha256": "a00dd2abbb1320d9e8c428e527e5c1b0a2bc5423be675a51247851ae26f41db4",
+      "description_head": "Idiomatic Rust patterns, ownership, error handling, traits, concurrency, and best practices for building safe, performan",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/rust/skills/rust-patterns"
+    },
+    {
+      "dir": "rust-testing",
+      "name": "rust-testing",
+      "description_chars": 149,
+      "description_sha256": "de6f3e398775cf9c7344ea34b7159a77b1f62fc97f2a93ab73b9f4497c0577bd",
+      "description_head": "Rust testing patterns including unit tests, integration tests, async testing, property-based testing, mocking, and cover",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/rust/skills/rust-testing"
+    },
+    {
+      "dir": "sdd",
+      "name": "sdd",
+      "description_chars": 305,
+      "description_sha256": "bc4d2f1b063c7c21d24b5a1eb6363fd4b112b273a3e638dea8250b1e1deac379",
+      "description_head": "Spec-Driven Development workflow. Use when starting a new feature, bugfix, or any task that benefits from structured spe",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/sdd"
+    },
+    {
+      "dir": "show-me",
+      "name": "show-me",
+      "description_chars": 408,
+      "description_sha256": "927496dcacc6bf2a5c35a29842f9b7162653684878bca38464db5856ccee2bee",
+      "description_head": "Use when the user says 「見せて」「図にして」「今の話を絵で」「どこが変わる？」「構造を一瞥したい」, \"show me\", or \"/show-me\", or when an explanation of code ",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/show-me"
+    },
+    {
+      "dir": "skill-stocktake",
+      "name": "skill-stocktake",
+      "description_chars": 169,
+      "description_sha256": "dfca7188ea3fe404e9bcc8cf143cb490995c7523fa2bbd43c7d145d076d31abc",
+      "description_head": "\"Use when auditing Claude skills and commands for quality. Supports Quick Scan (changed skills only) and Full Stocktake ",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/skill-stocktake"
+    },
+    {
+      "dir": "storybook-guidelines",
+      "name": "storybook-guidelines",
+      "description_chars": 240,
+      "description_sha256": "30b4b42bd6dd6f49c5609cb67575acc0e881d855e921de302a8fd155f652f18c",
+      "description_head": "Comprehensive Storybook story creation guidelines. Covers story structure, naming conventions, and visual testing patter",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/react/skills/storybook-guidelines"
+    },
+    {
+      "dir": "strategic-compact",
+      "name": "strategic-compact",
+      "description_chars": 284,
+      "description_sha256": "9f5cf5f65cfca59c02f18a56a0f3f94cf011ee297d7534024aaf4d00df3cb419",
+      "description_head": "Suggests manual context compaction at logical task boundaries (research→plan, milestone→next phase) instead of arbitrary",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/strategic-compact"
+    },
+    {
+      "dir": "systematic-debugging",
+      "name": "systematic-debugging",
+      "description_chars": 191,
+      "description_sha256": "d8567a87c9246202b0cd6726533f67a58e66bb35920a9a3ba0fe345c392b0df3",
+      "description_head": "Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes - enforces root cause invest",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/systematic-debugging"
+    },
+    {
+      "dir": "tdd-workflow",
+      "name": "tdd-workflow",
+      "description_chars": 160,
+      "description_sha256": "663a9a5c46bf5371fe9fdbbf74a0dffb4b41df51a73f124f69cbe8a943f44ac6",
+      "description_head": "Use when writing new features, fixing bugs, or refactoring code. Enforces test-driven development with 80%+ coverage inc",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/tdd-workflow"
+    },
+    {
+      "dir": "ts-modern",
+      "name": "ts-modern",
+      "description_chars": 470,
+      "description_sha256": "2721fbae6eae083714ad69fa07e5ff8fe2421646affcf4f5e124c745484e6163",
+      "description_head": "\"Use when writing or reviewing TypeScript or JavaScript and a legacy idiom appears — `as` casts or wide annotations that",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/packs/typescript/skills/ts-modern"
+    },
+    {
+      "dir": "ui-capture",
+      "name": "ui-capture",
+      "description_chars": 390,
+      "description_sha256": "c3f1cb40626324b9d3e7b59b3b6b11ab285e8ad7048cae23a25e6f6371d9ffcd",
+      "description_head": "Use when the user wants a screenshot or short GIF of a web UI for a PR description, writeup document, or Artifact — a ru",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/ui-capture"
+    },
+    {
+      "dir": "workday-calc",
+      "name": "workday-calc",
+      "description_chars": 155,
+      "description_sha256": "089b127e4622b2e36ccc32124a93c4fdeed28e56e4536c3f18b1027ab4668e73",
+      "description_head": "\"SlackとGitHubのactivityから勤務時間を算出する。デフォルト(9:30-19:00)をベースに、Slackの最初/最後のメッセージ時刻とGitHubのcommit時刻で早出・残業を補正。各日の作業メモ（何をしていたか）もS",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/personal/skills/workday-calc"
+    },
+    {
+      "dir": "writeup",
+      "name": "writeup",
+      "description_chars": 761,
+      "description_sha256": "66bb288d09f754f09c113ad2ead602dab09c0075cdd323b0389de313eaf8205e",
+      "description_head": "Use when the user wants a document that is kept and revisited rather than a one-off chat answer — a decision record (決定記",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/writeup"
+    },
+    {
+      "dir": "writeup-kit",
+      "name": "writeup-kit",
+      "description_chars": 232,
+      "description_sha256": "0fdf2bff1d13af2205956b2d036e3a51178082b4b77d3bb739eafca7b4313d3a",
+      "description_head": "Shared design kit (CSS tokens, 20 role-named components, page template, diagram IR contract, self-check rules) read by t",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/writeup-kit"
+    },
+    {
+      "dir": "writing-skills",
+      "name": "writing-skills",
+      "description_chars": 97,
+      "description_sha256": "5504b0825ec458aa8c20e9a55c6a932b36849e261a97aaf98af366e19a937154",
+      "description_head": "Use when creating new skills, editing existing skills, or verifying skills work before deployment",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/writing-skills"
+    },
+    {
+      "dir": "yoki-agent",
+      "name": "yoki-agent",
+      "description_chars": 152,
+      "description_sha256": "a1283babf8a77f03531483d2e7f5990c31b39b14162f3e73707a3ce6a8212c94",
+      "description_head": "単発で Codex / omp に 1 つの仕事を投げる CLI。ユーザーに名指しで頼まれたときだけ使う — 「yoki-agent で」「Codex にも聞いて」「omp に投げて」。自分から選ぶスキルではない。多角レビューや調査を並列で",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/yoki-agent"
+    },
+    {
+      "dir": "yoki-artifact",
+      "name": "yoki-artifact",
+      "description_chars": 373,
+      "description_sha256": "366da3060ee90d2f0183812bbcc4f6143d0b38993ab17317ddcfd827d942a611",
+      "description_head": "Use when the user wants to publish an HTML page to a private URL, share a page with someone, or read and reply to commen",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/yoki-artifact"
+    },
+    {
+      "dir": "yoki-graph",
+      "name": "yoki-graph",
+      "description_chars": 365,
+      "description_sha256": "0bd84f9a8a162fd20a2d3c5dc63a61d574ddeaf754f8d52f167eecc015fe7796",
+      "description_head": "多角の並列レビュー・調査・実装をワークフロー(グラフ)で回すときのカタログと起動方法。どのグラフがあるか(review / research / implement / preflight / design-review / accepta",
+      "source": "~/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/skills/yoki-graph"
+    }
+  ]
+}
