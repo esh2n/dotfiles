@@ -32,7 +32,7 @@ import type {
 import type { Logger } from "../domain/ports";
 import { type TierLogEntry, promptPreview } from "../domain/routing/tier-log";
 import type { SkillCandidate } from "../domain/skills/candidate";
-import type { RouterLogEntry } from "../domain/skills/router-log";
+import type { RouterLogEntry, RouterLogUsage } from "../domain/skills/router-log";
 import { JevProvider, type JevUsage } from "../infra/decision/jev-provider";
 import { ensureDecisionToken, tokenFilePath } from "../infra/decision/token-file";
 import {
@@ -41,6 +41,7 @@ import {
 } from "../infra/decision/typesafe-client";
 import { promptHash } from "../infra/logs/router-log";
 import { type JudgmentKind, runWithJudgmentKind } from "../infra/metrics/judgment-kind";
+import { collectJudgmentUsage } from "../infra/metrics/judgment-usage";
 import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../infra/metrics/registry";
 import { readSkillCatalog } from "../infra/skills/catalog";
 
@@ -384,6 +385,12 @@ async function recordSkillDecision(
   request: unknown,
   response: HttpResponse<unknown>,
   at: string,
+  /**
+   * What the judgment cost and how long it took. This is the half of the router log the
+   * hook-side writer cannot produce: `/decide` returns a `Decided` with no usage, so a cost
+   * per judgment exists only on this path.
+   */
+  spent: { readonly latencyMs: number; readonly usage: RouterLogUsage | undefined },
 ): Promise<void> {
   if (record === undefined) return;
 
@@ -392,7 +399,14 @@ async function recordSkillDecision(
   const prompt = typeof requestBody.prompt === "string" ? requestBody.prompt : "";
   const rawHarness = typeof requestBody.harness === "string" ? requestBody.harness.trim() : "";
   const harness = rawHarness === "" ? "unknown" : rawHarness;
-  const identity = { at, harness, promptHash: promptHash(prompt), promptChars: prompt.length };
+  const identity = {
+    at,
+    harness,
+    promptHash: promptHash(prompt),
+    promptChars: prompt.length,
+    latency_ms: spent.latencyMs,
+    ...(spent.usage === undefined ? {} : { usage: spent.usage }),
+  };
 
   const body = response.body;
   const decision =
@@ -538,15 +552,18 @@ export function serveDecisionService(
       const kind = pathname.slice(1);
       const startedAt = performance.now();
       // Inside the kind scope, so the provider's usage hook — composed before this
-      // request existed — labels its token counts with the endpoint that spent them.
-      const response = await runWithJudgmentKind(kind as JudgmentKind, async () => {
-        if (pathname === "/tier") return respondToTier(body, options.provider, deps);
-        if (pathname === "/skill") return respondToSkill(body, options.provider, skillDeps);
-        if (pathname === "/compact") {
-          return respondToCompaction(body, options.provider, compactionDeps);
-        }
-        return respondToDecision(body, options.provider, deps);
-      });
+      // request existed — labels its token counts with the endpoint that spent them; and
+      // inside the usage scope, so the same hook's numbers reach this request's log line.
+      const { result: response, usage } = await collectJudgmentUsage(() =>
+        runWithJudgmentKind(kind as JudgmentKind, async () => {
+          if (pathname === "/tier") return respondToTier(body, options.provider, deps);
+          if (pathname === "/skill") return respondToSkill(body, options.provider, skillDeps);
+          if (pathname === "/compact") {
+            return respondToCompaction(body, options.provider, compactionDeps);
+          }
+          return respondToDecision(body, options.provider, deps);
+        }),
+      );
 
       const elapsedSeconds = (performance.now() - startedAt) / 1000;
       metrics.increment("jig_judgment_requests_total", {
@@ -569,6 +586,7 @@ export function serveDecisionService(
           body,
           response,
           (deps.clock?.now() ?? new Date()).toISOString(),
+          { latencyMs: Math.round(elapsedSeconds * 1000), usage },
         );
       }
       return json(response.status, response.body);

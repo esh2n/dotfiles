@@ -31,6 +31,39 @@ export interface RouterLogEntry {
   readonly passed?: number;
   /** `decided` = the judgment cleared the gate; `fallback` = it did not act. */
   readonly source?: "decided" | "fallback";
+  /**
+   * Set when no judgment was asked for because the prompt is not a human request, naming
+   * which signature matched (`domain/skills/prompt-origin.ts`). The judgment fields are then
+   * absent, and so is any injection: the hook returned no opinion.
+   *
+   * A declined prompt and a skipped one look identical in a transcript — nothing is
+   * injected either way — so without this line the skip is unauditable, and a signature
+   * that starts eating real requests would be invisible.
+   */
+  readonly skipped?: string;
+  /**
+   * Wall time of the judgment, measured around the decision-provider call. Absent when no
+   * judgment was made (a skip, or a failure before the call).
+   *
+   * Snake-cased, unlike its neighbours, to match `usage` below, whose keys are the vendor's
+   * own. The 1,708 lines written before 2026-09-22 carry neither field, so anything reading
+   * this log treats both as optional.
+   */
+  readonly latency_ms?: number;
+  /**
+   * What the judgment model reported spending, when the writer can see it. Only the
+   * service-side writer can: the hook decides through `/decide`, whose wire contract
+   * (`domain/decision/remote.ts`) carries a `Decided` and no usage. So hook lines have
+   * `latency_ms` and no `usage`; `/skill` lines have both.
+   */
+  readonly usage?: RouterLogUsage;
   /** Set when the judgment could not be made at all; the other fields are then absent. */
   readonly error?: string;
+}
+
+/** The judgment model's own token counts, keys as the vendor reports them. */
+export interface RouterLogUsage {
+  readonly model: string;
+  readonly input_tokens: number;
+  readonly output_tokens: number;
 }

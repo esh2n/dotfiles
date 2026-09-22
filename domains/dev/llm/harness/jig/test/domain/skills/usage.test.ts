@@ -52,6 +52,7 @@ function turn(overrides: Partial<SkillTurn> = {}): SkillTurn {
     injected: [],
     confidence: undefined,
     read: [],
+    skilled: [],
     ...overrides,
   };
 }
@@ -91,7 +92,15 @@ describe("summarizeSkillUsage", () => {
     ]);
 
     expect(report.skills).toEqual([
-      { skill: "writeup", injected: 2, opened: 2, followed: 1, unrouted: 1 },
+      {
+        skill: "writeup",
+        injected: 2,
+        opened: 2,
+        followed: 1,
+        unrouted: 1,
+        openedViaRead: 2,
+        openedViaSkill: 0,
+      },
     ]);
   });
 
@@ -113,6 +122,52 @@ describe("summarizeSkillUsage", () => {
       turn({ read: ["alpha", "beta"] }),
     ]);
     expect(report.skills.map((skill) => skill.skill)).toEqual(["beta", "alpha"]);
+  });
+
+  it("counts a Skill-tool open as following the injection", () => {
+    // The turn the model obeyed through the tool the harness gives it. Before 2026-09-22
+    // this was filed as `ignored`.
+    const report = summarizeSkillUsage([turn({ injected: ["writeup"], skilled: ["writeup"] })]);
+
+    expect(report.totals.followed).toBe(1);
+    expect(report.totals.ignored).toBe(0);
+    expect(report.openedVia).toBe("any");
+  });
+
+  it("reproduces the old numbers under --opened-via read", () => {
+    const turns = [
+      turn({ injected: ["writeup"], skilled: ["writeup"] }),
+      turn({ injected: [], skilled: ["go-modern"] }),
+    ];
+
+    const both = summarizeSkillUsage(turns);
+    const readsOnly = summarizeSkillUsage(turns, { openedVia: "read" });
+
+    expect(both.totals.followed).toBe(1);
+    expect(both.totals.unrouted).toBe(1);
+    // Counting file reads alone, neither turn opened anything — which is exactly the
+    // before-number the report gave.
+    expect(readsOnly.totals.followed).toBe(0);
+    expect(readsOnly.totals.ignored).toBe(1);
+    expect(readsOnly.totals.silent).toBe(1);
+    expect(readsOnly.openedVia).toBe("read");
+  });
+
+  it("keeps both ways in on every row, whatever the counting rule", () => {
+    const report = summarizeSkillUsage(
+      [
+        turn({ injected: [], read: ["writeup"] }),
+        turn({ injected: [], skilled: ["writeup"] }),
+        // One turn that did both is one use of the skill, not two.
+        turn({ injected: [], read: ["writeup"], skilled: ["writeup"] }),
+      ],
+      { openedVia: "read" },
+    );
+
+    const row = report.skills.find((skill) => skill.skill === "writeup");
+    expect(row?.opened).toBe(2);
+    expect(row?.openedViaRead).toBe(2);
+    expect(row?.openedViaSkill).toBe(2);
   });
 
   it("reports an empty window without inventing a rate", () => {

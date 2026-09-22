@@ -30,6 +30,34 @@ function claudeRead(path: string, sidechain = false): string {
   });
 }
 
+/**
+ * The `Skill` tool as Claude Code actually records it, from a real transcript entry
+ * (2026-09-20, v2.1.278), trimmed to the fields this parser reads. The input names the
+ * skill rather than a path, and an optional `args` string may sit beside it.
+ */
+function claudeSkill(skill: string, args?: string, sidechain = false): string {
+  return JSON.stringify({
+    parentUuid: "a1",
+    isSidechain: sidechain,
+    type: "assistant",
+    message: {
+      role: "assistant",
+      model: "claude-fable-5",
+      content: [
+        {
+          type: "tool_use",
+          id: "toolu_019xz3WzhfAGs51WejDFZ2Rc",
+          name: "Skill",
+          input: { skill, ...(args === undefined ? {} : { args }) },
+          caller: { type: "direct" },
+        },
+      ],
+    },
+    uuid: "s1",
+    timestamp: "2026-09-20T01:00:02.000Z",
+  });
+}
+
 const PI_SESSION =
   '{"type":"session","version":3,"id":"s1","timestamp":"2026-09-20T02:00:00.000Z","cwd":"/repo"}';
 
@@ -88,6 +116,59 @@ describe("parseSkillTurns", () => {
     expect(turns[0]?.injected).toEqual(["writeup"]);
     expect(turns[0]?.confidence).toBe(0.92);
     expect(turns[0]?.read).toEqual(["writeup"]);
+  });
+
+  it("counts a Skill tool call as opening the skill, apart from a file read", () => {
+    // 1,208 of these in 30 days were counted as zero before 2026-09-22 — including turns
+    // where the model obeyed the injection through the tool the harness gives it.
+    const turns = parseSkillTurns(
+      [CLAUDE_PROMPT, CLAUDE_INJECTION, claudeSkill("writeup")].join("\n"),
+      "/sessions/claude.jsonl",
+      KNOWN,
+    );
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.injected).toEqual(["writeup"]);
+    expect(turns[0]?.skilled).toEqual(["writeup"]);
+    // Kept apart, so the old numbers stay reproducible from the same parse.
+    expect(turns[0]?.read).toEqual([]);
+  });
+
+  it("reads the skill name past an args string, and counts one invocation once", () => {
+    const turns = parseSkillTurns(
+      [
+        CLAUDE_PROMPT,
+        claudeSkill("writeup", "調査まとめ: ローカルLLM環境"),
+        claudeSkill("writeup"),
+      ].join("\n"),
+      "/sessions/claude.jsonl",
+      KNOWN,
+    );
+
+    expect(turns[0]?.skilled).toEqual(["writeup"]);
+  });
+
+  it("ignores a Skill call for something outside the catalog", () => {
+    // The tool also loads plugin and bundled skills, which the router never sees and this
+    // report has no business counting.
+    const turns = parseSkillTurns(
+      [CLAUDE_PROMPT, claudeSkill("artifact-design")].join("\n"),
+      "/sessions/claude.jsonl",
+      KNOWN,
+    );
+
+    expect(turns[0]?.skilled).toEqual([]);
+  });
+
+  it("folds a subagent's Skill call into the turn whose prompt caused it", () => {
+    const turns = parseSkillTurns(
+      [CLAUDE_PROMPT, CLAUDE_INJECTION, claudeSkill("go-modern", undefined, true)].join("\n"),
+      "/sessions/claude.jsonl",
+      KNOWN,
+    );
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.skilled).toEqual(["go-modern"]);
   });
 
   it("starts a new turn at the next prompt, not at a tool result", () => {

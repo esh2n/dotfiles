@@ -25,6 +25,7 @@ import { StaticProvider } from "../../src/infra/decision/static-provider";
 import { ensureDecisionToken } from "../../src/infra/decision/token-file";
 import { TypesafeError } from "../../src/infra/decision/typesafe-client";
 import { currentJudgmentKind } from "../../src/infra/metrics/judgment-kind";
+import { recordJudgmentUsage } from "../../src/infra/metrics/judgment-usage";
 import { METRICS_CONTENT_TYPE, MetricsRegistry } from "../../src/infra/metrics/registry";
 
 describe("respondToDecision", () => {
@@ -545,6 +546,41 @@ describe("the /skill path's router log", () => {
 
       expect(entries[0]?.harness).toBe("unknown");
       expect(entries[0]?.skills).toEqual([]);
+    } finally {
+      service.stop();
+    }
+  });
+
+  test("records what the judgment took and what it cost", async () => {
+    const entries: RouterLogEntry[] = [];
+    // What `JevProvider` does with its `onUsage` hook: report the vendor's counts from
+    // inside the judgment. The service side is the only place they can reach a log line —
+    // the harness-side hook decides through `/decide`, whose reply carries no usage.
+    const metered: DecisionProvider = {
+      name: "metered",
+      choice: () => Promise.reject(new Error("not asked")),
+      bool: () => Promise.reject(new Error("not asked")),
+      boolBatch: async (query: BoolBatchQuery) => {
+        recordJudgmentUsage({ model: "jev-latest", input_tokens: 412, output_tokens: 9 });
+        return query.prompts.map(() => ({ value: true, confidence: 0.9 }));
+      },
+      score: () => Promise.reject(new Error("not asked")),
+    };
+    const { service, token } = await startSkillService(metered, entries);
+
+    try {
+      await fetch(`${service.url}/skill`, {
+        method: "POST",
+        headers: authed(token),
+        body: JSON.stringify({ harness: "pi", prompt: "決定記録をまとめて" }),
+      });
+
+      expect(entries[0]?.latency_ms).toBeGreaterThanOrEqual(0);
+      expect(entries[0]?.usage).toEqual({
+        model: "jev-latest",
+        input_tokens: 412,
+        output_tokens: 9,
+      });
     } finally {
       service.stop();
     }

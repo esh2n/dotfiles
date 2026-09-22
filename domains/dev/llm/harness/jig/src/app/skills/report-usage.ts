@@ -8,7 +8,7 @@
  * harnesses already keep, so running it can never change what is being measured.
  */
 
-import type { SkillTurn, SkillUsageReport } from "../../domain/skills/usage";
+import type { SkillTurn, SkillUsageOptions, SkillUsageReport } from "../../domain/skills/usage";
 import { summarizeSkillUsage } from "../../domain/skills/usage";
 
 export interface SkillUsageDeps {
@@ -17,6 +17,8 @@ export interface SkillUsageDeps {
   /** One session file's contents into turns. Where a harness's field names are known. */
   readonly parse: (text: string, session: string) => readonly SkillTurn[];
   readonly read: (path: string) => Promise<string>;
+  /** Which opens count. Passed through; the counting rule is a domain decision. */
+  readonly options?: SkillUsageOptions;
 }
 
 export interface SkillUsageOutput {
@@ -42,5 +44,5 @@ export async function reportSkillUsage(deps: SkillUsageDeps): Promise<SkillUsage
     turns.push(...deps.parse(text, file));
   }
 
-  return { report: { sessions, ...summarizeSkillUsage(turns) }, unread };
+  return { report: { sessions, ...summarizeSkillUsage(turns, deps.options ?? {}) }, unread };
 }

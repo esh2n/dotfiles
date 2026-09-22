@@ -7,19 +7,32 @@
  * filesystem, so any report can be rendered in a test.
  */
 
-import type { Harness, SkillUsageReport, UsageTotals } from "../domain/skills/usage";
+import type { Harness, OpenedVia, SkillUsageReport, UsageTotals } from "../domain/skills/usage";
 
 export interface ReportArgs {
   /** How far back to read. Session trees hold years of files; the default is recent. */
   readonly days: number;
   readonly json: boolean;
+  /**
+   * Which opens count as "opened". The default counts both ways in; `read` reproduces the
+   * numbers this report gave before the `Skill` tool was parsed, so the effect of counting
+   * it is one flag rather than one checkout.
+   */
+  readonly openedVia: OpenedVia | "any";
 }
 
 export const DEFAULT_REPORT_DAYS = 14;
 
+const OPENED_VIA: readonly (OpenedVia | "any")[] = ["read", "skill", "any"];
+
+function parseOpenedVia(value: string | undefined): OpenedVia | "any" | undefined {
+  return OPENED_VIA.find((allowed) => allowed === value);
+}
+
 export function parseReportArgs(args: readonly string[]): ReportArgs | { readonly error: string } {
   let days = DEFAULT_REPORT_DAYS;
   let json = false;
+  let openedVia: OpenedVia | "any" = "any";
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -34,10 +47,17 @@ export function parseReportArgs(args: readonly string[]): ReportArgs | { readonl
       days = value;
       continue;
     }
+    if (arg === "--opened-via") {
+      index += 1;
+      const value = parseOpenedVia(args[index]);
+      if (value === undefined) return { error: "--opened-via needs read, skill or any" };
+      openedVia = value;
+      continue;
+    }
     return { error: `unknown option: ${arg ?? ""}` };
   }
 
-  return { days, json };
+  return { days, json, openedVia };
 }
 
 const LABELS: ReadonlyMap<keyof UsageTotals, string> = new Map([
@@ -95,14 +115,23 @@ function renderSkills(report: SkillUsageReport): string[] {
   const lines = [
     "",
     `skills (${rows.length})`,
-    `  ${"skill".padEnd(34)}${"injected".padStart(9)}${"opened".padStart(8)}${"followed".padStart(10)}${"unscouted".padStart(11)}`,
+    `  ${"skill".padEnd(34)}${"injected".padStart(9)}${"opened".padStart(8)}${"followed".padStart(10)}${"unscouted".padStart(11)}${"via read".padStart(10)}${"via skill".padStart(11)}`,
   ];
   for (const row of rows) {
     lines.push(
-      `  ${row.skill.padEnd(34)}${String(row.injected).padStart(9)}${String(row.opened).padStart(8)}${String(row.followed).padStart(10)}${String(row.unrouted).padStart(11)}`,
+      `  ${row.skill.padEnd(34)}${String(row.injected).padStart(9)}${String(row.opened).padStart(8)}${String(row.followed).padStart(10)}${String(row.unrouted).padStart(11)}${String(row.openedViaRead).padStart(10)}${String(row.openedViaSkill).padStart(11)}`,
     );
   }
   return lines;
+}
+
+/** What "opened" meant in this run, said out loud so two runs are never confused. */
+function counting(report: SkillUsageReport): string {
+  if (report.openedVia === "read") {
+    return "counting opens via the read tool only (the pre-2026-09-22 numbers); drop --opened-via to count the Skill tool too.";
+  }
+  if (report.openedVia === "skill") return "counting opens via the Skill tool only.";
+  return "counting opens via the read tool AND the Skill tool; --opened-via read gives the pre-2026-09-22 numbers.";
 }
 
 /** The report as an operator reads it. `files` is the number of sessions considered. */
@@ -118,6 +147,7 @@ export function renderSkillUsage(report: SkillUsageReport, args: ReportArgs): st
     ...renderHarnesses(report),
     ...renderSkills(report),
     "",
+    counting(report),
     "every prompt in the window counts, including automated sessions;",
     "narrow with JIG_PI_SESSIONS / JIG_CLAUDE_PROJECTS (colon-separated) or JIG_SESSION_ROOTS.",
     "reads through a shell (cat/sed/grep) are not tool calls and are not counted;",

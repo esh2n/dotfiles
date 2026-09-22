@@ -26,6 +26,7 @@ import { appendRouterLog } from "../infra/logs/router-log";
 import { appendSessionLog } from "../infra/logs/session-log";
 import { appendTierLog } from "../infra/logs/tier-log";
 import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
+import { recordJudgmentUsage } from "../infra/metrics/judgment-usage";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { readSkillCatalog } from "../infra/skills/catalog";
@@ -219,6 +220,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       if (subcommand === "user-prompt-submit") {
         const stdin = await new Response(Bun.stdin.stream()).text();
         const threshold = Number.parseFloat(process.env.JIG_SKILL_ROUTER_THRESHOLD ?? "");
+        const harness = harnessFlag(argv);
         process.stdout.write(
           await userPromptSubmit(
             stdin,
@@ -229,7 +231,10 @@ export async function main(argv: readonly string[]): Promise<number> {
                 appendRouterLog(join(resolveStateDir(process.env), "skill-router.jsonl"), entry),
               logger: ports.logger,
             },
-            Number.isFinite(threshold) ? { threshold } : {},
+            {
+              ...(Number.isFinite(threshold) ? { threshold } : {}),
+              ...(harness === undefined ? {} : { harness }),
+            },
           ),
         );
         return 0;
@@ -323,6 +328,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         files,
         parse: (text, session) => parseSkillTurns(text, session, known),
         read: (path) => Bun.file(path).text(),
+        options: { openedVia: parsed.openedVia },
       });
       process.stdout.write(renderSkillUsage(report, parsed));
       return 0;
@@ -340,6 +346,8 @@ export async function main(argv: readonly string[]): Promise<number> {
         ports.logger.info("decision.usage", { ...usage, kind });
         metrics.countTokens(usage.model, "input", usage.input_tokens, kind);
         metrics.countTokens(usage.model, "output", usage.output_tokens, kind);
+        // …and to the request in flight, so its router-log line can carry what it cost.
+        recordJudgmentUsage(usage);
       });
       serveDecisionService({
         provider,
@@ -386,8 +394,9 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  learn which model is calling by looking it up there. Prints nothing, never fails.\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
-          "  report skills [--days N] [--json] reads both harnesses' session transcripts and\n" +
-          "  shows what the router injected against what the model actually opened.\n" +
+          "  report skills [--days N] [--json] [--opened-via read|skill|any] reads both harnesses'\n" +
+          "  session transcripts and shows what the router injected against what the model opened;\n" +
+          "  opens count through the read tool and the Skill tool, --opened-via read for the older numbers.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +

@@ -145,12 +145,41 @@ function readPathsOf(entry: Record<string, unknown>, harness: Harness): readonly
   return paths;
 }
 
+/**
+ * Every skill this entry loaded through the harness's own skill tool, in call order.
+ *
+ * Claude Code records it as an ordinary `tool_use` named `Skill`, whose input names the
+ * skill rather than a path: `{"type":"tool_use","name":"Skill","input":{"skill":"writeup"}}`
+ * (an optional `args` string may sit alongside). The name comes back unresolved, which is
+ * why the caller filters it against the installed catalog exactly as it does a read path —
+ * the tool also loads plugin and bundled skills the router never sees, and those are not
+ * this report's business.
+ *
+ * pi has no equivalent entry in the transcripts read here, so this returns nothing for it
+ * rather than guessing at a shape; a pi skill invocation still shows up as the read it does.
+ */
+function skillCallsOf(entry: Record<string, unknown>, harness: Harness): readonly string[] {
+  if (harness !== "claude" || entry.type !== "assistant") return [];
+  const content = asRecord(entry.message)?.content;
+  if (!Array.isArray(content)) return [];
+
+  const names: string[] = [];
+  for (const part of content) {
+    const call = asRecord(part);
+    if (call === undefined || call.type !== "tool_use" || call.name !== "Skill") continue;
+    const input = asRecord(call.input);
+    if (typeof input?.skill === "string" && input.skill !== "") names.push(input.skill);
+  }
+  return names;
+}
+
 interface TurnBuilder {
   readonly harness: Harness;
   readonly at: string;
   injected: readonly string[];
   confidence: number | undefined;
   readonly read: string[];
+  readonly skilled: string[];
 }
 
 /**
@@ -182,6 +211,7 @@ export function parseSkillTurns(
       injected: current.injected,
       confidence: current.confidence,
       read: current.read,
+      skilled: current.skilled,
     });
     current = undefined;
   };
@@ -202,6 +232,7 @@ export function parseSkillTurns(
     const sidechain = entry.isSidechain === true;
     const injected = injectionOf(entry, harness);
     const paths = readPathsOf(entry, harness);
+    const invoked = skillCallsOf(entry, harness);
 
     if (!sidechain && isPrompt(entry, harness)) {
       flush();
@@ -211,15 +242,20 @@ export function parseSkillTurns(
         injected: [],
         confidence: undefined,
         read: [],
+        skilled: [],
       };
     }
-    if (current === undefined && (injected !== undefined || paths.length > 0)) {
+    if (
+      current === undefined &&
+      (injected !== undefined || paths.length > 0 || invoked.length > 0)
+    ) {
       current = {
         harness,
         at: timestampOf(entry),
         injected: [],
         confidence: undefined,
         read: [],
+        skilled: [],
       };
     }
     if (current === undefined) continue;
@@ -233,6 +269,11 @@ export function parseSkillTurns(
       const name = skillNameFromPath(path);
       if (name === undefined || !known.has(name) || current.read.includes(name)) continue;
       current.read.push(name);
+    }
+
+    for (const name of invoked) {
+      if (!known.has(name) || current.skilled.includes(name)) continue;
+      current.skilled.push(name);
     }
   }
 
