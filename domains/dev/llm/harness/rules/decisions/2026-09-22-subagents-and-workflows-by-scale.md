@@ -33,7 +33,7 @@ Status: accepted — ベンダーは制御をコードに置き規模で使い�
 
 ## Sources
 
-- `.tmp-research/orchestration-{vendors,paradigm,practitioners,evidence,in-the-wild,lens-workflow-engines}.md`、`multi-lane-review-per-harness.md`、`pre-pr-gate-practice.md`
+- `rules/research/2026-09-22-orchestration-vendors.md`、`rules/research/2026-09-22-orchestration-paradigm.md`、`rules/research/2026-09-22-orchestration-practitioners.md`、`rules/research/2026-09-22-orchestration-evidence.md`、`rules/research/2026-09-22-orchestration-in-the-wild.md`、`rules/research/2026-09-22-orchestration-lens-workflow-engines.md`、`rules/research/2026-09-22-multi-lane-review-per-harness.md`、`rules/research/2026-09-22-pre-pr-gate-practice.md`
 - Claude Code: https://code.claude.com/docs/en/workflows.md 、https://code.claude.com/docs/en/sub-agents.md 、https://code.claude.com/docs/en/best-practices.md
 - Anthropic research system: https://www.anthropic.com/engineering/built-multi-agent-research-system 、OpenAI Codex subagents: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - Cognition: https://cognition.ai/blog/multi-agents-working 、Amp: https://ampcode.com/news/a-faster-librarian 、https://ampcode.com/news/rush-mode

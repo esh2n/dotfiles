@@ -27,7 +27,7 @@ Status: accepted — 各ハーネスが goal を持ち、自前の実行系は�
 
 ## Sources
 
-- `.tmp-research/loop-vendors-evidence.md`、`loop-practitioners-wild.md`
+- `rules/research/2026-09-22-loop-vendors-evidence.md`、`rules/research/2026-09-22-loop-practitioners-wild.md`
 - Claude Code: https://code.claude.com/docs/en/goal 、https://code.claude.com/docs/en/scheduled-tasks 、https://code.claude.com/docs/en/routines
 - ImpossibleBench: https://arxiv.org/abs/2510.20270
 - 読者調査: https://newsletter.pragmaticengineer.com/p/what-is-loop-engineering

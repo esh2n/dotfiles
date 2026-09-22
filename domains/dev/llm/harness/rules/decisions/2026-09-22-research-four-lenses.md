@@ -31,4 +31,4 @@ Status: accepted — 一社の資料や逸話一件で下した判断が四方�
 ## Sources
 
 - 記憶: `research-four-lenses.md`
-- 覆った例: `.tmp-research/orchestration-{vendors,practitioners,evidence,in-the-wild}.md`、`format-hook-timing.md`
+- 覆った例: `rules/research/2026-09-22-orchestration-vendors.md`、`rules/research/2026-09-22-orchestration-practitioners.md`、`rules/research/2026-09-22-orchestration-evidence.md`、`rules/research/2026-09-22-orchestration-in-the-wild.md`、`rules/research/2026-09-22-format-hook-timing.md`

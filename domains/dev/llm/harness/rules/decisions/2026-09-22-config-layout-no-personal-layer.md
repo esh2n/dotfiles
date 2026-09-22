@@ -28,6 +28,6 @@ Status: accepted — 種類ごとの元ディレクトリと生成器の組が�
 
 ## Sources
 
-- `.tmp-research/industry-config-delivery.md`
+- `rules/research/2026-09-22-industry-config-delivery.md`
 - agent-config: https://github.com/domengabrovsek/agent-config 、anywhere-agents: https://github.com/yzhao062/anywhere-agents
 - Claude Code settings: https://code.claude.com/docs/en/settings 、Codex config: https://learn.chatgpt.com/docs/config-file/config-basic

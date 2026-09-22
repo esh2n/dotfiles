@@ -33,7 +33,7 @@ Status: accepted — 道具の一覧は既に flake にあり、Linux でも動�
 
 ## Sources
 
-- 実測と資料: `.tmp-research/nix-vs-mise-agent-box.md`、`box-toolchain-provisioning.md`
+- 実測と資料: `rules/research/2026-09-22-nix-vs-mise-agent-box.md`、`rules/research/2026-09-22-box-toolchain-provisioning.md`
 - Determinate installer: https://github.com/DeterminateSystems/nix-installer
 - closure コピーの前例: https://mitchellh.com/writing/nix-with-dockerfiles 、https://github.com/docker/labs-ai-tools-for-devs
 - mise の作者の立場: https://news.ycombinator.com/item?id=42359686 、lock の制約: https://mise.jdx.dev/dev-tools/mise-lock.html

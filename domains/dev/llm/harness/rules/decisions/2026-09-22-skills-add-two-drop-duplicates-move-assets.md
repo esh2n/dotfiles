@@ -28,6 +28,6 @@ Status: accepted — 確認された穴を埋める二本だけ入れ、三重�
 
 ## Sources
 
-- `.tmp-research/skills-inventory-and-market.md`
+- `rules/research/2026-09-22-skills-inventory-and-market.md`
 - obra/superpowers: https://github.com/obra/superpowers 、公式 plugin のスキャン結果: https://github.com/anthropics/claude-plugins-official/issues/5704
 - Anthropic: https://www.anthropic.com/engineering/writing-tools-for-agents 、Claude Code: https://code.claude.com/docs/en/skills.md

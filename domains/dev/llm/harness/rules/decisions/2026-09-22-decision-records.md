@@ -30,7 +30,7 @@ grill で決まったことが、セッションの記憶ファイル(Claude Cod
 
 ## Sources
 
-- 調査全文: `.claude/worktrees/harness-parity/.tmp-research/decision-records-for-agents.md`
+- 調査全文: `rules/research/2026-09-22-decision-records-for-agents.md`
 - Anthropic memory 文書: https://code.claude.com/docs/en/memory
 - 保守者の回答: https://github.com/anthropics/claude-code/issues/5055
 - Codex の 32KiB: https://github.com/openai/codex/issues/7138

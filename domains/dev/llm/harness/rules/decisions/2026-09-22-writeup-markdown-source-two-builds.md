@@ -12,7 +12,7 @@ writeup（セッションの調査・判断・勉強の記録を文書にして�
 - **調査記録は harness の repo に置き、索引で再調査を防ぐ。** `domains/dev/llm/harness/rules/research/<date>-<topic>.md`、先頭に「問い / 日付 / 結論一行 / 検証できなかったこと」。索引 `rules/research/INDEX.md`（一行一記録、200 行を超えたら分割）を生成する AGENTS.md から「調べる前に索引を読め。確立済みの事実は再調査しない」で指す。参照は番号 ID でなくパスと URL。
 - **人向けの view は同じ Markdown から二回ビルドする。** 私的サイトは全記録を Cloudflare Pages に置き Cloudflare Access で本人のメールだけ許可（スマホはブラウザでログイン）。公開サイトは `publish: true` の記録**だけを元の段階で選んで**別にビルドし、別の Pages プロジェクトに置く。store（private/work）は GitHub の private リポジトリに push して同期する。Artifact は投影の一つで、記録の置き場にはしない。
 - **記法は CommonMark 互換に固定する。** コールアウトは `> [!type]`、それ以外の部品（手順、比較、図とキャプション、注意）は `:::name` のディレクティブ。JSX は使わない。写像（`> [!type]`/`:::name` → `wu-*` の HTML）は自前の rehype 変換一つ。図は Mermaid/D2 をビルド時に描く。サイトの殻（索引、ナビ、検索、スマホ向け）は Astro に `.md` のまま任せる。
-- **文章は 16 項目の検査表で書く**（出典つき、`.tmp-research/knowledge-store-and-clear-writing.md`）。最重要の情報を先頭に、1 段落 1 アイデア、見出しは記述、具体例が浮かばない説明は疑う、説明文は「なぜ」と代替案を扱う。文の長さの数値目標は書かない（どの出典にも無い）。
+- **文章は 16 項目の検査表で書く**（出典つき、`rules/research/2026-09-22-knowledge-store-and-clear-writing.md`）。最重要の情報を先頭に、1 段落 1 アイデア、見出しは記述、具体例が浮かばない説明は疑う、説明文は「なぜ」と代替案を扱う。文の長さの数値目標は書かない（どの出典にも無い）。
 - **図は仕組みと関係を伝えるときだけ。** 一覧や平叙文の飾りに置かない。複雑になったら分割する。静的な図に「直感を養う」効果を主張しない。
 - **品質は読者の点数で追う。** lint（natural-japanese、textlint）は AI 臭の除去まで。分かりやすさは各文書に読者の点数を記録し、規則の変更で上がるかを見る。
 
@@ -39,7 +39,7 @@ writeup（セッションの調査・判断・勉強の記録を文書にして�
 
 ## Sources
 
-- `.tmp-research/writeup-practice.md`、`knowledge-store-and-clear-writing.md`、`private-notes-publishing-and-md-components.md`
+- `rules/research/2026-09-22-writeup-practice.md`、`rules/research/2026-09-22-knowledge-store-and-clear-writing.md`、`rules/research/2026-09-22-private-notes-publishing-and-md-components.md`
 - Claude Code memory: https://code.claude.com/docs/en/memory.md 、GitHub の警告: https://docs.github.com/en/copilot/concepts/response-customization
 - Cloudflare Access: https://developers.cloudflare.com/cloudflare-one/access-controls/ 、Quartz の漏れ: https://github.com/jackyzha0/quartz/issues/2531 、https://quartz.jzhao.xyz/features/private-pages
 - Artifact: https://support.claude.com/en/articles/9487310 、GitHub Pages: https://docs.github.com/en/enterprise-cloud@latest/pages/getting-started-with-github-pages/changing-the-visibility-of-your-github-pages-site

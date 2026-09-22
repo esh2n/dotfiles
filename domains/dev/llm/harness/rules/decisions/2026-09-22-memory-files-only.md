@@ -27,7 +27,7 @@ Status: accepted — 外部の記憶基盤に利得の測定がなく害の測�
 
 ## Sources
 
-- `.tmp-research/memory-tools-evaluation.md`
+- `rules/research/2026-09-22-memory-tools-evaluation.md`
 - Anthropic auto memory: https://code.claude.com/docs/en/memory
 - Letta の計測: https://www.letta.com/blog/benchmarking-ai-agent-memory 、Zep の反論: https://blog.getzep.com/lies-damn-lies-statistics-is-mem0-really-sota-in-agent-memory/
 - Mem0 の監査: https://github.com/mem0ai/mem0/issues/4573 、HaluMem: https://arxiv.org/abs/2511.03506 、ACE: https://arxiv.org/abs/2510.04618

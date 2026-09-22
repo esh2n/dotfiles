@@ -38,7 +38,7 @@ jig が所有しないもの: tmux-sidebar（既定で無効）、herdr-agent-st
 
 ## Sources
 
-- `.tmp-research/hooks-beyond-formatting.md`
+- `rules/research/2026-09-22-hooks-beyond-formatting.md`
 - Claude Code の監視: https://code.claude.com/docs/en/monitoring-usage.md 、費用: https://code.claude.com/docs/en/costs.md 、フックの手引き: https://code.claude.com/docs/en/hooks-guide.md
 - rtk: https://github.com/rtk-ai/rtk 、https://github.com/rtk-ai/rtk/blob/develop/docs/guide/resources/savings-explained.md
 - Claude Code の issue: https://github.com/anthropics/claude-code/issues/84011 、/64223 、/60112

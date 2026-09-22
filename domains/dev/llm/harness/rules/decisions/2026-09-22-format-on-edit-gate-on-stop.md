@@ -28,7 +28,7 @@ Status: accepted — 公開リポジトリの主流と各ハーネスの仕組�
 
 ## Sources
 
-- `.tmp-research/format-hook-timing.md`
+- `rules/research/2026-09-22-format-hook-timing.md`
 - Claude Code hooks 手引き: https://code.claude.com/docs/en/hooks-guide 、hooks 仕様: https://code.claude.com/docs/en/hooks
 - mtime の失敗: https://github.com/anthropics/claude-code/issues/3513 、LSP の行番号: https://github.com/anthropics/claude-code/issues/80267
 - marmelab の変更履歴: https://github.com/marmelab/crm-builder/blob/main/CHANGELOG.md
