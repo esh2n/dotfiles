@@ -49,3 +49,4 @@
 - [Which SKILL.md files should a 5-harness personal coding harness carry, audited against installed skills and industry?](2026-09-22-skills-inventory-and-market.md) — obra/superpowers から2本追加。休眠パック(88中34が未使用)へのfix執筆は停止。新規vendor済みスキルは未信用扱い (2026-09-22)
 - [agent の作業を文書化する慣行(writeup practice)の 2026 年業界調査](2026-09-22-writeup-practice.md) — 決定的な字面 linter は広く採用されるが AI 文検出器自体は不正確(誤検知 約20%)。公開先は書く/公開を地続きにする設計思想が実在するがエコシステムの活性度にばらつきがある (2026-09-22)
 - [Which yoki capabilities has jig replaced, and what still requires yoki-switch today?](2026-09-21-yoki-jig-coverage.md) — ディスクに設定を書く処理は全て yoki-switch/manager.sh 頼みのまま。jig の permission/MCP コンパイラは構築・テスト済みだが CLI 入口が無く、配線されていない (2026-09-21)
+- [一本の workflow スクリプトが五ハーネスで動くか](2026-09-22-workflow-script-portability.md) — CC と pi は一本、omp は 10 行のシム、Codex は不可（部下が親の fork）、DSH 未検証 (2026-09-22)

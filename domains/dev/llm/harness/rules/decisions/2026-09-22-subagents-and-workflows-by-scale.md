@@ -27,9 +27,10 @@ Status: accepted — ベンダーは制御をコードに置き規模で使い�
 ## Consequences
 
 - yoki-graph（自前の実行系）と preflight.js は捨てる。review・research・code-study・stocktake・design-review はスクリプトとして残し、各ハーネスで走らせる。
-- 未検証: 一本のスクリプトが pi の拡張・omp・DSH で本当に無変更で動くか、Codex の部下が fresh か継承か、omp の `agent()` と Claude Code の `agent()` の差。実機で確かめてから決定メモの Status を更新する。
+- 実機検証（同日、`rules/research/2026-09-22-workflow-script-portability.md`）: **pi は tintinweb/pi-subagents 0.19.0 で同じスクリプトがほぼ無変更で動く**（3 レーン並列・fresh を子セッションの JSONL で確認。要調整は `meta.phases` の要素が `{title}` オブジェクトであること、`model` 名は tiers.json からの翻訳が要ること。headless で回すなら pty 必須）。**omp は 10 行のシムで動く**（`export` 不可、`args` なし、`agent()` に per-call の `model` が無く親のモデルで走る → 決定 5 の「部下は安い層」は omp では agent frontmatter か `task.agentModelOverrides` 側で行う。`Date.now()` が throw しないので replay の同一性は保証されない）。**Codex は不可**（スクリプトの実行系が無く、部下は親スレッドの fork で親の会話を継承することを子の rollout で確認。変換では埋まらない）。DSH は未導入で未検証。
+- 訂正: pi 拡張の選択は tintinweb 一択（CC スクリプトのランナーとして「無変更で走る」と主張し実測で裏付いた唯一）。`tier` は tintinweb に無く `model` のみ。Claude Code 側で `meta.phases` の要素型を一度確かめる。
 - 測定が無いもの: N 人のレビュアー対 1 人（独立セッションが同一セッション派生に勝つ測定はある: F1 28.6% 対 23.8%）。費用は読む並列で 1.6〜3.9 倍、上限は必須（Claude Code は 16 並列・1,000/run、omp は 32、Codex は 4）。
-- 部下のモデル階層は jig の tiers.json が唯一の元。ハーネスごとの書式（Claude Code `model`、pi 拡張 `tier`、omp `agent()` の `agent`/`tier`）へ翻訳する。
+- 部下のモデル階層は jig の tiers.json が唯一の元。ハーネスごとの書式（Claude Code `model`、pi 拡張（tintinweb）`model`、omp は agent frontmatter / `task.agentModelOverrides`）へ翻訳する。
 
 ## Sources
 
