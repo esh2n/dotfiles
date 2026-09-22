@@ -28,7 +28,7 @@
     "command": "~/.claude/scripts/statusline.sh"
   },
   "enabledPlugins": {
-    "claude-mem@thedotmack": true,
+    "claude-mem@thedotmack": false,
     "crit@crit": true
   },
   "extraKnownMarketplaces": {
