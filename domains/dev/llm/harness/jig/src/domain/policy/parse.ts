@@ -25,7 +25,7 @@ const PROFILES: ReadonlySet<string> = new Set<HookProfile>(["minimal", "standard
 /** Shorthands accepted in `mode`, expanded to the actions they cover. */
 const MODE_SHORTHANDS: Readonly<Record<string, readonly Action[]>> = {
   shell: ["shell.exec"],
-  fs: ["fs.write", "fs.edit"],
+  fs: ["fs.write", "fs.edit", "fs.read"],
   net: ["net.fetch"],
   mcp: ["mcp.call"],
 };
@@ -180,6 +180,7 @@ function parseMode(raw: unknown): Readonly<Record<Action, Mode>> {
     "shell.exec": "denylist",
     "fs.write": "denylist",
     "fs.edit": "denylist",
+    "fs.read": "denylist",
     "net.fetch": "denylist",
     "mcp.call": "denylist",
   };

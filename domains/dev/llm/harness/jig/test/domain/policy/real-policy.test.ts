@@ -624,10 +624,75 @@ const CASES: readonly Case[] = [
     expected: "ask",
   },
 
-  // --- fs.read is NOT gated: reads are the sandbox's boundary, not the guard's ---
+  // --- fs.read: secret-shaped files are forbidden to the Read tool. The old
+  //     "reads are the sandbox's job" stance was wrong on the facts — Claude
+  //     Code's sandbox confines Bash only and leaves the Read tool unrestricted,
+  //     so the guard is the only thing standing between the agent and a secret.
   {
-    label: "reading ~/.aws/credentials is not gated by the guard (sandbox's job)",
+    label: "reading ~/.aws/credentials is forbidden",
     call: readCall("/Users/x/.aws/credentials"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "reading an SSH private key is forbidden",
+    call: readCall("/Users/x/.ssh/id_ed25519"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "reading gcloud's credential store is forbidden",
+    call: readCall("/Users/x/.config/gcloud/application_default_credentials.json"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "reading a project .env is forbidden",
+    call: readCall("/proj/.env"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "reading .env.example (a template) is allowed",
+    call: readCall("/proj/.env.example"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "reading a .pem is forbidden",
+    call: readCall("/proj/certs/server.pem"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "reading ordinary source is allowed",
+    call: readCall("/proj/src/index.ts"),
+    profile: "standard",
+    expected: "allow",
+  },
+  // The same secrets dumped through a shell reader — the bypass the Read rule
+  // alone would leave open.
+  {
+    label: "cat of ~/.aws/credentials is forbidden",
+    call: shellCall("cat ~/.aws/credentials"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "head of a project .env is forbidden",
+    call: shellCall("head -n 5 .env"),
+    profile: "minimal",
+    expected: "deny",
+  },
+  {
+    label: "cat of .env.example is allowed",
+    call: shellCall("cat .env.example"),
+    profile: "standard",
+    expected: "allow",
+  },
+  {
+    label: "cat of an ordinary file is allowed",
+    call: shellCall("cat README.md"),
     profile: "standard",
     expected: "allow",
   },

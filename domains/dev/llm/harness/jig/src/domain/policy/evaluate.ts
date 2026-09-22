@@ -62,7 +62,8 @@ function holds(target: Target, request: Request, commands: readonly ShellCommand
       return commands.some((cmd) => subjectMatchesCommand(subject, cmd));
     }
     case "fs.write":
-    case "fs.edit": {
+    case "fs.edit":
+    case "fs.read": {
       if (target.match !== undefined && !target.match.test(request.path)) return false;
       if (target.subject === undefined) return true;
       const { path, program, argv, host } = target.subject;
@@ -111,6 +112,7 @@ function describe(request: Request): readonly string[] {
     }
     case "fs.write":
     case "fs.edit":
+    case "fs.read":
       return [request.path];
     case "net.fetch":
       return [request.host];

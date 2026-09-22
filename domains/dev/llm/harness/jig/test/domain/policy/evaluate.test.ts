@@ -395,9 +395,15 @@ describe("judge v2: other actions", () => {
   });
 
   test("a tool the policy does not speak about is out of scope, never denied", () => {
-    const j = judge({ tool: "Read", input: { file_path: "/x/guard-rules.json" } }, pi, p);
+    const j = judge({ tool: "Glob", input: { pattern: "**/*.ts" } }, pi, p);
     expect(j.decision).toEqual({ kind: "allow" });
     expect(j.source).toBe("out-of-scope");
+  });
+
+  test("Read is in scope (fs.read); with no matching rule it is allowed, not out of scope", () => {
+    const j = judge({ tool: "Read", input: { file_path: "/x/notes.md" } }, pi, p);
+    expect(j.decision).toEqual({ kind: "allow" });
+    expect(j.source).not.toBe("out-of-scope");
   });
 
   test("a shell call with no command field is out of scope", () => {

@@ -36,7 +36,7 @@ export interface Principal {
 
 export type Request =
   | { readonly action: "shell.exec"; readonly raw: string; readonly extraction: Extraction }
-  | { readonly action: "fs.write" | "fs.edit"; readonly path: string }
+  | { readonly action: "fs.write" | "fs.edit" | "fs.read"; readonly path: string }
   | { readonly action: "net.fetch"; readonly url: string; readonly host: string }
   | {
       readonly action: "mcp.call";
@@ -55,6 +55,8 @@ const EDIT_TOOLS = new Set([
   "str_replace_based_edit_tool",
 ]);
 const FETCH_TOOLS = new Set(["WebFetch", "web_fetch", "fetch"]);
+/** The harness's file-reading tool: Claude Code `Read`, pi/DSH `read`, codex `view`. */
+const READ_TOOLS = new Set(["Read", "read", "view", "read_file"]);
 
 /**
  * MCP file-editing tools routed to fs.edit so the fs.edit rules (the floor,
@@ -110,6 +112,7 @@ export function actionOf(tool: string): Action | undefined {
   if (SHELL_TOOLS.has(tool)) return "shell.exec";
   if (WRITE_TOOLS.has(tool)) return "fs.write";
   if (EDIT_TOOLS.has(tool)) return "fs.edit";
+  if (READ_TOOLS.has(tool)) return "fs.read";
   if (FETCH_TOOLS.has(tool)) return "net.fetch";
   if (MCP_EDIT_TOOLS.has(tool)) return "fs.edit";
   if (tool.startsWith("mcp__")) return "mcp.call";
@@ -128,7 +131,8 @@ export function requestFor(call: ToolCall): Request | undefined {
     case "shell.exec":
       return shellRequest(call.input);
     case "fs.write":
-    case "fs.edit": {
+    case "fs.edit":
+    case "fs.read": {
       // `relative_path` is serena's field for the MCP edit tools routed here.
       const path = stringField(call.input, "file_path", "path", "relative_path");
       return path === undefined ? undefined : { action, path };

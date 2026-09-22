@@ -516,6 +516,63 @@
       ]
     },
     {
+      "id": "forbid-cred-read",
+      "effect": "forbid",
+      "action": "fs.read",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
+      },
+      "why": "home credential file — reading it pulls a live secret into the agent's context; the sandbox never covered the Read tool",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-env-read",
+      "effect": "forbid",
+      "action": "fs.read",
+      "subject": {
+        "path": "(?:^|/)\\.env(?:\\.(?!example|sample|template|dist|schema)[^/]+)?$"
+      },
+      "why": "a .env holds secrets — reading it pulls them into the agent's context (templates like .env.example are fine)",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-secret-file-read",
+      "effect": "forbid",
+      "action": "fs.read",
+      "subject": {
+        "path": "(?:^|/)(?:[^/]+\\.pem|[^/]+\\.key|id_rsa[^/]*|id_ed25519[^/]*)$"
+      },
+      "why": "key/cert file — reading it pulls the private material into the agent's context",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-secret-shell-read",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "cat|head|tail|less|more|bat|strings|xxd|od|hexdump|nl|tac",
+        "argv": "\\.aws/(?:credentials|config)|\\.ssh/id_|_(?:rsa|ecdsa|ed25519)(?=\\s|$)|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/|(?:^|[\\s/])\\.env(?:\\.(?!example|sample|template|dist|schema)[^\\s/]*)?(?=\\s|$)|\\.pem(?=\\s|$)|\\.key(?=\\s|$)|id_rsa|id_ed25519"
+      },
+      "why": "the Read-tool rules above are bypassed by dumping the file through a shell reader — same secrets, same answer",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
       "id": "ask-env-write",
       "effect": "ask",
       "action": "fs.write",

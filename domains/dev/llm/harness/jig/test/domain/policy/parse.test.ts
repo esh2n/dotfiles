@@ -43,6 +43,7 @@ describe("parsePolicy", () => {
       "shell.exec": "denylist",
       "fs.write": "allowlist",
       "fs.edit": "allowlist",
+      "fs.read": "allowlist",
       "net.fetch": "denylist",
       "mcp.call": "denylist",
     });
@@ -54,6 +55,7 @@ describe("parsePolicy", () => {
 
   test("mode defaults to denylist for every action", () => {
     expect(Object.values(build().mode)).toEqual([
+      "denylist",
       "denylist",
       "denylist",
       "denylist",

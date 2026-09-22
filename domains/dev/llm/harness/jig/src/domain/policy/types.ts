@@ -20,12 +20,17 @@ import type { HookProfile } from "../hooks/decision";
 
 export type Effect = "forbid" | "ask" | "permit";
 
-export type Action = "shell.exec" | "fs.write" | "fs.edit" | "net.fetch" | "mcp.call";
+export type Action = "shell.exec" | "fs.write" | "fs.edit" | "fs.read" | "net.fetch" | "mcp.call";
 
 export const ACTIONS: readonly Action[] = [
   "shell.exec",
   "fs.write",
   "fs.edit",
+  // fs.read gates the harness's own Read tool on secret-shaped paths. A `cat`
+  // still bypasses it, which is why the same paths also get shell rules — the
+  // sandbox was never the boundary here: Claude Code's sandbox confines Bash
+  // only and leaves the Read tool unrestricted on the host.
+  "fs.read",
   "net.fetch",
   "mcp.call",
 ];
