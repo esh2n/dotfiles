@@ -1,359 +1,79 @@
 ---
 name: sdd
-description: Spec-Driven Development workflow. Use when starting a new feature, bugfix, or any task that benefits from structured specification before implementation. Manages tasks and specs in ~/.config/work/{org}/{repo}/tasks/. Subcommands - init, clarify, research, design, tasks, implement, validate, status, list.
-argument-hint: "init|clarify|research|design|tasks|implement|validate|status|list [task-name]"
-metadata:
-  namespaces: [practice]
+description: Use only for large, ambiguous work that spans multiple files and whose approach is not yet settled. Do not use when the diff can be described in one sentence (skip planning entirely) or when the work merely spans files or has an uncertain method (that is the grilling skill's job). The owner invokes this explicitly; do not start it on your own.
+disable-model-invocation: true
+argument-hint: "<one-line goal>"
 ---
 
 # Spec-Driven Development (SDD)
 
-## Overview
+## Scope gate
 
-Structured specification-driven development workflow that separates planning from implementation. Specs are stored outside the repository at `~/.config/work/{org}/{repo}/tasks/` so they are accessible from any git worktree.
+This skill is for work that is both large and ambiguous: it will touch several files, and the shape of the solution is not yet decided. If the change can be described in one sentence, skip planning and just make it. If the change spans files or the method is uncertain, use the `grilling` skill to settle the approach in chat, one question at a time, and leave a short decision record — do not reach for a written spec. Only when neither shortcut applies — the scope is genuinely large and open questions would change the design — does a written SPEC earn its cost.
 
-**Announce at start:** "SDD スキルを使用します。"
+This is separate from any in-loop planning the harness already does while working (e.g. a running TODO list during implementation). This skill is only about whether to pause and write a spec before implementation starts.
 
-## Core Concepts
+## Step 1: Interview
 
-- **task** = 作業の最上位単位。全ての作業はtaskとして管理される
-- **spec** = taskに付随するオプショナルな構造化仕様（SDD成果物）
-- **notes** = 探索的・断片的な仕様メモ。specのインプットになりうる
+Before writing anything, resolve the ambiguity that actually changes the design. Ask the owner one question at a time — never a batch. Each question must be high-impact: it changes which files get touched, where the boundary of the change sits, what is explicitly out of scope, or how the result will be verified. Do not ask about things you can determine yourself by reading the code.
 
-## Directory Resolution
+Keep asking until nothing high-impact remains open. If a high-impact ambiguity still remains, do not write the SPEC yet — ask. A SPEC written over an unresolved high-impact question just encodes the wrong design more durably.
 
-### 1. Detect Repository Identity
+Stop as soon as the remaining questions are low-impact (naming, ordering, style) — record a reasonable default for those directly in the SPEC instead of asking.
 
-```bash
-# Get org/repo from git remote
-remote_url=$(git remote get-url origin 2>/dev/null)
-# Extract org/repo (handles both HTTPS and SSH)
-org_repo=$(echo "$remote_url" | sed -E 's#.*(github\.com|gitlab\.com)[:/]##' | sed 's/\.git$//')
-org=$(echo "$org_repo" | cut -d'/' -f1)
-repo=$(echo "$org_repo" | cut -d'/' -f2)
-# Fallback: remoteが無い/未対応ホストならローカル名を使う
-if [ -z "$org" ] || [ -z "$repo" ] || [ "$org" = "$repo" ]; then
-  repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
-  org="local"
-fi
+High-impact questions tend to fall into a few shapes:
 
-WORK_ROOT="$HOME/.config/work/${org}/${repo}"
-TASKS_DIR="${WORK_ROOT}/tasks"
-TEMPLATES_DIR="$HOME/.config/work/_templates"
-```
+- **Files/boundaries** — "This could live in `src/auth/` alongside the existing session code, or as a new `src/oauth/` module. Which?"
+- **Out of scope** — "Should this also migrate the existing sessions, or only apply to new logins?"
+- **Verification** — "What should I run to prove this works end-to-end — an existing test suite, a new integration test, a manual curl against a running server?"
 
-### 2. Initialize Work Directory (if needed)
+A question that doesn't change one of these (files touched, boundary, scope, or how success is checked) is probably not worth asking here.
 
-```bash
-mkdir -p "${TASKS_DIR}"
-mkdir -p "${WORK_ROOT}/decisions"
-mkdir -p "${WORK_ROOT}/docs"
-```
+## Step 2: Write SPEC.md
 
-## Subcommands
+Once the interview has settled every high-impact question, write exactly one self-contained file: `SPEC.md`. Do not split it into multiple documents. Use this structure:
 
-### `/sdd init <name>` — タスク作成
-
-新しいタスクを作成し、必要に応じてSDD specを初期化する。
-
-1. 連番を自動採番: `tasks/` 配下の `NNN-*` ディレクトリ名の数値prefixの最大値+1（ゼロパディング3桁）。**1件も無ければ 001**
-2. slug を生成: 引数が既に英小文字ケバブケースならそのまま。日本語なら意味を英訳した3〜5語のケバブケースに変換
-3. タスクディレクトリを作成
-4. `meta.md` と `notes.md` をテンプレート（`_templates/`）から生成。**テンプレートが無い環境では**、meta.md は下記の初期値、notes.md は `# {title}` + `## Background` + `## Notes` + `## References` の最小構造で生成する
-5. spec要否の判定（**typeはユーザーの依頼内容から推定する**）:
-   - type が bugfix/chore と判断でき、ユーザーがspecに言及していない → **質問せず `has_spec: false` で作成し、その旨を報告**
-   - type が feature/大きめの変更、または判断がつかない → ユーザーに確認: 「このタスクにSDD specは必要ですか？」
-6. spec必要なら `spec/` ディレクトリを作成し、テンプレートから各ファイルを生成
-
-**生成されるファイル:**
-```
-tasks/{NNN}-{slug}/
-├── meta.md
-├── notes.md
-└── spec/              # SDD有効時のみ
-    ├── requirements.md
-    ├── research.md
-    ├── design.md
-    ├── contracts/
-    ├── tasks.md
-    └── checklist.md
-```
-
-**meta.md の初期値:**
-```yaml
----
-id: "{NNN}"
-slug: "{slug}"
-title: "{依頼内容から生成した人間可読な一文（日本語可。slugの複製にしない）}"
-type: feature | bugfix | chore | exploration
-status: draft
-branch: ""
-worktree: ""
-created: "{YYYY-MM-DD}"
-updated: "{YYYY-MM-DD}"
-has_spec: true | false
----
-```
-
-**`_index.md` を更新:**
-タスク一覧テーブルに新しいタスクを追加する。`_index.md` が存在しなければ作成する。列は固定: `| ID | Title | Type | Status | Spec | Updated |`
-
-### `/sdd clarify` — 曖昧さの解消
-
-**前提:** カレントタスクが特定されていること（meta.md の status が draft or clarify）
-
-1. `notes.md` と `spec/requirements.md` の現在の内容を読む
-2. **grilling スキルを起動する**。対象は読み込んだ要件、出力先は `spec/requirements.md`、観点は下記を `--hints` で渡す:
-
-   ```
-   grilling "<task-id> の要件（notes.md + spec/requirements.md）" \
-     --out spec/requirements.md \
-     --hints "入出力の具体的な形式 / エッジケースの扱い / 非機能要件（パフォーマンス、セキュリティ） / 既存コードとの統合ポイント / スコープの境界（何をやらないか）"
-   ```
-
-   質問は grilling が1問ずつ出し、決定記録を `spec/requirements.md` の `## 決定記録` に書く。ここで自前の質問リストを作らない。
-3. grilling が「共通理解に達した」と報告したら、`meta.md` の status を `clarify` → `requirements-done` に更新（updated も更新）
-4. 共通理解に達していないうちは `/sdd research` に進まない
-
-### `/sdd research` — 調査
-
-1. コードベースを探索し、関連するファイル・パターン・依存関係を調査
-2. 結果を `spec/research.md` に記録
-3. `meta.md` の status を `researching` に更新
-
-**research.md に記録する内容:**
-- 関連する既存コード（ファイルパス + 概要）
-- 使用されているパターン・ライブラリ
-- 影響範囲の分析
-- 参考にすべき既存実装
-- リスク・懸念点
-
-### `/sdd design` — 設計
-
-**前提:** requirements と research が完了していること
-
-1. `spec/requirements.md` と `spec/research.md` を読む
-2. アーキテクチャ設計を `spec/design.md` に作成
-3. 必要に応じて `spec/contracts/` に API契約を作成
-4. `meta.md` の status を `designing` に更新
-5. **ユーザーに設計レビューを依頼する**
-
-**design.md に含める内容:**
-- システム構成図（Mermaid）
-- データモデル
-- コンポーネント間の依存関係
-- 主要な処理フロー（Mermaid sequence diagram）
-- 技術的判断とその理由
-
-**contracts/ に含める内容（該当する場合）:**
-- API エンドポイント定義
-- リクエスト/レスポンス型
-- エラーハンドリング仕様
-
-### `/sdd tasks` — タスク分解
-
-**前提:** design が完了しユーザーに承認されていること
-
-1. `spec/design.md` を読む
-2. 実装タスクを `spec/tasks.md` に分解
-3. `spec/checklist.md` に Done 定義を作成
-4. `meta.md` の status を `planned` に更新
-
-**tasks.md のフォーマット:**
 ```markdown
-# Implementation Tasks
+# SPEC: <one-line goal>
 
-## Phase 1: Foundation
-- [ ] T001 データモデルの定義 (`src/models/user.ts`)
-- [ ] T002 [P] バリデーションロジック (`src/validators/`)
-- [ ] T003 [P] データベースマイグレーション (`migrations/`)
+## Goal
 
-## Phase 2: Core Logic
-- [ ] T004 [depends:T001] 認証サービスの実装 (`src/services/auth.ts`)
-- [ ] T005 [depends:T001] API エンドポイント (`src/routes/auth.ts`)
+<one sentence: what this change accomplishes>
 
-## Phase 3: Integration
-- [ ] T006 [depends:T004,T005] E2Eテスト (`tests/e2e/auth.test.ts`)
+## Files touched and boundaries
+
+<which files/directories will change, and what is explicitly inside that boundary>
+
+## Out of scope
+
+<what this change deliberately does not do, so the implementer doesn't over-reach>
+
+## Verification
+
+<end-to-end, machine-checkable commands and their expected output —
+e.g. `pnpm test path/to/spec` should exit 0, `curl -s localhost:3000/health`
+should return `{"status":"ok"}`. Not "tests pass" — the actual command
+and the actual expected result.>
+
+## Open questions resolved (optional)
+
+<decisions made during the interview and why, for anything non-obvious>
 ```
 
-- `[P]` = 並列実行可能
-- `[depends:TXXX]` = 依存タスク
-- ファイルパスを明記してコンテキストを与える
+Keep every section short. The SPEC is a contract, not a design document — if a section needs sub-documents, the work was probably not scoped correctly in step 1.
 
-**checklist.md のフォーマット:**
-```markdown
-# Definition of Done
+## Step 3: Where SPEC.md lives
 
-## Functional
-- [ ] 全ての requirements が実装されている
-- [ ] エッジケースが処理されている
+Write `SPEC.md` at the repository root of the target project — not under `~/.config/work` or any other out-of-tree location. It is a temporary implementation contract, not a durable artifact: git-ignore it, or delete it once the implementation is complete. After implementation, the SPEC itself does not need to survive — only its conclusion does, as a short entry in the project's decision records (see `domains/dev/llm/harness/rules/decisions/2026-09-22-decision-records.md` for the format: Status, Problem, Decision, Alternatives considered, Consequences). Do not let SPEC.md linger in the tree after the work lands; a stale spec that no longer matches the code is worse than no spec.
 
-## Quality
-- [ ] ユニットテストが書かれている
-- [ ] lint/format が通っている
-- [ ] 型エラーがない
+## Step 4: Implement in a new session
 
-## Integration
-- [ ] 既存テストが壊れていない
-- [ ] API契約に準拠している
-```
+Do not implement in the same session that ran the interview. Start a fresh session and have it read `SPEC.md` as its only required context. A fresh session carries none of the back-and-forth of the interview, so it reads the SPEC as the decision-complete contract it is meant to be, rather than reasoning from the (possibly meandering) conversation that produced it. If the SPEC is truly self-contained, this loses nothing.
 
-### `/sdd implement` — 実装
+## Never
 
-**前提:** tasks が完了しユーザーに承認されていること
-
-1. `spec/tasks.md` を読み、未完了タスクを特定
-2. Phase 順に、依存関係を考慮して実装
-3. `[P]` マーカーのタスクは可能なら並列で実装
-4. 各タスク完了時に `spec/tasks.md` のチェックボックスを更新
-5. `meta.md` の status を `implementing` に更新
-
-**実装ルール:**
-- spec/design.md の設計に従う
-- spec/contracts/ の API契約に準拠する
-- 1タスク完了ごとに tasks.md を更新
-- 実装中に設計変更が必要な場合は **ユーザーに相談してから** design.md を更新
-
-### `/sdd validate` — 検証
-
-1. `spec/checklist.md` の各項目を検証
-2. `spec/tasks.md` の全タスクが完了しているか確認
-3. テストを実行
-4. 結果を報告
-5. 全て通れば `meta.md` の status を `done` に更新
-
-### `/sdd status` — 現在のタスク状態
-
-1. カレントブランチ名から対応するタスクを検索（meta.md の branch フィールド）
-2. 見つからなければ、status が done 以外のタスクのうち updated が最新のものを表示（その旨を注記）。タスクが0件なら「タスクなし。/sdd init で作成してください」と案内
-3. 以下の形式で表示（spec がある場合は各フェーズ進捗と tasks.md 完了率も）:
-
-```
-📋 SDD Status — {org}/{repo}
-  Task:    {NNN}-{slug}
-  Title:   {title}
-  Type:    {type} / Status: {status}
-  Branch:  {branch または "(未設定)"}
-  Spec:    {あり: フェーズ進捗 / なし: "notes.mdベース"}
-  Updated: {updated}
-  次のアクション: {statusに応じた次の一手を1行}
-```
-
-### `/sdd list` — タスク一覧
-
-1. `${TASKS_DIR}/_index.md` を表示
-2. 存在しなければ、全タスクの meta.md をスキャンして生成
-
-## Workflow Phases
-
-```
-                    ┌─────────────────────────────────────┐
-                    │           /sdd init                  │
-                    │  タスク作成 + spec要否判断            │
-                    └──────────────┬──────────────────────┘
-                                   │
-                    ┌──────────────▼──────────────────────┐
-             ┌──────│  spec不要: notes.md だけで作業開始   │
-             │      └──────────────┬──────────────────────┘
-             │                     │ spec必要
-             │      ┌──────────────▼──────────────────────┐
-             │      │         /sdd clarify                 │
-             │      │   曖昧さ解消（grilling で1問ずつ）       │
-             │      └──────────────┬──────────────────────┘
-             │                     │
-             │      ┌──────────────▼──────────────────────┐
-             │      │         /sdd research                │
-             │      │   コードベース調査                    │
-             │      └──────────────┬──────────────────────┘
-             │                     │
-             │      ┌──────────────▼──────────────────────┐
-             │      │         /sdd design                  │
-             │      │   設計 + Mermaid図 + API契約          │
-             │      │   ★ ユーザーレビュー ★               │
-             │      └──────────────┬──────────────────────┘
-             │                     │
-             │      ┌──────────────▼──────────────────────┐
-             │      │         /sdd tasks                   │
-             │      │   タスク分解 + Done定義               │
-             │      │   ★ ユーザー承認 ★                   │
-             │      └──────────────┬──────────────────────┘
-             │                     │
-             ├─────────────────────┤
-             │                     │
-             │      ┌──────────────▼──────────────────────┐
-             │      │         /sdd implement               │
-             │      │   Phase順に実装                      │
-             │      └──────────────┬──────────────────────┘
-             │                     │
-             │      ┌──────────────▼──────────────────────┐
-             └─────►│         /sdd validate                │
-                    │   checklist検証 + テスト実行          │
-                    └──────────────────────────────────────┘
-```
-
-## Current Task Resolution
-
-複数のサブコマンドで「カレントタスク」を特定する必要がある。以下の優先順で解決する:
-
-1. **引数で指定:** `/sdd design 001` → タスク001を対象
-2. **ブランチ名から逆引き:** 現在のgitブランチ名で全タスクの meta.md を検索
-3. **最新のin-progress:** status が implementing/designing 等の最新タスク
-4. **見つからない場合:** ユーザーに選択を求める
-
-## Integration with Git Worktree
-
-worktree作成時に `/sdd init` で作ったタスクと紐づける:
-
-```bash
-# worktree 作成後、meta.md を更新
-branch=$(git branch --show-current)
-worktree_path=$(pwd)
-# meta.md の branch と worktree フィールドを更新
-```
-
-**タスクと worktree の紐づけ手順:**
-1. `/sdd init` でタスク作成
-2. worktree を作成（`git worktree add` 等）
-3. meta.md の branch/worktree を更新
-4. `/sdd clarify` → `/sdd design` → `/sdd tasks` → `/sdd implement`
-
-## ADR (Architecture Decision Records)
-
-設計フェーズで重要な技術的判断があった場合:
-
-```bash
-# decisions/ に ADR を作成
-DECISIONS_DIR="${WORK_ROOT}/decisions"
-# NNN-title.md 形式
-```
-
-**ADR フォーマット:**
-```markdown
-# ADR-{NNN}: {タイトル}
-
-## Status
-Accepted | Proposed | Deprecated | Superseded by ADR-XXX
-
-## Context
-{判断が必要になった背景}
-
-## Decision
-{何を決めたか}
-
-## Consequences
-{この判断の結果・トレードオフ}
-```
-
-## Red Flags
-
-**Never:**
-- spec未完了の状態で implement に進む（ユーザー承認なしで）
-- design.md を実装中にユーザーに相談なく変更する
-- tasks.md のチェックを更新せずに次のタスクに進む
-- 他のタスクの spec を上書きする
-
-**Always:**
-- clarify で曖昧さを解消してから design に進む
-- design と tasks はユーザーレビュー/承認を挟む
-- 実装中は tasks.md の進捗を逐次更新する
-- status 変更時に meta.md の updated フィールドも更新する
+- Do not produce a constitution/specify/plan/tasks multi-document flow. One SPEC.md, nothing else.
+- Do not create task directories under `~/.config/work` or anywhere outside the target repository.
+- Do not generate ADRs. If a decision needs to be recorded, it goes in the project's decision records, not a separate ADR file.
+- Do not implement `status` or `list` subcommands — this skill has no subcommands and no persistent task tracking.
+- Do not add a "Definition of Done" checklist beyond what the Verification section already specifies. Verification is the definition of done.
