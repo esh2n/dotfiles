@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createNodeApplyFs } from "../../../src/infra/apply/node-apply-fs";
@@ -74,5 +84,79 @@ describe("createNodeApplyFs", () => {
     const before = Date.now();
     const now = fs.now().getTime();
     expect(now).toBeGreaterThanOrEqual(before - 1000);
+  });
+});
+
+describe("the symlink verbs", () => {
+  test("inspect tells the four states apart and never follows a link", async () => {
+    const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
+    writeFileSync(join(dir, "file"), "x");
+    mkdirSync(join(dir, "real"));
+    symlinkSync("AGENTS.md", join(dir, "rel"));
+    symlinkSync(join(dir, "real"), join(dir, "abs"));
+    symlinkSync(join(dir, "gone"), join(dir, "dangling"));
+
+    expect(await fs.inspect(join(dir, "nope"))).toEqual({ kind: "missing" });
+    expect(await fs.inspect(join(dir, "file"))).toEqual({ kind: "file" });
+    expect(await fs.inspect(join(dir, "real"))).toEqual({ kind: "dir" });
+    // A link to a directory is a symlink, not a dir, and the target is verbatim.
+    expect(await fs.inspect(join(dir, "abs"))).toEqual({
+      kind: "symlink",
+      target: join(dir, "real"),
+    });
+    expect(await fs.inspect(join(dir, "rel"))).toEqual({ kind: "symlink", target: "AGENTS.md" });
+    expect(await fs.inspect(join(dir, "dangling"))).toEqual({
+      kind: "symlink",
+      target: join(dir, "gone"),
+    });
+  });
+
+  test("symlink stores a relative target as given", async () => {
+    const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
+    await fs.symlink("AGENTS.md", join(dir, "CLAUDE.md"));
+    expect(readlinkSync(join(dir, "CLAUDE.md"))).toBe("AGENTS.md");
+  });
+
+  test("symlink refuses an occupied path — the domain plans the removal or backup first", async () => {
+    const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
+    writeFileSync(join(dir, "taken"), "x");
+    expect(fs.symlink("/elsewhere", join(dir, "taken"))).rejects.toThrow();
+  });
+
+  test("remove on a symlink to a directory unlinks the link and leaves the directory", async () => {
+    const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
+    mkdirSync(join(dir, "staging"));
+    writeFileSync(join(dir, "staging", "keep.md"), "kept");
+    symlinkSync(join(dir, "staging"), join(dir, "link"));
+
+    await fs.remove(join(dir, "link"));
+
+    expect(existsSync(join(dir, "link"))).toBe(false);
+    expect(readFileSync(join(dir, "staging", "keep.md"), "utf8")).toBe("kept");
+  });
+
+  test("remove on a real directory removes the tree", async () => {
+    const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
+    mkdirSync(join(dir, "tree", "deep"), { recursive: true });
+    symlinkSync("/nowhere", join(dir, "tree", "deep", "l"));
+    await fs.remove(join(dir, "tree"));
+    expect(existsSync(join(dir, "tree"))).toBe(false);
+  });
+
+  test("rename moves a file, a directory, or a link as-is", async () => {
+    const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
+    writeFileSync(join(dir, "CLAUDE.md"), "hand-written");
+    await fs.rename(join(dir, "CLAUDE.md"), join(dir, "CLAUDE.md.pre-jig.20260923-000000"));
+    expect(existsSync(join(dir, "CLAUDE.md"))).toBe(false);
+    expect(readFileSync(join(dir, "CLAUDE.md.pre-jig.20260923-000000"), "utf8")).toBe(
+      "hand-written",
+    );
+  });
+
+  test("mkdir creates parents and tolerates an existing directory", async () => {
+    const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
+    await fs.mkdir(join(dir, "a", "b"));
+    await fs.mkdir(join(dir, "a", "b"));
+    expect(lstatSync(join(dir, "a", "b")).isDirectory()).toBe(true);
   });
 });

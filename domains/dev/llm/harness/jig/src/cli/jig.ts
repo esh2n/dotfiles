@@ -90,17 +90,26 @@ function harnessRoot(): string {
  *
  * `CLAUDE_CONFIG_DIR` is honored for the destination because Claude Code
  * honors it: a machine that moved its configuration directory must not have
- * jig quietly compose a second settings.json at the default path.
+ * jig quietly compose a second settings.json at the default path. The
+ * symlink targets are absolute under the harness root, so they hold from
+ * wherever `~/.claude` is.
  */
 function resolveClaudeApplyPaths(): ClaudeApplyPaths {
   const harness = harnessRoot();
   const claudeDir = process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
   return {
+    harnessRoot: harness,
     guardRules: join(harness, "policy", "guard-rules.json"),
     mcpServers: join(harness, "mcp", "servers.json"),
     sandbox: join(harness, "policy", "sandbox.json"),
     decisions: join(harness, "rules", "decisions"),
     settings: join(claudeDir, "settings.json"),
+    agentsMd: join(claudeDir, "AGENTS.md"),
+    claudeMd: join(claudeDir, "CLAUDE.md"),
+    skills: join(claudeDir, "skills"),
+    agents: join(claudeDir, "agents"),
+    rulesDir: join(claudeDir, "rules"),
+    commands: join(claudeDir, "commands"),
     home: homedir(),
   };
 }
@@ -527,6 +536,10 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  apply --target claude composes ~/.claude/settings.json's hooks, permissions, sandbox and\n" +
           "  mcpServers from policy/guard-rules.json and mcp/servers.json; every other key in the live\n" +
           "  file is preserved. Dry-run prints the whole-file diff plus owned/left/REMOVED key lists.\n" +
+          "  The same run generates ~/.claude/AGENTS.md from rules/common and rules/decisions (with\n" +
+          "  CLAUDE.md -> AGENTS.md), links skills, agents and rules/<lang> into llm/harness/, and\n" +
+          "  retires commands/. A file or real directory in a link's way is renamed aside, never\n" +
+          "  deleted; hooks, scripts, workflows and the .<x>-merged staging dirs are not touched.\n" +
           "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +

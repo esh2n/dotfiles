@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ApplyPorts, ProvenanceInfo } from "../../src/app/apply/ports";
 import { applyCli } from "../../src/cli/apply";
+import { fakeClaudeFs } from "../app/apply/fake-claude-ports";
 
 const TIERS_JSON_PATH = "/repo/policy/tiers.json";
 const PI_PATH = "/repo/config/pi/models.json";
@@ -156,12 +157,21 @@ describe("applyCli", () => {
  * composition reported badly is still a surprise.
  */
 describe("applyCli --target claude", () => {
+  const H = "/repo/llm/harness";
+  const CLAUDE = "/home/u/.claude";
   const CLAUDE_PATHS = {
-    guardRules: "/repo/policy/guard-rules.json",
-    mcpServers: "/repo/mcp/servers.json",
-    sandbox: "/repo/policy/sandbox.json",
-    decisions: "/repo/rules/decisions",
-    settings: "/home/u/.claude/settings.json",
+    harnessRoot: H,
+    guardRules: `${H}/policy/guard-rules.json`,
+    mcpServers: `${H}/mcp/servers.json`,
+    sandbox: `${H}/policy/sandbox.json`,
+    decisions: `${H}/rules/decisions`,
+    settings: `${CLAUDE}/settings.json`,
+    agentsMd: `${CLAUDE}/AGENTS.md`,
+    claudeMd: `${CLAUDE}/CLAUDE.md`,
+    skills: `${CLAUDE}/skills`,
+    agents: `${CLAUDE}/agents`,
+    rulesDir: `${CLAUDE}/rules`,
+    commands: `${CLAUDE}/commands`,
     home: "/home/u",
   };
 
@@ -169,40 +179,25 @@ describe("applyCli --target claude", () => {
     [CLAUDE_PATHS.guardRules]: JSON.stringify({ version: 1, floor: [], rules: [] }),
     [CLAUDE_PATHS.mcpServers]: JSON.stringify({ schemaVersion: "jig.mcp.v1", servers: [] }),
     [`${CLAUDE_PATHS.decisions}/a.md`]: "# 題\n\nStatus: accepted — x\n\nrule: Do the thing.\n",
+    [`${H}/rules/common/README.md`]: "# rules/common\n",
   };
 
-  function claudeContext(extra: Record<string, string> = {}) {
-    const files: Record<string, string> = { ...SOURCES, ...extra };
-    const manifest: Record<string, string> = {};
+  function claudeContext(extra: Record<string, string> = {}, links: Record<string, string> = {}) {
+    const fake = fakeClaudeFs({ files: { ...SOURCES, ...extra }, links });
     return {
-      ports: {
-        async readFile(path: string) {
-          return files[path];
-        },
-        async writeAtomic(path: string, content: string) {
-          files[path] = content;
-        },
-        async listDir(path: string) {
-          const prefix = `${path}/`;
-          return Object.keys(files)
-            .filter((file) => file.startsWith(prefix))
-            .map((file) => file.slice(prefix.length));
-        },
-        sha256: (content: string) => `fake:${content.length}`,
-        async readManifest() {
-          return { ...manifest };
-        },
-        async writeManifest(next: Readonly<Record<string, string>>) {
-          Object.assign(manifest, next);
-        },
-        async writeProvenance() {},
-        now: () => new Date("2026-09-23T00:00:00.000Z"),
-        jigVersion: "0.0.0-test",
-      },
+      ports: fake.ports,
       paths: CLAUDE_PATHS,
       hookPaths: { bun: "/abs/bun", jig: "/abs/jig.ts" },
     };
   }
+
+  /** What `~/.claude` looks like before the first milestone-2 write. */
+  const YOKI_SWITCH_LINKS = {
+    [CLAUDE_PATHS.skills]: `${CLAUDE}/.skills-merged`,
+    [CLAUDE_PATHS.agents]: `${CLAUDE}/.agents-merged`,
+    [CLAUDE_PATHS.rulesDir]: `${CLAUDE}/.rules-merged`,
+    [CLAUDE_PATHS.commands]: `${CLAUDE}/.commands-merged`,
+  };
 
   test("reports the five hooks, the owned keys, and the paste-ready permit fragment", async () => {
     const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
@@ -231,7 +226,7 @@ describe("applyCli --target claude", () => {
     const result = await applyCli(["--target", "claude"], ports, paths, context);
 
     expect(result.stdout).toContain(
-      "excludedCommands copied from /repo/policy/sandbox.json: gh, docker, open",
+      "excludedCommands copied from /repo/llm/harness/policy/sandbox.json: gh, docker, open",
     );
     expect(result.stdout).toContain("still goes through jig's guard");
   });
@@ -251,6 +246,83 @@ describe("applyCli --target claude", () => {
 
     expect(result.stdout).toContain("WARNING: 1 accepted decision note(s) carry no `rule:` line");
     expect(result.stdout).toContain("- b.md");
+  });
+
+  test("AGENTS.md: its outcome, byte size and sources, and the generated text itself", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({ [`${H}/rules/common/core.md`]: "# Core\n\nBe brief.\n" });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toMatch(
+      /AGENTS\.md: write {2}\/home\/u\/\.claude\/AGENTS\.md {2}\(\d+ bytes\)/,
+    );
+    expect(result.stdout).toContain("rules/common rendered in (1): core.md");
+    expect(result.stdout).toContain("--- AGENTS.md (generated) ---");
+    expect(result.stdout).toContain("Be brief.");
+    expect(result.stdout).not.toContain("PREVIEW ONLY");
+  });
+
+  test("past 32 KiB the size line carries a WARNING naming Codex, and the exit code stays 0", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [`${H}/rules/common/big.md`]: `# Big\n\n${"x".repeat(33 * 1024)}\n`,
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("WARNING: over 32768 bytes; Codex truncates AGENTS.md there");
+  });
+
+  test("one line per link destination, with the state and — for replace — the old target", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext(
+      { [CLAUDE_PATHS.claudeMd]: "# merged by yoki-switch\n" },
+      YOKI_SWITCH_LINKS,
+    );
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain("links (3):");
+    expect(result.stdout).toMatch(
+      /CLAUDE\.md +backup-then-create \(existing file\/directory → \/home\/u\/\.claude\/CLAUDE\.md\.pre-jig\.20260923-000000\) +→ AGENTS\.md/,
+    );
+    expect(result.stdout).toMatch(
+      /skills +replace \(currently → \/home\/u\/\.claude\/\.skills-merged\) +→ \/repo\/llm\/harness\/skills/,
+    );
+    expect(result.stdout).toMatch(
+      /agents +replace \(currently → \/home\/u\/\.claude\/\.agents-merged\)/,
+    );
+    expect(result.stdout).toContain(
+      "rules directory: replace (currently → /home/u/.claude/.rules-merged)  /home/u/.claude/rules",
+    );
+    expect(result.stdout).toContain(
+      "commands: remove  /home/u/.claude/commands  (a symlink → /home/u/.claude/.commands-merged)",
+    );
+  });
+
+  test("the rules directory lists each planned link, and says why common is not one of them", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [`${H}/rules/go/errors.md`]: "---\npaths:\n  - '**/*.go'\n---\n# Go\n",
+      [`${CLAUDE_PATHS.rulesDir}/mine.md`]: "my rule",
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain("1 conditional-rule directory to link");
+    expect(result.stdout).toMatch(/go +create +→ \/repo\/llm\/harness\/rules\/go/);
+    expect(result.stdout).toMatch(/mine\.md +left alone \(not jig's: a regular file\)/);
+    expect(result.stdout).toMatch(
+      /common +always-on rules, rendered into AGENTS\.md — never linked/,
+    );
+  });
+
+  test("a commands directory holding real files is a CONFLICT line and exit 1", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({ [`${CLAUDE_PATHS.commands}/mine.md`]: "my command" });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("outcome: conflict");
+    expect(result.stdout).toContain("commands: CONFLICT");
+    expect(result.stdout).toContain("(mine.md)");
   });
 
   test("dry-run writes nothing even with a real destination path", async () => {

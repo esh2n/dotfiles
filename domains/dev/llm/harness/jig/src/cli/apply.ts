@@ -11,8 +11,10 @@
  *
  * - **pi / dsh / litellm** — model tiers, from `policy/tiers.json`, into files
  *   inside this repository (`app/apply/apply-tiers.ts`).
- * - **claude** — `~/.claude/settings.json`, from `policy/guard-rules.json` and
- *   `mcp/servers.json` (`app/apply/apply-claude.ts`). Milestone 1 of the
+ * - **claude** — `~/.claude/settings.json` from `policy/guard-rules.json` and
+ *   `mcp/servers.json`, the generated `~/.claude/AGENTS.md` from `rules/`,
+ *   and the `CLAUDE.md`/`skills`/`agents`/`rules/<lang>` symlinks into the
+ *   harness (`app/apply/apply-claude.ts`). Milestones 1 and 2 of the
  *   generator that retires `yoki-switch`.
  *
  * `--target all` means the first group only. The claude target writes into
@@ -24,6 +26,7 @@
 import {
   type ClaudeApplyPaths,
   type ClaudeApplyReport,
+  type LinkReport,
   applyClaude,
 } from "../app/apply/apply-claude";
 import {
@@ -34,6 +37,7 @@ import {
   applyTiers,
 } from "../app/apply/apply-tiers";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
+import { AGENTS_MD_BYTE_LIMIT } from "../domain/claude/agents-md";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import { DEFAULT_PERMITS, defaultPermitPolicyFragment } from "../domain/claude/permits";
 import { KNOWN_MACOS_EXCLUSION_CANDIDATES } from "../domain/claude/sandbox";
@@ -115,7 +119,10 @@ const PAD = 17;
  * The Claude Code target's dry-run. Three questions in order — what jig now
  * owns, what it leaves alone, what it takes away — because the third is the
  * one a reader has to agree to before `--write`, and burying it under a
- * 200-line diff is how a one-time cleanup becomes a surprise.
+ * 200-line diff is how a one-time cleanup becomes a surprise. Then the
+ * milestone-2 delivery, one line per destination: the generated AGENTS.md,
+ * each symlink with what stands at its path today, the rules directory's
+ * entries, and the retired `commands`.
  */
 function formatClaude(report: ClaudeApplyReport, dest: string): string {
   const { composition } = report;
@@ -172,11 +179,51 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
     report.diff === "" ? "(no differences)" : "--- diff (current vs generated) ---",
     ...(report.diff === "" ? [] : [report.diff]),
     "",
-    "--- AGENTS.md: milestone 2, PREVIEW ONLY (nothing is written) ---",
-    report.agentsMdPreview.trimEnd(),
+    ...agentsMdLines(report),
+    "",
+    ...linkLines(report),
+    "",
+    ...rulesDirLines(report),
+    "",
+    ...commandsLines(report),
   );
+  return lines.join("\n");
+}
 
-  const missingRule = report.agentsMdSkipped.filter((skipped) => skipped.missingRule);
+/** One word per destination state, and what it costs. */
+function describeLink(link: LinkReport): string {
+  switch (link.state) {
+    case "ok":
+      return "ok";
+    case "create":
+      return "create";
+    case "replace":
+      return `replace (currently → ${link.previousTarget})`;
+    case "backup-then-create":
+      return `backup-then-create (existing file/directory → ${link.backupPath})`;
+  }
+}
+
+function linkLine(label: string, link: LinkReport): string {
+  return `  ${label.padEnd(PAD)}${describeLink(link).padEnd(20)} → ${link.target}`;
+}
+
+/** The generated file: its outcome, its size against the Codex limit, and what went in. */
+function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
+  const { agentsMd } = report;
+  const lines: string[] = [
+    `AGENTS.md: ${agentsMd.outcome}  ${agentsMd.path}  (${agentsMd.bytes} bytes${agentsMd.overLimit ? ` — WARNING: over ${AGENTS_MD_BYTE_LIMIT} bytes; Codex truncates AGENTS.md there` : ""})`,
+    ...(agentsMd.backupPath === undefined
+      ? []
+      : [
+          `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
+        ]),
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    "--- AGENTS.md (generated) ---",
+    agentsMd.content.trimEnd(),
+  ];
+
+  const missingRule = agentsMd.skipped.filter((skipped) => skipped.missingRule);
   if (missingRule.length > 0) {
     lines.push(
       "",
@@ -185,13 +232,77 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
       "    A human writes that line at the time of the ruling; the generator never invents it.",
     );
   }
-  const other = report.agentsMdSkipped.filter((skipped) => !skipped.missingRule);
+  const other = agentsMd.skipped.filter((skipped) => !skipped.missingRule);
   if (other.length > 0) {
     lines.push(
       `  (${other.length} not rendered: ${other.map((s) => `${s.file} — ${s.reason}`).join("; ")})`,
     );
   }
-  return lines.join("\n");
+  return lines;
+}
+
+/** One line per symlink destination: the state, and for replace/backup what is there now. */
+function linkLines(report: ClaudeApplyReport): readonly string[] {
+  return [
+    `links (${report.links.length}):`,
+    ...report.links.map((link) => linkLine(basename(link.path), link)),
+    "  A symlink elsewhere is replaced (what it pointed at is untouched); a file or a real",
+    "  directory is renamed aside, never deleted.",
+  ];
+}
+
+/** The rules directory: itself, then its entries — planned, stale, or somebody else's. */
+function rulesDirLines(report: ClaudeApplyReport): readonly string[] {
+  const { rulesDir } = report;
+  const lines: string[] = [
+    `rules directory: ${describeLink(rulesDir.plan)}  ${rulesDir.path}`,
+    `  ${rulesDir.selection.linked.length} conditional-rule director${rulesDir.selection.linked.length === 1 ? "y" : "ies"} to link (paths: frontmatter decides when each loads):`,
+  ];
+  if (rulesDir.entries.length === 0) lines.push("    (none)");
+  for (const entry of rulesDir.entries) {
+    switch (entry.kind) {
+      case "link":
+        lines.push(linkLine(`  ${entry.name}`, entry.plan));
+        break;
+      case "stale":
+        lines.push(`    ${entry.name.padEnd(PAD - 2)}remove (stale jig link → ${entry.target})`);
+        break;
+      case "foreign":
+        lines.push(`    ${entry.name.padEnd(PAD - 2)}left alone (not jig's: ${entry.what})`);
+        break;
+    }
+  }
+  lines.push(
+    `  not linked (${rulesDir.selection.excluded.length}):`,
+    ...rulesDir.selection.excluded.map(
+      (entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`,
+    ),
+  );
+  return lines;
+}
+
+/** The retired directory: removed when it holds only pointers, a conflict when it holds files. */
+function commandsLines(report: ClaudeApplyReport): readonly string[] {
+  const { commands } = report;
+  switch (commands.action.kind) {
+    case "absent":
+      return [`commands: absent  ${commands.path}  (retired: commands are skills)`];
+    case "remove":
+      return [
+        `commands: remove  ${commands.path}  (${commands.action.reason})`,
+        "  Retired: commands are skills (rules/decisions/2026-09-22-commands-are-skills.md).",
+      ];
+    case "conflict":
+      return [
+        `commands: CONFLICT  ${commands.path}  (${commands.action.reason})`,
+        "  Retired: commands are skills. jig removes only a symlink or a directory of symlinks;",
+        "  this one holds real files, so it is left exactly as it is.",
+      ];
+  }
+}
+
+function basename(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
 }
 
 /** The sandbox block's provenance and its cost, both stated. */

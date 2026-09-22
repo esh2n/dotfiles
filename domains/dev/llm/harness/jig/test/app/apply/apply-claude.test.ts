@@ -1,14 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import { type ClaudeApplyPaths, applyClaude } from "../../../src/app/apply/apply-claude";
-import type { ClaudeApplyPorts, ProvenanceInfo } from "../../../src/app/apply/ports";
+import type { ClaudeApplyPorts } from "../../../src/app/apply/ports";
 import type { JsonObject } from "../../../src/domain/compose/merge";
+import { type FakeClaudeFs, type FakeClaudeFsSeed, fakeClaudeFs } from "./fake-claude-ports";
+
+const H = "/repo/llm/harness";
+const CLAUDE = "/home/u/.claude";
 
 const PATHS: ClaudeApplyPaths = {
-  guardRules: "/repo/policy/guard-rules.json",
-  mcpServers: "/repo/mcp/servers.json",
-  sandbox: "/repo/policy/sandbox.json",
-  decisions: "/repo/rules/decisions",
-  settings: "/home/u/.claude/settings.json",
+  harnessRoot: H,
+  guardRules: `${H}/policy/guard-rules.json`,
+  mcpServers: `${H}/mcp/servers.json`,
+  sandbox: `${H}/policy/sandbox.json`,
+  decisions: `${H}/rules/decisions`,
+  settings: `${CLAUDE}/settings.json`,
+  agentsMd: `${CLAUDE}/AGENTS.md`,
+  claudeMd: `${CLAUDE}/CLAUDE.md`,
+  skills: `${CLAUDE}/skills`,
+  agents: `${CLAUDE}/agents`,
+  rulesDir: `${CLAUDE}/rules`,
+  commands: `${CLAUDE}/commands`,
   home: "/home/u",
 };
 
@@ -73,55 +84,22 @@ const SANDBOX_SOURCE = JSON.stringify({
 
 const DECISION = "# 決定の題\n\nStatus: accepted — 理由（2026-09-22）\n\nrule: Do the one thing.\n";
 
-function fakePorts(initial: Record<string, string>): {
-  ports: ClaudeApplyPorts;
-  files: Record<string, string>;
-  manifest: Record<string, string>;
-  provenance: Record<string, ProvenanceInfo>;
-} {
-  const files: Record<string, string> = {
-    [PATHS.guardRules]: GUARD_RULES,
-    [PATHS.mcpServers]: MCP_SOURCE,
-    [PATHS.sandbox]: SANDBOX_SOURCE,
-    [`${PATHS.decisions}/2026-09-22-one.md`]: DECISION,
-    ...initial,
-  };
-  const manifest: Record<string, string> = {};
-  const provenance: Record<string, ProvenanceInfo> = {};
-
-  const ports: ClaudeApplyPorts = {
-    async readFile(path) {
-      return files[path];
+/** The sources every test starts from; the destination side is the seed. */
+function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
+  return fakeClaudeFs({
+    ...seed,
+    files: {
+      [PATHS.guardRules]: GUARD_RULES,
+      [PATHS.mcpServers]: MCP_SOURCE,
+      [PATHS.sandbox]: SANDBOX_SOURCE,
+      [`${PATHS.decisions}/2026-09-22-one.md`]: DECISION,
+      [`${H}/rules/common/README.md`]: "# rules/common\n",
+      [`${H}/rules/research/INDEX.md`]: "# index\n",
+      [`${H}/skills/README.md`]: "# skills\n",
+      [`${H}/agents/research.md`]: "# research\n",
+      ...seed.files,
     },
-    async writeAtomic(path, content) {
-      files[path] = content;
-    },
-    async listDir(path) {
-      const prefix = `${path}/`;
-      return Object.keys(files)
-        .filter((file) => file.startsWith(prefix))
-        .map((file) => file.slice(prefix.length));
-    },
-    sha256(content) {
-      let h = 0;
-      for (let i = 0; i < content.length; i++) h = (h * 31 + content.charCodeAt(i)) | 0;
-      return `fake:${h}`;
-    },
-    async readManifest() {
-      return { ...manifest };
-    },
-    async writeManifest(next) {
-      for (const key of Object.keys(manifest)) if (!(key in next)) delete manifest[key];
-      Object.assign(manifest, next);
-    },
-    async writeProvenance(destDir, info) {
-      provenance[destDir] = info;
-    },
-    now: () => new Date("2026-09-23T00:00:00.000Z"),
-    jigVersion: "0.0.0-test",
-  };
-
-  return { ports, files, manifest, provenance };
+  });
 }
 
 const run = (ports: ClaudeApplyPorts, write = false) =>
@@ -140,14 +118,36 @@ const LIVE_SETTINGS = JSON.stringify(
   2,
 );
 
+/** The machine as yoki-switch left it: staging-dir links and two hand-written files. */
+const YOKI_SWITCH_MACHINE: FakeClaudeFsSeed = {
+  files: {
+    [PATHS.settings]: LIVE_SETTINGS,
+    [PATHS.claudeMd]: "# merged by yoki-switch\n",
+    [PATHS.agentsMd]: "# hand-written, April\n",
+    [`${CLAUDE}/.skills-merged/writeup/SKILL.md`]: "x",
+    [`${CLAUDE}/.commands-merged/plan.md`]: "x",
+  },
+  links: {
+    [PATHS.skills]: `${CLAUDE}/.skills-merged`,
+    [PATHS.agents]: `${CLAUDE}/.agents-merged`,
+    [PATHS.rulesDir]: `${CLAUDE}/.rules-merged`,
+    [PATHS.commands]: `${CLAUDE}/.commands-merged`,
+  },
+};
+
 describe("dry-run is the default", () => {
   test("nothing is written and the outcome is the plan, not the act", async () => {
-    const { ports, files, manifest } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports, files, links, manifest } = fakePorts({
+      files: { [PATHS.settings]: LIVE_SETTINGS },
+    });
     const report = await run(ports);
 
     expect(report.wrote).toBe(false);
     expect(report.outcome).toBe("write");
+    expect(report.settingsOutcome).toBe("write");
     expect(files[PATHS.settings]).toBe(LIVE_SETTINGS);
+    expect(files[PATHS.agentsMd]).toBeUndefined();
+    expect(links).toEqual({});
     expect(manifest).toEqual({});
     expect(report.diff).not.toBe("");
   });
@@ -155,7 +155,7 @@ describe("dry-run is the default", () => {
 
 describe("what the composed file contains", () => {
   test("the five hooks, the projected permissions, the sandbox and the filtered MCP list", async () => {
-    const { ports } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     const report = await run(ports);
     const settings = report.composition.settings;
 
@@ -183,13 +183,13 @@ describe("what the composed file contains", () => {
   });
 
   test("excludedCommands comes from policy/sandbox.json, and its provenance is reported", async () => {
-    const { ports } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     const report = await run(ports);
     expect(report.sandboxSourcePath).toBe(PATHS.sandbox);
   });
 
   test("no policy/sandbox.json means the tightest list, and says so rather than passing for a choice", async () => {
-    const { ports, files } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     delete files[PATHS.sandbox];
     const report = await run(ports);
 
@@ -198,13 +198,13 @@ describe("what the composed file contains", () => {
   });
 
   test("a malformed policy/sandbox.json is an error, not a silently empty list", async () => {
-    const { ports, files } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     files[PATHS.sandbox] = JSON.stringify({ excludedCommands: "gh" });
     expect(run(ports)).rejects.toThrow("array");
   });
 
   test("MCP filtering: claude=false is excluded and {{HOME}} is substituted", async () => {
-    const { ports } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     const servers = (await run(ports)).composition.settings.mcpServers as JsonObject;
 
     expect(Object.keys(servers).sort()).toEqual(["codebase-memory-mcp", "serena"]);
@@ -212,13 +212,13 @@ describe("what the composed file contains", () => {
   });
 
   test("an ask rule has no native form and is reported as hook-only rather than guessed at", async () => {
-    const { ports } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     const report = await run(ports);
     expect(report.hookOnly.map((rule) => rule.id)).toEqual(["ask-sudo"]);
   });
 
   test("unmanaged keys survive and the removals are named", async () => {
-    const { ports } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     const { composition } = await run(ports);
 
     expect(composition.settings.model).toBe("claude-fable-5[1m]");
@@ -238,30 +238,34 @@ describe("what the composed file contains", () => {
 
 describe("--write", () => {
   test("writes atomically, records the hash, and leaves a provenance sidecar", async () => {
-    const { ports, files, manifest, provenance } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports, files, manifest, provenance } = fakePorts({
+      files: { [PATHS.settings]: LIVE_SETTINGS },
+    });
     const report = await run(ports, true);
 
     expect(report.wrote).toBe(true);
-    expect(files[PATHS.settings]).toBe(report.composition.settings && files[PATHS.settings]);
     expect(JSON.parse(files[PATHS.settings] ?? "{}").sandbox).toMatchObject({ enabled: true });
     expect(manifest[PATHS.settings]).toBe(ports.sha256(files[PATHS.settings] ?? ""));
-    expect(provenance["/home/u/.claude"]?.sourceFile).toBe(PATHS.guardRules);
+    expect(provenance[CLAUDE]?.sourceFile).toBe(PATHS.guardRules);
   });
 
   test("applying twice yields no diff the second time", async () => {
-    const { ports, files } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     await run(ports, true);
     const after = files[PATHS.settings];
 
     const second = await run(ports, true);
     expect(second.diff).toBe("");
     expect(second.outcome).toBe("noop");
+    expect(second.settingsOutcome).toBe("noop");
+    expect(second.agentsMd.outcome).toBe("noop");
+    expect(second.links.map((link) => link.state)).toEqual(["ok", "ok", "ok"]);
     expect(files[PATHS.settings]).toBe(after);
     expect(second.composition.removed).toEqual([]);
   });
 
   test("a hand edit to a key jig owns is a conflict, not something to overwrite", async () => {
-    const { ports, files } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     await run(ports, true);
 
     const edited = JSON.parse(files[PATHS.settings] ?? "{}") as Record<string, unknown>;
@@ -274,10 +278,11 @@ describe("--write", () => {
     expect(report.wrote).toBe(false);
     expect(files[PATHS.settings]).toBe(handEdited);
     expect(report.message).toContain("hand-edit conflict");
+    expect(report.message).toContain("settings.json");
   });
 
   test("a hand edit to a key jig does NOT own is carried through, and is not a conflict", async () => {
-    const { ports, files } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
     await run(ports, true);
 
     const edited = JSON.parse(files[PATHS.settings] ?? "{}") as Record<string, unknown>;
@@ -294,7 +299,7 @@ describe("--write", () => {
 
 describe("a machine with no settings.json yet", () => {
   test("composes the managed keys alone and has nothing to remove", async () => {
-    const { ports } = fakePorts({});
+    const { ports } = fakePorts();
     const report = await run(ports);
     expect(Object.keys(report.composition.settings)).toEqual([
       "hooks",
@@ -306,41 +311,299 @@ describe("a machine with no settings.json yet", () => {
   });
 });
 
-describe("the AGENTS.md preview", () => {
-  test("is produced for the dry-run and written nowhere", async () => {
-    const { ports, files } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
-    const before = Object.keys(files).length;
+describe("AGENTS.md", () => {
+  test("is generated from rules/common and rules/decisions with absolute links, and sized", async () => {
+    const { ports } = fakePorts({
+      files: {
+        [`${H}/rules/common/b-git.md`]: "# Git\n\nCommit small.\n",
+        [`${H}/rules/common/a-core.md`]: "---\npaths: []\n---\n# Core\n\nBe brief.\n",
+      },
+    });
     const report = await run(ports);
+    const { agentsMd } = report;
 
-    expect(report.agentsMdPreview).toContain("rules/research/INDEX.md");
+    expect(agentsMd.path).toBe(PATHS.agentsMd);
+    expect(agentsMd.commonFiles).toEqual(["a-core.md", "b-git.md"]);
+    expect(
+      agentsMd.content.startsWith(`<!-- generated by jig apply --target claude from ${H}/rules/`),
+    ).toBe(true);
+    expect(agentsMd.content.indexOf("# Core")).toBeLessThan(agentsMd.content.indexOf("# Git"));
+    expect(agentsMd.content).not.toContain("paths: []");
+    expect(agentsMd.content).toContain(`](${H}/rules/research/INDEX.md)`);
     // The note's `rule:` line, not its Japanese title.
-    expect(report.agentsMdPreview).toContain("- **Do the one thing.**");
-    expect(report.agentsMdPreview).not.toContain("決定の題");
-    expect(Object.keys(files)).toHaveLength(before);
+    expect(agentsMd.content).toContain(
+      `- **Do the one thing.** — [2026-09-22-one.md](${H}/rules/decisions/2026-09-22-one.md)`,
+    );
+    expect(agentsMd.content).not.toContain("決定の題");
+    expect(agentsMd.bytes).toBe(Buffer.byteLength(agentsMd.content));
+    expect(agentsMd.overLimit).toBe(false);
+  });
+
+  test("rules/common/README.md is not a rule and is not rendered", async () => {
+    const { ports } = fakePorts();
+    const report = await run(ports);
+    expect(report.agentsMd.commonFiles).toEqual([]);
+    expect(report.agentsMd.content).not.toContain("# rules/common");
+  });
+
+  test("past 32 KiB it is reported, not refused", async () => {
+    const { ports } = fakePorts({
+      files: { [`${H}/rules/common/big.md`]: `# Big\n\n${"x".repeat(33 * 1024)}\n` },
+    });
+    const report = await run(ports);
+    expect(report.agentsMd.overLimit).toBe(true);
+    expect(report.outcome).toBe("write");
   });
 
   test("an accepted note with no rule line is reported as a gap, not quietly dropped", async () => {
-    const { ports, files } = fakePorts({ [PATHS.settings]: LIVE_SETTINGS });
-    files[`${PATHS.decisions}/2026-09-23-two.md`] = "# 題\n\nStatus: accepted — 理由\n";
+    const { ports } = fakePorts({
+      files: { [`${PATHS.decisions}/2026-09-23-two.md`]: "# 題\n\nStatus: accepted — 理由\n" },
+    });
     const report = await run(ports);
 
-    expect(report.agentsMdSkipped).toContainEqual({
+    expect(report.agentsMd.skipped).toContainEqual({
       file: "2026-09-23-two.md",
       reason: expect.stringContaining("no `rule:` line"),
       missingRule: true,
     });
   });
+
+  test("--write lands it, records its hash, and keeps a file jig never wrote under a dated name", async () => {
+    const { ports, files, manifest } = fakePorts(YOKI_SWITCH_MACHINE);
+    const dry = await run(ports);
+    expect(dry.agentsMd.backupPath).toBe(`${PATHS.agentsMd}.pre-jig.20260923-000000`);
+
+    const report = await run(ports, true);
+    expect(report.wrote).toBe(true);
+    expect(files[PATHS.agentsMd]).toBe(report.agentsMd.content);
+    expect(files[`${PATHS.agentsMd}.pre-jig.20260923-000000`]).toBe("# hand-written, April\n");
+    expect(manifest[PATHS.agentsMd]).toBe(ports.sha256(report.agentsMd.content));
+  });
+
+  test("a hand edit after jig wrote it is a conflict for the whole delivery, and nothing is written", async () => {
+    const { ports, files, links } = fakePorts(YOKI_SWITCH_MACHINE);
+    await run(ports, true);
+    files[PATHS.agentsMd] = "# edited by hand\n";
+    // Put the skills link back the way yoki-switch had it, so there is a link change pending too.
+    links[PATHS.skills] = `${CLAUDE}/.skills-merged`;
+
+    const report = await run(ports, true);
+    expect(report.outcome).toBe("conflict");
+    expect(report.wrote).toBe(false);
+    expect(report.message).toContain("AGENTS.md");
+    expect(files[PATHS.agentsMd]).toBe("# edited by hand\n");
+    expect(links[PATHS.skills]).toBe(`${CLAUDE}/.skills-merged`);
+  });
+
+  test("a regenerated file after a source change is a plain write: the manifest hash still matches", async () => {
+    const { ports, files } = fakePorts(YOKI_SWITCH_MACHINE);
+    await run(ports, true);
+    files[`${H}/rules/common/new.md`] = "# New\n\nA new always-on rule.\n";
+
+    const report = await run(ports, true);
+    expect(report.agentsMd.outcome).toBe("write");
+    expect(report.wrote).toBe(true);
+    expect(files[PATHS.agentsMd]).toContain("A new always-on rule.");
+    // No second backup: the file being replaced was jig's own.
+    expect(Object.keys(files).filter((f) => f.includes(".pre-jig."))).toHaveLength(2);
+  });
+});
+
+describe("the links, on the machine yoki-switch left", () => {
+  test("the dry-run says exactly what happens to each destination", async () => {
+    const { ports } = fakePorts(YOKI_SWITCH_MACHINE);
+    const report = await run(ports);
+
+    expect(report.links).toEqual([
+      {
+        path: PATHS.claudeMd,
+        target: "AGENTS.md",
+        state: "backup-then-create",
+        backupPath: `${PATHS.claudeMd}.pre-jig.20260923-000000`,
+      },
+      {
+        path: PATHS.skills,
+        target: `${H}/skills`,
+        state: "replace",
+        previousTarget: `${CLAUDE}/.skills-merged`,
+      },
+      {
+        path: PATHS.agents,
+        target: `${H}/agents`,
+        state: "replace",
+        previousTarget: `${CLAUDE}/.agents-merged`,
+      },
+    ]);
+    expect(report.rulesDir.plan).toMatchObject({
+      state: "replace",
+      previousTarget: `${CLAUDE}/.rules-merged`,
+    });
+    expect(report.commands.action).toEqual({
+      kind: "remove",
+      reason: `a symlink → ${CLAUDE}/.commands-merged`,
+    });
+  });
+
+  test("--write replaces the staging links, keeps CLAUDE.md aside, and leaves the staging dirs alone", async () => {
+    const { ports, files, links, dirs } = fakePorts(YOKI_SWITCH_MACHINE);
+    const report = await run(ports, true);
+
+    expect(report.wrote).toBe(true);
+    expect(links[PATHS.claudeMd]).toBe("AGENTS.md");
+    expect(links[PATHS.skills]).toBe(`${H}/skills`);
+    expect(links[PATHS.agents]).toBe(`${H}/agents`);
+    expect(files[`${PATHS.claudeMd}.pre-jig.20260923-000000`]).toBe("# merged by yoki-switch\n");
+    expect(files[PATHS.claudeMd]).toBeUndefined();
+    // The rules directory is now real and empty of links (no conditional dirs exist yet).
+    expect(links[PATHS.rulesDir]).toBeUndefined();
+    expect(dirs.has(PATHS.rulesDir)).toBe(true);
+    // commands is gone; its staging dir is not.
+    expect(links[PATHS.commands]).toBeUndefined();
+    expect(files[`${CLAUDE}/.commands-merged/plan.md`]).toBe("x");
+    expect(files[`${CLAUDE}/.skills-merged/writeup/SKILL.md`]).toBe("x");
+  });
+
+  test("a real directory where a link should go is renamed aside, never deleted", async () => {
+    const { ports, files, links } = fakePorts({
+      files: { [`${PATHS.skills}/mine/SKILL.md`]: "my skill" },
+    });
+    const dry = await run(ports);
+    expect(dry.links[1]).toMatchObject({ state: "backup-then-create" });
+    expect(dry.outcome).toBe("write");
+
+    await run(ports, true);
+    expect(files[`${PATHS.skills}.pre-jig.20260923-000000/mine/SKILL.md`]).toBe("my skill");
+    expect(links[PATHS.skills]).toBe(`${H}/skills`);
+  });
+});
+
+describe("the rules directory", () => {
+  const withLangs: FakeClaudeFsSeed = {
+    files: {
+      [`${H}/rules/typescript/style.md`]: "---\npaths:\n  - '**/*.ts'\n---\n# TS\n",
+      [`${H}/rules/go/errors.md`]: "---\npaths:\n  - '**/*.go'\n---\n# Go\n",
+      [`${H}/rules/README.md`]: "# rules\n",
+    },
+  };
+
+  test("every subdirectory except common, decisions and research gets a link; the README is a file, not a candidate", async () => {
+    const { ports } = fakePorts(withLangs);
+    const report = await run(ports);
+
+    expect(report.rulesDir.selection.linked).toEqual(["go", "typescript"]);
+    expect(report.rulesDir.selection.excluded.map((e) => e.name)).toEqual([
+      "common",
+      "decisions",
+      "research",
+    ]);
+    expect(report.rulesDir.plan.state).toBe("create");
+    expect(report.rulesDir.entries).toEqual([
+      {
+        kind: "link",
+        name: "go",
+        plan: { path: `${PATHS.rulesDir}/go`, target: `${H}/rules/go`, state: "create" },
+      },
+      {
+        kind: "link",
+        name: "typescript",
+        plan: {
+          path: `${PATHS.rulesDir}/typescript`,
+          target: `${H}/rules/typescript`,
+          state: "create",
+        },
+      },
+    ]);
+  });
+
+  test("--write creates the directory and its links; a removed source directory leaves a stale link that the next write removes", async () => {
+    const { ports, files, links } = fakePorts(withLangs);
+    await run(ports, true);
+    expect(links[`${PATHS.rulesDir}/go`]).toBe(`${H}/rules/go`);
+    expect(links[`${PATHS.rulesDir}/typescript`]).toBe(`${H}/rules/typescript`);
+
+    delete files[`${H}/rules/go/errors.md`];
+    const dry = await run(ports);
+    expect(dry.rulesDir.entries).toContainEqual({
+      kind: "stale",
+      name: "go",
+      path: `${PATHS.rulesDir}/go`,
+      target: `${H}/rules/go`,
+    });
+    expect(dry.outcome).toBe("write");
+
+    await run(ports, true);
+    expect(links[`${PATHS.rulesDir}/go`]).toBeUndefined();
+    expect(links[`${PATHS.rulesDir}/typescript`]).toBe(`${H}/rules/typescript`);
+  });
+
+  test("an entry that is not jig's is reported and left exactly as it is", async () => {
+    const { ports, files, links } = fakePorts({
+      ...withLangs,
+      files: { ...withLangs.files, [`${PATHS.rulesDir}/mine.md`]: "my rule" },
+      links: { [`${PATHS.rulesDir}/elsewhere`]: "/somewhere/else" },
+    });
+    const report = await run(ports, true);
+
+    expect(report.rulesDir.entries.filter((e) => e.kind === "foreign").map((e) => e.name)).toEqual([
+      "elsewhere",
+      "mine.md",
+    ]);
+    expect(files[`${PATHS.rulesDir}/mine.md`]).toBe("my rule");
+    expect(links[`${PATHS.rulesDir}/elsewhere`]).toBe("/somewhere/else");
+  });
+
+  test("common is never linked, even though it is a directory under rules/", async () => {
+    const { ports, links } = fakePorts({
+      files: { [`${H}/rules/common/core.md`]: "# Core\n" },
+    });
+    const report = await run(ports, true);
+    expect(report.rulesDir.selection.linked).toEqual([]);
+    expect(links[`${PATHS.rulesDir}/common`]).toBeUndefined();
+    expect(report.agentsMd.content).toContain("# Core");
+  });
+});
+
+describe("the retired commands directory", () => {
+  test("absent is nothing to do", async () => {
+    const { ports } = fakePorts();
+    expect((await run(ports)).commands.action).toEqual({ kind: "absent" });
+  });
+
+  test("a directory of symlinks is removed on --write", async () => {
+    const { ports, links } = fakePorts({
+      links: { [`${PATHS.commands}/plan.md`]: "/repo/commands/plan.md" },
+    });
+    const dry = await run(ports);
+    expect(dry.commands.action.kind).toBe("remove");
+
+    await run(ports, true);
+    expect(links[`${PATHS.commands}/plan.md`]).toBeUndefined();
+  });
+
+  test("a directory holding a real file is a conflict, and nothing in the delivery is written", async () => {
+    const { ports, files, links } = fakePorts({
+      files: { [`${PATHS.commands}/mine.md`]: "my command" },
+    });
+    const report = await run(ports, true);
+
+    expect(report.outcome).toBe("conflict");
+    expect(report.wrote).toBe(false);
+    expect(report.message).toContain("commands");
+    expect(files[`${PATHS.commands}/mine.md`]).toBe("my command");
+    expect(links).toEqual({});
+    expect(files[PATHS.agentsMd]).toBeUndefined();
+  });
 });
 
 describe("a missing source is an error, not an empty result", () => {
   test("no guard policy", async () => {
-    const { ports, files } = fakePorts({});
+    const { ports, files } = fakePorts();
     delete files[PATHS.guardRules];
     expect(run(ports)).rejects.toThrow("guard policy not found");
   });
 
   test("no MCP source", async () => {
-    const { ports, files } = fakePorts({});
+    const { ports, files } = fakePorts();
     delete files[PATHS.mcpServers];
     expect(run(ports)).rejects.toThrow("MCP source not found");
   });

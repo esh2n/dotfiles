@@ -6,6 +6,8 @@
  * widening that interface for every other use-case that doesn't need them.
  */
 
+import type { PathState } from "../../domain/claude/links";
+
 export interface ProvenanceInfo {
   readonly sourceFile: string;
   readonly sourceSha256: string;
@@ -28,11 +30,24 @@ export interface ApplyPorts {
 }
 
 /**
- * What the Claude Code target needs on top of `ApplyPorts`: it renders one
- * line per accepted decision note, and the set of notes is whatever is in the
- * directory — not a list anyone maintains by hand.
+ * What the Claude Code target needs on top of `ApplyPorts`: directory
+ * listings (the set of decision notes, rule directories and common rules is
+ * whatever is on disk — not a list anyone maintains by hand), and the handful
+ * of filesystem verbs that deliver `~/.claude/{skills,agents,rules,CLAUDE.md}`
+ * as symlinks. Each mutating verb is only ever called on a path the domain
+ * has already classified (`domain/claude/links.ts` and friends); the adapter
+ * does not decide anything.
  */
 export interface ClaudeApplyPorts extends ApplyPorts {
   /** File names only, unsorted. A missing or unreadable directory is `[]`, not a throw. */
   listDir(path: string): Promise<readonly string[]>;
+  /** `lstat`-based: a symlink is reported as one, with `readlink`'s answer verbatim, never followed. */
+  inspect(path: string): Promise<PathState>;
+  /** `symlink(2)`: `target` is stored as given (relative stays relative). The path must not exist. */
+  symlink(target: string, path: string): Promise<void>;
+  rename(from: string, to: string): Promise<void>;
+  /** A symlink (the link itself, never what it points at) or a directory tree. */
+  remove(path: string): Promise<void>;
+  /** Creates parents as needed; an existing directory is fine. */
+  mkdir(path: string): Promise<void>;
 }

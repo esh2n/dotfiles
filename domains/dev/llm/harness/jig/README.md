@@ -73,7 +73,7 @@ inverted.
 | # | Scope | Status |
 |---|---|---|
 | 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, `mcpServers`, and the removal of `YOKI_*` from `env` | **done** |
-| 2 | The sources move: `skills/`, `rules/` and `agents/` into `llm/harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`) | next |
+| 2 | The sources move: `skills/`, `rules/` and `agents/` into `llm/harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`), and retires `~/.claude/commands` | **done** |
 | 3 | The other targets: Codex (`config.toml` + `hooks.json`), pi, omp, DSH | |
 | 4 | `yoki-switch` retired, along with `core/config/manager.sh`'s `link_*` functions for the harnesses | |
 
@@ -91,7 +91,7 @@ Rows cite the destination table in
 | `mcp.json` layers → `lib/mcp-inventory/writers/claude.js` (§1d) | `mcp/servers.json` → `domain/mcp/to-claude.ts` | 1 |
 | `.autoMode` carry-over (yoki-switch:317-326) | generalized: every unmanaged key is preserved, not just the one | 1 |
 | `~/.claude/.yoki/permissions.json` (hook-enforced deny set) | nothing — the guard reads `policy/guard-rules.json` directly | 1 |
-| `merge_claude_md()` (yoki-switch:332-346) — `CLAUDE.layer.md` + `CLAUDE.personal.md` | generated `AGENTS.md` from `rules/`; the decision-line and research-index parts already render (`domain/claude/agents-md.ts`) and appear in milestone 1's dry-run as a **preview only** | 2 |
+| `merge_claude_md()` (yoki-switch:332-346) — `CLAUDE.layer.md` + `CLAUDE.personal.md` | generated `AGENTS.md` from `rules/common/` + `rules/decisions/` (`domain/claude/agents-md.ts`), `CLAUDE.md` → `AGENTS.md` | 2 |
 | `merge_dir()` (yoki-switch:352-390) — the `.{dir}-merged` staging dirs behind `skills`/`hooks`/`commands`/`agents`/`rules`/`workflows`/`scripts` | one flat source tree, delivered by symlink; no `commands/` at all ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)) | 2 |
 | `link_external_resources()` (yoki-switch:411-452) and `external-links.yaml` | folded into the flat tree | 2 |
 | `.claude-packs` / `packs.default` / `pack enable\|disable` | gone — rules are selected by `paths:` frontmatter, skills by the judgment service | 2 |
@@ -151,20 +151,69 @@ Where a decision's source belongs there, the dry-run prints what to paste:
   the tightest possible answer, so a missing source can only over-restrict —
   and the dry-run states which of the two it used.
 
-And one it previews: the generated `AGENTS.md`. Its bold line per decision is
-the note's `rule:` line, copied verbatim, per
-[`2026-09-23-model-facing-english.md`](../rules/decisions/2026-09-23-model-facing-english.md)
-(what the model reads is English, what the owner reads stays Japanese, and a
-human writes the seam at the time of the ruling). An accepted note with no
-`rule:` line does not bind and is reported as a gap — the generator never
-translates a title into one.
-
 The dry-run prints a whole-file unified diff plus three lists: **keys jig now
 owns**, **keys left as-is**, and **keys jig would REMOVE**. The third is the
 one-time cleanup — the 33 yoki hooks, the 71 inherited allow rules, the
 `YOKI_*` environment variables — spelled out value by value, so no flag is
 needed to opt out of a surprise that has already been read.
 
-Not touched in milestone 1: `~/.claude/{skills,rules,agents,commands}` and
-`~/.claude/CLAUDE.md` are still `yoki-switch` symlinks, and `~/.claude.json` is
-never touched in any milestone.
+### Milestone 2: the rest of `~/.claude`, same command
+
+The same `jig apply --target claude` delivers the directories and the
+generated instructions file; `--write` does all of it in one run, and one
+conflict anywhere (either generated file hand-edited, or a `commands`
+directory holding real files) stops the whole write — the parts are one
+delivery.
+
+Sources, all under `llm/harness/`: `skills/<name>/SKILL.md` (one flat tree),
+`rules/common/*.md` (always-on), `rules/<lang>/*.md` (conditional, keyed by
+`paths:` frontmatter), `rules/decisions/*.md`, `agents/*.md`.
+
+Destinations:
+
+- **`AGENTS.md`** — generated, written atomically with the same hand-edit
+  detection as `settings.json` (`domain/tiers/plan.ts` + the manifest). In
+  order: one HTML comment naming the sources; the bodies of `rules/common/*.md`
+  in file-name order, frontmatter stripped, otherwise verbatim (`README.md`
+  skipped); then the research-index line and `## Decisions`. Every link is
+  absolute under the harness root — the file lives in `~/.claude`, where a
+  relative link resolves nowhere. The dry-run prints the byte size and warns
+  past 32 KiB, where Codex truncates
+  ([`2026-09-22-decision-records.md`](../rules/decisions/2026-09-22-decision-records.md));
+  a warning, not a refusal. A file at that path jig has no record of writing
+  is kept as `AGENTS.md.pre-jig.<stamp>` before the first generated one lands.
+  The bold line per decision is the note's `rule:` line, copied verbatim, per
+  [`2026-09-23-model-facing-english.md`](../rules/decisions/2026-09-23-model-facing-english.md);
+  an accepted note with no `rule:` line does not bind and is reported as a
+  gap — the generator never translates a title into one.
+- **`CLAUDE.md`** → symlink, relative target `AGENTS.md`.
+- **`skills`**, **`agents`** → symlinks to `llm/harness/skills` and `agents`,
+  absolute.
+- **`rules/`** → a real directory jig manages, holding one symlink per
+  conditional-rule directory: `rules/<lang>` → `llm/harness/rules/<lang>`.
+  Every subdirectory of `rules/` except `common`, `decisions` and `research`
+  is one (`domain/claude/rules-dir.ts`, `NOT_RULE_DIRS`, with the why):
+  `common` is in AGENTS.md and a link would load it twice; the other two are
+  Markdown for humans and would load as always-on rules. On write: the
+  directory is created if missing, missing links added, links pointing
+  elsewhere replaced, links into `llm/harness/rules/` that are no longer
+  planned removed as stale, and anything else left alone and reported as
+  "not jig's".
+- **`commands`** — retired
+  ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)).
+  A symlink, or a directory whose entries are all symlinks, is removed on
+  write; a directory holding any regular file is a conflict and is not
+  touched.
+
+Each symlink destination is planned by `domain/claude/links.ts` from what
+`lstat` finds there and printed one line per destination: `ok` (already the
+planned link), `create`, `replace` (a symlink elsewhere — the old target is
+shown; what it pointed at is untouched), or `backup-then-create` (a regular
+file or a real directory: renamed to `<path>.pre-jig.<YYYYMMDD-HHMMSS>`, UTC,
+then linked — user content is never deleted). On the machine yoki-switch left,
+that reads: `CLAUDE.md` backup-then-create, `skills`/`agents`/`rules` replace
+(currently → `.<x>-merged`), `commands` remove.
+
+Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
+`.<x>-merged` staging directory stay with `yoki-switch` until milestone 4, and
+`~/.claude.json` is never touched in any milestone.

@@ -7,9 +7,21 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  readlink,
+  rename,
+  rm,
+  symlink,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ClaudeApplyPorts, ProvenanceInfo } from "../../app/apply/ports";
+import type { PathState } from "../../domain/claude/links";
 
 function isEnoent(error: unknown): boolean {
   return (
@@ -83,6 +95,36 @@ export function createNodeApplyFs(options: NodeApplyFsOptions): ClaudeApplyPorts
         `${JSON.stringify(info, null, 2)}\n`,
         "utf8",
       );
+    },
+
+    async inspect(path: string): Promise<PathState> {
+      let stat: Awaited<ReturnType<typeof lstat>>;
+      try {
+        stat = await lstat(path);
+      } catch (error) {
+        if (isEnoent(error)) return { kind: "missing" };
+        throw error;
+      }
+      if (stat.isSymbolicLink()) return { kind: "symlink", target: await readlink(path) };
+      if (stat.isDirectory()) return { kind: "dir" };
+      return { kind: "file" };
+    },
+
+    symlink: (target: string, path: string) => symlink(target, path),
+
+    rename: (from: string, to: string) => rename(from, to),
+
+    // `lstat` first so a symlink to a directory is unlinked as a link: `rm -r`
+    // on the link would also only remove the link, but saying it here keeps
+    // the promise in the port ("never what it points at") visible.
+    async remove(path: string): Promise<void> {
+      const stat = await lstat(path);
+      if (stat.isDirectory()) await rm(path, { recursive: true });
+      else await unlink(path);
+    },
+
+    async mkdir(path: string): Promise<void> {
+      await mkdir(path, { recursive: true });
     },
 
     now: () => new Date(),
