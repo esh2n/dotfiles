@@ -1,0 +1,21 @@
+{
+  "name": "@esh2n/jig-omp-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "oh-my-pi (omp) extension that routes every tool call through jig's guard, records the session model, formats edited files and gates the end of a turn.",
+  "main": "src/index.ts",
+  "files": ["src", "README.md"],
+  "scripts": {
+    "typecheck": "cd ../.. && tsc --noEmit",
+    "test": "cd ../.. && bun test test/adapters/omp"
+  },
+  "peerDependencies": {
+    "@oh-my-pi/pi-coding-agent": ">=18.0.4"
+  },
+  "peerDependenciesMeta": {
+    "@oh-my-pi/pi-coding-agent": {
+      "optional": true
+    }
+  }
+}

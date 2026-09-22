@@ -61,7 +61,18 @@ export type Request =
       readonly raw: string;
     };
 
-const SHELL_TOOLS = new Set(["Bash", "bash", "bash_background", "shell", "local_shell"]);
+/**
+ * `eval` is omp's language-kernel cell (`{language, code}`), declared `exec`
+ * by omp and deliberately NOT covered by its `bash.patterns` allow/deny list
+ * — "This pattern policy controls approval for the `bash` tool"
+ * (omp `docs/approval-mode.md`), so a command denied as `bash` runs
+ * unchallenged as `os.system(...)` inside a cell. The omp adapter hands the
+ * cell body over as `command`; naming the tool here is what makes it a
+ * shell.exec rather than an out-of-scope call. The reading stays lenient, as
+ * for any command the extractor cannot prove: suspects match forbid and ask,
+ * and nothing is permitted on a guess.
+ */
+const SHELL_TOOLS = new Set(["Bash", "bash", "bash_background", "shell", "local_shell", "eval"]);
 const WRITE_TOOLS = new Set(["Write", "write", "create_file"]);
 const EDIT_TOOLS = new Set([
   "Edit",
