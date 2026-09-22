@@ -23,6 +23,11 @@
  */
 
 import { existsSync } from "node:fs";
+import {
+  type GateCommand,
+  gateCommandFor as chooseGateCommand,
+  tail,
+} from "../../../src/domain/hooks/gate";
 import type { OmpContext, OmpSessionStopEvent, OmpSessionStopResult } from "./omp";
 import { type Runner, runCommand } from "./run";
 
@@ -30,41 +35,21 @@ import { type Runner, runCommand } from "./run";
 export const MAX_CONTINUATIONS = 2;
 
 const TIMEOUT_MS = 180_000;
-const TAIL_LINES = 40;
-const TAIL_CHARS = 4_000;
-
-export interface GateCommand {
-  readonly label: string;
-  readonly bin: string;
-  readonly args: readonly string[];
-}
 
 /**
- * The check this project answers to, by what is in its root. One project,
- * one check: the gate is a backstop, not a build.
+ * Which check a project answers to, and how a failure is trimmed, are jig's
+ * own (`src/domain/hooks/gate.ts`) — shared verbatim with the Claude Code Stop
+ * hook, so the two harnesses gate on the same command. Wrapped here only to
+ * bind omp's `existsSync` default, which a pure module does not get to have.
  */
+export type { GateCommand };
+export { tail };
+
 export function gateCommandFor(
   cwd: string,
   exists: (p: string) => boolean = existsSync,
 ): GateCommand | undefined {
-  const has = (name: string): boolean => exists(`${cwd}/${name}`);
-  if (has("tsconfig.json")) {
-    return { label: "bunx tsc --noEmit", bin: "bunx", args: ["tsc", "--noEmit"] };
-  }
-  if (has("go.mod")) return { label: "go vet ./...", bin: "go", args: ["vet", "./..."] };
-  if (has("pyproject.toml") || has("ruff.toml") || has(".ruff.toml")) {
-    return { label: "ruff check", bin: "ruff", args: ["check", "."] };
-  }
-  if (has("Cargo.toml")) {
-    return { label: "cargo check", bin: "cargo", args: ["check", "--quiet"] };
-  }
-  return undefined;
-}
-
-/** The last lines of a failed run, which is all the model needs to act. */
-export function tail(text: string, lines = TAIL_LINES, chars = TAIL_CHARS): string {
-  const kept = text.trimEnd().split("\n").slice(-lines).join("\n");
-  return kept.length <= chars ? kept : kept.slice(kept.length - chars);
+  return chooseGateCommand(cwd, exists);
 }
 
 /** Continuations already spent, per session id. Lives as long as the process. */

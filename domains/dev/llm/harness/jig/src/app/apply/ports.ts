@@ -26,3 +26,13 @@ export interface ApplyPorts {
   now(): Date;
   readonly jigVersion: string;
 }
+
+/**
+ * What the Claude Code target needs on top of `ApplyPorts`: it renders one
+ * line per accepted decision note, and the set of notes is whatever is in the
+ * directory — not a list anyone maintains by hand.
+ */
+export interface ClaudeApplyPorts extends ApplyPorts {
+  /** File names only, unsorted. A missing or unreadable directory is `[]`, not a throw. */
+  listDir(path: string): Promise<readonly string[]>;
+}

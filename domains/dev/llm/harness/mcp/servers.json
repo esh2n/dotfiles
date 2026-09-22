@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "jig.mcp.v1",
+  "_comment": "The one MCP source of truth for every harness, per rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md and rules/decisions/2026-09-22-config-layout-no-personal-layer.md ('MCP の一覧(四つの形)'). One file, no layers, no packs. `targets.<harness>` means 'the generator should emit this server for that harness'. Values must be `${VAR}` references, never literal secrets (enforced by src/domain/mcp/parse.ts at load time). The generator writes Claude Code's copy into ~/.claude/settings.json's mcpServers and NEVER touches ~/.claude.json — servers already registered there by `claude mcp add` are removed once, by hand, at migration time (the decision's '初回の移行で claude mcp remove を手で行う'); detecting that duplication is explicitly not a generator feature.",
+  "servers": [
+    {
+      "name": "serena",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "-p",
+        "3.13",
+        "serena-agent==1.5.3",
+        "start-mcp-server",
+        "--project-from-cwd",
+        "--context",
+        "claude-code"
+      ],
+      "env": {},
+      "targets": { "claude": true, "codex": true, "omp": true, "pi": true, "dsh": true },
+      "targetOverrides": {
+        "codex": {
+          "args": [
+            "-p",
+            "3.13",
+            "serena-agent==1.5.3",
+            "start-mcp-server",
+            "--project-from-cwd",
+            "--context",
+            "codex"
+          ]
+        },
+        "omp": {
+          "args": [
+            "-p",
+            "3.13",
+            "serena-agent==1.5.3",
+            "start-mcp-server",
+            "--project-from-cwd",
+            "--context",
+            "codex"
+          ],
+          "_comment": "serena-agent ships no 'omp' context; 'codex' is the closest fit — both are headless tool-calling CLIs."
+        }
+      },
+      "_comment": "Kept: symbol-level search and edit. Claude Code's LSP plugin only reports diagnostics, so the roles do not overlap."
+    },
+    {
+      "name": "codebase-memory-mcp",
+      "transport": "stdio",
+      "command": "{{HOME}}/bin/codebase-memory-mcp-managed",
+      "args": [],
+      "env": {},
+      "targets": { "claude": true, "codex": true, "omp": true, "pi": true, "dsh": true },
+      "_comment": "Kept: the code graph. The vendor's '99% reduction' claim is unverified — measure it in jig's own audit."
+    },
+    {
+      "name": "context7",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@1.0.14"],
+      "env": {},
+      "targets": { "claude": true, "codex": true, "omp": true, "pi": true, "dsh": true },
+      "_comment": "Kept, and widened to every harness that has MCP at all: version-pinned documentation injection ('Codex だけでなく MCP を持つ全ハーネスに配る')."
+    },
+    {
+      "name": "playwright",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@0.0.32"],
+      "env": {},
+      "targets": { "claude": false, "codex": true, "omp": true, "pi": true, "dsh": false },
+      "_comment": "claude=false on purpose: Claude Code has claude-in-chrome natively. dsh=false because dsh loads MCP schemas eagerly into every request, so it gets only serena, codebase-memory and context7."
+    },
+    {
+      "name": "figma-remote",
+      "transport": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "env": {},
+      "targets": { "claude": true, "codex": true, "omp": true, "pi": true, "dsh": false },
+      "_comment": "Kept: there is design work to receive. figma-desktop was dropped by the same decision."
+    },
+    {
+      "name": "notion-mcp",
+      "transport": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "env": {},
+      "targets": { "claude": true, "codex": true, "omp": true, "pi": true, "dsh": false },
+      "_comment": "Kept: read and write Notion from inside the coding work."
+    }
+  ]
+}

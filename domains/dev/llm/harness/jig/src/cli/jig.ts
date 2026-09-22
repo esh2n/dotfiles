@@ -4,12 +4,15 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { ClaudeApplyPaths } from "../app/apply/apply-claude";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
+import { skillQuestionMode } from "../app/routing/select-skills";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
+import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
 import { JsonlAuditLog } from "../infra/audit/jsonl-audit";
@@ -31,6 +34,7 @@ import { currentJudgmentKind } from "../infra/metrics/judgment-kind";
 import { recordJudgmentUsage } from "../infra/metrics/judgment-usage";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
+import { runCommand } from "../infra/proc/exec-file";
 import { readSkillCatalog } from "../infra/skills/catalog";
 import { detectRepoSignals } from "../infra/skills/repo-signals";
 import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
@@ -39,8 +43,10 @@ import { type BoxCliContext, boxCli } from "./box";
 import { codexCli } from "./codex";
 import { parseCoverageArgs, renderCoverage } from "./coverage";
 import { decide } from "./decide";
+import { postToolUseFormat } from "./hooks/post-tool-use-format";
 import { preToolUse } from "./hooks/pre-tool-use";
 import { sessionStart } from "./hooks/session-start";
+import { stopGate } from "./hooks/stop-gate";
 import { userPromptSubmit } from "./hooks/user-prompt-submit";
 import { interactive } from "./interactive";
 import { parseReportArgs, renderSkillUsage } from "./report";
@@ -71,6 +77,46 @@ function resolveApplyPaths(): { tiersJsonPath: string; destPaths: ApplyTargetPat
       dsh: join(root, "domains", "dev", "config", "dsh", "settings.yaml"),
       litellm: join(root, "domains", "dev", "config", "litellm", "config.yaml"),
     },
+  };
+}
+
+/** The harness source tree: `domains/dev/llm/harness/`, the one place sources live. */
+function harnessRoot(): string {
+  return join(resolveApplyRoot(), "domains", "dev", "llm", "harness");
+}
+
+/**
+ * Where the Claude Code target reads from and writes to.
+ *
+ * `CLAUDE_CONFIG_DIR` is honored for the destination because Claude Code
+ * honors it: a machine that moved its configuration directory must not have
+ * jig quietly compose a second settings.json at the default path.
+ */
+function resolveClaudeApplyPaths(): ClaudeApplyPaths {
+  const harness = harnessRoot();
+  const claudeDir = process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
+  return {
+    guardRules: join(harness, "policy", "guard-rules.json"),
+    mcpServers: join(harness, "mcp", "servers.json"),
+    sandbox: join(harness, "policy", "sandbox.json"),
+    decisions: join(harness, "rules", "decisions"),
+    settings: join(claudeDir, "settings.json"),
+    home: homedir(),
+  };
+}
+
+/**
+ * How Claude Code should invoke jig from a hook: absolute paths only, for the
+ * same reason the Codex registration uses them — a hook runs in whatever
+ * environment the harness hands it, which is not a login shell and promises
+ * nothing about PATH. The mise shim survives bun upgrades, so it wins when it
+ * exists; otherwise the bun currently running this process.
+ */
+function claudeHookPaths(): ClaudeHookPaths {
+  const shim = join(homedir(), ".local", "share", "mise", "shims", "bun");
+  return {
+    bun: existsSync(shim) ? shim : process.execPath,
+    jig: fileURLToPath(import.meta.url),
   };
 }
 
@@ -270,9 +316,22 @@ export async function main(argv: readonly string[]): Promise<number> {
               ...(Number.isFinite(threshold) ? { threshold } : {}),
               ...(harness === undefined ? {} : { harness }),
               ...(argv.includes("--fallback") ? { fallback: true } : {}),
+              question: skillQuestionMode(process.env),
             },
           ),
         );
+        return 0;
+      }
+      if (subcommand === "post-tool-use-format") {
+        const stdin = await new Response(Bun.stdin.stream()).text();
+        // Nothing reaches stdout: Claude Code shows a PostToolUse hook's
+        // output to the model, and a formatter has nothing to tell it.
+        await postToolUseFormat(stdin, { run: runCommand, logger: ports.logger });
+        return 0;
+      }
+      if (subcommand === "stop-gate") {
+        const stdin = await new Response(Bun.stdin.stream()).text();
+        process.stdout.write(await stopGate(stdin, { run: runCommand, logger: ports.logger }));
         return 0;
       }
       ports.logger.error("unknown hook subcommand", { subcommand });
@@ -302,7 +361,11 @@ export async function main(argv: readonly string[]): Promise<number> {
         stateDir: resolveStateDir(process.env),
         jigVersion: VERSION,
       });
-      const result = await applyCli(argv.slice(1), applyPorts, resolveApplyPaths());
+      const result = await applyCli(argv.slice(1), applyPorts, resolveApplyPaths(), {
+        ports: applyPorts,
+        paths: resolveClaudeApplyPaths(),
+        hookPaths: claudeHookPaths(),
+      });
       process.stdout.write(result.stdout);
       return result.code;
     }
@@ -424,7 +487,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks session-start | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -440,6 +503,16 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  lets it offer skills `jig skills hide` marked disable-model-invocation — one switch,\n" +
           "  because hiding the listing while skipping hidden skills leaves an empty catalog.\n" +
           "  Off by default: where the listing is visible, the fallback would be a second copy of it.\n" +
+          "  JIG_SKILL_ROUTER_QUESTION=choice|bool picks the shape of the one judgment question.\n" +
+          "  bool (default) asks one yes/no per candidate against a shared material — 54 questions,\n" +
+          "  2 jev requests. choice asks ONE question listing every candidate plus an explicit\n" +
+          "  `none`, in the English wording frozen as PROTOCOL.md §3b `choice-en`, and ranks the\n" +
+          "  options by the probabilities the reply now carries; the threshold and the cap of 3\n" +
+          "  apply to those probabilities unchanged. It is arm C of the skill-selection experiment\n" +
+          "  (rules/research/skill-selection-experiment/PROTOCOL-C.md); the default stays bool until\n" +
+          "  that arm is chosen. Both the hook and the service read this variable, so the two paths\n" +
+          "  never ask different questions into the same log.\n" +
+          "  JIG_SKILL_ROUTER_THRESHOLD=<0..1> sets the gate (default 0.8) for either shape.\n" +
           "  skills hide|show [--write] [--root <dir>] sets or clears disable-model-invocation on\n" +
           "  every skill under the root (default ~/.claude/.skills-merged, or JIG_SKILL_ROOT) —\n" +
           "  the switch that hides the harness's listing. Dry-run by default; it prints the list\n" +
@@ -448,6 +521,13 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  report skills [--days N] [--json] [--opened-via read|skill|any] reads both harnesses'\n" +
           "  session transcripts and shows what the router injected against what the model opened;\n" +
           "  opens count through the read tool and the Skill tool, --opened-via read for the older numbers.\n" +
+          "  hooks post-tool-use-format formats the one file an edit tool just wrote, silently;\n" +
+          "  hooks stop-gate runs the project's typecheck/lint once at the end of a turn and hands a\n" +
+          "  failure back as a block reason, honouring stop_hook_active so it never loops.\n" +
+          "  apply --target claude composes ~/.claude/settings.json's hooks, permissions, sandbox and\n" +
+          "  mcpServers from policy/guard-rules.json and mcp/servers.json; every other key in the live\n" +
+          "  file is preserved. Dry-run prints the whole-file diff plus owned/left/REMOVED key lists.\n" +
+          "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +

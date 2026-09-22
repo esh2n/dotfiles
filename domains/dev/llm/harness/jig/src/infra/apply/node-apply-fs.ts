@@ -7,9 +7,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { ApplyPorts, ProvenanceInfo } from "../../app/apply/ports";
+import type { ClaudeApplyPorts, ProvenanceInfo } from "../../app/apply/ports";
 
 function isEnoent(error: unknown): boolean {
   return (
@@ -42,13 +42,24 @@ export interface NodeApplyFsOptions {
   readonly jigVersion: string;
 }
 
-export function createNodeApplyFs(options: NodeApplyFsOptions): ApplyPorts {
+export function createNodeApplyFs(options: NodeApplyFsOptions): ClaudeApplyPorts {
   const manifestPath = join(options.stateDir, "apply-manifest.json");
 
   return {
     readFile: readTextOrUndefined,
 
     writeAtomic: writeAtomicFile,
+
+    // Forgiving on purpose: the directory this lists is a source of *extra*
+    // lines in a generated document, so "no directory" is "no lines", not a
+    // failed apply.
+    async listDir(path: string): Promise<readonly string[]> {
+      try {
+        return await readdir(path);
+      } catch {
+        return [];
+      }
+    },
 
     sha256(content: string): string {
       return createHash("sha256").update(content, "utf8").digest("hex");

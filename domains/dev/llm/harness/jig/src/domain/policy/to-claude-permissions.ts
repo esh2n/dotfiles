@@ -4,6 +4,13 @@
  * `permissions.deny`/`allow` arrays can express — `Bash(<prefix> *)` prefix
  * matches and `Write(<glob>)`/`Edit(<glob>)` path globs.
  *
+ * The trailing-space-star form is documented, not a jig invention: "The `:*`
+ * suffix is an equivalent way to write a trailing wildcard, so `Bash(ls:*)`
+ * matches the same commands as `Bash(ls *)`"
+ * (https://code.claude.com/docs/en/permissions.md). `Bash(<prefix> *)` is
+ * also the form the retiring harness's 71 rules already use, so keeping it
+ * makes the migration diff readable; the two spellings are interchangeable.
+ *
  * This is a lossy, best-effort projection, not a reimplementation of the
  * guard: only the shapes explicitly recognized below convert; everything
  * else (an `ask` effect, a raw `match` string, `net.fetch`/`mcp.call`, or a

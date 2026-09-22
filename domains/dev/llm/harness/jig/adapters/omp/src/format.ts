@@ -24,88 +24,37 @@
  */
 
 import { existsSync } from "node:fs";
-import { dirname, extname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
+import {
+  type FormatCommand,
+  formatterFor as chooseFormatter,
+  projectRoot as findProjectRoot,
+} from "../../../src/domain/hooks/format";
 import { editedPaths } from "./map";
 import type { OmpToolResultEvent } from "./omp";
 import { type Runner, runCommand } from "./run";
 
 const TIMEOUT_MS = 15_000;
 
-/** Where a file's project starts: the nearest ancestor with a project marker. */
-const ROOT_MARKERS = [
-  "package.json",
-  "biome.json",
-  "biome.jsonc",
-  "go.mod",
-  "pyproject.toml",
-  "Cargo.toml",
-  ".git",
-];
+/**
+ * Which formatter a file gets, and where its project starts, are jig's own
+ * (`src/domain/hooks/format.ts`) — shared verbatim with the Claude Code
+ * PostToolUse hook, so the two harnesses cannot drift into formatting the same
+ * file two different ways. Wrapped here only to bind omp's `existsSync`
+ * default, which a pure module does not get to have.
+ */
+export type { FormatCommand };
 
 export function projectRoot(from: string, exists: (p: string) => boolean = existsSync): string {
-  let dir = from;
-  for (;;) {
-    for (const marker of ROOT_MARKERS) if (exists(join(dir, marker))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) return from;
-    dir = parent;
-  }
+  return findProjectRoot(from, exists);
 }
 
-export interface FormatCommand {
-  readonly bin: string;
-  readonly args: readonly string[];
-}
-
-const WEB_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-  ".mts",
-  ".cts",
-  ".json",
-  ".jsonc",
-  ".css",
-]);
-
-/**
- * The formatter for one file: biome when the project configures it (and the
- * local binary when the project vendors one), else prettier, else the
- * language's own. `undefined` means "nothing formats this", which is a skip,
- * not an error.
- */
 export function formatterFor(
   file: string,
   root: string,
   exists: (p: string) => boolean = existsSync,
 ): FormatCommand | undefined {
-  const ext = extname(file).toLowerCase();
-  if (WEB_EXTENSIONS.has(ext)) {
-    const biome = exists(join(root, "biome.json")) || exists(join(root, "biome.jsonc"));
-    const local = (name: string): string | undefined => {
-      const bin = join(root, "node_modules", ".bin", name);
-      return exists(bin) ? bin : undefined;
-    };
-    if (biome) {
-      // `check --write` is format plus the safe lint fixes in one pass, the
-      // same invocation the repo's own scripts use.
-      return { bin: local("biome") ?? "biome", args: ["check", "--write", file] };
-    }
-    return { bin: local("prettier") ?? "prettier", args: ["--write", file] };
-  }
-  switch (ext) {
-    case ".go":
-      return { bin: "gofmt", args: ["-w", file] };
-    case ".py":
-      return { bin: "ruff", args: ["format", file] };
-    case ".rs":
-      return { bin: "rustfmt", args: ["--edition", "2021", file] };
-    default:
-      return undefined;
-  }
+  return chooseFormatter(file, root, exists);
 }
 
 export interface FormatDeps {

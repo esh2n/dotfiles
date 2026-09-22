@@ -134,6 +134,125 @@ describe("applyCli", () => {
     expect(result.stdout).toMatch(/unknown --target/);
   });
 
+  test("--target all never reaches claude: that target writes into $HOME and must be named", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const result = await applyCli([], ports, paths);
+    expect(result.stdout).toContain("== pi ==");
+    expect(result.stdout).not.toContain("== claude ==");
+  });
+
+  test("--target claude with no claude context is refused rather than silently doing nothing", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const result = await applyCli(["--target", "claude"], ports, paths);
+    expect(result.code).toBe(2);
+    expect(result.stdout).toContain("not wired");
+  });
+});
+
+/**
+ * The claude dry-run's report, which is what a reader agrees to before
+ * `--write`. Exercised through the CLI because the wording — what is owned,
+ * what leaves, where the sandbox list came from — IS the contract; a correct
+ * composition reported badly is still a surprise.
+ */
+describe("applyCli --target claude", () => {
+  const CLAUDE_PATHS = {
+    guardRules: "/repo/policy/guard-rules.json",
+    mcpServers: "/repo/mcp/servers.json",
+    sandbox: "/repo/policy/sandbox.json",
+    decisions: "/repo/rules/decisions",
+    settings: "/home/u/.claude/settings.json",
+    home: "/home/u",
+  };
+
+  const SOURCES: Record<string, string> = {
+    [CLAUDE_PATHS.guardRules]: JSON.stringify({ version: 1, floor: [], rules: [] }),
+    [CLAUDE_PATHS.mcpServers]: JSON.stringify({ schemaVersion: "jig.mcp.v1", servers: [] }),
+    [`${CLAUDE_PATHS.decisions}/a.md`]: "# 題\n\nStatus: accepted — x\n\nrule: Do the thing.\n",
+  };
+
+  function claudeContext(extra: Record<string, string> = {}) {
+    const files: Record<string, string> = { ...SOURCES, ...extra };
+    const manifest: Record<string, string> = {};
+    return {
+      ports: {
+        async readFile(path: string) {
+          return files[path];
+        },
+        async writeAtomic(path: string, content: string) {
+          files[path] = content;
+        },
+        async listDir(path: string) {
+          const prefix = `${path}/`;
+          return Object.keys(files)
+            .filter((file) => file.startsWith(prefix))
+            .map((file) => file.slice(prefix.length));
+        },
+        sha256: (content: string) => `fake:${content.length}`,
+        async readManifest() {
+          return { ...manifest };
+        },
+        async writeManifest(next: Readonly<Record<string, string>>) {
+          Object.assign(manifest, next);
+        },
+        async writeProvenance() {},
+        now: () => new Date("2026-09-23T00:00:00.000Z"),
+        jigVersion: "0.0.0-test",
+      },
+      paths: CLAUDE_PATHS,
+      hookPaths: { bun: "/abs/bun", jig: "/abs/jig.ts" },
+    };
+  }
+
+  test("reports the five hooks, the owned keys, and the paste-ready permit fragment", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const result = await applyCli(["--target", "claude"], ports, paths, claudeContext());
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("hooks (5):");
+    expect(result.stdout).toContain("hooks stop-gate --harness claude");
+    expect(result.stdout).toContain("keys jig now owns (6):");
+    // The policy file is not agent-writable, so the dry-run hands over the text.
+    expect(result.stdout).toContain("not agent-writable by design");
+    expect(result.stdout).toContain('"id": "permit-git-commit"');
+  });
+
+  test("names permissions.deny a backstop and the PreToolUse hook the enforcement", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const result = await applyCli(["--target", "claude"], ports, paths, claudeContext());
+    expect(result.stdout).toContain("permissions.deny is a backstop only");
+  });
+
+  test("excludedCommands and its provenance are reported when policy/sandbox.json exists", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [CLAUDE_PATHS.sandbox]: JSON.stringify({ excludedCommands: ["gh", "docker", "open"] }),
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain(
+      "excludedCommands copied from /repo/policy/sandbox.json: gh, docker, open",
+    );
+    expect(result.stdout).toContain("still goes through jig's guard");
+  });
+
+  test("without that file the report says the empty list was a default, not a choice", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const result = await applyCli(["--target", "claude"], ports, paths, claudeContext());
+    expect(result.stdout).toContain("NO policy/sandbox.json");
+  });
+
+  test("an accepted note with no rule line is a WARNING, not a silent omission", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [`${CLAUDE_PATHS.decisions}/b.md`]: "# 題\n\nStatus: accepted — x\n",
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain("WARNING: 1 accepted decision note(s) carry no `rule:` line");
+    expect(result.stdout).toContain("- b.md");
+  });
+
   test("dry-run writes nothing even with a real destination path", async () => {
     const { ports, files } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     await applyCli(["--target", "pi"], ports, paths);

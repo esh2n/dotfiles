@@ -9,7 +9,8 @@ import { SECRET_KEY_PATTERN, looksLikeSecretValue } from "./secret-detection";
 import { MCP_SCHEMA_VERSION, type McpLayer, type McpServer } from "./types";
 
 const ENV_REF_RE = /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/;
-const KNOWN_TARGET_KEYS = new Set(["claude", "codex", "omp"]);
+/** Every harness a `targets`/`targetOverrides` block may name — see McpTargets. */
+const KNOWN_TARGET_KEYS = new Set(["claude", "codex", "omp", "pi", "dsh"]);
 
 function assertNoLiteralSecrets(server: McpServer, label: string): void {
   const env = server.env ?? {};
