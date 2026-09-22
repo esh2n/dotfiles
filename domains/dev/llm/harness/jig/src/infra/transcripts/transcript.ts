@@ -30,6 +30,15 @@ const REMINDER_LIST_NAMES = /^- "([^"]+)": /gm;
 const REMINDER_LIST_CONFIDENCE = /judgment confidence ([0-9., ]+)\)/;
 const REMINDER_SINGLE = /matches the "([^"]+)" skill \(judgment confidence ([0-9.]+)\)/;
 
+/**
+ * The fallback catalog (`domain/skills/fallback-catalog.ts`) writes its skills in the same
+ * `- "<name>": …` shape, on purpose — one format for the reader. It is not a selection, and
+ * counting a 20-skill catalog dump as 20 skills the router chose would put a router failure
+ * into the report as the router's best hour. The fallback's own record is the router log's
+ * `fallback` field, which is where the experiment reads it.
+ */
+const FALLBACK_HEADER = /^jig skill router: no selection for this request \(/m;
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
   return value as Record<string, unknown>;
@@ -103,6 +112,7 @@ function injectionOf(entry: Record<string, unknown>, harness: Harness): Injectio
   }
 
   if (text === undefined) return undefined;
+  if (FALLBACK_HEADER.test(text)) return undefined;
 
   const skills = [...text.matchAll(REMINDER_LIST_NAMES)].map((match) => match[1] ?? "");
   if (skills.length > 0) {

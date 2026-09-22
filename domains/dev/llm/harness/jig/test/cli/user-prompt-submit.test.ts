@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { userPromptSubmit } from "../../src/cli/hooks/user-prompt-submit";
+import { RemoteDecisionProtocolError } from "../../src/domain/decision/remote";
 import type { SkillCandidate } from "../../src/domain/skills/candidate";
+import { type RepoSignals, UNKNOWN_SIGNALS } from "../../src/domain/skills/fallback-catalog";
 import type { RouterLogEntry } from "../../src/domain/skills/router-log";
+import { RemoteDecisionError } from "../../src/infra/decision/remote-provider";
 import { StaticProvider } from "../../src/infra/decision/static-provider";
 
 const candidates: readonly SkillCandidate[] = [
@@ -295,6 +298,301 @@ describe("userPromptSubmit on prompts that are not human requests", () => {
 
     expect(output).not.toBe("");
     expect(recorded[0]?.skipped).toBeUndefined();
+  });
+});
+
+/**
+ * Arm B' of the skill-selection experiment: the harness's own listing is hidden, so a router
+ * that produces no selection leaves the model with no skills at all. Every branch that can
+ * produce no selection is below, plus the two that must NOT fall back.
+ */
+describe("the fallback catalog", () => {
+  const withPaths: readonly SkillCandidate[] = [
+    ...candidates,
+    {
+      name: "python-testing",
+      description: "pytest conventions",
+      path: "/skills/python-testing/SKILL.md",
+      paths: ["**/*.py"],
+    },
+  ];
+
+  const goRepo: RepoSignals = {
+    known: true,
+    extensions: new Set([".go", ".md"]),
+    filenames: new Set(["go.mod"]),
+  };
+
+  /** Deps whose catalog carries a path-scoped skill and whose repository is a Go checkout. */
+  function fallbackDeps(
+    answers: Answers,
+    recorded: RouterLogEntry[],
+    env: Record<string, string | undefined> = { JIG_ROUTER_FALLBACK: "1" },
+  ) {
+    return {
+      ...deps(answers, recorded, env),
+      provider: new StaticProvider({
+        bools: withPaths.map((candidate) => {
+          const [value, confidence] = answers[candidate.name] ?? [false, 1];
+          return { value, confidence };
+        }),
+      }),
+      catalog: async () => withPaths,
+      signals: async () => goRepo,
+    };
+  }
+
+  function contextOf(output: string): string {
+    return (JSON.parse(output) as { hookSpecificOutput: { additionalContext: string } })
+      .hookSpecificOutput.additionalContext;
+  }
+
+  test("injects the relevant catalog when nothing clears the gate", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(
+      JSON.stringify({ prompt: "何か" }),
+      fallbackDeps({ "ui-capture": [true, 0.3] }, recorded),
+      { harness: "claude" },
+    );
+
+    const context = contextOf(output);
+    expect(context).toContain(
+      "no selection for this request (no skill cleared the confidence gate)",
+    );
+    expect(context).toContain('- "writeup": documents that are kept');
+    // The gate is what failed, and the line still carries the confidence that fell short.
+    expect(recorded[0]?.fallback).toBe("below-threshold");
+    expect(recorded[0]?.source).toBe("fallback");
+    expect(recorded[0]?.confidence).toBeCloseTo(0.3);
+  });
+
+  test("injects it when the judgment matched nothing at all", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(
+      JSON.stringify({ prompt: "今日の天気" }),
+      fallbackDeps({}, recorded),
+    );
+
+    expect(contextOf(output)).toContain("(the judgment matched no skill)");
+    // A decided "nothing applies" is still a turn with no skills where the listing is hidden.
+    expect(recorded[0]?.fallback).toBe("no-match");
+    expect(recorded[0]?.source).toBe("decided");
+  });
+
+  test("injects it when the judgment service is unreachable, and names that", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(JSON.stringify({ prompt: "スクショ撮って" }), {
+      ...fallbackDeps({}, recorded),
+      provider: {
+        name: "broken",
+        choice: async () => {
+          throw new Error("never");
+        },
+        bool: async () => {
+          throw new Error("never");
+        },
+        boolBatch: async () => {
+          throw new RemoteDecisionError("judgment service unreachable at http://127.0.0.1:4100");
+        },
+        score: async () => {
+          throw new Error("never");
+        },
+      },
+    });
+
+    expect(contextOf(output)).toContain("(the judgment service was unreachable)");
+    expect(recorded[0]?.fallback).toBe("unreachable");
+    expect(String(recorded[0]?.error)).toContain("unreachable");
+  });
+
+  test("tells a timeout from an unreachable service", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(JSON.stringify({ prompt: "スクショ撮って" }), {
+      ...fallbackDeps({}, recorded),
+      provider: {
+        name: "slow",
+        choice: async () => {
+          throw new Error("never");
+        },
+        bool: async () => {
+          throw new Error("never");
+        },
+        boolBatch: async () => {
+          throw new RemoteDecisionError(
+            "judgment service unreachable at http://127.0.0.1:4100/decide: The operation timed out.",
+          );
+        },
+        score: async () => {
+          throw new Error("never");
+        },
+      },
+    });
+
+    // The transport folds a timeout into its unreachable message; the timeout is checked first.
+    expect(contextOf(output)).toContain("(the judgment timed out)");
+    expect(recorded[0]?.fallback).toBe("timeout");
+  });
+
+  test("injects it when the reply is not a judgment", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(JSON.stringify({ prompt: "スクショ撮って" }), {
+      ...fallbackDeps({}, recorded),
+      provider: {
+        name: "confused",
+        choice: async () => {
+          throw new Error("never");
+        },
+        bool: async () => {
+          throw new Error("never");
+        },
+        boolBatch: async () => {
+          throw new RemoteDecisionProtocolError("boolBatch answered 2 questions, asked 4");
+        },
+        score: async () => {
+          throw new Error("never");
+        },
+      },
+    });
+
+    // Structural, not textual: the malformed case has its own error type.
+    expect(contextOf(output)).toContain("(the judgment service answered with something");
+    expect(recorded[0]?.fallback).toBe("malformed");
+  });
+
+  test("filters the catalog by the repository's languages", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(
+      JSON.stringify({ prompt: "何か" }),
+      fallbackDeps({}, recorded),
+    );
+
+    const context = contextOf(output);
+    // The owner's condition: a Go checkout gets no Python skill in its fallback.
+    expect(context).toContain('- "golang-patterns"');
+    expect(context).not.toContain('- "python-testing"');
+  });
+
+  test("keeps only the skills that apply anywhere when the repository cannot be read", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(JSON.stringify({ prompt: "何か" }), {
+      ...fallbackDeps({}, recorded),
+      signals: async () => UNKNOWN_SIGNALS,
+    });
+
+    expect(contextOf(output)).not.toContain('- "python-testing"');
+    expect(contextOf(output)).toContain('- "writeup"');
+  });
+
+  test("a selection is still a selection: the fallback does not double it", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(
+      JSON.stringify({ prompt: "スクショ撮って" }),
+      fallbackDeps({ "ui-capture": [true, 0.96] }, recorded),
+    );
+
+    const context = contextOf(output);
+    expect(context).toContain("1 skill matches");
+    expect(context).not.toContain("no selection for this request");
+    expect(recorded[0]?.fallback).toBeUndefined();
+  });
+
+  test("stays silent when it is switched off, which is the default", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const off = await userPromptSubmit(
+      JSON.stringify({ prompt: "今日の天気" }),
+      fallbackDeps({}, recorded, {}),
+    );
+
+    // Arms A and C list the skills natively; a fallback there would be a second copy.
+    expect(off).toBe("");
+    expect(recorded[0]?.fallback).toBeUndefined();
+  });
+
+  test("the flag turns it on without the environment, as --harness does", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(
+      JSON.stringify({ prompt: "今日の天気" }),
+      fallbackDeps({}, recorded, {}),
+      { fallback: true },
+    );
+
+    expect(contextOf(output)).toContain("no selection for this request");
+  });
+
+  test("the same switch makes the hidden skills routable", async () => {
+    // Arm B' is one arrangement, not three: the listing is hidden, the fallback is on, and
+    // the hidden skills stay routable. A catalog that skipped them while the listing is
+    // hidden would leave the router with no candidates at all.
+    const asked: boolean[] = [];
+    const watching = (env: Record<string, string | undefined>) => ({
+      ...fallbackDeps({}, [], env),
+      catalog: async (includeHidden: boolean) => {
+        asked.push(includeHidden);
+        return withPaths;
+      },
+    });
+
+    await userPromptSubmit(JSON.stringify({ prompt: "何か" }), watching({}));
+    await userPromptSubmit(JSON.stringify({ prompt: "何か" }), watching({}), { fallback: true });
+    await userPromptSubmit(
+      JSON.stringify({ prompt: "何か" }),
+      watching({ JIG_ROUTER_FALLBACK: "1" }),
+    );
+
+    expect(asked).toEqual([false, true, true]);
+  });
+
+  test("never fires on a prompt that is not a human request", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(
+      JSON.stringify({ prompt: "Below is a conversation log from a Claude Code coding session." }),
+      fallbackDeps({}, recorded),
+    );
+
+    // A compaction pass has no tool loop to open a skill with. Putting a 54-line catalog into
+    // one would be the 2026-09-22 defect again, with a bigger payload.
+    expect(output).toBe("");
+    expect(recorded[0]?.skipped).toBe("compaction");
+    expect(recorded[0]?.fallback).toBeUndefined();
+  });
+
+  test("never fires when the router itself is switched off", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(
+      JSON.stringify({ prompt: "スクショ撮って" }),
+      fallbackDeps({}, recorded, { JIG_ROUTER_FALLBACK: "1", JIG_SKILL_ROUTER: "off" }),
+    );
+
+    expect(output).toBe("");
+    expect(recorded).toEqual([]);
+  });
+
+  test("an unreadable catalog has nothing to fall back to, and says nothing", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(JSON.stringify({ prompt: "スクショ撮って" }), {
+      ...fallbackDeps({}, recorded),
+      catalog: async () => {
+        throw new Error("catalog unreadable");
+      },
+    });
+
+    expect(output).toBe("");
+    expect(String(recorded[0]?.error)).toContain("catalog unreadable");
+    expect(recorded[0]?.fallback).toBeUndefined();
+  });
+
+  test("a failing repository probe is not a failing hook", async () => {
+    const recorded: RouterLogEntry[] = [];
+    const output = await userPromptSubmit(JSON.stringify({ prompt: "今日の天気" }), {
+      ...fallbackDeps({}, recorded),
+      signals: async () => {
+        throw new Error("walk exploded");
+      },
+    });
+
+    expect(output).toBe("");
+    expect(recorded[0]?.fallback).toBeUndefined();
+    expect(recorded[0]?.source).toBe("decided");
   });
 });
 

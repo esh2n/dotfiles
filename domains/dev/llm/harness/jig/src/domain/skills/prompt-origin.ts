@@ -38,7 +38,13 @@ export type NonHumanReason =
   | "task-notification"
   | "compaction"
   | "session-resume"
-  | "skill-body";
+  | "skill-body"
+  | "harness-nudge"
+  | "harness-notice"
+  | "workflow-task"
+  | "slash-noop"
+  | "command-body"
+  | "probe";
 
 export type PromptOrigin =
   | { readonly human: true }
@@ -71,6 +77,28 @@ export interface PromptOriginInput {
  *    hand-back usually arrives inside the former, but is matched on its own because it also
  *    arrives standalone).
  *  - `Base directory for this skill:` — 40. A skill body replayed back as a prompt.
+ *
+ * A second pass (`domains/dev/llm/harness/rules/research/skill-selection-experiment`,
+ * README.md §2, extracted by that dir's `tools/sample.mjs`) found six more machine shapes
+ * that these seven signatures let through as "human" — 750 of 7,406 prompts, 32% of what
+ * this classifier called human before they were added, from the same 30-day window:
+ *
+ *  - `[Your previous response had no visible output` — 478 (`harness-nudge`). The harness's
+ *    own auto-continue nudge after a turn produced nothing visible.
+ *  - Four openings, one reason (`harness-notice`, 94 total): `[Request interrupted by user`,
+ *    `Your claude.ai usage limit has reset`, `<local-command-caveat>`, `Continue from where
+ *    you left off`.
+ *  - `## Acceptance Contract` — 80 (`workflow-task`). A workflow's subagent task template.
+ *    Not a prefix (it sits partway through the template), and in pi this child runs as its
+ *    own session, so it carries no `agentType`/`agentId` for the structural check above to
+ *    catch. See `isWorkflowTask` for how this is matched without falling back to a bare
+ *    substring search.
+ *  - `/clear`, `/compact`, `/init` as the WHOLE prompt, bare or `<command-name>`/
+ *    `<command-message>`-wrapped with no args — 42 (`slash-noop`). See `isSlashNoop`.
+ *  - A slash command's own expanded body, re-submitted as a prompt — 41 (`command-body`):
+ *    `# /`, a `---` frontmatter block opening with `name:`, `description:` or
+ *    `argument-hint:`, or `Approach this as the design lead`.
+ *  - `Reply with exactly:` — 15 (`probe`). The owner's own router smoke tests.
  */
 const SIGNATURES: readonly (readonly [NonHumanReason, string])[] = [
   ["hook-event", "[MESSAGE FROM NON-USER SOURCE"],
@@ -80,7 +108,46 @@ const SIGNATURES: readonly (readonly [NonHumanReason, string])[] = [
   ["agent-message", "Another Claude session sent a message"],
   ["agent-message", "[Subagent hand-back]"],
   ["skill-body", "Base directory for this skill:"],
+  ["harness-nudge", "[Your previous response had no visible output"],
+  ["harness-notice", "[Request interrupted by user"],
+  ["harness-notice", "Your claude.ai usage limit has reset"],
+  ["harness-notice", "<local-command-caveat>"],
+  ["harness-notice", "Continue from where you left off"],
+  ["command-body", "# /"],
+  ["command-body", "---\nname:"],
+  ["command-body", "---\ndescription:"],
+  ["command-body", "---\nargument-hint:"],
+  ["command-body", "Approach this as the design lead"],
+  ["probe", "Reply with exactly:"],
 ];
+
+/**
+ * `/clear`, `/compact` and `/init` are ordinary words in a real request too ("what does
+ * /compact do?"), so this only fires when one of them IS the entire trimmed prompt — the
+ * shape Claude Code actually re-submits for a no-op slash command — either bare or wrapped
+ * in the `<command-name>`/`<command-message>` tags with no (or empty) `<command-args>`.
+ */
+const SLASH_NOOP_COMMANDS = "clear|compact|init";
+const BARE_SLASH_NOOP = new RegExp(`^/(?:${SLASH_NOOP_COMMANDS})$`);
+const WRAPPED_SLASH_NOOP = new RegExp(
+  `^<command-(name|message)>/(?:${SLASH_NOOP_COMMANDS})</command-\\1>(?:\\s*<command-args>\\s*</command-args>)?$`,
+);
+
+function isSlashNoop(wholeTrimmedPrompt: string): boolean {
+  return BARE_SLASH_NOOP.test(wholeTrimmedPrompt) || WRAPPED_SLASH_NOOP.test(wholeTrimmedPrompt);
+}
+
+/**
+ * `## Acceptance Contract` is the heading a workflow's task template opens its body with,
+ * not the start of the prompt (the template preamble comes first) — so this is a per-line
+ * check, not a prefix or a bare `includes`. Requiring the WHOLE line to be exactly that
+ * heading (rather than "a line that mentions it") keeps a request that merely discusses the
+ * marker in running prose — which is never alone on its own line — from being misread as a
+ * workflow task.
+ */
+function isWorkflowTask(prompt: string): boolean {
+  return prompt.split("\n").some((line) => line.trim() === "## Acceptance Contract");
+}
 
 function isPresent(value: unknown): boolean {
   return typeof value === "string" && value.trim() !== "";
@@ -93,6 +160,13 @@ function isPresent(value: unknown): boolean {
 export function classifyPromptOrigin(input: PromptOriginInput): PromptOrigin {
   if (isPresent(input.agentType) || isPresent(input.agentId)) {
     return { human: false, reason: "subagent" };
+  }
+
+  if (isSlashNoop(input.prompt.trim())) {
+    return { human: false, reason: "slash-noop" };
+  }
+  if (isWorkflowTask(input.prompt)) {
+    return { human: false, reason: "workflow-task" };
   }
 
   const text = input.prompt.trimStart();

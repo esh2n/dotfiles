@@ -43,6 +43,58 @@ describe("parseSkillFile", () => {
     expect(candidate?.description).toBe("first half second half");
   });
 
+  test("offers a hidden skill when asked to, which is what arm B' needs", () => {
+    // `jig skills hide` sets the field on every routable skill; reading the farm the default
+    // way after that returns nothing, and the router would have no catalog to choose from.
+    const front = FRONT("name: hidden\ndescription: not listed\ndisable-model-invocation: true");
+
+    expect(parseSkillFile(front, "/skills/hidden/SKILL.md", { includeHidden: true })).toEqual({
+      name: "hidden",
+      description: "not listed",
+      path: "/skills/hidden/SKILL.md",
+    });
+    expect(parseSkillFile(front, "/skills/hidden/SKILL.md")).toBeUndefined();
+  });
+
+  test("reads paths as a YAML list", () => {
+    const candidate = parseSkillFile(
+      FRONT('name: go\ndescription: Go idioms\npaths:\n  - "**/*.go"\n  - "**/go.mod"'),
+      "/skills/go/SKILL.md",
+    );
+    expect(candidate?.paths).toEqual(["**/*.go", "**/go.mod"]);
+  });
+
+  test("reads paths as a comma-separated string, quoted or not", () => {
+    const quoted = parseSkillFile(
+      FRONT('name: react\ndescription: React\npaths: "**/*.tsx", "**/*.jsx"'),
+      "/skills/react/SKILL.md",
+    );
+    const bare = parseSkillFile(
+      FRONT("name: react\ndescription: React\npaths: **/*.tsx, **/*.jsx"),
+      "/skills/react/SKILL.md",
+    );
+    const flow = parseSkillFile(
+      FRONT('name: react\ndescription: React\npaths: ["**/*.tsx", "**/*.jsx"]'),
+      "/skills/react/SKILL.md",
+    );
+
+    // The quoted comma form is the one a scalar parser mangles: it looks like one quoted
+    // string whose first and last characters are quotes.
+    expect(quoted?.paths).toEqual(["**/*.tsx", "**/*.jsx"]);
+    expect(bare?.paths).toEqual(["**/*.tsx", "**/*.jsx"]);
+    expect(flow?.paths).toEqual(["**/*.tsx", "**/*.jsx"]);
+  });
+
+  test("a skill with no paths carries none, which is not an empty list", () => {
+    const candidate = parseSkillFile(
+      FRONT("name: writeup\ndescription: documents that are kept"),
+      "/skills/writeup/SKILL.md",
+    );
+    // `undefined` means "applies anywhere"; `[]` would mean "applies nowhere".
+    expect(candidate?.paths).toBeUndefined();
+    expect("paths" in (candidate ?? {})).toBe(false);
+  });
+
   test("no candidate without frontmatter or a description", () => {
     expect(parseSkillFile("# just a body", "/skills/x/SKILL.md")).toBeUndefined();
     expect(parseSkillFile(FRONT("name: bare"), "/skills/bare/SKILL.md")).toBeUndefined();
@@ -66,6 +118,24 @@ describe("readSkillCatalog", () => {
       const catalog = await readSkillCatalog(root);
 
       expect(catalog.map((candidate) => candidate.name)).toEqual(["a-skill", "b-skill"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a farm whose skills are all hidden reads empty, or whole with includeHidden", async () => {
+    const root = mkdtempSync(join(tmpdir(), "jig-catalog-"));
+    try {
+      mkdirSync(join(root, "writeup"));
+      writeFileSync(
+        join(root, "writeup", "SKILL.md"),
+        FRONT("name: writeup\ndescription: documents\ndisable-model-invocation: true"),
+      );
+
+      expect(await readSkillCatalog(root)).toEqual([]);
+      expect((await readSkillCatalog(root, { includeHidden: true })).map((s) => s.name)).toEqual([
+        "writeup",
+      ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

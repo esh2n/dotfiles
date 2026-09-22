@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +9,7 @@ import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
 import { reportSkillUsage } from "../app/skills/report-usage";
+import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
 import { JsonlAuditLog } from "../infra/audit/jsonl-audit";
@@ -30,6 +32,7 @@ import { recordJudgmentUsage } from "../infra/metrics/judgment-usage";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { readSkillCatalog } from "../infra/skills/catalog";
+import { detectRepoSignals } from "../infra/skills/repo-signals";
 import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
 import { applyCli } from "./apply";
 import { type BoxCliContext, boxCli } from "./box";
@@ -42,6 +45,7 @@ import { userPromptSubmit } from "./hooks/user-prompt-submit";
 import { interactive } from "./interactive";
 import { parseReportArgs, renderSkillUsage } from "./report";
 import { buildJudgmentProvider, serveDecisionService } from "./serve";
+import { skillsCli } from "./skills";
 import { tier } from "./tier";
 
 const VERSION = "0.0.0";
@@ -185,6 +189,31 @@ function harnessFlag(argv: readonly string[]): string | undefined {
   return at === -1 ? undefined : argv[at + 1];
 }
 
+/** Filesystem side of `jig skills hide|show`. Forgiving reads, plain writes. */
+function skillRootPorts(): SkillRootPorts {
+  return {
+    listEntries: async (root) => {
+      try {
+        return await readdir(root);
+      } catch {
+        return [];
+      }
+    },
+    readFile: async (path) => {
+      try {
+        return await readFile(path, "utf8");
+      } catch {
+        return undefined;
+      }
+    },
+    // No stage-and-rename: the file being edited is a symlink into a repository, and an
+    // atomic rename over one replaces the link with a regular file, silently detaching the
+    // skill from the checkout it belongs to.
+    writeFile: (path, text) => writeFile(path, text, "utf8"),
+    join: (...parts) => join(...parts),
+  };
+}
+
 export async function main(argv: readonly string[]): Promise<number> {
   const [command, subcommand] = argv;
   const ports = buildPorts();
@@ -226,14 +255,21 @@ export async function main(argv: readonly string[]): Promise<number> {
             stdin,
             {
               provider: ports.decision,
-              catalog: () => readSkillCatalog(resolveSkillRoot()),
+              // `includeHidden` follows the fallback switch, which the hook decides: a
+              // listing that is hidden and a catalog that skips hidden skills would leave
+              // arm B' with no candidates at all.
+              catalog: (includeHidden) => readSkillCatalog(resolveSkillRoot(), { includeHidden }),
               record: (entry) =>
                 appendRouterLog(join(resolveStateDir(process.env), "skill-router.jsonl"), entry),
+              // The cwd is the repository the prompt is about; the hook is started in it by
+              // the harness. Only consulted when the fallback fires.
+              signals: () => detectRepoSignals(process.cwd()),
               logger: ports.logger,
             },
             {
               ...(Number.isFinite(threshold) ? { threshold } : {}),
               ...(harness === undefined ? {} : { harness }),
+              ...(argv.includes("--fallback") ? { fallback: true } : {}),
             },
           ),
         );
@@ -284,6 +320,11 @@ export async function main(argv: readonly string[]): Promise<number> {
     }
     case "box": {
       const result = await boxCli(argv.slice(1), buildBoxPorts(), boxContext());
+      process.stdout.write(result.stdout);
+      return result.code;
+    }
+    case "skills": {
+      const result = await skillsCli(argv.slice(1), skillRootPorts(), resolveSkillRoot());
       process.stdout.write(result.stdout);
       return result.code;
     }
@@ -383,7 +424,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks pre-tool-use | hooks session-start | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks pre-tool-use | hooks session-start | hooks user-prompt-submit | decide | tier | serve | report skills | report guard-coverage | apply [--target pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -394,6 +435,16 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  learn which model is calling by looking it up there. Prints nothing, never fails.\n" +
           "  hooks user-prompt-submit picks the skill a prompt matches and returns it as context;\n" +
           "  it never blocks the prompt (empty output means no opinion).\n" +
+          "  --fallback (or JIG_ROUTER_FALLBACK=1) makes a router that produced no selection inject\n" +
+          "  the catalog of skills relevant to this repository's languages instead of nothing, and\n" +
+          "  lets it offer skills `jig skills hide` marked disable-model-invocation — one switch,\n" +
+          "  because hiding the listing while skipping hidden skills leaves an empty catalog.\n" +
+          "  Off by default: where the listing is visible, the fallback would be a second copy of it.\n" +
+          "  skills hide|show [--write] [--root <dir>] sets or clears disable-model-invocation on\n" +
+          "  every skill under the root (default ~/.claude/.skills-merged, or JIG_SKILL_ROOT) —\n" +
+          "  the switch that hides the harness's listing. Dry-run by default; it prints the list\n" +
+          "  it would change, edits that one frontmatter key and nothing else, and refuses any\n" +
+          "  skill that sets user-invocable.\n" +
           "  report skills [--days N] [--json] [--opened-via read|skill|any] reads both harnesses'\n" +
           "  session transcripts and shows what the router injected against what the model opened;\n" +
           "  opens count through the read tool and the Skill tool, --opened-via read for the older numbers.\n" +

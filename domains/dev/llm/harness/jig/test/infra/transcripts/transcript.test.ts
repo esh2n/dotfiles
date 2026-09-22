@@ -118,6 +118,41 @@ describe("parseSkillTurns", () => {
     expect(turns[0]?.read).toEqual(["writeup"]);
   });
 
+  it("does not count a fallback catalog as skills the router chose", () => {
+    // The fallback writes its skills in the router's own `- "<name>": …` shape (one format
+    // for the reader), so without the header check a catalog dump would enter the report as
+    // the router's best hour — 20 injections on a turn where it failed to decide.
+    const fallback = JSON.stringify({
+      parentUuid: "u1",
+      isSidechain: false,
+      type: "attachment",
+      attachment: {
+        type: "hook_additional_context",
+        content: [
+          [
+            "jig skill router: no selection for this request (the judgment timed out).",
+            "The list below is not a recommendation — it is every installed skill […]",
+            '- "writeup": documents that are kept',
+            '- "go-modern": current Go forms',
+          ].join("\n"),
+        ],
+      },
+      uuid: "a1",
+      timestamp: "2026-09-20T01:00:01.000Z",
+    });
+
+    const turns = parseSkillTurns(
+      [CLAUDE_PROMPT, fallback, claudeSkill("writeup")].join("\n"),
+      "/sessions/claude.jsonl",
+      KNOWN,
+    );
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.injected).toEqual([]);
+    // What the model then did is still counted; the fallback's own record is the router log.
+    expect(turns[0]?.skilled).toEqual(["writeup"]);
+  });
+
   it("counts a Skill tool call as opening the skill, apart from a file read", () => {
     // 1,208 of these in 30 days were counted as zero before 2026-09-22 — including turns
     // where the model obeyed the injection through the tool the harness gives it.

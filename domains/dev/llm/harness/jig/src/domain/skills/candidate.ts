@@ -15,4 +15,16 @@ export interface SkillCandidate {
   readonly description: string;
   /** Where the skill's body is, so the reminder can point at it instead of carrying it. */
   readonly path: string;
+  /**
+   * The skill's `paths:` frontmatter, when it declares one — Claude Code's glob field:
+   * "Glob patterns that limit when this skill is activated. […] When set, Claude loads the
+   * skill automatically only when working with files matching the patterns"
+   * (https://code.claude.com/docs/en/skills.md, frontmatter reference).
+   *
+   * The router itself ignores it — it judges a request, not a file — but the fallback
+   * catalog needs it: a list of every skill installed would be mostly language skills for
+   * languages the repository does not contain. Absent when the skill declares none, which
+   * means "applies anywhere" and is NOT the same as an empty list.
+   */
+  readonly paths?: readonly string[];
 }

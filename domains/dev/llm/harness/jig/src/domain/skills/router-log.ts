@@ -59,6 +59,18 @@ export interface RouterLogEntry {
   readonly usage?: RouterLogUsage;
   /** Set when the judgment could not be made at all; the other fields are then absent. */
   readonly error?: string;
+  /**
+   * Set when the hook injected the fallback catalog instead of a selection, naming why
+   * (`domain/skills/fallback-catalog.ts`'s `FallbackReason`). Absent on every line written
+   * before 2026-09-22 and on every line where the router decided, so a reader treats it as
+   * optional like `latency_ms` and `usage`.
+   *
+   * It sits alongside the other fields rather than replacing them: a fallback for
+   * `below-threshold` still carries the `confidence` that fell short and the `source` that
+   * said so, and the question the experiment asks of this log — did a turn with no selection
+   * get the catalog, and did the model then open something — needs both halves on one line.
+   */
+  readonly fallback?: string;
 }
 
 /** The judgment model's own token counts, keys as the vendor reports them. */

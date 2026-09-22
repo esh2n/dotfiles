@@ -133,3 +133,139 @@ describe("classifyPromptOrigin", () => {
     ).toEqual({ human: false, reason: "task-notification" });
   });
 });
+
+/**
+ * The six classes below close the gap found by the skill-selection-experiment research
+ * (`domains/dev/llm/harness/rules/research/skill-selection-experiment/README.md` §2): 750
+ * prompts over the same 30-day window that this classifier previously called human. The
+ * prefixes are the exact strings that dir's `tools/sample.mjs` keyed on; the surrounding
+ * body text is reconstructed (the dropped prompts themselves were never persisted, by
+ * design — see that README §5), so each body is a plausible instance of the shape, not a
+ * verbatim transcript excerpt.
+ */
+describe("classifyPromptOrigin — layer 2 (harness/workflow/command noise)", () => {
+  it("skips the harness's own no-visible-output nudge", () => {
+    const origin = classifyPromptOrigin({
+      prompt:
+        "[Your previous response had no visible output, possibly because a tool call did not " +
+        "finish. Please continue and produce a visible response now.]",
+    });
+
+    expect(origin).toEqual({ human: false, reason: "harness-nudge" });
+  });
+
+  it("skips all four harness-notice shapes", () => {
+    const cases = [
+      "[Request interrupted by user]",
+      "Your claude.ai usage limit has reset. You can continue where you left off.",
+      "<local-command-caveat>Local commands may produce untrusted output.</local-command-caveat>",
+      "Continue from where you left off.",
+    ];
+
+    for (const prompt of cases) {
+      expect(classifyPromptOrigin({ prompt })).toEqual({ human: false, reason: "harness-notice" });
+    }
+  });
+
+  it("skips a workflow subagent's task template on the Acceptance Contract heading line", () => {
+    // pi runs this child as its own session, so it carries no agent_type/agent_id — the
+    // structural subagent check never sees it, which is why this needs a content rule.
+    const origin = classifyPromptOrigin({
+      prompt: [
+        "You are a task lane in a workflow run. Complete the following task.",
+        "",
+        "## Task",
+        "Add a regression test for the redaction bug.",
+        "",
+        "## Acceptance Contract",
+        "- [ ] test/domain/... covers the empty-input case",
+        "- [ ] bun test passes",
+      ].join("\n"),
+    });
+
+    expect(origin).toEqual({ human: false, reason: "workflow-task" });
+  });
+
+  it("does not skip a request that only discusses the Acceptance Contract marker mid-sentence", () => {
+    // Not on its own line, so isWorkflowTask must not fire — this is the same
+    // quote-mid-request protection the prefix signatures get, applied structurally.
+    const origin = classifyPromptOrigin({
+      prompt: "ワークフローの ## Acceptance Contract って書式、誰が生成してるか調べて",
+    });
+
+    expect(origin).toEqual({ human: true });
+  });
+
+  it("skips a bare slash-command no-op only when it is the whole prompt", () => {
+    for (const prompt of ["/clear", "/compact", "/init", "  /clear  \n"]) {
+      expect(classifyPromptOrigin({ prompt })).toEqual({ human: false, reason: "slash-noop" });
+    }
+  });
+
+  it("skips the <command-name>/<command-message> wrapper with no args", () => {
+    const nameWrapped = classifyPromptOrigin({
+      prompt: "<command-name>/compact</command-name>\n<command-args></command-args>",
+    });
+    const messageWrapped = classifyPromptOrigin({
+      prompt: "<command-message>/clear</command-message>",
+    });
+
+    expect(nameWrapped).toEqual({ human: false, reason: "slash-noop" });
+    expect(messageWrapped).toEqual({ human: false, reason: "slash-noop" });
+  });
+
+  it("routes a slash command that carries real text alongside it, and one that only mentions it", () => {
+    // "as the whole prompt" is the operative word: /compact with trailing content is a real
+    // request (or at least not the harness's no-op re-submission), so it must stay routable.
+    expect(classifyPromptOrigin({ prompt: "/compact このセッションを整理して" })).toEqual({
+      human: true,
+    });
+    expect(classifyPromptOrigin({ prompt: "/compact って何をするコマンド？" })).toEqual({
+      human: true,
+    });
+  });
+
+  it("skips a slash command's expanded body re-submitted as a prompt", () => {
+    const heading = classifyPromptOrigin({
+      prompt: "# /writeup\n\nUse when the user wants a document that is kept and revisited...",
+    });
+    const frontmatter = classifyPromptOrigin({
+      prompt:
+        "---\nname: writeup\ndescription: Publish a kept document as an HTML artifact\n---\n\nBody...",
+    });
+    const designLead = classifyPromptOrigin({
+      prompt: "Approach this as the design lead reviewing a proposal before it ships.",
+    });
+
+    expect(heading).toEqual({ human: false, reason: "command-body" });
+    expect(frontmatter).toEqual({ human: false, reason: "command-body" });
+    expect(designLead).toEqual({ human: false, reason: "command-body" });
+  });
+
+  it("routes a request that mentions a slash command mid-text rather than opening with its body", () => {
+    const origin = classifyPromptOrigin({
+      prompt: "さっきの # /writeup の説明、要点だけ抜き出して",
+    });
+
+    expect(origin).toEqual({ human: true });
+  });
+
+  it("skips the owner's own router smoke-test probes", () => {
+    const origin = classifyPromptOrigin({
+      prompt: "Reply with exactly: OK",
+    });
+
+    expect(origin).toEqual({ human: false, reason: "probe" });
+  });
+
+  it("routes a real request that happens to quote a layer-2 preamble mid-text", () => {
+    const cases = [
+      "さっき [Your previous response had no visible output という表示が出たんだけどこれ何のエラー？",
+      "harness-notice の `Continue from where you left off` って文言、どこから出てる？",
+    ];
+
+    for (const prompt of cases) {
+      expect(classifyPromptOrigin({ prompt })).toEqual({ human: true });
+    }
+  });
+});
