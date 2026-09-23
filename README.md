@@ -74,9 +74,9 @@ arguments to print the list:
 
 ```bash
 make            # list targets
-make update     # after editing packages/configs: nix build → activate → link → yoki-switch
-make claude     # only ~/.claude changed (packs, hooks, skills): yoki-switch apply
-make link       # only symlinks
+make update     # after editing packages/configs: nix build → activate → link → jig apply
+make claude     # only ~/.claude changed (rules, skills, agents): jig apply --target claude --write
+make link       # symlinks + jig apply --write for every harness (claude/codex/omp/pi/dsh)
 make template   # only .template regeneration
 ```
 
@@ -350,16 +350,17 @@ Pure interactive aliases (no argument support):
 | `fpull` | fetch → stash → pull → stash pop (all automatic) |
 | `gstore` | Interactive stash management (skim: Enter=apply, Ctrl-x=drop) |
 
-#### ECC Hook Manager (`chooks`)
+#### `chooks`
 
-Toggle Claude Code hooks on/off interactively. Changes are temporary — `yoki-switch apply` resets to defaults.
+The per-hook toggles went with yoki: `~/.claude/settings.json` carries jig's
+five inline hooks (`jig apply --target claude --write`) and nothing to switch
+per hook. What remains is the english-coach skill's flag.
 
 | Command | Description |
 |---------|-------------|
-| `chooks` | skim checklist to toggle hooks on/off |
-| `chooks status` | Show all hooks with current on/off state |
-| `chooks reset` | Re-enable all hooks |
-| `chooks profile` | Switch ECC_HOOK_PROFILE (minimal/standard/strict) |
+| `chooks status` | Show the english-coach state |
+| `chooks english-coach on\|off` | Toggle the english-coach skill (syncs `language`) |
+| `chooks reset` | english-coach off |
 
 #### Git Pagers
 

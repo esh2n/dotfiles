@@ -50,17 +50,37 @@ setup:
     - command: curl -fsSL https://mise.run | sh
       user: "1000"
       description: Install mise as the agent user so toolchains land in /home/agent
+    # jig is a bun program; the base image has node 22 and npm but no bun.
+    # Same three steps `jig box` generates (jig/src/app/box/kit.ts bunSteps):
+    # npm's global bin is not on the bare PATH hooks get, hence the symlink.
+    - command: npm install -g bun
+      description: bun for the jig generator and guard (jig is a bun program)
+    - command: ln -sf "$(npm prefix -g)/bin/bun" /usr/local/bin/bun
+      description: Put bun on the bare PATH that agent hooks get
+    - command: cd {{DOTFILES_ROOT}}/domains/dev/llm/harness/jig && bun install --frozen-lockfile
+      user: "1000"
+      description: Resolve jig's dependencies once, before the first apply
 
   startup:
-    # yoki-switch is fully portable — CLAUDE_DIR and DOTFILES_ROOT are both
-    # overridable and it contains no uname checks — so it rebuilds ~/.claude
-    # here exactly as it does on the host. Verified end to end 2026-08-15.
+    # The guard policy jig's PreToolUse hook reads (JIG_POLICY_FILE, else
+    # ~/.config/jig/policy/guard-rules.json) — the same link manager.sh's
+    # link_jig_policy makes on the host. `$HOME`, not `{{HOME}}`: it must
+    # resolve to the sandbox user's home at runtime, not the host's.
     - command:
         - sh
         - -c
-        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply
+        - mkdir -p "$HOME/.config/jig" && ln -sfn "{{DOTFILES_ROOT}}/domains/dev/llm/harness/policy" "$HOME/.config/jig/policy"
       user: "1000"
-      description: Rebuild ~/.claude from core + packs + personal
+      description: Link jig's shared guard policy
+    # jig resolves the checkout from its own path and honours CLAUDE_CONFIG_DIR,
+    # so it delivers ~/.claude here exactly as `make link` does on the host:
+    # settings.json hooks/permissions/sandbox, AGENTS.md, skills/rules/agents.
+    - command:
+        - sh
+        - -c
+        - bash {{DOTFILES_ROOT}}/domains/dev/bin/jig apply --target claude --write
+      user: "1000"
+      description: Deliver ~/.claude with the jig generator
     # Second layer: turn Claude Code's OWN Bash sandbox on inside the VM. The
     # microVM is the boundary; this is defense-in-depth under it, the same
     # layering Anthropic's sandbox docs recommend. Inside the VM the mechanism
@@ -81,10 +101,11 @@ setup:
     #      kits and mounts finish in under a minute without --clone, and
     #      --clone alone finishes too. Do not layer sub-mounts over a clone.
     #   2. sbx now mounts its own agent-skills dir read-only at
-    #      ~/.claude/skills, so `yoki-switch apply` above fails at the point
-    #      where it swaps that dir for a symlink ("Device or resource busy"),
-    #      and the dispatcher stops there — this python3 step then never
-    #      runs. The settings it writes were verified by running it by hand.
+    #      ~/.claude/skills, so `jig apply --target claude` above fails at the
+    #      point where it replaces that dir with its skill links ("Device or
+    #      resource busy"), and the dispatcher stops there — this python3 step
+    #      then never runs. The settings it writes were verified by running it
+    #      by hand. yoki-box passes --no-share-skills to avoid the mount.
     - command:
         - python3
         - -c
@@ -109,11 +130,7 @@ setup:
           print("sandbox enabled inside VM")
       user: "1000"
       description: Enable Claude Code's own sandbox (bubblewrap) inside the VM, fail-closed
-    # Packs are NOT enabled here. They default to OFF on a fresh machine and a
-    # sandbox is a fresh machine every time, so without them the sandbox runs
-    # with fewer rules and agents than the host (measured: rules 6 -> 2,
-    # agents 14 -> 9). But the enabled set is a machine-local choice — it lives
-    # in ~/.claude/.claude-packs, not in the repo (packs.default is empty), and
-    # there are 23 packs to choose from. Hardcoding a list here would go stale
-    # the first time a pack is added. yoki-box reads the host's .claude-packs
-    # and enables exactly that set after the sandbox is created.
+    # No pack step: jig has no packs. Rules are selected by their `paths:`
+    # frontmatter and skills by the judgment service, so the sandbox gets the
+    # same harness as the host from the one apply above. (yoki-box's
+    # sync_packs() is a no-op against a jig-delivered ~/.claude.)

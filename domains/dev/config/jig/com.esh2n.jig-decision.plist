@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Source template: the placeholder tokens below are expanded into a real
      copy at ~/Library/LaunchAgents/com.esh2n.jig-decision.plist by
-     `yoki-switch apply` (manager.sh link_launch_agents, via install_expanded) —
+     `make link` (manager.sh link_launch_agents, via install_expanded) —
      launchd itself never expands env vars or ~, so do not hand-edit the
      deployed copy; fix this source and re-apply. Load with:
        launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.esh2n.jig-decision.plist

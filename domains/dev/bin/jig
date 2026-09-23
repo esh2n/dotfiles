@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# jig — the harness generator and guard CLI (domains/dev/llm/harness/jig).
+#
+#   jig apply --target claude|codex|omp|pi|dsh [--write]   deliver one harness
+#   jig codex register [--write]                            register the Codex hook
+#   jig retire yoki [--write]                               remove what yoki left
+#   jig box new|list|resume|fetch|rm                        sbx microVM around a clone
+#
+# Thin launcher only: resolves DOTFILES_ROOT from this file's real location
+# (so the ~/bin symlink the dotfiles linker makes still finds the checkout)
+# and hands off to bun on the TypeScript entry point. jig derives the
+# repository root from that entry point's own path, so nothing else is passed.
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+DOTFILES_ROOT="$(cd "${BIN_DIR}/../../.." && pwd)"
+
+exec bun "${DOTFILES_ROOT}/domains/dev/llm/harness/jig/src/cli/jig.ts" "$@"

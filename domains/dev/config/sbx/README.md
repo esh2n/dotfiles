@@ -2,7 +2,7 @@
 
 `claude` はホストで走る。`yclaude` は [Docker Sandboxes](https://www.docker.com/products/docker-sandboxes/)
 の microVM の中で走る。**`y` を頭に付けるかどうかだけが操作の差**で、中身は
-`yoki-switch` が組み立てた同じ yoki ハーネス(hooks/rules/skills/workflows)。
+`jig apply --target <harness> --write` が配る同じハーネス(hooks/rules/skills/workflows)。
 
 なぜ VM かというと、`Bash(rm -rf ...)` のような deny list はシェルに対しては
 構造的に回避できるから — `cd ~/x && rm -rf .`、`$HOME`、スクリプト経由、
@@ -128,10 +128,11 @@ sbx が書く config には mcp-gateway の設定も同居しているため、k
 Codex 版とも同じ):
 
 - **ある**: node v22 / git / jq / python3 / rg / bash / npm / npx / uv / gh / curl
-- **ない**: zsh / mise / fd — kit の install はこの3つを埋めるだけ
+- **ない**: zsh / mise / fd / bun — kit の install はこの4つを埋める
 
-node が最初から入っているので、`run-with-flags.js` を叩く9本の core hook は
-追加の準備なしで動く。
+jig は bun プログラムなので、kit は `npm install -g bun` で bun を入れ、
+`/usr/local/bin/bun` に置く(hooks が受け取る素の PATH に npm の global bin は
+無い)。その後 `jig apply --target <harness> --write` で ~/.claude などを配る。
 
 ## ネットワーク
 
@@ -161,13 +162,11 @@ sbx policy log     # default-deny に当たったホスト名がそのまま出�
 ## 落とし穴
 
 - **`--no-share-skills` は必須**。付けないと sbx がホスト側の skills ストアを
-  `~/.claude/skills` に read-write でマウントし、`yoki-switch` が
+  `~/.claude/skills` に read-write でマウントし、`jig apply` が
   マウントポイントを置き換えられず "Device or resource busy" で落ちる。
   sbx のセキュリティ文書でもサンドボックス間の書き込み穴として挙がっている。
   `sbx create` 時のフラグなので kit には書けない — `yoki-box` が常に付けている
-- **パックは kit に書かない**。有効パックはマシン固有の選択で
-  (`~/.claude/.claude-packs`、23個から選ぶ)、リポジトリの `packs.default` は空。
-  kit に列挙するとパックが増えた瞬間に陳腐化するので、`yoki-box` が起動後に
-  ホストの設定を読んで同じものを有効化する
+- **パックは無い**。jig にパックの概念は無く、rules は `paths:` frontmatter、
+  skills は判断サービスが選ぶので、kit は `jig apply` 一発でホストと同じ中身になる
 - **同じ作業ディレクトリに複数のサンドボックス**があると `yfetch` の対象が
   曖昧になる。起動中のものを優先し、それでも複数なら名前を要求して止まる

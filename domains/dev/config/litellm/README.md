@@ -8,7 +8,8 @@ survives swapping the harness. This is how you decide, with data, which model
 belongs in each tier and whether pi or DSH is the better daily driver.
 
 Decision record: writeup store `yoki/2026-09-16-observability-proxy-litellm`.
-**This is not yoki-graph and not a workflow** — just the measurement layer.
+**This is not a workflow and not part of the jig generator** — just the
+measurement layer. Its launchd plist is deployed by `make link`.
 
 ## Tiers
 
@@ -117,9 +118,10 @@ the model:
   (api key = the LITELLM_MASTER_KEY value, or any string if metrics-only).
 - **DSH / codex** — set their OpenAI-compatible base_url to
   `http://localhost:4000` likewise.
-- **yoki-graph** — its deepseek/local backends already honor
-  `YOKI_DEEPSEEK_BASE_URL` / `YOKI_LOCAL_BASE_URL`; point those at the proxy to
-  route graph lanes through the same measurement.
+- **Workflow scripts** (`~/.claude/workflows`, delivered by `jig apply
+  --target claude`) — their provider lanes read `YOKI_DEEPSEEK_BASE_URL` /
+  `YOKI_LOCAL_BASE_URL`; point those at the proxy to route lanes through the
+  same measurement.
 
 ## Metrics
 

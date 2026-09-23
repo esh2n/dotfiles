@@ -1,12 +1,12 @@
 # Thin dispatcher over the existing scripts. No logic lives here — every target
 # just calls the script that owns the behavior. `make` alone prints this list.
 .DEFAULT_GOAL := help
-.PHONY: help update rebuild node2nix link template claude packs install install-force
+.PHONY: help update rebuild node2nix link template claude retire-yoki install install-force
 
 help:            ## この一覧を出す
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
 
-update:          ## nix build → activate → template/link → domain install → yoki-switch
+update:          ## nix build → activate → template/link → domain install → jig apply
 	./core/nix/update.sh
 
 rebuild:         ## update の完全再ビルド版（遅いが確実）
@@ -15,17 +15,17 @@ rebuild:         ## update の完全再ビルド版（遅いが確実）
 node2nix:        ## npm パッケージ (node2nix/package.json) を変えた後の update
 	./core/nix/update.sh --node2nix
 
-link:            ## symlink だけ張り直す
+link:            ## symlink を張り直し、各ハーネスに jig apply --write を流す
 	./core/config/manager.sh link
 
 template:        ## .template から設定ファイルだけ再生成
 	./core/config/manager.sh template
 
-claude:          ## ~/.claude を再合成 (yoki-switch apply)
-	yoki-switch apply
+claude:          ## ~/.claude だけ再生成 (jig apply --target claude --write)
+	bash ./domains/dev/bin/jig apply --target claude --write
 
-packs:           ## yoki の pack を対話で on/off
-	yoki-switch
+retire-yoki:     ## yoki が残した成果物を一覧 (削除は jig retire yoki --write)
+	bash ./domains/dev/bin/jig retire yoki
 
 install:         ## 初回セットアップ (Homebrew/Nix/mise/symlink)
 	./core/install/installer.sh

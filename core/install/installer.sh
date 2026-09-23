@@ -190,8 +190,10 @@ phase_core() {
         git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
     fi
 
-    # Everything Claude Code (ECC): cloned as sibling of dotfiles so
-    # yoki-switch resolves it via ${dotfiles_parent}/everything-claude-code.
+    # Everything Claude Code (ECC): cloned as sibling of dotfiles at
+    # ${dotfiles_parent}/everything-claude-code. This was yoki-switch's
+    # `ecc` source; jig does not read it, so the clone is kept only as a
+    # reference checkout until the owner drops this step.
     local ecc_dir
     ecc_dir="$(dirname "${DOTFILES_ROOT}")/everything-claude-code"
     if [[ ! -d "$ecc_dir/.git" ]]; then
@@ -256,11 +258,22 @@ phase_config() {
     log_info "Creating symlinks..."
     "${DOTFILES_ROOT}/core/config/manager.sh" link
 
-    # Generate Claude Code settings (settings.json + CLAUDE.md) via layer merge
-    local yoki_switch="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
-    if [[ -x "$yoki_switch" ]]; then
-        log_info "Applying Claude Code config (base + core + packs)..."
-        bash "$yoki_switch" apply
+    # Deliver the Claude Code and Codex harnesses with the jig generator
+    # (settings.json hooks/permissions, AGENTS.md, skills/rules/agents links,
+    # Codex's AGENTS.md/agents/mcp block and hook registration). manager.sh
+    # link already runs the per-harness applies; this pass is the explicit
+    # one a first install can read in the log, and both are idempotent.
+    local jig_bin="${DOTFILES_ROOT}/domains/dev/bin/jig"
+    if [[ -f "$jig_bin" ]] && command -v bun >/dev/null 2>&1; then
+        log_info "Applying Claude Code config (jig apply --target claude)..."
+        bash "$jig_bin" apply --target claude --write || log_warn "jig apply --target claude --write failed (non-critical)"
+        if command -v codex >/dev/null 2>&1; then
+            log_info "Applying Codex config (jig apply --target codex + codex register)..."
+            bash "$jig_bin" apply --target codex --write || log_warn "jig apply --target codex --write failed (non-critical)"
+            bash "$jig_bin" codex register --write || log_warn "jig codex register --write failed (non-critical)"
+        fi
+    else
+        log_warn "jig launcher or bun missing; run 'make claude' once bun is installed"
     fi
 
     ensure_git_identity

@@ -20,6 +20,7 @@ description: >-
 # rules against that list. Real lockdown is `sbx policy init` -> Locked Down
 # globally, then adding back per sandbox. Not done here; see README.
 #
-# Posture rules for the agent itself are carried by ~/.claude/CLAUDE.md, which
-# the yoki-claude kit provisions via yoki-switch. schemaVersion 2 has no
+# Posture rules for the agent itself are carried by ~/.claude/AGENTS.md
+# (CLAUDE.md links to it), which the yoki-claude kit provisions via
+# `jig apply --target claude --write`. schemaVersion 2 has no
 # agent-instructions field (agentContext/agentInstructions are v1 only).

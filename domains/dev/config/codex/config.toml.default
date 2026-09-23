@@ -1,16 +1,17 @@
 # Seed for ~/.codex/config.toml, copied ONCE by domains/dev/install.sh's
 # ensure_codex_config when the live file does not exist yet. It is never
-# re-applied: the live file carries yoki's `# yoki:begin` managed block and
+# re-applied: the live file carries jig's managed `[mcp_servers.*]` block and
 # codex's own hook trust hashes, which a second copy would discard.
 #
 # Keep only settings that are genuinely machine-local starting points here.
-# Anything yoki owns belongs in the claude-profiles layers instead:
-#   - MCP servers        -> claude-profiles/{core,personal}/mcp.json
-#   - hooks / rules      -> claude-profiles layers, via yoki-switch
-#   - permissions        -> claude-profiles/*/permissions.yaml
-# yoki refuses to manage an `[mcp_servers.<name>]` it finds declared outside
-# its block ("left alone, not regenerated"), so a server listed both here and
-# in mcp.json silently stops following the canonical inventory.
+# Anything jig owns belongs in domains/dev/llm/harness instead, delivered by
+# `make link` (`jig apply --target codex --write` + `jig codex register --write`):
+#   - MCP servers        -> llm/harness/mcp/servers.json
+#   - the guard hook     -> hooks.json, registered by `jig codex register`
+#   - AGENTS.md / agents -> llm/harness/rules, llm/harness/agents
+# jig refuses to manage an `[mcp_servers.<name>]` it finds declared outside
+# its block ("left alone, reported"), so a server listed both here and in
+# servers.json silently stops following the canonical inventory.
 
 hide_agent_reasoning = true
 network_access = true

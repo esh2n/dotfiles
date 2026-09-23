@@ -28,39 +28,25 @@ description: >-
 #
 # WHAT THIS KIT WRITES, AND WHAT IT DELIBERATELY DOES NOT
 #
-# 1. `yoki-switch apply --target codex` in startup (below) runs ONLY the
-#    codex generator (lib/targets/gen.js via yoki-switch's
-#    apply_target_generator) — never the plain `yoki-switch apply` the
-#    claude kit runs, which would also attempt the ~/.claude merge_settings
-#    step. That step is harmless here (~/.claude does not exist in a Codex
-#    sandbox, so `apply`'s claude branch would just run merge_settings
-#    against a fresh $CLAUDE_DIR — wasted work, not wrong), but --target
-#    codex says precisely what this kit needs and nothing else.
+# 1. `jig apply --target codex --write` in startup (below) delivers ONLY the
+#    Codex harness — ~/.codex/AGENTS.md, agents/*.toml, the ~/.agents/skills
+#    mount and jig's `[mcp_servers.*]` block — and `jig codex register
+#    --write` puts jig's PreToolUse guard into ~/.codex/hooks.json. Neither
+#    touches ~/.claude, which does not exist in a Codex sandbox.
 #
 # 2. It does NOT overwrite ~/.codex/config.toml wholesale. sbx already
 #    writes one at create time ("yolo mode": approval_policy = "never",
 #    sandbox_mode = "danger-full-access") and that same file carries the
 #    mcp-gateway server with its `Bearer proxy-managed` header — clobbering
-#    it would silently cut MCP off. codex-config-toml.js's managed-block
-#    writer only ever touches the `# yoki:begin`/`# yoki:end` block it owns,
-#    leaving sbx's `sandbox_mode`/`approval_policy` lines and the
-#    `[mcp_servers.*]` tables outside it untouched.
+#    it would silently cut MCP off. jig's block writer only ever touches the
+#    marked block it owns (jig README §Milestone 3a), leaving sbx's
+#    `sandbox_mode`/`approval_policy` lines and any `[mcp_servers.*]` table
+#    outside it untouched; a server declared outside the block is reported,
+#    not regenerated.
 #
-#    That same top-level `sandbox_mode = "danger-full-access"` line is also
-#    why the generator's own conflict rule matters here specifically: Codex
-#    rejects `default_permissions` combined with a top-level `sandbox_mode`
-#    (spike S3 §1), so codex-config-toml.js's hasConflictingTopLevelKey()
-#    detects it ahead of the managed block and skips writing
-#    `default_permissions = "yoki"` (and the whole permissions/hooks-state
-#    block) entirely, with a warning, rather than writing a config Codex
-#    would silently misinterpret. Verified directly (core/validation/
-#    test-targets-golden.sh) by running the generator against a config.toml
-#    fixture that carries the exact `sandbox_mode = "danger-full-access"`
-#    line sbx writes: default_permissions stays absent and sbx's own lines
-#    survive byte-for-byte. Net effect: inside this sandbox, Codex keeps
-#    running under sbx's own yolo-mode permissions — the yoki execpolicy
-#    rules/filesystem-deny table this kit would otherwise install don't
-#    apply here, on top of point 3 below.
+#    Net effect: inside this sandbox, Codex keeps running under sbx's own
+#    yolo-mode permissions — jig's guard is the PreToolUse hook, not a
+#    config-level permission table — on top of point 3 below.
 #
 # 3. It therefore leaves Codex more permissive than Claude in the same
 #    posture even where the managed block DOES get written. Claude runs
@@ -99,20 +85,37 @@ setup:
     - command: curl -fsSL https://mise.run | sh
       user: "1000"
       description: Install mise as the agent user so toolchains land in /home/agent
+    # jig is a bun program; the base image has node 22 and npm but no bun.
+    # Same three steps `jig box` generates (jig/src/app/box/kit.ts bunSteps):
+    # npm's global bin is not on the bare PATH hooks get, hence the symlink.
+    - command: npm install -g bun
+      description: bun for the jig generator and guard (jig is a bun program)
+    - command: ln -sf "$(npm prefix -g)/bin/bun" /usr/local/bin/bun
+      description: Put bun on the bare PATH that Codex hooks get
+    - command: cd {{DOTFILES_ROOT}}/domains/dev/llm/harness/jig && bun install --frozen-lockfile
+      user: "1000"
+      description: Resolve jig's dependencies once, before the first apply
 
   startup:
-    # yoki-switch is fully portable — CLAUDE_DIR/CODEX_DIR/OMP_AGENT_DIR and
-    # DOTFILES_ROOT are all overridable and it contains no uname checks — so
-    # it rebuilds ~/.codex here exactly as `apply --target codex` does on
-    # the host. `--target codex` restricts it to that one generator (see
-    # point 1 above) — never plain `apply`, which the claude kit uses
-    # because it needs the ~/.claude merge too.
+    # The guard policy jig's PreToolUse hook reads (JIG_POLICY_FILE, else
+    # ~/.config/jig/policy/guard-rules.json) — the same link manager.sh's
+    # link_jig_policy makes on the host. `$HOME`, not `{{HOME}}`: it must
+    # resolve to the sandbox user's home at runtime, not the host's.
     - command:
         - sh
         - -c
-        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply --target codex
+        - mkdir -p "$HOME/.config/jig" && ln -sfn "{{DOTFILES_ROOT}}/domains/dev/llm/harness/policy" "$HOME/.config/jig/policy"
       user: "1000"
-      description: Rebuild ~/.codex from core + packs + personal via lib/targets/gen.js
+      description: Link jig's shared guard policy
+    # jig resolves the checkout from its own path and honours CODEX_HOME, so
+    # it delivers ~/.codex here exactly as `make link` does on the host (see
+    # point 1 above). Two verbs: the harness, then the guard registration.
+    - command:
+        - sh
+        - -c
+        - bash {{DOTFILES_ROOT}}/domains/dev/bin/jig apply --target codex --write && bash {{DOTFILES_ROOT}}/domains/dev/bin/jig codex register --write
+      user: "1000"
+      description: Deliver ~/.codex with the jig generator and register jig's guard hook
     # Second layer: sbx writes `sandbox_mode = "danger-full-access"` at create
     # time (its "yolo mode", see point 2 above), which switches Codex's OWN
     # sandbox off inside the VM. The microVM is the boundary; Codex's
@@ -133,10 +136,5 @@ setup:
           grep -n '^sandbox_mode' "$f"
       user: "1000"
       description: Turn Codex's own workspace-write sandbox back on inside the VM (sbx defaults it off)
-    # Packs are NOT enabled here, same as the claude kit and for the same
-    # reason: they default to OFF on a fresh machine and a sandbox is a
-    # fresh machine every time. The enabled set is a machine-local choice
-    # (~/.claude/.claude-packs on the HOST, not in the repo), so yoki-box's
-    # sync_packs() reads it after the sandbox is created and re-runs
-    # `yoki-switch pack enable` for exactly that set — see domains/dev/bin/
-    # yoki-box.
+    # No pack step, same as the claude kit: jig has no packs, so the one
+    # apply above delivers the same Codex harness the host has.

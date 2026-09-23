@@ -65,9 +65,11 @@ Two things to know: the bridge treats a crashed or overrunning hook as no
 opinion (fails open), and `str_replace_editor` sends `path` rather than
 `file_path` — jig reads both.
 
-Redeploy after editing: run `link_dsh_resources` from the **main
-checkout** (manager.sh recomputes `DOTFILES_ROOT` from its own location, so
-sourcing it from a worktree writes a wrong path), or `yoki-switch apply`.
+Redeploy after editing: `make link`, or run `link_dsh_resources` from the
+**main checkout** (manager.sh recomputes `DOTFILES_ROOT` from its own
+location, so sourcing it from a worktree writes a wrong path). Either way
+the function ends with `jig apply --target dsh --write`, which delivers
+jig's MCP rows and `$DSH_HOME/AGENTS.md` after the expanded copies land.
 The main checkout's jig needs `bun install --frozen-lockfile` once.
 
 ## Confirm at first run (unverified points)

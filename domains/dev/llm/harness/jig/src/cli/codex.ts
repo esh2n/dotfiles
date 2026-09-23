@@ -47,7 +47,7 @@ export async function codexCli(
     if (result.written) {
       lines.push(
         "written. jig's group is now PreToolUse[0]; every other group moved down one, so",
-        "run `yoki-switch apply` next to let yoki recompute its own trust entries.",
+        "Codex may ask to re-trust them on next launch (yoki's groups go with `jig retire yoki --write`).",
       );
     } else if (result.hooksJsonChanged || result.configTomlChanged) {
       lines.push("dry run: nothing written. Re-run with --write to apply.");

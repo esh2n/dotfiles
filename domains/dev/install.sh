@@ -202,21 +202,21 @@ ensure_codex_config() {
 }
 
 # ~/.codex/config.toml contains machine-local trust and hook state, so it is
-# intentionally not replaced wholesale by the tracked default — hooks,
-# rules, agents, skill ports, AND MCP server registration (task T13: the
-# canonical mcp.json inventory's `[mcp_servers.<name>]` tables, appended
-# into config.toml's managed block) all come from the generator now. A
-# server already declared outside that managed block (e.g. a leftover
-# `codex mcp add` entry from before this migration) is left alone and
+# intentionally not replaced wholesale by the tracked default — AGENTS.md,
+# agents/*.toml, the ~/.agents/skills mount and the `[mcp_servers.<name>]`
+# block all come from the jig generator (`jig apply --target codex`), and
+# jig's PreToolUse guard is registered in hooks.json by `jig codex register`.
+# A server already declared outside jig's managed block is left alone and
 # reported rather than overwritten — see
-# lib/mcp-inventory/writers/codex.js.
+# domains/dev/llm/harness/jig/README.md §Milestone 3a.
 if has_command "codex"; then
     ensure_codex_config
 
-    yoki_switch="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
-    if [[ -x "$yoki_switch" ]]; then
-        log_info "Applying Codex config (hooks/rules/agents/skills/mcp)..."
-        bash "$yoki_switch" apply --target codex || log_warn "yoki-switch apply --target codex failed (non-critical)"
+    jig_bin="${DOTFILES_ROOT}/domains/dev/bin/jig"
+    if [[ -f "$jig_bin" ]] && has_command "bun"; then
+        log_info "Applying Codex config (AGENTS.md/agents/skills/mcp)..."
+        bash "$jig_bin" apply --target codex --write || log_warn "jig apply --target codex --write failed (non-critical)"
+        bash "$jig_bin" codex register --write || log_warn "jig codex register --write failed (non-critical)"
     fi
 fi
 

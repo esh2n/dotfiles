@@ -3,8 +3,8 @@ kind: mixin
 name: yoki-omp
 displayName: yoki harness for omp
 description: >-
-  Installs omp (oh-my-pi) and wires it to the dotfiles: ~/.claude from the
-  yoki layers, ~/.omp/agent from the omp config.
+  Installs omp (oh-my-pi) and wires it to the dotfiles: ~/.omp/agent from the
+  omp config plus the jig generator (agents, mcp.json, the jig.ts guard extension).
 
 # Generated from spec.yaml.in by yoki-box at launch — never installed as a file,
 # because {{DOTFILES_ROOT}} is a literal path belonging to one checkout.
@@ -13,11 +13,11 @@ description: >-
 #
 # omp defaults to approvalMode: yolo (every tool auto-approved) and
 # auto-executes repo-local .omp/ extensions at session start — both are stated
-# design positions, not gaps (upstream issue #8678 closed as by-design). The
-# yoki-guard extension carries the git rules across, but the layer that stands
-# between an agent and `rm -rf` does NOT exist on the omp side, and a
-# repo-local extension runs before any guard can see it. So: omp needs the VM
-# MORE than Claude Code does, not less.
+# design positions, not gaps (upstream issue #8678 closed as by-design). jig's
+# omp extension (extensions/jig.ts) carries the guard rules across, but the
+# layer that stands between an agent and `rm -rf` does NOT exist on the omp
+# side, and a repo-local extension runs before any guard can see it. So: omp
+# needs the VM MORE than Claude Code does, not less.
 
 permissions:
   network:
@@ -46,27 +46,35 @@ setup:
     - command: curl -fsSL https://omp.sh/install | sh
       user: "1000"
       description: omp itself (prebuilt binary into the agent user's PATH)
+    # jig is a bun program; omp's embedded Bun is not on PATH, and the base
+    # image has node 22 and npm but no bun. Same three steps `jig box`
+    # generates (jig/src/app/box/kit.ts bunSteps).
+    - command: npm install -g bun
+      description: bun for the jig generator and the jig.ts guard extension
+    - command: ln -sf "$(npm prefix -g)/bin/bun" /usr/local/bin/bun
+      description: Put bun on the bare PATH omp's extension host gets
+    - command: cd {{DOTFILES_ROOT}}/domains/dev/llm/harness/jig && bun install --frozen-lockfile
+      user: "1000"
+      description: Resolve jig's dependencies once, before the first apply
 
   startup:
-    # Rebuilds ~/.claude from core + packs + personal. The yoki-guard extension
-    # shells out to ~/.claude/hooks/*, so omp has no guardrails until this runs.
-    - command:
-        - sh
-        - -c
-        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply
-      user: "1000"
-      description: Rebuild ~/.claude (also what yoki-guard reads its rules from)
-
-    # models.yml/lsp.yml are plain repo files lib/targets/omp.js never
-    # touches (no generator equivalent — see gen.js/omp.js) — link them
-    # directly. Previously this was a side effect of calling
-    # link_omp_resources (core/config/manager.sh), which also fired
-    # `yoki-switch apply --target omp` itself as its own last step; that
-    # call is now made explicitly below instead (task T15), so this step
-    # only does the plain file linking. `$HOME`, not `{{HOME}}`: this must
+    # The guard policy jig's omp extension reads (JIG_POLICY_FILE, else
+    # ~/.config/jig/policy/guard-rules.json) — the same link manager.sh's
+    # link_jig_policy makes on the host. Without it the extension stands
+    # down and omp has no guardrails. `$HOME`, not `{{HOME}}`: this must
     # resolve to the SANDBOX user's home (/home/agent) at runtime, not the
     # host's — render_kit's `{{HOME}}` substitution bakes in the host's own
     # $HOME instead, which would be wrong here.
+    - command:
+        - sh
+        - -c
+        - mkdir -p "$HOME/.config/jig" && ln -sfn "{{DOTFILES_ROOT}}/domains/dev/llm/harness/policy" "$HOME/.config/jig/policy"
+      user: "1000"
+      description: Link jig's shared guard policy (what extensions/jig.ts reads its rules from)
+
+    # models.yml/lsp.yml are plain repo files jig never touches (no generator
+    # equivalent) — link them directly, as link_omp_resources does on the
+    # host; the jig apply below is that function's other half.
     - command:
         - sh
         - -c
@@ -74,16 +82,15 @@ setup:
       user: "1000"
       description: Ensure ~/.omp/agent exists and link models.yml/lsp.yml (no generator equivalent)
 
-    # Rebuilds ~/.omp/agent's config.yml/RULES.md/agents/yoki-hooks.json/
-    # mcp.json/extensions from core + packs + personal via lib/targets/
-    # gen.js — called directly here now (same shape as the codex kit's own
-    # startup), instead of implicitly through link_omp_resources.
+    # Delivers ~/.omp/agent's agents/*.md, jig's entries in mcp.json, the
+    # ~/.agents/skills mount and extensions/jig.ts (jig README §Milestone
+    # 3b); config.yml is omp's own and is left alone.
     - command:
         - sh
         - -c
-        - DOTFILES_ROOT={{DOTFILES_ROOT}} bash {{DOTFILES_ROOT}}/domains/dev/bin/yoki-switch apply --target omp
+        - bash {{DOTFILES_ROOT}}/domains/dev/bin/jig apply --target omp --write
       user: "1000"
-      description: Rebuild ~/.omp/agent from core + packs + personal via lib/targets/gen.js
+      description: Deliver ~/.omp/agent with the jig generator
 
     # NOT DONE HERE: authentication. omp uses subscription OAuth / API keys and
     # the credential store (~/.omp/agent/agent.db) is host runtime state,

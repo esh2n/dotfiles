@@ -288,11 +288,15 @@ main() {
         fi
     fi
 
-    # Re-merge Claude Code config (source settings may have changed)
-    local yoki_switch="${DOTFILES_ROOT}/domains/dev/bin/yoki-switch"
-    if [[ -x "$yoki_switch" ]]; then
-        log_info "Re-merging Claude Code config (base + core + packs)..."
-        bash "$yoki_switch" apply || log_warn "yoki-switch apply failed (non-critical)"
+    # Re-deliver the Claude Code and Codex harnesses (sources may have changed)
+    local jig_bin="${DOTFILES_ROOT}/domains/dev/bin/jig"
+    if [[ -f "$jig_bin" ]] && command -v bun >/dev/null 2>&1; then
+        log_info "Applying Claude Code config (jig apply --target claude)..."
+        bash "$jig_bin" apply --target claude --write || log_warn "jig apply --target claude --write failed (non-critical)"
+        if command -v codex >/dev/null 2>&1; then
+            bash "$jig_bin" apply --target codex --write || log_warn "jig apply --target codex --write failed (non-critical)"
+            bash "$jig_bin" codex register --write || log_warn "jig codex register --write failed (non-critical)"
+        fi
     fi
 
     echo ""
