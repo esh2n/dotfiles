@@ -57,6 +57,10 @@ step() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 port_answers() { curl -sf --max-time 2 "$1" >/dev/null 2>&1; }
 uid_gui() { echo "gui/$(id -u)"; }
 agent_loaded() { launchctl print "$(uid_gui)/$1" >/dev/null 2>&1; }
+# Every CLI that can sit waiting on a GUI or the network runs under a cap, so
+# a stuck tool becomes an owner step instead of a script that never returns
+# (`timeout` is coreutils from the nix profile; without it, run bare).
+capped() { if command -v timeout >/dev/null 2>&1; then timeout "$@"; else shift; "$@"; fi; }
 
 echo "home-llm-up: role=$ROLE os=$OS root=$DOTFILES_ROOT"
 
@@ -102,16 +106,18 @@ fi
 step "2. Tailscale login"
 TS_UP=0
 if [ -n "$TS_BIN" ]; then
-  # `|| true` inside the capture: a freshly installed Tailscale answers "The
-  # Tailscale CLI failed to start: Failed to load preferences" until the app
-  # has been opened once, and under pipefail that exit would end the script
-  # here (measured 2026-09-23) instead of becoming the owner step below.
-  ts_json="$("$TS_BIN" status --json 2>/dev/null || true)"
+  # A freshly installed Tailscale has no backend yet: from a sandbox the CLI
+  # answers "The Tailscale CLI failed to start: Failed to load preferences"
+  # at once, but from the owner's GUI session it launches the app and waits
+  # for a backend that never comes until someone logs in — the script hung
+  # here on 2026-09-23. So: open the app first (a no-op when it runs), give
+  # the CLI ten seconds, and treat anything but Running as "log in".
+  [ "$OS" = Darwin ] && { open -a Tailscale 2>/dev/null || true; sleep 2; }
+  ts_json="$(capped 10 "$TS_BIN" status --json 2>/dev/null || true)"
   state="$(printf '%s' "$ts_json" | sed -n 's/.*"BackendState": *"\([A-Za-z]*\)".*/\1/p' | head -1)"
   if [ "$state" = Running ]; then
     TS_UP=1; ok "logged in ($(printf '%s' "$ts_json" | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1))"
   else
-    [ "$OS" = Darwin ] && open -a Tailscale 2>/dev/null || true
     todo "log in to Tailscale (menu-bar app on macOS: Log in; Linux: sudo tailscale up), then re-run this script for the serve steps"
   fi
 fi
@@ -160,7 +166,7 @@ if [ "$ROLE" = hub ]; then
   if port_answers http://127.0.0.1:1234/v1/models; then
     ok "server answers"
   elif command -v lms >/dev/null 2>&1; then
-    lms server start --port 1234 >/dev/null 2>&1 && did "lms server start --port 1234" || true
+    capped 30 lms server start --port 1234 >/dev/null 2>&1 && did "lms server start --port 1234" || true
     sleep 3
     port_answers http://127.0.0.1:1234/v1/models && ok "server answers" || todo "LM Studio server not answering — open LM Studio once, Settings → 'run the LLM server on login', network 'localhost only'"
   else
@@ -181,12 +187,12 @@ fi
 step "6. tailscale serve"
 if [ "$TS_UP" = 1 ]; then
   if [ "$ROLE" = hub ]; then
-    "$TS_BIN" serve --bg --tcp 1234 tcp://127.0.0.1:1234 >/dev/null && did "tcp:1234 → LM Studio" || todo "tailscale serve --tcp 1234 failed"
-    "$TS_BIN" serve --bg --https=3001 127.0.0.1:3001 >/dev/null && did "https:3001 → Open WebUI" || todo "tailscale serve --https=3001 failed (HTTPS needs MagicDNS + HTTPS certificates enabled in the admin console)"
+    capped 20 "$TS_BIN" serve --bg --tcp 1234 tcp://127.0.0.1:1234 >/dev/null && did "tcp:1234 → LM Studio" || todo "tailscale serve --tcp 1234 failed"
+    capped 20 "$TS_BIN" serve --bg --https=3001 127.0.0.1:3001 >/dev/null && did "https:3001 → Open WebUI" || todo "tailscale serve --https=3001 failed (HTTPS needs MagicDNS + HTTPS certificates enabled in the admin console)"
   else
-    "$TS_BIN" serve --bg --tcp 4001 tcp://127.0.0.1:4001 >/dev/null && did "tcp:4001 → LiteLLM metrics" || todo "tailscale serve --tcp 4001 failed"
+    capped 20 "$TS_BIN" serve --bg --tcp 4001 tcp://127.0.0.1:4001 >/dev/null && did "tcp:4001 → LiteLLM metrics" || todo "tailscale serve --tcp 4001 failed"
   fi
-  "$TS_BIN" serve status 2>/dev/null | sed 's/^/    /'
+  capped 10 "$TS_BIN" serve status 2>/dev/null | sed 's/^/    /'
 else
   skip "waiting for the Tailscale login (step 2)"
 fi
@@ -197,6 +203,7 @@ if [ "$ROLE" = hub ]; then
   obs="$DOTFILES_ROOT/domains/dev/config/litellm/observability"
   if docker info >/dev/null 2>&1; then
     bash "$obs/start.sh" >/dev/null && ok "Prometheus up (127.0.0.1:9090)" || todo "observability/start.sh failed"
+    echo "    (first run pulls ghcr.io/open-webui/open-webui:main — a few minutes)"
     docker compose -f "$obs/docker-compose.yml" --profile webui up -d open-webui >/dev/null 2>&1 \
       && ok "Open WebUI up (127.0.0.1:3001)" || todo "open-webui did not start — docker compose -f $obs/docker-compose.yml --profile webui up -d open-webui"
   else
@@ -212,7 +219,7 @@ if command -v pi >/dev/null 2>&1; then
     if [ -f "$settings" ] && grep -q "\"npm:$pkg" "$settings"; then
       ok "$pkg present"
     else
-      pi install "npm:$pkg" >/dev/null 2>&1 && did "pi install npm:$pkg" || todo "pi install npm:$pkg failed"
+      capped 180 pi install "npm:$pkg" >/dev/null 2>&1 && did "pi install npm:$pkg" || todo "pi install npm:$pkg failed"
     fi
   done
 else
@@ -224,14 +231,14 @@ step "9. Claude Code MCP servers (user scope)"
 # jig prints one `claude mcp add --scope user …` line per server and never
 # runs the claude CLI itself; this owner script runs the missing ones.
 if command -v claude >/dev/null 2>&1; then
-  registered="$(claude mcp list 2>/dev/null || true)"
+  registered="$(capped 60 claude mcp list 2>/dev/null || true)"
   while IFS= read -r line; do
     name="$(printf '%s' "$line" | awk '{for(i=1;i<=NF;i++) if($i=="--scope"){print $(i+2); exit}}')"
     [ -z "$name" ] && continue
     if printf '%s' "$registered" | grep -q "^$name:"; then
       ok "$name registered"
     else
-      eval "$line" >/dev/null 2>&1 && did "$name: $line" || todo "failed: $line"
+      capped 60 bash -c "$line" >/dev/null 2>&1 && did "$name: $line" || todo "failed: $line"
     fi
   done < <(bash "$DOTFILES_ROOT/domains/dev/bin/jig" apply --target claude 2>/dev/null | sed -n 's/^  \(claude mcp add .*\)$/\1/p')
 else
