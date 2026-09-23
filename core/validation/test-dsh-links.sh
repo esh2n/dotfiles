@@ -109,11 +109,17 @@ is_expanded_copy() {
     local dest="$1" src="$2"
     [[ -f "$dest" && ! -L "$dest" ]] || return 1
     grep -q '{{' "$dest" && return 1
-    local expected
+    local expected actual
     expected="$(sed -e "s|{{HOME}}|${HOME}|g" \
                     -e "s|{{DOTFILES_ROOT}}|${DOTFILES_ROOT}|g" \
                     -e "s|{{USER}}|${USER}|g" "$src")"
-    [[ "$(cat "$dest")" == "$expected" ]]
+    # link_dsh_resources hands the profile to `jig apply --target dsh --write`
+    # right after the copy, which appends its MCP rows between
+    # `# jig:begin mcp` and `# jig:end mcp`. That block is jig's (tested in
+    # jig/test); here only manager.sh's copy is under test, so compare the
+    # file with the block and the blank line before it removed.
+    actual="$(sed -e '/^# jig:begin mcp$/,/^# jig:end mcp$/d' "$dest" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
+    [[ "$actual" == "$expected" ]]
 }
 
 snapshot_links() {
