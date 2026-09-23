@@ -2,6 +2,11 @@
 # Init scripts are static per tool version, so source them via cached_eval
 # (loader.sh) instead of spawning each binary on every shell (~15-25ms each).
 
+# jig skill router, arm C of the skill-selection experiment: one `choice`
+# question per prompt instead of the bool batch. The 14-day window starts the
+# day this flag is flipped (llm/harness/rules/research/skill-selection-experiment/PROTOCOL-C.md).
+export JIG_SKILL_ROUTER_QUESTION=choice
+
 # Zoxide (Smart Directory Jumper)
 if command -v zoxide &>/dev/null; then
   export _ZO_EXCLUDE_DIRS="$HOME/.Trash:$HOME/Library:$HOME/.cache:$HOME/.aws:*/.git:*/node_modules:*/vendor:*/.venv"
