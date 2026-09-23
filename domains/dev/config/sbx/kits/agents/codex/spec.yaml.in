@@ -60,8 +60,8 @@ description: >-
 #    arguments for the codex agent are not introspectable, so overriding
 #    them here would be guesswork. Pass it yourself when it matters:
 #        ycodex -- --approve-for-me
-#    or layer a profile: put yoki.config.toml under $CODEX_HOME and run
-#        ycodex -- -p yoki
+#    or layer a profile ([profiles.<name>] in $CODEX_HOME/config.toml) and run
+#        ycodex -- -p <name>
 
 permissions:
   network:

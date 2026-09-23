@@ -1,7 +1,7 @@
 schemaVersion: "2"
 kind: mixin
-name: yoki-connected
-displayName: yoki connected posture
+name: jig-connected
+displayName: jig connected posture
 description: >-
   GitHub credentials via the host-side proxy, so the agent can push a branch
   and open a pull request. Work leaves the sandbox as a PR, not as local files.

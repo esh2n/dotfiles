@@ -106,8 +106,8 @@ domains/dev/config/zellij/layouts/everforest.kdl
 domains/dev/config/zellij/layouts/onedark.kdl
 domains/dev/config/zellij/layouts/solarized.kdl
 domains/dev/config/cursor/settings.json
-# ~/.codex is a symlink into this directory, so everything yoki generates for
-# the codex target lands here. Only config.toml.default is authored by hand.
+# ~/.codex is a symlink into this directory, so everything jig apply --target
+# codex generates lands here. Only config.toml.default is authored by hand.
 domains/dev/config/codex/config.toml
 domains/dev/config/codex/AGENTS.md
 domains/dev/config/codex/hooks.json
@@ -125,8 +125,6 @@ domains/system/userstyles/gen/
 **/dropdown_windows.json
 **/sessions/
 **/session*
-# yoki runtime sources are code, not session state
-!domains/dev/config/claude-profiles/runtime/yoki/scripts/**/session*
 
 # Tmux plugins and generated files
 **/tmux/plugins/

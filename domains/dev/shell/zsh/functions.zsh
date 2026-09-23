@@ -2483,12 +2483,14 @@ claude() {
     CLAUDE_CODE_NO_FLICKER=1 "$claude_bin" "${extra_flags[@]}" "$@"
 }
 
-# Launch an unattended (AFK) session: confirmations relaxed via acceptEdits,
-# while the unattended-guard hook blocks guardrail self-modification
-# (~/.claude/**, llm/harness/**, jig apply) for the whole session.
-# Use this for /loop and cron-style runs instead of plain `claude`.
+# Launch an unattended (AFK) session: confirmations relaxed via acceptEdits.
+# jig's guard (policy/guard-rules.json) still runs on every tool call; there
+# is no separate unattended-only guard any more (the one that blocked
+# guardrail self-modification retired with the previous harness — the
+# unattended-run rules in rules/decisions/2026-09-22-loop-native-goal.md
+# are the open item). Use this for /loop and cron-style runs.
 claude-unattended() {
-    YOKI_UNATTENDED=1 claude --permission-mode acceptEdits "$@"
+    claude --permission-mode acceptEdits "$@"
 }
 
 # Toggle auto mode for claude (persisted to ~/.claude/.auto-mode)
@@ -2756,7 +2758,7 @@ function chooks() {
 # session start (omp runs them by design, issue #8678), while the explicit -e
 # keeps jig's guard extension loaded — explicit paths survive --no-extensions.
 # ~/.omp/agent/extensions/jig.ts is the link `jig apply --target omp --write`
-# makes to jig's omp adapter. Escape hatches: YOKI_OMP_ALL_EXTENSIONS=1 for
+# makes to jig's omp adapter. Escape hatches: JIG_OMP_ALL_EXTENSIONS=1 for
 # trusted repos that need their own .omp/ extensions, or `command omp` for
 # the raw binary.
 omp() {
@@ -2775,7 +2777,7 @@ omp() {
         echo "\033[33mproxy key unresolved — starting omp WITHOUT LITELLM_API_KEY (proxy/* models will fail to auth)\033[0m" >&2
     fi
     local guard="${HOME}/.omp/agent/extensions/jig.ts"
-    if [[ "${YOKI_OMP_ALL_EXTENSIONS:-0}" == "1" ]]; then
+    if [[ "${JIG_OMP_ALL_EXTENSIONS:-0}" == "1" ]]; then
         "$omp_bin" "$@"
         return
     fi
