@@ -100,11 +100,15 @@ else
 fi
 
 # --- metrics: the dedicated listener and the Prometheus that scrapes it ------
-# -L: LiteLLM answers /metrics with a 307 to /metrics/ (README "the trailing slash matters").
-if curl -sfL --max-time 5 http://127.0.0.1:4001/metrics 2>/dev/null | grep -q -E '^(# HELP )?litellm_'; then
-  pass "LiteLLM :4001 exposes litellm_* metrics"
+# The dedicated listener's documented probes: /health (no auth) and /metrics/ with the
+# trailing slash (https://docs.litellm.ai/docs/proxy/prometheus). /metrics without the
+# slash is not a contract, and the check that used it failed against a healthy listener
+# (measured 2026-09-23).
+if curl -sf --max-time 5 http://127.0.0.1:4001/health 2>/dev/null | grep -q healthy; then
+  series="$(curl -sf --max-time 5 http://127.0.0.1:4001/metrics/ 2>/dev/null | grep -c '^litellm_')"
+  pass "LiteLLM :4001 metrics listener healthy (${series:-0} litellm_* series)"
 else
-  fail "LiteLLM :4001 metrics listener not answering"
+  fail "LiteLLM :4001 metrics listener not answering /health"
 fi
 if [ "$ROLE" = hub ]; then
   health="$(curl -sf --max-time 5 http://127.0.0.1:9090/api/v1/targets 2>/dev/null | python3 -c '
@@ -117,7 +121,10 @@ for t in json.load(sys.stdin)["data"]["activeTargets"]:
     "") fail "Prometheus :9090 not answering (observability/start.sh)" ;;
     *) fail "Prometheus litellm target: ${health}" ;;
   esac
-  if curl -sf --max-time 5 -o /dev/null http://127.0.0.1:3001/ 2>/dev/null; then pass "Open WebUI :3001 answers"; else fail "Open WebUI :3001 not answering (docker compose --profile webui up -d open-webui)"; fi
+  # A fresh Open WebUI (new data volume) takes tens of seconds to first answer; wait up to 2 min.
+  webui=0
+  for _ in $(seq 1 60); do curl -sf --max-time 2 -o /dev/null http://127.0.0.1:3001/ 2>/dev/null && { webui=1; break; }; sleep 2; done
+  if [ "$webui" = 1 ]; then pass "Open WebUI :3001 answers"; else fail "Open WebUI :3001 not answering within 2 min (docker logs litellm-open-webui)"; fi
 fi
 
 # --- tailnet exposure -------------------------------------------------------
