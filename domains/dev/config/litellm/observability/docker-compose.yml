@@ -59,12 +59,11 @@ services:
     image: grafana/grafana:13.2.2
     container_name: litellm-grafana
     profiles: ["ui"]
-    # `no`, not `unless-stopped`: the decision was Prometheus resident and Grafana
-    # on demand, and a restart policy would quietly turn that into "resident
-    # forever after the first --ui". With `no`, Grafana runs while you asked for
-    # it and comes back only when asked. Change this line to `unless-stopped` if
-    # you would rather it always be there.
-    restart: "no"
+    # `unless-stopped` since 2026-09-24 (owner: "計測の grafana も常に起動して
+    # 欲しい"): Grafana is resident like Prometheus, brought up by
+    # domains/dev/install.sh (`start.sh --ui`) and probed by litellm/check.sh.
+    # Before that it was `no` — on demand, gone after a restart.
+    restart: unless-stopped
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

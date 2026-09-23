@@ -111,16 +111,24 @@ else
   fail "LiteLLM :4001 metrics listener not answering /health"
 fi
 if [ "$ROLE" = hub ]; then
-  health="$(curl -sf --max-time 5 http://127.0.0.1:9090/api/v1/targets 2>/dev/null | python3 -c '
+  # LiteLLM was just restarted by make update; Prometheus's last scrape may have
+  # hit the gap. Give it a few scrape intervals before calling the target down.
+  health=""
+  for _ in $(seq 1 12); do
+    health="$(curl -sf --max-time 5 http://127.0.0.1:9090/api/v1/targets 2>/dev/null | python3 -c '
 import json,sys
 for t in json.load(sys.stdin)["data"]["activeTargets"]:
     if t["labels"].get("job")=="litellm": print(t["health"], t["scrapeUrl"]); break
 ' 2>/dev/null)"
+    case "$health" in up*|"") break ;; esac
+    sleep 5
+  done
   case "$health" in
     up*) pass "Prometheus scrapes litellm: ${health}" ;;
     "") fail "Prometheus :9090 not answering (observability/start.sh)" ;;
     *) fail "Prometheus litellm target: ${health}" ;;
   esac
+  if curl -sf --max-time 5 -o /dev/null http://127.0.0.1:3000/api/health 2>/dev/null; then pass "Grafana :3000 answers (resident since 2026-09-24)"; else fail "Grafana :3000 not answering (observability/start.sh --ui)"; fi
   # A fresh Open WebUI (new data volume) takes tens of seconds to first answer; wait up to 2 min.
   webui=0
   for _ in $(seq 1 60); do curl -sf --max-time 2 -o /dev/null http://127.0.0.1:3001/ 2>/dev/null && { webui=1; break; }; sleep 2; done

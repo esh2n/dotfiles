@@ -365,7 +365,8 @@ home_llm() {
     if [[ "$role" == hub ]]; then
         local obs="${DOTFILES_ROOT}/domains/dev/config/litellm/observability"
         if docker info >/dev/null 2>&1; then
-            bash "${obs}/start.sh" >/dev/null && log_success "Prometheus: up (127.0.0.1:9090)" || hl_todo "observability/start.sh failed"
+            # --ui: Grafana is resident too (owner, 2026-09-24), not on demand.
+            bash "${obs}/start.sh" --ui >/dev/null && log_success "Prometheus + Grafana: up (127.0.0.1:9090, :3000)" || hl_todo "observability/start.sh --ui failed"
             # Open WebUI fronts the LiteLLM tiers; compose reads the proxy key from the environment.
             local proxy_key
             proxy_key="$("${DOTFILES_ROOT}/domains/dev/config/litellm/proxy-key.sh" 2>/dev/null || true)"

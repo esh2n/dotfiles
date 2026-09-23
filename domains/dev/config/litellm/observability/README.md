@@ -258,7 +258,7 @@ when something is firing, so it can be used as a check rather than a read-out.
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | Prometheus (resident) + Grafana (behind the `ui` profile) + Open WebUI (resident, behind the `webui` profile) |
+| `docker-compose.yml` | Prometheus (resident) + Grafana (resident since 2026-09-24, behind the `ui` profile, started by `install.sh` with `start.sh --ui`) + Open WebUI (resident, behind the `webui` profile) |
 | `prometheus/prometheus.yml` | one scrape job against the gateway, 15s |
 | `prometheus/alerts.yml` | the three rules, each with its rationale and its next action |
 | `prometheus/alerts.test.yml` | synthetic-series tests: fires when it should, quiet when a guard applies |
