@@ -30,7 +30,7 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 - omp の無言フォールバックは仕様: `findInitialModel` は「5. first available model」まで落ちる（https://github.com/can1357/oh-my-pi/blob/main/docs/models.md ）。`proxy` を足しても openai-codex の OAuth が omp に残っていれば、proxy が落ちた日はまた黙って gpt-5.5 に行く。**持ち主の手: omp の中で anthropic と openai-codex の認証を消す**（`/logout` 相当）。プロバイダが `proxy` だけなら、落ちたときは「no auth」で止まり、それが正しい失敗の見え方。
 - pi は「No auto-fallback to another provider」が設計方針（https://github.com/earendil-works/pi/pull/8966 ）だが起動レースで 10 回中 4 回別モデルで起動する報告あり（https://github.com/earendil-works/pi/issues/8810 ）。pi の設定は `proxy` 一本なので今の構成では落ち先が無い。
 - 記録: `rules/research/2026-09-23-model-routing-per-harness.md`。
-- 振り分け: pi は `extensions/tier-router.ts` がプロンプトごとに jig の `/tier` に聞いて tier を切り替える。omp には無かったので、jig の omp 拡張に同じものを足した（`adapters/omp/src/tier.ts`、`before_agent_start` → `ctx.setModel("proxy/<tier>")`、`/tier` コマンド）。role 表（`modelRoles`）は omp 自身の機能がどの tier を使うかで、難易度の振り分けはこの判定が担う。
+- 振り分け: 同日夜の裁定 `2026-09-23-tier-fixed-main-subagent-escalation.md` で上書き — セッションは一つの tier に固定（`main`）、`complex` は subagent、`/tier` は人の選択。pi / omp の拡張は保持だけを行い、プロンプトごとの判定は削除。
 - 未実測: omp から `proxy/*` を実際に叩いた結果（compat 設定が要るか — pi は `supportsDeveloperRole: false` / `maxTokensField: max_tokens` を指定している）。
 
 ## Sources

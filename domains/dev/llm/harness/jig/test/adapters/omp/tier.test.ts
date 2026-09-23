@@ -2,11 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { OmpContext } from "../../../adapters/omp/src/omp";
 import {
   activeSelector,
-  askTier,
   createTierRouter,
-  readDecision,
+  initialMode,
   routeTo,
-  serviceBase,
 } from "../../../adapters/omp/src/tier";
 
 /** An omp context whose model registry holds the three proxy tiers and records every switch. */
@@ -18,6 +16,11 @@ function ctxWith(
   const notices: string[] = [];
   const statuses: string[] = [];
   let active = current;
+  // Split on the FIRST slash only: an LM Studio id like `qwen/qwen3.6-35b-a3b` keeps its own slash.
+  const split = (spec: string) => {
+    const slash = spec.indexOf("/");
+    return { provider: spec.slice(0, slash), id: spec.slice(slash + 1) };
+  };
   const ctx: OmpContext = {
     cwd: "/work",
     hasUI: true,
@@ -30,16 +33,8 @@ function ctxWith(
       },
     },
     models: {
-      // Split on the FIRST slash only: an LM Studio id like `qwen/qwen3.6-35b-a3b` keeps its own slash.
-      current: () => {
-        const slash = active.indexOf("/");
-        return { provider: active.slice(0, slash), id: active.slice(slash + 1) };
-      },
-      resolve: (spec) => {
-        if (!registry.includes(spec)) return undefined;
-        const slash = spec.indexOf("/");
-        return { provider: spec.slice(0, slash), id: spec.slice(slash + 1) };
-      },
+      current: () => split(active),
+      resolve: (spec) => (registry.includes(spec) ? split(spec) : undefined),
     },
     setModel: async (spec) => {
       switches.push(String(spec));
@@ -49,75 +44,12 @@ function ctxWith(
   return { ctx, switches, notices, statuses, active: () => active };
 }
 
-/** A `fetch` that answers `/tier` with one fixed body. */
-function tierService(body: unknown, status = 200): typeof fetch {
-  return (async (input: string | URL | Request) => {
-    const url = String(input);
-    if (!url.endsWith("/tier")) throw new Error(`unexpected url ${url}`);
-    return new Response(JSON.stringify(body), {
-      status,
-      headers: { "content-type": "application/json" },
-    });
-  }) as typeof fetch;
-}
-
-describe("readDecision (the same contract pi's tier-router reads)", () => {
-  test("a valid reply keeps tier, confidence and source", () => {
-    expect(readDecision({ tier: "complex", confidence: 0.87, source: "decided" })).toEqual({
-      tier: "complex",
-      confidence: 0.87,
-      source: "decided",
-    });
-  });
-  test("missing confidence is 0 and anything but 'decided' is a fallback", () => {
-    expect(readDecision({ tier: "main", source: "guessed" })).toEqual({
-      tier: "main",
-      confidence: 0,
-      source: "fallback",
-    });
-  });
-  test("no tier → the service's error message, or a generic one", () => {
-    expect(() => readDecision({ error: { message: "no judgment available" } })).toThrow(
-      "no judgment available",
-    );
-    expect(() => readDecision({ tier: "bogus" })).toThrow(/no tier in the reply/);
-    expect(() => readDecision(null)).toThrow("tier service replied with no body");
-  });
-});
-
-describe("serviceBase", () => {
-  test("strips an endpoint suffix and a trailing slash", () => {
-    expect(serviceBase({ JIG_DECISION_URL: "http://127.0.0.1:4100/tier" })).toBe(
-      "http://127.0.0.1:4100",
-    );
-    expect(serviceBase({ JIG_DECISION_URL: "http://h:1/" })).toBe("http://h:1");
-    expect(serviceBase({})).toBe("http://127.0.0.1:4100");
-  });
-});
-
-describe("askTier", () => {
-  test("posts the prompt as omp's request and reads the decision", async () => {
-    let sent: unknown;
-    const doFetch = (async (_input: string | URL | Request, init?: RequestInit) => {
-      sent = JSON.parse(String(init?.body));
-      return new Response(
-        JSON.stringify({ tier: "deterministic", confidence: 0.9, source: "decided" }),
-      );
-    }) as typeof fetch;
-    const decision = await askTier("sort this list", 1000, {
-      env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" },
-      fetch: doFetch,
-    });
-    expect(sent).toEqual({ harness: "omp", request: "sort this list" });
-    expect(decision.tier).toBe("deterministic");
-  });
-  test("a 404 names the missing endpoint", async () => {
-    await expect(
-      askTier("x", 1000, {
-        env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" },
-        fetch: tierService({}, 404),
-      }),
-    ).rejects.toThrow(/no \/tier endpoint/);
+describe("initialMode (the session's tier at launch)", () => {
+  test("main unless OMP_TIER names another tier; off stops enforcing; nothing is ever automatic", () => {
+    expect(initialMode({})).toBe("main");
+    expect(initialMode({ OMP_TIER: "complex" })).toBe("complex");
+    expect(initialMode({ OMP_TIER: "off" })).toBe("off");
+    expect(initialMode({ OMP_TIER: "auto" })).toBe("main");
   });
 });
 
@@ -158,117 +90,65 @@ describe("routeTo", () => {
   });
 });
 
-describe("the router at session start", () => {
+describe("the session tier is held, never judged", () => {
   test("a session that opens on a direct provider is moved to proxy/main", async () => {
-    const router = createTierRouter({ env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
+    const router = createTierRouter({ env: {} });
     const { ctx, switches, notices } = ctxWith("lm-studio/qwen/qwen3.6-35b-a3b");
     await router.onSessionStart(ctx);
     expect(switches).toEqual(["proxy/main"]);
-    expect(notices.at(-1)).toMatch(/lm-studio\/qwen\/qwen3.6-35b-a3b is not a proxy tier — switched to proxy\/main/);
+    expect(notices.at(-1)).toMatch(
+      /lm-studio\/qwen\/qwen3.6-35b-a3b → proxy\/main \(session start/,
+    );
   });
-  test("a session already on a proxy tier is left where it is", async () => {
-    const router = createTierRouter({ env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
-    const { ctx, switches } = ctxWith("proxy/complex");
+  test("a session already on its tier is left alone, silently", async () => {
+    const router = createTierRouter({ env: {} });
+    const { ctx, switches, notices } = ctxWith("proxy/main");
     await router.onSessionStart(ctx);
-    expect(switches).toEqual([]);
-  });
-  test("a forced tier is applied at session start; off does nothing", async () => {
-    const forced = createTierRouter({ env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
-    const a = ctxWith("proxy/main");
-    await forced.onCommand("deterministic", a.ctx);
-    const b = ctxWith("lm-studio/qwen");
-    await forced.onSessionStart(b.ctx);
-    expect(b.switches).toEqual(["proxy/deterministic"]);
-
-    const off = createTierRouter({ env: { OMP_TIER_ROUTER: "off", JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
-    const c = ctxWith("lm-studio/qwen");
-    await off.onSessionStart(c.ctx);
-    expect(c.switches).toEqual([]);
-  });
-});
-
-describe("the router on a prompt", () => {
-  test("auto: judges the prompt and switches to the tier that came back", async () => {
-    const router = createTierRouter({
-      env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" },
-      fetch: tierService({ tier: "complex", confidence: 0.81, source: "decided" }),
-    });
-    const { ctx, switches, statuses } = ctxWith("proxy/main");
     await router.onPrompt({ prompt: "design the auth flow" }, ctx);
-    expect(switches).toEqual(["proxy/complex"]);
-    expect(statuses.at(-1)).toBe("tier: complex (0.81)");
-  });
-  test("slash commands and empty prompts are not judged", async () => {
-    let calls = 0;
-    const router = createTierRouter({
-      env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" },
-      fetch: (async (_input: string | URL | Request) => {
-        calls += 1;
-        return new Response(JSON.stringify({ tier: "main" }));
-      }) as typeof fetch,
-    });
-    const { ctx } = ctxWith("proxy/main");
-    await router.onPrompt({ prompt: "/help" }, ctx);
-    await router.onPrompt({ prompt: "   " }, ctx);
-    expect(calls).toBe(0);
-  });
-  test("an unreachable service keeps the current model and says so once", async () => {
-    const router = createTierRouter({
-      env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" },
-      fetch: (async (_input: string | URL | Request): Promise<Response> => {
-        throw new Error("ECONNREFUSED");
-      }) as typeof fetch,
-    });
-    const { ctx, switches, notices, statuses } = ctxWith("proxy/main");
-    await router.onPrompt({ prompt: "hello" }, ctx);
-    await router.onPrompt({ prompt: "hello again" }, ctx);
+    await router.onPrompt({ prompt: "sort this list" }, ctx);
     expect(switches).toEqual([]);
-    expect(notices.filter((n) => n.includes("unavailable"))).toHaveLength(1);
-    expect(statuses.at(-1)).toBe("tier: judgment unavailable");
+    expect(notices).toEqual([]);
   });
-  test("an unreachable service still pulls a direct-provider session back to proxy/main", async () => {
-    const router = createTierRouter({
-      env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" },
-      fetch: (async (_input: string | URL | Request): Promise<Response> => {
-        throw new Error("ECONNREFUSED");
-      }) as typeof fetch,
-    });
+  test("a /model pick of a direct provider is put back before the next prompt", async () => {
+    const router = createTierRouter({ env: {} });
+    const state = ctxWith("proxy/main");
+    await state.ctx.setModel?.("openai-codex/gpt-5.5");
+    await router.onPrompt({ prompt: "hello" }, state.ctx);
+    expect(state.active()).toBe("proxy/main");
+  });
+  test("slash commands are not a reason to touch the model", async () => {
+    const router = createTierRouter({ env: {} });
     const { ctx, switches } = ctxWith("lm-studio/qwen");
-    await router.onPrompt({ prompt: "hello" }, ctx);
-    expect(switches).toEqual(["proxy/main"]);
+    await router.onPrompt({ prompt: "/help" }, ctx);
+    expect(switches).toEqual([]);
   });
-  test("OMP_TIER_ROUTER=off starts off; /tier auto turns it on; a forced tier stops judging", async () => {
-    let calls = 0;
-    const router = createTierRouter({
-      env: { OMP_TIER_ROUTER: "off", JIG_DECISION_TOKEN_FILE: "/nonexistent" },
-      fetch: (async (_input: string | URL | Request) => {
-        calls += 1;
-        return new Response(
-          JSON.stringify({ tier: "complex", confidence: 0.9, source: "decided" }),
-        );
-      }) as typeof fetch,
-    });
-    const { ctx, switches } = ctxWith("proxy/main");
+  test("/tier <tier> changes the session's tier and holds it from then on", async () => {
+    const router = createTierRouter({ env: {} });
+    const state = ctxWith("proxy/main");
+    await router.onCommand("complex", state.ctx);
+    expect(router.mode()).toBe("complex");
+    expect(state.active()).toBe("proxy/complex");
+    await state.ctx.setModel?.("proxy/main");
+    await router.onPrompt({ prompt: "x" }, state.ctx);
+    expect(state.active()).toBe("proxy/complex");
+  });
+  test("/tier off stops enforcing; /tier with an unknown word is refused", async () => {
+    const router = createTierRouter({ env: {} });
+    const state = ctxWith("proxy/main");
+    await router.onCommand("off", state.ctx);
+    await state.ctx.setModel?.("lm-studio/qwen");
+    await router.onPrompt({ prompt: "x" }, state.ctx);
+    expect(state.active()).toBe("lm-studio/qwen");
+
+    await router.onCommand("auto", state.ctx);
+    expect(state.notices.at(-1)).toMatch(/unknown tier "auto"/);
     expect(router.mode()).toBe("off");
-    await router.onPrompt({ prompt: "x" }, ctx);
-    expect(calls).toBe(0);
-
-    await router.onCommand("auto", ctx);
-    await router.onPrompt({ prompt: "x" }, ctx);
-    expect(calls).toBe(1);
-    expect(switches).toEqual(["proxy/complex"]);
-
-    await router.onCommand("deterministic", ctx);
-    expect(router.mode()).toBe("deterministic");
-    await router.onPrompt({ prompt: "y" }, ctx);
-    expect(calls).toBe(1);
-    expect(switches.at(-1)).toBe("proxy/deterministic");
   });
-  test("/tier with an unknown word is refused with the choices", async () => {
-    const router = createTierRouter({ env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
-    const { ctx, notices } = ctxWith("proxy/main");
-    await router.onCommand("turbo", ctx);
-    expect(notices.at(-1)).toMatch(/unknown mode "turbo"/);
-    expect(router.mode()).toBe("auto");
+  test("a tier omp cannot resolve is reported and the turn goes on", async () => {
+    const router = createTierRouter({ env: {} });
+    const { ctx, notices, statuses } = ctxWith("lm-studio/qwen", []);
+    await router.onSessionStart(ctx);
+    expect(notices.at(-1)).toMatch(/no model proxy\/main in omp's registry/);
+    expect(statuses.at(-1)).toBe("tier: not on a tier");
   });
 });

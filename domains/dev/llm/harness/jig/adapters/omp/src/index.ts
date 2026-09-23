@@ -4,9 +4,9 @@
  *
  *   tool_call          → the guard (`guard.ts`), the enforcement point
  *   session_start      → the session's model, recorded (`session.ts`)
- *   before_agent_start → the tier judgment: which LiteLLM tier this prompt
- *                        needs, and the model switch (`tier.ts`) — omp's
- *                        prompt-submit event; the same judgment pi runs
+ *   before_agent_start → hold the session on its LiteLLM tier (`tier.ts`):
+ *                        never a judgment, never automatic — the ruling
+ *                        `2026-09-23-tier-fixed-main-subagent-escalation.md`
  *   tool_result        → format the edited file, silently (`format.ts`)
  *   session_stop       → typecheck/lint once, capped (`gate.ts`)
  *
@@ -30,7 +30,7 @@ import { recordSession } from "./session";
 import { createTierRouter } from "./tier";
 
 export { guardToolCall } from "./guard";
-export { activeSelector, askTier, createTierRouter, onProxyTier, readDecision, routeTo } from "./tier";
+export { activeSelector, createTierRouter, initialMode, routeTo } from "./tier";
 export { formatOnResult, formatPlanFor, formatterFor, projectRoot } from "./format";
 export {
   MAX_CONTINUATIONS,
@@ -64,7 +64,7 @@ export default function (pi: OmpExtensionApi): void {
     return undefined;
   });
   pi.registerCommand?.("tier", {
-    description: "Model routing: /tier [auto|off|main|complex|deterministic]",
+    description: "Session tier: /tier [main|complex|deterministic|off] — fixed for the session, never automatic",
     handler: (args, ctx) => tier.onCommand(args, ctx),
   });
 

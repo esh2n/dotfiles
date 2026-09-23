@@ -7,15 +7,14 @@ One omp extension carrying the five hooks
 |---|---|---|
 | `tool_call` | the guard — the enforcement point | `src/guard.ts` |
 | `session_start` | the session's model, written to `sessions.jsonl` | `src/session.ts` |
-| `before_agent_start` | the tier judgment: the prompt goes to jig's `/tier`, the tier that comes back (`proxy/main` / `proxy/complex` / `proxy/deterministic`, `rules/decisions/2026-09-23-model-routing-per-harness.md`) becomes the session model via `ctx.setModel`; `/tier [auto\|off\|<tier>]`; `OMP_TIER_ROUTER=off`, `OMP_TIER_PROVIDER`, `OMP_TIER_TIMEOUT_MS` | `src/tier.ts` |
+| `before_agent_start` | hold the session on its LiteLLM tier (`proxy/main` unless `/tier` or `OMP_TIER` picked another): put the model back when omp's startup order or a `/model` pick landed on a direct provider — never a judgment, never automatic (`rules/decisions/2026-09-23-tier-fixed-main-subagent-escalation.md`); the same hold runs at `session_start` | `src/tier.ts` |
 | `tool_result` | format the edited file, silently — the project's lefthook / pre-commit first, jig's table only without one | `src/format.ts` |
 | `session_stop` | the project's hooks on the touched files, else typecheck/lint; once, capped at 2 continuations | `src/gate.ts` |
 
 Skill selection at prompt submit stays Claude Code's; omp's prompt-submit
-slot carries the tier router instead — the same judgment pi's
-`extensions/tier-router.ts` asks, so the two harnesses never hold two
-wordings of one question. Without it every omp prompt runs on
-`modelRoles.default` and the escalation tier is never reached.
+slot only holds the session's tier. A stronger model is reached through a
+subagent whose `model:` maps to `proxy/complex` (`agents/models.json`), the
+same shape pi's `extensions/tier-router.ts` now has.
 
 ## The tool table
 

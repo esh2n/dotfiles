@@ -1,49 +1,26 @@
 import { describe, expect, test } from "bun:test";
-import { readDecision } from "../tier-router";
+import { initialMode, isTier } from "../tier-router";
 
-describe("readDecision", () => {
-  test("a valid tier reply is read with its confidence and source", () => {
-    const decision = readDecision({ tier: "complex", confidence: 0.87, source: "decided" });
-    expect(decision).toEqual({ tier: "complex", confidence: 0.87, source: "decided" });
+describe("isTier", () => {
+  test("accepts the three LiteLLM tiers and nothing else", () => {
+    expect(isTier("main")).toBe(true);
+    expect(isTier("complex")).toBe(true);
+    expect(isTier("deterministic")).toBe(true);
+    expect(isTier("auto")).toBe(false);
+    expect(isTier("")).toBe(false);
+    expect(isTier(undefined)).toBe(false);
   });
+});
 
-  test("confidence defaults to 0 when missing or the wrong type", () => {
-    expect(readDecision({ tier: "main" })).toEqual({
-      tier: "main",
-      confidence: 0,
-      source: "fallback",
-    });
-    expect(readDecision({ tier: "main", confidence: "high" })).toEqual({
-      tier: "main",
-      confidence: 0,
-      source: "fallback",
-    });
+describe("initialMode (the session's tier at launch)", () => {
+  test("main unless PI_TIER names another tier", () => {
+    expect(initialMode({})).toBe("main");
+    expect(initialMode({ PI_TIER: "complex" })).toBe("complex");
+    expect(initialMode({ PI_TIER: "deterministic" })).toBe("deterministic");
   });
-
-  test("source defaults to fallback for anything but the literal 'decided'", () => {
-    expect(readDecision({ tier: "main", source: "guessed" })).toEqual({
-      tier: "main",
-      confidence: 0,
-      source: "fallback",
-    });
-  });
-
-  test("an invalid tier throws, quoting the error message from an error-shaped body", () => {
-    expect(() => readDecision({ error: { message: "no judgment available" } })).toThrow(
-      "no judgment available",
-    );
-  });
-
-  test("an invalid tier with no error body throws a generic message", () => {
-    expect(() => readDecision({ tier: "bogus-tier" })).toThrow(/no tier in the reply/);
-  });
-
-  test("a non-object body throws", () => {
-    expect(() => readDecision(null)).toThrow("tier service replied with no body");
-    expect(() => readDecision("nope")).toThrow("tier service replied with no body");
-  });
-
-  test("a malformed error body (not an object) falls back to the generic message", () => {
-    expect(() => readDecision({ error: "boom" })).toThrow(/no tier in the reply/);
+  test("off stops enforcing; an unknown value falls back to main, never to automatic routing", () => {
+    expect(initialMode({ PI_TIER: "off" })).toBe("off");
+    expect(initialMode({ PI_TIER: "auto" })).toBe("main");
+    expect(initialMode({ PI_TIER: "turbo" })).toBe("main");
   });
 });

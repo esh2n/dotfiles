@@ -94,9 +94,9 @@ print(" ".join(sorted(set(walk(json.load(sys.stdin))))))
   esac
 fi
 if curl -sf --max-time 3 -o /dev/null http://127.0.0.1:4100/health 2>/dev/null; then
-  pass "jig decision service :4100 answers (tier routing for pi/omp)"
+  pass "jig decision service :4100 answers (skill selection)"
 else
-  fail "jig decision service :4100 not answering — tier routing falls back to the current model (launchctl print gui/\$(id -u)/com.esh2n.jig-decision)"
+  fail "jig decision service :4100 not answering — skill selection is off until it is (launchctl print gui/\$(id -u)/com.esh2n.jig-decision)"
 fi
 
 # --- metrics: the dedicated listener and the Prometheus that scrapes it ------
