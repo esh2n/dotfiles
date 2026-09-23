@@ -27,6 +27,20 @@
 export interface OmpUi {
   confirm?(title: string, message: string): Promise<boolean>;
   notify?(message: string, level?: string): void;
+  /** docs/extensions.md: `setStatus(message: string): void`, fire-and-forget. */
+  setStatus?(message: string): void;
+}
+
+/** omp's `Model`, the two fields the tier router compares. */
+export interface OmpModel {
+  readonly id?: string;
+  readonly provider?: string;
+}
+
+/** `ctx.models` (docs/extensions.md): `current()` is the live session model, `resolve(spec)` a `Model | undefined`. */
+export interface OmpModels {
+  current?(): OmpModel | undefined;
+  resolve?(spec: string): OmpModel | undefined;
 }
 
 /** `ReadonlySessionManager`, the one method read. */
@@ -44,7 +58,23 @@ export interface OmpContext {
   readonly ui?: OmpUi;
   readonly sessionManager?: OmpSessionManager;
   readonly model?: string | { readonly id?: string } | undefined;
+  /** `ctx.models`, present from the builds that document it; the tier router checks before use. */
+  readonly models?: OmpModels;
+  /** `setModel(spec: string | string[]): Promise<void>` — `provider/modelId`, a bare id, or a `@role` alias. */
+  readonly setModel?: (spec: string | readonly string[]) => Promise<void>;
 }
+
+/** `ExtensionCommandContext`: what a slash-command handler receives; the same members this adapter reads from `OmpContext`. */
+export type OmpCommandContext = OmpContext;
+
+/** `before_agent_start`: `prompt` is the joined, already-transformed text of the selected user messages. */
+export interface OmpBeforeAgentStartEvent {
+  readonly prompt?: string;
+  readonly images?: readonly unknown[];
+}
+
+/** `{override?, customMessages?, cancel?}` — the router returns nothing: it never rewrites or cancels a turn. */
+export type OmpBeforeAgentStartResult = Record<string, never>;
 
 /** `ToolCallEvent`: `{type, toolCallId, toolName, input}`. */
 export interface OmpToolCallEvent {
@@ -107,12 +137,21 @@ export interface OmpSessionStopResult {
 
 type Handler<E, R> = (event: E, ctx: OmpContext) => Promise<R | undefined> | R | undefined;
 
-/** `ExtensionAPI`, the four subscriptions this extension makes. */
+/** `ExtensionAPI`, the five subscriptions and the one command this extension registers. */
 export interface OmpExtensionApi {
   on(event: "session_start", handler: Handler<{ readonly type?: string }, void>): void;
+  on(event: "before_agent_start", handler: Handler<OmpBeforeAgentStartEvent, OmpBeforeAgentStartResult>): void;
   on(event: "tool_call", handler: Handler<OmpToolCallEvent, OmpToolCallResult>): void;
   on(event: "tool_result", handler: Handler<OmpToolResultEvent, OmpToolResultResult>): void;
   on(event: "session_stop", handler: Handler<OmpSessionStopEvent, OmpSessionStopResult>): void;
+  /** `registerCommand(name, {description, handler(args, ctx)})` — optional: older builds without it just get no `/tier`. */
+  registerCommand?(
+    name: string,
+    command: {
+      readonly description: string;
+      readonly handler: (args: string, ctx: OmpCommandContext) => Promise<void> | void;
+    },
+  ): void;
 }
 
 /** omp's `Model | string` unwrapped to the id jig records and audits. */

@@ -1,17 +1,21 @@
 # jig's omp (oh-my-pi) adapter
 
-One omp extension carrying four of the five hooks
+One omp extension carrying the five hooks
 `rules/decisions/2026-09-22-hooks-five-events.md` allows, one per event:
 
 | omp event | what runs | file |
 |---|---|---|
 | `tool_call` | the guard — the enforcement point | `src/guard.ts` |
 | `session_start` | the session's model, written to `sessions.jsonl` | `src/session.ts` |
+| `before_agent_start` | the tier judgment: the prompt goes to jig's `/tier`, the tier that comes back (`proxy/main` / `proxy/complex` / `proxy/deterministic`, `rules/decisions/2026-09-23-model-routing-per-harness.md`) becomes the session model via `ctx.setModel`; `/tier [auto\|off\|<tier>]`; `OMP_TIER_ROUTER=off`, `OMP_TIER_PROVIDER`, `OMP_TIER_TIMEOUT_MS` | `src/tier.ts` |
 | `tool_result` | format the edited file, silently — the project's lefthook / pre-commit first, jig's table only without one | `src/format.ts` |
 | `session_stop` | the project's hooks on the touched files, else typecheck/lint; once, capped at 2 continuations | `src/gate.ts` |
 
-The fifth (skill selection at prompt submit) is Claude Code's; no router
-lives here — the same decision retired it.
+Skill selection at prompt submit stays Claude Code's; omp's prompt-submit
+slot carries the tier router instead — the same judgment pi's
+`extensions/tier-router.ts` asks, so the two harnesses never hold two
+wordings of one question. Without it every omp prompt runs on
+`modelRoles.default` and the escalation tier is never reached.
 
 ## The tool table
 
