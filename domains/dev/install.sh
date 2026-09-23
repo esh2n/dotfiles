@@ -389,6 +389,10 @@ home_llm() {
     # the page unreachable because the phone had never joined.)
     if [[ "$role" == hub ]]; then
         hl_todo "phone: install the Tailscale app, log in with the same account, switch it on — it must appear in 'tailscale status' — then open https://$(printf '%s' "${ts_json:-}" | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1):3001 and create the first (admin) account"
+        # Steering sessions from the phone: Orca's companion, paired by code,
+        # direct over the tailnet (rules/decisions/2026-09-23-phone-steers-
+        # sessions-via-orca-companion.md). Pairing is a one-time GUI step.
+        hl_todo "phone: install the Orca app, then in Orca on this Mac generate a pairing code and paste it into the app; choose the direct (LAN/Tailscale) path, not Orca Relay (https://onorca.dev/docs/mobile)"
     fi
 
     # Does it actually answer? One real completion per tier and the plumbing
