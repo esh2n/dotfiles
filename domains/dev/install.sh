@@ -377,6 +377,11 @@ home_llm() {
     # `make tailscale-acl` renders acl.hujson with this tailnet's login + IP
     # into the clipboard and opens the page (domains/dev/config/tailscale/).
     hl_todo "tailnet policy (once per tailnet, and after editing acl.hujson): make tailscale-acl, then paste + Save"
+
+    # Does it actually answer? One real completion per tier and the plumbing
+    # around it (litellm/check.sh) — the only proof that is not a log line.
+    echo ""
+    bash "${DOTFILES_ROOT}/domains/dev/config/litellm/check.sh" || hl_todo "home-llm check reported $? failing line(s) above — fix those, then make update"
 }
 
 home_llm

@@ -424,8 +424,15 @@ link_omp_resources() {
 
     ensure_dir "$omp_home"
 
+    # config.yml is the template pass's render of config.yml.template (git-
+    # ignored, next to the template). Until 2026-09-23 only models.yml and
+    # lsp.yml were linked, so ~/.omp/agent/config.yml was a stale copy that no
+    # `make update` ever refreshed — the modelRoles ruling never reached omp.
+    # Linking the render makes the template the one source; omp's own writes
+    # (it keeps config.yml.lock beside it) land in the render until the next
+    # template pass, the same ownership pi's settings.json has.
     local f
-    for f in models.yml lsp.yml; do
+    for f in config.yml models.yml lsp.yml; do
         [[ -f "${src_dir}/${f}" ]] && link_file "${src_dir}/${f}" "${omp_home}/${f}"
     done
 
