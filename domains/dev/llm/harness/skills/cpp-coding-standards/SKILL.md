@@ -4,6 +4,7 @@ description: C++ coding standards based on the C++ Core Guidelines (isocpp.githu
 metadata:
   namespaces: [lang/cpp]
   origin: ECC
+  folded: rules/cpp (2026-09-23)
 ---
 
 # C++ Coding Standards (C++ Core Guidelines)
@@ -723,3 +724,59 @@ Before marking C++ work complete:
 - [ ] Exceptions are custom types, thrown by value, caught by reference (E.14, E.15)
 - [ ] `'\n'` instead of `std::endl` (SL.io.50)
 - [ ] No magic numbers (ES.45)
+
+## Folded from rules/cpp (2026-09-23)
+
+### Coding style
+
+#### Naming Conventions
+
+- Types/Classes: `PascalCase`
+- Functions/Methods: `snake_case` or `camelCase` (follow project convention)
+- Constants: `kPascalCase` or `UPPER_SNAKE_CASE`
+- Namespaces: `lowercase`
+- Member variables: `snake_case_` (trailing underscore) or `m_` prefix
+
+#### Formatting
+
+- Use **clang-format** — no style debates
+- Run `clang-format -i <file>` before committing
+
+### Patterns
+
+#### Error Handling: Optional and Expected Results
+
+- Use `std::optional` for values that may not exist
+- Use `std::expected` (C++23) or result types for expected failures
+
+### Security
+
+#### Casts
+
+- Avoid `reinterpret_cast` unless absolutely necessary
+
+#### Buffer Overflows
+
+- Use `std::string` over `char*`
+- Use `.at()` for bounds-checked access when safety matters
+- Never use `strcpy`, `strcat`, `sprintf` — use `std::string` or `fmt::format`
+
+#### Undefined Behavior
+
+- Avoid signed integer overflow
+- Never dereference null or dangling pointers
+- Use sanitizers in CI:
+  ```bash
+  cmake -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined" ..
+  ```
+
+#### Static Analysis
+
+- Use **clang-tidy** for automated checks:
+  ```bash
+  clang-tidy --checks='*' src/*.cpp
+  ```
+- Use **cppcheck** for additional analysis:
+  ```bash
+  cppcheck --enable=all src/
+  ```

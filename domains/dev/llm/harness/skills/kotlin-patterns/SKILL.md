@@ -4,6 +4,7 @@ description: Idiomatic Kotlin patterns, best practices, and conventions for buil
 metadata:
   namespaces: [lang/jvm]
   origin: ECC
+  folded: rules/kotlin (2026-09-23)
 ---
 
 # Kotlin Development Patterns
@@ -711,3 +712,200 @@ user?.address?.city?.let { process(it) }
 ```
 
 **Remember**: Kotlin code should be concise but readable. Leverage the type system for safety, prefer immutability, and use coroutines for concurrency. When in doubt, let the compiler help you.
+
+## Folded from rules/kotlin (2026-09-23)
+
+### Coding style
+
+- **Formatting**: use **ktlint** or **Detekt** for style enforcement; set `kotlin.code.style=official` in `gradle.properties`
+- **Naming**: `camelCase` for functions/properties, `PascalCase` for classes/interfaces/objects/type aliases, `SCREAMING_SNAKE_CASE` for constants (`const val` or `@JvmStatic`); prefix interfaces with behavior, not `I` — `Clickable`, not `IClickable`
+- Use `requireNotNull()` / `checkNotNull()` (not just `?:`) when a null value should fail fast with a message
+- Always use exhaustive `when` with sealed types — no `else` branch
+- Place extension functions in a file named after the receiver type (`StringExt.kt`, `FlowExt.kt`); keep scope limited — don't add extensions to `Any` or overly generic types
+- Never catch `CancellationException` — always rethrow it
+
+### Patterns
+
+#### Dependency Injection
+
+Prefer constructor injection. Use Koin (KMP) or Hilt (Android-only):
+
+```kotlin
+// Koin — declare modules
+val dataModule = module {
+    single<ItemRepository> { ItemRepositoryImpl(get(), get()) }
+    factory { GetItemsUseCase(get()) }
+    viewModelOf(::ItemListViewModel)
+}
+
+// Hilt — annotations
+@HiltViewModel
+class ItemListViewModel @Inject constructor(
+    private val getItems: GetItemsUseCase
+) : ViewModel()
+```
+
+#### ViewModel Pattern
+
+Single state object, event sink, one-way data flow:
+
+```kotlin
+data class ScreenState(
+    val items: List<Item> = emptyList(),
+    val isLoading: Boolean = false
+)
+
+class ScreenViewModel(private val useCase: GetItemsUseCase) : ViewModel() {
+    private val _state = MutableStateFlow(ScreenState())
+    val state = _state.asStateFlow()
+
+    fun onEvent(event: ScreenEvent) {
+        when (event) {
+            is ScreenEvent.Load -> load()
+            is ScreenEvent.Delete -> delete(event.id)
+        }
+    }
+}
+```
+
+#### Repository Pattern
+
+- `suspend` functions return `Result<T>` or custom error type
+- `Flow` for reactive streams
+- Coordinate local + remote data sources
+
+```kotlin
+interface ItemRepository {
+    suspend fun getById(id: String): Result<Item>
+    suspend fun getAll(): Result<List<Item>>
+    fun observeAll(): Flow<List<Item>>
+}
+```
+
+#### UseCase Pattern
+
+Single responsibility, `operator fun invoke`:
+
+```kotlin
+class GetItemUseCase(private val repository: ItemRepository) {
+    suspend operator fun invoke(id: String): Result<Item> {
+        return repository.getById(id)
+    }
+}
+
+class GetItemsUseCase(private val repository: ItemRepository) {
+    suspend operator fun invoke(): Result<List<Item>> {
+        return repository.getAll()
+    }
+}
+```
+
+#### expect/actual (KMP)
+
+Use for platform-specific implementations:
+
+```kotlin
+// commonMain
+expect fun platformName(): String
+expect class SecureStorage {
+    fun save(key: String, value: String)
+    fun get(key: String): String?
+}
+
+// androidMain
+actual fun platformName(): String = "Android"
+actual class SecureStorage {
+    actual fun save(key: String, value: String) { /* EncryptedSharedPreferences */ }
+    actual fun get(key: String): String? = null /* ... */
+}
+
+// iosMain
+actual fun platformName(): String = "iOS"
+actual class SecureStorage {
+    actual fun save(key: String, value: String) { /* Keychain */ }
+    actual fun get(key: String): String? = null /* ... */
+}
+```
+
+#### Coroutine Patterns (additional)
+
+- Use `viewModelScope` in ViewModels, `coroutineScope` for structured child work
+- Use `stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), initialValue)` for a `StateFlow` derived from a cold `Flow`
+
+### Security
+
+Android/KMP-specific security guidance (see also skill `security-review` for general checklists).
+
+#### Secrets Management
+
+- Never hardcode API keys, tokens, or credentials in source code
+- Use `local.properties` (git-ignored) for local development secrets
+- Use `BuildConfig` fields generated from CI secrets for release builds
+- Use `EncryptedSharedPreferences` (Android) or Keychain (iOS) for runtime secret storage
+
+```kotlin
+// BAD
+val apiKey = "sk-abc123..."
+
+// GOOD — from BuildConfig (generated at build time)
+val apiKey = BuildConfig.API_KEY
+
+// GOOD — from secure storage at runtime
+val token = secureStorage.get("auth_token")
+```
+
+#### Network Security
+
+- Use HTTPS exclusively — configure `network_security_config.xml` to block cleartext
+- Pin certificates for sensitive endpoints using OkHttp `CertificatePinner` or Ktor equivalent
+- Set timeouts on all HTTP clients — never leave defaults (which may be infinite)
+- Validate and sanitize all server responses before use
+
+```xml
+<!-- res/xml/network_security_config.xml -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
+```
+
+#### Input Validation
+
+- Validate all user input before processing or sending to API
+- Use parameterized queries for Room/SQLDelight — never concatenate user input into SQL
+- Sanitize file paths from user input to prevent path traversal
+
+```kotlin
+// BAD — SQL injection
+@Query("SELECT * FROM items WHERE name = '$input'")
+
+// GOOD — parameterized
+@Query("SELECT * FROM items WHERE name = :input")
+fun findByName(input: String): List<ItemEntity>
+```
+
+#### Data Protection
+
+- Use `EncryptedSharedPreferences` for sensitive key-value data on Android
+- Use `@Serializable` with explicit field names — don't leak internal property names
+- Clear sensitive data from memory when no longer needed
+- Use `@Keep` or ProGuard rules for serialized classes to prevent name mangling
+
+#### Authentication
+
+- Store tokens in secure storage, not in plain SharedPreferences
+- Implement token refresh with proper 401/403 handling
+- Clear all auth state on logout (tokens, cached user data, cookies)
+- Use biometric authentication (`BiometricPrompt`) for sensitive operations
+
+#### ProGuard / R8
+
+- Keep rules for all serialized models (`@Serializable`, Gson, Moshi)
+- Keep rules for reflection-based libraries (Koin, Retrofit)
+- Test release builds — obfuscation can break serialization silently
+
+#### WebView Security
+
+- Disable JavaScript unless explicitly needed: `settings.javaScriptEnabled = false`
+- Validate URLs before loading in WebView
+- Never expose `@JavascriptInterface` methods that access sensitive data
+- Use `WebViewClient.shouldOverrideUrlLoading()` to control navigation

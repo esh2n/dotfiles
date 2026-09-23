@@ -4,6 +4,7 @@ description: Idiomatic Go patterns, best practices, and conventions for building
 metadata:
   namespaces: [lang/go]
   origin: ECC
+  folded: rules/golang (2026-09-23)
 ---
 
 # Go Development Patterns
@@ -508,3 +509,32 @@ go mod tidy -v        # sync go.mod/go.sum with imports
 | Build works locally, fails in CI | Check `go.mod` `go` directive vs CI toolchain; `GOFLAGS`/`GOWORK` env |
 
 Fix order: build errors → `go vet` → linters. One fix at a time, re-run the build after each.
+
+## Folded from rules/golang (2026-09-23)
+
+### Security
+
+#### Secret Management
+
+```go
+apiKey := os.Getenv("OPENAI_API_KEY")
+if apiKey == "" {
+    log.Fatal("OPENAI_API_KEY not configured")
+}
+```
+
+#### Security Scanning
+
+- Use **gosec** for static security analysis:
+  ```bash
+  gosec ./...
+  ```
+
+#### Context & Timeouts
+
+Always use `context.Context` for timeout control:
+
+```go
+ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+```

@@ -4,6 +4,7 @@ description: Perl testing patterns using Test2::V0, Test::More, prove runner, mo
 metadata:
   namespaces: [lang/perl, practice]
   origin: ECC
+  folded: rules/perl (2026-09-23)
 ---
 
 # Perl Testing Patterns

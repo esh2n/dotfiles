@@ -4,6 +4,7 @@ description: Kotlin testing patterns with Kotest, MockK, coroutine testing, prop
 metadata:
   namespaces: [lang/jvm, practice]
   origin: ECC
+  folded: rules/kotlin (2026-09-23)
 ---
 
 # Kotlin Testing Patterns
@@ -824,3 +825,104 @@ test:
 ```
 
 **Remember**: Tests are documentation. They show how your Kotlin code is meant to be used. Use Kotest's expressive matchers to make tests readable and MockK for clean mocking of dependencies.
+
+## Folded from rules/kotlin (2026-09-23)
+
+For KMP/Android projects that use **kotlin.test** + **JUnit 4/5** + **Turbine** instead of (or alongside) Kotest — the framework choice depends on the project's platform targets, not a stylistic preference.
+
+### Testing
+
+#### Additional test framework options
+
+- **kotlin.test** for multiplatform (KMP) — `@Test`, `assertEquals`, `assertTrue`
+- **JUnit 4/5** for Android-specific tests
+- **Turbine** for testing `Flow` and `StateFlow`
+- **kotlinx-coroutines-test** for coroutine testing (`runTest`, `TestDispatcher`)
+
+#### ViewModel Testing with Turbine
+
+```kotlin
+@Test
+fun `loading state emitted then data`() = runTest {
+    val repo = FakeItemRepository()
+    repo.addItem(testItem)
+    val viewModel = ItemListViewModel(GetItemsUseCase(repo))
+
+    viewModel.state.test {
+        assertEquals(ItemListState(), awaitItem())     // initial state
+        viewModel.onEvent(ItemListEvent.Load)
+        assertTrue(awaitItem().isLoading)               // loading
+        assertEquals(listOf(testItem), awaitItem().items) // loaded
+    }
+}
+```
+
+#### Fakes Over Mocks
+
+For repository/data-source boundaries, prefer hand-written fakes over mocking frameworks — they're cheaper to maintain and don't couple the test to call order:
+
+```kotlin
+class FakeItemRepository : ItemRepository {
+    private val items = mutableListOf<Item>()
+    var fetchError: Throwable? = null
+
+    override suspend fun getAll(): Result<List<Item>> {
+        fetchError?.let { return Result.failure(it) }
+        return Result.success(items.toList())
+    }
+
+    override fun observeAll(): Flow<List<Item>> = flowOf(items.toList())
+
+    fun addItem(item: Item) { items.add(item) }
+}
+```
+
+MockK (as used throughout this skill) remains the right tool for mocking external services and collaborators that aren't worth a hand-written fake.
+
+#### Ktor MockEngine
+
+```kotlin
+val mockEngine = MockEngine { request ->
+    when (request.url.encodedPath) {
+        "/api/items" -> respond(
+            content = Json.encodeToString(testItems),
+            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+        )
+        else -> respondError(HttpStatusCode.NotFound)
+    }
+}
+
+val client = HttpClient(mockEngine) {
+    install(ContentNegotiation) { json() }
+}
+```
+
+#### Room/SQLDelight Testing
+
+- Room: Use `Room.inMemoryDatabaseBuilder()` for in-memory testing
+- SQLDelight: Use `JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)` for JVM tests
+
+```kotlin
+@Test
+fun `insert and query items`() = runTest {
+    val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+    Database.Schema.create(driver)
+    val db = Database(driver)
+
+    db.itemQueries.insert("1", "Sample Item", "description")
+    val items = db.itemQueries.getAll().executeAsList()
+    assertEquals(1, items.size)
+}
+```
+
+#### Test Organization (KMP source sets)
+
+```
+src/
+├── commonTest/kotlin/     # Shared tests (ViewModel, UseCase, Repository)
+├── androidUnitTest/kotlin/ # Android unit tests (JUnit)
+├── androidInstrumentedTest/kotlin/  # Instrumented tests (Room, UI)
+└── iosTest/kotlin/        # iOS-specific tests
+```
+
+Minimum test coverage: ViewModel + UseCase for every feature.

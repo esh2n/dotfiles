@@ -4,6 +4,7 @@ description: Go testing patterns including table-driven tests, subtests, benchma
 metadata:
   namespaces: [lang/go, practice]
   origin: ECC
+  folded: rules/golang (2026-09-23)
 ---
 
 # Go Testing Patterns

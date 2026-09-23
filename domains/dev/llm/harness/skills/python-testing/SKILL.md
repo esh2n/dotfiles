@@ -4,6 +4,7 @@ description: Use when writing or reviewing Python tests — pytest marker/confte
 metadata:
   namespaces: [lang/python, practice]
   origin: ECC
+  folded: rules/python (2026-09-23)
 ---
 
 # Python Testing Patterns

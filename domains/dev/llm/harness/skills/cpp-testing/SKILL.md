@@ -4,6 +4,7 @@ description: Use only when writing/updating/fixing C++ tests, configuring Google
 metadata:
   namespaces: [lang/cpp, practice]
   origin: ECC
+  folded: rules/cpp (2026-09-23)
 ---
 
 # C++ Testing (Agent Skill)

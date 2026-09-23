@@ -4,6 +4,7 @@ description: Modern Perl 5.36+ idioms, best practices, and conventions for build
 metadata:
   namespaces: [lang/perl]
   origin: ECC
+  folded: rules/perl (2026-09-23)
 ---
 
 # Modern Perl Development Patterns
@@ -504,3 +505,86 @@ require_module($module);
 ```
 
 **Remember**: Modern Perl is clean, readable, and safe. Let `use v5.36` handle the boilerplate, use Moo for objects, and prefer CPAN's battle-tested modules over hand-rolled solutions.
+
+## Folded from rules/perl (2026-09-23)
+
+### Coding style
+
+- Prefer `say` over `print` with explicit newlines
+- Moo attributes with `builder` or `default` are an acceptable exception to "read-only everything" for computed read-only values
+
+### Patterns
+
+#### Repository Pattern
+
+Use **DBI** or **DBIx::Class** behind an interface:
+
+```perl
+package MyApp::Repo::User;
+use Moo;
+
+has dbh => (is => 'ro', required => 1);
+
+sub find_by_id ($self, $id) {
+    my $sth = $self->dbh->prepare('SELECT * FROM users WHERE id = ?');
+    $sth->execute($id);
+    return $sth->fetchrow_hashref;
+}
+```
+
+### Security
+
+Perl-specific security guidance (see also skill `security-review` for general checklists).
+
+#### Taint Mode
+
+- Use `-T` flag on all CGI/web-facing scripts
+- Sanitize `%ENV` (`$ENV{PATH}`, `$ENV{CDPATH}`, etc.) before any external command
+
+#### Input Validation
+
+- Use allowlist regex for untainting — never `/(.*)/s`
+- Validate all user input with explicit patterns:
+
+```perl
+if ($input =~ /\A([a-zA-Z0-9_-]+)\z/) {
+    my $clean = $1;
+}
+```
+
+#### File I/O — Path Traversal
+
+Beyond three-arg open (see File I/O above), prevent path traversal with `Cwd::realpath`:
+
+```perl
+use Cwd 'realpath';
+my $safe_path = realpath($user_path);
+die "Path traversal" unless $safe_path =~ m{\A/allowed/directory/};
+```
+
+#### Process Execution
+
+- Use **list-form `system()`** — never single-string form
+- Use **IPC::Run3** for capturing output
+- Never use backticks with variable interpolation
+
+```perl
+system('grep', '-r', $pattern, $directory);  # safe
+```
+
+#### SQL Injection Prevention
+
+Always use DBI placeholders — never interpolate into SQL:
+
+```perl
+my $sth = $dbh->prepare('SELECT * FROM users WHERE email = ?');
+$sth->execute($email);
+```
+
+#### Security Scanning
+
+Run **perlcritic** with the security theme at severity 4+:
+
+```bash
+perlcritic --severity 4 --theme security lib/
+```

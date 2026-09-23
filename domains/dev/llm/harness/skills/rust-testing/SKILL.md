@@ -4,6 +4,7 @@ description: Rust testing patterns including unit tests, integration tests, asyn
 metadata:
   namespaces: [lang/rust, practice]
   origin: ECC
+  folded: rules/rust (2026-09-23)
 ---
 
 # Rust Testing Patterns
@@ -484,3 +485,44 @@ test:
 ```
 
 **Remember**: Tests are documentation. They show how your code is meant to be used. Write them clearly and keep them up to date.
+
+## Folded from rules/rust (2026-09-23)
+
+### Testing
+
+Manual mocking with `mockall::mock!` — when the production trait should stay free of `#[automock]` (e.g. it's defined for use outside tests, or you don't want the `mockall` attribute in production code), generate the mock manually inside the test module instead:
+
+```rust
+// Production trait — pub so integration tests can import it
+pub trait UserRepository {
+    fn find_by_id(&self, id: u64) -> Option<User>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockall::predicate::eq;
+
+    mockall::mock! {
+        pub Repo {}
+        impl UserRepository for Repo {
+            fn find_by_id(&self, id: u64) -> Option<User>;
+        }
+    }
+
+    #[test]
+    fn service_returns_user_when_found() {
+        let mut mock = MockRepo::new();
+        mock.expect_find_by_id()
+            .with(eq(42))
+            .times(1)
+            .returning(|_| Some(User { id: 42, name: "Alice".into() }));
+
+        let service = UserService::new(Box::new(mock));
+        let user = service.get_user(42).unwrap();
+        assert_eq!(user.name, "Alice");
+    }
+}
+```
+
+Coverage focus: target 80%+ line coverage, but concentrate on business logic — exclude generated code and FFI bindings from the figure.
