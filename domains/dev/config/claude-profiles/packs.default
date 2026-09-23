@@ -1,2 +1,0 @@
-# All packs default OFF — enable per machine with: yoki-switch pack enable <pack>
-# Projects declare needs via .yoki.json langs; a SessionStart hook prompts when a declared pack is disabled.
