@@ -60,7 +60,7 @@ ask() {  # ask <tier> — one short completion; prints reply and wall time
   local tier="$1" t0 t1 body reply
   t0="$(date +%s.%N)"
   body="$(curl -s --max-time 120 -H "Authorization: Bearer ${KEY}" -H 'content-type: application/json' \
-    -d "{\"model\":\"${tier}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the single word: pong\"}],\"max_tokens\":16}" \
+    -d "{\"model\":\"${tier}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the single word: pong\"}],\"max_tokens\":64}" \
     http://127.0.0.1:4000/v1/chat/completions 2>/dev/null)"
   t1="$(date +%s.%N)"
   reply="$(printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["choices"][0]["message"]["content"].strip().replace("\n"," ")[:60] + "  [" + d.get("model","?") + "]")' 2>/dev/null)"
@@ -77,7 +77,17 @@ ask() {  # ask <tier> — one short completion; prints reply and wall time
 
 # --- omp sees the proxy tiers? (the same key the omp() wrapper hands over) ---
 if command -v omp >/dev/null 2>&1 && [ -n "$KEY" ]; then
-  seen="$(LITELLM_API_KEY="$KEY" timeout 30 omp models ls proxy 2>/dev/null | grep -o -E 'proxy/(main|complex|deterministic)' | sort -u | tr '\n' ' ')"
+  # --json, then the provider field: the text listing does not print "proxy/<id>" (measured 2026-09-23: 0 matches while the picker showed all three).
+  seen="$(LITELLM_API_KEY="$KEY" timeout 30 omp models ls --json 2>/dev/null | python3 -c '
+import json, sys
+def walk(o):
+    if isinstance(o, dict):
+        if o.get("provider") == "proxy" and isinstance(o.get("id"), str): yield o["id"]
+        for v in o.values(): yield from walk(v)
+    elif isinstance(o, list):
+        for v in o: yield from walk(v)
+print(" ".join(sorted(set(walk(json.load(sys.stdin))))))
+' 2>/dev/null)"
   case "$seen" in
     *complex*deterministic*main*) pass "omp lists the proxy tiers: ${seen}" ;;
     *) fail "omp does not list proxy/{main,complex,deterministic} (models.yml provider, or key) — got: ${seen:-none}" ;;
@@ -90,7 +100,8 @@ else
 fi
 
 # --- metrics: the dedicated listener and the Prometheus that scrapes it ------
-if curl -sf --max-time 5 http://127.0.0.1:4001/metrics 2>/dev/null | grep -q '^litellm_'; then
+# -L: LiteLLM answers /metrics with a 307 to /metrics/ (README "the trailing slash matters").
+if curl -sfL --max-time 5 http://127.0.0.1:4001/metrics 2>/dev/null | grep -q -E '^(# HELP )?litellm_'; then
   pass "LiteLLM :4001 exposes litellm_* metrics"
 else
   fail "LiteLLM :4001 metrics listener not answering"
