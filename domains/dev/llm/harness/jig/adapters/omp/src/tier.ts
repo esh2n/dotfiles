@@ -19,6 +19,15 @@
  * says so on the first failure only (then stderr). The handler never throws
  * into omp's runner and never cancels a turn.
  *
+ * Two guarantees, so nobody ever picks a tier by hand and omp never runs on
+ * a direct provider (the ruling's "never a provider directly"):
+ *   - at session start the model is forced to `proxy/main` unless it already
+ *     is a proxy tier — omp's own startup order ("saved default provider/
+ *     model" before anything from `modelRoles`) would otherwise bring back
+ *     whatever it last fell to (measured 2026-09-23: lm-studio's qwen);
+ *   - on every prompt the tier judgment decides; when the judgment is
+ *     unavailable the model stays only if it is a proxy tier, else `main`.
+ *
  * Modes: `auto` (default; `OMP_TIER_ROUTER=off` makes `off` the default),
  * `off`, or a forced tier. `/tier [auto|off|main|complex|deterministic]`.
  */
@@ -142,8 +151,15 @@ export async function routeTo(
 
 export interface TierRouter {
   readonly mode: () => TierMode;
+  readonly onSessionStart: (ctx: OmpContext) => Promise<void>;
   readonly onPrompt: (event: OmpBeforeAgentStartEvent, ctx: OmpContext) => Promise<void>;
   readonly onCommand: (args: string, ctx: OmpCommandContext) => Promise<void>;
+}
+
+/** Is the active model one of the proxy tiers? */
+export function onProxyTier(ctx: OmpContext, providerId: string): boolean {
+  const active = activeSelector(ctx);
+  return active !== undefined && TIERS.some((tier) => active === `${providerId}/${tier}`);
 }
 
 /** The router's state and its two entry points; `index.ts` wires them to omp. */
@@ -161,8 +177,33 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
     ctx.ui?.notify?.(text, level);
   };
 
+  /** Off a proxy tier (a direct provider, or nothing) → `main`; the message names what was there. */
+  const ensureProxy = async (ctx: OmpContext, why: string): Promise<void> => {
+    if (onProxyTier(ctx, providerId)) return;
+    const was = activeSelector(ctx) ?? "no model";
+    const result = await routeTo("main", providerId, ctx);
+    status(ctx, result.switched ? `main (${why})` : "no proxy tier");
+    notify(
+      ctx,
+      result.switched
+        ? `tier-router: ${was} is not a proxy tier — switched to ${providerId}/main (${why})`
+        : `tier-router: ${was} is not a proxy tier and ${result.message}`,
+      result.switched ? "info" : "error",
+    );
+  };
+
   return {
     mode: () => mode,
+
+    async onSessionStart(ctx) {
+      if (mode === "off") return;
+      if (mode !== "auto") {
+        await routeTo(mode, providerId, ctx);
+        status(ctx, `${mode} (forced)`);
+        return;
+      }
+      await ensureProxy(ctx, "session start");
+    },
 
     async onPrompt(event, ctx) {
       if (mode === "off") return;
@@ -187,10 +228,11 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
         status(ctx, "judgment unavailable");
         if (!announcedFailure) {
           announcedFailure = true;
-          notify(ctx, `tier-router: judgment service unavailable (${message}); keeping the current model`, "error");
+          notify(ctx, `tier-router: judgment service unavailable (${message}); staying on a proxy tier`, "error");
         } else {
           console.error(`tier-router: judgment service unavailable (${message})`);
         }
+        await ensureProxy(ctx, "judgment unavailable");
       }
     },
 

@@ -30,14 +30,16 @@ function ctxWith(
       },
     },
     models: {
+      // Split on the FIRST slash only: an LM Studio id like `qwen/qwen3.6-35b-a3b` keeps its own slash.
       current: () => {
-        const [provider, id] = active.split("/");
-        return { provider, id };
+        const slash = active.indexOf("/");
+        return { provider: active.slice(0, slash), id: active.slice(slash + 1) };
       },
-      resolve: (spec) =>
-        registry.includes(spec)
-          ? { provider: spec.split("/")[0], id: spec.split("/")[1] }
-          : undefined,
+      resolve: (spec) => {
+        if (!registry.includes(spec)) return undefined;
+        const slash = spec.indexOf("/");
+        return { provider: spec.slice(0, slash), id: spec.slice(slash + 1) };
+      },
     },
     setModel: async (spec) => {
       switches.push(String(spec));
@@ -156,6 +158,35 @@ describe("routeTo", () => {
   });
 });
 
+describe("the router at session start", () => {
+  test("a session that opens on a direct provider is moved to proxy/main", async () => {
+    const router = createTierRouter({ env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
+    const { ctx, switches, notices } = ctxWith("lm-studio/qwen/qwen3.6-35b-a3b");
+    await router.onSessionStart(ctx);
+    expect(switches).toEqual(["proxy/main"]);
+    expect(notices.at(-1)).toMatch(/lm-studio\/qwen\/qwen3.6-35b-a3b is not a proxy tier — switched to proxy\/main/);
+  });
+  test("a session already on a proxy tier is left where it is", async () => {
+    const router = createTierRouter({ env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
+    const { ctx, switches } = ctxWith("proxy/complex");
+    await router.onSessionStart(ctx);
+    expect(switches).toEqual([]);
+  });
+  test("a forced tier is applied at session start; off does nothing", async () => {
+    const forced = createTierRouter({ env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
+    const a = ctxWith("proxy/main");
+    await forced.onCommand("deterministic", a.ctx);
+    const b = ctxWith("lm-studio/qwen");
+    await forced.onSessionStart(b.ctx);
+    expect(b.switches).toEqual(["proxy/deterministic"]);
+
+    const off = createTierRouter({ env: { OMP_TIER_ROUTER: "off", JIG_DECISION_TOKEN_FILE: "/nonexistent" } });
+    const c = ctxWith("lm-studio/qwen");
+    await off.onSessionStart(c.ctx);
+    expect(c.switches).toEqual([]);
+  });
+});
+
 describe("the router on a prompt", () => {
   test("auto: judges the prompt and switches to the tier that came back", async () => {
     const router = createTierRouter({
@@ -194,6 +225,17 @@ describe("the router on a prompt", () => {
     expect(switches).toEqual([]);
     expect(notices.filter((n) => n.includes("unavailable"))).toHaveLength(1);
     expect(statuses.at(-1)).toBe("tier: judgment unavailable");
+  });
+  test("an unreachable service still pulls a direct-provider session back to proxy/main", async () => {
+    const router = createTierRouter({
+      env: { JIG_DECISION_TOKEN_FILE: "/nonexistent" },
+      fetch: (async (_input: string | URL | Request): Promise<Response> => {
+        throw new Error("ECONNREFUSED");
+      }) as typeof fetch,
+    });
+    const { ctx, switches } = ctxWith("lm-studio/qwen");
+    await router.onPrompt({ prompt: "hello" }, ctx);
+    expect(switches).toEqual(["proxy/main"]);
   });
   test("OMP_TIER_ROUTER=off starts off; /tier auto turns it on; a forced tier stops judging", async () => {
     let calls = 0;

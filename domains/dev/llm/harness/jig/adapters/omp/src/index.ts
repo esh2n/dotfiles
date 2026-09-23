@@ -30,7 +30,7 @@ import { recordSession } from "./session";
 import { createTierRouter } from "./tier";
 
 export { guardToolCall } from "./guard";
-export { activeSelector, askTier, createTierRouter, readDecision, routeTo } from "./tier";
+export { activeSelector, askTier, createTierRouter, onProxyTier, readDecision, routeTo } from "./tier";
 export { formatOnResult, formatPlanFor, formatterFor, projectRoot } from "./format";
 export {
   MAX_CONTINUATIONS,
@@ -44,11 +44,16 @@ export { canonicalMcpName, editedPaths, hashlineOperations, mapToolCall } from "
 export { recordSession, sessionRecordOf } from "./session";
 
 export default function (pi: OmpExtensionApi): void {
+  const tier = createTierRouter();
   pi.on("session_start", async (_event, ctx) => {
     await recordSession(ctx);
+    try {
+      await tier.onSessionStart(ctx);
+    } catch (error) {
+      console.error(`tier-router: ${error instanceof Error ? error.message : String(error)}`);
+    }
   });
 
-  const tier = createTierRouter();
   pi.on("before_agent_start", async (event, ctx) => {
     try {
       await tier.onPrompt(event, ctx);
