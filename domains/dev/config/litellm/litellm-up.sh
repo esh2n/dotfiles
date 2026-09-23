@@ -68,7 +68,27 @@ export LITELLM_MASTER_KEY
 TYPESAFE_API_KEY="$(read_secret op://llm-automation/typesafe/credential)"
 export TYPESAFE_API_KEY
 
-# 4) clear any stale container, then run in the FOREGROUND so launchd owns it.
+# 4) where LM Studio is — the ONE value that differs between machines
+#    (rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
+#    If a local LM Studio answers, use it (host.docker.internal is the host's
+#    loopback as seen from the container). Otherwise this machine has no model
+#    of its own and reaches the Mac's LM Studio over the tailnet, by its
+#    Tailscale name. LiteLLM itself stays loopback-only everywhere; only LM
+#    Studio is served on the tailnet (`tailscale serve --bg --tcp 1234
+#    127.0.0.1:1234`, run once on the Mac). No per-machine file, no hostname
+#    branch: a machine that later gets its own LM Studio switches by itself.
+LM_STUDIO_REMOTE_HOST="${LM_STUDIO_REMOTE_HOST:-}"   # the Mac's MagicDNS name, e.g. mac.tail1234.ts.net
+if curl -sf --max-time 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1; then
+  LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"
+elif [ -n "$LM_STUDIO_REMOTE_HOST" ]; then
+  LM_STUDIO_API_BASE="http://${LM_STUDIO_REMOTE_HOST}:1234/v1"
+  echo "litellm-up: no local LM Studio on :1234, using ${LM_STUDIO_API_BASE}" >&2
+else
+  echo "litellm-up: no local LM Studio on :1234 and LM_STUDIO_REMOTE_HOST is unset — the deterministic tier will fail until one exists" >&2
+  LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"
+fi
+
+# 5) clear any stale container, then run in the FOREGROUND so launchd owns it.
 #    Non-secret values are inline; secrets are passed through from the env
 #    (bare -e NAME), never on the command line.
 docker rm -f "$NAME" >/dev/null 2>&1 || true
@@ -78,6 +98,6 @@ exec docker run --rm --name "$NAME" -p 127.0.0.1:4000:4000 \
   -e LITELLM_MASTER_KEY \
   -e TYPESAFE_API_KEY \
   -e OPENAI_API_KEY=unset-placeholder \
-  -e LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1 \
+  -e LM_STUDIO_API_BASE="$LM_STUDIO_API_BASE" \
   -e LM_STUDIO_API_KEY=lm-studio \
   "$IMAGE" --config /app/config.yaml
