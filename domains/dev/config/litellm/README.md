@@ -40,11 +40,12 @@ Confirm the vault/item coordinates in `litellm.op-vars` match your 1Password
 
 ## Install (always-on, launchd)
 
-One command does every step below that a script can do, on the Mac and on
-any other machine, and prints the owner-only steps that remain (a GUI login,
-a checkbox in LM Studio, the tailnet ACL): `make home-llm`
-(`home-llm-up.sh`, idempotent — re-run after fixing anything it lists).
-The steps themselves, for reading:
+`make update` (or `make install` on a new machine) does every step below
+that a script can do — section "5. Home LLM" of `domains/dev/install.sh`,
+idempotent — and prints the owner-only steps that remain (a GUI login, a
+checkbox in LM Studio, the tailnet policy via `make tailscale-acl`). Re-run
+`make update` after doing anything it lists. The steps themselves, for
+reading:
 
 The same path installs this stack and the LM Studio stack
 (`domains/dev/config/lmstudio/`, the model server + sleep guard), so both are

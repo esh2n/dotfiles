@@ -1,33 +1,37 @@
 # tailscale — the tailnet policy for the home-LLM ports
 
 `acl.hujson` is the tailnet policy file for the setup in
-`domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`:
-LM Studio on the Mac (`tcp:1234`) reachable from the owner's other machines, and
-each machine's LiteLLM dedicated metrics listener (`tcp:4001`) reachable from the
-Mac's Prometheus. The phone reaches Open WebUI on the Mac (`tcp:3001`, HTTPS
-via `tailscale serve --https`) — the only one of the three ports served over
-HTTPS rather than raw TCP, because a PWA install needs a real certificate.
-Nothing else is opened; LiteLLM's chat API (4000) is never served on the
-tailnet at all, and neither is LM Studio's own container port 8080 (Open WebUI
-is the only thing that talks to it, over loopback inside the same Mac).
+`domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`.
+It lets the owner's own devices reach each other on every port (the owner
+also runs SSH, screen sharing and more over the tailnet — ruling 2026-09-23)
+and nobody else reach anything. The home-LLM traffic it must carry: LM Studio
+on the Mac (`tcp:1234`) from the other machines' LiteLLM, each machine's
+LiteLLM metrics listener (`tcp:4001`) from the Mac's Prometheus, and Open
+WebUI on the Mac (`tcp:3001`, HTTPS via `tailscale serve --https` because a
+PWA install needs a real certificate) from the phone. LiteLLM's chat API
+(4000) is never served on the tailnet at all, and neither is LM Studio's own
+container port 8080 (Open WebUI is the only thing that talks to it, over
+loopback inside the same Mac) — those guarantees live in what `tailscale
+serve` publishes, not in this file.
 
 ## Where it lives
 
 Tailscale reads the policy from the **admin console**, not from this repo. This
-file is the source: paste it into Access controls after editing, or run it
-through GitOps — `tailscale/gitops-acl-action` commits it as `policy.hujson`,
+file is the source: `make tailscale-acl` fills the placeholders from
+`tailscale status`, copies the result to the clipboard and opens the page to
+paste it into (`paste-acl.sh`); or run it through GitOps — `tailscale/gitops-acl-action` commits it as `policy.hujson`,
 runs `test` on pull requests and `apply` on push to main
 (<https://tailscale.com/kb/1204/gitops-acls>). Nothing here installs it; there
 is no `link_*` step for it.
 
 ## Before pasting
 
-- It **replaces the default allow-all**. Add whatever else the devices need
-  (SSH, etc.) to the same file — a second commented grant keeps full
-  own-device reachability if that is wanted.
+- It **replaces the default allow-all** with own-devices-only, all ports.
+  A port-enumerating variant is kept commented in the file for the day the
+  ruling narrows.
 - `tests` carry placeholders (`owner@example.com`, `mac.example.ts.net`);
-  substitute the owner's login and the Mac's MagicDNS name or Tailscale IP, or
-  drop the block. The `deny` on `:4000` is the assertion worth keeping.
+  `make tailscale-acl` substitutes the owner's login and the Mac's Tailscale
+  IP.
 - The rules bind to `tailscale serve` traffic like any other service
   (<https://tailscale.com/kb/1312/serve>), which is why serving a port with
   `--tcp` is safe only together with this file.

@@ -1,7 +1,7 @@
 # Thin dispatcher over the existing scripts. No logic lives here — every target
 # just calls the script that owns the behavior. `make` alone prints this list.
 .DEFAULT_GOAL := help
-.PHONY: help update rebuild node2nix link template claude home-llm home-llm-acl retire-yoki install install-force
+.PHONY: help update rebuild node2nix link template claude tailscale-acl retire-yoki install install-force
 
 help:            ## この一覧を出す
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
@@ -24,11 +24,8 @@ template:        ## .template から設定ファイルだけ再生成
 claude:          ## ~/.claude だけ再生成 (jig apply --target claude --write)
 	bash ./domains/dev/bin/jig apply --target claude --write
 
-home-llm:        ## この機械をホーム LLM 裁定の状態に揃える（冪等、残る手作業は末尾に一覧）
-	bash ./domains/dev/config/litellm/home-llm-up.sh
-
-home-llm-acl:    ## tailnet の ACL を実値で描画してクリップボードへ、管理画面を開く（貼って Save）
-	bash ./domains/dev/config/litellm/home-llm-up.sh --acl
+tailscale-acl:   ## tailnet の ACL を実値で描画してクリップボードへ、管理画面を開く（貼って Save）
+	bash ./domains/dev/config/tailscale/paste-acl.sh
 
 retire-yoki:     ## yoki が残した成果物を一覧 (削除は jig retire yoki --write)
 	bash ./domains/dev/bin/jig retire yoki

@@ -6,45 +6,49 @@
 // committed as policy.hujson, `test` on pull requests, `apply` on push to main;
 // https://tailscale.com/kb/1204/gitops-acls).
 //
-// What it grants, and nothing more, between the OWNER'S OWN devices:
+// What it grants: the OWNER'S OWN devices reach each other on every port
+// (owner's ruling 2026-09-23: SSH, screen sharing and other connections
+// between the owner's machines run over the tailnet too, so the policy does
+// not enumerate ports). What it withholds: devices of other members, tagged
+// devices and nodes shared in from another tailnet reach nothing. That is
+// the "separation = tailnet membership" half of the decision record
+// (domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
+//
+// The home-LLM services this must let through (all on 127.0.0.1, put on the
+// tailnet with `tailscale serve`; "access control rules apply to Serve just
+// like any other service", https://tailscale.com/kb/1312/serve):
 //   tcp:1234  LM Studio on the Mac  — every other machine's LiteLLM reaches it
 //   tcp:4001  LiteLLM's dedicated metrics listener on every machine — the
 //             Mac's Prometheus scrapes it
-//   tcp:3001  Open WebUI on the Mac — the phone's chat page
-// All three services sit on 127.0.0.1 and are put on the tailnet with
-// `tailscale serve` (`--tcp` for 1234/4001, `--https` for 3001 — a PWA install
-// needs a real certificate) — and "access control rules apply to Serve just
-// like any other service" (https://tailscale.com/kb/1312/serve), so this file
-// is the boundary. LiteLLM's chat API (4000) is never served, so no rule for
-// it.
+//   tcp:3001  Open WebUI on the Mac — the phone's chat page (`--https`, a
+//             PWA install needs a real certificate)
+// LiteLLM's chat API (4000) is never served, so it is unreachable regardless
+// of this file — that guarantee lives in `tailscale serve`, not here.
 //
 // "src: autogroup:member -> dst: autogroup:self" means: a user's devices may
-// reach that same user's devices. Devices tagged, shared in from another
-// tailnet, or owned by another member are outside it. That is the
-// "separation = tailnet membership" half of the decision record
-// (domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
+// reach that same user's devices, and nothing else.
 //
-// Pasting this REPLACES the default allow-all policy. Anything else the owner
-// needs between devices (SSH, file sharing, ...) must be added here too.
+// Pasting this REPLACES the default allow-all policy (which also lets other
+// members' devices in). Paste with `make tailscale-acl`.
 //
 // Syntax references: https://tailscale.com/kb/1018/acls (policy file, acls),
 // https://tailscale.com/kb/1324/grants and https://tailscale.com/kb/1337/acl-syntax
 // (grants: src / dst / ip as "protocol:port"; autogroup:member; autogroup:self).
 {
 	"grants": [
-		// The owner's devices reach each other on the three LLM ports only.
+		// The owner's devices reach each other on every port (SSH, screen
+		// sharing, the three LLM ports, whatever comes next); nobody else does.
 		{
 			"src": ["autogroup:member"],
 			"dst": ["autogroup:self"],
-			"ip":  ["tcp:1234", "tcp:4001", "tcp:3001"],
+			"ip":  ["*"],
 		},
 
-		// Uncomment to keep full reachability between the owner's own devices
-		// (the pre-policy default, minus other members and shared-in nodes).
+		// The port-enumerating variant, if the ruling ever narrows again:
 		// {
 		// 	"src": ["autogroup:member"],
 		// 	"dst": ["autogroup:self"],
-		// 	"ip":  ["*"],
+		// 	"ip":  ["tcp:1234", "tcp:4001", "tcp:3001", "tcp:22"],
 		// },
 	],
 
@@ -61,14 +65,14 @@
 	// ],
 
 	// Assertions the admin console (or the GitOps `test` step) evaluates
-	// against the real tailnet. Replace the placeholders with the owner's
-	// login and the Mac's MagicDNS name (<machine>.<tailnet>.ts.net) or
-	// Tailscale IP; the `deny` line is the point — 4000 must never be open.
+	// against the real tailnet. `make tailscale-acl` fills the placeholders
+	// with the owner's login and the Mac's Tailscale IP. 4000 is not in a
+	// `deny` here because the grant is port-agnostic; its guarantee is that
+	// nothing ever runs `tailscale serve` for it.
 	"tests": [
 		{
 			"src":    "owner@example.com",
-			"accept": ["mac.example.ts.net:1234", "mac.example.ts.net:4001", "mac.example.ts.net:3001"],
-			"deny":   ["mac.example.ts.net:4000", "mac.example.ts.net:22"],
+			"accept": ["mac.example.ts.net:1234", "mac.example.ts.net:4001", "mac.example.ts.net:3001", "mac.example.ts.net:22"],
 		},
 	],
 }
