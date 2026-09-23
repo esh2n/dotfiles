@@ -8,7 +8,7 @@ import {
 describe("skillNameFromPath", () => {
   it("names the skill in the repo's profile layout", () => {
     expect(
-      skillNameFromPath("/repo/domains/dev/config/claude-profiles/core/skills/grilling/SKILL.md"),
+      skillNameFromPath("/repo/domains/dev/llm/harness/skills/grilling/SKILL.md"),
     ).toBe("grilling");
   });
 

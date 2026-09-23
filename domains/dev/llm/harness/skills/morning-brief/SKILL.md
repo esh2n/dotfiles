@@ -18,7 +18,7 @@ Claude CodeのWebFetchでブロックされるソース（Reddit, NHK, IGN Japan
 
 ```bash
 SCRIPT=~/.claude/skills/morning-brief/scripts/fetch_blocked_sources.py
-[ -f "$SCRIPT" ] || SCRIPT=${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/config/claude-profiles/personal/skills/morning-brief/scripts/fetch_blocked_sources.py
+[ -f "$SCRIPT" ] || SCRIPT=${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/morning-brief/scripts/fetch_blocked_sources.py
 python3 "$SCRIPT" > /tmp/morning-brief-blocked.json
 # 出力が空/実行失敗なら黙殺せず報告する(該当ソースをスキップする旨をユーザーに伝えて続行)
 [ -s /tmp/morning-brief-blocked.json ] || echo "WARN: blocked-sources取得に失敗。Reddit/NHK/IGNをスキップして続行"

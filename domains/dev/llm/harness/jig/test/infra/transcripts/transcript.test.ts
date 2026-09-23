@@ -257,7 +257,7 @@ describe("parseSkillTurns", () => {
       PI_SESSION,
       PI_PROMPT,
       PI_INJECTION,
-      piRead("/Users/x/go/repo/domains/dev/config/claude-profiles/core/skills/go-modern/SKILL.md"),
+      piRead("/Users/x/go/repo/domains/dev/llm/harness/skills/go-modern/SKILL.md"),
     ].join("\n");
 
     const turns = parseSkillTurns(text, "/sessions/pi.jsonl", KNOWN);
