@@ -39,7 +39,7 @@ ITEMS=(docker-compose.yml prometheus grafana deploy.sh start.sh stop.sh status.s
 
 if [[ "${1:-}" == "--check" ]]; then
   if [[ ! -d "$DEST" ]]; then
-    echo "[fail] 配備先がありません: $DEST（./deploy.sh を実行してください）"
+    echo "[fail] 配備先がありません: ${DEST}（./deploy.sh を実行してください）"
     exit 1
   fi
   drift=0

@@ -148,11 +148,18 @@ if [ "$OS" = Darwin ]; then
     # plist itself carries no EnvironmentVariables; setenv is per-session.
     [ -n "$REMOTE_HOST" ] && launchctl setenv LM_STUDIO_REMOTE_HOST "$REMOTE_HOST"
     # Restart so the job picks up the litellm-up.sh make link just deployed.
-    launchctl bootout "$(uid_gui)/com.esh2n.litellm-proxy" 2>/dev/null || true
-    launchctl bootstrap "$(uid_gui)" "$plist" && did "litellm-proxy (re)loaded" || todo "launchctl bootstrap of com.esh2n.litellm-proxy failed"
-    for _ in $(seq 1 60); do port_answers http://127.0.0.1:4000/health/liveliness && break; sleep 2; done
+    # A loaded job is restarted in place (`kickstart -k`): bootout returns
+    # before the job is gone, and a bootstrap right after it fails with
+    # "Bootstrap failed: 5: Input/output error" (measured 2026-09-23).
+    if agent_loaded com.esh2n.litellm-proxy; then
+      launchctl kickstart -k "$(uid_gui)/com.esh2n.litellm-proxy" && did "litellm-proxy restarted" || todo "launchctl kickstart -k of com.esh2n.litellm-proxy failed"
+    else
+      launchctl bootstrap "$(uid_gui)" "$plist" && did "litellm-proxy loaded" || todo "launchctl bootstrap of com.esh2n.litellm-proxy failed"
+    fi
+    # The container is recreated: give both listeners the same two minutes.
+    for _ in $(seq 1 60); do port_answers http://127.0.0.1:4001/metrics && break; sleep 2; done
     port_answers http://127.0.0.1:4000/health/liveliness && ok ":4000 answers" || todo "LiteLLM did not come up on :4000 within 2 min — tail ~/Library/Logs/litellm-proxy.log"
-    port_answers http://127.0.0.1:4001/metrics && ok ":4001 metrics answers" || todo "LiteLLM metrics :4001 not answering — the deployed litellm-up.sh must carry --prometheus_metrics_port"
+    port_answers http://127.0.0.1:4001/metrics && ok ":4001 metrics answers" || todo "LiteLLM metrics :4001 not answering within 2 min — tail ~/Library/Logs/litellm-proxy.log (the job must run the repo's litellm-up.sh with --prometheus_metrics_port)"
   else
     todo "$plist missing — make link should have written it"
   fi

@@ -38,7 +38,7 @@ docker compose up -d prometheus
 
 printf 'Prometheus の起動を待っています'
 for _ in $(seq 1 40); do
-  if curl -fsS -o /dev/null --max-time 2 "$PROM_URL/-/ready"; then
+  if curl -fsS -o /dev/null --max-time 2 "$PROM_URL/-/ready" 2>/dev/null; then
     echo " — 起動"
     break
   fi
@@ -80,7 +80,10 @@ case "$health" in
   up)      echo "[ok]   litellm の取り込み: 正常" ;;
   missing) echo "[warn] litellm の取り込み対象が見つかりません（prometheus.yml を確認）" ;;
   unknown) echo "[warn] litellm の初回取り込みが終わりません（ゲートウェイ停止中の可能性。status.sh で確認）" ;;
-  *)       echo "[warn] litellm の取り込み: $health（ゲートウェイが落ちている可能性。status.sh で確認）" ;;
+  # ${health} braced: bash 3.2 under a C locale reads the first byte of the
+  # full-width "（" as part of the name and dies with "health�: unbound
+  # variable" (measured 2026-09-23 from `make home-llm`).
+  *)       echo "[warn] litellm の取り込み: ${health}（ゲートウェイが落ちている可能性。status.sh で確認）" ;;
 esac
 
 echo "  保存データ: ${PROM_URL}/graph       （90日保持）"
