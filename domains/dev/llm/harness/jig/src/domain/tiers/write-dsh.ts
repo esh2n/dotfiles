@@ -16,6 +16,7 @@
 
 import type { DroppedField, WriteResult } from "./capability";
 import type { Tier, TierId, TiersPolicy } from "./types";
+import { HARNESS_USER_AGENT } from "./user-agent";
 
 // dsh's real file orders tiers main, complex, deterministic.
 const DSH_TIER_ORDER: readonly TierId[] = ["main", "complex", "deterministic"];
@@ -144,6 +145,8 @@ export function toDshModelsBlock(policy: TiersPolicy): WriteResult {
       proxy.dsh._comment?.apiKeyEnv ? `         # ${proxy.dsh._comment.apiKeyEnv}` : ""
     }`,
   );
+  lines.push(`${INDENT}  headers:`);
+  lines.push(`${INDENT}    User-Agent: ${HARNESS_USER_AGENT.dsh}   # the gateway's per-harness label (user_agent)`);
   lines.push("");
   if (proxy._comment?.compat) {
     lines.push(...wrapComment(proxy._comment.compat, `${INDENT}  `));

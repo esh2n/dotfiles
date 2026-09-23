@@ -13,6 +13,7 @@
 
 import type { DroppedField, WriteResult } from "./capability";
 import type { Tier, TierId, TiersPolicy } from "./types";
+import { HARNESS_USER_AGENT } from "./user-agent";
 
 const PI_TIER_ORDER: readonly TierId[] = ["main", "deterministic", "complex"];
 
@@ -100,6 +101,7 @@ export function toPiModels(policy: TiersPolicy): WriteResult {
         baseUrl: proxy.baseUrl,
         api: proxy.api,
         apiKey: proxy.pi.apiKey,
+        headers: { "User-Agent": HARNESS_USER_AGENT.pi },
         compat: { ...proxy.compat },
         models,
       },

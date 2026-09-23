@@ -33,10 +33,12 @@ which works, because it is there (`user_agent`).
 The `jig` judgment service has two modes (`typesafe-client.ts`). In DIRECT mode
 it calls jev at `api.typesafe.ai`, bypassing this gateway. In PROXY mode — the
 live deployment, `JIG_JEV_BASE_URL` pointed at the gateway's `/typesafe` — the
-calls transit this gateway (route `/typesafe/v1/systemone`,
-`api_provider="typesafe"`), so they DO appear under the `litellm` job; they carry
-`user_agent="jig-judgment"` so they stay separable from real harnesses rather
-than pooling under `none`.
+calls transit this gateway (route `/typesafe/v1/systemone`) with
+`user_agent="jig-judgment"`. They do NOT appear in the "by harness" panel:
+that panel counts `litellm_deployment_success_responses`, the model-routing
+counter, and a pass-through route is not a deployment (2026-09-24 —
+5,795 `/typesafe` requests in the proxy log, none in the panel). The
+judgment service's own `jig` job below is where they are measured.
 
 Either way, jig also exposes its own `/metrics` on `127.0.0.1:4100`, scraped by
 the `jig` job in `prometheus/prometheus.yml`; the dashboard is
@@ -174,7 +176,7 @@ of a copy; that is part of what the jig rebuild is for.
 |---|---|---|
 | requested alias | `requested_model` | was `main` / `complex` / `deterministic` actually used? |
 | served model | `model` | which real model answered |
-| harness | `user_agent` | which agent harness sent it (`pi (darwin …)`, …) |
+| harness | `user_agent` | which harness sent it — each names itself in its proxy config (`pi`, `dsh`, `omp`; Open WebUI shows as `Python/… aiohttp/…`, litellm/check.sh as `home-llm-check`) since 2026-09-24; before that the runtime's default (`Bun/…`, `None`) made them indistinguishable |
 | time | — | did a change help or hurt |
 
 Today's baseline, measured while writing this: 359 successful requests, 32.9M

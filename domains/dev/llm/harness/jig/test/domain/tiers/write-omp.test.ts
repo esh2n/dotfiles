@@ -17,7 +17,7 @@ describe("toOmpProxyBlock", () => {
 
   test("names the proxy connection the way omp's models.yml reads it: env var name, api, compat", () => {
     expect(content).toContain("  proxy:\n    baseUrl: http://localhost:4000/v1\n    apiKey: LITELLM_API_KEY\n    api: openai-completions\n");
-    expect(content).toContain("    compat:\n      supportsDeveloperRole: false\n      maxTokensField: max_tokens\n");
+    expect(content).toContain("    headers:\n      User-Agent: omp\n    compat:\n      supportsDeveloperRole: false\n      maxTokensField: max_tokens\n");
   });
 
   test("every tier carries contextWindow and maxTokens from tiers.json, in main/complex/deterministic order", () => {

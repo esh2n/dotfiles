@@ -169,6 +169,8 @@ const TIER_FIELDS = [
   "samplingParams",
   "pi",
   "dsh",
+  // where the window/output numbers come from — a note for humans, never read
+  "_context_source",
 ] as const;
 
 function parseTier(raw: unknown, id: TierId): Tier {

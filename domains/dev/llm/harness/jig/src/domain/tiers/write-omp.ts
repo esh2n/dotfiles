@@ -38,6 +38,7 @@ export const OMP_THINKING_FORMATS: ReadonlySet<string> = new Set([
 
 import type { DroppedField, WriteResult } from "./capability";
 import type { Tier, TierId, TiersPolicy } from "./types";
+import { HARNESS_USER_AGENT } from "./user-agent";
 
 const OMP_TIER_ORDER: readonly TierId[] = ["main", "complex", "deterministic"];
 const INDENT = "  "; // under `providers:`
@@ -88,6 +89,8 @@ export function toOmpProxyBlock(policy: TiersPolicy): WriteResult {
     `${P}baseUrl: ${proxy.baseUrl}`,
     `${P}apiKey: ${proxy.dsh.apiKeyEnv}`,
     `${P}api: ${proxy.api}`,
+    `${P}headers:`,
+    `${P}  User-Agent: ${HARNESS_USER_AGENT.omp}`,
     `${P}compat:`,
     `${P}  supportsDeveloperRole: ${proxy.compat.supportsDeveloperRole}`,
     `${P}  maxTokensField: ${proxy.compat.maxTokensField}`,

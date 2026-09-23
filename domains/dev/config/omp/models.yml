@@ -48,6 +48,8 @@ providers:
     baseUrl: http://localhost:4000/v1
     apiKey: LITELLM_API_KEY
     api: openai-completions
+    headers:
+      User-Agent: omp
     compat:
       supportsDeveloperRole: false
       maxTokensField: max_tokens

@@ -68,7 +68,7 @@ esac
 ask() {  # ask <tier> — one short completion; prints reply and wall time
   local tier="$1" t0 t1 body reply
   t0="$(date +%s.%N)"
-  body="$(curl -s --max-time 120 -H "Authorization: Bearer ${KEY}" -H 'content-type: application/json' \
+  body="$(curl -s --max-time 120 -A home-llm-check -H "Authorization: Bearer ${KEY}" -H 'content-type: application/json' \
     -d "{\"model\":\"${tier}\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the single word: pong\"}],\"max_tokens\":64}" \
     http://127.0.0.1:4000/v1/chat/completions 2>/dev/null)"
   t1="$(date +%s.%N)"

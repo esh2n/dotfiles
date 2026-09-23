@@ -17,6 +17,8 @@ llm-pi-ai:
       api: openai-completions           # LiteLLM speaks OpenAI Chat Completions
       baseURL: http://localhost:4000/v1 # confirm /v1 vs bare :4000 against the running proxy
       apiKeyEnv: LITELLM_API_KEY         # the PROXY master key, injected via `op run` (never on disk)
+      headers:
+        User-Agent: dsh   # the gateway's per-harness label (user_agent)
 
       # localhost gateways: pi-ai treats an unknown URL as OpenAI itself and
       # sends fields LiteLLM may reject — these two are the usual fixes and
