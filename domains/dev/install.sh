@@ -398,9 +398,11 @@ home_llm() {
         # Steering sessions from the phone: Orca's companion, paired by code,
         # direct over the tailnet (rules/decisions/2026-09-23-phone-steers-
         # sessions-via-orca-companion.md). Pairing is a one-time GUI step.
-        hl_once "phone (Orca companion, direct over the tailnet — a pairing made through Orca Relay must be redone): Mac → Orca account/status menu → Pair → one-time code; phone → Orca app → Pair → paste the code, open the local network address field and enter $(printf '%s' "${ts_json:-}" | python3 -c 'import json,sys
+        local ts_ip
+        ts_ip="$(printf '%s' "${ts_json:-}" | python3 -c 'import json,sys
 try: print(json.load(sys.stdin)["Self"]["TailscaleIPs"][0])
-except Exception: print("<this Mac'"'"'s Tailscale IP>")' 2>/dev/null):6768 (Orca's default port); the worktree list must show with Wi-Fi off and Tailscale on (https://onorca.dev/docs/mobile)"
+except Exception: print("100.x.y.z")' 2>/dev/null)"
+        hl_once "phone (Orca companion, direct over the tailnet; a pairing made through Orca Relay must be redone): Orca → 設定 → セットアップ → モバイル → 接続方法 = LAN (not Orca Relay) → open 「より速いローカル経路も使う」 and pick this Mac's Tailscale IP (${ts_ip}), not the Wi-Fi 192.168.x.x → remove the old paired device → QRコードを生成 → phone: Orca Mobile → Pair Desktop → scan. Verify with Wi-Fi off and Tailscale on: the worktree list must show (https://onorca.dev/docs/mobile)"
     fi
 
     # Does it actually answer? One real completion per tier and the plumbing
