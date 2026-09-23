@@ -18,7 +18,7 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 
 ## Alternatives considered
 
-- **omp を Anthropic OAuth に再ログインさせて据え置く**: 第三者ハーネスがサブスクの OAuth を使う可否がベンダー方針に依存し、失効が再発する。持ち主の方針（ベンダー製以外は LiteLLM）に反する。却下。
+- **omp を Anthropic OAuth に再ログインさせて据え置く**: 第三者ハーネスがサブスクの OAuth を使う可否がベンダー方針に依存し、失効が再発する。調査記録: Anthropic は 2026-01 に opencode で Claude Max の OAuth を使った利用者を BAN し、opencode 側は「anthropic legal demanded we respond … their ToS prohibits using your claude max subscription outside of claude code」とクローズしている（https://github.com/anomalyco/opencode/issues/6930 ）。公式に認めるのは Agent SDK 経由だけで、それも 6/15 に pause（https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan ）。今回の `invalid_grant` は omp 自身の並行 refresh 競合（https://github.com/can1357/oh-my-pi/issues/5396 ）でも BAN でも同じ文字列になり判別できない。持ち主の方針（ベンダー製以外は LiteLLM）にも反する。却下。
 - **五ハーネス全部を LiteLLM 経由**: Claude Code と Codex はサブスク（OAuth）で動き、API 課金に変わる。持ち主が「違和感がない」と明言した現状を変える理由が無い。却下。
 
 ## Consequences
@@ -27,7 +27,9 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 - omp の `review` / `scout`（omp の文書に無い role 名）は消え、文書にある role（default / smol / tiny / commit / task / slow / plan / advisor）だけを使う。
 - `~/.omp/agent/config.yml` はテンプレートの複製なので、次の `make update`（template pass）で置き換わる。
 - Codex の `config.toml` の `model = "gpt-5-codex"` は古い ID のまま。Codex のモデルと「Codex で他モデル」は別件の grill。
-- 前例なし: omp のプロバイダ認証失敗時のフォールバック規則の一次資料（調査中: `rules/research/2026-09-23-model-routing-per-harness.md` 予定）。
+- omp の無言フォールバックは仕様: `findInitialModel` は「5. first available model」まで落ちる（https://github.com/can1357/oh-my-pi/blob/main/docs/models.md ）。`proxy` を足しても openai-codex の OAuth が omp に残っていれば、proxy が落ちた日はまた黙って gpt-5.5 に行く。**持ち主の手: omp の中で anthropic と openai-codex の認証を消す**（`/logout` 相当）。プロバイダが `proxy` だけなら、落ちたときは「no auth」で止まり、それが正しい失敗の見え方。
+- pi は「No auto-fallback to another provider」が設計方針（https://github.com/earendil-works/pi/pull/8966 ）だが起動レースで 10 回中 4 回別モデルで起動する報告あり（https://github.com/earendil-works/pi/issues/8810 ）。pi の設定は `proxy` 一本なので今の構成では落ち先が無い。
+- 記録: `rules/research/2026-09-23-model-routing-per-harness.md`。
 - 未実測: omp から `proxy/*` を実際に叩いた結果（compat 設定が要るか — pi は `supportsDeveloperRole: false` / `maxTokensField: max_tokens` を指定している）。
 
 ## Sources
