@@ -17,8 +17,24 @@
  * omp's own schema; a rejection shows up as `omp models ls` listing no
  * proxy tier, which litellm/check.sh probes.
  *
+ * `compat.thinkingFormat` is carried only when omp's schema accepts the
+ * value — measured 2026-09-24 against omp 18.x: `must be "openai",
+ * "openrouter", "zai", "qwen" or "qwen-chat-template" (was "deepseek")`, and
+ * one rejected value disables EVERY custom provider ("models.yml validation
+ * failed — custom providers disabled"). pi-ai's `deepseek` format is
+ * therefore dropped and reported; omp shapes DeepSeek thinking itself.
+ *
  * Order pins omp's own: main, complex, deterministic (the canonical order).
  */
+
+/** The `compat.thinkingFormat` values omp's models.yml schema accepts (its own error message, 2026-09-24). */
+export const OMP_THINKING_FORMATS: ReadonlySet<string> = new Set([
+  "openai",
+  "openrouter",
+  "zai",
+  "qwen",
+  "qwen-chat-template",
+]);
 
 import type { DroppedField, WriteResult } from "./capability";
 import type { Tier, TierId, TiersPolicy } from "./types";
@@ -47,8 +63,16 @@ function renderModel(tier: Tier, dropped: DroppedField[]): string {
     `${F}contextWindow: ${tier.contextWindow}`,
     `${F}maxTokens: ${tier.maxTokens}`,
   ];
-  if (tier.compat.thinkingFormat) {
-    lines.push(`${F}compat:`, `${F}  thinkingFormat: ${tier.compat.thinkingFormat}`);
+  if (tier.compat.thinkingFormat !== undefined) {
+    if (OMP_THINKING_FORMATS.has(tier.compat.thinkingFormat)) {
+      lines.push(`${F}compat:`, `${F}  thinkingFormat: ${tier.compat.thinkingFormat}`);
+    } else {
+      dropped.push({
+        field: "compat.thinkingFormat",
+        tier: tier.alias,
+        reason: `omp's schema accepts only ${[...OMP_THINKING_FORMATS].join("/")} (was "${tier.compat.thinkingFormat}"); one bad value disables every custom provider`,
+      });
+    }
   }
   return lines.join("\n");
 }

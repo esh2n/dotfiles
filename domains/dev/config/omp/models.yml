@@ -58,16 +58,12 @@ providers:
         input: [text]
         contextWindow: 1000000
         maxTokens: 16384
-        compat:
-          thinkingFormat: deepseek
       - id: complex
         name: complex — DeepSeek V4 Pro (LiteLLM tier)
         reasoning: true
         input: [text]
         contextWindow: 1000000
         maxTokens: 32768
-        compat:
-          thinkingFormat: deepseek
       - id: deterministic
         name: deterministic — local Qwen (LiteLLM tier)
         reasoning: true

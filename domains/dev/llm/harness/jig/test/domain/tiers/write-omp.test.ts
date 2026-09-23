@@ -57,4 +57,12 @@ describe("toOmpProxyBlock", () => {
     expect(fields).toContain("backend");
     expect(fields).toContain("connections.proxy.pi");
   });
+
+  test("a thinkingFormat omp's schema rejects (pi-ai's deepseek) is left out and reported; an accepted one is kept", () => {
+    // measured 2026-09-24: one rejected value disables every custom provider
+    expect(content).not.toContain("thinkingFormat: deepseek");
+    expect(content).toContain("thinkingFormat: qwen-chat-template");
+    const reasons = dropped.filter((d) => d.field === "compat.thinkingFormat").map((d) => d.tier);
+    expect(reasons).toEqual(["main", "complex"]);
+  });
 });
