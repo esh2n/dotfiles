@@ -14,8 +14,8 @@
 ```
 addendum_version: 1.0
 extends:           PROTOCOL.md（protocol_version 0.1-draft、FROZEN.md 2026-09-23 で凍結）
-window_start_commit: <オーナーが JIG_SKILL_ROUTER_QUESTION=choice に倒した日のコミットを後で記入>
-window_start_date:   <同上、その日の 00:00 JST>
+window_start_commit: フラグを shell 設定に入れたコミット（2026-09-23、`feat(jig): arm C flag in shell config`。fish `conf.d/init.fish` と zsh `integrations.zsh` で `JIG_SKILL_ROUTER_QUESTION=choice`）
+window_start_date:   2026-09-24 00:00 JST（倒したのは 09-23 昼、開始日は翌日の 0 時から数えて 14 日）
 window:              14 日（開始日を含む 14 日間）
 ```
 
@@ -188,6 +188,14 @@ PROTOCOL.md §8 の 9 項目はすべてそのまま効いている。C に固�
    ことでも、従ったことでもない。加えて §8.4——`cat`/`sed`/`grep` でのシェル読みは tool call
    ではないので数えられず、follow rate はどの腕でも同じだけ**過小**に出る。30% という
    閾値はこの過小を織り込んだ値としてオーナーが置いたものであり、「正しい追従率」ではない。
+
+4. **一覧は凍結時の 54 本ではない。** 開始までに生成器 M2 が入り、pack の on/off が無くなって
+   `~/.claude/skills` は 100 本（commands 由来の 11 本、obra の 2 本を含む）になり、日本語だった
+   description は英語に書き換わった。`catalog-snapshot.json` は凍結記録として残すが、C の
+   follow rate と distinct-skill 数は**開始時点の実カタログ**（`jig report skills` が読む
+   `~/.claude/skills`）で数える。一覧が倍近く増えたぶん、モデル自身の選択（分母側）が
+   凍結時と同じ振る舞いをする保証はなく、A との比較は「同じ一覧」ではない——結果の節で
+   必ず断る。
 
 ---
 

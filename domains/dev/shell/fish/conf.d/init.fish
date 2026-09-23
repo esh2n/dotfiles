@@ -27,6 +27,11 @@ if test (uname) = "Darwin"
   alias date 'gdate'
 end
 
+# jig skill router, arm C of the skill-selection experiment: one `choice`
+# question per prompt instead of the bool batch. The 14-day window starts the
+# day this flag is flipped (llm/harness/rules/research/skill-selection-experiment/PROTOCOL-C.md).
+set -gx JIG_SKILL_ROUTER_QUESTION choice
+
 # Load functions
 # Fish autoloads functions from the functions/ directory automatically if it's in $fish_function_path
 # We need to ensure that directory is added to the path in the main config.fish loader
