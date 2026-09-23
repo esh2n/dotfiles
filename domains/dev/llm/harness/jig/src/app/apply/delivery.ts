@@ -237,8 +237,8 @@ export async function listSkillCandidates(
   return candidates;
 }
 
-/** The targets that deliver `~/.agents/skills`; each finds the other's links `ok`. */
-export const AGENTS_SKILLS_MOUNT_TARGETS = ["codex", "omp"] as const;
+/** The targets that deliver `~/.agents/skills`; each finds the others' links `ok`. */
+export const AGENTS_SKILLS_MOUNT_TARGETS = ["codex", "omp", "pi"] as const;
 
 export type AgentsSkillsMountTarget = (typeof AGENTS_SKILLS_MOUNT_TARGETS)[number];
 
@@ -260,7 +260,9 @@ export interface AgentsSkillsMountReport extends ManagedDirReport {
  * `~/.agents/skills/`: the cross-harness skills mount, one link per skill
  * directory of `skills/`. Codex reads it as the user scope of its skill
  * discovery (https://learn.chatgpt.com/docs/build-skills, `$HOME/.agents/skills`),
- * and so do pi and omp (omp: the `agents` provider, "Load skills from
+ * and so do pi and omp (pi: https://pi.dev/docs/latest/skills, "Pi also
+ * supports the Agent Skills locations `~/.agents/skills/` and
+ * `.agents/skills/`"; omp: the `agents` provider, "Load skills from
  * .agent/skills and .agents/skills (project walk-up + user home)",
  * `packages/coding-agent/src/discovery/agents.ts`). One directory, one plan,
  * whichever target asks: the same links are planned from the same sources,
@@ -313,8 +315,7 @@ export interface ManagedDirInput {
  * One managed directory: the directory itself, then its entries reconciled
  * against the selection. Entries that are neither planned nor stale are
  * reported as foreign and never touched — for `~/.claude/skills/` that is
- * Claude Code's own `synced/` tree and its `.bucket-<id>` marker, for
- * `~/.codex/skills/` Codex's bundled `.system/`.
+ * Claude Code's own `synced/` tree and its `.bucket-<id>` marker.
  */
 export async function planManagedDir(
   ports: ClaudeApplyPorts,

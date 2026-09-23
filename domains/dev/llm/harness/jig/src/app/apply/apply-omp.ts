@@ -43,6 +43,7 @@
 
 import {
   type ModelChoice,
+  type ModelMapping,
   modelChoiceFor,
   parseAgentDefinition,
 } from "../../domain/claude/agent-definition";
@@ -177,8 +178,12 @@ export interface OmpApplyReport {
 }
 
 export interface OmpApplyOptions {
-  /** Claude tier name (`haiku`/`sonnet`/`opus`) → omp model selector. Empty until a ruling supplies one. */
-  readonly ompModels: Readonly<Record<string, string>>;
+  /**
+   * Claude tier name (`haiku`/`sonnet`/`opus`, lower-cased) → omp model
+   * selector: the `omp` table of `agents/models.json`. Empty until a ruling
+   * fills it; `reasoningEffort` is ignored here (the selector carries it).
+   */
+  readonly ompModels: Readonly<Record<string, ModelMapping>>;
   /** Called with each generated file's frontmatter (YAML) before writing; throw to refuse. */
   readonly validateFrontmatter?: (yaml: string) => void;
 }
@@ -216,8 +221,13 @@ async function planAgents(
     const text = await ports.readFile(`${sourceDir}/${sourceFile}`);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
-    const definition = parseAgentDefinition(text, stem);
-    const model = modelChoiceFor(definition.model, options.ompModels);
+    const { definition, model } = decide(sourceFile, () => {
+      const parsed = parseAgentDefinition(text, stem);
+      return {
+        definition: parsed,
+        model: modelChoiceFor(parsed.model, options.ompModels, parsed.models?.omp),
+      };
+    });
     if (model.kind === "unmapped") {
       unmappedTiers.set(model.tier, (unmappedTiers.get(model.tier) ?? 0) + 1);
     }
@@ -271,6 +281,16 @@ async function planAgents(
     unmappedTiers: counted(unmappedTiers).map(({ key, count }) => ({ tier: key, count })),
     unmappedTools: counted(unmappedTools).map(({ key, count }) => ({ tool: key, count })),
   };
+}
+
+/** A source that cannot be read is an error naming the file, not a silently skipped agent. */
+function decide<T>(sourceFile: string, read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`jig apply --target omp: agents/${sourceFile}: ${reason}`);
+  }
 }
 
 async function planMcpJson(

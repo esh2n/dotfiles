@@ -17,20 +17,29 @@
  *   `rules/` directories of per-entry symlinks into the harness
  *   (`app/apply/apply-claude.ts`). Milestones 1 and 2 of the generator that
  *   retires `yoki-switch`.
- * - **codex** — `~/.agents/skills` and `~/.codex/skills` as managed
- *   directories of links, the same generated AGENTS.md into `~/.codex`, one
- *   generated `~/.codex/agents/<name>.toml` per agent, and jig's MCP block
- *   in `~/.codex/config.toml` (`app/apply/apply-codex.ts`). Milestone 3a.
+ * - **codex** — `~/.agents/skills` as a managed directory of links (the
+ *   only skills delivery Codex gets; `~/.codex/skills` is reported, not
+ *   managed), the same generated AGENTS.md into `~/.codex`, one generated
+ *   `~/.codex/agents/<name>.toml` per agent with the model from
+ *   `agents/models.json`, and jig's MCP block in `~/.codex/config.toml`
+ *   (`app/apply/apply-codex.ts`). Milestone 3a.
  * - **omp** — the same `~/.agents/skills`, one generated
  *   `~/.omp/agent/agents/<name>.md` per agent, jig's entries in
  *   `~/.omp/agent/mcp.json`, and the `extensions/jig.ts` link to jig's omp
  *   extension (`app/apply/apply-omp.ts`). Milestone 3b.
+ * - **pi**, the agent-directory half — the same `~/.agents/skills`, the
+ *   same generated AGENTS.md into `~/.pi/agent` (over the symlink standing
+ *   there today), and jig's entries in pi-mcp-adapter's
+ *   `~/.config/mcp/mcp.json`; packages, extensions and the two gaps
+ *   reported (`app/apply/apply-pi.ts`). Milestone 3c-pi. `--target pi`
+ *   names one harness, so it runs both halves: the tiers write into the
+ *   checkout's `pi/models.json` (the first group's part), then this.
  *
  * `--target all` means the first group only. The claude, codex and omp
- * targets write into `$HOME` rather than into the checkout, so each has to
- * be named: a verb that reaches a user's live harness configuration by
- * default is one keystroke from a surprise, and nothing about the word
- * "all" says which files it means.
+ * targets, and pi's agent-directory half, write into `$HOME` rather than
+ * into the checkout, so each has to be named: a verb that reaches a user's
+ * live harness configuration by default is one keystroke from a surprise,
+ * and nothing about the word "all" says which files it means.
  */
 
 import {
@@ -46,7 +55,6 @@ import {
   type CodexApplyPaths,
   type CodexApplyReport,
   applyCodex,
-  yokiCommandLeftovers,
 } from "../app/apply/apply-codex";
 import {
   type OmpAgentFileReport,
@@ -55,6 +63,7 @@ import {
   type OmpApplyReport,
   applyOmp,
 } from "../app/apply/apply-omp";
+import { type PiApplyPaths, type PiApplyReport, applyPi } from "../app/apply/apply-pi";
 import {
   ALL_APPLY_TARGETS,
   type ApplyTarget,
@@ -67,10 +76,9 @@ import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
 import type { ModelChoice } from "../domain/claude/agent-definition";
 import { AGENTS_MD_BYTE_LIMIT } from "../domain/claude/agents-md";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
-import { describeStaleReason } from "../domain/claude/managed-dir";
+import { describePathState, describeStaleReason } from "../domain/claude/managed-dir";
 import { DEFAULT_PERMITS, defaultPermitPolicyFragment } from "../domain/claude/permits";
 import { KNOWN_MACOS_EXCLUSION_CANDIDATES } from "../domain/claude/sandbox";
-import { NO_CODEX_PORT_REASON } from "../domain/codex/skills";
 
 export interface ApplyCliResult {
   readonly stdout: string;
@@ -82,6 +90,8 @@ interface ParsedArgs {
   readonly claude: boolean;
   readonly codex: boolean;
   readonly omp: boolean;
+  /** `--target pi`: the tiers half (`targets` holds `pi` too) plus the agent-directory half. */
+  readonly pi: boolean;
   readonly write: boolean;
 }
 
@@ -104,10 +114,11 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
   }
 
   const targetName = targetArg ?? "all";
-  const none = { targets: [], claude: false, codex: false, omp: false, write };
+  const none = { targets: [], claude: false, codex: false, omp: false, pi: false, write };
   if (targetName === "claude") return { ...none, claude: true };
   if (targetName === "codex") return { ...none, codex: true };
   if (targetName === "omp") return { ...none, omp: true };
+  if (targetName === "pi") return { ...none, targets: ["pi"], pi: true };
   if (targetName === "all") return { ...none, targets: ALL_APPLY_TARGETS };
   if ((ALL_APPLY_TARGETS as readonly string[]).includes(targetName)) {
     return { ...none, targets: [targetName as ApplyTarget] };
@@ -320,13 +331,6 @@ interface ManagedDirWording {
   readonly how: string;
   /** Printed after the entries when any is foreign: who else writes here, and that jig leaves it. */
   readonly foreignNote?: readonly string[];
-  /**
-   * An exclusion reason that is the expected case rather than news — for
-   * `~/.codex/skills`, every skill without a port. Entries excluded for it
-   * are counted on one line instead of listed, so the list keeps the ones
-   * worth reading.
-   */
-  readonly summarizeExcluded?: string;
 }
 
 /**
@@ -367,19 +371,15 @@ function managedDirLines(
   if (wording.foreignNote !== undefined && dir.entries.some((entry) => entry.kind === "foreign")) {
     lines.push(...wording.foreignNote.map((line) => `  ${line}`));
   }
-  const listed = dir.selection.excluded.filter(
-    (entry) => entry.reason !== wording.summarizeExcluded,
+  const excludedWidth = Math.max(
+    PAD,
+    ...dir.selection.excluded.map((entry) => entry.name.length + 3),
   );
-  const summarized = dir.selection.excluded.length - listed.length;
-  const excludedWidth = Math.max(PAD, ...listed.map((entry) => entry.name.length + 3));
   lines.push(
     `  not linked (${dir.selection.excluded.length}):`,
-    ...listed.map((entry) => `    ${entry.name.padEnd(excludedWidth - 2)}${entry.reason}`),
-    ...(summarized > 0
-      ? [
-          `    (${summarized} ${summarized === 1 ? "entry" : "entries"}) ${wording.summarizeExcluded}`,
-        ]
-      : []),
+    ...dir.selection.excluded.map(
+      (entry) => `    ${entry.name.padEnd(excludedWidth - 2)}${entry.reason}`,
+    ),
   );
   return lines;
 }
@@ -454,11 +454,12 @@ function sandboxLines(report: ClaudeApplyReport): readonly string[] {
 }
 
 /**
- * The Codex target's dry-run, in the Claude target's order: the two managed
- * skill directories, the generated AGENTS.md (as a diff — its text is the
- * Claude target's, printed there), the generated agent files with the model
- * question answered per tier, config.toml's block with its conflicts and
- * yoki's leftovers, and the one file that is `jig codex register`'s.
+ * The Codex target's dry-run, in the Claude target's order: the managed
+ * skills mount and what `~/.codex/skills` holds (reported, not managed), the
+ * generated AGENTS.md (as a diff — its text is the Claude target's, printed
+ * there), the generated agent files with the model question answered per
+ * tier, config.toml's block with its conflicts and yoki's leftovers, and the
+ * one file that is `jig codex register`'s.
  */
 function formatCodex(report: CodexApplyReport, dest: string): string {
   const lines: string[] = [
@@ -483,12 +484,13 @@ function formatCodex(report: CodexApplyReport, dest: string): string {
 }
 
 /**
- * `~/.agents/skills`: the one directory two targets deliver. The section
- * names both and the one that planned this run, so a reader of either
- * dry-run knows the other will find the same links `ok`.
+ * `~/.agents/skills`: the one directory three targets deliver. The section
+ * names them all and the one that planned this run, so a reader of any
+ * dry-run knows the others will find the same links `ok`.
  */
 function agentsSkillsMountLines(mount: AgentsSkillsMountReport): readonly string[] {
-  const targets = AGENTS_SKILLS_MOUNT_TARGETS.map((target) => `--target ${target}`).join(" and ");
+  const flags = AGENTS_SKILLS_MOUNT_TARGETS.map((target) => `--target ${target}`);
+  const targets = `${flags.slice(0, -1).join(", ")} and ${flags[flags.length - 1]}`;
   return [
     ...managedDirLines("skills (cross-harness)", mount, {
       noun: "skill director",
@@ -496,39 +498,42 @@ function agentsSkillsMountLines(mount: AgentsSkillsMountReport): readonly string
       singular: "y",
       how: "each holds a SKILL.md; Codex, pi and omp read this directory",
     }),
-    `  Delivered by ${targets} alike, from one plan (this run: --target ${mount.target}); the other finds the same links ok.`,
+    `  Delivered by ${targets} alike, from one plan (this run: --target ${mount.target}); the others find the same links ok.`,
   ];
 }
 
-/** `~/.codex/skills`: the ports, then yoki's `cmd-*` directories under their own heading. */
+/**
+ * `~/.codex/skills`: not a destination. Codex reads every skill from
+ * `~/.agents/skills` like pi and omp, and the Codex-specific ports are
+ * gone, so the directory is listed for the hand cleanup of milestone 4 and
+ * nothing in it is planned.
+ */
 function codexSkillsLines(report: CodexApplyReport): readonly string[] {
-  const leftovers = yokiCommandLeftovers(report.codexSkillsDir);
+  const { codexSkills } = report;
   const lines = [
-    ...managedDirLines("codex skills", report.codexSkillsDir, {
-      noun: "Codex port",
-      plural: "s",
-      singular: "",
-      how: "skills/<name>/codex/SKILL.md; the link points at the port",
-      foreignNote: [
-        "Codex keeps its bundled skills in `.system/` here; that is not jig's and stays.",
-      ],
-      summarizeExcluded: NO_CODEX_PORT_REASON,
-    }),
+    `codex skills: not managed by jig  ${codexSkills.path}`,
+    "  Codex reads every skill from ~/.agents/skills (above), as pi and omp do; the codex/SKILL.md ports",
+    "  are dropped, so nothing is delivered here and nothing here is removed.",
   ];
-  if (leftovers.length > 0) {
+  if (codexSkills.state.kind !== "dir") {
     lines.push(
-      `  yoki leftovers (${leftovers.length}) — real directories from yoki's command→skill conversion, redundant now that`,
-      "  commands are skills delivered through ~/.agents/skills; jig removes links, never directories (milestone 4):",
-      ...leftovers.map((leftover) => `    ${leftover.name}`),
+      `  yoki leftovers (milestone 4) — not managed by jig: (${describePathState(codexSkills.state)})`,
     );
+    return lines;
   }
-  const ported = report.codexSkillsDir.selection.linked.length;
-  if (ported > 0) {
+  if (codexSkills.entries.length === 0) {
     lines.push(
-      "  Note: a ported skill is listed twice in Codex (here and in ~/.agents/skills); Codex does not merge",
-      "  same-named skills (build-skills doc). Whether the generic entry should yield is a ruling, not a flag.",
+      "  yoki leftovers (milestone 4) — not managed by jig: (none; the directory is empty)",
     );
+    return lines;
   }
+  const width = Math.max(PAD, ...codexSkills.entries.map((entry) => entry.name.length + 3));
+  lines.push(
+    `  yoki leftovers (milestone 4) — not managed by jig (${codexSkills.entries.length}), clean by hand:`,
+    ...codexSkills.entries.map(
+      (entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}  — ${entry.note}`,
+    ),
+  );
   return lines;
 }
 
@@ -554,11 +559,21 @@ function describeModel(file: AgentFileReport): string {
   return describeModelChoice(file.model, "Codex id");
 }
 
-/** One phrase per answer to the model question; `what` names the harness's kind of id. */
+/**
+ * One phrase per answer to the model question; `what` names the harness's
+ * kind of id. A mapped answer says where it came from — the tier, or the
+ * agent's own `models:` override — and the effort when one rides along.
+ */
 function describeModelChoice(model: ModelChoice, what: string): string {
   switch (model.kind) {
-    case "mapped":
-      return `model: ${model.model} (${model.tier})`;
+    case "mapped": {
+      const effort = model.reasoningEffort === undefined ? "" : ` effort=${model.reasoningEffort}`;
+      const from =
+        model.override === true
+          ? `models: override${model.tier === undefined ? "" : `, tier ${model.tier}`}`
+          : (model.tier ?? "");
+      return `model: ${model.model}${effort} (${from})`;
+    }
     case "inherit":
       return "model: (none: inherits)";
     case "unmapped":
@@ -572,7 +587,7 @@ function agentFileLines(report: CodexApplyReport): readonly string[] {
   const width = Math.max(PAD, ...agents.files.map((file) => file.name.length + 3));
   const lines = [
     `agents (generated files): ${agents.path}`,
-    `  ${agents.files.length} agent definition${agents.files.length === 1 ? "" : "s"} → <name>.toml (name, description, developer_instructions; tools folded into the instructions):`,
+    `  ${agents.files.length} agent definition${agents.files.length === 1 ? "" : "s"} → <name>.toml (name, description, model, model_reasoning_effort, developer_instructions; tools folded into the instructions):`,
   ];
   if (agents.files.length === 0) lines.push("    (none)");
   for (const file of agents.files) {
@@ -580,10 +595,17 @@ function agentFileLines(report: CodexApplyReport): readonly string[] {
       `    ${file.name.padEnd(width - 2)}${file.outcome.padEnd(10)}${describeModel(file)}${file.backupPath === undefined ? "" : `  (not jig's yet → kept as ${basename(file.backupPath)})`}`,
     );
   }
+  const source = agents.mappingSource === undefined ? "agents/models.json" : agents.mappingSource;
+  if (agents.mappedTiers.length > 0) {
+    lines.push(
+      `  model tiers mapped by ${source} (${agents.mappedTiers.map((t) => `${t.tier} → ${t.model}${t.reasoningEffort === undefined ? "" : ` ${t.reasoningEffort}`}: ${t.count}`).join(", ")});`,
+      "  model_reasoning_effort is written where the mapping carries one.",
+    );
+  }
   if (agents.unmappedTiers.length > 0) {
     lines.push(
-      `  model tiers with no Codex id (${agents.unmappedTiers.map((t) => `${t.tier}: ${t.count}`).join(", ")}): \`model\` is left out and Codex`,
-      "  applies its default. jig has no source for Codex model ids; a mapping is a ruling, never a guess.",
+      `  model tiers with no Codex id in ${source} (${agents.unmappedTiers.map((t) => `${t.tier}: ${t.count}`).join(", ")}): \`model\` is left out and Codex`,
+      "  applies its default. A mapping is a ruling, recorded in that file, never a guess here.",
     );
   }
   if (agents.excluded.length > 0) {
@@ -693,8 +715,8 @@ function ompAgentFileLines(report: OmpApplyReport): readonly string[] {
   if (agents.unmappedTiers.length > 0) {
     lines.push(
       `  model tiers with no omp selector (${agents.unmappedTiers.map((t) => `${t.tier}: ${t.count}`).join(", ")}): \`model\` is left out and omp`,
-      "  applies its task default. omp wants a provider-qualified selector or a modelRoles alias; jig has no",
-      "  source that maps Claude tiers to one, and a mapping is a ruling, never a guess.",
+      "  applies its task default. omp wants a provider-qualified selector or a modelRoles alias; the `omp`",
+      "  table of agents/models.json is empty until ruled, and a mapping is a ruling, never a guess.",
     );
   }
   if (agents.unmappedTools.length > 0) {
@@ -796,6 +818,166 @@ function ompLeftoverLines(report: OmpApplyReport): readonly string[] {
   ];
 }
 
+/**
+ * The pi target's agent-directory half, in the omp target's order: the
+ * shared skills mount, the generated AGENTS.md over the symlink standing
+ * there today (with the source-side cleanup it leaves), pi-mcp-adapter's
+ * config with what is carried through, the two packages the delivery
+ * relies on with the paste-able line for each that is missing, the
+ * extensions directory as manager.sh leaves it, and the two gaps.
+ */
+function formatPi(report: PiApplyReport, paths: PiApplyPaths): string {
+  const lines: string[] = [
+    "== pi (agent directory) ==",
+    `outcome: ${report.outcome}`,
+    `dest: ${paths.agentDir}`,
+    ...(report.message === undefined ? [] : [`message: ${report.message}`]),
+    "",
+    ...agentsSkillsMountLines(report.agentsSkillsDir),
+    `  pi reads this directory natively (docs skills.md: "Pi also supports the Agent Skills locations ~/.agents/skills/"); no ${paths.agentDir}/skills is created.`,
+    "",
+    ...piAgentsMdLines(report),
+    "",
+    ...piMcpLines(report),
+    "",
+    ...piPackageLines(report),
+    "",
+    ...piExtensionLines(report),
+    "",
+    'subagents: GAP — pi has none natively (rules/research/2026-09-22-multi-lane-review-per-harness.md: "Pi itself remains',
+    "  fundamentally single-agent\"). The subagents decision's answer: a workflow script is written once, in Claude",
+    "  Code's syntax; pi runs it through tintinweb/pi-subagents when that package is installed (see packages above).",
+    "rules: GAP: the conditional `paths:` rules (rules/<lang>/) are not delivered to pi in this milestone;",
+    "  pi has no ~/.claude/rules reader, and jig's pi extensions do not inject them yet.",
+  ];
+  return lines.join("\n");
+}
+
+/** The generated file over the link, the diff, and the repo file it leaves unused. */
+function piAgentsMdLines(report: PiApplyReport): readonly string[] {
+  const { agentsMd, retiredAgentsMd } = report;
+  const lines = [
+    `AGENTS.md: ${agentsMd.outcome}  ${agentsMd.path}  (${agentsMd.bytes} bytes${agentsMd.overLimit ? ` — WARNING: over ${AGENTS_MD_BYTE_LIMIT} bytes; Codex truncates AGENTS.md there` : ""})`,
+    "  the same generated content as ~/.claude/AGENTS.md — one source, one file for all five harnesses",
+    "  (config-layout decision, 2026-09-24 consequence); pi reads <agent-dir>/AGENTS.md (docs configuration.md).",
+    ...(agentsMd.replacesSymlink === undefined
+      ? []
+      : [
+          `  a symlink stands there today (→ ${agentsMd.replacesSymlink}); on --write the link is replaced by the`,
+          "  generated regular file — a pointer, so nothing is backed up, and what it pointed at is untouched.",
+        ]),
+    ...(agentsMd.backupPath === undefined
+      ? []
+      : [
+          `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
+        ]),
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    ...(agentsMd.diff === ""
+      ? ["  (no differences)"]
+      : ["--- diff (current vs generated) ---", agentsMd.diff]),
+  ];
+  if (retiredAgentsMd.state.kind !== "missing") {
+    lines.push(
+      `  source-side cleanup (yours, not jig's): ${retiredAgentsMd.path} is ${describePathState(retiredAgentsMd.state)}`,
+      "  and unused once the generated file lands — pi's short AGENTS.md retires. jig does not delete repository",
+      "  files; remove it by hand, and drop AGENTS.md from core/config/manager.sh link_pi_resources, which would",
+      "  otherwise put the symlink back on its next run (milestone 4 retires the whole function).",
+    );
+  }
+  return lines;
+}
+
+/** jig's entries in the adapter's shared config, what is carried through, the adapter's own override file, and the diff. */
+function piMcpLines(report: PiApplyReport): readonly string[] {
+  const { mcpJson } = report;
+  const lines = [
+    `mcp (pi-mcp-adapter): ${mcpJson.outcome}  ${mcpJson.path}`,
+    `  jig's mcpServers entries (${mcpJson.servers.length}): ${mcpJson.servers.length === 0 ? "(none)" : mcpJson.servers.join(", ")}`,
+    "  pi has no MCP client (rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md §Q1); the MCP-list decision delivers",
+    "  the list through the community extension pi-mcp-adapter, which reads this file as its user-global shared config",
+    '  (README "File Layout") and connects lazily by default, so the full targets.pi list costs nothing until called.',
+    "  Entries carry command/args/env or url/headers, no `type` (the adapter documents none; the transport is which is set).",
+  ];
+  if (mcpJson.invalid !== undefined) {
+    lines.push(
+      `  CONFLICT: the file could not be read as a JSON object (${mcpJson.invalid}); nothing can be carried`,
+      "  through, so nothing is written until it is fixed by hand.",
+    );
+  }
+  if (mcpJson.foreign.length > 0) {
+    lines.push(
+      `  entries no source produces (${mcpJson.foreign.length}), carried through as they are: ${mcpJson.foreign.join(", ")}`,
+    );
+  }
+  if (mcpJson.carried.length > 0) {
+    lines.push(`  other top-level keys carried through: ${mcpJson.carried.join(", ")}`);
+  }
+  lines.push(
+    "  Hand-edit detection compares jig's entries, not the file. `/mcp disable` never edits this file (it writes",
+    "  `disabled` into the project's .pi/mcp.json), so a `disabled` inside a jig entry here is a hand edit and a conflict.",
+    `  ${mcpJson.adapterOverride.path}: ${mcpJson.adapterOverride.state.kind === "missing" ? "absent" : describePathState(mcpJson.adapterOverride.state)} — the adapter's own override file (higher precedence;`,
+    "  a same-named server there wins over jig's); not jig's, never written.",
+    ...(mcpJson.diff === ""
+      ? ["  (no differences)"]
+      : ["--- diff (current vs generated) ---", mcpJson.diff]),
+  );
+  return lines;
+}
+
+/** Report only: the two packages the delivery relies on, each present or with its paste-able lines. */
+function piPackageLines(report: PiApplyReport): readonly string[] {
+  const { packages } = report;
+  const width = Math.max(PAD, ...packages.packages.map((entry) => entry.name.length + 3));
+  const lines = [
+    `packages (report only): ${packages.path}`,
+    "  the source ~/.pi/agent/settings.json links to (manager.sh); `packages` is where `pi install` records a package",
+    "  (docs packages.md). jig does not edit settings.json in this milestone.",
+    ...(packages.invalid === undefined
+      ? []
+      : [
+          `  WARNING: could not read it (${packages.invalid}); every package below reads as missing.`,
+        ]),
+  ];
+  for (const entry of packages.packages) {
+    if (entry.source !== undefined) {
+      lines.push(`  ${entry.name.padEnd(width)}present (${entry.source})  — ${entry.role}`);
+      continue;
+    }
+    lines.push(
+      `  ${entry.name.padEnd(width)}MISSING  — ${entry.role}`,
+      `    run once:               ${entry.installLine}`,
+      `    or add to "packages":   ${entry.packagesEntry}`,
+    );
+  }
+  return lines;
+}
+
+/** Report only: what manager.sh links here today, and everything else. */
+function piExtensionLines(report: PiApplyReport): readonly string[] {
+  const { extensions } = report;
+  const width = Math.max(
+    PAD,
+    ...[...extensions.managerLinks, ...extensions.foreign].map((entry) => entry.name.length + 3),
+  );
+  const lines = [
+    `extensions (report only): ${extensions.path}${extensions.dirState.kind === "missing" ? "  (absent)" : ""}`,
+    `  delivered by core/config/manager.sh link_pi_resources until milestone 4 (${extensions.managerLinks.length}), links into domains/dev/config/pi/extensions/:`,
+    ...(extensions.managerLinks.length === 0
+      ? ["    (none)"]
+      : extensions.managerLinks.map(
+          (entry) => `    ${entry.name.padEnd(width - 2)}a symlink → ${entry.target}`,
+        )),
+  ];
+  if (extensions.foreign.length > 0) {
+    lines.push(
+      `  not jig's (${extensions.foreign.length}), left alone:`,
+      ...extensions.foreign.map((entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`),
+    );
+  }
+  lines.push("  Nothing here is linked or unlinked by this milestone.");
+  return lines;
+}
+
 export interface ClaudeCliContext {
   readonly ports: ClaudeApplyPorts;
   readonly paths: ClaudeApplyPaths;
@@ -814,6 +996,11 @@ export interface OmpCliContext {
   readonly options: OmpApplyOptions;
 }
 
+export interface PiCliContext {
+  readonly ports: ClaudeApplyPorts;
+  readonly paths: PiApplyPaths;
+}
+
 export async function applyCli(
   args: readonly string[],
   ports: ApplyPorts,
@@ -821,6 +1008,7 @@ export async function applyCli(
   claude?: ClaudeCliContext,
   codex?: CodexCliContext,
   omp?: OmpCliContext,
+  pi?: PiCliContext,
 ): Promise<ApplyCliResult> {
   const parsed = parseArgs(args);
   if ("error" in parsed) {
@@ -874,9 +1062,24 @@ export async function applyCli(
     ports,
   );
 
-  const out = report.results.map(formatResult).join("\n\n");
+  const sections = report.results.map(formatResult);
   const hasBlockedWrite = report.results.some((r) => isBlockedWriteFailure(r, parsed.write));
-  const code = report.hasConflict || hasBlockedWrite ? 1 : 0;
+  let code = report.hasConflict || hasBlockedWrite ? 1 : 0;
 
-  return { stdout: `${out}\n`, code };
+  // `--target pi` names the harness, so the agent-directory half follows the
+  // tiers half in the same run. Not wired (tests, older composition roots):
+  // the tiers half stands alone and says so.
+  if (parsed.pi) {
+    if (pi === undefined) {
+      sections.push(
+        "== pi (agent directory) ==\nnot wired in this context: only pi/models.json (above) was considered",
+      );
+    } else {
+      const piReport = await applyPi({ paths: pi.paths, write: parsed.write }, pi.ports);
+      sections.push(formatPi(piReport, pi.paths));
+      if (piReport.outcome === "conflict") code = 1;
+    }
+  }
+
+  return { stdout: `${sections.join("\n\n")}\n`, code };
 }

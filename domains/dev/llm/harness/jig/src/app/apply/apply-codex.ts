@@ -12,19 +12,23 @@
  *   which the omp target calls as well: one directory, one plan. Today it
  *   holds yoki-switch's links into the retired `claude-profiles/` tree,
  *   dangling since the sources moved; those are stale and go, anything
- *   else is not jig's.
- * - `~/.codex/skills/` — a managed directory of links, only for skills with
- *   a Codex port (`skills/<name>/codex/SKILL.md`), each link pointing at the
- *   port (`domain/codex/skills.ts`). yoki's command→skill conversions
- *   (`cmd-*`, real directories) are reported as leftovers and not removed:
- *   jig deletes links it or its predecessor made, never a directory.
+ *   else is not jig's. It is the only skills delivery Codex gets: the
+ *   Codex-specific ports (`skills/<name>/codex/SKILL.md`) were dropped by
+ *   the ruling of 2026-09-23, so `~/.codex/skills/` is not managed by jig at
+ *   all — its entries (yoki's port links and `cmd-*` directories, Codex's
+ *   bundled `.system/`) are listed in the dry-run as leftovers for
+ *   milestone 4 and never touched.
  * - `~/.codex/AGENTS.md` — the same generated content as
  *   `~/.claude/AGENTS.md`, from the same renderer: one source, two
  *   destinations, no vocabulary substitution. yoki's file there is backed
  *   up before the first generated one lands, as the Claude target does.
  * - `~/.codex/agents/<name>.toml` — one generated file per `agents/*.md`
  *   (`domain/codex/agents.ts`), each tracked in the manifest so a hand edit
- *   is a conflict. A file there that no source produces is not jig's.
+ *   is a conflict. `model` and `model_reasoning_effort` come from the
+ *   `codex` table of `agents/models.json` (`domain/claude/agent-models.ts`,
+ *   read at the composition root) or the agent's own `models.codex`
+ *   override; a tier the table does not know leaves `model` out and is
+ *   counted. A file there that no source produces is not jig's.
  * - `~/.codex/config.toml` — `[mcp_servers.<name>]` for every server with
  *   `targets.codex`, inside jig's `# jig:begin mcp` block
  *   (`domain/codex/config.ts`); every other table carried through. A
@@ -41,8 +45,9 @@
  * whole write.
  */
 
+import type { ModelMapping } from "../../domain/claude/agent-definition";
 import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
-import { backupPath } from "../../domain/claude/links";
+import { type PathState, backupPath } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
 import {
   type CodexModelChoice,
@@ -59,28 +64,20 @@ import {
   renderMcpBlock,
   yokiLeftovers,
 } from "../../domain/codex/config";
-import {
-  type CodexSkillCandidate,
-  codexPortTarget,
-  selectCodexSkillPorts,
-} from "../../domain/codex/skills";
 import { parseMcpLayer } from "../../domain/mcp/parse";
 import { unifiedDiff } from "../../domain/tiers/diff";
 import { type PlanAction, planApply } from "../../domain/tiers/plan";
 import {
   type AgentsMdReport,
   type AgentsSkillsMountReport,
-  type ManagedDirReport,
   applyAgentsMd,
   applyManagedDir,
   buildAgentsMd,
   dirOf,
   listEntries,
-  listSkillCandidates,
   managedDirChanges,
   planAgentsMd,
   planAgentsSkillsMount,
-  planManagedDir,
   readJson,
 } from "./delivery";
 import type { CodexApplyPorts } from "./ports";
@@ -99,7 +96,7 @@ export interface CodexApplyPaths {
   readonly formerSkillRoots: readonly string[];
   /** Destination: `~/.agents/skills`, the cross-harness mount, one link per skill. */
   readonly agentsSkills: string;
-  /** Destination: `~/.codex/skills`, one link per Codex port. */
+  /** `~/.codex/skills`: not managed by jig; its entries are reported as leftovers only. */
   readonly codexSkills: string;
   /** Destination: `~/.codex/AGENTS.md`, generated. */
   readonly agentsMd: string;
@@ -127,6 +124,14 @@ export interface AgentFileReport {
   readonly backupPath?: string;
 }
 
+/** One tier of the mapping in use and how many agents it decided. */
+export interface MappedTierReport {
+  readonly tier: string;
+  readonly model: string;
+  readonly reasoningEffort?: string;
+  readonly count: number;
+}
+
 export interface AgentsDirReport {
   readonly path: string;
   readonly files: readonly AgentFileReport[];
@@ -134,8 +139,28 @@ export interface AgentsDirReport {
   readonly excluded: readonly { readonly name: string; readonly reason: string }[];
   /** Entries of the destination that no source produces: not jig's, left alone. */
   readonly foreign: readonly { readonly name: string; readonly what: string }[];
+  /** Where the tier table came from, when the caller said. */
+  readonly mappingSource?: string;
+  /** Source tiers the table maps, with what they map to and how many agents each decided. Most agents first. */
+  readonly mappedTiers: readonly MappedTierReport[];
   /** Source tiers with no Codex model, and how many agents name each. */
   readonly unmappedTiers: readonly { readonly tier: string; readonly count: number }[];
+}
+
+/** One entry of `~/.codex/skills`, named and left alone. */
+export interface CodexSkillsLeftover {
+  readonly name: string;
+  readonly path: string;
+  readonly what: string;
+  /** Whose it is, and why jig leaves it. */
+  readonly note: string;
+}
+
+/** `~/.codex/skills` as found: not a destination, a listing for milestone 4. */
+export interface CodexSkillsReport {
+  readonly path: string;
+  readonly state: PathState;
+  readonly entries: readonly CodexSkillsLeftover[];
 }
 
 export interface ConfigTomlReport {
@@ -158,7 +183,8 @@ export interface CodexApplyReport {
   readonly wrote: boolean;
   /** `~/.agents/skills`, the mount the omp target delivers too (`delivery.ts`). */
   readonly agentsSkillsDir: AgentsSkillsMountReport;
-  readonly codexSkillsDir: ManagedDirReport;
+  /** `~/.codex/skills`, reported only. */
+  readonly codexSkills: CodexSkillsReport;
   readonly agentsMd: AgentsMdReport;
   readonly agents: AgentsDirReport;
   readonly configToml: ConfigTomlReport;
@@ -168,54 +194,60 @@ export interface CodexApplyReport {
 }
 
 export interface CodexApplyOptions {
-  /** Claude tier name (`haiku`/`sonnet`/`opus`) → Codex model id. Empty until a ruling supplies one. */
-  readonly codexModels: Readonly<Record<string, string>>;
+  /**
+   * Claude tier name (`haiku`/`sonnet`/`opus`, lower-cased) → Codex model and
+   * reasoning effort: the `codex` table of `agents/models.json`. Empty means
+   * every tier is a reported gap.
+   */
+  readonly codexModels: Readonly<Record<string, ModelMapping>>;
+  /** Where `codexModels` was read from, for the dry-run. */
+  readonly modelsSource?: string;
   /** Called with each generated TOML text before writing; throw to refuse. */
   readonly validateToml?: (text: string) => void;
 }
 
-/** Every entry of `skills/`, with whether it holds a `SKILL.md` and a `codex/SKILL.md`. */
-async function listCodexSkillCandidates(
-  ports: CodexApplyPorts,
-  harnessSkills: string,
-): Promise<readonly CodexSkillCandidate[]> {
-  const candidates: CodexSkillCandidate[] = [];
-  for (const candidate of await listSkillCandidates(ports, harnessSkills)) {
-    const port = candidate.hasSkillMd
-      ? await ports.inspect(`${codexPortTarget(harnessSkills, candidate.name)}/SKILL.md`)
-      : { kind: "missing" as const };
-    candidates.push({ ...candidate, hasCodexPort: port.kind === "file" });
-  }
-  return candidates;
+/** yoki's command→skill conversions: real `cmd-*` directories. */
+function isYokiCommandDir(name: string, state: PathState): boolean {
+  return name.startsWith("cmd-") && state.kind === "dir";
 }
 
-async function planCodexSkillsDir(
+/** Codex's bundled skills live under `.system/` in the same directory. */
+const CODEX_SYSTEM_SKILLS = ".system";
+
+function leftoverNote(name: string, state: PathState): string {
+  if (name === CODEX_SYSTEM_SKILLS) return "Codex's bundled skills; Codex's own";
+  if (isYokiCommandDir(name, state)) {
+    return "yoki's command→skill conversion; commands are skills, delivered through ~/.agents/skills";
+  }
+  if (state.kind === "symlink") {
+    return "yoki's link to a codex/SKILL.md port; ports are dropped, the skill reaches Codex through ~/.agents/skills";
+  }
+  return "not jig's";
+}
+
+/**
+ * What stands under `~/.codex/skills` today. Nothing is planned for the
+ * directory: Codex reads every skill from `~/.agents/skills` like pi and omp,
+ * and the Codex-specific ports are gone. Each entry is named with whose it
+ * is, so the hand cleanup of milestone 4 has its list.
+ */
+async function reportCodexSkills(
   ports: CodexApplyPorts,
   paths: CodexApplyPaths,
-  now: Date,
-): Promise<ManagedDirReport> {
-  const sourceDir = `${paths.harnessRoot}/skills`;
-  const selection = selectCodexSkillPorts(await listCodexSkillCandidates(ports, sourceDir));
-  return planManagedDir(ports, {
-    dir: paths.codexSkills,
-    sourceDir,
-    selection,
-    now,
-    targetOf: (name) => codexPortTarget(sourceDir, name),
-    formerSourceDirs: paths.formerSkillRoots,
-    probeDangling: true,
-  });
-}
-
-/** yoki's command→skill conversions: real `cmd-*` directories under `~/.codex/skills`. */
-export function yokiCommandLeftovers(
-  report: ManagedDirReport,
-): readonly { readonly name: string; readonly path: string }[] {
-  return report.entries.flatMap((entry) =>
-    entry.kind === "foreign" && entry.name.startsWith("cmd-") && entry.what === "a directory"
-      ? [{ name: entry.name, path: entry.path }]
-      : [],
-  );
+): Promise<CodexSkillsReport> {
+  const state = await ports.inspect(paths.codexSkills);
+  const entries =
+    state.kind === "dir"
+      ? (await listEntries(ports, paths.codexSkills))
+          .map((entry) => ({
+            name: entry.name,
+            path: `${paths.codexSkills}/${entry.name}`,
+            what: describePathState(entry.state),
+            note: leftoverNote(entry.name, entry.state),
+          }))
+          .sort((a, b) => compare(a.name, b.name))
+      : [];
+  return { path: paths.codexSkills, state, entries };
 }
 
 async function planAgents(
@@ -231,14 +263,29 @@ async function planAgents(
 
   const files: AgentFileReport[] = [];
   const produced = new Set<string>();
+  const mapped = new Map<string, MappedTierReport>();
   const unmapped = new Map<string, number>();
   for (const sourceFile of selection.linked) {
     const text = await ports.readFile(`${sourceDir}/${sourceFile}`);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
-    const definition = parseAgentDefinition(text, stem);
-    const model = codexModelFor(definition.model, options.codexModels);
+    const { definition, model } = decide(sourceFile, () => {
+      const parsed = parseAgentDefinition(text, stem);
+      return {
+        definition: parsed,
+        model: codexModelFor(parsed.model, options.codexModels, parsed.models?.codex),
+      };
+    });
     if (model.kind === "unmapped") unmapped.set(model.tier, (unmapped.get(model.tier) ?? 0) + 1);
+    if (model.kind === "mapped" && model.override === undefined && model.tier !== undefined) {
+      const seen = mapped.get(model.tier);
+      mapped.set(model.tier, {
+        tier: model.tier,
+        model: model.model,
+        ...(model.reasoningEffort === undefined ? {} : { reasoningEffort: model.reasoningEffort }),
+        count: (seen?.count ?? 0) + 1,
+      });
+    }
     const content = renderCodexAgent({
       definition,
       model,
@@ -272,17 +319,29 @@ async function planAgents(
   const foreign = (await listEntries(ports, paths.agentsDir))
     .filter((entry) => !produced.has(entry.name))
     .map((entry) => ({ name: entry.name, what: describePathState(entry.state) }))
-    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    .sort((a, b) => compare(a.name, b.name));
 
   return {
     path: paths.agentsDir,
     files,
     excluded: selection.excluded,
     foreign,
+    ...(options.modelsSource === undefined ? {} : { mappingSource: options.modelsSource }),
+    mappedTiers: [...mapped.values()].sort((a, b) => b.count - a.count),
     unmappedTiers: [...unmapped.entries()]
       .map(([tier, count]) => ({ tier, count }))
       .sort((a, b) => b.count - a.count),
   };
+}
+
+/** A source that cannot be read is an error naming the file, not a silently skipped agent. */
+function decide<T>(sourceFile: string, read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`jig apply --target codex: agents/${sourceFile}: ${reason}`);
+  }
 }
 
 async function planConfigToml(
@@ -330,7 +389,6 @@ async function planConfigToml(
 function needsWrite(report: Omit<CodexApplyReport, "outcome" | "wrote" | "message">): boolean {
   return (
     managedDirChanges(report.agentsSkillsDir) ||
-    managedDirChanges(report.codexSkillsDir) ||
     report.agentsMd.outcome === "write" ||
     report.agents.files.some((file) => file.outcome === "write") ||
     report.configToml.outcome === "write"
@@ -360,7 +418,7 @@ export async function applyCodex(
 
   const base = {
     agentsSkillsDir: await planAgentsSkillsMount(ports, paths, "codex", now),
-    codexSkillsDir: await planCodexSkillsDir(ports, paths, now),
+    codexSkills: await reportCodexSkills(ports, paths),
     agentsMd,
     agents,
     configToml: config.report,
@@ -418,7 +476,6 @@ export async function applyCodex(
       jigVersion: ports.jigVersion,
     });
     await applyManagedDir(ports, base.agentsSkillsDir);
-    await applyManagedDir(ports, base.codexSkillsDir);
     return { ...base, outcome: "write", wrote: true };
   }
 
@@ -448,4 +505,8 @@ function seedManifest(
   for (const file of report.agents.files) seed(file.path, file.content);
   seed(report.configToml.path, report.configToml.block);
   return added;
+}
+
+function compare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }

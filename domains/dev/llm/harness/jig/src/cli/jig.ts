@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { ClaudeApplyPaths } from "../app/apply/apply-claude";
 import type { CodexApplyOptions, CodexApplyPaths } from "../app/apply/apply-codex";
 import type { OmpApplyOptions, OmpApplyPaths } from "../app/apply/apply-omp";
+import type { PiApplyPaths } from "../app/apply/apply-pi";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
@@ -14,8 +15,11 @@ import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/h
 import { skillQuestionMode } from "../app/routing/select-skills";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
+import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
+import { resolvePiAgentDir } from "../domain/pi/agent-dir";
+import { PI_MCP_USER_CONFIG } from "../domain/pi/mcp";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
 import { JsonlAuditLog } from "../infra/audit/jsonl-audit";
@@ -148,16 +152,35 @@ function resolveCodexApplyPaths(): CodexApplyPaths {
 }
 
 /**
- * What the Codex target needs beyond its paths. The model map is empty on
- * purpose: jig has no source that names Codex model ids for Claude's tier
- * names (`policy/tiers.json` maps tiers to the proxy's backends, not to
- * Codex), and yoki's `harness-models.json` is the retiring generator's
- * guess, not a ruling. Until a decision note supplies one, every agent's
- * `model` is left out and the dry-run says so per tier.
+ * `agents/models.json`: the ruled Claude-tier → model table the Codex and
+ * omp targets read (`domain/claude/agent-models.ts`; the file's `_comment`
+ * carries the ruling, the prices and the sources). It is a source like
+ * `mcp/servers.json`, so a missing or malformed file is an error naming it,
+ * never an empty map: `policy/tiers.json` maps tiers to the proxy's
+ * backends, not to another harness's ids, and the generator never guesses.
  */
-function codexApplyOptions(): CodexApplyOptions {
+async function readAgentModels(): Promise<{ readonly path: string; readonly models: AgentModels }> {
+  const path = join(harnessRoot(), "agents", "models.json");
+  let text: string;
+  try {
+    text = await readFile(path, "utf8");
+  } catch {
+    throw new Error(`jig apply: agent model table not found at ${path}`);
+  }
+  return { path, models: parseAgentModels(text, path) };
+}
+
+/**
+ * What the Codex target needs beyond its paths: the `codex` table of
+ * `agents/models.json`, and TOML validation of every generated file with
+ * Bun's parser before it is written.
+ */
+function codexApplyOptions(
+  agentModels: Awaited<ReturnType<typeof readAgentModels>>,
+): CodexApplyOptions {
   return {
-    codexModels: {},
+    codexModels: agentModels.models.codex,
+    modelsSource: agentModels.path,
     validateToml: (text) => {
       Bun.TOML.parse(text);
     },
@@ -193,19 +216,57 @@ function resolveOmpApplyPaths(): OmpApplyPaths {
 }
 
 /**
- * What the omp target needs beyond its paths. The model map is empty for
- * the reason the Codex one is: omp wants a provider-qualified selector or a
- * `modelRoles` alias, and jig has no source that names one for Claude's
- * tier names. The frontmatter is validated as YAML with Bun's parser before
- * a file is written, so a description that breaks the frontmatter is
- * refused here rather than dropped by omp at discovery.
+ * What the omp target needs beyond its paths: the `omp` table of
+ * `agents/models.json` — empty until ruled, because omp wants a
+ * provider-qualified selector or a `modelRoles` alias and no ruling has
+ * named one; filling that table is the whole change. The frontmatter is
+ * validated as YAML with Bun's parser before a file is written, so a
+ * description that breaks the frontmatter is refused here rather than
+ * dropped by omp at discovery.
  */
-function ompApplyOptions(): OmpApplyOptions {
+function ompApplyOptions(
+  agentModels: Awaited<ReturnType<typeof readAgentModels>>,
+): OmpApplyOptions {
   return {
-    ompModels: {},
+    ompModels: agentModels.models.omp,
     validateFrontmatter: (yaml) => {
       Bun.YAML.parse(yaml);
     },
+  };
+}
+
+/**
+ * Where the pi target's agent-directory half reads from and writes to.
+ *
+ * The agent directory follows pi's own rule (`domain/pi/agent-dir.ts`:
+ * `PI_CODING_AGENT_DIR`, else `~/.pi/agent`). `~/.agents/skills` is the
+ * mount the Codex and omp targets deliver, under `$HOME` whatever the agent
+ * directory is. The MCP file is pi-mcp-adapter's user-global shared config,
+ * `~/.config/mcp/mcp.json` as its README spells it (`domain/pi/mcp.ts`; no
+ * XDG variable is documented, so none is honoured). The repo-side paths
+ * name what `core/config/manager.sh link_pi_resources` links today: the
+ * settings file (read as the `packages` source), the extensions directory
+ * (reported), and the AGENTS.md that retires.
+ */
+function resolvePiApplyPaths(): PiApplyPaths {
+  const harness = harnessRoot();
+  const agentDir = resolvePiAgentDir(process.env, homedir()).dir;
+  const repoPi = join(resolveApplyRoot(), "domains", "dev", "config", "pi");
+  return {
+    harnessRoot: harness,
+    mcpServers: join(harness, "mcp", "servers.json"),
+    decisions: join(harness, "rules", "decisions"),
+    formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
+    agentsSkills: join(homedir(), ".agents", "skills"),
+    agentDir,
+    agentsMd: join(agentDir, "AGENTS.md"),
+    mcpJson: join(homedir(), PI_MCP_USER_CONFIG),
+    adapterOverride: join(agentDir, "mcp.json"),
+    extensionsDir: join(agentDir, "extensions"),
+    repoExtensionsDir: join(repoPi, "extensions"),
+    repoSettings: join(repoPi, "settings.json"),
+    retiredAgentsMd: join(repoPi, "AGENTS.md"),
+    home: homedir(),
   };
 }
 
@@ -471,13 +532,19 @@ export async function main(argv: readonly string[]): Promise<number> {
         stateDir: resolveStateDir(process.env),
         jigVersion: VERSION,
       });
+      const agentModels = await readAgentModels();
       const result = await applyCli(
         argv.slice(1),
         applyPorts,
         resolveApplyPaths(),
         { ports: applyPorts, paths: resolveClaudeApplyPaths(), hookPaths: claudeHookPaths() },
-        { ports: applyPorts, paths: resolveCodexApplyPaths(), options: codexApplyOptions() },
-        { ports: applyPorts, paths: resolveOmpApplyPaths(), options: ompApplyOptions() },
+        {
+          ports: applyPorts,
+          paths: resolveCodexApplyPaths(),
+          options: codexApplyOptions(agentModels),
+        },
+        { ports: applyPorts, paths: resolveOmpApplyPaths(), options: ompApplyOptions(agentModels) },
+        { ports: applyPorts, paths: resolvePiApplyPaths() },
       );
       process.stdout.write(result.stdout);
       return result.code;
@@ -651,12 +718,13 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  .<x>-merged staging dirs are not touched.\n" +
           "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
           "  apply --target codex delivers the same sources to Codex ($CODEX_HOME, default ~/.codex):\n" +
-          "  ~/.agents/skills (one link per skill; the mount Codex, pi and omp read) and ~/.codex/skills\n" +
-          "  (one link per Codex port, skills/<name>/codex) as managed directories — links yoki-switch\n" +
-          "  left into the old tree, or dangling, are removed; yoki's cmd-* directories are reported,\n" +
-          "  not removed; ~/.codex/AGENTS.md, the same generated file as ~/.claude/AGENTS.md;\n" +
+          "  ~/.agents/skills (one link per skill; the mount Codex, pi and omp read) as a managed\n" +
+          "  directory — links yoki-switch left into the old tree, or dangling, are removed; ~/.codex/skills\n" +
+          "  is not managed at all (no Codex-specific ports), its entries are listed as leftovers;\n" +
+          "  ~/.codex/AGENTS.md, the same generated file as ~/.claude/AGENTS.md;\n" +
           "  ~/.codex/agents/<name>.toml generated from agents/*.md (tools become a sentence in\n" +
-          "  developer_instructions; model is left out until a ruling maps Claude tiers to Codex ids);\n" +
+          "  developer_instructions; model and model_reasoning_effort from agents/models.json's codex\n" +
+          "  table, or the agent's own models.codex override; an unmapped tier is left out and counted);\n" +
           "  and [mcp_servers.*] for targets.codex servers inside a `# jig:begin mcp` block of\n" +
           "  ~/.codex/config.toml, every other table preserved. A server already declared outside the\n" +
           "  block is a conflict to clean up by hand once. hooks.json is jig codex register's.\n" +
@@ -665,12 +733,23 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  agent dir per OMP_PROFILE/PI_PROFILE/PI_CODING_AGENT_DIR): the same ~/.agents/skills mount the\n" +
           "  codex target delivers (one plan, either target); ~/.omp/agent/agents/<name>.md generated from\n" +
           "  agents/*.md (omp's own frontmatter; tools mapped to omp ids, unmappable ones dropped and counted;\n" +
-          "  model left out until a ruling maps Claude tiers to omp selectors; body verbatim); jig's entries in\n" +
+          "  model from agents/models.json's omp table, empty until ruled, so left out and counted; body\n" +
+          "  verbatim); jig's entries in\n" +
           "  ~/.omp/agent/mcp.json for targets.omp servers, every other entry and key carried through; and\n" +
           "  extensions/jig.ts -> jig's omp extension. yoki-hooks.json, RULES.md, .yoki/, config.yml and\n" +
           "  yoki's extension links are reported as leftovers, not touched; config.yml is not jig's yet.\n" +
           "  Conditional paths: rules are not delivered to omp in this milestone (the dry-run says so).\n" +
           "  Dry-run by default; --write does all of it in one run; never part of --target all.\n" +
+          "  apply --target pi runs both halves for the one harness: pi/models.json from policy/tiers.json\n" +
+          "  (the tiers half, the only part --target all runs), then the agent directory (~/.pi/agent, or\n" +
+          "  PI_CODING_AGENT_DIR): the same ~/.agents/skills mount the codex and omp targets deliver;\n" +
+          "  ~/.pi/agent/AGENTS.md, the same generated file as ~/.claude/AGENTS.md — today a symlink into the\n" +
+          "  repo, replaced by the generated file on --write (the repo file is untouched and reported as unused);\n" +
+          "  and jig's entries in pi-mcp-adapter's ~/.config/mcp/mcp.json for targets.pi servers, every other\n" +
+          "  entry and key carried through. Report only: whether packages in domains/dev/config/pi/settings.json\n" +
+          "  declares pi-mcp-adapter and @tintinweb/pi-subagents (the paste-able line is printed when not),\n" +
+          "  what ~/.pi/agent/extensions holds (manager.sh's links until milestone 4), and the two gaps\n" +
+          "  (no native subagents; conditional paths: rules not delivered). Dry-run by default; --write.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +

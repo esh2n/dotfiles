@@ -32,8 +32,14 @@
  * carries through.
  */
 
-import type { Json, JsonObject } from "../compose/merge";
+import type { JsonObject } from "../compose/merge";
 import { type TemplateVars, applyTemplate } from "../compose/template";
+import {
+  type McpJsonEntry,
+  type McpJsonPlan,
+  planMcpJson,
+  renderMcpJsonBlock,
+} from "../mcp/mcp-json";
 import type { McpServer } from "../mcp/types";
 
 /** The schema line omp itself writes into files it manages (docs/mcp-config.md, "Add a schema reference"). */
@@ -41,10 +47,7 @@ export const OMP_MCP_SCHEMA_URL =
   "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json";
 
 /** One server's entry, ready to place under `mcpServers`. */
-export interface OmpMcpEntry {
-  readonly name: string;
-  readonly entry: JsonObject;
-}
+export type OmpMcpEntry = McpJsonEntry;
 
 function applyOmpOverride(server: McpServer): McpServer {
   const override = server.targetOverrides?.omp;
@@ -93,112 +96,22 @@ export function buildOmpMcpServers(
   return out;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 /** The text hand-edit detection hashes: jig's entries alone, in source order. */
 export function renderOmpMcpBlock(entries: readonly OmpMcpEntry[]): string {
-  const block: Record<string, Json> = {};
-  for (const { name, entry } of entries) block[name] = entry;
-  return `${JSON.stringify(block, null, 2)}\n`;
+  return renderMcpJsonBlock(entries);
 }
 
-export interface OmpMcpPlan {
-  /** mcp.json as it should read afterwards. */
-  readonly text: string;
-  /** jig's entries as generated (`renderOmpMcpBlock`). */
-  readonly block: string;
-  /** jig's entries as they stand in the file today; absent when none of them is there. */
-  readonly currentBlock: string | undefined;
-  /** `mcpServers` entries no source produces: carried through, named. */
-  readonly foreign: readonly string[];
-  /** Top-level keys other than `mcpServers`: carried through, named. */
-  readonly carried: readonly string[];
-  /** Set when the file could not be read as an object: nothing can be carried through, so nothing is written. */
-  readonly invalid?: string;
-}
+export type OmpMcpPlan = McpJsonPlan;
 
 /**
- * Upsert jig's entries. Managed entries come first in source order (so a
- * server dropped from the source leaves nothing behind and one renamed
- * moves), then every foreign entry in the order the file had them. Every
- * other top-level key keeps its value; `$schema` is added when absent, with
- * the URL omp writes itself.
+ * Upsert jig's entries (`domain/mcp/mcp-json.ts`, the rule shared with the
+ * pi target): managed entries first in source order, then every foreign
+ * entry in the order the file had them, every other top-level key kept;
+ * `$schema` is added when absent, with the URL omp writes itself.
  */
 export function planOmpMcpJson(
   current: string | undefined,
   entries: readonly OmpMcpEntry[],
 ): OmpMcpPlan {
-  const block = renderOmpMcpBlock(entries);
-  const managed = new Set(entries.map((entry) => entry.name));
-
-  let parsed: Record<string, unknown> = {};
-  if (current !== undefined && current.trim() !== "") {
-    let value: unknown;
-    try {
-      value = JSON.parse(current);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        text: current,
-        block,
-        currentBlock: undefined,
-        foreign: [],
-        carried: [],
-        invalid: message,
-      };
-    }
-    if (!isObject(value)) {
-      return {
-        text: current,
-        block,
-        currentBlock: undefined,
-        foreign: [],
-        carried: [],
-        invalid: "the top level is not a JSON object",
-      };
-    }
-    parsed = value;
-  }
-
-  const servers = isObject(parsed.mcpServers) ? parsed.mcpServers : {};
-  const present: OmpMcpEntry[] = [];
-  const foreign: [string, unknown][] = [];
-  for (const [name, entry] of Object.entries(servers)) {
-    if (managed.has(name)) present.push({ name, entry: entry as JsonObject });
-    else foreign.push([name, entry]);
-  }
-  // In source order, so a reordering by hand is not a change and the
-  // comparison is entry against entry.
-  const currentBlock =
-    present.length === 0
-      ? undefined
-      : renderOmpMcpBlock(
-          entries.flatMap((entry) => present.filter((found) => found.name === entry.name)),
-        );
-
-  const mcpServers: Record<string, unknown> = {};
-  for (const { name, entry } of entries) mcpServers[name] = entry;
-  for (const [name, entry] of foreign) mcpServers[name] = entry;
-
-  const out: Record<string, unknown> = {
-    $schema: parsed.$schema ?? OMP_MCP_SCHEMA_URL,
-    mcpServers,
-  };
-  const carried: string[] = [];
-  for (const [key, value] of Object.entries(parsed)) {
-    if (key === "mcpServers" || key === "$schema") continue;
-    out[key] = value;
-    carried.push(key);
-  }
-  if (parsed.$schema !== undefined) carried.unshift("$schema");
-
-  return {
-    text: `${JSON.stringify(out, null, 2)}\n`,
-    block,
-    currentBlock,
-    foreign: foreign.map(([name]) => name),
-    carried,
-  };
+  return planMcpJson(current, entries, { schema: OMP_MCP_SCHEMA_URL });
 }

@@ -190,13 +190,49 @@ describe("the generated agent files", () => {
   test("a mapped tier lands in `model`; an unmapped one is never guessed", async () => {
     const { ports } = fakePorts();
     const report = await applyOmp(
-      { paths: PATHS, options: { ...OPTIONS, ompModels: { sonnet: "@review" } }, write: false },
+      {
+        paths: PATHS,
+        options: { ...OPTIONS, ompModels: { sonnet: { model: "@review" } } },
+        write: false,
+      },
       ports,
     );
     const [research, scout] = report.agents.files;
     expect(research?.content).toContain('model: "@review"');
     expect(scout?.content).not.toContain("model:");
     expect(report.agents.unmappedTiers).toEqual([{ tier: "haiku", count: 1 }]);
+  });
+
+  test("an agent's own models.omp wins over the table; a mapping's reasoningEffort is not written", async () => {
+    const { ports } = fakePorts({
+      files: {
+        [`${H}/agents/scout.md`]:
+          '---\nname: scout\ndescription: Cheap lookups.\nmodel: haiku\nmodels: { omp: { model: "@cheap", reasoningEffort: "low" } }\n---\n\nLook things up.\n',
+      },
+    });
+    const report = await run(ports);
+    const scout = report.agents.files.find((file) => file.name === "scout.md");
+    expect(scout?.model).toEqual({
+      kind: "mapped",
+      tier: "haiku",
+      model: "@cheap",
+      reasoningEffort: "low",
+      override: true,
+    });
+    expect(scout?.content).toContain('model: "@cheap"');
+    expect(scout?.content).not.toContain("low");
+    expect(report.agents.unmappedTiers).toEqual([{ tier: "sonnet", count: 1 }]);
+  });
+
+  test("a malformed models: block is an error naming the file, not a dropped override", async () => {
+    const { ports } = fakePorts({
+      files: {
+        [`${H}/agents/scout.md`]: "---\nname: scout\nmodels:\n  omp:\n    effort: low\n---\nx\n",
+      },
+    });
+    expect(run(ports)).rejects.toThrow(
+      "jig apply --target omp: agents/scout.md: scout.md: models.omp",
+    );
   });
 
   test("yoki's same-named files are kept aside on first write; files no source produces are not jig's", async () => {

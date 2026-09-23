@@ -19,13 +19,13 @@
  * *former* source tree (`formerSourceDirs` — the `claude-profiles/` tree
  * yoki-switch linked from, which the same delivery replaces) and a link the
  * caller found dangling (`ManagedDirEntry.dangling`) are stale too. Both are
- * what the Codex destinations (`~/.agents/skills`, `~/.codex/skills`) hold
- * today; the Claude destinations pass neither and keep the narrow rule.
+ * what the cross-harness mount (`~/.agents/skills`) holds today; the Claude
+ * destinations pass neither and keep the narrow rule.
  *
  * Pure. The caller lists both directories and hands over what it found; the
  * per-destination selection (which source entries get a link, and why the
- * rest do not) lives beside it in `rules-dir.ts`, `skills-dir.ts`,
- * `agents-dir.ts` and `../codex/skills.ts`.
+ * rest do not) lives beside it in `rules-dir.ts`, `skills-dir.ts` and
+ * `agents-dir.ts`.
  */
 
 import { type LinkPlan, type PathState, planLink } from "./links";

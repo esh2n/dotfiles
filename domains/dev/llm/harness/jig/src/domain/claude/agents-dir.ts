@@ -9,7 +9,8 @@
  * rather than routed into git sources through one symlink to the tree.
  *
  * An agent definition is a regular `*.md` file. Anything else at the top of
- * the tree gets no link.
+ * the tree — the directory's `README.md` and `models.json` included — gets
+ * no link.
  *
  * Pure. The caller lists the source directory and hands over what it found.
  */
@@ -35,8 +36,12 @@ export function selectAgentFiles(candidates: readonly AgentCandidate[]): Managed
   return { linked, excluded };
 }
 
+/** The directory's own documentation (`agents/README.md`), as `rules/common/README.md` and `skills/README.md` are. */
+const README_RE = /^readme\.md$/i;
+
 function skipReason(candidate: AgentCandidate): string | undefined {
   if (!candidate.name.endsWith(".md")) return "not a *.md file";
+  if (README_RE.test(candidate.name)) return "the directory's README, not an agent definition";
   switch (candidate.state.kind) {
     case "file":
       return undefined;

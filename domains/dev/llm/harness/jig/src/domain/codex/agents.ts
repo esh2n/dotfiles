@@ -16,9 +16,22 @@
  *   custom agent inherits the session's tools — so the list is rendered as
  *   one trailing sentence of the instructions rather than dropped.
  * - `model`: a Claude tier name (`haiku`/`sonnet`/`opus`) means nothing to
- *   Codex. It is looked up in a map the caller supplies; a tier the map does
- *   not know is left out, so Codex applies its own default, and reported.
- *   The generator never invents a Codex model id.
+ *   Codex. It is looked up in the `codex` table of `agents/models.json`
+ *   (`../claude/agent-models.ts`; the ruling of 2026-09-23 maps `sonnet` and
+ *   `haiku` to `gpt-6-luna`, `opus` to `gpt-6-sol` —
+ *   https://learn.chatgpt.com/docs/models, prices at
+ *   https://developers.openai.com/api/docs/pricing), or overridden by the
+ *   agent's own `models.codex` block. A tier the table does not know is left
+ *   out, so Codex applies its own default, and reported. Omitting `model`
+ *   inherits: "explicit spawn → `[agents]` default → parent" (subagents
+ *   page). The generator never invents a Codex model id.
+ * - `model_reasoning_effort`: written whenever the mapping or override
+ *   carries a `reasoningEffort`. The config reference lists
+ *   `low | medium | high | xhigh | max | ultra` and says "Available levels
+ *   depend on the model and client"
+ *   (https://learn.chatgpt.com/docs/config-file/config-reference); a value
+ *   outside that list is refused here rather than written for Codex to
+ *   reject at spawn.
  *
  * The source parser and the model question are `../claude/agent-definition.ts`,
  * shared with the omp target; the Codex names below are kept for callers.
@@ -30,20 +43,48 @@
 import {
   type AgentDefinition,
   type ModelChoice,
+  type ModelMapping,
   modelChoiceFor,
   parseAgentDefinition,
 } from "../claude/agent-definition";
 
 export { parseAgentDefinition };
-export type { AgentDefinition };
+export type { AgentDefinition, ModelMapping };
 
 /** See `ModelChoice`: the same three answers, for a Codex model id. */
 export type CodexModelChoice = ModelChoice;
 
-export const codexModelFor: (
+/**
+ * The `model_reasoning_effort` levels the config reference lists
+ * (https://learn.chatgpt.com/docs/config-file/config-reference). Which of
+ * them a given model accepts is Codex's to say; the official guidance is
+ * "start with medium for GPT-6 Sol, high for GPT-6 Luna".
+ */
+export const CODEX_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max", "ultra"] as const;
+
+/**
+ * `modelChoiceFor`, plus the one check Codex adds: a reasoning effort must be
+ * a level the config reference names. The error says which entry, so the
+ * caller can add the file.
+ */
+export function codexModelFor(
   tier: string | undefined,
-  map: Readonly<Record<string, string>>,
-) => CodexModelChoice = modelChoiceFor;
+  map: Readonly<Record<string, ModelMapping>>,
+  override?: ModelMapping,
+): CodexModelChoice {
+  const choice = modelChoiceFor(tier, map, override);
+  if (
+    choice.kind === "mapped" &&
+    choice.reasoningEffort !== undefined &&
+    !(CODEX_REASONING_EFFORTS as readonly string[]).includes(choice.reasoningEffort)
+  ) {
+    const where = choice.override === true ? "the models.codex override" : `tier "${choice.tier}"`;
+    throw new Error(
+      `reasoningEffort "${choice.reasoningEffort}" for ${where} is not a Codex model_reasoning_effort (${CODEX_REASONING_EFFORTS.join(", ")})`,
+    );
+  }
+  return choice;
+}
 
 /**
  * A TOML basic string (https://toml.io/en/v1.0.0#string): `"` and `\`
@@ -84,7 +125,10 @@ export function toolsSentence(tools: readonly string[]): string {
     : `The source definition limits this agent to these tools: ${tools.join(", ")}. Codex has no per-agent tool list, so honour it as an instruction.`;
 }
 
-/** The whole `<name>.toml`. Required keys first, `model` only when mapped, instructions last. */
+/**
+ * The whole `<name>.toml`. Required keys first, `model` and
+ * `model_reasoning_effort` only when mapped, instructions last.
+ */
 export function renderCodexAgent(input: CodexAgentInput): string {
   const { definition, model } = input;
   const sentence = toolsSentence(definition.tools);
@@ -95,6 +139,9 @@ export function renderCodexAgent(input: CodexAgentInput): string {
     `name = ${tomlString(definition.name)}`,
     `description = ${tomlString(definition.description)}`,
     ...(model.kind === "mapped" ? [`model = ${tomlString(model.model)}`] : []),
+    ...(model.kind === "mapped" && model.reasoningEffort !== undefined
+      ? [`model_reasoning_effort = ${tomlString(model.reasoningEffort)}`]
+      : []),
     `developer_instructions = ${tomlString(instructions)}`,
   ];
   return `${lines.join("\n")}\n`;

@@ -74,9 +74,10 @@ inverted.
 |---|---|---|
 | 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, and the removal of `YOKI_*` from `env`; MCP servers as printed `claude mcp add` lines | **done** |
 | 2 | The sources move: `skills/`, `rules/` and `agents/` into `llm/harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`), and retires `~/.claude/commands` | **done** |
-| 3a | Codex: `~/.agents/skills` and `~/.codex/skills` as managed link directories, `~/.codex/AGENTS.md`, `~/.codex/agents/*.toml`, jig's MCP block in `~/.codex/config.toml` | **done** |
+| 3a | Codex: `~/.agents/skills` as a managed link directory (`~/.codex/skills` reported, not managed), `~/.codex/AGENTS.md`, `~/.codex/agents/*.toml` with the model from `agents/models.json`, jig's MCP block in `~/.codex/config.toml` | **done** |
 | 3b | omp: the same `~/.agents/skills` mount (one plan shared with 3a), `~/.omp/agent/agents/*.md`, jig's entries in `~/.omp/agent/mcp.json`, `~/.omp/agent/extensions/jig.ts` → jig's omp extension; `config.yml` reported, not owned | **done** |
-| 3c | pi, DSH | |
+| 3c-pi | pi: the same `~/.agents/skills` mount (one plan shared with 3a/3b), `~/.pi/agent/AGENTS.md` as the same generated file (replacing today's symlink into the repo), jig's entries in pi-mcp-adapter's `~/.config/mcp/mcp.json`; `packages` and `extensions/` reported, not owned | **done** |
+| 3c-dsh | DSH | |
 | 4 | `yoki-switch` retired, along with `core/config/manager.sh`'s `link_*` functions for the harnesses | |
 
 ### What each milestone replaces in `yoki-switch`
@@ -97,10 +98,12 @@ Rows cite the destination table in
 | `merge_dir()` (yoki-switch:352-390) — the `.{dir}-merged` staging dirs behind `skills`/`hooks`/`commands`/`agents`/`rules`/`workflows`/`scripts` | one flat source tree, delivered by symlink; no `commands/` at all ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)) | 2 |
 | `link_external_resources()` (yoki-switch:411-452) and `external-links.yaml` | folded into the flat tree | 2 |
 | `.claude-packs` / `packs.default` / `pack enable\|disable` | gone — rules are selected by `paths:` frontmatter, skills by the judgment service | 2 |
-| `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex: `codex-agents.js`, `codex-skills.js`, the `# yoki:begin` block of `config.toml`, the `~/.agents/skills` links | `app/apply/apply-codex.ts` + `domain/codex/{skills,agents,config}.ts`, with the milestone-2 delivery verbs shared through `app/apply/delivery.ts` | 3a |
+| `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex: `codex-agents.js`, `codex-skills.js`, the `# yoki:begin` block of `config.toml`, the `~/.agents/skills` links | `app/apply/apply-codex.ts` + `domain/codex/{agents,config}.ts` and `domain/claude/agent-models.ts`, with the milestone-2 delivery verbs shared through `app/apply/delivery.ts`; `codex-skills.js` has no successor (no Codex-specific skills) | 3a |
 | `targets/gen.js` for omp: `omp-agents.js` + `omp-tool-names.js`, `omp-mcp.js`, the `~/.agents/skills` links, `link_omp_resources` in `core/config/manager.sh` | `app/apply/apply-omp.ts` + `domain/omp/{agents,mcp,agent-dir}.ts`, the mount through `app/apply/delivery.ts`'s `planAgentsSkillsMount` (shared with 3a) | 3b |
 | `targets/gen.js` for omp: `omp-config-yml.js`, `omp-rules-md.js`, `omp-hooks.js` (`config.yml`, `RULES.md`, `yoki-hooks.json`, the `yoki-*.ts` extension links) | nothing yet — reported as leftovers by 3b; `config.yml` ownership is a ruling not made | 4 |
-| `link_pi_resources` / `link_dsh_resources` in `core/config/manager.sh` | per-target modules under `app/apply/` | 3c |
+| `link_pi_resources` in `core/config/manager.sh`: the `AGENTS.md` link | `app/apply/apply-pi.ts`: the generated file over the link, `domain/pi/{mcp,packages,agent-dir}.ts` for the rest; the mount through `planAgentsSkillsMount` (shared with 3a/3b) | 3c-pi |
+| `link_pi_resources`: the `settings.json`/`models.json` links, the `extensions/*.ts` and `themes/*.json` file links | nothing yet — reported by 3c-pi (`extensions/`) or untouched (`settings.json` is read as the `packages` source; `models.json` is the tiers target's file) | 4 |
+| `link_dsh_resources` in `core/config/manager.sh` | per-target module under `app/apply/` | 3c-dsh |
 
 ### Milestone 1: what `jig apply --target claude` does
 
@@ -310,18 +313,18 @@ Destinations, one source tree:
   destination (`formerSourceDirs`, `dangling`), make those stale — removed on
   write, reported as `link into the retired tree` or `dangling link` — while
   the Claude directories keep the narrow rule. Anything else is not jig's.
-- **`~/.codex/skills/`** — the same mechanism, only for skills with a Codex
-  port: `~/.codex/skills/<name>` → `skills/<name>/codex`
-  (`domain/codex/skills.ts`; today `grilling` and `code-graph-exploration`).
-  Codex's bundled `.system/` is foreign and stays. yoki's `cmd-*`
-  directories — its command→skill conversion, redundant now that commands
-  are skills delivered through `~/.agents/skills` — are real directories, so
-  jig does not remove them; the dry-run lists them under a `yoki leftovers`
-  heading for milestone 4. One consequence the doc states and the dry-run
-  repeats: "If two skills share the same `name`, Codex doesn't merge them;
-  both can appear in skill selectors" — a ported skill is listed twice. The
-  generator delivers what the sources say; whether the generic entry should
-  yield is a ruling, not a flag.
+- **`~/.codex/skills/`** — not managed by jig. Codex reads every skill from
+  `~/.agents/skills` like pi and omp, and the Codex-specific ports
+  (`skills/<name>/codex/SKILL.md`, once `grilling` and
+  `code-graph-exploration`) were dropped on 2026-09-23: a port was a second
+  `SKILL.md` for the same skill, and Codex "doesn't merge" two skills of one
+  `name` (build-skills doc), so the skill appeared twice. Nothing is
+  delivered into the directory and nothing in it is removed; the dry-run
+  lists what stands there today — yoki's two port links (into the retired
+  tree), its sixteen `cmd-*` directories (the command→skill conversion,
+  redundant now that commands are skills), and Codex's bundled `.system/` —
+  under a `yoki leftovers (milestone 4) — not managed by jig` heading, each
+  with whose it is, for the hand cleanup.
 - **`~/.codex/AGENTS.md`** — the same generated content as
   `~/.claude/AGENTS.md`, from the same renderer, with the same hand-edit
   detection and the same first-write backup (`.pre-jig.<stamp>`; today the
@@ -336,13 +339,24 @@ Destinations, one source tree:
   `developer_instructions`, and `tools:` as one trailing sentence of the
   instructions, because Codex's custom agent has no per-agent tool list and a
   dropped field should be visible. `model:` is a Claude tier name
-  (`sonnet`/`opus`/`haiku`) and jig has no source that maps it to a Codex id
-  — `policy/tiers.json` maps tiers to the proxy's backends, and yoki's
-  `harness-models.json` is the retiring generator's guess, not a ruling — so
-  `model` is left out (Codex applies its default) and the dry-run counts the
-  gap per tier. The map is a `CodexApplyOptions.codexModels` parameter,
-  empty at the composition root until a decision note fills it. Files there
-  that no source produces are not jig's.
+  (`sonnet`/`opus`/`haiku`) and Codex wants one of its own ids, so the tier
+  is looked up in the `codex` table of
+  [`agents/models.json`](../agents/models.json)
+  (`domain/claude/agent-models.ts`; documented in
+  [`agents/README.md`](../agents/README.md)), ruled on 2026-09-23 from
+  Codex's model and pricing pages: `sonnet` → `gpt-6-luna` at
+  `model_reasoning_effort = "high"`, `haiku` → `gpt-6-luna` at `medium`,
+  `opus` → `gpt-6-sol` at `medium`; the file's `_comment` carries the
+  prices and the sources. An agent may override its entry with a
+  `models: { codex: { model, reasoningEffort } }` block in its frontmatter,
+  which wins over the tier. A tier the table does not know leaves `model`
+  out (Codex applies its default; an absent `model:` inherits, which is not
+  a gap) and the dry-run counts it; a `reasoningEffort` outside the config
+  reference's `low | medium | high | xhigh | max | ultra` is refused before
+  anything is written. The table reaches the use-case as
+  `CodexApplyOptions.codexModels`, read once at the composition root, so the
+  tests inject a map and the CLI reads the file. Files there that no source
+  produces are not jig's.
 - **`~/.codex/config.toml`** — `[mcp_servers.<id>]` for every server with
   `targets.codex: true` (`targetOverrides.codex` applied, `{{HOME}}`
   substituted; stdio: `command`, `args`, `env`; HTTP: `url`), inside jig's
@@ -417,12 +431,15 @@ Destinations, one source tree:
   is omp's URL reader; a name with no omp tool is left out and counted
   (`NotebookEdit`, `Skill`), which only narrows the agent; an empty result
   omits the key and omp grants its default set. `model:` is a Claude tier
-  and omp wants a provider-qualified selector or a `modelRoles` alias; jig
-  has no source for that mapping, so `model` is left out and the dry-run
-  counts the gap per tier, exactly as the Codex target does
-  (`OmpApplyOptions.ompModels`, empty at the composition root until a
-  decision note fills it). The generated frontmatter is validated as YAML
-  before writing.
+  and omp wants a provider-qualified selector or a `modelRoles` alias; the
+  `omp` table of `agents/models.json` is empty until a ruling names one, so
+  `model` is left out and the dry-run counts the gap per tier, exactly as
+  the Codex target does (`OmpApplyOptions.ompModels`, the same file's `omp`
+  object, read at the composition root; filling it is the whole change — a
+  mapping's `reasoningEffort` is ignored here, the selector carries the
+  effort). A `models: { omp: { model } }` block in an agent's frontmatter
+  overrides its entry. The generated frontmatter is validated as YAML before
+  writing.
 - **`~/.omp/agent/mcp.json`** — jig's entries of `mcpServers` for every
   server with `targets.omp: true` (`targetOverrides.omp` applied, `{{HOME}}`
   substituted, `${VAR}` left for omp to expand at discovery; stdio:
@@ -472,3 +489,114 @@ and any conflict anywhere (a hand-edited generated file, a changed jig entry
 in `mcp.json`, an unreadable `mcp.json`, a regular file where the
 `extensions` directory should be) returns `wrote: false` with nothing
 written.
+
+### Milestone 3c: pi
+
+```sh
+bun src/cli/jig.ts apply --target pi            # dry-run: models.json, then the agent directory
+bun src/cli/jig.ts apply --target pi --write    # writes both halves in one run; any conflict aborts the second
+```
+
+`--target pi` names one harness, so it runs both halves: the tiers write into
+the checkout's `domains/dev/config/pi/models.json` from `policy/tiers.json`
+(the part `--target all` has always run, unchanged), then the agent-directory
+half below (`app/apply/apply-pi.ts`), which is never part of `--target all`
+for the reason the other three are not. The agent directory is resolved the
+way pi resolves it (`domain/pi/agent-dir.ts`, from
+[configuration](https://pi.dev/docs/latest/configuration) and
+[environment-variables](https://pi.dev/docs/latest/environment-variables)):
+`~/.pi/agent`, or `PI_CODING_AGENT_DIR` as a whole replacement. The formats
+are pi's own documentation and pi-mcp-adapter's README, cited where each is
+fixed in code. The facts about pi that the delivery rests on are in
+[`rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md`](../rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md)
+(no MCP client; pi-mcp-adapter is the de facto adapter),
+[`2026-09-22-commands-vs-skills.md`](../rules/research/2026-09-22-commands-vs-skills.md)
+(skill discovery paths, `/skill:name`), and
+[`2026-09-22-generator-migration-map.md`](../rules/research/2026-09-22-generator-migration-map.md)
+§2 and §6.3 (what `core/config/manager.sh link_pi_resources` links today, file
+by file, never a directory, because pi writes its own files into
+`~/.pi/agent`).
+
+Destinations, one source tree:
+
+- **`~/.agents/skills/`** — the directory the Codex and omp targets deliver,
+  from the one function all three call (`planAgentsSkillsMount`); whichever
+  target runs first creates the links and the others find every entry `ok`.
+  pi reads it natively ([skills](https://pi.dev/docs/latest/skills): "Pi also
+  supports the Agent Skills locations `~/.agents/skills/` and
+  `.agents/skills/`") and registers each as `/skill:name`, so jig creates no
+  `~/.pi/agent/skills/`.
+- **`~/.pi/agent/AGENTS.md`** — the same generated content as
+  `~/.claude/AGENTS.md` and `~/.codex/AGENTS.md`, from the same renderer;
+  pi reads it from the agent directory
+  ([configuration](https://pi.dev/docs/latest/configuration): "User
+  instructions applied across working directories"). Per the
+  [config-layout decision](../rules/decisions/2026-09-22-config-layout-no-personal-layer.md)
+  (Consequences, 2026-09-24) the generated file is identical for all five
+  harnesses and pi's short `domains/dev/config/pi/AGENTS.md` retires. On
+  the machine manager.sh left, the path is a symlink to that repo file: on
+  `--write` the link is removed and the generated regular file written in
+  its place — a symlink is `replace`, not a backup, and what it pointed at
+  is untouched. The dry-run then names the repo file as a source-side
+  cleanup for the owner (jig does not delete repository files) and says to
+  drop `AGENTS.md` from `link_pi_resources`, which would otherwise put the
+  link back on its next run. A regular file jig has no record of writing is
+  kept as `AGENTS.md.pre-jig.<stamp>`, and a hand edit after jig wrote is a
+  conflict, as everywhere.
+- **`~/.config/mcp/mcp.json`** — jig's entries of `mcpServers` for every
+  server with `targets.pi: true` (`targetOverrides.pi` applied, `{{HOME}}`
+  substituted, `${VAR}` left for the adapter; stdio: `command`, `args`,
+  `env`; http/sse: `url`, `headers`), in pi-mcp-adapter's shape
+  (`domain/pi/mcp.ts`). pi has no MCP client and will not get one; the
+  [MCP-list decision](../rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md)
+  delivers the full list through that community extension, which reads
+  this path as its "Preferred user-global shared config"
+  ([README](https://github.com/nicobailon/pi-mcp-adapter), "Quick Start",
+  "Config → File Layout") and is "lazy by default — [servers] won't connect
+  until you actually call one of their tools", so a server costs nothing
+  until called. The README's "Server Options" table documents no `type`
+  field — the transport is which of `command`/`url` is set — so none is
+  written, and a source `sse` server becomes a `url` entry the adapter
+  reaches with its SSE fallback. Ownership is per entry, as in omp's
+  `mcp.json` (the rule is one function, `domain/mcp/mcp-json.ts`, that both
+  call): every entry no source produces and every other top-level key (the
+  adapter's `settings`, a `$schema`) is carried through and named; no
+  `$schema` is added. `/mcp disable` never edits this file (it writes
+  `disabled` into the project's `.pi/mcp.json`, "the source file is never
+  rewritten"), so a `disabled` inside a jig entry here is a hand edit and a
+  conflict. `~/.pi/agent/mcp.json` is the adapter's own override file, with
+  higher precedence ("later entries win"): it is reported as found and
+  never written. On the machine manager.sh left, neither file exists: one
+  write, then noop.
+- **Report only: `packages`.** The delivery relies on two extensions, and
+  jig does not edit pi's settings in this milestone. The dry-run reads the
+  REPO `domains/dev/config/pi/settings.json` — a source; `~/.pi/agent/settings.json`
+  is a symlink to it — and says per package whether `packages` declares it
+  (by pi's identity rule, package name at any version;
+  [packages](https://pi.dev/docs/latest/packages), "Understand scope and
+  identity"): `pi-mcp-adapter`, without which the entries above reach
+  nothing, and `@tintinweb/pi-subagents`, the runner of the subagents
+  decision. For each that is missing it prints the `pi install npm:<name>`
+  line ("Personal installs are written to `~/.pi/agent/settings.json`") and
+  the `"npm:<name>"` entry to add by hand. On the machine manager.sh left,
+  both are missing.
+- **Report only: `~/.pi/agent/extensions/`.** Every symlink into
+  `domains/dev/config/pi/extensions/` is named as delivered by
+  `core/config/manager.sh link_pi_resources` until milestone 4; everything
+  else (orca's own `*.ts` files today) as not jig's. Nothing is linked or
+  unlinked.
+- **Two gaps, one line each.** Subagents: pi has none natively
+  ([`2026-09-22-multi-lane-review-per-harness.md`](../rules/research/2026-09-22-multi-lane-review-per-harness.md):
+  "Pi itself remains fundamentally single-agent"); the
+  [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md)'s
+  answer is a workflow script written once in Claude Code's syntax, which
+  pi runs through tintinweb/pi-subagents when that package is installed —
+  the `packages` check above. Conditional `paths:` rules: not delivered to
+  pi in this milestone, in the omp target's words.
+
+`--write` writes both halves in one run — `models.json`, then AGENTS.md
+(the link removed first), the adapter config, the manifest and provenance,
+then the skills mount — and any conflict in the agent-directory half (a
+hand-edited AGENTS.md, a changed jig entry in the adapter config, an
+unreadable adapter config) returns `wrote: false` for that half with nothing
+of it written; the exit code is 1 when either half conflicts.

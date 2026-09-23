@@ -56,13 +56,14 @@ describe("parseAgentDefinition", () => {
 });
 
 describe("codexModelFor", () => {
-  const MAP = { sonnet: "gpt-x-mid" };
+  const MAP = { sonnet: { model: "gpt-6-luna", reasoningEffort: "high" } };
 
-  test("a mapped tier yields the Codex id; an unmapped one is a reported gap, never a guess", () => {
+  test("a mapped tier yields the Codex id and its effort; an unmapped one is a reported gap, never a guess", () => {
     expect(codexModelFor("sonnet", MAP)).toEqual({
       kind: "mapped",
       tier: "sonnet",
-      model: "gpt-x-mid",
+      model: "gpt-6-luna",
+      reasoningEffort: "high",
     });
     expect(codexModelFor("Sonnet", MAP)).toMatchObject({ kind: "mapped" });
     expect(codexModelFor("opus", MAP)).toEqual({ kind: "unmapped", tier: "opus" });
@@ -71,6 +72,34 @@ describe("codexModelFor", () => {
   test("absent and `inherit` both mean: leave `model` out, and that is not a gap", () => {
     expect(codexModelFor(undefined, MAP)).toEqual({ kind: "inherit" });
     expect(codexModelFor("inherit", MAP)).toEqual({ kind: "inherit" });
+  });
+
+  test("the agent's own models.codex wins over the tier", () => {
+    expect(codexModelFor("sonnet", MAP, { model: "gpt-6-sol", reasoningEffort: "medium" })).toEqual(
+      {
+        kind: "mapped",
+        tier: "sonnet",
+        model: "gpt-6-sol",
+        reasoningEffort: "medium",
+        override: true,
+      },
+    );
+  });
+
+  test("an effort outside the config reference's list is refused, from the table or an override", () => {
+    expect(() =>
+      codexModelFor("sonnet", { sonnet: { model: "gpt-6-luna", reasoningEffort: "hi" } }),
+    ).toThrow(
+      'reasoningEffort "hi" for tier "sonnet" is not a Codex model_reasoning_effort (low, medium, high, xhigh, max, ultra)',
+    );
+    expect(() =>
+      codexModelFor("sonnet", MAP, { model: "gpt-6-sol", reasoningEffort: "MAX" }),
+    ).toThrow('reasoningEffort "MAX" for the models.codex override');
+    expect(
+      codexModelFor("sonnet", MAP, { model: "gpt-6-sol", reasoningEffort: "xhigh" }),
+    ).toMatchObject({
+      reasoningEffort: "xhigh",
+    });
   });
 });
 
@@ -102,14 +131,27 @@ describe("renderCodexAgent", () => {
     expect(String(parsed.developer_instructions)).toContain("Read, Grep, WebFetch");
   });
 
-  test("a mapped model is written between description and the instructions", () => {
+  test("a mapped model is written between description and the instructions, with no effort line when none is mapped", () => {
     const toml = renderCodexAgent({
       definition,
       model: { kind: "mapped", tier: "sonnet", model: "gpt-x-mid" },
       sourcePath: "/s.md",
     });
     expect(toml).toContain('\nmodel = "gpt-x-mid"\n');
+    expect(toml).not.toContain("model_reasoning_effort");
     expect(toml.indexOf("model =")).toBeLessThan(toml.indexOf("developer_instructions ="));
+  });
+
+  test("model_reasoning_effort follows model whenever the mapping carries one", () => {
+    const toml = renderCodexAgent({
+      definition,
+      model: { kind: "mapped", tier: "sonnet", model: "gpt-6-luna", reasoningEffort: "high" },
+      sourcePath: "/s.md",
+    });
+    expect(toml).toContain('\nmodel = "gpt-6-luna"\nmodel_reasoning_effort = "high"\n');
+    const parsed = Bun.TOML.parse(toml) as Record<string, unknown>;
+    expect(parsed.model).toBe("gpt-6-luna");
+    expect(parsed.model_reasoning_effort).toBe("high");
   });
 
   test("no tools: no sentence, the body alone", () => {

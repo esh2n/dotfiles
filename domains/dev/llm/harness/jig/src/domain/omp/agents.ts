@@ -27,8 +27,11 @@
  *   survives, the key is omitted and omp grants its default set.
  * - `model:` is a Claude tier; omp wants a provider-qualified selector
  *   (`openai/gpt-5.4:high`) or a `modelRoles` alias (`@review`). Looked up
- *   in a map the caller supplies, left out and reported otherwise, exactly
- *   as the Codex target does. The generator never invents one.
+ *   in the `omp` table of `agents/models.json` (`../claude/agent-models.ts`;
+ *   empty until ruled) or the agent's own `models.omp` override, left out
+ *   and reported otherwise, exactly as the Codex target does. A mapping's
+ *   `reasoningEffort` is ignored: omp's selector carries the effort
+ *   (`:high`). The generator never invents one.
  *
  * Pure: a definition in, the file's text out.
  */

@@ -470,9 +470,9 @@ describe("applyCli --target claude", () => {
 
 /**
  * The codex dry-run's report, exercised through the CLI for the same reason
- * the claude one is: the sections — two skill directories, the generated
- * files, the block and its conflicts, the leftovers — are what a reader
- * agrees to before `--write`.
+ * the claude one is: the sections — the skills mount, what `~/.codex/skills`
+ * holds, the generated files with the model per tier, the block and its
+ * conflicts, the leftovers — are what a reader agrees to before `--write`.
  */
 describe("applyCli --target codex", () => {
   const H = "/repo/llm/harness";
@@ -516,18 +516,28 @@ describe("applyCli --target codex", () => {
     [`${H}/skills/README.md`]: "# skills\n",
     [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
     [`${H}/skills/grilling/SKILL.md`]: "---\nname: grilling\n---\n",
-    [`${H}/skills/grilling/codex/SKILL.md`]: "---\nname: grilling\n---\n",
     [`${H}/agents/research.md`]:
       '---\nname: research\ndescription: Survey.\ntools: ["Read"]\nmodel: sonnet\n---\nSurvey.\n',
   };
 
-  function codexContext(extra: Record<string, string> = {}, links: Record<string, string> = {}) {
+  const RULED_MODELS = {
+    sonnet: { model: "gpt-6-luna", reasoningEffort: "high" },
+    haiku: { model: "gpt-6-luna", reasoningEffort: "medium" },
+    opus: { model: "gpt-6-sol", reasoningEffort: "medium" },
+  };
+
+  function codexContext(
+    extra: Record<string, string> = {},
+    links: Record<string, string> = {},
+    codexModels: Record<string, { model: string; reasoningEffort?: string }> = {},
+  ) {
     const fake = fakeClaudeFs({ files: { ...SOURCES, ...extra }, links });
     return {
       ports: fake.ports,
       paths: CODEX_PATHS,
       options: {
-        codexModels: {},
+        codexModels,
+        modelsSource: `${H}/agents/models.json`,
         validateToml: (text: string) => {
           Bun.TOML.parse(text);
         },
@@ -537,7 +547,7 @@ describe("applyCli --target codex", () => {
 
   const tiers = () => fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) }).ports;
 
-  test("both skill directories, with counts, the port's target, and why the rest are not ported", async () => {
+  test("the skills mount with counts; ~/.codex/skills named as not managed, empty when absent", async () => {
     const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, codexContext());
 
     expect(result.code).toBe(0);
@@ -549,22 +559,14 @@ describe("applyCli --target codex", () => {
     expect(result.stdout).toContain(
       "2 skill directories to link (each holds a SKILL.md; Codex, pi and omp read this directory):",
     );
-    expect(result.stdout).toContain("codex skills directory: create  /home/u/.codex/skills");
-    expect(result.stdout).toContain("1 Codex port to link");
-    expect(result.stdout).toMatch(
-      /grilling +create +→ \/repo\/llm\/harness\/skills\/grilling\/codex/,
-    );
-    // The skills without a port are the expected case: counted, not listed one by one.
-    expect(result.stdout).toContain("not linked (2):");
-    expect(result.stdout).toMatch(/README\.md +a file, not a skill directory/);
-    expect(result.stdout).toContain(
-      "    (1 entry) no codex/SKILL.md — reaches Codex through ~/.agents/skills",
-    );
-    expect(result.stdout).not.toMatch(/writeup +no codex/);
-    expect(result.stdout).toContain("listed twice in Codex");
+    expect(result.stdout).toContain("codex skills: not managed by jig  /home/u/.codex/skills");
+    expect(result.stdout).toContain("the codex/SKILL.md ports");
+    expect(result.stdout).toContain("yoki leftovers (milestone 4) — not managed by jig: (missing)");
+    expect(result.stdout).not.toContain("Codex port");
+    expect(result.stdout).not.toContain("listed twice in Codex");
   });
 
-  test("on the machine yoki-switch left: stale links named with why, cmd-* under a yoki heading, .system not jig's", async () => {
+  test("on the machine yoki-switch left: stale links named with why; every entry of ~/.codex/skills under the yoki heading with whose it is", async () => {
     const context = codexContext(
       {
         [`${CODEX_PATHS.codexSkills}/cmd-aside/SKILL.md`]: "x",
@@ -574,6 +576,7 @@ describe("applyCli --target codex", () => {
         [`${CODEX_PATHS.agentsSkills}/writeup`]: `${OLD}/core/skills/writeup`,
         [`${CODEX_PATHS.agentsSkills}/gone`]: `${OLD}/packs/go/skills/gone`,
         [`${CODEX_PATHS.agentsSkills}/nowhere`]: "/nowhere/at/all",
+        [`${CODEX_PATHS.codexSkills}/grilling`]: `${OLD}/core/skills/grilling/codex`,
       },
     );
     const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, context);
@@ -586,11 +589,17 @@ describe("applyCli --target codex", () => {
     );
     expect(result.stdout).toMatch(/nowhere +remove \(dangling link → \/nowhere\/at\/all\)/);
     expect(result.stdout).toContain(
-      "yoki leftovers (1) — real directories from yoki's command→skill conversion",
+      "yoki leftovers (milestone 4) — not managed by jig (3), clean by hand:",
     );
-    expect(result.stdout).toMatch(/\n {4}cmd-aside\n/);
-    expect(result.stdout).toMatch(/\.system +left alone \(not jig's: a directory\)/);
-    expect(result.stdout).toContain("Codex keeps its bundled skills in `.system/`");
+    expect(result.stdout).toMatch(/\n {4}\.system +a directory {2}— Codex's bundled skills/);
+    expect(result.stdout).toMatch(
+      /\n {4}cmd-aside +a directory {2}— yoki's command→skill conversion/,
+    );
+    expect(result.stdout).toMatch(
+      /\n {4}grilling +a symlink → \/repo\/config\/claude-profiles\/core\/skills\/grilling\/codex {2}— yoki's link to a codex\/SKILL\.md port/,
+    );
+    // Nothing under it is planned: no create, replace or remove line names the directory.
+    expect(result.stdout).not.toMatch(/\/home\/u\/\.codex\/skills\/\S+ +(create|replace|remove)/);
   });
 
   test("AGENTS.md is named as the Claude target's content, the agent files list the model gap per tier, hooks.json is only named", async () => {
@@ -609,11 +618,42 @@ describe("applyCli --target codex", () => {
     expect(result.stdout).toMatch(
       /research\.toml +write +model: \(none: no Codex id for "sonnet"\)/,
     );
-    expect(result.stdout).toContain("model tiers with no Codex id (sonnet: 1)");
+    expect(result.stdout).toContain(
+      "model tiers with no Codex id in /repo/llm/harness/agents/models.json (sonnet: 1)",
+    );
+    expect(result.stdout).not.toContain("model tiers mapped by");
     expect(result.stdout).toMatch(/not jig's \(1\), left alone:\n +mine\.toml +a regular file/);
     expect(result.stdout).toContain(
       "hooks.json: not touched  /home/u/.codex/hooks.json  (jig codex register's",
     );
+  });
+
+  test("with the ruled table: model and effort per file, the tier summary, no gap line", async () => {
+    const context = codexContext(
+      {
+        [`${H}/agents/scout.md`]: "---\nname: scout\nmodel: haiku\n---\nLook.\n",
+        [`${H}/agents/architect.md`]:
+          "---\nname: architect\nmodel: opus\nmodels: { codex: { model: gpt-6-sol, reasoningEffort: xhigh } }\n---\nPlan.\n",
+        [`${H}/agents/plain.md`]: "---\nname: plain\n---\nNo tier.\n",
+      },
+      {},
+      RULED_MODELS,
+    );
+    const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, context);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(
+      /research\.toml +write +model: gpt-6-luna effort=high \(sonnet\)/,
+    );
+    expect(result.stdout).toMatch(/scout\.toml +write +model: gpt-6-luna effort=medium \(haiku\)/);
+    expect(result.stdout).toMatch(
+      /architect\.toml +write +model: gpt-6-sol effort=xhigh \(models: override, tier opus\)/,
+    );
+    expect(result.stdout).toMatch(/plain\.toml +write +model: \(none: inherits\)/);
+    expect(result.stdout).toContain(
+      "model tiers mapped by /repo/llm/harness/agents/models.json (sonnet → gpt-6-luna high: 1, haiku → gpt-6-luna medium: 1);",
+    );
+    expect(result.stdout).not.toContain("model tiers with no Codex id");
   });
 
   test("config.toml: the servers in jig's block, a CONFLICT line per table declared outside it, yoki's leftovers, exit 1", async () => {
@@ -643,7 +683,7 @@ describe("applyCli --target codex", () => {
   test("the shared skills mount says which target planned it", async () => {
     const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, codexContext());
     expect(result.stdout).toContain(
-      "Delivered by --target codex and --target omp alike, from one plan (this run: --target codex)",
+      "Delivered by --target codex, --target omp and --target pi alike, from one plan (this run: --target codex)",
     );
   });
 });
@@ -808,5 +848,185 @@ describe("applyCli --target omp", () => {
     expect(refused.stdout).toContain("--target omp is not wired");
     const all = await applyCli([], tiers(), paths, undefined, undefined, ompContext());
     expect(all.stdout).not.toContain("== omp ==");
+  });
+});
+
+/**
+ * The pi dry-run's report, through the CLI: `--target pi` runs the tiers
+ * half (pi/models.json) and then the agent-directory half, and the sections
+ * of the latter — the shared mount, AGENTS.md over the symlink with the
+ * source-side cleanup, the adapter's config, the packages check with its
+ * paste-able lines, the extensions as manager.sh leaves them, the two gaps —
+ * are what a reader agrees to before `--write`.
+ */
+describe("applyCli --target pi", () => {
+  const H = "/repo/llm/harness";
+  const OLD = "/repo/config/claude-profiles";
+  const REPO_PI = "/repo/config/pi";
+  const PI = "/home/u/.pi/agent";
+  const PI_PATHS = {
+    harnessRoot: H,
+    mcpServers: `${H}/mcp/servers.json`,
+    decisions: `${H}/rules/decisions`,
+    formerSkillRoots: [OLD],
+    agentsSkills: "/home/u/.agents/skills",
+    agentDir: PI,
+    agentsMd: `${PI}/AGENTS.md`,
+    mcpJson: "/home/u/.config/mcp/mcp.json",
+    adapterOverride: `${PI}/mcp.json`,
+    extensionsDir: `${PI}/extensions`,
+    repoExtensionsDir: `${REPO_PI}/extensions`,
+    repoSettings: `${REPO_PI}/settings.json`,
+    retiredAgentsMd: `${REPO_PI}/AGENTS.md`,
+    home: "/home/u",
+  };
+
+  const SOURCES: Record<string, string> = {
+    [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
+    [PI_PATHS.mcpServers]: JSON.stringify({
+      schemaVersion: "jig.mcp.v1",
+      servers: [
+        {
+          name: "serena",
+          transport: "stdio",
+          command: "uvx",
+          args: ["serena"],
+          targets: { pi: true },
+        },
+        {
+          name: "notion-mcp",
+          transport: "http",
+          url: "https://mcp.notion.com/mcp",
+          targets: { pi: true },
+        },
+      ],
+    }),
+    [`${H}/rules/common/core.md`]: "# Core\n\nBe brief.\n",
+    [`${H}/rules/decisions/a.md`]:
+      "# A\n\nStatus: accepted — because\n\nrule: Do the thing.\n\n## Problem\n\nx\n",
+    [`${H}/skills/README.md`]: "# skills\n",
+    [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
+    [PI_PATHS.repoSettings]: JSON.stringify({ packages: ["npm:pi-web-access"] }),
+  };
+
+  function piContext(extra: Record<string, string> = {}, links: Record<string, string> = {}) {
+    const fake = fakeClaudeFs({ files: { ...SOURCES, ...extra }, links });
+    return { ports: fake.ports, paths: PI_PATHS, fake };
+  }
+
+  const cli = (context = piContext(), args = ["--target", "pi"]) =>
+    applyCli(args, context.ports, paths, undefined, undefined, undefined, context);
+
+  test("both halves in one run: the tiers section first, then the agent directory with the mount, the gaps and the packages lines", async () => {
+    const result = await cli();
+
+    expect(result.code).toBe(0);
+    expect(result.stdout.indexOf("== pi ==")).toBeLessThan(
+      result.stdout.indexOf("== pi (agent directory) =="),
+    );
+    expect(result.stdout).toContain("dest: /home/u/.pi/agent");
+    expect(result.stdout).toContain(
+      "skills (cross-harness) directory: create  /home/u/.agents/skills",
+    );
+    expect(result.stdout).toContain("(this run: --target pi)");
+    expect(result.stdout).toContain("no /home/u/.pi/agent/skills is created");
+    expect(result.stdout).toContain("AGENTS.md: write  /home/u/.pi/agent/AGENTS.md");
+    expect(result.stdout).toContain("one file for all five harnesses");
+    expect(result.stdout).toContain("mcp (pi-mcp-adapter): write  /home/u/.config/mcp/mcp.json");
+    expect(result.stdout).toContain("jig's mcpServers entries (2): serena, notion-mcp");
+    expect(result.stdout).toContain(
+      "/home/u/.pi/agent/mcp.json: absent — the adapter's own override file",
+    );
+    expect(result.stdout).toContain("packages (report only): /repo/config/pi/settings.json");
+    expect(result.stdout).toMatch(/pi-mcp-adapter +MISSING/);
+    expect(result.stdout).toContain("run once:               pi install npm:pi-mcp-adapter");
+    expect(result.stdout).toContain('or add to "packages":   "npm:pi-mcp-adapter"');
+    expect(result.stdout).toMatch(/@tintinweb\/pi-subagents +MISSING/);
+    expect(result.stdout).toContain("subagents: GAP — pi has none natively");
+    expect(result.stdout).toContain("rules: GAP: the conditional `paths:` rules");
+  });
+
+  test("the symlink standing at AGENTS.md today, the retiring repo file, and manager.sh's extension links", async () => {
+    const context = piContext(
+      {
+        [`${REPO_PI}/AGENTS.md`]: "# Working rules (all pi tiers)\n",
+        [`${REPO_PI}/extensions/guard.ts`]: "x",
+        [`${PI}/extensions/orca-prefill.ts`]: "x",
+        [PI_PATHS.repoSettings]: JSON.stringify({
+          packages: ["npm:pi-mcp-adapter@1.0.0", "npm:@tintinweb/pi-subagents"],
+        }),
+      },
+      {
+        [`${PI}/AGENTS.md`]: `${REPO_PI}/AGENTS.md`,
+        [`${PI}/extensions/guard.ts`]: `${REPO_PI}/extensions/guard.ts`,
+      },
+    );
+    const result = await cli(context);
+
+    expect(result.stdout).toContain(
+      "a symlink stands there today (→ /repo/config/pi/AGENTS.md); on --write the link is replaced by the",
+    );
+    expect(result.stdout).toContain("-# Working rules (all pi tiers)");
+    expect(result.stdout).toContain(
+      "source-side cleanup (yours, not jig's): /repo/config/pi/AGENTS.md is a regular file",
+    );
+    expect(result.stdout).toContain("drop AGENTS.md from core/config/manager.sh link_pi_resources");
+    expect(result.stdout).toMatch(/pi-mcp-adapter +present \(npm:pi-mcp-adapter@1\.0\.0\)/);
+    expect(result.stdout).toMatch(
+      /@tintinweb\/pi-subagents +present \(npm:@tintinweb\/pi-subagents\)/,
+    );
+    expect(result.stdout).not.toContain("run once:");
+    expect(result.stdout).toContain(
+      "delivered by core/config/manager.sh link_pi_resources until milestone 4 (1), links into domains/dev/config/pi/extensions/:",
+    );
+    expect(result.stdout).toMatch(
+      /guard\.ts +a symlink → \/repo\/config\/pi\/extensions\/guard\.ts/,
+    );
+    expect(result.stdout).toMatch(
+      /not jig's \(1\), left alone:\n +orca-prefill\.ts +a regular file/,
+    );
+    expect(result.stdout).toContain("Nothing here is linked or unlinked by this milestone.");
+  });
+
+  test("the adapter config: carried-through entries and keys, and the diff", async () => {
+    const context = piContext({
+      [PI_PATHS.mcpJson]: JSON.stringify({
+        settings: { hostConfigDiscovery: "off" },
+        mcpServers: { mine: { command: "mine" } },
+      }),
+    });
+    const result = await cli(context);
+    expect(result.stdout).toContain(
+      "entries no source produces (1), carried through as they are: mine",
+    );
+    expect(result.stdout).toContain("other top-level keys carried through: settings");
+    expect(result.stdout).toContain('+    "serena": {');
+    expect(result.stdout).not.toContain('"type"');
+  });
+
+  test("an unreadable adapter config is a CONFLICT line and exit 1, while the tiers half still reports", async () => {
+    const result = await cli(piContext({ [PI_PATHS.mcpJson]: "{ nope" }));
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("== pi ==\noutcome: write");
+    expect(result.stdout).toContain("== pi (agent directory) ==\noutcome: conflict");
+    expect(result.stdout).toContain("CONFLICT: the file could not be read as a JSON object");
+  });
+
+  test("--write does both halves; --target pi with no pi context runs the tiers half alone and says so; --target all never reaches the agent directory", async () => {
+    const context = piContext();
+    const written = await cli(context, ["--target", "pi", "--write"]);
+    expect(written.code).toBe(0);
+    expect(context.fake.files[PI_PATH]).toContain('"id": "main"');
+    expect(context.fake.files[PI_PATHS.mcpJson]).toContain('"serena"');
+    expect(context.fake.files[`${PI}/AGENTS.md`]).toContain("# Core");
+
+    const alone = await applyCli(["--target", "pi"], piContext().ports, paths);
+    expect(alone.code).toBe(0);
+    expect(alone.stdout).toContain("== pi ==");
+    expect(alone.stdout).toContain("not wired in this context: only pi/models.json");
+
+    const all = await cli(piContext(), []);
+    expect(all.stdout).toContain("== pi ==");
+    expect(all.stdout).not.toContain("== pi (agent directory) ==");
   });
 });

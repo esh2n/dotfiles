@@ -9,11 +9,15 @@ describe("selectAgentFiles", () => {
       { name: "notes.txt", state: { kind: "file" } },
       { name: "drafts.md", state: { kind: "dir" } },
       { name: "linked.md", state: { kind: "symlink", target: "/elsewhere/linked.md" } },
+      { name: "README.md", state: { kind: "file" } },
+      { name: "models.json", state: { kind: "file" } },
     ]);
     expect(linked).toEqual(["architect.md", "research.md"]);
     expect(excluded).toEqual([
+      { name: "README.md", reason: "the directory's README, not an agent definition" },
       { name: "drafts.md", reason: "a directory, not a *.md agent definition" },
       { name: "linked.md", reason: "a symlink, not a regular *.md file" },
+      { name: "models.json", reason: "not a *.md file" },
       { name: "notes.txt", reason: "not a *.md file" },
     ]);
   });

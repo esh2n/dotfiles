@@ -3,7 +3,6 @@ import {
   type CodexApplyOptions,
   type CodexApplyPaths,
   applyCodex,
-  yokiCommandLeftovers,
 } from "../../../src/app/apply/apply-codex";
 import type { CodexApplyPorts } from "../../../src/app/apply/ports";
 import { MCP_BLOCK_BEGIN, MCP_BLOCK_END } from "../../../src/domain/codex/config";
@@ -33,6 +32,13 @@ const OPTIONS: CodexApplyOptions = {
   validateToml: (text) => {
     Bun.TOML.parse(text);
   },
+};
+
+/** The ruling of 2026-09-23, as `agents/models.json`'s codex table parses. */
+const RULED_MODELS = {
+  sonnet: { model: "gpt-6-luna", reasoningEffort: "high" },
+  haiku: { model: "gpt-6-luna", reasoningEffort: "medium" },
+  opus: { model: "gpt-6-sol", reasoningEffort: "medium" },
 };
 
 const MCP_SOURCE = JSON.stringify({
@@ -82,7 +88,6 @@ function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
       [`${H}/skills/README.md`]: "# skills\n",
       [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
       [`${H}/skills/grilling/SKILL.md`]: "---\nname: grilling\n---\n",
-      [`${H}/skills/grilling/codex/SKILL.md`]: "---\nname: grilling\n---\nfor codex\n",
       [`${H}/agents/research.md`]: RESEARCH_AGENT,
       [`${H}/agents/scout.md`]: SCOUT_AGENT,
       ...seed.files,
@@ -159,8 +164,8 @@ describe("dry-run is the default", () => {
   });
 });
 
-describe("the two skill directories", () => {
-  test("~/.agents/skills gets every skill; ~/.codex/skills only the ports, pointing at codex/", async () => {
+describe("the skills mount, and ~/.codex/skills reported beside it", () => {
+  test("~/.agents/skills gets every skill; ~/.codex/skills gets nothing planned", async () => {
     const { ports } = fakePorts();
     const report = await run(ports);
 
@@ -168,25 +173,14 @@ describe("the two skill directories", () => {
     expect(
       report.agentsSkillsDir.entries.map((e) => (e.kind === "link" ? e.plan.target : e.kind)),
     ).toEqual([`${H}/skills/grilling`, `${H}/skills/writeup`]);
-    expect(report.codexSkillsDir.selection.linked).toEqual(["grilling"]);
-    expect(report.codexSkillsDir.selection.excluded).toEqual([
-      { name: "README.md", reason: "a file, not a skill directory" },
-      { name: "writeup", reason: "no codex/SKILL.md — reaches Codex through ~/.agents/skills" },
-    ]);
-    expect(report.codexSkillsDir.entries).toEqual([
-      {
-        kind: "link",
-        name: "grilling",
-        plan: {
-          path: `${PATHS.codexSkills}/grilling`,
-          target: `${H}/skills/grilling/codex`,
-          state: "create",
-        },
-      },
-    ]);
+    expect(report.codexSkills).toEqual({
+      path: PATHS.codexSkills,
+      state: { kind: "missing" },
+      entries: [],
+    });
   });
 
-  test("on the machine yoki-switch left: links into the old tree are stale (replaced or removed), cmd-* and .system are not jig's", async () => {
+  test("on the machine yoki-switch left: links into the old tree are stale (replaced or removed); ~/.codex/skills is listed entry by entry with whose each is, and left alone", async () => {
     const { ports } = fakePorts(YOKI_SWITCH_MACHINE);
     const report = await run(ports);
 
@@ -197,13 +191,26 @@ describe("the two skill directories", () => {
           : `${e.name}:${e.kind}${e.kind === "stale" ? `:${e.reason}` : ""}`,
       ),
     ).toEqual(["grilling:replace", "writeup:replace", "retired:stale:former-tree"]);
-    expect(
-      report.codexSkillsDir.entries.map((e) =>
-        e.kind === "link" ? `${e.name}:${e.plan.state}` : `${e.name}:${e.kind}`,
-      ),
-    ).toEqual(["grilling:replace", ".system:foreign", "cmd-aside:foreign"]);
-    expect(yokiCommandLeftovers(report.codexSkillsDir)).toEqual([
-      { name: "cmd-aside", path: `${PATHS.codexSkills}/cmd-aside` },
+    expect(report.codexSkills.state).toEqual({ kind: "dir" });
+    expect(report.codexSkills.entries).toEqual([
+      {
+        name: ".system",
+        path: `${PATHS.codexSkills}/.system`,
+        what: "a directory",
+        note: "Codex's bundled skills; Codex's own",
+      },
+      {
+        name: "cmd-aside",
+        path: `${PATHS.codexSkills}/cmd-aside`,
+        what: "a directory",
+        note: "yoki's command→skill conversion; commands are skills, delivered through ~/.agents/skills",
+      },
+      {
+        name: "grilling",
+        path: `${PATHS.codexSkills}/grilling`,
+        what: `a symlink → ${OLD}/core/skills/grilling/codex`,
+        note: "yoki's link to a codex/SKILL.md port; ports are dropped, the skill reaches Codex through ~/.agents/skills",
+      },
     ]);
   });
 
@@ -274,16 +281,104 @@ describe("the generated agent files", () => {
     ]);
   });
 
-  test("a mapped tier lands in `model`; an unmapped one is never guessed", async () => {
+  test("a mapped tier lands in `model` and `model_reasoning_effort`; an unmapped one is never guessed", async () => {
     const { ports } = fakePorts();
     const report = await applyCodex(
-      { paths: PATHS, options: { ...OPTIONS, codexModels: { sonnet: "gpt-x-mid" } }, write: false },
+      {
+        paths: PATHS,
+        options: {
+          ...OPTIONS,
+          codexModels: { sonnet: { model: "gpt-6-luna", reasoningEffort: "high" } },
+          modelsSource: `${H}/agents/models.json`,
+        },
+        write: false,
+      },
       ports,
     );
     const [research, scout] = report.agents.files;
-    expect((Bun.TOML.parse(research?.content ?? "") as { model?: string }).model).toBe("gpt-x-mid");
+    expect(Bun.TOML.parse(research?.content ?? "")).toMatchObject({
+      model: "gpt-6-luna",
+      model_reasoning_effort: "high",
+    });
     expect((Bun.TOML.parse(scout?.content ?? "") as { model?: string }).model).toBeUndefined();
+    expect(report.agents.mappingSource).toBe(`${H}/agents/models.json`);
+    expect(report.agents.mappedTiers).toEqual([
+      { tier: "sonnet", model: "gpt-6-luna", reasoningEffort: "high", count: 1 },
+    ]);
     expect(report.agents.unmappedTiers).toEqual([{ tier: "haiku", count: 1 }]);
+  });
+
+  test("with the ruled table every tier is mapped and the gap count is zero", async () => {
+    const { ports } = fakePorts();
+    const report = await applyCodex(
+      { paths: PATHS, options: { ...OPTIONS, codexModels: RULED_MODELS }, write: false },
+      ports,
+    );
+    expect(report.agents.unmappedTiers).toEqual([]);
+    expect(report.agents.mappedTiers).toEqual([
+      { tier: "sonnet", model: "gpt-6-luna", reasoningEffort: "high", count: 1 },
+      { tier: "haiku", model: "gpt-6-luna", reasoningEffort: "medium", count: 1 },
+    ]);
+    expect(Bun.TOML.parse(report.agents.files[1]?.content ?? "")).toMatchObject({
+      name: "scout",
+      model: "gpt-6-luna",
+      model_reasoning_effort: "medium",
+    });
+  });
+
+  test("an agent's own models.codex wins over the table, and the report says so", async () => {
+    const { ports } = fakePorts({
+      files: {
+        [`${H}/agents/research.md`]:
+          "---\nname: research\ndescription: Industry survey.\nmodel: sonnet\nmodels:\n  codex:\n    model: gpt-6-sol\n    reasoningEffort: xhigh\n---\n\nSurvey first, judge second.\n",
+      },
+    });
+    const report = await applyCodex(
+      { paths: PATHS, options: { ...OPTIONS, codexModels: RULED_MODELS }, write: false },
+      ports,
+    );
+    const research = report.agents.files[0];
+    expect(research?.model).toEqual({
+      kind: "mapped",
+      tier: "sonnet",
+      model: "gpt-6-sol",
+      reasoningEffort: "xhigh",
+      override: true,
+    });
+    expect(Bun.TOML.parse(research?.content ?? "")).toMatchObject({
+      model: "gpt-6-sol",
+      model_reasoning_effort: "xhigh",
+    });
+    // The override is the agent's, not the tier's: the tier line counts only table-decided agents.
+    expect(report.agents.mappedTiers).toEqual([
+      { tier: "haiku", model: "gpt-6-luna", reasoningEffort: "medium", count: 1 },
+    ]);
+    expect(report.agents.unmappedTiers).toEqual([]);
+  });
+
+  test("a bad effort — in the table or in an override — is an error naming the agent, never written", async () => {
+    const { ports, files } = fakePorts();
+    expect(
+      applyCodex(
+        {
+          paths: PATHS,
+          options: {
+            ...OPTIONS,
+            codexModels: { sonnet: { model: "gpt-6-luna", reasoningEffort: "hi" } },
+          },
+          write: true,
+        },
+        ports,
+      ),
+    ).rejects.toThrow(
+      'jig apply --target codex: agents/research.md: reasoningEffort "hi" for tier "sonnet"',
+    );
+    files[`${H}/agents/scout.md`] =
+      "---\nname: scout\nmodel: haiku\nmodels: { codex: { model: gpt-6-luna, reasoningEffort: MAX } }\n---\nx\n";
+    expect(run(ports, true)).rejects.toThrow(
+      'agents/scout.md: reasoningEffort "MAX" for the models.codex override',
+    );
+    expect(files[`${PATHS.agentsDir}/research.toml`]).toBeUndefined();
   });
 
   test("files there that no source produces are not jig's; yoki's same-named files are kept aside on first write", async () => {
@@ -448,10 +543,9 @@ describe("--write delivers everything in one run", () => {
     expect(links[`${AGENTS_SKILLS}/writeup`]).toBe(`${H}/skills/writeup`);
     expect(links[`${AGENTS_SKILLS}/grilling`]).toBe(`${H}/skills/grilling`);
     expect(links[`${AGENTS_SKILLS}/retired`]).toBeUndefined();
-    expect(links[`${PATHS.codexSkills}/grilling`]).toBe(`${H}/skills/grilling/codex`);
-    expect(
-      dirs.has(PATHS.codexSkills) || files[`${PATHS.codexSkills}/cmd-aside/SKILL.md`] !== undefined,
-    ).toBe(true);
+    // ~/.codex/skills is not jig's: yoki's port link, its cmd-* directory and Codex's .system all stand.
+    expect(links[`${PATHS.codexSkills}/grilling`]).toBe(`${OLD}/core/skills/grilling/codex`);
+    expect(dirs.has(PATHS.codexSkills)).toBe(false);
     expect(files[`${PATHS.codexSkills}/cmd-aside/SKILL.md`]).toBe("---\nname: cmd-aside\n---\n");
     expect(files[`${PATHS.codexSkills}/.system/imagegen/SKILL.md`]).toBe("bundled");
     expect(files[`${PATHS.agentsDir}/scout.toml`]).toContain('name = "scout"');

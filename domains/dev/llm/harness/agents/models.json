@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "jig.agent-models.v1",
+  "_comment": [
+    "Claude tier name (the `model:` of agents/*.md: haiku | sonnet | opus) → the model each other harness gives that agent. Read by `jig apply --target codex` and `--target omp` (jig/src/domain/claude/agent-models.ts); a tier absent here leaves `model` out of the generated file and the dry-run counts the gap. An agent may override its own entry with a `models:` block in its frontmatter (see README.md).",
+    "codex — ruled 2026-09-23. Codex's current ids and list prices per 1M tokens in/out (https://learn.chatgpt.com/docs/models, https://developers.openai.com/api/docs/pricing): gpt-6-astra $10/$50, gpt-6-sol $2/$10, gpt-6-luna $0.10/$0.50 — 'Our most efficient model for focused, high-volume tasks, including summarization, extraction, and focused coding'; the official subagents example uses luna for every read-only agent (https://learn.chatgpt.com/docs/agent-configuration/subagents). reasoningEffort is `model_reasoning_effort` (low | medium | high | xhigh | max | ultra; 'Available levels depend on the model and client' — https://learn.chatgpt.com/docs/config-file/config-reference), following the official guidance 'start with medium for GPT-6 Sol, high for GPT-6 Luna': sonnet → luna high (the reviewers and researchers), haiku → luna medium (the cheap lookups), opus → sol medium (the one agent that plans). astra is not mapped: no agent here is worth 100x luna's price by default. An agent with no `model:` gets nothing and inherits (explicit spawn → [agents] default → parent).",
+    "omp — empty until ruled. omp wants a provider-qualified selector (`openai/gpt-5.4:high`) or a modelRoles alias (`@review`); the effort rides in the selector, so reasoningEffort is ignored there. Fill this object with the same shape ({ \"sonnet\": { \"model\": \"...\" } }) and `jig apply --target omp` picks it up; no code change."
+  ],
+  "codex": {
+    "sonnet": { "model": "gpt-6-luna", "reasoningEffort": "high" },
+    "haiku": { "model": "gpt-6-luna", "reasoningEffort": "medium" },
+    "opus": { "model": "gpt-6-sol", "reasoningEffort": "medium" }
+  },
+  "omp": {}
+}

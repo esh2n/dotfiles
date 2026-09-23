@@ -61,3 +61,6 @@ export type CodexApplyPorts = ClaudeApplyPorts;
 
 /** The omp target: generated files, one link, one directory of links. The same verbs again. */
 export type OmpApplyPorts = ClaudeApplyPorts;
+
+/** The pi target: one generated file (over a symlink today), one JSON file, one directory of links. The same verbs. */
+export type PiApplyPorts = ClaudeApplyPorts;
