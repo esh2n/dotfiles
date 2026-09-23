@@ -33,11 +33,12 @@
  * lets the turn end.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import type { ChangedFiles } from "../../domain/hooks/changed";
-import { gatePlanFor, projectHooksFor, tail } from "../../domain/hooks/gate";
+import type { ReadDir } from "../../domain/hooks/format";
+import { gatePlanFor, gateWantsChangedFiles, projectHooksFor, tail } from "../../domain/hooks/gate";
 import { missingToolReason } from "../../domain/hooks/project-hooks";
-import type { Runner } from "../../domain/hooks/run";
+import type { RunResult, Runner } from "../../domain/hooks/run";
 import type { Logger } from "../../domain/ports";
 import { changedFiles } from "../../infra/proc/changed-files";
 
@@ -47,6 +48,15 @@ import { changedFiles } from "../../infra/proc/changed-files";
  * runner gets to report a timeout rather than being killed mid-report.
  */
 const TIMEOUT_MS = 240_000;
+
+/** The table's `.sln` / `.csproj` lookup; an unreadable directory is empty. */
+const readDirSync: ReadDir = (dir) => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
+};
 
 /**
  * Said to the model, not just to the log: a gate that will not fire again is a
@@ -65,7 +75,9 @@ interface StopPayload {
 export interface StopGateDeps {
   readonly run: Runner;
   readonly exists?: (path: string) => boolean;
-  /** The files this turn touched; only asked when the project has a hook config. */
+  /** For the table's `.sln` / `.csproj` lookup. */
+  readonly readDir?: ReadDir;
+  /** The files this turn touched; only asked when the plan is file-scoped or the project has a hook config. */
   readonly changedFiles?: ChangedFiles;
   readonly timeoutMs?: number;
   readonly logger?: Logger;
@@ -90,13 +102,15 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
   }
 
   const cwd = typeof payload.cwd === "string" && payload.cwd !== "" ? payload.cwd : process.cwd();
+  const readDir = deps.readDir ?? readDirSync;
 
-  // git is only asked when there is a hook config to hand the list to.
+  // git is only asked when there is something to hand the list to: the
+  // project's hook runner, or a file-scoped entry of the table.
   const hooks = projectHooksFor(cwd, exists);
   let changed: readonly string[] | undefined;
-  if (hooks !== undefined) {
+  if (gateWantsChangedFiles(cwd, exists, readDir)) {
     try {
-      changed = await (deps.changedFiles ?? changedFiles)(hooks.root);
+      changed = await (deps.changedFiles ?? changedFiles)(hooks?.root ?? cwd);
     } catch (error) {
       deps.logger?.debug("gate.changed-files-failed", {
         message: error instanceof Error ? error.message : String(error),
@@ -105,40 +119,51 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
     }
   }
 
-  const plan = gatePlanFor(cwd, exists, changed);
+  const plan = gatePlanFor(cwd, exists, changed, readDir);
   if (plan.kind === "nothing") {
     deps.logger?.debug(`gate.${plan.reason}`, { cwd, tool: hooks?.tool });
     return "";
   }
 
-  let result: Awaited<ReturnType<Runner>>;
-  try {
-    result = await deps.run(plan.bin, plan.args, {
-      cwd: plan.cwd,
-      timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
-    });
-  } catch (error) {
-    deps.logger?.debug("gate.run-failed", {
-      source: plan.source,
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return "";
-  }
-
-  if (result.missing) {
-    if (plan.source === "project" && hooks !== undefined) {
-      // The ruling's one hard line: a project's rules are never replaced by
-      // jig's, so the answer is "install it", said once (stop_hook_active).
-      deps.logger?.debug("gate.project-tool-missing", { tool: hooks.tool, config: hooks.config });
-      return `${JSON.stringify({ decision: "block", reason: missingToolReason(hooks) })}\n`;
+  // In order; the first failure is the one reported. A table tool that is
+  // not installed is skipped and the rest still run (phpstan absent, `php -l`
+  // still counts).
+  for (const command of plan.commands) {
+    let result: RunResult;
+    try {
+      result = await deps.run(command.bin, command.args, {
+        cwd: plan.cwd,
+        timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
+      });
+    } catch (error) {
+      deps.logger?.debug("gate.run-failed", {
+        source: plan.source,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return "";
     }
-    return "";
+
+    if (result.missing) {
+      if (plan.source === "project" && hooks !== undefined) {
+        // The ruling's one hard line: a project's rules are never replaced by
+        // jig's, so the answer is "install it", said once (stop_hook_active).
+        deps.logger?.debug("gate.project-tool-missing", { tool: hooks.tool, config: hooks.config });
+        return `${JSON.stringify({ decision: "block", reason: missingToolReason(hooks) })}\n`;
+      }
+      deps.logger?.debug("gate.tool-missing", { label: command.label, bin: command.bin });
+      continue;
+    }
+    if (result.code === 0) continue;
+
+    const output = tail(`${result.stdout}\n${result.stderr}`.trim());
+    const reason = `jig gate: \`${command.label}\` failed (exit ${result.code}). ${ONCE_PER_TURN}\n\n${output}`;
+
+    deps.logger?.debug("gate.blocked", {
+      source: plan.source,
+      label: command.label,
+      code: result.code,
+    });
+    return `${JSON.stringify({ decision: "block", reason })}\n`;
   }
-  if (result.code === 0) return "";
-
-  const output = tail(`${result.stdout}\n${result.stderr}`.trim());
-  const reason = `jig gate: \`${plan.label}\` failed (exit ${result.code}). ${ONCE_PER_TURN}\n\n${output}`;
-
-  deps.logger?.debug("gate.blocked", { source: plan.source, label: plan.label, code: result.code });
-  return `${JSON.stringify({ decision: "block", reason })}\n`;
+  return "";
 }

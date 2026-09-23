@@ -41,6 +41,28 @@ describe("what gets formatted", () => {
     expect(calls[0]?.at(-1)).toBe("/repo/src/a.ts");
   });
 
+  test("a C# file: the enclosing .csproj is listed, and dotnet format runs from the root", async () => {
+    const { run, calls } = runner();
+    const runIn: string[] = [];
+    const spy: Runner = (bin, args, options) => {
+      runIn.push(options.cwd);
+      return run(bin, args, options);
+    };
+    const formatted = await postToolUseFormat(
+      payload({ tool_input: { file_path: "/repo/src/App/Program.cs" } }),
+      {
+        run: spy,
+        exists: exists(["/repo/src/App/Program.cs", "/repo/.git"]),
+        readDir: (dir) => (dir === "/repo/src/App" ? ["App.csproj", "Program.cs"] : []),
+      },
+    );
+    expect(formatted).toBe("/repo/src/App/Program.cs");
+    expect(calls).toEqual([
+      ["dotnet", "format", "/repo/src/App/App.csproj", "--include", "src/App/Program.cs"],
+    ]);
+    expect(runIn).toEqual(["/repo"]);
+  });
+
   test("NotebookEdit's notebook_path counts as an edited file", async () => {
     const { run, calls } = runner();
     await postToolUseFormat(

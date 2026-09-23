@@ -132,6 +132,27 @@ Owned, from sources:
   (`stylelint.config.{js,mjs,cjs}`, `.stylelintrc{,.js,.mjs,.cjs,.yml,.yaml,.json}`, or a `stylelint` key in `package.json`); `.css` falls to biome / prettier only without one, and the preprocessor extensions to nothing.
   `.rs` gets bare `rustfmt <f>` when a `rustfmt.toml` / `.rustfmt.toml` exists (rustfmt's own edition lookup), else `--edition` from the root `Cargo.toml`'s `[package]`, else `--edition 2021`.
   staticcheck, cargo clippy, `go test -race` and html-validate are never hooks: they are default permits (below) and one `rules/common` line.
+  Per [`2026-09-23-all-languages-format-and-gate.md`](../rules/decisions/2026-09-23-all-languages-format-and-gate.md)
+  the tables cover eleven languages, each with one edit-time formatter (file-scoped, in place) and one Stop-time check
+  chosen by the marker at the cwd, in this precedence; a missing tool is a silent skip, and the Stop gate runs a plan's
+  commands in order and reports the first failure:
+
+  | language | edit: extensions → formatter | Stop: marker → check |
+  |---|---|---|
+  | TS/JS/JSON/CSS | `.ts .tsx .js .jsx .mjs .cjs .mts .cts .json .jsonc .css` → `biome check --write` (with `biome.json`) else `prettier --write`; stylelint as above | `tsconfig.json` → `bunx tsc --noEmit` |
+  | Go | `.go` → `gofmt -w` | `go.mod` → `go vet ./...` |
+  | Python | `.py` → `ruff format` | `pyproject.toml` / `ruff.toml` / `.ruff.toml` → `ruff check .` |
+  | Rust | `.rs` → `rustfmt` (edition as above) | `Cargo.toml` → `cargo check --quiet` |
+  | C/C++ | `.cpp .cc .cxx .hpp .hh .h .c` → `clang-format -i` | `CMakeLists.txt` → `cmake --build <build\|out/build\|cmake-build-debug>`, first that exists (none: skip) |
+  | C# | `.cs` → `dotnet format <nearest .csproj, else root .sln> --include <f>` (no project: skip) | `*.sln` else `*.csproj` at cwd → `dotnet build <it> --no-restore --nologo -clp:ErrorsOnly` |
+  | Java | `.java` → `google-java-format --replace` | `pom.xml` → `./mvnw` / `mvn -q compile`; `build.gradle(.kts)` → `./gradlew` / `gradle -q compileJava` (`src/main/java`) and/or `compileKotlin` (`src/main/kotlin`), `classes` when neither is at the root |
+  | Kotlin | `.kt .kts` → `ktlint --format` when `.editorconfig` has a `[*.{kt,kts}]` section, else `ktfmt` | `build.gradle(.kts)` → as Java |
+  | Perl | `.pl .pm .t .psgi .cgi` → `perltidy -b -bext=/` | `cpanfile` (or, with no marker at all, any touched `.pl`/`.pm`) → `perl -c <f>` per touched `.pl`/`.pm` |
+  | PHP | `.php` → `vendor/bin/pint` / `pint` (with `pint.json` or the vendored binary), else `php-cs-fixer fix` (with `.php-cs-fixer(.dist).php`), else `pint` | `composer.json` → `php -l <f>` per touched `.php`, then `vendor/bin/phpstan analyse --no-progress <files>` with `phpstan.neon` / `.neon.dist` / `.dist.neon` |
+  | Swift | `.swift` → `swiftformat` | `Package.swift` → `swift build` |
+
+  The doc URL each argv form was checked against sits next to its entry in `domain/hooks/format.ts` and `domain/hooks/gate.ts`.
+  The touched-files list (`git diff --name-only --relative HEAD` plus untracked) is asked for only when the plan needs it: a project hook runner, a Perl or PHP gate, or a project with no marker.
 - `permissions.allow` / `permissions.deny` — projected from
   `policy/guard-rules.json` by `domain/policy/to-claude-permissions.ts`, plus
   the default permits of

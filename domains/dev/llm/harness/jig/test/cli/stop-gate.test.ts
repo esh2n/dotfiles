@@ -183,11 +183,86 @@ describe("which check a project answers to", () => {
       ["go.mod", ["go", "vet", "./..."]],
       ["pyproject.toml", ["ruff", "check", "."]],
       ["Cargo.toml", ["cargo", "check", "--quiet"]],
+      ["pom.xml", ["mvn", "-q", "compile"]],
+      ["Package.swift", ["swift", "build"]],
     ];
     for (const [marker, expected] of cases) {
       const { run, calls } = runner({ code: 0 });
       await stopGate(payload(), { run, exists: exists([marker]) });
       expect(calls).toEqual([expected]);
     }
+  });
+
+  test("a .csproj at the cwd is found by listing it, and named on the command line", async () => {
+    const { run, calls } = runner({ code: 0 });
+    await stopGate(payload(), {
+      run,
+      exists: exists([]),
+      readDir: (dir) => (dir === "/repo" ? ["App.csproj", "Program.cs"] : []),
+    });
+    expect(calls).toEqual([
+      ["dotnet", "build", "/repo/App.csproj", "--no-restore", "--nologo", "-clp:ErrorsOnly"],
+    ]);
+  });
+
+  test("a file-scoped gate asks git at the cwd and runs one process per touched file, in order", async () => {
+    const asked: string[] = [];
+    const calls: string[][] = [];
+    const run: Runner = async (bin, args) => {
+      calls.push([bin, ...args]);
+      return args.includes("lib/B.pm")
+        ? {
+            code: 255,
+            stdout: "",
+            stderr: 'syntax error at lib/B.pm line 3, near "}"',
+            missing: false,
+          }
+        : { code: 0, stdout: "", stderr: "lib/A.pm syntax OK", missing: false };
+    };
+    const out = await stopGate(payload(), {
+      run,
+      exists: exists(["cpanfile", "lib/A.pm", "lib/B.pm", "lib/C.pm"]),
+      changedFiles: async (cwd) => {
+        asked.push(cwd);
+        return ["lib/A.pm", "lib/B.pm", "lib/C.pm", "README.md"];
+      },
+    });
+
+    expect(asked).toEqual(["/repo"]);
+    // Stops at the first failure; C is not reached.
+    expect(calls).toEqual([
+      ["perl", "-c", "lib/A.pm"],
+      ["perl", "-c", "lib/B.pm"],
+    ]);
+    const decision = blocked(out);
+    expect(decision.decision).toBe("block");
+    expect(decision.reason).toContain("`perl -c lib/B.pm` failed (exit 255)");
+    expect(decision.reason).toContain("syntax error at lib/B.pm");
+  });
+
+  test("a table tool that is not installed is skipped; the rest of the plan still decides", async () => {
+    const calls: string[][] = [];
+    const run: Runner = async (bin, args) => {
+      calls.push([bin, ...args]);
+      return bin === "php"
+        ? { code: 0, stdout: "No syntax errors detected", stderr: "", missing: false }
+        : { code: 127, stdout: "", stderr: "", missing: true };
+    };
+    const out = await stopGate(payload(), {
+      run,
+      exists: exists(["composer.json", "phpstan.neon", "src/A.php"]),
+      changedFiles: async () => ["src/A.php"],
+    });
+    expect(out).toBe("");
+    expect(calls).toEqual([
+      ["php", "-l", "src/A.php"],
+      ["phpstan", "analyse", "--no-progress", "src/A.php"],
+    ]);
+  });
+
+  test("a CMake project with no build tree lets the turn end", async () => {
+    const { run, calls } = runner({ code: 1 });
+    expect(await stopGate(payload(), { run, exists: exists(["CMakeLists.txt"]) })).toBe("");
+    expect(calls).toEqual([]);
   });
 });

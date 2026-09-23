@@ -32,12 +32,41 @@ beforeEach(() => {
 });
 
 describe("which check a project answers to", () => {
+  const label = (names: readonly string[]): string | undefined => {
+    const table = gateCommandFor("/repo", exists(names));
+    return table.kind === "run" ? table.commands[0]?.label : undefined;
+  };
+
   test("is decided by what is in its root", () => {
-    expect(gateCommandFor("/repo", exists(["tsconfig.json"]))?.label).toBe("bunx tsc --noEmit");
-    expect(gateCommandFor("/repo", exists(["go.mod"]))?.label).toBe("go vet ./...");
-    expect(gateCommandFor("/repo", exists(["pyproject.toml"]))?.label).toBe("ruff check");
-    expect(gateCommandFor("/repo", exists(["Cargo.toml"]))?.label).toBe("cargo check");
-    expect(gateCommandFor("/repo", exists(["README.md"]))).toBeUndefined();
+    expect(label(["tsconfig.json"])).toBe("bunx tsc --noEmit");
+    expect(label(["go.mod"])).toBe("go vet ./...");
+    expect(label(["pyproject.toml"])).toBe("ruff check");
+    expect(label(["Cargo.toml"])).toBe("cargo check");
+    expect(gateCommandFor("/repo", exists(["README.md"]))).toEqual({
+      kind: "nothing",
+      reason: "no-check",
+    });
+  });
+
+  test("the seven languages of the all-languages ruling, through the same wrapper", () => {
+    expect(label(["CMakeLists.txt", "build"])).toBe("cmake --build build");
+    expect(label(["pom.xml"])).toBe("mvn -q compile");
+    expect(label(["build.gradle.kts", "gradlew", "src/main/kotlin"])).toBe(
+      "./gradlew -q compileKotlin",
+    );
+    expect(label(["Package.swift"])).toBe("swift build");
+    // File-scoped: the wrapper's default readDir and no list is "git could not say".
+    expect(gateCommandFor("/repo", exists(["composer.json"]))).toEqual({
+      kind: "nothing",
+      reason: "no-git",
+    });
+    expect(gateCommandFor("/repo", exists(["cpanfile"]), ["lib/A.pm"])).toEqual({
+      kind: "run",
+      commands: [{ label: "perl -c lib/A.pm", bin: "perl", args: ["-c", "lib/A.pm"] }],
+    });
+    expect(
+      gateCommandFor("/repo", exists([]), undefined, () => ["App.csproj"]).kind === "run",
+    ).toBe(true);
   });
 });
 
@@ -148,6 +177,72 @@ describe("a project with its own hooks", () => {
       }),
     ).toBeUndefined();
     expect(calls).toHaveLength(0);
+  });
+
+  test("a file-scoped table gate asks git at the cwd and runs one process per touched file", async () => {
+    const { run, calls } = runner({ code: 0 });
+    const asked: string[] = [];
+    const out = await gateOnStop({ session_id: "s-1" }, ctx, {
+      run,
+      exists: exists(["composer.json", "src/A.php", "src/B.php", "phpstan.neon"]),
+      changedFiles: async (cwd) => {
+        asked.push(cwd);
+        return ["src/A.php", "src/B.php", "README.md"];
+      },
+    });
+    expect(out).toBeUndefined();
+    expect(asked).toEqual(["/repo"]);
+    expect(calls).toEqual([
+      ["php", "-l", "src/A.php"],
+      ["php", "-l", "src/B.php"],
+      ["phpstan", "analyse", "--no-progress", "src/A.php", "src/B.php"],
+    ]);
+  });
+
+  test("a table tool that is not installed is skipped and the rest of the plan still runs", async () => {
+    const calls: string[][] = [];
+    const run: Runner = async (bin, args) => {
+      calls.push([bin, ...args]);
+      return bin === "php"
+        ? { code: 0, stdout: "", stderr: "", missing: false }
+        : { code: 127, stdout: "", stderr: "", missing: true };
+    };
+    const out = await gateOnStop({ session_id: "s-1" }, ctx, {
+      run,
+      exists: exists(["composer.json", "src/A.php", "phpstan.neon.dist"]),
+      changedFiles: async () => ["src/A.php"],
+    });
+    expect(out).toBeUndefined();
+    expect(calls).toHaveLength(2);
+  });
+
+  test("the first failing command of a plan is the one reported", async () => {
+    const run: Runner = async (bin, args) =>
+      args.includes("src/B.php")
+        ? { code: 255, stdout: "PHP Parse error in src/B.php", stderr: "", missing: false }
+        : { code: 0, stdout: "", stderr: "", missing: false };
+    const out = await gateOnStop({ session_id: "s-1" }, ctx, {
+      run,
+      exists: exists(["composer.json", "src/A.php", "src/B.php"]),
+      changedFiles: async () => ["src/A.php", "src/B.php"],
+    });
+    expect(out?.continue).toBe(true);
+    expect(out?.additionalContext).toContain("`php -l src/B.php` failed (exit 255)");
+    expect(out?.additionalContext).toContain("PHP Parse error");
+  });
+
+  test("a whole-project table gate never asks git", async () => {
+    const { run } = runner({ code: 0 });
+    const asked: string[] = [];
+    await gateOnStop({ session_id: "s-1" }, ctx, {
+      run,
+      exists: exists(["Cargo.toml"]),
+      changedFiles: async (cwd) => {
+        asked.push(cwd);
+        return [];
+      },
+    });
+    expect(asked).toEqual([]);
   });
 
   test("the tool is not installed: told once per session, never the table", async () => {

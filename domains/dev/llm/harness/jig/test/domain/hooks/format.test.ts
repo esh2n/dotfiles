@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  PHP_CS_FIXER_CONFIG_FILES,
   STYLELINT_CONFIG_FILES,
   cargoEdition,
+  csharpProject,
   formatPlanFor,
   formatterFor,
+  ktlintConfigured,
   projectRoot,
   rustfmtArgs,
   stylelintConfigured,
@@ -11,6 +14,8 @@ import {
 
 const exists = (paths: readonly string[]) => (path: string) => paths.includes(path);
 const texts = (files: Readonly<Record<string, string>>) => (path: string) => files[path];
+const dirs = (listing: Readonly<Record<string, readonly string[]>>) => (dir: string) =>
+  listing[dir] ?? [];
 
 describe("formatPlanFor: the project's hooks first, the table only without them", () => {
   test("a lefthook.yml project: lefthook on that one file, relative to the config's root", () => {
@@ -199,5 +204,181 @@ describe("the project root", () => {
   test("is found by a hook config alone", () => {
     expect(projectRoot("/repo/src", exists(["/repo/.pre-commit-config.yaml"]))).toBe("/repo");
     expect(projectRoot("/repo/src", exists(["/repo/.lefthook.yml"]))).toBe("/repo");
+  });
+
+  test("is found by the seven new languages' markers", () => {
+    for (const marker of [
+      "CMakeLists.txt",
+      "pom.xml",
+      "build.gradle",
+      "build.gradle.kts",
+      "settings.gradle.kts",
+      "cpanfile",
+      "composer.json",
+      "Package.swift",
+    ]) {
+      expect(projectRoot("/repo/src/deep", exists([`/repo/${marker}`]))).toBe("/repo");
+    }
+  });
+});
+
+describe("the seven languages of the all-languages ruling, one formatter each", () => {
+  const none = exists([]);
+
+  test("C/C++: clang-format -i on every source and header spelling", () => {
+    for (const ext of [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h", ".c"]) {
+      expect(formatterFor(`/repo/src/a${ext}`, "/repo", none)).toEqual({
+        bin: "clang-format",
+        args: ["-i", `/repo/src/a${ext}`],
+      });
+    }
+  });
+
+  test("C#: dotnet format on the enclosing .csproj, --include the file relative to the root", () => {
+    const listing = dirs({
+      "/repo/src/App": ["App.csproj", "Program.cs"],
+      "/repo": ["Everything.sln", "src"],
+    });
+    expect(csharpProject("/repo/src/App/Program.cs", "/repo", listing)).toBe(
+      "/repo/src/App/App.csproj",
+    );
+    expect(formatterFor("/repo/src/App/Program.cs", "/repo", none, undefined, listing)).toEqual({
+      bin: "dotnet",
+      args: ["format", "/repo/src/App/App.csproj", "--include", "src/App/Program.cs"],
+    });
+    // No .csproj above the file: the root's .sln.
+    expect(csharpProject("/repo/tools/x.cs", "/repo", listing)).toBe("/repo/Everything.sln");
+    // Neither: nothing formats it — dotnet format needs a project or solution.
+    expect(formatterFor("/repo/x.cs", "/repo", none)).toBeUndefined();
+    // Two .csproj in one directory: the first by name, deterministically.
+    const two = dirs({ "/repo": ["Z.csproj", "A.csproj"] });
+    expect(csharpProject("/repo/x.cs", "/repo", two)).toBe("/repo/A.csproj");
+  });
+
+  test("Java: google-java-format --replace", () => {
+    expect(formatterFor("/repo/src/A.java", "/repo", none)).toEqual({
+      bin: "google-java-format",
+      args: ["--replace", "/repo/src/A.java"],
+    });
+  });
+
+  test("Kotlin: ktlint --format when .editorconfig has a [*.{kt,kts}] section, else ktfmt", () => {
+    const withSection = texts({
+      "/repo/.editorconfig": "root = true\n\n[*.{kt,kts}]\nktlint_code_style = ktlint_official\n",
+    });
+    const withoutSection = texts({
+      "/repo/.editorconfig": "root = true\n\n[*.py]\nindent_size = 4\n",
+    });
+    const editorconfig = exists(["/repo/.editorconfig"]);
+
+    expect(ktlintConfigured("/repo", editorconfig, withSection)).toBe(true);
+    expect(ktlintConfigured("/repo", editorconfig, withoutSection)).toBe(false);
+    expect(ktlintConfigured("/repo", none, withSection)).toBe(false);
+    // Other spellings of the Kotlin section count too.
+    expect(
+      ktlintConfigured("/repo", editorconfig, texts({ "/repo/.editorconfig": "[*.kt]\n" })),
+    ).toBe(true);
+    expect(
+      ktlintConfigured("/repo", editorconfig, texts({ "/repo/.editorconfig": "[{*.kt,*.kts}]\n" })),
+    ).toBe(true);
+
+    for (const ext of [".kt", ".kts"]) {
+      expect(formatterFor(`/repo/src/A${ext}`, "/repo", editorconfig, withSection)).toEqual({
+        bin: "ktlint",
+        args: ["--format", `/repo/src/A${ext}`],
+      });
+      expect(formatterFor(`/repo/src/A${ext}`, "/repo", editorconfig, withoutSection)).toEqual({
+        bin: "ktfmt",
+        args: [`/repo/src/A${ext}`],
+      });
+      expect(formatterFor(`/repo/src/A${ext}`, "/repo", none)).toEqual({
+        bin: "ktfmt",
+        args: [`/repo/src/A${ext}`],
+      });
+    }
+  });
+
+  test("Perl: perltidy -b -bext=/ (in place, backup deleted on success) on every Perl spelling", () => {
+    for (const ext of [".pl", ".pm", ".t", ".psgi", ".cgi"]) {
+      expect(formatterFor(`/repo/lib/A${ext}`, "/repo", none)).toEqual({
+        bin: "perltidy",
+        args: ["-b", "-bext=/", `/repo/lib/A${ext}`],
+      });
+    }
+  });
+
+  test("PHP: pint with pint.json or a vendored pint, php-cs-fixer with its config, pint otherwise", () => {
+    expect(formatterFor("/repo/src/A.php", "/repo", exists(["/repo/pint.json"]))).toEqual({
+      bin: "pint",
+      args: ["/repo/src/A.php"],
+    });
+    // The vendored binary is preferred, and is itself reason enough to pick pint.
+    expect(formatterFor("/repo/src/A.php", "/repo", exists(["/repo/vendor/bin/pint"]))).toEqual({
+      bin: "/repo/vendor/bin/pint",
+      args: ["/repo/src/A.php"],
+    });
+    expect(PHP_CS_FIXER_CONFIG_FILES).toEqual([".php-cs-fixer.dist.php", ".php-cs-fixer.php"]);
+    for (const config of PHP_CS_FIXER_CONFIG_FILES) {
+      expect(formatterFor("/repo/src/A.php", "/repo", exists([`/repo/${config}`]))).toEqual({
+        bin: "php-cs-fixer",
+        args: ["fix", "/repo/src/A.php"],
+      });
+      expect(
+        formatterFor(
+          "/repo/src/A.php",
+          "/repo",
+          exists([`/repo/${config}`, "/repo/vendor/bin/php-cs-fixer"]),
+        )?.bin,
+      ).toBe("/repo/vendor/bin/php-cs-fixer");
+    }
+    // Both configs: pint, the first branch.
+    expect(
+      formatterFor(
+        "/repo/src/A.php",
+        "/repo",
+        exists(["/repo/pint.json", "/repo/.php-cs-fixer.php"]),
+      )?.bin,
+    ).toBe("pint");
+    // Neither: pint, which needs no config.
+    expect(formatterFor("/repo/src/A.php", "/repo", none)).toEqual({
+      bin: "pint",
+      args: ["/repo/src/A.php"],
+    });
+  });
+
+  test("Swift: swiftformat on the file", () => {
+    expect(formatterFor("/repo/Sources/A.swift", "/repo", none)).toEqual({
+      bin: "swiftformat",
+      args: ["/repo/Sources/A.swift"],
+    });
+  });
+
+  test("the plan runs from the language's own project root, and readDir reaches the table", () => {
+    expect(
+      formatPlanFor(
+        "/repo/lib/A.pm",
+        exists(["/repo/cpanfile", "/repo/lib/A.pm"]),
+        undefined,
+        dirs({}),
+      ),
+    ).toEqual({
+      source: "table",
+      bin: "perltidy",
+      args: ["-b", "-bext=/", "/repo/lib/A.pm"],
+      cwd: "/repo",
+    });
+    expect(
+      formatPlanFor(
+        "/repo/src/App/Program.cs",
+        exists(["/repo/.git"]),
+        undefined,
+        dirs({ "/repo/src/App": ["App.csproj"] }),
+      ),
+    ).toEqual({
+      source: "table",
+      bin: "dotnet",
+      args: ["format", "/repo/src/App/App.csproj", "--include", "src/App/Program.cs"],
+      cwd: "/repo",
+    });
   });
 });

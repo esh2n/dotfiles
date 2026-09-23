@@ -41,6 +41,20 @@ describe("which formatter a file gets", () => {
     expect(formatterFor("/repo/main.go", "/repo", exists([]))?.bin).toBe("gofmt");
     expect(formatterFor("/repo/main.py", "/repo", exists([]))?.bin).toBe("ruff");
     expect(formatterFor("/repo/main.rs", "/repo", exists([]))?.bin).toBe("rustfmt");
+    expect(formatterFor("/repo/main.cpp", "/repo", exists([]))?.bin).toBe("clang-format");
+    expect(formatterFor("/repo/Main.java", "/repo", exists([]))?.bin).toBe("google-java-format");
+    expect(formatterFor("/repo/Main.kt", "/repo", exists([]))?.bin).toBe("ktfmt");
+    expect(formatterFor("/repo/main.pl", "/repo", exists([]))?.bin).toBe("perltidy");
+    expect(formatterFor("/repo/main.php", "/repo", exists([]))?.bin).toBe("pint");
+    expect(formatterFor("/repo/main.swift", "/repo", exists([]))?.bin).toBe("swiftformat");
+    // C# through the wrapper's readDir default: no project on disk, so a skip.
+    expect(formatterFor("/repo/Program.cs", "/repo", exists([]))).toBeUndefined();
+    expect(
+      formatterFor("/repo/Program.cs", "/repo", exists([]), undefined, () => ["App.csproj"]),
+    ).toEqual({
+      bin: "dotnet",
+      args: ["format", "/repo/App.csproj", "--include", "Program.cs"],
+    });
   });
 
   test("a file nothing formats is a skip, not an error", () => {

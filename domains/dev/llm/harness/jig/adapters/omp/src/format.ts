@@ -23,11 +23,12 @@
  * which is what the repo's own tooling checks; running both is idempotent.
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import {
   type FormatCommand,
   type FormatPlan,
+  type ReadDir,
   type ReadText,
   formatterFor as chooseFormatter,
   formatPlanFor as choosePlan,
@@ -39,12 +40,21 @@ import { type Runner, runCommand } from "./run";
 
 const TIMEOUT_MS = 15_000;
 
-/** `package.json` / `Cargo.toml` text for the table's config lookups; unreadable is "no text". */
+/** `package.json` / `Cargo.toml` / `.editorconfig` text for the table's config lookups; unreadable is "no text". */
 const readTextSync: ReadText = (path) => {
   try {
     return readFileSync(path, "utf8");
   } catch {
     return undefined;
+  }
+};
+
+/** The table's `.csproj` / `.sln` lookup for `dotnet format`; an unreadable directory is empty. */
+const readDirSync: ReadDir = (dir) => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
   }
 };
 
@@ -58,14 +68,15 @@ const readTextSync: ReadText = (path) => {
  * the extension table only without one). Wrapped here only to bind omp's
  * `existsSync` default, which a pure module does not get to have.
  */
-export type { FormatCommand, FormatPlan, ReadText };
+export type { FormatCommand, FormatPlan, ReadDir, ReadText };
 
 export function formatPlanFor(
   file: string,
   exists: (p: string) => boolean = existsSync,
   readText: ReadText = readTextSync,
+  readDir: ReadDir = readDirSync,
 ): FormatPlan | undefined {
-  return choosePlan(file, exists, readText);
+  return choosePlan(file, exists, readText, readDir);
 }
 
 export function projectRoot(from: string, exists: (p: string) => boolean = existsSync): string {
@@ -77,15 +88,18 @@ export function formatterFor(
   root: string,
   exists: (p: string) => boolean = existsSync,
   readText: ReadText = readTextSync,
+  readDir: ReadDir = readDirSync,
 ): FormatCommand | undefined {
-  return chooseFormatter(file, root, exists, readText);
+  return chooseFormatter(file, root, exists, readText, readDir);
 }
 
 export interface FormatDeps {
   readonly run?: Runner;
   readonly exists?: (path: string) => boolean;
-  /** For the table's `package.json` (stylelint) and `Cargo.toml` (edition) lookups. */
+  /** For the table's `package.json` (stylelint), `Cargo.toml` (edition) and `.editorconfig` (ktlint) lookups. */
   readonly readText?: ReadText;
+  /** For the table's `.csproj` / `.sln` lookup (C#). */
+  readonly readDir?: ReadDir;
   readonly timeoutMs?: number;
 }
 
@@ -108,7 +122,12 @@ export async function formatOnResult(
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) continue;
     const file = isAbsolute(path) ? path : resolve(cwd, path);
     if (!exists(file)) continue;
-    const plan = formatPlanFor(file, exists, deps.readText ?? readTextSync);
+    const plan = formatPlanFor(
+      file,
+      exists,
+      deps.readText ?? readTextSync,
+      deps.readDir ?? readDirSync,
+    );
     if (plan === undefined) continue;
     // A project hook runner that is not installed is a skip here too — the
     // ruling forbids the table as its substitute, and the stop gate is what
