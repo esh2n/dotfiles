@@ -99,9 +99,8 @@ assert_file_exists() {
 # -----------------------------------------------------------------------------
 # Symlink safety (task T35): every git-tracked symlink must be RELATIVE and
 # stay INSIDE the repository. Anything that needs to point into $HOME or is
-# machine/account specific belongs in an external-links.yaml layer instead
-# (personal/external-links.yaml + yoki-switch's link_external_resources()),
-# linked at apply time rather than committed as a real symlink.
+# machine/account specific is not committed as a real symlink at all — it is
+# made at apply time by core/config/manager.sh's linking functions instead.
 # -----------------------------------------------------------------------------
 
 # Normalizes a slash-separated relative path (may contain "." / ".."
@@ -352,8 +351,8 @@ const fs = require("fs");
 const path = require("path");
 const root = process.argv[1];
 // Text-like extensions only: a vendored binary or image is expected to hold
-// NUL bytes. Kept in sync with TEXT_EXTENSIONS in
-// runtime/yoki/scripts/lib/prepush-scan.js.
+// NUL bytes. This list is self-contained — nothing else in the repo reads
+// it or needs to stay in sync with it.
 const exts = new Set([".js", ".mjs", ".ts", ".sh", ".md", ".json", ".yaml",
   ".yml", ".toml", ".nix", ".html", ".css", ".txt", ".zsh"]);
 for (const rel of fs.readFileSync(0).toString("utf8").split("\u0000")) {

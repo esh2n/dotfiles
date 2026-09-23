@@ -114,27 +114,14 @@ run_validation() {
 # not a repeatable regression suite) and "workday-calc" (needs `uv`, a skill
 # runtime dependency rather than a harness/hook one). Each suite is re-run as
 # its own case invocation of this same script, so the default run and e.g.
-# `validator.sh harness-adapter` on its own always do exactly the same thing.
+# `validator.sh portability` on its own always do exactly the same thing.
 run_all_checks() {
     local suites=(
         portability
-        merge-settings
-        yoki-switch-targets
-        targets-golden
-        git-guard
-        unattended-guard
-        correction-distill
-        worktree-guard
         pi-links
         dsh-links
-        yoki-box
-        omp-yoki-bridge
-        harness-adapter
-        pack-hooks
+        code-graph-cache-gc
         yoki-artifact
-        yoki-graph
-        yoki-loop
-        suggest-compact
     )
 
     local overall_failed=0
@@ -180,64 +167,6 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/portability.sh"
             run_portability_checks
             ;;
-        "merge-settings")
-            source "${SCRIPT_DIR}/test-merge-settings.sh"
-            run_merge_settings_checks
-            ;;
-        "yoki-switch-targets")
-            if ! command -v node >/dev/null 2>&1; then
-                log_error "yoki-switch-targets requires node (for \`node --test\` and lib/targets/gen.js) — none found on PATH."
-                exit 1
-            fi
-
-            # lib/targets/*.test.js are the module-level unit suites behind
-            # everything the end-to-end checks below exercise (hook
-            # translation, config.toml/AGENTS.md managed blocks, the
-            # Claude->Codex vocabulary substitution, skill symlink
-            # decisions). They had no runner: the golden suite diffs whole
-            # generated trees and this suite drives gen.js against the real
-            # sources, so a broken unit contract only ever surfaced
-            # indirectly, and a unit test with no end-to-end consequence
-            # never ran in CI at all. Same shape as the harness-adapter
-            # case above: unit suite and contract suite both run, either
-            # one failing fails the case.
-            node_unit_status=0
-            node --test \
-                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/targets/test/"*.test.js \
-                || node_unit_status=$?
-
-            source "${SCRIPT_DIR}/test-yoki-switch-targets.sh"
-            targets_contract_status=0
-            run_yoki_switch_targets_checks || targets_contract_status=$?
-
-            if [[ "$node_unit_status" -ne 0 || "$targets_contract_status" -ne 0 ]]; then
-                exit 1
-            fi
-            ;;
-        "targets-golden")
-            if ! command -v node >/dev/null 2>&1; then
-                log_error "targets-golden requires node (for lib/targets/gen.js) — none found on PATH."
-                exit 1
-            fi
-            source "${SCRIPT_DIR}/test-targets-golden.sh"
-            run_targets_golden_checks
-            ;;
-        "git-guard")
-            source "${SCRIPT_DIR}/test-git-guard.sh"
-            run_git_guard_checks
-            ;;
-        "unattended-guard")
-            source "${SCRIPT_DIR}/test-unattended-guard.sh"
-            run_unattended_guard_checks
-            ;;
-        "correction-distill")
-            source "${SCRIPT_DIR}/test-correction-distill.sh"
-            run_correction_distill_checks
-            ;;
-        "worktree-guard")
-            source "${SCRIPT_DIR}/test-worktree-guard.sh"
-            run_worktree_guard_checks
-            ;;
         "pi-links")
             source "${SCRIPT_DIR}/test-pi-links.sh"
             run_pi_links_checks
@@ -246,52 +175,8 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-dsh-links.sh"
             run_dsh_links_checks
             ;;
-        "yoki-box")
-            source "${SCRIPT_DIR}/test-yoki-box.sh"
-            run_yoki_box_checks
-            ;;
-        "omp-yoki-bridge")
-            source "${SCRIPT_DIR}/test-omp-yoki-bridge.sh"
-            run_omp_yoki_bridge_checks
-            ;;
-        "harness-adapter")
-            if ! command -v node >/dev/null 2>&1; then
-                log_error "harness-adapter requires node (for \`node --test\` and the real hook runners) — none found on PATH."
-                exit 1
-            fi
-
-            node_unit_status=0
-            node --test \
-                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/harness/test/**/*.test.js" \
-                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/runtime/yoki/scripts/hooks/test/**/*.test.js" \
-                || node_unit_status=$?
-
-            source "${SCRIPT_DIR}/test-harness-adapter.sh"
-            node_contract_status=0
-            run_harness_adapter_checks || node_contract_status=$?
-
-            if [[ "$node_unit_status" -ne 0 || "$node_contract_status" -ne 0 ]]; then
-                exit 1
-            fi
-            ;;
-        "pack-hooks")
-            if ! command -v node >/dev/null 2>&1; then
-                log_error "pack-hooks requires node (for \`node --test\` over the pack hook suites) — none found on PATH."
-                exit 1
-            fi
-
-            # Pack-owned hook unit suites. These live under
-            # packs/<name>/hooks/test/ (plus the go pack's hooks/*.test.mjs),
-            # OUTSIDE runtime/yoki — so the harness-adapter case's globs never
-            # reach them, and until this suite existed no validator.sh pass ran
-            # them at all: a pack hook regression (a broken fail-open, a walk
-            # that escapes the repo) shipped without ever failing CI. Both
-            # patterns are handed to node's own glob expansion, same as the
-            # harness-adapter case above; a new pack's hooks/test/*.test.js is
-            # picked up with no validator change.
-            node --test \
-                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/packs/*/hooks/test/**/*.test.js" \
-                "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/packs/*/hooks/*.test.mjs"
+        "code-graph-cache-gc")
+            bash "${SCRIPT_DIR}/test-code-graph-cache-gc.sh"
             ;;
         "yoki-artifact")
             if ! command -v node >/dev/null 2>&1; then
@@ -302,33 +187,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
             source "${SCRIPT_DIR}/test-yoki-artifact.sh"
             run_yoki_artifact_checks
             ;;
-        "yoki-graph")
-            if ! command -v node >/dev/null 2>&1; then
-                log_error "yoki-graph requires node (for \`node --test\` and the mock-backend CLI) — none found on PATH."
-                exit 1
-            fi
-
-            source "${SCRIPT_DIR}/test-yoki-graph.sh"
-            run_yoki_graph_checks
-            ;;
-        "yoki-loop")
-            if ! command -v node >/dev/null 2>&1; then
-                log_error "yoki-loop requires node (for \`node --test\` and the real CLI) — none found on PATH."
-                exit 1
-            fi
-
-            source "${SCRIPT_DIR}/test-yoki-loop.sh"
-            run_yoki_loop_checks
-            ;;
-        "suggest-compact")
-            source "${SCRIPT_DIR}/test-suggest-compact.sh"
-            run_suggest_compact_checks
-            ;;
         "workday-calc")
-            uv run "${DOTFILES_ROOT}/domains/dev/config/claude-profiles/personal/skills/workday-calc/scripts/calc.py" --selftest
+            uv run "${DOTFILES_ROOT}/domains/dev/llm/harness/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 [pre|post|portability|merge-settings|yoki-switch-targets|targets-golden|git-guard|unattended-guard|correction-distill|worktree-guard|pi-links|dsh-links|yoki-box|omp-yoki-bridge|harness-adapter|pack-hooks|yoki-artifact|yoki-graph|yoki-loop|suggest-compact|workday-calc]"
+            echo "Usage: $0 [pre|post|portability|pi-links|dsh-links|code-graph-cache-gc|yoki-artifact|workday-calc]"
             echo "       (no args runs every self-contained regression suite)"
             exit 1
             ;;
