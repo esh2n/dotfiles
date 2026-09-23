@@ -63,20 +63,29 @@ echo "home-llm-up: role=$ROLE os=$OS root=$DOTFILES_ROOT"
 # ---------------------------------------------------------------- 1. apps
 step "1. Apps (Tailscale$([ "$ROLE" = hub ] && echo ', LM Studio'))"
 if [ "$OS" = Darwin ]; then
-  missing=()
-  [ -d /Applications/Tailscale.app ] || missing+=(tailscale-app)
-  [ "$ROLE" = hub ] && [ ! -d "/Applications/LM Studio.app" ] && missing+=(lm-studio)
-  if [ ${#missing[@]} -gt 0 ]; then
-    # The casks are declared in domains/dev/packages/homebrew.nix; the repo's
-    # own path to install them is the nix-darwin switch (`make update`).
-    did "installing ${missing[@]+"${missing[@]}"} via make update (nix-darwin homebrew.casks)"
-    make -C "$DOTFILES_ROOT" update
-    [ -d /Applications/Tailscale.app ] || todo "Tailscale.app still missing after make update — check homebrew.nix / the update log"
-    [ "$ROLE" = hub ] && [ ! -d "/Applications/LM Studio.app" ] && todo "LM Studio.app still missing after make update"
-    [ -z "$TS_BIN" ] && [ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ] && TS_BIN=/Applications/Tailscale.app/Contents/MacOS/Tailscale
-  else
-    ok "installed"
-  fi
+  # The casks are declared in domains/dev/packages/homebrew.nix (nix-darwin
+  # homebrew.casks, cleanup "none"), so installing the same cask here directly
+  # is what the next `make update` would do, minus the full system switch —
+  # and minus the failure mode measured 2026-09-23: `brew bundle` inside the
+  # switch dies on an app that was installed from a DMG by hand (chgrp
+  # "Operation not permitted", then the whole activation aborts). An app that
+  # exists but is not brew-managed is adopted (`--adopt` records it when its
+  # version equals the cask's), and anything brew cannot settle becomes an
+  # owner step instead of killing this script.
+  cask_app() {
+    local cask="$1" app="$2"
+    if brew list --cask "$cask" >/dev/null 2>&1; then ok "$cask (brew)"; return; fi
+    if [ -d "$app" ]; then
+      if brew install --cask --adopt "$cask" >/dev/null 2>&1; then did "$cask adopted (was installed by hand)"
+      else todo "$app is installed by hand at a version the cask ($cask) does not match: update it from inside the app (or quit it and move it to the Trash — models and settings live under ~/.lmstudio and ~/Library, not in the app) and re-run"
+      fi
+    else
+      brew install --cask "$cask" >/dev/null 2>&1 && did "$cask installed" || todo "brew install --cask $cask failed — run it by hand to see why"
+    fi
+  }
+  cask_app tailscale-app /Applications/Tailscale.app
+  [ "$ROLE" = hub ] && cask_app lm-studio "/Applications/LM Studio.app"
+  [ -z "$TS_BIN" ] && [ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ] && TS_BIN=/Applications/Tailscale.app/Contents/MacOS/Tailscale
 else
   [ -n "$TS_BIN" ] && ok "tailscale on PATH" || todo "install tailscale (https://tailscale.com/download/linux) and re-run"
 fi
