@@ -26,6 +26,20 @@
 # `!op read` from inside omp's child process cannot always reach the login
 # Keychain. Tier → model lives in litellm/config.yaml, never here.
 providers:
+  # omp adds an IMPLICIT, keyless `lm-studio` provider probing 127.0.0.1:1234
+  # whenever this id is not configured (docs/models.md: "If `lm-studio` is not
+  # explicitly configured, registry adds an implicit discoverable provider …
+  # auth mode: keyless"). Keyless means always "available", so it became the
+  # fallback model the moment LM Studio was up (measured 2026-09-23: omp
+  # started on qwen/qwen3.6-35b-a3b). That is a direct provider — no LiteLLM,
+  # no measurement — which the routing ruling forbids for omp. Configuring the
+  # id explicitly is the one documented way to stop the discovery; this entry
+  # points nowhere and lists nothing, so it can never be selected. LM Studio
+  # is reached only as the proxy's `deterministic` tier.
+  lm-studio:
+    baseUrl: http://127.0.0.1:9/v1
+    api: openai-completions
+    models: []
   proxy:
     baseUrl: http://localhost:4000/v1
     apiKey: LITELLM_API_KEY

@@ -59,6 +59,20 @@ ask() {  # ask <tier> — one short completion; prints reply and wall time
 }
 [ -n "$KEY" ] && { [ "$ROLE" = hub ] && ask deterministic; ask main; [ "$WITH_COMPLEX" = 1 ] && ask complex; }
 
+# --- omp sees the proxy tiers? (the same key the omp() wrapper hands over) ---
+if command -v omp >/dev/null 2>&1 && [ -n "$KEY" ]; then
+  seen="$(LITELLM_API_KEY="$KEY" timeout 30 omp models ls proxy 2>/dev/null | grep -o -E 'proxy/(main|complex|deterministic)' | sort -u | tr '\n' ' ')"
+  case "$seen" in
+    *complex*deterministic*main*) pass "omp lists the proxy tiers: ${seen}" ;;
+    *) fail "omp does not list proxy/{main,complex,deterministic} (models.yml provider, or key) — got: ${seen:-none}" ;;
+  esac
+fi
+if curl -sf --max-time 3 -o /dev/null http://127.0.0.1:4100/health 2>/dev/null; then
+  pass "jig decision service :4100 answers (tier routing for pi/omp)"
+else
+  fail "jig decision service :4100 not answering — tier routing falls back to the current model (launchctl print gui/\$(id -u)/com.esh2n.jig-decision)"
+fi
+
 # --- metrics: the dedicated listener and the Prometheus that scrapes it ------
 if curl -sf --max-time 5 http://127.0.0.1:4001/metrics 2>/dev/null | grep -q '^litellm_'; then
   pass "LiteLLM :4001 exposes litellm_* metrics"
