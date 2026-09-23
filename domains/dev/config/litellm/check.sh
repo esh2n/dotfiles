@@ -40,15 +40,6 @@ echo "home-llm check (${ROLE})"
 if [ "$ROLE" = hub ]; then
   models="$(curl -sf --max-time 5 http://127.0.0.1:1234/v1/models 2>/dev/null | python3 -c 'import json,sys; print(" ".join(m["id"] for m in json.load(sys.stdin)["data"]))' 2>/dev/null)"
   if [ -n "$models" ]; then pass "LM Studio :1234 lists: ${models}"; else fail "LM Studio :1234 does not answer /v1/models (server off, or no model loaded)"; fi
-  # The context window each LOADED model actually runs with (LM Studio REST v0:
-  # loaded_context_length / max_context_length) — the number the deterministic
-  # tier's contextWindow in policy/tiers.json (131072) must not exceed.
-  ctx="$(curl -sf --max-time 5 http://127.0.0.1:1234/api/v0/models 2>/dev/null | python3 -c '
-import json,sys
-for m in json.load(sys.stdin).get("data",[]):
-    if m.get("state")=="loaded": print(f"{m[\"id\"]}: loaded={m.get(\"loaded_context_length\")} max={m.get(\"max_context_length\")}")
-' 2>/dev/null | tr "\n" ";")"
-  [ -n "$ctx" ] && pass "LM Studio loaded context: ${ctx}" || fail "LM Studio: no model loaded (the deterministic tier answers only while one is)"
 fi
 
 # --- LiteLLM: key, tier list, one real completion per tier -------------------
@@ -83,6 +74,22 @@ ask() {  # ask <tier> — one short completion; prints reply and wall time
 # node's own LiteLLM → the hub's LM Studio over the tailnet (litellm-up.sh's
 # LM_STUDIO_REMOTE_HOST). A node never needs a local model.
 [ -n "$KEY" ] && { ask deterministic; ask main; [ "$WITH_COMPLEX" = 1 ] && ask complex; }
+
+# --- LM Studio (hub): the context window the model is really loaded with -----
+# Probed AFTER `ask deterministic` on purpose: LM Studio loads a model
+# just-in-time on the first request and unloads it after its idle TTL, so
+# before the completion above /api/v0/models may list every model as
+# "not-loaded" (measured 2026-09-24: FAIL here while the tier answered in 2.7s).
+# loaded_context_length is the number the deterministic tier's contextWindow
+# in policy/tiers.json must not exceed.
+if [ "$ROLE" = hub ]; then
+  ctx="$(curl -sf --max-time 5 http://127.0.0.1:1234/api/v0/models 2>/dev/null | python3 -c '
+import json,sys
+for m in json.load(sys.stdin).get("data",[]):
+    if m.get("state")=="loaded": print(f"{m[\"id\"]}: loaded={m.get(\"loaded_context_length\")} max={m.get(\"max_context_length\")}")
+' 2>/dev/null | tr "\n" ";")"
+  [ -n "$ctx" ] && pass "LM Studio loaded context: ${ctx}" || fail "LM Studio: no model loaded even after the deterministic completion (JIT load failed, or /api/v0/models is off)"
+fi
 
 # --- omp sees the proxy tiers? (the same key the omp() wrapper hands over) ---
 if command -v omp >/dev/null 2>&1 && [ -n "$KEY" ]; then
