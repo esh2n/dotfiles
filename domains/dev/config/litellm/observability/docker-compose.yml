@@ -1,21 +1,35 @@
-# Observability stack for the local LLM gateway (LiteLLM).
+# Observability stack for the local LLM gateway (LiteLLM), plus the phone's
+# chat page.
 #
-# Two components with different jobs, which is why they have different lifetimes:
+# Three components with different jobs, which is why they have different
+# lifetimes and different profiles:
 #
-#   prometheus — scrapes the gateway and STORES the numbers. LiteLLM keeps its
-#                counters in process memory and loses them on every restart, so
-#                Prometheus is the only thing that makes history survive. It is
-#                therefore resident (`restart: unless-stopped`).
-#   grafana    — renders what Prometheus stored. It stores nothing itself, so it
-#                is safe to stop, and it is behind the "ui" profile: a plain
-#                `docker compose up -d` starts Prometheus only.
+#   prometheus  — scrapes the gateway and STORES the numbers. LiteLLM keeps its
+#                 counters in process memory and loses them on every restart,
+#                 so Prometheus is the only thing that makes history survive.
+#                 It is therefore resident (`restart: unless-stopped`).
+#   grafana     — renders what Prometheus stored. It stores nothing itself, so
+#                 it is safe to stop, and it is behind the "ui" profile: a
+#                 plain `docker compose up -d` starts Prometheus only.
+#   open-webui  — the phone's chat page in front of the Mac's own LM Studio
+#                 (ruling:
+#                 ../../../llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
+#                 It is resident like Prometheus (the phone must be able to
+#                 reach it at any time), but on its own "webui" profile so that
+#                 `stop.sh`'s `--profile ui down` — which tears down the
+#                 default + "ui" services — never takes it down as a side
+#                 effect. Bring it up once with
+#                 `docker compose --profile webui up -d open-webui`; see
+#                 README "Open WebUI (phone)" for the rest of the setup.
 #
-# Both ports bind 127.0.0.1. The gateway's own port is published to loopback
-# only, and reaching it from a container goes through OrbStack's
-# host.docker.internal proxy — measured, not assumed (see README).
+# All ports bind 127.0.0.1. The gateway's own port is published to loopback
+# only, and reaching it (or LM Studio) from a container goes through
+# OrbStack's host.docker.internal proxy — measured, not assumed (see README).
 #
-# Run it through start.sh / stop.sh / status.sh rather than calling compose
-# directly, so the flags and the health checks stay in one place.
+# Run prometheus/grafana through start.sh / stop.sh / status.sh rather than
+# calling compose directly, so the flags and the health checks stay in one
+# place. open-webui is started once by hand (see README) and then left
+# resident.
 
 services:
   prometheus:
@@ -75,6 +89,40 @@ services:
     depends_on:
       - prometheus
 
+  open-webui:
+    # `:main` is docs' documented "standard image (recommended)" tag for the
+    # quick-start docker compose example, not a pinned version — no other tag
+    # is offered there: https://docs.openwebui.com/getting-started/quick-start/
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: litellm-open-webui
+    # See "webui" profile note in the file header above.
+    profiles: ["webui"]
+    # Resident, like Prometheus: the phone must be able to reach it at any
+    # time, not only while someone happens to be watching a dashboard. This is
+    # the "常駐させ" (keep it resident) half of the ruling this follows.
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:8080" # 8080 = the container's documented listen port
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - open-webui-data:/app/backend/data
+    environment:
+      # OpenAI-compatible backend = the Mac's own LM Studio over loopback,
+      # reached the same way Prometheus reaches the gateway above — never the
+      # LiteLLM gateway and never the LAN.
+      OPENAI_API_BASE_URL: "http://host.docker.internal:1234/v1"
+      # LM Studio accepts any bearer value; "lm-studio" is the documented
+      # placeholder for exactly this case.
+      OPENAI_API_KEY: "lm-studio"
+      # No local Ollama on this Mac; keeps the model list to LM Studio only.
+      ENABLE_OLLAMA_API: "false"
+      # WEBUI_AUTH is left unset (documented default: true — the app's own
+      # login stays on). The tailnet is the network boundary; this is a
+      # second, independent gate, and the first account created becomes
+      # admin. https://docs.openwebui.com/getting-started/quick-start/
+
 volumes:
   prometheus-data:
   grafana-data:
+  open-webui-data:

@@ -4,8 +4,12 @@
 `domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`:
 LM Studio on the Mac (`tcp:1234`) reachable from the owner's other machines, and
 each machine's LiteLLM dedicated metrics listener (`tcp:4001`) reachable from the
-Mac's Prometheus. Nothing else is opened; LiteLLM's chat API (4000) is never
-served on the tailnet at all.
+Mac's Prometheus. The phone reaches Open WebUI on the Mac (`tcp:3001`, HTTPS
+via `tailscale serve --https`) — the only one of the three ports served over
+HTTPS rather than raw TCP, because a PWA install needs a real certificate.
+Nothing else is opened; LiteLLM's chat API (4000) is never served on the
+tailnet at all, and neither is LM Studio's own container port 8080 (Open WebUI
+is the only thing that talks to it, over loopback inside the same Mac).
 
 ## Where it lives
 
@@ -28,11 +32,12 @@ is no `link_*` step for it.
   (<https://tailscale.com/kb/1312/serve>), which is why serving a port with
   `--tcp` is safe only together with this file.
 
-## The two `serve` commands it governs
+## The three `serve` commands it governs
 
 | Machine | Once | Opens |
 |---|---|---|
 | the Mac | `tailscale serve --bg --tcp 1234 tcp://127.0.0.1:1234` | LM Studio (`domains/dev/config/lmstudio/`) |
+| the Mac | `tailscale serve --bg --https=3001 127.0.0.1:3001` | Open WebUI, the phone's chat page (`domains/dev/config/litellm/observability/`) |
 | every non-Mac machine | `tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001` | LiteLLM metrics only (`domains/dev/config/litellm/litellm-up.sh`) |
 
 Then uncomment that machine's target in

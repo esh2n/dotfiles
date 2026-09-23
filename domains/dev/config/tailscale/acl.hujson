@@ -10,10 +10,13 @@
 //   tcp:1234  LM Studio on the Mac  — every other machine's LiteLLM reaches it
 //   tcp:4001  LiteLLM's dedicated metrics listener on every machine — the
 //             Mac's Prometheus scrapes it
-// Both services sit on 127.0.0.1 and are put on the tailnet with
-// `tailscale serve --tcp` — and "access control rules apply to Serve just like
-// any other service" (https://tailscale.com/kb/1312/serve), so this file is
-// the boundary. LiteLLM's chat API (4000) is never served, so no rule for it.
+//   tcp:3001  Open WebUI on the Mac — the phone's chat page
+// All three services sit on 127.0.0.1 and are put on the tailnet with
+// `tailscale serve` (`--tcp` for 1234/4001, `--https` for 3001 — a PWA install
+// needs a real certificate) — and "access control rules apply to Serve just
+// like any other service" (https://tailscale.com/kb/1312/serve), so this file
+// is the boundary. LiteLLM's chat API (4000) is never served, so no rule for
+// it.
 //
 // "src: autogroup:member -> dst: autogroup:self" means: a user's devices may
 // reach that same user's devices. Devices tagged, shared in from another
@@ -29,11 +32,11 @@
 // (grants: src / dst / ip as "protocol:port"; autogroup:member; autogroup:self).
 {
 	"grants": [
-		// The owner's devices reach each other on the two LLM ports only.
+		// The owner's devices reach each other on the three LLM ports only.
 		{
 			"src": ["autogroup:member"],
 			"dst": ["autogroup:self"],
-			"ip":  ["tcp:1234", "tcp:4001"],
+			"ip":  ["tcp:1234", "tcp:4001", "tcp:3001"],
 		},
 
 		// Uncomment to keep full reachability between the owner's own devices
@@ -64,7 +67,7 @@
 	"tests": [
 		{
 			"src":    "owner@example.com",
-			"accept": ["mac.example.ts.net:1234", "mac.example.ts.net:4001"],
+			"accept": ["mac.example.ts.net:1234", "mac.example.ts.net:4001", "mac.example.ts.net:3001"],
 			"deny":   ["mac.example.ts.net:4000", "mac.example.ts.net:22"],
 		},
 	],

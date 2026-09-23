@@ -82,6 +82,66 @@ container goes through OrbStack's `host.docker.internal` proxy — measured, not
 assumed: a container returns 200 from `http://host.docker.internal:4000/metrics/`
 even though the gateway is published to loopback only.
 
+## Open WebUI (phone)
+
+A third container, `open-webui` — a self-hosted chat page
+(`ghcr.io/open-webui/open-webui:main`, the documented "standard image
+(recommended)" tag:
+<https://docs.openwebui.com/getting-started/quick-start/>) in front of the
+same Mac's own LM Studio. It is not part of the gateway's measurement (it
+never talks to LiteLLM), it is here because it is the same kind of thing:
+another Docker service that must stay loopback-only and reach the Mac's LLM
+through `host.docker.internal`. It's the answer to "how do I use the Mac's
+models from my phone" from the ruling this stack follows:
+[`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`](../../../llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
+
+"Add to Home Screen" on the phone installs it as a standalone app: every Open
+WebUI instance is a Progressive Web App by design
+(<https://docs.openwebui.com/getting-started/open-webui-as-app>), no App Store
+involved.
+
+**What it talks to.** `OPENAI_API_BASE_URL=http://host.docker.internal:1234/v1`
+— the Mac's own LM Studio over loopback, the same `host.docker.internal` proxy
+Prometheus uses above, never the LiteLLM gateway and never the LAN.
+`OPENAI_API_KEY=lm-studio` — LM Studio accepts any bearer value; this is the
+documented placeholder for exactly that case. `ENABLE_OLLAMA_API=false` — no
+local Ollama on this Mac. `WEBUI_AUTH` is left unset, i.e. at its documented
+default (`true`): the tailnet is the network boundary, but the app keeps its
+own, separate login — the first account created becomes admin, and sign-up
+then turns itself off. Env var reference:
+<https://docs.openwebui.com/reference/env-configuration>.
+
+**Once-only setup:**
+
+```bash
+docker compose --profile webui up -d open-webui   # resident after this (restart: unless-stopped)
+open http://127.0.0.1:3001                        # on the Mac
+#  → "Create Admin Account" — that first account becomes the admin
+tailscale serve --bg --https=3001 127.0.0.1:3001   # on the Mac, once
+```
+
+Then open `https://<mac-name>.<tailnet>.ts.net:3001` on the phone and add it
+to the home screen.
+
+`--https`, not `--tcp`: a PWA install needs a real TLS certificate (its
+service worker requires a secure context), and Tailscale's HTTPS serve issues
+one automatically for the tailnet. This is the opposite of LM Studio's own
+tailnet exposure (`tailscale serve --bg --tcp 1234 127.0.0.1:1234`): 1234 is a
+raw API port with no browser involved, so `--tcp` is enough there.
+<https://tailscale.com/kb/1242/tailscale-serve>, <https://tailscale.com/kb/1312/serve>.
+
+It never listens on the LAN — same `127.0.0.1:<port>:<port>` binding as
+Prometheus and Grafana above — and is reached from the phone only through
+Tailscale's own identity boundary, exactly like LM Studio.
+
+`open-webui` is on its own compose profile (`webui`), not `ui` like Grafana,
+and is **not** started or stopped by `start.sh` / `stop.sh` / `status.sh`:
+`stop.sh`'s `docker compose --profile ui down` activates the default profile
+plus `ui`, so a `webui`-profiled service is untouched by it — the phone's chat
+page should not go down just because someone ran `./stop.sh` on the metrics
+stack. Bring it up once by hand as above; `restart: unless-stopped` keeps it
+running across Docker/OrbStack restarts without repeating the command.
+
 ## Source, deployed copy, and drift
 
 The definitions are **copied** to `~/.config/litellm/observability`, the same way
@@ -192,7 +252,7 @@ when something is firing, so it can be used as a check rather than a read-out.
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | Prometheus (resident) + Grafana (behind the `ui` profile) |
+| `docker-compose.yml` | Prometheus (resident) + Grafana (behind the `ui` profile) + Open WebUI (resident, behind the `webui` profile) |
 | `prometheus/prometheus.yml` | one scrape job against the gateway, 15s |
 | `prometheus/alerts.yml` | the three rules, each with its rationale and its next action |
 | `prometheus/alerts.test.yml` | synthetic-series tests: fires when it should, quiet when a guard applies |
