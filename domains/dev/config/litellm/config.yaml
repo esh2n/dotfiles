@@ -39,9 +39,13 @@ model_list:
 litellm_settings:
   # Free OSS Prometheus exporter — this is the whole point of the proxy.
   callbacks: ["prometheus"]
-  # /metrics is bearer-auth'd by default since v1.85.0. This is a single-user
-  # local proxy, so scraping without the master key is fine; flip to true (and
-  # scrape with the master key) if the port is ever exposed.
+  # /metrics is bearer-auth'd by default since v1.85.0. This setting governs
+  # ONLY /metrics on the proxy port (4000), which is loopback-only on every
+  # machine, so scraping it without the master key is fine. Cross-machine
+  # scraping uses the dedicated metrics listener (--prometheus_metrics_port
+  # 4001 in litellm-up.sh), which ignores this setting and has no key auth at
+  # all — its boundary is the tailnet ACL. Flip this to true (and scrape with
+  # the master key) only if port 4000 itself is ever exposed.
   require_auth_for_metrics_endpoint: false
 
 general_settings:

@@ -91,8 +91,20 @@ fi
 # 5) clear any stale container, then run in the FOREGROUND so launchd owns it.
 #    Non-secret values are inline; secrets are passed through from the env
 #    (bare -e NAME), never on the command line.
+#
+#    Two ports, both loopback: 4000 is the chat API (never leaves this machine);
+#    4001 is LiteLLM's dedicated metrics listener (v1.101.0+, same metric set as
+#    :4000/metrics/, no LiteLLM key auth). It exists so the Mac's Prometheus can
+#    aggregate every machine WITHOUT the chat API ever being served: on a
+#    non-Mac machine, run once
+#      tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001
+#    and only 4001 becomes reachable — from the owner's own devices, per
+#    domains/dev/config/tailscale/acl.hujson. Same decision record as step 4.
+METRICS_PORT=4001
 docker rm -f "$NAME" >/dev/null 2>&1 || true
-exec docker run --rm --name "$NAME" -p 127.0.0.1:4000:4000 \
+exec docker run --rm --name "$NAME" \
+  -p 127.0.0.1:4000:4000 \
+  -p "127.0.0.1:${METRICS_PORT}:${METRICS_PORT}" \
   -v "$CFG_DIR/config.yaml":/app/config.yaml \
   -e DEEPSEEK_API_KEY \
   -e LITELLM_MASTER_KEY \
@@ -100,4 +112,4 @@ exec docker run --rm --name "$NAME" -p 127.0.0.1:4000:4000 \
   -e OPENAI_API_KEY=unset-placeholder \
   -e LM_STUDIO_API_BASE="$LM_STUDIO_API_BASE" \
   -e LM_STUDIO_API_KEY=lm-studio \
-  "$IMAGE" --config /app/config.yaml
+  "$IMAGE" --config /app/config.yaml --prometheus_metrics_port "$METRICS_PORT"

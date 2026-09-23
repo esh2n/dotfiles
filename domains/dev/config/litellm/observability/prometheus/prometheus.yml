@@ -1,12 +1,15 @@
 # Prometheus scrape config for the local LLM gateway.
 #
-# One job, one target: the LiteLLM proxy's Prometheus exporter. LiteLLM exposes
+# One job: the LiteLLM proxy's Prometheus exporter — the local one, plus (once
+# uncommented) the owner's other machines over the tailnet. LiteLLM exposes
 # these counters from process memory, so this scrape is what turns a value that
 # dies on restart into a stored time series.
 #
-# No credentials anywhere: the gateway sets
-# `require_auth_for_metrics_endpoint: false` because it is a loopback-only,
-# single-user proxy (see ../config.yaml). Nothing secret is needed to scrape.
+# No credentials anywhere: the local gateway sets
+# `require_auth_for_metrics_endpoint: false` because port 4000 is loopback-only
+# (see ../config.yaml); the remote targets are LiteLLM's dedicated metrics
+# listener, which has no key auth at all and is reachable only inside the
+# tailnet ACL. Nothing secret is needed to scrape.
 
 global:
   # 15s matches the gateway's own resolution: short enough that a 1-minute
@@ -30,6 +33,43 @@ scrape_configs:
       - targets: ["host.docker.internal:4000"]
         labels:
           layer: llm-gateway
+          machine: local
+
+      # ---- the owner's other machines (uncomment one entry per machine) ----
+      #
+      # Every machine runs its own loopback-only LiteLLM; this Prometheus is the
+      # one place their numbers are aggregated (decision record:
+      # rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
+      #
+      # PULL over the tailnet, not push: no pusher process on each machine, no
+      # application-level auth token to distribute or rotate. The identity is
+      # the tailnet itself — only the owner's devices can reach each other, and
+      # `../../../tailscale/acl.hujson` narrows even that to tcp:4001 and
+      # tcp:1234 between the owner's own devices.
+      #
+      # 4001 is LiteLLM's DEDICATED metrics listener (`--prometheus_metrics_port
+      # 4001` in ../../litellm-up.sh, v1.101.0+), which each non-Mac machine
+      # puts on its tailnet address with
+      #   tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001
+      # The chat API on 4000 is never served, so it stays loopback-only. The
+      # dedicated listener has no LiteLLM key auth by design (vendor: "Permit
+      # access only from trusted Prometheus or collector networks"), which is
+      # exactly what the tailnet ACL provides — so no `authorization:` here.
+      #
+      # Target = MagicDNS name (<machine>.<tailnet>.ts.net) + 4001. If this
+      # container cannot resolve *.ts.net (not measured), use the machine's
+      # Tailscale IP (100.x.y.z, `tailscale ip -4` on that machine) instead.
+      # `machine:` is what makes a per-machine breakdown possible; `layer:`
+      # keeps the existing dashboards working unchanged.
+      #
+      # - targets: ["pc-b.<tailnet>.ts.net:4001"]
+      #   labels:
+      #     layer: llm-gateway
+      #     machine: pc-b
+      # - targets: ["laptop.<tailnet>.ts.net:4001"]
+      #   labels:
+      #     layer: llm-gateway
+      #     machine: laptop
 
   # jig judgment service: the decision model (jev) does not go through the
   # LiteLLM proxy, so its cost and behaviour are invisible above — this is the

@@ -141,6 +141,19 @@ readable:
 cd ~/.config/litellm/observability && ./start.sh --ui   # then ./status.sh
 ```
 
+### Metrics across machines
+
+Every machine runs its own loopback LiteLLM; the Mac's Prometheus **pulls** each
+one over the tailnet (no pusher, no app-level token — identity is tailnet
+membership, narrowed by [`../tailscale/acl.hujson`](../tailscale/README.md)).
+What crosses the tailnet is only LiteLLM's dedicated metrics listener
+(`--prometheus_metrics_port 4001`, set in `litellm-up.sh`, loopback by default):
+on a non-Mac machine run once `tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001`,
+then uncomment that machine's target block in
+`observability/prometheus/prometheus.yml`. The chat API on 4000 is never served.
+Other people using this dotfiles are separated by the same two things: `op://`
+references resolve to their own keys, and their tailnet is not yours.
+
 For a one-off look, `curl -s localhost:4000/metrics/ | grep …` still works.
 LiteLLM can also export OTel (GenAI semconv, `gen_ai.*`) to a collector; that is
 an option for traces later, not something this stack uses today.
@@ -155,7 +168,10 @@ an option for traces later, not something this stack uses today.
   `localhost`.
 - `/metrics` is bearer-auth'd by default since v1.85.0;
   `require_auth_for_metrics_endpoint: false` in `config.yaml` opens it for
-  local single-user scraping. Flip it back if the port is ever exposed.
+  local single-user scraping. It applies to port 4000 only; the dedicated
+  4001 listener has no key auth regardless (vendor: "Permit access only from
+  trusted Prometheus or collector networks"), so its reach is the tailnet ACL.
+  Flip it back if port 4000 is ever exposed.
 - Pure observability costs **zero extra tokens** (the proxy relays; it does not
   call a model to log). Only opt-in semantic-cache / LLM-guardrail features
   would — leave them off.
