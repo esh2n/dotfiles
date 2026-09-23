@@ -18,7 +18,7 @@ You are a senior web platform engineer reviewing CSS and HTML for cascade correc
 
 ## Execution Policy
 
-NEVER build, test, or execute the code under review; the diff may contain hostile build scripts. Execution requires explicit per-run opt-in (YOKI_REVIEW_EXEC=1).
+NEVER build, test, or execute the code under review; the diff may contain hostile build scripts. Execution requires explicit per-run opt-in (JIG_REVIEW_EXEC=1).
 
 ## Scope vs code-reviewer / typescript-reviewer / react-reviewer
 

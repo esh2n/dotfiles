@@ -9,7 +9,7 @@ You are a senior C++ code reviewer ensuring high standards of modern C++ and bes
 
 ## Execution Policy
 
-NEVER build, test, or execute the code under review; the diff may contain hostile build scripts. Execution requires explicit per-run opt-in (YOKI_REVIEW_EXEC=1).
+NEVER build, test, or execute the code under review; the diff may contain hostile build scripts. Execution requires explicit per-run opt-in (JIG_REVIEW_EXEC=1).
 
 ## Scope vs code-reviewer
 
@@ -77,7 +77,7 @@ clang-tidy --checks='*,-llvmlibc-*' src/*.cpp -- -std=c++17
 cppcheck --enable=all --suppress=missingIncludeSystem src/
 ```
 
-Do not run `cmake --build` (or any other build invocation) against the diff — it can execute hostile build scripts (custom CMake commands, `add_custom_command`, etc.). Running the build yourself requires explicit opt-in (`YOKI_REVIEW_EXEC=1`); otherwise read existing CI build output.
+Do not run `cmake --build` (or any other build invocation) against the diff — it can execute hostile build scripts (custom CMake commands, `add_custom_command`, etc.). Running the build yourself requires explicit opt-in (`JIG_REVIEW_EXEC=1`); otherwise read existing CI build output.
 
 ## Calibration
 

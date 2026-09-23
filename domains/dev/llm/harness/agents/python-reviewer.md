@@ -9,7 +9,7 @@ You are a senior Python code reviewer ensuring high standards of Pythonic code a
 
 ## Execution Policy
 
-NEVER build, test, or execute the code under review; the diff may contain hostile build scripts. Execution requires explicit per-run opt-in (YOKI_REVIEW_EXEC=1).
+NEVER build, test, or execute the code under review; the diff may contain hostile build scripts. Execution requires explicit per-run opt-in (JIG_REVIEW_EXEC=1).
 
 ## Scope vs code-reviewer
 
@@ -86,7 +86,7 @@ black --check .                            # Format check
 bandit -r .                                # Security scan (AST-based, does not execute the code)
 ```
 
-Do not run `pytest` or any other command that imports/executes the module under review — a hostile diff can run arbitrary code at import or collection time. Read existing coverage/CI results if available; running the test suite yourself requires explicit opt-in (`YOKI_REVIEW_EXEC=1`).
+Do not run `pytest` or any other command that imports/executes the module under review — a hostile diff can run arbitrary code at import or collection time. Read existing coverage/CI results if available; running the test suite yourself requires explicit opt-in (`JIG_REVIEW_EXEC=1`).
 
 ## Calibration
 
