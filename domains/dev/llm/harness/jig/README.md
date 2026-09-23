@@ -78,7 +78,7 @@ inverted.
 | 3b | omp: the same `~/.agents/skills` mount (one plan shared with 3a), `~/.omp/agent/agents/*.md`, jig's entries in `~/.omp/agent/mcp.json`, `~/.omp/agent/extensions/jig.ts` → jig's omp extension; `config.yml` reported, not owned | **done** |
 | 3c-pi | pi: the same `~/.agents/skills` mount (one plan shared with 3a/3b), `~/.pi/agent/AGENTS.md` as the same generated file (replacing today's symlink into the repo), jig's entries in pi-mcp-adapter's `~/.config/mcp/mcp.json`; `packages` and `extensions/` reported, not owned | **done** |
 | 3c-dsh | DSH: jig's `@deepseek-ai/dsh-mcp-client` rows (serena, codebase-memory, context7 — the `targets.dsh` set) in each scaffolded-and-repo-owned profile's `$DSH_HOME/profiles/<name>/cordis.patch.yml`, every other row carried through; `$DSH_HOME/AGENTS.md` as the same generated file; skills, the home-level patch, `settings.yaml`, `hooks.claude.json` and the guard plugin reported, not owned | **done** |
-| 4 | `yoki-switch` retired, along with `core/config/manager.sh`'s `link_*` functions for the harnesses | |
+| 4 | `~/.claude/{scripts,workflows}` as two more managed directories of the Claude target, and `jig retire yoki [--write]`: the yoki / yoki-switch artifacts on the machine, listed with evidence and removed on `--write` — the staging directories, state, links, Codex's block and hook groups, omp's files, Cursor's links | **code done**; the owner's source moves and the `--write` runs remain (see [Milestone 4](#milestone-4-jig-retire-yoki)). `core/config/manager.sh`'s `link_*` functions for pi and DSH are not retired by it |
 
 ### What each milestone replaces in `yoki-switch`
 
@@ -95,12 +95,13 @@ Rows cite the destination table in
 | `.autoMode` carry-over (yoki-switch:317-326) | generalized: every unmanaged key is preserved, not just the one | 1 |
 | `~/.claude/.yoki/permissions.json` (hook-enforced deny set) | nothing — the guard reads `policy/guard-rules.json` directly | 1 |
 | `merge_claude_md()` (yoki-switch:332-346) — `CLAUDE.layer.md` + `CLAUDE.personal.md` | generated `AGENTS.md` from `rules/common/` + `rules/decisions/` (`domain/claude/agents-md.ts`), `CLAUDE.md` → `AGENTS.md` | 2 |
-| `merge_dir()` (yoki-switch:352-390) — the `.{dir}-merged` staging dirs behind `skills`/`hooks`/`commands`/`agents`/`rules`/`workflows`/`scripts` | one flat source tree, delivered by symlink; no `commands/` at all ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)) | 2 |
+| `merge_dir()` (yoki-switch:352-390) — the `.{dir}-merged` staging dirs behind `skills`/`hooks`/`commands`/`agents`/`rules`/`workflows`/`scripts` | one flat source tree, delivered by symlink; no `commands/` at all ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)); `scripts` and `workflows` as managed directories, and the staging dirs themselves, `~/.claude/hooks`, `.yoki/` and `.claude-packs` removed by `jig retire yoki` | 2, 4 |
 | `link_external_resources()` (yoki-switch:411-452) and `external-links.yaml` | folded into the flat tree | 2 |
 | `.claude-packs` / `packs.default` / `pack enable\|disable` | gone — rules are selected by `paths:` frontmatter, skills by the judgment service | 2 |
-| `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex: `codex-agents.js`, `codex-skills.js`, the `# yoki:begin` block of `config.toml`, the `~/.agents/skills` links | `app/apply/apply-codex.ts` + `domain/codex/{agents,config}.ts` and `domain/claude/agent-models.ts`, with the milestone-2 delivery verbs shared through `app/apply/delivery.ts`; `codex-skills.js` has no successor (no Codex-specific skills) | 3a |
+| `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex: `codex-agents.js`, `codex-skills.js`, the `# yoki:begin` block of `config.toml`, the `~/.agents/skills` links | `app/apply/apply-codex.ts` + `domain/codex/{agents,config}.ts` and `domain/claude/agent-models.ts`, with the milestone-2 delivery verbs shared through `app/apply/delivery.ts`; `codex-skills.js` has no successor (no Codex-specific skills) — its `cmd-*` directories, the two port links, the block, `[permissions.yoki]`, `rules/yoki.rules`, `.yoki/` and the hook groups in `hooks.json` are removed by `jig retire yoki` | 3a, 4 |
 | `targets/gen.js` for omp: `omp-agents.js` + `omp-tool-names.js`, `omp-mcp.js`, the `~/.agents/skills` links, `link_omp_resources` in `core/config/manager.sh` | `app/apply/apply-omp.ts` + `domain/omp/{agents,mcp,agent-dir}.ts`, the mount through `app/apply/delivery.ts`'s `planAgentsSkillsMount` (shared with 3a) | 3b |
-| `targets/gen.js` for omp: `omp-config-yml.js`, `omp-rules-md.js`, `omp-hooks.js` (`config.yml`, `RULES.md`, `yoki-hooks.json`, the `yoki-*.ts` extension links) | nothing yet — reported as leftovers by 3b; `config.yml` ownership is a ruling not made | 4 |
+| `targets/gen.js` for omp: `omp-config-yml.js`, `omp-rules-md.js`, `omp-hooks.js` (`config.yml`, `RULES.md`, `yoki-hooks.json`, the `yoki-*.ts` extension links) | `RULES.md`, `yoki-hooks.json`, `.yoki/` and the two `yoki-*.ts` links removed by `jig retire yoki`; `config.yml` left, its ownership a ruling not made | 4 |
+| `link_cursor_rules` — `~/.cursor/rules/*` → `claude-profiles/runtime/yoki/.cursor/rules/` | nothing delivered (Cursor is not a jig target); the links removed by `jig retire yoki` | 4 |
 | `link_pi_resources` in `core/config/manager.sh`: the `AGENTS.md` link | `app/apply/apply-pi.ts`: the generated file over the link, `domain/pi/{mcp,packages,agent-dir}.ts` for the rest; the mount through `planAgentsSkillsMount` (shared with 3a/3b) | 3c-pi |
 | `link_pi_resources`: the `settings.json`/`models.json` links, the `extensions/*.ts` and `themes/*.json` file links | nothing yet — reported by 3c-pi (`extensions/`) or untouched (`settings.json` is read as the `packages` source; `models.json` is the tiers target's file) | 4 |
 | `link_dsh_resources` in `core/config/manager.sh`: the profile discovery rule (scaffolded AND in the repo) | `app/apply/apply-dsh.ts`, the same rule, plus what manager.sh never did — the MCP rows (`domain/dsh/{mcp,cordis-patch}.ts`) and `AGENTS.md` | 3c-dsh |
@@ -282,8 +283,10 @@ same content, after it the managed directory above. `JIG_SKILL_ROOT` still
 overrides it.
 
 Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
-`.<x>-merged` staging directory stay with `yoki-switch` until milestone 4, and
-`~/.claude.json` is never touched in any milestone.
+`.<x>-merged` staging directory stayed with `yoki-switch` until milestone 4
+(below: `scripts` and `workflows` join the managed directories, `hooks` and
+the staging directories go through `jig retire yoki`), and `~/.claude.json` is
+never touched in any milestone.
 
 ### Milestone 3a: codex
 
@@ -738,3 +741,119 @@ dry-run and marked in the code:
 - Whether one row in the home-level `$DSH_HOME/cordis.patch.yml` could
   replace the per-profile rows for every profile at once — a ruling, not a
   guess; the delivery is per profile as manager.sh's is.
+
+### Milestone 4: `jig retire yoki`
+
+```sh
+bun src/cli/jig.ts apply --target claude            # now also plans ~/.claude/{scripts,workflows}
+bun src/cli/jig.ts retire yoki                      # dry-run: every yoki artifact, per harness, with evidence
+bun src/cli/jig.ts retire yoki --write              # removes what the dry-run listed; skips stay skipped
+```
+
+Two pieces. The first is two more managed directories of the Claude target,
+same mechanism as `skills/`, `agents/` and `rules/`
+(`domain/claude/managed-dir.ts`):
+
+- **`~/.claude/scripts/`** — one link per regular file of `H/scripts/`
+  (`domain/claude/scripts-dir.ts`; `README.md` gets none). The path is
+  fixed by `settings.json`'s `statusLine.command:
+  "~/.claude/scripts/statusline.sh"`, which the link keeps valid.
+- **`~/.claude/workflows/`** — one link per `*.js` of `H/workflows/` plus one
+  for `lib/` when it is a directory (`domain/claude/workflows-dir.ts`). The
+  scripts are the ones the
+  [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md)
+  keeps: review, research, code-study, stocktake, design-review; preflight
+  and the yoki-graph engine go. As of 2026-09-23 none of them imports
+  `./lib/…` — `review.js`, `research.js` and `design-review.js` carry the
+  provider-lane helpers inline, `lib/lanes.js` being the canonical copy
+  (review.js:75) — so the `lib` link is there for the day one does, and
+  resolves the same whichever way the Workflow tool loads the file.
+
+Today both destinations are yoki-switch's symlinks to `.scripts-merged` and
+`.workflows-merged`: `replace`, exactly as `skills` was. A source directory
+that does not exist yet is a report line — `scripts directory: not planned
+(no H/scripts yet)` — and nothing is planned for its destination, so the
+yoki-switch link keeps serving `statusline.sh` until the files arrive. The
+owner's moves are the prerequisite (jig does not move repository files):
+
+- `domains/dev/config/claude-profiles/personal/scripts/statusline.sh` →
+  `H/scripts/statusline.sh`
+- `domains/dev/config/claude-profiles/core/workflows/{review,research,code-study,stocktake,design-review}.js`
+  and `lib/` → `H/workflows/`
+
+The second is the verb. `jig retire yoki` lists, and on `--write` removes,
+the artifacts yoki and yoki-switch left that jig knows about, grouped per
+harness, each line with what it is, the evidence it is yoki's, and the
+action (`app/retire/retire-yoki.ts`; the classifiers in
+`domain/retire/classify.ts`, the two text rewrites in
+`domain/retire/codex-config.ts`). Everything is classified before anything
+is removed; a path that does not match its evidence — a real file where a
+link was expected, a staging directory that grew a regular file, a block
+with no end marker, a `config.toml` that would not parse afterwards — is
+`SKIP` with the reason, never forced, and the rest of the run goes on.
+
+- **Claude Code**: `~/.claude/hooks` when it is a symlink to `.hooks-merged`
+  (hooks have no jig successor — the five are settings.json-inline); each
+  `.{skills,hooks,scripts,commands,agents,rules,workflows}-merged` staging
+  directory when every entry is a symlink or it is empty, and — `hooks`
+  excepted — while `~/.claude/<x>` no longer links to it (otherwise it is
+  skipped with "run `jig apply --target claude --write` first"; on this
+  machine `.skills-merged` is skipped for good: Claude Code wrote its
+  `synced/` tree into it while `skills` still pointed there, and that is
+  the owner's to move); `.yoki/` (yoki's permission set; the one tree whose
+  regular files go); `.claude-packs`.
+- **Codex**: `config.toml`'s `# yoki:begin … # yoki:end` block
+  (`removeMarkedBlock`, the helper the two jig blocks use) and the
+  `[permissions.yoki]` / `[permissions.yoki.filesystem]` tables wherever
+  they stand, every other byte kept. Two tables the block holds are
+  Codex's, not yoki's, and are lifted out and kept: `[features]` and
+  `[features.multi_agent_v2]` — `hooks = true` is what makes Codex run
+  hooks at all, jig's registered guard included, and dropping the block
+  whole would switch the guard off silently. `hooks.json`'s groups whose
+  commands reference `run-with-flags.js`, `$YOKI_ROOT` or `YOKI_`
+  (parsed with `parseHooksDocument`, the reader `jig codex register`
+  uses; jig's group and every other — orca's, herdr's — stay in order; an
+  event left empty is dropped), and the `[hooks.state.…]` trust tables of
+  those handlers (on this machine they sit inside the block; a kept group
+  whose index shifts is reported, since re-trusting is Codex's prompt).
+  `rules/yoki.rules` (by name and its `GENERATED by yoki` header);
+  `.yoki/`; the sixteen `cmd-*` skill directories, each holding only the
+  `SKILL.md` yoki wrote — no `cmd-*` `SKILL.md` carries a yoki marker (the
+  frontmatter is `name`/`description`), so the evidence is yoki's own
+  record, `.yoki/codex-manifest.json`, with the inventory's sixteen names
+  as the fallback when that manifest is gone (a manifest that exists and
+  does not list a directory is the last word); the two port links
+  (`grilling`, `code-graph-exploration`) into `claude-profiles/`.
+  `~/.codex/skills/.system` and the directory itself stay.
+- **omp**: `yoki-hooks.json`, `RULES.md` (by its `<!-- yoki:begin -->`
+  header), `.yoki/`, and `extensions/{yoki-bridge,yoki-guard}.ts` when they
+  are symlinks into `domains/dev/config/omp/extensions/` or
+  `claude-profiles/`. `config.yml` stays: a ruling not made.
+- **Cursor**: every `~/.cursor/rules/*` symlink into
+  `claude-profiles/runtime/yoki/.cursor/rules/` (39 today); the count of
+  other entries is reported and they stay, as does the directory.
+
+Removal order on `--write`: files and links first, then `config.toml` and
+`hooks.json` (each renamed to `<file>.pre-retire.<YYYYMMDD-HHMMSS>` before
+the new text lands atomically), directories last — a `cmd-*` directory's
+`SKILL.md` is gone before the then-empty directory is. The adapter's three
+removal verbs (`app/retire/ports.ts`, `infra/apply/node-apply-fs.ts`) each
+refuse any other kind of path than the one they are named for, and
+`removeTree` refuses a tree holding a regular file anywhere outside
+`.yoki/`; a refusal is recorded per item (exit 1) and the run continues.
+
+Never touched: `~/.claude.json`; `~/.claude/settings.json` (the Claude
+target's, and its `statusLine.command` keeps working through the `scripts`
+link); `~/.claude/{scripts,workflows}` (that target's too); Codex's
+`.system/`; omp's `config.yml`; and the repository trees the removed links
+point into — jig deletes no repository file. Not in this verb:
+`core/config/manager.sh`'s `link_pi_resources` and `link_dsh_resources`
+(pi's `extensions/` and settings links, DSH's `settings.yaml`,
+`hooks.claude.json` and the guard plugin), which the pi and DSH targets
+still report.
+
+The order that leaves nothing dangling: the owner's two moves; `jig apply
+--target claude --write` (replaces the `scripts`/`workflows` links); `jig
+retire yoki --write`; then `jig apply --target codex --write`, whose
+`[mcp_servers.*]` conflict with yoki's block resolves once the block is
+gone, and `jig codex register --write` if Codex asks to re-trust.

@@ -24,9 +24,17 @@
  *   to the tree would route that into git sources. `rules/common/` is never
  *   linked because AGENTS.md carries it.
  * - `~/.claude/commands` (milestone 2): retired — commands are skills.
+ * - `~/.claude/{scripts,workflows}/` (milestone 4): two more managed
+ *   directories, same mechanism — one link per file of `H/scripts/`, one per
+ *   `*.js` of `H/workflows/` plus `lib/` (`domain/claude/{scripts,workflows}-dir.ts`).
+ *   Today both destinations are yoki-switch's symlinks to `.<x>-merged`
+ *   staging directories: `replace`, exactly as `skills/` was. A source
+ *   directory that does not exist yet is reported ("no H/scripts yet") and
+ *   nothing is planned for its destination — the symlink there keeps
+ *   working until the owner moves the files.
  *
- * `~/.claude/{hooks,scripts,workflows}` and yoki-switch's `.<x>-merged`
- * staging directories are not touched (milestone 4).
+ * `~/.claude/hooks` and yoki-switch's `.<x>-merged` staging directories are
+ * `jig retire yoki`'s (`app/retire/retire-yoki.ts`), not this command's.
  *
  * The dependency direction is the one
  * `rules/decisions/2026-09-22-config-layout-no-personal-layer.md` fixes:
@@ -52,6 +60,7 @@
 import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { type CommandsAction, classifyCommands } from "../../domain/claude/commands";
 import { type ClaudeHookPaths, buildClaudeHooks } from "../../domain/claude/hooks";
+import type { PathState } from "../../domain/claude/links";
 import { DEFAULT_PERMITS } from "../../domain/claude/permits";
 import { selectRuleDirs } from "../../domain/claude/rules-dir";
 import {
@@ -60,12 +69,14 @@ import {
   hostSandbox,
   parseSandboxSource,
 } from "../../domain/claude/sandbox";
+import { type ScriptCandidate, selectScriptFiles } from "../../domain/claude/scripts-dir";
 import {
   type ClaudeComposition,
   composeClaudeSettings,
   renderClaudeSettings,
 } from "../../domain/claude/settings";
 import { selectSkillDirs } from "../../domain/claude/skills-dir";
+import { type WorkflowCandidate, selectWorkflowEntries } from "../../domain/claude/workflows-dir";
 import type { JsonObject } from "../../domain/compose/merge";
 import { renderClaudeMcpAdd } from "../../domain/mcp/claude-mcp-add";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -125,11 +136,30 @@ export interface ClaudeApplyPaths {
   readonly rulesDir: string;
   /** Destination: `~/.claude/commands`, retired. */
   readonly commands: string;
+  /** Destination: `~/.claude/scripts`, a real directory of links to `<harnessRoot>/scripts/<file>`. */
+  readonly scripts: string;
+  /** Destination: `~/.claude/workflows`, a real directory of links to `<harnessRoot>/workflows/<name>.js` and `lib`. */
+  readonly workflows: string;
   /** Substituted into mcp command paths; `{{HOME}}`. */
   readonly home: string;
 }
 
 export type ClaudeOutcome = "write" | "noop" | "conflict";
+
+/**
+ * A managed directory whose source tree may not exist yet (milestone 4:
+ * `H/scripts/` and `H/workflows/` are the owner's manual moves). With the
+ * source absent nothing is planned — `dir` is unset, the destination is
+ * described as found and left alone — so the yoki-switch symlink standing
+ * there keeps serving `statusline.sh` until the files arrive.
+ */
+export interface OptionalManagedDirReport {
+  readonly sourceDir: string;
+  /** What stands at the destination, for the report line when nothing is planned. */
+  readonly destinationState: PathState;
+  /** Present when the source directory exists. */
+  readonly dir?: ManagedDirReport;
+}
 
 export interface CommandsReport {
   readonly path: string;
@@ -162,6 +192,10 @@ export interface ClaudeApplyReport {
   readonly agentsDir: ManagedDirReport;
   readonly rulesDir: ManagedDirReport;
   readonly commands: CommandsReport;
+  /** Milestone 4: `~/.claude/scripts`, when `H/scripts/` exists. */
+  readonly scriptsDir: OptionalManagedDirReport;
+  /** Milestone 4: `~/.claude/workflows`, when `H/workflows/` exists. */
+  readonly workflowsDir: OptionalManagedDirReport;
   /**
    * `mcp/servers.json` filtered to `targets.claude`, as `claude mcp add` lines.
    * Printed, never run: jig neither writes `~/.claude.json` nor invokes the CLI.
@@ -266,6 +300,50 @@ async function planCommands(ports: ClaudeApplyPorts, path: string): Promise<Comm
   return { path, action: classifyCommands(state, await inspectEntries(ports, path, state)) };
 }
 
+/** A source tree is there when it is a directory, or a link the listing can follow. */
+async function sourceExists(ports: ClaudeApplyPorts, dir: string): Promise<boolean> {
+  const state = await ports.inspect(dir);
+  return state.kind === "dir" || state.kind === "symlink";
+}
+
+async function planScriptsDir(
+  ports: ClaudeApplyPorts,
+  paths: ClaudeApplyPaths,
+  now: Date,
+): Promise<OptionalManagedDirReport> {
+  const sourceDir = `${paths.harnessRoot}/scripts`;
+  const destinationState = await ports.inspect(paths.scripts);
+  if (!(await sourceExists(ports, sourceDir))) return { sourceDir, destinationState };
+  const candidates: readonly ScriptCandidate[] = await listEntries(ports, sourceDir);
+  const selection = selectScriptFiles(candidates);
+  return {
+    sourceDir,
+    destinationState,
+    dir: await planManagedDir(ports, { dir: paths.scripts, sourceDir, selection, now }),
+  };
+}
+
+async function planWorkflowsDir(
+  ports: ClaudeApplyPorts,
+  paths: ClaudeApplyPaths,
+  now: Date,
+): Promise<OptionalManagedDirReport> {
+  const sourceDir = `${paths.harnessRoot}/workflows`;
+  const destinationState = await ports.inspect(paths.workflows);
+  if (!(await sourceExists(ports, sourceDir))) return { sourceDir, destinationState };
+  const candidates: readonly WorkflowCandidate[] = await listEntries(ports, sourceDir);
+  const selection = selectWorkflowEntries(candidates);
+  return {
+    sourceDir,
+    destinationState,
+    dir: await planManagedDir(ports, { dir: paths.workflows, sourceDir, selection, now }),
+  };
+}
+
+function optionalDirChanges(report: OptionalManagedDirReport): boolean {
+  return report.dir !== undefined && managedDirChanges(report.dir);
+}
+
 function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "message">): boolean {
   return (
     report.settingsOutcome === "write" ||
@@ -274,7 +352,9 @@ function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "messa
     managedDirChanges(report.skillsDir) ||
     managedDirChanges(report.agentsDir) ||
     managedDirChanges(report.rulesDir) ||
-    report.commands.action.kind === "remove"
+    report.commands.action.kind === "remove" ||
+    optionalDirChanges(report.scriptsDir) ||
+    optionalDirChanges(report.workflowsDir)
   );
 }
 
@@ -348,6 +428,8 @@ export async function applyClaude(
     agentsDir: await planAgentsDir(ports, paths, now),
     rulesDir: await planRulesDir(ports, paths, now),
     commands: await planCommands(ports, paths.commands),
+    scriptsDir: await planScriptsDir(ports, paths, now),
+    workflowsDir: await planWorkflowsDir(ports, paths, now),
     mcpAdds,
     sandboxSourcePath: sandbox.found ? paths.sandbox : undefined,
   };
@@ -395,6 +477,8 @@ export async function applyClaude(
     await applyManagedDir(ports, base.agentsDir);
     await applyManagedDir(ports, base.rulesDir);
     if (base.commands.action.kind === "remove") await ports.remove(paths.commands);
+    if (base.scriptsDir.dir !== undefined) await applyManagedDir(ports, base.scriptsDir.dir);
+    if (base.workflowsDir.dir !== undefined) await applyManagedDir(ports, base.workflowsDir.dir);
     return { ...base, outcome: "write", wrote: true };
   }
 

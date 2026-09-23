@@ -44,7 +44,7 @@ interface Group {
   readonly hooks: readonly Handler[];
 }
 
-type HooksDocument = { hooks: Record<string, unknown[]> } & Record<string, unknown>;
+export type HooksDocument = { hooks: Record<string, unknown[]> } & Record<string, unknown>;
 
 export interface RegistrationInput {
   /** The exact command line codex will run. Absolute paths only: no env reaches the hook. */
@@ -64,18 +64,24 @@ export interface RegistrationPlan {
   readonly canonicalIdentity: string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isJigGroup(group: unknown): boolean {
+/** A group holding jig's guard handler, whatever else it carries. Shared with `jig retire yoki`, which keeps it. */
+export function isJigGroup(group: unknown): boolean {
   if (!isRecord(group) || !Array.isArray(group.hooks)) return false;
   return group.hooks.some(
     (h) => isRecord(h) && typeof h.command === "string" && h.command.includes(JIG_CODEX_MARK),
   );
 }
 
-function parseHooksDocument(text: string | undefined): HooksDocument {
+/**
+ * hooks.json as an object of event arrays, every other top-level key kept.
+ * Shared with `jig retire yoki` (`domain/retire/codex-config.ts`), so both
+ * commands read the file the same way and refuse the same malformed shapes.
+ */
+export function parseHooksDocument(text: string | undefined): HooksDocument {
   if (text === undefined || text.trim() === "") return { hooks: {} };
   const parsed: unknown = JSON.parse(text);
   if (!isRecord(parsed)) throw new Error("hooks.json: expected an object at the top level");

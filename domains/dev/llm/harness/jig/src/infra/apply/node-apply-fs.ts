@@ -19,8 +19,9 @@ import {
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import type { ClaudeApplyPorts, ProvenanceInfo } from "../../app/apply/ports";
+import type { RetirePorts } from "../../app/retire/ports";
 import type { PathState } from "../../domain/claude/links";
 
 function isErrorCode(error: unknown, code: string): boolean {
@@ -58,7 +59,35 @@ export interface NodeApplyFsOptions {
   readonly jigVersion: string;
 }
 
-export function createNodeApplyFs(options: NodeApplyFsOptions): ClaudeApplyPorts {
+/** The one directory name whose regular files `removeTree` may take: yoki's own state. */
+const YOKI_STATE_DIR = ".yoki";
+
+/**
+ * The regular files under `root`, as paths relative to it, symlinks not
+ * followed. Only the ones outside any `.yoki/` component count — those are
+ * the files a tree removal must refuse.
+ */
+async function regularFilesOutsideYoki(root: string): Promise<string[]> {
+  const found: string[] = [];
+  const walk = async (dir: string): Promise<void> => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) {
+        await walk(path);
+        continue;
+      }
+      const rel = relative(root, path);
+      const insideYoki =
+        basename(root) === YOKI_STATE_DIR || rel.split("/").includes(YOKI_STATE_DIR);
+      if (!insideYoki) found.push(rel);
+    }
+  };
+  await walk(root);
+  return found;
+}
+
+export function createNodeApplyFs(options: NodeApplyFsOptions): ClaudeApplyPorts & RetirePorts {
   const manifestPath = join(options.stateDir, "apply-manifest.json");
 
   return {
@@ -132,6 +161,33 @@ export function createNodeApplyFs(options: NodeApplyFsOptions): ClaudeApplyPorts
 
     async mkdir(path: string): Promise<void> {
       await mkdir(path, { recursive: true });
+    },
+
+    // The three retire verbs each check the kind of path before acting: the
+    // use-case classified it, and the adapter will not act on a different kind
+    // than the one the classification named.
+    async removeLink(path: string): Promise<void> {
+      const stat = await lstat(path);
+      if (!stat.isSymbolicLink()) throw new Error(`removeLink: ${path} is not a symlink`);
+      await unlink(path);
+    },
+
+    async removeFile(path: string): Promise<void> {
+      const stat = await lstat(path);
+      if (!stat.isFile()) throw new Error(`removeFile: ${path} is not a regular file`);
+      await unlink(path);
+    },
+
+    async removeTree(path: string): Promise<void> {
+      const stat = await lstat(path);
+      if (!stat.isDirectory()) throw new Error(`removeTree: ${path} is not a directory`);
+      const files = await regularFilesOutsideYoki(path);
+      if (files.length > 0) {
+        throw new Error(
+          `removeTree: ${path} holds ${files.length} regular file${files.length === 1 ? "" : "s"} outside .yoki/ (${files.slice(0, 5).join(", ")}${files.length > 5 ? ", …" : ""}); refused`,
+        );
+      }
+      await rm(path, { recursive: true });
     },
 
     now: () => new Date(),

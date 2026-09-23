@@ -13,6 +13,7 @@ import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
+import type { RetirePaths } from "../app/retire/retire-yoki";
 import { skillQuestionMode } from "../app/routing/select-skills";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
@@ -59,6 +60,7 @@ import { stopGate } from "./hooks/stop-gate";
 import { userPromptSubmit } from "./hooks/user-prompt-submit";
 import { interactive } from "./interactive";
 import { parseReportArgs, renderSkillUsage } from "./report";
+import { retireCli } from "./retire";
 import { buildJudgmentProvider, serveDecisionService } from "./serve";
 import { skillsCli } from "./skills";
 import { tier } from "./tier";
@@ -119,6 +121,8 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
     agents: join(claudeDir, "agents"),
     rulesDir: join(claudeDir, "rules"),
     commands: join(claudeDir, "commands"),
+    scripts: join(claudeDir, "scripts"),
+    workflows: join(claudeDir, "workflows"),
     home: homedir(),
   };
 }
@@ -307,6 +311,25 @@ function resolveDshApplyPaths(): DshApplyPaths {
     hooksClaudeJson: join(dshHome.dir, "hooks.claude.json"),
     pluginDir: join(harness, "jig", "adapters", "dsh"),
     home: homedir(),
+  };
+}
+
+/**
+ * Where `jig retire yoki` looks: the four harness directories, resolved the
+ * way each apply target resolves its own (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
+ * omp's profile rules; Cursor has no override jig knows), and the two
+ * repository trees the removed links point into — named so a link is
+ * recognised by where it points, and never followed.
+ */
+function resolveRetirePaths(): RetirePaths {
+  const config = join(resolveApplyRoot(), "domains", "dev", "config");
+  return {
+    claudeDir: process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"),
+    codexHome: process.env.CODEX_HOME ?? join(homedir(), ".codex"),
+    ompAgentDir: resolveOmpAgentDir(process.env, homedir()).dir,
+    cursorRules: join(homedir(), ".cursor", "rules"),
+    claudeProfilesRoot: join(config, "claude-profiles"),
+    ompRepoExtensions: join(config, "omp", "extensions"),
   };
 }
 
@@ -602,6 +625,19 @@ export async function main(argv: readonly string[]): Promise<number> {
       process.stdout.write(result.stdout);
       return result.code;
     }
+    case "retire": {
+      const retirePorts = createNodeApplyFs({
+        stateDir: resolveStateDir(process.env),
+        jigVersion: VERSION,
+      });
+      const result = await retireCli(argv.slice(1), retirePorts, resolveRetirePaths(), {
+        validateToml: (text) => {
+          Bun.TOML.parse(text);
+        },
+      });
+      process.stdout.write(result.stdout);
+      return result.code;
+    }
     case "box": {
       const result = await boxCli(argv.slice(1), buildBoxPorts(), boxContext());
       process.stdout.write(result.stdout);
@@ -708,7 +744,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -755,9 +791,22 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  CLAUDE.md -> AGENTS.md), manages skills/, agents/ and rules/ as real directories of\n" +
           "  per-entry links into llm/harness/ (entries that are not jig's, such as Claude Code's\n" +
           "  own skills/synced, are left alone), and retires commands/. A file or real directory\n" +
-          "  in a link's way is renamed aside, never deleted; hooks, scripts, workflows and the\n" +
-          "  .<x>-merged staging dirs are not touched.\n" +
+          "  in a link's way is renamed aside, never deleted. Milestone 4 adds scripts/ (one link per\n" +
+          "  file of llm/harness/scripts/) and workflows/ (one per *.js of llm/harness/workflows/, plus\n" +
+          "  lib/) as two more managed directories; a source directory that does not exist yet is\n" +
+          "  reported and its destination left as found. hooks and the .<x>-merged staging dirs are\n" +
+          "  `jig retire yoki`'s.\n" +
           "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
+          "  retire yoki [--write] lists (default) or removes the artifacts yoki and yoki-switch left,\n" +
+          "  per harness, each with what it is and the evidence it is yoki's: ~/.claude's .<x>-merged\n" +
+          "  staging dirs (only when every entry is a symlink; skipped while ~/.claude/<x> still links\n" +
+          "  there), .yoki/, .claude-packs and the hooks link; ~/.codex's `# yoki:begin` block and\n" +
+          "  [permissions.yoki] tables in config.toml ([features] lifted out and kept — hooks = true\n" +
+          "  runs jig's guard), yoki's groups in hooks.json and their trust entries, rules/yoki.rules,\n" +
+          "  .yoki/, the cmd-* skill dirs its manifest lists and the two port links; omp's\n" +
+          "  yoki-hooks.json, RULES.md, .yoki/ and yoki-*.ts links; ~/.cursor/rules links into yoki's\n" +
+          "  tree. A path that does not match its evidence is skipped, never forced. config.toml and\n" +
+          "  hooks.json are rewritten atomically with a .pre-retire.<stamp> copy of each kept.\n" +
           "  apply --target codex delivers the same sources to Codex ($CODEX_HOME, default ~/.codex):\n" +
           "  ~/.agents/skills (one link per skill; the mount Codex, pi and omp read) as a managed\n" +
           "  directory — links yoki-switch left into the old tree, or dangling, are removed; ~/.codex/skills\n" +

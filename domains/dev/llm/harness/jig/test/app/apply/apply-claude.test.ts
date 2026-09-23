@@ -20,6 +20,8 @@ const PATHS: ClaudeApplyPaths = {
   agents: `${CLAUDE}/agents`,
   rulesDir: `${CLAUDE}/rules`,
   commands: `${CLAUDE}/commands`,
+  scripts: `${CLAUDE}/scripts`,
+  workflows: `${CLAUDE}/workflows`,
   home: "/home/u",
 };
 
@@ -765,6 +767,77 @@ describe("the retired commands directory", () => {
     expect(files[`${PATHS.commands}/mine.md`]).toBe("my command");
     expect(links).toEqual({});
     expect(files[PATHS.agentsMd]).toBeUndefined();
+  });
+});
+
+describe("milestone 4: scripts and workflows", () => {
+  const YOKI_LINKS = {
+    [PATHS.scripts]: `${CLAUDE}/.scripts-merged`,
+    [PATHS.workflows]: `${CLAUDE}/.workflows-merged`,
+  };
+
+  test("with no H/scripts and no H/workflows yet, nothing is planned and the destinations are left as found", async () => {
+    const { ports, links } = fakePorts({ links: YOKI_LINKS });
+    const report = await run(ports, true);
+
+    expect(report.scriptsDir.dir).toBeUndefined();
+    expect(report.scriptsDir.sourceDir).toBe(`${H}/scripts`);
+    expect(report.scriptsDir.destinationState).toEqual({
+      kind: "symlink",
+      target: `${CLAUDE}/.scripts-merged`,
+    });
+    expect(report.workflowsDir.dir).toBeUndefined();
+    // The yoki-switch links stay: statusline.sh is still served through them.
+    expect(links[PATHS.scripts]).toBe(`${CLAUDE}/.scripts-merged`);
+    expect(links[PATHS.workflows]).toBe(`${CLAUDE}/.workflows-merged`);
+  });
+
+  test("once the sources exist, the links are replaced by managed directories, exactly as skills was", async () => {
+    const { ports, links, dirs } = fakePorts({
+      links: YOKI_LINKS,
+      files: {
+        [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n",
+        [`${H}/scripts/README.md`]: "# scripts\n",
+        [`${H}/workflows/review.js`]: "// review\n",
+        [`${H}/workflows/lib/lanes.js`]: "// lanes\n",
+        [`${H}/workflows/README.md`]: "# workflows\n",
+      },
+    });
+    const dry = await run(ports);
+    expect(dry.scriptsDir.dir?.plan.state).toBe("replace");
+    expect(dry.scriptsDir.dir?.selection.linked).toEqual(["statusline.sh"]);
+    expect(dry.workflowsDir.dir?.plan.state).toBe("replace");
+    expect(dry.workflowsDir.dir?.selection.linked).toEqual(["lib", "review.js"]);
+    expect(dry.outcome).toBe("write");
+
+    const report = await run(ports, true);
+    expect(report.wrote).toBe(true);
+    expect(dirs.has(PATHS.scripts)).toBe(true);
+    expect(links[`${PATHS.scripts}/statusline.sh`]).toBe(`${H}/scripts/statusline.sh`);
+    expect(links[`${PATHS.scripts}/README.md`]).toBeUndefined();
+    expect(dirs.has(PATHS.workflows)).toBe(true);
+    expect(links[`${PATHS.workflows}/review.js`]).toBe(`${H}/workflows/review.js`);
+    expect(links[`${PATHS.workflows}/lib`]).toBe(`${H}/workflows/lib`);
+
+    // The second run finds every link ok.
+    const again = await run(ports);
+    expect(again.scriptsDir.dir?.plan.state).toBe("ok");
+    expect(again.workflowsDir.dir?.plan.state).toBe("ok");
+  });
+
+  test("a user's own file in the destination is not jig's and is left alone", async () => {
+    const { ports, files } = fakePorts({
+      files: {
+        [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n",
+        [`${PATHS.scripts}/mine.sh`]: "mine",
+      },
+    });
+    const report = await run(ports, true);
+    expect(report.scriptsDir.dir?.entries.map((e) => [e.name, e.kind])).toEqual([
+      ["statusline.sh", "link"],
+      ["mine.sh", "foreign"],
+    ]);
+    expect(files[`${PATHS.scripts}/mine.sh`]).toBe("mine");
   });
 });
 

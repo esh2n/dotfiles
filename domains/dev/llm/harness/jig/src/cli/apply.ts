@@ -55,6 +55,7 @@ import {
   type ClaudeApplyReport,
   type LinkReport,
   type ManagedDirReport,
+  type OptionalManagedDirReport,
   applyClaude,
 } from "../app/apply/apply-claude";
 import {
@@ -282,8 +283,44 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
     }),
     "",
     ...commandsLines(report),
+    "",
+    ...optionalDirLines("scripts", report.scriptsDir, {
+      noun: "script",
+      plural: "s",
+      singular: "",
+      how: "regular files; settings.json's statusLine.command names ~/.claude/scripts/statusline.sh",
+    }),
+    "",
+    ...optionalDirLines("workflows", report.workflowsDir, {
+      noun: "workflow entr",
+      plural: "ies",
+      singular: "y",
+      how: "*.js scripts for Claude Code's Workflow tool, plus lib/ when present",
+    }),
   );
   return lines.join("\n");
+}
+
+/**
+ * A milestone-4 managed directory whose source may not exist yet: the same
+ * section as the other three when it does, one report line when it does not
+ * — the owner's move is a prerequisite, and the destination is left as found.
+ */
+function optionalDirLines(
+  label: string,
+  report: OptionalManagedDirReport,
+  wording: ManagedDirWording,
+): readonly string[] {
+  if (report.dir !== undefined) return managedDirLines(label, report.dir, wording);
+  const found =
+    report.destinationState.kind === "missing"
+      ? "absent"
+      : describePathState(report.destinationState);
+  return [
+    `${label} directory: not planned  (no ${report.sourceDir} yet)`,
+    `  the destination is ${found} and is left as found until the source directory exists;`,
+    "  move the files there by hand (milestone 4 prerequisite), then apply again.",
+  ];
 }
 
 /** One word per destination state, and what it costs. */

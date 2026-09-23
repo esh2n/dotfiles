@@ -172,6 +172,8 @@ describe("applyCli --target claude", () => {
     agents: `${CLAUDE}/agents`,
     rulesDir: `${CLAUDE}/rules`,
     commands: `${CLAUDE}/commands`,
+    scripts: `${CLAUDE}/scripts`,
+    workflows: `${CLAUDE}/workflows`,
     home: "/home/u",
   };
 
@@ -351,6 +353,58 @@ describe("applyCli --target claude", () => {
     expect(result.stdout).toContain(
       "commands: remove  /home/u/.claude/commands  (a symlink → /home/u/.claude/.commands-merged)",
     );
+  });
+
+  test("scripts and workflows: one report line each while their sources do not exist yet", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({}, { [CLAUDE_PATHS.scripts]: `${CLAUDE}/.scripts-merged` });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain(
+      "scripts directory: not planned  (no /repo/llm/harness/scripts yet)\n  the destination is a symlink → /home/u/.claude/.scripts-merged and is left as found",
+    );
+    expect(result.stdout).toContain(
+      "workflows directory: not planned  (no /repo/llm/harness/workflows yet)\n  the destination is absent and is left as found",
+    );
+    expect(result.stdout).toContain("milestone 4 prerequisite");
+  });
+
+  test("scripts and workflows: the managed-directory section once the sources exist", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext(
+      {
+        [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n",
+        [`${H}/workflows/review.js`]: "// review\n",
+        [`${H}/workflows/lib/lanes.js`]: "// lanes\n",
+        [`${H}/workflows/notes.md`]: "notes\n",
+      },
+      {
+        [CLAUDE_PATHS.scripts]: `${CLAUDE}/.scripts-merged`,
+        [CLAUDE_PATHS.workflows]: `${CLAUDE}/.workflows-merged`,
+      },
+    );
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain(
+      "scripts directory: replace (currently → /home/u/.claude/.scripts-merged)  /home/u/.claude/scripts",
+    );
+    expect(result.stdout).toContain(
+      "1 script to link (regular files; settings.json's statusLine.command",
+    );
+    expect(result.stdout).toMatch(
+      /statusline\.sh +create +→ \/repo\/llm\/harness\/scripts\/statusline\.sh/,
+    );
+    expect(result.stdout).toContain(
+      "workflows directory: replace (currently → /home/u/.claude/.workflows-merged)  /home/u/.claude/workflows",
+    );
+    expect(result.stdout).toContain(
+      "2 workflow entries to link (*.js scripts for Claude Code's Workflow tool, plus lib/ when present)",
+    );
+    expect(result.stdout).toMatch(/lib +create +→ \/repo\/llm\/harness\/workflows\/lib/);
+    expect(result.stdout).toMatch(
+      /review\.js +create +→ \/repo\/llm\/harness\/workflows\/review\.js/,
+    );
+    expect(result.stdout).toMatch(/notes\.md +not a \*\.js workflow script/);
   });
 
   test("the rules directory lists each planned link, and says why common is not one of them", async () => {
