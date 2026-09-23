@@ -7,6 +7,12 @@
 # Run by hand (`bash domains/dev/config/litellm/check.sh`) or at the end of
 # `make update` (domains/dev/install.sh, section 5). Exit code = number of FAILs.
 #
+# Roles: on the hub (the Mac with LM Studio.app) every line applies. On a
+# node (any machine without LM Studio) only what the ruling puts there is
+# checked — its own LiteLLM, the tiers through it (deterministic reaches the
+# hub over the tailnet), its metrics port and `tailscale serve 4001`; no
+# local model, no Prometheus, no Open WebUI is expected or probed.
+#
 # What it costs: one tiny prompt to `main` (DeepSeek, a fraction of a cent);
 # `deterministic` is local and free. `complex` is not exercised by default
 # (it is the escalation tier; pass --complex to include it).
@@ -57,7 +63,10 @@ ask() {  # ask <tier> — one short completion; prints reply and wall time
     fail "tier ${tier}: no completion — $(printf '%s' "$body" | head -c 200)"
   fi
 }
-[ -n "$KEY" ] && { [ "$ROLE" = hub ] && ask deterministic; ask main; [ "$WITH_COMPLEX" = 1 ] && ask complex; }
+# `deterministic` on a node is the round trip that matters most there: the
+# node's own LiteLLM → the hub's LM Studio over the tailnet (litellm-up.sh's
+# LM_STUDIO_REMOTE_HOST). A node never needs a local model.
+[ -n "$KEY" ] && { ask deterministic; ask main; [ "$WITH_COMPLEX" = 1 ] && ask complex; }
 
 # --- omp sees the proxy tiers? (the same key the omp() wrapper hands over) ---
 if command -v omp >/dev/null 2>&1 && [ -n "$KEY" ]; then
