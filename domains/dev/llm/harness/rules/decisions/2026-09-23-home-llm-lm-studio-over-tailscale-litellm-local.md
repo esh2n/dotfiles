@@ -30,7 +30,8 @@ rule: Expose only LM Studio over the tailnet (`tailscale serve --bg --tcp 1234 1
 - `domains/dev/config/litellm/litellm-up.sh` が LM Studio の場所を自動判定する（`LM_STUDIO_REMOTE_HOST` に Mac の Tailscale 名を一度書く）。
 - Tailscale の導入（各機械、ユーザーのログイン）、Mac での `tailscale serve` 一回、Open WebUI の常駐は未実施。
 - 起動スクリプトと plist は macOS 前提（launchd、Docker Desktop/OrbStack）。Linux 機では systemd unit と `host.docker.internal` の代替が要る — flake の per-system 化の一部として扱う。
-- Mac のスリープ対策（`pmset` の disablesleep か `caffeinate` の常駐か）は別途決める。どの形でも共通の課題。
+- Mac のスリープ対策は `caffeinate -s -w <LM Studio の daemon の pid>` を launchd で daemon に紐づける（同日の裁定）。`pmset -a disablesleep 1` は機械全体を恒久に起こすので採らない — サーバーが動いている間だけ起きている、が正しい範囲。
+- Tailscale・LM Studio・LiteLLM・Open WebUI は手で入れず dotfiles が入れる（同日の指示）: GUI アプリは `domains/dev/packages/homebrew.nix` の cask、常駐は launchd の plist、Open WebUI は observability の docker-compose。
 - 前例なし: Open WebUI を LiteLLM の bearer key 構成に繋いだ公開例、LiteLLM 単体（1 コンテナ・Mac 常駐）のレイテンシ実測。
 
 ## Sources
