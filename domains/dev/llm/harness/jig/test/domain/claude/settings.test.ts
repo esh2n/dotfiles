@@ -17,7 +17,6 @@ const MANAGED: ClaudeManagedInput = {
   deny: ["Bash(shutdown *)"],
   defaultMode: "auto",
   sandbox: { enabled: true },
-  mcpServers: { serena: { type: "stdio", command: "uvx", args: [] } },
 };
 
 describe("keys jig does not own survive untouched", () => {
@@ -50,7 +49,6 @@ describe("keys jig does not own survive untouched", () => {
       "hooks",
       "permissions",
       "sandbox",
-      "mcpServers",
     ]);
   });
 
@@ -71,7 +69,7 @@ describe("keys jig does not own survive untouched", () => {
   test("a missing settings.json composes the managed keys and nothing else", () => {
     const { settings, left, removed } = composeClaudeSettings(undefined, MANAGED);
 
-    expect(Object.keys(settings)).toEqual(["hooks", "permissions", "sandbox", "mcpServers"]);
+    expect(Object.keys(settings)).toEqual(["hooks", "permissions", "sandbox"]);
     expect(left).toEqual([]);
     expect(removed).toEqual([]);
     expect((settings.permissions as JsonObject).defaultMode).toBe("auto");
@@ -158,29 +156,50 @@ describe("what the apply takes away is listed, not silently dropped", () => {
     expect(settings.env).toEqual({ CLAUDE_CODE_ENABLE_TELEMETRY: "0", CLAUDECODE: "1" });
   });
 
-  test("an MCP server that is no longer in the source is listed as leaving", () => {
+  test("a leftover mcpServers key is jig's own dead value: removed whole, named, with the reason", () => {
     const current: JsonObject = {
       mcpServers: { serena: { type: "stdio" }, "figma-desktop": { type: "http" } },
+      model: "x",
     };
-    const { removed } = composeClaudeSettings(current, MANAGED);
-    expect(removed).toContainEqual({ key: "mcpServers", items: ["figma-desktop"] });
+    const { settings, left, removed } = composeClaudeSettings(current, MANAGED);
+
+    expect(settings.mcpServers).toBeUndefined();
+    expect(Object.keys(settings)).toEqual(["model", "hooks", "permissions", "sandbox"]);
+    expect(left).toEqual(["model"]);
+    expect(removed).toContainEqual({
+      key: "mcpServers",
+      items: ["serena", "figma-desktop"],
+      reason:
+        "settings.json is not an MCP source (docs: mcp.md); delivered through `claude mcp add` instead",
+    });
+  });
+
+  test("a mcpServers value of a shape jig does not recognize is still reported as leaving", () => {
+    const { settings, removed } = composeClaudeSettings({ mcpServers: "odd" }, MANAGED);
+    expect(settings.mcpServers).toBeUndefined();
+    expect(removed.find((group) => group.key === "mcpServers")?.items).toEqual([
+      "(unrecognized value)",
+    ]);
+  });
+
+  test("no mcpServers key means no mcpServers removal", () => {
+    const { removed } = composeClaudeSettings({ model: "x" }, MANAGED);
+    expect(removed.some((group) => group.key === "mcpServers")).toBe(false);
   });
 });
 
 describe("the managed keys themselves", () => {
-  test("hooks, permissions, sandbox and mcpServers take the generated values outright", () => {
+  test("hooks, permissions and sandbox take the generated values outright", () => {
     const current: JsonObject = {
       hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "old" }] }] },
       permissions: { allow: ["old"], deny: ["old"], defaultMode: "acceptEdits" },
       sandbox: { enabled: false },
-      mcpServers: { old: {} },
     };
 
     const { settings } = composeClaudeSettings(current, MANAGED);
 
     expect(settings.hooks).toEqual(MANAGED.hooks);
     expect(settings.sandbox).toEqual(MANAGED.sandbox);
-    expect(settings.mcpServers).toEqual(MANAGED.mcpServers);
     expect(settings.permissions).toEqual({
       allow: ["Bash(git commit *)"],
       deny: ["Bash(shutdown *)"],

@@ -8,20 +8,36 @@
 import { SECRET_KEY_PATTERN, looksLikeSecretValue } from "./secret-detection";
 import { MCP_SCHEMA_VERSION, type McpLayer, type McpServer } from "./types";
 
-const ENV_REF_RE = /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/;
+/** `${VAR}` or `${VAR:-default}` — the two forms Claude Code expands at runtime (mcp.md). */
+const ENV_REF_RE = /\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}/g;
 /** Every harness a `targets`/`targetOverrides` block may name — see McpTargets. */
 const KNOWN_TARGET_KEYS = new Set(["claude", "codex", "omp", "pi", "dsh"]);
 
-function assertNoLiteralSecrets(server: McpServer, label: string): void {
-  const env = server.env ?? {};
-  for (const [key, value] of Object.entries(env)) {
-    if (typeof value !== "string" || ENV_REF_RE.test(value)) continue; // a `${VAR}` reference is always fine
+/**
+ * A value that carries the secret as a reference is fine whatever its key:
+ * `${TOKEN}` alone, and also the shape the docs recommend for a header,
+ * `Bearer ${TOKEN}` — no word left once the references are stripped may
+ * itself look like a credential.
+ */
+function isReferenceValue(value: string): boolean {
+  if (value.match(ENV_REF_RE) === null) return false;
+  const words = value.replace(ENV_REF_RE, " ").split(/\s+/);
+  return !words.some(looksLikeSecretValue);
+}
 
-    if (looksLikeSecretValue(value) || SECRET_KEY_PATTERN.test(key)) {
-      throw new Error(
-        `${label}: server "${server.name}" env.${key} looks like a literal secret — ` +
-          `use "\${${key}}" (an env-var reference) instead of a literal value`,
-      );
+function assertNoLiteralSecrets(server: McpServer, label: string): void {
+  // `headers` gets the same rule as `env`: a bearer token in a header is a
+  // secret, and Claude Code expands `${VAR}` in headers at runtime too (mcp.md).
+  for (const field of ["env", "headers"] as const) {
+    for (const [key, value] of Object.entries(server[field] ?? {})) {
+      if (typeof value !== "string" || isReferenceValue(value)) continue;
+
+      if (looksLikeSecretValue(value) || SECRET_KEY_PATTERN.test(key)) {
+        throw new Error(
+          `${label}: server "${server.name}" ${field}.${key} looks like a literal secret — ` +
+            `use "\${${key}}" (an env-var reference) instead of a literal value`,
+        );
+      }
     }
   }
 }

@@ -589,9 +589,12 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  hooks post-tool-use-format formats the one file an edit tool just wrote, silently;\n" +
           "  hooks stop-gate runs the project's typecheck/lint once at the end of a turn and hands a\n" +
           "  failure back as a block reason, honouring stop_hook_active so it never loops.\n" +
-          "  apply --target claude composes ~/.claude/settings.json's hooks, permissions, sandbox and\n" +
-          "  mcpServers from policy/guard-rules.json and mcp/servers.json; every other key in the live\n" +
-          "  file is preserved. Dry-run prints the whole-file diff plus owned/left/REMOVED key lists.\n" +
+          "  apply --target claude composes ~/.claude/settings.json's hooks, permissions and sandbox\n" +
+          "  from policy/guard-rules.json; every other key in the live file is preserved (a leftover\n" +
+          "  mcpServers key is removed: Claude Code never read it there). Dry-run prints the whole-file\n" +
+          "  diff plus owned/left/REMOVED key lists, and one paste-able `claude mcp add --scope user`\n" +
+          "  line per targets.claude server in mcp/servers.json — jig never writes ~/.claude.json and\n" +
+          "  never runs the claude CLI, so those lines are run by hand, once.\n" +
           "  The same run generates ~/.claude/AGENTS.md from rules/common and rules/decisions (with\n" +
           "  CLAUDE.md -> AGENTS.md), manages skills/, agents/ and rules/ as real directories of\n" +
           "  per-entry links into llm/harness/ (entries that are not jig's, such as Claude Code's\n" +

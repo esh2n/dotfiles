@@ -71,6 +71,46 @@ describe("parseMcpLayer", () => {
     expect(() => parseMcpLayer(text, "test.json")).toThrow(/looks like a literal secret/);
   });
 
+  test("headers get the same rule as env: a literal bearer token throws, a ${VAR} reference is fine", () => {
+    const literal = validLayer([
+      {
+        name: "s",
+        transport: "http",
+        url: "https://example.com/mcp",
+        headers: { Authorization: "Bearer sk-abcdefghijklmnopqrstuvwx" },
+        targets: {},
+      },
+    ]);
+    expect(() => parseMcpLayer(literal, "test.json")).toThrow(/headers\.Authorization looks like/);
+
+    // The docs' own recommended shape: the secret is a reference, the scheme word is not.
+    for (const value of ["${MY_TOKEN}", "Bearer ${MY_TOKEN}", "Bearer ${MY_TOKEN:-}"]) {
+      const reference = validLayer([
+        {
+          name: "s",
+          transport: "http",
+          url: "https://example.com/mcp",
+          headers: { Authorization: value },
+          targets: {},
+        },
+      ]);
+      expect(() => parseMcpLayer(reference, "test.json")).not.toThrow();
+    }
+  });
+
+  test("a reference beside a literal credential does not launder the literal", () => {
+    const text = validLayer([
+      {
+        name: "s",
+        transport: "http",
+        url: "https://example.com/mcp",
+        headers: { Authorization: "${SCHEME} sk-abcdefghijklmnopqrstuvwx" },
+        targets: {},
+      },
+    ]);
+    expect(() => parseMcpLayer(text, "test.json")).toThrow(/looks like a literal secret/);
+  });
+
   test("a non-secret-shaped literal env value does not throw", () => {
     const text = validLayer([
       { name: "s", transport: "stdio", command: "x", env: { LOG_LEVEL: "debug" }, targets: {} },

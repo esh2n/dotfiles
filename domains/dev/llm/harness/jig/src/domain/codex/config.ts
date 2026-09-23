@@ -51,7 +51,7 @@ function applyCodexOverride(server: McpServer): McpServer {
 /** The key/value pairs one server's table carries, in the order they are written. */
 function tableFields(server: McpServer): JsonObject {
   const env = server.env && Object.keys(server.env).length > 0 ? { ...server.env } : undefined;
-  if (server.transport === "http") {
+  if (server.transport !== "stdio") {
     return {
       ...(server.url === undefined ? {} : { url: server.url }),
       ...(env === undefined ? {} : { env }),

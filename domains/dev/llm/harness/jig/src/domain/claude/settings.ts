@@ -19,6 +19,14 @@
  * Key order follows `current` so a diff shows changes and not a reshuffle;
  * keys jig adds that were not there (`sandbox`) append at the end.
  *
+ * One key is neither owned nor carried: `mcpServers`. Milestone 1 wrote it on
+ * the assumption that Claude Code reads MCP servers from settings.json; it does
+ * not (mcp.md, settings.md — the user-scope source is `~/.claude.json`, written
+ * only by `claude mcp add`). So the key is jig's own dead value: it leaves on
+ * write and is reported under the removals with that reason. The servers
+ * themselves are delivered as printed `claude mcp add` lines
+ * (domain/mcp/claude-mcp-add.ts).
+ *
  * Pure. No IO, no clock, no paths.
  */
 
@@ -53,8 +61,6 @@ export interface ClaudeManagedInput {
   readonly defaultMode: string;
   /** The host-mode sandbox block (domain/claude/sandbox.ts). */
   readonly sandbox: JsonObject;
-  /** Built from mcp/servers.json, filtered to claude (domain/mcp/to-claude.ts). */
-  readonly mcpServers: JsonObject;
 }
 
 /** One group of values the apply would drop, named so the dry-run can print them. */
@@ -62,7 +68,21 @@ export interface Removal {
   /** Dotted path of the key the values are leaving, e.g. `hooks.PreToolUse`. */
   readonly key: string;
   readonly items: readonly string[];
+  /** Why the whole key goes, when it is not merely "no longer generated". */
+  readonly reason?: string;
 }
+
+/**
+ * Keys jig wrote in an earlier milestone on a wrong assumption. They are not
+ * owned (nothing regenerates them) and not carried (they are jig's, not the
+ * user's); the apply removes each with its reason.
+ */
+export const DEAD_KEYS: ReadonlyMap<string, string> = new Map([
+  [
+    "mcpServers",
+    "settings.json is not an MCP source (docs: mcp.md); delivered through `claude mcp add` instead",
+  ],
+]);
 
 export interface ClaudeComposition {
   readonly settings: JsonObject;
@@ -80,7 +100,6 @@ export const OWNED_KEYS: readonly string[] = [
   "permissions.deny",
   "permissions.defaultMode",
   "sandbox",
-  "mcpServers",
 ];
 
 function isJsonObject(value: Json | undefined): value is JsonObject {
@@ -188,10 +207,31 @@ function removedHooks(current: Json | undefined, next: JsonObject): readonly Rem
   return out;
 }
 
-function removedMcp(current: Json | undefined, next: JsonObject): readonly Removal[] {
-  if (!isJsonObject(current)) return [];
-  const gone = Object.keys(current).filter((name) => !(name in next));
-  return gone.length === 0 ? [] : [{ key: "mcpServers", items: gone }];
+/**
+ * A dead key leaves whole. Its items are named for the report — the server
+ * names of a `mcpServers` object — so the reader sees what to re-register with
+ * `claude mcp add`; a shape jig does not recognize is still reported, as one
+ * opaque entry, rather than vanishing from the summary.
+ */
+function removedDeadKeys(current: JsonObject | undefined): readonly Removal[] {
+  if (current === undefined) return [];
+  const out: Removal[] = [];
+  for (const [key, reason] of DEAD_KEYS) {
+    if (!(key in current)) continue;
+    const value = current[key];
+    const items = isJsonObject(value) ? Object.keys(value) : ["(unrecognized value)"];
+    out.push({ key, items, reason });
+  }
+  return out;
+}
+
+function withoutDeadKeys(current: JsonObject | undefined): JsonObject | undefined {
+  if (current === undefined) return undefined;
+  const out: Record<string, Json> = {};
+  for (const [key, value] of Object.entries(current)) {
+    if (!DEAD_KEYS.has(key)) out[key] = value;
+  }
+  return out;
 }
 
 /**
@@ -210,13 +250,12 @@ export function composeClaudeSettings(
     hooks: managed.hooks,
     permissions: permissions.value,
     sandbox: managed.sandbox,
-    mcpServers: managed.mcpServers,
     ...(env.value === undefined ? {} : { env: env.value }),
   };
 
-  const settings = mergeInOrder(current, replacements);
+  const settings = mergeInOrder(withoutDeadKeys(current), replacements);
 
-  const claimed = new Set(["hooks", "permissions", "sandbox", "mcpServers", "env"]);
+  const claimed = new Set(["hooks", "permissions", "sandbox", "env", ...DEAD_KEYS.keys()]);
   const left = [
     ...Object.keys(current ?? {}).filter((key) => !claimed.has(key)),
     ...permissions.left,
@@ -235,7 +274,7 @@ export function composeClaudeSettings(
       isJsonObject(current?.permissions) ? current.permissions.deny : undefined,
       managed.deny,
     ),
-    ...removedMcp(current?.mcpServers, managed.mcpServers),
+    ...removedDeadKeys(current),
     ...(env.removed.length === 0 ? [] : [{ key: "env", items: env.removed }]),
   ];
 

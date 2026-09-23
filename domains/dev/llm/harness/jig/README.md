@@ -61,8 +61,8 @@ only.** A destination file is read for exactly two purposes: to carry through
 keys jig does not own, and to report what an apply would remove. No managed
 value and no diagnostic is ever derived from what was read there — the
 dependency runs one way, sources → output. Reconciling a setting that exists in
-two places (an MCP server registered both in `settings.json` and in
-`~/.claude.json`, say) is a one-time manual migration step, not a generator
+two places (an MCP server registered in `~/.claude.json` under a name the
+source no longer has, say) is a one-time manual migration step, not a generator
 feature; the decision above records the day that dependency nearly got
 inverted.
 
@@ -72,7 +72,7 @@ inverted.
 
 | # | Scope | Status |
 |---|---|---|
-| 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, `mcpServers`, and the removal of `YOKI_*` from `env` | **done** |
+| 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, and the removal of `YOKI_*` from `env`; MCP servers as printed `claude mcp add` lines | **done** |
 | 2 | The sources move: `skills/`, `rules/` and `agents/` into `llm/harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`), and retires `~/.claude/commands` | **done** |
 | 3a | Codex: `~/.agents/skills` and `~/.codex/skills` as managed link directories, `~/.codex/AGENTS.md`, `~/.codex/agents/*.toml`, jig's MCP block in `~/.codex/config.toml` | **done** |
 | 3b | pi, omp, DSH | |
@@ -86,10 +86,10 @@ Rows cite the destination table in
 
 | yoki-switch mechanism (map §1a) | Replaced by | Milestone |
 |---|---|---|
-| `merge_settings()` (yoki-switch:200-327) — `jq -s` over `core/settings.layer.json` × packs × `personal/settings.personal.json` | `app/apply/apply-claude.ts` + `domain/claude/settings.ts`: no layers, six managed keys, everything else preserved | 1 |
+| `merge_settings()` (yoki-switch:200-327) — `jq -s` over `core/settings.layer.json` × packs × `personal/settings.personal.json` | `app/apply/apply-claude.ts` + `domain/claude/settings.ts`: no layers, five managed keys, everything else preserved | 1 |
 | the `hooks` array concatenation of §1e (personal → packs → core, 33 entries over 7 events) | `domain/claude/hooks.ts`: five events, one hook each, generated from jig's own subcommands | 1 |
 | `permissions.yaml` layers → `lib/permissions/to-claude.js` (§1c) | `domain/policy/to-claude-permissions.ts` over `policy/guard-rules.json`, plus `domain/claude/permits.ts` | 1 |
-| `mcp.json` layers → `lib/mcp-inventory/writers/claude.js` (§1d) | `mcp/servers.json` → `domain/mcp/to-claude.ts` | 1 |
+| `mcp.json` layers → `lib/mcp-inventory/writers/claude.js` (§1d), which wrote `mcpServers` into settings.json — a key Claude Code never reads | `mcp/servers.json` → `domain/mcp/to-claude.ts` → `domain/mcp/claude-mcp-add.ts`: one printed `claude mcp add --scope user` line per server, run by hand (see "MCP servers" below) | 1 |
 | `.autoMode` carry-over (yoki-switch:317-326) | generalized: every unmanaged key is preserved, not just the one | 1 |
 | `~/.claude/.yoki/permissions.json` (hook-enforced deny set) | nothing — the guard reads `policy/guard-rules.json` directly | 1 |
 | `merge_claude_md()` (yoki-switch:332-346) — `CLAUDE.layer.md` + `CLAUDE.personal.md` | generated `AGENTS.md` from `rules/common/` + `rules/decisions/` (`domain/claude/agents-md.ts`), `CLAUDE.md` → `AGENTS.md` | 2 |
@@ -127,13 +127,45 @@ Owned, from sources:
   allowlist. `enabled`, `failIfUnavailable` and `allowUnsandboxedCommands` are
   fixed in code; `excludedCommands` is copied verbatim from
   `policy/sandbox.json`, which the owner maintains and no agent may write.
-- `mcpServers` — `mcp/servers.json` filtered to `targets.claude`.
 
 Preserved: everything else in the live file, byte-for-byte in value —
 `autoMode`, `enabledPlugins`, `statusLine`, `model`, `effortLevel`, `theme`,
 `env` (minus the retiring harness's own keys: `YOKI_*` and
 `CLAUDE_PLUGIN_ROOT`, whose value names the runtime being retired), and any key
 Claude Code adds later.
+
+Removed as jig's own dead value: `mcpServers`. Milestone 1 first wrote it on
+the assumption that Claude Code reads MCP servers from settings.json; it does
+not (next section). The key is neither owned nor carried: it leaves on
+`--write`, and the dry-run lists it under "keys jig would REMOVE" with that
+reason.
+
+### MCP servers
+
+Claude Code does not read MCP servers from `~/.claude/settings.json`
+([mcp.md](https://code.claude.com/docs/en/mcp.md),
+[settings.md](https://code.claude.com/docs/en/settings.md): "MCP servers are
+NOT stored in settings.json"). Its sources are `~/.claude.json` (user scope,
+written by `claude mcp add --scope user …`), the project's `.mcp.json`,
+plugins, claude.ai connectors and managed-mcp.json. There is no JSON bulk-add
+command: `claude mcp add` and `claude mcp remove` are the only documented
+writers of `~/.claude.json`, and `claude mcp list` shows every source with its
+scope. `~/.claude.json` is also a file jig may neither read nor write (the
+invariant above), so the delivery is the same as the default permits': the
+dry-run prints, under `mcp servers (claude mcp, user scope)`, one paste-able
+line per `targets.claude` server in `mcp/servers.json` —
+`targetOverrides.claude` applied, `{{HOME}}` substituted, `env` as `-e`,
+`headers` as `-H`, `transport` as `--transport stdio|http|sse`, every word
+shell-quoted (`domain/mcp/shell-quote.ts`; a `${VAR}` reference is
+single-quoted so it reaches `~/.claude.json` intact, where Claude Code expands
+it at runtime). The owner runs the block once, and again after editing
+`mcp/servers.json`. A server registered in `~/.claude.json` but no longer in
+the source is removed by hand with `claude mcp remove --scope user <name>`;
+jig cannot list those, because it does not read `~/.claude.json`.
+
+`--write` does not run the lines. Whether jig may invoke the `claude` CLI is a
+ruling the owner has not made; until then `--write` performs the settings.json
+change only, and the dry-run says so under the block.
 
 ### Two things the generator prints instead of writing
 

@@ -204,12 +204,25 @@ describe("what the composed file contains", () => {
     expect(run(ports)).rejects.toThrow("array");
   });
 
-  test("MCP filtering: claude=false is excluded and {{HOME}} is substituted", async () => {
+  test("MCP servers are claude mcp add lines, not a settings key: claude=false is excluded and {{HOME}} is substituted", async () => {
     const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
-    const servers = (await run(ports)).composition.settings.mcpServers as JsonObject;
+    const report = await run(ports);
 
-    expect(Object.keys(servers).sort()).toEqual(["codebase-memory-mcp", "serena"]);
-    expect((servers["codebase-memory-mcp"] as JsonObject).command).toBe("/home/u/bin/cmm");
+    expect(report.composition.settings.mcpServers).toBeUndefined();
+    expect(report.composition.owned).not.toContain("mcpServers");
+    expect(report.mcpAdds.map((add) => add.name)).toEqual(["serena", "codebase-memory-mcp"]);
+    expect(report.mcpAdds.map((add) => add.line)).toEqual([
+      "claude mcp add --transport stdio --scope user serena -- uvx serena",
+      "claude mcp add --transport stdio --scope user codebase-memory-mcp -- /home/u/bin/cmm",
+    ]);
+  });
+
+  test("the mcpServers key milestone 1 wrote is removed with its reason", async () => {
+    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
+    const { composition } = await run(ports);
+    const group = composition.removed.find((removal) => removal.key === "mcpServers");
+    expect(group?.items).toEqual(["figma-desktop"]);
+    expect(group?.reason).toContain("settings.json is not an MCP source");
   });
 
   test("an ask rule has no native form and is reported as hook-only rather than guessed at", async () => {
@@ -245,7 +258,10 @@ describe("--write", () => {
     const report = await run(ports, true);
 
     expect(report.wrote).toBe(true);
-    expect(JSON.parse(files[PATHS.settings] ?? "{}").sandbox).toMatchObject({ enabled: true });
+    const written = JSON.parse(files[PATHS.settings] ?? "{}") as JsonObject;
+    expect(written.sandbox).toMatchObject({ enabled: true });
+    // The dead key leaves on write; the servers go through `claude mcp add` by hand.
+    expect(written.mcpServers).toBeUndefined();
     expect(manifest[PATHS.settings]).toBe(ports.sha256(files[PATHS.settings] ?? ""));
     expect(provenance[CLAUDE]?.sourceFile).toBe(PATHS.guardRules);
   });
@@ -309,12 +325,7 @@ describe("a machine with no settings.json yet", () => {
   test("composes the managed keys alone and has nothing to remove", async () => {
     const { ports } = fakePorts();
     const report = await run(ports);
-    expect(Object.keys(report.composition.settings)).toEqual([
-      "hooks",
-      "permissions",
-      "sandbox",
-      "mcpServers",
-    ]);
+    expect(Object.keys(report.composition.settings)).toEqual(["hooks", "permissions", "sandbox"]);
     expect(report.composition.removed).toEqual([]);
   });
 });

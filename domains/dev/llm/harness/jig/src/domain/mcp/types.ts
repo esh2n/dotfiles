@@ -15,7 +15,8 @@
 
 export const MCP_SCHEMA_VERSION = "jig.mcp.v1";
 
-export type McpTransport = "stdio" | "http";
+/** `sse` is the deprecated remote transport Claude Code still accepts (`claude mcp add --transport sse`). */
+export type McpTransport = "stdio" | "http" | "sse";
 
 /**
  * `targets.<key>` / `targetOverrides.<key>` — one key per harness the
@@ -39,6 +40,7 @@ export interface McpServerOverride {
   readonly args?: readonly string[];
   readonly url?: string;
   readonly env?: Readonly<Record<string, string>>;
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 export interface McpServer {
@@ -48,6 +50,8 @@ export interface McpServer {
   readonly args?: readonly string[];
   readonly url?: string;
   readonly env?: Readonly<Record<string, string>>;
+  /** http / sse: static request headers. Values are `${VAR}` references, never literal secrets. */
+  readonly headers?: Readonly<Record<string, string>>;
   readonly targets?: McpTargets;
   readonly targetOverrides?: {
     readonly claude?: McpServerOverride;
@@ -62,13 +66,4 @@ export interface McpServer {
 export interface McpLayer {
   readonly schemaVersion: string;
   readonly servers: readonly McpServer[];
-}
-
-/** The shape one server takes in Claude's settings.json `mcpServers`. */
-export interface ClaudeMcpEntry {
-  readonly type: "http" | "stdio";
-  readonly url?: string;
-  readonly command?: string;
-  readonly args?: readonly string[];
-  readonly env?: Readonly<Record<string, string>>;
 }

@@ -7,8 +7,14 @@
  * command:
  *
  * - `~/.claude/settings.json` (milestone 1): exactly `hooks`,
- *   `permissions.{allow,deny,defaultMode}`, `sandbox` and `mcpServers`, plus
- *   the absence of the retired harness's `env` keys.
+ *   `permissions.{allow,deny,defaultMode}` and `sandbox`, plus the absence of
+ *   the retired harness's `env` keys and of the `mcpServers` key milestone 1
+ *   once wrote there by mistake (Claude Code never read it).
+ * - MCP servers (milestone 1, corrected): printed as `claude mcp add --scope
+ *   user` lines for the owner to paste, one per `targets.claude` server in
+ *   `mcp/servers.json`. Their destination, `~/.claude.json`, is a file jig
+ *   neither reads nor writes, and jig does not run the `claude` CLI either —
+ *   `--write` performs the settings.json change only.
  * - `~/.claude/AGENTS.md` (milestone 2): generated from `rules/common/` and
  *   `rules/decisions/`, with `CLAUDE.md` a relative symlink to it.
  * - `~/.claude/{skills,agents,rules}/` (milestone 2): three real directories
@@ -61,7 +67,7 @@ import {
 } from "../../domain/claude/settings";
 import { selectSkillDirs } from "../../domain/claude/skills-dir";
 import type { JsonObject } from "../../domain/compose/merge";
-import { applyTemplate } from "../../domain/compose/template";
+import { renderClaudeMcpAdd } from "../../domain/mcp/claude-mcp-add";
 import { parseMcpLayer } from "../../domain/mcp/parse";
 import { buildClaudeMcpServers } from "../../domain/mcp/to-claude";
 import { parsePolicy } from "../../domain/policy/parse";
@@ -130,6 +136,12 @@ export interface CommandsReport {
   readonly action: CommandsAction;
 }
 
+/** One server the owner registers by hand: its name and the exact line to paste. */
+export interface McpAddReport {
+  readonly name: string;
+  readonly line: string;
+}
+
 export interface ClaudeApplyReport {
   /** Over all parts: any conflict wins; then any change; then noop. */
   readonly outcome: ClaudeOutcome;
@@ -150,6 +162,11 @@ export interface ClaudeApplyReport {
   readonly agentsDir: ManagedDirReport;
   readonly rulesDir: ManagedDirReport;
   readonly commands: CommandsReport;
+  /**
+   * `mcp/servers.json` filtered to `targets.claude`, as `claude mcp add` lines.
+   * Printed, never run: jig neither writes `~/.claude.json` nor invokes the CLI.
+   */
+  readonly mcpAdds: readonly McpAddReport[];
   /** `undefined` when `policy/sandbox.json` does not exist yet. */
   readonly sandboxSourcePath: string | undefined;
   readonly message?: string;
@@ -164,17 +181,19 @@ function allowList(projected: ClaudePermissions): readonly string[] {
   return [...new Set([...projected.allow, ...DEFAULT_PERMITS.map((permit) => permit.rule)])].sort();
 }
 
-async function buildMcpServers(
+async function buildMcpAdds(
   ports: ClaudeApplyPorts,
   paths: ClaudeApplyPaths,
-): Promise<JsonObject> {
+): Promise<readonly McpAddReport[]> {
   const read = await readJson(ports, paths.mcpServers);
   if (read === undefined) {
     throw new Error(`jig apply --target claude: MCP source not found at ${paths.mcpServers}`);
   }
   const layer = parseMcpLayer(read.text, paths.mcpServers);
-  const servers = buildClaudeMcpServers(layer.servers);
-  return applyTemplate(servers, { HOME: paths.home }) as JsonObject;
+  return buildClaudeMcpServers(layer.servers, { HOME: paths.home }).map((add) => ({
+    name: add.name,
+    line: renderClaudeMcpAdd(add),
+  }));
 }
 
 /**
@@ -288,9 +307,9 @@ export async function applyClaude(
       // itself stays auto so everything unlisted still reaches the classifier.
       defaultMode: "auto",
       sandbox: hostSandbox(sandbox.source),
-      mcpServers: await buildMcpServers(ports, paths),
     },
   );
+  const mcpAdds = await buildMcpAdds(ports, paths);
 
   const currentText = (await ports.readFile(paths.settings)) ?? "";
   const generated = renderClaudeSettings(composition.settings);
@@ -329,6 +348,7 @@ export async function applyClaude(
     agentsDir: await planAgentsDir(ports, paths, now),
     rulesDir: await planRulesDir(ports, paths, now),
     commands: await planCommands(ports, paths.commands),
+    mcpAdds,
     sandboxSourcePath: sandbox.found ? paths.sandbox : undefined,
   };
 

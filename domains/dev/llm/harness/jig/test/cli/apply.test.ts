@@ -206,10 +206,65 @@ describe("applyCli --target claude", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("hooks (5):");
     expect(result.stdout).toContain("hooks stop-gate --harness claude");
-    expect(result.stdout).toContain("keys jig now owns (6):");
+    expect(result.stdout).toContain("keys jig now owns (5):");
+    expect(result.stdout).not.toContain("  mcpServers\n");
     // The policy file is not agent-writable, so the dry-run hands over the text.
     expect(result.stdout).toContain("not agent-writable by design");
     expect(result.stdout).toContain('"id": "permit-git-commit"');
+  });
+
+  test("MCP servers are a paste-able claude mcp add block, with the by-hand remove and the --write caveat", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [CLAUDE_PATHS.mcpServers]: JSON.stringify({
+        schemaVersion: "jig.mcp.v1",
+        servers: [
+          {
+            name: "serena",
+            transport: "stdio",
+            command: "uvx",
+            args: ["serena", "--context", "claude-code"],
+            targets: { claude: true },
+          },
+          {
+            name: "figma-remote",
+            transport: "http",
+            url: "https://mcp.figma.com/mcp",
+            headers: { Authorization: "Bearer ${FIGMA_TOKEN}" },
+            targets: { claude: true },
+          },
+          { name: "playwright", transport: "stdio", command: "npx", targets: { claude: false } },
+        ],
+      }),
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain("mcp servers (claude mcp, user scope) (2):");
+    expect(result.stdout).toContain(
+      "\n  claude mcp add --transport stdio --scope user serena -- uvx serena --context claude-code\n",
+    );
+    expect(result.stdout).toContain(
+      "\n  claude mcp add --transport http --scope user figma-remote https://mcp.figma.com/mcp -H 'Authorization: Bearer ${FIGMA_TOKEN}'\n",
+    );
+    expect(result.stdout).not.toContain("playwright");
+    expect(result.stdout).toContain("`claude mcp remove --scope user <name>`");
+    expect(result.stdout).toContain("jig does not read ~/.claude.json, so it cannot");
+    expect(result.stdout).toContain("--write does not run these lines");
+    expect(result.stdout).toContain("re-run them after editing mcp/servers.json");
+  });
+
+  test("a leftover mcpServers key is listed under REMOVE with its reason", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [CLAUDE_PATHS.settings]: JSON.stringify({
+        mcpServers: { serena: { type: "stdio" }, "figma-desktop": { type: "http" } },
+      }),
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain(
+      "  mcpServers (2) — settings.json is not an MCP source (docs: mcp.md); delivered through `claude mcp add` instead:\n    - serena\n    - figma-desktop\n",
+    );
   });
 
   test("names permissions.deny a backstop and the PreToolUse hook the enforcement", async () => {
