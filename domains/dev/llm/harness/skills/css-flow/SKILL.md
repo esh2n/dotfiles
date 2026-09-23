@@ -136,7 +136,7 @@ margins were used in the first place.
 - Components should own no outer margin — spacing is the parent/layout's
   responsibility, not the component's. This is the same spacing-ownership
   rule `agent: web-platform-reviewer`'s methodology lane enforces for
-  `.yoki.json`-configured projects; the stack pattern and `gap` are the two
+  projects whose `AGENTS.md` names the layout as the spacing owner; the stack pattern and `gap` are the two
   ways to honor it without hardcoding spacing into the component being
   built.
 - `skill: defensive-css`'s "space between sibling elements shouldn't

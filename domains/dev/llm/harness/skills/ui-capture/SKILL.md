@@ -242,7 +242,7 @@ doubles — the app is not restarted.
 ## Project manifest (`.ui-capture.json`)
 
 One per project root. **Do not commit it** — `.ui-capture.json` is in the
-dotfiles global gitignore (same treatment as `.yoki.json`), so it never shows
+dotfiles global gitignore, so it never shows
 in `git status`. Create it once per checkout and per machine (ui-capture design
 decision point 1 — option A. The "outside the repo" alternative was rejected
 this time: an unsynced `~/.config/work` does not carry to other machines, and
