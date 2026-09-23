@@ -313,7 +313,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (user_agent) (increase(litellm_deployment_success_responses_total[$__rate_interval]))",
+          "expr": "label_replace(label_replace(sum by (user_agent) (increase(litellm_deployment_success_responses_total[$__rate_interval])), \"user_agent\", \"open-webui\", \"user_agent\", \"Python/.* aiohttp/.*\"), \"user_agent\", \"unnamed (no User-Agent header)\", \"user_agent\", \"None\")",
           "legendFormat": "{{user_agent}}"
         }
       ],

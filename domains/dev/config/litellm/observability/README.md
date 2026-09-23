@@ -176,7 +176,7 @@ of a copy; that is part of what the jig rebuild is for.
 |---|---|---|
 | requested alias | `requested_model` | was `main` / `complex` / `deterministic` actually used? |
 | served model | `model` | which real model answered |
-| harness | `user_agent` | which harness sent it — each names itself in its proxy config (`pi`, `dsh`, `omp`; Open WebUI shows as `Python/… aiohttp/…`, litellm/check.sh as `home-llm-check`) since 2026-09-24; before that the runtime's default (`Bun/…`, `None`) made them indistinguishable |
+| harness | `user_agent` | which harness sent it — each names itself in its proxy config (`pi`, `dsh`, `omp`; Open WebUI cannot set a header (its env reference has none for backend calls) so the panel renames its `Python/… aiohttp/…` to `open-webui` with `label_replace`, and a client sending no header shows as `unnamed (no User-Agent header)`; litellm/check.sh sends `home-llm-check`) since 2026-09-24; before that the runtime's default (`Bun/…`, `None`) made them indistinguishable |
 | time | — | did a change help or hurt |
 
 Today's baseline, measured while writing this: 359 successful requests, 32.9M
