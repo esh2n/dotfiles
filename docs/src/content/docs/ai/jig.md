@@ -5,8 +5,9 @@ description: 一つのソースツリーから Claude Code / Codex / omp / pi / 
 
 jig は `domains/dev/llm/harness/` にあるハーネスの生成器とガード。ソースは
 `llm/harness/{skills,rules,agents,mcp,policy,scripts,workflows}` の一つの平らな
-ツリーで、層もパックも無い。rules は `paths:` frontmatter で対象ファイルを
-開いたときだけ読まれ、skills は判断サービスが選ぶ。yoki(`claude-profiles/` の
+ツリーで、層もパックも無い。言語ごとの指針は `skills/<lang>-*` の中にあり
+（`rules/` に残るのは常時読み込みの `common/`、決定メモ、調査記録だけ）、
+skills は判断サービスが選ぶ。yoki(`claude-profiles/` の
 3層合成と `yoki-switch`)の後継で、置き換えの経緯と各マイルストーンの詳細は
 `domains/dev/llm/harness/jig/README.md` にある。
 

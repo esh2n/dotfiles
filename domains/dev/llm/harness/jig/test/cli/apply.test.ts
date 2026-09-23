@@ -809,7 +809,7 @@ describe("applyCli --target omp", () => {
   const cli = (context = ompContext()) =>
     applyCli(["--target", "omp"], tiers(), paths, undefined, undefined, context);
 
-  test("the shared mount names this run's target; the agent files list model and tool gaps; native delivery and the rules gap are stated", async () => {
+  test("the shared mount names this run's target; the agent files list model and tool gaps; native delivery and where language guidance travels are stated", async () => {
     const result = await cli();
 
     expect(result.code).toBe(0);
@@ -828,7 +828,7 @@ describe("applyCli --target omp", () => {
     expect(result.stdout).toContain("Claude tools with no omp tool (NotebookEdit: 1)");
     expect(result.stdout).toContain("reaches omp natively, nothing to deliver:");
     expect(result.stdout).toContain("/home/u/.claude/CLAUDE.md → AGENTS.md");
-    expect(result.stdout).toContain("GAP: the conditional `paths:` rules");
+    expect(result.stdout).toContain("language guidance: inside the language skills (skills/<lang>-*)");
   });
 
   test("mcp.json: jig's entries, the carried-through entries and keys, and the diff", async () => {
@@ -997,7 +997,7 @@ describe("applyCli --target pi", () => {
     expect(result.stdout).toContain('or add to "packages":   "npm:pi-mcp-adapter"');
     expect(result.stdout).toMatch(/@tintinweb\/pi-subagents +MISSING/);
     expect(result.stdout).toContain("subagents: GAP — pi has none natively");
-    expect(result.stdout).toContain("rules: GAP: the conditional `paths:` rules");
+    expect(result.stdout).toContain("rules: language guidance is not a separate delivery");
   });
 
   test("the symlink standing at AGENTS.md today, the retiring repo file, and manager.sh's extension links", async () => {
@@ -1207,7 +1207,7 @@ describe("applyCli --target dsh", () => {
     expect(result.stdout).toMatch(
       /jig-guard plugin +\/repo\/llm\/harness\/jig\/adapters\/dsh: build \+ link {2}\(/,
     );
-    expect(result.stdout).toContain("GAP: the conditional `paths:` rules");
+    expect(result.stdout).toContain("language guidance: inside the language skills (skills/<lang>-*)");
     expect(result.stdout).toContain("[unverified] — facts the delivery rests on");
   });
 

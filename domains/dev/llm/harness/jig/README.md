@@ -237,9 +237,11 @@ conflict anywhere (either generated file hand-edited, or a `commands`
 directory holding real files) stops the whole write — the parts are one
 delivery.
 
-Sources, all under `llm/harness/`: `skills/<name>/SKILL.md` (one flat tree),
-`rules/common/*.md` (always-on), `rules/<lang>/*.md` (conditional, keyed by
-`paths:` frontmatter), `rules/decisions/*.md`, `agents/*.md`.
+Sources, all under `llm/harness/`: `skills/<name>/SKILL.md` (one flat tree;
+language guidance lives here, in `skills/<lang>-*`), `rules/common/*.md`
+(always-on), `rules/decisions/*.md`, `agents/*.md`. There is no
+`rules/<lang>/` and no `paths:`-scoped rule
+([`2026-09-23-language-rules-fold-into-skills.md`](../rules/decisions/2026-09-23-language-rules-fold-into-skills.md)).
 
 Destinations:
 
@@ -267,11 +269,14 @@ Destinations:
     tree's `README.md` and a directory without one get no link).
   - `agents/<name>.md` → `llm/harness/agents/<name>.md`, for every regular
     `*.md` file there (`domain/claude/agents-dir.ts`).
-  - `rules/<lang>` → `llm/harness/rules/<lang>`, for every subdirectory of
+  - `rules/<name>` → `llm/harness/rules/<name>`, for every subdirectory of
     `rules/` except `common`, `decisions` and `research`
     (`domain/claude/rules-dir.ts`, `NOT_RULE_DIRS`, with the why): `common`
     is in AGENTS.md and a link would load it twice; the other two are
-    Markdown for humans and would load as always-on rules.
+    Markdown for humans and would load as always-on rules. Since the
+    language rules were folded into skills (2026-09-23) no such
+    subdirectory exists, so the directory holds no links; the reconciliation
+    stays so a future non-language rule directory would be delivered.
 
   Why directories of links and not one symlink per tree: Claude Code writes
   into `~/.claude/skills/` itself — it keeps `synced/<bucket-id>/…` there
@@ -513,10 +518,10 @@ Destinations, one source tree:
   should write is a ruling not yet made. Skills and the instructions file
   reach omp natively — `~/.agents/skills` above, and `~/.claude/CLAUDE.md`
   (→ `AGENTS.md`) through omp's `claude` provider; jig writes no
-  `~/.omp/agent/AGENTS.md`, which would shadow it. The conditional `paths:`
-  rules (`rules/<lang>/`) are **not** delivered to omp in this milestone:
-  omp has no `~/.claude/rules` reader and jig's omp extension does not
-  inject them yet. The dry-run names that gap.
+  `~/.omp/agent/AGENTS.md`, which would shadow it. Language guidance reaches
+  omp inside the language skills (`skills/<lang>-*`, the mount above); there
+  is no separate rules delivery to any harness
+  ([`2026-09-23-language-rules-fold-into-skills.md`](../rules/decisions/2026-09-23-language-rules-fold-into-skills.md)).
 
 `--write` writes all of it in one run — the generated files, `mcp.json`,
 the manifest and provenance, then the skills mount and the extension link —
@@ -626,8 +631,8 @@ Destinations, one source tree:
   [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md)'s
   answer is a workflow script written once in Claude Code's syntax, which
   pi runs through tintinweb/pi-subagents when that package is installed —
-  the `packages` check above. Conditional `paths:` rules: not delivered to
-  pi in this milestone, in the omp target's words.
+  the `packages` check above. Language guidance: inside the language skills,
+  as for omp.
 
 `--write` writes both halves in one run — `models.json`, then AGENTS.md
 (the link removed first), the adapter config, the manifest and provenance,
@@ -742,8 +747,8 @@ Destinations, one source tree:
   link:` into each profile — reported per profile as linked or not) stay
   with `link_dsh_resources` until milestone 4. The home-level
   `$DSH_HOME/cordis.patch.yml` is reported as found, scanned for a jig
-  duplicate, and never written. The conditional `paths:` rules are not
-  delivered to DSH in this milestone, in the omp and pi targets' words.
+  duplicate, and never written. Language guidance: inside the language
+  skills, as for omp and pi.
 
 `--write` writes both halves in one run — `settings.yaml`'s block, then each
 profile's patch file, AGENTS.md, the manifest and provenance (into

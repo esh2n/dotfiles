@@ -116,5 +116,8 @@ inheriting an ambient default.
 
 ## Terraform
 
-For the accompanying rule (never hardcode project IDs or secrets in `.tf`),
-see `packs/gcp/rules/gcp/terraform-gcp.md`.
+Never hardcode a project ID, service account email, or secret value in
+`.tf`/`.tfvars`. Use an input variable for project IDs and a
+`google_secret_manager_secret_version` data source for secrets — never a
+literal string, and never a `.tfvars` file with real values committed to git.
+(Folded from `rules/gcp/terraform-gcp.md`, 2026-09-23.)

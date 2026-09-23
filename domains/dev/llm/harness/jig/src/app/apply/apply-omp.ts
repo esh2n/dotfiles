@@ -32,8 +32,8 @@
  *   are yoki's, left for milestone 4. jig does not own `config.yml` in this
  *   milestone at all — omp's approval policy there is a ruling not yet made.
  *   Skills and the instructions file reach omp natively (`~/.agents/skills`,
- *   `~/.claude/CLAUDE.md`); the conditional `paths:` rules do not reach omp
- *   in this milestone, and the dry-run names that gap.
+ *   `~/.claude/CLAUDE.md`); language guidance travels inside the language
+ *   skills, so there is no rules delivery to name.
  *
  * The invariant is the Claude target's: sources → output, one way. The
  * destination is read to carry through what jig does not own and to say

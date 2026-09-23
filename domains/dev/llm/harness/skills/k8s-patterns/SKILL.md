@@ -98,8 +98,11 @@ monitoring/alerting history instead.
   external resource orphaned — still running, still billing. Find and fix
   the controller that owns the finalizer first.
 
-## Manifest-glob note
+## Is it a manifest?
 
-For the accompanying rule that scopes this skill to actual Kubernetes YAML
-(the `**/*.yaml` glob also matches Helm values, CI configs, and other
-non-Kubernetes YAML), see `packs/k8s/rules/k8s/manifests.md`.
+A `.yaml`/`.yml` file is not necessarily a Kubernetes manifest — the same
+extension carries Helm values, CI configs and plenty else. Before applying
+anything above, confirm the file has `apiVersion:` and `kind:` at the top
+level; only then run the review lanes (resource requests/limits, probes,
+PodDisruptionBudget, image pinning, security context, NetworkPolicy).
+(Folded from `rules/k8s/manifests.md`, 2026-09-23.)

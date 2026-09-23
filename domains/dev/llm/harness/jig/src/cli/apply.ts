@@ -746,8 +746,8 @@ function formatOmp(report: OmpApplyReport, paths: OmpApplyPaths): string {
     "reaches omp natively, nothing to deliver:",
     `  skills       ${paths.agentsSkills} (omp's \`agents\` provider reads ~/.agents/skills; ~/.claude/skills through its \`claude\` provider)`,
     `  instructions ${paths.home}/.claude/CLAUDE.md → AGENTS.md (omp's \`claude\` provider; a ${paths.agentDir}/AGENTS.md would shadow it, and jig writes none)`,
-    "  GAP: the conditional `paths:` rules (rules/<lang>/) are not delivered to omp in this milestone;",
-    "  omp has no ~/.claude/rules reader, and jig's omp extension does not inject them yet.",
+    "  language guidance: inside the language skills (skills/<lang>-*), carried by the mount above —",
+    "  no separate rules delivery (rules/decisions/2026-09-23-language-rules-fold-into-skills.md).",
   ];
   return lines.join("\n");
 }
@@ -911,8 +911,8 @@ function formatPi(report: PiApplyReport, paths: PiApplyPaths): string {
     'subagents: GAP — pi has none natively (rules/research/2026-09-22-multi-lane-review-per-harness.md: "Pi itself remains',
     "  fundamentally single-agent\"). The subagents decision's answer: a workflow script is written once, in Claude",
     "  Code's syntax; pi runs it through tintinweb/pi-subagents when that package is installed (see packages above).",
-    "rules: GAP: the conditional `paths:` rules (rules/<lang>/) are not delivered to pi in this milestone;",
-    "  pi has no ~/.claude/rules reader, and jig's pi extensions do not inject them yet.",
+    "rules: language guidance is not a separate delivery — it lives in the language skills (skills/<lang>-*),",
+    "  which the mount above carries (rules/decisions/2026-09-23-language-rules-fold-into-skills.md).",
   ];
   return lines.join("\n");
 }
@@ -1220,8 +1220,8 @@ function dshReportOnlyLines(report: DshApplyReport, paths: DshApplyPaths): reado
     `  settings.yaml      ${report.settingsYaml.path}: ${state(report.settingsYaml)}  (link to the repo file the tiers half above writes)`,
     `  hooks.claude.json  ${report.hooksClaudeJson.path}: ${state(report.hooksClaudeJson)}  (expanded copy for the dsh-hooks-claude-code bridge; the profiles compose jig-guard instead)`,
     `  jig-guard plugin   ${paths.pluginDir}: build + link  (bun run build, then pnpm add link: per profile — see each profile above)`,
-    "  GAP: the conditional `paths:` rules (rules/<lang>/) are not delivered to DSH in this milestone; jig's",
-    "  dsh plugin does not inject them yet.",
+    "  language guidance: inside the language skills (skills/<lang>-*), carried by the skills mount —",
+    "  no separate rules delivery (rules/decisions/2026-09-23-language-rules-fold-into-skills.md).",
   ];
 }
 

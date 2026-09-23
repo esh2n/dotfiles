@@ -6,11 +6,13 @@ here, in file-name order, into the generated `~/.claude/AGENTS.md` (with
 reading order; no file carries `paths:` frontmatter, because these load
 unconditionally.
 
-Language-specific rules live in sibling directories (`../go/`, `../python/`,
-…), each file keyed by `paths:` frontmatter, and are delivered as
-`~/.claude/rules/<lang>` links instead — never rendered into AGENTS.md
-(`../decisions/2026-09-22-config-layout-no-personal-layer.md`). `common/` is
-never linked there, or it would load twice.
+Language-specific guidance does not live under `rules/` at all: it is in the
+language's skill (`../../skills/<lang>-patterns`, `<lang>-testing`, …), which
+every harness receives through its skills mount
+(`../decisions/2026-09-23-language-rules-fold-into-skills.md`; the earlier
+`rules/<lang>/` + `paths:` delivery reached Claude Code only). `rules/` holds
+only `common/`, `decisions/` and `research/`; `common/` is never linked under
+`~/.claude/rules`, or it would load twice.
 
 Two things the generated AGENTS.md carries besides these rules:
 

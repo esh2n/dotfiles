@@ -132,7 +132,7 @@ export interface ClaudeApplyPaths {
   readonly skills: string;
   /** Destination: `~/.claude/agents`, a real directory of links to `<harnessRoot>/agents/<name>.md`. */
   readonly agents: string;
-  /** Destination: `~/.claude/rules`, a real directory of links to `<harnessRoot>/rules/<lang>`. */
+  /** Destination: `~/.claude/rules`, a real directory of links to `<harnessRoot>/rules/<name>` (none since the language rules moved into skills). */
   readonly rulesDir: string;
   /** Destination: `~/.claude/commands`, retired. */
   readonly commands: string;

@@ -1,11 +1,16 @@
 /**
  * `~/.claude/rules/`: a managed directory of links (`managed-dir.ts`), one
- * per conditional-rule directory of `llm/harness/rules/` —
- * `~/.claude/rules/<lang>` → `<harness>/rules/<lang>`. Claude Code loads a
- * rule file there when a file matching its `paths:` frontmatter is touched;
- * that is what makes these directories the right thing to link and the
- * always-on `common/` the wrong thing (it is rendered into AGENTS.md, and a
- * link would load it twice).
+ * per rule directory of `llm/harness/rules/` other than the three excluded
+ * below — `~/.claude/rules/<name>` → `<harness>/rules/<name>`. Claude Code
+ * loads a rule file there when a file matching its `paths:` frontmatter is
+ * touched; the always-on `common/` must not be linked (it is rendered into
+ * AGENTS.md, and a link would load it twice).
+ *
+ * Since 2026-09-23 no such directory exists: the language rules were folded
+ * into the language skills (`rules/decisions/2026-09-23-language-rules-fold-
+ * into-skills.md`), so the managed directory reconciles to no links and the
+ * stale `<lang>` links are removed on the next apply. The selection stays so
+ * a future non-language rule directory would still be delivered.
  *
  * This module is the selection only: which subdirectories of `rules/` get a
  * link. Pure. The caller lists the source directory and hands over the

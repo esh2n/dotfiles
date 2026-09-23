@@ -196,6 +196,10 @@ PROTOCOL.md §8 の 9 項目はすべてそのまま効いている。C に固�
    `~/.claude/skills`）で数える。一覧が倍近く増えたぶん、モデル自身の選択（分母側）が
    凍結時と同じ振る舞いをする保証はなく、A との比較は「同じ一覧」ではない——結果の節で
    必ず断る。
+   追記 2026-09-23 夜: 裁定 b2（`rules/<lang>/` を言語 skill に畳む）で、期間中に skill が
+   さらに増える（python-patterns、java-testing、typescript/csharp/php/swift の patterns と
+   testing = 10 本前後）。分母が動いた日付をここに残す。C の集計は開始時点の実カタログで
+   数える方針のまま。
 
 ---
 

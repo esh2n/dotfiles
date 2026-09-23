@@ -37,8 +37,8 @@
  *   tintinweb/pi-subagents (`domain/pi/packages.ts`), with the paste-able
  *   line for each that is missing; `<agentDir>/extensions/` — the links
  *   `link_pi_resources` makes into `domains/dev/config/pi/extensions/` until
- *   milestone 4, and everything else as not jig's; the two gaps (no native
- *   subagents, no conditional `paths:` rules).
+ *   milestone 4, and everything else as not jig's; the one gap (no native
+ *   subagents — language guidance travels inside the language skills).
  *
  * The invariant is the Claude target's: sources → output, one way. The
  * destination is read to carry through what jig does not own and to say
