@@ -7,8 +7,8 @@ One omp extension carrying four of the five hooks
 |---|---|---|
 | `tool_call` | the guard — the enforcement point | `src/guard.ts` |
 | `session_start` | the session's model, written to `sessions.jsonl` | `src/session.ts` |
-| `tool_result` | format the edited file, silently | `src/format.ts` |
-| `session_stop` | typecheck/lint once, capped at 2 continuations | `src/gate.ts` |
+| `tool_result` | format the edited file, silently — the project's lefthook / pre-commit first, jig's table only without one | `src/format.ts` |
+| `session_stop` | the project's hooks on the touched files, else typecheck/lint; once, capped at 2 continuations | `src/gate.ts` |
 
 The fifth (skill selection at prompt submit) is Claude Code's; no router
 lives here — the same decision retired it.
@@ -58,12 +58,19 @@ between the model and the machine.
 
 ## Gate
 
-`session_stop` runs one project-detected check — `bunx tsc --noEmit`,
-`go vet ./...`, `ruff check`, or `cargo check` — and on failure returns
-`{continue: true, additionalContext: <tail>}`. omp allows 8 advisory
-continuations; this stops at **2 per session** and then lets the turn end.
-It never uses `{decision: "block"}`, which would keep blocking until a
-handler relents. A missing toolchain is not a failure. Subagent sessions are
+`session_stop` runs one check and on failure returns
+`{continue: true, additionalContext: <tail>}`. Which check follows
+[`2026-09-23-project-hooks-first-jig-table-fallback.md`](../../../rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md):
+a project with `lefthook.yml` / `.lefthook.yml` / `.pre-commit-config.yaml` gets
+`lefthook run pre-commit --file <f>…` / `pre-commit run --files <f>…` on the
+files the turn touched (`git diff --name-only --relative HEAD` plus untracked;
+git absent or nothing changed → nothing runs); only a project with no such
+file gets jig's table — `bunx tsc --noEmit`, `go vet ./...`, `ruff check`, or
+`cargo check`. omp allows 8 advisory continuations; this stops at **2 per
+session** and then lets the turn end. It never uses `{decision: "block"}`,
+which would keep blocking until a handler relents. A missing toolchain is not
+a failure — except the project's own hook runner, which is never replaced by
+the table: the session is told once to install it. Subagent sessions are
 skipped (see the caveat below).
 
 ## Installing it

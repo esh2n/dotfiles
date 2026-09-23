@@ -781,6 +781,10 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  hooks post-tool-use-format formats the one file an edit tool just wrote, silently;\n" +
           "  hooks stop-gate runs the project's typecheck/lint once at the end of a turn and hands a\n" +
           "  failure back as a block reason, honouring stop_hook_active so it never loops.\n" +
+          "  Both run the project's own hooks first when it has lefthook.yml / .lefthook.yml /\n" +
+          "  .pre-commit-config.yaml (lefthook run pre-commit --file <f> / pre-commit run --files <f>,\n" +
+          "  the gate on the files the turn touched); jig's tables apply only without such a file,\n" +
+          "  and a config whose tool is not installed blocks once with 'install it', never the table.\n" +
           "  apply --target claude composes ~/.claude/settings.json's hooks, permissions and sandbox\n" +
           "  from policy/guard-rules.json; every other key in the live file is preserved (a leftover\n" +
           "  mcpServers key is removed: Claude Code never read it there). Dry-run prints the whole-file\n" +

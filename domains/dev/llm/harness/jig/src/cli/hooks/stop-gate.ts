@@ -16,6 +16,16 @@
  * - **a missing toolchain is not a failure.** A repository whose `tsc` is not
  *   installed must still be able to finish a turn (`missing` from the runner).
  *
+ * `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md` adds
+ * the precedence in front of the table: a project with `lefthook.yml` /
+ * `.pre-commit-config.yaml` is gated by its own hook runner on the files this
+ * turn touched (`git diff --name-only` plus untracked, through the
+ * `ChangedFiles` port), and the table applies only when there is no such
+ * file. The one exception to "missing is not a failure" is that runner: the
+ * config exists, the tool does not, and the table is NOT the substitute — the
+ * gate blocks once (the `stop_hook_active` guard above is the "once") with a
+ * one-line reason telling the owner to install it.
+ *
  * It blocks with `{"decision":"block","reason":...}` rather than exit code 2:
  * same effect, but the reason reaches the model as data instead of as scraped
  * stderr. Everything else — an unparseable payload, a project with no
@@ -24,9 +34,12 @@
  */
 
 import { existsSync } from "node:fs";
-import { gateCommandFor, tail } from "../../domain/hooks/gate";
+import type { ChangedFiles } from "../../domain/hooks/changed";
+import { gatePlanFor, projectHooksFor, tail } from "../../domain/hooks/gate";
+import { missingToolReason } from "../../domain/hooks/project-hooks";
 import type { Runner } from "../../domain/hooks/run";
 import type { Logger } from "../../domain/ports";
+import { changedFiles } from "../../infra/proc/changed-files";
 
 /**
  * Long enough for a cold `tsc` on a real project; the hook's registered
@@ -52,6 +65,8 @@ interface StopPayload {
 export interface StopGateDeps {
   readonly run: Runner;
   readonly exists?: (path: string) => boolean;
+  /** The files this turn touched; only asked when the project has a hook config. */
+  readonly changedFiles?: ChangedFiles;
   readonly timeoutMs?: number;
   readonly logger?: Logger;
 }
@@ -75,30 +90,55 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
   }
 
   const cwd = typeof payload.cwd === "string" && payload.cwd !== "" ? payload.cwd : process.cwd();
-  const command = gateCommandFor(cwd, exists);
-  if (command === undefined) {
-    deps.logger?.debug("gate.no-check", { cwd });
+
+  // git is only asked when there is a hook config to hand the list to.
+  const hooks = projectHooksFor(cwd, exists);
+  let changed: readonly string[] | undefined;
+  if (hooks !== undefined) {
+    try {
+      changed = await (deps.changedFiles ?? changedFiles)(hooks.root);
+    } catch (error) {
+      deps.logger?.debug("gate.changed-files-failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+      changed = undefined;
+    }
+  }
+
+  const plan = gatePlanFor(cwd, exists, changed);
+  if (plan.kind === "nothing") {
+    deps.logger?.debug(`gate.${plan.reason}`, { cwd, tool: hooks?.tool });
     return "";
   }
 
   let result: Awaited<ReturnType<Runner>>;
   try {
-    result = await deps.run(command.bin, command.args, {
-      cwd,
+    result = await deps.run(plan.bin, plan.args, {
+      cwd: plan.cwd,
       timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
     });
   } catch (error) {
     deps.logger?.debug("gate.run-failed", {
+      source: plan.source,
       message: error instanceof Error ? error.message : String(error),
     });
     return "";
   }
 
-  if (result.missing || result.code === 0) return "";
+  if (result.missing) {
+    if (plan.source === "project" && hooks !== undefined) {
+      // The ruling's one hard line: a project's rules are never replaced by
+      // jig's, so the answer is "install it", said once (stop_hook_active).
+      deps.logger?.debug("gate.project-tool-missing", { tool: hooks.tool, config: hooks.config });
+      return `${JSON.stringify({ decision: "block", reason: missingToolReason(hooks) })}\n`;
+    }
+    return "";
+  }
+  if (result.code === 0) return "";
 
   const output = tail(`${result.stdout}\n${result.stderr}`.trim());
-  const reason = `jig gate: \`${command.label}\` failed (exit ${result.code}). ${ONCE_PER_TURN}\n\n${output}`;
+  const reason = `jig gate: \`${plan.label}\` failed (exit ${result.code}). ${ONCE_PER_TURN}\n\n${output}`;
 
-  deps.logger?.debug("gate.blocked", { label: command.label, code: result.code });
+  deps.logger?.debug("gate.blocked", { source: plan.source, label: plan.label, code: result.code });
   return `${JSON.stringify({ decision: "block", reason })}\n`;
 }

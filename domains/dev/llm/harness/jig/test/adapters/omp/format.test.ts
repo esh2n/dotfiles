@@ -105,6 +105,28 @@ describe("formatOnResult", () => {
     expect(formatted).toEqual([]);
   });
 
+  test("a project with lefthook.yml gets lefthook on each edited file, not the table", async () => {
+    const { run, calls } = runner();
+    const formatted = await formatOnResult(
+      { toolName: "write", input: { path: "src/a.go" }, isError: false },
+      "/repo",
+      { run, exists: exists(["/repo/lefthook.yml", "/repo/go.mod", "/repo/src/a.go"]) },
+    );
+    expect(formatted).toEqual(["/repo/src/a.go"]);
+    expect(calls).toEqual([["lefthook", "run", "pre-commit", "--file", "src/a.go"]]);
+  });
+
+  test("a project hook runner that is not installed is a skip, not a fall-through to the table", async () => {
+    const { run, calls } = runner({ missing: true, code: 127 });
+    const formatted = await formatOnResult(
+      { toolName: "write", input: { path: "src/a.go" }, isError: false },
+      "/repo",
+      { run, exists: exists(["/repo/.pre-commit-config.yaml", "/repo/go.mod", "/repo/src/a.go"]) },
+    );
+    expect(formatted).toEqual([]);
+    expect(calls).toEqual([["pre-commit", "run", "--files", "src/a.go"]]);
+  });
+
   test("a write to an internal resource is not a file to format", async () => {
     const { run, calls } = runner();
     await formatOnResult(

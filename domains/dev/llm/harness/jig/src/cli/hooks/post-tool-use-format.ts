@@ -19,12 +19,17 @@
  *   it and returns. A formatter is not a reason to interrupt anyone.
  *
  * Which formatter and which project root are `domain/hooks/format.ts`'s, the
- * same module omp's adapter uses.
+ * same module omp's adapter uses — including the precedence of
+ * `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md`: a
+ * project with `lefthook.yml` / `.pre-commit-config.yaml` gets its own hook
+ * runner on the file, and jig's table only when there is none. When the
+ * project has the config but not the tool, this stays silent (a debug line)
+ * and does NOT fall back to the table; the Stop gate is what tells the owner.
  */
 
 import { existsSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
-import { formatterFor, projectRoot } from "../../domain/hooks/format";
+import { isAbsolute, resolve } from "node:path";
+import { formatPlanFor } from "../../domain/hooks/format";
 import type { Runner } from "../../domain/hooks/run";
 import type { Logger } from "../../domain/ports";
 
@@ -95,27 +100,38 @@ export async function postToolUseFormat(
   const file = isAbsolute(named) ? named : resolve(cwd, named);
   if (!exists(file)) return undefined;
 
-  const root = projectRoot(dirname(file), exists);
-  const command = formatterFor(file, root, exists);
-  if (command === undefined) return undefined;
+  const plan = formatPlanFor(file, exists);
+  if (plan === undefined) return undefined;
+  const { source, bin } = plan;
 
   try {
-    const result = await deps.run(command.bin, command.args, {
-      cwd: root,
+    const result = await deps.run(plan.bin, plan.args, {
+      cwd: plan.cwd,
       timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
     });
-    if (result.missing || result.code !== 0) {
-      deps.logger?.debug("format.skipped", { file, bin: command.bin, code: result.code });
+    if (result.missing) {
+      // A project hook runner that is not installed is the owner's to fix and
+      // the gate's to say; a table formatter that is not installed is a skip.
+      deps.logger?.debug(source === "project" ? "format.project-tool-missing" : "format.skipped", {
+        file,
+        source,
+        bin,
+      });
+      return undefined;
+    }
+    if (result.code !== 0) {
+      deps.logger?.debug("format.skipped", { file, source, bin, code: result.code });
       return undefined;
     }
   } catch (error) {
     deps.logger?.debug("format.failed", {
       file,
+      source,
       message: error instanceof Error ? error.message : String(error),
     });
     return undefined;
   }
 
-  deps.logger?.debug("format.done", { file, bin: command.bin });
+  deps.logger?.debug("format.done", { file, source, bin });
   return file;
 }

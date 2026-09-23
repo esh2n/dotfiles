@@ -9,5 +9,7 @@
  * in omp's vocabulary rather than reaching across the tree for a type.
  */
 
+export type { ChangedFiles } from "../../../src/domain/hooks/changed";
 export type { RunResult as CommandResult, Runner } from "../../../src/domain/hooks/run";
+export { changedFiles } from "../../../src/infra/proc/changed-files";
 export { runCommand } from "../../../src/infra/proc/exec-file";

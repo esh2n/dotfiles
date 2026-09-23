@@ -25,11 +25,15 @@
 import { existsSync } from "node:fs";
 import {
   type GateCommand,
+  type GatePlan,
   gateCommandFor as chooseGateCommand,
+  gatePlanFor as choosePlan,
+  projectHooksFor,
   tail,
 } from "../../../src/domain/hooks/gate";
+import { missingToolReason } from "../../../src/domain/hooks/project-hooks";
 import type { OmpContext, OmpSessionStopEvent, OmpSessionStopResult } from "./omp";
-import { type Runner, runCommand } from "./run";
+import { type ChangedFiles, type Runner, changedFiles, runCommand } from "./run";
 
 /** Continuations this gate will ask for, per session. omp's own ceiling is 8. */
 export const MAX_CONTINUATIONS = 2;
@@ -39,10 +43,14 @@ const TIMEOUT_MS = 180_000;
 /**
  * Which check a project answers to, and how a failure is trimmed, are jig's
  * own (`src/domain/hooks/gate.ts`) — shared verbatim with the Claude Code Stop
- * hook, so the two harnesses gate on the same command. Wrapped here only to
+ * hook, so the two harnesses gate on the same command. That includes the
+ * precedence of
+ * `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md`
+ * (`gatePlanFor`: the project's lefthook / pre-commit on the files this turn
+ * touched first, the marker table only without one). Wrapped here only to
  * bind omp's `existsSync` default, which a pure module does not get to have.
  */
-export type { GateCommand };
+export type { GateCommand, GatePlan };
 export { tail };
 
 export function gateCommandFor(
@@ -52,17 +60,34 @@ export function gateCommandFor(
   return chooseGateCommand(cwd, exists);
 }
 
+export function gatePlanFor(
+  cwd: string,
+  changed: readonly string[] | undefined,
+  exists: (p: string) => boolean = existsSync,
+): GatePlan {
+  return choosePlan(cwd, exists, changed);
+}
+
 /** Continuations already spent, per session id. Lives as long as the process. */
 const spent = new Map<string, number>();
+
+/**
+ * Sessions already told their project's hook runner is not installed. Said
+ * once per session: the fix is the owner's, and repeating it buys nothing.
+ */
+const toldMissing = new Set<string>();
 
 /** Test seam: forget what this process has counted. */
 export function resetGate(): void {
   spent.clear();
+  toldMissing.clear();
 }
 
 export interface GateDeps {
   readonly run?: Runner;
   readonly exists?: (path: string) => boolean;
+  /** The files this turn touched; only asked when the project has a hook config. */
+  readonly changedFiles?: ChangedFiles;
   readonly timeoutMs?: number;
   readonly maxContinuations?: number;
   /**
@@ -102,17 +127,32 @@ export async function gateOnStop(
   const cap = deps.maxContinuations ?? MAX_CONTINUATIONS;
   if ((spent.get(session) ?? 0) >= cap) return undefined;
 
-  const command = gateCommandFor(ctx.cwd, deps.exists ?? existsSync);
-  if (command === undefined) return undefined;
+  const exists = deps.exists ?? existsSync;
+  // git is only asked when there is a hook config to hand the list to.
+  const hooks = projectHooksFor(ctx.cwd, exists);
+  const changed =
+    hooks === undefined ? undefined : await (deps.changedFiles ?? changedFiles)(hooks.root);
+  const plan = gatePlanFor(ctx.cwd, changed, exists);
+  if (plan.kind === "nothing") return undefined;
 
   const run = deps.run ?? runCommand;
-  const result = await run(command.bin, command.args, {
-    cwd: ctx.cwd,
+  const result = await run(plan.bin, plan.args, {
+    cwd: plan.cwd,
     timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
   });
-  // A missing toolchain is not a failing check: a repo whose `tsc` is not
-  // installed must still be able to finish a turn.
-  if (result.missing || result.code === 0) return undefined;
+  if (result.missing) {
+    // A missing toolchain is not a failing check: a repo whose `tsc` is not
+    // installed must still be able to finish a turn. The project's own hook
+    // runner is the exception — the ruling forbids the table as its
+    // substitute, so the owner is told to install it, once per session.
+    if (plan.source !== "project" || hooks === undefined || toldMissing.has(session)) {
+      return undefined;
+    }
+    toldMissing.add(session);
+    spent.set(session, (spent.get(session) ?? 0) + 1);
+    return { continue: true, additionalContext: missingToolReason(hooks) };
+  }
+  if (result.code === 0) return undefined;
 
   const used = (spent.get(session) ?? 0) + 1;
   spent.set(session, used);
@@ -120,7 +160,7 @@ export async function gateOnStop(
   return {
     continue: true,
     additionalContext:
-      `jig gate: \`${command.label}\` failed (exit ${result.code}). ` +
+      `jig gate: \`${plan.label}\` failed (exit ${result.code}). ` +
       `Fix what it reports before finishing — continuation ${used} of ${cap}, ` +
       `after which the turn ends whatever the gate says.\n\n${output}`,
   };

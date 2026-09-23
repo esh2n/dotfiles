@@ -114,6 +114,59 @@ describe("gateOnStop", () => {
   });
 });
 
+describe("a project with its own hooks", () => {
+  const lefthook = exists(["lefthook.yml", "tsconfig.json", "src/a.ts"]);
+  const changedFiles = (files: readonly string[] | undefined) => async () => files;
+
+  test("lefthook on the files this turn touched, not the table's tsc", async () => {
+    const { run, calls } = runner({ code: 1, stderr: "lint failed" });
+    const out = await gateOnStop({ session_id: "s-1" }, ctx, {
+      run,
+      exists: lefthook,
+      changedFiles: changedFiles(["src/a.ts"]),
+    });
+    expect(calls).toEqual([["lefthook", "run", "pre-commit", "--file", "src/a.ts"]]);
+    expect(out?.continue).toBe(true);
+    expect(out?.additionalContext).toContain("lefthook run pre-commit (1 file)");
+    expect(out?.additionalContext).toContain("lint failed");
+  });
+
+  test("nothing changed, or git absent: the session settles without the table", async () => {
+    const { run, calls } = runner({ code: 1 });
+    expect(
+      await gateOnStop({ session_id: "s-1" }, ctx, {
+        run,
+        exists: lefthook,
+        changedFiles: changedFiles([]),
+      }),
+    ).toBeUndefined();
+    expect(
+      await gateOnStop({ session_id: "s-1" }, ctx, {
+        run,
+        exists: lefthook,
+        changedFiles: changedFiles(undefined),
+      }),
+    ).toBeUndefined();
+    expect(calls).toHaveLength(0);
+  });
+
+  test("the tool is not installed: told once per session, never the table", async () => {
+    const { run, calls } = runner({ missing: true, code: 127 });
+    const deps = { run, exists: lefthook, changedFiles: changedFiles(["src/a.ts"]) };
+    const first = await gateOnStop({ session_id: "s-1" }, ctx, deps);
+    expect(first?.continue).toBe(true);
+    expect(first?.additionalContext).toContain("`lefthook` is not on PATH");
+    expect(first?.additionalContext).not.toContain("\n");
+    expect(await gateOnStop({ session_id: "s-1" }, ctx, deps)).toBeUndefined();
+    expect(calls).toEqual([
+      ["lefthook", "run", "pre-commit", "--file", "src/a.ts"],
+      ["lefthook", "run", "pre-commit", "--file", "src/a.ts"],
+    ]);
+    // Another session is told too.
+    expect((await gateOnStop({ session_id: "s-2" }, ctx, deps))?.continue).toBe(true);
+  });
+});
+
 describe("tail", () => {
   test("keeps the end, which is where the errors are", () => {
     const text = Array.from({ length: 100 }, (_, i) => `line ${i}`).join("\n");

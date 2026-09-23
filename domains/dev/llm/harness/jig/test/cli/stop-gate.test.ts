@@ -84,6 +84,99 @@ describe("what lets the turn end", () => {
   });
 });
 
+describe("a project with its own hooks", () => {
+  const lefthook = exists(["lefthook.yml", "tsconfig.json", "src/a.ts", "b.md"]);
+  const changedFiles = (files: readonly string[] | undefined) => {
+    const asked: string[] = [];
+    const collect = async (cwd: string) => {
+      asked.push(cwd);
+      return files;
+    };
+    return { collect, asked };
+  };
+
+  test("lefthook.yml: lefthook on the files this turn touched, not the table's tsc", async () => {
+    const { run, calls } = runner({ code: 1, stderr: "lint: src/a.ts is not formatted" });
+    const git = changedFiles(["src/a.ts", "b.md"]);
+    const out = await stopGate(payload(), { run, exists: lefthook, changedFiles: git.collect });
+
+    expect(git.asked).toEqual(["/repo"]);
+    expect(calls).toEqual([
+      ["lefthook", "run", "pre-commit", "--file", "src/a.ts", "--file", "b.md"],
+    ]);
+    const decision = blocked(out);
+    expect(decision.decision).toBe("block");
+    expect(decision.reason).toContain("lefthook run pre-commit (2 files)");
+    expect(decision.reason).toContain("is not formatted");
+    expect(decision.reason).toContain("once per turn");
+  });
+
+  test(".pre-commit-config.yaml: pre-commit --files with every touched file", async () => {
+    const { run, calls } = runner({ code: 0 });
+    await stopGate(payload(), {
+      run,
+      exists: exists([".pre-commit-config.yaml", "x.py", "y.py"]),
+      changedFiles: changedFiles(["x.py", "y.py"]).collect,
+    });
+    expect(calls).toEqual([["pre-commit", "run", "--files", "x.py", "y.py"]]);
+  });
+
+  test("nothing changed, or git absent: nothing runs and the turn ends — never the table", async () => {
+    const { run, calls } = runner({ code: 1 });
+    expect(
+      await stopGate(payload(), { run, exists: lefthook, changedFiles: changedFiles([]).collect }),
+    ).toBe("");
+    expect(
+      await stopGate(payload(), {
+        run,
+        exists: lefthook,
+        changedFiles: changedFiles(undefined).collect,
+      }),
+    ).toBe("");
+    expect(calls).toEqual([]);
+  });
+
+  test("the tool is not installed: one block telling the owner to install it, not the table", async () => {
+    const { run, calls } = runner({ missing: true, code: 127 });
+    const out = await stopGate(payload(), {
+      run,
+      exists: lefthook,
+      changedFiles: changedFiles(["src/a.ts"]).collect,
+    });
+
+    expect(calls).toEqual([["lefthook", "run", "pre-commit", "--file", "src/a.ts"]]);
+    const decision = blocked(out);
+    expect(decision.decision).toBe("block");
+    expect(decision.reason).not.toContain("\n");
+    expect(decision.reason).toContain("`lefthook` is not on PATH");
+    expect(decision.reason).toContain("`lefthook.yml`");
+    expect(decision.reason).toContain("does not substitute");
+  });
+
+  test("...and stop_hook_active is what makes that once", async () => {
+    const { run, calls } = runner({ missing: true, code: 127 });
+    expect(
+      await stopGate(payload({ stop_hook_active: true }), {
+        run,
+        exists: lefthook,
+        changedFiles: changedFiles(["src/a.ts"]).collect,
+      }),
+    ).toBe("");
+    expect(calls).toEqual([]);
+  });
+
+  test("a project without a hook config never asks git", async () => {
+    const { run } = runner({ code: 0 });
+    const git = changedFiles(["src/a.ts"]);
+    await stopGate(payload(), {
+      run,
+      exists: exists(["tsconfig.json"]),
+      changedFiles: git.collect,
+    });
+    expect(git.asked).toEqual([]);
+  });
+});
+
 describe("which check a project answers to", () => {
   test("the project's own, one per project", async () => {
     const cases: [string, string[]][] = [

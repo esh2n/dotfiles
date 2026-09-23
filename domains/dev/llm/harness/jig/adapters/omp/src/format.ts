@@ -24,10 +24,12 @@
  */
 
 import { existsSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import {
   type FormatCommand,
+  type FormatPlan,
   formatterFor as chooseFormatter,
+  formatPlanFor as choosePlan,
   projectRoot as findProjectRoot,
 } from "../../../src/domain/hooks/format";
 import { editedPaths } from "./map";
@@ -40,10 +42,20 @@ const TIMEOUT_MS = 15_000;
  * Which formatter a file gets, and where its project starts, are jig's own
  * (`src/domain/hooks/format.ts`) — shared verbatim with the Claude Code
  * PostToolUse hook, so the two harnesses cannot drift into formatting the same
- * file two different ways. Wrapped here only to bind omp's `existsSync`
- * default, which a pure module does not get to have.
+ * file two different ways. That includes the precedence of
+ * `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md`
+ * (`formatPlanFor`: the project's lefthook / pre-commit on the file first,
+ * the extension table only without one). Wrapped here only to bind omp's
+ * `existsSync` default, which a pure module does not get to have.
  */
-export type { FormatCommand };
+export type { FormatCommand, FormatPlan };
+
+export function formatPlanFor(
+  file: string,
+  exists: (p: string) => boolean = existsSync,
+): FormatPlan | undefined {
+  return choosePlan(file, exists);
+}
 
 export function projectRoot(from: string, exists: (p: string) => boolean = existsSync): string {
   return findProjectRoot(from, exists);
@@ -82,11 +94,13 @@ export async function formatOnResult(
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) continue;
     const file = isAbsolute(path) ? path : resolve(cwd, path);
     if (!exists(file)) continue;
-    const root = projectRoot(dirname(file), exists);
-    const command = formatterFor(file, root, exists);
-    if (command === undefined) continue;
-    const result = await run(command.bin, command.args, {
-      cwd: root,
+    const plan = formatPlanFor(file, exists);
+    if (plan === undefined) continue;
+    // A project hook runner that is not installed is a skip here too — the
+    // ruling forbids the table as its substitute, and the stop gate is what
+    // tells the owner; a formatter never says anything.
+    const result = await run(plan.bin, plan.args, {
+      cwd: plan.cwd,
       timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
     });
     if (!result.missing && result.code === 0) formatted.push(file);

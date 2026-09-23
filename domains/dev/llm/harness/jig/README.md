@@ -122,6 +122,11 @@ Owned, from sources:
 - `hooks` — the five of
   [`2026-09-22-hooks-five-events.md`](../rules/decisions/2026-09-22-hooks-five-events.md),
   each an absolute bun path plus an absolute path to `src/cli/jig.ts`.
+  The formatter (`post-tool-use-format`) and the gate (`stop-gate`) follow
+  [`2026-09-23-project-hooks-first-jig-table-fallback.md`](../rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md):
+  a project with `lefthook.yml` / `.lefthook.yml` / `.pre-commit-config.yaml` gets its own runner
+  (`lefthook run pre-commit --file <f>…` / `pre-commit run --files <f>…`) on the edited file and, at Stop, on the files the turn touched;
+  jig's extension and marker tables apply only to projects with no such file, and a config without its tool blocks once with "install it" instead of falling back.
 - `permissions.allow` / `permissions.deny` — projected from
   `policy/guard-rules.json` by `domain/policy/to-claude-permissions.ts`, plus
   the default permits of

@@ -51,6 +51,51 @@ describe("what gets formatted", () => {
   });
 });
 
+describe("a project with its own hooks", () => {
+  const LEFTHOOK = [...PROJECT, "/repo/lefthook.yml"];
+  const PRE_COMMIT = [...PROJECT, "/repo/.pre-commit-config.yaml"];
+
+  test("lefthook.yml: lefthook on that file, from the config's root, not the table's biome", async () => {
+    const { run, calls } = runner();
+    const runIn: string[] = [];
+    const spy: Runner = (bin, args, options) => {
+      runIn.push(options.cwd);
+      return run(bin, args, options);
+    };
+    const formatted = await postToolUseFormat(payload(), { run: spy, exists: exists(LEFTHOOK) });
+
+    expect(formatted).toBe("/repo/src/a.ts");
+    expect(calls).toEqual([["lefthook", "run", "pre-commit", "--file", "src/a.ts"]]);
+    expect(runIn).toEqual(["/repo"]);
+  });
+
+  test(".pre-commit-config.yaml: pre-commit on that file", async () => {
+    const { run, calls } = runner();
+    await postToolUseFormat(payload(), { run, exists: exists(PRE_COMMIT) });
+    expect(calls).toEqual([["pre-commit", "run", "--files", "src/a.ts"]]);
+  });
+
+  test("the tool is not installed: silent, a debug line, and NO fallback to the table", async () => {
+    const { run, calls } = runner({ missing: true, code: 127 });
+    const debug: string[] = [];
+    const logger = {
+      debug: (message: string) => debug.push(message),
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    };
+    const formatted = await postToolUseFormat(payload(), {
+      run,
+      exists: exists(LEFTHOOK),
+      logger,
+    });
+
+    expect(formatted).toBeUndefined();
+    expect(calls).toEqual([["lefthook", "run", "pre-commit", "--file", "src/a.ts"]]);
+    expect(debug).toEqual(["format.project-tool-missing"]);
+  });
+});
+
 describe("what is skipped, silently", () => {
   test("Bash — it names no file, so the formatter has nothing to do", async () => {
     const { run, calls } = runner();

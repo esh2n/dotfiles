@@ -28,8 +28,15 @@ import type { OmpExtensionApi } from "./omp";
 import { recordSession } from "./session";
 
 export { guardToolCall } from "./guard";
-export { formatOnResult, formatterFor, projectRoot } from "./format";
-export { MAX_CONTINUATIONS, gateCommandFor, gateOnStop, resetGate, tail } from "./gate";
+export { formatOnResult, formatPlanFor, formatterFor, projectRoot } from "./format";
+export {
+  MAX_CONTINUATIONS,
+  gateCommandFor,
+  gateOnStop,
+  gatePlanFor,
+  resetGate,
+  tail,
+} from "./gate";
 export { canonicalMcpName, editedPaths, hashlineOperations, mapToolCall } from "./map";
 export { recordSession, sessionRecordOf } from "./session";
 

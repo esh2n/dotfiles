@@ -5,16 +5,29 @@
  * 編集したファイルだけ、無音。The "edited file only, never the tree" part is
  * enforced by shape — every function here takes a single file.
  *
+ * `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md` puts
+ * one branch in front of all of that: a project with its own hook runner
+ * (`lefthook.yml` / `.lefthook.yml` / `.pre-commit-config.yaml`) gets that
+ * runner on the edited file, and the extension table below is only for
+ * projects with none. `formatPlanFor` is that precedence; `formatterFor` is
+ * the table alone.
+ *
  * Pure: `exists` is injected, nothing is executed. The harness adapters
  * (`cli/hooks/post-tool-use-format.ts` for Claude Code,
  * `adapters/omp/src/format.ts` for omp) supply the event decoding and the
  * runner; this decides only what to run.
  */
 
-import { dirname, extname, join } from "node:path";
+import { dirname, extname, join, relative } from "node:path";
+import { PROJECT_HOOK_MARKERS, projectHookCommand, projectHooksFor } from "./project-hooks";
 
-/** Where a file's project starts: the nearest ancestor with a project marker. */
+/**
+ * Where a file's project starts: the nearest ancestor with a project marker.
+ * The hook configs are markers too, so a project that has nothing but a
+ * `lefthook.yml` still has a root.
+ */
 const ROOT_MARKERS = [
+  ...PROJECT_HOOK_MARKERS,
   "package.json",
   "biome.json",
   "biome.jsonc",
@@ -88,4 +101,31 @@ export function formatterFor(
     default:
       return undefined;
   }
+}
+
+/**
+ * What formats one file, with where the answer came from: `project` is the
+ * project's own hook runner, `table` is jig's extension table. The adapters
+ * log `source`; the ruling's "never substitute" clause depends on their
+ * treating a missing `project` tool differently from a missing `table` one.
+ */
+export interface FormatPlan extends FormatCommand {
+  readonly source: "project" | "table";
+  /** The directory to run in: the hook config's, or the table's project root. */
+  readonly cwd: string;
+}
+
+/** The project's hooks on this one file if it has any, else the table. */
+export function formatPlanFor(
+  file: string,
+  exists: (path: string) => boolean,
+): FormatPlan | undefined {
+  const hooks = projectHooksFor(dirname(file), exists);
+  if (hooks !== undefined) {
+    const command = projectHookCommand(hooks, [relative(hooks.root, file)]);
+    return { source: "project", bin: command.bin, args: command.args, cwd: hooks.root };
+  }
+  const root = projectRoot(dirname(file), exists);
+  const command = formatterFor(file, root, exists);
+  return command === undefined ? undefined : { source: "table", ...command, cwd: root };
 }
