@@ -113,16 +113,20 @@ if [ "$OS" = Darwin ]; then
     local cask="$1" app="$2"
     if brew list --cask "$cask" >/dev/null 2>&1; then ok "$cask (brew)"; return; fi
     if [ -d "$app" ]; then
-      # `--adopt` only records an app whose version equals the cask's; compare
-      # first, because a doomed attempt still asks for sudo (chgrp) and shows
-      # the owner a bare "Password:" with no explanation (measured 2026-09-23).
-      local have want
+      # An app installed by hand satisfies the cask's purpose (the cask exists
+      # so a NEW machine gets the app), so it is not made brew-managed here:
+      # `brew install --cask --adopt` was tried twice on 2026-09-23 and both
+      # times asked for sudo and failed even at the cask's exact version (the
+      # in-app updater's bundle is not byte-identical to the download). The
+      # only thing checked is that the app is not older than the cask.
+      local have want newest
       have="$(defaults read "$app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || true)"
       want="$(brew info --cask --json=v2 "$cask" 2>/dev/null | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1 | tr ',' '+')"
-      if [ -n "$have" ] && [ "$have" = "$want" ] && brew install --cask --adopt "$cask" >/dev/null 2>&1; then
-        did "$cask adopted (was installed by hand, version $have)"
+      newest="$(printf '%s\n%s\n' "$have" "$want" | sort -V | tail -1)"
+      if [ -n "$have" ] && [ "$newest" = "$have" ]; then
+        ok "$cask: installed by hand, version $have (cask $want) — left unmanaged by brew"
       else
-        todo "$app is installed by hand at version ${have:-?}, the cask ($cask) is ${want:-?}: update it from inside the app, or quit it and move it to the Trash (models and settings live under ~/.lmstudio and ~/Library, not in the app); then re-run"
+        todo "$app is version ${have:-?}, older than the cask ($cask ${want:-?}): update it from inside the app, then re-run"
       fi
     else
       brew install --cask "$cask" >/dev/null 2>&1 && did "$cask installed" || todo "brew install --cask $cask failed — run it by hand to see why"
@@ -228,7 +232,7 @@ step "6. tailscale serve"
 if [ "$TS_UP" = 1 ]; then
   if [ "$ROLE" = hub ]; then
     capped 20 "$TS_BIN" serve --bg --tcp 1234 tcp://127.0.0.1:1234 >/dev/null && did "tcp:1234 → LM Studio" || todo "tailscale serve --tcp 1234 failed"
-    capped 20 "$TS_BIN" serve --bg --https=3001 127.0.0.1:3001 >/dev/null && did "https:3001 → Open WebUI" || todo "tailscale serve --https=3001 failed (HTTPS needs MagicDNS + HTTPS certificates enabled in the admin console)"
+    capped 20 "$TS_BIN" serve --bg --https=3001 127.0.0.1:3001 >/dev/null && did "https:3001 → Open WebUI" || todo "tailscale serve --https=3001 failed: enable HTTPS certificates once for the tailnet at https://login.tailscale.com/admin/dns (section \"HTTPS Certificates\" → Enable HTTPS; MagicDNS must be on; https://tailscale.com/kb/1153/enabling-https), then re-run"
   else
     capped 20 "$TS_BIN" serve --bg --tcp 4001 tcp://127.0.0.1:4001 >/dev/null && did "tcp:4001 → LiteLLM metrics" || todo "tailscale serve --tcp 4001 failed"
   fi
