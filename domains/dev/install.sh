@@ -256,7 +256,12 @@ fi
 # -----------------------------------------------------------------------------
 
 HOME_LLM_TODO=()
+HOME_LLM_ONCE=()
 hl_todo() { HOME_LLM_TODO+=("$*"); log_warn "$*"; }
+# A step this script can neither do nor verify (admin console, another
+# device): listed under its own heading, once, so it is not mistaken for a
+# failure of this run. Done it before? Then it is nothing to act on.
+hl_once() { HOME_LLM_ONCE+=("$*"); }
 hl_port() { curl -sf --max-time 2 "$1" >/dev/null 2>&1; }
 hl_agent_loaded() { launchctl print "gui/$(id -u)/$1" >/dev/null 2>&1; }
 hl_role() {
@@ -384,16 +389,16 @@ home_llm() {
     # Owner-only, no API: the tailnet policy lives in the admin console.
     # `make tailscale-acl` renders acl.hujson with this tailnet's login + IP
     # into the clipboard and opens the page (domains/dev/config/tailscale/).
-    hl_todo "tailnet policy (once per tailnet, and after editing acl.hujson): make tailscale-acl, then paste + Save"
+    hl_once "tailnet policy (once per tailnet, and after editing acl.hujson): make tailscale-acl, then paste + Save"
     # The phone is a tailnet device like any other: nothing on the Mac can
     # enrol it. (Missing from this list until 2026-09-23 — the owner found
     # the page unreachable because the phone had never joined.)
     if [[ "$role" == hub ]]; then
-        hl_todo "phone: install the Tailscale app, log in with the same account, switch it on — it must appear in 'tailscale status' — then open https://$(printf '%s' "${ts_json:-}" | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1):3001 and create the first (admin) account"
+        hl_once "phone: install the Tailscale app, log in with the same account, switch it on — it must appear in 'tailscale status' — then open https://$(printf '%s' "${ts_json:-}" | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1):3001 and create the first (admin) account"
         # Steering sessions from the phone: Orca's companion, paired by code,
         # direct over the tailnet (rules/decisions/2026-09-23-phone-steers-
         # sessions-via-orca-companion.md). Pairing is a one-time GUI step.
-        hl_todo "phone: install the Orca app, then in Orca on this Mac generate a pairing code and paste it into the app; choose the direct (LAN/Tailscale) path, not Orca Relay (https://onorca.dev/docs/mobile)"
+        hl_once "phone: install the Orca app, then in Orca on this Mac generate a pairing code and paste it into the app; choose the direct (LAN/Tailscale) path, not Orca Relay (https://onorca.dev/docs/mobile)"
     fi
 
     # Does it actually answer? One real completion per tier and the plumbing
@@ -406,8 +411,13 @@ home_llm
 
 if [[ ${#HOME_LLM_TODO[@]} -gt 0 ]]; then
     echo ""
-    log_info "Home LLM — steps left for the owner (${#HOME_LLM_TODO[@]}):"
+    log_info "Home LLM — failed this run, fix and make update again (${#HOME_LLM_TODO[@]}):"
     for line in "${HOME_LLM_TODO[@]}"; do echo "  - ${line}"; done
+fi
+if [[ ${#HOME_LLM_ONCE[@]} -gt 0 ]]; then
+    echo ""
+    log_info "Home LLM — once per tailnet / phone, not re-checked here; already done = nothing to do (${#HOME_LLM_ONCE[@]}):"
+    for line in "${HOME_LLM_ONCE[@]}"; do echo "  - ${line}"; done
 fi
 
 log_success "Dev Domain installed."

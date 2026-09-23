@@ -44,6 +44,7 @@
       ],
       "contextWindow": 1000000,
       "maxTokens": 16384,
+      "_context_source": "contextWindow 1000000 / max output 384K: DeepSeek Models & Pricing table, deepseek-flash column, CONTEXT LENGTH '1M', MAX OUTPUT 'MAXIMUM: 384K' (https://api-docs.deepseek.com/quick_start/pricing, read 2026-09-24). maxTokens 16384 is a deliberate cap below that maximum.",
       "compat": {
         "thinkingFormat": "deepseek"
       },
@@ -79,6 +80,7 @@
       ],
       "contextWindow": 1000000,
       "maxTokens": 32768,
+      "_context_source": "contextWindow 1000000 / max output 384K: same table, deepseek-v4-pro column, CONTEXT LENGTH '1M', MAX OUTPUT 'MAXIMUM: 384K' (https://api-docs.deepseek.com/quick_start/pricing, read 2026-09-24).",
       "compat": {
         "thinkingFormat": "deepseek"
       },
@@ -105,6 +107,7 @@
       ],
       "contextWindow": 131072,
       "maxTokens": 32768,
+      "_context_source": "contextWindow 131072 is the window LM Studio loads qwen3.8-27b with — NOT a model constant. litellm/check.sh prints the loaded context length (LM Studio REST v0 loaded_context_length); if it is lower, this value must follow it, or the tier overflows silently. [unverified against the live load as of 2026-09-24]",
       "compat": {
         "thinkingFormat": "qwen-chat-template",
         "supportsReasoningEffort": false
