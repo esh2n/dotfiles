@@ -66,18 +66,18 @@
       "name": "playwright",
       "transport": "stdio",
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@0.0.32"],
+      "args": ["-y", "@playwright/mcp@0.0.82"],
       "env": {},
       "targets": { "claude": false, "codex": true, "omp": true, "pi": true, "dsh": false },
-      "_comment": "claude=false on purpose: Claude Code has claude-in-chrome natively. dsh=false because dsh loads MCP schemas eagerly into every request, so it gets only serena, codebase-memory and context7."
+      "_comment": "claude=false on purpose: Claude Code has claude-in-chrome natively. dsh=false because dsh loads MCP schemas eagerly into every request, so it gets only serena, codebase-memory and context7. Pin bumped 0.0.32 (2025-07) → 0.0.82 on 2026-09-23: pi-mcp-adapter 2.37.0 rejected 0.0.32's tools/list (every inputSchema.type failed 'expected object'); 0.0.82 is the registry's latest (https://registry.npmjs.org/@playwright%2Fmcp)."
     },
     {
       "name": "figma-remote",
       "transport": "http",
       "url": "https://mcp.figma.com/mcp",
       "env": {},
-      "targets": { "claude": true, "codex": true, "omp": true, "pi": true, "dsh": false },
-      "_comment": "Kept: there is design work to receive. figma-desktop was dropped by the same decision."
+      "targets": { "claude": true, "codex": true, "omp": true, "pi": false, "dsh": false },
+      "_comment": "Kept: there is design work to receive. figma-desktop was dropped by the same decision. pi=false since 2026-09-23: Figma's remote MCP needs a pre-registered OAuth client — pi-mcp-adapter's Dynamic Client Registration is refused (HTTP 403), measured; Claude Code and Codex run their own OAuth flow."
     },
     {
       "name": "notion-mcp",
