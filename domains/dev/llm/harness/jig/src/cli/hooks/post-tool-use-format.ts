@@ -27,13 +27,22 @@
  * and does NOT fall back to the table; the Stop gate is what tells the owner.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
-import { formatPlanFor } from "../../domain/hooks/format";
+import { type ReadText, formatPlanFor } from "../../domain/hooks/format";
 import type { Runner } from "../../domain/hooks/run";
 import type { Logger } from "../../domain/ports";
 
 const TIMEOUT_MS = 15_000;
+
+/** `package.json` / `Cargo.toml` text for the table's config lookups; unreadable is "no text". */
+const readTextSync: ReadText = (path) => {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return undefined;
+  }
+};
 
 /** The PostToolUse payload, as far as this hook reads it — every field checked. */
 interface PostToolUsePayload {
@@ -49,6 +58,8 @@ const EDIT_TOOLS = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit"]);
 export interface FormatHookDeps {
   readonly run: Runner;
   readonly exists?: (path: string) => boolean;
+  /** For the table's `package.json` (stylelint) and `Cargo.toml` (edition) lookups. */
+  readonly readText?: ReadText;
   readonly timeoutMs?: number;
   readonly logger?: Logger;
 }
@@ -100,7 +111,7 @@ export async function postToolUseFormat(
   const file = isAbsolute(named) ? named : resolve(cwd, named);
   if (!exists(file)) return undefined;
 
-  const plan = formatPlanFor(file, exists);
+  const plan = formatPlanFor(file, exists, deps.readText ?? readTextSync);
   if (plan === undefined) return undefined;
   const { source, bin } = plan;
 

@@ -28,8 +28,8 @@ describe("the fallback and the policy fragment are the same decision, twice", ()
   });
 });
 
-describe("the decision's three kinds, and nothing broader", () => {
-  test("git commit, git push, and four test runners", () => {
+describe("the decision's three kinds plus the static checks, and nothing broader", () => {
+  test("git commit, git push, four test runners, and the four static checks the hooks never run", () => {
     expect(DEFAULT_PERMITS.map((permit) => permit.rule)).toEqual([
       "Bash(git commit *)",
       "Bash(git push *)",
@@ -37,7 +37,31 @@ describe("the decision's three kinds, and nothing broader", () => {
       "Bash(go test *)",
       "Bash(pytest *)",
       "Bash(bun test *)",
+      "Bash(staticcheck *)",
+      "Bash(cargo clippy *)",
+      "Bash(stylelint *)",
+      "Bash(html-validate *)",
     ]);
+  });
+
+  test("each static-check permit names the ruling that keeps it out of the hooks", () => {
+    const ruling = "2026-09-23-hooks-carry-formatters-only-stylelint-added";
+    const checks = DEFAULT_PERMITS.filter((permit) =>
+      [
+        "permit-staticcheck",
+        "permit-cargo-clippy",
+        "permit-stylelint",
+        "permit-html-validate",
+      ].includes(permit.policyRule.id),
+    );
+    expect(checks).toHaveLength(4);
+    for (const permit of checks) expect(permit.policyRule.why).toContain(ruling);
+  });
+
+  test("cargo clippy is the subcommand, not cargo as a whole", () => {
+    const clippy = DEFAULT_PERMITS.find((permit) => permit.policyRule.id === "permit-cargo-clippy");
+    expect(clippy?.policyRule.subject).toEqual({ program: "cargo", argv: "^clippy\\b" });
+    expect(DEFAULT_PERMITS.map((permit) => permit.rule)).not.toContain("Bash(cargo *)");
   });
 
   test("no broad shape: no bare interpreter, no package-manager run, no Bash(*)", () => {

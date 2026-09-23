@@ -127,6 +127,11 @@ Owned, from sources:
   a project with `lefthook.yml` / `.lefthook.yml` / `.pre-commit-config.yaml` gets its own runner
   (`lefthook run pre-commit --file <f>…` / `pre-commit run --files <f>…`) on the edited file and, at Stop, on the files the turn touched;
   jig's extension and marker tables apply only to projects with no such file, and a config without its tool blocks once with "install it" instead of falling back.
+  Per [`2026-09-23-hooks-carry-formatters-only-stylelint-added.md`](../rules/decisions/2026-09-23-hooks-carry-formatters-only-stylelint-added.md)
+  the table runs formatters only: `.css .scss .sass .less` get `stylelint --fix <f>` when the project has a stylelint config
+  (`stylelint.config.{js,mjs,cjs}`, `.stylelintrc{,.js,.mjs,.cjs,.yml,.yaml,.json}`, or a `stylelint` key in `package.json`); `.css` falls to biome / prettier only without one, and the preprocessor extensions to nothing.
+  `.rs` gets bare `rustfmt <f>` when a `rustfmt.toml` / `.rustfmt.toml` exists (rustfmt's own edition lookup), else `--edition` from the root `Cargo.toml`'s `[package]`, else `--edition 2021`.
+  staticcheck, cargo clippy, `go test -race` and html-validate are never hooks: they are default permits (below) and one `rules/common` line.
 - `permissions.allow` / `permissions.deny` — projected from
   `policy/guard-rules.json` by `domain/policy/to-claude-permissions.ts`, plus
   the default permits of

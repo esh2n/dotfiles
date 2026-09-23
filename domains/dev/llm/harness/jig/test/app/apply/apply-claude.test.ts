@@ -167,14 +167,20 @@ describe("what the composed file contains", () => {
     const permissions = settings.permissions as JsonObject;
     expect(permissions.deny).toEqual(["Bash(shutdown *)"]);
     expect(permissions.defaultMode).toBe("auto");
-    // The six default permits, and nothing from the old 71.
+    // The ten default permits (six of the allow-from-guard-permit decision,
+    // four static checks of the hooks-carry-formatters-only one), and
+    // nothing from the old 71.
     expect(permissions.allow).toEqual([
       "Bash(bun test *)",
+      "Bash(cargo clippy *)",
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(go test *)",
+      "Bash(html-validate *)",
       "Bash(npm test *)",
       "Bash(pytest *)",
+      "Bash(staticcheck *)",
+      "Bash(stylelint *)",
     ]);
 
     expect(settings.sandbox).toEqual({

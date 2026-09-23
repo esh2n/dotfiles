@@ -23,11 +23,12 @@
  * which is what the repo's own tooling checks; running both is idempotent.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import {
   type FormatCommand,
   type FormatPlan,
+  type ReadText,
   formatterFor as chooseFormatter,
   formatPlanFor as choosePlan,
   projectRoot as findProjectRoot,
@@ -37,6 +38,15 @@ import type { OmpToolResultEvent } from "./omp";
 import { type Runner, runCommand } from "./run";
 
 const TIMEOUT_MS = 15_000;
+
+/** `package.json` / `Cargo.toml` text for the table's config lookups; unreadable is "no text". */
+const readTextSync: ReadText = (path) => {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return undefined;
+  }
+};
 
 /**
  * Which formatter a file gets, and where its project starts, are jig's own
@@ -48,13 +58,14 @@ const TIMEOUT_MS = 15_000;
  * the extension table only without one). Wrapped here only to bind omp's
  * `existsSync` default, which a pure module does not get to have.
  */
-export type { FormatCommand, FormatPlan };
+export type { FormatCommand, FormatPlan, ReadText };
 
 export function formatPlanFor(
   file: string,
   exists: (p: string) => boolean = existsSync,
+  readText: ReadText = readTextSync,
 ): FormatPlan | undefined {
-  return choosePlan(file, exists);
+  return choosePlan(file, exists, readText);
 }
 
 export function projectRoot(from: string, exists: (p: string) => boolean = existsSync): string {
@@ -65,13 +76,16 @@ export function formatterFor(
   file: string,
   root: string,
   exists: (p: string) => boolean = existsSync,
+  readText: ReadText = readTextSync,
 ): FormatCommand | undefined {
-  return chooseFormatter(file, root, exists);
+  return chooseFormatter(file, root, exists, readText);
 }
 
 export interface FormatDeps {
   readonly run?: Runner;
   readonly exists?: (path: string) => boolean;
+  /** For the table's `package.json` (stylelint) and `Cargo.toml` (edition) lookups. */
+  readonly readText?: ReadText;
   readonly timeoutMs?: number;
 }
 
@@ -94,7 +108,7 @@ export async function formatOnResult(
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) continue;
     const file = isAbsolute(path) ? path : resolve(cwd, path);
     if (!exists(file)) continue;
-    const plan = formatPlanFor(file, exists);
+    const plan = formatPlanFor(file, exists, deps.readText ?? readTextSync);
     if (plan === undefined) continue;
     // A project hook runner that is not installed is a skip here too — the
     // ruling forbids the table as its substitute, and the stop gate is what

@@ -4,6 +4,7 @@
 - Use feature branches for all development
 - Follow semantic versioning for releases
 - Document breaking changes
+- Before claiming completion, run the language's static checks the project does not already run in its hooks: Go `staticcheck ./...`, Rust `cargo clippy`, CSS `stylelint`, HTML `html-validate` — and show their output
 
 ## Testing
 

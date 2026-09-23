@@ -25,6 +25,12 @@
  * Deliberately narrow. The decision's other half is「広い形(`Bash(*)`、
  * インタプリタ丸ごと、パッケージマネージャの run)は書かない」— nothing here
  * may grow into one.
+ *
+ * `rules/decisions/2026-09-23-hooks-carry-formatters-only-stylelint-added.md`
+ * adds the static checks that ruling keeps OUT of the hooks: staticcheck,
+ * cargo clippy, stylelint, html-validate (`go test` was already here). They
+ * are permits so the model can run them when `rules/common` tells it to
+ * before claiming completion — the same fragment, the same paste.
  */
 
 /** A `rules[]` entry of `policy/guard-rules.json`, as JSON. */
@@ -64,6 +70,33 @@ function testRunner(id: string, program: string, subcommand: boolean): DefaultPe
   };
 }
 
+const STATIC_CHECKS_RULING = "2026-09-23-hooks-carry-formatters-only-stylelint-added";
+
+/**
+ * A static check the hooks never run: `<program> <subcommand>`, or the bare
+ * program when the checker is its own binary.
+ */
+function staticCheck(
+  id: string,
+  program: string,
+  subcommand: string | undefined,
+  language: string,
+): DefaultPermit {
+  const command = subcommand === undefined ? program : `${program} ${subcommand}`;
+  return {
+    rule: `Bash(${command} *)`,
+    why: `${language} static check, run by the model before claiming completion, never by a hook`,
+    policyRule: {
+      id,
+      effect: "permit",
+      action: "shell.exec",
+      subject: subcommand === undefined ? { program } : { program, argv: `^${subcommand}\\b` },
+      why: `${STATIC_CHECKS_RULING}: ${command} is not wired into hooks; the model runs it before claiming completion`,
+      profiles: [...ALL_PROFILES],
+    },
+  };
+}
+
 export const DEFAULT_PERMITS: readonly DefaultPermit[] = [
   {
     rule: "Bash(git commit *)",
@@ -96,6 +129,10 @@ export const DEFAULT_PERMITS: readonly DefaultPermit[] = [
   testRunner("permit-go-test", "go", true),
   testRunner("permit-pytest", "pytest", false),
   testRunner("permit-bun-test", "bun", true),
+  staticCheck("permit-staticcheck", "staticcheck", undefined, "Go"),
+  staticCheck("permit-cargo-clippy", "cargo", "clippy", "Rust"),
+  staticCheck("permit-stylelint", "stylelint", undefined, "CSS"),
+  staticCheck("permit-html-validate", "html-validate", undefined, "HTML"),
 ];
 
 /**
