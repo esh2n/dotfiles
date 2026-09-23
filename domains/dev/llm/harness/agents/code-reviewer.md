@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Expert code review specialist. Proactively reviews code for quality, security, and maintainability. Use immediately after writing or modifying code. MUST BE USED for all code changes. 対話での単発レビュー用、多角レビューは review workflow。
+description: Expert code review specialist. Proactively reviews code for quality, security, and maintainability. Use immediately after writing or modifying code. MUST BE USED for all code changes. For one-off reviews in conversation; multi-angle review goes to the review workflow.
 tools: ["Read", "Grep", "Glob", "Bash"]
 model: sonnet
 ---

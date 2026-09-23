@@ -1,35 +1,35 @@
 ---
 name: workday-input
-description: "Chrome経由でWorkdayの勤怠入力画面に勤務時間を入力する。workday-calcで算出したデータを使用。claude --chrome で実行。"
+description: "Enter work hours into Workday's time-entry screen through Chrome, using the data computed by workday-calc. Run under claude --chrome."
 disable-model-invocation: true
 metadata:
   namespaces: [work]
 ---
 
-# Workday Input — 勤怠入力
+# Workday Input — time entry
 
-`/workday-calc` で算出・保存された勤務時間データを、Chrome ブラウザ経由で Workday の勤怠入力画面に入力する。
+Enter the work-hour data computed and saved by `/workday-calc` into Workday's time-entry screen through the Chrome browser.
 
 ## Prerequisites
 
-- `claude --chrome` で起動していること（Chrome 拡張 `Claude in Chrome` が必要）
-- Workday に SSO ログイン済みであること
-- `/workday-calc` の結果が `~/workday-reports/{YYYY}/{MM}.txt` に保存済みであること
+- Started with `claude --chrome` (the `Claude in Chrome` extension is required)
+- Already SSO-logged-in to Workday
+- `/workday-calc` results saved at `~/workday-reports/{YYYY}/{MM}.txt`
 
-## 使い方
+## Usage
 
 ```
-/workday-input              # 最新のレポートを使って入力
-/workday-input 2026-03      # 指定月のレポートを使って入力
+/workday-input              # enter using the latest report
+/workday-input 2026-03      # enter using the report for the given month
 ```
 
-## Step 1: データ読み込み
+## Step 1: Load the data
 
-`~/workday-reports/{YYYY}/{MM}.txt` を読み、入力対象の日を特定する。
+Read `~/workday-reports/{YYYY}/{MM}.txt` and identify the days to enter.
 
-ファイルがなければ「`/workday-calc` を先に実行してください」と案内して終了。
+If the file does not exist, tell the user to run `/workday-calc` first and stop.
 
-### データフォーマット
+### Data format
 
 ```
 3/2(月) 9:30-19:00 休憩12:00-13:00 リモート
@@ -37,115 +37,115 @@ metadata:
 3/4(水) 病欠(年次有給休暇・終日)
 ```
 
-## Step 2: Workday を開く
+## Step 2: Open Workday
 
-Chrome で Workday の勤怠入力画面を開く。
+Open Workday's time-entry screen in Chrome.
 
-URL は `~/.config/workday/config` の `WORKDAY_CALENDAR_URL` を使う（無ければ作成を案内して停止）。
+The URL comes from `WORKDAY_CALENDAR_URL` in `~/.config/workday/config` (if missing, tell the user to create it and stop).
 
-`tabs_context_mcp` → `tabs_create_mcp` or 既存タブで `navigate` する。
+`tabs_context_mcp` → `tabs_create_mcp` or `navigate` in an existing tab.
 
-## Step 3: 週ビューの確認
+## Step 3: Check the week view
 
-Workday は週単位で表示される。
-- ヘッダーに各日の列、時間帯が行で表示
-- `前へ` / `次へ` ボタンで週を移動
-- 対象月の最初の週に移動してから入力を開始する
+Workday displays one week at a time.
+- Header shows one column per day; time slots are rows
+- `前へ` / `次へ` buttons move between weeks
+- Move to the first week of the target month before starting entry
 
-## Step 4: 各日の入力
+## Step 4: Enter each day
 
-**各エントリの流れ(全体像)**: 空白セルをクリック → 時間タイプ「勤務時間」を選択 →
-開始/終了を入力 → 出社有無を選択 → OK → スクショでヘッダー時間数を確認。
-以下の詳細手順はこの流れの各ステップを画面状態で確認しながら進めるためのもの。
+**Flow per entry (overview)**: click an empty cell → select time type 「勤務時間」 →
+enter start/end → select office/remote → OK → screenshot and check the header hours.
+The detailed steps below walk through this flow while verifying the screen state at each step.
 
-### 事前チェック
+### Pre-check
 
-workday-calcの出力ファイルが存在し、対象期間のデータが揃っていることを確認してから開始する。
-無ければ先に workday-calc を実行するようユーザーに伝えて停止する。
+Confirm the workday-calc output file exists and covers the target period before starting.
+If not, tell the user to run workday-calc first and stop.
 
-### 重要: 入力確認ルール
+### Important: entry verification rule
 
-**各エントリの OK を押した後、必ずスクショを撮ってヘッダーの時間数を確認すること。**
-確認せずに次の日に進むと、入力漏れに気づけない。
+**After pressing OK on every entry, take a screenshot and check the header hours.**
+Moving on to the next day without checking hides missed entries.
 
-- OK 後 → wait 2秒 → screenshot → ヘッダーの `時間: X` が期待値か確認 → OK なら次へ
-- 期待値と異なる場合は、そのエントリをクリックして内容を確認・修正
+- After OK → wait 2 seconds → screenshot → check the header `時間: X` is the expected value → if OK, next
+- If it differs from the expected value, click that entry to inspect and fix it
 
-### 通常日（2エントリ）
+### Regular day (2 entries)
 
-1日の勤務時間を **休憩で分割して2エントリ** で入力する。
+Enter one day's work hours as **2 entries split at the break**.
 
-**エントリ1（午前）**:
-1. 対象日のカレンダー **空白セル**（既存エントリがないエリア）をクリック → 「時間の入力」ダイアログが開く
-   - ⚠️ 既存エントリ（勤務時間ブロック等）をクリックすると編集/詳細画面が開くので注意
-   - ⚠️ ヘッダー行（欠勤日数等）をクリックすると「時間ブロック」詳細が開くので注意
-   - 空白セルをクリックすると「時間の入力」ダイアログ（時間タイプ未選択、時間:0）が開く
-2. 時間タイプ選択:
-   a. リストアイコン（≡）をクリック → カテゴリリストが展開
-   b. 「時間エントリ コード」をクリック → サブリストが展開
-   c. 「勤務時間」のラジオボタンをクリック
-   d. → フォームに「開始」「終了」「終了理由」「出社有無」フィールドが表示される
-   e. ⚠️ 表示されない場合、時間タイプの選択が失敗している。スクショで確認すること
-3. 開始: 開始フィールドをクリック → `{start_time}` を入力（例: 9:30）
-4. 終了: 終了フィールドをクリック → `12:00` を入力
-5. 終了理由: 「終了」のまま（デフォルト）
-6. 時間数: 自動計算される（例: 2.5）— **スクショで確認**
-7. 出社有無:
-   a. リストアイコン（≡）をクリック
-   b. 「出社有無」をクリック → サブリストが展開
-   c. 値を選択（1.出社 / 3.在宅）
-8. OK を押して保存
-9. **wait 2秒 → screenshot → ヘッダーの時間数を確認**
+**Entry 1 (morning)**:
+1. Click an **empty cell** on the target day's calendar (an area with no existing entry) → the 「時間の入力」 dialog opens
+   - ⚠️ Clicking an existing entry (a work-hours block etc.) opens the edit/detail screen — avoid it
+   - ⚠️ Clicking the header row (absence days etc.) opens the "time block" detail — avoid it
+   - Clicking an empty cell opens the 「時間の入力」 dialog (time type unselected, hours: 0)
+2. Select the time type:
+   a. Click the list icon (≡) → the category list expands
+   b. Click 「時間エントリ コード」 → the sub-list expands
+   c. Click the 「勤務時間」 radio button
+   d. → The form now shows the fields 「開始」「終了」「終了理由」「出社有無」
+   e. ⚠️ If they do not appear, the time-type selection failed. Verify with a screenshot
+3. Start: click the start field → enter `{start_time}` (e.g. 9:30)
+4. End: click the end field → enter `12:00`
+5. End reason: leave as 「終了」 (default)
+6. Hours: computed automatically (e.g. 2.5) — **verify with a screenshot**
+7. Office/remote:
+   a. Click the list icon (≡)
+   b. Click 「出社有無」 → the sub-list expands
+   c. Pick the value (1.出社 / 3.在宅)
+8. Press OK to save
+9. **wait 2 seconds → screenshot → check the header hours**
 
-**エントリ2（午後）**:
-1. 同じ日のカレンダー **空白セル**（午前エントリの下、13時あたり）をクリック
-   - ⚠️ 午前エントリのブロックをクリックしないよう注意
-2. 同様に時間タイプ「勤務時間」を選択（手順は午前と同じ）
-3. 開始: `13:00`
-4. 終了: `{end_time}` を入力（例: 19:00）
-5. 出社有無: エントリ1と同じ値
-6. OK を押して保存
-7. **wait 2秒 → screenshot → ヘッダーの時間数が 8.5（通常日）か確認**
+**Entry 2 (afternoon)**:
+1. Click an **empty cell** on the same day (below the morning entry, around 13:00)
+   - ⚠️ Do not click the morning entry's block
+2. Select time type 「勤務時間」 the same way (same steps as the morning)
+3. Start: `13:00`
+4. End: enter `{end_time}` (e.g. 19:00)
+5. Office/remote: same value as entry 1
+6. Press OK to save
+7. **wait 2 seconds → screenshot → check the header hours read 8.5 (regular day)**
 
-### 出社有無の値
+### Office/remote values
 
-| データの勤務地 | 選択する値 |
+| Location in data | Value to select |
 |-------------|----------|
 | 出社 | 1.出社 |
 | リモート | 3.在宅 |
 | 出張 | 2.出張/直行直帰 |
 
-### 特殊日の入力
+### Special days
 
-**午後半休（例: 9:30-13:00）**:
-- エントリ1のみ: start〜13:00、出社有無を設定
+**Afternoon half-day off (e.g. 9:30-13:00)**:
+- Entry 1 only: start–13:00, set office/remote
 
-**午前半休（例: 13:00-19:00）**:
-- エントリ1のみ: 13:00〜end、出社有無を設定
+**Morning half-day off (e.g. 13:00-19:00)**:
+- Entry 1 only: 13:00–end, set office/remote
 
-**病欠・休暇**:
-- 勤務時間の入力は不要（有給申請が済んでいればスキップ）
+**Sick leave / vacation**:
+- No work-hours entry needed (skip if the leave request is already filed)
 
-**深夜残業（例: 9:30-23:45）**:
-- エントリ1: start〜12:00
-- エントリ2: 13:00〜end
+**Late-night overtime (e.g. 9:30-23:45)**:
+- Entry 1: start–12:00
+- Entry 2: 13:00–end
 
-### 週の切り替え
+### Switching weeks
 
-1週間分の入力が終わったら `次へ` ボタンで次の週に移動。
+After finishing one week, press `次へ` to move to the next week.
 
-## Step 5: 入力後の確認
+## Step 5: Post-entry check
 
-全日の入力完了後:
-1. サマリーの「総労働時間」が想定値と一致するか確認
-2. 「レビュー」ボタンは **ユーザーの明示的な許可を得てから** 押す
+After all days are entered:
+1. Check that the summary's 「総労働時間」 matches the expected total
+2. Press the 「レビュー」 button **only with the user's explicit permission**
 
-## 操作の注意点
+## Operating notes
 
-- **毎回スクショ確認**: OK 後は必ず screenshot で結果を検証。ブラインド操作で次に進まない
-- **クリック位置**: 空白セルと既存エントリの区別が重要。既存エントリをクリックすると編集画面が開く
-- **エントリの修正**: 既存エントリをクリック → 値を変更 → OK（**削除は避ける**）
-- **時間タイプ選択の確認**: 「勤務時間」を選ぶとフォームに「開始」「終了」「終了理由」「出社有無」が表示される。これが表示されてなければ選択失敗
-- **出社有無の選択肢**: 1.出社 / 2.出張/直行直帰 / 3.在宅
-- **既入力日のスキップ**: ヘッダーの時間 > 0 の日は入力済み。スキップ
-- **週の切り替え後**: screenshot で週の日付とヘッダーの時間数を確認してから入力開始
+- **Screenshot every time**: always verify with a screenshot after OK. Never proceed blind
+- **Click position**: telling empty cells from existing entries matters. Clicking an existing entry opens the edit screen
+- **Fixing an entry**: click the existing entry → change values → OK (**avoid deleting**)
+- **Confirming the time-type selection**: choosing 「勤務時間」 shows 「開始」「終了」「終了理由」「出社有無」 on the form. If they are not shown, the selection failed
+- **Office/remote options**: 1.出社 / 2.出張/直行直帰 / 3.在宅
+- **Skip already-entered days**: a day whose header hours > 0 is already entered. Skip it
+- **After switching weeks**: screenshot to confirm the week's dates and header hours before entering

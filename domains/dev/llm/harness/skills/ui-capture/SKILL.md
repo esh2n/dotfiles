@@ -9,189 +9,191 @@ metadata:
 
 ## Overview
 
-ui-capture は web UI を headless Chromium で操作して PNG / GIF を書き出す実行体
-(`bin/capture.mjs`)だけを持つ。責務の切り分けは明確: **アプリの起動手段を
-決めるのは呼び出し元のプロジェクト**(dev サーバ、モックバックエンド、
-フィクスチャの用意)、**ブラウザを操作してエンコードするのはこのスキル**。
+ui-capture holds only one executable (`bin/capture.mjs`), which drives a web UI
+in headless Chromium and writes PNG / GIF. The split of responsibilities is
+clear: **the calling project decides how the app is launched** (dev server, mock
+backend, fixtures); **this skill drives the browser and encodes**.
 
-起動手段の渡し方は2通り: `--url` に既に動いている URL を渡すか、
-プロジェクトの `.ui-capture.json` マニフェストで起動コマンドを宣言して
-capture.mjs 自身に立ち上げさせるか。どちらの場合も **起動コマンドを
-capture.mjs や呼び出しエージェントが推測しない** — マニフェストが無く
-`--url` も無ければ、起動を試みずに exit 2 で「起動手段なし」と報告して
-止まる。
+There are 2 ways to hand over the launch: pass an already running URL with
+`--url`, or declare the launch command in the project's `.ui-capture.json`
+manifest and let capture.mjs start it itself. In both cases **neither
+capture.mjs nor the calling agent guesses the launch command** — with no
+manifest and no `--url`, it does not attempt a launch; it reports "no launch
+method" and stops with exit 2.
 
-対象は web UI(Playwright で headless に撮れるもの)に限る。ネイティブ
-macOS アプリ(Tauri のパレット、Swift Core 等)は AppKit / Accessibility が要り
-対象外 — そもそも起動すると esh2n の画面を奪う。
+Only web UIs (anything Playwright can capture headlessly) are in scope. Native
+macOS apps (a Tauri palette, Swift Core, etc.) need AppKit / Accessibility and
+are out of scope — launching them steals esh2n's screen anyway.
 
 ## Zero-dependency rule
 
-このスキル自身は `node_modules` を持たない。追加インストールはスキルの
-外(マシン共有の1箇所)で完結させる。
+This skill has no `node_modules` of its own. Any extra install lives outside
+the skill (one machine-shared place).
 
-- **playwright** は3段階で解決する(この順)。
-  1. 呼び出し元プロジェクトの `node_modules`
+- **playwright** resolves in 3 stages (in this order).
+  1. The calling project's `node_modules`
      (`require.resolve('playwright', { paths: [process.cwd()] })`) —
-     プロジェクトが自分の版を固定しているなら常にそれを優先する
-  2. `$UI_CAPTURE_PLAYWRIGHT=/path/to/node_modules/playwright` — 明示指定
-     (テストや、node_modules から辿れない配置向け)
-  3. 共有インストール `~/.local/share/ui-capture/node_modules/playwright`
-     — `bin/setup.mjs` がマシンごとに一度用意する(次節)。Go・Swift 等
-     Node を持たないプロダクトの最後の手段。使うときは
-     `PLAYWRIGHT_BROWSERS_PATH` を同ディレクトリ内の `browsers/` に固定
-     してから import する(npm 本体と Chromium の版を一致させるため)
-  どれも解決できなければ exit 3(playwright not found)で、`bin/setup.mjs`
-  を指す明示エラーとともに落ちる。
-- **ffmpeg** は PATH 上のものを使う(WebM → GIF の 2 パス変換
-  `palettegen`/`paletteuse`)。無ければ GIF は静かに失敗させず、要約 JSON に
-  `gif: { status: "skipped", reason: "ffmpeg not found on PATH" }` を出して
-  exit 0 で終える(PNG は撮れているので致命ではない)。
+     always prefer the version the project pins, when it has one
+  2. `$UI_CAPTURE_PLAYWRIGHT=/path/to/node_modules/playwright` — explicit
+     (for tests, or layouts not reachable from node_modules)
+  3. The shared install `~/.local/share/ui-capture/node_modules/playwright`
+     — set up once per machine by `bin/setup.mjs` (next section). The last
+     resort for products without Node (Go, Swift, etc.). When used, pin
+     `PLAYWRIGHT_BROWSERS_PATH` to `browsers/` inside the same directory
+     before importing (so the npm package and Chromium versions match)
+  If none resolves, fail with exit 3 (playwright not found) and an explicit
+  error pointing at `bin/setup.mjs`.
+- **ffmpeg** is taken from PATH (the 2-pass WebM → GIF conversion,
+  `palettegen`/`paletteuse`). If absent, do not let the GIF fail silently:
+  emit `gif: { status: "skipped", reason: "ffmpeg not found on PATH" }` in the
+  summary JSON and exit 0 (the PNGs were captured, so it is not fatal).
 
-## 初期設定(マシンごとに一度)
+## Initial setup (once per machine)
 
-Node でないプロダクトでも撮れるようにするには、マシンごとに一度だけ:
+To capture from non-Node products as well, once per machine:
 
 ```bash
 node "$SELF/bin/setup.mjs"
 ```
 
-`~/.local/share/ui-capture/` に playwright(1.61.1 固定)と Chromium
-(同ディレクトリ内の `browsers/`)を揃える。npm 本体と Chromium の版は
-必ず一致していなければならないので、両方をこの1ディレクトリに閉じて
-setup.mjs だけが書き換える(nix との二重管理はしない — ui-capture の設計
-決定点2)。冪等 — 既に同じ版が入っていれば何もダウンロードし直さない。
-setup 時に使った node の絶対パスと版を `~/.local/share/ui-capture/
-meta.json` に記録する(次節の理由で使う)。
+This installs playwright (pinned 1.61.1) and Chromium (in `browsers/` inside
+the same directory) under `~/.local/share/ui-capture/`. The npm package and
+Chromium versions must always match, so both are confined to this one
+directory and only setup.mjs rewrites it (no double management with nix —
+ui-capture design decision point 2). Idempotent — if the same version is
+already present, nothing is downloaded again. The absolute path and version of
+the node used at setup are recorded in `~/.local/share/ui-capture/meta.json`
+(used for the reason in the next section).
 
-`--upgrade` で版を固定したまま再インストール、`--upgrade --playwright
-<version>` で版を上げて再インストールする(`--playwright` 単独では使えない
-— 誤って野良の版を入れないため)。npm が無い、または Node が22未満なら
-明確なメッセージで落ちる(それぞれ exit 7、exit 6)。
+`--upgrade` reinstalls at the pinned version; `--upgrade --playwright
+<version>` bumps the version and reinstalls (`--playwright` alone is not
+allowed — to avoid installing a stray version by mistake). Without npm, or with
+Node below 22, it fails with a clear message (exit 7 and exit 6 respectively).
 
-Node がプロジェクトになく共有インストールも使わないプロダクト(このスキル
-自身の開発を含む)では setup.mjs は不要 — `--url` か、プロジェクト自身の
-`node_modules` の playwright で足りる。
+For products that have no Node in the project and do not use the shared
+install (including developing this skill itself), setup.mjs is unnecessary —
+`--url`, or the playwright in the project's own `node_modules`, suffices.
 
-## Node の版(`bin/ui-capture` 経由での実行を推奨)
+## Node version (run through `bin/ui-capture`, recommended)
 
-mise は cwd でツールの版を切り替える。古い Node(Playwright がサポートする
-下限は22)を pin した repo の中で `.ui-capture.json` から起動して撮影する
-と、capture.mjs 自身もその古い Node で走ってしまいかねない — アプリの
-dev サーバと撮影プロセスは別プロセスなので結合はしないが、
-**capture.mjs を実行する Node の版**だけは効く。
+mise switches tool versions by cwd. Launching a capture from `.ui-capture.json`
+inside a repo that pins an old Node (Playwright's supported floor is 22) can
+make capture.mjs itself run on that old Node — the app's dev server and the
+capture process are separate processes, so they are not coupled, but
+**the Node version running capture.mjs** does matter.
 
-これを避けるため、薄いランチャ `bin/ui-capture` を経由することを推奨する:
+To avoid this, go through the thin launcher `bin/ui-capture`:
 
 ```bash
 "$SELF/bin/ui-capture" --url http://127.0.0.1:PORT --scenario scenario.json --out ./out
 ```
 
-`bin/ui-capture` は次の順で node を解決し、それで `capture.mjs` を
-`exec` する:
+`bin/ui-capture` resolves node in this order, then `exec`s `capture.mjs`
+with it:
 
-1. `$UI_CAPTURE_NODE`(明示指定の逃げ道)
-2. `~/.local/share/ui-capture/meta.json` に記録された node(`bin/setup.mjs`
-   が setup 時に記録)
-3. `command -v node`(PATH 上のもの)
+1. `$UI_CAPTURE_NODE` (the explicit escape hatch)
+2. The node recorded in `~/.local/share/ui-capture/meta.json` (written by
+   `bin/setup.mjs` at setup)
+3. `command -v node` (whatever is on PATH)
 
-`node "$SELF/bin/capture.mjs" ...` と直接叩くことも変わらずできる —
-その場合は呼び出し元の Node がそのまま使われる(cwd が22以上を pin した
-repo なら問題ない)。capture.mjs 自身も起動時に `process.version` を検査し、
-22未満なら `bin/ui-capture` と `$UI_CAPTURE_NODE` を案内して exit 6 で
-落ちる(黙って古い Node では走らない)。
+Calling `node "$SELF/bin/capture.mjs" ...` directly still works — the caller's
+Node is used as-is (fine when cwd pins 22 or newer). capture.mjs also checks
+`process.version` at startup and, below 22, points at `bin/ui-capture` and
+`$UI_CAPTURE_NODE` and exits 6 (it never silently runs on an old Node).
 
-## 手順
+## Procedure
 
-### 1. プロジェクトの起動方法を見つける
+### 1. Find how the project launches
 
-まず「このプロジェクトは web UI をどう起動するか」を探す:
+First look for "how does this project start its web UI":
 
-- プロジェクト自身のスキル(`<repo>/.claude/skills/` 等)
-- mise task / package.json script(`mise run dev`、`pnpm dev` 等)
-- 既存の検収・品質ゲートスクリプトが使っている起動子(arekore の例:
-  `apps/viewer/test/quality/mock-daemon.ts` + `serve.ts` — production build
-  した `dist/` をモックデーモン付きで静的配信する。同じ helper を import
-  して `site.url` を得ればよい)
+- The project's own skills (`<repo>/.claude/skills/` etc.)
+- mise tasks / package.json scripts (`mise run dev`, `pnpm dev`, etc.)
+- The launcher used by existing acceptance / quality-gate scripts (arekore
+  example: `apps/viewer/test/quality/mock-daemon.ts` + `serve.ts` — serves the
+  production-built `dist/` statically with a mock daemon. Import the same
+  helper and take `site.url`)
 
-見つけたら、どちらかの経路で capture.mjs に渡す。**新しい起動方法を自作
-しない** — 既にあるものを再利用する。
+Once found, hand it to capture.mjs by one of the two routes. **Do not invent
+a new launch method** — reuse what exists.
 
-**経路 A — 自分で起動して `--url` を渡す。** 見つけた起動子を
-**バックグラウンドで自分が起動し**、得た URL を `--url` に渡す。1回限りの
-撮影、既に起動済みのアプリを撮る場合、起動子がスクリプトから呼びにくい
-形(対話 CLI 等)のときに向く。
+**Route A — launch it yourself and pass `--url`.** Start the launcher you found
+**yourself, in the background**, and pass the resulting URL as `--url`. Suited
+to one-off captures, an app that is already running, or a launcher that is
+awkward to call from a script (an interactive CLI, etc.).
 
-**経路 B — `.ui-capture.json` マニフェストを書き、capture.mjs 自身に
-起動させる。** `node "$SELF/bin/capture.mjs" init` で雛形を作れる(見つけた
-`dev`/`start`/`serve` スクリプトを候補提示し、最有力を埋める。実行はしない
-— `url`/`ready` は手で確認して埋める)。プロジェクトのルートに1度だけ
-書けば、以後は capture.mjs が起動から後始末まで面倒を見る(「起動する側」
-も「片付ける側」も自分でやる)。書式は次の節。プロジェクトに
-`.ui-capture.json` が無く、`--url` も渡されなければ、capture.mjs は起動を推測せず
-`起動手段なし: --url か .ui-capture.json を用意する` で exit 2 する —
-これは意図した挙動で、回避しようとせずプロジェクト側にマニフェストを
-足す。
+**Route B — write a `.ui-capture.json` manifest and let capture.mjs launch.**
+`node "$SELF/bin/capture.mjs" init` scaffolds one (it proposes the
+`dev`/`start`/`serve` scripts it found and fills in the best candidate; it
+runs nothing — `url`/`ready` are checked and filled by hand). Written once at
+the project root, capture.mjs handles launch through cleanup from then on (it
+is both "the one who starts" and "the one who tidies up"). Format in the next
+section. When the project has no `.ui-capture.json` and no `--url` is passed,
+capture.mjs guesses nothing and exits 2 with
+`起動手段なし: --url か .ui-capture.json を用意する` — this is intended; do not
+work around it, add the manifest on the project side.
 
-SAFETY: `headless: false` は絶対に渡さない。`open`、`osascript`、ブラウザの
-実ウィンドウを開くものは一切使わない。ここは capture.mjs 側で強制済み
-(常に `chromium.launch()` を引数なしで呼ぶ)だが、起動子側(経路 A の
-自作起動コード、経路 B の `launch` コマンド)でも同じ規律を守ること。
+SAFETY: never pass `headless: false`. Never use `open`, `osascript`, or
+anything that opens a real browser window. capture.mjs enforces this (it
+always calls `chromium.launch()` with no arguments), but the launcher side
+(route A's self-written launch code, route B's `launch` command) must keep the
+same discipline.
 
-### 2. シナリオファイルを書く(JSON — zero-dep のため YAML ではなく JSON)
+### 2. Write the scenario file (JSON — JSON rather than YAML, for zero-dep)
 
-下記フォーマットのファイルを書き、`--scenario` に渡す。
+Write a file in the format below and pass it with `--scenario`.
 
-### 3. capture.mjs を実行する
+### 3. Run capture.mjs
 
-`bin/ui-capture` 経由を推奨する(前節「Node の版」)。`node bin/capture.mjs`
-と直接叩いても、cwd が22以上の Node を pin していれば同じ結果になる。
+Prefer `bin/ui-capture` (see "Node version" above). Calling `node bin/capture.mjs`
+directly gives the same result as long as cwd pins Node 22 or newer.
 
 ```bash
-# 経路 A(--url)
+# Route A (--url)
 "$SELF/bin/ui-capture" --url http://127.0.0.1:PORT --scenario scenario.json --out ./out
 
-# 経路 B(.ui-capture.json、--project は省略すると cwd から上へ探す)
+# Route B (.ui-capture.json; omit --project to search upward from cwd)
 "$SELF/bin/ui-capture" --project . --scenario scenario.json --out ./out
 ```
 
-主なフラグ(すべて省略可、既定値は括弧内): `--project`(`.ui-capture.json`
-を探し始めるディレクトリ。既定は cwd)、`--width`(1280)、`--height`(800)、
-`--scale`(2、`deviceScaleFactor`)、`--gif-fps`(10)、`--gif-width`(800)、
-`--theme light|dark`(`prefers-color-scheme` をエミュレート)、`--timeout`
-(5000、ms。`page.setDefaultTimeout()` に渡す既定タイムアウト — セレクタ
-待ち・クリック・`goto` など timeout を明示しないステップ全般に効く)、
-`--dry-run`(何も実行・書き出しせず、シナリオの妥当性とステップ数だけ
-確認する)。
+Main flags (all optional, defaults in parentheses): `--project` (directory to
+start searching for `.ui-capture.json`; default cwd), `--width` (1280),
+`--height` (800), `--scale` (2, `deviceScaleFactor`), `--gif-fps` (10),
+`--gif-width` (800), `--theme light|dark` (emulates `prefers-color-scheme`),
+`--timeout` (5000, ms. The default timeout passed to `page.setDefaultTimeout()`
+— applies to every step without an explicit timeout: selector waits, clicks,
+`goto`, etc.), `--dry-run` (executes and writes nothing; only checks scenario
+validity and the step count).
 
-標準出力に JSON 要約(撮ったファイル・バイト数・GIF の長さ・
-`launched`(マニフェストから自分で起動したか)・`playwright`(解決元 —
-`"project" | "env" | "shared"`)・8MB/8s 予算超過の warning)を1回だけ出す。
-`--dry-run` の要約にも `playwright` は入るが、解決できなくても dry-run 自体
-は落とさない(`null` になるだけ — シナリオの妥当性だけを見る契約のため)。
+Prints one JSON summary to stdout (files captured, byte sizes, GIF length,
+`launched` (whether it launched from the manifest itself), `playwright` (where
+it resolved — `"project" | "env" | "shared"`), warnings for exceeding the
+8MB/8s budget). The `--dry-run` summary also includes `playwright`, but a
+failed resolution does not fail the dry run itself (it is just `null` — the
+contract is to check scenario validity only).
 
-exit code: 0=成功、2=引数かシナリオが不正(`--url` も `.ui-capture.json` も
-無い場合を含む)、3=playwright が解決できない、4=ステップ実行失敗
-(どのステップ・どのセレクタで失敗したかを stderr に出す)、5=マニフェストの
-`launch` が readiness まで届かずタイムアウト(60秒)、または `launch`
-コマンド自体が起動できなかった、6=実行中の Node が22未満(`bin/ui-capture`
-か `$UI_CAPTURE_NODE` で22以上の node を使う)。
+Exit codes: 0=success, 2=invalid arguments or scenario (including neither
+`--url` nor `.ui-capture.json` present), 3=playwright cannot be resolved,
+4=step execution failed (which step and which selector go to stderr),
+5=the manifest's `launch` did not reach readiness before the timeout (60s),
+or the `launch` command itself could not start, 6=the running Node is below
+22 (use a node 22+ via `bin/ui-capture` or `$UI_CAPTURE_NODE`).
 
-### 4. writeup へ渡す
+### 4. Hand over to writeup
 
-出力を `<slug>-assets/` にコピーし、`.wu-shot` から参照する(1 figure に
-`<img>` は1枚、`alt` は必須。GIF もそのまま `<img src="x.gif">` でよい —
-ブラウザも GitHub も自動再生する。詳細は writeup-kit の
-`references/components.md` の `.wu-shot` 節)。
+Copy the output into `<slug>-assets/` and reference it from `.wu-shot` (one
+`<img>` per figure, `alt` required. A GIF works as-is via `<img src="x.gif">`
+— browsers and GitHub both autoplay it. Details in the `.wu-shot` section of
+writeup-kit's `references/components.md`).
 
-### 5. サイズ予算
+### 5. Size budget
 
-`.wu-shot` の合計は 8MB 未満、ページ全体は Artifact の上限 16MB 未満に
-収める(writeup-kit と同じ予算)。この予算に合わせて GIF の既定値は
-fps 10・width 800・目安 8 秒以内にしてある。長いフローは複数の GIF に
-分割する — 1本に詰め込まない。
+Keep the `.wu-shot` total under 8MB and the whole page under the Artifact
+limit of 16MB (the same budget as writeup-kit). The GIF defaults are set for
+this budget: fps 10, width 800, about 8 seconds. Split a long flow into
+several GIFs — do not cram it into one.
 
-## シナリオフォーマット
+## Scenario format
 
 ```json
 {
@@ -209,47 +211,48 @@ fps 10・width 800・目安 8 秒以内にしてある。長いフローは複�
 }
 ```
 
-ステップは1つずつ順に実行する。各行は次のキーのうち **ちょうど1つ**を持つ:
+Steps run one at a time, in order. Each line has **exactly one** of these keys:
 
-| キー | 意味 |
+| Key | Meaning |
 |---|---|
-| `goto` | `--url` を基点にした相対パス、または絶対 URL へ遷移 |
-| `click` | セレクタをクリック |
-| `fill` | `[セレクタ, テキスト]` — その要素に入力 |
-| `press` | `page.keyboard.press()` にそのまま渡すキー文字列(例: `Meta+KeyK`、`Escape`) |
-| `wait` | ミリ秒だけ待つ |
-| `waitFor` | セレクタが visible になるまで待つ |
-| `shot` | PNG を書き出す。名前を渡す。任意で `clip`(セレクタ)を添えるとその要素の bounding box だけ切り出す |
-| `hover` | セレクタにホバー |
+| `goto` | Navigate to a path relative to `--url`, or to an absolute URL |
+| `click` | Click the selector |
+| `fill` | `[selector, text]` — type into that element |
+| `press` | Key string passed as-is to `page.keyboard.press()` (e.g. `Meta+KeyK`, `Escape`) |
+| `wait` | Wait the given milliseconds |
+| `waitFor` | Wait until the selector becomes visible |
+| `shot` | Write a PNG. Takes a name. Optional `clip` (selector) crops to that element's bounding box |
+| `hover` | Hover over the selector |
 
-`gif` を持たせると、シナリオ全体の録画から GIF を1本書き出す。手順は次の
-4段階:
+With `gif` present, one GIF is written from a recording of the whole scenario.
+The procedure has 4 stages:
 
-1. `recordVideo` 付きでコンテキストを作る(コンテキストごと録画)
-2. 全ステップを実行する
-3. コンテキストを閉じて WebM を確定する
-4. ffmpeg の 2 パス(`palettegen`/`paletteuse`)で GIF 化する
+1. Create the context with `recordVideo` (recording per context)
+2. Run every step
+3. Close the context to finalize the WebM
+4. Convert to GIF with ffmpeg's 2 passes (`palettegen`/`paletteuse`)
 
-`gif` を省略すれば PNG だけの実行になる。
+Omit `gif` for a PNG-only run.
 
-`gif` と `shot` が同居するシナリオは、録画を汚さないためスキルが自動で
-2周実行する(録画専用の1周めは shot を飛ばし、静止画専用の2周めは動画を
-録らずに shot を撮る)。実行時間はおよそ2倍になる — アプリの再起動は
-しない。
+A scenario with both `gif` and `shot` is run in 2 passes automatically so the
+recording stays clean (the recording-only first pass skips shots; the
+still-only second pass records no video and takes the shots). Runtime roughly
+doubles — the app is not restarted.
 
-## プロジェクトマニフェスト(`.ui-capture.json`)
+## Project manifest (`.ui-capture.json`)
 
-プロジェクトのルートに1つ置く。**commit しない** — dotfiles の global
-gitignore に `.ui-capture.json` が入っているので(`.yoki.json` と同じ扱い)、
-`git status` にも出ない。checkout ごと・マシンごとに1回作る(ui-capture の
-設計 決定点1 — 案A。「repo 外に置く」対案は今回不採用: 同期されない
-`~/.config/work` では別マシンに効かず、A の運用が harness に前例済み)。
+One per project root. **Do not commit it** — `.ui-capture.json` is in the
+dotfiles global gitignore (same treatment as `.yoki.json`), so it never shows
+in `git status`. Create it once per checkout and per machine (ui-capture design
+decision point 1 — option A. The "outside the repo" alternative was rejected
+this time: an unsynced `~/.config/work` does not carry to other machines, and
+A's operation already has precedent in the harness).
 
-capture.mjs は `--project`(既定 cwd)から上へディレクトリを辿り、最初に
-見つかった `.ui-capture.json` を使う。探索は `.git`(ファイルでもディレクトリ
-でも可)のあるディレクトリで止まる — そのディレクトリ自身は調べるが、
-それより上(別リポジトリ)へは辿らない。`.git` に一度も出会わなければ、
-従来どおり filesystem root まで辿って諦める。
+capture.mjs walks upward from `--project` (default cwd) and uses the first
+`.ui-capture.json` found. The walk stops at the directory containing `.git`
+(file or directory) — that directory itself is checked, but nothing above it
+(another repository) is. If it never meets a `.git`, it walks to the
+filesystem root as before and gives up.
 
 ```json
 {
@@ -260,57 +263,57 @@ capture.mjs は `--project`(既定 cwd)から上へディレクトリを辿り�
 }
 ```
 
-| フィールド | 必須 | 意味 |
+| Field | Required | Meaning |
 |---|---|---|
-| `launch` | 必須 | シェルで実行する起動コマンド(文字列そのまま `spawn(cmd, { shell: true })`) |
-| `url` | 必須 | 起動が終わった後、シナリオが撮りに行く基点 URL |
-| `ready` | 必須 | 起動完了の判定。文字列なら `launch` の stdout/stderr にその部分文字列が出るまで待つ。`{ "http": "/path" }` なら `url + path` が HTTP 200 を返すまで待つ。どちらもタイムアウトは60秒(exit 5) |
-| `stop` | 任意 | 撮影後に実行する終了コマンド。省略時は `launch` が作ったプロセスグループへ `SIGTERM` を送る(`spawn` を `detached: true` で起動しているため、グループごと止まる) |
-| `env` | 任意 | `launch`/`stop` に追加で渡す環境変数(`process.env` に上書きマージ) |
+| `launch` | required | Launch command run in the shell (the string as-is, `spawn(cmd, { shell: true })`) |
+| `url` | required | Base URL the scenario captures against once launch is done |
+| `ready` | required | Readiness test. A string waits until that substring appears on `launch`'s stdout/stderr. `{ "http": "/path" }` waits until `url + path` returns HTTP 200. Either way the timeout is 60 seconds (exit 5) |
+| `stop` | optional | Stop command run after capture. If omitted, `SIGTERM` is sent to the process group `launch` created (spawned with `detached: true`, so the whole group stops) |
+| `env` | optional | Extra environment variables for `launch`/`stop` (merged over `process.env`) |
 
-### 雛形を作る — `capture.mjs init`
+### Scaffolding — `capture.mjs init`
 
-新しいプロジェクトで手で書く代わりに:
+Instead of writing by hand in a new project:
 
 ```bash
 node "$SELF/bin/capture.mjs" init
-# 既にあるものを書き換えるなら:
+# to overwrite an existing one:
 node "$SELF/bin/capture.mjs" init --force
 ```
 
-repo ルート(cwd から上へ `.git` を探して見つけたディレクトリ。無ければ
-exit 2)に `.ui-capture.json` の雛形を書く。**何も実行しない** — root と
-`apps/*` の `package.json` から `dev`/`start`/`serve` スクリプトを候補として
-拾い、最有力(root の `dev` を最優先)を `launch` に埋めるだけ。`url` と
-`ready` は環境依存で推測できないのでプレースホルダのまま残す — 標準出力
-の候補一覧を見て手で埋める。既に `.ui-capture.json` があれば `--force` を
-付けない限り exit 2 で止まり、上書きしない。
+Writes a `.ui-capture.json` scaffold at the repo root (the directory found by
+searching upward from cwd for `.git`; exit 2 if none). **Runs nothing** — it
+only collects `dev`/`start`/`serve` scripts from the root and `apps/*`
+`package.json` files as candidates and fills the best one (root `dev` first)
+into `launch`. `url` and `ready` are environment-dependent and cannot be
+guessed, so they stay as placeholders — fill them by hand from the candidate
+list on stdout. If `.ui-capture.json` already exists, it stops with exit 2
+and does not overwrite unless `--force` is given.
 
-capture.mjs は撮影の成功・失敗を問わず、自分が起動したプロセスを最後に
-必ず止める(`finally` で片付け、常駐プロセスを残さない)。
+Whether capture succeeds or fails, capture.mjs always stops the processes it
+started at the end (cleanup in `finally`; no lingering resident process).
 
-## よくある失敗
+## Common failures
 
-- **`--url` も `.ui-capture.json` も無いのに capture.mjs へ起動コマンドを
-  推測させようとする** — capture.mjs は起動コマンドを一切推測しない。
-  経路 A(自分で起動して `--url`)か経路 B(`.ui-capture.json` を書く)の
-  どちらかを選ぶ。exit 2「起動手段なし」が出たら、回避せずマニフェストを
-  足すか `--url` を渡す。
-- **`.ui-capture.json` の `launch` に自作の起動コマンドをその場ででっち上げる**
-  — 既存の dev サーバ・mise task・検収スクリプトの起動子をそのまま
-  `launch` に書く。プロジェクトに無い新しい起動手順を発明しない。
-- **`headless: false` にして「確認のため」画面を開く** — 絶対にしない。
-  esh2n の画面はエージェントの作業中で、奪ってはいけない。
-- **`press` に人間可読な表記(`⌘K`)をそのまま書く** — Playwright の
-  `keyboard.press()` が解釈できる文字列(`Meta+KeyK` 等)を書く。
-- **GIF が長すぎる/大きすぎる** — 1本のシナリオに複数のフローを詰め込んで
-  8 秒・8MB を超える。フローごとに `gif.name` を分けて複数回実行する。
-- **playwright が見つからないのに黙ってエラーメッセージだけ見て諦める** —
-  プロジェクトに `node_modules` が無いなら `UI_CAPTURE_PLAYWRIGHT` で明示
-  指定するか、`node bin/setup.mjs` を一度実行して共有インストールを使う。
-- **ffmpeg が無い環境で GIF 必須だと思い込む** — スキップは正常系(exit 0)。
-  PNG だけでも十分な提出物になることが多い。
-- **古い Node を pin した repo の中で `node bin/capture.mjs` を直接叩く** —
-  `bin/ui-capture` 経由なら harness の Node に固定される。直接叩くなら
-  cwd が22以上を pin していることを確認する(exit 6 が出たら
-  `bin/ui-capture` に切り替える)。
+- **Trying to make capture.mjs guess the launch command with neither `--url`
+  nor `.ui-capture.json`** — capture.mjs never guesses a launch command.
+  Choose route A (launch yourself and pass `--url`) or route B (write
+  `.ui-capture.json`). On exit 2 "no launch method", do not work around it:
+  add the manifest or pass `--url`.
+- **Improvising a launch command of your own in `.ui-capture.json`'s `launch`**
+  — put the existing dev server / mise task / acceptance-script launcher in
+  `launch` as-is. Do not invent a launch procedure the project does not have.
+- **Setting `headless: false` to open the screen "for checking"** — never.
+  esh2n's screen is in use while the agent works; do not take it.
+- **Writing a human-readable notation (`⌘K`) straight into `press`** — write
+  a string Playwright's `keyboard.press()` understands (`Meta+KeyK` etc.).
+- **GIF too long / too large** — several flows crammed into one scenario blow
+  the 8 seconds / 8MB. Give each flow its own `gif.name` and run multiple times.
+- **Giving up on "playwright not found" after just reading the error** — if the
+  project has no `node_modules`, point at it explicitly with
+  `UI_CAPTURE_PLAYWRIGHT` or run `node bin/setup.mjs` once and use the shared install.
+- **Assuming the GIF is mandatory where ffmpeg is absent** — the skip is the
+  normal path (exit 0). PNGs alone are often a sufficient deliverable.
+- **Calling `node bin/capture.mjs` directly inside a repo that pins an old Node** —
+  via `bin/ui-capture` it is pinned to the harness's Node. If calling directly,
+  confirm cwd pins 22 or newer (on exit 6, switch to `bin/ui-capture`).

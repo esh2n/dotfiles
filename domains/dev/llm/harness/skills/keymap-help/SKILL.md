@@ -1,92 +1,97 @@
 ---
 name: keymap-help
-description: "Neovimのキーバインドを調べる。「このキーなんだっけ？」「dotfilesでカスタムしたやつ何だっけ？」に答える。実行時にアクティブなdistro(lazyvim/nvchad/astrovim/custom)を自動判定し、headless nvimで全キーマップを実ダンプ、dotfilesで自作したものは★で区別。どのディレクトリからでも実行可能。nvimのキーマップ/keymap/keybinding/ショートカットを聞かれたら使う。"
+description: "Look up Neovim keybindings. Answers 「このキーなんだっけ？」 and 「dotfilesでカスタムしたやつ何だっけ？」. Detects the active distro (lazyvim/nvchad/astrovim/custom) at run time, dumps every keymap from a headless nvim, and marks the ones defined in dotfiles with ★. Runs from any directory. Use whenever the user asks about nvim keymaps, keybindings, or shortcuts."
 metadata:
   namespaces: [work]
 ---
 
-# keymap-help — Neovim キーマップヘルパー
+# keymap-help — Neovim keymap helper
 
-Neovim のキーバインドを調べるスキル。次の3つの悩みを解決する:
+A skill for looking up Neovim keybindings. It solves three problems:
 
-1. **このキーバインドなんだっけ…?** → キー or 説明で横断検索
-2. **dotfilesでカスタムしたけど忘れた…** → 自作キーだけ ★ で抽出
-3. **他のdirから参照するの面倒…** → cwd非依存。どこからでも動く
+1. **"What was this keybinding again?"** → search across keys and descriptions
+2. **"I customized this in dotfiles and forgot"** → extract only self-made keys, marked ★
+3. **"Annoying to consult from another dir"** → cwd-independent; works from anywhere
 
-## 仕組み
+## How it works
 
-- `~/.config/nvim` のシンボリックリンクから**アクティブなdistroを実行時に判定**する
-  （lazyvim / nvchad / astrovim / custom を `nvim-switch` で切替可能なため、ハードコードしない）
-- **headless nvim** を起動し `VeryLazy` を発火 → `nvim_get_keymap` で全モードの
-  キーマップを実ダンプする（framework既定 + プラグイン + 自作、500件超）。
-  leader/localleader は `<leader>` / `<localleader>` に展開して表示。
-- グローバルマップに載らない**バッファローカル/遅延登録キー**（特に `gd` `gr` `gI`
-  `gy` など LspAttach 時のみ張られる LSP 系）は、`lazy.core.config` のプラグイン
-  spec（`keys` と lspconfig の `opts.servers[*].keys`）から補完取得する。
-  4 distro とも lazy.nvim ベースなので横断的に効く。
-- **既知の穴**: treesitter-textobjects の移動キー（`]f` `[f` `]c` `]a` 等）は
-  `opts.(textobjects.)move.keys` に定義されFileType時登録のため、実ダンプにも
-  spec補完にも載らない。関数/クラス/引数への移動を聞かれて0件のときは、
-  `nvim-treesitter-textobjects` のspec（lazyvimなら
-  `~/.local/share/nvim/lazy/` 配下 or dotfilesのplugin設定）を直接読んで答える。
-- headless 起動の lua は一時ファイル経由（`luafile`）で渡し argv を極小化。
-  環境変数が肥大化したセッションでも `posix_spawn` の `E2BIG` を踏みにくくしている。
-- アクティブなdistroの**dotfiles設定ディレクトリだけ**をgrepして自作キーを特定する。
-  この配下には framework 本体（`~/.local/share/nvim`）は含まれないので、
-  ここで見つかる lhs は必然的にユーザーのカスタム → ★ で注釈。
-- ダンプ結果はdistroごとにキャッシュ（1h TTL + config変更で自動失効）。初回のみ約3秒、
-  以降 ~0.1秒。`--refresh` で強制再取得。
+- **Detects the active distro at run time** from the `~/.config/nvim` symlink
+  (lazyvim / nvchad / astrovim / custom are switchable via `nvim-switch`, so never hardcode it)
+- Starts a **headless nvim**, fires `VeryLazy`, then dumps every mode's keymaps
+  through `nvim_get_keymap` (framework defaults + plugins + custom, 500+ entries).
+  leader/localleader are shown expanded as `<leader>` / `<localleader>`.
+- **Buffer-local / lazily registered keys** that never reach the global map (notably
+  the LSP set `gd` `gr` `gI` `gy` etc., mapped only on LspAttach) are filled in from the
+  `lazy.core.config` plugin specs (`keys` and lspconfig's `opts.servers[*].keys`).
+  All 4 distros are lazy.nvim based, so this works across them.
+- **Known gap**: treesitter-textobjects motion keys (`]f` `[f` `]c` `]a` etc.) are defined
+  in `opts.(textobjects.)move.keys` and registered on FileType, so they appear in neither
+  the dump nor the spec fill-in. When asked about function/class/argument motions and
+  the search returns 0 hits, read the `nvim-treesitter-textobjects` spec directly (for
+  lazyvim: under `~/.local/share/nvim/lazy/` or the dotfiles plugin config) and answer.
+- The headless-startup lua is passed via a temp file (`luafile`) to keep argv minimal,
+  so sessions with a bloated environment are unlikely to hit `posix_spawn` `E2BIG`.
+- Greps **only the active distro's dotfiles config directory** to identify custom keys.
+  That tree does not contain the framework itself (`~/.local/share/nvim`), so any lhs
+  found there is necessarily user-defined → annotated with ★.
+- Dump results are cached per distro (1h TTL + auto-invalidated on config change). First
+  run ~3s, then ~0.1s. `--refresh` forces a fresh dump.
 
-## 使い方
+## Usage
 
-ヘルパースクリプトを実行する（**cwd不問**、絶対パスで呼ぶ）:
+Run the helper script (**cwd-independent**, call it by absolute path):
 
 ```bash
 SC="$HOME/.claude/skills/keymap-help/scripts/nvim-keymaps.sh"
-# symlink破損時はdotfiles実体にfallback
-[ -f "$SC" ] || SC="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/config/claude-profiles/personal/skills/keymap-help/scripts/nvim-keymaps.sh"
+# fall back to the dotfiles copy when the symlink is broken
+[ -f "$SC" ] || SC="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/keymap-help/scripts/nvim-keymaps.sh"
 
-bash "$SC"                    # 全キーマップ (customは★)
-bash "$SC" git                # "git" を含むlhs/説明を横断検索
-bash "$SC" find files         # 複数語はAND検索
-bash "$SC" -c                 # dotfilesでカスタムしたキーだけ
-bash "$SC" -c herdr           # 自作キーの中から "herdr" 検索
-bash "$SC" -k '<leader>ff'    # このキーの動作は？(完全一致)
-bash "$SC" -m v git           # visualモードに絞って検索
-bash "$SC" --distro           # 今どのdistroが有効か + 設定パス
-bash "$SC" --refresh          # ダンプ再取得
-bash "$SC" --raw              # TSV出力 (mode\tlhs\tdesc\tcustom) — 加工用
+bash "$SC"                    # all keymaps (custom marked ★)
+bash "$SC" git                # search lhs/description containing "git"
+bash "$SC" find files         # multiple words = AND search
+bash "$SC" -c                 # only keys customized in dotfiles
+bash "$SC" -c herdr           # search "herdr" among custom keys
+bash "$SC" -k '<leader>ff'    # what does this key do? (exact match)
+bash "$SC" -m v git           # restrict search to visual mode
+bash "$SC" --distro           # which distro is active + config path
+bash "$SC" --refresh          # re-dump
+bash "$SC" --raw              # TSV output (mode\tlhs\tdesc\tcustom) — for post-processing
 ```
 
-スクリプトが `~/.claude/skills/` 経由で見つからない場合は dotfiles 内の実体を使う:
-`domains/dev/config/claude-profiles/personal/skills/keymap-help/scripts/nvim-keymaps.sh`
+If the script is not reachable via `~/.claude/skills/`, use the copy inside dotfiles:
+`domains/dev/llm/harness/skills/keymap-help/scripts/nvim-keymaps.sh`
 
-## 応答方針（agent向け）
+## Response policy (for the agent)
 
-ユーザーが nvim のキーバインド・ショートカット・keymap について聞いたら:
+When the user asks about nvim keybindings, shortcuts, or keymaps:
 
-1. まず `nvim-keymaps.sh <query>` で調べる。「自分がカスタムしたやつ」を聞かれたら `-c`。
-   descは英語なので、日本語で聞かれたら英語キーワード（next/function/buffer等）に変換して検索。0件なら同義語（func/method/motion等）も試す。
-2. 結果をそのまま貼るのではなく、**関連するものを絞って提示**する。★付き（自作）を優先的に案内。
-3. 該当0件なら自分で `--refresh` を実行して再検索 → それでも0件なら同義語で再検索 → 最後は `--distro` が示すconfig dirのlazy specを直接調べる（上記「既知の穴」参照）。ユーザーに操作を促して終わりにしない。
-4. 出力の見方: `★` = dotfiles自作 / 列は `mode  lhs  説明`（説明が無いキーはrhsコマンドが表示される）。mode は n=normal, i=insert,
-   v=visual, x=visual-block系, o=operator, t=terminal, c=command。
+1. Run `nvim-keymaps.sh <query>` first. Use `-c` when asked about "the ones I customized".
+   Descriptions are in English, so translate a Japanese question into English keywords
+   (next/function/buffer etc.) before searching. On 0 hits, also try synonyms (func/method/motion etc.).
+2. Do not paste the raw output; **narrow it to the relevant entries**. Lead with ★ (custom) entries.
+3. On 0 hits, run `--refresh` yourself and search again → still 0, retry with synonyms → finally
+   read the lazy spec in the config dir shown by `--distro` (see "Known gap" above). Never end
+   by telling the user to run something themselves.
+4. Reading the output: `★` = custom in dotfiles / columns are `mode  lhs  description` (keys
+   without a description show the rhs command). mode: n=normal, i=insert,
+   v=visual, x=visual-block family, o=operator, t=terminal, c=command.
 
-### sandbox で spawn が失敗したときの fallback（重要）
+### Fallback when spawn fails in the sandbox (important)
 
-Bash 実行が **`E2BIG` / `posix_spawn` / sandbox 関連の spawn エラー**で失敗した場合、
-script のバグではなく **Claude Code のサンドボックスがコマンドをラップした際の argv 肥大**
-（巨大 monorepo で seatbelt プロファイルが膨れる）が原因。script 本体は実行前に落ちている。
+If Bash fails with an **`E2BIG` / `posix_spawn` / sandbox-related spawn error**, the script
+is not at fault: **Claude Code's sandbox wrapper inflated argv** (the seatbelt profile
+balloons in large monorepos). The script itself never started.
 
-このとき、**同じコマンドを Bash tool の `dangerouslyDisableSandbox: true` を付けて再実行**する。
-その1コマンドだけサンドボックス外で走り、プロジェクトの sandbox 設定自体は変更しない。
+In that case, **re-run the same command with the Bash tool's `dangerouslyDisableSandbox: true`**.
+Only that one command runs outside the sandbox; the project's sandbox settings stay untouched.
 
-- この skill は**読み取り専用**（nvim 設定を読む + headless nvim + 自分のキャッシュ `~/.cache/keymap-help/` に書くだけ）なので、この用途に限りサンドボックス外実行は低リスク。
-- 恒久対策を望むユーザーには、プロジェクトの sandbox `excludedCommands` に
-  `bash *nvim-keymaps.sh*` 等を追加する方法を案内してもよい（sandbox は有効なまま、この
-  スクリプトだけ除外）。sandbox 全体を `enabled: false` にするのは勧めない。
+- This skill is **read-only** (reads nvim config + headless nvim + writes only its own cache
+  `~/.cache/keymap-help/`), so running it outside the sandbox is low risk for this purpose alone.
+- If the user wants a permanent fix, you may suggest adding `bash *nvim-keymaps.sh*` or similar
+  to the project's sandbox `excludedCommands` (sandbox stays on, only this script is excluded).
+  Do not recommend setting the whole sandbox to `enabled: false`.
 
-## 出力例
+## Output example
 
 ```
 # active: lazyvim | custom only (3件)  ★=dotfilesでカスタム
@@ -96,7 +101,7 @@ script のバグではなく **Claude Code のサンドボックスがコマン�
 ★  x   <leader>zl              herdr: send file path + line range to agent
 ```
 
-## 前提
+## Prerequisites
 
-- `nvim` が PATH にあること。
-- headless起動で設定が正常にロードできること（壊れている場合はエラーを表示）。
+- `nvim` on PATH.
+- The config loads cleanly under headless startup (a broken config surfaces as an error).

@@ -112,7 +112,7 @@ stretching the view: a keepable page uses the `writeup` skill (kind 設計
 or 作業メモ); a beginner-facing picture uses `eli5`. Do not write ad-hoc
 HTML files for a show-me answer and do not `open` files from this skill.
 Rare exception: structure too dense for text/Mermaid but not yet worth a
-full page — the `writeup-kit` renderer (`../writeup-kit/bin/render-diagram.mjs`)
+full page — the `writeup-kit` renderer (`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/bin/render-diagram.mjs`)
 can produce a standalone SVG figure to inline: choose the type with the
 `writing.md` §4 rule, confirm it with `--list-types`, take the IR shape
 from `--doc <type>`, render with `--figure`; trim the view first before
