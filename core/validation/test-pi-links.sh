@@ -9,7 +9,7 @@ set -euo pipefail
 # (orca-*.ts, `pi install`ed files) next to what this repo owns, so the
 # contract under test is exactly the dangerous part:
 #
-#   - settings.json / models.json / AGENTS.md and every extensions/*.ts are
+#   - settings.json / models.json and every extensions/*.ts are
 #     linked FILE BY FILE (a directory symlink would destroy the co-resident
 #     user files — asserted here by planting an orca-*.ts first)
 #   - re-running is idempotent
@@ -130,7 +130,8 @@ run_pi_links_checks() {
         run_link_pi
 
     local f
-    for f in settings.json models.json AGENTS.md; do
+    # AGENTS.md is no longer linked: jig generates ~/.pi/agent/AGENTS.md (milestone 3c-pi).
+    for f in settings.json models.json; do
         check "case2: ${f} linked" \
             is_link_to "${FAKE_HOME}/.pi/agent/${f}" "${PI_SRC}/${f}"
     done
