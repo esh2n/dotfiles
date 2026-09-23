@@ -198,3 +198,20 @@ omp（oh-my-pi）自体はスマホフロントを持たないため、RPC モ�
 2. **実践者の主流は自作である**: Tailscale + tmux/mosh + Termius/Termux によるフル SSH アクセスが最も多く言及される、インフラを増やさない構成。ここでの共通の不満は「入力しづらい」「通知が煩わしくて切った」であり、致命的な失敗報告（=完全に放棄した）は見当たらなかった。
 3. **専用リレー OSS が急増中で、規模差が大きい**。Happy Coder（23.8k★、Claude Code/Codex 対応、E2E暗号化）が头一つ抜けているが、その Happy Coder 自身が「スマホ操作の裏でデフォルトが `--dangerously-skip-permissions` になっている」という、今回owner が最も気にするはずの「承認」を無効化する既定値バグを抱えている（issue #1514、2026-09-23時点でopen）。9remote・Pane・run-kit など 2026年に入ってからの若いプロジェクトが同じ課題に別解を出し続けている状態で、まだ業界標準と呼べる決定版は無い。omp/pi 向けの非公式ブリッジは★1〜25の個人プロジェクトのみで、実績と呼べる段階にない。
 
+---
+
+## 追記（同日、持ち主の指摘）: Orca の mobile companion — 調査漏れ
+
+持ち主が既に使っている ADE、Orca（onorca.dev、`stablyai/orca` cask、MIT）に、ベンダー純正のスマホ用 companion app（iOS App Store / Android APK）がある。上の調査はこれを見落としていた。[直接取得（要約経由）, https://onorca.dev/docs/mobile ]
+
+できること（原文引用）: "See every worktree, its agent, and its current status (working / done / waiting on input)" / "Open supported agent sessions in Chat UI (a chat-style transcript) or the raw terminal" / "Send a short reply (continue, yes, free-text) when an agent is waiting on input" / "Open Source Control for a worktree to review changed files, stage or unstage, and commit" / "Create a workspace from mobile" / "Switch your active agent account"。位置づけは "intentionally not a full editor — it's a remote control for the desktop you already have running"。
+
+つなぎ方: デスクトップが一回限りのペアリングコードを出し、スマホに貼る。経路は "Orca Relay"（要サインイン、LAN の近道あり）か直結（LAN）で、Tailscale 越しの直結が経路として挙げられている。デスクトップが常に正で、閉じると直結セッションは落ちる。Relay がトラフィックを保存するかは文書に無し（[unverified]）。
+
+対象エージェント: トップページは Claude Code / Codex / OpenCode / Grok / Gemini / Cursor / Copilot と "20+ additional CLI agents" を挙げる。omp / pi / DSH が「Chat UI 対応」かは未確認だが、"raw terminal" は全セッションで開ける。
+
+これで表の一行が増える:
+
+| Orca mobile companion | 全 worktree の状態、端末の生表示とスクロールバック、待ち状態への返答（continue / yes / 自由文）、Source Control（差分・stage・commit）、workspace 作成、アカウント切替 | Orca desktop 常駐、ペアリングコード、直結（LAN / Tailscale）か Orca Relay（サインイン） | デスクトップを閉じると切れる、未保存の markdown に保存確認なし、Relay の保存方針は文書に無し |
+
+結論への影響: 「ローカルで動くセッションをスマホから操作する」をベンダー純正で持つのは Claude Code の Remote Control だけ、と書いたが、**Orca の companion がエージェント横断で同じことを純正に提供している**（Claude Code 以外も対象、承認は「待ち状態への返答」の形）。実践者の自作（Tailscale SSH + tmux）と同じ Tailscale 直結の経路で動く。
