@@ -74,8 +74,10 @@ cd ~/.config/litellm/observability     # the deployed copy; this is what runs
 
 Prometheus is resident (`restart: unless-stopped`) because it is the component
 that loses data if it is down: the gateway's counters are in memory, so an hour
-without scraping is an hour that cannot be recovered. Grafana stores nothing, so
-it is behind the `ui` profile and costs nothing to leave off.
+without scraping is an hour that cannot be recovered. Grafana stores nothing,
+but since 2026-09-24 it is resident too (owner's call: the dashboards should
+always be there) — `domains/dev/install.sh` starts both with `start.sh --ui`
+on every `make update`, and `../check.sh` probes `:3000`.
 
 Both ports bind `127.0.0.1`. Reaching the gateway's metrics from inside a
 container goes through OrbStack's `host.docker.internal` proxy — measured, not
@@ -88,10 +90,10 @@ A third container, `open-webui` — a self-hosted chat page
 (`ghcr.io/open-webui/open-webui:main`, the documented "standard image
 (recommended)" tag:
 <https://docs.openwebui.com/getting-started/quick-start/>) in front of the
-same Mac's own LM Studio. It is not part of the gateway's measurement (it
-never talks to LiteLLM), it is here because it is the same kind of thing:
-another Docker service that must stay loopback-only and reach the Mac's LLM
-through `host.docker.internal`. It's the answer to "how do I use the Mac's
+LiteLLM gateway (since 2026-09-23; before that, LM Studio directly). It is
+here because it is the same kind of thing: another Docker service that must
+stay loopback-only and reach the gateway through `host.docker.internal`, and
+its traffic is measured like every harness's. It's the answer to "how do I use the Mac's
 models from my phone" from the ruling this stack follows:
 [`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`](../../../llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
 
