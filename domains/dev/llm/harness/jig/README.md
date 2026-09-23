@@ -648,6 +648,14 @@ bun src/cli/jig.ts apply --target dsh            # dry-run: settings.yaml's bloc
 bun src/cli/jig.ts apply --target dsh --write    # writes both halves in one run; any conflict aborts the second
 ```
 
+`--target omp` likewise runs the tiers half first: the `proxy:` provider
+block of the checkout's `domains/dev/config/omp/models.yml`, between the
+same `# BEGIN jig:tiers` / `# END jig:tiers` markers dsh uses
+(`domain/tiers/write-omp.ts`, since 2026-09-24 — the hand-written block
+before it carried no `contextWindow` / `maxTokens`, so omp assumed its
+defaults, 128k / 16k, for the 1M-token tiers). Then the agent-directory half
+above.
+
 `--target dsh` names one harness, so, as `--target pi` does, it runs both
 halves: the tiers write into the checkout's `domains/dev/config/dsh/settings.yaml`
 from `policy/tiers.json` (the part `--target all` has always run, unchanged),

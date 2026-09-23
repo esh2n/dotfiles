@@ -86,6 +86,7 @@ function resolveApplyPaths(): { tiersJsonPath: string; destPaths: ApplyTargetPat
     destPaths: {
       pi: join(root, "domains", "dev", "config", "pi", "models.json"),
       dsh: join(root, "domains", "dev", "config", "dsh", "settings.yaml"),
+      omp: join(root, "domains", "dev", "config", "omp", "models.yml"),
       litellm: join(root, "domains", "dev", "config", "litellm", "config.yaml"),
     },
   };

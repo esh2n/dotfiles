@@ -6,6 +6,7 @@ import { fakeClaudeFs } from "../app/apply/fake-claude-ports";
 const TIERS_JSON_PATH = "/repo/policy/tiers.json";
 const PI_PATH = "/repo/config/pi/models.json";
 const DSH_PATH = "/repo/config/dsh/settings.yaml";
+const OMP_PATH = "/repo/config/omp/models.yml";
 const LITELLM_PATH = "/repo/config/litellm/config.yaml";
 
 const MINIMAL_TIERS = {
@@ -100,7 +101,7 @@ function fakePorts(initialFiles: Record<string, string>): {
 
 const paths = {
   tiersJsonPath: TIERS_JSON_PATH,
-  destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+  destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
 };
 
 describe("applyCli", () => {
@@ -896,12 +897,14 @@ describe("applyCli --target omp", () => {
     );
   });
 
-  test("--target omp with no omp context is refused; --target all never reaches omp", async () => {
-    const refused = await applyCli(["--target", "omp"], tiers(), paths);
-    expect(refused.code).toBe(2);
-    expect(refused.stdout).toContain("--target omp is not wired");
+  test("--target omp with no omp context runs the tiers half alone and says so; --target all reaches omp's tiers half, never its agent directory", async () => {
+    const alone = await applyCli(["--target", "omp"], tiers(), paths);
+    expect(alone.code).toBe(0);
+    expect(alone.stdout).toContain("== omp ==");
+    expect(alone.stdout).toContain("not wired in this context: only omp/models.yml");
     const all = await applyCli([], tiers(), paths, undefined, undefined, ompContext());
-    expect(all.stdout).not.toContain("== omp ==");
+    expect(all.stdout).toContain("== omp ==");
+    expect(all.stdout).not.toContain("== omp (agent directory) ==");
   });
 });
 

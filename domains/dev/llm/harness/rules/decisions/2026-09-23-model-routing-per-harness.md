@@ -31,6 +31,7 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 - pi は「No auto-fallback to another provider」が設計方針（https://github.com/earendil-works/pi/pull/8966 ）だが起動レースで 10 回中 4 回別モデルで起動する報告あり（https://github.com/earendil-works/pi/issues/8810 ）。pi の設定は `proxy` 一本なので今の構成では落ち先が無い。
 - 記録: `rules/research/2026-09-23-model-routing-per-harness.md`。
 - 振り分け: 同日夜の裁定 `2026-09-23-tier-fixed-main-subagent-escalation.md` で上書き — セッションは一つの tier に固定（`main`）、`complex` は subagent、`/tier` は人の選択。pi / omp の拡張は保持だけを行い、プロンプトごとの判定は削除。
+- 2026-09-24: omp の `proxy` ブロックは手書きをやめ `policy/tiers.json` から生成（`jig apply --target omp` の tiers 半分、`models.yml` の `# BEGIN jig:tiers` 区間）。手書き版は `contextWindow` / `maxTokens` を持たず omp の既定 128,000 / 16,384 が効いていた（omp docs/models.md の既定値）。正しくは main / complex = 1,000,000（DeepSeek 文書 https://api-docs.deepseek.com/quick_start/pricing の「1M」）、deterministic = 131,072（LM Studio でロードした qwen3.8-27b の窓、[unverified: 実機のロード設定と要照合]）。pi / DSH は以前から同じ源。Claude Code / Codex はベンダーのモデルで各自の窓。
 - 未実測: omp から `proxy/*` を実際に叩いた結果（compat 設定が要るか — pi は `supportsDeveloperRole: false` / `maxTokensField: max_tokens` を指定している）。
 
 ## Sources

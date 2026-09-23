@@ -144,7 +144,7 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
   };
   if (targetName === "claude") return { ...none, claude: true };
   if (targetName === "codex") return { ...none, codex: true };
-  if (targetName === "omp") return { ...none, omp: true };
+  if (targetName === "omp") return { ...none, targets: ["omp"], omp: true };
   if (targetName === "pi") return { ...none, targets: ["pi"], pi: true };
   if (targetName === "dsh") return { ...none, targets: ["dsh"], dsh: true };
   if (targetName === "all") return { ...none, targets: ALL_APPLY_TARGETS };
@@ -1268,20 +1268,6 @@ export async function applyCli(
     return { stdout: `jig apply: ${parsed.error}\n`, code: 2 };
   }
 
-  if (parsed.omp) {
-    if (omp === undefined) {
-      return { stdout: "jig apply: --target omp is not wired in this context\n", code: 2 };
-    }
-    const report = await applyOmp(
-      { paths: omp.paths, options: omp.options, write: parsed.write },
-      omp.ports,
-    );
-    return {
-      stdout: `${formatOmp(report, omp.paths)}\n`,
-      code: report.outcome === "conflict" ? 1 : 0,
-    };
-  }
-
   if (parsed.codex) {
     if (codex === undefined) {
       return { stdout: "jig apply: --target codex is not wired in this context\n", code: 2 };
@@ -1318,6 +1304,23 @@ export async function applyCli(
   const sections = report.results.map(formatResult);
   const hasBlockedWrite = report.results.some((r) => isBlockedWriteFailure(r, parsed.write));
   let code = report.hasConflict || hasBlockedWrite ? 1 : 0;
+
+  // `--target omp` names the harness, so the agent-directory half follows the
+  // tiers half (omp/models.yml's proxy block) in the same run, as for pi.
+  if (parsed.omp) {
+    if (omp === undefined) {
+      sections.push(
+        "== omp (agent directory) ==\nnot wired in this context: only omp/models.yml (above) was considered",
+      );
+    } else {
+      const ompReport = await applyOmp(
+        { paths: omp.paths, options: omp.options, write: parsed.write },
+        omp.ports,
+      );
+      sections.push(formatOmp(ompReport, omp.paths));
+      if (ompReport.outcome === "conflict") code = 1;
+    }
+  }
 
   // `--target pi` names the harness, so the agent-directory half follows the
   // tiers half in the same run. Not wired (tests, older composition roots):

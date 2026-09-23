@@ -17,7 +17,10 @@
 #         api: openai-completions
 
 # The local LiteLLM measuring proxy (domains/dev/config/litellm/), the same
-# three tier aliases pi and DSH use (owner's ruling 2026-09-23: every harness
+# three tier aliases pi and DSH use. The `proxy:` block between the jig:tiers
+# markers is GENERATED from llm/harness/policy/tiers.json by `jig apply
+# --target omp` (contextWindow / maxTokens per tier come from there — omp's
+# own defaults are 128k / 16k and were what a hand-written block got); (owner's ruling 2026-09-23: every harness
 # that is not the model vendor's own — pi, DSH, omp — goes through LiteLLM;
 # Claude Code and Codex keep their vendor's models). `apiKey` names an env
 # var (docs/models.md: "Value is first treated as an environment variable
@@ -40,14 +43,37 @@ providers:
     baseUrl: http://127.0.0.1:9/v1
     api: openai-completions
     models: []
+  # BEGIN jig:tiers (generated — edit policy/tiers.json, then jig apply)
   proxy:
     baseUrl: http://localhost:4000/v1
     apiKey: LITELLM_API_KEY
     api: openai-completions
+    compat:
+      supportsDeveloperRole: false
+      maxTokensField: max_tokens
     models:
       - id: main
-        name: main (LiteLLM tier — everyday)
+        name: main — DeepSeek Flash (LiteLLM tier)
+        reasoning: true
+        input: [text]
+        contextWindow: 1000000
+        maxTokens: 16384
+        compat:
+          thinkingFormat: deepseek
       - id: complex
-        name: complex (LiteLLM tier — hard judgment / design)
+        name: complex — DeepSeek V4 Pro (LiteLLM tier)
+        reasoning: true
+        input: [text]
+        contextWindow: 1000000
+        maxTokens: 32768
+        compat:
+          thinkingFormat: deepseek
       - id: deterministic
-        name: deterministic (LiteLLM tier — local LM Studio, reproducible / offline)
+        name: deterministic — local Qwen (LiteLLM tier)
+        reasoning: true
+        input: [text]
+        contextWindow: 131072
+        maxTokens: 32768
+        compat:
+          thinkingFormat: qwen-chat-template
+  # END jig:tiers

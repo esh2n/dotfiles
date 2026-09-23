@@ -15,16 +15,19 @@ import { type PlanAction, planApply } from "../../domain/tiers/plan";
 import { spliceManagedBlock } from "../../domain/tiers/splice";
 import type { TiersPolicy } from "../../domain/tiers/types";
 import { toDshModelsBlock } from "../../domain/tiers/write-dsh";
+import { toOmpProxyBlock } from "../../domain/tiers/write-omp";
 import { toLitellmModelList } from "../../domain/tiers/write-litellm";
 import { toPiModels } from "../../domain/tiers/write-pi";
 import type { ApplyPorts } from "./ports";
 
-export type ApplyTarget = "pi" | "dsh" | "litellm";
-export const ALL_APPLY_TARGETS: readonly ApplyTarget[] = ["pi", "dsh", "litellm"];
+export type ApplyTarget = "pi" | "dsh" | "omp" | "litellm";
+export const ALL_APPLY_TARGETS: readonly ApplyTarget[] = ["pi", "dsh", "omp", "litellm"];
 
 export interface ApplyTargetPaths {
   readonly pi: string;
   readonly dsh: string;
+  /** `domains/dev/config/omp/models.yml` — the `proxy:` block between the jig:tiers markers. */
+  readonly omp: string;
   readonly litellm: string;
 }
 
@@ -157,8 +160,15 @@ async function applyPi(
   };
 }
 
-async function applyDsh(
-  policy: TiersPolicy,
+/**
+ * dsh's settings.yaml and omp's models.yml take the same shape: one managed
+ * YAML block between the shared markers, spliced into a file the owner also
+ * edits by hand outside the markers.
+ */
+async function applyManagedYaml(
+  target: "dsh" | "omp",
+  block: string,
+  dropped: readonly DroppedField[],
   destPath: string,
   ports: ApplyPorts,
   manifest: Record<string, string>,
@@ -166,12 +176,11 @@ async function applyDsh(
   tiersJsonPath: string,
   tiersJsonText: string,
 ): Promise<TargetResult> {
-  const { content: block, dropped } = toDshModelsBlock(policy);
   const current = await ports.readFile(destPath);
 
   if (current === undefined) {
     return {
-      target: "dsh",
+      target,
       outcome: "dest-missing",
       diff: "",
       dropped,
@@ -185,7 +194,7 @@ async function applyDsh(
     generated = spliceManagedBlock(current, block, TIERS_MANAGED_BLOCK_MARKERS);
   } catch (error) {
     return {
-      target: "dsh",
+      target,
       outcome: "markers-missing",
       diff: "",
       dropped,
@@ -207,7 +216,7 @@ async function applyDsh(
 
   if (write && plan.action === "write") {
     await finishWrite(ports, destPath, generated, tiersJsonPath, tiersJsonText, manifest);
-    return { target: "dsh", outcome: "write", diff, dropped, wrote: true };
+    return { target, outcome: "write", diff, dropped, wrote: true };
   }
 
   if (write && plan.action === "noop") {
@@ -215,7 +224,7 @@ async function applyDsh(
   }
 
   return {
-    target: "dsh",
+    target,
     outcome: outcomeFromPlan(plan.action),
     diff,
     dropped,
@@ -309,11 +318,15 @@ export async function applyTiers(
           tiersJsonText,
         ),
       );
-    } else if (target === "dsh") {
+    } else if (target === "dsh" || target === "omp") {
+      const { content, dropped } =
+        target === "dsh" ? toDshModelsBlock(policy) : toOmpProxyBlock(policy);
       results.push(
-        await applyDsh(
-          policy,
-          input.destPaths.dsh,
+        await applyManagedYaml(
+          target,
+          content,
+          dropped,
+          input.destPaths[target],
           ports,
           manifest,
           input.options.write,

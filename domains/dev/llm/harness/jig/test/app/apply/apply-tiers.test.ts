@@ -5,6 +5,7 @@ import { TIERS_MANAGED_BLOCK_MARKERS } from "../../../src/domain/tiers/markers";
 
 const TIERS_JSON_PATH = "/repo/policy/tiers.json";
 const PI_PATH = "/repo/config/pi/models.json";
+const OMP_PATH = "/repo/config/omp/models.yml";
 const DSH_PATH = "/repo/config/dsh/settings.yaml";
 const LITELLM_PATH = "/repo/config/litellm/config.yaml";
 
@@ -123,7 +124,7 @@ describe("applyTiers", () => {
     const report = await applyTiers(
       {
         tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
         options: { targets: ["pi"], write: false },
       },
       ports,
@@ -142,7 +143,7 @@ describe("applyTiers", () => {
     const report = await applyTiers(
       {
         tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
         options: { targets: ["pi"], write: true },
       },
       ports,
@@ -161,7 +162,7 @@ describe("applyTiers", () => {
       applyTiers(
         {
           tiersJsonPath: TIERS_JSON_PATH,
-          destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+          destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
           options: { targets: ["pi"], write: true },
         },
         ports,
@@ -187,7 +188,7 @@ describe("applyTiers", () => {
     const report = await applyTiers(
       {
         tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
         options: { targets: ["pi"], write: true },
       },
       ports,
@@ -202,7 +203,7 @@ describe("applyTiers", () => {
     const { ports, files } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     const opts = {
       tiersJsonPath: TIERS_JSON_PATH,
-      destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+      destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
     };
 
     await applyTiers({ ...opts, options: { targets: ["pi"], write: true } }, ports);
@@ -224,7 +225,7 @@ describe("applyTiers", () => {
     const report = await applyTiers(
       {
         tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
         options: { targets: ["dsh"], write: true },
       },
       ports,
@@ -244,7 +245,7 @@ describe("applyTiers", () => {
     const report = await applyTiers(
       {
         tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
         options: { targets: ["dsh"], write: true },
       },
       ports,
@@ -265,7 +266,7 @@ describe("applyTiers", () => {
     const report = await applyTiers(
       {
         tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
         options: { targets: ["litellm"], write: true },
       },
       ports,
@@ -286,7 +287,7 @@ describe("applyTiers", () => {
     const report = await applyTiers(
       {
         tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
         options: { targets: ["pi", "dsh", "litellm"], write: false },
       },
       ports,
@@ -302,7 +303,7 @@ describe("applyTiers", () => {
       applyTiers(
         {
           tiersJsonPath: TIERS_JSON_PATH,
-          destPaths: { pi: PI_PATH, dsh: DSH_PATH, litellm: LITELLM_PATH },
+          destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
           options: { targets: ["pi"], write: false },
         },
         ports,
