@@ -37,6 +37,33 @@ injected at launch by 1Password:
 Confirm the vault/item coordinates in `litellm.op-vars` match your 1Password
 (assumed `op://Private/{deepseek,openai,litellm}/credential`).
 
+## Install (always-on, launchd)
+
+The same path installs this stack and the LM Studio stack
+(`domains/dev/config/lmstudio/`, the model server + sleep guard), so both are
+set up identically:
+
+1. `make link` (`core/config/manager.sh link`) symlinks this directory to
+   `~/.config/litellm` and writes `com.esh2n.litellm-proxy.plist` as an
+   **expanded copy** to `~/Library/LaunchAgents/` (`link_launch_agents` →
+   `install_expanded` resolves the `{{HOME}}` placeholders; launchd expands
+   nothing itself). Loading is never done by `make link`.
+2. Once per machine, put the 1Password service-account token in the login
+   Keychain under the name `litellm-op-token` (see "Interactive vs headless
+   op" below; `litellm-up.sh` reads it with `security find-generic-password
+   -s litellm-op-token -w`).
+3. Load the job once:
+   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist`.
+   Logs: `~/Library/Logs/litellm-proxy.log`.
+4. On a machine without its own LM Studio, set `LM_STUDIO_REMOTE_HOST` (the
+   Mac's Tailscale MagicDNS name) for the job; `litellm-up.sh` picks the local
+   LM Studio when `127.0.0.1:1234` answers and that name otherwise.
+
+After editing the plist or `litellm-up.sh`: `make link`, then
+`launchctl bootout gui/$(id -u)/com.esh2n.litellm-proxy` and `bootstrap`
+again. The model server itself, its login autostart and the
+`caffeinate` sleep guard live in `domains/dev/config/lmstudio/README.md`.
+
 ## Run
 
 Docker (self-contained; keys injected by op):

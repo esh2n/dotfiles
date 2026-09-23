@@ -484,6 +484,12 @@ run_portability_checks() {
     assert_no_hardcoded_user \
         "$DOTFILES_ROOT/domains/dev/config/jig/jig-decision-up.sh" \
         "jig-decision-up.sh PATH/JIG_DIR should use \$(id -un)/\$DOTFILES_ROOT, not a literal username" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/lmstudio/com.esh2n.lmstudio-awake.plist" \
+        "lmstudio-awake plist source should use {{HOME}} placeholders" || true
+    assert_no_hardcoded_user \
+        "$DOTFILES_ROOT/domains/dev/config/lmstudio/awake.sh" \
+        "lmstudio awake.sh PATH should use \$(id -un), not a literal username" || true
 
     echo ""
     log_info "--- 7c. dsh sources: No hardcoded user paths ---"

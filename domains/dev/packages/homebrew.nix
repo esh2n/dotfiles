@@ -48,5 +48,31 @@
     # renderer, a different app. Tap trusted by core/utils/homebrew.sh.
     # The app self-updates on the stable channel regardless of brew pinning.
     "stablyai/orca/orca"
+    # Tailscale, Standalone variant (the .pkg from pkgs.tailscale.com). Cask
+    # because it is a GUI app with a system extension; the formula `tailscale`
+    # is the open-source tailscaled (root daemon, no GUI, "only recommended
+    # for unattended installs managed by experienced macOS system
+    # administrators" — https://tailscale.com/kb/1065/macos-variants) and the
+    # App Store variant cannot `tailscale serve`. Tailscale's own advice:
+    # "Always start by downloading and installing our Standalone variant".
+    # Token renamed from `tailscale` to `tailscale-app` (old_tokens:
+    # ["tailscale"]; https://formulae.brew.sh/api/cask/tailscale-app.json);
+    # the pkg puts the CLI at /usr/local/bin/tailscale (bundle path:
+    # /Applications/Tailscale.app/Contents/MacOS/Tailscale,
+    # https://tailscale.com/kb/1080/cli). Once per machine, by hand: log in
+    # from the menu-bar app; on the Mac that hosts LM Studio also run
+    # `tailscale serve --bg --tcp 1234 127.0.0.1:1234` (persists across
+    # reboots; rules/decisions/2026-09-23-home-llm-…). The app registers its
+    # own login item, so no launchd job is needed.
+    "tailscale-app"
+    # LM Studio (https://formulae.brew.sh/cask/lm-studio — installs
+    # "LM Studio.app" only; the `lms` CLI is bootstrapped by the app into
+    # ~/.lmstudio/bin/lms on first launch). Cask because it is the desktop
+    # app; the headless server runs inside it. Once per machine, by hand:
+    # open the app, Settings (Cmd+,) → check "run the LLM server on login",
+    # then `lms server start --port 1234` once so the saved state is
+    # "running" (https://lmstudio.ai/docs/app/api/headless). The sleep guard
+    # is domains/dev/config/lmstudio/ (launchd + caffeinate).
+    "lm-studio"
   ];
 }
