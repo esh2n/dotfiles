@@ -21,12 +21,16 @@
  *   directories of links, the same generated AGENTS.md into `~/.codex`, one
  *   generated `~/.codex/agents/<name>.toml` per agent, and jig's MCP block
  *   in `~/.codex/config.toml` (`app/apply/apply-codex.ts`). Milestone 3a.
+ * - **omp** — the same `~/.agents/skills`, one generated
+ *   `~/.omp/agent/agents/<name>.md` per agent, jig's entries in
+ *   `~/.omp/agent/mcp.json`, and the `extensions/jig.ts` link to jig's omp
+ *   extension (`app/apply/apply-omp.ts`). Milestone 3b.
  *
- * `--target all` means the first group only. The claude and codex targets
- * write into `$HOME` rather than into the checkout, so each has to be named:
- * a verb that reaches a user's live harness configuration by default is one
- * keystroke from a surprise, and nothing about the word "all" says which
- * files it means.
+ * `--target all` means the first group only. The claude, codex and omp
+ * targets write into `$HOME` rather than into the checkout, so each has to
+ * be named: a verb that reaches a user's live harness configuration by
+ * default is one keystroke from a surprise, and nothing about the word
+ * "all" says which files it means.
  */
 
 import {
@@ -45,13 +49,22 @@ import {
   yokiCommandLeftovers,
 } from "../app/apply/apply-codex";
 import {
+  type OmpAgentFileReport,
+  type OmpApplyOptions,
+  type OmpApplyPaths,
+  type OmpApplyReport,
+  applyOmp,
+} from "../app/apply/apply-omp";
+import {
   ALL_APPLY_TARGETS,
   type ApplyTarget,
   type ApplyTargetPaths,
   type TargetResult,
   applyTiers,
 } from "../app/apply/apply-tiers";
+import { AGENTS_SKILLS_MOUNT_TARGETS, type AgentsSkillsMountReport } from "../app/apply/delivery";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
+import type { ModelChoice } from "../domain/claude/agent-definition";
 import { AGENTS_MD_BYTE_LIMIT } from "../domain/claude/agents-md";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import { describeStaleReason } from "../domain/claude/managed-dir";
@@ -68,6 +81,7 @@ interface ParsedArgs {
   readonly targets: readonly ApplyTarget[];
   readonly claude: boolean;
   readonly codex: boolean;
+  readonly omp: boolean;
   readonly write: boolean;
 }
 
@@ -90,20 +104,16 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
   }
 
   const targetName = targetArg ?? "all";
-  if (targetName === "claude") {
-    return { targets: [], claude: true, codex: false, write };
-  }
-  if (targetName === "codex") {
-    return { targets: [], claude: false, codex: true, write };
-  }
-  if (targetName === "all") {
-    return { targets: ALL_APPLY_TARGETS, claude: false, codex: false, write };
-  }
+  const none = { targets: [], claude: false, codex: false, omp: false, write };
+  if (targetName === "claude") return { ...none, claude: true };
+  if (targetName === "codex") return { ...none, codex: true };
+  if (targetName === "omp") return { ...none, omp: true };
+  if (targetName === "all") return { ...none, targets: ALL_APPLY_TARGETS };
   if ((ALL_APPLY_TARGETS as readonly string[]).includes(targetName)) {
-    return { targets: [targetName as ApplyTarget], claude: false, codex: false, write };
+    return { ...none, targets: [targetName as ApplyTarget] };
   }
   return {
-    error: `unknown --target ${JSON.stringify(targetName)} (expected claude, codex, pi, dsh, litellm, or all)`,
+    error: `unknown --target ${JSON.stringify(targetName)} (expected claude, codex, omp, pi, dsh, litellm, or all)`,
   };
 }
 
@@ -457,12 +467,7 @@ function formatCodex(report: CodexApplyReport, dest: string): string {
     `dest: ${dest}`,
     ...(report.message === undefined ? [] : [`message: ${report.message}`]),
     "",
-    ...managedDirLines("skills (cross-harness)", report.agentsSkillsDir, {
-      noun: "skill director",
-      plural: "ies",
-      singular: "y",
-      how: "each holds a SKILL.md; Codex, pi and omp read this directory",
-    }),
+    ...agentsSkillsMountLines(report.agentsSkillsDir),
     "",
     ...codexSkillsLines(report),
     "",
@@ -475,6 +480,24 @@ function formatCodex(report: CodexApplyReport, dest: string): string {
     `hooks.json: not touched  ${report.hooksJson}  (jig codex register's; run that to change the guard hook)`,
   ];
   return lines.join("\n");
+}
+
+/**
+ * `~/.agents/skills`: the one directory two targets deliver. The section
+ * names both and the one that planned this run, so a reader of either
+ * dry-run knows the other will find the same links `ok`.
+ */
+function agentsSkillsMountLines(mount: AgentsSkillsMountReport): readonly string[] {
+  const targets = AGENTS_SKILLS_MOUNT_TARGETS.map((target) => `--target ${target}`).join(" and ");
+  return [
+    ...managedDirLines("skills (cross-harness)", mount, {
+      noun: "skill director",
+      plural: "ies",
+      singular: "y",
+      how: "each holds a SKILL.md; Codex, pi and omp read this directory",
+    }),
+    `  Delivered by ${targets} alike, from one plan (this run: --target ${mount.target}); the other finds the same links ok.`,
+  ];
 }
 
 /** `~/.codex/skills`: the ports, then yoki's `cmd-*` directories under their own heading. */
@@ -528,13 +551,18 @@ function codexAgentsMdLines(report: CodexApplyReport): readonly string[] {
 }
 
 function describeModel(file: AgentFileReport): string {
-  switch (file.model.kind) {
+  return describeModelChoice(file.model, "Codex id");
+}
+
+/** One phrase per answer to the model question; `what` names the harness's kind of id. */
+function describeModelChoice(model: ModelChoice, what: string): string {
+  switch (model.kind) {
     case "mapped":
-      return `model: ${file.model.model} (${file.model.tier})`;
+      return `model: ${model.model} (${model.tier})`;
     case "inherit":
       return "model: (none: inherits)";
     case "unmapped":
-      return `model: (none: no Codex id for "${file.model.tier}")`;
+      return `model: (none: no ${what} for "${model.tier}")`;
   }
 }
 
@@ -604,6 +632,170 @@ function configTomlLines(report: CodexApplyReport): readonly string[] {
   return lines;
 }
 
+/**
+ * The omp target's dry-run, in the Codex target's order: the shared skills
+ * mount, the generated agent files with the model and tool questions
+ * answered per file, mcp.json's entries with what is carried through, the
+ * extension link beside the directory's other entries, yoki's leftovers
+ * under their own heading, and what reaches omp natively — including the
+ * one gap this milestone leaves.
+ */
+function formatOmp(report: OmpApplyReport, paths: OmpApplyPaths): string {
+  const lines: string[] = [
+    "== omp ==",
+    `outcome: ${report.outcome}`,
+    `dest: ${paths.agentDir}`,
+    ...(report.message === undefined ? [] : [`message: ${report.message}`]),
+    "",
+    ...agentsSkillsMountLines(report.agentsSkillsDir),
+    "",
+    ...ompAgentFileLines(report),
+    "",
+    ...mcpJsonLines(report),
+    "",
+    ...extensionLines(report),
+    "",
+    ...ompLeftoverLines(report),
+    "",
+    "reaches omp natively, nothing to deliver:",
+    `  skills       ${paths.agentsSkills} (omp's \`agents\` provider reads ~/.agents/skills; ~/.claude/skills through its \`claude\` provider)`,
+    `  instructions ${paths.home}/.claude/CLAUDE.md → AGENTS.md (omp's \`claude\` provider; a ${paths.agentDir}/AGENTS.md would shadow it, and jig writes none)`,
+    "  GAP: the conditional `paths:` rules (rules/<lang>/) are not delivered to omp in this milestone;",
+    "  omp has no ~/.claude/rules reader, and jig's omp extension does not inject them yet.",
+  ];
+  return lines.join("\n");
+}
+
+function describeOmpTools(file: OmpAgentFileReport): string {
+  const kept =
+    file.tools.tools.length === 0
+      ? "(none: omp's default set)"
+      : `[${file.tools.tools.join(", ")}]`;
+  const dropped =
+    file.tools.unmapped.length === 0 ? "" : `  dropped: ${file.tools.unmapped.join(", ")}`;
+  return `tools: ${kept}${dropped}`;
+}
+
+/** One line per generated agent file, then the two gaps counted, then what stands there that no source produces. */
+function ompAgentFileLines(report: OmpApplyReport): readonly string[] {
+  const { agents } = report;
+  const width = Math.max(PAD, ...agents.files.map((file) => file.name.length + 3));
+  const lines = [
+    `agents (generated files): ${agents.path}`,
+    `  ${agents.files.length} agent definition${agents.files.length === 1 ? "" : "s"} → <name>.md (omp's own frontmatter: name, description, model, tools; body verbatim):`,
+  ];
+  if (agents.files.length === 0) lines.push("    (none)");
+  for (const file of agents.files) {
+    lines.push(
+      `    ${file.name.padEnd(width - 2)}${file.outcome.padEnd(10)}${describeModelChoice(file.model, "omp selector")}  ${describeOmpTools(file)}${file.backupPath === undefined ? "" : `  (not jig's yet → kept as ${basename(file.backupPath)})`}`,
+    );
+  }
+  if (agents.unmappedTiers.length > 0) {
+    lines.push(
+      `  model tiers with no omp selector (${agents.unmappedTiers.map((t) => `${t.tier}: ${t.count}`).join(", ")}): \`model\` is left out and omp`,
+      "  applies its task default. omp wants a provider-qualified selector or a modelRoles alias; jig has no",
+      "  source that maps Claude tiers to one, and a mapping is a ruling, never a guess.",
+    );
+  }
+  if (agents.unmappedTools.length > 0) {
+    lines.push(
+      `  Claude tools with no omp tool (${agents.unmappedTools.map((t) => `${t.tool}: ${t.count}`).join(", ")}): left out of \`tools\`,`,
+      "  which only narrows the agent (omp: packages/coding-agent/src/tools/builtin-names.ts).",
+    );
+  }
+  if (agents.excluded.length > 0) {
+    lines.push(
+      `  not generated (${agents.excluded.length}):`,
+      ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
+    );
+  }
+  if (agents.foreign.length > 0) {
+    lines.push(
+      `  not jig's (${agents.foreign.length}), left alone:`,
+      ...agents.foreign.map((entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`),
+    );
+  }
+  return lines;
+}
+
+/** jig's entries, what is carried through, the conflict that stops a write, and the diff. */
+function mcpJsonLines(report: OmpApplyReport): readonly string[] {
+  const { mcpJson } = report;
+  const lines = [
+    `mcp.json: ${mcpJson.outcome}  ${mcpJson.path}`,
+    `  jig's mcpServers entries (${mcpJson.servers.length}): ${mcpJson.servers.length === 0 ? "(none)" : mcpJson.servers.join(", ")}`,
+    "  omp's MCP client is lazy (xdev), so the full targets.omp list is delivered (mcp-list decision).",
+  ];
+  if (mcpJson.invalid !== undefined) {
+    lines.push(
+      `  CONFLICT: the file could not be read as a JSON object (${mcpJson.invalid}); nothing can be carried`,
+      "  through, so nothing is written until it is fixed by hand.",
+    );
+  }
+  if (mcpJson.foreign.length > 0) {
+    lines.push(
+      `  entries no source produces (${mcpJson.foreign.length}), carried through as they are: ${mcpJson.foreign.join(", ")}`,
+    );
+  }
+  if (mcpJson.carried.length > 0) {
+    lines.push(`  other top-level keys carried through: ${mcpJson.carried.join(", ")}`);
+  }
+  lines.push(
+    "  Hand-edit detection compares jig's entries, not the file: omp writes here itself (/mcp add). A",
+    "  `/mcp disable` on a jig server edits the entry and is a conflict; `disabledServers` is carried through.",
+    ...(mcpJson.diff === ""
+      ? ["  (no differences)"]
+      : ["--- diff (current vs generated) ---", mcpJson.diff]),
+  );
+  return lines;
+}
+
+/** The one link, then the directory's other entries: yoki's, and not jig's. */
+function extensionLines(report: OmpApplyReport): readonly string[] {
+  const { extensions } = report;
+  const width = Math.max(
+    PAD,
+    ...[...extensions.yokiLeftovers, ...extensions.foreign].map((entry) => entry.name.length + 3),
+  );
+  const lines = [
+    `extensions: ${extensions.path}${extensions.dirState.kind === "missing" ? "  (created on --write)" : extensions.dirState.kind === "file" ? "  CONFLICT: a regular file" : ""}`,
+    linkLine(basename(extensions.link.path), extensions.link, width),
+    "  omp loads *.ts in this directory directly, symlinks included (docs/extension-loading.md); the",
+    "  extension carries the guard, the session record, the formatter and the stop gate (adapters/omp/README.md).",
+    "  Disable it with `disabledExtensions: [extension-module:jig]` in config.yml, not by removing the link.",
+  ];
+  if (extensions.yokiLeftovers.length > 0) {
+    lines.push(
+      `  yoki leftovers (milestone 4) (${extensions.yokiLeftovers.length}), left alone:`,
+      ...extensions.yokiLeftovers.map(
+        (entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`,
+      ),
+    );
+  }
+  if (extensions.foreign.length > 0) {
+    lines.push(
+      `  not jig's (${extensions.foreign.length}), left alone:`,
+      ...extensions.foreign.map((entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`),
+    );
+  }
+  return lines;
+}
+
+/** What yoki left under the agent directory, each with why jig leaves it. */
+function ompLeftoverLines(report: OmpApplyReport): readonly string[] {
+  const { yokiLeftovers } = report;
+  if (yokiLeftovers.length === 0) {
+    return ["yoki leftovers (milestone 4): (none found under the agent directory)"];
+  }
+  const width = Math.max(PAD, ...yokiLeftovers.map((entry) => entry.name.length + 3));
+  return [
+    `yoki leftovers (milestone 4) (${yokiLeftovers.length}), left alone:`,
+    ...yokiLeftovers.map(
+      (entry) => `  ${entry.name.padEnd(width)}${entry.what.padEnd(16)}${entry.note}`,
+    ),
+  ];
+}
+
 export interface ClaudeCliContext {
   readonly ports: ClaudeApplyPorts;
   readonly paths: ClaudeApplyPaths;
@@ -616,16 +808,37 @@ export interface CodexCliContext {
   readonly options: CodexApplyOptions;
 }
 
+export interface OmpCliContext {
+  readonly ports: ClaudeApplyPorts;
+  readonly paths: OmpApplyPaths;
+  readonly options: OmpApplyOptions;
+}
+
 export async function applyCli(
   args: readonly string[],
   ports: ApplyPorts,
   paths: { readonly tiersJsonPath: string; readonly destPaths: ApplyTargetPaths },
   claude?: ClaudeCliContext,
   codex?: CodexCliContext,
+  omp?: OmpCliContext,
 ): Promise<ApplyCliResult> {
   const parsed = parseArgs(args);
   if ("error" in parsed) {
     return { stdout: `jig apply: ${parsed.error}\n`, code: 2 };
+  }
+
+  if (parsed.omp) {
+    if (omp === undefined) {
+      return { stdout: "jig apply: --target omp is not wired in this context\n", code: 2 };
+    }
+    const report = await applyOmp(
+      { paths: omp.paths, options: omp.options, write: parsed.write },
+      omp.ports,
+    );
+    return {
+      stdout: `${formatOmp(report, omp.paths)}\n`,
+      code: report.outcome === "conflict" ? 1 : 0,
+    };
   }
 
   if (parsed.codex) {

@@ -8,9 +8,11 @@
  * - `~/.agents/skills/` — a managed directory of links, one per skill
  *   directory of `skills/`: the user scope of Codex's skill discovery
  *   (https://learn.chatgpt.com/docs/build-skills), and the directory pi and
- *   omp read too. Today it holds yoki-switch's links into the retired
- *   `claude-profiles/` tree, dangling since the sources moved; those are
- *   stale and go, anything else is not jig's.
+ *   omp read too. Planned by `planAgentsSkillsMount` in `./delivery.ts`,
+ *   which the omp target calls as well: one directory, one plan. Today it
+ *   holds yoki-switch's links into the retired `claude-profiles/` tree,
+ *   dangling since the sources moved; those are stale and go, anything
+ *   else is not jig's.
  * - `~/.codex/skills/` — a managed directory of links, only for skills with
  *   a Codex port (`skills/<name>/codex/SKILL.md`), each link pointing at the
  *   port (`domain/codex/skills.ts`). yoki's command→skill conversions
@@ -42,7 +44,6 @@
 import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { backupPath } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
-import { selectSkillDirs } from "../../domain/claude/skills-dir";
 import {
   type CodexModelChoice,
   codexAgentFileName,
@@ -68,6 +69,7 @@ import { unifiedDiff } from "../../domain/tiers/diff";
 import { type PlanAction, planApply } from "../../domain/tiers/plan";
 import {
   type AgentsMdReport,
+  type AgentsSkillsMountReport,
   type ManagedDirReport,
   applyAgentsMd,
   applyManagedDir,
@@ -77,6 +79,7 @@ import {
   listSkillCandidates,
   managedDirChanges,
   planAgentsMd,
+  planAgentsSkillsMount,
   planManagedDir,
   readJson,
 } from "./delivery";
@@ -153,7 +156,8 @@ export interface CodexApplyReport {
   readonly outcome: CodexOutcome;
   /** True when `--write` applied the delivery. Never true with a conflict anywhere. */
   readonly wrote: boolean;
-  readonly agentsSkillsDir: ManagedDirReport;
+  /** `~/.agents/skills`, the mount the omp target delivers too (`delivery.ts`). */
+  readonly agentsSkillsDir: AgentsSkillsMountReport;
   readonly codexSkillsDir: ManagedDirReport;
   readonly agentsMd: AgentsMdReport;
   readonly agents: AgentsDirReport;
@@ -183,23 +187,6 @@ async function listCodexSkillCandidates(
     candidates.push({ ...candidate, hasCodexPort: port.kind === "file" });
   }
   return candidates;
-}
-
-async function planAgentsSkillsDir(
-  ports: CodexApplyPorts,
-  paths: CodexApplyPaths,
-  now: Date,
-): Promise<ManagedDirReport> {
-  const sourceDir = `${paths.harnessRoot}/skills`;
-  const selection = selectSkillDirs(await listSkillCandidates(ports, sourceDir));
-  return planManagedDir(ports, {
-    dir: paths.agentsSkills,
-    sourceDir,
-    selection,
-    now,
-    formerSourceDirs: paths.formerSkillRoots,
-    probeDangling: true,
-  });
 }
 
 async function planCodexSkillsDir(
@@ -372,7 +359,7 @@ export async function applyCodex(
   const config = await planConfigToml(ports, paths, options, manifest);
 
   const base = {
-    agentsSkillsDir: await planAgentsSkillsDir(ports, paths, now),
+    agentsSkillsDir: await planAgentsSkillsMount(ports, paths, "codex", now),
     codexSkillsDir: await planCodexSkillsDir(ports, paths, now),
     agentsMd,
     agents,

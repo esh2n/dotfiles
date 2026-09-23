@@ -639,4 +639,174 @@ describe("applyCli --target codex", () => {
     const result = await applyCli([], tiers(), paths, undefined, codexContext());
     expect(result.stdout).not.toContain("== codex ==");
   });
+
+  test("the shared skills mount says which target planned it", async () => {
+    const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, codexContext());
+    expect(result.stdout).toContain(
+      "Delivered by --target codex and --target omp alike, from one plan (this run: --target codex)",
+    );
+  });
+});
+
+/**
+ * The omp dry-run's report, through the CLI for the same reason: the
+ * sections — the shared mount, the generated files with both gaps, mcp.json
+ * with what is carried through, the extension link, the leftovers, and what
+ * reaches omp natively — are what a reader agrees to before `--write`.
+ */
+describe("applyCli --target omp", () => {
+  const H = "/repo/llm/harness";
+  const OLD = "/repo/config/claude-profiles";
+  const OMP = "/home/u/.omp/agent";
+  const OMP_PATHS = {
+    harnessRoot: H,
+    mcpServers: `${H}/mcp/servers.json`,
+    formerSkillRoots: [OLD],
+    agentsSkills: "/home/u/.agents/skills",
+    agentDir: OMP,
+    agentsDir: `${OMP}/agents`,
+    mcpJson: `${OMP}/mcp.json`,
+    extensionsDir: `${OMP}/extensions`,
+    extensionTarget: `${H}/jig/adapters/omp/src/index.ts`,
+    home: "/home/u",
+  };
+
+  const SOURCES: Record<string, string> = {
+    [OMP_PATHS.mcpServers]: JSON.stringify({
+      schemaVersion: "jig.mcp.v1",
+      servers: [
+        {
+          name: "serena",
+          transport: "stdio",
+          command: "uvx",
+          args: ["serena"],
+          targets: { omp: true },
+        },
+        {
+          name: "notion-mcp",
+          transport: "http",
+          url: "https://mcp.notion.com/mcp",
+          targets: { omp: true },
+        },
+      ],
+    }),
+    [`${H}/skills/README.md`]: "# skills\n",
+    [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
+    [`${H}/agents/research.md`]:
+      '---\nname: research\ndescription: Survey.\ntools: ["Read", "NotebookEdit"]\nmodel: sonnet\n---\nSurvey.\n',
+    [OMP_PATHS.extensionTarget]: "export default function () {}\n",
+  };
+
+  function ompContext(extra: Record<string, string> = {}, links: Record<string, string> = {}) {
+    const fake = fakeClaudeFs({ files: { ...SOURCES, ...extra }, links });
+    return {
+      ports: fake.ports,
+      paths: OMP_PATHS,
+      options: {
+        ompModels: {},
+        validateFrontmatter: (yaml: string) => {
+          Bun.YAML.parse(yaml);
+        },
+      },
+    };
+  }
+
+  const tiers = () => fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) }).ports;
+  const cli = (context = ompContext()) =>
+    applyCli(["--target", "omp"], tiers(), paths, undefined, undefined, context);
+
+  test("the shared mount names this run's target; the agent files list model and tool gaps; native delivery and the rules gap are stated", async () => {
+    const result = await cli();
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("== omp ==");
+    expect(result.stdout).toContain("dest: /home/u/.omp/agent");
+    expect(result.stdout).toContain(
+      "skills (cross-harness) directory: create  /home/u/.agents/skills",
+    );
+    expect(result.stdout).toContain("(this run: --target omp)");
+    expect(result.stdout).toContain("agents (generated files): /home/u/.omp/agent/agents");
+    expect(result.stdout).toContain("1 agent definition → <name>.md");
+    expect(result.stdout).toMatch(
+      /research\.md +write +model: \(none: no omp selector for "sonnet"\) +tools: \[read\] +dropped: NotebookEdit/,
+    );
+    expect(result.stdout).toContain("model tiers with no omp selector (sonnet: 1)");
+    expect(result.stdout).toContain("Claude tools with no omp tool (NotebookEdit: 1)");
+    expect(result.stdout).toContain("reaches omp natively, nothing to deliver:");
+    expect(result.stdout).toContain("/home/u/.claude/CLAUDE.md → AGENTS.md");
+    expect(result.stdout).toContain("GAP: the conditional `paths:` rules");
+  });
+
+  test("mcp.json: jig's entries, the carried-through entries and keys, and the diff", async () => {
+    const context = ompContext({
+      [OMP_PATHS.mcpJson]: JSON.stringify({
+        mcpServers: { mine: { type: "stdio", command: "mine" } },
+        disabledServers: ["mine"],
+      }),
+    });
+    const result = await cli(context);
+
+    expect(result.stdout).toContain("mcp.json: write  /home/u/.omp/agent/mcp.json");
+    expect(result.stdout).toContain("jig's mcpServers entries (2): serena, notion-mcp");
+    expect(result.stdout).toContain(
+      "entries no source produces (1), carried through as they are: mine",
+    );
+    expect(result.stdout).toContain("other top-level keys carried through: disabledServers");
+    expect(result.stdout).toContain("--- diff (current vs generated) ---");
+    expect(result.stdout).toContain('+    "serena": {');
+  });
+
+  test("an unreadable mcp.json is a CONFLICT line and exit 1", async () => {
+    const result = await cli(ompContext({ [OMP_PATHS.mcpJson]: "{ nope" }));
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("outcome: conflict");
+    expect(result.stdout).toContain("CONFLICT: the file could not be read as a JSON object");
+  });
+
+  test("the extension link, yoki's links under their own heading, the rest not jig's; the leftovers section", async () => {
+    const context = ompContext(
+      {
+        [`${OMP}/extensions/orca-prefill.ts`]: "x",
+        [`${OMP}/yoki-hooks.json`]: "{}",
+        [`${OMP}/config.yml`]: "# GENERATED by yoki\n",
+      },
+      { [`${OMP}/extensions/yoki-guard.ts`]: "/repo/config/omp/extensions/yoki-guard.ts" },
+    );
+    const result = await cli(context);
+
+    expect(result.stdout).toContain("extensions: /home/u/.omp/agent/extensions");
+    expect(result.stdout).toMatch(
+      /jig\.ts +create +→ \/repo\/llm\/harness\/jig\/adapters\/omp\/src\/index\.ts/,
+    );
+    expect(result.stdout).toContain("extension-module:jig");
+    expect(result.stdout).toMatch(
+      /yoki leftovers \(milestone 4\) \(1\), left alone:\n +yoki-guard\.ts +a symlink → /,
+    );
+    expect(result.stdout).toMatch(
+      /not jig's \(1\), left alone:\n +orca-prefill\.ts +a regular file/,
+    );
+    expect(result.stdout).toContain("yoki leftovers (milestone 4) (2), left alone:");
+    expect(result.stdout).toMatch(
+      /config\.yml +a regular file +omp's settings, generated by yoki; jig does not own config\.yml/,
+    );
+    expect(result.stdout).toMatch(/yoki-hooks\.json +a regular file +yoki's hook registry/);
+  });
+
+  test("a clean agent directory says the extensions directory is created and no leftovers were found", async () => {
+    const result = await cli();
+    expect(result.stdout).toContain(
+      "extensions: /home/u/.omp/agent/extensions  (created on --write)",
+    );
+    expect(result.stdout).toContain(
+      "yoki leftovers (milestone 4): (none found under the agent directory)",
+    );
+  });
+
+  test("--target omp with no omp context is refused; --target all never reaches omp", async () => {
+    const refused = await applyCli(["--target", "omp"], tiers(), paths);
+    expect(refused.code).toBe(2);
+    expect(refused.stdout).toContain("--target omp is not wired");
+    const all = await applyCli([], tiers(), paths, undefined, undefined, ompContext());
+    expect(all.stdout).not.toContain("== omp ==");
+  });
 });

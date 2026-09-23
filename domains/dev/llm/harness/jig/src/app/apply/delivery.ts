@@ -33,7 +33,7 @@ import {
   type ManagedSelection,
   reconcileManagedDir,
 } from "../../domain/claude/managed-dir";
-import type { SkillCandidate } from "../../domain/claude/skills-dir";
+import { type SkillCandidate, selectSkillDirs } from "../../domain/claude/skills-dir";
 import { unifiedDiff } from "../../domain/tiers/diff";
 import { type PlanAction, planApply } from "../../domain/tiers/plan";
 import type { ClaudeApplyPorts } from "./ports";
@@ -235,6 +235,59 @@ export async function listSkillCandidates(
     candidates.push({ ...entry, hasSkillMd: skillMd.kind === "file" });
   }
   return candidates;
+}
+
+/** The targets that deliver `~/.agents/skills`; each finds the other's links `ok`. */
+export const AGENTS_SKILLS_MOUNT_TARGETS = ["codex", "omp"] as const;
+
+export type AgentsSkillsMountTarget = (typeof AGENTS_SKILLS_MOUNT_TARGETS)[number];
+
+export interface AgentsSkillsMountPaths {
+  /** `llm/harness/`, absolute. */
+  readonly harnessRoot: string;
+  /** Destination: `~/.agents/skills`. */
+  readonly agentsSkills: string;
+  /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
+  readonly formerSkillRoots: readonly string[];
+}
+
+/** A `ManagedDirReport` that also says which target planned it. */
+export interface AgentsSkillsMountReport extends ManagedDirReport {
+  readonly target: AgentsSkillsMountTarget;
+}
+
+/**
+ * `~/.agents/skills/`: the cross-harness skills mount, one link per skill
+ * directory of `skills/`. Codex reads it as the user scope of its skill
+ * discovery (https://learn.chatgpt.com/docs/build-skills, `$HOME/.agents/skills`),
+ * and so do pi and omp (omp: the `agents` provider, "Load skills from
+ * .agent/skills and .agents/skills (project walk-up + user home)",
+ * `packages/coding-agent/src/discovery/agents.ts`). One directory, one plan,
+ * whichever target asks: the same links are planned from the same sources,
+ * so the second target to run finds every entry `ok`. The report carries
+ * which target planned it, and the dry-run says so.
+ *
+ * Today the directory holds yoki-switch's links into the retired
+ * `claude-profiles/` tree, dangling since the sources moved; those are stale
+ * and go (`formerSourceDirs`, `probeDangling`), anything else is not jig's.
+ */
+export async function planAgentsSkillsMount(
+  ports: ClaudeApplyPorts,
+  paths: AgentsSkillsMountPaths,
+  target: AgentsSkillsMountTarget,
+  now: Date,
+): Promise<AgentsSkillsMountReport> {
+  const sourceDir = `${paths.harnessRoot}/skills`;
+  const selection = selectSkillDirs(await listSkillCandidates(ports, sourceDir));
+  const report = await planManagedDir(ports, {
+    dir: paths.agentsSkills,
+    sourceDir,
+    selection,
+    now,
+    formerSourceDirs: paths.formerSkillRoots,
+    probeDangling: true,
+  });
+  return { ...report, target };
 }
 
 export function withBackup(plan: LinkPlan, now: Date): LinkReport {

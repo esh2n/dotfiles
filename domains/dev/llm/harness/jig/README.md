@@ -75,7 +75,8 @@ inverted.
 | 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, and the removal of `YOKI_*` from `env`; MCP servers as printed `claude mcp add` lines | **done** |
 | 2 | The sources move: `skills/`, `rules/` and `agents/` into `llm/harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`), and retires `~/.claude/commands` | **done** |
 | 3a | Codex: `~/.agents/skills` and `~/.codex/skills` as managed link directories, `~/.codex/AGENTS.md`, `~/.codex/agents/*.toml`, jig's MCP block in `~/.codex/config.toml` | **done** |
-| 3b | pi, omp, DSH | |
+| 3b | omp: the same `~/.agents/skills` mount (one plan shared with 3a), `~/.omp/agent/agents/*.md`, jig's entries in `~/.omp/agent/mcp.json`, `~/.omp/agent/extensions/jig.ts` → jig's omp extension; `config.yml` reported, not owned | **done** |
+| 3c | pi, DSH | |
 | 4 | `yoki-switch` retired, along with `core/config/manager.sh`'s `link_*` functions for the harnesses | |
 
 ### What each milestone replaces in `yoki-switch`
@@ -97,7 +98,9 @@ Rows cite the destination table in
 | `link_external_resources()` (yoki-switch:411-452) and `external-links.yaml` | folded into the flat tree | 2 |
 | `.claude-packs` / `packs.default` / `pack enable\|disable` | gone — rules are selected by `paths:` frontmatter, skills by the judgment service | 2 |
 | `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex: `codex-agents.js`, `codex-skills.js`, the `# yoki:begin` block of `config.toml`, the `~/.agents/skills` links | `app/apply/apply-codex.ts` + `domain/codex/{skills,agents,config}.ts`, with the milestone-2 delivery verbs shared through `app/apply/delivery.ts` | 3a |
-| `targets/gen.js` for omp, `link_pi_resources` / `link_dsh_resources` / `link_omp_resources` in `core/config/manager.sh` | per-target modules under `app/apply/` | 3b |
+| `targets/gen.js` for omp: `omp-agents.js` + `omp-tool-names.js`, `omp-mcp.js`, the `~/.agents/skills` links, `link_omp_resources` in `core/config/manager.sh` | `app/apply/apply-omp.ts` + `domain/omp/{agents,mcp,agent-dir}.ts`, the mount through `app/apply/delivery.ts`'s `planAgentsSkillsMount` (shared with 3a) | 3b |
+| `targets/gen.js` for omp: `omp-config-yml.js`, `omp-rules-md.js`, `omp-hooks.js` (`config.yml`, `RULES.md`, `yoki-hooks.json`, the `yoki-*.ts` extension links) | nothing yet — reported as leftovers by 3b; `config.yml` ownership is a ruling not made | 4 |
+| `link_pi_resources` / `link_dsh_resources` in `core/config/manager.sh` | per-target modules under `app/apply/` | 3c |
 
 ### Milestone 1: what `jig apply --target claude` does
 
@@ -366,3 +369,106 @@ Destinations, one source tree:
 manifest and provenance, then the two directories — and any conflict
 anywhere (a hand-edited generated file, the block, a server declared outside
 it) returns `wrote: false` with nothing written.
+
+### Milestone 3b: omp
+
+```sh
+bun src/cli/jig.ts apply --target omp            # dry-run: the plan, the diffs, the leftovers
+bun src/cli/jig.ts apply --target omp --write    # writes everything in one run; any conflict aborts it
+```
+
+Same shape as the Codex target, over omp's agent directory and the
+cross-harness skills mount. Never part of `--target all`. The agent directory
+is resolved the way omp resolves it (`domain/omp/agent-dir.ts`, from
+[environment-variables.md §6](https://github.com/can1357/oh-my-pi/blob/main/docs/environment-variables.md)
+and [config-usage.md "Profiles"](https://github.com/can1357/oh-my-pi/blob/main/docs/config-usage.md#profiles)):
+`~/.omp/agent` by default, `~/.omp/profiles/<name>/agent` under
+`OMP_PROFILE` (or the legacy `PI_PROFILE`), `PI_CODING_AGENT_DIR` as a whole
+replacement for the default profile only, `PI_CONFIG_DIR` renaming `.omp`.
+The formats are omp's own documentation and sources, cited where each is
+fixed in code: [task-agent-discovery.md](https://github.com/can1357/oh-my-pi/blob/main/docs/task-agent-discovery.md)
+(custom agents), [mcp-config.md](https://github.com/can1357/oh-my-pi/blob/main/docs/mcp-config.md)
+(`mcp.json`), [extension-loading.md](https://github.com/can1357/oh-my-pi/blob/main/docs/extension-loading.md)
+(extensions), and `packages/coding-agent/src/tools/builtin-names.ts` (tool
+ids).
+
+Destinations, one source tree:
+
+- **`~/.agents/skills/`** — the directory the Codex target delivers, from
+  the one function both call (`planAgentsSkillsMount` in
+  `app/apply/delivery.ts`): same sources, same selection, same stale rules,
+  so whichever target runs first creates the links and the other finds every
+  entry `ok`. The report carries which target planned it and the dry-run
+  says so. omp reads the directory through its `agents` provider
+  ("Load skills from .agent/skills and .agents/skills"), and
+  `~/.claude/skills` through its `claude` provider; duplicate names are
+  deduplicated by omp, first provider wins.
+- **`~/.omp/agent/agents/<name>.md`** — one generated file per
+  `agents/*.md`, manifest-tracked (a hand edit is a conflict; a file jig has
+  no record of writing — today yoki's — is kept as
+  `<name>.md.pre-jig.<stamp>` first; a file no source produces is not
+  jig's). omp's agent file is the source's own shape, so the body is copied
+  verbatim and only the frontmatter is translated (`domain/omp/agents.ts`):
+  `name` and `description` verbatim (omp drops a file missing either);
+  `tools:` through a fixed table onto omp's ids — omp's own
+  `normalizeToolNames` lower-cases a name only when the result is a built-in
+  id, so `WebSearch` or `TodoWrite` would otherwise pass through as unknown
+  tools and restrict the agent to nothing; `WebFetch` maps to `read`, which
+  is omp's URL reader; a name with no omp tool is left out and counted
+  (`NotebookEdit`, `Skill`), which only narrows the agent; an empty result
+  omits the key and omp grants its default set. `model:` is a Claude tier
+  and omp wants a provider-qualified selector or a `modelRoles` alias; jig
+  has no source for that mapping, so `model` is left out and the dry-run
+  counts the gap per tier, exactly as the Codex target does
+  (`OmpApplyOptions.ompModels`, empty at the composition root until a
+  decision note fills it). The generated frontmatter is validated as YAML
+  before writing.
+- **`~/.omp/agent/mcp.json`** — jig's entries of `mcpServers` for every
+  server with `targets.omp: true` (`targetOverrides.omp` applied, `{{HOME}}`
+  substituted, `${VAR}` left for omp to expand at discovery; stdio:
+  `type`, `command`, `args`, `env`; http/sse: `type`, `url`, `headers`),
+  in omp's documented shape (`domain/omp/mcp.ts`). Per the
+  [MCP-list decision](../rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md)
+  omp gets the full list: its MCP client is lazy (`xdev`), so a server
+  costs nothing until called. Ownership is per entry: every `mcpServers`
+  entry no source produces (a hand-added server, or one from `/mcp add`) and
+  every other top-level key (`$schema`, `disabledServers`, `enabledServers`)
+  is carried through and named. Hand-edit detection compares jig's entries,
+  not the file — omp writes into this file itself — so a server omp adds
+  after jig wrote is not a conflict, while a `/mcp disable` on a jig server
+  (omp edits the entry's `enabled` in place) is one, and the dry-run names
+  `disabledServers` as the way that does not collide. A file that cannot be
+  read as a JSON object is a conflict too: nothing can be carried through,
+  so nothing is written. On the machine yoki-switch left, the file holds two
+  of the six servers in the other order: one write, then noop.
+- **`~/.omp/agent/extensions/jig.ts`** — a symlink to
+  `jig/adapters/omp/src/index.ts`, the extension that carries the guard,
+  the session record, the formatter and the stop gate
+  ([adapters/omp/README.md](adapters/omp/README.md), "Installing it"). omp's
+  native discovery scans that directory for `*.{ts,js}`, "symlinks are
+  treated as eligible files/directories", and loads TypeScript directly, so
+  there is no package and no build. The directory is created when missing;
+  a regular file at the link's path is renamed aside. The directory's other
+  entries are listed and left alone: `yoki-bridge.ts` and `yoki-guard.ts`
+  under a "yoki leftovers (milestone 4)" heading, anything else as not
+  jig's. To switch the extension off, `disabledExtensions:
+  [extension-module:jig]` in `config.yml` — omp derives that id from the
+  link's name.
+- **Report only.** `yoki-hooks.json`, `RULES.md`, `.yoki/` and `config.yml`
+  under the agent directory are yoki's, listed with what each is and left
+  for milestone 4. jig does not own `config.yml` in this milestone: omp's
+  approval policy, tool settings and model roles live there, and what jig
+  should write is a ruling not yet made. Skills and the instructions file
+  reach omp natively — `~/.agents/skills` above, and `~/.claude/CLAUDE.md`
+  (→ `AGENTS.md`) through omp's `claude` provider; jig writes no
+  `~/.omp/agent/AGENTS.md`, which would shadow it. The conditional `paths:`
+  rules (`rules/<lang>/`) are **not** delivered to omp in this milestone:
+  omp has no `~/.claude/rules` reader and jig's omp extension does not
+  inject them yet. The dry-run names that gap.
+
+`--write` writes all of it in one run — the generated files, `mcp.json`,
+the manifest and provenance, then the skills mount and the extension link —
+and any conflict anywhere (a hand-edited generated file, a changed jig entry
+in `mcp.json`, an unreadable `mcp.json`, a regular file where the
+`extensions` directory should be) returns `wrote: false` with nothing
+written.

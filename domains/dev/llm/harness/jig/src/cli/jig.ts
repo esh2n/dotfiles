@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ClaudeApplyPaths } from "../app/apply/apply-claude";
 import type { CodexApplyOptions, CodexApplyPaths } from "../app/apply/apply-codex";
+import type { OmpApplyOptions, OmpApplyPaths } from "../app/apply/apply-omp";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
@@ -14,6 +15,7 @@ import { skillQuestionMode } from "../app/routing/select-skills";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
+import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
 import type { Ports } from "../domain/ports";
 import { createNodeApplyFs } from "../infra/apply/node-apply-fs";
 import { JsonlAuditLog } from "../infra/audit/jsonl-audit";
@@ -158,6 +160,51 @@ function codexApplyOptions(): CodexApplyOptions {
     codexModels: {},
     validateToml: (text) => {
       Bun.TOML.parse(text);
+    },
+  };
+}
+
+/**
+ * Where the omp target reads from and writes to.
+ *
+ * The agent directory follows omp's own rules (`domain/omp/agent-dir.ts`:
+ * `PI_CODING_AGENT_DIR`, `OMP_PROFILE`/`PI_PROFILE`, `PI_CONFIG_DIR`), for
+ * the reason the other two targets honour their overrides. `~/.agents/skills`
+ * is the same mount the Codex target delivers, under `$HOME` whatever the
+ * agent directory is. The extension target is jig's own omp adapter inside
+ * this checkout, linked by absolute path so the link holds from wherever
+ * the agent directory is.
+ */
+function resolveOmpApplyPaths(): OmpApplyPaths {
+  const harness = harnessRoot();
+  const agentDir = resolveOmpAgentDir(process.env, homedir()).dir;
+  return {
+    harnessRoot: harness,
+    mcpServers: join(harness, "mcp", "servers.json"),
+    formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
+    agentsSkills: join(homedir(), ".agents", "skills"),
+    agentDir,
+    agentsDir: join(agentDir, "agents"),
+    mcpJson: join(agentDir, "mcp.json"),
+    extensionsDir: join(agentDir, "extensions"),
+    extensionTarget: join(harness, "jig", "adapters", "omp", "src", "index.ts"),
+    home: homedir(),
+  };
+}
+
+/**
+ * What the omp target needs beyond its paths. The model map is empty for
+ * the reason the Codex one is: omp wants a provider-qualified selector or a
+ * `modelRoles` alias, and jig has no source that names one for Claude's
+ * tier names. The frontmatter is validated as YAML with Bun's parser before
+ * a file is written, so a description that breaks the frontmatter is
+ * refused here rather than dropped by omp at discovery.
+ */
+function ompApplyOptions(): OmpApplyOptions {
+  return {
+    ompModels: {},
+    validateFrontmatter: (yaml) => {
+      Bun.YAML.parse(yaml);
     },
   };
 }
@@ -430,6 +477,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         resolveApplyPaths(),
         { ports: applyPorts, paths: resolveClaudeApplyPaths(), hookPaths: claudeHookPaths() },
         { ports: applyPorts, paths: resolveCodexApplyPaths(), options: codexApplyOptions() },
+        { ports: applyPorts, paths: resolveOmpApplyPaths(), options: ompApplyOptions() },
       );
       process.stdout.write(result.stdout);
       return result.code;
@@ -552,7 +600,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -612,6 +660,16 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  and [mcp_servers.*] for targets.codex servers inside a `# jig:begin mcp` block of\n" +
           "  ~/.codex/config.toml, every other table preserved. A server already declared outside the\n" +
           "  block is a conflict to clean up by hand once. hooks.json is jig codex register's.\n" +
+          "  Dry-run by default; --write does all of it in one run; never part of --target all.\n" +
+          "  apply --target omp delivers the same sources to omp (~/.omp/agent, or the active profile's\n" +
+          "  agent dir per OMP_PROFILE/PI_PROFILE/PI_CODING_AGENT_DIR): the same ~/.agents/skills mount the\n" +
+          "  codex target delivers (one plan, either target); ~/.omp/agent/agents/<name>.md generated from\n" +
+          "  agents/*.md (omp's own frontmatter; tools mapped to omp ids, unmappable ones dropped and counted;\n" +
+          "  model left out until a ruling maps Claude tiers to omp selectors; body verbatim); jig's entries in\n" +
+          "  ~/.omp/agent/mcp.json for targets.omp servers, every other entry and key carried through; and\n" +
+          "  extensions/jig.ts -> jig's omp extension. yoki-hooks.json, RULES.md, .yoki/, config.yml and\n" +
+          "  yoki's extension links are reported as leftovers, not touched; config.yml is not jig's yet.\n" +
+          "  Conditional paths: rules are not delivered to omp in this milestone (the dry-run says so).\n" +
           "  Dry-run by default; --write does all of it in one run; never part of --target all.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +

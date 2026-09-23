@@ -20,94 +20,30 @@
  *   not know is left out, so Codex applies its own default, and reported.
  *   The generator never invents a Codex model id.
  *
+ * The source parser and the model question are `../claude/agent-definition.ts`,
+ * shared with the omp target; the Codex names below are kept for callers.
+ *
  * Pure: text in, text out. The caller reads the file and validates the
  * result as TOML if it wants to.
  */
 
-export interface AgentDefinition {
-  readonly name: string;
-  readonly description: string;
-  readonly tools: readonly string[];
-  /** The `model:` value as written, trimmed; absent when the frontmatter has none. */
-  readonly model?: string;
-  /** The prompt, frontmatter removed, surrounding blank lines trimmed. */
-  readonly body: string;
-}
+import {
+  type AgentDefinition,
+  type ModelChoice,
+  modelChoiceFor,
+  parseAgentDefinition,
+} from "../claude/agent-definition";
 
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+export { parseAgentDefinition };
+export type { AgentDefinition };
 
-/**
- * The four fields, read off the frontmatter as text. A scalar may be bare or
- * quoted; `tools` may be a flow list (`["Read", "Grep"]`), a comma-separated
- * scalar, or a block list. Nothing else in the frontmatter is looked at.
- */
-export function parseAgentDefinition(text: string, fileStem: string): AgentDefinition {
-  const match = FRONTMATTER_RE.exec(text);
-  const front = match?.[1] ?? "";
-  const body = (match === null ? text : text.slice(match[0].length)).replace(/^\n+|\n+$/g, "");
-  const lines = front.split(/\r?\n/);
+/** See `ModelChoice`: the same three answers, for a Codex model id. */
+export type CodexModelChoice = ModelChoice;
 
-  const scalar = (key: string): string | undefined => {
-    const line = lines.find((candidate) => candidate.startsWith(`${key}:`));
-    if (line === undefined) return undefined;
-    const raw = line.slice(key.length + 1).trim();
-    return raw === "" ? undefined : unquote(raw);
-  };
-
-  const model = scalar("model");
-  return {
-    name: scalar("name") ?? fileStem,
-    description: scalar("description") ?? "",
-    tools: parseTools(lines),
-    ...(model === undefined ? {} : { model }),
-    body,
-  };
-}
-
-function parseTools(lines: readonly string[]): readonly string[] {
-  const at = lines.findIndex((line) => line.startsWith("tools:"));
-  if (at === -1) return [];
-  const raw = (lines[at] ?? "").slice("tools:".length).trim();
-  if (raw !== "") {
-    const flow = /^\[(.*)\]$/.exec(raw)?.[1];
-    return (flow ?? raw)
-      .split(",")
-      .map((tool) => unquote(tool.trim()))
-      .filter((tool) => tool !== "");
-  }
-  const items: string[] = [];
-  for (const line of lines.slice(at + 1)) {
-    const item = /^\s+-\s*(.+?)\s*$/.exec(line)?.[1];
-    if (item === undefined) break;
-    items.push(unquote(item));
-  }
-  return items;
-}
-
-function unquote(value: string): string {
-  const quoted = /^(["'])(.*)\1$/.exec(value);
-  return quoted?.[2] ?? value;
-}
-
-/**
- * The `model` a Codex agent gets for a source tier, or why it gets none.
- * `inherit` is Claude Code's "the caller's model" and has no Codex form
- * either, but it is not a gap: leaving `model` out is exactly what it means.
- */
-export type CodexModelChoice =
-  | { readonly kind: "mapped"; readonly tier: string; readonly model: string }
-  | { readonly kind: "inherit" }
-  | { readonly kind: "unmapped"; readonly tier: string };
-
-export function codexModelFor(
+export const codexModelFor: (
   tier: string | undefined,
   map: Readonly<Record<string, string>>,
-): CodexModelChoice {
-  if (tier === undefined || tier === "inherit") return { kind: "inherit" };
-  const key = tier.toLowerCase();
-  const model = map[key];
-  return model === undefined ? { kind: "unmapped", tier } : { kind: "mapped", tier, model };
-}
+) => CodexModelChoice = modelChoiceFor;
 
 /**
  * A TOML basic string (https://toml.io/en/v1.0.0#string): `"` and `\`

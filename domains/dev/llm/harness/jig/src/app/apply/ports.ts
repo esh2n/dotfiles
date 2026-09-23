@@ -58,3 +58,6 @@ export interface ClaudeApplyPorts extends ApplyPorts {
  * so a use-case says which harness it is about.
  */
 export type CodexApplyPorts = ClaudeApplyPorts;
+
+/** The omp target: generated files, one link, one directory of links. The same verbs again. */
+export type OmpApplyPorts = ClaudeApplyPorts;
