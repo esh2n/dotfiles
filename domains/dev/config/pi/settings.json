@@ -16,7 +16,9 @@
     "https://github.com/sting8k/pi-vcc",
     "https://github.com/dbachelder/pi-btw",
     "npm:@plannotator/pi-extension",
-    "npm:pi-web-access"
+    "npm:pi-web-access",
+    "npm:pi-mcp-adapter",
+    "npm:@tintinweb/pi-subagents"
   ],
   "lastChangelogVersion": "0.85.1",
   "theme": "unkai"
