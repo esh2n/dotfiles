@@ -76,8 +76,16 @@ if [ "$OS" = Darwin ]; then
     local cask="$1" app="$2"
     if brew list --cask "$cask" >/dev/null 2>&1; then ok "$cask (brew)"; return; fi
     if [ -d "$app" ]; then
-      if brew install --cask --adopt "$cask" >/dev/null 2>&1; then did "$cask adopted (was installed by hand)"
-      else todo "$app is installed by hand at a version the cask ($cask) does not match: update it from inside the app (or quit it and move it to the Trash — models and settings live under ~/.lmstudio and ~/Library, not in the app) and re-run"
+      # `--adopt` only records an app whose version equals the cask's; compare
+      # first, because a doomed attempt still asks for sudo (chgrp) and shows
+      # the owner a bare "Password:" with no explanation (measured 2026-09-23).
+      local have want
+      have="$(defaults read "$app/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || true)"
+      want="$(brew info --cask --json=v2 "$cask" 2>/dev/null | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1 | tr ',' '+')"
+      if [ -n "$have" ] && [ "$have" = "$want" ] && brew install --cask --adopt "$cask" >/dev/null 2>&1; then
+        did "$cask adopted (was installed by hand, version $have)"
+      else
+        todo "$app is installed by hand at version ${have:-?}, the cask ($cask) is ${want:-?}: update it from inside the app, or quit it and move it to the Trash (models and settings live under ~/.lmstudio and ~/Library, not in the app); then re-run"
       fi
     else
       brew install --cask "$cask" >/dev/null 2>&1 && did "$cask installed" || todo "brew install --cask $cask failed — run it by hand to see why"
@@ -94,9 +102,14 @@ fi
 step "2. Tailscale login"
 TS_UP=0
 if [ -n "$TS_BIN" ]; then
-  state="$("$TS_BIN" status --json 2>/dev/null | sed -n 's/.*"BackendState": *"\([A-Za-z]*\)".*/\1/p' | head -1)"
+  # `|| true` inside the capture: a freshly installed Tailscale answers "The
+  # Tailscale CLI failed to start: Failed to load preferences" until the app
+  # has been opened once, and under pipefail that exit would end the script
+  # here (measured 2026-09-23) instead of becoming the owner step below.
+  ts_json="$("$TS_BIN" status --json 2>/dev/null || true)"
+  state="$(printf '%s' "$ts_json" | sed -n 's/.*"BackendState": *"\([A-Za-z]*\)".*/\1/p' | head -1)"
   if [ "$state" = Running ]; then
-    TS_UP=1; ok "logged in ($("$TS_BIN" status --json | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1))"
+    TS_UP=1; ok "logged in ($(printf '%s' "$ts_json" | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1))"
   else
     [ "$OS" = Darwin ] && open -a Tailscale 2>/dev/null || true
     todo "log in to Tailscale (menu-bar app on macOS: Log in; Linux: sudo tailscale up), then re-run this script for the serve steps"
@@ -130,7 +143,7 @@ if [ "$OS" = Darwin ]; then
     [ -n "$REMOTE_HOST" ] && launchctl setenv LM_STUDIO_REMOTE_HOST "$REMOTE_HOST"
     # Restart so the job picks up the litellm-up.sh make link just deployed.
     launchctl bootout "$(uid_gui)/com.esh2n.litellm-proxy" 2>/dev/null || true
-    launchctl bootstrap "$(uid_gui)" "$plist" && did "litellm-proxy (re)loaded"
+    launchctl bootstrap "$(uid_gui)" "$plist" && did "litellm-proxy (re)loaded" || todo "launchctl bootstrap of com.esh2n.litellm-proxy failed"
     for _ in $(seq 1 60); do port_answers http://127.0.0.1:4000/health/liveliness && break; sleep 2; done
     port_answers http://127.0.0.1:4000/health/liveliness && ok ":4000 answers" || todo "LiteLLM did not come up on :4000 within 2 min — tail ~/Library/Logs/litellm-proxy.log"
     port_answers http://127.0.0.1:4001/metrics && ok ":4001 metrics answers" || todo "LiteLLM metrics :4001 not answering — the deployed litellm-up.sh must carry --prometheus_metrics_port"
@@ -158,7 +171,7 @@ if [ "$ROLE" = hub ]; then
   if agent_loaded com.esh2n.lmstudio-awake; then
     ok "awake job loaded"
   elif [ -f "$awake" ]; then
-    launchctl bootstrap "$(uid_gui)" "$awake" && did "awake job loaded (caffeinate while the server lives)"
+    launchctl bootstrap "$(uid_gui)" "$awake" && did "awake job loaded (caffeinate while the server lives)" || todo "launchctl bootstrap of com.esh2n.lmstudio-awake failed"
   else
     todo "$awake missing — make link should have written it"
   fi
@@ -168,10 +181,10 @@ fi
 step "6. tailscale serve"
 if [ "$TS_UP" = 1 ]; then
   if [ "$ROLE" = hub ]; then
-    "$TS_BIN" serve --bg --tcp 1234 tcp://127.0.0.1:1234 >/dev/null && did "tcp:1234 → LM Studio"
-    "$TS_BIN" serve --bg --https=3001 127.0.0.1:3001 >/dev/null && did "https:3001 → Open WebUI"
+    "$TS_BIN" serve --bg --tcp 1234 tcp://127.0.0.1:1234 >/dev/null && did "tcp:1234 → LM Studio" || todo "tailscale serve --tcp 1234 failed"
+    "$TS_BIN" serve --bg --https=3001 127.0.0.1:3001 >/dev/null && did "https:3001 → Open WebUI" || todo "tailscale serve --https=3001 failed (HTTPS needs MagicDNS + HTTPS certificates enabled in the admin console)"
   else
-    "$TS_BIN" serve --bg --tcp 4001 tcp://127.0.0.1:4001 >/dev/null && did "tcp:4001 → LiteLLM metrics"
+    "$TS_BIN" serve --bg --tcp 4001 tcp://127.0.0.1:4001 >/dev/null && did "tcp:4001 → LiteLLM metrics" || todo "tailscale serve --tcp 4001 failed"
   fi
   "$TS_BIN" serve status 2>/dev/null | sed 's/^/    /'
 else
