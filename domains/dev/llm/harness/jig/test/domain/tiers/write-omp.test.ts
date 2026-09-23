@@ -58,7 +58,7 @@ describe("toOmpProxyBlock", () => {
     ].join("\n");
     const after = spliceManagedBlock(before, content, TIERS_MANAGED_BLOCK_MARKERS);
     expect(after).toContain("  lm-studio:\n    baseUrl: http://127.0.0.1:9/v1\n");
-    expect(after).toContain("        contextWindow: 1000000\n");
+    expect(after).toContain("        contextWindow: 200000\n        maxContextWindow: 1000000\n");
     expect(after.startsWith("providers:\n")).toBe(true);
   });
 
