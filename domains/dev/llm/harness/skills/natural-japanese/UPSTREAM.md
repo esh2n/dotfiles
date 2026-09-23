@@ -11,10 +11,14 @@ Vendored from https://github.com/coji/natural-japanese
 ```sh
 git clone --depth 1 https://github.com/coji/natural-japanese /tmp/nj
 rsync -a --delete --exclude UPSTREAM.md /tmp/nj/skills/natural-japanese/ \
-  "$DOTFILES_ROOT/domains/dev/config/claude-profiles/personal/skills/natural-japanese/"
+  "$DOTFILES_ROOT/domains/dev/llm/harness/skills/natural-japanese/"
 # update the pinned commit above, then:
-yoki-switch apply
+jig apply --target claude --write
 ```
 
 Scripts run via `uv run` (PEP 723 inline deps). `semantic.py` is heavyweight
 (torch + sentence-transformers, ~1GB model download on first run).
+
+## Local changes
+
+SKILL.md instructions rendered in English (2026-09-23, ruling 2026-09-23-model-facing-english.md); references/ and scripts/ untouched. Re-apply after an upstream sync.

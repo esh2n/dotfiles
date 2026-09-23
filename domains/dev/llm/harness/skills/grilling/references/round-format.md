@@ -1,156 +1,160 @@
-# ラウンド文書の形式
+# Round document format
 
-grilling が各ラウンドで書き出す `.claude/.cache/grilling/<slug>/round-<n>.md` の仕様。
+Specification of the `.claude/.cache/grilling/<slug>/round-<n>.md` that grilling writes out each round.
+Round documents are owner-facing: prose, labels and option text are written in Japanese; this file describes the structure.
 
-**この形式のフェンス付き YAML ブロックが、ローカルの描画面（`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/render.mjs`）が
-読む機械可読な正本である。** 散文（`### ❓ Q[n]` ブロック）は人間が読む面で、
-YAML ブロックは機械が読む面。**両者は常に同じ内容でなければならない。**
-片方だけを直さない。散文を書き換えたら同じラウンドの YAML も直す。
+**The fenced YAML blocks in this format are the machine-readable source of truth read by the
+local renderer (`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/render.mjs`).**
+The prose (`### ❓ Q[n]` blocks) is the human-facing side; the YAML blocks are the
+machine-facing side. **Both must always carry the same content.** Never fix only one.
+If you rewrite the prose, fix the same round's YAML too.
 
-## 全体構造
+## Overall structure
 
 1. frontmatter
-2. `## 前提`（任意） — 散文 + ```premise フェンス（YAML）
-3. `## 設計ツリー` — ```tree フェンス（YAML）
-4. 問いごとに `### ❓ Q[n]` の散文ブロック
-   → ```diagram フェンス 0 個以上 → ```question フェンス（YAML）
-5. 各問いの直後に `answer:` 行
+2. `## 前提` (optional) — prose + a ```premise fence (YAML)
+3. `## 設計ツリー` — a ```tree fence (YAML)
+4. Per question, a `### ❓ Q[n]` prose block
+   → zero or more ```diagram fences → a ```question fence (YAML)
+5. An `answer:` line right after each question
 
-`diagram` は必ず散文と `question` フェンスの**あいだ**に置く。順番が違うと
-レンダラーがスキーマ違反として弾く。
+A `diagram` always goes **between** the prose and the `question` fence. Any other
+order is rejected by the renderer as a schema violation.
 
 ## 1. frontmatter
 
 ```yaml
 ---
-slug: <対象から作った英小文字ケバブケース>
-round: <整数。1 始まり>
-target: <対象の1行説明。ファイルが対象ならパス>
-status: open | answered   # このラウンドの全問に回答が付いたら answered
+slug: <lowercase kebab-case derived from the target>
+round: <integer, starting at 1>
+target: <one-line description of the target; the path if it is a file>
+status: open | answered   # answered once every question in this round has an answer
 ---
 ```
 
-## 2. 前提（任意、ラウンドに 1 つ）
+## 2. Premise (optional, one per round)
 
-そのラウンドを読む人が最初に要る文脈。散文の**最初の段落**がページのリード文に、
-```premise フェンスが前提パネルの定義リストになる。
+The context a reader of this round needs first. The **first paragraph** of prose becomes
+the page's lead; the ```premise fence becomes the premise panel's definition list.
 
 ```yaml
-task: <この作業は何か。1〜2行>
-decided: <すでに決まっていること>
-why_now: <なぜ今この判断が要るのか>
-unblocks: <これが決まると何が始まるか>
+task: <what this work is, 1–2 lines>
+decided: <what is already decided>
+why_now: <why this decision is needed now>
+unblocks: <what starts once this is decided>
 ```
 
-4 つのキーはすべて任意だが、**それ以外のキーは書けない**（スキーマ違反になる）。
+All four keys are optional, but **no other key is allowed** (schema violation).
 
-## 3. 設計ツリー
+## 3. Design tree
 
-```tree フェンスの中身は YAML。ノードは `id` / `label` / `state` / `children`。
-`state` は `decided` | `open` | `asked` のいずれか。
+The ```tree fence holds YAML. Nodes have `id` / `label` / `state` / `children`.
+`state` is one of `decided` | `open` | `asked`.
 
-- `decided` — 回答済み。`decision` に決まったことを1行で書く。
-- `asked` — このラウンドで質問中。回答待ち。`asks: q1` を書くと、描画面で
-  そのノードのラベルがその問い（`#q1`）へのリンクになる。任意。
-- `open` — 未着手。前提がすべて `decided` の `open` ノードが frontier。
+- `decided` — answered. Write the decision in one line under `decision`.
+- `asked` — being asked in this round; awaiting an answer. Writing `asks: q1` makes the
+  renderer link that node's label to the question (`#q1`). Optional.
+- `open` — not started. `open` nodes whose prerequisites are all `decided` form the frontier.
 
 ```yaml
 - id: n2
   label: 有効期限とリフレッシュ戦略
   state: asked
-  asks: q3          # 任意。この節点で聞いている問いの id
+  asks: q3          # optional; id of the question asked at this node
   children: []
 ```
 
-ページのヘッダの進捗行（決定済み x / 回答待ち y / 未着手 z）はこの木から数える。
-木は**入れ子リスト**として描かれる（横に伸びる図にすると読めなくなるため）。
+The page header's progress line (決定済み x / 回答待ち y / 未着手 z) is counted from this tree.
+The tree is drawn as a **nested list** (a sideways-growing figure becomes unreadable).
 
-## 4. 問い
+## 4. Questions
 
-散文ブロックは SKILL.md §7 と同じ形式。直後に ```question フェンスを置く。
+The prose block uses the same format as SKILL.md §7. Place a ```question fence right after it.
 
-「なぜ今この判断か」「抽象／具体」の行の後、選択肢の箇条書きの前に置いた行は**解説**として
-ページに描画される。使える記法は 段落 / `- ` 箇条書き / `####` 小見出し / GFM 表 /
-`**太字**` / `` `code` `` / リンク。読み物にせず、小見出しで塊を分け、比較は表にする。
+Lines placed after the "なぜ今この判断か" and "抽象／具体" lines and before the option bullets
+render on the page as **explanation**. Allowed syntax: paragraphs / `- ` bullets / `####`
+subheadings / GFM tables / `**bold**` / `` `code` `` / links. Not reading material:
+split blocks with subheadings and put comparisons in tables.
 
 ```yaml
-id: q1                      # 散文の Q 番号と一致させる
+id: q1                      # must match the prose Q number
 options:
   - key: A
-    label: <選択肢>
-    gains: <得るもの>
-    loses: <失うもの>
-recommended: A              # options の key のいずれか
-prioritized_tradeoff: <推奨で重視したトレードオフ。1行>
-rationale: |                # 必須。推奨の論証。2〜4文
-  <いま一番多く変わるのは何か>
-  <他案の利点がなぜ今は要らないのか>
-  <条件つきなら、どうなったら推奨がひっくり返るか>
+    label: <option>
+    gains: <what it gains>
+    loses: <what it loses>
+recommended: A              # one of the option keys
+prioritized_tradeoff: <the trade-off prioritized in the recommendation, one line>
+rationale: |                # required; the argument for the recommendation, 2–4 sentences
+  <what changes the most right now>
+  <why the other options' advantages are not needed now>
+  <if conditional, what would flip the recommendation>
 sources:
   - kind: url               # url | path
-    ref: https://...        # kind: path なら path:line
+    ref: https://...        # for kind: path, path:line
 ```
 
-`prioritized_tradeoff` は**見出し**（1行）、`rationale` は**本文**（複数段落可、
-行内マークダウンの最小サブセットが使える）。選択肢の label / gains / loses を
-言い直すだけの rationale は書かない——**選択肢の表を読めば分かることは書かない**。
+`prioritized_tradeoff` is the **heading** (one line); `rationale` is the **body** (several
+paragraphs allowed, with a minimal subset of inline Markdown). Do not write a rationale that
+merely restates the options' label / gains / loses — **never write what the options table already shows**.
 
-## 5. 図（任意、問いごとに 0 個以上）
+## 5. Diagrams (optional, zero or more per question)
 
-**構造を比べる問いには図を描く。** どの部品がどこに載るか、どの経路が変わるか——
-言葉より絵のほうが速い問いは描く。逆に**一文で言えるならその一文を書く**。
+**Draw a diagram for questions that compare structure.** Which component sits where, which
+route changes — where a picture is faster than words, draw it. Conversely, **if one sentence
+says it, write that sentence.**
 
 ```yaml
-id: d1                       # 必須。その問いの中で一意
-title: 現在地                # 必須。図の名前
-caption: <この絵が主張することを一文で>   # 任意。figcaption と aria-label
-direction: right             # 任意。書かなければ列幅に収まる向きをレンダラーが選ぶ
-groups:                      # 任意。ノードを囲む枠
+id: d1                       # required; unique within the question
+title: 現在地                # required; the figure's name
+caption: <one sentence stating what this picture claims>   # optional; figcaption and aria-label
+direction: right             # optional; omitted, the renderer picks the orientation that fits the column
+groups:                      # optional; frames around nodes
   - id: browser
     label: ブラウザ
     tone: ts                 # ts | rs | new | neutral
-nodes:                       # 必須。1 個以上
+nodes:                       # required; one or more
   - id: spa
     label: SPA
-    group: browser           # 任意。groups の id
-    tone: ts                 # 任意。既定は neutral
-    dashed: true             # 任意。まだ無いもの・将来のもの
-    emphasis: true           # 任意。太枠＋太字。図に 1〜2 個まで
-edges:                       # 任意
+    group: browser           # optional; a groups id
+    tone: ts                 # optional; default neutral
+    dashed: true             # optional; something not yet existing / future
+    emphasis: true           # optional; bold frame + bold text; 1–2 per figure at most
+edges:                       # optional
   - from: spa
     to: sdk
-    label: 呼ぶ              # 任意
-    kind: sync               # 必須。sync | async | reply
+    label: 呼ぶ              # optional
+    kind: sync               # required; sync | async | reply
 ```
 
-- `kind` — `sync` は実線＋塗りつぶし矢尻（同期の呼び出し）、`async` は実線＋
-  開いた矢尻（非同期・生成）、`reply` は破線＋開いた矢尻（応答・戻り）。
-- 凡例は**実際に使われた種類だけ**が sync → async → reply の順で自動で付く。
-  辺が無い図には凡例も付かない。
-- `tone` はページの配色トークンにそのまま対応する。既存／新規／別言語側といった
-  「どちら側の話か」を色で分けるために使い、装飾のために使わない。
-- `direction` は**書かないほうがよい**。書かなければ、レンダラーが横向き・縦向きの
-  両方を試して本文の列（720px）に収まるほうを選び、必要なら 0.78 倍までは縮める。
-  明示するとその向きに固定され、収まらなければ横スクロールになる。
-- `label` / `caption` / `title` に `: `（コロン + 空白）を含めるときは**必ず引用符で
-  囲む**（例: `label: "A: push"`）。裸で書くと YAML が入れ子のマッピングと解釈し、
-  レンダラーが `YAML として読めません` のスキーマ違反で止まる。選択肢を辺のラベルで
-  区別する `A: …` / `B: …` の書き方は便利なぶん、この罠に毎回かかる。
+- `kind` — `sync` is a solid line with a filled arrowhead (synchronous call), `async` a solid
+  line with an open arrowhead (asynchronous / spawn), `reply` a dashed line with an open arrowhead (response / return).
+- The legend lists **only the kinds actually used**, automatically, in the order sync → async → reply.
+  A figure with no edges gets no legend.
+- `tone` maps directly to the page's color tokens. Use it to separate "which side this is"
+  — existing / new / the other-language side — never for decoration.
+- `direction` is **better left out**. Omitted, the renderer tries both horizontal and vertical,
+  picks the one that fits the body column (720px), and shrinks down to 0.78x if needed.
+  Set explicitly, the orientation is fixed and overflows into horizontal scrolling if it does not fit.
+- When `label` / `caption` / `title` contain `: ` (colon + space), **always quote them**
+  (e.g. `label: "A: push"`). Written bare, YAML reads it as a nested mapping and the renderer
+  stops with a `YAML として読めません` schema violation. Distinguishing options by edge labels
+  as `A: …` / `B: …` is handy and falls into this trap every time.
 
-## 6. 回答
+## 6. Answers
 
-回答を得たら、その問いの ```question フェンスの直後に1行で追記する。
+Once an answer is in, append one line right after that question's ```question fence.
 
 ```
-answer: A — <ユーザーの言葉。選択肢外の自由回答ならその内容をそのまま>
+answer: A — <the user's words; a free-text answer outside the options, verbatim>
 ```
 
-回答が付いたら設計ツリーの該当ノードを `decided` にし、frontmatter の
-`status` を更新する。新しく生まれた未決事項は次ラウンドの木に `open` で足す。
+When an answer is attached, set the design tree's node to `decided` and update the frontmatter
+`status`. Add newly created open items to the next round's tree as `open`.
 
 ---
 
-## 記入例（round-2.md）
+## Example (round-2.md)
 
 ````markdown
 ---
@@ -313,21 +317,21 @@ sources:
 answer: A — 即時同期。ただし BroadcastChannel 非対応環境は B にフォールバック
 ````
 
-## 描画
+## Rendering
 
 ```sh
-# ローカルで回答まで集める（既定）。全問の提出まで戻らない
+# Collect answers locally (default). Does not return until every question is submitted
 node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" serve .claude/.cache/grilling/<slug>/round-<n>.md
 
-# Artifact に出す fragment を書き出す
+# Write out a fragment for the Artifact tool
 node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" .claude/.cache/grilling/<slug>/round-<n>.md \
   --fragment -o "$SCRATCHPAD/round-<n>.html"
 ```
 
-スキーマ違反は終了コード 2 で、どのブロックのどのフィールドかを出す。
+A schema violation exits with code 2 and names the block and field.
 
-ページの意匠は `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/lib/kit.mjs` が自動で決める。writeup-kit
-（`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`）があればそちらの
-chrome・コンポーネント・図の検証に乗り、無ければこれまでどおり grilling 自前の
-意匠にフォールバックする。この形式自体（frontmatter / 前提 / 設計ツリー / 問い /
-図）はどちらの意匠でも変わらない。詳細は `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md`。
+The page design is chosen automatically by `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/lib/kit.mjs`. When writeup-kit
+(`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`) exists, it rides on that kit's
+chrome, components and diagram checks; otherwise it falls back to grilling's own
+design as before. The format itself (frontmatter / premise / design tree / questions /
+diagrams) is the same under either design. Details: `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md`.

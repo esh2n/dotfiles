@@ -7,127 +7,133 @@ metadata:
 
 # grilling
 
-対象: $ARGUMENTS
+Target: $ARGUMENTS
 
-## 1. 目的
+## 1. Purpose
 
-plan / design / decision を、共通理解に達するまで詰める。
+Grill a plan / design / decision until shared understanding is reached.
 
-ユーザーが「共通理解に達した」と明示的に確認するまで、実装にも計画作成にも移らない。
-中途半端な合意で先へ進むのがこのスキルの唯一の失敗モード。
+Do not move to implementation or planning until the user explicitly confirms
+"共通理解に達した" (shared understanding reached). Moving on with a half-formed
+agreement is this skill's only failure mode.
 
-## 2. 入力
+## 2. Input
 
-- **対象** — テキストまたはファイルパス。省略時は直前の会話で扱っていた設計を対象にする。
-- `--out <path>` — 決定記録の書き出し先。sdd の `spec/requirements.md`、プロダクト独自 SDD の任意の md、または省略（＝チャットにのみ出す）。
-- `--hints "..."` — 呼び出し元スキルが渡す観点。frontier の初期シードとして使う。
+- **Target** — text or a file path. When omitted, use the design discussed most recently in the conversation.
+- `--out <path>` — where the decision record is written. sdd's `spec/requirements.md`, any md in a product's own SDD, or omitted (= chat only).
+- `--hints "..."` — angles passed by a calling skill. Use them as the initial seed of the frontier.
 
-## 3. 設計ツリーと frontier
+## 3. Design tree and frontier
 
-対象を**判断の木**として保持する。ノード = 決めるべきこと、辺 = 「A を決めないと B は決められない」。
+Hold the target as a **decision tree**. Node = something to decide; edge = "B cannot be decided until A is".
 
-- **frontier** = 前提がすべて解決済みで、まだ決まっていないノード。次に出す問いは必ず frontier から選ぶ。
-- 回答を受けたらノードを `decided` にし、その回答が生んだ新しい未決ノードを子として木に足す。
-- **深さ優先**。1本の枝を洞察が尽きるまで掘ってから隣の枝へ移る。話題を跳ね回らない。
-- 木は毎ラウンドのラウンド文書に記録する（§8）。
+- **frontier** = nodes whose prerequisites are all resolved and which are still undecided. Every question you ask must come from the frontier.
+- On an answer, mark the node `decided` and add the new open nodes that answer created as its children.
+- **Depth first.** Dig one branch until the insight runs out, then move to the next. Do not hop between topics.
+- Record the tree in every round document (§8).
 
-## 4. 事実は聞かず調べる
+## 4. Facts are investigated, not asked
 
-コード・環境・設定・ドキュメントを読めば分かることは**ユーザーに聞かない**。
+Whatever can be learned by reading code, environment, config, or docs, **do not ask the user**.
 
-- 調査はサブエージェント（`Explore` または `general-purpose`、model は sonnet）に投げる。複数の疑問は1回でまとめて並列に投げる。
-- 調査中の事実に依存する問いは frontier から一旦外し、結果が返ってから出す。
-- ユーザーに聞くのは**選択・トレードオフを伴う意思決定のみ**。「どうしますか」ではなく「A と B のどちらを失いますか」。
-- 甘い回答・曖昧な回答には突っ込む。「それはどちらの意味ですか」「その前提が崩れたら何が壊れますか」「その数字の出どころは」。同意して次へ行かない。
-- frontier のノードが外部呼び出し・キュー／トピック・メトリクス・ヘルスチェックに関わるときは、調査サブエージェントに `~/.claude/skills/*/references/review-checklist.md` を `ls` させ、存在するものの `## trade-offs` 節と、そこから指されている SKILL.md の節を読ませる。問いの選択肢と得失はその節から組み、出典は `~/.claude/skills/resilience-patterns/SKILL.md § Circuit breaker` の形で示す（§5 の内部文書引用の形式に従う）。checklist が無ければこの手順は飛ばす。
+- Delegate investigation to subagents (`Explore` or `general-purpose`, model sonnet). Bundle several questions into one parallel batch.
+- Pull questions that depend on a fact still under investigation off the frontier until the result is back.
+- Ask the user **only for decisions that involve a choice or trade-off**. Not "what do you want?" but "which of A and B do you give up?".
+- Push back on soft or vague answers: "which of the two do you mean?", "what breaks if that assumption fails?", "where does that number come from?". Do not agree and move on.
+- When a frontier node touches external calls, queues/topics, metrics, or health checks, have the investigating subagent `ls` `~/.claude/skills/*/references/review-checklist.md`, then read the `## trade-offs` section of each one that exists and the SKILL.md sections it points to. Build the question's options and gains/losses from those sections and cite them in the form `~/.claude/skills/resilience-patterns/SKILL.md § Circuit breaker` (follow §5's internal-document citation format). Skip this step when no checklist exists.
 
-## 5. 出典の扱い
+## 5. Sources
 
-- 推奨の根拠に外部文献（公式ドキュメント・論文・権威ある設計ガイド）を引くときは、sonnet サブエージェントに WebFetch させ、**URL が実在し、該当箇所が主張どおりであること**を確認してから引用する。
-- 確認できなかった出典は書かない。記憶からの引用は出典ではない。
-- **外部文書 (社内 wiki のページ、チケット、議事録) を根拠にするときは、識別子だけで
-  参照しない**。読者はその文書を知らない前提で、問いの中に次を書く: URL、誰が
-  (どの立場の人が) いつ書いたか、その文書が何を言っているか (平語で 2〜3 行)、
-  なぜこの問いに関係するか (何と食い違う・何を決めている)。番号や略称だけを
-  出して「〜に書かれている」と済ませると、読者は判断できない。
-- 相手側の文書と自分側の決定が食い違っているときは、その事実を問いの本文で
-  明示し、図には「どこが食い違うか」を描く。
-- repo 内の根拠は `path:line` で示す。行番号まで書く。
+- When a recommendation cites external literature (official docs, papers, authoritative design guides), have a sonnet subagent WebFetch it and confirm **the URL exists and the passage says what is claimed** before citing.
+- Never write a source you could not verify. A quote from memory is not a source.
+- **When an external document (an internal wiki page, a ticket, meeting minutes) is
+  the basis, never reference it by identifier alone.** Assume the reader does not
+  know the document, and write inside the question: the URL, who wrote it (in what
+  role) and when, what it says (2–3 plain lines), and why it matters to this
+  question (what it contradicts / what it decides). A bare number or abbreviation
+  plus "it says so in ..." leaves the reader unable to judge.
+- When the other side's document and your own decision conflict, state that fact
+  in the question body and draw "where they conflict" in the diagram.
+- Cite evidence inside the repo as `path:line`, down to the line number.
 
-## 6. チャネル
+## 6. Channels
 
-問いをどこに出すか。**1ラウンド = 1ページ**（frontier の問い **3〜6問**）を出すのが
-`local` と `artifact`。どちらもメインセッションが書くのは**ラウンド文書だけ**で、
-HTML の生成は **sonnet サブエージェント**に投げる。手で HTML や SVG を書かない。
+Where the questions go. `local` and `artifact` both put out **one page per round**
+(**3–6** frontier questions). In both, the main session writes **only the round
+document**; HTML generation is delegated to a **sonnet subagent**. Never hand-write
+HTML or SVG.
 
-描画ツールの実体は skill の外、`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/`
-にある（以下 `<render>` = `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render`）。
-ラウンドの HTML 意匠は `<render>` が自動で決める: きょうだいディレクトリ
-（`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`）に writeup-kit があれば
-そちらのページ意匠・図の検証（`bin/lib/verify-diagram.mjs`）に乗せ、無ければ
-grilling 自前の `template/style.css` と `lib/diagram.mjs` にフォールバックする。
-呼び出し側はどちらが使われているかを気にしなくてよい（`<render>/README.md` 参照）。
+The renderer lives outside the skill at `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/`
+(below, `<render>` = `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render`).
+`<render>` picks the round's HTML design on its own: when writeup-kit exists in the
+sibling directory (`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`) it rides on
+that page design and its diagram checks (`bin/lib/verify-diagram.mjs`); otherwise it
+falls back to grilling's own `template/style.css` and `lib/diagram.mjs`. The caller
+need not care which is in use (see `<render>/README.md`).
 
-フォールバック順は **local → artifact → chat**。codex から呼ばれる場合も含め、
-ブラウザのあるマシンなら常に local。artifact は共有したい・別端末で答えたい・
-ユーザーが指定したときだけ。chat は描画が使えないときの最終手段。
+Fallback order is **local → artifact → chat**. On any machine with a browser,
+including when called from codex, always local. artifact only when the user wants to
+share, answer from another device, or asks for it. chat is the last resort when
+rendering is unavailable.
 
-会社の痕跡（社内ドメインの remote、社内 org、社内ツール名、社内語）が見つかったら
-**artifact を使わない**（外部サービスへの公開になるため）。local はローカル描画で
-外部にデータが出ないので、会社の痕跡があっても使ってよい。判断がつかなければ
-**一度だけ聞く**。
+If company traces are found (an internal-domain remote, an internal org, internal
+tool names, internal jargon), **do not use artifact** (it publishes to an external
+service). local renders locally and sends no data out, so it is fine even with
+company traces. When unsure, **ask once**.
 
-### local（既定。ブラウザがあるマシンならこれ）
+### local (default; any machine with a browser)
 
-配信の前に次の 2 つを済ませる。どちらも sandbox 環境で実際に詰まった箇所。
+Finish these two before serving. Both are spots that actually got stuck in a sandbox.
 
-1. **描画ツールの実体を用意する**。`<render>/node_modules` が無ければ
-   `pnpm install` が要るが、`~/.claude/skills` が dotfiles への symlink だと
-   実体側に書けず `EPERM` で失敗する（`!` prefix でも同じ）。その場合は
-   `<render>` ごと scratchpad に複製してそこで `pnpm install` し、以後は
-   複製側の `render.mjs` を使う。sandbox の解除は求めない。
-2. **serve せずに描画して検証する**。
-   `node <render>/render.mjs <round.md> -o <scratchpad>/round-<n>.html` が
-   exit 0 になることを確認してから配信する。exit 2 はスキーマ違反で、
-   典型例は図のラベルに `A: push` のような `: ` 入りの値を裸で書いたもの
-   （YAML が入れ子と解釈する）。`: ` を含むラベルは必ず引用符で囲む。
-   検証せずに serve をサブエージェントに投げると、即終了しても結果が
-   戻らず待機状態だけが残る。
+1. **Materialize the renderer.** If `<render>/node_modules` is missing,
+   `pnpm install` is needed, but when `~/.claude/skills` is a symlink into dotfiles
+   the target is not writable and it fails with `EPERM` (same with a `!` prefix).
+   In that case copy the whole `<render>` into the scratchpad, `pnpm install` there,
+   and use the copy's `render.mjs` from then on. Do not ask to lift the sandbox.
+2. **Render and validate without serving.** Confirm
+   `node <render>/render.mjs <round.md> -o <scratchpad>/round-<n>.html`
+   exits 0 before serving. Exit 2 is a schema violation; the typical case is a
+   diagram label containing `: ` written bare, such as `A: push`
+   (YAML reads it as a nested mapping). Always quote labels containing `: `.
+   Handing serve to a subagent without validating first leaves only a hanging
+   wait: even if it exits immediately, the result never comes back.
 
-配信は `node <render>/render.mjs serve <round.md> --no-open` で行う。
-sandbox 内では `open` がブラウザに届かないので自動 open に頼らず、stderr の
-URL をすぐユーザーに伝える（メインセッションの `run_in_background` Bash で
-stderr を scratchpad のファイルに落として読むのが確実。サブエージェントに
-任せると全問提出まで URL が戻らない）。
+Serve with `node <render>/render.mjs serve <round.md> --no-open`.
+Inside a sandbox `open` never reaches the browser, so do not rely on auto-open;
+relay the URL from stderr to the user right away (the reliable way is a
+`run_in_background` Bash in the main session that dumps stderr to a scratchpad file
+and reads it. Delegated to a subagent, the URL comes back only after every
+question is submitted).
 
-**URL はラウンドをまたいで同じにする**。ユーザーは 1 つの URL を開き直して答え
-続けたいのであって、ラウンドごとに別ポートを渡されたいわけではない。`serve` は
-`--port` 省略時に **slug から決まる固定ポート**（40000〜49999）を使うので、同じ
-slug のラウンドは常に同じ URL になる。そのポートが別プロセスに使われていたときだけ
-空きポートへ退避し、その旨を stderr に出す。別の grilling は slug が違えばポートも
-違うので、同時に走らせても衝突しない。
+**Keep the URL the same across rounds.** The user wants to reopen one URL and keep
+answering, not receive a different port each round. With `--port` omitted, `serve`
+uses a **fixed port derived from the slug** (40000–49999), so rounds with the same
+slug always get the same URL. Only when that port is taken by another process does
+it fall back to a free one, and it says so on stderr. A different grilling has a
+different slug and therefore a different port, so running them concurrently does
+not collide.
 
-serve は**全問の提出まで戻らない**。戻り値の要約（`q1: A — …`）をそのまま
-`answer:` 行に写す。回答は `<round.md と同じディレクトリ>/answers.jsonl` にも
-残る（最後の行が勝つ）。
+serve **does not return until every question is submitted**. Copy its returned
+summary (`q1: A — …`) verbatim into the `answer:` lines. Answers also persist in
+`<same directory as round.md>/answers.jsonl` (last line wins).
 
-### artifact（共有したい・別端末で答えたい・ユーザーが指定したとき）
+### artifact (sharing, answering from another device, or user request)
 
-- `render.mjs <round.md> --fragment -o <scratchpad>/round-<n>.html` を走らせ、
-  返ってきたパスを Artifact ツールに渡す。
-- **毎ラウンド同じファイルパスを渡す**ことで URL を保つ（1 slug = 1 artifact）。
-  `capabilities: {artifact: {}}` を付け、入力が保存されセッションに通知が来るようにする。
-- 回答の回収は artifact の再読込（`action: "read"`）。各 `.answer` の `data-choice` と
-  `textarea` の値を取り出し、ラウンド文書に `answer:` 行として書き戻す。
-- 全問に回答が付いたら次のラウンドへ。同じ artifact を上書きする。
+- Run `render.mjs <round.md> --fragment -o <scratchpad>/round-<n>.html` and
+  pass the returned path to the Artifact tool.
+- **Pass the same file path every round** to keep the URL (1 slug = 1 artifact).
+  Add `capabilities: {artifact: {}}` so input is saved and the session is notified.
+- Collect answers by re-reading the artifact (`action: "read"`). Take each `.answer`'s
+  `data-choice` and `textarea` value and write them back into the round document as `answer:` lines.
+- Once every question has an answer, go to the next round. Overwrite the same artifact.
 
-### chat（フォールバック）
+### chat (fallback)
 
-§7 の形式で**1問ずつ**出し、回答を待つ。ページは作らない。
+Ask **one question at a time** in the §7 format and wait for the answer. No page is made.
 
-## 7. 1問の形式（チャット）
+## 7. Format of one question (chat)
 
-必ずこの Markdown を使う。**AskUserQuestion は使わない**（選択肢ごとの理由を並べ、自由記述の回答も許すため）。
+Always use this Markdown. **Do not use AskUserQuestion** (to lay out a reason per option and allow free-text answers). The template labels are Japanese because the page is owner-facing.
 
 ```
 ### ❓ Q[n]: [質問]
@@ -138,130 +144,138 @@ serve は**全問の提出まで戻らない**。戻り値の要約（`q1: A —
 **推奨: [A]** — 重視したトレードオフ: …。根拠: [出典 or path:line]
 ```
 
-チャットに出す1問は **25 行以内**。選択肢は 2〜4 個。
+One chat question is **25 lines or fewer**. 2–4 options.
 
-「なぜ今この判断か」は**具体例から入り、一文一義で書く**。「ユーザーが X を指定した。
-その後 Y が起きた。今の仕組みでは Z が動く。そのとき X をどうするかが決まっていない」の
-順で、1 文に 1 つの出来事だけを入れる。他文書の文言をそのまま貼らず、自分の言葉で
-言い直す。2 つの論点 (例: 食い違いが 2 点) があるなら、文を分けて 1 点ずつ書く。
+"なぜ今この判断か" (why this decision now) **starts from a concrete example, one
+fact per sentence**. Order: "the user specified X. Then Y happened. Under the current
+mechanism Z runs. What to do with X at that point is undecided", one event per
+sentence. Do not paste wording from other documents; restate in your own words. Two
+issues (e.g. two points of conflict) get separate sentences, one point each.
 
-## 8. ラウンド文書
+## 8. Round document
 
-チャネルによらず、問いを出すのと**同時に**同じ内容を
-`.claude/.cache/grilling/<slug>/round-<n>.md` に書く。
+Whatever the channel, **at the same time** as asking, write the same content to
+`.claude/.cache/grilling/<slug>/round-<n>.md`. Round documents are owner-facing: write their prose in Japanese.
 
-- `<slug>` は対象から作る英小文字ケバブケース。ディレクトリが無ければ作る。
-- プロジェクト外（git repo でない場所）で動かす場合は scratchpad 配下に書く。
-- 形式は `references/round-format.md` に従う。散文と機械可読 YAML ブロックの**両方**を書き、内容を一致させる。
-- ラウンド文書は問いのほかに **`## 前提`（そのラウンドの文脈）** と、問いごとの
-  **```diagram ブロック** も持つ。どちらも描画面（`<render>`）がそのまま図とパネルにする。
-- **読者はこの会話を読んでいない人だと仮定して書く**。数日後の本人も、他のメンバーも
-  同じ。`## 前提` には対象の仕組みを「何が・どこに・どう流れるか」から書き、
-  問いで使う言葉（購読、待ち行列、版、など）はそこで定義する。
-  会話中に付けた自作ラベル（「案B」「パターン2」）は**使わない**。参照するたびに中身で書く。
-- **`## 前提` は読ませる文章ではなく、引きに来る辞書として構造化する**。長い散文の
-  段落に用語を埋め込まない (読まれない)。形は次の 3 つに固定する:
-  1. リード 1 段落 (3 行以内): 対象は何で、このラウンドで何を決めるか
-  2. `**用語**` の箇条書き: 1 用語 1 行、「名前 — 何か」の形で 2 行以内。載せるのは
-     このラウンドの問いに出る用語だけ。出典の `path:line` は前提に書かず、各問いの
-     **具体** に置く
-  3. `**決まっていること**` の箇条書き: 1 決定 1 行
-  全体で画面 1 枚 (25 行) を超えたら削る。削れないなら、それは前提ではなく問いの中で
-  説明すべき内容。
-- **読者に前提知識が無い問いには、問いの中に解説を書く**。「なぜ今この判断か」と
-  「抽象／具体」の行の後に置いた段落はページに散文として描画される。そこに
-  (1) 登場する仕組みが何か、(2) 関係者が何を主張しているか、(3) 選択肢を同じ観点で
-  並べた比較、(4) 自分がどのトレードオフを取って推奨に至ったか、(5) 別の選択肢を
-  選ぶべき状況、を書く。前提の辞書(上記)は用語の引き当て用で、判断の材料には
-  ならない。解説をチャットにだけ書いてページに載せないと、ページだけを見る読者は
-  「前提の説明が無い」と保留する(実例あり)。
-- **解説は読み物にしない。構造化して「説明」にする**。段落の塊を並べると「長すぎて
-  読めない。情報は落とさず構造化しろ」と保留される(実例あり)。守ること:
-  1 塊は 3 行以内。`####` 小見出しで (1)〜(5) を分ける。比較は必ず GFM 表
-  (行 = 選択肢、列 = 同じ観点)。手順や列挙は `- ` 箇条書き。判断の核だけ `**太字**`。
-  仕組みの説明は概念ごとに図を分ける(1 問に図が 2〜3 枚あってよい。
-  例: 現在の基盤の流れ / 新しい部品の構造 / 案ごとの経路)。散文は「一文一義」で、
-  接続詞でつないだ長文を書かない。
-- **1 問に載せる量を絞る**。分かりにくさの主因は量と概念の数。1 問に新しい概念は
-  1 つまで。データ項目を出すときは**用途** (何のために要るか) を最初に 1 行で書き、
-  用途の無い項目は出さない。複数の項目をまとめた自作の呼び名を作らず、項目名を
-  そのまま書く。選択肢のラベルは「〜を持つ / 〜に置く / 〜で翻訳する」のように、
-  読めば絵が描ける動詞で書く。
-- **表の使いどころ**。複数の案を同じ観点で比べるとき、状況ごとに値がどうなるかを
-  並べるときに使う (行 = 案または状況、列 = 観点)。1 つの概念の説明や手順には使わず、
-  一文か箇条書きで書く。表は 4 列まで、セルは 1 行まで。表の前に「この表は何を
-  比べるか」を 1 文で書く。
-- **選択肢は「何を作るか・何がどこを通るか・その結果どうなるか」の 3 点で書く**。
-  「専用の購読を足す」だけでは読者は絵が描けない。作る部品、通る経路、待ち時間や
-  挙動の帰結まで書いて、初めて A と B の違いが分かる。
-- **図は既定で描く。省くほうが例外**。経路・配置・合成・状態遷移・待ち行列など、
-  選択肢ごとに「何がどこを通るか」が変わる問いは必ず ```diagram を持つ。読者は
-  ページだけを見て選ぶので、散文で説明した構造を絵にしないのは説明の欠落。
-  省いてよいのは、権限や命名のように**一文で言い切れて絵にしても情報が増えない**
-  問いだけで、その場合は散文の中にその一文を書く。
-- **serve に渡す前に自己点検する**: 各問いについて「選択肢を絵で並べたら違いが
-  見えるか」を問い、見えるなら描いていないのは不備として直す。図は 1 問 1 枚で、
-  選択肢の違いが**同じ絵の中で**分かるように (A の経路・B の経路を辺のラベルで) 描く。
-- **前のラウンドの決定は、番号でなく中身で引く**。「Q60 で決めたとおり」は読者に伝わらない。
-  決定記録やラウンド文書の該当箇所を grep し、決定の文をそのまま `## 前提` に引用する。
-  ユーザーの記憶と食い違う可能性があるので、ユーザーの発言も記録で裏を取ってから前提に書く。
-  決定の前提が後で変わったときは「前提が消えた」と明示して問い直す。
-- **決定済みの事項は問いにしない**。「この形にしますか」は承認伺いで、何と何を天秤に
-  かけるのかが無い。問いは「X と Y のどちらを取るか」の形にし、各問いの冒頭に
-  「決めてほしいこと」を 1 行で書く。決定済みの内容は前提に置く。
-- **設計 (ドメインモデル・DDL・手順) を扱う問いでは、コードはコードブロックで出す**。
-  Go の構造は ```go、DDL は ```sql の実物の文で書き、項目ごとの意図 (なぜ持つか、
-  なぜこの名前か) は各行のコメントに置く。下に「名前の意図」の節を別に作らない
-  (読者にスクロールを強いる)。ドメインモデルと DDL は別物として分けて書く
-  (DB だけの列、例えばテナントの id はドメインには無い)。主キー・index・べき等の
-  鍵まで書く。
-- **選択肢は「取るべきとき」まで書く**。得るもの／失うものの表の下に「A を取るとき: …」
-  「B を取るとき: …」を箇条書きで置く。読者は自分の状況がどちらかを当てはめて選ぶ。
-- **図は小さく**。1 図はノード 6 個まで、ラベルは 1 行。長い流れは概念ごとに分ける。
-  横スクロールが要る図は失敗。
-- **「具体」の行には事実を書く**。`path:line` の羅列は根拠の置き場であって説明ではない。
-  「今の行は page_id を必ず持つ」のように、その行が何をしているかを一文で書き、
-  `path:line` はその後ろに添える。
-- ユーザーの回答は同じファイルに `answer:` として追記し、`status` を `answered` にする。
-- **リポジトリにはコミットしない**。対象プロジェクトの `.gitignore` に `.claude/.cache/` が
-  含まれているか確認し、含まれていなければ追記するかユーザーに知らせる。
+- `<slug>` is lowercase kebab-case derived from the target. Create the directory if missing.
+- Outside a project (not a git repo), write under the scratchpad.
+- Follow `references/round-format.md`. Write **both** the prose and the machine-readable YAML blocks, and keep them consistent.
+- Besides the questions, a round document carries **`## 前提` (that round's context)** and a
+  **```diagram block** per question. The renderer (`<render>`) turns both straight into figures and panels.
+- **Write for a reader who has not read this conversation.** That includes yourself days
+  later and other members. In `## 前提`, start from how the target works — "what, where,
+  how it flows" — and define the terms the questions use (subscription, queue, version, etc.) there.
+  **Never use** ad-hoc labels coined during the conversation ("案B", "パターン2"). Spell out the content at every reference.
+- **`## 前提` is a dictionary to look things up in, not prose to read through.** Do not bury
+  terms in long paragraphs (they go unread). Fix the shape to these three:
+  1. One lead paragraph (3 lines max): what the target is and what this round decides
+  2. A `**用語**` bullet list: one term per line, "name — what it is", 2 lines max. Only terms
+     that appear in this round's questions. `path:line` sources go in each question's
+     **具体**, not here
+  3. A `**決まっていること**` bullet list: one decision per line
+  If the whole thing exceeds one screen (25 lines), cut. If it cannot be cut, it is not
+  context but something the question itself must explain.
+- **When the reader lacks background for a question, write the explanation inside the question.**
+  Paragraphs placed after the "なぜ今この判断か" and "抽象／具体" lines render as prose on the
+  page. Put there: (1) what the mechanisms involved are, (2) what each party claims,
+  (3) a comparison of the options on the same criteria, (4) which trade-off you took to
+  reach the recommendation, (5) when another option should be chosen. The premise
+  dictionary (above) is for term lookup and does not serve as decision material. Explanation
+  written only in chat and left off the page makes a page-only reader defer with
+  "no context given" (this has happened).
+- **Explanation is not reading material. Structure it into an "explanation".** A stack of
+  paragraphs gets deferred with "too long to read; keep the information, structure it"
+  (this has happened). Rules: one block is 3 lines max. Separate (1)–(5) with `####`
+  subheadings. Comparisons are always GFM tables (row = option, column = same criterion).
+  Steps and enumerations are `- ` bullets. Only the core of the judgment gets `**bold**`.
+  Split mechanism explanations into one figure per concept (2–3 figures per question is
+  fine, e.g. current platform flow / new component structure / route per option). Prose is
+  one fact per sentence; no long sentences chained with conjunctions.
+- **Limit what one question carries.** Volume and the number of concepts are the main
+  causes of confusion. At most one new concept per question. When listing data items,
+  give the **purpose** (what it is needed for) first in one line, and drop items with no
+  purpose. Do not coin a collective name for several items; write the item names as they
+  are. Label options with verbs that let the reader picture them: "hold X / put it in Y /
+  translate via Z".
+- **Where tables belong.** For comparing several options on the same criteria, or laying
+  out how a value changes per situation (row = option or situation, column = criterion).
+  Not for explaining one concept or a procedure; use a sentence or bullets. Tables have
+  4 columns max, one line per cell. Precede each table with one sentence saying what it compares.
+- **Write options as three things: what is built, what passes through where, and what results.**
+  "Add a dedicated subscription" alone gives the reader no picture. Only when the component
+  built, the route taken, and the consequences for latency and behavior are written does the
+  difference between A and B show.
+- **Diagrams are the default; omitting one is the exception.** Any question where "what
+  passes through where" differs per option — routes, placement, composition, state
+  transitions, queues — must have a ```diagram. The reader chooses from the page alone, so a
+  structure explained in prose but not drawn is a missing explanation. Omit only for questions
+  such as permissions or naming that **fit in one sentence and gain nothing from a picture**,
+  and then write that sentence in the prose.
+- **Self-check before handing to serve**: for each question ask "if the options were drawn
+  side by side, would the difference be visible?"; if yes and it is not drawn, fix it as a
+  defect. One figure per question, with the options' difference visible **within the same
+  picture** (A's route and B's route as edge labels).
+- **Cite earlier rounds' decisions by content, not by number.** "As decided in Q60" means
+  nothing to the reader. grep the decision record or round documents for the passage and quote
+  the decision sentence verbatim in `## 前提`. The user's memory may differ, so verify the
+  user's own statements against the record before putting them in the premise.
+  When a decision's premise later changes, state "the premise is gone" and re-ask.
+- **Do not turn decided matters into questions.** "Shall we go with this shape?" is a request
+  for approval with nothing weighed against anything. Phrase questions as "X or Y?", and open
+  each with one line of "what I need decided". Decided content goes in the premise.
+- **Questions about design (domain model, DDL, procedures) show code in code blocks.** Go
+  structures as real ```go, DDL as real ```sql statements, with the intent per field (why it
+  exists, why this name) in a comment on each line. Do not add a separate "intent of names"
+  section below (it forces the reader to scroll). Keep domain model and DDL apart as different
+  things (DB-only columns, e.g. a tenant id, are not in the domain). Write primary keys,
+  indexes, and idempotency keys too.
+- **Options say "when to pick this" too.** Under the gains/losses table, put bullets
+  "A を取るとき: …" / "B を取るとき: …". The reader maps their situation onto one and chooses.
+- **Keep diagrams small.** 6 nodes max per figure, one-line labels. Split long flows by concept.
+  A figure that needs horizontal scrolling is a failure.
+- **The "具体" line states facts.** A run of `path:line` is where evidence lives, not an
+  explanation. Write one sentence on what that line does, e.g. "the current line always carries
+  page_id", then append the `path:line`.
+- Append the user's answer to the same file as `answer:` and set `status` to `answered`.
+- **Do not commit to the repository.** Check that the target project's `.gitignore` contains
+  `.claude/.cache/`; if not, add it or tell the user.
 
-## 9. 記録の寿命
+## 9. Lifetime of records
 
-- **HTML** — scratchpad に出す。**残さない**（`serve` はファイルに書かず配るだけ）。
-- **ラウンド文書 / `answers.jsonl`** — `.claude/.cache/grilling/<slug>/`。
-  grilling をしているあいだだけ。`answers.jsonl` は `answer:` 行に写したら用済み。
-- **決定記録を書いた時点で**、そのラウンドを順に連結して同じディレクトリの
-  `transcript.md` にまとめ、`round-<n>.md` は削除する。決定記録の「元ラウンド」は
-  `transcript.md` を指す。
-- **スキル開始時**に、`.claude/.cache/grilling/` 直下の slug ディレクトリのうち
-  mtime が 60 日より古いものを消し、消したことを**1行で**言う。
+- **HTML** — goes to the scratchpad. **Not kept** (`serve` only distributes, never writes a file).
+- **Round documents / `answers.jsonl`** — `.claude/.cache/grilling/<slug>/`.
+  Only for the duration of the grilling. `answers.jsonl` is spent once copied into `answer:` lines.
+- **When the decision record is written**, concatenate the rounds in order into
+  `transcript.md` in the same directory and delete the `round-<n>.md` files. The decision
+  record's "元ラウンド" points at `transcript.md`.
+- **At skill start**, delete slug directories directly under `.claude/.cache/grilling/`
+  whose mtime is older than 60 days, and say so in **one line**.
 
   ```sh
   find .claude/.cache/grilling -mindepth 1 -maxdepth 1 -type d -mtime +60 -exec rm -rf {} +
   ```
 
-- **grilling は writeup の store（`~/.local/share/writeup/`）に直接書き込まない。**
-  決定記録を保存として残すときは §12 の writeup 手順（`decision-page.mjs` → `writeup` の
-  保存フロー）を必ず経由する。grilling 自身が store 配下にファイルを置くことはない。
+- **grilling never writes directly into writeup's store (`~/.local/share/writeup/`).**
+  When a decision record is to be kept, always go through the §12 writeup route
+  (`decision-page.mjs` → `writeup`'s save flow). grilling itself never places files under the store.
 
-## 10. 終了
+## 10. Ending
 
-frontier が空になり、重要な枝に暗黙の前提が残っていないことを確認したうえで、
-「共通理解に達しましたか」と聞く。
+Once the frontier is empty and no important branch has an implicit assumption left,
+ask "共通理解に達しましたか" (have we reached shared understanding?).
 
-- 続行を求められたら、指摘された箇所をノードとして木に足し、深掘りを再開する。
-- 「もう十分」と言われても、未決の前提が残っていればそれを1行で列挙してから終える。
+- If asked to continue, add the pointed-out items to the tree as nodes and resume digging.
+- Even if told "もう十分" (enough), list any remaining undecided assumptions in one line each before ending.
 
-## 11. まとめフェーズ
+## 11. Wrap-up phase
 
-1. 2〜3案が並立したまま残っていたら、**比較表**を提示する（列: 案 / 得るもの / 失うもの / 向く状況）。
-2. 決定記録を **200〜300 字ごとの節**に区切り、順に提示する。各節の末尾で「ここまで合っていますか」と確認を取る。
-3. 食い違いが出たら §3 の木に戻り、その枝を掘り直す。
+1. If 2–3 options are still standing side by side, present a **comparison table** (columns: 案 / 得るもの / 失うもの / 向く状況).
+2. Split the decision record into **sections of 200–300 characters** and present them in order. At the end of each, confirm "ここまで合っていますか" (correct so far?).
+3. On a mismatch, go back to the §3 tree and re-dig that branch.
 
-## 12. 決定記録の形式
+## 12. Decision record format
 
-`--out` のファイルに書く。既存ファイルに `## 決定記録` があれば更新、無ければ末尾に追記する。
+Write to the `--out` file. If the file already has `## 決定記録`, update it; otherwise append. The record is owner-facing and written in Japanese, with these headings verbatim.
 
 ```markdown
 ## 決定記録
@@ -279,47 +293,47 @@ frontier が空になり、重要な枝に暗黙の前提が残っていない�
 `.claude/.cache/grilling/<slug>/transcript.md`
 ```
 
-**ADR 昇格の基準**: 戻しにくい／自明でない／本物のトレードオフがある——この3つを**すべて**満たす決定のときだけ、別途 ADR の作成を提案する（勝手に書かない）。
+**ADR promotion criteria**: hard to reverse / not obvious / a real trade-off — propose a separate ADR only for decisions that meet **all three** (never write one unasked).
 
-### 決定記録を残す（ユーザーが保存を望んだとき）
+### Keeping the decision record (when the user wants it saved)
 
-`--out` に書いた決定記録をページとして残したいとユーザーが言ったら、次を実行する。
-grilling 自身は store に触らない——ここから先は writeup 側の手順。
+When the user says they want the `--out` decision record kept as a page, run the following.
+grilling itself does not touch the store — from here on it is writeup's procedure.
 
 ```sh
 node <render>/decision-page.mjs <--out のファイル> --out <scratchpad>/decision.html
 ```
 
-`decision-page.mjs` は `## 決定記録` ブロック（決まったこと / 検討して却下した案 /
-未決・前提 / 推奨アプローチ / 出典 / 次のステップ / 元ラウンド）を writeup-kit の
-`kind: 決定記録` ページに変換し、書き出した直後に kit の
-`bin/self-check.mjs --write-meta` を走らせて結果を出す（writeup-kit が無い環境では
-実行できない旨だけ伝える）。self-check の指摘（長文・括弧の重なりなど）は
-内容側の問題なので、必要なら決定記録の文面を削ってから作り直す。
+`decision-page.mjs` converts the `## 決定記録` block (決まったこと / 検討して却下した案 /
+未決・前提 / 推奨アプローチ / 出典 / 次のステップ / 元ラウンド) into a writeup-kit
+`kind: 決定記録` page and, right after writing it, runs the kit's
+`bin/self-check.mjs --write-meta` and reports the result (where writeup-kit is absent, just
+say it cannot run). self-check findings (long sentences, nested parentheses, etc.) are
+content problems, so trim the decision record's wording if needed and regenerate.
 
-保存は writeup の手順に従う: `<store>/<folder>/<date>-<slug>.html` に置き、
-`writeup` の build / commit を経る。grilling は `--out` のファイルと
-`decision.html` を作るところまでで、store への配置・commit は writeup 側の責務。
+Saving follows writeup's procedure: place it at `<store>/<folder>/<date>-<slug>.html` and go
+through `writeup`'s build / commit. grilling stops at producing the `--out` file and
+`decision.html`; placing it in the store and committing is writeup's responsibility.
 
-## 13. 他スキルからの利用
+## 13. Use from other skills
 
-`grilling <対象> --out <path> --hints "..."` を呼ぶだけでよい。
+Just call `grilling <対象> --out <path> --hints "..."`.
 
-例（sdd clarify）:
+Example (sdd clarify):
 
 ```
 grilling "spec/requirements.md の要件" --out spec/requirements.md \
   --hints "入出力の形式 / エッジケース / 非機能要件 / 既存コードとの統合点 / スコープ境界"
 ```
 
-呼び出し元は、grilling が「共通理解に達した」と報告してから次のフェーズへ進む。
+The caller proceeds to the next phase only after grilling reports "共通理解に達した".
 
-Codex からは `@grilling`（または /skills メニュー）で使える。`codex/SKILL.md` が同じ round-format と render を参照する。
+From Codex, use `@grilling` (or the /skills menu). `codex/SKILL.md` references the same round-format and render.
 
-## 参考
+## References
 
-- `references/round-format.md` — ラウンド文書の形式（機械可読な正本）
-- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md` — ラウンド文書を1ページの HTML にする描画面（writeup-kit がある場合の意匠も含む）
-- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/decision-page.mjs` — 決定記録 Markdown を writeup の `kind: 決定記録` ページに変換する
+- `references/round-format.md` — round document format (the machine-readable source of truth)
+- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md` — the renderer that turns a round document into a one-page HTML (including the design used when writeup-kit is present)
+- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/decision-page.mjs` — converts a decision-record Markdown into a writeup `kind: 決定記録` page
 - Matt Pocock, `grilling` skill — https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling
 - ryonakae, `dig` skill — https://github.com/ryonakae/dotfiles/blob/master/config/.agents/skills/dig/SKILL.md

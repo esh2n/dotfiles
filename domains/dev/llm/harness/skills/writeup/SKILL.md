@@ -1,6 +1,6 @@
 ---
 name: writeup
-description: Use when the user wants a document that is kept and revisited rather than a one-off chat answer — a decision record (決定記録), design doc (設計), research summary (調査まとめ), reference roundup (参考資料まとめ), PBI doc (PBI 資料), picture explainer (絵解き), work note (作業メモ), or meeting minutes (議事録). Triggers include "まとめて", "設計書にして", "決定記録を残して", "資料にして", "writeup", "/writeup", and a research/design-review/acceptance/deliberate workflow that returned a Markdown report worth keeping. Not for a single in-chat visual answer (use show-me), a beginner picture explainer (use eli5), or a grilling interview round. Also not writeup when the text is headed somewhere else — Notion, a 社内 wiki, Slack, スライド, a PR description, or a repo README — even when the request says まとめて or 議事録.
+description: Use when the user wants a document that is kept and revisited rather than a one-off chat answer — a decision record (決定記録), design doc (設計), research summary (調査まとめ), reference roundup (参考資料まとめ), PBI doc (PBI 資料), picture explainer (絵解き), work note (作業メモ), or meeting minutes (議事録). Triggers include "まとめて", "設計書にして", "決定記録を残して", "資料にして", "writeup", "/writeup", and a research/design-review/acceptance/deliberate workflow that returned a Markdown report worth keeping. Not for a single in-chat visual answer (use show-me), a beginner picture explainer (use eli5), or a grilling interview round. Also not writeup when the text is headed somewhere else — Notion, a company wiki, Slack, slides, a PR description, or a repo README — even when the request says まとめて or 議事録.
 metadata:
   namespaces: [doc]
 ---
@@ -12,7 +12,8 @@ metadata:
 writeup produces one HTML page for one of 8 kinds of durable document,
 saved into a git-backed store (a commit on every save). The visual and
 structural contract lives in `writeup-kit`; this file drives it. Page
-output is Japanese; class names, IR keys and CLI flags are English.
+output is Japanese (the pages are owner-facing); class names, IR keys, CLI
+flags and the `kind` identifiers (設計, 作業メモ, 絵解き, 決定記録 …) are used verbatim.
 
 ## Zero-dependency rule and kit resolution
 
@@ -40,7 +41,7 @@ before step 1:** `node "$SELF/scripts/init-store.mjs" --name work
 --description 仕事`, then the same with `--name private --description 個人
 --default` (each becomes its own git repo), then carry on. Decide from the
 request wording, the repository you are in, and the recent conversation;
-declare it in one line before saving (「work に保存します」); ask once only
+declare it in one line before saving (「work に保存します」, "saving to work"); ask once only
 when genuinely unsure. Set `STORE=<that path>` and pass `--store "$STORE"`
 to every kit CLI (`serve`/`publish` also take `--store-name`). After the
 first save inside a repository, offer `init-store.mjs --marker <name>`: it
@@ -85,7 +86,7 @@ into `private`.
      `ui-capture` skill instead of describing it in prose: derive the
      scenario from the routes/components the diff touched, GIF only for a
      flow and PNG for a state (budgets fps 10 / width 800 / ≤ 8s). If it
-     cannot be captured, say why under 未確認 instead of leaving a
+     cannot be captured, say why under the 未確認 (unverified) section instead of leaving a
      `.wu-shot` without a file.
 4. **Lint.** `node $KIT/bin/lint.mjs page.html --json`.
    `--surface-only` only for 作業メモ (contract Q33). `lint.mjs` finds
@@ -158,7 +159,7 @@ name="published-artifact">`, commit. Exit 4 (private-word refusal) is
 final — never bypass it. `--to cloudflare` needs `[cloudflare]
 access_verified = true`. Exit codes and walkthroughs: `references/publish.md`.
 
-**別 harness からも同じ URL を（Codex / omp を含む）**: `--to yoki-artifact`
+**The same URL from another harness (Codex / omp included)**: `--to yoki-artifact`
 is the cross-harness route to a private URL — it stages exactly like `--to
 file` (full standalone document, private-word check included, no
 `--internal`), writes `<store>/.publish/<slug>.yoki-artifact.html`, then
@@ -175,13 +176,13 @@ update a page under the same channel, never a new one. A missing or failing
 CLI is exit 9, with the CLI's own message as the detail. Walkthrough:
 `references/publish.md`; the CLI itself: the `yoki-artifact` skill.
 
-**GitHub PR（非公開リポでも可）**: `--to github` is the one target that
+**GitHub PR (private repos too)**: `--to github` is the one target that
 writes a **folder**, not a single file — there is no repo commit, no
 branch and no external host in this path, only GitHub's own attachment
 store. `node $KIT/bin/publish.mjs page.html --to github --out
 <dir> [--pdf] [--internal]` writes `<slug>.md` (figures linked as
 `figures/<name>.svg`), `figures/*.svg` restyled standalone, a staged
-`<slug>.html` (the 原本, useful on its own), and `<slug>.pdf` with `--pdf`.
+`<slug>.html` (the original, useful on its own), and `<slug>.pdf` with `--pdf`.
 Hand the folder to `gh pr create|comment --body-file <slug>.md --attach
 figures/... [--attach <slug>.pdf]`, run **from inside that folder** —
 `--attach` only rewrites a `![alt](figures/x.svg)` reference when the

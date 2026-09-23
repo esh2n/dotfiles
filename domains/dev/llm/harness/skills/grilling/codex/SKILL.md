@@ -1,45 +1,45 @@
 ---
 name: grilling
-description: plan / design / decision を共通理解に達するまで詰める設計インタビュー。「詰めて」「深掘りして」「設計を詰めたい」「プランの穴を突いて」や、設計ドラフトを渡して何が足りないか聞かれたときに使う。トレードオフを伴う判断だけを聞き、調べれば分かる事実は自分で調べる。
+description: Design interview that grills a plan / design / decision until shared understanding is reached. Use when the user says "詰めて", "深掘りして", "設計を詰めたい", "プランの穴を突いて", or hands over a draft design and asks what is missing. Asks only about decisions that involve trade-offs; facts that can be looked up are investigated, not asked.
 argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 ---
 
 # grilling
 
-対象: $ARGUMENTS（省略時は直前の会話で扱っていた設計）。`--out <path>` は決定記録の書き出し先、`--hints "..."` は観点の初期シード。
+Target: $ARGUMENTS (when omitted, the design discussed most recently in the conversation). `--out <path>` is where the decision record is written; `--hints "..."` is the initial seed of angles.
 
-## 役割
+## Role
 
-- ユーザーが「共通理解に達した」と明示的に言うまで、実装にも計画作成にも移るな。中途半端な合意で先へ進むのが唯一の失敗モード。
-- 対象を**判断の木**として保持しろ。ノード = 決めるべきこと、辺 = 「A を決めないと B は決められない」。
-- **frontier** = 前提がすべて解決済みで未決のノード。問いは必ず frontier から選べ。回答を受けたらそのノードを `decided` にし、生まれた未決ノードを子として足せ。
-- **深さ優先**。1本の枝を洞察が尽きるまで掘ってから隣へ移れ。話題を跳ね回るな。
-- コード・環境・設定・ドキュメントを読めば分かることは**聞くな、自分で調べろ**。調査中の事実に依存する問いは frontier から一旦外し、結果が出てから出せ。
-- ユーザーに聞くのは**トレードオフを伴う意思決定のみ**。「どうしますか」ではなく「A と B のどちらを失いますか」。
-- 甘い回答には突っ込め。「それはどちらの意味か」「その前提が崩れたら何が壊れるか」「その数字の出どころは」。同意して次へ行くな。
-- 出典は**実在を確認してから**引け。確認できなかった出典は書くな。記憶からの引用は出典ではない。repo 内の根拠は `path:line` で行番号まで示せ。
+- Do not move to implementation or planning until the user explicitly says "共通理解に達した" (shared understanding reached). Moving on with a half-formed agreement is the only failure mode.
+- Hold the target as a **decision tree**. Node = something to decide; edge = "B cannot be decided until A is".
+- **frontier** = undecided nodes whose prerequisites are all resolved. Always pick questions from the frontier. On an answer, mark that node `decided` and add the open nodes it created as children.
+- **Depth first.** Dig one branch until the insight runs out, then move to the next. Do not hop between topics.
+- Whatever can be learned by reading code, environment, config, or docs: **do not ask, investigate it yourself**. Pull questions that depend on a fact under investigation off the frontier until the result is in.
+- Ask the user **only for decisions that involve trade-offs**. Not "what do you want?" but "which of A and B do you give up?".
+- Push back on soft answers: "which do you mean?", "what breaks if that assumption fails?", "where does that number come from?". Do not agree and move on.
+- Cite sources **only after confirming they exist**. Never write a source you could not verify. A quote from memory is not a source. Cite repo evidence as `path:line`, down to the line number.
 
-## 手順
+## Procedure
 
-1. 開始時に `find .claude/.cache/grilling -mindepth 1 -maxdepth 1 -type d -mtime +60 -exec rm -rf {} +` を実行し、消したことを1行で言え。
-2. ラウンド文書を `.claude/.cache/grilling/<slug>/round-<n>.md` に書け（`<slug>` は対象から作る英小文字ケバブケース。git repo でない場所なら一時ディレクトリ配下に書く）。形式は
+1. At start, run `find .claude/.cache/grilling -mindepth 1 -maxdepth 1 -type d -mtime +60 -exec rm -rf {} +` and say in one line what was deleted.
+2. Write the round document to `.claude/.cache/grilling/<slug>/round-<n>.md` (`<slug>` is lowercase kebab-case derived from the target; outside a git repo, write under a temporary directory). Round documents are owner-facing: write their prose in Japanese. **Read**
    `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/grilling/references/round-format.md`
-   (`DOTFILES_ROOT` は dotfiles のチェックアウト位置)
-   を**読んでから**それに従え。散文と機械可読 YAML ブロックの両方を書き、内容を一致させろ。1ラウンド = frontier の問い 3〜6問。構造を比べる問い（位置や経路が争点の問い）には ```diagram を描き、それ以外は一文で済ませろ。
-3. `node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" serve <round.md>`
-   を実行しろ。ページが開き、**全問の提出まで戻らない**。終了を待て。
-4. stdout の集計（`q1: A — メモ`）をそのままラウンド文書の `answer:` 行に写し、`status: answered` にしろ。回答は同ディレクトリの `answers.jsonl` にも残る（最後の行が勝つ）。
-5. 木を更新して次のラウンドへ。frontier が空になり、重要な枝に暗黙の前提が残っていないことを確認してから「共通理解に達しましたか」と聞け。
-6. 2〜3案が並立したまま残っていたら比較表（案 / 得るもの / 失うもの / 向く状況）を出せ。決定記録は 200〜300 字ごとの節に区切って順に提示し、各節の末尾で確認を取れ。食い違いが出たら木に戻ってその枝を掘り直せ。
-7. 決定記録を `--out` のファイルに書け（`## 決定記録` があれば更新、無ければ末尾に追記）。
+   (`DOTFILES_ROOT` is where dotfiles is checked out)
+   first, then follow it. Write both the prose and the machine-readable YAML blocks, and keep them consistent. One round = 3–6 frontier questions. Draw a ```diagram for questions that compare structure (where placement or routes are at stake); one sentence suffices for the rest.
+3. Run `node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" serve <round.md>`.
+   A page opens and the command **does not return until every question is submitted**. Wait for it to finish.
+4. Copy the stdout summary (`q1: A — メモ`) verbatim into the round document's `answer:` lines and set `status: answered`. Answers also persist in `answers.jsonl` in the same directory (last line wins).
+5. Update the tree and go to the next round. Once the frontier is empty and no important branch has an implicit assumption left, ask "共通理解に達しましたか" (have we reached shared understanding?).
+6. If 2–3 options are still standing side by side, present a comparison table (案 / 得るもの / 失うもの / 向く状況). Present the decision record in sections of 200–300 characters, confirming at the end of each. On a mismatch, go back to the tree and re-dig that branch.
+7. Write the decision record to the `--out` file (update `## 決定記録` if present, otherwise append). It is owner-facing, in Japanese.
 
-## チャネル
+## Channels
 
-- **local（既定）** — 上の `render.mjs serve`。ブラウザがあるマシンならこれ。
-  ページの意匠は writeup-kit が `$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`
-  にあればそちらに乗り、無ければ grilling 自前の意匠にフォールバックする
-  （呼び出し側は気にしなくてよい）。
-- **chat（フォールバック）** — 1問ずつ次の形式で出して回答を待つ。ページは作らない。1問 25 行以内、選択肢 2〜4 個。
+- **local (default)** — the `render.mjs serve` above. Use it on any machine with a browser.
+  The page design rides on writeup-kit when it exists at `$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`,
+  otherwise it falls back to grilling's own design
+  (the caller need not care).
+- **chat (fallback)** — ask one question at a time in the format below and wait for the answer. No page is made. 25 lines max per question, 2–4 options.
 
 ```
 ### ❓ Q[n]: [質問]
@@ -50,19 +50,19 @@ argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 **推奨: [A]** — 重視したトレードオフ: …。根拠: [出典 or path:line]
 ```
 
-会社の痕跡（社内ドメインの remote、社内 org、社内ツール名、社内語）が見つかれば chat。判断がつかなければ一度だけ聞け。
+If company traces are found (an internal-domain remote, an internal org, internal tool names, internal jargon), use chat. When unsure, ask once.
 
-## 決定記録の形式
+## Decision record format
 
-`## 決定記録` の下に `### 決まったこと`（決定 — 重視したトレードオフ1行）/ `### 検討して却下した案`（案 — 却下理由）/ `### 未決・前提`（残る前提と、崩れたときの影響）/ `### 推奨アプローチ` / `### 出典`（URL or path:line）/ `### 次のステップ` / `### 元ラウンド`（`.claude/.cache/grilling/<slug>/transcript.md`）を書け。
-戻しにくい・自明でない・本物のトレードオフがある——この3つを**すべて**満たす決定のときだけ ADR 作成を提案しろ（勝手に書くな）。
+Under `## 決定記録` write `### 決まったこと` (decision — one line on the trade-off prioritized) / `### 検討して却下した案` (option — reason rejected) / `### 未決・前提` (remaining assumptions and the impact if they fail) / `### 推奨アプローチ` / `### 出典` (URL or path:line) / `### 次のステップ` / `### 元ラウンド` (`.claude/.cache/grilling/<slug>/transcript.md`).
+Hard to reverse, not obvious, a real trade-off — propose an ADR only for decisions that meet **all three** (never write one unasked).
 
-ユーザーが保存を望んだら `node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/decision-page.mjs" <--out のファイル> --out <path>.html` で
-writeup-kit の `kind: 決定記録` ページに変換し、writeup の保存手順（store への配置・commit）に渡せ。
-grilling 自身は store に書き込まない。
+When the user wants it saved, run `node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/decision-page.mjs" <--out のファイル> --out <path>.html` to
+convert it into a writeup-kit `kind: 決定記録` page and hand it to writeup's save procedure (placement in the store, commit).
+grilling itself never writes into the store.
 
-## 記録の寿命
+## Lifetime of records
 
-- HTML は残すな（`serve` はファイルに書かず配るだけ）。
-- 決定記録を書いた時点でラウンドを順に連結して `transcript.md` にまとめ、`round-<n>.md` は削除しろ。
-- 開始時に 60 日より古い slug ディレクトリを掃除しろ（手順1）。リポジトリにはコミットするな。
+- Do not keep the HTML (`serve` only distributes, never writes a file).
+- When the decision record is written, concatenate the rounds in order into `transcript.md` and delete the `round-<n>.md` files.
+- Clean up slug directories older than 60 days at start (step 1). Never commit to the repository.

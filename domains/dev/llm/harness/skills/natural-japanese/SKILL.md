@@ -1,6 +1,6 @@
 ---
 name: natural-japanese
-description: 仕事の日本語文書を読みやすくわかりやすく書く・直すためのスキル。議事録（文字起こしからの議事録化を含む）、調査レポート・分析レポート、社内ガイド・マニュアル、リサーチメモ・ディスカッションペーパー・企画書・提案書・報告書・メール、スライド構成案といったビジネス文書の作成・校正、「結論から書いて」「論旨を明確に」「見出しを端的に」「専門用語をわかりやすく説明して」といった指示のいずれでも使用する。AI臭さの除去（「AIっぽい」「AI臭い」「機械翻訳っぽい」「不自然」「もっと自然な日本語に」「機械っぽい」「人間っぽくして」「単調」「〜することができる、と言えるだろう、のような言い回し」といった直接・間接・口語の指摘、AIで書いたと言われた/疑われた）、読みにくい・わかりにくい文章の改善依頼（語順がおかしい、一文が長い、何が言いたいか分からない、読点の位置がおかしい等）、note記事やブログ記事・エッセイの新規執筆（任意のテーマをゼロから書く・書き起こす依頼を含む）、既存文章のリライト・推敲、AI臭さの診断・採点（「この文章AIが書いた？」「AI臭さをスコアで出して」「どれくらいAIっぽいか判定して」という書き換えを伴わない依頼）、自分の文体を学ばせたい・プロファイル化したいという要望（過去の文章を読ませて自分らしく書いてほしいという依頼も含む）にも対応する。技術文書の章構成やMarkdownフォーマットの整形自体（一文一行化・引用ブロック・脚注記法など）は対象外——それは別スキルの領域であり、本スキルは文章の自然さ・読みやすさ・わかりやすさに特化する。
+description: Skill for writing and revising Japanese business documents so they read easily and clearly. Use for creating or proofreading business writing — meeting minutes (including turning a transcript into minutes), research and analysis reports, internal guides and manuals, research memos, discussion papers, proposals, plans, reports, email, and slide outlines — and for any instruction such as 「結論から書いて」「論旨を明確に」「見出しを端的に」「専門用語をわかりやすく説明して」. Also handles removing AI smell (direct, indirect or colloquial complaints such as 「AIっぽい」「AI臭い」「機械翻訳っぽい」「不自然」「もっと自然な日本語に」「機械っぽい」「人間っぽくして」「単調」「〜することができる、と言えるだろう、のような言い回し」, or the user was told / suspected of writing with AI), requests to improve hard-to-read or unclear text (odd word order, overlong sentences, unclear point, misplaced commas, etc.), writing new note articles, blog posts or essays (including writing any topic from scratch), rewriting and polishing existing text, diagnosing or scoring AI smell (「この文章AIが書いた？」「AI臭さをスコアで出して」「どれくらいAIっぽいか判定して」 — requests without a rewrite), and requests to learn or profile the user's own style (including reading their past writing to write like them). Out of scope: chapter structure of technical documents and Markdown formatting itself (one sentence per line, blockquotes, footnote syntax, etc.) — that belongs to another skill; this skill is dedicated to naturalness, readability and clarity of the prose.
 license: MIT
 argument-hint: "[write|score] [quick|full|exp] [対象ファイルや依頼内容]"
 metadata:
@@ -9,136 +9,136 @@ metadata:
 
 # natural-japanese
 
-仕事の日本語を、読みやすくわかりやすく書くためのスキル。議事録・調査レポート・社内ガイド・リサーチメモ・スライドといった仕事の文書から、note・ブログ・エッセイまで。AI臭さの除去は工程の一部として組み込まれている。
+A skill for writing Japanese business prose that reads easily and clearly. From business documents — minutes, research reports, internal guides, research memos, slides — to note, blog and essay pieces. Removing AI smell is built into the process as one of its steps. The documents produced are Japanese; the instructions below are in English.
 
-## 設計思想
+## Design philosophy
 
-軸は二つ。第一に「検出は機械、判断はAI」。AIは自分の癖を認識しにくいから、疑いの検出は機械が決定的に行い、直すかどうかはAI（あなた）が文脈で判断する。第二に「事後修正より生成時制約」。書いた後にAI臭を消すより、書く前の設計と書くときの制約で発生自体を防ぐほうが効く。工程は「設計 → 執筆 → 検査 → 収束」の順に進む。
+Two axes. First, "detection by machine, judgment by AI". An AI has trouble recognizing its own habits, so suspicion is detected deterministically by a machine, and whether to fix it is judged by the AI (you) in context. Second, "constraints at generation time over fixing afterwards". Preventing the smell through design before writing and constraints while writing beats scrubbing it out afterwards. The process runs in the order "design → write → inspect → converge".
 
-## 実行モード — クイックとフル
+## Execution modes — quick and full
 
-同じ工程を、かける手間の異なる2つのモードで回す。所要時間の実測目安——クイックは短い文書（会議メモ程度）で30秒前後、長め（1万字級）でも3分程度。フルは短い文書で7分前後、1万字級で15〜20分。フルを始めるときは、この目安をユーザーに一言伝えてから着手する。
+The same process runs in two modes that differ in effort. Measured time as a guide: quick takes about 30 seconds on a short document (a meeting memo) and about 3 minutes even on a long one (around 10,000 characters). Full takes about 7 minutes on a short document and 15–20 minutes at 10,000 characters. When starting full, tell the user this estimate in one line before beginning.
 
-**クイック（既定）**: 日常の文書はこちら。サブエージェントを使わず、この場で完結させる。追加で読むのは該当する doctype の型1ファイルだけでよい（文体憲法は§2の要約で足りる。他の references は lint の finding が出て判断に迷ったときだけ開く）。設計（§1）は読者・主メッセージ・見出しの確認を頭の中で済ませる。検査は lint（kit 版があればそれ、無ければ uv 版）を1回と、自分でのスケルトン通読。lint は文書が短くても省略しない（短文では統計系検出器が沈黙するが、禁止語・翻訳調は文1つでも検出される。数秒の保険であり、これを飛ばした時点でクイックの品質保証は成立しない）。収束ループは新規 finding が出なければ1周で切り上げ、最終パスの通読をして終える。スキルによる追加時間は数十秒に収まるはずで、それを超えて references を読み込みはじめたらフルモードの仕事をしている。
+**Quick (default)**: for everyday documents. No subagents; finish in place. The only extra file to read is the one doctype template that applies (the §2 summary of the writing constitution is enough; open the other references only when a lint finding leaves you unsure). Do the design (§1) — reader, main message, headings — in your head. Inspection is one lint run (the kit version if present, otherwise the uv version) plus your own skeleton read-through. Do not skip lint even for a short document (the statistical detectors go quiet on short text, but forbidden words and translationese are detected from a single sentence. It is a few seconds of insurance, and skipping it voids quick's quality guarantee). The convergence loop stops after one pass if no new findings appear; finish with the final-pass read-through. The skill should add only tens of seconds; if you find yourself reading references beyond that, you are doing full-mode work.
 
-**フル**: ユーザーが「しっかり」「ちゃんと」「時間をかけていい」と言ったとき、対外・経営向けなど失敗コストが高い文書、または長い文書（目安1万字超）のとき。フルと決めたら（またはユーザーがフルを指定したら）、文書が小さくても工程を省略しない。lint（kit 版があればそれ、無ければ uv 版）に加えて outline / terms も実行し、検査（§4）の三つのレビュー——構造レビュー・読みやすさレビュー・doctype照合——を並列のサブエージェントで必ず行う（各自が所見を返し、判断台帳への統合と「直す/残す」の判断は必ず親が行う。執筆そのものは分割しない——濃淡・比喩の一貫・章間の接続は文書全体を見ないと守れない）。収束は状態条件（§5）を満たすまで回す。「この文書には過剰」と感じても、工程を勝手に間引かず、クイックへの切り替えをユーザーに提案する。なお実測で、思考予算(effort)を低く絞った実行はフルの工程を合理化で削りやすいことが確認されている。effort を選べる環境でフルを実行するなら high を推奨する(クイックは low で十分)。
+**Full**: when the user says 「しっかり」「ちゃんと」「時間をかけていい」, when the cost of failure is high (external or executive audience), or when the document is long (over about 10,000 characters). Once full is chosen (or the user specifies it), do not skip steps even for a small document. Besides lint (kit version if present, otherwise uv), run outline / terms too, and always perform the three reviews of inspection (§4) — structure review, readability review, doctype check — in parallel subagents (each returns findings; merging into the decision ledger and the "fix / keep" judgment are always done by the parent. Never split the writing itself — density, consistent metaphors and connections between sections cannot be kept without seeing the whole document). Converge until the state condition (§5) is met. Even if it feels "excessive for this document", do not thin the process on your own; propose switching to quick to the user. Note that measurements confirm runs with a low thinking budget (effort) tend to rationalize away full's steps. Where effort is selectable, high is recommended for full (low is enough for quick).
 
-どちらか迷ったら、まずクイックで仕上げてから「フルで磨き直すこともできる」とユーザーに一言添えるのがよい。
+When torn, finish in quick first and add one line telling the user "it can be polished again in full".
 
-## 呼び出し方 — write / score / モード指定
+## Invocation — write / score / mode
 
-スキルがコマンドとして引数つきで呼ばれた場合、次の形を解釈する。
+When the skill is called as a command with arguments, interpret these forms.
 
-- `/natural-japanese [quick|full] <対象>` — 書く・直す（既定）。新規作成かリライトかは対象から判断する
-- `/natural-japanese write [quick|full] <お題や素材>` — **新規作成を明示**。元の文章がない状態から、§1の設計（読者・主メッセージ・スケルトン・濃淡・素材集め）→§2の執筆→検査→収束の全工程で書き起こす。素材が乏しければ§1-4で先に集めるか、ユーザーに求める
-- `/natural-japanese score [quick|full|exp] <ファイル>` — **診断のみ**。文書を書き換えず、自然度スコア（0〜100、高いほど自然=AI臭が薄い）と理由で返す。quick=lint のみ（30秒）、full=構造・読みやすさレビュー込み、exp=semantic.py の深層検出込み（初回約1GBダウンロード）。**最初に必ず `references/diagnose.md` を読む**。スコアの算出式・バンド・出力形式の定義がそこにあり、これを読まずに lint findings の転記で返した時点で診断モードの仕事になっていない。診断後にリライトを提案してよいが、頼まれるまで直さない
+- `/natural-japanese [quick|full] <対象>` — write or revise (default). Decide from the target whether it is new writing or a rewrite
+- `/natural-japanese write [quick|full] <お題や素材>` — **explicitly new writing**. Starting with no source text, write through the whole process: §1 design (reader, main message, skeleton, density, material gathering) → §2 writing → inspection → convergence. If material is thin, gather it first via §1-4 or ask the user
+- `/natural-japanese score [quick|full|exp] <ファイル>` — **diagnosis only**. Without rewriting, return a naturalness score (0–100, higher = more natural = less AI smell) with reasons. quick = lint only (30 seconds), full = with structure and readability reviews, exp = with semantic.py deep detection (about 1GB download on first run). **Always read `references/diagnose.md` first.** The score formula, bands and output format are defined there; returning transcribed lint findings without reading it is not diagnosis-mode work. You may propose a rewrite after diagnosing, but do not fix until asked
 
-モード指定がなければ実行モードの基準で自分で選ぶ。自然言語でも同じ（「〇〇について書いて」→ write 相当、「この文章AIっぽい？」「AI臭さを採点して」→ score 相当）。
+Without a mode, choose one yourself by the execution-mode criteria. Natural language works the same (「〇〇について書いて」 → write, 「この文章AIっぽい？」「AI臭さを採点して」 → score).
 
-## 1. 設計 — 書く前に決める
+## 1. Design — decide before writing
 
-### 1-1. 読者・目的・文書タイプ
+### 1-1. Reader, purpose, document type
 
-誰が読み、読んだ後に何が起きてほしい文書かを特定する（不明ならユーザーに聞く）。文書タイプが定まったら、対応する型を読む:
+Identify who reads it and what should happen after they read it (ask the user if unclear). Once the document type is settled, read the matching template:
 
-- 議事録 → `references/doctypes/minutes.md`
-- 調査レポート・分析レポート → `references/doctypes/report.md`
-- 社内ガイド・マニュアル → `references/doctypes/guide.md`
-- リサーチメモ・ディスカッションペーパー・企画書 → `references/doctypes/memo.md`
-- スライド構成 → `references/doctypes/slide.md`
+- 議事録 (minutes) → `references/doctypes/minutes.md`
+- 調査レポート・分析レポート (research / analysis report) → `references/doctypes/report.md`
+- 社内ガイド・マニュアル (internal guide / manual) → `references/doctypes/guide.md`
+- リサーチメモ・ディスカッションペーパー・企画書 (research memo / discussion paper / proposal) → `references/doctypes/memo.md`
+- スライド構成 (slide outline) → `references/doctypes/slide.md`
 
-型に当てはまらない文書（note・ブログ・エッセイ等）はこの節を飛ばしてよい。
+Documents that fit no template (note, blog, essay, etc.) may skip this section.
 
-### 1-2. 主メッセージとスケルトン
+### 1-2. Main message and skeleton
 
-本文を書く前に、主メッセージを一文で書く。書けないなら素材不足であり、書き方の問題ではない（→ 1-4）。次に見出しスケルトンを作る。各見出しは「背景」「まとめ」のようなラベルではなく、結論を含むメッセージにする。見出しだけを順に読んで論旨が通ることを確認してから本文に進む。
+Before the body, write the main message in one sentence. If you cannot, the material is insufficient — not a writing problem (→ 1-4). Next, build the heading skeleton. Each heading is a message that contains a conclusion, not a label like 「背景」「まとめ」. Confirm the argument holds when reading only the headings in order, then proceed to the body.
 
-### 1-3. 濃淡設計
+### 1-3. Density design
 
-すべての節を同じ熱量・同じ厚みで書くと、それ自体が「整いすぎた不自然さ」になる。重要な節を厚く、軽い節は正直に軽く、と意図的なムラを設計しておく。手順は `references/revision-guide.md` の「濃淡設計」を参照。
+Writing every section with the same heat and thickness is itself an "over-tidy unnaturalness". Deliberately design unevenness: important sections thick, light sections honestly light. Procedure: 「濃淡設計」 in `references/revision-guide.md`.
 
-### 1-4. 素材集め — 任意、新規執筆時
+### 1-4. Material gathering — optional, for new writing
 
-固有名詞・数値・実例が手元に乏しいまま書き始めると、後段で「一般論しか言えていない」と気づいても直しようがない。推論と検索の往復で素材を集める手順、十分と判断する基準、Web検索不可の環境でのユーザーへの素材提供依頼は `references/revision-guide.md` の「素材集め」を参照。
+Starting to write with few proper nouns, numbers or real examples at hand leaves nothing to fix when you later notice "this only says generalities". The procedure for gathering material by alternating reasoning and search, the criteria for "enough", and how to ask the user for material where web search is unavailable: 「素材集め」 in `references/revision-guide.md`.
 
-### 1-5. 文体プロファイル — 任意
+### 1-5. Style profile — optional
 
-`style-profile.md`（プロジェクトルートかユーザー指定の場所）が既にあれば読み込み、視点・語彙・リズムの癖を下敷きにする。なければ汎用モードで進めてよい。ユーザーが「自分の文体を学ばせたい」と求めた場合のみ、`assets/style-profile-template.md` に沿って過去文章3〜5本から特徴を抽出し、プロファイルを書き出す（断定しすぎず「傾向として」と留保をつける）。
+If `style-profile.md` (at the project root or a user-specified place) already exists, read it and build on its habits of viewpoint, vocabulary and rhythm. Otherwise proceed in generic mode. Only when the user asks to have their own style learned, extract the characteristics of 3–5 past pieces following `assets/style-profile-template.md` and write out the profile (hedge with 「傾向として」 rather than asserting).
 
-## 2. 執筆 — 文体憲法の下で書く
+## 2. Writing — under the writing constitution
 
-`references/writing-constitution.md` の12箇条を制約として本文を書く。要点だけ挙げると——結論から書き前置きを書かない、見出しはメッセージ、説明は地の文で書き箇条書きは真に並列な圧縮のみ、専門用語は「機能→名前」の順で文中説明、固有名詞・数値で接地、太字は文中の核1箇所、濃淡をつける、同じ鋳型を3回繰り返さない、「〜ではなく」は本当の誤解訂正だけ、限界と推定は明示ラベルで開示、事実と意見を分ける、結びは再統合しレポートは So What まで。
+Write the body under the 12 articles of `references/writing-constitution.md` as constraints. In brief: lead with the conclusion and write no preamble; headings are messages; explain in running prose, with bullets only for truly parallel compression; explain jargon inline in the order "function → name"; ground with proper nouns and numbers; bold only the one core phrase in the text; vary density; never repeat the same mold three times; 「〜ではなく」 only for a genuine correction of a misunderstanding; disclose limits and estimates with explicit labels; separate fact from opinion; close by re-integrating, and for reports reach the So What.
 
-この段階では禁止語やリズムを気にしすぎず、憲法の範囲で内容を出し切ってよい。細部は次の検査工程が拾う。
+At this stage do not fuss over forbidden words or rhythm; get the content out within the constitution. The inspection step catches the details.
 
-## 3. 検査(1) — 静的検知
+## 3. Inspection (1) — static detection
 
-スクリプトは絶対パスで呼ぶ（**cwd不問**）:
+Call the scripts by absolute path (**cwd-independent**):
 
 ```bash
 SK="$HOME/.claude/skills/natural-japanese"
-# symlink破損時はdotfiles実体にfallback
+# fall back to the dotfiles checkout when the symlink is broken
 [ -d "$SK/scripts" ] || SK="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/natural-japanese"
 
 uv run "$SK/scripts/lint.py" --json <file>
 ```
 
-### lint の実体
+### Which lint
 
-`uv run scripts/lint.py` は既定だが唯一の実体ではない。優先順は次のとおり: (1) `writeup-kit` の Node 製 lint（`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/bin/lint.mjs`。skill からの相対パスでは解決しない）があれば `node <kit>/bin/lint.mjs <file> --json` を優先する。JSON の形（category/severity/excerpt/span/message/suggestion）は同じで、`--baseline` も使え、`--config` は `.writeup.toml` を自動探索する。(2) kit が無ければ従来どおり `uv run scripts/lint.py`。(3) `uv` も使えない環境では `references/manual-checklist.md` で人手チェック。
+`uv run scripts/lint.py` is the default but not the only implementation. Priority: (1) if `writeup-kit`'s Node lint exists (`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/bin/lint.mjs`; it does not resolve from a path relative to the skill), prefer `node <kit>/bin/lint.mjs <file> --json`. The JSON shape (category/severity/excerpt/span/message/suggestion) is the same, `--baseline` works too, and `--config` auto-discovers `.writeup.toml`. (2) Without the kit, `uv run scripts/lint.py` as before. (3) Where `uv` is unavailable either, check by hand with `references/manual-checklist.md`.
 
-両実装は検出器と禁止語・翻訳調の語彙リスト（計13検出器）を共有するが、形態素解析器が異なる（kit 版=IPADIC、uv 版=Sudachi C）。そのため ngram / lexical_diversity / low_specificity 系の件数はわずかにずれることがある——どちらの数値も参考値として扱い、判断は§4の目視レビューに委ねる。
+Both implementations share the detectors and the forbidden-word / translationese vocabularies (13 detectors in total) but use different morphological analyzers (kit = IPADIC, uv = Sudachi C). So counts from the ngram / lexical_diversity / low_specificity detectors may differ slightly — treat either number as indicative and defer judgment to the visual review in §4.
 
-禁止語・翻訳調・否定肯定対比の反復・文長の均質さ・体言止め率・段落頭の接続詞率・語彙多様性・英語統語の疑いなどを機械的に検出する。検出結果は件数に関わらず exit code 0（lint なので、件数で CI を止めることはしない）。入力エラーのときだけ exit code 1。
+It mechanically detects forbidden words, translationese, repeated negative-positive contrast, uniform sentence length, noun-ending rate, paragraph-initial conjunction rate, lexical diversity, suspected English syntax, and more. The exit code is 0 regardless of the count (it is a lint; it never fails CI on count). Exit code 1 only on input error.
 
-対象文書のジャンルが明確なら `--genre essay|tech|business` を指定する。コーパス校正済みの閾値プロファイルに切り替わり、誤検知が減る。ジャンルごとの判断基準の差分は `references/genre-notes.md` を参照。
+When the document's genre is clear, pass `--genre essay|tech|business`. It switches to a corpus-calibrated threshold profile and reduces false positives. Per-genre differences in judgment: `references/genre-notes.md`.
 
-収束ループ（4〜5）では、直前の `--json` 出力を `--baseline` に渡すと resolved / new / persisting を自動で仕分けてくれる。`uv` が使えない環境（Claude.ai 等）では `references/manual-checklist.md` で同じ観点を人手でなぞる。
+In the convergence loop (4–5), passing the previous `--json` output as `--baseline` sorts findings into resolved / new / persisting automatically. Where `uv` is unavailable (Claude.ai etc.), trace the same points by hand with `references/manual-checklist.md`.
 
-もう一つ、`scripts/semantic.py` という EXPERIMENTAL な意味的検出器がある。文埋め込みで隣接文の類似度の起伏（話題の平板さ）を測るもので、torch + sentence-transformers 依存・初回~1GBのモデルダウンロードを伴う重量級のため lint.py 本体には組み込まず、独立した opt-in エントリにしている。フル工程や環境が許すときだけ `uv run "$SK/scripts/semantic.py" --json <file>` を追加で回し、findings は lint と同じく判断台帳に載せて扱う。
+There is also an EXPERIMENTAL semantic detector, `scripts/semantic.py`. It measures the rise and fall of similarity between adjacent sentences via sentence embeddings (flatness of topic); being heavyweight — torch + sentence-transformers, ~1GB model download on first run — it is not built into lint.py but kept as a separate opt-in entry. Only in the full process or when the environment allows, additionally run `uv run "$SK/scripts/semantic.py" --json <file>` and put its findings on the decision ledger like lint's.
 
-## 4. 検査(2) — 判断台帳と二つのレビュー
+## 4. Inspection (2) — the decision ledger and two reviews
 
-lint の findings は疑いの提示であり、機械的に全部直せという指示ではない。今回ヒットしたカテゴリの節を `references/revision-guide.md` で読み直し、文脈に照らして「直す/直さない」を判断する。判断は finding 一つひとつに「直した」か「残す（理由）」かを書き残しながら進める（台帳の形式は同ファイルの「判断台帳」を参照）。
+lint findings are suspicions, not an order to fix everything mechanically. Re-read the section of `references/revision-guide.md` for each category that was hit and decide "fix / do not fix" in context. Record the decision for each finding as you go — "fixed" or "kept (reason)" (ledger format: 「判断台帳」 in that file).
 
-用語カタログが必要なら: 禁止語 → `references/forbidden-patterns.md`、翻訳調 → `references/translationese.md`。専門用語が初出で説明されているか確認する材料には `uv run "$SK/scripts/terms.py" <file>` を使う。カタカナ複合語・ASCII略語・固有名詞らしき語を初出行・出現回数・説明マーカーの有無つきで列挙する（説明済みかどうかは機械が判断せず、AI/人間が行う）。
+If you need a term catalog: forbidden words → `references/forbidden-patterns.md`, translationese → `references/translationese.md`. To check whether jargon is explained at first use, run `uv run "$SK/scripts/terms.py" <file>`. It lists katakana compounds, ASCII abbreviations and likely proper nouns with the line of first use, occurrence count and whether an explanation marker is present (whether it is actually explained is judged by the AI/human, not the machine).
 
-### 構造レビュー — スケルトン通読
+### Structure review — skeleton read-through
 
-lint は文レベルの表層しか見えない。特に箇条書き主体の議事録・スライドでは lint がほぼ素通りするため、構造レビューが主役になる。完成した本文から見出しと各段落の先頭文だけを抜き出して読み、次を確かめる（`uv run "$SK/scripts/outline.py" <file>` で見出し・各段落の先頭文・箇条書きプレースホルダを行番号付きで機械抽出できる）:
+lint sees only the sentence-level surface. Especially in bullet-heavy minutes and slides, lint passes almost everything, so the structure review takes the lead. Extract only the headings and the first sentence of each paragraph from the finished body, read them, and check the following (`uv run "$SK/scripts/outline.py" <file>` extracts headings, each paragraph's first sentence and bullet placeholders with line numbers):
 
-1. 論旨が通るか（スケルトンだけで話が追えるか）
-2. 各見出しがメッセージになっているか
-3. 同じ鋳型の反復がないか（定義文の型、節の内部構成、書き出しの文型）
-4. 濃淡があるか（全節が同じ厚みになっていないか）
-5. 結びが So What に接続しているか（レポート系）
+1. Does the argument hold (can the story be followed from the skeleton alone)?
+2. Is each heading a message?
+3. Is the same mold repeated (definition-sentence pattern, internal section structure, opening sentence pattern)?
+4. Is there density variation (are all sections the same thickness)?
+5. Does the close connect to the So What (report types)?
 
-文書タイプが定まっている場合は、doctype の「必須要素」と「AIがやりがちな失敗」も照合する。
+When the document type is settled, also check the doctype's 「必須要素」 (required elements) and 「AIがやりがちな失敗」 (typical AI failures).
 
-### 読みやすさレビュー
+### Readability review
 
-語順、読点の位置、一文一義、主語述語の距離、こそあど言葉の多用、冗長表現は、機械的な閾値化ができないと実証済みの判断領域。`references/readability-principles.md`（一般原則）と `references/readability-antipatterns.md`（悪文パターン24種）を参照しながら毎周回、目視で判断する。
+Word order, comma placement, one idea per sentence, subject-predicate distance, overuse of demonstratives, and redundancy are judgment areas proven not to threshold mechanically. Judge them visually every pass, referring to `references/readability-principles.md` (general principles) and `references/readability-antipatterns.md` (24 bad-writing patterns).
 
-構造レビュー・読みやすさレビューで見つけた問題も、lint の finding と同様に判断台帳へ一行として起こす。
+Problems found in the structure and readability reviews also go on the decision ledger as one line each, like lint findings.
 
-段落が一般論しか言えていない（固有名・数値・実例がない）場合は、書き方でなく素材の問題であることが多い。`references/revision-guide.md` の「素材不足の分岐」を見て情報収集に戻るべきか判断する。
+When a paragraph says only generalities (no proper nouns, numbers, real examples), it is usually a material problem, not a writing one. See 「素材不足の分岐」 in `references/revision-guide.md` to decide whether to go back to gathering information.
 
-## 5. 収束
+## 5. Convergence
 
-台帳の「直した」項目を反映したら lint を再実行し、新しい finding が出ていないか確認する。台帳上の全 finding が仕分けられ、修正が新たな finding を生んでいない状態になるまで 3〜4 を繰り返す。同じ finding が2周連続で再発する場合は `references/revision-guide.md` の「発散ガード」を参照。
+After applying the ledger's "fixed" items, re-run lint and check for new findings. Repeat 3–4 until every finding on the ledger is sorted and the fixes produce no new findings. If the same finding recurs two passes in a row, see 「発散ガード」 in `references/revision-guide.md`.
 
-既存文書のリライトでは、同じ種類の修正（見出しの結論化、箇条書きの地の文化など）を全項目へ一律に当てると、元の文書の自然な濃淡を消してかえってAI臭が増す。価値を足せる箇所だけを選んで直す原則は `references/revision-guide.md` の「改稿を一律に適用しない」を参照。
+When rewriting an existing document, applying the same kind of fix uniformly to every item (turning headings into conclusions, bullets into prose, etc.) erases the document's natural density and increases AI smell instead. The principle of fixing only where it adds value: 「改稿を一律に適用しない」 in `references/revision-guide.md`.
 
-## 6. 最終パス — 自己点検ループ
+## 6. Final pass — self-check loop
 
-lint と台帳が収束しても、それは既知のパターンが消えたことしか意味しない。最後に必ず、初見の読者として通読し、声に出して読むつもりでリズムを確かめる。手順は `references/revision-guide.md` の「自己点検ループ」を参照。違和感を見つけたら台帳に起こして5に戻り、なくなったら完了とする。
+Even once lint and the ledger converge, that only means the known patterns are gone. At the end, always read through as a first-time reader and check the rhythm as if reading aloud. Procedure: 「自己点検ループ」 in `references/revision-guide.md`. If something feels off, put it on the ledger and return to 5; when nothing does, finish.
 
-## 7. 後片付け
+## 7. Cleanup
 
-完了したら、作業中に作った中間ファイル（台帳・lint の JSON・下書きのバックアップ等）をすべて削除する。ユーザーのプロジェクトに残してよいのは完成した文書と、ユーザーが明示的に望んだ場合の `style-profile.md` だけ。詳細は `references/revision-guide.md` の「作業ファイルの扱い」を参照。
+When done, delete every intermediate file created during the work (ledger, lint JSON, draft backups, etc.). The only things that may remain in the user's project are the finished document and, only when the user explicitly wanted it, `style-profile.md`. Details: 「作業ファイルの扱い」 in `references/revision-guide.md`.
 
-## 参考例
+## Examples
 
-before/after の具体例は `references/examples.md` を参照。
+For concrete before/after examples, see `references/examples.md`.
 
-英語テキストのAIっぽさ除去を頼まれた場合は `references/patterns-en.md`（英語のAI文パターン集）を参照する。
+When asked to remove AI smell from English text, refer to `references/patterns-en.md` (a catalog of English AI-writing patterns).
