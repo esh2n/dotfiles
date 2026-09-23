@@ -129,6 +129,9 @@ if [ -n "$TS_BIN" ]; then
   if [ "$ROLE" = hub ]; then
     printf '%s' "$serve" | grep -q ':1234' && pass "tailscale serve tcp:1234 (LM Studio) → ${name:-?}:1234" || fail "tailscale serve tcp:1234 missing"
     printf '%s' "$serve" | grep -q ':3001' && pass "tailscale serve https:3001 (Open WebUI) → https://${name:-?}:3001" || fail "tailscale serve https:3001 missing (HTTPS certificates enabled in the admin console?)"
+    # Which devices are on the tailnet right now: the phone must be one of them before the page can open there.
+    peers="$(timeout 10 "$TS_BIN" status 2>/dev/null | awk 'NR>0 && $2 != "" {print $2 " (" $4 ")"}' | grep -v "^$(hostname -s)" | tr '\n' ',' | sed 's/,$//')"
+    if [ -n "$peers" ]; then pass "tailnet devices besides this Mac: ${peers}"; else fail "no other device on the tailnet — the phone has not joined (Tailscale app, same account, switched on)"; fi
     echo "       from the phone (on the tailnet): open https://${name:-<mac>}:3001 — that is the one check only another device can make"
   else
     printf '%s' "$serve" | grep -q ':4001' && pass "tailscale serve tcp:4001 (metrics) → ${name:-?}:4001" || fail "tailscale serve tcp:4001 missing"

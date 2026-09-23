@@ -377,6 +377,12 @@ home_llm() {
     # `make tailscale-acl` renders acl.hujson with this tailnet's login + IP
     # into the clipboard and opens the page (domains/dev/config/tailscale/).
     hl_todo "tailnet policy (once per tailnet, and after editing acl.hujson): make tailscale-acl, then paste + Save"
+    # The phone is a tailnet device like any other: nothing on the Mac can
+    # enrol it. (Missing from this list until 2026-09-23 — the owner found
+    # the page unreachable because the phone had never joined.)
+    if [[ "$role" == hub ]]; then
+        hl_todo "phone: install the Tailscale app, log in with the same account, switch it on — it must appear in 'tailscale status' — then open https://$(printf '%s' "${ts_json:-}" | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1):3001 and create the first (admin) account"
+    fi
 
     # Does it actually answer? One real completion per tier and the plumbing
     # around it (litellm/check.sh) — the only proof that is not a log line.
