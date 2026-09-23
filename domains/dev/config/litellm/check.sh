@@ -23,9 +23,16 @@ export PATH="/etc/profiles/per-user/$(id -un)/bin:/opt/homebrew/bin:/usr/local/b
 WITH_COMPLEX=0
 [ "${1:-}" = "--complex" ] && WITH_COMPLEX=1
 
+# Every line is also appended, uncoloured and timestamped, to a log the owner
+# (or an agent reading the machine later) can consult without re-running the
+# probes: ${XDG_STATE_HOME:-~/.local/state}/home-llm/check.log
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/home-llm"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG="${LOG_DIR}/check.log"
+{ echo ""; echo "== $(date '+%Y-%m-%d %H:%M:%S %Z') $(hostname -s) =="; } >>"$LOG" 2>/dev/null || true
 FAILS=0
-pass() { printf '  \033[32mPASS\033[0m %s\n' "$*"; }
-fail() { FAILS=$((FAILS + 1)); printf '  \033[31mFAIL\033[0m %s\n' "$*"; }
+pass() { printf '  \033[32mPASS\033[0m %s\n' "$*"; echo "PASS $*" >>"$LOG" 2>/dev/null || true; }
+fail() { FAILS=$((FAILS + 1)); printf '  \033[31mFAIL\033[0m %s\n' "$*"; echo "FAIL $*" >>"$LOG" 2>/dev/null || true; }
 ROLE=node; [ "$(uname -s)" = Darwin ] && [ -d "/Applications/LM Studio.app" ] && ROLE=hub
 echo "home-llm check (${ROLE})"
 
@@ -119,5 +126,6 @@ else
   fail "tailscale CLI not found"
 fi
 
-echo "home-llm check: ${FAILS} FAIL"
+echo "home-llm check: ${FAILS} FAIL  (log: ${LOG})"
+echo "TOTAL ${FAILS} FAIL" >>"$LOG" 2>/dev/null || true
 exit "$FAILS"
