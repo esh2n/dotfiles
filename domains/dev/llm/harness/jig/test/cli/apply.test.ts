@@ -1030,3 +1030,187 @@ describe("applyCli --target pi", () => {
     expect(all.stdout).not.toContain("== pi (agent directory) ==");
   });
 });
+
+/**
+ * The DSH dry-run's report, through the CLI: `--target dsh` runs the tiers
+ * half (dsh/settings.yaml) and then the harness-home half, and the sections
+ * of the latter — the profiles found against the repo's, the rows and the
+ * block per profile, the home-level layer, AGENTS.md against DSH's budget,
+ * what reaches DSH natively or through manager.sh, the [unverified] list —
+ * are what a reader agrees to before `--write`.
+ */
+describe("applyCli --target dsh", () => {
+  const H = "/repo/llm/harness";
+  const REPO_DSH = "/repo/config/dsh";
+  const DSH = "/home/u/.dsh";
+  const PROFILES = `${DSH}/profiles`;
+  const DSH_PATHS = {
+    harnessRoot: H,
+    mcpServers: `${H}/mcp/servers.json`,
+    decisions: `${H}/rules/decisions`,
+    dshHome: DSH,
+    dshHomeVia: "default" as const,
+    profilesDir: PROFILES,
+    repoProfilesDir: `${REPO_DSH}/profiles`,
+    agentsMd: `${DSH}/AGENTS.md`,
+    homePatch: `${DSH}/cordis.patch.yml`,
+    agentsSkills: "/home/u/.agents/skills",
+    agentsSkillsVia: "default" as const,
+    settingsYaml: `${DSH}/settings.yaml`,
+    hooksClaudeJson: `${DSH}/hooks.claude.json`,
+    pluginDir: `${H}/jig/adapters/dsh`,
+    home: "/home/u",
+  };
+
+  const REPO_PATCH =
+    "- id: agent-default-model\n  config:\n    provider: local-proxy\n- insert:\n    - id: jig-guard\n      name: '@esh2n/jig-dsh-guard'\n";
+
+  const SOURCES: Record<string, string> = {
+    [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
+    [DSH_PATH]:
+      "llm-pi-ai:\n  providers:\n    # BEGIN jig:tiers (generated — edit policy/tiers.json, then jig apply)\n    local-proxy:\n      displayName: x\n    # END jig:tiers\n",
+    [DSH_PATHS.mcpServers]: JSON.stringify({
+      schemaVersion: "jig.mcp.v1",
+      servers: [
+        {
+          name: "serena",
+          transport: "stdio",
+          command: "uvx",
+          args: ["serena"],
+          targets: { dsh: true },
+        },
+        {
+          name: "notion-mcp",
+          transport: "http",
+          url: "https://mcp.notion.com/mcp",
+          targets: { pi: true, dsh: false },
+        },
+      ],
+    }),
+    [`${H}/rules/common/core.md`]: "# Core\n\nBe brief.\n",
+    [`${H}/rules/decisions/a.md`]:
+      "# A\n\nStatus: accepted — because\n\nrule: Do the thing.\n\n## Problem\n\nx\n",
+    [`${REPO_DSH}/profiles/proxy/cordis.patch.yml`]: REPO_PATCH,
+    [`${REPO_DSH}/profiles/headless/cordis.patch.yml`]: REPO_PATCH,
+  };
+
+  function dshContext(extra: Record<string, string> = {}, links: Record<string, string> = {}) {
+    const fake = fakeClaudeFs({ files: { ...SOURCES, ...extra }, links });
+    return { ports: fake.ports, paths: DSH_PATHS, fake };
+  }
+
+  const cli = (context = dshContext(), args = ["--target", "dsh"]) =>
+    applyCli(args, context.ports, paths, undefined, undefined, undefined, undefined, context);
+
+  test("both halves in one run: the tiers section first, then the harness home with the profiles, the rows, AGENTS.md against the budget, the report-only lines and the [unverified] list", async () => {
+    const context = dshContext(
+      {
+        [`${PROFILES}/proxy/cordis.patch.yml`]: REPO_PATCH,
+        [`${PROFILES}/web/package.json`]: "{}",
+        [`${DSH}/hooks.claude.json`]: "{}",
+      },
+      {
+        [`${PROFILES}/proxy/node_modules/@esh2n/jig-dsh-guard`]: `${H}/jig/adapters/dsh`,
+        [`${DSH}/settings.yaml`]: `${REPO_DSH}/settings.yaml`,
+      },
+    );
+    const result = await cli(context);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout.indexOf("== dsh ==")).toBeLessThan(
+      result.stdout.indexOf("== dsh (harness home) =="),
+    );
+    expect(result.stdout).toContain("dest: /home/u/.dsh  (default ~/.dsh; DSH_HOME overrides)");
+    expect(result.stdout).toContain("profiles: /home/u/.dsh/profiles");
+    expect(result.stdout).toMatch(
+      /delivered to \(1\):\n +proxy +write +\/home\/u\/\.dsh\/profiles\/proxy\/cordis\.patch\.yml/,
+    );
+    expect(result.stdout).toContain(
+      "in the repo, not scaffolded on this machine (1): headless — nothing delivered there",
+    );
+    expect(result.stdout).toContain("scaffolded, not the repo's (1), left alone: web");
+    expect(result.stdout).toContain("jig's rows (1): mcp-serena");
+    expect(result.stdout).toContain("proxy: write  /home/u/.dsh/profiles/proxy/cordis.patch.yml");
+    expect(result.stdout).toContain("guard plugin (report only): linked (a symlink →");
+    expect(result.stdout).toContain("+# jig:begin mcp");
+    expect(result.stdout).toContain("+        serverName: 'serena'");
+    expect(result.stdout).not.toContain("notion");
+    expect(result.stdout).toContain(
+      "/home/u/.dsh/cordis.patch.yml: absent — the home-level patch layer",
+    );
+    expect(result.stdout).toMatch(
+      /AGENTS\.md: write {2}\/home\/u\/\.dsh\/AGENTS\.md {2}\(\d+ bytes of dsh-base's 65536-byte budget/,
+    );
+    expect(result.stdout).toContain("one file for all five harnesses");
+    expect(result.stdout).toContain("skills (report only): /home/u/.agents/skills: absent");
+    expect(result.stdout).toContain("DSH reads ~/.agents/skills natively");
+    expect(result.stdout).toMatch(
+      /settings\.yaml +\/home\/u\/\.dsh\/settings\.yaml: a symlink → \/repo\/config\/dsh\/settings\.yaml {2}\(/,
+    );
+    expect(result.stdout).toMatch(
+      /hooks\.claude\.json +\/home\/u\/\.dsh\/hooks\.claude\.json: a regular file {2}\(/,
+    );
+    expect(result.stdout).toMatch(
+      /jig-guard plugin +\/repo\/llm\/harness\/jig\/adapters\/dsh: build \+ link {2}\(/,
+    );
+    expect(result.stdout).toContain("GAP: the conditional `paths:` rules");
+    expect(result.stdout).toContain("[unverified] — facts the delivery rests on");
+  });
+
+  test("DSH not scaffolded: the dry-run says so, AGENTS.md is not delivered, and --write writes nothing under the home", async () => {
+    const context = dshContext();
+    const result = await cli(context, ["--target", "dsh", "--write"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("== dsh (harness home) ==\noutcome: noop");
+    expect(result.stdout).toContain("message: DSH not scaffolded");
+    expect(result.stdout).toContain(
+      "DSH NOT SCAFFOLDED: no profile matches, so nothing is delivered",
+    );
+    expect(result.stdout).toContain(
+      "AGENTS.md: not delivered  /home/u/.dsh/AGENTS.md  (DSH not scaffolded",
+    );
+    expect(Object.keys(context.fake.files).some((path) => path.startsWith(DSH))).toBe(false);
+    // The tiers half still wrote the repo file.
+    expect(context.fake.files[DSH_PATH]).toContain("LiteLLM (local)");
+  });
+
+  test("the scaffold's `[]`, a conflict outside the block (exit 1), and the unverified transport note", async () => {
+    const empty = await cli(
+      dshContext({ [`${PROFILES}/proxy/cordis.patch.yml`]: "# scaffold\n[]\n" }),
+    );
+    expect(empty.code).toBe(0);
+    expect(empty.stdout).toContain("the file holds only the scaffold's `[]`");
+    expect(empty.stdout).toContain("-[]");
+
+    const byHand = await cli(
+      dshContext({
+        [`${PROFILES}/proxy/cordis.patch.yml`]: `${REPO_PATCH}- id: mcp-serena\n  config:\n    serverName: serena\n`,
+      }),
+    );
+    expect(byHand.code).toBe(1);
+    expect(byHand.stdout).toContain("== dsh ==\noutcome: write");
+    expect(byHand.stdout).toContain("== dsh (harness home) ==\noutcome: conflict");
+    expect(byHand.stdout).toContain("CONFLICT: 2 of jig's rows already declared outside the block");
+    expect(byHand.stdout).toMatch(/id mcp-serena {2}line 7/);
+    expect(byHand.stdout).toMatch(/serverName serena {2}line 9/);
+    expect(byHand.stdout).toContain("streamable-http");
+  });
+
+  test("--write does both halves; --target dsh with no dsh context runs the tiers half alone and says so; --target all never reaches the home", async () => {
+    const context = dshContext({ [`${PROFILES}/proxy/cordis.patch.yml`]: REPO_PATCH });
+    const written = await cli(context, ["--target", "dsh", "--write"]);
+    expect(written.code).toBe(0);
+    expect(context.fake.files[DSH_PATH]).toContain("LiteLLM (local)");
+    expect(context.fake.files[`${PROFILES}/proxy/cordis.patch.yml`]).toContain("mcp-serena");
+    expect(context.fake.files[`${DSH}/AGENTS.md`]).toContain("# Core");
+
+    const alone = await applyCli(["--target", "dsh"], dshContext().ports, paths);
+    expect(alone.code).toBe(0);
+    expect(alone.stdout).toContain("== dsh ==");
+    expect(alone.stdout).toContain("not wired in this context: only dsh/settings.yaml");
+
+    const all = await cli(dshContext(), []);
+    expect(all.stdout).toContain("== dsh ==");
+    expect(all.stdout).not.toContain("== dsh (harness home) ==");
+  });
+});

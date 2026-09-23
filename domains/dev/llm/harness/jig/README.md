@@ -77,7 +77,7 @@ inverted.
 | 3a | Codex: `~/.agents/skills` as a managed link directory (`~/.codex/skills` reported, not managed), `~/.codex/AGENTS.md`, `~/.codex/agents/*.toml` with the model from `agents/models.json`, jig's MCP block in `~/.codex/config.toml` | **done** |
 | 3b | omp: the same `~/.agents/skills` mount (one plan shared with 3a), `~/.omp/agent/agents/*.md`, jig's entries in `~/.omp/agent/mcp.json`, `~/.omp/agent/extensions/jig.ts` → jig's omp extension; `config.yml` reported, not owned | **done** |
 | 3c-pi | pi: the same `~/.agents/skills` mount (one plan shared with 3a/3b), `~/.pi/agent/AGENTS.md` as the same generated file (replacing today's symlink into the repo), jig's entries in pi-mcp-adapter's `~/.config/mcp/mcp.json`; `packages` and `extensions/` reported, not owned | **done** |
-| 3c-dsh | DSH | |
+| 3c-dsh | DSH: jig's `@deepseek-ai/dsh-mcp-client` rows (serena, codebase-memory, context7 — the `targets.dsh` set) in each scaffolded-and-repo-owned profile's `$DSH_HOME/profiles/<name>/cordis.patch.yml`, every other row carried through; `$DSH_HOME/AGENTS.md` as the same generated file; skills, the home-level patch, `settings.yaml`, `hooks.claude.json` and the guard plugin reported, not owned | **done** |
 | 4 | `yoki-switch` retired, along with `core/config/manager.sh`'s `link_*` functions for the harnesses | |
 
 ### What each milestone replaces in `yoki-switch`
@@ -103,7 +103,8 @@ Rows cite the destination table in
 | `targets/gen.js` for omp: `omp-config-yml.js`, `omp-rules-md.js`, `omp-hooks.js` (`config.yml`, `RULES.md`, `yoki-hooks.json`, the `yoki-*.ts` extension links) | nothing yet — reported as leftovers by 3b; `config.yml` ownership is a ruling not made | 4 |
 | `link_pi_resources` in `core/config/manager.sh`: the `AGENTS.md` link | `app/apply/apply-pi.ts`: the generated file over the link, `domain/pi/{mcp,packages,agent-dir}.ts` for the rest; the mount through `planAgentsSkillsMount` (shared with 3a/3b) | 3c-pi |
 | `link_pi_resources`: the `settings.json`/`models.json` links, the `extensions/*.ts` and `themes/*.json` file links | nothing yet — reported by 3c-pi (`extensions/`) or untouched (`settings.json` is read as the `packages` source; `models.json` is the tiers target's file) | 4 |
-| `link_dsh_resources` in `core/config/manager.sh` | per-target module under `app/apply/` | 3c-dsh |
+| `link_dsh_resources` in `core/config/manager.sh`: the profile discovery rule (scaffolded AND in the repo) | `app/apply/apply-dsh.ts`, the same rule, plus what manager.sh never did — the MCP rows (`domain/dsh/{mcp,cordis-patch}.ts`) and `AGENTS.md` | 3c-dsh |
+| `link_dsh_resources`: the `settings.yaml` link, the `hooks.claude.json` expanded copy, the per-profile `cordis.patch.yml` expanded copy, the plugin build + `pnpm add link:` | nothing yet — reported by 3c-dsh; the expanded copy still overwrites jig's block on each run, which reads as "write again" | 4 |
 
 ### Milestone 1: what `jig apply --target claude` does
 
@@ -600,3 +601,140 @@ then the skills mount — and any conflict in the agent-directory half (a
 hand-edited AGENTS.md, a changed jig entry in the adapter config, an
 unreadable adapter config) returns `wrote: false` for that half with nothing
 of it written; the exit code is 1 when either half conflicts.
+
+### Milestone 3c: dsh
+
+```sh
+bun src/cli/jig.ts apply --target dsh            # dry-run: settings.yaml's block, then the harness home
+bun src/cli/jig.ts apply --target dsh --write    # writes both halves in one run; any conflict aborts the second
+```
+
+`--target dsh` names one harness, so, as `--target pi` does, it runs both
+halves: the tiers write into the checkout's `domains/dev/config/dsh/settings.yaml`
+from `policy/tiers.json` (the part `--target all` has always run, unchanged),
+then the harness-home half below (`app/apply/apply-dsh.ts`), never part of
+`--target all`. The home is resolved the way DSH resolves it
+(`domain/dsh/home.ts`, from `@deepseek-ai/dsh-home-paths`' README: `$DSH_HOME`,
+a blank value ignored, else `~/.dsh` — the rule `link_dsh_resources` reads
+too). The formats are DSH's own package READMEs at 0.1.5-rc.2 — the
+installed copies under `~/.dsh/profiles/node_modules/@deepseek-ai/`, which
+is the running version — cited where each is fixed in code; the facts the
+delivery rests on are also in
+[`rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md`](../rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md)
+§Q2 (the Cordis row shape, eager loading) and
+[`2026-09-22-generator-migration-map.md`](../rules/research/2026-09-22-generator-migration-map.md)
+§6.5 (the profile tree, expanded copies, never creating a profile).
+
+DSH composes a profile as patches over an empty entry list: each bundle's
+patch in `dsh.profile.bundles` order, then the profile's own
+`cordis.patch.yml`, then the home-level `$DSH_HOME/cordis.patch.yml`, then
+`--patch` overlays (dsh README, "Profiles"). A patch file is "a top-level
+YAML array of loader patch entries (id-targeted config overrides, disables,
+and insert lists; `!!js` expressions allowed)" — DSH's own comment in the
+file it scaffolds — applied "in order" (`applyEntryPatches`,
+cordis-plugin-include): a row with `id:` replaces that entry's whole config
+("does not deep-merge"), a row with `insert:` appends entries. So the rows
+ARE mergeable, and the answer to "whole file or rows" is rows: jig owns one
+`- insert:` row and nothing else in the file.
+
+Destinations, one source tree:
+
+- **`$DSH_HOME/profiles/<name>/cordis.patch.yml`** — for every profile that
+  DSH has scaffolded there AND the repo owns
+  (`domains/dev/config/dsh/profiles/<name>/cordis.patch.yml` exists), the
+  rule `link_dsh_resources` applies. Profiles are pnpm workspaces DSH
+  scaffolds itself; jig never creates one, and a repo profile DSH has not
+  scaffolded is named and gets nothing. `node_modules` under `profiles/` is
+  DSH's shared module fallback, not a profile. When no profile matches, DSH
+  is not scaffolded and the target delivers nothing at all — not even
+  AGENTS.md, which would create the home. Into each matching file goes one
+  `- insert:` patch row holding one `@deepseek-ai/dsh-mcp-client` entry per
+  server with `targets.dsh: true` (`domain/dsh/mcp.ts`; `targetOverrides.dsh`
+  applied, `{{HOME}}` substituted because DSH reads paths literally — the
+  reason `install_expanded` exists), between `# jig:begin mcp` and
+  `# jig:end mcp` at the end of the file (`domain/dsh/cordis-patch.ts`).
+  Per the [MCP-list decision](../rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md)
+  DSH gets only serena, codebase-memory-mcp and context7: its client is
+  eager — "The tool descriptions and input schemas enter every request
+  while the tools are registered" (dsh-mcp-client README, "Model
+  Experience") — and the set is chosen in `mcp/servers.json`, not in code.
+  Each entry carries the README's fields: `serverName`, `transport`
+  (`stdio`, or `streamable-http` for a source `http`/`sse` server — the only
+  remote transport documented), `command`/`args`/`env` or `url`/`headers`;
+  ids are `mcp-<name>`, the README's own convention. Every string is
+  single-quoted, except that a `${VAR}` reference — which DSH does not
+  expand — is rendered as the documented `!!js` expression (`!!js
+  process.env.VAR`, or the template form `!!js '`Bearer
+  ${process.env.TOKEN}`'`). Every other row — the repo's
+  `agent-default-model` override and `jig-guard` insert that manager.sh
+  installs, anything hand-added, every comment — is carried through byte
+  for byte: the file is spliced as text and never re-serialised. The
+  scaffold's lone `[]` (DSH: "an empty or comments-only file fails boot —
+  disable the layer with `[]` instead") gives way to the block, and comes
+  back if the block is ever removed from a file that then holds only
+  comments. Hand-edit detection compares the block, not the file, per
+  profile in the manifest: a hand edit inside the block is a conflict; a
+  jig id or `serverName` declared outside it (by hand, or in the home-level
+  layer) is a conflict naming the line, because a duplicate id fails boot
+  ("duplicate loader entry id") and a duplicate server name drops the later
+  row — the one-time manual reconciliation the config-layout decision keeps
+  out of the generator; an unterminated block is one too. Until milestone 4,
+  `link_dsh_resources` overwrites the file with the repo copy on each run
+  and drops the block; that reads as "write again", never as a conflict,
+  and the dry-run says to re-apply after it. On this machine both
+  `headless` and `proxy` are scaffolded with the repo's rows and the plugin
+  linked: two writes, then noop.
+- **`$DSH_HOME/AGENTS.md`** — the same generated content as
+  `~/.claude/AGENTS.md`, from the same renderer, with the same hand-edit
+  detection and first-write backup. DSH reads it: "The first request
+  includes one durable baseline message with the user-global
+  `$DSH_HOME/AGENTS.md` followed by the project chain" (dsh-agent-instructions
+  README; `dsh-base` enables it by default with a 65,536-byte `maxBytes`
+  over the whole chain, and "broader files are omitted before the most
+  specific file is truncated"), so the dry-run prints the size against that
+  budget and warns past it — this file is the broadest, so it is the first
+  DSH drops. On this machine the file does not exist yet: one write.
+- **Report only: skills.** DSH reads `~/.agents/skills` natively
+  (dsh-skill-filesystem README: the `user-agents` root `<agentsHome>/skills`,
+  `agentsHome` = `$DSH_AGENTS_HOME` or `~/.agents`, rank 500, beside
+  `<dshHome>/skills` at rank 400). The mount is the Codex/omp/pi targets'
+  delivery, one plan (`planAgentsSkillsMount`); this target reports its
+  state and plans nothing there. Promoting `dsh` into
+  `AGENTS_SKILLS_MOUNT_TARGETS` would be a one-line change if wanted.
+- **Report only: manager.sh's.** `settings.yaml` (the link to the repo file
+  the tiers half writes), `hooks.claude.json` (the expanded copy for the
+  `dsh-hooks-claude-code` bridge, which the profiles no longer compose), and
+  the jig-guard plugin (`bun run build` in `adapters/dsh`, then `pnpm add
+  link:` into each profile — reported per profile as linked or not) stay
+  with `link_dsh_resources` until milestone 4. The home-level
+  `$DSH_HOME/cordis.patch.yml` is reported as found, scanned for a jig
+  duplicate, and never written. The conditional `paths:` rules are not
+  delivered to DSH in this milestone, in the omp and pi targets' words.
+
+`--write` writes both halves in one run — `settings.yaml`'s block, then each
+profile's patch file, AGENTS.md, the manifest and provenance (into
+`$DSH_HOME`) — and any conflict in the harness-home half returns `wrote:
+false` for that half with nothing of it written; the exit code is 1 when
+either half conflicts.
+
+**`[unverified]`** — what DSH's own docs did not settle, printed by the
+dry-run and marked in the code:
+
+- `docs/config-catalog.md`, the "exhaustive source for every accepted
+  field", was not fetched (404 on raw `main`); the dsh-mcp-client README's
+  field table at 0.1.5-rc.2 is what the entries follow.
+- A source `http`/`sse` server becomes `transport: streamable-http`, the
+  only remote transport the README documents; whether an SSE-only server
+  answers it is untested. No `targets.dsh` server uses either today.
+- `!!js process.env.X` inside an inserted row's config: documented for
+  entries (mcp-client README) and for patch files (dsh-app-boot README:
+  "interpolate `!!js` expressions at boot"); the combination is not
+  exercised, since no `targets.dsh` server carries `${VAR}` today. Bun's
+  YAML parser reads the tag as its text, which the tests pin.
+- Only `$DSH_HOME` is honoured; a home configured inside DSH's own settings
+  ("an explicit configured path has the highest precedence",
+  dsh-home-paths README) is not read, because jig reads no DSH settings
+  file.
+- Whether one row in the home-level `$DSH_HOME/cordis.patch.yml` could
+  replace the per-profile rows for every profile at once — a ruling, not a
+  guess; the delivery is per profile as manager.sh's is.

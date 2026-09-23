@@ -34,9 +34,17 @@
  *   reported (`app/apply/apply-pi.ts`). Milestone 3c-pi. `--target pi`
  *   names one harness, so it runs both halves: the tiers write into the
  *   checkout's `pi/models.json` (the first group's part), then this.
+ * - **dsh**, the harness-home half — jig's `@deepseek-ai/dsh-mcp-client`
+ *   rows in each scaffolded-and-repo-owned profile's `cordis.patch.yml`
+ *   under `$DSH_HOME/profiles/`, and the same generated AGENTS.md into
+ *   `$DSH_HOME`; skills, the home-level patch, settings.yaml,
+ *   hooks.claude.json and the guard plugin reported
+ *   (`app/apply/apply-dsh.ts`). Milestone 3c-dsh. `--target dsh` runs both
+ *   halves the way `--target pi` does: the tiers write into the checkout's
+ *   `dsh/settings.yaml` first, then this.
  *
  * `--target all` means the first group only. The claude, codex and omp
- * targets, and pi's agent-directory half, write into `$HOME` rather than
+ * targets, and pi's and dsh's second halves, write into `$HOME` rather than
  * into the checkout, so each has to be named: a verb that reaches a user's
  * live harness configuration by default is one keystroke from a surprise,
  * and nothing about the word "all" says which files it means.
@@ -57,6 +65,13 @@ import {
   applyCodex,
 } from "../app/apply/apply-codex";
 import {
+  DSH_INSTRUCTIONS_BUDGET_BYTES,
+  type DshApplyPaths,
+  type DshApplyReport,
+  type DshProfileReport,
+  applyDsh,
+} from "../app/apply/apply-dsh";
+import {
   type OmpAgentFileReport,
   type OmpApplyOptions,
   type OmpApplyPaths,
@@ -76,6 +91,7 @@ import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
 import type { ModelChoice } from "../domain/claude/agent-definition";
 import { AGENTS_MD_BYTE_LIMIT } from "../domain/claude/agents-md";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
+import type { PathState } from "../domain/claude/links";
 import { describePathState, describeStaleReason } from "../domain/claude/managed-dir";
 import { DEFAULT_PERMITS, defaultPermitPolicyFragment } from "../domain/claude/permits";
 import { KNOWN_MACOS_EXCLUSION_CANDIDATES } from "../domain/claude/sandbox";
@@ -92,6 +108,8 @@ interface ParsedArgs {
   readonly omp: boolean;
   /** `--target pi`: the tiers half (`targets` holds `pi` too) plus the agent-directory half. */
   readonly pi: boolean;
+  /** `--target dsh`: the tiers half (`targets` holds `dsh` too) plus the harness-home half. */
+  readonly dsh: boolean;
   readonly write: boolean;
 }
 
@@ -114,11 +132,20 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
   }
 
   const targetName = targetArg ?? "all";
-  const none = { targets: [], claude: false, codex: false, omp: false, pi: false, write };
+  const none = {
+    targets: [],
+    claude: false,
+    codex: false,
+    omp: false,
+    pi: false,
+    dsh: false,
+    write,
+  };
   if (targetName === "claude") return { ...none, claude: true };
   if (targetName === "codex") return { ...none, codex: true };
   if (targetName === "omp") return { ...none, omp: true };
   if (targetName === "pi") return { ...none, targets: ["pi"], pi: true };
+  if (targetName === "dsh") return { ...none, targets: ["dsh"], dsh: true };
   if (targetName === "all") return { ...none, targets: ALL_APPLY_TARGETS };
   if ((ALL_APPLY_TARGETS as readonly string[]).includes(targetName)) {
     return { ...none, targets: [targetName as ApplyTarget] };
@@ -978,6 +1005,189 @@ function piExtensionLines(report: PiApplyReport): readonly string[] {
   return lines;
 }
 
+/**
+ * The DSH target's harness-home half, in the pi target's order: the
+ * profiles found against the repo's, the MCP rows and the block per
+ * profile with its conflicts and diff, the home-level patch layer, the
+ * generated AGENTS.md against DSH's budget, then what reaches DSH
+ * natively or through manager.sh — and the facts the delivery could not
+ * verify, marked as such.
+ */
+function formatDsh(report: DshApplyReport, paths: DshApplyPaths): string {
+  const lines: string[] = [
+    "== dsh (harness home) ==",
+    `outcome: ${report.outcome}`,
+    `dest: ${paths.dshHome}  (${paths.dshHomeVia === "DSH_HOME" ? "DSH_HOME" : "default ~/.dsh; DSH_HOME overrides"})`,
+    ...(report.message === undefined ? [] : [`message: ${report.message}`]),
+    "",
+    ...dshProfileLines(report, paths),
+    "",
+    ...dshMcpLines(report),
+    "",
+    ...dshAgentsMdLines(report, paths),
+    "",
+    ...dshReportOnlyLines(report, paths),
+    "",
+    "[unverified] — facts the delivery rests on that DSH's own docs did not settle:",
+    "  - docs/config-catalog.md (the exhaustive field list) was not fetched (404 on raw main); the",
+    "    dsh-mcp-client README's field table (0.1.5-rc.2, installed copy) is what is cited.",
+    "  - a source `http`/`sse` server becomes `transport: streamable-http`, the only remote transport the",
+    "    README documents; whether an SSE-only server answers it is untested (no dsh server uses either today).",
+    "  - `!!js process.env.X` inside an inserted row's config: documented for entries (README) and for patch",
+    "    files (dsh-app-boot README); the combination is not exercised — no dsh server carries `${VAR}` today.",
+    "  - only `$DSH_HOME` is honoured; a home configured inside dsh's own settings (dsh-home-paths: 'an explicit",
+    "    configured path has the highest precedence') is not read, because jig reads no dsh settings file.",
+  ];
+  return lines.join("\n");
+}
+
+/** The profiles: which are both scaffolded and the repo's, which are one but not the other. */
+function dshProfileLines(report: DshApplyReport, paths: DshApplyPaths): readonly string[] {
+  const lines = [
+    `profiles: ${report.profilesDir.path}${report.profilesDir.state.kind === "dir" ? "" : `  (${describePathState(report.profilesDir.state)})`}`,
+    `  a profile counts when DSH scaffolded it there AND the repo owns ${paths.repoProfilesDir}/<name>/cordis.patch.yml`,
+    "  (the rule core/config/manager.sh link_dsh_resources applies); jig never creates a profile directory.",
+  ];
+  if (!report.scaffolded) {
+    lines.push(
+      "  DSH NOT SCAFFOLDED: no profile matches, so nothing is delivered — not the patch rows, not AGENTS.md",
+      "  (which would create the home). Run dsh once (`dsh --profile <name>`) to scaffold, then apply again.",
+    );
+  } else {
+    const width = Math.max(PAD, ...report.profiles.map((profile) => profile.name.length + 3));
+    lines.push(
+      `  delivered to (${report.profiles.length}):`,
+      ...report.profiles.map(
+        (profile) =>
+          `    ${profile.name.padEnd(width - 2)}${profile.outcome.padEnd(10)}${profile.patchPath}`,
+      ),
+    );
+  }
+  if (report.notScaffolded.length > 0) {
+    lines.push(
+      `  in the repo, not scaffolded on this machine (${report.notScaffolded.length}): ${report.notScaffolded.join(", ")} — nothing delivered there`,
+    );
+  }
+  if (report.foreignProfiles.length > 0) {
+    lines.push(
+      `  scaffolded, not the repo's (${report.foreignProfiles.length}), left alone: ${report.foreignProfiles.join(", ")}`,
+    );
+  }
+  return lines;
+}
+
+/** One profile's block: what stands there, the conflicts that stop a write, the guard plugin, the diff. */
+function dshProfileBlockLines(profile: DshProfileReport): readonly string[] {
+  const lines = [
+    `  ${profile.name}: ${profile.outcome}  ${profile.patchPath}${profile.state.kind === "missing" ? "  (absent: created with jig's block only; the repo's rows come from manager.sh)" : profile.state.kind === "file" ? "" : `  (${describePathState(profile.state)})`}`,
+  ];
+  if (profile.replacesEmptyLayer) {
+    lines.push(
+      "    the file holds only the scaffold's `[]` (an empty layer; a comments-only file fails boot): the block",
+      "    takes its place, comments kept.",
+    );
+  }
+  if (profile.invalid !== undefined) {
+    lines.push(`    CONFLICT: ${profile.invalid}; nothing is written until it is fixed by hand.`);
+  }
+  if (profile.declaredOutside.length > 0) {
+    lines.push(
+      `    CONFLICT: ${profile.declaredOutside.length} of jig's rows already declared outside the block — a duplicate id fails`,
+      "    DSH's boot and a duplicate serverName drops the later row, so nothing is written until reconciled by hand:",
+      ...profile.declaredOutside.map((d) => `      ${d.kind} ${d.value}  line ${d.line}`),
+    );
+  }
+  lines.push(
+    `    guard plugin (report only): ${profile.guardPlugin.kind === "missing" ? "NOT linked into node_modules/@esh2n/jig-dsh-guard — the jig-guard row fails to load until manager.sh link_dsh_resources runs" : `linked (${describePathState(profile.guardPlugin)} at node_modules/@esh2n/jig-dsh-guard)`}`,
+    ...(profile.diff === ""
+      ? ["    (no differences)"]
+      : ["    --- diff (current vs generated) ---", profile.diff]),
+  );
+  return lines;
+}
+
+/** jig's rows, what the block is, the per-profile plans, and the home-level layer. */
+function dshMcpLines(report: DshApplyReport): readonly string[] {
+  const { mcp, homePatch } = report;
+  const lines = [
+    `mcp (cordis.patch.yml, per profile): jig's rows (${mcp.rows.length}): ${mcp.rows.length === 0 ? "(none)" : mcp.rows.map((row) => row.id).join(", ")}`,
+    '  DSH\'s MCP client is eager — "tool descriptions and input schemas enter every request" (dsh-mcp-client',
+    "  README) — so only targets.dsh servers are delivered (MCP-list decision: serena, codebase-memory, context7).",
+    "  Each is a plugin row of @deepseek-ai/dsh-mcp-client (serverName, transport stdio|streamable-http,",
+    "  command/args/env or url/headers; {{HOME}} expanded — DSH reads paths literally) inside one `- insert:`",
+    "  patch row between `# jig:begin mcp` and `# jig:end mcp`. Every other row — the repo's",
+    "  agent-default-model and jig-guard rows, anything hand-added — is carried through byte for byte.",
+    "  Hand-edit detection compares the block, not the file.",
+  ];
+  if (report.scaffolded) {
+    for (const profile of report.profiles) lines.push(...dshProfileBlockLines(profile));
+    lines.push(
+      "  Until milestone 4, core/config/manager.sh link_dsh_resources overwrites each of these files with the",
+      "  repo copy (install_expanded) on every run and drops the block: re-run `jig apply --target dsh --write`",
+      "  after it (the block's absence reads as write, never as a conflict).",
+    );
+  }
+  lines.push(
+    `  ${homePatch.path}: ${homePatch.state.kind === "missing" ? "absent" : describePathState(homePatch.state)} — the home-level patch layer, applied after every`,
+    "  profile's (dsh README \"Profiles\"); not jig's, never written. [unverified] whether one row there could",
+    "  replace the per-profile rows for every profile at once — a ruling, not a guess here.",
+    ...(homePatch.declaredOutside.length > 0
+      ? [
+          `  CONFLICT: it declares ${homePatch.declaredOutside.map((d) => `${d.kind} ${d.value} (line ${d.line})`).join(", ")} — a duplicate fails DSH's boot.`,
+        ]
+      : []),
+  );
+  return lines;
+}
+
+/** The generated file against DSH's chain budget; absent when nothing is delivered. */
+function dshAgentsMdLines(report: DshApplyReport, paths: DshApplyPaths): readonly string[] {
+  const { agentsMd } = report;
+  if (agentsMd === undefined) {
+    return [
+      `AGENTS.md: not delivered  ${paths.agentsMd}  (DSH not scaffolded; the file would create the home)`,
+    ];
+  }
+  const budget =
+    agentsMd.bytes > DSH_INSTRUCTIONS_BUDGET_BYTES
+      ? ` — WARNING: over dsh-base's ${DSH_INSTRUCTIONS_BUDGET_BYTES}-byte instruction budget; DSH omits the broadest file (this one) first`
+      : ` of dsh-base's ${DSH_INSTRUCTIONS_BUDGET_BYTES}-byte budget for the whole instruction chain`;
+  return [
+    `AGENTS.md: ${agentsMd.outcome}  ${agentsMd.path}  (${agentsMd.bytes} bytes${budget})`,
+    "  the same generated content as ~/.claude/AGENTS.md — one source, one file for all five harnesses",
+    "  (config-layout decision); DSH reads the user-global $DSH_HOME/AGENTS.md first, then the project chain",
+    "  (dsh-agent-instructions README; dsh-base enables it by default).",
+    ...(agentsMd.backupPath === undefined
+      ? []
+      : [
+          `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
+        ]),
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    ...(agentsMd.diff === ""
+      ? ["  (no differences)"]
+      : ["--- diff (current vs generated) ---", agentsMd.diff]),
+  ];
+}
+
+/** What reaches DSH natively, and what manager.sh still delivers. */
+function dshReportOnlyLines(report: DshApplyReport, paths: DshApplyPaths): readonly string[] {
+  const state = (entry: { readonly state: PathState }) =>
+    entry.state.kind === "missing" ? "absent" : describePathState(entry.state);
+  return [
+    `skills (report only): ${report.agentsSkills.path}: ${state(report.agentsSkills)}${paths.agentsSkillsVia === "DSH_AGENTS_HOME" ? "  (DSH_AGENTS_HOME)" : ""}`,
+    "  DSH reads ~/.agents/skills natively (dsh-skill-filesystem README: the user-agents root <agentsHome>/skills,",
+    "  agentsHome = $DSH_AGENTS_HOME or ~/.agents, rank 500; <dshHome>/skills at rank 400). The mount is",
+    "  --target codex/omp/pi's delivery (one plan, planAgentsSkillsMount); this target plans nothing there.",
+    "",
+    "delivered by core/config/manager.sh link_dsh_resources until milestone 4 (report only):",
+    `  settings.yaml      ${report.settingsYaml.path}: ${state(report.settingsYaml)}  (link to the repo file the tiers half above writes)`,
+    `  hooks.claude.json  ${report.hooksClaudeJson.path}: ${state(report.hooksClaudeJson)}  (expanded copy for the dsh-hooks-claude-code bridge; the profiles compose jig-guard instead)`,
+    `  jig-guard plugin   ${paths.pluginDir}: build + link  (bun run build, then pnpm add link: per profile — see each profile above)`,
+    "  GAP: the conditional `paths:` rules (rules/<lang>/) are not delivered to DSH in this milestone; jig's",
+    "  dsh plugin does not inject them yet.",
+  ];
+}
+
 export interface ClaudeCliContext {
   readonly ports: ClaudeApplyPorts;
   readonly paths: ClaudeApplyPaths;
@@ -1001,6 +1211,11 @@ export interface PiCliContext {
   readonly paths: PiApplyPaths;
 }
 
+export interface DshCliContext {
+  readonly ports: ClaudeApplyPorts;
+  readonly paths: DshApplyPaths;
+}
+
 export async function applyCli(
   args: readonly string[],
   ports: ApplyPorts,
@@ -1009,6 +1224,7 @@ export async function applyCli(
   codex?: CodexCliContext,
   omp?: OmpCliContext,
   pi?: PiCliContext,
+  dsh?: DshCliContext,
 ): Promise<ApplyCliResult> {
   const parsed = parseArgs(args);
   if ("error" in parsed) {
@@ -1078,6 +1294,20 @@ export async function applyCli(
       const piReport = await applyPi({ paths: pi.paths, write: parsed.write }, pi.ports);
       sections.push(formatPi(piReport, pi.paths));
       if (piReport.outcome === "conflict") code = 1;
+    }
+  }
+
+  // `--target dsh` names the harness too: the harness-home half follows the
+  // tiers half, on the pi target's pattern.
+  if (parsed.dsh) {
+    if (dsh === undefined) {
+      sections.push(
+        "== dsh (harness home) ==\nnot wired in this context: only dsh/settings.yaml (above) was considered",
+      );
+    } else {
+      const dshReport = await applyDsh({ paths: dsh.paths, write: parsed.write }, dsh.ports);
+      sections.push(formatDsh(dshReport, dsh.paths));
+      if (dshReport.outcome === "conflict") code = 1;
     }
   }
 

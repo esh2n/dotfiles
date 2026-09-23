@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ClaudeApplyPaths } from "../app/apply/apply-claude";
 import type { CodexApplyOptions, CodexApplyPaths } from "../app/apply/apply-codex";
+import type { DshApplyPaths } from "../app/apply/apply-dsh";
 import type { OmpApplyOptions, OmpApplyPaths } from "../app/apply/apply-omp";
 import type { PiApplyPaths } from "../app/apply/apply-pi";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
@@ -17,6 +18,7 @@ import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
+import { DSH_PROFILES_DIR, DSH_PROFILE_PATCH_FILENAME, resolveDshHome } from "../domain/dsh/home";
 import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
 import { resolvePiAgentDir } from "../domain/pi/agent-dir";
 import { PI_MCP_USER_CONFIG } from "../domain/pi/mcp";
@@ -266,6 +268,44 @@ function resolvePiApplyPaths(): PiApplyPaths {
     repoExtensionsDir: join(repoPi, "extensions"),
     repoSettings: join(repoPi, "settings.json"),
     retiredAgentsMd: join(repoPi, "AGENTS.md"),
+    home: homedir(),
+  };
+}
+
+/**
+ * Where the DSH target's harness-home half reads from and writes to.
+ *
+ * The home follows DSH's own rule (`domain/dsh/home.ts`: `DSH_HOME`, else
+ * `~/.dsh`), the rule `core/config/manager.sh link_dsh_resources` reads
+ * too. Profiles live under `<home>/profiles/<name>`, scaffolded by DSH; the
+ * repo's own profile patches are under `domains/dev/config/dsh/profiles`.
+ * The skills root DSH reads is `$DSH_AGENTS_HOME/skills`, else
+ * `~/.agents/skills` (dsh-skill-filesystem README) — the mount the Codex,
+ * omp and pi targets deliver; reported here, not planned. The guard plugin
+ * is jig's own dsh adapter inside this checkout.
+ */
+function resolveDshApplyPaths(): DshApplyPaths {
+  const harness = harnessRoot();
+  const dshHome = resolveDshHome(process.env, homedir());
+  const agentsHome = process.env.DSH_AGENTS_HOME?.trim();
+  return {
+    harnessRoot: harness,
+    mcpServers: join(harness, "mcp", "servers.json"),
+    decisions: join(harness, "rules", "decisions"),
+    dshHome: dshHome.dir,
+    dshHomeVia: dshHome.via,
+    profilesDir: join(dshHome.dir, DSH_PROFILES_DIR),
+    repoProfilesDir: join(resolveApplyRoot(), "domains", "dev", "config", "dsh", "profiles"),
+    agentsMd: join(dshHome.dir, "AGENTS.md"),
+    homePatch: join(dshHome.dir, DSH_PROFILE_PATCH_FILENAME),
+    agentsSkills:
+      agentsHome === undefined || agentsHome === ""
+        ? join(homedir(), ".agents", "skills")
+        : join(agentsHome, "skills"),
+    agentsSkillsVia: agentsHome === undefined || agentsHome === "" ? "default" : "DSH_AGENTS_HOME",
+    settingsYaml: join(dshHome.dir, "settings.yaml"),
+    hooksClaudeJson: join(dshHome.dir, "hooks.claude.json"),
+    pluginDir: join(harness, "jig", "adapters", "dsh"),
     home: homedir(),
   };
 }
@@ -545,6 +585,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         },
         { ports: applyPorts, paths: resolveOmpApplyPaths(), options: ompApplyOptions(agentModels) },
         { ports: applyPorts, paths: resolvePiApplyPaths() },
+        { ports: applyPorts, paths: resolveDshApplyPaths() },
       );
       process.stdout.write(result.stdout);
       return result.code;
@@ -750,6 +791,17 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  declares pi-mcp-adapter and @tintinweb/pi-subagents (the paste-able line is printed when not),\n" +
           "  what ~/.pi/agent/extensions holds (manager.sh's links until milestone 4), and the two gaps\n" +
           "  (no native subagents; conditional paths: rules not delivered). Dry-run by default; --write.\n" +
+          "  apply --target dsh runs both halves for the one harness: dsh/settings.yaml's managed block from\n" +
+          "  policy/tiers.json (the tiers half, the only part --target all runs), then the harness home\n" +
+          "  ($DSH_HOME, default ~/.dsh): jig's @deepseek-ai/dsh-mcp-client rows for targets.dsh servers (only\n" +
+          "  serena, codebase-memory, context7 — DSH loads MCP schemas eagerly) inside a `# jig:begin mcp` block\n" +
+          "  of each profile's cordis.patch.yml, for every profile DSH has scaffolded under $DSH_HOME/profiles\n" +
+          "  that the repo also owns (domains/dev/config/dsh/profiles/<name>/), every other row carried through;\n" +
+          "  and $DSH_HOME/AGENTS.md, the same generated file as ~/.claude/AGENTS.md (DSH reads it first, then\n" +
+          "  the project chain). No matching profile: nothing is delivered and no directory is created. Report\n" +
+          "  only: ~/.agents/skills (DSH reads it natively; the codex/omp/pi mount), the home-level\n" +
+          "  cordis.patch.yml, settings.yaml, hooks.claude.json and the jig-guard plugin (manager.sh's until\n" +
+          "  milestone 4), and the [unverified] list. Dry-run by default; --write.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +

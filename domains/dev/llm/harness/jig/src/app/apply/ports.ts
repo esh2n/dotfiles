@@ -64,3 +64,6 @@ export type OmpApplyPorts = ClaudeApplyPorts;
 
 /** The pi target: one generated file (over a symlink today), one JSON file, one directory of links. The same verbs. */
 export type PiApplyPorts = ClaudeApplyPorts;
+
+/** The DSH target: one generated file, one spliced YAML file per profile, directory listings to find the profiles. The same verbs. */
+export type DshApplyPorts = ClaudeApplyPorts;
