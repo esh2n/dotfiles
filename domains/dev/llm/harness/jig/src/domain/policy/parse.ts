@@ -16,6 +16,7 @@ import {
   type Rule,
   type SubjectPattern,
 } from "./types";
+import type { Waivers } from "./waivers";
 
 const EFFECTS: ReadonlySet<string> = new Set<Effect>(["forbid", "ask", "permit"]);
 const ACTION_SET: ReadonlySet<string> = new Set<Action>(ACTIONS);
@@ -133,6 +134,20 @@ function parseRule(raw: unknown, index: number): Rule {
     }
   }
 
+  const { unlessCwdIn } = raw;
+  if (unlessCwdIn !== undefined) {
+    if (typeof unlessCwdIn !== "string" || unlessCwdIn === "" || unlessCwdIn.includes("/")) {
+      throw new Error(
+        `${label} has an "unlessCwdIn" that is not a plain file name (a list beside the policy)`,
+      );
+    }
+    if (effect === "permit") {
+      throw new Error(
+        `${label} is permit and cannot carry "unlessCwdIn" (only forbid and ask are waived)`,
+      );
+    }
+  }
+
   const { principals } = raw;
   if (principals !== undefined) {
     if (
@@ -153,6 +168,7 @@ function parseRule(raw: unknown, index: number): Rule {
     why,
     profiles: profiles as HookProfile[],
     principals: principals as string[] | undefined,
+    unlessCwdIn: unlessCwdIn as string | undefined,
   };
 }
 
@@ -226,5 +242,21 @@ export function parsePolicy(json: Record<string, unknown>): Policy {
     if (ids.has(id)) throw new Error(`guard policy: duplicate rule id "${id}"`);
     ids.add(id);
   }
-  return { version: 1, floor, mode: parseMode(json.mode), rules };
+  return { version: 1, floor, mode: parseMode(json.mode), rules, waivers: {} };
+}
+
+/** The waiver list names the rules refer to, each once, in rule order. */
+export function waiverListNames(policy: Policy): readonly string[] {
+  const names: string[] = [];
+  for (const rule of policy.rules) {
+    if (rule.unlessCwdIn !== undefined && !names.includes(rule.unlessCwdIn)) {
+      names.push(rule.unlessCwdIn);
+    }
+  }
+  return names;
+}
+
+/** The same policy with its waiver lists attached (the loader's step, after reading them). */
+export function withWaivers(policy: Policy, waivers: Waivers): Policy {
+  return { ...policy, waivers };
 }

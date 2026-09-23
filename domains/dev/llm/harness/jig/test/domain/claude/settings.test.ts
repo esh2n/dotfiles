@@ -8,11 +8,13 @@ import type { Json, JsonObject } from "../../../src/domain/compose/merge";
 
 const JIG_GUARD = "/bun /h/jig/src/cli/jig.ts hooks pre-tool-use --harness claude";
 const JIG_GATE = "/bun /h/jig/src/cli/jig.ts hooks stop-gate --harness claude";
-const ORCA = "if [ -z \"${HOME-}\" ]; then :; else \"${HOME}/.orca/agent-hooks/claude-hook.sh\"; fi";
+const ORCA = 'if [ -z "${HOME-}" ]; then :; else "${HOME}/.orca/agent-hooks/claude-hook.sh"; fi';
 
 const MANAGED: ClaudeManagedInput = {
   hooks: {
-    PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: JIG_GUARD, timeout: 10 }] }],
+    PreToolUse: [
+      { matcher: "Bash", hooks: [{ type: "command", command: JIG_GUARD, timeout: 10 }] },
+    ],
     Stop: [{ hooks: [{ type: "command", command: JIG_GATE, timeout: 300 }] }],
   },
   allow: ["Bash(git commit *)"],
@@ -83,10 +85,27 @@ describe("what the apply takes away is listed, not silently dropped", () => {
     const current: JsonObject = {
       hooks: {
         PreToolUse: [
-          { matcher: "Bash", hooks: [{ type: "command", command: "/bun /OLD/jig/src/cli/jig.ts hooks pre-tool-use --harness claude" }] },
+          {
+            matcher: "Bash",
+            hooks: [
+              {
+                type: "command",
+                command: "/bun /OLD/jig/src/cli/jig.ts hooks pre-tool-use --harness claude",
+              },
+            ],
+          },
           { matcher: "Bash", hooks: [{ type: "command", command: "some-other-tool.sh" }] },
         ],
-        Stop: [{ hooks: [{ type: "command", command: "/bun /OLD/jig/src/cli/jig.ts hooks stop-gate --harness claude" }] }],
+        Stop: [
+          {
+            hooks: [
+              {
+                type: "command",
+                command: "/bun /OLD/jig/src/cli/jig.ts hooks stop-gate --harness claude",
+              },
+            ],
+          },
+        ],
       },
     };
 
@@ -94,10 +113,19 @@ describe("what the apply takes away is listed, not silently dropped", () => {
     const hooks = settings.hooks as Record<string, JsonObject[]>;
 
     expect(removed).toEqual([
-      { key: "hooks.PreToolUse", items: ["/bun /OLD/jig/src/cli/jig.ts hooks pre-tool-use --harness claude"] },
-      { key: "hooks.Stop", items: ["/bun /OLD/jig/src/cli/jig.ts hooks stop-gate --harness claude"] },
+      {
+        key: "hooks.PreToolUse",
+        items: ["/bun /OLD/jig/src/cli/jig.ts hooks pre-tool-use --harness claude"],
+      },
+      {
+        key: "hooks.Stop",
+        items: ["/bun /OLD/jig/src/cli/jig.ts hooks stop-gate --harness claude"],
+      },
     ]);
-    expect(hooks.PreToolUse?.[1]).toEqual({ matcher: "Bash", hooks: [{ type: "command", command: "some-other-tool.sh" }] });
+    expect(hooks.PreToolUse?.[1]).toEqual({
+      matcher: "Bash",
+      hooks: [{ type: "command", command: "some-other-tool.sh" }],
+    });
   });
 
   test("another program's hooks (Orca's agent-hooks) are carried on every event, after jig's, and reported as left", () => {
@@ -118,7 +146,9 @@ describe("what the apply takes away is listed, not silently dropped", () => {
       { matcher: "Bash", hooks: [{ type: "command", command: JIG_GUARD, timeout: 10 }] },
       { matcher: "*", hooks: [{ type: "command", command: ORCA, timeout: 10 }] },
     ]);
-    expect(hooks.SubagentStart).toEqual([{ hooks: [{ type: "command", command: ORCA, timeout: 10 }] }]);
+    expect(hooks.SubagentStart).toEqual([
+      { hooks: [{ type: "command", command: ORCA, timeout: 10 }] },
+    ]);
     expect(hooks.Stop).toEqual(MANAGED.hooks.Stop as JsonObject[]);
     expect(left).toContain("hooks.PreToolUse (1 carried)");
     expect(left).toContain("hooks.SubagentStart (1 carried)");
@@ -221,7 +251,18 @@ describe("what the apply takes away is listed, not silently dropped", () => {
 describe("the managed keys themselves", () => {
   test("hooks, permissions and sandbox take the generated values outright", () => {
     const current: JsonObject = {
-      hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "/bun /OLD/jig/src/cli/jig.ts hooks pre-tool-use --harness claude" }] }] },
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              {
+                type: "command",
+                command: "/bun /OLD/jig/src/cli/jig.ts hooks pre-tool-use --harness claude",
+              },
+            ],
+          },
+        ],
+      },
       permissions: { allow: ["old"], deny: ["old"], defaultMode: "acceptEdits" },
       sandbox: { enabled: false },
     };

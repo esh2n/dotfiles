@@ -223,6 +223,25 @@ Where a decision's source belongs there, the dry-run prints what to paste:
   the tightest possible answer, so a missing source can only over-restrict —
   and the dry-run states which of the two it used.
 
+### Waiver lists: a rule switched off per repository, by the owner, outside git
+
+A forbid or ask rule may carry `"unlessCwdIn": "<list name>"`. The list is a
+plain text file **beside the policy** (`~/.config/jig/policy/<list name>`),
+one path prefix per line (`~` allowed, `#` comments), written by the owner
+and never committed: the policy directory is floor-protected, so no agent can
+add a line, and `.gitignore` keeps the file out of the repository even if the
+directory is the linked one. When the calling session's cwd is under a listed
+prefix, that one rule does not fire; the audit line names it under `waived`.
+A command that reaches into another repository (`git -C`, `--git-dir`,
+`--work-tree`, a `cd`/`pushd` on the same line, or anything the reader could
+not resolve) is never waived. Every adapter loads lists through
+`src/app/hooks/load-policy.ts`, so the four harnesses agree.
+
+The one use today is `git-push-main-master` with `main-push-allowed`: the
+owner's personal repositories may take a push to `main`, work repositories
+keep the forbid, and nothing about it lives in a repository or the shell
+environment (`rules/decisions/2026-09-24-main-push-allowed-repos-in-owner-policy.md`).
+
 The dry-run prints a whole-file unified diff plus three lists: **keys jig now
 owns**, **keys left as-is**, and **keys jig would REMOVE**. The third is the
 one-time cleanup — the 33 yoki hooks, the 71 inherited allow rules, the

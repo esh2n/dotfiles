@@ -38,12 +38,14 @@ import type { AuditLog, Logger } from "../../../llm/harness/jig/src/domain/ports
 
 type Environment = typeof import("../../../llm/harness/jig/src/app/hooks/environment");
 type RunHook = typeof import("../../../llm/harness/jig/src/app/hooks/run-hook");
+type LoadPolicy = typeof import("../../../llm/harness/jig/src/app/hooks/load-policy");
 type Parse = typeof import("../../../llm/harness/jig/src/domain/policy/parse");
 type Audit = typeof import("../../../llm/harness/jig/src/infra/audit/jsonl-audit");
 
 interface Jig {
   readonly env: Environment;
   readonly hook: RunHook;
+  readonly load: LoadPolicy;
   readonly parse: Parse;
   readonly audit: Audit;
 }
@@ -65,6 +67,7 @@ function jig(): Promise<Jig> {
   jigModules ??= (async () => ({
     env: (await import(join(JIG_SRC, "app", "hooks", "environment.ts"))) as Environment,
     hook: (await import(join(JIG_SRC, "app", "hooks", "run-hook.ts"))) as RunHook,
+    load: (await import(join(JIG_SRC, "app", "hooks", "load-policy.ts"))) as LoadPolicy,
     parse: (await import(join(JIG_SRC, "domain", "policy", "parse.ts"))) as Parse,
     audit: (await import(join(JIG_SRC, "infra", "audit", "jsonl-audit.ts"))) as Audit,
   }))();
@@ -89,12 +92,8 @@ export async function loadPolicy(path: string): Promise<Loaded> {
   if (cache !== undefined && cache.path === path) return cache.loaded;
 
   try {
-    const { parse, hook } = await jig();
-    const text = readFileSync(path, "utf8");
-    const loaded: LoadedPolicy = {
-      policy: parse.parsePolicy(JSON.parse(text)),
-      hash: hook.policyHash(text),
-    };
+    const { load } = await jig();
+    const loaded = await load.loadGuardPolicy(path, async (p) => readFileSync(p, "utf8"));
     cache = { path, loaded };
     return loaded;
   } catch (err) {

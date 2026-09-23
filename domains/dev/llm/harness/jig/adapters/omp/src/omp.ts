@@ -140,7 +140,10 @@ type Handler<E, R> = (event: E, ctx: OmpContext) => Promise<R | undefined> | R |
 /** `ExtensionAPI`, the five subscriptions and the one command this extension registers. */
 export interface OmpExtensionApi {
   on(event: "session_start", handler: Handler<{ readonly type?: string }, void>): void;
-  on(event: "before_agent_start", handler: Handler<OmpBeforeAgentStartEvent, OmpBeforeAgentStartResult>): void;
+  on(
+    event: "before_agent_start",
+    handler: Handler<OmpBeforeAgentStartEvent, OmpBeforeAgentStartResult>,
+  ): void;
   on(event: "tool_call", handler: Handler<OmpToolCallEvent, OmpToolCallResult>): void;
   on(event: "tool_result", handler: Handler<OmpToolResultEvent, OmpToolResultResult>): void;
   on(event: "session_stop", handler: Handler<OmpSessionStopEvent, OmpSessionStopResult>): void;

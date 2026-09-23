@@ -29,4 +29,6 @@ export interface Judgment {
   readonly subject?: readonly string[];
   /** What subject extraction concluded, shell calls only. */
   readonly extraction?: { readonly kind: string; readonly detail?: string };
+  /** Rules that would have spoken but were waived for this cwd (`./waivers.ts`). */
+  readonly waived?: readonly string[];
 }

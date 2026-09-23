@@ -68,7 +68,8 @@ export async function routeTo(
       message: `no model ${wanted} in omp's registry (models.yml provider "${providerId}", LITELLM_API_KEY resolved?)`,
     };
   }
-  if (ctx.setModel === undefined) return { switched: false, message: "this omp build exposes no ctx.setModel" };
+  if (ctx.setModel === undefined)
+    return { switched: false, message: "this omp build exposes no ctx.setModel" };
   try {
     await ctx.setModel(wanted);
   } catch (error) {
@@ -109,7 +110,11 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
     const result = await routeTo(mode, providerId, ctx);
     if (result.switched) {
       status(ctx, mode);
-      notify(ctx, `tier-router: ${was} → ${providerId}/${mode} (${why}; the session's tier is ${mode})`, "info");
+      notify(
+        ctx,
+        `tier-router: ${was} → ${providerId}/${mode} (${why}; the session's tier is ${mode})`,
+        "info",
+      );
     } else if (result.message.startsWith("already")) {
       status(ctx, mode);
     } else {
@@ -134,17 +139,29 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
     async onCommand(args, ctx) {
       const wanted = (args ?? "").trim();
       if (wanted === "") {
-        notify(ctx, `tier-router: session tier ${mode} — active model ${activeSelector(ctx) ?? "unknown"}`, "info");
+        notify(
+          ctx,
+          `tier-router: session tier ${mode} — active model ${activeSelector(ctx) ?? "unknown"}`,
+          "info",
+        );
         return;
       }
       if (wanted === "off") {
         mode = "off";
         status(ctx, "off");
-        notify(ctx, "tier-router: not holding the model; /model is yours until /tier <tier>.", "info");
+        notify(
+          ctx,
+          "tier-router: not holding the model; /model is yours until /tier <tier>.",
+          "info",
+        );
         return;
       }
       if (!isTier(wanted)) {
-        notify(ctx, `tier-router: unknown tier "${wanted}". Use main, complex, deterministic, or off.`, "error");
+        notify(
+          ctx,
+          `tier-router: unknown tier "${wanted}". Use main, complex, deterministic, or off.`,
+          "error",
+        );
         return;
       }
       mode = wanted;
@@ -153,7 +170,9 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
       status(ctx, ok ? wanted : "not on a tier");
       notify(
         ctx,
-        ok ? `tier-router: session tier is now ${wanted} (${result.message}).` : `tier-router: ${result.message}`,
+        ok
+          ? `tier-router: session tier is now ${wanted} (${result.message}).`
+          : `tier-router: ${result.message}`,
         ok ? "info" : "error",
       );
     },

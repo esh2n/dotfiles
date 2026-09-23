@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 
 type Environment = typeof import("../../../src/app/hooks/environment");
 type RunHook = typeof import("../../../src/app/hooks/run-hook");
+type LoadPolicy = typeof import("../../../src/app/hooks/load-policy");
 type Parse = typeof import("../../../src/domain/policy/parse");
 type Audit = typeof import("../../../src/infra/audit/jsonl-audit");
 type SessionLog = typeof import("../../../src/infra/logs/session-log");
@@ -30,6 +31,7 @@ type SessionLog = typeof import("../../../src/infra/logs/session-log");
 export interface Jig {
   readonly env: Environment;
   readonly hook: RunHook;
+  readonly load: LoadPolicy;
   readonly parse: Parse;
   readonly audit: Audit;
   readonly sessions: SessionLog;
@@ -57,6 +59,7 @@ export function jig(): Promise<Jig> {
       return {
         env: (await import(join(JIG_SRC, "app", "hooks", "environment.ts"))) as Environment,
         hook: (await import(join(JIG_SRC, "app", "hooks", "run-hook.ts"))) as RunHook,
+        load: (await import(join(JIG_SRC, "app", "hooks", "load-policy.ts"))) as LoadPolicy,
         parse: (await import(join(JIG_SRC, "domain", "policy", "parse.ts"))) as Parse,
         audit: (await import(join(JIG_SRC, "infra", "audit", "jsonl-audit.ts"))) as Audit,
         sessions: (await import(join(JIG_SRC, "infra", "logs", "session-log.ts"))) as SessionLog,

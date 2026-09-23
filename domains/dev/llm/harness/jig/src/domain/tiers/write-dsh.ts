@@ -147,7 +147,9 @@ export function toDshModelsBlock(policy: TiersPolicy): WriteResult {
     }`,
   );
   lines.push(`${INDENT}  headers:`);
-  lines.push(`${INDENT}    User-Agent: ${HARNESS_USER_AGENT.dsh}   # the gateway's per-harness label (user_agent)`);
+  lines.push(
+    `${INDENT}    User-Agent: ${HARNESS_USER_AGENT.dsh}   # the gateway's per-harness label (user_agent)`,
+  );
   lines.push("");
   if (proxy._comment?.compat) {
     lines.push(...wrapComment(proxy._comment.compat, `${INDENT}  `));

@@ -17,6 +17,7 @@
  */
 
 import type { HookProfile } from "../hooks/decision";
+import type { Waivers } from "./waivers";
 
 export type Effect = "forbid" | "ask" | "permit";
 
@@ -65,6 +66,12 @@ export interface Rule {
   readonly profiles: readonly HookProfile[];
   /** Harness names this rule applies to; undefined means all. */
   readonly principals: readonly string[] | undefined;
+  /**
+   * The waiver list (a file beside the policy, owner-written, uncommitted)
+   * whose path prefixes switch this rule off for sessions under them. forbid
+   * and ask only. See `./waivers.ts`.
+   */
+  readonly unlessCwdIn: string | undefined;
 }
 
 /** A forbid that ignores profiles, principals and mode. */
@@ -81,4 +88,6 @@ export interface Policy {
   readonly floor: readonly FloorRule[];
   readonly mode: Readonly<Record<Action, Mode>>;
   readonly rules: readonly Rule[];
+  /** The waiver lists rules name, as loaded beside the policy; `{}` straight from the parser. */
+  readonly waivers: Waivers;
 }

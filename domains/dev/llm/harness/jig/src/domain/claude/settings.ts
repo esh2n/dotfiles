@@ -209,7 +209,11 @@ function isJigGroup(group: Json): boolean {
 function composeHooks(
   current: Json | undefined,
   managed: JsonObject,
-): { readonly value: JsonObject; readonly carried: readonly string[]; readonly removed: readonly Removal[] } {
+): {
+  readonly value: JsonObject;
+  readonly carried: readonly string[];
+  readonly removed: readonly Removal[];
+} {
   const currentObject = isJsonObject(current) ? current : {};
   const value: Record<string, Json> = {};
   const carried: string[] = [];

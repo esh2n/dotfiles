@@ -16,8 +16,12 @@ describe("toOmpProxyBlock", () => {
   const { content, dropped } = toOmpProxyBlock(policy);
 
   test("names the proxy connection the way omp's models.yml reads it: env var name, api, compat", () => {
-    expect(content).toContain("  proxy:\n    baseUrl: http://localhost:4000/v1\n    apiKey: LITELLM_API_KEY\n    api: openai-completions\n");
-    expect(content).toContain("    headers:\n      User-Agent: omp\n    compat:\n      supportsDeveloperRole: false\n      maxTokensField: max_tokens\n");
+    expect(content).toContain(
+      "  proxy:\n    baseUrl: http://localhost:4000/v1\n    apiKey: LITELLM_API_KEY\n    api: openai-completions\n",
+    );
+    expect(content).toContain(
+      "    headers:\n      User-Agent: omp\n    compat:\n      supportsDeveloperRole: false\n      maxTokensField: max_tokens\n",
+    );
   });
 
   test("every tier carries contextWindow and maxTokens from tiers.json, in main/complex/deterministic order", () => {
@@ -36,7 +40,9 @@ describe("toOmpProxyBlock", () => {
 
   test("the 1M provider window travels as maxContextWindow (omp's /extended-context), never as the budget", () => {
     // ruling 2026-09-24: budget 200K, extended window 1M, only omp has the second field
-    expect(content).toContain("      - id: main\n        name: main — DeepSeek Flash (LiteLLM tier)\n        reasoning: true\n        input: [text]\n        contextWindow: 200000\n        maxContextWindow: 1000000\n");
+    expect(content).toContain(
+      "      - id: main\n        name: main — DeepSeek Flash (LiteLLM tier)\n        reasoning: true\n        input: [text]\n        contextWindow: 200000\n        maxContextWindow: 1000000\n",
+    );
     expect(content).toContain("      - id: complex\n");
     expect(content).not.toContain("contextWindow: 1000000");
     // the local tier has no extended window

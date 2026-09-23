@@ -149,3 +149,43 @@ describe("version tolerance during migration", () => {
     expect(() => parsePolicy({ rules: [] })).toThrow(/unsupported version/);
   });
 });
+
+describe("unlessCwdIn", () => {
+  test("is kept on a forbid and on an ask", () => {
+    const policy = build({
+      rules: [
+        rule({ unlessCwdIn: "main-push-allowed" }),
+        rule({ id: "ask-x", effect: "ask", unlessCwdIn: "x-allowed" }),
+      ],
+    });
+    expect(policy.rules.map((r) => r.unlessCwdIn)).toEqual(["main-push-allowed", "x-allowed"]);
+  });
+
+  test("is absent by default", () => {
+    expect(build({ rules: [rule()] }).rules[0]?.unlessCwdIn).toBeUndefined();
+  });
+
+  test("must be a plain file name", () => {
+    expect(() => build({ rules: [rule({ unlessCwdIn: "" })] })).toThrow(/unlessCwdIn/);
+    expect(() => build({ rules: [rule({ unlessCwdIn: "../etc/passwd" })] })).toThrow(
+      /plain file name/,
+    );
+    expect(() => build({ rules: [rule({ unlessCwdIn: 3 })] })).toThrow(/unlessCwdIn/);
+  });
+
+  test("is refused on a permit", () => {
+    expect(() =>
+      build({
+        rules: [
+          rule({
+            id: "permit-ls",
+            effect: "permit",
+            subject: { program: "ls" },
+            why: undefined,
+            unlessCwdIn: "x",
+          }),
+        ],
+      }),
+    ).toThrow(/permit/);
+  });
+});

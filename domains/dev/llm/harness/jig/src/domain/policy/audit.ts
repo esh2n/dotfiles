@@ -27,6 +27,8 @@ export interface AuditEntry {
   readonly source: Judgment["source"];
   readonly policy: { readonly version: 1; readonly hash: string };
   readonly extraction?: { readonly kind: string; readonly detail?: string };
+  /** Rules waived for the session's cwd — the owner's list spoke, not the rule. */
+  readonly waived?: readonly string[];
 }
 
 export interface AuditContext {
@@ -51,5 +53,6 @@ export function auditEntryFor(judgment: Judgment, context: AuditContext): AuditE
     source: judgment.source,
     policy: context.policy,
     ...(judgment.extraction === undefined ? {} : { extraction: judgment.extraction }),
+    ...(judgment.waived === undefined ? {} : { waived: judgment.waived }),
   };
 }

@@ -67,12 +67,8 @@ let cache: { readonly path: string; readonly loaded: LoadedPolicy } | undefined;
 export async function loadPolicy(path: string): Promise<Loaded> {
   if (cache !== undefined && cache.path === path) return cache.loaded;
   try {
-    const { parse, hook } = await jig();
-    const text = readFileSync(path, "utf8");
-    const loaded: LoadedPolicy = {
-      policy: parse.parsePolicy(JSON.parse(text)),
-      hash: hook.policyHash(text),
-    };
+    const { load } = await jig();
+    const loaded = await load.loadGuardPolicy(path, async (p) => readFileSync(p, "utf8"));
     cache = { path, loaded };
     return loaded;
   } catch (error) {

@@ -269,3 +269,7 @@ domains/dev/config/git/identity-guard
 # writeup-kit ships vendored runtime bundles (elk, lindera) on purpose
 !domains/dev/llm/tools/writeup-kit/vendor/
 .jig-provenance.json
+
+# Guard waiver lists: owner-written, per machine, never committed
+# (rules/decisions/2026-09-24-main-push-allowed-repos-in-owner-policy.md)
+domains/dev/llm/harness/policy/main-push-allowed

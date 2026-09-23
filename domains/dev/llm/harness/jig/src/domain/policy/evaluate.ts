@@ -34,6 +34,7 @@ import { basename } from "../subject";
 import type { Judgment } from "./judgment";
 import type { Principal, Request } from "./request";
 import type { FloorRule, Policy, Rule, SubjectPattern } from "./types";
+import { waived } from "./waivers";
 
 interface Target {
   readonly subject: SubjectPattern | undefined;
@@ -139,6 +140,7 @@ function judgment(
   decision: Decision,
   source: Judgment["source"],
   ruleId?: string,
+  waivedIds: readonly string[] = [],
 ): Judgment {
   return {
     decision,
@@ -147,6 +149,7 @@ function judgment(
     action: request.action,
     subject: describe(request),
     ...(request.action === "shell.exec" ? { extraction: extractionSummary(request) } : {}),
+    ...(waivedIds.length === 0 ? {} : { waived: waivedIds }),
   };
 }
 
@@ -176,24 +179,48 @@ export function evaluatePolicy(policy: Policy, request: Request, principal: Prin
     return judgment(request, { kind: "deny", reason: floor.why }, "floor", floor.id);
   }
 
-  const active = policy.rules.filter(
+  const named = policy.rules.filter(
     (rule) => rule.action === request.action && isActive(rule, principal),
   );
+  // A rule the owner waived for this cwd is set aside — and named in the
+  // judgment, so the audit log shows the list spoke, not the rule.
+  const waivedIds = named
+    .filter(
+      (rule) =>
+        rule.unlessCwdIn !== undefined &&
+        rule.effect !== "permit" &&
+        holds(rule, request, suspected) &&
+        waived(rule.unlessCwdIn, policy.waivers, principal.cwd, request),
+    )
+    .map((rule) => rule.id);
+  const active = named.filter((rule) => !waivedIds.includes(rule.id));
 
   const forbid = active.find((rule) => rule.effect === "forbid" && holds(rule, request, suspected));
   if (forbid !== undefined) {
-    return judgment(request, { kind: "deny", reason: forbid.why ?? forbid.id }, "rule", forbid.id);
+    return judgment(
+      request,
+      { kind: "deny", reason: forbid.why ?? forbid.id },
+      "rule",
+      forbid.id,
+      waivedIds,
+    );
   }
 
   const ask = active.find((rule) => rule.effect === "ask" && holds(rule, request, suspected));
   if (ask !== undefined) {
-    return judgment(request, { kind: "ask", reason: ask.why ?? ask.id }, "rule", ask.id);
+    return judgment(request, { kind: "ask", reason: ask.why ?? ask.id }, "rule", ask.id, waivedIds);
   }
 
   if (policy.mode[request.action] === "allowlist") {
     const commands = proven(request);
     if (commands === undefined) {
-      return judgment(request, { kind: "ask", reason: unprovenReason(request) }, "allowlist");
+      return judgment(
+        request,
+        { kind: "ask", reason: unprovenReason(request) },
+        "allowlist",
+        undefined,
+        waivedIds,
+      );
     }
     const permits = active.filter((rule) => rule.effect === "permit");
     const covered =
@@ -205,9 +232,11 @@ export function evaluatePolicy(policy: Policy, request: Request, principal: Prin
         request,
         { kind: "ask", reason: `jig: no permit rule covers ${describe(request).join("; ")}` },
         "allowlist",
+        undefined,
+        waivedIds,
       );
     }
   }
 
-  return judgment(request, { kind: "allow" }, "none");
+  return judgment(request, { kind: "allow" }, "none", undefined, waivedIds);
 }

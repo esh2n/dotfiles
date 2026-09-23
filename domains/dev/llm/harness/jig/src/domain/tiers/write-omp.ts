@@ -54,14 +54,43 @@ const M = `${P}  `; // `- id:` lines
 const F = `${M}  `; // model fields
 
 function renderModel(tier: Tier, dropped: DroppedField[]): string {
-  dropped.push({ field: "backend", tier: tier.alias, reason: "omp only ever talks to the proxy alias; backend routing is opaque to it" });
-  dropped.push({ field: "pi.name", tier: tier.alias, reason: "omp's name is derived from displayName" });
+  dropped.push({
+    field: "backend",
+    tier: tier.alias,
+    reason: "omp only ever talks to the proxy alias; backend routing is opaque to it",
+  });
+  dropped.push({
+    field: "pi.name",
+    tier: tier.alias,
+    reason: "omp's name is derived from displayName",
+  });
   dropped.push({ field: "dsh.name", tier: tier.alias, reason: "dsh's presentation string" });
-  if (tier.dsh.reasoningEfforts) dropped.push({ field: "dsh.reasoningEfforts", tier: tier.alias, reason: "dsh-only effort table" });
-  if (tier.dsh._comment) dropped.push({ field: "dsh._comment", tier: tier.alias, reason: "dsh-only comment" });
-  if (tier.thinkingLevelMap) dropped.push({ field: "thinkingLevelMap", tier: tier.alias, reason: "pi-only; omp maps effort through the selector suffix (:low|:medium|:high)" });
-  if (tier.samplingParams) dropped.push({ field: "samplingParams", tier: tier.alias, reason: "omp's models.yml has no per-model sampling params field in docs/models.md" });
-  if (tier.compat.supportsReasoningEffort !== undefined) dropped.push({ field: "compat.supportsReasoningEffort", tier: tier.alias, reason: "not a documented omp compat key" });
+  if (tier.dsh.reasoningEfforts)
+    dropped.push({
+      field: "dsh.reasoningEfforts",
+      tier: tier.alias,
+      reason: "dsh-only effort table",
+    });
+  if (tier.dsh._comment)
+    dropped.push({ field: "dsh._comment", tier: tier.alias, reason: "dsh-only comment" });
+  if (tier.thinkingLevelMap)
+    dropped.push({
+      field: "thinkingLevelMap",
+      tier: tier.alias,
+      reason: "pi-only; omp maps effort through the selector suffix (:low|:medium|:high)",
+    });
+  if (tier.samplingParams)
+    dropped.push({
+      field: "samplingParams",
+      tier: tier.alias,
+      reason: "omp's models.yml has no per-model sampling params field in docs/models.md",
+    });
+  if (tier.compat.supportsReasoningEffort !== undefined)
+    dropped.push({
+      field: "compat.supportsReasoningEffort",
+      tier: tier.alias,
+      reason: "not a documented omp compat key",
+    });
 
   const lines = [
     `${M}- id: ${tier.alias}`,
@@ -69,7 +98,9 @@ function renderModel(tier: Tier, dropped: DroppedField[]): string {
     `${F}reasoning: ${tier.reasoning}`,
     `${F}input: [${tier.input.join(", ")}]`,
     `${F}contextWindow: ${tier.contextWindow}`,
-    ...(tier.maxContextWindow === undefined ? [] : [`${F}maxContextWindow: ${tier.maxContextWindow}`]),
+    ...(tier.maxContextWindow === undefined
+      ? []
+      : [`${F}maxContextWindow: ${tier.maxContextWindow}`]),
     `${F}maxTokens: ${tier.maxTokens}`,
   ];
   if (tier.compat.thinkingFormat !== undefined) {
@@ -89,8 +120,16 @@ function renderModel(tier: Tier, dropped: DroppedField[]): string {
 export function toOmpProxyBlock(policy: TiersPolicy): WriteResult {
   const dropped: DroppedField[] = [];
   const proxy = policy.connections.proxy;
-  dropped.push({ field: "connections.proxy.pi", tier: "*", reason: "omp names the env var like dsh does (apiKeyEnv), not pi's $VAR form" });
-  dropped.push({ field: "connections.proxy.dsh.displayName", tier: "*", reason: "omp has no provider display name" });
+  dropped.push({
+    field: "connections.proxy.pi",
+    tier: "*",
+    reason: "omp names the env var like dsh does (apiKeyEnv), not pi's $VAR form",
+  });
+  dropped.push({
+    field: "connections.proxy.dsh.displayName",
+    tier: "*",
+    reason: "omp has no provider display name",
+  });
 
   const lines = [
     `${INDENT}proxy:`,

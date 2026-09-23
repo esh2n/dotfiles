@@ -3,10 +3,10 @@ import {
   resolveProfile,
   resolveSessionsPath,
 } from "../../app/hooks/environment";
-import { type LoadedPolicy, policyHash, runHook } from "../../app/hooks/run-hook";
+import { loadGuardPolicy } from "../../app/hooks/load-policy";
+import { type LoadedPolicy, runHook } from "../../app/hooks/run-hook";
 import { sessionModel } from "../../app/hooks/session-model";
 import type { ToolCall } from "../../domain/hooks/decision";
-import { parsePolicy } from "../../domain/policy/parse";
 import type { Principal } from "../../domain/policy/request";
 import type { Ports } from "../../domain/ports";
 
@@ -59,11 +59,7 @@ async function loadPolicy(path: string, fs: Ports["fs"]): Promise<PolicyLoad> {
 
   let result: PolicyLoad;
   try {
-    const text = await fs.read(path);
-    result = {
-      kind: "ok",
-      loaded: { policy: parsePolicy(JSON.parse(text)), hash: policyHash(text) },
-    };
+    result = { kind: "ok", loaded: await loadGuardPolicy(path, (p) => fs.read(p)) };
   } catch (error) {
     result = { kind: "error", message: error instanceof Error ? error.message : String(error) };
   }

@@ -32,9 +32,9 @@ import {
   resolvePolicyPath,
   resolveProfile,
 } from "../../../src/app/hooks/environment";
-import { type LoadedPolicy, policyHash, runHook } from "../../../src/app/hooks/run-hook";
+import { loadGuardPolicy } from "../../../src/app/hooks/load-policy";
+import { type LoadedPolicy, runHook } from "../../../src/app/hooks/run-hook";
 import type { Decision, ToolCall } from "../../../src/domain/hooks/decision";
-import { parsePolicy } from "../../../src/domain/policy/parse";
 import type { Principal } from "../../../src/domain/policy/request";
 import type { AuditLog, Logger } from "../../../src/domain/ports";
 import { JsonlAuditLog } from "../../../src/infra/audit/jsonl-audit";
@@ -89,8 +89,7 @@ let cache: { readonly path: string; readonly loaded: LoadedPolicy } | undefined;
 export async function loadPolicy(path: string): Promise<Loaded> {
   if (cache !== undefined && cache.path === path) return cache.loaded;
   try {
-    const text = await readFile(path, "utf8");
-    const loaded: LoadedPolicy = { policy: parsePolicy(JSON.parse(text)), hash: policyHash(text) };
+    const loaded = await loadGuardPolicy(path, (p) => readFile(p, "utf8"));
     cache = { path, loaded };
     return loaded;
   } catch (error) {

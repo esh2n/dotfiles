@@ -829,7 +829,9 @@ describe("applyCli --target omp", () => {
     expect(result.stdout).toContain("Claude tools with no omp tool (NotebookEdit: 1)");
     expect(result.stdout).toContain("reaches omp natively, nothing to deliver:");
     expect(result.stdout).toContain("/home/u/.claude/CLAUDE.md → AGENTS.md");
-    expect(result.stdout).toContain("language guidance: inside the language skills (skills/<lang>-*)");
+    expect(result.stdout).toContain(
+      "language guidance: inside the language skills (skills/<lang>-*)",
+    );
   });
 
   test("mcp.json: jig's entries, the carried-through entries and keys, and the diff", async () => {
@@ -1210,7 +1212,9 @@ describe("applyCli --target dsh", () => {
     expect(result.stdout).toMatch(
       /jig-guard plugin +\/repo\/llm\/harness\/jig\/adapters\/dsh: build \+ link {2}\(/,
     );
-    expect(result.stdout).toContain("language guidance: inside the language skills (skills/<lang>-*)");
+    expect(result.stdout).toContain(
+      "language guidance: inside the language skills (skills/<lang>-*)",
+    );
     expect(result.stdout).toContain("[unverified] — facts the delivery rests on");
   });
 
