@@ -24,10 +24,9 @@ import path from "node:path";
 // symlink — see the isMain check below for the same reasoning), so this
 // relative path is stable regardless of how the CLI was invoked.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// The pattern file still lives with the retiring yoki runtime; reach it through the repo
-// root rather than a relative walk, which broke when the skill moved under llm/harness.
-const DOTFILES_ROOT = process.env.DOTFILES_ROOT || path.resolve(__dirname, "../../../../../../../..");
-const SECRET_PATTERNS_PATH = path.join(DOTFILES_ROOT, "domains/dev/config/claude-profiles/runtime/yoki/scripts/lib/secret-patterns.json");
+// The pattern file lives next to this module (it moved here from the retired yoki
+// runtime; nothing else reads it).
+const SECRET_PATTERNS_PATH = path.join(__dirname, "secret-patterns.json");
 
 function loadSecretRules() {
   const defs = JSON.parse(readFileSync(SECRET_PATTERNS_PATH, "utf8"));
