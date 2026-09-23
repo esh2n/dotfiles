@@ -366,8 +366,15 @@ home_llm() {
         local obs="${DOTFILES_ROOT}/domains/dev/config/litellm/observability"
         if docker info >/dev/null 2>&1; then
             bash "${obs}/start.sh" >/dev/null && log_success "Prometheus: up (127.0.0.1:9090)" || hl_todo "observability/start.sh failed"
-            docker compose -f "${obs}/docker-compose.yml" --profile webui up -d open-webui >/dev/null 2>&1 \
-                && log_success "Open WebUI: up (127.0.0.1:3001)" || hl_todo "Open WebUI: docker compose --profile webui up -d open-webui failed"
+            # Open WebUI fronts the LiteLLM tiers; compose reads the proxy key from the environment.
+            local proxy_key
+            proxy_key="$("${DOTFILES_ROOT}/domains/dev/config/litellm/proxy-key.sh" 2>/dev/null || true)"
+            if [[ -z "$proxy_key" ]]; then
+                hl_todo "Open WebUI: proxy key unresolved (litellm/proxy-key.sh), not started"
+            else
+                LITELLM_API_KEY="$proxy_key" docker compose -f "${obs}/docker-compose.yml" --profile webui up -d open-webui >/dev/null 2>&1 \
+                    && log_success "Open WebUI: up (127.0.0.1:3001, tiers via LiteLLM)" || hl_todo "Open WebUI: docker compose --profile webui up -d open-webui failed"
+            fi
         else
             hl_todo "docker is not answering (start OrbStack), then make update for Prometheus / Open WebUI"
         fi

@@ -100,11 +100,17 @@ WebUI instance is a Progressive Web App by design
 (<https://docs.openwebui.com/getting-started/open-webui-as-app>), no App Store
 involved.
 
-**What it talks to.** `OPENAI_API_BASE_URL=http://host.docker.internal:1234/v1`
-— the Mac's own LM Studio over loopback, the same `host.docker.internal` proxy
-Prometheus uses above, never the LiteLLM gateway and never the LAN.
-`OPENAI_API_KEY=lm-studio` — LM Studio accepts any bearer value; this is the
-documented placeholder for exactly that case. `ENABLE_OLLAMA_API=false` — no
+**What it talks to.** `OPENAI_API_BASE_URL=http://host.docker.internal:4000/v1`
+— the LiteLLM gateway on the same Mac, so the phone gets the same three tiers
+(`main` / `complex` / `deterministic`) as pi, DSH and omp and its usage is
+measured like theirs (owner's ruling 2026-09-23; before that it pointed at LM
+Studio directly and the phone saw local models only, unmeasured).
+`OPENAI_API_KEY` is the proxy's master key, put in the environment by
+`domains/dev/install.sh` (resolved through `../proxy-key.sh`), never written
+into the compose file. Both are Open WebUI "ConfigVar"s — read on first
+launch, then persisted in the data volume, later env changes ignored
+(<https://docs.openwebui.com/reference/env-configuration/>) — so changing
+them means recreating `observability_open-webui-data`. `ENABLE_OLLAMA_API=false` — no
 local Ollama on this Mac. `WEBUI_AUTH` is left unset, i.e. at its documented
 default (`true`): the tailnet is the network boundary, but the app keeps its
 own, separate login — the first account created becomes admin, and sign-up

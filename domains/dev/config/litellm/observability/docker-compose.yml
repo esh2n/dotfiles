@@ -108,13 +108,21 @@ services:
     volumes:
       - open-webui-data:/app/backend/data
     environment:
-      # OpenAI-compatible backend = the Mac's own LM Studio over loopback,
-      # reached the same way Prometheus reaches the gateway above — never the
-      # LiteLLM gateway and never the LAN.
-      OPENAI_API_BASE_URL: "http://host.docker.internal:1234/v1"
-      # LM Studio accepts any bearer value; "lm-studio" is the documented
-      # placeholder for exactly this case.
-      OPENAI_API_KEY: "lm-studio"
+      # OpenAI-compatible backend = the LiteLLM gateway on this Mac, reached
+      # the same way Prometheus reaches it above — never the LAN. The phone
+      # gets the same three tiers (main / complex / deterministic) as every
+      # non-vendor harness and its usage is measured like theirs (owner's
+      # ruling 2026-09-23, rules/decisions/2026-09-23-model-routing-per-
+      # harness.md). Until 2026-09-23 this pointed at LM Studio (:1234), so
+      # the phone saw local models only, unmeasured.
+      OPENAI_API_BASE_URL: "http://host.docker.internal:4000/v1"
+      # The proxy's master key, resolved by the caller (domains/dev/install.sh
+      # via litellm/proxy-key.sh) and passed in the environment — never
+      # written here. Both variables are Open WebUI "ConfigVar"s: read on
+      # FIRST launch, then kept in the data volume and later env changes
+      # ignored (https://docs.openwebui.com/reference/env-configuration/);
+      # changing them means recreating observability_open-webui-data.
+      OPENAI_API_KEY: "${LITELLM_API_KEY:?LITELLM_API_KEY must be in the environment (litellm/proxy-key.sh)}"
       # No local Ollama on this Mac; keeps the model list to LM Studio only.
       ENABLE_OLLAMA_API: "false"
       # WEBUI_AUTH is left unset (documented default: true — the app's own
