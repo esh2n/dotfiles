@@ -113,7 +113,7 @@ const LIVE_SETTINGS = JSON.stringify(
     env: { YOKI_ROOT: "/yoki", GOPATH: "/go" },
     model: "claude-fable-5[1m]",
     autoMode: { allow: ["$defaults"] },
-    hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "git-guard.sh" }] }] },
+    hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "/bun /OLD/jig/src/cli/jig.ts hooks pre-tool-use --harness claude" }] }] },
     permissions: { allow: ["Edit(./**)"], deny: ["Bash(rm *)"], defaultMode: "acceptEdits" },
     mcpServers: { "figma-desktop": { type: "http" } },
   },

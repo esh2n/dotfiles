@@ -25,3 +25,12 @@ describe("selectRuleDirs", () => {
     expect(selectRuleDirs([]).excluded).toEqual([]);
   });
 });
+
+describe("selectRuleDirs and hidden directories", () => {
+  test("a dot-directory is excluded as tool state, never linked", () => {
+    const { linked, excluded } = selectRuleDirs([".claude", "common", "go"]);
+    expect(linked).toEqual(["go"]);
+    expect(excluded.map((e) => e.name)).toEqual([".claude", "common"]);
+    expect(excluded[0]?.reason).toMatch(/hidden directory/);
+  });
+});

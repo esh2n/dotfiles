@@ -19,6 +19,16 @@
  * Key order follows `current` so a diff shows changes and not a reshuffle;
  * keys jig adds that were not there (`sandbox`) append at the end.
  *
+ * `hooks` is owned PER ENTRY, not as a whole: jig replaces the entries whose
+ * command is jig's own (`…/jig.ts hooks …`) and carries every other entry
+ * through — it does not know or judge other programs' hooks. Claude
+ * Code's own tooling writes into the same key — Orca's agent-hooks put a
+ * `~/.orca/agent-hooks/claude-hook.sh` entry on every event (measured
+ * 2026-09-24: 12 events, ~28 KB) — and replacing the key outright made every
+ * Orca launch a "hand-edit conflict" that stopped `--write`. The five-hooks
+ * ruling (`2026-09-22-hooks-five-events.md`) bounds what jig registers, not
+ * what other programs may.
+ *
  * One key is neither owned nor carried: `mcpServers`. Milestone 1 wrote it on
  * the assumption that Claude Code reads MCP servers from settings.json; it does
  * not (mcp.md, settings.md — the user-scope source is `~/.claude.json`, written
@@ -51,8 +61,15 @@ export function isRetiredEnvKey(key: string): boolean {
   return RETIRED_ENV_PREFIX.test(key) || RETIRED_ENV_NAMES.has(key);
 }
 
+/** A hook command jig itself registers (domain/claude/hooks.ts): replaced on every apply; nothing else is jig's. */
+export const JIG_HOOK_COMMAND = /\/jig\.ts hooks /;
+
+export function isJigHookCommand(command: string): boolean {
+  return JIG_HOOK_COMMAND.test(command);
+}
+
 export interface ClaudeManagedInput {
-  /** The five hook entries (domain/claude/hooks.ts). Replaces the key outright. */
+  /** The five hook entries (domain/claude/hooks.ts). Replaces jig's own entries; other programs' entries are carried. */
   readonly hooks: JsonObject;
   /** Projected from guard-rules.json plus the decision's default permits. */
   readonly allow: readonly string[];
@@ -112,33 +129,6 @@ function asStrings(value: Json | undefined): readonly string[] {
     : [];
 }
 
-/**
- * Every `command` string under a hooks event, however deeply the harness
- * nested it. Defensive on purpose: this is read from a file another program
- * writes, and a shape jig does not recognize must still be *reported* as
- * removed rather than silently vanish from the diff summary.
- */
-function hookCommandsOf(eventValue: Json | undefined): readonly string[] {
-  if (!Array.isArray(eventValue)) return [];
-  const out: string[] = [];
-  for (const group of eventValue) {
-    if (!isJsonObject(group)) {
-      out.push("(unrecognized entry)");
-      continue;
-    }
-    const inner = group.hooks;
-    if (!Array.isArray(inner)) {
-      out.push("(entry with no hooks array)");
-      continue;
-    }
-    for (const hook of inner) {
-      const command = isJsonObject(hook) ? hook.command : undefined;
-      out.push(typeof command === "string" ? command : "(entry with no command)");
-    }
-  }
-  return out;
-}
-
 /** Order-preserving replace-and-append: `current`'s keys first, then anything new. */
 function mergeInOrder(
   current: JsonObject | undefined,
@@ -196,15 +186,54 @@ function removedFromArray(
   return gone.length === 0 ? [] : [{ key, items: gone }];
 }
 
-function removedHooks(current: Json | undefined, next: JsonObject): readonly Removal[] {
-  if (!isJsonObject(current)) return [];
-  const out: Removal[] = [];
-  for (const [event, value] of Object.entries(current)) {
-    const keep = new Set(hookCommandsOf(next[event]));
-    const gone = hookCommandsOf(value).filter((command) => !keep.has(command));
-    if (gone.length > 0) out.push({ key: `hooks.${event}`, items: gone });
+/** The commands of one hook group (an entry may carry several). */
+function groupCommands(group: Json): readonly string[] {
+  if (!isJsonObject(group) || !Array.isArray(group.hooks)) return [];
+  return group.hooks.flatMap((hook) =>
+    isJsonObject(hook) && typeof hook.command === "string" ? [hook.command] : [],
+  );
+}
+
+/** Is this current hook group jig's own? A group with no readable command is not — it is not jig's to judge. */
+function isJigGroup(group: Json): boolean {
+  const commands = groupCommands(group);
+  return commands.length > 0 && commands.every(isJigHookCommand);
+}
+
+/**
+ * Per event: jig's generated entries first, then every other entry of the
+ * current file in its original order. Only jig's own stale entries (an old
+ * path) leave, and they are reported. An event jig does not register keeps
+ * its other entries; an event that ends up empty is dropped.
+ */
+function composeHooks(
+  current: Json | undefined,
+  managed: JsonObject,
+): { readonly value: JsonObject; readonly carried: readonly string[]; readonly removed: readonly Removal[] } {
+  const currentObject = isJsonObject(current) ? current : {};
+  const value: Record<string, Json> = {};
+  const carried: string[] = [];
+  const removed: Removal[] = [];
+  const events = [...new Set([...Object.keys(currentObject), ...Object.keys(managed)])];
+  for (const event of events) {
+    const currentGroups = Array.isArray(currentObject[event]) ? currentObject[event] : [];
+    const managedGroups = Array.isArray(managed[event]) ? managed[event] : [];
+    const keep = new Set(managedGroups.flatMap(groupCommands));
+    const foreign: Json[] = [];
+    const gone: string[] = [];
+    for (const group of currentGroups) {
+      if (!isJigGroup(group)) {
+        foreign.push(group);
+        continue;
+      }
+      for (const command of groupCommands(group)) if (!keep.has(command)) gone.push(command);
+    }
+    const composed = [...managedGroups, ...foreign];
+    if (composed.length > 0) value[event] = composed;
+    if (foreign.length > 0) carried.push(`hooks.${event} (${foreign.length} carried)`);
+    if (gone.length > 0) removed.push({ key: `hooks.${event}`, items: gone });
   }
-  return out;
+  return { value, carried, removed };
 }
 
 /**
@@ -245,9 +274,10 @@ export function composeClaudeSettings(
 ): ClaudeComposition {
   const permissions = composePermissions(current?.permissions, managed);
   const env = composeEnv(current?.env);
+  const hooks = composeHooks(current?.hooks, managed.hooks);
 
   const replacements: Record<string, Json> = {
-    hooks: managed.hooks,
+    hooks: hooks.value,
     permissions: permissions.value,
     sandbox: managed.sandbox,
     ...(env.value === undefined ? {} : { env: env.value }),
@@ -259,11 +289,12 @@ export function composeClaudeSettings(
   const left = [
     ...Object.keys(current ?? {}).filter((key) => !claimed.has(key)),
     ...permissions.left,
+    ...hooks.carried,
     ...(env.value === undefined ? [] : [`env (${Object.keys(env.value).length} keys)`]),
   ];
 
   const removed: Removal[] = [
-    ...removedHooks(current?.hooks, managed.hooks),
+    ...hooks.removed,
     ...removedFromArray(
       "permissions.allow",
       isJsonObject(current?.permissions) ? current.permissions.allow : undefined,

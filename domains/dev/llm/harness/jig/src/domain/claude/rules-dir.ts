@@ -39,7 +39,12 @@ export function selectRuleDirs(dirNames: readonly string[]): ManagedSelection {
   const linked: string[] = [];
   const excluded: { name: string; reason: string }[] = [];
   for (const name of [...dirNames].sort()) {
-    const reason = EXCLUSION_REASON[name];
+    // A dot-directory is tool state, never a rule directory: a Claude Code
+    // session started inside rules/ leaves `.claude/.cc-writes` there
+    // (measured 2026-09-24), and linking it would load nothing useful.
+    const reason = name.startsWith(".")
+      ? "hidden directory — tool state, not rules"
+      : EXCLUSION_REASON[name];
     if (reason === undefined) linked.push(name);
     else excluded.push({ name, reason });
   }
