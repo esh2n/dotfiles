@@ -21,7 +21,10 @@
 #         Claude MCP registrations
 #
 # Usage: home-llm-up.sh [--hub|--node] [--remote-host <mac.tailnet.ts.net>]
-#        `make home-llm` runs it from the canonical checkout.
+#        home-llm-up.sh --acl   render tailscale/acl.hujson with this tailnet's
+#                               real login + IP, copy it to the clipboard and
+#                               open the admin console page to paste it into
+#        `make home-llm` / `make home-llm-acl` run these from the canonical checkout.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
@@ -29,13 +32,15 @@ export DOTFILES_ROOT="${DOTFILES_ROOT:-$ROOT}"
 export PATH="$HOME/.lmstudio/bin:/etc/profiles/per-user/$(id -un)/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 ROLE=""
+ACL_ONLY=0
 REMOTE_HOST="${LM_STUDIO_REMOTE_HOST:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --hub) ROLE=hub ;;
     --node) ROLE=node ;;
+    --acl) ACL_ONLY=1 ;;
     --remote-host) REMOTE_HOST="$2"; shift ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
   shift
@@ -61,6 +66,34 @@ agent_loaded() { launchctl print "$(uid_gui)/$1" >/dev/null 2>&1; }
 # a stuck tool becomes an owner step instead of a script that never returns
 # (`timeout` is coreutils from the nix profile; without it, run bare).
 capped() { if command -v timeout >/dev/null 2>&1; then timeout "$@"; else shift; "$@"; fi; }
+
+# --acl: the tailnet policy is the one piece that lives in Tailscale's admin
+# console, not on any machine. The repo file keeps placeholders (no login or
+# IP committed); this fills them from the live tailnet, puts the result on the
+# clipboard and opens the page — the owner pastes (Cmd+A, Cmd+V) and saves.
+if [ "$ACL_ONLY" = 1 ]; then
+  acl="$DOTFILES_ROOT/domains/dev/config/tailscale/acl.hujson"
+  [ -n "$TS_BIN" ] || { echo "tailscale CLI not found — install/log in first (make home-llm)" >&2; exit 1; }
+  ts_json="$(capped 10 "$TS_BIN" status --json 2>/dev/null || true)"
+  read -r ts_ip ts_login < <(printf '%s' "$ts_json" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+me = d["Self"]
+print(me["TailscaleIPs"][0], d["User"][str(me["UserID"])]["LoginName"])
+' 2>/dev/null || true)
+  [ -n "${ts_ip:-}" ] || { echo "tailscale status --json gave no Self/User — log in first (make home-llm)" >&2; exit 1; }
+  rendered="$(sed -e "s|owner@example.com|$ts_login|" -e "s|mac.example.ts.net|$ts_ip|g" "$acl")"
+  if command -v pbcopy >/dev/null 2>&1; then printf '%s\n' "$rendered" | pbcopy; where=clipboard
+  elif command -v wl-copy >/dev/null 2>&1; then printf '%s\n' "$rendered" | wl-copy; where=clipboard
+  elif command -v xclip >/dev/null 2>&1; then printf '%s\n' "$rendered" | xclip -selection clipboard; where=clipboard
+  else printf '%s\n' "$rendered"; where=stdout
+  fi
+  echo "tailnet policy rendered for $ts_login / $ts_ip → $where"
+  echo "paste it over the whole editor at https://login.tailscale.com/admin/acls/file (Cmd+A, Cmd+V), then Save."
+  echo "SSH or anything else between your own devices over Tailscale? Uncomment the '\"ip\": [\"*\"]' grant before saving."
+  [ "$OS" = Darwin ] && open "https://login.tailscale.com/admin/acls/file" 2>/dev/null || true
+  exit 0
+fi
 
 echo "home-llm-up: role=$ROLE os=$OS root=$DOTFILES_ROOT"
 
@@ -254,7 +287,7 @@ fi
 
 # --------------------------------------------------------------- 10. manual
 step "10. Owner-only (no API for these)"
-todo "tailnet ACL: paste domains/dev/config/tailscale/acl.hujson into https://login.tailscale.com/admin/acls (once per tailnet)"
+todo "tailnet ACL (once per tailnet): make home-llm-acl — renders acl.hujson with your login + IP into the clipboard and opens the console page to paste it into"
 [ "$ROLE" = hub ] && todo "for each node, uncomment its target in domains/dev/config/litellm/observability/prometheus/prometheus.yml (name from 'tailscale status') and re-run observability/start.sh"
 
 # --------------------------------------------------------------- summary
