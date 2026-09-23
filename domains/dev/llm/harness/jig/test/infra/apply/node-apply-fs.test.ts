@@ -97,6 +97,8 @@ describe("the symlink verbs", () => {
     symlinkSync(join(dir, "gone"), join(dir, "dangling"));
 
     expect(await fs.inspect(join(dir, "nope"))).toEqual({ kind: "missing" });
+    // A path through a regular file (ENOTDIR) names nothing, like one through a missing parent.
+    expect(await fs.inspect(join(dir, "file", "SKILL.md"))).toEqual({ kind: "missing" });
     expect(await fs.inspect(join(dir, "file"))).toEqual({ kind: "file" });
     expect(await fs.inspect(join(dir, "real"))).toEqual({ kind: "dir" });
     // A link to a directory is a symlink, not a dir, and the target is verbatim.

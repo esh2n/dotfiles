@@ -96,6 +96,7 @@ function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
       [`${H}/rules/common/README.md`]: "# rules/common\n",
       [`${H}/rules/research/INDEX.md`]: "# index\n",
       [`${H}/skills/README.md`]: "# skills\n",
+      [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
       [`${H}/agents/research.md`]: "# research\n",
       ...seed.files,
     },
@@ -259,7 +260,14 @@ describe("--write", () => {
     expect(second.outcome).toBe("noop");
     expect(second.settingsOutcome).toBe("noop");
     expect(second.agentsMd.outcome).toBe("noop");
-    expect(second.links.map((link) => link.state)).toEqual(["ok", "ok", "ok"]);
+    expect(second.links.map((link) => link.state)).toEqual(["ok"]);
+    expect(second.skillsDir.plan.state).toBe("ok");
+    expect(
+      second.skillsDir.entries.map((e) => (e.kind === "link" ? e.plan.state : e.kind)),
+    ).toEqual(["ok"]);
+    expect(
+      second.agentsDir.entries.map((e) => (e.kind === "link" ? e.plan.state : e.kind)),
+    ).toEqual(["ok"]);
     expect(files[PATHS.settings]).toBe(after);
     expect(second.composition.removed).toEqual([]);
   });
@@ -384,15 +392,15 @@ describe("AGENTS.md", () => {
     const { ports, files, links } = fakePorts(YOKI_SWITCH_MACHINE);
     await run(ports, true);
     files[PATHS.agentsMd] = "# edited by hand\n";
-    // Put the skills link back the way yoki-switch had it, so there is a link change pending too.
-    links[PATHS.skills] = `${CLAUDE}/.skills-merged`;
+    // Remove the writeup link jig made, so there is a link change pending too.
+    delete links[`${PATHS.skills}/writeup`];
 
     const report = await run(ports, true);
     expect(report.outcome).toBe("conflict");
     expect(report.wrote).toBe(false);
     expect(report.message).toContain("AGENTS.md");
     expect(files[PATHS.agentsMd]).toBe("# edited by hand\n");
-    expect(links[PATHS.skills]).toBe(`${CLAUDE}/.skills-merged`);
+    expect(links[`${PATHS.skills}/writeup`]).toBeUndefined();
   });
 
   test("a regenerated file after a source change is a plain write: the manifest hash still matches", async () => {
@@ -409,7 +417,7 @@ describe("AGENTS.md", () => {
   });
 });
 
-describe("the links, on the machine yoki-switch left", () => {
+describe("the links and directories, on the machine yoki-switch left", () => {
   test("the dry-run says exactly what happens to each destination", async () => {
     const { ports } = fakePorts(YOKI_SWITCH_MACHINE);
     const report = await run(ports);
@@ -421,17 +429,33 @@ describe("the links, on the machine yoki-switch left", () => {
         state: "backup-then-create",
         backupPath: `${PATHS.claudeMd}.pre-jig.20260923-000000`,
       },
+    ]);
+    // The three staging links become real directories; the entries are planned
+    // as `create` because a symlink has no entries of its own to reconcile.
+    expect(report.skillsDir.plan).toMatchObject({
+      state: "replace",
+      previousTarget: `${CLAUDE}/.skills-merged`,
+    });
+    expect(report.skillsDir.entries).toEqual([
       {
-        path: PATHS.skills,
-        target: `${H}/skills`,
-        state: "replace",
-        previousTarget: `${CLAUDE}/.skills-merged`,
+        kind: "link",
+        name: "writeup",
+        plan: { path: `${PATHS.skills}/writeup`, target: `${H}/skills/writeup`, state: "create" },
       },
+    ]);
+    expect(report.agentsDir.plan).toMatchObject({
+      state: "replace",
+      previousTarget: `${CLAUDE}/.agents-merged`,
+    });
+    expect(report.agentsDir.entries).toEqual([
       {
-        path: PATHS.agents,
-        target: `${H}/agents`,
-        state: "replace",
-        previousTarget: `${CLAUDE}/.agents-merged`,
+        kind: "link",
+        name: "research.md",
+        plan: {
+          path: `${PATHS.agents}/research.md`,
+          target: `${H}/agents/research.md`,
+          state: "create",
+        },
       },
     ]);
     expect(report.rulesDir.plan).toMatchObject({
@@ -444,16 +468,23 @@ describe("the links, on the machine yoki-switch left", () => {
     });
   });
 
-  test("--write replaces the staging links, keeps CLAUDE.md aside, and leaves the staging dirs alone", async () => {
+  test("--write turns the staging links into directories of links, keeps CLAUDE.md aside, and leaves the staging dirs alone", async () => {
     const { ports, files, links, dirs } = fakePorts(YOKI_SWITCH_MACHINE);
     const report = await run(ports, true);
 
     expect(report.wrote).toBe(true);
     expect(links[PATHS.claudeMd]).toBe("AGENTS.md");
-    expect(links[PATHS.skills]).toBe(`${H}/skills`);
-    expect(links[PATHS.agents]).toBe(`${H}/agents`);
     expect(files[`${PATHS.claudeMd}.pre-jig.20260923-000000`]).toBe("# merged by yoki-switch\n");
     expect(files[PATHS.claudeMd]).toBeUndefined();
+    // skills and agents are real directories now, one link per entry — never a
+    // link to the tree, or Claude Code's own synced/ writes would land in git.
+    expect(links[PATHS.skills]).toBeUndefined();
+    expect(dirs.has(PATHS.skills)).toBe(true);
+    expect(links[`${PATHS.skills}/writeup`]).toBe(`${H}/skills/writeup`);
+    expect(links[`${PATHS.skills}/README.md`]).toBeUndefined();
+    expect(links[PATHS.agents]).toBeUndefined();
+    expect(dirs.has(PATHS.agents)).toBe(true);
+    expect(links[`${PATHS.agents}/research.md`]).toBe(`${H}/agents/research.md`);
     // The rules directory is now real and empty of links (no conditional dirs exist yet).
     expect(links[PATHS.rulesDir]).toBeUndefined();
     expect(dirs.has(PATHS.rulesDir)).toBe(true);
@@ -463,17 +494,147 @@ describe("the links, on the machine yoki-switch left", () => {
     expect(files[`${CLAUDE}/.skills-merged/writeup/SKILL.md`]).toBe("x");
   });
 
-  test("a real directory where a link should go is renamed aside, never deleted", async () => {
+  test("a real directory where CLAUDE.md should go is renamed aside, never deleted", async () => {
     const { ports, files, links } = fakePorts({
-      files: { [`${PATHS.skills}/mine/SKILL.md`]: "my skill" },
+      files: { [`${PATHS.claudeMd}/notes.md`]: "mine" },
     });
     const dry = await run(ports);
-    expect(dry.links[1]).toMatchObject({ state: "backup-then-create" });
+    expect(dry.links[0]).toMatchObject({ state: "backup-then-create" });
     expect(dry.outcome).toBe("write");
 
     await run(ports, true);
-    expect(files[`${PATHS.skills}.pre-jig.20260923-000000/mine/SKILL.md`]).toBe("my skill");
-    expect(links[PATHS.skills]).toBe(`${H}/skills`);
+    expect(files[`${PATHS.claudeMd}.pre-jig.20260923-000000/notes.md`]).toBe("mine");
+    expect(links[PATHS.claudeMd]).toBe("AGENTS.md");
+  });
+});
+
+describe("the skills directory", () => {
+  /** What Claude Code itself keeps in ~/.claude/skills: the synced tree and its marker. */
+  const CLAUDE_CODES_OWN: FakeClaudeFsSeed = {
+    files: {
+      [`${PATHS.skills}/synced/bucket-1/remote-skill/SKILL.md`]: "synced",
+      [`${PATHS.skills}/.bucket-bucket-1`]: "",
+    },
+  };
+
+  test("one link per directory holding SKILL.md; the README and a directory without one are not linked, with why", async () => {
+    const { ports } = fakePorts({
+      files: {
+        [`${H}/skills/eli5/SKILL.md`]: "---\nname: eli5\n---\n",
+        [`${H}/skills/archive/old.md`]: "not a skill",
+      },
+    });
+    const report = await run(ports);
+
+    expect(report.skillsDir.selection.linked).toEqual(["eli5", "writeup"]);
+    expect(report.skillsDir.selection.excluded).toEqual([
+      { name: "README.md", reason: "a file, not a skill directory" },
+      { name: "archive", reason: "no SKILL.md inside, so not a skill" },
+    ]);
+  });
+
+  test("Claude Code's synced tree and marker are not jig's: reported, and untouched by --write", async () => {
+    const { ports, files, links } = fakePorts(CLAUDE_CODES_OWN);
+    const dry = await run(ports);
+    expect(dry.skillsDir.plan.state).toBe("ok");
+    expect(dry.skillsDir.entries).toEqual([
+      {
+        kind: "link",
+        name: "writeup",
+        plan: { path: `${PATHS.skills}/writeup`, target: `${H}/skills/writeup`, state: "create" },
+      },
+      {
+        kind: "foreign",
+        name: ".bucket-bucket-1",
+        path: `${PATHS.skills}/.bucket-bucket-1`,
+        what: "a regular file",
+      },
+      { kind: "foreign", name: "synced", path: `${PATHS.skills}/synced`, what: "a directory" },
+    ]);
+
+    await run(ports, true);
+    expect(links[`${PATHS.skills}/writeup`]).toBe(`${H}/skills/writeup`);
+    expect(files[`${PATHS.skills}/synced/bucket-1/remote-skill/SKILL.md`]).toBe("synced");
+    expect(files[`${PATHS.skills}/.bucket-bucket-1`]).toBe("");
+    // The tree was never linked into the harness: nothing of Claude Code's is in git sources.
+    expect(links[PATHS.skills]).toBeUndefined();
+  });
+
+  test("a link into the harness's skills/ that is no longer planned is stale and removed; one elsewhere is not jig's", async () => {
+    const { ports, links } = fakePorts({
+      links: {
+        [`${PATHS.skills}/retired`]: `${H}/skills/retired`,
+        [`${PATHS.skills}/mine`]: "/somewhere/else/mine",
+      },
+    });
+    const dry = await run(ports);
+    expect(dry.skillsDir.entries.map((e) => `${e.name}:${e.kind}`)).toEqual([
+      "writeup:link",
+      "retired:stale",
+      "mine:foreign",
+    ]);
+
+    await run(ports, true);
+    expect(links[`${PATHS.skills}/retired`]).toBeUndefined();
+    expect(links[`${PATHS.skills}/mine`]).toBe("/somewhere/else/mine");
+  });
+
+  test("a user's real directory where a skill link should go is renamed aside, never deleted", async () => {
+    const { ports, files, links } = fakePorts({
+      files: { [`${PATHS.skills}/writeup/SKILL.md`]: "my own writeup" },
+    });
+    const dry = await run(ports);
+    expect(dry.skillsDir.entries[0]).toMatchObject({
+      kind: "link",
+      plan: {
+        state: "backup-then-create",
+        backupPath: `${PATHS.skills}/writeup.pre-jig.20260923-000000`,
+      },
+    });
+
+    await run(ports, true);
+    expect(files[`${PATHS.skills}/writeup.pre-jig.20260923-000000/SKILL.md`]).toBe(
+      "my own writeup",
+    );
+    expect(links[`${PATHS.skills}/writeup`]).toBe(`${H}/skills/writeup`);
+  });
+});
+
+describe("the agents directory", () => {
+  test("one link per *.md file; anything else in agents/ is not linked, with why", async () => {
+    const { ports, links } = fakePorts({
+      files: {
+        [`${H}/agents/architect.md`]: "# architect\n",
+        [`${H}/agents/notes.txt`]: "x",
+      },
+    });
+    const report = await run(ports, true);
+
+    expect(report.agentsDir.selection.linked).toEqual(["architect.md", "research.md"]);
+    expect(report.agentsDir.selection.excluded).toEqual([
+      { name: "notes.txt", reason: "not a *.md file" },
+    ]);
+    expect(links[`${PATHS.agents}/architect.md`]).toBe(`${H}/agents/architect.md`);
+    expect(links[`${PATHS.agents}/research.md`]).toBe(`${H}/agents/research.md`);
+    expect(links[`${PATHS.agents}/notes.txt`]).toBeUndefined();
+  });
+
+  test("a removed source file leaves a stale link that the next write removes; a user's own file stays", async () => {
+    const { ports, files, links } = fakePorts({
+      files: { [`${PATHS.agents}/mine.md`]: "my agent" },
+    });
+    await run(ports, true);
+    delete files[`${H}/agents/research.md`];
+
+    const dry = await run(ports);
+    expect(dry.agentsDir.entries.map((e) => `${e.name}:${e.kind}`)).toEqual([
+      "research.md:stale",
+      "mine.md:foreign",
+    ]);
+
+    await run(ports, true);
+    expect(links[`${PATHS.agents}/research.md`]).toBeUndefined();
+    expect(files[`${PATHS.agents}/mine.md`]).toBe("my agent");
   });
 });
 

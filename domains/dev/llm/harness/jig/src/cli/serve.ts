@@ -132,11 +132,12 @@ export async function respondToSkill(
 
 /**
  * Where the skill endpoint reads the list a harness shows. Matches the hook's own
- * default (`cli/jig.ts`): the merged farm Claude Code renders from, which on this
- * machine is every profile's skills.
+ * default (`cli/jig.ts`): `~/.claude/skills`, the directory Claude Code itself loads
+ * from — after `jig apply --target claude --write` a managed directory of per-skill
+ * links into the harness, before it yoki-switch's symlink to the same content.
  */
 function defaultSkillRoot(): string {
-  return join(homedir(), ".claude", ".skills-merged");
+  return join(homedir(), ".claude", "skills");
 }
 
 /**

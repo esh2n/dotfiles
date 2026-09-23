@@ -187,32 +187,59 @@ Destinations:
   an accepted note with no `rule:` line does not bind and is reported as a
   gap — the generator never translates a title into one.
 - **`CLAUDE.md`** → symlink, relative target `AGENTS.md`.
-- **`skills`**, **`agents`** → symlinks to `llm/harness/skills` and `agents`,
-  absolute.
-- **`rules/`** → a real directory jig manages, holding one symlink per
-  conditional-rule directory: `rules/<lang>` → `llm/harness/rules/<lang>`.
-  Every subdirectory of `rules/` except `common`, `decisions` and `research`
-  is one (`domain/claude/rules-dir.ts`, `NOT_RULE_DIRS`, with the why):
-  `common` is in AGENTS.md and a link would load it twice; the other two are
-  Markdown for humans and would load as always-on rules. On write: the
-  directory is created if missing, missing links added, links pointing
-  elsewhere replaced, links into `llm/harness/rules/` that are no longer
-  planned removed as stale, and anything else left alone and reported as
-  "not jig's".
+- **`skills/`**, **`agents/`**, **`rules/`** → three real directories jig
+  manages, each holding one symlink per entry
+  (`domain/claude/managed-dir.ts`, one reconciliation shared by all three):
+  - `skills/<name>` → `llm/harness/skills/<name>`, for every directory
+    there that holds a `SKILL.md` (`domain/claude/skills-dir.ts`; the
+    tree's `README.md` and a directory without one get no link).
+  - `agents/<name>.md` → `llm/harness/agents/<name>.md`, for every regular
+    `*.md` file there (`domain/claude/agents-dir.ts`).
+  - `rules/<lang>` → `llm/harness/rules/<lang>`, for every subdirectory of
+    `rules/` except `common`, `decisions` and `research`
+    (`domain/claude/rules-dir.ts`, `NOT_RULE_DIRS`, with the why): `common`
+    is in AGENTS.md and a link would load it twice; the other two are
+    Markdown for humans and would load as always-on rules.
+
+  Why directories of links and not one symlink per tree: Claude Code writes
+  into `~/.claude/skills/` itself — it keeps `synced/<bucket-id>/…` there
+  (skills synced from the claude.ai account) with a `.bucket-<id>` marker
+  beside it, and updates that tree on its own. One symlink from
+  `~/.claude/skills` into the harness would land those writes in git
+  sources. `agents/` takes the same shape for the same reason and for
+  symmetry. On write, for each of the three: the directory is created if
+  missing (a symlink standing there — today yoki-switch's `.<x>-merged` — is
+  replaced, its target left alone), missing links added, links pointing
+  elsewhere replaced, links into the source tree that are no longer planned
+  removed as stale, and anything else left alone and reported as "not
+  jig's" — `synced/` and its marker are the expected case, named in the
+  dry-run.
 - **`commands`** — retired
   ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)).
   A symlink, or a directory whose entries are all symlinks, is removed on
   write; a directory holding any regular file is a conflict and is not
   touched.
 
-Each symlink destination is planned by `domain/claude/links.ts` from what
-`lstat` finds there and printed one line per destination: `ok` (already the
-planned link), `create`, `replace` (a symlink elsewhere — the old target is
-shown; what it pointed at is untouched), or `backup-then-create` (a regular
-file or a real directory: renamed to `<path>.pre-jig.<YYYYMMDD-HHMMSS>`, UTC,
-then linked — user content is never deleted). On the machine yoki-switch left,
-that reads: `CLAUDE.md` backup-then-create, `skills`/`agents`/`rules` replace
-(currently → `.<x>-merged`), `commands` remove.
+Each symlink destination — `CLAUDE.md` and every entry of the three managed
+directories — is planned by `domain/claude/links.ts` from what `lstat` finds
+there and printed one line per destination: `ok` (already the planned link),
+`create`, `replace` (a symlink elsewhere — the old target is shown; what it
+pointed at is untouched), or `backup-then-create` (a regular file or a real
+directory: renamed to `<path>.pre-jig.<YYYYMMDD-HHMMSS>`, UTC, then linked —
+user content is never deleted). The dry-run prints a `links` section for
+`CLAUDE.md`, then a `skills directory:`, `agents directory:` and `rules
+directory:` section of the same shape: the directory's own state, the count
+of entries to link, one line per entry (planned, stale, or not jig's), and
+the source entries that get no link with why. On the machine yoki-switch
+left, that reads: `CLAUDE.md` backup-then-create; `skills`, `agents` and
+`rules` directories replace (currently → `.<x>-merged`) with every entry
+`create`; `commands` remove.
+
+The skill router (`hooks user-prompt-submit`, `serve`, `skills hide|show`)
+reads its default root from `~/.claude/skills`, the directory Claude Code
+itself loads from — before the first `--write` yoki-switch's symlink to the
+same content, after it the managed directory above. `JIG_SKILL_ROOT` still
+overrides it.
 
 Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
 `.<x>-merged` staging directory stay with `yoki-switch` until milestone 4, and

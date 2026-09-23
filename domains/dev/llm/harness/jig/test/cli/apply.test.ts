@@ -280,15 +280,15 @@ describe("applyCli --target claude", () => {
     );
     const result = await applyCli(["--target", "claude"], ports, paths, context);
 
-    expect(result.stdout).toContain("links (3):");
+    expect(result.stdout).toContain("links (1):");
     expect(result.stdout).toMatch(
       /CLAUDE\.md +backup-then-create \(existing file\/directory → \/home\/u\/\.claude\/CLAUDE\.md\.pre-jig\.20260923-000000\) +→ AGENTS\.md/,
     );
-    expect(result.stdout).toMatch(
-      /skills +replace \(currently → \/home\/u\/\.claude\/\.skills-merged\) +→ \/repo\/llm\/harness\/skills/,
+    expect(result.stdout).toContain(
+      "skills directory: replace (currently → /home/u/.claude/.skills-merged)  /home/u/.claude/skills",
     );
-    expect(result.stdout).toMatch(
-      /agents +replace \(currently → \/home\/u\/\.claude\/\.agents-merged\)/,
+    expect(result.stdout).toContain(
+      "agents directory: replace (currently → /home/u/.claude/.agents-merged)  /home/u/.claude/agents",
     );
     expect(result.stdout).toContain(
       "rules directory: replace (currently → /home/u/.claude/.rules-merged)  /home/u/.claude/rules",
@@ -312,6 +312,43 @@ describe("applyCli --target claude", () => {
     expect(result.stdout).toMatch(
       /common +always-on rules, rendered into AGENTS\.md — never linked/,
     );
+  });
+
+  test("the skills directory lists each skill link with a count, and names Claude Code's synced tree as not jig's", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [`${H}/skills/README.md`]: "# skills\n",
+      [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
+      [`${H}/skills/eli5/SKILL.md`]: "---\nname: eli5\n---\n",
+      [`${CLAUDE_PATHS.skills}/synced/bucket-1/x/SKILL.md`]: "synced",
+      [`${CLAUDE_PATHS.skills}/.bucket-bucket-1`]: "",
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain("skills directory: ok  /home/u/.claude/skills");
+    expect(result.stdout).toContain("2 skill directories to link (each holds a SKILL.md):");
+    expect(result.stdout).toMatch(/eli5 +create +→ \/repo\/llm\/harness\/skills\/eli5/);
+    expect(result.stdout).toMatch(/writeup +create +→ \/repo\/llm\/harness\/skills\/writeup/);
+    expect(result.stdout).toMatch(/synced +left alone \(not jig's: a directory\)/);
+    expect(result.stdout).toMatch(/\.bucket-bucket-1 +left alone \(not jig's: a regular file\)/);
+    expect(result.stdout).toContain("Claude Code writes its own entries here");
+    expect(result.stdout).toMatch(/README\.md +a file, not a skill directory/);
+  });
+
+  test("the agents directory lists each *.md link with a count", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const context = claudeContext({
+      [`${H}/agents/research.md`]: "# research\n",
+      [`${H}/agents/notes.txt`]: "x",
+    });
+    const result = await applyCli(["--target", "claude"], ports, paths, context);
+
+    expect(result.stdout).toContain("agents directory: create  /home/u/.claude/agents");
+    expect(result.stdout).toContain("1 agent definition to link (*.md files):");
+    expect(result.stdout).toMatch(
+      /research\.md +create +→ \/repo\/llm\/harness\/agents\/research\.md/,
+    );
+    expect(result.stdout).toMatch(/notes\.txt +not a \*\.md file/);
   });
 
   test("a commands directory holding real files is a CONFLICT line and exit 1", async () => {

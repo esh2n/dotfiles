@@ -2,8 +2,8 @@
  * `jig skills hide|show` — flip `disable-model-invocation` across a whole skill root.
  *
  * Dry run by default, and the default is the safety mechanism rather than politeness: the
- * root this points at by default is `~/.claude/.skills-merged`, whose entries are symlinks
- * into repositories, so a write here edits checked-in files in several projects at once. The
+ * root this points at by default is `~/.claude/skills`, whose entries are symlinks into
+ * the harness's `skills/` tree, so a write here edits checked-in files. The
  * list printed by a dry run is the review step — see `domain/skills/invocation.ts` for why
  * `show` in particular cannot tell what it is about to unhide.
  *

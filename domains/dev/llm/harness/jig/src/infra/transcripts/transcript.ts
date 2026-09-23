@@ -5,8 +5,8 @@
  * parser per harness would mean two places to fix when a harness renames something — so
  * the shapes are read side by side, and a line that matches neither is skipped rather
  * than guessed at. The one thing this deliberately does NOT do is resolve symlinks: a
- * read of `~/.claude/.skills-merged/<name>/SKILL.md` and a read of the repo path it
- * points at both name the same skill by directory name, which is all the report needs.
+ * read of `~/.claude/skills/<name>/SKILL.md` and a read of the repo path it points at
+ * both name the same skill by directory name, which is all the report needs.
  *
  * The transcripts are the record the harnesses already keep. Nothing here is installed in
  * a harness, so a harness that stops writing a field shows up as a smaller number rather

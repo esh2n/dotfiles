@@ -11,9 +11,12 @@
  *   the absence of the retired harness's `env` keys.
  * - `~/.claude/AGENTS.md` (milestone 2): generated from `rules/common/` and
  *   `rules/decisions/`, with `CLAUDE.md` a relative symlink to it.
- * - `~/.claude/{skills,agents}` (milestone 2): symlinks into the harness.
- * - `~/.claude/rules/` (milestone 2): a real directory of per-language links,
- *   reconciled; `common/` is never linked because AGENTS.md carries it.
+ * - `~/.claude/{skills,agents,rules}/` (milestone 2): three real directories
+ *   jig manages, one symlink per entry into the harness, reconciled
+ *   (`domain/claude/managed-dir.ts`). Not one symlink per directory: Claude
+ *   Code writes its own `synced/` tree into `~/.claude/skills/`, and a link
+ *   to the tree would route that into git sources. `rules/common/` is never
+ *   linked because AGENTS.md carries it.
  * - `~/.claude/commands` (milestone 2): retired — commands are skills.
  *
  * `~/.claude/{hooks,scripts,workflows}` and yoki-switch's `.<x>-merged`
@@ -37,6 +40,7 @@
  * delivery, and a half-applied one is harder to reason about than none.
  */
 
+import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import {
   AGENTS_MD_BYTE_LIMIT,
   type RuleSource,
@@ -55,14 +59,14 @@ import {
   planDirectory,
   planLink,
 } from "../../domain/claude/links";
-import { DEFAULT_PERMITS } from "../../domain/claude/permits";
 import {
-  type RuleDirSelection,
-  type RulesDirEntry,
-  type RulesEntryAction,
-  reconcileRulesDir,
-  selectRuleDirs,
-} from "../../domain/claude/rules-dir";
+  type ManagedDirEntry,
+  type ManagedEntryAction,
+  type ManagedSelection,
+  reconcileManagedDir,
+} from "../../domain/claude/managed-dir";
+import { DEFAULT_PERMITS } from "../../domain/claude/permits";
+import { selectRuleDirs } from "../../domain/claude/rules-dir";
 import {
   NO_SANDBOX_SOURCE,
   type SandboxSource,
@@ -74,6 +78,7 @@ import {
   composeClaudeSettings,
   renderClaudeSettings,
 } from "../../domain/claude/settings";
+import { type SkillCandidate, selectSkillDirs } from "../../domain/claude/skills-dir";
 import type { JsonObject } from "../../domain/compose/merge";
 import { applyTemplate } from "../../domain/compose/template";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -104,9 +109,9 @@ export interface ClaudeApplyPaths {
   readonly agentsMd: string;
   /** Destination: `~/.claude/CLAUDE.md`, a symlink with the relative target `AGENTS.md`. */
   readonly claudeMd: string;
-  /** Destination: `~/.claude/skills`, a symlink to `<harnessRoot>/skills`. */
+  /** Destination: `~/.claude/skills`, a real directory of links to `<harnessRoot>/skills/<name>`. */
   readonly skills: string;
-  /** Destination: `~/.claude/agents`, a symlink to `<harnessRoot>/agents`. */
+  /** Destination: `~/.claude/agents`, a real directory of links to `<harnessRoot>/agents/<name>.md`. */
   readonly agents: string;
   /** Destination: `~/.claude/rules`, a real directory of links to `<harnessRoot>/rules/<lang>`. */
   readonly rulesDir: string;
@@ -142,18 +147,19 @@ export interface LinkReport extends LinkPlan {
   readonly backupPath?: string;
 }
 
-/** `RulesEntryAction` with the backup name filled in for a planned link. */
-export type RulesEntryReport =
-  | Exclude<RulesEntryAction, { readonly kind: "link" }>
+/** `ManagedEntryAction` with the backup name filled in for a planned link. */
+export type ManagedEntryReport =
+  | Exclude<ManagedEntryAction, { readonly kind: "link" }>
   | { readonly kind: "link"; readonly name: string; readonly plan: LinkReport };
 
-export interface RulesDirReport {
+/** One of the three managed directories: `skills/`, `agents/`, `rules/`. */
+export interface ManagedDirReport {
   readonly path: string;
   /** The directory itself. */
   readonly plan: LinkReport;
-  readonly selection: RuleDirSelection;
+  readonly selection: ManagedSelection;
   /** Per entry, planned links first. Empty when the directory is not a real directory yet. */
-  readonly entries: readonly RulesEntryReport[];
+  readonly entries: readonly ManagedEntryReport[];
 }
 
 export interface CommandsReport {
@@ -175,9 +181,11 @@ export interface ClaudeApplyReport {
   /** The five hook command lines, for the dry-run listing. */
   readonly hookCommands: readonly { readonly event: string; readonly command: string }[];
   readonly agentsMd: AgentsMdReport;
-  /** `CLAUDE.md`, `skills`, `agents` — in that order. */
+  /** Single symlinks: `CLAUDE.md` only. */
   readonly links: readonly LinkReport[];
-  readonly rulesDir: RulesDirReport;
+  readonly skillsDir: ManagedDirReport;
+  readonly agentsDir: ManagedDirReport;
+  readonly rulesDir: ManagedDirReport;
   readonly commands: CommandsReport;
   /** `undefined` when `policy/sandbox.json` does not exist yet. */
   readonly sandboxSourcePath: string | undefined;
@@ -266,28 +274,52 @@ async function buildAgentsMd(
   };
 }
 
-/** Subdirectories of `<harnessRoot>/rules/`, by `lstat` — a README there is a file and never a candidate. */
-async function listRuleDirs(ports: ClaudeApplyPorts, harnessRules: string): Promise<string[]> {
-  const dirs: string[] = [];
-  for (const name of await ports.listDir(harnessRules)) {
-    const state = await ports.inspect(`${harnessRules}/${name}`);
-    if (state.kind === "dir") dirs.push(name);
-  }
-  return dirs;
-}
-
-/** The entries of a directory with what each is; `[]` for anything that is not a real directory. */
-async function inspectEntries(
+/** The entries of a directory with what each is, by `lstat`. */
+async function listEntries(
   ports: ClaudeApplyPorts,
   dir: string,
-  state: PathState,
-): Promise<readonly RulesDirEntry[]> {
-  if (state.kind !== "dir") return [];
-  const entries: RulesDirEntry[] = [];
+): Promise<readonly ManagedDirEntry[]> {
+  const entries: ManagedDirEntry[] = [];
   for (const name of await ports.listDir(dir)) {
     entries.push({ name, state: await ports.inspect(`${dir}/${name}`) });
   }
   return entries;
+}
+
+/** The entries of a destination directory; `[]` for anything that is not a real directory (yet). */
+async function inspectEntries(
+  ports: ClaudeApplyPorts,
+  dir: string,
+  state: PathState,
+): Promise<readonly ManagedDirEntry[]> {
+  return state.kind === "dir" ? listEntries(ports, dir) : [];
+}
+
+/** Subdirectories of `<harnessRoot>/rules/` — a README there is a file and never a candidate. */
+async function listRuleDirs(ports: ClaudeApplyPorts, harnessRules: string): Promise<string[]> {
+  return (await listEntries(ports, harnessRules))
+    .filter((entry) => entry.state.kind === "dir")
+    .map((entry) => entry.name);
+}
+
+/**
+ * Every entry of `<harnessRoot>/skills/`, with whether it holds a `SKILL.md`.
+ * Only a directory (or a link, which may lead to one) is probed; nothing lies
+ * under a regular file such as the tree's `README.md`.
+ */
+async function listSkillCandidates(
+  ports: ClaudeApplyPorts,
+  harnessSkills: string,
+): Promise<readonly SkillCandidate[]> {
+  const candidates: SkillCandidate[] = [];
+  for (const entry of await listEntries(ports, harnessSkills)) {
+    const mayHoldSkill = entry.state.kind === "dir" || entry.state.kind === "symlink";
+    const skillMd = mayHoldSkill
+      ? await ports.inspect(`${harnessSkills}/${entry.name}/SKILL.md`)
+      : { kind: "missing" as const };
+    candidates.push({ ...entry, hasSkillMd: skillMd.kind === "file" });
+  }
+  return candidates;
 }
 
 function withBackup(plan: LinkPlan, now: Date): LinkReport {
@@ -305,8 +337,6 @@ async function planLinks(
   // and a moved `~/.claude` keeps the pair intact.
   const wanted: readonly { readonly path: string; readonly target: string }[] = [
     { path: paths.claudeMd, target: "AGENTS.md" },
-    { path: paths.skills, target: `${paths.harnessRoot}/skills` },
-    { path: paths.agents, target: `${paths.harnessRoot}/agents` },
   ];
   const links: LinkReport[] = [];
   for (const { path, target } of wanted) {
@@ -315,28 +345,67 @@ async function planLinks(
   return links;
 }
 
+/**
+ * One managed directory: the directory itself, then its entries reconciled
+ * against the selection. Entries that are neither planned nor stale are
+ * reported as foreign and never touched — for `skills/` that is Claude Code's
+ * own `synced/` tree and its `.bucket-<id>` marker, the expected case.
+ */
+async function planManagedDir(
+  ports: ClaudeApplyPorts,
+  input: {
+    readonly dir: string;
+    readonly sourceDir: string;
+    readonly selection: ManagedSelection;
+    readonly now: Date;
+  },
+): Promise<ManagedDirReport> {
+  const state = await ports.inspect(input.dir);
+  const entries: ManagedEntryReport[] = reconcileManagedDir({
+    dir: input.dir,
+    sourceDir: input.sourceDir,
+    planned: input.selection.linked,
+    entries: await inspectEntries(ports, input.dir, state),
+  }).map((action) =>
+    action.kind === "link" ? { ...action, plan: withBackup(action.plan, input.now) } : action,
+  );
+  return {
+    path: input.dir,
+    plan: withBackup(planDirectory(input.dir, state), input.now),
+    selection: input.selection,
+    entries,
+  };
+}
+
+async function planSkillsDir(
+  ports: ClaudeApplyPorts,
+  paths: ClaudeApplyPaths,
+  now: Date,
+): Promise<ManagedDirReport> {
+  const sourceDir = `${paths.harnessRoot}/skills`;
+  const selection = selectSkillDirs(await listSkillCandidates(ports, sourceDir));
+  return planManagedDir(ports, { dir: paths.skills, sourceDir, selection, now });
+}
+
+async function planAgentsDir(
+  ports: ClaudeApplyPorts,
+  paths: ClaudeApplyPaths,
+  now: Date,
+): Promise<ManagedDirReport> {
+  const sourceDir = `${paths.harnessRoot}/agents`;
+  const candidates: readonly AgentCandidate[] = await listEntries(ports, sourceDir);
+  const selection = selectAgentFiles(candidates);
+  return planManagedDir(ports, { dir: paths.agents, sourceDir, selection, now });
+}
+
 async function planRulesDir(
   ports: ClaudeApplyPorts,
   paths: ClaudeApplyPaths,
   now: Date,
-): Promise<RulesDirReport> {
-  const harnessRules = `${paths.harnessRoot}/rules`;
-  const selection = selectRuleDirs(await listRuleDirs(ports, harnessRules));
-  const state = await ports.inspect(paths.rulesDir);
-  const entries: RulesEntryReport[] = reconcileRulesDir({
-    rulesDir: paths.rulesDir,
-    harnessRules,
-    planned: selection.linked,
-    entries: await inspectEntries(ports, paths.rulesDir, state),
-  }).map((action) =>
-    action.kind === "link" ? { ...action, plan: withBackup(action.plan, now) } : action,
-  );
-  return {
-    path: paths.rulesDir,
-    plan: withBackup(planDirectory(paths.rulesDir, state), now),
-    selection,
-    entries,
-  };
+): Promise<ManagedDirReport> {
+  const sourceDir = `${paths.harnessRoot}/rules`;
+  const selection = selectRuleDirs(await listRuleDirs(ports, sourceDir));
+  return planManagedDir(ports, { dir: paths.rulesDir, sourceDir, selection, now });
 }
 
 async function planCommands(ports: ClaudeApplyPorts, path: string): Promise<CommandsReport> {
@@ -361,7 +430,8 @@ async function applyLink(ports: ClaudeApplyPorts, link: LinkReport): Promise<voi
   await ports.symlink(link.target, link.path);
 }
 
-async function applyRulesDir(ports: ClaudeApplyPorts, report: RulesDirReport): Promise<void> {
+/** Execute one managed directory's plan: the directory first, then each entry. Foreign entries are not touched. */
+async function applyManagedDir(ports: ClaudeApplyPorts, report: ManagedDirReport): Promise<void> {
   const dir = report.plan;
   if (dir.state === "replace") await ports.remove(dir.path);
   if (dir.state === "backup-then-create" && dir.backupPath !== undefined) {
@@ -374,18 +444,24 @@ async function applyRulesDir(ports: ClaudeApplyPorts, report: RulesDirReport): P
   }
 }
 
-function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "message">): boolean {
-  const linkChanges = report.links.some((link) => link.state !== "ok");
-  const ruleChanges =
-    report.rulesDir.plan.state !== "ok" ||
-    report.rulesDir.entries.some(
+/** True when `--write` would touch the directory or any entry in it. */
+function managedDirChanges(report: ManagedDirReport): boolean {
+  return (
+    report.plan.state !== "ok" ||
+    report.entries.some(
       (entry) => entry.kind === "stale" || (entry.kind === "link" && entry.plan.state !== "ok"),
-    );
+    )
+  );
+}
+
+function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "message">): boolean {
   return (
     report.settingsOutcome === "write" ||
     report.agentsMd.outcome === "write" ||
-    linkChanges ||
-    ruleChanges ||
+    report.links.some((link) => link.state !== "ok") ||
+    managedDirChanges(report.skillsDir) ||
+    managedDirChanges(report.agentsDir) ||
+    managedDirChanges(report.rulesDir) ||
     report.commands.action.kind === "remove"
   );
 }
@@ -473,6 +549,8 @@ export async function applyClaude(
     hookCommands,
     agentsMd,
     links: await planLinks(ports, paths, now),
+    skillsDir: await planSkillsDir(ports, paths, now),
+    agentsDir: await planAgentsDir(ports, paths, now),
     rulesDir: await planRulesDir(ports, paths, now),
     commands: await planCommands(ports, paths.commands),
     sandboxSourcePath: sandbox.found ? paths.sandbox : undefined,
@@ -522,7 +600,9 @@ export async function applyClaude(
       jigVersion: ports.jigVersion,
     });
     for (const link of base.links) await applyLink(ports, link);
-    await applyRulesDir(ports, base.rulesDir);
+    await applyManagedDir(ports, base.skillsDir);
+    await applyManagedDir(ports, base.agentsDir);
+    await applyManagedDir(ports, base.rulesDir);
     if (base.commands.action.kind === "remove") await ports.remove(paths.commands);
     return { ...base, outcome: "write", wrote: true };
   }

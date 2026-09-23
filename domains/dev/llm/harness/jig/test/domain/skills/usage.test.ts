@@ -7,9 +7,9 @@ import {
 
 describe("skillNameFromPath", () => {
   it("names the skill in the repo's profile layout", () => {
-    expect(
-      skillNameFromPath("/repo/domains/dev/llm/harness/skills/grilling/SKILL.md"),
-    ).toBe("grilling");
+    expect(skillNameFromPath("/repo/domains/dev/llm/harness/skills/grilling/SKILL.md")).toBe(
+      "grilling",
+    );
   });
 
   it("names the skill in the merged farm", () => {

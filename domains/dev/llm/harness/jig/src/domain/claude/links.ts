@@ -1,8 +1,8 @@
 /**
  * Planning one symlink destination under `~/.claude` (milestone 2 of the
- * generator): `skills`, `agents`, `CLAUDE.md`, and each entry of the `rules/`
- * directory. What is at the path decides what `--write` does to it, and the
- * dry-run prints exactly that.
+ * generator): `CLAUDE.md`, and each entry of the managed `skills/`, `agents/`
+ * and `rules/` directories. What is at the path decides what `--write` does
+ * to it, and the dry-run prints exactly that.
  *
  * The one rule with teeth: user content is never deleted. A regular file or
  * a real directory where a link should go is renamed aside, not removed, and
@@ -54,10 +54,10 @@ export function planLink(path: string, target: string, current: PathState): Link
 }
 
 /**
- * The `rules/` directory itself is the one destination that must be a real
- * directory: `create` when missing, `ok` when it is one, `replace` when a
- * symlink stands in (the link goes, the target stays), `backup-then-create`
- * when a file does.
+ * The managed directories themselves (`skills/`, `agents/`, `rules/`) must be
+ * real directories: `create` when missing, `ok` when it is one, `replace`
+ * when a symlink stands in (the link goes, the target stays),
+ * `backup-then-create` when a file does.
  */
 export function planDirectory(path: string, current: PathState): LinkPlan {
   switch (current.kind) {

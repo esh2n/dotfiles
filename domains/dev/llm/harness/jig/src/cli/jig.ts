@@ -129,9 +129,15 @@ function claudeHookPaths(): ClaudeHookPaths {
   };
 }
 
-/** Where the skill router reads the list a harness shows. Overridable for tests. */
+/**
+ * Where the skill router reads the list a harness shows: `~/.claude/skills`,
+ * the directory Claude Code itself loads from. After `jig apply --target
+ * claude --write` that is the managed directory of per-skill links into the
+ * harness; before it, yoki-switch's symlink to the same content. Overridable
+ * for tests.
+ */
 function resolveSkillRoot(env: Record<string, string | undefined> = process.env): string {
-  return env.JIG_SKILL_ROOT ?? join(homedir(), ".claude", ".skills-merged");
+  return env.JIG_SKILL_ROOT ?? join(homedir(), ".claude", "skills");
 }
 
 /**
@@ -523,7 +529,7 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  never ask different questions into the same log.\n" +
           "  JIG_SKILL_ROUTER_THRESHOLD=<0..1> sets the gate (default 0.8) for either shape.\n" +
           "  skills hide|show [--write] [--root <dir>] sets or clears disable-model-invocation on\n" +
-          "  every skill under the root (default ~/.claude/.skills-merged, or JIG_SKILL_ROOT) —\n" +
+          "  every skill under the root (default ~/.claude/skills, or JIG_SKILL_ROOT) —\n" +
           "  the switch that hides the harness's listing. Dry-run by default; it prints the list\n" +
           "  it would change, edits that one frontmatter key and nothing else, and refuses any\n" +
           "  skill that sets user-invocable.\n" +
@@ -537,9 +543,11 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  mcpServers from policy/guard-rules.json and mcp/servers.json; every other key in the live\n" +
           "  file is preserved. Dry-run prints the whole-file diff plus owned/left/REMOVED key lists.\n" +
           "  The same run generates ~/.claude/AGENTS.md from rules/common and rules/decisions (with\n" +
-          "  CLAUDE.md -> AGENTS.md), links skills, agents and rules/<lang> into llm/harness/, and\n" +
-          "  retires commands/. A file or real directory in a link's way is renamed aside, never\n" +
-          "  deleted; hooks, scripts, workflows and the .<x>-merged staging dirs are not touched.\n" +
+          "  CLAUDE.md -> AGENTS.md), manages skills/, agents/ and rules/ as real directories of\n" +
+          "  per-entry links into llm/harness/ (entries that are not jig's, such as Claude Code's\n" +
+          "  own skills/synced, are left alone), and retires commands/. A file or real directory\n" +
+          "  in a link's way is renamed aside, never deleted; hooks, scripts, workflows and the\n" +
+          "  .<x>-merged staging dirs are not touched.\n" +
           "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +

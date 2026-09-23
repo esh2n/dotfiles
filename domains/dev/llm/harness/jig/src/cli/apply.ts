@@ -13,9 +13,10 @@
  *   inside this repository (`app/apply/apply-tiers.ts`).
  * - **claude** — `~/.claude/settings.json` from `policy/guard-rules.json` and
  *   `mcp/servers.json`, the generated `~/.claude/AGENTS.md` from `rules/`,
- *   and the `CLAUDE.md`/`skills`/`agents`/`rules/<lang>` symlinks into the
- *   harness (`app/apply/apply-claude.ts`). Milestones 1 and 2 of the
- *   generator that retires `yoki-switch`.
+ *   the `CLAUDE.md` symlink, and the managed `skills/`, `agents/` and
+ *   `rules/` directories of per-entry symlinks into the harness
+ *   (`app/apply/apply-claude.ts`). Milestones 1 and 2 of the generator that
+ *   retires `yoki-switch`.
  *
  * `--target all` means the first group only. The claude target writes into
  * `$HOME` rather than into the checkout, so it has to be named: a verb that
@@ -27,6 +28,7 @@ import {
   type ClaudeApplyPaths,
   type ClaudeApplyReport,
   type LinkReport,
+  type ManagedDirReport,
   applyClaude,
 } from "../app/apply/apply-claude";
 import {
@@ -121,8 +123,8 @@ const PAD = 17;
  * one a reader has to agree to before `--write`, and burying it under a
  * 200-line diff is how a one-time cleanup becomes a surprise. Then the
  * milestone-2 delivery, one line per destination: the generated AGENTS.md,
- * each symlink with what stands at its path today, the rules directory's
- * entries, and the retired `commands`.
+ * the `CLAUDE.md` symlink with what stands at its path today, the three
+ * managed directories' entries, and the retired `commands`.
  */
 function formatClaude(report: ClaudeApplyReport, dest: string): string {
   const { composition } = report;
@@ -183,7 +185,30 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
     "",
     ...linkLines(report),
     "",
-    ...rulesDirLines(report),
+    ...managedDirLines("skills", report.skillsDir, {
+      noun: "skill director",
+      plural: "ies",
+      singular: "y",
+      how: "each holds a SKILL.md",
+      foreignNote: [
+        "Claude Code writes its own entries here (`synced/` from the claude.ai account and its",
+        ".bucket-<id> marker); that is why this is a directory of links and not one link.",
+      ],
+    }),
+    "",
+    ...managedDirLines("agents", report.agentsDir, {
+      noun: "agent definition",
+      plural: "s",
+      singular: "",
+      how: "*.md files",
+    }),
+    "",
+    ...managedDirLines("rules", report.rulesDir, {
+      noun: "conditional-rule director",
+      plural: "ies",
+      singular: "y",
+      how: "paths: frontmatter decides when each loads",
+    }),
     "",
     ...commandsLines(report),
   );
@@ -204,8 +229,9 @@ function describeLink(link: LinkReport): string {
   }
 }
 
-function linkLine(label: string, link: LinkReport): string {
-  return `  ${label.padEnd(PAD)}${describeLink(link).padEnd(20)} → ${link.target}`;
+/** `width` is the label column; a section with long entry names widens it so the columns still line up. */
+function linkLine(label: string, link: LinkReport, width = PAD): string {
+  return `  ${label.padEnd(width)}${describeLink(link).padEnd(20)} → ${link.target}`;
 }
 
 /** The generated file: its outcome, its size against the Codex limit, and what went in. */
@@ -241,7 +267,7 @@ function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
   return lines;
 }
 
-/** One line per symlink destination: the state, and for replace/backup what is there now. */
+/** One line per single symlink destination: the state, and for replace/backup what is there now. */
 function linkLines(report: ClaudeApplyReport): readonly string[] {
   return [
     `links (${report.links.length}):`,
@@ -251,32 +277,57 @@ function linkLines(report: ClaudeApplyReport): readonly string[] {
   ];
 }
 
-/** The rules directory: itself, then its entries — planned, stale, or somebody else's. */
-function rulesDirLines(report: ClaudeApplyReport): readonly string[] {
-  const { rulesDir } = report;
+/** The words one managed-directory section needs: what its entries are called, and what makes one. */
+interface ManagedDirWording {
+  /** Stem of the entry noun, e.g. `skill director` → `skill directory` / `skill directories`. */
+  readonly noun: string;
+  readonly singular: string;
+  readonly plural: string;
+  /** Parenthetical after the count: what qualifies an entry. */
+  readonly how: string;
+  /** Printed after the entries when any is foreign: who else writes here, and that jig leaves it. */
+  readonly foreignNote?: readonly string[];
+}
+
+/**
+ * One managed directory: itself, then its entries — planned, stale, or
+ * somebody else's — then the source entries that get no link and why. The
+ * three sections (`skills`, `agents`, `rules`) share this shape so a reader
+ * learns it once.
+ */
+function managedDirLines(
+  label: string,
+  dir: ManagedDirReport,
+  wording: ManagedDirWording,
+): readonly string[] {
+  const count = dir.selection.linked.length;
   const lines: string[] = [
-    `rules directory: ${describeLink(rulesDir.plan)}  ${rulesDir.path}`,
-    `  ${rulesDir.selection.linked.length} conditional-rule director${rulesDir.selection.linked.length === 1 ? "y" : "ies"} to link (paths: frontmatter decides when each loads):`,
+    `${label} directory: ${describeLink(dir.plan)}  ${dir.path}`,
+    `  ${count} ${wording.noun}${count === 1 ? wording.singular : wording.plural} to link (${wording.how}):`,
   ];
-  if (rulesDir.entries.length === 0) lines.push("    (none)");
-  for (const entry of rulesDir.entries) {
+  if (dir.entries.length === 0) lines.push("    (none)");
+  // Entry names (a skill's, or Claude Code's `.bucket-<uuid>` marker) can run past the
+  // default column; the label is `"  " + name`, plus one space so the columns never touch.
+  const width = Math.max(PAD, ...dir.entries.map((entry) => entry.name.length + 3));
+  for (const entry of dir.entries) {
     switch (entry.kind) {
       case "link":
-        lines.push(linkLine(`  ${entry.name}`, entry.plan));
+        lines.push(linkLine(`  ${entry.name}`, entry.plan, width));
         break;
       case "stale":
-        lines.push(`    ${entry.name.padEnd(PAD - 2)}remove (stale jig link → ${entry.target})`);
+        lines.push(`    ${entry.name.padEnd(width - 2)}remove (stale jig link → ${entry.target})`);
         break;
       case "foreign":
-        lines.push(`    ${entry.name.padEnd(PAD - 2)}left alone (not jig's: ${entry.what})`);
+        lines.push(`    ${entry.name.padEnd(width - 2)}left alone (not jig's: ${entry.what})`);
         break;
     }
   }
+  if (wording.foreignNote !== undefined && dir.entries.some((entry) => entry.kind === "foreign")) {
+    lines.push(...wording.foreignNote.map((line) => `  ${line}`));
+  }
   lines.push(
-    `  not linked (${rulesDir.selection.excluded.length}):`,
-    ...rulesDir.selection.excluded.map(
-      (entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`,
-    ),
+    `  not linked (${dir.selection.excluded.length}):`,
+    ...dir.selection.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
   );
   return lines;
 }

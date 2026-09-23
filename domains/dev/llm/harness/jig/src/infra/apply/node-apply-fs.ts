@@ -23,13 +23,17 @@ import { dirname, join } from "node:path";
 import type { ClaudeApplyPorts, ProvenanceInfo } from "../../app/apply/ports";
 import type { PathState } from "../../domain/claude/links";
 
-function isEnoent(error: unknown): boolean {
+function isErrorCode(error: unknown, code: string): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    (error as { code?: unknown }).code === "ENOENT"
+    (error as { code?: unknown }).code === code
   );
+}
+
+function isEnoent(error: unknown): boolean {
+  return isErrorCode(error, "ENOENT");
 }
 
 async function readTextOrUndefined(path: string): Promise<string | undefined> {
@@ -97,12 +101,15 @@ export function createNodeApplyFs(options: NodeApplyFsOptions): ClaudeApplyPorts
       );
     },
 
+    // ENOTDIR is `missing` too: a path that runs through a regular file
+    // (`skills/README.md/SKILL.md`) names nothing, exactly as a path whose
+    // parent does not exist names nothing.
     async inspect(path: string): Promise<PathState> {
       let stat: Awaited<ReturnType<typeof lstat>>;
       try {
         stat = await lstat(path);
       } catch (error) {
-        if (isEnoent(error)) return { kind: "missing" };
+        if (isEnoent(error) || isErrorCode(error, "ENOTDIR")) return { kind: "missing" };
         throw error;
       }
       if (stat.isSymbolicLink()) return { kind: "symlink", target: await readlink(path) };

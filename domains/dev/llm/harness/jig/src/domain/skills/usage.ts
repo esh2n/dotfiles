@@ -79,15 +79,19 @@ function openedOf(turn: SkillTurn, openedVia: OpenedVia | "any"): readonly strin
   return [...turn.read, ...turn.skilled.filter((skill) => !turn.read.includes(skill))];
 }
 
-/** Directory names a skill's files live under, in the two shapes this machine uses. */
+/**
+ * Directory names a skill's files live under. `skills` is both the repo shape and the
+ * live one; `.skills-merged` is yoki-switch's retired staging directory, kept so that
+ * transcripts recorded before the move still count.
+ */
 const SKILL_DIRS: ReadonlySet<string> = new Set(["skills", ".skills-merged"]);
 
 /**
  * The skill a path names, or `undefined` for a path that names none.
  *
- * The rightmost marker wins, because both shapes nest: the repo keeps skills at
- * `claude-profiles/<profile>/skills/<name>/SKILL.md` and the merged farm symlinks them
- * into `~/.claude/.skills-merged/<name>/SKILL.md`, so one read arrives under either.
+ * The rightmost marker wins, because the shapes nest: the repo keeps skills at
+ * `domains/dev/llm/harness/skills/<name>/SKILL.md` and `~/.claude/skills/<name>` links
+ * there, so one read arrives under either.
  *
  * The name is a CANDIDATE, not a fact: a directory named `skills` can hold things that are
  * not skills (jig's own `src/infra/skills/`), so the caller filters the result against the
