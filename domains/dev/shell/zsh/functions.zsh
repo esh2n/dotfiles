@@ -2760,11 +2760,20 @@ function chooks() {
 # trusted repos that need their own .omp/ extensions, or `command omp` for
 # the raw binary.
 omp() {
-    local omp_bin
+    local omp_bin key
     omp_bin="$(whence -p omp)" || {
         echo "\033[31momp not found. Run: brew install can1357/tap/omp\033[0m" >&2
         return 1
     }
+    # omp's models run through the local LiteLLM proxy (models.yml `proxy`,
+    # same tiers as pi); resolve the proxy key here, in the interactive shell
+    # that can reach the Keychain, and hand it over as LITELLM_API_KEY — the
+    # same reason and mechanism as pi() below.
+    if key="$("${DOTFILES_ROOT:?DOTFILES_ROOT unset — source the dev shell init}/domains/dev/config/litellm/proxy-key.sh" 2>/dev/null)"; then
+        export LITELLM_API_KEY="$key"
+    else
+        echo "\033[33mproxy key unresolved — starting omp WITHOUT LITELLM_API_KEY (proxy/* models will fail to auth)\033[0m" >&2
+    fi
     local guard="${HOME}/.omp/agent/extensions/jig.ts"
     if [[ "${YOKI_OMP_ALL_EXTENSIONS:-0}" == "1" ]]; then
         "$omp_bin" "$@"

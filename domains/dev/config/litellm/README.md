@@ -123,8 +123,13 @@ the model:
 - **pi** — in `models.json`, add a provider with `baseUrl:
   http://localhost:4000` and models `main` / `complex` / `deterministic`
   (api key = the LITELLM_MASTER_KEY value, or any string if metrics-only).
-- **DSH / codex** — set their OpenAI-compatible base_url to
-  `http://localhost:4000` likewise.
+- **omp** — `domains/dev/config/omp/models.yml` declares provider `proxy`
+  with the three tiers as its models and `config.yml.template` maps every
+  `modelRoles` entry to `proxy/<tier>`; the `omp()` zsh wrapper hands it
+  `LITELLM_API_KEY` the same way `pi()` does.
+- **DSH** — `settings.yaml` points its OpenAI-compatible base_url at
+  `http://localhost:4000/v1` likewise. **Codex** keeps OpenAI's own models
+  (rules/decisions/2026-09-23-model-routing-per-harness.md).
 - **Workflow scripts** (`~/.claude/workflows`, delivered by `jig apply
   --target claude`) — their provider lanes read `YOKI_DEEPSEEK_BASE_URL` /
   `YOKI_LOCAL_BASE_URL`; point those at the proxy to route lanes through the

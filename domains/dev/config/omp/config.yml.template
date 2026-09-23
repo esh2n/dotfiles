@@ -24,8 +24,21 @@ tools:
   approval:
     eval: prompt
 
+# Every role on the LiteLLM tiers (models.yml `proxy`, owner's ruling
+# 2026-09-23). Roles are omp's documented set (docs/models.md): `slow`,
+# `plan` and `advisor` are the thorough/reasoning roles → the escalation tier;
+# everything lightweight (session titles, memory, commit messages, task
+# subagents) → the everyday tier. `deterministic` is chosen by hand
+# (--model deterministic) for reproducible/offline work, not by a role.
 modelRoles:
-  default: anthropic/claude-fable-5
+  default: proxy/main
+  smol: proxy/main
+  tiny: proxy/main
+  commit: proxy/main
+  task: proxy/main
+  slow: proxy/complex
+  plan: proxy/complex
+  advisor: proxy/complex
 
 symbolPreset: unicode
 composer:

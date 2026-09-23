@@ -16,6 +16,24 @@
 #         name: Hermes 4 405B
 #         api: openai-completions
 
-# Keep the document an object when no custom providers are enabled. A
-# comments-only YAML document parses as null and OMP reports a schema error.
-providers: {}
+# The local LiteLLM measuring proxy (domains/dev/config/litellm/), the same
+# three tier aliases pi and DSH use (owner's ruling 2026-09-23: every harness
+# that is not the model vendor's own — pi, DSH, omp — goes through LiteLLM;
+# Claude Code and Codex keep their vendor's models). `apiKey` names an env
+# var (docs/models.md: "Value is first treated as an environment variable
+# name"); the omp() shell wrapper resolves LITELLM_API_KEY once from the
+# Keychain-backed proxy-key.sh, exactly as the pi() wrapper does, because an
+# `!op read` from inside omp's child process cannot always reach the login
+# Keychain. Tier → model lives in litellm/config.yaml, never here.
+providers:
+  proxy:
+    baseUrl: http://localhost:4000/v1
+    apiKey: LITELLM_API_KEY
+    api: openai-completions
+    models:
+      - id: main
+        name: main (LiteLLM tier — everyday)
+      - id: complex
+        name: complex (LiteLLM tier — hard judgment / design)
+      - id: deterministic
+        name: deterministic (LiteLLM tier — local LM Studio, reproducible / offline)
