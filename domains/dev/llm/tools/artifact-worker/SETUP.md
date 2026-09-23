@@ -193,7 +193,7 @@ export OWNER_EMAIL=you@example.com         # 唯一の書き込み権限者
   グループはオーナー 1 人で作られる。あとで `viewers.json` を空にしても
   同じ理由で失敗しない
 
-日常の共有は `viewers.json` の編集ではなく **`yoki-artifact share`**（5-7）を
+日常の共有は `viewers.json` の編集ではなく **`artifact share`**（5-7）を
 使う。ただし `setup.mjs` はグループの include を `viewers.json` で**丸ごと
 置き換える**。`share` で足したアドレスを恒久的に残したいなら
 `viewers.json` にも書いておくこと。書き忘れると次の `setup.mjs` 実行で
@@ -203,7 +203,7 @@ Access グループから消える（D1 側の viewers 行は残るので、
 ### 5-3. 実行
 
 ```sh
-cd domains/dev/config/claude-profiles/core/skills/yoki-artifact/worker
+cd domains/dev/llm/tools/artifact-worker
 pnpm add -D wrangler          # まだなら
 node scripts/setup.mjs --dry-run
 node scripts/setup.mjs
@@ -253,7 +253,8 @@ node scripts/setup.mjs
 Cloudflare 側からも二度と読めない。
 
 - その場で **1Password に保存する**
-- CLI から使うときは `YOKI_ARTIFACT_CLIENT_SECRET` に入れる
+- CLI から使うときは `ARTIFACT_CLIENT_SECRET` に入れる（旧名
+  `YOKI_ARTIFACT_CLIENT_SECRET` も当面は読む）
 - `~/.config/yoki-artifact/config.json` には **client id しか書かない**。
   secret はどのファイルにも書かれない
 - 無くしたらローテーション（下記 5-6）
@@ -289,11 +290,11 @@ publish / revoke / share / 全チャンネル閲覧 / コメント既読化ま�
    （新しいトークンを作り、新しい `client_id` を `SERVICE_TOKEN_NAME` に
    書いて再デプロイし、Service Auth ポリシーも張り直す）
 3. stderr に一度だけ出る新しい secret を 1Password に保存し、
-   `YOKI_ARTIFACT_CLIENT_SECRET` を差し替える
+   `ARTIFACT_CLIENT_SECRET` を差し替える
 
 古いトークンは削除された時点でエッジでも Worker でも通らなくなる。
 
-### 5-7. `yoki-artifact share` と Access グループ
+### 5-7. `artifact share` と Access グループ
 
 閲覧者の許可は **2 つのリストが揃って初めて**成立する。
 
@@ -306,7 +307,7 @@ D1 だけ更新しても意味がない。**Access が Worker に到達する前
 共有相手はページを開けない。逆に Access グループだけ更新すると、エッジは
 通すが Worker が 403 を返す。
 
-そこで `yoki-artifact share` / `unshare` が**唯一の入口**として両方を更新する。
+そこで `artifact share` / `unshare` が**唯一の入口**として両方を更新する。
 
 1. D1 を更新（`POST /api/artifacts/:channel/viewers`）
 2. Access グループを read-modify-write で更新
@@ -323,7 +324,7 @@ export CLOUDFLARE_ACCOUNT_ID=...    # 未設定なら config.json の accountId
 - Access グループの ID は `~/.config/yoki-artifact/config.json` の
   **`accessGroupId`**。これは `setup.mjs` が書く。古い config で欠けている
   場合は `node scripts/setup.mjs` を再実行すれば入る
-  （一時的に `YOKI_ARTIFACT_ACCESS_GROUP_ID` で上書きもできる）
+  （一時的に `ARTIFACT_ACCESS_GROUP_ID` で上書きもできる）
 
 **3 つのどれかが欠けている / Cloudflare が拒否したときは、`share` は
 exit 2 で止まり、手でやる手順をそのまま印字する。**「D1 は更新済み」である

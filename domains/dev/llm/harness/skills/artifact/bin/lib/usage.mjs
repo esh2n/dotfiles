@@ -1,23 +1,23 @@
 // usage.mjs — the help text, kept apart from the dispatcher so `--help` stays
 // one string that is easy to read and easy to diff.
 
-export const USAGE = `yoki-artifact — publish and manage yoki artifacts.
+export const USAGE = `artifact — publish and manage artifacts.
 
 Usage:
-  yoki-artifact publish <file.html> --channel <c> [--title t] [--label l] [--note n]
-                                    [--allow-external] [--json] [--open]
-  yoki-artifact list [--json]
-  yoki-artifact versions <channel> [--json]
-  yoki-artifact revoke <channel> [--json]
-  yoki-artifact share <channel> --to a@b [--to c@d] [--json]
-  yoki-artifact unshare <channel> --to a@b [--json]
-  yoki-artifact open <channel>
-  yoki-artifact comments <channel> [--since ISO] [--to-agent] [--json]
-  yoki-artifact reply <channel> <comment-id> <text> [--json]
-  yoki-artifact resolve <channel> <comment-id> [--json]
-  yoki-artifact seen <channel> <comment-id> [--json]
-  yoki-artifact watch <channel...> [--interval 30] [--once] [--json]
-  yoki-artifact doctor [--json]
+  artifact publish <file.html> --channel <c> [--title t] [--label l] [--note n]
+                                [--allow-external] [--json] [--open]
+  artifact list [--json]
+  artifact versions <channel> [--json]
+  artifact revoke <channel> [--json]
+  artifact share <channel> --to a@b [--to c@d] [--json]
+  artifact unshare <channel> --to a@b [--json]
+  artifact open <channel>
+  artifact comments <channel> [--since ISO] [--to-agent] [--json]
+  artifact reply <channel> <comment-id> <text> [--json]
+  artifact resolve <channel> <comment-id> [--json]
+  artifact seen <channel> <comment-id> [--json]
+  artifact watch <channel...> [--interval 30] [--once] [--json]
+  artifact doctor [--json]
 
 Publish refuses, before any network call, a file that is missing, not a single
 HTML file, over 16 MiB, that matches a credential pattern, or that references a
@@ -39,8 +39,10 @@ Configuration (~/.config/yoki-artifact/config.json):
     "accessGroupId": "...", "accountId": "..." }
 
 Environment overrides (these win over the file):
-  YOKI_ARTIFACT_URL, YOKI_ARTIFACT_CLIENT_ID, YOKI_ARTIFACT_CLIENT_SECRET,
-  YOKI_ARTIFACT_ACCESS_GROUP_ID
+  ARTIFACT_URL, ARTIFACT_CLIENT_ID, ARTIFACT_CLIENT_SECRET,
+  ARTIFACT_ACCESS_GROUP_ID
+  (renamed from yoki-artifact's YOKI_ARTIFACT_* — those are still read as a
+  fallback when the ARTIFACT_* one is unset)
 
 The client secret is never read from, or written to, the config file.
 

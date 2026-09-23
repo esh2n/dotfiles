@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// yoki-artifact.mjs — argv in, one command out.
+// artifact.mjs (formerly yoki-artifact.mjs) — argv in, one command out.
 //
 // This file does dispatch and nothing else: parse, build the client, run the
 // command, print. Every command returns `{ json, lines }`, so `--json` is
@@ -101,7 +101,7 @@ async function main() {
       if (asJson) {
         process.stdout.write(`${JSON.stringify({ ok: false, code: cause.code, error: cause.message })}\n`);
       } else {
-        process.stderr.write(`yoki-artifact: ${cause.message}\n`);
+        process.stderr.write(`artifact: ${cause.message}\n`);
         if (cause.detail) process.stderr.write(`${cause.detail}\n`);
       }
       return cause.exitCode;
@@ -109,7 +109,7 @@ async function main() {
     if (asJson) {
       process.stdout.write(`${JSON.stringify({ ok: false, code: "internal", error: String(cause) })}\n`);
     } else {
-      process.stderr.write(`yoki-artifact: ${cause instanceof Error ? (cause.stack ?? cause.message) : cause}\n`);
+      process.stderr.write(`artifact: ${cause instanceof Error ? (cause.stack ?? cause.message) : cause}\n`);
     }
     return EXIT.usage;
   }
@@ -118,7 +118,7 @@ async function main() {
 // Only run when invoked as the entrypoint — importing this file (the tests do)
 // must not start a command.
 //
-// ~/.claude/skills/yoki-artifact is a directory symlink into this repo, so in
+// ~/.claude/skills/artifact is a directory symlink into this repo, so in
 // real use process.argv[1] is the path *through* that symlink while
 // import.meta.url is the resolved one. A plain string compare would therefore
 // be false, main() would never run, and the CLI would exit 0 having done

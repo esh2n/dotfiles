@@ -3,9 +3,11 @@
 //
 // Precedence, per field: environment wins over the config file. The secret is
 // the one field that is never read from the config file at all — it comes from
-// $YOKI_ARTIFACT_CLIENT_SECRET or from running `secretCommand` (a keychain /
-// 1Password read), so a plaintext service-token secret never lands on disk.
-// Nothing in this module logs or returns the secret in a diagnostic string.
+// $ARTIFACT_CLIENT_SECRET (or the deprecated $YOKI_ARTIFACT_CLIENT_SECRET,
+// read as a fallback since the skill was renamed from yoki-artifact) or from
+// running `secretCommand` (a keychain / 1Password read), so a plaintext
+// service-token secret never lands on disk. Nothing in this module logs or
+// returns the secret in a diagnostic string.
 //
 // `accessGroupId` and `accountId` are written by tools/artifact-worker/scripts/setup.mjs and
 // read back here so `share`/`unshare` can update the Cloudflare Access group
@@ -104,8 +106,11 @@ export function loadConfig(env = process.env) {
   const fromFile = readConfigFile(file) ?? {};
   const fileExists = Object.keys(fromFile).length > 0 || fs.existsSync(file);
 
-  const envUrl = env.YOKI_ARTIFACT_URL?.trim();
-  const envClientId = env.YOKI_ARTIFACT_CLIENT_ID?.trim();
+  // ARTIFACT_* is the current name; YOKI_ARTIFACT_* is read as a fallback for
+  // one release (the CLI was renamed from yoki-artifact to artifact — this
+  // keeps an existing shell profile / secret manager working unmodified).
+  const envUrl = env.ARTIFACT_URL?.trim() || env.YOKI_ARTIFACT_URL?.trim();
+  const envClientId = env.ARTIFACT_CLIENT_ID?.trim() || env.YOKI_ARTIFACT_CLIENT_ID?.trim();
   // tools/artifact-worker/scripts/setup.mjs historically wrote only `workerUrl` and
   // `serviceTokenClientId`; it now writes both spellings, and the loader
   // accepts either so a config written by any setup version still publishes.
@@ -118,7 +123,7 @@ export function loadConfig(env = process.env) {
   // Written by tools/artifact-worker/scripts/setup.mjs. `share`/`unshare` need it to keep the
   // Cloudflare Access group in step with the D1 viewer list; every other
   // command ignores it, so it stays optional and is never required here.
-  const envGroupId = env.YOKI_ARTIFACT_ACCESS_GROUP_ID?.trim();
+  const envGroupId = env.ARTIFACT_ACCESS_GROUP_ID?.trim() || env.YOKI_ARTIFACT_ACCESS_GROUP_ID?.trim();
   const accessGroupId = envGroupId || stringField(fromFile.accessGroupId, "accessGroupId", file);
   const accountId = stringField(fromFile.accountId, "accountId", file);
 
@@ -126,19 +131,19 @@ export function loadConfig(env = process.env) {
   if (!rawBaseUrl) {
     throw usageError(
       "no_base_url",
-      `No base URL. Set YOKI_ARTIFACT_URL or "baseUrl" in ${file}.`,
+      `No base URL. Set ARTIFACT_URL or "baseUrl" in ${file}.`,
     );
   }
   const clientId = envClientId || fileClientId;
   if (!clientId) {
     throw usageError(
       "no_client_id",
-      `No Access client id. Set YOKI_ARTIFACT_CLIENT_ID or "clientId" in ${file}.`,
+      `No Access client id. Set ARTIFACT_CLIENT_ID or "clientId" in ${file}.`,
     );
   }
 
   return Object.freeze({
-    baseUrl: normalizeBaseUrl(rawBaseUrl, envUrl ? "YOKI_ARTIFACT_URL" : `"baseUrl" in ${file}`),
+    baseUrl: normalizeBaseUrl(rawBaseUrl, envUrl ? "ARTIFACT_URL" : `"baseUrl" in ${file}`),
     clientId,
     secretCommand,
     accessGroupId: accessGroupId ?? null,
@@ -191,12 +196,12 @@ function runSecretCommand(command, env) {
  *          to the caller only; never printed, never written to disk.
  */
 export function resolveSecret(config, env = process.env) {
-  const fromEnv = env.YOKI_ARTIFACT_CLIENT_SECRET?.trim();
+  const fromEnv = env.ARTIFACT_CLIENT_SECRET?.trim() || env.YOKI_ARTIFACT_CLIENT_SECRET?.trim();
   if (fromEnv) return Object.freeze({ secret: fromEnv, source: "env" });
   if (!config.secretCommand) {
     throw usageError(
       "no_client_secret",
-      `No Access client secret. Set YOKI_ARTIFACT_CLIENT_SECRET or "secretCommand" in ${config.file}.`,
+      `No Access client secret. Set ARTIFACT_CLIENT_SECRET or "secretCommand" in ${config.file}.`,
     );
   }
   return Object.freeze({ secret: runSecretCommand(config.secretCommand, env), source: "command" });

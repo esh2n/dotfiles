@@ -20,7 +20,7 @@ import path from "node:path";
 // duplicated — this CLI is ESM, that runtime is CJS, so a single data file
 // both `import`/`require` is simpler than a shared module. import.meta.url
 // resolves through any symlink this file is reached by (a skill directory
-// symlinked into ~/.claude/skills, the domains/dev/bin/yoki-artifact
+// symlinked into ~/.claude/skills, the domains/dev/bin/artifact
 // symlink — see the isMain check below for the same reasoning), so this
 // relative path is stable regardless of how the CLI was invoked.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

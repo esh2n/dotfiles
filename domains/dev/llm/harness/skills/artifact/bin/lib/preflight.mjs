@@ -19,6 +19,9 @@ export const WRITEUP_KIT_MARKER = 'class="wu-';
 export const SELF_CHECK_TIMEOUT_MS = 120_000;
 
 export function selfCheckPath(env = process.env) {
+  // ARTIFACT_SELF_CHECK is the current name; YOKI_ARTIFACT_SELF_CHECK is read
+  // as a fallback for one release (renamed from the yoki-artifact skill).
+  if (env.ARTIFACT_SELF_CHECK?.trim()) return env.ARTIFACT_SELF_CHECK.trim();
   if (env.YOKI_ARTIFACT_SELF_CHECK?.trim()) return env.YOKI_ARTIFACT_SELF_CHECK.trim();
   const root = env.DOTFILES_ROOT?.trim() || path.join(env.HOME ?? "", "dotfiles");
   return path.join(root, "domains", "dev", "llm", "tools", "writeup-kit", "bin", "self-check.mjs");

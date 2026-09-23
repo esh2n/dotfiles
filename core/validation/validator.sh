@@ -121,7 +121,7 @@ run_all_checks() {
         pi-links
         dsh-links
         code-graph-cache-gc
-        yoki-artifact
+        artifact
     )
 
     local overall_failed=0
@@ -178,20 +178,20 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         "code-graph-cache-gc")
             bash "${SCRIPT_DIR}/test-code-graph-cache-gc.sh"
             ;;
-        "yoki-artifact")
+        "artifact")
             if ! command -v node >/dev/null 2>&1; then
-                log_error "yoki-artifact requires node (the CLI, the fake Worker and both \`node --test\` suites) — none found on PATH."
+                log_error "artifact requires node (the CLI, the fake Worker and both \`node --test\` suites) — none found on PATH."
                 exit 1
             fi
 
-            source "${SCRIPT_DIR}/test-yoki-artifact.sh"
-            run_yoki_artifact_checks
+            source "${SCRIPT_DIR}/test-artifact.sh"
+            run_artifact_checks
             ;;
         "workday-calc")
             uv run "${DOTFILES_ROOT}/domains/dev/llm/harness/skills/workday-calc/scripts/calc.py" --selftest
             ;;
         *)
-            echo "Usage: $0 [pre|post|portability|pi-links|dsh-links|code-graph-cache-gc|yoki-artifact|workday-calc]"
+            echo "Usage: $0 [pre|post|portability|pi-links|dsh-links|code-graph-cache-gc|artifact|workday-calc]"
             echo "       (no args runs every self-contained regression suite)"
             exit 1
             ;;

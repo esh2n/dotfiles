@@ -46,7 +46,7 @@ without writing or deploying anything.
 | 6 | Staged page exceeds the 16MB Artifact limit |
 | 7 | A `.wu-diffview` on the page carries a diff that could not be parsed; publish refused (fix the diff inside its script, or drop the figure) |
 | 8 | The `_kit/writeup.css` `<link>` was still present after CSS inlining — a bug, not an authoring mistake; report it rather than retrying |
-| 9 | `--to yoki-artifact` and the `yoki-artifact` CLI is missing from `PATH`, exited non-zero, or answered with something that is not a publish result (its own message is printed as the detail) |
+| 9 | `--to yoki-artifact` and the `artifact` CLI is missing from `PATH`, exited non-zero, or answered with something that is not a publish result (its own message is printed as the detail) |
 
 ## Private-word check (exit 4)
 
@@ -128,13 +128,13 @@ publish: wrote /path/to/store/.publish/2026-08-14-example.yoki-artifact.html
 
 The cross-harness route to a private URL — the one target that works
 identically from Claude Code, Codex and omp, because the publishing is
-done by the `yoki-artifact` CLI on `PATH` rather than by a tool only one
+done by the `artifact` CLI on `PATH` rather than by a tool only one
 harness has (inside Claude Code the native Artifact tool is still there;
-see the `yoki-artifact` skill for when each one is the right pick). It
+see the `artifact` skill for when each one is the right pick). It
 stages exactly like `--to file` — a full standalone document, CSS
 inlined, `.wu-shot` images inlined, back-nav dropped, private-word check
 (no `--internal` here), 16MB check — writes it to
-`<store>/.publish/<slug>.yoki-artifact.html`, then execs `yoki-artifact
+`<store>/.publish/<slug>.yoki-artifact.html`, then execs `artifact
 publish <staged> --channel <slug or --channel> --title <page title>
 --json` and writes the viewer URL it returns into the *source* page as
 `<meta name="published-yoki-artifact" content="<url>">` — the same

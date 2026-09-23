@@ -30,7 +30,7 @@ export const FALLBACK_HINTS = [
   "  3. Create an Access service token and add it to that application's policy",
   "     (Service Auth), otherwise every request is redirected to the login page.",
   "  4. Write ~/.config/yoki-artifact/config.json with baseUrl + clientId, and",
-  "     provide the secret via YOKI_ARTIFACT_CLIENT_SECRET or secretCommand.",
+  "     provide the secret via ARTIFACT_CLIENT_SECRET or secretCommand.",
 ];
 
 /** SETUP.md is a full guide; a failing doctor gets the head of it, not all of it. */

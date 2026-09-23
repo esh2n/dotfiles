@@ -1,6 +1,6 @@
-// yoki-artifact CLI tests.
+// artifact CLI tests (this skill was renamed from yoki-artifact to artifact).
 //
-// Every case runs the real `bin/yoki-artifact` launcher as a child process, so
+// Every case runs the real `bin/artifact` launcher as a child process, so
 // what is under test is the whole path a caller actually takes: sh launcher ->
 // entrypoint guard -> dispatch -> exit code. The API is a local http server on
 // 127.0.0.1 (test/fixtures/api-server.mjs); nothing here touches the network,
@@ -34,7 +34,7 @@ import { mergeInclude, resolveAccessGroupTarget } from "../bin/lib/access-group.
 import { networkError } from "../bin/lib/errors.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const LAUNCHER = path.join(HERE, "..", "bin", "yoki-artifact");
+const LAUNCHER = path.join(HERE, "..", "bin", "artifact");
 
 const PAGE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>demo</title></head>
@@ -56,16 +56,16 @@ function env(extra = {}) {
     XDG_STATE_HOME: path.join(home, ".local", "state"),
     // Point the writeup-kit hook at a path that does not exist, so a real
     // installation on the developer's machine cannot influence the tests.
-    YOKI_ARTIFACT_SELF_CHECK: path.join(home, "no-such-self-check.mjs"),
+    ARTIFACT_SELF_CHECK: path.join(home, "no-such-self-check.mjs"),
     ...extra,
   };
 }
 
 function credentials(extra = {}) {
   return env({
-    YOKI_ARTIFACT_URL: server.baseUrl,
-    YOKI_ARTIFACT_CLIENT_ID: CLIENT_ID,
-    YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET,
+    ARTIFACT_URL: server.baseUrl,
+    ARTIFACT_CLIENT_ID: CLIENT_ID,
+    ARTIFACT_CLIENT_SECRET: CLIENT_SECRET,
     ...extra,
   });
 }
@@ -124,15 +124,15 @@ after(async () => {
 });
 
 beforeEach(() => {
-  home = fs.mkdtempSync(path.join(os.tmpdir(), "yoki-artifact-test-"));
+  home = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-test-"));
 });
 
 describe("usage", () => {
   test("--help prints usage and exits 0", async () => {
     const result = await runCli(["--help"], { env: env() });
     assert.equal(result.code, 0);
-    assert.match(result.stdout, /^yoki-artifact — publish and manage yoki artifacts\./);
-    assert.match(result.stdout, /yoki-artifact publish <file\.html> --channel <c>/);
+    assert.match(result.stdout, /^artifact — publish and manage artifacts\./);
+    assert.match(result.stdout, /artifact publish <file\.html> --channel <c>/);
     assert.match(result.stdout, /0 ok {3}1 usage {3}2 network\/auth {3}3 external refs/);
   });
 
@@ -334,7 +334,7 @@ describe("writeup-kit self-check", () => {
   test("a writeup-kit page that passes self-check is published", async () => {
     const file = writePage("kit.html", kitPage);
     const result = await runCli(["publish", file, "--channel", "demo-kit"], {
-      env: credentials({ YOKI_ARTIFACT_SELF_CHECK: stubSelfCheck(0) }),
+      env: credentials({ ARTIFACT_SELF_CHECK: stubSelfCheck(0) }),
     });
     assert.equal(result.code, 0, result.stderr);
     assert.match(result.stdout, /published version 1/);
@@ -344,7 +344,7 @@ describe("writeup-kit self-check", () => {
     const file = writePage("kit.html", kitPage);
     const before = server.requests.length;
     const result = await runCli(["publish", file, "--channel", "demo-kit-bad"], {
-      env: credentials({ YOKI_ARTIFACT_SELF_CHECK: stubSelfCheck(1) }),
+      env: credentials({ ARTIFACT_SELF_CHECK: stubSelfCheck(1) }),
     });
     assert.equal(result.code, 1);
     assert.match(result.stderr, /writeup-kit self-check failed \(exit 1\)/);
@@ -354,7 +354,7 @@ describe("writeup-kit self-check", () => {
   test("a page that is not writeup-kit skips self-check entirely", async () => {
     const file = writePage("plain.html", PAGE);
     const result = await runCli(["publish", file, "--channel", "demo-plain"], {
-      env: credentials({ YOKI_ARTIFACT_SELF_CHECK: stubSelfCheck(1) }),
+      env: credentials({ ARTIFACT_SELF_CHECK: stubSelfCheck(1) }),
     });
     assert.equal(result.code, 0, result.stderr);
   });
@@ -362,7 +362,7 @@ describe("writeup-kit self-check", () => {
   test("self-check is skipped when writeup-kit is not installed", async () => {
     const file = writePage("kit.html", kitPage);
     const result = await runCli(["publish", file, "--channel", "demo-kit-absent"], {
-      env: credentials({ YOKI_ARTIFACT_SELF_CHECK: path.join(home, "absent.mjs") }),
+      env: credentials({ ARTIFACT_SELF_CHECK: path.join(home, "absent.mjs") }),
     });
     assert.equal(result.code, 0, result.stderr);
   });
@@ -399,14 +399,14 @@ describe("config and env precedence", () => {
   test("the config file is used when the environment is silent", async () => {
     writeConfig({ baseUrl: server.baseUrl, clientId: CLIENT_ID });
     const result = await runCli(["list", "--json"], {
-      env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
+      env: env({ ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
     });
     assert.equal(result.code, 0, result.stderr);
   });
 
   test("a trailing slash in baseUrl does not produce a doubled path", async () => {
     writeConfig({ baseUrl: `${server.baseUrl}/`, clientId: CLIENT_ID });
-    const result = await runCli(["list"], { env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }) });
+    const result = await runCli(["list"], { env: env({ ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }) });
     assert.equal(result.code, 0, result.stderr);
     assert.equal(server.requests.at(-1).path, "/api/artifacts");
   });
@@ -417,7 +417,7 @@ describe("config and env precedence", () => {
   test("a config with only the setup spellings still works", async () => {
     writeConfig({ workerUrl: server.baseUrl, serviceTokenClientId: CLIENT_ID });
     const result = await runCli(["list", "--json"], {
-      env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
+      env: env({ ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
     });
     assert.equal(result.code, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).ok, true);
@@ -431,7 +431,7 @@ describe("config and env precedence", () => {
       serviceTokenClientId: "wrong-client-id",
     });
     const result = await runCli(["list", "--json"], {
-      env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
+      env: env({ ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }),
     });
     assert.equal(result.code, 0, result.stderr);
   });
@@ -444,13 +444,13 @@ describe("config and env precedence", () => {
   });
 
   test("a wrong secret is an auth failure, exit 2", async () => {
-    const result = await runCli(["list"], { env: credentials({ YOKI_ARTIFACT_CLIENT_SECRET: "nope" }) });
+    const result = await runCli(["list"], { env: credentials({ ARTIFACT_CLIENT_SECRET: "nope" }) });
     assert.equal(result.code, 2);
     assert.match(result.stderr, /Access rejected the request \(403\)/);
   });
 
   test("an unreachable base URL is exit 2", async () => {
-    const result = await runCli(["list"], { env: credentials({ YOKI_ARTIFACT_URL: "http://127.0.0.1:1" }) });
+    const result = await runCli(["list"], { env: credentials({ ARTIFACT_URL: "http://127.0.0.1:1" }) });
     assert.equal(result.code, 2);
     assert.match(result.stderr, /Cannot reach/);
   });
@@ -461,7 +461,7 @@ describe("config and env precedence", () => {
   // request is built.
   test("a plain-http base URL is refused before anything is sent", async () => {
     const before = server.requests.length;
-    const result = await runCli(["list"], { env: credentials({ YOKI_ARTIFACT_URL: "http://artifacts.example.test" }) });
+    const result = await runCli(["list"], { env: credentials({ ARTIFACT_URL: "http://artifacts.example.test" }) });
     assert.equal(result.code, 1);
     assert.match(result.stderr, /must be an https URL/);
     assert.equal(server.requests.length, before, "nothing may reach the network");
@@ -469,7 +469,7 @@ describe("config and env precedence", () => {
 
   test("a plain-http base URL in the config file is refused the same way", async () => {
     writeConfig({ baseUrl: "http://artifacts.example.test", clientId: CLIENT_ID });
-    const result = await runCli(["list"], { env: env({ YOKI_ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }) });
+    const result = await runCli(["list"], { env: env({ ARTIFACT_CLIENT_SECRET: CLIENT_SECRET }) });
     assert.equal(result.code, 1);
     assert.match(result.stderr, /must be an https URL/);
   });
@@ -739,7 +739,7 @@ describe("share / unshare keep the Access group in step", () => {
       const text = result.lines.join("\n");
       assert.match(text, /D1 viewer list for "demo" WAS updated/);
       assert.match(text, expected);
-      assert.match(text, /yoki-artifact share demo --to new@example\.test/);
+      assert.match(text, /artifact share demo --to new@example\.test/);
       assert.match(text, /node scripts\/setup\.mjs/);
       assert.match(text, /Zero Trust → Access → Access Groups/);
       assert.match(text, /yoki-artifact-viewers/);
@@ -989,7 +989,7 @@ describe("doctor", () => {
 
   test("an unreachable API fails only the api check, exit 2", async () => {
     const result = await runCli(["doctor", "--json"], {
-      env: credentials({ YOKI_ARTIFACT_URL: "http://127.0.0.1:1" }),
+      env: credentials({ ARTIFACT_URL: "http://127.0.0.1:1" }),
     });
     assert.equal(result.code, 2);
     const payload = JSON.parse(result.stdout);

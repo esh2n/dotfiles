@@ -1,12 +1,12 @@
 # artifact-worker
 
-The Cloudflare Worker behind `yoki-artifact`: Workers + R2 (page bodies) +
-D1 (channels, versions, comments) + Access (who may view). It used to sit
-inside the skill as `skills/yoki-artifact/worker/`; it lives here so the
-skill holds procedure only.
+The Cloudflare Worker behind `artifact` (formerly `yoki-artifact`): Workers +
+R2 (page bodies) + D1 (channels, versions, comments) + Access (who may view).
+It used to sit inside the skill as `skills/yoki-artifact/worker/`; it lives
+here so the skill holds procedure only.
 
-- Driven by the `yoki-artifact` skill
-  (`$DOTFILES_ROOT/domains/dev/llm/harness/skills/yoki-artifact/`), whose CLI
+- Driven by the `artifact` skill
+  (`$DOTFILES_ROOT/domains/dev/llm/harness/skills/artifact/`), whose CLI
   in `bin/` talks to the deployed Worker. The CLI finds this directory through
   `$DOTFILES_ROOT` (`doctor` prints the head of `SETUP.md` from here).
 - Setup: read `SETUP.md` first (Zero Trust onboarding, IdP, R2 activation and

@@ -21,8 +21,8 @@ export function nodeVersionOk(version) {
 
 export function nodeVersionGuardMessage(version) {
   return [
-    `yoki-artifact needs Node >= ${MIN_NODE_MAJOR} (running ${version}).`,
-    "Set YOKI_ARTIFACT_NODE to a newer node binary, or run it from a shell",
+    `artifact needs Node >= ${MIN_NODE_MAJOR} (running ${version}).`,
+    "Set ARTIFACT_NODE to a newer node binary, or run it from a shell",
     "whose PATH has one.",
   ].join("\n");
 }

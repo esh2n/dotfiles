@@ -15,7 +15,7 @@ Rulings that shape this directory:
   `user-invocable: false`
   (`../rules/decisions/2026-09-22-commands-are-skills.md`)
 - a skill holds procedure, never build artifacts or media: the renderers and
-  projects that used to sit inside `grilling`, `writeup-kit`, `yoki-artifact`
+  projects that used to sit inside `grilling`, `writeup-kit`, `artifact`
   and `dopa-shorts` live under `domains/dev/llm/tools/` and
   `domains/creative/`, referenced through `$DOTFILES_ROOT`
   (`../rules/decisions/2026-09-22-skills-add-two-drop-duplicates-move-assets.md`)
@@ -33,5 +33,8 @@ system), `plan` (the harness's plan mode covers it,
 `2026-09-23-plan-by-size-grill-default.md`) and `quality-gate` (the Stop gate
 hook covers it, `2026-09-22-format-on-edit-gate-on-stop.md`).
 
-Still to be judged when yoki is retired (milestone 4): `yoki-agent`,
-`yoki-graph`, `yoki-artifact`, `cost-tracking`.
+Retired with yoki (2026-09-23): `yoki-agent` and `yoki-graph` (their engine
+was the yoki-graph runtime; a workflow script now runs on the harness itself),
+`cost-tracking` (its data source was yoki's metrics log; LiteLLM's Prometheus
+metrics replace it). `yoki-artifact` was renamed `artifact` and stays until the
+writeup private build exists.

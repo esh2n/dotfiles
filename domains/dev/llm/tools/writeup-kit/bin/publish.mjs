@@ -57,7 +57,7 @@
 // failed, 4 private-word hit, 5 cloudflare Access not verified, 6 size
 // over 16MB, 7 a `.wu-diffview` whose diff could not be rendered, 8 the
 // kit CSS `<link>` survived inlining (see `inlineKitCss`'s comment-skip
-// below), 9 the `yoki-artifact` CLI is missing from `PATH`, failed, or
+// below), 9 the `artifact` CLI (`--to yoki-artifact`) is missing from `PATH`, failed, or
 // answered with something that is not a publish result. (9, not 7: 7 and
 // 8 were already taken by the two failures above and reusing one would
 // make a CLI failure indistinguishable from an unrenderable diff.)
@@ -81,9 +81,11 @@ const MAX_BYTES = 16 * 1024 * 1024
 /** Every `--to` value publish accepts, in the order the usage string lists them. */
 export const TARGETS = ['artifact', 'cloudflare', 'file', 'github', 'yoki-artifact']
 
-/** The executable `--to yoki-artifact` looks for on `PATH`, and the meta tag it
- * records the returned viewer URL under on the source page. */
-const YOKI_ARTIFACT_BIN = 'yoki-artifact'
+/** The executable `--to yoki-artifact` looks for on `PATH` (the CLI's own
+ * launcher was renamed from `yoki-artifact` to `artifact`; the skill lives at
+ * `harness/skills/artifact/` now), and the meta tag it records the returned
+ * viewer URL under on the source page. */
+const YOKI_ARTIFACT_BIN = 'artifact'
 export const YOKI_ARTIFACT_META = 'published-yoki-artifact'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -576,7 +578,7 @@ function publishToYokiArtifact(staged, pageFile, storeDir, { channel }) {
     throw new PublishError(
       9,
       missing
-        ? `publish refused: \`${YOKI_ARTIFACT_BIN}\` is not on PATH — install the yoki-artifact skill's bin/ first (the staged page is at ${out})`
+        ? `publish refused: \`${YOKI_ARTIFACT_BIN}\` is not on PATH — install the artifact skill's bin/ first (the staged page is at ${out})`
         : `publish refused: \`${argv.join(' ')}\` failed (exit ${e && e.status !== undefined ? e.status : '?'})`,
       detail || (e && e.message) || '(no output)',
     )
@@ -778,7 +780,7 @@ async function main() {
   if (!args.file || !args.to) {
     console.error('usage: node bin/publish.mjs <page.html> --to artifact|cloudflare|file|github|yoki-artifact [--out path] [--channel name] [--store dir | --store-name name] [--dry-run] [--deploy] [--pdf] [--internal]')
     console.error('  --channel applies to --to yoki-artifact (default: the page slug)')
-    console.error('  exit codes: 2 usage, 3 self-check, 4 private word, 5 cloudflare Access, 6 over 16MB, 7 unrenderable .wu-diffview, 8 kit CSS link survived inlining, 9 the yoki-artifact CLI is missing from PATH or failed')
+    console.error('  exit codes: 2 usage, 3 self-check, 4 private word, 5 cloudflare Access, 6 over 16MB, 7 unrenderable .wu-diffview, 8 kit CSS link survived inlining, 9 the artifact CLI is missing from PATH or failed')
     return 2
   }
   try {

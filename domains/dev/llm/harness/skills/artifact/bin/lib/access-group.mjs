@@ -202,7 +202,7 @@ export function manualAccessGroupSteps({
     `Do ONE of these so ${list} is ${verb} "${VIEWERS_GROUP_NAME}" in ${account}:`,
     "",
     `  a. export ${API_TOKEN_ENV}=… ${ACCOUNT_ID_ENV}=… and re-run:`,
-    `       yoki-artifact ${command} ${channel} ${emails.map((email) => `--to ${email}`).join(" ")}`,
+    `       artifact ${command} ${channel} ${emails.map((email) => `--to ${email}`).join(" ")}`,
     `     (the D1 write is idempotent, so re-running is safe)`,
     "",
     `  b. edit $DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/viewers.json (${command === "unshare" ? "remove" : "add"} ${list}) and run:`,

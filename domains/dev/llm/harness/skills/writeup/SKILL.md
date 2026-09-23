@@ -163,18 +163,18 @@ access_verified = true`. Exit codes and walkthroughs: `references/publish.md`.
 is the cross-harness route to a private URL — it stages exactly like `--to
 file` (full standalone document, private-word check included, no
 `--internal`), writes `<store>/.publish/<slug>.yoki-artifact.html`, then
-execs the `yoki-artifact` CLI on `PATH` (`publish <staged> --channel <slug
+execs the `artifact` CLI on `PATH` (`publish <staged> --channel <slug
 or --channel> --title <page title> --json`) and records the URL it returns
 on the source page as `<meta name="published-yoki-artifact">` — the same
 ledger as `published-artifact`, written for you because this target knows
 the URL. Inside Claude Code the native Artifact tool remains the shorter
 path for a one-off page; reach for this one when the page must be
 publishable or updatable from a harness that has no Artifact tool, or when
-comments should come back through `yoki-artifact comments`. `--channel`
+comments should come back through `artifact comments`. `--channel`
 (default: the page slug) is what keeps the URL stable across re-publishes —
 update a page under the same channel, never a new one. A missing or failing
 CLI is exit 9, with the CLI's own message as the detail. Walkthrough:
-`references/publish.md`; the CLI itself: the `yoki-artifact` skill.
+`references/publish.md`; the CLI itself: the `artifact` skill.
 
 **GitHub PR (private repos too)**: `--to github` is the one target that
 writes a **folder**, not a single file — there is no repo commit, no

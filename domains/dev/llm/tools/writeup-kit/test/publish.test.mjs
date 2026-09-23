@@ -988,19 +988,20 @@ describe('publish(): --internal is restricted to --to github', () => {
 
 // --- --to yoki-artifact -----------------------------------------------------
 // `yoki-artifact` stages exactly like `--to file` (a full standalone
-// document) and then hands that file to the `yoki-artifact` CLI, which is
-// the only thing in this path that talks to a network. Every test below
-// stubs that CLI on PATH — publish.mjs must never reach a real Worker, and
-// the stub is also how the argv it builds is observed.
+// document) and then hands that file to the `artifact` CLI (the renamed
+// `yoki-artifact` skill's launcher), which is the only thing in this path
+// that talks to a network. Every test below stubs that CLI on PATH —
+// publish.mjs must never reach a real Worker, and the stub is also how the
+// argv it builds is observed.
 
-/** A fake `yoki-artifact` executable in a fresh PATH directory. `body` is the
+/** A fake `artifact` executable in a fresh PATH directory. `body` is the
  * shell script's body; it always records its own argv to `<dir>/argv.txt`
  * first so a test can assert on what publish.mjs actually invoked. */
 function stubYokiArtifact(body) {
   const dir = mkdtempSync(join(tmpdir(), 'wu-yoki-bin-'))
   const argvFile = join(dir, 'argv.txt')
   const script = `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(argvFile)}\n${body}\n`
-  writeFileSync(join(dir, 'yoki-artifact'), script, { mode: 0o755 })
+  writeFileSync(join(dir, 'artifact'), script, { mode: 0o755 })
   return { dir, argvFile }
 }
 
@@ -1025,7 +1026,7 @@ describe('publish(): --to yoki-artifact --dry-run plans without running anything
     assert.equal(result.output, join(store, '.publish', '2026-08-01-example-decision.yoki-artifact.html'))
     assert.equal(result.channel, '2026-08-01-example-decision')
     assert.equal(result.title, '再試行方針の決定')
-    assert.match(result.command, /^yoki-artifact publish .*\.yoki-artifact\.html --channel 2026-08-01-example-decision --title .* --json$/)
+    assert.match(result.command, /^artifact publish .*\.yoki-artifact\.html --channel 2026-08-01-example-decision --title .* --json$/)
   })
 
   test('--channel overrides the slug in the plan', () => {

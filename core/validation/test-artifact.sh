@@ -2,16 +2,16 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
-# yoki-artifact End-to-End Contract Test (test-yoki-artifact.sh)
+# artifact End-to-End Contract Test (test-artifact.sh)
 # -----------------------------------------------------------------------------
 # Exercises the CLI the way a caller actually reaches it: through the
-# domains/dev/bin/yoki-artifact symlink the dotfiles linker installs into
+# domains/dev/bin/artifact symlink the dotfiles linker installs into
 # ~/bin, against the skill's own fake Worker
-# (skills/yoki-artifact/test/fixtures/api-server.mjs) on 127.0.0.1.
+# (skills/artifact/test/fixtures/api-server.mjs) on 127.0.0.1.
 #
 # What this covers that the unit suites do not:
 #   - the bin symlink exists, points where it should, and still finds
-#     yoki-artifact.mjs after the linker's second hop into ~/bin
+#     artifact.mjs after the linker's second hop into ~/bin
 #   - publish -> versions -> comments --to-agent -> watch --once -> revoke as
 #     one sequence against one server, asserting exit codes and JSON shapes
 #   - the secret-scan fixture is refused and nothing reaches the API
@@ -22,16 +22,16 @@ set -euo pipefail
 # a real Cloudflare deployment: the CLI runs with a scrubbed environment
 # pointed at a throwaway HOME.
 #
-# Usage: ./test-yoki-artifact.sh
+# Usage: ./test-artifact.sh
 # -----------------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${DOTFILES_ROOT}/core/utils/common.sh"
 
-SKILL="${DOTFILES_ROOT}/domains/dev/llm/harness/skills/yoki-artifact"
-BIN_LINK="${DOTFILES_ROOT}/domains/dev/bin/yoki-artifact"
-BIN_LINK_TARGET="../llm/harness/skills/yoki-artifact/bin/yoki-artifact"
+SKILL="${DOTFILES_ROOT}/domains/dev/llm/harness/skills/artifact"
+BIN_LINK="${DOTFILES_ROOT}/domains/dev/bin/artifact"
+BIN_LINK_TARGET="../llm/harness/skills/artifact/bin/artifact"
 
 NODE_MAJOR_FLOOR=22
 SERVER_READY_TIMEOUT=15
@@ -148,8 +148,8 @@ write_driver() {
 // to it, prints one JSON line of connection details, then waits for SIGTERM.
 import { pathToFileURL } from "node:url";
 
-const fixture = await import(pathToFileURL(process.env.YOKI_ARTIFACT_FIXTURE).href);
-const channel = process.env.YOKI_ARTIFACT_CHANNEL;
+const fixture = await import(pathToFileURL(process.env.ARTIFACT_FIXTURE).href);
+const channel = process.env.ARTIFACT_CHANNEL;
 
 // One unseen agent comment, one already picked up, one written to a human —
 // enough to tell `comments --to-agent` and `watch --once` apart.
@@ -184,8 +184,8 @@ start_fake_api() {
     write_driver
     mkfifo "${FIXTURE}/handshake"
 
-    YOKI_ARTIFACT_FIXTURE="${SKILL}/test/fixtures/api-server.mjs" \
-    YOKI_ARTIFACT_CHANNEL="$CHANNEL" \
+    ARTIFACT_FIXTURE="${SKILL}/test/fixtures/api-server.mjs" \
+    ARTIFACT_CHANNEL="$CHANNEL" \
         node "${FIXTURE}/driver.mjs" > "${FIXTURE}/handshake" 2> "${FIXTURE}/driver.log" &
     API_PID=$!
 
@@ -224,10 +224,10 @@ cli() {
         HOME="$FAKE_HOME" \
         XDG_CONFIG_HOME="${FAKE_HOME}/.config" \
         XDG_STATE_HOME="${FAKE_HOME}/.local/state" \
-        YOKI_ARTIFACT_SELF_CHECK="${FAKE_HOME}/no-such-self-check.mjs" \
-        YOKI_ARTIFACT_URL="$API_URL" \
-        YOKI_ARTIFACT_CLIENT_ID="$API_CLIENT_ID" \
-        YOKI_ARTIFACT_CLIENT_SECRET="$API_CLIENT_SECRET" \
+        ARTIFACT_SELF_CHECK="${FAKE_HOME}/no-such-self-check.mjs" \
+        ARTIFACT_URL="$API_URL" \
+        ARTIFACT_CLIENT_ID="$API_CLIENT_ID" \
+        ARTIFACT_CLIENT_SECRET="$API_CLIENT_SECRET" \
         "$BIN_LINK" "$@" > "$CLI_STDOUT" 2> "$CLI_STDERR" || CLI_STATUS=$?
     return 0
 }
@@ -248,9 +248,9 @@ PAGE
 
 check_bin_symlink() {
     if [[ -L "$BIN_LINK" ]]; then
-        pass "case1: domains/dev/bin/yoki-artifact is a symlink"
+        pass "case1: domains/dev/bin/artifact is a symlink"
     else
-        fail "case1: domains/dev/bin/yoki-artifact is a symlink"
+        fail "case1: domains/dev/bin/artifact is a symlink"
         return 1
     fi
     assert_eq "case2: it points at the skill launcher, relatively" \
@@ -265,11 +265,11 @@ check_bin_symlink() {
     # launcher is reached through two hops. That is the shape that breaks a
     # launcher resolving only `dirname "$0"`, so assert on it rather than on a
     # direct call.
-    ln -sf "$BIN_LINK" "${FIXTURE}/bin/yoki-artifact"
+    ln -sf "$BIN_LINK" "${FIXTURE}/bin/artifact"
     local out=""
-    out="$("${FIXTURE}/bin/yoki-artifact" --help 2>&1)" || true
+    out="$("${FIXTURE}/bin/artifact" --help 2>&1)" || true
     assert_contains "case4: the installed double link still finds the CLI" \
-        "yoki-artifact — publish and manage yoki artifacts." "$out"
+        "artifact — publish and manage artifacts." "$out"
 }
 
 check_publish() {
@@ -367,7 +367,7 @@ check_secret_gate() {
 check_unit_suites() {
     if ! has_command npm; then
         log_warn "SKIP: npm is not installed — the worker suite cannot run"
-    elif (cd "${SKILL}/worker" && npm test) > "${FIXTURE}/worker-test.log" 2>&1; then
+    elif (cd "${DOTFILES_ROOT}/domains/dev/llm/tools/artifact-worker" && npm test) > "${FIXTURE}/worker-test.log" 2>&1; then
         pass "case35: worker/ npm test passes"
     else
         fail "case35: worker/ npm test passes"
@@ -388,22 +388,22 @@ check_unit_suites() {
 check_validator_wiring() {
     local validator="${SCRIPT_DIR}/validator.sh"
 
-    if grep -qE '^\s+yoki-artifact\s*$' "$validator"; then
-        pass "case37: validator.sh runs yoki-artifact in its default (no-args) pass"
+    if grep -qE '^\s+artifact\s*$' "$validator"; then
+        pass "case37: validator.sh runs artifact in its default (no-args) pass"
     else
-        fail "case37: validator.sh runs yoki-artifact in its default (no-args) pass"
+        fail "case37: validator.sh runs artifact in its default (no-args) pass"
     fi
 
-    if grep -qF '"yoki-artifact")' "$validator"; then
-        pass "case38: validator.sh accepts \`validator.sh yoki-artifact\`"
+    if grep -qF '"artifact")' "$validator"; then
+        pass "case38: validator.sh accepts \`validator.sh artifact\`"
     else
-        fail "case38: validator.sh accepts \`validator.sh yoki-artifact\`"
+        fail "case38: validator.sh accepts \`validator.sh artifact\`"
     fi
 
-    if grep -q 'Usage: \$0 .*|yoki-artifact|' "$validator"; then
-        pass "case39: validator.sh usage line lists yoki-artifact"
+    if grep -q 'Usage: \$0 .*|artifact|' "$validator"; then
+        pass "case39: validator.sh usage line lists artifact"
     else
-        fail "case39: validator.sh usage line lists yoki-artifact"
+        fail "case39: validator.sh usage line lists artifact"
     fi
 }
 
@@ -418,8 +418,8 @@ run_e2e_checks() {
     check_validator_wiring
 }
 
-run_yoki_artifact_checks() {
-    log_info "=== yoki-artifact End-to-End Test Suite ==="
+run_artifact_checks() {
+    log_info "=== artifact End-to-End Test Suite ==="
     echo ""
 
     prerequisites_ok || return 0
@@ -446,5 +446,5 @@ run_yoki_artifact_checks() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    run_yoki_artifact_checks
+    run_artifact_checks
 fi

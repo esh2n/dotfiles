@@ -13,9 +13,9 @@ log/
 **/credentials.yml
 **/*secret*.json
 # Not a secret itself — a JSON list of the REGEX SHAPES that catch one
-# (openai-key, github-token, ...), shared by yoki-artifact's scan.mjs and
+# (openai-key, github-token, ...), shared by artifact's scan.mjs and
 # the T35 prepush scanner. Re-included so it can actually be tracked.
-!domains/dev/llm/harness/skills/yoki-artifact/bin/lib/secret-patterns.json
+!domains/dev/llm/harness/skills/artifact/bin/lib/secret-patterns.json
 **/*token*.json
 **/*.pem
 **/*.key
