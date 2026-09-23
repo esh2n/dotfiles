@@ -52,6 +52,13 @@ function buildPiModel(tier: Tier, dropped: DroppedField[]): Record<string, unkno
     tier: tier.alias,
     reason: "pi only ever talks to the proxy alias; backend routing is opaque to it",
   });
+  if (tier.maxContextWindow !== undefined) {
+    dropped.push({
+      field: "maxContextWindow",
+      tier: tier.alias,
+      reason: "pi has no extended-window field; the budget (contextWindow) is its only window",
+    });
+  }
 
   const model: Record<string, unknown> = {
     id: tier.alias,

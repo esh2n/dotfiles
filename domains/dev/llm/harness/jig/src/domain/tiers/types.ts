@@ -70,7 +70,10 @@ export interface Tier {
   readonly backend: TierBackend;
   readonly reasoning: boolean;
   readonly input: readonly string[];
+  /** The harness's context BUDGET (compaction trigger, status %), not the provider's limit — rules/decisions/2026-09-24-context-window-budget-200k-extended-1m.md. */
   readonly contextWindow: number;
+  /** The provider's larger window a harness may opt into explicitly (omp `/extended-context on`); absent = no extended window. */
+  readonly maxContextWindow?: number;
   readonly maxTokens: number;
   readonly compat: TierCompat;
   /** pi only; deterministic-tier-only in practice, but not schema-enforced. */

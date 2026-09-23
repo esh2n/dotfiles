@@ -24,6 +24,13 @@
  * failed — custom providers disabled"). pi-ai's `deepseek` format is
  * therefore dropped and reported; omp shapes DeepSeek thinking itself.
  *
+ * `contextWindow` is the budget (200K, the ruling of 2026-09-24) and
+ * `maxContextWindow` the provider's window (1M) that `/extended-context on`
+ * opts into — omp is the one harness with that two-tier field, so only this
+ * writer emits it (docs/models.md: "Set `contextWindow` to the normal prompt
+ * window and `maxContextWindow` to the larger prompt window accepted by the
+ * provider").
+ *
  * Order pins omp's own: main, complex, deterministic (the canonical order).
  */
 
@@ -62,6 +69,7 @@ function renderModel(tier: Tier, dropped: DroppedField[]): string {
     `${F}reasoning: ${tier.reasoning}`,
     `${F}input: [${tier.input.join(", ")}]`,
     `${F}contextWindow: ${tier.contextWindow}`,
+    ...(tier.maxContextWindow === undefined ? [] : [`${F}maxContextWindow: ${tier.maxContextWindow}`]),
     `${F}maxTokens: ${tier.maxTokens}`,
   ];
   if (tier.compat.thinkingFormat !== undefined) {

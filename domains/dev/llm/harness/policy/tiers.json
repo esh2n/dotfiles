@@ -42,9 +42,10 @@
       "input": [
         "text"
       ],
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
+      "maxContextWindow": 1000000,
       "maxTokens": 16384,
-      "_context_source": "contextWindow 1000000 / max output 384K: DeepSeek Models & Pricing table, deepseek-flash column, CONTEXT LENGTH '1M', MAX OUTPUT 'MAXIMUM: 384K' (https://api-docs.deepseek.com/quick_start/pricing, read 2026-09-24). maxTokens 16384 is a deliberate cap below that maximum.",
+      "_context_source": "contextWindow 200000 = the harness BUDGET (compaction point), ruled 2026-09-24 (rules/decisions/2026-09-24-context-window-budget-200k-extended-1m.md): the value Claude Code falls back to behind a gateway, below the ~256K where DeepSeek MRCR drops (third-party). maxContextWindow 1000000 = the provider window (DeepSeek pricing table, deepseek-flash: CONTEXT LENGTH 1M, MAX OUTPUT MAXIMUM 384K, https://api-docs.deepseek.com/quick_start/pricing), reachable in omp with /extended-context on. maxTokens 16384 is a deliberate output cap.",
       "compat": {
         "thinkingFormat": "deepseek"
       },
@@ -78,9 +79,10 @@
       "input": [
         "text"
       ],
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
+      "maxContextWindow": 1000000,
       "maxTokens": 32768,
-      "_context_source": "contextWindow 1000000 / max output 384K: same table, deepseek-v4-pro column, CONTEXT LENGTH '1M', MAX OUTPUT 'MAXIMUM: 384K' (https://api-docs.deepseek.com/quick_start/pricing, read 2026-09-24).",
+      "_context_source": "contextWindow 200000 = the harness budget (same ruling as main). maxContextWindow 1000000 = the provider window (DeepSeek pricing table, deepseek-v4-pro column: CONTEXT LENGTH 1M, MAX OUTPUT MAXIMUM 384K).",
       "compat": {
         "thinkingFormat": "deepseek"
       },

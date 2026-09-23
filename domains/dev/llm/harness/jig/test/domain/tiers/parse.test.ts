@@ -161,3 +161,14 @@ describe("parseTiers", () => {
     expect(() => parseTiers(doc)).toThrow(/reasoningEfforts/);
   });
 });
+
+describe("maxContextWindow (the provider window a harness may opt into)", () => {
+  test("is optional, and a number when present", () => {
+    const withIt = validDoc() as unknown as { tiers: Record<string, Record<string, unknown>> };
+    (withIt.tiers.main as Record<string, unknown>).maxContextWindow = 1000000;
+    expect(parseTiers(withIt).tiers.main.maxContextWindow).toBe(1000000);
+    expect(parseTiers(validDoc()).tiers.main.maxContextWindow).toBeUndefined();
+    (withIt.tiers.main as Record<string, unknown>).maxContextWindow = "1M";
+    expect(() => parseTiers(withIt)).toThrow(/maxContextWindow/);
+  });
+});

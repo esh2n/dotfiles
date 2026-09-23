@@ -42,6 +42,7 @@ function wrapComment(text: string, indent: string, width = 78): string[] {
 
 function dropTierFields(tier: Tier, dropped: DroppedField[]): void {
   const notExpressible: ReadonlyArray<[string, unknown]> = [
+    ["maxContextWindow", tier.maxContextWindow],
     ["reasoning", tier.reasoning],
     ["input", tier.input],
     ["contextWindow", tier.contextWindow],

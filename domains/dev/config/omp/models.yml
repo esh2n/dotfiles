@@ -58,13 +58,15 @@ providers:
         name: main — DeepSeek Flash (LiteLLM tier)
         reasoning: true
         input: [text]
-        contextWindow: 1000000
+        contextWindow: 200000
+        maxContextWindow: 1000000
         maxTokens: 16384
       - id: complex
         name: complex — DeepSeek V4 Pro (LiteLLM tier)
         reasoning: true
         input: [text]
-        contextWindow: 1000000
+        contextWindow: 200000
+        maxContextWindow: 1000000
         maxTokens: 32768
       - id: deterministic
         name: deterministic — local Qwen (LiteLLM tier)

@@ -163,6 +163,7 @@ const TIER_FIELDS = [
   "reasoning",
   "input",
   "contextWindow",
+  "maxContextWindow",
   "maxTokens",
   "compat",
   "thinkingLevelMap",
@@ -190,6 +191,9 @@ function parseTier(raw: unknown, id: TierId): Tier {
     reasoning: requireBoolean(obj.reasoning, `${label}.reasoning`),
     input: requireStringArray(obj.input, `${label}.input`),
     contextWindow: requireNumber(obj.contextWindow, `${label}.contextWindow`),
+    ...(obj.maxContextWindow === undefined
+      ? {}
+      : { maxContextWindow: requireNumber(obj.maxContextWindow, `${label}.maxContextWindow`) }),
     maxTokens: requireNumber(obj.maxTokens, `${label}.maxTokens`),
     compat: parseTierCompat(obj.compat, `${label}.compat`),
     ...(obj.thinkingLevelMap === undefined
