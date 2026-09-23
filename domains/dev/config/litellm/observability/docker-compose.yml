@@ -122,7 +122,10 @@ services:
       # FIRST launch, then kept in the data volume and later env changes
       # ignored (https://docs.openwebui.com/reference/env-configuration/);
       # changing them means recreating observability_open-webui-data.
-      OPENAI_API_KEY: "${LITELLM_API_KEY:?LITELLM_API_KEY must be in the environment (litellm/proxy-key.sh)}"
+      # Defaulted, not required: `:?` made even `docker compose rm` fail
+      # (measured 2026-09-23). install.sh refuses to start the service without
+      # the real key; a bare `up` gets this visibly wrong value instead.
+      OPENAI_API_KEY: "${LITELLM_API_KEY:-unset-run-make-update}"
       # No local Ollama on this Mac; keeps the model list to LM Studio only.
       ENABLE_OLLAMA_API: "false"
       # WEBUI_AUTH is left unset (documented default: true — the app's own
