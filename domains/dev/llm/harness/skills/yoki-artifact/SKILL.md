@@ -32,11 +32,12 @@ Artifact tool のほうが手数が少ない。writeup の `--to artifact` は�
 
 ## 初期設定(マシンごとに一度)
 
-Worker(Cloudflare Workers + R2 + D1 + Access)を先に立てる。手順は
-`worker/SETUP.md` — Zero Trust のオンボーディング、IdP 登録、R2 の有効化、
+Worker(Cloudflare Workers + R2 + D1 + Access)を先に立てる。Worker プロジェクトは skill の外
+`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/`(`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/artifact-worker`)にある。手順は
+`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/SETUP.md` — Zero Trust のオンボーディング、IdP 登録、R2 の有効化、
 API トークン発行までが手作業で、そこから先(D1/R2 作成、マイグレーション、
 デプロイ、Access アプリとポリシー、サービストークン、設定ファイル書き出し)は
-`worker/scripts/setup.mjs` がやる。**wrangler はグローバルに入れない** —
+`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/scripts/setup.mjs` がやる。**wrangler はグローバルに入れない** —
 プロジェクトに固定して `pnpm exec wrangler ...` で呼ぶ。
 
 CLI 側の設定は `~/.config/yoki-artifact/config.json`:
@@ -63,8 +64,8 @@ Worker 側の `SERVICE_TOKEN_NAME` var は、**オーナー権限を持つサー
 トークンを1本に固定する**もの(`setup.mjs` が `yoki-artifact-cli` の
 client id を書く)。未設定だと **どのサービストークンもオーナーにならず**、
 CLI は publish / revoke / share で 403 `not_owner` になる。そうなったら
-`worker/scripts/setup.mjs` を再実行する — 詳細と rotate 手順は
-`worker/SETUP.md` 5-6。
+`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/scripts/setup.mjs` を再実行する — 詳細と rotate 手順は
+`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/SETUP.md` 5-6。
 
 `~/.claude/skills/yoki-artifact` は dotfiles へのディレクトリ symlink なので、
 PATH に置くのはその中のランチャ1本でよい:
@@ -75,7 +76,7 @@ ln -sf ~/.claude/skills/yoki-artifact/bin/yoki-artifact ~/.local/bin/yoki-artifa
 
 writeup-kit の `--to yoki-artifact` は **PATH 上の `yoki-artifact` しか探さない**
 (exit 9)。設定が効いているかは `yoki-artifact doctor` で見る — 設定・秘密・
-Worker への到達を1つずつ試して、落ちた項目だけ `worker/SETUP.md` の該当箇所を
+Worker への到達を1つずつ試して、落ちた項目だけ `$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/SETUP.md` の該当箇所を
 出す。うまくいかないときは推測で config を書き換える前に必ず doctor を通す。
 
 ## Node の版(`bin/yoki-artifact` 経由での実行を推奨)

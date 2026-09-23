@@ -3,14 +3,16 @@
 grilling が書いたラウンド文書（`round-<n>.md`）を読み、そのラウンドの問いを
 すべて載せた 1 枚の HTML にする。外部アセットは Google Fonts のスタイルシートだけ。
 
-**このディレクトリは grilling スキルの一部。生成物（HTML）は scratchpad に置き、
-リポジトリには残さない。**
+**このディレクトリは grilling スキル（`$DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/`）が
+駆動する描画ツール。skill 側には手順だけを置き、実体はここ
+（`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/`）に置く。生成物（HTML）は
+scratchpad に置き、リポジトリには残さない。**
 
 ## ページ意匠 — writeup-kit があれば乗せ、無ければ自前
 
 `lib/kit.mjs` が起動のたびに writeup-kit の在り処を解決する
-（きょうだいディレクトリ `../writeup-kit` → `~/.claude/skills/writeup-kit` →
-無し、の順）。
+（きょうだいディレクトリ `../writeup-kit` →
+`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit` → 無し、の順）。
 
 - **kit がある場合** — ページ chrome（`.wu-header`/`.wu-footer`）と本文の
   コンポーネント（`.wu-summary`/`.wu-terms`/`.wu-compare`/`.wu-decision`/
@@ -48,7 +50,7 @@ store への配置・commit は writeup 側の保存手順に従う（`SKILL.md`
 ## 使い方
 
 ```sh
-cd <skill>/render
+cd "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render"
 pnpm install                      # 初回のみ（elkjs / yaml）
 
 node render.mjs <round.md> [-o <out.html>] [--title "<見出し>"] [--fragment]
@@ -126,7 +128,7 @@ q3: other — 両方いらない
 
 ## 入力の契約
 
-正本は [`../references/round-format.md`](../references/round-format.md)。
+正本は `$DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/references/round-format.md`。
 このレンダラーが読むのは次のブロックだけで、それ以外の散文は無視する。
 
 | ブロック | 必須 | 描画先 |
@@ -201,7 +203,7 @@ edges:                     # 任意
    すべてに定義がある変数だけを使う。
 5. **`test/`** — fixture に例を足し、(a) スキーマ違反がブロック名つきで出ること、
    (b) 生成 HTML に出ること、(c) SVG に NaN が出ないこと、を足す。
-6. **`../references/round-format.md`** — 語彙の正本なので必ず同時に直す。
+6. **`$DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/references/round-format.md`** — 語彙の正本なので必ず同時に直す。
 
 ## テスト
 

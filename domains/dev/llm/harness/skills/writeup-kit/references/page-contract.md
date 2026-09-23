@@ -328,8 +328,9 @@ why PDF is comment-only).
 
 ## 7. Cross-skill resolution
 
-- Kit resolution order for a calling skill: (1) sibling directory
-  `../writeup-kit/`, (2) `~/.claude/skills/writeup-kit/`, (3) kit-less
+- Kit resolution for a calling skill: (1)
+  `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/`
+  (never a path relative to the skill), (2) kit-less
   fallback mode — see `SKILL.md` for what fallback mode does.
 - Distribution unit: `writeup`, `writeup-kit`, `grilling`, `eli5`, and
   `show-me` ship as one plugin, but each also works if installed alone.

@@ -8,16 +8,14 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import {
   registerStore, registerStoreInFile, registeredNames, initNamedStore, initStore, parseArgs, portablePath, registryPath,
-  findRepoRoot, markerText, writeRepoMarker, REPO_MARKER,
+  findRepoRoot, markerText, writeRepoMarker, REPO_MARKER, KIT_DIR,
 } from '../scripts/init-store.mjs'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const KIT_TOML = join(HERE, '..', '..', 'writeup-kit', 'bin', 'lib', 'toml-lite.mjs')
-const KIT_STORE = join(HERE, '..', '..', 'writeup-kit', 'bin', 'lib', 'store.mjs')
+const KIT_TOML = join(KIT_DIR, 'bin', 'lib', 'toml-lite.mjs')
+const KIT_STORE = join(KIT_DIR, 'bin', 'lib', 'store.mjs')
 
 const ENV_KEYS = ['WRITEUP_STORE', 'WRITEUP_STORES']
 let savedEnv

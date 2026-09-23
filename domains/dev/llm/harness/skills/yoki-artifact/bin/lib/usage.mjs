@@ -29,7 +29,7 @@ share / unshare update BOTH lists that decide viewer access: the Worker's own
 viewer rows, and the Cloudflare Access group "yoki-artifact-viewers" that
 admits people at the edge. The second needs CLOUDFLARE_API_TOKEN and
 CLOUDFLARE_ACCOUNT_ID in the environment plus "accessGroupId" in the config
-file (written by worker/scripts/setup.mjs). Without them — or if Cloudflare
+file (written by tools/artifact-worker/scripts/setup.mjs). Without them — or if Cloudflare
 refuses — the command exits 2 and prints the exact manual step; the viewer-row
 change has already been made and is safe to re-run.
 

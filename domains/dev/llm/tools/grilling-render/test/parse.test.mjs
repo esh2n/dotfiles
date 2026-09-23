@@ -257,7 +257,9 @@ nodes:
 })
 
 test('round-format.md に載っている記入例が実際に読める（ドキュメントとの乖離検知）', () => {
-  const doc = readFileSync(join(HERE, '..', '..', 'references', 'round-format.md'), 'utf8')
+  // 正本は grilling skill 側（$DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/references/）。
+  const root = process.env.DOTFILES_ROOT || join(HERE, '..', '..', '..', '..', '..', '..')
+  const doc = readFileSync(join(root, 'domains', 'dev', 'llm', 'harness', 'skills', 'grilling', 'references', 'round-format.md'), 'utf8')
   const m = /^````markdown\n([\s\S]*?)\n````$/m.exec(doc)
   assert.ok(m, 'round-format.md に ````markdown の記入例が無い')
   const r = parseRound(m[1])

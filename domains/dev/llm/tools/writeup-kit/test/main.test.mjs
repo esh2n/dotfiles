@@ -1,6 +1,6 @@
 // main.test.mjs — the entry guard (bin/lib/main.mjs) has to keep working
-// when the kit is reached through a symlink, because that's how it's
-// normally invoked: `~/.claude/skills/writeup-kit` symlinks into this repo.
+// when the kit is reached through a symlink, because that is how it is
+// normally invoked: `$DOTFILES_ROOT` (which holds tools/writeup-kit) is a symlink.
 // `process.argv[1]` keeps the symlinked path Node was told to run while
 // `import.meta.url` resolves to the realpath, so a naive string comparison
 // never matches through the symlink and the CLI silently exits 0 having

@@ -5,6 +5,13 @@ skills: CSS tokens, 20 role-named page components, a page template, a diagram
 IR contract with 29 figure types, a Japanese prose linter, and a structural
 self-check. Skills read it; users do not invoke it directly.
 
+This directory (`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/`) holds the
+kit's executable and vendored parts — `bin/`, `vendor/`, `kit/`, `test/`. The
+skill that describes it (`SKILL.md`, `references/`) stays at
+`$DOTFILES_ROOT/domains/dev/llm/harness/skills/writeup-kit/`; the skills that
+drive it (`writeup`, `show-me`, `eli5`, `grilling`) resolve it as
+`KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"`.
+
 Pages are HTML, saved into a **store** — a git repository holding the pages,
 a generated `index.html` and `manifest.json`, and a synced copy of the kit's
 CSS under `_kit/`.
@@ -23,21 +30,18 @@ Sizes: `writeup-kit` 22 MB, of which `vendor/` is 19 MB and everything else
 
 ## Install
 
-Copy the three skill directories into `~/.claude/skills/`:
+Nothing to install: the kit is used in place from the dotfiles checkout, and
+the skills that drive it are linked into `~/.claude/skills/` by `jig apply`.
+Every skill resolves the kit at
+`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit`; with the
+kit absent there, tools that need it say so and name the path they checked.
+
+Verify the checkout:
 
 ```bash
-cp -R writeup-kit writeup show-me ~/.claude/skills/
-```
-
-Skills resolve the kit as a sibling directory first, then
-`~/.claude/skills/writeup-kit` — both layouts work. With the kit in neither
-place, tools that need it say so and name both paths they checked.
-
-Verify the copy:
-
-```bash
-cd ~/.claude/skills/writeup-kit && node --test   # 1867 tests
-cd ~/.claude/skills/writeup     && node --test   #   15 tests
+KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"
+cd "$KIT" && node --test                                              # 1867 tests
+cd "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/writeup" && node --test   #   15 tests
 ```
 
 ## Stores and the registry
@@ -96,8 +100,8 @@ resolves to.
 
 Each CLI's entry guard resolves realpaths on both sides (`bin/lib/main.mjs`'s
 `isMain`) rather than comparing `process.argv[1]` to `import.meta.url`
-directly — the kit is normally invoked through the `~/.claude/skills`
-symlink, and a raw string comparison never matches through it.
+directly — `$DOTFILES_ROOT` is commonly a symlink, so the kit is reached
+through one, and a raw string comparison never matches through it.
 
 ## First page in five commands
 
@@ -120,6 +124,7 @@ Save it as `$STORE/<folder>/<YYYY-MM-DD>-<slug>.html`, then commit in `$STORE`.
 
 ## References
 
-`references/kinds.md` (the 8 document kinds and their required sections),
-`references/components.md` (the 20 components), `references/figure-types.md`,
-`references/writing.md`, `references/tokens.md`, `references/page-contract.md`.
+Under `$DOTFILES_ROOT/domains/dev/llm/harness/skills/writeup-kit/references/`:
+`kinds.md` (the 8 document kinds and their required sections),
+`components.md` (the 20 components), `figure-types.md`, `writing.md`,
+`tokens.md`, `page-contract.md`.

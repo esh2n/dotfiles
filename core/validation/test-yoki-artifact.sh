@@ -29,9 +29,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${DOTFILES_ROOT}/core/utils/common.sh"
 
-SKILL="${DOTFILES_ROOT}/domains/dev/config/claude-profiles/core/skills/yoki-artifact"
+SKILL="${DOTFILES_ROOT}/domains/dev/llm/harness/skills/yoki-artifact"
 BIN_LINK="${DOTFILES_ROOT}/domains/dev/bin/yoki-artifact"
-BIN_LINK_TARGET="../config/claude-profiles/core/skills/yoki-artifact/bin/yoki-artifact"
+BIN_LINK_TARGET="../llm/harness/skills/yoki-artifact/bin/yoki-artifact"
 
 NODE_MAJOR_FLOOR=22
 SERVER_READY_TIMEOUT=15

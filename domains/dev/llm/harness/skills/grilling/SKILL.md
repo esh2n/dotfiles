@@ -60,11 +60,13 @@ plan / design / decision を、共通理解に達するまで詰める。
 `local` と `artifact`。どちらもメインセッションが書くのは**ラウンド文書だけ**で、
 HTML の生成は **sonnet サブエージェント**に投げる。手で HTML や SVG を書かない。
 
-ラウンドの HTML 意匠は `render/` が自動で決める: きょうだいディレクトリ
-（`../writeup-kit`）か `~/.claude/skills/writeup-kit` に writeup-kit があれば
+描画ツールの実体は skill の外、`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/`
+にある（以下 `<render>` = `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render`）。
+ラウンドの HTML 意匠は `<render>` が自動で決める: きょうだいディレクトリ
+（`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`）に writeup-kit があれば
 そちらのページ意匠・図の検証（`bin/lib/verify-diagram.mjs`）に乗せ、無ければ
 grilling 自前の `template/style.css` と `lib/diagram.mjs` にフォールバックする。
-呼び出し側はどちらが使われているかを気にしなくてよい（`render/README.md` 参照）。
+呼び出し側はどちらが使われているかを気にしなくてよい（`<render>/README.md` 参照）。
 
 フォールバック順は **local → artifact → chat**。codex から呼ばれる場合も含め、
 ブラウザのあるマシンなら常に local。artifact は共有したい・別端末で答えたい・
@@ -79,10 +81,10 @@ grilling 自前の `template/style.css` と `lib/diagram.mjs` にフォールバ
 
 配信の前に次の 2 つを済ませる。どちらも sandbox 環境で実際に詰まった箇所。
 
-1. **描画ツールの実体を用意する**。`<skill>/render/node_modules` が無ければ
+1. **描画ツールの実体を用意する**。`<render>/node_modules` が無ければ
    `pnpm install` が要るが、`~/.claude/skills` が dotfiles への symlink だと
    実体側に書けず `EPERM` で失敗する（`!` prefix でも同じ）。その場合は
-   `render/` ごと scratchpad に複製してそこで `pnpm install` し、以後は
+   `<render>` ごと scratchpad に複製してそこで `pnpm install` し、以後は
    複製側の `render.mjs` を使う。sandbox の解除は求めない。
 2. **serve せずに描画して検証する**。
    `node <render>/render.mjs <round.md> -o <scratchpad>/round-<n>.html` が
@@ -152,7 +154,7 @@ serve は**全問の提出まで戻らない**。戻り値の要約（`q1: A —
 - プロジェクト外（git repo でない場所）で動かす場合は scratchpad 配下に書く。
 - 形式は `references/round-format.md` に従う。散文と機械可読 YAML ブロックの**両方**を書き、内容を一致させる。
 - ラウンド文書は問いのほかに **`## 前提`（そのラウンドの文脈）** と、問いごとの
-  **```diagram ブロック** も持つ。どちらも描画面（`render/`）がそのまま図とパネルにする。
+  **```diagram ブロック** も持つ。どちらも描画面（`<render>`）がそのまま図とパネルにする。
 - **読者はこの会話を読んでいない人だと仮定して書く**。数日後の本人も、他のメンバーも
   同じ。`## 前提` には対象の仕組みを「何が・どこに・どう流れるか」から書き、
   問いで使う言葉（購読、待ち行列、版、など）はそこで定義する。
@@ -285,7 +287,7 @@ frontier が空になり、重要な枝に暗黙の前提が残っていない�
 grilling 自身は store に触らない——ここから先は writeup 側の手順。
 
 ```sh
-node <skill>/render/decision-page.mjs <--out のファイル> --out <scratchpad>/decision.html
+node <render>/decision-page.mjs <--out のファイル> --out <scratchpad>/decision.html
 ```
 
 `decision-page.mjs` は `## 決定記録` ブロック（決まったこと / 検討して却下した案 /
@@ -317,7 +319,7 @@ Codex からは `@grilling`（または /skills メニュー）で使える。`c
 ## 参考
 
 - `references/round-format.md` — ラウンド文書の形式（機械可読な正本）
-- `render/README.md` — ラウンド文書を1ページの HTML にする描画面（writeup-kit がある場合の意匠も含む）
-- `render/decision-page.mjs` — 決定記録 Markdown を writeup の `kind: 決定記録` ページに変換する
+- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md` — ラウンド文書を1ページの HTML にする描画面（writeup-kit がある場合の意匠も含む）
+- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/decision-page.mjs` — 決定記録 Markdown を writeup の `kind: 決定記録` ページに変換する
 - Matt Pocock, `grilling` skill — https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling
 - ryonakae, `dig` skill — https://github.com/ryonakae/dotfiles/blob/master/config/.agents/skills/dig/SKILL.md

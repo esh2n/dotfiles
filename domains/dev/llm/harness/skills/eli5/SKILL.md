@@ -52,7 +52,7 @@ Panels in this order, each a single sentence of "what it shows":
 
 - Load `artifact-design` (required) and `artifact-diagramming` (for the SVGs) before writing the file.
 - One scrolling page, one panel per screen-ish section; panels stack vertically on narrow screens.
-- Drawings are inline SVG with a handful of large shapes and thick strokes — no external images, no photos, no icon fonts. Use `currentColor` / CSS tokens so every drawing survives both light and dark theme. If the `writeup-kit` skill is installed (`../writeup-kit/kit/writeup.css` next to this skill, or `~/.claude/skills/writeup-kit/`), take the color and type tokens from it so explainers match the rest of the document family; do not use its components — pictures stay pictures.
+- Drawings are inline SVG with a handful of large shapes and thick strokes — no external images, no photos, no icon fonts. Use `currentColor` / CSS tokens so every drawing survives both light and dark theme. If the `writeup-kit` skill is installed (`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/kit/writeup.css`), take the color and type tokens from it so explainers match the rest of the document family; do not use its components — pictures stay pictures.
 - Type: one large friendly face, headline ≥ 2rem, body ≥ 1.25rem. No bullet lists, no tables, no code blocks in the body.
 - Title: the topic as a short noun phrase. Favicon: one emoji matching the analogy.
 - Write the file to the scratchpad and publish with the Artifact tool; give the user the link.

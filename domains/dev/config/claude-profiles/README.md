@@ -377,8 +377,8 @@ yoki-artifact を選ぶのは Artifact tool を持たない harness から公開
 
 **初期設定はマシンごとに一度だけ必要**: Cloudflare Workers + R2 + D1 +
 Access を立てる手作業(Zero Trust オンボーディング、IdP登録など)と、
-そこから先の自動セットアップ(`worker/scripts/setup.mjs`)に分かれる。
-手順は `core/skills/yoki-artifact/worker/SETUP.md` を参照— この手作業を
+そこから先の自動セットアップ(`domains/dev/llm/tools/artifact-worker/scripts/setup.mjs`)に分かれる。
+手順は `domains/dev/llm/tools/artifact-worker/SETUP.md` を参照— この手作業を
 飛ばすと自動セットアップは必ず失敗するので、必ず上から順に読むこと。
 
 ### 4つ目のターゲットを足す場合

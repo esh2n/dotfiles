@@ -19,8 +19,8 @@ output is Japanese; class names, IR keys and CLI flags are English.
 Everything runs on `node` alone. Resolve the kit first:
 
 ```bash
-SELF="<this skill's own directory>"; KIT=""
-for d in "$SELF/../writeup-kit" "$HOME/.claude/skills/writeup-kit"; do [ -d "$d" ] && { KIT="$d"; break; }; done
+SELF="<this skill's own directory>"
+KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"; [ -d "$KIT" ] || KIT=""
 ```
 
 If `$KIT` is empty, run in **kit-less fallback mode**: hand-write a minimal

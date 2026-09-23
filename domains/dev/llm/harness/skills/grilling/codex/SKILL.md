@@ -23,10 +23,10 @@ argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 
 1. 開始時に `find .claude/.cache/grilling -mindepth 1 -maxdepth 1 -type d -mtime +60 -exec rm -rf {} +` を実行し、消したことを1行で言え。
 2. ラウンド文書を `.claude/.cache/grilling/<slug>/round-<n>.md` に書け（`<slug>` は対象から作る英小文字ケバブケース。git repo でない場所なら一時ディレクトリ配下に書く）。形式は
-   `$YOKI_ROOT/../../core/skills/grilling/references/round-format.md`
-   (codex は起動時に `YOKI_ROOT` を設定する — `domains/dev/config/claude-profiles/runtime/yoki` から見た grilling スキルの相対位置)
+   `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/grilling/references/round-format.md`
+   (`DOTFILES_ROOT` は dotfiles のチェックアウト位置)
    を**読んでから**それに従え。散文と機械可読 YAML ブロックの両方を書き、内容を一致させろ。1ラウンド = frontier の問い 3〜6問。構造を比べる問い（位置や経路が争点の問い）には ```diagram を描き、それ以外は一文で済ませろ。
-3. `node "$YOKI_ROOT/../../core/skills/grilling/render/render.mjs" serve <round.md>`
+3. `node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" serve <round.md>`
    を実行しろ。ページが開き、**全問の提出まで戻らない**。終了を待て。
 4. stdout の集計（`q1: A — メモ`）をそのままラウンド文書の `answer:` 行に写し、`status: answered` にしろ。回答は同ディレクトリの `answers.jsonl` にも残る（最後の行が勝つ）。
 5. 木を更新して次のラウンドへ。frontier が空になり、重要な枝に暗黙の前提が残っていないことを確認してから「共通理解に達しましたか」と聞け。
@@ -36,7 +36,7 @@ argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 ## チャネル
 
 - **local（既定）** — 上の `render.mjs serve`。ブラウザがあるマシンならこれ。
-  ページの意匠は writeup-kit がきょうだいディレクトリか `~/.claude/skills/writeup-kit`
+  ページの意匠は writeup-kit が `$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`
   にあればそちらに乗り、無ければ grilling 自前の意匠にフォールバックする
   （呼び出し側は気にしなくてよい）。
 - **chat（フォールバック）** — 1問ずつ次の形式で出して回答を待つ。ページは作らない。1問 25 行以内、選択肢 2〜4 個。
@@ -57,7 +57,7 @@ argument-hint: "<対象> [--out <path>] [--hints \"...\"]"
 `## 決定記録` の下に `### 決まったこと`（決定 — 重視したトレードオフ1行）/ `### 検討して却下した案`（案 — 却下理由）/ `### 未決・前提`（残る前提と、崩れたときの影響）/ `### 推奨アプローチ` / `### 出典`（URL or path:line）/ `### 次のステップ` / `### 元ラウンド`（`.claude/.cache/grilling/<slug>/transcript.md`）を書け。
 戻しにくい・自明でない・本物のトレードオフがある——この3つを**すべて**満たす決定のときだけ ADR 作成を提案しろ（勝手に書くな）。
 
-ユーザーが保存を望んだら `node <skill>/render/decision-page.mjs <--out のファイル> --out <path>.html` で
+ユーザーが保存を望んだら `node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/decision-page.mjs" <--out のファイル> --out <path>.html` で
 writeup-kit の `kind: 決定記録` ページに変換し、writeup の保存手順（store への配置・commit）に渡せ。
 grilling 自身は store に書き込まない。
 

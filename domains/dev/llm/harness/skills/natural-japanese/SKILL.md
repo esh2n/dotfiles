@@ -78,14 +78,14 @@ metadata:
 ```bash
 SK="$HOME/.claude/skills/natural-japanese"
 # symlink破損時はdotfiles実体にfallback
-[ -d "$SK/scripts" ] || SK="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/config/claude-profiles/personal/skills/natural-japanese"
+[ -d "$SK/scripts" ] || SK="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/natural-japanese"
 
 uv run "$SK/scripts/lint.py" --json <file>
 ```
 
 ### lint の実体
 
-`uv run scripts/lint.py` は既定だが唯一の実体ではない。優先順は次のとおり: (1) `writeup-kit` の Node 製 lint（`~/.claude/skills/writeup-kit/bin/lint.mjs`、無ければ dotfiles 内の `../../../core/skills/writeup-kit/bin/lint.mjs`——`$SK` からは `core/skills/writeup-kit` が `personal/skills/natural-japanese` の3階層上にある——を解決）があれば `node <kit>/bin/lint.mjs <file> --json` を優先する。JSON の形（category/severity/excerpt/span/message/suggestion）は同じで、`--baseline` も使え、`--config` は `.writeup.toml` を自動探索する。(2) kit が無ければ従来どおり `uv run scripts/lint.py`。(3) `uv` も使えない環境では `references/manual-checklist.md` で人手チェック。
+`uv run scripts/lint.py` は既定だが唯一の実体ではない。優先順は次のとおり: (1) `writeup-kit` の Node 製 lint（`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/bin/lint.mjs`。skill からの相対パスでは解決しない）があれば `node <kit>/bin/lint.mjs <file> --json` を優先する。JSON の形（category/severity/excerpt/span/message/suggestion）は同じで、`--baseline` も使え、`--config` は `.writeup.toml` を自動探索する。(2) kit が無ければ従来どおり `uv run scripts/lint.py`。(3) `uv` も使えない環境では `references/manual-checklist.md` で人手チェック。
 
 両実装は検出器と禁止語・翻訳調の語彙リスト（計13検出器）を共有するが、形態素解析器が異なる（kit 版=IPADIC、uv 版=Sudachi C）。そのため ngram / lexical_diversity / low_specificity 系の件数はわずかにずれることがある——どちらの数値も参考値として扱い、判断は§4の目視レビューに委ねる。
 

@@ -10,19 +10,21 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 
-const HERE = dirname(fileURLToPath(import.meta.url)) // .../grilling/render/lib
-const SKILL_DIR = join(HERE, '..', '..') // .../grilling
-// grilling skill dir のきょうだいに置かれた writeup-kit（core/skills/writeup-kit）。
-const SIBLING_CANDIDATE = join(SKILL_DIR, '..', 'writeup-kit')
-const HOME_CANDIDATE = join(homedir(), '.claude', 'skills', 'writeup-kit')
+const HERE = dirname(fileURLToPath(import.meta.url)) // .../tools/grilling-render/lib
+const RENDER_DIR = join(HERE, '..') // .../tools/grilling-render
+// grilling-render のきょうだいに置かれた writeup-kit（domains/dev/llm/tools/writeup-kit）。
+const SIBLING_CANDIDATE = join(RENDER_DIR, '..', 'writeup-kit')
+// dotfiles の外から呼ばれたとき（scratchpad への複製など）の固定位置。
+const DOTFILES_ROOT = process.env.DOTFILES_ROOT || join(homedir(), 'dotfiles')
+const DOTFILES_CANDIDATE = join(DOTFILES_ROOT, 'domains', 'dev', 'llm', 'tools', 'writeup-kit')
 
 function isValidKitDir(dir) {
   return Boolean(dir) && existsSync(join(dir, 'kit', 'writeup.css'))
 }
 
 /**
- * writeup-kit の在り処を解決する。解決順は「grilling のきょうだいディレクトリ
- * (sibling) → ~/.claude/skills/writeup-kit → null（無し）」。
+ * writeup-kit の在り処を解決する。解決順は「grilling-render のきょうだいディレクトリ
+ * (sibling) → $DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit → null（無し）」。
  *
  * @param {string|null} [override] テスト・呼び出し元からの明示指定。
  *   `null` は「無いものとして扱え」の明示指定（フォールバック経路のテスト用）。
@@ -32,7 +34,7 @@ export function kitDir(override) {
   if (override === null) return null
   if (typeof override === 'string') return isValidKitDir(override) ? override : null
   if (isValidKitDir(SIBLING_CANDIDATE)) return SIBLING_CANDIDATE
-  if (isValidKitDir(HOME_CANDIDATE)) return HOME_CANDIDATE
+  if (isValidKitDir(DOTFILES_CANDIDATE)) return DOTFILES_CANDIDATE
   return null
 }
 

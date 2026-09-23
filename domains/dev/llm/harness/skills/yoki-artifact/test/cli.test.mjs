@@ -316,7 +316,7 @@ describe("publish safety gates", () => {
 });
 
 describe("writeup-kit self-check", () => {
-  // A stub standing in for ~/.claude/skills/writeup-kit/bin/self-check.mjs:
+  // A stub standing in for $DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/bin/self-check.mjs:
   // same contract (argv[2] is the page, exit 0 means clean), no writeup-kit
   // installation required to run these tests.
   function stubSelfCheck(exitCode) {
@@ -411,7 +411,7 @@ describe("config and env precedence", () => {
     assert.equal(server.requests.at(-1).path, "/api/artifacts");
   });
 
-  // worker/scripts/setup.mjs used to write only these spellings, and a fresh
+  // tools/artifact-worker/scripts/setup.mjs used to write only these spellings, and a fresh
   // setup could not publish at all (hit live 2026-09). The loader now falls
   // back workerUrl -> baseUrl and serviceTokenClientId -> clientId.
   test("a config with only the setup spellings still works", async () => {
@@ -973,7 +973,7 @@ describe("doctor", () => {
     assert.match(result.stdout, /Cloudflare Access|Setup/);
   });
 
-  test("hints come from worker/SETUP.md when it is there, capped in length", () => {
+  test("hints come from tools/artifact-worker/SETUP.md when it is there, capped in length", () => {
     const file = path.join(home, "SETUP.md");
     fs.writeFileSync(file, Array.from({ length: HINT_LINE_LIMIT + 5 }, (_, i) => `line ${i + 1}`).join("\n"), "utf8");
     const hints = setupHints(file);

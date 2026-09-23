@@ -2,7 +2,7 @@
 
 grilling が各ラウンドで書き出す `.claude/.cache/grilling/<slug>/round-<n>.md` の仕様。
 
-**この形式のフェンス付き YAML ブロックが、ローカルの描画面（`../render/render.mjs`）が
+**この形式のフェンス付き YAML ブロックが、ローカルの描画面（`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/render.mjs`）が
 読む機械可読な正本である。** 散文（`### ❓ Q[n]` ブロック）は人間が読む面で、
 YAML ブロックは機械が読む面。**両者は常に同じ内容でなければならない。**
 片方だけを直さない。散文を書き換えたら同じラウンドの YAML も直す。
@@ -317,17 +317,17 @@ answer: A — 即時同期。ただし BroadcastChannel 非対応環境は B に
 
 ```sh
 # ローカルで回答まで集める（既定）。全問の提出まで戻らない
-node <skill>/render/render.mjs serve .claude/.cache/grilling/<slug>/round-<n>.md
+node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" serve .claude/.cache/grilling/<slug>/round-<n>.md
 
 # Artifact に出す fragment を書き出す
-node <skill>/render/render.mjs .claude/.cache/grilling/<slug>/round-<n>.md \
+node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" .claude/.cache/grilling/<slug>/round-<n>.md \
   --fragment -o "$SCRATCHPAD/round-<n>.html"
 ```
 
 スキーマ違反は終了コード 2 で、どのブロックのどのフィールドかを出す。
 
-ページの意匠は `render/lib/kit.mjs` が自動で決める。writeup-kit（きょうだい
-ディレクトリ、または `~/.claude/skills/writeup-kit`）があればそちらの
+ページの意匠は `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/lib/kit.mjs` が自動で決める。writeup-kit
+（`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`）があればそちらの
 chrome・コンポーネント・図の検証に乗り、無ければこれまでどおり grilling 自前の
 意匠にフォールバックする。この形式自体（frontmatter / 前提 / 設計ツリー / 問い /
-図）はどちらの意匠でも変わらない。詳細は [`../render/README.md`](../render/README.md)。
+図）はどちらの意匠でも変わらない。詳細は `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md`。

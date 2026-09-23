@@ -36,7 +36,6 @@ import { homedir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
 
 // Inlined from bin/lib/main.mjs (kept in sync manually): this script has no
 // dependency on writeup-kit's own libs by design (see file header), so the
@@ -62,7 +61,6 @@ function isMain(importMetaUrl) {
   }
   return argvReal === moduleReal
 }
-const SKILL_DIR = join(HERE, '..')
 
 const WRITEUP_TOML_TEMPLATE = `[private]
 words = []
@@ -292,13 +290,12 @@ export function writeRepoMarker(name, { cwd = process.cwd(), registryFile = regi
   return log
 }
 
-/** Same resolution order as SKILL.md: sibling `../writeup-kit/` next to
- * this skill's own directory, then `~/.claude/skills/writeup-kit/`. */
-function resolveKitDir() {
-  const sibling = join(SKILL_DIR, '..', 'writeup-kit')
-  if (existsSync(join(sibling, 'bin', 'build.mjs'))) return sibling
-  const shared = join(homedir(), '.claude', 'skills', 'writeup-kit')
-  if (existsSync(join(shared, 'bin', 'build.mjs'))) return shared
+/** Same resolution as SKILL.md: the kit lives outside the skill tree at
+ * `$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/` (never a path relative
+ * to this skill's own directory). */
+export const KIT_DIR = join(process.env.DOTFILES_ROOT || join(homedir(), 'dotfiles'), 'domains', 'dev', 'llm', 'tools', 'writeup-kit')
+export function resolveKitDir() {
+  if (existsSync(join(KIT_DIR, 'bin', 'build.mjs'))) return KIT_DIR
   return null
 }
 
@@ -381,7 +378,7 @@ export function initStore(storeDir) {
 
   const kitDir = resolveKitDir()
   if (!kitDir) {
-    log.push('init-store: writeup-kit not found (checked ../writeup-kit and ~/.claude/skills/writeup-kit) — skipped build')
+    log.push(`init-store: writeup-kit not found (checked ${KIT_DIR}) — skipped build`)
     return log
   }
 

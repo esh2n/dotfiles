@@ -332,7 +332,7 @@ exit 2 で止まり、手でやる手順をそのまま印字する。**「D1 �
 
 1. `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` を入れて同じコマンドを
    再実行する（D1 側は冪等なので安全）
-2. `worker/viewers.json` を直して `node scripts/setup.mjs`
+2. `artifact-worker/viewers.json` を直して `node scripts/setup.mjs`
 3. ダッシュボード: Zero Trust → Access → Access Groups →
    `yoki-artifact-viewers` に Emails の include ルールを足す／消す
 

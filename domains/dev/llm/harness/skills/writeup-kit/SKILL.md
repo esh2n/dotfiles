@@ -22,11 +22,13 @@ inside `vendor/` so the kit works on a machine with nothing else installed.
 
 ## How other skills resolve the kit
 
-A skill that produces a page looks for the kit in this order:
+The kit's executable parts live outside the skill tree, under
+`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/`. A skill that produces a
+page looks for the kit in this order:
 
-1. Sibling directory: `../writeup-kit/` (next to the calling skill's own directory)
-2. Shared install: `~/.claude/skills/writeup-kit/`
-3. **Kit-less fallback mode** — if neither exists, the calling skill still
+1. `KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"`
+   (never a path relative to the calling skill's own directory)
+2. **Kit-less fallback mode** — if that directory does not exist, the calling skill still
    produces a page, but with reduced fidelity: minimal CSS inlined by hand
    (no shared tokens), diagrams rendered as a plain table of their IR
    instead of SVG, and the lint gate reduced to its 6 surface-level
@@ -35,17 +37,23 @@ A skill that produces a page looks for the kit in this order:
 
 ## File map
 
-- `kit/` — `writeup.css` (tokens + components), `template.html` (page
-  skeleton with verbatim chrome), `samples.html` (one example of every
-  component)
+In this skill directory:
+
 - `references/` — `components.md` (full component table + HTML shapes),
   `kinds.md` (the 8 page types and their required sections), `page-contract.md`
   (store layout, meta contract, self-check table, Markdown mapping, publish)
+
+Under `$KIT` (`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/`):
+
+- `kit/` — `writeup.css` (tokens + components), `template.html` (page
+  skeleton with verbatim chrome), `samples.html` (one example of every
+  component)
 - `bin/` — `render-diagram`, `lint`, `self-check`, `build`, `serve`,
   `publish`, `to-md`, `rerender-figures` (bulk re-render of stored diagram
   figures after a kit/renderer upgrade)
 - `vendor/` — `elk` (graph layout), `lindera` wasm + dictionary (Japanese
   tokenizer for the lint gate)
+- `test/` — `node --test` from `$KIT`
 
 ## Quick Reference
 

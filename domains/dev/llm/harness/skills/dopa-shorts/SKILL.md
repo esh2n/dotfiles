@@ -10,12 +10,12 @@ metadata:
 長文を読めない人(通称ドパガキ)向けに、文章をテンポの速い縦動画mp4に変換する。
 パイプライン: ①台本JSON生成(Claude) → ②TTS音声生成 → ③Remotionレンダリング。
 
-- skill本体: この`SKILL.md`(台本生成の文法)と `video/`(レンダラー)
-- 台本スキーマの正: `video/src/schema.ts`(zod)
+- skill本体: この`SKILL.md`(台本生成の文法)。レンダラーは skill の外、`$DOTFILES_ROOT/domains/creative/dopa-shorts/video/`(以下 `<video>` = `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/creative/dopa-shorts/video`)
+- 台本スキーマの正: `<video>/src/schema.ts`(zod)
 
 ## Prerequisites
 
-- `video/` で `pnpm install && pnpm bootstrap` 済みであること(未実行ならまず実行)
+- `<video>` で `pnpm install && pnpm bootstrap` 済みであること(未実行ならまず実行)
   (`pnpm setup` と打たないこと — pnpm本体の予約コマンドでシェル設定を書き換えてしまう)
 - ボイスに `voicevox` を使う場合: VOICEVOXアプリが起動していること(`open -a VOICEVOX`)
 - `coefont`(ひろゆき等): 環境変数 `COEFONT_ACCESS_KEY` / `COEFONT_CLIENT_SECRET` / `COEFONT_VOICE_<NAME>`
@@ -27,7 +27,7 @@ metadata:
 2. 下の「ドパガキ文法」に従って台本JSONを作り、**必ず一度ユーザーに提示して承認を得る**
    (元記事に対する事実誤りはこの段階でしか直せない)
 3. 台本を`<slug>.json`として保存し、音声生成:
-   `cd video && pnpm voice <path/to/script.json>`
+   `cd "<video>" && pnpm voice <path/to/script.json>`
 4. ドラフト確認: `pnpm render <path/to/script.json> --draft` → 出来た`out/<slug>.draft.mp4`をユーザーに確認してもらう
 5. 本レンダリング: `pnpm render <path/to/script.json>` → `out/<slug>.mp4`
 
@@ -36,7 +36,7 @@ VOICEVOXなしで見た目だけ確認する場合は `pnpm render ... --no-voic
 
 ## 台本JSONフォーマット
 
-`examples/sample-script.json` が正しい実例。スキーマの正は `video/src/schema.ts`。
+`examples/sample-script.json` が正しい実例。スキーマの正は `<video>/src/schema.ts`。
 
 ```jsonc
 {
@@ -97,7 +97,7 @@ VOICEVOXなしで見た目だけ確認する場合は `pnpm render ... --no-voic
 | CoeFont認証エラー | 環境変数を確認。急ぐなら `meta.adapter: "voicevox"` に切替 |
 | manifestカット数不一致 | 台本変更後に `pnpm voice <script> --force` |
 | レンダリングが遅い | まず `--draft` で確認してから本番を回す |
-| BGMファイルがない | `video/public/bgm/` にmp3を置く(DOVA-SYNDROME等)か `bgm: null` |
+| BGMファイルがない | `<video>/public/bgm/` にmp3を置く(DOVA-SYNDROME等)か `bgm: null` |
 
 ## 権利メモ(個人・内輪視聴前提)
 

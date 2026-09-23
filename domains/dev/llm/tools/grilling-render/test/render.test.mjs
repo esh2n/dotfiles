@@ -407,7 +407,7 @@ test('kit モード: 検証用 fixture (round-kit.md) は 2 問・表・#### 小
 
 // --- kit.mjs: writeup-kit の在り処解決 ------------------------------------
 
-test('kit.mjs: override なしでは grilling のきょうだいの writeup-kit を自動判定する', async () => {
+test('kit.mjs: override なしでは grilling-render のきょうだい（tools/writeup-kit）の writeup-kit を自動判定する', async () => {
   const { kitDir } = await import('../lib/kit.mjs')
   const dir = kitDir()
   assert.ok(dir, 'このリポジトリでは writeup-kit がきょうだいに実在するはず')

@@ -276,7 +276,11 @@ describe('render-diagram.mjs: --list-types and --doc', () => {
 
 describe('references/figure-types.md exists and names every registered type', () => {
   test('the reference documents the contract exports and lists diagram + sequence as implemented', () => {
-    const path = join(ROOT, 'references', 'figure-types.md')
+    // The skill's references/ stay under harness/skills/writeup-kit ($DOTFILES_ROOT), not next to bin/.
+    const skillRefs = process.env.DOTFILES_ROOT
+      ? join(process.env.DOTFILES_ROOT, 'domains', 'dev', 'llm', 'harness', 'skills', 'writeup-kit', 'references')
+      : join(ROOT, '..', '..', 'harness', 'skills', 'writeup-kit', 'references')
+    const path = join(skillRefs, 'figure-types.md')
     assert.ok(existsSync(path))
     const text = readFileSync(path, 'utf8')
     for (const name of PLUGIN_EXPORTS) assert.ok(text.includes(`\`${name}\``), `figure-types.md does not mention export ${name}`)

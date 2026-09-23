@@ -2,8 +2,8 @@
 //
 // The Worker validates all of this again (it must: the CLI is not the only
 // possible caller). Checking here too just turns a round trip and a 400 into
-// an instant, clearer message — these rules mirror worker/src/store.mjs and
-// worker/src/api.mjs, which remain the authority.
+// an instant, clearer message — these rules mirror tools/artifact-worker/src/store.mjs and
+// tools/artifact-worker/src/api.mjs, which remain the authority.
 
 import { usageError } from "./errors.mjs";
 

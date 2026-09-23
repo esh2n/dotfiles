@@ -1,7 +1,7 @@
 // api-server.mjs — a local stand-in for the deployed Worker.
 //
 // It implements only the routes the CLI calls, with the same JSON shapes as
-// worker/src/api.mjs and worker/src/comments.mjs, and it enforces the Access
+// tools/artifact-worker/src/api.mjs and tools/artifact-worker/src/comments.mjs, and it enforces the Access
 // service-token headers so the tests prove the CLI actually sends them. It
 // listens on 127.0.0.1 with an ephemeral port: no network leaves the machine.
 
@@ -202,7 +202,7 @@ export async function startApiServer(options = {}) {
 }
 
 /**
- * A comment row shaped like worker/src/comments.mjs serializeComment().
+ * A comment row shaped like tools/artifact-worker/src/comments.mjs serializeComment().
  *
  * The owner view, which is what the CLI's service token gets: both the address
  * and the pseudonym. A non-owner would receive `author_display` alone.

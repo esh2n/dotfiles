@@ -7,7 +7,7 @@
 // 1Password read), so a plaintext service-token secret never lands on disk.
 // Nothing in this module logs or returns the secret in a diagnostic string.
 //
-// `accessGroupId` and `accountId` are written by worker/scripts/setup.mjs and
+// `accessGroupId` and `accountId` are written by tools/artifact-worker/scripts/setup.mjs and
 // read back here so `share`/`unshare` can update the Cloudflare Access group
 // as well as the D1 viewer list. They are optional: a config written before
 // that existed still loads, and the commands that need them say so.
@@ -106,7 +106,7 @@ export function loadConfig(env = process.env) {
 
   const envUrl = env.YOKI_ARTIFACT_URL?.trim();
   const envClientId = env.YOKI_ARTIFACT_CLIENT_ID?.trim();
-  // worker/scripts/setup.mjs historically wrote only `workerUrl` and
+  // tools/artifact-worker/scripts/setup.mjs historically wrote only `workerUrl` and
   // `serviceTokenClientId`; it now writes both spellings, and the loader
   // accepts either so a config written by any setup version still publishes.
   const fileUrl =
@@ -115,7 +115,7 @@ export function loadConfig(env = process.env) {
     stringField(fromFile.clientId, "clientId", file) ??
     stringField(fromFile.serviceTokenClientId, "serviceTokenClientId", file);
   const secretCommand = stringField(fromFile.secretCommand, "secretCommand", file);
-  // Written by worker/scripts/setup.mjs. `share`/`unshare` need it to keep the
+  // Written by tools/artifact-worker/scripts/setup.mjs. `share`/`unshare` need it to keep the
   // Cloudflare Access group in step with the D1 viewer list; every other
   // command ignores it, so it stays optional and is never required here.
   const envGroupId = env.YOKI_ARTIFACT_ACCESS_GROUP_ID?.trim();

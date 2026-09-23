@@ -1,5 +1,5 @@
 // 構造化されたラウンドを 1 ページの HTML にする。
-// writeup-kit がサイド (../../writeup-kit または ~/.claude/skills/writeup-kit)
+// writeup-kit がきょうだい (../../writeup-kit) か $DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit
 // にあればページ意匠・図の検証を kit に委譲し、無ければ grilling 自前の
 // template/style.css・lib/diagram.mjs にフォールバックする（lib/kit.mjs）。
 import { readFile } from 'node:fs/promises'

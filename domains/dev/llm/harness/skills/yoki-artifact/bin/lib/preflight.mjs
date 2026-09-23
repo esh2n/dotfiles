@@ -20,7 +20,8 @@ export const SELF_CHECK_TIMEOUT_MS = 120_000;
 
 export function selfCheckPath(env = process.env) {
   if (env.YOKI_ARTIFACT_SELF_CHECK?.trim()) return env.YOKI_ARTIFACT_SELF_CHECK.trim();
-  return path.join(env.HOME ?? "", ".claude", "skills", "writeup-kit", "bin", "self-check.mjs");
+  const root = env.DOTFILES_ROOT?.trim() || path.join(env.HOME ?? "", "dotfiles");
+  return path.join(root, "domains", "dev", "llm", "tools", "writeup-kit", "bin", "self-check.mjs");
 }
 
 export function looksLikeWriteupKit(html) {

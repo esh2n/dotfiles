@@ -54,7 +54,7 @@ export function mergeInclude(include, { add = [], remove = [] } = {}) {
  * Everything the Access update needs, or the list of what is missing.
  * The token and account come from the environment (they are operator
  * credentials, never stored); the group id comes from config.json, written by
- * worker/scripts/setup.mjs.
+ * tools/artifact-worker/scripts/setup.mjs.
  *
  * @returns {{ok: true, apiToken, accountId, groupId}
  *          | {ok: false, missing: string[], accountId: string|null}}
@@ -205,8 +205,8 @@ export function manualAccessGroupSteps({
     `       yoki-artifact ${command} ${channel} ${emails.map((email) => `--to ${email}`).join(" ")}`,
     `     (the D1 write is idempotent, so re-running is safe)`,
     "",
-    `  b. edit worker/viewers.json (${command === "unshare" ? "remove" : "add"} ${list}) and run:`,
-    "       cd worker && node scripts/setup.mjs",
+    `  b. edit $DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/viewers.json (${command === "unshare" ? "remove" : "add"} ${list}) and run:`,
+    "       cd $DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker && node scripts/setup.mjs",
     `     setup.mjs rewrites the group from that file and records accessGroupId`,
     `     in ${configFile}.`,
     "",
