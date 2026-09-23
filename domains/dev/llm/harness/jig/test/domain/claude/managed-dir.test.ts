@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { describePathState, reconcileManagedDir } from "../../../src/domain/claude/managed-dir";
+import {
+  describePathState,
+  describeStaleReason,
+  reconcileManagedDir,
+} from "../../../src/domain/claude/managed-dir";
 
 const DIR = "/home/u/.claude/skills";
 const SOURCE = "/repo/llm/harness/skills";
@@ -49,7 +53,73 @@ describe("reconcileManagedDir", () => {
       name: "retired",
       path: `${DIR}/retired`,
       target: `${SOURCE}/retired`,
+      reason: "unplanned",
     });
+  });
+
+  test("a link under a former source tree is stale only when the caller names that tree", () => {
+    const entries = [
+      { name: "old", state: { kind: "symlink" as const, target: "/old/core/skills/old" } },
+    ];
+    const narrow = reconcileManagedDir({ dir: DIR, sourceDir: SOURCE, planned: [], entries });
+    expect(narrow.map((a) => a.kind)).toEqual(["foreign"]);
+
+    const widened = reconcileManagedDir({
+      dir: DIR,
+      sourceDir: SOURCE,
+      planned: [],
+      formerSourceDirs: ["/old/core", "/old/packs"],
+      entries,
+    });
+    expect(widened[0]).toEqual({
+      kind: "stale",
+      name: "old",
+      path: `${DIR}/old`,
+      target: "/old/core/skills/old",
+      reason: "former-tree",
+    });
+  });
+
+  test("a dangling link is stale only when the caller followed it and said so", () => {
+    const target = "/gone/skills/x";
+    const unprobed = reconcileManagedDir({
+      dir: DIR,
+      sourceDir: SOURCE,
+      planned: [],
+      entries: [{ name: "x", state: { kind: "symlink", target } }],
+    });
+    expect(unprobed.map((a) => a.kind)).toEqual(["foreign"]);
+
+    const probed = reconcileManagedDir({
+      dir: DIR,
+      sourceDir: SOURCE,
+      planned: [],
+      entries: [
+        { name: "x", state: { kind: "symlink", target }, dangling: true },
+        { name: "y", state: { kind: "symlink", target: "/elsewhere/y" }, dangling: false },
+      ],
+    });
+    expect(probed.map((a) => `${a.name}:${a.kind}`)).toEqual(["x:stale", "y:foreign"]);
+    expect(probed[0]).toMatchObject({ reason: "dangling" });
+  });
+
+  test("targetOf points a planned link somewhere under the source other than <sourceDir>/<name>", () => {
+    const actions = reconcileManagedDir({
+      dir: DIR,
+      sourceDir: SOURCE,
+      planned: ["grilling"],
+      targetOf: (name) => `${SOURCE}/${name}/codex`,
+      entries: [
+        { name: "grilling", state: { kind: "symlink", target: `${SOURCE}/grilling/codex` } },
+      ],
+    });
+    expect(actions).toEqual([
+      {
+        kind: "link",
+        name: "grilling",
+        plan: { path: `${DIR}/grilling`, target: `${SOURCE}/grilling/codex`, state: "ok" },
+      },
+    ]);
   });
 
   test("anything not jig's — Claude Code's synced tree and marker, a link elsewhere — is left alone and named", () => {
@@ -98,6 +168,14 @@ describe("reconcileManagedDir", () => {
       "backup-then-create",
       "backup-then-create",
     ]);
+  });
+});
+
+describe("describeStaleReason", () => {
+  test("names each reason in the dry-run's words", () => {
+    expect(describeStaleReason("unplanned")).toBe("stale jig link");
+    expect(describeStaleReason("former-tree")).toBe("link into the retired tree");
+    expect(describeStaleReason("dangling")).toBe("dangling link");
   });
 });
 

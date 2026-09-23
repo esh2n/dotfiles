@@ -182,11 +182,20 @@ export function planTrust(existing: string | undefined, tables: readonly string[
 }
 
 function removeJigBlock(text: string): string {
-  const begin = text.indexOf(JIG_BLOCK_BEGIN);
+  return removeMarkedBlock(text, JIG_BLOCK_BEGIN, JIG_BLOCK_END);
+}
+
+/**
+ * The text without one marked block (markers included). Shared with the MCP
+ * block `jig apply --target codex` keeps in the same file (`./config.ts`):
+ * the two blocks have distinct markers and each command removes only its own.
+ */
+export function removeMarkedBlock(text: string, beginMarker: string, endMarker: string): string {
+  const begin = text.indexOf(beginMarker);
   if (begin === -1) return text;
-  const endAt = text.indexOf(JIG_BLOCK_END, begin);
-  if (endAt === -1) throw new Error(`config.toml: "${JIG_BLOCK_BEGIN}" without "${JIG_BLOCK_END}"`);
-  const end = endAt + JIG_BLOCK_END.length;
+  const endAt = text.indexOf(endMarker, begin);
+  if (endAt === -1) throw new Error(`config.toml: "${beginMarker}" without "${endMarker}"`);
+  const end = endAt + endMarker.length;
   return text.slice(0, begin) + text.slice(end).replace(/^\n/, "");
 }
 

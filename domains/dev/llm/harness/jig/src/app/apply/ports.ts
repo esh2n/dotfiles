@@ -51,3 +51,10 @@ export interface ClaudeApplyPorts extends ApplyPorts {
   /** Creates parents as needed; an existing directory is fine. */
   mkdir(path: string): Promise<void>;
 }
+
+/**
+ * The Codex target delivers the same kinds of things (generated files,
+ * directories of links) and needs the same verbs. One interface, two names,
+ * so a use-case says which harness it is about.
+ */
+export type CodexApplyPorts = ClaudeApplyPorts;

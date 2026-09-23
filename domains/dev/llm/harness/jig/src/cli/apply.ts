@@ -17,11 +17,16 @@
  *   `rules/` directories of per-entry symlinks into the harness
  *   (`app/apply/apply-claude.ts`). Milestones 1 and 2 of the generator that
  *   retires `yoki-switch`.
+ * - **codex** — `~/.agents/skills` and `~/.codex/skills` as managed
+ *   directories of links, the same generated AGENTS.md into `~/.codex`, one
+ *   generated `~/.codex/agents/<name>.toml` per agent, and jig's MCP block
+ *   in `~/.codex/config.toml` (`app/apply/apply-codex.ts`). Milestone 3a.
  *
- * `--target all` means the first group only. The claude target writes into
- * `$HOME` rather than into the checkout, so it has to be named: a verb that
- * reaches a user's live harness configuration by default is one keystroke
- * from a surprise, and nothing about the word "all" says which files it means.
+ * `--target all` means the first group only. The claude and codex targets
+ * write into `$HOME` rather than into the checkout, so each has to be named:
+ * a verb that reaches a user's live harness configuration by default is one
+ * keystroke from a surprise, and nothing about the word "all" says which
+ * files it means.
  */
 
 import {
@@ -32,6 +37,14 @@ import {
   applyClaude,
 } from "../app/apply/apply-claude";
 import {
+  type AgentFileReport,
+  type CodexApplyOptions,
+  type CodexApplyPaths,
+  type CodexApplyReport,
+  applyCodex,
+  yokiCommandLeftovers,
+} from "../app/apply/apply-codex";
+import {
   ALL_APPLY_TARGETS,
   type ApplyTarget,
   type ApplyTargetPaths,
@@ -41,8 +54,10 @@ import {
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
 import { AGENTS_MD_BYTE_LIMIT } from "../domain/claude/agents-md";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
+import { describeStaleReason } from "../domain/claude/managed-dir";
 import { DEFAULT_PERMITS, defaultPermitPolicyFragment } from "../domain/claude/permits";
 import { KNOWN_MACOS_EXCLUSION_CANDIDATES } from "../domain/claude/sandbox";
+import { NO_CODEX_PORT_REASON } from "../domain/codex/skills";
 
 export interface ApplyCliResult {
   readonly stdout: string;
@@ -52,6 +67,7 @@ export interface ApplyCliResult {
 interface ParsedArgs {
   readonly targets: readonly ApplyTarget[];
   readonly claude: boolean;
+  readonly codex: boolean;
   readonly write: boolean;
 }
 
@@ -75,16 +91,19 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
 
   const targetName = targetArg ?? "all";
   if (targetName === "claude") {
-    return { targets: [], claude: true, write };
+    return { targets: [], claude: true, codex: false, write };
+  }
+  if (targetName === "codex") {
+    return { targets: [], claude: false, codex: true, write };
   }
   if (targetName === "all") {
-    return { targets: ALL_APPLY_TARGETS, claude: false, write };
+    return { targets: ALL_APPLY_TARGETS, claude: false, codex: false, write };
   }
   if ((ALL_APPLY_TARGETS as readonly string[]).includes(targetName)) {
-    return { targets: [targetName as ApplyTarget], claude: false, write };
+    return { targets: [targetName as ApplyTarget], claude: false, codex: false, write };
   }
   return {
-    error: `unknown --target ${JSON.stringify(targetName)} (expected claude, pi, dsh, litellm, or all)`,
+    error: `unknown --target ${JSON.stringify(targetName)} (expected claude, codex, pi, dsh, litellm, or all)`,
   };
 }
 
@@ -287,6 +306,13 @@ interface ManagedDirWording {
   readonly how: string;
   /** Printed after the entries when any is foreign: who else writes here, and that jig leaves it. */
   readonly foreignNote?: readonly string[];
+  /**
+   * An exclusion reason that is the expected case rather than news — for
+   * `~/.codex/skills`, every skill without a port. Entries excluded for it
+   * are counted on one line instead of listed, so the list keeps the ones
+   * worth reading.
+   */
+  readonly summarizeExcluded?: string;
 }
 
 /**
@@ -315,7 +341,9 @@ function managedDirLines(
         lines.push(linkLine(`  ${entry.name}`, entry.plan, width));
         break;
       case "stale":
-        lines.push(`    ${entry.name.padEnd(width - 2)}remove (stale jig link → ${entry.target})`);
+        lines.push(
+          `    ${entry.name.padEnd(width - 2)}remove (${describeStaleReason(entry.reason)} → ${entry.target})`,
+        );
         break;
       case "foreign":
         lines.push(`    ${entry.name.padEnd(width - 2)}left alone (not jig's: ${entry.what})`);
@@ -325,9 +353,19 @@ function managedDirLines(
   if (wording.foreignNote !== undefined && dir.entries.some((entry) => entry.kind === "foreign")) {
     lines.push(...wording.foreignNote.map((line) => `  ${line}`));
   }
+  const listed = dir.selection.excluded.filter(
+    (entry) => entry.reason !== wording.summarizeExcluded,
+  );
+  const summarized = dir.selection.excluded.length - listed.length;
+  const excludedWidth = Math.max(PAD, ...listed.map((entry) => entry.name.length + 3));
   lines.push(
     `  not linked (${dir.selection.excluded.length}):`,
-    ...dir.selection.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
+    ...listed.map((entry) => `    ${entry.name.padEnd(excludedWidth - 2)}${entry.reason}`),
+    ...(summarized > 0
+      ? [
+          `    (${summarized} ${summarized === 1 ? "entry" : "entries"}) ${wording.summarizeExcluded}`,
+        ]
+      : []),
   );
   return lines;
 }
@@ -356,6 +394,10 @@ function basename(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
+function dirOf(path: string): string {
+  return path.slice(0, Math.max(path.lastIndexOf("/"), 0));
+}
+
 /** The sandbox block's provenance and its cost, both stated. */
 function sandboxLines(report: ClaudeApplyReport): readonly string[] {
   const excluded = (report.composition.settings.sandbox as { excludedCommands?: unknown })
@@ -373,10 +415,177 @@ function sandboxLines(report: ClaudeApplyReport): readonly string[] {
   ];
 }
 
+/**
+ * The Codex target's dry-run, in the Claude target's order: the two managed
+ * skill directories, the generated AGENTS.md (as a diff — its text is the
+ * Claude target's, printed there), the generated agent files with the model
+ * question answered per tier, config.toml's block with its conflicts and
+ * yoki's leftovers, and the one file that is `jig codex register`'s.
+ */
+function formatCodex(report: CodexApplyReport, dest: string): string {
+  const lines: string[] = [
+    "== codex ==",
+    `outcome: ${report.outcome}`,
+    `dest: ${dest}`,
+    ...(report.message === undefined ? [] : [`message: ${report.message}`]),
+    "",
+    ...managedDirLines("skills (cross-harness)", report.agentsSkillsDir, {
+      noun: "skill director",
+      plural: "ies",
+      singular: "y",
+      how: "each holds a SKILL.md; Codex, pi and omp read this directory",
+    }),
+    "",
+    ...codexSkillsLines(report),
+    "",
+    ...codexAgentsMdLines(report),
+    "",
+    ...agentFileLines(report),
+    "",
+    ...configTomlLines(report),
+    "",
+    `hooks.json: not touched  ${report.hooksJson}  (jig codex register's; run that to change the guard hook)`,
+  ];
+  return lines.join("\n");
+}
+
+/** `~/.codex/skills`: the ports, then yoki's `cmd-*` directories under their own heading. */
+function codexSkillsLines(report: CodexApplyReport): readonly string[] {
+  const leftovers = yokiCommandLeftovers(report.codexSkillsDir);
+  const lines = [
+    ...managedDirLines("codex skills", report.codexSkillsDir, {
+      noun: "Codex port",
+      plural: "s",
+      singular: "",
+      how: "skills/<name>/codex/SKILL.md; the link points at the port",
+      foreignNote: [
+        "Codex keeps its bundled skills in `.system/` here; that is not jig's and stays.",
+      ],
+      summarizeExcluded: NO_CODEX_PORT_REASON,
+    }),
+  ];
+  if (leftovers.length > 0) {
+    lines.push(
+      `  yoki leftovers (${leftovers.length}) — real directories from yoki's command→skill conversion, redundant now that`,
+      "  commands are skills delivered through ~/.agents/skills; jig removes links, never directories (milestone 4):",
+      ...leftovers.map((leftover) => `    ${leftover.name}`),
+    );
+  }
+  const ported = report.codexSkillsDir.selection.linked.length;
+  if (ported > 0) {
+    lines.push(
+      "  Note: a ported skill is listed twice in Codex (here and in ~/.agents/skills); Codex does not merge",
+      "  same-named skills (build-skills doc). Whether the generic entry should yield is a ruling, not a flag.",
+    );
+  }
+  return lines;
+}
+
+/** The generated file's outcome and size, then the diff against what stands there; its text is the Claude target's. */
+function codexAgentsMdLines(report: CodexApplyReport): readonly string[] {
+  const { agentsMd } = report;
+  return [
+    `AGENTS.md: ${agentsMd.outcome}  ${agentsMd.path}  (${agentsMd.bytes} bytes${agentsMd.overLimit ? ` — WARNING: over ${AGENTS_MD_BYTE_LIMIT} bytes; Codex truncates AGENTS.md there` : ""})`,
+    "  the same generated content as ~/.claude/AGENTS.md — one source, two destinations",
+    ...(agentsMd.backupPath === undefined
+      ? []
+      : [
+          `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
+        ]),
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    ...(agentsMd.diff === ""
+      ? ["  (no differences)"]
+      : ["--- diff (current vs generated) ---", agentsMd.diff]),
+  ];
+}
+
+function describeModel(file: AgentFileReport): string {
+  switch (file.model.kind) {
+    case "mapped":
+      return `model: ${file.model.model} (${file.model.tier})`;
+    case "inherit":
+      return "model: (none: inherits)";
+    case "unmapped":
+      return `model: (none: no Codex id for "${file.model.tier}")`;
+  }
+}
+
+/** One line per generated agent file, then what stands in the directory that no source produces. */
+function agentFileLines(report: CodexApplyReport): readonly string[] {
+  const { agents } = report;
+  const width = Math.max(PAD, ...agents.files.map((file) => file.name.length + 3));
+  const lines = [
+    `agents (generated files): ${agents.path}`,
+    `  ${agents.files.length} agent definition${agents.files.length === 1 ? "" : "s"} → <name>.toml (name, description, developer_instructions; tools folded into the instructions):`,
+  ];
+  if (agents.files.length === 0) lines.push("    (none)");
+  for (const file of agents.files) {
+    lines.push(
+      `    ${file.name.padEnd(width - 2)}${file.outcome.padEnd(10)}${describeModel(file)}${file.backupPath === undefined ? "" : `  (not jig's yet → kept as ${basename(file.backupPath)})`}`,
+    );
+  }
+  if (agents.unmappedTiers.length > 0) {
+    lines.push(
+      `  model tiers with no Codex id (${agents.unmappedTiers.map((t) => `${t.tier}: ${t.count}`).join(", ")}): \`model\` is left out and Codex`,
+      "  applies its default. jig has no source for Codex model ids; a mapping is a ruling, never a guess.",
+    );
+  }
+  if (agents.excluded.length > 0) {
+    lines.push(
+      `  not generated (${agents.excluded.length}):`,
+      ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
+    );
+  }
+  if (agents.foreign.length > 0) {
+    lines.push(
+      `  not jig's (${agents.foreign.length}), left alone:`,
+      ...agents.foreign.map((entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`),
+    );
+  }
+  return lines;
+}
+
+/** jig's MCP block: the servers, the conflicts that stop a write, yoki's leftovers, and the diff. */
+function configTomlLines(report: CodexApplyReport): readonly string[] {
+  const { configToml } = report;
+  const lines = [
+    `config.toml: ${configToml.outcome}  ${configToml.path}`,
+    `  mcp servers in jig's block (${configToml.servers.length}): ${configToml.servers.length === 0 ? "(none)" : configToml.servers.join(", ")}`,
+    "  every other table in the file is carried through byte for byte.",
+  ];
+  if (configToml.declaredOutside.length > 0) {
+    lines.push(
+      `  CONFLICT: ${configToml.declaredOutside.length} of them already declared outside jig's block — a duplicate table stops Codex`,
+      "  from loading its config, so nothing is written until these are removed by hand (a one-time cleanup):",
+      ...configToml.declaredOutside.map(
+        (table) => `    [mcp_servers.${table.name}]  line ${table.line}`,
+      ),
+    );
+  }
+  if (configToml.yokiLeftovers.length > 0) {
+    lines.push(
+      `  yoki leftovers (${configToml.yokiLeftovers.length}), left alone until milestone 4:`,
+      ...configToml.yokiLeftovers.map((leftover) => `    ${leftover}`),
+    );
+  }
+  lines.push(
+    ...(configToml.diff === ""
+      ? ["  (no differences)"]
+      : ["--- diff (current vs generated) ---", configToml.diff]),
+  );
+  return lines;
+}
+
 export interface ClaudeCliContext {
   readonly ports: ClaudeApplyPorts;
   readonly paths: ClaudeApplyPaths;
   readonly hookPaths: ClaudeHookPaths;
+}
+
+export interface CodexCliContext {
+  readonly ports: ClaudeApplyPorts;
+  readonly paths: CodexApplyPaths;
+  readonly options: CodexApplyOptions;
 }
 
 export async function applyCli(
@@ -384,10 +593,25 @@ export async function applyCli(
   ports: ApplyPorts,
   paths: { readonly tiersJsonPath: string; readonly destPaths: ApplyTargetPaths },
   claude?: ClaudeCliContext,
+  codex?: CodexCliContext,
 ): Promise<ApplyCliResult> {
   const parsed = parseArgs(args);
   if ("error" in parsed) {
     return { stdout: `jig apply: ${parsed.error}\n`, code: 2 };
+  }
+
+  if (parsed.codex) {
+    if (codex === undefined) {
+      return { stdout: "jig apply: --target codex is not wired in this context\n", code: 2 };
+    }
+    const report = await applyCodex(
+      { paths: codex.paths, options: codex.options, write: parsed.write },
+      codex.ports,
+    );
+    return {
+      stdout: `${formatCodex(report, dirOf(codex.paths.configToml))}\n`,
+      code: report.outcome === "conflict" ? 1 : 0,
+    };
   }
 
   if (parsed.claude) {

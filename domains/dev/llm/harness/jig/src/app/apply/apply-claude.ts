@@ -38,33 +38,14 @@
  * to overwrite. One conflict anywhere — either file, or a `commands`
  * directory holding real files — stops the whole write: the parts are one
  * delivery, and a half-applied one is harder to reason about than none.
+ *
+ * The delivery verbs shared with the Codex target (the generated AGENTS.md,
+ * single links, managed directories) live in `./delivery.ts`.
  */
 
 import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
-import {
-  AGENTS_MD_BYTE_LIMIT,
-  type RuleSource,
-  type SkippedDecision,
-  agentsMdBytes,
-  decisionLines,
-  isCommonRule,
-  renderAgentsMd,
-} from "../../domain/claude/agents-md";
 import { type CommandsAction, classifyCommands } from "../../domain/claude/commands";
 import { type ClaudeHookPaths, buildClaudeHooks } from "../../domain/claude/hooks";
-import {
-  type LinkPlan,
-  type PathState,
-  backupPath,
-  planDirectory,
-  planLink,
-} from "../../domain/claude/links";
-import {
-  type ManagedDirEntry,
-  type ManagedEntryAction,
-  type ManagedSelection,
-  reconcileManagedDir,
-} from "../../domain/claude/managed-dir";
 import { DEFAULT_PERMITS } from "../../domain/claude/permits";
 import { selectRuleDirs } from "../../domain/claude/rules-dir";
 import {
@@ -78,7 +59,7 @@ import {
   composeClaudeSettings,
   renderClaudeSettings,
 } from "../../domain/claude/settings";
-import { type SkillCandidate, selectSkillDirs } from "../../domain/claude/skills-dir";
+import { selectSkillDirs } from "../../domain/claude/skills-dir";
 import type { JsonObject } from "../../domain/compose/merge";
 import { applyTemplate } from "../../domain/compose/template";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -90,7 +71,28 @@ import {
 } from "../../domain/policy/to-claude-permissions";
 import { unifiedDiff } from "../../domain/tiers/diff";
 import { type PlanAction, planApply } from "../../domain/tiers/plan";
+import {
+  type AgentsMdReport,
+  type LinkReport,
+  type ManagedDirReport,
+  type ManagedEntryReport,
+  applyAgentsMd,
+  applyLink,
+  applyManagedDir,
+  buildAgentsMd,
+  dirOf,
+  inspectEntries,
+  listEntries,
+  listSkillCandidates,
+  managedDirChanges,
+  planAgentsMd,
+  planManagedDir,
+  planSingleLink,
+  readJson,
+} from "./delivery";
 import type { ClaudeApplyPorts } from "./ports";
+
+export type { AgentsMdReport, LinkReport, ManagedDirReport, ManagedEntryReport };
 
 export interface ClaudeApplyPaths {
   /** `llm/harness/`, absolute. `skills/`, `agents/`, `rules/` and `rules/common/` are under it. */
@@ -123,45 +125,6 @@ export interface ClaudeApplyPaths {
 
 export type ClaudeOutcome = "write" | "noop" | "conflict";
 
-export interface AgentsMdReport {
-  readonly path: string;
-  readonly content: string;
-  readonly bytes: number;
-  /** Past `AGENTS_MD_BYTE_LIMIT`: Codex truncates there. A reported line, not an error. */
-  readonly overLimit: boolean;
-  readonly outcome: PlanAction;
-  /** `rules/common/*.md` rendered in, in order. */
-  readonly commonFiles: readonly string[];
-  /** Decision notes the renderer skipped, with why. */
-  readonly skipped: readonly SkippedDecision[];
-  /**
-   * Set when a file jig never wrote stands at the path: on `--write` it is
-   * renamed to this before the first generated file lands, so the hand-written
-   * AGENTS.md of the yoki-switch days is kept, not overwritten.
-   */
-  readonly backupPath?: string;
-}
-
-export interface LinkReport extends LinkPlan {
-  /** For `backup-then-create`: where the existing file or directory goes. */
-  readonly backupPath?: string;
-}
-
-/** `ManagedEntryAction` with the backup name filled in for a planned link. */
-export type ManagedEntryReport =
-  | Exclude<ManagedEntryAction, { readonly kind: "link" }>
-  | { readonly kind: "link"; readonly name: string; readonly plan: LinkReport };
-
-/** One of the three managed directories: `skills/`, `agents/`, `rules/`. */
-export interface ManagedDirReport {
-  readonly path: string;
-  /** The directory itself. */
-  readonly plan: LinkReport;
-  readonly selection: ManagedSelection;
-  /** Per entry, planned links first. Empty when the directory is not a real directory yet. */
-  readonly entries: readonly ManagedEntryReport[];
-}
-
 export interface CommandsReport {
   readonly path: string;
   readonly action: CommandsAction;
@@ -190,15 +153,6 @@ export interface ClaudeApplyReport {
   /** `undefined` when `policy/sandbox.json` does not exist yet. */
   readonly sandboxSourcePath: string | undefined;
   readonly message?: string;
-}
-
-async function readJson(
-  ports: ClaudeApplyPorts,
-  path: string,
-): Promise<{ readonly text: string; readonly json: unknown } | undefined> {
-  const text = await ports.readFile(path);
-  if (text === undefined) return undefined;
-  return { text, json: JSON.parse(text) as unknown };
 }
 
 /**
@@ -240,92 +194,11 @@ async function readSandboxSource(
   return { source: parseSandboxSource(read.json, path), found: true };
 }
 
-/** Every `*.md` in a directory, in name order, with its text. Files that vanish between list and read are skipped. */
-async function readMarkdownDir(
-  ports: ClaudeApplyPorts,
-  dir: string,
-  keep: (name: string) => boolean,
-): Promise<readonly RuleSource[]> {
-  const names = [...(await ports.listDir(dir))].filter(keep);
-  names.sort();
-  const sources: RuleSource[] = [];
-  for (const file of names) {
-    const text = await ports.readFile(`${dir}/${file}`);
-    if (text !== undefined) sources.push({ file, text });
-  }
-  return sources;
-}
-
-async function buildAgentsMd(
-  ports: ClaudeApplyPorts,
-  paths: ClaudeApplyPaths,
-): Promise<{
-  readonly content: string;
-  readonly commonFiles: readonly string[];
-  readonly skipped: readonly SkippedDecision[];
-}> {
-  const common = await readMarkdownDir(ports, `${paths.harnessRoot}/rules/common`, isCommonRule);
-  const notes = await readMarkdownDir(ports, paths.decisions, (name) => name.endsWith(".md"));
-  const decisions = decisionLines(notes);
-  return {
-    content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common, decisions }),
-    commonFiles: common.map((source) => source.file),
-    skipped: decisions.skipped,
-  };
-}
-
-/** The entries of a directory with what each is, by `lstat`. */
-async function listEntries(
-  ports: ClaudeApplyPorts,
-  dir: string,
-): Promise<readonly ManagedDirEntry[]> {
-  const entries: ManagedDirEntry[] = [];
-  for (const name of await ports.listDir(dir)) {
-    entries.push({ name, state: await ports.inspect(`${dir}/${name}`) });
-  }
-  return entries;
-}
-
-/** The entries of a destination directory; `[]` for anything that is not a real directory (yet). */
-async function inspectEntries(
-  ports: ClaudeApplyPorts,
-  dir: string,
-  state: PathState,
-): Promise<readonly ManagedDirEntry[]> {
-  return state.kind === "dir" ? listEntries(ports, dir) : [];
-}
-
 /** Subdirectories of `<harnessRoot>/rules/` — a README there is a file and never a candidate. */
 async function listRuleDirs(ports: ClaudeApplyPorts, harnessRules: string): Promise<string[]> {
   return (await listEntries(ports, harnessRules))
     .filter((entry) => entry.state.kind === "dir")
     .map((entry) => entry.name);
-}
-
-/**
- * Every entry of `<harnessRoot>/skills/`, with whether it holds a `SKILL.md`.
- * Only a directory (or a link, which may lead to one) is probed; nothing lies
- * under a regular file such as the tree's `README.md`.
- */
-async function listSkillCandidates(
-  ports: ClaudeApplyPorts,
-  harnessSkills: string,
-): Promise<readonly SkillCandidate[]> {
-  const candidates: SkillCandidate[] = [];
-  for (const entry of await listEntries(ports, harnessSkills)) {
-    const mayHoldSkill = entry.state.kind === "dir" || entry.state.kind === "symlink";
-    const skillMd = mayHoldSkill
-      ? await ports.inspect(`${harnessSkills}/${entry.name}/SKILL.md`)
-      : { kind: "missing" as const };
-    candidates.push({ ...entry, hasSkillMd: skillMd.kind === "file" });
-  }
-  return candidates;
-}
-
-function withBackup(plan: LinkPlan, now: Date): LinkReport {
-  return plan.state === "backup-then-create"
-    ? { ...plan, backupPath: backupPath(plan.path, now) }
-    : plan;
 }
 
 async function planLinks(
@@ -335,46 +208,7 @@ async function planLinks(
 ): Promise<readonly LinkReport[]> {
   // CLAUDE.md's target is relative on purpose: the two files sit side by side
   // and a moved `~/.claude` keeps the pair intact.
-  const wanted: readonly { readonly path: string; readonly target: string }[] = [
-    { path: paths.claudeMd, target: "AGENTS.md" },
-  ];
-  const links: LinkReport[] = [];
-  for (const { path, target } of wanted) {
-    links.push(withBackup(planLink(path, target, await ports.inspect(path)), now));
-  }
-  return links;
-}
-
-/**
- * One managed directory: the directory itself, then its entries reconciled
- * against the selection. Entries that are neither planned nor stale are
- * reported as foreign and never touched — for `skills/` that is Claude Code's
- * own `synced/` tree and its `.bucket-<id>` marker, the expected case.
- */
-async function planManagedDir(
-  ports: ClaudeApplyPorts,
-  input: {
-    readonly dir: string;
-    readonly sourceDir: string;
-    readonly selection: ManagedSelection;
-    readonly now: Date;
-  },
-): Promise<ManagedDirReport> {
-  const state = await ports.inspect(input.dir);
-  const entries: ManagedEntryReport[] = reconcileManagedDir({
-    dir: input.dir,
-    sourceDir: input.sourceDir,
-    planned: input.selection.linked,
-    entries: await inspectEntries(ports, input.dir, state),
-  }).map((action) =>
-    action.kind === "link" ? { ...action, plan: withBackup(action.plan, input.now) } : action,
-  );
-  return {
-    path: input.dir,
-    plan: withBackup(planDirectory(input.dir, state), input.now),
-    selection: input.selection,
-    entries,
-  };
+  return [await planSingleLink(ports, paths.claudeMd, "AGENTS.md", now)];
 }
 
 async function planSkillsDir(
@@ -411,47 +245,6 @@ async function planRulesDir(
 async function planCommands(ports: ClaudeApplyPorts, path: string): Promise<CommandsReport> {
   const state = await ports.inspect(path);
   return { path, action: classifyCommands(state, await inspectEntries(ports, path, state)) };
-}
-
-/** Execute one link plan. `ok` is a no-op; the others end with the link in place. */
-async function applyLink(ports: ClaudeApplyPorts, link: LinkReport): Promise<void> {
-  switch (link.state) {
-    case "ok":
-      return;
-    case "replace":
-      await ports.remove(link.path);
-      break;
-    case "backup-then-create":
-      if (link.backupPath !== undefined) await ports.rename(link.path, link.backupPath);
-      break;
-    case "create":
-      break;
-  }
-  await ports.symlink(link.target, link.path);
-}
-
-/** Execute one managed directory's plan: the directory first, then each entry. Foreign entries are not touched. */
-async function applyManagedDir(ports: ClaudeApplyPorts, report: ManagedDirReport): Promise<void> {
-  const dir = report.plan;
-  if (dir.state === "replace") await ports.remove(dir.path);
-  if (dir.state === "backup-then-create" && dir.backupPath !== undefined) {
-    await ports.rename(dir.path, dir.backupPath);
-  }
-  if (dir.state !== "ok") await ports.mkdir(dir.path);
-  for (const entry of report.entries) {
-    if (entry.kind === "link") await applyLink(ports, entry.plan);
-    else if (entry.kind === "stale") await ports.remove(entry.path);
-  }
-}
-
-/** True when `--write` would touch the directory or any entry in it. */
-function managedDirChanges(report: ManagedDirReport): boolean {
-  return (
-    report.plan.state !== "ok" ||
-    report.entries.some(
-      (entry) => entry.kind === "stale" || (entry.kind === "link" && entry.plan.state !== "ok"),
-    )
-  );
 }
 
 function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "message">): boolean {
@@ -512,29 +305,12 @@ export async function applyClaude(
   });
 
   const now = ports.now();
-  const agents = await buildAgentsMd(ports, paths);
-  const agentsCurrent = await ports.readFile(paths.agentsMd);
-  const agentsPlan = planApply({
-    currentContent: agentsCurrent,
-    generatedContent: agents.content,
-    manifestHash: manifest[paths.agentsMd],
-    sha256: ports.sha256,
-  });
-  const agentsMd: AgentsMdReport = {
+  const agentsMd = await planAgentsMd(ports, {
     path: paths.agentsMd,
-    content: agents.content,
-    bytes: agentsMdBytes(agents.content),
-    overLimit: agentsMdBytes(agents.content) > AGENTS_MD_BYTE_LIMIT,
-    outcome: agentsPlan.action,
-    commonFiles: agents.commonFiles,
-    skipped: agents.skipped,
-    // A file jig has no record of writing is somebody's, until proven otherwise.
-    ...(agentsPlan.action === "write" &&
-    agentsCurrent !== undefined &&
-    manifest[paths.agentsMd] === undefined
-      ? { backupPath: backupPath(paths.agentsMd, now) }
-      : {}),
-  };
+    generated: await buildAgentsMd(ports, paths),
+    manifest,
+    now,
+  });
 
   const hookCommands = Object.entries(hooks).map(([event, value]) => ({
     event,
@@ -560,7 +336,7 @@ export async function applyClaude(
     ...(settingsPlan.action === "conflict"
       ? ["settings.json differs from both jig's last write and the newly generated content"]
       : []),
-    ...(agentsPlan.action === "conflict"
+    ...(agentsMd.outcome === "conflict"
       ? ["AGENTS.md differs from both jig's last write and the newly generated content"]
       : []),
     ...(base.commands.action.kind === "conflict"
@@ -582,16 +358,11 @@ export async function applyClaude(
       await ports.writeAtomic(paths.settings, generated);
       manifest[paths.settings] = ports.sha256(generated);
     }
-    if (agentsPlan.action === "write") {
-      if (agentsMd.backupPath !== undefined)
-        await ports.rename(paths.agentsMd, agentsMd.backupPath);
-      await ports.writeAtomic(paths.agentsMd, agents.content);
-      manifest[paths.agentsMd] = ports.sha256(agents.content);
-    }
+    if (agentsMd.outcome === "write") await applyAgentsMd(ports, agentsMd, manifest);
     // The manifest seeds for the two files even when they were already
     // current, so a LATER hand edit is detected as one.
     manifest[paths.settings] ??= ports.sha256(generated);
-    manifest[paths.agentsMd] ??= ports.sha256(agents.content);
+    manifest[paths.agentsMd] ??= ports.sha256(agentsMd.content);
     await ports.writeManifest(manifest);
     await ports.writeProvenance(dirOf(paths.settings), {
       sourceFile: paths.guardRules,
@@ -613,7 +384,7 @@ export async function applyClaude(
     // out-of-repo state only.
     if (manifest[paths.settings] === undefined || manifest[paths.agentsMd] === undefined) {
       manifest[paths.settings] ??= ports.sha256(generated);
-      manifest[paths.agentsMd] ??= ports.sha256(agents.content);
+      manifest[paths.agentsMd] ??= ports.sha256(agentsMd.content);
       await ports.writeManifest(manifest);
     }
   }
@@ -628,8 +399,4 @@ function firstCommand(eventValue: unknown): string {
   const hook = Array.isArray(hooks) ? hooks[0] : undefined;
   const command = (hook as { command?: unknown } | undefined)?.command;
   return typeof command === "string" ? command : "(none)";
-}
-
-function dirOf(path: string): string {
-  return path.slice(0, Math.max(path.lastIndexOf("/"), 0));
 }

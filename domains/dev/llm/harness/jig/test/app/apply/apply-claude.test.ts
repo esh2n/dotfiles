@@ -689,6 +689,7 @@ describe("the rules directory", () => {
       name: "go",
       path: `${PATHS.rulesDir}/go`,
       target: `${H}/rules/go`,
+      reason: "unplanned",
     });
     expect(dry.outcome).toBe("write");
 

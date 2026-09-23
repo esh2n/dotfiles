@@ -362,6 +362,13 @@ describe("applyCli --target claude", () => {
     expect(result.stdout).toContain("(mine.md)");
   });
 
+  test("--target codex with no codex context is refused rather than silently doing nothing", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const result = await applyCli(["--target", "codex"], ports, paths, claudeContext());
+    expect(result.code).toBe(2);
+    expect(result.stdout).toContain("--target codex is not wired");
+  });
+
   test("dry-run writes nothing even with a real destination path", async () => {
     const { ports, files } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     await applyCli(["--target", "pi"], ports, paths);
@@ -403,5 +410,178 @@ describe("applyCli --target claude", () => {
     });
     const result = await applyCli(["--target", "dsh", "--write"], ports, paths);
     expect(result.code).toBe(1);
+  });
+});
+
+/**
+ * The codex dry-run's report, exercised through the CLI for the same reason
+ * the claude one is: the sections — two skill directories, the generated
+ * files, the block and its conflicts, the leftovers — are what a reader
+ * agrees to before `--write`.
+ */
+describe("applyCli --target codex", () => {
+  const H = "/repo/llm/harness";
+  const OLD = "/repo/config/claude-profiles";
+  const CODEX = "/home/u/.codex";
+  const CODEX_PATHS = {
+    harnessRoot: H,
+    mcpServers: `${H}/mcp/servers.json`,
+    decisions: `${H}/rules/decisions`,
+    formerSkillRoots: [OLD],
+    agentsSkills: "/home/u/.agents/skills",
+    codexSkills: `${CODEX}/skills`,
+    agentsMd: `${CODEX}/AGENTS.md`,
+    agentsDir: `${CODEX}/agents`,
+    configToml: `${CODEX}/config.toml`,
+    hooksJson: `${CODEX}/hooks.json`,
+    home: "/home/u",
+  };
+
+  const SOURCES: Record<string, string> = {
+    [CODEX_PATHS.mcpServers]: JSON.stringify({
+      schemaVersion: "jig.mcp.v1",
+      servers: [
+        {
+          name: "serena",
+          transport: "stdio",
+          command: "uvx",
+          args: ["serena"],
+          targets: { codex: true },
+        },
+        {
+          name: "notion-mcp",
+          transport: "http",
+          url: "https://mcp.notion.com/mcp",
+          targets: { codex: true },
+        },
+      ],
+    }),
+    [`${CODEX_PATHS.decisions}/a.md`]: "# 題\n\nStatus: accepted — x\n\nrule: Do the thing.\n",
+    [`${H}/rules/common/core.md`]: "# Core\n\nBe brief.\n",
+    [`${H}/skills/README.md`]: "# skills\n",
+    [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
+    [`${H}/skills/grilling/SKILL.md`]: "---\nname: grilling\n---\n",
+    [`${H}/skills/grilling/codex/SKILL.md`]: "---\nname: grilling\n---\n",
+    [`${H}/agents/research.md`]:
+      '---\nname: research\ndescription: Survey.\ntools: ["Read"]\nmodel: sonnet\n---\nSurvey.\n',
+  };
+
+  function codexContext(extra: Record<string, string> = {}, links: Record<string, string> = {}) {
+    const fake = fakeClaudeFs({ files: { ...SOURCES, ...extra }, links });
+    return {
+      ports: fake.ports,
+      paths: CODEX_PATHS,
+      options: {
+        codexModels: {},
+        validateToml: (text: string) => {
+          Bun.TOML.parse(text);
+        },
+      },
+    };
+  }
+
+  const tiers = () => fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) }).ports;
+
+  test("both skill directories, with counts, the port's target, and why the rest are not ported", async () => {
+    const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, codexContext());
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("== codex ==");
+    expect(result.stdout).toContain("dest: /home/u/.codex");
+    expect(result.stdout).toContain(
+      "skills (cross-harness) directory: create  /home/u/.agents/skills",
+    );
+    expect(result.stdout).toContain(
+      "2 skill directories to link (each holds a SKILL.md; Codex, pi and omp read this directory):",
+    );
+    expect(result.stdout).toContain("codex skills directory: create  /home/u/.codex/skills");
+    expect(result.stdout).toContain("1 Codex port to link");
+    expect(result.stdout).toMatch(
+      /grilling +create +→ \/repo\/llm\/harness\/skills\/grilling\/codex/,
+    );
+    // The skills without a port are the expected case: counted, not listed one by one.
+    expect(result.stdout).toContain("not linked (2):");
+    expect(result.stdout).toMatch(/README\.md +a file, not a skill directory/);
+    expect(result.stdout).toContain(
+      "    (1 entry) no codex/SKILL.md — reaches Codex through ~/.agents/skills",
+    );
+    expect(result.stdout).not.toMatch(/writeup +no codex/);
+    expect(result.stdout).toContain("listed twice in Codex");
+  });
+
+  test("on the machine yoki-switch left: stale links named with why, cmd-* under a yoki heading, .system not jig's", async () => {
+    const context = codexContext(
+      {
+        [`${CODEX_PATHS.codexSkills}/cmd-aside/SKILL.md`]: "x",
+        [`${CODEX_PATHS.codexSkills}/.system/imagegen/SKILL.md`]: "x",
+      },
+      {
+        [`${CODEX_PATHS.agentsSkills}/writeup`]: `${OLD}/core/skills/writeup`,
+        [`${CODEX_PATHS.agentsSkills}/gone`]: `${OLD}/packs/go/skills/gone`,
+        [`${CODEX_PATHS.agentsSkills}/nowhere`]: "/nowhere/at/all",
+      },
+    );
+    const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, context);
+
+    expect(result.stdout).toMatch(
+      /writeup +replace \(currently → \/repo\/config\/claude-profiles\/core\/skills\/writeup\)/,
+    );
+    expect(result.stdout).toMatch(
+      /gone +remove \(link into the retired tree → \/repo\/config\/claude-profiles\/packs\/go\/skills\/gone\)/,
+    );
+    expect(result.stdout).toMatch(/nowhere +remove \(dangling link → \/nowhere\/at\/all\)/);
+    expect(result.stdout).toContain(
+      "yoki leftovers (1) — real directories from yoki's command→skill conversion",
+    );
+    expect(result.stdout).toMatch(/\n {4}cmd-aside\n/);
+    expect(result.stdout).toMatch(/\.system +left alone \(not jig's: a directory\)/);
+    expect(result.stdout).toContain("Codex keeps its bundled skills in `.system/`");
+  });
+
+  test("AGENTS.md is named as the Claude target's content, the agent files list the model gap per tier, hooks.json is only named", async () => {
+    const context = codexContext({
+      [`${CODEX_PATHS.agentsDir}/mine.toml`]: 'name = "mine"\n',
+    });
+    const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, context);
+
+    expect(result.stdout).toMatch(
+      /AGENTS\.md: write {2}\/home\/u\/\.codex\/AGENTS\.md {2}\(\d+ bytes\)/,
+    );
+    expect(result.stdout).toContain("the same generated content as ~/.claude/AGENTS.md");
+    expect(result.stdout).toContain("rules/common rendered in (1): core.md");
+    expect(result.stdout).toContain("agents (generated files): /home/u/.codex/agents");
+    expect(result.stdout).toContain("1 agent definition → <name>.toml");
+    expect(result.stdout).toMatch(
+      /research\.toml +write +model: \(none: no Codex id for "sonnet"\)/,
+    );
+    expect(result.stdout).toContain("model tiers with no Codex id (sonnet: 1)");
+    expect(result.stdout).toMatch(/not jig's \(1\), left alone:\n +mine\.toml +a regular file/);
+    expect(result.stdout).toContain(
+      "hooks.json: not touched  /home/u/.codex/hooks.json  (jig codex register's",
+    );
+  });
+
+  test("config.toml: the servers in jig's block, a CONFLICT line per table declared outside it, yoki's leftovers, exit 1", async () => {
+    const context = codexContext({
+      [CODEX_PATHS.configToml]:
+        '# yoki:begin\n[permissions.yoki]\nextends = ":workspace"\n\n[mcp_servers.notion-mcp]\nurl = "u"\n# yoki:end\n\n[projects."/r"]\ntrust_level = "trusted"\n',
+    });
+    const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, context);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("outcome: conflict");
+    expect(result.stdout).toContain("config.toml: write  /home/u/.codex/config.toml");
+    expect(result.stdout).toContain("mcp servers in jig's block (2): serena, notion-mcp");
+    expect(result.stdout).toContain("CONFLICT: 1 of them already declared outside jig's block");
+    expect(result.stdout).toContain("[mcp_servers.notion-mcp]  line 5");
+    expect(result.stdout).toContain("yoki leftovers (2), left alone until milestone 4:");
+    expect(result.stdout).toContain("    [permissions.yoki]");
+    expect(result.stdout).toContain("--- diff (current vs generated) ---");
+    expect(result.stdout).toContain("+# jig:begin mcp");
+  });
+
+  test("--target all never reaches codex either", async () => {
+    const result = await applyCli([], tiers(), paths, undefined, codexContext());
+    expect(result.stdout).not.toContain("== codex ==");
   });
 });

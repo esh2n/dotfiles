@@ -74,7 +74,8 @@ inverted.
 |---|---|---|
 | 1 | Claude Code's `~/.claude/settings.json`: `hooks`, `permissions.{allow,deny,defaultMode}`, `sandbox`, `mcpServers`, and the removal of `YOKI_*` from `env` | **done** |
 | 2 | The sources move: `skills/`, `rules/` and `agents/` into `llm/harness/`, and jig delivers `~/.claude/{skills,rules,agents}` and the generated `AGENTS.md` (with `CLAUDE.md` → `AGENTS.md`), and retires `~/.claude/commands` | **done** |
-| 3 | The other targets: Codex (`config.toml` + `hooks.json`), pi, omp, DSH | |
+| 3a | Codex: `~/.agents/skills` and `~/.codex/skills` as managed link directories, `~/.codex/AGENTS.md`, `~/.codex/agents/*.toml`, jig's MCP block in `~/.codex/config.toml` | **done** |
+| 3b | pi, omp, DSH | |
 | 4 | `yoki-switch` retired, along with `core/config/manager.sh`'s `link_*` functions for the harnesses | |
 
 ### What each milestone replaces in `yoki-switch`
@@ -95,8 +96,8 @@ Rows cite the destination table in
 | `merge_dir()` (yoki-switch:352-390) — the `.{dir}-merged` staging dirs behind `skills`/`hooks`/`commands`/`agents`/`rules`/`workflows`/`scripts` | one flat source tree, delivered by symlink; no `commands/` at all ([commands are skills](../rules/decisions/2026-09-22-commands-are-skills.md)) | 2 |
 | `link_external_resources()` (yoki-switch:411-452) and `external-links.yaml` | folded into the flat tree | 2 |
 | `.claude-packs` / `packs.default` / `pack enable\|disable` | gone — rules are selected by `paths:` frontmatter, skills by the judgment service | 2 |
-| `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex and omp | per-target modules under `app/apply/` | 3 |
-| `core/config/manager.sh`'s `link_pi_resources` / `link_dsh_resources` / `link_omp_resources` | per-target modules under `app/apply/` | 3 |
+| `apply_target_generator()` (yoki-switch:670-706) → `targets/gen.js` for codex: `codex-agents.js`, `codex-skills.js`, the `# yoki:begin` block of `config.toml`, the `~/.agents/skills` links | `app/apply/apply-codex.ts` + `domain/codex/{skills,agents,config}.ts`, with the milestone-2 delivery verbs shared through `app/apply/delivery.ts` | 3a |
+| `targets/gen.js` for omp, `link_pi_resources` / `link_dsh_resources` / `link_omp_resources` in `core/config/manager.sh` | per-target modules under `app/apply/` | 3b |
 
 ### Milestone 1: what `jig apply --target claude` does
 
@@ -244,3 +245,92 @@ overrides it.
 Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
 `.<x>-merged` staging directory stay with `yoki-switch` until milestone 4, and
 `~/.claude.json` is never touched in any milestone.
+
+### Milestone 3a: codex
+
+```sh
+bun src/cli/jig.ts apply --target codex            # dry-run: the plan, the diffs, the leftovers
+bun src/cli/jig.ts apply --target codex --write    # writes everything in one run; any conflict aborts it
+```
+
+Same shape as the Claude target, over `$CODEX_HOME` (default `~/.codex`,
+honored as `CLAUDE_CONFIG_DIR` is) and the cross-harness skills mount. Never
+part of `--target all`, for the same reason. The formats are Codex's own
+documentation, cited where each is fixed in code:
+[build-skills](https://learn.chatgpt.com/docs/build-skills) (skill discovery
+paths, `agents/openai.yaml`), [custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents)
+(`~/.codex/agents/*.toml`), and the
+[config reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+(`[mcp_servers.<id>]`).
+
+Destinations, one source tree:
+
+- **`~/.agents/skills/`** — a managed directory of links
+  (`domain/claude/managed-dir.ts`, the milestone-2 mechanism), one per skill
+  directory of `skills/` that holds a `SKILL.md` — the `$HOME/.agents/skills`
+  row of Codex's discovery table ("Personal skills across repositories"), and
+  the directory pi and omp read too. On the machine yoki-switch left it holds
+  53 links into the retired `claude-profiles/` tree, all dangling since the
+  sources moved: two widenings of the milestone-2 stale rule, both opt-in per
+  destination (`formerSourceDirs`, `dangling`), make those stale — removed on
+  write, reported as `link into the retired tree` or `dangling link` — while
+  the Claude directories keep the narrow rule. Anything else is not jig's.
+- **`~/.codex/skills/`** — the same mechanism, only for skills with a Codex
+  port: `~/.codex/skills/<name>` → `skills/<name>/codex`
+  (`domain/codex/skills.ts`; today `grilling` and `code-graph-exploration`).
+  Codex's bundled `.system/` is foreign and stays. yoki's `cmd-*`
+  directories — its command→skill conversion, redundant now that commands
+  are skills delivered through `~/.agents/skills` — are real directories, so
+  jig does not remove them; the dry-run lists them under a `yoki leftovers`
+  heading for milestone 4. One consequence the doc states and the dry-run
+  repeats: "If two skills share the same `name`, Codex doesn't merge them;
+  both can appear in skill selectors" — a ported skill is listed twice. The
+  generator delivers what the sources say; whether the generic entry should
+  yield is a ruling, not a flag.
+- **`~/.codex/AGENTS.md`** — the same generated content as
+  `~/.claude/AGENTS.md`, from the same renderer, with the same hand-edit
+  detection and the same first-write backup (`.pre-jig.<stamp>`; today the
+  file there is yoki's, with its markers). One source, two destinations, no
+  vocabulary substitution — the header names the claude target because the
+  bytes are that file's. The dry-run prints the diff rather than the text.
+- **`~/.codex/agents/<name>.toml`** — one generated file per `agents/*.md`,
+  each tracked in the manifest (`planApply` per file; a hand edit is a
+  conflict; a file jig has no record of writing is kept as
+  `<name>.toml.pre-jig.<stamp>` first). The translation
+  (`domain/codex/agents.ts`): `name` and `description` verbatim, the body as
+  `developer_instructions`, and `tools:` as one trailing sentence of the
+  instructions, because Codex's custom agent has no per-agent tool list and a
+  dropped field should be visible. `model:` is a Claude tier name
+  (`sonnet`/`opus`/`haiku`) and jig has no source that maps it to a Codex id
+  — `policy/tiers.json` maps tiers to the proxy's backends, and yoki's
+  `harness-models.json` is the retiring generator's guess, not a ruling — so
+  `model` is left out (Codex applies its default) and the dry-run counts the
+  gap per tier. The map is a `CodexApplyOptions.codexModels` parameter,
+  empty at the composition root until a decision note fills it. Files there
+  that no source produces are not jig's.
+- **`~/.codex/config.toml`** — `[mcp_servers.<id>]` for every server with
+  `targets.codex: true` (`targetOverrides.codex` applied, `{{HOME}}`
+  substituted; stdio: `command`, `args`, `env`; HTTP: `url`), inside jig's
+  own `# jig:begin mcp` … `# jig:end mcp` block, beside the
+  `# jig:begin hooks` block `jig codex register` keeps
+  (`domain/codex/config.ts`). Each command rewrites only its own block;
+  every other table — `[projects.*]` that Codex writes when a directory is
+  trusted, `[features]`, `[sandbox_workspace_write]`, yoki's block — is
+  carried through byte for byte. Hand-edit detection compares the block,
+  not the file, so a directory Codex trusts after jig wrote is not a
+  conflict. A `[mcp_servers.<id>]` outside the block for a server jig also
+  writes is a conflict that names the table and its line and stops the write:
+  a duplicate table stops Codex from loading its configuration at all, and
+  reconciling a setting that exists in two places is the one-time manual
+  step the config-layout decision keeps out of the generator, exactly as
+  with `~/.claude.json`. On the machine yoki-switch left, that is five
+  servers (three in yoki's block, two at the top level). `[permissions.yoki]`
+  and `[permissions.yoki.filesystem]`, and yoki's block as a whole, are
+  reported as leftovers for milestone 4.
+- **`~/.codex/hooks.json`** — `jig codex register`'s. The dry-run says so and
+  nothing touches it here.
+
+`--write` writes all of it in one run — the generated files, the block, the
+manifest and provenance, then the two directories — and any conflict
+anywhere (a hand-edited generated file, the block, a server declared outside
+it) returns `wrote: false` with nothing written.

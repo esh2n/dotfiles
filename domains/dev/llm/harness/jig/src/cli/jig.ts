@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ClaudeApplyPaths } from "../app/apply/apply-claude";
+import type { CodexApplyOptions, CodexApplyPaths } from "../app/apply/apply-codex";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
@@ -111,6 +112,53 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
     rulesDir: join(claudeDir, "rules"),
     commands: join(claudeDir, "commands"),
     home: homedir(),
+  };
+}
+
+/**
+ * Where the Codex target reads from and writes to.
+ *
+ * `CODEX_HOME` is honored for the same reason `CLAUDE_CONFIG_DIR` is: Codex
+ * honors it, so a moved configuration directory must not get a second copy
+ * at the default path. `~/.agents/skills` is not under it — it is the user
+ * scope of Codex's skill discovery (https://learn.chatgpt.com/docs/build-skills)
+ * and the directory pi and omp read, so it lives under `$HOME` whatever
+ * `CODEX_HOME` says. The former skill roots are the `claude-profiles/` tree
+ * yoki-switch linked from before the sources moved (milestone 2); links
+ * under it are stale, not somebody's.
+ */
+function resolveCodexApplyPaths(): CodexApplyPaths {
+  const harness = harnessRoot();
+  const codexHome = process.env.CODEX_HOME ?? join(homedir(), ".codex");
+  return {
+    harnessRoot: harness,
+    mcpServers: join(harness, "mcp", "servers.json"),
+    decisions: join(harness, "rules", "decisions"),
+    formerSkillRoots: [join(resolveApplyRoot(), "domains", "dev", "config", "claude-profiles")],
+    agentsSkills: join(homedir(), ".agents", "skills"),
+    codexSkills: join(codexHome, "skills"),
+    agentsMd: join(codexHome, "AGENTS.md"),
+    agentsDir: join(codexHome, "agents"),
+    configToml: join(codexHome, "config.toml"),
+    hooksJson: join(codexHome, "hooks.json"),
+    home: homedir(),
+  };
+}
+
+/**
+ * What the Codex target needs beyond its paths. The model map is empty on
+ * purpose: jig has no source that names Codex model ids for Claude's tier
+ * names (`policy/tiers.json` maps tiers to the proxy's backends, not to
+ * Codex), and yoki's `harness-models.json` is the retiring generator's
+ * guess, not a ruling. Until a decision note supplies one, every agent's
+ * `model` is left out and the dry-run says so per tier.
+ */
+function codexApplyOptions(): CodexApplyOptions {
+  return {
+    codexModels: {},
+    validateToml: (text) => {
+      Bun.TOML.parse(text);
+    },
   };
 }
 
@@ -376,11 +424,13 @@ export async function main(argv: readonly string[]): Promise<number> {
         stateDir: resolveStateDir(process.env),
         jigVersion: VERSION,
       });
-      const result = await applyCli(argv.slice(1), applyPorts, resolveApplyPaths(), {
-        ports: applyPorts,
-        paths: resolveClaudeApplyPaths(),
-        hookPaths: claudeHookPaths(),
-      });
+      const result = await applyCli(
+        argv.slice(1),
+        applyPorts,
+        resolveApplyPaths(),
+        { ports: applyPorts, paths: resolveClaudeApplyPaths(), hookPaths: claudeHookPaths() },
+        { ports: applyPorts, paths: resolveCodexApplyPaths(), options: codexApplyOptions() },
+      );
       process.stdout.write(result.stdout);
       return result.code;
     }
@@ -502,7 +552,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|pi|dsh|litellm|all] [--write] | codex register [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -549,6 +599,17 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  in a link's way is renamed aside, never deleted; hooks, scripts, workflows and the\n" +
           "  .<x>-merged staging dirs are not touched.\n" +
           "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
+          "  apply --target codex delivers the same sources to Codex ($CODEX_HOME, default ~/.codex):\n" +
+          "  ~/.agents/skills (one link per skill; the mount Codex, pi and omp read) and ~/.codex/skills\n" +
+          "  (one link per Codex port, skills/<name>/codex) as managed directories — links yoki-switch\n" +
+          "  left into the old tree, or dangling, are removed; yoki's cmd-* directories are reported,\n" +
+          "  not removed; ~/.codex/AGENTS.md, the same generated file as ~/.claude/AGENTS.md;\n" +
+          "  ~/.codex/agents/<name>.toml generated from agents/*.md (tools become a sentence in\n" +
+          "  developer_instructions; model is left out until a ruling maps Claude tiers to Codex ids);\n" +
+          "  and [mcp_servers.*] for targets.codex servers inside a `# jig:begin mcp` block of\n" +
+          "  ~/.codex/config.toml, every other table preserved. A server already declared outside the\n" +
+          "  block is a conflict to clean up by hand once. hooks.json is jig codex register's.\n" +
+          "  Dry-run by default; --write does all of it in one run; never part of --target all.\n" +
           "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
           "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +
