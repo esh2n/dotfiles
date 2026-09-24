@@ -39,7 +39,7 @@ flake.nix                    入口（composition root）。lib の組み立て�
 dotfiles/
 ├── flake.nix, flake.lock     # 出力: darwinConfigurations.mac、homeConfigurations.linux、packages、checks、formatter
 ├── Makefile                  # up / check / fmt
-├── bootstrap.sh              # Nix が無ければ入れて `nix run .#dotctl -- up`（Nix より前に動くので shell）
+├── bootstrap.sh              # Nix が無ければ入れて、OS ごとに switch（Nix より前に動くので shell。dotctl ができたらそれを呼ぶだけに）
 ├── roles.example.json        # 役割ファイルの形の例（実体は ~/.config/dotfiles/roles.json、追跡しない）
 │
 ├── lib/                      # 組み立ての部品（ロジックはここに集める）
@@ -49,8 +49,9 @@ dotfiles/
 │   └── mk-service.nix        #   一つの宣言から launchd / systemd --user を出す
 │
 ├── roles/                    # 役割 = どの機能を有効にするか（中身は持たない）
-│   ├── options.nix           #   options.dotfiles.roles.<name>.enable（一つの名前空間）
-│   └── base.nix, dev.nix, desktop.nix, llm-hub.nix, gpu.nix
+│   ├── options.nix           #   options.dotfiles.roles.<name>.enable（一つの名前空間。nix-darwin の評価はこれだけ読む）
+│   ├── default.nix           #   home-manager の評価が読む: options と各役割
+│   └── dev.nix, llm-hub.nix, …  # 役割ごとに、どの機能を on にするか
 │
 ├── system/                   # OS 層（nix-darwin だけ。Omarchy の OS 層は Omarchy のもの）
 │   └── darwin/               #   defaults.nix（Dock・キーボード）、homebrew.nix（cask・formula・App Store）、nix.nix
@@ -88,20 +89,28 @@ dotfiles/
 
 ## 4. `make up` の流れ
 
-1. `bootstrap.sh`: Nix が無ければ入れる（Mac は Determinate の installer、Omarchy は公式 installer の `--daemon`）。
-2. `nix run .#dotctl -- up`（dotctl 自身も flake で固定される）。
-3. dotctl が OS を判定し、`darwin-rebuild switch --flake .#mac --impure` か `home-manager switch --flake .#linux --impure`（home-manager 自体も flake で固定）。`--impure` は facts.nix の読み取りのためだけ。
-4. Linux は pacman の一覧を入れる（無いものだけ）。両方で `mise install`。
-5. activation の最後に jig apply。最後に健康確認（`dotctl status`）。
+1. `bootstrap.sh`: Nix が無ければ入れる。両 OS とも公式 installer の `--daemon`。
+   - **変えました（2026-09-25）**: 以前は「Mac は Determinate の installer」としていました。Determinate の installer は 2026-01-01 以降 Determinate Nix しか入れず、`--prefer-upstream-nix` は効きません（https://determinate.systems/blog/installer-dropping-upstream/）。Determinate Nix を入れた機械では nix-darwin に `nix.enable = false` を求められますが、この flake は `nix.settings` で Nix 自体を nix-darwin に管理させています。両立しないので、公式 installer に揃えます。
+2. OS を判定する（`uname -s`。hostname やユーザー名は見ない）。
+   - Mac: ユーザーとして `nix build next#darwinConfigurations.mac.system --impure` を実行し、root で走らせるのは `nix-env -p /nix/var/nix/profiles/system --set` と `activate` の二つだけ。`darwin-rebuild switch` を sudo で呼ばないのは、darwin-rebuild が root で動くと `HOME=~root` に書き換え、facts.nix がユーザーの HOME と役割ファイルを読めなくなるため（nix-darwin の `darwin-rebuild.sh` 冒頭）。今の `core/nix/update.sh` も同じく build はユーザー、`activate` だけ sudo。
+   - Linux: flake で固定した home-manager を `nix run next#home-manager -- switch --flake next#linux --impure -b pre-next`。
+   - `--impure` は facts.nix の読み取りのためだけ。
+3. 旧レイアウトの symlink が行く手にあれば `<名前>.pre-next` に退避する（Mac は `home-manager.backupFileExtension`、Linux は `-b`）。
+4. switch の後、今のシェルの PATH にプロファイルを足してから `mise install`（初回の switch で入った mise を新しいシェル無しで見つけるため）。
+5. activation の中で、テンプレートの展開（`render-templates`、writeBoundary の前）と jig apply（`harness-apply`、linkGeneration の後）。
+6. `next/` の下に git が追跡していないファイルがあれば名前を出して警告する（flake は git 経由で読むので見えない）。
 
-何度走らせても同じ結果になる。install と update の区別はない。
+何度走らせても同じ結果になる。install と update の区別はない。dotctl ができたら、2 以降を dotctl に移し、`bootstrap.sh` は Nix を入れて dotctl を呼ぶだけにする。
 
 ## 5. 常駐サービス
 
-- `lib/mk-service.nix` が「コマンド・引数・秘密情報の参照・ログ・自動起動」の小さな宣言を受け取り、Mac は `launchd.agents`、Linux は `systemd.user.services` を出す。
-- 秘密情報は起動時に `op run --env-file=<参照ファイル> -- <コマンド>`。人のいない起動なので、1Password のサービスアカウントのトークンを OS の保管場所（Mac は Keychain、Linux は libsecret）から読む。
-- 有効化は役割で: `llm-hub` で LiteLLM・observability・Open WebUI、`gpu` で llama-server、Mac の `llm-hub` で LM Studio の keep-awake。
-- 個人 dotfiles での実例がないので、jig-decision（今は誰も起動していない）で最初に試し、llama-server は最後。
+- `lib/mk-service.nix` が「スクリプト・環境変数・再起動の間隔」の小さな宣言（`dotfiles.services.<名前>`）を受け取り、Mac は `launchd.agents`、Linux は `systemd.user.services` を出す。サービスの宣言は既定で off。
+- 有効にするのは役割のモジュール（`roles/<名前>.nix`）だけ。機能のモジュールは役割を読まない（`tests/next/layers.bats` で検査）。
+  - `dev`: LiteLLM（各機械に一つ、ループバックのみ。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`）と jig-decision。
+  - `llm-hub`（Mac）: LM Studio の keep-awake。Prometheus・Grafana・Open WebUI もこの役割（未移植）。
+  - `gpu`（Linux）: llama-server（未移植）。
+  - **変えました（2026-09-25）**: 以前は「`llm-hub` で LiteLLM」としていました。LiteLLM は裁定で「どの機械にも一つ」なので、harness を使う機械の役割である `dev` に移しました。
+- 秘密情報: 1Password のサービスアカウントのトークンを OS の保管場所から読む。Mac は login Keychain、Linux は Secret Service（libsecret、Omarchy は gnome-keyring）。読み方は `domains/dev/config/litellm/secrets.sh` の一か所。
 
 ## 6. 自作ツール
 
