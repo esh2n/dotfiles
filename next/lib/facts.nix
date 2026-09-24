@@ -5,6 +5,9 @@
 #
 #   username  $USER ("ci" when unset, so a pure evaluation still names a user)
 #   home      $HOME — required: a missing $HOME is an error, never a guess
+#   repo      $DOTFILES_ROOT — the checkout editable configs link into
+#             (out-of-store symlinks point at the checkout, not the store copy
+#             the flake is evaluated from); required when a link is placed
 #   roles     the machine-local roles file: $DOTFILES_ROLES_FILE, else
 #             $HOME/.config/dotfiles/roles.json; no file means no roles.
 #             Never committed — which roles a machine takes is chosen on the
@@ -16,6 +19,9 @@ let
   user = getEnv "USER";
   homeEnv = getEnv "HOME";
   home = if homeEnv != "" then homeEnv else throw "facts: HOME is not set (evaluate with --impure in a login environment)";
+
+  repoEnv = getEnv "DOTFILES_ROOT";
+  repo = if repoEnv != "" then repoEnv else throw "facts: DOTFILES_ROOT is not set (make up exports it; it is the checkout links point into)";
 
   rolesFile =
     let
@@ -42,6 +48,6 @@ let
 in
 {
   username = if user == "" then "ci" else user;
-  inherit home;
+  inherit home repo;
   roles = if builtins.pathExists rolesFile then parseRoles rolesFile else [ ];
 }

@@ -34,6 +34,12 @@ nix-darwin.lib.darwinSystem {
           { _module.args.facts = facts; }
           ../roles/options.nix
           ../home/shared/base.nix
+          ../home/shared/lib
+          ../home/shared/zsh
+          ../home/shared/tig
+          ../home/shared/crit
+          ../home/shared/bin
+          ../home/darwin/bin
           ../home/shared/packages/cli.nix
           ../home/shared/packages/lsp.nix
           ../home/darwin/packages.nix

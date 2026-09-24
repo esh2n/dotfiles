@@ -15,6 +15,11 @@ inputs.home-manager.lib.homeManagerConfiguration {
     { _module.args.facts = facts; }
     ../roles/options.nix
     ../home/shared/base.nix
+    ../home/shared/lib
+    ../home/shared/zsh
+    ../home/shared/tig
+    ../home/shared/crit
+    ../home/shared/bin
     ../home/shared/packages/cli.nix
     ../home/shared/packages/lsp.nix
   ];
