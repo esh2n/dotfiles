@@ -1,0 +1,20 @@
+# shellcheck shell=bash
+# Helpers for tests that evaluate flakes. Evaluation only — nothing is built
+# or activated, so a test can never change the machine it runs on.
+#
+# DOTFILES_NIX_STORE: when the Nix daemon is out of reach (an agent sandbox),
+# point it at a writable directory and evaluation runs against a local store
+# there. CI and a normal shell leave it unset and use the daemon.
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+nix_eval_raw() { # nix_eval_raw <flake-dir-relative-to-repo> <attribute>
+	local dir="$1" attr="$2"
+	local -a store=()
+	if [[ -n "${DOTFILES_NIX_STORE:-}" ]]; then
+		store=(--store "${DOTFILES_NIX_STORE}")
+	fi
+	nix --extra-experimental-features 'nix-command flakes' eval \
+		"${store[@]}" --impure --raw \
+		"git+file://${REPO_ROOT}?dir=${dir}#${attr}"
+}
