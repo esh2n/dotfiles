@@ -5,6 +5,7 @@
 {
   cargo-compete = callPackage ./cargo-compete { };
   codebase-memory-mcp = callPackage ./codebase-memory-mcp { };
+  dev-setup = callPackage ./scripts/dev-setup { };
   go-mockgen = callPackage ./go-mockgen { };
   go-protoc-gen-go = callPackage ./go-protoc-gen-go { };
   harness-apply = callPackage ./scripts/harness-apply { };

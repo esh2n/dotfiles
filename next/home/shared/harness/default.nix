@@ -44,4 +44,20 @@ in
   home.activation.harnessApply = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     run ${lib.getExe pkgs.harness-apply} ${lib.escapeShellArg facts.repo}
   '';
+
+  # Commands the harnesses need that jig does not run: Claude Code's native
+  # installer, its user-scoped MCP servers (from jig's output, so after
+  # harnessApply), pi's packages, and a reference checkout of ECC.
+  dotfiles.setup = {
+    claude-cli.command = config.lib.dotfiles.devSetup "claude-cli";
+    claude-mcp = {
+      command = config.lib.dotfiles.devSetup "claude-mcp";
+      after = [ "harnessApply" "setup-claude-cli" ];
+    };
+    pi-packages = {
+      command = config.lib.dotfiles.devSetup "pi-packages";
+      after = [ "harnessApply" ];
+    };
+    ecc.command = config.lib.dotfiles.devSetup "ecc";
+  };
 }

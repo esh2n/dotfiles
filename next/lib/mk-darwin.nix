@@ -47,10 +47,19 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/templated
           ../home/shared/serena
           ../home/shared/harness
+          ../home/shared/nvim
+          ../home/shared/git
+          ../home/shared/gh
+          ../home/shared/mise
+          ../home/shared/zellij
+          ../home/shared/cargo-tools
           ./mk-service.nix
+          ./mk-setup.nix
           ../home/shared/services
           ../home/darwin/lmstudio-awake
           ../home/darwin/apps
+          ../home/darwin/tmux
+          ../home/darwin/codebase-memory
           ../home/darwin/configs
           ../home/shared/packages/cli.nix
           ../home/shared/packages/lsp.nix

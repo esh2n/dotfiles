@@ -1,9 +1,12 @@
 # macOS apps whose config lives outside ~/.config, or in two places.
+# Warp rewrites settings.toml itself: seeded once, never overwritten.
 { config, ... }:
 let
   link = config.lib.dotfiles.link;
 in
 {
+  dotfiles.setup.warp-seed.command = config.lib.dotfiles.devSetup "warp-seed";
+
   home.file = {
     ".warp".source = link "domains/dev/config/warp";
     ".orca".source = link "domains/dev/config/orca";
