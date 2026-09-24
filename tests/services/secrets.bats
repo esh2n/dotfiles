@@ -1,0 +1,87 @@
+#!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
+# domains/dev/config/litellm/secrets.sh: what every headless launcher (the
+# LiteLLM proxy, jig-decision, proxy-key.sh) uses to reach 1Password without
+# a prompt. The service-account token comes from the OS's own store — the
+# login Keychain on macOS, the Secret Service (libsecret) on Linux
+# (plans/2026-09-24-dotfiles-architecture.md, "秘密情報").
+
+LIB="${BATS_TEST_DIRNAME}/../../domains/dev/config/litellm/secrets.sh"
+
+setup() {
+	BIN="${BATS_TEST_TMPDIR}/bin"
+	LOG="${BATS_TEST_TMPDIR}/calls.log"
+	mkdir -p "${BIN}"
+	fake security 'echo keychain-token'
+	fake secret-tool 'echo libsecret-token'
+	fake timeout 'shift; exec "$@"'
+	fake sleep ':'
+}
+
+fake() { # fake <name> <body>: a command that records its call, then runs body
+	printf '#!/usr/bin/env bash\necho "%s $*" >>"%s"\n%s\n' "$1" "${LOG}" "$2" >"${BIN}/$1"
+	chmod +x "${BIN}/$1"
+}
+
+os() { fake uname "echo $1"; }
+
+in_lib() { DOTFILES_SERVICE_PATH="${BIN}:/usr/bin:/bin" PATH="${BIN}:/usr/bin:/bin" bash -c "set -euo pipefail; source '${LIB}'; $1"; }
+
+@test "secrets: on macOS the op token comes from the login Keychain" {
+	os Darwin
+	run --separate-stderr in_lib 'export_op_token; echo "$OP_SERVICE_ACCOUNT_TOKEN"'
+	[ "$status" -eq 0 ]
+	[ "$output" = "keychain-token" ]
+	grep -q "^security find-generic-password -s litellm-op-token -w" "${LOG}"
+}
+
+@test "secrets: on Linux the op token comes from the Secret Service" {
+	os Linux
+	run --separate-stderr in_lib 'export_op_token; echo "$OP_SERVICE_ACCOUNT_TOKEN"'
+	[ "$status" -eq 0 ]
+	[ "$output" = "libsecret-token" ]
+	grep -q "^secret-tool lookup service litellm-op-token" "${LOG}"
+}
+
+@test "secrets: an empty store is a failure that says how to fill it" {
+	os Linux
+	fake secret-tool ':'
+	run --separate-stderr in_lib 'export_op_token; echo reached'
+	[ "$status" -ne 0 ]
+	[[ "$output" != *reached* ]]
+	[[ "$stderr" == *"secret-tool store"* ]]
+}
+
+@test "secrets: read_secret retries an empty first read once" {
+	os Darwin
+	fake op 'n=$(grep -c "^op " "'"${LOG}"'"); [ "$n" -ge 2 ] && echo value || true'
+	run --separate-stderr in_lib 'read_secret op://v/i/f'
+	[ "$status" -eq 0 ]
+	[ "$output" = "value" ]
+	[ "$(grep -c '^op read op://v/i/f' "${LOG}")" -eq 2 ]
+}
+
+@test "secrets: read_secret aborts when both reads are empty" {
+	os Darwin
+	fake op ':'
+	run --separate-stderr in_lib 'x="$(read_secret op://v/i/f)"; echo reached'
+	[ "$status" -ne 0 ]
+	[[ "$output" != *reached* ]]
+	[[ "$stderr" == *"op://v/i/f"* ]]
+}
+
+@test "secrets: the service PATH names both Nix profiles" {
+	os Linux
+	run --separate-stderr env -u DOTFILES_SERVICE_PATH PATH="${BIN}:/usr/bin:/bin" bash -c "source '${LIB}'; echo \"\$PATH\""
+	[[ "$output" == *"/etc/profiles/per-user/"* ]]
+	[[ "$output" == *"/.nix-profile/bin"* ]]
+}
+
+@test "secrets: the launchers read the token only through this library" {
+	C="${BATS_TEST_DIRNAME}/../../domains/dev/config"
+	run grep -ln "security find-generic-password" "${C}/litellm/litellm-up.sh" "${C}/litellm/proxy-key.sh" "${C}/jig/jig-decision-up.sh"
+	[ "$status" -eq 1 ]
+	for f in "${C}/litellm/litellm-up.sh" "${C}/litellm/proxy-key.sh" "${C}/jig/jig-decision-up.sh"; do
+		grep -qE '^source .*secrets\.sh"$' "$f"
+	done
+}
