@@ -6,12 +6,11 @@
  *   session_start      → the session's model, recorded (`session.ts`)
  *   before_agent_start → hold the session on its LiteLLM tier (`tier.ts`):
  *                        never a judgment, never automatic — the ruling
- *                        `2026-09-23-tier-fixed-main-subagent-escalation.md`
+ *                        `2026-09-23-tier-fixed-main-subagent-escalation.md`;
+ *                        then the skill router (`skill.ts`), the same
+ *                        `/skill` judgment Claude Code, pi and DSH use
  *   tool_result        → format the edited file, silently (`format.ts`)
  *   session_stop       → typecheck/lint once, capped (`gate.ts`)
- *
- * Skill selection at prompt submit stays Claude Code's (the decision names
- * it there); the prompt-submit slot here carries the tier router instead.
  *
  * Every handler swallows its own failures. Extensions run in omp's own
  * process with no isolation, and a throw out of a `tool_call` handler blocks
@@ -27,6 +26,7 @@ import { type GuardDeps, guardToolCall } from "./guard";
 import { resolveMcpServers } from "./mcp-servers";
 import type { OmpExtensionApi } from "./omp";
 import { recordSession } from "./session";
+import { routeSkill } from "./skill";
 import { createTierRouter } from "./tier";
 
 export { guardToolCall } from "./guard";
@@ -42,6 +42,7 @@ export {
 } from "./gate";
 export { canonicalMcpName, editedPaths, hashlineOperations, mapToolCall } from "./map";
 export { recordSession, sessionRecordOf } from "./session";
+export { routeSkill } from "./skill";
 
 export default function (pi: OmpExtensionApi): void {
   const tier = createTierRouter();
@@ -61,7 +62,7 @@ export default function (pi: OmpExtensionApi): void {
       // Routing that fails keeps the current model; it never touches the turn.
       console.error(`tier-router: ${error instanceof Error ? error.message : String(error)}`);
     }
-    return undefined;
+    return routeSkill(event, ctx);
   });
   pi.registerCommand?.("tier", {
     description:

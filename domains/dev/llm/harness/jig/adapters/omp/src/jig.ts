@@ -27,6 +27,7 @@ type LoadPolicy = typeof import("../../../src/app/hooks/load-policy");
 type Parse = typeof import("../../../src/domain/policy/parse");
 type Audit = typeof import("../../../src/infra/audit/jsonl-audit");
 type SessionLog = typeof import("../../../src/infra/logs/session-log");
+type SkillClient = typeof import("../../../src/infra/decision/skill-client");
 
 export interface Jig {
   readonly env: Environment;
@@ -35,6 +36,7 @@ export interface Jig {
   readonly parse: Parse;
   readonly audit: Audit;
   readonly sessions: SessionLog;
+  readonly skill: SkillClient;
 }
 
 /** jig's source tree, found from where this file really lives. */
@@ -63,6 +65,7 @@ export function jig(): Promise<Jig> {
         parse: (await import(join(JIG_SRC, "domain", "policy", "parse.ts"))) as Parse,
         audit: (await import(join(JIG_SRC, "infra", "audit", "jsonl-audit.ts"))) as Audit,
         sessions: (await import(join(JIG_SRC, "infra", "logs", "session-log.ts"))) as SessionLog,
+        skill: (await import(join(JIG_SRC, "infra", "decision", "skill-client.ts"))) as SkillClient,
       };
     } catch (error) {
       modules = undefined;

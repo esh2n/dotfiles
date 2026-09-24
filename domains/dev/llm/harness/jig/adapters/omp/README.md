@@ -8,6 +8,7 @@ One omp extension carrying the five hooks
 | `tool_call` | the guard — the enforcement point | `src/guard.ts` |
 | `session_start` | the session's model, written to `sessions.jsonl` | `src/session.ts` |
 | `before_agent_start` | hold the session on its LiteLLM tier (`proxy/main` unless `/tier` or `OMP_TIER` picked another): put the model back when omp's startup order or a `/model` pick landed on a direct provider — never a judgment, never automatic (`rules/decisions/2026-09-23-tier-fixed-main-subagent-escalation.md`); the same hold runs at `session_start` | `src/tier.ts` |
+| `before_agent_start` (after the tier hold) | skill selection: the prompt goes to jig's judgment service (`/skill`), and a match comes back as one hidden message naming the skill's SKILL.md — never a system-prompt rewrite; `OMP_SKILL_ROUTER=off` turns it off | `src/skill.ts` |
 | `tool_result` | format the edited file, silently — the project's lefthook / pre-commit first, jig's table only without one | `src/format.ts` |
 | `session_stop` | the project's hooks on the touched files, else typecheck/lint; once, capped at 2 continuations | `src/gate.ts` |
 

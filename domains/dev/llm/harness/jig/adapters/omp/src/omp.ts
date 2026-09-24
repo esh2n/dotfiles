@@ -73,8 +73,20 @@ export interface OmpBeforeAgentStartEvent {
   readonly images?: readonly unknown[];
 }
 
-/** `{override?, customMessages?, cancel?}` — the router returns nothing: it never rewrites or cancels a turn. */
-export type OmpBeforeAgentStartResult = Record<string, never>;
+/**
+ * What a `before_agent_start` handler may return. omp's runner
+ * (`emitBeforeAgentStart`, omp 18.0.4) collects each handler's `message` into
+ * the turn and takes `systemPrompt` as an override. jig returns only
+ * `message` — the skill reminder — and never touches the system prompt, the
+ * cached prefix.
+ */
+export interface OmpBeforeAgentStartResult {
+  readonly message?: {
+    readonly customType: string;
+    readonly content: string;
+    readonly display: boolean;
+  };
+}
 
 /** `ToolCallEvent`: `{type, toolCallId, toolName, input}`. */
 export interface OmpToolCallEvent {
