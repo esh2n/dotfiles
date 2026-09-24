@@ -56,6 +56,14 @@
         )
       );
 
+      # The home-manager bootstrap.sh runs on Linux, pinned by this flake's
+      # lock (the Mac switches from the built system's own tools).
+      apps = {
+        x86_64-linux.home-manager = {
+          type = "app";
+          program = lib.getExe inputs.home-manager.packages.x86_64-linux.home-manager;
+        };
+      };
       darwinConfigurations.mac = import ./lib/mk-darwin.nix { inherit inputs facts; };
       homeConfigurations.linux = import ./lib/mk-home.nix { inherit inputs facts; };
     };

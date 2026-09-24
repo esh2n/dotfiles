@@ -29,10 +29,13 @@ nix-darwin.lib.darwinSystem {
     {
       home-manager.useGlobalPkgs = true;
       home-manager.useUserPackages = true;
+      # Files the old layout left in place are kept as <name>.pre-next, the
+      # same extension bootstrap.sh gives home-manager on Linux.
+      home-manager.backupFileExtension = "pre-next";
       home-manager.users.${username} = {
         imports = [
           { _module.args.facts = facts; }
-          ../roles/options.nix
+          ../roles
           ../home/shared/base.nix
           ../home/shared/lib
           ../home/shared/zsh
