@@ -43,7 +43,24 @@ Remote from a phone = SSH tunnel to `127.0.0.1:3080` (no cloud). Sessions are
 event-sourced JSONL server-side, so phone↔PC continuity is "both hit the same
 `dsh web` over the tunnel."
 
-## Guard hook
+## jig plugin
+
+Both profiles (`profiles/proxy/cordis.patch.yml`, `profiles/headless/cordis.patch.yml`)
+compose jig's own cordis plugin, `@esh2n/jig-dsh-guard`
+(`domains/dev/llm/harness/jig/adapters/dsh`, built by `make update`). It
+subscribes four DSH events, so dsh gets what Claude Code, pi and omp get:
+
+| DSH event | what runs | file |
+|---|---|---|
+| `agent/pre-step` | skill selection: a human's message goes to jig's judgment service (`/skill`); a match is appended as one message naming the SKILL.md. `DSH_SKILL_ROUTER=off` turns it off | `src/skill.ts` |
+| `tools/pre-execute` | the guard, the same evaluator and policy as every other harness | `src/index.ts` |
+| `tools/post-execute` | format the file `write` / `edit` / `str_replace_editor` wrote, silently | `src/format.ts` |
+| `agent/turn-stopping` | typecheck/lint (the project's hooks first); a failure is steered back, at most twice per session | `src/gate.ts` |
+
+The section below describes the bridge the plugin replaced; `hooks.claude.json`
+is still installed but no profile composes the bridge.
+
+### Before the plugin: the Claude Code bridge
 
 `hooks.claude.json` wires dsh into jig's PreToolUse hook via the official
 `@deepseek-ai/dsh-hooks-claude-code` bridge, so dsh reads the same shared

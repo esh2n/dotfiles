@@ -22,6 +22,11 @@
  * dsh-base, `policy: ask` unless DSH_PERMISSION_MODE=danger-full-access)
  * prompts the user, and denies when nothing can prompt. Never an allow.
  *
+ * The same plugin also routes skills (`agent/pre-step`, `./skill.ts`),
+ * formats each written file (`tools/post-execute`, `./format.ts`) and gates
+ * the end of a turn (`agent/turn-stopping`, `./gate.ts`), so DSH gets what
+ * Claude Code, pi and omp get.
+ *
  * Built with `bun build --target node` into `lib/index.js` (dsh loads plain
  * JS); jig's core and unbash are bundled in.
  */
@@ -38,6 +43,14 @@ import type { Decision, ToolCall } from "../../../src/domain/hooks/decision";
 import type { Principal } from "../../../src/domain/policy/request";
 import type { AuditLog, Logger } from "../../../src/domain/ports";
 import { JsonlAuditLog } from "../../../src/infra/audit/jsonl-audit";
+import { formatAfterExecute } from "./format";
+import { type DshStoppingAgent, gateOnTurnStopping } from "./gate";
+import {
+  type DshPreStepDecision,
+  type DshStepAgent,
+  type DshStepMessage,
+  routeStep,
+} from "./skill";
 
 // --- the slice of dsh's contract this plugin touches (structural, version 0.1.5-rc.2) ---
 
@@ -60,7 +73,15 @@ export type DshPreToolDecision =
   | { readonly kind: "deny"; readonly reason: string }
   | { readonly kind: "ask"; readonly reason?: string };
 
-/** The cordis context surface used: one event subscription. */
+/** `ToolExecutionResult` from @deepseek-ai/dsh-tools, the field read here. */
+export interface DshToolExecutionResult {
+  readonly isError: boolean;
+}
+
+/** `PostToolDecision` from @deepseek-ai/dsh-tools; passed through untouched. */
+export type DshPostToolDecision = unknown;
+
+/** The cordis context surface used: four event subscriptions. */
 export interface DshContext {
   on(
     event: "tools/pre-execute",
@@ -68,6 +89,25 @@ export interface DshContext {
       exec: DshToolExecution,
       next: () => Promise<DshPreToolDecision>,
     ) => Promise<DshPreToolDecision>,
+  ): unknown;
+  on(
+    event: "tools/post-execute",
+    listener: (
+      exec: DshToolExecution,
+      result: DshToolExecutionResult,
+      next: () => Promise<DshPostToolDecision>,
+    ) => Promise<DshPostToolDecision>,
+  ): unknown;
+  on(
+    event: "agent/pre-step",
+    listener: (
+      payload: { readonly agent: DshStepAgent; readonly messages: readonly DshStepMessage[] },
+      next: () => Promise<DshPreStepDecision>,
+    ) => Promise<DshPreStepDecision>,
+  ): unknown;
+  on(
+    event: "agent/turn-stopping",
+    listener: (payload: { readonly agent: DshStoppingAgent }) => Promise<void>,
   ): unknown;
 }
 
@@ -195,9 +235,23 @@ export async function guardExecution(
   }
 }
 
-/** cordis entry point. */
+/**
+ * cordis entry point: the skill router when a human's message enters a step,
+ * the guard before every tool call, the formatter after every successful
+ * write, and the typecheck/lint gate when a turn is about to close (`rules/decisions/2026-09-22-format-on-edit-gate-on-stop.md`). The
+ * formatter and the gate never throw into DSH: a failure there is a skip.
+ */
 export function apply(ctx: DshContext, config: GuardConfig = {}): void {
   const audit = new JsonlAuditLog(resolveAuditPath(process.env));
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   ctx.on("tools/pre-execute", (exec, next) => guardExecution(exec, next, { audit, timeoutMs }));
+  ctx.on("tools/post-execute", async (exec, result, next) => {
+    const cwd = exec.agent?.session.header.cwd ?? process.cwd();
+    await formatAfterExecute(exec.name, exec.arguments, result.isError, cwd).catch(() => undefined);
+    return next();
+  });
+  ctx.on("agent/pre-step", (payload, next) => routeStep(payload, next));
+  ctx.on("agent/turn-stopping", async ({ agent }) => {
+    await gateOnTurnStopping(agent).catch(() => undefined);
+  });
 }
