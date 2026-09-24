@@ -22,6 +22,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/bin
     ../home/shared/configs
     ../home/shared/templated
+    ../home/shared/serena
     ../home/linux/git
     ../home/shared/packages/cli.nix
     ../home/shared/packages/lsp.nix
