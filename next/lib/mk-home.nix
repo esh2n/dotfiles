@@ -20,6 +20,8 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/tig
     ../home/shared/crit
     ../home/shared/bin
+    ../home/shared/configs
+    ../home/linux/git
     ../home/shared/packages/cli.nix
     ../home/shared/packages/lsp.nix
   ];

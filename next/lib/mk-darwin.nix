@@ -40,6 +40,8 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/crit
           ../home/shared/bin
           ../home/darwin/bin
+          ../home/shared/configs
+          ../home/darwin/configs
           ../home/shared/packages/cli.nix
           ../home/shared/packages/lsp.nix
           ../home/darwin/packages.nix

@@ -7,8 +7,9 @@
 # there. CI and a normal shell leave it unset and use the daemon.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# Links point into the checkout under test (next/lib/facts.nix reads this).
-export DOTFILES_ROOT="${DOTFILES_ROOT:-${REPO_ROOT}}"
+# Links point into the checkout under test (next/lib/facts.nix reads this) —
+# always this checkout, whatever the calling shell exported.
+export DOTFILES_ROOT="${REPO_ROOT}"
 
 nix_eval_expr_json() { # nix_eval_expr_json <nix expression>
 	local -a store=()
