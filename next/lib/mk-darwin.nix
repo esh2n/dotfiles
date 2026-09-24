@@ -43,6 +43,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/configs
           ../home/shared/templated
           ../home/shared/serena
+          ../home/shared/harness
           ../home/darwin/apps
           ../home/darwin/configs
           ../home/shared/packages/cli.nix
