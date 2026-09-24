@@ -20,6 +20,11 @@ nix-darwin.lib.darwinSystem {
   inherit system;
   specialArgs = { inherit username; };
   modules = [
+    # Facts reach modules as an overridable module argument, not specialArgs
+    # (the NixOS manual keeps specialArgs for what imports need).
+    { _module.args.facts = facts; }
+    ../roles/options.nix
+
     (legacy + "/darwin.nix")
 
     (domains + "/dev/packages/homebrew.nix")
