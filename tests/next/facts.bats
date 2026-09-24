@@ -42,7 +42,7 @@ facts_roles() {
 }
 
 facts_attr_without_home() { # facts_attr_without_home <attr>
-	env -u HOME XDG_CACHE_HOME="${XDG_CACHE_HOME:-}" DOTFILES_NIX_STORE="${DOTFILES_NIX_STORE:-}" \
+	env -u HOME XDG_CACHE_HOME="${XDG_CACHE_HOME:-}" DOTFILES_NIX_STORE="${DOTFILES_NIX_STORE:-}" DOTFILES_TEST_KEEP_ROLES_FILE=1 \
 		bash -c 'source "$1"; nix_eval_expr_json "(import $2/next/lib/facts.nix).$3"' _ \
 		"${BATS_TEST_DIRNAME}/../lib/nix.bash" "${REPO_ROOT}" "$1"
 }

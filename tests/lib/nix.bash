@@ -10,6 +10,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # Links point into the checkout under test (next/lib/facts.nix reads this) —
 # always this checkout, whatever the calling shell exported.
 export DOTFILES_ROOT="${REPO_ROOT}"
+# No roles unless a test writes its own file: the machine's own roles file
+# (~/.config/dotfiles/roles.json) must never decide what a test sees.
+# A helper that re-sources this file in a child keeps the test's own setting
+# with DOTFILES_TEST_KEEP_ROLES_FILE=1.
+if [[ "${DOTFILES_TEST_KEEP_ROLES_FILE:-}" != 1 ]]; then
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR:-${BATS_RUN_TMPDIR:-/nonexistent}}/no-roles.json"
+fi
 
 nix_eval_expr_json() { # nix_eval_expr_json <nix expression>
 	local -a store=()
