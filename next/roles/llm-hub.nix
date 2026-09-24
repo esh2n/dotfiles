@@ -9,4 +9,8 @@
 }:
 lib.mkIf (config.dotfiles.roles.llm-hub.enable && pkgs.stdenv.hostPlatform.isDarwin) {
   dotfiles.services.lmstudio-awake.enable = true;
+  dotfiles.homeLlm = {
+    enable = true;
+    hub = true;
+  };
 }

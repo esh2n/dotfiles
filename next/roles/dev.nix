@@ -5,4 +5,5 @@
 lib.mkIf config.dotfiles.roles.dev.enable {
   dotfiles.services.litellm-proxy.enable = true;
   dotfiles.services.jig-decision.enable = true;
+  dotfiles.homeLlm.enable = true;
 }

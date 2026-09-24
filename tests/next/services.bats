@@ -61,3 +61,24 @@ print(json.dumps(v))' "${@:2}"; }
 	[ "$status" -eq 0 ]
 	[ "$output" = '["jig-decision","litellm-proxy"]' ]
 }
+
+setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
+	local cfg
+	if [ "$1" = darwin ]; then cfg="darwinConfigurations.mac.config.home-manager.users.\"${USER}\""; else cfg="homeConfigurations.linux.config"; fi
+	nix_eval_expr_json "let s = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").${cfg}.dotfiles.setup.home-llm; in if s.enable then s.command else null"
+}
+
+@test "services: the home-LLM steps run as hub on an llm-hub mac, as node on a dev machine, not at all without dev" {
+	roles '"dev", "llm-hub"'
+	run --separate-stderr setup_cmd darwin
+	[[ "$output" == *"home-llm-setup ${REPO_ROOT} hub\"" ]]
+	roles '"dev"'
+	run --separate-stderr setup_cmd darwin
+	[[ "$output" == *"home-llm-setup ${REPO_ROOT} node\"" ]]
+	roles '"dev", "llm-hub"'
+	run --separate-stderr setup_cmd linux
+	[[ "$output" == *" node\"" ]]
+	roles ''
+	run --separate-stderr setup_cmd darwin
+	[ "$output" = null ]
+}

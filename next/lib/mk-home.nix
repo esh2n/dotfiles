@@ -33,6 +33,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ./mk-service.nix
     ./mk-setup.nix
     ../home/shared/services
+    ../home/shared/home-llm
     ../home/linux/git
     ../home/shared/packages/cli.nix
     ../home/shared/packages/lsp.nix
