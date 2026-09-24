@@ -20,6 +20,13 @@ in
     inherit (c.system.defaults) dock finder NSGlobalDomain;
   };
   stateVersion = c.system.stateVersion;
+  primaryUser = c.system.primaryUser;
+  nixbldGid = c.ids.gids.nixbld;
+  nixFeatures = c.nix.settings.experimental-features;
+  homebrew = {
+    inherit (c.homebrew) enable;
+    inherit (c.homebrew.onActivation) autoUpdate cleanup;
+  };
   homeStateVersion = c.home-manager.users.${user}.home.stateVersion;
   homeDirectory = c.home-manager.users.${user}.home.homeDirectory;
   direnv = c.home-manager.users.${user}.programs.direnv.enable;
