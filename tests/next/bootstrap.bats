@@ -185,3 +185,15 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 	[ "$status" -eq 0 ]
 	[ "$output" = '"pre-next"' ]
 }
+
+@test "bootstrap: the taps it trusts, computed from the flake, are the ones the old hand-kept list named" {
+	expr="$(sed -n '/--apply/,/concatStringsSep/p' "${BOOT}" | sed "1s/.*--apply '//; \$s/')\"\$//")"
+	local -a store=()
+	[[ -n "${DOTFILES_NIX_STORE:-}" ]] && store=(--store "${DOTFILES_NIX_STORE}")
+	run --separate-stderr nix --extra-experimental-features 'nix-command flakes' eval "${store[@]}" --impure --raw \
+		"git+file://${REPO_ROOT}?dir=next#darwinConfigurations.mac.config.homebrew" --apply "$expr"
+	[ "$status" -eq 0 ]
+	got="$(tr ' ' '\n' <<<"$output" | tr '[:upper:]' '[:lower:]' | sort | tr '\n' ' ')"
+	old="$(sed -n '/local taps=(/,/)/p' "${REPO_ROOT}/core/utils/homebrew.sh" | grep -Eo '[a-z0-9-]+/[a-z0-9-]+' | tr '[:upper:]' '[:lower:]' | sort | tr '\n' ' ')"
+	[ "$got" = "$old" ] || { echo "got: $got"; echo "old: $old"; false; }
+}
