@@ -30,6 +30,7 @@ set -euo pipefail
 # PATH, export_op_token and read_secret (Keychain on macOS, libsecret on Linux)
 # shellcheck source=SCRIPTDIR/secrets.sh
 source "$(dirname "${BASH_SOURCE[0]}")/secrets.sh"
+use_service_path
 
 CFG_DIR="$HOME/.config/litellm"
 IMAGE="ghcr.io/berriai/litellm@sha256:114aca7726c311915c8ea5120fcc44d32a0648c3ae3aec41a1014f0e846b16d1"
@@ -60,6 +61,8 @@ export TYPESAFE_API_KEY
 #    Studio is served on the tailnet (`tailscale serve --bg --tcp 1234
 #    127.0.0.1:1234`, run once on the Mac). No per-machine file, no hostname
 #    branch: a machine that later gets its own LM Studio switches by itself.
+#    The local branch is the Mac's (LM Studio runs on macOS only, 2026-09-24
+#    decision); a Linux machine reaches the models over the tailnet.
 LM_STUDIO_REMOTE_HOST="${LM_STUDIO_REMOTE_HOST:-}"   # the Mac's MagicDNS name, e.g. mac.tail1234.ts.net
 if curl -sf --max-time 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1; then
   LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"
@@ -84,14 +87,8 @@ fi
 #    and only 4001 becomes reachable — from the owner's own devices, per
 #    domains/dev/config/tailscale/acl.hujson. Same decision record as step 4.
 METRICS_PORT=4001
-# host.docker.internal exists by itself on macOS runtimes; Linux Docker adds it
-# only when asked (host-gateway = the host's bridge address).
-HOST_GATEWAY=()
-if [ "$(uname -s)" = Linux ]; then
-  HOST_GATEWAY=(--add-host=host.docker.internal:host-gateway)
-fi
 docker rm -f "$NAME" >/dev/null 2>&1 || true
-exec docker run --rm --name "$NAME" ${HOST_GATEWAY[@]+"${HOST_GATEWAY[@]}"} \
+exec docker run --rm --name "$NAME" \
   -p 127.0.0.1:4000:4000 \
   -p "127.0.0.1:${METRICS_PORT}:${METRICS_PORT}" \
   -v "$CFG_DIR/config.yaml":/app/config.yaml \

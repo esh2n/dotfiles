@@ -12,5 +12,6 @@
 set -euo pipefail
 # shellcheck source=SCRIPTDIR/secrets.sh
 source "$(dirname "${BASH_SOURCE[0]}")/secrets.sh"
+use_service_path
 export_op_token
 exec timeout 30 op read op://llm-automation/litellm/credential

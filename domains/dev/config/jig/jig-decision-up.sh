@@ -30,6 +30,7 @@ set -euo pipefail
 # PATH, export_op_token and read_secret (Keychain on macOS, libsecret on Linux)
 # shellcheck source=SCRIPTDIR/../litellm/secrets.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../litellm/secrets.sh"
+use_service_path
 
 # Where the jig checkout lives. Set by the plist (from {{DOTFILES_ROOT}} at
 # apply time); this fallback is only for a manual/ad-hoc run where JIG_DIR

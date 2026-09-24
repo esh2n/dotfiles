@@ -8,11 +8,15 @@
 #   macOS: security add-generic-password -a "$USER" -s litellm-op-token -w '<token>'
 #   Linux: secret-tool store --label='1Password service account' service litellm-op-token
 
-# launchd and systemd hand services a minimal PATH; name the tools' real
-# locations: nix-darwin's per-user profile, standalone home-manager's profile,
-# Homebrew, then the system. DOTFILES_SERVICE_PATH replaces the list whole
-# (tests put their stand-ins there).
-export PATH="${DOTFILES_SERVICE_PATH:-/etc/profiles/per-user/$(id -un)/bin:${HOME}/.nix-profile/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
+# use_service_path: launchd and systemd hand services a minimal PATH, and an
+# inherited one is not trusted to find `security`, `secret-tool` or `op`.
+# Replace it with the tools' real locations: nix-darwin's per-user profile,
+# standalone home-manager's profile, Homebrew, then the system. Every launcher
+# calls this first; nothing can override the list.
+use_service_path() {
+  PATH="/etc/profiles/per-user/$(id -un)/bin:${HOME}/.nix-profile/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  export PATH
+}
 
 OP_TOKEN_ITEM="litellm-op-token"
 

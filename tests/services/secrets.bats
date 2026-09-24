@@ -25,7 +25,7 @@ fake() { # fake <name> <body>: a command that records its call, then runs body
 
 os() { fake uname "echo $1"; }
 
-in_lib() { DOTFILES_SERVICE_PATH="${BIN}:/usr/bin:/bin" PATH="${BIN}:/usr/bin:/bin" bash -c "set -euo pipefail; source '${LIB}'; $1"; }
+in_lib() { PATH="${BIN}:/usr/bin:/bin" bash -c "set -euo pipefail; source '${LIB}'; $1"; }
 
 @test "secrets: on macOS the op token comes from the login Keychain" {
 	os Darwin
@@ -70,11 +70,13 @@ in_lib() { DOTFILES_SERVICE_PATH="${BIN}:/usr/bin:/bin" PATH="${BIN}:/usr/bin:/b
 	[[ "$stderr" == *"op://v/i/f"* ]]
 }
 
-@test "secrets: the service PATH names both Nix profiles" {
+@test "secrets: the service PATH is fixed and names both Nix profiles, whatever was inherited" {
 	os Linux
-	run --separate-stderr env -u DOTFILES_SERVICE_PATH PATH="${BIN}:/usr/bin:/bin" bash -c "source '${LIB}'; echo \"\$PATH\""
-	[[ "$output" == *"/etc/profiles/per-user/"* ]]
+	run --separate-stderr in_lib 'PATH="/evil:$PATH"; use_service_path; echo "$PATH"'
+	[[ "$output" == "/etc/profiles/per-user/"* ]]
 	[[ "$output" == *"/.nix-profile/bin"* ]]
+	[[ "$output" != *"/evil"* ]]
+	[[ "$output" != *"${BIN}"* ]]
 }
 
 @test "secrets: the launchers read the token only through this library" {
@@ -83,5 +85,7 @@ in_lib() { DOTFILES_SERVICE_PATH="${BIN}:/usr/bin:/bin" PATH="${BIN}:/usr/bin:/b
 	[ "$status" -eq 1 ]
 	for f in "${C}/litellm/litellm-up.sh" "${C}/litellm/proxy-key.sh" "${C}/jig/jig-decision-up.sh"; do
 		grep -qE '^source .*secrets\.sh"$' "$f"
+		# the fixed PATH comes before any tool is looked up
+		[ "$(grep -n '^use_service_path$' "$f" | cut -d: -f1)" -lt "$(grep -n '^export_op_token$' "$f" | cut -d: -f1)" ]
 	done
 }
