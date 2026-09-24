@@ -4,6 +4,7 @@
 # environment itself.
 #
 #   username  $USER ("ci" under pure evaluation)
+#   home      $HOME (the platform default for username under pure evaluation)
 #   roles     the machine-local roles file: $DOTFILES_ROLES_FILE, else
 #             ~/.config/dotfiles/roles.json. Never committed — which roles a
 #             machine takes is chosen on the machine; what a role means is
@@ -39,5 +40,6 @@ let
 in
 {
   username = if user == "" then "ci" else user;
+  home = if home != "" then home else null;
   roles = if rolesFile != "" && builtins.pathExists rolesFile then parseRoles rolesFile else [ ];
 }

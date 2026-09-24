@@ -1,0 +1,21 @@
+# Builds standalone home-manager for Linux (Omarchy): no system layer — the
+# OS is Omarchy's — only the user's home.
+{ inputs, facts }:
+let
+  system = "x86_64-linux";
+  pkgs = import inputs.nixpkgs {
+    inherit system;
+    overlays = import ./overlays.nix { inherit inputs system; };
+    config.allowUnfree = true;
+  };
+in
+inputs.home-manager.lib.homeManagerConfiguration {
+  inherit pkgs;
+  modules = [
+    { _module.args.facts = facts; }
+    ../roles/options.nix
+    ../home/shared/base.nix
+    ../home/shared/packages/cli.nix
+    ../home/shared/packages/lsp.nix
+  ];
+}

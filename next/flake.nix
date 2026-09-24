@@ -44,5 +44,6 @@
     in
     {
       darwinConfigurations.mac = import ./lib/mk-darwin.nix { inherit inputs facts; };
+      homeConfigurations.linux = import ./lib/mk-home.nix { inherit inputs facts; };
     };
 }

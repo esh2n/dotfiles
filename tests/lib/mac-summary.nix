@@ -5,7 +5,8 @@
 { flake, config, user }:
 let
   c = (builtins.getFlake flake).darwinConfigurations.${config}.config;
-  sorted = builtins.sort builtins.lessThan;
+  # Sets, not lists: duplicates across modules and their order carry no meaning.
+  sorted = xs: builtins.sort builtins.lessThan (builtins.attrNames (builtins.listToAttrs (map (n: { name = n; value = null; }) xs)));
   names = map (x: if builtins.isString x then x else x.name);
 in
 {
@@ -20,4 +21,6 @@ in
   };
   stateVersion = c.system.stateVersion;
   homeStateVersion = c.home-manager.users.${user}.home.stateVersion;
+  homeDirectory = c.home-manager.users.${user}.home.homeDirectory;
+  direnv = c.home-manager.users.${user}.programs.direnv.enable;
 }
