@@ -112,6 +112,14 @@ dotfiles/
   - **変えました（2026-09-25）**: 以前は「`llm-hub` で LiteLLM」としていました。LiteLLM は裁定で「どの機械にも一つ」なので、harness を使う機械の役割である `dev` に移しました。
 - 秘密情報: 1Password のサービスアカウントのトークンを OS の保管場所から読む。Mac は login Keychain、Linux は Secret Service（libsecret、Omarchy は gnome-keyring）。読み方は `domains/dev/config/litellm/secrets.sh` の一か所。
 
+## 5.5 セットアップの手順（宣言できないもの）
+
+- ツール自身の登録コマンド、書き換え可能な場所へのダウンロード、一度だけ置いてあとはアプリが持つ設定ファイルは、宣言にできない。`lib/mk-setup.nix` の `dotfiles.setup.<名前>` に一行の宣言として書き、activation の linkGeneration の後に走らせる。失敗は警告だけで、switch は止めない（旧 installer と同じ約束）。
+- 中身は `pkgs/scripts/dev-setup`（旧 `domains/dev/install.sh` と `core/install/installer.sh` の手順を一つずつのサブコマンドに）と `pkgs/scripts/home-llm-setup`（旧 `home_llm()`。hub か node かは機械の役割で決める。以前は LM Studio.app があるかで決めていた）。ブラウザの拡張ポリシーと userstyle、SbarLua は、中身が移るまで各ドメインのスクリプトをそのまま呼ぶ。
+- 宣言する場所は機能のモジュール（`home/shared/{nvim,git,gh,mise,zellij,cargo-tools,harness,zsh}`、`home/darwin/{tmux,apps,codebase-memory,browsers,sketchybar}`、`home/shared/home-llm`）。Linux に無いのは tmux（Omarchy が持つ）、Warp、Codebase-Memory、ブラウザ、SbarLua。
+- `bootstrap.sh` が持つのは switch の前にしかできないこと: Homebrew を入れる、flake が宣言するサードパーティの tap を信頼させる（手で保つ一覧は廃止）、nix-darwin を初めて入れる Mac の `/etc/{bashrc,zshrc}` を退避する。switch の後にログインシェルを zsh に（`/etc/shells` に無ければ手順を示すだけ）。
+- 移さなかったもの: `brew unlink ollama`（Nix と Homebrew の両方に ollama があった移行期の回避策。今は Homebrew だけ）、node2nix（今の系でも配線されていない。M0 で消す）、事前・事後の検査（bootstrap が理由を出して止まる）、NvChad などの clone（中身はリポジトリにあり、リンクで届く）。
+
 ## 6. 自作ツール
 
 - **shell に残す**: 100 行未満で素直なもの（gh 拡張の更新、壁紙取得など）。`writeShellApplication` で包み（shellcheck が自動で走り、依存コマンドを固定）、共通関数は `pkgs/scripts/lib/` の一か所。テストは bats。
