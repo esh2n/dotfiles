@@ -1,10 +1,13 @@
 # Thin dispatcher over the existing scripts. No logic lives here — every target
 # just calls the script that owns the behavior. `make` alone prints this list.
 .DEFAULT_GOAL := help
-.PHONY: help update rebuild node2nix link template claude tailscale-acl retire-yoki install install-force
+.PHONY: help up update rebuild node2nix link template claude tailscale-acl retire-yoki install install-force
 
 help:            ## この一覧を出す
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
+
+up:              ## 新しい構成（next/）で入れる・更新する。何度でも同じ結果（install と update の区別なし）
+	./next/bootstrap.sh
 
 update:          ## nix build → activate → template/link → domain install → jig apply
 	./core/nix/update.sh
