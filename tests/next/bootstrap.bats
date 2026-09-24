@@ -13,7 +13,7 @@ setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
 	LOG="${BATS_TEST_TMPDIR}/calls.log"
 	mkdir -p "${BIN}"
-	stub mise curl
+	stub mise curl brew chsh
 	# Keep the real profiles off the PATH bootstrap extends after a switch.
 	export HOME="${BATS_TEST_TMPDIR}/home"
 	mkdir -p "${HOME}"
@@ -21,7 +21,7 @@ setup() {
 	chmod +x "${BIN}/id"
 	SYS="${BATS_TEST_TMPDIR}/system"
 	mkdir -p "${SYS}/sw/bin"
-	printf '#!/usr/bin/env bash\necho "nix $* [root=${DOTFILES_ROOT:-}] [home=${HOME}]" >>"%s"\n[[ " $* " == *" build "* ]] && echo "%s"\nexit "${NIX_EXIT:-0}"\n' "${LOG}" "${SYS}" >"${BIN}/nix"
+	printf '#!/usr/bin/env bash\necho "nix $* [root=${DOTFILES_ROOT:-}] [home=${HOME}]" >>"%s"\n[[ " $* " == *" build "* ]] && echo "%s"\n[[ " $* " == *" eval "* ]] && echo "felixkratz/formulae can1357/tap"\nexit "${NIX_EXIT:-0}"\n' "${LOG}" "${SYS}" >"${BIN}/nix"
 	chmod +x "${BIN}/nix"
 	printf '#!/usr/bin/env bash\necho "nix-env $*" >>"%s"\n' "${LOG}" >"${SYS}/sw/bin/nix-env"
 	printf '#!/usr/bin/env bash\necho "activate" >>"%s"\n' "${LOG}" >"${SYS}/activate"
@@ -117,6 +117,53 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 	rm -f "$f"
 	[ "$status" -eq 0 ]
 	[[ "$stderr" == *"untracked-bootstrap-probe.nix"* ]]
+}
+
+@test "bootstrap: on macOS Homebrew is installed first when missing, never on Linux" {
+	os Darwin
+	rm "${BIN}/brew"
+	# the "installer" the stub curl hands to bash puts a brew on PATH
+	cat >"${BATS_TEST_TMPDIR}/brew-installer" <<-INSTALLER
+		cp "${BIN}/chsh" "${BIN}/brew"
+	INSTALLER
+	printf '#!/usr/bin/env bash\necho "curl $*" >>"%s"\ncat "%s"\n' "${LOG}" "${BATS_TEST_TMPDIR}/brew-installer" >"${BIN}/curl"
+	run boot
+	[ "$status" -eq 0 ]
+	grep -q "^curl .*Homebrew/install/HEAD/install.sh" "${LOG}"
+	[ "$(grep -n '^curl .*Homebrew' "${LOG}" | cut -d: -f1)" -lt "$(grep -n '^nix .* build ' "${LOG}" | cut -d: -f1)" ]
+	os Linux
+	: >"${LOG}"
+	run boot
+	! grep -q "Homebrew" "${LOG}"
+}
+
+@test "bootstrap: third-party taps the flake names are trusted before activation, in both brew config homes" {
+	os Darwin
+	run boot
+	[ "$status" -eq 0 ]
+	grep -q "^nix .* eval .*${NEXT}#darwinConfigurations.mac.config.homebrew" "${LOG}"
+	[ "$(grep -c '^brew trust --tap felixkratz/formulae can1357/tap' "${LOG}")" -eq 2 ]
+	[ "$(grep -n '^brew trust --tap' "${LOG}" | head -1 | cut -d: -f1)" -lt "$(grep -n '^activate' "${LOG}" | cut -d: -f1)" ]
+}
+
+@test "bootstrap: the login shell becomes zsh when zsh is a listed shell" {
+	os Darwin
+	SHELL=/bin/bash run boot
+	[ "$status" -eq 0 ]
+	grep -q "^chsh -s /bin/zsh " "${LOG}"
+	: >"${LOG}"
+	SHELL=/bin/zsh run boot
+	! grep -q "^chsh" "${LOG}"
+}
+
+@test "bootstrap: a zsh missing from /etc/shells is reported, not forced" {
+	os Linux
+	printf '#!/bin/sh\n' >"${BIN}/zsh"
+	chmod +x "${BIN}/zsh"
+	SHELL=/bin/bash run --separate-stderr boot
+	[ "$status" -eq 0 ]
+	! grep -q "^chsh" "${LOG}"
+	[[ "$stderr" == *"/etc/shells"* ]]
 }
 
 @test "bootstrap: an unknown platform is refused by name" {
