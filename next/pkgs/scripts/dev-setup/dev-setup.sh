@@ -45,9 +45,11 @@ step_git_lfs() {
 
 step_gh_extensions() {
 	need gh || return 0
-	local extensions=(orangain/gh-pr-graph) ext
+	local extensions=(orangain/gh-pr-graph) ext installed
+	# read once: under pipefail, `gh ... | grep -q` can fail on a match
+	installed="$(gh extension list 2>/dev/null || true)"
 	for ext in "${extensions[@]}"; do
-		gh extension list 2>/dev/null | grep -Fq "${ext}" && continue
+		grep -Fq "${ext}" <<<"${installed}" && continue
 		gh extension install "${ext}"
 	done
 }
@@ -148,7 +150,10 @@ step_zellij_harpoon() {
 	need cargo || return 0
 	local version src
 	version="$(zellij --version | awk '{print $2}')"
+	need git || return 0
 	src="$(mktemp -d)"
+	# shellcheck disable=SC2064 # expand now: src is local
+	trap "rm -rf '${src}'" RETURN
 	git clone --depth 1 https://github.com/Nacho114/harpoon.git "${src}"
 	sed "s/zellij-tile = \".*\"/zellij-tile = \"${version}\"/" "${src}/Cargo.toml" >"${src}/Cargo.toml.new"
 	mv "${src}/Cargo.toml.new" "${src}/Cargo.toml"
@@ -156,7 +161,6 @@ step_zellij_harpoon() {
 	cargo build --manifest-path "${src}/Cargo.toml" --release --target wasm32-wasip1
 	mkdir -p "${dir}"
 	cp "${src}/target/wasm32-wasip1/release/harpoon.wasm" "${dir}/"
-	rm -rf "${src}"
 }
 
 # A reference checkout beside this one (jig does not read it).

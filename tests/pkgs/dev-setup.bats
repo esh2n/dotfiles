@@ -198,3 +198,23 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	[ "$status" -eq 0 ]
 	grep -qx "git clone https://github.com/affaan-m/everything-claude-code.git ${BATS_TEST_TMPDIR}/everything-claude-code" "${LOG}"
 }
+
+@test "dev-setup gh-extensions: an installed extension is found under pipefail too" {
+	echo "gh pr-graph  orangain/gh-pr-graph  v1" >"${BATS_TEST_TMPDIR}/ext"
+	fake gh 'if [ "$1 $2" = "extension list" ]; then cat "'"${BATS_TEST_TMPDIR}"'/ext"; yes filler | head -100000; fi'
+	PATH="${BIN}:/usr/bin:/bin" run bash -euo pipefail "${SCRIPT}" "${ROOT}" gh-extensions
+	[ "$status" -eq 0 ]
+	! grep -q "extension install" "${LOG}"
+}
+
+@test "dev-setup zellij-harpoon: a failed build leaves no scratch directory behind" {
+	fake zellij 'echo "zellij 0.43.1"'
+	fake cargo 'exit 1'
+	fake git 'mkdir -p "$5"; echo "[dependencies]" >"$5/Cargo.toml"'
+	fake rustup
+	export TMPDIR="${BATS_TEST_TMPDIR}/scratch"
+	mkdir -p "${TMPDIR}"
+	PATH="${BIN}:/usr/bin:/bin" run bash -euo pipefail "${SCRIPT}" "${ROOT}" zellij-harpoon
+	[ "$status" -ne 0 ]
+	[ -z "$(ls -A "${TMPDIR}")" ]
+}
