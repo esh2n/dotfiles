@@ -44,6 +44,9 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/templated
           ../home/shared/serena
           ../home/shared/harness
+          ./mk-service.nix
+          ../home/shared/services
+          ../home/darwin/lmstudio-awake
           ../home/darwin/apps
           ../home/darwin/configs
           ../home/shared/packages/cli.nix

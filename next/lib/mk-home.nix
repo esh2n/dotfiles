@@ -24,6 +24,8 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/templated
     ../home/shared/serena
     ../home/shared/harness
+    ./mk-service.nix
+    ../home/shared/services
     ../home/linux/git
     ../home/shared/packages/cli.nix
     ../home/shared/packages/lsp.nix
