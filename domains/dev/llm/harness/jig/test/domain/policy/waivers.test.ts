@@ -81,6 +81,43 @@ describe("reachesElsewhere", () => {
     );
   });
 
+  test("an environment assignment can point git elsewhere, so any assignment refuses the waiver", () => {
+    expect(
+      reachesElsewhere(
+        shell("GIT_DIR=/work/repo/.git GIT_WORK_TREE=/work/repo git push origin main"),
+        prefixes,
+      ),
+    ).toBe(true);
+    expect(
+      reachesElsewhere(shell("env GIT_DIR=/work/repo/.git git push origin main"), prefixes),
+    ).toBe(true);
+  });
+
+  test("git -c and --config-env rewrite config for one call", () => {
+    expect(
+      reachesElsewhere(
+        shell("git -c remote.origin.url=git@github.com:acme/x push origin main"),
+        prefixes,
+      ),
+    ).toBe(true);
+    expect(
+      reachesElsewhere(shell("git --config-env=remote.origin.url=U push origin main"), prefixes),
+    ).toBe(true);
+  });
+
+  test("a push that names its destination by URL or path goes elsewhere", () => {
+    expect(reachesElsewhere(shell("git push git@github.com:acme/x.git main"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("git push /work/repo main"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("git push https://github.com/acme/x main"), prefixes)).toBe(true);
+    expect(reachesElsewhere(shell("git push -u origin main"), prefixes)).toBe(false);
+  });
+
+  test("-C on another program does not count against the push", () => {
+    expect(reachesElsewhere(shell("grep -C 3 x notes.md && git push origin main"), prefixes)).toBe(
+      false,
+    );
+  });
+
   test("a cd or pushd on the same line leaves the cwd", () => {
     expect(reachesElsewhere(shell("cd /work/repo && git push origin main"), prefixes)).toBe(true);
     expect(reachesElsewhere(shell("pushd /work/repo; git push origin main"), prefixes)).toBe(true);
@@ -100,7 +137,13 @@ describe("reachesElsewhere", () => {
       false,
     );
     expect(reachesElsewhere(write("/work/repo/x"), prefixes)).toBe(true);
-    expect(reachesElsewhere(write("relative/x"), prefixes)).toBe(false);
+    const here = "/Users/owner/go/github.com/owner/dotfiles";
+    expect(reachesElsewhere(write("relative/x"), prefixes, here)).toBe(false);
+    expect(reachesElsewhere(write("../../acme/secret"), prefixes, here)).toBe(true);
+    expect(reachesElsewhere(write("/Users/owner/go/github.com/owner/../acme/x"), prefixes)).toBe(
+      true,
+    );
+    expect(reachesElsewhere(write("relative/x"), prefixes)).toBe(true);
   });
 });
 
@@ -134,6 +177,19 @@ describe("a waived rule, end to end through judge", () => {
     );
     expect(
       judge(bash("cd /work/repo && git push origin main"), at(personal), p).decision.kind,
+    ).toBe("deny");
+  });
+
+  test("GIT_DIR from a listed cwd is not waived, end to end", () => {
+    expect(
+      judge(bash("GIT_DIR=/work/repo/.git git push origin main"), at(personal), p).decision.kind,
+    ).toBe("deny");
+  });
+
+  test("a cwd that climbs out of the prefix with .. is not listed", () => {
+    expect(
+      judge(bash("git push origin main"), at("/Users/owner/go/github.com/owner/../acme/service"), p)
+        .decision.kind,
     ).toBe("deny");
   });
 
