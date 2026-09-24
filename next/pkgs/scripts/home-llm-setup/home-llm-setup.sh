@@ -22,6 +22,8 @@ case "${ROLE}" in hub | node) ;; *)
 esac
 
 OS="$(uname -s)"
+# LM Studio installs its CLI here; activation does not read the shell's rc.
+PATH="${HOME}/.lmstudio/bin:${PATH}"
 LITELLM="${ROOT}/domains/dev/config/litellm"
 TODO=()
 todo() { TODO+=("$*"); }
@@ -69,7 +71,15 @@ restart_litellm() {
 	case "${OS}" in
 	Darwin)
 		[[ "${ROLE}" == node && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && launchctl setenv LM_STUDIO_REMOTE_HOST "${LM_STUDIO_REMOTE_HOST}"
-		launchctl kickstart -k "gui/$(id -u)/com.esh2n.litellm-proxy" || todo "LiteLLM: launchctl kickstart failed"
+		local domain job=com.esh2n.litellm-proxy
+		domain="gui/$(id -u)"
+		# A loaded job is restarted in place; bootout-then-bootstrap races
+		# ("Input/output error"). One launchd has not loaded yet is loaded.
+		if launchctl print "${domain}/${job}" >/dev/null 2>&1; then
+			launchctl kickstart -k "${domain}/${job}" || todo "LiteLLM: launchctl kickstart failed"
+		else
+			launchctl bootstrap "${domain}" "${HOME}/Library/LaunchAgents/${job}.plist" || todo "LiteLLM: launchctl bootstrap failed"
+		fi
 		;;
 	*)
 		[[ "${ROLE}" == node && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && systemctl --user set-environment "LM_STUDIO_REMOTE_HOST=${LM_STUDIO_REMOTE_HOST}"

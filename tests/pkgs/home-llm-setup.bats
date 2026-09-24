@@ -104,3 +104,26 @@ hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"
 	[ "$(tail -1 "${LOG}")" = "check.sh" ]
 	[[ "$output" == *"check.sh reported failing"* ]]
 }
+
+@test "home-llm hub: finds lms where LM Studio puts it, off the activation PATH" {
+	export HOME="${BATS_TEST_TMPDIR}/home"
+	mkdir -p "${HOME}/.lmstudio/bin"
+	printf '#!/usr/bin/env bash\necho "lms $*" >>"%s"\n' "${LOG}" >"${HOME}/.lmstudio/bin/lms"
+	chmod +x "${HOME}/.lmstudio/bin/lms"
+	rm "${BIN}/lms"
+	fake curl 'case "$*" in *1234*) exit 7 ;; esac'
+	run hl hub
+	grep -q "^lms server start --port 1234" "${LOG}"
+}
+
+@test "home-llm: a LiteLLM job launchd does not have loaded yet is bootstrapped, a loaded one kickstarted" {
+	fake launchctl 'if [ "$1" = print ]; then exit 113; fi'
+	run hl node
+	grep -q "^launchctl bootstrap gui/[0-9]* .*/Library/LaunchAgents/com.esh2n.litellm-proxy.plist" "${LOG}"
+	! grep -q "kickstart" "${LOG}"
+	: >"${LOG}"
+	fake launchctl
+	run hl node
+	grep -q "^launchctl kickstart -k gui/.*/com.esh2n.litellm-proxy" "${LOG}"
+	! grep -q "^launchctl bootstrap" "${LOG}"
+}
