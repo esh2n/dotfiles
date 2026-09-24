@@ -130,9 +130,14 @@ fi
 # 4. Additional Setup
 # -----------------------------------------------------------------------------
 
+# --skip-repo: set up the global LFS filters only. A plain `git lfs install`
+# run from inside this checkout also drops a pre-push hook into it, and this
+# repository tracks no LFS files — the hook only ran `git lfs pre-push`, whose
+# TLS check fails inside Claude Code's macOS sandbox (Go + Seatbelt,
+# OSStatus -26276) and blocked every push from a session.
 if has_command "git-lfs"; then
-    log_info "Initializing git-lfs..."
-    git lfs install
+    log_info "Initializing git-lfs (global filters only)..."
+    git lfs install --skip-repo
 fi
 
 # GitHub CLI extensions are state managed by gh itself. Install missing
