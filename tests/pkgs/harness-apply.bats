@@ -73,3 +73,15 @@ jig codex register --write'
 	! grep -q '^jig codex register' "${LOG}"
 	grep -q '^jig apply --target codex --write' "${LOG}"
 }
+
+@test "harness-apply: codex's config is seeded once from the default, before jig writes into it" {
+	C="${ROOT}/domains/dev/config/codex"
+	mkdir -p "$C"
+	echo 'seed = true' >"${C}/config.toml.default"
+	run apply
+	[ "$status" -eq 0 ]
+	[ "$(cat "${C}/config.toml")" = 'seed = true' ]
+	echo 'trusted = "machine-local"' >"${C}/config.toml"
+	run apply
+	[ "$(cat "${C}/config.toml")" = 'trusted = "machine-local"' ]
+}

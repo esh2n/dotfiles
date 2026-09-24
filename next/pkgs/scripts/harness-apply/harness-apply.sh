@@ -6,7 +6,9 @@
 #   1. build jig's DSH plugin and give DSH its expanded copies
 #      ($DSH_HOME/hooks.claude.json; each scaffolded profile's
 #      cordis.patch.yml, plus the plugin linked into it with pnpm)
-#   2. `jig apply --target <h> --write` for claude, codex, pi, omp, dsh
+#   2. seed codex's config.toml once from config.toml.default (it then holds
+#      machine-local trust and hook state, so it is never overwritten), then
+#      `jig apply --target <h> --write` for claude, codex, pi, omp, dsh
 #   3. `jig codex register --write` when codex is installed
 # A missing tool is a warning, never a failure: activation must finish.
 set -euo pipefail
@@ -56,6 +58,12 @@ for profile_src in "${dsh_src}"/profiles/*/; do
 			warn "could not link the jig plugin into DSH profile ${profile}"
 	fi
 done
+
+# 2. codex's live config, seeded once — before jig writes its block into it
+codex_cfg="${root}/domains/dev/config/codex"
+if [[ ! -f "${codex_cfg}/config.toml" && -f "${codex_cfg}/config.toml.default" ]]; then
+	cp "${codex_cfg}/config.toml.default" "${codex_cfg}/config.toml"
+fi
 
 # 2 and 3. jig
 if [[ ! -f "${jig}" ]]; then
