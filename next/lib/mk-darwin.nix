@@ -60,6 +60,8 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/apps
           ../home/darwin/tmux
           ../home/darwin/codebase-memory
+          ../home/darwin/browsers
+          ../home/darwin/sketchybar
           ../home/darwin/configs
           ../home/shared/packages/cli.nix
           ../home/shared/packages/lsp.nix
