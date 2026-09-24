@@ -1,0 +1,60 @@
+name: next
+
+# The next/ layout: tests on both platforms, then a real build of each
+# platform's configuration (the tests only evaluate). The builds switch every
+# role on, so everything a role can add is built; tests write their own roles
+# files.
+
+on:
+  push:
+    branches: [main]
+    paths: ["next/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
+  pull_request:
+    paths: ["next/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          shellcheck -x next/bootstrap.sh next/pkgs/scripts/*/*.sh tests/run.sh \
+            domains/dev/config/litellm/{secrets,litellm-up,proxy-key}.sh \
+            domains/dev/config/jig/jig-decision-up.sh
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: roles
+        run: echo '{"roles":["base","dev","desktop","llm-hub","gpu"]}' > "$RUNNER_TEMP/roles.json"
+      - name: tests (platform-neutral and Linux)
+        run: bash tests/run.sh tests/next/facts.bats tests/next/layers.bats tests/next/linux.bats tests/next/bootstrap.bats tests/pkgs tests/services
+      - name: build homeConfigurations.linux
+        env:
+          DOTFILES_ROOT: ${{ github.workspace }}
+        run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build ./next#homeConfigurations.linux.activationPackage --impure --print-build-logs
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: roles
+        run: echo '{"roles":["base","dev","desktop","llm-hub"]}' > "$RUNNER_TEMP/roles.json"
+      - name: tests
+        run: bash tests/run.sh
+      - name: build darwinConfigurations.mac
+        env:
+          DOTFILES_ROOT: ${{ github.workspace }}
+        run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build ./next#darwinConfigurations.mac.system --impure --print-build-logs
