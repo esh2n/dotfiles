@@ -9,7 +9,7 @@
       mas
       nowplaying-cli
       cocoapods
-      codebase-memory-mcp # upstream ships macOS binaries only (core/nix/overlays.nix)
+      codebase-memory-mcp # upstream ships macOS binaries only (next/pkgs)
       mise
 
       # Fonts

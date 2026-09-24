@@ -1,0 +1,50 @@
+#!/usr/bin/env bats
+bats_require_minimum_version 1.5.0
+# Packages this repo builds (next/pkgs) or overrides (next/overlays).
+# Every one must build exactly what the current layout builds — same
+# derivation, not only the same name, so a lost patch or pin is caught.
+
+load '../lib/nix.bash'
+
+# cargo-compete is compared separately below: the old overlay took openssl
+# from `prev` without callPackage and so linked a different openssl than the
+# rest of the system; next/pkgs uses callPackage and the system's openssl.
+OWN=(codebase-memory-mcp go-mockgen go-protoc-gen-go spanner-cli spanner-dump)
+OVERRIDDEN=(gh gotools)
+
+drv() { # drv <flake-dir> <config-name> <package>
+	nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=$1\").darwinConfigurations.\"$2\".pkgs.\"$3\".drvPath"
+}
+
+@test "pkgs: every package built or overridden here builds the same derivation as before" {
+	for name in "${OWN[@]}" "${OVERRIDDEN[@]}"; do
+		run --separate-stderr drv core/nix "${USER}-mac" "$name"
+		[ "$status" -eq 0 ]
+		current="$output"
+		run --separate-stderr drv next mac "$name"
+		[ "$status" -eq 0 ]
+		if [ "$output" != "$current" ]; then
+			echo "${name}: ${output} != ${current}"
+			false
+		fi
+	done
+}
+
+@test "pkgs: the flake exposes its own packages per platform" {
+	run --separate-stderr nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.aarch64-darwin"
+	[ "$status" -eq 0 ]
+	[ "$output" = '["cargo-compete","codebase-memory-mcp","go-mockgen","go-protoc-gen-go","spanner-cli","spanner-dump"]' ]
+}
+
+@test "pkgs: codebase-memory-mcp is not offered on linux (upstream ships macOS binaries only)" {
+	run --separate-stderr nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.x86_64-linux"
+	[ "$status" -eq 0 ]
+	[ "$output" = '["cargo-compete","go-mockgen","go-protoc-gen-go","spanner-cli","spanner-dump"]' ]
+}
+
+@test "pkgs: cargo-compete links the same openssl as the rest of the system" {
+	run --separate-stderr nix_eval_expr_json "let p = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.pkgs; in builtins.elem p.openssl.dev.drvPath (map (d: d.drvPath) p.cargo-compete.buildInputs)"
+	[ "$status" -eq 0 ]
+	[ "$output" = "true" ]
+}
+

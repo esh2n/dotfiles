@@ -1,13 +1,12 @@
-# The package overlays both platforms build with: the repo's own packages and
-# overrides (still in core/nix/overlays.nix until they move to pkgs/ and
-# overlays/), plus packages taken from flake inputs. brew-nix (macOS casks)
-# only exists on darwin.
+# The package overlays both platforms build with: this repo's own packages and
+# overrides (next/overlays, next/pkgs), plus packages taken from flake inputs.
+# brew-nix (macOS casks) only exists on darwin.
 { inputs, system }:
 let
   isDarwin = builtins.match ".*-darwin" system != null;
 in
 [
-  (import ../../core/nix/overlays.nix)
+  (import ../overlays)
   (final: prev: { crit = inputs.crit.packages.${system}.default; })
   (final: prev: { capsule = inputs.capsule.packages.${system}.default; })
 ]

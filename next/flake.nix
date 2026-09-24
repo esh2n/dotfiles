@@ -41,8 +41,21 @@
     inputs:
     let
       facts = import ./lib/facts.nix;
+      systems = [
+        "aarch64-darwin"
+        "x86_64-linux"
+      ];
+      inherit (inputs.nixpkgs) lib;
     in
     {
+      # This repo's own packages, per platform (only where they are available).
+      packages = lib.genAttrs systems (
+        system:
+        lib.filterAttrs (_: p: lib.meta.availableOn { inherit system; } p) (
+          import ./pkgs { inherit (inputs.nixpkgs.legacyPackages.${system}) callPackage; }
+        )
+      );
+
       darwinConfigurations.mac = import ./lib/mk-darwin.nix { inherit inputs facts; };
       homeConfigurations.linux = import ./lib/mk-home.nix { inherit inputs facts; };
     };
