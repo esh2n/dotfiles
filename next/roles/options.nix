@@ -1,7 +1,7 @@
 # The roles interface: one namespace, options.dotfiles.roles.<name>.enable.
-# Feature modules read these options; they never read the roles file, the
-# environment, or each other. Which roles are on is decided by the
-# machine-local roles file and injected as the `facts` module argument.
+# Only the role modules beside this file read these options; feature modules
+# never do. Which roles are on is decided by the machine-local roles file and
+# injected as the `facts` module argument.
 { lib, facts, ... }:
 let
   names = import ./names.nix;

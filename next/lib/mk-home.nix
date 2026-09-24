@@ -13,7 +13,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
   inherit pkgs;
   modules = [
     { _module.args.facts = facts; }
-    ../roles/options.nix
+    ../roles
     ../home/shared/base.nix
     ../home/shared/lib
     ../home/shared/zsh
