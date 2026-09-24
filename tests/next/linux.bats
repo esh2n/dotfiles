@@ -24,14 +24,7 @@ linux() { # linux <attribute path under the configuration>
 }
 
 @test "linux: nothing macOS-only or Omarchy-owned is installed" {
-	run --separate-stderr linux "config.home.packages"
+	run --separate-stderr nix_eval_expr_json "let names = map (p: p.pname or (builtins.parseDrvName p.name).name) (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.packages; in builtins.filter (n: builtins.elem n names) [ \"mas\" \"nowplaying-cli\" \"cocoapods\" \"codebase-memory-mcp\" \"mise\" ]"
 	[ "$status" -eq 0 ]
-	run --separate-stderr nix_eval_expr_json "map (p: p.name) (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.packages"
-	[ "$status" -eq 0 ]
-	for name in mas nowplaying-cli cocoapods codebase-memory-mcp mise; do
-		if [[ "$output" == *"\"${name}-"* ]]; then
-			echo "found macOS-only or Omarchy-owned package: ${name}"
-			false
-		fi
-	done
+	[ "$output" = "[]" ]
 }

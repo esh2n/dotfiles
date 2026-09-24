@@ -3,17 +3,19 @@
 # receives these values through the builders, never by reading the
 # environment itself.
 #
-#   username  $USER ("ci" under pure evaluation)
-#   home      $HOME (the platform default for username under pure evaluation)
+#   username  $USER ("ci" when unset, so a pure evaluation still names a user)
+#   home      $HOME — required: a missing $HOME is an error, never a guess
 #   roles     the machine-local roles file: $DOTFILES_ROLES_FILE, else
-#             ~/.config/dotfiles/roles.json. Never committed — which roles a
-#             machine takes is chosen on the machine; what a role means is
-#             committed in roles/.
+#             $HOME/.config/dotfiles/roles.json; no file means no roles.
+#             Never committed — which roles a machine takes is chosen on the
+#             machine; what a role means is committed in roles/.
 let
   getEnv = builtins.getEnv;
-  user = getEnv "USER";
-  home = getEnv "HOME";
   known = import ../roles/names.nix;
+
+  user = getEnv "USER";
+  homeEnv = getEnv "HOME";
+  home = if homeEnv != "" then homeEnv else throw "facts: HOME is not set (evaluate with --impure in a login environment)";
 
   rolesFile =
     let
@@ -40,6 +42,6 @@ let
 in
 {
   username = if user == "" then "ci" else user;
-  home = if home != "" then home else null;
-  roles = if rolesFile != "" && builtins.pathExists rolesFile then parseRoles rolesFile else [ ];
+  inherit home;
+  roles = if builtins.pathExists rolesFile then parseRoles rolesFile else [ ];
 }

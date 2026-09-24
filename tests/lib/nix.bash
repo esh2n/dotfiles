@@ -8,17 +8,6 @@
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-nix_eval_raw() { # nix_eval_raw <flake-dir-relative-to-repo> <attribute>
-	local dir="$1" attr="$2"
-	local -a store=()
-	if [[ -n "${DOTFILES_NIX_STORE:-}" ]]; then
-		store=(--store "${DOTFILES_NIX_STORE}")
-	fi
-	nix --extra-experimental-features 'nix-command flakes' eval \
-		"${store[@]}" --impure --raw \
-		"git+file://${REPO_ROOT}?dir=${dir}#${attr}"
-}
-
 nix_eval_expr_json() { # nix_eval_expr_json <nix expression>
 	local -a store=()
 	if [[ -n "${DOTFILES_NIX_STORE:-}" ]]; then
