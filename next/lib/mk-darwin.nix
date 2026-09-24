@@ -41,6 +41,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/bin
           ../home/darwin/bin
           ../home/shared/configs
+          ../home/shared/templated
           ../home/darwin/configs
           ../home/shared/packages/cli.nix
           ../home/shared/packages/lsp.nix

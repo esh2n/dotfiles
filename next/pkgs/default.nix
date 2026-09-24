@@ -7,6 +7,7 @@
   codebase-memory-mcp = callPackage ./codebase-memory-mcp { };
   go-mockgen = callPackage ./go-mockgen { };
   go-protoc-gen-go = callPackage ./go-protoc-gen-go { };
+  render-templates = callPackage ./scripts/render-templates { };
   spanner-cli = callPackage ./spanner-cli { };
   spanner-dump = callPackage ./spanner-dump { };
 }
