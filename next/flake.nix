@@ -71,7 +71,7 @@
         };
       };
       darwinConfigurations.mac = import ./lib/mk-darwin.nix { inherit inputs facts; };
-      homeConfigurations.linux = import ./lib/mk-home.nix { inherit inputs facts; };
+      homeConfigurations.linux = import ./lib/mk-linux.nix { inherit inputs facts; };
 
       # `nix flake check --impure` (facts.nix reads the environment): the
       # repo's packages plus each platform's whole configuration, which
