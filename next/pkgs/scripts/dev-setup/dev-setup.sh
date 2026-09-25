@@ -144,28 +144,6 @@ step_zellij_plugins() {
 	done
 }
 
-# harpoon has no prebuilt release that matches every zellij: build it against
-# the installed zellij's plugin API.
-step_zellij_harpoon() {
-	local dir="${HOME}/.config/zellij/plugins"
-	[[ -s "${dir}/harpoon.wasm" ]] && return 0
-	need zellij || return 0
-	need cargo || return 0
-	local version src
-	version="$(zellij --version | awk '{print $2}')"
-	need git || return 0
-	src="$(mktemp -d)"
-	# shellcheck disable=SC2064 # expand now: src is local
-	trap "rm -rf '${src}'" RETURN
-	git clone --depth 1 https://github.com/Nacho114/harpoon.git "${src}"
-	sed "s/zellij-tile = \".*\"/zellij-tile = \"${version}\"/" "${src}/Cargo.toml" >"${src}/Cargo.toml.new"
-	mv "${src}/Cargo.toml.new" "${src}/Cargo.toml"
-	rustup target add wasm32-wasip1 >/dev/null 2>&1 || true
-	cargo build --manifest-path "${src}/Cargo.toml" --release --target wasm32-wasip1
-	mkdir -p "${dir}"
-	cp "${src}/target/wasm32-wasip1/release/harpoon.wasm" "${dir}/"
-}
-
 # Stylus's userstyles for every theme, generated in the checkout from its
 # templates (domains/system/userstyles).
 step_userstyles() {
@@ -227,7 +205,7 @@ step_ecc() {
 case "${STEP}" in
 capsule-daemon | mise-trust | nvim-default | git-lfs | gh-extensions | codebase-memory | \
 	claude-cli | claude-mcp | pi-packages | pacifica | warp-seed | git-identity | tpm | \
-	zellij-plugins | zellij-harpoon | ecc | userstyles | sbarlua)
+	zellij-plugins | ecc | userstyles | sbarlua)
 	"step_${STEP//-/_}"
 	;;
 *)

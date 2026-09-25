@@ -73,9 +73,16 @@ keybinds {
             SwitchToMode "normal"
         }
         bind "b" {
-            LaunchOrFocusPlugin "file:~/.config/zellij/plugins/harpoon.wasm" {
+            // zellij-pane-picker: Space stars a pane, Enter jumps to it.
+            // Its global Alt keys are off: they clash with AeroSpace's alt-hjkl.
+            LaunchOrFocusPlugin "file:~/.local/share/zellij/plugins/zellij-pane-picker.wasm" {
                 floating true
                 move_to_focused_tab true
+                list_panes ""
+                navigate_back ""
+                toggle_star ""
+                next_star ""
+                previous_star ""
             }
             SwitchToMode "normal"
         }

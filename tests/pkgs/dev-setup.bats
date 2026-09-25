@@ -210,18 +210,6 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	! grep -q "extension install" "${LOG}"
 }
 
-@test "dev-setup zellij-harpoon: a failed build leaves no scratch directory behind" {
-	fake zellij 'echo "zellij 0.43.1"'
-	fake cargo 'exit 1'
-	fake git 'mkdir -p "$5"; echo "[dependencies]" >"$5/Cargo.toml"'
-	fake rustup
-	export TMPDIR="${BATS_TEST_TMPDIR}/scratch"
-	mkdir -p "${TMPDIR}"
-	PATH="${BIN}:/usr/bin:/bin" run bash -euo pipefail "${SCRIPT}" "${ROOT}" zellij-harpoon
-	[ "$status" -ne 0 ]
-	[ -z "$(ls -A "${TMPDIR}")" ]
-}
-
 @test "dev-setup userstyles: generates every theme's userstyle with the checkout's script" {
 	mkdir -p "${ROOT}/domains/system/userstyles/scripts"
 	printf '#!/usr/bin/env bash\necho "generate $*" >>"%s"\n' "${LOG}" >"${ROOT}/domains/system/userstyles/scripts/generate-userstyle.sh"
