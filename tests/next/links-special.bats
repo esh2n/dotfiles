@@ -20,7 +20,7 @@ target() {
 	for kind in darwin linux; do
 		run --separate-stderr links "$kind"
 		[ "$status" -eq 0 ]
-		[ "$(target "$output" ".serena")" = "${REPO_ROOT}/domains/dev/config/serena" ]
+		[ "$(target "$output" ".serena")" = "${REPO_ROOT}/next/home/shared/serena/config" ]
 	done
 }
 

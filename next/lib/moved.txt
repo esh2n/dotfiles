@@ -35,3 +35,4 @@ domains/system/config/themes next/home/shared/theme/themes
 domains/system/config/theme-env next/home/shared/theme/env
 domains/system/userstyles next/home/darwin/browsers/userstyles
 domains/workspace/assets/background next/home/shared/theme/wallpapers
+domains/dev/config/serena next/home/shared/serena/config

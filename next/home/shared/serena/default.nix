@@ -1,6 +1,6 @@
-# serena reads ~/.serena (its config is rendered from a template, see
-# home/shared/templated).
+# serena reads ~/.serena, a link to config/ beside this file (serena_config.yml
+# is rendered there from its template; serena keeps its logs there too).
 { config, ... }:
 {
-  home.file.".serena".source = config.lib.dotfiles.link "domains/dev/config/serena";
+  home.file.".serena".source = config.lib.dotfiles.link "next/home/shared/serena/config";
 }
