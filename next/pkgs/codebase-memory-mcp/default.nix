@@ -10,7 +10,7 @@
 }:
 stdenvNoCC.mkDerivation rec {
   pname = "codebase-memory-mcp";
-  version = "0.10.8";
+  version = "0.11.0";
 
   src =
     if stdenv.hostPlatform.isDarwin then
@@ -20,14 +20,14 @@ stdenvNoCC.mkDerivation rec {
         }.tar.gz";
         hash =
           if stdenv.hostPlatform.isAarch64 then
-            "sha256-m9hA37Psfq708xA4IFetqlsOkE34gxBNA//POYNq/Qc="
+            "sha256-Te5/OLY3QOZ1HXp+1+sQKRwfKj6iQV9ZncaDcMoKLRg="
           else
-            "sha256-KxkwhUEK84AWNKUi9LF9zWaZaV4BWgaDk8h4F8HSYNQ=";
+            "sha256-2/HHO/y95k593kzRMg2nr8AuLJcu4Xia4DlSFBH1Ey4=";
       }
     else
       fetchurl {
         url = "https://github.com/DeusData/codebase-memory-mcp/releases/download/v${version}/codebase-memory-mcp-linux-amd64-portable.tar.gz";
-        hash = "sha256-bu9JZSvAx4IPQxFBJQRNQL9/TZfBGyWS9rD2owdwIyU=";
+        hash = "sha256-H56Ck+srxcBc+ien6PwDPabXKf+tUlzPzao/1gYwZoM=";
       };
 
   sourceRoot = ".";

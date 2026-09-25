@@ -80,15 +80,15 @@ final: prev: {
   # upstream moves quickly and the graph is advisory, not a source of truth.
   codebase-memory-mcp = prev.stdenvNoCC.mkDerivation rec {
     pname = "codebase-memory-mcp";
-    version = "0.10.8";
+    version = "0.11.0";
 
     src = prev.fetchurl {
       url = "https://github.com/DeusData/codebase-memory-mcp/releases/download/v${version}/codebase-memory-mcp-darwin-${
         if prev.stdenv.hostPlatform.isAarch64 then "arm64" else "amd64"
       }.tar.gz";
       hash = if prev.stdenv.hostPlatform.isAarch64
-        then "sha256-m9hA37Psfq708xA4IFetqlsOkE34gxBNA//POYNq/Qc="
-        else "sha256-KxkwhUEK84AWNKUi9LF9zWaZaV4BWgaDk8h4F8HSYNQ=";
+        then "sha256-Te5/OLY3QOZ1HXp+1+sQKRwfKj6iQV9ZncaDcMoKLRg="
+        else "sha256-2/HHO/y95k593kzRMg2nr8AuLJcu4Xia4DlSFBH1Ey4=";
     };
 
     sourceRoot = ".";
