@@ -84,7 +84,6 @@ func applyValues(e Env, name string) {
 		{"vscode", func() error { return applyVSCode(e, name) }},
 		{"neovim", func() error { return applyNeovim(e, name) }},
 		{"wallpaper", func() error { return applyWallpaper(e, name) }},
-		{"userstyles", func() error { return applyUserstyles(e, name) }},
 		{"cli colours", func() error { return applyCLI(e, name) }},
 		{"orca", func() error { return applyOrca(e, name) }},
 	}
@@ -165,28 +164,9 @@ func applyWallpaper(e Env, name string) error {
 	return nil
 }
 
-// Stylus reads each site's active.user.css; point it at the theme's.
-func applyUserstyles(e Env, name string) error {
-	dir := e.repo("domains/system/userstyles")
-	sites, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
-	for _, s := range sites {
-		switch s.Name() {
-		case "templates", "scripts", "vars":
-			continue
-		}
-		site := filepath.Join(dir, s.Name())
-		if !s.IsDir() || !exists(filepath.Join(site, name+".user.css")) {
-			continue
-		}
-		if err := relink(name+".user.css", filepath.Join(site, "active.user.css")); err != nil {
-			e.warn("userstyles: %v", err)
-		}
-	}
-	return nil
-}
+// Browser userstyles are not switched here: each generated style carries
+// every theme and Stylus picks one from its own "Theme" setting
+// (@var select theme in domains/system/userstyles/scripts/generate-userstyle.sh).
 
 func applyOrca(e Env, name string) error {
 	support := filepath.Join(e.Home, "Library/Application Support/orca")

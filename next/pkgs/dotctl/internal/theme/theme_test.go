@@ -171,14 +171,12 @@ func TestNothingReplacesARealFile(t *testing.T) {
 	f := newFixture(t)
 	e := f.env()
 	must(t, Init(e, "nord"))
-	site := filepath.Join(f.repo, "domains/system/userstyles/github")
-	must(t, os.MkdirAll(site, 0o755))
-	must(t, os.WriteFile(filepath.Join(site, "dracula.user.css"), nil, 0o644))
-	mine := filepath.Join(site, "active.user.css")
+	mine := filepath.Join(f.repo, Apps[1].Pointer)
+	must(t, os.Remove(mine))
 	must(t, os.WriteFile(mine, []byte("hand edited"), 0o644))
-	must(t, Set(e, "dracula"))
+	_ = Set(e, "dracula")
 	if got := through(t, mine); got != "hand edited" {
-		t.Fatalf("a real active.user.css was replaced: %q", got)
+		t.Fatalf("a real %s was replaced: %q", Apps[1].Pointer, got)
 	}
 }
 
