@@ -4,7 +4,7 @@
 //
 // The naive check is `process.argv[1] === fileURLToPath(import.meta.url)`,
 // but it breaks when the script is reached through a symlink: this kit lives
-// under `$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`, and `$DOTFILES_ROOT`
+// under `$DOTFILES_ROOT/harness/tools/writeup-kit`, and `$DOTFILES_ROOT`
 // is commonly a symlink. `process.argv[1]` keeps the symlinked path Node was told to run,
 // while `import.meta.url` resolves to the realpath of the file — so the
 // strings never match, the guard is false, and the CLI silently exits 0

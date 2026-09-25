@@ -4,7 +4,7 @@ Executable projects that a skill drives but must not carry. A skill under
 `../harness/skills/<name>/` holds procedure (`SKILL.md`, `references/`);
 anything with `node_modules`, vendored binaries, build output or a deploy
 target lives here and is referenced from the skill through
-`$DOTFILES_ROOT` (`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/<tool>`),
+`$DOTFILES_ROOT` (`${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/<tool>`),
 never by a path relative to the skill
 (`../harness/rules/decisions/2026-09-22-skills-add-two-drop-duplicates-move-assets.md`).
 

@@ -85,7 +85,7 @@ uv run "$SK/scripts/lint.py" --json <file>
 
 ### Which lint
 
-`uv run scripts/lint.py` is the default but not the only implementation. Priority: (1) if `writeup-kit`'s Node lint exists (`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/bin/lint.mjs`; it does not resolve from a path relative to the skill), prefer `node <kit>/bin/lint.mjs <file> --json`. The JSON shape (category/severity/excerpt/span/message/suggestion) is the same, `--baseline` works too, and `--config` auto-discovers `.writeup.toml`. (2) Without the kit, `uv run scripts/lint.py` as before. (3) Where `uv` is unavailable either, check by hand with `references/manual-checklist.md`.
+`uv run scripts/lint.py` is the default but not the only implementation. Priority: (1) if `writeup-kit`'s Node lint exists (`${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit/bin/lint.mjs`; it does not resolve from a path relative to the skill), prefer `node <kit>/bin/lint.mjs <file> --json`. The JSON shape (category/severity/excerpt/span/message/suggestion) is the same, `--baseline` works too, and `--config` auto-discovers `.writeup.toml`. (2) Without the kit, `uv run scripts/lint.py` as before. (3) Where `uv` is unavailable either, check by hand with `references/manual-checklist.md`.
 
 Both implementations share the detectors and the forbidden-word / translationese vocabularies (13 detectors in total) but use different morphological analyzers (kit = IPADIC, uv = Sudachi C). So counts from the ngram / lexical_diversity / low_specificity detectors may differ slightly — treat either number as indicative and defer judgment to the visual review in §4.
 

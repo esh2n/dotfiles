@@ -78,7 +78,7 @@ Prometheus is resident (`restart: unless-stopped`) because it is the component
 that loses data if it is down: the gateway's counters are in memory, so an hour
 without scraping is an hour that cannot be recovered. Grafana stores nothing,
 but since 2026-09-24 it is resident too (owner's call: the dashboards should
-always be there) — `domains/dev/install.sh` starts both with `start.sh --ui`
+always be there) — `dotctl llm setup` starts both with `start.sh --ui`
 on every `make up`, and `dotctl llm check` probes `:3000`.
 
 Both ports bind `127.0.0.1`. Reaching the gateway's metrics from inside a
@@ -110,7 +110,7 @@ involved.
 measured like theirs (owner's ruling 2026-09-23; before that it pointed at LM
 Studio directly and the phone saw local models only, unmeasured).
 `OPENAI_API_KEY` is the proxy's master key, put in the environment by
-`domains/dev/install.sh` (resolved through `../proxy-key.sh`), never written
+`dotctl llm setup` (resolved through `../proxy-key.sh`), never written
 into the compose file. Both are Open WebUI "ConfigVar"s — read on first
 launch, then persisted in the data volume, later env changes ignored
 (<https://docs.openwebui.com/reference/env-configuration/>) — so changing

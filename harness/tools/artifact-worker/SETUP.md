@@ -203,7 +203,7 @@ Access グループから消える（D1 側の viewers 行は残るので、
 ### 5-3. 実行
 
 ```sh
-cd domains/dev/llm/tools/artifact-worker
+cd harness/tools/artifact-worker
 pnpm add -D wrangler          # まだなら
 node scripts/setup.mjs --dry-run
 node scripts/setup.mjs

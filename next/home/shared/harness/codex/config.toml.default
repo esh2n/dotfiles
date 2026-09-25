@@ -1,4 +1,4 @@
-# Seed for ~/.codex/config.toml, copied ONCE by domains/dev/install.sh's
+# Seed for ~/.codex/config.toml, copied ONCE by harness-apply (next/pkgs/scripts/harness-apply)'s
 # ensure_codex_config when the live file does not exist yet. It is never
 # re-applied: the live file carries jig's managed `[mcp_servers.*]` block and
 # codex's own hook trust hashes, which a second copy would discard.

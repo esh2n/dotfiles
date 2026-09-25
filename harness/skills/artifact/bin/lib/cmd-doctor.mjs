@@ -13,17 +13,17 @@ import { EXIT } from "./errors.mjs";
 import { createClient } from "./client.mjs";
 import { configPath, loadConfig, resolveSecret } from "./config.mjs";
 
-/** The Worker project lives outside the skill: $DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker */
+/** The Worker project lives outside the skill: $DOTFILES_ROOT/harness/tools/artifact-worker */
 export const WORKER_DIR = path.join(
   process.env.DOTFILES_ROOT || path.join(os.homedir(), "dotfiles"),
-  "domains", "dev", "llm", "tools", "artifact-worker",
+  "harness", "tools", "artifact-worker",
 );
 export const SETUP_DOC = path.join(WORKER_DIR, "SETUP.md");
 
 /** Shown when SETUP.md is not at WORKER_DIR (a partial checkout). */
 export const FALLBACK_HINTS = [
   "Setup checklist:",
-  "  1. Deploy the Worker: cd $DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker && pnpm wrangler deploy",
+  "  1. Deploy the Worker: cd $DOTFILES_ROOT/harness/tools/artifact-worker && pnpm wrangler deploy",
   "     (needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the environment)",
   "  2. Put the Worker behind a Cloudflare Access application, and set",
   "     ACCESS_TEAM_DOMAIN / ACCESS_AUD / OWNER_EMAIL on the Worker.",

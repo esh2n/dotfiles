@@ -24,7 +24,7 @@ export function selfCheckPath(env = process.env) {
   if (env.ARTIFACT_SELF_CHECK?.trim()) return env.ARTIFACT_SELF_CHECK.trim();
   if (env.YOKI_ARTIFACT_SELF_CHECK?.trim()) return env.YOKI_ARTIFACT_SELF_CHECK.trim();
   const root = env.DOTFILES_ROOT?.trim() || path.join(env.HOME ?? "", "dotfiles");
-  return path.join(root, "domains", "dev", "llm", "tools", "writeup-kit", "bin", "self-check.mjs");
+  return path.join(root, "harness", "tools", "writeup-kit", "bin", "self-check.mjs");
 }
 
 export function looksLikeWriteupKit(html) {

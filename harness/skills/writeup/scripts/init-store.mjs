@@ -291,9 +291,9 @@ export function writeRepoMarker(name, { cwd = process.cwd(), registryFile = regi
 }
 
 /** Same resolution as SKILL.md: the kit lives outside the skill tree at
- * `$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/` (never a path relative
+ * `$DOTFILES_ROOT/harness/tools/writeup-kit/` (never a path relative
  * to this skill's own directory). */
-export const KIT_DIR = join(process.env.DOTFILES_ROOT || join(homedir(), 'dotfiles'), 'domains', 'dev', 'llm', 'tools', 'writeup-kit')
+export const KIT_DIR = join(process.env.DOTFILES_ROOT || join(homedir(), 'dotfiles'), 'harness', 'tools', 'writeup-kit')
 export function resolveKitDir() {
   if (existsSync(join(KIT_DIR, 'bin', 'build.mjs'))) return KIT_DIR
   return null

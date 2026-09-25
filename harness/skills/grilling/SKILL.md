@@ -63,10 +63,10 @@ Where the questions go. `local` and `artifact` both put out **one page per round
 document**; HTML generation is delegated to a **sonnet subagent**. Never hand-write
 HTML or SVG.
 
-The renderer lives outside the skill at `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/`
-(below, `<render>` = `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render`).
+The renderer lives outside the skill at `$DOTFILES_ROOT/harness/tools/grilling-render/`
+(below, `<render>` = `${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/grilling-render`).
 `<render>` picks the round's HTML design on its own: when writeup-kit exists in the
-sibling directory (`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`) it rides on
+sibling directory (`$DOTFILES_ROOT/harness/tools/writeup-kit`) it rides on
 that page design and its diagram checks (`bin/lib/verify-diagram.mjs`); otherwise it
 falls back to grilling's own `template/style.css` and `lib/diagram.mjs`. The caller
 need not care which is in use (see `<render>/README.md`).
@@ -333,7 +333,7 @@ From Codex, use `@grilling` (or the /skills menu). `codex/SKILL.md` references t
 ## References
 
 - `references/round-format.md` — round document format (the machine-readable source of truth)
-- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md` — the renderer that turns a round document into a one-page HTML (including the design used when writeup-kit is present)
-- `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/decision-page.mjs` — converts a decision-record Markdown into a writeup `kind: 決定記録` page
+- `$DOTFILES_ROOT/harness/tools/grilling-render/README.md` — the renderer that turns a round document into a one-page HTML (including the design used when writeup-kit is present)
+- `$DOTFILES_ROOT/harness/tools/grilling-render/decision-page.mjs` — converts a decision-record Markdown into a writeup `kind: 決定記録` page
 - Matt Pocock, `grilling` skill — https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling
 - ryonakae, `dig` skill — https://github.com/ryonakae/dotfiles/blob/master/config/.agents/skills/dig/SKILL.md

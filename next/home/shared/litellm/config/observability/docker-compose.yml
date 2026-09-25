@@ -61,7 +61,7 @@ services:
     profiles: ["ui"]
     # `unless-stopped` since 2026-09-24 (owner: "計測の grafana も常に起動して
     # 欲しい"): Grafana is resident like Prometheus, brought up by
-    # domains/dev/install.sh (`start.sh --ui`) and probed by litellm/check.sh.
+    # `dotctl llm setup` (`start.sh --ui`) and probed by `dotctl llm check`.
     # Before that it was `no` — on demand, gone after a restart.
     restart: unless-stopped
     ports:
@@ -115,7 +115,7 @@ services:
       # harness.md). Until 2026-09-23 this pointed at LM Studio (:1234), so
       # the phone saw local models only, unmeasured.
       OPENAI_API_BASE_URL: "http://host.docker.internal:4000/v1"
-      # The proxy's master key, resolved by the caller (domains/dev/install.sh
+      # The proxy's master key, resolved by the caller (`dotctl llm setup`
       # via litellm/proxy-key.sh) and passed in the environment — never
       # written here. Both variables are Open WebUI "ConfigVar"s: read on
       # FIRST launch, then kept in the data volume and later env changes

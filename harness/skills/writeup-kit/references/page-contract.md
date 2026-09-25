@@ -329,7 +329,7 @@ why PDF is comment-only).
 ## 7. Cross-skill resolution
 
 - Kit resolution for a calling skill: (1)
-  `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit/`
+  `${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit/`
   (never a path relative to the skill), (2) kit-less
   fallback mode — see `SKILL.md` for what fallback mode does.
 - Distribution unit: `writeup`, `writeup-kit`, `grilling`, `eli5`, and

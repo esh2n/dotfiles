@@ -21,7 +21,7 @@ Everything runs on `node` alone. Resolve the kit first:
 
 ```bash
 SELF="<this skill's own directory>"
-KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"; [ -d "$KIT" ] || KIT=""
+KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit"; [ -d "$KIT" ] || KIT=""
 ```
 
 If `$KIT` is empty, run in **kit-less fallback mode**: hand-write a minimal

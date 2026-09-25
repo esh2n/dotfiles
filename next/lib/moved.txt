@@ -43,3 +43,4 @@ domains/dev/config/omp next/home/shared/harness/omp
 domains/dev/config/dsh next/home/shared/harness/dsh
 domains/dev/config/litellm next/home/shared/litellm/config
 domains/dev/config/sbx next/home/shared/sbx/config
+domains/dev/llm/tools harness/tools

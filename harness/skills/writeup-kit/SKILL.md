@@ -23,10 +23,10 @@ inside `vendor/` so the kit works on a machine with nothing else installed.
 ## How other skills resolve the kit
 
 The kit's executable parts live outside the skill tree, under
-`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/`. A skill that produces a
+`$DOTFILES_ROOT/harness/tools/writeup-kit/`. A skill that produces a
 page looks for the kit in this order:
 
-1. `KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"`
+1. `KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit"`
    (never a path relative to the calling skill's own directory)
 2. **Kit-less fallback mode** — if that directory does not exist, the calling skill still
    produces a page, but with reduced fidelity: minimal CSS inlined by hand
@@ -43,7 +43,7 @@ In this skill directory:
   `kinds.md` (the 8 page types and their required sections), `page-contract.md`
   (store layout, meta contract, self-check table, Markdown mapping, publish)
 
-Under `$KIT` (`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/`):
+Under `$KIT` (`$DOTFILES_ROOT/harness/tools/writeup-kit/`):
 
 - `kit/` — `writeup.css` (tokens + components), `template.html` (page
   skeleton with verbatim chrome), `samples.html` (one example of every

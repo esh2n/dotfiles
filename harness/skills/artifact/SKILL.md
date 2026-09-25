@@ -33,11 +33,11 @@ fewer steps. writeup's `--to artifact` is for that; `--to yoki-artifact` is for 
 ## Initial setup (once per machine)
 
 Stand up the Worker (Cloudflare Workers + R2 + D1 + Access) first. The Worker project lives outside the skill at
-`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/` (`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/artifact-worker`). The procedure is
-`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/SETUP.md` — Zero Trust onboarding, IdP registration, enabling R2 and
+`$DOTFILES_ROOT/harness/tools/artifact-worker/` (`${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/artifact-worker`). The procedure is
+`$DOTFILES_ROOT/harness/tools/artifact-worker/SETUP.md` — Zero Trust onboarding, IdP registration, enabling R2 and
 issuing an API token are manual; everything after that (D1/R2 creation, migrations,
 deploy, the Access app and policy, the service token, writing the config file) is done by
-`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/scripts/setup.mjs`. **Never install wrangler globally** —
+`$DOTFILES_ROOT/harness/tools/artifact-worker/scripts/setup.mjs`. **Never install wrangler globally** —
 pin it to the project and call it with `pnpm exec wrangler ...`.
 
 The CLI-side config is `~/.config/yoki-artifact/config.json`:
@@ -66,8 +66,8 @@ The Worker-side `SERVICE_TOKEN_NAME` var **pins the one service token that has o
 rights** (`setup.mjs` writes the client id of `yoki-artifact-cli`). Left unset,
 **no service token is the owner** and the CLI gets 403 `not_owner` on publish / revoke / share.
 In that case re-run
-`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/scripts/setup.mjs` — details and the rotate procedure are in
-`$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/SETUP.md` 5-6.
+`$DOTFILES_ROOT/harness/tools/artifact-worker/scripts/setup.mjs` — details and the rotate procedure are in
+`$DOTFILES_ROOT/harness/tools/artifact-worker/SETUP.md` 5-6.
 
 `~/.claude/skills/artifact` is a directory symlink into dotfiles, so the only
 thing to put on PATH is the one launcher inside it:
@@ -79,7 +79,7 @@ ln -sf ~/.claude/skills/artifact/bin/artifact ~/.local/bin/artifact
 writeup-kit's `--to yoki-artifact` **looks only for `artifact` on PATH**
 (exit 9). Check whether the config works with `artifact doctor` — it tries config,
 secret and reachability of the Worker one by one and, for each failed item, prints the
-matching section of `$DOTFILES_ROOT/domains/dev/llm/tools/artifact-worker/SETUP.md`.
+matching section of `$DOTFILES_ROOT/harness/tools/artifact-worker/SETUP.md`.
 When something does not work, always run doctor before rewriting config on a guess.
 
 ## Node version (run via `bin/artifact`)

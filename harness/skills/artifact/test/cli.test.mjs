@@ -316,7 +316,7 @@ describe("publish safety gates", () => {
 });
 
 describe("writeup-kit self-check", () => {
-  // A stub standing in for $DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/bin/self-check.mjs:
+  // A stub standing in for $DOTFILES_ROOT/harness/tools/writeup-kit/bin/self-check.mjs:
   // same contract (argv[2] is the page, exit 0 means clean), no writeup-kit
   // installation required to run these tests.
   function stubSelfCheck(exitCode) {

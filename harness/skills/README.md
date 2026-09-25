@@ -16,7 +16,7 @@ Rulings that shape this directory:
   (`../rules/decisions/2026-09-22-commands-are-skills.md`)
 - a skill holds procedure, never build artifacts or media: the renderers and
   projects that used to sit inside `grilling`, `writeup-kit`, `artifact`
-  live under `domains/dev/llm/tools/`, referenced through `$DOTFILES_ROOT`;
+  live under `harness/tools/`, referenced through `$DOTFILES_ROOT`;
   `dopa-shorts`'s renderer is its own repository outside the dotfiles
   (`../rules/decisions/2026-09-22-skills-add-two-drop-duplicates-move-assets.md`)
 - vendored skills carry `UPSTREAM.md` with the pinned commit and the local

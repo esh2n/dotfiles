@@ -4,7 +4,7 @@ Specification of the `.claude/.cache/grilling/<slug>/round-<n>.md` that grilling
 Round documents are owner-facing: prose, labels and option text are written in Japanese; this file describes the structure.
 
 **The fenced YAML blocks in this format are the machine-readable source of truth read by the
-local renderer (`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/render.mjs`).**
+local renderer (`$DOTFILES_ROOT/harness/tools/grilling-render/render.mjs`).**
 The prose (`### ❓ Q[n]` blocks) is the human-facing side; the YAML blocks are the
 machine-facing side. **Both must always carry the same content.** Never fix only one.
 If you rewrite the prose, fix the same round's YAML too.
@@ -321,17 +321,17 @@ answer: A — 即時同期。ただし BroadcastChannel 非対応環境は B に
 
 ```sh
 # Collect answers locally (default). Does not return until every question is submitted
-node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" serve .claude/.cache/grilling/<slug>/round-<n>.md
+node "${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/grilling-render/render.mjs" serve .claude/.cache/grilling/<slug>/round-<n>.md
 
 # Write out a fragment for the Artifact tool
-node "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/grilling-render/render.mjs" .claude/.cache/grilling/<slug>/round-<n>.md \
+node "${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/grilling-render/render.mjs" .claude/.cache/grilling/<slug>/round-<n>.md \
   --fragment -o "$SCRATCHPAD/round-<n>.html"
 ```
 
 A schema violation exits with code 2 and names the block and field.
 
-The page design is chosen automatically by `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/lib/kit.mjs`. When writeup-kit
-(`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit`) exists, it rides on that kit's
+The page design is chosen automatically by `$DOTFILES_ROOT/harness/tools/grilling-render/lib/kit.mjs`. When writeup-kit
+(`$DOTFILES_ROOT/harness/tools/writeup-kit`) exists, it rides on that kit's
 chrome, components and diagram checks; otherwise it falls back to grilling's own
 design as before. The format itself (frontmatter / premise / design tree / questions /
-diagrams) is the same under either design. Details: `$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/README.md`.
+diagrams) is the same under either design. Details: `$DOTFILES_ROOT/harness/tools/grilling-render/README.md`.

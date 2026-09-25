@@ -271,7 +271,7 @@ next/home/shared/harness/claude/workflows
 next/home/shared/git/config/identity-guard
 
 # writeup-kit ships vendored runtime bundles (elk, lindera) on purpose
-!domains/dev/llm/tools/writeup-kit/vendor/
+!harness/tools/writeup-kit/vendor/
 .jig-provenance.json
 
 # Guard waiver lists: owner-written, per machine, never committed

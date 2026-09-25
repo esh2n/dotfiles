@@ -5,12 +5,12 @@ skills: CSS tokens, 20 role-named page components, a page template, a diagram
 IR contract with 29 figure types, a Japanese prose linter, and a structural
 self-check. Skills read it; users do not invoke it directly.
 
-This directory (`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/`) holds the
+This directory (`$DOTFILES_ROOT/harness/tools/writeup-kit/`) holds the
 kit's executable and vendored parts — `bin/`, `vendor/`, `kit/`, `test/`. The
 skill that describes it (`SKILL.md`, `references/`) stays at
 `$DOTFILES_ROOT/harness/skills/writeup-kit/`; the skills that
 drive it (`writeup`, `show-me`, `eli5`, `grilling`) resolve it as
-`KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"`.
+`KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit"`.
 
 Pages are HTML, saved into a **store** — a git repository holding the pages,
 a generated `index.html` and `manifest.json`, and a synced copy of the kit's
@@ -33,13 +33,13 @@ Sizes: `writeup-kit` 22 MB, of which `vendor/` is 19 MB and everything else
 Nothing to install: the kit is used in place from the dotfiles checkout, and
 the skills that drive it are linked into `~/.claude/skills/` by `jig apply`.
 Every skill resolves the kit at
-`${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit`; with the
+`${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit`; with the
 kit absent there, tools that need it say so and name the path they checked.
 
 Verify the checkout:
 
 ```bash
-KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"
+KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/harness/tools/writeup-kit"
 cd "$KIT" && node --test                                              # 1867 tests
 cd "${DOTFILES_ROOT:-$HOME/dotfiles}/harness/skills/writeup" && node --test   #   15 tests
 ```
