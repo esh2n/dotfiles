@@ -33,13 +33,13 @@ drv() { # drv <flake-dir> <config-name> <package>
 @test "pkgs: the flake exposes its own packages per platform" {
 	run --separate-stderr nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.aarch64-darwin"
 	[ "$status" -eq 0 ]
-	[ "$output" = '["cargo-compete","codebase-memory-mcp","dotctl","harness-apply","llm-ledger-sync","render-templates"]' ]
+	[ "$output" = '["cargo-compete","codebase-memory-mcp","dotctl","harness-apply","llm-ledger-sync"]' ]
 }
 
 @test "pkgs: linux gets the same packages, codebase-memory-mcp from its static linux build" {
 	run --separate-stderr nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.x86_64-linux"
 	[ "$status" -eq 0 ]
-	[ "$output" = '["cargo-compete","codebase-memory-mcp","dotctl","harness-apply","llm-ledger-sync","render-templates"]' ]
+	[ "$output" = '["cargo-compete","codebase-memory-mcp","dotctl","harness-apply","llm-ledger-sync"]' ]
 	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.x86_64-linux.codebase-memory-mcp.src.url"
 	[[ "$output" == *"codebase-memory-mcp-linux-amd64-portable.tar.gz\"" ]]
 }

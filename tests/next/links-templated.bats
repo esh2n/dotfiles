@@ -45,7 +45,7 @@ activation() { # activation <darwin|linux>
 	for kind in darwin linux; do
 		run --separate-stderr activation "$kind"
 		[ "$status" -eq 0 ]
-		[[ "$output" == *"/bin/render-templates"* ]] || { echo "${kind}: ${output}"; false; }
+		[[ "$output" == *"/bin/dotctl templates render --repo"* ]] || { echo "${kind}: ${output}"; false; }
 		[[ "$output" == *"${REPO_ROOT}"* ]] || { echo "${kind}: no checkout in ${output}"; false; }
 	done
 }

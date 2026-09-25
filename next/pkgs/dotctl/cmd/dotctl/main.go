@@ -27,6 +27,7 @@ commands:
   gh pr-graph-update                     upgrade the pr-graph extension (also: gh-pr-graph-update)
   editor extensions [--repo DIR]         install the editor extensions into VS Code and Cursor (also: install-extensions)
   wallpaper search|random|set ...        Wallhaven wallpapers on every macOS desktop (also: wallpaper)
+  templates render [--repo DIR]          render every *.template in the checkout beside itself
   mado [use|stop|status|list|layout|info]  switch the macOS window-manager profile (also: mado)
   theme [--repo DIR] list|current|init|set <name>
                                          switch the colour theme (one link, then reloads)
@@ -94,6 +95,8 @@ func run(args []string, out, errOut io.Writer) int {
 		return runEditor(args[1:], out, errOut)
 	case "wallpaper":
 		return runWallpaper(home, args[1:], out, errOut)
+	case "templates":
+		return runTemplates(args[1:], out, errOut)
 	case "mado":
 		return runMado(home, args[1:], out, errOut)
 	case "theme":

@@ -26,6 +26,6 @@ in
   # Before links are written, so a fresh checkout already has the files the
   # links point at.
   home.activation.renderTemplates = lib.hm.dag.entryBefore [ "writeBoundary" ] ''
-    run ${lib.getExe pkgs.render-templates} ${lib.escapeShellArg facts.repo}
+    run ${lib.getExe pkgs.dotctl} templates render --repo ${lib.escapeShellArg facts.repo}
   '';
 }

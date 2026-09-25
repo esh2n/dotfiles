@@ -11,7 +11,6 @@ let
     dotctl = callPackage ./dotctl { };
     harness-apply = callPackage ./scripts/harness-apply { };
     llm-ledger-sync = callPackage ./scripts/llm-ledger-sync { };
-    render-templates = callPackage ./scripts/render-templates { };
   };
 in
 self

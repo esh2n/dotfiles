@@ -12,6 +12,7 @@ import (
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/gh"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/nvim"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/sys"
+	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/templates"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/ui"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/wallpaper"
 )
@@ -146,4 +147,20 @@ func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 		words = append(words, fs.Arg(0))
 		args = fs.Args()[1:]
 	}
+}
+
+// runTemplates is `dotctl templates render [--repo DIR]`, run by activation
+// before the links are written.
+func runTemplates(args []string, out, errOut io.Writer) int {
+	if len(args) == 0 || args[0] != "render" {
+		fmt.Fprint(errOut, "usage: dotctl templates render [--repo DIR]\n")
+		return 2
+	}
+	repo, rest, ok := repoFlag("templates render", args[1:], errOut)
+	if !ok || len(rest) > 0 {
+		return 2
+	}
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "templates"}
+	_, err := templates.RenderAll(templates.Values{Home: os.Getenv("HOME"), User: os.Getenv("USER"), Root: repo})
+	return done(p, err)
 }
