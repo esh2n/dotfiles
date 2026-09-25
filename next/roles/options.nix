@@ -7,12 +7,9 @@ let
   names = import ./names.nix;
 in
 {
-  options.dotfiles.roles = lib.genAttrs names (
-    name:
-    {
-      enable = lib.mkEnableOption "the ${name} role";
-    }
-  );
+  options.dotfiles.roles = lib.genAttrs names (name: {
+    enable = lib.mkEnableOption "the ${name} role";
+  });
 
   # base is on for every machine, roles file or not; the rest as the file says
   config.dotfiles.roles = lib.genAttrs ([ "base" ] ++ facts.roles) (_: {

@@ -30,10 +30,14 @@ in
     ".dsh/settings.yaml".source = link "${config'}/dsh/settings.yaml";
   }
   // lib.mapAttrs' (
-    name: _: lib.nameValuePair ".pi/agent/extensions/${name}" { source = link "${config'}/pi/extensions/${name}"; }
+    name: _:
+    lib.nameValuePair ".pi/agent/extensions/${name}" {
+      source = link "${config'}/pi/extensions/${name}";
+    }
   ) (piFiles "extensions" ".ts")
   // lib.mapAttrs' (
-    name: _: lib.nameValuePair ".pi/agent/themes/${name}" { source = link "${config'}/pi/themes/${name}"; }
+    name: _:
+    lib.nameValuePair ".pi/agent/themes/${name}" { source = link "${config'}/pi/themes/${name}"; }
   ) (piFiles "themes" ".json");
 
   xdg.configFile = {
@@ -52,7 +56,10 @@ in
     claude-cli.command = config.lib.dotfiles.devSetup "claude-cli";
     claude-mcp = {
       command = config.lib.dotfiles.devSetup "claude-mcp";
-      after = [ "harnessApply" "setup-claude-cli" ];
+      after = [
+        "harnessApply"
+        "setup-claude-cli"
+      ];
     };
     pi-packages = {
       command = config.lib.dotfiles.devSetup "pi-packages";

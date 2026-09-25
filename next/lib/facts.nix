@@ -24,10 +24,18 @@ let
 
   user = getEnv "USER";
   homeEnv = getEnv "HOME";
-  home = if homeEnv != "" then homeEnv else throw "facts: HOME is not set (evaluate with --impure in a login environment)";
+  home =
+    if homeEnv != "" then
+      homeEnv
+    else
+      throw "facts: HOME is not set (evaluate with --impure in a login environment)";
 
   repoEnv = getEnv "DOTFILES_ROOT";
-  repo = if repoEnv != "" then repoEnv else throw "facts: DOTFILES_ROOT is not set (make up exports it; it is the checkout links point into)";
+  repo =
+    if repoEnv != "" then
+      repoEnv
+    else
+      throw "facts: DOTFILES_ROOT is not set (make up exports it; it is the checkout links point into)";
 
   rolesFile =
     let
@@ -42,7 +50,11 @@ let
     else
       throw ''facts: unknown role "${role}" in ${rolesFile} (known: ${builtins.concatStringsSep ", " known})'';
 
-  doc = if builtins.pathExists rolesFile then builtins.fromJSON (builtins.readFile rolesFile) else { roles = [ ]; };
+  doc =
+    if builtins.pathExists rolesFile then
+      builtins.fromJSON (builtins.readFile rolesFile)
+    else
+      { roles = [ ]; };
 
   parseRoles =
     if builtins.isAttrs doc && doc ? roles && builtins.isList doc.roles then
@@ -56,7 +68,9 @@ let
     in
     if n == null then
       null
-    else if builtins.isAttrs n && builtins.isString (n.version or null) && builtins.isString (n.sha256 or null) then
+    else if
+      builtins.isAttrs n && builtins.isString (n.version or null) && builtins.isString (n.sha256 or null)
+    then
       {
         inherit (n) version sha256;
         acceptLicense = n.acceptLicense or false;

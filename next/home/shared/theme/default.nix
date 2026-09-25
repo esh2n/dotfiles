@@ -43,7 +43,8 @@ in
     lib.concatMap (
       n:
       lib.mapAttrsToList (
-        file: source: lib.nameValuePair "theme/palettes/${n}/${file}" { source = link (source (pick source n)); }
+        file: source:
+        lib.nameValuePair "theme/palettes/${n}/${file}" { source = link (source (pick source n)); }
       ) apps
     ) themes
   );

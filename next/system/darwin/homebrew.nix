@@ -126,7 +126,7 @@
 
       # Browsers and passwords
       "google-chrome"
-      "thebrowsercompany-dia"  # Dia Browser (AI browser from The Browser Company)
+      "thebrowsercompany-dia" # Dia Browser (AI browser from The Browser Company)
       "firefox"
       "1password"
     ];

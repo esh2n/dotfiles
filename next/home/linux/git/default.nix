@@ -12,7 +12,7 @@ let
   ];
 in
 {
-  xdg.configFile = lib.genAttrs (map (f: "git/${f}") files) (
-    name: { source = link "domains/dev/config/${name}"; }
-  );
+  xdg.configFile = lib.genAttrs (map (f: "git/${f}") files) (name: {
+    source = link "domains/dev/config/${name}";
+  });
 }

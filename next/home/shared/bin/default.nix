@@ -13,5 +13,7 @@ let
   };
 in
 {
-  home.file = lib.mapAttrs' (name: path: lib.nameValuePair "bin/${name}" { source = link path; }) commands;
+  home.file = lib.mapAttrs' (
+    name: path: lib.nameValuePair "bin/${name}" { source = link path; }
+  ) commands;
 }

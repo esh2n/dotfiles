@@ -51,6 +51,9 @@ jobs:
       # not gpu: llama.cpp's CUDA build is not in any binary cache, too heavy here
       - name: roles
         run: echo '{"roles":["base","dev","desktop","llm-hub"]}' > "$RUNNER_TEMP/roles.json"
+      - name: nix fmt (nixfmt over next/)
+        working-directory: next
+        run: nix fmt -- --ci
       - name: tests (platform-neutral and Linux)
         run: bash tests/run.sh tests/next/facts.bats tests/next/layers.bats tests/next/linux.bats tests/next/bootstrap.bats tests/pkgs tests/services
       - name: build homeConfigurations.linux

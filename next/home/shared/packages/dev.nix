@@ -38,7 +38,6 @@
       go-protoc-gen-go
       spanner-cli
       spanner-dump
-    
 
       # Cloudflare
       wrangler # Cloudflare Workers CLI (artifact deploy/login)
