@@ -131,3 +131,11 @@ hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"
 	grep -q "^launchctl kickstart -k gui/.*/com.esh2n.litellm-proxy" "${LOG}"
 	! grep -q "^launchctl bootstrap" "${LOG}"
 }
+
+@test "home-llm --gpu: also serves llama-server's port, nothing else extra" {
+	run hl node --gpu
+	[ "$status" -eq 0 ]
+	grep -qx "tailscale serve --bg --tcp 8080 tcp://127.0.0.1:8080" "${LOG}"
+	grep -qx "tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001" "${LOG}"
+	[ "$(grep -c '^tailscale serve' "${LOG}")" -eq 2 ]
+}

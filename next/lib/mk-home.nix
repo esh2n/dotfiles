@@ -6,7 +6,12 @@ let
   pkgs = import inputs.nixpkgs {
     inherit system;
     overlays = import ./overlays.nix { inherit inputs system; };
-    config.allowUnfree = true;
+    config = {
+      allowUnfree = true;
+      # NVIDIA's driver license is accepted by the owner, per machine, in the
+      # roles file ("nvidia": {"acceptLicense": true}); never here.
+      nvidia.acceptLicense = facts.nvidia != null && facts.nvidia.acceptLicense;
+    };
   };
 in
 inputs.home-manager.lib.homeManagerConfiguration {
@@ -36,6 +41,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/services
     ../home/shared/home-llm
     ../home/linux/git
+    ../home/linux/llama-server
     ../home/shared/packages/cli.nix
     ../home/shared/packages/lsp.nix
   ];

@@ -128,6 +128,21 @@ warn_untracked() {
 	fi
 }
 
+# The gpu role's CUDA programs find the NVIDIA libraries through
+# /run/opengl-driver, which a system service (installed as root, once per
+# driver change) provides; home-manager only puts the setup command in the
+# profile. Run it when the installed unit is not this generation's.
+gpu_drivers() {
+	local setup unit want
+	setup="${HOME}/.nix-profile/bin/non-nixos-gpu-setup"
+	[[ -x "${setup}" ]] || return 0
+	want="$(cd "$(dirname "$(readlink -f "${setup}")")/.." && pwd)/lib/systemd/system/non-nixos-gpu.service"
+	unit="$(readlink -f /etc/systemd/system/non-nixos-gpu.service 2>/dev/null || true)"
+	[[ "${unit}" == "${want}" ]] && return 0
+	log "setting up NVIDIA drivers for Nix programs (root)"
+	sudo "${setup}" || warn "non-nixos-gpu-setup failed; CUDA programs will not find the GPU"
+}
+
 runtimes() {
 	if command -v mise >/dev/null 2>&1; then
 		mise install
@@ -149,6 +164,7 @@ main() {
 	command -v nix >/dev/null 2>&1 || install_nix
 	warn_untracked
 	switch "${os}"
+	[[ "${os}" == Linux ]] && gpu_drivers
 	login_shell
 	runtimes
 }

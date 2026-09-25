@@ -7,14 +7,17 @@
 #   hub : LM Studio's server, tailscale serve 1234 (LM Studio) + https 3001
 #         (Open WebUI), Prometheus + Grafana + Open WebUI
 #   node: LiteLLM pointed at the hub, tailscale serve 4001 (metrics only)
+#   --gpu: tailscale serve 8080 (llama-server, the gpu role on Linux)
 #   both: LiteLLM restarted onto the current config, then litellm/check.sh
 #
 # The service definitions themselves are declared (next/roles, mk-service);
 # this runs only the steps that are commands. Nothing here fails the switch:
 # what cannot be done now is listed at the end, with what to do.
 
-ROOT="${1:?usage: home-llm-setup <checkout> <hub|node>}"
-ROLE="${2:?usage: home-llm-setup <checkout> <hub|node>}"
+ROOT="${1:?usage: home-llm-setup <checkout> <hub|node> [--gpu]}"
+ROLE="${2:?usage: home-llm-setup <checkout> <hub|node> [--gpu]}"
+GPU=0
+[[ "${3:-}" == --gpu ]] && GPU=1
 case "${ROLE}" in hub | node) ;; *)
 	echo "home-llm-setup: role must be hub or node, not ${ROLE}" >&2
 	exit 2
@@ -135,6 +138,10 @@ elif [[ "${ROLE}" == hub ]]; then
 	serve --https=3001 127.0.0.1:3001
 else
 	serve --tcp 4001 tcp://127.0.0.1:4001
+fi
+# gpu: llama-server, the one model server this machine puts on the tailnet
+if [[ -n "${TS}" && "${GPU}" == 1 && "$(tailscale_state)" == Running ]]; then
+	serve --tcp 8080 tcp://127.0.0.1:8080
 fi
 
 [[ "${ROLE}" == hub ]] && lm_studio

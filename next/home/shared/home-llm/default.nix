@@ -15,13 +15,14 @@ in
   options.dotfiles.homeLlm = {
     enable = lib.mkEnableOption "the home-LLM setup steps";
     hub = lib.mkEnableOption "the hub half (LM Studio, tailnet exposure, Prometheus, Open WebUI)";
+    gpu = lib.mkEnableOption "llama-server on this machine (Linux; home/linux/llama-server)";
   };
 
   config.dotfiles.setup.home-llm = {
     inherit (cfg) enable;
     command = "${lib.getExe pkgs.home-llm-setup} ${lib.escapeShellArg facts.repo} ${
       if cfg.hub then "hub" else "node"
-    }";
+    }${lib.optionalString cfg.gpu " --gpu"}";
     # after the service manager has the current LiteLLM definition
     after = [
       "setupLaunchAgents"

@@ -48,8 +48,9 @@ jobs:
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
+      # not gpu: llama.cpp's CUDA build is not in any binary cache, too heavy here
       - name: roles
-        run: echo '{"roles":["base","dev","desktop","llm-hub","gpu"]}' > "$RUNNER_TEMP/roles.json"
+        run: echo '{"roles":["base","dev","desktop","llm-hub"]}' > "$RUNNER_TEMP/roles.json"
       - name: tests (platform-neutral and Linux)
         run: bash tests/run.sh tests/next/facts.bats tests/next/layers.bats tests/next/linux.bats tests/next/bootstrap.bats tests/pkgs tests/services
       - name: build homeConfigurations.linux

@@ -10,4 +10,9 @@ in
   (final: prev: { crit = inputs.crit.packages.${system}.default; })
   (final: prev: { capsule = inputs.capsule.packages.${system}.default; })
 ]
-++ (if isDarwin then [ inputs.brew-nix.overlays.default ] else [ ])
+++ (
+  if isDarwin then
+    [ inputs.brew-nix.overlays.default ]
+  else
+    [ (final: prev: { llama-server-cuda = inputs.llama-cpp.packages.${system}.cuda; }) ]
+)

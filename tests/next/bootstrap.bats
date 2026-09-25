@@ -166,6 +166,26 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 	[[ "$stderr" == *"/etc/shells"* ]]
 }
 
+@test "bootstrap: on a gpu machine the driver link is set up as root once, and not again while it matches" {
+	os Linux
+	pkg="${BATS_TEST_TMPDIR}/non-nixos-gpu"
+	mkdir -p "${pkg}/bin" "${pkg}/lib/systemd/system" "${HOME}/.nix-profile/bin"
+	printf '#!/bin/sh\necho gpu-setup-ran >>"%s"\n' "${LOG}" >"${pkg}/bin/non-nixos-gpu-setup"
+	chmod +x "${pkg}/bin/non-nixos-gpu-setup"
+	touch "${pkg}/lib/systemd/system/non-nixos-gpu.service"
+	ln -s "${pkg}/bin/non-nixos-gpu-setup" "${HOME}/.nix-profile/bin/non-nixos-gpu-setup"
+	run boot
+	[ "$status" -eq 0 ]
+	grep -q "^sudo .*non-nixos-gpu-setup" "${LOG}"
+	grep -qx "gpu-setup-ran" "${LOG}"
+}
+
+@test "bootstrap: no gpu setup where the gpu role put none" {
+	os Linux
+	run boot
+	! grep -q "non-nixos-gpu-setup" "${LOG}"
+}
+
 @test "bootstrap: an unknown platform is refused by name" {
 	os FreeBSD
 	run boot

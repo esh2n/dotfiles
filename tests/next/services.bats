@@ -82,3 +82,46 @@ setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 	run --separate-stderr setup_cmd darwin
 	[ "$output" = null ]
 }
+
+gpu_linux() { # gpu_linux <attr under config>
+	nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.$1"
+}
+
+@test "services: the gpu role runs llama-server on linux, bound to loopback, with the host's driver" {
+	printf '{"roles": ["dev", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA=", "acceptLicense": true}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.ExecStart'
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"${REPO_ROOT}/next/home/linux/llama-server/llama-server-up.sh"* ]]
+	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.Environment'
+	[[ "$output" == *"LLAMA_SERVER_BIN="*"llama-server"* ]]
+	[[ "$output" == *"LLAMA_PORT=8080"* ]]
+	run --separate-stderr gpu_linux 'targets.genericLinux.gpu.nvidia'
+	[[ "$output" == *'"version":"580.82.09"'* ]]
+	run --separate-stderr gpu_linux 'dotfiles.setup.home-llm.command'
+	[[ "$output" == *" node --gpu\"" ]]
+}
+
+@test "services: the gpu role without the host's driver in the roles file is an error that says what to add" {
+	roles '"dev", "gpu"'
+	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.ExecStart'
+	[ "$status" -ne 0 ]
+	[[ "$stderr" == *"nvidia"* ]]
+}
+
+@test "services: the gpu role stops until the owner has accepted NVIDIA's license in the roles file" {
+	printf '{"roles": ["dev", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA="}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.ExecStart'
+	[ "$status" -ne 0 ]
+	[[ "$stderr" == *"acceptLicense"* ]]
+}
+
+@test "services: no llama-server without the gpu role, and never on the mac" {
+	roles '"dev"'
+	run --separate-stderr units
+	[[ "$output" != *"llama-server"* ]]
+	roles '"dev", "gpu"'
+	run --separate-stderr agents
+	[ "$(field "$output" llama-server)" = "null" ]
+}

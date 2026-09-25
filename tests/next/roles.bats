@@ -28,7 +28,7 @@ role_enabled() { # role_enabled <role>
 }
 
 @test "roles: with every role on, both platforms' configurations evaluate to a build" {
-	printf '{"roles": ["base", "dev", "desktop", "llm-hub", "gpu"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["base", "dev", "desktop", "llm-hub", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "acceptLicense": true}}\n' >"${DOTFILES_ROLES_FILE}"
 	F="builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\""
 	run --separate-stderr nix_eval_expr_json "[ (${F}).darwinConfigurations.mac.system.drvPath (${F}).homeConfigurations.linux.activationPackage.drvPath ]"
 	[ "$status" -eq 0 ]

@@ -6,5 +6,6 @@
     ./options.nix
     ./dev.nix
     ./llm-hub.nix
+    ./gpu.nix
   ];
 }
