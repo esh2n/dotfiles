@@ -40,12 +40,16 @@ target() { # target <json> <path under ~>
 	done
 }
 
-@test "links: every command in domains/*/bin is in ~/bin on the mac" {
+# dotctl answers to these names now (next/pkgs/dotctl postInstall).
+TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch "
+
+@test "links: every command in domains/*/bin is in ~/bin on the mac, unless dotctl took it over" {
 	run --separate-stderr links darwin
 	[ "$status" -eq 0 ]
 	json="$output"
 	for path in "${REPO_ROOT}"/domains/*/bin/*; do
 		name="$(basename "$path")"
+		[[ "${TAKEN_BY_DOTCTL}" == *" ${name} "* ]] && continue
 		got="$(target "$json" "bin/${name}")"
 		want="${path}"
 		[ "$got" = "$want" ] || { echo "bin/${name}: ${got}"; false; }
@@ -59,7 +63,17 @@ target() { # target <json> <path under ~>
 	for name in install-extensions theme-switch orca-theme-apply.py mado wallpaper codebase-memory-mcp-managed; do
 		[ "$(target "$json" "bin/${name}")" = "<missing>" ] || { echo "bin/${name} present on linux"; false; }
 	done
-	for name in artifact code-graph-cache-gc gh-pr-graph-update git-credential-gh-owner jig nvim-switch setup-neovim-distros gh-switch; do
+	for name in artifact gh-pr-graph-update git-credential-gh-owner jig setup-neovim-distros gh-switch; do
 		[ "$(target "$json" "bin/${name}")" != "<missing>" ] || { echo "bin/${name} missing on linux"; false; }
+	done
+}
+
+@test "links: commands dotctl took over are not linked from the old scripts" {
+	for kind in darwin linux; do
+		run --separate-stderr links "$kind"
+		[ "$status" -eq 0 ]
+		for name in code-graph-cache-gc nvim-switch; do
+			[ "$(target "$output" "bin/${name}")" = "<missing>" ] || { echo "${kind} bin/${name} still linked"; false; }
+		done
 	done
 }

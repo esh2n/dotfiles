@@ -54,3 +54,10 @@ drv() { # drv <flake-dir> <config-name> <package>
 	[ "$status" -eq 0 ]
 	[ "$output" = "[true,true]" ]
 }
+
+@test "pkgs: dotctl answers to the old command names it replaced" {
+	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.aarch64-darwin.dotctl.postInstall"
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"code-graph-cache-gc"* ]]
+	[[ "$output" == *"nvim-switch"* ]]
+}

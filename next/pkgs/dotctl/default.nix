@@ -14,6 +14,11 @@ buildGoModule {
   };
   vendorHash = null;
   subPackages = [ "cmd/dotctl" ];
+  # the old command names still work: argv[0] picks the subcommand
+  postInstall = ''
+    ln -s dotctl $out/bin/code-graph-cache-gc
+    ln -s dotctl $out/bin/nvim-switch
+  '';
   meta = {
     description = "The dotfiles' own CLI";
     mainProgram = "dotctl";

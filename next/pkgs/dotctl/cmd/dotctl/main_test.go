@@ -34,3 +34,20 @@ func TestRunDispatch(t *testing.T) {
 		t.Fatalf("nvim emacs: exit %d, want 1", code)
 	}
 }
+
+func TestCacheGCReadsItsLimitsFromTheEnvironment(t *testing.T) {
+	t.Setenv("CBM_CACHE_DIR", t.TempDir())
+	t.Setenv("CODE_GRAPH_CACHE_TTL_DAYS", "seven")
+	var out, errOut bytes.Buffer
+	if code := runCacheGC(t.TempDir(), []string{"--force"}, nil, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "CODE_GRAPH_CACHE_TTL_DAYS") {
+		t.Fatalf("bad TTL: exit %d, stderr %q", code, errOut.String())
+	}
+	t.Setenv("CODE_GRAPH_CACHE_TTL_DAYS", "7")
+	repo := t.TempDir()
+	if code := runCacheGC(t.TempDir(), []string{"--touch", repo}, nil, &out, &errOut); code != 0 {
+		t.Fatalf("--touch: exit %d, stderr %q", code, errOut.String())
+	}
+	if code := runCacheGC(t.TempDir(), []string{"--bogus"}, nil, &out, &errOut); code != 2 {
+		t.Fatalf("unknown flag: exit %d", code)
+	}
+}
