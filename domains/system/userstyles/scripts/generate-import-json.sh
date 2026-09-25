@@ -13,7 +13,11 @@ GEN_DIR="$USERSTYLES_DIR/gen"
 OUTPUT_FILE="$GEN_DIR/import.json"
 DOTFILES_ROOT="$(cd "$USERSTYLES_DIR/../../.." && pwd)"
 
-source "$DOTFILES_ROOT/core/utils/common.sh"
+# Logging, local: these scripts no longer read the old layout's core/ helpers.
+log_info() { printf '%s\n' "$*"; }
+log_success() { printf '%s\n' "$*"; }
+log_warning() { printf 'warning: %s\n' "$*" >&2; }
+log_error() { printf 'error: %s\n' "$*" >&2; }
 
 # Ensure gen directory exists
 mkdir -p "$GEN_DIR"
