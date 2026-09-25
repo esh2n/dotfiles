@@ -11,14 +11,29 @@ summary() { # summary <flake-dir> <config-name>
 	nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/mac-summary.nix { flake = \"git+file://${REPO_ROOT}?dir=$1\"; config = \"$2\"; user = \"${USER}\"; }"
 }
 
-@test "mac parity: next installs and sets exactly what the current layout does" {
+# What next installs on purpose beyond the current layout, one package-name
+# prefix each (the entries are "<name>-<version>").
+ADDED_IN_NEXT='"dotctl-'
+
+@test "mac parity: next installs and sets exactly what the current layout does, plus its own additions" {
 	run --separate-stderr summary core/nix "${USER}-mac"
 	[ "$status" -eq 0 ]
 	current="$output"
 	run --separate-stderr summary next mac
 	[ "$status" -eq 0 ]
+	output="$(printf '%s' "$output" | python3 -c '
+import json, sys
+prefixes = sys.argv[1].split()
+def strip(v):
+    if isinstance(v, dict): return {k: strip(x) for k, x in v.items()}
+    if isinstance(v, list): return [strip(x) for x in v if not (isinstance(x, str) and any(json.dumps(x).startswith(p) for p in prefixes))]
+    return v
+print(json.dumps(strip(json.load(sys.stdin)), separators=(",", ":")))' "${ADDED_IN_NEXT}")"
+	current="$(printf '%s' "$current" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin), separators=(",", ":")))')"
 	if [ "$output" != "$current" ]; then
-		diff <(printf '%s' "$current" | tr ',' '\n') <(printf '%s' "$output" | tr ',' '\n') || true
+		printf '%s' "$current" | tr ',' '\n' >"${BATS_TEST_TMPDIR}/current"
+		printf '%s' "$output" | tr ',' '\n' >"${BATS_TEST_TMPDIR}/next"
+		diff "${BATS_TEST_TMPDIR}/current" "${BATS_TEST_TMPDIR}/next" || true
 		false
 	fi
 }
