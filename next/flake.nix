@@ -72,5 +72,21 @@
       };
       darwinConfigurations.mac = import ./lib/mk-darwin.nix { inherit inputs facts; };
       homeConfigurations.linux = import ./lib/mk-home.nix { inherit inputs facts; };
+
+      # `nix flake check --impure` (facts.nix reads the environment): the
+      # repo's packages plus each platform's whole configuration, which
+      # flake check would not build by itself.
+      checks = lib.genAttrs systems (
+        system:
+        inputs.self.packages.${system}
+        // (
+          if system == "aarch64-darwin" then
+            { mac = inputs.self.darwinConfigurations.mac.system; }
+          else
+            { linux = inputs.self.homeConfigurations.linux.activationPackage; }
+        )
+      );
+
+      formatter = lib.genAttrs systems (system: inputs.nixpkgs.legacyPackages.${system}.nixfmt-tree);
     };
 }
