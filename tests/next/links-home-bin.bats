@@ -41,7 +41,7 @@ target() { # target <json> <path under ~>
 }
 
 # dotctl answers to these names now (next/pkgs/dotctl postInstall).
-TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch "
+TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado "
 
 @test "links: every command in domains/*/bin is in ~/bin on the mac, unless dotctl took it over" {
 	run --separate-stderr links darwin
@@ -72,7 +72,7 @@ TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch "
 	for kind in darwin linux; do
 		run --separate-stderr links "$kind"
 		[ "$status" -eq 0 ]
-		for name in code-graph-cache-gc nvim-switch theme-switch; do
+		for name in code-graph-cache-gc nvim-switch theme-switch mado; do
 			[ "$(target "$output" "bin/${name}")" = "<missing>" ] || { echo "${kind} bin/${name} still linked"; false; }
 		done
 	done

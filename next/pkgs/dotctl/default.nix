@@ -19,6 +19,7 @@ buildGoModule {
     ln -s dotctl $out/bin/code-graph-cache-gc
     ln -s dotctl $out/bin/nvim-switch
     ln -s dotctl $out/bin/theme-switch
+    ln -s dotctl $out/bin/mado
   '';
   meta = {
     description = "The dotfiles' own CLI";

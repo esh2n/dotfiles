@@ -7,7 +7,6 @@ let
     codebase-memory-mcp-managed = "domains/dev/bin/codebase-memory-mcp-managed";
     install-extensions = "domains/dev/bin/install-extensions";
     "orca-theme-apply.py" = "domains/system/bin/orca-theme-apply.py";
-    mado = "domains/workspace/bin/mado";
     wallpaper = "domains/creative/bin/wallpaper";
   };
 in

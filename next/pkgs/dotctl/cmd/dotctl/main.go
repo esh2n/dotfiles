@@ -19,6 +19,7 @@ commands:
   nvim <custom|nvchad|lazyvim|astrovim>  point ~/.config/nvim at a distribution
   nvim current                           name the active distribution
   nvim list                              list distributions, marking the active one
+  mado [use|stop|status|list|layout|info]  switch the macOS window-manager profile (also: mado)
   theme [--repo DIR] list|current|init|set <name>
                                          switch the colour theme (one link, then reloads)
   cache-gc [--force] [--dry-run] [--quiet] [--touch REPO]
@@ -34,6 +35,8 @@ func main() {
 		args = append([]string{"cache-gc"}, args...)
 	case "nvim-switch":
 		args = append([]string{"nvim"}, args...)
+	case "mado":
+		args = append([]string{"mado"}, args...)
 	case "theme-switch":
 		if len(args) == 0 {
 			args = []string{"theme", "list"}
@@ -59,6 +62,8 @@ func run(args []string, out, errOut io.Writer) int {
 		return runNvim(home, args[1:], out, errOut)
 	case "up":
 		return runUp(home, args[1:], out, errOut)
+	case "mado":
+		return runMado(home, args[1:], out, errOut)
 	case "theme":
 		return runTheme(home, args[1:], out, errOut)
 	case "cache-gc":

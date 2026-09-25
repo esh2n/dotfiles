@@ -61,4 +61,5 @@ drv() { # drv <flake-dir> <config-name> <package>
 	[[ "$output" == *"code-graph-cache-gc"* ]]
 	[[ "$output" == *"nvim-switch"* ]]
 	[[ "$output" == *"theme-switch"* ]]
+	[[ "$output" == *"mado"* ]]
 }
