@@ -40,6 +40,8 @@ target() { # target <json> <path under ~>
 	for dir in "${REPO_ROOT}"/next/home/*/*/config/; do
 		[ -d "$dir" ] || continue
 		name="$(basename "$(dirname "$dir")")"
+		# placed in ~ itself, not ~/.config (links-special.bats)
+		[[ " warp orca " == *" ${name} "* ]] && continue
 		got="$(target "$json" ".config/${name}")"
 		[ "$got" = "${dir%/}" ] || { echo ".config/${name}: ${got}"; false; }
 	done

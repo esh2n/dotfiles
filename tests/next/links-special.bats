@@ -28,11 +28,11 @@ target() {
 	run --separate-stderr links darwin
 	[ "$status" -eq 0 ]
 	json="$output"
-	[ "$(target "$json" ".warp")" = "${REPO_ROOT}/domains/dev/config/warp" ]
-	[ "$(target "$json" ".orca")" = "${REPO_ROOT}/domains/dev/config/orca" ]
-	[ "$(target "$json" ".config/vscode")" = "${REPO_ROOT}/domains/dev/config/vscode" ]
-	[ "$(target "$json" ".config/cursor")" = "${REPO_ROOT}/domains/dev/config/cursor" ]
-	[ "$(target "$json" "Library/Application Support/Code/User/settings.json")" = "${REPO_ROOT}/domains/dev/config/vscode/settings.json" ]
+	[ "$(target "$json" ".warp")" = "${REPO_ROOT}/next/home/darwin/warp/config" ]
+	[ "$(target "$json" ".orca")" = "${REPO_ROOT}/next/home/darwin/orca/config" ]
+	[ "$(target "$json" ".config/vscode")" = "${REPO_ROOT}/next/home/darwin/vscode/config" ]
+	[ "$(target "$json" ".config/cursor")" = "${REPO_ROOT}/next/home/darwin/cursor/config" ]
+	[ "$(target "$json" "Library/Application Support/Code/User/settings.json")" = "${REPO_ROOT}/next/home/darwin/vscode/config/settings.json" ]
 }
 
 @test "special: none of the Mac apps' dirs are placed on linux" {

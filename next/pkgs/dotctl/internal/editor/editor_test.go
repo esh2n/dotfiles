@@ -41,7 +41,7 @@ func TestListSkipsCommentsAndBlanks(t *testing.T) {
 
 func TestInstallIntoEachPresentEditor(t *testing.T) {
 	repo := t.TempDir()
-	file := filepath.Join(repo, "domains", "dev", "config", "vscode", "extensions.txt")
+	file := filepath.Join(repo, "next", "home", "darwin", "vscode", "config", "extensions.txt")
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		t.Fatal(err)
 	}

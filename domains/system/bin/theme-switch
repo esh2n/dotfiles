@@ -293,9 +293,9 @@ fi
 # Update Warp Theme
 # Warp loads themes from ~/.warp/themes/<name>.yaml and reads `theme = "<name>"`
 # from settings.toml. It hot-reloads on settings.toml change, so no restart.
-WARP_CONFIG_DIR="$DOTFILES_ROOT/domains/dev/config/warp"
+WARP_CONFIG_DIR="$DOTFILES_ROOT/next/home/darwin/warp/config"
 if [[ ! -d "$WARP_CONFIG_DIR" ]]; then
-    WARP_CONFIG_DIR="$HOME/dotfiles/domains/dev/config/warp"
+    WARP_CONFIG_DIR="$HOME/dotfiles/next/home/darwin/warp/config"
 fi
 
 if [[ -d "$WARP_CONFIG_DIR" ]]; then

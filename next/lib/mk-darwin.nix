@@ -61,7 +61,6 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/services
           ../home/shared/home-llm
           ../home/shared/llm-ledger
-          ../home/darwin/apps
           ../home/darwin/tmux
           ../home/darwin/browsers
           ../home/darwin/sketchybar
@@ -80,6 +79,10 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/borders
           ../home/shared/wezterm
           ../home/shared/starship
+          ../home/darwin/warp
+          ../home/darwin/orca
+          ../home/darwin/vscode
+          ../home/darwin/cursor
           ../home/darwin/configs
           ../home/shared/packages
           ../home/darwin/packages.nix

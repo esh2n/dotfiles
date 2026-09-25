@@ -16,7 +16,7 @@ setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
 	LOG="${BATS_TEST_TMPDIR}/calls.log"
 	export HOME="${BATS_TEST_TMPDIR}/home"
-	mkdir -p "${ROOT}/domains/dev/bin" "${ROOT}/domains/dev/config/warp" "${BIN}" "${HOME}"
+	mkdir -p "${ROOT}/domains/dev/bin" "${ROOT}/next/home/darwin/warp/config" "${BIN}" "${HOME}"
 	touch "${LOG}"
 }
 
@@ -149,13 +149,13 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 }
 
 @test "setup warp-seed: copies the default once and never over the live file" {
-	echo default >"${ROOT}/domains/dev/config/warp/settings.toml.default"
+	echo default >"${ROOT}/next/home/darwin/warp/config/settings.toml.default"
 	run step warp-seed
 	[ "$status" -eq 0 ]
-	[ "$(cat "${ROOT}/domains/dev/config/warp/settings.toml")" = default ]
-	echo edited >"${ROOT}/domains/dev/config/warp/settings.toml"
+	[ "$(cat "${ROOT}/next/home/darwin/warp/config/settings.toml")" = default ]
+	echo edited >"${ROOT}/next/home/darwin/warp/config/settings.toml"
 	run step warp-seed
-	[ "$(cat "${ROOT}/domains/dev/config/warp/settings.toml")" = edited ]
+	[ "$(cat "${ROOT}/next/home/darwin/warp/config/settings.toml")" = edited ]
 }
 
 @test "setup git-identity: writes config.local from .env, then leaves it alone" {

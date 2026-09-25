@@ -437,7 +437,7 @@ run_portability_checks() {
     echo ""
     log_info "--- 5. VSCode: No hardcoded user paths ---"
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/dev/config/vscode/settings.json.template" \
+        "$DOTFILES_ROOT/next/home/darwin/vscode/config/settings.json.template" \
         "VSCode template should use {{HOME}} consistently" || true
 
     echo ""

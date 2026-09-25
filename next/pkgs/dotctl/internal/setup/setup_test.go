@@ -268,7 +268,7 @@ func TestPiPackagesInstallsWhatSettingsLacksAndWarnsOnFailure(t *testing.T) {
 
 func TestWarpSeedCopiesOnce(t *testing.T) {
 	w := newWorld(t)
-	dir := filepath.Join(w.repo, "domains", "dev", "config", "warp")
+	dir := filepath.Join(w.repo, "next", "home", "darwin", "warp", "config")
 	write(t, filepath.Join(dir, "settings.toml.default"), "default")
 	if err := Run(w.env, "warp-seed"); err != nil {
 		t.Fatal(err)

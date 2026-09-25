@@ -218,7 +218,7 @@ func pacifica(e Env) error {
 // Warp rewrites settings.toml itself, so the live file is machine-local:
 // seeded once from the tracked default, never overwritten.
 func warpSeed(e Env) error {
-	dir := filepath.Join(e.Repo, "domains", "dev", "config", "warp")
+	dir := filepath.Join(e.Repo, "next", "home", "darwin", "warp", "config")
 	live, def := filepath.Join(dir, "settings.toml"), filepath.Join(dir, "settings.toml.default")
 	if exists(live) || !exists(def) {
 		return nil

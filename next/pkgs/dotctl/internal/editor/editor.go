@@ -1,5 +1,5 @@
 // Package editor installs the checkout's editor extensions
-// (domains/dev/config/vscode/extensions.txt) into every VS Code-family
+// (next/home/darwin/vscode/config/extensions.txt) into every VS Code-family
 // editor that is installed (was install-extensions).
 package editor
 
@@ -39,7 +39,7 @@ func List(text string) []string {
 // Install installs the list into each editor present, warning per
 // extension that fails. The error is only for a missing list.
 func Install(s Sys, p ui.Printer, repo string) error {
-	file := filepath.Join(repo, "domains", "dev", "config", "vscode", "extensions.txt")
+	file := filepath.Join(repo, "next", "home", "darwin", "vscode", "config", "extensions.txt")
 	b, err := os.ReadFile(file)
 	if err != nil {
 		return err

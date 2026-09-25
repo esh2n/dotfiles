@@ -286,7 +286,7 @@ phase_config() {
 # `theme` line, so the live file is gitignored/machine-local — we only seed it
 # once and never clobber an existing one.
 ensure_warp_settings() {
-    local warp_dir="${DOTFILES_ROOT}/domains/dev/config/warp"
+    local warp_dir="${DOTFILES_ROOT}/next/home/darwin/warp/config"
     local live="${warp_dir}/settings.toml"
     local seed="${warp_dir}/settings.toml.default"
 

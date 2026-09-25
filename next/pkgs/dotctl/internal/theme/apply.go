@@ -106,8 +106,8 @@ func applyZellij(e Env, name string) error {
 }
 
 func applyWarp(e Env, name string) error {
-	settings := e.repo("domains/dev/config/warp/settings.toml")
-	if !exists(e.repo("domains/dev/config/warp/themes/"+name+".yaml")) || !exists(settings) {
+	settings := e.repo("next/home/darwin/warp/config/settings.toml")
+	if !exists(e.repo("next/home/darwin/warp/config/themes/"+name+".yaml")) || !exists(settings) {
 		return nil
 	}
 	_, err := rewrite(settings, regexp.MustCompile(`(?m)^theme = .*$`), fmt.Sprintf(`theme = "%s"`, name))
@@ -183,7 +183,7 @@ func applyOrca(e Env, name string) error {
 		return err
 	}
 	warpName := ""
-	if b, err := os.ReadFile(e.repo("domains/dev/config/warp/themes/" + name + ".yaml")); err == nil {
+	if b, err := os.ReadFile(e.repo("next/home/darwin/warp/config/themes/" + name + ".yaml")); err == nil {
 		if m := regexp.MustCompile(`(?m)^name:\s*["']?([^"'\n]*)["']?\s*$`).FindSubmatch(b); m != nil {
 			warpName = strings.TrimSpace(string(m[1]))
 		}

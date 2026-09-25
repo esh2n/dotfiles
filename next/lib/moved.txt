@@ -27,3 +27,7 @@ domains/dev/config/git next/home/shared/git/config
 domains/dev/config/zellij next/home/shared/zellij/config
 domains/dev/config/mise next/home/shared/mise/config
 domains/dev/config/starship next/home/shared/starship/config
+domains/dev/config/warp next/home/darwin/warp/config
+domains/dev/config/orca next/home/darwin/orca/config
+domains/dev/config/vscode next/home/darwin/vscode/config
+domains/dev/config/cursor next/home/darwin/cursor/config
