@@ -33,6 +33,12 @@ func main() {
 		args = append([]string{"cache-gc"}, args...)
 	case "nvim-switch":
 		args = append([]string{"nvim"}, args...)
+	case "theme-switch":
+		if len(args) == 0 {
+			args = []string{"theme", "list"}
+		} else {
+			args = append([]string{"theme", "set"}, args...)
+		}
 	}
 	os.Exit(run(args, os.Stdout, os.Stderr))
 }

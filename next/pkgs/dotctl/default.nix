@@ -18,6 +18,7 @@ buildGoModule {
   postInstall = ''
     ln -s dotctl $out/bin/code-graph-cache-gc
     ln -s dotctl $out/bin/nvim-switch
+    ln -s dotctl $out/bin/theme-switch
   '';
   meta = {
     description = "The dotfiles' own CLI";
