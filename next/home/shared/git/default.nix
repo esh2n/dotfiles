@@ -23,6 +23,9 @@ in
       })
     ))
   ];
+  # ~/.gitconfig: rendered beside this file from gitconfig.template (its
+  # conditional includes come from config/conditional, machine-local)
+  home.file.".gitconfig".source = link "next/home/shared/git/gitconfig";
   dotfiles.setup.git-lfs.command = config.lib.dotfiles.setupStep "git-lfs";
   dotfiles.setup.git-identity.command = config.lib.dotfiles.setupStep "git-identity";
 }

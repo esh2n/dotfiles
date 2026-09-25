@@ -141,7 +141,7 @@ func TestList(t *testing.T) {
 func TestZellijLayoutFollowsTheThemeAndSurvivesARender(t *testing.T) {
 	f := newFixture(t)
 	e := f.env()
-	zdir := filepath.Join(f.repo, "domains/dev/config/zellij")
+	zdir := filepath.Join(f.repo, "next/home/shared/zellij/config")
 	must(t, os.MkdirAll(filepath.Join(zdir, "layouts"), 0o755))
 	for _, n := range []string{"nord", "dracula"} {
 		must(t, os.WriteFile(filepath.Join(zdir, "layouts", n+".kdl"), nil, 0o644))

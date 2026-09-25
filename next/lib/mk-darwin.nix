@@ -79,6 +79,7 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/ghostty
           ../home/darwin/borders
           ../home/shared/wezterm
+          ../home/shared/starship
           ../home/darwin/configs
           ../home/shared/packages
           ../home/darwin/packages.nix

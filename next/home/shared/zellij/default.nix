@@ -13,6 +13,9 @@ let
   setup = config.lib.dotfiles.setupStep;
 in
 {
+  # ~/.config/zellij is a link to config/ beside this file (config.kdl and
+  # the layouts are rendered there from their templates)
+  xdg.configFile.zellij.source = config.lib.dotfiles.link "next/home/shared/zellij/config";
   dotfiles.setup.zellij-plugins.command = setup "zellij-plugins";
 
   # ~/.config/zellij links into the checkout, so the pinned plugin lives

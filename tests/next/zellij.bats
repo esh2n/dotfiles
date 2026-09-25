@@ -9,6 +9,6 @@ load '../lib/nix.bash'
 	run --separate-stderr nix_eval_expr_json "let f = builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\"; k = \"zellij/plugins/zellij-pane-picker.wasm\"; in [ (f.darwinConfigurations.mac.config.home-manager.users.\"${USER}\".xdg.dataFile ? \${k}) (f.homeConfigurations.linux.config.xdg.dataFile ? \${k}) ]"
 	[ "$status" -eq 0 ]
 	[ "$output" = "[true,true]" ]
-	grep -q 'LaunchOrFocusPlugin "file:~/.local/share/zellij/plugins/zellij-pane-picker.wasm"' "${REPO_ROOT}/domains/dev/config/zellij/config.kdl.template"
-	! grep -q "harpoon" "${REPO_ROOT}/domains/dev/config/zellij/config.kdl.template"
+	grep -q 'LaunchOrFocusPlugin "file:~/.local/share/zellij/plugins/zellij-pane-picker.wasm"' "${REPO_ROOT}/next/home/shared/zellij/config/config.kdl.template"
+	! grep -q "harpoon" "${REPO_ROOT}/next/home/shared/zellij/config/config.kdl.template"
 }

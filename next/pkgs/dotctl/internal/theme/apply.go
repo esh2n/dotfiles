@@ -115,7 +115,7 @@ func applyWarp(e Env, name string) error {
 }
 
 func applyStarship(e Env, name string) error {
-	cfg := e.repo("domains/dev/config/starship/starship.toml")
+	cfg := e.repo("next/home/shared/starship/config/starship.toml")
 	b, err := os.ReadFile(cfg)
 	if err != nil {
 		return nil // not rendered on this machine

@@ -207,9 +207,9 @@ if [[ -d "$ZELLIJ_CONFIG_DIR" ]]; then
             if [[ -L "$ZELLIJ_CONFIG_DIR/config.kdl" ]]; then
                 # It's a symlink, regenerate from template
                 if [[ -n "$DOTFILES_ROOT" ]]; then
-                    ZELLIJ_TEMPLATE="$DOTFILES_ROOT/domains/dev/config/zellij/config.kdl.template"
+                    ZELLIJ_TEMPLATE="$DOTFILES_ROOT/next/home/shared/zellij/config/config.kdl.template"
                 else
-                    ZELLIJ_TEMPLATE="$HOME/dotfiles/domains/dev/config/zellij/config.kdl.template"
+                    ZELLIJ_TEMPLATE="$HOME/dotfiles/next/home/shared/zellij/config/config.kdl.template"
                 fi
                 if [[ -f "$ZELLIJ_TEMPLATE" ]]; then
                     # Regenerate config.kdl with new theme
@@ -320,7 +320,7 @@ if [[ -f "$WEZTERM_CONFIG" ]]; then
 fi
 
 # Update Starship Palette (generated from template, gitignored)
-STARSHIP_CONFIG="$DOTFILES_ROOT/domains/dev/config/starship/starship.toml"
+STARSHIP_CONFIG="$DOTFILES_ROOT/next/home/shared/starship/config/starship.toml"
 if [[ ! -f "$STARSHIP_CONFIG" ]]; then
     STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
 fi

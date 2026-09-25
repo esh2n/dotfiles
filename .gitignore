@@ -91,20 +91,20 @@ domains/dev/config/claude/.last-cleanup
 domains/dev/config/claude/.last-update-result.json
 domains/dev/config/claude/correction-analysis/
 domains/dev/config/claude/.yoki/
-domains/dev/config/starship/starship.toml
-domains/dev/config/mise/config.toml
-domains/dev/config/zellij/config.kdl
-domains/dev/config/zellij/layouts/default.kdl
-domains/dev/config/zellij/layouts/nord.kdl
-domains/dev/config/zellij/layouts/tokyonight.kdl
-domains/dev/config/zellij/layouts/catppuccin.kdl
-domains/dev/config/zellij/layouts/kanagawa.kdl
-domains/dev/config/zellij/layouts/gruvbox.kdl
-domains/dev/config/zellij/layouts/dracula.kdl
-domains/dev/config/zellij/layouts/rosepine.kdl
-domains/dev/config/zellij/layouts/everforest.kdl
-domains/dev/config/zellij/layouts/onedark.kdl
-domains/dev/config/zellij/layouts/solarized.kdl
+next/home/shared/starship/config/starship.toml
+next/home/shared/mise/config/config.toml
+next/home/shared/zellij/config/config.kdl
+next/home/shared/zellij/config/layouts/default.kdl
+next/home/shared/zellij/config/layouts/nord.kdl
+next/home/shared/zellij/config/layouts/tokyonight.kdl
+next/home/shared/zellij/config/layouts/catppuccin.kdl
+next/home/shared/zellij/config/layouts/kanagawa.kdl
+next/home/shared/zellij/config/layouts/gruvbox.kdl
+next/home/shared/zellij/config/layouts/dracula.kdl
+next/home/shared/zellij/config/layouts/rosepine.kdl
+next/home/shared/zellij/config/layouts/everforest.kdl
+next/home/shared/zellij/config/layouts/onedark.kdl
+next/home/shared/zellij/config/layouts/solarized.kdl
 domains/dev/config/cursor/settings.json
 # ~/.codex is a symlink into this directory, so everything jig apply --target
 # codex generates lands here. Only config.toml.default is authored by hand.
@@ -172,6 +172,8 @@ next/home/shared/nvim/custom/lua/custom/colorscheme.lua
 **/git/config.local
 **/git/conditional/
 **/.gitconfig
+# rendered from next/home/shared/git/gitconfig.template
+next/home/shared/git/gitconfig
 
 # User-specific jj config (should be local only)
 **/jj/conf.d/user.toml

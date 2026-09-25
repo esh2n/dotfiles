@@ -34,10 +34,10 @@ activation() { # activation <darwin|linux>
 		json="$output"
 		for name in mise starship zellij; do
 			got="$(target "$json" ".config/${name}")"
-			[ "$got" = "${REPO_ROOT}/domains/dev/config/${name}" ] || { echo "${kind} .config/${name}: ${got}"; false; }
+			[ "$got" = "${REPO_ROOT}/next/home/shared/${name}/config" ] || { echo "${kind} .config/${name}: ${got}"; false; }
 		done
 		got="$(target "$json" ".gitconfig")"
-		[ "$got" = "${REPO_ROOT}/domains/dev/home/.gitconfig" ] || { echo "${kind} .gitconfig: ${got}"; false; }
+		[ "$got" = "${REPO_ROOT}/next/home/shared/git/gitconfig" ] || { echo "${kind} .gitconfig: ${got}"; false; }
 	done
 }
 

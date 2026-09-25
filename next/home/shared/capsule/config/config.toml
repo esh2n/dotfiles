@@ -1,4 +1,4 @@
-# capsule prompt config — ported from starship.toml (domains/dev/config/starship/)
+# capsule prompt config — ported from starship.toml (next/home/shared/starship/config/)
 # Colors are ANSI names (capsule has no hex support); the terminal theme
 # (catppuccin via theme-env) maps them to the same palette starship used.
 # Not portable from starship: right-side prompt, exit-code number display.

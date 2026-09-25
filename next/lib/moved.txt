@@ -24,3 +24,6 @@ domains/dev/config/nvim-nvchad next/home/shared/nvim/nvchad
 domains/dev/config/nvim-astrovim next/home/shared/nvim/astrovim
 domains/dev/config/nvim-custom next/home/shared/nvim/custom
 domains/dev/config/git next/home/shared/git/config
+domains/dev/config/zellij next/home/shared/zellij/config
+domains/dev/config/mise next/home/shared/mise/config
+domains/dev/config/starship next/home/shared/starship/config
