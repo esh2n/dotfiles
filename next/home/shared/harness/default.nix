@@ -45,8 +45,10 @@ in
     "jig/policy".source = link "domains/dev/llm/harness/policy";
   };
 
+  # bun (mise), codex and pnpm are the user's tools: harness-apply sees the
+  # user's PATH, not only activation's
   home.activation.harnessApply = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    run ${lib.getExe pkgs.harness-apply} ${lib.escapeShellArg facts.repo}
+    (PATH="$PATH:${config.lib.dotfiles.userPath}" && run ${lib.getExe pkgs.harness-apply} ${lib.escapeShellArg facts.repo})
   '';
 
   # Commands the harnesses need that jig does not run: Claude Code's native

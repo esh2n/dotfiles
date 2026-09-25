@@ -36,6 +36,9 @@ let
   ];
 in
 {
+  # the same PATH for other activation entries that drive the user's tools
+  config.lib.dotfiles.userPath = userPath;
+
   options.dotfiles.setup = lib.mkOption {
     default = { };
     description = "Idempotent setup steps run on activation.";

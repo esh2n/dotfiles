@@ -12,10 +12,10 @@ use_service_path
 
 : "${LEDGER_SYNC_BIN:?set by the unit}"
 export_op_token
-LEDGER_PASSWORD="$(try_secret op://llm-automation/litellm-db/credential)"
+LEDGER_PASSWORD="$(try_secret op://llm-automation/litellm-db/password)"
 if [ -z "${LEDGER_PASSWORD}" ]; then
 	# no DB on this machine either (litellm-up.sh): nothing to ship; look again later
-	echo "ledger-sync-up: no ledger DB secret (op://llm-automation/litellm-db/credential)" >&2
+	echo "ledger-sync-up: no ledger DB secret (op://llm-automation/litellm-db/password)" >&2
 	exec sleep 3600
 fi
 export LEDGER_PASSWORD

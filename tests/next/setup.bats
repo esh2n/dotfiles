@@ -77,3 +77,9 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-me
 	[[ "$data" == *"/opt/homebrew/bin"* ]]
 	[[ "$data" == *":/usr/bin:/bin:"* ]]
 }
+
+@test "setup: harness-apply also sees the user's tools (bun from mise, codex, pnpm)" {
+	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.config.home-manager.users.\"${USER}\".home.activation.harnessApply.data"
+	[[ "$output" == *"/.local/share/mise/shims"* ]]
+	[[ "$output" == *"harness-apply"* ]]
+}

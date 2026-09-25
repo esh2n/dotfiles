@@ -67,18 +67,21 @@ step_claude_cli() {
 }
 
 # User-scoped MCP servers live in ~/.claude.json, which only `claude mcp add`
-# writes. jig prints one such line per server; run the ones not listed yet.
+# writes. jig prints one such line per server; run the ones not registered
+# yet. What is registered is read from ~/.claude.json itself: `claude mcp
+# list` connects to every server first, and under activation's time limit it
+# can return nothing, which made every add fail as "already exists".
 step_claude_mcp() {
 	need claude || return 0
 	need bun || return 0
-	local registered line name
-	registered="$(timeout 60 claude mcp list 2>/dev/null || true)"
+	local registered line name out
+	registered="$(jq -r '.mcpServers // {} | keys[]' "${HOME}/.claude.json" 2>/dev/null || true)"
 	while IFS= read -r line; do
 		name="$(awk '{for(i=1;i<=NF;i++) if($i=="--scope"){print $(i+2); exit}}' <<<"${line}")"
 		[[ -z "${name}" ]] && continue
-		grep -q "^${name}:" <<<"${registered}" && continue
+		grep -qx "${name}" <<<"${registered}" && continue
 		note "registering ${name}"
-		timeout 60 bash -c "${line}" >/dev/null 2>&1 || warn "failed: ${line}"
+		out="$(timeout 60 bash -c "${line}" 2>&1)" || warn "failed: ${line}: ${out}"
 	done < <(bash "${ROOT}/domains/dev/bin/jig" apply --target claude 2>/dev/null | sed -n 's/^  \(claude mcp add .*\)$/\1/p')
 }
 

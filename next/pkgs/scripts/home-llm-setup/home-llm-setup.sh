@@ -137,7 +137,7 @@ console_stacks() {
 		docker exec -i litellm-db psql -q -U litellm -d litellm -v ON_ERROR_STOP=1 <"${ROOT}/next/home/shared/llm-ledger/ledger.sql" ||
 			todo "cost ledger: could not create its table (docker exec litellm-db psql)"
 	else
-		todo "cost ledger: no litellm-db container yet (store op://llm-automation/litellm-db/credential, then make up)"
+		todo "cost ledger: no litellm-db container yet (store op://llm-automation/litellm-db/password, then make up)"
 	fi
 	local key
 	key="$("${LITELLM}/proxy-key.sh" 2>/dev/null || true)"

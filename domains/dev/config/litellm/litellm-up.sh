@@ -65,7 +65,7 @@ export TYPESAFE_API_KEY
 #     the others ship to (rules/decisions/2026-09-25-llm-cost-ledger-local-first.md).
 #     Without the DB secret LiteLLM serves as before, only unrecorded.
 #     The password must be URL-safe (letters and digits): it goes into a URL.
-LITELLM_DB_PASSWORD="$(try_secret op://llm-automation/litellm-db/credential)"
+LITELLM_DB_PASSWORD="$(try_secret op://llm-automation/litellm-db/password)"
 DB_ARGS=()
 if [ -n "$LITELLM_DB_PASSWORD" ]; then
   # the DB container reads its password from a file (POSTGRES_PASSWORD_FILE),
@@ -87,7 +87,7 @@ if [ -n "$LITELLM_DB_PASSWORD" ]; then
   export DATABASE_URL="postgresql://litellm:${LITELLM_DB_PASSWORD}@${DB_NAME}:5432/litellm"
   DB_ARGS=(--network "$NETWORK" -e DATABASE_URL)
 else
-  echo "litellm-up: no ledger DB secret (op://llm-automation/litellm-db/credential); serving without spend records" >&2
+  echo "litellm-up: no ledger DB secret (op://llm-automation/litellm-db/password); serving without spend records" >&2
 fi
 
 # 4) where LM Studio is — the ONE value that differs between machines

@@ -25,6 +25,8 @@ if [[ ! -f "${ROLES}" ]]; then
 	say "wrote ${ROLES}"
 fi
 
+# a Password item: its value is the "password" field
+# (op://llm-automation/litellm-db/password, read by litellm-up.sh and the sync)
 if ! op item get litellm-db --vault llm-automation >/dev/null 2>&1; then
 	op item create --vault llm-automation --category password --title litellm-db \
 		--generate-password=letters,digits,32 >/dev/null

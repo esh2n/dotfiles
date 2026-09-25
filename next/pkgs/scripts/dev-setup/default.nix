@@ -7,6 +7,7 @@
   gnused,
   gawk,
   gnugrep,
+  jq,
   dotctl,
 }:
 writeShellApplication {
@@ -16,6 +17,7 @@ writeShellApplication {
     gnused
     gawk
     gnugrep
+    jq
     dotctl
   ];
   inheritPath = true;
