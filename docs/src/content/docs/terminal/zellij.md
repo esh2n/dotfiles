@@ -15,7 +15,7 @@ Theme sync、status bar、fuzzy finder、pane bookmark を組み込んだ Zellij
 |--------|------|
 | Zjstatus | Git branch、時刻、mode 表示のある status bar |
 | Monocle | pane / tab の fuzzy finder (`Ctrl+q` → `f`) |
-| Harpoon | pane の bookmark 管理 (`Ctrl+q` → `b`) |
+| zellij-pane-picker | 星を付けた pane への切替 (`Ctrl+q` → `b`) |
 
 ## Keybindings
 
@@ -49,38 +49,27 @@ prefix key は `Ctrl+q`。
 | Key | Plugin | 説明 |
 |-----|--------|------|
 | `f` | Monocle | pane/tab を検索して jump |
-| `b` | Harpoon | bookmark した pane に切替 |
+| `b` | zellij-pane-picker | pane の一覧、星を付けた pane に切替 |
 
-### Harpoon の操作
+### zellij-pane-picker の操作
 
 | Key | 操作 |
 |-----|------|
-| `a` | 現在の pane を bookmark に追加 |
-| `j`/`k` or `↑`/`↓` | list 内を移動 |
+| 文字入力 | pane を絞り込む |
+| `↑`/`↓` | list 内を移動 |
+| `Space` | 選択した pane に星を付ける/外す |
 | `Enter` | 選択した pane に jump |
-| `d` | bookmark から削除 |
 | `Esc` | 閉じる |
 
+plugin 自身の Alt キーは AeroSpace の `alt-hjkl` とぶつかるため切ってある。
+
 :::tip
-pane が 2-3 個なら `Ctrl+q` → `h/j/k/l` で十分。5 個以上の pane を使うようになると Harpoon が便利。
+pane が 2-3 個なら `Ctrl+q` → `h/j/k/l` で十分。5 個以上の pane を使うようになると便利。
 :::
 
 ## Setup
 
-Zellij 0.38.0 以上と、Rust の `wasm32-wasip1` target が必要。
-
-```bash
-rustup target add wasm32-wasip1
-```
-
-plugin は自動で download される。Harpoon を手動 build する場合:
-
-```bash
-git clone https://github.com/Nacho114/harpoon.git /tmp/harpoon
-cd /tmp/harpoon
-cargo build --release --target wasm32-wasip1
-cp target/wasm32-wasip1/release/harpoon.wasm ~/.config/zellij/plugins/
-```
+zjstatus と monocle は `make up`（setup の `zellij-plugins`）が download する。zellij-pane-picker は Nix が版を固定して `~/.local/share/zellij/plugins/` に置く（`next/home/shared/zellij`）。
 
 ## File 構成
 
@@ -94,8 +83,7 @@ cp target/wasm32-wasip1/release/harpoon.wasm ~/.config/zellij/plugins/
 │   └── default.kdl      # active theme への symlink
 └── plugins/
     ├── zjstatus.wasm    # status bar
-    ├── monocle.wasm     # fuzzy finder
-    └── harpoon.wasm     # pane 管理
+    └── monocle.wasm     # fuzzy finder
 ```
 
 ## Status bar の表示内容
@@ -120,12 +108,6 @@ cp target/wasm32-wasip1/release/harpoon.wasm ~/.config/zellij/plugins/
 1. file permission を確認: `ls -la ~/.config/zellij/layouts/`
 2. session を再起動: `zellij kill-all-sessions`
 3. theme-switch script を確認: `which theme-switch`
-
-### Harpoon が crash する
-
-1. `wasm32-wasip1` target が install 済みか確認
-2. source から rebuild
-3. config に `move_to_focused_tab true` があるか確認
 
 ## Customize
 

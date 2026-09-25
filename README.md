@@ -789,7 +789,7 @@ Keybindings unified across tmux, WezTerm, Zellij, and Herdr (`~/.config/herdr/co
 | Exit copy mode | `Esc` or `q` | |
 | Detach session | `Prefix + d` | |
 | Monocle plugin | `Prefix + f` | Zellij only (file finder) |
-| Harpoon plugin | `Prefix + h` | Zellij only (bookmarks) |
+| Pane picker plugin | `Prefix + b` | Zellij only (starred panes) |
 
 **opensessions (AI Agent Sidebar):**
 

@@ -15,7 +15,7 @@ Running `theme-switch` with Catppuccin, Tokyo Night, or Nord automatically updat
 |--------|-------------|
 | Zjstatus | Status bar with git branch, time, and mode indicator |
 | Monocle | Fuzzy finder for panes and tabs (`Ctrl+q` then `f`) |
-| Harpoon | Pane bookmark manager (`Ctrl+q` then `b`) |
+| zellij-pane-picker | Starred panes (`Ctrl+q` then `b`) |
 
 ## Keybindings
 
@@ -49,38 +49,27 @@ Prefix key is `Ctrl+q`.
 | Key | Plugin | What it does |
 |-----|--------|-------------|
 | `f` | Monocle | Search and jump to panes/tabs |
-| `b` | Harpoon | Switch between bookmarked panes |
+| `b` | zellij-pane-picker | List panes, switch to starred ones |
 
-### Harpoon controls
+### zellij-pane-picker controls
 
 | Key | Action |
 |-----|--------|
-| `a` | Add current pane to bookmarks |
-| `j`/`k` or `↑`/`↓` | Navigate list |
-| `Enter` | Jump to selected pane |
-| `d` | Remove bookmark |
+| Type | Filter panes |
+| `↑`/`↓` | Move through the list |
+| `Space` | Star/unstar the selected pane |
+| `Enter` | Jump to the selected pane |
 | `Esc` | Close |
 
+The plugin's own Alt keys are off: they clash with AeroSpace's `alt-hjkl`.
+
 :::tip
-With 2-3 panes, `Ctrl+q` then `h/j/k/l` is enough. Harpoon becomes useful when you're juggling 5 or more.
+With 2-3 panes, `Ctrl+q` then `h/j/k/l` is enough. The picker becomes useful when you're juggling 5 or more.
 :::
 
 ## Setup
 
-Requires Zellij 0.38.0+ and the `wasm32-wasip1` Rust target.
-
-```bash
-rustup target add wasm32-wasip1
-```
-
-Plugins are downloaded automatically. To manually rebuild Harpoon:
-
-```bash
-git clone https://github.com/Nacho114/harpoon.git /tmp/harpoon
-cd /tmp/harpoon
-cargo build --release --target wasm32-wasip1
-cp target/wasm32-wasip1/release/harpoon.wasm ~/.config/zellij/plugins/
-```
+`make up` downloads zjstatus and monocle (the `zellij-plugins` setup step). zellij-pane-picker is pinned by Nix and placed at `~/.local/share/zellij/plugins/` (`next/home/shared/zellij`).
 
 ## File layout
 
@@ -94,8 +83,7 @@ cp target/wasm32-wasip1/release/harpoon.wasm ~/.config/zellij/plugins/
 │   └── default.kdl      # Symlink to active theme
 └── plugins/
     ├── zjstatus.wasm    # Status bar
-    ├── monocle.wasm     # Fuzzy finder
-    └── harpoon.wasm     # Pane management
+    └── monocle.wasm     # Fuzzy finder
 ```
 
 ## Status bar
@@ -115,12 +103,6 @@ Shows mode indicator (colored background), session name, git branch (refreshes e
 1. Check permissions: `ls -la ~/.config/zellij/layouts/`
 2. Restart sessions: `zellij kill-all-sessions`
 3. Verify script: `which theme-switch`
-
-### Harpoon crashes
-
-1. Make sure `wasm32-wasip1` target is installed
-2. Rebuild from source
-3. Check that config has `move_to_focused_tab true`
 
 ## Customization
 

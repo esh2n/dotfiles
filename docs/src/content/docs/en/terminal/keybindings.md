@@ -52,7 +52,7 @@ The same keybindings work across tmux, WezTerm, and Zellij. Prefix key is `Ctrl+
 | Action | Key | Description |
 |--------|-----|-------------|
 | Monocle | `Prefix + f` | Fuzzy finder for panes/tabs |
-| Harpoon | `Prefix + b` | Pane bookmarks |
+| zellij-pane-picker | `Prefix + b` | Starred panes |
 
 ## tmux session restore
 

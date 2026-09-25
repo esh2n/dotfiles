@@ -12,7 +12,7 @@ Rich, modern terminal multiplexer configuration with theme integration and power
 ### 🔌 Plugins
 - **Zjstatus** - Rich status bar with Git info, time, mode display
 - **Monocle** - Fuzzy file finder (`Ctrl+q` → `f`)
-- **Harpoon** - Favorite panes management (`Ctrl+q` → `b`)
+- **zellij-pane-picker** - Starred panes (`Ctrl+q` → `b`)
 
 ### ⌨️ Keybindings
 
@@ -40,41 +40,27 @@ Prefix key: `Ctrl+q` (enters locked/prefix mode)
 
 **Plugins (prefix mode):**
 - `f` - **Monocle** - zellij内のファジーファインダー。開いているpane/tabをインクリメンタル検索してジャンプ
-- `b` - **Harpoon** - よく使うpaneをブックマークして即座に切り替え。paneが多い時に便利
+- `b` - **zellij-pane-picker** - paneの一覧。よく使うpaneに星を付けて即座に切り替え。paneが多い時に便利
 
-**Harpoon Commands:**
+**zellij-pane-picker Commands:**
 
 | Key | Action |
 |-----|--------|
-| `a` | 現在のpaneをブックマークに追加 |
-| `j`/`k` or `↑`/`↓` | リスト内を移動 |
+| 文字入力 | paneを絞り込む |
+| `↑`/`↓` | リスト内を移動 |
+| `Space` | 選択したpaneに星を付ける/外す |
 | `Enter` | 選択したpaneにジャンプ |
-| `d` | ブックマークから削除 |
 | `Esc` | 閉じる |
 
-> **Tip:** paneが2〜3個なら `Ctrl+q` → `h/j/k/l` のpane移動で十分。paneが5個以上になる運用でHarpoonが真価を発揮する。
+プラグイン自身の Alt キー（`Alt l` など）は AeroSpace の `alt-hjkl` とぶつかるため切ってある。
+
+> **Tip:** paneが2〜3個なら `Ctrl+q` → `h/j/k/l` のpane移動で十分。paneが5個以上になる運用で真価を発揮する。
 
 ## 🚀 Installation
 
-### Prerequisites
-- Zellij 0.38.0+
-- Rust with `wasm32-wasip1` target
+### Plugins
 
-```bash
-rustup target add wasm32-wasip1
-```
-
-### Plugin Setup
-
-Plugins are automatically downloaded and configured. If you need to rebuild Harpoon:
-
-```bash
-# Clone and build Harpoon from source
-git clone https://github.com/Nacho114/harpoon.git /tmp/harpoon
-cd /tmp/harpoon
-cargo build --release --target wasm32-wasip1
-cp target/wasm32-wasip1/release/harpoon.wasm ~/.config/zellij/plugins/
-```
+zjstatus and monocle are downloaded by `make up` (the `zellij-plugins` setup step). zellij-pane-picker is pinned by Nix (`next/home/shared/zellij`) and placed at `~/.local/share/zellij/plugins/`.
 
 ### Theme Integration
 
@@ -99,8 +85,7 @@ theme-switch nord
 │   └── default.kdl      # Default layout (symlinks to active theme)
 └── plugins/
     ├── zjstatus.wasm    # Status bar plugin
-    ├── monocle.wasm     # File finder plugin
-    └── harpoon.wasm     # Pane management plugin
+    └── monocle.wasm     # File finder plugin
 ```
 
 ## 🎯 Status Bar Features
@@ -127,13 +112,6 @@ If themes don't switch properly:
 1. Check file permissions: `ls -la ~/.config/zellij/layouts/`
 2. Restart Zellij sessions: `zellij kill-all-sessions`
 3. Verify theme-switch script: `which theme-switch`
-
-### Harpoon Crashes
-If Harpoon shows "Error in plugin":
-
-1. Ensure `wasm32-wasip1` target is installed
-2. Rebuild from source (required for compatibility)
-3. Check config has `move_to_focused_tab true`
 
 ## 🎨 Customization
 

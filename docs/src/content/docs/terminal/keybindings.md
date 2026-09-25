@@ -55,7 +55,7 @@ Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ
 | 操作 | Key | 説明 |
 |------|-----|------|
 | Monocle | `Prefix + f` | fuzzy finder |
-| Harpoon | `Prefix + b` | pane bookmark 管理 |
+| zellij-pane-picker | `Prefix + b` | 星を付けた pane に切替 |
 
 ## tmux session 復元
 
