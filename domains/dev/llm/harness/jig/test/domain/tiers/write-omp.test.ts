@@ -25,7 +25,7 @@ describe("toOmpProxyBlock", () => {
   });
 
   test("every tier carries contextWindow and maxTokens from tiers.json, in main/complex/deterministic order", () => {
-    const ids = [...content.matchAll(/^      - id: (\w+)$/gm)].map((m) => m[1]);
+    const ids = [...content.matchAll(/^ {6}- id: (\w+)$/gm)].map((m) => m[1]);
     expect(ids).toEqual(["main", "complex", "deterministic"]);
     for (const id of ids) {
       const tier = policy.tiers[id as "main" | "complex" | "deterministic"];

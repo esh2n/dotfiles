@@ -43,7 +43,6 @@ type step func(Env) error
 var steps = map[string]step{
 	"capsule-daemon":  capsuleDaemon,
 	"claude-cli":      claudeCLI,
-	"claude-mcp":      claudeMCP,
 	"codebase-memory": codebaseMemory,
 	"ecc":             ecc,
 	"gh-extensions":   ghExtensions,

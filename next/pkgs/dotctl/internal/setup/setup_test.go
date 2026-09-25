@@ -120,7 +120,7 @@ func TestUnknownStepNamesTheKnownOnes(t *testing.T) {
 }
 
 func TestMissingToolSkipsWithAWarning(t *testing.T) {
-	for _, name := range []string{"capsule-daemon", "mise-trust", "git-lfs", "gh-extensions", "codebase-memory", "claude-mcp", "pi-packages", "pacifica", "tpm", "userstyles", "sbarlua", "ecc"} {
+	for _, name := range []string{"capsule-daemon", "mise-trust", "git-lfs", "gh-extensions", "codebase-memory", "pi-packages", "pacifica", "tpm", "userstyles", "sbarlua", "ecc"} {
 		w := newWorld(t)
 		if err := Run(w.env, name); err != nil {
 			t.Fatalf("%s: %v", name, err)
@@ -217,37 +217,6 @@ func TestCodebaseMemoryTurnsOnIndexAndWatch(t *testing.T) {
 		if !w.sys.ran("codebase-memory-mcp config set " + k + " true") {
 			t.Fatalf("%s not set: %v", k, w.sys.calls)
 		}
-	}
-}
-
-func TestClaudeMCPAddsUnregisteredAndReportsFailures(t *testing.T) {
-	w := newWorld(t, "claude", "bun")
-	write(t, filepath.Join(w.home, ".claude.json"), `{"mcpServers": {"serena": {}}}`)
-	w.sys.outputs["bash "+filepath.Join(w.repo, "domains", "dev", "bin", "jig")] =
-		"wrote\n  claude mcp add --scope user serena -- serena start\n  claude mcp add --scope user context7 -- ctx7\n  claude mcp add --scope user broken -- x\n"
-	w.sys.fail["bash -c claude mcp add --scope user broken"] = errors.New("exit status 1")
-	if err := Run(w.env, "claude-mcp"); err != nil {
-		t.Fatal(err)
-	}
-	if !w.sys.ran("bash -c claude mcp add --scope user context7 -- ctx7") || w.sys.ran("bash -c claude mcp add --scope user serena -- serena start") {
-		t.Fatalf("calls %v", w.sys.calls)
-	}
-	if !strings.Contains(w.err.String(), "failed: claude mcp add --scope user broken") {
-		t.Fatalf("stderr %q", w.err.String())
-	}
-}
-
-func TestMCPParsing(t *testing.T) {
-	if mcpName("claude mcp add --scope user x -- y") != "x" || mcpName("claude mcp add x") != "" || mcpName("a --scope") != "" {
-		t.Fatal("mcpName")
-	}
-	if got := mcpServers(filepath.Join(t.TempDir(), "missing.json")); len(got) != 0 {
-		t.Fatalf("missing file: %v", got)
-	}
-	bad := filepath.Join(t.TempDir(), "bad.json")
-	write(t, bad, "{")
-	if got := mcpServers(bad); len(got) != 0 {
-		t.Fatalf("bad json: %v", got)
 	}
 }
 

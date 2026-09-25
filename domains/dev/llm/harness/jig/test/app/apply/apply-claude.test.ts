@@ -14,6 +14,7 @@ const PATHS: ClaudeApplyPaths = {
   sandbox: `${H}/policy/sandbox.json`,
   decisions: `${H}/rules/decisions`,
   settings: `${CLAUDE}/settings.json`,
+  claudeJson: "/home/u/.claude.json",
   agentsMd: `${CLAUDE}/AGENTS.md`,
   claudeMd: `${CLAUDE}/CLAUDE.md`,
   skills: `${CLAUDE}/skills`,
@@ -223,17 +224,62 @@ describe("what the composed file contains", () => {
     expect(run(ports)).rejects.toThrow("array");
   });
 
-  test("MCP servers are claude mcp add lines, not a settings key: claude=false is excluded and {{HOME}} is substituted", async () => {
-    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
-    const report = await run(ports);
+  test("MCP servers go into ~/.claude.json's mcpServers, not a settings key: claude=false is excluded and {{HOME}} is substituted", async () => {
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
+    const report = await applyClaude({ paths: PATHS, hookPaths: HOOK_PATHS, write: true }, ports);
 
     expect(report.composition.settings.mcpServers).toBeUndefined();
     expect(report.composition.owned).not.toContain("mcpServers");
-    expect(report.mcpAdds.map((add) => add.name)).toEqual(["serena", "codebase-memory-mcp"]);
-    expect(report.mcpAdds.map((add) => add.line)).toEqual([
-      "claude mcp add --transport stdio --scope user serena -- uvx serena",
-      "claude mcp add --transport stdio --scope user codebase-memory-mcp -- /home/u/bin/cmm",
-    ]);
+    expect(report.mcp.added).toEqual(["serena", "codebase-memory-mcp"]);
+    expect(JSON.parse(files[PATHS.claudeJson] ?? "{}").mcpServers).toEqual({
+      serena: { type: "stdio", command: "uvx", args: ["serena"], env: {} },
+      "codebase-memory-mcp": { type: "stdio", command: "/home/u/bin/cmm", args: [], env: {} },
+    });
+  });
+
+  test("~/.claude.json keeps everything but jig's servers; a dropped server jig wrote is removed, others stay", async () => {
+    const claudeState = {
+      numStartups: 42,
+      projects: { "/x": { history: ["a"] } },
+      mcpServers: {
+        mine: { type: "stdio", command: "old", args: [], env: {} },
+        hand: { type: "http", url: "u", headers: {} },
+      },
+    };
+    const { ports, files } = fakePorts({
+      files: { [PATHS.settings]: LIVE_SETTINGS, [PATHS.claudeJson]: JSON.stringify(claudeState) },
+    });
+    const manifest = await ports.readManifest();
+    await ports.writeManifest({
+      ...manifest,
+      [`${PATHS.claudeJson}#mcpServers`]: JSON.stringify(["mine"]),
+    });
+    const report = await applyClaude({ paths: PATHS, hookPaths: HOOK_PATHS, write: true }, ports);
+
+    expect(report.mcp.removed).toEqual(["mine"]);
+    expect(report.mcp.others).toEqual(["hand"]);
+    const after = JSON.parse(files[PATHS.claudeJson] ?? "{}");
+    expect(after.numStartups).toBe(42);
+    expect(after.projects).toEqual({ "/x": { history: ["a"] } });
+    expect(Object.keys(after.mcpServers)).toEqual(["hand", "serena", "codebase-memory-mcp"]);
+    expect(
+      JSON.parse((await ports.readManifest())[`${PATHS.claudeJson}#mcpServers`] ?? "[]"),
+    ).toEqual(["serena", "codebase-memory-mcp"]);
+  });
+
+  test("a server of the same name that jig did not write stops the write instead of replacing it", async () => {
+    const claudeState = {
+      mcpServers: { serena: { type: "stdio", command: "someone-else", args: [], env: {} } },
+    };
+    const { ports, files } = fakePorts({
+      files: { [PATHS.settings]: LIVE_SETTINGS, [PATHS.claudeJson]: JSON.stringify(claudeState) },
+    });
+    const report = await applyClaude({ paths: PATHS, hookPaths: HOOK_PATHS, write: true }, ports);
+
+    expect(report.outcome).toBe("conflict");
+    expect(report.wrote).toBe(false);
+    expect(report.message).toContain("serena, not written by jig");
+    expect(JSON.parse(files[PATHS.claudeJson] ?? "{}")).toEqual(claudeState);
   });
 
   test("the mcpServers key milestone 1 wrote is removed with its reason", async () => {

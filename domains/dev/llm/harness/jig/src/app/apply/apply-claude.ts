@@ -10,11 +10,12 @@
  *   `permissions.{allow,deny,defaultMode}` and `sandbox`, plus the absence of
  *   the retired harness's `env` keys and of the `mcpServers` key milestone 1
  *   once wrote there by mistake (Claude Code never read it).
- * - MCP servers (milestone 1, corrected): printed as `claude mcp add --scope
- *   user` lines for the owner to paste, one per `targets.claude` server in
- *   `mcp/servers.json`. Their destination, `~/.claude.json`, is a file jig
- *   neither reads nor writes, and jig does not run the `claude` CLI either —
- *   `--write` performs the settings.json change only.
+ * - MCP servers: the `mcpServers` key of `~/.claude.json`, Claude Code's
+ *   user-scope MCP source, holds every `targets.claude` server of
+ *   `mcp/servers.json`. Only that key changes; the rest of the file is
+ *   Claude Code's own state and comes back as read
+ *   (`domain/claude/claude-json.ts`,
+ *   rules/decisions/2026-09-25-jig-writes-claude-json-mcp.md).
  * - `~/.claude/AGENTS.md` (milestone 2): generated from `rules/common/` and
  *   `rules/decisions/`, with `CLAUDE.md` a relative symlink to it.
  * - `~/.claude/{skills,agents,rules}/` (milestone 2): three real directories
@@ -58,6 +59,7 @@
  */
 
 import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
+import { type ClaudeJsonMcpPlan, planClaudeJsonMcp } from "../../domain/claude/claude-json";
 import { type CommandsAction, classifyCommands } from "../../domain/claude/commands";
 import { type ClaudeHookPaths, buildClaudeHooks } from "../../domain/claude/hooks";
 import type { PathState } from "../../domain/claude/links";
@@ -78,7 +80,6 @@ import {
 import { selectSkillDirs } from "../../domain/claude/skills-dir";
 import { type WorkflowCandidate, selectWorkflowEntries } from "../../domain/claude/workflows-dir";
 import type { JsonObject } from "../../domain/compose/merge";
-import { renderClaudeMcpAdd } from "../../domain/mcp/claude-mcp-add";
 import { parseMcpLayer } from "../../domain/mcp/parse";
 import { buildClaudeMcpServers } from "../../domain/mcp/to-claude";
 import { parsePolicy } from "../../domain/policy/parse";
@@ -140,6 +141,8 @@ export interface ClaudeApplyPaths {
   readonly scripts: string;
   /** Destination: `~/.claude/workflows`, a real directory of links to `<harnessRoot>/workflows/<name>.js` and `lib`. */
   readonly workflows: string;
+  /** Destination: `~/.claude.json`, Claude Code's own file; only its `mcpServers` key is jig's. */
+  readonly claudeJson: string;
   /** Substituted into mcp command paths; `{{HOME}}`. */
   readonly home: string;
 }
@@ -166,11 +169,8 @@ export interface CommandsReport {
   readonly action: CommandsAction;
 }
 
-/** One server the owner registers by hand: its name and the exact line to paste. */
-export interface McpAddReport {
-  readonly name: string;
-  readonly line: string;
-}
+/** The `mcpServers` change in `~/.claude.json`. */
+export type McpReport = ClaudeJsonMcpPlan & { readonly path: string };
 
 export interface ClaudeApplyReport {
   /** Over all parts: any conflict wins; then any change; then noop. */
@@ -196,11 +196,8 @@ export interface ClaudeApplyReport {
   readonly scriptsDir: OptionalManagedDirReport;
   /** Milestone 4: `~/.claude/workflows`, when `H/workflows/` exists. */
   readonly workflowsDir: OptionalManagedDirReport;
-  /**
-   * `mcp/servers.json` filtered to `targets.claude`, as `claude mcp add` lines.
-   * Printed, never run: jig neither writes `~/.claude.json` nor invokes the CLI.
-   */
-  readonly mcpAdds: readonly McpAddReport[];
+  /** `mcp/servers.json`'s `targets.claude` servers, into `~/.claude.json`'s `mcpServers`. */
+  readonly mcp: McpReport;
   /** `undefined` when `policy/sandbox.json` does not exist yet. */
   readonly sandboxSourcePath: string | undefined;
   readonly message?: string;
@@ -215,19 +212,26 @@ function allowList(projected: ClaudePermissions): readonly string[] {
   return [...new Set([...projected.allow, ...DEFAULT_PERMITS.map((permit) => permit.rule)])].sort();
 }
 
-async function buildMcpAdds(
+/** The manifest entry naming the servers jig wrote into `~/.claude.json` last. */
+function mcpOwnedKey(paths: ClaudeApplyPaths): string {
+  return `${paths.claudeJson}#mcpServers`;
+}
+
+async function planMcp(
   ports: ClaudeApplyPorts,
   paths: ClaudeApplyPaths,
-): Promise<readonly McpAddReport[]> {
+  manifest: Readonly<Record<string, string>>,
+): Promise<McpReport> {
   const read = await readJson(ports, paths.mcpServers);
   if (read === undefined) {
     throw new Error(`jig apply --target claude: MCP source not found at ${paths.mcpServers}`);
   }
   const layer = parseMcpLayer(read.text, paths.mcpServers);
-  return buildClaudeMcpServers(layer.servers, { HOME: paths.home }).map((add) => ({
-    name: add.name,
-    line: renderClaudeMcpAdd(add),
-  }));
+  const servers = buildClaudeMcpServers(layer.servers, { HOME: paths.home });
+  const recorded = manifest[mcpOwnedKey(paths)];
+  const owned = recorded === undefined ? [] : (JSON.parse(recorded) as string[]);
+  const plan = planClaudeJsonMcp(await ports.readFile(paths.claudeJson), servers, owned);
+  return { ...plan, path: paths.claudeJson };
 }
 
 /**
@@ -354,7 +358,8 @@ function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "messa
     managedDirChanges(report.rulesDir) ||
     report.commands.action.kind === "remove" ||
     optionalDirChanges(report.scriptsDir) ||
-    optionalDirChanges(report.workflowsDir)
+    optionalDirChanges(report.workflowsDir) ||
+    report.mcp.outcome === "write"
   );
 }
 
@@ -389,13 +394,12 @@ export async function applyClaude(
       sandbox: hostSandbox(sandbox.source),
     },
   );
-  const mcpAdds = await buildMcpAdds(ports, paths);
-
   const currentText = (await ports.readFile(paths.settings)) ?? "";
   const generated = renderClaudeSettings(composition.settings);
   const diff = unifiedDiff(paths.settings, currentText, "generated", generated);
 
   const manifest = { ...(await ports.readManifest()) };
+  const mcp = await planMcp(ports, paths, manifest);
   const settingsPlan = planApply({
     currentContent: currentText === "" ? undefined : currentText,
     generatedContent: generated,
@@ -430,7 +434,7 @@ export async function applyClaude(
     commands: await planCommands(ports, paths.commands),
     scriptsDir: await planScriptsDir(ports, paths, now),
     workflowsDir: await planWorkflowsDir(ports, paths, now),
-    mcpAdds,
+    mcp,
     sandboxSourcePath: sandbox.found ? paths.sandbox : undefined,
   };
 
@@ -443,6 +447,9 @@ export async function applyClaude(
       : []),
     ...(base.commands.action.kind === "conflict"
       ? [`${paths.commands} is ${base.commands.action.reason}`]
+      : []),
+    ...(mcp.outcome === "conflict"
+      ? [mcp.reason ?? "~/.claude.json cannot take the MCP servers"]
       : []),
   ];
   if (conflicts.length > 0) {
@@ -461,6 +468,9 @@ export async function applyClaude(
       manifest[paths.settings] = ports.sha256(generated);
     }
     if (agentsMd.outcome === "write") await applyAgentsMd(ports, agentsMd, manifest);
+    if (mcp.outcome === "write" && mcp.content !== undefined)
+      await ports.writeAtomic(paths.claudeJson, mcp.content);
+    manifest[mcpOwnedKey(paths)] = JSON.stringify(mcp.owned);
     // The manifest seeds for the two files even when they were already
     // current, so a LATER hand edit is detected as one.
     manifest[paths.settings] ??= ports.sha256(generated);
@@ -486,9 +496,15 @@ export async function applyClaude(
     // Nothing to deliver, but seed the manifest for both generated files so a
     // LATER hand edit is detected as one. No file content changes: this is
     // out-of-repo state only.
-    if (manifest[paths.settings] === undefined || manifest[paths.agentsMd] === undefined) {
+    const owned = JSON.stringify(mcp.owned);
+    if (
+      manifest[paths.settings] === undefined ||
+      manifest[paths.agentsMd] === undefined ||
+      manifest[mcpOwnedKey(paths)] !== owned
+    ) {
       manifest[paths.settings] ??= ports.sha256(generated);
       manifest[paths.agentsMd] ??= ports.sha256(agentsMd.content);
+      manifest[mcpOwnedKey(paths)] = owned;
       await ports.writeManifest(manifest);
     }
   }

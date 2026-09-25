@@ -476,27 +476,18 @@ function dirOf(path: string): string {
   return path.slice(0, Math.max(path.lastIndexOf("/"), 0));
 }
 
-/**
- * The MCP servers, printed instead of written — the same delivery as the
- * permit fragment. settings.json is not an MCP source; the user-scope one is
- * `~/.claude.json`, which only `claude mcp add` writes and jig never reads, so
- * the section is a paste-able block plus the one thing jig cannot list.
- */
+/** The `mcpServers` change in ~/.claude.json: what is added, changed, removed, and left alone. */
 function mcpLines(report: ClaudeApplyReport): readonly string[] {
-  const { mcpAdds } = report;
+  const { mcp } = report;
+  const list = (label: string, names: readonly string[]) =>
+    names.length === 0 ? [] : [`  ${label}: ${names.join(", ")}`];
   return [
-    `mcp servers (claude mcp, user scope) (${mcpAdds.length}):`,
-    "  Claude Code does not read MCP servers from settings.json (docs: mcp.md); its user-scope",
-    "  source is ~/.claude.json, which only `claude mcp add` writes and jig never reads or writes.",
-    "  Paste and run these once; they register every targets.claude server from mcp/servers.json:",
-    ...(mcpAdds.length === 0 ? ["  (none)"] : mcpAdds.map((add) => `  ${add.line}`)),
-    "",
-    "  A server registered in ~/.claude.json but absent from mcp/servers.json is removed by hand",
-    "  with `claude mcp remove --scope user <name>`; jig does not read ~/.claude.json, so it cannot",
-    "  list those — `claude mcp list` shows every source with its scope.",
-    "  --write does not run these lines: jig never invokes the claude CLI (whether it may is a",
-    "  ruling not yet made), so --write performs the settings.json change only. Run the lines",
-    "  above once; re-run them after editing mcp/servers.json.",
+    `mcp servers (${mcp.path}, mcpServers only): ${mcp.outcome}`,
+    ...list("add", mcp.added),
+    ...list("update", mcp.changed),
+    ...list("remove (jig wrote it; no longer in mcp/servers.json)", mcp.removed),
+    ...list("left alone (not jig's)", mcp.others),
+    ...(mcp.reason === undefined ? [] : [`  ${mcp.reason}`]),
   ];
 }
 

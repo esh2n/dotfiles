@@ -230,7 +230,7 @@ describe("what the apply takes away is listed, not silently dropped", () => {
       key: "mcpServers",
       items: ["serena", "figma-desktop"],
       reason:
-        "settings.json is not an MCP source (docs: mcp.md); delivered through `claude mcp add` instead",
+        "settings.json is not an MCP source (docs: mcp.md); delivered into ~/.claude.json's mcpServers instead",
     });
   });
 

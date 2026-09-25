@@ -7,73 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
-
-// User-scoped MCP servers live in ~/.claude.json, which only `claude mcp add`
-// writes. jig prints one such line per server; the ones not registered yet
-// are run. What is registered is read from ~/.claude.json itself: `claude mcp
-// list` connects to every server first, and under activation's time limit it
-// can return nothing, which made every add fail as "already exists".
-func claudeMCP(e Env) error {
-	if !e.need("claude") || !e.need("bun") {
-		return nil
-	}
-	registered := mcpServers(e.path(".claude.json"))
-	jig, _, _ := e.Sys.Capture(0, "bash", filepath.Join(e.Repo, "domains", "dev", "bin", "jig"), "apply", "--target", "claude")
-	for _, line := range mcpAddLines(jig) {
-		name := mcpName(line)
-		if name == "" || registered[name] {
-			continue
-		}
-		e.UI.Note("registering %s", name)
-		out, errOut, err := e.Sys.Capture(60*time.Second, "bash", "-c", line)
-		if err != nil {
-			e.UI.Warn("failed: %s: %v: %s", line, err, strings.TrimSpace(out+errOut))
-		}
-	}
-	return nil
-}
-
-// mcpServers names the servers ~/.claude.json has; none when it is missing
-// or unreadable.
-func mcpServers(file string) map[string]bool {
-	var doc struct {
-		MCPServers map[string]json.RawMessage `json:"mcpServers"`
-	}
-	b, err := os.ReadFile(file)
-	names := map[string]bool{}
-	if err != nil || json.Unmarshal(b, &doc) != nil {
-		return names
-	}
-	for n := range doc.MCPServers {
-		names[n] = true
-	}
-	return names
-}
-
-// mcpAddLines picks jig's "  claude mcp add ..." lines out of its report.
-func mcpAddLines(report string) []string {
-	var lines []string
-	for _, l := range strings.Split(report, "\n") {
-		if strings.HasPrefix(l, "  claude mcp add ") {
-			lines = append(lines, strings.TrimPrefix(l, "  "))
-		}
-	}
-	return lines
-}
-
-// mcpName is the server a `claude mcp add --scope <scope> <name> ...` line
-// adds ("" when the line has no --scope).
-func mcpName(line string) string {
-	f := strings.Fields(line)
-	for i, w := range f {
-		if w == "--scope" && i+2 < len(f) {
-			return f[i+2]
-		}
-	}
-	return ""
-}
 
 var emailLine = regexp.MustCompile(`(?m)^[ \t]*email[ \t]*=`)
 

@@ -15,8 +15,8 @@ import { type PlanAction, planApply } from "../../domain/tiers/plan";
 import { spliceManagedBlock } from "../../domain/tiers/splice";
 import type { TiersPolicy } from "../../domain/tiers/types";
 import { toDshModelsBlock } from "../../domain/tiers/write-dsh";
-import { toOmpProxyBlock } from "../../domain/tiers/write-omp";
 import { toLitellmModelList } from "../../domain/tiers/write-litellm";
+import { toOmpProxyBlock } from "../../domain/tiers/write-omp";
 import { toPiModels } from "../../domain/tiers/write-pi";
 import type { ApplyPorts } from "./ports";
 

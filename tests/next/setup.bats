@@ -41,7 +41,7 @@ print(json.dumps(v))' "${@:2}"; }
 
 names() { printf '%s' "$1" | python3 -c 'import json,sys; print(" ".join(sorted(json.load(sys.stdin))))'; }
 
-SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-memory setup-ecc setup-gh-extensions setup-git-identity setup-git-lfs setup-mise-trust setup-nvim-default setup-pacifica setup-pi-packages setup-theme-init setup-zellij-plugins"
+SHARED="setup-capsule-daemon setup-claude-cli setup-codebase-memory setup-ecc setup-gh-extensions setup-git-identity setup-git-lfs setup-mise-trust setup-nvim-default setup-pacifica setup-pi-packages setup-theme-init setup-zellij-plugins"
 
 @test "setup: the mac runs every ported step, plus its own" {
 	run --separate-stderr activation darwin
@@ -61,11 +61,6 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-me
 	run --separate-stderr activation darwin
 	[[ "$(field "$output" setup-userstyles data)" == *"dotctl setup --repo ${REPO_ROOT} userstyles"* ]]
 	[[ "$(field "$output" setup-sbarlua data)" == *"dotctl setup --repo ${REPO_ROOT} sbarlua"* ]]
-}
-
-@test "setup: claude's MCP servers are registered after jig has written them and the CLI exists" {
-	run --separate-stderr activation darwin
-	[ "$(field "$output" setup-claude-mcp after)" = '["linkGeneration", "harnessApply", "setup-claude-cli"]' ]
 }
 
 @test "setup: steps see the user's tools (profiles, mise, cargo, Homebrew, the system), not only activation's PATH" {

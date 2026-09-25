@@ -35,7 +35,7 @@
  * only by `claude mcp add`). So the key is jig's own dead value: it leaves on
  * write and is reported under the removals with that reason. The servers
  * themselves are delivered as printed `claude mcp add` lines
- * (domain/mcp/claude-mcp-add.ts).
+ * (domain/claude/claude-json.ts writes them into ~/.claude.json).
  *
  * Pure. No IO, no clock, no paths.
  */
@@ -97,7 +97,7 @@ export interface Removal {
 export const DEAD_KEYS: ReadonlyMap<string, string> = new Map([
   [
     "mcpServers",
-    "settings.json is not an MCP source (docs: mcp.md); delivered through `claude mcp add` instead",
+    "settings.json is not an MCP source (docs: mcp.md); delivered into ~/.claude.json's mcpServers instead",
   ],
 ]);
 

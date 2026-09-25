@@ -112,20 +112,6 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 	[ ! -s "${LOG}" ]
 }
 
-@test "setup claude-mcp: adds only the servers ~/.claude.json does not have yet, and says why one fails" {
-	printf '#!/usr/bin/env bash\nprintf "wrote\\n  claude mcp add --scope user serena -- serena start\\n  claude mcp add --scope user context7 -- ctx7\\n  claude mcp add --scope user broken -- x\\n"\n' >"${ROOT}/domains/dev/bin/jig"
-	fake bun
-	fake claude 'case "$*" in *broken*) echo "boom: bad config" >&2; exit 1 ;; esac'
-	fake timeout 'shift; exec "$@"'
-	echo '{"mcpServers": {"serena": {"command": "serena"}}}' >"${HOME}/.claude.json"
-	run --separate-stderr step claude-mcp
-	[ "$status" -eq 0 ]
-	grep -qx "claude mcp add --scope user context7 -- ctx7" "${LOG}"
-	! grep -q "claude mcp add --scope user serena" "${LOG}"
-	! grep -q "claude mcp list" "${LOG}"
-	[[ "$stderr" == *"boom: bad config"* ]]
-}
-
 @test "setup pi-packages: installs the packages settings.json does not name" {
 	fake pi
 	fake timeout 'shift; exec "$@"'

@@ -116,6 +116,12 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
     sandbox: join(harness, "policy", "sandbox.json"),
     decisions: join(harness, "rules", "decisions"),
     settings: join(claudeDir, "settings.json"),
+    // Claude Code keeps .claude.json in CLAUDE_CONFIG_DIR when that is set,
+    // otherwise beside ~/.claude in the home directory.
+    claudeJson:
+      process.env.CLAUDE_CONFIG_DIR === undefined
+        ? join(homedir(), ".claude.json")
+        : join(process.env.CLAUDE_CONFIG_DIR, ".claude.json"),
     agentsMd: join(claudeDir, "AGENTS.md"),
     claudeMd: join(claudeDir, "CLAUDE.md"),
     skills: join(claudeDir, "skills"),

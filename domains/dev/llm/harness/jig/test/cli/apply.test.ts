@@ -167,6 +167,7 @@ describe("applyCli --target claude", () => {
     sandbox: `${H}/policy/sandbox.json`,
     decisions: `${H}/rules/decisions`,
     settings: `${CLAUDE}/settings.json`,
+    claudeJson: "/home/u/.claude.json",
     agentsMd: `${CLAUDE}/AGENTS.md`,
     claudeMd: `${CLAUDE}/CLAUDE.md`,
     skills: `${CLAUDE}/skills`,
@@ -216,7 +217,7 @@ describe("applyCli --target claude", () => {
     expect(result.stdout).toContain('"id": "permit-git-commit"');
   });
 
-  test("MCP servers are a paste-able claude mcp add block, with the by-hand remove and the --write caveat", async () => {
+  test("MCP servers are listed as the change to ~/.claude.json's mcpServers", async () => {
     const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     const context = claudeContext({
       [CLAUDE_PATHS.mcpServers]: JSON.stringify({
@@ -242,18 +243,9 @@ describe("applyCli --target claude", () => {
     });
     const result = await applyCli(["--target", "claude"], ports, paths, context);
 
-    expect(result.stdout).toContain("mcp servers (claude mcp, user scope) (2):");
-    expect(result.stdout).toContain(
-      "\n  claude mcp add --transport stdio --scope user serena -- uvx serena --context claude-code\n",
-    );
-    expect(result.stdout).toContain(
-      "\n  claude mcp add --transport http --scope user figma-remote https://mcp.figma.com/mcp -H 'Authorization: Bearer ${FIGMA_TOKEN}'\n",
-    );
+    expect(result.stdout).toContain("mcp servers (/home/u/.claude.json, mcpServers only): write");
+    expect(result.stdout).toContain("\n  add: serena, figma-remote\n");
     expect(result.stdout).not.toContain("playwright");
-    expect(result.stdout).toContain("`claude mcp remove --scope user <name>`");
-    expect(result.stdout).toContain("jig does not read ~/.claude.json, so it cannot");
-    expect(result.stdout).toContain("--write does not run these lines");
-    expect(result.stdout).toContain("re-run them after editing mcp/servers.json");
   });
 
   test("a leftover mcpServers key is listed under REMOVE with its reason", async () => {
@@ -266,7 +258,7 @@ describe("applyCli --target claude", () => {
     const result = await applyCli(["--target", "claude"], ports, paths, context);
 
     expect(result.stdout).toContain(
-      "  mcpServers (2) — settings.json is not an MCP source (docs: mcp.md); delivered through `claude mcp add` instead:\n    - serena\n    - figma-desktop\n",
+      "  mcpServers (2) — settings.json is not an MCP source (docs: mcp.md); delivered into ~/.claude.json's mcpServers instead:\n    - serena\n    - figma-desktop\n",
     );
   });
 

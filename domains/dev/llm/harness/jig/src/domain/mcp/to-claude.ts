@@ -5,16 +5,10 @@
  * `buildMcpServers`), reading `server.targets.claude` /
  * `targetOverrides.claude` directly.
  *
- * What this module does NOT produce any more is a `mcpServers` object for
- * `~/.claude/settings.json`. Claude Code does not read MCP servers from that
- * file (mcp.md and settings.md: "MCP servers are NOT stored in settings.json");
- * its user-scope source is `~/.claude.json`, which only `claude mcp add`
- * writes and which jig may neither read nor write
- * (`rules/decisions/2026-09-22-config-layout-no-personal-layer.md`). So the
- * result here is the parsed, overridden and templated form of each server,
- * and `./claude-mcp-add.ts` renders it as the `claude mcp add` line the
- * dry-run prints for the owner to paste — the same delivery the default
- * permits get instead of a write into `policy/`.
+ * Claude Code does not read MCP servers from `~/.claude/settings.json`; its
+ * user-scope source is the `mcpServers` key of `~/.claude.json`, which
+ * `domain/claude/claude-json.ts` fills from the result here — the parsed,
+ * overridden and templated form of each server.
  *
  * `{{HOME}}` placeholders are substituted here, field by field, because the
  * result is a typed record and not a Json tree the compose template pass could
@@ -24,7 +18,7 @@
 import { type TemplateVars, templateString } from "../compose/template";
 import type { McpServer, McpServerOverride, McpTransport } from "./types";
 
-/** One server as `claude mcp add` will take it — the parsed, overridden, templated form. */
+/** One server for Claude Code — the parsed, overridden, templated form. */
 export interface ClaudeMcpAdd {
   readonly name: string;
   readonly transport: McpTransport;
