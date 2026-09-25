@@ -33,3 +33,5 @@ domains/dev/config/vscode next/home/darwin/vscode/config
 domains/dev/config/cursor next/home/darwin/cursor/config
 domains/system/config/themes next/home/shared/theme/themes
 domains/system/config/theme-env next/home/shared/theme/env
+domains/system/userstyles next/home/darwin/browsers/userstyles
+domains/workspace/assets/background next/home/shared/theme/wallpapers

@@ -76,9 +76,9 @@ function M.get_random_background()
   local bg_dir
   
   if dotfiles_root then
-    bg_dir = dotfiles_root .. separator .. "domains" .. separator .. "workspace" .. separator .. "assets" .. separator .. "background"
+    bg_dir = dotfiles_root .. separator .. "next" .. separator .. "home" .. separator .. "shared" .. separator .. "theme" .. separator .. "wallpapers"
   else
-    bg_dir = home .. separator .. "dotfiles" .. separator .. "domains" .. separator .. "workspace" .. separator .. "assets" .. separator .. "background"
+    bg_dir = home .. separator .. "dotfiles" .. separator .. "next" .. separator .. "home" .. separator .. "shared" .. separator .. "theme" .. separator .. "wallpapers"
   end
   
   -- WezTermのglob機能を使って画像リストを取得

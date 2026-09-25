@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USERSTYLES_DIR="$(dirname "$SCRIPT_DIR")"
 GEN_DIR="$USERSTYLES_DIR/gen"
 OUTPUT_FILE="$GEN_DIR/import.json"
-DOTFILES_ROOT="$(cd "$USERSTYLES_DIR/../../.." && pwd)"
+DOTFILES_ROOT="$(cd "$USERSTYLES_DIR/../../../../.." && pwd)"
 
 # Logging, local: these scripts no longer read the old layout's core/ helpers.
 log_info() { printf '%s\n' "$*"; }

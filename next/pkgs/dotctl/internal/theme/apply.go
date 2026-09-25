@@ -152,7 +152,7 @@ func applyVSCode(e Env, name string) error {
 
 func applyWallpaper(e Env, name string) error {
 	for _, ext := range []string{"jpg", "jpeg", "png", "heic"} {
-		img := e.repo("domains/workspace/assets/background/" + name + "." + ext)
+		img := e.repo("next/home/shared/theme/wallpapers/" + name + "." + ext)
 		if !exists(img) {
 			continue
 		}
@@ -166,7 +166,7 @@ func applyWallpaper(e Env, name string) error {
 
 // Browser userstyles are not switched here: each generated style carries
 // every theme and Stylus picks one from its own "Theme" setting
-// (@var select theme in domains/system/userstyles/scripts/generate-userstyle.sh).
+// (@var select theme in next/home/darwin/browsers/userstyles/scripts/generate-userstyle.sh).
 
 func applyOrca(e Env, name string) error {
 	support := filepath.Join(e.Home, "Library/Application Support/orca")

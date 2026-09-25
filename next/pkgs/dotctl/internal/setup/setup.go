@@ -261,12 +261,12 @@ func zellijPlugins(e Env) error {
 }
 
 // Stylus's userstyles for every theme, generated in the checkout from its
-// templates (domains/system/userstyles).
+// templates (next/home/darwin/browsers/userstyles).
 func userstyles(e Env) error {
 	if !e.need("lessc") || !e.need("jq") {
 		return nil
 	}
-	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "domains", "system", "userstyles", "scripts", "generate-userstyle.sh"), "all")
+	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "next", "home", "darwin", "browsers", "userstyles", "scripts", "generate-userstyle.sh"), "all")
 }
 
 // A reference checkout beside this one (jig does not read it).

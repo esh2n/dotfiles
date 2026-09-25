@@ -115,9 +115,9 @@ domains/dev/config/codex/agents/
 domains/dev/config/codex/.yoki/
 
 # Userstyles (generated from templates)
-domains/system/userstyles/gen/
+next/home/darwin/browsers/userstyles/gen/
 # wallpapers `dotctl wallpaper` downloads beside the tracked theme images
-domains/workspace/assets/background/wallhaven-*
+next/home/shared/theme/wallpapers/wallhaven-*
 
 # Lock files and generated state files
 **/lazy-lock.json

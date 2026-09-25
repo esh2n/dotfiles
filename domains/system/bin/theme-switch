@@ -583,9 +583,9 @@ EOF
 fi
 
 # Update macOS Wallpaper
-WALLPAPER_DIR="$DOTFILES_ROOT/domains/workspace/assets/background"
+WALLPAPER_DIR="$DOTFILES_ROOT/next/home/shared/theme/wallpapers"
 if [[ ! -d "$WALLPAPER_DIR" ]]; then
-    WALLPAPER_DIR="$HOME/dotfiles/domains/workspace/assets/background"
+    WALLPAPER_DIR="$HOME/dotfiles/next/home/shared/theme/wallpapers"
 fi
 
 if [[ -d "$WALLPAPER_DIR" ]]; then
@@ -611,9 +611,9 @@ if [[ -d "$WALLPAPER_DIR" ]]; then
 fi
 
 # Update Userstyles (for Stylus browser extension)
-USERSTYLES_DIR="$DOTFILES_ROOT/domains/system/userstyles"
+USERSTYLES_DIR="$DOTFILES_ROOT/next/home/darwin/browsers/userstyles"
 if [[ ! -d "$USERSTYLES_DIR" ]]; then
-    USERSTYLES_DIR="$HOME/dotfiles/domains/system/userstyles"
+    USERSTYLES_DIR="$HOME/dotfiles/next/home/darwin/browsers/userstyles"
 fi
 
 if [[ -d "$USERSTYLES_DIR" ]]; then

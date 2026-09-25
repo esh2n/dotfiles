@@ -10,7 +10,7 @@ USERSTYLES_DIR="$(dirname "$SCRIPT_DIR")"
 TEMPLATES_DIR="$USERSTYLES_DIR/templates"
 GEN_DIR="$USERSTYLES_DIR/gen"
 LIB_FILE="$USERSTYLES_DIR/lib/themes.less"
-DOTFILES_ROOT="$(cd "$USERSTYLES_DIR/../../.." && pwd)"
+DOTFILES_ROOT="$(cd "$USERSTYLES_DIR/../../../../.." && pwd)"
 
 # Logging, local: these scripts no longer read the old layout's core/ helpers.
 log_info() { printf '%s\n' "$*"; }

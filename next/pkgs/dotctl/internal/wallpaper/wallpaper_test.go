@@ -55,7 +55,7 @@ func TestFetchDownloadsOnceAndSets(t *testing.T) {
 	if !strings.Contains(w.asked[0], "q=cyber+punk") || !strings.Contains(w.asked[0], "purity=100") || !strings.Contains(w.asked[0], "sorting=random") {
 		t.Fatalf("search %s", w.asked[0])
 	}
-	file := filepath.Join(e.Repo, "domains", "workspace", "assets", "background", "wallhaven-abc123.jpg")
+	file := filepath.Join(e.Repo, "next", "home", "shared", "theme", "wallpapers", "wallhaven-abc123.jpg")
 	if b, _ := os.ReadFile(file); string(b) != "IMG" {
 		t.Fatalf("image %q", b)
 	}

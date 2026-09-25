@@ -1,6 +1,6 @@
 // Package wallpaper fetches wallpapers from Wallhaven and sets them on every
 // macOS desktop (was domains/creative/bin/wallpaper). Downloads are kept in
-// the checkout's domains/workspace/assets/background; ~/.current_wallpaper
+// the checkout's next/home/shared/theme/wallpapers; ~/.current_wallpaper
 // links the one in use.
 package wallpaper
 
@@ -74,7 +74,7 @@ func (s Search) query() (string, error) {
 }
 
 func (e Env) dir() string {
-	return filepath.Join(e.Repo, "domains", "workspace", "assets", "background")
+	return filepath.Join(e.Repo, "next", "home", "shared", "theme", "wallpapers")
 }
 
 // Fetch finds one wallpaper for the search, downloads it once, and sets it.

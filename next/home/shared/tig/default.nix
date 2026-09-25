@@ -1,4 +1,4 @@
 { config, ... }:
 {
-  home.file.".tigrc".source = config.lib.dotfiles.link "domains/dev/home/.tigrc";
+  home.file.".tigrc".source = config.lib.dotfiles.link "next/home/shared/tig/tigrc";
 }

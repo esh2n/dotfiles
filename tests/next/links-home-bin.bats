@@ -37,10 +37,8 @@ target() { # target <json> <path under ~>
 			got="$(target "$json" "$f")"
 			[ "$got" = "${REPO_ROOT}/next/home/shared/zsh/${f#.}" ] || { echo "${kind} ${f}: ${got}"; false; }
 		done
-		for f in .tigrc .crit.config.json; do
-			got="$(target "$json" "$f")"
-			[ "$got" = "${REPO_ROOT}/domains/dev/home/${f}" ] || { echo "${kind} ${f}: ${got}"; false; }
-		done
+		[ "$(target "$json" .tigrc)" = "${REPO_ROOT}/next/home/shared/tig/tigrc" ] || { echo "${kind} .tigrc"; false; }
+		[ "$(target "$json" .crit.config.json)" = "${REPO_ROOT}/next/home/shared/crit/crit.config.json" ] || { echo "${kind} .crit.config.json"; false; }
 	done
 }
 
@@ -64,7 +62,9 @@ TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado gh-switch gh
 	run --separate-stderr links linux
 	[ "$status" -eq 0 ]
 	json="$output"
-	for name in artifact codebase-memory-mcp-managed git-credential-gh-owner jig; do
+	[ "$(target "$json" bin/codebase-memory-mcp-managed)" = "${REPO_ROOT}/next/home/shared/codebase-memory/codebase-memory-mcp-managed" ]
+	[ "$(target "$json" bin/git-credential-gh-owner)" = "${REPO_ROOT}/next/home/shared/git/git-credential-gh-owner" ]
+	for name in artifact jig; do
 		[ "$(target "$json" "bin/${name}")" != "<missing>" ] || { echo "bin/${name} missing on linux"; false; }
 	done
 }

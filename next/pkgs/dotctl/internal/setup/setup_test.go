@@ -335,7 +335,7 @@ func TestUserstylesRunsTheCheckoutsGenerator(t *testing.T) {
 	if err := Run(w.env, "userstyles"); err != nil {
 		t.Fatal(err)
 	}
-	want := "bash " + filepath.Join(w.repo, "domains", "system", "userstyles", "scripts", "generate-userstyle.sh") + " all"
+	want := "bash " + filepath.Join(w.repo, "next", "home", "darwin", "browsers", "userstyles", "scripts", "generate-userstyle.sh") + " all"
 	if !w.sys.ran(want) {
 		t.Fatalf("calls %v", w.sys.calls)
 	}

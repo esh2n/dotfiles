@@ -18,11 +18,11 @@ fi
 WALLHAVEN_API="https://wallhaven.cc/api/v1"
 # Use DOTFILES_ROOT if available, otherwise fallback to relative path from script
 if [[ -n "$DOTFILES_ROOT" ]]; then
-    DOWNLOAD_DIR="$DOTFILES_ROOT/domains/workspace/assets/background"
+    DOWNLOAD_DIR="$DOTFILES_ROOT/next/home/shared/theme/wallpapers"
 else
     # Fallback: assume script is in domains/creative/bin, so go up 3 levels to root, then to workspace
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    DOWNLOAD_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")/domains/workspace/assets/background"
+    DOWNLOAD_DIR="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")/next/home/shared/theme/wallpapers"
 fi
 CURRENT_WALLPAPER="$HOME/.current_wallpaper"
 
