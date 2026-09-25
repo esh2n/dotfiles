@@ -151,6 +151,18 @@ runtimes() {
 	fi
 }
 
+# Which roles this machine takes is the owner's choice, written once per
+# machine. Without the file only base would be installed, so a machine that
+# had more would lose it: stop and say what to write instead.
+require_roles() {
+	local file="${DOTFILES_ROLES_FILE:-${HOME}/.config/dotfiles/roles.json}"
+	[[ -f "${file}" ]] && return 0
+	warn "no roles file at ${file}. Write the roles this machine takes, for example:"
+	warn "  mkdir -p $(dirname "${file}") && echo '{\"roles\": [\"base\", \"dev\", \"desktop\", \"llm-hub\"]}' > ${file}"
+	warn "roles: base (always), dev, desktop, llm-hub (the Mac serving LM Studio), gpu (Linux + NVIDIA)"
+	exit 1
+}
+
 main() {
 	local os
 	os="$(uname -s)"
@@ -161,6 +173,7 @@ main() {
 		exit 1
 		;;
 	esac
+	require_roles
 	command -v nix >/dev/null 2>&1 || install_nix
 	warn_untracked
 	switch "${os}"

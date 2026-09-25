@@ -16,7 +16,9 @@ setup() {
 	stub mise curl brew chsh
 	# Keep the real profiles off the PATH bootstrap extends after a switch.
 	export HOME="${BATS_TEST_TMPDIR}/home"
-	mkdir -p "${HOME}"
+	mkdir -p "${HOME}/.config/dotfiles"
+	echo '{"roles": ["dev"]}' >"${HOME}/.config/dotfiles/roles.json"
+	unset DOTFILES_ROLES_FILE
 	printf '#!/usr/bin/env bash\necho bootstrap-test-user\n' >"${BIN}/id"
 	chmod +x "${BIN}/id"
 	SYS="${BATS_TEST_TMPDIR}/system"
@@ -184,6 +186,24 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 	os Linux
 	run boot
 	! grep -q "non-nixos-gpu-setup" "${LOG}"
+}
+
+@test "bootstrap: without a roles file it stops before changing anything, and says what to write" {
+	os Darwin
+	rm "${HOME}/.config/dotfiles/roles.json"
+	run --separate-stderr boot
+	[ "$status" -eq 1 ]
+	[[ "$stderr" == *"roles.json"* ]]
+	[[ "$stderr" == *'"roles"'* ]]
+	! grep -q "^nix\|^sudo\|^curl" "${LOG}"
+}
+
+@test "bootstrap: DOTFILES_ROLES_FILE names another roles file" {
+	os Linux
+	rm "${HOME}/.config/dotfiles/roles.json"
+	echo '{"roles": []}' >"${BATS_TEST_TMPDIR}/elsewhere.json"
+	DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/elsewhere.json" run boot
+	[ "$status" -eq 0 ]
 }
 
 @test "bootstrap: an unknown platform is refused by name" {
