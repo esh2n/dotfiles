@@ -311,7 +311,7 @@ home_llm() {
     # section needs itself (same functions manager.sh uses; idempotent).
     source "${DOTFILES_ROOT}/core/config/manager.sh"
     link_file "${DOTFILES_ROOT}/domains/dev/config/litellm" "${HOME}/.config/litellm"
-    link_file "${DOTFILES_ROOT}/domains/dev/config/lmstudio" "${HOME}/.config/lmstudio"
+    link_file "${DOTFILES_ROOT}/next/home/darwin/lmstudio/config" "${HOME}/.config/lmstudio"
     link_launch_agents "${DOTFILES_ROOT}/domains/dev"
 
     # LiteLLM: loopback-only measuring proxy, one per machine. Secrets come

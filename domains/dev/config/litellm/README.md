@@ -48,7 +48,7 @@ checkbox in LM Studio, the tailnet policy via `make tailscale-acl`). Re-run
 reading:
 
 The same path installs this stack and the LM Studio stack
-(`domains/dev/config/lmstudio/`, the model server + sleep guard), so both are
+(`next/home/darwin/lmstudio/config/`, the model server + sleep guard), so both are
 set up identically:
 
 1. `make link` (`core/config/manager.sh link`) symlinks this directory to
@@ -70,7 +70,7 @@ set up identically:
 After editing the plist or `litellm-up.sh`: `make link`, then
 `launchctl bootout gui/$(id -u)/com.esh2n.litellm-proxy` and `bootstrap`
 again. The model server itself, its login autostart and the
-`caffeinate` sleep guard live in `domains/dev/config/lmstudio/README.md`.
+`caffeinate` sleep guard live in `next/home/darwin/lmstudio/config/README.md`.
 
 ## Run
 

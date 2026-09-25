@@ -61,7 +61,6 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/services
           ../home/shared/home-llm
           ../home/shared/llm-ledger
-          ../home/darwin/lmstudio-awake
           ../home/darwin/apps
           ../home/darwin/tmux
           ../home/darwin/browsers
@@ -76,6 +75,7 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/omniwm
           ../home/darwin/paneru
           ../home/darwin/mado
+          ../home/darwin/lmstudio
           ../home/darwin/configs
           ../home/shared/packages
           ../home/darwin/packages.nix

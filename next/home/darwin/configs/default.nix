@@ -8,8 +8,6 @@ let
     git = "domains/dev/config/git";
     ghostty = "domains/dev/config/ghostty";
     tmux = "domains/dev/config/tmux";
-    lmstudio = "domains/dev/config/lmstudio";
-    browsers = "domains/system/config/browsers";
     borders = "domains/workspace/config/borders";
     sketchybar = "domains/workspace/config/sketchybar";
   };

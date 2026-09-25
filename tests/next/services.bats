@@ -43,7 +43,7 @@ print(json.dumps(v))' "${@:2}"; }
 	[ "$(field "$a" jig-decision ProgramArguments)" = "[\"/bin/bash\", \"${C}/jig/jig-decision-up.sh\"]" ]
 	[ "$(field "$a" jig-decision EnvironmentVariables JIG_DIR)" = "\"${REPO_ROOT}/domains/dev/llm/harness/jig\"" ]
 	[ "$(field "$a" jig-decision EnvironmentVariables JIG_DECISION_PORT)" = '"4100"' ]
-	[ "$(field "$a" lmstudio-awake ProgramArguments)" = "[\"/bin/bash\", \"${C}/lmstudio/awake.sh\"]" ]
+	[ "$(field "$a" lmstudio-awake ProgramArguments)" = "[\"/bin/bash\", \"${REPO_ROOT}/next/home/darwin/lmstudio/config/awake.sh\"]" ]
 	[ "$(field "$a" lmstudio-awake ThrottleInterval)" = "30" ]
 }
 

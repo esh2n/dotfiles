@@ -1,14 +1,14 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
 # Browser extensions (macOS): Chrome and Dia force-install the extensions
-# listed in domains/system/config/browsers/extensions.json — declared by
+# listed in next/home/darwin/browsers/config/extensions.json — declared by
 # nix-darwin (system.defaults.CustomUserPreferences), not a script's
 # `defaults write`.
 
 load '../lib/nix.bash'
 
 @test "browsers: Chrome and Dia force-install exactly the listed extensions" {
-	want="$(python3 -c 'import json,sys; print(json.dumps([e["id"] for e in json.load(open(sys.argv[1]))["extensions"]], separators=(",", ":")))' "${REPO_ROOT}/domains/system/config/browsers/extensions.json")"
+	want="$(python3 -c 'import json,sys; print(json.dumps([e["id"] for e in json.load(open(sys.argv[1]))["extensions"]], separators=(",", ":")))' "${REPO_ROOT}/next/home/darwin/browsers/config/extensions.json")"
 	for app in com.google.Chrome company.thebrowser.dia; do
 		run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.config.system.defaults.CustomUserPreferences.\"${app}\".ExtensionInstallForcelist"
 		[ "$status" -eq 0 ]

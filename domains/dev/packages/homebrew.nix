@@ -70,7 +70,7 @@
     # open the app, Settings (Cmd+,) → check "run the LLM server on login",
     # then `lms server start --port 1234` once so the saved state is
     # "running" (https://lmstudio.ai/docs/app/api/headless). The sleep guard
-    # is domains/dev/config/lmstudio/ (launchd + caffeinate).
+    # is next/home/darwin/lmstudio/config/ (launchd + caffeinate).
     "lm-studio"
   ];
 }

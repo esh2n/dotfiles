@@ -40,7 +40,7 @@ is no `link_*` step for it.
 
 | Machine | Once | Opens |
 |---|---|---|
-| the Mac | `tailscale serve --bg --tcp 1234 tcp://127.0.0.1:1234` | LM Studio (`domains/dev/config/lmstudio/`) |
+| the Mac | `tailscale serve --bg --tcp 1234 tcp://127.0.0.1:1234` | LM Studio (`next/home/darwin/lmstudio/config/`) |
 | the Mac | `tailscale serve --bg --https=3001 127.0.0.1:3001` | Open WebUI, the phone's chat page (`domains/dev/config/litellm/observability/`) |
 | every non-Mac machine | `tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001` | LiteLLM metrics only (`domains/dev/config/litellm/litellm-up.sh`) |
 
