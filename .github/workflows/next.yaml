@@ -27,6 +27,20 @@ jobs:
             domains/dev/config/litellm/{secrets,litellm-up,proxy-key}.sh \
             domains/dev/config/jig/jig-decision-up.sh
 
+  dotctl:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: next/pkgs/dotctl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: next/pkgs/dotctl/go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go run honnef.co/go/tools/cmd/staticcheck@2026.1 ./...
+
   linux:
     runs-on: ubuntu-latest
     steps:
