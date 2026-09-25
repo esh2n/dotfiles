@@ -100,7 +100,7 @@ dotfiles/
 5. activation の中で、テンプレートの展開（`render-templates`、writeBoundary の前）と jig apply（`harness-apply`、linkGeneration の後）。
 6. `next/` の下に git が追跡していないファイルがあれば名前を出して警告する（flake は git 経由で読むので見えない）。
 
-何度走らせても同じ結果になる。install と update の区別はない。dotctl ができたら、2 以降を dotctl に移し、`bootstrap.sh` は Nix を入れて dotctl を呼ぶだけにする。
+何度走らせても同じ結果になる。install と update の区別はない。2 以降は `dotctl up` に移した（2026-09-25）。`bootstrap.sh` は Nix を入れて `nix run next#dotctl -- up` を呼ぶだけ。役割ファイルが無い機械では、何も変えずに止まって書く内容を示す（無いまま走ると base だけになり、今あるものが外れるため）。
 
 ## 5. 常駐サービス
 
