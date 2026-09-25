@@ -7,7 +7,8 @@
 #
 #   --lmstudio: LM Studio's server, tailscale serve 1234
 #   --gpu     : tailscale serve 8080 (llama-server, Linux)
-#   --console : Prometheus + Grafana + Open WebUI, tailscale serve https 3001;
+#   --console : Prometheus + Grafana + Open WebUI, the cost ledger's table,
+#               tailscale serve https 3001 and tcp 5432 (the ledger);
 #               without it, tailscale serve 4001 so the console can scrape
 #               this machine's LiteLLM metrics
 #   always    : LiteLLM restarted onto the current config, then litellm/check.sh
@@ -125,6 +126,13 @@ console_stacks() {
 		return 0
 	fi
 	bash "${LITELLM}/observability/start.sh" --ui >/dev/null || todo "observability/start.sh --ui failed"
+	# the ledger's own table beside LiteLLM's (idempotent)
+	if docker inspect litellm-db >/dev/null 2>&1; then
+		docker exec -i litellm-db psql -q -U litellm -d litellm -v ON_ERROR_STOP=1 <"${ROOT}/next/home/shared/llm-ledger/ledger.sql" ||
+			todo "cost ledger: could not create its table (docker exec litellm-db psql)"
+	else
+		todo "cost ledger: no litellm-db container yet (store op://llm-automation/litellm-db/credential, then make up)"
+	fi
 	local key
 	key="$("${LITELLM}/proxy-key.sh" 2>/dev/null || true)"
 	if [[ -z "${key}" ]]; then
@@ -145,6 +153,7 @@ else
 	[[ "${GPU}" == 1 ]] && serve --tcp 8080 tcp://127.0.0.1:8080
 	if [[ "${CONSOLE}" == 1 ]]; then
 		serve --https=3001 127.0.0.1:3001
+		serve --tcp 5432 tcp://127.0.0.1:5432 # the cost ledger, for the other machines' sync
 	else
 		serve --tcp 4001 tcp://127.0.0.1:4001
 	fi

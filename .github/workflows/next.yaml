@@ -41,6 +41,28 @@ jobs:
       - run: go test ./...
       - run: go run honnef.co/go/tools/cmd/staticcheck@2026.1 ./...
 
+  # the cost-ledger sync's SQL against a real Postgres
+  # (rules/decisions/2026-09-25-llm-cost-ledger-local-first.md)
+  ledger:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: ledger sync against Postgres
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: bash tests/integration/ledger-sync.sh
+
   linux:
     runs-on: ubuntu-latest
     steps:

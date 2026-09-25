@@ -13,6 +13,7 @@ let
     go-mockgen = callPackage ./go-mockgen { };
     go-protoc-gen-go = callPackage ./go-protoc-gen-go { };
     harness-apply = callPackage ./scripts/harness-apply { };
+    llm-ledger-sync = callPackage ./scripts/llm-ledger-sync { };
     home-llm-setup = callPackage ./scripts/home-llm-setup { };
     render-templates = callPackage ./scripts/render-templates { };
     spanner-cli = callPackage ./spanner-cli { };

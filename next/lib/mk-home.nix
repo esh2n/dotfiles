@@ -41,6 +41,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ./mk-setup.nix
     ../home/shared/services
     ../home/shared/home-llm
+    ../home/shared/llm-ledger
     ../home/linux/git
     ../home/linux/llama-server
     ../home/shared/packages

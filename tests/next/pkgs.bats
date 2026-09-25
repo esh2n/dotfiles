@@ -33,13 +33,13 @@ drv() { # drv <flake-dir> <config-name> <package>
 @test "pkgs: the flake exposes its own packages per platform" {
 	run --separate-stderr nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.aarch64-darwin"
 	[ "$status" -eq 0 ]
-	[ "$output" = '["cargo-compete","codebase-memory-mcp","dev-setup","dotctl","go-mockgen","go-protoc-gen-go","harness-apply","home-llm-setup","render-templates","spanner-cli","spanner-dump"]' ]
+	[ "$output" = '["cargo-compete","codebase-memory-mcp","dev-setup","dotctl","go-mockgen","go-protoc-gen-go","harness-apply","home-llm-setup","llm-ledger-sync","render-templates","spanner-cli","spanner-dump"]' ]
 }
 
 @test "pkgs: codebase-memory-mcp is not offered on linux (upstream ships macOS binaries only)" {
 	run --separate-stderr nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").packages.x86_64-linux"
 	[ "$status" -eq 0 ]
-	[ "$output" = '["cargo-compete","dev-setup","dotctl","go-mockgen","go-protoc-gen-go","harness-apply","home-llm-setup","render-templates","spanner-cli","spanner-dump"]' ]
+	[ "$output" = '["cargo-compete","dev-setup","dotctl","go-mockgen","go-protoc-gen-go","harness-apply","home-llm-setup","llm-ledger-sync","render-templates","spanner-cli","spanner-dump"]' ]
 }
 
 @test "pkgs: cargo-compete links the same openssl as the rest of the system" {

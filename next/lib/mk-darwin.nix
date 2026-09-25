@@ -59,6 +59,7 @@ nix-darwin.lib.darwinSystem {
           ./mk-setup.nix
           ../home/shared/services
           ../home/shared/home-llm
+          ../home/shared/llm-ledger
           ../home/darwin/lmstudio-awake
           ../home/darwin/apps
           ../home/darwin/tmux

@@ -18,6 +18,9 @@
 #             distribution installed, and using them means accepting NVIDIA's
 #             license — the owner's act, so it lives in their file); null
 #             when absent.
+#   consoleHost the llm-console machine's tailnet name, from the same file's
+#             optional "consoleHost" (where the cost ledger lives); null when
+#             absent.
 let
   getEnv = builtins.getEnv;
   known = import ../roles/names.nix;
@@ -83,4 +86,12 @@ in
   inherit home repo;
   roles = parseRoles;
   nvidia = parseNvidia;
+  consoleHost =
+    let
+      h = doc.consoleHost or null;
+    in
+    if h == null || builtins.isString h then
+      h
+    else
+      throw ''facts: "consoleHost" in ${rolesFile} must be a string (a tailnet name)'';
 }

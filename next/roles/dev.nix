@@ -7,5 +7,7 @@ lib.mkIf config.dotfiles.roles.dev.enable {
   dotfiles.services.litellm-proxy.enable = true;
   dotfiles.services.jig-decision.enable = true;
   dotfiles.homeLlm.enable = true;
+  # the ledger machine's LiteLLM writes to the ledger itself
+  dotfiles.services.llm-ledger-sync.enable = !config.dotfiles.roles.llm-console.enable;
   dotfiles.packages.dev.enable = true;
 }

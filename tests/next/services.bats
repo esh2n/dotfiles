@@ -59,7 +59,7 @@ print(json.dumps(v))' "${@:2}"; }
 	roles '"dev", "lmstudio"'
 	run --separate-stderr units
 	[ "$status" -eq 0 ]
-	[ "$output" = '["jig-decision","litellm-proxy"]' ]
+	[ "$output" = '["jig-decision","litellm-proxy","llm-ledger-sync"]' ]
 }
 
 setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
@@ -124,4 +124,17 @@ gpu_linux() { # gpu_linux <attr under config>
 	roles '"dev", "gpu"'
 	run --separate-stderr agents
 	[ "$(field "$output" llama-server)" = "null" ]
+}
+
+@test "services: a dev machine without llm-console ships its spend to the ledger; the ledger machine does not" {
+	printf '{"roles": ["dev"], "consoleHost": "mac.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr units
+	[[ "$output" == *'"llm-ledger-sync"'* ]]
+	run --separate-stderr gpu_linux 'systemd.user.services.llm-ledger-sync.Service.Environment'
+	[[ "$output" == *"LEDGER_HOST=mac.example.ts.net"* ]]
+	[[ "$output" == *"LEDGER_SQL=${REPO_ROOT}/next/home/shared/llm-ledger/ledger.sql"* ]]
+	roles '"dev", "llm-console"'
+	run --separate-stderr agents
+	[ "$(field "$output" llm-ledger-sync)" = "null" ]
 }

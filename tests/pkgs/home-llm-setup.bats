@@ -12,7 +12,8 @@ setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
 	LOG="${BATS_TEST_TMPDIR}/calls.log"
 	L="${ROOT}/domains/dev/config/litellm"
-	mkdir -p "${L}/observability" "${BIN}"
+	mkdir -p "${L}/observability" "${BIN}" "${ROOT}/next/home/shared/llm-ledger"
+	touch "${ROOT}/next/home/shared/llm-ledger/ledger.sql"
 	touch "${LOG}"
 	for f in check.sh observability/start.sh; do
 		printf '#!/usr/bin/env bash\necho "%s $*" >>"%s"\n' "$f" "${LOG}" >"${L}/$f"
@@ -142,4 +143,16 @@ hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"
 	grep -qx "tailscale serve --bg --tcp 8080 tcp://127.0.0.1:8080" "${LOG}"
 	grep -qx "tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001" "${LOG}"
 	[ "$(grep -c '^tailscale serve' "${LOG}")" -eq 2 ]
+}
+
+@test "home-llm --console: serves the cost ledger's port and creates its table in the local DB" {
+	run hl --console
+	[ "$status" -eq 0 ]
+	grep -qx "tailscale serve --bg --tcp 5432 tcp://127.0.0.1:5432" "${LOG}"
+	grep -q "^docker exec -i litellm-db psql -q -U litellm -d litellm -v ON_ERROR_STOP=1" "${LOG}"
+}
+
+@test "home-llm without --console: the ledger port stays closed" {
+	run hl --lmstudio
+	! grep -q "5432" "${LOG}"
 }

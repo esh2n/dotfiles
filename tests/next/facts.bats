@@ -85,3 +85,15 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).nv
 	[ "$status" -ne 0 ]
 	[[ "$stderr" == *"nvidia"*"sha256"* ]]
 }
+
+@test "facts: consoleHost, the ledger machine's tailnet name, is read from the roles file" {
+	printf '{"roles": ["dev"], "consoleHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).consoleHost"
+	[ "$output" = '"mac.example.ts.net"' ]
+	printf '{"roles": ["dev"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).consoleHost"
+	[ "$output" = null ]
+	printf '{"roles": ["dev"], "consoleHost": 5}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).consoleHost"
+	[ "$status" -ne 0 ]
+}
