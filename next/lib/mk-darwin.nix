@@ -43,7 +43,6 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/tig
           ../home/shared/crit
           ../home/shared/bin
-          ../home/darwin/bin
           ../home/shared/configs
           ../home/shared/templated
           ../home/shared/serena

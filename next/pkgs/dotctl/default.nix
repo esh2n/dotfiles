@@ -20,6 +20,11 @@ buildGoModule {
     ln -s dotctl $out/bin/nvim-switch
     ln -s dotctl $out/bin/theme-switch
     ln -s dotctl $out/bin/mado
+    ln -s dotctl $out/bin/gh-switch
+    ln -s dotctl $out/bin/gh-pr-graph-update
+    ln -s dotctl $out/bin/setup-neovim-distros
+    ln -s dotctl $out/bin/install-extensions
+    ln -s dotctl $out/bin/wallpaper
   '';
   meta = {
     description = "The dotfiles' own CLI";

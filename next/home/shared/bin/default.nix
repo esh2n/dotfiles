@@ -1,16 +1,15 @@
-# Personal commands in ~/bin that work on every platform. code-graph-cache-gc
-# and nvim-switch are dotctl now (installed under those names by its package).
+# Personal commands in ~/bin that work on every platform: the thin entry
+# points that hand off to another program. Everything with output of its own
+# is dotctl now, installed under the old names by its package
+# (rules/decisions/2026-09-25-dotctl-owns-every-command-with-output.md).
 { config, lib, ... }:
 let
   link = config.lib.dotfiles.link;
   commands = {
     artifact = "domains/dev/bin/artifact";
     codebase-memory-mcp-managed = "domains/dev/bin/codebase-memory-mcp-managed";
-    gh-pr-graph-update = "domains/dev/bin/gh-pr-graph-update";
     git-credential-gh-owner = "domains/dev/bin/git-credential-gh-owner";
     jig = "domains/dev/bin/jig";
-    setup-neovim-distros = "domains/dev/bin/setup-neovim-distros";
-    gh-switch = "domains/workspace/bin/gh-switch";
   };
 in
 {

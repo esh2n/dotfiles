@@ -64,4 +64,7 @@ drv() { # drv <flake-dir> <config-name> <package>
 	[[ "$output" == *"nvim-switch"* ]]
 	[[ "$output" == *"theme-switch"* ]]
 	[[ "$output" == *"mado"* ]]
+	for name in gh-switch gh-pr-graph-update setup-neovim-distros install-extensions wallpaper; do
+		[[ "$output" == *"bin/${name}"* ]] || { echo "no ${name}"; false; }
+	done
 }

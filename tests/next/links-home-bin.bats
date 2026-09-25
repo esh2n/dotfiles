@@ -41,7 +41,7 @@ target() { # target <json> <path under ~>
 }
 
 # dotctl answers to these names now (next/pkgs/dotctl postInstall).
-TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado "
+TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado gh-switch gh-pr-graph-update setup-neovim-distros install-extensions wallpaper orca-theme-apply.py "
 
 @test "links: every command in domains/*/bin is in ~/bin on the mac, unless dotctl took it over" {
 	run --separate-stderr links darwin
@@ -56,14 +56,11 @@ TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado "
 	done
 }
 
-@test "links: macOS-only commands stay off ~/bin on linux, the rest are there" {
+@test "links: the thin entry points are in ~/bin on linux too" {
 	run --separate-stderr links linux
 	[ "$status" -eq 0 ]
 	json="$output"
-	for name in install-extensions theme-switch orca-theme-apply.py mado wallpaper; do
-		[ "$(target "$json" "bin/${name}")" = "<missing>" ] || { echo "bin/${name} present on linux"; false; }
-	done
-	for name in artifact codebase-memory-mcp-managed gh-pr-graph-update git-credential-gh-owner jig setup-neovim-distros gh-switch; do
+	for name in artifact codebase-memory-mcp-managed git-credential-gh-owner jig; do
 		[ "$(target "$json" "bin/${name}")" != "<missing>" ] || { echo "bin/${name} missing on linux"; false; }
 	done
 }
@@ -72,7 +69,7 @@ TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado "
 	for kind in darwin linux; do
 		run --separate-stderr links "$kind"
 		[ "$status" -eq 0 ]
-		for name in code-graph-cache-gc nvim-switch theme-switch mado; do
+		for name in ${TAKEN_BY_DOTCTL}; do
 			[ "$(target "$output" "bin/${name}")" = "<missing>" ] || { echo "${kind} bin/${name} still linked"; false; }
 		done
 	done

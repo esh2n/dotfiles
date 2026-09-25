@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
@@ -102,5 +103,67 @@ func TestCheckLogFollowsXDGState(t *testing.T) {
 	}
 	if isTerminal(&bytes.Buffer{}) {
 		t.Fatal("a buffer is not a terminal")
+	}
+}
+
+func TestOldNamesBecomeTheirSubcommands(t *testing.T) {
+	cases := map[string][2][]string{
+		"/x/code-graph-cache-gc":  {{"--quiet"}, {"cache-gc", "--quiet"}},
+		"nvim-switch":             {{"lazyvim"}, {"nvim", "lazyvim"}},
+		"theme-switch":            {nil, {"theme", "list"}},
+		"gh-switch":               {nil, {"gh", "switch"}},
+		"gh-pr-graph-update":      {nil, {"gh", "pr-graph-update"}},
+		"setup-neovim-distros":    {nil, {"nvim", "install"}},
+		"install-extensions":      {nil, {"editor", "extensions"}},
+		"wallpaper":               {{"random"}, {"wallpaper", "random"}},
+		"mado":                    {{"status"}, {"mado", "status"}},
+		"/nix/store/x/bin/dotctl": {{"up"}, {"up"}},
+	}
+	for argv0, c := range cases {
+		if got := aliasArgs(argv0, c[0]); strings.Join(got, " ") != strings.Join(c[1], " ") {
+			t.Errorf("%s %v: got %v, want %v", argv0, c[0], got, c[1])
+		}
+	}
+	if got := aliasArgs("theme-switch", []string{"nord"}); strings.Join(got, " ") != "theme set nord" {
+		t.Errorf("theme-switch nord: %v", got)
+	}
+}
+
+func TestToolsRefuseWhatTheyDoNotKnow(t *testing.T) {
+	t.Setenv("DOTFILES_ROOT", "")
+	var out, errOut bytes.Buffer
+	for name, code := range map[string]int{
+		"gh":             runGH(nil, strings.NewReader(""), &out, &errOut),
+		"gh nope":        runGH([]string{"nope"}, strings.NewReader(""), &out, &errOut),
+		"editor":         runEditor(nil, &out, &errOut),
+		"editor no repo": runEditor([]string{"extensions"}, &out, &errOut),
+		"wallpaper":      runWallpaper(t.TempDir(), nil, &out, &errOut),
+		"nvim install":   runNvimInstall(nil, &out, &errOut),
+	} {
+		if code != 2 {
+			t.Errorf("%s: exit %d", name, code)
+		}
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{{"--repo", repo}, {"--repo", repo, "search"}, {"--repo", repo, "random", "extra"}, {"--repo", repo, "set"}, {"--repo", repo, "search", "--sorting"}, {"--repo", repo, "dance"}} {
+		if code := runWallpaper(t.TempDir(), args, &out, &errOut); code != 2 {
+			t.Errorf("wallpaper %v: exit %d", args, code)
+		}
+	}
+}
+
+func TestParseInterspersedTakesFlagsAnywhere(t *testing.T) {
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	p := fs.String("purity", "", "")
+	words, err := parseInterspersed(fs, []string{"anime", "--purity", "110", "scenery"})
+	if err != nil || strings.Join(words, " ") != "anime scenery" || *p != "110" {
+		t.Fatalf("%v %v %q", words, err, *p)
+	}
+}
+
+func TestEditorExtensionsWithAMissingList(t *testing.T) {
+	var out, errOut bytes.Buffer
+	if code := runEditor([]string{"extensions", "--repo", t.TempDir()}, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "editor extensions:") {
+		t.Fatalf("exit %d, stderr %q", code, errOut.String())
 	}
 }

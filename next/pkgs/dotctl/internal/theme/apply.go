@@ -208,5 +208,6 @@ func applyOrca(e Env, name string) error {
 			warpName = strings.TrimSpace(string(m[1]))
 		}
 	}
-	return e.Run("python3", e.repo("domains/system/bin/orca-theme-apply.py"), support, p.Variant(), warpName)
+	_, err = OrcaApply(support, p.Variant(), warpName)
+	return err
 }

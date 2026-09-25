@@ -22,6 +22,11 @@ commands:
   nvim <custom|nvchad|lazyvim|astrovim>  point ~/.config/nvim at a distribution
   nvim current                           name the active distribution
   nvim list                              list distributions, marking the active one
+  nvim install [--repo DIR]              fetch the distributions into the checkout (also: setup-neovim-distros)
+  gh switch                              switch the active GitHub account (also: gh-switch)
+  gh pr-graph-update                     upgrade the pr-graph extension (also: gh-pr-graph-update)
+  editor extensions [--repo DIR]         install the editor extensions into VS Code and Cursor (also: install-extensions)
+  wallpaper search|random|set ...        Wallhaven wallpapers on every macOS desktop (also: wallpaper)
   mado [use|stop|status|list|layout|info]  switch the macOS window-manager profile (also: mado)
   theme [--repo DIR] list|current|init|set <name>
                                          switch the colour theme (one link, then reloads)
@@ -31,15 +36,29 @@ commands:
 `
 
 func main() {
-	args := os.Args[1:]
-	// Installed under old command names too; the name picks the command.
-	switch filepath.Base(os.Args[0]) {
+	os.Exit(run(aliasArgs(os.Args[0], os.Args[1:]), os.Stdout, os.Stderr))
+}
+
+// aliasArgs turns a call under an old command name into the subcommand it
+// became; any other name leaves the arguments as they are.
+func aliasArgs(argv0 string, args []string) []string {
+	switch filepath.Base(argv0) {
 	case "code-graph-cache-gc":
 		args = append([]string{"cache-gc"}, args...)
 	case "nvim-switch":
 		args = append([]string{"nvim"}, args...)
 	case "mado":
 		args = append([]string{"mado"}, args...)
+	case "gh-switch":
+		args = []string{"gh", "switch"}
+	case "gh-pr-graph-update":
+		args = []string{"gh", "pr-graph-update"}
+	case "setup-neovim-distros":
+		args = append([]string{"nvim", "install"}, args...)
+	case "install-extensions":
+		args = append([]string{"editor", "extensions"}, args...)
+	case "wallpaper":
+		args = append([]string{"wallpaper"}, args...)
 	case "theme-switch":
 		if len(args) == 0 {
 			args = []string{"theme", "list"}
@@ -47,7 +66,7 @@ func main() {
 			args = append([]string{"theme", "set"}, args...)
 		}
 	}
-	os.Exit(run(args, os.Stdout, os.Stderr))
+	return args
 }
 
 func run(args []string, out, errOut io.Writer) int {
@@ -69,6 +88,12 @@ func run(args []string, out, errOut io.Writer) int {
 		return runSetup(home, args[1:], out, errOut)
 	case "llm":
 		return runLLM(home, args[1:], out, errOut)
+	case "gh":
+		return runGH(args[1:], os.Stdin, out, errOut)
+	case "editor":
+		return runEditor(args[1:], out, errOut)
+	case "wallpaper":
+		return runWallpaper(home, args[1:], out, errOut)
 	case "mado":
 		return runMado(home, args[1:], out, errOut)
 	case "theme":
@@ -85,6 +110,9 @@ func run(args []string, out, errOut io.Writer) int {
 }
 
 func runNvim(home string, args []string, out, errOut io.Writer) int {
+	if len(args) > 0 && args[0] == "install" {
+		return runNvimInstall(args[1:], out, errOut)
+	}
 	if len(args) != 1 {
 		fmt.Fprint(errOut, usage)
 		return 2
