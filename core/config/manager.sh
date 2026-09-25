@@ -20,7 +20,7 @@ source "${DOTFILES_ROOT}/core/utils/common.sh"
 # -----------------------------------------------------------------------------
 
 generate_conditional_includes() {
-    local conditional_dir="${DOTFILES_ROOT}/domains/dev/config/git/conditional"
+    local conditional_dir="${DOTFILES_ROOT}/next/home/shared/git/config/conditional"
     local includes=""
 
     # Check if conditional directory exists

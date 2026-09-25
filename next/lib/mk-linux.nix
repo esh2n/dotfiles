@@ -43,7 +43,6 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/services
     ../home/shared/home-llm
     ../home/shared/llm-ledger
-    ../home/linux/git
     ../home/linux/llama-server
     ../home/shared/jj
     ../home/shared/zed

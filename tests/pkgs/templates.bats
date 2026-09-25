@@ -2,7 +2,7 @@
 bats_require_minimum_version 1.5.0
 # dotctl templates render: every *.template under the checkout becomes the file beside
 # it, with {{HOME}}, {{USER}}, {{DOTFILES_ROOT}} replaced and
-# {{CONDITIONAL_INCLUDES}} built from domains/dev/config/git/conditional/*.conf
+# {{CONDITIONAL_INCLUDES}} built from next/home/shared/git/config/conditional/*.conf
 # (machine-local, untracked). The rendered files are working copies that
 # theme-switch and the tools themselves write to, so they live in the checkout.
 
@@ -14,7 +14,7 @@ setup_file() {
 
 setup() {
 	ROOT="${BATS_TEST_TMPDIR}/repo"
-	mkdir -p "${ROOT}/domains/dev/config/app" "${ROOT}/domains/dev/home" "${ROOT}/domains/dev/config/git/conditional"
+	mkdir -p "${ROOT}/domains/dev/config/app" "${ROOT}/domains/dev/home" "${ROOT}/next/home/shared/git/config/conditional"
 }
 
 render() {
@@ -30,8 +30,8 @@ render() {
 
 @test "templates: conditional includes come from the conf files, gitdir ones as includeIf" {
 	printf '[user]\n{{CONDITIONAL_INCLUDES}}\n[core]\n' >"${ROOT}/domains/dev/home/.gitconfig.template"
-	printf '# GITDIR: {{HOME}}/work/\n[user]\n  email = w@example.com\n' >"${ROOT}/domains/dev/config/git/conditional/work.conf"
-	printf '[user]\n  name = me\n' >"${ROOT}/domains/dev/config/git/conditional/default.conf"
+	printf '# GITDIR: {{HOME}}/work/\n[user]\n  email = w@example.com\n' >"${ROOT}/next/home/shared/git/config/conditional/work.conf"
+	printf '[user]\n  name = me\n' >"${ROOT}/next/home/shared/git/config/conditional/default.conf"
 	run render
 	[ "$status" -eq 0 ]
 	expected='[user]
@@ -74,9 +74,9 @@ render() {
 			mkdir -p "${dest}/$(dirname "$t")"
 			cp "${repo}/${t}" "${dest}/${t}"
 		done < <(git -C "$repo" ls-files '*.template')
-		mkdir -p "${dest}/domains/dev/config/git/conditional"
-		printf '# GITDIR: {{HOME}}/work/\n[user]\n  email = w@example.com\n' >"${dest}/domains/dev/config/git/conditional/work.conf"
-		printf '[user]\n  name = me\n' >"${dest}/domains/dev/config/git/conditional/default.conf"
+		mkdir -p "${dest}/next/home/shared/git/config/conditional"
+		printf '# GITDIR: {{HOME}}/work/\n[user]\n  email = w@example.com\n' >"${dest}/next/home/shared/git/config/conditional/work.conf"
+		printf '[user]\n  name = me\n' >"${dest}/next/home/shared/git/config/conditional/default.conf"
 	done
 	# manager.sh's own renderer, pointed at the copy (its DOTFILES_ROOT).
 	(

@@ -443,7 +443,7 @@ run_portability_checks() {
     echo ""
     log_info "--- 6. Sketchybar: No hardcoded user paths ---"
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/workspace/config/sketchybar/plugins/weather.sh" \
+        "$DOTFILES_ROOT/next/home/darwin/sketchybar/config/plugins/weather.sh" \
         "weather.sh should use DOTFILES_ROOT" || true
 
     echo ""
@@ -483,10 +483,10 @@ run_portability_checks() {
         "$DOTFILES_ROOT/domains/dev/config/jig/jig-decision-up.sh" \
         "jig-decision-up.sh PATH/JIG_DIR should use \$(id -un)/\$DOTFILES_ROOT, not a literal username" || true
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/dev/config/lmstudio/com.esh2n.lmstudio-awake.plist" \
+        "$DOTFILES_ROOT/next/home/darwin/lmstudio/config/com.esh2n.lmstudio-awake.plist" \
         "lmstudio-awake plist source should use {{HOME}} placeholders" || true
     assert_no_hardcoded_user \
-        "$DOTFILES_ROOT/domains/dev/config/lmstudio/awake.sh" \
+        "$DOTFILES_ROOT/next/home/darwin/lmstudio/config/awake.sh" \
         "lmstudio awake.sh PATH should use \$(id -un), not a literal username" || true
 
     echo ""

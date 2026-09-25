@@ -3,7 +3,7 @@
 //
 //	{{HOME}} {{USER}} {{DOTFILES_ROOT}}  the machine's values
 //	{{CONDITIONAL_INCLUDES}}             git include / includeIf sections
-//	                                     built from domains/dev/config/git/
+//	                                     built from next/home/shared/git/config/
 //	                                     conditional/*.conf (machine-local,
 //	                                     untracked; a conf whose first
 //	                                     "# GITDIR: <dir>" line names a
@@ -27,7 +27,7 @@ import (
 type Values struct{ Home, User, Root string }
 
 func conditionalDir(root string) string {
-	return filepath.Join(root, "domains", "dev", "config", "git", "conditional")
+	return filepath.Join(root, "next", "home", "shared", "git", "config", "conditional")
 }
 
 // Includes builds the git include sections from the conditional confs; ok is

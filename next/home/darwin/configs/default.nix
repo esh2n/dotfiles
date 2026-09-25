@@ -5,7 +5,6 @@
 let
   link = config.lib.dotfiles.link;
   dirs = {
-    git = "domains/dev/config/git";
   };
 in
 {

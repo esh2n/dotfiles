@@ -67,8 +67,8 @@ target() { # target <json> <path under ~>
 	json="$output"
 	[ "$(target "$json" ".config/git/config")" = "<missing>" ]
 	# Tracked files only: the checkout also holds machine-generated ones.
-	for name in $(git -C "${REPO_ROOT}" ls-files domains/dev/config/git | xargs -n1 basename); do
-		path="${REPO_ROOT}/domains/dev/config/git/${name}"
+	for name in $(git -C "${REPO_ROOT}" ls-files next/home/shared/git/config | xargs -n1 basename); do
+		path="${REPO_ROOT}/next/home/shared/git/config/${name}"
 		[ "$name" = config ] && continue
 		got="$(target "$json" ".config/git/${name}")"
 		[ "$got" = "$path" ] || { echo ".config/git/${name}: ${got}"; false; }

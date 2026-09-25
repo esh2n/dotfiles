@@ -23,3 +23,4 @@ domains/dev/config/nvim-lazyvim next/home/shared/nvim/lazyvim
 domains/dev/config/nvim-nvchad next/home/shared/nvim/nvchad
 domains/dev/config/nvim-astrovim next/home/shared/nvim/astrovim
 domains/dev/config/nvim-custom next/home/shared/nvim/custom
+domains/dev/config/git next/home/shared/git/config
