@@ -14,7 +14,7 @@ skills は判断サービスが選ぶ。yoki(`claude-profiles/` の
 ## 入口
 
 ```bash
-make link                                  # symlink + 5ハーネスすべてに jig apply --write
+make up                                    # リンク + 5ハーネスすべてに jig apply --write
 make claude                                # ~/.claude だけ (jig apply --target claude --write)
 jig apply --target claude|codex|omp|pi|dsh  # dry-run: 計画だけ表示
 jig apply --target <x> --write             # 書く
