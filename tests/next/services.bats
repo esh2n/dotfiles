@@ -27,8 +27,8 @@ print(json.dumps(v))' "${@:2}"; }
 	[ "$output" = "{}" ]
 }
 
-@test "services: dev and lmstudio on the mac give the three agents the plists defined" {
-	roles '"dev", "lmstudio"'
+@test "services: developer and model-provider on the mac give the three agents the plists defined" {
+	roles '"developer", "model-provider"'
 	run --separate-stderr agents
 	[ "$status" -eq 0 ]
 	a="$output"
@@ -48,18 +48,22 @@ print(json.dumps(v))' "${@:2}"; }
 }
 
 @test "services: dev alone on the mac has no LM Studio guard" {
-	roles '"dev"'
+	roles '"developer"'
 	run --separate-stderr agents
 	[ "$status" -eq 0 ]
 	[ "$(field "$output" lmstudio-awake)" = "null" ]
 	[ "$(field "$output" litellm-proxy Label)" = '"com.esh2n.litellm-proxy"' ]
 }
 
-@test "services: linux renders the same services as systemd user units, never the LM Studio guard" {
-	roles '"dev", "lmstudio"'
+@test "services: linux renders the same services as systemd user units; model-provider there is llama-server, never the LM Studio guard" {
+	roles '"developer"'
 	run --separate-stderr units
 	[ "$status" -eq 0 ]
 	[ "$output" = '["jig-decision","litellm-proxy","llm-ledger-sync"]' ]
+	printf '{"roles": ["developer", "model-provider"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA=", "acceptLicense": true}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr units
+	[ "$status" -eq 0 ]
+	[ "$output" = '["jig-decision","litellm-proxy","llama-server","llm-ledger-sync"]' ]
 }
 
 setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
@@ -68,14 +72,14 @@ setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 	nix_eval_expr_json "let s = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").${cfg}.dotfiles.setup.home-llm; in if s.enable then s.command else null"
 }
 
-@test "services: the home-LLM steps follow the roles: lmstudio, llm-console, gpu; not at all without one" {
-	roles '"dev", "lmstudio", "llm-console"'
+@test "services: the home-LLM steps follow the roles: model-provider, observer; not at all without one" {
+	roles '"developer", "model-provider", "observer"'
 	run --separate-stderr setup_cmd darwin
 	[[ "$output" == *"home-llm-setup ${REPO_ROOT} --lmstudio --console\"" ]]
-	roles '"dev"'
+	roles '"developer"'
 	run --separate-stderr setup_cmd darwin
 	[[ "$output" == *"home-llm-setup ${REPO_ROOT}\"" ]]
-	roles '"dev", "lmstudio"'
+	roles '"developer", "model-provider"'
 	run --separate-stderr setup_cmd linux
 	[[ "$output" == *"home-llm-setup ${REPO_ROOT}\"" ]]
 	roles ''
@@ -87,8 +91,8 @@ gpu_linux() { # gpu_linux <attr under config>
 	nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.$1"
 }
 
-@test "services: the gpu role runs llama-server on linux, bound to loopback, with the host's driver" {
-	printf '{"roles": ["dev", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA=", "acceptLicense": true}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+@test "services: model-provider runs llama-server on linux, bound to loopback, with the host's driver" {
+	printf '{"roles": ["developer", "model-provider"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA=", "acceptLicense": true}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.ExecStart'
 	[ "$status" -eq 0 ]
@@ -102,39 +106,39 @@ gpu_linux() { # gpu_linux <attr under config>
 	[[ "$output" == *"home-llm-setup ${REPO_ROOT} --gpu\"" ]]
 }
 
-@test "services: the gpu role without the host's driver in the roles file is an error that says what to add" {
-	roles '"dev", "gpu"'
+@test "services: model-provider on linux without the host's driver in the roles file is an error that says what to add" {
+	roles '"developer", "model-provider"'
 	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.ExecStart'
 	[ "$status" -ne 0 ]
 	[[ "$stderr" == *"nvidia"* ]]
 }
 
-@test "services: the gpu role stops until the owner has accepted NVIDIA's license in the roles file" {
-	printf '{"roles": ["dev", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA="}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+@test "services: model-provider on linux stops until the owner has accepted NVIDIA's license in the roles file" {
+	printf '{"roles": ["developer", "model-provider"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA="}}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.ExecStart'
 	[ "$status" -ne 0 ]
 	[[ "$stderr" == *"acceptLicense"* ]]
 }
 
-@test "services: no llama-server without the gpu role, and never on the mac" {
-	roles '"dev"'
+@test "services: no llama-server without model-provider, and never on the mac" {
+	roles '"developer"'
 	run --separate-stderr units
 	[[ "$output" != *"llama-server"* ]]
-	roles '"dev", "gpu"'
+	roles '"developer", "model-provider"'
 	run --separate-stderr agents
 	[ "$(field "$output" llama-server)" = "null" ]
 }
 
-@test "services: a dev machine without llm-console ships its spend to the ledger; the ledger machine does not" {
-	printf '{"roles": ["dev"], "consoleHost": "mac.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+@test "services: a developer machine that is not the observer ships its spend to the ledger; the ledger machine does not" {
+	printf '{"roles": ["developer"], "observerHost": "mac.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr units
 	[[ "$output" == *'"llm-ledger-sync"'* ]]
 	run --separate-stderr gpu_linux 'systemd.user.services.llm-ledger-sync.Service.Environment'
 	[[ "$output" == *"LEDGER_HOST=mac.example.ts.net"* ]]
 	[[ "$output" == *"LEDGER_SQL=${REPO_ROOT}/next/home/shared/llm-ledger/ledger.sql"* ]]
-	roles '"dev", "llm-console"'
+	roles '"developer", "observer"'
 	run --separate-stderr agents
 	[ "$(field "$output" llm-ledger-sync)" = "null" ]
 }

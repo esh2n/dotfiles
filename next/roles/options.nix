@@ -7,7 +7,7 @@ let
   names = import ./names.nix;
 in
 {
-  options.dotfiles.roles = lib.genAttrs names (name: {
+  options.dotfiles.roles = lib.genAttrs ([ "base" ] ++ names) (name: {
     enable = lib.mkEnableOption "the ${name} role";
   });
 

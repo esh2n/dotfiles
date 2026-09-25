@@ -78,7 +78,7 @@ func setup(t *testing.T, osName string) (*fakeSys, Config) {
 	home := t.TempDir()
 	repo := t.TempDir()
 	must(t, os.MkdirAll(filepath.Join(home, ".config", "dotfiles"), 0o755))
-	must(t, os.WriteFile(filepath.Join(home, ".config", "dotfiles", "roles.json"), []byte(`{"roles":["dev"]}`), 0o644))
+	must(t, os.WriteFile(filepath.Join(home, ".config", "dotfiles", "roles.json"), []byte(`{"roles":["developer"]}`), 0o644))
 	f := &fakeSys{
 		os:      osName,
 		have:    map[string]bool{"nix": true, "brew": true, "mise": true, "zsh": true},

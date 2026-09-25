@@ -13,17 +13,18 @@
 #             Never committed — which roles a machine takes is chosen on the
 #             machine; what a role means is committed in roles/.
 #   nvidia    the host's NVIDIA driver, from the same file's optional
-#             "nvidia": {"version", "sha256", "acceptLicense"} (the gpu role
+#             "nvidia": {"version", "sha256", "acceptLicense"} (a Linux model-provider
 #             needs it: Nix's driver libraries must match what the
 #             distribution installed, and using them means accepting NVIDIA's
 #             license — the owner's act, so it lives in their file); null
 #             when absent.
-#   consoleHost the llm-console machine's tailnet name, from the same file's
-#             optional "consoleHost" (where the cost ledger lives); null when
+#   observerHost the observer machine's tailnet name, from the same file's
+#             optional "observerHost" (where the cost ledger lives); null when
 #             absent.
 let
   getEnv = builtins.getEnv;
   known = import ../roles/names.nix;
+  renamed = import ../roles/renamed.nix;
 
   user = getEnv "USER";
   homeEnv = getEnv "HOME";
@@ -50,6 +51,8 @@ let
     role:
     if builtins.elem role known then
       role
+    else if renamed ? ${role} then
+      throw ''facts: the role "${role}" in ${rolesFile} was renamed: use ${renamed.${role}} (known: ${builtins.concatStringsSep ", " known})''
     else
       throw ''facts: unknown role "${role}" in ${rolesFile} (known: ${builtins.concatStringsSep ", " known})'';
 
@@ -86,12 +89,12 @@ in
   inherit home repo;
   roles = parseRoles;
   nvidia = parseNvidia;
-  consoleHost =
+  observerHost =
     let
-      h = doc.consoleHost or null;
+      h = doc.observerHost or null;
     in
     if h == null || builtins.isString h then
       h
     else
-      throw ''facts: "consoleHost" in ${rolesFile} must be a string (a tailnet name)'';
+      throw ''facts: "observerHost" in ${rolesFile} must be a string (a tailnet name)'';
 }

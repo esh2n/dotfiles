@@ -8,7 +8,7 @@ load '../lib/nix.bash'
 
 setup() {
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
-	printf '{"roles": ["dev", "lmstudio"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["developer", "model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
 }
 
 role_enabled() { # role_enabled <role>
@@ -16,19 +16,19 @@ role_enabled() { # role_enabled <role>
 }
 
 @test "roles: a role named in the roles file is enabled on the mac" {
-	run --separate-stderr role_enabled lmstudio
+	run --separate-stderr role_enabled model-provider
 	[ "$status" -eq 0 ]
 	[ "$output" = "true" ]
 }
 
 @test "roles: a role not named in the roles file stays off" {
-	run --separate-stderr role_enabled gpu
+	run --separate-stderr role_enabled observer
 	[ "$status" -eq 0 ]
 	[ "$output" = "false" ]
 }
 
 @test "roles: with every role on, both platforms' configurations evaluate to a build" {
-	printf '{"roles": ["base", "dev", "desktop", "lmstudio", "llm-console", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "acceptLicense": true}}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["developer", "desk-user", "model-provider", "observer"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "acceptLicense": true}}\n' >"${DOTFILES_ROLES_FILE}"
 	F="builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\""
 	run --separate-stderr nix_eval_expr_json "[ (${F}).darwinConfigurations.mac.system.drvPath (${F}).homeConfigurations.linux.activationPackage.drvPath ]"
 	[ "$status" -eq 0 ]
@@ -53,13 +53,13 @@ has() { printf '%s' "$1" | python3 -c 'import json,sys; sys.exit(0 if sys.argv[1
 	! has "$output" ffmpeg
 }
 
-@test "roles: dev adds the language tooling, desktop the media tools and GUI apps" {
-	printf '{"roles": ["dev"]}\n' >"${DOTFILES_ROLES_FILE}"
+@test "roles: developer adds the language tooling, desk-user the media tools and GUI apps" {
+	printf '{"roles": ["developer"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr pkgnames linux
 	has "$output" gopls
 	has "$output" kubectl
 	! has "$output" ffmpeg
-	printf '{"roles": ["desktop"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["desk-user"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr pkgnames darwin
 	has "$output" ffmpeg
 	has "$output" mas

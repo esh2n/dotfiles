@@ -1,7 +1,7 @@
 # The home LLM's command steps (next/pkgs/scripts/home-llm-setup): tailscale
 # serve for what this machine offers, LiteLLM restarted onto its current
 # config, the console's stacks, and the tier check. Off until a role turns it
-# on; which parts run is the roles' call (lmstudio, llm-console, gpu).
+# on; which parts run is the roles' call (model-provider, observer).
 {
   config,
   lib,

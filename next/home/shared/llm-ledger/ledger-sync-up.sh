@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Foreground launcher for the cost-ledger sync (a machine without the
-# llm-console role; rules/decisions/2026-09-25-llm-cost-ledger-local-first.md).
+# observer role; rules/decisions/2026-09-25-llm-cost-ledger-local-first.md).
 # Resolves the ledger DB password headlessly, like LiteLLM's own launcher, and
 # hands over to llm-ledger-sync (next/pkgs/scripts/llm-ledger-sync).
 set -euo pipefail

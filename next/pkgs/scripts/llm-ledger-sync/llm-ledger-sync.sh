@@ -13,7 +13,7 @@
 # the same columns in the same order.
 #
 #   LEDGER_PASSWORD  both DBs' password (required)
-#   LEDGER_HOST      the llm-console machine's tailnet name (unset: nothing to do)
+#   LEDGER_HOST      the observer machine's tailnet name (unset: nothing to do)
 #   LEDGER_MACHINE   this machine's name in the ledger (default: hostname -s)
 #   LEDGER_SQL       the ledger's own tables (next/home/shared/llm-ledger/ledger.sql)
 #   LEDGER_LOCAL     host:port/db of this machine's DB (default 127.0.0.1:5432/litellm)
@@ -33,7 +33,7 @@ log() { printf 'llm-ledger-sync: %s\n' "$*" >&2; }
 
 sync_once() {
 	if [[ -z "${LEDGER_HOST:-}" && -z "${LEDGER_CENTRAL:-}" ]]; then
-		log "no ledger host (the llm-console machine's tailnet name) — nothing to ship to"
+		log "no ledger host (the observer machine's tailnet name) — nothing to ship to"
 		return 0
 	fi
 	local central="postgresql://litellm@${LEDGER_CENTRAL:-${LEDGER_HOST}:5432/litellm}"

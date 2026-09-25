@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Move this Mac to the next layout, in one line; safe to run again:
-#   1. the roles file (~/.config/dotfiles/roles.json), if there is none
+#   1. the roles file (~/.config/dotfiles/roles.json), if there is none; an
+#      old one's retired role names renamed
 #   2. the cost ledger's DB password in 1Password (letters and digits: it goes
 #      into a URL), if there is none
 #   3. main fast-forwarded to the work branch in the checkout
@@ -21,8 +22,16 @@ fi
 
 if [[ ! -f "${ROLES}" ]]; then
 	mkdir -p "$(dirname "${ROLES}")"
-	echo '{"roles": ["base", "dev", "desktop", "lmstudio", "llm-console"]}' >"${ROLES}"
+	echo '{"roles": ["developer", "desk-user", "model-provider", "observer"]}' >"${ROLES}"
 	say "wrote ${ROLES}"
+elif grep -qE '"(base|dev|desktop|lmstudio|gpu|llm-console)"' "${ROLES}"; then
+	# the role names retired on 2026-09-25 (next/roles/renamed.nix)
+	sed -E -e 's/"base", *//; s/, *"base"//' \
+		-e 's/"dev"/"developer"/; s/"desktop"/"desk-user"/; s/"llm-console"/"observer"/' \
+		-e 's/"(lmstudio|gpu)"/"model-provider"/; s/"consoleHost"/"observerHost"/' \
+		"${ROLES}" >"${ROLES}.new"
+	mv "${ROLES}.new" "${ROLES}"
+	say "renamed the roles in ${ROLES}: $(cat "${ROLES}")"
 fi
 
 # a Password item: its value is the "password" field

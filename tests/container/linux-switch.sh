@@ -11,7 +11,7 @@
 # (nix-darwin) cannot run in a container.
 set -euo pipefail
 
-DEFAULT_ROLES='{"roles":["base","dev"]}'
+DEFAULT_ROLES='{"roles":["developer"]}'
 ROLES="${1:-${DEFAULT_ROLES}}"
 REPO="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 WORK="$(mktemp -d)"

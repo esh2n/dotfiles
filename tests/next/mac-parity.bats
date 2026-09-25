@@ -7,10 +7,10 @@ bats_require_minimum_version 1.5.0
 
 load '../lib/nix.bash'
 
-# The Mac takes base, dev, desktop, lmstudio and llm-console; the current layout has no
+# The Mac takes developer, desk-user, model-provider and observer; the current layout has no
 # roles and installs everything.
 setup() {
-	printf '{"roles": ["base", "dev", "desktop", "lmstudio", "llm-console"]}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	printf '{"roles": ["developer", "desk-user", "model-provider", "observer"]}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 }
 

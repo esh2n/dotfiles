@@ -21,21 +21,25 @@ facts_roles() {
 }
 
 @test "facts: the roles written in the file are the roles" {
-	printf '{"roles": ["dev", "lmstudio"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["developer", "model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run facts_roles
 	[ "$status" -eq 0 ]
-	[ "$output" = '["dev","lmstudio"]' ]
+	[ "$output" = '["developer","model-provider"]' ]
 }
 
 @test "facts: an unknown role is rejected by name" {
-	printf '{"roles": ["dev", "gpuu"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["developer", "gpuu"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run facts_roles
 	[ "$status" -ne 0 ]
 	[[ "$output" == *'unknown role "gpuu"'* ]]
+	printf '{"roles": ["llm-console"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run facts_roles
+	[ "$status" -ne 0 ]
+	[[ "$output" == *'the role "llm-console"'*'was renamed: use observer'* ]]
 }
 
 @test "facts: a file without a roles list is rejected" {
-	printf '{"role": "dev"}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"role": "developer"}\n' >"${DOTFILES_ROLES_FILE}"
 	run facts_roles
 	[ "$status" -ne 0 ]
 	[[ "$output" == *'"roles"'* ]]
@@ -61,39 +65,39 @@ facts_attr_without_home() { # facts_attr_without_home <attr>
 }
 
 @test "facts: without HOME, an explicit DOTFILES_ROLES_FILE still works" {
-	printf '{"roles": ["gpu"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run facts_attr_without_home roles
 	[ "$status" -eq 0 ]
-	[ "$output" = '["gpu"]' ]
+	[ "$output" = '["model-provider"]' ]
 }
 
 facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).nvidia"; }
 
 @test "facts: the host's NVIDIA driver is read from the roles file, null when absent" {
-	printf '{"roles": ["gpu"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr facts_nvidia
 	[ "$output" = null ]
-	printf '{"roles": ["gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA="}}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["model-provider"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA="}}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr facts_nvidia
 	[ "$status" -eq 0 ]
 	[ "$output" = '{"acceptLicense":false,"sha256":"sha256-AAAA=","version":"580.82.09"}' ]
 }
 
 @test "facts: an nvidia entry without both version and sha256 is rejected" {
-	printf '{"roles": ["gpu"], "nvidia": {"version": "580.82.09"}}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["model-provider"], "nvidia": {"version": "580.82.09"}}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr facts_nvidia
 	[ "$status" -ne 0 ]
 	[[ "$stderr" == *"nvidia"*"sha256"* ]]
 }
 
-@test "facts: consoleHost, the ledger machine's tailnet name, is read from the roles file" {
-	printf '{"roles": ["dev"], "consoleHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).consoleHost"
+@test "facts: observerHost, the ledger machine's tailnet name, is read from the roles file" {
+	printf '{"roles": ["developer"], "observerHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).observerHost"
 	[ "$output" = '"mac.example.ts.net"' ]
-	printf '{"roles": ["dev"]}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).consoleHost"
+	printf '{"roles": ["developer"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).observerHost"
 	[ "$output" = null ]
-	printf '{"roles": ["dev"], "consoleHost": 5}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).consoleHost"
+	printf '{"roles": ["developer"], "observerHost": 5}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).observerHost"
 	[ "$status" -ne 0 ]
 }

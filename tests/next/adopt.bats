@@ -29,11 +29,21 @@ adopt() { PATH="${BIN}:/usr/bin:/bin" DOTFILES_CHECKOUT="$CHECKOUT" bash "$SCRIP
 @test "adopt: writes the Mac's roles file when there is none, and leaves one that exists" {
 	run adopt
 	[ "$status" -eq 0 ]
-	grep -q '"lmstudio"' "$HOME/.config/dotfiles/roles.json"
-	grep -q '"llm-console"' "$HOME/.config/dotfiles/roles.json"
-	echo '{"roles": ["base"]}' >"$HOME/.config/dotfiles/roles.json"
+	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles": ["developer", "desk-user", "model-provider", "observer"]}' ]
+	echo '{"roles": ["developer"]}' >"$HOME/.config/dotfiles/roles.json"
 	run adopt
-	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles": ["base"]}' ]
+	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles": ["developer"]}' ]
+}
+
+@test "adopt: a roles file with the retired names is renamed in place" {
+	mkdir -p "$HOME/.config/dotfiles"
+	echo '{"roles": ["base", "dev", "desktop", "lmstudio", "llm-console"], "consoleHost": "m"}' >"$HOME/.config/dotfiles/roles.json"
+	run adopt
+	[ "$status" -eq 0 ]
+	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles": ["developer", "desk-user", "model-provider", "observer"], "observerHost": "m"}' ]
+	echo '{"roles": ["dev", "gpu"]}' >"$HOME/.config/dotfiles/roles.json"
+	run adopt
+	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles": ["developer", "model-provider"]}' ]
 }
 
 @test "adopt: creates the ledger password in 1Password only when missing, letters and digits" {

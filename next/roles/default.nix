@@ -5,10 +5,9 @@
   imports = [
     ./options.nix
     ./base.nix
-    ./desktop.nix
-    ./dev.nix
-    ./lmstudio.nix
-    ./llm-console.nix
-    ./gpu.nix
+    ./developer.nix
+    ./desk-user.nix
+    ./model-provider.nix
+    ./observer.nix
   ];
 }
