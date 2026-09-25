@@ -1,5 +1,6 @@
 # gpu: a Linux machine with an NVIDIA card serves extra local models with
-# llama-server (the Omarchy desktop; the Mac's models are llm-hub's LM Studio).
+# llama-server (the Omarchy desktop), on the tailnet like the lmstudio role's
+# LM Studio: every machine's LiteLLM can use either.
 {
   config,
   lib,

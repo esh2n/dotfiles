@@ -114,8 +114,8 @@ func requireRoles(c Config) error {
 		return nil
 	}
 	return fmt.Errorf("no roles file at %s. Write the roles this machine takes, for example:\n"+
-		"  mkdir -p %s && echo '{\"roles\": [\"base\", \"dev\", \"desktop\", \"llm-hub\"]}' > %s\n"+
-		"roles: base (always), dev, desktop, llm-hub (the Mac serving LM Studio), gpu (Linux + NVIDIA)",
+		"  mkdir -p %s && echo '{\"roles\": [\"base\", \"dev\", \"desktop\", \"lmstudio\", \"llm-console\"]}' > %s\n"+
+		"roles: base (always), dev, desktop, lmstudio (serves LM Studio's models), llm-console (Prometheus, Grafana, Open WebUI; one machine), gpu (serves llama-server; Linux + NVIDIA)",
 		file, filepath.Dir(file), file)
 }
 

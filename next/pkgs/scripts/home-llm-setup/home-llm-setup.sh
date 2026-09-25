@@ -1,28 +1,35 @@
-# home-llm-setup <checkout> <hub|node>: bring this machine to the home-LLM
-# rulings (rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md,
+# home-llm-setup <checkout> [--lmstudio] [--console] [--gpu]: bring this
+# machine to the home-LLM rulings
+# (rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md,
 # 2026-09-24-home-llm-second-host-omarchy-llama-server.md). Ported from the
-# old domains/dev/install.sh; which half runs is the machine's role now
-# (llm-hub = hub, any other dev machine = node), not whether an app exists.
+# old domains/dev/install.sh. Machines use each other's models — there is no
+# hub; what runs follows this machine's roles, never whether an app exists:
 #
-#   hub : LM Studio's server, tailscale serve 1234 (LM Studio) + https 3001
-#         (Open WebUI), Prometheus + Grafana + Open WebUI
-#   node: LiteLLM pointed at the hub, tailscale serve 4001 (metrics only)
-#   --gpu: tailscale serve 8080 (llama-server, the gpu role on Linux)
-#   both: LiteLLM restarted onto the current config, then litellm/check.sh
+#   --lmstudio: LM Studio's server, tailscale serve 1234
+#   --gpu     : tailscale serve 8080 (llama-server, Linux)
+#   --console : Prometheus + Grafana + Open WebUI, tailscale serve https 3001;
+#               without it, tailscale serve 4001 so the console can scrape
+#               this machine's LiteLLM metrics
+#   always    : LiteLLM restarted onto the current config, then litellm/check.sh
 #
 # The service definitions themselves are declared (next/roles, mk-service);
 # this runs only the steps that are commands. Nothing here fails the switch:
 # what cannot be done now is listed at the end, with what to do.
 
-ROOT="${1:?usage: home-llm-setup <checkout> <hub|node> [--gpu]}"
-ROLE="${2:?usage: home-llm-setup <checkout> <hub|node> [--gpu]}"
-GPU=0
-[[ "${3:-}" == --gpu ]] && GPU=1
-case "${ROLE}" in hub | node) ;; *)
-	echo "home-llm-setup: role must be hub or node, not ${ROLE}" >&2
-	exit 2
-	;;
-esac
+ROOT="${1:?usage: home-llm-setup <checkout> [--lmstudio] [--console] [--gpu]}"
+shift
+LMSTUDIO=0 CONSOLE=0 GPU=0
+for flag in "$@"; do
+	case "${flag}" in
+	--lmstudio) LMSTUDIO=1 ;;
+	--console) CONSOLE=1 ;;
+	--gpu) GPU=1 ;;
+	*)
+		echo "home-llm-setup: unknown flag ${flag} (--lmstudio, --console, --gpu)" >&2
+		exit 2
+		;;
+	esac
+done
 
 OS="$(uname -s)"
 # LM Studio installs its CLI here; activation does not read the shell's rc.
@@ -73,7 +80,7 @@ restart_litellm() {
 	fi
 	case "${OS}" in
 	Darwin)
-		[[ "${ROLE}" == node && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && launchctl setenv LM_STUDIO_REMOTE_HOST "${LM_STUDIO_REMOTE_HOST}"
+		[[ "${LMSTUDIO}" == 0 && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && launchctl setenv LM_STUDIO_REMOTE_HOST "${LM_STUDIO_REMOTE_HOST}"
 		local domain job=com.esh2n.litellm-proxy
 		domain="gui/$(id -u)"
 		# A loaded job is restarted in place; bootout-then-bootstrap races
@@ -85,12 +92,12 @@ restart_litellm() {
 		fi
 		;;
 	*)
-		[[ "${ROLE}" == node && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && systemctl --user set-environment "LM_STUDIO_REMOTE_HOST=${LM_STUDIO_REMOTE_HOST}"
+		[[ "${LMSTUDIO}" == 0 && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && systemctl --user set-environment "LM_STUDIO_REMOTE_HOST=${LM_STUDIO_REMOTE_HOST}"
 		systemctl --user restart litellm-proxy.service || todo "LiteLLM: systemctl --user restart litellm-proxy failed"
 		;;
 	esac
-	if [[ "${ROLE}" == node && -z "${LM_STUDIO_REMOTE_HOST:-}" ]]; then
-		todo "LiteLLM (node): name the hub once — LM_STUDIO_REMOTE_HOST=<hub.tailnet.ts.net> make up"
+	if [[ "${LMSTUDIO}" == 0 && -z "${LM_STUDIO_REMOTE_HOST:-}" ]]; then
+		todo "LiteLLM: name the machine serving LM Studio once — LM_STUDIO_REMOTE_HOST=<mac.tailnet.ts.net> make up"
 	fi
 	local url
 	for url in http://127.0.0.1:4000/health/liveliness http://127.0.0.1:4001/metrics; do
@@ -112,7 +119,7 @@ lm_studio() {
 	todo "LM Studio: open the app once, Settings → 'run the LLM server on login', network 'localhost only'; then make up"
 }
 
-hub_stacks() {
+console_stacks() {
 	if ! docker info >/dev/null 2>&1; then
 		todo "docker is not answering (start OrbStack), then make up for Prometheus / Grafana / Open WebUI"
 		return 0
@@ -133,27 +140,29 @@ if [[ -z "${TS}" ]]; then
 	todo "Tailscale is not installed (macOS: the tailscale-app cask; Linux: https://tailscale.com/download/linux)"
 elif [[ "$(tailscale_state)" != Running ]]; then
 	todo "Tailscale: log in (macOS: the menu-bar app; Linux: sudo tailscale up), then make up for the serve steps"
-elif [[ "${ROLE}" == hub ]]; then
-	serve --tcp 1234 tcp://127.0.0.1:1234
-	serve --https=3001 127.0.0.1:3001
 else
-	serve --tcp 4001 tcp://127.0.0.1:4001
-fi
-# gpu: llama-server, the one model server this machine puts on the tailnet
-if [[ -n "${TS}" && "${GPU}" == 1 && "$(tailscale_state)" == Running ]]; then
-	serve --tcp 8080 tcp://127.0.0.1:8080
+	[[ "${LMSTUDIO}" == 1 ]] && serve --tcp 1234 tcp://127.0.0.1:1234
+	[[ "${GPU}" == 1 ]] && serve --tcp 8080 tcp://127.0.0.1:8080
+	if [[ "${CONSOLE}" == 1 ]]; then
+		serve --https=3001 127.0.0.1:3001
+	else
+		serve --tcp 4001 tcp://127.0.0.1:4001
+	fi
 fi
 
-[[ "${ROLE}" == hub ]] && lm_studio
+[[ "${LMSTUDIO}" == 1 ]] && lm_studio
 restart_litellm
-[[ "${ROLE}" == hub ]] && hub_stacks
-bash "${LITELLM}/check.sh" --role "${ROLE}" || todo "litellm/check.sh reported failing lines above"
+[[ "${CONSOLE}" == 1 ]] && console_stacks
+CHECK=()
+[[ "${LMSTUDIO}" == 1 ]] && CHECK+=(--lmstudio)
+[[ "${CONSOLE}" == 1 ]] && CHECK+=(--console)
+bash "${LITELLM}/check.sh" ${CHECK[@]+"${CHECK[@]}"} || todo "litellm/check.sh reported failing lines above"
 
 if ((${#TODO[@]})); then
 	echo "home-llm: left to do:"
 	printf '  - %s\n' "${TODO[@]}"
 fi
-if [[ "${ROLE}" == hub ]]; then
+if [[ "${CONSOLE}" == 1 ]]; then
 	echo "home-llm: once, by hand: the tailnet policy (make tailscale-acl, paste, Save); the phone joins the tailnet and pairs Orca's companion over LAN"
 fi
 exit 0

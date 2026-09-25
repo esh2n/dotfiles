@@ -21,10 +21,10 @@ facts_roles() {
 }
 
 @test "facts: the roles written in the file are the roles" {
-	printf '{"roles": ["dev", "llm-hub"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["dev", "lmstudio"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run facts_roles
 	[ "$status" -eq 0 ]
-	[ "$output" = '["dev","llm-hub"]' ]
+	[ "$output" = '["dev","lmstudio"]' ]
 }
 
 @test "facts: an unknown role is rejected by name" {

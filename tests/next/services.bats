@@ -27,8 +27,8 @@ print(json.dumps(v))' "${@:2}"; }
 	[ "$output" = "{}" ]
 }
 
-@test "services: dev and llm-hub on the mac give the three agents the plists defined" {
-	roles '"dev", "llm-hub"'
+@test "services: dev and lmstudio on the mac give the three agents the plists defined" {
+	roles '"dev", "lmstudio"'
 	run --separate-stderr agents
 	[ "$status" -eq 0 ]
 	a="$output"
@@ -56,7 +56,7 @@ print(json.dumps(v))' "${@:2}"; }
 }
 
 @test "services: linux renders the same services as systemd user units, never the LM Studio guard" {
-	roles '"dev", "llm-hub"'
+	roles '"dev", "lmstudio"'
 	run --separate-stderr units
 	[ "$status" -eq 0 ]
 	[ "$output" = '["jig-decision","litellm-proxy"]' ]
@@ -68,16 +68,16 @@ setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 	nix_eval_expr_json "let s = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").${cfg}.dotfiles.setup.home-llm; in if s.enable then s.command else null"
 }
 
-@test "services: the home-LLM steps run as hub on an llm-hub mac, as node on a dev machine, not at all without dev" {
-	roles '"dev", "llm-hub"'
+@test "services: the home-LLM steps follow the roles: lmstudio, llm-console, gpu; not at all without one" {
+	roles '"dev", "lmstudio", "llm-console"'
 	run --separate-stderr setup_cmd darwin
-	[[ "$output" == *"home-llm-setup ${REPO_ROOT} hub\"" ]]
+	[[ "$output" == *"home-llm-setup ${REPO_ROOT} --lmstudio --console\"" ]]
 	roles '"dev"'
 	run --separate-stderr setup_cmd darwin
-	[[ "$output" == *"home-llm-setup ${REPO_ROOT} node\"" ]]
-	roles '"dev", "llm-hub"'
+	[[ "$output" == *"home-llm-setup ${REPO_ROOT}\"" ]]
+	roles '"dev", "lmstudio"'
 	run --separate-stderr setup_cmd linux
-	[[ "$output" == *" node\"" ]]
+	[[ "$output" == *"home-llm-setup ${REPO_ROOT}\"" ]]
 	roles ''
 	run --separate-stderr setup_cmd darwin
 	[ "$output" = null ]
@@ -99,7 +99,7 @@ gpu_linux() { # gpu_linux <attr under config>
 	run --separate-stderr gpu_linux 'targets.genericLinux.gpu.nvidia'
 	[[ "$output" == *'"version":"580.82.09"'* ]]
 	run --separate-stderr gpu_linux 'dotfiles.setup.home-llm.command'
-	[[ "$output" == *" node --gpu\"" ]]
+	[[ "$output" == *"home-llm-setup ${REPO_ROOT} --gpu\"" ]]
 }
 
 @test "services: the gpu role without the host's driver in the roles file is an error that says what to add" {

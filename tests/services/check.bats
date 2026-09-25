@@ -34,3 +34,12 @@ check() { PATH="${BIN}:/usr/bin:/bin" bash "$D/check.sh" "$@"; }
 	run check --role gpu
 	[ "$status" -eq 2 ]
 }
+
+@test "check: --lmstudio and --console name what this machine offers" {
+	run check --lmstudio
+	[[ "${lines[0]}" == "home-llm check (lmstudio)" ]]
+	run check --lmstudio --console
+	[[ "${lines[0]}" == "home-llm check (lmstudio console)" ]]
+	run check --console
+	[[ "${lines[0]}" == "home-llm check (console)" ]]
+}

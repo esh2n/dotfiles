@@ -1,6 +1,6 @@
 # Keeps the Mac awake exactly while the LM Studio server runs. The wrapper
 # waits for :1234, then becomes `caffeinate -s -w <pid>`; it exits with the
-# server and is started again. Off by default; next/roles/llm-hub.nix turns
+# server and is started again. Off by default; next/roles/lmstudio.nix turns
 # it on.
 {
   dotfiles.services.lmstudio-awake = {

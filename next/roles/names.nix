@@ -5,6 +5,7 @@
   "base"
   "dev"
   "desktop"
-  "llm-hub"
+  "lmstudio"
+  "llm-console"
   "gpu"
 ]

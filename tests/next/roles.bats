@@ -8,7 +8,7 @@ load '../lib/nix.bash'
 
 setup() {
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
-	printf '{"roles": ["dev", "llm-hub"]}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["dev", "lmstudio"]}\n' >"${DOTFILES_ROLES_FILE}"
 }
 
 role_enabled() { # role_enabled <role>
@@ -16,7 +16,7 @@ role_enabled() { # role_enabled <role>
 }
 
 @test "roles: a role named in the roles file is enabled on the mac" {
-	run --separate-stderr role_enabled llm-hub
+	run --separate-stderr role_enabled lmstudio
 	[ "$status" -eq 0 ]
 	[ "$output" = "true" ]
 }
@@ -28,7 +28,7 @@ role_enabled() { # role_enabled <role>
 }
 
 @test "roles: with every role on, both platforms' configurations evaluate to a build" {
-	printf '{"roles": ["base", "dev", "desktop", "llm-hub", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "acceptLicense": true}}\n' >"${DOTFILES_ROLES_FILE}"
+	printf '{"roles": ["base", "dev", "desktop", "lmstudio", "llm-console", "gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "acceptLicense": true}}\n' >"${DOTFILES_ROLES_FILE}"
 	F="builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\""
 	run --separate-stderr nix_eval_expr_json "[ (${F}).darwinConfigurations.mac.system.drvPath (${F}).homeConfigurations.linux.activationPackage.drvPath ]"
 	[ "$status" -eq 0 ]

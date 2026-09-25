@@ -7,7 +7,8 @@
     ./base.nix
     ./desktop.nix
     ./dev.nix
-    ./llm-hub.nix
+    ./lmstudio.nix
+    ./llm-console.nix
     ./gpu.nix
   ];
 }

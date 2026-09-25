@@ -50,7 +50,7 @@ jobs:
           extra_nix_config: experimental-features = nix-command flakes
       # not gpu: llama.cpp's CUDA build is not in any binary cache, too heavy here
       - name: roles
-        run: echo '{"roles":["base","dev","desktop","llm-hub"]}' > "$RUNNER_TEMP/roles.json"
+        run: echo '{"roles":["base","dev","desktop","lmstudio","llm-console"]}' > "$RUNNER_TEMP/roles.json"
       - name: nix fmt (nixfmt over next/)
         working-directory: next
         run: nix fmt -- --ci
@@ -69,7 +69,7 @@ jobs:
         with:
           extra_nix_config: experimental-features = nix-command flakes
       - name: roles
-        run: echo '{"roles":["base","dev","desktop","llm-hub"]}' > "$RUNNER_TEMP/roles.json"
+        run: echo '{"roles":["base","dev","desktop","lmstudio","llm-console"]}' > "$RUNNER_TEMP/roles.json"
       - name: tests
         run: bash tests/run.sh
       - name: build darwinConfigurations.mac

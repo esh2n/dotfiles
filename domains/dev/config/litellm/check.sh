@@ -7,12 +7,11 @@
 # Run by hand (`bash domains/dev/config/litellm/check.sh`) or at the end of
 # `make update` (domains/dev/install.sh, section 5). Exit code = number of FAILs.
 #
-# Roles (--role hub|node; without it, the Mac with LM Studio.app is the hub):
-# on the hub every line applies. On a
-# node (any machine without LM Studio) only what the ruling puts there is
-# checked — its own LiteLLM, the tiers through it (deterministic reaches the
-# hub over the tailnet), its metrics port and `tailscale serve 4001`; no
-# local model, no Prometheus, no Open WebUI is expected or probed.
+# What is probed follows what this machine offers: --lmstudio (LM Studio's
+# server and `tailscale serve 1234`), --console (Prometheus, Grafana, Open
+# WebUI, `tailscale serve 3001`; without it, `tailscale serve 4001` for the
+# console's scrape). Every machine gets its own LiteLLM and the tiers through
+# it. The old layout's --role hub|node means both|neither.
 #
 # What it costs: one tiny prompt to `main` (DeepSeek, a fraction of a cent);
 # `deterministic` is local and free. `complex` is not exercised by default
@@ -23,11 +22,15 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="/etc/profiles/per-user/$(id -un)/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 WITH_COMPLEX=0
 ROLE=""
+LMSTUDIO=""
+CONSOLE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --complex) WITH_COMPLEX=1 ;;
     --role) ROLE="${2:-}"; shift ;;
-    *) echo "usage: check.sh [--complex] [--role hub|node]" >&2; exit 2 ;;
+    --lmstudio) LMSTUDIO=1 ;;
+    --console) CONSOLE=1 ;;
+    *) echo "usage: check.sh [--complex] [--lmstudio] [--console] | [--role hub|node]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -43,15 +46,23 @@ LOG="${LOG_DIR}/check.log"
 FAILS=0
 pass() { printf '  \033[32mPASS\033[0m %s\n' "$*"; echo "PASS $*" >>"$LOG" 2>/dev/null || true; }
 fail() { FAILS=$((FAILS + 1)); printf '  \033[31mFAIL\033[0m %s\n' "$*"; echo "FAIL $*" >>"$LOG" 2>/dev/null || true; }
-# The caller's role wins (next passes the machine's role); without one, guess
-# as the old installer did: the Mac with LM Studio.app is the hub.
-if [ -z "$ROLE" ]; then
-  ROLE=node; [ "$(uname -s)" = Darwin ] && [ -d "/Applications/LM Studio.app" ] && ROLE=hub
+# What this machine offers decides what is probed. next passes it as
+# --lmstudio / --console (the machine's roles); --role hub|node is the old
+# layout's name for both / neither; with nothing, guess as the old installer
+# did: the Mac with LM Studio.app is both.
+if [ -n "${LMSTUDIO}${CONSOLE}" ]; then
+  LMSTUDIO="${LMSTUDIO:-0}"; CONSOLE="${CONSOLE:-0}"
+  ROLE="$( { [ "$LMSTUDIO" = 1 ] && printf 'lmstudio '; [ "$CONSOLE" = 1 ] && printf 'console'; } | sed 's/ $//')"
+else
+  if [ -z "$ROLE" ]; then
+    ROLE=node; [ "$(uname -s)" = Darwin ] && [ -d "/Applications/LM Studio.app" ] && ROLE=hub
+  fi
+  if [ "$ROLE" = hub ]; then LMSTUDIO=1; CONSOLE=1; else LMSTUDIO=0; CONSOLE=0; fi
 fi
 echo "home-llm check (${ROLE})"
 
 # --- LM Studio (hub): the model server itself ------------------------------
-if [ "$ROLE" = hub ]; then
+if [ "$LMSTUDIO" = 1 ]; then
   models="$(curl -sf --max-time 5 http://127.0.0.1:1234/v1/models 2>/dev/null | python3 -c 'import json,sys; print(" ".join(m["id"] for m in json.load(sys.stdin)["data"]))' 2>/dev/null)"
   if [ -n "$models" ]; then pass "LM Studio :1234 lists: ${models}"; else fail "LM Studio :1234 does not answer /v1/models (server off, or no model loaded)"; fi
 fi
@@ -96,7 +107,7 @@ ask() {  # ask <tier> — one short completion; prints reply and wall time
 # "not-loaded" (measured 2026-09-24: FAIL here while the tier answered in 2.7s).
 # loaded_context_length is the number the deterministic tier's contextWindow
 # in policy/tiers.json must not exceed.
-if [ "$ROLE" = hub ]; then
+if [ "$LMSTUDIO" = 1 ]; then
   ctx="$(curl -sf --max-time 5 http://127.0.0.1:1234/api/v0/models 2>/dev/null | python3 -c '
 import json,sys
 for m in json.load(sys.stdin).get("data",[]):
@@ -140,7 +151,7 @@ if curl -sf --max-time 5 http://127.0.0.1:4001/health 2>/dev/null | grep -q heal
 else
   fail "LiteLLM :4001 metrics listener not answering /health"
 fi
-if [ "$ROLE" = hub ]; then
+if [ "$CONSOLE" = 1 ]; then
   # LiteLLM was just restarted by make update; Prometheus's last scrape may have
   # hit the gap. Give it a few scrape intervals before calling the target down.
   health=""
@@ -171,8 +182,10 @@ TS_BIN="$(command -v tailscale || true)"
 if [ -n "$TS_BIN" ]; then
   serve="$(timeout 10 "$TS_BIN" serve status 2>/dev/null || true)"
   name="$(timeout 10 "$TS_BIN" status --json 2>/dev/null | sed -n 's/.*"DNSName": *"\([^"]*\)\.".*/\1/p' | head -1)"
-  if [ "$ROLE" = hub ]; then
+  if [ "$LMSTUDIO" = 1 ]; then
     printf '%s' "$serve" | grep -q ':1234' && pass "tailscale serve tcp:1234 (LM Studio) → ${name:-?}:1234" || fail "tailscale serve tcp:1234 missing"
+  fi
+  if [ "$CONSOLE" = 1 ]; then
     printf '%s' "$serve" | grep -q ':3001' && pass "tailscale serve https:3001 (Open WebUI) → https://${name:-?}:3001" || fail "tailscale serve https:3001 missing (HTTPS certificates enabled in the admin console?)"
     # Which devices are on the tailnet right now: the phone must be one of them before the page can open there.
     peers="$(timeout 10 "$TS_BIN" status 2>/dev/null | awk 'NR>0 && $2 != "" {print $2 " (" $4 ")"}' | grep -v "^$(hostname -s)" | tr '\n' ',' | sed 's/,$//')"

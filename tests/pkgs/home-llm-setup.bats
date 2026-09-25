@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# home-llm-setup <checkout> <hub|node>: the home-LLM steps that are commands.
+# home-llm-setup <checkout> [--lmstudio] [--console] [--gpu]: the home-LLM
+# steps that are commands, chosen by what this machine offers.
 # Every outside tool is a recording stand-in; the script never fails the
 # switch and lists what is left to do instead.
 
@@ -31,21 +32,21 @@ fake() { # fake <name> [body]
 
 hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"; }
 
-@test "home-llm: a role other than hub or node is refused" {
-	run hl gpu
+@test "home-llm: an unknown flag is refused" {
+	run hl --hub
 	[ "$status" -eq 2 ]
 }
 
-@test "home-llm hub: serves LM Studio and Open WebUI on the tailnet, never the metrics port" {
-	run hl hub
+@test "home-llm lmstudio + console: serves LM Studio and Open WebUI on the tailnet, never the metrics port" {
+	run hl --lmstudio --console
 	[ "$status" -eq 0 ]
 	grep -qx "tailscale serve --bg --tcp 1234 tcp://127.0.0.1:1234" "${LOG}"
 	grep -qx "tailscale serve --bg --https=3001 127.0.0.1:3001" "${LOG}"
 	! grep -q "serve --bg --tcp 4001" "${LOG}"
 }
 
-@test "home-llm node: serves the metrics port only" {
-	run hl node
+@test "home-llm without a role: serves the metrics port only" {
+	run hl
 	[ "$status" -eq 0 ]
 	grep -qx "tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001" "${LOG}"
 	[ "$(grep -c '^tailscale serve' "${LOG}")" -eq 1 ]
@@ -53,87 +54,90 @@ hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"
 
 @test "home-llm: logged out of tailscale serves nothing and says to log in" {
 	fake tailscale 'if [ "$1" = status ]; then echo "{\"BackendState\": \"NeedsLogin\"}"; fi'
-	run hl hub
+	run hl --lmstudio --console
 	[ "$status" -eq 0 ]
 	! grep -q "tailscale serve" "${LOG}"
 	[[ "$output" == *"Tailscale: log in"* ]]
 }
 
-@test "home-llm hub: starts Prometheus + Grafana, and Open WebUI with the LiteLLM key in its environment" {
+@test "home-llm console: starts Prometheus + Grafana, and Open WebUI with the LiteLLM key in its environment" {
 	fake docker 'if [ "$1" = compose ]; then echo "compose key=${LITELLM_API_KEY:-}" >>"'"${LOG}"'"; fi'
-	run hl hub
+	run hl --console
 	[ "$status" -eq 0 ]
 	grep -qx "observability/start.sh --ui" "${LOG}"
 	grep -q "^docker compose -f ${L}/observability/docker-compose.yml --profile webui up -d open-webui" "${LOG}"
 	grep -qx "compose key=the-key" "${LOG}"
 }
 
-@test "home-llm node: no stacks, no LM Studio" {
-	run hl node
+@test "home-llm without lmstudio or console: no stacks, no LM Studio" {
+	run hl
 	! grep -q "observability/start.sh" "${LOG}"
 	! grep -q "^lms" "${LOG}"
 	! grep -q "^docker compose" "${LOG}"
 }
 
 @test "home-llm: LiteLLM restarts onto the current config on macOS and Linux" {
-	run hl node
+	run hl
 	grep -q "^launchctl kickstart -k gui/.*/com.esh2n.litellm-proxy" "${LOG}"
 	: >"${LOG}"
 	fake uname 'echo Linux'
-	run hl node
+	run hl
 	grep -qx "systemctl --user restart litellm-proxy.service" "${LOG}"
 }
 
 @test "home-llm: without the op token LiteLLM is left alone and the reason is listed" {
 	fake security 'exit 44'
-	run hl node
+	run hl
 	[ "$status" -eq 0 ]
 	! grep -q "kickstart" "${LOG}"
 	[[ "$output" == *"service-account token"* ]]
 }
 
-@test "home-llm node: the hub's name reaches the service when given" {
-	LM_STUDIO_REMOTE_HOST=hub.example.ts.net run hl node
-	grep -qx "launchctl setenv LM_STUDIO_REMOTE_HOST hub.example.ts.net" "${LOG}"
+@test "home-llm without lmstudio: the LM Studio machine's name reaches the service when given" {
+	LM_STUDIO_REMOTE_HOST=mac.example.ts.net run hl
+	grep -qx "launchctl setenv LM_STUDIO_REMOTE_HOST mac.example.ts.net" "${LOG}"
 }
 
 @test "home-llm: the tier check runs last, and its failure is listed, not fatal" {
 	printf '#!/usr/bin/env bash\necho "check.sh" >>"%s"\nexit 3\n' "${LOG}" >"${L}/check.sh"
-	run hl hub
+	run hl --lmstudio --console
 	[ "$status" -eq 0 ]
 	[ "$(tail -1 "${LOG}")" = "check.sh" ]
 	[[ "$output" == *"check.sh reported failing"* ]]
 	: >"${LOG}"
 	printf '#!/usr/bin/env bash\necho "check.sh $*" >>"%s"\n' "${LOG}" >"${L}/check.sh"
-	run hl node
-	grep -qx "check.sh --role node" "${LOG}"
+	run hl --lmstudio
+	grep -qx "check.sh --lmstudio" "${LOG}"
+	: >"${LOG}"
+	run hl
+	grep -Eqx "check.sh ?" "${LOG}"
 }
 
-@test "home-llm hub: finds lms where LM Studio puts it, off the activation PATH" {
+@test "home-llm lmstudio: finds lms where LM Studio puts it, off the activation PATH" {
 	export HOME="${BATS_TEST_TMPDIR}/home"
 	mkdir -p "${HOME}/.lmstudio/bin"
 	printf '#!/usr/bin/env bash\necho "lms $*" >>"%s"\n' "${LOG}" >"${HOME}/.lmstudio/bin/lms"
 	chmod +x "${HOME}/.lmstudio/bin/lms"
 	rm "${BIN}/lms"
 	fake curl 'case "$*" in *1234*) exit 7 ;; esac'
-	run hl hub
+	run hl --lmstudio
 	grep -q "^lms server start --port 1234" "${LOG}"
 }
 
 @test "home-llm: a LiteLLM job launchd does not have loaded yet is bootstrapped, a loaded one kickstarted" {
 	fake launchctl 'if [ "$1" = print ]; then exit 113; fi'
-	run hl node
+	run hl
 	grep -q "^launchctl bootstrap gui/[0-9]* .*/Library/LaunchAgents/com.esh2n.litellm-proxy.plist" "${LOG}"
 	! grep -q "kickstart" "${LOG}"
 	: >"${LOG}"
 	fake launchctl
-	run hl node
+	run hl
 	grep -q "^launchctl kickstart -k gui/.*/com.esh2n.litellm-proxy" "${LOG}"
 	! grep -q "^launchctl bootstrap" "${LOG}"
 }
 
 @test "home-llm --gpu: also serves llama-server's port, nothing else extra" {
-	run hl node --gpu
+	run hl --gpu
 	[ "$status" -eq 0 ]
 	grep -qx "tailscale serve --bg --tcp 8080 tcp://127.0.0.1:8080" "${LOG}"
 	grep -qx "tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001" "${LOG}"
