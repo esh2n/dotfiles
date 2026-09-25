@@ -134,6 +134,12 @@ func Init(e Env, fallback string) error {
 			return err
 		}
 	}
+	// make up renders zellij's config.kdl again, resetting its layout
+	if cur, err := Current(e); err == nil {
+		if err := applyZellij(e, cur); err != nil {
+			e.warn("zellij: %v", err)
+		}
+	}
 	return nil
 }
 
@@ -151,6 +157,7 @@ func Set(e Env, name string) error {
 		return err
 	}
 	reload(e)
+	applyValues(e, name)
 	return nil
 }
 

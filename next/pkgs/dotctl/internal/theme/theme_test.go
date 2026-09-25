@@ -135,3 +135,34 @@ func TestList(t *testing.T) {
 		t.Fatalf("List = %v", got)
 	}
 }
+
+// zellij's config.kdl is rendered from a template on every make up, which
+// resets default_layout; Init (run on every switch) puts the theme back.
+func TestZellijLayoutFollowsTheThemeAndSurvivesARender(t *testing.T) {
+	f := newFixture(t)
+	e := f.env()
+	zdir := filepath.Join(f.repo, "domains/dev/config/zellij")
+	must(t, os.MkdirAll(filepath.Join(zdir, "layouts"), 0o755))
+	for _, n := range []string{"nord", "dracula"} {
+		must(t, os.WriteFile(filepath.Join(zdir, "layouts", n+".kdl"), nil, 0o644))
+	}
+	rendered := filepath.Join(zdir, "config.kdl")
+	render := func() { must(t, os.WriteFile(rendered, []byte("theme \"x\"\ndefault_layout \"nord\"\n"), 0o644)) }
+	render()
+	must(t, os.MkdirAll(filepath.Join(f.home, ".config", "zellij"), 0o755))
+	must(t, os.Symlink(rendered, filepath.Join(f.home, ".config", "zellij", "config.kdl")))
+
+	must(t, Init(e, "nord"))
+	must(t, Set(e, "dracula"))
+	if got := through(t, rendered); got != "theme \"x\"\ndefault_layout \"dracula\"\n" {
+		t.Fatalf("after set: %q", got)
+	}
+	if _, err := os.Readlink(filepath.Join(f.home, ".config", "zellij", "config.kdl")); err != nil {
+		t.Fatal("the home-manager link was replaced by a file")
+	}
+	render()
+	must(t, Init(e, "nord"))
+	if got := through(t, rendered); got != "theme \"x\"\ndefault_layout \"dracula\"\n" {
+		t.Fatalf("after a re-render and init: %q", got)
+	}
+}
