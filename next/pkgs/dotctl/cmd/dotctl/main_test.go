@@ -62,11 +62,3 @@ func TestThemeNeedsTheCheckout(t *testing.T) {
 		t.Fatalf("set without a name: exit %d", code)
 	}
 }
-
-func TestWithEnvSetsAndRemoves(t *testing.T) {
-	got := withEnv([]string{"A=1", "XDG_CONFIG_HOME=/x", "B=2"}, []string{"XDG_CONFIG_HOME=", "C=3"})
-	want := []string{"A=1", "B=2", "C=3"}
-	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("withEnv = %v", got)
-	}
-}

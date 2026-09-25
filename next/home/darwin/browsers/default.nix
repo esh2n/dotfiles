@@ -2,5 +2,5 @@
 # checkout. The extensions themselves are declared in system/darwin/browsers.nix.
 { config, ... }:
 {
-  dotfiles.setup.userstyles.command = config.lib.dotfiles.devSetup "userstyles";
+  dotfiles.setup.userstyles.command = config.lib.dotfiles.setupStep "userstyles";
 }

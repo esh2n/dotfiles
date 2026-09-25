@@ -2,7 +2,7 @@
 # ones are never upgraded behind the owner's back.
 { config, ... }:
 let
-  setup = config.lib.dotfiles.devSetup;
+  setup = config.lib.dotfiles.setupStep;
 in
 {
   dotfiles.setup.gh-extensions.command = setup "gh-extensions";

@@ -9,7 +9,6 @@ let
     cargo-compete = callPackage ./cargo-compete { };
     codebase-memory-mcp = callPackage ./codebase-memory-mcp { };
     dotctl = callPackage ./dotctl { };
-    dev-setup = callPackage ./scripts/dev-setup { inherit (self) dotctl; };
     harness-apply = callPackage ./scripts/harness-apply { };
     llm-ledger-sync = callPackage ./scripts/llm-ledger-sync { };
     home-llm-setup = callPackage ./scripts/home-llm-setup { };

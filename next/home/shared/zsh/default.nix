@@ -6,7 +6,7 @@ let
   link = config.lib.dotfiles.link;
 in
 {
-  dotfiles.setup.capsule-daemon.command = config.lib.dotfiles.devSetup "capsule-daemon";
+  dotfiles.setup.capsule-daemon.command = config.lib.dotfiles.setupStep "capsule-daemon";
 
   home.file = {
     ".zshenv".source = link "domains/dev/home/.zshenv";

@@ -6,61 +6,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"runtime"
-	"strings"
 
+	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/sys"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/up"
 )
-
-// osSys is the real machine for `dotctl up`.
-type osSys struct{}
-
-func (osSys) Run(env []string, name string, args ...string) error {
-	c := exec.Command(name, args...)
-	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr // sudo may ask
-	if len(env) > 0 {
-		c.Env = withEnv(os.Environ(), env)
-	}
-	return c.Run()
-}
-
-// withEnv applies "K=v" (set) and "K=" (remove) to base.
-func withEnv(base, changes []string) []string {
-	out := base
-	for _, ch := range changes {
-		key, val, _ := strings.Cut(ch, "=")
-		kept := out[:0:0]
-		for _, e := range out {
-			if !strings.HasPrefix(e, key+"=") {
-				kept = append(kept, e)
-			}
-		}
-		if val != "" {
-			kept = append(kept, ch)
-		}
-		out = kept
-	}
-	return out
-}
-
-func (osSys) Output(name string, args ...string) (string, error) {
-	c := exec.Command(name, args...)
-	c.Stderr = os.Stderr
-	out, err := c.Output()
-	return string(out), err
-}
-
-func (osSys) Quiet(name string, args ...string) error {
-	return exec.Command(name, args...).Run() // no stdio: discarded
-}
-
-func (osSys) Has(name string) bool { _, err := exec.LookPath(name); return err == nil }
-func (osSys) OS() string           { return runtime.GOOS }
-
-func (osSys) Shells() string {
-	b, _ := os.ReadFile("/etc/shells")
-	return string(b)
-}
 
 // runUp is `dotctl up [--repo DIR]`, what `make up` runs once Nix exists.
 func runUp(home string, args []string, out, errOut io.Writer) int {
@@ -86,7 +35,7 @@ func runUp(home string, args []string, out, errOut io.Writer) int {
 		Log:       func(s string) { fmt.Fprintln(out, "up:", s) },
 		Warn:      func(s string) { fmt.Fprintln(errOut, "up: warning:", s) },
 	}
-	if err := up.Run(osSys{}, c); err != nil {
+	if err := up.Run(sys.OS{}, c); err != nil {
 		fmt.Fprintln(errOut, "up:", err)
 		return 1
 	}

@@ -2,7 +2,7 @@
 # machine ~/.config/nvim starts as LazyVim (nvim-switch picks another).
 { config, ... }:
 let
-  setup = config.lib.dotfiles.devSetup;
+  setup = config.lib.dotfiles.setupStep;
 in
 {
   dotfiles.setup.nvim-default.command = setup "nvim-default";

@@ -5,9 +5,9 @@
 #     An out-of-store symlink into the checkout: the file stays editable in
 #     place and an edit takes effect without a rebuild.
 #
-#   config.lib.dotfiles.devSetup "<step>"
-#     The command line of one dev-setup step (next/pkgs/scripts/dev-setup),
-#     for dotfiles.setup.<name>.command.
+#   config.lib.dotfiles.setupStep "<step>"
+#     The command line of one `dotctl setup` step (next/pkgs/dotctl,
+#     internal/setup), for dotfiles.setup.<name>.command.
 {
   config,
   lib,
@@ -18,6 +18,6 @@
 {
   lib.dotfiles = {
     link = path: config.lib.file.mkOutOfStoreSymlink "${facts.repo}/${path}";
-    devSetup = step: "${lib.getExe pkgs.dev-setup} ${lib.escapeShellArg facts.repo} ${step}";
+    setupStep = step: "${lib.getExe pkgs.dotctl} setup --repo ${lib.escapeShellArg facts.repo} ${step}";
   };
 }

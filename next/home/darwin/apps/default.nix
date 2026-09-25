@@ -5,7 +5,7 @@ let
   link = config.lib.dotfiles.link;
 in
 {
-  dotfiles.setup.warp-seed.command = config.lib.dotfiles.devSetup "warp-seed";
+  dotfiles.setup.warp-seed.command = config.lib.dotfiles.setupStep "warp-seed";
 
   home.file = {
     ".warp".source = link "domains/dev/config/warp";

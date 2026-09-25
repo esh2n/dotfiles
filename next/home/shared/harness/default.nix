@@ -55,18 +55,18 @@ in
   # installer, its user-scoped MCP servers (from jig's output, so after
   # harnessApply), pi's packages, and a reference checkout of ECC.
   dotfiles.setup = {
-    claude-cli.command = config.lib.dotfiles.devSetup "claude-cli";
+    claude-cli.command = config.lib.dotfiles.setupStep "claude-cli";
     claude-mcp = {
-      command = config.lib.dotfiles.devSetup "claude-mcp";
+      command = config.lib.dotfiles.setupStep "claude-mcp";
       after = [
         "harnessApply"
         "setup-claude-cli"
       ];
     };
     pi-packages = {
-      command = config.lib.dotfiles.devSetup "pi-packages";
+      command = config.lib.dotfiles.setupStep "pi-packages";
       after = [ "harnessApply" ];
     };
-    ecc.command = config.lib.dotfiles.devSetup "ecc";
+    ecc.command = config.lib.dotfiles.setupStep "ecc";
   };
 }

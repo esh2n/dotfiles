@@ -57,10 +57,10 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-me
 	[ "$(names "$output")" = "$expected" ] || { echo "got: $(names "$output")"; false; }
 }
 
-@test "setup: the mac's userstyles and SbarLua are dev-setup steps" {
+@test "setup: the mac's userstyles and SbarLua are dotctl setup steps" {
 	run --separate-stderr activation darwin
-	[[ "$(field "$output" setup-userstyles data)" == *"dev-setup ${REPO_ROOT} userstyles"* ]]
-	[[ "$(field "$output" setup-sbarlua data)" == *"dev-setup ${REPO_ROOT} sbarlua"* ]]
+	[[ "$(field "$output" setup-userstyles data)" == *"dotctl setup --repo ${REPO_ROOT} userstyles"* ]]
+	[[ "$(field "$output" setup-sbarlua data)" == *"dotctl setup --repo ${REPO_ROOT} sbarlua"* ]]
 }
 
 @test "setup: claude's MCP servers are registered after jig has written them and the CLI exists" {

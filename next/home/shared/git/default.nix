@@ -2,7 +2,7 @@
 # (~/.config/git/config.local, from the checkout's untracked .env).
 { config, ... }:
 let
-  setup = config.lib.dotfiles.devSetup;
+  setup = config.lib.dotfiles.setupStep;
 in
 {
   dotfiles.setup.git-lfs.command = setup "git-lfs";

@@ -10,7 +10,7 @@
   ...
 }:
 let
-  setup = config.lib.dotfiles.devSetup;
+  setup = config.lib.dotfiles.setupStep;
 in
 {
   dotfiles.setup.zellij-plugins.command = setup "zellij-plugins";

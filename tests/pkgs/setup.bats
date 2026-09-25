@@ -1,10 +1,15 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# dev-setup <checkout> <step>: the setup steps the old dev installer ran,
-# one subcommand each. Every step looks first and acts only on what is
-# missing, so running it twice changes nothing the second time.
+# dotctl setup <step>: the setup steps the old dev installer ran, one
+# subcommand each. Every step looks first and acts only on what is missing,
+# so running it twice changes nothing the second time. Driven from outside,
+# as activation runs them, with every other tool a recording stand-in.
 
-SCRIPT="${BATS_TEST_DIRNAME}/../../next/pkgs/scripts/dev-setup/dev-setup.sh"
+load '../lib/dotctl.bash'
+
+setup_file() {
+	build_dotctl "${BATS_FILE_TMPDIR}"
+}
 
 setup() {
 	ROOT="${BATS_TEST_TMPDIR}/repo"
@@ -20,22 +25,22 @@ fake() { # fake <name> [body]: records "<name> <args>", then runs body
 	chmod +x "${BIN}/$1"
 }
 
-step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
+step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 
-@test "dev-setup: an unknown step is refused by name" {
+@test "setup: an unknown step is refused by name" {
 	run step no-such-step
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"no-such-step"* ]]
 }
 
-@test "dev-setup: a missing tool skips its step with a warning" {
+@test "setup: a missing tool skips its step with a warning" {
 	run --separate-stderr step gh-extensions
 	[ "$status" -eq 0 ]
 	[[ "$stderr" == *"gh"* ]]
 	[ ! -s "${LOG}" ]
 }
 
-@test "dev-setup capsule-daemon: registers once, not when the socket exists" {
+@test "setup capsule-daemon: registers once, not when the socket exists" {
 	fake capsule
 	run step capsule-daemon
 	[ "$status" -eq 0 ]
@@ -48,7 +53,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	[ ! -s "${LOG}" ]
 }
 
-@test "dev-setup mise-trust: trusts the managed config when it exists" {
+@test "setup mise-trust: trusts the managed config when it exists" {
 	fake mise
 	run step mise-trust
 	[ "$status" -eq 0 ]
@@ -58,18 +63,17 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	grep -qx "mise trust ${HOME}/.config/mise/config.toml" "${LOG}"
 }
 
-@test "dev-setup nvim-default: picks lazyvim only when ~/.config/nvim is absent" {
-	fake dotctl
+@test "setup nvim-default: picks lazyvim only when ~/.config/nvim is absent" {
+	mkdir -p "${HOME}/.config/nvim-lazyvim"
 	run step nvim-default
 	[ "$status" -eq 0 ]
-	grep -qx "dotctl nvim lazyvim" "${LOG}"
-	: >"${LOG}"
-	mkdir -p "${HOME}/.config" && ln -s /elsewhere "${HOME}/.config/nvim"
+	[ "$(readlink "${HOME}/.config/nvim")" = "${HOME}/.config/nvim-lazyvim" ]
+	rm "${HOME}/.config/nvim" && ln -s /elsewhere "${HOME}/.config/nvim"
 	run step nvim-default
-	[ ! -s "${LOG}" ]
+	[ "$(readlink "${HOME}/.config/nvim")" = /elsewhere ]
 }
 
-@test "dev-setup git-lfs: global filters only, never a hook in this checkout" {
+@test "setup git-lfs: global filters only, never a hook in this checkout" {
 	fake git-lfs
 	fake git
 	run step git-lfs
@@ -77,7 +81,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	grep -qx "git lfs install --skip-repo" "${LOG}"
 }
 
-@test "dev-setup gh-extensions: installs what is missing, leaves installed ones alone" {
+@test "setup gh-extensions: installs what is missing, leaves installed ones alone" {
 	fake gh 'if [ "$1 $2" = "extension list" ]; then cat "'"${BATS_TEST_TMPDIR}"'/ext" 2>/dev/null; fi'
 	run step gh-extensions
 	[ "$status" -eq 0 ]
@@ -88,7 +92,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	! grep -q "extension install" "${LOG}"
 }
 
-@test "dev-setup codebase-memory: turns on auto index and watch" {
+@test "setup codebase-memory: turns on auto index and watch" {
 	fake codebase-memory-mcp
 	run step codebase-memory
 	[ "$status" -eq 0 ]
@@ -96,7 +100,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	grep -qx "codebase-memory-mcp config set auto_watch true" "${LOG}"
 }
 
-@test "dev-setup claude-cli: runs the native installer only when claude is absent" {
+@test "setup claude-cli: runs the native installer only when claude is absent" {
 	fake curl 'echo "echo installer-ran >>'"${LOG}"'"'
 	run step claude-cli
 	[ "$status" -eq 0 ]
@@ -108,7 +112,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	[ ! -s "${LOG}" ]
 }
 
-@test "dev-setup claude-mcp: adds only the servers ~/.claude.json does not have yet, and says why one fails" {
+@test "setup claude-mcp: adds only the servers ~/.claude.json does not have yet, and says why one fails" {
 	printf '#!/usr/bin/env bash\nprintf "wrote\\n  claude mcp add --scope user serena -- serena start\\n  claude mcp add --scope user context7 -- ctx7\\n  claude mcp add --scope user broken -- x\\n"\n' >"${ROOT}/domains/dev/bin/jig"
 	fake bun
 	fake claude 'case "$*" in *broken*) echo "boom: bad config" >&2; exit 1 ;; esac'
@@ -122,7 +126,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	[[ "$stderr" == *"boom: bad config"* ]]
 }
 
-@test "dev-setup pi-packages: installs the packages settings.json does not name" {
+@test "setup pi-packages: installs the packages settings.json does not name" {
 	fake pi
 	fake timeout 'shift; exec "$@"'
 	mkdir -p "${HOME}/.pi/agent"
@@ -133,7 +137,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	! grep -q "pi install npm:pi-mcp-adapter" "${LOG}"
 }
 
-@test "dev-setup pacifica: cargo-installs it only when missing" {
+@test "setup pacifica: cargo-installs it only when missing" {
 	fake cargo
 	run step pacifica
 	[ "$status" -eq 0 ]
@@ -144,7 +148,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	! grep -q "^cargo" "${LOG}"
 }
 
-@test "dev-setup warp-seed: copies the default once and never over the live file" {
+@test "setup warp-seed: copies the default once and never over the live file" {
 	echo default >"${ROOT}/domains/dev/config/warp/settings.toml.default"
 	run step warp-seed
 	[ "$status" -eq 0 ]
@@ -154,7 +158,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	[ "$(cat "${ROOT}/domains/dev/config/warp/settings.toml")" = edited ]
 }
 
-@test "dev-setup git-identity: writes config.local from .env, then leaves it alone" {
+@test "setup git-identity: writes config.local from .env, then leaves it alone" {
 	printf 'GIT_USER_NAME=Someone\nGIT_USER_EMAIL=someone@example.com\n' >"${ROOT}/.env"
 	run step git-identity
 	[ "$status" -eq 0 ]
@@ -165,14 +169,14 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	grep -q "email = someone@example.com" "${HOME}/.config/git/config.local"
 }
 
-@test "dev-setup git-identity: without values it says where to put them and writes nothing" {
+@test "setup git-identity: without values it says where to put them and writes nothing" {
 	run --separate-stderr step git-identity
 	[ "$status" -eq 0 ]
 	[[ "$stderr" == *"GIT_USER_EMAIL"* ]]
 	[ ! -e "${HOME}/.config/git/config.local" ]
 }
 
-@test "dev-setup tpm: clones tmux's plugin manager once" {
+@test "setup tpm: clones tmux's plugin manager once" {
 	fake git
 	run step tpm
 	[ "$status" -eq 0 ]
@@ -183,7 +187,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	[ ! -s "${LOG}" ]
 }
 
-@test "dev-setup zellij-plugins: downloads the prebuilt plugins that are missing" {
+@test "setup zellij-plugins: downloads the prebuilt plugins that are missing" {
 	fake curl 'while [ $# -gt 0 ]; do if [ "$1" = -o ]; then echo wasm >"$2"; fi; shift; done'
 	run step zellij-plugins
 	[ "$status" -eq 0 ]
@@ -195,22 +199,22 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	! grep -q "zjstatus" "${LOG}"
 }
 
-@test "dev-setup ecc: clones the reference checkout beside this one, once" {
+@test "setup ecc: clones the reference checkout beside this one, once" {
 	fake git
 	run step ecc
 	[ "$status" -eq 0 ]
 	grep -qx "git clone https://github.com/affaan-m/everything-claude-code.git ${BATS_TEST_TMPDIR}/everything-claude-code" "${LOG}"
 }
 
-@test "dev-setup gh-extensions: an installed extension is found under pipefail too" {
+@test "setup gh-extensions: an installed extension is found in a long list" {
 	echo "gh pr-graph  orangain/gh-pr-graph  v1" >"${BATS_TEST_TMPDIR}/ext"
 	fake gh 'if [ "$1 $2" = "extension list" ]; then cat "'"${BATS_TEST_TMPDIR}"'/ext"; yes filler | head -100000; fi'
-	PATH="${BIN}:/usr/bin:/bin" run bash -euo pipefail "${SCRIPT}" "${ROOT}" gh-extensions
+	run step gh-extensions
 	[ "$status" -eq 0 ]
 	! grep -q "extension install" "${LOG}"
 }
 
-@test "dev-setup userstyles: generates every theme's userstyle with the checkout's script" {
+@test "setup userstyles: generates every theme's userstyle with the checkout's script" {
 	mkdir -p "${ROOT}/domains/system/userstyles/scripts"
 	printf '#!/usr/bin/env bash\necho "generate $*" >>"%s"\n' "${LOG}" >"${ROOT}/domains/system/userstyles/scripts/generate-userstyle.sh"
 	fake lessc
@@ -220,14 +224,14 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	grep -qx "generate all" "${LOG}"
 }
 
-@test "dev-setup userstyles: without lessc it is skipped with a warning" {
+@test "setup userstyles: without lessc it is skipped with a warning" {
 	fake jq
 	run --separate-stderr step userstyles
 	[ "$status" -eq 0 ]
 	[[ "$stderr" == *"lessc"* ]]
 }
 
-@test "dev-setup sbarlua: an installed module built for the running Lua is left alone" {
+@test "setup sbarlua: an installed module built for the running Lua is left alone" {
 	fake lua 'echo "Lua 5.4.7  Copyright (C) 1994-2024"'
 	mkdir -p "${HOME}/.local/share/sketchybar_lua"
 	printf 'xx LuaVersion: Lua 5.4 xx' >"${HOME}/.local/share/sketchybar_lua/sketchybar.so"
@@ -238,7 +242,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	! grep -q "^git\|^make" "${LOG}"
 }
 
-@test "dev-setup sbarlua: builds for the running Lua, patched for launchd, when missing or built for another Lua" {
+@test "setup sbarlua: builds for the running Lua, patched for launchd, when missing or built for another Lua" {
 	fake lua 'echo "Lua 5.5.0  Copyright"'
 	fake git 'if [ "$1" = clone ]; then mkdir -p "$5/src"; echo "if (getppid() == 1) exit(0);" >"$5/src/sketchybar.c"; fi'
 	fake make 'if [ "$3" = install ]; then mkdir -p "'"${HOME}"'/.local/share/sketchybar_lua"; printf "LuaVersion: Lua 5.5" >"'"${HOME}"'/.local/share/sketchybar_lua/sketchybar.so"; fi'
@@ -249,7 +253,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	! grep -q "getppid() == 1) exit" "${HOME}/.cache/sbarlua/src/sketchybar.c"
 }
 
-@test "dev-setup sbarlua: without lua it is skipped with a warning" {
+@test "setup sbarlua: without lua it is skipped with a warning" {
 	run --separate-stderr step sbarlua
 	[ "$status" -eq 0 ]
 	[[ "$stderr" == *"lua"* ]]
