@@ -130,9 +130,14 @@ dotfiles/
 
 ## 7. テーマ切り替え
 
-- アプリの設定本体は `home/<os>/<app>/`、テーマの断片だけ `home/shared/theme/palettes/<name>/<app>.*`。本体は include で `~/.config/theme/current/<app>.*` を読む。
-- 切り替えは `dotctl theme <名前>` が `~/.config/theme/current` の symlink を一本張り替え、アプリごとの再読み込み（tmux の source-file など）を送るだけ。20 ファイルを書き換えない。
-- include できないアプリだけ、コピーと再読み込みの表で扱う。Nix は仕組みだけを持ち、どのテーマかは持たない（切り替えにビルドを挟まない）。
+実装済み（2026-09-25、`next/home/shared/theme`・`next/pkgs/dotctl/internal/theme`）。
+
+- `~/.config/theme/palettes/<名前>/<ファイル>` を home-manager がテーマごとに宣言する（リポジトリのテーマファイルへのリンク）。アプリのファイルが無いテーマ（明るい版）は同じ系統のもの（catppuccin-latte → catppuccin）、無ければ catppuccin を借りる。アプリが存在しないファイルを読むことはない。
+- `~/.config/theme/current` はどれか一つの palettes へのリンク。動かすのは `dotctl theme set <名前>`（旧名 `theme-switch <名前>` でも動く）だけ。
+- 読み込み（include）に対応したアプリ（system の colors.lua、ghostty、tmux、sketchybar、borders）は、それぞれの読み口のリンクが `current/<ファイル>` を通る。`dotctl theme init` が activation のたびに張る（旧 theme-switch が選んでいたテーマは引き継ぐ）。
+- 読み込みに対応しないアプリ（Warp、starship、VS Code・Cursor、Neovim 4 種、zellij、壁紙、Stylus、シェル環境、delta、tmux-pane-border、Orca）は値を書き換える。旧 theme-switch と同じファイルを書くことを `tests/services/theme-parity.bats` で確かめている。
+- zellij は、make up のたびにテンプレートから描き直されて配置が戻る不具合があった。`theme init` が毎回いまのテーマに戻す。home-manager のリンクを実ファイルで上書きしない。
+- 旧 theme-switch の不具合は移さなかった: userstyle 再生成スクリプトの名前違い（毎回何もしていなかった）、存在しない rosepine-dawn の対応表。
 
 ## 8. テストと CI
 
