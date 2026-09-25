@@ -14,7 +14,8 @@ in
     }
   );
 
-  config.dotfiles.roles = lib.genAttrs facts.roles (_: {
+  # base is on for every machine, roles file or not; the rest as the file says
+  config.dotfiles.roles = lib.genAttrs ([ "base" ] ++ facts.roles) (_: {
     enable = lib.mkDefault true;
   });
 }

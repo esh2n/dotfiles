@@ -43,7 +43,6 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/home-llm
     ../home/linux/git
     ../home/linux/llama-server
-    ../home/shared/packages/cli.nix
-    ../home/shared/packages/lsp.nix
+    ../home/shared/packages
   ];
 }

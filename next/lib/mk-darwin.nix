@@ -66,8 +66,7 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/browsers
           ../home/darwin/sketchybar
           ../home/darwin/configs
-          ../home/shared/packages/cli.nix
-          ../home/shared/packages/lsp.nix
+          ../home/shared/packages
           ../home/darwin/packages.nix
         ];
       };

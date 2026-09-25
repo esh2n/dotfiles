@@ -7,6 +7,13 @@ bats_require_minimum_version 1.5.0
 
 load '../lib/nix.bash'
 
+# The Mac takes base, dev, desktop and llm-hub; the current layout has no
+# roles and installs everything.
+setup() {
+	printf '{"roles": ["base", "dev", "desktop", "llm-hub"]}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+}
+
 summary() { # summary <flake-dir> <config-name>
 	nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/mac-summary.nix { flake = \"git+file://${REPO_ROOT}?dir=$1\"; config = \"$2\"; user = \"${USER}\"; }"
 }

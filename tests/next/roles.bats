@@ -34,3 +34,34 @@ role_enabled() { # role_enabled <role>
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"darwin-system"*"home-manager-generation"* ]]
 }
+
+pkgnames() { # pkgnames <darwin|linux>: the names of home.packages
+	local cfg
+	if [ "$1" = darwin ]; then cfg="darwinConfigurations.mac.config.home-manager.users.\"${USER}\""; else cfg="homeConfigurations.linux.config"; fi
+	nix_eval_expr_json "map (p: p.pname or p.name) (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").${cfg}.home.packages"
+}
+
+has() { printf '%s' "$1" | python3 -c 'import json,sys; sys.exit(0 if sys.argv[1] in json.load(sys.stdin) else 1)' "$2"; }
+
+@test "roles: base is installed with no roles file at all" {
+	rm -f "${DOTFILES_ROLES_FILE}"
+	run --separate-stderr pkgnames linux
+	[ "$status" -eq 0 ]
+	has "$output" ripgrep
+	has "$output" neovim
+	! has "$output" gopls
+	! has "$output" ffmpeg
+}
+
+@test "roles: dev adds the language tooling, desktop the media tools and GUI apps" {
+	printf '{"roles": ["dev"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr pkgnames linux
+	has "$output" gopls
+	has "$output" kubectl
+	! has "$output" ffmpeg
+	printf '{"roles": ["desktop"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr pkgnames darwin
+	has "$output" ffmpeg
+	has "$output" mas
+	! has "$output" gopls
+}

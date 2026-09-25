@@ -4,6 +4,8 @@
 {
   imports = [
     ./options.nix
+    ./base.nix
+    ./desktop.nix
     ./dev.nix
     ./llm-hub.nix
     ./gpu.nix
