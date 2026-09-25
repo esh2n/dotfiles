@@ -18,6 +18,8 @@ commands:
   nvim <custom|nvchad|lazyvim|astrovim>  point ~/.config/nvim at a distribution
   nvim current                           name the active distribution
   nvim list                              list distributions, marking the active one
+  theme [--repo DIR] list|current|init|set <name>
+                                         switch the colour theme (one link, then reloads)
   cache-gc [--force] [--dry-run] [--quiet] [--touch REPO]
                                          keep Codebase-Memory's indexes within age and size
                                          (also installed as code-graph-cache-gc)
@@ -48,6 +50,8 @@ func run(args []string, out, errOut io.Writer) int {
 	switch args[0] {
 	case "nvim":
 		return runNvim(home, args[1:], out, errOut)
+	case "theme":
+		return runTheme(home, args[1:], out, errOut)
 	case "cache-gc":
 		return runCacheGC(home, args[1:], nil, out, errOut)
 	case "help", "-h", "--help":

@@ -48,6 +48,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/serena
           ../home/shared/harness
           ../home/shared/dotctl
+          ../home/shared/theme
           ../home/shared/nvim
           ../home/shared/git
           ../home/shared/gh

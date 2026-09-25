@@ -51,3 +51,14 @@ func TestCacheGCReadsItsLimitsFromTheEnvironment(t *testing.T) {
 		t.Fatalf("unknown flag: exit %d", code)
 	}
 }
+
+func TestThemeNeedsTheCheckout(t *testing.T) {
+	t.Setenv("DOTFILES_ROOT", "")
+	var out, errOut bytes.Buffer
+	if code := runTheme(t.TempDir(), []string{"list"}, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "--repo") {
+		t.Fatalf("exit %d, stderr %q", code, errOut.String())
+	}
+	if code := runTheme(t.TempDir(), []string{"--repo", t.TempDir(), "set"}, &out, &errOut); code != 2 {
+		t.Fatalf("set without a name: exit %d", code)
+	}
+}
