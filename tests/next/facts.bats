@@ -66,3 +66,22 @@ facts_attr_without_home() { # facts_attr_without_home <attr>
 	[ "$status" -eq 0 ]
 	[ "$output" = '["gpu"]' ]
 }
+
+facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).nvidia"; }
+
+@test "facts: the host's NVIDIA driver is read from the roles file, null when absent" {
+	printf '{"roles": ["gpu"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr facts_nvidia
+	[ "$output" = null ]
+	printf '{"roles": ["gpu"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAA="}}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr facts_nvidia
+	[ "$status" -eq 0 ]
+	[ "$output" = '{"acceptLicense":false,"sha256":"sha256-AAAA=","version":"580.82.09"}' ]
+}
+
+@test "facts: an nvidia entry without both version and sha256 is rejected" {
+	printf '{"roles": ["gpu"], "nvidia": {"version": "580.82.09"}}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr facts_nvidia
+	[ "$status" -ne 0 ]
+	[[ "$stderr" == *"nvidia"*"sha256"* ]]
+}

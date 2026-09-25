@@ -12,6 +12,12 @@
 #             $HOME/.config/dotfiles/roles.json; no file means no roles.
 #             Never committed — which roles a machine takes is chosen on the
 #             machine; what a role means is committed in roles/.
+#   nvidia    the host's NVIDIA driver, from the same file's optional
+#             "nvidia": {"version", "sha256", "acceptLicense"} (the gpu role
+#             needs it: Nix's driver libraries must match what the
+#             distribution installed, and using them means accepting NVIDIA's
+#             license — the owner's act, so it lives in their file); null
+#             when absent.
 let
   getEnv = builtins.getEnv;
   known = import ../roles/names.nix;
@@ -36,18 +42,31 @@ let
     else
       throw ''facts: unknown role "${role}" in ${rolesFile} (known: ${builtins.concatStringsSep ", " known})'';
 
+  doc = if builtins.pathExists rolesFile then builtins.fromJSON (builtins.readFile rolesFile) else { roles = [ ]; };
+
   parseRoles =
-    path:
-    let
-      doc = builtins.fromJSON (builtins.readFile path);
-    in
     if builtins.isAttrs doc && doc ? roles && builtins.isList doc.roles then
       map checkRole doc.roles
     else
-      throw ''facts: ${path} must be {"roles": [ ... ]}'';
+      throw ''facts: ${rolesFile} must be {"roles": [ ... ]}'';
+
+  parseNvidia =
+    let
+      n = doc.nvidia or null;
+    in
+    if n == null then
+      null
+    else if builtins.isAttrs n && builtins.isString (n.version or null) && builtins.isString (n.sha256 or null) then
+      {
+        inherit (n) version sha256;
+        acceptLicense = n.acceptLicense or false;
+      }
+    else
+      throw ''facts: "nvidia" in ${rolesFile} needs both "version" and "sha256" (the host driver's, e.g. from nvidia-smi and nix store prefetch-file)'';
 in
 {
   username = if user == "" then "ci" else user;
   inherit home repo;
-  roles = if builtins.pathExists rolesFile then parseRoles rolesFile else [ ];
+  roles = parseRoles;
+  nvidia = parseNvidia;
 }
