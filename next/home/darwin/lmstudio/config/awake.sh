@@ -31,7 +31,8 @@
 set -euo pipefail
 
 # launchd hands us a minimal PATH; name the tools' real locations.
-export PATH="/etc/profiles/per-user/$(id -un)/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+user="$(id -un)"
+export PATH="/etc/profiles/per-user/${user}/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 # The LM Studio server port. Keep in step with the port LM Studio is started
 # on (`lms server start --port 1234`) and with the `tailscale serve` target.
