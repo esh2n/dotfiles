@@ -50,6 +50,10 @@ func (osSys) Output(name string, args ...string) (string, error) {
 	return string(out), err
 }
 
+func (osSys) Quiet(name string, args ...string) error {
+	return exec.Command(name, args...).Run() // no stdio: discarded
+}
+
 func (osSys) Has(name string) bool { _, err := exec.LookPath(name); return err == nil }
 func (osSys) OS() string           { return runtime.GOOS }
 

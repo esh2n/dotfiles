@@ -21,6 +21,8 @@ type Sys interface {
 	// removes K from the environment.
 	Run(env []string, name string, args ...string) error
 	Output(name string, args ...string) (string, error)
+	// Quiet runs a command with no output: a yes/no probe.
+	Quiet(name string, args ...string) error
 	Has(name string) bool
 	OS() string     // "darwin" or "linux"
 	Shells() string // the contents of /etc/shells
@@ -132,7 +134,9 @@ func switchDarwin(s Sys, c Config) error {
 		return err
 	}
 	trustTaps(s, c)
-	setAsideEtc(s, c)
+	if err := setAsideEtc(s, c); err != nil {
+		return err
+	}
 	// What `darwin-rebuild switch` does, split so only the last two steps are
 	// root's: under sudo darwin-rebuild resets HOME, and facts.nix would read
 	// root's home.
@@ -189,7 +193,7 @@ in builtins.concatStringsSep " " (builtins.attrNames (builtins.listToAttrs (map 
 // Homebrew refuses third-party taps it was not told to trust, and nix-darwin
 // runs brew with a scrubbed environment: trust in both config homes.
 func trustTaps(s Sys, c Config) {
-	if s.Run(nil, "brew", "trust", "--help") != nil {
+	if s.Quiet("brew", "trust", "--help") != nil {
 		return
 	}
 	out, err := s.Output(nix[0], append(nix[1:], "eval", "--impure", "--raw", c.next()+"#darwinConfigurations.mac.config.homebrew", "--apply", tapsExpr)...)
@@ -208,7 +212,7 @@ func trustTaps(s Sys, c Config) {
 
 // On a Mac nix-darwin has never managed, /etc/bashrc and /etc/zshrc are plain
 // files and activation refuses to replace them: move them aside once.
-func setAsideEtc(s Sys, c Config) {
+func setAsideEtc(s Sys, c Config) error {
 	etc := orDefault(c.EtcDir, "/etc")
 	for _, f := range []string{"bashrc", "zshrc"} {
 		p := filepath.Join(etc, f)
@@ -219,10 +223,12 @@ func setAsideEtc(s Sys, c Config) {
 		if _, err := os.Lstat(p + ".before-nix-darwin"); err == nil {
 			continue
 		}
+		// activation would refuse the plain file anyway: stop here, clearly
 		if err := s.Run(nil, "sudo", "mv", p, p+".before-nix-darwin"); err != nil {
-			c.warn("could not move %s aside: %v", p, err)
+			return fmt.Errorf("moving %s aside (nix-darwin will not replace it): %w", p, err)
 		}
 	}
+	return nil
 }
 
 // The gpu role's CUDA programs find the NVIDIA libraries through
@@ -232,6 +238,9 @@ func gpuDrivers(s Sys, c Config) {
 	real, err := filepath.EvalSymlinks(setup)
 	if err != nil {
 		return
+	}
+	if info, err := os.Stat(real); err != nil || info.Mode()&0o111 == 0 {
+		return // not an executable yet: nothing to run
 	}
 	want := filepath.Join(filepath.Dir(filepath.Dir(real)), "lib", "systemd", "system", "non-nixos-gpu.service")
 	unit, _ := filepath.EvalSymlinks(orDefault(c.GPUUnit, "/etc/systemd/system/non-nixos-gpu.service"))

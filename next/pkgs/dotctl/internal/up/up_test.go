@@ -61,6 +61,14 @@ func (f *fakeSys) Output(name string, args ...string) (string, error) {
 	return "", nil
 }
 
+func (f *fakeSys) Quiet(name string, args ...string) error {
+	cmd := f.record([]string{"quiet"}, name, args)
+	if f.match(f.fail, cmd) {
+		return errors.New("failed")
+	}
+	return nil
+}
+
 func (f *fakeSys) Has(name string) bool { return f.have[name] }
 func (f *fakeSys) OS() string           { return f.os }
 func (f *fakeSys) Shells() string       { return f.shells }
@@ -229,6 +237,39 @@ func TestAPlainEtcZshrcIsMovedAsideOnce(t *testing.T) {
 	must(t, Run(f, c2))
 	if index(f.calls, "sudo mv") >= 0 {
 		t.Fatalf("moved twice: %v", f.calls)
+	}
+}
+
+func TestAFailedEtcMoveStopsBeforeTheBuild(t *testing.T) {
+	f, c := setup(t, "darwin")
+	must(t, os.WriteFile(filepath.Join(c.EtcDir, "zshrc"), nil, 0o644))
+	f.fail["sudo mv"] = true
+	if err := Run(f, c); err == nil {
+		t.Fatal("went on after the move failed")
+	}
+	if index(f.calls, "nix --extra-experimental-features nix-command flakes build") >= 0 {
+		t.Fatalf("built anyway: %v", f.calls)
+	}
+}
+
+func TestTheTrustProbeIsQuiet(t *testing.T) {
+	f, c := setup(t, "darwin")
+	must(t, Run(f, c))
+	if index(f.calls, "[quiet] brew trust --help") < 0 || index(f.calls, "brew trust --help") >= 0 {
+		t.Fatalf("probe: %v", f.calls)
+	}
+}
+
+func TestANonExecutableGPUSetupIsSkipped(t *testing.T) {
+	f, c := setup(t, "linux")
+	pkg := filepath.Join(t.TempDir(), "p")
+	must(t, os.MkdirAll(filepath.Join(pkg, "bin"), 0o755))
+	must(t, os.WriteFile(filepath.Join(pkg, "bin/non-nixos-gpu-setup"), nil, 0o644))
+	must(t, os.MkdirAll(filepath.Join(c.Home, ".nix-profile/bin"), 0o755))
+	must(t, os.Symlink(filepath.Join(pkg, "bin/non-nixos-gpu-setup"), filepath.Join(c.Home, ".nix-profile/bin/non-nixos-gpu-setup")))
+	must(t, Run(f, c))
+	if index(f.calls, "sudo") >= 0 {
+		t.Fatalf("ran a non-executable setup: %v", f.calls)
 	}
 }
 
