@@ -1,0 +1,25 @@
+# Directories the next layout moved: "<old> <new>", from the checkout's root.
+# git moves the tracked files; `dotctl up` carries what stays behind (files
+# only this machine has: git's conditional includes, app state, rendered
+# files) from <old> to <new> (next/pkgs/dotctl/internal/up/carry.go).
+domains/dev/config/jj next/home/shared/jj/config
+domains/dev/config/zed next/home/shared/zed/config
+domains/dev/config/capsule next/home/shared/capsule/config
+domains/dev/config/tailscale next/home/shared/tailscale/config
+domains/dev/config/herdr next/home/darwin/herdr/config
+domains/workspace/config/aerospace next/home/darwin/aerospace/config
+domains/workspace/config/hammerspoon next/home/darwin/hammerspoon/config
+domains/workspace/config/omniwm next/home/darwin/omniwm/config
+domains/workspace/config/paneru next/home/darwin/paneru/config
+domains/workspace/config/mado next/home/darwin/mado/config
+domains/system/config/browsers next/home/darwin/browsers/config
+domains/dev/config/lmstudio next/home/darwin/lmstudio/config
+domains/dev/config/ghostty next/home/darwin/ghostty/config
+domains/workspace/config/borders next/home/darwin/borders/config
+domains/dev/config/wezterm next/home/shared/wezterm/config
+domains/dev/config/tmux next/home/darwin/tmux/config
+domains/workspace/config/sketchybar next/home/darwin/sketchybar/config
+domains/dev/config/nvim-lazyvim next/home/shared/nvim/lazyvim
+domains/dev/config/nvim-nvchad next/home/shared/nvim/nvchad
+domains/dev/config/nvim-astrovim next/home/shared/nvim/astrovim
+domains/dev/config/nvim-custom next/home/shared/nvim/custom
