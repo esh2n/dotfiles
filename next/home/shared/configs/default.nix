@@ -5,7 +5,6 @@
 let
   link = config.lib.dotfiles.link;
   dirs = {
-    themes = "domains/system/config/themes";
     litellm = "domains/dev/config/litellm";
     sbx = "domains/dev/config/sbx";
   };

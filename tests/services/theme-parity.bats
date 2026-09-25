@@ -20,6 +20,8 @@ world() {
 	mkdir -p "$w/repo/domains/dev/config" "$w/repo/domains/workspace/config" "$w/repo/core" "$w/home/.config/git" "$w/home/.config/tmux-pane-border" "$w/bin"
 	cp -R "${REPO}/core/utils" "$w/repo/core/"
 	cp -R "${REPO}/domains/system" "$w/repo/domains/"
+	mkdir -p "$w/repo/next/home/shared"
+	cp -R "${REPO}/next/home/shared/theme" "$w/repo/next/home/shared/"
 	for d in lazyvim nvchad astrovim custom; do
 		mkdir -p "$w/repo/next/home/shared/nvim"
 		cp -R "${REPO}/next/home/shared/nvim/$d" "$w/repo/next/home/shared/nvim/"
@@ -60,9 +62,8 @@ compare() { # compare <theme>
 	new "$b" "$1"
 	# old:new — the Neovim files sit at their old place for the old script
 	for f in \
-		repo/domains/system/config/theme-env/current.sh \
-		repo/domains/system/config/theme-env/current.fish \
-		repo/domains/system/config/theme-env/ripgreprc \
+		repo/next/home/shared/theme/env/current.sh \
+		repo/next/home/shared/theme/env/ripgreprc \
 		home/.config/git/delta-theme.gitconfig \
 		home/.config/tmux-pane-border/config.toml \
 		repo/domains/dev/config/nvim-lazyvim/lua/plugins/colorscheme.lua:repo/next/home/shared/nvim/lazyvim/lua/plugins/colorscheme.lua \

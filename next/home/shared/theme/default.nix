@@ -20,14 +20,14 @@ let
   checkout = ../../../..;
   # file in a palette -> the theme file, relative to the checkout
   apps = {
-    "colors.lua" = n: "domains/system/config/themes/${n}.lua";
+    "colors.lua" = n: "next/home/shared/theme/themes/${n}.lua";
     ghostty = n: "next/home/darwin/ghostty/config/themes/${n}";
     "tmux.conf" = n: "next/home/darwin/tmux/config/themes/${n}.conf";
     "sketchybar.lua" = n: "next/home/darwin/sketchybar/config/themes/${n}.lua";
     "borders.sh" = n: "next/home/darwin/borders/config/themes/${n}.sh";
   };
   themes = map (f: lib.removeSuffix ".lua" f) (
-    builtins.attrNames (builtins.readDir (checkout + "/domains/system/config/themes"))
+    builtins.attrNames (builtins.readDir (checkout + "/next/home/shared/theme/themes"))
   );
   family = n: builtins.head (lib.splitString "-" n);
   exists = rel: builtins.pathExists (checkout + "/${rel}");
@@ -39,7 +39,12 @@ let
     ];
 in
 {
-  xdg.configFile = lib.listToAttrs (
+  # the palettes themselves (for apps that read them from ~/.config/themes),
+  # and one directory of links per theme
+  xdg.configFile = {
+    themes.source = link "next/home/shared/theme/themes";
+  }
+  // lib.listToAttrs (
     lib.concatMap (
       n:
       lib.mapAttrsToList (

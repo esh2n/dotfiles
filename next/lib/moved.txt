@@ -31,3 +31,5 @@ domains/dev/config/warp next/home/darwin/warp/config
 domains/dev/config/orca next/home/darwin/orca/config
 domains/dev/config/vscode next/home/darwin/vscode/config
 domains/dev/config/cursor next/home/darwin/cursor/config
+domains/system/config/themes next/home/shared/theme/themes
+domains/system/config/theme-env next/home/shared/theme/env

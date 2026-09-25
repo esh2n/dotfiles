@@ -725,7 +725,7 @@ export FZF_DEFAULT_OPTS="\$FZF_DEFAULT_OPTS \\
   --color=selected-bg:#${C_SURFACE1}"
 
 # ripgrep (resolve path at source time via DOTFILES_ROOT)
-_theme_env_dir="\${DOTFILES_ROOT:-\$HOME/dotfiles}/domains/system/config/theme-env"
+_theme_env_dir="\${DOTFILES_ROOT:-\$HOME/dotfiles}/next/home/shared/theme/env"
 export RIPGREP_CONFIG_PATH="\${_theme_env_dir}/ripgreprc"
 unset _theme_env_dir
 ENVEOF
@@ -739,9 +739,9 @@ set -gx CLAUDE_STATUSLINE_COLOR_HEX "#${C_BLUE}"
 set -gx BAT_THEME "ansi"
 set -gx FZF_DEFAULT_OPTS "\$FZF_DEFAULT_OPTS --color=bg+:#${C_SURFACE0},bg:#${C_BG},spinner:#${C_TEAL},hl:#${C_BLUE} --color=fg:#${C_FG},header:#${C_BLUE},info:#${C_MAUVE},pointer:#${C_TEAL} --color=marker:#${C_GREEN},fg+:#${C_FG},prompt:#${C_MAUVE},hl+:#${C_BLUE} --color=selected-bg:#${C_SURFACE1}"
 if test -n "\$DOTFILES_ROOT"
-    set -gx RIPGREP_CONFIG_PATH "\$DOTFILES_ROOT/domains/system/config/theme-env/ripgreprc"
+    set -gx RIPGREP_CONFIG_PATH "\$DOTFILES_ROOT/next/home/shared/theme/env/ripgreprc"
 else
-    set -gx RIPGREP_CONFIG_PATH "\$HOME/dotfiles/domains/system/config/theme-env/ripgreprc"
+    set -gx RIPGREP_CONFIG_PATH "\$HOME/dotfiles/next/home/shared/theme/env/ripgreprc"
 end
 FISHEOF
 

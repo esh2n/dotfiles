@@ -18,7 +18,7 @@ target() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.load(sys.s
 	run --separate-stderr links
 	[ "$status" -eq 0 ]
 	json="$output"
-	for f in "${REPO_ROOT}"/domains/system/config/themes/*.lua; do
+	for f in "${REPO_ROOT}"/next/home/shared/theme/themes/*.lua; do
 		t="$(basename "$f" .lua)"
 		for file in colors.lua ghostty tmux.conf sketchybar.lua borders.sh; do
 			[ "$(target "$json" ".config/theme/palettes/${t}/${file}")" != "<missing>" ] || { echo "${t}/${file} missing"; false; }
@@ -30,8 +30,8 @@ target() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.load(sys.s
 	run --separate-stderr links
 	json="$output"
 	[ "$(target "$json" .config/theme/palettes/nord/ghostty)" = "${REPO_ROOT}/next/home/darwin/ghostty/config/themes/nord" ]
-	[ "$(target "$json" .config/theme/palettes/nord/colors.lua)" = "${REPO_ROOT}/domains/system/config/themes/nord.lua" ]
-	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/colors.lua)" = "${REPO_ROOT}/domains/system/config/themes/catppuccin-latte.lua" ]
+	[ "$(target "$json" .config/theme/palettes/nord/colors.lua)" = "${REPO_ROOT}/next/home/shared/theme/themes/nord.lua" ]
+	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/colors.lua)" = "${REPO_ROOT}/next/home/shared/theme/themes/catppuccin-latte.lua" ]
 	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/ghostty)" = "${REPO_ROOT}/next/home/darwin/ghostty/config/themes/catppuccin" ]
 	[ "$(target "$json" .config/theme/palettes/tokyonight-day/tmux.conf)" = "${REPO_ROOT}/next/home/darwin/tmux/config/themes/tokyonight.conf" ]
 }

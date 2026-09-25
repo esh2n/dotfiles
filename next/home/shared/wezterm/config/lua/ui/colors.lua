@@ -1,17 +1,17 @@
 local wezterm = require('wezterm')
 local M = {}
 
--- Load central colors from domains/system/config/colors.lua
+-- Load central colors from next/home/shared/theme/colors.lua
 local function load_central_colors()
     local dotfiles_root = os.getenv('DOTFILES_ROOT')
     local home = os.getenv('HOME')
     local path
     
     if dotfiles_root then
-        path = dotfiles_root .. "/domains/system/config/colors.lua"
+        path = dotfiles_root .. "/next/home/shared/theme/colors.lua"
     else
         -- Fallback
-        path = home .. "/dotfiles/domains/system/config/colors.lua"
+        path = home .. "/dotfiles/next/home/shared/theme/colors.lua"
     end
     
     local f = loadfile(path)

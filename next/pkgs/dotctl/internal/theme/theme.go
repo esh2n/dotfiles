@@ -34,7 +34,7 @@ func (a App) Source(name string) string { return fmt.Sprintf(a.source, name) }
 // Apps are those switched through `current`. The first one's link is also the
 // record the old theme-switch kept, so Init can adopt its choice.
 var Apps = []App{
-	{File: "colors.lua", Pointer: "domains/system/config/colors.lua", source: "domains/system/config/themes/%s.lua"},
+	{File: "colors.lua", Pointer: "next/home/shared/theme/colors.lua", source: "next/home/shared/theme/themes/%s.lua"},
 	{File: "ghostty", Pointer: "next/home/darwin/ghostty/config/theme", source: "next/home/darwin/ghostty/config/themes/%s"},
 	{File: "tmux.conf", Pointer: "next/home/darwin/tmux/config/themes/current.conf", source: "next/home/darwin/tmux/config/themes/%s.conf"},
 	{File: "sketchybar.lua", Pointer: "next/home/darwin/sketchybar/config/colors.lua", source: "next/home/darwin/sketchybar/config/themes/%s.lua"},

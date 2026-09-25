@@ -56,7 +56,7 @@ target() { # target <json> <path under ~>
 	done
 	for name in jj zed wezterm capsule themes litellm tailscale sbx; do
 		got="$(target "$json" ".config/${name}")"
-		[[ "$got" == "${REPO_ROOT}/domains/"*"/config/${name}" || "$got" == "${REPO_ROOT}/next/home/shared/${name}/config" ]] || { echo ".config/${name}: ${got}"; false; }
+		[[ "$got" == "${REPO_ROOT}/domains/"*"/config/${name}" || "$got" == "${REPO_ROOT}/next/home/shared/${name}/config" || "$got" == "${REPO_ROOT}/next/home/shared/theme/${name}" ]] || { echo ".config/${name}: ${got}"; false; }
 	done
 	for name in ghostty tmux herdr git aerospace sketchybar borders hammerspoon mado omniwm paneru lmstudio browsers; do
 		[ "$(target "$json" ".config/${name}")" = "<missing>" ] || { echo ".config/${name} placed on linux"; false; }
