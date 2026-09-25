@@ -33,7 +33,7 @@ step_mise_trust() {
 
 step_nvim_default() {
 	[[ -L "${HOME}/.config/nvim" || -e "${HOME}/.config/nvim" ]] && return 0
-	bash "${ROOT}/domains/dev/bin/nvim-switch" lazyvim
+	dotctl nvim lazyvim
 }
 
 # --skip-repo: global filters only. A plain `git lfs install` inside this

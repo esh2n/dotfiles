@@ -7,6 +7,7 @@
   gnused,
   gawk,
   gnugrep,
+  dotctl,
 }:
 writeShellApplication {
   name = "dev-setup";
@@ -15,6 +16,7 @@ writeShellApplication {
     gnused
     gawk
     gnugrep
+    dotctl
   ];
   inheritPath = true;
   text = builtins.readFile ./dev-setup.sh;

@@ -59,10 +59,10 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 }
 
 @test "dev-setup nvim-default: picks lazyvim only when ~/.config/nvim is absent" {
-	printf '#!/usr/bin/env bash\necho "nvim-switch $*" >>"%s"\n' "${LOG}" >"${ROOT}/domains/dev/bin/nvim-switch"
+	fake dotctl
 	run step nvim-default
 	[ "$status" -eq 0 ]
-	grep -qx "nvim-switch lazyvim" "${LOG}"
+	grep -qx "dotctl nvim lazyvim" "${LOG}"
 	: >"${LOG}"
 	mkdir -p "${HOME}/.config" && ln -s /elsewhere "${HOME}/.config/nvim"
 	run step nvim-default
