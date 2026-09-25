@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -41,24 +42,40 @@ func (OS) Quiet(name string, args ...string) error {
 	return exec.Command(name, args...).Run()
 }
 
-// Capture runs a command silently and returns its stdout and stderr. A
-// timeout of 0 means none; past it the command is killed and the error says
-// so.
-func (OS) Capture(timeout time.Duration, name string, args ...string) (string, string, error) {
+// Cmd is one command run silently by Exec.
+type Cmd struct {
+	Name    string
+	Args    []string
+	Env     []string      // "K=v" sets, "K=" removes (see WithEnv)
+	Stdin   io.Reader     // nil: no input
+	Timeout time.Duration // 0: none
+}
+
+// Exec runs a command silently and returns its stdout and stderr. Past its
+// timeout the command is killed and the error says so.
+func (OS) Exec(c Cmd) (string, string, error) {
 	ctx := context.Background()
-	if timeout > 0 {
+	if c.Timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, timeout)
+		ctx, cancel = context.WithTimeout(ctx, c.Timeout)
 		defer cancel()
 	}
-	c := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, c.Name, c.Args...)
+	if len(c.Env) > 0 {
+		cmd.Env = WithEnv(os.Environ(), c.Env)
+	}
 	var out, errOut bytes.Buffer
-	c.Stdout, c.Stderr = &out, &errOut
-	err := c.Run()
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = c.Stdin, &out, &errOut
+	err := cmd.Run()
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		err = errors.New("timed out after " + timeout.String())
+		err = errors.New("timed out after " + c.Timeout.String())
 	}
 	return out.String(), errOut.String(), err
+}
+
+// Capture is Exec with only a command line and a timeout.
+func (s OS) Capture(timeout time.Duration, name string, args ...string) (string, string, error) {
+	return s.Exec(Cmd{Name: name, Args: args, Timeout: timeout})
 }
 
 // Has reports whether a command is on PATH.

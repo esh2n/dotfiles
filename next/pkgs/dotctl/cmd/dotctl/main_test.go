@@ -62,3 +62,45 @@ func TestThemeNeedsTheCheckout(t *testing.T) {
 		t.Fatalf("set without a name: exit %d", code)
 	}
 }
+
+func TestLLMRefusesWhatItDoesNotKnow(t *testing.T) {
+	t.Setenv("DOTFILES_ROOT", "")
+	var out, errOut bytes.Buffer
+	for _, args := range [][]string{nil, {"serve"}, {"setup", "--hub"}, {"check", "extra"}} {
+		if code := runLLM(t.TempDir(), args, &out, &errOut); code != 2 {
+			t.Fatalf("%v: exit %d", args, code)
+		}
+	}
+	if code := runLLM(t.TempDir(), []string{"check"}, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "--repo") {
+		t.Fatalf("no checkout: exit %d, stderr %q", code, errOut.String())
+	}
+}
+
+func TestSetupRefusesWhatItDoesNotKnow(t *testing.T) {
+	t.Setenv("DOTFILES_ROOT", "")
+	var out, errOut bytes.Buffer
+	if code := runSetup(t.TempDir(), []string{"tpm"}, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "--repo") {
+		t.Fatalf("no checkout: exit %d", code)
+	}
+	errOut.Reset()
+	if code := runSetup(t.TempDir(), []string{"--repo", t.TempDir(), "no-such-step"}, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "no-such-step") {
+		t.Fatalf("unknown step: exit %d, stderr %q", code, errOut.String())
+	}
+	if code := runSetup(t.TempDir(), nil, &out, &errOut); code != 2 {
+		t.Fatalf("no step: exit %d", code)
+	}
+}
+
+func TestCheckLogFollowsXDGState(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", "/s")
+	if checkLog("/h") != "/s/home-llm/check.log" {
+		t.Fatal(checkLog("/h"))
+	}
+	t.Setenv("XDG_STATE_HOME", "")
+	if checkLog("/h") != "/h/.local/state/home-llm/check.log" {
+		t.Fatal(checkLog("/h"))
+	}
+	if isTerminal(&bytes.Buffer{}) {
+		t.Fatal("a buffer is not a terminal")
+	}
+}

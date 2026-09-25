@@ -33,3 +33,10 @@ func TestCaptureSeparatesStreamsAndTimesOut(t *testing.T) {
 		t.Fatal("Has is wrong")
 	}
 }
+
+func TestExecPassesEnvAndStdin(t *testing.T) {
+	out, _, err := OS{}.Exec(Cmd{Name: "sh", Args: []string{"-c", "printf %s \"$K\"; cat"}, Env: []string{"K=v"}, Stdin: strings.NewReader("in")})
+	if err != nil || out != "vin" {
+		t.Fatalf("got %q %v", out, err)
+	}
+}

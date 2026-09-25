@@ -1,4 +1,4 @@
-# The home LLM's command steps (next/pkgs/scripts/home-llm-setup): tailscale
+# The home LLM's command steps (`dotctl llm setup`, next/pkgs/dotctl): tailscale
 # serve for what this machine offers, LiteLLM restarted onto its current
 # config, the console's stacks, and the tier check. Off until a role turns it
 # on; which parts run is the roles' call (model-provider, observer).
@@ -24,7 +24,10 @@ in
     inherit (cfg) enable;
     command = lib.concatStringsSep " " (
       [
-        (lib.getExe pkgs.home-llm-setup)
+        (lib.getExe pkgs.dotctl)
+        "llm"
+        "setup"
+        "--repo"
         (lib.escapeShellArg facts.repo)
       ]
       ++ lib.optional cfg.lmstudio "--lmstudio"

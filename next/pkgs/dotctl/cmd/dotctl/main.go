@@ -17,6 +17,8 @@ const usage = `usage: dotctl <command> [args]
 commands:
   up [--repo DIR]                        install or update this machine (what make up runs)
   setup [--repo DIR] <step>              one setup step Nix cannot declare (activation runs them)
+  llm setup|check [--lmstudio] [--gpu] [--console] [--complex]
+                                         the home LLM's command steps, and its PASS/FAIL check
   nvim <custom|nvchad|lazyvim|astrovim>  point ~/.config/nvim at a distribution
   nvim current                           name the active distribution
   nvim list                              list distributions, marking the active one
@@ -65,6 +67,8 @@ func run(args []string, out, errOut io.Writer) int {
 		return runUp(home, args[1:], out, errOut)
 	case "setup":
 		return runSetup(home, args[1:], out, errOut)
+	case "llm":
+		return runLLM(home, args[1:], out, errOut)
 	case "mado":
 		return runMado(home, args[1:], out, errOut)
 	case "theme":

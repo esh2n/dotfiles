@@ -134,7 +134,7 @@ func TestMissingToolSkipsWithAWarning(t *testing.T) {
 func TestSimpleStepsRunTheirCommandOnce(t *testing.T) {
 	cases := []struct {
 		step, tool, want string
-		done              func(w world)
+		done             func(w world)
 	}{
 		{"capsule-daemon", "capsule", "capsule daemon install", nil},
 		{"git-lfs", "git-lfs", "git lfs install --skip-repo", nil},

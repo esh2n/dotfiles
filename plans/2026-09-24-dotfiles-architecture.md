@@ -116,7 +116,7 @@ dotfiles/
 ## 5.5 セットアップの手順（宣言できないもの）
 
 - ツール自身の登録コマンド、書き換え可能な場所へのダウンロード、一度だけ置いてあとはアプリが持つ設定ファイルは、宣言にできない。`lib/mk-setup.nix` の `dotfiles.setup.<名前>` に一行の宣言として書き、activation の linkGeneration の後に走らせる。失敗は警告だけで、switch は止めない（旧 installer と同じ約束）。
-- 中身は `dotctl setup <step>`（旧 `domains/dev/install.sh` と `core/install/installer.sh` の手順を一つずつのサブコマンドに。`pkgs/dotctl/internal/setup`）と `pkgs/scripts/home-llm-setup`（旧 `home_llm()`。どの部分を動かすかは機械の役割で決める。以前は LM Studio.app があるかで決めていた）。userstyle は、中身が移るまでドメインのスクリプトをそのまま呼ぶ。
+- 中身は `dotctl setup <step>`（旧 `domains/dev/install.sh` と `core/install/installer.sh` の手順を一つずつのサブコマンドに。`pkgs/dotctl/internal/setup`）と `dotctl llm setup`（旧 `home_llm()`、確認は `dotctl llm check`。どの部分を動かすかは機械の役割で決める。以前は LM Studio.app があるかで決めていた）。userstyle は、中身が移るまでドメインのスクリプトをそのまま呼ぶ。
 - 宣言する場所は機能のモジュール（`home/shared/{nvim,git,gh,mise,zellij,cargo-tools,harness,zsh}`、`home/darwin/{tmux,apps,codebase-memory,browsers,sketchybar}`、`home/shared/home-llm`）。Linux に無いのは tmux（Omarchy が持つ）、Warp、Codebase-Memory、ブラウザ、SbarLua。
 - `bootstrap.sh` が持つのは switch の前にしかできないこと: Homebrew を入れる、flake が宣言するサードパーティの tap を信頼させる（手で保つ一覧は廃止）、nix-darwin を初めて入れる Mac の `/etc/{bashrc,zshrc}` を退避する。switch の後にログインシェルを zsh に（`/etc/shells` に無ければ手順を示すだけ）。
 - 移さなかったもの: `brew unlink ollama`（Nix と Homebrew の両方に ollama があった移行期の回避策。今は Homebrew だけ）、node2nix（今の系でも配線されていない。M0 で消す）、事前・事後の検査（bootstrap が理由を出して止まる）、NvChad などの clone（中身はリポジトリにあり、リンクで届く）。

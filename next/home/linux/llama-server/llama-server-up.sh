@@ -3,7 +3,7 @@
 # --user owns the process). Decision:
 # rules/decisions/2026-09-24-home-llm-second-host-omarchy-llama-server.md.
 #
-# Bound to loopback; `tailscale serve --tcp 8080` (home-llm-setup --gpu) is
+# Bound to loopback; `tailscale serve --tcp 8080` (`dotctl llm setup --gpu`) is
 # the only exposure. Every request needs the API key, resolved headlessly from
 # 1Password like LiteLLM's and handed over in a 0600 file under
 # $XDG_RUNTIME_DIR — never on the command line, where ps would show it.
