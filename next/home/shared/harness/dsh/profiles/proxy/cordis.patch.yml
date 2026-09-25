@@ -1,0 +1,34 @@
+# User patch layer for the `proxy` profile — symlinked to
+# ~/.dsh/profiles/proxy/cordis.patch.yml by manager.sh link_dsh_resources.
+#
+# dsh-base's agent-default-model row starts sessions on deepseek-official /
+# deepseek-flash (a DIRECT provider connection). This row overrides it by id
+# (last write wins per row; a patch replaces the row's whole config) so every
+# session starts on the local LiteLLM proxy and lands on the measurement
+# plane. The provider/model ids come from settings.yaml (local-proxy / main).
+#
+# jig-guard is jig's own cordis plugin (harness/jig/adapters/dsh,
+# built to lib/index.js and linked into this profile's node_modules by
+# manager.sh link_dsh_resources). It sits on dsh's `tools/pre-execute`
+# waterfall, so every tool call (bash, write, edit, str_replace_editor and
+# every MCP tool) goes through the same evaluator and policy pi, Claude Code
+# and codex use. A crashed or overrunning guard denies; it never lets a call
+# through. It replaced the @deepseek-ai/dsh-hooks-claude-code bridge, which
+# treated a failed hook as "no opinion" and saw neither MCP calls nor which
+# agent was asking.
+#
+# Replace-by-id (a top-level `- id:` row with `config:`): dsh-app-boot's
+# applyEntryPatches treats a row WITHOUT `insert` as an override of the
+# existing entry of that id, replacing its whole config. `insert` is
+# append-only — inserting an id that dsh-base already composes fails boot
+# with "duplicate loader entry id" (seen 2026-09-21).
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: local-proxy
+    model: main
+- insert:
+    - id: jig-guard
+      name: '@esh2n/jig-dsh-guard'
+      config:
+        timeoutMs: 10000

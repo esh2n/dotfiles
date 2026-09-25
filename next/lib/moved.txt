@@ -36,3 +36,10 @@ domains/system/config/theme-env next/home/shared/theme/env
 domains/system/userstyles next/home/darwin/browsers/userstyles
 domains/workspace/assets/background next/home/shared/theme/wallpapers
 domains/dev/config/serena next/home/shared/serena/config
+domains/dev/config/claude next/home/shared/harness/claude
+domains/dev/config/codex next/home/shared/harness/codex
+domains/dev/config/pi next/home/shared/harness/pi
+domains/dev/config/omp next/home/shared/harness/omp
+domains/dev/config/dsh next/home/shared/harness/dsh
+domains/dev/config/litellm next/home/shared/litellm/config
+domains/dev/config/sbx next/home/shared/sbx/config

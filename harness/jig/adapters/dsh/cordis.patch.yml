@@ -1,0 +1,8 @@
+# Bundle patch shipped with the plugin: the row a profile needs to compose it.
+# The dotfiles profiles carry the same row explicitly (next/home/shared/harness/dsh/
+# profiles/*/cordis.patch.yml); this file documents the plugin's own shape.
+- insert:
+    - id: jig-guard
+      name: '@esh2n/jig-dsh-guard'
+      config:
+        timeoutMs: 10000

@@ -1,0 +1,79 @@
+# Custom model providers for omp (docs/models.md) — managed by dotfiles,
+# symlinked to ~/.omp/agent/models.yml.
+#
+# Any OpenAI-compatible endpoint can be added here without touching omp's
+# source: baseUrl + apiKey env var + api. Template below for Nous Research
+# Hermes — uncomment after verifying the current base URL and setting the env
+# var (never hardcode the key).
+#
+# providers:
+#   nous:
+#     baseUrl: https://inference-api.nousresearch.com/v1  # VERIFY before enabling
+#     apiKey: NOUS_API_KEY
+#     api: openai-completions
+#     models:
+#       - id: hermes-4-405b
+#         name: Hermes 4 405B
+#         api: openai-completions
+
+# The local LiteLLM measuring proxy (next/home/shared/litellm/config/), the same
+# three tier aliases pi and DSH use. The `proxy:` block between the jig:tiers
+# markers is GENERATED from llm/harness/policy/tiers.json by `jig apply
+# --target omp` (contextWindow / maxTokens per tier come from there — omp's
+# own defaults are 128k / 16k and were what a hand-written block got); (owner's ruling 2026-09-23: every harness
+# that is not the model vendor's own — pi, DSH, omp — goes through LiteLLM;
+# Claude Code and Codex keep their vendor's models). `apiKey` names an env
+# var (docs/models.md: "Value is first treated as an environment variable
+# name"); the omp() shell wrapper resolves LITELLM_API_KEY once from the
+# Keychain-backed proxy-key.sh, exactly as the pi() wrapper does, because an
+# `!op read` from inside omp's child process cannot always reach the login
+# Keychain. Tier → model lives in litellm/config.yaml, never here.
+providers:
+  # omp adds an IMPLICIT, keyless `lm-studio` provider probing 127.0.0.1:1234
+  # whenever this id is not configured (docs/models.md: "If `lm-studio` is not
+  # explicitly configured, registry adds an implicit discoverable provider …
+  # auth mode: keyless"). Keyless means always "available", so it became the
+  # fallback model the moment LM Studio was up (measured 2026-09-23: omp
+  # started on qwen/qwen3.6-35b-a3b). That is a direct provider — no LiteLLM,
+  # no measurement — which the routing ruling forbids for omp. Configuring the
+  # id explicitly is the one documented way to stop the discovery; this entry
+  # points nowhere and lists nothing, so it can never be selected. LM Studio
+  # is reached only as the proxy's `deterministic` tier.
+  lm-studio:
+    baseUrl: http://127.0.0.1:9/v1
+    api: openai-completions
+    models: []
+  # BEGIN jig:tiers (generated — edit policy/tiers.json, then jig apply)
+  proxy:
+    baseUrl: http://localhost:4000/v1
+    apiKey: LITELLM_API_KEY
+    api: openai-completions
+    headers:
+      User-Agent: omp
+    compat:
+      supportsDeveloperRole: false
+      maxTokensField: max_tokens
+    models:
+      - id: main
+        name: main — DeepSeek Flash (LiteLLM tier)
+        reasoning: true
+        input: [text]
+        contextWindow: 200000
+        maxContextWindow: 1000000
+        maxTokens: 16384
+      - id: complex
+        name: complex — DeepSeek V4 Pro (LiteLLM tier)
+        reasoning: true
+        input: [text]
+        contextWindow: 200000
+        maxContextWindow: 1000000
+        maxTokens: 32768
+      - id: deterministic
+        name: deterministic — local Qwen (LiteLLM tier)
+        reasoning: true
+        input: [text]
+        contextWindow: 131072
+        maxTokens: 32768
+        compat:
+          thinkingFormat: qwen-chat-template
+  # END jig:tiers

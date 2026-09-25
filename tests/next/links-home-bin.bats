@@ -45,17 +45,11 @@ target() { # target <json> <path under ~>
 # dotctl answers to these names now (next/pkgs/dotctl postInstall).
 TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado gh-switch gh-pr-graph-update setup-neovim-distros install-extensions wallpaper orca-theme-apply.py "
 
-@test "links: every command in domains/*/bin is in ~/bin on the mac, unless dotctl took it over" {
+@test "links: jig's launcher and the artifact CLI are in ~/bin, from the harness" {
 	run --separate-stderr links darwin
 	[ "$status" -eq 0 ]
-	json="$output"
-	for path in "${REPO_ROOT}"/domains/*/bin/*; do
-		name="$(basename "$path")"
-		[[ "${TAKEN_BY_DOTCTL}" == *" ${name} "* ]] && continue
-		got="$(target "$json" "bin/${name}")"
-		want="${path}"
-		[ "$got" = "$want" ] || { echo "bin/${name}: ${got}"; false; }
-	done
+	[ "$(target "$output" bin/jig)" = "${REPO_ROOT}/harness/bin/jig" ]
+	[ "$(target "$output" bin/artifact)" = "${REPO_ROOT}/harness/skills/artifact/bin/artifact" ]
 }
 
 @test "links: the thin entry points are in ~/bin on linux too" {

@@ -1,7 +1,7 @@
 # tailscale — the tailnet policy for the home-LLM ports
 
 `acl.hujson` is the tailnet policy file for the setup in
-`domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`.
+`harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`.
 It lets the owner's own devices reach each other on every port (the owner
 also runs SSH, screen sharing and more over the tailnet — ruling 2026-09-23)
 and nobody else reach anything. The home-LLM traffic it must carry: LM Studio
@@ -41,11 +41,11 @@ is no `link_*` step for it.
 | Machine | Once | Opens |
 |---|---|---|
 | the Mac | `tailscale serve --bg --tcp 1234 tcp://127.0.0.1:1234` | LM Studio (`next/home/darwin/lmstudio/config/`) |
-| the Mac | `tailscale serve --bg --https=3001 127.0.0.1:3001` | Open WebUI, the phone's chat page (`domains/dev/config/litellm/observability/`) |
-| every non-Mac machine | `tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001` | LiteLLM metrics only (`domains/dev/config/litellm/litellm-up.sh`) |
+| the Mac | `tailscale serve --bg --https=3001 127.0.0.1:3001` | Open WebUI, the phone's chat page (`next/home/shared/litellm/config/observability/`) |
+| every non-Mac machine | `tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001` | LiteLLM metrics only (`next/home/shared/litellm/config/litellm-up.sh`) |
 
 Then uncomment that machine's target in
-`domains/dev/config/litellm/observability/prometheus/prometheus.yml`.
+`next/home/shared/litellm/config/observability/prometheus/prometheus.yml`.
 
 Syntax: <https://tailscale.com/kb/1018/acls>, <https://tailscale.com/kb/1324/grants>,
 <https://tailscale.com/kb/1337/acl-syntax>.

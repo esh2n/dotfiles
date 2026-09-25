@@ -6,8 +6,8 @@
 let
   link = config.lib.dotfiles.link;
   commands = {
-    artifact = "domains/dev/bin/artifact";
-    jig = "domains/dev/bin/jig";
+    artifact = "harness/skills/artifact/bin/artifact";
+    jig = "harness/bin/jig";
   };
 in
 {

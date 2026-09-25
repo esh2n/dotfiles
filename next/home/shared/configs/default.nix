@@ -5,8 +5,8 @@
 let
   link = config.lib.dotfiles.link;
   dirs = {
-    litellm = "domains/dev/config/litellm";
-    sbx = "domains/dev/config/sbx";
+    litellm = "next/home/shared/litellm/config";
+    sbx = "next/home/shared/sbx/config";
   };
 in
 {

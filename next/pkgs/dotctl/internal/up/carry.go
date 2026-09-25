@@ -59,12 +59,22 @@ func carryDir(c Config, oldDir, newDir string) {
 		if err != nil {
 			return nil
 		}
+		rel, _ := filepath.Rel(oldDir, path)
+		dest := filepath.Join(newDir, rel)
 		if d.IsDir() {
+			// a directory the new place does not have moves whole, in one
+			// rename (an app's state tree can hold thousands of files)
+			if path != oldDir {
+				if _, err := os.Lstat(dest); errors.Is(err, fs.ErrNotExist) {
+					if err := os.MkdirAll(filepath.Dir(dest), 0o755); err == nil && os.Rename(path, dest) == nil {
+						c.log("carried %s to %s", path, dest)
+						return filepath.SkipDir
+					}
+				}
+			}
 			dirs = append(dirs, path)
 			return nil
 		}
-		rel, _ := filepath.Rel(oldDir, path)
-		dest := filepath.Join(newDir, rel)
 		if _, err := os.Lstat(dest); err == nil {
 			c.warn("%s was left at the old place and %s already exists; keeping both", path, dest)
 			return nil

@@ -6,7 +6,7 @@ It used to sit inside the skill as `skills/yoki-artifact/worker/`; it lives
 here so the skill holds procedure only.
 
 - Driven by the `artifact` skill
-  (`$DOTFILES_ROOT/domains/dev/llm/harness/skills/artifact/`), whose CLI
+  (`$DOTFILES_ROOT/harness/skills/artifact/`), whose CLI
   in `bin/` talks to the deployed Worker. The CLI finds this directory through
   `$DOTFILES_ROOT` (`doctor` prints the head of `SETUP.md` from here).
 - Setup: read `SETUP.md` first (Zero Trust onboarding, IdP, R2 activation and

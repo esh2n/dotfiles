@@ -39,8 +39,8 @@ func TestCarryOverMovesLeftoversOnce(t *testing.T) {
 			t.Fatalf("warnings lack %q: %v", want, warns)
 		}
 	}
-	if len(logs) != 1 {
-		t.Fatalf("logs %v", logs)
+	if len(logs) != 1 || !strings.Contains(logs[0], "conditional") {
+		t.Fatalf("the conditional directory should move whole, once: %v", logs)
 	}
 	must(t, carryOver(c)) // again: nothing new
 	if len(logs) != 1 {

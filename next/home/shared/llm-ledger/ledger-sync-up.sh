@@ -6,8 +6,8 @@
 set -euo pipefail
 
 # PATH, export_op_token, try_secret (Keychain on macOS, libsecret on Linux)
-# shellcheck source=SCRIPTDIR/../../../../domains/dev/config/litellm/secrets.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../../../../domains/dev/config/litellm/secrets.sh"
+# shellcheck source=SCRIPTDIR/../litellm/config/secrets.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../litellm/config/secrets.sh"
 use_service_path
 
 : "${DOTCTL:?set by the unit}"

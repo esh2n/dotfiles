@@ -2771,7 +2771,7 @@ omp() {
     # same tiers as pi); resolve the proxy key here, in the interactive shell
     # that can reach the Keychain, and hand it over as LITELLM_API_KEY — the
     # same reason and mechanism as pi() below.
-    if key="$("${DOTFILES_ROOT:?DOTFILES_ROOT unset — source the dev shell init}/domains/dev/config/litellm/proxy-key.sh" 2>/dev/null)"; then
+    if key="$("${DOTFILES_ROOT:?DOTFILES_ROOT unset — source the dev shell init}/next/home/shared/litellm/config/proxy-key.sh" 2>/dev/null)"; then
         export LITELLM_API_KEY="$key"
     else
         echo "\033[33mproxy key unresolved — starting omp WITHOUT LITELLM_API_KEY (proxy/* models will fail to auth)\033[0m" >&2
@@ -2802,7 +2802,7 @@ pi() {
         echo "\033[31mpi not found on PATH\033[0m" >&2
         return 1
     }
-    key="$("${DOTFILES_ROOT:?DOTFILES_ROOT unset — source the dev shell init}/domains/dev/config/litellm/proxy-key.sh" 2>/dev/null)" || {
+    key="$("${DOTFILES_ROOT:?DOTFILES_ROOT unset — source the dev shell init}/next/home/shared/litellm/config/proxy-key.sh" 2>/dev/null)" || {
         echo "\033[33mproxy key unresolved — starting pi WITHOUT LITELLM_API_KEY (proxy models will fail to auth)\033[0m" >&2
         "$pi_bin" "$@"
         return

@@ -32,16 +32,16 @@ print(json.dumps(v))' "${@:2}"; }
 	run --separate-stderr agents
 	[ "$status" -eq 0 ]
 	a="$output"
-	C="${REPO_ROOT}/domains/dev/config"
+	C="${REPO_ROOT}/next/home/shared"
 	[ "$(field "$a" litellm-proxy Label)" = '"com.esh2n.litellm-proxy"' ]
-	[ "$(field "$a" litellm-proxy ProgramArguments)" = "[\"/bin/bash\", \"${C}/litellm/litellm-up.sh\"]" ]
+	[ "$(field "$a" litellm-proxy ProgramArguments)" = "[\"/bin/bash\", \"${C}/litellm/config/litellm-up.sh\"]" ]
 	[ "$(field "$a" litellm-proxy ThrottleInterval)" = "120" ]
 	[ "$(field "$a" litellm-proxy KeepAlive)" = "true" ]
 	[ "$(field "$a" litellm-proxy RunAtLoad)" = "true" ]
 	[ "$(field "$a" litellm-proxy ProcessType)" = '"Background"' ]
 	[ "$(field "$a" litellm-proxy StandardOutPath)" = "\"${HOME}/Library/Logs/litellm-proxy.log\"" ]
-	[ "$(field "$a" jig-decision ProgramArguments)" = "[\"/bin/bash\", \"${C}/jig/jig-decision-up.sh\"]" ]
-	[ "$(field "$a" jig-decision EnvironmentVariables JIG_DIR)" = "\"${REPO_ROOT}/domains/dev/llm/harness/jig\"" ]
+	[ "$(field "$a" jig-decision ProgramArguments)" = "[\"/bin/bash\", \"${C}/services/jig-decision-up.sh\"]" ]
+	[ "$(field "$a" jig-decision EnvironmentVariables JIG_DIR)" = "\"${REPO_ROOT}/harness/jig\"" ]
 	[ "$(field "$a" jig-decision EnvironmentVariables JIG_DECISION_PORT)" = '"4100"' ]
 	[ "$(field "$a" lmstudio-awake ProgramArguments)" = "[\"/bin/bash\", \"${REPO_ROOT}/next/home/darwin/lmstudio/config/awake.sh\"]" ]
 	[ "$(field "$a" lmstudio-awake ThrottleInterval)" = "30" ]

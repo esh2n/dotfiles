@@ -8,7 +8,7 @@ self-check. Skills read it; users do not invoke it directly.
 This directory (`$DOTFILES_ROOT/domains/dev/llm/tools/writeup-kit/`) holds the
 kit's executable and vendored parts — `bin/`, `vendor/`, `kit/`, `test/`. The
 skill that describes it (`SKILL.md`, `references/`) stays at
-`$DOTFILES_ROOT/domains/dev/llm/harness/skills/writeup-kit/`; the skills that
+`$DOTFILES_ROOT/harness/skills/writeup-kit/`; the skills that
 drive it (`writeup`, `show-me`, `eli5`, `grilling`) resolve it as
 `KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"`.
 
@@ -41,7 +41,7 @@ Verify the checkout:
 ```bash
 KIT="${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/tools/writeup-kit"
 cd "$KIT" && node --test                                              # 1867 tests
-cd "${DOTFILES_ROOT:-$HOME/dotfiles}/domains/dev/llm/harness/skills/writeup" && node --test   #   15 tests
+cd "${DOTFILES_ROOT:-$HOME/dotfiles}/harness/skills/writeup" && node --test   #   15 tests
 ```
 
 ## Stores and the registry
@@ -124,7 +124,7 @@ Save it as `$STORE/<folder>/<YYYY-MM-DD>-<slug>.html`, then commit in `$STORE`.
 
 ## References
 
-Under `$DOTFILES_ROOT/domains/dev/llm/harness/skills/writeup-kit/references/`:
+Under `$DOTFILES_ROOT/harness/skills/writeup-kit/references/`:
 `kinds.md` (the 8 document kinds and their required sections),
 `components.md` (the 20 components), `figure-types.md`, `writing.md`,
 `tokens.md`, `page-contract.md`.

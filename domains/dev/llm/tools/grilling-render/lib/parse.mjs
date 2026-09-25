@@ -1,5 +1,5 @@
 // ラウンド文書 (round-N.md) を構造化データに変換する。
-// 形式の正本は $DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/references/round-format.md。
+// 形式の正本は $DOTFILES_ROOT/harness/skills/grilling/references/round-format.md。
 import { parse as parseYaml } from 'yaml'
 
 /** スキーマ違反。どのブロックのどのフィールドかを message に必ず含める。 */

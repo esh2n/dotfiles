@@ -12,11 +12,12 @@
 }:
 let
   link = config.lib.dotfiles.link;
-  config' = "domains/dev/config";
+  # each harness's own files, beside this module
+  config' = "next/home/shared/harness";
   piFiles =
     dir: suffix:
     lib.filterAttrs (name: type: type != "directory" && lib.hasSuffix suffix name) (
-      builtins.readDir (../../../../domains/dev/config/pi + "/${dir}")
+      builtins.readDir (./pi + "/${dir}")
     );
 in
 {
@@ -42,7 +43,7 @@ in
 
   xdg.configFile = {
     codex.source = link "${config'}/codex";
-    "jig/policy".source = link "domains/dev/llm/harness/policy";
+    "jig/policy".source = link "harness/policy";
   };
 
   # bun (mise), codex and pnpm are the user's tools: harness-apply sees the

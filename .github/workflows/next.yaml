@@ -8,9 +8,9 @@ name: next
 on:
   push:
     branches: [main]
-    paths: ["next/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
+    paths: ["next/**", "harness/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
   pull_request:
-    paths: ["next/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
+    paths: ["next/**", "harness/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
   workflow_dispatch:
 
 permissions:
@@ -24,9 +24,23 @@ jobs:
       - name: shellcheck
         run: |
           shellcheck -x next/bootstrap.sh next/pkgs/scripts/*/*.sh tests/run.sh \
-            domains/dev/config/litellm/{secrets,litellm-up,proxy-key}.sh \
-            domains/dev/config/jig/jig-decision-up.sh \
-            domains/dev/config/sbx/kits/agents/link-harness.sh
+            next/home/shared/litellm/config/{secrets,litellm-up,proxy-key}.sh \
+            next/home/shared/services/jig-decision-up.sh \
+            next/home/shared/sbx/config/kits/agents/link-harness.sh
+
+  # jig, the harness generator and guard (harness/jig): types, lint, tests
+  jig:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: harness/jig
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bunx biome check .
+      - run: bun test
 
   dotctl:
     runs-on: ubuntu-latest

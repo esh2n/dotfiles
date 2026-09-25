@@ -19,7 +19,7 @@ target() {
 }
 
 @test "harness links: claude, codex, jig policy, pi, omp and dsh files point into the checkout" {
-	C="${REPO_ROOT}/domains/dev/config"
+	C="${REPO_ROOT}/next/home/shared/harness"
 	for kind in darwin linux; do
 		run --separate-stderr links "$kind"
 		[ "$status" -eq 0 ]
@@ -27,7 +27,7 @@ target() {
 		check() { [ "$(target "$json" "$1")" = "$2" ] || { echo "${kind} $1: $(target "$json" "$1")"; false; }; }
 		check .claude "${C}/claude"
 		check .config/codex "${C}/codex"
-		check .config/jig/policy "${REPO_ROOT}/domains/dev/llm/harness/policy"
+		check .config/jig/policy "${REPO_ROOT}/harness/policy"
 		check .pi/agent/settings.json "${C}/pi/settings.json"
 		check .pi/agent/models.json "${C}/pi/models.json"
 		for ext in "${C}"/pi/extensions/*.ts; do check ".pi/agent/extensions/$(basename "$ext")" "$ext"; done

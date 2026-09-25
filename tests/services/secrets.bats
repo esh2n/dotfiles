@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# domains/dev/config/litellm/secrets.sh: what every headless launcher (the
+# next/home/shared/litellm/config/secrets.sh: what every headless launcher (the
 # LiteLLM proxy, jig-decision, proxy-key.sh) uses to reach 1Password without
 # a prompt. The service-account token comes from the OS's own store — the
 # login Keychain on macOS, the Secret Service (libsecret) on Linux
 # (plans/2026-09-24-dotfiles-architecture.md, "秘密情報").
 
-LIB="${BATS_TEST_DIRNAME}/../../domains/dev/config/litellm/secrets.sh"
+LIB="${BATS_TEST_DIRNAME}/../../next/home/shared/litellm/config/secrets.sh"
 
 setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
@@ -80,10 +80,10 @@ in_lib() { PATH="${BIN}:/usr/bin:/bin" bash -c "set -euo pipefail; source '${LIB
 }
 
 @test "secrets: the launchers read the token only through this library" {
-	C="${BATS_TEST_DIRNAME}/../../domains/dev/config"
-	run grep -ln "security find-generic-password" "${C}/litellm/litellm-up.sh" "${C}/litellm/proxy-key.sh" "${C}/jig/jig-decision-up.sh"
+	C="${BATS_TEST_DIRNAME}/../../next/home/shared"
+	run grep -ln "security find-generic-password" "${C}/litellm/config/litellm-up.sh" "${C}/litellm/config/proxy-key.sh" "${C}/services/jig-decision-up.sh"
 	[ "$status" -eq 1 ]
-	for f in "${C}/litellm/litellm-up.sh" "${C}/litellm/proxy-key.sh" "${C}/jig/jig-decision-up.sh"; do
+	for f in "${C}/litellm/config/litellm-up.sh" "${C}/litellm/config/proxy-key.sh" "${C}/services/jig-decision-up.sh"; do
 		grep -qE '^source .*secrets\.sh"$' "$f"
 		# the fixed PATH comes before any tool is looked up
 		[ "$(grep -n '^use_service_path$' "$f" | cut -d: -f1)" -lt "$(grep -n '^export_op_token$' "$f" | cut -d: -f1)" ]

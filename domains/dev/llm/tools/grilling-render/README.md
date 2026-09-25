@@ -3,7 +3,7 @@
 grilling が書いたラウンド文書（`round-<n>.md`）を読み、そのラウンドの問いを
 すべて載せた 1 枚の HTML にする。外部アセットは Google Fonts のスタイルシートだけ。
 
-**このディレクトリは grilling スキル（`$DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/`）が
+**このディレクトリは grilling スキル（`$DOTFILES_ROOT/harness/skills/grilling/`）が
 駆動する描画ツール。skill 側には手順だけを置き、実体はここ
 （`$DOTFILES_ROOT/domains/dev/llm/tools/grilling-render/`）に置く。生成物（HTML）は
 scratchpad に置き、リポジトリには残さない。**
@@ -128,7 +128,7 @@ q3: other — 両方いらない
 
 ## 入力の契約
 
-正本は `$DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/references/round-format.md`。
+正本は `$DOTFILES_ROOT/harness/skills/grilling/references/round-format.md`。
 このレンダラーが読むのは次のブロックだけで、それ以外の散文は無視する。
 
 | ブロック | 必須 | 描画先 |
@@ -203,7 +203,7 @@ edges:                     # 任意
    すべてに定義がある変数だけを使う。
 5. **`test/`** — fixture に例を足し、(a) スキーマ違反がブロック名つきで出ること、
    (b) 生成 HTML に出ること、(c) SVG に NaN が出ないこと、を足す。
-6. **`$DOTFILES_ROOT/domains/dev/llm/harness/skills/grilling/references/round-format.md`** — 語彙の正本なので必ず同時に直す。
+6. **`$DOTFILES_ROOT/harness/skills/grilling/references/round-format.md`** — 語彙の正本なので必ず同時に直す。
 
 ## テスト
 

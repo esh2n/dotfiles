@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "jig.agent-models.v1",
+  "_comment": [
+    "Claude tier name (the `model:` of agents/*.md: haiku | sonnet | opus) → the model each other harness gives that agent. Read by `jig apply --target codex` and `--target omp` (jig/src/domain/claude/agent-models.ts); a tier absent here leaves `model` out of the generated file and the dry-run counts the gap. An agent may override its own entry with a `models:` block in its frontmatter (see README.md).",
+    "codex — ruled 2026-09-23. Codex's current ids and list prices per 1M tokens in/out (https://learn.chatgpt.com/docs/models, https://developers.openai.com/api/docs/pricing): gpt-6-astra $10/$50, gpt-6-sol $2/$10, gpt-6-luna $0.10/$0.50 — 'Our most efficient model for focused, high-volume tasks, including summarization, extraction, and focused coding'; the official subagents example uses luna for every read-only agent (https://learn.chatgpt.com/docs/agent-configuration/subagents). reasoningEffort is `model_reasoning_effort` (low | medium | high | xhigh | max | ultra; 'Available levels depend on the model and client' — https://learn.chatgpt.com/docs/config-file/config-reference), following the official guidance 'start with medium for GPT-6 Sol, high for GPT-6 Luna': sonnet → luna high (the reviewers and researchers), haiku → luna medium (the cheap lookups), opus → sol medium (the one agent that plans). astra is not mapped: no agent here is worth 100x luna's price by default. An agent with no `model:` gets nothing and inherits (explicit spawn → [agents] default → parent).",
+    "omp — ruled 2026-09-23 with the owner's model policy: omp (like pi and DSH) runs every model through the local LiteLLM proxy's tier aliases (next/home/shared/harness/omp/models.yml provider `proxy`; tiers → models in next/home/shared/litellm/config/config.yaml). The selector is provider-qualified (`proxy/<tier>`); the effort rides in the selector, so reasoningEffort is ignored here. Same shape as the codex table: the reviewers/researchers (sonnet) and the cheap lookups (haiku) → the everyday tier, the one agent that plans (opus) → the escalation tier."
+  ],
+  "codex": {
+    "sonnet": { "model": "gpt-6-luna", "reasoningEffort": "high" },
+    "haiku": { "model": "gpt-6-luna", "reasoningEffort": "medium" },
+    "opus": { "model": "gpt-6-sol", "reasoningEffort": "medium" }
+  },
+  "omp": {
+    "sonnet": { "model": "proxy/main" },
+    "haiku": { "model": "proxy/main" },
+    "opus": { "model": "proxy/complex" }
+  }
+}

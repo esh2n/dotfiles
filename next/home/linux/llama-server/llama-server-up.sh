@@ -12,8 +12,8 @@
 set -euo pipefail
 
 # PATH, export_op_token and read_secret (libsecret on Linux)
-# shellcheck source=SCRIPTDIR/../../../../domains/dev/config/litellm/secrets.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../../../../domains/dev/config/litellm/secrets.sh"
+# shellcheck source=SCRIPTDIR/../../shared/litellm/config/secrets.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../shared/litellm/config/secrets.sh"
 use_service_path
 
 : "${LLAMA_SERVER_BIN:?set by the unit}" "${LLAMA_PORT:?set by the unit}" "${LLAMA_MODELS_DIR:?set by the unit}"

@@ -12,7 +12,7 @@
 // not enumerate ports). What it withholds: devices of other members, tagged
 // devices and nodes shared in from another tailnet reach nothing. That is
 // the "separation = tailnet membership" half of the decision record
-// (domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
+// (harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
 //
 // The home-LLM services this must let through (all on 127.0.0.1, put on the
 // tailnet with `tailscale serve`; "access control rules apply to Serve just

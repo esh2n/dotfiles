@@ -1,0 +1,19 @@
+/** Shared test fixture: loads the REAL `harness/policy/tiers.json`. */
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseTiers } from "../../../src/domain/tiers/parse";
+
+export const REAL_TIERS_PATH = join(
+  import.meta.dir,
+  "..",
+  "..",
+  "..",
+  "..",
+  "policy",
+  "tiers.json",
+);
+
+export function loadRealTiers() {
+  return parseTiers(JSON.parse(readFileSync(REAL_TIERS_PATH, "utf8")));
+}

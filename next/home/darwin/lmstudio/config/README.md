@@ -3,7 +3,7 @@
 The one model server this dotfiles setup exposes to other machines. It stays
 on `127.0.0.1:1234`; only Tailscale puts it on the tailnet, and every LiteLLM
 instance (loopback-only, one per machine) points at it — see
-`domains/dev/llm/harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`.
+`harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`.
 
 ## What runs
 
@@ -77,7 +77,7 @@ On the Mac that hosts the models:
 
 On every other machine: log in to Tailscale, and give LiteLLM the Mac's
 MagicDNS name once (`LM_STUDIO_REMOTE_HOST`, see
-`domains/dev/config/litellm/litellm-up.sh`). Nothing from this directory is
+`next/home/shared/litellm/config/litellm-up.sh`). Nothing from this directory is
 needed there.
 
 ## Re-apply / remove

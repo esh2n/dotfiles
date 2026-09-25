@@ -31,7 +31,7 @@ setup() {
 up() {
 	# the library's fixed service PATH is replaced by the stand-ins' dir for the test
 	sed "s|^use_service_path\$|PATH=\"${BIN}:/usr/bin:/bin\"|" "$SCRIPT" >"${BATS_TEST_TMPDIR}/up.sh"
-	cp "${BATS_TEST_DIRNAME}/../../domains/dev/config/litellm/secrets.sh" "${BATS_TEST_TMPDIR}/secrets.sh"
+	cp "${BATS_TEST_DIRNAME}/../../next/home/shared/litellm/config/secrets.sh" "${BATS_TEST_TMPDIR}/secrets.sh"
 	sed -i.bak "s|^source .*secrets.sh\"\$|source \"${BATS_TEST_TMPDIR}/secrets.sh\"|" "${BATS_TEST_TMPDIR}/up.sh"
 	PATH="${BIN}:/usr/bin:/bin" bash "${BATS_TEST_TMPDIR}/up.sh"
 }

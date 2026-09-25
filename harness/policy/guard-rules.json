@@ -1,0 +1,794 @@
+{
+  "version": 1,
+  "mode": {
+    "shell": "denylist",
+    "fs": "denylist",
+    "net": "denylist",
+    "mcp": "denylist"
+  },
+  "floor": [
+    {
+      "id": "floor-policy-write",
+      "action": "fs.write",
+      "subject": {
+        "path": "\\.config/jig/policy/|harness/policy/"
+      },
+      "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
+    },
+    {
+      "id": "floor-policy-edit",
+      "action": "fs.edit",
+      "subject": {
+        "path": "\\.config/jig/policy/|harness/policy/"
+      },
+      "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
+    },
+    {
+      "id": "floor-policy-redirect",
+      "action": "shell.exec",
+      "subject": {
+        "path": "\\.config/jig/policy/|harness/policy/"
+      },
+      "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
+    },
+    {
+      "id": "floor-policy-shell-write",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tee|mv|cp|rm|install|ln|truncate|rsync",
+        "argv": "\\.config/jig/policy|harness/policy"
+      },
+      "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
+    },
+    {
+      "id": "floor-policy-sed-in-place",
+      "action": "shell.exec",
+      "subject": {
+        "program": "sed|perl",
+        "argv": "(?=.*(?:^|\\s)-[a-zA-Z]*i)(?=.*(?:\\.config/jig/policy|harness/policy))"
+      },
+      "why": "the guard policy must not be editable by the agents it guards — change it by hand, outside a session"
+    },
+    {
+      "id": "floor-rm-root-home-system",
+      "action": "shell.exec",
+      "subject": {
+        "program": "rm",
+        "argv": "(?=.*(?:^|\\s)(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive|--no-preserve-root)\\b)(?=.*(?:^|\\s)(?:/|/\\*|~|~/|~/\\*|\\$HOME|\\$HOME/|\\$HOME/\\*|/(?:bin|boot|dev|etc|lib|lib64|opt|private|root|sbin|sys|usr|var|Users|System|Library|Applications|Volumes)(?:/\\*)?)(?:\\s|$))"
+      },
+      "why": "recursive delete of the root, home or a system directory"
+    },
+    {
+      "id": "floor-mkfs",
+      "action": "shell.exec",
+      "subject": {
+        "program": "mkfs(\\..+)?|mke2fs|mkswap|newfs(_.+)?|wipefs"
+      },
+      "why": "formats or wipes a filesystem"
+    },
+    {
+      "id": "floor-diskutil-erase",
+      "action": "shell.exec",
+      "subject": {
+        "program": "diskutil",
+        "argv": "^(?:erase(?:Disk|Volume)|reformat|partitionDisk|zeroDisk|randomDisk|secureErase|apfs\\s+(?:deleteContainer|deleteVolume|eraseVolume))\\b"
+      },
+      "why": "erases a disk or volume"
+    },
+    {
+      "id": "floor-dd-block-device",
+      "action": "shell.exec",
+      "subject": {
+        "program": "dd",
+        "argv": "(?:^|\\s)of=/dev/"
+      },
+      "why": "writes raw bytes to a block device"
+    },
+    {
+      "id": "floor-write-block-device",
+      "action": "shell.exec",
+      "subject": {
+        "path": "/dev/(?:r?disk[0-9]|sd[a-z]|nvme[0-9]|vd[a-z]|hd[a-z]|mmcblk[0-9]|xvd[a-z])"
+      },
+      "why": "a shell redirect to a raw block device overwrites the disk; /dev/null, /dev/stdout and friends are unaffected"
+    },
+    {
+      "id": "floor-partition-tool",
+      "action": "shell.exec",
+      "subject": {
+        "program": "fdisk|sfdisk|cfdisk|parted|gpart"
+      },
+      "why": "editing the partition table irreversibly destroys data, like mkfs; no everyday use in a coding session"
+    },
+    {
+      "id": "floor-fork-bomb",
+      "action": "shell.exec",
+      "match": "\\w+\\s*\\(\\s*\\)\\s*\\{[^}]*\\|\\s*\\w+\\s*&[^}]*\\}\\s*;\\s*\\w+",
+      "why": "fork bomb"
+    },
+    {
+      "id": "floor-power",
+      "action": "shell.exec",
+      "subject": {
+        "program": "shutdown|reboot|halt|poweroff"
+      },
+      "why": "system power control"
+    },
+    {
+      "id": "floor-git-hooks-write",
+      "action": "fs.write",
+      "subject": {
+        "path": "(^|/)\\.git/hooks/"
+      },
+      "why": "a git hook runs arbitrary code on the next commit"
+    },
+    {
+      "id": "floor-git-hooks-edit",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(^|/)\\.git/hooks/"
+      },
+      "why": "a git hook runs arbitrary code on the next commit"
+    },
+    {
+      "id": "floor-git-hooks-redirect",
+      "action": "shell.exec",
+      "subject": {
+        "path": "(^|/)\\.git/hooks/"
+      },
+      "why": "a git hook runs arbitrary code on the next commit"
+    },
+    {
+      "id": "floor-git-hooks-shell-write",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tee|mv|cp|install|ln|rsync",
+        "argv": "(^|/|\\s)\\.git/hooks/"
+      },
+      "why": "a git hook runs arbitrary code on the next commit"
+    },
+    {
+      "id": "floor-shell-rc-write",
+      "action": "fs.write",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)$"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
+    },
+    {
+      "id": "floor-shell-rc-edit",
+      "action": "fs.edit",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)$"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
+    },
+    {
+      "id": "floor-shell-rc-redirect",
+      "action": "shell.exec",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)$"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
+    },
+    {
+      "id": "floor-shell-rc-shell-write",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tee|mv|cp|install|ln|rsync|truncate|dd",
+        "argv": "(?:\\.zshrc|\\.zprofile|\\.zshenv|\\.bashrc|\\.bash_profile|\\.bash_login|\\.profile|\\.envrc|\\.config/fish/config\\.fish)"
+      },
+      "why": "shell startup files run code on every new shell — a single write silently rewires the shell"
+    }
+  ],
+  "rules": [
+    {
+      "id": "git-force-push",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*push\\b.*(?:--force|(?:^|\\s)-f\\b)"
+      },
+      "why": "force push is never recoverable",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "git-push-main-master",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*push\\b(?=.*\\b(?:main|master)\\b)"
+      },
+      "why": "pushing to main/master by command pattern bypasses the PR workflow",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "git-no-verify",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "(?:^|\\s)--no-verify\\b"
+      },
+      "why": "bypassing hooks is forbidden — fix the failure instead",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "git-hooks-path-override",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "(?:^|\\s)-c\\s+core\\.hooksPath=|(?:^|\\s)config\\b.*\\bcore\\.hooksPath\\b"
+      },
+      "why": "pointing core.hooksPath elsewhere skips the repository's hooks",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "git-commit-dash-n",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*commit\\b.*(?:^|\\s)-n\\b"
+      },
+      "why": "-n on git commit is short for --no-verify and skips hooks",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "git-reset-hard",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*reset\\b.*(?:^|\\s)--hard\\b"
+      },
+      "why": "discards uncommitted work irrecoverably",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "git-clean-force",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*clean\\b.*(?:^|\\s)(?:-[a-zA-Z]*f[a-zA-Z]*|--force)(?:\\s|$)"
+      },
+      "why": "deletes untracked files irrecoverably",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "git-checkout-dot",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "git",
+        "argv": "^(?:(?:-C|-c)\\s+\\S+\\s+|-[a-zA-Z]\\s+|--[a-zA-Z][a-zA-Z-]*(?:=\\S+)?\\s+)*checkout\\s+--\\s+\\.(?:\\s|$)"
+      },
+      "why": "discards all working-tree changes",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "lms-load",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "lms",
+        "argv": "^load\\b"
+      },
+      "why": "loading a second model would exhaust unified memory on this machine",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "mlx-vlm-serve",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "mlx-vlm|mlx_vlm",
+        "argv": "\\bserve(r)?\\b"
+      },
+      "why": "a second model server can exhaust memory and crash this machine",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "mlx-vlm-server-module",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "argv": "\\bmlx_vlm\\.server\\b"
+      },
+      "why": "a second model server can exhaust memory and crash this machine",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "rm-recursive-force",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "rm",
+        "argv": "(?=.*(?:^|\\s)(?:-[a-zA-Z]*r[a-zA-Z]*|--recursive)\\b)(?=.*(?:^|\\s)(?:-[a-zA-Z]*f[a-zA-Z]*|--force)\\b)"
+      },
+      "why": "recursive force delete",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "sudo",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "sudo|doas"
+      },
+      "why": "privilege escalation",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "kill-force",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "kill|killall",
+        "argv": "(?:^|\\s)-(?:9|KILL|SIGKILL)\\b|(?:^|\\s)-s\\s+(?:9|KILL|SIGKILL)\\b"
+      },
+      "why": "force-killing processes",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "pkill",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "pkill"
+      },
+      "why": "force-killing processes",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "curl-pipe-shell",
+      "effect": "ask",
+      "action": "shell.exec",
+      "match": "\\b(?:curl|wget)\\b[^|]*\\|\\s*(?:ba|z|da)?sh\\b",
+      "why": "piping a remote script straight to a shell",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "find-exec",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "find",
+        "argv": "(^|\\s)-(exec|execdir|ok|okdir|delete)(\\s|$)"
+      },
+      "why": "find runs a command per match (or deletes); the guard cannot see what each match becomes",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "chmod-777-recursive",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "chmod",
+        "argv": "(?=.*(?:^|\\s)-[a-zA-Z]*R)(?=.*(?:^|\\s)777\\b)"
+      },
+      "why": "world-writable permissions",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "rm-lock-files",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "rm",
+        "argv": "package-lock\\.json|\\.lock\\b"
+      },
+      "why": "deleting lock files to silence errors",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-write",
+      "effect": "forbid",
+      "action": "fs.write",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-edit",
+      "effect": "forbid",
+      "action": "fs.edit",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-redirect",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-shell-write",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "tee|mv|cp|install|ln|rsync|truncate|dd",
+        "argv": "(?:\\.aws/(?:credentials|config)|\\.ssh/(?:authorized_keys|id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
+      },
+      "why": "home credential file — writing it plants a poisoned credential the machine trusts",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-cred-read",
+      "effect": "forbid",
+      "action": "fs.read",
+      "subject": {
+        "path": "^(?:~|/Users/[^/]+|/home/[^/]+)/(?:\\.aws/(?:credentials|config)|\\.ssh/(?:id_[^/]+|[^/]*_(?:rsa|ecdsa|ed25519))|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/)"
+      },
+      "why": "home credential file — reading it pulls a live secret into the agent's context; the sandbox never covered the Read tool",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-env-read",
+      "effect": "forbid",
+      "action": "fs.read",
+      "subject": {
+        "path": "(?:^|/)\\.env(?:\\.(?!example|sample|template|dist|schema)[^/]+)?$"
+      },
+      "why": "a .env holds secrets — reading it pulls them into the agent's context (templates like .env.example are fine)",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-secret-file-read",
+      "effect": "forbid",
+      "action": "fs.read",
+      "subject": {
+        "path": "(?:^|/)(?:[^/]+\\.pem|[^/]+\\.key|id_rsa[^/]*|id_ed25519[^/]*)$"
+      },
+      "why": "key/cert file — reading it pulls the private material into the agent's context",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "forbid-secret-shell-read",
+      "effect": "forbid",
+      "action": "shell.exec",
+      "subject": {
+        "program": "cat|head|tail|less|more|bat|strings|xxd|od|hexdump|nl|tac",
+        "argv": "\\.aws/(?:credentials|config)|\\.ssh/id_|_(?:rsa|ecdsa|ed25519)(?=\\s|$)|\\.docker/config\\.json|\\.kube/config|\\.gnupg/|\\.netrc|\\.npmrc|\\.pypirc|\\.azure/|\\.config/gcloud/|(?:^|[\\s/])\\.env(?:\\.(?!example|sample|template|dist|schema)[^\\s/]*)?(?=\\s|$)|\\.pem(?=\\s|$)|\\.key(?=\\s|$)|id_rsa|id_ed25519"
+      },
+      "why": "the Read-tool rules above are bypassed by dumping the file through a shell reader — same secrets, same answer",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-env-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)\\.env(?:\\.(?!example|sample|template|dist|schema)[^/]+)?$"
+      },
+      "why": "a .env holds secrets — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-env-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)\\.env(?:\\.(?!example|sample|template|dist|schema)[^/]+)?$"
+      },
+      "why": "a .env holds secrets — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-secret-file-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)(?:[^/]+\\.pem|[^/]+\\.key|id_rsa[^/]*|id_ed25519[^/]*)$"
+      },
+      "why": "key/cert file — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-secret-file-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)(?:[^/]+\\.pem|[^/]+\\.key|id_rsa[^/]*|id_ed25519[^/]*)$"
+      },
+      "why": "key/cert file — confirm before writing one",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-ci-config-write",
+      "effect": "ask",
+      "action": "fs.write",
+      "subject": {
+        "path": "(?:^|/)(?:\\.github/workflows/[^/]+\\.ya?ml|\\.gitlab-ci\\.yml|\\.circleci/config\\.yml|azure-pipelines\\.yml|\\.woodpecker\\.yml|Jenkinsfile)$"
+      },
+      "why": "CI config runs on every push — confirm the change",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-ci-config-edit",
+      "effect": "ask",
+      "action": "fs.edit",
+      "subject": {
+        "path": "(?:^|/)(?:\\.github/workflows/[^/]+\\.ya?ml|\\.gitlab-ci\\.yml|\\.circleci/config\\.yml|azure-pipelines\\.yml|\\.woodpecker\\.yml|Jenkinsfile)$"
+      },
+      "why": "CI config runs on every push — confirm the change",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-terraform-destroy-shell",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "terraform|terragrunt",
+        "argv": "(?:^|\\s)destroy\\b"
+      },
+      "why": "terraform/terragrunt destroy tears down real infrastructure — confirm (shell path; the Terraform Cloud MCP path is ask-mcp-terraform-mutation)",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-gcloud-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "gcloud",
+        "argv": "\\b(?:projects\\s+delete|compute\\s+instances\\s+delete|sql\\s+instances\\s+delete)\\b"
+      },
+      "why": "deletes live Google Cloud infrastructure or data — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-aws-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "aws",
+        "argv": "\\b(?:s3\\s+rb|ec2\\s+terminate-instances|rds\\s+delete-db-(?:instance|cluster)|cloudformation\\s+delete-stack|eks\\s+delete-cluster|dynamodb\\s+delete-table)\\b"
+      },
+      "why": "deletes live AWS infrastructure or data (bucket, instance, database, stack, cluster) — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-az-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "az",
+        "argv": "\\b(?:group\\s+delete|vm\\s+delete|storage\\s+account\\s+delete)\\b"
+      },
+      "why": "deletes live Azure infrastructure (a resource group delete takes everything in it) — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-kubectl-delete",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "kubectl",
+        "argv": "\\bdelete\\s+(?:namespace|all|--all|-A)\\b"
+      },
+      "why": "wipes a whole namespace or every matched resource in a live cluster — confirm (deleting a single named resource is not gated)",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-helm-uninstall",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "helm",
+        "argv": "^uninstall\\b"
+      },
+      "why": "removes an entire deployed release from the cluster — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-package-publish",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "npm|pnpm|yarn|cargo|deno",
+        "argv": "^publish\\b"
+      },
+      "why": "publishing to a public registry is outward-facing and near-irreversible — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-nuget-push",
+      "effect": "ask",
+      "action": "shell.exec",
+      "subject": {
+        "program": "dotnet",
+        "argv": "\\bnuget\\s+push\\b"
+      },
+      "why": "pushes a package to a public NuGet feed — outward-facing and near-irreversible — confirm",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-mcp-terraform-mutation",
+      "effect": "ask",
+      "action": "mcp.call",
+      "subject": {
+        "program": "terraform",
+        "argv": "^(create_|delete_|update_|attach_|detach_|action_run|add_team_member|grant_team_access|force_unlock_workspace)"
+      },
+      "why": "an MCP call that mutates Terraform Cloud infrastructure (trigger a run, delete or rewrite workspaces, variables or policy sets) — a human confirms; a harness that cannot ask falls back to deny",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    },
+    {
+      "id": "ask-mcp-container-use-exec",
+      "effect": "ask",
+      "action": "mcp.call",
+      "subject": {
+        "program": "container-use",
+        "argv": "^environment_(create|config|run_cmd|file_edit|file_write|file_delete|checkpoint|add_service)$"
+      },
+      "why": "an MCP call that runs code in or mutates a container-use environment (run_cmd and config execute arbitrary commands, checkpoint pushes an image) — a human confirms; a harness that cannot ask falls back to deny",
+      "profiles": [
+        "standard",
+        "strict"
+      ]
+    }
+  ]
+}

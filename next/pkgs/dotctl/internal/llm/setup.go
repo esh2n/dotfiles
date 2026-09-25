@@ -106,7 +106,7 @@ const litellmJob = "com.esh2n.litellm-proxy"
 
 func restartLiteLLM(e Env, add func(string, ...any)) {
 	if !hasOpToken(e) {
-		add("LiteLLM: store the 1Password service-account token once (domains/dev/config/litellm/secrets.sh names the command for this OS), then make up")
+		add("LiteLLM: store the 1Password service-account token once (next/home/shared/litellm/config/secrets.sh names the command for this OS), then make up")
 		return
 	}
 	remote := e.Getenv("LM_STUDIO_REMOTE_HOST")

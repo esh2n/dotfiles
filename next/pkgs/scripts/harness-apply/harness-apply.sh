@@ -20,9 +20,9 @@ if [[ ! -d "${root}" ]]; then
 fi
 root="$(cd "${root}" && pwd)"
 dsh_home="${DSH_HOME:-${HOME}/.dsh}"
-dsh_src="${root}/domains/dev/config/dsh"
-plugin="${root}/domains/dev/llm/harness/jig/adapters/dsh"
-jig="${root}/domains/dev/bin/jig"
+dsh_src="${root}/next/home/shared/harness/dsh"
+plugin="${root}/harness/jig/adapters/dsh"
+jig="${root}/harness/bin/jig"
 
 warn() { echo "harness-apply: $*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -60,7 +60,7 @@ for profile_src in "${dsh_src}"/profiles/*/; do
 done
 
 # 2. codex's live config, seeded once — before jig writes its block into it
-codex_cfg="${root}/domains/dev/config/codex"
+codex_cfg="${root}/next/home/shared/harness/codex"
 if [[ ! -f "${codex_cfg}/config.toml" && -f "${codex_cfg}/config.toml.default" ]]; then
 	cp "${codex_cfg}/config.toml.default" "${codex_cfg}/config.toml"
 fi

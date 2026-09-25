@@ -3,13 +3,13 @@ title: jig ハーネス
 description: 一つのソースツリーから Claude Code / Codex / omp / pi / DSH の5ハーネスへ設定を配る生成器「jig」と、そのガード・判断サービス。
 ---
 
-jig は `domains/dev/llm/harness/` にあるハーネスの生成器とガード。ソースは
+jig は `harness/` にあるハーネスの生成器とガード。ソースは
 `llm/harness/{skills,rules,agents,mcp,policy,scripts,workflows}` の一つの平らな
 ツリーで、層もパックも無い。言語ごとの指針は `skills/<lang>-*` の中にあり
 （`rules/` に残るのは常時読み込みの `common/`、決定メモ、調査記録だけ）、
 skills は判断サービスが選ぶ。yoki(`claude-profiles/` の
 3層合成と `yoki-switch`)の後継で、置き換えの経緯と各マイルストーンの詳細は
-`domains/dev/llm/harness/jig/README.md` にある。
+`harness/jig/README.md` にある。
 
 ## 入口
 
@@ -23,7 +23,7 @@ jig retire yoki [--write]                  # yoki が残した成果物を一覧
 jig box new|list|resume|fetch|rm           # sbx microVM の中でこのリポの clone を動かす
 ```
 
-`jig` は `domains/dev/bin/jig`(`~/bin` に symlink)の bun ランチャー。
+`jig` は `harness/bin/jig`(`~/bin` に symlink)の bun ランチャー。
 チェックアウトの位置は自分のパスから決めるので環境変数は要らない。
 
 ## 生成の原則
