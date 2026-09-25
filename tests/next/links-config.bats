@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
 # App config directories placed under ~/.config as links into the checkout.
-# Oracle for the Mac: manager.sh's rule — every domains/*/config/<name> goes to
-# ~/.config/<name> — minus what is handled elsewhere (jig-owned harness dirs,
-# the retired claude-profiles, templated dirs, and dirs placed outside
-# ~/.config). Linux gets the cross-platform ones only; Omarchy's own paths
+# Oracle for the Mac: every next/home/<os>/<app>/config is ~/.config/<app>, and
+# every domains/*/config/<name> still in the old place goes to
+# ~/.config/<name> — minus what is handled elsewhere (jig-owned harness dirs
+# and dirs placed outside ~/.config). Linux gets the cross-platform ones only; Omarchy's own paths
 # (ghostty, tmux, herdr, ~/.config/git/config) are left to Omarchy.
 
 load '../lib/nix.bash'
@@ -41,7 +41,7 @@ target() { # target <json> <path under ~>
 		[ -d "$dir" ] || continue
 		name="$(basename "$(dirname "$dir")")"
 		# placed in ~ itself, not ~/.config (links-special.bats)
-		[[ " warp orca " == *" ${name} "* ]] && continue
+		[[ " warp orca serena " == *" ${name} "* ]] && continue
 		got="$(target "$json" ".config/${name}")"
 		[ "$got" = "${dir%/}" ] || { echo ".config/${name}: ${got}"; false; }
 	done

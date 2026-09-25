@@ -1,1 +1,0 @@
-__FIXTURES_ROOT__/dotfiles-stub/domains/dev/config/omp/extensions/yoki-bridge.ts

@@ -65,35 +65,3 @@ render() {
 	[ "$status" -ne 0 ]
 	[[ "$output" == *"nowhere"* ]]
 }
-
-@test "templates: the repo's real templates render exactly as manager.sh renders them" {
-	repo="${BATS_TEST_DIRNAME}/../.."
-	old="${BATS_TEST_TMPDIR}/old" new="${BATS_TEST_TMPDIR}/new"
-	for dest in "$old" "$new"; do
-		while IFS= read -r t; do
-			mkdir -p "${dest}/$(dirname "$t")"
-			cp "${repo}/${t}" "${dest}/${t}"
-		done < <(git -C "$repo" ls-files '*.template')
-		mkdir -p "${dest}/next/home/shared/git/config/conditional"
-		printf '# GITDIR: {{HOME}}/work/\n[user]\n  email = w@example.com\n' >"${dest}/next/home/shared/git/config/conditional/work.conf"
-		printf '[user]\n  name = me\n' >"${dest}/next/home/shared/git/config/conditional/default.conf"
-	done
-	# manager.sh's own renderer, pointed at the copy (its DOTFILES_ROOT).
-	(
-		cd "$old"
-		HOME=/home/tester USER=tester bash -c '
-			source "$1/core/utils/common.sh"
-			scratch="$3"
-			mktemp() { command mktemp "${scratch}/tmp.XXXXXX"; }
-			eval "$(sed -n "/^generate_conditional_includes()/,/^}/p;/^process_template()/,/^}/p" "$1/core/config/manager.sh")"
-			DOTFILES_ROOT="$2"
-			log_info() { :; }; log_success() { :; }
-			while IFS= read -r t; do process_template "$t"; done < <(find "$2" -name "*.template")
-		' _ "$repo" "$old" "${BATS_TEST_TMPDIR}"
-	)
-	HOME=/home/tester USER=tester "${DOTCTL}" templates render --repo "$new"
-	while IFS= read -r t; do
-		out="${t%.template}"
-		diff -u "${old}/${out}" "${new}/${out}"
-	done < <(git -C "$repo" ls-files '*.template')
-}

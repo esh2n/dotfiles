@@ -1,28 +1,13 @@
-# Thin dispatcher over the existing scripts. No logic lives here — every target
-# just calls the script that owns the behavior. `make` alone prints this list.
+# Thin dispatcher: no logic lives here — every target calls the command that
+# owns the behavior. `make` alone prints this list.
 .DEFAULT_GOAL := help
-.PHONY: help up update rebuild node2nix link template claude tailscale-acl retire-yoki install install-force
+.PHONY: help up claude tailscale-acl retire-yoki
 
 help:            ## この一覧を出す
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-14s %s\n", $$1, $$2}'
 
-up:              ## 新しい構成（next/）で入れる・更新する。何度でも同じ結果（install と update の区別なし）
+up:              ## この機械を入れる・更新する。何度でも同じ結果（install と update の区別なし）
 	./next/bootstrap.sh
-
-update:          ## nix build → activate → template/link → domain install → jig apply
-	./core/nix/update.sh
-
-rebuild:         ## update の完全再ビルド版（遅いが確実）
-	./core/nix/update.sh --rebuild
-
-node2nix:        ## npm パッケージ (node2nix/package.json) を変えた後の update
-	./core/nix/update.sh --node2nix
-
-link:            ## symlink を張り直し、各ハーネスに jig apply --write を流す
-	./core/config/manager.sh link
-
-template:        ## .template から設定ファイルだけ再生成
-	./core/config/manager.sh template
 
 claude:          ## ~/.claude だけ再生成 (jig apply --target claude --write)
 	bash ./domains/dev/bin/jig apply --target claude --write
@@ -33,8 +18,3 @@ tailscale-acl:   ## tailnet の ACL を実値で描画してクリップボー�
 retire-yoki:     ## yoki が残した成果物を一覧 (削除は jig retire yoki --write)
 	bash ./domains/dev/bin/jig retire yoki
 
-install:         ## 初回セットアップ (Homebrew/Nix/mise/symlink)
-	./core/install/installer.sh
-
-install-force:   ## 初回セットアップ + 他 dotfiles の古い symlink を除去
-	./core/install/installer.sh --force

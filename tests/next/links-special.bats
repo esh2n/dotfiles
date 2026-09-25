@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# Config dirs placed outside ~/.config, as manager.sh places them.
+# Config dirs placed outside ~/.config, where the apps read them.
 
 load '../lib/nix.bash'
 

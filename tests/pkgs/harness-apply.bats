@@ -4,7 +4,7 @@ bats_require_minimum_version 1.5.0
 # once the links are in place — build the DSH plugin, install DSH's expanded
 # copies into scaffolded profiles, then `jig apply --write` per harness and
 # `jig codex register`. Missing tools are skipped with a warning, never fatal
-# (the same contract manager.sh had).
+# (the contract the old installer had too).
 
 SCRIPT="${BATS_TEST_DIRNAME}/../../next/pkgs/scripts/harness-apply/harness-apply.sh"
 

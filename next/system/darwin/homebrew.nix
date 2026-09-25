@@ -37,7 +37,7 @@
       "dlvhdr/formulae/diffnav"
       "noborus/tap/ov"
       "sesh"
-      "can1357/tap/omp" # oh-my-pi coding agent; tap trusted by core/utils/homebrew.sh
+      "can1357/tap/omp" # oh-my-pi coding agent; tap trusted by dotctl up
       "herdr" # not in nixpkgs
       "hunk" # not in nixpkgs
 
@@ -61,7 +61,7 @@
       # `brew upgrade --cask codex`, then `make link`.
       "codex"
       # microVM sandbox for coding agents. docker/tap is casks-only too (same
-      # trap as codex); the tap is trusted by core/utils/homebrew.sh.
+      # trap as codex); the tap is trusted by dotctl up.
       "docker/tap/sbx"
       # Grok Bot (x.ai/bot, signed+built by Anysphere) — AI teammates desktop
       # app. Cask lives in homebrew-cask core; the app self-updates. First
@@ -71,7 +71,7 @@
       "grok-bot"
       # Orca ADE (worktree IDE for coding agents, onorca.dev). MUST stay
       # tap-qualified: the untapped homebrew/cask "orca" is Plotly's chart
-      # renderer, a different app. Tap trusted by core/utils/homebrew.sh.
+      # renderer, a different app. Tap trusted by dotctl up.
       # The app self-updates on the stable channel regardless of brew pinning.
       "stablyai/orca/orca"
       # Tailscale, Standalone variant (the .pkg from pkgs.tailscale.com). Cask
@@ -121,7 +121,7 @@
       # Screenshot + screen recording + annotation in one OSS app; meant to
       # replace both cleanshot and screen-studio (see home/darwin/packages.nix). Requires
       # macOS 26.4+, so the cask fails to install until the OS is upgraded.
-      # The tap is trusted by core/utils/homebrew.sh.
+      # The tap is trusted by dotctl up.
       "fayazara/tap/screendrop"
 
       # Browsers and passwords

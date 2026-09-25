@@ -1,5 +1,5 @@
 {
-  description = "esh2n's dotfiles (next layout, grown beside core/nix until it builds the same system)";
+  description = "esh2n's dotfiles";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

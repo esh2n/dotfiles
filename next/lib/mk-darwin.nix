@@ -1,7 +1,6 @@
 # Builds the macOS system: nix-darwin with home-manager as its module.
 # The system layer lives in next/system/darwin, the user layer in next/home.
-# tests/next/mac-parity.bats keeps this configuring the same Mac as the
-# current layout (core/nix) until the switch.
+# The Mac switched to it on 2026-09-25 from the old layout (core/nix, removed).
 { inputs, facts }:
 let
   inherit (inputs) nix-darwin home-manager;

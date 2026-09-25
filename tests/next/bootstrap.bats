@@ -66,7 +66,7 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 	[ "$output" = '"pre-next"' ]
 }
 
-@test "bootstrap: the taps dotctl up trusts, computed from the flake, are the ones the old hand-kept list named" {
+@test "bootstrap: the taps dotctl up trusts, computed from the flake, are every tap the Mac uses" {
 	expr="$(python3 -c 'import re,sys; print(re.search(r"const tapsExpr = `(.*?)`", open(sys.argv[1]).read(), re.S).group(1))' "${REPO_ROOT}/next/pkgs/dotctl/internal/up/up.go")"
 	local -a store=()
 	[[ -n "${DOTFILES_NIX_STORE:-}" ]] && store=(--store "${DOTFILES_NIX_STORE}")
@@ -74,6 +74,7 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 		"git+file://${REPO_ROOT}?dir=next#darwinConfigurations.mac.config.homebrew" --apply "$expr"
 	[ "$status" -eq 0 ]
 	got="$(tr ' ' '\n' <<<"$output" | tr '[:upper:]' '[:lower:]' | sort | tr '\n' ' ')"
-	old="$(sed -n '/local taps=(/,/)/p' "${REPO_ROOT}/core/utils/homebrew.sh" | grep -Eo '[a-z0-9-]+/[a-z0-9-]+' | tr '[:upper:]' '[:lower:]' | sort | tr '\n' ' ')"
-	[ "$got" = "$old" ] || { echo "got: $got"; echo "old: $old"; false; }
+	# the list the old layout kept by hand (core/utils/homebrew.sh, removed)
+	want="barutsrb/tap can1357/tap dlvhdr/formulae docker/tap fayazara/tap felixkratz/formulae k1low/tap karinushka/paneru nikitabobko/tap noborus/tap satococoa/tap stablyai/orca "
+	[ "$got" = "$want" ] || { echo "got:  $got"; echo "want: $want"; false; }
 }
