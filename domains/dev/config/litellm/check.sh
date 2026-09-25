@@ -186,6 +186,7 @@ if [ -n "$TS_BIN" ]; then
     printf '%s' "$serve" | grep -q ':1234' && pass "tailscale serve tcp:1234 (LM Studio) → ${name:-?}:1234" || fail "tailscale serve tcp:1234 missing"
   fi
   if [ "$CONSOLE" = 1 ]; then
+    printf '%s' "$serve" | grep -q ':5432' && pass "tailscale serve tcp:5432 (cost ledger) → ${name:-?}:5432" || fail "tailscale serve tcp:5432 missing (the other machines cannot ship spend to the ledger)"
     printf '%s' "$serve" | grep -q ':3001' && pass "tailscale serve https:3001 (Open WebUI) → https://${name:-?}:3001" || fail "tailscale serve https:3001 missing (HTTPS certificates enabled in the admin console?)"
     # Which devices are on the tailnet right now: the phone must be one of them before the page can open there.
     peers="$(timeout 10 "$TS_BIN" status 2>/dev/null | awk 'NR>0 && $2 != "" {print $2 " (" $4 ")"}' | grep -v "^$(hostname -s)" | tr '\n' ',' | sed 's/,$//')"

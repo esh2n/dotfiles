@@ -35,6 +35,9 @@ use_service_path
 CFG_DIR="$HOME/.config/litellm"
 IMAGE="ghcr.io/berriai/litellm@sha256:114aca7726c311915c8ea5120fcc44d32a0648c3ae3aec41a1014f0e846b16d1"
 NAME="litellm-proxy"
+DB_IMAGE="postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+DB_NAME="litellm-db"
+NETWORK="litellm"
 
 
 # 1) service-account token from the OS store (headless, no prompt)
@@ -51,6 +54,32 @@ LITELLM_MASTER_KEY="$(read_secret op://llm-automation/litellm/credential)"
 export LITELLM_MASTER_KEY
 TYPESAFE_API_KEY="$(read_secret op://llm-automation/typesafe/credential)"
 export TYPESAFE_API_KEY
+
+# 3b) this machine's spend ledger: LiteLLM writes every request's cost to its
+#     own Postgres on the same docker network — never across the tailnet on
+#     the request path. The llm-console machine's Postgres is the one ledger
+#     the others ship to (rules/decisions/2026-09-25-llm-cost-ledger-local-first.md).
+#     Without the DB secret LiteLLM serves as before, only unrecorded.
+#     The password must be URL-safe (letters and digits): it goes into a URL.
+LITELLM_DB_PASSWORD="$(try_secret op://llm-automation/litellm-db/credential)"
+DB_ARGS=()
+if [ -n "$LITELLM_DB_PASSWORD" ]; then
+  export POSTGRES_PASSWORD="$LITELLM_DB_PASSWORD" POSTGRES_USER=litellm POSTGRES_DB=litellm
+  docker network inspect "$NETWORK" >/dev/null 2>&1 || docker network create "$NETWORK" >/dev/null
+  if [ "$(docker inspect -f '{{.State.Running}}' "$DB_NAME" 2>/dev/null || true)" != true ]; then
+    docker rm -f "$DB_NAME" >/dev/null 2>&1 || true
+    # 5432 on loopback only: the ledger sync reads it here, and on the
+    # llm-console machine `tailscale serve --tcp 5432` is its one exposure.
+    docker run -d --name "$DB_NAME" --restart unless-stopped --network "$NETWORK" \
+      -p 127.0.0.1:5432:5432 -v litellm-db-data:/var/lib/postgresql/data \
+      -e POSTGRES_PASSWORD -e POSTGRES_USER -e POSTGRES_DB "$DB_IMAGE" >/dev/null
+  fi
+  until docker exec "$DB_NAME" pg_isready -U litellm -d litellm >/dev/null 2>&1; do sleep 1; done
+  export DATABASE_URL="postgresql://litellm:${LITELLM_DB_PASSWORD}@${DB_NAME}:5432/litellm"
+  DB_ARGS=(--network "$NETWORK" -e DATABASE_URL)
+else
+  echo "litellm-up: no ledger DB secret (op://llm-automation/litellm-db/credential); serving without spend records" >&2
+fi
 
 # 4) where LM Studio is — the ONE value that differs between machines
 #    (rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
@@ -88,7 +117,7 @@ fi
 #    domains/dev/config/tailscale/acl.hujson. Same decision record as step 4.
 METRICS_PORT=4001
 docker rm -f "$NAME" >/dev/null 2>&1 || true
-exec docker run --rm --name "$NAME" \
+exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} \
   -p 127.0.0.1:4000:4000 \
   -p "127.0.0.1:${METRICS_PORT}:${METRICS_PORT}" \
   -v "$CFG_DIR/config.yaml":/app/config.yaml \

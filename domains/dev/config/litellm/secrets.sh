@@ -56,3 +56,15 @@ read_secret() {
   fi
   printf '%s' "${value}"
 }
+
+# try_secret <op://ref>: like read_secret, but an unresolved secret is an
+# empty result, not an aborted launch — for what the service can run without.
+try_secret() {
+  local value
+  value="$(timeout 60 op read "$1" 2>/dev/null || true)"
+  if [ -z "${value}" ]; then
+    sleep 2
+    value="$(timeout 60 op read "$1" 2>/dev/null || true)"
+  fi
+  printf '%s' "${value}"
+}
