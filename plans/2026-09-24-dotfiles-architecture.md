@@ -157,7 +157,7 @@ snowfall-lib・std・ez-configs・digga のような枠組み、dendritic を背
 
 ## 11. 未決事項（持ち主が決める）
 
-1. dotctl の言語: 証拠の上では Go。ハーネスと揃えて TypeScript（Bun）にしたいかは持ち主の判断。
+1. ~~dotctl の言語~~ → Go に決定（2026-09-25、`rules/decisions/2026-09-25-dotctl-in-go.md`）。
 2. 役割ファイルの場所と形（案: `~/.config/dotfiles/roles.json`、`{"roles": [...]}`）と役割の一覧（案: base・dev・desktop・llm-hub・gpu）。
 3. ハーネスを `harness/` に移すこと（`2026-09-22-config-layout-no-personal-layer.md` の置き換え）と、writeup-kit・artifact-worker・dopa-shorts を `projects/` に置くか repo の外へ出すか。
 4. テーマを include で読めないアプリの一覧（実装時に棚卸し）。
