@@ -3,7 +3,7 @@
 [Orca](https://www.onorca.dev/) — worktree IDE for coding agents. Installed as
 the tap-qualified cask `stablyai/orca/orca` (the untapped `orca` cask is
 Plotly's unrelated chart renderer). This directory is linked to `~/.orca` by
-`manager.sh` (same non-XDG pattern as warp).
+`next/home/darwin/orca` (same non-XDG pattern as warp).
 
 What is managed here:
 

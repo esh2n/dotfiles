@@ -19,7 +19,7 @@ export PATH="/etc/profiles/per-user/$(id -un)/bin:/opt/homebrew/bin:/usr/local/b
 
 TS_BIN="$(command -v tailscale || true)"
 [ -z "$TS_BIN" ] && [ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ] && TS_BIN=/Applications/Tailscale.app/Contents/MacOS/Tailscale
-[ -n "$TS_BIN" ] || { echo "tailscale CLI not found — install and log in first (make update)" >&2; exit 1; }
+[ -n "$TS_BIN" ] || { echo "tailscale CLI not found — install and log in first (make up)" >&2; exit 1; }
 
 ts_json="$(timeout 10 "$TS_BIN" status --json 2>/dev/null || true)"
 read -r ts_ip ts_login < <(printf '%s' "$ts_json" | python3 -c '

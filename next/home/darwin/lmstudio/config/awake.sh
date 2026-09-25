@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Keep the Mac awake exactly while the LM Studio server is up — no longer.
 #
-# Supervised by launchd (com.esh2n.lmstudio-awake.plist, KeepAlive). Loop:
+# Supervised by launchd (the lmstudio-awake agent, KeepAlive). Loop:
 # wait until something listens on 127.0.0.1:$PORT, then hand the rest of this
 # process to `caffeinate -s -w <pid>`, which holds a sleep assertion until that
 # pid exits. When the server goes away caffeinate exits, launchd relaunches
@@ -26,8 +26,8 @@
 # standalone llmster (https://lmstudio.ai/docs/app/api/headless, "Option 1"),
 # the listener is still the thing to wait for, and this script does not change.
 #
-# Deployed to ~/.config/lmstudio by `make link` (manager.sh link_domain);
-# launched by ~/Library/LaunchAgents/com.esh2n.lmstudio-awake.plist.
+# Linked as ~/.config/lmstudio/awake.sh and run by the lmstudio-awake launchd
+# agent that next/home/darwin/lmstudio/default.nix declares.
 set -euo pipefail
 
 # launchd hands us a minimal PATH; name the tools' real locations.

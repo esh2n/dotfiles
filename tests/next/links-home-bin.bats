@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
 # Files placed directly under ~ and commands placed in ~/bin: each is a
-# symlink into the checkout (editable in place), exactly as manager.sh does,
+# symlink into the checkout (editable in place), as the old layout did,
 # minus what only works on macOS on the Linux side.
 
 load '../lib/nix.bash'

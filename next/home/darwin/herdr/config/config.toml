@@ -1,5 +1,5 @@
 # Docs: https://herdr.dev/docs/configuration/
-# Symlinked to ~/.config/herdr/config.toml by manager.sh.
+# Linked as ~/.config/herdr/config.toml by next/home/darwin/herdr.
 # Herdr's default keymap is already tmux-like; only the deltas from our setup follow.
 # Requires herdr >= 0.7.4 (popup panes, sidebar row layouts).
 

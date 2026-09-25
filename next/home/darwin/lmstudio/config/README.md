@@ -46,13 +46,10 @@ which also keeps working if the standalone `llmster` is ever used.
    `lm-studio` and `tailscale-app`. The cask installs `LM Studio.app` only;
    the app bootstraps the `lms` CLI into `~/.lmstudio/bin/lms` on first launch
    ("lms ships with LM Studio", https://lmstudio.ai/docs/cli).
-2. Files: `make link` (`core/config/manager.sh link`) symlinks this directory
-   to `~/.config/lmstudio` and writes the launchd job as an **expanded copy**
-   to `~/Library/LaunchAgents/com.esh2n.lmstudio-awake.plist`
-   (`link_launch_agents` → `install_expanded` resolves `{{HOME}}`; launchd
-   expands nothing itself, so the source plist must keep the placeholder).
-   Loading the job is a separate, deliberate step (below); `make link` never
-   does it.
+2. Files and the job: `make up` links this directory to `~/.config/lmstudio`
+   and, on a model-provider Mac, declares the `lmstudio-awake` launchd agent
+   (`next/home/darwin/lmstudio/default.nix`, rendered by
+   `next/lib/mk-service.nix`); home-manager loads it on the switch.
 
 ## Once-only owner steps (per machine)
 
@@ -85,9 +82,9 @@ needed there.
 
 ## Re-apply / remove
 
-- Changed the plist or `awake.sh`: `make link`, then
-  `launchctl bootout gui/$(id -u)/com.esh2n.lmstudio-awake` and `bootstrap`
-  again (the deployed plist is a copy, not a link).
+- Changed `awake.sh`: it is read from the checkout, so the next start of the
+  job uses it (`launchctl kickstart -k gui/$(id -u)/com.esh2n.lmstudio-awake`
+  restarts it now). Changed the service declaration: `make up`.
 - Stop holding the Mac awake: `launchctl bootout gui/$(id -u)/com.esh2n.lmstudio-awake`.
 - Battery: `caffeinate -s` is AC-only by definition; on battery the Mac
   sleeps as usual. That is the intended scope.

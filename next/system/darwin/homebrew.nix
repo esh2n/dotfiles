@@ -58,7 +58,7 @@
       # Minimum 0.147.0 (the hooks.json `[hooks.state]` trust-hash format
       # `jig codex register` writes assumes it), recommended 0.150.0+ (adds the
       # Interrupt hook event). Below these floors the fix is
-      # `brew upgrade --cask codex`, then `make link`.
+      # `brew upgrade --cask codex`, then `make up`.
       "codex"
       # microVM sandbox for coding agents. docker/tap is casks-only too (same
       # trap as codex); the tap is trusted by dotctl up.

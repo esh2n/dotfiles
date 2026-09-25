@@ -79,7 +79,7 @@ that loses data if it is down: the gateway's counters are in memory, so an hour
 without scraping is an hour that cannot be recovered. Grafana stores nothing,
 but since 2026-09-24 it is resident too (owner's call: the dashboards should
 always be there) — `domains/dev/install.sh` starts both with `start.sh --ui`
-on every `make update`, and `../check.sh` probes `:3000`.
+on every `make up`, and `dotctl llm check` probes `:3000`.
 
 Both ports bind `127.0.0.1`. Reaching the gateway's metrics from inside a
 container goes through OrbStack's `host.docker.internal` proxy — measured, not

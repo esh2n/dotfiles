@@ -1,5 +1,5 @@
 // Zellij Configuration - Unified with tmux/WezTerm (Prefix: Ctrl+q)
-// This file is generated from config.kdl.template by manager.sh
+// config.kdl is rendered from this template by `dotctl templates render`
 default_layout "nord"
 
 plugins {

@@ -9,7 +9,8 @@ belongs in each tier and whether pi or DSH is the better daily driver.
 
 Decision record: writeup store `yoki/2026-09-16-observability-proxy-litellm`.
 **This is not a workflow and not part of the jig generator** — just the
-measurement layer. Its launchd plist is deployed by `make link`.
+measurement layer. Its service is declared in `next/home/shared/services` and
+switched on by the developer role.
 
 ## Tiers
 
@@ -40,36 +41,31 @@ Confirm the vault/item coordinates in `litellm.op-vars` match your 1Password
 
 ## Install (always-on, launchd)
 
-`make update` (or `make install` on a new machine) does every step below
-that a script can do — section "5. Home LLM" of `domains/dev/install.sh`,
-idempotent — and prints the owner-only steps that remain (a GUI login, a
+`make up` does every step below that a command can do (`dotctl llm setup`,
+idempotent) and prints the owner-only steps that remain (a GUI login, a
 checkbox in LM Studio, the tailnet policy via `make tailscale-acl`). Re-run
-`make update` after doing anything it lists. The steps themselves, for
+`make up` after doing anything it lists. The steps themselves, for
 reading:
 
 The same path installs this stack and the LM Studio stack
 (`next/home/darwin/lmstudio/config/`, the model server + sleep guard), so both are
 set up identically:
 
-1. `make link` (`core/config/manager.sh link`) symlinks this directory to
-   `~/.config/litellm` and writes `com.esh2n.litellm-proxy.plist` as an
-   **expanded copy** to `~/Library/LaunchAgents/` (`link_launch_agents` →
-   `install_expanded` resolves the `{{HOME}}` placeholders; launchd expands
-   nothing itself). Loading is never done by `make link`.
+1. `make up` links this directory to `~/.config/litellm` and declares the
+   `litellm-proxy` service (a launchd agent on macOS, a systemd user service
+   on Linux; `next/lib/mk-service.nix`).
 2. Once per machine, put the 1Password service-account token in the login
    Keychain under the name `litellm-op-token` (see "Interactive vs headless
    op" below; `litellm-up.sh` reads it with `security find-generic-password
    -s litellm-op-token -w`).
-3. Load the job once:
-   `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist`.
-   Logs: `~/Library/Logs/litellm-proxy.log`.
+3. `dotctl llm setup` (run by the switch) loads the job onto the current
+   definition. Logs: `~/Library/Logs/litellm-proxy.log`.
 4. On a machine without its own LM Studio, set `LM_STUDIO_REMOTE_HOST` (the
    Mac's Tailscale MagicDNS name) for the job; `litellm-up.sh` picks the local
    LM Studio when `127.0.0.1:1234` answers and that name otherwise.
 
-After editing the plist or `litellm-up.sh`: `make link`, then
-`launchctl bootout gui/$(id -u)/com.esh2n.litellm-proxy` and `bootstrap`
-again. The model server itself, its login autostart and the
+After editing `litellm-up.sh` or the service declaration: `make up` (it
+reloads the job). The model server itself, its login autostart and the
 `caffeinate` sleep guard live in `next/home/darwin/lmstudio/config/README.md`.
 
 ## Run

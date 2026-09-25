@@ -6,7 +6,6 @@
 #      into a URL), if there is none
 #   3. main fast-forwarded to the work branch in the checkout
 #   4. make up there
-# The old `make update` keeps working until the old layout is removed.
 set -euo pipefail
 
 CHECKOUT="${DOTFILES_CHECKOUT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && git rev-parse --path-format=absolute --git-common-dir | xargs dirname)}"
