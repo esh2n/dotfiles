@@ -10,9 +10,30 @@
 # Each becomes the activation entry setup-<name>, after the links are in
 # place. A failing step warns and the switch goes on — the contract the old
 # installer had — so one unreachable download never blocks the rest.
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  facts,
+  ...
+}:
 let
   enabled = lib.filterAttrs (_: s: s.enable) config.dotfiles.setup;
+  # Activation runs with a PATH of its own; a step drives the user's tools
+  # (installed by Nix, mise, cargo, Homebrew, the system), so it sees them
+  # after activation's own.
+  userPath = lib.concatStringsSep ":" [
+    "/etc/profiles/per-user/${facts.username}/bin"
+    "${facts.home}/.nix-profile/bin"
+    "${facts.home}/.local/share/mise/shims"
+    "${facts.home}/.cargo/bin"
+    "${facts.home}/.local/bin"
+    "/opt/homebrew/bin"
+    "/usr/local/bin"
+    "/usr/bin"
+    "/bin"
+    "/usr/sbin"
+    "/sbin"
+  ];
 in
 {
   options.dotfiles.setup = lib.mkOption {
@@ -44,7 +65,7 @@ in
     name: step:
     lib.nameValuePair "setup-${name}" (
       lib.hm.dag.entryAfter ([ "linkGeneration" ] ++ step.after) ''
-        if ! run ${step.command}; then
+        if ! (PATH="$PATH:${userPath}" && run ${step.command}); then
           warnEcho "setup ${name} failed; make up goes on (run it again once the cause is fixed)"
         fi
       ''

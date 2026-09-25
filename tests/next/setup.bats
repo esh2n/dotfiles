@@ -33,7 +33,7 @@ print(json.dumps(v))' "${@:2}"; }
 			after="$(field "$json" "$n" after)"
 			[[ "$after" == *'"linkGeneration"'* ]] || { echo "$kind $n after=$after"; false; }
 			data="$(field "$json" "$n" data)"
-			[[ "$data" == *"if ! run "* ]] || { echo "$kind $n: $data"; false; }
+			[[ "$data" == *"if ! (PATH="*" && run "* ]] || { echo "$kind $n: $data"; false; }
 			[[ "$data" == *"warnEcho"* ]] || { echo "$kind $n: $data"; false; }
 		done
 	done
@@ -66,4 +66,14 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-me
 @test "setup: claude's MCP servers are registered after jig has written them and the CLI exists" {
 	run --separate-stderr activation darwin
 	[ "$(field "$output" setup-claude-mcp after)" = '["linkGeneration", "harnessApply", "setup-claude-cli"]' ]
+}
+
+@test "setup: steps see the user's tools (profiles, mise, cargo, Homebrew, the system), not only activation's PATH" {
+	run --separate-stderr activation darwin
+	data="$(field "$output" setup-git-lfs data)"
+	[[ "$data" == *"/etc/profiles/per-user/${USER}/bin"* ]]
+	[[ "$data" == *"/.local/share/mise/shims"* ]]
+	[[ "$data" == *"/.cargo/bin"* ]]
+	[[ "$data" == *"/opt/homebrew/bin"* ]]
+	[[ "$data" == *":/usr/bin:/bin:"* ]]
 }
