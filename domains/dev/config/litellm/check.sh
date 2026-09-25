@@ -7,7 +7,8 @@
 # Run by hand (`bash domains/dev/config/litellm/check.sh`) or at the end of
 # `make update` (domains/dev/install.sh, section 5). Exit code = number of FAILs.
 #
-# Roles: on the hub (the Mac with LM Studio.app) every line applies. On a
+# Roles (--role hub|node; without it, the Mac with LM Studio.app is the hub):
+# on the hub every line applies. On a
 # node (any machine without LM Studio) only what the ruling puts there is
 # checked — its own LiteLLM, the tiers through it (deterministic reaches the
 # hub over the tailnet), its metrics port and `tailscale serve 4001`; no
@@ -21,7 +22,16 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="/etc/profiles/per-user/$(id -un)/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 WITH_COMPLEX=0
-[ "${1:-}" = "--complex" ] && WITH_COMPLEX=1
+ROLE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --complex) WITH_COMPLEX=1 ;;
+    --role) ROLE="${2:-}"; shift ;;
+    *) echo "usage: check.sh [--complex] [--role hub|node]" >&2; exit 2 ;;
+  esac
+  shift
+done
+case "$ROLE" in hub|node|"") ;; *) echo "check.sh: role must be hub or node, not ${ROLE}" >&2; exit 2 ;; esac
 
 # Every line is also appended, uncoloured and timestamped, to a log the owner
 # (or an agent reading the machine later) can consult without re-running the
@@ -33,7 +43,11 @@ LOG="${LOG_DIR}/check.log"
 FAILS=0
 pass() { printf '  \033[32mPASS\033[0m %s\n' "$*"; echo "PASS $*" >>"$LOG" 2>/dev/null || true; }
 fail() { FAILS=$((FAILS + 1)); printf '  \033[31mFAIL\033[0m %s\n' "$*"; echo "FAIL $*" >>"$LOG" 2>/dev/null || true; }
-ROLE=node; [ "$(uname -s)" = Darwin ] && [ -d "/Applications/LM Studio.app" ] && ROLE=hub
+# The caller's role wins (next passes the machine's role); without one, guess
+# as the old installer did: the Mac with LM Studio.app is the hub.
+if [ -z "$ROLE" ]; then
+  ROLE=node; [ "$(uname -s)" = Darwin ] && [ -d "/Applications/LM Studio.app" ] && ROLE=hub
+fi
 echo "home-llm check (${ROLE})"
 
 # --- LM Studio (hub): the model server itself ------------------------------

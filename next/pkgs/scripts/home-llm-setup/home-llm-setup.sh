@@ -140,7 +140,7 @@ fi
 [[ "${ROLE}" == hub ]] && lm_studio
 restart_litellm
 [[ "${ROLE}" == hub ]] && hub_stacks
-bash "${LITELLM}/check.sh" || todo "litellm/check.sh reported failing lines above"
+bash "${LITELLM}/check.sh" --role "${ROLE}" || todo "litellm/check.sh reported failing lines above"
 
 if ((${#TODO[@]})); then
 	echo "home-llm: left to do:"

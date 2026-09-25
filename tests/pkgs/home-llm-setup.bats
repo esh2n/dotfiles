@@ -103,6 +103,10 @@ hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"
 	[ "$status" -eq 0 ]
 	[ "$(tail -1 "${LOG}")" = "check.sh" ]
 	[[ "$output" == *"check.sh reported failing"* ]]
+	: >"${LOG}"
+	printf '#!/usr/bin/env bash\necho "check.sh $*" >>"%s"\n' "${LOG}" >"${L}/check.sh"
+	run hl node
+	grep -qx "check.sh --role node" "${LOG}"
 }
 
 @test "home-llm hub: finds lms where LM Studio puts it, off the activation PATH" {
