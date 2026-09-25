@@ -35,3 +35,11 @@ linux() { # linux <attribute path under the configuration>
 	run --separate-stderr nix_eval_expr_json "builtins.any (p: (p.pname or \"\") == \"codebase-memory-mcp\") (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.packages"
 	[ "$output" = true ]
 }
+
+@test "linux and mac: dev installs uv, which serena's MCP entry runs (uvx)" {
+	printf '{"roles": ["dev"]}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	F="builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\""
+	run --separate-stderr nix_eval_expr_json "let has = ps: builtins.any (p: (p.pname or \"\") == \"uv\") ps; in [ (has (${F}).homeConfigurations.linux.config.home.packages) (has (${F}).darwinConfigurations.mac.config.home-manager.users.\"${USER}\".home.packages) ]"
+	[ "$output" = "[true,true]" ]
+}

@@ -20,7 +20,7 @@ summary() { # summary <flake-dir> <config-name>
 
 # What next installs on purpose beyond the current layout, one package-name
 # prefix each (the entries are "<name>-<version>").
-ADDED_IN_NEXT='"dotctl-'
+ADDED_IN_NEXT='"dotctl- "uv-'
 
 @test "mac parity: next installs and sets exactly what the current layout does, plus its own additions" {
 	run --separate-stderr summary core/nix "${USER}-mac"

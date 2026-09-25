@@ -31,6 +31,9 @@
       pnpm
       yarn
 
+      # uvx starts serena, an MCP server every harness is given
+      uv
+
       # Code graph MCP server, given to every harness (next/pkgs)
       codebase-memory-mcp
 
