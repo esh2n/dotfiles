@@ -163,6 +163,55 @@ step_zellij_harpoon() {
 	cp "${src}/target/wasm32-wasip1/release/harpoon.wasm" "${dir}/"
 }
 
+# Stylus's userstyles for every theme, generated in the checkout from its
+# templates (domains/system/userstyles).
+step_userstyles() {
+	need lessc || return 0
+	need jq || return 0
+	bash "${ROOT}/domains/system/userstyles/scripts/generate-userstyle.sh" all
+}
+
+# SbarLua (sketchybar's Lua module; not on luarocks) built from source into
+# ~/.local/share/sketchybar_lua. It vendors Lua and only loads in an
+# interpreter of the same major.minor (a mismatch is an empty bar, no error),
+# so it is rebuilt whenever the running Lua changes.
+step_sbarlua() {
+	if command -v mise >/dev/null 2>&1; then
+		eval "$(mise env -s bash 2>/dev/null)" || true
+	fi
+	need lua || return 0
+	local target="${HOME}/.local/share/sketchybar_lua/sketchybar.so"
+	local src="${HOME}/.cache/sbarlua" host built
+	host="$(lua -v 2>&1 | sed -n 's/^Lua \([0-9]*\.[0-9]*\).*/\1/p')"
+	if [[ -f "${target}" ]]; then
+		built="$(grep -a -o 'LuaVersion: Lua [0-9]*\.[0-9]*' "${target}" | head -1 | sed 's/.*Lua //' || true)"
+		[[ -n "${built}" && "${built}" == "${host}" ]] && return 0
+		note "built for Lua ${built:-unknown}, lua is ${host}: rebuilding"
+	fi
+	need git || return 0
+	need make || return 0
+	if [[ -d "${src}/.git" ]]; then
+		git -C "${src}" fetch --depth 1 origin
+		git -C "${src}" reset --hard origin/HEAD
+	else
+		rm -rf "${src}"
+		git clone --depth 1 https://github.com/FelixKratz/SbarLua "${src}"
+	fi
+	# Under launchd the lua process's parent is PID 1 at once, and SbarLua's
+	# orphan check exits ~1s after start: subscribed callbacks never fire.
+	local c="${src}/src/sketchybar.c"
+	if [[ -f "${c}" ]] && grep -q 'if (getppid() == 1) exit(0);' "${c}"; then
+		sed 's|if (getppid() == 1) exit(0);|/* orphan_check disabled for launchd compatibility */|' "${c}" >"${c}.new"
+		mv "${c}.new" "${c}"
+	fi
+	make -C "${src}" clean >/dev/null 2>&1 || true
+	make -C "${src}" install
+	[[ -f "${target}" ]] || {
+		warn "make install finished but ${target} is missing"
+		return 1
+	}
+}
+
 # A reference checkout beside this one (jig does not read it).
 step_ecc() {
 	local dir
@@ -175,7 +224,7 @@ step_ecc() {
 case "${STEP}" in
 capsule-daemon | mise-trust | nvim-default | git-lfs | gh-extensions | codebase-memory | \
 	claude-cli | claude-mcp | pi-packages | pacifica | warp-seed | git-identity | tpm | \
-	zellij-plugins | zellij-harpoon | ecc)
+	zellij-plugins | zellij-harpoon | ecc | userstyles | sbarlua)
 	"step_${STEP//-/_}"
 	;;
 *)

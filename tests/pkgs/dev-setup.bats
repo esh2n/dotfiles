@@ -218,3 +218,48 @@ step() { PATH="${BIN}:/usr/bin:/bin" bash "${SCRIPT}" "${ROOT}" "$@"; }
 	[ "$status" -ne 0 ]
 	[ -z "$(ls -A "${TMPDIR}")" ]
 }
+
+@test "dev-setup userstyles: generates every theme's userstyle with the checkout's script" {
+	mkdir -p "${ROOT}/domains/system/userstyles/scripts"
+	printf '#!/usr/bin/env bash\necho "generate $*" >>"%s"\n' "${LOG}" >"${ROOT}/domains/system/userstyles/scripts/generate-userstyle.sh"
+	fake lessc
+	fake jq
+	run step userstyles
+	[ "$status" -eq 0 ]
+	grep -qx "generate all" "${LOG}"
+}
+
+@test "dev-setup userstyles: without lessc it is skipped with a warning" {
+	fake jq
+	run --separate-stderr step userstyles
+	[ "$status" -eq 0 ]
+	[[ "$stderr" == *"lessc"* ]]
+}
+
+@test "dev-setup sbarlua: an installed module built for the running Lua is left alone" {
+	fake lua 'echo "Lua 5.4.7  Copyright (C) 1994-2024"'
+	mkdir -p "${HOME}/.local/share/sketchybar_lua"
+	printf 'xx LuaVersion: Lua 5.4 xx' >"${HOME}/.local/share/sketchybar_lua/sketchybar.so"
+	fake git
+	fake make
+	run step sbarlua
+	[ "$status" -eq 0 ]
+	! grep -q "^git\|^make" "${LOG}"
+}
+
+@test "dev-setup sbarlua: builds for the running Lua, patched for launchd, when missing or built for another Lua" {
+	fake lua 'echo "Lua 5.5.0  Copyright"'
+	fake git 'if [ "$1" = clone ]; then mkdir -p "$5/src"; echo "if (getppid() == 1) exit(0);" >"$5/src/sketchybar.c"; fi'
+	fake make 'if [ "$3" = install ]; then mkdir -p "'"${HOME}"'/.local/share/sketchybar_lua"; printf "LuaVersion: Lua 5.5" >"'"${HOME}"'/.local/share/sketchybar_lua/sketchybar.so"; fi'
+	run step sbarlua
+	[ "$status" -eq 0 ]
+	grep -q "^git clone --depth 1 https://github.com/FelixKratz/SbarLua ${HOME}/.cache/sbarlua" "${LOG}"
+	grep -q "^make -C ${HOME}/.cache/sbarlua install" "${LOG}"
+	! grep -q "getppid() == 1) exit" "${HOME}/.cache/sbarlua/src/sketchybar.c"
+}
+
+@test "dev-setup sbarlua: without lua it is skipped with a warning" {
+	run --separate-stderr step sbarlua
+	[ "$status" -eq 0 ]
+	[[ "$stderr" == *"lua"* ]]
+}

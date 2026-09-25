@@ -46,7 +46,7 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-me
 @test "setup: the mac runs every ported step, plus its own" {
 	run --separate-stderr activation darwin
 	[ "$status" -eq 0 ]
-	expected="$(printf '%s\n' ${SHARED} setup-browsers setup-sbarlua setup-tpm setup-warp-seed | sort | tr '\n' ' ' | sed 's/ $//')"
+	expected="$(printf '%s\n' ${SHARED} setup-sbarlua setup-userstyles setup-tpm setup-warp-seed | sort | tr '\n' ' ' | sed 's/ $//')"
 	[ "$(names "$output")" = "$expected" ] || { echo "got: $(names "$output")"; false; }
 }
 
@@ -57,10 +57,10 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-me
 	[ "$(names "$output")" = "$expected" ] || { echo "got: $(names "$output")"; false; }
 }
 
-@test "setup: the mac's browser policy and SbarLua come from the domain scripts they replace" {
+@test "setup: the mac's userstyles and SbarLua are dev-setup steps" {
 	run --separate-stderr activation darwin
-	[[ "$(field "$output" setup-browsers data)" == *"${REPO_ROOT}/domains/system/install.sh"* ]]
-	[[ "$(field "$output" setup-sbarlua data)" == *"${REPO_ROOT}/domains/workspace/install.sh"* ]]
+	[[ "$(field "$output" setup-userstyles data)" == *"dev-setup ${REPO_ROOT} userstyles"* ]]
+	[[ "$(field "$output" setup-sbarlua data)" == *"dev-setup ${REPO_ROOT} sbarlua"* ]]
 }
 
 @test "setup: claude's MCP servers are registered after jig has written them and the CLI exists" {
