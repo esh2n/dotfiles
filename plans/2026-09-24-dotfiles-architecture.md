@@ -165,6 +165,6 @@ snowfall-lib・std・ez-configs・digga のような枠組み、dendritic を背
 
 1. ~~dotctl の言語~~ → Go に決定（2026-09-25、`rules/decisions/2026-09-25-dotctl-in-go.md`）。
 2. ~~役割ファイルの場所と形と役割の一覧~~ → `~/.config/dotfiles/roles.json`、`{"roles": [...]}`。役割は developer・desk-user・model-provider・observer（base は書かない）に決定（2026-09-25、`rules/decisions/2026-09-25-roles-named-as-people.md`）。
-3. ハーネスを `harness/` に移すこと（`2026-09-22-config-layout-no-personal-layer.md` の置き換え）と、writeup-kit・artifact-worker・dopa-shorts を `projects/` に置くか repo の外へ出すか。
+3. ハーネスを `harness/` に移すこと（`2026-09-22-config-layout-no-personal-layer.md` の置き換え）と、writeup-kit・artifact-worker・dopa-shorts を `projects/` に置くか repo の外へ出すか。→ dopa-shorts は repo の外（`~/go/github.com/esh2n/dopa-shorts`）に決定（2026-09-25、writeup の store と同じ扱い）。
 4. テーマを include で読めないアプリの一覧（実装時に棚卸し）。
 5. モジュール単体テストをいつ入れるか。

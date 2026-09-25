@@ -10,7 +10,7 @@ metadata:
 Converts text into a fast-paced vertical mp4 for people who cannot read long text (nicknamed ドパガキ, "dopa-kids").
 Pipeline: (1) script JSON generation (Claude) → (2) TTS audio generation → (3) Remotion rendering.
 
-- Skill body: this `SKILL.md` (the grammar for script generation). The renderer lives outside the skill at `$DOTFILES_ROOT/domains/creative/dopa-shorts/video/` (below, `<video>` = `${DOTFILES_ROOT:-$HOME/dotfiles}/domains/creative/dopa-shorts/video`)
+- Skill body: this `SKILL.md` (the grammar for script generation). The renderer is its own repository outside the dotfiles, `~/go/github.com/esh2n/dopa-shorts` (below, `<video>` = `${DOPA_SHORTS_ROOT:-$HOME/go/github.com/esh2n/dopa-shorts}/video`).
 - Source of truth for the script schema: `<video>/src/schema.ts` (zod)
 
 ## Prerequisites

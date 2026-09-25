@@ -14,5 +14,5 @@ never by a path relative to the skill
 | `grilling-render/` | Renders a grilling round document to one HTML page and collects answers locally; `pnpm install` (elkjs, yaml) | `grilling` |
 | `writeup-kit/` | The writeup design kit: CLIs (`bin/`), CSS and template (`kit/`), vendored elk + lindera (`vendor/`), tests; nothing to install | `writeup`, `show-me`, `eli5`, `grilling` (skill docs stay in `harness/skills/writeup-kit/`) |
 
-The dopa-shorts Remotion project moved the same way, to
-`domains/creative/dopa-shorts/video/`.
+The dopa-shorts Remotion project moved out of the dotfiles to its own
+repository, `~/go/github.com/esh2n/dopa-shorts`.
