@@ -15,7 +15,7 @@ description: >-
 # via virtiofs, read-only) — and a literal path belongs to one checkout, so a
 # generated artifact would be wrong the moment yoki-box runs from a worktree.
 # Rendering at launch means the kit always matches the caller. The `.in`
-# suffix (not `.template`) keeps core/config/manager.sh from generating it.
+# suffix (not `.template`) keeps the template renderer (render-templates) from generating it.
 #
 # Measured on the base image 2026-08-15 (Ubuntu 26.04, user `agent`,
 # home /home/agent): node v22.22.1, git 2.53, jq, python3, rg, bash, npm/npx,
@@ -63,8 +63,8 @@ setup:
 
   startup:
     # The guard policy jig's PreToolUse hook reads (JIG_POLICY_FILE, else
-    # ~/.config/jig/policy/guard-rules.json) — the same link manager.sh's
-    # link_jig_policy makes on the host. `$HOME`, not `{{HOME}}`: it must
+    # ~/.config/jig/policy/guard-rules.json) — the same link home-manager
+    # makes on the host (next/home/shared/harness). `$HOME`, not `{{HOME}}`: it must
     # resolve to the sandbox user's home at runtime, not the host's.
     - command:
         - sh

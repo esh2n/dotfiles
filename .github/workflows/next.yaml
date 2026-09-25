@@ -25,7 +25,8 @@ jobs:
         run: |
           shellcheck -x next/bootstrap.sh next/pkgs/scripts/*/*.sh tests/run.sh \
             domains/dev/config/litellm/{secrets,litellm-up,proxy-key}.sh \
-            domains/dev/config/jig/jig-decision-up.sh
+            domains/dev/config/jig/jig-decision-up.sh \
+            domains/dev/config/sbx/kits/agents/link-harness.sh
 
   dotctl:
     runs-on: ubuntu-latest

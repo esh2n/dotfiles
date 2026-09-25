@@ -59,8 +59,8 @@ setup:
 
   startup:
     # The guard policy jig's omp extension reads (JIG_POLICY_FILE, else
-    # ~/.config/jig/policy/guard-rules.json) — the same link manager.sh's
-    # link_jig_policy makes on the host. Without it the extension stands
+    # ~/.config/jig/policy/guard-rules.json) — the same link home-manager
+    # makes on the host (next/home/shared/harness). Without it the extension stands
     # down and omp has no guardrails. `$HOME`, not `{{HOME}}`: this must
     # resolve to the SANDBOX user's home (/home/agent) at runtime, not the
     # host's — render_kit's `{{HOME}}` substitution bakes in the host's own

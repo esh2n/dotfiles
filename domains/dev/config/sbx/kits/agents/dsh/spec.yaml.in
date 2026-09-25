@@ -61,12 +61,12 @@ setup:
       description: Install dsh (no contrib image exists; the shell base ships Node 22.22.1)
   startup:
     # dsh's profile tree and the jig-guard plugin, linked from the checkout by
-    # the same manager.sh function the host uses. link_dsh_resources builds the
-    # plugin (bun) and pnpm-links it into each profile, exactly as on the host.
+    # link-harness.sh, which does what harness-apply does on the host: builds the
+    # plugin (bun) and pnpm-links it into each profile.
     - command:
         - bash
         - -lc
-        - "source \"{{DOTFILES_ROOT}}/core/config/manager.sh\" >/dev/null 2>&1 || true; link_dsh_resources \"{{DOTFILES_ROOT}}/domains/dev/config/dsh\""
+        - "bash \"{{DOTFILES_ROOT}}/domains/dev/config/sbx/kits/agents/link-harness.sh\" dsh \"{{DOTFILES_ROOT}}\""
       user: "1000"
       description: Install dsh profiles and build/link jig-guard from the dotfiles checkout
     # dsh's LiteLLM provider must name the host as the sandbox sees it. The

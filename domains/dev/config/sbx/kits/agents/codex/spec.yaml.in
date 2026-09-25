@@ -16,7 +16,7 @@ description: >-
 # is a literal path belonging to one checkout, and a sandbox mounts the repo
 # at its HOST path, so a generated artifact would be wrong the moment
 # yoki-box runs from a worktree. The `.in` suffix (not `.template`) keeps
-# core/config/manager.sh from generating it. This kit now embeds a host
+# the template renderer (render-templates) from generating it. This kit now embeds a host
 # path — previously it did not, and was a plain spec.yaml (yoki-box keys the
 # read-only dotfiles mounts off spec.yaml.in's presence, so converting it is
 # what turns the mounts on below).
@@ -98,8 +98,8 @@ setup:
 
   startup:
     # The guard policy jig's PreToolUse hook reads (JIG_POLICY_FILE, else
-    # ~/.config/jig/policy/guard-rules.json) — the same link manager.sh's
-    # link_jig_policy makes on the host. `$HOME`, not `{{HOME}}`: it must
+    # ~/.config/jig/policy/guard-rules.json) — the same link home-manager
+    # makes on the host (next/home/shared/harness). `$HOME`, not `{{HOME}}`: it must
     # resolve to the sandbox user's home at runtime, not the host's.
     - command:
         - sh

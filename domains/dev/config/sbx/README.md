@@ -112,7 +112,7 @@ sbx が書く config には mcp-gateway の設定も同居しているため、k
   **展開は `yoki-box` が起動時に `$TMPDIR` へ行い、リポジトリには書き戻さない**
   — 絶対パスは特定のチェックアウトに属するので、生成物として設置すると
   worktree から起動した瞬間に嘘になる。拡張子が `.template` ではなく `.in`
-  なのは、`core/config/manager.sh` の生成対象から外すため
+  なのは、テンプレートの展開（render-templates）の対象から外すため
 - `yoki-box` はこの `spec.yaml.in` の有無で挙動を変える:
   - **ある** → dotfiles の3ディレクトリ(`core/`, `domains/dev/bin/`,
     `domains/dev/config/claude-profiles/`)を read-only でマウントし、

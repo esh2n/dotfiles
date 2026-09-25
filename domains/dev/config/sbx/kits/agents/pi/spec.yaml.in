@@ -11,7 +11,7 @@ description: >-
 # Rendered by yoki-box at launch into a temp dir (see the claude kit's
 # spec.yaml.in for why: {{DOTFILES_ROOT}} is one checkout's literal path and
 # the sandbox mounts the repo at that same host path). The `.in` suffix keeps
-# core/config/manager.sh from generating it.
+# the template renderer from generating it.
 #
 # Why a `kind: sandbox` kit and not a mixin on `shell`: the contrib image
 # docker.io/sbx/pi-image has pi and Node 22.22.1 baked in and is rebuilt
@@ -81,11 +81,11 @@ setup:
       description: Point npm at the sandbox proxy so pi's runtime npm use works in exec contexts
   startup:
     # pi's config, extensions and AGENTS.md: the same symlinks the host has,
-    # made by the same manager.sh function, against the mounted checkout.
+    # made by link-harness.sh against the mounted checkout.
     - command:
         - bash
         - -lc
-        - "source \"{{DOTFILES_ROOT}}/core/config/manager.sh\" >/dev/null 2>&1 || true; link_pi_resources \"{{DOTFILES_ROOT}}/domains/dev/config/pi\""
+        - "bash \"{{DOTFILES_ROOT}}/domains/dev/config/sbx/kits/agents/link-harness.sh\" pi \"{{DOTFILES_ROOT}}\""
       user: "1000"
       description: Link pi's settings, models, AGENTS.md and extensions from the dotfiles checkout
     # models.json must name the host as the sandbox sees it. The host file is
