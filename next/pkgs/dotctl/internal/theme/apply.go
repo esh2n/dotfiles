@@ -50,11 +50,23 @@ func rewrite(path string, re *regexp.Regexp, repl string) (bool, error) {
 		return false, nil
 	}
 	out := re.ReplaceAll(b, []byte(repl))
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, out, 0o644); err != nil {
+	// a temp name of its own: two switches at once must not share one
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
+	if err != nil {
 		return false, err
 	}
-	return true, os.Rename(tmp, path)
+	defer os.Remove(tmp.Name()) // gone after the rename; cleans up on failure
+	if _, err := tmp.Write(out); err != nil {
+		tmp.Close()
+		return false, err
+	}
+	if err := tmp.Close(); err != nil {
+		return false, err
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		return false, err
+	}
+	return true, os.Rename(tmp.Name(), path)
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
@@ -170,7 +182,7 @@ func applyUserstyles(e Env, name string) error {
 			continue
 		}
 		if err := relink(name+".user.css", filepath.Join(site, "active.user.css")); err != nil {
-			return err
+			e.warn("userstyles: %v", err)
 		}
 	}
 	return nil

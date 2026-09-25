@@ -86,7 +86,12 @@ func Current(e Env) (string, error) {
 }
 
 // relink points link at target, replacing a link already there atomically.
+// A real file or directory in the way is never replaced: that is the
+// owner's, and the error says so.
 func relink(target, link string) error {
+	if info, err := os.Lstat(link); err == nil && info.Mode()&os.ModeSymlink == 0 {
+		return fmt.Errorf("%s is a real file, not a link; move it aside first", link)
+	}
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		return err
 	}
@@ -127,9 +132,6 @@ func Init(e Env, fallback string) error {
 		if got, err := os.Readlink(p); err == nil && got == want {
 			continue
 		}
-		if info, err := os.Lstat(p); err == nil && info.Mode()&os.ModeSymlink == 0 {
-			return fmt.Errorf("%s is a real file, not a link; move it aside first", p)
-		}
 		if err := relink(want, p); err != nil {
 			return err
 		}
@@ -146,8 +148,8 @@ func Init(e Env, fallback string) error {
 // Set switches to name, then asks the running apps to reload. Only a failed
 // switch is an error; a failed reload is a warning.
 func Set(e Env, name string) error {
-	if name == "" || strings.ContainsRune(name, filepath.Separator) {
-		return errors.New("theme name required")
+	if name == "" || name == "." || name == ".." || filepath.Base(name) != name {
+		return errors.New("a theme name, not a path, is required")
 	}
 	if _, err := os.Stat(e.palette(name)); err != nil {
 		names, _ := List(e)
