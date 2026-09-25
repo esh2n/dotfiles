@@ -101,10 +101,6 @@
     # Overlay
     cargo-compete
     crit
-    go-mockgen
-    go-protoc-gen-go
-    spanner-cli
-    spanner-dump
 
   ]
   ++ (with pkgs.brewCasks; [

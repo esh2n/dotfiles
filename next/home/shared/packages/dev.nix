@@ -40,10 +40,6 @@
       # Built by this repo (overlays)
       cargo-compete
       crit
-      go-mockgen
-      go-protoc-gen-go
-      spanner-cli
-      spanner-dump
 
       # Cloudflare
       wrangler # Cloudflare Workers CLI (artifact deploy/login)

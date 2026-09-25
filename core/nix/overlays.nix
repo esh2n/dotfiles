@@ -21,61 +21,6 @@ final: prev: {
     vendorHash = "sha256-v9h17XD/fyHasgLsHHkGvoV1qITWpwGDJ6MtlvWnN4c=";
   });
 
-  # Go
-  spanner-cli = prev.buildGoModule rec {
-    pname = "spanner-cli";
-    version = "0d0904f";
-    src = prev.fetchFromGitHub {
-      owner = "cloudspannerecosystem";
-      repo = "spanner-cli";
-      rev = "0d0904f873b0712f3114ff62728281b7dc0e9092";
-      hash = "sha256-pccPbxKbqQnQDsIhFXUBhX0NPyjWsUCez4gvbdmoB3U=";
-    };
-    vendorHash = "sha256-BHULxJgFQZd3RmRJNTBGIXhJb6b/aGQSAdIDUiAb5Bo=";
-    doCheck = false;
-  };
-
-  spanner-dump = prev.buildGoModule rec {
-    pname = "spanner-dump";
-    version = "6983541";
-    src = prev.fetchFromGitHub {
-      owner = "cloudspannerecosystem";
-      repo = "spanner-dump";
-      rev = "6983541f4cffd4f032e4577efdf27222f3a5df99";
-      hash = "sha256-dEayfG9XLP3zFzGlNtVga5qtJp6sY1JbFfi5BpG9P/4=";
-    };
-    vendorHash = "sha256-poMojfYnSn6X4qEa311r24ZUxR+ED8xNKDIwpGV7tDE=";
-    doCheck = false;
-  };
-
-  go-mockgen = prev.buildGoModule rec {
-    pname = "mockgen";
-    version = "1.6.0";
-    src = prev.fetchFromGitHub {
-      owner = "golang";
-      repo = "mock";
-      rev = "v${version}";
-      hash = "sha256-5Kp7oTmd8kqUN+rzm9cLqp9nb3jZdQyltGGQDiRSWcE=";
-    };
-    vendorHash = "sha256-5gkrn+OxbNN8J1lbgbxM8jACtKA7t07sbfJ7gVJWpJM=";
-    subPackages = [ "mockgen" ];
-    doCheck = false;
-  };
-
-  go-protoc-gen-go = prev.buildGoModule rec {
-    pname = "protoc-gen-go";
-    version = "1.35.2";
-    src = prev.fetchFromGitHub {
-      owner = "protocolbuffers";
-      repo = "protobuf-go";
-      rev = "v${version}";
-      hash = "sha256-mgAMO7B9lYAtgcW5RjDzyjRzQL+v8jqvgo0eTswamHE=";
-    };
-    vendorHash = "sha256-nGI/Bd6eMEoY0sBwWEtyhFowHVvwLKjbT4yfzFz6Z3E=";
-    subPackages = [ "cmd/protoc-gen-go" ];
-    doCheck = false;
-  };
-
   # Persistent code graph for Claude Code / Codex. Keep the release pinned:
   # upstream moves quickly and the graph is advisory, not a source of truth.
   codebase-memory-mcp = prev.stdenvNoCC.mkDerivation rec {
