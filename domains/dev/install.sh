@@ -393,7 +393,7 @@ home_llm() {
 
     # Owner-only, no API: the tailnet policy lives in the admin console.
     # `make tailscale-acl` renders acl.hujson with this tailnet's login + IP
-    # into the clipboard and opens the page (domains/dev/config/tailscale/).
+    # into the clipboard and opens the page (next/home/shared/tailscale/config/).
     hl_once "tailnet policy (once per tailnet, and after editing acl.hujson): make tailscale-acl, then paste + Save"
     # The phone is a tailnet device like any other: nothing on the Mac can
     # enrol it. (Missing from this list until 2026-09-23 — the owner found

@@ -123,7 +123,7 @@ fi
 #    non-Mac machine, run once
 #      tailscale serve --bg --tcp 4001 tcp://127.0.0.1:4001
 #    and only 4001 becomes reachable — from the owner's own devices, per
-#    domains/dev/config/tailscale/acl.hujson. Same decision record as step 4.
+#    next/home/shared/tailscale/config/acl.hujson. Same decision record as step 4.
 METRICS_PORT=4001
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} \

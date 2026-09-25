@@ -66,6 +66,16 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/tmux
           ../home/darwin/browsers
           ../home/darwin/sketchybar
+          ../home/shared/jj
+          ../home/shared/zed
+          ../home/shared/capsule
+          ../home/shared/tailscale
+          ../home/darwin/herdr
+          ../home/darwin/aerospace
+          ../home/darwin/hammerspoon
+          ../home/darwin/omniwm
+          ../home/darwin/paneru
+          ../home/darwin/mado
           ../home/darwin/configs
           ../home/shared/packages
           ../home/darwin/packages.nix

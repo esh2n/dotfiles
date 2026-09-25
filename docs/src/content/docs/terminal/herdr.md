@@ -7,7 +7,7 @@ description: コーディングエージェント向けターミナルマルチ�
 1 つのターミナルから扱うためのマルチプレクサ。tmux に近い操作感のまま、各ペインで動くエージェントの
 状態（working / blocked / idle）を認識し、SSH 越しのリモートマシンでも同じセッションを扱える。
 
-- 設定ファイル: `~/.config/herdr/config.toml`（dotfiles では `domains/dev/config/herdr/config.toml`）
+- 設定ファイル: `~/.config/herdr/config.toml`（dotfiles では `next/home/darwin/herdr/config/config.toml`）
 - インストール: `homebrew.nix` の `brew "herdr"`（nixpkgs 未収録のため Homebrew 経由）
 - prefix key は tmux / Zellij / WezTerm と統一で `Ctrl+q`
 

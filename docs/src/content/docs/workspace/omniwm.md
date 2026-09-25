@@ -97,7 +97,7 @@ runtime override で、**再起動で消える**。
 
 ## カスタマイズ
 
-設定は `~/.config/omniwm/settings.toml`（`domains/workspace/config/omniwm/`
+設定は `~/.config/omniwm/settings.toml`（`next/home/darwin/omniwm/config/`
 への symlink）+ GUI Settings。外部編集は上記の手順で。
 
 - 全 hotkey 再割当（Settings > Hotkeys）

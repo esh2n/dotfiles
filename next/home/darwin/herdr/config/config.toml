@@ -13,7 +13,7 @@ new_cwd = "follow"
 name = "catppuccin"
 
 [update]
-# The binary comes from Homebrew (see domains/dev/packages/homebrew.nix), so
+# The binary comes from Homebrew (see next/system/darwin/homebrew.nix), so
 # herdr must not offer to update itself — a self-update would drift from the
 # Cellar and get clobbered by the next `brew upgrade`. Bump via brew instead.
 version_check = false

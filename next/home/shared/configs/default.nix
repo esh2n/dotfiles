@@ -9,13 +9,9 @@ let
     nvim-nvchad = "domains/dev/config/nvim-nvchad";
     nvim-astrovim = "domains/dev/config/nvim-astrovim";
     nvim-custom = "domains/dev/config/nvim-custom";
-    jj = "domains/dev/config/jj";
-    zed = "domains/dev/config/zed";
     wezterm = "domains/dev/config/wezterm";
-    capsule = "domains/dev/config/capsule";
     themes = "domains/system/config/themes";
     litellm = "domains/dev/config/litellm";
-    tailscale = "domains/dev/config/tailscale";
     sbx = "domains/dev/config/sbx";
   };
 in

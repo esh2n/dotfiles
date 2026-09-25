@@ -33,6 +33,13 @@ target() { # target <json> <path under ~>
 		got="$(target "$json" ".config/${name}")"
 		[ "$got" = "${dir%/}" ] || { echo ".config/${name}: ${got}"; false; }
 	done
+	# moved apps: next/home/<os>/<app>/config is ~/.config/<app>
+	for dir in "${REPO_ROOT}"/next/home/*/*/config/; do
+		[ -d "$dir" ] || continue
+		name="$(basename "$(dirname "$dir")")"
+		got="$(target "$json" ".config/${name}")"
+		[ "$got" = "${dir%/}" ] || { echo ".config/${name}: ${got}"; false; }
+	done
 }
 
 @test "config links: linux gets the cross-platform dirs and none of Omarchy's own" {
@@ -41,7 +48,7 @@ target() { # target <json> <path under ~>
 	json="$output"
 	for name in nvim-lazyvim nvim-nvchad nvim-astrovim nvim-custom jj zed wezterm capsule themes litellm tailscale sbx; do
 		got="$(target "$json" ".config/${name}")"
-		[[ "$got" == "${REPO_ROOT}/domains/"*"/config/${name}" ]] || { echo ".config/${name}: ${got}"; false; }
+		[[ "$got" == "${REPO_ROOT}/domains/"*"/config/${name}" || "$got" == "${REPO_ROOT}/next/home/shared/${name}/config" ]] || { echo ".config/${name}: ${got}"; false; }
 	done
 	for name in ghostty tmux herdr git aerospace sketchybar borders hammerspoon mado omniwm paneru lmstudio browsers; do
 		[ "$(target "$json" ".config/${name}")" = "<missing>" ] || { echo ".config/${name} placed on linux"; false; }

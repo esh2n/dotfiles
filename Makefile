@@ -28,7 +28,7 @@ claude:          ## ~/.claude だけ再生成 (jig apply --target claude --write
 	bash ./domains/dev/bin/jig apply --target claude --write
 
 tailscale-acl:   ## tailnet の ACL を実値で描画してクリップボードへ、管理画面を開く（貼って Save）
-	bash ./domains/dev/config/tailscale/paste-acl.sh
+	bash ./next/home/shared/tailscale/config/paste-acl.sh
 
 retire-yoki:     ## yoki が残した成果物を一覧 (削除は jig retire yoki --write)
 	bash ./domains/dev/bin/jig retire yoki

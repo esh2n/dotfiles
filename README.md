@@ -943,7 +943,7 @@ Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across 
 
 **Built-ins:** Ghostty-powered quake terminal (position/size/glass configurable), fuzzy command palette, thumbnail overview, scratchpads, Ice-like menu bar icon hiding.
 
-**Customization:** `~/.config/omniwm/settings.toml` (symlinked to `domains/workspace/config/omniwm/`, generated on first launch, live-reloads on save) plus GUI Settings. All hotkeys remappable; App Rules for float/workspace assignment/sizes (replaces AeroSpace's `on-window-detected`); workspace bar position/height/icon overrides; System Hyper Trigger (Caps Lock, F13-F20).
+**Customization:** `~/.config/omniwm/settings.toml` (symlinked to `next/home/darwin/omniwm/config/`, generated on first launch, live-reloads on save) plus GUI Settings. All hotkeys remappable; App Rules for float/workspace assignment/sizes (replaces AeroSpace's `on-window-detected`); workspace bar position/height/icon overrides; System Hyper Trigger (Caps Lock, F13-F20).
 
 **Automation:** `omniwmctl` — `query` (windows/workspaces/monitors as JSON), `subscribe` (event stream), `watch <event> --exec <script>` (run a script per event; the hook for future sketchybar integration).
 
