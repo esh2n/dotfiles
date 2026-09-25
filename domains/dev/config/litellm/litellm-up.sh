@@ -61,7 +61,7 @@ export TYPESAFE_API_KEY
 
 # 3b) this machine's spend ledger: LiteLLM writes every request's cost to its
 #     own Postgres on the same docker network — never across the tailnet on
-#     the request path. The llm-console machine's Postgres is the one ledger
+#     the request path. The observer machine's Postgres is the one ledger
 #     the others ship to (rules/decisions/2026-09-25-llm-cost-ledger-local-first.md).
 #     Without the DB secret LiteLLM serves as before, only unrecorded.
 #     The password must be URL-safe (letters and digits): it goes into a URL.
@@ -76,7 +76,7 @@ if [ -n "$LITELLM_DB_PASSWORD" ]; then
   if [ "$(docker inspect -f '{{.State.Running}}' "$DB_NAME" 2>/dev/null || true)" != true ]; then
     docker rm -f "$DB_NAME" >/dev/null 2>&1 || true
     # 5432 on loopback only: the ledger sync reads it here, and on the
-    # llm-console machine `tailscale serve --tcp 5432` is its one exposure.
+    # observer machine `tailscale serve --tcp 5432` is its one exposure.
     docker run -d --name "$DB_NAME" --restart unless-stopped --network "$NETWORK" \
       -p 127.0.0.1:5432:5432 -v litellm-db-data:/var/lib/postgresql/data \
       -v "$SECRET_DIR/db_password:/run/secrets/db_password:ro" \

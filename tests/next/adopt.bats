@@ -40,10 +40,16 @@ adopt() { PATH="${BIN}:/usr/bin:/bin" DOTFILES_CHECKOUT="$CHECKOUT" bash "$SCRIP
 	echo '{"roles": ["base", "dev", "desktop", "lmstudio", "llm-console"], "consoleHost": "m"}' >"$HOME/.config/dotfiles/roles.json"
 	run adopt
 	[ "$status" -eq 0 ]
-	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles": ["developer", "desk-user", "model-provider", "observer"], "observerHost": "m"}' ]
-	echo '{"roles": ["dev", "gpu"]}' >"$HOME/.config/dotfiles/roles.json"
+	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles":["developer","desk-user","model-provider","observer"],"observerHost":"m"}' ]
+	echo '{"roles": ["dev", "lmstudio", "gpu", "base"]}' >"$HOME/.config/dotfiles/roles.json"
 	run adopt
-	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles": ["developer", "model-provider"]}' ]
+	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles":["developer","model-provider"]}' ]
+	echo '{"roles": ["base"]}' >"$HOME/.config/dotfiles/roles.json"
+	run adopt
+	[ "$(cat "$HOME/.config/dotfiles/roles.json")" = '{"roles":[]}' ]
+	cp "$HOME/.config/dotfiles/roles.json" "${BATS_TEST_TMPDIR}/before"
+	run adopt
+	cmp "$HOME/.config/dotfiles/roles.json" "${BATS_TEST_TMPDIR}/before"
 }
 
 @test "adopt: creates the ledger password in 1Password only when missing, letters and digits" {

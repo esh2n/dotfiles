@@ -24,12 +24,16 @@ if [[ ! -f "${ROLES}" ]]; then
 	mkdir -p "$(dirname "${ROLES}")"
 	echo '{"roles": ["developer", "desk-user", "model-provider", "observer"]}' >"${ROLES}"
 	say "wrote ${ROLES}"
-elif grep -qE '"(base|dev|desktop|lmstudio|gpu|llm-console)"' "${ROLES}"; then
-	# the role names retired on 2026-09-25 (next/roles/renamed.nix)
-	sed -E -e 's/"base", *//; s/, *"base"//' \
-		-e 's/"dev"/"developer"/; s/"desktop"/"desk-user"/; s/"llm-console"/"observer"/' \
-		-e 's/"(lmstudio|gpu)"/"model-provider"/; s/"consoleHost"/"observerHost"/' \
-		"${ROLES}" >"${ROLES}.new"
+elif grep -qE '"(base|dev|desktop|lmstudio|gpu|llm-console|consoleHost)"' "${ROLES}"; then
+	# the role names retired on 2026-09-25 (next/roles/renamed.nix): renamed,
+	# base dropped (every machine is base), duplicates removed in order
+	jq -c '
+		{"dev": "developer", "desktop": "desk-user", "lmstudio": "model-provider",
+		 "gpu": "model-provider", "llm-console": "observer"} as $new
+		| .roles |= (map($new[.] // .) | map(select(. != "base"))
+			| reduce .[] as $r ([]; if index([$r]) then . else . + [$r] end))
+		| if has("consoleHost") then .observerHost = .consoleHost | del(.consoleHost) else . end
+	' "${ROLES}" >"${ROLES}.new"
 	mv "${ROLES}.new" "${ROLES}"
 	say "renamed the roles in ${ROLES}: $(cat "${ROLES}")"
 fi
