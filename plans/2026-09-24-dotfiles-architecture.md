@@ -106,10 +106,12 @@ dotfiles/
 
 - `lib/mk-service.nix` が「スクリプト・環境変数・再起動の間隔」の小さな宣言（`dotfiles.services.<名前>`）を受け取り、Mac は `launchd.agents`、Linux は `systemd.user.services` を出す。サービスの宣言は既定で off。
 - 有効にするのは役割のモジュール（`roles/<名前>.nix`）だけ。機能のモジュールは役割を読まない（`tests/next/layers.bats` で検査）。
-  - `dev`: LiteLLM（各機械に一つ、ループバックのみ。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`）と jig-decision。
-  - `llm-hub`（Mac）: LM Studio の keep-awake。Prometheus・Grafana・Open WebUI もこの役割（未移植）。
-  - `gpu`（Linux）: llama-server（未移植）。
-  - **変えました（2026-09-25）**: 以前は「`llm-hub` で LiteLLM」としていました。LiteLLM は裁定で「どの機械にも一つ」なので、harness を使う機械の役割である `dev` に移しました。
+  - `dev`: LiteLLM（各機械に一つ、ループバックのみ）と jig-decision。llm-console でない機械では、使用額を台帳へ送る同期（`llm-ledger-sync`）も。
+  - `lmstudio`（Mac）: LM Studio のモデルを tailnet に出す。keep-awake。
+  - `llm-console`（一台）: Prometheus・Grafana・Open WebUI と、利用コストの台帳（Postgres、tailnet に 5432）。
+  - `gpu`（Linux）: llama-server。
+  - **変えました（2026-09-25）**: 以前は `llm-hub` 一つに「LM Studio を出す」と「集計と窓口」をまとめ、hub / node で分けていました。機械はお互いのモデルを使えるので hub は無く、`lmstudio` と `llm-console` に分けました。
+  - 利用コストは台帳一冊（`rules/decisions/2026-09-25-llm-cost-ledger-local-first.md`）: 各機械の LiteLLM は同じ docker ネットワーク上の自分の Postgres に書き、llm-console の機械の Postgres が台帳。他の機械は届くときに未送信分を `request_id` で重複なく送る。予算は機械ごと。
 - 秘密情報: 1Password のサービスアカウントのトークンを OS の保管場所から読む。Mac は login Keychain、Linux は Secret Service（libsecret、Omarchy は gnome-keyring）。読み方は `domains/dev/config/litellm/secrets.sh` の一か所。
 
 ## 5.5 セットアップの手順（宣言できないもの）
