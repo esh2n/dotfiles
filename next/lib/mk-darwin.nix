@@ -19,6 +19,7 @@ nix-darwin.lib.darwinSystem {
     ../system/darwin/base.nix
     ../system/darwin/defaults.nix
     ../system/darwin/homebrew.nix
+    ../system/darwin/browsers.nix
 
     {
       nixpkgs.overlays = import ./overlays.nix { inherit inputs system; };
