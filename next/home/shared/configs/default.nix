@@ -5,10 +5,6 @@
 let
   link = config.lib.dotfiles.link;
   dirs = {
-    nvim-lazyvim = "domains/dev/config/nvim-lazyvim";
-    nvim-nvchad = "domains/dev/config/nvim-nvchad";
-    nvim-astrovim = "domains/dev/config/nvim-astrovim";
-    nvim-custom = "domains/dev/config/nvim-custom";
     themes = "domains/system/config/themes";
     litellm = "domains/dev/config/litellm";
     sbx = "domains/dev/config/sbx";

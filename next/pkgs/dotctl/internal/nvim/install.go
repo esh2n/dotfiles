@@ -18,13 +18,13 @@ var Sources = map[string]string{
 type Cloner func(url, dir string) error
 
 // Install puts every distribution's files into the checkout's
-// domains/dev/config/nvim-<name> (which home-manager links as
+// next/home/shared/nvim/<name> (which home-manager links as
 // ~/.config/nvim-<name>), cloned once and kept without their .git so the
 // checkout tracks them. It returns the names it installed.
 func Install(repo string, clone Cloner) ([]string, error) {
 	var done []string
 	for _, name := range []string{"lazyvim", "nvchad", "astrovim"} {
-		dir := filepath.Join(repo, "domains", "dev", "config", "nvim-"+name)
+		dir := filepath.Join(repo, "next", "home", "shared", "nvim", name)
 		if _, err := os.Stat(dir); err == nil {
 			continue
 		}

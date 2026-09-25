@@ -10,7 +10,7 @@ import (
 
 func TestInstallClonesMissingDistributionsWithoutGit(t *testing.T) {
 	repo := t.TempDir()
-	existing := filepath.Join(repo, "domains", "dev", "config", "nvim-nvchad")
+	existing := filepath.Join(repo, "next", "home", "shared", "nvim", "nvchad")
 	if err := os.MkdirAll(existing, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestInstallClonesMissingDistributionsWithoutGit(t *testing.T) {
 	if !reflect.DeepEqual(cloned, []string{Sources["lazyvim"], Sources["astrovim"]}) {
 		t.Fatalf("cloned %v", cloned)
 	}
-	if _, err := os.Stat(filepath.Join(repo, "domains", "dev", "config", "nvim-lazyvim", ".git")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(repo, "next", "home", "shared", "nvim", "lazyvim", ".git")); !os.IsNotExist(err) {
 		t.Fatal(".git kept")
 	}
 	if done, _ := Install(repo, clone); len(done) != 0 {

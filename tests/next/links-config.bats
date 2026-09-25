@@ -33,6 +33,9 @@ target() { # target <json> <path under ~>
 		got="$(target "$json" ".config/${name}")"
 		[ "$got" = "${dir%/}" ] || { echo ".config/${name}: ${got}"; false; }
 	done
+	for d in lazyvim nvchad astrovim custom; do
+		[ "$(target "$json" ".config/nvim-${d}")" = "${REPO_ROOT}/next/home/shared/nvim/${d}" ] || { echo ".config/nvim-${d}"; false; }
+	done
 	# moved apps: next/home/<os>/<app>/config is ~/.config/<app>
 	for dir in "${REPO_ROOT}"/next/home/*/*/config/; do
 		[ -d "$dir" ] || continue
@@ -46,7 +49,10 @@ target() { # target <json> <path under ~>
 	run --separate-stderr links linux
 	[ "$status" -eq 0 ]
 	json="$output"
-	for name in nvim-lazyvim nvim-nvchad nvim-astrovim nvim-custom jj zed wezterm capsule themes litellm tailscale sbx; do
+	for d in lazyvim nvchad astrovim custom; do
+		[ "$(target "$json" ".config/nvim-${d}")" = "${REPO_ROOT}/next/home/shared/nvim/${d}" ] || { echo ".config/nvim-${d}"; false; }
+	done
+	for name in jj zed wezterm capsule themes litellm tailscale sbx; do
 		got="$(target "$json" ".config/${name}")"
 		[[ "$got" == "${REPO_ROOT}/domains/"*"/config/${name}" || "$got" == "${REPO_ROOT}/next/home/shared/${name}/config" ]] || { echo ".config/${name}: ${got}"; false; }
 	done

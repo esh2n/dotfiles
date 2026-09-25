@@ -20,7 +20,11 @@ world() {
 	mkdir -p "$w/repo/domains/dev/config" "$w/repo/domains/workspace/config" "$w/repo/core" "$w/home/.config/git" "$w/home/.config/tmux-pane-border" "$w/bin"
 	cp -R "${REPO}/core/utils" "$w/repo/core/"
 	cp -R "${REPO}/domains/system" "$w/repo/domains/"
-	for d in nvim-lazyvim nvim-nvchad nvim-astrovim nvim-custom; do cp -R "${REPO}/domains/dev/config/$d" "$w/repo/domains/dev/config/"; done
+	for d in lazyvim nvchad astrovim custom; do
+		mkdir -p "$w/repo/next/home/shared/nvim"
+		cp -R "${REPO}/next/home/shared/nvim/$d" "$w/repo/next/home/shared/nvim/"
+		cp -R "${REPO}/next/home/shared/nvim/$d" "$w/repo/domains/dev/config/nvim-$d"
+	done
 	# apps already beside their modules: dotctl reads them there, the old
 	# theme-switch at their old domains/ place, so both get a copy
 	local app old
@@ -54,20 +58,22 @@ compare() { # compare <theme>
 	world "$b"
 	old "$a" "$1" || true
 	new "$b" "$1"
+	# old:new — the Neovim files sit at their old place for the old script
 	for f in \
 		repo/domains/system/config/theme-env/current.sh \
 		repo/domains/system/config/theme-env/current.fish \
 		repo/domains/system/config/theme-env/ripgreprc \
 		home/.config/git/delta-theme.gitconfig \
 		home/.config/tmux-pane-border/config.toml \
-		repo/domains/dev/config/nvim-lazyvim/lua/plugins/colorscheme.lua \
-		repo/domains/dev/config/nvim-nvchad/lua/chadrc.lua \
-		repo/domains/dev/config/nvim-astrovim/lua/plugins/colorscheme.lua \
-		repo/domains/dev/config/nvim-custom/lua/custom/colorscheme.lua; do
-		[ -e "$a/$f" ] || { echo "old wrote no $f"; false; }
-		diff -u "$a/$f" "$b/$f" || { echo "differs: $f"; false; }
+		repo/domains/dev/config/nvim-lazyvim/lua/plugins/colorscheme.lua:repo/next/home/shared/nvim/lazyvim/lua/plugins/colorscheme.lua \
+		repo/domains/dev/config/nvim-nvchad/lua/chadrc.lua:repo/next/home/shared/nvim/nvchad/lua/chadrc.lua \
+		repo/domains/dev/config/nvim-astrovim/lua/plugins/colorscheme.lua:repo/next/home/shared/nvim/astrovim/lua/plugins/colorscheme.lua \
+		repo/domains/dev/config/nvim-custom/lua/custom/colorscheme.lua:repo/next/home/shared/nvim/custom/lua/custom/colorscheme.lua; do
+		local fa="${f%%:*}" fb="${f#*:}"
+		[ -e "$a/$fa" ] || { echo "old wrote no $fa"; false; }
+		diff -u "$a/$fa" "$b/$fb" || { echo "differs: $fb"; false; }
 	done
-}
+
 
 @test "theme parity: a dark theme" {
 	compare nord
