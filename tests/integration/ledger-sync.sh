@@ -11,8 +11,10 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SYNC="${REPO}/next/pkgs/scripts/llm-ledger-sync/llm-ledger-sync.sh"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/ledger-it.XXXXXX")"
+# dotctl from this checkout (tests/lib/dotctl.bash: go build, or nix)
+# shellcheck source=tests/lib/dotctl.bash
+source "${REPO}/tests/lib/dotctl.bash"
 trap 'if [[ -n "${PG_BIN:-}" ]]; then "${PG_BIN}/pg_ctl" -D "${WORK}/data" stop -m immediate >/dev/null 2>&1 || true; fi; rm -rf "${WORK}"' EXIT
 
 if [[ -n "${PG_BIN:-}" ]]; then
@@ -22,6 +24,8 @@ if [[ -n "${PG_BIN:-}" ]]; then
 	initdb -D "${WORK}/data" -U postgres --pwfile="${WORK}/pw" -A scram-sha-256 >/dev/null
 	pg_ctl -D "${WORK}/data" -o "-p ${PGPORT} -k ${WORK} -c listen_addresses=127.0.0.1" -l "${WORK}/log" -w start >/dev/null
 fi
+
+build_dotctl "${WORK}"
 
 admin() { psql -v ON_ERROR_STOP=1 -qAt -d postgres "$@"; }
 admin -c "DROP DATABASE IF EXISTS local" -c "DROP DATABASE IF EXISTS central" -c "DROP ROLE IF EXISTS litellm"
@@ -40,7 +44,7 @@ sync() {
 	local here="${PGHOST}:${PGPORT}"
 	env -u PGHOST -u PGPORT LEDGER_PASSWORD=pw LEDGER_LOCAL="${here}/local" LEDGER_CENTRAL="${1:-${here}/central}" \
 		LEDGER_MACHINE=omarchy LEDGER_SQL="${REPO}/next/home/shared/llm-ledger/ledger.sql" \
-		LEDGER_STATE_DIR="${WORK}/state" bash -euo pipefail "$SYNC" once
+		LEDGER_STATE_DIR="${WORK}/state" "${DOTCTL}" ledger sync once
 }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 expect() { [[ "$2" == "$3" ]] || fail "$1: got '$2', want '$3'"; }

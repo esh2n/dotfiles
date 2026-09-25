@@ -56,6 +56,10 @@ jobs:
           --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 15
     steps:
       - uses: actions/checkout@v4
+      # dotctl ledger sync is built from the checkout (tests/lib/dotctl.bash)
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: next/pkgs/dotctl/go.mod
       - name: ledger sync against Postgres
         env:
           PGHOST: 127.0.0.1
@@ -71,6 +75,10 @@ jobs:
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
+      # tests drive dotctl built from the checkout (tests/lib/dotctl.bash)
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: next/pkgs/dotctl/go.mod
       # not model-provider: on Linux it builds llama.cpp with CUDA, which is in
       # no binary cache and too heavy here
       - name: roles
@@ -92,6 +100,10 @@ jobs:
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
+      # tests drive dotctl built from the checkout (tests/lib/dotctl.bash)
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: next/pkgs/dotctl/go.mod
       - name: roles
         run: echo '{"roles":["developer","desk-user","model-provider","observer"]}' > "$RUNNER_TEMP/roles.json"
       - name: tests

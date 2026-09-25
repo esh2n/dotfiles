@@ -6,10 +6,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/editor"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/gh"
+	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/ledger"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/nvim"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/sys"
 	"github.com/esh2n/dotfiles/next/pkgs/dotctl/internal/templates"
@@ -163,4 +166,32 @@ func runTemplates(args []string, out, errOut io.Writer) int {
 	p := ui.Printer{Out: out, Err: errOut, Prefix: "templates"}
 	_, err := templates.RenderAll(templates.Values{Home: os.Getenv("HOME"), User: os.Getenv("USER"), Root: repo})
 	return done(p, err)
+}
+
+// runLedger is `dotctl ledger sync once|loop`: this machine's LiteLLM spend
+// rows to the observer's cost ledger (the service runs loop).
+func runLedger(home string, args []string, out, errOut io.Writer) int {
+	if len(args) != 2 || args[0] != "sync" || (args[1] != "once" && args[1] != "loop") {
+		fmt.Fprint(errOut, "usage: dotctl ledger sync once|loop\n")
+		return 2
+	}
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "ledger sync"}
+	host, _ := os.Hostname()
+	c, err := ledger.FromEnv(os.Getenv, home, host)
+	if err != nil {
+		return done(p, err)
+	}
+	if args[1] == "once" {
+		return done(p, ledger.Once(sys.OS{}, p, c))
+	}
+	interval := 300 * time.Second
+	if s := os.Getenv("LEDGER_INTERVAL"); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n <= 0 {
+			return done(p, fmt.Errorf("LEDGER_INTERVAL must be a number of seconds, not %q", s))
+		}
+		interval = time.Duration(n) * time.Second
+	}
+	ledger.Loop(sys.OS{}, p, c, interval, time.Sleep)
+	return 0
 }

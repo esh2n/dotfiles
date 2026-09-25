@@ -28,6 +28,7 @@ commands:
   editor extensions [--repo DIR]         install the editor extensions into VS Code and Cursor (also: install-extensions)
   wallpaper search|random|set ...        Wallhaven wallpapers on every macOS desktop (also: wallpaper)
   templates render [--repo DIR]          render every *.template in the checkout beside itself
+  ledger sync once|loop                  ship this machine's LiteLLM spend to the cost ledger (LEDGER_* env)
   mado [use|stop|status|list|layout|info]  switch the macOS window-manager profile (also: mado)
   theme [--repo DIR] list|current|init|set <name>
                                          switch the colour theme (one link, then reloads)
@@ -97,6 +98,8 @@ func run(args []string, out, errOut io.Writer) int {
 		return runWallpaper(home, args[1:], out, errOut)
 	case "templates":
 		return runTemplates(args[1:], out, errOut)
+	case "ledger":
+		return runLedger(home, args[1:], out, errOut)
 	case "mado":
 		return runMado(home, args[1:], out, errOut)
 	case "theme":

@@ -12,7 +12,8 @@
   dotfiles.services.llm-ledger-sync = {
     script = "next/home/shared/llm-ledger/ledger-sync-up.sh";
     environment = {
-      LEDGER_SYNC_BIN = lib.getExe pkgs.llm-ledger-sync;
+      DOTCTL = lib.getExe pkgs.dotctl;
+      LEDGER_PSQL = "${pkgs.postgresql}/bin/psql";
       LEDGER_SQL = "${facts.repo}/next/home/shared/llm-ledger/ledger.sql";
     }
     // lib.optionalAttrs (facts.observerHost != null) { LEDGER_HOST = facts.observerHost; };

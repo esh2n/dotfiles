@@ -2,7 +2,7 @@
 # Foreground launcher for the cost-ledger sync (a machine without the
 # observer role; rules/decisions/2026-09-25-llm-cost-ledger-local-first.md).
 # Resolves the ledger DB password headlessly, like LiteLLM's own launcher, and
-# hands over to llm-ledger-sync (next/pkgs/scripts/llm-ledger-sync).
+# hands over to `dotctl ledger sync loop` (next/pkgs/dotctl, internal/ledger).
 set -euo pipefail
 
 # PATH, export_op_token, try_secret (Keychain on macOS, libsecret on Linux)
@@ -10,7 +10,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../../../domains/dev/config/litellm/secrets.sh"
 use_service_path
 
-: "${LEDGER_SYNC_BIN:?set by the unit}"
+: "${DOTCTL:?set by the unit}"
 export_op_token
 LEDGER_PASSWORD="$(try_secret op://llm-automation/litellm-db/password)"
 if [ -z "${LEDGER_PASSWORD}" ]; then
@@ -19,4 +19,4 @@ if [ -z "${LEDGER_PASSWORD}" ]; then
 	exec sleep 3600
 fi
 export LEDGER_PASSWORD
-exec "${LEDGER_SYNC_BIN}" loop
+exec "${DOTCTL}" ledger sync loop
