@@ -45,13 +45,13 @@ dotfiles/
 ├── lib/                      # 組み立ての部品（ロジックはここに集める）
 │   ├── facts.nix             #   唯一の不純な読み取り: $USER、$HOME、役割ファイル（形を assertions で検査）
 │   ├── mk-darwin.nix         #   nix-darwin + home-manager を組み立てる
-│   ├── mk-home.nix           #   standalone home-manager を組み立てる
+│   ├── mk-linux.nix          #   standalone home-manager を組み立てる（Linux）
 │   └── mk-service.nix        #   一つの宣言から launchd / systemd --user を出す
 │
 ├── roles/                    # 役割 = どの機能を有効にするか（中身は持たない）
 │   ├── options.nix           #   options.dotfiles.roles.<name>.enable（一つの名前空間。nix-darwin の評価はこれだけ読む）
 │   ├── default.nix           #   home-manager の評価が読む: options と各役割
-│   └── dev.nix, llm-hub.nix, …  # 役割ごとに、どの機能を on にするか
+│   └── developer.nix, observer.nix, …  # 役割ごとに、どの機能を on にするか
 │
 ├── system/                   # OS 層（nix-darwin だけ。Omarchy の OS 層は Omarchy のもの）
 │   └── darwin/               #   defaults.nix（Dock・キーボード）、homebrew.nix（cask・formula・App Store）、nix.nix
@@ -124,7 +124,7 @@ dotfiles/
 
 ## 6. 自作ツール
 
-- **shell に残す**: 100 行未満で素直なもの（gh 拡張の更新、壁紙取得など）。`writeShellApplication` で包み（shellcheck が自動で走り、依存コマンドを固定）、共通関数は `pkgs/scripts/lib/` の一か所。テストは bats。
+- **shell に残す**: 別のプログラムに処理を渡すだけの薄い入口だけ。出力を持つコマンドは長さに関係なく dotctl にし、シェルの共通関数ライブラリは作らない（2026-09-25 に変更、`rules/decisions/2026-09-25-dotctl-owns-every-command-with-output.md`）。
 - **シェルでしかできないもの**: `cd`、環境変数、プロンプトのフック、fzf のウィジェットは zsh 関数として `home/shared/zsh/functions/` に残す（mise・starship も `eval` させる一行が要る）。
 - **dotctl に移す**: theme-switch、mado、nvim-switch、code-graph-cache-gc、家の LLM の確認、zsh 関数のうちシェルの状態を変えない部分。一つのバイナリのサブコマンドにし、ログ・エラー・設定・秘密情報を `pkgs/dotctl/internal/` の共通部品にする。
 - **言語**: 証拠は Go を支持（個人 dotfiles の CLI の実例 chezmoi、起動 9ms・2.1MiB、ビルド 1.85 秒、`buildGoModule`）。Rust は同じ形の実例がほぼなく（5 件、最大 3★）ビルドも遅い。Bun の単一バイナリには再現バグ（#14676・#24470）と 60MiB。
@@ -165,7 +165,7 @@ snowfall-lib・std・ez-configs・digga のような枠組み、dendritic を背
 ## 11. 未決事項（持ち主が決める）
 
 1. ~~dotctl の言語~~ → Go に決定（2026-09-25、`rules/decisions/2026-09-25-dotctl-in-go.md`）。
-2. 役割ファイルの場所と形（案: `~/.config/dotfiles/roles.json`、`{"roles": [...]}`）と役割の一覧（案: base・dev・desktop・llm-hub・gpu）。
+2. ~~役割ファイルの場所と形と役割の一覧~~ → `~/.config/dotfiles/roles.json`、`{"roles": [...]}`。役割は developer・desk-user・model-provider・observer（base は書かない）に決定（2026-09-25、`rules/decisions/2026-09-25-roles-named-as-people.md`）。
 3. ハーネスを `harness/` に移すこと（`2026-09-22-config-layout-no-personal-layer.md` の置き換え）と、writeup-kit・artifact-worker・dopa-shorts を `projects/` に置くか repo の外へ出すか。
 4. テーマを include で読めないアプリの一覧（実装時に棚卸し）。
 5. モジュール単体テストをいつ入れるか。
