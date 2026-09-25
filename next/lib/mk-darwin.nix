@@ -48,6 +48,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/serena
           ../home/shared/harness
           ../home/shared/dotctl
+          ../home/shared/codebase-memory
           ../home/shared/theme
           ../home/shared/nvim
           ../home/shared/git
@@ -63,7 +64,6 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/lmstudio-awake
           ../home/darwin/apps
           ../home/darwin/tmux
-          ../home/darwin/codebase-memory
           ../home/darwin/browsers
           ../home/darwin/sketchybar
           ../home/darwin/configs

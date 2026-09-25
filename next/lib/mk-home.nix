@@ -30,6 +30,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/serena
     ../home/shared/harness
     ../home/shared/dotctl
+    ../home/shared/codebase-memory
     ../home/shared/theme
     ../home/shared/nvim
     ../home/shared/git

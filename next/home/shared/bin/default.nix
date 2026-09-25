@@ -5,6 +5,7 @@ let
   link = config.lib.dotfiles.link;
   commands = {
     artifact = "domains/dev/bin/artifact";
+    codebase-memory-mcp-managed = "domains/dev/bin/codebase-memory-mcp-managed";
     gh-pr-graph-update = "domains/dev/bin/gh-pr-graph-update";
     git-credential-gh-owner = "domains/dev/bin/git-credential-gh-owner";
     jig = "domains/dev/bin/jig";

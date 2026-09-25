@@ -41,16 +41,16 @@ print(json.dumps(v))' "${@:2}"; }
 
 names() { printf '%s' "$1" | python3 -c 'import json,sys; print(" ".join(sorted(json.load(sys.stdin))))'; }
 
-SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-ecc setup-gh-extensions setup-git-identity setup-git-lfs setup-mise-trust setup-nvim-default setup-pacifica setup-pi-packages setup-theme-init setup-zellij-harpoon setup-zellij-plugins"
+SHARED="setup-capsule-daemon setup-claude-cli setup-claude-mcp setup-codebase-memory setup-ecc setup-gh-extensions setup-git-identity setup-git-lfs setup-mise-trust setup-nvim-default setup-pacifica setup-pi-packages setup-theme-init setup-zellij-harpoon setup-zellij-plugins"
 
 @test "setup: the mac runs every ported step, plus its own" {
 	run --separate-stderr activation darwin
 	[ "$status" -eq 0 ]
-	expected="$(printf '%s\n' ${SHARED} setup-browsers setup-codebase-memory setup-sbarlua setup-tpm setup-warp-seed | sort | tr '\n' ' ' | sed 's/ $//')"
+	expected="$(printf '%s\n' ${SHARED} setup-browsers setup-sbarlua setup-tpm setup-warp-seed | sort | tr '\n' ' ' | sed 's/ $//')"
 	[ "$(names "$output")" = "$expected" ] || { echo "got: $(names "$output")"; false; }
 }
 
-@test "setup: linux runs the shared steps only (Omarchy owns tmux; warp and codebase-memory are mac-only)" {
+@test "setup: linux runs the shared steps only (Omarchy owns tmux; warp is mac-only)" {
 	run --separate-stderr activation linux
 	[ "$status" -eq 0 ]
 	expected="$(printf '%s\n' ${SHARED} | sort | tr '\n' ' ' | sed 's/ $//')"

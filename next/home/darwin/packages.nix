@@ -15,10 +15,7 @@ in
 {
   home.packages = lib.mkMerge [
     (lib.mkIf (on "base") [ pkgs.mise ])
-    (lib.mkIf (on "dev") [
-      pkgs.cocoapods
-      pkgs.codebase-memory-mcp # upstream ships macOS binaries only (next/pkgs)
-    ])
+    (lib.mkIf (on "dev") [ pkgs.cocoapods ])
     (lib.mkIf (on "desktop") (
       [
         pkgs.mas

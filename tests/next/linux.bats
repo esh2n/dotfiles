@@ -24,7 +24,14 @@ linux() { # linux <attribute path under the configuration>
 }
 
 @test "linux: nothing macOS-only or Omarchy-owned is installed" {
-	run --separate-stderr nix_eval_expr_json "let names = map (p: p.pname or (builtins.parseDrvName p.name).name) (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.packages; in builtins.filter (n: builtins.elem n names) [ \"mas\" \"nowplaying-cli\" \"cocoapods\" \"codebase-memory-mcp\" \"mise\" ]"
+	run --separate-stderr nix_eval_expr_json "let names = map (p: p.pname or (builtins.parseDrvName p.name).name) (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.packages; in builtins.filter (n: builtins.elem n names) [ \"mas\" \"nowplaying-cli\" \"cocoapods\" \"mise\" ]"
 	[ "$status" -eq 0 ]
 	[ "$output" = "[]" ]
+}
+
+@test "linux: codebase-memory-mcp is installed with dev, since every harness is given it as an MCP server" {
+	printf '{"roles": ["dev"]}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr nix_eval_expr_json "builtins.any (p: (p.pname or \"\") == \"codebase-memory-mcp\") (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.packages"
+	[ "$output" = true ]
 }

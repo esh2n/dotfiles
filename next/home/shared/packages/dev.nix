@@ -31,6 +31,9 @@
       pnpm
       yarn
 
+      # Code graph MCP server, given to every harness (next/pkgs)
+      codebase-memory-mcp
+
       # Built by this repo (overlays)
       cargo-compete
       crit

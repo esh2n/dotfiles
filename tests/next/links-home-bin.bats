@@ -60,10 +60,10 @@ TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado "
 	run --separate-stderr links linux
 	[ "$status" -eq 0 ]
 	json="$output"
-	for name in install-extensions theme-switch orca-theme-apply.py mado wallpaper codebase-memory-mcp-managed; do
+	for name in install-extensions theme-switch orca-theme-apply.py mado wallpaper; do
 		[ "$(target "$json" "bin/${name}")" = "<missing>" ] || { echo "bin/${name} present on linux"; false; }
 	done
-	for name in artifact gh-pr-graph-update git-credential-gh-owner jig setup-neovim-distros gh-switch; do
+	for name in artifact codebase-memory-mcp-managed gh-pr-graph-update git-credential-gh-owner jig setup-neovim-distros gh-switch; do
 		[ "$(target "$json" "bin/${name}")" != "<missing>" ] || { echo "bin/${name} missing on linux"; false; }
 	done
 }
