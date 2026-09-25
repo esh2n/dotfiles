@@ -84,13 +84,19 @@ restart_litellm() {
 		[[ "${LMSTUDIO}" == 0 && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && launchctl setenv LM_STUDIO_REMOTE_HOST "${LM_STUDIO_REMOTE_HOST}"
 		local domain job=com.esh2n.litellm-proxy
 		domain="gui/$(id -u)"
-		# A loaded job is restarted in place; bootout-then-bootstrap races
-		# ("Input/output error"). One launchd has not loaded yet is loaded.
+		# Reload from the current plist: a job loaded by an earlier layout (or
+		# an older plist) is booted out first. bootout returns before the job
+		# is gone, and bootstrapping then fails with "Input/output error"
+		# (code 5), so wait until launchd no longer has it.
 		if launchctl print "${domain}/${job}" >/dev/null 2>&1; then
-			launchctl kickstart -k "${domain}/${job}" || todo "LiteLLM: launchctl kickstart failed"
-		else
-			launchctl bootstrap "${domain}" "${HOME}/Library/LaunchAgents/${job}.plist" || todo "LiteLLM: launchctl bootstrap failed"
+			launchctl bootout "${domain}/${job}" >/dev/null 2>&1 || true
+			local _
+			for _ in $(seq 1 40); do
+				launchctl print "${domain}/${job}" >/dev/null 2>&1 || break
+				sleep 0.5
+			done
 		fi
+		launchctl bootstrap "${domain}" "${HOME}/Library/LaunchAgents/${job}.plist" || todo "LiteLLM: launchctl bootstrap failed"
 		;;
 	*)
 		[[ "${LMSTUDIO}" == 0 && -n "${LM_STUDIO_REMOTE_HOST:-}" ]] && systemctl --user set-environment "LM_STUDIO_REMOTE_HOST=${LM_STUDIO_REMOTE_HOST}"

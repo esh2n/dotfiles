@@ -79,7 +79,7 @@ hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"
 
 @test "home-llm: LiteLLM restarts onto the current config on macOS and Linux" {
 	run hl
-	grep -q "^launchctl kickstart -k gui/.*/com.esh2n.litellm-proxy" "${LOG}"
+	grep -q "^launchctl bootstrap gui/.*/Library/LaunchAgents/com.esh2n.litellm-proxy.plist" "${LOG}"
 	: >"${LOG}"
 	fake uname 'echo Linux'
 	run hl
@@ -125,16 +125,24 @@ hl() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "${ROOT}" "$@"
 	grep -q "^lms server start --port 1234" "${LOG}"
 }
 
-@test "home-llm: a LiteLLM job launchd does not have loaded yet is bootstrapped, a loaded one kickstarted" {
+@test "home-llm: a LiteLLM job launchd does not have loaded yet is bootstrapped" {
 	fake launchctl 'if [ "$1" = print ]; then exit 113; fi'
 	run hl
 	grep -q "^launchctl bootstrap gui/[0-9]* .*/Library/LaunchAgents/com.esh2n.litellm-proxy.plist" "${LOG}"
-	! grep -q "kickstart" "${LOG}"
-	: >"${LOG}"
-	fake launchctl
+	! grep -q "bootout" "${LOG}"
+}
+
+@test "home-llm: a loaded LiteLLM job is booted out, waited for until gone, then bootstrapped from the current plist" {
+	# loaded until bootout, then gone after one more look (bootout returns early)
+	STATE="${BATS_TEST_TMPDIR}/lc"
+	fake launchctl 'case "$1" in
+		print) [ -f "'"${STATE}"'.gone" ] && exit 113; [ -f "'"${STATE}"'.out" ] && touch "'"${STATE}"'.gone"; exit 0 ;;
+		bootout) touch "'"${STATE}"'.out" ;;
+	esac'
 	run hl
-	grep -q "^launchctl kickstart -k gui/.*/com.esh2n.litellm-proxy" "${LOG}"
-	! grep -q "^launchctl bootstrap" "${LOG}"
+	[ "$(grep -n '^launchctl bootout' "${LOG}" | cut -d: -f1)" -lt "$(grep -n '^launchctl bootstrap' "${LOG}" | cut -d: -f1)" ]
+	[ "$(grep -c '^launchctl print' "${LOG}")" -ge 3 ]
+	! grep -q "kickstart" "${LOG}"
 }
 
 @test "home-llm --gpu: also serves llama-server's port, nothing else extra" {
