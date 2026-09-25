@@ -49,6 +49,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/zed
     ../home/shared/capsule
     ../home/shared/tailscale
+    ../home/shared/wezterm
     ../home/shared/packages
   ];
 }

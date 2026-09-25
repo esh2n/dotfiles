@@ -217,7 +217,7 @@ func applyCLI(e Env, name string) error {
 	}
 
 	active, inactive := "#"+h("blue"), "#"+h("surface0")
-	if b, err := os.ReadFile(e.repo("domains/dev/config/tmux/themes/" + name + ".conf")); err == nil {
+	if b, err := os.ReadFile(e.repo("next/home/darwin/tmux/config/themes/" + name + ".conf")); err == nil {
 		pick := func(key string) string {
 			m := regexp.MustCompile(`(?m)^.*` + regexp.QuoteMeta(key) + `.*"(#[a-f0-9]{6})".*$`).FindSubmatch(b)
 			if m == nil {

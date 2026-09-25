@@ -151,10 +151,10 @@ ln -sf "$THEME_FILE" "$TARGET_LINK"
 log_success "Updated system config symlink"
 
 # Update Ghostty Theme
-GHOSTTY_CONFIG_DIR="$DOTFILES_ROOT/domains/dev/config/ghostty"
+GHOSTTY_CONFIG_DIR="$DOTFILES_ROOT/next/home/darwin/ghostty/config"
 if [[ ! -d "$GHOSTTY_CONFIG_DIR" ]]; then
     # Fallback
-    GHOSTTY_CONFIG_DIR="$HOME/dotfiles/domains/dev/config/ghostty"
+    GHOSTTY_CONFIG_DIR="$HOME/dotfiles/next/home/darwin/ghostty/config"
 fi
 
 if [[ -d "$GHOSTTY_CONFIG_DIR" ]]; then
@@ -169,10 +169,10 @@ if [[ -d "$GHOSTTY_CONFIG_DIR" ]]; then
 fi
 
 # Update Borders Theme
-BORDERS_CONFIG_DIR="$DOTFILES_ROOT/domains/workspace/config/borders"
+BORDERS_CONFIG_DIR="$DOTFILES_ROOT/next/home/darwin/borders/config"
 if [[ ! -d "$BORDERS_CONFIG_DIR" ]]; then
     # Fallback
-    BORDERS_CONFIG_DIR="$HOME/dotfiles/domains/workspace/config/borders"
+    BORDERS_CONFIG_DIR="$HOME/dotfiles/next/home/darwin/borders/config"
 fi
 
 if [[ -d "$BORDERS_CONFIG_DIR" ]]; then
@@ -264,10 +264,10 @@ if [[ -d "$TMUX_THEMES_DIR" ]]; then
 fi
 
 # Update and Reload Sketchybar
-SKETCHYBAR_CONFIG_DIR="$DOTFILES_ROOT/domains/workspace/config/sketchybar"
+SKETCHYBAR_CONFIG_DIR="$DOTFILES_ROOT/next/home/darwin/sketchybar/config"
 if [[ ! -d "$SKETCHYBAR_CONFIG_DIR" ]]; then
     # Fallback
-    SKETCHYBAR_CONFIG_DIR="$HOME/dotfiles/domains/workspace/config/sketchybar"
+    SKETCHYBAR_CONFIG_DIR="$HOME/dotfiles/next/home/darwin/sketchybar/config"
 fi
 
 if [[ -d "$SKETCHYBAR_CONFIG_DIR" ]]; then

@@ -7,7 +7,7 @@ ITEM_NAME="${1:-widgets.weather}"
 CITY_ID="1850147"  # Tokyo
 
 # Resolve script's real directory through symlinks
-# (~/.config/sketchybar -> dotfiles/domains/workspace/config/sketchybar)
+# (~/.config/sketchybar -> dotfiles/next/home/darwin/sketchybar/config)
 resolve_script_dir() {
     local src="${BASH_SOURCE[0]}"
     while [[ -h "$src" ]]; do
@@ -25,9 +25,9 @@ resolve_script_dir() {
     cd "$(dirname "$src")" && pwd -P
 }
 
-# Walk up from .../domains/workspace/config/sketchybar/plugins to dotfiles root
+# Walk up from .../next/home/darwin/sketchybar/config/plugins to dotfiles root
 SCRIPT_DIR="$(resolve_script_dir)"
-SCRIPT_DOTFILES_ROOT="$(cd "$SCRIPT_DIR/../../../../.." 2>/dev/null && pwd -P)"
+SCRIPT_DOTFILES_ROOT="$(cd "$SCRIPT_DIR/../../../../../.." 2>/dev/null && pwd -P)"
 
 # Get API key from environment or .env file
 get_api_key() {

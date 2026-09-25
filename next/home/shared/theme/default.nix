@@ -21,10 +21,10 @@ let
   # file in a palette -> the theme file, relative to the checkout
   apps = {
     "colors.lua" = n: "domains/system/config/themes/${n}.lua";
-    ghostty = n: "domains/dev/config/ghostty/themes/${n}";
-    "tmux.conf" = n: "domains/dev/config/tmux/themes/${n}.conf";
-    "sketchybar.lua" = n: "domains/workspace/config/sketchybar/themes/${n}.lua";
-    "borders.sh" = n: "domains/workspace/config/borders/themes/${n}.sh";
+    ghostty = n: "next/home/darwin/ghostty/config/themes/${n}";
+    "tmux.conf" = n: "next/home/darwin/tmux/config/themes/${n}.conf";
+    "sketchybar.lua" = n: "next/home/darwin/sketchybar/config/themes/${n}.lua";
+    "borders.sh" = n: "next/home/darwin/borders/config/themes/${n}.sh";
   };
   themes = map (f: lib.removeSuffix ".lua" f) (
     builtins.attrNames (builtins.readDir (checkout + "/domains/system/config/themes"))

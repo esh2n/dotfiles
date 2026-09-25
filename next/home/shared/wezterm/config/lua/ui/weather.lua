@@ -19,7 +19,7 @@ local function get_api_key()
         -- 設定ディレクトリからリポジトリルートを見つける試み
         if wezterm.config_dir then
             local config_dir = wezterm.config_dir:gsub([[\]], '/')
-            local repo_root = config_dir:match('(.+)/config/wezterm')
+            local repo_root = config_dir:match('(.+)/next/home/shared/wezterm/config')
             
             -- 設定ディレクトリから見つかったパスを追加
             if repo_root then
@@ -27,7 +27,7 @@ local function get_api_key()
             end
 
             -- 直接設定ディレクトリの親の親を試す
-            table.insert(paths, config_dir .. '/../../.env')
+            table.insert(paths, config_dir .. '/../../../../../.env')
         end
         
         -- ホームディレクトリを使用する場合のパス
@@ -48,8 +48,7 @@ local function get_api_key()
             -- パス区切り文字の標準化
             wezterm_config = wezterm_config:gsub([[\]], '/')
             -- 相対的な場所の推測
-            table.insert(paths, wezterm_config .. '/../../.env')
-            table.insert(paths, wezterm_config .. '/../../../.env')
+            table.insert(paths, wezterm_config .. '/../../../../../.env')
         end
         
         -- 存在するパスを返す

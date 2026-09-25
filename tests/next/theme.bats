@@ -29,11 +29,11 @@ target() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.load(sys.s
 @test "theme: a palette points at the theme's own files, or its family's when it has none" {
 	run --separate-stderr links
 	json="$output"
-	[ "$(target "$json" .config/theme/palettes/nord/ghostty)" = "${REPO_ROOT}/domains/dev/config/ghostty/themes/nord" ]
+	[ "$(target "$json" .config/theme/palettes/nord/ghostty)" = "${REPO_ROOT}/next/home/darwin/ghostty/config/themes/nord" ]
 	[ "$(target "$json" .config/theme/palettes/nord/colors.lua)" = "${REPO_ROOT}/domains/system/config/themes/nord.lua" ]
 	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/colors.lua)" = "${REPO_ROOT}/domains/system/config/themes/catppuccin-latte.lua" ]
-	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/ghostty)" = "${REPO_ROOT}/domains/dev/config/ghostty/themes/catppuccin" ]
-	[ "$(target "$json" .config/theme/palettes/tokyonight-day/tmux.conf)" = "${REPO_ROOT}/domains/dev/config/tmux/themes/tokyonight.conf" ]
+	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/ghostty)" = "${REPO_ROOT}/next/home/darwin/ghostty/config/themes/catppuccin" ]
+	[ "$(target "$json" .config/theme/palettes/tokyonight-day/tmux.conf)" = "${REPO_ROOT}/next/home/darwin/tmux/config/themes/tokyonight.conf" ]
 }
 
 @test "theme: activation points the apps through the current theme" {

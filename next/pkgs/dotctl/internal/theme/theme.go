@@ -35,10 +35,10 @@ func (a App) Source(name string) string { return fmt.Sprintf(a.source, name) }
 // record the old theme-switch kept, so Init can adopt its choice.
 var Apps = []App{
 	{File: "colors.lua", Pointer: "domains/system/config/colors.lua", source: "domains/system/config/themes/%s.lua"},
-	{File: "ghostty", Pointer: "domains/dev/config/ghostty/theme", source: "domains/dev/config/ghostty/themes/%s"},
-	{File: "tmux.conf", Pointer: "domains/dev/config/tmux/themes/current.conf", source: "domains/dev/config/tmux/themes/%s.conf"},
-	{File: "sketchybar.lua", Pointer: "domains/workspace/config/sketchybar/colors.lua", source: "domains/workspace/config/sketchybar/themes/%s.lua"},
-	{File: "borders.sh", Pointer: "domains/workspace/config/borders/colors.sh", source: "domains/workspace/config/borders/themes/%s.sh"},
+	{File: "ghostty", Pointer: "next/home/darwin/ghostty/config/theme", source: "next/home/darwin/ghostty/config/themes/%s"},
+	{File: "tmux.conf", Pointer: "next/home/darwin/tmux/config/themes/current.conf", source: "next/home/darwin/tmux/config/themes/%s.conf"},
+	{File: "sketchybar.lua", Pointer: "next/home/darwin/sketchybar/config/colors.lua", source: "next/home/darwin/sketchybar/config/themes/%s.lua"},
+	{File: "borders.sh", Pointer: "next/home/darwin/borders/config/colors.sh", source: "next/home/darwin/borders/config/themes/%s.sh"},
 }
 
 // Env is the world a switch acts on; tests replace Run and Has.
@@ -180,7 +180,7 @@ func reload(e Env) {
 	}
 	if has("borders") && e.Start != nil {
 		_ = e.Run("pkill", "-x", "borders") // not running is fine
-		if err := e.Start(filepath.Join(e.Repo, "domains/workspace/config/borders/bordersrc")); err != nil {
+		if err := e.Start(filepath.Join(e.Repo, "next/home/darwin/borders/config/bordersrc")); err != nil {
 			e.warn("borders: %v", err)
 		}
 	}

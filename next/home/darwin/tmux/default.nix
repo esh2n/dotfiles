@@ -1,8 +1,7 @@
-# tmux (macOS; Omarchy owns tmux on Linux): its plugins load through TPM.
+# tmux (macOS; Omarchy owns tmux on Linux): ~/.config/tmux is a link to
+# config/ beside this file, and its plugins load through TPM.
 { config, ... }:
-let
-  setup = config.lib.dotfiles.setupStep;
-in
 {
-  dotfiles.setup.tpm.command = setup "tpm";
+  xdg.configFile.tmux.source = config.lib.dotfiles.link "next/home/darwin/tmux/config";
+  dotfiles.setup.tpm.command = config.lib.dotfiles.setupStep "tpm";
 }

@@ -20,9 +20,18 @@ world() {
 	mkdir -p "$w/repo/domains/dev/config" "$w/repo/domains/workspace/config" "$w/repo/core" "$w/home/.config/git" "$w/home/.config/tmux-pane-border" "$w/bin"
 	cp -R "${REPO}/core/utils" "$w/repo/core/"
 	cp -R "${REPO}/domains/system" "$w/repo/domains/"
-	for d in tmux ghostty nvim-lazyvim nvim-nvchad nvim-astrovim nvim-custom; do cp -R "${REPO}/domains/dev/config/$d" "$w/repo/domains/dev/config/"; done
-	for d in sketchybar borders; do cp -R "${REPO}/domains/workspace/config/$d" "$w/repo/domains/workspace/config/"; done
-	ln -s "$w/repo/domains/dev/config/tmux" "$w/home/.config/tmux"
+	for d in nvim-lazyvim nvim-nvchad nvim-astrovim nvim-custom; do cp -R "${REPO}/domains/dev/config/$d" "$w/repo/domains/dev/config/"; done
+	# apps already beside their modules: dotctl reads them there, the old
+	# theme-switch at their old domains/ place, so both get a copy
+	local app old
+	for app in darwin/tmux:dev/config/tmux darwin/ghostty:dev/config/ghostty \
+		darwin/sketchybar:workspace/config/sketchybar darwin/borders:workspace/config/borders; do
+		old="${app#*:}" app="${app%%:*}"
+		mkdir -p "$w/repo/next/home/${app}" "$w/repo/domains/${old}"
+		cp -R "${REPO}/next/home/${app}/config" "$w/repo/next/home/${app}/"
+		cp -R "${REPO}/next/home/${app}/config/." "$w/repo/domains/${old}/"
+	done
+	ln -s "$w/repo/next/home/darwin/tmux/config" "$w/home/.config/tmux"
 	for t in tmux sketchybar borders pkill desktoppr pgrep; do printf '#!/bin/sh\nexit 1\n' >"$w/bin/$t"; chmod +x "$w/bin/$t"; done
 }
 

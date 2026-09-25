@@ -6,10 +6,6 @@ let
   link = config.lib.dotfiles.link;
   dirs = {
     git = "domains/dev/config/git";
-    ghostty = "domains/dev/config/ghostty";
-    tmux = "domains/dev/config/tmux";
-    borders = "domains/workspace/config/borders";
-    sketchybar = "domains/workspace/config/sketchybar";
   };
 in
 {

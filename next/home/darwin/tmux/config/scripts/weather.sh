@@ -20,8 +20,8 @@ find_env_file() {
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local dotfiles_root
 
-    # Walk up from tmux config directory to find dotfiles root
-    dotfiles_root="$(cd "${script_dir}/../../.." && pwd)"
+    # Walk up from next/home/darwin/tmux/config/scripts to the checkout
+    dotfiles_root="$(cd "${script_dir}/../../../../../.." && pwd)"
     if [[ -f "${dotfiles_root}/.env" ]]; then
         echo "${dotfiles_root}/.env"
         return
