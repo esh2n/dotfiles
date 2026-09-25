@@ -15,6 +15,7 @@ import (
 const usage = `usage: dotctl <command> [args]
 
 commands:
+  up [--repo DIR]                        install or update this machine (what make up runs)
   nvim <custom|nvchad|lazyvim|astrovim>  point ~/.config/nvim at a distribution
   nvim current                           name the active distribution
   nvim list                              list distributions, marking the active one
@@ -56,6 +57,8 @@ func run(args []string, out, errOut io.Writer) int {
 	switch args[0] {
 	case "nvim":
 		return runNvim(home, args[1:], out, errOut)
+	case "up":
+		return runUp(home, args[1:], out, errOut)
 	case "theme":
 		return runTheme(home, args[1:], out, errOut)
 	case "cache-gc":
