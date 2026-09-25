@@ -40,6 +40,11 @@ sync_once() {
 	local since newest rows
 	mkdir -p "${STATE}"
 	since="$(cat "${STATE}/shipped" 2>/dev/null || echo '1970-01-01 00:00:00')"
+	# the watermark goes into SQL: only a plain timestamp gets there
+	if [[ ! "${since}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,6})?$ ]]; then
+		log "the watermark is not a timestamp; sending everything again (duplicates are dropped)"
+		since='1970-01-01 00:00:00'
+	fi
 	# Every step is checked by hand: in loop mode this runs under `||`, where
 	# set -e is off, and a failure must never move the watermark.
 	# the newest row now, before copying: rows written meanwhile go next time

@@ -13,6 +13,7 @@ setup() {
 	sed "s|^use_service_path\$|PATH=\"${BIN}:/usr/bin:/bin\"|" "$C/litellm-up.sh" >"$D/litellm-up.sh"
 	cp "$C/secrets.sh" "$D/secrets.sh"
 	export HOME="${BATS_TEST_TMPDIR}/home" DB_SECRET=the-db-pw
+	unset XDG_RUNTIME_DIR
 	mkdir -p "$HOME"
 	fake uname 'echo Darwin'
 	fake security 'echo token'
@@ -45,9 +46,14 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	grep -qx "db-url=postgresql://litellm:the-db-pw@litellm-db:5432/litellm" "$LOG"
 }
 
-@test "litellm-up: the DB password never appears on a command line" {
+@test "litellm-up: the DB password never appears on a command line, and the DB reads it from a private file" {
 	run up
 	! grep -q "^docker .*the-db-pw" "$LOG"
+	grep -q "^docker run -d .*-e POSTGRES_PASSWORD_FILE=/run/secrets/db_password " "$LOG"
+	! grep -q "^docker run -d .*-e POSTGRES_PASSWORD " "$LOG"
+	f="${HOME}/.local/state/litellm-secrets/db_password"
+	[ "$(cat "$f")" = the-db-pw ]
+	[ "$(stat -f %Lp "$f" 2>/dev/null || stat -c %a "$f")" = 600 ]
 }
 
 @test "litellm-up: a running DB is reused, not recreated" {

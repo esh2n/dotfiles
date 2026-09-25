@@ -4,9 +4,13 @@
 # Secret model (Stack A — no secret at rest): the 1Password SERVICE ACCOUNT token
 # is read from the OS store — login Keychain / libsecret — (no biometric prompt), then bounded
 # `op read`s resolve the provider secrets into this process's env. Nothing secret
-# touches disk, the config, or Docker metadata — the container runs --rm in the
-# FOREGROUND so launchd (KeepAlive) supervises it. Each op read is time-boxed so a
-# throttled/unreachable 1Password fails fast and launchd retries.
+# is on a command line or in the repository. The provider keys and DATABASE_URL
+# do reach the container as environment variables, which Docker keeps in the
+# container's config (`docker inspect` shows them to whoever can use the docker
+# socket) for as long as the container exists; the container runs --rm in the
+# FOREGROUND so launchd (KeepAlive) supervises it and removes it on exit. The
+# ledger DB container reads its password from a 0600 file instead. Each op read
+# is time-boxed so a throttled/unreachable 1Password fails fast and launchd retries.
 #
 # master_key is a real secret (op://llm-automation/litellm/credential). Consumers
 # fetch it through their own op paths.
@@ -64,7 +68,10 @@ export TYPESAFE_API_KEY
 LITELLM_DB_PASSWORD="$(try_secret op://llm-automation/litellm-db/credential)"
 DB_ARGS=()
 if [ -n "$LITELLM_DB_PASSWORD" ]; then
-  export POSTGRES_PASSWORD="$LITELLM_DB_PASSWORD" POSTGRES_USER=litellm POSTGRES_DB=litellm
+  # the DB container reads its password from a file (POSTGRES_PASSWORD_FILE),
+  # so it is not kept in the container's config
+  SECRET_DIR="${XDG_RUNTIME_DIR:-$HOME/.local/state}/litellm-secrets"
+  (umask 077 && mkdir -p "$SECRET_DIR" && printf '%s' "$LITELLM_DB_PASSWORD" >"$SECRET_DIR/db_password")
   docker network inspect "$NETWORK" >/dev/null 2>&1 || docker network create "$NETWORK" >/dev/null
   if [ "$(docker inspect -f '{{.State.Running}}' "$DB_NAME" 2>/dev/null || true)" != true ]; then
     docker rm -f "$DB_NAME" >/dev/null 2>&1 || true
@@ -72,7 +79,9 @@ if [ -n "$LITELLM_DB_PASSWORD" ]; then
     # llm-console machine `tailscale serve --tcp 5432` is its one exposure.
     docker run -d --name "$DB_NAME" --restart unless-stopped --network "$NETWORK" \
       -p 127.0.0.1:5432:5432 -v litellm-db-data:/var/lib/postgresql/data \
-      -e POSTGRES_PASSWORD -e POSTGRES_USER -e POSTGRES_DB "$DB_IMAGE" >/dev/null
+      -v "$SECRET_DIR/db_password:/run/secrets/db_password:ro" \
+      -e POSTGRES_PASSWORD_FILE=/run/secrets/db_password -e POSTGRES_USER=litellm -e POSTGRES_DB=litellm \
+      "$DB_IMAGE" >/dev/null
   fi
   until docker exec "$DB_NAME" pg_isready -U litellm -d litellm >/dev/null 2>&1; do sleep 1; done
   export DATABASE_URL="postgresql://litellm:${LITELLM_DB_PASSWORD}@${DB_NAME}:5432/litellm"

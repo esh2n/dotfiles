@@ -76,3 +76,11 @@ sync() { PATH="${BIN}:/usr/bin:/bin" bash -euo pipefail "${SCRIPT}" "$@"; }
 	[[ "$stderr" == *"no ledger host"* ]]
 	[ ! -e "$LOG" ] || ! grep -q "^psql" "$LOG"
 }
+
+@test "llm-ledger-sync: a watermark that is not a timestamp never reaches the SQL" {
+	mkdir -p "$LEDGER_STATE_DIR"
+	printf "%s" "2026-01-01'); DROP TABLE x; --" >"${LEDGER_STATE_DIR}/shipped"
+	run --separate-stderr sync once
+	! grep -q "DROP TABLE" "$LOG"
+	grep -q "timestamp '1970-01-01 00:00:00'" "$LOG"
+}
