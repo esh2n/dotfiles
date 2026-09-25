@@ -1,12 +1,5 @@
 # Utility Functions for Zsh
 
-# Load core library
-if [[ -n "$DOTFILES_ROOT" ]]; then
-  source "$DOTFILES_ROOT/core/utils/common.sh"
-elif [[ -f "$HOME/dotfiles/dotfiles/core/utils/common.sh" ]]; then
-  source "$HOME/dotfiles/dotfiles/core/utils/common.sh"
-fi
-
 # Zsh-specific wrappers and utilities
 
 # Quick directory backup

@@ -15,7 +15,7 @@
         "compat": "localhost gateways: pi-ai treats an unknown URL as OpenAI itself and sends fields LiteLLM may reject — these two are the usual fixes and have no UI field, so they must live here.",
         "supportsDeveloperRole": "system prompt as `system`, not `developer`",
         "maxTokensField": "if the proxy rejects max_completion_tokens",
-        "pi.apiKey": "env interpolation: the `pi` shell wrapper (domains/dev/shell/zsh/functions.zsh) resolves the op-managed proxy key ONCE at launch and exports LITELLM_API_KEY, so pi never spawns a key-reader in a subprocess that cannot reach the Keychain. Launch pi via that wrapper, not the raw binary."
+        "pi.apiKey": "env interpolation: the `pi` shell wrapper (next/home/shared/zsh/rc/functions.zsh) resolves the op-managed proxy key ONCE at launch and exports LITELLM_API_KEY, so pi never spawns a key-reader in a subprocess that cannot reach the Keychain. Launch pi via that wrapper, not the raw binary."
       },
       "pi": {
         "apiKey": "$LITELLM_API_KEY"

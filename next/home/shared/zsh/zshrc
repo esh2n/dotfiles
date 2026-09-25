@@ -4,39 +4,26 @@
 
 # .zshrc - Dotfiles Entry Point
 
-# 1. Define Dotfiles Root / ドットファイルルートの定義
-# Resolve symlink to find dotfiles root / シンボリックリンクからルートパスを解決
+# 1. The checkout: this file is a link to next/home/shared/zsh/zshrc in it
 if [[ -z "$DOTFILES_ROOT" ]]; then
-    if [[ -L "${HOME}/.zshrc" ]]; then
-        # :A resolves the symlink in-shell (no readlink/dirname forks)
-        # .zshrc is in domains/dev/home/.zshrc -> root is ../../../
-        DOTFILES_ROOT="${${:-${HOME}/.zshrc}:A:h:h:h:h}"
-    else
-        # Fallback: resolve via ghq root + git remote
-        local ghq_root="${GHQ_ROOT:-${HOME}/go}"
-        local gh_user="${GITHUB_USER:-$(git config github.user 2>/dev/null || echo "")}"
-        if [[ -n "$gh_user" ]]; then
-            DOTFILES_ROOT="${ghq_root}/github.com/${gh_user}/dotfiles"
-        else
-            DOTFILES_ROOT="${HOME}/dotfiles"
-        fi
-    fi
+    # :A resolves the symlink in-shell (no readlink/dirname forks)
+    DOTFILES_ROOT="${${:-${HOME}/.zshrc}:A:h:h:h:h:h}"
 fi
-
 export DOTFILES_ROOT
 
-# 2. Source Core Loader / コアローダーの読み込み
-if [[ -f "${DOTFILES_ROOT}/core/install/loader.sh" ]]; then
-    source "${DOTFILES_ROOT}/core/install/loader.sh"
-else
-    echo "Error: loader.sh not found at ${DOTFILES_ROOT}/core/install/loader.sh"
-    return 1
-fi
+# 2. Colours for fzf, bat and ripgrep, written by dotctl theme
+[[ -f "${DOTFILES_ROOT}/domains/system/config/theme-env/current.sh" ]] &&
+    source "${DOTFILES_ROOT}/domains/system/config/theme-env/current.sh"
 
-# 3. Load Domain Configurations / ドメイン設定の読み込み
-# (mise activation lives in integrations.zsh; the old lazy wrappers here
-#  were overwritten by it before ever being used, so they were dropped)
-load_domain_shell_configs "$DOTFILES_ROOT" "zsh"
+# 3. The fragments, in the order the old loader read them (not in a
+#    function: typeset in a fragment must stay global). brew.zsh maps
+#    $OSTYPE to Darwin/Linux for the fragments after it.
+for __rc in helpers.zsh aliases.sh options.zsh utils.zsh functions.zsh \
+    integrations.zsh aliases.zsh keybindings.zsh editors.zsh \
+    brew.zsh sketchybar.zsh services.zsh; do
+    source "${DOTFILES_ROOT}/next/home/shared/zsh/rc/${__rc}"
+done
+unset __rc
 
 # 4. Local Config Overrides / ローカル設定の上書き
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

@@ -33,7 +33,11 @@ target() { # target <json> <path under ~>
 		run --separate-stderr links "$kind"
 		[ "$status" -eq 0 ]
 		json="$output"
-		for f in .zshenv .zshrc .zprofile .tigrc .crit.config.json; do
+		for f in .zshenv .zshrc .zprofile; do
+			got="$(target "$json" "$f")"
+			[ "$got" = "${REPO_ROOT}/next/home/shared/zsh/${f#.}" ] || { echo "${kind} ${f}: ${got}"; false; }
+		done
+		for f in .tigrc .crit.config.json; do
 			got="$(target "$json" "$f")"
 			[ "$got" = "${REPO_ROOT}/domains/dev/home/${f}" ] || { echo "${kind} ${f}: ${got}"; false; }
 		done
