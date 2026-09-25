@@ -1,87 +1,47 @@
 ---
 title: Install
-description: dotfiles の install 手順と package 管理。
+description: dotfiles の入れ方と更新の仕方、機械の役割。
 ---
 
-## Setup
+## 入れる・更新する
+
+新しい機械に入れるときも、今の機械を更新するときも、同じ一行です。何度実行しても結果は同じです。
 
 ```bash
 cd dotfiles
-./core/install/installer.sh
+make up    # = ./next/bootstrap.sh
 ```
 
-| Option | 説明 |
-|--------|------|
-| `--force` | 古い symlink を削除してから link |
-| `-h, --help` | help を表示 |
+`next/bootstrap.sh` は、Nix が無ければ公式のインストーラー（multi-user）で入れ、あとを `dotctl up` に渡します。`dotctl up` がすることは次のとおりです。
 
-```bash
-# 通常の install
-./core/install/installer.sh
+1. 役割ファイル（下記）を確かめる
+2. 移動したディレクトリに残った、この機械だけのファイルを新しい場所へ運ぶ
+3. macOS は nix-darwin、Linux は home-manager で構成を作って切り替える
+4. Nix では宣言できない手順（`dotctl setup` の各手順）を走らせる
+5. ログインシェルを zsh にし、mise で言語の実行環境を入れる
 
-# Clean install (古い symlink を削除してから link)
-./core/install/installer.sh --force
+## 役割ファイル
+
+どの役割を持つかは、機械ごとの追跡しないファイル `~/.config/dotfiles/roles.json` に書きます。無いと `dotctl up` が止まり、書き方の例を出します。
+
+```json
+{"roles": ["developer", "desk-user", "model-provider", "observer"]}
 ```
 
-installer は以下を順に実行する。
+| 役割 | 足すもの |
+|------|----------|
+| （全部の機械） | シェル、CLI の道具、各アプリの設定 |
+| `developer` | 言語の道具、手元の LiteLLM、jig の判断サービス |
+| `desk-user` | GUI アプリ、フォント、メディアの道具 |
+| `model-provider` | 手元のモデルを tailnet に貸す。macOS は LM Studio、Linux + NVIDIA は llama-server |
+| `observer` | Prometheus、Grafana、Open WebUI、AI の利用コストの台帳（一台だけ） |
 
-1. Homebrew と Nix を install (未導入の場合)
-2. nix-darwin の設定を適用 (package はすべて Nix 経由)
-3. mise で言語 runtime を setup
-4. 古い symlink を検出
-5. 設定ファイルの symlink を作成
-6. 既存ファイルを backup (直近 7 世代を保持)
+## Package の置き場所
 
-## Package 管理 (Nix)
+| 種類 | 置き場所 |
+|------|----------|
+| CLI の道具・language server | flake（`next/home/*/packages*`） |
+| GUI アプリ | nix-darwin が宣言する Homebrew の cask（`next/system/darwin/homebrew.nix`） |
+| 言語の実行環境 | mise |
 
-全 package は Nix flake で管理。install 先の優先順位は以下のとおり。
-
-1. **nixpkgs** — main の package source
-2. **overlays** — nixpkgs にない package を独自定義
-3. **brew-nix** — brew-nix で動く GUI アプリ
-4. **nix-darwin homebrew** — GUI アプリの fallback / Homebrew 限定の CLI
-5. **cargo install** — 他で手に入らない Rust tool
-
-| File | 役割 |
-|------|------|
-| `core/nix/flake.nix` | Nix flake の entry point |
-| `core/nix/darwin.nix` | macOS の system 設定 |
-| `core/nix/overlays.nix` | custom package 定義 |
-| `domains/*/packages/home.nix` | domain ごとの user package |
-| `domains/*/packages/homebrew.nix` | domain ごとの Homebrew fallback |
-
-## Package の更新
-
-設定を変更したら以下の command で反映する。
-
-```bash
-# package 変更後の quick update
-./core/nix/update.sh
-
-# Full rebuild (時間はかかるが確実)
-./core/nix/update.sh --rebuild
-
-# npm package 追加後の更新
-./core/nix/update.sh --node2nix
-```
-
-### npm package の追加 (node2nix)
-
-1. `domains/dev/packages/node2nix/package.json` を編集
-2. `./core/nix/update.sh --node2nix` を実行
-
-```json title="package.json"
-{
-  "dependencies": {
-    "@anthropic-ai/claude-code": "*",
-    "aicommits": "^1.0.0"
-  }
-}
-```
-
-## Backup
-
-既存の設定ファイルは自動で backup される。
-
-- 形式: `{filename}.backup.{timestamp}`
-- 例: `.zshrc.backup.20250123_012345`
+変えたら `make up` で反映します。

@@ -1,71 +1,49 @@
 ---
 title: 構成
-description: Symlink、template system、環境変数について。
+description: 設定ファイルの置き場所、template、環境変数、個人設定。
 ---
 
-## Symlink の管理
+## 設定ファイルの置き場所
 
-```bash
-# symlink を再作成
-./core/config/manager.sh link
+各アプリの設定は、そのアプリのモジュールの隣にあります（`next/home/<os>/<app>/config/`）。`~/.config/<app>` などはそこへのリンクなので、編集はそのまま次の起動から効きます。構成の作り直しは要りません。
 
-# template を処理
-./core/config/manager.sh template
-```
+## Template
 
-## Template system
-
-VSCode の `settings.json` や Mise の `config.toml` など、環境変数を直接使えない設定ファイルがある。こうしたファイルは `.template` で管理し、`{{HOME}}` を placeholder として埋め込んでいる。
-
-```bash
-# template から設定ファイルを生成
-./core/config/manager.sh template
-```
-
-`{{HOME}}` は実際の home directory に置換される。生成ファイルは git に含まず、`.template` だけを track する。
+VS Code の `settings.json`、mise の `config.toml`、`~/.gitconfig` のように環境変数を読めない設定は `*.template` で管理します。切り替えのたびに `dotctl templates render` が隣に展開し、`{{HOME}}`、`{{USER}}`、`{{DOTFILES_ROOT}}` を埋めます。展開したファイルは git に含めません。
 
 ## 環境変数
 
-WezTerm の天気 widget には OpenWeather API key が必要。
-
-dotfiles root に `.env` を作成する。
+WezTerm の天気 widget には OpenWeather の API key が要ります。checkout の root に `.env` を作ります。
 
 ```bash
 OPENWEATHER_API_KEY=your-api-key
 ```
 
-読み込み先の優先順位:
-- 環境変数 `OPENWEATHER_API_KEY`
-- `$DOTFILES_ROOT/.env`
-- `~/dotfiles/.env`
-- 設定 directory からの相対 path
-
-Lua ベースの設定 (WezTerm) では `DOTFILES_ROOT` を shell 設定に追加する。
-
-```bash
-export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
-```
+読む順番: 環境変数 `OPENWEATHER_API_KEY` → `$DOTFILES_ROOT/.env` → `~/dotfiles/.env` → 設定ディレクトリからの相対パス。`DOTFILES_ROOT` は zsh が `~/.zshrc` のリンク先から決めます。
 
 ## 個人設定
 
-user 固有の設定は以下に配置する。
-
 | File | 用途 |
 |------|------|
-| `~/.config/git/config.local` | Git の個人設定 |
-| `~/.config/jj/conf.d/user.toml` | Jujutsu の user 設定 (名前、email) |
-| `domains/dev/home/.zshenv` | shell 環境変数 |
+| `~/.config/git/config.local` | Git の名前と email（`.env` の `GIT_USER_NAME` / `GIT_USER_EMAIL` から `make up` が書く） |
+| `next/home/shared/git/config/conditional/*.conf` | ディレクトリごとの Git 設定（機械ごと、追跡しない） |
+| `~/.config/jj/conf.d/user.toml` | Jujutsu の user 設定 |
+| `~/.zshrc.local` | この機械だけの zsh 設定 |
 
 ## Directory 構成
 
 ```text
 dotfiles/
-├── core/          # installer, config manager, utilities
-├── domains/       # domain 別の設定
-│   ├── creative/  # media tools, wallpaper
-│   ├── dev/       # Neovim, terminal, shell, languages
-│   ├── infra/     # network, security
-│   ├── system/    # fonts, colors, themes
-│   └── workspace/ # window manager, status bar
-└── specs/         # architecture docs
+├── next/                 # flake
+│   ├── lib/              #   facts、組み立て、常駐サービス、setup の手順
+│   ├── roles/            #   役割ごとに何を有効にするか
+│   ├── system/darwin/    #   nix-darwin (defaults、Homebrew、browser)
+│   ├── home/             #   home-manager。一アプリ一ディレクトリ、設定はモジュールの隣
+│   │   ├── shared/       #     両 OS
+│   │   ├── darwin/       #     macOS だけ
+│   │   └── linux/        #     Omarchy だけ
+│   └── pkgs/             #   ここでビルドするもの (dotctl など)
+├── domains/dev/          # coding agent のハーネス (jig) と設定。harness/ へ移る予定
+├── tests/                # bats
+└── docs/                 # この site
 ```

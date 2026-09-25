@@ -42,18 +42,17 @@ jig box new|list|resume|fetch|rm           # sbx microVM の中でこのリポ�
 | `claude` (`~/.claude`) | `settings.json` の `hooks` / `permissions` / `sandbox`、`AGENTS.md`(`CLAUDE.md` → `AGENTS.md`)、`skills/` `rules/` `agents/` `scripts/` `workflows/` のリンクディレクトリ。MCP は `claude mcp add` 行を印字するだけ | `~/.claude.json`、他の settings キー |
 | `codex` (`~/.codex`) | `AGENTS.md`、`agents/*.toml`(モデルは `agents/models.json`)、`~/.agents/skills` のマウント、`config.toml` の `[mcp_servers.*]` ブロック。ガードは `jig codex register` が `hooks.json` に登録 | ブロック外の `[mcp_servers.*]`(報告のみ)、`~/.codex/skills` |
 | `omp` (`~/.omp/agent`) | `agents/*.md`、`mcp.json` の jig エントリ、同じ `~/.agents/skills` マウント、`extensions/jig.ts` → jig の omp 拡張 | `config.yml`(報告のみ) |
-| `pi` (`~/.pi/agent`) | `AGENTS.md`(旧 symlink を実ファイルで置換)、pi-mcp-adapter の `~/.config/mcp/mcp.json`、同じ skills マウント | `settings.json` / `models.json` / `extensions/`(`manager.sh link_pi_resources` のリンク) |
-| `dsh` (`$DSH_HOME`) | scaffold 済みプロファイルの `cordis.patch.yml` にある jig の MCP 行、`AGENTS.md` | `settings.yaml`、`hooks.claude.json`、ガードプラグイン(`link_dsh_resources` の展開コピー) |
+| `pi` (`~/.pi/agent`) | `AGENTS.md`(旧 symlink を実ファイルで置換)、pi-mcp-adapter の `~/.config/mcp/mcp.json`、同じ skills マウント | `settings.json` / `models.json` / `extensions/`(home-manager のリンク、`next/home/shared/harness`) |
+| `dsh` (`$DSH_HOME`) | scaffold 済みプロファイルの `cordis.patch.yml` にある jig の MCP 行、`AGENTS.md` | `settings.yaml`、`hooks.claude.json`、ガードプラグイン(`harness-apply` の展開コピー) |
 
-pi と DSH は `core/config/manager.sh` の `link_pi_resources` / `link_dsh_resources`
-が自前のリンクを張った後に `jig apply --target pi|dsh --write` を呼ぶ。omp も
-`link_omp_resources` が `models.yml` / `lsp.yml` を張ってから同様に呼ぶ。
-`make link` 一回で5つ全部が揃うのはこのため。
+各ハーネスの自前のファイルは home-manager がリンクし（`next/home/shared/harness`）、
+そのあと activation の `harness-apply` が DSH のプラグインを組み立てて、
+`jig apply --target <h> --write` を5つ全部に流す。`make up` 一回で揃うのはこのため。
 
 ## ガードと判断
 
 - **ガード**: `llm/harness/policy/guard-rules.json` が唯一のルール源。
-  `~/.config/jig/policy` へのリンクを `manager.sh link_jig_policy` が張り、
+  `~/.config/jig/policy` へのリンクを home-manager が張り、
   Claude Code の PreToolUse hook、Codex の hook、omp の `jig.ts`、pi の
   `guard.ts`、DSH の cordis プラグインが同じファイルを読む。
 - **判断サービス**: `jig serve`(launchd `com.esh2n.jig-decision`)が loopback で

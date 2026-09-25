@@ -37,21 +37,25 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ```text
 dotfiles/
-├── core/          # Installer, config manager, utilities
-├── domains/       # Domain-specific configurations
-│   ├── creative/  # Media tools, wallpapers
-│   ├── dev/       # Neovim, terminals, shells, languages
-│   ├── infra/     # Network, security
-│   ├── system/    # Fonts, colors, themes
-│   └── workspace/ # Window managers, status bars
-└── specs/         # Architecture docs
+├── next/                 # the flake
+│   ├── lib/              #   facts, builders, services, setup steps
+│   ├── roles/            #   what each role turns on
+│   ├── system/darwin/    #   nix-darwin: defaults, Homebrew, browsers
+│   ├── home/             #   home-manager: one directory per app, config beside its module
+│   │   ├── shared/       #     both platforms
+│   │   ├── darwin/       #     macOS only
+│   │   └── linux/        #     Omarchy only
+│   └── pkgs/             #   packages built here, dotctl among them
+├── domains/dev/          # coding-agent harness (jig) and its configs, moving to harness/
+├── tests/                # bats
+└── docs/                 # this site
 ```
 
 ## Quick start
 
 ```bash
 cd dotfiles
-./core/install/installer.sh
+make up
 ```
 
 The installer handles everything from Homebrew and Nix setup to symlink creation. See [Installation](/dotfiles/en/getting-started/installation/) for details.
@@ -62,7 +66,7 @@ The installer handles everything from Homebrew and Nix setup to symlink creation
 |----------|-------|
 | Terminal | WezTerm, Ghostty, Warp |
 | Multiplexer | Zellij |
-| Shell | Zsh, Fish, Starship |
+| Shell | Zsh, Starship |
 | CLI | eza, bat, skim, zoxide, atuin, yazi, btop |
 | Editor | Neovim (4 distributions), VSCode, Cursor |
 | Window Manager | AeroSpace, Borders, Sketchybar |

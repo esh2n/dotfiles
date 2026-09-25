@@ -1,9 +1,9 @@
 ---
 title: esh2n/dotfiles
-description: Domain-driven dotfiles with multi-shell support and unified theme switching.
+description: One Nix flake for macOS and Linux, machine roles and unified theme switching.
 template: splash
 hero:
-  tagline: Domain-driven dotfiles. Multi-shell, Nix package management, one-command theme switching.
+  tagline: One Nix flake for macOS and Linux. Machine roles, one-command theme switching.
   actions:
     - text: Getting Started
       link: /dotfiles/getting-started/installation/
@@ -20,13 +20,13 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 <CardGrid stagger>
   <Card title="Multi-shell" icon="terminal">
-    Zsh / Fish dual support. Shared aliases and env vars with modern CLI tools — skim, eza, bat, zoxide, atuin, yazi.
+    Zsh, with shared aliases and env vars with modern CLI tools — skim, eza, bat, zoxide, atuin, yazi.
   </Card>
   <Card title="Neovim Switch" icon="pencil">
-    Switch between Custom / LazyVim / NvChad / AstroVim instantly with `nvim-switch`.
+    Switch between Custom / LazyVim / NvChad / AstroVim instantly with `dotctl nvim`.
   </Card>
   <Card title="Theme Sync" icon="sun">
-    `theme-switch` applies Catppuccin / Nord / Tokyo Night across WezTerm, Ghostty, Sketchybar, Borders, Zellij.
+    `dotctl theme set` applies Catppuccin / Nord / Tokyo Night across WezTerm, Ghostty, Sketchybar, Borders, Zellij.
   </Card>
   <Card title="Nix Managed" icon="setting">
     All packages declared via Nix flake. Reproducible build environment.
@@ -37,24 +37,28 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ```text
 dotfiles/
-├── core/          # installer, config manager, utilities
-├── domains/       # domain-separated configs
-│   ├── creative/  # media tools, wallpaper
-│   ├── dev/       # Neovim, terminal, shell, languages
-│   ├── infra/     # network, security
-│   ├── system/    # fonts, colors, themes
-│   └── workspace/ # window manager, status bar
-└── specs/         # architecture docs
+├── next/                 # flake
+│   ├── lib/              #   facts、組み立て、常駐サービス、setup の手順
+│   ├── roles/            #   役割ごとに何を有効にするか
+│   ├── system/darwin/    #   nix-darwin (defaults、Homebrew、browser)
+│   ├── home/             #   home-manager。一アプリ一ディレクトリ、設定はモジュールの隣
+│   │   ├── shared/       #     両 OS
+│   │   ├── darwin/       #     macOS だけ
+│   │   └── linux/        #     Omarchy だけ
+│   └── pkgs/             #   ここでビルドするもの (dotctl など)
+├── domains/dev/          # coding agent のハーネス (jig) と設定。harness/ へ移る予定
+├── tests/                # bats
+└── docs/                 # この site
 ```
 
 ## Quick Start
 
 ```bash
 cd dotfiles
-./core/install/installer.sh
+make up
 ```
 
-Runs Homebrew + Nix setup and creates symlinks. See [Installation](/dotfiles/getting-started/installation/) for details.
+Installs Nix when missing, then builds and switches this machine. See [Installation](/dotfiles/getting-started/installation/) for details.
 
 ## Included Tools
 
@@ -62,7 +66,7 @@ Runs Homebrew + Nix setup and creates symlinks. See [Installation](/dotfiles/get
 |----------|-------|
 | Terminal | WezTerm, Ghostty |
 | Multiplexer | Zellij, tmux |
-| Shell | Zsh, Fish, Starship |
+| Shell | Zsh, Starship |
 | CLI | eza, bat, skim, zoxide, atuin, yazi, btop |
 | Editor | Neovim (4 distributions), VSCode, Cursor |
 | Window Manager | AeroSpace, Borders, Sketchybar |

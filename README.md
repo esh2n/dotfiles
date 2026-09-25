@@ -1,177 +1,94 @@
 # Dotfiles Configuration
 
-Domain-driven dotfiles with multi-shell support and theme switching.
+One Nix flake for macOS (nix-darwin) and Linux (standalone home-manager on
+Omarchy), with machine roles, one theme switch for every tool, and `dotctl`,
+the repo's own CLI.
 
 > **More info**: https://esh2n.github.io/dotfiles/
 
-## Features
+## Install and update
 
-### Multi-Shell Support
-- **Zsh & Fish**: Full support for both shells
-- **Shared configs**: Centralized aliases and environment variables
-- **Modern tools**: skim, eza, bat, zoxide, atuin, yazi
-
-### Neovim Distribution Switcher
-Switch between multiple Neovim distributions:
-
-| Distribution | Description |
-|--------------|-------------|
-| Custom | Personal configuration |
-| LazyVim | Fast and minimal |
-| NvChad | Beautiful UI |
-| AstroVim | Feature-rich |
+The same command installs a new machine and updates an existing one; running
+it again changes nothing:
 
 ```bash
-nvim-switch lazyvim
-nvim-switch custom
+make up          # = ./next/bootstrap.sh: installs Nix when missing, then `dotctl up`
 ```
 
-### Theme Switcher
-Quick theme switching for all tools:
+`dotctl up` builds and switches this machine's configuration, runs the setup
+steps Nix cannot declare, sets zsh as the login shell and installs mise's
+runtimes. Before the first run, write the roles this machine takes to
+`~/.config/dotfiles/roles.json` (untracked; `dotctl up` stops and shows an
+example when it is missing):
 
-| Theme | Base Colors |
-|-------|-------------|
-| Catppuccin Mocha | Warm, soft pastels |
-| Nord | Cool, arctic palette |
-| Tokyo Night | Dark, vibrant |
-
-Applies to: WezTerm, Ghostty, Sketchybar, Borders, Zellij, tmux, Starship, VSCode/Cursor, Neovim, fzf, bat, ripgrep, delta, Wallpaper
-
-```bash
-theme-switch catppuccin       # Dark
-theme-switch catppuccin-latte  # Light
-theme-switch tokyonight
-theme-switch tokyonight-day    # Light
-theme-switch everforest-light  # Light
+```json
+{"roles": ["developer", "desk-user", "model-provider", "observer"]}
 ```
 
-### Wallpaper Integration
-Download and set wallpapers from Wallhaven.cc:
+| Role | What it adds |
+|------|--------------|
+| (every machine) | shell, CLI tools, editors' configs |
+| `developer` | language tooling, the local LiteLLM, jig's decision service |
+| `desk-user` | GUI apps, fonts, media tools |
+| `model-provider` | lends local models on the tailnet: LM Studio on macOS, llama-server on Linux + NVIDIA |
+| `observer` | Prometheus, Grafana, Open WebUI and the AI cost ledger (one machine) |
+
+Other targets (`make` alone lists them):
 
 ```bash
-wallpaper search "cyberpunk"
+make claude          # only ~/.claude changed: jig apply --target claude --write
+make tailscale-acl   # render the tailnet policy, copy it, open the admin page
 ```
 
 ## Directory Structure
 
 ```
 dotfiles/
-├── core/          # Installer, config manager, utilities
-├── domains/       # Domain-specific configurations
-│   ├── creative/  # Media tools, wallpaper scripts
-│   ├── dev/       # Neovim, terminals, shells, languages
-│   ├── infra/     # Network, security
-│   ├── system/    # Fonts, colors, themes
-│   └── workspace/ # Window managers, status bars
-└── specs/         # Architecture documentation
+├── next/                 # the flake
+│   ├── lib/              #   facts (the one impure read), builders, services, setup steps
+│   ├── roles/            #   what each role turns on
+│   ├── system/darwin/    #   nix-darwin: defaults, Homebrew, browsers
+│   ├── home/             #   home-manager: one directory per app, config beside its module
+│   │   ├── shared/       #     both platforms (zsh, nvim, git, zellij, wezterm, theme, ...)
+│   │   ├── darwin/       #     macOS only (tmux, ghostty, sketchybar, aerospace, ...)
+│   │   └── linux/        #     Omarchy only (llama-server)
+│   ├── pkgs/             #   packages built here, dotctl among them
+│   └── overlays/         #   upstream packages pinned or adjusted
+├── domains/dev/          # coding-agent harness (jig) and its configs, moving to harness/
+├── tests/                # bats suites
+└── docs/                 # the documentation site
 ```
 
-## Quick Commands
-
-Every day-to-day entry point is a `make` target (the `Makefile` only dispatches
-to the scripts below; it holds no logic of its own). Run `make` with no
-arguments to print the list:
+## dotctl
 
 ```bash
-make            # list targets
-make update     # after editing packages/configs: nix build → activate → link → jig apply
-make claude     # only ~/.claude changed (rules, skills, agents): jig apply --target claude --write
-make link       # symlinks + jig apply --write for every harness (claude/codex/omp/pi/dsh)
-make template   # only .template regeneration
+dotctl theme set tokyonight      # every tool's colours (also: theme-switch)
+dotctl nvim lazyvim              # which Neovim distribution ~/.config/nvim is (also: nvim-switch)
+dotctl wallpaper search cyberpunk
+dotctl llm check                 # the home LLM stack, PASS/FAIL per probe
+dotctl help                      # everything else
 ```
 
-## Installation
-
-```bash
-cd dotfiles
-make install    # = ./core/install/installer.sh
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--force` | Remove stale symlinks pointing to other dotfiles before linking |
-| `-h, --help` | Show help message |
-
-```bash
-# Normal installation
-./core/install/installer.sh
-
-# Clean install (removes old dotfiles symlinks)
-./core/install/installer.sh --force
-```
-
-The installer will:
-1. Install Homebrew & Nix (if needed)
-2. Apply nix-darwin configuration (installs all packages via Nix)
-3. Setup language runtimes (mise)
-4. Detect stale symlinks from other dotfiles
-5. Create symlinks to configurations
-6. Backup existing files (keeps 7 most recent)
+Themes apply to WezTerm, Ghostty, Sketchybar, Borders, Zellij, tmux, Starship,
+VS Code/Cursor, Neovim, fzf, bat, ripgrep, delta and the wallpaper. Neovim
+distributions: custom, LazyVim, NvChad, AstroVim.
 
 ## Configuration
 
-### Package Management (Nix)
+### Packages
 
-All packages are managed via Nix flake. Priority order:
-1. **nixpkgs** - Primary source
-2. **overlays** - Custom packages not in nixpkgs
-3. **brew-nix** - GUI apps that work with brew-nix
-4. **nix-darwin homebrew** - Fallback for problematic GUI apps / Homebrew-only CLI
-5. **cargo install** - Rust tools not available elsewhere
+CLI tools and language servers come from the flake
+(`next/home/*/packages*`), GUI apps from Homebrew casks declared by
+nix-darwin (`next/system/darwin/homebrew.nix`), language runtimes from mise.
+After editing any of them, run `make up`.
 
-| Location | Purpose |
-|----------|---------|
-| `core/nix/flake.nix` | Main Nix flake entry point |
-| `core/nix/darwin.nix` | System-wide macOS settings |
-| `core/nix/overlays.nix` | Custom package definitions |
-| `domains/*/packages/home.nix` | User packages per domain |
-| `domains/*/packages/homebrew.nix` | Homebrew fallbacks per domain |
+### Templates
 
-### Updating Packages
-
-After modifying package configurations, apply changes with:
-
-```bash
-make update     # ./core/nix/update.sh — quick update after package changes
-make rebuild    # ./core/nix/update.sh --rebuild — complete rebuild (slower but thorough)
-make node2nix   # ./core/nix/update.sh --node2nix — after adding npm packages
-```
-
-#### Adding NPM Packages via node2nix
-
-1. Edit `domains/dev/packages/node2nix/package.json`
-2. Run update script: `make node2nix`
-3. The script will regenerate and apply changes
-
-Example adding a package:
-```json
-{
-  "dependencies": {
-    "@anthropic-ai/claude-code": "*",
-    "aicommits": "^1.0.0"
-  }
-}
-```
-
-### Symlink Management
-
-```bash
-make link       # ./core/config/manager.sh link — re-apply symlinks
-make template   # ./core/config/manager.sh template — process templates
-```
-
-### Template System
-
-Some config files (VSCode `settings.json`, Mise `config.toml`) cannot use environment variables. Use `.template` files with `{{HOME}}` placeholders:
-
-```bash
-# Generate config files from templates
-./core/config/manager.sh template
-```
-
-This replaces `{{HOME}}` with your actual home directory. Generated files are ignored by git; only `.template` files are tracked.
+Some config files cannot read environment variables (VS Code `settings.json`,
+mise `config.toml`, `~/.gitconfig`). Their tracked `*.template` is rendered
+beside itself on every switch (`dotctl templates render`), with `{{HOME}}`,
+`{{USER}}` and `{{DOTFILES_ROOT}}` filled in; the rendered files are ignored
+by git.
 
 ### Environment Variables
 
@@ -1082,7 +999,7 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 
 9 essential extensions are automatically configured (1Password, Vimium, Stylus, JSON Formatter, Enhanced GitHub, Refined GitHub, Material Icons for GitHub, Text Blaze, Easy Grouping for Google Calendar).
 
-Runs automatically with `./core/install/installer.sh`. Restart Chrome/Dia to install.
+Declared by nix-darwin (`next/system/darwin/browsers.nix`) on `make up`. Restart Chrome/Dia to install.
 
 ## Safety
 
@@ -1095,7 +1012,7 @@ All existing configurations are backed up:
 User-specific settings go in:
 - `~/.config/git/config.local` - Git settings
 - `~/.config/jj/conf.d/user.toml` - Jujutsu user settings (name, email)
-- Shell environment: Modify `domains/dev/home/.zshenv`
+- Shell environment: Modify `next/home/shared/zsh/zshenv`
 
 ## License
 

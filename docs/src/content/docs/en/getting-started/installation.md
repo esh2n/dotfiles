@@ -1,87 +1,51 @@
 ---
-title: Installation
-description: How to install the dotfiles and manage packages.
+title: Install
+description: Installing and updating the dotfiles, and machine roles.
 ---
 
-## Setup
+## Install and update
+
+One command installs a new machine and updates an existing one; running it
+again changes nothing.
 
 ```bash
 cd dotfiles
-./core/install/installer.sh
+make up    # = ./next/bootstrap.sh
 ```
 
-| Option | Description |
-|--------|-------------|
-| `--force` | Remove stale symlinks from other dotfiles before linking |
-| `-h, --help` | Show help |
+`next/bootstrap.sh` installs Nix with the official multi-user installer when it
+is missing, then hands over to `dotctl up`, which:
 
-```bash
-# Standard install
-./core/install/installer.sh
+1. checks the roles file (below)
+2. carries machine-local files left in moved directories to their new place
+3. builds and switches the configuration: nix-darwin on macOS, home-manager on Linux
+4. runs the steps Nix cannot declare (`dotctl setup`)
+5. makes zsh the login shell and installs mise's runtimes
 
-# Clean install (removes old symlinks first)
-./core/install/installer.sh --force
+## Roles file
+
+Which roles a machine takes lives in an untracked, machine-local file,
+`~/.config/dotfiles/roles.json`. Without it `dotctl up` stops and shows an
+example.
+
+```json
+{"roles": ["developer", "desk-user", "model-provider", "observer"]}
 ```
 
-The installer runs these steps in order:
+| Role | What it adds |
+|------|--------------|
+| (every machine) | shell, CLI tools, app configs |
+| `developer` | language tooling, the local LiteLLM, jig's decision service |
+| `desk-user` | GUI apps, fonts, media tools |
+| `model-provider` | lends local models on the tailnet: LM Studio on macOS, llama-server on Linux + NVIDIA |
+| `observer` | Prometheus, Grafana, Open WebUI and the AI cost ledger (one machine) |
 
-1. Install Homebrew and Nix (if missing)
-2. Apply nix-darwin configuration (all packages via Nix)
-3. Set up language runtimes with mise
-4. Detect stale symlinks
-5. Create config symlinks
-6. Back up existing files (keeps the 7 most recent)
+## Where packages come from
 
-## Package management (Nix)
+| Kind | Where |
+|------|-------|
+| CLI tools, language servers | the flake (`next/home/*/packages*`) |
+| GUI apps | Homebrew casks declared by nix-darwin (`next/system/darwin/homebrew.nix`) |
+| Language runtimes | mise |
 
-All packages are managed through a Nix flake. Install priority:
-
-1. **nixpkgs** — primary source
-2. **overlays** — custom packages not in nixpkgs
-3. **brew-nix** — GUI apps compatible with brew-nix
-4. **nix-darwin homebrew** — fallback for problematic GUI apps / Homebrew-only CLI
-5. **cargo install** — Rust tools not available elsewhere
-
-| File | Purpose |
-|------|---------|
-| `core/nix/flake.nix` | Nix flake entrypoint |
-| `core/nix/darwin.nix` | macOS system settings |
-| `core/nix/overlays.nix` | Custom package definitions |
-| `domains/*/packages/home.nix` | Per-domain user packages |
-| `domains/*/packages/homebrew.nix` | Per-domain Homebrew fallbacks |
-
-## Updating packages
-
-After changing package config, apply with:
-
-```bash
-# Quick update
-./core/nix/update.sh
-
-# Full rebuild (slower, thorough)
-./core/nix/update.sh --rebuild
-
-# After adding npm packages
-./core/nix/update.sh --node2nix
-```
-
-### Adding npm packages (node2nix)
-
-1. Edit `domains/dev/packages/node2nix/package.json`
-2. Run `./core/nix/update.sh --node2nix`
-
-```json title="package.json"
-{
-  "dependencies": {
-    "@anthropic-ai/claude-code": "*",
-    "aicommits": "^1.0.0"
-  }
-}
-```
-
-## Backups
-
-Existing config files are backed up automatically.
-
-- Format: `{filename}.backup.{timestamp}`
-- Example: `.zshrc.backup.20250123_012345`
+After changing any of them, run `make up`.

@@ -1,71 +1,58 @@
 ---
 title: Configuration
-description: Symlink management, templates, and environment variables.
+description: Where configs live, templates, environment variables, personal settings.
 ---
 
-## Symlink management
+## Where configs live
 
-```bash
-# Re-create symlinks
-./core/config/manager.sh link
+Each app's config sits beside its module (`next/home/<os>/<app>/config/`).
+`~/.config/<app>` and the like are links to it, so an edit takes effect the
+next time the app starts, without a rebuild.
 
-# Process templates
-./core/config/manager.sh template
-```
+## Templates
 
-## Template system
-
-Some config files (VSCode `settings.json`, Mise `config.toml`) can't use environment variables directly. These use `.template` files with `{{HOME}}` as a placeholder.
-
-```bash
-# Generate config files from templates
-./core/config/manager.sh template
-```
-
-`{{HOME}}` gets replaced with your actual home directory. Generated files are gitignored — only `.template` files are tracked.
+Configs that cannot read environment variables — VS Code's `settings.json`,
+mise's `config.toml`, `~/.gitconfig` — are kept as `*.template`. Every switch
+renders them beside themselves (`dotctl templates render`), filling in
+`{{HOME}}`, `{{USER}}` and `{{DOTFILES_ROOT}}`. The rendered files are ignored
+by git.
 
 ## Environment variables
 
-The WezTerm weather widget needs an OpenWeather API key.
-
-Create `.env` at the dotfiles root:
+WezTerm's weather widget needs an OpenWeather API key. Create `.env` at the
+checkout's root:
 
 ```bash
 OPENWEATHER_API_KEY=your-api-key
 ```
 
-Lookup order:
-- `OPENWEATHER_API_KEY` env var
-- `$DOTFILES_ROOT/.env`
-- `~/dotfiles/.env`
-- Relative paths from config directories
+Lookup order: the `OPENWEATHER_API_KEY` variable, `$DOTFILES_ROOT/.env`,
+`~/dotfiles/.env`, then paths relative to the config directory.
+`DOTFILES_ROOT` is set by zsh from where `~/.zshrc` links to.
 
-For Lua-based configs (WezTerm), add `DOTFILES_ROOT` to your shell config:
-
-```bash
-export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
-```
-
-## User-specific config
-
-Personal settings go in these files:
+## Personal settings
 
 | File | Purpose |
 |------|---------|
-| `~/.config/git/config.local` | Git identity and preferences |
-| `~/.config/jj/conf.d/user.toml` | Jujutsu user settings (name, email) |
-| `domains/dev/home/.zshenv` | Shell environment variables |
+| `~/.config/git/config.local` | Git name and email (written by `make up` from `.env`'s `GIT_USER_NAME` / `GIT_USER_EMAIL`) |
+| `next/home/shared/git/config/conditional/*.conf` | per-directory Git settings (machine-local, untracked) |
+| `~/.config/jj/conf.d/user.toml` | Jujutsu user settings |
+| `~/.zshrc.local` | zsh settings for this machine only |
 
 ## Directory layout
 
 ```text
 dotfiles/
-├── core/          # Installer, config manager, utilities
-├── domains/       # Domain-specific configurations
-│   ├── creative/  # Media tools, wallpapers
-│   ├── dev/       # Neovim, terminals, shells, languages
-│   ├── infra/     # Network, security
-│   ├── system/    # Fonts, colors, themes
-│   └── workspace/ # Window managers, status bars
-└── specs/         # Architecture docs
+├── next/                 # the flake
+│   ├── lib/              #   facts, builders, services, setup steps
+│   ├── roles/            #   what each role turns on
+│   ├── system/darwin/    #   nix-darwin: defaults, Homebrew, browsers
+│   ├── home/             #   home-manager: one directory per app, config beside its module
+│   │   ├── shared/       #     both platforms
+│   │   ├── darwin/       #     macOS only
+│   │   └── linux/        #     Omarchy only
+│   └── pkgs/             #   packages built here, dotctl among them
+├── domains/dev/          # coding-agent harness (jig) and its configs, moving to harness/
+├── tests/                # bats
+└── docs/                 # this site
 ```
