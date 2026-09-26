@@ -22,9 +22,6 @@
 
     brews = [
       # Development
-      # login shell (registered as /opt/homebrew/bin/fish in dscl) — keep
-      # declared or onActivation.cleanup = "zap" will uninstall it
-      "fish"
       "thefuck"
       "staticcheck"
       "golangci-lint"

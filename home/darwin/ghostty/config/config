@@ -57,7 +57,7 @@ cursor-style-blink = true
 
 # Performance and behavior
 gtk-single-instance = false
-shell-integration = fish
+shell-integration = zsh
 shell-integration-features = cursor,title,sudo
 confirm-close-surface = false
 
