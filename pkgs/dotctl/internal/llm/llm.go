@@ -178,7 +178,10 @@ func (e Env) tailscale() string {
 // tailnetStatus is `tailscale status --json`, the parts used here.
 type tailnetStatus struct {
 	BackendState string
-	Self         struct{ DNSName, HostName string }
+	Self         struct {
+		DNSName, HostName string
+		TailscaleIPs      []string
+	}
 	Peer         map[string]struct {
 		HostName, OS string
 	}

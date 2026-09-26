@@ -59,14 +59,11 @@ func runLLM(home string, args []string, out, errOut io.Writer) int {
 	}
 	todo := llm.Setup(e, check)
 	if len(todo) > 0 {
-		fmt.Fprintln(out, "home-llm: left to do:")
-		for _, t := range todo {
-			fmt.Fprintln(out, "  - "+t)
-		}
+		e.UI.Heading("home-llm: left to do")
+		e.UI.List(todo...)
 	}
-	if o.Console {
-		fmt.Fprintln(out, "home-llm: once, by hand: the tailnet policy (make tailscale-acl, paste, Save); the phone joins the tailnet and pairs Orca's companion over LAN")
-	}
+	e.UI.Heading("home-llm: once, by hand")
+	e.UI.Steps(llm.Once(e)...)
 	return 0
 }
 
