@@ -12,6 +12,14 @@ M.palette = {
     overlay0 = 0xffa0a0a0,
     surface1 = 0xffc8c8c8,
     surface0 = 0xffd8d8d8,
+    pink = 0xffa04080,
+    maroon = 0xffa02030,
+    peach = 0xffb06020,
+    sky = 0xff2080a0,
+    subtext1 = 0xff505050,
+    overlay2 = 0xff808080,
+    mantle = 0xffe8e8e8,
+    crust = 0xffdcdcdc,
     base = 0xfff4f4f4,
 }
 return M

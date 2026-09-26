@@ -47,6 +47,7 @@ type Env struct {
 	Start      func(cmd ...string) error // start and leave running
 	Has        func(cmd string) bool
 	Warn       func(msg string)
+	Getenv     func(string) string // nil: no environment
 	Sleep      func(time.Duration) // nil: time.Sleep
 }
 
@@ -134,6 +135,11 @@ func Init(e Env, fallback string) error {
 		}
 		if err := relink(want, p); err != nil {
 			return err
+		}
+	}
+	if e.omarchy() {
+		if err := writeOmarchyThemes(e); err != nil {
+			e.warn("omarchy: %v", err)
 		}
 	}
 	// make up renders zellij's config.kdl again, resetting its layout

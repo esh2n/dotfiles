@@ -30,8 +30,9 @@ func themeEnv(home, repo string, p ui.Printer) theme.Env {
 			}
 			return c.Process.Release()
 		},
-		Has:  func(cmd string) bool { _, err := exec.LookPath(cmd); return err == nil },
-		Warn: func(msg string) { p.Warn("%s", msg) },
+		Has:    func(cmd string) bool { _, err := exec.LookPath(cmd); return err == nil },
+		Warn:   func(msg string) { p.Warn("%s", msg) },
+		Getenv: os.Getenv,
 	}
 }
 

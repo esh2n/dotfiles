@@ -84,6 +84,7 @@ func applyValues(e Env, name string) {
 		{"vscode", func() error { return applyVSCode(e, name) }},
 		{"neovim", func() error { return applyNeovim(e, name) }},
 		{"wallpaper", func() error { return applyWallpaper(e, name) }},
+		{"omarchy", func() error { return applyOmarchy(e, name) }},
 		{"cli colours", func() error { return applyCLI(e, name) }},
 		{"orca", func() error { return applyOrca(e, name) }},
 	}
@@ -137,6 +138,9 @@ func applyStarship(e Env, name string) error {
 }
 
 func applyVSCode(e Env, name string) error {
+	if e.omarchy() {
+		return nil // omarchy-theme-set-vscode sets it from Omarchy's theme
+	}
 	theme, ok := vscodeThemes[name]
 	if !ok {
 		e.warn("VSCode theme mapping not found for '%s'", name)
@@ -161,6 +165,9 @@ func applyVSCode(e Env, name string) error {
 }
 
 func applyWallpaper(e Env, name string) error {
+	if e.omarchy() {
+		return nil // Omarchy's theme carries its own (applyOmarchy)
+	}
 	for _, ext := range []string{"jpg", "jpeg", "png", "heic"} {
 		img := e.repo("home/shared/theme/wallpapers/" + name + "." + ext)
 		if !exists(img) {

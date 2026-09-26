@@ -41,7 +41,7 @@ func (f *fixture) env() Env {
 	return Env{Home: f.home, Repo: f.repo, Run: func(cmd ...string) error {
 		f.ran = append(f.ran, cmd)
 		return nil
-	}, Has: func(string) bool { return true }}
+	}, Has: func(c string) bool { return c != "omarchy" }}
 }
 
 // through reads a pointer the way the app does: following every link.
