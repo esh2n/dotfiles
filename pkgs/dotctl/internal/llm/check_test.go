@@ -17,6 +17,7 @@ func healthy(w world) {
 	w.sys.outputs["tailscale serve status"] = "tcp://mac:1234\ntcp://mac:5432\nhttps://mac:3001\ntcp://mac:4001\ntcp://mac:8080\n"
 	w.sys.outputs["omp models ls --json"] = `{"models": [{"provider": "proxy", "id": "main"}, {"provider": "proxy", "id": "complex"}, {"nested": [{"provider": "proxy", "id": "deterministic"}]}, {"provider": "other", "id": "x"}]}`
 	w.svc.set("/lms/v1/models", `{"data": [{"id": "qwen"}, {"id": "nomic"}]}`)
+	fallbackIs(w, "qwen")
 	w.svc.set("/lms/api/v1/models", `{"models": [{"key": "qwen", "max_context_length": 262144, "loaded_instances": [{"id": "qwen", "config": {"context_length": 32768}}]}, {"key": "nomic", "loaded_instances": []}]}`)
 	w.svc.set("/litellm/v1/models", `{"data": [{"id": "main"}, {"id": "deterministic"}, {"id": "complex"}]}`)
 	w.svc.set("POST /litellm/v1/chat/completions", `{"model": "local-qwen", "choices": [{"message": {"content": " pong\n"}}]}`)
@@ -47,6 +48,7 @@ func TestCheckAllPassOnAHealthyObserver(t *testing.T) {
 	for _, want := range []string{
 		"home-llm check (lmstudio console)",
 		"PASS LM Studio :1234 lists: qwen nomic",
+		"PASS deterministic falls back to LM Studio's qwen",
 		"PASS LiteLLM :4000 tiers: complex deterministic main",
 		`PASS tier deterministic: "pong  [local-qwen]"`,
 		"PASS omp lists the proxy tiers: complex deterministic main",
@@ -187,5 +189,34 @@ func TestCheckNamesTheDockerEngineFirst(t *testing.T) {
 	w.sys.stderr["docker info"] = "permission denied while trying to connect to the docker API"
 	if got := check(w); !strings.Contains(got, "not in the docker group") {
 		t.Fatalf("a refusal says why: %s", got)
+	}
+}
+
+// fallbackIs writes a litellm/config.yaml whose deterministic falls back to
+// LM Studio's model id.
+func fallbackIs(w world, id string) {
+	p := w.env.litellm("config.yaml")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile(p, []byte("model_list:\n  - model_name: deterministic\n    litellm_params:\n      model: lm_studio/"+id+"\n"), 0o644); err != nil {
+		panic(err)
+	}
+}
+
+func TestCheckFailsWhenLMStudioLacksTheFallbackModel(t *testing.T) {
+	w := newWorld(t, "darwin", Offer{LMStudio: true})
+	healthy(w)
+	fallbackIs(w, "lmstudio-community/Qwen3.8-27B-MLX-4bit")
+	_, out, _ := runCheck(w, false)
+	if !strings.Contains(out, "FAIL deterministic falls back to lmstudio-community/Qwen3.8-27B-MLX-4bit, which LM Studio does not list") {
+		t.Fatalf("out:\n%s", out)
+	}
+}
+
+func TestTheRepositorysLiteLLMConfigNamesAnLMStudioFallback(t *testing.T) {
+	e := Env{Repo: filepath.Join("..", "..", "..", "..")}
+	if got := lmStudioFallback(e); got == "" {
+		t.Fatal("litellm/config.yaml has no `model: lm_studio/...` line")
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -118,11 +120,34 @@ func ids(body []byte) []string {
 
 func checkLMStudioModels(e Env, c *Checker) {
 	body, ok := e.get(e.URLs.LMStudio+"/v1/models", 5*time.Second)
-	if models := ids(body); ok && len(models) > 0 {
-		c.pass("LM Studio :1234 lists: %s", strings.Join(models, " "))
-	} else {
+	models := ids(body)
+	if !ok || len(models) == 0 {
 		c.fail("LM Studio :1234 does not answer /v1/models (server off, or no model)")
+		return
 	}
+	c.pass("LM Studio :1234 lists: %s", strings.Join(models, " "))
+	want := lmStudioFallback(e)
+	switch {
+	case want == "":
+		c.fail("deterministic's LM Studio fallback not found in litellm/config.yaml (a `model: lm_studio/...` line)")
+	case slices.Contains(models, want):
+		c.pass("deterministic falls back to LM Studio's %s", want)
+	default:
+		c.fail("deterministic falls back to %s, which LM Studio does not list — set that line in litellm/config.yaml to one of the ids above", want)
+	}
+}
+
+// lmStudioFallback is the LM Studio model id deterministic falls back to:
+// the `model: lm_studio/<id>` line of litellm/config.yaml.
+func lmStudioFallback(e Env) string {
+	b, err := os.ReadFile(e.litellm("config.yaml"))
+	if err != nil {
+		return ""
+	}
+	if m := regexp.MustCompile(`(?m)^\s*model: lm_studio/(\S+)\s*$`).FindSubmatch(b); m != nil {
+		return string(m[1])
+	}
+	return ""
 }
 
 func hasTiers(tiers []string) bool {
