@@ -42,6 +42,22 @@ jobs:
       - run: bunx biome check .
       - run: bun test
 
+  # the artifact skill's CLI and its Worker: zero-dependency node:test suites
+  # (the CLI's run against its own fake API on 127.0.0.1)
+  artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: artifact CLI
+        working-directory: harness/skills/artifact
+        run: node --test test/cli.test.mjs
+      - name: artifact Worker
+        working-directory: harness/tools/artifact-worker
+        run: node --test "test/*.test.mjs"
+
   dotctl:
     runs-on: ubuntu-latest
     defaults:
