@@ -88,6 +88,8 @@ general_settings:
   enable_health_check_routing: true
   health_check_ignore_transient_errors: true
   background_health_check_model_groups: ["deterministic"]
+  # an on-demand GET /health skips the Mac deployment too (docs/proxy/health.md)
+  health_check_skip_disabled_background_models: true
   # Gateway master key — a REAL secret since 2026-09-20 (ruling: the old
   # committed constant assumed loopback-only, but the observability stack
   # documents container-reachable paths to this gateway, so the trust boundary

@@ -132,6 +132,8 @@ export LLAMA_SERVER_API_KEY
 #     On the Mac it is local (host.docker.internal is the host's loopback as
 #     seen from the container); elsewhere it is the Mac's tailnet name, the
 #     roles file's "lmStudioHost". Without either the fallback fails too.
+#     The curl covers a machine that runs LM Studio locally without being a
+#     Mac; uname covers the Mac while LM Studio is not up yet at login.
 LM_STUDIO_HOST="${LM_STUDIO_HOST:-}"
 if curl -sf --max-time 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1 || [ "$(uname -s)" = Darwin ]; then
   LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"

@@ -1109,8 +1109,8 @@
     {
       "id": 26,
       "type": "timeseries",
-      "title": "フォールバックの回数",
-      "description": "一つ目の行き先が失敗して次の行き先が答えた回数（成功と失敗）。deterministic では、Omarchy 機の代わりに Mac の Qwen3.8-27B が答えた回数。",
+      "title": "deterministic: どちらが答えたか",
+      "description": "deterministic の要求に答えた回数を行き先（api_base）ごとに出す。:8080 が Omarchy 機の llama-server、:1234 が Mac の LM Studio。:1234 が増えていれば Omarchy 機の代わりに Mac が答えている。同じ名前の中で優先順に切り替わる形（order）なので、別の名前へ回すときの litellm_deployment_successful_fallbacks は数えない恐れがあり、使わない。",
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -1124,13 +1124,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase({__name__=~\"litellm_deployment_successful_fallbacks(_total)?\"}[$__rate_interval]))",
-          "legendFormat": "成功"
-        },
-        {
-          "refId": "B",
-          "expr": "sum(increase({__name__=~\"litellm_deployment_failed_fallbacks(_total)?\"}[$__rate_interval]))",
-          "legendFormat": "失敗"
+          "expr": "sum by (api_base) (increase({__name__=~\"litellm_deployment_success_responses(_total)?\", requested_model=\"deterministic\"}[$__rate_interval]))",
+          "legendFormat": "{{api_base}}"
         }
       ],
       "fieldConfig": {
