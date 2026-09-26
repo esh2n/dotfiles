@@ -9,10 +9,10 @@ description: dotfiles の入れ方と更新の仕方、機械の役割。
 
 ```bash
 cd dotfiles
-make up    # = ./next/bootstrap.sh
+make up    # = ./bootstrap.sh
 ```
 
-`next/bootstrap.sh` は、Nix が無ければ公式のインストーラー（multi-user）で入れ、あとを `dotctl up` に渡します。`dotctl up` がすることは次のとおりです。
+`bootstrap.sh` は、Nix が無ければ公式のインストーラー（multi-user）で入れ、あとを `dotctl up` に渡します。`dotctl up` がすることは次のとおりです。
 
 1. 役割ファイル（下記）を確かめる
 2. 移動したディレクトリに残った、この機械だけのファイルを新しい場所へ運ぶ
@@ -40,8 +40,8 @@ make up    # = ./next/bootstrap.sh
 
 | 種類 | 置き場所 |
 |------|----------|
-| CLI の道具・language server | flake（`next/home/*/packages*`） |
-| GUI アプリ | nix-darwin が宣言する Homebrew の cask（`next/system/darwin/homebrew.nix`） |
+| CLI の道具・language server | flake（`home/*/packages*`） |
+| GUI アプリ | nix-darwin が宣言する Homebrew の cask（`system/darwin/homebrew.nix`） |
 | 言語の実行環境 | mise |
 
 変えたら `make up` で反映します。

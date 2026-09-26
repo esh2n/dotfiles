@@ -28,7 +28,7 @@ rule: Expose only LM Studio over the tailnet (`tailscale serve --bg --tcp 1234 1
 
 ## Consequences
 
-- `next/home/shared/litellm/config/litellm-up.sh` が LM Studio の場所を自動判定する（`LM_STUDIO_REMOTE_HOST` に Mac の Tailscale 名を一度書く）。
+- `home/shared/litellm/config/litellm-up.sh` が LM Studio の場所を自動判定する（`LM_STUDIO_REMOTE_HOST` に Mac の Tailscale 名を一度書く）。
 - Tailscale の導入（各機械、ユーザーのログイン）、Mac での `tailscale serve` 一回、Open WebUI の常駐は未実施。
 - 起動スクリプトと plist は macOS 前提（launchd、Docker Desktop/OrbStack）。Linux 機では systemd unit と `host.docker.internal` の代替が要る — flake の per-system 化の一部として扱う。
 - Mac のスリープ対策は `caffeinate -s -w <LM Studio の daemon の pid>` を launchd で daemon に紐づける（同日の裁定）。`pmset -a disablesleep 1` は機械全体を恒久に起こすので採らない — サーバーが動いている間だけ起きている、が正しい範囲。

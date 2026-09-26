@@ -37,18 +37,20 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ```text
 dotfiles/
-├── next/                 # flake
-│   ├── lib/              #   facts、組み立て、常駐サービス、setup の手順
-│   ├── roles/            #   役割ごとに何を有効にするか
-│   ├── system/darwin/    #   nix-darwin (defaults、Homebrew、browser)
-│   ├── home/             #   home-manager。一アプリ一ディレクトリ、設定はモジュールの隣
-│   │   ├── shared/       #     両 OS
-│   │   ├── darwin/       #     macOS だけ
-│   │   └── linux/        #     Omarchy だけ
-│   └── pkgs/             #   ここでビルドするもの (dotctl など)
-├── domains/dev/          # coding agent のハーネス (jig) と設定。harness/ へ移る予定
-├── tests/                # bats
-└── docs/                 # この site
+├── flake.nix, flake.lock    # flake: darwinConfigurations.mac、homeConfigurations.linux、packages
+├── bootstrap.sh             # make up: Nix が無ければ入れて dotctl up に渡す
+├── lib/                     # facts（唯一の不純な読み取り）、組み立て、常駐サービス、setup の手順
+├── roles/                   # 役割ごとに何を有効にするか
+├── system/darwin/           # nix-darwin (defaults、Homebrew、browser)
+├── home/                    # home-manager。一アプリ一ディレクトリ、設定はモジュールの隣
+│   ├── shared/              #   両 OS
+│   ├── darwin/              #   macOS だけ
+│   └── linux/               #   Omarchy だけ
+├── pkgs/                    # ここでビルドするもの (dotctl など)
+├── overlays/                # 上流の package の版固定・調整
+├── harness/                 # coding agent のハーネス (jig、rules、skills、agents、policy、tools)
+├── tests/                   # bats
+└── docs/                    # この site
 ```
 
 ## Quick Start

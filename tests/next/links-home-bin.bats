@@ -12,9 +12,9 @@ setup() {
 
 links() { # links <darwin|linux>
 	if [ "$1" = darwin ]; then
-		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}?dir=next\"; kind = \"darwin\"; config = \"mac\"; user = \"${USER}\"; }"
+		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}\"; kind = \"darwin\"; config = \"mac\"; user = \"${USER}\"; }"
 	else
-		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}?dir=next\"; kind = \"linux\"; config = \"linux\"; }"
+		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}\"; kind = \"linux\"; config = \"linux\"; }"
 	fi
 }
 
@@ -23,7 +23,7 @@ target() { # target <json> <path under ~>
 }
 
 @test "facts: the checkout is DOTFILES_ROOT" {
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).repo"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).repo"
 	[ "$status" -eq 0 ]
 	[ "$output" = "\"${REPO_ROOT}\"" ]
 }
@@ -35,14 +35,14 @@ target() { # target <json> <path under ~>
 		json="$output"
 		for f in .zshenv .zshrc .zprofile; do
 			got="$(target "$json" "$f")"
-			[ "$got" = "${REPO_ROOT}/next/home/shared/zsh/${f#.}" ] || { echo "${kind} ${f}: ${got}"; false; }
+			[ "$got" = "${REPO_ROOT}/home/shared/zsh/${f#.}" ] || { echo "${kind} ${f}: ${got}"; false; }
 		done
-		[ "$(target "$json" .tigrc)" = "${REPO_ROOT}/next/home/shared/tig/tigrc" ] || { echo "${kind} .tigrc"; false; }
-		[ "$(target "$json" .crit.config.json)" = "${REPO_ROOT}/next/home/shared/crit/crit.config.json" ] || { echo "${kind} .crit.config.json"; false; }
+		[ "$(target "$json" .tigrc)" = "${REPO_ROOT}/home/shared/tig/tigrc" ] || { echo "${kind} .tigrc"; false; }
+		[ "$(target "$json" .crit.config.json)" = "${REPO_ROOT}/home/shared/crit/crit.config.json" ] || { echo "${kind} .crit.config.json"; false; }
 	done
 }
 
-# dotctl answers to these names now (next/pkgs/dotctl postInstall).
+# dotctl answers to these names now (pkgs/dotctl postInstall).
 TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado gh-switch gh-pr-graph-update setup-neovim-distros install-extensions wallpaper orca-theme-apply.py "
 
 @test "links: jig's launcher and the artifact CLI are in ~/bin, from the harness" {
@@ -56,8 +56,8 @@ TAKEN_BY_DOTCTL=" code-graph-cache-gc nvim-switch theme-switch mado gh-switch gh
 	run --separate-stderr links linux
 	[ "$status" -eq 0 ]
 	json="$output"
-	[ "$(target "$json" bin/codebase-memory-mcp-managed)" = "${REPO_ROOT}/next/home/shared/codebase-memory/codebase-memory-mcp-managed" ]
-	[ "$(target "$json" bin/git-credential-gh-owner)" = "${REPO_ROOT}/next/home/shared/git/git-credential-gh-owner" ]
+	[ "$(target "$json" bin/codebase-memory-mcp-managed)" = "${REPO_ROOT}/home/shared/codebase-memory/codebase-memory-mcp-managed" ]
+	[ "$(target "$json" bin/git-credential-gh-owner)" = "${REPO_ROOT}/home/shared/git/git-credential-gh-owner" ]
 	for name in artifact jig; do
 		[ "$(target "$json" "bin/${name}")" != "<missing>" ] || { echo "bin/${name} missing on linux"; false; }
 	done

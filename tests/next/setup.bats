@@ -15,7 +15,7 @@ activation() { # activation <darwin|linux>: { name: { after, data } } for setup-
 	else
 		cfg="homeConfigurations.linux.config"
 	fi
-	nix_eval_expr_json "let a = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").${cfg}.home.activation; in builtins.mapAttrs (_: e: { inherit (e) after; data = e.data; }) (builtins.removeAttrs a (builtins.filter (n: builtins.substring 0 6 n != \"setup-\") (builtins.attrNames a)))"
+	nix_eval_expr_json "let a = (builtins.getFlake \"git+file://${REPO_ROOT}\").${cfg}.home.activation; in builtins.mapAttrs (_: e: { inherit (e) after; data = e.data; }) (builtins.removeAttrs a (builtins.filter (n: builtins.substring 0 6 n != \"setup-\") (builtins.attrNames a)))"
 }
 
 field() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d
@@ -74,7 +74,7 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-codebase-memory setup-ecc se
 }
 
 @test "setup: harness-apply also sees the user's tools (bun from mise, codex, pnpm)" {
-	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.config.home-manager.users.\"${USER}\".home.activation.harnessApply.data"
+	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}\").darwinConfigurations.mac.config.home-manager.users.\"${USER}\".home.activation.harnessApply.data"
 	[[ "$output" == *"/.local/share/mise/shims"* ]]
 	[[ "$output" == *"harness-apply"* ]]
 }

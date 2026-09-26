@@ -26,7 +26,7 @@ rule: Keep harness source files under domains/dev/llm/harness/, organized by kin
 
 - ハーネスごとの置き場の違い(ディレクトリ、形式、層の重ね方)は生成器に閉じ込める。生成器は各ハーネスの層のアルゴリズム(Claude Code の JSON 優先順位、Codex の TOML 優先順位、pi の深いマージ、DSH の profile の patch)を個別に知る必要がある。
 - ハーネスが自分の設定ファイルに書き込む一時的な鍵(`feedbackSurveyState` など)を、生成のたびに壊さない配慮が要る(実例で報告あり)。
-- 生成される AGENTS.md は五つのハーネスで同一（2026-09-24 の裁定: pi も同じ物を読む。pi 専用の短い `next/home/shared/harness/pi/AGENTS.md` は退役。長すぎるなら `rules/common` を締める — ハーネスごとに別本を持たない）。
+- 生成される AGENTS.md は五つのハーネスで同一（2026-09-24 の裁定: pi も同じ物を読む。pi 専用の短い `home/shared/harness/pi/AGENTS.md` は退役。長すぎるなら `rules/common` を締める — ハーネスごとに別本を持たない）。
 - 生成器の依存は元 → 出力の一方向。出力先やハーネス自身のファイル(`~/.claude.json` など)を読んでよいのは、自分が管理しない鍵をそのまま戻すためだけで、読んだ内容で管理する鍵の値や診断の出力を変えない。二か所にあるものの整理は移行時の一回の手作業であって、生成器の機能ではない(2026-09-22、MCP の二重登録を生成器で検知しようとして依存を逆にしかけた)。
 
 ## Sources

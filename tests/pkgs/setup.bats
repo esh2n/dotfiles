@@ -16,7 +16,7 @@ setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
 	LOG="${BATS_TEST_TMPDIR}/calls.log"
 	export HOME="${BATS_TEST_TMPDIR}/home"
-	mkdir -p "${ROOT}/domains/dev/bin" "${ROOT}/next/home/darwin/warp/config" "${BIN}" "${HOME}"
+	mkdir -p "${ROOT}/domains/dev/bin" "${ROOT}/home/darwin/warp/config" "${BIN}" "${HOME}"
 	touch "${LOG}"
 }
 
@@ -135,13 +135,13 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 }
 
 @test "setup warp-seed: copies the default once and never over the live file" {
-	echo default >"${ROOT}/next/home/darwin/warp/config/settings.toml.default"
+	echo default >"${ROOT}/home/darwin/warp/config/settings.toml.default"
 	run step warp-seed
 	[ "$status" -eq 0 ]
-	[ "$(cat "${ROOT}/next/home/darwin/warp/config/settings.toml")" = default ]
-	echo edited >"${ROOT}/next/home/darwin/warp/config/settings.toml"
+	[ "$(cat "${ROOT}/home/darwin/warp/config/settings.toml")" = default ]
+	echo edited >"${ROOT}/home/darwin/warp/config/settings.toml"
 	run step warp-seed
-	[ "$(cat "${ROOT}/next/home/darwin/warp/config/settings.toml")" = edited ]
+	[ "$(cat "${ROOT}/home/darwin/warp/config/settings.toml")" = edited ]
 }
 
 @test "setup git-identity: writes config.local from .env, then leaves it alone" {
@@ -201,8 +201,8 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 }
 
 @test "setup userstyles: generates every theme's userstyle with the checkout's script" {
-	mkdir -p "${ROOT}/next/home/darwin/browsers/userstyles/scripts"
-	printf '#!/usr/bin/env bash\necho "generate $*" >>"%s"\n' "${LOG}" >"${ROOT}/next/home/darwin/browsers/userstyles/scripts/generate-userstyle.sh"
+	mkdir -p "${ROOT}/home/darwin/browsers/userstyles/scripts"
+	printf '#!/usr/bin/env bash\necho "generate $*" >>"%s"\n' "${LOG}" >"${ROOT}/home/darwin/browsers/userstyles/scripts/generate-userstyle.sh"
 	fake lessc
 	fake jq
 	run step userstyles

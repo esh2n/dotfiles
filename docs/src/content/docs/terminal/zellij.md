@@ -69,7 +69,7 @@ pane が 2-3 個なら `Ctrl+q` → `h/j/k/l` で十分。5 個以上の pane �
 
 ## Setup
 
-zjstatus と monocle は `make up`（setup の `zellij-plugins`）が download する。zellij-pane-picker は Nix が版を固定して `~/.local/share/zellij/plugins/` に置く（`next/home/shared/zellij`）。
+zjstatus と monocle は `make up`（setup の `zellij-plugins`）が download する。zellij-pane-picker は Nix が版を固定して `~/.local/share/zellij/plugins/` に置く（`home/shared/zellij`）。
 
 ## File 構成
 

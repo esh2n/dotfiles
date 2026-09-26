@@ -1,6 +1,6 @@
 /**
  * Pure writer: canonical `TiersPolicy` -> the managed `local-proxy:` provider
- * subtree of `next/home/shared/harness/dsh/settings.yaml`. Returns ONLY that
+ * subtree of `home/shared/harness/dsh/settings.yaml`. Returns ONLY that
  * subtree's text (4-space indented, matching where `local-proxy:` sits under
  * `llm-pi-ai: / providers:` in the real file) — `./splice.ts` +
  * `./markers.ts` do the actual insertion into the full file, since that file

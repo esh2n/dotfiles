@@ -2,11 +2,26 @@
 # contributed it: package names, Homebrew lists, taps, App Store apps and
 # system defaults. Two configurations with equal summaries configure the same
 # machine even when their derivation paths differ only by list order.
-{ flake, config, user }:
+{
+  flake,
+  config,
+  user,
+}:
 let
   c = (builtins.getFlake flake).darwinConfigurations.${config}.config;
   # Sets, not lists: duplicates across modules and their order carry no meaning.
-  sorted = xs: builtins.sort builtins.lessThan (builtins.attrNames (builtins.listToAttrs (map (n: { name = n; value = null; }) xs)));
+  sorted =
+    xs:
+    builtins.sort builtins.lessThan (
+      builtins.attrNames (
+        builtins.listToAttrs (
+          map (n: {
+            name = n;
+            value = null;
+          }) xs
+        )
+      )
+    );
   names = map (x: if builtins.isString x then x else x.name);
 in
 {

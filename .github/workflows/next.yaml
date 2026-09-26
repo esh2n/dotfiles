@@ -1,6 +1,6 @@
 name: next
 
-# The next/ layout: tests on both platforms, then a real build of each
+# The flake: tests on both platforms, then a real build of each
 # platform's configuration (the tests only evaluate). The builds switch every
 # role on, so everything a role can add is built; tests write their own roles
 # files.
@@ -8,9 +8,9 @@ name: next
 on:
   push:
     branches: [main]
-    paths: ["next/**", "harness/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
+    paths: ["**/*.nix", "flake.lock", "home/**", "lib/**", "roles/**", "system/**", "pkgs/**", "overlays/**", "harness/**", "tests/**", "bootstrap.sh", ".github/workflows/next.yaml"]
   pull_request:
-    paths: ["next/**", "harness/**", "tests/**", "domains/**", ".github/workflows/next.yaml"]
+    paths: ["**/*.nix", "flake.lock", "home/**", "lib/**", "roles/**", "system/**", "pkgs/**", "overlays/**", "harness/**", "tests/**", "bootstrap.sh", ".github/workflows/next.yaml"]
   workflow_dispatch:
 
 permissions:
@@ -23,10 +23,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: shellcheck
         run: |
-          shellcheck -x next/bootstrap.sh next/pkgs/scripts/*/*.sh tests/run.sh \
-            next/home/shared/litellm/config/{secrets,litellm-up,proxy-key}.sh \
-            next/home/shared/services/jig-decision-up.sh \
-            next/home/shared/sbx/config/kits/agents/link-harness.sh
+          shellcheck -x bootstrap.sh pkgs/scripts/*/*.sh tests/run.sh \
+            home/shared/litellm/config/{secrets,litellm-up,proxy-key}.sh \
+            home/shared/services/jig-decision-up.sh \
+            home/shared/sbx/config/kits/agents/link-harness.sh
 
   # jig, the harness generator and guard (harness/jig): types, lint, tests
   jig:
@@ -46,12 +46,12 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: next/pkgs/dotctl
+        working-directory: pkgs/dotctl
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: next/pkgs/dotctl/go.mod
+          go-version-file: pkgs/dotctl/go.mod
       - run: go vet ./...
       - run: go test ./...
       - run: go run honnef.co/go/tools/cmd/staticcheck@2026.1 ./...
@@ -73,7 +73,7 @@ jobs:
       # dotctl ledger sync is built from the checkout (tests/lib/dotctl.bash)
       - uses: actions/setup-go@v5
         with:
-          go-version-file: next/pkgs/dotctl/go.mod
+          go-version-file: pkgs/dotctl/go.mod
       - name: ledger sync against Postgres
         env:
           PGHOST: 127.0.0.1
@@ -92,20 +92,19 @@ jobs:
       # tests drive dotctl built from the checkout (tests/lib/dotctl.bash)
       - uses: actions/setup-go@v5
         with:
-          go-version-file: next/pkgs/dotctl/go.mod
+          go-version-file: pkgs/dotctl/go.mod
       # not model-provider: on Linux it builds llama.cpp with CUDA, which is in
       # no binary cache and too heavy here
       - name: roles
         run: echo '{"roles":["developer","desk-user","observer"]}' > "$RUNNER_TEMP/roles.json"
-      - name: nix fmt (nixfmt over next/)
-        working-directory: next
+      - name: nix fmt (nixfmt over the flake)
         run: nix fmt -- --ci
       - name: tests (platform-neutral and Linux)
         run: bash tests/run.sh tests/next/facts.bats tests/next/layers.bats tests/next/linux.bats tests/next/bootstrap.bats tests/pkgs tests/services
       - name: build homeConfigurations.linux
         env:
           DOTFILES_ROOT: ${{ github.workspace }}
-        run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build ./next#homeConfigurations.linux.activationPackage --impure --print-build-logs
+        run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build .#homeConfigurations.linux.activationPackage --impure --print-build-logs
 
   mac:
     runs-on: macos-latest
@@ -117,7 +116,7 @@ jobs:
       # tests drive dotctl built from the checkout (tests/lib/dotctl.bash)
       - uses: actions/setup-go@v5
         with:
-          go-version-file: next/pkgs/dotctl/go.mod
+          go-version-file: pkgs/dotctl/go.mod
       - name: roles
         run: echo '{"roles":["developer","desk-user","model-provider","observer"]}' > "$RUNNER_TEMP/roles.json"
       - name: tests
@@ -125,4 +124,4 @@ jobs:
       - name: build darwinConfigurations.mac
         env:
           DOTFILES_ROOT: ${{ github.workspace }}
-        run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build ./next#darwinConfigurations.mac.system --impure --print-build-logs
+        run: DOTFILES_ROLES_FILE="$RUNNER_TEMP/roles.json" nix build .#darwinConfigurations.mac.system --impure --print-build-logs

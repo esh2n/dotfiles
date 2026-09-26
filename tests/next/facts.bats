@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# next/lib/facts.nix is the only impure read of the configuration. It reads the
+# lib/facts.nix is the only impure read of the configuration. It reads the
 # machine-local roles file (never committed) and rejects anything it does not
 # understand, so a typo in that file fails loudly instead of silently dropping
 # a role.
@@ -11,7 +11,7 @@ setup() {
 }
 
 facts_roles() {
-	nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).roles"
+	nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).roles"
 }
 
 @test "facts: no roles file means no roles" {
@@ -47,7 +47,7 @@ facts_roles() {
 
 facts_attr_without_home() { # facts_attr_without_home <attr>
 	env -u HOME XDG_CACHE_HOME="${XDG_CACHE_HOME:-}" DOTFILES_NIX_STORE="${DOTFILES_NIX_STORE:-}" DOTFILES_TEST_KEEP_ROLES_FILE=1 \
-		bash -c 'source "$1"; nix_eval_expr_json "(import $2/next/lib/facts.nix).$3"' _ \
+		bash -c 'source "$1"; nix_eval_expr_json "(import $2/lib/facts.nix).$3"' _ \
 		"${BATS_TEST_DIRNAME}/../lib/nix.bash" "${REPO_ROOT}" "$1"
 }
 
@@ -71,7 +71,7 @@ facts_attr_without_home() { # facts_attr_without_home <attr>
 	[ "$output" = '["model-provider"]' ]
 }
 
-facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).nvidia"; }
+facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).nvidia"; }
 
 @test "facts: the host's NVIDIA driver is read from the roles file, null when absent" {
 	printf '{"roles": ["model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
@@ -92,12 +92,12 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).nv
 
 @test "facts: observerHost, the ledger machine's tailnet name, is read from the roles file" {
 	printf '{"roles": ["developer"], "observerHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).observerHost"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).observerHost"
 	[ "$output" = '"mac.example.ts.net"' ]
 	printf '{"roles": ["developer"]}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).observerHost"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).observerHost"
 	[ "$output" = null ]
 	printf '{"roles": ["developer"], "observerHost": 5}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/next/lib/facts.nix).observerHost"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).observerHost"
 	[ "$status" -ne 0 ]
 }

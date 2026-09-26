@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Try the Linux side of next/ for real, in a throwaway Arch Linux container:
+# Try the Linux side of the flake for real, in a throwaway Arch Linux container:
 # install Nix, write a roles file, run home-manager switch the way
-# next/bootstrap.sh does, then check that links point into the checkout.
+# bootstrap.sh does, then check that links point into the checkout.
 # Only the committed HEAD is tested (the container clones a git bundle).
 #
 #   bash tests/container/linux-switch.sh [roles-json]
@@ -31,8 +31,8 @@ mkdir -p "${HOME}/.config/dotfiles"
 printf '%s\n' "${ROLES}" >"${HOME}/.config/dotfiles/roles.json"
 export DOTFILES_ROOT="${HOME}/dotfiles"
 cd "${DOTFILES_ROOT}"
-nix --extra-experimental-features 'nix-command flakes' run ./next#home-manager -- \
-	switch --flake ./next#linux --impure -b pre-next
+nix --extra-experimental-features 'nix-command flakes' run .#home-manager -- \
+	switch --flake .#linux --impure -b pre-next
 fail=0
 for f in .zshrc .claude .config/codex .config/jig/policy; do
 	t="$(readlink -f "${HOME}/${f}" || true)"

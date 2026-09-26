@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_comment": "Canonical model-tier table. next/home/shared/harness/pi/models.json, dsh/settings.yaml's local-proxy provider block, and litellm/config.yaml's model_list are all generated from this file by jig (`src/domain/tiers/` + `bun src/cli/jig.ts apply`, run from harness/jig). Edit THIS file, then `jig apply`; never hand-edit a generated file directly except inside dsh's settings.yaml `# BEGIN jig:tiers` / `# END jig:tiers` markers, which jig also refuses to touch by hand once it owns them. Decision record: writeup store yoki/2026-09-16-observability-proxy-litellm; unified in the harness-parity plan, Phase 2.",
+  "_comment": "Canonical model-tier table. home/shared/harness/pi/models.json, dsh/settings.yaml's local-proxy provider block, and litellm/config.yaml's model_list are all generated from this file by jig (`src/domain/tiers/` + `bun src/cli/jig.ts apply`, run from harness/jig). Edit THIS file, then `jig apply`; never hand-edit a generated file directly except inside dsh's settings.yaml `# BEGIN jig:tiers` / `# END jig:tiers` markers, which jig also refuses to touch by hand once it owns them. Decision record: writeup store yoki/2026-09-16-observability-proxy-litellm; unified in the harness-parity plan, Phase 2.",
   "connections": {
     "proxy": {
       "baseUrl": "http://localhost:4000/v1",
@@ -15,7 +15,7 @@
         "compat": "localhost gateways: pi-ai treats an unknown URL as OpenAI itself and sends fields LiteLLM may reject — these two are the usual fixes and have no UI field, so they must live here.",
         "supportsDeveloperRole": "system prompt as `system`, not `developer`",
         "maxTokensField": "if the proxy rejects max_completion_tokens",
-        "pi.apiKey": "env interpolation: the `pi` shell wrapper (next/home/shared/zsh/rc/functions.zsh) resolves the op-managed proxy key ONCE at launch and exports LITELLM_API_KEY, so pi never spawns a key-reader in a subprocess that cannot reach the Keychain. Launch pi via that wrapper, not the raw binary."
+        "pi.apiKey": "env interpolation: the `pi` shell wrapper (home/shared/zsh/rc/functions.zsh) resolves the op-managed proxy key ONCE at launch and exports LITELLM_API_KEY, so pi never spawns a key-reader in a subprocess that cannot reach the Keychain. Launch pi via that wrapper, not the raw binary."
       },
       "pi": {
         "apiKey": "$LITELLM_API_KEY"

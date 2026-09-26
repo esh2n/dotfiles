@@ -1028,7 +1028,7 @@ describe("applyCli --target pi", () => {
     );
     expect(result.stdout).not.toContain("run once:");
     expect(result.stdout).toContain(
-      "delivered by core/config/manager.sh link_pi_resources until milestone 4 (1), links into next/home/shared/harness/pi/extensions/:",
+      "delivered by core/config/manager.sh link_pi_resources until milestone 4 (1), links into home/shared/harness/pi/extensions/:",
     );
     expect(result.stdout).toMatch(
       /guard\.ts +a symlink → \/repo\/config\/pi\/extensions\/guard\.ts/,

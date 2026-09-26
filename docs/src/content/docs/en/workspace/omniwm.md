@@ -98,7 +98,7 @@ Correct procedure: **quit gracefully
 ## Customization
 
 Settings live in `~/.config/omniwm/settings.toml` (symlinked to
-`next/home/darwin/omniwm/config/`) plus the GUI Settings. External edits
+`home/darwin/omniwm/config/`) plus the GUI Settings. External edits
 follow the procedure above.
 
 - All hotkeys remappable (Settings > Hotkeys)

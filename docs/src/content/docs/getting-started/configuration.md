@@ -5,7 +5,7 @@ description: 設定ファイルの置き場所、template、環境変数、個�
 
 ## 設定ファイルの置き場所
 
-各アプリの設定は、そのアプリのモジュールの隣にあります（`next/home/<os>/<app>/config/`）。`~/.config/<app>` などはそこへのリンクなので、編集はそのまま次の起動から効きます。構成の作り直しは要りません。
+各アプリの設定は、そのアプリのモジュールの隣にあります（`home/<os>/<app>/config/`）。`~/.config/<app>` などはそこへのリンクなので、編集はそのまま次の起動から効きます。構成の作り直しは要りません。
 
 ## Template
 
@@ -26,7 +26,7 @@ OPENWEATHER_API_KEY=your-api-key
 | File | 用途 |
 |------|------|
 | `~/.config/git/config.local` | Git の名前と email（`.env` の `GIT_USER_NAME` / `GIT_USER_EMAIL` から `make up` が書く） |
-| `next/home/shared/git/config/conditional/*.conf` | ディレクトリごとの Git 設定（機械ごと、追跡しない） |
+| `home/shared/git/config/conditional/*.conf` | ディレクトリごとの Git 設定（機械ごと、追跡しない） |
 | `~/.config/jj/conf.d/user.toml` | Jujutsu の user 設定 |
 | `~/.zshrc.local` | この機械だけの zsh 設定 |
 
@@ -34,16 +34,18 @@ OPENWEATHER_API_KEY=your-api-key
 
 ```text
 dotfiles/
-├── next/                 # flake
-│   ├── lib/              #   facts、組み立て、常駐サービス、setup の手順
-│   ├── roles/            #   役割ごとに何を有効にするか
-│   ├── system/darwin/    #   nix-darwin (defaults、Homebrew、browser)
-│   ├── home/             #   home-manager。一アプリ一ディレクトリ、設定はモジュールの隣
-│   │   ├── shared/       #     両 OS
-│   │   ├── darwin/       #     macOS だけ
-│   │   └── linux/        #     Omarchy だけ
-│   └── pkgs/             #   ここでビルドするもの (dotctl など)
-├── domains/dev/          # coding agent のハーネス (jig) と設定。harness/ へ移る予定
-├── tests/                # bats
-└── docs/                 # この site
+├── flake.nix, flake.lock    # flake: darwinConfigurations.mac、homeConfigurations.linux、packages
+├── bootstrap.sh             # make up: Nix が無ければ入れて dotctl up に渡す
+├── lib/                     # facts（唯一の不純な読み取り）、組み立て、常駐サービス、setup の手順
+├── roles/                   # 役割ごとに何を有効にするか
+├── system/darwin/           # nix-darwin (defaults、Homebrew、browser)
+├── home/                    # home-manager。一アプリ一ディレクトリ、設定はモジュールの隣
+│   ├── shared/              #   両 OS
+│   ├── darwin/              #   macOS だけ
+│   └── linux/               #   Omarchy だけ
+├── pkgs/                    # ここでビルドするもの (dotctl など)
+├── overlays/                # 上流の package の版固定・調整
+├── harness/                 # coding agent のハーネス (jig、rules、skills、agents、policy、tools)
+├── tests/                   # bats
+└── docs/                    # この site
 ```

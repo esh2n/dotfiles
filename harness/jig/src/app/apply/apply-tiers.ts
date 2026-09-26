@@ -26,7 +26,7 @@ export const ALL_APPLY_TARGETS: readonly ApplyTarget[] = ["pi", "dsh", "omp", "l
 export interface ApplyTargetPaths {
   readonly pi: string;
   readonly dsh: string;
-  /** `next/home/shared/harness/omp/models.yml` — the `proxy:` block between the jig:tiers markers. */
+  /** `home/shared/harness/omp/models.yml` — the `proxy:` block between the jig:tiers markers. */
   readonly omp: string;
   readonly litellm: string;
 }

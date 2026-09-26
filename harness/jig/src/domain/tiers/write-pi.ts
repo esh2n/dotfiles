@@ -1,5 +1,5 @@
 /**
- * Pure writer: canonical `TiersPolicy` -> `next/home/shared/harness/pi/models.json`
+ * Pure writer: canonical `TiersPolicy` -> `home/shared/harness/pi/models.json`
  * content. pi's format is plain JSON, so it can express every canonical
  * field except dsh's own presentation (`dsh.name`, `dsh.reasoningEfforts`,
  * `dsh._comment`) and `backend` (pi only ever talks to the proxy alias —

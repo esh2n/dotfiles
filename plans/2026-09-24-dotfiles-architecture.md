@@ -111,7 +111,7 @@ dotfiles/
   - `observer`（一台）: Prometheus・Grafana・Open WebUI と、利用コストの台帳（Postgres、tailnet に 5432）。
   - **変えました（2026-09-25）**: 以前は `llm-hub` 一つに「LM Studio を出す」と「集計と窓口」をまとめ、hub / node で分けていました。機械はお互いのモデルを使えるので hub は無く、分けました。同じ日に役割を人の名前にしました（`rules/decisions/2026-09-25-roles-named-as-people.md`）。
   - 利用コストは台帳一冊（`rules/decisions/2026-09-25-llm-cost-ledger-local-first.md`）: 各機械の LiteLLM は同じ docker ネットワーク上の自分の Postgres に書き、observer の機械の Postgres が台帳。他の機械は届くときに未送信分を `request_id` で重複なく送る。予算は機械ごと。
-- 秘密情報: 1Password のサービスアカウントのトークンを OS の保管場所から読む。Mac は login Keychain、Linux は Secret Service（libsecret、Omarchy は gnome-keyring）。読み方は `next/home/shared/litellm/config/secrets.sh` の一か所。
+- 秘密情報: 1Password のサービスアカウントのトークンを OS の保管場所から読む。Mac は login Keychain、Linux は Secret Service（libsecret、Omarchy は gnome-keyring）。読み方は `home/shared/litellm/config/secrets.sh` の一か所。
 
 ## 5.5 セットアップの手順（宣言できないもの）
 
@@ -131,7 +131,7 @@ dotfiles/
 
 ## 7. テーマ切り替え
 
-実装済み（2026-09-25、`next/home/shared/theme`・`next/pkgs/dotctl/internal/theme`）。
+実装済み（2026-09-25、`home/shared/theme`・`pkgs/dotctl/internal/theme`）。
 
 - `~/.config/theme/palettes/<名前>/<ファイル>` を home-manager がテーマごとに宣言する（リポジトリのテーマファイルへのリンク）。アプリのファイルが無いテーマ（明るい版）は同じ系統のもの（catppuccin-latte → catppuccin）、無ければ catppuccin を借りる。アプリが存在しないファイルを読むことはない。
 - `~/.config/theme/current` はどれか一つの palettes へのリンク。動かすのは `dotctl theme set <名前>`（旧名 `theme-switch <名前>` でも動く）だけ。

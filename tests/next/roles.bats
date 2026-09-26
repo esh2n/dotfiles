@@ -12,7 +12,7 @@ setup() {
 }
 
 role_enabled() { # role_enabled <role>
-	nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.config.dotfiles.roles.\"$1\".enable"
+	nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}\").darwinConfigurations.mac.config.dotfiles.roles.\"$1\".enable"
 }
 
 @test "roles: a role named in the roles file is enabled on the mac" {
@@ -29,7 +29,7 @@ role_enabled() { # role_enabled <role>
 
 @test "roles: with every role on, both platforms' configurations evaluate to a build" {
 	printf '{"roles": ["developer", "desk-user", "model-provider", "observer"], "nvidia": {"version": "580.82.09", "sha256": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "acceptLicense": true}}\n' >"${DOTFILES_ROLES_FILE}"
-	F="builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\""
+	F="builtins.getFlake \"git+file://${REPO_ROOT}\""
 	run --separate-stderr nix_eval_expr_json "[ (${F}).darwinConfigurations.mac.system.drvPath (${F}).homeConfigurations.linux.activationPackage.drvPath ]"
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"darwin-system"*"home-manager-generation"* ]]
@@ -38,7 +38,7 @@ role_enabled() { # role_enabled <role>
 pkgnames() { # pkgnames <darwin|linux>: the names of home.packages
 	local cfg
 	if [ "$1" = darwin ]; then cfg="darwinConfigurations.mac.config.home-manager.users.\"${USER}\""; else cfg="homeConfigurations.linux.config"; fi
-	nix_eval_expr_json "map (p: p.pname or p.name) (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").${cfg}.home.packages"
+	nix_eval_expr_json "map (p: p.pname or p.name) (builtins.getFlake \"git+file://${REPO_ROOT}\").${cfg}.home.packages"
 }
 
 has() { printf '%s' "$1" | python3 -c 'import json,sys; sys.exit(0 if sys.argv[1] in json.load(sys.stdin) else 1)' "$2"; }

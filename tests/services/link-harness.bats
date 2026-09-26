@@ -4,12 +4,12 @@ bats_require_minimum_version 1.5.0
 # config linked from the mounted checkout, then jig apply (skipped here: no
 # bun on PATH).
 
-SCRIPT="${BATS_TEST_DIRNAME}/../../next/home/shared/sbx/config/kits/agents/link-harness.sh"
+SCRIPT="${BATS_TEST_DIRNAME}/../../home/shared/sbx/config/kits/agents/link-harness.sh"
 
 setup() {
 	ROOT="${BATS_TEST_TMPDIR}/repo"
 	export HOME="${BATS_TEST_TMPDIR}/home"
-	C="${ROOT}/next/home/shared/harness"
+	C="${ROOT}/home/shared/harness"
 	mkdir -p "${C}/pi/extensions" "${C}/pi/themes" "${C}/dsh/profiles/proxy" "${HOME}/.dsh/profiles/proxy"
 	echo '{}' >"${C}/pi/settings.json"
 	echo '{}' >"${C}/pi/models.json"

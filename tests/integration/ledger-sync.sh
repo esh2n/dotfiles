@@ -43,7 +43,7 @@ q central "INSERT INTO \"LiteLLM_SpendLogs\" VALUES ('m1','acompletion',2,'2026-
 sync() {
 	local here="${PGHOST}:${PGPORT}"
 	env -u PGHOST -u PGPORT LEDGER_PASSWORD=pw LEDGER_LOCAL="${here}/local" LEDGER_CENTRAL="${1:-${here}/central}" \
-		LEDGER_MACHINE=omarchy LEDGER_SQL="${REPO}/next/home/shared/llm-ledger/ledger.sql" \
+		LEDGER_MACHINE=omarchy LEDGER_SQL="${REPO}/home/shared/llm-ledger/ledger.sql" \
 		LEDGER_STATE_DIR="${WORK}/state" "${DOTCTL}" ledger sync once
 }
 fail() { echo "FAIL: $*" >&2; exit 1; }

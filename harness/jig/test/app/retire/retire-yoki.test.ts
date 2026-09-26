@@ -7,7 +7,7 @@ const CODEX = "/home/u/.codex";
 const OMP = "/home/u/.omp/agent";
 const CURSOR = "/home/u/.cursor/rules";
 const PROFILES = "/repo/domains/dev/config/claude-profiles";
-const OMP_EXT = "/repo/next/home/shared/harness/omp/extensions";
+const OMP_EXT = "/repo/home/shared/harness/omp/extensions";
 
 const PATHS: RetirePaths = {
   claudeDir: CLAUDE,

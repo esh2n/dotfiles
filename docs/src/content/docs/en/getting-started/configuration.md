@@ -5,7 +5,7 @@ description: Where configs live, templates, environment variables, personal sett
 
 ## Where configs live
 
-Each app's config sits beside its module (`next/home/<os>/<app>/config/`).
+Each app's config sits beside its module (`home/<os>/<app>/config/`).
 `~/.config/<app>` and the like are links to it, so an edit takes effect the
 next time the app starts, without a rebuild.
 
@@ -35,7 +35,7 @@ Lookup order: the `OPENWEATHER_API_KEY` variable, `$DOTFILES_ROOT/.env`,
 | File | Purpose |
 |------|---------|
 | `~/.config/git/config.local` | Git name and email (written by `make up` from `.env`'s `GIT_USER_NAME` / `GIT_USER_EMAIL`) |
-| `next/home/shared/git/config/conditional/*.conf` | per-directory Git settings (machine-local, untracked) |
+| `home/shared/git/config/conditional/*.conf` | per-directory Git settings (machine-local, untracked) |
 | `~/.config/jj/conf.d/user.toml` | Jujutsu user settings |
 | `~/.zshrc.local` | zsh settings for this machine only |
 
@@ -43,16 +43,18 @@ Lookup order: the `OPENWEATHER_API_KEY` variable, `$DOTFILES_ROOT/.env`,
 
 ```text
 dotfiles/
-├── next/                 # the flake
-│   ├── lib/              #   facts, builders, services, setup steps
-│   ├── roles/            #   what each role turns on
-│   ├── system/darwin/    #   nix-darwin: defaults, Homebrew, browsers
-│   ├── home/             #   home-manager: one directory per app, config beside its module
-│   │   ├── shared/       #     both platforms
-│   │   ├── darwin/       #     macOS only
-│   │   └── linux/        #     Omarchy only
-│   └── pkgs/             #   packages built here, dotctl among them
-├── domains/dev/          # coding-agent harness (jig) and its configs, moving to harness/
-├── tests/                # bats
-└── docs/                 # this site
+├── flake.nix, flake.lock    # the flake: darwinConfigurations.mac, homeConfigurations.linux, packages
+├── bootstrap.sh             # make up: installs Nix when missing, then dotctl up
+├── lib/                     # facts (the one impure read), builders, services, setup steps
+├── roles/                   # what each role turns on
+├── system/darwin/           # nix-darwin: defaults, Homebrew, browsers
+├── home/                    # home-manager: one directory per app, config beside its module
+│   ├── shared/              #   both platforms (zsh, nvim, git, zellij, wezterm, theme, harness, ...)
+│   ├── darwin/              #   macOS only (tmux, ghostty, sketchybar, aerospace, ...)
+│   └── linux/               #   Omarchy only (llama-server)
+├── pkgs/                    # packages built here, dotctl among them
+├── overlays/                # upstream packages pinned or adjusted
+├── harness/                 # coding-agent harness: jig, rules, skills, agents, policy, tools
+├── tests/                   # bats suites
+└── docs/                    # the documentation site
 ```

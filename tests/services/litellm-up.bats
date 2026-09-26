@@ -9,7 +9,7 @@ setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
 	LOG="${BATS_TEST_TMPDIR}/calls.log"
 	mkdir -p "$D" "$BIN"
-	C="${BATS_TEST_DIRNAME}/../../next/home/shared/litellm/config"
+	C="${BATS_TEST_DIRNAME}/../../home/shared/litellm/config"
 	sed "s|^use_service_path\$|PATH=\"${BIN}:/usr/bin:/bin\"|" "$C/litellm-up.sh" >"$D/litellm-up.sh"
 	cp "$C/secrets.sh" "$D/secrets.sh"
 	export HOME="${BATS_TEST_TMPDIR}/home" DB_SECRET=the-db-pw

@@ -557,7 +557,7 @@ bun src/cli/jig.ts apply --target pi --write    # writes both halves in one run;
 ```
 
 `--target pi` names one harness, so it runs both halves: the tiers write into
-the checkout's `next/home/shared/harness/pi/models.json` from `policy/tiers.json`
+the checkout's `home/shared/harness/pi/models.json` from `policy/tiers.json`
 (the part `--target all` has always run, unchanged), then the agent-directory
 half below (`app/apply/apply-pi.ts`), which is never part of `--target all`
 for the reason the other three are not. The agent directory is resolved the
@@ -592,7 +592,7 @@ Destinations, one source tree:
   instructions applied across working directories"). Per the
   [config-layout decision](../rules/decisions/2026-09-22-config-layout-no-personal-layer.md)
   (Consequences, 2026-09-24) the generated file is identical for all five
-  harnesses and pi's short `next/home/shared/harness/pi/AGENTS.md` retires. On
+  harnesses and pi's short `home/shared/harness/pi/AGENTS.md` retires. On
   the machine manager.sh left, the path is a symlink to that repo file: on
   `--write` the link is removed and the generated regular file written in
   its place — a symlink is `replace`, not a backup, and what it pointed at
@@ -629,7 +629,7 @@ Destinations, one source tree:
   write, then noop.
 - **Report only: `packages`.** The delivery relies on two extensions, and
   jig does not edit pi's settings in this milestone. The dry-run reads the
-  REPO `next/home/shared/harness/pi/settings.json` — a source; `~/.pi/agent/settings.json`
+  REPO `home/shared/harness/pi/settings.json` — a source; `~/.pi/agent/settings.json`
   is a symlink to it — and says per package whether `packages` declares it
   (by pi's identity rule, package name at any version;
   [packages](https://pi.dev/docs/latest/packages), "Understand scope and
@@ -640,7 +640,7 @@ Destinations, one source tree:
   the `"npm:<name>"` entry to add by hand. On the machine manager.sh left,
   both are missing.
 - **Report only: `~/.pi/agent/extensions/`.** Every symlink into
-  `next/home/shared/harness/pi/extensions/` is named as delivered by
+  `home/shared/harness/pi/extensions/` is named as delivered by
   `core/config/manager.sh link_pi_resources` until milestone 4; everything
   else (orca's own `*.ts` files today) as not jig's. Nothing is linked or
   unlinked.
@@ -668,7 +668,7 @@ bun src/cli/jig.ts apply --target dsh --write    # writes both halves in one run
 ```
 
 `--target omp` likewise runs the tiers half first: the `proxy:` provider
-block of the checkout's `next/home/shared/harness/omp/models.yml`, between the
+block of the checkout's `home/shared/harness/omp/models.yml`, between the
 same `# BEGIN jig:tiers` / `# END jig:tiers` markers dsh uses
 (`domain/tiers/write-omp.ts`, since 2026-09-24 — the hand-written block
 before it carried no `contextWindow` / `maxTokens`, so omp assumed its
@@ -676,7 +676,7 @@ defaults, 128k / 16k, for the 1M-token tiers). Then the agent-directory half
 above.
 
 `--target dsh` names one harness, so, as `--target pi` does, it runs both
-halves: the tiers write into the checkout's `next/home/shared/harness/dsh/settings.yaml`
+halves: the tiers write into the checkout's `home/shared/harness/dsh/settings.yaml`
 from `policy/tiers.json` (the part `--target all` has always run, unchanged),
 then the harness-home half below (`app/apply/apply-dsh.ts`), never part of
 `--target all`. The home is resolved the way DSH resolves it
@@ -707,7 +707,7 @@ Destinations, one source tree:
 
 - **`$DSH_HOME/profiles/<name>/cordis.patch.yml`** — for every profile that
   DSH has scaffolded there AND the repo owns
-  (`next/home/shared/harness/dsh/profiles/<name>/cordis.patch.yml` exists), the
+  (`home/shared/harness/dsh/profiles/<name>/cordis.patch.yml` exists), the
   rule `link_dsh_resources` applies. Profiles are pnpm workspaces DSH
   scaffolds itself; jig never creates one, and a repo profile DSH has not
   scaffolded is named and gets nothing. `node_modules` under `profiles/` is
@@ -890,7 +890,7 @@ with no end marker, a `config.toml` that would not parse afterwards — is
   `~/.codex/skills/.system` and the directory itself stay.
 - **omp**: `yoki-hooks.json`, `RULES.md` (by its `<!-- yoki:begin -->`
   header), `.yoki/`, and `extensions/{yoki-bridge,yoki-guard}.ts` when they
-  are symlinks into `next/home/shared/harness/omp/extensions/` or
+  are symlinks into `home/shared/harness/omp/extensions/` or
   `claude-profiles/`. `config.yml` stays: a ruling not made.
 - **Cursor**: every `~/.cursor/rules/*` symlink into
   `claude-profiles/runtime/yoki/.cursor/rules/` (39 today); the count of

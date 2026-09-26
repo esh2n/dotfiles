@@ -9,11 +9,11 @@ load '../lib/nix.bash'
 roles() { printf '{"roles": [%s]}\n' "$1" >"${BATS_TEST_TMPDIR}/roles.json"; export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"; }
 
 agents() {
-	nix_eval_expr_json "let a = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.config.home-manager.users.\"${USER}\".launchd.agents; in builtins.mapAttrs (_: v: v.config) (builtins.removeAttrs a (builtins.filter (n: !a.\${n}.enable) (builtins.attrNames a)))"
+	nix_eval_expr_json "let a = (builtins.getFlake \"git+file://${REPO_ROOT}\").darwinConfigurations.mac.config.home-manager.users.\"${USER}\".launchd.agents; in builtins.mapAttrs (_: v: v.config) (builtins.removeAttrs a (builtins.filter (n: !a.\${n}.enable) (builtins.attrNames a)))"
 }
 
 units() {
-	nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.systemd.user.services"
+	nix_eval_expr_json "builtins.attrNames (builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config.systemd.user.services"
 }
 
 field() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d
@@ -32,7 +32,7 @@ print(json.dumps(v))' "${@:2}"; }
 	run --separate-stderr agents
 	[ "$status" -eq 0 ]
 	a="$output"
-	C="${REPO_ROOT}/next/home/shared"
+	C="${REPO_ROOT}/home/shared"
 	[ "$(field "$a" litellm-proxy Label)" = '"com.esh2n.litellm-proxy"' ]
 	[ "$(field "$a" litellm-proxy ProgramArguments)" = "[\"/bin/bash\", \"${C}/litellm/config/litellm-up.sh\"]" ]
 	[ "$(field "$a" litellm-proxy ThrottleInterval)" = "120" ]
@@ -43,7 +43,7 @@ print(json.dumps(v))' "${@:2}"; }
 	[ "$(field "$a" jig-decision ProgramArguments)" = "[\"/bin/bash\", \"${C}/services/jig-decision-up.sh\"]" ]
 	[ "$(field "$a" jig-decision EnvironmentVariables JIG_DIR)" = "\"${REPO_ROOT}/harness/jig\"" ]
 	[ "$(field "$a" jig-decision EnvironmentVariables JIG_DECISION_PORT)" = '"4100"' ]
-	[ "$(field "$a" lmstudio-awake ProgramArguments)" = "[\"/bin/bash\", \"${REPO_ROOT}/next/home/darwin/lmstudio/config/awake.sh\"]" ]
+	[ "$(field "$a" lmstudio-awake ProgramArguments)" = "[\"/bin/bash\", \"${REPO_ROOT}/home/darwin/lmstudio/config/awake.sh\"]" ]
 	[ "$(field "$a" lmstudio-awake ThrottleInterval)" = "30" ]
 }
 
@@ -69,7 +69,7 @@ print(json.dumps(v))' "${@:2}"; }
 setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 	local cfg
 	if [ "$1" = darwin ]; then cfg="darwinConfigurations.mac.config.home-manager.users.\"${USER}\""; else cfg="homeConfigurations.linux.config"; fi
-	nix_eval_expr_json "let s = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").${cfg}.dotfiles.setup.home-llm; in if s.enable then s.command else null"
+	nix_eval_expr_json "let s = (builtins.getFlake \"git+file://${REPO_ROOT}\").${cfg}.dotfiles.setup.home-llm; in if s.enable then s.command else null"
 }
 
 @test "services: the home-LLM steps follow the roles: model-provider, observer; not at all without one" {
@@ -88,7 +88,7 @@ setup_cmd() { # setup_cmd <darwin|linux>: the home-llm step's command, or null
 }
 
 gpu_linux() { # gpu_linux <attr under config>
-	nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.$1"
+	nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config.$1"
 }
 
 @test "services: model-provider runs llama-server on linux, bound to loopback, with the host's driver" {
@@ -96,7 +96,7 @@ gpu_linux() { # gpu_linux <attr under config>
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.ExecStart'
 	[ "$status" -eq 0 ]
-	[[ "$output" == *"${REPO_ROOT}/next/home/linux/llama-server/llama-server-up.sh"* ]]
+	[[ "$output" == *"${REPO_ROOT}/home/linux/llama-server/llama-server-up.sh"* ]]
 	run --separate-stderr gpu_linux 'systemd.user.services.llama-server.Service.Environment'
 	[[ "$output" == *"LLAMA_SERVER_BIN="*"llama-server"* ]]
 	[[ "$output" == *"LLAMA_PORT=8080"* ]]
@@ -137,7 +137,7 @@ gpu_linux() { # gpu_linux <attr under config>
 	[[ "$output" == *'"llm-ledger-sync"'* ]]
 	run --separate-stderr gpu_linux 'systemd.user.services.llm-ledger-sync.Service.Environment'
 	[[ "$output" == *"LEDGER_HOST=mac.example.ts.net"* ]]
-	[[ "$output" == *"LEDGER_SQL=${REPO_ROOT}/next/home/shared/llm-ledger/ledger.sql"* ]]
+	[[ "$output" == *"LEDGER_SQL=${REPO_ROOT}/home/shared/llm-ledger/ledger.sql"* ]]
 	roles '"developer", "observer"'
 	run --separate-stderr agents
 	[ "$(field "$output" llm-ledger-sync)" = "null" ]

@@ -151,12 +151,12 @@ describe("state directories and files known by name", () => {
 
 describe("links recognised by where they point", () => {
   const base = { harness: "omp" as const, path: "/o/extensions/yoki-guard.ts", what: "ext" };
-  const roots = ["/repo/next/home/shared/harness/omp/extensions", PROFILES];
+  const roots = ["/repo/home/shared/harness/omp/extensions", PROFILES];
 
   test("a symlink into one of the roots goes", () => {
     const item = classifyLinkInto({
       ...base,
-      state: { kind: "symlink", target: "/repo/next/home/shared/harness/omp/extensions/yoki-guard.ts" },
+      state: { kind: "symlink", target: "/repo/home/shared/harness/omp/extensions/yoki-guard.ts" },
       roots,
       rootsLabel: "the repo",
     });

@@ -21,7 +21,7 @@
  * replaces those links — this command skips their staging directories while
  * the links stand); `~/.codex/skills/.system` and anything in a harness
  * directory that is not named here; omp's `config.yml` (a ruling not made);
- * the source trees under `claude-profiles/` and `next/home/shared/harness/omp/`
+ * the source trees under `claude-profiles/` and `home/shared/harness/omp/`
  * that the removed links point into — jig does not delete repository files.
  */
 
@@ -63,7 +63,7 @@ export interface RetirePaths {
   readonly cursorRules: string;
   /** `domains/dev/config/claude-profiles`, the retired tree yoki-switch linked from. */
   readonly claudeProfilesRoot: string;
-  /** `next/home/shared/harness/omp/extensions`, where yoki's omp extensions live in the repo. */
+  /** `home/shared/harness/omp/extensions`, where yoki's omp extensions live in the repo. */
   readonly ompRepoExtensions: string;
 }
 
@@ -439,7 +439,7 @@ async function planOmp(ports: RetirePorts, paths: RetirePaths): Promise<RetireGr
         state: await ports.inspect(path),
         what: "yoki's omp extension link (link_omp_resources); jig's extension is extensions/jig.ts",
         roots: [paths.ompRepoExtensions, paths.claudeProfilesRoot],
-        rootsLabel: "next/home/shared/harness/omp/extensions/ or claude-profiles/",
+        rootsLabel: "home/shared/harness/omp/extensions/ or claude-profiles/",
       }),
     );
   }

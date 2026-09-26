@@ -1,6 +1,6 @@
 /**
  * [live-verified] `toPiModels` regenerated from the REAL `tiers.json` must
- * equal the REAL `next/home/shared/harness/pi/models.json` byte-for-byte — that's
+ * equal the REAL `home/shared/harness/pi/models.json` byte-for-byte — that's
  * the golden requirement: tiers.json was reverse-engineered FROM this file,
  * so the round trip must be exact.
  */
@@ -18,7 +18,6 @@ const REAL_PI_MODELS_PATH = join(
   "..",
   "..",
   "..",
-  "next",
   "home",
   "shared",
   "harness",

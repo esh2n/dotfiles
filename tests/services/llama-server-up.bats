@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# next/home/linux/llama-server/llama-server-up.sh: the systemd unit's
+# home/linux/llama-server/llama-server-up.sh: the systemd unit's
 # foreground launcher. The API key comes from 1Password (the same headless
 # path as LiteLLM) and reaches llama-server through a 0600 file, never argv.
 
-SCRIPT="${BATS_TEST_DIRNAME}/../../next/home/linux/llama-server/llama-server-up.sh"
+SCRIPT="${BATS_TEST_DIRNAME}/../../home/linux/llama-server/llama-server-up.sh"
 
 setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
@@ -31,7 +31,7 @@ setup() {
 up() {
 	# the library's fixed service PATH is replaced by the stand-ins' dir for the test
 	sed "s|^use_service_path\$|PATH=\"${BIN}:/usr/bin:/bin\"|" "$SCRIPT" >"${BATS_TEST_TMPDIR}/up.sh"
-	cp "${BATS_TEST_DIRNAME}/../../next/home/shared/litellm/config/secrets.sh" "${BATS_TEST_TMPDIR}/secrets.sh"
+	cp "${BATS_TEST_DIRNAME}/../../home/shared/litellm/config/secrets.sh" "${BATS_TEST_TMPDIR}/secrets.sh"
 	sed -i.bak "s|^source .*secrets.sh\"\$|source \"${BATS_TEST_TMPDIR}/secrets.sh\"|" "${BATS_TEST_TMPDIR}/up.sh"
 	PATH="${BIN}:/usr/bin:/bin" bash "${BATS_TEST_TMPDIR}/up.sh"
 }

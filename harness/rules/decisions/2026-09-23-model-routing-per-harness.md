@@ -12,7 +12,7 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 
 - Claude Code → Claude、Codex → OpenAI。ベンダー製ハーネスはベンダーのモデル。
 - pi・DSH・omp → LiteLLM の tier だけ（`main` / `complex` / `deterministic`）。プロバイダ直結の設定は置かない。
-- omp: `next/home/shared/harness/omp/models.yml` にプロバイダ `proxy`（`http://localhost:4000/v1`、`apiKey: LITELLM_API_KEY`）、`config.yml.template` の `modelRoles` は全部 `proxy/*`（default / smol / tiny / commit / task → `main`、slow / plan / advisor → `complex`）。鍵は pi と同じく zsh の `omp()` ラッパーが `proxy-key.sh` で一度解決して渡す。
+- omp: `home/shared/harness/omp/models.yml` にプロバイダ `proxy`（`http://localhost:4000/v1`、`apiKey: LITELLM_API_KEY`）、`config.yml.template` の `modelRoles` は全部 `proxy/*`（default / smol / tiny / commit / task → `main`、slow / plan / advisor → `complex`）。鍵は pi と同じく zsh の `omp()` ラッパーが `proxy-key.sh` で一度解決して渡す。
 - omp の subagent 表（`agents/models.json` の `omp`）: sonnet・haiku → `proxy/main`、opus → `proxy/complex`（codex 表と同じ考え方）。
 - 持ち主の追記（未裁定）: 「Codex も Codex 以外のモデルを使えるはず」— Codex の一部を LiteLLM 経由にするかは別件で grill。
 
@@ -37,5 +37,5 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 ## Sources
 
 - omp の provider 設定: https://github.com/can1357/oh-my-pi/blob/main/docs/models.md（`apiKey` は「Value is first treated as an environment variable name」、role は default / smol / slow / vision / plan / commit / tiny / task / advisor）
-- LiteLLM の tier 定義: `next/home/shared/litellm/config/config.yaml`、`next/home/shared/litellm/config/README.md`「Point a harness at it」
+- LiteLLM の tier 定義: `home/shared/litellm/config/config.yaml`、`home/shared/litellm/config/README.md`「Point a harness at it」
 - 先行の裁定: `2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`（jig の tier は `localhost:4000` のまま）

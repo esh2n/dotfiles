@@ -1,0 +1,47 @@
+# Directories the next layout moved: "<old> <new>", from the checkout's root.
+# git moves the tracked files; `dotctl up` carries what stays behind (files
+# only this machine has: git's conditional includes, app state, rendered
+# files) from <old> to <new> (pkgs/dotctl/internal/up/carry.go).
+domains/dev/config/jj home/shared/jj/config
+domains/dev/config/zed home/shared/zed/config
+domains/dev/config/capsule home/shared/capsule/config
+domains/dev/config/tailscale home/shared/tailscale/config
+domains/dev/config/herdr home/darwin/herdr/config
+domains/workspace/config/aerospace home/darwin/aerospace/config
+domains/workspace/config/hammerspoon home/darwin/hammerspoon/config
+domains/workspace/config/omniwm home/darwin/omniwm/config
+domains/workspace/config/paneru home/darwin/paneru/config
+domains/workspace/config/mado home/darwin/mado/config
+domains/system/config/browsers home/darwin/browsers/config
+domains/dev/config/lmstudio home/darwin/lmstudio/config
+domains/dev/config/ghostty home/darwin/ghostty/config
+domains/workspace/config/borders home/darwin/borders/config
+domains/dev/config/wezterm home/shared/wezterm/config
+domains/dev/config/tmux home/darwin/tmux/config
+domains/workspace/config/sketchybar home/darwin/sketchybar/config
+domains/dev/config/nvim-lazyvim home/shared/nvim/lazyvim
+domains/dev/config/nvim-nvchad home/shared/nvim/nvchad
+domains/dev/config/nvim-astrovim home/shared/nvim/astrovim
+domains/dev/config/nvim-custom home/shared/nvim/custom
+domains/dev/config/git home/shared/git/config
+domains/dev/config/zellij home/shared/zellij/config
+domains/dev/config/mise home/shared/mise/config
+domains/dev/config/starship home/shared/starship/config
+domains/dev/config/warp home/darwin/warp/config
+domains/dev/config/orca home/darwin/orca/config
+domains/dev/config/vscode home/darwin/vscode/config
+domains/dev/config/cursor home/darwin/cursor/config
+domains/system/config/themes home/shared/theme/themes
+domains/system/config/theme-env home/shared/theme/env
+domains/system/userstyles home/darwin/browsers/userstyles
+domains/workspace/assets/background home/shared/theme/wallpapers
+domains/dev/config/serena home/shared/serena/config
+domains/dev/config/claude home/shared/harness/claude
+domains/dev/config/codex home/shared/harness/codex
+domains/dev/config/pi home/shared/harness/pi
+domains/dev/config/omp home/shared/harness/omp
+domains/dev/config/dsh home/shared/harness/dsh
+domains/dev/config/litellm home/shared/litellm/config
+domains/dev/config/sbx home/shared/sbx/config
+domains/dev/llm/tools harness/tools
+next/home home

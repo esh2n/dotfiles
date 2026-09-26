@@ -1,13 +1,13 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# next/bootstrap.sh — the one entry point (`make up`): install Nix when
+# bootstrap.sh — the one entry point (`make up`): install Nix when
 # missing, then hand over to `dotctl up` (whose steps are tested in Go,
-# next/pkgs/dotctl/internal/up). External commands are recording stand-ins.
+# pkgs/dotctl/internal/up). External commands are recording stand-ins.
 
 load ../lib/nix
 
-BOOT="${BATS_TEST_DIRNAME}/../../next/bootstrap.sh"
-NEXT="$(cd "${BATS_TEST_DIRNAME}/../../next" && pwd)"
+BOOT="${BATS_TEST_DIRNAME}/../../bootstrap.sh"
+NEXT="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
 
 setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"
@@ -55,23 +55,23 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 }
 
 @test "bootstrap: the flake pins dotctl and the home-manager dotctl runs on Linux" {
-	run --separate-stderr nix_eval_expr_json "let f = builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\"; in [ f.packages.aarch64-darwin.dotctl.meta.mainProgram f.packages.x86_64-linux.dotctl.meta.mainProgram f.apps.x86_64-linux.home-manager.type ]"
+	run --separate-stderr nix_eval_expr_json "let f = builtins.getFlake \"git+file://${REPO_ROOT}\"; in [ f.packages.aarch64-darwin.dotctl.meta.mainProgram f.packages.x86_64-linux.dotctl.meta.mainProgram f.apps.x86_64-linux.home-manager.type ]"
 	[ "$status" -eq 0 ]
 	[ "$output" = '["dotctl","dotctl","app"]' ]
 }
 
 @test "bootstrap: nix-darwin backs up files in the way with the same extension" {
-	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.config.home-manager.backupFileExtension"
+	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}\").darwinConfigurations.mac.config.home-manager.backupFileExtension"
 	[ "$status" -eq 0 ]
 	[ "$output" = '"pre-next"' ]
 }
 
 @test "bootstrap: the taps dotctl up trusts, computed from the flake, are every tap the Mac uses" {
-	expr="$(python3 -c 'import re,sys; print(re.search(r"const tapsExpr = `(.*?)`", open(sys.argv[1]).read(), re.S).group(1))' "${REPO_ROOT}/next/pkgs/dotctl/internal/up/up.go")"
+	expr="$(python3 -c 'import re,sys; print(re.search(r"const tapsExpr = `(.*?)`", open(sys.argv[1]).read(), re.S).group(1))' "${REPO_ROOT}/pkgs/dotctl/internal/up/up.go")"
 	local -a store=()
 	[[ -n "${DOTFILES_NIX_STORE:-}" ]] && store=(--store "${DOTFILES_NIX_STORE}")
 	run --separate-stderr nix --extra-experimental-features 'nix-command flakes' eval "${store[@]}" --impure --raw \
-		"git+file://${REPO_ROOT}?dir=next#darwinConfigurations.mac.config.homebrew" --apply "$expr"
+		"git+file://${REPO_ROOT}#darwinConfigurations.mac.config.homebrew" --apply "$expr"
 	[ "$status" -eq 0 ]
 	got="$(tr ' ' '\n' <<<"$output" | tr '[:upper:]' '[:lower:]' | sort | tr '\n' ' ')"
 	# the list the old layout kept by hand (core/utils/homebrew.sh, removed)

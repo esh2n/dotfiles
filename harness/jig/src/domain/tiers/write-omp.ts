@@ -1,6 +1,6 @@
 /**
  * Pure writer: canonical `TiersPolicy` -> the `proxy:` provider block of
- * `next/home/shared/harness/omp/models.yml`, spliced between the shared
+ * `home/shared/harness/omp/models.yml`, spliced between the shared
  * `# BEGIN jig:tiers` / `# END jig:tiers` markers like dsh's block.
  *
  * Why generated: until 2026-09-24 the block was written by hand and carried

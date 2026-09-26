@@ -1,7 +1,12 @@
 # The links a home configuration places, as { "<path under ~>" = "<target>"; }.
 # Out-of-store symlinks are read back from the derivation that creates them,
 # so a link is compared by where it points, not by a store path.
-{ flake, kind, config, user ? null }:
+{
+  flake,
+  kind,
+  config,
+  user ? null,
+}:
 let
   f = builtins.getFlake flake;
   hm =

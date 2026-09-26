@@ -20,7 +20,7 @@ rule: Name each machine role for who the machine is to the rest of the home — 
 
 - 役割は Web アプリの権限の仕組みと同じ形にする。役割ファイル（`roles.json`）が機械に役割を割り当て、`roles/<name>.nix` が役割ごとに機能のスイッチ（`dotfiles.services.*`、`dotfiles.packages.*`、`dotfiles.homeLlm.*`）を入れる。機能の側は自分のスイッチだけを見て、役割名では分岐しない（テストで検査済み）。
 - 役割ファイルの `consoleHost` は `observerHost` にする。
-- 旧名が役割ファイルに残っていれば、`facts.nix` は新しい名前を示して止まる（`roles/renamed.nix`）。この Mac の役割ファイルは `next/adopt-mac.sh` が一度だけ書き換える。
+- 旧名が役割ファイルに残っていれば、`facts.nix` は新しい名前を示して止まる（`roles/renamed.nix`）。この Mac の役割ファイルは `adopt-mac.sh` が一度だけ書き換える。
 - Open WebUI（スマホのチャット）は「見る」仕事ではないが、observer に含める（持ち主の裁定）。
 
 ## Alternatives considered

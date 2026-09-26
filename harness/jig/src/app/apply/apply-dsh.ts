@@ -5,12 +5,12 @@
  * generator that retires `yoki-switch` and `core/config/manager.sh`'s
  * `link_dsh_resources`; the same shape as `./apply-pi.ts`, over DSH's
  * harness home (`~/.dsh`, or `DSH_HOME` — `domain/dsh/home.ts`). The tiers
- * half (`next/home/shared/harness/dsh/settings.yaml` from `policy/tiers.json`,
+ * half (`home/shared/harness/dsh/settings.yaml` from `policy/tiers.json`,
  * `./apply-tiers.ts`) runs first under the same target name, as pi's does.
  *
  * - `<dshHome>/profiles/<name>/cordis.patch.yml` — for every profile DSH
  *   has scaffolded there that ALSO has a source
- *   `next/home/shared/harness/dsh/profiles/<name>/cordis.patch.yml` (the rule
+ *   `home/shared/harness/dsh/profiles/<name>/cordis.patch.yml` (the rule
  *   `link_dsh_resources` applies, so the two agree on which profiles are
  *   ours): jig's `- insert:` row of `@deepseek-ai/dsh-mcp-client` entries,
  *   one per server with `targets.dsh` (`domain/dsh/mcp.ts`), inside its
@@ -86,7 +86,7 @@ export interface DshApplyPaths {
   readonly dshHomeVia: "DSH_HOME" | "default";
   /** `<dshHome>/profiles`, the directory DSH scaffolds profiles into. */
   readonly profilesDir: string;
-  /** Source: `next/home/shared/harness/dsh/profiles`, one `<name>/cordis.patch.yml` per profile the repo owns. */
+  /** Source: `home/shared/harness/dsh/profiles`, one `<name>/cordis.patch.yml` per profile the repo owns. */
   readonly repoProfilesDir: string;
   /** Destination: `<dshHome>/AGENTS.md`. */
   readonly agentsMd: string;

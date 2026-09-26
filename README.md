@@ -12,7 +12,7 @@ The same command installs a new machine and updates an existing one; running
 it again changes nothing:
 
 ```bash
-make up          # = ./next/bootstrap.sh: installs Nix when missing, then `dotctl up`
+make up          # = ./bootstrap.sh: installs Nix when missing, then `dotctl up`
 ```
 
 `dotctl up` builds and switches this machine's configuration, runs the setup
@@ -44,19 +44,20 @@ make tailscale-acl   # render the tailnet policy, copy it, open the admin page
 
 ```
 dotfiles/
-├── next/                 # the flake
-│   ├── lib/              #   facts (the one impure read), builders, services, setup steps
-│   ├── roles/            #   what each role turns on
-│   ├── system/darwin/    #   nix-darwin: defaults, Homebrew, browsers
-│   ├── home/             #   home-manager: one directory per app, config beside its module
-│   │   ├── shared/       #     both platforms (zsh, nvim, git, zellij, wezterm, theme, ...)
-│   │   ├── darwin/       #     macOS only (tmux, ghostty, sketchybar, aerospace, ...)
-│   │   └── linux/        #     Omarchy only (llama-server)
-│   ├── pkgs/             #   packages built here, dotctl among them
-│   └── overlays/         #   upstream packages pinned or adjusted
-├── domains/dev/          # coding-agent harness (jig) and its configs, moving to harness/
-├── tests/                # bats suites
-└── docs/                 # the documentation site
+├── flake.nix, flake.lock    # the flake: darwinConfigurations.mac, homeConfigurations.linux, packages
+├── bootstrap.sh             # make up: installs Nix when missing, then dotctl up
+├── lib/                     # facts (the one impure read), builders, services, setup steps
+├── roles/                   # what each role turns on
+├── system/darwin/           # nix-darwin: defaults, Homebrew, browsers
+├── home/                    # home-manager: one directory per app, config beside its module
+│   ├── shared/              #   both platforms (zsh, nvim, git, zellij, wezterm, theme, harness, ...)
+│   ├── darwin/              #   macOS only (tmux, ghostty, sketchybar, aerospace, ...)
+│   └── linux/               #   Omarchy only (llama-server)
+├── pkgs/                    # packages built here, dotctl among them
+├── overlays/                # upstream packages pinned or adjusted
+├── harness/                 # coding-agent harness: jig, rules, skills, agents, policy, tools
+├── tests/                   # bats suites
+└── docs/                    # the documentation site
 ```
 
 ## dotctl
@@ -78,8 +79,8 @@ distributions: custom, LazyVim, NvChad, AstroVim.
 ### Packages
 
 CLI tools and language servers come from the flake
-(`next/home/*/packages*`), GUI apps from Homebrew casks declared by
-nix-darwin (`next/system/darwin/homebrew.nix`), language runtimes from mise.
+(`home/*/packages*`), GUI apps from Homebrew casks declared by
+nix-darwin (`system/darwin/homebrew.nix`), language runtimes from mise.
 After editing any of them, run `make up`.
 
 ### Templates
@@ -860,7 +861,7 @@ Each monitor has independent workspaces. Use `Alt+h/j/k/l` to move focus across 
 
 **Built-ins:** Ghostty-powered quake terminal (position/size/glass configurable), fuzzy command palette, thumbnail overview, scratchpads, Ice-like menu bar icon hiding.
 
-**Customization:** `~/.config/omniwm/settings.toml` (symlinked to `next/home/darwin/omniwm/config/`, generated on first launch, live-reloads on save) plus GUI Settings. All hotkeys remappable; App Rules for float/workspace assignment/sizes (replaces AeroSpace's `on-window-detected`); workspace bar position/height/icon overrides; System Hyper Trigger (Caps Lock, F13-F20).
+**Customization:** `~/.config/omniwm/settings.toml` (symlinked to `home/darwin/omniwm/config/`, generated on first launch, live-reloads on save) plus GUI Settings. All hotkeys remappable; App Rules for float/workspace assignment/sizes (replaces AeroSpace's `on-window-detected`); workspace bar position/height/icon overrides; System Hyper Trigger (Caps Lock, F13-F20).
 
 **Automation:** `omniwmctl` — `query` (windows/workspaces/monitors as JSON), `subscribe` (event stream), `watch <event> --exec <script>` (run a script per event; the hook for future sketchybar integration).
 
@@ -999,7 +1000,7 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 
 9 essential extensions are automatically configured (1Password, Vimium, Stylus, JSON Formatter, Enhanced GitHub, Refined GitHub, Material Icons for GitHub, Text Blaze, Easy Grouping for Google Calendar).
 
-Declared by nix-darwin (`next/system/darwin/browsers.nix`) on `make up`. Restart Chrome/Dia to install.
+Declared by nix-darwin (`system/darwin/browsers.nix`) on `make up`. Restart Chrome/Dia to install.
 
 ## Safety
 
@@ -1012,7 +1013,7 @@ All existing configurations are backed up:
 User-specific settings go in:
 - `~/.config/git/config.local` - Git settings
 - `~/.config/jj/conf.d/user.toml` - Jujutsu user settings (name, email)
-- Shell environment: Modify `next/home/shared/zsh/zshenv`
+- Shell environment: Modify `home/shared/zsh/zshenv`
 
 ## License
 

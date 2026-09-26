@@ -1,0 +1,57 @@
+
+# Kiro CLI pre block. Keep at the top of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh"
+
+# .zshrc - Dotfiles Entry Point
+
+# 1. The checkout: this file is a link to home/shared/zsh/zshrc in it
+if [[ -z "$DOTFILES_ROOT" ]]; then
+    # :A resolves the symlink in-shell (no readlink/dirname forks)
+    DOTFILES_ROOT="${${:-${HOME}/.zshrc}:A:h:h:h:h}"
+fi
+export DOTFILES_ROOT
+
+# 2. Colours for fzf, bat and ripgrep, written by dotctl theme
+[[ -f "${DOTFILES_ROOT}/home/shared/theme/env/current.sh" ]] &&
+    source "${DOTFILES_ROOT}/home/shared/theme/env/current.sh"
+
+# 3. The fragments, in the order the old loader read them (not in a
+#    function: typeset in a fragment must stay global). brew.zsh maps
+#    $OSTYPE to Darwin/Linux for the fragments after it.
+for __rc in helpers.zsh aliases.sh options.zsh utils.zsh functions.zsh \
+    integrations.zsh aliases.zsh keybindings.zsh editors.zsh \
+    brew.zsh sketchybar.zsh services.zsh; do
+    source "${DOTFILES_ROOT}/home/shared/zsh/rc/${__rc}"
+done
+unset __rc
+
+# 4. Local Config Overrides / ローカル設定の上書き
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
+# 5. Amazon Q / Other Integrations
+
+
+# claude-mem: resolve latest installed version dynamically
+claude-mem() {
+    local base="$HOME/.claude/plugins/cache/thedotmack/claude-mem"
+    local latest
+    latest=$(ls -v "$base" 2>/dev/null | tail -1)
+    if [[ -n "$latest" && -f "$base/$latest/scripts/worker-service.cjs" ]]; then
+        bun "$base/$latest/scripts/worker-service.cjs" "$@"
+    else
+        echo "claude-mem not found. Install via claude plugin." >&2
+        return 1
+    fi
+}
+# alias claude-mem= — managed by function above; do not remove this comment
+
+. "$HOME/.local/share/../bin/env"
+
+
+# Kiro CLI post block. Keep at the bottom of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"
+
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:$HOME/.lmstudio/bin"
+# End of LM Studio CLI section
+

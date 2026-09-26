@@ -6,7 +6,7 @@ bats_require_minimum_version 1.5.0
 
 load '../lib/nix.bash'
 
-F() { printf 'builtins.getFlake "git+file://%s?dir=next"' "${REPO_ROOT}"; }
+F() { printf 'builtins.getFlake "git+file://%s"' "${REPO_ROOT}"; }
 
 @test "flake: checks build each platform's configuration and the repo's packages" {
 	run --separate-stderr nix_eval_expr_json "builtins.mapAttrs (_: builtins.attrNames) ($(F)).checks"

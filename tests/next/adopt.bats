@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# next/adopt-mac.sh: the owner's one line to move this Mac to next — the roles
+# adopt-mac.sh: the owner's one line to move this Mac to next — the roles
 # file, the ledger DB password in 1Password, main fast-forwarded to the work
 # branch, then make up. Every outside command is a recording stand-in.
 
-SCRIPT="${BATS_TEST_DIRNAME}/../../next/adopt-mac.sh"
+SCRIPT="${BATS_TEST_DIRNAME}/../../adopt-mac.sh"
 
 setup() {
 	BIN="${BATS_TEST_TMPDIR}/bin"

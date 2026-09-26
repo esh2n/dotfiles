@@ -84,10 +84,10 @@ function resolveApplyPaths(): { tiersJsonPath: string; destPaths: ApplyTargetPat
   return {
     tiersJsonPath: join(root, "harness", "policy", "tiers.json"),
     destPaths: {
-      pi: join(root, "next", "home", "shared", "harness", "pi", "models.json"),
-      dsh: join(root, "next", "home", "shared", "harness", "dsh", "settings.yaml"),
-      omp: join(root, "next", "home", "shared", "harness", "omp", "models.yml"),
-      litellm: join(root, "next", "home", "shared", "litellm", "config", "config.yaml"),
+      pi: join(root, "home", "shared", "harness", "pi", "models.json"),
+      dsh: join(root, "home", "shared", "harness", "dsh", "settings.yaml"),
+      omp: join(root, "home", "shared", "harness", "omp", "models.yml"),
+      litellm: join(root, "home", "shared", "litellm", "config", "config.yaml"),
     },
   };
 }
@@ -264,7 +264,7 @@ function ompApplyOptions(
 function resolvePiApplyPaths(): PiApplyPaths {
   const harness = harnessRoot();
   const agentDir = resolvePiAgentDir(process.env, homedir()).dir;
-  const repoPi = join(resolveApplyRoot(), "next", "home", "shared", "harness", "pi");
+  const repoPi = join(resolveApplyRoot(), "home", "shared", "harness", "pi");
   return {
     harnessRoot: harness,
     mcpServers: join(harness, "mcp", "servers.json"),
@@ -289,7 +289,7 @@ function resolvePiApplyPaths(): PiApplyPaths {
  * The home follows DSH's own rule (`domain/dsh/home.ts`: `DSH_HOME`, else
  * `~/.dsh`), the rule `core/config/manager.sh link_dsh_resources` reads
  * too. Profiles live under `<home>/profiles/<name>`, scaffolded by DSH; the
- * repo's own profile patches are under `next/home/shared/harness/dsh/profiles`.
+ * repo's own profile patches are under `home/shared/harness/dsh/profiles`.
  * The skills root DSH reads is `$DSH_AGENTS_HOME/skills`, else
  * `~/.agents/skills` (dsh-skill-filesystem README) — the mount the Codex,
  * omp and pi targets deliver; reported here, not planned. The guard plugin
@@ -306,7 +306,7 @@ function resolveDshApplyPaths(): DshApplyPaths {
     dshHome: dshHome.dir,
     dshHomeVia: dshHome.via,
     profilesDir: join(dshHome.dir, DSH_PROFILES_DIR),
-    repoProfilesDir: join(resolveApplyRoot(), "next", "home", "shared", "harness", "dsh", "profiles"),
+    repoProfilesDir: join(resolveApplyRoot(), "home", "shared", "harness", "dsh", "profiles"),
     agentsMd: join(dshHome.dir, "AGENTS.md"),
     homePatch: join(dshHome.dir, DSH_PROFILE_PATCH_FILENAME),
     agentsSkills:
@@ -431,7 +431,7 @@ function buildBoxPorts(): BoxPorts {
  * anywhere still finds its own.
  */
 function boxContext(env: Record<string, string | undefined> = process.env): BoxCliContext {
-  const postures = join(resolveApplyRoot(), "next", "home", "shared", "sbx", "config", "kits", "postures");
+  const postures = join(resolveApplyRoot(), "home", "shared", "sbx", "config", "kits", "postures");
   return {
     cwd: process.cwd(),
     postureKits: { guarded: join(postures, "guarded"), connected: join(postures, "connected") },
@@ -847,7 +847,7 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  ~/.pi/agent/AGENTS.md, the same generated file as ~/.claude/AGENTS.md — today a symlink into the\n" +
           "  repo, replaced by the generated file on --write (the repo file is untouched and reported as unused);\n" +
           "  and jig's entries in pi-mcp-adapter's ~/.config/mcp/mcp.json for targets.pi servers, every other\n" +
-          "  entry and key carried through. Report only: whether packages in next/home/shared/harness/pi/settings.json\n" +
+          "  entry and key carried through. Report only: whether packages in home/shared/harness/pi/settings.json\n" +
           "  declares pi-mcp-adapter and @tintinweb/pi-subagents (the paste-able line is printed when not),\n" +
           "  what ~/.pi/agent/extensions holds (manager.sh's links until milestone 4), and the two gaps\n" +
           "  (no native subagents; conditional paths: rules not delivered). Dry-run by default; --write.\n" +
@@ -856,7 +856,7 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  ($DSH_HOME, default ~/.dsh): jig's @deepseek-ai/dsh-mcp-client rows for targets.dsh servers (only\n" +
           "  serena, codebase-memory, context7 — DSH loads MCP schemas eagerly) inside a `# jig:begin mcp` block\n" +
           "  of each profile's cordis.patch.yml, for every profile DSH has scaffolded under $DSH_HOME/profiles\n" +
-          "  that the repo also owns (next/home/shared/harness/dsh/profiles/<name>/), every other row carried through;\n" +
+          "  that the repo also owns (home/shared/harness/dsh/profiles/<name>/), every other row carried through;\n" +
           "  and $DSH_HOME/AGENTS.md, the same generated file as ~/.claude/AGENTS.md (DSH reads it first, then\n" +
           "  the project chain). No matching profile: nothing is delivered and no directory is created. Report\n" +
           "  only: ~/.agents/skills (DSH reads it natively; the codex/omp/pi mount), the home-level\n" +

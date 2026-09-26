@@ -8,9 +8,9 @@ load '../lib/nix.bash'
 
 links() { # links <darwin|linux>
 	if [ "$1" = darwin ]; then
-		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}?dir=next\"; kind = \"darwin\"; config = \"mac\"; user = \"${USER}\"; }"
+		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}\"; kind = \"darwin\"; config = \"mac\"; user = \"${USER}\"; }"
 	else
-		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}?dir=next\"; kind = \"linux\"; config = \"linux\"; }"
+		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}\"; kind = \"linux\"; config = \"linux\"; }"
 	fi
 }
 
@@ -19,7 +19,7 @@ target() {
 }
 
 @test "harness links: claude, codex, jig policy, pi, omp and dsh files point into the checkout" {
-	C="${REPO_ROOT}/next/home/shared/harness"
+	C="${REPO_ROOT}/home/shared/harness"
 	for kind in darwin linux; do
 		run --separate-stderr links "$kind"
 		[ "$status" -eq 0 ]
@@ -39,7 +39,7 @@ target() {
 }
 
 @test "harness links: activation runs harness-apply on the checkout after the links are written" {
-	run --separate-stderr nix_eval_expr_json "let a = (builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.activation.harnessApply; in { inherit (a) data after; }"
+	run --separate-stderr nix_eval_expr_json "let a = (builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config.home.activation.harnessApply; in { inherit (a) data after; }"
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"/bin/harness-apply"* ]]
 	[[ "$output" == *"${REPO_ROOT}"* ]]

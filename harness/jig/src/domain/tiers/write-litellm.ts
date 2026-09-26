@@ -1,6 +1,6 @@
 /**
  * Pure writer: canonical `TiersPolicy` -> the managed `model_list` entries of
- * `next/home/shared/litellm/config/config.yaml`. Unlike the pi and dsh writers,
+ * `home/shared/litellm/config/config.yaml`. Unlike the pi and dsh writers,
  * this one is dry-run / review-only this phase (see `../../app/apply`) — the
  * measurement plane is deliberately not auto-written, so `jig apply --write`
  * refuses this target regardless of what this function produces.

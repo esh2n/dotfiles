@@ -10,10 +10,10 @@ again changes nothing.
 
 ```bash
 cd dotfiles
-make up    # = ./next/bootstrap.sh
+make up    # = ./bootstrap.sh
 ```
 
-`next/bootstrap.sh` installs Nix with the official multi-user installer when it
+`bootstrap.sh` installs Nix with the official multi-user installer when it
 is missing, then hands over to `dotctl up`, which:
 
 1. checks the roles file (below)
@@ -44,8 +44,8 @@ example.
 
 | Kind | Where |
 |------|-------|
-| CLI tools, language servers | the flake (`next/home/*/packages*`) |
-| GUI apps | Homebrew casks declared by nix-darwin (`next/system/darwin/homebrew.nix`) |
+| CLI tools, language servers | the flake (`home/*/packages*`) |
+| GUI apps | Homebrew casks declared by nix-darwin (`system/darwin/homebrew.nix`) |
 | Language runtimes | mise |
 
 After changing any of them, run `make up`.

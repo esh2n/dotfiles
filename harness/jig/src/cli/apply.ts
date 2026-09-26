@@ -1016,7 +1016,7 @@ function piExtensionLines(report: PiApplyReport): readonly string[] {
   );
   const lines = [
     `extensions (report only): ${extensions.path}${extensions.dirState.kind === "missing" ? "  (absent)" : ""}`,
-    `  delivered by core/config/manager.sh link_pi_resources until milestone 4 (${extensions.managerLinks.length}), links into next/home/shared/harness/pi/extensions/:`,
+    `  delivered by core/config/manager.sh link_pi_resources until milestone 4 (${extensions.managerLinks.length}), links into home/shared/harness/pi/extensions/:`,
     ...(extensions.managerLinks.length === 0
       ? ["    (none)"]
       : extensions.managerLinks.map(

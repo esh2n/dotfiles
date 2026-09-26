@@ -14,7 +14,7 @@
  *   "`<agent-dir>/AGENTS.override.md`, `AGENTS.md`, `AGENTS.MD`, `CLAUDE.md`,
  *   or `CLAUDE.MD` — User instructions applied across working
  *   directories"). Today the path is a symlink into the repository
- *   (`next/home/shared/harness/pi/AGENTS.md`, linked by `link_pi_resources`); per
+ *   (`home/shared/harness/pi/AGENTS.md`, linked by `link_pi_resources`); per
  *   `rules/decisions/2026-09-22-config-layout-no-personal-layer.md`
  *   (Consequences, 2026-09-24: the generated AGENTS.md is identical for all
  *   five harnesses, pi's short one retires) the link is replaced by the
@@ -36,7 +36,7 @@
  *   source `~/.pi/agent/settings.json` links to) declares pi-mcp-adapter and
  *   tintinweb/pi-subagents (`domain/pi/packages.ts`), with the paste-able
  *   line for each that is missing; `<agentDir>/extensions/` — the links
- *   `link_pi_resources` makes into `next/home/shared/harness/pi/extensions/` until
+ *   `link_pi_resources` makes into `home/shared/harness/pi/extensions/` until
  *   milestone 4, and everything else as not jig's; the one gap (no native
  *   subagents — language guidance travels inside the language skills).
  *
@@ -95,11 +95,11 @@ export interface PiApplyPaths {
   readonly adapterOverride: string;
   /** `<agentDir>/extensions/`, reported only. */
   readonly extensionsDir: string;
-  /** Source of the extension links `link_pi_resources` makes: `next/home/shared/harness/pi/extensions`. */
+  /** Source of the extension links `link_pi_resources` makes: `home/shared/harness/pi/extensions`. */
   readonly repoExtensionsDir: string;
-  /** Source: `next/home/shared/harness/pi/settings.json`, the file `<agentDir>/settings.json` links to. */
+  /** Source: `home/shared/harness/pi/settings.json`, the file `<agentDir>/settings.json` links to. */
   readonly repoSettings: string;
-  /** The retiring `next/home/shared/harness/pi/AGENTS.md`, reported as unused once the generated file lands. */
+  /** The retiring `home/shared/harness/pi/AGENTS.md`, reported as unused once the generated file lands. */
   readonly retiredAgentsMd: string;
   /** Substituted into mcp command paths; `{{HOME}}`. */
   readonly home: string;
@@ -153,7 +153,7 @@ export interface PiPackagesReport {
 export interface PiExtensionsReport {
   readonly path: string;
   readonly dirState: PathState;
-  /** Links into `next/home/shared/harness/pi/extensions/`: `link_pi_resources`'s until milestone 4. */
+  /** Links into `home/shared/harness/pi/extensions/`: `link_pi_resources`'s until milestone 4. */
   readonly managerLinks: readonly { readonly name: string; readonly target: string }[];
   /** Everything else: not jig's. */
   readonly foreign: readonly { readonly name: string; readonly what: string }[];

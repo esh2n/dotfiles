@@ -9,9 +9,9 @@ load '../lib/nix.bash'
 
 links() { # links <darwin|linux>
 	if [ "$1" = darwin ]; then
-		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}?dir=next\"; kind = \"darwin\"; config = \"mac\"; user = \"${USER}\"; }"
+		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}\"; kind = \"darwin\"; config = \"mac\"; user = \"${USER}\"; }"
 	else
-		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}?dir=next\"; kind = \"linux\"; config = \"linux\"; }"
+		nix_eval_expr_json "import ${REPO_ROOT}/tests/lib/links.nix { flake = \"git+file://${REPO_ROOT}\"; kind = \"linux\"; config = \"linux\"; }"
 	fi
 }
 
@@ -21,9 +21,9 @@ target() {
 
 activation() { # activation <darwin|linux>
 	if [ "$1" = darwin ]; then
-		nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").darwinConfigurations.mac.config.home-manager.users.\"${USER}\".home.activation.renderTemplates.data"
+		nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}\").darwinConfigurations.mac.config.home-manager.users.\"${USER}\".home.activation.renderTemplates.data"
 	else
-		nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}?dir=next\").homeConfigurations.linux.config.home.activation.renderTemplates.data"
+		nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config.home.activation.renderTemplates.data"
 	fi
 }
 
@@ -34,10 +34,10 @@ activation() { # activation <darwin|linux>
 		json="$output"
 		for name in mise starship zellij; do
 			got="$(target "$json" ".config/${name}")"
-			[ "$got" = "${REPO_ROOT}/next/home/shared/${name}/config" ] || { echo "${kind} .config/${name}: ${got}"; false; }
+			[ "$got" = "${REPO_ROOT}/home/shared/${name}/config" ] || { echo "${kind} .config/${name}: ${got}"; false; }
 		done
 		got="$(target "$json" ".gitconfig")"
-		[ "$got" = "${REPO_ROOT}/next/home/shared/git/gitconfig" ] || { echo "${kind} .gitconfig: ${got}"; false; }
+		[ "$got" = "${REPO_ROOT}/home/shared/git/gitconfig" ] || { echo "${kind} .gitconfig: ${got}"; false; }
 	done
 }
 

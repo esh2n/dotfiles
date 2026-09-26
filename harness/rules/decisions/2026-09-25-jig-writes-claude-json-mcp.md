@@ -28,4 +28,4 @@ Claude Code はユーザー単位の MCP サーバーを `~/.claude.json` の `m
 ## Sources
 
 - `harness/jig/src/domain/claude/claude-json.ts`
-- 置き換えた実装: `domain/mcp/claude-mcp-add.ts`、`next/pkgs/dotctl/internal/setup/steps.go` の `claudeMCP`
+- 置き換えた実装: `domain/mcp/claude-mcp-add.ts`、`pkgs/dotctl/internal/setup/steps.go` の `claudeMCP`

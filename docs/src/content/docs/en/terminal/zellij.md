@@ -69,7 +69,7 @@ With 2-3 panes, `Ctrl+q` then `h/j/k/l` is enough. The picker becomes useful whe
 
 ## Setup
 
-`make up` downloads zjstatus and monocle (the `zellij-plugins` setup step). zellij-pane-picker is pinned by Nix and placed at `~/.local/share/zellij/plugins/` (`next/home/shared/zellij`).
+`make up` downloads zjstatus and monocle (the `zellij-plugins` setup step). zellij-pane-picker is pinned by Nix and placed at `~/.local/share/zellij/plugins/` (`home/shared/zellij`).
 
 ## File layout
 

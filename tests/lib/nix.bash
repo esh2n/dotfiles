@@ -7,7 +7,7 @@
 # there. CI and a normal shell leave it unset and use the daemon.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-# Links point into the checkout under test (next/lib/facts.nix reads this) —
+# Links point into the checkout under test (lib/facts.nix reads this) —
 # always this checkout, whatever the calling shell exported.
 export DOTFILES_ROOT="${REPO_ROOT}"
 # No roles unless a test writes its own file: the machine's own roles file
