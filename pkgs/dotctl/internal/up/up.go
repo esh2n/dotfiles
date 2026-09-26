@@ -86,7 +86,7 @@ func Run(s Sys, c Config) error {
 			return err
 		}
 	} else {
-		if err := nixCmd(s, "run", c.flake()+"#home-manager", "--", "switch", "--flake", c.flake()+"#linux", "--impure", "-b", "pre-next"); err != nil {
+		if err := nixCmd(s, "run", c.flake()+"#home-manager", "--", "switch", "--flake", c.flake()+"#linux", "--impure", "-b", "pre-dotfiles"); err != nil {
 			return fmt.Errorf("home-manager switch: %w", err)
 		}
 	}

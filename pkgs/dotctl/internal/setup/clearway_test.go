@@ -19,10 +19,10 @@ func TestTpmMovesABrokenTmuxLinkAside(t *testing.T) {
 	if info, err := os.Lstat(tmux); err != nil || !info.IsDir() {
 		t.Fatalf("~/.tmux is not a directory now: %v", err)
 	}
-	if target, err := os.Readlink(tmux + ".pre-next"); err != nil || target != filepath.Join(w.home, "gone", "tmux") {
+	if target, err := os.Readlink(tmux + ".pre-dotfiles"); err != nil || target != filepath.Join(w.home, "gone", "tmux") {
 		t.Fatalf("the old link was not kept aside: %q %v", target, err)
 	}
-	if !strings.Contains(w.out.String(), "[WARN]") || !strings.Contains(w.out.String(), "moved to "+tmux+".pre-next") {
+	if !strings.Contains(w.out.String(), "[WARN]") || !strings.Contains(w.out.String(), "moved to "+tmux+".pre-dotfiles") {
 		t.Fatalf("out %q", w.out.String())
 	}
 }
@@ -30,16 +30,16 @@ func TestTpmMovesABrokenTmuxLinkAside(t *testing.T) {
 func TestMoveAsideNeverOverwritesAnEarlierBackup(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "x")
-	for _, f := range []string{p, p + ".pre-next"} {
+	for _, f := range []string{p, p + ".pre-dotfiles"} {
 		if err := os.WriteFile(f, []byte(f), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 	aside, err := moveAside(p)
-	if err != nil || aside != p+".pre-next.1" {
+	if err != nil || aside != p+".pre-dotfiles.1" {
 		t.Fatalf("moved to %q: %v", aside, err)
 	}
-	if b, _ := os.ReadFile(p + ".pre-next"); string(b) != p+".pre-next" {
+	if b, _ := os.ReadFile(p + ".pre-dotfiles"); string(b) != p+".pre-dotfiles" {
 		t.Fatal("the earlier backup was overwritten")
 	}
 }

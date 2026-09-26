@@ -32,7 +32,7 @@ printf '%s\n' "${ROLES}" >"${HOME}/.config/dotfiles/roles.json"
 export DOTFILES_ROOT="${HOME}/dotfiles"
 cd "${DOTFILES_ROOT}"
 nix --extra-experimental-features 'nix-command flakes' run .#home-manager -- \
-	switch --flake .#linux --impure -b pre-next
+	switch --flake .#linux --impure -b pre-dotfiles
 fail=0
 for f in .zshrc .claude .config/codex .config/jig/policy; do
 	t="$(readlink -f "${HOME}/${f}" || true)"

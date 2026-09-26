@@ -11,7 +11,7 @@ import (
 // treats a path it needs (rules/research/2026-09-26-dotfiles-prior-state-cleanup.md):
 // anything standing where a directory has to be — a file, a broken link, a
 // link to a file, often left by an earlier dotfiles setup — is moved aside
-// with the ".pre-next" suffix, never deleted.
+// with the ".pre-dotfiles" suffix, never deleted.
 func makeHomeDirs(e Env, dir string) error {
 	rel, err := filepath.Rel(e.Home, dir)
 	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
@@ -36,15 +36,15 @@ func makeHomeDirs(e Env, dir string) error {
 	return os.MkdirAll(dir, 0o755)
 }
 
-// moveAside renames path to path.pre-next, or path.pre-next.N when that is
+// moveAside renames path to path.pre-dotfiles, or path.pre-dotfiles.N when that is
 // taken, and says where it went.
 func moveAside(path string) (string, error) {
-	aside := path + ".pre-next"
+	aside := path + ".pre-dotfiles"
 	for n := 1; ; n++ {
 		if _, err := os.Lstat(aside); os.IsNotExist(err) {
 			break
 		}
-		aside = fmt.Sprintf("%s.pre-next.%d", path, n)
+		aside = fmt.Sprintf("%s.pre-dotfiles.%d", path, n)
 	}
 	return aside, os.Rename(path, aside)
 }

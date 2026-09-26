@@ -29,9 +29,9 @@ nix-darwin.lib.darwinSystem {
     {
       home-manager.useGlobalPkgs = true;
       home-manager.useUserPackages = true;
-      # Files the old layout left in place are kept as <name>.pre-next, the
+      # Whatever stands where a file goes is kept as <name>.pre-dotfiles, the
       # same extension bootstrap.sh gives home-manager on Linux.
-      home-manager.backupFileExtension = "pre-next";
+      home-manager.backupFileExtension = "pre-dotfiles";
       home-manager.users.${username} = {
         imports = [
           { _module.args.facts = facts; }

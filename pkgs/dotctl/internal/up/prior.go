@@ -17,7 +17,7 @@ import (
 //     not ours to judge: it is listed, never touched
 //
 // A path the new setup needs is not decided here: home-manager moves what
-// is in its way aside (backupFileExtension "pre-next"), and so do the setup
+// is in its way aside (backupFileExtension "pre-dotfiles"), and so do the setup
 // steps.
 func sweepPriorLinks(c Config) {
 	repos := []string{filepath.Clean(c.Repo)}

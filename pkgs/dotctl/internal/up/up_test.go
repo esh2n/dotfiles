@@ -103,8 +103,8 @@ func index(calls []string, prefix string) int {
 func TestMacBuildsAsTheUserAndActivatesAsRoot(t *testing.T) {
 	f, c := setup(t, "darwin")
 	must(t, Run(f, c))
-	next := c.Repo
-	build := index(f.calls, "nix --extra-experimental-features nix-command flakes build --no-link --print-out-paths --impure "+next+"#darwinConfigurations.mac.system")
+	flake := c.Repo
+	build := index(f.calls, "nix --extra-experimental-features nix-command flakes build --no-link --print-out-paths --impure "+flake+"#darwinConfigurations.mac.system")
 	setProfile := index(f.calls, "sudo -H /nix/store/sys/sw/bin/nix-env -p /nix/var/nix/profiles/system --set /nix/store/sys")
 	activate := index(f.calls, "sudo -H /nix/store/sys/activate")
 	if build < 0 || setProfile < 0 || activate < 0 || !(build < setProfile && setProfile < activate) {
@@ -143,8 +143,8 @@ func TestMacInstallsHomebrewWhenMissingNeverOnLinux(t *testing.T) {
 func TestLinuxSwitchesHomeManagerWithBackups(t *testing.T) {
 	f, c := setup(t, "linux")
 	must(t, Run(f, c))
-	next := c.Repo
-	if index(f.calls, "nix --extra-experimental-features nix-command flakes run "+next+"#home-manager -- switch --flake "+next+"#linux --impure -b pre-next") < 0 {
+	flake := c.Repo
+	if index(f.calls, "nix --extra-experimental-features nix-command flakes run "+flake+"#home-manager -- switch --flake "+flake+"#linux --impure -b pre-dotfiles") < 0 {
 		t.Fatalf("no home-manager switch: %v", f.calls)
 	}
 	if index(f.calls, "sudo") >= 0 {

@@ -93,19 +93,19 @@ dotfiles/
    - **変えました（2026-09-25）**: 以前は「Mac は Determinate の installer」としていました。Determinate の installer は 2026-01-01 以降 Determinate Nix しか入れず、`--prefer-upstream-nix` は効きません（https://determinate.systems/blog/installer-dropping-upstream/）。Determinate Nix を入れた機械では nix-darwin に `nix.enable = false` を求められますが、この flake は `nix.settings` で Nix 自体を nix-darwin に管理させています。両立しないので、公式 installer に揃えます。
 2. OS を判定する（`uname -s`。hostname やユーザー名は見ない）。
    - Mac: ユーザーとして `nix build next#darwinConfigurations.mac.system --impure` を実行し、root で走らせるのは `nix-env -p /nix/var/nix/profiles/system --set` と `activate` の二つだけ。`darwin-rebuild switch` を sudo で呼ばないのは、darwin-rebuild が root で動くと `HOME=~root` に書き換え、facts.nix がユーザーの HOME と役割ファイルを読めなくなるため（nix-darwin の `darwin-rebuild.sh` 冒頭）。今の `core/nix/update.sh` も同じく build はユーザー、`activate` だけ sudo。
-   - Linux: flake で固定した home-manager を `nix run next#home-manager -- switch --flake next#linux --impure -b pre-next`。
+   - Linux: flake で固定した home-manager を `nix run .#home-manager -- switch --flake .#linux --impure -b pre-dotfiles`。
    - `--impure` は facts.nix の読み取りのためだけ。
-3. 旧レイアウトの symlink が行く手にあれば `<名前>.pre-next` に退避する（Mac は `home-manager.backupFileExtension`、Linux は `-b`）。
+3. 行く手に別のものがあれば `<名前>.pre-dotfiles` に退避する（Mac は `home-manager.backupFileExtension`、Linux は `-b`）。
 4. switch の後、今のシェルの PATH にプロファイルを足してから `mise install`（初回の switch で入った mise を新しいシェル無しで見つけるため）。
 5. activation の中で、テンプレートの展開（`render-templates`、writeBoundary の前）と jig apply（`jig setup`、linkGeneration の後）。
-6. `next/` の下に git が追跡していないファイルがあれば名前を出して警告する（flake は git 経由で読むので見えない）。
+6. リポジトリの中に git が追跡していないファイルがあれば名前を出して警告する（flake は git 経由で読むので見えない）。
 
 何度走らせても同じ結果になる。install と update の区別はない。2 以降は `dotctl up` に移した（2026-09-25）。`bootstrap.sh` は Nix を入れて `nix run next#dotctl -- up` を呼ぶだけ。役割ファイルが無い機械では、何も変えずに止まって書く内容を示す（無いまま走ると base だけになり、今あるものが外れるため）。
 
 ## 5. 常駐サービス
 
 - `lib/mk-service.nix` が「スクリプト・環境変数・再起動の間隔」の小さな宣言（`dotfiles.services.<名前>`）を受け取り、Mac は `launchd.agents`、Linux は `systemd.user.services` を出す。サービスの宣言は既定で off。
-- 有効にするのは役割のモジュール（`roles/<名前>.nix`）だけ。機能のモジュールは役割を読まない（`tests/next/layers.bats` で検査）。
+- 有効にするのは役割のモジュール（`roles/<名前>.nix`）だけ。機能のモジュールは役割を読まない（`tests/flake/layers.bats` で検査）。
   - `developer`: LiteLLM（各機械に一つ、ループバックのみ）と jig-decision。observer でない機械では、使用額を台帳へ送る同期（`llm-ledger-sync`）も。
   - `model-provider`: 自分のモデルを tailnet に出す。Mac は LM Studio（keep-awake）、Linux + NVIDIA は llama-server。
   - `observer`（一台）: Prometheus・Grafana・Open WebUI と、利用コストの台帳（Postgres、tailnet に 5432）。

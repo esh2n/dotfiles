@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# adopt-mac.sh: the owner's one line to move this Mac to next — the roles
+# adopt-mac.sh: the owner's one line to move this Mac to this layout — the roles
 # file, the ledger DB password in 1Password, main fast-forwarded to the work
 # branch, then make up. Every outside command is a recording stand-in.
 

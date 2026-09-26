@@ -119,7 +119,7 @@ It links `settings.json` / `models.json` and each `extensions/*.ts` and
 `themes/*.json` file-by-file into `~/.pi/agent/` (never the directory — your
 own `~/.pi/agent/extensions/*.ts` and `pi install`ed extensions stay
 untouched); `jig setup` then writes `~/.pi/agent/AGENTS.md`. Regression
-suite: `tests/next/links-harness.bats`.
+suite: `tests/flake/links-harness.bats`.
 
 <details>
 <summary>Manual fallback (environments without the dotfiles link machinery)</summary>

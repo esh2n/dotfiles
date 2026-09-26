@@ -63,7 +63,7 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 @test "bootstrap: nix-darwin backs up files in the way with the same extension" {
 	run --separate-stderr nix_eval_expr_json "(builtins.getFlake \"git+file://${REPO_ROOT}\").darwinConfigurations.mac.config.home-manager.backupFileExtension"
 	[ "$status" -eq 0 ]
-	[ "$output" = '"pre-next"' ]
+	[ "$output" = '"pre-dotfiles"' ]
 }
 
 @test "bootstrap: the taps dotctl up trusts, computed from the flake, are every tap the Mac uses" {
