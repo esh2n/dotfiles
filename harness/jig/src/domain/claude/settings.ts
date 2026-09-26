@@ -316,6 +316,23 @@ export function composeClaudeSettings(
   return { settings, owned: OWNED_KEYS, left, removed };
 }
 
+/**
+ * The part of the file jig owns (OWNED_KEYS), alone and in a fixed order: what
+ * a hand edit is judged on. Claude Code itself rewrites the keys jig does not
+ * own (`/model`, `/config`, plugins), so a whole-file comparison would take
+ * every such change for a hand edit of jig's content.
+ */
+export function ownedView(settings: JsonObject | undefined): string {
+  const pick = (path: string): Json | null => {
+    let value: Json | undefined = settings;
+    for (const part of path.split(".")) {
+      value = isJsonObject(value) ? value[part] : undefined;
+    }
+    return value ?? null;
+  };
+  return JSON.stringify(OWNED_KEYS.map((key) => [key, pick(key)]));
+}
+
 /** Exactly how the file is written: 2-space JSON, one trailing newline. */
 export function renderClaudeSettings(settings: JsonObject): string {
   return `${JSON.stringify(settings, null, 2)}\n`;

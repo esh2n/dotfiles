@@ -75,6 +75,7 @@ import { type ScriptCandidate, selectScriptFiles } from "../../domain/claude/scr
 import {
   type ClaudeComposition,
   composeClaudeSettings,
+  ownedView,
   renderClaudeSettings,
 } from "../../domain/claude/settings";
 import { selectSkillDirs } from "../../domain/claude/skills-dir";
@@ -88,7 +89,7 @@ import {
   toClaudePermissions,
 } from "../../domain/policy/to-claude-permissions";
 import { unifiedDiff } from "../../domain/tiers/diff";
-import { type PlanAction, planApply } from "../../domain/tiers/plan";
+import type { PlanAction } from "../../domain/tiers/plan";
 import {
   type AgentsMdReport,
   type LinkReport,
@@ -400,11 +401,13 @@ export async function applyClaude(
 
   const manifest = { ...(await ports.readManifest()) };
   const mcp = await planMcp(ports, paths, manifest);
-  const settingsPlan = planApply({
-    currentContent: currentText === "" ? undefined : currentText,
-    generatedContent: generated,
-    manifestHash: manifest[paths.settings],
-    sha256: ports.sha256,
+  const currentJson = (await readJson(ports, paths.settings))?.json as JsonObject | undefined;
+  const settingsPlan = planOwned({
+    currentText,
+    generated,
+    currentOwned: ports.sha256(ownedView(currentJson)),
+    generatedOwned: ports.sha256(ownedView(composition.settings)),
+    recorded: manifest[ownedKey(paths)],
   });
 
   const now = ports.now();
@@ -465,7 +468,7 @@ export async function applyClaude(
   if (input.write && changes) {
     if (settingsPlan.action === "write") {
       await ports.writeAtomic(paths.settings, generated);
-      manifest[paths.settings] = ports.sha256(generated);
+      manifest[ownedKey(paths)] = ports.sha256(ownedView(composition.settings));
     }
     if (agentsMd.outcome === "write") await applyAgentsMd(ports, agentsMd, manifest);
     if (mcp.outcome === "write" && mcp.content !== undefined)
@@ -473,7 +476,8 @@ export async function applyClaude(
     manifest[mcpOwnedKey(paths)] = JSON.stringify(mcp.owned);
     // The manifest seeds for the two files even when they were already
     // current, so a LATER hand edit is detected as one.
-    manifest[paths.settings] ??= ports.sha256(generated);
+    manifest[ownedKey(paths)] ??= ports.sha256(ownedView(composition.settings));
+    delete manifest[paths.settings]; // the whole-file hash it replaces
     manifest[paths.agentsMd] ??= ports.sha256(agentsMd.content);
     await ports.writeManifest(manifest);
     await ports.writeProvenance(dirOf(paths.settings), {
@@ -498,11 +502,12 @@ export async function applyClaude(
     // out-of-repo state only.
     const owned = JSON.stringify(mcp.owned);
     if (
-      manifest[paths.settings] === undefined ||
+      manifest[ownedKey(paths)] === undefined ||
       manifest[paths.agentsMd] === undefined ||
       manifest[mcpOwnedKey(paths)] !== owned
     ) {
-      manifest[paths.settings] ??= ports.sha256(generated);
+      manifest[ownedKey(paths)] ??= ports.sha256(ownedView(composition.settings));
+      delete manifest[paths.settings];
       manifest[paths.agentsMd] ??= ports.sha256(agentsMd.content);
       manifest[mcpOwnedKey(paths)] = owned;
       await ports.writeManifest(manifest);
@@ -510,6 +515,32 @@ export async function applyClaude(
   }
 
   return { ...base, outcome: changes ? "write" : "noop", wrote: false };
+}
+
+/** Where the hash of the part of settings.json jig owns is recorded. */
+function ownedKey(paths: ClaudeApplyPaths): string {
+  return `${paths.settings}#owned`;
+}
+
+/**
+ * write / noop / conflict for settings.json, judged on the keys jig owns:
+ * a change anywhere else is Claude Code's own and is carried through. With no
+ * record of jig's part yet (a first run, or a manifest from before it was
+ * kept), there is nothing to judge a hand edit against, so it is written.
+ */
+function planOwned(input: {
+  readonly currentText: string;
+  readonly generated: string;
+  readonly currentOwned: string;
+  readonly generatedOwned: string;
+  readonly recorded: string | undefined;
+}): { readonly action: "write" | "noop" | "conflict" } {
+  if (input.currentText === input.generated) return { action: "noop" };
+  if (input.currentText === "" || input.recorded === undefined) return { action: "write" };
+  if (input.currentOwned === input.recorded || input.currentOwned === input.generatedOwned) {
+    return { action: "write" };
+  }
+  return { action: "conflict" };
 }
 
 /** The one command line inside an event's single group, for the dry-run listing. */

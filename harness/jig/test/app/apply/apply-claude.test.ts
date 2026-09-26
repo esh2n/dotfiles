@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { type ClaudeApplyPaths, applyClaude } from "../../../src/app/apply/apply-claude";
 import type { ClaudeApplyPorts } from "../../../src/app/apply/ports";
+import { ownedView } from "../../../src/domain/claude/settings";
 import type { JsonObject } from "../../../src/domain/compose/merge";
 import { type FakeClaudeFs, type FakeClaudeFsSeed, fakeClaudeFs } from "./fake-claude-ports";
 
@@ -327,7 +328,10 @@ describe("--write", () => {
     expect(written.sandbox).toMatchObject({ enabled: true });
     // The dead key leaves on write; the servers go through `claude mcp add` by hand.
     expect(written.mcpServers).toBeUndefined();
-    expect(manifest[PATHS.settings]).toBe(ports.sha256(files[PATHS.settings] ?? ""));
+    expect(manifest[`${PATHS.settings}#owned`]).toBe(
+      ports.sha256(ownedView(JSON.parse(files[PATHS.settings] ?? "{}") as JsonObject)),
+    );
+    expect(manifest[PATHS.settings]).toBeUndefined();
     expect(provenance[CLAUDE]?.sourceFile).toBe(PATHS.guardRules);
   });
 
@@ -383,6 +387,37 @@ describe("--write", () => {
     // there is nothing to reconcile: the user's own key simply survives.
     expect(report.outcome).toBe("noop");
     expect(report.composition.settings.theme).toBe("dark-daltonized");
+  });
+});
+
+describe("Claude Code rewrites the keys jig does not own", () => {
+  test("a /model or /config change there does not stop a later source change from landing", async () => {
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
+    await run(ports, true);
+
+    // Claude Code changes a key of its own...
+    const edited = JSON.parse(files[PATHS.settings] ?? "{}") as Record<string, unknown>;
+    edited.model = "claude-opus-5-5";
+    files[PATHS.settings] = `${JSON.stringify(edited, null, 2)}\n`;
+    // ...and then the checkout moves, so the hooks point somewhere new
+    const moved = await applyClaude(
+      { paths: PATHS, hookPaths: { bun: "/abs/bun", jig: "/moved/jig.ts" }, write: true },
+      ports,
+    );
+
+    expect(moved.outcome).toBe("write");
+    const after = JSON.parse(files[PATHS.settings] ?? "{}") as JsonObject;
+    expect(after.model).toBe("claude-opus-5-5");
+    expect(JSON.stringify(after.hooks)).toContain("/moved/jig.ts");
+  });
+
+  test("a manifest from before the owned hash was kept is a write, not a conflict", async () => {
+    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
+    await ports.writeManifest({ [PATHS.settings]: "the-old-whole-file-hash" });
+    const report = await run(ports, true);
+    expect(report.outcome).toBe("write");
+    expect((await ports.readManifest())[`${PATHS.settings}#owned`]).toBeDefined();
+    expect(files[PATHS.settings]).toContain("/abs/jig.ts");
   });
 });
 
