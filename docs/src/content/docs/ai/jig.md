@@ -43,10 +43,10 @@ jig box new|list|resume|fetch|rm           # sbx microVM の中でこのリポ�
 | `codex` (`~/.codex`) | `AGENTS.md`、`agents/*.toml`(モデルは `agents/models.json`)、`~/.agents/skills` のマウント、`config.toml` の `[mcp_servers.*]` ブロック。ガードは `jig codex register` が `hooks.json` に登録 | ブロック外の `[mcp_servers.*]`(報告のみ)、`~/.codex/skills` |
 | `omp` (`~/.omp/agent`) | `agents/*.md`、`mcp.json` の jig エントリ、同じ `~/.agents/skills` マウント、`extensions/jig.ts` → jig の omp 拡張 | `config.yml`(報告のみ) |
 | `pi` (`~/.pi/agent`) | `AGENTS.md`(旧 symlink を実ファイルで置換)、pi-mcp-adapter の `~/.config/mcp/mcp.json`、同じ skills マウント | `settings.json` / `models.json` / `extensions/`(home-manager のリンク、`home/shared/harness`) |
-| `dsh` (`$DSH_HOME`) | scaffold 済みプロファイルの `cordis.patch.yml` にある jig の MCP 行、`AGENTS.md` | `settings.yaml`、`hooks.claude.json`、ガードプラグイン(`harness-apply` の展開コピー) |
+| `dsh` (`$DSH_HOME`) | scaffold 済みプロファイルの `cordis.patch.yml` にある jig の MCP 行、`AGENTS.md` | `settings.yaml`、`hooks.claude.json`、ガードプラグイン(`jig setup` の展開コピー) |
 
 各ハーネスの自前のファイルは home-manager がリンクし（`home/shared/harness`）、
-そのあと activation の `harness-apply` が DSH のプラグインを組み立てて、
+そのあと activation の `jig setup` が DSH のプラグインを組み立てて、
 `jig apply --target <h> --write` を5つ全部に流す。`make up` 一回で揃うのはこのため。
 
 ## ガードと判断

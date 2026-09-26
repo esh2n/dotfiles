@@ -97,7 +97,7 @@ dotfiles/
    - `--impure` は facts.nix の読み取りのためだけ。
 3. 旧レイアウトの symlink が行く手にあれば `<名前>.pre-next` に退避する（Mac は `home-manager.backupFileExtension`、Linux は `-b`）。
 4. switch の後、今のシェルの PATH にプロファイルを足してから `mise install`（初回の switch で入った mise を新しいシェル無しで見つけるため）。
-5. activation の中で、テンプレートの展開（`render-templates`、writeBoundary の前）と jig apply（`harness-apply`、linkGeneration の後）。
+5. activation の中で、テンプレートの展開（`render-templates`、writeBoundary の前）と jig apply（`jig setup`、linkGeneration の後）。
 6. `next/` の下に git が追跡していないファイルがあれば名前を出して警告する（flake は git 経由で読むので見えない）。
 
 何度走らせても同じ結果になる。install と update の区別はない。2 以降は `dotctl up` に移した（2026-09-25）。`bootstrap.sh` は Nix を入れて `nix run next#dotctl -- up` を呼ぶだけ。役割ファイルが無い機械では、何も変えずに止まって書く内容を示す（無いまま走ると base だけになり、今あるものが外れるため）。
@@ -157,7 +157,7 @@ dotfiles/
 - **M5**: dotctl を作り、theme-switch と大きい shell を移す。テーマの仕組みを入れ替える。
 - **M6**: ハーネスを `harness/` へ、同居アプリを `projects/` か repo の外へ移す（どちらも別の決定）。
 
-進み具合（2026-09-26）: M0・M1・M3・M5 は済み、`next/` はリポジトリの根元へ上げた。M4 は jig-decision・LiteLLM・台帳まで済み、llama-server は Omarchy の役割待ち。M2 は Omarchy 実機での `make up` が未実施。M6 はハーネスを `harness/` に移し、dopa-shorts は別リポジトリへ出した。残りは `harness-apply.sh` を jig へ移すこと。
+進み具合（2026-09-26）: M0・M1・M3・M5 は済み、`next/` はリポジトリの根元へ上げた。M4 は jig-decision・LiteLLM・台帳まで済み、llama-server は Omarchy の役割待ち。M2 は Omarchy 実機での `make up` が未実施。M6 はハーネスを `harness/` に移し、dopa-shorts は別リポジトリへ出した。`harness-apply.sh` は `jig setup` になった（2026-09-26）。
 
 ## 10. やらないこと
 

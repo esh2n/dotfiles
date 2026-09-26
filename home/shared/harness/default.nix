@@ -2,7 +2,7 @@
 # policy). Files are links into the checkout; pi and omp get theirs one by
 # one because their directories also hold runtime state and the user's own
 # extensions. What is a command rather than a file — jig apply, the DSH
-# plugin — runs as harness-apply after the links are written.
+# plugin — runs as `jig setup` after the links are written.
 {
   config,
   lib,
@@ -46,10 +46,16 @@ in
     "jig/policy".source = link "harness/policy";
   };
 
-  # bun (mise), codex and pnpm are the user's tools: harness-apply sees the
-  # user's PATH, not only activation's
+  # bun (mise), codex and pnpm are the user's tools: jig setup sees the
+  # user's PATH, not only activation's. jig runs on bun, so without it the
+  # step is skipped with a warning; activation still finishes.
   home.activation.harnessApply = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    (PATH="$PATH:${config.lib.dotfiles.userPath}" && run ${lib.getExe pkgs.harness-apply} ${lib.escapeShellArg facts.repo})
+    if PATH="$PATH:${config.lib.dotfiles.userPath}" command -v bun >/dev/null 2>&1; then
+      (PATH="$PATH:${config.lib.dotfiles.userPath}" && run bash ${lib.escapeShellArg "${facts.repo}/harness/bin/jig"} setup) \
+        || warnEcho "jig setup failed"
+    else
+      warnEcho "bun is not on PATH; skipping jig setup (run make up again once mise has installed bun)"
+    fi
   '';
 
   # Commands the harnesses need that jig does not run: Claude Code's native

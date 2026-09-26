@@ -9,7 +9,6 @@ let
     cargo-compete = callPackage ./cargo-compete { };
     codebase-memory-mcp = callPackage ./codebase-memory-mcp { };
     dotctl = callPackage ./dotctl { };
-    harness-apply = callPackage ./scripts/harness-apply { };
   };
 in
 self

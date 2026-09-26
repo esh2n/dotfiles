@@ -61,7 +61,7 @@ setup:
       description: Install dsh (no contrib image exists; the shell base ships Node 22.22.1)
   startup:
     # dsh's profile tree and the jig-guard plugin, linked from the checkout by
-    # link-harness.sh, which does what harness-apply does on the host: builds the
+    # link-harness.sh, which runs `jig setup --target dsh` as the host does: builds the
     # plugin (bun) and pnpm-links it into each profile.
     - command:
         - bash

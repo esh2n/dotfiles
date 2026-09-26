@@ -15,6 +15,7 @@ import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
 import type { RetirePaths } from "../app/retire/retire-yoki";
 import { skillQuestionMode } from "../app/routing/select-skills";
+import { SETUP_TARGETS, isSetupTarget, setupHarness } from "../app/setup/setup-harness";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
@@ -45,6 +46,7 @@ import { recordJudgmentUsage } from "../infra/metrics/judgment-usage";
 import { MetricsRegistry } from "../infra/metrics/registry";
 import { BunProcessRunner } from "../infra/proc/bun-runner";
 import { runCommand } from "../infra/proc/exec-file";
+import { createSetupPorts } from "../infra/setup/setup-ports";
 import { readSkillCatalog } from "../infra/skills/catalog";
 import { detectRepoSignals } from "../infra/skills/repo-signals";
 import { findTranscripts, parseSkillTurns } from "../infra/transcripts/transcript";
@@ -74,9 +76,7 @@ const VERSION = "0.0.0";
  * for anyone dry-running apply against a scratch copy of the repo).
  */
 function resolveApplyRoot(): string {
-  return (
-    process.env.JIG_APPLY_ROOT ?? join(import.meta.dir, "..", "..", "..", "..")
-  );
+  return process.env.JIG_APPLY_ROOT ?? join(import.meta.dir, "..", "..", "..", "..");
 }
 
 function resolveApplyPaths(): { tiersJsonPath: string; destPaths: ApplyTargetPaths } {
@@ -645,6 +645,25 @@ export async function main(argv: readonly string[]): Promise<number> {
       process.stdout.write(result.stdout);
       return result.code;
     }
+    case "setup": {
+      const rest = argv.slice(1);
+      const target = rest[0] === "--target" ? rest[1] : undefined;
+      const known = target === undefined || isSetupTarget(target);
+      if (!known || (target === undefined ? rest.length !== 0 : rest.length !== 2)) {
+        process.stderr.write(`usage: jig setup [--target ${SETUP_TARGETS.join("|")}]\n`);
+        return 2;
+      }
+      return setupHarness(
+        {
+          root: resolveApplyRoot(),
+          dshHome: resolveDshHome(process.env, homedir()).dir,
+          home: homedir(),
+          user: process.env.USER ?? "",
+        },
+        createSetupPorts(main),
+        target === undefined ? SETUP_TARGETS : [target],
+      );
+    }
     case "box": {
       const result = await boxCli(argv.slice(1), buildBoxPorts(), boxContext());
       process.stdout.write(result.stdout);
@@ -751,7 +770,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write] | setup [--target claude|codex|pi|omp|dsh] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -795,9 +814,9 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  apply --target claude composes ~/.claude/settings.json's hooks, permissions and sandbox\n" +
           "  from policy/guard-rules.json; every other key in the live file is preserved (a leftover\n" +
           "  mcpServers key is removed: Claude Code never read it there). Dry-run prints the whole-file\n" +
-          "  diff plus owned/left/REMOVED key lists, and one paste-able `claude mcp add --scope user`\n" +
-          "  line per targets.claude server in mcp/servers.json — jig never writes ~/.claude.json and\n" +
-          "  never runs the claude CLI, so those lines are run by hand, once.\n" +
+          "  diff plus owned/left/REMOVED key lists; the targets.claude servers of mcp/servers.json\n" +
+          "  go into ~/.claude.json's mcpServers (or $CLAUDE_CONFIG_DIR/.claude.json), jig removing\n" +
+          "  only servers it wrote and refusing one of the same name it did not.\n" +
           "  The same run generates ~/.claude/AGENTS.md from rules/common and rules/decisions (with\n" +
           "  CLAUDE.md -> AGENTS.md), manages skills/, agents/ and rules/ as real directories of\n" +
           "  per-entry links into llm/harness/ (entries that are not jig's, such as Claude Code's\n" +
@@ -808,6 +827,11 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  reported and its destination left as found. hooks and the .<x>-merged staging dirs are\n" +
           "  `jig retire yoki`'s.\n" +
           "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
+          "  setup runs what activation needs once the links are written: builds the DSH plugin, installs\n" +
+          "  DSH's expanded copies into scaffolded profiles and links the plugin there, seeds codex's\n" +
+          "  config.toml once, then apply --write for claude, codex, pi, omp and dsh and, when codex is\n" +
+          "  installed, codex register --write; --target <h> does only that harness's part (a sandbox kit).\n" +
+          "  A missing tool or a failed step warns; it exits 0.\n" +
           "  retire yoki [--write] lists (default) or removes the artifacts yoki and yoki-switch left,\n" +
           "  per harness, each with what it is and the evidence it is yoki's: ~/.claude's .<x>-merged\n" +
           "  staging dirs (only when every entry is a symlink; skipped while ~/.claude/<x> still links\n" +

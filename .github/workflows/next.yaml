@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: shellcheck
         run: |
-          shellcheck -x bootstrap.sh pkgs/scripts/*/*.sh tests/run.sh \
+          shellcheck -x bootstrap.sh adopt-mac.sh tests/run.sh \
             home/shared/litellm/config/{secrets,litellm-up,proxy-key}.sh \
             home/shared/services/jig-decision-up.sh \
             home/shared/sbx/config/kits/agents/link-harness.sh

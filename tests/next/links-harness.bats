@@ -2,7 +2,7 @@
 bats_require_minimum_version 1.5.0
 # The coding-agent harness: what jig and the harnesses read, linked into the
 # checkout on both platforms (runtime state next to them stays untouched —
-# pi and omp get their files one by one), and harness-apply on activation.
+# pi and omp get their files one by one), and `jig setup` on activation.
 
 load '../lib/nix.bash'
 
@@ -38,10 +38,9 @@ target() {
 	done
 }
 
-@test "harness links: activation runs harness-apply on the checkout after the links are written" {
+@test "harness links: activation runs jig setup from the checkout after the links are written" {
 	run --separate-stderr nix_eval_expr_json "let a = (builtins.getFlake \"git+file://${REPO_ROOT}\").homeConfigurations.linux.config.home.activation.harnessApply; in { inherit (a) data after; }"
 	[ "$status" -eq 0 ]
-	[[ "$output" == *"/bin/harness-apply"* ]]
-	[[ "$output" == *"${REPO_ROOT}"* ]]
+	[[ "$output" == *"${REPO_ROOT}/harness/bin/jig"*" setup"* ]]
 	[[ "$output" == *'"linkGeneration"'* ]]
 }
