@@ -1060,6 +1060,98 @@
           "mode": "multi"
         }
       }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "deterministic の行き先の状態",
+      "description": "deterministic の二つの行き先（Omarchy 機の llama-server と Mac の LM Studio）の状態。0 = 正常、1 = 一部障害、2 = 停止。Omarchy 機が 2 の間は Mac が代わりに答えている（rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md）。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 78
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (api_base) (litellm_deployment_state)",
+          "legendFormat": "{{api_base}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 2,
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "フォールバックの回数",
+      "description": "一つ目の行き先が失敗して次の行き先が答えた回数（成功と失敗）。deterministic では、Omarchy 機の代わりに Mac の Qwen3.8-27B が答えた回数。",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 78
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase({__name__=~\"litellm_deployment_successful_fallbacks(_total)?\"}[$__rate_interval]))",
+          "legendFormat": "成功"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase({__name__=~\"litellm_deployment_failed_fallbacks(_total)?\"}[$__rate_interval]))",
+          "legendFormat": "失敗"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "sum"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     }
   ]
 }
