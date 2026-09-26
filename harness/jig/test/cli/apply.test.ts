@@ -136,6 +136,16 @@ describe("applyCli", () => {
     expect(result.stdout).toMatch(/unknown --target/);
   });
 
+  test("--take-over needs --write and one of claude, codex, pi", async () => {
+    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
+    const dry = await applyCli(["--target", "codex", "--take-over"], ports, paths);
+    expect(dry.code).toBe(2);
+    expect(dry.stdout).toContain("needs --write");
+    const wrong = await applyCli(["--target", "omp", "--write", "--take-over"], ports, paths);
+    expect(wrong.code).toBe(2);
+    expect(wrong.stdout).toContain("claude, codex or pi");
+  });
+
   test("--target all never reaches claude: that target writes into $HOME and must be named", async () => {
     const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     const result = await applyCli([], ports, paths);

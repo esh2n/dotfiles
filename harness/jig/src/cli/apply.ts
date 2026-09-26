@@ -89,6 +89,7 @@ import {
 } from "../app/apply/apply-tiers";
 import { AGENTS_SKILLS_MOUNT_TARGETS, type AgentsSkillsMountReport } from "../app/apply/delivery";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
+import { prepareTakeOver } from "../app/apply/take-over";
 import type { ModelChoice } from "../domain/claude/agent-definition";
 import { AGENTS_MD_BYTE_LIMIT } from "../domain/claude/agents-md";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
@@ -112,16 +113,21 @@ interface ParsedArgs {
   /** `--target dsh`: the tiers half (`targets` holds `dsh` too) plus the harness-home half. */
   readonly dsh: boolean;
   readonly write: boolean;
+  /** `--take-over` (with --write): jig's own stale content is replaced (app/apply/take-over.ts). */
+  readonly takeOver: boolean;
 }
 
 function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: string } {
   let targetArg: string | undefined;
   let write = false;
+  let takeOver = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--write") {
       write = true;
+    } else if (arg === "--take-over") {
+      takeOver = true;
     } else if (arg === "--target") {
       i++;
       targetArg = args[i];
@@ -132,7 +138,13 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
     }
   }
 
+  if (takeOver && !write) {
+    return { error: "--take-over replaces files, so it needs --write" };
+  }
   const targetName = targetArg ?? "all";
+  if (takeOver && !["claude", "codex", "pi"].includes(targetName)) {
+    return { error: "--take-over is for one of --target claude, codex or pi" };
+  }
   const none = {
     targets: [],
     claude: false,
@@ -141,6 +153,7 @@ function parseArgs(args: readonly string[]): ParsedArgs | { readonly error: stri
     pi: false,
     dsh: false,
     write,
+    takeOver,
   };
   if (targetName === "claude") return { ...none, claude: true };
   if (targetName === "codex") return { ...none, codex: true };
@@ -1244,6 +1257,10 @@ export interface DshCliContext {
   readonly paths: DshApplyPaths;
 }
 
+function keptLines(kept: readonly string[]): string {
+  return kept.map((path) => `take-over: kept a copy at ${path}\n`).join("");
+}
+
 export async function applyCli(
   args: readonly string[],
   ports: ApplyPorts,
@@ -1263,12 +1280,18 @@ export async function applyCli(
     if (codex === undefined) {
       return { stdout: "jig apply: --target codex is not wired in this context\n", code: 2 };
     }
+    const kept = parsed.takeOver
+      ? await prepareTakeOver(codex.ports, {
+          files: [codex.paths.configToml, codex.paths.agentsMd],
+          records: [codex.paths.configToml, codex.paths.agentsMd],
+        })
+      : [];
     const report = await applyCodex(
       { paths: codex.paths, options: codex.options, write: parsed.write },
       codex.ports,
     );
     return {
-      stdout: `${formatCodex(report, dirOf(codex.paths.configToml))}\n`,
+      stdout: `${keptLines(kept)}${formatCodex(report, dirOf(codex.paths.configToml))}\n`,
       code: report.outcome === "conflict" ? 1 : 0,
     };
   }
@@ -1277,12 +1300,23 @@ export async function applyCli(
     if (claude === undefined) {
       return { stdout: "jig apply: --target claude is not wired in this context\n", code: 2 };
     }
+    const kept = parsed.takeOver
+      ? await prepareTakeOver(claude.ports, {
+          files: [claude.paths.settings, claude.paths.agentsMd, claude.paths.claudeJson],
+          records: [claude.paths.settings, `${claude.paths.settings}#owned`, claude.paths.agentsMd],
+        })
+      : [];
     const report = await applyClaude(
-      { paths: claude.paths, hookPaths: claude.hookPaths, write: parsed.write },
+      {
+        paths: claude.paths,
+        hookPaths: claude.hookPaths,
+        write: parsed.write,
+        takeOver: parsed.takeOver,
+      },
       claude.ports,
     );
     return {
-      stdout: `${formatClaude(report, claude.paths.settings)}\n`,
+      stdout: `${keptLines(kept)}${formatClaude(report, claude.paths.settings)}\n`,
       code: report.outcome === "conflict" ? 1 : 0,
     };
   }
@@ -1322,8 +1356,14 @@ export async function applyCli(
         "== pi (agent directory) ==\nnot wired in this context: only pi/models.json (above) was considered",
       );
     } else {
+      const kept = parsed.takeOver
+        ? await prepareTakeOver(pi.ports, {
+            files: [pi.paths.mcpJson, pi.paths.agentsMd],
+            records: [pi.paths.mcpJson, pi.paths.agentsMd],
+          })
+        : [];
       const piReport = await applyPi({ paths: pi.paths, write: parsed.write }, pi.ports);
-      sections.push(formatPi(piReport, pi.paths));
+      sections.push(`${keptLines(kept)}${formatPi(piReport, pi.paths)}`);
       if (piReport.outcome === "conflict") code = 1;
     }
   }

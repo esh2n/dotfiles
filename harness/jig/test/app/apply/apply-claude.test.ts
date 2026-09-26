@@ -421,6 +421,30 @@ describe("Claude Code rewrites the keys jig does not own", () => {
   });
 });
 
+describe("--take-over", () => {
+  test("a server of jig's name an earlier installer registered is adopted and replaced", async () => {
+    const claudeState = {
+      mcpServers: { serena: { type: "stdio", command: "someone-else", args: [], env: {} } },
+    };
+    const { ports, files } = fakePorts({
+      files: { [PATHS.settings]: LIVE_SETTINGS, [PATHS.claudeJson]: JSON.stringify(claudeState) },
+    });
+    const refused = await applyClaude({ paths: PATHS, hookPaths: HOOK_PATHS, write: true }, ports);
+    expect(refused.outcome).toBe("conflict");
+
+    const report = await applyClaude(
+      { paths: PATHS, hookPaths: HOOK_PATHS, write: true, takeOver: true },
+      ports,
+    );
+    expect(report.outcome).toBe("write");
+    const after = JSON.parse(files[PATHS.claudeJson] ?? "{}");
+    expect(after.mcpServers.serena.command).not.toBe("someone-else");
+    expect(
+      JSON.parse((await ports.readManifest())[`${PATHS.claudeJson}#mcpServers`] ?? "[]"),
+    ).toContain("serena");
+  });
+});
+
 describe("a machine with no settings.json yet", () => {
   test("composes the managed keys alone and has nothing to remove", async () => {
     const { ports } = fakePorts();

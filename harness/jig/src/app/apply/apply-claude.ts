@@ -222,6 +222,7 @@ async function planMcp(
   ports: ClaudeApplyPorts,
   paths: ClaudeApplyPaths,
   manifest: Readonly<Record<string, string>>,
+  takeOver: boolean,
 ): Promise<McpReport> {
   const read = await readJson(ports, paths.mcpServers);
   if (read === undefined) {
@@ -230,8 +231,14 @@ async function planMcp(
   const layer = parseMcpLayer(read.text, paths.mcpServers);
   const servers = buildClaudeMcpServers(layer.servers, { HOME: paths.home });
   const recorded = manifest[mcpOwnedKey(paths)];
-  const owned = recorded === undefined ? [] : (JSON.parse(recorded) as string[]);
-  const plan = planClaudeJsonMcp(await ports.readFile(paths.claudeJson), servers, owned);
+  const recordedNames = recorded === undefined ? [] : (JSON.parse(recorded) as string[]);
+  const current = await ports.readFile(paths.claudeJson);
+  // --take-over: a server of jig's name already in the file (registered by an
+  // earlier installer) becomes jig's, to be replaced with jig's definition
+  const owned = takeOver
+    ? [...new Set([...recordedNames, ...presentNames(current, servers)])]
+    : recordedNames;
+  const plan = planClaudeJsonMcp(current, servers, owned);
   return { ...plan, path: paths.claudeJson };
 }
 
@@ -369,6 +376,8 @@ export async function applyClaude(
     readonly paths: ClaudeApplyPaths;
     readonly hookPaths: ClaudeHookPaths;
     readonly write: boolean;
+    /** Adopt jig's servers already in ~/.claude.json (see app/apply/take-over.ts). */
+    readonly takeOver?: boolean;
   },
   ports: ClaudeApplyPorts,
 ): Promise<ClaudeApplyReport> {
@@ -400,7 +409,7 @@ export async function applyClaude(
   const diff = unifiedDiff(paths.settings, currentText, "generated", generated);
 
   const manifest = { ...(await ports.readManifest()) };
-  const mcp = await planMcp(ports, paths, manifest);
+  const mcp = await planMcp(ports, paths, manifest, input.takeOver === true);
   const currentJson = (await readJson(ports, paths.settings))?.json as JsonObject | undefined;
   const settingsPlan = planOwned({
     currentText,
@@ -515,6 +524,24 @@ export async function applyClaude(
   }
 
   return { ...base, outcome: changes ? "write" : "noop", wrote: false };
+}
+
+/** jig's server names that the file already declares. */
+function presentNames(
+  current: string | undefined,
+  servers: readonly { readonly name: string }[],
+): string[] {
+  let declared: unknown;
+  try {
+    declared =
+      current === undefined
+        ? undefined
+        : (JSON.parse(current) as { mcpServers?: unknown }).mcpServers;
+  } catch {
+    return [];
+  }
+  if (typeof declared !== "object" || declared === null) return [];
+  return servers.map((s) => s.name).filter((name) => name in declared);
 }
 
 /** Where the hash of the part of settings.json jig owns is recorded. */

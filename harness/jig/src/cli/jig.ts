@@ -770,7 +770,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write] | setup [--target claude|codex|pi|omp|dsh] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write [--take-over]] | setup [--target claude|codex|pi|omp|dsh] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -827,6 +827,10 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  reported and its destination left as found. hooks and the .<x>-merged staging dirs are\n" +
           "  `jig retire yoki`'s.\n" +
           "  It is never part of --target all: it writes into $HOME, so it has to be named.\n" +
+          "  apply --write --take-over (claude, codex or pi): when jig's own earlier writes no longer match its\n" +
+          "  record (a moved checkout, MCP servers an earlier installer registered), copies the files aside\n" +
+          "  (<file>.pre-dotfiles), forgets jig's record of them and writes jig's part again; the rest of\n" +
+          "  each file is still carried through as read.\n" +
           "  setup runs what activation needs once the links are written: builds the DSH plugin, installs\n" +
           "  DSH's expanded copies into scaffolded profiles and links the plugin there, seeds codex's\n" +
           "  config.toml once, then apply --write for claude, codex, pi, omp and dsh and, when codex is\n" +
