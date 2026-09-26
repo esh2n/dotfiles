@@ -233,7 +233,7 @@ func tpm(e Env) error {
 	if exists(dir) || !e.need("git") {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+	if err := makeHomeDirs(e, filepath.Dir(dir)); err != nil {
 		return err
 	}
 	return e.Sys.Run(nil, "git", "clone", "https://github.com/tmux-plugins/tpm", dir)
@@ -241,7 +241,7 @@ func tpm(e Env) error {
 
 func zellijPlugins(e Env) error {
 	dir := e.path(".config", "zellij", "plugins")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := makeHomeDirs(e, dir); err != nil {
 		return err
 	}
 	for _, repo := range []string{"dj95/zjstatus", "imsnif/monocle"} {
@@ -266,4 +266,3 @@ func userstyles(e Env) error {
 	}
 	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "home", "darwin", "browsers", "userstyles", "scripts", "generate-userstyle.sh"), "all")
 }
-

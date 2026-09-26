@@ -83,6 +83,7 @@ func Run(s Sys, c Config) error {
 	if err := carryOver(c); err != nil {
 		c.warn("carrying machine-local files to moved directories: %v", err)
 	}
+	sweepPriorLinks(c)
 	if s.OS() == "darwin" {
 		if err := switchDarwin(s, c); err != nil {
 			return err
