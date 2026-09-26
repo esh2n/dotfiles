@@ -193,6 +193,44 @@ func TestNvimDefaultLinksLazyvimOnlyWhenAbsent(t *testing.T) {
 	}
 }
 
+func TestNvimDefaultMovesARealDirectoryAside(t *testing.T) {
+	w := newWorld(t)
+	if err := os.MkdirAll(filepath.Join(w.home, ".config", "nvim-lazyvim"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(w.home, ".config", "nvim")
+	write(t, filepath.Join(link, "init.lua"), "-- Omarchy's\n")
+	if err := Run(w.env, "nvim-default"); err != nil {
+		t.Fatal(err)
+	}
+	if target, _ := os.Readlink(link); target != filepath.Join(w.home, ".config", "nvim-lazyvim") {
+		t.Fatalf("link = %q", target)
+	}
+	if got, err := os.ReadFile(link + ".pre-dotfiles/init.lua"); err != nil || string(got) != "-- Omarchy's\n" {
+		t.Fatalf("the directory must be kept aside: %q %v", got, err)
+	}
+}
+
+func TestNvimDefaultLeavesAnotherLinkAlone(t *testing.T) {
+	w := newWorld(t)
+	for _, d := range []string{"nvim-lazyvim", "nvim-nvchad"} {
+		if err := os.MkdirAll(filepath.Join(w.home, ".config", d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := filepath.Join(w.home, ".config", "nvim")
+	chosen := filepath.Join(w.home, ".config", "nvim-nvchad")
+	if err := os.Symlink(chosen, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(w.env, "nvim-default"); err != nil {
+		t.Fatal(err)
+	}
+	if target, _ := os.Readlink(link); target != chosen {
+		t.Fatalf("link = %q", target)
+	}
+}
+
 func TestGhExtensionsInstallsOnlyMissing(t *testing.T) {
 	w := newWorld(t, "gh")
 	if err := Run(w.env, "gh-extensions"); err != nil || !w.sys.ran("gh extension install orangain/gh-pr-graph") {

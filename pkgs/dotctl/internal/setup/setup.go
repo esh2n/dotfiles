@@ -134,8 +134,19 @@ func miseTrust(e Env) error {
 	return e.quiet(0, "mise", "trust", cfg)
 }
 
+// nvimDefault points ~/.config/nvim at lazyvim when it is not a working
+// link already: absent, dangling, or a real directory (Omarchy seeds its own
+// LazyVim there), which is moved aside first. A link, to a distribution or
+// elsewhere, is the owner's choice and stays.
 func nvimDefault(e Env) error {
-	if exists(e.path(".config", "nvim")) {
+	link := e.path(".config", "nvim")
+	if info, err := os.Lstat(link); err == nil && info.IsDir() {
+		aside, err := moveAside(link)
+		if err != nil {
+			return fmt.Errorf("moving %s aside: %w", link, err)
+		}
+		e.UI.Note("moved %s to %s", link, aside)
+	} else if exists(link) {
 		return nil
 	}
 	if err := nvim.Switch(e.Home, "lazyvim", e.Now()); err != nil {
