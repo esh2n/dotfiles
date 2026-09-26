@@ -43,11 +43,20 @@ type Config struct {
 	DryRun   bool
 }
 
+// Removal is one index a run removed, and why: "expire" (unused for longer
+// than TTL) or "evict" (least recently used while above MaxBytes).
+type Removal struct {
+	Project
+	Reason string
+}
+
 // Result says what a run removed (or would remove, in a dry run).
 type Result struct {
-	Removed   []string
-	Skipped   bool // within the interval, or another run holds the lock
-	OverLimit bool // still above MaxBytes: only indexes used in the last day remain
+	Removed   []Removal
+	Skipped   bool  // within the interval, or another run holds the lock
+	OverLimit bool  // still above MaxBytes: only indexes used in the last day remain
+	Total     int64 // bytes left after the run
+	MaxBytes  int64
 }
 
 func hashOf(root string) string {
@@ -141,8 +150,8 @@ func Run(c Config, idx Index) (Result, error) {
 	for _, p := range projects {
 		total += p.Size
 	}
-	remove := func(p Project) error {
-		res.Removed = append(res.Removed, p.Name)
+	remove := func(p Project, reason string) error {
+		res.Removed = append(res.Removed, Removal{p, reason})
 		total -= p.Size
 		if c.DryRun {
 			return nil
@@ -170,7 +179,7 @@ func Run(c Config, idx Index) (Result, error) {
 			continue
 		}
 		if now.Sub(used) > c.TTL {
-			if err := remove(p); err != nil {
+			if err := remove(p, "expire"); err != nil {
 				return res, err
 			}
 			continue
@@ -186,11 +195,12 @@ func Run(c Config, idx Index) (Result, error) {
 		if now.Sub(a.used) <= 24*time.Hour {
 			continue
 		}
-		if err := remove(a.Project); err != nil {
+		if err := remove(a.Project, "evict"); err != nil {
 			return res, err
 		}
 	}
 	res.OverLimit = total > c.MaxBytes
+	res.Total, res.MaxBytes = total, c.MaxBytes
 
 	if !c.DryRun {
 		if err := os.WriteFile(lastGC, nil, 0o600); err != nil {

@@ -92,8 +92,13 @@ func TestSizePressureEvictsLeastRecentButNeverTheLastDay(t *testing.T) {
 	if !slices.Equal(idx.deleted, []string{"a", "b"}) {
 		t.Fatalf("evicted %v, want [a b] (oldest first, c used today)", idx.deleted)
 	}
-	if !res.OverLimit {
-		t.Fatal("still above the limit, but not reported")
+	if !res.OverLimit || res.Total <= res.MaxBytes {
+		t.Fatalf("still above the limit, but not reported: %+v", res)
+	}
+	for _, r := range res.Removed {
+		if r.Reason != "evict" {
+			t.Fatalf("%s removed for %q, want evict", r.Name, r.Reason)
+		}
 	}
 }
 
@@ -106,7 +111,7 @@ func TestDryRunDeletesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(idx.deleted) != 0 || !slices.Equal(res.Removed, []string{"old"}) {
+	if len(idx.deleted) != 0 || len(res.Removed) != 1 || res.Removed[0].Name != "old" || res.Removed[0].Reason != "expire" {
 		t.Fatalf("dry run deleted %v, reported %v", idx.deleted, res.Removed)
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/cachegc"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
 // cbmIndex is Codebase-Memory's own CLI: the only safe way to delete an index.
@@ -83,15 +84,16 @@ func runCacheGC(home string, args []string, idx cachegc.Index, out, errOut io.Wr
 	if err := fs.Parse(args); err != nil || fs.NArg() > 0 {
 		return 2
 	}
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "cache-gc"}
 	c, err := cacheConfig(home)
 	if err != nil {
-		fmt.Fprintln(errOut, "cache-gc:", err)
+		p.Error("%v", err)
 		return 2
 	}
 	c.Force, c.DryRun = *force, *dryRun
 	if *touch != "" {
 		if err := cachegc.Touch(c, *touch); err != nil {
-			fmt.Fprintln(errOut, "cache-gc:", err)
+			p.Error("%v", err)
 			return 1
 		}
 		return 0
@@ -104,15 +106,15 @@ func runCacheGC(home string, args []string, idx cachegc.Index, out, errOut io.Wr
 	}
 	res, err := cachegc.Run(c, idx)
 	if err != nil {
-		fmt.Fprintln(errOut, "cache-gc:", err)
+		p.Error("%v", err)
 		return 1
 	}
 	if !*quiet {
-		for _, name := range res.Removed {
-			fmt.Fprintln(out, "removed", name)
+		for _, r := range res.Removed {
+			p.Note("%s %s (%s, %d bytes)", r.Reason, r.Name, r.Root, r.Size)
 		}
 		if res.OverLimit {
-			fmt.Fprintln(errOut, "cache-gc: still above the size limit; indexes used in the last day were kept")
+			p.Warn("cache remains above limit: %d > %d bytes; recent indexes were preserved", res.Total, res.MaxBytes)
 		}
 	}
 	return 0
