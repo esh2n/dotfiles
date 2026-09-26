@@ -18,7 +18,7 @@ switched on by the developer role.
 |---|---|---|---|
 | `main` | DeepSeek | `deepseek-flash` | everyday default, cheap/fast |
 | `complex` | OpenAI | `gpt-6-astra` (Astra) | hard judgment / design |
-| `deterministic` | llama-server on the Omarchy desktop (tailnet); the Mac's LM Studio while the desktop is off | `Qwen3.8-27B-Q4_K_M` / `lmstudio-community/Qwen3.8-27B-MLX-4bit` | executes a plan a frontier model designed; falls back only to the same model |
+| `deterministic` | llama-server on the Omarchy desktop (tailnet); the Mac's LM Studio while the desktop is off | `Qwen3.8-27B-Q4_K_M` / `qwen/qwen3.8-27b@4bit` | executes a plan a frontier model designed; falls back only to the same model |
 
 A harness calls the proxy with `model` = one of these aliases; the proxy picks
 the provider. Switch tiers by switching the alias — no per-harness provider

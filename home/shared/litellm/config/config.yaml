@@ -34,8 +34,9 @@ model_list:
   #   order 1: the Omarchy desktop's llama-server (RTX 3090 Ti), over the
   #            tailnet from every machine, the desktop included. The model id is
   #            the GGUF file name without .gguf (router mode, --models-dir).
-  #   order 2: the Mac's LM Studio, only while the desktop is off. LM Studio
-  #            loads the 4-bit build just in time (evicting whatever other
+  #   order 2: the Mac's LM Studio, only while the desktop is off (the 4-bit
+  #            build measured 15.0 tok/s there, bench/report.md). LM Studio
+  #            loads it just in time (evicting whatever other
   #            JIT-loaded model the Mac had) and unloads it after `ttl` idle
   #            seconds, so the Mac's own larger model comes back.
   # Only order 1 is health-checked in the background: a probe runs a real
@@ -55,7 +56,7 @@ model_list:
 
   - model_name: deterministic
     litellm_params:
-      model: lm_studio/lmstudio-community/Qwen3.8-27B-MLX-4bit
+      model: lm_studio/qwen/qwen3.8-27b@4bit
       api_base: os.environ/LM_STUDIO_API_BASE
       api_key: os.environ/LM_STUDIO_API_KEY
       order: 2
