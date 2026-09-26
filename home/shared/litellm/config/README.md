@@ -18,7 +18,7 @@ switched on by the developer role.
 |---|---|---|---|
 | `main` | DeepSeek | `deepseek-flash` | everyday default, cheap/fast |
 | `complex` | OpenAI | `gpt-6-astra` (Astra) | hard judgment / design |
-| `deterministic` | LM Studio (local) | `qwen/qwen3.8-27b` | reproducible / offline / free |
+| `deterministic` | llama-server on the Omarchy desktop (tailnet) | `Qwen3.8-27B-Q4_K_M` | executes a plan a frontier model designed; no fallback while the desktop is off |
 
 A harness calls the proxy with `model` = one of these aliases; the proxy picks
 the provider. Switch tiers by switching the alias — no per-harness provider
@@ -60,9 +60,12 @@ set up identically:
    -s litellm-op-token -w`).
 3. `dotctl llm setup` (run by the switch) loads the job onto the current
    definition. Logs: `~/Library/Logs/litellm-proxy.log`.
-4. On a machine without its own LM Studio, set `LM_STUDIO_REMOTE_HOST` (the
-   Mac's Tailscale MagicDNS name) for the job; `litellm-up.sh` picks the local
-   LM Studio when `127.0.0.1:1234` answers and that name otherwise.
+4. Write the Omarchy desktop's Tailscale MagicDNS name into the roles file as
+   `"llamaServerHost"`; the service passes it to `litellm-up.sh` as
+   `LLAMA_SERVER_HOST`, and `deterministic` goes to
+   `http://<that name>:8080/v1` with the key
+   `op://llm-automation/llama-server/credential`
+   (rules/decisions/2026-09-26-deterministic-on-the-gpu.md).
 
 After editing `litellm-up.sh` or the service declaration: `make up` (it
 reloads the job). The model server itself, its login autostart and the
@@ -173,9 +176,6 @@ an option for traces later, not something this stack uses today.
 - `deepseek-flash` isn't in LiteLLM's built-in model table, but `deepseek/`
   passes the id straight through to api.deepseek.com, which is the current id.
   If a call 404s, add `api_base: https://api.deepseek.com` to the `main` entry.
-- Under Docker on a Mac, the local tier must reach the host via
-  `host.docker.internal` (set in `litellm.op-vars`); native run uses
-  `localhost`.
 - `/metrics` is bearer-auth'd by default since v1.85.0;
   `require_auth_for_metrics_endpoint: false` in `config.yaml` opens it for
   local single-user scraping. It applies to port 4000 only; the dedicated

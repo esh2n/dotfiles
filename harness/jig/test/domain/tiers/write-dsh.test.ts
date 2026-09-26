@@ -116,10 +116,10 @@ const EXPECTED_AFTER = [
   "        - id: complex",
   "          name: complex (Astra)",
   "",
-  "        # deterministic -> proxy alias that maps to qwen/qwen3.8-27b",
+  "        # deterministic -> proxy alias that maps to Qwen3.8-27B-Q4_K_M",
   "        # add `input: [text, image]` if this qwen build is vision-capable",
   "        - id: deterministic",
-  "          name: deterministic (local Qwen)",
+  "          name: deterministic (Qwen3.8-27B, desktop GPU)",
   "    # END jig:tiers",
   "",
 ].join("\n");

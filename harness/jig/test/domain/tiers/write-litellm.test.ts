@@ -24,13 +24,13 @@ describe("toLitellmModelList", () => {
     expect(content).toContain("model: deepseek/deepseek-flash");
     expect(content).toContain("api_key: os.environ/DEEPSEEK_API_KEY");
     expect(content).toContain("model: deepseek/deepseek-v4-pro");
-    expect(content).toContain("model: lm_studio/qwen/qwen3.8-27b");
+    expect(content).toContain("model: openai/Qwen3.8-27B-Q4_K_M");
   });
 
-  test("the deterministic entry has no api_key line (matches the real file: lm_studio needs none)", () => {
+  test("the deterministic entry reads the desktop llama-server's key (matches the real file)", () => {
     const { content } = toLitellmModelList(loadRealTiers());
     const detBlock = content.slice(content.indexOf("model_name: deterministic"));
-    expect(detBlock).not.toContain("api_key");
+    expect(detBlock).toContain("api_key: os.environ/LLAMA_SERVER_API_KEY");
   });
 
   test("reports everything outside alias/backend as dropped", () => {

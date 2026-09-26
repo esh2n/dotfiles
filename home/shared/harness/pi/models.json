@@ -27,12 +27,12 @@
         },
         {
           "id": "deterministic",
-          "name": "deterministic — local Qwen (proxy, measured)",
+          "name": "deterministic — Qwen3.8-27B (desktop GPU)",
           "reasoning": true,
           "input": [
             "text"
           ],
-          "contextWindow": 131072,
+          "contextWindow": 65536,
           "maxTokens": 32768,
           "compat": {
             "thinkingFormat": "qwen-chat-template",

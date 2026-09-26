@@ -21,6 +21,9 @@
 #   observerHost the observer machine's tailnet name, from the same file's
 #             optional "observerHost" (where the cost ledger lives); null when
 #             absent.
+#   llamaServerHost the tailnet name of the machine whose llama-server
+#             serves the deterministic tier (the Omarchy desktop), from the
+#             same file's optional "llamaServerHost"; null when absent.
 let
   getEnv = builtins.getEnv;
   known = import ../roles/names.nix;
@@ -97,4 +100,12 @@ in
       h
     else
       throw ''facts: "observerHost" in ${rolesFile} must be a string (a tailnet name)'';
+  llamaServerHost =
+    let
+      h = doc.llamaServerHost or null;
+    in
+    if h == null || builtins.isString h then
+      h
+    else
+      throw ''facts: "llamaServerHost" in ${rolesFile} must be a string (a tailnet name)'';
 }

@@ -142,3 +142,13 @@ gpu_linux() { # gpu_linux <attr under config>
 	run --separate-stderr agents
 	[ "$(field "$output" llm-ledger-sync)" = "null" ]
 }
+
+@test "services: LiteLLM is told where the deterministic tier's llama-server is" {
+	printf '{"roles": ["developer"], "llamaServerHost": "desktop.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr gpu_linux 'systemd.user.services.litellm-proxy.Service.Environment'
+	[[ "$output" == *"LLAMA_SERVER_HOST=desktop.example.ts.net"* ]]
+	printf '{"roles": ["developer"]}\n' >"${BATS_TEST_TMPDIR}/roles.json"
+	run --separate-stderr gpu_linux 'systemd.user.services.litellm-proxy.Service.Environment'
+	[[ "$output" != *"LLAMA_SERVER_HOST"* ]]
+}

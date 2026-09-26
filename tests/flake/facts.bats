@@ -101,3 +101,15 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).nvidia"
 	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).observerHost"
 	[ "$status" -ne 0 ]
 }
+
+@test "facts: llamaServerHost, where the deterministic tier's llama-server is, is read from the roles file" {
+	printf '{"roles": ["developer"], "llamaServerHost": "desktop.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).llamaServerHost"
+	[ "$output" = '"desktop.example.ts.net"' ]
+	printf '{"roles": ["developer"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).llamaServerHost"
+	[ "$output" = null ]
+	printf '{"roles": ["developer"], "llamaServerHost": 5}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).llamaServerHost"
+	[ "$status" -ne 0 ]
+}

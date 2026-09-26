@@ -106,27 +106,26 @@ else
   echo "litellm-up: no ledger DB secret (op://llm-automation/litellm-db/password); serving without spend records" >&2
 fi
 
-# 4) where LM Studio is — the ONE value that differs between machines
-#    (rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md).
-#    If a local LM Studio answers, use it (host.docker.internal is the host's
-#    loopback as seen from the container). Otherwise this machine has no model
-#    of its own and reaches the Mac's LM Studio over the tailnet, by its
-#    Tailscale name. LiteLLM itself stays loopback-only everywhere; only LM
-#    Studio is served on the tailnet (`tailscale serve --bg --tcp 1234
-#    127.0.0.1:1234`, run once on the Mac). No per-machine file, no hostname
-#    branch: a machine that later gets its own LM Studio switches by itself.
-#    The local branch is the Mac's (LM Studio runs on macOS only, 2026-09-24
-#    decision); a Linux machine reaches the models over the tailnet.
-LM_STUDIO_REMOTE_HOST="${LM_STUDIO_REMOTE_HOST:-}"   # the Mac's MagicDNS name, e.g. mac.tail1234.ts.net
-if curl -sf --max-time 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1; then
-  LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"
-elif [ -n "$LM_STUDIO_REMOTE_HOST" ]; then
-  LM_STUDIO_API_BASE="http://${LM_STUDIO_REMOTE_HOST}:1234/v1"
-  echo "litellm-up: no local LM Studio on :1234, using ${LM_STUDIO_API_BASE}" >&2
+# 4) where the deterministic tier is: the Omarchy desktop's llama-server
+#    (rules/decisions/2026-09-26-deterministic-on-the-gpu.md), reached by its
+#    tailnet name from every machine, the desktop included — llama-server
+#    binds loopback and `tailscale serve --tcp 8080` is its one exposure.
+#    LLAMA_SERVER_HOST comes from the roles file's "llamaServerHost". Without
+#    it, or without the key, LiteLLM still serves the other tiers and only
+#    deterministic fails.
+LLAMA_SERVER_HOST="${LLAMA_SERVER_HOST:-}"
+LLAMA_SERVER_API_KEY="$(try_secret op://llm-automation/llama-server/credential)"
+if [ -n "$LLAMA_SERVER_HOST" ]; then
+  LLAMA_SERVER_API_BASE="http://${LLAMA_SERVER_HOST}:8080/v1"
 else
-  echo "litellm-up: no local LM Studio on :1234 and LM_STUDIO_REMOTE_HOST is unset — the deterministic tier will fail until one exists" >&2
-  LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"
+  echo "litellm-up: \"llamaServerHost\" is not in the roles file — the deterministic tier will fail until it is" >&2
+  LLAMA_SERVER_API_BASE="http://llama-server.invalid:8080/v1"
 fi
+if [ -z "$LLAMA_SERVER_API_KEY" ]; then
+  echo "litellm-up: op://llm-automation/llama-server/credential did not resolve — the deterministic tier will fail until it does" >&2
+  LLAMA_SERVER_API_KEY="unset"
+fi
+export LLAMA_SERVER_API_KEY
 
 # 5) clear any stale container, then run in the FOREGROUND so launchd owns it.
 #    Non-secret values are inline; secrets are passed through from the env
@@ -150,6 +149,6 @@ exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} \
   -e LITELLM_MASTER_KEY \
   -e TYPESAFE_API_KEY \
   -e OPENAI_API_KEY=unset-placeholder \
-  -e LM_STUDIO_API_BASE="$LM_STUDIO_API_BASE" \
-  -e LM_STUDIO_API_KEY=lm-studio \
+  -e LLAMA_SERVER_API_BASE="$LLAMA_SERVER_API_BASE" \
+  -e LLAMA_SERVER_API_KEY \
   "$IMAGE" --config /app/config.yaml --prometheus_metrics_port "$METRICS_PORT"

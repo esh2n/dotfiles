@@ -98,18 +98,19 @@
     },
     "deterministic": {
       "alias": "deterministic",
-      "displayName": "local Qwen",
+      "displayName": "Qwen3.8-27B on the desktop GPU",
       "backend": {
-        "provider": "lm_studio",
-        "model": "qwen/qwen3.8-27b"
+        "provider": "openai",
+        "model": "Qwen3.8-27B-Q4_K_M",
+        "apiKeyEnv": "LLAMA_SERVER_API_KEY"
       },
       "reasoning": true,
       "input": [
         "text"
       ],
-      "contextWindow": 131072,
+      "contextWindow": 65536,
       "maxTokens": 32768,
-      "_context_source": "contextWindow 131072 is the window LM Studio loads qwen3.8-27b with — NOT a model constant. litellm/check.sh prints the loaded context length (LM Studio REST v0 loaded_context_length); if it is lower, this value must follow it, or the tier overflows silently. [unverified against the live load as of 2026-09-24]",
+      "_context_source": "deterministic is the executor of a plan a frontier model designed (rules/decisions/2026-09-26-deterministic-on-the-gpu.md). It runs on the Omarchy desktop's llama-server (home/linux/llama-server), one slot with -c 65536: on 24GB that is the most one slot holds next to the 17.4GB model with an fp16 KV cache, and Qwen3.8-27B slows about 25x past ~80K (llama.cpp #27623). contextWindow follows that -c. The backend is `openai/` because llama-server speaks the OpenAI API; the model id is the GGUF file name without .gguf (router mode, --models-dir). samplingParams are the model card's thinking-mode values, the ones Qwen evaluated its agentic coding with (https://huggingface.co/Qwen/Qwen3.8-27B).",
       "compat": {
         "thinkingFormat": "qwen-chat-template",
         "supportsReasoningEffort": false
@@ -128,10 +129,10 @@
         "top_k": 20
       },
       "pi": {
-        "name": "deterministic — local Qwen (proxy, measured)"
+        "name": "deterministic — Qwen3.8-27B (desktop GPU)"
       },
       "dsh": {
-        "name": "deterministic (local Qwen)",
+        "name": "deterministic (Qwen3.8-27B, desktop GPU)",
         "_comment": {
           "name": "add `input: [text, image]` if this qwen build is vision-capable"
         }

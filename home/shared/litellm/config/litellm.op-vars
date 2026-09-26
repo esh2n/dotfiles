@@ -24,8 +24,7 @@ TYPESAFE_API_KEY=op://llm-automation/typesafe/credential
 # unused until an openai item is added to llm-automation and referenced here.
 OPENAI_API_KEY=unset-placeholder
 
-# LM Studio local endpoint. host.docker.internal = the Mac host as seen from
-# inside the Docker container. If running LiteLLM natively, change to
-# http://localhost:1234/v1.
-LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1
-LM_STUDIO_API_KEY=lm-studio
+# The deterministic tier's llama-server (the Omarchy desktop). Its API base
+# is http://<the roles file's llamaServerHost>:8080/v1 — a machine fact, so
+# it is not here: export LLAMA_SERVER_API_BASE before start.sh.
+LLAMA_SERVER_API_KEY=op://llm-automation/llama-server/credential

@@ -28,13 +28,23 @@ model_list:
       model: deepseek/deepseek-v4-pro
       api_key: os.environ/DEEPSEEK_API_KEY
 
-  # deterministic — local Qwen on LM Studio (free, offline, reproducible).
-  # api_base / api_key come from LM_STUDIO_API_BASE / LM_STUDIO_API_KEY (set in
-  # litellm.env). Under Docker on a Mac the base MUST be host.docker.internal
-  # (the container's localhost is not the host); native pip run uses localhost.
+  # deterministic — the executor: carries out a plan a frontier model already
+  # designed (rules/decisions/2026-09-26-deterministic-on-the-gpu.md).
+  # Qwen3.8-27B on the Omarchy desktop's llama-server (RTX 3090 Ti), reached
+  # over the tailnet from every machine, the desktop included. The model id is
+  # the GGUF file name without .gguf (router mode, --models-dir).
+  # LLAMA_SERVER_API_BASE / LLAMA_SERVER_API_KEY are set by litellm-up.sh.
+  # No fallback to another machine or model: while the desktop is off, this
+  # answers "unavailable" — after one failure it is cooled down for 30 s
+  # instead of being retried for 5-6 s per request (LiteLLM #40405).
   - model_name: deterministic
     litellm_params:
-      model: lm_studio/qwen/qwen3.8-27b
+      model: openai/Qwen3.8-27B-Q4_K_M
+      api_base: os.environ/LLAMA_SERVER_API_BASE
+      api_key: os.environ/LLAMA_SERVER_API_KEY
+    model_info:
+      allowed_fails: 1
+      cooldown_time: 30
 
 litellm_settings:
   # Free OSS Prometheus exporter — this is the whole point of the proxy.
