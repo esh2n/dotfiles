@@ -1,5 +1,5 @@
 // Package wallpaper fetches wallpapers from Wallhaven and sets them on every
-// macOS desktop (was domains/creative/bin/wallpaper). Downloads are kept in
+// macOS desktop, or Omarchy's (was domains/creative/bin/wallpaper). Downloads are kept in
 // the checkout's home/shared/theme/wallpapers; ~/.current_wallpaper
 // links the one in use.
 package wallpaper
@@ -170,10 +170,22 @@ func appleString(s string) string {
 }
 
 // Set puts a local image on every desktop and links it as
-// ~/.current_wallpaper. macOS only.
+// ~/.current_wallpaper: on macOS through System Events, on Linux through
+// Omarchy (`omarchy theme bg set`, which keeps it until the next theme).
 func Set(e Env, file string) error {
-	if e.Sys.OS() != "darwin" {
-		return errors.New("setting the wallpaper is macOS only")
+	var cmd func(abs string) sys.Cmd
+	switch e.Sys.OS() {
+	case "darwin":
+		cmd = func(abs string) sys.Cmd {
+			script := "tell application \"System Events\" to tell every desktop to set picture to " + appleString(abs)
+			return sys.Cmd{Name: "osascript", Args: []string{"-e", script}, Timeout: 30 * time.Second}
+		}
+	case "linux":
+		cmd = func(abs string) sys.Cmd {
+			return sys.Cmd{Name: "omarchy", Args: []string{"theme", "bg", "set", abs}, Timeout: 30 * time.Second}
+		}
+	default:
+		return errors.New("setting the wallpaper needs macOS or Omarchy")
 	}
 	abs, err := filepath.Abs(file)
 	if err != nil {
@@ -182,9 +194,9 @@ func Set(e Env, file string) error {
 	if info, err := os.Stat(abs); err != nil || info.IsDir() {
 		return fmt.Errorf("no image at %s", abs)
 	}
-	script := "tell application \"System Events\" to tell every desktop to set picture to " + appleString(abs)
-	if _, errOut, err := e.Sys.Exec(sys.Cmd{Name: "osascript", Args: []string{"-e", script}, Timeout: 30 * time.Second}); err != nil {
-		return fmt.Errorf("osascript: %v: %s", err, strings.TrimSpace(errOut))
+	c := cmd(abs)
+	if _, errOut, err := e.Sys.Exec(c); err != nil {
+		return fmt.Errorf("%s: %v: %s", c.Name, err, strings.TrimSpace(errOut))
 	}
 	link := filepath.Join(e.Home, ".current_wallpaper")
 	if err := os.Remove(link); err != nil && !os.IsNotExist(err) {

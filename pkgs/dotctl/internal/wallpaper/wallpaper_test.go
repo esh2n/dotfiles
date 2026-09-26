@@ -19,7 +19,7 @@ type fakeSys struct {
 }
 
 func (f *fakeSys) Exec(c sys.Cmd) (string, string, error) {
-	f.scripts = append(f.scripts, strings.Join(c.Args, " "))
+	f.scripts = append(f.scripts, c.Name+" "+strings.Join(c.Args, " "))
 	return "", "", nil
 }
 func (f *fakeSys) OS() string { return f.os }
@@ -94,7 +94,7 @@ func TestFetchRefusesWhatItShouldNotTrust(t *testing.T) {
 	}
 }
 
-func TestSetQuotesThePathAndIsMacOnly(t *testing.T) {
+func TestSetQuotesThePathOnTheMac(t *testing.T) {
 	f := &fakeSys{os: "darwin"}
 	e, _ := env(t, &web{}, f)
 	file := filepath.Join(e.Repo, `a "b" \c.png`)
@@ -110,8 +110,26 @@ func TestSetQuotesThePathAndIsMacOnly(t *testing.T) {
 	if err := Set(e, filepath.Join(e.Repo, "missing.png")); err == nil {
 		t.Fatal("a missing image is set")
 	}
-	e.Sys = &fakeSys{os: "linux"}
+	e.Sys = &fakeSys{os: "freebsd"}
 	if err := Set(e, file); err == nil {
-		t.Fatal("set on linux")
+		t.Fatal("set on an OS with no way to set it")
+	}
+}
+
+func TestSetOnLinuxGoesThroughOmarchy(t *testing.T) {
+	f := &fakeSys{os: "linux"}
+	e, _ := env(t, &web{}, f)
+	file := filepath.Join(e.Repo, "a b.png")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Set(e, file); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.scripts) != 1 || f.scripts[0] != "omarchy theme bg set "+file {
+		t.Fatalf("ran %q", f.scripts)
+	}
+	if got, _ := os.Readlink(filepath.Join(e.Home, ".current_wallpaper")); got != file {
+		t.Fatalf("~/.current_wallpaper -> %q", got)
 	}
 }

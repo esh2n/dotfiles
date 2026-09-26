@@ -27,7 +27,7 @@ commands:
   gh switch                              switch the active GitHub account (also: gh-switch)
   gh pr-graph-update                     upgrade the pr-graph extension (also: gh-pr-graph-update)
   editor extensions [--repo DIR]         install the editor extensions into VS Code and Cursor (also: install-extensions)
-  wallpaper search|random|set ...        Wallhaven wallpapers on every macOS desktop (also: wallpaper)
+  wallpaper search|random|set ...        Wallhaven wallpapers on the desktop, macOS or Omarchy (also: wallpaper)
   templates render [--repo DIR]          render every *.template in the checkout beside itself
   ledger sync once|loop                  ship this machine's LiteLLM spend to the cost ledger (LEDGER_* env)
   mado [use|stop|status|list|layout|info]  switch the macOS window-manager profile (also: mado)
