@@ -57,6 +57,10 @@ jobs:
       - name: artifact Worker
         working-directory: harness/tools/artifact-worker
         run: node --test "test/*.test.mjs"
+      # the CLI through its launcher links, publish to revoke, against the
+      # fake Worker (skips itself where node 22, jq or a local port is missing)
+      - name: artifact end to end
+        run: bash tests/run.sh tests/services/artifact-e2e.bats
 
   dotctl:
     runs-on: ubuntu-latest
