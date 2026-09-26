@@ -1,9 +1,11 @@
 # LM Studio — the home model server (headless, at login, awake while serving)
 
-The one model server this dotfiles setup exposes to other machines. It stays
-on `127.0.0.1:1234`; only Tailscale puts it on the tailnet, and every LiteLLM
-instance (loopback-only, one per machine) points at it — see
-`harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`.
+The Mac's model server. It stays on `127.0.0.1:1234`; only Tailscale puts it
+on the tailnet. Since 2026-09-26 no LiteLLM tier points at it: `deterministic`
+moved to the Omarchy desktop's llama-server
+(`harness/rules/decisions/2026-09-26-deterministic-on-the-gpu.md`), and which
+larger model the Mac serves, under which name, is decided after a survey of
+what fits in 64GB.
 
 ## What runs
 
@@ -75,10 +77,7 @@ On the Mac that hosts the models:
    `/Applications/Tailscale.app/Contents/MacOS/Tailscale`
    (https://tailscale.com/kb/1080/cli).
 
-On every other machine: log in to Tailscale, and give LiteLLM the Mac's
-MagicDNS name once (`LM_STUDIO_REMOTE_HOST`, see
-`home/shared/litellm/config/litellm-up.sh`). Nothing from this directory is
-needed there.
+Nothing from this directory is needed on the other machines.
 
 ## Re-apply / remove
 
