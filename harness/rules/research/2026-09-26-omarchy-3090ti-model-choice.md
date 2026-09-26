@@ -116,3 +116,34 @@ Nejumi LLM リーダーボード 4（2026-09-01、[Qualiteg の要約](https://j
 1. Qwen3.8-27B・Qwen3.6-27B・Qwen3.6-35B-A3B（とその Coder 版があればそれ）の GGUF リポジトリとファイルサイズ
 2. Nejumi 4 の原典の数値
 3. gpt-oss-20b の #27720 の現状
+
+## 追補: 決める前に確かめた三点（同日）
+
+HF API（`/api/models/<id>`、`/tree/main`）と GitHub REST API を直接確認。
+
+**Qwen3.6 / 3.8 の実在とサイズ。** `Qwen/Qwen3.6-27B`（2026-04）、`Qwen/Qwen3.8-27B`（2026-08-14）、`Qwen/Qwen3.6-35B-A3B`（2026-04、256 専門家・8 活性）はどれも実在し Apache-2.0。27B は画像も読むマルチモーダル（`image-text-to-text`）。Qwen 公式の Coder 版は 3.6 / 3.8 とも無く、検索に出るのはコミュニティの改造（abliterated 系を含む）だけ。
+
+`config.json` の `text_config` は線形注意と通常の注意の混在（`full_attention_interval: 4`）で、KV キャッシュを持つのは 27B が 64 層中 16 層、35B-A3B が 40 層中 10 層だけ。fp16 の KV は 27B が 2×4×256×2B×16 = 64KB/トークン（32k で約 2.1GB、65k で約 4.2GB）、35B-A3B が 2×2×256×2B×10 = 20KB/トークン（32k で約 0.64GB、65k で約 1.28GB）。
+
+| GGUF（GB） | Q4_K_M | UD-Q4_K_XL | IQ4_XS | Q5_K_M | Q6_K |
+|---|---|---|---|---|---|
+| Qwen3.6-27B unsloth | 16.82 | 17.61 | 15.44 | 19.51 | 22.52 |
+| Qwen3.6-27B bartowski | 17.98 | — | 15.78 | 20.97 | 23.68 |
+| Qwen3.8-27B unsloth | UD-Q4_K_M 16.46 | 17.56 | UD-IQ4_XS 14.25 | UD-Q5_K_M 19.77 | UD-Q6_K 21.98 |
+| Qwen3.8-27B bartowski | 17.44 | — | 15.48 | 20.92 | 23.86 |
+| Qwen3.6-35B-A3B bartowski | 22.29 | — | 19.70 | 25.91 | 30.95 |
+| Qwen3.6-35B-A3B unsloth | UD-Q4_K_M 22.13 | 22.36 | 17.73 | UD 26.46 | — |
+
+24GB に収まるのは、27B の Q4 級（65k でも 19〜22GB）、27B の Q5_K_M（32k でぎりぎり）、35B-A3B の Q4 級（65k で約 23〜24GB、aminrj.com の実測 24.2GB と一致）。27B の Q6_K と 35B-A3B の Q5 以上は載らない。この二つを同時に VRAM に置くことはできないので、router は切り替えのたびに読み直す。
+
+llama.cpp は PR #19468（qwen3.5 系の対応、2026-02-10 マージ）より後のビルドが要る。変換の修正 PR #27132（線形注意のテンソル）は 2026-08-15 時点でまだオープン。
+
+**Nejumi 4 の原典。** W&B のレポート（https://wandb.ai/llm-leaderboard/nejumi-leaderboard4/reports/Nejumi-LLM-Leaderboaed-4--VmlldzoxNDQyMzkxMA ）は JS 描画で表を取れず、GraphQL は非公開。原典は未到達のまま。二次要約の数値は再確認でき、gpt-oss-20b・Qwen3-30B-A3B-2507・Qwen3-Coder-30B-A3B はその要約に載っていない（[unverified]）。
+
+**不具合の現状。**
+- #27720（gpt-oss のツール呼び出し）は 2026-08-26 にクローズ。直ったのではなく、クライアントがツール呼び出しを含むターンで `reasoning_content` を送り返していないのが原因とされた: "I'm going to close this simply because handling garbage output is not feasible from a parsing perspective. Feel free to reopen if you continue to have issues even after round-tripping the reasoning content."
+- #27733（オープン、2026-08-26）: Qwen3.8-27B のエージェント用途で、1 日 2 回ほど末尾の閉じていない `<think>` のせいで最終の解析が失敗し、1 万トークン超の生成が捨てられる（CUDA で再現、`--jinja`）。
+- #29092（オープン、2026-09-18、HIP/ROCm）: qwen35 / qwen35moe の線形注意の状態が、使い回したスロットでリクエストをまたいで残る。CUDA での報告は見つからなかった（[unverified]）。
+- #28522 のコメントに「Qwen 系で MCP のツールがループする」という未確認の報告。
+
+**エージェント用途のツール呼び出しの測定。** llama-server `--jinja` 経由で三モデルを比べた測定は見つからなかった（前例なし）。ベンダーの数値は gpt-oss-20b の tau-bench Retail 54.8%（OpenAI 公式、別のハーネス）だけ。Qwen3.6-35B-A3B の公式ブログ（"Agentic Coding Power, Now Open to All"）は JS 描画で数値を取れなかった。
