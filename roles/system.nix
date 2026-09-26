@@ -13,5 +13,7 @@ in
     dev.enable = on "developer";
     desktop.enable = on "desk-user";
     models.enable = on "model-provider";
+    # LiteLLM (developer) and Prometheus/Grafana/Open WebUI (observer) run in Docker
+    docker.enable = on "developer" || on "observer";
   };
 }

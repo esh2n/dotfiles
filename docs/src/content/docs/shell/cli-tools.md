@@ -19,7 +19,7 @@ Zsh と Fish の両方で同じ alias と環境変数を使える。共通の設
 | yazi | terminal file manager |
 | vivid | LS_COLORS の生成 |
 | btop | system monitor |
-| thefuck | 直前の command miss を自動修正 |
+| pay-respects | 直前の command miss を自動修正 |
 
 ## よく使う key 操作
 
@@ -30,7 +30,7 @@ Zsh と Fish の両方で同じ alias と環境変数を使える。共通の設
 | `z <dir>` | directory に jump (zoxide) |
 | `zi` | directory を interactive に選択 (zoxide) |
 | `btop` | system monitor を起動 |
-| `fuck` | 直前の command を修正して再実行 (thefuck) |
+| `f` | 直前の command を修正して再実行 (pay-respects) |
 
 入力中は gray の text で suggest が表示される (zsh-autosuggestions)。
 

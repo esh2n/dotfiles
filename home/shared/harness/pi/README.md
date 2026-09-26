@@ -89,11 +89,8 @@ Extensions adapted from [earlyaidopters/marks-pi-harness](https://github.com/ear
 
 ## Install
 
-Install the latest release — this lane carries no version pin:
-
-```sh
-npm install -g @earendil-works/pi-coding-agent@latest
-```
+pi comes from nixpkgs (`pi-coding-agent`, home/shared/packages/dev.nix), on
+the Mac and on Linux alike; `make up` installs and updates it with the flake.
 
 History: 0.84.x was held back for upstream #9216 (0.85.x local streaming
 "terminated" + auto-compaction not re-triggering after the first run). On
@@ -102,11 +99,8 @@ History: 0.84.x was held back for upstream #9216 (0.85.x local streaming
 on this machine passed, so 0.85.1 is installed. The issue is still open and
 was reported after 0.85.1 shipped (Windows + Ollama, GGUF quant — not this
 machine's macOS + LM Studio MLX setup), so neither symptom is fixed by a
-newer release yet. Roll back if either shows up:
-
-```sh
-npm install -g @earendil-works/pi-coding-agent@0.84.4
-```
+newer release yet. Roll back if either shows up: pin `pi-coding-agent` to
+0.84.4 with an override in overlays/default.nix, then `make up`.
 
 Config linking is home-manager's (`home/shared/harness/default.nix`), not by
 hand. One command, idempotent, from the checkout:

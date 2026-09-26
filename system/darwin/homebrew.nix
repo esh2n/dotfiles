@@ -5,14 +5,15 @@
 # By kind, as the Nix packages are; the roles turn the kinds on
 # (roles/system.nix): dev is the development formulae and CLI casks, desktop
 # the GUI apps, fonts and App Store apps (GUI development apps need both),
-# models the local model runners; the taps and Tailscale are on every Mac.
+# models the local model runners, docker the Docker engine; the taps and
+# Tailscale are on every Mac.
 # cleanup stays "none", so turning a kind off never uninstalls.
 { config, lib, ... }:
 let
   on = kind: config.dotfiles.homebrew.${kind}.enable;
 in
 {
-  options.dotfiles.homebrew = lib.genAttrs [ "dev" "desktop" "models" ] (kind: {
+  options.dotfiles.homebrew = lib.genAttrs [ "dev" "desktop" "models" "docker" ] (kind: {
     enable = lib.mkEnableOption "the ${kind} Homebrew formulae and casks";
   });
 
@@ -28,37 +29,17 @@ in
 
     taps = [
       "felixkratz/formulae"
-      "satococoa/tap"
       "nikitabobko/tap"
       "BarutSRB/tap"
     ];
 
-    brews =
-      lib.optionals (on "dev") [
-        "thefuck"
-        "staticcheck"
-        "golangci-lint"
-        "govulncheck"
-        "protoc-gen-go-grpc"
-        "satococoa/tap/wtp"
-        "rtk"
-        "k1LoW/tap/mo"
-        "dlvhdr/formulae/diffnav"
-        "noborus/tap/ov"
-        "sesh"
-        "can1357/tap/omp" # oh-my-pi coding agent; tap trusted by dotctl up
-        "herdr" # not in nixpkgs
-        "hunk" # not in nixpkgs
-      ]
-      ++ lib.optionals (on "models") [
-        "ollama"
-      ]
-      # window management and the bar
-      ++ lib.optionals (on "desktop") [
-        "sketchybar"
-        "borders"
-        "karinushka/paneru/paneru"
-      ];
+    # CLI tools come from Nix (home/shared/packages); these are what nixpkgs
+    # does not have for the Mac: the window-management bar and borders
+    brews = lib.optionals (on "desktop") [
+      "sketchybar"
+      "borders"
+      "karinushka/paneru/paneru"
+    ];
 
     casks =
       # every machine is on the tailnet
@@ -81,14 +62,11 @@ in
         # own login item, so no launchd job is needed.
         "tailscale-app"
       ]
+      # the Docker engine LiteLLM and the observer's stacks run in; it starts at
+      # login once `dotctl setup orbstack` has set that (it needs a logged-in
+      # user: OrbStack does not run as a daemon)
+      ++ lib.optionals (on "docker") [ "orbstack" ]
       ++ lib.optionals (on "dev") [
-        # codex ships as a cask only — there is no `codex` formula, so listing it
-        # under brews made `brew bundle` fail and left the install unmanaged.
-        # Minimum 0.147.0 (the hooks.json `[hooks.state]` trust-hash format
-        # `jig codex register` writes assumes it), recommended 0.150.0+ (adds the
-        # Interrupt hook event). Below these floors the fix is
-        # `brew upgrade --cask codex`, then `make up`.
-        "codex"
         # microVM sandbox for coding agents. docker/tap is casks-only too (same
         # trap as codex); the tap is trusted by dotctl up.
         "docker/tap/sbx"

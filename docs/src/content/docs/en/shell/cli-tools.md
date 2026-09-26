@@ -19,7 +19,7 @@ Both Zsh and Fish share the same aliases and environment variables. The common c
 | yazi | terminal file manager |
 | vivid | LS_COLORS generator |
 | btop | system monitor |
-| thefuck | auto-corrects your last command |
+| pay-respects | auto-corrects your last command |
 
 ## Common shortcuts
 
@@ -30,7 +30,7 @@ Both Zsh and Fish share the same aliases and environment variables. The common c
 | `z <dir>` | Jump to directory (zoxide) |
 | `zi` | Pick directory interactively (zoxide) |
 | `btop` | Launch system monitor |
-| `fuck` | Fix and re-run last command (thefuck) |
+| `f` | Fix and re-run last command (pay-respects) |
 
 Gray text appears as you type showing suggestions (zsh-autosuggestions).
 

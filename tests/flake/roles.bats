@@ -78,7 +78,7 @@ brewlists() { # brewlists: casks and brews by name, as one JSON object
 
 	printf '{"roles": ["developer", "model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr brewlists
-	[[ "$output" == *'"golangci-lint"'* && "$output" == *'"ollama"'* && "$output" == *'"codex"'* && "$output" == *'"lm-studio"'* ]]
+	[[ "$output" == *'"docker/tap/sbx"'* && "$output" == *'"orbstack"'* && "$output" == *'"lm-studio"'* ]]
 	[[ "$output" != *'"cursor"'* && "$output" != *'"sketchybar"'* && "$output" != *'"font-fira-code"'* ]]
 
 	printf '{"roles": ["developer", "desk-user"]}\n' >"${DOTFILES_ROLES_FILE}"

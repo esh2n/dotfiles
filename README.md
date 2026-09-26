@@ -130,7 +130,7 @@ export DOTFILES_ROOT="/path/to/your/checkout" # the directory that holds flake.n
 - **yazi** - Terminal file manager
 - **vivid** - LS_COLORS generator
 - **btop** - Modern system monitor
-- **thefuck** - Command correction
+- **pay-respects** - Command correction
 - **mo** - Markdown viewer (browser, live-reload, Mermaid/KaTeX)
 - **diffnav** - File-tree git diff pager (delta-based, GitHub-style)
 - **ov** - Feature-rich terminal pager (section jump, column mode, filter)
@@ -141,7 +141,7 @@ export DOTFILES_ROOT="/path/to/your/checkout" # the directory that holds flake.n
 - `z <dir>` - Smart directory jumping (zoxide)
 - `zi` - Interactive directory selection (zoxide)
 - `btop` - Interactive system monitor
-- `fuck` - Fix previous command (thefuck)
+- `f` - Fix previous command (pay-respects)
 - Auto-suggestions appear in gray text (zsh-autosuggestions)
 
 ### Git Aliases

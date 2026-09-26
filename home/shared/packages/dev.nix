@@ -26,6 +26,9 @@
       gotools
       gopls
       delve
+      go-tools # staticcheck, which the rules ask for before completion
+      golangci-lint
+      govulncheck
       protobuf
       bundler
       pnpm
@@ -33,6 +36,22 @@
 
       # uvx starts serena, an MCP server every harness is given
       uv
+
+      # Coding-agent harnesses jig delivers to (Claude Code comes from its own
+      # installer, dotctl setup claude-cli; DSH runs through npx). codex must
+      # be >= 0.147.0: jig codex register writes the [hooks.state] trust hash
+      # format it introduced.
+      codex
+      omp
+      pi-coding-agent
+
+      # Terminal and git
+      herdr # needs >= 0.7.4 (home/shared/herdr); its self-update is off
+      wtp # git worktrees (zsh functions)
+      diffnav # git's diff pager
+      ov # git's log pager
+      glow # Markdown in the terminal
+      pay-respects # command correction (was thefuck)
 
       # Code graph MCP server, given to every harness (pkgs)
       codebase-memory-mcp

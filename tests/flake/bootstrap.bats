@@ -77,7 +77,8 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 		"git+file://${REPO_ROOT}#darwinConfigurations.mac.config.homebrew" --apply "$expr"
 	[ "$status" -eq 0 ]
 	got="$(tr ' ' '\n' <<<"$output" | tr '[:upper:]' '[:lower:]' | sort | tr '\n' ' ')"
-	# the list the old layout kept by hand (core/utils/homebrew.sh, removed)
-	want="barutsrb/tap can1357/tap dlvhdr/formulae docker/tap fayazara/tap felixkratz/formulae k1low/tap karinushka/paneru nikitabobko/tap noborus/tap satococoa/tap stablyai/orca "
+	# every tap a declared formula or cask names (the CLI tools' taps left
+	# with the tools, for Nix, on 2026-09-26)
+	want="barutsrb/tap docker/tap fayazara/tap felixkratz/formulae karinushka/paneru nikitabobko/tap stablyai/orca "
 	[ "$got" = "$want" ] || { echo "got:  $got"; echo "want: $want"; false; }
 }

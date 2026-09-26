@@ -2764,7 +2764,7 @@ function chooks() {
 omp() {
     local omp_bin key
     omp_bin="$(whence -p omp)" || {
-        echo "\033[31momp not found. Run: brew install can1357/tap/omp\033[0m" >&2
+        echo "\033[31momp not found. Run make up (it comes from Nix, home/shared/packages/dev.nix)\033[0m" >&2
         return 1
     }
     # omp's models run through the local LiteLLM proxy (models.yml `proxy`,
