@@ -98,7 +98,11 @@ func applyValues(e Env, name string) {
 // resolves to (the checkout's rendered copy), keeping home-manager's link.
 func applyZellij(e Env, name string) error {
 	cfg, err := filepath.EvalSymlinks(filepath.Join(e.Home, ".config", "zellij", "config.kdl"))
-	if err != nil || !exists(filepath.Join(filepath.Dir(cfg), "layouts", name+".kdl")) {
+	if err != nil {
+		return nil // zellij is not set up on this machine
+	}
+	if !exists(filepath.Join(filepath.Dir(cfg), "layouts", name+".kdl")) {
+		e.warn("Zellij layout '%s' not found", name)
 		return nil
 	}
 	_, err = rewrite(cfg, regexp.MustCompile(`default_layout "[^"]*"`), fmt.Sprintf(`default_layout "%s"`, name))
@@ -107,7 +111,11 @@ func applyZellij(e Env, name string) error {
 
 func applyWarp(e Env, name string) error {
 	settings := e.repo("home/darwin/warp/config/settings.toml")
-	if !exists(e.repo("home/darwin/warp/config/themes/"+name+".yaml")) || !exists(settings) {
+	if !exists(settings) {
+		return nil // not a Mac, or Warp's settings not seeded yet
+	}
+	if !exists(e.repo("home/darwin/warp/config/themes/" + name + ".yaml")) {
+		e.warn("Warp theme '%s' not found", name)
 		return nil
 	}
 	_, err := rewrite(settings, regexp.MustCompile(`(?m)^theme = .*$`), fmt.Sprintf(`theme = "%s"`, name))
@@ -121,6 +129,7 @@ func applyStarship(e Env, name string) error {
 		return nil // not rendered on this machine
 	}
 	if !regexp.MustCompile(`(?m)^\[palettes\.` + regexp.QuoteMeta(name) + `\]`).Match(b) {
+		e.warn("Starship palette '%s' not found", name)
 		return nil
 	}
 	_, err = rewrite(cfg, regexp.MustCompile(`(?m)^palette = "[^"]*"`), fmt.Sprintf(`palette = "%s"`, name))
@@ -130,6 +139,7 @@ func applyStarship(e Env, name string) error {
 func applyVSCode(e Env, name string) error {
 	theme, ok := vscodeThemes[name]
 	if !ok {
+		e.warn("VSCode theme mapping not found for '%s'", name)
 		return nil
 	}
 	for _, rel := range []string{
@@ -157,10 +167,12 @@ func applyWallpaper(e Env, name string) error {
 			continue
 		}
 		if e.Has == nil || !e.Has("desktoppr") {
+			e.warn("desktoppr not found; wallpaper not set")
 			return nil
 		}
 		return e.Run("desktoppr", img)
 	}
+	e.warn("Wallpaper for '%s' not found", name)
 	return nil
 }
 
