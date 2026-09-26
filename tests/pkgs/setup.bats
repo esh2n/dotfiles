@@ -207,7 +207,7 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 	fake jq
 	run --separate-stderr step userstyles
 	[ "$status" -eq 0 ]
-	[[ "$stderr" == *"lessc"* ]]
+	[[ "$output" == *"[WARN]"*"lessc"* ]]
 }
 
 @test "setup sbarlua: an installed module built for the running Lua is left alone" {
@@ -235,5 +235,5 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 @test "setup sbarlua: without lua it is skipped with a warning" {
 	run --separate-stderr step sbarlua
 	[ "$status" -eq 0 ]
-	[[ "$stderr" == *"lua"* ]]
+	[[ "$output" == *"[WARN]"*"lua"* ]]
 }
