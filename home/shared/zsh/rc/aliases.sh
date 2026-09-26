@@ -1,6 +1,6 @@
-#!/bin/sh
-# Common Aliases (POSIX compliant)
-# Sourced by both Zsh and Fish
+#!/usr/bin/env bash
+# Common aliases, sourced by zsh (home/shared/zsh/zshrc). Written so bash can
+# source it too (the tests do); not POSIX sh: rm below uses arrays.
 
 # Editors
 alias vim='nvim'
@@ -13,8 +13,43 @@ alias la="eza -a --icons"
 alias ll="eza -l --icons"
 alias llt="eza --tree --level=2 -a"
 
-# rm replacement (trash)
-alias rm='trash'
+# rm sends to the trash. rm's own options (-r -R -f -d -v -i -I, alone or
+# run together, until --) are taken and dropped; with -f a path that does not
+# exist is skipped silently, as rm does. The trash is macOS's /usr/bin/trash
+# (Finder's Trash, so "Put Back" works) where it exists, else trash-cli's
+# trash-put (Linux). A bare `trash` is not used: on macOS 15+ it resolves to
+# Apple's, which refuses rm's options. Rm really deletes.
+unalias rm 2>/dev/null
+rm() {
+	local trash=/usr/bin/trash arg force=0 opts=1
+	local -a paths
+	paths=()
+	[ -x "$trash" ] || trash="trash-put"
+	[ -n "${DOTFILES_TRASH:-}" ] && trash="$DOTFILES_TRASH" # tests
+	for arg in "$@"; do
+		if [ "$opts" = 1 ]; then
+			case "$arg" in
+			--) opts=0; continue ;;
+			--force) force=1; continue ;;
+			--recursive | --dir | --verbose | --interactive*) continue ;;
+			-[rRfdviI]*)
+				case "$arg" in *f*) force=1 ;; esac
+				continue
+				;;
+			esac
+		fi
+		if [ "$force" = 1 ] && [ ! -e "$arg" ] && [ ! -L "$arg" ]; then
+			continue
+		fi
+		paths+=("$arg")
+	done
+	if [ "${#paths[@]}" -eq 0 ]; then
+		[ "$force" = 1 ] && return 0
+		echo "rm: missing operand" >&2
+		return 1
+	fi
+	"$trash" "${paths[@]}"
+}
 alias Rm='command rm -rf'
 
 # Git
