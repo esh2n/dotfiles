@@ -1,40 +1,40 @@
-# deterministic を Omarchy 機の GPU（Qwen3.8-27B）へ移す
+# deterministic（計画を実行するモデル）を Omarchy 機の GPU（Qwen3.8-27B）へ移す
 
-Status: accepted — 持ち主の裁定（2026-09-26、「決定的を gpu に置きたい」「moe のやつよりも 3.8 の方がいい」）。`2026-09-24-home-llm-second-host-omarchy-llama-server.md` を置き換える。deterministic の置き場所を変え、Omarchy 機のモデルを決める。llama-server の router mode、用途名で載せること、別モデルへの fallback を置かないこと、`allowed_fails: 1` + `cooldown_time: 30` はそのまま引き継ぐ
+Status: accepted — 持ち主の裁定（2026-09-26、「決定的を gpu に置きたい」「moe のやつよりも 3.8 の方がいい」、定義は「フロンティアモデルやベンチマークの高いモデルが設計したものを実行するモデル。やることが決まっていて、あとは実行するだけの時に使う」）。同日、最初の版が deterministic を「出力がビット単位で揃う tier」と読み違えていたので、定義を直して書き直した。`2026-09-24-home-llm-second-host-omarchy-llama-server.md` を置き換える。llama-server の router mode、tailnet への出し方、別モデルへの fallback を置かないこと、`allowed_fails: 1` + `cooldown_time: 30` はそのまま引き継ぐ
 
-rule: The `deterministic` tier is served by the Omarchy desktop's `llama-server` (RTX 3090 Ti, Qwen3.8-27B at 4-bit) with temperature 0, a fixed seed and one slot, and never falls back to another machine or model: while the desktop is off or booted into Windows, `deterministic` answers "unavailable". The same model also serves `agent-gpu` (coding and Japanese prose, normal sampling). `llama-server` runs in router mode as a systemd user service with `--api-key`, exposed on the tailnet with one `tailscale serve` TCP port; every machine's LiteLLM lists its models under purpose names with `allowed_fails: 1` + `cooldown_time: 30`, chosen explicitly per session.
+rule: The `deterministic` tier is the executor: it carries out a plan that a frontier or higher-benchmark model (`complex`, Claude, Codex) already designed, when what to do is settled and only doing it remains — it is not a tier for bit-identical output. It is served by the Omarchy desktop's `llama-server` (RTX 3090 Ti, Qwen3.8-27B at 4-bit, one slot with a 65,536-token context, Qwen's recommended sampling) and never falls back to another machine or model: while the desktop is off or booted into Windows, `deterministic` answers "unavailable". `llama-server` runs in router mode as a systemd user service with `--api-key`, exposed on the tailnet with one `tailscale serve` TCP port; every machine's LiteLLM lists it with `allowed_fails: 1` + `cooldown_time: 30` in its `model_info`.
 
 ## Problem
 
-09-24 の記録は deterministic を Mac の LM Studio に固定した。理由は、CUDA は一台でも出力が揺れる報告があること（llama.cpp #2838）と、Omarchy 機が Windows と切り替えて起動するので止まっていることが多いこと。持ち主は、帯域の大きい GPU（3090 Ti、約 1TB/s）で決定的な作業を動かし、Mac は遅くても大きいモデルに回したい。
+`deterministic` は、持ち主にとって「上位のモデルが設計したものを実行するモデル」だった。ところがリポジトリの記録は、それを「出力が再現する tier」（09-23 の `reproducible/offline`）や「JSON・分類・素直な編集の tier」（09-18 の選定メモ）と書き、09-24 の記録は再現性を理由に Mac の LM Studio へ固定した。持ち主は、帯域の大きい GPU（3090 Ti、約 1TB/s。Mac は M4 Pro で約 273GB/s）で実行役を速く回し、Mac は遅くても大きいモデルに回したい。
 
 ## Decision
 
-- **deterministic は Omarchy 機の llama-server が出す。** モデルは Qwen3.8-27B の 4bit（bartowski Q4_K_M、17.44GB）。温度 0、シード固定、同時処理 1。
-- **Mac へも別モデルへも fallback しない。** 機械をまたぐと Metal と CUDA で出力が変わり、どちらが答えたか分からない tier は再現性の意味を失う。Omarchy 機が止まっている間、deterministic は使えない（持ち主が受け入れた）。
-- **同じモデルを `agent-gpu` としても出す。** コーディングと日本語の文章用、通常のサンプリング。一つのモデルなので router の読み直しは起きない。
-- **MoE（Qwen3.6-35B-A3B）は置かない。** 3.8-27B の方が新しく（2026-08）、毎トークン 27B 分を使い、日本語の測定（Nejumi 4 で 0.81、二次情報）があるのは 3.8-27B だけ。速さは 3090 の 27B dense で 70〜90 tok/s（3.6-27B の実測）と足りる。
-- **再現するかは実機で測る。** 同じプロンプトを繰り返し投げて出力が一字一句同じかを数え、結果を記録に残す。揃わなければこの決定を見直す。
+- **deterministic は計画の実行役。** 何をするかは上位のモデル（`complex`、Claude、Codex）が決め、deterministic はそれを手順どおりに実行する。求めるのは、ツール呼び出しを崩さないこと、指示に従うこと、計画とコードが入る文脈、速さ。出力がビット単位で揃うことは求めない。
+- **Omarchy 機の llama-server が出す。** モデルは Qwen3.8-27B の 4bit（`bartowski/Qwen3.8-27B-GGUF` の `Qwen3.8-27B-Q4_K_M.gguf`、17.44GB）。文脈 65,536、KV は量子化しない（fp16 で約 4.2GB、合わせて約 22GB）。24GB ではこの文脈を一つのスロットにしか持てないので、同時処理は 1。サンプリングは Qwen の推奨値。
+- **Mac へも別モデルへも fallback しない。** 別のモデルが答えると、計画を実行する力が黙って変わる。Omarchy 機が止まっている間、deterministic は使えない（持ち主が受け入れた）。
+- **MoE（Qwen3.6-35B-A3B）は置かない。** 3.8-27B の方が新しく（2026-08）、毎トークン 27B 分を使う。速さは 3090 の 27B dense で 70〜90 tok/s（3.6-27B の実測）と足りる。
+- **Mac の LM Studio は LiteLLM から外す。** 何を置くか（遅くても大きいモデル）は、64GB に載る候補の調査のあとに持ち主が決める。
 
 ## Alternatives considered
 
-- **deterministic は Mac のまま、GPU は速さの用途だけ（09-24 の形）**: 持ち主が退けた。
-- **GPU 用に試験用の別名を足して併存**: 同じ役割の名前が二つになり、セッションでどちらを選ぶか決められない。却下。
-- **GPU を主、Mac を予備**: 機械をまたぐと再現性の意味がなくなり、よく止まる機械を主にすると LiteLLM #40405 を踏む。却下。
-- **Qwen3.6-35B-A3B（MoE）**: 速い（100〜133 tok/s）が、計算に使うのは 3B で、日本語の測定がない。却下。
+- **deterministic は Mac のまま（09-24 の形）**: 持ち主が退けた。Mac を選んだ理由（CUDA は出力が揺れる）は、実行役という定義では効かない。
+- **実行役とは別に GPU の名前（`agent-gpu` など）を足す**: 同じ役割の名前が二つになり、セッションでどちらを選ぶか決められない。却下。
+- **GPU を主、Mac を予備**: 別のモデルが黙って答え、よく止まる機械を主にすると LiteLLM #40405 を踏む。却下。
+- **Qwen3.6-35B-A3B（MoE）**: 速い（100〜133 tok/s）が、計算に使うのは 3B。持ち主が 3.8-27B を選んだ。
 - **gpt-oss-20b**: 軽いが、ツール呼び出しで `reasoning_content` をクライアントが送り返さないと壊れる（#27720 は「クライアント側の問題」としてクローズ）。却下。
+- **温度 0・キャッシュ無効で出力を揃える設定**: 実行役には要らない。思考つきのモデルを貪欲生成で回すとループしやすい。却下。
 
 ## Consequences
 
-- 持ち主の手作業（一度）: Omarchy 機を tailnet に参加させる。1Password の `op://llm-automation/llama-server/credential` を作る。役割ファイルに `model-provider` と NVIDIA ドライバの情報を書く。
-- Mac の LM Studio の役割（大きいモデルを別の名前で出すか、何を置くか）は、64GB に載る候補の調査の後に持ち主が決める。決まるまで Mac のモデルは LiteLLM に載らない。
-- 残る不具合: Qwen3.8-27B のエージェント用途で 1 日 2 回ほど長い生成が捨てられる（#27733、open）。qwen35 系の線形注意の状態がスロットの使い回しで漏れる報告（#29092、ROCm、CUDA では未報告）。CUDA 13.2 と Qwen3.6 系の組み合わせで出力が壊れる報告（aminrj.com）。llama.cpp は PR #19468（2026-02-10）より後のビルドが要る。
-- 「再現性」の実測はまだない。温度 0・同時処理 1 でも揺れるかは #2838 の条件次第。
+- 持ち主の手作業（一度）: Omarchy 機を tailnet に参加させる。1Password の `op://llm-automation/llama-server/credential` を作る。役割ファイルに `model-provider`、NVIDIA ドライバの情報、Omarchy 機の tailnet 名（`llamaServerHost`）を書く。
+- 残る不具合: Qwen3.8-27B のエージェント用途で 1 日 2 回ほど長い生成が捨てられる（#27733、open）。実行役の用途にそのまま当たるので、頻度を実機で見る。約 80K を超えると生成が約 25 倍遅くなる（#27623）ので文脈は 65,536 に抑える。KV を量子化すると不正メモリアクセスの報告がある（#21383、RTX 3090）。llama.cpp は PR #19468（2026-02-10）より後のビルドが要る。
+- harness の文脈の予算（`contextWindow`）は 65,536 になる。
 
 ## Sources
 
 - `rules/research/2026-09-26-omarchy-3090ti-model-choice.md`
-- `rules/research/2026-09-24-two-host-home-llm.md`
-- https://github.com/ggml-org/llama.cpp/issues/2838
+- `rules/research/2026-09-26-llama-server-determinism-cuda.md`
 - https://github.com/ggml-org/llama.cpp/issues/27733
+- https://github.com/ggml-org/llama.cpp/issues/27623
 - https://github.com/BerriAI/litellm/issues/40405

@@ -13,6 +13,9 @@ unverified:
 
 # llama-server（CUDA、qwen3_5）で出力を揃える
 
+> [!note]
+> 同日、持ち主が deterministic の定義を「上位のモデルが設計した計画を実行するモデル」と示した（`rules/decisions/2026-09-26-deterministic-on-the-gpu.md`）。出力をビット単位で揃えることはその tier の目的ではない。この記録は、ビット単位の一致が要る用途（評価の再現など）のための事実として残す。
+
 前提: `2026-09-24-two-host-home-llm.md` の 3.4 節（#2838 と #16016 だけを根拠にしていた）を、この記録で更新する。GitHub の issue・PR の本文とコメントは API で原文を取得した。
 
 ## ベンダー（llama.cpp、LiteLLM）
