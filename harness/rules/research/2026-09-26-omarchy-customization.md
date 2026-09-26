@@ -346,3 +346,14 @@ commit() {
 **問い4(キーバインド)**: `~/.config/hypr/bindings.lua` に `o.bind()`(新規)、`o.rebind()`(置換)、`hl.unbind()`(無効化のみ)を書く。全既定バインドの一括無効化は `hyprland.lua` で `require("default.hypr.omarchy")` より**前**に `omarchy_default_bindings = false` を置く(順序を間違えると効かない)。最大の落とし穴は `omarchy refresh hyprland` が `bindings.lua` を含む override ファイル全部を無条件でテンプレートへ戻すこと — アップデートそのものではなく、ユーザー自身がこのコマンドを叩く操作に対して無防備。
 
 **問い5(実践者と事故)**: 2026-09-24記録の実践者の型(typecraft-dev の二層、sspaeti の共有 stow リポジトリ、公式 Discussion での chezmoi 優勢)、および4件のオープンな issue(#5013/#11096/#9326/#10413、2026-09-26時点で全て未マージのまま)は変化なし。今回新たに実装コードで裏取りできたのは、**Q1 で紹介されている「dotfiles 向け」の `omarchy bar` コマンド群自体が、`shell.json` を symlink 管理している場合にそのリンクを破壊する**という具体的な矛盾で、これは manual の「Stow を勧める」ページと「dotfiles 向けにこのコマンドを使え」というページが、実装レベルでは両立しないことを意味する。dotfiles マネージャ(home-manager 含む)が Omarchy 上のこれらファイルを symlink で管理する設計を取るなら、**`shell.json` とバー設定は「symlink で管理しつつ `omarchy bar`/`omarchy plugin` コマンドは使わない」か「コマンドで運用しつつ symlink を諦める(copy + 差分検知)」のどちらかを選ぶ必要がある**、という設計上のトレードオフとして扱うべきである。
+
+## 追補: テーマ切替の post-hook と OMARCHY_PATH（同日、ソース直接確認）
+
+出典はすべて `omacom/omarchy@quattro`（`basecamp/omarchy` はここへリダイレクト、既定ブランチ `quattro`）の `bin/` と `default/`。
+
+- **`OMARCHY_PATH` の既定は `/usr/share/omarchy`**（`default/bash/env-bootstrap`）。`/etc/omarchy.conf`（`omarchy-dev-link` が書く開発モード）があるときだけ別の場所になる。本番のコマンドはパッケージから `/usr/bin/omarchy-*` に入る。上の本文で `~/.local/share/omarchy` と書いた推測は誤り。
+- **`omarchy-theme-set-pi` / `-claude`**: `--activate` なしで呼ばれる（`omarchy-theme-set` の post-hook はこの形）と、テーマファイルを `~/.pi/agent/themes/omarchy-system.json`・`~/.claude/themes/omarchy.json` へ mktemp+cp+mv で置くだけ。`settings.json` の `theme` を書くのは `--activate` のときだけ。jig が書く設定とは重ならない。
+- **`omarchy-theme-set-vscode`**: `code`・`code-insiders`・`codium`・`/usr/bin/cursor` のうち入っているものについて、`~/.config/<editor>/User/settings.json` の `workbench.colorTheme` を `sed -i --follow-symlinks` で書き換える（エディタごとに `omarchy-toggle-enabled skip-<editor>-theme-changes` で止められる）。
+- **`omarchy-theme-set-browser`**: Chromium 系のポリシーファイルにテーマ色を書き、動いているブラウザに `--refresh-platform-policy` を送る。拡張の External Extensions とは別のファイル。
+- **`omarchy-theme-set <name>`**: 名前は小文字化と空白→`-` で正規化（`"Tokyo Night"` も通る）。`$OMARCHY_PATH/themes/<name>` か `~/.config/omarchy/themes/<name>` を探し、無ければ `exit 1`。ユーザーのテーマは `.git` が無ければ `cp -r` でそのまま重ねる（シンボリックリンクはリンクのまま）。必須は `colors.toml` だけで、端末・nvim・btop などは `default/themed/*.tpl`（19 本）から生成される。
+- **壁紙**: テーマ切替時は `~/.config/omarchy/backgrounds/<theme>/` とテーマの `backgrounds/` を `find -L` で集めて選ぶ（リンク先を辿る）。手動の差し替えは `omarchy theme bg set <path>`（`~/.local/state/omarchy/current/background` へ `ln -nsf`）。
