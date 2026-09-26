@@ -7,7 +7,7 @@ domains/dev/config/jj home/shared/jj/config
 domains/dev/config/zed home/shared/zed/config
 domains/dev/config/capsule home/shared/capsule/config
 domains/dev/config/tailscale home/shared/tailscale/config
-domains/dev/config/herdr home/darwin/herdr/config
+domains/dev/config/herdr home/shared/herdr/config
 domains/workspace/config/aerospace home/darwin/aerospace/config
 domains/workspace/config/hammerspoon home/darwin/hammerspoon/config
 domains/workspace/config/omniwm home/darwin/omniwm/config

@@ -67,6 +67,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/zed
           ../home/shared/capsule
           ../home/shared/tailscale
+          ../home/shared/herdr
           ../home/darwin/herdr
           ../home/darwin/aerospace
           ../home/darwin/hammerspoon

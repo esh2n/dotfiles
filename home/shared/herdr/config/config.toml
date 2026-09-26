@@ -1,5 +1,5 @@
 # Docs: https://herdr.dev/docs/configuration/
-# Linked as ~/.config/herdr/config.toml by home/darwin/herdr.
+# Linked as ~/.config/herdr/config.toml by home/shared/herdr, on macOS and Linux.
 # Herdr's default keymap is already tmux-like; only the deltas from our setup follow.
 # Requires herdr >= 0.7.4 (popup panes, sidebar row layouts).
 
@@ -13,9 +13,9 @@ new_cwd = "follow"
 name = "catppuccin"
 
 [update]
-# The binary comes from Homebrew (see system/darwin/homebrew.nix), so
-# herdr must not offer to update itself — a self-update would drift from the
-# Cellar and get clobbered by the next `brew upgrade`. Bump via brew instead.
+# The binary comes from Nix on macOS (home/darwin/herdr) and from Omarchy's
+# own package on Linux, so herdr must not offer to update itself: a
+# self-update would drift from either and be undone by the next update.
 version_check = false
 
 # Desktop notification when an agent finishes or needs input.
@@ -97,7 +97,7 @@ height = "60%"
 [experimental]
 # Prefix chords stop registering while a Japanese IME is active, because the
 # IME swallows the keystroke. Bounce the macOS input source to ASCII for the
-# duration of prefix mode, then restore it.
+# duration of prefix mode, then restore it (macOS only; Linux ignores it).
 switch_ascii_input_source_in_prefix = true
 
 # Claude Code and Codex paint their own cursor, which hides the real one and

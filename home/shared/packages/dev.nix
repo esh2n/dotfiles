@@ -46,7 +46,6 @@
       pi-coding-agent
 
       # Terminal and git
-      herdr # needs >= 0.7.4 (home/shared/herdr); its self-update is off
       wtp # git worktrees (zsh functions)
       diffnav # git's diff pager
       ov # git's log pager

@@ -53,7 +53,7 @@ target() { # target <json> <path under ~>
 	for d in lazyvim nvchad astrovim custom; do
 		[ "$(target "$json" ".config/nvim-${d}")" = "${REPO_ROOT}/home/shared/nvim/${d}" ] || { echo ".config/nvim-${d}"; false; }
 	done
-	for name in jj zed wezterm capsule themes litellm tailscale sbx; do
+	for name in jj zed wezterm capsule themes litellm tailscale sbx herdr; do
 		got="$(target "$json" ".config/${name}")"
 		[[ "$got" == "${REPO_ROOT}/domains/"*"/config/${name}" || "$got" == "${REPO_ROOT}/home/shared/${name}/config" || "$got" == "${REPO_ROOT}/home/shared/theme/${name}" ]] || { echo ".config/${name}: ${got}"; false; }
 	done
@@ -61,7 +61,7 @@ target() { # target <json> <path under ~>
 	[ "$(target "$json" .config/ghostty/platform)" = "${REPO_ROOT}/home/linux/ghostty/platform" ]
 	# the colours are Omarchy's, included by the platform part
 	[ "$(target "$json" .config/ghostty/theme)" = "<missing>" ]
-	for name in ghostty herdr git aerospace sketchybar borders hammerspoon mado omniwm paneru lmstudio browsers; do
+	for name in ghostty git aerospace sketchybar borders hammerspoon mado omniwm paneru lmstudio browsers; do
 		[ "$(target "$json" ".config/${name}")" = "<missing>" ] || { echo ".config/${name} placed on linux"; false; }
 	done
 }

@@ -48,6 +48,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/linux/zsh
     ../home/shared/ghostty
     ../home/linux/ghostty
+    ../home/shared/herdr
     ../home/shared/jj
     ../home/shared/zed
     ../home/shared/capsule
