@@ -1,4 +1,4 @@
-package up
+package retire
 
 import (
 	"os"
@@ -6,6 +6,13 @@ import (
 	"strings"
 	"testing"
 )
+
+func must(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestCarryOverMovesLeftoversOnce(t *testing.T) {
 	repo := t.TempDir()

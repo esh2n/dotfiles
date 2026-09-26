@@ -1,7 +1,8 @@
-# Directories the next layout moved: "<old> <new>", from the checkout's root.
-# git moves the tracked files; `dotctl up` carries what stays behind (files
-# only this machine has: git's conditional includes, app state, rendered
-# files) from <old> to <new> (pkgs/dotctl/internal/up/carry.go).
+# Directories the old layout moved to: "<old> <new>", from the checkout's root.
+# git moves the tracked files; `dotctl retire-old-layout` (run once by
+# adopt-mac.sh) carries what stays behind (files only this machine has: git's
+# conditional includes, app state, rendered files) from <old> to <new>
+# (pkgs/dotctl/internal/retire). Leaves the repository with adopt-mac.sh.
 domains/dev/config/jj home/shared/jj/config
 domains/dev/config/zed home/shared/zed/config
 domains/dev/config/capsule home/shared/capsule/config

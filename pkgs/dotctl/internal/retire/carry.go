@@ -1,4 +1,4 @@
-package up
+package retire
 
 import (
 	"bufio"

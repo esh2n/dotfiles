@@ -5,7 +5,11 @@
 #   2. the cost ledger's DB password in 1Password (letters and digits: it goes
 #      into a URL), if there is none
 #   3. main fast-forwarded to the work branch in the checkout
-#   4. make up there
+#   4. the old layout taken off (dotctl retire-old-layout: the only code that
+#      knows it; make up does not)
+#   5. make up there
+# Once this Mac has moved, this script, lib/moved.txt and
+# pkgs/dotctl/internal/retire leave the repository.
 set -euo pipefail
 
 # the main checkout, whether this copy is run from it or from one of its worktrees
@@ -51,5 +55,7 @@ if ! git -C "${CHECKOUT}" merge-base --is-ancestor "${BRANCH}" main; then
 		{ say "the checkout ${CHECKOUT} is not on main; switch it to main first" >&2; exit 1; }
 	git -C "${CHECKOUT}" merge --ff-only "${BRANCH}"
 fi
+
+nix --extra-experimental-features 'nix-command flakes' run "${CHECKOUT}#dotctl" -- retire-old-layout --repo "${CHECKOUT}"
 
 make -C "${CHECKOUT}" up

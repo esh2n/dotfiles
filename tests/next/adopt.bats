@@ -17,6 +17,7 @@ setup() {
 	fake op 'case "$1 $2" in "item get") exit "${OP_MISSING:-0}" ;; esac'
 	fake git 'case "$*" in *"merge-base --is-ancestor"*) exit "${IN_MAIN:-1}" ;; *"rev-parse --abbrev-ref HEAD"*) echo main ;; esac'
 	fake make
+	fake nix
 }
 
 fake() {
@@ -62,12 +63,14 @@ adopt() { PATH="${BIN}:/usr/bin:/bin" DOTFILES_CHECKOUT="$CHECKOUT" bash "$SCRIP
 	! grep -q "op item create" "$LOG"
 }
 
-@test "adopt: fast-forwards main to the work branch in the checkout, then runs make up there" {
+@test "adopt: fast-forwards main, takes the old layout off, then runs make up there" {
 	run adopt
 	[ "$status" -eq 0 ]
 	grep -q "^git -C ${CHECKOUT} merge --ff-only work-2026-09-23" "$LOG"
+	grep -q "^nix .*run ${CHECKOUT}#dotctl -- retire-old-layout --repo ${CHECKOUT}$" "$LOG"
 	grep -qx "make -C ${CHECKOUT} up" "$LOG"
-	[ "$(grep -n 'merge --ff-only' "$LOG" | cut -d: -f1)" -lt "$(grep -n '^make' "$LOG" | cut -d: -f1)" ]
+	[ "$(grep -n 'merge --ff-only' "$LOG" | cut -d: -f1)" -lt "$(grep -n 'retire-old-layout' "$LOG" | cut -d: -f1)" ]
+	[ "$(grep -n 'retire-old-layout' "$LOG" | cut -d: -f1)" -lt "$(grep -n '^make' "$LOG" | cut -d: -f1)" ]
 }
 
 @test "adopt: a main that already has the work branch is not merged again" {
