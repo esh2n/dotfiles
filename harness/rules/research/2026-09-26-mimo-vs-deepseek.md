@@ -84,3 +84,21 @@ LiteLLM（https://docs.litellm.ai/docs/providers/xiaomi_mimo 、https://docs.lit
 | deterministic | Qwen3.8-27B（3090 Ti） | V2.6-Distill-Qwen-9B | llama.cpp でツール呼び出しが終わらない（#29319）。直るまで使わない |
 
 副次的な発見: DeepSeek には V4.1 Flash（知能指数 39、236 tok/s）がある。main の `deepseek-flash` が今どの版を指しているかは確かめていない。
+
+## 追補: X の一次情報（2026-09-27、fxtwitter で原文を確認）
+
+投稿は Web 検索で見つけ、本文は `https://api.fxtwitter.com/<user>/status/<id>` の `tweet.text` から取った。Artificial Analysis の MiMo-V2.6-Flash 単独のページは 404 で、独立機関はまだ Flash を測っていない。
+
+| 投稿 | 投稿者 | 日付 | 内容 | 測り方の記載 |
+|---|---|---|---|---|
+| https://x.com/Tech2Wild/status/2102215150203719903 | 個人のホームラボ（4,258） | 2026-09-22 | Flash を 2x DGX Spark・vLLM + DFlash（投機的デコード）で "88 tok/s single-stream on counting"、"206 on code"、"0.37s TTFT" | あり（ただし特殊な構成で、クラウドの数字とは比べられない） |
+| https://x.com/Tech2Wild/status/2102263581060309172 | 同 | 2026-09-22 | "this model can lock into repeating the same tool call inside one response until max_tokens. We saw single turns with 148 and 446 identical grep calls, and 44-minute turns of repeated bash checks"。OMP・DeepSeek Harness でも起きた。回避は `--generation-config auto` と `repetition_penalty 1.05` | あり |
+| https://x.com/CommandCodeAI/status/2102590815541600656 | Command Code（コーディングエージェント製品、24,594） | 2026-09-23 | 同じ課題で "DSV4.1-Flash: 9/10 · $0.024 · one-shot"、"Mimo-V2.6-Flash: 8/10 · $0.018 · playable 2D result in ~4 iterations" | あり（自社の課題、機械の記載なし） |
+| https://x.com/DogukanUrker/status/2102326190757323185 | 個人のホームラボ（1,457） | 2026-09-22 | 9B 蒸留版（Flash 本体ではない）を RTX 3060 12GB・Q5_K_M で "~47 tok/s decode, ~1600 tok/s prefill" | あり |
+| https://x.com/opencode/status/2102145730999730611 | OpenCode 公式 | 2026-09-21 | "MiMo V2.6 Flash is free for the next week" | なし |
+| https://x.com/XiaomiMiMo/status/2102138585491361942 | Xiaomi MiMo 公式 | 2026-09-21 | Pro-UltraSpeed が "up to 20× faster generation"（基準の記載なし） | なし |
+
+- Xiaomi・OpenRouter・OpenCode の公式の投稿は告知だけで、独自の測定はない。
+- ツール呼び出しを延々と繰り返す報告は、X の Tech2Wild のほか、MiMo-Code の issue に少なくとも 7 件（#914・#1181・#2436・#2496・#2497・#2509・#2527、要約経由）。経路（vLLM・OpenCode・MiMo Code Desktop）の違う場所で同時期に出ている。
+- 中国語のコミュニティ（知乎・Linux.do）に「Flash は名前ほど速くない」という趣旨の投稿があるが、原文に届かなかった（[unverified]）。
+- この追補で main / complex の判断は変わらない。むしろ切り替えを支持しない材料（ツール呼び出しの繰り返し）が増えた。
