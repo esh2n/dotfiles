@@ -702,10 +702,7 @@ const CASES: readonly Case[] = [
   //     the floor the way a raw mcp.call would ---
   {
     label: "serena replace_content on the guard policy is on the floor (bypass closed)",
-    call: mcpCall(
-      "mcp__serena__replace_content",
-      "harness/policy/guard-rules.json",
-    ),
+    call: mcpCall("mcp__serena__replace_content", "harness/policy/guard-rules.json"),
     profile: "minimal",
     expected: "deny",
   },
