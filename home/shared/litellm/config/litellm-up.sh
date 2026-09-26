@@ -126,6 +126,20 @@ if [ -z "$LLAMA_SERVER_API_KEY" ]; then
   LLAMA_SERVER_API_KEY="unset"
 fi
 export LLAMA_SERVER_API_KEY
+# Linux: the container cannot resolve a *.ts.net name itself — the host's
+# resolver is systemd-resolved's 127.0.0.53 stub, which Docker replaces with
+# public DNS. Resolve it here, on the host, and hand the container that one
+# name, leaving every other lookup as it was. (macOS: OrbStack's containers
+# already resolve through the Mac's own resolver, MagicDNS included.)
+HOST_ARGS=()
+if [ "$(uname -s)" = Linux ] && [ -n "$LLAMA_SERVER_HOST" ]; then
+  LLAMA_SERVER_IP="$(getent ahostsv4 "$LLAMA_SERVER_HOST" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
+  if [ -n "$LLAMA_SERVER_IP" ]; then
+    HOST_ARGS=(--add-host "${LLAMA_SERVER_HOST}:${LLAMA_SERVER_IP}")
+  else
+    echo "litellm-up: ${LLAMA_SERVER_HOST} does not resolve on this machine (Tailscale down?) — the deterministic tier will fail until it does" >&2
+  fi
+fi
 
 # 5) clear any stale container, then run in the FOREGROUND so launchd owns it.
 #    Non-secret values are inline; secrets are passed through from the env
@@ -141,7 +155,7 @@ export LLAMA_SERVER_API_KEY
 #    home/shared/tailscale/config/acl.hujson. Same decision record as step 4.
 METRICS_PORT=4001
 docker rm -f "$NAME" >/dev/null 2>&1 || true
-exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} \
+exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} ${HOST_ARGS[@]+"${HOST_ARGS[@]}"} \
   -p 127.0.0.1:4000:4000 \
   -p "127.0.0.1:${METRICS_PORT}:${METRICS_PORT}" \
   -v "$CFG_DIR/config.yaml":/app/config.yaml \

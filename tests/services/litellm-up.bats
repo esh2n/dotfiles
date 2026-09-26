@@ -93,3 +93,29 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	[[ "$stderr" == *"not in the docker group"* ]]
 	! grep -q "^docker run" "$LOG"
 }
+
+@test "litellm-up: deterministic goes to the desktop's llama-server, its key passed by name only" {
+	export LLAMA_SERVER_HOST=desktop.example.ts.net
+	run up
+	[ "$status" -eq 0 ]
+	grep -q "^docker run --rm .*-e LLAMA_SERVER_API_BASE=http://desktop.example.ts.net:8080/v1 -e LLAMA_SERVER_API_KEY " "$LOG"
+	! grep -q "^docker run --rm .*LLAMA_SERVER_API_KEY=" "$LOG"
+}
+
+@test "litellm-up: on linux the desktop's tailnet name is resolved on the host and handed to the container" {
+	export LLAMA_SERVER_HOST=desktop.example.ts.net
+	fake uname 'echo Linux'
+	fake secret-tool 'echo token'
+	fake getent 'echo "100.64.0.7      STREAM desktop.example.ts.net"'
+	run up
+	[ "$status" -eq 0 ]
+	grep -q "^docker run --rm .*--add-host desktop.example.ts.net:100.64.0.7 " "$LOG"
+}
+
+@test "litellm-up: without the desktop's name it still serves, and says deterministic will fail" {
+	unset LLAMA_SERVER_HOST
+	run --separate-stderr up
+	[ "$status" -eq 0 ]
+	grep -q "^docker run --rm --name litellm-proxy" "$LOG"
+	[[ "$stderr" == *'"llamaServerHost" is not in the roles file'* ]]
+}
