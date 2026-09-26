@@ -29,6 +29,7 @@ export interface SetupPaths {
 }
 
 export interface SetupPorts {
+  /** undefined when the file is not there; any other failure throws. */
   readText(path: string): Promise<string | undefined>;
   /** Creates the parent directory; replaces the file whole. */
   writeText(path: string, text: string): Promise<void>;
@@ -60,8 +61,10 @@ export async function setupHarness(
   ports: SetupPorts,
   targets: readonly SetupTarget[] = SETUP_TARGETS,
 ): Promise<number> {
-  if (targets.includes("dsh")) await setupDsh(paths, ports);
-  if (targets.includes("codex")) await seedCodexConfig(paths.root, ports);
+  if (targets.includes("dsh")) await step(ports, "DSH", () => setupDsh(paths, ports));
+  if (targets.includes("codex")) {
+    await step(ports, "codex's config.toml", () => seedCodexConfig(paths.root, ports));
+  }
   for (const target of targets) {
     if ((await ports.jig(["apply", "--target", target, "--write"])) !== 0) {
       ports.warn(`jig apply --target ${target} failed`);
@@ -73,6 +76,15 @@ export async function setupHarness(
     }
   }
   return 0;
+}
+
+/** Runs one step; a failure is a warning, and the next step still runs. */
+async function step(ports: SetupPorts, what: string, run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    ports.warn(`${what}: ${(error as Error).message}`);
+  }
 }
 
 async function setupDsh(paths: SetupPaths, ports: SetupPorts): Promise<void> {

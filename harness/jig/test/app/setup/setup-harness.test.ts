@@ -21,15 +21,20 @@ function fake(options: {
   dirs?: string[];
   tools?: string[];
   failing?: string[];
+  unreadable?: string[];
 }): Fake {
   const files = new Map(Object.entries(options.files ?? {}));
   const dirs = new Set(options.dirs ?? []);
   const tools = new Set(options.tools ?? ["bun", "pnpm", "codex"]);
   const failing = new Set(options.failing ?? []);
+  const unreadable = new Set(options.unreadable ?? []);
   const calls: string[] = [];
   const warnings: string[] = [];
   const ports: SetupPorts = {
-    readText: async (path) => files.get(path),
+    readText: async (path) => {
+      if (unreadable.has(path)) throw new Error(`EACCES: ${path}`);
+      return files.get(path);
+    },
     writeText: async (path, text) => {
       files.set(path, text);
     },
@@ -180,5 +185,19 @@ describe("setupHarness", () => {
     expect(await setupHarness(paths, f.ports, ["pi"])).toBe(0);
     expect(f.calls).toEqual(["jig apply --target pi --write"]);
     expect(f.files.has(`${CODEX}/config.toml`)).toBe(false);
+  });
+
+  test("an unreadable config.toml is never taken for a missing one", async () => {
+    const f = fake({
+      files: {
+        [`${CODEX}/config.toml.default`]: "seed = true\n",
+        [`${CODEX}/config.toml`]: "trust = 1\n",
+      },
+      unreadable: [`${CODEX}/config.toml`],
+    });
+    expect(await setupHarness(paths, f.ports)).toBe(0);
+    expect(f.files.get(`${CODEX}/config.toml`)).toBe("trust = 1\n");
+    expect(f.warnings.some((w) => w.startsWith("codex's config.toml: EACCES"))).toBe(true);
+    expect(f.calls).toContain("jig apply --target dsh --write");
   });
 });
