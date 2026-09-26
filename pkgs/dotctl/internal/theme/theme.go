@@ -48,6 +48,7 @@ type Env struct {
 	Start      func(cmd ...string) error // start and leave running
 	Has        func(cmd string) bool
 	Warn       func(msg string)
+	Sleep      func(time.Duration) // nil: time.Sleep
 }
 
 func (e Env) themeDir() string { return filepath.Join(e.Home, ".config", "theme") }
@@ -180,6 +181,9 @@ func reload(e Env) {
 	}
 	if has("borders") && e.Start != nil {
 		_ = e.Run("pkill", "-x", "borders") // not running is fine
+		if !waitGone(e, "borders", 2*time.Second) {
+			e.warn("borders: the old process did not exit within 2s; starting the new one anyway")
+		}
 		if err := e.Start(filepath.Join(e.Repo, "home/darwin/borders/config/bordersrc")); err != nil {
 			e.warn("borders: %v", err)
 		}
@@ -189,5 +193,25 @@ func reload(e Env) {
 	if _, err := os.Stat(wez); err == nil {
 		now := time.Now()
 		_ = os.Chtimes(wez, now, now)
+	}
+}
+
+// waitGone polls until no process is named name, for at most limit:
+// pkill returns once the signal is sent, not once the process has exited,
+// and a new borders started beside the old one fights it for the windows.
+func waitGone(e Env, name string, limit time.Duration) bool {
+	sleep := e.Sleep
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+	const step = 50 * time.Millisecond
+	for waited := time.Duration(0); ; waited += step {
+		if e.Run("pgrep", "-x", name) != nil {
+			return true
+		}
+		if waited >= limit {
+			return false
+		}
+		sleep(step)
 	}
 }
