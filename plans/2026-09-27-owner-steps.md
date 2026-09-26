@@ -55,7 +55,7 @@ op read op://llm-automation/llama-server/credential | wc -c
 
 ### A3. main を進めて GitHub に上げる
 
-何のため: Omarchy 機はこのリポジトリを GitHub から取ってくる。今、Mac の main は GitHub より 333 コミット進んでいて、私の作業はさらに 21 コミット先のブランチにある。push の前に、上げていない 349 コミットを gitleaks で確かめ、秘密情報は 0 件だった（リポジトリは公開）。
+何のため: Omarchy 機はこのリポジトリを GitHub から取ってくる。今、Mac の main は GitHub より 300 以上のコミット先にあり、私の作業はさらにその先のブランチ `work-2026-09-23` にある。リポジトリは公開なので、push していない全コミットを gitleaks で確かめ、秘密情報は 0 件だった（2026-09-27）。
 
 どこで: Mac のターミナル。
 
