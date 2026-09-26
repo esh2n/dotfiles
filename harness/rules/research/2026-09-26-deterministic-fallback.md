@@ -71,3 +71,7 @@ LM Studio（https://lmstudio.ai/docs/app/api/ttl-and-auto-evict ）: "By default
 - 黙ったフォールバックの最大の害は、弱いモデルに替わってツール呼び出しの中身が壊れること。フォールバック先を同じモデル（Qwen3.8-27B）にすればこの害は小さく、起きたことは応答ヘッダと Prometheus で見える。
 - Mac の Qwen3.8-27B は 4bit なら 11〜14 tok/s 程度の見込み（8bit は約 9）。MLX での実測はない。
 - 止まっている機械を要求の前に外すには `enable_health_check_routing` が要る。無ければ、止まった直後の要求が一度 `timeout` まで待たされる。ヘルスチェックは毎回本物の生成を走らせる。
+
+## 追補: Mac の MLX 4bit の実測（2026-09-27、手元の記録）
+
+`home/shared/litellm/config/bench/report.md`（このリポジトリの A/B、LM Studio、温度 0、runs 2）に、M4 Pro での `qwen/qwen3.8-27b@4bit` の実測がある: 平均 TTFT 1548 ms、平均 decode 15.0 tok/s、読み込み後の重み 16.08 GB、自動採点 10/10。上の「MLX での M4 Pro の実測は見つからない」はこれで埋まる。LM Studio の API はこの `qwen/qwen3.8-27b@4bit` という名前で答える。
