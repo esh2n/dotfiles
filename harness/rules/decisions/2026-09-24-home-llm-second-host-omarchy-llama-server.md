@@ -1,6 +1,6 @@
 # 家の LLM の二台目: Omarchy 機の llama-server を用途別の名前で載せ、deterministic は Mac に固定
 
-Status: accepted — 持ち主の裁定（2026-09-24、「はい良さそうなんですが」）。経緯: 「両方使えるといいね」→ 決定的なタスクは Mac、GPU 機では日本語の文章用や軽量 4bit などを動かしたい → 「Omarchy で動かしたい」→「vLLM では？」への比較調査のあとの提案に対して。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md` の「tailnet に出すモデルサーバーは Mac の LM Studio だけ」を、この記録で置き換える（それ以外の部分、LiteLLM は各機械でループバックのみ・一台一つ・計測の集め方は変えない）
+Status: superseded by 2026-09-26-deterministic-on-the-gpu.md（deterministic の置き場所を Omarchy 機へ移し、モデルを決めた。llama-server の router mode・用途名・fallback なし・allowed_fails と cooldown はそちらが引き継ぐ） — accepted — 持ち主の裁定（2026-09-24、「はい良さそうなんですが」）。経緯: 「両方使えるといいね」→ 決定的なタスクは Mac、GPU 機では日本語の文章用や軽量 4bit などを動かしたい → 「Omarchy で動かしたい」→「vLLM では？」への比較調査のあとの提案に対して。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md` の「tailnet に出すモデルサーバーは Mac の LM Studio だけ」を、この記録で置き換える（それ以外の部分、LiteLLM は各機械でループバックのみ・一台一つ・計測の集め方は変えない）
 
 rule: The `deterministic` tier stays on the Mac's LM Studio alone and is never routed to another machine. The Omarchy desktop (RTX 3090 Ti) serves additional local models with llama.cpp's `llama-server` in router mode, as a systemd user service with `--api-key`, exposed on the tailnet with one `tailscale serve` TCP port; every machine's LiteLLM lists those models under purpose names (e.g. Japanese prose, light 4-bit), chosen explicitly per session like any tier, with no fallback to another model and `allowed_fails: 1` + `cooldown_time: 30` so a powered-off desktop answers "unavailable" in about a second.
 
