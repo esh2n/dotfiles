@@ -65,3 +65,24 @@ has() { printf '%s' "$1" | python3 -c 'import json,sys; sys.exit(0 if sys.argv[1
 	has "$output" mas
 	! has "$output" gopls
 }
+
+brewlists() { # brewlists: casks and brews by name, as one JSON object
+	nix_eval_expr_json "let h = (builtins.getFlake \"git+file://${REPO_ROOT}\").darwinConfigurations.mac.config.homebrew; n = x: if builtins.isString x then x else x.name; in { brews = map n h.brews; casks = map n h.casks; mas = builtins.attrNames h.masApps; }"
+}
+
+@test "roles: Homebrew follows the roles too — Tailscale everywhere, the rest by role" {
+	printf '{"roles": []}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr brewlists
+	[ "$status" -eq 0 ]
+	[ "$output" = '{"brews":[],"casks":["tailscale-app"],"mas":[]}' ]
+
+	printf '{"roles": ["developer", "model-provider"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr brewlists
+	[[ "$output" == *'"golangci-lint"'* && "$output" == *'"ollama"'* && "$output" == *'"codex"'* && "$output" == *'"lm-studio"'* ]]
+	[[ "$output" != *'"cursor"'* && "$output" != *'"sketchybar"'* && "$output" != *'"font-fira-code"'* ]]
+
+	printf '{"roles": ["developer", "desk-user"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr brewlists
+	[[ "$output" == *'"cursor"'* && "$output" == *'"sketchybar"'* && "$output" == *'"font-hackgen-nerd"'* && "$output" == *'"Dropover"'* ]]
+	[[ "$output" != *'"lm-studio"'* ]]
+}

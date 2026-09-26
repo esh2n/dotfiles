@@ -67,6 +67,9 @@ boot() { PATH="${BIN}:/usr/bin:/bin" bash "${BOOT}" "$@"; }
 }
 
 @test "bootstrap: the taps dotctl up trusts, computed from the flake, are every tap the Mac uses" {
+	# Homebrew follows the roles: with every role on, every tap is in use
+	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
+	printf '{"roles": ["developer", "desk-user", "model-provider", "observer"]}\n' >"${DOTFILES_ROLES_FILE}"
 	expr="$(python3 -c 'import re,sys; print(re.search(r"const tapsExpr = `(.*?)`", open(sys.argv[1]).read(), re.S).group(1))' "${REPO_ROOT}/pkgs/dotctl/internal/up/up.go")"
 	local -a store=()
 	[[ -n "${DOTFILES_NIX_STORE:-}" ]] && store=(--store "${DOTFILES_NIX_STORE}")
