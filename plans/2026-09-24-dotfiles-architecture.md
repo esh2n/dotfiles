@@ -157,6 +157,8 @@ dotfiles/
 - **M5**: dotctl を作り、theme-switch と大きい shell を移す。テーマの仕組みを入れ替える。
 - **M6**: ハーネスを `harness/` へ、同居アプリを `projects/` か repo の外へ移す（どちらも別の決定）。
 
+進み具合（2026-09-26）: M0・M1・M3・M5 は済み、`next/` はリポジトリの根元へ上げた。M4 は jig-decision・LiteLLM・台帳まで済み、llama-server は Omarchy の役割待ち。M2 は Omarchy 実機での `make up` が未実施。M6 はハーネスを `harness/` に移し、dopa-shorts は別リポジトリへ出した。残りは `harness-apply.sh` を jig へ移すこと。
+
 ## 10. やらないこと
 
 snowfall-lib・std・ez-configs・digga のような枠組み、dendritic を背骨にすること（本家に darwin の実例なし）、独自の DI 名前空間、NixOS の VM テスト、WASM、chezmoi、Ansible、自作 CLI の Rust 化と Bun の単一バイナリ化。
