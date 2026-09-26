@@ -60,14 +60,14 @@ dotfiles/
 │   ├── shared/               #   両 OS
 │   │   ├── zsh/              #     default.nix、zshenv、zshrc、functions/（シェルでしかできない関数）
 │   │   ├── nvim/             #     default.nix、lazyvim/、nvchad/、astronvim/、custom/
-│   │   ├── git/ tmux/ zellij/ ghostty/ wezterm/ starship/ mise/ jj/ herdr/ serena/ …
+│   │   ├── git/ zellij/ ghostty/ wezterm/ starship/ mise/ jj/ herdr/ browsers/ serena/ …
 │   │   ├── packages/         #     cli.nix、lsp.nix
 │   │   ├── services/         #     litellm/、jig-decision/、observability/（それぞれ default.nix と設定・compose・起動スクリプト）
 │   │   ├── secrets/          #     起動時の op run、トークンの置き場
 │   │   ├── theme/            #     default.nix（仕組み）と palettes/<name>/（テーマの断片）
 │   │   └── harness/          #     default.nix: harness/ を ~/.claude などへ jig で届ける配線
 │   ├── darwin/               #   Mac だけ: aerospace/、sketchybar/、borders/、hammerspoon/、lmstudio-awake/、vscode/ …
-│   └── linux/                #   Omarchy だけ: omarchy/（触らない領域の宣言）、pacman/、llama-server/
+│   └── linux/                #   Omarchy だけ: ghostty/（platform）、browsers/（Chromium の拡張）、omarchy-shell/（bar）、zsh/、llama-server/
 │
 ├── pkgs/                     # 自分でビルドするもの（ryan4yin・Misterio77 の pkgs/）
 │   ├── dotctl/               #   自作 CLI（一つのバイナリにサブコマンド）と default.nix
@@ -117,7 +117,8 @@ dotfiles/
 
 - ツール自身の登録コマンド、書き換え可能な場所へのダウンロード、一度だけ置いてあとはアプリが持つ設定ファイルは、宣言にできない。`lib/mk-setup.nix` の `dotfiles.setup.<名前>` に一行の宣言として書き、activation の linkGeneration の後に走らせる。失敗は警告だけで、switch は止めない（旧 installer と同じ約束）。
 - 中身は `dotctl setup <step>`（旧 `domains/dev/install.sh` と `core/install/installer.sh` の手順を一つずつのサブコマンドに。`pkgs/dotctl/internal/setup`）と `dotctl llm setup`（旧 `home_llm()`、確認は `dotctl llm check`。どの部分を動かすかは機械の役割で決める。以前は LM Studio.app があるかで決めていた）。userstyle は、中身が移るまでドメインのスクリプトをそのまま呼ぶ。
-- 宣言する場所は機能のモジュール（`home/shared/{nvim,git,gh,mise,zellij,cargo-tools,harness,zsh}`、`home/darwin/{tmux,apps,codebase-memory,browsers,sketchybar}`、`home/shared/home-llm`）。Linux に無いのは tmux（Omarchy が持つ）、Warp、Codebase-Memory、ブラウザ、SbarLua。
+- 宣言する場所は機能のモジュール（`home/shared/{nvim,git,gh,mise,zellij,cargo-tools,harness,zsh,browsers}`、`home/darwin/{apps,codebase-memory,sketchybar}`、`home/linux/omarchy-shell`、`home/shared/home-llm`）。Mac だけなのは Warp、OrbStack、SbarLua。Linux だけなのは Omarchy の bar（`omarchy bar` の一覧 `home/linux/omarchy-shell/bar` を流す）。
+- **変えました（2026-09-26）**: tmux は設定ごと外した（tpm の手順も）。ブラウザの拡張一覧と userstyle は両 OS で共有し、Linux では Omarchy の Chromium に external extensions として置く（ブラウザ本体は入れない）。`~/.config/nvim` が実ディレクトリ（Omarchy の LazyVim）なら `.pre-dotfiles` に退避してから lazyvim へ向ける。
 - `bootstrap.sh` が持つのは switch の前にしかできないこと: Homebrew を入れる、flake が宣言するサードパーティの tap を信頼させる（手で保つ一覧は廃止）、nix-darwin を初めて入れる Mac の `/etc/{bashrc,zshrc}` を退避する。switch の後にログインシェルを zsh に（`/etc/shells` に無ければ手順を示すだけ）。
 - 移さなかったもの: `brew unlink ollama`（Nix と Homebrew の両方に ollama があった移行期の回避策。今は Homebrew だけ）、node2nix（今の系でも配線されていない。M0 で消す）、事前・事後の検査（bootstrap が理由を出して止まる）、NvChad などの clone（中身はリポジトリにあり、リンクで届く）。
 
@@ -135,9 +136,10 @@ dotfiles/
 
 - `~/.config/theme/palettes/<名前>/<ファイル>` を home-manager がテーマごとに宣言する（リポジトリのテーマファイルへのリンク）。アプリのファイルが無いテーマ（明るい版）は同じ系統のもの（catppuccin-latte → catppuccin）、無ければ catppuccin を借りる。アプリが存在しないファイルを読むことはない。
 - `~/.config/theme/current` はどれか一つの palettes へのリンク。動かすのは `dotctl theme set <名前>`（旧名 `theme-switch <名前>` でも動く）だけ。
-- 読み込み（include）に対応したアプリ（system の colors.lua、ghostty、tmux、sketchybar、borders）は、それぞれの読み口のリンクが `current/<ファイル>` を通る。`dotctl theme init` が activation のたびに張る（旧 theme-switch が選んでいたテーマは引き継ぐ）。
-- 読み込みに対応しないアプリ（Warp、starship、VS Code・Cursor、Neovim 4 種、zellij、壁紙、Stylus、シェル環境、delta、tmux-pane-border、Orca）は値を書き換える。書き出す中身は旧 theme-switch と一致することを確かめたうえで、`pkgs/dotctl/internal/theme/golden_test.go`（作った配色を入力にした正解ファイル）で固定し、本物のテーマは `themes_test.go` が必要な色・対応表・アプリごとのファイル（無ければ同じ系統）の揃いを確かめる。
+- 読み込み（include）に対応したアプリ（system の colors.lua、ghostty、sketchybar、borders）は、それぞれの読み口のリンクが `current/<ファイル>` を通る。`dotctl theme init` が activation のたびに張る（旧 theme-switch が選んでいたテーマは引き継ぐ）。
+- 読み込みに対応しないアプリ（Warp、starship、VS Code・Cursor、Neovim 4 種、zellij、壁紙、Stylus、シェル環境、delta、Orca）は値を書き換える。書き出す中身は旧 theme-switch と一致することを確かめたうえで、`pkgs/dotctl/internal/theme/golden_test.go`（作った配色を入力にした正解ファイル）で固定し、本物のテーマは `themes_test.go` が必要な色・対応表・アプリごとのファイル（無ければ同じ系統）の揃いを確かめる。
 - zellij は、make up のたびにテンプレートから描き直されて配置が戻る不具合があった。`theme init` が毎回いまのテーマに戻す。home-manager のリンクを実ファイルで上書きしない。
+- **Omarchy（2026-09-26）**: デスクトップ・端末・Chromium・VS Code の色は Omarchy のテーマが持つ。`dotctl theme set` は `current` を動かしたうえで `omarchy theme set <名前>` を呼び、VS Code と壁紙には触らない。Omarchy に同じ系統があるテーマ（8 件、rosepine → rose-pine、tokyonight → tokyo-night）は Omarchy のものをそのまま使い、無い 5 件（dracula・onedark・solarized・everforest-light・tokyonight-day）はパレットから `~/.config/omarchy/themes/<名前>/colors.toml` を書く。壁紙はそのテーマの `backgrounds/` に、リポジトリの壁紙か、無ければ同じ系統の Omarchy の壁紙へのリンクを置く。ghostty は共通の `config` と OS ごとの `platform` に分け、Linux の platform は Omarchy の現在のテーマを読む。`dotctl wallpaper set` は Linux では `omarchy theme bg set`。
 - 旧 theme-switch の不具合は移さなかった: userstyle 再生成スクリプトの名前違い（毎回何もしていなかった）、存在しない rosepine-dawn の対応表。
 
 ## 8. テストと CI
@@ -157,7 +159,7 @@ dotfiles/
 - **M5**: dotctl を作り、theme-switch と大きい shell を移す。テーマの仕組みを入れ替える。
 - **M6**: ハーネスを `harness/` へ、同居アプリを `projects/` か repo の外へ移す（どちらも別の決定）。
 
-進み具合（2026-09-26）: M0・M1・M3・M5 は済み、`next/` はリポジトリの根元へ上げた。M4 は jig-decision・LiteLLM・台帳まで済み、llama-server は Omarchy の役割待ち。M2 は Omarchy 実機での `make up` が未実施。M6 はハーネスを `harness/` に移し、dopa-shorts は別リポジトリへ出した。`harness-apply.sh` は `jig setup` になった（2026-09-26）。
+進み具合（2026-09-26）: M0・M1・M3・M5 は済み、Omarchy 側の配線（ghostty・herdr・ブラウザ・bar・テーマ・壁紙）も入った、`next/` はリポジトリの根元へ上げた。M4 は jig-decision・LiteLLM・台帳まで済み、llama-server は Omarchy の役割待ち。M2 は Omarchy 実機での `make up` が未実施。M6 はハーネスを `harness/` に移し、dopa-shorts は別リポジトリへ出した。`harness-apply.sh` は `jig setup` になった（2026-09-26）。
 
 ## 10. やらないこと
 
