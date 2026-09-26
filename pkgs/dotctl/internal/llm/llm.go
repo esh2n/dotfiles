@@ -182,7 +182,7 @@ type tailnetStatus struct {
 		DNSName, HostName string
 		TailscaleIPs      []string
 	}
-	Peer         map[string]struct {
+	Peer map[string]struct {
 		HostName, OS string
 	}
 }
