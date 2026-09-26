@@ -45,6 +45,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/home-llm
     ../home/shared/llm-ledger
     ../home/linux/llama-server
+    ../home/linux/zsh
     ../home/shared/jj
     ../home/shared/zed
     ../home/shared/capsule

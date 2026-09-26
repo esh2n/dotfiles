@@ -24,6 +24,8 @@ func helpFor(command string) string {
 		return wallpaperUsage
 	case "setup":
 		return setupUsage()
+	case "service":
+		return serviceUsage
 	default:
 		return usage
 	}

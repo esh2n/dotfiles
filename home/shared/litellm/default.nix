@@ -4,4 +4,5 @@
 { config, ... }:
 {
   xdg.configFile.litellm.source = config.lib.dotfiles.link "home/shared/litellm/config";
+  dotfiles.zsh.snippets.litellm = "home/shared/litellm/litellm.zsh";
 }

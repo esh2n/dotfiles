@@ -5,7 +5,6 @@
 # Editors
 alias vim='nvim'
 alias vi='vim'
-alias cursor='open -a "Cursor"'
 
 # File operations (eza)
 alias ls="eza --icons"
@@ -162,7 +161,6 @@ alias de='deno'
 alias gcp='gcloud'
 
 # Architecture
-alias intel="arch -x86_64"
 
 # Utilities
 alias curl_header='curl -D - -s -o /dev/null'
@@ -174,7 +172,6 @@ alias cat='bat --style=plain --paging=never'
 alias less='bat --style=plain'
 
 # Mac
-alias disp='open "x-apple.systempreferences:com.apple.Displays-Settings.extension"'
 
 # Jujutsu (jj) — mirrors git aliases with j prefix
 alias j='jj'

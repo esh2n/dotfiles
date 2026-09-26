@@ -2,4 +2,5 @@
 { config, ... }:
 {
   xdg.configFile.mado.source = config.lib.dotfiles.link "home/darwin/mado/config";
+  dotfiles.zsh.snippets.mado = "home/darwin/mado/mado.zsh";
 }

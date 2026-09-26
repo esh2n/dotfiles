@@ -7,7 +7,6 @@ plugins {
 }
 mouse_mode true
 pane_frames false
-copy_command "pbcopy"
 
 keybinds {
     normal clear-defaults=true {

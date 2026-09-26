@@ -2,4 +2,5 @@
 { config, ... }:
 {
   xdg.configFile.borders.source = config.lib.dotfiles.link "home/darwin/borders/config";
+  dotfiles.zsh.snippets.borders = "home/darwin/borders/borders.zsh";
 }

@@ -19,9 +19,15 @@ export DOTFILES_ROOT
 #    function: typeset in a fragment must stay global). brew.zsh maps
 #    $OSTYPE to Darwin/Linux for the fragments after it.
 for __rc in helpers.zsh aliases.sh options.zsh utils.zsh functions.zsh \
-    integrations.zsh aliases.zsh keybindings.zsh editors.zsh \
-    brew.zsh sketchybar.zsh services.zsh; do
+    integrations.zsh aliases.zsh keybindings.zsh editors.zsh brew.zsh; do
     source "${DOTFILES_ROOT}/home/shared/zsh/rc/${__rc}"
+done
+unset __rc
+
+# 3b. The fragments feature modules add on this machine (home/shared/zsh's
+#     snippets): a module's own, and only on the platforms that import it
+for __rc in "${XDG_CONFIG_HOME:-$HOME/.config}"/zsh/conf.d/*.zsh(N); do
+    source "$__rc"
 done
 unset __rc
 

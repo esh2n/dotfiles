@@ -5,4 +5,5 @@
 {
   xdg.configFile.sketchybar.source = config.lib.dotfiles.link "home/darwin/sketchybar/config";
   dotfiles.setup.sbarlua.command = config.lib.dotfiles.setupStep "sbarlua";
+  dotfiles.zsh.snippets.sketchybar = "home/darwin/sketchybar/sketchybar.zsh";
 }

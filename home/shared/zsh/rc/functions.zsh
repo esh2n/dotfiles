@@ -1224,19 +1224,6 @@ function jwt() {
 # Utilities
 # -----------------------------------------------------------------------------
 
-# Toggle Zen Mode (Hide UI elements)
-function toggle_zen_mode() {
-  if pgrep -x "sketchybar" >/dev/null; then
-    run_with_spinner "Stopping Sketchybar" brew services stop sketchybar
-    run_with_spinner "Stopping Borders" brew services stop borders
-    log_info "🧘 Zen Mode: ON"
-  else
-    run_with_spinner "Starting Sketchybar" brew services start sketchybar
-    run_with_spinner "Starting Borders" brew services start borders
-    log_info "🖥️ Zen Mode: OFF"
-  fi
-}
-
 # GCloud Switcher
 function gx() {
   local config=$(gcloud config configurations list | sk --ansi --reverse --height '50%' | awk '{print $1}')
@@ -2810,26 +2797,7 @@ pi() {
     LITELLM_API_KEY="$key" "$pi_bin" "$@"
 }
 
-# litellm-restart — restart the local LiteLLM proxy (launchd-managed Docker
-# container) after a config or key change. Uses the modern launchctl service
-# API (kickstart -k), the same one `brew services restart` uses, not the
-# retired load/unload -w. Run this after rotating the proxy key — the running
-# container holds the OLD key until it is restarted.
-litellm-restart() {
-    local label="com.esh2n.litellm-proxy"
-    launchctl kickstart -k "gui/$(id -u)/${label}" || {
-        echo "\033[31mfailed to kickstart ${label} — is it loaded? (launchctl print gui/$(id -u)/${label})\033[0m" >&2
-        return 1
-    }
-    echo "restarting ${label}…"
-    local i
-    for i in $(seq 1 20); do
-        sleep 2
-        if curl -fs -o /dev/null "http://127.0.0.1:4000/health" 2>/dev/null; then
-            echo "\033[32mproxy healthy at http://127.0.0.1:4000\033[0m"
-            return 0
-        fi
-    done
-    echo "\033[33mproxy did not report healthy within ~40s — check ~/Library/Logs/litellm-proxy.log\033[0m" >&2
-    return 1
-}
+# mdview — a Markdown file or folder in the browser, GFM and mermaid, reloaded
+# on save (mdts through npx: nothing to install; research:
+# harness/rules/research/2026-09-26-markdown-preview.md)
+mdview() { npx --yes mdts "$@"; }

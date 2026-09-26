@@ -33,6 +33,7 @@ commands:
   mado [use|stop|status|list|layout|info]  switch the macOS window-manager profile (also: mado)
   theme [--repo DIR] list|current|init|set <name>
                                          switch the colour theme (one link, then reloads)
+  service restart <name> [--health URL] restart a resident service (launchd or systemd --user)
   retire-old-layout [--repo DIR]         take the old layout (domains/, core/, next/) off this Mac, once
                                          (adopt-mac.sh runs it; leaves with it)
   cache-gc [--force] [--dry-run] [--quiet] [--touch REPO]
@@ -113,6 +114,8 @@ func run(args []string, out, errOut io.Writer) int {
 		return runTheme(home, args[1:], out, errOut)
 	case "cache-gc":
 		return runCacheGC(home, args[1:], nil, out, errOut)
+	case "service":
+		return runService(args[1:], out, errOut)
 	case "retire-old-layout":
 		return runRetire(home, args[1:], out, errOut)
 	case "help", "-h", "--help":

@@ -19,15 +19,8 @@ alias ghl='cd $(ghq root)/$(find $(ghq root)/*/*/* -type d -prune | sed -e "s#"$
 alias vv='sk_edit_file'
 
 # Utilities
-alias zen='toggle_zen_mode'
-alias x64='exec arch -x86_64 "$SHELL"'
-alias a64='exec arch -arm64e "$SHELL"'
 
 # jj with Fuzzy Finder (skim-based interactive selection)
 alias jbd_sk='sk_select_jj_bookmark | xargs -t jj bookmark delete'
 alias jbm_sk='sk_select_jj_bookmark | xargs -I {} -t jj bookmark move --to @ {}'
 
-# Compatibility
-if [[ "$(uname)" == "Darwin" ]]; then
-  alias date='gdate'
-fi
