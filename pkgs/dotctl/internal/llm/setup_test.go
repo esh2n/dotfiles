@@ -1,6 +1,9 @@
 package llm
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -173,22 +176,77 @@ func TestSetupLeavesLiteLLMAloneWithoutTheOpToken(t *testing.T) {
 	}
 }
 
-func TestSetupPassesTheLMStudioMachineToLiteLLM(t *testing.T) {
-	w := newWorld(t, "darwin", Offer{})
-	w.env.Getenv = func(k string) string {
-		if k == "LM_STUDIO_REMOTE_HOST" {
-			return "mac.example.ts.net"
+func TestSetupFetchesTheListedModelsOnceAndChecksTheirHash(t *testing.T) {
+	w := newWorld(t, "linux", Offer{GPU: true})
+	body := []byte("gguf bytes")
+	sum := sha256.Sum256(body)
+	list := fmt.Sprintf(`{"models": [{"file": "m.gguf", "url": "https://example.test/m.gguf", "size": %d, "sha256": %q}]}`, len(body), hex.EncodeToString(sum[:]))
+	write(t, filepath.Join(w.env.Repo, "home", "linux", "llama-server", "models.json"), list)
+	part := filepath.Join(w.env.Home, "models", "m.gguf.part")
+	w.sys.onExec = func(line string) (bool, error) {
+		if strings.HasPrefix(line, "curl ") {
+			return true, os.WriteFile(part, body, 0o644)
 		}
-		return ""
+		return false, nil
 	}
-	todo := Setup(w.env, nil)
-	if !w.sys.ran("launchctl setenv LM_STUDIO_REMOTE_HOST mac.example.ts.net") || contains(todo, "name the machine serving LM Studio") {
-		t.Fatalf("todo %v calls %v", todo, w.sys.calls)
-	}
-	w = newWorld(t, "linux", Offer{})
-	w.env.Getenv = func(string) string { return "" }
-	if todo = Setup(w.env, nil); !contains(todo, "name the machine serving LM Studio") {
+	if todo := Setup(w.env, nil); contains(todo, "llama-server model") {
 		t.Fatalf("todo %v", todo)
+	}
+	if got, err := os.ReadFile(filepath.Join(w.env.Home, "models", "m.gguf")); err != nil || string(got) != string(body) {
+		t.Fatalf("model not in place: %q %v", got, err)
+	}
+	if !w.sys.ran("curl -fL --retry 3 -C - -o " + part + " https://example.test/m.gguf") {
+		t.Fatalf("calls %v", w.sys.calls)
+	}
+	w.sys.calls = nil
+	Setup(w.env, nil)
+	if w.sys.ran("curl ") {
+		t.Fatal("a model of the listed size is fetched again")
+	}
+}
+
+func TestSetupRemovesADownloadWhoseHashDiffers(t *testing.T) {
+	w := newWorld(t, "linux", Offer{GPU: true})
+	write(t, filepath.Join(w.env.Repo, "home", "linux", "llama-server", "models.json"),
+		`{"models": [{"file": "m.gguf", "url": "https://example.test/m.gguf", "size": 5, "sha256": "`+strings.Repeat("0", 64)+`"}]}`)
+	part := filepath.Join(w.env.Home, "models", "m.gguf.part")
+	w.sys.onExec = func(line string) (bool, error) {
+		if strings.HasPrefix(line, "curl ") {
+			return true, os.WriteFile(part, []byte("wrong"), 0o644)
+		}
+		return false, nil
+	}
+	if todo := Setup(w.env, nil); !contains(todo, "the download was removed") {
+		t.Fatalf("todo %v", todo)
+	}
+	if _, err := os.Stat(part); !os.IsNotExist(err) {
+		t.Fatal("a download with the wrong hash is kept")
+	}
+	if _, err := os.Stat(filepath.Join(w.env.Home, "models", "m.gguf")); !os.IsNotExist(err) {
+		t.Fatal("a download with the wrong hash is put in place")
+	}
+}
+
+func TestModelListRejectsWhatIsNotAPinnedGGUF(t *testing.T) {
+	dir := t.TempDir()
+	for _, bad := range []string{
+		`{"models": [{"file": "../x.gguf", "url": "https://h/x", "size": 1, "sha256": "` + strings.Repeat("a", 64) + `"}]}`,
+		`{"models": [{"file": "x.bin", "url": "https://h/x", "size": 1, "sha256": "` + strings.Repeat("a", 64) + `"}]}`,
+		`{"models": [{"file": "x.gguf", "url": "http://h/x", "size": 1, "sha256": "` + strings.Repeat("a", 64) + `"}]}`,
+		`{"models": [{"file": "x.gguf", "url": "https://h/x", "size": 1, "sha256": "short"}]}`,
+	} {
+		p := filepath.Join(dir, "models.json")
+		write(t, p, bad)
+		if _, err := readModelList(p); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+}
+
+func TestTheRepositorysModelListIsValid(t *testing.T) {
+	list, err := readModelList(filepath.Join("..", "..", "..", "..", "home", "linux", "llama-server", "models.json"))
+	if err != nil || len(list) == 0 {
+		t.Fatalf("%v %v", list, err)
 	}
 }
 
@@ -223,5 +281,15 @@ func TestSetupReportsFailedRestartsAndLedgerTable(t *testing.T) {
 	w.sys.fail["launchctl"] = true
 	if todo = Setup(w.env, nil); !contains(todo, "launchctl bootstrap failed") {
 		t.Fatalf("todo %v", todo)
+	}
+}
+
+func write(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

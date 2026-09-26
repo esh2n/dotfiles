@@ -1,0 +1,11 @@
+{
+  "_comment": "The GGUF files llama-server serves (router mode, --models-dir): `dotctl llm setup` fetches each one missing from ~/models, pinned to a revision and checked against its sha256 (the Hugging Face LFS oid). The request's model id is the file name without .gguf. Decision: rules/decisions/2026-09-26-deterministic-on-the-gpu.md.",
+  "models": [
+    {
+      "file": "Qwen3.8-27B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen3.8-27B-GGUF/resolve/0c92138c51f112d2f0dc84d5f6d1ebe4b9912b9a/Qwen3.8-27B-Q4_K_M.gguf",
+      "size": 17442399968,
+      "sha256": "880a52af8317974f7b4b064a6bc29ff49e188b91aa218e08eea3078b6b1cc673"
+    }
+  ]
+}

@@ -49,7 +49,6 @@ func TestCheckAllPassOnAHealthyObserver(t *testing.T) {
 		"PASS LM Studio :1234 lists: qwen nomic",
 		"PASS LiteLLM :4000 tiers: complex deterministic main",
 		`PASS tier deterministic: "pong  [local-qwen]"`,
-		"PASS LM Studio loaded context: qwen: loaded=32768 max=262144",
 		"PASS omp lists the proxy tiers: complex deterministic main",
 		"PASS LiteLLM :4001 metrics listener healthy (2 litellm_* series)",
 		"PASS Prometheus scrapes litellm: up http://host:4000/metrics/",
@@ -90,7 +89,6 @@ func TestCheckCountsEveryFailure(t *testing.T) {
 		"FAIL LM Studio :1234 does not answer",
 		"FAIL LiteLLM master key unresolved",
 		"FAIL LiteLLM :4000 /v1/models does not answer",
-		"FAIL LM Studio: no model loaded",
 		"FAIL jig decision service :4100 not answering",
 		"FAIL LiteLLM :4001 metrics listener not answering",
 		"FAIL Prometheus :9090 not answering",
@@ -102,7 +100,7 @@ func TestCheckCountsEveryFailure(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
 	}
-	if fails != 10 || !strings.Contains(out, "home-llm check: 10 FAIL") {
+	if fails != 9 || !strings.Contains(out, "home-llm check: 9 FAIL") {
 		t.Fatalf("fails %d:\n%s", fails, out)
 	}
 }
@@ -129,18 +127,6 @@ func TestCheckPartialAnswersFail(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
-	}
-}
-
-func TestLoadedContextReadsTheV1Shape(t *testing.T) {
-	if got := loadedContext([]byte(`{"models": [{"key": "k", "loaded_instances": [{"config": {}}]}]}`)); len(got) != 1 || got[0] != "k: loaded=? max=?" {
-		t.Fatalf("got %v", got)
-	}
-	if got := loadedContext([]byte(`{"data": [{"id": "x", "state": "loaded"}]}`)); len(got) != 0 {
-		t.Fatalf("the v0 shape is not the v1 one: %v", got)
-	}
-	if loadedContext([]byte("nope")) != nil {
-		t.Fatal("bad json")
 	}
 }
 

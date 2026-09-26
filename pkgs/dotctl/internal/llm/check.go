@@ -61,19 +61,14 @@ func Check(e Env, c *Checker, withComplex bool) int {
 	}
 	checkTiers(e, c, key)
 	if key != "" {
-		// deterministic on a machine without LM Studio is the round trip that
-		// matters most there: its own LiteLLM → the Mac's LM Studio over the
-		// tailnet (litellm-up.sh's LM_STUDIO_REMOTE_HOST).
+		// deterministic is the round trip across the tailnet: this machine's
+		// LiteLLM → the desktop's llama-server (the roles file's
+		// "llamaServerHost"); it fails while the desktop is off.
 		ask(e, c, key, "deterministic")
 		ask(e, c, key, "main")
 		if withComplex {
 			ask(e, c, key, "complex")
 		}
-	}
-	// After the deterministic completion on purpose: LM Studio loads a model
-	// just in time on the first request and unloads it after its idle TTL.
-	if e.Offer.LMStudio {
-		checkLoadedContext(e, c)
 	}
 	checkOmp(e, c, key)
 	if e.answers(e.URLs.Decision + "/health") {
@@ -208,57 +203,6 @@ func clip(s string, n int) string {
 		return s
 	}
 	return s[:n]
-}
-
-// loadedContext lists "key: loaded=N max=M" for every model instance LM
-// Studio has in memory, from its v1 REST API (GET /api/v1/models, LM Studio
-// 0.4+: https://lmstudio.ai/docs/developer/rest/list). A model is loaded when
-// its loaded_instances is not empty; each instance carries the context
-// length it was loaded with. The v0 API's model list documents no loaded
-// context length, which is why the old check never found one.
-func loadedContext(body []byte) []string {
-	var doc struct {
-		Models []struct {
-			Key              string `json:"key"`
-			MaxContextLength *int   `json:"max_context_length"`
-			LoadedInstances  []struct {
-				ID     string `json:"id"`
-				Config struct {
-					ContextLength *int `json:"context_length"`
-				} `json:"config"`
-			} `json:"loaded_instances"`
-		} `json:"models"`
-	}
-	if json.Unmarshal(body, &doc) != nil {
-		return nil
-	}
-	var out []string
-	for _, m := range doc.Models {
-		for _, in := range m.LoadedInstances {
-			name := in.ID
-			if name == "" {
-				name = m.Key
-			}
-			out = append(out, fmt.Sprintf("%s: loaded=%s max=%s", name, intOr(in.Config.ContextLength), intOr(m.MaxContextLength)))
-		}
-	}
-	return out
-}
-
-func intOr(p *int) string {
-	if p == nil {
-		return "?"
-	}
-	return fmt.Sprint(*p)
-}
-
-func checkLoadedContext(e Env, c *Checker) {
-	body, _ := e.get(e.URLs.LMStudio+"/api/v1/models", 5*time.Second)
-	if loaded := loadedContext(body); len(loaded) > 0 {
-		c.pass("LM Studio loaded context: %s", strings.Join(loaded, "; "))
-	} else {
-		c.fail("LM Studio: no model loaded even after the deterministic completion (JIT load failed, or LM Studio older than 0.4 has no /api/v1/models)")
-	}
 }
 
 // proxyModels collects the ids of every object with provider "proxy".

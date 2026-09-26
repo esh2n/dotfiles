@@ -17,7 +17,8 @@ import (
 // failures are one more to-do.
 //
 //	LMStudio: LM Studio's server, tailscale serve 1234
-//	GPU     : tailscale serve 8080 (llama-server, Linux)
+//	GPU     : tailscale serve 8080 (llama-server, Linux) and the models it
+//	          serves (home/linux/llama-server/models.json into ~/models)
 //	Console : Prometheus + Grafana + Open WebUI, the cost ledger's table,
 //	          tailscale serve https 3001 and tcp 5432 (the ledger); without
 //	          it, tailscale serve 4001 so the console can scrape this
@@ -33,6 +34,9 @@ func Setup(e Env, check func(Env) int) []string {
 	serveTailnet(e, add)
 	if e.Offer.LMStudio {
 		lmStudio(e, add)
+	}
+	if e.Offer.GPU {
+		fetchModels(e, add)
 	}
 	restartLiteLLM(e, add)
 	if e.Offer.Console {
@@ -109,22 +113,12 @@ func restartLiteLLM(e Env, add func(string, ...any)) {
 		add("LiteLLM: store the 1Password service-account token once (home/shared/litellm/config/secrets.sh names the command for this OS), then make up")
 		return
 	}
-	remote := e.Getenv("LM_STUDIO_REMOTE_HOST")
 	if e.Sys.OS() == "darwin" {
-		if !e.Offer.LMStudio && remote != "" {
-			_, _, _ = e.run(10*time.Second, "launchctl", "setenv", "LM_STUDIO_REMOTE_HOST", remote)
-		}
 		reloadLaunchd(e, add)
 	} else {
-		if !e.Offer.LMStudio && remote != "" {
-			_, _, _ = e.run(10*time.Second, "systemctl", "--user", "set-environment", "LM_STUDIO_REMOTE_HOST="+remote)
-		}
 		if _, errOut, err := e.run(60*time.Second, "systemctl", "--user", "restart", "litellm-proxy.service"); err != nil {
 			add("LiteLLM: systemctl --user restart litellm-proxy failed: %s", errOut)
 		}
-	}
-	if !e.Offer.LMStudio && remote == "" {
-		add("LiteLLM: name the machine serving LM Studio once — LM_STUDIO_REMOTE_HOST=<mac.tailnet.ts.net> make up")
 	}
 	for _, url := range []string{e.URLs.LiteLLM + "/health/liveliness", e.URLs.Metrics + "/metrics"} {
 		if e.waitFor(url) {
