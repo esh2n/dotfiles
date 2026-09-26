@@ -106,7 +106,7 @@ func (e Env) withDefaults() Env {
 
 // litellm is the checkout's LiteLLM directory (config, scripts, stacks).
 func (e Env) litellm(parts ...string) string {
-	return filepath.Join(append([]string{e.Repo, "domains", "dev", "config", "litellm"}, parts...)...)
+	return filepath.Join(append([]string{e.Repo, "home", "shared", "litellm", "config"}, parts...)...)
 }
 
 // run runs a command silently with a timeout.

@@ -152,3 +152,22 @@ func TestOfferName(t *testing.T) {
 		t.Fatal("helpers")
 	}
 }
+
+// The scripts dotctl llm runs live in the checkout; a path that moved without
+// this helper following it fails here, not on a machine.
+func TestLitellmScriptsExistInTheCheckout(t *testing.T) {
+	repo, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := Env{Repo: repo}
+	for _, path := range []string{
+		env.litellm("proxy-key.sh"),
+		env.litellm("observability", "start.sh"),
+		env.litellm("observability", "docker-compose.yml"),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("dotctl llm expects %s: %v", path, err)
+		}
+	}
+}
