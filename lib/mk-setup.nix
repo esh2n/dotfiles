@@ -19,14 +19,15 @@
 let
   enabled = lib.filterAttrs (_: s: s.enable) config.dotfiles.setup;
   # Activation runs with a PATH of its own; a step drives the user's tools
-  # (installed by Nix, mise, cargo, Homebrew, the system), so it sees them
-  # after activation's own.
+  # (installed by Nix, mise, cargo, Homebrew, Omarchy, the system), so it
+  # sees them after activation's own.
   userPath = lib.concatStringsSep ":" [
     "/etc/profiles/per-user/${facts.username}/bin"
     "${facts.home}/.nix-profile/bin"
     "${facts.home}/.local/share/mise/shims"
     "${facts.home}/.cargo/bin"
     "${facts.home}/.local/bin"
+    "${facts.home}/.local/share/omarchy/bin"
     "/opt/homebrew/bin"
     "/usr/local/bin"
     "/usr/bin"

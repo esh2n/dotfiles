@@ -231,6 +231,28 @@ func TestNvimDefaultLeavesAnotherLinkAlone(t *testing.T) {
 	}
 }
 
+func TestOmarchyBarRunsEachLineAndWarnsOnARefusal(t *testing.T) {
+	w := newWorld(t, "omarchy")
+	write(t, filepath.Join(w.repo, "home", "linux", "omarchy-shell", "bar"), "# comment\n\nposition bottom\ntransparent toggle\n")
+	w.sys.fail["omarchy bar position bottom"] = errors.New("exit status 1")
+	if err := Run(w.env, "omarchy-bar"); err != nil {
+		t.Fatal(err)
+	}
+	if !w.sys.ran("omarchy bar position bottom") || !w.sys.ran("omarchy bar transparent toggle") {
+		t.Fatalf("calls: %v", w.sys.calls)
+	}
+	if !strings.Contains(w.out.String(), "[WARN]") {
+		t.Fatalf("a refusal must warn: %q", w.out.String())
+	}
+}
+
+func TestOmarchyBarDoesNothingWithoutOmarchy(t *testing.T) {
+	w := newWorld(t)
+	if err := Run(w.env, "omarchy-bar"); err != nil || len(w.sys.calls) != 0 {
+		t.Fatalf("%v %v", err, w.sys.calls)
+	}
+}
+
 func TestGhExtensionsInstallsOnlyMissing(t *testing.T) {
 	w := newWorld(t, "gh")
 	if err := Run(w.env, "gh-extensions"); err != nil || !w.sys.ran("gh extension install orangain/gh-pr-graph") {

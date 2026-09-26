@@ -49,6 +49,7 @@ var steps = map[string]step{
 	"git-lfs":         gitLFS,
 	"mise-trust":      miseTrust,
 	"nvim-default":    nvimDefault,
+	"omarchy-bar":     omarchyBar,
 	"orbstack":        orbstack,
 	"pacifica":        pacifica,
 	"pi-packages":     piPackages,
@@ -265,6 +266,30 @@ func userstyles(e Env) error {
 		return nil
 	}
 	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "home", "shared", "browsers", "userstyles", "scripts", "generate-userstyle.sh"), "all")
+}
+
+// omarchyBar runs each line of home/linux/omarchy-shell/bar as `omarchy bar
+// <line>`. No omarchy: not an Omarchy machine, nothing to do. A refused
+// command warns and the rest still run.
+func omarchyBar(e Env) error {
+	if !e.Sys.Has("omarchy") {
+		return nil
+	}
+	list := filepath.Join(e.Repo, "home", "linux", "omarchy-shell", "bar")
+	body, err := os.ReadFile(list)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(body), "\n") {
+		args := strings.Fields(line)
+		if len(args) == 0 || strings.HasPrefix(args[0], "#") {
+			continue
+		}
+		if err := e.quiet(time.Minute, "omarchy", append([]string{"bar"}, args...)...); err != nil {
+			e.UI.Warn("%v", err)
+		}
+	}
+	return nil
 }
 
 // OrbStack starts at login. `app.start_at_login` is not in OrbStack's
