@@ -125,8 +125,8 @@ func TestMissingToolSkipsWithAWarning(t *testing.T) {
 		if err := Run(w.env, name); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if len(w.sys.calls) != 0 || !strings.Contains(w.err.String(), "is not installed; skipped") {
-			t.Fatalf("%s: calls %v, stderr %q", name, w.sys.calls, w.err.String())
+		if len(w.sys.calls) != 0 || !strings.Contains(w.out.String(), "is not installed; skipped") {
+			t.Fatalf("%s: calls %v, out %q", name, w.sys.calls, w.out.String())
 		}
 	}
 }
@@ -230,8 +230,8 @@ func TestPiPackagesInstallsWhatSettingsLacksAndWarnsOnFailure(t *testing.T) {
 	if w.sys.ran("pi install npm:pi-mcp-adapter") || !w.sys.ran("pi install npm:@tintinweb/pi-subagents") {
 		t.Fatalf("calls %v", w.sys.calls)
 	}
-	if !strings.Contains(w.err.String(), "pi install npm:@tintinweb/pi-subagents") {
-		t.Fatalf("stderr %q", w.err.String())
+	if !strings.Contains(w.out.String(), "pi install npm:@tintinweb/pi-subagents") {
+		t.Fatalf("out %q", w.out.String())
 	}
 }
 
@@ -254,8 +254,8 @@ func TestWarpSeedCopiesOnce(t *testing.T) {
 func TestGitIdentityFromEnvironmentOrDotEnv(t *testing.T) {
 	w := newWorld(t)
 	out := filepath.Join(w.home, ".config", "git", "config.local")
-	if err := Run(w.env, "git-identity"); err != nil || !strings.Contains(w.err.String(), "GIT_USER_EMAIL") {
-		t.Fatalf("no values: %v %q", err, w.err.String())
+	if err := Run(w.env, "git-identity"); err != nil || !strings.Contains(w.out.String(), "GIT_USER_EMAIL") {
+		t.Fatalf("no values: %v %q", err, w.out.String())
 	}
 	if _, err := os.Stat(out); err == nil {
 		t.Fatal("wrote an identity from nothing")
@@ -294,8 +294,8 @@ func TestZellijPluginsDownloadsMissingAndWarnsOnFailure(t *testing.T) {
 	if len(w.sys.calls) != 1 || !strings.Contains(w.sys.calls[0], "monocle/releases/latest/download/monocle.wasm") {
 		t.Fatalf("calls %v", w.sys.calls)
 	}
-	if !strings.Contains(w.err.String(), "download of monocle.wasm failed") {
-		t.Fatalf("stderr %q", w.err.String())
+	if !strings.Contains(w.out.String(), "download of monocle.wasm failed") {
+		t.Fatalf("out %q", w.out.String())
 	}
 }
 

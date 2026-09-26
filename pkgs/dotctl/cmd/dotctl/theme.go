@@ -8,12 +8,13 @@ import (
 	"os/exec"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/theme"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
 // defaultTheme is used when nothing has been chosen on this machine yet.
 const defaultTheme = "catppuccin"
 
-func themeEnv(home, repo string, errOut io.Writer) theme.Env {
+func themeEnv(home, repo string, p ui.Printer) theme.Env {
 	return theme.Env{
 		Home: home,
 		Repo: repo,
@@ -30,7 +31,7 @@ func themeEnv(home, repo string, errOut io.Writer) theme.Env {
 			return c.Process.Release()
 		},
 		Has:  func(cmd string) bool { _, err := exec.LookPath(cmd); return err == nil },
-		Warn: func(msg string) { fmt.Fprintln(errOut, "dotctl theme: warning:", msg) },
+		Warn: func(msg string) { p.Warn("%s", msg) },
 	}
 }
 
@@ -51,9 +52,10 @@ func runTheme(home string, args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "dotctl theme: the checkout is unknown; pass --repo or set DOTFILES_ROOT")
 		return 2
 	}
-	e := themeEnv(home, *repo, errOut)
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "theme"}
+	e := themeEnv(home, *repo, p)
 	fail := func(err error) int {
-		fmt.Fprintln(errOut, "dotctl theme:", err)
+		p.Error("%v", err)
 		return 1
 	}
 	switch {
@@ -84,7 +86,7 @@ func runTheme(home string, args []string, out, errOut io.Writer) int {
 		if err := theme.Set(e, rest[1]); err != nil {
 			return fail(err)
 		}
-		fmt.Fprintln(out, "theme:", rest[1])
+		p.Success("%s", rest[1])
 	default:
 		fmt.Fprint(errOut, usage)
 		return 2

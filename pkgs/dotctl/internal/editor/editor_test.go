@@ -59,8 +59,8 @@ func TestInstallIntoEachPresentEditor(t *testing.T) {
 	if !strings.Contains(out.String(), "VS Code: 1 installed, 1 failed; 3 extensions in all") {
 		t.Fatalf("out %q", out.String())
 	}
-	if !strings.Contains(errOut.String(), "bad.ext failed") || !strings.Contains(errOut.String(), "Cursor is not installed") {
-		t.Fatalf("stderr %q", errOut.String())
+	if !strings.Contains(out.String(), "bad.ext failed") || !strings.Contains(out.String(), "Cursor is not installed") {
+		t.Fatalf("out %q", out.String())
 	}
 	if err := Install(f, ui.Printer{}, t.TempDir()); err == nil {
 		t.Fatal("a missing list is not an error")

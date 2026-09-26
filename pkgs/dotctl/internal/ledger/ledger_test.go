@@ -124,7 +124,7 @@ func TestNothingToDoAndBadInputs(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(c.StateDir, "shipped"), []byte("'; DROP TABLE x; --"), 0o644)
 	f = &fakePsql{}
 	var warn bytes.Buffer
-	_ = Once(f, ui.Printer{Err: &warn}, c)
+	_ = Once(f, ui.Printer{Out: &warn}, c)
 	if strings.Contains(strings.Join(f.calls[0].Args, " "), "DROP") || !strings.Contains(warn.String(), "not a timestamp") {
 		t.Fatalf("a bad watermark reached SQL: %v", f.calls[0].Args)
 	}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/setup"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/sys"
@@ -20,7 +19,7 @@ func runSetup(home string, args []string, out, errOut io.Writer) int {
 	fs.SetOutput(errOut)
 	repo := fs.String("repo", os.Getenv("DOTFILES_ROOT"), "the checkout (default $DOTFILES_ROOT)")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 1 {
-		fmt.Fprintf(errOut, "usage: dotctl setup [--repo DIR] <step>\nsteps: %s\n", strings.Join(setup.Names(), ", "))
+		fmt.Fprint(errOut, setupUsage())
 		return 2
 	}
 	if *repo == "" {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/nvim"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
 const usage = `usage: dotctl <command> [args]
@@ -81,6 +82,10 @@ func run(args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "dotctl:", err)
 		return 1
 	}
+	if len(args) > 1 && isHelp(args[1]) {
+		fmt.Fprint(out, helpFor(args[0]))
+		return 0
+	}
 	switch args[0] {
 	case "nvim":
 		return runNvim(home, args[1:], out, errOut)
@@ -123,24 +128,26 @@ func runNvim(home string, args []string, out, errOut io.Writer) int {
 		fmt.Fprint(errOut, usage)
 		return 2
 	}
+	p := ui.Printer{Out: out, Err: errOut}
 	switch args[0] {
 	case "current":
-		fmt.Fprintln(out, nvim.Current(home))
+		p.Note("Current: %s", nvim.Current(home))
 	case "list":
 		cur := nvim.Current(home)
+		p.Note("Available configurations:")
 		for _, d := range nvim.Distributions {
-			mark := "  "
 			if d == cur {
-				mark = "* "
+				p.Note("* %s (active)", d)
+			} else {
+				p.Note("  %s", d)
 			}
-			fmt.Fprintln(out, mark+d)
 		}
 	default:
 		if err := nvim.Switch(home, args[0], time.Now()); err != nil {
-			fmt.Fprintln(errOut, "dotctl nvim:", err)
+			p.With("nvim").Error("%v", err)
 			return 1
 		}
-		fmt.Fprintln(out, "switched to nvim-"+args[0])
+		p.With("nvim").Success("switched to nvim-%s", args[0])
 	}
 	return 0
 }

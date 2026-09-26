@@ -28,11 +28,34 @@ func TestRunDispatch(t *testing.T) {
 	}
 	out.Reset()
 	run([]string{"nvim", "list"}, &out, &errOut)
-	if !strings.Contains(out.String(), "* lazyvim") {
+	if !strings.Contains(out.String(), "Available configurations:\n") || !strings.Contains(out.String(), "* lazyvim (active)") {
 		t.Fatalf("list did not mark lazyvim active: %q", out.String())
+	}
+	out.Reset()
+	run([]string{"nvim", "current"}, &out, &errOut)
+	if out.String() != "Current: lazyvim\n" {
+		t.Fatalf("current: %q", out.String())
 	}
 	if code := run([]string{"nvim", "emacs"}, &out, &errOut); code != 1 {
 		t.Fatalf("nvim emacs: exit %d, want 1", code)
+	}
+}
+
+// Asking any command for help is a success: the usage on stdout, exit 0.
+func TestHelpIsASuccessEverywhere(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	for _, args := range [][]string{
+		{"help"}, {"--help"}, {"wallpaper", "help"}, {"wallpaper", "-h"}, {"llm", "--help"},
+		{"setup", "help"}, {"theme", "-h"}, {"mado", "help"}, {"gh", "--help"}, {"cache-gc", "-h"},
+	} {
+		var out, errOut bytes.Buffer
+		if code := run(args, &out, &errOut); code != 0 || !strings.Contains(out.String(), "usage") && !strings.Contains(out.String(), "mado") || errOut.Len() != 0 {
+			t.Errorf("%v: exit %d, stdout %q, stderr %q", args, code, out.String(), errOut.String())
+		}
+	}
+	var out, errOut bytes.Buffer
+	if run([]string{"wallpaper", "--help"}, &out, &errOut); !strings.Contains(out.String(), "dotctl wallpaper") {
+		t.Fatalf("wallpaper help is not the wallpaper usage: %q", out.String())
 	}
 }
 

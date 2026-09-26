@@ -8,6 +8,7 @@ import (
 	"os/exec"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/sys"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/up"
 )
 
@@ -25,6 +26,7 @@ func runUp(home string, args []string, out, errOut io.Writer) int {
 	}
 	// facts.nix reads the checkout from DOTFILES_ROOT during evaluation
 	_ = os.Setenv("DOTFILES_ROOT", *repo)
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "up"}
 	c := up.Config{
 		Home:      home,
 		Repo:      *repo,
@@ -32,11 +34,11 @@ func runUp(home string, args []string, out, errOut io.Writer) int {
 		Shell:     os.Getenv("SHELL"),
 		RolesFile: os.Getenv("DOTFILES_ROLES_FILE"),
 		FindZsh:   func() string { p, _ := exec.LookPath("zsh"); return p },
-		Log:       func(s string) { fmt.Fprintln(out, "up:", s) },
-		Warn:      func(s string) { fmt.Fprintln(errOut, "up: warning:", s) },
+		Log:       func(s string) { p.Note("%s", s) },
+		Warn:      func(s string) { p.Warn("%s", s) },
 	}
 	if err := up.Run(sys.OS{}, c); err != nil {
-		fmt.Fprintln(errOut, "up:", err)
+		p.Error("%v", err)
 		return 1
 	}
 	return 0
