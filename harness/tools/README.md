@@ -15,4 +15,4 @@ never by a path relative to the skill
 | `writeup-kit/` | The writeup design kit: CLIs (`bin/`), CSS and template (`kit/`), vendored elk + lindera (`vendor/`), tests; nothing to install | `writeup`, `show-me`, `eli5`, `grilling` (skill docs stay in `harness/skills/writeup-kit/`) |
 
 The dopa-shorts Remotion project moved out of the dotfiles to its own
-repository, `~/go/github.com/esh2n/dopa-shorts`.
+repository, cloned beside the dotfiles checkout (`$DOTFILES_ROOT/../dopa-shorts`).

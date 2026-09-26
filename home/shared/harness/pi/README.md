@@ -108,30 +108,29 @@ newer release yet. Roll back if either shows up:
 npm install -g @earendil-works/pi-coding-agent@0.84.4
 ```
 
-Config linking is managed by the dotfiles link machinery, not by hand
-(`link_pi_resources()` in `core/config/manager.sh`, invoked by the standard
-link flow — same mechanism as omp). One command, idempotent:
+Config linking is home-manager's (`home/shared/harness/default.nix`), not by
+hand. One command, idempotent, from the checkout:
 
 ```sh
-bash "$HOME/go/github.com/esh2n/dotfiles/core/config/manager.sh" link dev
+make up
 ```
 
-It links `settings.json` / `models.json` / `AGENTS.md` and each
-`extensions/*.ts` file-by-file into `~/.pi/agent/` (never the directory —
-your own `~/.pi/agent/extensions/*.ts` and `pi install`ed extensions stay
-untouched), and sweeps dangling links that point into this repo's pi dir.
-Regression suite: `core/validation/validator.sh pi-links`.
+It links `settings.json` / `models.json` and each `extensions/*.ts` and
+`themes/*.json` file-by-file into `~/.pi/agent/` (never the directory — your
+own `~/.pi/agent/extensions/*.ts` and `pi install`ed extensions stay
+untouched); `jig setup` then writes `~/.pi/agent/AGENTS.md`. Regression
+suite: `tests/next/links-harness.bats`.
 
 <details>
 <summary>Manual fallback (environments without the dotfiles link machinery)</summary>
 
 ```sh
-PI_SRC="$HOME/go/github.com/esh2n/dotfiles/home/shared/harness/pi"
+PI_SRC="$DOTFILES_ROOT/home/shared/harness/pi"
 mkdir -p ~/.pi/agent/extensions
 ln -sf "$PI_SRC/settings.json" ~/.pi/agent/settings.json
 ln -sf "$PI_SRC/models.json"   ~/.pi/agent/models.json
-ln -sf "$PI_SRC/AGENTS.md"     ~/.pi/agent/AGENTS.md
 for f in "$PI_SRC"/extensions/*.ts; do ln -sf "$f" ~/.pi/agent/extensions/"$(basename "$f")"; done
+jig apply --target pi --write   # writes ~/.pi/agent/AGENTS.md
 ```
 
 </details>

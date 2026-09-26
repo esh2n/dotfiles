@@ -8,9 +8,9 @@ name: next
 on:
   push:
     branches: [main]
-    paths: ["**/*.nix", "flake.lock", "home/**", "lib/**", "roles/**", "system/**", "pkgs/**", "overlays/**", "harness/**", "tests/**", "bootstrap.sh", ".github/workflows/next.yaml"]
+    paths: ["**/*.nix", "flake.lock", "home/**", "lib/**", "roles/**", "system/**", "pkgs/**", "overlays/**", "harness/**", "tests/**", "bootstrap.sh", "adopt-mac.sh", "Makefile", ".env.example", "**/*.md", ".github/workflows/next.yaml"]
   pull_request:
-    paths: ["**/*.nix", "flake.lock", "home/**", "lib/**", "roles/**", "system/**", "pkgs/**", "overlays/**", "harness/**", "tests/**", "bootstrap.sh", ".github/workflows/next.yaml"]
+    paths: ["**/*.nix", "flake.lock", "home/**", "lib/**", "roles/**", "system/**", "pkgs/**", "overlays/**", "harness/**", "tests/**", "bootstrap.sh", "adopt-mac.sh", "Makefile", ".env.example", "**/*.md", ".github/workflows/next.yaml"]
   workflow_dispatch:
 
 permissions:
@@ -100,7 +100,7 @@ jobs:
       - name: nix fmt (nixfmt over the flake)
         run: nix fmt -- --ci
       - name: tests (platform-neutral and Linux)
-        run: bash tests/run.sh tests/next/facts.bats tests/next/layers.bats tests/next/linux.bats tests/next/bootstrap.bats tests/pkgs tests/services
+        run: bash tests/run.sh tests/repo tests/next/facts.bats tests/next/layers.bats tests/next/linux.bats tests/next/bootstrap.bats tests/pkgs tests/services
       - name: build homeConfigurations.linux
         env:
           DOTFILES_ROOT: ${{ github.workspace }}

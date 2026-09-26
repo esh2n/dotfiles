@@ -109,7 +109,7 @@ The widget checks `OPENWEATHER_API_KEY` env var first, then looks for `.env` in:
 
 For Lua-based configs (WezTerm), set `DOTFILES_ROOT` in your shell config:
 ```bash
-export DOTFILES_ROOT="$HOME/go/github.com/esh2n/dotfiles/dotfiles"
+export DOTFILES_ROOT="/path/to/your/checkout" # the directory that holds flake.nix
 ```
 
 ## Included Tools
