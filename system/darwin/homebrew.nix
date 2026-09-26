@@ -2,17 +2,21 @@
 # that need a system extension, a self-updater or a signed installer, and
 # App Store apps. CLI tools that nixpkgs has live in home/*/packages instead.
 #
-# What is installed follows the machine's roles, as the Nix packages do:
-# developer gets the development formulae and CLI casks, desk-user the GUI
-# apps, fonts and App Store apps (GUI development apps need both),
-# model-provider the local model runners; every machine gets the taps and
-# Tailscale. cleanup stays "none", so dropping a role never uninstalls.
+# By kind, as the Nix packages are; the roles turn the kinds on
+# (roles/system.nix): dev is the development formulae and CLI casks, desktop
+# the GUI apps, fonts and App Store apps (GUI development apps need both),
+# models the local model runners; the taps and Tailscale are on every Mac.
+# cleanup stays "none", so turning a kind off never uninstalls.
 { config, lib, ... }:
 let
-  on = role: config.dotfiles.roles.${role}.enable;
+  on = kind: config.dotfiles.homebrew.${kind}.enable;
 in
 {
-  homebrew = {
+  options.dotfiles.homebrew = lib.genAttrs [ "dev" "desktop" "models" ] (kind: {
+    enable = lib.mkEnableOption "the ${kind} Homebrew formulae and casks";
+  });
+
+  config.homebrew = {
     enable = true;
     onActivation = {
       autoUpdate = true;
@@ -30,7 +34,7 @@ in
     ];
 
     brews =
-      lib.optionals (on "developer") [
+      lib.optionals (on "dev") [
         "thefuck"
         "staticcheck"
         "golangci-lint"
@@ -46,11 +50,11 @@ in
         "herdr" # not in nixpkgs
         "hunk" # not in nixpkgs
       ]
-      ++ lib.optionals (on "model-provider") [
+      ++ lib.optionals (on "models") [
         "ollama"
       ]
       # window management and the bar
-      ++ lib.optionals (on "desk-user") [
+      ++ lib.optionals (on "desktop") [
         "sketchybar"
         "borders"
         "karinushka/paneru/paneru"
@@ -77,7 +81,7 @@ in
         # own login item, so no launchd job is needed.
         "tailscale-app"
       ]
-      ++ lib.optionals (on "developer") [
+      ++ lib.optionals (on "dev") [
         # codex ships as a cask only — there is no `codex` formula, so listing it
         # under brews made `brew bundle` fail and left the install unmanaged.
         # Minimum 0.147.0 (the hooks.json `[hooks.state]` trust-hash format
@@ -90,7 +94,7 @@ in
         "docker/tap/sbx"
       ]
       # GUI development apps
-      ++ lib.optionals (on "developer" && on "desk-user") [
+      ++ lib.optionals (on "dev" && on "desktop") [
         "android-studio"
         "warp"
         "cursor"
@@ -100,7 +104,7 @@ in
         # The app self-updates on the stable channel regardless of brew pinning.
         "stablyai/orca/orca"
       ]
-      ++ lib.optionals (on "model-provider") [
+      ++ lib.optionals (on "models") [
         # LM Studio (https://formulae.brew.sh/cask/lm-studio — installs
         # "LM Studio.app" only; the `lms` CLI is bootstrapped by the app into
         # ~/.lmstudio/bin/lms on first launch). Cask because it is the desktop
@@ -111,7 +115,7 @@ in
         # is home/darwin/lmstudio/config/ (launchd + caffeinate).
         "lm-studio"
       ]
-      ++ lib.optionals (on "desk-user") [
+      ++ lib.optionals (on "desktop") [
         "discord"
         # Grok Bot (x.ai/bot, signed+built by Anysphere) — AI teammates desktop
         # app. Cask lives in homebrew-cask core; the app self-updates. First
@@ -153,7 +157,7 @@ in
         "1password"
       ];
 
-    masApps = lib.optionalAttrs (on "desk-user") {
+    masApps = lib.optionalAttrs (on "desktop") {
       "Dropover" = 1355679052;
     };
   };

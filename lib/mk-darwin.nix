@@ -13,7 +13,7 @@ nix-darwin.lib.darwinSystem {
     # Facts reach modules as an overridable module argument, not specialArgs
     # (the NixOS manual keeps specialArgs for what imports need).
     { _module.args.facts = facts; }
-    ../roles/options.nix
+    ../roles/system.nix
 
     ../system/darwin/base.nix
     ../system/darwin/defaults.nix
