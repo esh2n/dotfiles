@@ -44,7 +44,6 @@ var steps = map[string]step{
 	"capsule-daemon":  capsuleDaemon,
 	"claude-cli":      claudeCLI,
 	"codebase-memory": codebaseMemory,
-	"ecc":             ecc,
 	"gh-extensions":   ghExtensions,
 	"git-identity":    gitIdentity,
 	"git-lfs":         gitLFS,
@@ -268,11 +267,3 @@ func userstyles(e Env) error {
 	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "home", "darwin", "browsers", "userstyles", "scripts", "generate-userstyle.sh"), "all")
 }
 
-// A reference checkout beside this one (jig does not read it).
-func ecc(e Env) error {
-	dir := filepath.Join(filepath.Dir(e.Repo), "everything-claude-code")
-	if exists(filepath.Join(dir, ".git")) || !e.need("git") {
-		return nil
-	}
-	return e.Sys.Run(nil, "git", "clone", "https://github.com/affaan-m/everything-claude-code.git", dir)
-}

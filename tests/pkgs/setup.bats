@@ -185,13 +185,6 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 	! grep -q "zjstatus" "${LOG}"
 }
 
-@test "setup ecc: clones the reference checkout beside this one, once" {
-	fake git
-	run step ecc
-	[ "$status" -eq 0 ]
-	grep -qx "git clone https://github.com/affaan-m/everything-claude-code.git ${BATS_TEST_TMPDIR}/everything-claude-code" "${LOG}"
-}
-
 @test "setup gh-extensions: an installed extension is found in a long list" {
 	echo "gh pr-graph  orangain/gh-pr-graph  v1" >"${BATS_TEST_TMPDIR}/ext"
 	fake gh 'if [ "$1 $2" = "extension list" ]; then cat "'"${BATS_TEST_TMPDIR}"'/ext"; yes filler | head -100000; fi'
