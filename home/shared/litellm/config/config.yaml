@@ -29,22 +29,42 @@ model_list:
       api_key: os.environ/DEEPSEEK_API_KEY
 
   # deterministic — the executor: carries out a plan a frontier model already
-  # designed (rules/decisions/2026-09-26-deterministic-on-the-gpu.md).
-  # Qwen3.8-27B on the Omarchy desktop's llama-server (RTX 3090 Ti), reached
-  # over the tailnet from every machine, the desktop included. The model id is
-  # the GGUF file name without .gguf (router mode, --models-dir).
-  # LLAMA_SERVER_API_BASE / LLAMA_SERVER_API_KEY are set by litellm-up.sh.
-  # No fallback to another machine or model: while the desktop is off, this
-  # answers "unavailable" — after one failure it is cooled down for 30 s
-  # instead of being retried for 5-6 s per request (LiteLLM #40405).
+  # designed (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
+  # Two deployments of the same model, Qwen3.8-27B, under one name:
+  #   order 1: the Omarchy desktop's llama-server (RTX 3090 Ti), over the
+  #            tailnet from every machine, the desktop included. The model id is
+  #            the GGUF file name without .gguf (router mode, --models-dir).
+  #   order 2: the Mac's LM Studio, only while the desktop is off. LM Studio
+  #            loads the 4-bit build just in time (evicting whatever other
+  #            JIT-loaded model the Mac had) and unloads it after `ttl` idle
+  #            seconds, so the Mac's own larger model comes back.
+  # Only order 1 is health-checked in the background: a probe runs a real
+  # completion, and probing the Mac would keep Qwen loaded all the time.
+  # Which one answered: the x-litellm-model-api-base response header, and
+  # litellm_deployment_successful_fallbacks / litellm_deployment_state.
   - model_name: deterministic
     litellm_params:
       model: openai/Qwen3.8-27B-Q4_K_M
       api_base: os.environ/LLAMA_SERVER_API_BASE
       api_key: os.environ/LLAMA_SERVER_API_KEY
+      order: 1
     model_info:
       allowed_fails: 1
-      cooldown_time: 30
+      # longer than health_check_interval (docs/proxy/health_check_routing.md)
+      cooldown_time: 90
+
+  - model_name: deterministic
+    litellm_params:
+      model: lm_studio/lmstudio-community/Qwen3.8-27B-MLX-4bit
+      api_base: os.environ/LM_STUDIO_API_BASE
+      api_key: os.environ/LM_STUDIO_API_KEY
+      order: 2
+      # LM Studio unloads a JIT-loaded model after this many idle seconds
+      # (https://lmstudio.ai/docs/app/api/ttl-and-auto-evict)
+      extra_body:
+        ttl: 600
+    model_info:
+      disable_background_health_check: true
 
 litellm_settings:
   # Free OSS Prometheus exporter — this is the whole point of the proxy.
@@ -59,6 +79,15 @@ litellm_settings:
   require_auth_for_metrics_endpoint: false
 
 general_settings:
+  # Probe deterministic's desktop deployment every 60 s and take it out of
+  # the pool while it fails, so a request goes straight to the Mac instead of
+  # waiting on a powered-off machine (docs/proxy/health_check_routing.md). The
+  # cloud tiers are not probed: a probe is a real, billed completion.
+  background_health_checks: true
+  health_check_interval: 60
+  enable_health_check_routing: true
+  health_check_ignore_transient_errors: true
+  background_health_check_model_groups: ["deterministic"]
   # Gateway master key — a REAL secret since 2026-09-20 (ruling: the old
   # committed constant assumed loopback-only, but the observability stack
   # documents container-reachable paths to this gateway, so the trust boundary

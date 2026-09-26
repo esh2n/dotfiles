@@ -126,19 +126,37 @@ if [ -z "$LLAMA_SERVER_API_KEY" ]; then
   LLAMA_SERVER_API_KEY="unset"
 fi
 export LLAMA_SERVER_API_KEY
+
+# 4b) where deterministic falls back while the desktop is off: the Mac's LM
+#     Studio (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
+#     On the Mac it is local (host.docker.internal is the host's loopback as
+#     seen from the container); elsewhere it is the Mac's tailnet name, the
+#     roles file's "lmStudioHost". Without either the fallback fails too.
+LM_STUDIO_HOST="${LM_STUDIO_HOST:-}"
+if curl -sf --max-time 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1 || [ "$(uname -s)" = Darwin ]; then
+  LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"
+elif [ -n "$LM_STUDIO_HOST" ]; then
+  LM_STUDIO_API_BASE="http://${LM_STUDIO_HOST}:1234/v1"
+else
+  echo "litellm-up: \"lmStudioHost\" is not in the roles file — deterministic has no fallback while the desktop is off" >&2
+  LM_STUDIO_API_BASE="http://lm-studio.invalid:1234/v1"
+fi
 # Linux: the container cannot resolve a *.ts.net name itself — the host's
 # resolver is systemd-resolved's 127.0.0.53 stub, which Docker replaces with
 # public DNS. Resolve it here, on the host, and hand the container that one
 # name, leaving every other lookup as it was. (macOS: OrbStack's containers
 # already resolve through the Mac's own resolver, MagicDNS included.)
 HOST_ARGS=()
-if [ "$(uname -s)" = Linux ] && [ -n "$LLAMA_SERVER_HOST" ]; then
-  LLAMA_SERVER_IP="$(getent ahostsv4 "$LLAMA_SERVER_HOST" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
-  if [ -n "$LLAMA_SERVER_IP" ]; then
-    HOST_ARGS=(--add-host "${LLAMA_SERVER_HOST}:${LLAMA_SERVER_IP}")
-  else
-    echo "litellm-up: ${LLAMA_SERVER_HOST} does not resolve on this machine (Tailscale down?) — the deterministic tier will fail until it does" >&2
-  fi
+if [ "$(uname -s)" = Linux ]; then
+  for tailnet_host in "$LLAMA_SERVER_HOST" "$LM_STUDIO_HOST"; do
+    [ -n "$tailnet_host" ] || continue
+    tailnet_ip="$(getent ahostsv4 "$tailnet_host" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
+    if [ -n "$tailnet_ip" ]; then
+      HOST_ARGS+=(--add-host "${tailnet_host}:${tailnet_ip}")
+    else
+      echo "litellm-up: ${tailnet_host} does not resolve on this machine (Tailscale down?) — deterministic cannot reach it until it does" >&2
+    fi
+  done
 fi
 
 # 5) clear any stale container, then run in the FOREGROUND so launchd owns it.
@@ -165,4 +183,6 @@ exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} ${HOST_ARGS[@]
   -e OPENAI_API_KEY=unset-placeholder \
   -e LLAMA_SERVER_API_BASE="$LLAMA_SERVER_API_BASE" \
   -e LLAMA_SERVER_API_KEY \
+  -e LM_STUDIO_API_BASE="$LM_STUDIO_API_BASE" \
+  -e LM_STUDIO_API_KEY=lm-studio \
   "$IMAGE" --config /app/config.yaml --prometheus_metrics_port "$METRICS_PORT"

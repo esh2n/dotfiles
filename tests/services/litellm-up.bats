@@ -102,14 +102,21 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	! grep -q "^docker run --rm .*LLAMA_SERVER_API_KEY=" "$LOG"
 }
 
-@test "litellm-up: on linux the desktop's tailnet name is resolved on the host and handed to the container" {
-	export LLAMA_SERVER_HOST=desktop.example.ts.net
+@test "litellm-up: on linux both tailnet names are resolved on the host and handed to the container" {
+	export LLAMA_SERVER_HOST=desktop.example.ts.net LM_STUDIO_HOST=mac.example.ts.net
 	fake uname 'echo Linux'
 	fake secret-tool 'echo token'
-	fake getent 'echo "100.64.0.7      STREAM desktop.example.ts.net"'
+	fake getent 'case "$2" in desktop*) echo "100.64.0.7      STREAM $2" ;; mac*) echo "100.64.0.8      STREAM $2" ;; esac'
 	run up
 	[ "$status" -eq 0 ]
-	grep -q "^docker run --rm .*--add-host desktop.example.ts.net:100.64.0.7 " "$LOG"
+	grep -q "^docker run --rm .*--add-host desktop.example.ts.net:100.64.0.7 --add-host mac.example.ts.net:100.64.0.8 " "$LOG"
+	grep -q "^docker run --rm .*-e LM_STUDIO_API_BASE=http://mac.example.ts.net:1234/v1 " "$LOG"
+}
+
+@test "litellm-up: on the mac deterministic falls back to its own LM Studio" {
+	run up
+	[ "$status" -eq 0 ]
+	grep -q "^docker run --rm .*-e LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1 " "$LOG"
 }
 
 @test "litellm-up: without the desktop's name it still serves, and says deterministic will fail" {

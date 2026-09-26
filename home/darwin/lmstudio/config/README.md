@@ -1,11 +1,14 @@
 # LM Studio — the home model server (headless, at login, awake while serving)
 
 The Mac's model server. It stays on `127.0.0.1:1234`; only Tailscale puts it
-on the tailnet. Since 2026-09-26 no LiteLLM tier points at it: `deterministic`
-moved to the Omarchy desktop's llama-server
-(`harness/rules/decisions/2026-09-26-deterministic-on-the-gpu.md`), and which
-larger model the Mac serves, under which name, is decided after a survey of
-what fits in 64GB.
+on the tailnet. `deterministic` runs on the Omarchy desktop's llama-server and
+falls back here only while the desktop is off: LM Studio then loads
+`lmstudio-community/Qwen3.8-27B-MLX-4bit` just in time and unloads it after
+10 idle minutes
+(`harness/rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md`).
+Any other model the Mac runs must be JIT-loaded as well (not pinned with
+`lms load`), so LM Studio's auto-evict can swap it out; which larger model
+that is gets decided after a survey of what fits in 64GB.
 
 ## What runs
 

@@ -24,6 +24,9 @@
 #   llamaServerHost the tailnet name of the machine whose llama-server
 #             serves the deterministic tier (the Omarchy desktop), from the
 #             same file's optional "llamaServerHost"; null when absent.
+#   lmStudioHost the Mac's tailnet name, where deterministic falls back
+#             while the desktop is off, from the same file's optional
+#             "lmStudioHost"; null when absent (the Mac itself needs none).
 let
   getEnv = builtins.getEnv;
   known = import ../roles/names.nix;
@@ -108,4 +111,12 @@ in
       h
     else
       throw ''facts: "llamaServerHost" in ${rolesFile} must be a string (a tailnet name)'';
+  lmStudioHost =
+    let
+      h = doc.lmStudioHost or null;
+    in
+    if h == null || builtins.isString h then
+      h
+    else
+      throw ''facts: "lmStudioHost" in ${rolesFile} must be a string (a tailnet name)'';
 }

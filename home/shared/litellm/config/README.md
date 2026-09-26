@@ -18,7 +18,7 @@ switched on by the developer role.
 |---|---|---|---|
 | `main` | DeepSeek | `deepseek-flash` | everyday default, cheap/fast |
 | `complex` | OpenAI | `gpt-6-astra` (Astra) | hard judgment / design |
-| `deterministic` | llama-server on the Omarchy desktop (tailnet) | `Qwen3.8-27B-Q4_K_M` | executes a plan a frontier model designed; no fallback while the desktop is off |
+| `deterministic` | llama-server on the Omarchy desktop (tailnet); the Mac's LM Studio while the desktop is off | `Qwen3.8-27B-Q4_K_M` / `lmstudio-community/Qwen3.8-27B-MLX-4bit` | executes a plan a frontier model designed; falls back only to the same model |
 
 A harness calls the proxy with `model` = one of these aliases; the proxy picks
 the provider. Switch tiers by switching the alias — no per-harness provider
@@ -64,8 +64,10 @@ set up identically:
    `"llamaServerHost"`; the service passes it to `litellm-up.sh` as
    `LLAMA_SERVER_HOST`, and `deterministic` goes to
    `http://<that name>:8080/v1` with the key
-   `op://llm-automation/llama-server/credential`
-   (rules/decisions/2026-09-26-deterministic-on-the-gpu.md).
+   `op://llm-automation/llama-server/credential`. On every machine but the
+   Mac, also write the Mac's MagicDNS name as `"lmStudioHost"`: while the
+   desktop is off, `deterministic` falls back to the Mac's LM Studio
+   (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
 
 After editing `litellm-up.sh` or the service declaration: `make up` (it
 reloads the job). The model server itself, its login autostart and the

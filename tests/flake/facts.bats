@@ -113,3 +113,12 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).nvidia"
 	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).llamaServerHost"
 	[ "$status" -ne 0 ]
 }
+
+@test "facts: lmStudioHost, where deterministic falls back, is read from the roles file" {
+	printf '{"roles": ["developer"], "lmStudioHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).lmStudioHost"
+	[ "$output" = '"mac.example.ts.net"' ]
+	printf '{"roles": ["developer"], "lmStudioHost": ["x"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).lmStudioHost"
+	[ "$status" -ne 0 ]
+}
