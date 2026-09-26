@@ -45,7 +45,8 @@ const RUNS = Math.max(1, parseInt(args.runs || "2", 10));
 const MAXTOK = parseInt(args["max-tokens"] || "4096", 10);
 const PROMPTS_PATH = args.prompts || new URL("./prompts.json", import.meta.url).pathname;
 const OUT = args.out || null;
-const APIKEY = args["api-key"] || "lm-studio";
+// BENCH_API_KEY keeps a real key off the command line (ps shows argv).
+const APIKEY = process.env.BENCH_API_KEY || args["api-key"] || "lm-studio";
 const SEQUENTIAL = args.sequential === "true";
 const CTX = args["context-length"] ? parseInt(args["context-length"], 10) : null;
 const PARALLEL = args.parallel ? parseInt(args.parallel, 10) : null;
