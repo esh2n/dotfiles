@@ -29,10 +29,10 @@ target() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.load(sys.s
 @test "theme: a palette points at the theme's own files, or its family's when it has none" {
 	run --separate-stderr links
 	json="$output"
-	[ "$(target "$json" .config/theme/palettes/nord/ghostty)" = "${REPO_ROOT}/home/darwin/ghostty/config/themes/nord" ]
+	[ "$(target "$json" .config/theme/palettes/nord/ghostty)" = "${REPO_ROOT}/home/darwin/ghostty/themes/nord" ]
 	[ "$(target "$json" .config/theme/palettes/nord/colors.lua)" = "${REPO_ROOT}/home/shared/theme/themes/nord.lua" ]
 	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/colors.lua)" = "${REPO_ROOT}/home/shared/theme/themes/catppuccin-latte.lua" ]
-	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/ghostty)" = "${REPO_ROOT}/home/darwin/ghostty/config/themes/catppuccin" ]
+	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/ghostty)" = "${REPO_ROOT}/home/darwin/ghostty/themes/catppuccin" ]
 	[ "$(target "$json" .config/theme/palettes/tokyonight-day/sketchybar.lua)" = "${REPO_ROOT}/home/darwin/sketchybar/config/themes/tokyonight.lua" ]
 }
 

@@ -15,7 +15,7 @@ domains/workspace/config/paneru home/darwin/paneru/config
 domains/workspace/config/mado home/darwin/mado/config
 domains/system/config/browsers home/darwin/browsers/config
 domains/dev/config/lmstudio home/darwin/lmstudio/config
-domains/dev/config/ghostty home/darwin/ghostty/config
+domains/dev/config/ghostty home/darwin/ghostty
 domains/workspace/config/borders home/darwin/borders/config
 domains/dev/config/wezterm home/shared/wezterm/config
 domains/dev/config/tmux home/darwin/tmux/config

@@ -4,8 +4,9 @@ bats_require_minimum_version 1.5.0
 # Oracle for the Mac: every home/<os>/<app>/config is ~/.config/<app>, and
 # every domains/*/config/<name> still in the old place goes to
 # ~/.config/<name> — minus what is handled elsewhere (jig-owned harness dirs
-# and dirs placed outside ~/.config). Linux gets the cross-platform ones only; Omarchy's own paths
-# (ghostty, tmux, herdr, ~/.config/git/config) are left to Omarchy.
+# and dirs placed outside ~/.config). Linux gets the cross-platform ones only;
+# ~/.config/git/config is left to Omarchy. Ghostty is linked file by file:
+# the shared config, then each OS's platform part.
 
 load '../lib/nix.bash'
 
@@ -39,6 +40,10 @@ target() { # target <json> <path under ~>
 		got="$(target "$json" ".config/${name}")"
 		[ "$got" = "${dir%/}" ] || { echo ".config/${name}: ${got}"; false; }
 	done
+	[ "$(target "$json" .config/ghostty/config)" = "${REPO_ROOT}/home/shared/ghostty/config" ]
+	[ "$(target "$json" .config/ghostty/shaders)" = "${REPO_ROOT}/home/shared/ghostty/shaders" ]
+	[ "$(target "$json" .config/ghostty/platform)" = "${REPO_ROOT}/home/darwin/ghostty/platform" ]
+	[ "$(target "$json" .config/ghostty/theme)" = "${REPO_ROOT}/home/darwin/ghostty/theme" ]
 }
 
 @test "config links: linux gets the cross-platform dirs and none of Omarchy's own" {
@@ -52,7 +57,11 @@ target() { # target <json> <path under ~>
 		got="$(target "$json" ".config/${name}")"
 		[[ "$got" == "${REPO_ROOT}/domains/"*"/config/${name}" || "$got" == "${REPO_ROOT}/home/shared/${name}/config" || "$got" == "${REPO_ROOT}/home/shared/theme/${name}" ]] || { echo ".config/${name}: ${got}"; false; }
 	done
-	for name in ghostty tmux herdr git aerospace sketchybar borders hammerspoon mado omniwm paneru lmstudio browsers; do
+	[ "$(target "$json" .config/ghostty/config)" = "${REPO_ROOT}/home/shared/ghostty/config" ]
+	[ "$(target "$json" .config/ghostty/platform)" = "${REPO_ROOT}/home/linux/ghostty/platform" ]
+	# the colours are Omarchy's, included by the platform part
+	[ "$(target "$json" .config/ghostty/theme)" = "<missing>" ]
+	for name in ghostty herdr git aerospace sketchybar borders hammerspoon mado omniwm paneru lmstudio browsers; do
 		[ "$(target "$json" ".config/${name}")" = "<missing>" ] || { echo ".config/${name} placed on linux"; false; }
 	done
 }

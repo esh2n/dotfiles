@@ -35,7 +35,7 @@ func (a App) Source(name string) string { return fmt.Sprintf(a.source, name) }
 // record the old theme-switch kept, so Init can adopt its choice.
 var Apps = []App{
 	{File: "colors.lua", Pointer: "home/shared/theme/colors.lua", source: "home/shared/theme/themes/%s.lua"},
-	{File: "ghostty", Pointer: "home/darwin/ghostty/config/theme", source: "home/darwin/ghostty/config/themes/%s"},
+	{File: "ghostty", Pointer: "home/darwin/ghostty/theme", source: "home/darwin/ghostty/themes/%s"},
 	{File: "sketchybar.lua", Pointer: "home/darwin/sketchybar/config/colors.lua", source: "home/darwin/sketchybar/config/themes/%s.lua"},
 	{File: "borders.sh", Pointer: "home/darwin/borders/config/colors.sh", source: "home/darwin/borders/config/themes/%s.sh"},
 }

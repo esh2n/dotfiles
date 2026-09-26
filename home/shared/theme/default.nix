@@ -21,7 +21,7 @@ let
   # file in a palette -> the theme file, relative to the checkout
   apps = {
     "colors.lua" = n: "home/shared/theme/themes/${n}.lua";
-    ghostty = n: "home/darwin/ghostty/config/themes/${n}";
+    ghostty = n: "home/darwin/ghostty/themes/${n}";
     "sketchybar.lua" = n: "home/darwin/sketchybar/config/themes/${n}.lua";
     "borders.sh" = n: "home/darwin/borders/config/themes/${n}.sh";
   };

@@ -74,6 +74,7 @@ nix-darwin.lib.darwinSystem {
           ../home/darwin/paneru
           ../home/darwin/mado
           ../home/darwin/lmstudio
+          ../home/shared/ghostty
           ../home/darwin/ghostty
           ../home/darwin/borders
           ../home/shared/wezterm

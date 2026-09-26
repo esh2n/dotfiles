@@ -1,0 +1,11 @@
+# Ghostty on Linux (Omarchy): read after ~/.config/ghostty/config
+# (home/shared/ghostty). Hyprland holds SUPER, so the keybinds stay on
+# Ghostty's own ctrl+shift defaults and none are set here.
+
+# The theme is Omarchy's: `omarchy theme set` moves current/theme
+config-file = ?"~/.config/omarchy/current/theme/ghostty.conf"
+
+# One process per window, so Hyprland sees each one
+gtk-single-instance = false
+# Hyprland draws the frame
+window-decoration = none
