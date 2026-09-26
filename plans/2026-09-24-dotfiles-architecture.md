@@ -136,7 +136,7 @@ dotfiles/
 - `~/.config/theme/palettes/<名前>/<ファイル>` を home-manager がテーマごとに宣言する（リポジトリのテーマファイルへのリンク）。アプリのファイルが無いテーマ（明るい版）は同じ系統のもの（catppuccin-latte → catppuccin）、無ければ catppuccin を借りる。アプリが存在しないファイルを読むことはない。
 - `~/.config/theme/current` はどれか一つの palettes へのリンク。動かすのは `dotctl theme set <名前>`（旧名 `theme-switch <名前>` でも動く）だけ。
 - 読み込み（include）に対応したアプリ（system の colors.lua、ghostty、tmux、sketchybar、borders）は、それぞれの読み口のリンクが `current/<ファイル>` を通る。`dotctl theme init` が activation のたびに張る（旧 theme-switch が選んでいたテーマは引き継ぐ）。
-- 読み込みに対応しないアプリ（Warp、starship、VS Code・Cursor、Neovim 4 種、zellij、壁紙、Stylus、シェル環境、delta、tmux-pane-border、Orca）は値を書き換える。旧 theme-switch と同じファイルを書くことを `tests/services/theme-parity.bats` で確かめている。
+- 読み込みに対応しないアプリ（Warp、starship、VS Code・Cursor、Neovim 4 種、zellij、壁紙、Stylus、シェル環境、delta、tmux-pane-border、Orca）は値を書き換える。書き出す中身は旧 theme-switch と一致することを確かめたうえで、`pkgs/dotctl/internal/theme/golden_test.go`（作った配色を入力にした正解ファイル）で固定し、本物のテーマは `themes_test.go` が必要な色・対応表・アプリごとのファイル（無ければ同じ系統）の揃いを確かめる。
 - zellij は、make up のたびにテンプレートから描き直されて配置が戻る不具合があった。`theme init` が毎回いまのテーマに戻す。home-manager のリンクを実ファイルで上書きしない。
 - 旧 theme-switch の不具合は移さなかった: userstyle 再生成スクリプトの名前違い（毎回何もしていなかった）、存在しない rosepine-dawn の対応表。
 

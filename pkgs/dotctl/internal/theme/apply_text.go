@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-// The texts below are the old theme-switch's heredocs, byte for byte, so a
-// machine switched by either writes the same files
-// (tests/services/theme-parity.bats).
+// The texts below are the old theme-switch's heredocs, byte for byte (checked
+// against it before it was removed); golden_test.go now holds them, and
+// themes_test.go checks every real theme has what they read.
 
 const nvimPlugins = `  {
     "catppuccin/nvim",
