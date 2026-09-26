@@ -49,6 +49,8 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/ghostty
     ../home/linux/ghostty
     ../home/shared/herdr
+    ../home/shared/browsers
+    ../home/linux/browsers
     ../home/shared/jj
     ../home/shared/zed
     ../home/shared/capsule

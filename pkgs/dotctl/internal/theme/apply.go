@@ -178,7 +178,7 @@ func applyWallpaper(e Env, name string) error {
 
 // Browser userstyles are not switched here: each generated style carries
 // every theme and Stylus picks one from its own "Theme" setting
-// (@var select theme in home/darwin/browsers/userstyles/scripts/generate-userstyle.sh).
+// (@var select theme in home/shared/browsers/userstyles/scripts/generate-userstyle.sh).
 
 func applyOrca(e Env, name string) error {
 	support := filepath.Join(e.Home, "Library/Application Support/orca")

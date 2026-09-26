@@ -61,7 +61,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/services
           ../home/shared/home-llm
           ../home/shared/llm-ledger
-          ../home/darwin/browsers
+          ../home/shared/browsers
           ../home/darwin/sketchybar
           ../home/shared/jj
           ../home/shared/zed

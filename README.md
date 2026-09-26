@@ -977,7 +977,7 @@ All distributions use `<Space>` as the leader key. Press `<Space>` and wait to s
 
 9 essential extensions are automatically configured (1Password, Vimium, Stylus, JSON Formatter, Enhanced GitHub, Refined GitHub, Material Icons for GitHub, Text Blaze, Easy Grouping for Google Calendar).
 
-Declared by nix-darwin (`system/darwin/browsers.nix`) on `make up`. Restart Chrome/Dia to install.
+The list is `home/shared/browsers/config/extensions.json`. On macOS nix-darwin force-installs it in Chrome and Dia (`system/darwin/browsers.nix`); on Linux home-manager writes it as Chromium's external extensions (`home/linux/browsers`). Restart the browser to install.
 
 ## Safety
 

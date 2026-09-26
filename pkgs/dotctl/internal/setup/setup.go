@@ -259,12 +259,12 @@ func zellijPlugins(e Env) error {
 }
 
 // Stylus's userstyles for every theme, generated in the checkout from its
-// templates (home/darwin/browsers/userstyles).
+// templates (home/shared/browsers/userstyles).
 func userstyles(e Env) error {
 	if !e.need("lessc") || !e.need("jq") {
 		return nil
 	}
-	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "home", "darwin", "browsers", "userstyles", "scripts", "generate-userstyle.sh"), "all")
+	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "home", "shared", "browsers", "userstyles", "scripts", "generate-userstyle.sh"), "all")
 }
 
 // OrbStack starts at login. `app.start_at_login` is not in OrbStack's

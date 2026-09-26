@@ -183,8 +183,8 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 }
 
 @test "setup userstyles: generates every theme's userstyle with the checkout's script" {
-	mkdir -p "${ROOT}/home/darwin/browsers/userstyles/scripts"
-	printf '#!/usr/bin/env bash\necho "generate $*" >>"%s"\n' "${LOG}" >"${ROOT}/home/darwin/browsers/userstyles/scripts/generate-userstyle.sh"
+	mkdir -p "${ROOT}/home/shared/browsers/userstyles/scripts"
+	printf '#!/usr/bin/env bash\necho "generate $*" >>"%s"\n' "${LOG}" >"${ROOT}/home/shared/browsers/userstyles/scripts/generate-userstyle.sh"
 	fake lessc
 	fake jq
 	run step userstyles

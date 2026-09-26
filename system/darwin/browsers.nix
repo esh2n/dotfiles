@@ -1,11 +1,11 @@
 # Browser extensions (macOS): Chrome and Dia force-install the extensions in
-# home/darwin/browsers/config/extensions.json. The list is the one source;
+# home/shared/browsers/config/extensions.json. The list is the one source;
 # nix-darwin writes it on activation (it replaced a script's `defaults write`).
 { ... }:
 let
   ids =
     map (e: e.id)
-      (builtins.fromJSON (builtins.readFile ../../home/darwin/browsers/config/extensions.json))
+      (builtins.fromJSON (builtins.readFile ../../home/shared/browsers/config/extensions.json))
       .extensions;
   forcelist = {
     ExtensionInstallForcelist = ids;

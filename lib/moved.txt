@@ -13,7 +13,7 @@ domains/workspace/config/hammerspoon home/darwin/hammerspoon/config
 domains/workspace/config/omniwm home/darwin/omniwm/config
 domains/workspace/config/paneru home/darwin/paneru/config
 domains/workspace/config/mado home/darwin/mado/config
-domains/system/config/browsers home/darwin/browsers/config
+domains/system/config/browsers home/shared/browsers/config
 domains/dev/config/lmstudio home/darwin/lmstudio/config
 domains/dev/config/ghostty home/darwin/ghostty
 domains/workspace/config/borders home/darwin/borders/config
@@ -34,7 +34,7 @@ domains/dev/config/vscode home/darwin/vscode/config
 domains/dev/config/cursor home/darwin/cursor/config
 domains/system/config/themes home/shared/theme/themes
 domains/system/config/theme-env home/shared/theme/env
-domains/system/userstyles home/darwin/browsers/userstyles
+domains/system/userstyles home/shared/browsers/userstyles
 domains/workspace/assets/background home/shared/theme/wallpapers
 domains/dev/config/serena home/shared/serena/config
 domains/dev/config/claude home/shared/harness/claude

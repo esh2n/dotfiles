@@ -115,7 +115,7 @@ home/shared/harness/codex/agents/
 home/shared/harness/codex/.yoki/
 
 # Userstyles (generated from templates)
-home/darwin/browsers/userstyles/gen/
+home/shared/browsers/userstyles/gen/
 # wallpapers `dotctl wallpaper` downloads beside the tracked theme images
 home/shared/theme/wallpapers/wallhaven-*
 
