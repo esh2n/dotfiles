@@ -46,11 +46,11 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-codebase-memory setup-gh-ext
 @test "setup: the mac runs every ported step, plus its own" {
 	run --separate-stderr activation darwin
 	[ "$status" -eq 0 ]
-	expected="$(printf '%s\n' ${SHARED} setup-orbstack setup-sbarlua setup-userstyles setup-tpm setup-warp-seed | sort | tr '\n' ' ' | sed 's/ $//')"
+	expected="$(printf '%s\n' ${SHARED} setup-orbstack setup-sbarlua setup-userstyles setup-warp-seed | sort | tr '\n' ' ' | sed 's/ $//')"
 	[ "$(names "$output")" = "$expected" ] || { echo "got: $(names "$output")"; false; }
 }
 
-@test "setup: linux runs the shared steps only (Omarchy owns tmux; warp is mac-only)" {
+@test "setup: linux runs the shared steps only (warp and the bar are mac-only)" {
 	run --separate-stderr activation linux
 	[ "$status" -eq 0 ]
 	expected="$(printf '%s\n' ${SHARED} | sort | tr '\n' ' ' | sed 's/ $//')"

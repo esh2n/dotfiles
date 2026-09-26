@@ -76,7 +76,6 @@ export default defineConfig({
 							slug: 'terminal/keybindings',
 						},
 						{ label: 'Zellij', slug: 'terminal/zellij' },
-						{ label: 'tmux', slug: 'terminal/tmux' },
 						{ label: 'Herdr', slug: 'terminal/herdr' },
 						{ label: 'Ghostty', slug: 'terminal/ghostty' },
 						{ label: 'WezTerm', slug: 'terminal/wezterm' },

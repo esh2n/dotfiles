@@ -1,9 +1,9 @@
 ---
 title: Keybindings
-description: tmux / WezTerm / Zellij / Herdr で統一された keybinding。
+description: WezTerm / Zellij / Herdr で統一された keybinding。
 ---
 
-tmux, WezTerm, Zellij, Herdr で共通の keybinding を使えるようにしている。prefix key は `Ctrl+q`。
+WezTerm, Zellij, Herdr で共通の keybinding を使えるようにしている。prefix key は `Ctrl+q`。
 
 Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ移動 (`Alt+h`/`Alt+l`) を
 この共通スキームに合わせている。Herdr 固有のキー・エージェント連携は [Herdr](/terminal/herdr/) を参照。
@@ -29,7 +29,6 @@ Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ
 | 次の tab | `Ctrl+l` | prefix 不要 |
 | Tab 1-5 | `Ctrl+1-5` | prefix 不要、Zellij のみ |
 | 新規 tab | `Prefix + t` | Zellij のみ |
-| 直前の tab | `Prefix + Tab` | tmux のみ |
 
 ## Copy / Scroll mode
 
@@ -56,17 +55,6 @@ Herdr は分割 (`Prefix + \` / `-`)・pane 移動 (`Prefix + h/j/k/l`)・タブ
 |------|-----|------|
 | Monocle | `Prefix + f` | fuzzy finder |
 | zellij-pane-picker | `Prefix + b` | 星を付けた pane に切替 |
-
-## tmux session 復元
-
-tmux-resurrect と tmux-continuum の設定。
-
-- 15 分ごとに自動 save
-- tmux 起動時に自動 restore
-- 手動 save: `Prefix + Ctrl+s`
-- 手動 restore: `Prefix + Ctrl+r`
-- 復元対象: window, pane, working directory, 実行中 program (vim, nvim, ssh など)
-- 保存先: `~/.tmux/resurrect/`
 
 ## Zellij session 管理
 

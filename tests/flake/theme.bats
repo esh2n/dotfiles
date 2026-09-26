@@ -20,7 +20,7 @@ target() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.load(sys.s
 	json="$output"
 	for f in "${REPO_ROOT}"/home/shared/theme/themes/*.lua; do
 		t="$(basename "$f" .lua)"
-		for file in colors.lua ghostty tmux.conf sketchybar.lua borders.sh; do
+		for file in colors.lua ghostty sketchybar.lua borders.sh; do
 			[ "$(target "$json" ".config/theme/palettes/${t}/${file}")" != "<missing>" ] || { echo "${t}/${file} missing"; false; }
 		done
 	done
@@ -33,7 +33,7 @@ target() { printf '%s' "$1" | python3 -c 'import json,sys; print(json.load(sys.s
 	[ "$(target "$json" .config/theme/palettes/nord/colors.lua)" = "${REPO_ROOT}/home/shared/theme/themes/nord.lua" ]
 	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/colors.lua)" = "${REPO_ROOT}/home/shared/theme/themes/catppuccin-latte.lua" ]
 	[ "$(target "$json" .config/theme/palettes/catppuccin-latte/ghostty)" = "${REPO_ROOT}/home/darwin/ghostty/config/themes/catppuccin" ]
-	[ "$(target "$json" .config/theme/palettes/tokyonight-day/tmux.conf)" = "${REPO_ROOT}/home/darwin/tmux/config/themes/tokyonight.conf" ]
+	[ "$(target "$json" .config/theme/palettes/tokyonight-day/sketchybar.lua)" = "${REPO_ROOT}/home/darwin/sketchybar/config/themes/tokyonight.lua" ]
 }
 
 @test "theme: activation points the apps through the current theme" {

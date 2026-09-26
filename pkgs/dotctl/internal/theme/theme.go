@@ -6,8 +6,8 @@
 //	~/.config/theme/current                 -> palettes/<name>; only Set moves it
 //	<app pointer in the checkout>           -> ~/.config/theme/current/<file>
 //
-// An app reads its pointer (ghostty's `config-file = theme`, tmux's
-// `source-file themes/current.conf`, ...), so moving `current` switches every
+// An app reads its pointer (ghostty's `config-file = theme`, sketchybar's
+// `require("colors")`, ...), so moving `current` switches every
 // app at once; Set then asks the running ones to reload.
 package theme
 
@@ -36,7 +36,6 @@ func (a App) Source(name string) string { return fmt.Sprintf(a.source, name) }
 var Apps = []App{
 	{File: "colors.lua", Pointer: "home/shared/theme/colors.lua", source: "home/shared/theme/themes/%s.lua"},
 	{File: "ghostty", Pointer: "home/darwin/ghostty/config/theme", source: "home/darwin/ghostty/config/themes/%s"},
-	{File: "tmux.conf", Pointer: "home/darwin/tmux/config/themes/current.conf", source: "home/darwin/tmux/config/themes/%s.conf"},
 	{File: "sketchybar.lua", Pointer: "home/darwin/sketchybar/config/colors.lua", source: "home/darwin/sketchybar/config/themes/%s.lua"},
 	{File: "borders.sh", Pointer: "home/darwin/borders/config/colors.sh", source: "home/darwin/borders/config/themes/%s.sh"},
 }
@@ -172,9 +171,6 @@ func reload(e Env) {
 				e.warn("%s: %v", strings.Join(cmd, " "), err)
 			}
 		}
-	}
-	if has("tmux") && e.Run != nil && e.Run("tmux", "list-sessions") == nil {
-		run("tmux", "source-file", filepath.Join(e.Home, ".config", "tmux", "tmux.conf"))
 	}
 	if has("sketchybar") {
 		run("sketchybar", "--reload")

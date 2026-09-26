@@ -53,7 +53,6 @@ var steps = map[string]step{
 	"pacifica":        pacifica,
 	"pi-packages":     piPackages,
 	"sbarlua":         sbarlua,
-	"tpm":             tpm,
 	"userstyles":      userstyles,
 	"warp-seed":       warpSeed,
 	"zellij-plugins":  zellijPlugins,
@@ -227,17 +226,6 @@ func warpSeed(e Env) error {
 		return err
 	}
 	return os.WriteFile(live, b, 0o644)
-}
-
-func tpm(e Env) error {
-	dir := e.path(".tmux", "plugins", "tpm")
-	if exists(dir) || !e.need("git") {
-		return nil
-	}
-	if err := makeHomeDirs(e, filepath.Dir(dir)); err != nil {
-		return err
-	}
-	return e.Sys.Run(nil, "git", "clone", "https://github.com/tmux-plugins/tpm", dir)
 }
 
 func zellijPlugins(e Env) error {

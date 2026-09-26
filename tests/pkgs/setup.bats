@@ -162,17 +162,6 @@ step() { PATH="${BIN}:/usr/bin:/bin" "${DOTCTL}" setup --repo "${ROOT}" "$@"; }
 	[ ! -e "${HOME}/.config/git/config.local" ]
 }
 
-@test "setup tpm: clones tmux's plugin manager once" {
-	fake git
-	run step tpm
-	[ "$status" -eq 0 ]
-	grep -qx "git clone https://github.com/tmux-plugins/tpm ${HOME}/.tmux/plugins/tpm" "${LOG}"
-	: >"${LOG}"
-	mkdir -p "${HOME}/.tmux/plugins/tpm"
-	run step tpm
-	[ ! -s "${LOG}" ]
-}
-
 @test "setup zellij-plugins: downloads the prebuilt plugins that are missing" {
 	fake curl 'while [ $# -gt 0 ]; do if [ "$1" = -o ]; then echo wasm >"$2"; fi; shift; done'
 	run step zellij-plugins

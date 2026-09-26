@@ -112,7 +112,7 @@ func write(t *testing.T, path, body string) {
 func TestUnknownStepNamesTheKnownOnes(t *testing.T) {
 	w := newWorld(t)
 	err := Run(w.env, "no-such-step")
-	if !errors.Is(err, ErrUnknownStep) || !strings.Contains(err.Error(), "tpm") {
+	if !errors.Is(err, ErrUnknownStep) || !strings.Contains(err.Error(), "zellij-plugins") {
 		t.Fatalf("got %v", err)
 	}
 	if len(Names()) != len(steps) || Names()[0] != "capsule-daemon" {
@@ -121,7 +121,7 @@ func TestUnknownStepNamesTheKnownOnes(t *testing.T) {
 }
 
 func TestMissingToolSkipsWithAWarning(t *testing.T) {
-	for _, name := range []string{"capsule-daemon", "mise-trust", "git-lfs", "gh-extensions", "codebase-memory", "pi-packages", "pacifica", "tpm", "userstyles", "sbarlua"} {
+	for _, name := range []string{"capsule-daemon", "mise-trust", "git-lfs", "gh-extensions", "codebase-memory", "pi-packages", "pacifica", "userstyles", "sbarlua"} {
 		w := newWorld(t)
 		if err := Run(w.env, name); err != nil {
 			t.Fatalf("%s: %v", name, err)
@@ -140,7 +140,6 @@ func TestSimpleStepsRunTheirCommandOnce(t *testing.T) {
 		{"capsule-daemon", "capsule", "capsule daemon install", nil},
 		{"git-lfs", "git-lfs", "git lfs install --skip-repo", nil},
 		{"pacifica", "cargo", "cargo install --git https://github.com/serinuntius/pacifica", func(w world) { w.sys.have["pacifica"] = true }},
-		{"tpm", "git", "git clone https://github.com/tmux-plugins/tpm " + "{home}/.tmux/plugins/tpm", func(w world) { _ = os.MkdirAll(filepath.Join(w.home, ".tmux", "plugins", "tpm"), 0o755) }},
 		{"claude-cli", "", "bash -c set -o pipefail; curl -fsSL https://claude.ai/install.sh | bash", func(w world) {
 			write(t, filepath.Join(w.home, ".local", "bin", "claude"), "#!/bin/sh\n")
 			_ = os.Chmod(filepath.Join(w.home, ".local", "bin", "claude"), 0o755)

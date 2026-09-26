@@ -7,22 +7,25 @@ import (
 	"testing"
 )
 
-func TestTpmMovesABrokenTmuxLinkAside(t *testing.T) {
-	w := newWorld(t, "git")
-	tmux := filepath.Join(w.home, ".tmux")
-	if err := os.Symlink(filepath.Join(w.home, "gone", "tmux"), tmux); err != nil {
+func TestZellijPluginsMoveABrokenLinkAside(t *testing.T) {
+	w := newWorld(t, "curl")
+	zellij := filepath.Join(w.home, ".config", "zellij")
+	if err := os.MkdirAll(filepath.Dir(zellij), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := Run(w.env, "tpm"); err != nil {
+	if err := os.Symlink(filepath.Join(w.home, "gone", "zellij"), zellij); err != nil {
 		t.Fatal(err)
 	}
-	if info, err := os.Lstat(tmux); err != nil || !info.IsDir() {
-		t.Fatalf("~/.tmux is not a directory now: %v", err)
+	if err := Run(w.env, "zellij-plugins"); err != nil {
+		t.Fatal(err)
 	}
-	if target, err := os.Readlink(tmux + ".pre-dotfiles"); err != nil || target != filepath.Join(w.home, "gone", "tmux") {
+	if info, err := os.Lstat(filepath.Join(zellij, "plugins")); err != nil || !info.IsDir() {
+		t.Fatalf("the plugins directory was not made: %v", err)
+	}
+	if target, err := os.Readlink(zellij + ".pre-dotfiles"); err != nil || target != filepath.Join(w.home, "gone", "zellij") {
 		t.Fatalf("the old link was not kept aside: %q %v", target, err)
 	}
-	if !strings.Contains(w.out.String(), "[WARN]") || !strings.Contains(w.out.String(), "moved to "+tmux+".pre-dotfiles") {
+	if !strings.Contains(w.out.String(), "[WARN]") || !strings.Contains(w.out.String(), "moved to "+zellij+".pre-dotfiles") {
 		t.Fatalf("out %q", w.out.String())
 	}
 }

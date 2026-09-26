@@ -26,27 +26,22 @@ var written = map[string]struct {
 	"current.sh":               {false, "home/shared/theme/env/current.sh"},
 	"ripgreprc":                {false, "home/shared/theme/env/ripgreprc"},
 	"delta-theme.gitconfig":    {true, ".config/git/delta-theme.gitconfig"},
-	"tmux-pane-border.toml":    {true, ".config/tmux-pane-border/config.toml"},
 }
 
 func TestGeneratedFilesMatchGolden(t *testing.T) {
-	for _, c := range []struct{ name, palette, tmux string }{
-		{"nord", "palette-dark.lua", "tmux-dark.conf"}, // tmux colours from the theme's tmux file
-		{"catppuccin-latte", "palette-light.lua", ""},  // no tmux file: the palette's colours
+	for _, c := range []struct{ name, palette string }{
+		{"nord", "palette-dark.lua"},
+		{"catppuccin-latte", "palette-light.lua"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			home, repo := t.TempDir(), t.TempDir()
 			copyFile(t, filepath.Join("testdata", c.palette), filepath.Join(repo, Apps[0].Source(c.name)))
-			if c.tmux != "" {
-				copyFile(t, filepath.Join("testdata", c.tmux), filepath.Join(repo, "home/darwin/tmux/config/themes", c.name+".conf"))
-			}
 			for _, d := range []string{
 				"home/shared/nvim/lazyvim/lua/plugins", "home/shared/nvim/nvchad",
 				"home/shared/nvim/astrovim/lua/plugins", "home/shared/nvim/custom/lua/custom",
 			} {
 				mkdir(t, filepath.Join(repo, d))
 			}
-			mkdir(t, filepath.Join(home, ".config", "tmux-pane-border"))
 			e := Env{Home: home, Repo: repo}
 			if err := applyNeovim(e, c.name); err != nil {
 				t.Fatal(err)

@@ -22,7 +22,6 @@ let
   apps = {
     "colors.lua" = n: "home/shared/theme/themes/${n}.lua";
     ghostty = n: "home/darwin/ghostty/config/themes/${n}";
-    "tmux.conf" = n: "home/darwin/tmux/config/themes/${n}.conf";
     "sketchybar.lua" = n: "home/darwin/sketchybar/config/themes/${n}.lua";
     "borders.sh" = n: "home/darwin/borders/config/themes/${n}.sh";
   };

@@ -1,9 +1,9 @@
 ---
 title: Keybindings
-description: Unified keybindings across tmux, WezTerm, and Zellij.
+description: Unified keybindings across WezTerm, Zellij, and Herdr.
 ---
 
-The same keybindings work across tmux, WezTerm, and Zellij. Prefix key is `Ctrl+q`.
+The same keybindings work across WezTerm, Zellij, and Herdr. Prefix key is `Ctrl+q`.
 
 ## Pane operations
 
@@ -26,7 +26,6 @@ The same keybindings work across tmux, WezTerm, and Zellij. Prefix key is `Ctrl+
 | Next tab | `Ctrl+l` | No prefix needed |
 | Tab 1-5 | `Ctrl+1-5` | No prefix, Zellij only |
 | New tab | `Prefix + t` | Zellij only |
-| Last tab | `Prefix + Tab` | tmux only |
 
 ## Copy / Scroll mode
 
@@ -53,17 +52,6 @@ The same keybindings work across tmux, WezTerm, and Zellij. Prefix key is `Ctrl+
 |--------|-----|-------------|
 | Monocle | `Prefix + f` | Fuzzy finder for panes/tabs |
 | zellij-pane-picker | `Prefix + b` | Starred panes |
-
-## tmux session restore
-
-Using tmux-resurrect and tmux-continuum:
-
-- Auto-saves every 15 minutes
-- Auto-restores on tmux startup
-- Manual save: `Prefix + Ctrl+s`
-- Manual restore: `Prefix + Ctrl+r`
-- Restores windows, panes, working dirs, and running programs (vim, nvim, ssh, etc.)
-- Stored in `~/.tmux/resurrect/`
 
 ## Zellij session management
 

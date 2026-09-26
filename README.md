@@ -51,7 +51,7 @@ dotfiles/
 ├── system/darwin/           # nix-darwin: defaults, Homebrew, browsers
 ├── home/                    # home-manager: one directory per app, config beside its module
 │   ├── shared/              #   both platforms (zsh, nvim, git, zellij, wezterm, theme, harness, ...)
-│   ├── darwin/              #   macOS only (tmux, ghostty, sketchybar, aerospace, ...)
+│   ├── darwin/              #   macOS only (sketchybar, aerospace, borders, ...)
 │   └── linux/               #   Omarchy only (llama-server)
 ├── pkgs/                    # packages built here, dotctl among them
 ├── overlays/                # upstream packages pinned or adjusted
@@ -70,7 +70,7 @@ dotctl llm check                 # the home LLM stack, PASS/FAIL per probe
 dotctl help                      # everything else
 ```
 
-Themes apply to WezTerm, Ghostty, Sketchybar, Borders, Zellij, tmux, Starship,
+Themes apply to WezTerm, Ghostty, Sketchybar, Borders, Zellij, Starship,
 VS Code/Cursor, Neovim, fzf, bat, ripgrep, delta and the wallpaper. Neovim
 distributions: custom, LazyVim, NvChad, AstroVim.
 
@@ -117,7 +117,7 @@ export DOTFILES_ROOT="/path/to/your/checkout" # the directory that holds flake.n
 ### Terminal & Shell
 - WezTerm, Ghostty, Warp
 - Zellij (terminal multiplexer with rich plugins)
-- Herdr (agent multiplexer, unified keybindings with tmux/Zellij)
+- Herdr (agent multiplexer, unified keybindings with Zellij/WezTerm)
 - Zsh, Fish
 - Starship prompt
 
@@ -679,9 +679,9 @@ direnv allow
 # Main worktree remains unaffected
 ```
 
-#### tmux / WezTerm / Zellij (Prefix: Ctrl+q)
+#### WezTerm / Zellij / Herdr (Prefix: Ctrl+q)
 
-Keybindings unified across tmux, WezTerm, Zellij, and Herdr (`~/.config/herdr/config.toml`, prefix `Ctrl+q`).
+Keybindings unified across WezTerm, Zellij, and Herdr (`~/.config/herdr/config.toml`, prefix `Ctrl+q`).
 
 | Operation | Keybind | Note |
 |-----------|---------|------|
@@ -697,7 +697,6 @@ Keybindings unified across tmux, WezTerm, Zellij, and Herdr (`~/.config/herdr/co
 | Next tab | `Ctrl+l` | No prefix |
 | Go to tab 1-5 | `Ctrl+1-5` | No prefix, Zellij only |
 | New tab | `Prefix + t` | Zellij only |
-| Last tab | `Prefix + Tab` | tmux only |
 | Copy/scroll mode | `Prefix + [` | WezTerm: `Prefix + c` |
 | Move (copy mode) | `h/j/k/l`, `w/b/e`, `0/$` | Vim-style navigation |
 | Page scroll (copy mode) | `Ctrl+u/d` (half), `Ctrl+b/f` (full) | |
@@ -708,28 +707,6 @@ Keybindings unified across tmux, WezTerm, Zellij, and Herdr (`~/.config/herdr/co
 | Detach session | `Prefix + d` | |
 | Monocle plugin | `Prefix + f` | Zellij only (file finder) |
 | Pane picker plugin | `Prefix + b` | Zellij only (starred panes) |
-
-**opensessions (AI Agent Sidebar):**
-
-Monitors Claude Code / Codex / Amp / OpenCode across all tmux sessions.
-
-| Keybind | Action |
-|---------|--------|
-| `Prefix a` | Toggle sidebar (current window) |
-| `Prefix A` | Toggle sidebar (all windows) |
-| `j/k` in sidebar | Navigate sessions |
-| `Enter` in sidebar | Switch to session |
-| `Tab` in sidebar | Detail panel (branch, cwd, ports) |
-
-Agent states (Running/Waiting/Idle/Error) auto-detected. Subagent tree, task progress, activity log (Read/Edit/Bash), git branch/PR info displayed. Rust binary — lightweight.
-
-**tmux Session Restore (tmux-resurrect + tmux-continuum):**
-- Auto-save every 15 minutes
-- Auto-restore on tmux startup
-- Manual save: `Prefix + Ctrl+s`
-- Manual restore: `Prefix + Ctrl+r`
-- Restores: windows, panes, working dirs, running programs (vim, nvim, ssh, etc.)
-- Session files: `~/.tmux/resurrect/`
 
 **Zellij Session Management:**
 - List sessions: `zellij list-sessions`
