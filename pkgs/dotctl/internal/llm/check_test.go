@@ -171,3 +171,35 @@ func TestLitellmScriptsExistInTheCheckout(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckNamesTheDockerEngineFirst(t *testing.T) {
+	check := func(w world) string {
+		var out bytes.Buffer
+		Check(w.env, &Checker{Out: &out}, false)
+		return out.String()
+	}
+	w := newWorld(t, "darwin", Offer{})
+	healthy(w)
+	if got := check(w); !strings.Contains(got, "PASS Docker engine answers") {
+		t.Fatalf("a running engine is a pass: %s", got)
+	}
+
+	w = newWorld(t, "darwin", Offer{})
+	healthy(w)
+	w.sys.fail["docker info"] = true
+	got := check(w)
+	if !strings.Contains(got, "FAIL Docker engine not answering (macOS: start OrbStack") {
+		t.Fatalf("a stopped engine is named: %s", got)
+	}
+	if strings.Index(got, "Docker engine") > strings.Index(got, "LiteLLM") {
+		t.Fatalf("the engine comes before LiteLLM: %s", got)
+	}
+
+	w = newWorld(t, "linux", Offer{})
+	healthy(w)
+	w.sys.fail["docker info"] = true
+	w.sys.stderr["docker info"] = "permission denied while trying to connect to the docker API"
+	if got := check(w); !strings.Contains(got, "not in the docker group") {
+		t.Fatalf("a refusal says why: %s", got)
+	}
+}

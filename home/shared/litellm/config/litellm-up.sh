@@ -48,8 +48,24 @@ NETWORK="litellm"
 export_op_token
 
 # 2) wait for the container runtime (OrbStack on macOS, Docker on Linux) to be
-#    ready — the service manager may fire first
-until docker info >/dev/null 2>&1; do sleep 3; done
+#    ready — the service manager may fire first. Said once in the log, so a
+#    stopped engine shows; an engine that refuses this user is not waited for
+#    (exit, and the service manager's retry logs it again).
+waited=0
+until docker_info="$(docker info 2>&1)"; do
+  case "$docker_info" in
+    *"permission denied"*)
+      echo "litellm-up: Docker refuses this user (not in the docker group): run omarchy-setup-security-sudoless-docker, then log in again" >&2
+      exit 1
+      ;;
+  esac
+  if [ "$waited" = 0 ]; then
+    echo "litellm-up: waiting for the Docker engine (macOS: start OrbStack; Linux: docker.socket)"
+    waited=1
+  fi
+  sleep 3
+done
+[ "$waited" = 0 ] || echo "litellm-up: the Docker engine answers"
 
 # 3) resolve the secrets, time-boxed with retry-on-empty (fail fast -> launchd retries)
 DEEPSEEK_API_KEY="$(read_secret op://llm-automation/deepseek/credential)"

@@ -47,6 +47,9 @@ func (c *Checker) line(word, color, msg string) {
 func Check(e Env, c *Checker, withComplex bool) int {
 	e = e.withDefaults()
 	fmt.Fprintf(c.Out, "home-llm check (%s)\n", e.Offer.Name())
+	// LiteLLM and the observer's stacks run in Docker: a stopped engine is
+	// the one cause behind every failure below, so it is named first
+	checkDocker(e, c)
 	if e.Offer.LMStudio {
 		checkLMStudioModels(e, c)
 	}
@@ -418,4 +421,16 @@ func checkTailnet(e Env, c *Checker) {
 		c.fail("no other device on the tailnet — the phone has not joined (Tailscale app, same account, switched on)")
 	}
 	fmt.Fprintf(c.Out, "       from the phone (on the tailnet): open https://%s:3001 — that is the one check only another device can make\n", name)
+}
+
+func checkDocker(e Env, c *Checker) {
+	_, errOut, err := e.run(20*time.Second, "docker", "info")
+	switch {
+	case err == nil:
+		c.pass("Docker engine answers")
+	case strings.Contains(errOut, "permission denied"):
+		c.fail("Docker refuses this user (not in the docker group): omarchy-setup-security-sudoless-docker, then log in again")
+	default:
+		c.fail("Docker engine not answering (macOS: start OrbStack; Linux: systemctl start docker.socket) — everything in containers below fails with it")
+	}
 }

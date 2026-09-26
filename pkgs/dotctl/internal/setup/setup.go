@@ -49,6 +49,7 @@ var steps = map[string]step{
 	"git-lfs":         gitLFS,
 	"mise-trust":      miseTrust,
 	"nvim-default":    nvimDefault,
+	"orbstack":        orbstack,
 	"pacifica":        pacifica,
 	"pi-packages":     piPackages,
 	"sbarlua":         sbarlua,
@@ -265,4 +266,19 @@ func userstyles(e Env) error {
 		return nil
 	}
 	return e.Sys.Run(nil, "bash", filepath.Join(e.Repo, "home", "darwin", "browsers", "userstyles", "scripts", "generate-userstyle.sh"), "all")
+}
+
+// OrbStack starts at login. `app.start_at_login` is not in OrbStack's
+// settings reference; its maintainer added it in orbstack/orbstack#1581
+// ("Added for the next version as `orb config set app.start_at_login true`"),
+// so a refusal says how to do it by hand. No orb: the Mac has no role that
+// installs it.
+func orbstack(e Env) error {
+	if !e.Sys.Has("orb") {
+		return nil
+	}
+	if err := e.quiet(time.Minute, "orb", "config", "set", "app.start_at_login", "true"); err != nil {
+		e.UI.Warn("could not set OrbStack to start at login (%v): turn on Settings → General → \"Start at login\" in OrbStack", err)
+	}
+	return nil
 }

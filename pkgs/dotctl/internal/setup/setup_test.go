@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -360,5 +361,21 @@ func TestSbarluaRebuildsPatchedForAnotherLua(t *testing.T) {
 	err := Run(w.env, "sbarlua")
 	if !w.sys.ran("git -C "+src+" reset --hard origin/HEAD") || err == nil || !strings.Contains(err.Error(), "is missing") {
 		t.Fatalf("err %v, calls %v", err, w.sys.calls)
+	}
+}
+
+func TestOrbStackStartsAtLogin(t *testing.T) {
+	w := newWorld(t) // no orb: a Mac without a role that installs it
+	if err := Run(w.env, "orbstack"); err != nil || len(w.sys.calls) != 0 || w.out.Len() != 0 {
+		t.Fatalf("without orb: err %v calls %v out %q", err, w.sys.calls, w.out.String())
+	}
+	w = newWorld(t, "orb")
+	if err := Run(w.env, "orbstack"); err != nil || !slices.Contains(w.sys.calls, "orb config set app.start_at_login true") {
+		t.Fatalf("err %v calls %v", err, w.sys.calls)
+	}
+	w = newWorld(t, "orb")
+	w.sys.fail["orb config"] = errors.New("unknown key")
+	if err := Run(w.env, "orbstack"); err != nil || !strings.Contains(w.out.String(), "Start at login") {
+		t.Fatalf("a refusal says how to do it by hand: err %v out %q", err, w.out.String())
 	}
 }

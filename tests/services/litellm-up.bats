@@ -72,3 +72,24 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	grep -qx "db-url=none" "$LOG"
 	[[ "$stderr" == *"without spend records"* ]]
 }
+
+@test "litellm-up: a stopped engine is waited for, and said once in the log" {
+	# `docker info` fails twice, then answers
+	fake docker 'case "$1" in
+		info) n=$(cat "'"${BATS_TEST_TMPDIR}"'/n" 2>/dev/null || echo 0); echo $((n + 1)) >"'"${BATS_TEST_TMPDIR}"'/n"; [ "$n" -ge 2 ] || { echo "Cannot connect to the Docker daemon" >&2; exit 1; } ;;
+		network) [ "$2" = inspect ] && exit 1 ;;
+	esac
+	case "$1 $2" in "inspect -f") echo false ;; esac'
+	run --separate-stderr up
+	[ "$status" -eq 0 ]
+	[ "$(grep -c 'waiting for the Docker engine' <<<"$output")" -eq 1 ]
+	[[ "$output" == *"the Docker engine answers"* ]]
+}
+
+@test "litellm-up: an engine that refuses this user stops it with the reason" {
+	fake docker 'case "$1" in info) echo "permission denied while trying to connect to the docker API" >&2; exit 1 ;; esac'
+	run --separate-stderr up
+	[ "$status" -eq 1 ]
+	[[ "$stderr" == *"not in the docker group"* ]]
+	! grep -q "^docker run" "$LOG"
+}

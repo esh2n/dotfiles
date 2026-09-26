@@ -99,6 +99,7 @@ func Run(s Sys, c Config) error {
 	}, string(os.PathListSeparator)))
 	if s.OS() == "linux" {
 		gpuDrivers(s, c)
+		dockerGroup(s, c)
 	}
 	loginShell(s, c)
 	if !s.Has("mise") {
@@ -273,4 +274,24 @@ func loginShell(s Sys, c Config) {
 		}
 	}
 	c.warn("%s is not in /etc/shells; add it (sudo) and run: chsh -s %s", c.ZshPath, c.ZshPath)
+}
+
+// Omarchy installs Docker but, since 4.x, leaves the user out of the docker
+// group ("equivalent to passwordless root"); LiteLLM and the observer's
+// stacks run docker as the user, so without it they cannot start. Joining is
+// Omarchy's own command and asks for sudo: said, never done here.
+func dockerGroup(s Sys, c Config) {
+	if !s.Has("docker") {
+		return
+	}
+	groups, err := s.Output("id", "-nG")
+	if err != nil {
+		return
+	}
+	for _, g := range strings.Fields(groups) {
+		if g == "docker" {
+			return
+		}
+	}
+	c.warn("you are not in the docker group, so LiteLLM cannot run its containers: run omarchy-setup-security-sudoless-docker (it asks for sudo), then log in again")
 }

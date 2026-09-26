@@ -279,3 +279,26 @@ func TestUnknownPlatformIsRefused(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestLinuxSaysWhenTheUserIsNotInTheDockerGroup(t *testing.T) {
+	var warned []string
+	f, c := setup(t, "linux")
+	f.have["docker"] = true
+	f.outputs["id -nG"] = "esh2n wheel video"
+	c.Warn = func(s string) { warned = append(warned, s) }
+	dockerGroup(f, c)
+	if len(warned) != 1 || !strings.Contains(warned[0], "omarchy-setup-security-sudoless-docker") {
+		t.Fatalf("warned %q", warned)
+	}
+	warned = nil
+	f.outputs["id -nG"] = "esh2n wheel docker"
+	dockerGroup(f, c)
+	if len(warned) != 0 {
+		t.Fatalf("a member is not warned: %q", warned)
+	}
+	for _, call := range f.calls {
+		if strings.Contains(call, "sudo") || strings.Contains(call, "omarchy-setup") {
+			t.Fatalf("it must only say, never run: %v", f.calls)
+		}
+	}
+}

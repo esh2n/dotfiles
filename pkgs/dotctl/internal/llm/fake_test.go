@@ -23,6 +23,7 @@ type fakeSys struct {
 	have    map[string]bool
 	outputs map[string]string
 	fail    map[string]bool
+	stderr  map[string]string // what a failing command says; "boom" when unset
 	calls   []string
 	env     map[string][]string
 	stdin   map[string]string
@@ -30,7 +31,7 @@ type fakeSys struct {
 }
 
 func newFakeSys(osName string, have ...string) *fakeSys {
-	f := &fakeSys{os: osName, have: map[string]bool{}, outputs: map[string]string{}, fail: map[string]bool{}, env: map[string][]string{}, stdin: map[string]string{}}
+	f := &fakeSys{os: osName, have: map[string]bool{}, outputs: map[string]string{}, fail: map[string]bool{}, stderr: map[string]string{}, env: map[string][]string{}, stdin: map[string]string{}}
 	for _, h := range have {
 		f.have[h] = true
 	}
@@ -54,6 +55,9 @@ func (f *fakeSys) Exec(c sys.Cmd) (string, string, error) {
 	}
 	for p := range f.fail {
 		if strings.HasPrefix(line, p) {
+			if msg, ok := f.stderr[p]; ok {
+				return "", msg, errFake
+			}
 			return "", "boom", errFake
 		}
 	}

@@ -80,6 +80,7 @@ nix-darwin.lib.darwinSystem {
           ../home/shared/wezterm
           ../home/shared/starship
           ../home/darwin/warp
+          ../home/darwin/orbstack
           ../home/darwin/orca
           ../home/darwin/vscode
           ../home/darwin/cursor
