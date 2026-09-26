@@ -8,7 +8,8 @@
 #   4. make up there
 set -euo pipefail
 
-CHECKOUT="${DOTFILES_CHECKOUT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && git rev-parse --path-format=absolute --git-common-dir | xargs dirname)}"
+# the main checkout, whether this copy is run from it or from one of its worktrees
+CHECKOUT="${DOTFILES_CHECKOUT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && git rev-parse --path-format=absolute --git-common-dir | xargs dirname)}"
 BRANCH="work-2026-09-23"
 ROLES="${HOME}/.config/dotfiles/roles.json"
 

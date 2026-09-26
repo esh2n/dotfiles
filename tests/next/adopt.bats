@@ -83,3 +83,21 @@ adopt() { PATH="${BIN}:/usr/bin:/bin" DOTFILES_CHECKOUT="$CHECKOUT" bash "$SCRIP
 	[ "$status" -ne 0 ]
 	! grep -q "^make\|^git" "$LOG"
 }
+
+@test "adopt: without DOTFILES_CHECKOUT it finds the main checkout, from the checkout or from a worktree" {
+	REAL_GIT="$(PATH=/usr/bin:/bin command -v git)"
+	main="${BATS_TEST_TMPDIR}/main"
+	"$REAL_GIT" init -q -b main "$main"
+	"$REAL_GIT" -C "$main" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+	"$REAL_GIT" -C "$main" worktree add -q "${BATS_TEST_TMPDIR}/wt"
+	main="$(cd "$main" && pwd -P)"
+	# rev-parse is the real git; everything else is recorded
+	fake git 'case "$*" in *rev-parse*--git-common-dir*) exec '"$REAL_GIT"' "$@" ;; *"merge-base --is-ancestor"*) exit 0 ;; esac'
+	for copy in "$main" "${BATS_TEST_TMPDIR}/wt"; do
+		cp "$SCRIPT" "$copy/adopt-mac.sh"
+		: >"$LOG"
+		PATH="${BIN}:/usr/bin:/bin" run bash "$copy/adopt-mac.sh"
+		[ "$status" -eq 0 ]
+		grep -q "^make -C ${main} up" "$LOG" || { cat "$LOG"; false; }
+	done
+}

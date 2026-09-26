@@ -14,6 +14,6 @@
 set -euo pipefail
 
 BIN_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-DOTFILES_ROOT="$(cd "${BIN_DIR}/.." && pwd)"
+DOTFILES_ROOT="$(cd "${BIN_DIR}/../.." && pwd)" # harness/bin -> the checkout
 
 exec bun "${DOTFILES_ROOT}/harness/jig/src/cli/jig.ts" "$@"
