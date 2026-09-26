@@ -103,7 +103,10 @@ describe("setupHarness", () => {
       `{"root": "${ROOT}", "home": "${HOME}"}\n`,
     );
     expect(f.files.get(`${DSH}/profiles/proxy/cordis.patch.yml`)).toBe(`plugin: ${ROOT}\n`);
-    expect(f.calls).toContain(`bun run build (in ${PLUGIN})`);
+    const install = f.calls.indexOf(`bun install --frozen-lockfile (in ${ROOT}/harness/jig)`);
+    const build = f.calls.indexOf(`bun run build (in ${PLUGIN})`);
+    expect(install).toBeGreaterThanOrEqual(0);
+    expect(build).toBeGreaterThan(install); // jig's dependencies before the bundle
     expect(f.calls).toContain(`pnpm add link:${PLUGIN} (in ${DSH}/profiles/proxy)`);
     // the copies land before jig writes its block into them
     const pnpm = f.calls.findIndex((c) => c.startsWith("pnpm"));
@@ -122,6 +125,17 @@ describe("setupHarness", () => {
     expect(await setupHarness(paths, f.ports)).toBe(0);
     expect(f.files.has(`${DSH}/profiles/proxy/cordis.patch.yml`)).toBe(false);
     expect(f.calls.some((c) => c.startsWith("pnpm"))).toBe(false);
+  });
+
+  test("jig's dependencies failing to install is a warning, and nothing is built or linked", async () => {
+    const f = fake({
+      files: { [`${PLUGIN}/src/index.ts`]: "" },
+      dirs: [`${DSH_SRC}/profiles/proxy`, `${DSH}/profiles/proxy`],
+      failing: ["bun install --frozen-lockfile"],
+    });
+    expect(await setupHarness(paths, f.ports)).toBe(0);
+    expect(f.warnings.some((w) => w.includes("plugin not built"))).toBe(true);
+    expect(f.calls.some((c) => c.startsWith("bun run build") || c.startsWith("pnpm"))).toBe(false);
   });
 
   test("a failed plugin build is a warning, and no profile is linked", async () => {

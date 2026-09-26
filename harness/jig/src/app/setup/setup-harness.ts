@@ -90,7 +90,7 @@ async function step(ports: SetupPorts, what: string, run: () => Promise<void>): 
 async function setupDsh(paths: SetupPaths, ports: SetupPorts): Promise<void> {
   const source = `${paths.root}/home/shared/harness/dsh`;
   const plugin = `${paths.root}/harness/jig/adapters/dsh`;
-  const pluginBuilt = await buildPlugin(plugin, ports);
+  const pluginBuilt = await buildPlugin(`${paths.root}/harness/jig`, plugin, ports);
   const canLink = pluginBuilt && (await ports.have("pnpm"));
   const vars = { home: paths.home, user: paths.user, dotfilesRoot: paths.root };
   const install = async (from: string, to: string): Promise<void> => {
@@ -113,9 +113,16 @@ async function setupDsh(paths: SetupPaths, ports: SetupPorts): Promise<void> {
   }
 }
 
-async function buildPlugin(plugin: string, ports: SetupPorts): Promise<boolean> {
+// The plugin bundles jig's own source, so jig's dependencies must be there
+// first: bun fetches missing packages when it runs a script, not when it
+// bundles one.
+async function buildPlugin(jig: string, plugin: string, ports: SetupPorts): Promise<boolean> {
   if ((await ports.readText(`${plugin}/src/index.ts`)) === undefined) return false;
-  if ((await ports.have("bun")) && (await ports.run("bun", ["run", "build"], plugin)) === 0) {
+  if (
+    (await ports.have("bun")) &&
+    (await ports.run("bun", ["install", "--frozen-lockfile"], jig)) === 0 &&
+    (await ports.run("bun", ["run", "build"], plugin)) === 0
+  ) {
     return true;
   }
   ports.warn(
