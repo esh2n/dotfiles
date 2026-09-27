@@ -63,6 +63,7 @@ in
   # servers are jig's: harnessApply writes them into ~/.claude.json.)
   dotfiles.setup = {
     claude-cli.command = config.lib.dotfiles.setupStep "claude-cli";
+    records-ttl.command = config.lib.dotfiles.setupStep "records-ttl";
     git-filters.command = config.lib.dotfiles.setupStep "git-filters";
     pi-packages = {
       command = config.lib.dotfiles.setupStep "pi-packages";
