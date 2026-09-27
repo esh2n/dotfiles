@@ -65,7 +65,7 @@ func Check(e Env, c *Checker, withComplex bool) int {
 	if key != "" {
 		// deterministic is the round trip across the tailnet: this machine's
 		// LiteLLM → the desktop's llama-server (the roles file's
-		// "llamaServerHost"); it fails while the desktop is off.
+		// "linuxModelHost"); it fails while the desktop is off.
 		ask(e, c, key, "deterministic")
 		ask(e, c, key, "main")
 		if withComplex {

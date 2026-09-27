@@ -32,26 +32,27 @@ bash ~/go/github.com/esh2n/dotfiles/.claude/worktrees/harness-parity/home/shared
   ```
 - `no 1Password service-account token` と出たら、LiteLLM が使っているトークンが Keychain に無い。LiteLLM が今動いているなら起きないはず。
 
-### A2. llama-server の API キーを 1Password に作る
+### A2. Linux のモデルサーバーの API キーを 1Password に作る
 
-何のため: Omarchy 機の llama-server は、このキーを知っている相手にしか答えない。Omarchy 機の llama-server と、全部の機械の LiteLLM が同じキーを読む。
+何のため: Linux 機（Omarchy）のモデルサーバーは、このキーを知っている相手にしか答えない。使うのは各機械の LiteLLM だけで、ハーネスは知らない（ハーネスが使うのは LiteLLM 自身の鍵 `op://llm-automation/litellm/credential`）。
 
-どこで: Mac の 1Password アプリ。
+どこで: Mac の 1Password アプリとターミナル。
 
-手順:
+1. ターミナルで次を打つ。`sk-` に 64 文字の乱数が続いた値が出る（手元の他の鍵と形を揃える）。
+   ```
+   echo "sk-$(openssl rand -hex 32)"
+   ```
+2. 1Password で vault `llm-automation` を開き、「+ New Item」→「API Credential」。
+3. タイトルを `linux-model-server` にする。
+4. 「credential」の欄に 1 の値を貼って保存する。
 
-1. vault `llm-automation` を開き、「+ New Item」→「API Credential」。
-2. タイトルを `llama-server` にする（小文字、ハイフン）。
-3. 「credential」の欄に、推測されない長い文字列を入れる。ターミナルで `openssl rand -hex 32` を打つと 64 文字の文字列が出るので、それを貼る。
-4. 保存する。
-
-見分け方: ターミナルで次を打ち、64 文字が出れば正しい（出たものはどこにも貼らない）。
+見分け方:
 
 ```
-op read op://llm-automation/llama-server/credential | wc -c
+op read op://llm-automation/linux-model-server/credential | cut -c1-3
 ```
 
-`64` か `65`（末尾の改行の有無）と出ればよい。`op` がサインインを求めたら、1Password アプリの承認に従う。
+`sk-` と出ればよい（全体は表示しない）。
 
 ### A3. main を進めて GitHub に上げる
 
@@ -221,8 +222,8 @@ nvim ~/.config/dotfiles/roles.json
     "sha256": "<sha256-…>",
     "acceptLicense": true
   },
-  "llamaServerHost": "<Omarchy 機の名前>",
-  "lmStudioHost": "<Mac の名前>",
+  "linuxModelHost": "<Omarchy 機の名前>",
+  "macModelHost": "<Mac の名前>",
   "observerHost": "<Mac の名前>"
 }
 ```
@@ -231,8 +232,8 @@ nvim ~/.config/dotfiles/roles.json
 - `desk-user`: 人が座って使う機械のフォントやアプリ。
 - `model-provider`: この機械の GPU で llama-server を動かし、tailnet に出す。
 - `acceptLicense: true`: NVIDIA のドライバのライブラリを使うことへの同意。内容は https://www.nvidia.com/en-us/drivers/nvidia-license/ 。同意しない場合は `model-provider` を外す。
-- `llamaServerHost`: deterministic の行き先（この機械自身）。
-- `lmStudioHost`: この機械の llama-server が落ちているときの deterministic の行き先（Mac）。この機械の電源が切れているときは、この機械の LiteLLM も止まっているので関係しない。
+- `linuxModelHost`: deterministic の行き先（この機械自身）。
+- `macModelHost`: この機械の llama-server が落ちているときの deterministic の行き先（Mac）。この機械の電源が切れているときは、この機械の LiteLLM も止まっているので関係しない。
 - `observerHost`: 利用料の台帳がある機械（Mac）。この機械の LiteLLM の使用額をそこへ送る。
 
 ### B8. `make up`
@@ -281,11 +282,11 @@ nvim ~/.config/dotfiles/roles.json
 ```json
 {
   "roles": ["developer", "desk-user", "model-provider", "observer"],
-  "llamaServerHost": "<Omarchy 機の名前>"
+  "linuxModelHost": "<Omarchy 機の名前>"
 }
 ```
 
-Mac 自身には `lmStudioHost` と `observerHost` は要らない（LM Studio も台帳も自分の中にある）。
+Mac 自身には `macModelHost` と `observerHost` は要らない（LM Studio も台帳も自分の中にある）。
 
 ```
 cd ~/go/github.com/esh2n/dotfiles

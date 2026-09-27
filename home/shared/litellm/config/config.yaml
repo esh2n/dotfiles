@@ -33,7 +33,7 @@ model_list:
       model: deepseek/deepseek-v4-pro
       api_key: os.environ/DEEPSEEK_API_KEY
 
-  # deterministic ← qwen3.8-27b-desktop (order 1)
+  # deterministic ← qwen3.8-27b-linux (order 1)
   # The Omarchy desktop's llama-server (RTX 3090 Ti), over the tailnet; the
   # model id is the GGUF file name without .gguf (router mode). Health-checked
   # in the background, so while the desktop is off it is out of the pool;
@@ -42,8 +42,8 @@ model_list:
   - model_name: deterministic
     litellm_params:
       model: openai/Qwen3.8-27B-Q4_K_M
-      api_base: os.environ/LLAMA_SERVER_API_BASE
-      api_key: os.environ/LLAMA_SERVER_API_KEY
+      api_base: os.environ/LINUX_MODEL_API_BASE
+      api_key: os.environ/LINUX_MODEL_API_KEY
       order: 1
     model_info:
       allowed_fails: 1
@@ -58,8 +58,8 @@ model_list:
   - model_name: deterministic
     litellm_params:
       model: lm_studio/qwen/qwen3.8-27b@4bit
-      api_base: os.environ/LM_STUDIO_API_BASE
-      api_key: os.environ/LM_STUDIO_API_KEY
+      api_base: os.environ/MAC_MODEL_API_BASE
+      api_key: os.environ/MAC_MODEL_API_KEY
       order: 2
       extra_body:
         ttl: 600

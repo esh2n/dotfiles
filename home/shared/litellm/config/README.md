@@ -68,11 +68,11 @@ set up identically:
 3. `dotctl llm setup` (run by the switch) loads the job onto the current
    definition. Logs: `~/Library/Logs/litellm-proxy.log`.
 4. Write the Omarchy desktop's Tailscale MagicDNS name into the roles file as
-   `"llamaServerHost"`; the service passes it to `litellm-up.sh` as
-   `LLAMA_SERVER_HOST`, and `deterministic` goes to
+   `"linuxModelHost"`; the service passes it to `litellm-up.sh` as
+   `LINUX_MODEL_HOST`, and `deterministic` goes to
    `http://<that name>:8080/v1` with the key
-   `op://llm-automation/llama-server/credential`. On every machine but the
-   Mac, also write the Mac's MagicDNS name as `"lmStudioHost"`: while the
+   `op://llm-automation/linux-model-server/credential`. On every machine but the
+   Mac, also write the Mac's MagicDNS name as `"macModelHost"`: while the
    desktop is off, `deterministic` falls back to the Mac's LM Studio
    (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
 

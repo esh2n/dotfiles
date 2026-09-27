@@ -3,17 +3,17 @@
 { facts, lib, ... }:
 {
   dotfiles.services = {
-    # LLAMA_SERVER_HOST / LM_STUDIO_HOST: where deterministic's two
-    # deployments are (the roles file's "llamaServerHost" / "lmStudioHost");
+    # LINUX_MODEL_HOST / MAC_MODEL_HOST: where deterministic's two
+    # deployments are (the roles file's "linuxModelHost" / "macModelHost");
     # litellm-up.sh says so when one is unset.
     litellm-proxy = {
       script = "home/shared/litellm/config/litellm-up.sh";
       environment =
-        lib.optionalAttrs (facts.llamaServerHost != null) {
-          LLAMA_SERVER_HOST = facts.llamaServerHost;
+        lib.optionalAttrs (facts.linuxModelHost != null) {
+          LINUX_MODEL_HOST = facts.linuxModelHost;
         }
-        // lib.optionalAttrs (facts.lmStudioHost != null) {
-          LM_STUDIO_HOST = facts.lmStudioHost;
+        // lib.optionalAttrs (facts.macModelHost != null) {
+          MAC_MODEL_HOST = facts.macModelHost;
         };
     };
     jig-decision = {

@@ -39,12 +39,12 @@
       },
       "notes": "Same key and caveats as mimo-v2.6-flash. Bench: 10/10, TTFT 3525 ms, 127 tok/s (report-mimo-vs-deepseek-pro.md)."
     },
-    "qwen3.8-27b-desktop": {
+    "qwen3.8-27b-linux": {
       "provider": "openai",
       "model": "Qwen3.8-27B-Q4_K_M",
-      "apiBaseEnv": "LLAMA_SERVER_API_BASE",
-      "apiKeyEnv": "LLAMA_SERVER_API_KEY",
-      "keyRef": "op://llm-automation/llama-server/credential",
+      "apiBaseEnv": "LINUX_MODEL_API_BASE",
+      "apiKeyEnv": "LINUX_MODEL_API_KEY",
+      "keyRef": "op://llm-automation/linux-model-server/credential",
       "modelInfo": {
         "allowed_fails": 1,
         "cooldown_time": 90
@@ -54,8 +54,8 @@
     "qwen3.8-27b-mac": {
       "provider": "lm_studio",
       "model": "qwen/qwen3.8-27b@4bit",
-      "apiBaseEnv": "LM_STUDIO_API_BASE",
-      "apiKeyEnv": "LM_STUDIO_API_KEY",
+      "apiBaseEnv": "MAC_MODEL_API_BASE",
+      "apiKeyEnv": "MAC_MODEL_API_KEY",
       "litellmParams": {
         "extra_body": {
           "ttl": 600

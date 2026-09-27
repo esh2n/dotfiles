@@ -96,43 +96,43 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 }
 
 @test "litellm-up: deterministic goes to the desktop's llama-server, its key passed by name only" {
-	export LLAMA_SERVER_HOST=desktop.example.ts.net
+	export LINUX_MODEL_HOST=desktop.example.ts.net
 	run up
 	[ "$status" -eq 0 ]
-	grep -q "^docker run --rm .*-e LLAMA_SERVER_API_BASE=http://desktop.example.ts.net:8080/v1 " "$LOG"
-	grep -q "^docker run --rm .* -e LLAMA_SERVER_API_KEY " "$LOG"
-	! grep -q "^docker run --rm .*LLAMA_SERVER_API_KEY=" "$LOG"
+	grep -q "^docker run --rm .*-e LINUX_MODEL_API_BASE=http://desktop.example.ts.net:8080/v1 " "$LOG"
+	grep -q "^docker run --rm .* -e LINUX_MODEL_API_KEY " "$LOG"
+	! grep -q "^docker run --rm .*LINUX_MODEL_API_KEY=" "$LOG"
 }
 
 @test "litellm-up: on linux both tailnet names are resolved on the host and handed to the container" {
-	export LLAMA_SERVER_HOST=desktop.example.ts.net LM_STUDIO_HOST=mac.example.ts.net
+	export LINUX_MODEL_HOST=desktop.example.ts.net MAC_MODEL_HOST=mac.example.ts.net
 	fake uname 'echo Linux'
 	fake secret-tool 'echo token'
 	fake getent 'case "$2" in desktop*) echo "100.64.0.7      STREAM $2" ;; mac*) echo "100.64.0.8      STREAM $2" ;; esac'
 	run up
 	[ "$status" -eq 0 ]
 	grep -q "^docker run --rm .*--add-host desktop.example.ts.net:100.64.0.7 --add-host mac.example.ts.net:100.64.0.8 " "$LOG"
-	grep -q "^docker run --rm .*-e LM_STUDIO_API_BASE=http://mac.example.ts.net:1234/v1 " "$LOG"
+	grep -q "^docker run --rm .*-e MAC_MODEL_API_BASE=http://mac.example.ts.net:1234/v1 " "$LOG"
 }
 
 @test "litellm-up: on the mac deterministic falls back to its own LM Studio" {
 	run up
 	[ "$status" -eq 0 ]
-	grep -q "^docker run --rm .*-e LM_STUDIO_API_BASE=http://host.docker.internal:1234/v1 " "$LOG"
+	grep -q "^docker run --rm .*-e MAC_MODEL_API_BASE=http://host.docker.internal:1234/v1 " "$LOG"
 }
 
 @test "litellm-up: without the desktop's name it still serves, and says deterministic will fail" {
-	unset LLAMA_SERVER_HOST
+	unset LINUX_MODEL_HOST
 	run --separate-stderr up
 	[ "$status" -eq 0 ]
 	grep -q "^docker run --rm --name litellm-proxy" "$LOG"
-	[[ "$stderr" == *'"llamaServerHost" is not in the roles file'* ]]
+	[[ "$stderr" == *'"linuxModelHost" is not in the roles file'* ]]
 }
 
 @test "litellm-up: every catalog key reaches the container by name, never by value" {
 	run up
 	[ "$status" -eq 0 ]
-	for key in DEEPSEEK_API_KEY XIAOMI_MIMO_API_KEY LLAMA_SERVER_API_KEY; do
+	for key in DEEPSEEK_API_KEY XIAOMI_MIMO_API_KEY LINUX_MODEL_API_KEY; do
 		grep -q "^docker run --rm .* -e ${key} " "$LOG" || { echo "missing ${key}"; false; }
 	done
 	[ "$(grep -c -- "-e DEEPSEEK_API_KEY " "$LOG")" = 1 ]

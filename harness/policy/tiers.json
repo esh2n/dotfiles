@@ -96,7 +96,7 @@
       "alias": "deterministic",
       "displayName": "Qwen3.8-27B on the desktop GPU",
       "use": [
-        "qwen3.8-27b-desktop",
+        "qwen3.8-27b-linux",
         "qwen3.8-27b-mac"
       ],
       "reasoning": true,

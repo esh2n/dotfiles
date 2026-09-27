@@ -33,7 +33,7 @@ describe("assignTier", () => {
 describe("describeTiers", () => {
   test("lists each tier's models in order, then the catalog", () => {
     const out = describeTiers(tiers, catalog);
-    expect(out).toContain("deterministic  qwen3.8-27b-desktop → qwen3.8-27b-mac");
+    expect(out).toContain("deterministic  qwen3.8-27b-linux → qwen3.8-27b-mac");
     expect(out).toContain("catalog: deepseek-flash, deepseek-v4-pro");
   });
 });

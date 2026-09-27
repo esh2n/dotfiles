@@ -143,32 +143,32 @@ fi
 #    (rules/decisions/2026-09-26-deterministic-on-the-gpu.md), reached by its
 #    tailnet name from every machine, the desktop included — llama-server
 #    binds loopback and `tailscale serve --tcp 8080` is its one exposure.
-#    LLAMA_SERVER_HOST comes from the roles file's "llamaServerHost" (its key
+#    LINUX_MODEL_HOST comes from the roles file's "linuxModelHost" (its key
 #    is a catalog key, step 3a). Without it LiteLLM still serves the other
 #    tiers and only deterministic's first deployment fails.
-LLAMA_SERVER_HOST="${LLAMA_SERVER_HOST:-}"
-if [ -n "$LLAMA_SERVER_HOST" ]; then
-  LLAMA_SERVER_API_BASE="http://${LLAMA_SERVER_HOST}:8080/v1"
+LINUX_MODEL_HOST="${LINUX_MODEL_HOST:-}"
+if [ -n "$LINUX_MODEL_HOST" ]; then
+  LINUX_MODEL_API_BASE="http://${LINUX_MODEL_HOST}:8080/v1"
 else
-  echo "litellm-up: \"llamaServerHost\" is not in the roles file — the deterministic tier will fail until it is" >&2
-  LLAMA_SERVER_API_BASE="http://llama-server.invalid:8080/v1"
+  echo "litellm-up: \"linuxModelHost\" is not in the roles file — the deterministic tier will fail until it is" >&2
+  LINUX_MODEL_API_BASE="http://linux-model-server.invalid:8080/v1"
 fi
 
 # 4b) where deterministic falls back while the desktop is off: the Mac's LM
 #     Studio (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
 #     On the Mac it is local (host.docker.internal is the host's loopback as
 #     seen from the container); elsewhere it is the Mac's tailnet name, the
-#     roles file's "lmStudioHost". Without either the fallback fails too.
+#     roles file's "macModelHost". Without either the fallback fails too.
 #     The curl covers a machine that runs LM Studio locally without being a
 #     Mac; uname covers the Mac while LM Studio is not up yet at login.
-LM_STUDIO_HOST="${LM_STUDIO_HOST:-}"
+MAC_MODEL_HOST="${MAC_MODEL_HOST:-}"
 if curl -sf --max-time 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1 || [ "$(uname -s)" = Darwin ]; then
-  LM_STUDIO_API_BASE="http://host.docker.internal:1234/v1"
-elif [ -n "$LM_STUDIO_HOST" ]; then
-  LM_STUDIO_API_BASE="http://${LM_STUDIO_HOST}:1234/v1"
+  MAC_MODEL_API_BASE="http://host.docker.internal:1234/v1"
+elif [ -n "$MAC_MODEL_HOST" ]; then
+  MAC_MODEL_API_BASE="http://${MAC_MODEL_HOST}:1234/v1"
 else
-  echo "litellm-up: \"lmStudioHost\" is not in the roles file — deterministic has no fallback while the desktop is off" >&2
-  LM_STUDIO_API_BASE="http://lm-studio.invalid:1234/v1"
+  echo "litellm-up: \"macModelHost\" is not in the roles file — deterministic has no fallback while the desktop is off" >&2
+  MAC_MODEL_API_BASE="http://mac-model-server.invalid:1234/v1"
 fi
 # Linux: the container cannot resolve a *.ts.net name itself — the host's
 # resolver is systemd-resolved's 127.0.0.53 stub, which Docker replaces with
@@ -177,7 +177,7 @@ fi
 # already resolve through the Mac's own resolver, MagicDNS included.)
 HOST_ARGS=()
 if [ "$(uname -s)" = Linux ]; then
-  for tailnet_host in "$LLAMA_SERVER_HOST" "$LM_STUDIO_HOST"; do
+  for tailnet_host in "$LINUX_MODEL_HOST" "$MAC_MODEL_HOST"; do
     [ -n "$tailnet_host" ] || continue
     tailnet_ip="$(getent ahostsv4 "$tailnet_host" 2>/dev/null | awk 'NR == 1 { print $1 }' || true)"
     if [ -n "$tailnet_ip" ]; then
@@ -209,7 +209,7 @@ exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} ${HOST_ARGS[@]
   -e LITELLM_MASTER_KEY \
   -e TYPESAFE_API_KEY \
   -e OPENAI_API_KEY=unset-placeholder \
-  -e LLAMA_SERVER_API_BASE="$LLAMA_SERVER_API_BASE" \
-  -e LM_STUDIO_API_BASE="$LM_STUDIO_API_BASE" \
-  -e LM_STUDIO_API_KEY=lm-studio \
+  -e LINUX_MODEL_API_BASE="$LINUX_MODEL_API_BASE" \
+  -e MAC_MODEL_API_BASE="$MAC_MODEL_API_BASE" \
+  -e MAC_MODEL_API_KEY=lm-studio \
   "$IMAGE" --config /app/config.yaml --prometheus_metrics_port "$METRICS_PORT"

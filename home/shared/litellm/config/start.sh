@@ -10,7 +10,7 @@
 # bottom. Proxy comes up on http://localhost:4000 ; metrics on /metrics.
 set -euo pipefail
 cd "$(dirname "$0")"
-: "${LLAMA_SERVER_API_BASE:?export it: http://<llamaServerHost>:8080/v1}"
+: "${LINUX_MODEL_API_BASE:?export it: http://<linuxModelHost>:8080/v1}"
 
 # Pin a real, current tag — verify the latest stable on
 # https://github.com/BerriAI/litellm/pkgs/container/litellm before first run.
@@ -21,7 +21,7 @@ op run --env-file litellm.op-vars -- \
     -v "$(pwd)/config.yaml:/app/proxy_server_config.yaml" \
     -p 127.0.0.1:4000:4000 \
     -e DEEPSEEK_API_KEY -e OPENAI_API_KEY -e LITELLM_MASTER_KEY \
-    -e LLAMA_SERVER_API_BASE -e LLAMA_SERVER_API_KEY \
+    -e LINUX_MODEL_API_BASE -e LINUX_MODEL_API_KEY \
     "$LITELLM_IMAGE" \
     --config /app/proxy_server_config.yaml
 

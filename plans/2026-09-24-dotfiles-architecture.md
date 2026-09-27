@@ -108,7 +108,7 @@ dotfiles/
 - 有効にするのは役割のモジュール（`roles/<名前>.nix`）だけ。機能のモジュールは役割を読まない（`tests/flake/layers.bats` で検査）。
   - `developer`: LiteLLM（各機械に一つ、ループバックのみ）と jig-decision。observer でない機械では、使用額を台帳へ送る同期（`llm-ledger-sync`）も。
   - `model-provider`: 自分のモデルを tailnet に出す。Mac は LM Studio（keep-awake）、Linux + NVIDIA は llama-server。
-  - **変えました（2026-09-26）**: `deterministic`（上位のモデルが設計した計画を実行するモデル）は Omarchy 機の llama-server（Qwen3.8-27B Q4_K_M、文脈 65,536、スロット 1）に移した。各機械の LiteLLM は役割ファイルの `llamaServerHost` で行き先を知り、止まっている間は他へ逃がさない。モデルは `home/linux/llama-server/models.json`（リビジョンと sha256 で固定）を `dotctl llm setup --gpu` が取ってくる。Mac の LM Studio はどの tier も指していない（`rules/decisions/2026-09-26-deterministic-on-the-gpu.md`）。
+  - **変えました（2026-09-26）**: `deterministic`（上位のモデルが設計した計画を実行するモデル）は Omarchy 機の llama-server（Qwen3.8-27B Q4_K_M、文脈 65,536、スロット 1）に移した。各機械の LiteLLM は役割ファイルの `linuxModelHost` で行き先を知り、止まっている間は他へ逃がさない。モデルは `home/linux/llama-server/models.json`（リビジョンと sha256 で固定）を `dotctl llm setup --gpu` が取ってくる。Mac の LM Studio はどの tier も指していない（`rules/decisions/2026-09-26-deterministic-on-the-gpu.md`）。
   - `observer`（一台）: Prometheus・Grafana・Open WebUI と、利用コストの台帳（Postgres、tailnet に 5432）。
   - **変えました（2026-09-25）**: 以前は `llm-hub` 一つに「LM Studio を出す」と「集計と窓口」をまとめ、hub / node で分けていました。機械はお互いのモデルを使えるので hub は無く、分けました。同じ日に役割を人の名前にしました（`rules/decisions/2026-09-25-roles-named-as-people.md`）。
   - 利用コストは台帳一冊（`rules/decisions/2026-09-25-llm-cost-ledger-local-first.md`）: 各機械の LiteLLM は同じ docker ネットワーク上の自分の Postgres に書き、observer の機械の Postgres が台帳。他の機械は届くときに未送信分を `request_id` で重複なく送る。予算は機械ごと。

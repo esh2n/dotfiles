@@ -25,6 +25,6 @@ TYPESAFE_API_KEY=op://llm-automation/typesafe/credential
 OPENAI_API_KEY=unset-placeholder
 
 # The deterministic tier's llama-server (the Omarchy desktop). Its API base
-# is http://<the roles file's llamaServerHost>:8080/v1 — a machine fact, so
-# it is not here: export LLAMA_SERVER_API_BASE before start.sh.
-LLAMA_SERVER_API_KEY=op://llm-automation/llama-server/credential
+# is http://<the roles file's linuxModelHost>:8080/v1 — a machine fact, so
+# it is not here: export LINUX_MODEL_API_BASE before start.sh.
+LINUX_MODEL_API_KEY=op://llm-automation/linux-model-server/credential

@@ -27,7 +27,7 @@ use_service_path
 : "${LLAMA_SERVER_BIN:?set by the unit}" "${LLAMA_PORT:?set by the unit}" "${LLAMA_MODELS_DIR:?set by the unit}"
 
 export_op_token
-KEY="$(read_secret op://llm-automation/llama-server/credential)"
+KEY="$(read_secret op://llm-automation/linux-model-server/credential)"
 
 umask 077
 KEY_FILE="${XDG_RUNTIME_DIR:-/tmp}/llama-server.key"

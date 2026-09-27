@@ -34,7 +34,7 @@ describe("toLitellmModelList", () => {
   test("the deterministic entry reads the desktop llama-server's key (matches the real file)", () => {
     const { content } = toLitellmModelList(loadRealTiers());
     const detBlock = content.slice(content.indexOf("model_name: deterministic"));
-    expect(detBlock).toContain("api_key: os.environ/LLAMA_SERVER_API_KEY");
+    expect(detBlock).toContain("api_key: os.environ/LINUX_MODEL_API_KEY");
   });
 
   test("reports everything outside alias/backend as dropped", () => {
@@ -52,7 +52,7 @@ describe("toLitellmModelList", () => {
     const { content } = toLitellmModelList(loadRealTiers());
     const det = content.slice(content.indexOf("# deterministic ←"));
     expect(det.indexOf("order: 1")).toBeLessThan(det.indexOf("order: 2"));
-    expect(det).toContain("api_base: os.environ/LLAMA_SERVER_API_BASE");
+    expect(det).toContain("api_base: os.environ/LINUX_MODEL_API_BASE");
     expect(det).toContain("      extra_body:\n        ttl: 600");
     expect(det).toContain("    model_info:\n      disable_background_health_check: true");
     expect(content.slice(0, content.indexOf("# complex"))).not.toContain("order:");

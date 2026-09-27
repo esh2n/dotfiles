@@ -15,7 +15,7 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 - **`litellm/config.yaml` の tier の部分は生成。** `# BEGIN jig:tiers` と `# END jig:tiers` の間を、`jig apply --write` が二つのファイルから書く（DSH・omp と同じ仕組み）。これまでの「LiteLLM は書かずに見せるだけ」はやめる。
 - **切り替えは一行。** `dotctl llm use <tier> <model>...` が、`jig tiers use`（割り当ての書き換え、一覧に無い ID は拒む）→ `jig apply --target all --write`（生成）→ LiteLLM の再起動を順に行う。今の割り当ては `jig tiers` で見る。
 - **鍵は一覧から読む。** `litellm-up.sh` は一覧の `keyRef` を順に読み、`apiKeyEnv` に入れて名前だけをコンテナに渡す。読めない鍵があっても起動は止めず、その鍵を使うモデルだけが失敗する。
-- **今の割り当て。** `main` ← `deepseek-flash`、`complex` ← `deepseek-v4-pro`、`deterministic` ← `qwen3.8-27b-desktop` → `qwen3.8-27b-mac`（`2026-09-27-deterministic-falls-back-to-the-mac.md`）。一覧には MiMo の `mimo-v2.6-flash` と `mimo-v2.6-pro` も入れた（値段は、固定している LiteLLM が V2.6 を知らないので `modelInfo` に書いた）。
+- **今の割り当て。** `main` ← `deepseek-flash`、`complex` ← `deepseek-v4-pro`、`deterministic` ← `qwen3.8-27b-linux` → `qwen3.8-27b-mac`（`2026-09-27-deterministic-falls-back-to-the-mac.md`）。一覧には MiMo の `mimo-v2.6-flash` と `mimo-v2.6-pro` も入れた（値段は、固定している LiteLLM が V2.6 を知らないので `modelInfo` に書いた）。
 
 ## Alternatives considered
 

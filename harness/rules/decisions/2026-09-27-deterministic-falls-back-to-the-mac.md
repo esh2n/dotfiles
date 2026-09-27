@@ -26,7 +26,7 @@ rule: The `deterministic` tier is the executor: it carries out a plan that a fro
 
 ## Consequences
 
-- 持ち主の手作業: Omarchy 機以外の機械の役割ファイルに、Mac の tailnet 名 `lmStudioHost` を書く（Mac 自身は要らない）。Mac の大きいモデルは JIT で読み込む（どのモデルにするかは、64GB に載る候補の調査のあとに決める）。
+- 持ち主の手作業: Omarchy 機以外の機械の役割ファイルに、Mac の tailnet 名 `macModelHost` を書く（Mac 自身は要らない）。Mac の大きいモデルは JIT で読み込む（どのモデルにするかは、64GB に載る候補の調査のあとに決める）。
 - 最初の一回は LM Studio の読み込みで待つ（15GB の秒数は未測定）。Mac で大きいモデルを使っている最中に落ちてくると、大きいモデルは一度下ろされる。
 - LM Studio の API は `qwen/qwen3.8-27b@4bit` という名前で答える（bench の実測で使った名前）。`dotctl llm check` が、LM Studio の一覧にこの名前があるかを確かめる。
 - LiteLLM の `extra_body.ttl` が LM Studio まで届くかは未確認。

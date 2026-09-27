@@ -21,12 +21,12 @@
 #   observerHost the observer machine's tailnet name, from the same file's
 #             optional "observerHost" (where the cost ledger lives); null when
 #             absent.
-#   llamaServerHost the tailnet name of the machine whose llama-server
+#   linuxModelHost the tailnet name of the machine whose llama-server
 #             serves the deterministic tier (the Omarchy desktop), from the
-#             same file's optional "llamaServerHost"; null when absent.
-#   lmStudioHost the Mac's tailnet name, where deterministic falls back
+#             same file's optional "linuxModelHost"; null when absent.
+#   macModelHost the Mac's tailnet name, where deterministic falls back
 #             while the desktop is off, from the same file's optional
-#             "lmStudioHost"; null when absent (the Mac itself needs none).
+#             "macModelHost"; null when absent (the Mac itself needs none).
 let
   getEnv = builtins.getEnv;
   known = import ../roles/names.nix;
@@ -103,20 +103,20 @@ in
       h
     else
       throw ''facts: "observerHost" in ${rolesFile} must be a string (a tailnet name)'';
-  llamaServerHost =
+  linuxModelHost =
     let
-      h = doc.llamaServerHost or null;
+      h = doc.linuxModelHost or null;
     in
     if h == null || builtins.isString h then
       h
     else
-      throw ''facts: "llamaServerHost" in ${rolesFile} must be a string (a tailnet name)'';
-  lmStudioHost =
+      throw ''facts: "linuxModelHost" in ${rolesFile} must be a string (a tailnet name)'';
+  macModelHost =
     let
-      h = doc.lmStudioHost or null;
+      h = doc.macModelHost or null;
     in
     if h == null || builtins.isString h then
       h
     else
-      throw ''facts: "lmStudioHost" in ${rolesFile} must be a string (a tailnet name)'';
+      throw ''facts: "macModelHost" in ${rolesFile} must be a string (a tailnet name)'';
 }

@@ -102,23 +102,23 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).nvidia"
 	[ "$status" -ne 0 ]
 }
 
-@test "facts: llamaServerHost, where the deterministic tier's llama-server is, is read from the roles file" {
-	printf '{"roles": ["developer"], "llamaServerHost": "desktop.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).llamaServerHost"
+@test "facts: linuxModelHost, where the deterministic tier's llama-server is, is read from the roles file" {
+	printf '{"roles": ["developer"], "linuxModelHost": "desktop.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).linuxModelHost"
 	[ "$output" = '"desktop.example.ts.net"' ]
 	printf '{"roles": ["developer"]}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).llamaServerHost"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).linuxModelHost"
 	[ "$output" = null ]
-	printf '{"roles": ["developer"], "llamaServerHost": 5}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).llamaServerHost"
+	printf '{"roles": ["developer"], "linuxModelHost": 5}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).linuxModelHost"
 	[ "$status" -ne 0 ]
 }
 
-@test "facts: lmStudioHost, where deterministic falls back, is read from the roles file" {
-	printf '{"roles": ["developer"], "lmStudioHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).lmStudioHost"
+@test "facts: macModelHost, where deterministic falls back, is read from the roles file" {
+	printf '{"roles": ["developer"], "macModelHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).macModelHost"
 	[ "$output" = '"mac.example.ts.net"' ]
-	printf '{"roles": ["developer"], "lmStudioHost": ["x"]}\n' >"${DOTFILES_ROLES_FILE}"
-	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).lmStudioHost"
+	printf '{"roles": ["developer"], "macModelHost": ["x"]}\n' >"${DOTFILES_ROLES_FILE}"
+	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).macModelHost"
 	[ "$status" -ne 0 ]
 }
