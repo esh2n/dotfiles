@@ -13,6 +13,7 @@ setup() {
 	sed "s|^use_service_path\$|PATH=\"${BIN}:/usr/bin:/bin\"|" "$C/litellm-up.sh" >"$D/litellm-up.sh"
 	cp "$C/secrets.sh" "$D/secrets.sh"
 	export HOME="${BATS_TEST_TMPDIR}/home" DB_SECRET=the-db-pw
+	export MODELS_JSON="${BATS_TEST_DIRNAME}/../../harness/policy/models.json"
 	unset XDG_RUNTIME_DIR
 	mkdir -p "$HOME"
 	fake uname 'echo Darwin'
@@ -98,7 +99,8 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	export LLAMA_SERVER_HOST=desktop.example.ts.net
 	run up
 	[ "$status" -eq 0 ]
-	grep -q "^docker run --rm .*-e LLAMA_SERVER_API_BASE=http://desktop.example.ts.net:8080/v1 -e LLAMA_SERVER_API_KEY " "$LOG"
+	grep -q "^docker run --rm .*-e LLAMA_SERVER_API_BASE=http://desktop.example.ts.net:8080/v1 " "$LOG"
+	grep -q "^docker run --rm .* -e LLAMA_SERVER_API_KEY " "$LOG"
 	! grep -q "^docker run --rm .*LLAMA_SERVER_API_KEY=" "$LOG"
 }
 
@@ -125,4 +127,23 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	[ "$status" -eq 0 ]
 	grep -q "^docker run --rm --name litellm-proxy" "$LOG"
 	[[ "$stderr" == *'"llamaServerHost" is not in the roles file'* ]]
+}
+
+@test "litellm-up: every catalog key reaches the container by name, never by value" {
+	run up
+	[ "$status" -eq 0 ]
+	for key in DEEPSEEK_API_KEY XIAOMI_MIMO_API_KEY LLAMA_SERVER_API_KEY; do
+		grep -q "^docker run --rm .* -e ${key} " "$LOG" || { echo "missing ${key}"; false; }
+	done
+	[ "$(grep -c -- "-e DEEPSEEK_API_KEY " "$LOG")" = 1 ]
+	! grep -q "^docker run --rm .*=secret" "$LOG"
+	grep -q "^op read op://llm-automation/xiaomi/credential" "$LOG"
+}
+
+@test "litellm-up: a key that does not resolve fails only its models, and says which" {
+	fake op 'case "$*" in *xiaomi*) exit 1 ;; *litellm-db*) printf "%s" "$DB_SECRET" ;; *) echo secret ;; esac'
+	run --separate-stderr up
+	[ "$status" -eq 0 ]
+	grep -q "^docker run --rm --name litellm-proxy" "$LOG"
+	[[ "$stderr" == *"op://llm-automation/xiaomi/credential did not resolve"*"XIAOMI_MIMO_API_KEY"* ]]
 }

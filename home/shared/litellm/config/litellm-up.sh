@@ -68,12 +68,39 @@ done
 [ "$waited" = 0 ] || echo "litellm-up: the Docker engine answers"
 
 # 3) resolve the secrets, time-boxed with retry-on-empty (fail fast -> launchd retries)
-DEEPSEEK_API_KEY="$(read_secret op://llm-automation/deepseek/credential)"
-export DEEPSEEK_API_KEY
 LITELLM_MASTER_KEY="$(read_secret op://llm-automation/litellm/credential)"
 export LITELLM_MASTER_KEY
 TYPESAFE_API_KEY="$(read_secret op://llm-automation/typesafe/credential)"
 export TYPESAFE_API_KEY
+
+# 3a) the models' keys: every catalog entry with a keyRef puts it in its
+#     apiKeyEnv (harness/policy/models.json, the list `dotctl llm use` picks
+#     tiers from; rules/decisions/2026-09-27-model-catalog-and-tier-assignment.md).
+#     A key that does not resolve fails only the models that need it.
+MODELS_JSON="${MODELS_JSON:-}"
+if [ -z "$MODELS_JSON" ] && [ -d "$CFG_DIR" ]; then
+  MODELS_JSON="$(cd "$CFG_DIR" && pwd -P)/../../../../harness/policy/models.json"
+fi
+KEY_ARGS=()
+if [ -n "$MODELS_JSON" ] && [ -f "$MODELS_JSON" ]; then
+  while read -r key_env key_ref; do
+    if ! [[ "$key_env" =~ ^[A-Z][A-Z0-9_]*$ ]] || [[ "$key_ref" != op://* ]]; then
+      echo "litellm-up: skipping a malformed catalog key (${key_env:-?})" >&2
+      continue
+    fi
+    key_value="$(try_secret "$key_ref")"
+    if [ -z "$key_value" ]; then
+      echo "litellm-up: ${key_ref} did not resolve — the models reading ${key_env} will fail until it does" >&2
+      key_value="unset"
+    fi
+    printf -v "$key_env" '%s' "$key_value"
+    export "${key_env?}"
+    KEY_ARGS+=(-e "$key_env")
+  done < <(jq -r '.models[] | select(.keyRef and .apiKeyEnv) | "\(.apiKeyEnv) \(.keyRef)"' "$MODELS_JSON" | sort -u)
+  unset key_value
+else
+  echo "litellm-up: no model catalog at ${MODELS_JSON:-?} — no model keys, every tier will fail" >&2
+fi
 
 # 3b) this machine's spend ledger: LiteLLM writes every request's cost to its
 #     own Postgres on the same docker network — never across the tailnet on
@@ -110,22 +137,16 @@ fi
 #    (rules/decisions/2026-09-26-deterministic-on-the-gpu.md), reached by its
 #    tailnet name from every machine, the desktop included — llama-server
 #    binds loopback and `tailscale serve --tcp 8080` is its one exposure.
-#    LLAMA_SERVER_HOST comes from the roles file's "llamaServerHost". Without
-#    it, or without the key, LiteLLM still serves the other tiers and only
-#    deterministic fails.
+#    LLAMA_SERVER_HOST comes from the roles file's "llamaServerHost" (its key
+#    is a catalog key, step 3a). Without it LiteLLM still serves the other
+#    tiers and only deterministic's first deployment fails.
 LLAMA_SERVER_HOST="${LLAMA_SERVER_HOST:-}"
-LLAMA_SERVER_API_KEY="$(try_secret op://llm-automation/llama-server/credential)"
 if [ -n "$LLAMA_SERVER_HOST" ]; then
   LLAMA_SERVER_API_BASE="http://${LLAMA_SERVER_HOST}:8080/v1"
 else
   echo "litellm-up: \"llamaServerHost\" is not in the roles file — the deterministic tier will fail until it is" >&2
   LLAMA_SERVER_API_BASE="http://llama-server.invalid:8080/v1"
 fi
-if [ -z "$LLAMA_SERVER_API_KEY" ]; then
-  echo "litellm-up: op://llm-automation/llama-server/credential did not resolve — the deterministic tier will fail until it does" >&2
-  LLAMA_SERVER_API_KEY="unset"
-fi
-export LLAMA_SERVER_API_KEY
 
 # 4b) where deterministic falls back while the desktop is off: the Mac's LM
 #     Studio (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
@@ -175,16 +196,14 @@ fi
 #    home/shared/tailscale/config/acl.hujson. Same decision record as step 4.
 METRICS_PORT=4001
 docker rm -f "$NAME" >/dev/null 2>&1 || true
-exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} ${HOST_ARGS[@]+"${HOST_ARGS[@]}"} \
+exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} ${HOST_ARGS[@]+"${HOST_ARGS[@]}"} ${KEY_ARGS[@]+"${KEY_ARGS[@]}"} \
   -p 127.0.0.1:4000:4000 \
   -p "127.0.0.1:${METRICS_PORT}:${METRICS_PORT}" \
   -v "$CFG_DIR/config.yaml":/app/config.yaml \
-  -e DEEPSEEK_API_KEY \
   -e LITELLM_MASTER_KEY \
   -e TYPESAFE_API_KEY \
   -e OPENAI_API_KEY=unset-placeholder \
   -e LLAMA_SERVER_API_BASE="$LLAMA_SERVER_API_BASE" \
-  -e LLAMA_SERVER_API_KEY \
   -e LM_STUDIO_API_BASE="$LM_STUDIO_API_BASE" \
   -e LM_STUDIO_API_KEY=lm-studio \
   "$IMAGE" --config /app/config.yaml --prometheus_metrics_port "$METRICS_PORT"
