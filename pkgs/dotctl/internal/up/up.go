@@ -265,6 +265,12 @@ func gpuDrivers(s Sys, c Config) {
 	c.log("setting up NVIDIA drivers for Nix programs (root)")
 	if err := s.Run(nil, "sudo", setup); err != nil {
 		c.warn("non-nixos-gpu-setup failed; CUDA programs will not find the GPU")
+		return
+	}
+	// home-manager's activation started llama-server before the drivers
+	// were there, so it came up without the GPU: start it again
+	if err := s.Run(nil, "systemctl", "--user", "try-restart", "llama-server.service"); err != nil {
+		c.warn("llama-server did not restart; run: systemctl --user restart llama-server")
 	}
 }
 

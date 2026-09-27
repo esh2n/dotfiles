@@ -227,6 +227,9 @@ func TestGPUDriverSetupRunsWhenTheUnitIsNotThisGeneration(t *testing.T) {
 	if index(f.calls, "sudo "+filepath.Join(c.Home, ".nix-profile/bin/non-nixos-gpu-setup")) < 0 {
 		t.Fatalf("gpu setup not run: %v", f.calls)
 	}
+	if index(f.calls, "systemctl --user try-restart llama-server.service") < index(f.calls, "sudo "+filepath.Join(c.Home, ".nix-profile/bin/non-nixos-gpu-setup")) {
+		t.Fatalf("llama-server not restarted after the driver setup: %v", f.calls)
+	}
 }
 
 func TestAPlainEtcZshrcIsMovedAsideOnce(t *testing.T) {
