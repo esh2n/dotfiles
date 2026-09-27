@@ -50,10 +50,10 @@ SHARED="setup-capsule-daemon setup-claude-cli setup-codebase-memory setup-gh-ext
 	[ "$(names "$output")" = "$expected" ] || { echo "got: $(names "$output")"; false; }
 }
 
-@test "setup: linux runs the shared steps and Omarchy's bar (warp and SbarLua are mac-only)" {
+@test "setup: linux runs the shared steps and Omarchy's bar, themes and Rise (warp and SbarLua are mac-only)" {
 	run --separate-stderr activation linux
 	[ "$status" -eq 0 ]
-	expected="$(printf '%s\n' ${SHARED} setup-omarchy-bar | sort | tr '\n' ' ' | sed 's/ $//')"
+	expected="$(printf '%s\n' ${SHARED} setup-omarchy-bar setup-omarchy-themes setup-quickshell-rise | sort | tr '\n' ' ' | sed 's/ $//')"
 	[ "$(names "$output")" = "$expected" ] || { echo "got: $(names "$output")"; false; }
 }
 
