@@ -319,3 +319,44 @@ brew uninstall --cask codex
 ```
 
 入っていないものがあると `No such keg` と出るが、無視してよい。herdr・wtp・omp・codex・diffnav・ov・staticcheck・golangci-lint・govulncheck は Nix から入るようになったので、消しても使える。
+
+---
+
+## D. MiMo を試す（A3 と A4 の `make up` が済んでから）
+
+何のため: `main` や `complex` の中身を、実際に使いながら MiMo と DeepSeek で入れ替えて比べる。tier の名前は変わらないので、ハーネスの設定はそのまま。
+
+今の割り当てを見る:
+
+```
+~/go/github.com/esh2n/dotfiles/harness/bin/jig tiers
+```
+
+`main  deepseek-flash` のように tier ごとの中身と、候補の一覧（catalog）が出る。
+
+`main` を MiMo-V2.6-Flash にする:
+
+```
+dotctl llm use main mimo-v2.6-flash
+```
+
+割り当ての書き換え、LiteLLM の設定の生成、LiteLLM の再起動まで一度に行う。`LiteLLM is up with main → mimo-v2.6-flash` と出ればよい。
+
+`complex` を MiMo-V2.6-Pro にする:
+
+```
+dotctl llm use complex mimo-v2.6-pro
+```
+
+戻す:
+
+```
+dotctl llm use main deepseek-flash
+dotctl llm use complex deepseek-v4-pro
+```
+
+知っておくこと:
+
+- 切り替えるとリポジトリのファイル（`harness/policy/tiers.json`、LiteLLM の `config.yaml`、DSH の設定）が変わる。試している間は差分のままでよい。決めたらコミットする。
+- MiMo は、ツールを使う会話で前の返答の推論（`reasoning_content`）を送り返さないとエラーを返す。pi や omp で `400` のエラーが出たら、それを Claude に見せる。
+- 新しいモデルを足すときは、`harness/policy/models.json` に 1 件足し、鍵を 1Password に入れてから `dotctl llm use`。
