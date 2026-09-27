@@ -77,6 +77,7 @@ if [ "$OSTYPE" = "Darwin" ]; then
         "$HOME/.cargo/bin"
         "$PNPM_HOME"
         "$BUN_INSTALL/bin"
+        "$HOME/.local/bin"
         "${path[@]}"
     )
 elif [ "$IS_WSL" = "1" ]; then
@@ -106,6 +107,17 @@ else
         "${path[@]}"
     )
 fi
+
+# Nix-installed CLIs go first, so a shim an installer drops in ~/.local/bin
+# (pi's and omp's installers put mise-backed ones there) cannot shadow the
+# Nix package. Missing directories are dropped by (N-/).
+path=(
+    $HOME/.nix-profile/bin(N-/)
+    /etc/profiles/per-user/$USER/bin(N-/)
+    /run/current-system/sw/bin(N-/)
+    /nix/var/nix/profiles/default/bin(N-/)
+    "${path[@]}"
+)
 
 export PATH
 
