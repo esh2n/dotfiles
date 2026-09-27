@@ -302,3 +302,21 @@ home/shared/harness/claude/state/
 
 # research workers' scratch notes (the records they fed are rules/research/)
 /.tmp-research/
+
+# Empty placeholders Claude Code's sandbox (bubblewrap) creates to mount
+# /dev/null over paths it denies writing; they reappear while a sandboxed
+# session runs. Anchored to the root so no real file elsewhere is hidden.
+/.bash_profile
+/.bashrc
+/.gitmodules
+/.idea
+/.mcp.json
+/.profile
+/.ripgreprc
+/.vscode
+/.zprofile
+/.zshrc
+home/shared/harness/claude/daemon
+home/shared/harness/claude/ide
+home/shared/harness/claude/jobs
+home/shared/harness/claude/local
