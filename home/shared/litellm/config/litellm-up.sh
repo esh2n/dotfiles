@@ -120,12 +120,13 @@ if [ -n "$LITELLM_DB_PASSWORD" ]; then
   # the DB container reads its password from a file (POSTGRES_PASSWORD_FILE),
   # so it is not kept in the container's config
   SECRET_DIR="${XDG_RUNTIME_DIR:-$HOME/.local/state}/litellm-secrets"
-  # A directory here is what `-v` left when the DB container restarted at boot
-  # before this script wrote the file ($XDG_RUNTIME_DIR is emptied on reboot);
-  # Docker made it as root, so only the owner can clear it.
-  if [ -d "$SECRET_DIR/db_password" ]; then
-    echo "litellm-up: $SECRET_DIR/db_password is a directory Docker created; clear it once:" >&2
-    echo "  docker rm -f $DB_NAME && sudo rm -rf $SECRET_DIR/db_password" >&2
+  # A directory at db_password, or a secrets directory this user does not own,
+  # is what `-v` left when the DB container restarted at boot before this
+  # script wrote the file ($XDG_RUNTIME_DIR is emptied on reboot); Docker made
+  # both as root, so only the owner can clear them.
+  if [ -d "$SECRET_DIR/db_password" ] || { [ -e "$SECRET_DIR" ] && [ ! -O "$SECRET_DIR" ]; }; then
+    echo "litellm-up: $SECRET_DIR was created by Docker as root; clear it once:" >&2
+    echo "  docker rm -f $DB_NAME && sudo rm -rf $SECRET_DIR" >&2
     exit 1
   fi
   (umask 077 && mkdir -p "$SECRET_DIR" && printf '%s' "$LITELLM_DB_PASSWORD" >"$SECRET_DIR/db_password")
