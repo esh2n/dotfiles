@@ -1,15 +1,15 @@
 ---
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback
+description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates the one worktree layout every harness shares (.claude/worktrees/<name>, branch <name>) and leaves the merge to the owner
 ---
 
 # Using Git Worktrees
 
 ## Overview
 
-Ensure work happens in an isolated workspace. Prefer your platform's native worktree tools. Fall back to manual git worktrees only when no native tool is available.
+Ensure work happens in an isolated workspace. Every harness isolates the same way: a git worktree at `.claude/worktrees/<name>` on a branch named `<name>`, made with plain git.
 
-**Core principle:** Detect existing isolation first. Then use native tools. Then fall back to git. Never fight the harness.
+**Core principle:** Detect existing isolation first. Then create the one layout with plain git. The owner merges.
 
 **Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
 
@@ -46,55 +46,25 @@ Honor any existing declared preference without asking. If the user declines cons
 
 ## Step 1: Create Isolated Workspace
 
-**You have two mechanisms. Try them in this order.**
-
-### 1a. Native Worktree Tools (preferred)
-
-The user has asked for an isolated workspace (Step 0 consent). Do you already have a way to create a worktree? It might be a tool with a name like `EnterWorktree`, `WorktreeCreate`, a `/worktree` command, or a `--worktree` flag. If you do, use it and skip to Step 2.
-
-Native tools handle directory placement, branch creation, and cleanup automatically. Using `git worktree add` when you have a native tool creates phantom state your harness can't see or manage.
-
-Only proceed to Step 1b if you have no native worktree tool available.
-
-### 1b. Git Worktree Fallback
-
-**Only use this if Step 1a does not apply** — you have no native worktree tool available. Create a worktree manually using git.
-
-#### Directory Selection
-
-Follow this priority order. Explicit user preference always beats observed filesystem state.
-
-1. **Check your instructions for a declared worktree directory preference.** If the user has already specified one, use it without asking.
-
-2. **Check for an existing project-local worktree directory:**
-   ```bash
-   ls -d .worktrees 2>/dev/null     # Preferred (hidden)
-   ls -d worktrees 2>/dev/null      # Alternative
-   ```
-   If found, use it. If both exist, `.worktrees` wins.
-
-3. **If there is no other guidance available**, default to `.worktrees/` at the project root.
-
-#### Safety Verification (project-local directories only)
-
-**MUST verify directory is ignored before creating worktree:**
+**One way, in every harness.** Claude Code, Codex, pi, omp and the Swarm all isolate the same way, so the owner never has to remember which harness does what: a git worktree at `.claude/worktrees/<name>` on a branch named `<name>`, made with plain git. Do not use a harness's own isolation (Codex's detached-HEAD worktrees, omp's `isolated` copies, a native `EnterWorktree` that names things differently) — the owner's ruling of 2026-09-27 trades that convenience for one layout everywhere.
 
 ```bash
-git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/dev/null
+root=$(git rev-parse --show-toplevel)
+name=<short-kebab-name>          # also the branch name
+# keep .claude/worktrees/ out of git status without touching the committed .gitignore
+git -C "$root" check-ignore -q .claude/worktrees/probe \
+  || echo '.claude/worktrees/' >> "$(git -C "$root" rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+git -C "$root" worktree add -b "$name" "$root/.claude/worktrees/$name" HEAD
+cd "$root/.claude/worktrees/$name"
 ```
 
-**If NOT ignored:** Add to .gitignore, commit the change, then proceed.
+A branch or directory with that name already existing is a stop, never a reuse: it may hold someone's work. Pick another name.
 
-**Why critical:** Prevents accidentally committing worktree contents to repository.
-
-#### Create the Worktree
+**Files git ignores but the work needs** (`.env` and the like) are copied only when the project lists them in `.worktreeinclude` (gitignore syntax, the file Claude Code and Codex read for the same purpose):
 
 ```bash
-# Determine path based on chosen location
-path="$LOCATION/$BRANCH_NAME"
-
-git worktree add "$path" -b "$BRANCH_NAME"
-cd "$path"
+[ -f "$root/.worktreeinclude" ] && git -C "$root" ls-files --others --ignored --exclude-from=.worktreeinclude \
+  | while read -r f; do mkdir -p "$(dirname "$f")"; cp "$root/$f" "$f"; done
 ```
 
 **Sandbox fallback:** If `git worktree add` fails with a permission error (sandbox denial), tell the user the sandbox blocked worktree creation and you're working in the current directory instead. Then run setup and baseline tests in place.
@@ -143,19 +113,29 @@ Tests passing (<N> tests, 0 failures)
 Ready to implement <feature-name>
 ```
 
+## Step 4: Finish — the owner decides the merge
+
+Commit the work on the worktree's branch. Merging it back is the owner's decision, never automatic (Claude Code's background sessions, Codex and named practitioners all leave the merge to a person; a merge that git calls clean can still be wrong in meaning). When the owner says to merge, from the main checkout:
+
+```bash
+git merge --no-ff <name>               # the branch stays visible as one unit in history
+git worktree remove .claude/worktrees/<name>
+git branch -d <name>                   # -d, not -D: refuses if anything is unmerged
+```
+
+A worktree with uncommitted changes, or a branch that is not merged, is left in place and reported — never force-removed.
+
 ## Quick Reference
 
 | Situation | Action |
 |-----------|--------|
 | Already in linked worktree | Skip creation (Step 0) |
 | In a submodule | Treat as normal repo (Step 0 guard) |
-| Native worktree tool available | Use it (Step 1a) |
-| No native tool | Git worktree fallback (Step 1b) |
-| `.worktrees/` exists | Use it (verify ignored) |
-| `worktrees/` exists | Use it (verify ignored) |
-| Both exist | Use `.worktrees/` |
-| Neither exists | Check instruction file, then default `.worktrees/` |
-| Directory not ignored | Add to .gitignore + commit |
+| Any harness | `.claude/worktrees/<name>`, branch `<name>`, plain git (Step 1) |
+| Name already taken | Pick another name; never reuse |
+| Directory not ignored | Add `.claude/worktrees/` to the repo's `info/exclude`, not `.gitignore` |
+| Ignored files needed (`.env`) | Only those listed in `.worktreeinclude` |
+| Work done | Commit on the branch; merge only when the owner says (Step 4) |
 | Permission error on create | Sandbox fallback, work in place |
 | Tests fail during baseline | Report failures + ask |
 | No package.json/Cargo.toml | Skip dependency install |
@@ -165,7 +145,8 @@ Ready to implement <feature-name>
 | Excuse | Reality |
 |--------|---------|
 | "I'm obviously not in a worktree — no need to check" | Run Step 0. Harness-created isolation and submodules both fool eyeballing; the detection commands settle it. |
-| "`git worktree add` is quicker than hunting for a native tool" | A native tool (e.g. `EnterWorktree`) owns placement, branching, and cleanup. Bypassing it is the #1 mistake — it creates phantom state your harness can't see or manage. |
+| "This harness has its own isolation, it's easier" | Every harness uses the same `.claude/worktrees/<name>` + branch `<name>`, so the owner sees one layout. A harness-specific form is exactly what the owner ruled out. |
+| "The branch is done, I'll merge it" | Merging is the owner's call. Commit, report the branch, and wait. |
 | "The worktree directory is surely ignored already" | Run `git check-ignore`. An unignored worktree directory commits the whole tree into the repo. |
-| "Any directory name works" | Explicit instructions beat an existing project-local directory, which beats the `.worktrees/` default. |
+| "`.worktrees/` is the usual place" | Here it is `.claude/worktrees/<name>`, in every harness. |
 | "The workspace is fresh — baseline tests can wait" | A dirty baseline makes every later failure ambiguous. Run the tests now; proceeding past failures is your human partner's call. |
