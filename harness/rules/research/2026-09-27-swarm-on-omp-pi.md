@@ -23,6 +23,13 @@
 
 → 手本の画面（常時表示、順番待ち・未読・進み具合・モデル・深さの列）は、omp の公開 API の上に「表示だけ」を足す形では作れない。
 
+## 追補: 一人に任せるサブエージェントと Swarm を一つにするか（[subagent-vs-swarm.md](2026-09-27-swarm/subagent-vs-swarm.md)）
+
+- ベンダーは仕組みを分けて持つ: Kimi Code は `Agent` と `AgentSwarm`（Tower と Swarm は互いを禁止する別モード、PR #3976）、Claude Code はサブエージェントと agent teams。Claude Code は表示だけを共有する（"Subagents appear in the same agent panel as teammates"、agent teams を有効にしたときのみ）。
+- omp 向けの Swarm 拡張 bigs/omp-swarm（★0、09-25）も分けている: "Main agent only: task subagents don't see the swarm tool."
+- 実践者の makoMakoGo は「関連するが別で、混同しやすい」と書く。一つにまとめて成功したという名前のある報告は見つからなかった。
+- 似た道具が二つあると、モデルは正しさより説明の強さで選ぶという未解決の報告がある（langgraph #8818）。
+
 ## 否定側
 
 - 自動のマルチエージェントは CoT の多数決より弱く、最大 10 倍高い（arXiv 2606.13003、推論・検索課題でコーディングではない）。Shopify は「早いうちはマルチエージェントを避けよ」。Claude Code の agent teams は既定 off の試験機能で、トークンは作業役の数に比例（references.md）。これらは作り方の制約（費用を一覧で見せる、作業役の数に上限）として扱う。
