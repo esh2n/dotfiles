@@ -22,6 +22,8 @@ func helpFor(command string) string {
 		return madoUsage
 	case "wallpaper":
 		return wallpaperUsage
+	case "records":
+		return recordsUsage
 	case "setup":
 		return setupUsage()
 	case "service":

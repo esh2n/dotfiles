@@ -56,6 +56,7 @@ var steps = map[string]step{
 	"pacifica":        pacifica,
 	"pi-packages":     piPackages,
 	"quickshell-rise": quickshellRise,
+	"records-ttl":     recordsTTL,
 	"sbarlua":         sbarlua,
 	"userstyles":      userstyles,
 	"warp-seed":       warpSeed,
