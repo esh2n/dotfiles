@@ -52,6 +52,8 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/browsers
     ../home/linux/browsers
     ../home/linux/omarchy-shell
+    ../home/linux/hypr
+    ../home/linux/quickshell-rise
     ../home/shared/jj
     ../home/shared/zed
     ../home/shared/capsule

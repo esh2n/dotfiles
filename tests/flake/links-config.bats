@@ -79,3 +79,18 @@ target() { # target <json> <path under ~>
 		[ "$got" = "$path" ] || { echo ".config/git/${name}: ${got}"; false; }
 	done
 }
+
+@test "config links: Omarchy's look (Hyprland's looknfeel, Rise's bar files) is linux-only" {
+	run --separate-stderr links linux
+	[ "$status" -eq 0 ]
+	linux="$output"
+	run --separate-stderr links darwin
+	[ "$status" -eq 0 ]
+	mac="$output"
+	[ "$(target "$linux" .config/hypr/looknfeel.lua)" = "${REPO_ROOT}/home/linux/hypr/looknfeel.lua" ]
+	[ "$(target "$mac" .config/hypr/looknfeel.lua)" = "<missing>" ]
+	for f in quickshell_splits quickshell_barsplits quickshell_barorder quickshell_widgets quickshell_widgets_v2; do
+		[ "$(target "$linux" ".cache/${f}")" = "${REPO_ROOT}/home/linux/quickshell-rise/cache/${f}" ] || { echo ".cache/${f}"; false; }
+		[ "$(target "$mac" ".cache/${f}")" = "<missing>" ] || { echo ".cache/${f} placed on the mac"; false; }
+	done
+}

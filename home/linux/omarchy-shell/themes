@@ -1,0 +1,5 @@
+# Omarchy themes from git, one repository URL per line, installed by
+# `dotctl setup omarchy-themes` on a machine that lacks them. Installing one
+# also switches to it, so a new machine starts on the last one listed; a
+# machine that has them keeps whichever theme it is on.
+https://github.com/HANCORE-linux/omarchy-dos-moos-theme.git
