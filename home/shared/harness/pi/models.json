@@ -19,7 +19,7 @@
           "input": [
             "text"
           ],
-          "contextWindow": 200000,
+          "contextWindow": 1000000,
           "maxTokens": 16384,
           "compat": {
             "thinkingFormat": "deepseek"
@@ -59,7 +59,7 @@
           "input": [
             "text"
           ],
-          "contextWindow": 200000,
+          "contextWindow": 1000000,
           "maxTokens": 32768,
           "compat": {
             "thinkingFormat": "deepseek"
