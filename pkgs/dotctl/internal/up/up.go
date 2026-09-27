@@ -37,7 +37,7 @@ type Config struct {
 	FindZsh    func() string
 	RolesFile  string // default ~/.config/dotfiles/roles.json
 	EtcDir     string // default /etc
-	GPUUnit    string // default /etc/systemd/system/non-nixos-gpu.service
+	GPUConf    string // default /etc/tmpfiles.d/non-nixos-gpu.conf
 	Log, Warn  func(string)
 }
 
@@ -257,9 +257,11 @@ func gpuDrivers(s Sys, c Config) {
 	if info, err := os.Stat(real); err != nil || info.Mode()&0o111 == 0 {
 		return // not an executable yet: nothing to run
 	}
-	want := filepath.Join(filepath.Dir(filepath.Dir(real)), "lib", "systemd", "system", "non-nixos-gpu.service")
-	unit, _ := filepath.EvalSymlinks(orDefault(c.GPUUnit, "/etc/systemd/system/non-nixos-gpu.service"))
-	if unit == want {
+	// the setup links its tmpfiles.d rule (which makes /run/opengl-driver)
+	// into /etc/tmpfiles.d; linked to this generation means nothing to do
+	want := filepath.Join(filepath.Dir(filepath.Dir(real)), "lib", "tmpfiles.d", "non-nixos-gpu.conf")
+	conf, _ := filepath.EvalSymlinks(orDefault(c.GPUConf, "/etc/tmpfiles.d/non-nixos-gpu.conf"))
+	if conf == want {
 		return
 	}
 	c.log("setting up NVIDIA drivers for Nix programs (root)")

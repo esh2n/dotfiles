@@ -218,11 +218,11 @@ func TestGPUDriverSetupRunsWhenTheUnitIsNotThisGeneration(t *testing.T) {
 	f, c := setup(t, "linux")
 	pkg := filepath.Join(t.TempDir(), "non-nixos-gpu")
 	must(t, os.MkdirAll(filepath.Join(pkg, "bin"), 0o755))
-	must(t, os.MkdirAll(filepath.Join(pkg, "lib/systemd/system"), 0o755))
+	must(t, os.MkdirAll(filepath.Join(pkg, "lib/tmpfiles.d"), 0o755))
 	must(t, os.WriteFile(filepath.Join(pkg, "bin/non-nixos-gpu-setup"), nil, 0o755))
 	must(t, os.MkdirAll(filepath.Join(c.Home, ".nix-profile/bin"), 0o755))
 	must(t, os.Symlink(filepath.Join(pkg, "bin/non-nixos-gpu-setup"), filepath.Join(c.Home, ".nix-profile/bin/non-nixos-gpu-setup")))
-	c.GPUUnit = filepath.Join(t.TempDir(), "absent.service")
+	c.GPUConf = filepath.Join(t.TempDir(), "absent.conf")
 	must(t, Run(f, c))
 	if index(f.calls, "sudo "+filepath.Join(c.Home, ".nix-profile/bin/non-nixos-gpu-setup")) < 0 {
 		t.Fatalf("gpu setup not run: %v", f.calls)
@@ -265,6 +265,24 @@ func TestTheTrustProbeIsQuiet(t *testing.T) {
 	must(t, Run(f, c))
 	if index(f.calls, "[quiet] brew trust --help") < 0 || index(f.calls, "brew trust --help") >= 0 {
 		t.Fatalf("probe: %v", f.calls)
+	}
+}
+
+func TestGPUDriverSetupIsSkippedWhenThisGenerationIsInstalled(t *testing.T) {
+	f, c := setup(t, "linux")
+	pkg := filepath.Join(t.TempDir(), "non-nixos-gpu")
+	must(t, os.MkdirAll(filepath.Join(pkg, "bin"), 0o755))
+	must(t, os.MkdirAll(filepath.Join(pkg, "lib/tmpfiles.d"), 0o755))
+	must(t, os.WriteFile(filepath.Join(pkg, "bin/non-nixos-gpu-setup"), nil, 0o755))
+	must(t, os.WriteFile(filepath.Join(pkg, "lib/tmpfiles.d/non-nixos-gpu.conf"), nil, 0o644))
+	must(t, os.MkdirAll(filepath.Join(c.Home, ".nix-profile/bin"), 0o755))
+	must(t, os.Symlink(filepath.Join(pkg, "bin/non-nixos-gpu-setup"), filepath.Join(c.Home, ".nix-profile/bin/non-nixos-gpu-setup")))
+	// what non-nixos-gpu-setup leaves behind: /etc/tmpfiles.d/non-nixos-gpu.conf
+	c.GPUConf = filepath.Join(t.TempDir(), "non-nixos-gpu.conf")
+	must(t, os.Symlink(filepath.Join(pkg, "lib/tmpfiles.d/non-nixos-gpu.conf"), c.GPUConf))
+	must(t, Run(f, c))
+	if index(f.calls, "sudo") >= 0 {
+		t.Fatalf("installed drivers set up again: %v", f.calls)
 	}
 }
 
