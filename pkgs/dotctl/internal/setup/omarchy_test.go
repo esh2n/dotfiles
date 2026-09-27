@@ -47,8 +47,11 @@ func TestOmarchyThemesDoesNothingWithoutOmarchy(t *testing.T) {
 func TestOmarchyThemeName(t *testing.T) {
 	for url, want := range map[string]string{
 		"https://github.com/HANCORE-linux/omarchy-dos-moos-theme.git": "dos-moos",
-		"https://github.com/x/Omarchy-Blue-Theme":                     "blue",
+		"https://github.com/x/Omarchy-Blue-Theme":                     "omarchy-blue-theme",
+		"https://github.com/x/omarchy-Mixed-theme":                    "mixed",
 		"https://github.com/x/plain.git":                              "plain",
+		"git@github.com:x/omarchy-ssh-theme.git":                      "ssh",
+		"git@host:omarchy-home-theme.git":                             "home",
 	} {
 		if got := omarchyThemeName(url); got != want {
 			t.Errorf("%s: got %q, want %q", url, got, want)

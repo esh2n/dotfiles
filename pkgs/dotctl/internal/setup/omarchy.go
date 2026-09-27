@@ -15,12 +15,18 @@ import (
 
 var omarchyThemeAffixes = regexp.MustCompile(`^omarchy-|-theme$`)
 
-// omarchyThemeName is the directory omarchy-theme-install clones into: the
-// repository's name without .git, an omarchy- prefix or a -theme suffix,
-// lower-cased (the same rule as /usr/bin/omarchy-theme-install).
+// omarchyThemeName is the directory omarchy-theme-install clones into, by
+// its own steps in its order: an scp-style user@host: prefix dropped, the
+// base name without .git, a case-sensitive omarchy- prefix and -theme suffix
+// removed, and only then lower-cased — so Omarchy-Blue-Theme keeps its
+// affixes and becomes omarchy-blue-theme.
 func omarchyThemeName(url string) string {
-	name := strings.ToLower(strings.TrimSuffix(filepath.Base(url), ".git"))
-	return omarchyThemeAffixes.ReplaceAllString(name, "")
+	path := url
+	if host, rest, ok := strings.Cut(url, ":"); ok && !strings.Contains(url, "://") && !strings.Contains(host, "/") {
+		path = rest
+	}
+	name := strings.TrimSuffix(filepath.Base(path), ".git")
+	return strings.ToLower(omarchyThemeAffixes.ReplaceAllString(name, ""))
 }
 
 // omarchyThemes installs each theme listed in home/linux/omarchy-shell/themes
