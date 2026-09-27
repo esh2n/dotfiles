@@ -44,6 +44,10 @@ const MODELS = (args.models || "").split(",").map((s) => s.trim()).filter(Boolea
 const RUNS = Math.max(1, parseInt(args.runs || "2", 10));
 const MAXTOK = parseInt(args["max-tokens"] || "4096", 10);
 const PROMPTS_PATH = args.prompts || new URL("./prompts.json", import.meta.url).pathname;
+// The path as a report shows it: relative to this directory, since a report is
+// committed and must not carry one machine's path.
+const BENCH_DIR = new URL(".", import.meta.url).pathname;
+const PROMPTS_LABEL = PROMPTS_PATH.startsWith(BENCH_DIR) ? PROMPTS_PATH.slice(BENCH_DIR.length) : PROMPTS_PATH.split("/").pop();
 const OUT = args.out || null;
 // BENCH_API_KEY keeps a real key off the command line (ps shows argv).
 const APIKEY = process.env.BENCH_API_KEY || args["api-key"] || "lm-studio";
@@ -257,7 +261,8 @@ function report(ran = MODELS) {
   L.push(`# Local quant A/B — deterministic tier\n`);
   L.push(`- base: \`${BASE}\` · runs/prompt: ${RUNS} · max_tokens: ${MAXTOK} · temp 0, seed 0`);
   L.push(`- models: ${M.map((m) => `\`${m}\``).join(" vs ")}`);
-  L.push(`- prompts: ${PROMPTS.length} (${PROMPTS_PATH})\n`);
+  // relative to this directory: a report is committed, and must not carry one machine's path
+  L.push(`- prompts: ${PROMPTS.length} (${PROMPTS_LABEL})\n`);
 
   // Speed
   L.push(`## Speed\n`);

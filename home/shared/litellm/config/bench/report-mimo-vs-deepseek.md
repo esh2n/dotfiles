@@ -13,7 +13,7 @@
 
 - base: `https://api.xiaomimimo.com/v1` · runs/prompt: 2 · max_tokens: 4096 · temp 0, seed 0
 - models: `mimo-v2.6-flash`
-- prompts: 10 (/Users/esh2n/go/github.com/esh2n/dotfiles/.claude/worktrees/harness-parity/home/shared/litellm/config/bench/prompts.json)
+- prompts: 10 (prompts.json)
 
 ## Speed
 
@@ -47,7 +47,7 @@
 
 - base: `https://api.deepseek.com/v1` · runs/prompt: 2 · max_tokens: 4096 · temp 0, seed 0
 - models: `deepseek-flash`
-- prompts: 10 (/Users/esh2n/go/github.com/esh2n/dotfiles/.claude/worktrees/harness-parity/home/shared/litellm/config/bench/prompts.json)
+- prompts: 10 (prompts.json)
 
 ## Speed
 
