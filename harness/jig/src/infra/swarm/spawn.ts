@@ -14,8 +14,15 @@ const KILL_GRACE_MS = 5_000;
 export const spawnWorker: Spawn = (bin, args, options): WorkerProcess => {
   const child = nodeSpawn(bin, [...args], {
     cwd: options.cwd,
+    // The whole environment, on purpose: a worker is the same harness the
+    // parent runs, with the same tools and the same guard, and it needs the
+    // same keys to reach LiteLLM. It is given nothing the parent session
+    // could not already use itself.
     env: { ...process.env, ...options.env },
     stdio: ["ignore", "pipe", "pipe"],
+    // its own process group, so stopping it stops what it started too (the
+    // worker's harness runs tools as children of its own)
+    detached: true,
   });
   let pending = "";
   let stderr = "";
@@ -37,6 +44,15 @@ export const spawnWorker: Spawn = (bin, args, options): WorkerProcess => {
     stderr = (stderr + chunk).slice(-STDERR_TAIL);
   });
 
+  const signalGroup = (signal: NodeJS.Signals) => {
+    try {
+      if (child.pid !== undefined) process.kill(-child.pid, signal);
+    } catch {
+      // the group is gone already; fall back to the process itself
+      child.kill(signal);
+    }
+  };
+
   const finish = (code: number | null) => {
     if (exited) return;
     exited = true;
@@ -51,10 +67,10 @@ export const spawnWorker: Spawn = (bin, args, options): WorkerProcess => {
 
   return {
     kill() {
-      if (exited || child.killed) return;
-      child.kill("SIGTERM");
+      if (exited) return;
+      signalGroup("SIGTERM");
       setTimeout(() => {
-        if (!exited) child.kill("SIGKILL");
+        if (!exited) signalGroup("SIGKILL");
       }, KILL_GRACE_MS).unref();
     },
   };

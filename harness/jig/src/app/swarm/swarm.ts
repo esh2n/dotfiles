@@ -130,7 +130,8 @@ export class Swarm {
   private async pump(): Promise<void> {
     for (const name of runnable(this.workers, this.deps.config)) {
       const w = this.workers.find((x) => x.spec.name === name);
-      if (w === undefined) continue;
+      // another pump() may have started it while this one awaited a worktree
+      if (w === undefined || w.status !== "queued") continue;
       this.set(
         markStarted(this.workers, name, this.deps.now(), this.deps.modelLabel?.(w.spec.tier)),
       );
@@ -183,11 +184,17 @@ export class Swarm {
           this.procs.delete(name);
           const current = this.workers.find((x) => x.spec.name === name);
           const text = ended?.text ?? current?.result;
-          const error =
-            ended?.error ??
-            (code === 0
+          const exitError =
+            code === 0
               ? undefined
-              : `exited with ${code === null ? "a signal" : `status ${code}`}${stderrTail === "" ? "" : `: ${stderrTail}`}`);
+              : `exited with ${code === null ? "a signal" : `status ${code}`}${stderrTail === "" ? "" : `: ${stderrTail}`}`;
+          // a clean exit with no verdict and no answer means the stream was not
+          // understood (a changed output format), not an empty success
+          const silent =
+            code === 0 && ended === undefined && (text === undefined || text === "")
+              ? "the worker exited without an answer the Swarm could read (its output format may have changed)"
+              : undefined;
+          const error = ended?.error ?? exitError ?? silent;
           this.afterExit(name, {
             ...(error === undefined ? {} : { error }),
             ...(text === undefined ? {} : { result: text }),

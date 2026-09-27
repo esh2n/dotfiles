@@ -33,6 +33,8 @@ case "$task" in
   ok:*) echo '{"t":"turn"}'; echo '{"t":"tool"}'; echo '{"t":"usage","in":100,"out":20,"cost":0.001}'; echo "{\\"t\\":\\"end\\",\\"text\\":\\"\${task#ok:}\\"}";;
   fail) echo "broken" >&2; exit 3;;
   sleep) sleep 30;;
+  silent) exit 0;;
+  grandchild:*) sleep 30 & echo $! > "\${task#grandchild:}"; wait;;
   commit:*) f="\${task#commit:}"; mkdir -p "$(dirname "$f")"; echo x > "$f"; git add "$f" >/dev/null; git -c user.email=t@e -c user.name=t commit -qm w >/dev/null; echo '{"t":"end","text":"committed"}';;
 esac
 `;
@@ -211,6 +213,35 @@ describe("stopping", () => {
     const swarm = makeSwarm();
     swarm.shutdown();
     expect(swarm.start([{ name: "a", task: "ok:x" }], "main").ok).toBe(false);
+  });
+});
+
+describe("what a worker leaves behind", () => {
+  test("a clean exit with nothing readable is a failure, not an empty success", async () => {
+    const swarm = makeSwarm();
+    swarm.start([{ name: "quiet", task: "silent", files: ["q/**"] }], "main");
+    await until(() => delivered.length === 1);
+    expect(swarm.current[0]?.status).toBe("failed");
+    expect(swarm.current[0]?.note).toContain("output format may have changed");
+  });
+
+  test("cancel stops what the worker started too", async () => {
+    const pidFile = join(root, "grandchild.pid");
+    const swarm = makeSwarm();
+    swarm.start([{ name: "gc", task: `grandchild:${pidFile}`, files: ["g/**"] }], "main");
+    await until(() => existsSync(pidFile) && readFileSync(pidFile, "utf8").trim() !== "");
+    const pid = Number(readFileSync(pidFile, "utf8").trim());
+    swarm.cancel();
+    const alive = () => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    await until(() => !alive(), 5_000);
+    expect(alive()).toBe(false);
   });
 });
 
