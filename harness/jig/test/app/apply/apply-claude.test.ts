@@ -967,7 +967,17 @@ describe("milestone 4: scripts and workflows", () => {
     await run(withScript.ports, true);
     const written = JSON.parse(withScript.files[PATHS.settings] ?? "{}");
     expect(written.statusLine?.type).toBe("command");
-    expect(String(written.statusLine?.command)).toEndWith("/statusline.sh");
+    expect(written.statusLine?.command).toBe("~/.claude/scripts/statusline.sh");
+
+    // CLAUDE_CONFIG_DIR elsewhere: the link lives there, so the command names it in full
+    const elsewhere = fakePorts({ files: { [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n" } });
+    await applyClaude(
+      { paths: { ...PATHS, scripts: "/cfg/claude/scripts" }, hookPaths: HOOK_PATHS, write: true },
+      elsewhere.ports,
+    );
+    expect(JSON.parse(elsewhere.files[PATHS.settings] ?? "{}").statusLine?.command).toBe(
+      "/cfg/claude/scripts/statusline.sh",
+    );
 
     const without = fakePorts();
     await run(without.ports, true);
