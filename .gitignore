@@ -108,6 +108,8 @@ home/shared/harness/claude/loop.md
 home/shared/harness/claude/scheduled_tasks.json
 home/shared/harness/claude/policy-limits.json*
 home/shared/harness/claude/remote-settings*
+# written by omarchy-theme-set-claude on every Omarchy theme switch
+home/shared/harness/claude/themes/
 home/shared/starship/config/starship.toml
 home/shared/mise/config/config.toml
 home/shared/zellij/config/config.kdl
