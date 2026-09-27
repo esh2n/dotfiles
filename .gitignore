@@ -91,6 +91,23 @@ home/shared/harness/claude/.last-cleanup
 home/shared/harness/claude/.last-update-result.json
 home/shared/harness/claude/correction-analysis/
 home/shared/harness/claude/.yoki/
+# Claude Code runtime state (credentials, daemon, caches) — never commit
+home/shared/harness/claude/.credentials.json
+home/shared/harness/claude/.device-keys.json
+home/shared/harness/claude/.config.json
+home/shared/harness/claude/.cc-writes
+home/shared/harness/claude/daemon.json
+home/shared/harness/claude/routines
+home/shared/harness/claude/shares
+home/shared/harness/claude/cowork_plugins
+home/shared/harness/claude/mcp-discovery-cache
+home/shared/harness/claude/mcp-skill-archives
+home/shared/harness/claude/output-styles
+home/shared/harness/claude/launch.json
+home/shared/harness/claude/loop.md
+home/shared/harness/claude/scheduled_tasks.json
+home/shared/harness/claude/policy-limits.json*
+home/shared/harness/claude/remote-settings*
 home/shared/starship/config/starship.toml
 home/shared/mise/config/config.toml
 home/shared/zellij/config/config.kdl
