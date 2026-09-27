@@ -1,6 +1,6 @@
 # 委譲はサブエージェントとワークフローを規模で使い分け、スクリプトは一本、実行系は各ハーネス、実行の分担は決定的な仕事に限る
 
-Status: accepted — ベンダーは制御をコードに置き規模で使い分け、読む並列と決定的な実行の分担には効いた測定があり、書く並列だけが負けている（2026-09-22）。`2026-09-22-workflow-research-only.md` の「ハーネス横断は考えない」を上書きする
+Status: accepted — ベンダーは制御をコードに置き規模で使い分け、読む並列と決定的な実行の分担には効いた測定があり、書く並列だけが負けている（2026-09-22）。`2026-09-22-workflow-research-only.md` の「ハーネス横断は考えない」を上書きする。Swarm の拡張だけは `2026-09-27-swarm-extension.md` が例外にした
 
 rule: Choose a single subagent for one or two delegations, a workflow script for a fixed multi-step procedure; either way, only delegate read-and-report work or deterministic execution (tests, lint, build, schema checks) — never implementation needing shared design judgment or concurrent writes to one file. Write workflow scripts once in Claude Code's syntax; jig itself has no execution engine.
 

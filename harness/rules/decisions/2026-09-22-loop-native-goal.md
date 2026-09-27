@@ -1,6 +1,6 @@
 # 無人の繰り返し実行は各ハーネスの goal 機能で回し、jig はその制約だけを持つ
 
-Status: accepted — 各ハーネスが goal を持ち、自前の実行系は業界でも生き残っていない（2026-09-22）
+Status: accepted — 各ハーネスが goal を持ち、自前の実行系は業界でも生き残っていない（2026-09-22）。Swarm の拡張だけは `2026-09-27-swarm-extension.md` が例外にした
 
 rule: Never build a custom loop/execution engine; drive unattended repetition through each harness's native goal feature (Claude Code /goal, Codex /goal, DSH goal, pi-goal, omp goal mode). During any unattended goal run, forbid fs.write/fs.edit to test paths and forbid credential and deploy commands via guard rules, and only run tasks whose success condition is machine-checkable before starting.
 
