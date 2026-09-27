@@ -147,3 +147,23 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	grep -q "^docker run --rm --name litellm-proxy" "$LOG"
 	[[ "$stderr" == *"op://llm-automation/xiaomi/credential did not resolve"*"XIAOMI_MIMO_API_KEY"* ]]
 }
+
+@test "litellm-up: an unreadable catalog says so and still serves" {
+	export MODELS_JSON="${BATS_TEST_TMPDIR}/models.json"
+	printf '{ not json\n' >"$MODELS_JSON"
+	run --separate-stderr up
+	[ "$status" -eq 0 ]
+	grep -q "^docker run --rm --name litellm-proxy" "$LOG"
+	[[ "$stderr" == *"could not read the model catalog"* ]]
+	! grep -q -- "-e DEEPSEEK_API_KEY" "$LOG"
+}
+
+@test "litellm-up: without MODELS_JSON the catalog is found from the linked config directory" {
+	unset MODELS_JSON
+	mkdir -p "$HOME/.config"
+	ln -s "${BATS_TEST_DIRNAME}/../../home/shared/litellm/config" "$HOME/.config/litellm"
+	run --separate-stderr up
+	[ "$status" -eq 0 ]
+	grep -q "^docker run --rm .* -e XIAOMI_MIMO_API_KEY " "$LOG"
+	[[ "$stderr" != *"no model catalog"* ]]
+}

@@ -78,4 +78,25 @@ describe("toLitellmModelList", () => {
     const { content } = toLitellmModelList(loadRealTiers());
     expect(spliceManagedBlock(real, content, TIERS_MANAGED_BLOCK_MARKERS)).toBe(real);
   });
+
+  test("an exponent without a decimal point gets one, so YAML reads a float, not a string", () => {
+    const policy = loadRealTiers();
+    const first = policy.tiers.main.deployments[0];
+    if (first === undefined) throw new Error("main has no deployment");
+    const withPrice = {
+      ...policy,
+      tiers: {
+        ...policy.tiers,
+        main: {
+          ...policy.tiers.main,
+          deployments: [{ ...first, modelInfo: { a: 1e-9, b: 1.4e-7, c: 90, d: "1e-9" } }],
+        },
+      },
+    };
+    const { content } = toLitellmModelList(withPrice);
+    expect(content).toContain("      a: 1.0e-9");
+    expect(content).toContain("      b: 1.4e-7");
+    expect(content).toContain("      c: 90");
+    expect(content).toContain('      d: "1e-9"');
+  });
 });

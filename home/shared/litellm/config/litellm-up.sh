@@ -82,9 +82,17 @@ if [ -z "$MODELS_JSON" ] && [ -d "$CFG_DIR" ]; then
   MODELS_JSON="$(cd "$CFG_DIR" && pwd -P)/../../../../harness/policy/models.json"
 fi
 KEY_ARGS=()
-if [ -n "$MODELS_JSON" ] && [ -f "$MODELS_JSON" ]; then
+catalog_keys=""
+if [ -z "$MODELS_JSON" ] || [ ! -f "$MODELS_JSON" ]; then
+  echo "litellm-up: no model catalog at ${MODELS_JSON:-?} — no model keys, every tier will fail" >&2
+elif ! catalog_keys="$(jq -r '.models[] | select(.keyRef and .apiKeyEnv) | "\(.apiKeyEnv) \(.keyRef)"' "$MODELS_JSON" | sort -u)"; then
+  echo "litellm-up: could not read the model catalog ${MODELS_JSON} with jq — no model keys, every tier will fail" >&2
+  catalog_keys=""
+fi
+if [ -n "$catalog_keys" ]; then
   while read -r key_env key_ref; do
-    if ! [[ "$key_env" =~ ^[A-Z][A-Z0-9_]*$ ]] || [[ "$key_ref" != op://* ]]; then
+    # only a *_API_KEY name: a catalog typo must never overwrite PATH and the like
+    if ! [[ "$key_env" =~ ^[A-Z][A-Z0-9_]*_API_KEY$ ]] || [[ "$key_ref" != op://* ]]; then
       echo "litellm-up: skipping a malformed catalog key (${key_env:-?})" >&2
       continue
     fi
@@ -96,10 +104,8 @@ if [ -n "$MODELS_JSON" ] && [ -f "$MODELS_JSON" ]; then
     printf -v "$key_env" '%s' "$key_value"
     export "${key_env?}"
     KEY_ARGS+=(-e "$key_env")
-  done < <(jq -r '.models[] | select(.keyRef and .apiKeyEnv) | "\(.apiKeyEnv) \(.keyRef)"' "$MODELS_JSON" | sort -u)
+  done <<<"$catalog_keys"
   unset key_value
-else
-  echo "litellm-up: no model catalog at ${MODELS_JSON:-?} — no model keys, every tier will fail" >&2
 fi
 
 # 3b) this machine's spend ledger: LiteLLM writes every request's cost to its

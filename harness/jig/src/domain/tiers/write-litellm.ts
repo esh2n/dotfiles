@@ -38,10 +38,19 @@ const PLAIN = /^[A-Za-z0-9_./:@+-]+$/;
 
 /** A YAML scalar: plain when it cannot be misread, JSON-quoted otherwise. */
 function scalar(value: unknown): string {
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number") {
+    // YAML 1.1 (PyYAML, which LiteLLM loads its config with) reads an exponent
+    // without a decimal point, 1e-9, as a string; 1.0e-9 is a float
+    const text = String(value);
+    return /e/i.test(text) && !text.includes(".") ? text.replace(/e/i, ".0e") : text;
+  }
+  if (typeof value === "boolean") return String(value);
   if (value === null) return "null";
   if (typeof value === "string") {
-    const ambiguous = /^(true|false|null|yes|no|on|off|~|[-+]?[0-9.]+)$/i.test(value);
+    const ambiguous =
+      /^(true|false|null|yes|no|on|off|~|[-+]?[0-9._]+(e[-+]?[0-9]+)?|0x[0-9a-f]+|\.inf|\.nan)$/i.test(
+        value,
+      );
     return PLAIN.test(value) && !ambiguous ? value : JSON.stringify(value);
   }
   return JSON.stringify(value);

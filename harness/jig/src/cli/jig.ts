@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync } from "node:fs";
+import { existsSync, renameSync } from "node:fs";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -636,7 +636,10 @@ export async function main(argv: readonly string[]): Promise<number> {
           process.stderr.write("usage: jig tiers [list] | jig tiers use <tier> <model>...\n");
           return 2;
         }
-        await Bun.write(tiersJsonPath, assignTier(tiersText, catalogText, tier, models));
+        // staged beside it and renamed over it, so a crash never leaves a half-written tiers.json
+        const staged = `${tiersJsonPath}.${process.pid}.tmp`;
+        await Bun.write(staged, assignTier(tiersText, catalogText, tier, models));
+        renameSync(staged, tiersJsonPath);
         process.stdout.write(`${tier} now uses ${models.join(" → ")} (run: jig apply --write)\n`);
         return 0;
       } catch (error) {

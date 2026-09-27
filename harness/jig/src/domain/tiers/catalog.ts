@@ -69,14 +69,22 @@ const MODEL_FIELDS = [
   "notes",
 ] as const;
 
-const ENV_NAME = /^[A-Z][A-Z0-9_]*$/;
+/** Env names by what they hold, so a typo can never name PATH, HOME or the like. */
+const ENV_NAME = { key: /^[A-Z][A-Z0-9_]*_API_KEY$/, base: /^[A-Z][A-Z0-9_]*_API_BASE$/ } as const;
 const CATALOG_ID = /^[a-z0-9][a-z0-9._-]*$/;
 
-function optionalEnv(value: unknown, label: string): string | undefined {
+function optionalEnv(
+  value: unknown,
+  label: string,
+  kind: keyof typeof ENV_NAME,
+): string | undefined {
   if (value === undefined) return undefined;
   const name = requireString(value, label);
-  if (!ENV_NAME.test(name)) {
-    throw new Error(`models catalog: ${label} "${name}" is not an environment variable name`);
+  if (!ENV_NAME[kind].test(name)) {
+    const suffix = kind === "key" ? "_API_KEY" : "_API_BASE";
+    throw new Error(
+      `models catalog: ${label} "${name}" must be an upper-case name ending in ${suffix}`,
+    );
   }
   return name;
 }
@@ -100,11 +108,11 @@ function parseModel(raw: unknown, id: string): CatalogModel {
   if (keyRef !== undefined && !keyRef.startsWith("op://")) {
     throw new Error(`models catalog: ${label}.keyRef must be an op:// reference, never a key`);
   }
-  const apiKeyEnv = optionalEnv(obj.apiKeyEnv, `${label}.apiKeyEnv`);
+  const apiKeyEnv = optionalEnv(obj.apiKeyEnv, `${label}.apiKeyEnv`, "key");
   if (keyRef !== undefined && apiKeyEnv === undefined) {
     throw new Error(`models catalog: ${label} has a keyRef but no apiKeyEnv to put it in`);
   }
-  const apiBaseEnv = optionalEnv(obj.apiBaseEnv, `${label}.apiBaseEnv`);
+  const apiBaseEnv = optionalEnv(obj.apiBaseEnv, `${label}.apiBaseEnv`, "base");
   const litellmParams = optionalRecord(obj.litellmParams, `${label}.litellmParams`);
   const modelInfo = optionalRecord(obj.modelInfo, `${label}.modelInfo`);
   return {
