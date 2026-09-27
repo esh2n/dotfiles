@@ -156,7 +156,8 @@ if [[ -n "$cwd" && -d "$cwd" ]]; then
 
                 fetch_ago=""
                 if [[ -f "$fetch_head" ]]; then
-                    fetch_time=$(stat -f %m "$fetch_head" 2>/dev/null || stat -c %Y "$fetch_head" 2>/dev/null)
+                    # GNU stat first: on Linux `stat -f` means filesystem status and succeeds with text
+                    fetch_time=$(stat -c %Y "$fetch_head" 2>/dev/null || stat -f %m "$fetch_head" 2>/dev/null || echo "")
                     if [[ -n "$fetch_time" ]]; then
                         fetch_ago=$(format_duration $(($(date +%s) - fetch_time)))
                     fi
@@ -225,7 +226,7 @@ if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then
             first_epoch=$(gdate -d "$first_timestamp" +%s 2>/dev/null || echo "")
             now_epoch=$(gdate +%s)
         else
-            first_epoch=$(/bin/date -j -f "%Y-%m-%dT%H:%M:%S" "${first_timestamp%%.*}" +%s 2>/dev/null || echo "")
+            first_epoch=$(/bin/date -j -f "%Y-%m-%dT%H:%M:%S" "${first_timestamp%%.*}" +%s 2>/dev/null || date -d "${first_timestamp%%.*}" +%s 2>/dev/null || echo "")
             now_epoch=$(/bin/date +%s)
         fi
         if [[ -n "$first_epoch" ]]; then
