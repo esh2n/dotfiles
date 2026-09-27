@@ -102,3 +102,16 @@ LiteLLM（https://docs.litellm.ai/docs/providers/xiaomi_mimo 、https://docs.lit
 - ツール呼び出しを延々と繰り返す報告は、X の Tech2Wild のほか、MiMo-Code の issue に少なくとも 7 件（#914・#1181・#2436・#2496・#2497・#2509・#2527、要約経由）。経路（vLLM・OpenCode・MiMo Code Desktop）の違う場所で同時期に出ている。
 - 中国語のコミュニティ（知乎・Linux.do）に「Flash は名前ほど速くない」という趣旨の投稿があるが、原文に届かなかった（[unverified]）。
 - この追補で main / complex の判断は変わらない。むしろ切り替えを支持しない材料（ツール呼び出しの繰り返し）が増えた。
+
+## 追補: 手元の実測（2026-09-27）
+
+`home/shared/litellm/config/bench/report-mimo-vs-deepseek.md`。同じ 10 問（JSON の抽出、ツールの引数、CSV→JSON、分類、決まった形式、数値の抽出、計算、コードの修正）を、それぞれの公式 API に 2 回ずつ。温度 0・シード 0。生成速度は推論のトークンも含めて数える。
+
+| モデル | 正解 | 最初の応答まで | 生成速度 | 1 問の合計時間 | 2 回の出力 |
+|---|--:|--:|--:|--:|---|
+| deepseek-flash | 10/10 | 573 ms | 174.0 tok/s | 757 ms | すべて一致 |
+| mimo-v2.6-flash | 10/10 | 3447 ms | 113.0 tok/s | 4288 ms | code-edit-nil で不一致 |
+
+- 一回で答える機械的な作業では、どちらも全問正解。MiMo は 1 問あたり約 5.7 倍時間がかかり、最初の応答まで約 6 倍待つ。
+- 報告にある「ツール呼び出しを延々と繰り返す」問題は、複数ターンでツールを使わせないと出ないので、この測定では見ていない。
+- 最初の MiMo の実行は、アカウントの残高が 0 で全部 HTTP 402（`insufficient_balance`）だった。

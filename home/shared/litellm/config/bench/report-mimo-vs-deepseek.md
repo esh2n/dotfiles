@@ -1,6 +1,13 @@
 # MiMo-V2.6-Flash vs deepseek-flash
 
-- date: 2026-09-27T05:28Z · runs/prompt: 2 · each model on its own vendor API
+- 2026-09-27 · runs/prompt: 2 · each model on its own vendor API · temp 0, seed 0 · max_tokens 4096
+- deepseek-flash was measured first; mimo-v2.6-flash after the Xiaomi account was funded (the first MiMo run got HTTP 402 `insufficient_balance` on every request)
+- decode tok/s counts every generated token, reasoning included (MiMo reasons by default)
+
+| model | pass | avg TTFT (ms) | avg decode (tok/s) | avg total (ms) | identical across runs |
+|---|--:|--:|--:|--:|---|
+| `deepseek-flash` | 10/10 | 573 | 174.0 | 757 | all |
+| `mimo-v2.6-flash` | 10/10 | 3447 | 113.0 | 4288 | varied on code-edit-nil |
 
 ## Local quant A/B — deterministic tier
 
@@ -12,28 +19,29 @@
 
 | model | avg TTFT (ms) | avg decode (tok/s) | avg total (ms) |
 |---|--:|--:|--:|
-| `mimo-v2.6-flash` | — | — | — |
+| `mimo-v2.6-flash` | 3447 | 113.0 | 4288 |
 
 ## Quality (auto-graded, run 1)
 
 | prompt | check | `mimo-v2.6-flash` | agree? |
 |---|---|---|---|
-| json-extract | json_fields | ❌ error | = |
-| tool-args | json_fields | ❌ error | = |
-| csv-to-json | json_array_len | ❌ error | = |
-| classify-sentiment | equals | ❌ error | = |
-| enum-route | equals | ❌ error | = |
-| yes-no | equals | ❌ error | = |
-| exact-format | equals | ❌ error | = |
-| extract-number | equals | ❌ error | = |
-| math-factorial | equals | ❌ error | = |
-| code-edit-nil | contains | ❌ error | = |
+| json-extract | json_fields | ✅ | = |
+| tool-args | json_fields | ✅ | = |
+| csv-to-json | json_array_len | ✅ | = |
+| classify-sentiment | equals | ✅ | = |
+| enum-route | equals | ✅ | = |
+| yes-no | equals | ✅ | = |
+| exact-format | equals | ✅ | = |
+| extract-number | equals | ✅ | = |
+| math-factorial | equals | ✅ | = |
+| code-edit-nil | contains | ✅ | = |
 
-**auto-pass:** `mimo-v2.6-flash` 0/10
+**auto-pass:** `mimo-v2.6-flash` 10/10
 
 ## Determinism (identical output across 2 runs)
 
-- `mimo-v2.6-flash`: all deterministic ✅
+- `mimo-v2.6-flash`: varied on code-edit-nil ⚠️
+
 
 ## Local quant A/B — deterministic tier
 
