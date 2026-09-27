@@ -4,7 +4,7 @@
  * implementations are in `infra/swarm/`; tests pass fakes.
  */
 
-import type { WorkerProgress } from "../../domain/swarm/state";
+import type { DecodedEvent } from "../../domain/swarm/decode";
 
 /** A running worker process. */
 export interface WorkerProcess {
@@ -24,16 +24,10 @@ export interface SpawnOptions {
 
 export type Spawn = (bin: string, args: readonly string[], options: SpawnOptions) => WorkerProcess;
 
-/**
- * One line of a worker's event stream, decoded. `end` is the harness saying
- * the run is over (with an error when it failed); a process can also just
- * exit, which the Swarm handles as well.
- */
-export type WorkerEvent =
-  | { readonly kind: "progress"; readonly progress: WorkerProgress }
-  | { readonly kind: "end"; readonly error?: string; readonly text?: string };
+/** One line of a worker's event stream, decoded (`domain/swarm/decode.ts`). */
+export type WorkerEvent = DecodedEvent;
 
-/** pi and omp speak different JSONL dialects; each adapter supplies its decoder. */
+/** How to read one stdout line; pi and omp share `decodeWorkerLine`, tests pass their own. */
 export type Decode = (line: string) => readonly WorkerEvent[];
 
 /** Append-only logs under the session's state directory. */

@@ -28,6 +28,9 @@ type Parse = typeof import("../../../src/domain/policy/parse");
 type Audit = typeof import("../../../src/infra/audit/jsonl-audit");
 type SessionLog = typeof import("../../../src/infra/logs/session-log");
 type SkillClient = typeof import("../../../src/infra/decision/skill-client");
+type SwarmSession = typeof import("../../../src/infra/swarm/session");
+type SwarmTool = typeof import("../../../src/app/swarm/tool");
+type SwarmWidget = typeof import("../../../src/app/swarm/widget");
 
 export interface Jig {
   readonly env: Environment;
@@ -37,6 +40,9 @@ export interface Jig {
   readonly audit: Audit;
   readonly sessions: SessionLog;
   readonly skill: SkillClient;
+  readonly swarmSession: SwarmSession;
+  readonly swarmTool: SwarmTool;
+  readonly swarmWidget: SwarmWidget;
 }
 
 /** jig's source tree, found from where this file really lives. */
@@ -66,6 +72,9 @@ export function jig(): Promise<Jig> {
         audit: (await import(join(JIG_SRC, "infra", "audit", "jsonl-audit.ts"))) as Audit,
         sessions: (await import(join(JIG_SRC, "infra", "logs", "session-log.ts"))) as SessionLog,
         skill: (await import(join(JIG_SRC, "infra", "decision", "skill-client.ts"))) as SkillClient,
+        swarmSession: (await import(join(JIG_SRC, "infra", "swarm", "session.ts"))) as SwarmSession,
+        swarmTool: (await import(join(JIG_SRC, "app", "swarm", "tool.ts"))) as SwarmTool,
+        swarmWidget: (await import(join(JIG_SRC, "app", "swarm", "widget.ts"))) as SwarmWidget,
       };
     } catch (error) {
       modules = undefined;

@@ -29,6 +29,33 @@ export interface OmpUi {
   notify?(message: string, level?: string): void;
   /** docs/extensions.md: `setStatus(message: string): void`, fire-and-forget. */
   setStatus?(message: string): void;
+  /**
+   * `setWidget(key, content, {placement})` (extensions/types.ts:270): a string
+   * list, a component factory `(tui, theme) => Component`, or `undefined` to
+   * clear. Used by the Swarm's table.
+   */
+  setWidget?(
+    key: string,
+    content: ((tui: OmpTui, theme: OmpTheme) => OmpComponent) | readonly string[] | undefined,
+    options?: { readonly placement?: "aboveEditor" | "belowEditor" },
+  ): void;
+}
+
+/** `TUI`, the one member the Swarm's widget calls. */
+export interface OmpTui {
+  requestRender(): void;
+}
+
+/** `Theme`, the one member the Swarm's widget calls. */
+export interface OmpTheme {
+  fg(color: string, text: string): string;
+}
+
+/** `Component & {dispose?}` as a widget factory returns it. */
+export interface OmpComponent {
+  render(width: number): readonly string[];
+  invalidate?(): void;
+  dispose?(): void;
 }
 
 /** omp's `Model`, the two fields the tier router compares. */
@@ -159,6 +186,34 @@ export interface OmpExtensionApi {
   on(event: "tool_call", handler: Handler<OmpToolCallEvent, OmpToolCallResult>): void;
   on(event: "tool_result", handler: Handler<OmpToolResultEvent, OmpToolResultResult>): void;
   on(event: "session_stop", handler: Handler<OmpSessionStopEvent, OmpSessionStopResult>): void;
+  on(event: "session_shutdown", handler: Handler<{ readonly type?: string }, void>): void;
+  /**
+   * `registerTool(definition)` (extensions/types.ts:1347). `parameters` may be
+   * plain JSON Schema; `loadMode: "essential"` keeps the tool in the
+   * top-level list (extension tools default to "discoverable").
+   */
+  registerTool?(tool: {
+    readonly name: string;
+    readonly label: string;
+    readonly description: string;
+    readonly parameters: unknown;
+    readonly loadMode?: "essential" | "discoverable";
+    execute(
+      toolCallId: string,
+      params: Record<string, unknown>,
+      signal: AbortSignal | undefined,
+      onUpdate: unknown,
+      ctx: OmpContext,
+    ): Promise<{ content: { type: "text"; text: string }[]; details?: unknown; isError?: boolean }>;
+  }): void;
+  /** `sendMessage(message, {triggerTurn, deliverAs})` (extensions/types.ts:1467). */
+  sendMessage?(
+    message: { readonly customType: string; readonly content: string; readonly display: boolean },
+    options?: {
+      readonly triggerTurn?: boolean;
+      readonly deliverAs?: "steer" | "followUp" | "nextTurn" | "aside";
+    },
+  ): void;
   /** `registerCommand(name, {description, handler(args, ctx)})` — optional: older builds without it just get no `/tier`. */
   registerCommand?(
     name: string,

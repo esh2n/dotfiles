@@ -214,8 +214,16 @@ export function summary(workers: readonly Worker[]): string {
   return `Swarm · ${state} · ${parts.join(" · ")}`;
 }
 
-/** The widget's lines, at most MAX_LINES; empty when there are no workers. */
-export function renderTable(workers: readonly Worker[], width: number, now: number): string[] {
+/** What a line of the table is, so an adapter can colour it. */
+export type LineTone = "header" | Status | "more" | "summary";
+
+export interface TableLine {
+  readonly text: string;
+  readonly tone: LineTone;
+}
+
+/** The widget's lines with what each one is, at most MAX_LINES; empty when there are no workers. */
+export function tableLines(workers: readonly Worker[], width: number, now: number): TableLine[] {
   if (workers.length === 0) return [];
   const sorted = [...workers].sort(
     (a, b) => ORDER[a.status] - ORDER[b.status] || a.queuedAt - b.queuedAt,
@@ -224,8 +232,21 @@ export function renderTable(workers: readonly Worker[], width: number, now: numb
   const shown = sorted.length > room ? sorted.slice(0, room - 1) : sorted;
   const rows = shown.map((w) => cells(w, workers, now));
   const widths = layout([HEADER, ...rows], width);
-  const out = [line(HEADER, widths, width), ...rows.map((r) => line(r, widths, width))];
-  if (sorted.length > room) out.push(cut(`… ほか ${sorted.length - shown.length} 件`, width));
-  out.push(cut(summary(workers), width));
+  const out: TableLine[] = [
+    { text: line(HEADER, widths, width), tone: "header" },
+    ...rows.map((r, i) => ({
+      text: line(r, widths, width),
+      tone: shown[i]?.status ?? ("done" as const),
+    })),
+  ];
+  if (sorted.length > room) {
+    out.push({ text: cut(`… ほか ${sorted.length - shown.length} 件`, width), tone: "more" });
+  }
+  out.push({ text: cut(summary(workers), width), tone: "summary" });
   return out;
+}
+
+/** The widget's lines, at most MAX_LINES; empty when there are no workers. */
+export function renderTable(workers: readonly Worker[], width: number, now: number): string[] {
+  return tableLines(workers, width, now).map((l) => l.text);
 }

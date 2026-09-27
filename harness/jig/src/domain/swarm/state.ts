@@ -87,12 +87,14 @@ export function runnable(workers: Workers, config: SwarmConfig): readonly string
   return start;
 }
 
-export function markStarted(workers: Workers, name: string, now: number): Workers {
+/** `model`: what to show for it — the catalog model its tier points at, when known. */
+export function markStarted(workers: Workers, name: string, now: number, model?: string): Workers {
   return update(workers, name, (w) => ({
     ...w,
     status: "working",
     startedAt: now,
     lastEventAt: now,
+    ...(model === undefined ? {} : { model }),
   }));
 }
 

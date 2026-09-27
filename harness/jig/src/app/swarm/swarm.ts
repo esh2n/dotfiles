@@ -40,7 +40,11 @@ export interface SwarmDeps {
   readonly root: string;
   /** Names of worktrees earlier sessions' Swarms created here (for cleanup). */
   readonly ownWorktrees?: readonly string[];
+  /** What to call a tier's model in the table (the catalog id it points at). */
+  readonly modelLabel?: (tier: Tier) => string | undefined;
   readonly onChange: (workers: Workers) => void;
+  /** The Swarm's own worktree names changed: keep them for a later session's cleanup. */
+  readonly onWorktrees?: (names: readonly string[]) => void;
   readonly onDeliver: (message: string, workers: readonly Worker[]) => void;
 }
 
@@ -127,7 +131,9 @@ export class Swarm {
     for (const name of runnable(this.workers, this.deps.config)) {
       const w = this.workers.find((x) => x.spec.name === name);
       if (w === undefined) continue;
-      this.set(markStarted(this.workers, name, this.deps.now()));
+      this.set(
+        markStarted(this.workers, name, this.deps.now(), this.deps.modelLabel?.(w.spec.tier)),
+      );
       try {
         const cwd = w.spec.isolated ? await this.isolate(name) : this.deps.root;
         if (this.closed || this.workers.find((x) => x.spec.name === name)?.status !== "working")
@@ -142,6 +148,7 @@ export class Swarm {
   private async isolate(name: string): Promise<string> {
     const dir = await createWorktree(this.deps.worktree, this.deps.root, name);
     this.worktrees.push(name);
+    this.deps.onWorktrees?.(this.worktrees);
     return dir;
   }
 
@@ -305,6 +312,7 @@ export class Swarm {
   async removeMergedWorktrees(): Promise<readonly string[]> {
     const removed = await removeMerged(this.deps.worktree, this.deps.root, this.worktrees);
     for (const name of removed) this.worktrees.splice(this.worktrees.indexOf(name), 1);
+    if (removed.length > 0) this.deps.onWorktrees?.(this.worktrees);
     return removed;
   }
 
