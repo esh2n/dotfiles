@@ -75,6 +75,7 @@ func (f *fakeSys) Shells() string       { return f.shells }
 
 func setup(t *testing.T, osName string) (*fakeSys, Config) {
 	t.Helper()
+	t.Setenv("NIX_CONFIG", "") // the recorded calls must not depend on the caller's shell
 	home := t.TempDir()
 	repo := t.TempDir()
 	must(t, os.MkdirAll(filepath.Join(home, ".config", "dotfiles"), 0o755))
@@ -95,6 +96,10 @@ func must(t *testing.T, err error) {
 		t.Fatal(err)
 	}
 }
+
+// withFlakes is how a nix call is recorded: with NIX_CONFIG turning flakes on
+// for the nix it runs underneath (home-manager's own calls).
+const withFlakes = "[NIX_CONFIG=extra-experimental-features = nix-command flakes] "
 
 func index(calls []string, prefix string) int {
 	return slices.IndexFunc(calls, func(c string) bool { return strings.HasPrefix(c, prefix) })
@@ -144,7 +149,7 @@ func TestLinuxSwitchesHomeManagerWithBackups(t *testing.T) {
 	f, c := setup(t, "linux")
 	must(t, Run(f, c))
 	flake := c.Repo
-	if index(f.calls, "nix --extra-experimental-features nix-command flakes run "+flake+"#home-manager -- switch --flake "+flake+"#linux --impure -b pre-dotfiles") < 0 {
+	if index(f.calls, withFlakes+"nix --extra-experimental-features nix-command flakes run "+flake+"#home-manager -- switch --flake "+flake+"#linux --impure -b pre-dotfiles") < 0 {
 		t.Fatalf("no home-manager switch: %v", f.calls)
 	}
 	if index(f.calls, "sudo") >= 0 {
@@ -300,5 +305,14 @@ func TestLinuxSaysWhenTheUserIsNotInTheDockerGroup(t *testing.T) {
 		if strings.Contains(call, "sudo") || strings.Contains(call, "omarchy-setup") {
 			t.Fatalf("it must only say, never run: %v", f.calls)
 		}
+	}
+}
+
+func TestNixConfigKeepsWhatTheCallerHas(t *testing.T) {
+	if got := nixConfig(""); got != "extra-experimental-features = nix-command flakes" {
+		t.Fatalf("empty: %q", got)
+	}
+	if got := nixConfig("max-jobs = 4\n"); got != "max-jobs = 4\nextra-experimental-features = nix-command flakes" {
+		t.Fatalf("kept: %q", got)
 	}
 }

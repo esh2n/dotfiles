@@ -65,8 +65,20 @@ func orDefault(v, def string) string {
 	return v
 }
 
+// nixCmd runs nix with flakes on. The flag covers this call only; the nix
+// that home-manager (and anything else) runs underneath reads NIX_CONFIG, and
+// a fresh multi-user install on Linux has flakes off, so both are set. A
+// NIX_CONFIG the caller already has is kept.
 func nixCmd(s Sys, args ...string) error {
-	return s.Run(nil, nix[0], append(nix[1:], args...)...)
+	return s.Run([]string{"NIX_CONFIG=" + nixConfig(os.Getenv("NIX_CONFIG"))}, nix[0], append(nix[1:], args...)...)
+}
+
+func nixConfig(current string) string {
+	const flakes = "extra-experimental-features = nix-command flakes"
+	if strings.TrimSpace(current) == "" {
+		return flakes
+	}
+	return strings.TrimRight(current, "\n") + "\n" + flakes
 }
 
 // Run brings this machine to the checkout.
