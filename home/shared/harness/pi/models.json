@@ -27,7 +27,7 @@
         },
         {
           "id": "deterministic",
-          "name": "deterministic — Qwen3.8-27B (desktop GPU)",
+          "name": "deterministic — Qwen3.8-27B (Linux model server)",
           "reasoning": true,
           "input": [
             "text"

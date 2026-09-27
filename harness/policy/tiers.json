@@ -94,7 +94,7 @@
     },
     "deterministic": {
       "alias": "deterministic",
-      "displayName": "Qwen3.8-27B on the desktop GPU",
+      "displayName": "Qwen3.8-27B on the Linux model server",
       "use": [
         "qwen3.8-27b-linux",
         "qwen3.8-27b-mac"
@@ -105,7 +105,7 @@
       ],
       "contextWindow": 65536,
       "maxTokens": 32768,
-      "_context_source": "deterministic is the executor of a plan a frontier model designed (rules/decisions/2026-09-26-deterministic-on-the-gpu.md). It runs on the Omarchy desktop's llama-server (home/linux/llama-server), one slot with -c 65536: on 24GB that is the most one slot holds next to the 17.4GB model with an fp16 KV cache, and Qwen3.8-27B slows about 25x past ~80K (llama.cpp #27623). contextWindow follows that -c. The backend is `openai/` because llama-server speaks the OpenAI API; the model id is the GGUF file name without .gguf (router mode, --models-dir). samplingParams are the model card's thinking-mode values, the ones Qwen evaluated its agentic coding with (https://huggingface.co/Qwen/Qwen3.8-27B).",
+      "_context_source": "deterministic is the executor of a plan a frontier model designed (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md). It runs on the Linux model server (llama-server on the Omarchy machine ; home/linux/llama-server), one slot with -c 65536: on 24GB that is the most one slot holds next to the 17.4GB model with an fp16 KV cache, and Qwen3.8-27B slows about 25x past ~80K (llama.cpp #27623). contextWindow follows that -c. The backend is `openai/` because llama-server speaks the OpenAI API; the model id is the GGUF file name without .gguf (router mode, --models-dir). samplingParams are the model card's thinking-mode values, the ones Qwen evaluated its agentic coding with (https://huggingface.co/Qwen/Qwen3.8-27B).",
       "compat": {
         "thinkingFormat": "qwen-chat-template",
         "supportsReasoningEffort": false
@@ -124,10 +124,10 @@
         "top_k": 20
       },
       "pi": {
-        "name": "deterministic — Qwen3.8-27B (desktop GPU)"
+        "name": "deterministic — Qwen3.8-27B (Linux model server)"
       },
       "dsh": {
-        "name": "deterministic (Qwen3.8-27B, desktop GPU)",
+        "name": "deterministic (Qwen3.8-27B, Linux model server)",
         "_comment": {
           "name": "add `input: [text, image]` if this qwen build is vision-capable"
         }

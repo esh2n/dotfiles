@@ -119,7 +119,7 @@ const EXPECTED_AFTER = [
   "        # deterministic -> proxy alias that maps to Qwen3.8-27B-Q4_K_M",
   "        # add `input: [text, image]` if this qwen build is vision-capable",
   "        - id: deterministic",
-  "          name: deterministic (Qwen3.8-27B, desktop GPU)",
+  "          name: deterministic (Qwen3.8-27B, Linux model server)",
   "    # END jig:tiers",
   "",
 ].join("\n");

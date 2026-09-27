@@ -69,10 +69,10 @@ providers:
         maxContextWindow: 1000000
         maxTokens: 32768
       - id: deterministic
-        name: deterministic — local Qwen (LiteLLM tier)
+        name: deterministic — Qwen3.8-27B on the Linux model server (LiteLLM tier)
         reasoning: true
         input: [text]
-        contextWindow: 131072
+        contextWindow: 65536
         maxTokens: 32768
         compat:
           thinkingFormat: qwen-chat-template
