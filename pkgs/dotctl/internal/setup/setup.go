@@ -45,6 +45,7 @@ var steps = map[string]step{
 	"claude-cli":      claudeCLI,
 	"codebase-memory": codebaseMemory,
 	"gh-extensions":   ghExtensions,
+	"git-filters":     gitFilters,
 	"git-identity":    gitIdentity,
 	"git-lfs":         gitLFS,
 	"mise-trust":      miseTrust,

@@ -58,10 +58,12 @@ in
   '';
 
   # Commands the harnesses need that jig does not run: Claude Code's native
-  # installer and pi's packages. (Claude Code's MCP servers are jig's:
-  # harnessApply writes them into ~/.claude.json.)
+  # installer, pi's packages, and the git filter that keeps pi's runtime key
+  # out of the tracked settings.json (.gitattributes). (Claude Code's MCP
+  # servers are jig's: harnessApply writes them into ~/.claude.json.)
   dotfiles.setup = {
     claude-cli.command = config.lib.dotfiles.setupStep "claude-cli";
+    git-filters.command = config.lib.dotfiles.setupStep "git-filters";
     pi-packages = {
       command = config.lib.dotfiles.setupStep "pi-packages";
       after = [ "harnessApply" ];

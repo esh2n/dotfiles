@@ -20,6 +20,5 @@
     "npm:pi-mcp-adapter",
     "npm:@tintinweb/pi-subagents"
   ],
-  "lastChangelogVersion": "0.87.1",
   "theme": "unkai"
 }
