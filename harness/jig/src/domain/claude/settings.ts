@@ -11,7 +11,7 @@
  * So `current` enters this function for exactly two purposes: to carry
  * unmanaged keys through unchanged, and to say what is being removed. No
  * managed value is ever derived from it. `autoMode`, `enabledPlugins`,
- * `statusLine`, `model`, `effortLevel`, `theme` and everything else Claude
+ * `model`, `effortLevel`, `theme` and everything else Claude
  * Code writes for itself survive byte-for-byte in value — the same
  * runtime-owned-key carryover yoki-switch does for `.autoMode`, generalized to
  * "everything jig did not claim".
@@ -78,6 +78,11 @@ export interface ClaudeManagedInput {
   readonly defaultMode: string;
   /** The host-mode sandbox block (domain/claude/sandbox.ts). */
   readonly sandbox: JsonObject;
+  /**
+   * The status line, when the harness ships `scripts/statusline.sh`: owned
+   * then, so a new machine gets it; carried through untouched when absent.
+   */
+  readonly statusLine?: JsonObject;
 }
 
 /** One group of values the apply would drop, named so the dry-run can print them. */
@@ -117,6 +122,7 @@ export const OWNED_KEYS: readonly string[] = [
   "permissions.deny",
   "permissions.defaultMode",
   "sandbox",
+  "statusLine",
 ];
 
 function isJsonObject(value: Json | undefined): value is JsonObject {
@@ -284,12 +290,20 @@ export function composeClaudeSettings(
     hooks: hooks.value,
     permissions: permissions.value,
     sandbox: managed.sandbox,
+    ...(managed.statusLine === undefined ? {} : { statusLine: managed.statusLine }),
     ...(env.value === undefined ? {} : { env: env.value }),
   };
 
   const settings = mergeInOrder(withoutDeadKeys(current), replacements);
 
-  const claimed = new Set(["hooks", "permissions", "sandbox", "env", ...DEAD_KEYS.keys()]);
+  const claimed = new Set([
+    "hooks",
+    "permissions",
+    "sandbox",
+    "env",
+    ...(managed.statusLine === undefined ? [] : ["statusLine"]),
+    ...DEAD_KEYS.keys(),
+  ]);
   const left = [
     ...Object.keys(current ?? {}).filter((key) => !claimed.has(key)),
     ...permissions.left,
@@ -313,7 +327,11 @@ export function composeClaudeSettings(
     ...(env.removed.length === 0 ? [] : [{ key: "env", items: env.removed }]),
   ];
 
-  return { settings, owned: OWNED_KEYS, left, removed };
+  const owned =
+    managed.statusLine === undefined
+      ? OWNED_KEYS.filter((key) => key !== "statusLine")
+      : OWNED_KEYS;
+  return { settings, owned, left, removed };
 }
 
 /**
@@ -330,7 +348,15 @@ export function ownedView(settings: JsonObject | undefined): string {
     }
     return value ?? null;
   };
-  return JSON.stringify(OWNED_KEYS.map((key) => [key, pick(key)]));
+  // An owned key the file does not have is left out rather than written as
+  // null, so claiming a new key (statusLine) does not change the view of a
+  // file recorded before the claim — that would read as a hand edit.
+  return JSON.stringify(
+    OWNED_KEYS.flatMap((key) => {
+      const value = pick(key);
+      return value === null ? [] : [[key, value]];
+    }),
+  );
 }
 
 /** Exactly how the file is written: 2-space JSON, one trailing newline. */

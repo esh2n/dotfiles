@@ -961,6 +961,18 @@ describe("milestone 4: scripts and workflows", () => {
     ]);
     expect(files[`${PATHS.scripts}/mine.sh`]).toBe("mine");
   });
+
+  test("the shipped statusline.sh is named in settings.json; without it the key is not claimed", async () => {
+    const withScript = fakePorts({ files: { [`${H}/scripts/statusline.sh`]: "#!/bin/sh\n" } });
+    await run(withScript.ports, true);
+    const written = JSON.parse(withScript.files[PATHS.settings] ?? "{}");
+    expect(written.statusLine?.type).toBe("command");
+    expect(String(written.statusLine?.command)).toEndWith("/statusline.sh");
+
+    const without = fakePorts();
+    await run(without.ports, true);
+    expect(JSON.parse(without.files[PATHS.settings] ?? "{}").statusLine).toBeUndefined();
+  });
 });
 
 describe("a missing source is an error, not an empty result", () => {

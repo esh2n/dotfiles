@@ -402,6 +402,7 @@ export async function applyClaude(
       // itself stays auto so everything unlisted still reaches the classifier.
       defaultMode: "auto",
       sandbox: hostSandbox(sandbox.source),
+      ...(await statusLineFor(ports, paths)),
     },
   );
   const currentText = (await ports.readFile(paths.settings)) ?? "";
@@ -542,6 +543,21 @@ function presentNames(
   }
   if (typeof declared !== "object" || declared === null) return [];
   return servers.map((s) => s.name).filter((name) => name in declared);
+}
+
+/**
+ * The status line runs the harness's `scripts/statusline.sh` through the link
+ * jig keeps in `~/.claude/scripts`. Without that script jig claims nothing and
+ * whatever the file has stays.
+ */
+async function statusLineFor(
+  ports: ClaudeApplyPorts,
+  paths: ClaudeApplyPaths,
+): Promise<{ statusLine?: JsonObject }> {
+  if ((await ports.readFile(`${paths.harnessRoot}/scripts/statusline.sh`)) === undefined) return {};
+  const underHome = paths.scripts === `${paths.home}/.claude/scripts`;
+  const command = underHome ? "~/.claude/scripts/statusline.sh" : `${paths.scripts}/statusline.sh`;
+  return { statusLine: { type: "command", command } };
 }
 
 /** Where the hash of the part of settings.json jig owns is recorded. */

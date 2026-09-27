@@ -168,7 +168,7 @@ Owned, from sources:
   `policy/sandbox.json`, which the owner maintains and no agent may write.
 
 Preserved: everything else in the live file, byte-for-byte in value —
-`autoMode`, `enabledPlugins`, `statusLine`, `model`, `effortLevel`, `theme`,
+`autoMode`, `enabledPlugins`, `model`, `effortLevel`, `theme`,
 `env` (minus the retiring harness's own keys: `YOKI_*` and
 `CLAUDE_PLUGIN_ROOT`, whose value names the runtime being retired), and any key
 Claude Code adds later.
@@ -820,7 +820,10 @@ same mechanism as `skills/`, `agents/` and `rules/`
 - **`~/.claude/scripts/`** — one link per regular file of `H/scripts/`
   (`domain/claude/scripts-dir.ts`; `README.md` gets none). The path is
   fixed by `settings.json`'s `statusLine.command:
-  "~/.claude/scripts/statusline.sh"`, which the link keeps valid.
+  "~/.claude/scripts/statusline.sh"`, which the link keeps valid. jig owns
+  that `statusLine` key whenever `H/scripts/statusline.sh` exists, so a new
+  machine gets the status line too; without the script the key is carried
+  as found.
 - **`~/.claude/workflows/`** — one link per `*.js` of `H/workflows/` plus one
   for `lib/` when it is a directory (`domain/claude/workflows-dir.ts`). The
   scripts are the ones the

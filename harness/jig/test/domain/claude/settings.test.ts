@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type ClaudeManagedInput,
   composeClaudeSettings,
+  ownedView,
   renderClaudeSettings,
 } from "../../../src/domain/claude/settings";
 import type { Json, JsonObject } from "../../../src/domain/compose/merge";
@@ -276,6 +277,51 @@ describe("the managed keys themselves", () => {
       deny: ["Bash(shutdown *)"],
       defaultMode: "auto",
     });
+  });
+});
+
+describe("the status line", () => {
+  const STATUS: JsonObject = { type: "command", command: "~/.claude/scripts/statusline.sh" };
+
+  test("a machine without one gets the harness's status line", () => {
+    const { settings, left } = composeClaudeSettings(
+      { model: "x" },
+      { ...MANAGED, statusLine: STATUS },
+    );
+    expect(settings.statusLine).toEqual(STATUS);
+    expect(left).toEqual(["model"]);
+  });
+
+  test("a different status line is replaced when the harness ships one", () => {
+    const { settings } = composeClaudeSettings(
+      { statusLine: { type: "command", command: "old.sh" } },
+      { ...MANAGED, statusLine: STATUS },
+    );
+    expect(settings.statusLine).toEqual(STATUS);
+  });
+
+  test("without one from the harness, the file's own is carried and reported as left", () => {
+    const current: JsonObject = { statusLine: { type: "command", command: "mine.sh" } };
+    const { settings, left } = composeClaudeSettings(current, MANAGED);
+    expect(settings.statusLine).toEqual(current.statusLine);
+    expect(left).toContain("statusLine");
+  });
+
+  test("the owned view of a file with no status line is the view recorded before the claim", () => {
+    const before: JsonObject = {
+      hooks: {},
+      permissions: { allow: [], deny: [], defaultMode: "auto" },
+      sandbox: {},
+    };
+    expect(ownedView(before)).toBe(
+      JSON.stringify([
+        ["hooks", {}],
+        ["permissions.allow", []],
+        ["permissions.deny", []],
+        ["permissions.defaultMode", "auto"],
+        ["sandbox", {}],
+      ]),
+    );
   });
 });
 
