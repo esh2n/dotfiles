@@ -7,6 +7,7 @@
 package records
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -83,18 +84,46 @@ func nameDate(name string) (time.Time, bool) {
 // Prune removes each item and drops the research INDEX lines that link to
 // it. It refuses, before touching anything, a path that is not directly
 // inside a flow directory — stock (decisions, knowledge) is never pruned.
+// A removal that fails is reported and the rest still go; the INDEX loses
+// the lines of exactly the entries that went.
 func Prune(repo string, items []Item) error {
 	for _, it := range items {
 		if !inFlow(it.Path) {
 			return fmt.Errorf("not a flow document: %s", it.Path)
 		}
 	}
+	var removed []Item
+	var errs []error
 	for _, it := range items {
-		if err := os.RemoveAll(filepath.Join(repo, filepath.FromSlash(it.Path))); err != nil {
-			return err
+		if err := removeAll(filepath.Join(repo, filepath.FromSlash(it.Path))); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", it.Path, err))
+			continue
 		}
+		removed = append(removed, it)
 	}
-	return dropIndexLines(repo, items)
+	errs = append(errs, dropIndexLines(repo, removed))
+	return errors.Join(errs...)
+}
+
+// removeAll is os.RemoveAll; a test replaces it to fail one removal.
+var removeAll = os.RemoveAll
+
+// Capture runs a command with a timeout and returns its stdout, its stderr
+// and its error (internal/sys.OS.Capture).
+type Capture func(timeout time.Duration, name string, args ...string) (string, string, error)
+
+// GitFirstCommit dates a checkout path by the commit that added it, through
+// capture so the call is bounded and testable; a failure leaves it undated.
+func GitFirstCommit(repo string, capture Capture) DateOf {
+	return func(rel string) (time.Time, bool) {
+		out, _, err := capture(time.Minute, "git", "-C", repo, "log", "--diff-filter=A", "--format=%as", "--reverse", "--", rel)
+		if err != nil {
+			return time.Time{}, false
+		}
+		first, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+		d, err := time.Parse("2006-01-02", first)
+		return d, err == nil
+	}
 }
 
 func inFlow(rel string) bool {

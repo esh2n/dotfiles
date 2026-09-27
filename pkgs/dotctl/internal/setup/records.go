@@ -1,7 +1,6 @@
 package setup
 
 import (
-	"strings"
 	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/records"
@@ -12,7 +11,7 @@ import (
 // warns: promoting is a judgment the records-triage skill makes, and
 // removing is `dotctl records prune --yes`, run on purpose.
 func recordsTTL(e Env) error {
-	expired, err := records.Expired(e.Repo, e.Now(), records.TTL, e.firstCommit)
+	expired, err := records.Expired(e.Repo, e.Now(), records.TTL, e.firstCommit())
 	if err != nil {
 		return err
 	}
@@ -26,16 +25,11 @@ func recordsTTL(e Env) error {
 	return nil
 }
 
-// firstCommit dates a checkout path by the commit that added it.
-func (e Env) firstCommit(rel string) (time.Time, bool) {
+// firstCommit dates by git when it is installed; without git an undated
+// entry stays undated.
+func (e Env) firstCommit() records.DateOf {
 	if !e.Sys.Has("git") {
-		return time.Time{}, false
+		return func(string) (time.Time, bool) { return time.Time{}, false }
 	}
-	out, _, err := e.Sys.Capture(time.Minute, "git", "-C", e.Repo, "log", "--diff-filter=A", "--format=%as", "--reverse", "--", rel)
-	if err != nil {
-		return time.Time{}, false
-	}
-	first, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
-	d, err := time.Parse("2006-01-02", first)
-	return d, err == nil
+	return records.GitFirstCommit(e.Repo, e.Sys.Capture)
 }

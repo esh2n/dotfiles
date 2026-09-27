@@ -118,3 +118,45 @@ func TestPruneRefusesAPathOutsideTheFlowDirs(t *testing.T) {
 		t.Fatal("a stock record was touched")
 	}
 }
+
+func TestPruneKeepsGoingPastAFailureAndStillDropsTheRemovedLines(t *testing.T) {
+	repo := t.TempDir()
+	research := filepath.Join(repo, "harness", "rules", "research")
+	write(t, filepath.Join(research, "2026-09-01-a.md"), "")
+	write(t, filepath.Join(research, "2026-09-02-b.md"), "")
+	write(t, filepath.Join(research, "INDEX.md"), "- [a](2026-09-01-a.md)\n- [b](2026-09-02-b.md)\n- [c](2026-09-03-c.md)\n")
+	removeAll = func(p string) error {
+		if strings.HasSuffix(p, "2026-09-01-a.md") {
+			return os.ErrPermission
+		}
+		return os.RemoveAll(p)
+	}
+	t.Cleanup(func() { removeAll = os.RemoveAll })
+	err := Prune(repo, []Item{{Path: "harness/rules/research/2026-09-01-a.md"}, {Path: "harness/rules/research/2026-09-02-b.md"}})
+	if err == nil || !strings.Contains(err.Error(), "2026-09-01-a.md") {
+		t.Fatalf("the failure must be reported: %v", err)
+	}
+	index, _ := os.ReadFile(filepath.Join(research, "INDEX.md"))
+	if string(index) != "- [a](2026-09-01-a.md)\n- [c](2026-09-03-c.md)\n" {
+		t.Fatalf("index %q", index)
+	}
+}
+
+func TestGitFirstCommitReadsTheOldestAddDate(t *testing.T) {
+	var got []string
+	capture := func(_ time.Duration, name string, args ...string) (string, string, error) {
+		got = append([]string{name}, args...)
+		return "2026-09-02\n2026-09-20\n", "", nil
+	}
+	d, ok := GitFirstCommit("/repo", capture)("plans/x")
+	if !ok || d.Format("2006-01-02") != "2026-09-02" {
+		t.Fatalf("%v %v", d, ok)
+	}
+	if strings.Join(got, " ") != "git -C /repo log --diff-filter=A --format=%as --reverse -- plans/x" {
+		t.Fatalf("ran %v", got)
+	}
+	failing := func(time.Duration, string, ...string) (string, string, error) { return "", "", os.ErrNotExist }
+	if _, ok := GitFirstCommit("/repo", failing)("plans/x"); ok {
+		t.Fatal("a failed git must leave the entry undated")
+	}
+}

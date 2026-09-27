@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/records"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/sys"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
@@ -40,7 +39,7 @@ func runRecords(args []string, out, errOut io.Writer) int {
 		return 2
 	}
 	p := ui.Printer{Out: out, Err: errOut, Prefix: "records"}
-	expired, err := records.Expired(*repo, time.Now(), records.TTL, gitFirstCommit(*repo))
+	expired, err := records.Expired(*repo, time.Now(), records.TTL, records.GitFirstCommit(*repo, sys.OS{}.Capture))
 	if err != nil {
 		p.Error("%v", err)
 		return 1
@@ -62,17 +61,4 @@ func runRecords(args []string, out, errOut io.Writer) int {
 	}
 	fmt.Fprintf(out, "removed %d; commit the removal in the checkout\n", len(expired))
 	return 0
-}
-
-// gitFirstCommit dates a checkout path by the commit that added it.
-func gitFirstCommit(repo string) records.DateOf {
-	return func(rel string) (time.Time, bool) {
-		b, err := exec.Command("git", "-C", repo, "log", "--diff-filter=A", "--format=%as", "--reverse", "--", rel).Output()
-		if err != nil {
-			return time.Time{}, false
-		}
-		first, _, _ := strings.Cut(strings.TrimSpace(string(b)), "\n")
-		d, err := time.Parse("2006-01-02", first)
-		return d, err == nil
-	}
 }
