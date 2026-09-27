@@ -23,7 +23,8 @@ export const WORKER_ENV = "JIG_SWARM_WORKER";
 
 /** Copy of `SWARM_TOOL_DESCRIPTION` (src/app/swarm/tool.ts). */
 export const DESCRIPTION = [
-  "Run several worker agents in the background, each on its own task, and keep talking with the user meanwhile.",
+  "When to use: two or more independent pieces of work that can run side by side (a worker each). For a single piece of work, use the harness's own subagent tool if it has one (omp: task); where it has none, a batch of one worker is fine.",
+  "It runs the workers in the background and you keep talking with the user meanwhile.",
   "action=start: give `items`, each {name, task, tier?, effort?, files?, isolated?}. It returns at once; the results of one start arrive together as one message when all of them have finished (at once if one fails).",
   "Give each worker a self-contained task (it sees nothing of this conversation) and the `files` it may write (paths or globs). Workers whose files overlap never run at the same time; a worker with no `files` is treated as touching everything, so it runs alone among writers.",
   "tier: main (everyday, default: this session's tier), complex (harder reasoning), deterministic (carrying out a plan already designed; one at a time).",
