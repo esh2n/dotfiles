@@ -120,15 +120,28 @@ if [ -n "$LITELLM_DB_PASSWORD" ]; then
   # the DB container reads its password from a file (POSTGRES_PASSWORD_FILE),
   # so it is not kept in the container's config
   SECRET_DIR="${XDG_RUNTIME_DIR:-$HOME/.local/state}/litellm-secrets"
+  # A directory at db_password, or a secrets directory this user does not own,
+  # is what `-v` left when the DB container restarted at boot before this
+  # script wrote the file ($XDG_RUNTIME_DIR is emptied on reboot); Docker made
+  # both as root, so only the owner can clear them.
+  if [ -d "$SECRET_DIR/db_password" ] || { [ -e "$SECRET_DIR" ] && [ ! -O "$SECRET_DIR" ]; }; then
+    echo "litellm-up: $SECRET_DIR was created by Docker as root; clear it once:" >&2
+    echo "  docker rm -f $DB_NAME && sudo rm -rf $SECRET_DIR" >&2
+    exit 1
+  fi
   (umask 077 && mkdir -p "$SECRET_DIR" && printf '%s' "$LITELLM_DB_PASSWORD" >"$SECRET_DIR/db_password")
   docker network inspect "$NETWORK" >/dev/null 2>&1 || docker network create "$NETWORK" >/dev/null
   if [ "$(docker inspect -f '{{.State.Running}}' "$DB_NAME" 2>/dev/null || true)" != true ]; then
     docker rm -f "$DB_NAME" >/dev/null 2>&1 || true
     # 5432 on loopback only: the ledger sync reads it here, and on the
     # observer machine `tailscale serve --tcp 5432` is its one exposure.
+    # --mount, not -v: a missing source is an error instead of a new root-owned
+    # directory, so the boot-time restart fails and this script recreates the
+    # container after writing the file
+    # (docs.docker.com/engine/storage/bind-mounts/).
     docker run -d --name "$DB_NAME" --restart unless-stopped --network "$NETWORK" \
       -p 127.0.0.1:5432:5432 -v litellm-db-data:/var/lib/postgresql/data \
-      -v "$SECRET_DIR/db_password:/run/secrets/db_password:ro" \
+      --mount "type=bind,src=$SECRET_DIR/db_password,dst=/run/secrets/db_password,readonly" \
       -e POSTGRES_PASSWORD_FILE=/run/secrets/db_password -e POSTGRES_USER=litellm -e POSTGRES_DB=litellm \
       "$DB_IMAGE" >/dev/null
   fi
