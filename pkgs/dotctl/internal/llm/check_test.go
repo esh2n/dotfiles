@@ -214,6 +214,16 @@ func TestCheckFailsWhenLMStudioLacksTheFallbackModel(t *testing.T) {
 	}
 }
 
+func TestCheckAcceptsAVariantOfAListedModel(t *testing.T) {
+	w := newWorld(t, "darwin", Offer{LMStudio: true})
+	healthy(w)
+	fallbackIs(w, "qwen@4bit")
+	_, out, _ := runCheck(w, false)
+	if !strings.Contains(out, "PASS deterministic falls back to LM Studio's qwen@4bit") {
+		t.Fatalf("out:\n%s", out)
+	}
+}
+
 func TestTheRepositorysLiteLLMConfigNamesAnLMStudioFallback(t *testing.T) {
 	e := Env{Repo: filepath.Join("..", "..", "..", "..")}
 	if got := lmStudioFallback(e); got == "" {

@@ -130,10 +130,12 @@ func checkLMStudioModels(e Env, c *Checker) {
 	switch {
 	case want == "":
 		c.fail("deterministic's LM Studio fallback not found in litellm/config.yaml (a `model: lm_studio/...` line)")
-	case slices.Contains(models, want):
+	// LM Studio lists a model once; `<id>@<quant>` picks one of its
+	// downloaded variants, so the id before the @ is what must be listed
+	case slices.Contains(models, want) || slices.Contains(models, strings.SplitN(want, "@", 2)[0]):
 		c.pass("deterministic falls back to LM Studio's %s", want)
 	default:
-		c.fail("deterministic falls back to %s, which LM Studio does not list — set that line in litellm/config.yaml to one of the ids above", want)
+		c.fail("deterministic falls back to %s, which LM Studio does not list — set its entry in harness/policy/models.json to one of the ids above", want)
 	}
 }
 
