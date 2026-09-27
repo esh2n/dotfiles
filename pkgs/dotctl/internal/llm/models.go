@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/sys"
 )
@@ -76,7 +77,10 @@ func fetchModel(e Env, m ggufModel, dest string) error {
 	part := dest + ".part"
 	e.UI.Note("downloading %s (%.1f GB) into %s", m.File, float64(m.Size)/1e9, filepath.Dir(dest))
 	// no timeout: 17GB takes as long as the line allows; -C - resumes
-	if _, errOut, err := e.Sys.Exec(sys.Cmd{Name: "curl", Args: []string{"-fL", "--retry", "3", "-C", "-", "-o", part, m.URL}}); err != nil {
+	stop := watchDownload(e, m, part)
+	_, errOut, err := e.Sys.Exec(sys.Cmd{Name: "curl", Args: []string{"-fL", "--retry", "3", "-C", "-", "-o", part, m.URL}})
+	stop()
+	if err != nil {
 		return fmt.Errorf("curl: %v: %s", err, strings.TrimSpace(errOut))
 	}
 	sum, err := fileSHA256(part)
@@ -90,6 +94,35 @@ func fetchModel(e Env, m ggufModel, dest string) error {
 		return fmt.Errorf("sha256 %s, want %s; the download was removed", sum, m.SHA256)
 	}
 	return os.Rename(part, dest)
+}
+
+// progressEvery is how often a running download reports how far it is.
+var progressEvery = 30 * time.Second
+
+// watchDownload reports the size of the .part file every progressEvery
+// while curl runs silently under Exec. The returned stop waits for the
+// watcher to finish, so nothing prints after it returns.
+func watchDownload(e Env, m ggufModel, part string) (stop func()) {
+	done, finished := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(finished)
+		tick := time.NewTicker(progressEvery)
+		defer tick.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-tick.C:
+				if info, err := os.Stat(part); err == nil {
+					e.UI.Note("%s: %.1f / %.1f GB (%d%%)", m.File, float64(info.Size())/1e9, float64(m.Size)/1e9, info.Size()*100/m.Size)
+				}
+			}
+		}
+	}()
+	return func() {
+		close(done)
+		<-finished
+	}
 }
 
 func fileSHA256(path string) (string, error) {

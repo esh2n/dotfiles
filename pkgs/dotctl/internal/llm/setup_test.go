@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func contains(list []string, sub string) bool {
@@ -202,6 +203,31 @@ func TestSetupFetchesTheListedModelsOnceAndChecksTheirHash(t *testing.T) {
 	Setup(w.env, nil)
 	if w.sys.ran("curl ") {
 		t.Fatal("a model of the listed size is fetched again")
+	}
+}
+
+func TestSetupReportsDownloadProgress(t *testing.T) {
+	w := newWorld(t, "linux", Offer{GPU: true})
+	body := []byte("0123456789")
+	sum := sha256.Sum256(body)
+	write(t, filepath.Join(w.env.Repo, "home", "linux", "llama-server", "models.json"),
+		fmt.Sprintf(`{"models": [{"file": "m.gguf", "url": "https://example.test/m.gguf", "size": %d, "sha256": %q}]}`, len(body), hex.EncodeToString(sum[:])))
+	part := filepath.Join(w.env.Home, "models", "m.gguf.part")
+	defer func(d time.Duration) { progressEvery = d }(progressEvery)
+	progressEvery = time.Millisecond
+	w.sys.onExec = func(line string) (bool, error) {
+		if !strings.HasPrefix(line, "curl ") {
+			return false, nil
+		}
+		if err := os.WriteFile(part, body[:5], 0o644); err != nil {
+			return true, err
+		}
+		time.Sleep(50 * time.Millisecond)
+		return true, os.WriteFile(part, body, 0o644)
+	}
+	Setup(w.env, nil)
+	if !strings.Contains(w.out.String(), "m.gguf: 0.0 / 0.0 GB (50%)") {
+		t.Fatalf("no progress line:\n%s", w.out.String())
 	}
 }
 
