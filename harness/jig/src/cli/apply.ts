@@ -743,6 +743,8 @@ function formatOmp(report: OmpApplyReport, paths: OmpApplyPaths): string {
     "",
     ...mcpJsonLines(report),
     "",
+    ...configYmlLines(report),
+    "",
     ...extensionLines(report),
     "",
     ...ompLeftoverLines(report),
@@ -836,6 +838,29 @@ function mcpJsonLines(report: OmpApplyReport): readonly string[] {
     ...(mcpJson.diff === ""
       ? ["  (no differences)"]
       : ["--- diff (current vs generated) ---", mcpJson.diff]),
+  );
+  return lines;
+}
+
+function configYmlLines(report: OmpApplyReport): readonly string[] {
+  const { configYml } = report;
+  const lines = [
+    `config.yml: ${configYml.outcome}  ${configYml.path}`,
+    "  jig's keys: modelRoles, tools.approvalMode, tools.approval.eval, statusLine (domain/omp/config.ts);",
+    "  omp rewrites this file itself, so the rest is carried as omp wrote it and a hand edit is judged on jig's keys only.",
+  ];
+  if (configYml.invalid !== undefined) {
+    lines.push(
+      `  CONFLICT: the file could not be read as YAML (${configYml.invalid}); nothing is written until it is fixed by hand.`,
+    );
+  }
+  if (configYml.carried.length > 0) {
+    lines.push(`  omp's keys carried through: ${configYml.carried.join(", ")}`);
+  }
+  lines.push(
+    ...(configYml.diff === ""
+      ? ["  (no differences)"]
+      : ["--- diff (current vs generated) ---", configYml.diff]),
   );
   return lines;
 }

@@ -132,8 +132,9 @@ the model:
   http://localhost:4000` and models `main` / `complex` / `deterministic`
   (api key = the LITELLM_MASTER_KEY value, or any string if metrics-only).
 - **omp** — `home/shared/harness/omp/models.yml` declares provider `proxy`
-  with the three tiers as its models and `config.yml.template` maps every
-  `modelRoles` entry to `proxy/<tier>`; the `omp()` zsh wrapper hands it
+  with the three tiers as its models, and jig writes `~/.omp/agent/config.yml`'s
+  `modelRoles` (every role to `proxy/<tier>`, `harness/jig/src/domain/omp/config.ts`);
+  the `omp()` zsh wrapper hands it
   `LITELLM_API_KEY` the same way `pi()` does.
 - **DSH** — `settings.yaml` points its OpenAI-compatible base_url at
   `http://localhost:4000/v1` likewise. **Codex** keeps OpenAI's own models

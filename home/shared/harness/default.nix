@@ -25,7 +25,6 @@ in
     ".claude".source = link "${config'}/claude";
     ".pi/agent/settings.json".source = link "${config'}/pi/settings.json";
     ".pi/agent/models.json".source = link "${config'}/pi/models.json";
-    ".omp/agent/config.yml".source = link "${config'}/omp/config.yml";
     ".omp/agent/models.yml".source = link "${config'}/omp/models.yml";
     ".omp/agent/lsp.yml".source = link "${config'}/omp/lsp.yml";
     ".dsh/settings.yaml".source = link "${config'}/dsh/settings.yaml";

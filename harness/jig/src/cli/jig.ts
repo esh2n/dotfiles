@@ -223,6 +223,7 @@ function resolveOmpApplyPaths(): OmpApplyPaths {
     agentDir,
     agentsDir: join(agentDir, "agents"),
     mcpJson: join(agentDir, "mcp.json"),
+    configYml: join(agentDir, "config.yml"),
     extensionsDir: join(agentDir, "extensions"),
     extensionTarget: join(harness, "jig", "adapters", "omp", "src", "index.ts"),
     home: homedir(),
