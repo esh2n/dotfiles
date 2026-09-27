@@ -37,7 +37,7 @@ export async function routeSkill(
     const decision = await client.askSkill("omp", prompt, { env });
     const reminder = client.skillReminder(decision, "omp");
     if (reminder === undefined) return undefined;
-    ctx.ui?.setStatus?.(`skill: ${decision.skills.map((pick) => pick.name).join(", ")}`);
+    ctx.ui?.setStatus?.("jig-skill", `skill: ${decision.skills.map((pick) => pick.name).join(", ")}`);
     return { message: { customType: "jig-skill-router", content: reminder, display: false } };
   } catch {
     return undefined;

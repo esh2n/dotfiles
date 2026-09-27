@@ -29,7 +29,10 @@ function client(decision: SkillDecision | Error) {
 }
 
 const statuses: string[] = [];
-const ctx = { cwd: "/p", ui: { setStatus: (m: string) => statuses.push(m) } } as never;
+const ctx = {
+  cwd: "/p",
+  ui: { setStatus: (key: string, m: string) => statuses.push(`${key}=${m}`) },
+} as never;
 
 describe("routeSkill (omp)", () => {
   test("a matched prompt returns one hidden message with the reminder", async () => {

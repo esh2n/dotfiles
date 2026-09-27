@@ -27,8 +27,12 @@
 export interface OmpUi {
   confirm?(title: string, message: string): Promise<boolean>;
   notify?(message: string, level?: string): void;
-  /** docs/extensions.md: `setStatus(message: string): void`, fire-and-forget. */
-  setStatus?(message: string): void;
+  /**
+   * `setStatus(key, text)` (extensions/types.ts:264, v18.3.4): one status per
+   * key, shown sorted by key in the status line's `status` segment; `undefined`
+   * clears the key. An older one-argument form took the text alone.
+   */
+  setStatus?(key: string, text: string | undefined): void;
   /**
    * `setWidget(key, content, {placement})` (extensions/types.ts:270): a string
    * list, a component factory `(tui, theme) => Component`, or `undefined` to

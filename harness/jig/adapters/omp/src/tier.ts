@@ -97,7 +97,7 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
   const providerId = env.OMP_TIER_PROVIDER ?? "proxy";
 
   const status = (ctx: OmpContext, text: string): void => {
-    ctx.ui?.setStatus?.(`tier: ${text}`);
+    ctx.ui?.setStatus?.("jig-tier", `tier: ${text}`);
   };
   const notify = (ctx: OmpContext, text: string, level: "info" | "warn" | "error"): void => {
     ctx.ui?.notify?.(text, level);

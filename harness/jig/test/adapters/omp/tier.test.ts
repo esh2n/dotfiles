@@ -28,8 +28,8 @@ function ctxWith(
       notify: (message) => {
         notices.push(message);
       },
-      setStatus: (message) => {
-        statuses.push(message);
+      setStatus: (key, message) => {
+        statuses.push(`${key}=${message}`);
       },
     },
     models: {
@@ -149,6 +149,6 @@ describe("the session tier is held, never judged", () => {
     const { ctx, notices, statuses } = ctxWith("lm-studio/qwen", []);
     await router.onSessionStart(ctx);
     expect(notices.at(-1)).toMatch(/no model proxy\/main in omp's registry/);
-    expect(statuses.at(-1)).toBe("tier: not on a tier");
+    expect(statuses.at(-1)).toBe("jig-tier=tier: not on a tier");
   });
 });
