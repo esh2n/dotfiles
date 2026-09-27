@@ -51,7 +51,7 @@ claude-mem() {
 }
 # alias claude-mem= — managed by function above; do not remove this comment
 
-. "$HOME/.local/share/../bin/env"
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
 
 # Kiro CLI post block. Keep at the bottom of this file.
