@@ -278,9 +278,10 @@ func gpuDrivers(s Sys, c Config) {
 }
 
 // Omarchy's ufw denies what comes in, and LiteLLM's container reaches
-// llama-server through the host (tailscale serve on :8080) from a docker
-// network: let the docker networks (172.16.0.0/12), and nothing else, reach
-// that port. Root is asked once; a marker keeps later runs quiet.
+// llama-server at this machine's tailnet address (tailscale serve on :8080)
+// from a docker network: let docker's address pool (172.16.0.0/12) reach
+// port 8080 on tailnet addresses (100.64.0.0/10) and nothing else. Root is
+// asked once; a marker keeps later runs quiet.
 func llamaFirewall(s Sys, c Config) {
 	if !s.Has("ufw") {
 		return
@@ -293,8 +294,8 @@ func llamaFirewall(s Sys, c Config) {
 		return
 	}
 	c.log("letting LiteLLM's container reach llama-server through the firewall (root)")
-	if err := s.Run(nil, "sudo", "ufw", "allow", "from", "172.16.0.0/12", "to", "any", "port", "8080", "proto", "tcp", "comment", "litellm-to-llama-server"); err != nil {
-		c.warn("ufw rule not added; the deterministic tier cannot reach llama-server until: sudo ufw allow from 172.16.0.0/12 to any port 8080 proto tcp")
+	if err := s.Run(nil, "sudo", "ufw", "allow", "from", "172.16.0.0/12", "to", "100.64.0.0/10", "port", "8080", "proto", "tcp", "comment", "litellm-to-llama-server"); err != nil {
+		c.warn("ufw rule not added; the deterministic tier cannot reach llama-server until: sudo ufw allow from 172.16.0.0/12 to 100.64.0.0/10 port 8080 proto tcp")
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {

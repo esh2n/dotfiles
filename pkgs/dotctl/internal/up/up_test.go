@@ -295,7 +295,7 @@ func TestLlamaServerFirewallRuleIsAddedOnce(t *testing.T) {
 	must(t, os.MkdirAll(filepath.Join(c.Home, ".nix-profile/bin"), 0o755))
 	must(t, os.Symlink(filepath.Join(pkg, "bin/non-nixos-gpu-setup"), filepath.Join(c.Home, ".nix-profile/bin/non-nixos-gpu-setup")))
 	c.GPUConf = filepath.Join(t.TempDir(), "absent.conf")
-	rule := "sudo ufw allow from 172.16.0.0/12 to any port 8080 proto tcp comment litellm-to-llama-server"
+	rule := "sudo ufw allow from 172.16.0.0/12 to 100.64.0.0/10 port 8080 proto tcp comment litellm-to-llama-server"
 	must(t, Run(f, c))
 	if index(f.calls, rule) < 0 {
 		t.Fatalf("no firewall rule: %v", f.calls)
