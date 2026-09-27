@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "_comment": "Canonical model-tier table. home/shared/harness/pi/models.json, dsh/settings.yaml's local-proxy provider block, and litellm/config.yaml's model_list are all generated from this file by jig (`src/domain/tiers/` + `bun src/cli/jig.ts apply`, run from harness/jig). Edit THIS file, then `jig apply`; never hand-edit a generated file directly except inside dsh's settings.yaml `# BEGIN jig:tiers` / `# END jig:tiers` markers, which jig also refuses to touch by hand once it owns them. Decision record: writeup store yoki/2026-09-16-observability-proxy-litellm; unified in the harness-parity plan, Phase 2.",
+  "_comment": "Canonical model-tier table. home/shared/harness/pi/models.json, dsh/settings.yaml's local-proxy provider block, and litellm/config.yaml's model_list are all generated from this file and the model catalog beside it (policy/models.json; each tier's `use` names catalog ids) by jig (`src/domain/tiers/` + `bun src/cli/jig.ts apply`, run from harness/jig). Edit THIS file, then `jig apply`; never hand-edit a generated file directly except inside dsh's settings.yaml `# BEGIN jig:tiers` / `# END jig:tiers` markers, which jig also refuses to touch by hand once it owns them. Decision record: writeup store yoki/2026-09-16-observability-proxy-litellm; unified in the harness-parity plan, Phase 2.",
   "connections": {
     "proxy": {
       "baseUrl": "http://localhost:4000/v1",
@@ -33,11 +33,9 @@
     "main": {
       "alias": "main",
       "displayName": "DeepSeek Flash",
-      "backend": {
-        "provider": "deepseek",
-        "model": "deepseek-flash",
-        "apiKeyEnv": "DEEPSEEK_API_KEY"
-      },
+      "use": [
+        "deepseek-flash"
+      ],
       "reasoning": true,
       "input": [
         "text"
@@ -70,11 +68,9 @@
     "complex": {
       "alias": "complex",
       "displayName": "DeepSeek V4 Pro",
-      "backend": {
-        "provider": "deepseek",
-        "model": "deepseek-v4-pro",
-        "apiKeyEnv": "DEEPSEEK_API_KEY"
-      },
+      "use": [
+        "deepseek-v4-pro"
+      ],
       "reasoning": true,
       "input": [
         "text"
@@ -99,11 +95,10 @@
     "deterministic": {
       "alias": "deterministic",
       "displayName": "Qwen3.8-27B on the desktop GPU",
-      "backend": {
-        "provider": "openai",
-        "model": "Qwen3.8-27B-Q4_K_M",
-        "apiKeyEnv": "LLAMA_SERVER_API_KEY"
-      },
+      "use": [
+        "qwen3.8-27b-desktop",
+        "qwen3.8-27b-mac"
+      ],
       "reasoning": true,
       "input": [
         "text"
@@ -124,7 +119,7 @@
         "max": null
       },
       "samplingParams": {
-        "temperature": 1.0,
+        "temperature": 1,
         "top_p": 0.95,
         "top_k": 20
       },

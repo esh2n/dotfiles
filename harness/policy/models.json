@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "_comment": "Every model a tier may use, one LiteLLM deployment each. harness/policy/tiers.json points each tier at ids here (`use`, in LiteLLM order); `jig apply --write` renders both into the managed block of home/shared/litellm/config/config.yaml, and litellm-up.sh reads each keyRef into its apiKeyEnv at launch. A new model is one new entry here and its key in 1Password; `dotctl llm use <tier> <id>` switches a tier to it. Decision: harness/rules/decisions/2026-09-27-model-catalog-and-tier-assignment.md.",
+  "models": {
+    "deepseek-flash": {
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "keyRef": "op://llm-automation/deepseek/credential",
+      "notes": "`deepseek/` passes the id straight through to api.deepseek.com. Measured on this repo's bench: 10/10, TTFT 573 ms, 174 tok/s (home/shared/litellm/config/bench/report-mimo-vs-deepseek.md)."
+    },
+    "deepseek-v4-pro": {
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "keyRef": "op://llm-automation/deepseek/credential",
+      "notes": "Same DeepSeek key as deepseek-flash. Bench: 10/10, TTFT 798 ms, 69 tok/s (report-mimo-vs-deepseek-pro.md)."
+    },
+    "mimo-v2.6-flash": {
+      "provider": "xiaomi_mimo",
+      "model": "mimo-v2.6-flash",
+      "apiKeyEnv": "XIAOMI_MIMO_API_KEY",
+      "keyRef": "op://llm-automation/xiaomi/credential",
+      "modelInfo": {
+        "input_cost_per_token": 1.4e-7,
+        "output_cost_per_token": 2.8e-7
+      },
+      "notes": "Pay-as-you-go key (sk-). Reasons by default; in a multi-turn tool conversation the previous reasoning_content must be sent back or the API rejects the request (docs.litellm.ai/docs/providers/xiaomi_mimo). Tool-call loops are reported widely (rules/research/2026-09-26-mimo-vs-deepseek.md). Bench: 10/10, TTFT 3447 ms, 113 tok/s. Prices per token from the vendor, since the pinned LiteLLM predates V2.6."
+    },
+    "mimo-v2.6-pro": {
+      "provider": "xiaomi_mimo",
+      "model": "mimo-v2.6-pro",
+      "apiKeyEnv": "XIAOMI_MIMO_API_KEY",
+      "keyRef": "op://llm-automation/xiaomi/credential",
+      "modelInfo": {
+        "input_cost_per_token": 4.35e-7,
+        "output_cost_per_token": 8.7e-7,
+        "cache_read_input_token_cost": 3.6e-9
+      },
+      "notes": "Same key and caveats as mimo-v2.6-flash. Bench: 10/10, TTFT 3525 ms, 127 tok/s (report-mimo-vs-deepseek-pro.md)."
+    },
+    "qwen3.8-27b-desktop": {
+      "provider": "openai",
+      "model": "Qwen3.8-27B-Q4_K_M",
+      "apiBaseEnv": "LLAMA_SERVER_API_BASE",
+      "apiKeyEnv": "LLAMA_SERVER_API_KEY",
+      "keyRef": "op://llm-automation/llama-server/credential",
+      "modelInfo": {
+        "allowed_fails": 1,
+        "cooldown_time": 90
+      },
+      "notes": "The Omarchy desktop's llama-server (RTX 3090 Ti), over the tailnet; the model id is the GGUF file name without .gguf (router mode). Health-checked in the background, so while the desktop is off it is out of the pool; cooldown_time is longer than health_check_interval (docs/proxy/health_check_routing.md)."
+    },
+    "qwen3.8-27b-mac": {
+      "provider": "lm_studio",
+      "model": "qwen/qwen3.8-27b@4bit",
+      "apiBaseEnv": "LM_STUDIO_API_BASE",
+      "apiKeyEnv": "LM_STUDIO_API_KEY",
+      "litellmParams": {
+        "extra_body": {
+          "ttl": 600
+        }
+      },
+      "modelInfo": {
+        "disable_background_health_check": true
+      },
+      "notes": "The Mac's LM Studio, loaded just in time and unloaded after 600 idle seconds so the Mac's own model comes back (lmstudio.ai/docs/app/api/ttl-and-auto-evict); 15.0 tok/s measured (bench/report.md). Never probed: a probe is a real completion and would keep Qwen loaded."
+    }
+  }
+}

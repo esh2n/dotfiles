@@ -1,13 +1,14 @@
 /**
- * `jig apply`'s use-case: read the canonical tiers.json, generate each
- * target's content, diff it against what's actually on disk, and — only
- * when asked, and never for litellm — write it atomically with hand-edit
- * detection and a provenance sidecar. Depends only on `ApplyPorts` and the
+ * `jig apply`'s use-case: read the canonical tiers.json and the model
+ * catalog beside it (policy/models.json), generate each target's content,
+ * diff it against what's actually on disk, and — only when asked — write it
+ * atomically with hand-edit detection and a provenance sidecar. Depends only on `ApplyPorts` and the
  * pure `domain/tiers/*` functions; no direct filesystem/crypto calls here
  * (those live in `../../infra/apply`).
  */
 
 import type { DroppedField } from "../../domain/tiers/capability";
+import { parseCatalog } from "../../domain/tiers/catalog";
 import { unifiedDiff } from "../../domain/tiers/diff";
 import { TIERS_MANAGED_BLOCK_MARKERS } from "../../domain/tiers/markers";
 import { parseTiers } from "../../domain/tiers/parse";
@@ -161,12 +162,12 @@ async function applyPi(
 }
 
 /**
- * dsh's settings.yaml and omp's models.yml take the same shape: one managed
- * YAML block between the shared markers, spliced into a file the owner also
- * edits by hand outside the markers.
+ * dsh's settings.yaml, omp's models.yml and LiteLLM's config.yaml take the
+ * same shape: one managed YAML block between the shared markers, spliced into
+ * a file the owner also edits by hand outside the markers.
  */
 async function applyManagedYaml(
-  target: "dsh" | "omp",
+  target: "dsh" | "omp" | "litellm",
   block: string,
   dropped: readonly DroppedField[],
   destPath: string,
@@ -238,54 +239,6 @@ async function applyManagedYaml(
   };
 }
 
-async function applyLitellm(
-  policy: TiersPolicy,
-  destPath: string,
-  ports: ApplyPorts,
-  write: boolean,
-): Promise<TargetResult> {
-  const { content: block, dropped } = toLitellmModelList(policy);
-  const current = await ports.readFile(destPath);
-
-  const refusalMessage = "deferred: measurement plane, apply manually after review";
-
-  if (current === undefined) {
-    return {
-      target: "litellm",
-      outcome: "dest-missing",
-      diff: "",
-      dropped,
-      wrote: false,
-      message: `${destPath} does not exist`,
-    };
-  }
-
-  try {
-    const generated = spliceManagedBlock(current, block, TIERS_MANAGED_BLOCK_MARKERS);
-    const diff = unifiedDiff(destPath, current, "generated", generated);
-    return {
-      target: "litellm",
-      outcome: write ? "refused" : diff === "" ? "noop" : "write",
-      diff,
-      dropped,
-      wrote: false,
-      message: refusalMessage,
-    };
-  } catch {
-    // No managed-block markers in config.yaml yet (by design — never inserted
-    // this phase). Show the generated block for review instead of a diff.
-    return {
-      target: "litellm",
-      outcome: "markers-missing",
-      diff: "",
-      dropped,
-      wrote: false,
-      message: `${refusalMessage} (no # BEGIN jig:tiers markers in ${destPath} yet)`,
-      preview: block,
-    };
-  }
-}
-
 export async function applyTiers(
   input: {
     readonly tiersJsonPath: string;
@@ -298,7 +251,12 @@ export async function applyTiers(
   if (tiersJsonText === undefined) {
     throw new Error(`jig apply: tiers.json not found at ${input.tiersJsonPath}`);
   }
-  const policy = parseTiers(JSON.parse(tiersJsonText));
+  const catalogPath = input.tiersJsonPath.replace(/tiers\.json$/, "models.json");
+  const catalogText = await ports.readFile(catalogPath);
+  if (catalogText === undefined) {
+    throw new Error(`jig apply: the model catalog is not at ${catalogPath}`);
+  }
+  const policy = parseTiers(JSON.parse(tiersJsonText), parseCatalog(JSON.parse(catalogText)));
 
   const manifest = { ...(await ports.readManifest()) };
   const results: TargetResult[] = [];
@@ -318,9 +276,13 @@ export async function applyTiers(
           tiersJsonText,
         ),
       );
-    } else if (target === "dsh" || target === "omp") {
+    } else {
       const { content, dropped } =
-        target === "dsh" ? toDshModelsBlock(policy) : toOmpProxyBlock(policy);
+        target === "dsh"
+          ? toDshModelsBlock(policy)
+          : target === "omp"
+            ? toOmpProxyBlock(policy)
+            : toLitellmModelList(policy);
       results.push(
         await applyManagedYaml(
           target,
@@ -334,8 +296,6 @@ export async function applyTiers(
           tiersJsonText,
         ),
       );
-    } else {
-      results.push(await applyLitellm(policy, input.destPaths.litellm, ports, input.options.write));
     }
   }
 

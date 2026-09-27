@@ -7,6 +7,7 @@
  * `../policy/parse.ts`.
  */
 
+import type { CatalogModel, ModelCatalog } from "./catalog";
 import { TIER_IDS, type Tier, type TierId, type TiersPolicy } from "./types";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -78,16 +79,29 @@ function parseCommentMap(value: unknown, label: string): Record<string, string> 
   return result;
 }
 
-function parseBackend(value: unknown, label: string): Tier["backend"] {
-  const obj = requireObject(value, label);
-  assertKnownKeys(obj, ["provider", "model", "apiKeyEnv"], label);
-  return {
-    provider: requireString(obj.provider, `${label}.provider`),
-    model: requireString(obj.model, `${label}.model`),
-    ...(obj.apiKeyEnv === undefined
-      ? {}
-      : { apiKeyEnv: requireString(obj.apiKeyEnv, `${label}.apiKeyEnv`) }),
-  };
+function resolveUse(
+  value: unknown,
+  label: string,
+  catalog: ModelCatalog,
+): { use: readonly string[]; deployments: readonly CatalogModel[] } {
+  const use = requireStringArray(value, label);
+  if (use.length === 0) {
+    throw new Error(`tiers policy: ${label} must name at least one catalog model`);
+  }
+  if (new Set(use).size !== use.length) {
+    throw new Error(`tiers policy: ${label} names a catalog model twice`);
+  }
+  const deployments = use.map((id) => {
+    const model = catalog.models[id];
+    if (model === undefined) {
+      const known = Object.keys(catalog.models).join(", ");
+      throw new Error(
+        `tiers policy: ${label} names "${id}", which policy/models.json does not have (known: ${known})`,
+      );
+    }
+    return model;
+  });
+  return { use, deployments };
 }
 
 function parseTierCompat(value: unknown, label: string): Tier["compat"] {
@@ -159,7 +173,7 @@ function parseTierDsh(value: unknown, label: string): Tier["dsh"] {
 const TIER_FIELDS = [
   "alias",
   "displayName",
-  "backend",
+  "use",
   "reasoning",
   "input",
   "contextWindow",
@@ -174,7 +188,7 @@ const TIER_FIELDS = [
   "_context_source",
 ] as const;
 
-function parseTier(raw: unknown, id: TierId): Tier {
+function parseTier(raw: unknown, id: TierId, catalog: ModelCatalog): Tier {
   const label = `tier "${id}"`;
   const obj = requireObject(raw, label);
   assertKnownKeys(obj, TIER_FIELDS, label);
@@ -187,7 +201,19 @@ function parseTier(raw: unknown, id: TierId): Tier {
   return {
     alias,
     displayName: requireString(obj.displayName, `${label}.displayName`),
-    backend: parseBackend(obj.backend, `${label}.backend`),
+    ...(() => {
+      const { use, deployments } = resolveUse(obj.use, `${label}.use`, catalog);
+      const first = deployments[0] as CatalogModel;
+      return {
+        use,
+        deployments,
+        backend: {
+          provider: first.provider,
+          model: first.model,
+          ...(first.apiKeyEnv === undefined ? {} : { apiKeyEnv: first.apiKeyEnv }),
+        },
+      };
+    })(),
     reasoning: requireBoolean(obj.reasoning, `${label}.reasoning`),
     input: requireStringArray(obj.input, `${label}.input`),
     contextWindow: requireNumber(obj.contextWindow, `${label}.contextWindow`),
@@ -245,8 +271,11 @@ function parseProxyConnection(value: unknown): TiersPolicy["connections"]["proxy
   };
 }
 
-/** Parse and strictly validate an already-`JSON.parse`d tiers document. */
-export function parseTiers(json: unknown): TiersPolicy {
+/**
+ * Parse and strictly validate an already-`JSON.parse`d tiers document; each
+ * tier's `use` is resolved against the model catalog.
+ */
+export function parseTiers(json: unknown, catalog: ModelCatalog): TiersPolicy {
   if (!isPlainObject(json)) {
     throw new Error("tiers policy: expected a JSON object at the top level");
   }
@@ -275,7 +304,7 @@ export function parseTiers(json: unknown): TiersPolicy {
   }
 
   const tiers = Object.fromEntries(
-    TIER_IDS.map((id) => [id, parseTier(tiersObj[id], id)]),
+    TIER_IDS.map((id) => [id, parseTier(tiersObj[id], id, catalog)]),
   ) as Record<TierId, Tier>;
 
   return {

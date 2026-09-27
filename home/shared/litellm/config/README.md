@@ -14,15 +14,22 @@ switched on by the developer role.
 
 ## Tiers
 
+The current assignment (`harness/bin/jig tiers` prints it):
+
 | alias | provider | model | for |
 |---|---|---|---|
 | `main` | DeepSeek | `deepseek-flash` | everyday default, cheap/fast |
-| `complex` | OpenAI | `gpt-6-astra` (Astra) | hard judgment / design |
+| `complex` | DeepSeek | `deepseek-v4-pro` | hard judgment / design |
 | `deterministic` | llama-server on the Omarchy desktop (tailnet); the Mac's LM Studio while the desktop is off | `Qwen3.8-27B-Q4_K_M` / `qwen/qwen3.8-27b@4bit` | executes a plan a frontier model designed; falls back only to the same model |
 
 A harness calls the proxy with `model` = one of these aliases; the proxy picks
-the provider. Switch tiers by switching the alias — no per-harness provider
-config.
+the provider. What each tier uses is `harness/policy/tiers.json` (`use`, ids
+from the model catalog `harness/policy/models.json`); jig generates the tiers'
+block of `config.yaml` from the two. See the current assignment with
+`harness/bin/jig tiers`, switch with `dotctl llm use <tier> <model>...` (e.g.
+`dotctl llm use main mimo-v2.6-flash`), and add a model as one catalog entry
+plus its key in 1Password
+(`harness/rules/decisions/2026-09-27-model-catalog-and-tier-assignment.md`).
 
 ## Keys — never on disk
 

@@ -11,38 +11,34 @@
 # op:// references live in litellm.env — pointers, not secrets). See README.md.
 
 model_list:
-  # main — everyday default. DeepSeek Flash (cheap/fast).
-  # `deepseek/` is the provider prefix; the id after it (deepseek-flash) is
-  # passed straight through to api.deepseek.com, which is the current model id.
+  # The tiers' deployments are generated: which catalog models each tier uses
+  # is harness/policy/tiers.json (`use`), what each model is is
+  # harness/policy/models.json. Switch a tier with `dotctl llm use <tier>
+  # <model>`; never edit between the markers by hand.
+  # BEGIN jig:tiers (generated — edit policy/tiers.json, then jig apply)
+  # main ← deepseek-flash
+  # `deepseek/` passes the id straight through to api.deepseek.com. Measured on
+  # this repo's bench: 10/10, TTFT 573 ms, 174 tok/s
+  # (home/shared/litellm/config/bench/report-mimo-vs-deepseek.md).
   - model_name: main
     litellm_params:
       model: deepseek/deepseek-flash
       api_key: os.environ/DEEPSEEK_API_KEY
 
-  # complex — near-frontier architect. DeepSeek V4 Pro: same DeepSeek key as
-  # main (no new secret), OpenAI-compatible so it proxies + measures cleanly,
-  # per-token but cheap. Swap to a true-frontier per-token route (Astra/Fable)
-  # here later if needed.
+  # complex ← deepseek-v4-pro
+  # Same DeepSeek key as deepseek-flash. Bench: 10/10, TTFT 798 ms, 69 tok/s
+  # (report-mimo-vs-deepseek-pro.md).
   - model_name: complex
     litellm_params:
       model: deepseek/deepseek-v4-pro
       api_key: os.environ/DEEPSEEK_API_KEY
 
-  # deterministic — the executor: carries out a plan a frontier model already
-  # designed (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
-  # Two deployments of the same model, Qwen3.8-27B, under one name:
-  #   order 1: the Omarchy desktop's llama-server (RTX 3090 Ti), over the
-  #            tailnet from every machine, the desktop included. The model id is
-  #            the GGUF file name without .gguf (router mode, --models-dir).
-  #   order 2: the Mac's LM Studio, only while the desktop is off (the 4-bit
-  #            build measured 15.0 tok/s there, bench/report.md). LM Studio
-  #            loads it just in time (evicting whatever other
-  #            JIT-loaded model the Mac had) and unloads it after `ttl` idle
-  #            seconds, so the Mac's own larger model comes back.
-  # Only order 1 is health-checked in the background: a probe runs a real
-  # completion, and probing the Mac would keep Qwen loaded all the time.
-  # Which one answered: the x-litellm-model-api-base response header, and
-  # litellm_deployment_successful_fallbacks / litellm_deployment_state.
+  # deterministic ← qwen3.8-27b-desktop (order 1)
+  # The Omarchy desktop's llama-server (RTX 3090 Ti), over the tailnet; the
+  # model id is the GGUF file name without .gguf (router mode). Health-checked
+  # in the background, so while the desktop is off it is out of the pool;
+  # cooldown_time is longer than health_check_interval
+  # (docs/proxy/health_check_routing.md).
   - model_name: deterministic
     litellm_params:
       model: openai/Qwen3.8-27B-Q4_K_M
@@ -51,21 +47,25 @@ model_list:
       order: 1
     model_info:
       allowed_fails: 1
-      # longer than health_check_interval (docs/proxy/health_check_routing.md)
       cooldown_time: 90
 
+  # deterministic ← qwen3.8-27b-mac (order 2)
+  # The Mac's LM Studio, loaded just in time and unloaded after 600 idle seconds
+  # so the Mac's own model comes back
+  # (lmstudio.ai/docs/app/api/ttl-and-auto-evict); 15.0 tok/s measured
+  # (bench/report.md). Never probed: a probe is a real completion and would keep
+  # Qwen loaded.
   - model_name: deterministic
     litellm_params:
       model: lm_studio/qwen/qwen3.8-27b@4bit
       api_base: os.environ/LM_STUDIO_API_BASE
       api_key: os.environ/LM_STUDIO_API_KEY
       order: 2
-      # LM Studio unloads a JIT-loaded model after this many idle seconds
-      # (https://lmstudio.ai/docs/app/api/ttl-and-auto-evict)
       extra_body:
         ttl: 600
     model_info:
       disable_background_health_check: true
+  # END jig:tiers
 
 litellm_settings:
   # Free OSS Prometheus exporter — this is the whole point of the proxy.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseTiers } from "../../../src/domain/tiers/parse";
+import { TEST_CATALOG } from "./catalog-fixture";
 
 interface RawTierDoc {
   version: number;
@@ -35,7 +36,7 @@ function validDoc(): RawTierDoc {
       main: {
         alias: "main",
         displayName: "DeepSeek Flash",
-        backend: { provider: "deepseek", model: "deepseek-flash", apiKeyEnv: "DEEPSEEK_API_KEY" },
+        use: ["deepseek-flash"],
         reasoning: true,
         input: ["text"],
         contextWindow: 1000000,
@@ -47,7 +48,7 @@ function validDoc(): RawTierDoc {
       complex: {
         alias: "complex",
         displayName: "DeepSeek V4 Pro",
-        backend: { provider: "deepseek", model: "deepseek-v4-pro", apiKeyEnv: "DEEPSEEK_API_KEY" },
+        use: ["deepseek-v4-pro"],
         reasoning: true,
         input: ["text"],
         contextWindow: 1000000,
@@ -59,7 +60,7 @@ function validDoc(): RawTierDoc {
       deterministic: {
         alias: "deterministic",
         displayName: "local Qwen",
-        backend: { provider: "lm_studio", model: "qwen/qwen3.8-27b" },
+        use: ["qwen-local"],
         reasoning: true,
         input: ["text"],
         contextWindow: 131072,
@@ -76,7 +77,7 @@ function validDoc(): RawTierDoc {
 
 describe("parseTiers", () => {
   test("parses a valid document", () => {
-    const policy = parseTiers(validDoc());
+    const policy = parseTiers(validDoc(), TEST_CATALOG);
     expect(policy.version).toBe(1);
     expect(policy.tiers.main.alias).toBe("main");
     expect(policy.tiers.deterministic.samplingParams?.temperature).toBe(1);
@@ -91,74 +92,76 @@ describe("parseTiers", () => {
       doc.tiers.complex.dsh._comment = { name: "why" };
     }
 
-    expect(() => parseTiers(doc)).not.toThrow();
+    expect(() => parseTiers(doc, TEST_CATALOG)).not.toThrow();
   });
 
   test("rejects a non-object document", () => {
-    expect(() => parseTiers(null)).toThrow(/expected a JSON object/);
-    expect(() => parseTiers("nope")).toThrow(/expected a JSON object/);
+    expect(() => parseTiers(null, TEST_CATALOG)).toThrow(/expected a JSON object/);
+    expect(() => parseTiers("nope", TEST_CATALOG)).toThrow(/expected a JSON object/);
   });
 
   test("rejects an unsupported version", () => {
     const doc = validDoc();
     doc.version = 2;
-    expect(() => parseTiers(doc)).toThrow(/unsupported version/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/unsupported version/);
   });
 
   test("rejects an unknown top-level key", () => {
     const doc = validDoc();
     doc.extra = true;
-    expect(() => parseTiers(doc)).toThrow(/unknown key "extra"/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/unknown key "extra"/);
   });
 
   test("rejects a missing tier", () => {
     const doc = validDoc();
     // biome-ignore lint/performance/noDelete: an undefined value would still satisfy `in`
     delete doc.tiers.complex;
-    expect(() => parseTiers(doc)).toThrow(/missing tier "complex"/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/missing tier "complex"/);
   });
 
   test("rejects an unknown tier key", () => {
     const doc = validDoc();
     doc.tiers.banana = doc.tiers.main;
-    expect(() => parseTiers(doc)).toThrow(/unknown tier "banana"/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/unknown tier "banana"/);
   });
 
   test("rejects a tier with an unknown field", () => {
     const doc = validDoc();
     doc.tiers.main.bogus = true;
-    expect(() => parseTiers(doc)).toThrow(/tier "main".*unknown key "bogus"/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/tier "main".*unknown key "bogus"/);
   });
 
   test("rejects a tier missing a required field", () => {
     const doc = validDoc();
     // biome-ignore lint/performance/noDelete: an undefined value would still fail type checks the same way, but explicitly
     delete doc.tiers.main.contextWindow;
-    expect(() => parseTiers(doc)).toThrow(/tier "main".*contextWindow/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/tier "main".*contextWindow/);
   });
 
   test("rejects a tier with the wrong alias (must equal its own key)", () => {
     const doc = validDoc();
     doc.tiers.main.alias = "not-main";
-    expect(() => parseTiers(doc)).toThrow(/alias "not-main" must equal its tier key "main"/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(
+      /alias "not-main" must equal its tier key "main"/,
+    );
   });
 
   test("rejects an unknown key under connections.proxy", () => {
     const doc = validDoc();
     doc.connections.proxy.bogus = true;
-    expect(() => parseTiers(doc)).toThrow(/connections\.proxy.*unknown key "bogus"/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/connections\.proxy.*unknown key "bogus"/);
   });
 
   test("rejects a non-boolean compat.supportsDeveloperRole", () => {
     const doc = validDoc();
     doc.connections.proxy.compat.supportsDeveloperRole = "false";
-    expect(() => parseTiers(doc)).toThrow(/supportsDeveloperRole/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/supportsDeveloperRole/);
   });
 
   test("rejects an EffortMap value that is neither string nor null", () => {
     const doc = validDoc();
     doc.tiers.main.dsh.reasoningEfforts = { off: 5 };
-    expect(() => parseTiers(doc)).toThrow(/reasoningEfforts/);
+    expect(() => parseTiers(doc, TEST_CATALOG)).toThrow(/reasoningEfforts/);
   });
 });
 
@@ -166,9 +169,29 @@ describe("maxContextWindow (the provider window a harness may opt into)", () => 
   test("is optional, and a number when present", () => {
     const withIt = validDoc() as unknown as { tiers: Record<string, Record<string, unknown>> };
     (withIt.tiers.main as Record<string, unknown>).maxContextWindow = 1000000;
-    expect(parseTiers(withIt).tiers.main.maxContextWindow).toBe(1000000);
-    expect(parseTiers(validDoc()).tiers.main.maxContextWindow).toBeUndefined();
+    expect(parseTiers(withIt, TEST_CATALOG).tiers.main.maxContextWindow).toBe(1000000);
+    expect(parseTiers(validDoc(), TEST_CATALOG).tiers.main.maxContextWindow).toBeUndefined();
     (withIt.tiers.main as Record<string, unknown>).maxContextWindow = "1M";
-    expect(() => parseTiers(withIt)).toThrow(/maxContextWindow/);
+    expect(() => parseTiers(withIt, TEST_CATALOG)).toThrow(/maxContextWindow/);
+  });
+
+  test("resolves use against the catalog, first model as the backend", () => {
+    const doc = validDoc();
+    doc.tiers.deterministic.use = ["qwen-local", "deepseek-flash"];
+    const tier = parseTiers(doc, TEST_CATALOG).tiers.deterministic;
+    expect(tier.deployments.map((d) => d.id)).toEqual(["qwen-local", "deepseek-flash"]);
+    expect(tier.backend).toEqual({ provider: "lm_studio", model: "qwen/qwen3.8-27b" });
+  });
+
+  test("refuses a use naming a model the catalog lacks, an empty use, or one model twice", () => {
+    const unknown = validDoc();
+    unknown.tiers.main.use = ["nope"];
+    expect(() => parseTiers(unknown, TEST_CATALOG)).toThrow(/does not have/);
+    const empty = validDoc();
+    empty.tiers.main.use = [];
+    expect(() => parseTiers(empty, TEST_CATALOG)).toThrow(/at least one/);
+    const twice = validDoc();
+    twice.tiers.main.use = ["deepseek-flash", "deepseek-flash"];
+    expect(() => parseTiers(twice, TEST_CATALOG)).toThrow(/twice/);
   });
 });

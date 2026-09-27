@@ -21,7 +21,12 @@
 export const TIER_IDS = ["main", "complex", "deterministic"] as const;
 export type TierId = (typeof TIER_IDS)[number];
 
-/** Where a tier's requests actually go once they leave the proxy. Consumed by the litellm writer. */
+import type { CatalogModel } from "./catalog";
+
+/**
+ * The first model a tier uses, as the writers that only name it need it
+ * (dsh's comment). Resolved from the catalog; never written in tiers.json.
+ */
 export interface TierBackend {
   readonly provider: string;
   readonly model: string;
@@ -67,6 +72,11 @@ export interface Tier {
   /** The proxy's `model_name` / litellm alias — identical across every target by construction. */
   readonly alias: string;
   readonly displayName: string;
+  /** Catalog ids (`policy/models.json`), in LiteLLM `order`: the first answers, the next only when it is out. */
+  readonly use: readonly string[];
+  /** `use`, resolved from the catalog. */
+  readonly deployments: readonly CatalogModel[];
+  /** `deployments[0]` as provider/model/key. */
   readonly backend: TierBackend;
   readonly reasoning: boolean;
   readonly input: readonly string[];

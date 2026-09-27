@@ -18,6 +18,7 @@ import { skillQuestionMode } from "../app/routing/select-skills";
 import { SETUP_TARGETS, isSetupTarget, setupHarness } from "../app/setup/setup-harness";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
+import { assignTier, describeTiers } from "../app/tiers/assign";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import { DSH_PROFILES_DIR, DSH_PROFILE_PATCH_FILENAME, resolveDshHome } from "../domain/dsh/home";
@@ -620,6 +621,31 @@ export async function main(argv: readonly string[]): Promise<number> {
       process.stdout.write(result.stdout);
       return result.code;
     }
+    case "tiers": {
+      const { tiersJsonPath } = resolveApplyPaths();
+      const catalogPath = tiersJsonPath.replace(/tiers\.json$/, "models.json");
+      const [sub, tier, ...models] = argv.slice(1);
+      try {
+        const tiersText = await Bun.file(tiersJsonPath).text();
+        const catalogText = await Bun.file(catalogPath).text();
+        if (sub === undefined || sub === "list") {
+          process.stdout.write(describeTiers(tiersText, catalogText));
+          return 0;
+        }
+        if (sub !== "use" || tier === undefined) {
+          process.stderr.write("usage: jig tiers [list] | jig tiers use <tier> <model>...\n");
+          return 2;
+        }
+        await Bun.write(tiersJsonPath, assignTier(tiersText, catalogText, tier, models));
+        process.stdout.write(`${tier} now uses ${models.join(" → ")} (run: jig apply --write)\n`);
+        return 0;
+      } catch (error) {
+        process.stderr.write(
+          `jig tiers: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+        return 1;
+      }
+    }
     case "codex": {
       const { paths, input } = codexRegistration();
       const applyPorts = createNodeApplyFs({
@@ -770,7 +796,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         return result.code;
       }
       process.stdout.write(
-        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write [--take-over]] | setup [--target claude|codex|pi|omp|dsh] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
+        "usage: jig <version | hooks <pre-tool-use|session-start|user-prompt-submit|post-tool-use-format|stop-gate> | decide | tier | serve | report skills | report guard-coverage | apply [--target claude|codex|omp|pi|dsh|litellm|all] [--write [--take-over]] | tiers [use <tier> <model>...] | setup [--target claude|codex|pi|omp|dsh] | codex register [--write] | retire yoki [--write] | skills <hide|show> [--write] | box <new|list|resume|fetch|rm>>\n" +
           "  run with no arguments on a terminal for the interactive entry point:\n" +
           "  which harness, then host or box (an sbx microVM around a clone of this repo).\n" +
           "  box new [--agent claude|codex] [--pr] [--path <dir>] [--dry-run] creates one;\n" +
@@ -890,10 +916,11 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  only: ~/.agents/skills (DSH reads it natively; the codex/omp/pi mount), the home-level\n" +
           "  cordis.patch.yml, settings.yaml, hooks.claude.json and the jig-guard plugin (manager.sh's until\n" +
           "  milestone 4), and the [unverified] list. Dry-run by default; --write.\n" +
-          "  apply regenerates pi/models.json and dsh/settings.yaml's managed block from policy/tiers.json.\n" +
+          "  apply regenerates pi/models.json and the managed blocks of dsh/settings.yaml, omp's models.yml\n" +
+          "  and litellm's config.yaml from policy/tiers.json and the model catalog policy/models.json.\n" +
           "  dry-run by default (shows a diff, writes nothing); --write stages+renames atomically.\n" +
-          "  litellm is writer+dry-run only this phase — --write is always refused there; apply that\n" +
-          "  target's config.yaml change by hand after reviewing the diff.\n" +
+          "  `jig tiers use <tier> <model>...` points a tier at catalog models (in LiteLLM order), then\n" +
+          "  run apply --write; `jig tiers` lists the tiers and the catalog.\n" +
           "  Machine delivery is unchanged: this writes the repo files jig's existing symlink\n" +
           "  machinery already points pi/dsh at — it does not itself install or symlink anything.\n",
       );

@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { ApplyPorts, ProvenanceInfo } from "../../src/app/apply/ports";
 import { applyCli } from "../../src/cli/apply";
+import { TIERS_MANAGED_BLOCK_MARKERS } from "../../src/domain/tiers/markers";
 import { fakeClaudeFs } from "../app/apply/fake-claude-ports";
+import { TEST_CATALOG_JSON } from "../domain/tiers/catalog-fixture";
 
 const TIERS_JSON_PATH = "/repo/policy/tiers.json";
 const PI_PATH = "/repo/config/pi/models.json";
@@ -24,7 +26,7 @@ const MINIMAL_TIERS = {
     main: {
       alias: "main",
       displayName: "DeepSeek Flash",
-      backend: { provider: "deepseek", model: "deepseek-flash", apiKeyEnv: "DEEPSEEK_API_KEY" },
+      use: ["deepseek-flash"],
       reasoning: true,
       input: ["text"],
       contextWindow: 1000000,
@@ -36,7 +38,7 @@ const MINIMAL_TIERS = {
     complex: {
       alias: "complex",
       displayName: "DeepSeek V4 Pro",
-      backend: { provider: "deepseek", model: "deepseek-v4-pro", apiKeyEnv: "DEEPSEEK_API_KEY" },
+      use: ["deepseek-v4-pro"],
       reasoning: true,
       input: ["text"],
       contextWindow: 1000000,
@@ -48,7 +50,7 @@ const MINIMAL_TIERS = {
     deterministic: {
       alias: "deterministic",
       displayName: "local Qwen",
-      backend: { provider: "lm_studio", model: "qwen/qwen3.8-27b" },
+      use: ["qwen-local"],
       reasoning: true,
       input: ["text"],
       contextWindow: 131072,
@@ -64,7 +66,11 @@ function fakePorts(initialFiles: Record<string, string>): {
   ports: ApplyPorts;
   files: Record<string, string>;
 } {
-  const files: Record<string, string> = { ...initialFiles };
+  // the model catalog sits beside tiers.json
+  const files: Record<string, string> = {
+    [TIERS_JSON_PATH.replace(/tiers\.json$/, "models.json")]: JSON.stringify(TEST_CATALOG_JSON),
+    ...initialFiles,
+  };
   const manifest: Record<string, string> = {};
   const provenance: Record<string, ProvenanceInfo> = {};
 
@@ -494,14 +500,24 @@ describe("applyCli --target claude", () => {
     expect(files[PI_PATH]).toContain('"id": "main"');
   });
 
-  test("litellm --write is refused but exits 0 (documented, correct behavior)", async () => {
+  test("litellm --write splices the tiers block between the markers", async () => {
+    const { ports, files } = fakePorts({
+      [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
+      [LITELLM_PATH]: `model_list:\n  ${TIERS_MANAGED_BLOCK_MARKERS.begin}\n  ${TIERS_MANAGED_BLOCK_MARKERS.end}\n`,
+    });
+    const result = await applyCli(["--target", "litellm", "--write"], ports, paths);
+    expect(result.code).toBe(0);
+    expect(files[LITELLM_PATH]).toContain("model: deepseek/deepseek-flash");
+    expect(files[LITELLM_PATH]).toContain(TIERS_MANAGED_BLOCK_MARKERS.end);
+  });
+
+  test("litellm --write without the markers writes nothing and fails", async () => {
     const { ports, files } = fakePorts({
       [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
       [LITELLM_PATH]: "model_list:\n",
     });
     const result = await applyCli(["--target", "litellm", "--write"], ports, paths);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toMatch(/deferred/);
+    expect(result.code).not.toBe(0);
     expect(files[LITELLM_PATH]).toBe("model_list:\n");
   });
 
@@ -518,6 +534,7 @@ describe("applyCli --target claude", () => {
   test("dsh --write with markers missing exits nonzero (the write was requested but couldn't happen)", async () => {
     const { ports } = fakePorts({
       [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
+      [TIERS_JSON_PATH.replace(/tiers\.json$/, "models.json")]: JSON.stringify(TEST_CATALOG_JSON),
       [DSH_PATH]: "llm-pi-ai:\n  providers:\n    local-proxy:\n      displayName: x\n",
     });
     const result = await applyCli(["--target", "dsh", "--write"], ports, paths);
@@ -944,6 +961,7 @@ describe("applyCli --target pi", () => {
 
   const SOURCES: Record<string, string> = {
     [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
+    [TIERS_JSON_PATH.replace(/tiers\.json$/, "models.json")]: JSON.stringify(TEST_CATALOG_JSON),
     [PI_PATHS.mcpServers]: JSON.stringify({
       schemaVersion: "jig.mcp.v1",
       servers: [
@@ -1128,6 +1146,7 @@ describe("applyCli --target dsh", () => {
 
   const SOURCES: Record<string, string> = {
     [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
+    [TIERS_JSON_PATH.replace(/tiers\.json$/, "models.json")]: JSON.stringify(TEST_CATALOG_JSON),
     [DSH_PATH]:
       "llm-pi-ai:\n  providers:\n    # BEGIN jig:tiers (generated — edit policy/tiers.json, then jig apply)\n    local-proxy:\n      displayName: x\n    # END jig:tiers\n",
     [DSH_PATHS.mcpServers]: JSON.stringify({

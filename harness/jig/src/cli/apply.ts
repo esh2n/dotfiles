@@ -9,7 +9,7 @@
  *
  * Two kinds of target live behind the one verb:
  *
- * - **pi / dsh / litellm** — model tiers, from `policy/tiers.json`, into files
+ * - **pi / dsh / litellm** — model tiers, from `policy/tiers.json` and the model catalog `policy/models.json`, into files
  *   inside this repository (`app/apply/apply-tiers.ts`).
  * - **claude** — `~/.claude/settings.json` from `policy/guard-rules.json` and
  *   `mcp/servers.json`, the generated `~/.claude/AGENTS.md` from `rules/`,
@@ -190,9 +190,9 @@ function formatResult(result: TargetResult): string {
   return lines.join("\n");
 }
 
-/** A --write request for pi/dsh that could not actually write (no markers, no dest) is a real failure; litellm refusing --write is the documented, correct behavior. */
+/** A --write request for a tiers target that could not actually write (no markers, no dest) is a real failure. */
 function isBlockedWriteFailure(result: TargetResult, wroteRequested: boolean): boolean {
-  if (!wroteRequested || result.target === "litellm") return false;
+  if (!wroteRequested) return false;
   return result.outcome === "markers-missing" || result.outcome === "dest-missing";
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { applyTiers } from "../../../src/app/apply/apply-tiers";
 import type { ApplyPorts, ProvenanceInfo } from "../../../src/app/apply/ports";
 import { TIERS_MANAGED_BLOCK_MARKERS } from "../../../src/domain/tiers/markers";
+import { TEST_CATALOG, TEST_CATALOG_JSON } from "../../domain/tiers/catalog-fixture";
 
 const TIERS_JSON_PATH = "/repo/policy/tiers.json";
 const PI_PATH = "/repo/config/pi/models.json";
@@ -24,7 +25,7 @@ const MINIMAL_TIERS = {
     main: {
       alias: "main",
       displayName: "DeepSeek Flash",
-      backend: { provider: "deepseek", model: "deepseek-flash", apiKeyEnv: "DEEPSEEK_API_KEY" },
+      use: ["deepseek-flash"],
       reasoning: true,
       input: ["text"],
       contextWindow: 1000000,
@@ -36,7 +37,7 @@ const MINIMAL_TIERS = {
     complex: {
       alias: "complex",
       displayName: "DeepSeek V4 Pro",
-      backend: { provider: "deepseek", model: "deepseek-v4-pro", apiKeyEnv: "DEEPSEEK_API_KEY" },
+      use: ["deepseek-v4-pro"],
       reasoning: true,
       input: ["text"],
       contextWindow: 1000000,
@@ -48,7 +49,7 @@ const MINIMAL_TIERS = {
     deterministic: {
       alias: "deterministic",
       displayName: "local Qwen",
-      backend: { provider: "lm_studio", model: "qwen/qwen3.8-27b" },
+      use: ["qwen-local"],
       reasoning: true,
       input: ["text"],
       contextWindow: 131072,
@@ -66,7 +67,11 @@ function fakePorts(initialFiles: Record<string, string>): {
   manifest: Record<string, string>;
   provenance: Record<string, ProvenanceInfo>;
 } {
-  const files: Record<string, string> = { ...initialFiles };
+  // the model catalog sits beside tiers.json
+  const files: Record<string, string> = {
+    [TIERS_JSON_PATH.replace(/tiers\.json$/, "models.json")]: JSON.stringify(TEST_CATALOG_JSON),
+    ...initialFiles,
+  };
   const manifest: Record<string, string> = {};
   const provenance: Record<string, ProvenanceInfo> = {};
 
@@ -183,7 +188,7 @@ describe("applyTiers", () => {
     // manifest entry yet — as if it were hand-authored to already match.
     const { toPiModels } = await import("../../../src/domain/tiers/write-pi");
     const { parseTiers } = await import("../../../src/domain/tiers/parse");
-    files[PI_PATH] = toPiModels(parseTiers(MINIMAL_TIERS)).content;
+    files[PI_PATH] = toPiModels(parseTiers(MINIMAL_TIERS, TEST_CATALOG)).content;
 
     const report = await applyTiers(
       {
@@ -257,23 +262,28 @@ describe("applyTiers", () => {
     expect(files[DSH_PATH]).not.toContain("old: content");
   });
 
-  test("litellm always refuses --write, regardless of markers", async () => {
+  test("litellm is written like dsh: the tiers block between the markers, and nothing without them", async () => {
+    const withMarkers = `model_list:\n  ${TIERS_MANAGED_BLOCK_MARKERS.begin}\n  ${TIERS_MANAGED_BLOCK_MARKERS.end}\n`;
     const { ports, files } = fakePorts({
       [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS),
-      [LITELLM_PATH]: "model_list:\n",
+      [LITELLM_PATH]: withMarkers,
     });
+    const run = () =>
+      applyTiers(
+        {
+          tiersJsonPath: TIERS_JSON_PATH,
+          destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
+          options: { targets: ["litellm"], write: true },
+        },
+        ports,
+      );
 
-    const report = await applyTiers(
-      {
-        tiersJsonPath: TIERS_JSON_PATH,
-        destPaths: { pi: PI_PATH, dsh: DSH_PATH, omp: OMP_PATH, litellm: LITELLM_PATH },
-        options: { targets: ["litellm"], write: true },
-      },
-      ports,
-    );
+    expect((await run()).results[0]?.outcome).toBe("write");
+    expect(files[LITELLM_PATH]).toContain("  - model_name: deterministic");
+    expect(files[LITELLM_PATH]).toContain("model: lm_studio/qwen/qwen3.8-27b");
 
-    expect(report.results[0]?.outcome).toBe("markers-missing");
-    expect(report.results[0]?.message).toMatch(/deferred/);
+    files[LITELLM_PATH] = "model_list:\n";
+    expect((await run()).results[0]?.outcome).toBe("markers-missing");
     expect(files[LITELLM_PATH]).toBe("model_list:\n");
   });
 

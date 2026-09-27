@@ -1,12 +1,16 @@
 /**
- * `toLitellmModelList` is writer + dry-run only this phase (see
- * `../../app/apply`'s refusal for `--write --target litellm`), so there is
- * no golden byte-for-byte requirement here — just that the generated
- * entries carry the real backend routes and that everything litellm's
- * model_list format cannot express is reported as dropped.
+ * `toLitellmModelList` renders each tier's catalog models into the managed
+ * block of home/shared/litellm/config/config.yaml, which `jig apply --write`
+ * splices in: the real routes, `order` for a tier with several models, the
+ * catalog's litellm_params and model_info, and a report of what the
+ * model_list format cannot express.
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { TIERS_MANAGED_BLOCK_MARKERS } from "../../../src/domain/tiers/markers";
+import { spliceManagedBlock } from "../../../src/domain/tiers/splice";
 import { toLitellmModelList } from "../../../src/domain/tiers/write-litellm";
 import { loadRealTiers } from "./fixtures";
 
@@ -42,5 +46,36 @@ describe("toLitellmModelList", () => {
     expect(fields).toContain("main:pi");
     expect(fields).toContain("main:dsh");
     expect(fields).toContain("*:connections.proxy");
+  });
+
+  test("a tier with several models gets one entry each, in order, with the catalog's params and model_info", () => {
+    const { content } = toLitellmModelList(loadRealTiers());
+    const det = content.slice(content.indexOf("# deterministic ←"));
+    expect(det.indexOf("order: 1")).toBeLessThan(det.indexOf("order: 2"));
+    expect(det).toContain("api_base: os.environ/LLAMA_SERVER_API_BASE");
+    expect(det).toContain("      extra_body:\n        ttl: 600");
+    expect(det).toContain("    model_info:\n      disable_background_health_check: true");
+    expect(content.slice(0, content.indexOf("# complex"))).not.toContain("order:");
+  });
+
+  test("[live-verified] the repository's config.yaml holds exactly the generated block", () => {
+    const real = readFileSync(
+      join(
+        import.meta.dir,
+        "..",
+        "..",
+        "..",
+        "..",
+        "..",
+        "home",
+        "shared",
+        "litellm",
+        "config",
+        "config.yaml",
+      ),
+      "utf8",
+    );
+    const { content } = toLitellmModelList(loadRealTiers());
+    expect(spliceManagedBlock(real, content, TIERS_MANAGED_BLOCK_MARKERS)).toBe(real);
   });
 });
