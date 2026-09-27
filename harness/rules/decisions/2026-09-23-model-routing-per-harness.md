@@ -1,6 +1,6 @@
 # モデルの経路: ベンダー製ハーネスは自社モデル、それ以外は LiteLLM の tier
 
-Status: accepted — 持ち主の裁定（2026-09-23 夜）。「ClaudeCode と Codex はモデルを作っているベンダーのハーネスなので自社モデルで違和感がない。pi・DSH・omp はどのモデルも使えるので LiteLLM の 2 段（main / complex）と、決定的なタスクはローカル LLM」。omp が Anthropic OAuth の失効で無言で openai-codex / gpt-5.5 に落ちていたのを見つけた場で出た
+Status: superseded by 2026-09-27-model-catalog-and-tier-assignment.md（tier → モデルは候補の一覧と割り当てから生成するようにした。ベンダー製ハーネスは自社モデル、それ以外は tier だけ、はそちらが引き継ぐ） — accepted — 持ち主の裁定（2026-09-23 夜）。「ClaudeCode と Codex はモデルを作っているベンダーのハーネスなので自社モデルで違和感がない。pi・DSH・omp はどのモデルも使えるので LiteLLM の 2 段（main / complex）と、決定的なタスクはローカル LLM」。omp が Anthropic OAuth の失効で無言で openai-codex / gpt-5.5 に落ちていたのを見つけた場で出た
 
 rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harness (pi, DSH, omp) sends all model calls through the local LiteLLM proxy at `localhost:4000` using only the tier aliases `main` (everyday), `complex` (escalation) and `deterministic` (local LM Studio, reproducible/offline), never a provider directly. Tier → model is decided once in `litellm/config.yaml`; a harness config names tiers, not models. A harness that silently falls back to another provider when its default's auth fails is a defect to fix, not a state to leave.
 
