@@ -9,17 +9,22 @@ import (
 	"strings"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/llm"
+	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/service"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/sys"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
 const llmUsage = `usage: dotctl llm setup [--repo DIR] [--lmstudio] [--gpu] [--console]
        dotctl llm check [--repo DIR] [--lmstudio] [--gpu] [--console] [--complex]
+       dotctl llm use [--repo DIR] <tier> <model>...   point a tier at catalog models (harness/policy/models.json)
 `
 
 // runLLM is `dotctl llm setup|check`: the home LLM's command steps (what
 // activation runs for the model-provider and observer roles) and its check.
 func runLLM(home string, args []string, out, errOut io.Writer) int {
+	if len(args) > 0 && args[0] == "use" {
+		return runLLMUse(home, args[1:], out, errOut)
+	}
 	if len(args) == 0 || (args[0] != "setup" && args[0] != "check") {
 		fmt.Fprint(errOut, llmUsage)
 		return 2
@@ -84,4 +89,26 @@ func isTerminal(w io.Writer) bool {
 	}
 	info, err := f.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
+
+// runLLMUse is `dotctl llm use [--repo DIR] <tier> <model>...`.
+func runLLMUse(home string, args []string, out, errOut io.Writer) int {
+	repo, rest, ok := repoFlag("llm use", args, errOut)
+	if !ok {
+		return 2
+	}
+	if len(rest) < 2 {
+		fmt.Fprint(errOut, llmUsage)
+		return 2
+	}
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "llm use"}
+	e := llm.Env{Home: home, Repo: repo, Sys: sys.OS{}, UI: p}
+	restart := func() error {
+		return service.Restart(service.Env{Sys: sys.OS{}, UI: p, UID: os.Getuid()}, "litellm-proxy", "http://127.0.0.1:4000/health/liveliness")
+	}
+	if err := llm.Use(e, rest[0], rest[1:], restart); err != nil {
+		p.Error("%v", err)
+		return 1
+	}
+	return 0
 }
