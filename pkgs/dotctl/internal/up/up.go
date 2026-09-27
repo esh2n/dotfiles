@@ -111,6 +111,7 @@ func Run(s Sys, c Config) error {
 	}, string(os.PathListSeparator)))
 	if s.OS() == "linux" {
 		gpuDrivers(s, c)
+		llamaFirewall(s, c)
 		dockerGroup(s, c)
 	}
 	loginShell(s, c)
@@ -273,6 +274,35 @@ func gpuDrivers(s Sys, c Config) {
 	// were there, so it came up without the GPU: start it again
 	if err := s.Run(nil, "systemctl", "--user", "try-restart", "llama-server.service"); err != nil {
 		c.warn("llama-server did not restart; run: systemctl --user restart llama-server")
+	}
+}
+
+// Omarchy's ufw denies what comes in, and LiteLLM's container reaches
+// llama-server through the host (tailscale serve on :8080) from a docker
+// network: let the docker networks (172.16.0.0/12), and nothing else, reach
+// that port. Root is asked once; a marker keeps later runs quiet.
+func llamaFirewall(s Sys, c Config) {
+	if !s.Has("ufw") {
+		return
+	}
+	if _, err := os.Stat(filepath.Join(c.Home, ".nix-profile", "bin", "non-nixos-gpu-setup")); err != nil {
+		return // no gpu role: no llama-server here
+	}
+	marker := filepath.Join(c.Home, ".local", "state", "dotfiles", "ufw-llama-server")
+	if _, err := os.Stat(marker); err == nil {
+		return
+	}
+	c.log("letting LiteLLM's container reach llama-server through the firewall (root)")
+	if err := s.Run(nil, "sudo", "ufw", "allow", "from", "172.16.0.0/12", "to", "any", "port", "8080", "proto", "tcp", "comment", "litellm-to-llama-server"); err != nil {
+		c.warn("ufw rule not added; the deterministic tier cannot reach llama-server until: sudo ufw allow from 172.16.0.0/12 to any port 8080 proto tcp")
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
+		c.warn("could not record the ufw rule: %v", err)
+		return
+	}
+	if err := os.WriteFile(marker, nil, 0o644); err != nil {
+		c.warn("could not record the ufw rule: %v", err)
 	}
 }
 
