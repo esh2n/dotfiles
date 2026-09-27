@@ -6,7 +6,11 @@
 #
 #   bash home/shared/litellm/config/bench/mimo-vs-deepseek.sh [runs]
 #
-# XIAOMI_REF / DEEPSEEK_REF override where the keys are.
+# XIAOMI_REF / DEEPSEEK_REF override where the keys are; ONLY=mimo or
+# ONLY=deepseek runs one side. MIMO_BASE overrides MiMo's endpoint: a
+# pay-as-you-go key (sk-…) uses https://api.xiaomimimo.com/v1, a Token Plan key
+# (tp-…) its plan's endpoint, e.g. https://token-plan-cn.xiaomimimo.com/v1
+# (https://mimo.mi.com/docs/en-US/quick-start/summary/first-api-call).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,7 +21,7 @@ export_op_token
 runs="${1:-2}"
 xiaomi_ref="${XIAOMI_REF:-op://llm-automation/xiaomi/credential}"
 deepseek_ref="${DEEPSEEK_REF:-op://llm-automation/deepseek/credential}"
-report="${here}/report-mimo-vs-deepseek.md"
+report="${here}/report-mimo-vs-deepseek${ONLY:+-${ONLY}}.md"
 work="$(mktemp -d)"
 trap '/bin/rm -rf "${work}"' EXIT
 
@@ -29,13 +33,22 @@ bench() {
     --base "$2" --models "$3" --runs "${runs}" --out "${work}/$1.md"
 }
 
-bench mimo https://api.xiaomimimo.com/v1 mimo-v2.6-flash "${xiaomi_ref}"
-bench deepseek https://api.deepseek.com/v1 deepseek-flash "${deepseek_ref}"
+# ONLY=mimo (or deepseek) runs one side, e.g. after fixing that side alone
+only="${ONLY:-}"
+names=()
+if [ -z "${only}" ] || [ "${only}" = mimo ]; then
+  bench mimo "${MIMO_BASE:-https://api.xiaomimimo.com/v1}" mimo-v2.6-flash "${xiaomi_ref}"
+  names+=(mimo)
+fi
+if [ -z "${only}" ] || [ "${only}" = deepseek ]; then
+  bench deepseek https://api.deepseek.com/v1 deepseek-flash "${deepseek_ref}"
+  names+=(deepseek)
+fi
 
 {
   printf '# MiMo-V2.6-Flash vs deepseek-flash\n\n'
   printf -- '- date: %s · runs/prompt: %s · each model on its own vendor API\n\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "${runs}"
-  for name in mimo deepseek; do
+  for name in "${names[@]}"; do
     sed 's/^# /## /' "${work}/${name}.md"
     printf '\n'
   done

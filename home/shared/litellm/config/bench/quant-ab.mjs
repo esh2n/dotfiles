@@ -331,15 +331,28 @@ function report(ran = MODELS) {
     );
   }
 
-  // Determinism (run-to-run identity)
+  // Errors: what the backend said, so a failed run can be diagnosed
+  const errored = M.filter((m) => PROMPTS.some((p) => results[m][p.id].some((r) => r.error)));
+  if (errored.length) {
+    L.push(`## Errors\n`);
+    for (const m of errored) {
+      const counts = new Map();
+      for (const p of PROMPTS) for (const r of results[m][p.id]) if (r.error) counts.set(r.error, (counts.get(r.error) || 0) + 1);
+      for (const [msg, n] of counts) L.push(`- \`${m}\` ×${n}: \`${msg.replace(/`/g, "'")}\``);
+    }
+    L.push("");
+  }
+
+  // Determinism (run-to-run identity); an errored run is not an output
   if (RUNS > 1) {
     L.push(`## Determinism (identical output across ${RUNS} runs)\n`);
     for (const m of M) {
-      const nondet = PROMPTS.filter((p) => {
-        const outs = results[m][p.id].map((r) => r.text);
-        return new Set(outs).size > 1;
-      }).map((p) => p.id);
-      L.push(`- \`${m}\`: ${nondet.length === 0 ? "all deterministic ✅" : `varied on ${nondet.join(", ")} ⚠️`}`);
+      const ok = PROMPTS.filter((p) => results[m][p.id].every((r) => !r.error));
+      const nondet = ok.filter((p) => new Set(results[m][p.id].map((r) => r.text)).size > 1).map((p) => p.id);
+      const skipped = PROMPTS.length - ok.length;
+      const verdict = ok.length === 0 ? "not measured (every prompt errored)"
+        : nondet.length === 0 ? "all deterministic ✅" : `varied on ${nondet.join(", ")} ⚠️`;
+      L.push(`- \`${m}\`: ${verdict}${skipped && ok.length ? ` (${skipped} errored prompts not compared)` : ""}`);
     }
     L.push("");
   }
