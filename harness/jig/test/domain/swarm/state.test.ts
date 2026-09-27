@@ -86,7 +86,7 @@ describe("who may start", () => {
 });
 
 describe("a worker's life", () => {
-  test("progress keeps running totals and the latest text", () => {
+  test("progress adds each call's usage and keeps the latest text", () => {
     let w = markStarted(enqueue([], [spec("a")], 1, 0), "a", 1);
     w = recordProgress(w, "a", { turn: true, model: "deepseek-flash" }, 2);
     w = recordProgress(
@@ -95,8 +95,18 @@ describe("a worker's life", () => {
       { toolCall: true, usage: { input: 10, output: 2, cacheRead: 0, cacheWrite: 0, cost: 0.01 } },
       3,
     );
-    w = recordProgress(w, "a", { toolCall: true, text: "done" }, 4);
+    w = recordProgress(
+      w,
+      "a",
+      {
+        toolCall: true,
+        text: "done",
+        usage: { input: 5, output: 1, cacheRead: 3, cacheWrite: 0, cost: 0.02 },
+      },
+      4,
+    );
     const [a] = w;
+    expect(a?.usage).toEqual({ input: 15, output: 3, cacheRead: 3, cacheWrite: 0, cost: 0.03 });
     expect(a).toMatchObject({
       turns: 1,
       toolCalls: 2,
@@ -104,7 +114,6 @@ describe("a worker's life", () => {
       result: "done",
       lastEventAt: 4,
     });
-    expect(a?.usage.cost).toBe(0.01);
   });
 
   test("success is unread; an isolated success waits for a merge; an error is a failure", () => {

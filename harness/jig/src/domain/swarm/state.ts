@@ -101,9 +101,22 @@ export interface WorkerProgress {
   readonly model?: string;
   readonly turn?: boolean;
   readonly toolCall?: boolean;
-  /** Totals so far (the harnesses report running totals, not deltas). */
+  /** One finished model call's usage, added to the worker's totals. */
   readonly usage?: Usage;
   readonly text?: string;
+}
+
+function addUsage(total: Usage, call: Usage): Usage {
+  return {
+    input: total.input + call.input,
+    output: total.output + call.output,
+    cacheRead: total.cacheRead + call.cacheRead,
+    cacheWrite: total.cacheWrite + call.cacheWrite,
+    cost:
+      total.cost === undefined && call.cost === undefined
+        ? undefined
+        : (total.cost ?? 0) + (call.cost ?? 0),
+  };
 }
 
 export function recordProgress(
@@ -118,7 +131,7 @@ export function recordProgress(
     ...(progress.model === undefined ? {} : { model: progress.model }),
     turns: w.turns + (progress.turn === true ? 1 : 0),
     toolCalls: w.toolCalls + (progress.toolCall === true ? 1 : 0),
-    ...(progress.usage === undefined ? {} : { usage: progress.usage }),
+    ...(progress.usage === undefined ? {} : { usage: addUsage(w.usage, progress.usage) }),
     ...(progress.text === undefined ? {} : { result: progress.text }),
   }));
 }
