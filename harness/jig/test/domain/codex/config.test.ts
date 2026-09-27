@@ -148,3 +148,25 @@ describe("yokiLeftovers", () => {
     expect(yokiLeftovers("[features]\nhooks = true\n")).toEqual([]);
   });
 });
+
+describe("the status line", () => {
+  test("the block sets Codex's built-in status line items, as valid TOML", () => {
+    const parsed = Bun.TOML.parse(renderMcpBlock([])) as { tui?: { status_line?: string[] } };
+    expect(parsed.tui?.status_line).toEqual([
+      "model-with-reasoning",
+      "current-dir",
+      "git-branch",
+      "context-used",
+      "used-tokens",
+    ]);
+  });
+
+  test("it sits beside the MCP servers without breaking them", () => {
+    const parsed = Bun.TOML.parse(renderMcpBlock(buildCodexMcpTables(SERVERS, { HOME: "/h" }))) as {
+      mcp_servers?: Record<string, unknown>;
+      tui?: unknown;
+    };
+    expect(Object.keys(parsed.mcp_servers ?? {}).length).toBeGreaterThan(0);
+    expect(parsed.tui).toBeDefined();
+  });
+});

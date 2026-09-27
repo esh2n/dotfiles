@@ -100,9 +100,35 @@ export function buildCodexMcpTables(
   return tables;
 }
 
-/** The managed block, markers included. Empty tables still produce a block, so the markers seed the file. */
+/**
+ * Codex's status line: its built-in items only (`[tui].status_line`, codex-rs
+ * bottom_pane/status_line_setup.rs, rust-v0.155.1 — Codex runs no script,
+ * issue #17827), chosen to match what Claude Code's statusline.sh shows:
+ * model and effort, directory, branch, context used, tokens. Codex has no
+ * session-duration item, and its cost item is for Enterprise workspaces only
+ * (rules/research/2026-09-27-statusline-across-harnesses.md).
+ */
+export const CODEX_STATUS_LINE = [
+  "model-with-reasoning",
+  "current-dir",
+  "git-branch",
+  "context-used",
+  "used-tokens",
+] as const;
+
+function tuiTable(): string {
+  return `[tui]\nstatus_line = [${CODEX_STATUS_LINE.map((item) => `"${item}"`).join(", ")}]\n`;
+}
+
+/**
+ * The managed block, markers included. Empty tables still produce a block, so
+ * the markers seed the file. It also carries `[tui]` for the status line: one
+ * block keeps one hand-edit check (a `[tui]` declared elsewhere in the file is
+ * a duplicate table, which the TOML check reports).
+ */
 export function renderMcpBlock(tables: readonly CodexMcpTable[]): string {
-  return `${MCP_BLOCK_BEGIN}\n${tables.map((table) => table.text).join("\n")}${MCP_BLOCK_END}\n`;
+  const body = [...tables.map((table) => table.text), tuiTable()].join("\n");
+  return `${MCP_BLOCK_BEGIN}\n${body}${MCP_BLOCK_END}\n`;
 }
 
 export interface McpBlockPlan {
