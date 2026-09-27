@@ -210,7 +210,8 @@
         "minimal",
         "standard",
         "strict"
-      ]
+      ],
+      "unlessCwdIn": "main-push-allowed"
     },
     {
       "id": "git-no-verify",
