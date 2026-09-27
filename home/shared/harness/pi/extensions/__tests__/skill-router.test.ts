@@ -2,30 +2,23 @@ import { describe, expect, test } from "bun:test";
 import { type SkillDecision, readSkillDecision, reminderFor } from "../skill-router";
 
 describe("readSkillDecision", () => {
-  test("reads a skill answer", () => {
+  test("reads the service's batch answer", () => {
     expect(
       readSkillDecision({
-        skill: "cost-tracking",
-        path: "/skills/cost-tracking/SKILL.md",
-        confidence: 1,
+        skills: [{ name: "cost-tracking", path: "/skills/cost-tracking/SKILL.md", confidence: 1 }],
+        passed: 1,
         source: "decided",
       }),
     ).toEqual<SkillDecision>({
-      skill: "cost-tracking",
-      path: "/skills/cost-tracking/SKILL.md",
-      confidence: 1,
+      skills: [{ name: "cost-tracking", path: "/skills/cost-tracking/SKILL.md", confidence: 1 }],
+      passed: 1,
       source: "decided",
     });
   });
 
-  test("reads a `null` answer: nothing applies", () => {
-    const decision = readSkillDecision({
-      skill: null,
-      path: null,
-      confidence: 0.99,
-      source: "decided",
-    });
-    expect(decision.skill).toBeNull();
+  test("reads an empty answer: nothing applies", () => {
+    const decision = readSkillDecision({ skills: [], passed: 0, source: "decided" });
+    expect(decision.skills).toEqual([]);
     expect(reminderFor(decision)).toBeUndefined();
   });
 
@@ -33,9 +26,11 @@ describe("readSkillDecision", () => {
     for (const body of [
       undefined,
       {},
-      { skill: 1, path: null, confidence: 1, source: "decided" },
-      { skill: "x", path: null, confidence: "1", source: "decided" },
-      { skill: "x", path: null, confidence: 1, source: "maybe" },
+      { skills: "x", passed: 0, source: "decided" },
+      { skills: [], passed: "0", source: "decided" },
+      { skills: [], passed: 0, source: "maybe" },
+      { skills: [{ name: "x", path: null, confidence: 1 }], passed: 1, source: "decided" },
+      { skills: [{ name: "x", path: "/p", confidence: "1" }], passed: 1, source: "decided" },
     ]) {
       expect(() => readSkillDecision(body)).toThrow();
     }
@@ -43,24 +38,27 @@ describe("readSkillDecision", () => {
 });
 
 describe("reminderFor", () => {
-  test("points at the body instead of carrying it", () => {
+  test("points at the bodies instead of carrying them", () => {
     const reminder = reminderFor({
-      skill: "writeup",
-      path: "/skills/writeup/SKILL.md",
-      confidence: 0.93,
+      skills: [
+        { name: "writeup", path: "/skills/writeup/SKILL.md", confidence: 0.93 },
+        { name: "natural-japanese", path: "/skills/natural-japanese/SKILL.md", confidence: 0.81 },
+      ],
+      passed: 2,
       source: "decided",
     });
-
-    expect(reminder).toContain('"writeup"');
-    expect(reminder).toContain("0.93");
-    expect(reminder).toContain("/skills/writeup/SKILL.md");
+    expect(reminder).toContain("2 skills match");
+    expect(reminder).toContain("0.93, 0.81");
+    expect(reminder).toContain('- "writeup": /skills/writeup/SKILL.md');
+    expect(reminder).toContain('- "natural-japanese": /skills/natural-japanese/SKILL.md');
   });
 
-  test("a name without a path is not injectable", () => {
-    // The path is the whole point: the body is what the model needs, and the router
-    // never carries it.
-    expect(
-      reminderFor({ skill: "writeup", path: null, confidence: 0.93, source: "decided" }),
-    ).toBeUndefined();
+  test("one skill reads as one", () => {
+    const reminder = reminderFor({
+      skills: [{ name: "writeup", path: "/skills/writeup/SKILL.md", confidence: 0.93 }],
+      passed: 1,
+      source: "decided",
+    });
+    expect(reminder).toContain("1 skill matches");
   });
 });

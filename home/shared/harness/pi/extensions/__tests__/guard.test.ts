@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveProfile } from "../../../../llm/harness/jig/src/app/hooks/environment";
-import type { AuditEntry } from "../../../../llm/harness/jig/src/domain/policy/audit";
+import { resolveProfile } from "../../../../../../harness/jig/src/app/hooks/environment";
+import type { AuditEntry } from "../../../../../../harness/jig/src/domain/policy/audit";
 import { type GuardContext, guardToolCall, loadPolicy } from "../guard";
 
 const POLICY = {

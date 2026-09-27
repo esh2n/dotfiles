@@ -2,10 +2,10 @@ import { readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { LoadedPolicy } from "../../../llm/harness/jig/src/app/hooks/run-hook";
-import type { Decision, ToolCall } from "../../../llm/harness/jig/src/domain/hooks/decision";
-import type { Principal } from "../../../llm/harness/jig/src/domain/policy/request";
-import type { AuditLog, Logger } from "../../../llm/harness/jig/src/domain/ports";
+import type { LoadedPolicy } from "../../../../../harness/jig/src/app/hooks/run-hook";
+import type { Decision, ToolCall } from "../../../../../harness/jig/src/domain/hooks/decision";
+import type { Principal } from "../../../../../harness/jig/src/domain/policy/request";
+import type { AuditLog, Logger } from "../../../../../harness/jig/src/domain/ports";
 
 // pi's connection to the shared guard.
 //
@@ -36,11 +36,11 @@ import type { AuditLog, Logger } from "../../../llm/harness/jig/src/domain/ports
 //  - it keeps its own time budget, because pi has none: a guard that
 //    hangs would hang the session.
 
-type Environment = typeof import("../../../llm/harness/jig/src/app/hooks/environment");
-type RunHook = typeof import("../../../llm/harness/jig/src/app/hooks/run-hook");
-type LoadPolicy = typeof import("../../../llm/harness/jig/src/app/hooks/load-policy");
-type Parse = typeof import("../../../llm/harness/jig/src/domain/policy/parse");
-type Audit = typeof import("../../../llm/harness/jig/src/infra/audit/jsonl-audit");
+type Environment = typeof import("../../../../../harness/jig/src/app/hooks/environment");
+type RunHook = typeof import("../../../../../harness/jig/src/app/hooks/run-hook");
+type LoadPolicy = typeof import("../../../../../harness/jig/src/app/hooks/load-policy");
+type Parse = typeof import("../../../../../harness/jig/src/domain/policy/parse");
+type Audit = typeof import("../../../../../harness/jig/src/infra/audit/jsonl-audit");
 
 interface Jig {
   readonly env: Environment;
@@ -56,7 +56,8 @@ const JIG_SRC = join(
   "..",
   "..",
   "..",
-  "llm",
+  "..",
+  "..",
   "harness",
   "jig",
   "src",
