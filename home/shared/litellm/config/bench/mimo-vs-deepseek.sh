@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# MiMo-V2.6-Flash against deepseek-flash (the `main` tier) on this bench's
-# prompts, each on its own vendor API (rules/research/2026-09-26-mimo-vs-deepseek.md).
+# MiMo against DeepSeek on this bench's prompts, each on its own vendor API
+# (rules/research/2026-09-26-mimo-vs-deepseek.md): TIER=flash (default) is
+# mimo-v2.6-flash against deepseek-flash (the `main` tier), TIER=pro is
+# mimo-v2.6-pro against deepseek-v4-pro (the `complex` tier).
 # The keys come from 1Password through the same service account LiteLLM uses
 # and reach quant-ab.mjs only as BENCH_API_KEY, never on a command line.
 #
@@ -19,9 +21,21 @@ source "${here}/../secrets.sh"
 export_op_token
 
 runs="${1:-2}"
+tier="${TIER:-flash}"
+case "${tier}" in
+flash) mimo_model=mimo-v2.6-flash deepseek_model=deepseek-flash max_tokens=4096 ;;
+# the pro models reason longer; 4096 tokens can cut them off mid-thought
+pro) mimo_model=mimo-v2.6-pro deepseek_model=deepseek-v4-pro max_tokens=16384 ;;
+*)
+  echo "${0##*/}: TIER is flash or pro, not ${tier}" >&2
+  exit 2
+  ;;
+esac
 xiaomi_ref="${XIAOMI_REF:-op://llm-automation/xiaomi/credential}"
 deepseek_ref="${DEEPSEEK_REF:-op://llm-automation/deepseek/credential}"
-report="${here}/report-mimo-vs-deepseek${ONLY:+-${ONLY}}.md"
+suffix=""
+[ "${tier}" = flash ] || suffix="-${tier}"
+report="${here}/report-mimo-vs-deepseek${suffix}${ONLY:+-${ONLY}}.md"
 work="$(mktemp -d)"
 trap '/bin/rm -rf "${work}"' EXIT
 
@@ -30,23 +44,23 @@ bench() {
   local key
   key="$(read_secret "$4")"
   BENCH_API_KEY="${key}" node "${here}/quant-ab.mjs" \
-    --base "$2" --models "$3" --runs "${runs}" --out "${work}/$1.md"
+    --base "$2" --models "$3" --runs "${runs}" --max-tokens "${max_tokens}" --out "${work}/$1.md"
 }
 
 # ONLY=mimo (or deepseek) runs one side, e.g. after fixing that side alone
 only="${ONLY:-}"
 names=()
 if [ -z "${only}" ] || [ "${only}" = mimo ]; then
-  bench mimo "${MIMO_BASE:-https://api.xiaomimimo.com/v1}" mimo-v2.6-flash "${xiaomi_ref}"
+  bench mimo "${MIMO_BASE:-https://api.xiaomimimo.com/v1}" "${mimo_model}" "${xiaomi_ref}"
   names+=(mimo)
 fi
 if [ -z "${only}" ] || [ "${only}" = deepseek ]; then
-  bench deepseek https://api.deepseek.com/v1 deepseek-flash "${deepseek_ref}"
+  bench deepseek https://api.deepseek.com/v1 "${deepseek_model}" "${deepseek_ref}"
   names+=(deepseek)
 fi
 
 {
-  printf '# MiMo-V2.6-Flash vs deepseek-flash\n\n'
+  printf '# %s vs %s\n\n' "${mimo_model}" "${deepseek_model}"
   printf -- '- date: %s · runs/prompt: %s · each model on its own vendor API\n\n' "$(date -u +%Y-%m-%dT%H:%MZ)" "${runs}"
   for name in "${names[@]}"; do
     sed 's/^# /## /' "${work}/${name}.md"
