@@ -8,7 +8,7 @@ unverified:
   - "Gemini CLI の --yolo フラグ（policy-engine ページは yolo を mode としてのみ記載）"
   - "StrongDM の一次ページ（factory.strongdm.ai は RSS のみ。引用は Willison のページ経由で TRANSCRIBED）"
   - "Twitter/X 由来の引用（Willison 2025-10-22、Ronacher 2025-06-12、Yegge 2025-07-19、Karpathy 2026-02-21）は投稿自体を直接取得していない"
-  - "Crush の規則なし時の既定、Goose にサンドボックスがあるか、Pi の containerization.md 本文、antirez / Thorsten Ball / Kent Beck の立場は確認できず"
+  - "Goose にサンドボックスがあるか、Pi の containerization.md 本文、antirez / Thorsten Ball / Kent Beck の立場は確認できず"
   - "Anthropic が引用する承認疲れの Reddit スレッド（本文取得不可）と Apollo Research の pilot（該当記事を特定できず）"
   - "Gemini CLI の policy-engine の tier 番号は、同ページの表と節の例が一つずれている（どちらが正か未解決）"
 sources_note: "本文は英語（引用を原文のまま保つため）。全ての URL は 2026-09-27 に直接取得。TRANSCRIBED は第三者（主に Simon Willison の weblog）が原文とリンクを再掲しているもの。参照はパスで行い番号 ID は使わない。"
@@ -17,6 +17,8 @@ sources_note: "本文は英語（引用を原文のまま保つため）。全�
 # How practitioners and companies gate coding agents: yolo, sandbox, allowlists, or prompts
 
 **Research date:** 2026-09-27. **Slice:** lens 2 of the four-lens rule (named practitioners) plus published company practice, with the product-level facts needed to read those practitioners' statements in context.
+
+**Revision 2 (2026-09-27, after this record was first collected):** two defaults were corrected on verification. Amp was drafted as prompt-per-tool and is not — "By default, Amp does not ask for approval before running tools." Crush was drafted as unverified and is not — "By default, Crush will ask you for permission before running tool calls." The "code-execution surface" section of the synthesis was added, and the not-verified list went from 16 items to 15; the front-matter unverified list no longer names Crush, since this revision verified it.
 
 ## Method and verification legend
 
@@ -141,6 +143,13 @@ Gating is therefore delegated: a `tool.call` plugin hook returning `{ action: 'a
 - "Most people do not worry about file edits anymore, because Git makes the cost of a wrong edit negligible."
 - "We have observed there being two kinds of operators: risk-tolerant ones using frontier agents all day, often running multiple instances at the same time; and cautious users who like to stay in control, carefully reviewing every step the agent takes. Both groups' needs are valid"
 
+
+**The rule language matches source text, which the vendor says out loud.** The notes page's worked example is worth reproducing, because it shows exactly what a rule can see. Rule resolution is ordered and first-match-wins: "Before performing *any* tool call, Amp checks all permission rules in sequence until it finds a matching rule." And the matcher operates on the command *string*:
+
+> "The `Bash` tool accepts the entire shell command pipeline to run in the `cmd` parameter. This is a string containing source code, so we need match any command line that *looks* like a git push command"
+
+The page then demonstrates the consequence for `ask Bash --cmd '*git*push*'`: "The `*` is a wildcard, so this rule will match all of these command lines" — "`cd ../other-repo && git push`", "`git commit -m 'WIP' && git push`", "`git --work-tree=. push origin`". Anything subtler is handed to a program (`amp permissions add delegate --to amp-permissions-helper '*'`), where "The program receives the tool parameters on stdin as JSON, and makes a decision with its exit code: `0` allows the tool call, `1` makes Amp ask, and `2` rejects the tool call, forwarding stderr to the model", or to an OPA server. The notes page also states the flip side of the no-gate default: "Restrictions aren't necessary for tools like this with an easy undo action."
+
 **Company practice, published:** `https://ampcode.com/notes/thats-not-soc-2-compliant` (13 Aug 2026) — Amp pushes to `main` with no pull requests, deliberately, from the first commit; the controls their auditors accepted were "Restricted push access", "Signed commits", "Automated CI", and "An audit trail that's as good as a PR's"; and: "And no, code review isn't on the list. The criteria don't say a second human has to stare at a diff." With the scale caveat: "But we're not going to pretend a 2,000-person company should let everyone push to main." And `https://ampcode.com/news/less-noise` (25 Sep 2026): "If you have the patience to watch your agents work, you're giving them too short a leash."
 
 ## Block/Goose → Agentic AI Foundation (DIRECT: `goose-docs.ai`)
@@ -150,11 +159,20 @@ Gating is therefore delegated: a `tool.call` plugin hook returning `{ action: 'a
 **3. Isolation.** Not documented on the pages fetched. No sandbox claim was found; treat as on-host until shown otherwise.
 **4. Stated position.** Gating is by mode, not by boundary; the vendor's compensating control is supply-chain — "goose automatically checks external extensions for known malware before activation". Institutional note: goose moved to the Agentic AI Foundation (`https://goose-docs.ai/blog/2026/04/07/goose-moves-to-aaif`, 7 Apr 2026).
 
-## Charm / Crush (DIRECT: `raw.githubusercontent.com/charmbracelet/crush/main/docs/config/README.md`)
+## Charm / Crush (DIRECT: `raw.githubusercontent.com/charmbracelet/crush/main/README.md` 1,055 lines and `.../docs/config/README.md` 645 lines, both fetched 2026-09-27)
 
 **1. Exec surface.** A Bash tool — and the config file *is* Bash: `~/.config/crush/crushrc`.
-**2. Default approval behaviour.** Allow/deny lists, no sandbox: "Configure tool permissions. `allow` skips approval prompts; `deny` hides tools from the agent entirely." Examples in the doc: `permissions allow view ls grep edit` and `permissions deny bash`, with the top-of-file example commented "# Auto-approve some tools." The default posture (what happens *without* a rule) is **not verified** on this page.
+
+**2. Default approval behaviour — the only product surveyed whose documented default is a prompt.** From the README:
+> "By default, Crush will ask you for permission before running tool calls. If you'd like, you can allow tools to be executed without prompting you for permissions. Use this with care."
+
+and the two documented ways out, on the same page:
+> "You can also skip all permission prompts completely by running Crush with the `--yolo` flag. Be very, very careful with this feature."
+
+Per-tool lists come from the config reference: "Configure tool permissions. `allow` skips approval prompts; `deny` hides tools from the agent entirely." (`permissions allow view ls grep edit`, `permissions deny bash`; the top-of-file example is commented "# Auto-approve some tools."). The gate is delivered as an interruption the user is expected to be *at the machine* for: "Crush sends desktop notifications when a tool call requires permission and when the agent finishes its turn. They're only sent when the terminal window isn't focused _and_ your terminal supports reporting the focus state." `--yolo` is also process-wide and sticky per workspace: "The first client to create a workspace fixes its process-wide flags. In particular, `--yolo` and `--debug` follow a **first-wins** rule: later clients that arrive at the same `--cwd` with different values for those flags do not change the running workspace."
+
 **3. Isolation.** None documented.
+
 **4. Stated position.** Trust-the-config-file: "Just like `crush.json`, `crushrc` is a trusted file. Guard it carefully and don't download random configs without reading them first."
 
 ## Pi / earendil-works (DIRECT: GitHub API, `github.com/badlogic/pi-mono` → `earendil-works/pi`, 109,686 stars, fetched 2026-09-27)
@@ -338,9 +356,9 @@ This is the far end of the axis: not "yolo with a sandbox", but "yolo with no re
 | Claude Code (Anthropic docs) | 2026-02-18 → 2026-08-14 | production code, interactive | classifier (auto mode); was prompt-per-action | interactive sessions start in `auto` at v2.1.283+; auto was Pro/Max/Team-wide from 14 Aug 2026; `-p`/SDK still start Manual; Seatbelt/Bubblewrap shipped; `bypassPermissions` refused as root/sudo | — | allowlist proxy "was the piece that failed"; users approve 93%→97% of prompts; 17%→5% dangerous-command block rate as prompts accumulate |
 | Codex (OpenAI docs) | 2026 docs (page current) | production code, interactive | OS sandbox + approvals, two independent controls | sandbox on by default (`workspace-write`); `on-request` approvals; `auto_review` reviewer option | — | approval fatigue (stated as the reason the sandbox exists) |
 | Gemini CLI (Google docs) | docs Apr 2026; product end 2026-06-18 | production code, interactive | policy engine rules + optional sandbox + trusted-folders | sandbox is **opt-in**; trusted folders **disabled by default**; `yolo` mode exists | — | untrusted-workspace "safe mode" exists precisely because auto-accept is dangerous |
-| Amp (notes + orbs) | 2026-08-05 / 2026-09-14 | production code | none by default; optional plugin hook (`tool.call` → allow/reject) or OPA policy server; orbs = remote machine | "By default, Amp does not ask for approval before running tools."; workspace MCP servers are the one thing that does need approval | orb burst 20, then one per 5 min; sleeping orbs cost nothing | "Taking tools away... makes the agent look for an alternative" |
+| Amp (docs + notes) | 2026-08-05 / 2026-09-21 | production code | none by default; optional plugin hook (`tool.call` → allow/reject) or OPA policy server; orbs = remote machine | "By default, Amp does not ask for approval before running tools."; workspace MCP servers are the one thing that does need approval | orb burst 20, then one per 5 min; sleeping orbs cost nothing | "Taking tools away... makes the agent look for an alternative" |
 | Goose (docs) | 2026 docs; AAIF 2026-04-07 | production code | mode-based autonomy, no documented sandbox | "**Autonomous Mode is applied by default**" | — | supply-chain compromise (whence the extensions malware check) |
-| Crush (docs) | repo @ 2026-09-27 | production code | `permissions allow/deny` lists; config is Bash | allow/deny documented; default posture **not verified** | — | untrusted config file (`crushrc` "is a trusted file") |
+| Crush (README + config docs) | repo @ 2026-09-27 | production code | prompt per tool call by default; `permissions allow/deny`; `--yolo` skips all prompts | "By default, Crush will ask you for permission before running tool calls."; "Be very, very careful with this feature" | — | untrusted config file (`crushrc` "is a trusted file"); the gate is delivered as a desktop notification |
 | Pi (README) | fetched 2026-09-27 | production code | **none** | "no built-in permission system"; "containerize or sandbox Pi" | — | — |
 | Simon Willison (practitioner) | 2025-10-22 / 2026-08-08 | mixed, incl. research | yolo + sandbox; rejects allowlists | "always use `--dangerously-skip-permissions`"; "run coding agents in a sandbox" | — | "Confirmation fatigue is real"; allowlists "inherently unreliable" |
 | Armin Ronacher (practitioner) | 2025-06-12 | production code | yolo + Docker | "I disable all permission checks"; "moving your dev env into docker" | — | — |
@@ -368,11 +386,15 @@ The strongest version of this claim comes from Anthropic's own post-mortem — a
 
 ## Nobody has published anything that supports rule-based gating as a durable security boundary
 
-The only positive statements about allowlists in the entire corpus are product defaults (Amp's `ask`/`allow` policy, Crush's `permissions allow`, Gemini's policy engine). The negative statements are from the two sides that have measured or been burned: Willison ("I don't trust them at all"), Anthropic's own numbers on what users do with allow-rules (49.5% create them, 43% of those for interpreters, "essentially equivalent in practice" to blanket shell access), and Anthropic's decision to *drop interpreter rules from auto mode's classifiers* because they "grant arbitrary code execution".
+Allowlist-style gating exists in every product surveyed, and in every case but one it is opt-in or a non-default mode (Amp's `ask`/`allow` rules, Crush's `permissions allow`, Gemini's policy engine and its `yolo` mode). The corpus contains exactly one product whose documented default is a prompt — Crush: "By default, Crush will ask you for permission before running tool calls." — and its next paragraph hands the user `--yolo`. The negative statements are from the two sides that have measured or been burned: Willison ("I don't trust them at all"), Anthropic's own numbers on what users do with allow-rules (49.5% create them, 43% of those for interpreters, "essentially equivalent in practice" to blanket shell access), and Anthropic's decision to *drop interpreter rules from auto mode's classifiers* because they "grant arbitrary code execution".
 
 ## The 2026 default is autonomy, and it was set this year
 
-Dates on the defaults: manual approval was Claude Code's default as of Feb 2026; auto mode became Pro/Max/Team-wide on 14 Aug 2026 and the built-in default for interactive terminal and VS Code sessions at v2.1.283; Gemini CLI ships a `yolo` mode and an opt-in sandbox; Goose ships autonomous-by-default; Amp publishes a one-liner to allow everything; Pi ships no gate at all and tells you to containerise. The direction is one-way and the sandbox is the only compensating control that either major vendor defends in writing.
+Dates on the defaults: manual approval was Claude Code's default as of Feb 2026; auto mode became Pro/Max/Team-wide on 14 Aug 2026 and the built-in default for interactive terminal and VS Code sessions at v2.1.283; Gemini CLI ships a `yolo` mode and an opt-in sandbox; Goose ships autonomous-by-default; Amp states outright that it does not ask for approval before running tools; Pi ships no gate at all and tells you to containerise. One product points the other way — Crush, prompt-per-tool-call by default — and it is one of only two surveyed agents (with Goose) that documents no sandbox at all, so its default is a gate with nothing behind it. The direction is one-way and the sandbox is the only compensating control that either major vendor defends in writing.
+
+## The code-execution surface is not the thing being gated, and one product gates nothing at all
+
+Amp ships `code_exec` and states that it does not ask for approval before running tools; Claude Code's `auto` mode covers "Everything, with background safety checks"; Goose is autonomous by default; Pi ships no permission system and points at containers instead. Where an approval gate does exist in 2026 it is aimed at *configuration* (Amp's workspace MCP servers), at *interpreter rules* (Anthropic drops them from auto mode), or at *workspaces* (Gemini's trusted folders) — never at "this tool executes code" as such.
 
 ## "Company practice" is not one thing, even inside a single company
 
@@ -408,20 +430,19 @@ Cloudflare's is the only company figure with both token cost and scale ($1,100 /
 
 1. **`--yolo` as a CLI flag for Gemini CLI.** The policy-engine page names `yolo` only as an approval *mode*. The configuration reference was not confirmed, so no flag is asserted here.
 2. **StrongDM's primary page.** `https://factory.strongdm.ai` returned only an RSS shell; every StrongDM quote above is TRANSCRIBED from Simon Willison's page, with the primary blamed on JS rendering. Their `$1,000/day` claim is unverified verbatim.
-3. **Crush's default permission posture** without a rule (prompt vs allow-all). The `--disabled-tools`/`--enabled-tools` flags and the `allow`/`deny` semantics are verified; the absence of a rule is not.
-4. **Goose and any sandbox.** No sandbox is documented on the permission pages fetched; that is an absence of evidence, not evidence of absence.
-5. **Pi's `containerization.md` contents.** The README names three patterns (Gondolin, plain Docker, OpenShell); the doc itself was not read.
-6. **antirez's position** on permissions/sandboxing. `antirez.com/news/154`, `/news/158`, `/news/164` and one HN thread checked; **no statement found**.
-7. **Thorsten Ball's position.** No gating statement found in his archive; "Ownership" (8 Jul 2026) is an Amp internal note whose contents were not read.
-8. **Kent Beck.** Not surveyed this session.
-9. **Twitter/X posts quoted via Simon Willison's tag pages** (Willison 2025-10-22, Ronacher 2025-06-12, Yegge 2025-07-19, Karpathy 2026-02-21, Osmani 2026-04-13). The tweets themselves were not fetched; the tag pages reproduce them verbatim with links.
-10. **The Reddit thread Anthropic cites for approval fatigue.** `https://www.reddit.com/r/ClaudeAI/comments/1rru8zw/` returned a JS shell containing only an inline SVG logo, zero post text. **Not reachable, not absent.**
-11. **Anthropic's cited Apollo Research approval-fatigue pilot.** The current Apollo blog index does not show a post identifiable as that pilot; it may be a different publication channel.
-12. **Shopify's internal approval policy.** Publicly attributed work (the CEO's Liquid PR, the River agent's Slack-only confinement) is verified; the policy behind them is not published.
-13. **Cloudflare's per-session cost breakdown** and whether a human reviewed the "PRs that were just wrong". Not published.
-14. **Whether Google's geminicli.com docs still reflect a supported product** for the enterprise tier after the 18 Jun 2026 Antigravity transition. The banner persists; the enterprise carve-out is quoted but the docs' post-transition maintenance state was not verified.
+3. **Goose and any sandbox.** No sandbox is documented on the permission pages fetched; that is an absence of evidence, not evidence of absence.
+4. **Pi's `containerization.md` contents.** The README names three patterns (Gondolin, plain Docker, OpenShell); the doc itself was not read.
+5. **antirez's position** on permissions/sandboxing. `antirez.com/news/154`, `/news/158`, `/news/164` and one HN thread checked; **no statement found**.
+6. **Thorsten Ball's position.** No gating statement found in his archive; "Ownership" (8 Jul 2026) is an Amp internal note whose contents were not read.
+7. **Kent Beck.** Not surveyed this session.
+8. **Twitter/X posts quoted via Simon Willison's tag pages** (Willison 2025-10-22, Ronacher 2025-06-12, Yegge 2025-07-19, Karpathy 2026-02-21, Osmani 2026-04-13). The tweets themselves were not fetched; the tag pages reproduce them verbatim with links.
+9. **The Reddit thread Anthropic cites for approval fatigue.** `https://www.reddit.com/r/ClaudeAI/comments/1rru8zw/` returned a JS shell containing only an inline SVG logo, zero post text. **Not reachable, not absent.**
+10. **Anthropic's cited Apollo Research approval-fatigue pilot.** The current Apollo blog index does not show a post identifiable as that pilot; it may be a different publication channel.
+11. **Shopify's internal approval policy.** Publicly attributed work (the CEO's Liquid PR, the River agent's Slack-only confinement) is verified; the policy behind them is not published.
+12. **Cloudflare's per-session cost breakdown** and whether a human reviewed the "PRs that were just wrong". Not published.
+13. **Whether Google's geminicli.com docs still reflect a supported product** for the enterprise tier after the 18 Jun 2026 Antigravity transition. The banner persists; the enterprise carve-out is quoted but the docs' post-transition maintenance state was not verified.
 
-15. **Which Gemini CLI policy-engine tier numbering is authoritative.** The page's tier table says "Default 1 / Extension 2 / Workspace 3 **(Currently disabled)** / User 4 / Admin 5", while the worked examples directly below compute "A `priority: 10` rule in a Workspace policy TOML becomes `2.010`. A `priority: 100` rule in a User policy TOML becomes `3.100`." Both are reproduced; the discrepancy is in the vendor's own page and was not resolved.
-16. **Version drift in the Claude Code answers.** The quoted defaults are stated by the docs for v2.1.283 or later; on earlier builds the built-in starting mode was Manual, and before 14 Aug 2026 auto mode applied to Pro/Max/Team plans only. Any deployment pinned to an older build should read the version guards inside those quotes literally.
+14. **Which Gemini CLI policy-engine tier numbering is authoritative.** The page's tier table says "Default 1 / Extension 2 / Workspace 3 **(Currently disabled)** / User 4 / Admin 5", while the worked examples directly below compute "A `priority: 10` rule in a Workspace policy TOML becomes `2.010`. A `priority: 100` rule in a User policy TOML becomes `3.100`." Both are reproduced; the discrepancy is in the vendor's own page and was not resolved.
+15. **Version drift in the Claude Code answers.** The quoted defaults are stated by the docs for v2.1.283 or later; on earlier builds the built-in starting mode was Manual, and before 14 Aug 2026 auto mode applied to Pro/Max/Team plans only. Any deployment pinned to an older build should read the version guards inside those quotes literally.
 
 *Every URL in this document was fetched during the 2026-09-27 session unless marked TRANSCRIBED or listed as unreachable. No trained-knowledge defaults, flag names, or setting names were used.*
