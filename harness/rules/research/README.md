@@ -1,6 +1,6 @@
 # 調査記録
 
-このディレクトリは harness / jig の設計判断を支える調査記録を置く。決定そのものではない — 決定は `../decisions/` にあり、そこだけが「何を決め、何を捨て、なぜか」を持つ。ここにあるのは決定の根拠になった調査の生データと結論であって、AGENTS.md からは「調べる前に `rules/research/INDEX.md` を読め。確立済みの事実は再調査しない」という一行で指される。
+このディレクトリは harness / jig の設計判断を支える調査記録を置く。決定そのものではない — 決定は `../decisions/` にあり、そこだけが「何を決め、何を捨て、なぜか」を持つ。ここにあるのは調査の生データと結論で、フローとして扱う。名前の日付から 14 日のうちに、長く使う事実は `../knowledge/` へ、決定の根拠は決定記録へ移し（スキル `records-triage`）、残りは `dotctl records prune --yes` で消す（`../decisions/2026-09-27-records-flow-and-stock.md`）。AGENTS.md からは、`rules/knowledge/INDEX.md` と `rules/research/INDEX.md` の二つを調べる前に読めと指される。
 
 ## 記録とは何か
 
