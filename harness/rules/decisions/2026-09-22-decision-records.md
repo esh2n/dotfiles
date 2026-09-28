@@ -6,7 +6,7 @@ rule: Write binding decisions as harness/rules/decisions/YYYY-MM-DD-topic.md wit
 
 ## Problem
 
-grill で決まったことが、セッションの記憶ファイル(Claude Code 専用、機械ローカル、エージェントの行動を縛らない)にしか残らない。次のセッションや別のハーネスで同じ議論が蒸し返される。「恒久ルールにする方法が確立されているべき」。
+grill で決まったことが、セッションの記憶ファイル(Claude Code 専用、機械ローカル、エージェントの行動を縛らない)にしか残らない。次のセッションや別のハーネスで同じ議論が蒸し返される。決まったことを恒久ルールにする方法が要る。
 
 ## Decision
 

@@ -1,6 +1,6 @@
 # 整形と検査はプロジェクト自身の手順が最優先、jig の対応表は手順が無いときの既定
 
-Status: accepted — 業界の多数派はハーネス側の薄い対応表だが、プロジェクトが自分の手順（lefthook / pre-commit）を持つ大規模リポジトリはそれに委譲しており、持ち主の裁定は「プロジェクトの規則が一番強くないとダメ」（2026-09-23）
+Status: accepted — 業界の多数派はハーネス側の薄い対応表だが、プロジェクトが自分の手順（lefthook / pre-commit）を持つ大規模リポジトリはそれに委譲している。持ち主の裁定（2026-09-23）で、プロジェクトの規則を最優先にする
 
 rule: When the project defines its own hooks (`lefthook.yml` / `.lefthook.yml` or `.pre-commit-config.yaml` at the project root), jig's edit-time formatter and Stop-time gate run those on the touched files instead of jig's own table; jig's extension→formatter and marker→gate tables apply only to projects with no such file. Never override a project's own lint or format rules with harness defaults.
 
@@ -17,7 +17,7 @@ jig の PostToolUse（編集ごとの整形）と Stop（応答の終わりの�
 
 ## Alternatives considered
 
-- **jig の対応表だけで行く（現状）**: 数の上では業界の多数派（PostToolUse から prettier 直書き 1,724 件、pre-commit 委譲 186 件、lefthook 委譲 4 件）。単純だが、プロジェクトの手順と二重管理になり、プロジェクトが除外や順序を決めていても jig が別の規則で上書きする。持ち主の要件に反する。却下。
+- **jig の対応表だけで行く（現状）**: 数の上では業界の多数派（PostToolUse から prettier 直書き 1,724 件、pre-commit 委譲 186 件、lefthook 委譲 4 件）。単純だが、プロジェクトの手順と二重管理になり、プロジェクトが除外や順序を決めていても jig が別の規則で上書きする。プロジェクトの規則を最優先にする要件に反する。却下。
 - **手順ファイルの有無に関わらず両方走らせる**: 二重に整形・検査し、結果が食い違ったときにどちらが正か分からない。却下。
 - **`package.json` の scripts や mise の tasks も「プロジェクトの手順」とみなす**: 実在するが、何が整形で何が検査かの規約が無く、勝手に走らせると副作用がある。前例が確認できた lefthook / pre-commit に限り、必要になったら広げる。
 

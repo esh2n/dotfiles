@@ -1,6 +1,6 @@
 # ハーネスの元はリポジトリ直下の harness/ に置く（domains/ の解体に合わせて）
 
-Status: accepted — 持ち主の裁定（2026-09-24、ディレクトリ構造の提案に「ok」）。`2026-09-22-config-layout-no-personal-layer.md` の置き場所の部分（`harness/`）だけを置き換える。種類ごとに一か所、personal 層を作らない、翻訳は生成器（jig）が持つ、生成物を commit しない、は変わらない
+Status: accepted — 持ち主の裁定（2026-09-24）。`2026-09-22-config-layout-no-personal-layer.md` の置き場所の部分（`harness/`）だけを置き換える。種類ごとに一か所、personal 層を作らない、翻訳は生成器（jig）が持つ、生成物を commit しない、は変わらない
 
 rule: Keep harness source files under harness/ at the repository root, organized by kind (rules/, skills/, agents/, hooks/, mcp/, policy/, jig/), never a separate personal/ layer. Do all per-harness translation inside the jig apply generator, and never commit its generated output to the repository.
 

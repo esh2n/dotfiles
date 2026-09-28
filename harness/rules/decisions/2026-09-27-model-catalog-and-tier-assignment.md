@@ -1,12 +1,12 @@
 # tier の中身は候補の一覧から選び、一行で切り替える
 
-Status: accepted — 持ち主の裁定（2026-09-27、「main も complex も実際に私が使ってみて考えたほうがいい、とりあえずは deepseek でもいいけど切り替えられるようになってるんだっけ」「今後別のモデルになることも考えた設計になるべき」への提案に「はい」）。`2026-09-23-model-routing-per-harness.md` を置き換える。ベンダー製ハーネスは自社モデル、それ以外は LiteLLM の tier だけ、という部分はそのまま引き継ぎ、「tier → モデルは `litellm/config.yaml` で一度だけ決める」を変える
+Status: accepted — 持ち主の裁定（2026-09-27）。要件: main と complex のモデルを実際に使いながら切り替えられ、今後別のモデルに替えることも考えた設計にする。`2026-09-23-model-routing-per-harness.md` を置き換える。ベンダー製ハーネスは自社モデル、それ以外は LiteLLM の tier だけ、という部分はそのまま引き継ぎ、「tier → モデルは `litellm/config.yaml` で一度だけ決める」を変える
 
 rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harness (pi, DSH, omp) sends all model calls through the local LiteLLM proxy at `localhost:4000` using only the tier names `main` (everyday), `complex` (escalation) and `deterministic` (the executor of a designed plan), never a provider directly. Every model a tier may use is one entry in the catalog `harness/policy/models.json` (provider, model, key reference, LiteLLM params); `harness/policy/tiers.json` only names catalog ids per tier (`use`, in LiteLLM order), and jig generates the tiers' block of `litellm/config.yaml` from the two — never edit that block by hand. Switch a tier with `dotctl llm use <tier> <model>...`; a new model is one catalog entry plus its key in 1Password. A harness that silently falls back to another provider when its default's auth fails is a defect to fix, not a state to leave.
 
 ## Problem
 
-持ち主は、MiMo（Xiaomi）を `main` と `complex` で実際に使って DeepSeek と比べたい。これからも別のモデルが出るたびに試したい。ところが tier の中身は、`harness/policy/tiers.json` の `backend` と、手で書いた `litellm/config.yaml` の二か所に書かれていて、切り替えるには両方を直して LiteLLM を再起動する必要があった。LiteLLM の鍵も `litellm-up.sh` にプロバイダごとに書いてあり、新しいプロバイダのたびにスクリプトを直していた。
+MiMo（Xiaomi）を `main` と `complex` で実際に使って DeepSeek と比べる。これからも別のモデルが出るたびに試す。ところが tier の中身は、`harness/policy/tiers.json` の `backend` と、手で書いた `litellm/config.yaml` の二か所に書かれていて、切り替えるには両方を直して LiteLLM を再起動する必要があった。LiteLLM の鍵も `litellm-up.sh` にプロバイダごとに書いてあり、新しいプロバイダのたびにスクリプトを直していた。
 
 ## Decision
 
@@ -21,7 +21,7 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 
 - **LiteLLM の `model_group_alias` で tier を別名にする**: 設定項目としては今もあり（`docs/proxy/config_settings.md`）、config.yaml から無視される不具合（#15020）は 2025-10 に閉じている。ただ、別名にした tier が `/v1/models` の一覧に出るかが docs に書かれておらず、出なければ `dotctl llm check` とハーネスのモデル一覧が tier を見つけられない。採らない。
 - **tier ごとに候補を全部 config.yaml に並べ、`order` で使うものを先頭にする**: 切り替えが順番の入れ替えになるが、使わないモデルへ黙って落ちる（fallback の失敗例、gke-labs/kube-agents #2023）。却下。
-- **config.yaml を手で直し続ける**: 二か所の手直しと再起動を毎回やることになり、持ち主が試す回数が減る。却下。
+- **config.yaml を手で直し続ける**: 二か所の手直しと再起動を毎回やることになり、試す回数が減る。却下。
 - **dotctl（Go）で config.yaml を生成する**: ハーネスごとの変換は jig の中に置く、という決定（`2026-09-24-harness-top-level-dir.md`）と、既存の jig の生成器・印の仕組みを外れる。却下。
 
 ## Consequences

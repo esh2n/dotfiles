@@ -1,12 +1,12 @@
 # 作業の隔離はどのハーネスでも一つの形にし、合流は持ち主が決める
 
-Status: accepted — 持ち主の裁定（2026-09-27、「worktree を作るのかそのブランチでやるのかという方法をハーネスで変える意味がわからないし認知負荷が高い」「あえてコマンド増やすのも認知負荷が高いのでは」への案に「はい、その形で」）
+Status: accepted — 持ち主の裁定（2026-09-27）。隔離の形をハーネスごとに変えず、専用のコマンドも足さない
 
 rule: Work in the current checkout by default; parallel workers whose files overlap wait instead of sharing them. When isolation is needed, every harness (Claude Code, Codex, pi, omp, the Swarm) makes the same thing with plain git — a worktree at `.claude/worktrees/<name>` on a branch named `<name>`, ignored through the repository's `info/exclude`, with only `.worktreeinclude`-listed ignored files copied in — never a harness's own isolation form. Merging back is the owner's decision, done with `git merge --no-ff <name>`, then `git worktree remove` and `git branch -d`; nothing merges automatically, no dedicated command is added, and unmerged or dirty worktrees are never force-removed.
 
 ## Problem
 
-隔離の形がハーネスごとに違っていた。Claude Code は `.claude/worktrees/<名前>` にブランチ付きの worktree、Codex はブランチを持たない worktree（detached HEAD）、omp は git の worktree ではなくファイルを写した一時的な場所。スキル `using-git-worktrees` も「そのハーネスのやり方を優先する」と書いていた。持ち主は、どのハーネスで何が起きるかを覚えておく負荷を問題にした。
+隔離の形がハーネスごとに違っていた。Claude Code は `.claude/worktrees/<名前>` にブランチ付きの worktree、Codex はブランチを持たない worktree（detached HEAD）、omp は git の worktree ではなくファイルを写した一時的な場所。スキル `using-git-worktrees` も「そのハーネスのやり方を優先する」と書いていた。どのハーネスで何が起きるかを覚えておく必要があった。
 
 ## Decision
 
@@ -17,8 +17,8 @@ rule: Work in the current checkout by default; parallel workers whose files over
 
 ## Alternatives considered
 
-- **ハーネスごとの隔離をそのまま使う**: 持ち主の負荷の原因そのもの。却下。
-- **`jig worktree` のような入り口を足す**: 覚えるコマンドが一つ増える。持ち主が却下。
+- **ハーネスごとの隔離をそのまま使う**: 覚えておく負荷の原因そのもの。却下。
+- **`jig worktree` のような入り口を足す**: 覚えるコマンドが一つ増える。却下。
 - **条件を満たせば自動でマージする（Kimi Code の Tower 型）**: 自動でマージして使われている実装は見つからず（Tower は既定 off の試験機能、Crystal は製品終了）、ベンダー（Claude Code、Codex）も実践者（Petr Baudis の pi-side-agents）もマージを人に任せている。git がきれいにマージできても意味の上で壊れる例がある（rules/research/2026-09-27-swarm/worktree-merge.md）。採らない。
 
 ## Consequences

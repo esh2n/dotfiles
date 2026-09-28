@@ -1,6 +1,6 @@
 # 役割は「その機械が家の中で誰か」を表す人の名前にする
 
-Status: accepted — 持ち主の裁定（2026-09-25、「role は通常の web app の admin のような人の名前がいい」「observer はいい」、提案一式に「ok」）。`plans/2026-09-24-dotfiles-architecture.md` §11 の未決 2 のうち、役割の一覧を閉じる
+Status: accepted — 持ち主の裁定（2026-09-25）。役割は web アプリの admin のような人の名前にする。`plans/2026-09-24-dotfiles-architecture.md` §11 の未決 2 のうち、役割の一覧を閉じる
 
 rule: Name each machine role for who the machine is to the rest of the home — developer, desk-user, model-provider, observer — never for a product (lmstudio), a part (gpu) or coined jargon (llm-console). A role grants capabilities the way a web app's role grants permissions: feature modules check only their own capability option, never a role name. Every machine is base without listing it; one role covers one job, and the engine behind it follows the detected platform (model-provider is LM Studio on macOS, llama-server on Linux with NVIDIA).
 
@@ -26,7 +26,7 @@ rule: Name each machine role for who the machine is to the rest of the home — 
 ## Alternatives considered
 
 - **旧名のまま**: 名前の観点が混ざったまま残り、読み手がそのつど中身を確かめる必要がある。却下。
-- **機能の名前（`gui`、`llm-dashboard` など）**: 何が入るかは表すが、機械の立場を表さない。持ち主が人の名前を選んだ。却下。
+- **機能の名前（`gui`、`llm-dashboard` など）**: 何が入るかは表すが、機械の立場を表さない。人の名前を採った。却下。
 - **lmstudio と gpu を別の役割のまま残す**: 同じ仕事に二つの名前があり、しかも OS で分かれる。「機械の種類は検出し、名前では決めない」（`2026-09-24-dotfiles-nix-only-roles-symlink.md`）とも合わない。却下。
 - **旧名を別名として受け付け続ける**: 名前が二重になり、いつまでも消せない。旧名は分かりやすい誤りで止め、書き換えは一度きりにする。却下。
 

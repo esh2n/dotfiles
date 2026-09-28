@@ -1,12 +1,12 @@
 # LiteLLM を通る AI 利用コストは一冊の台帳で持つ: 各機械は手元の Postgres に書き、llm-console の機械の台帳へあとから送る
 
-Status: accepted — 持ち主の裁定（2026-09-25、「Ok」）。経緯: 「私が使った AI の利用コストを一元で管理できること」（機械ごとの LiteLLM を Grafana で足すだけでは要件外）→ 範囲は「LiteLLM 通過分だけ」（Claude Code・Codex の直接利用は、少なくともいまは対象外）→ 共有 DB に直接書く案に「Mac が止まっているときの書き込みと再送」「書き込みに行く遅延」の懸念 → ソースまで読んだ調査の後、手元に書いてあとから送る形に「Ok」。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md` の「LiteLLM は各機械の loopback に一つ」は変えない。tailnet に出す口に台帳の Postgres を一つ足す
+Status: accepted — 持ち主の裁定（2026-09-25）。要件: AI の利用コストを一か所で管理する（機械ごとの LiteLLM を Grafana で足すだけでは足りない）。範囲は LiteLLM を通る分だけ（Claude Code・Codex の直接利用は、いまは対象外）。共有 DB に直接書く案には、機械が止まっているときの書き込みと再送、書き込みの遅延の問題があり、ソースまで読んだ調査の後、手元に書いてあとから送る形を採った。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md` の「LiteLLM は各機械の loopback に一つ」は変えない。tailnet に出す口に台帳の Postgres を一つ足す
 
 rule: Keep one LiteLLM per machine, loopback-only, but give each its own local Postgres on the same docker network (never a DB across the tailnet on the request path); the llm-console machine's Postgres is the single cost ledger, and every other machine ships its unsent LiteLLM_SpendLogs rows to it when reachable, idempotently by request_id (the table's primary key), recording which machine each row came from. Expose only the ledger's Postgres port on the tailnet from the llm-console machine. Budgets are per machine; the cross-machine total is read from the ledger. If the DB secret is unavailable, LiteLLM still serves without a DB rather than stopping.
 
 ## Problem
 
-LiteLLM を通る AI の利用コストを一元で管理したい（合計が一本、機械・ハーネス・モデル別の内訳）。機械は Mac と Omarchy 機の二台で、Omarchy 機は Windows と切り替えるため止まっていることが多く、Mac も寝ることがある。
+LiteLLM を通る AI の利用コストを一元で管理したい（合計が一本、機械・ハーネス・モデル別の内訳）。機械は Mac と Omarchy 機の二台で、Omarchy 機は止まっていることが多く、Mac も寝ることがある。
 
 ## Decision
 
@@ -21,7 +21,7 @@ LiteLLM を通る AI の利用コストを一元で管理したい（合計が�
 
 - **各機械の LiteLLM が台帳の Postgres に直接書く（LiteLLM 公式の複数台共有の型）**: 書き込みは応答の後なので遅れないが、Mac が止まっている間は LiteLLM のメモリ（64MB まで、古いものから捨てる）に溜めるだけで、ディスクに残らない。その間に Omarchy 側の LiteLLM が止まれば（再起動・電源断・Windows への切り替え）記録が消える。また鍵の確認のキャッシュが切れた直後は、止まった DB を最大 10 秒待つ（`PROXY_DB_LOOKUP_DEADLINE_SECONDS`）。却下。
 - **LiteLLM を Mac に一つだけ置く**: Mac が寝た瞬間に Omarchy から全 tier が使えなくなる。今より悪化。却下。
-- **Grafana で Prometheus のカウンタを機械横断で足す**: 台帳ではない。持ち主が要件外と判定。却下。
+- **Grafana で Prometheus のカウンタを機械横断で足す**: 台帳ではなく、要件を満たさない。却下。
 - **Langfuse などの別サービスへの callback**: 常駐サービスが増え、既存の Prometheus/Grafana を活かさない。LiteLLM 組み込みの callback もメモリにしか溜めない。却下。
 
 ## Consequences

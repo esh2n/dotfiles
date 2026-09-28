@@ -1,6 +1,6 @@
 # jig の既定の対応表は全言語に整形と型検査の両方を持つ、言語で品質に差をつけない
 
-Status: accepted — 対応表型（拡張子 → 標準ツール 1 つ）は業界の多数派で、各言語に事実上の標準整形器がある。Stop の型検査は作業中のプロジェクトの言語だけに走るので他言語のコストは乗らず、既に TS の tsc・Rust の cargo check が払っている種類の待ちを他言語にも等しく払う（2026-09-23、持ち主「どの言語でもクオリティを求めて欲しい」）
+Status: accepted — 対応表型（拡張子 → 標準ツール 1 つ）は業界の多数派で、各言語に事実上の標準整形器がある。Stop の型検査は作業中のプロジェクトの言語だけに走るので他言語のコストは乗らず、既に TS の tsc・Rust の cargo check が払っている種類の待ちを他言語にも等しく払う（持ち主の裁定、2026-09-23。要件はどの言語でも同じ品質を求めること）
 
 rule: jig's fallback tables cover every language the rules tree knows — C++, C#, Java, Kotlin, Perl, PHP, Swift join TS/JS, Go, Python, Rust — each with one edit-time formatter and one Stop-time incremental compile or type check chosen by the project's marker file; a missing tool is a silent skip, never an error. Do not leave a language with no gate on the grounds of latency: the gate only ever runs the current project's own language.
 

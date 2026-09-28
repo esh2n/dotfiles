@@ -1,6 +1,6 @@
 # omp の eval は `prompt` のまま。yolo の下で人が見る唯一のツールとして残す
 
-Status: accepted — 持ち主の裁定（2026-09-27、「維持でいいよ」）。選択肢は「(a) `prompt` 維持 / (b) `allow` / (c) `deny`」の三つで、(a) を採った。
+Status: accepted — 持ち主の裁定（2026-09-27）。選択肢は「(a) `prompt` 維持 / (b) `allow` / (c) `deny`」の三つで、(a) を採った。
 
 rule: Keep `tools.approval.eval: prompt` in omp's config alongside `tools.approvalMode: yolo`. It is the only layer that sees code the guard's static extraction cannot resolve, and it is omp's own documented lever for the gap `bash.patterns` cannot close — never remove it to reduce prompts, never raise it to `deny`, and never describe it as a boundary. Nothing in omp is a boundary: for untrusted input the boundary is running omp inside the sandbox (yomp/sbx).
 

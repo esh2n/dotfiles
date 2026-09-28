@@ -1,12 +1,12 @@
 # deterministic は Omarchy 機が止まっている間だけ Mac の同じモデルへ落ちる
 
-Status: accepted — 持ち主の裁定（2026-09-27、「Mac で作業してるときに Omarchy 側の起動ができてなくて決定的なタスクが失敗するみたいなことにならないようにフォールバックの対応を入れた方がいい」「ふだん Mac は空くから別の大きめなモデルとか動かしてもいい、Omarchy が止まった時だけ Qwen にできるのかな？」への提案に「ok」）。`2026-09-26-deterministic-on-the-gpu.md` を置き換える。deterministic の定義（計画の実行役）、主の置き場所（Omarchy 機の llama-server、Qwen3.8-27B Q4_K_M、65,536 文脈、スロット 1、Qwen の推奨サンプリング）はそのまま引き継ぎ、「どこへも fallback しない」だけを変える
+Status: accepted — 持ち主の裁定（2026-09-27）。要件: Omarchy 機が止まっていても deterministic の作業が失敗しないこと、普段は空いている Mac で別の大きいモデルを動かせること。`2026-09-26-deterministic-on-the-gpu.md` を置き換える。deterministic の定義（計画の実行役）、主の置き場所（Omarchy 機の llama-server、Qwen3.8-27B Q4_K_M、65,536 文脈、スロット 1、Qwen の推奨サンプリング）はそのまま引き継ぎ、「どこへも fallback しない」だけを変える
 
-rule: The `deterministic` tier is the executor: it carries out a plan that a frontier or higher-benchmark model (`complex`, Claude, Codex) already designed; it is not a tier for bit-identical output. It has two deployments of the same model, Qwen3.8-27B, under one LiteLLM `model_name`: `order: 1` is the Omarchy desktop's `llama-server` (RTX 3090 Ti, 4-bit, one slot with a 65,536-token context, Qwen's recommended sampling), the only deployment LiteLLM health-checks in the background (`enable_health_check_routing`, every 60 s, `cooldown_time` 90); `order: 2` is the Mac's LM Studio (`qwen/qwen3.8-27b@4bit`, loaded just in time with a 600 s `ttl`, `disable_background_health_check: true`), used only while the desktop is out of the pool. Never fall back to a different model. The Mac's own larger model must be JIT-loaded too, so LM Studio's auto-evict swaps it out; whether a fallback happened is read from the `x-litellm-model-api-base` header and `litellm_deployment_success_responses` by `api_base`.
+rule: The `deterministic` tier is the executor: it carries out a plan that a frontier or higher-benchmark model (`complex`, Claude, Codex) already designed; it is not a tier for bit-identical output. It has two deployments of the same model, Qwen3.8-27B, under one LiteLLM `model_name`: `order: 1` is the Omarchy desktop's `llama-server` (24 GB GPU, 4-bit, one slot with a 65,536-token context, Qwen's recommended sampling), the only deployment LiteLLM health-checks in the background (`enable_health_check_routing`, every 60 s, `cooldown_time` 90); `order: 2` is the Mac's LM Studio (`qwen/qwen3.8-27b@4bit`, loaded just in time with a 600 s `ttl`, `disable_background_health_check: true`), used only while the desktop is out of the pool. Never fall back to a different model. The Mac's own larger model must be JIT-loaded too, so LM Studio's auto-evict swaps it out; whether a fallback happened is read from the `x-litellm-model-api-base` header and `litellm_deployment_success_responses` by `api_base`.
 
 ## Problem
 
-09-26 の記録は、Omarchy 機が止まっている間 deterministic を「使えない」にした。Omarchy 機は Windows と切り替えて起動するので止まっていることが多く、Mac で作業している間に deterministic の作業が失敗する。一方で持ち主は、普段は空いている Mac で別の大きいモデルを動かしたい。
+09-26 の記録は、Omarchy 機が止まっている間 deterministic を「使えない」にした。Omarchy 機は止まっていることが多く、Mac で作業している間に deterministic の作業が失敗する。一方で、普段は空いている Mac では別の大きいモデルを動かす。
 
 ## Decision
 

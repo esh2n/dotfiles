@@ -1,12 +1,12 @@
 # main への push を許すリポジトリは、持ち主が policy の脇に置く追跡外の一覧で決める
 
-Status: accepted — 持ち主の裁定（2026-09-24、「Codex の形を jig に写す。あなた自身の policy に、main への push を許すリポジトリのパスを一度書く。→いいけど commit 対象にしちゃダメだよ」）。その前に「セッションごとでいい」「env はプロジェクトと競合するし仕事で使えない」の二段の絞り込みがあった
+Status: accepted — 持ち主の裁定（2026-09-24）。Codex の形（持ち主の policy に、main への push を許すリポジトリのパスを書く）を jig に写し、その一覧は commit しない
 
 rule: Never push to main/master; the guard forbids it (`git-push-main-master`) everywhere except in repositories the owner listed in `~/.config/jig/policy/main-push-allowed` — an owner-written, per-machine, never-committed file of path prefixes read through the rule's `unlessCwdIn`. Nothing in a repository, a prompt, or the environment lifts the rule, and a command that reaches into another repository (`git -C`, `--git-dir`, `--work-tree`, `cd` on the same line) is never waived.
 
 ## Problem
 
-`rules/common/10-git.md` は「プロジェクトの `.yoki.json` に `allowMainBranchWork: true` があれば main に push 可」と書いていたが、それを読む処理は退役した yoki と共に消え、jig の guard は `git-push-main-master` を全プロファイルで forbid している。持ち主は dotfiles と個人開発では main に頻繁に push する。仕事のリポジトリでは main への push は禁止のまま。
+`rules/common/10-git.md` は「プロジェクトの `.yoki.json` に `allowMainBranchWork: true` があれば main に push 可」と書いていたが、それを読む処理は退役した yoki と共に消え、jig の guard は `git-push-main-master` を全プロファイルで forbid している。main に直接 push するリポジトリもあれば、禁止のままにすべきリポジトリもある。
 
 ## Decision
 
@@ -21,7 +21,7 @@ rule: Never push to main/master; the guard forbids it (`git-push-main-master`) e
 ## Alternatives considered
 
 - **コミットされる repo ファイル（`.yoki.json` の形）**: GitHub 全体で `allowMainBranchWork` の前例ゼロ。Codex は信頼していないプロジェクトの `.codex/` 層を無視、Claude Code は deny がどの層でも勝つ方向。CVE-2026-21852 はプロジェクト側の値を安全分岐に使う設計が実害になった例。却下。
-- **起動時の env（`JIG_ALLOW_MAIN_PUSH=1`）**: 公開実装 3 件（aiops-starter-kit / FailSafe / nightgauge）の収束形で、全ハーネスに届く。だが持ち主の指摘どおりシェル全体の印で、リポジトリに紐づかず、direnv / mise と衝突し、仕事のリポジトリへ漏れる。却下。
+- **起動時の env（`JIG_ALLOW_MAIN_PUSH=1`）**: 公開実装 3 件（aiops-starter-kit / FailSafe / nightgauge）の収束形で、全ハーネスに届く。だがシェル全体の印で、リポジトリに紐づかず、direnv / mise と衝突し、許していないリポジトリへ漏れる。却下。
 - **セッション ID 付きの `/allow-main`**: 前例なし。superpowers の「明示同意」は会話だけで機械的強制がない。却下。
 - **push のたびに `ask`**: Claude Code と DSH だけ。Codex / pi / omp は ask を持たず jig が deny に落とす。却下。
 - **git remote の owner で判定**: 実物なし。`git remote set-url` を別途塞ぐ必要がある。却下。

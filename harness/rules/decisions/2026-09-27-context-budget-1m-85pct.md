@@ -1,6 +1,6 @@
 # ハーネスの予算はプロバイダの 1M にし、圧縮は 85%（850K）で発火させる
 
-Status: accepted — 持ち主の裁定（2026-09-27、「Bで85%」）。調査記録 `rules/research/2026-09-27-current-generation-context-practice.md` と `2026-09-27-current-long-context-coding-measurements.md` の結論を引いた推しに対して
+Status: accepted — 持ち主の裁定（2026-09-27。案 B、圧縮点 85%）。調査記録 `rules/research/2026-09-27-current-generation-context-practice.md` と `2026-09-27-current-long-context-coding-measurements.md` の結論を引いた推しに対して
 
 rule: Set a harness's `contextWindow` for the `main` and `complex` tiers to the provider's own 1,000,000 window, not a smaller budget, and let compaction fire at 85% of it — omp needs no setting (its 15% reserve gives 850,000) and pi sets `reserveTokens: 150000` for the same 850,000 point. Never pin `compaction.thresholdTokens` or any fixed threshold below 85%: a fixed number defeats `/extended-context on`, and re-summarizing every ten minutes loses far more than a long window costs.
 

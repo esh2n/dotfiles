@@ -6,7 +6,7 @@ rule: Keep language-specific guidance in the language's skill (`skills/<lang>-*`
 
 ## Problem
 
-`rules/<lang>/*.md`（12 言語、3,700 行、`paths:` 付き）は Claude Code だけが該当ファイルに触れたとき自動で読み込む。他の四ハーネスには一行も届いていない。持ち主の要件は五ハーネスで品質を揃えること。
+`rules/<lang>/*.md`（12 言語、3,700 行、`paths:` 付き）は Claude Code だけが該当ファイルに触れたとき自動で読み込む。他の四ハーネスには一行も届いていない。要件は五ハーネスで品質を揃えること。
 
 ## Decision
 
@@ -18,7 +18,7 @@ rule: Keep language-specific guidance in the language's skill (`skills/<lang>-*`
 ## Alternatives considered
 
 - **各ハーネスに jig が差し込む（自作注入）**: 拡張点は四つとも確認できた（`2026-09-23-path-rule-injection-seams.md`）が、実地でやった唯一の報告が失敗（#21675）。却下。
-- **ユーザーの AGENTS.md に削って畳む**: 業界の畳み先に最も近いが、常時読み込みは「触れたときだけ」という条件付けの意図に反する（持ち主「論外」）。却下。
+- **ユーザーの AGENTS.md に削って畳む**: 業界の畳み先に最も近いが、常時読み込みは「触れたときだけ」という条件付けの意図に反する。却下。
 - **Claude Code だけ `paths:` を残す**: 他ハーネスに届かない。却下（持ち主）。
 - **プロジェクト内のネスト AGENTS.md**: 業界の型そのものだが、ユーザー全体の規則には合わず、jig はプロジェクトにファイルを書かない。却下。
 

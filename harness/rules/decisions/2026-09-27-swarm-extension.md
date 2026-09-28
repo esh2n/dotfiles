@@ -1,12 +1,12 @@
 # Swarm は omp・pi の拡張として自分で持ち、実行系を持たない決めごとの例外にする
 
-Status: accepted — 持ち主の裁定（2026-09-27、「はい、その案で進めて」）。09-13 から求めていた Swarm（「やってほしいとしか言ってない」）を、私が 09-13 と 09-22 の調査で見送りにしていた。`2026-09-22-subagents-and-workflows-by-scale.md` の「jig itself has no execution engine」と `2026-09-22-loop-native-goal.md` の「Never build a custom loop/execution engine」に、この拡張だけの例外を足す（両記録のほかの部分は変えない）
+Status: accepted — 持ち主の裁定（2026-09-27）。09-13 から求められていた Swarm を、09-13 と 09-22 の調査で見送りにしていた。`2026-09-22-subagents-and-workflows-by-scale.md` の「jig itself has no execution engine」と `2026-09-22-loop-native-goal.md` の「Never build a custom loop/execution engine」に、この拡張だけの例外を足す（両記録のほかの部分は変えない）
 
 rule: The Swarm extension for omp and pi is the one exception to "no custom execution engine": it spawns worker agents as headless harness processes that talk to LiteLLM by tier name, keeps its own queue with a concurrency limit (per tier; `deterministic` has one slot), and shows every worker in an always-visible table below the editor — name, model, effort, status (working, queued, unread, done, failed), progress, idle, age, note, cost and tokens. It never runs unattended loops (goal features still own those), never lets workers write the same files at once without isolation, and never hides cost: the concurrency cap and the running cost are always on screen.
 
 ## Problem
 
-持ち主は、@voidwarriorchan の自作 Swarm（kimi-cli 風、Astra ハーネス）と同等以上の体験を pi・omp で使いたい。二枚の画面写真で分かった形は、入力欄の下に常に出る表（NAME / MODEL / EFFORT / STATUS / PROGRESS / IDLE / AGE / NOTE）で、状態に Working・Queued・Unread があり、18 人を同時に動かしている。
+要件: @voidwarriorchan の自作 Swarm（kimi-cli 風、Astra ハーネス）と同等以上の体験を pi・omp で使えること。二枚の画面写真で分かった形は、入力欄の下に常に出る表（NAME / MODEL / EFFORT / STATUS / PROGRESS / IDLE / AGE / NOTE）で、状態に Working・Queued・Unread があり、18 人を同時に動かしている。
 
 omp の本体（v18.3.4 のソース）は子を並行に動かせるが、上限を超えて待つ子はどの画面にも出ず、拡張が子の状態（モデル・費用・トークン）を受け取る公開 API は起動時の一回だけで、常に出る一覧は動いている子の名前だけ。pi の本体には Swarm が無く、拡張の pi-agent-teams は 6 月から止まり、pi ごと落ちる不具合が放置されている（`rules/research/2026-09-27-swarm-on-omp-pi.md`）。表示だけを足す形では、この画面は作れない。
 

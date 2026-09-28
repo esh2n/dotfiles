@@ -6,7 +6,7 @@ rule: Before any design decision, gather evidence from all four lenses — vendo
 
 ## Problem
 
-設計判断を、ベンダー一社の資料、自分の既存コードのコメント、一件の逸話、部下の要約だけで下していた。「根拠のない意見は意味がない」。
+設計判断を、ベンダー一社の資料、自分の既存コードのコメント、一件の逸話、部下の要約だけで下していた。根拠のない意見では判断できない。
 
 ## Decision
 

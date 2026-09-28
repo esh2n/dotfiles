@@ -1,6 +1,6 @@
 # モデルの経路: ベンダー製ハーネスは自社モデル、それ以外は LiteLLM の tier
 
-Status: superseded by 2026-09-27-model-catalog-and-tier-assignment.md（tier → モデルは候補の一覧と割り当てから生成するようにした。ベンダー製ハーネスは自社モデル、それ以外は tier だけ、はそちらが引き継ぐ） — accepted — 持ち主の裁定（2026-09-23 夜）。「ClaudeCode と Codex はモデルを作っているベンダーのハーネスなので自社モデルで違和感がない。pi・DSH・omp はどのモデルも使えるので LiteLLM の 2 段（main / complex）と、決定的なタスクはローカル LLM」。omp が Anthropic OAuth の失効で無言で openai-codex / gpt-5.5 に落ちていたのを見つけた場で出た
+Status: superseded by 2026-09-27-model-catalog-and-tier-assignment.md（tier → モデルは候補の一覧と割り当てから生成するようにした。ベンダー製ハーネスは自社モデル、それ以外は tier だけ、はそちらが引き継ぐ） — accepted — 持ち主の裁定（2026-09-23）。omp が Anthropic OAuth の失効で無言で openai-codex / gpt-5.5 に落ちていたのを見つけた場で出た
 
 rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harness (pi, DSH, omp) sends all model calls through the local LiteLLM proxy at `localhost:4000` using only the tier aliases `main` (everyday), `complex` (escalation) and `deterministic` (local LM Studio, reproducible/offline), never a provider directly. Tier → model is decided once in `litellm/config.yaml`; a harness config names tiers, not models. A harness that silently falls back to another provider when its default's auth fails is a defect to fix, not a state to leave.
 
@@ -14,12 +14,12 @@ rule: Claude Code runs Claude models and Codex runs OpenAI's; every other harnes
 - pi・DSH・omp → LiteLLM の tier だけ（`main` / `complex` / `deterministic`）。プロバイダ直結の設定は置かない。
 - omp: `home/shared/harness/omp/models.yml` にプロバイダ `proxy`（`http://localhost:4000/v1`、`apiKey: LITELLM_API_KEY`）、`config.yml.template` の `modelRoles` は全部 `proxy/*`（default / smol / tiny / commit / task → `main`、slow / plan / advisor → `complex`）。鍵は pi と同じく zsh の `omp()` ラッパーが `proxy-key.sh` で一度解決して渡す。
 - omp の subagent 表（`agents/models.json` の `omp`）: sonnet・haiku → `proxy/main`、opus → `proxy/complex`（codex 表と同じ考え方）。
-- 持ち主の追記（未裁定）: 「Codex も Codex 以外のモデルを使えるはず」— Codex の一部を LiteLLM 経由にするかは別件で grill。
+- 未裁定: Codex も他社のモデルを使えるはずで、Codex の一部を LiteLLM 経由にするかは別件で grill。
 
 ## Alternatives considered
 
 - **omp を Anthropic OAuth に再ログインさせて据え置く**: 第三者ハーネスがサブスクの OAuth を使う可否がベンダー方針に依存し、失効が再発する。調査記録: Anthropic は 2026-01 に opencode で Claude Max の OAuth を使った利用者を BAN し、opencode 側は「anthropic legal demanded we respond … their ToS prohibits using your claude max subscription outside of claude code」とクローズしている（https://github.com/anomalyco/opencode/issues/6930 ）。公式に認めるのは Agent SDK 経由だけで、それも 6/15 に pause（https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan ）。今回の `invalid_grant` は omp 自身の並行 refresh 競合（https://github.com/can1357/oh-my-pi/issues/5396 ）でも BAN でも同じ文字列になり判別できない。持ち主の方針（ベンダー製以外は LiteLLM）にも反する。却下。
-- **五ハーネス全部を LiteLLM 経由**: Claude Code と Codex はサブスク（OAuth）で動き、API 課金に変わる。持ち主が「違和感がない」と明言した現状を変える理由が無い。却下。
+- **五ハーネス全部を LiteLLM 経由**: Claude Code と Codex はサブスク（OAuth）で動き、API 課金に変わる。ベンダー製ハーネスが自社モデルを使う現状を変える理由が無い。却下。
 
 ## Consequences
 
