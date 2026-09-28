@@ -1,6 +1,6 @@
 # 出力を持つ自作コマンドは全部 dotctl にし、シェルは薄い入口だけにする
 
-Status: accepted — 持ち主の裁定（2026-09-25）。出力の共通処理を Go とシェルの二か所で持たないための提案を採った。`2026-09-25-dotctl-in-go.md` の「100 行未満はシェルに残す」と `plans/2026-09-24-dotfiles-architecture.md` §6 の `pkgs/scripts/lib/` を置き換える
+Status: accepted — 持ち主の裁定（2026-09-25）。出力の共通処理を Go とシェルの二か所で持たないための提案を採った。`2026-09-25-dotctl-in-go.md` の「100 行未満はシェルに残す」と、dotfiles の設計計画にあった `pkgs/scripts/lib/` を置き換える
 
 rule: Every personal command that prints to the user, logs or reports errors is a dotctl subcommand, sharing pkgs/dotctl/internal/ — including the setup steps (dotctl setup), the home-LLM setup and check (dotctl llm), gh-switch, wallpaper, install-extensions and setup-neovim-distros — whatever its length. Shell stays only for thin entry points that hand off to another program with no output helpers of their own (codebase-memory-mcp-managed, jig, git-credential-gh-owner) and for zsh functions that must change the calling shell's state; there is no shared shell helper library.
 

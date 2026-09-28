@@ -1,6 +1,6 @@
 # 役割は「その機械が家の中で誰か」を表す人の名前にする
 
-Status: accepted — 持ち主の裁定（2026-09-25）。役割は web アプリの admin のような人の名前にする。`plans/2026-09-24-dotfiles-architecture.md` §11 の未決 2 のうち、役割の一覧を閉じる
+Status: accepted — 持ち主の裁定（2026-09-25）。役割は web アプリの admin のような人の名前にする。dotfiles の設計計画の未決 2 のうち、役割の一覧を閉じる
 
 rule: Name each machine role for who the machine is to the rest of the home — developer, desk-user, model-provider, observer — never for a product (lmstudio), a part (gpu) or coined jargon (llm-console). A role grants capabilities the way a web app's role grants permissions: feature modules check only their own capability option, never a role name. Every machine is base without listing it; one role covers one job, and the engine behind it follows the detected platform (model-provider is LM Studio on macOS, llama-server on Linux with NVIDIA).
 

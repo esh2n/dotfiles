@@ -1,6 +1,6 @@
 # ハーネスの context window は 200K を予算に、1M は omp の拡張窓だけ
 
-Status: superseded by 2026-09-27-context-budget-1m-85pct.md（予算を 200K から 1M へ。圧縮点は 170K から 850K になり、`/extended-context` は主経路でなくなった。`tiers.json` の一箇所で引き上げ、出典を `_context_source` に残す手順は引き継ぐ） — accepted — 持ち主の裁定（2026-09-24）。調査記録 `rules/research/2026-09-24-context-window-budget-for-1m-models.md` の結論を引いた推しに対して
+Status: superseded by 2026-09-27-context-budget-1m-85pct.md（予算を 200K から 1M へ。圧縮点は 170K から 850K になり、`/extended-context` は主経路でなくなった。`tiers.json` の一箇所で引き上げ、出典を `_context_source` に残す手順は引き継ぐ） — accepted — 持ち主の裁定（2026-09-24）。調査の結論（出典は本文末）を引いた推しに対して
 
 rule: A harness's `contextWindow` is a budget, not the provider's limit: set it to 200,000 for the `main` and `complex` tiers (1M-class DeepSeek models) in every harness config jig generates (pi, DSH, omp), and give omp alone `maxContextWindow: 1000000` so `/extended-context on` can widen one session on purpose. Never set the budget to the provider's maximum; a compaction trigger proportional to a 1M window stops firing in practice. `deterministic`'s budget follows the context length LM Studio actually loads the model with, as `litellm/check.sh` reports it.
 
