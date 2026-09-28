@@ -11,7 +11,7 @@
  * day: no vendor harness switches the main model per turn, LiteLLM
  * recommends session affinity because a switch drops provider-side prompt
  * caching, and the one measured same-shape implementation lost most of its
- * cache (`rules/research/2026-09-23-tier-routing-switch-vs-subagent-vs-gateway.md`).
+ * cache (see the ruling above).
  *
  * What is left is enforcement, which omp needs more than pi does: omp's own
  * startup order restores "the saved default provider/model" before anything

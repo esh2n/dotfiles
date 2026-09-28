@@ -4,7 +4,7 @@
 
 # jig skill router, arm C of the skill-selection experiment: one `choice`
 # question per prompt instead of the bool batch. The 14-day window starts the
-# day this flag is flipped (llm/harness/rules/research/skill-selection-experiment/PROTOCOL-C.md).
+# day this flag is flipped (harness/rules/knowledge/skill-selection-router-experiment.md).
 export JIG_SKILL_ROUTER_QUESTION=choice
 
 # Zoxide (Smart Directory Jumper)

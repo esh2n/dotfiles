@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync, renameSync } from "node:fs";
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,13 +15,13 @@ import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
 import type { RetirePaths } from "../app/retire/retire-yoki";
 import { skillQuestionMode } from "../app/routing/select-skills";
-import { SETUP_TARGETS, isSetupTarget, setupHarness } from "../app/setup/setup-harness";
+import { isSetupTarget, SETUP_TARGETS, setupHarness } from "../app/setup/setup-harness";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import { assignTier, describeTiers } from "../app/tiers/assign";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
-import { DSH_PROFILES_DIR, DSH_PROFILE_PATCH_FILENAME, resolveDshHome } from "../domain/dsh/home";
+import { DSH_PROFILE_PATCH_FILENAME, DSH_PROFILES_DIR, resolveDshHome } from "../domain/dsh/home";
 import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
 import { resolvePiAgentDir } from "../domain/pi/agent-dir";
 import { PI_MCP_USER_CONFIG } from "../domain/pi/mcp";
@@ -822,7 +822,7 @@ export async function main(argv: readonly string[]): Promise<number> {
           "  `none`, in the English wording frozen as PROTOCOL.md §3b `choice-en`, and ranks the\n" +
           "  options by the probabilities the reply now carries; the threshold and the cap of 3\n" +
           "  apply to those probabilities unchanged. It is arm C of the skill-selection experiment\n" +
-          "  (rules/research/skill-selection-experiment/PROTOCOL-C.md); the default stays bool until\n" +
+          "  (rules/knowledge/skill-selection-router-experiment.md); the default stays bool until\n" +
           "  that arm is chosen. Both the hook and the service read this variable, so the two paths\n" +
           "  never ask different questions into the same log.\n" +
           "  JIG_SKILL_ROUTER_THRESHOLD=<0..1> sets the gate (default 0.8) for either shape.\n" +

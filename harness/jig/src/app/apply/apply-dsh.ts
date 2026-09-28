@@ -19,8 +19,8 @@
  *   edit inside the block, a jig id or server name declared outside it, or
  *   an unterminated block is a conflict. A profile directory is never
  *   created: DSH scaffolds profiles ("pnpm workspaces DSH itself
- *   scaffolds", `rules/research/2026-09-22-generator-migration-map.md`
- *   §6.5), and when none matches nothing at all is delivered.
+ *   scaffolds", per the yoki-switch migration map §6.5), and when none
+ *   matches nothing at all is delivered.
  * - `<dshHome>/AGENTS.md` — the same generated content as
  *   `~/.claude/AGENTS.md`, from the same renderer (`buildAgentsMd`,
  *   `./delivery.ts`). DSH reads it: "The first request includes ... the

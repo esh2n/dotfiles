@@ -51,41 +51,41 @@
  */
 
 import {
+  applyClaude,
   type ClaudeApplyPaths,
   type ClaudeApplyReport,
   type LinkReport,
   type ManagedDirReport,
   type OptionalManagedDirReport,
-  applyClaude,
 } from "../app/apply/apply-claude";
 import {
   type AgentFileReport,
+  applyCodex,
   type CodexApplyOptions,
   type CodexApplyPaths,
   type CodexApplyReport,
-  applyCodex,
 } from "../app/apply/apply-codex";
 import {
+  applyDsh,
   DSH_INSTRUCTIONS_BUDGET_BYTES,
   type DshApplyPaths,
   type DshApplyReport,
   type DshProfileReport,
-  applyDsh,
 } from "../app/apply/apply-dsh";
 import {
+  applyOmp,
   type OmpAgentFileReport,
   type OmpApplyOptions,
   type OmpApplyPaths,
   type OmpApplyReport,
-  applyOmp,
 } from "../app/apply/apply-omp";
-import { type PiApplyPaths, type PiApplyReport, applyPi } from "../app/apply/apply-pi";
+import { applyPi, type PiApplyPaths, type PiApplyReport } from "../app/apply/apply-pi";
 import {
   ALL_APPLY_TARGETS,
   type ApplyTarget,
   type ApplyTargetPaths,
-  type TargetResult,
   applyTiers,
+  type TargetResult,
 } from "../app/apply/apply-tiers";
 import { AGENTS_SKILLS_MOUNT_TARGETS, type AgentsSkillsMountReport } from "../app/apply/delivery";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
@@ -937,7 +937,7 @@ function formatPi(report: PiApplyReport, paths: PiApplyPaths): string {
     "",
     ...piExtensionLines(report),
     "",
-    'subagents: GAP — pi has none natively (rules/research/2026-09-22-multi-lane-review-per-harness.md: "Pi itself remains',
+    'subagents: GAP — pi has none natively (rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md: "Pi itself remains',
     "  fundamentally single-agent\"). The subagents decision's answer: a workflow script is written once, in Claude",
     "  Code's syntax; pi runs it through tintinweb/pi-subagents when that package is installed (see packages above).",
     "rules: language guidance is not a separate delivery — it lives in the language skills (skills/<lang>-*),",
@@ -986,7 +986,7 @@ function piMcpLines(report: PiApplyReport): readonly string[] {
   const lines = [
     `mcp (pi-mcp-adapter): ${mcpJson.outcome}  ${mcpJson.path}`,
     `  jig's mcpServers entries (${mcpJson.servers.length}): ${mcpJson.servers.length === 0 ? "(none)" : mcpJson.servers.join(", ")}`,
-    "  pi has no MCP client (rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md §Q1); the MCP-list decision delivers",
+    "  pi has no MCP client (rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md §Q1); the MCP-list decision delivers",
     "  the list through the community extension pi-mcp-adapter, which reads this file as its user-global shared config",
     '  (README "File Layout") and connects lazily by default, so the full targets.pi list costs nothing until called.',
     "  Entries carry command/args/env or url/headers, no `type` (the adapter documents none; the transport is which is set).",

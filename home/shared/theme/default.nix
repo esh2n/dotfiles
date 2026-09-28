@@ -1,4 +1,4 @@
-# Themes (plans/2026-09-24-dotfiles-architecture.md §7). One palette per
+# Themes. One palette per
 # theme, ~/.config/theme/palettes/<name>/<file>, linking the checkout's theme
 # files; `dotctl theme set` moves ~/.config/theme/current between them, and
 # each app's pointer reads through `current` (dotctl theme init, on every

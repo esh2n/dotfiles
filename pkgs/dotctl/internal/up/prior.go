@@ -9,7 +9,7 @@ import (
 // sweepPriorLinks deals with the links an earlier dotfiles setup left in
 // the places they are made — ~, ~/.config and ~/bin, top level only —
 // before the switch lays the new ones
-// (rules/research/2026-09-26-dotfiles-prior-state-cleanup.md):
+// (rules/knowledge/dotfiles-migration-cleanup.md):
 //
 //   - a link into this checkout whose target is gone was made by this
 //     repository's old layout: it is removed (dotbot's `clean` rule)

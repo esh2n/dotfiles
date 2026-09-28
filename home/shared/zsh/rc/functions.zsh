@@ -2799,5 +2799,5 @@ pi() {
 
 # mdview — a Markdown file or folder in the browser, GFM and mermaid, reloaded
 # on save (mdts through npx: nothing to install; research:
-# harness/rules/research/2026-09-26-markdown-preview.md)
+# harness/rules/knowledge/markdown-preview-tools.md)
 mdview() { npx --yes mdts "$@"; }

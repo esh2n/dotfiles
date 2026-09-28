@@ -1,5 +1,5 @@
 // Package up is `make up` after Nix exists: install and update alike, safe
-// to run again (plans/2026-09-24-dotfiles-architecture.md §4). bootstrap.sh
+// to run again (rules/decisions/2026-09-24-dotfiles-nix-only-roles-symlink.md). bootstrap.sh
 // installs Nix when missing and hands over to `dotctl up`.
 //
 // The platform decides what runs, never the hostname or user name. Everything

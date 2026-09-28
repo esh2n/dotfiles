@@ -6,7 +6,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 // drawn the way pi draws one: a `ctx.ui.setFooter` component, not a script.
 //
 // Owner's ruling (2026-09-27): every harness shows the same content in its own
-// native form (rules/research/2026-09-27-statusline-across-harnesses.md — only
+// native form (rules/knowledge/statusline-across-harnesses.md — only
 // Claude Code runs an external script; pi replaces its footer from an
 // extension). Two lines:
 //

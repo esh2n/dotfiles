@@ -49,8 +49,8 @@ export type RemoteDecisionResponse =
        * not). Mirrors `Decided.probabilities`, which already carried it in-process
        * and which this reply used to drop — so a caller behind the service could
        * see the winner but never the runner-up, and a top-3 over a Choice was not
-       * obtainable at all (`rules/research/skill-selection-experiment/
-       * RESULTS-OFFLINE.md` §1.3, the gap that motivated this field).
+       * obtainable at all (`rules/knowledge/skill-selection-router-experiment.md`,
+       * the gap that motivated this field).
        *
        * OPTIONAL IN BOTH DIRECTIONS, which is the whole compatibility story: a
        * service built before this field simply omits it and a client built before

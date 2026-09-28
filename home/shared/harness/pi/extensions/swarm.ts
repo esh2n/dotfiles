@@ -7,8 +7,8 @@ import { Type } from "typebox";
 // swarm — run worker agents in the background and show them below the editor.
 //
 // Ruling: rules/decisions/2026-09-27-swarm-extension.md (the one exception to
-// "no custom execution engine"); spec: plans/2026-09-27-swarm-spec.md. All
-// of the work is jig's shared Swarm (`harness/jig/src/app/swarm/`), the same
+// "no custom execution engine"). All of the work is jig's shared Swarm
+// (`harness/jig/src/app/swarm/`), the same
 // code omp's adapter runs; this file is pi's registration and nothing else.
 //
 // jig is loaded the way guard.ts loads it: pi reads this file through a

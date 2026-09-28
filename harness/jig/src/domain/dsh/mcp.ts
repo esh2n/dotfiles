@@ -25,7 +25,7 @@
  * streamable-http. The optional fields (`toolCallTimeoutMs`,
  * `failOnStartupError`, `reconnect.*`) have no counterpart in
  * `mcp/servers.json` and are not written. The same facts are recorded in
- * `rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md` §Q2 (DSH).
+ * `rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md` §Q2 (DSH).
  *
  * DSH loads eagerly: "The tool descriptions and input schemas enter every
  * request while the tools are registered" (README, "Model Experience"), so

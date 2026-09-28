@@ -8,7 +8,7 @@ import (
 )
 
 // makeHomeDirs creates dir under the home directory the way home-manager
-// treats a path it needs (rules/research/2026-09-26-dotfiles-prior-state-cleanup.md):
+// treats a path it needs (rules/knowledge/dotfiles-migration-cleanup.md):
 // anything standing where a directory has to be — a file, a broken link, a
 // link to a file, often left by an earlier dotfiles setup — is moved aside
 // with the ".pre-dotfiles" suffix, never deleted.
