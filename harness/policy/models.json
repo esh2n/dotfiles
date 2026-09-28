@@ -25,7 +25,7 @@
         "input_cost_per_token": 1.4e-7,
         "output_cost_per_token": 2.8e-7
       },
-      "notes": "Pay-as-you-go key (sk-). Reasons by default; in a multi-turn tool conversation the previous reasoning_content must be sent back or the API rejects the request (docs.litellm.ai/docs/providers/xiaomi_mimo). Tool-call loops are reported widely (rules/research/2026-09-26-mimo-vs-deepseek.md). Bench: 10/10, TTFT 3447 ms, 113 tok/s. Prices per token from the vendor, since the pinned LiteLLM predates V2.6."
+      "notes": "Pay-as-you-go key (sk-). Reasons by default; in a multi-turn tool conversation the previous reasoning_content must be sent back or the API rejects the request (docs.litellm.ai/docs/providers/xiaomi_mimo). Tool-call loops are reported widely (harness/rules/decisions/2026-09-27-model-catalog-and-tier-assignment.md). Bench: 10/10, TTFT 3447 ms, 113 tok/s. Prices per token from the vendor, since the pinned LiteLLM predates V2.6."
     },
     "mimo-v2.6-pro": {
       "provider": "xiaomi_mimo",
