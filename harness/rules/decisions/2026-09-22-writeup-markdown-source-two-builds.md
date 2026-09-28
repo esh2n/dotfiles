@@ -41,9 +41,12 @@ writeup（セッションの調査・判断・勉強の記録を文書にして�
 
 ## Sources
 
-- `rules/research/2026-09-22-writeup-practice.md`、`rules/research/2026-09-22-knowledge-store-and-clear-writing.md`、`rules/research/2026-09-22-private-notes-publishing-and-md-components.md`
+- 自宅サーバー + Tailscale を選んだ実践者の比較（einverne、2026-08）: https://einverne.github.io/post/2026/08/ignis-obsidian-web-app.html
+- 決定記録と説明文書の分離を明言する一次資料（Nygard の原典、ADR の直接の起源）: https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions 、MADR テンプレート: https://raw.githubusercontent.com/adr/madr/main/template/adr-template.md 、log4brains README（分離を最も明示）: https://raw.githubusercontent.com/thomvaill/log4brains/master/README.md
+- 決定記録と説明文書を統合する逆方向の先例（Kubernetes KEP テンプレート）: https://raw.githubusercontent.com/kubernetes/enhancements/master/keps/NNNN-kep-template/README.md
+- Notion のページ単位 Publish トグル（「一件だけ公開」への最も直接的な答え）: https://www.notion.com/help/public-pages-and-web-publishing
 - Claude Code memory: https://code.claude.com/docs/en/memory.md 、GitHub の警告: https://docs.github.com/en/copilot/concepts/response-customization
-- Cloudflare Access: https://developers.cloudflare.com/cloudflare-one/access-controls/ 、Quartz の漏れ: https://github.com/jackyzha0/quartz/issues/2531 、https://quartz.jzhao.xyz/features/private-pages
+- Cloudflare Access: https://developers.cloudflare.com/cloudflare-one/access-controls/ 、Quartz の ExplicitPublish が添付を漏らす実名の issue: https://github.com/jackyzha0/quartz/issues/2531 、https://github.com/jackyzha0/quartz/issues/1941 、https://github.com/jackyzha0/quartz/issues/1950 、https://github.com/jackyzha0/quartz/issues/1519 、https://quartz.jzhao.xyz/features/private-pages
 - Artifact: https://support.claude.com/en/articles/9487310 、GitHub Pages: https://docs.github.com/en/enterprise-cloud@latest/pages/getting-started-with-github-pages/changing-the-visibility-of-your-github-pages-site
 - 記法: https://docs.astro.build/en/guides/markdown-content/ 、https://github.com/remarkjs/remark-directive 、https://markdoc.dev/docs/overview 、https://github.com/just-the-docs/just-the-docs/issues/1483
 - 文章: https://developers.google.com/style/paragraph-structure 、https://www.hyuki.com/writing/writing.html 、https://diataxis.fr 、https://worrydream.com/ExplorableExplanations/ 、https://news.ycombinator.com/item?id=46927101

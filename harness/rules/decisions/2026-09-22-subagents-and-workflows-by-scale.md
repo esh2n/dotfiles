@@ -29,17 +29,23 @@ rule: Choose a single subagent for one or two delegations, a workflow script for
 ## Consequences
 
 - yoki-graph（自前の実行系）と preflight.js は捨てる。review・research・code-study・stocktake・design-review はスクリプトとして残し、各ハーネスで走らせる。
-- 実機検証（同日、`rules/research/2026-09-22-workflow-script-portability.md`）: **pi は tintinweb/pi-subagents 0.19.0 で同じスクリプトがほぼ無変更で動く**（3 レーン並列・fresh を子セッションの JSONL で確認。要調整は `meta.phases` の要素が `{title}` オブジェクトであること、`model` 名は tiers.json からの翻訳が要ること。headless で回すなら pty 必須）。**omp は 10 行のシムで動く**（`export` 不可、`args` なし、`agent()` に per-call の `model` が無く親のモデルで走る → 決定 5 の「部下は安い層」は omp では agent frontmatter か `task.agentModelOverrides` 側で行う。`Date.now()` が throw しないので replay の同一性は保証されない）。**Codex は不可**（スクリプトの実行系が無く、部下は親スレッドの fork で親の会話を継承することを子の rollout で確認。変換では埋まらない）。DSH は未導入で未検証。
+- 実機検証（同日）: **pi は tintinweb/pi-subagents 0.19.0 で同じスクリプトがほぼ無変更で動く**（3 レーン並列・fresh を子セッションの JSONL で確認。要調整は `meta.phases` の要素が `{title}` オブジェクトであること、`model` 名は tiers.json からの翻訳が要ること。headless で回すなら pty 必須）。**omp は 10 行のシムで動く**（`export` 不可、`args` なし、`agent()` に per-call の `model` が無く親のモデルで走る → 決定 5 の「部下は安い層」は omp では agent frontmatter か `task.agentModelOverrides` 側で行う。`Date.now()` が throw しないので replay の同一性は保証されない）。**Codex は不可**（スクリプトの実行系が無く、部下は親スレッドの fork で親の会話を継承することを子の rollout で確認。変換では埋まらない）。DSH は未導入で未検証。
 - 訂正: pi 拡張の選択は tintinweb 一択（CC スクリプトのランナーとして「無変更で走る」と主張し実測で裏付いた唯一）。`tier` は tintinweb に無く `model` のみ。Claude Code 側で `meta.phases` の要素型を一度確かめる。
 - 測定が無いもの: N 人のレビュアー対 1 人（独立セッションが同一セッション派生に勝つ測定はある: F1 28.6% 対 23.8%）。費用は読む並列で 1.6〜3.9 倍、上限は必須（Claude Code は 16 並列・1,000/run、omp は 32、Codex は 4）。
 - 部下のモデル階層は jig の tiers.json が唯一の元。ハーネスごとの書式（Claude Code `model`、pi 拡張（tintinweb）`model`、omp は agent frontmatter / `task.agentModelOverrides`）へ翻訳する。
 
 ## Sources
 
-- `rules/research/2026-09-22-orchestration-vendors.md`、`rules/research/2026-09-22-orchestration-paradigm.md`、`rules/research/2026-09-22-orchestration-practitioners.md`、`rules/research/2026-09-22-orchestration-evidence.md`、`rules/research/2026-09-22-orchestration-in-the-wild.md`、`rules/research/2026-09-22-orchestration-lens-workflow-engines.md`、`rules/research/2026-09-22-multi-lane-review-per-harness.md`、`rules/research/2026-09-22-pre-pr-gate-practice.md`
-- Claude Code: https://code.claude.com/docs/en/workflows.md 、https://code.claude.com/docs/en/sub-agents.md 、https://code.claude.com/docs/en/best-practices.md
+- Claude Code: https://code.claude.com/docs/en/workflows.md 、https://code.claude.com/docs/en/sub-agents.md 、https://code.claude.com/docs/en/best-practices.md 、費用（agent teams 約 7 倍）: https://code.claude.com/docs/en/costs.md
+- OpenAI handoffs（コード制御の主張の出典）: https://openai.github.io/openai-agents-python/multi_agent/
+- Google ADK（deterministic and predictable の出典）: https://adk.dev/agents/
+- Microsoft Agent Framework（「関数で書けるなら関数を」の出典）: https://learn.microsoft.com/en-us/agent-framework/overview/agent-framework-overview
 - Anthropic research system: https://www.anthropic.com/engineering/built-multi-agent-research-system 、OpenAI Codex subagents: https://learn.chatgpt.com/docs/agent-configuration/subagents
 - Cognition: https://cognition.ai/blog/multi-agents-working 、Amp: https://ampcode.com/news/a-faster-librarian 、https://ampcode.com/news/rush-mode
+- Ronacher「安いモデルはループの中では安くない」: https://lucumr.pocoo.org/2025/11/21/agents-are-hard/ 、Zechner「black box within a black box」: https://mariozechner.at/posts/2025-11-30-pi-coding-agent/
+- TRAE の SWE-bench Verified 70.6→78.8% のリーダーボード: https://github.com/SWE-bench/swe-bench.github.io
+- headless 実行系の公開実装が 0〜40 星で定番が無いことの例: https://github.com/kelvinschen/acpus 、https://github.com/JANG-MINWOO/agent-review-gate
+- レビュー系スクリプトを残す判断の裏付け（Claude Code の PR レビュー実装）: https://code.claude.com/docs/en/code-review.md
 - 統制比較: https://arxiv.org/html/2512.08296 、独立セッションのレビュー: https://arxiv.org/abs/2603.12123
 - pi 拡張: https://github.com/nicobailon/pi-subagents 、https://github.com/tintinweb/pi-subagents 、https://github.com/QuintinShaw/pi-dynamic-workflows
 - omp: https://github.com/can1357/oh-my-pi （docs/magic-keywords.md、docs/tools/eval.md）、DSH: https://github.com/deepseek-ai/deepseek-harness （docs/subsystems/workflow.md）

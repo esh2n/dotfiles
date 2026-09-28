@@ -32,9 +32,11 @@ grill で決まったことが、セッションの記憶ファイル(Claude Cod
 
 ## Sources
 
-- 調査全文: `rules/research/2026-09-22-decision-records-for-agents.md`
 - Anthropic memory 文書: https://code.claude.com/docs/en/memory
 - 保守者の回答: https://github.com/anthropics/claude-code/issues/5055
 - Codex の 32KiB: https://github.com/openai/codex/issues/7138
 - DSH Agent Notes: https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/notes/README.md
 - ETH の測定: https://arxiv.org/abs/2602.11988
+- HTML は投影・Markdown が元という同型の前例: log4brains https://github.com/thomvaill/log4brains 、Backstage の ADR プラグイン https://github.com/backstage/community-plugins/blob/main/workspaces/adr/plugins/adr/README.md
+- 同期ツール（symlink と生成で足りるとして退けた対象）: ruler https://github.com/intellectronica/ruler 、rulesync https://github.com/dyoshikawa/rulesync
+- issue tracker を記憶にする案（Beads）: https://github.com/gastownhall/beads

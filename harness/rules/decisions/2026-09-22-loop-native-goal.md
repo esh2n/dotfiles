@@ -29,7 +29,10 @@ rule: Never build a custom loop/execution engine; drive unattended repetition th
 
 ## Sources
 
-- `rules/research/2026-09-22-loop-vendors-evidence.md`、`rules/research/2026-09-22-loop-practitioners-wild.md`
+- snarktank/ralph（21,838 星、更新停止）: https://github.com/snarktank/ralph
+- 段階数と文脈長に応じた劣化（Context Rot）: https://arxiv.org/abs/2509.09677
+- Anthropic の ralph-loop plugin、上限が静かに無効になる例: https://github.com/anthropics/claude-code/issues/81826
+- 遮断器が正常な実行を止める例（frankbria/ralph-claude-code の circuit breaker）: https://github.com/frankbria/ralph-claude-code
 - Claude Code: https://code.claude.com/docs/en/goal 、https://code.claude.com/docs/en/scheduled-tasks 、https://code.claude.com/docs/en/routines
 - ImpossibleBench: https://arxiv.org/abs/2510.20270
 - 読者調査: https://newsletter.pragmaticengineer.com/p/what-is-loop-engineering

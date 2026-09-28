@@ -33,8 +33,9 @@ rule: The `deterministic` tier is the executor: it carries out a plan that a fro
 
 ## Sources
 
-- `rules/research/2026-09-26-omarchy-3090ti-model-choice.md`
-- `rules/research/2026-09-26-llama-server-determinism-cuda.md`
+- Qwen3.6-27B dense の同世代 GPU での実測（70〜90 tok/s の根拠）: https://sanj.dev/post/qwen-3-6-27b-dual-rtx-3090-llama-cpp-tuning/
+- Qwen3.6-35B-A3B（MoE）の実測（100〜133 tok/s）: https://aminrj.com/posts/llamacpp-qwen36-35b/
+- CUDA の非決定性の技術的背景: https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/
 - https://github.com/ggml-org/llama.cpp/issues/27733
 - https://github.com/ggml-org/llama.cpp/issues/27623
 - https://github.com/BerriAI/litellm/issues/40405

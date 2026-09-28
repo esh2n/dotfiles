@@ -31,6 +31,5 @@ pi の `extensions/tier-router.ts`（9/19）と、同日 omp に移した `adapt
 
 ## Sources
 
-- `rules/research/2026-09-23-tier-routing-switch-vs-subagent-vs-gateway.md`
 - https://code.claude.com/docs/en/sub-agents 、https://docs.litellm.ai/docs/routing
 - https://github.com/davila7/claude-code-templates/issues/972 、https://github.com/earendil-works/pi/issues/6167 、https://github.com/earendil-works/pi/issues/8810

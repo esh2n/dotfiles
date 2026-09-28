@@ -31,7 +31,7 @@ rule: Steer a coding-agent session running on the Mac from the phone through Orc
 
 ## Sources
 
-- `rules/research/2026-09-23-phone-access-to-agent-sessions.md`（追記に Orca）
+- Tailscale SSH + 端末アプリの実践者記録（放棄報告なし、補助に降格した根拠）: https://www.qu8n.com/posts/running-claude-code-from-my-phone 、https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/
 - https://onorca.dev/docs/mobile 、https://onorca.dev/
 - https://code.claude.com/docs/en/remote-control
 - https://github.com/slopus/happy/issues/1514

@@ -29,8 +29,10 @@ rule: Write corrections directly into enforced files (AGENTS.md rules, guard-rul
 
 ## Sources
 
-- `rules/research/2026-09-22-memory-tools-evaluation.md`
 - Anthropic auto memory: https://code.claude.com/docs/en/memory
+- auto memory 無効化しても前置きが残る（11.3k〜16.2k トークン）: https://github.com/anthropics/claude-code/issues/63903
+- MEMORY.md があふれると新しい記述から落ちる: https://github.com/anthropics/claude-code/issues/92998
+- Devin Knowledge の非推奨・Skills への移行: https://docs.devin.ai/product-guides/knowledge
 - Letta の計測: https://www.letta.com/blog/benchmarking-ai-agent-memory 、Zep の反論: https://blog.getzep.com/lies-damn-lies-statistics-is-mem0-really-sota-in-agent-memory/
 - Mem0 の監査: https://github.com/mem0ai/mem0/issues/4573 、HaluMem: https://arxiv.org/abs/2511.03506 、ACE: https://arxiv.org/abs/2510.04618
 - claude-mem のコスト: https://github.com/thedotmack/claude-mem/issues/3848 、検索バグ: https://github.com/thedotmack/claude-mem/issues/4138

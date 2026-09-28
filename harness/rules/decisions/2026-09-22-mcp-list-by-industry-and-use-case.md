@@ -34,7 +34,6 @@ rule: Keep serena, codebase-memory-mcp, context7, playwright-mcp, figma-remote a
 
 ## Sources
 
-- `rules/research/2026-09-22-mcp-servers-value.md`、`rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md`
 - pi: https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/ 、https://github.com/nicobailon/pi-mcp-adapter 、https://github.com/mrclrchtr/supi
 - omp: https://github.com/can1357/oh-my-pi （docs/mcp-config.md）、DSH: https://github.com/deepseek-ai/deepseek-harness （packages/mcp/mcp-client/README.md）
 - 誘導: https://github.com/oraios/serena/issues/1398 、/1429 、https://github.com/upstash/context7/issues/2287 、https://lucumr.pocoo.org/2026/7/4/better-models-worse-tools/

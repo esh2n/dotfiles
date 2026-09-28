@@ -33,5 +33,6 @@ LiteLLM を通る AI の利用コストを一元で管理したい（合計が�
 
 ## Sources
 
-- `rules/research/2026-09-25-single-llm-cost-ledger.md`
-- `rules/research/2026-09-25-cost-ledger-outage-and-latency.md`（LiteLLM のソース: 書き込みが応答の後で走ること、メモリのキューの上限と破棄、鍵確認の 10 秒の待ち、`request_id` が主キー）
+- LiteLLM のソース（spend log の書き込みが応答の後で走ること、`SPEND_LOG_QUEUE_MAX_BYTES` によるメモリキューの上限と drop-oldest）: https://github.com/BerriAI/litellm/blob/main/litellm/proxy/utils.py
+- シャットダウン時のキュードレイン修正（spend log 消失バグの対処）: https://github.com/BerriAI/litellm/pull/34826
+- `/spend/logs/v2` と `request_id` が主キーであること: https://docs.litellm.ai/docs/proxy/cost_tracking

@@ -30,6 +30,6 @@ rule: jig's own hook tables run formatters on edit and type-check/lint gates at 
 
 ## Sources
 
-- `rules/research/2026-09-23-per-language-hooks-and-rule-delivery.md`
+- `rules/decisions/2026-09-23-all-languages-format-and-gate.md`
 - `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md`
 - staticcheck: https://staticcheck.dev/docs/running-staticcheck/ci/ 、stylelint CLI: https://stylelint.io/user-guide/cli

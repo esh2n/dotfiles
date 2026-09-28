@@ -33,7 +33,7 @@ MiMo（Xiaomi）を `main` と `complex` で実際に使って DeepSeek と比�
 
 ## Sources
 
-- `rules/research/2026-09-26-mimo-vs-deepseek.md`
-- `rules/research/2026-09-26-deterministic-fallback.md`
+- MiMo は複数ターンのツール呼び出しで前の `reasoning_content` を送り返さないと API が拒否する（LiteLLM 公式、day-0 対応）: https://docs.litellm.ai/docs/providers/xiaomi_mimo
+- MiMo-V2.6-Pro と DeepSeek の独立測定（知能指数・速度）: https://artificialanalysis.ai/models/mimo-v2-6-pro
 - https://github.com/BerriAI/litellm/issues/15020
 - https://github.com/gke-labs/kube-agents/issues/2023

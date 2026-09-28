@@ -8,7 +8,7 @@ rule: The Swarm extension for omp and pi is the one exception to "no custom exec
 
 要件: @voidwarriorchan の自作 Swarm（kimi-cli 風、Astra ハーネス）と同等以上の体験を pi・omp で使えること。二枚の画面写真で分かった形は、入力欄の下に常に出る表（NAME / MODEL / EFFORT / STATUS / PROGRESS / IDLE / AGE / NOTE）で、状態に Working・Queued・Unread があり、18 人を同時に動かしている。
 
-omp の本体（v18.3.4 のソース）は子を並行に動かせるが、上限を超えて待つ子はどの画面にも出ず、拡張が子の状態（モデル・費用・トークン）を受け取る公開 API は起動時の一回だけで、常に出る一覧は動いている子の名前だけ。pi の本体には Swarm が無く、拡張の pi-agent-teams は 6 月から止まり、pi ごと落ちる不具合が放置されている（`rules/research/2026-09-27-swarm-on-omp-pi.md`）。表示だけを足す形では、この画面は作れない。
+omp の本体（v18.3.4 のソース）は子を並行に動かせるが、上限を超えて待つ子はどの画面にも出ず、拡張が子の状態（モデル・費用・トークン）を受け取る公開 API は起動時の一回だけで、常に出る一覧は動いている子の名前だけ（omp の Agent Hub: https://raw.githubusercontent.com/can1357/oh-my-pi/main/docs/agent-hub.md 、拡張 API: https://raw.githubusercontent.com/can1357/oh-my-pi/main/docs/extensions.md ）。pi の本体には Swarm が無く、拡張の pi-agent-teams は 6 月から止まり、pi ごと落ちる不具合が放置されている（https://github.com/tmustier/pi-agent-teams/issues/50 、https://github.com/tmustier/pi-agent-teams/issues/9 ）。表示だけを足す形では、この画面は作れない。
 
 ## Decision
 
@@ -21,7 +21,7 @@ omp の本体（v18.3.4 のソース）は子を並行に動かせるが、上�
 
 ## Alternatives considered
 
-- **omp の本体の子と Agent Hub を使い、表示だけを足す**: 待つ子が見えず、拡張が子のモデル・費用を受け取れないので、手本の表が作れない（`rules/research/2026-09-27-swarm/omp-internals.md`）。取り下げた。
+- **omp の本体の子と Agent Hub を使い、表示だけを足す**: 待つ子が見えず、拡張が子のモデル・費用を受け取れないので、手本の表が作れない（omp の Agent Hub / 拡張 API: https://raw.githubusercontent.com/can1357/oh-my-pi/main/docs/agent-hub.md 、https://raw.githubusercontent.com/can1357/oh-my-pi/main/docs/extensions.md ）。取り下げた。
 - **pi-agent-teams を入れる**: 6 月から更新が止まり、親のタイマーが pi ごと落とす issue #50 と、作業の跡が 1 か月で 2.2GB 溜まる issue #9 が放置。却下。
 - **herdr のペインに作業役を並べる**: 手本の人が「そこから抜け出して楽になった」形そのもの。却下。
 - **Kimi Code をそのまま使う**: pi・omp と jig の配線（ガード、フォーマット、tier）から外れ、9 月まで Ctrl+C で CLI ごと落ちる・再起動で一覧が戻らない不具合があった。却下。
@@ -34,5 +34,7 @@ omp の本体（v18.3.4 のソース）は子を並行に動かせるが、上�
 
 ## Sources
 
-- `rules/research/2026-09-27-swarm-on-omp-pi.md` と同じ名前のディレクトリの記録
+- Kimi Code（手本にした Swarm 実装）: https://github.com/MoonshotAI/kimi-code 、https://www.kimi.ai/blog/agent-swarm
+- omp Agent Hub: https://raw.githubusercontent.com/can1357/oh-my-pi/main/docs/agent-hub.md
+- pi-agent-teams（6 月から停止、issue #50・#9 放置）: https://github.com/tmustier/pi-agent-teams
 - 持ち主が貼った @voidwarriorchan の画面写真 2 枚（2026-09-27）

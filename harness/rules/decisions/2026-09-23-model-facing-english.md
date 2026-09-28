@@ -30,7 +30,6 @@ rule: Write everything the model reads (AGENTS.md rules, SKILL.md incl. descript
 
 ## Sources
 
-- `rules/research/2026-09-23-model-facing-language.md`
 - M-IFEval: https://arxiv.org/abs/2502.04688 、トークナイザ: https://arxiv.org/abs/2305.15425
 - Claude Code の issue: https://github.com/anthropics/claude-code/issues/87367 、/82785 、/21400
 - 実測: https://qiita.com/hisashi-ito/items/62bdc1a983f3f7dc649a 、skill の予算: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices

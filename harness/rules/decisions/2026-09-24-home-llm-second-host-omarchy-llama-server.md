@@ -34,8 +34,11 @@ rule: The `deterministic` tier stays on the Mac's LM Studio alone and is never r
 
 ## Sources
 
-- `rules/research/2026-09-24-two-host-home-llm.md`
-- `rules/research/2026-09-24-vllm-vs-llama-server.md`
+- vLLM の動作実例（24GB で一人 127 tok/s）: https://github.com/syv-ai/HyperQwen
+- vLLM がアイドル時も GPU メモリを解放しない（not planned）: https://github.com/vllm-project/vllm/issues/15287
+- vLLM の複数モデル切替（sleep mode）は開発者プレビュー: https://docs.vllm.ai/en/latest/features/sleep_mode/
+- LM Studio Linux 版が CUDA で GPU を検出できない不具合: https://github.com/lmstudio-ai/lmstudio-bug-tracker/issues/1051
+- SGLang は家庭用に作られていないという実践者の評: https://markaicode.com/vs/sglang-vs-llamacpp/
 - https://github.com/BerriAI/litellm/issues/40405
 - https://github.com/ggml-org/llama.cpp/issues/2838
 - https://huggingface.co/blog/ggml-org/model-management-in-llamacpp

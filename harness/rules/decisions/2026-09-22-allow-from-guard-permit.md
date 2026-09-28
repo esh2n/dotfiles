@@ -30,8 +30,7 @@ Claude Code の `permissions.allow`（71 本、旧設定の層から生成）を
 
 ## Sources
 
-- `rules/research/2026-09-22-allow-list-vs-auto-mode.md`
 - 判定順序と auto モード: https://code.claude.com/docs/en/permission-modes.md 、規則: https://code.claude.com/docs/en/permissions.md
 - 分類器の評価: https://www.anthropic.com/engineering/claude-code-auto-mode
-- issue: https://github.com/anthropics/claude-code/issues/88770 、/95996 、/91517 、/83611
+- issue: https://github.com/anthropics/claude-code/issues/88770 、/95996 、/91517 、/83611 、/88575 、/85491 、/76149
 - 実践者: https://simonwillison.net/2026/Aug/8/auto-mode/ 、https://github.com/froggugugugu/project-blueprints

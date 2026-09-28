@@ -29,5 +29,6 @@ theme-switch、mado、nvim-switch、code-graph-cache-gc、家の LLM の確認�
 
 ## Sources
 
-- `rules/research/2026-09-24-personal-tooling-language.md`（chezmoi が Go、起動 9ms・2.1MiB、ビルド 1.85 秒、Bun 単一バイナリの不具合）
-- `plans/2026-09-24-dotfiles-architecture.md` §6
+- 起動時間・ビルド時間の実測比較（cli-lang-bench、chezmoi が Go 製の事実上の標準）: https://github.com/ngs/cli-lang-bench
+- Bun 単一バイナリの不具合（`bun build --compile` が外部ファイルに依存／実行環境依存のバイナリを生成）: https://github.com/oven-sh/bun/issues/14676 、https://github.com/oven-sh/bun/issues/24470
+- `rules/decisions/2026-09-25-dotctl-owns-every-command-with-output.md`

@@ -32,4 +32,3 @@ rule: Every personal command that prints to the user, logs or reports errors is 
 ## Sources
 
 - `2026-09-25-dotctl-in-go.md`
-- `plans/2026-09-24-dotfiles-architecture.md` §6

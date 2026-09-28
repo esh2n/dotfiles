@@ -44,8 +44,7 @@ Mac（メモリ 64GB）の LM Studio のモデルを、三つのユースケー�
 
 ## Sources
 
-- `rules/research/2026-09-23-home-llm-server-gateway-by-use-case.md`
-- `rules/research/2026-09-23-local-llm-across-home-machines.md`
+- LM Studio ヘッドレスの認証トグルが CLI から有効化できない未解決バグ（LAN 直 bind を却下する根拠）: https://github.com/lmstudio-ai/lms/issues/489
 - LM Studio: https://lmstudio.ai/docs/app/api/headless 、https://lmstudio.ai/docs/developer/openai-compat/structured-output 、https://lmstudio.ai/docs/developer/openai-compat/tools
 - Ollama 並行数: https://docs.ollama.com/faq 、llama-server: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 - LiteLLM advisories: https://api.github.com/repos/BerriAI/litellm/security-advisories

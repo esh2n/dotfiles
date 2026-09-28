@@ -31,5 +31,8 @@ rule: Manage the dotfiles with Nix alone (nix-darwin on macOS, standalone home-m
 
 ## Sources
 
-- `rules/research/2026-09-24-steelman-nix.md`、`2026-09-24-steelman-chezmoi.md`
-- `rules/research/2026-09-24-chezmoi-copy-vs-symlink.md`、`2026-09-24-dotfiles-tool-choice.md`、`2026-09-24-role-based-dotfiles.md`、`2026-09-24-dotfiles-architecture.md`、`2026-09-24-dotfiles-on-omarchy.md`
+- chezmoi 実践者の同規模実装（macOS/Linux/Windows 統一）: https://github.com/skenmy/dotfiles
+- chezmoi 運用でのドリフト再発（4 回未満 2 か月）: https://github.com/stanfish06/my-configs/issues/140
+- Homebrew 経由のバージョン未固定によるコスト事故: https://github.com/laurigates/dotfiles/issues/418
+- `mkOutOfStoreSymlink` のマルチユーザー権限不具合: https://github.com/nix-community/home-manager/issues/4692
+- nix-darwin の大型 macOS 更新での破損: https://github.com/nix-darwin/nix-darwin/issues/1866

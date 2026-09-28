@@ -29,7 +29,6 @@ rule: Default to grilling plus a short decision record; skip planning when the d
 
 ## Sources
 
-- `rules/research/2026-09-22-spec-driven-development-evidence.md`
 - Anthropic: https://code.claude.com/docs/en/best-practices 、Codex plan mode（生ソース）: https://github.com/openai/codex （codex-rs/collaboration-mode-templates/templates/plan.md）
 - Cursor: https://cursor.com/docs/agent/planning 、Devin: https://docs.devin.ai 、Kiro: https://kiro.dev/docs/specs/best-practices/
 - Spec Kit: https://github.com/github/spec-kit 、https://github.blog/ai-and-ml/generative-ai/spec-driven-development-with-ai-get-started-with-a-new-open-source-toolkit/

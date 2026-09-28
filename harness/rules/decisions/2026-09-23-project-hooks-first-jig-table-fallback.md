@@ -29,6 +29,6 @@ jig の PostToolUse（編集ごとの整形）と Stop（応答の終わりの�
 
 ## Sources
 
-- `rules/research/2026-09-23-per-language-hooks-and-rule-delivery.md`
+- `rules/decisions/2026-09-23-all-languages-format-and-gate.md`
 - 委譲の実例: dragonflydb（PostToolUse → `pre-commit run --files`）、ray-project（skill 経由で pre-commit）
 - lefthook: https://github.com/evilmartians/lefthook 、pre-commit: https://pre-commit.com/

@@ -32,6 +32,6 @@ rule: A harness's `contextWindow` is a budget, not the provider's limit: set it 
 
 ## Sources
 
-- `rules/research/2026-09-24-context-window-budget-for-1m-models.md`
+- https://platform.claude.com/docs/en/build-with-claude/context-windows 、https://platform.claude.com/docs/en/about-claude/pricing#long-context-pricing 、https://github.com/anomalyco/opencode/issues/8140 、https://github.com/balcsida/pi-provider-litellm/issues/170
 - https://code.claude.com/docs/en/model-config 、https://github.com/can1357/oh-my-pi/blob/main/docs/models.md 、https://api-docs.deepseek.com/quick_start/pricing
 - https://github.com/cline/cline/issues/14329 、https://github.com/earendil-works/pi/issues/9482 、https://github.com/deepseek-ai/deepseek-harness/discussions/5800

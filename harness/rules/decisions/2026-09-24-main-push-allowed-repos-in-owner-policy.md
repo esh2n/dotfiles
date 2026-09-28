@@ -39,8 +39,9 @@ rule: Never push to main/master; the guard forbids it (`git-push-main-master`) e
 
 ## Sources
 
-- `rules/research/2026-09-24-project-scoped-rule-override.md`
-- `rules/research/2026-09-24-main-push-consent-forms.md`
+- CVE-2026-21852（プロジェクト側の値を trust confirmation より前の安全分岐に使い実害になった例）: https://www.microsoft.com/en-us/security/blog/2026/06/05/securing-ci-cd-in-agentic-world-claude-code-github-action-case/
+- 起動時の env/CLI フラグを決定論的 preflight が読む公開実装（収束形）: https://github.com/Igor-C-Assuncao/aiops-starter-kit 、https://github.com/MythologIQ-Labs-LLC/FailSafe 、https://github.com/nightgauge/nightgauge
+- 「明示同意」は会話だけで機械的強制がない例: https://github.com/obra/superpowers/
 - https://learn.chatgpt.com/docs/config-file/config-basic （Codex の projects / trust）
 - https://code.claude.com/docs/en/settings （`.claude/settings.local.json`）
 - https://github.com/Dicklesworthstone/destructive_command_guard/issues/457

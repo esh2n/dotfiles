@@ -26,7 +26,7 @@ omp は `approvalMode: yolo`（読み・書き・実行すべて承認なし）�
 ## Alternatives considered
 
 - **`allow`（eval を無人で通す）**: 残る層は jig guard だけになる。guard は eval を `shell.exec` に翻訳し、セル本文とクォート文字列（同一引数リストの連続リテラルは連結して `["rm","-rf","/tmp/x"]` を `rm -rf /tmp/x` に戻す。`harness/jig/adapters/omp/src/map.ts:265-309`）を規則に当てるが、**静的読解**である。`"".join(parts)`、変数から組み立てた文字列、読んだファイルの `exec`、import したモジュールの中身はコマンドとして現れない。規則は `forbid`/`ask` が suspects に当たり（`harness/jig/src/domain/policy/evaluate.ts:92-101`）、モードは denylist なので**一致しなければ allow**。計算で作られたコードをカバーする層が消えるため却下。
-- **`deny`（eval を使わせない）**: 18 製品中 12 はインタプリタを積んでおらず、業界的には最も普通の選択（`rules/research/2026-09-27-code-execution-gating-across-agents.md`）。しかし eval は omp の常設ツール（`loadMode = "essential"`）で、コスト側の根拠が無いまま機能を落とすことになるため却下。プロンプトは eval にしか付かず、常用は `bash`/`read`/`write` なので実費が小さい。
+- **`deny`（eval を使わせない）**: 18 製品中 12 はインタプリタを積んでおらず、業界的には最も普通の選択（Claude Code: https://code.claude.com/docs/en/sandboxing 、Cursor: https://cursor.com/docs/agent/security/run-modes.md ）。しかし eval は omp の常設ツール（`loadMode = "essential"`）で、コスト側の根拠が無いまま機能を落とすことになるため却下。プロンプトは eval にしか付かず、常用は `bash`/`read`/`write` なので実費が小さい。
 - **`bash.patterns` に eval 用の規則を足す**: 原理的に不可（パターンは `bash` ツールだけを gate する）。jig は `config.yml` を所有しない方針でもあり却下（テンプレートのコメントにあるとおり）。
 - **OS sandbox をこの決定に含める**: 却下ではなく分離。「プロンプトを残す」と「境界を作る」は別の決定で、後者は sandbox の運用（yomp/sbx）として扱う。この記録は前者だけを決める。
 
@@ -42,4 +42,5 @@ omp は `approvalMode: yolo`（読み・書き・実行すべて承認なし）�
 - omp の文書: `docs/approval-mode.md`（`bash.patterns` が eval に届かないこと、`eval: prompt`/`deny` の指示、パターン方針は「process or filesystem containment」ではないこと）、`docs/python-repl.md`。
 - omp 18.2.11 のソース（`/nix/store/…-omp-18.2.11/lib/omp/packages/coding-agent/`）: `src/tools/approval.ts:173-259`、`src/tools/eval.ts:295-304`、`test/tools/approval.test.ts:82-83`、`src/eval/preludes.ts:86-93`。
 - jig 側: `harness/jig/adapters/omp/README.md:28,38-43,60-61`、`adapters/omp/src/map.ts:265-309`、`src/domain/policy/evaluate.ts:92-101`。
-- 調査記録: `rules/research/2026-09-27-code-execution-gating-across-agents.md`（18 製品の型。境界が全く無いのは omp と pi の 2 つだけ）、`rules/research/2026-09-27-practitioner-agent-approval-practice.md`（著名人 12 名に「毎回承認」する運用は一人もいない。承認疲れの実測）。
+- 18 製品の型（境界が全く無いのは omp と pi の 2 つだけ）: omp のパターン方針は「process or filesystem containment ではない」: https://github.com/can1357/oh-my-pi/blob/main/docs/approval-mode.md
+- 著名人 12 名に「毎回承認」する運用は一人もいない。承認疲れの実測（93%→97% 承認、50 プロンプト以降は拒否率 5% まで低下）: https://www.anthropic.com/engineering/how-we-contain-claude 、https://claude.com/blog/auto-mode-default-in-claude-code 、https://simonwillison.net/2025/Oct/22/living-dangerously-with-claude/

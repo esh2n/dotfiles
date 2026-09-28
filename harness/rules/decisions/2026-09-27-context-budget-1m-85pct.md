@@ -35,9 +35,7 @@ rule: Set a harness's `contextWindow` for the `main` and `complex` tiers to the 
 
 ## Sources
 
-- `rules/research/2026-09-27-current-generation-context-practice.md`（実践者の設定値: Nisi 1,050,000、Jellydn 1,050,000 + 794,000、Silverlock 200,000）
-- `rules/research/2026-09-27-current-long-context-coding-measurements.md`（arXiv 2608.11242 の ~17%、arXiv 2607.17937v2 の 299,140 文字で 8/10 → 3/10、arXiv 2608.00101 の実運用分布）
-- `rules/research/2026-09-27-compaction-defaults-across-harnesses.md`（omp の式と pi の `reserveTokens`）
+- `harness/rules/knowledge/context-compaction-practice.md`（実践者の設定値: Nisi 1,050,000、Jellydn 1,050,000 + 794,000、Silverlock 200,000；arXiv 2608.11242 の ~17%、arXiv 2607.17937v2 の 299,140 文字で 8/10 → 3/10、arXiv 2608.00101 の実運用分布；omp の式と pi の `reserveTokens`）
 - omp 実装: `packages/agent/src/compaction/compaction.ts`、`settings-schema.ts`（`extendedContext` の既定は false）
 - pi docs: `docs/compaction.md`
 - https://api-docs.deepseek.com/quick_start/pricing 、https://github.com/openai/codex/issues/19185 、https://github.com/cline/cline/issues/14329

@@ -27,5 +27,7 @@ jig の対応表は C++ / C# / Java / Kotlin / Perl / PHP / Swift で「何も�
 
 ## Sources
 
-- `rules/research/2026-09-23-per-language-hooks-and-rule-delivery.md`
+- Biome（対応表型の事実上の標準整形器、速度）: https://biomejs.dev/
+- staticcheck（ベンダー自身は CI/エディタでの利用を想定し Stop ゲートには言及しない、位置づけの対比として）: https://staticcheck.dev/docs/
+- Claude Code hooks のタイムアウト既定値（PostToolUse/Stop は 600 秒、重い検査でも障害になりにくい根拠）: https://code.claude.com/docs/en/hooks
 - `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md`、`2026-09-23-hooks-carry-formatters-only-stylelint-added.md`

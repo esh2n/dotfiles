@@ -19,7 +19,7 @@ rule: Work in the current checkout by default; parallel workers whose files over
 
 - **ハーネスごとの隔離をそのまま使う**: 覚えておく負荷の原因そのもの。却下。
 - **`jig worktree` のような入り口を足す**: 覚えるコマンドが一つ増える。却下。
-- **条件を満たせば自動でマージする（Kimi Code の Tower 型）**: 自動でマージして使われている実装は見つからず（Tower は既定 off の試験機能、Crystal は製品終了）、ベンダー（Claude Code、Codex）も実践者（Petr Baudis の pi-side-agents）もマージを人に任せている。git がきれいにマージできても意味の上で壊れる例がある（rules/research/2026-09-27-swarm/worktree-merge.md）。採らない。
+- **条件を満たせば自動でマージする（Kimi Code の Tower 型）**: 自動でマージして使われている実装は見つからず（Tower は既定 off の試験機能、Crystal は製品終了）、ベンダー（Claude Code、Codex）も実践者（Petr Baudis の pi-side-agents）もマージを人に任せている。git がきれいにマージできても意味の上で壊れる例がある（https://dev.to/rollnuts/git-worktrees-arent-enough-for-parallel-ai-agents-38b7 、https://arxiv.org/abs/2604.03551 ）。採らない。
 
 ## Consequences
 
@@ -29,5 +29,5 @@ rule: Work in the current checkout by default; parallel workers whose files over
 
 ## Sources
 
-- `rules/research/2026-09-27-swarm/worktree-merge.md`
-- `rules/research/2026-09-22-orchestration-practitioners.md`（Steinberger、Bun の書き直し）
+- https://dev.to/rollnuts/git-worktrees-arent-enough-for-parallel-ai-agents-38b7 、https://arxiv.org/abs/2604.03551 、https://arxiv.org/abs/2607.04697
+- `rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`（Steinberger、Bun の書き直し）

@@ -37,5 +37,4 @@ rule: Name each machine role for who the machine is to the rest of the home — 
 
 ## Sources
 
-- `plans/2026-09-24-dotfiles-architecture.md` §11 の 2
 - `2026-09-24-dotfiles-nix-only-roles-symlink.md`（機械の種類は検出する）

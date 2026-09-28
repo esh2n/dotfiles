@@ -35,7 +35,7 @@ rule: The `deterministic` tier is the executor: it carries out a plan that a fro
 
 ## Sources
 
-- `rules/research/2026-09-26-deterministic-fallback.md`
-- `rules/research/2026-09-26-omarchy-3090ti-model-choice.md`
+- Qwen3.6-27B dense の同世代 GPU での実測（70〜90 tok/s、Mac 側 4bit 15.0 tok/s と比べる根拠）: https://sanj.dev/post/qwen-3-6-27b-dual-rtx-3090-llama-cpp-tuning/
+- Qwen3.6-35B-A3B（MoE）の実測: https://aminrj.com/posts/llamacpp-qwen36-35b/
 - https://github.com/gke-labs/kube-agents/issues/2023
 - https://lmstudio.ai/docs/app/api/ttl-and-auto-evict

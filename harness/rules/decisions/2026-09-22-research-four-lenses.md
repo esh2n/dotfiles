@@ -33,4 +33,4 @@ rule: Before any design decision, gather evidence from all four lenses — vendo
 ## Sources
 
 - 記憶: `research-four-lenses.md`
-- 覆った例: `rules/research/2026-09-22-orchestration-vendors.md`、`rules/research/2026-09-22-orchestration-practitioners.md`、`rules/research/2026-09-22-orchestration-evidence.md`、`rules/research/2026-09-22-orchestration-in-the-wild.md`、`rules/research/2026-09-22-format-hook-timing.md`
+- 覆った例: `rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`、`rules/decisions/2026-09-22-format-on-edit-gate-on-stop.md`
