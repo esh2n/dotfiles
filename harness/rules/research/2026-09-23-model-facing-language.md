@@ -22,7 +22,7 @@ sources_note: "URLs and quotes are inside the record; references by path, never 
 - `[fetched]` = WebFetch summarized the live page; the summarizing model's paraphrase is trusted for structure but direct quotes were requested and are reproduced verbatim where quoted.
 - `[qiita]` = the Qiita API returned full article HTML, stripped to text locally; quotes below are verbatim from that stripped text.
 - `[arxiv]` = abstract or PDF page images read directly; numbers in tables were read off the actual paper (M-IFEval Table 1/2, read from the PDF page images).
-- `[gh]` = GitHub API / code-search, authenticated as `esh2n`. Code-search `total_count` above ~1,000 true hits is an API-documented approximation, not an exact count — treated as order-of-magnitude only.
+- `[gh]` = GitHub API / code-search, authenticated. Code-search `total_count` above ~1,000 true hits is an API-documented approximation, not an exact count — treated as order-of-magnitude only.
 - Nothing in this record was reached only through a summarizer without also being available to quote; anywhere a number appears, it was read from primary text (paper table, API JSON, article body), not inferred from a summary alone.
 
 ## 1. Vendors

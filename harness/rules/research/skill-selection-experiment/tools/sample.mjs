@@ -16,7 +16,8 @@ function redact(text) {
   t = t.replaceAll(HOME, "~");
   t = t.replace(/\/Users\/[A-Za-z0-9._-]+/g, "~");
   t = t.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>");
-  t = t.replace(/\besh2n\b/gi, "<user>");
+  const user = process.env.USER ?? "";
+  if (user) t = t.replace(new RegExp(`\\b${user.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"), "<user>");
   t = t.replace(/\b(gh[pousr]_[A-Za-z0-9]{10,}|sk-[A-Za-z0-9-]{10,}|ey[A-Za-z0-9_-]{20,})\b/g, "<token>");
   t = t.replace(/[ \t]+/g, " ");
   return t.trim();

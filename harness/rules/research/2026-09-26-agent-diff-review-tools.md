@@ -13,7 +13,7 @@ sources_note: "gh CLI自体はサンドボックス内でTLS検証に失敗す�
 
 # コーディングエージェントの差分をターミナル/ローカルでレビューする2026年のツール — hunk vs crit、他の候補
 
-**調査日**: 2026-09-26。持ち主のdotfiles(`/Users/esh2n/go/github.com/esh2n/dotfiles`)は`flake.nix`で`crit = { url = "github:tomasz-tomczyk/crit"; inputs.nixpkgs.follows = "nixpkgs"; }`をinputに持ち、`lib/overlays.nix`が`crit = inputs.crit.packages.${system}.default`としてoverlayに載せ、`lib/mk-darwin.nix`と`lib/mk-linux.nix`の両方が`../home/shared/crit`をimportして`home/shared/packages/dev.nix`の`home.packages`に加えている。`home/shared/crit/crit.config.json`は`{"base_branch": "main", "notify_on_round_ready": true, "no_update_check": true}`で、`agent_cmd`は設定されていない——つまり持ち主はcritの「Send to agent」自動応答機能(`claude --dangerously-skip-permissions -p`等)は使わず、レビューUI+コメント+Claude Code側の`/crit`・`/crit-story`スキル(このセッションのskill一覧にも`crit:crit-cli`・`crit:crit-story`として実在)経由の手動往復にとどめている。本記録はここにhunkが加える価値があるかを問う。
+**調査日**: 2026-09-26。持ち主のdotfiles(`<checkout>`)は`flake.nix`で`crit = { url = "github:tomasz-tomczyk/crit"; inputs.nixpkgs.follows = "nixpkgs"; }`をinputに持ち、`lib/overlays.nix`が`crit = inputs.crit.packages.${system}.default`としてoverlayに載せ、`lib/mk-darwin.nix`と`lib/mk-linux.nix`の両方が`../home/shared/crit`をimportして`home/shared/packages/dev.nix`の`home.packages`に加えている。`home/shared/crit/crit.config.json`は`{"base_branch": "main", "notify_on_round_ready": true, "no_update_check": true}`で、`agent_cmd`は設定されていない——つまり持ち主はcritの「Send to agent」自動応答機能(`claude --dangerously-skip-permissions -p`等)は使わず、レビューUI+コメント+Claude Code側の`/crit`・`/crit-story`スキル(このセッションのskill一覧にも`crit:crit-cli`・`crit:crit-story`として実在)経由の手動往復にとどめている。本記録はここにhunkが加える価値があるかを問う。
 
 ## 方法と検証凡例
 

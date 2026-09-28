@@ -147,7 +147,7 @@ setActiveTools）」プリミティブを核に持っており、サードパー
    `~/.omp/profiles/<name>/agent/mcp.json`）。このマシンの実物 `[local config, read-only]`:
    ```json
    { "mcpServers": {
-       "codebase-memory-mcp": {"type": "stdio", "command": "/Users/esh2n/bin/codebase-memory-mcp-managed"},
+       "codebase-memory-mcp": {"type": "stdio", "command": "~/bin/codebase-memory-mcp-managed"},
        "serena": {"type": "stdio", "command": "uvx", "args": ["-p","3.13","serena-agent==1.5.3","start-mcp-server","--project-from-cwd","--context","codex"]}
    } }
    ```

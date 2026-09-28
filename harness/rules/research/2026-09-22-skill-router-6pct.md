@@ -165,7 +165,7 @@ From `src/cli/hooks/user-prompt-submit.ts::reminder()`:
 ```
 jig skill router: 1 skill matches this request (judgment confidence 0.91).
 Read and follow these before doing the work:
-- "writeup": /Users/esh2n/.claude/.skills-merged/writeup/SKILL.md
+- "writeup": ~/.claude/.skills-merged/writeup/SKILL.md
 ```
 
 It arrives as `hookSpecificOutput.additionalContext` and is recorded in the transcript as an
@@ -280,7 +280,7 @@ are positive proof it was read and acted on. The hook output is reaching the mod
 **H2 — the injected text doesn't tell the model how to open the skill.** **REFUTED as
 stated, but with a real defect underneath.**
 209/209 injections contain an absolute filesystem path
-(`- "writeup": /Users/esh2n/.claude/.skills-merged/writeup/SKILL.md`), so "it can't follow"
+(`- "writeup": ~/.claude/.skills-merged/writeup/SKILL.md`), so "it can't follow"
 is false. **However, 0/209 name the `Skill` tool** — and the `Skill` tool is the harness's
 own, cheaper, native way to load a skill. The reminder steers the model toward `Read`, which
 is the only thing the report counts; 3 turns show the model preferring `Skill` anyway and

@@ -15,7 +15,7 @@ and what the industry has produced.
 ## Method and verification legend
 
 - **Direct fetch** — `WebFetch` on the vendor's own docs page, or `gh api` /
-  `gh search` against GitHub's API (authenticated as esh2n). Marked inline.
+  `gh search` against GitHub's API (authenticated). Marked inline.
 - **Summarized fetch** — WebFetch always runs the page through a small model
   before returning text; every WebFetch result below is therefore a
   *summarizing* fetch, not raw HTML. Quotes are as returned by that summarizer;

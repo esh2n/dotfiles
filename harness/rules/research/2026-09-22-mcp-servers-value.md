@@ -31,7 +31,7 @@ Date: 2026-09-22. Scope: five harnesses (Claude Code, Codex, pi, DSH, omp) shari
 
 | Harness | Source file | Servers |
 |---|---|---|
-| Claude Code (user scope) | `~/.claude.json` → `mcpServers` | `codebase-memory-mcp` (stdio, `/Users/esh2n/bin/codebase-memory-mcp-managed`), `serena` (stdio, `uvx serena-agent==1.5.3 start-mcp-server --context claude-code`) |
+| Claude Code (user scope) | `~/.claude.json` → `mcpServers` | `codebase-memory-mcp` (stdio, `~/bin/codebase-memory-mcp-managed`), `serena` (stdio, `uvx serena-agent==1.5.3 start-mcp-server --context claude-code`) |
 | Claude Code (settings) | `~/.claude/settings.json` → `mcpServers` | `figma-remote` (http, `https://mcp.figma.com/mcp`), `figma-desktop` (http, `http://127.0.0.1:3845/mcp`) |
 | Claude Code (plugin) | `~/.claude/plugins/cache/thedotmack/claude-mem/12.4.9/.mcp.json` (installed plugin `claude-mem@thedotmack` v12.4.9) | `mcp-search` (stdio, `bun ${CLAUDE_PLUGIN_ROOT}/scripts/mcp-server.cjs`) — the plugin also installs 5 lifecycle hooks that run independent of MCP |
 | Codex | `~/.codex/config.toml` → `[mcp_servers.*]` | `context7` (`npx @upstash/context7-mcp@1.0.14`), `playwright` (`npx @playwright/mcp@0.0.32`), `notion-mcp` (http, `https://mcp.notion.com/mcp`), `codebase-memory-mcp`, `serena` (`--context codex`) |

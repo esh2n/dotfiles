@@ -42,7 +42,7 @@ practitioner record, not here.
 - **NON-EVIDENCE** — recorded so the search is not repeated; excluded from the verdict.
 
 Retrieval paths that worked: `read` on a URL (append `:raw` for Atom/XML — without it titles and
-summaries are stripped), `gh api` authenticated as `esh2n`, the HN Algolia API
+summaries are stripped), `gh api` authenticated, the HN Algolia API
 (`hn.algolia.com/api/v1/...`), `api.fxtwitter.com/<handle>/status/<id>`, and the arXiv export API.
 
 Retrieval that failed, recorded as such: `web_search` on every provider (this session's egress);

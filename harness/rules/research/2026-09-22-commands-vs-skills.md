@@ -102,7 +102,7 @@ Sources: https://github.com/can1357/homebrew-tap (tap description), local `omp -
 
 ### DSH (cordis / `@deepseek-ai/dsh`)
 
-npm's docs page for `@deepseek-ai/dsh` returned HTTP 403 (not reachable) from this environment. The repo's own local README (`/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/dsh/README.md`) already carries an internal note: "Model picker — selection is Web-UI-driven (Settings → Models); a `/model` slash command was not found in the docs." No commands-vs-skills distinction could be confirmed or denied for DSH. **Not found — absence of evidence, not evidence of absence.**
+npm's docs page for `@deepseek-ai/dsh` returned HTTP 403 (not reachable) from this environment. The repo's own local README (`<checkout>/domains/dev/config/dsh/README.md`) already carries an internal note: "Model picker — selection is Web-UI-driven (Settings → Models); a `/model` slash command was not found in the docs." No commands-vs-skills distinction could be confirmed or denied for DSH. **Not found — absence of evidence, not evidence of absence.**
 
 Source attempted: https://www.npmjs.com/package/@deepseek-ai/dsh (403)
 

@@ -23,7 +23,7 @@ sources_note: "URLs and quotes are inside the record; references by path, never 
 - 直接 fetch: `WebFetch` / `curl` でベンダー一次ドキュメント・GitHub raw を取得したもの。無印。
 - `[via summarizer]`: WebFetch は取得した HTML を小型モデルで要約してから返す。原文全体ではなく要約結果であることを明示する。
 - `[unverified]`: このセッションで一次情報に到達できず、モデルの学習知識に基づく主張。
-- `gh`（認証済みアカウント esh2n）で `gh search repos` / `gh search code` / `gh repo view` / `gh api` を使用。
+- `gh`（認証済み）で `gh search repos` / `gh search code` / `gh repo view` / `gh api` を使用。
 - 到達できなかったソース（403・404・ペイウォール・JS レンダリング・CAPTCHA）は「未到達」と明記する。「見つからない」は「存在しない」ではなく「到達できなかった」を意味する。
 - 本調査は 4 本の並列サブエージェント（サブクエスチョン 1〜4 をそれぞれ担当）で実施し、この文書に統合した。セッションの `WebSearch` 予算は 200 回/セッションで、後半に走ったエージェントほど枯渇の影響を受けた（サブクエスチョン 2・4 は途中で予算切れ、DuckDuckGo の代替検索も CAPTCHA で不可）。この制約自体を負のエビデンスの一部として扱い、到達できなかった項目は隠さず「未到達」リストに列挙する。
 

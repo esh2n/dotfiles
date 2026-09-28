@@ -4,7 +4,7 @@ Mac の移行の仕上げと、Omarchy 機を初めて入れるところまで�
 
 前提:
 
-- リポジトリは Mac の `~/go/github.com/esh2n/dotfiles`。私（Claude）の作業は同じリポジトリのブランチ `work-2026-09-23` にある。
+- リポジトリは Mac の `<checkout>`。私（Claude）の作業は同じリポジトリのブランチ `work-2026-09-23` にある。
 - 1Password の vault は `llm-automation`。LiteLLM は、その vault だけを読めるサービスアカウントで鍵を読む。
 - 決定の中身は `harness/rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md`。
 
@@ -19,7 +19,7 @@ Mac の移行の仕上げと、Omarchy 機を初めて入れるところまで�
 どこで: Mac のターミナル、どこからでも。
 
 ```
-bash ~/go/github.com/esh2n/dotfiles/.claude/worktrees/harness-parity/home/shared/litellm/config/bench/mimo-vs-deepseek.sh
+bash <checkout>/.claude/worktrees/harness-parity/home/shared/litellm/config/bench/mimo-vs-deepseek.sh
 ```
 
 見分け方: 最後に `wrote …/report-mimo-vs-deepseek.md` と出る。その中身を Claude に見せる。
@@ -28,7 +28,7 @@ bash ~/go/github.com/esh2n/dotfiles/.claude/worktrees/harness-parity/home/shared
 
 - `could not resolve op://llm-automation/xiaomi/credential` と出たら、1Password の項目の名前か欄の名前が違う。1Password で Xiaomi の項目を開き、右上の「…」→「Copy Secret Reference」で参照をコピーし、先頭に付けて打ち直す:
   ```
-  XIAOMI_REF='op://llm-automation/<項目>/<欄>' bash ~/go/github.com/esh2n/dotfiles/.claude/worktrees/harness-parity/home/shared/litellm/config/bench/mimo-vs-deepseek.sh
+  XIAOMI_REF='op://llm-automation/<項目>/<欄>' bash <checkout>/.claude/worktrees/harness-parity/home/shared/litellm/config/bench/mimo-vs-deepseek.sh
   ```
 - `no 1Password service-account token` と出たら、LiteLLM が使っているトークンが Keychain に無い。LiteLLM が今動いているなら起きないはず。
 
@@ -61,7 +61,7 @@ op read op://llm-automation/linux-model-server/credential | cut -c1-3
 どこで: Mac のターミナル。
 
 ```
-cd ~/go/github.com/esh2n/dotfiles
+cd <checkout>
 git merge --ff-only work-2026-09-23
 git push origin main
 ```
@@ -87,7 +87,7 @@ ls -ld ~/.config/ghostty
 
 ```
 rm ~/.config/ghostty
-cd ~/go/github.com/esh2n/dotfiles
+cd <checkout>
 rm -r home/darwin/ghostty/config home/darwin/herdr/config home/darwin/browsers
 make up
 ```
@@ -168,18 +168,18 @@ omarchy-setup-security-sudoless-docker
 A3 の push が済んでから。
 
 ```
-mkdir -p ~/go/github.com/esh2n
-git clone https://github.com/esh2n/dotfiles.git ~/go/github.com/esh2n/dotfiles
+mkdir -p ~/go/github.com/<user>
+git clone https://github.com/esh2n/dotfiles.git <checkout>
 ```
 
-見分け方: `ls ~/go/github.com/esh2n/dotfiles/bootstrap.sh` がファイルを出す。
+見分け方: `ls <checkout>/bootstrap.sh` がファイルを出す。
 
 ### B5. Nix を入れる
 
 何のため: この dotfiles は Nix で組み立てる。`bootstrap.sh` は Nix が無ければ入れて止まる。
 
 ```
-cd ~/go/github.com/esh2n/dotfiles
+cd <checkout>
 bash bootstrap.sh
 ```
 
@@ -239,7 +239,7 @@ nvim ~/.config/dotfiles/roles.json
 ### B8. `make up`
 
 ```
-cd ~/go/github.com/esh2n/dotfiles
+cd <checkout>
 make up
 ```
 
@@ -256,7 +256,7 @@ make up
 ### B9. 確かめる
 
 ```
-dotctl llm check --repo ~/go/github.com/esh2n/dotfiles --gpu
+dotctl llm check --repo <checkout> --gpu
 ```
 
 `--gpu` は「この機械は llama-server を出している」という意味（役割ファイルではなく、この引数で何を確かめるかが決まる）。
@@ -289,9 +289,9 @@ nvim ~/.config/dotfiles/roles.json
 Mac 自身には `macModelHost` と `observerHost` は要らない（LM Studio も台帳も自分の中にある）。
 
 ```
-cd ~/go/github.com/esh2n/dotfiles
+cd <checkout>
 make up
-dotctl llm check --repo ~/go/github.com/esh2n/dotfiles --lmstudio --console
+dotctl llm check --repo <checkout> --lmstudio --console
 ```
 
 `--lmstudio` は「この機械は LM Studio を出している」、`--console` は「この機械が observer（Grafana と台帳）」という意味。
@@ -303,7 +303,7 @@ dotctl llm check --repo ~/go/github.com/esh2n/dotfiles --lmstudio --console
 Omarchy 機を Windows で起動する（または電源を切る）。60 秒待ってから Mac で:
 
 ```
-dotctl llm check --repo ~/go/github.com/esh2n/dotfiles --lmstudio --console
+dotctl llm check --repo <checkout> --lmstudio --console
 ```
 
 `tier deterministic` が PASS のままなら、Mac が代わりに答えている。最初の一回は LM Studio が Qwen を読み込むので、しばらく待つことがある（何秒かを控えておいて Claude に教えてほしい）。Grafana の「deterministic: どちらが答えたか」で、`:1234` の線が伸びる。
@@ -330,7 +330,7 @@ brew uninstall --cask codex
 今の割り当てを見る:
 
 ```
-~/go/github.com/esh2n/dotfiles/harness/bin/jig tiers
+<checkout>/harness/bin/jig tiers
 ```
 
 `main  deepseek-flash` のように tier ごとの中身と、候補の一覧（catalog）が出る。

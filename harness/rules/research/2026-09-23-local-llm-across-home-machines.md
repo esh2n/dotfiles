@@ -33,9 +33,8 @@ sources_note: "URLs and quotes are inside the record; references by path, never 
 - **待受アドレス(実測)**: `~/.lmstudio/.internal/http-server-config.json` に `"networkInterface": "127.0.0.1"`, `"cors": false`, `"autoStartOnLaunch": false`, `"port": 1234`。`lsof -iTCP:1234 -sTCP:LISTEN` も `127.0.0.1:1234` のみを確認 — LANやtailnetには一切出ていない。
 - **ダウンロード済みモデル**(名前・サイズのみ): `Qwen3.6-35B-A3B-MLX-8bit`(35G)、`Qwen3.8-27B-MLX-4bit`(15G)、`Qwen3.8-27B-MLX-8bit`(28G)、`Ternary-Bonsai-27B-mlx-2bit`(7.9G)。記憶ノート([[local-llm-64gb-research]])の「Qwen3.6-35B-A3B級」に加え、8bit/4bitのQwen3.8-27Bも実在。
 - **LiteLLM proxy** (`domains/dev/config/litellm/config.yaml`): `model_list` に `deterministic` = `lm_studio/qwen/qwen3.8-27b` があり、LM StudioがLiteLLM経由の実バックエンドであることを確認。`master_key: os.environ/LITELLM_MASTER_KEY` は config.yaml 自身のコメントで「2026-09-20以降は実秘密(op経由)」と明記 — 以前の記憶ノート([[litellm-proxy-live-stack]])にある「秘密にせず sk-local-proxy」という記述はこの時点で上書き済み。
-- **launchdプリスト**: `~/Library/LaunchAgents/com.esh2n.litellm-proxy.plist`(`grep -rl litellm`で発見)。`RunAtLoad`+`KeepAlive`+`ThrottleInterval 120`。起動スクリプト `~/.config/litellm/litellm-up.sh` を読むと、Dockerコンテナは `-p 127.0.0.1:4000:4000` で起動——**LiteLLM proxyも現状はloopback限定**。`docker inspect litellm-proxy` の `NetworkSettings.Ports` も `{"4000/tcp":[{"HostIp":"127.0.0.1","HostPort":"4000"}]}` で一致。LM StudioへはDocker内から `http://host.docker.internal:1234/v1` で到達(コンテナ視点でのlocalhost越え)。
+- **launchdプリスト**: `~/Library/LaunchAgents/com.<user>.litellm-proxy.plist`(`grep -rl litellm`で発見)。`RunAtLoad`+`KeepAlive`+`ThrottleInterval 120`。起動スクリプト `~/.config/litellm/litellm-up.sh` を読むと、Dockerコンテナは `-p 127.0.0.1:4000:4000` で起動——**LiteLLM proxyも現状はloopback限定**。`docker inspect litellm-proxy` の `NetworkSettings.Ports` も `{"4000/tcp":[{"HostIp":"127.0.0.1","HostPort":"4000"}]}` で一致。LM StudioへはDocker内から `http://host.docker.internal:1234/v1` で到達(コンテナ視点でのlocalhost越え)。
 - **Tailscale**: `which tailscale` → 見つからず。**未導入**。
-- **macOSファイアウォール**: `socketfilterfw --getglobalstate` → "Firewall is disabled. (State = 0)"。ただし現状どちらのサービスも0.0.0.0にbindしていないため、ファイアウォール状態は今は実害を生んでいない。
 
 **結論**: 現状のスタックは全レイヤーがloopback限定(127.0.0.1)で、他マシン/スマホからは一切到達不能。今回の問いは「これをどう安全に拡張するか」という設計問題であり、既存の露出事故を塞ぐ話ではない。
 

@@ -36,7 +36,7 @@ Investigated: uncommitted work in worktree `harness-parity` (branch
 ### Session that wrote them
 
 `grep -l "apply-claude.ts" ~/.claude/projects/*/*.jsonl`:
-- Main-checkout project dir (`-Users-esh2n-go-github-com-esh2n-dotfiles`): **no matches.**
+- Main-checkout project dir (`<checkout-project-dir>`): **no matches.**
 - Worktree project dir
   (`-...--claude-worktrees-harness-parity`): 3 matches.
   - `4973e1e6-...jsonl` (36 lines, 2026-09-22T05:36:49–05:37:15Z) and
@@ -268,7 +268,7 @@ No output — clean.
 ### Hygiene grep (new/modified files + their tests)
 
 `console.log`, `: any`, `as any`, `TODO`, `FIXME`: **none found.**
-Hardcoded absolute paths / usernames (`/Users/`, `esh2n`): **none found**
+Hardcoded absolute paths / usernames (`/Users/`, `<user>`): **none found**
 (all paths are parameterized via `ClaudeApplyPaths`/`GuardApplyPaths`
 interfaces, populated from `homedir()`/`process.env` in `jig.ts`, or are
 test-fixture placeholder paths like `/claude/.claude-packs`).

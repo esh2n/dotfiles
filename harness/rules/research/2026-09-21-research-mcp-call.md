@@ -199,9 +199,9 @@ server-wide ones.
 ## 4. What jig's evaluator can match on for `mcp.call` TODAY
 
 Read directly from
-`/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/llm/harness/jig/src/domain/policy/request.ts`
+`<checkout>/domains/dev/llm/harness/jig/src/domain/policy/request.ts`
 and
-`/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/llm/harness/jig/src/domain/policy/evaluate.ts`
+`<checkout>/domains/dev/llm/harness/jig/src/domain/policy/evaluate.ts`
 (both current on this branch).
 
 `request.ts`, the `mcp.call` case of `requestFor`:
@@ -326,9 +326,9 @@ taxonomy in §3 and not a distinct "injection defense" category.
 
 ## 7. The configured MCP servers in this repo, classified
 
-From `/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/claude-profiles/core/mcp.json`
+From `<checkout>/domains/dev/config/claude-profiles/core/mcp.json`
 (personal `mcp.json` has no servers) and
-`/Users/esh2n/go/github.com/esh2n/dotfiles/domains/dev/config/codex/config.toml.default`.
+`<checkout>/domains/dev/config/codex/config.toml.default`.
 
 | Server | Harnesses | Transport | Risk class (§3) | Notes |
 |---|---|---|---|---|

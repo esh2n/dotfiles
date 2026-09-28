@@ -151,7 +151,7 @@ framing, is itself the finding: it names what jig must supply as the harness-ind
 
 ## Real-world survey (GitHub) — summary
 
-`gh` is authenticated (account `esh2n`); `gh search repos`/`gh search code` worked after one transient secondary-rate-limit 403 on a parallel burst (resolved by spacing calls out — `gh api rate_limit` showed the search quota was 30/30 fresh moments later, so it was request pacing, not a real limit). Repos actually read (README + description), not just listed:
+`gh` is authenticated (authenticated); `gh search repos`/`gh search code` worked after one transient secondary-rate-limit 403 on a parallel burst (resolved by spacing calls out — `gh api rate_limit` showed the search quota was 30/30 fresh moments later, so it was request pacing, not a real limit). Repos actually read (README + description), not just listed:
 
 | Repo | Stars | Harnesses covered | Delivery mechanism |
 |---|---|---|---|

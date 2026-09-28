@@ -16,7 +16,7 @@ sources_note: "URLs and quotes are inside the record; references by path, never 
 # generator migration map — yoki-switch → new config generator
 
 Fact-finding only. Read-only research from the main checkout
-`/Users/esh2n/go/github.com/esh2n/dotfiles` (branch `main`), plus this
+`<checkout>` (branch `main`), plus this
 machine's live state. No design decisions here — see
 `domains/dev/llm/harness/rules/decisions/*.md` for those.
 
@@ -27,7 +27,7 @@ machine's live state. No design decisions here — see
 Source: `domains/dev/bin/yoki-switch` (1039 lines, bash). **There is no
 `core/config/manager.sh` delegation inside claude-profiles** — that filename
 exists but as a *different* script at the repo root,
-`/Users/esh2n/go/github.com/esh2n/dotfiles/core/config/manager.sh` (602
+`<checkout>/core/config/manager.sh` (602
 lines), which is a **separate, wider-scope linker** covering `pi`, `dsh`,
 `omp` static files, launchd plists, and every `domains/*` directory — not
 just the five AI harnesses. yoki-switch and manager.sh are two independent
@@ -399,7 +399,7 @@ workflow-research-only}.md` (all 9, plus README.md).
    `[hooks]` TOML sections, without pinning the file's location) — on this
    machine `hooks.json` lives at `~/.codex/hooks.json` (16 KB, sibling to
    `config.toml`, confirmed by `ls`, §2) and `config.toml` carries a large
-   generated `[hooks.state."/Users/esh2n/.codex/hooks.json:event:n:m"]`
+   generated `[hooks.state."~/.codex/hooks.json:event:n:m"]`
    block that is runtime execution bookkeeping keyed back to that same
    `hooks.json` path+index — i.e. Codex round-trips state into `config.toml`
    the same way Claude Code round-trips `.autoMode` into `settings.json`

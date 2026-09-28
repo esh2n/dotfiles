@@ -135,7 +135,7 @@ this whole survey where "native" isn't strictly better anywhere.
 
 ## 5. Real-world survey (GitHub, `gh search code`)
 
-`gh auth status` confirmed authenticated (`esh2n`, `repo`/`read:org`/etc.
+`gh auth status` confirmed authenticated (`repo`/`read:org`/etc.
 scopes). Code search itself hit GitHub's **secondary rate limit** (HTTP 403
 "API rate limit exceeded") repeatedly mid-survey — each query below
 succeeded after a short backoff (`until ...; do sleep 8; done`); a few

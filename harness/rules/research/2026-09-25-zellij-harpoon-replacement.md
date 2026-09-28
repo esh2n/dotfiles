@@ -68,7 +68,7 @@ sources_note: "gh CLI認証が無効(keyring token invalid)だったため、Git
 
 出典: https://api.github.com/repos/cartwmic/harpoon (curl、commits) [一次データ]
 
-- コミット`0e7dac38`(2026-07-10、著者Michael Cartwright、★0・followers 0のGitHubアカウント、esh2n/本リポジトリとは無関係の第三者)のメッセージ[verbatim]: 「build: bump zellij-tile 0.42.2 -> 0.44.3 ... Matches the installed zellij runtime (new supported floor). Only source change: focus_terminal_pane gains a third bool (focus_terminal_pane(id, true, false)). Behavior-neutral; wasm build and harpoon-core tests green.」
+- コミット`0e7dac38`(2026-07-10、著者Michael Cartwright、★0・followers 0のGitHubアカウント、本リポジトリとは無関係の第三者)のメッセージ[verbatim]: 「build: bump zellij-tile 0.42.2 -> 0.44.3 ... Matches the installed zellij runtime (new supported floor). Only source change: focus_terminal_pane gains a third bool (focus_terminal_pane(id, true, false)). Behavior-neutral; wasm build and harpoon-core tests green.」
 - **課題factsが記述する『zellij-tile 0.44.3向けにビルドすると3引数エラー』という状況そのものを、この持ち主とは無関係の第三者エンジニアが独立に踏み、同じ原因(focus_terminal_paneの第3引数)を同じ結論で特定し修正した**——一次情報としての裏付けが取れた実例。ただしこのフォークは★0・フォーク0・リリース0件、`.github/workflows`は404(CI無し)で「wasm build...green」はコミットメッセージの自己申告のみ。直後のコミット群は`opsx`/`respawn-state-handoff`という無関係なワークフロー自動化の作業に切り替わっており、harpoon機能としての継続開発は止まっている。
 
 出典: https://raw.githubusercontent.com/gabber235/zellij-harpoon/main (raw取得、commits経由API併用) [一次データ]
