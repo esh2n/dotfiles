@@ -1,12 +1,12 @@
 # モデルの載せ降ろしと一覧は、各機械の LiteLLM を入口にする
 
-Status: accepted — 持ち主の裁定（2026-09-30、「LiteLLM に gateway 経由で load unload みたいな口を用意する感じかな？」への「そう言ってます」）
+Status: accepted — 持ち主の裁定（2026-09-30）
 
 rule: Reach every model server's own load, unload and list through the machine's own LiteLLM, as pass-through routes `/model-servers/<server>/models[/load|/unload]` that require the proxy key; `dotctl llm models|load|unload` is the one caller, the same on every machine. Relay only the model-list paths, never a server's chat endpoints, so no request bypasses LiteLLM's metering. What LiteLLM cannot do — starting and stopping a process to switch a GPU's use — is a separate small endpoint on that machine, reached through the same LiteLLM.
 
 ## Problem
 
-Mac の LM Studio と Omarchy の llama-server の、今何が載っているかを見る、載せる、降ろす、を同じ方法でしたい。前の案は操作口を Omarchy だけに作り、Mac に届かなかった（「Mac のモデルを切り替えたい時はどうするの？ adhoc では？」）。両方を束ねる既製品に今の構成に合うものは無い（`research/2026-09-30-home-model-fleet-control.md`: GPUStack は v2 で macOS を打ち切り、exo は Linux で GPU を使えず、LocalAI はエンジンを置き換える前提）。一方、各エンジンは自前の口を持つ（llama-server の router: `GET /models`・`POST /models/load|unload`、LM Studio REST v1: `/api/v1/models`・`/load`・`/unload`）。
+Mac の LM Studio と Omarchy の llama-server の、今何が載っているかを見る、載せる、降ろす、を同じ方法でしたい。前の案は操作口を Omarchy だけに作り、Mac のモデルには同じ操作が届かなかったため却下された。両方を束ねる既製品に今の構成に合うものは無い（`research/2026-09-30-home-model-fleet-control.md`: GPUStack は v2 で macOS を打ち切り、exo は Linux で GPU を使えず、LocalAI はエンジンを置き換える前提）。一方、各エンジンは自前の口を持つ（llama-server の router: `GET /models`・`POST /models/load|unload`、LM Studio REST v1: `/api/v1/models`・`/load`・`/unload`）。
 
 ## Decision
 

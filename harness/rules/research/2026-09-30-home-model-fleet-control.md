@@ -9,7 +9,7 @@
 - `harness/rules/decisions/2026-09-25-roles-named-as-people.md`: model-provider ロールは Mac が LM Studio、Linux+NVIDIA が llama-server と確定済み。本調査はこの二つを置き換える提案をしない。
 - `harness/rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md`: LiteLLM の `deterministic` tier は同一モデル名の中で `order: 1` が Omarchy 機の llama-server、`order: 2` が Mac の LM Studio、というフォールバック構成が確定済み。
 - `harness/rules/decisions/2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md`: LM Studio だけを `tailscale serve --bg --tcp 1234 127.0.0.1:1234` で tailnet に出し、LiteLLM は各機 loopback のまま、という境界線が確定済み。
-- 持ち主の裁定: 操作口が Linux 機だけにあってはならない。「Mac のモデルを切り替えたい時はどうするの？ adhoc では？」という却下理由がある。
+- 要件: 操作口は Linux 機だけにあってはならず、Mac のモデルにも同じ操作が届くこと。
 
 ## 1. 方法と検証の凡例
 
