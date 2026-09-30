@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // serversWorld is LiteLLM's pass-through as a stand-in server, recording what
@@ -145,4 +146,21 @@ func equalModels(a, b []ServerModel) bool {
 	x, _ := json.Marshal(a)
 	y, _ := json.Marshal(b)
 	return string(x) == string(y)
+}
+
+func TestASilentServerIsNamedAsProbablyOff(t *testing.T) {
+	release := make(chan struct{})
+	sw := newServersWorld(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+		if strings.HasPrefix(r.URL.Path, "/model-servers/linux") {
+			<-release
+			return
+		}
+		io.WriteString(w, macList)
+	})
+	defer close(release)
+	sw.env.HTTP = &http.Client{}
+	state := readServerWith(sw.env.withDefaults(), "the-key", "linux", 50*time.Millisecond)
+	if state.Err == nil || !strings.Contains(state.Err.Error(), "probably off") {
+		t.Errorf("a silent server should read as probably off: %v", state.Err)
+	}
 }
