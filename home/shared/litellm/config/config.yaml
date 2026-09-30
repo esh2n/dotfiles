@@ -87,7 +87,10 @@ general_settings:
   background_health_checks: true
   health_check_interval: 60
   enable_health_check_routing: true
-  health_check_ignore_transient_errors: true
+  # health_check_ignore_transient_errors stays OFF: it counts 408 as healthy
+  # (proxy_server.py, "treat 429/408 endpoints as healthy"), and a powered-off
+  # desktop answers the probe with exactly that timeout, so the flag kept the
+  # desktop in the pool and every request hung on it (measured 2026-09-30).
   background_health_check_model_groups: ["deterministic"]
   # an on-demand GET /health skips the Mac deployment too (docs/proxy/health.md)
   health_check_skip_disabled_background_models: true
