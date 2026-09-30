@@ -47,6 +47,8 @@ export const DESCRIPTION = [
   "Give each worker a self-contained task (it sees nothing of this conversation) and the `files` it may write (paths or globs). Workers whose files overlap never run at the same time; a worker with no `files` is treated as touching everything, so it runs alone among writers.",
   "tier: main (everyday, default: this session's tier), complex (harder reasoning), deterministic (carrying out a plan already designed; one at a time).",
   "isolated=true puts the worker in its own git worktree (.claude/worktrees/<name>, branch <name>); it commits there and the owner decides whether to merge. Use it only when workers must change the same files.",
+  "Results arrive by themselves as a message in a later turn: end your turn and let them come. Never poll with status, and never sleep in a shell to wait.",
+  "action=wait: only when you have nothing else to do and cannot go on without the results; it returns when the next batch has finished (at once if one fails), with their results, and otherwise only after 30 minutes.",
   "action=status: see every worker. action=results: read finished workers' answers. action=cancel: stop workers by `names` (all when omitted).",
 ].join(" ");
 
@@ -54,7 +56,7 @@ export const DESCRIPTION = [
 export const PARAMETERS = {
   type: "object",
   properties: {
-    action: { type: "string", enum: ["start", "status", "results", "cancel"] },
+    action: { type: "string", enum: ["start", "wait", "status", "results", "cancel"] },
     items: {
       type: "array",
       description: "For start: the workers to run.",
@@ -125,12 +127,12 @@ export function registerSwarm(pi: OmpExtensionApi, env: NodeJS.ProcessEnv = proc
     description: DESCRIPTION,
     parameters: PARAMETERS,
     loadMode: "essential",
-    async execute(_id, params, _signal, _onUpdate, ctx) {
+    async execute(_id, params, signal, _onUpdate, ctx) {
       try {
         const core = await jig();
         const live = await ensure(ctx);
         const tier = core.swarmTool.sessionTier(env.OMP_TIER, modelIdOf(ctx.model));
-        const result = core.swarmTool.runSwarmTool(live, params, tier);
+        // shown first: `wait` blocks, and the table is what shows it is waiting on something
         if (!widgetShown && ctx.hasUI && ctx.ui?.setWidget !== undefined) {
           ctx.ui.setWidget(
             WIDGET_KEY,
@@ -139,6 +141,7 @@ export function registerSwarm(pi: OmpExtensionApi, env: NodeJS.ProcessEnv = proc
           );
           widgetShown = true;
         }
+        const result = await core.swarmTool.runSwarmTool(live, params, tier, signal);
         return { content: [{ type: "text", text: result.text }], isError: !result.ok };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

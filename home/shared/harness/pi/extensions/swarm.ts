@@ -61,6 +61,7 @@ const WIDGET_KEY = "jig-swarm";
 const PARAMETERS = Type.Object({
   action: Type.Union([
     Type.Literal("start"),
+    Type.Literal("wait"),
     Type.Literal("status"),
     Type.Literal("results"),
     Type.Literal("cancel"),
@@ -157,18 +158,21 @@ export default function (pi: ExtensionAPI) {
       "Give each worker a self-contained task (it sees nothing of this conversation) and the `files` it may write (paths or globs). Workers whose files overlap never run at the same time; a worker with no `files` is treated as touching everything, so it runs alone among writers.",
       "tier: main (everyday, default: this session's tier), complex (harder reasoning), deterministic (carrying out a plan already designed; one at a time).",
       "isolated=true puts the worker in its own git worktree (.claude/worktrees/<name>, branch <name>); it commits there and the owner decides whether to merge. Use it only when workers must change the same files.",
+      "Results arrive by themselves as a message in a later turn: end your turn and let them come. Never poll with status, and never sleep in a shell to wait.",
+      "action=wait: only when you have nothing else to do and cannot go on without the results; it returns when the next batch has finished (at once if one fails), with their results, and otherwise only after 30 minutes.",
       "action=status: see every worker. action=results: read finished workers' answers. action=cancel: stop workers by `names` (all when omitted).",
     ].join(" "),
     parameters: PARAMETERS,
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const { tool } = await jig();
       const live = await ensure(ctx);
       const tier = tool.sessionTier(
         process.env.PI_TIER,
         ctx.model?.provider === "proxy" ? ctx.model.id : undefined,
       );
-      const result = tool.runSwarmTool(live, params, tier);
+      // shown first: `wait` blocks, and the table is what shows it is waiting on something
       await showTable(ctx, live);
+      const result = await tool.runSwarmTool(live, params, tier, signal);
       // pi marks a failed tool call by a throw, not a flag
       if (!result.ok) throw new Error(result.text);
       return { content: [{ type: "text", text: result.text }], details: undefined };

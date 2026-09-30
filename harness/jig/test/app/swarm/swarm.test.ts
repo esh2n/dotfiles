@@ -376,3 +376,58 @@ describe("cost comes from LiteLLM's spend log, by each worker's tag", () => {
     expect(clock.stopped()).toBe(1);
   });
 });
+
+describe("wait: the parent blocks until the next delivery, and it becomes the tool result", () => {
+  test("the batch's results come back from wait, not as a second message", async () => {
+    const swarm = makeSwarm();
+    swarm.start([{ name: "a", task: "ok:alpha" }], "main");
+    const text = await swarm.wait();
+    expect(text).toContain("alpha");
+    expect(delivered).toHaveLength(0);
+    expect(swarm.current[0]?.status).toBe("done");
+  });
+
+  test("a batch started while a wait is pending resolves it too", async () => {
+    const swarm = makeSwarm();
+    swarm.start([{ name: "slow", task: "sleep", files: ["slow/**"] }], "main");
+    const waiting = swarm.wait();
+    swarm.start([{ name: "quick", task: "ok:beta", files: ["quick/**"] }], "main");
+    const text = await waiting;
+    expect(text).toContain("beta");
+    expect(text).not.toContain("slow");
+    swarm.shutdown();
+  });
+
+  test("with nothing queued or running it returns at once", async () => {
+    const swarm = makeSwarm();
+    expect(await swarm.wait()).toContain("Nothing to wait for");
+  });
+
+  test("the abort signal ends it, and the results still arrive as a message", async () => {
+    const swarm = makeSwarm();
+    swarm.start([{ name: "a", task: "sleep" }], "main");
+    const abort = new AbortController();
+    const waiting = swarm.wait(abort.signal);
+    abort.abort();
+    expect(await waiting).toContain("Wait cancelled");
+    swarm.shutdown();
+  });
+
+  test("the one safety cap returns the table, not an empty answer", async () => {
+    const swarm = makeSwarm();
+    swarm.start([{ name: "a", task: "sleep" }], "main");
+    const text = await swarm.wait(undefined, 50);
+    expect(text).toContain("Still running");
+    expect(text).toContain("- a [working]");
+    swarm.shutdown();
+  });
+
+  test("only one wait at a time, and shutdown releases it", async () => {
+    const swarm = makeSwarm();
+    swarm.start([{ name: "a", task: "sleep" }], "main");
+    const first = swarm.wait();
+    expect(await swarm.wait()).toContain("already in progress");
+    swarm.shutdown();
+    expect(await first).toContain("session is ending");
+  });
+});

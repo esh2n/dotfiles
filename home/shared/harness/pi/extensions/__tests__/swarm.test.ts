@@ -100,6 +100,29 @@ describe("pi's swarm extension", () => {
     expect(result?.content[0]?.text).toBe("No workers in this session.");
   });
 
+  test("wait reaches the shared swarm with pi's abort signal", async () => {
+    const { api, tools } = fakePi();
+    register(api as never);
+    const ctx = {
+      cwd: process.cwd(),
+      hasUI: false,
+      mode: "json",
+      model: undefined,
+      sessionManager: { getSessionId: () => "test-session" },
+      ui: { setWidget: () => {} },
+    };
+    const aborted = new AbortController();
+    aborted.abort();
+    const result = await tools[0]?.execute(
+      "call-1",
+      { action: "wait" },
+      aborted.signal,
+      undefined,
+      ctx,
+    );
+    expect(result?.content[0]?.text).toContain("Wait cancelled");
+  });
+
   test("a bad action is a failed tool call (pi fails by throwing)", async () => {
     const { api, tools } = fakePi();
     register(api as never);
