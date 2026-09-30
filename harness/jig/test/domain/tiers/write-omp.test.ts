@@ -38,13 +38,13 @@ describe("toOmpProxyBlock", () => {
     expect(content).not.toContain("contextWindow: 128000");
   });
 
-  test("the 1M provider window travels as maxContextWindow (omp's /extended-context), never as the budget", () => {
-    // ruling 2026-09-24: budget 200K, extended window 1M, only omp has the second field
+  test("the provider window travels as maxContextWindow (omp's /extended-context) beside the budget", () => {
+    // ruling 2026-09-27 (context-budget-1m-85pct): the budget is the 1M provider
+    // window itself; only omp has the second field
     expect(content).toContain(
-      "      - id: main\n        name: main — DeepSeek Flash (LiteLLM tier)\n        reasoning: true\n        input: [text]\n        contextWindow: 200000\n        maxContextWindow: 1000000\n",
+      "      - id: main\n        name: main — DeepSeek Flash (LiteLLM tier)\n        reasoning: true\n        input: [text]\n        contextWindow: 1000000\n        maxContextWindow: 1000000\n",
     );
     expect(content).toContain("      - id: complex\n");
-    expect(content).not.toContain("contextWindow: 1000000");
     // the local tier has no extended window
     const det = content.slice(content.indexOf("- id: deterministic"));
     expect(det).not.toContain("maxContextWindow");
@@ -64,7 +64,7 @@ describe("toOmpProxyBlock", () => {
     ].join("\n");
     const after = spliceManagedBlock(before, content, TIERS_MANAGED_BLOCK_MARKERS);
     expect(after).toContain("  lm-studio:\n    baseUrl: http://127.0.0.1:9/v1\n");
-    expect(after).toContain("        contextWindow: 200000\n        maxContextWindow: 1000000\n");
+    expect(after).toContain("        contextWindow: 1000000\n        maxContextWindow: 1000000\n");
     expect(after.startsWith("providers:\n")).toBe(true);
   });
 
