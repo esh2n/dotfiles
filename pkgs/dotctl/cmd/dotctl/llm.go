@@ -17,6 +17,8 @@ import (
 const llmUsage = `usage: dotctl llm setup [--repo DIR] [--lmstudio] [--gpu] [--console]
        dotctl llm check [--repo DIR] [--lmstudio] [--gpu] [--console] [--complex]
        dotctl llm use [--repo DIR] <tier> <model>...   point a tier at catalog models (harness/policy/models.json)
+       dotctl llm models [--repo DIR]                  what each model server (linux, mac) has, and what is loaded
+       dotctl llm load|unload [--repo DIR] <server> <model>   change what a model server has loaded
 `
 
 // runLLM is `dotctl llm setup|check`: the home LLM's command steps (what
@@ -24,6 +26,9 @@ const llmUsage = `usage: dotctl llm setup [--repo DIR] [--lmstudio] [--gpu] [--c
 func runLLM(home string, args []string, out, errOut io.Writer) int {
 	if len(args) > 0 && args[0] == "use" {
 		return runLLMUse(home, args[1:], out, errOut)
+	}
+	if len(args) > 0 && (args[0] == "models" || args[0] == "load" || args[0] == "unload") {
+		return runLLMServers(home, args[0], args[1:], out, errOut)
 	}
 	if len(args) == 0 || (args[0] != "setup" && args[0] != "check") {
 		fmt.Fprint(errOut, llmUsage)
@@ -110,5 +115,60 @@ func runLLMUse(home string, args []string, out, errOut io.Writer) int {
 		p.Error("%v", err)
 		return 1
 	}
+	return 0
+}
+
+// runLLMServers is `dotctl llm models|load|unload`: the model servers of
+// every machine, reached through this machine's LiteLLM
+// (rules/decisions/2026-09-30-model-servers-through-litellm.md).
+func runLLMServers(home, verb string, args []string, out, errOut io.Writer) int {
+	repo, rest, ok := repoFlag("llm "+verb, args, errOut)
+	if !ok {
+		return 2
+	}
+	p := ui.Printer{Out: out, Err: errOut, Prefix: "llm " + verb}
+	e := llm.Env{Home: home, Repo: repo, Sys: sys.OS{}, UI: p}
+	if verb == "models" {
+		if len(rest) != 0 {
+			fmt.Fprint(errOut, llmUsage)
+			return 2
+		}
+		failed := 0
+		for _, s := range llm.ServerModels(e) {
+			p.Heading("%s", s.Server)
+			if s.Err != nil {
+				p.Error("%v", s.Err)
+				failed++
+				continue
+			}
+			items := make([]string, 0, len(s.Models))
+			for _, m := range s.Models {
+				state := "not loaded"
+				if m.Loaded {
+					state = "loaded"
+				}
+				items = append(items, m.ID+"  ("+state+")")
+			}
+			if len(items) == 0 {
+				p.Note("no models")
+				continue
+			}
+			p.List(items...)
+		}
+		return failed
+	}
+	if len(rest) != 2 {
+		fmt.Fprint(errOut, llmUsage)
+		return 2
+	}
+	change := llm.LoadModel
+	if verb == "unload" {
+		change = llm.UnloadModel
+	}
+	if err := change(e, rest[0], rest[1]); err != nil {
+		p.Error("%v", err)
+		return 1
+	}
+	p.Success("%sed %s on %s", verb, rest[1], rest[0])
 	return 0
 }

@@ -224,5 +224,7 @@ exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} ${HOST_ARGS[@]
   -e OPENAI_API_KEY=unset-placeholder \
   -e LINUX_MODEL_API_BASE="$LINUX_MODEL_API_BASE" \
   -e MAC_MODEL_API_BASE="$MAC_MODEL_API_BASE" \
+  -e LINUX_MODEL_SERVER_MODELS="${LINUX_MODEL_API_BASE%/v1}/models" \
+  -e MAC_MODEL_SERVER_MODELS="${MAC_MODEL_API_BASE%/v1}/api/v1/models" \
   -e MAC_MODEL_API_KEY=lm-studio \
   "$IMAGE" --config /app/config.yaml --prometheus_metrics_port "$METRICS_PORT"
