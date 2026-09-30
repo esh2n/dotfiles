@@ -190,3 +190,27 @@ func TestEditorExtensionsWithAMissingList(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut.String())
 	}
 }
+
+func TestLLMServersRefuseWhatTheyCannotDo(t *testing.T) {
+	t.Setenv("DOTFILES_ROOT", "")
+	repo := t.TempDir()
+	var out, errOut bytes.Buffer
+	for _, args := range [][]string{
+		{"models", "--repo", repo, "extra"},
+		{"load", "--repo", repo, "mac"},
+		{"unload", "--repo", repo, "mac", "m", "extra"},
+		{"load", "mac", "m"}, // no checkout
+	} {
+		if code := runLLM(t.TempDir(), args, &out, &errOut); code != 2 {
+			t.Fatalf("%v: exit %d, stderr %q", args, code, errOut.String())
+		}
+	}
+	errOut.Reset()
+	if code := runLLM(t.TempDir(), []string{"load", "--repo", repo, "windows", "m"}, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "unknown model server") {
+		t.Fatalf("unknown server: exit %d, stderr %q", code, errOut.String())
+	}
+	errOut.Reset()
+	if code := runLLM(t.TempDir(), []string{"unload", "--repo", repo, "linux", ""}, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "name the model") {
+		t.Fatalf("empty model: exit %d, stderr %q", code, errOut.String())
+	}
+}

@@ -3,6 +3,7 @@ package llm
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -61,11 +62,19 @@ func ServerModels(e Env) []ServerState {
 }
 
 func readServer(e Env, key, server string) ServerState {
+	return readServerWith(e, key, server, 10*time.Second)
+}
+
+func readServerWith(e Env, key, server string, within time.Duration) ServerState {
 	if key == "" {
 		return ServerState{Server: server, Err: fmt.Errorf("the LiteLLM key did not resolve (litellm/proxy-key.sh)")}
 	}
-	body, status, err := e.call(http.MethodGet, e.serverURL(server, ""), key, nil, 10*time.Second)
+	body, status, err := e.call(http.MethodGet, e.serverURL(server, ""), key, nil, within)
 	if err != nil {
+		var timeout interface{ Timeout() bool }
+		if errors.As(err, &timeout) && timeout.Timeout() {
+			err = fmt.Errorf("no answer within %s — the %s model server is probably off or off the tailnet", within, server)
+		}
 		return ServerState{Server: server, Err: err}
 	}
 	if status/100 != 2 {
