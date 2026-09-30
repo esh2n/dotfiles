@@ -134,6 +134,7 @@ export async function stopGate(stdin: string, deps: StopGateDeps): Promise<strin
       result = await deps.run(command.bin, command.args, {
         cwd: plan.cwd,
         timeoutMs: deps.timeoutMs ?? TIMEOUT_MS,
+        ...(command.unsetEnv === undefined ? {} : { unsetEnv: command.unsetEnv }),
       });
     } catch (error) {
       deps.logger?.debug("gate.run-failed", {

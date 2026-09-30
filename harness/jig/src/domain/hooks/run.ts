@@ -23,5 +23,10 @@ export interface RunResult {
 export type Runner = (
   bin: string,
   args: readonly string[],
-  options: { readonly cwd: string; readonly timeoutMs: number },
+  options: {
+    readonly cwd: string;
+    readonly timeoutMs: number;
+    /** Variables removed from the inherited environment for this one command. */
+    readonly unsetEnv?: readonly string[];
+  },
 ) => Promise<RunResult>;
