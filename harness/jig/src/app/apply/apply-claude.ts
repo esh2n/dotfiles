@@ -65,12 +65,7 @@ import { type ClaudeHookPaths, buildClaudeHooks } from "../../domain/claude/hook
 import type { PathState } from "../../domain/claude/links";
 import { DEFAULT_PERMITS } from "../../domain/claude/permits";
 import { selectRuleDirs } from "../../domain/claude/rules-dir";
-import {
-  NO_SANDBOX_SOURCE,
-  type SandboxSource,
-  hostSandbox,
-  parseSandboxSource,
-} from "../../domain/claude/sandbox";
+import { HOST_SANDBOX } from "../../domain/claude/sandbox";
 import { type ScriptCandidate, selectScriptFiles } from "../../domain/claude/scripts-dir";
 import {
   type ClaudeComposition,
@@ -120,8 +115,6 @@ export interface ClaudeApplyPaths {
   readonly guardRules: string;
   /** `llm/harness/mcp/servers.json`. */
   readonly mcpServers: string;
-  /** `llm/harness/policy/sandbox.json`. Absent is tolerated, and reported. */
-  readonly sandbox: string;
   /** `llm/harness/rules/decisions/`. */
   readonly decisions: string;
   /** Destination: `~/.claude/settings.json`. */
@@ -199,8 +192,6 @@ export interface ClaudeApplyReport {
   readonly workflowsDir: OptionalManagedDirReport;
   /** `mcp/servers.json`'s `targets.claude` servers, into `~/.claude.json`'s `mcpServers`. */
   readonly mcp: McpReport;
-  /** `undefined` when `policy/sandbox.json` does not exist yet. */
-  readonly sandboxSourcePath: string | undefined;
   readonly message?: string;
 }
 
@@ -240,23 +231,6 @@ async function planMcp(
     : recordedNames;
   const plan = planClaudeJsonMcp(current, servers, owned);
   return { ...plan, path: paths.claudeJson };
-}
-
-/**
- * `policy/sandbox.json`, or the empty default when it does not exist yet.
- *
- * Tolerating absence is deliberate and one-directional: an empty
- * `excludedCommands` is the *tightest* answer, so a missing source can only
- * over-restrict. The apply reports which of the two it used, because an empty
- * list that nobody chose and an empty list somebody chose are different facts.
- */
-async function readSandboxSource(
-  ports: ClaudeApplyPorts,
-  path: string,
-): Promise<{ readonly source: SandboxSource; readonly found: boolean }> {
-  const read = await readJson(ports, path);
-  if (read === undefined) return { source: NO_SANDBOX_SOURCE, found: false };
-  return { source: parseSandboxSource(read.json, path), found: true };
 }
 
 /** Subdirectories of `<harnessRoot>/rules/` — a README there is a file and never a candidate. */
@@ -388,8 +362,6 @@ export async function applyClaude(
   }
   const projected = toClaudePermissions(parsePolicy(policySource.json as Record<string, unknown>));
 
-  const sandbox = await readSandboxSource(ports, paths.sandbox);
-
   const hooks = buildClaudeHooks(input.hookPaths);
   const composition = composeClaudeSettings(
     (await readJson(ports, paths.settings))?.json as JsonObject | undefined,
@@ -401,7 +373,7 @@ export async function applyClaude(
       // allow list above is what survives auto mode's first stage; the mode
       // itself stays auto so everything unlisted still reaches the classifier.
       defaultMode: "auto",
-      sandbox: hostSandbox(sandbox.source),
+      sandbox: HOST_SANDBOX,
       ...(await statusLineFor(ports, paths)),
     },
   );
@@ -448,7 +420,6 @@ export async function applyClaude(
     scriptsDir: await planScriptsDir(ports, paths, now),
     workflowsDir: await planWorkflowsDir(ports, paths, now),
     mcp,
-    sandboxSourcePath: sandbox.found ? paths.sandbox : undefined,
   };
 
   const conflicts: string[] = [

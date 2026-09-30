@@ -180,7 +180,6 @@ describe("applyCli --target claude", () => {
     harnessRoot: H,
     guardRules: `${H}/policy/guard-rules.json`,
     mcpServers: `${H}/mcp/servers.json`,
-    sandbox: `${H}/policy/sandbox.json`,
     decisions: `${H}/rules/decisions`,
     settings: `${CLAUDE}/settings.json`,
     claudeJson: "/home/u/.claude.json",
@@ -284,23 +283,11 @@ describe("applyCli --target claude", () => {
     expect(result.stdout).toContain("permissions.deny is a backstop only");
   });
 
-  test("excludedCommands and its provenance are reported when policy/sandbox.json exists", async () => {
-    const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
-    const context = claudeContext({
-      [CLAUDE_PATHS.sandbox]: JSON.stringify({ excludedCommands: ["gh", "docker", "open"] }),
-    });
-    const result = await applyCli(["--target", "claude"], ports, paths, context);
-
-    expect(result.stdout).toContain(
-      "excludedCommands copied from /repo/llm/harness/policy/sandbox.json: gh, docker, open",
-    );
-    expect(result.stdout).toContain("still goes through jig's guard");
-  });
-
-  test("without that file the report says the empty list was a default, not a choice", async () => {
+  test("says the host sandbox is off and what still checks each call", async () => {
     const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     const result = await applyCli(["--target", "claude"], ports, paths, claudeContext());
-    expect(result.stdout).toContain("NO policy/sandbox.json");
+    expect(result.stdout).toContain("sandbox: off on the host");
+    expect(result.stdout).toContain("jig's guard and auto mode's classifier");
   });
 
   test("an accepted note with no rule line is a WARNING, not a silent omission", async () => {

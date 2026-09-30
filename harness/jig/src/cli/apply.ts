@@ -51,41 +51,41 @@
  */
 
 import {
-  applyClaude,
   type ClaudeApplyPaths,
   type ClaudeApplyReport,
   type LinkReport,
   type ManagedDirReport,
   type OptionalManagedDirReport,
+  applyClaude,
 } from "../app/apply/apply-claude";
 import {
   type AgentFileReport,
-  applyCodex,
   type CodexApplyOptions,
   type CodexApplyPaths,
   type CodexApplyReport,
+  applyCodex,
 } from "../app/apply/apply-codex";
 import {
-  applyDsh,
   DSH_INSTRUCTIONS_BUDGET_BYTES,
   type DshApplyPaths,
   type DshApplyReport,
   type DshProfileReport,
+  applyDsh,
 } from "../app/apply/apply-dsh";
 import {
-  applyOmp,
   type OmpAgentFileReport,
   type OmpApplyOptions,
   type OmpApplyPaths,
   type OmpApplyReport,
+  applyOmp,
 } from "../app/apply/apply-omp";
-import { applyPi, type PiApplyPaths, type PiApplyReport } from "../app/apply/apply-pi";
+import { type PiApplyPaths, type PiApplyReport, applyPi } from "../app/apply/apply-pi";
 import {
   ALL_APPLY_TARGETS,
   type ApplyTarget,
   type ApplyTargetPaths,
-  applyTiers,
   type TargetResult,
+  applyTiers,
 } from "../app/apply/apply-tiers";
 import { AGENTS_SKILLS_MOUNT_TARGETS, type AgentsSkillsMountReport } from "../app/apply/delivery";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
@@ -96,7 +96,6 @@ import type { ClaudeHookPaths } from "../domain/claude/hooks";
 import type { PathState } from "../domain/claude/links";
 import { describePathState, describeStaleReason } from "../domain/claude/managed-dir";
 import { DEFAULT_PERMITS, defaultPermitPolicyFragment } from "../domain/claude/permits";
-import { KNOWN_MACOS_EXCLUSION_CANDIDATES } from "../domain/claude/sandbox";
 
 export interface ApplyCliResult {
   readonly stdout: string;
@@ -256,7 +255,7 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
     "  form at all, so removing the hook removes them entirely.",
     ...report.hookOnly.map((rule) => `  ${rule.id.padEnd(30)}${rule.reason}`),
     "",
-    ...sandboxLines(report),
+    ...sandboxLines(),
     "",
     ...mcpLines(report),
     "",
@@ -504,20 +503,10 @@ function mcpLines(report: ClaudeApplyReport): readonly string[] {
   ];
 }
 
-/** The sandbox block's provenance and its cost, both stated. */
-function sandboxLines(report: ClaudeApplyReport): readonly string[] {
-  const excluded = (report.composition.settings.sandbox as { excludedCommands?: unknown })
-    ?.excludedCommands;
-  const list = Array.isArray(excluded) ? excluded : [];
-  const provenance =
-    report.sandboxSourcePath === undefined
-      ? "sandbox: host mode, strict. NO policy/sandbox.json — excludedCommands defaults to empty (the tightest answer; create the file to choose)."
-      : `sandbox: host mode, strict. excludedCommands copied from ${report.sandboxSourcePath}: ${list.length === 0 ? "(none)" : list.join(", ")}`;
+/** The sandbox block, and why it says what it says. */
+function sandboxLines(): readonly string[] {
   return [
-    provenance,
-    "  An excluded command runs outside the OS sandbox but still goes through jig's guard.",
-    "  What an empty list costs on macOS, per the sandboxing doc:",
-    ...KNOWN_MACOS_EXCLUSION_CANDIDATES.map((candidate) => `    - ${candidate}`),
+    "sandbox: off on the host (rules/decisions/2026-09-30-host-claude-without-os-sandbox.md); jig's guard and auto mode's classifier still check every tool call.",
   ];
 }
 

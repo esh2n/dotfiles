@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync, renameSync } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,13 +15,13 @@ import { reportCoverage } from "../app/coverage/report-coverage";
 import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
 import type { RetirePaths } from "../app/retire/retire-yoki";
 import { skillQuestionMode } from "../app/routing/select-skills";
-import { isSetupTarget, SETUP_TARGETS, setupHarness } from "../app/setup/setup-harness";
+import { SETUP_TARGETS, isSetupTarget, setupHarness } from "../app/setup/setup-harness";
 import { reportSkillUsage } from "../app/skills/report-usage";
 import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import { assignTier, describeTiers } from "../app/tiers/assign";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
-import { DSH_PROFILE_PATCH_FILENAME, DSH_PROFILES_DIR, resolveDshHome } from "../domain/dsh/home";
+import { DSH_PROFILES_DIR, DSH_PROFILE_PATCH_FILENAME, resolveDshHome } from "../domain/dsh/home";
 import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
 import { resolvePiAgentDir } from "../domain/pi/agent-dir";
 import { PI_MCP_USER_CONFIG } from "../domain/pi/mcp";
@@ -114,7 +114,6 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
     harnessRoot: harness,
     guardRules: join(harness, "policy", "guard-rules.json"),
     mcpServers: join(harness, "mcp", "servers.json"),
-    sandbox: join(harness, "policy", "sandbox.json"),
     decisions: join(harness, "rules", "decisions"),
     settings: join(claudeDir, "settings.json"),
     // Claude Code keeps .claude.json in CLAUDE_CONFIG_DIR when that is set,

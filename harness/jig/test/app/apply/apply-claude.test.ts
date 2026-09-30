@@ -12,7 +12,6 @@ const PATHS: ClaudeApplyPaths = {
   harnessRoot: H,
   guardRules: `${H}/policy/guard-rules.json`,
   mcpServers: `${H}/mcp/servers.json`,
-  sandbox: `${H}/policy/sandbox.json`,
   decisions: `${H}/rules/decisions`,
   settings: `${CLAUDE}/settings.json`,
   claudeJson: "/home/u/.claude.json",
@@ -81,11 +80,6 @@ const MCP_SOURCE = JSON.stringify({
   ],
 });
 
-const SANDBOX_SOURCE = JSON.stringify({
-  _note: "the owner's list",
-  excludedCommands: ["gh", "docker", "open"],
-});
-
 const DECISION = "# 決定の題\n\nStatus: accepted — 理由（2026-09-22）\n\nrule: Do the one thing.\n";
 
 /** The sources every test starts from; the destination side is the seed. */
@@ -95,7 +89,6 @@ function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
     files: {
       [PATHS.guardRules]: GUARD_RULES,
       [PATHS.mcpServers]: MCP_SOURCE,
-      [PATHS.sandbox]: SANDBOX_SOURCE,
       [`${PATHS.decisions}/2026-09-22-one.md`]: DECISION,
       [`${H}/rules/common/README.md`]: "# rules/common\n",
       [`${H}/rules/research/INDEX.md`]: "# index\n",
@@ -196,33 +189,7 @@ describe("what the composed file contains", () => {
       "Bash(stylelint *)",
     ]);
 
-    expect(settings.sandbox).toEqual({
-      enabled: true,
-      failIfUnavailable: true,
-      allowUnsandboxedCommands: false,
-      excludedCommands: ["gh", "docker", "open"],
-    });
-  });
-
-  test("excludedCommands comes from policy/sandbox.json, and its provenance is reported", async () => {
-    const { ports } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
-    const report = await run(ports);
-    expect(report.sandboxSourcePath).toBe(PATHS.sandbox);
-  });
-
-  test("no policy/sandbox.json means the tightest list, and says so rather than passing for a choice", async () => {
-    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
-    delete files[PATHS.sandbox];
-    const report = await run(ports);
-
-    expect(report.sandboxSourcePath).toBeUndefined();
-    expect(report.composition.settings.sandbox).toMatchObject({ excludedCommands: [] });
-  });
-
-  test("a malformed policy/sandbox.json is an error, not a silently empty list", async () => {
-    const { ports, files } = fakePorts({ files: { [PATHS.settings]: LIVE_SETTINGS } });
-    files[PATHS.sandbox] = JSON.stringify({ excludedCommands: "gh" });
-    expect(run(ports)).rejects.toThrow("array");
+    expect(settings.sandbox).toEqual({ enabled: false });
   });
 
   test("MCP servers go into ~/.claude.json's mcpServers, not a settings key: claude=false is excluded and {{HOME}} is substituted", async () => {
@@ -325,7 +292,7 @@ describe("--write", () => {
 
     expect(report.wrote).toBe(true);
     const written = JSON.parse(files[PATHS.settings] ?? "{}") as JsonObject;
-    expect(written.sandbox).toMatchObject({ enabled: true });
+    expect(written.sandbox).toEqual({ enabled: false });
     // The dead key leaves on write; the servers go through `claude mcp add` by hand.
     expect(written.mcpServers).toBeUndefined();
     expect(manifest[`${PATHS.settings}#owned`]).toBe(
@@ -362,7 +329,7 @@ describe("--write", () => {
     await run(ports, true);
 
     const edited = JSON.parse(files[PATHS.settings] ?? "{}") as Record<string, unknown>;
-    edited.sandbox = { enabled: false };
+    edited.sandbox = { enabled: true };
     files[PATHS.settings] = `${JSON.stringify(edited, null, 2)}\n`;
     const handEdited = files[PATHS.settings];
 

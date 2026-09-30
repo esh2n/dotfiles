@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { CLAUDE_HOOK_EVENTS, buildClaudeHooks } from "../../../src/domain/claude/hooks";
-import {
-  NO_SANDBOX_SOURCE,
-  hostSandbox,
-  parseSandboxSource,
-} from "../../../src/domain/claude/sandbox";
+import { HOST_SANDBOX } from "../../../src/domain/claude/sandbox";
 
 const PATHS = { bun: "/abs/bun", jig: "/abs/jig/src/cli/jig.ts" };
 
@@ -72,41 +68,7 @@ describe("the five hooks", () => {
 });
 
 describe("the host sandbox block", () => {
-  test("enabled, fail-closed, no unsandboxed retry; the exclusion list is copied, not decided", () => {
-    expect(hostSandbox({ excludedCommands: ["gh", "docker", "open"] })).toEqual({
-      enabled: true,
-      failIfUnavailable: true,
-      allowUnsandboxedCommands: false,
-      excludedCommands: ["gh", "docker", "open"],
-    });
-  });
-
-  test("the default when policy/sandbox.json is absent is empty — the tightest answer", () => {
-    expect(hostSandbox(NO_SANDBOX_SOURCE)).toMatchObject({ excludedCommands: [] });
-  });
-
-  test("no network allowlist: that is the box's business, not the host's", () => {
-    expect(hostSandbox(NO_SANDBOX_SOURCE)).not.toHaveProperty("network");
-  });
-});
-
-describe("policy/sandbox.json", () => {
-  test("a valid source is taken verbatim", () => {
-    expect(parseSandboxSource({ excludedCommands: ["gh"] }, "f")).toEqual({
-      excludedCommands: ["gh"],
-    });
-  });
-
-  test("a malformed list is an error, never silently an empty one", () => {
-    expect(() => parseSandboxSource({}, "f")).toThrow('missing "excludedCommands"');
-    expect(() => parseSandboxSource({ excludedCommands: "gh" }, "f")).toThrow("array");
-    expect(() => parseSandboxSource({ excludedCommands: ["gh", ""] }, "f")).toThrow("non-empty");
-    expect(() => parseSandboxSource([], "f")).toThrow("JSON object");
-  });
-
-  test("an `_note` beside the list is ignored, so the file can carry its own reasoning", () => {
-    expect(parseSandboxSource({ _note: "why", excludedCommands: [] }, "f")).toEqual({
-      excludedCommands: [],
-    });
+  test("says off in so many words (rules/decisions/2026-09-30-host-claude-without-os-sandbox.md)", () => {
+    expect(HOST_SANDBOX).toEqual({ enabled: false });
   });
 });
