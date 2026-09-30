@@ -790,6 +790,20 @@
         "standard",
         "strict"
       ]
+    },
+    {
+      "id": "permit-declscope",
+      "effect": "permit",
+      "action": "shell.exec",
+      "subject": {
+        "program": "declscope"
+      },
+      "why": "2026-09-30-declscope-file-scoped-private: declscope is not wired into hooks; the go-reviewer runs it on a diff",
+      "profiles": [
+        "minimal",
+        "standard",
+        "strict"
+      ]
     }
   ]
 }

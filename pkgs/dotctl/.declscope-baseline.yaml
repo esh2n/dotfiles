@@ -1,0 +1,192 @@
+# declscope baseline
+#
+# Violations recorded here are suppressed; new ones are still reported.
+# Regenerate with:
+#
+#     declscope baseline ./...
+#
+# Do not edit by hand. An entry disappears when its violation is fixed, so the
+# diff of a regeneration is the record of what was cleaned up.
+packages:
+  github.com/esh2n/dotfiles/pkgs/dotctl/cmd/dotctl:
+    boundary:
+      cachegc:
+        - runCacheGC
+      help:
+        - helpFor
+        - isHelp
+        - setupUsage
+      llm:
+        - checkLog
+        - isTerminal
+        - llmUsage
+        - runLLM
+      mado:
+        - madoUsage
+        - runMado
+      main:
+        - run
+        - usage
+      records:
+        - recordsUsage
+        - runRecords
+      retire:
+        - runRetire
+      service:
+        - runService
+        - serviceUsage
+      setup:
+        - runSetup
+      theme:
+        - runTheme
+      tools:
+        - parseInterspersed
+        - repoFlag
+        - runEditor
+        - runGH
+        - runLedger
+        - runNvimInstall
+        - runTemplates
+        - runWallpaper
+        - wallpaperUsage
+      up:
+        - runUp
+  github.com/esh2n/dotfiles/pkgs/dotctl/internal/llm:
+    boundary:
+      fake:
+        - errFake
+        - fakeSys.calls
+        - fakeSys.count
+        - fakeSys.env
+        - fakeSys.fail
+        - fakeSys.have
+        - fakeSys.index
+        - fakeSys.onExec
+        - fakeSys.outputs
+        - fakeSys.ran
+        - fakeSys.stderr
+        - fakeSys.stdin
+        - newWorld
+        - services.posts
+        - services.set
+        - world
+        - world.env
+        - world.home
+        - world.out
+        - world.running
+        - world.svc
+        - world.sys
+      llm:
+        - Env.answers
+        - Env.get
+        - Env.litellm
+        - Env.proxyKey
+        - Env.run
+        - Env.status
+        - Env.tailscale
+        - Env.waitFor
+        - Env.withDefaults
+      models:
+        - fetchModels
+        - progressEvery
+        - readModelList
+      read:
+        - readAll
+  github.com/esh2n/dotfiles/pkgs/dotctl/internal/mado:
+    boundary:
+      mado:
+        - Config.in
+        - Config.profiles
+        - Config.recorded
+        - Config.say
+        - input
+        - input.eof
+        - input.r
+  github.com/esh2n/dotfiles/pkgs/dotctl/internal/retire:
+    boundary:
+      carry:
+        - carryOver
+        - must
+      retire:
+        - Config.log
+        - Config.warn
+  github.com/esh2n/dotfiles/pkgs/dotctl/internal/setup:
+    boundary:
+      clearway:
+        - makeHomeDirs
+        - moveAside
+      gitfilters:
+        - gitFilters
+      omarchy:
+        - omarchyThemes
+        - quickshellRise
+      records:
+        - recordsTTL
+      setup:
+        - Env.need
+        - Env.path
+        - Env.quiet
+        - exists
+        - fakeSys.calls
+        - fakeSys.fail
+        - fakeSys.outputs
+        - fakeSys.ran
+        - newWorld
+        - world.env
+        - world.home
+        - world.out
+        - world.repo
+        - world.sys
+        - write
+      steps:
+        - gitIdentity
+        - orphanCheck
+        - sbarlua
+  github.com/esh2n/dotfiles/pkgs/dotctl/internal/theme:
+    boundary:
+      apply:
+        - Env.repo
+        - applyVSCode
+        - applyValues
+        - applyWallpaper
+        - applyZellij
+        - exists
+        - nvchadThemes
+        - or
+        - rewrite
+        - statuslineColors
+        - vscodeThemes
+      applyText:
+        - applyCLI
+        - applyNeovim
+      golden:
+        - copyFile
+        - update
+      omarchy:
+        - Env.omarchy
+        - applyOmarchy
+        - writeOmarchyThemes
+      orca:
+        - writeAtomic
+      palette:
+        - readPalette
+        - scaled
+        - xterm256
+      theme:
+        - App.source
+        - Env.warn
+        - fixture
+        - fixture.env
+        - fixture.home
+        - fixture.ran
+        - fixture.repo
+        - must
+        - reload
+        - through
+  github.com/esh2n/dotfiles/pkgs/dotctl/internal/up:
+    boundary:
+      prior:
+        - sweepPriorLinks
+      up:
+        - Config.log
+        - Config.warn

@@ -8,6 +8,7 @@ let
   self = {
     cargo-compete = callPackage ./cargo-compete { };
     codebase-memory-mcp = callPackage ./codebase-memory-mcp { };
+    declscope = callPackage ./declscope { };
     dotctl = callPackage ./dotctl { };
   };
 in

@@ -25,9 +25,27 @@ When invoked:
    - For local review, prefer `git diff --staged -- '*.go'` and `git diff -- '*.go'` first.
    - For branch review, diff against the merge-base: `git diff $(git merge-base origin/main HEAD) -- '*.go'` (fall back to `main`, then `master`, if `origin/main` does not exist) so multi-commit branches are fully reviewed.
    - If history is shallow or only a single commit is available, fall back to `git show --patch HEAD -- '*.go'`.
-2. Run `go vet ./...` and `staticcheck ./...` if available
+2. Run `go vet ./...` and `staticcheck ./...` if available, and `declscope` as described in "File-scoped boundaries" below
 3. Focus on modified `.go` files and read surrounding context before commenting
 4. Begin review
+
+## File-scoped boundaries (declscope)
+
+`declscope` treats an unexported name as private to the file that declares it, and reports a use from another file (`X is private to namespace "a", but is used from namespace "b"`, then `used here` at the use). What it catches is new code, often agent-written, quietly reaching into another file's helpers or struct fields. Its findings on an existing codebase are mostly deliberate sharing, so only what this diff adds matters. The ruling is `harness/rules/decisions/2026-09-30-declscope-file-scoped-private.md`.
+
+Skip this section when `declscope` is not on PATH, and on a cgo diff for the same reason as the diagnostic commands below. Also skip it when the diff touches `go.mod` or `go.work`, and name the command in the review instead: `declscope` loads packages through `go list`, and a raised `go` or `toolchain` line would otherwise make it download and run another Go toolchain.
+
+1. Write a config outside the repository that keeps the project's settings but no baseline. The project's baseline is keyed by declaration, not by use, so a new use of a declaration it already lists would be absorbed.
+   - If the package has a `.declscope.yaml` (the nearest one above it), copy it without its `baseline:` line.
+   - Either way, add `baseline: absent.yaml`. A baseline that does not exist is read as empty.
+   - Put it under `$TMPDIR`, never in the repository.
+2. Run `GOTOOLCHAIN=local GOFLAGS=-mod=readonly declscope -config <that file> <the changed packages>`. `-config` reads that one file and no other.
+3. Keep only the findings whose `used here` line is a line this diff added (`git diff -U0` against the same base as step 1 of "When invoked"). Drop every other finding: it was there before this change.
+4. Report what is left:
+   - **The project has a `.declscope.yaml`**: it adopted the rule, so each crossing is a finding, `[C:8/I:6]` unless the context says otherwise. The fix is to use an exported or shared entry point, or mark the declaration `//declscope:package` when the sharing is intended.
+   - **No `.declscope.yaml`**: the project never adopted the rule. List the crossings under a separate `Advisory (declscope)` heading as a question ("`order.go` now calls `normalizeEmail` from `user.go`; is that sharing intended?"). They are not findings and do not count toward the approval criteria.
+
+Never write `.declscope.yaml` or a baseline into the repository under review; whether a project adopts declscope is its owners' decision.
 
 ## Reporting Threshold
 
@@ -85,11 +103,12 @@ Performance (allocation, GC, lock contention, mutex-vs-atomic, Pool fit, hot-pat
 
 ## Diagnostic Commands
 
-Static/parse-only in the pure-Go case — these read and type-check the source without executing `init()`/`main()`. Caveat (same standard as the rust-reviewer's `build.rs` rule): on a package that uses cgo, all four invoke the C toolchain with the package's own `#cgo` CFLAGS/LDFLAGS — diff-controlled input driving a compiler is execution, not static analysis. For a diff touching cgo directives or C sources, skip them and name the command in the finding instead, unless `JIG_REVIEW_EXEC=1` is set:
+Static/parse-only in the pure-Go case — these read and type-check the source without executing `init()`/`main()`. Caveat (same standard as the rust-reviewer's `build.rs` rule): on a package that uses cgo, all of them invoke the C toolchain with the package's own `#cgo` CFLAGS/LDFLAGS — diff-controlled input driving a compiler is execution, not static analysis. For a diff touching cgo directives or C sources, skip them and name the command in the finding instead, unless `JIG_REVIEW_EXEC=1` is set:
 
 ```bash
 go vet ./...
 staticcheck ./...
+GOTOOLCHAIN=local GOFLAGS=-mod=readonly declscope -config "$TMPDIR/<dir>/declscope.yaml" <changed packages>
 golangci-lint run
 govulncheck ./...
 ```
