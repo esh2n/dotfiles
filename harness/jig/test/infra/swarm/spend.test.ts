@@ -20,21 +20,24 @@ describe("the proxy's spend by tag", () => {
     expect(url.searchParams.get("tags")).toBe("t:a,t:b");
   });
 
-  test("rows become tag → USD, numbers as strings included, odd rows skipped", () => {
-    const costs = parseSpendRows([
-      { individual_request_tag: "a", log_count: 2, total_spend: 0.25 },
-      { individual_request_tag: "b", log_count: 1, total_spend: "0.5" },
-      { individual_request_tag: "c", total_spend: null },
-      "junk",
-    ]);
+  test("the UI's spend_per_tag becomes tag → USD, numbers as strings included, odd rows skipped", () => {
+    const costs = parseSpendRows({
+      spend_per_tag: [
+        { name: "a", spend: 0.25, log_count: 2 },
+        { name: "b", spend: "0.5", log_count: 1 },
+        { name: "c", spend: null },
+        "junk",
+      ],
+    });
     expect([...costs]).toEqual([
       ["a", 0.25],
       ["b", 0.5],
     ]);
   });
 
-  test("a body that is not a list is an error, not zero", () => {
-    expect(() => parseSpendRows({ detail: "no db" })).toThrow("did not return a list");
+  test("any other body is an error that names what came back, not zero", () => {
+    expect(() => parseSpendRows({ detail: "no db" })).toThrow("got keys detail");
+    expect(() => parseSpendRows([])).toThrow("got a list");
   });
 
   test("sends the proxy key and reports a refusal", async () => {
@@ -45,7 +48,7 @@ describe("the proxy's spend by tag", () => {
       now: () => NOON,
       fetch: (async (url: string, init?: RequestInit) => {
         seen.push({ url, auth: new Headers(init?.headers).get("authorization") });
-        return new Response(JSON.stringify([{ individual_request_tag: "a", total_spend: 1 }]));
+        return new Response(JSON.stringify({ spend_per_tag: [{ name: "a", spend: 1 }] }));
       }) as typeof fetch,
     });
     expect([...(await lookup(["a"]))]).toEqual([["a", 1]]);

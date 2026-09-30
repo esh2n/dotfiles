@@ -6,8 +6,9 @@
  * `proxy/spend_tracking/spend_management_endpoints.py`, `global_view_spend_tags`;
  * no premium check) sums `spend` from the `DailyTagSpend` view, a plain view
  * over `LiteLLM_SpendLogs` (`proxy/db/create_views.py`), so a row counts as
- * soon as the batch writer has flushed it. Each row is
- * `{individual_request_tag, log_count, total_spend}`.
+ * soon as the batch writer has flushed it. The answer is the UI's shape,
+ * `{spend_per_tag: [{name, spend, log_count}]}` (`ui_get_spend_by_tags`),
+ * with `spend` rounded to four decimals.
  *
  * `spend_date` is `DATE(startTime)` in the database's time zone, so the
  * window is yesterday to tomorrow (UTC): a worker that crosses midnight is
@@ -36,13 +37,24 @@ export function spendRequestUrl(root: string, tags: readonly string[], now: numb
   return `${root}/global/spend/tags?${params.toString()}`;
 }
 
-/** Rows → tag → USD; rows that are not the documented shape are skipped. */
+/** `{spend_per_tag: [...]}` → tag → USD; entries that are not the documented shape are skipped. */
 export function parseSpendRows(body: unknown): ReadonlyMap<string, number> {
+  const rows =
+    typeof body === "object" && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>).spend_per_tag
+      : undefined;
+  if (!Array.isArray(rows)) {
+    const shape = Array.isArray(body)
+      ? "a list"
+      : typeof body === "object" && body !== null
+        ? `keys ${Object.keys(body).join(",")}`
+        : typeof body;
+    throw new Error(`spend by tag: expected {spend_per_tag: [...]}, got ${shape}`);
+  }
   const out = new Map<string, number>();
-  if (!Array.isArray(body)) throw new Error("spend by tag: the proxy did not return a list");
-  for (const row of body) {
+  for (const row of rows) {
     if (typeof row !== "object" || row === null) continue;
-    const { individual_request_tag: tag, total_spend: spend } = row as Record<string, unknown>;
+    const { name: tag, spend } = row as Record<string, unknown>;
     const usd = typeof spend === "string" ? Number(spend) : spend;
     if (typeof tag === "string" && typeof usd === "number" && Number.isFinite(usd)) {
       out.set(tag, (out.get(tag) ?? 0) + usd);
