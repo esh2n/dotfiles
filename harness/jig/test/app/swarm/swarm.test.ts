@@ -30,10 +30,11 @@ import { spawnWorker } from "../../../src/infra/swarm/spawn";
 const SCRIPT = `
 task="$1"
 case "$task" in
-  ok:*) echo '{"t":"turn"}'; echo '{"t":"tool"}'; echo '{"t":"usage","in":100,"out":20,"cost":0.001}'; echo "{\\"t\\":\\"end\\",\\"text\\":\\"\${task#ok:}\\"}";;
+  ok:*) echo '{"t":"turn"}'; echo '{"t":"tool"}'; echo '{"t":"usage","in":100,"out":20}'; echo "{\\"t\\":\\"end\\",\\"text\\":\\"\${task#ok:}\\"}";;
   fail) echo "broken" >&2; exit 3;;
   sleep) sleep 30;;
   silent) exit 0;;
+  tag) echo "{\\"t\\":\\"end\\",\\"text\\":\\"$JIG_SWARM_TAG\\"}";;
   grandchild:*) sleep 30 & echo $! > "\${task#grandchild:}"; wait;;
   commit:*) f="\${task#commit:}"; mkdir -p "$(dirname "$f")"; echo x > "$f"; git add "$f" >/dev/null; git -c user.email=t@e -c user.name=t commit -qm w >/dev/null; echo '{"t":"end","text":"committed"}';;
 esac
@@ -55,7 +56,6 @@ const decode: Decode = (line) => {
     text?: string;
     in?: number;
     out?: number;
-    cost?: number;
   };
   switch (e.t) {
     case "turn":
@@ -72,7 +72,6 @@ const decode: Decode = (line) => {
               output: e.out ?? 0,
               cacheRead: 0,
               cacheWrite: 0,
-              cost: e.cost,
             },
           },
         },
@@ -156,7 +155,8 @@ describe("a batch runs in the background and is delivered once", () => {
     expect(swarm.current.every((w) => w.status === "done")).toBe(true);
     const a = swarm.current.find((w) => w.spec.name === "a");
     expect(a).toMatchObject({ turns: 1, toolCalls: 1 });
-    expect(a?.usage).toMatchObject({ input: 100, output: 20, cost: 0.001 });
+    expect(a?.usage).toMatchObject({ input: 100, output: 20 });
+    expect(a?.cost).toBeUndefined();
     expect(readFileSync(join(stateDir, "a.result.md"), "utf8")).toBe("alpha\n");
   });
 
@@ -289,5 +289,90 @@ describe("refusals", () => {
     const r = swarm.start([{ name: "A B", task: "x" }], "main");
     expect(r.ok).toBe(false);
     expect(swarm.current).toEqual([]);
+  });
+});
+
+describe("cost comes from LiteLLM's spend log, by each worker's tag", () => {
+  function manualClock() {
+    const ticks: (() => void)[] = [];
+    let stopped = 0;
+    return {
+      every: (_ms: number, tick: () => void) => {
+        ticks.push(tick);
+        return () => {
+          stopped += 1;
+        };
+      },
+      tick: () => {
+        for (const t of ticks) t();
+      },
+      stopped: () => stopped,
+    };
+  }
+
+  test("each worker runs with its own tag, and the log's spend becomes its cost", async () => {
+    const clock = manualClock();
+    const asked: string[][] = [];
+    const swarm = makeSwarm({
+      spend: {
+        tag: (name) => `jig-swarm:s:${name}`,
+        lookup: async (tags) => {
+          asked.push([...tags]);
+          return new Map([["jig-swarm:s:a", 0.0123]]);
+        },
+        every: clock.every,
+      },
+    });
+    swarm.start(
+      [
+        { name: "a", task: "tag", files: ["a/**"] },
+        { name: "b", task: "ok:beta", files: ["b/**"] },
+      ],
+      "main",
+    );
+    await until(() => delivered.length === 1);
+    expect(delivered[0]?.message).toContain("jig-swarm:s:a");
+    clock.tick();
+    await until(() => swarm.current.find((w) => w.spec.name === "a")?.cost !== undefined);
+    expect(asked[0]?.sort()).toEqual(["jig-swarm:s:a", "jig-swarm:s:b"]);
+    expect(swarm.current.find((w) => w.spec.name === "b")?.cost).toBeUndefined();
+  });
+
+  test("an unreachable proxy leaves the cost unknown and is logged", async () => {
+    const clock = manualClock();
+    let calls = 0;
+    const swarm = makeSwarm({
+      spend: {
+        tag: (name) => name,
+        lookup: async () => {
+          calls += 1;
+          throw new Error("connection refused");
+        },
+        every: clock.every,
+      },
+    });
+    swarm.start([{ name: "a", task: "ok:alpha" }], "main");
+    await until(() => delivered.length === 1);
+    clock.tick();
+    await until(() => calls === 1);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(swarm.current[0]?.cost).toBeUndefined();
+    expect(readFileSync(join(stateDir, "events.jsonl"), "utf8")).toContain("connection refused");
+  });
+
+  test("watching stops when no cost can change any more, and at shutdown", async () => {
+    const clock = manualClock();
+    let now = Date.now();
+    const swarm = makeSwarm({
+      now: () => now,
+      spend: { tag: (n) => n, lookup: async () => new Map(), every: clock.every },
+    });
+    swarm.start([{ name: "a", task: "ok:alpha" }], "main");
+    await until(() => delivered.length === 1);
+    now += 10 * 60_000;
+    clock.tick();
+    await until(() => clock.stopped() === 1);
+    swarm.shutdown();
+    expect(clock.stopped()).toBe(1);
   });
 });

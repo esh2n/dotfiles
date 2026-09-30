@@ -51,3 +51,12 @@ export interface HarnessCommand {
   /** Extra environment for a worker of `tier` (the tier holder, the recursion guard). */
   env(tier: string): Readonly<Record<string, string>>;
 }
+
+/**
+ * LiteLLM's spend by tag: for each tag asked about that has priced rows, the
+ * USD summed over them. A tag with no rows yet is absent, never zero.
+ */
+export type SpendLookup = (tags: readonly string[]) => Promise<ReadonlyMap<string, number>>;
+
+/** Run `tick` every `ms` until the returned function is called. */
+export type Every = (ms: number, tick: () => void) => () => void;

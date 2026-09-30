@@ -117,7 +117,7 @@ function cells(w: Worker, all: readonly Worker[], now: number): string[] {
     idle,
     age,
     note(w),
-    cost(w.usage.cost),
+    cost(w.cost),
     tokens(totalTokens(w)),
   ];
 }
@@ -207,7 +207,7 @@ export function summary(workers: readonly Worker[]): string {
   ];
   if (count("held") > 0) parts.push(`${count("held")} held`);
   if (count("failed") > 0) parts.push(`${count("failed")} failed`);
-  const costs = workers.map((w) => w.usage.cost).filter((c): c is number => c !== undefined);
+  const costs = workers.map((w) => w.cost).filter((c): c is number => c !== undefined);
   parts.push(costs.length === 0 ? "cost —" : cost(costs.reduce((a, b) => a + b, 0)));
   parts.push(`${tokens(workers.reduce((a, w) => a + totalTokens(w), 0))} tok`);
   const state = count("working") > 0 ? "Working" : count("queued") > 0 ? "Queued" : "Idle";

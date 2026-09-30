@@ -7,7 +7,9 @@
  *   turn_start                   a model turn began
  *   tool_execution_start         a tool call (`toolName`)
  *   message_end{message}         a finished message; for the assistant it
- *                                carries `usage` (tokens and `cost.total`),
+ *                                carries `usage` (tokens; its `cost` is the
+ *                                harness's own pricing, which is nothing for
+ *                                proxy tiers, so it is not read),
  *                                `stopReason` and `errorMessage`, and its
  *                                text content blocks
  *
@@ -41,14 +43,11 @@ function num(value: unknown): number {
 function usageOf(value: unknown): Usage | undefined {
   const u = record(value);
   if (u === undefined) return undefined;
-  const cost = record(u.cost);
-  const total = cost === undefined ? undefined : cost.total;
   return {
     input: num(u.input),
     output: num(u.output),
     cacheRead: num(u.cacheRead),
     cacheWrite: num(u.cacheWrite),
-    cost: typeof total === "number" && Number.isFinite(total) ? total : undefined,
   };
 }
 

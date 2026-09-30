@@ -92,7 +92,7 @@ describe("a worker's life", () => {
     w = recordProgress(
       w,
       "a",
-      { toolCall: true, usage: { input: 10, output: 2, cacheRead: 0, cacheWrite: 0, cost: 0.01 } },
+      { toolCall: true, usage: { input: 10, output: 2, cacheRead: 0, cacheWrite: 0 } },
       3,
     );
     w = recordProgress(
@@ -101,12 +101,12 @@ describe("a worker's life", () => {
       {
         toolCall: true,
         text: "done",
-        usage: { input: 5, output: 1, cacheRead: 3, cacheWrite: 0, cost: 0.02 },
+        usage: { input: 5, output: 1, cacheRead: 3, cacheWrite: 0 },
       },
       4,
     );
     const [a] = w;
-    expect(a?.usage).toEqual({ input: 15, output: 3, cacheRead: 3, cacheWrite: 0, cost: 0.03 });
+    expect(a?.usage).toEqual({ input: 15, output: 3, cacheRead: 3, cacheWrite: 0 });
     expect(a).toMatchObject({
       turns: 1,
       toolCalls: 2,

@@ -114,10 +114,6 @@ function addUsage(total: Usage, call: Usage): Usage {
     output: total.output + call.output,
     cacheRead: total.cacheRead + call.cacheRead,
     cacheWrite: total.cacheWrite + call.cacheWrite,
-    cost:
-      total.cost === undefined && call.cost === undefined
-        ? undefined
-        : (total.cost ?? 0) + (call.cost ?? 0),
   };
 }
 
@@ -136,6 +132,14 @@ export function recordProgress(
     ...(progress.usage === undefined ? {} : { usage: addUsage(w.usage, progress.usage) }),
     ...(progress.text === undefined ? {} : { result: progress.text }),
   }));
+}
+
+/** Costs read from LiteLLM's spend log, by worker name; a worker absent from `costs` keeps its own. */
+export function recordCost(workers: Workers, costs: ReadonlyMap<string, number>): Workers {
+  return workers.map((w) => {
+    const usd = costs.get(w.spec.name);
+    return usd === undefined || usd === w.cost ? w : { ...w, cost: usd };
+  });
 }
 
 /** The process ended. `error` set: it failed. An isolated worker that succeeded waits for a merge. */

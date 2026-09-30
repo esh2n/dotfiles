@@ -14,13 +14,18 @@ import { Swarm, type SwarmDeps } from "../../app/swarm/swarm";
 import { type WorktreeDeps, repoRoot } from "../../app/swarm/worktree";
 import { DEFAULT_CONFIG, type SwarmConfig, parseSwarmConfig } from "../../domain/swarm/config";
 import { decodeWorkerLine } from "../../domain/swarm/decode";
+import { spendTag } from "../../domain/swarm/spend";
 import { TIERS, type Tier } from "../../domain/swarm/types";
 import { runCommand } from "../proc/exec-file";
 import { nodeWorktreeFs } from "./fs";
 import { fileSwarmLog, swarmStateDir } from "./log";
 import { spawnWorker } from "./spawn";
+import { litellmSpendLookup } from "./spend";
 
 export type HarnessName = "pi" | "omp";
+
+/** For the worker side of the adapters: the tag variable and how a request body carries it. */
+export { SPEND_TAG_ENV, withSpendTag } from "../../domain/swarm/spend";
 
 /** Set in every worker's environment: a worker never registers `swarm` (no nesting). */
 export const WORKER_ENV = "JIG_SWARM_WORKER";
@@ -53,6 +58,42 @@ export function loadModelLabels(root = HARNESS_ROOT): Partial<Record<Tier, strin
     if (Array.isArray(use) && typeof use[0] === "string") out[tier] = use[0];
   }
   return out;
+}
+
+/** tiers.json's `connections.proxy.baseUrl`, the proxy every tier goes through. */
+export function loadProxyBaseUrl(root = HARNESS_ROOT): string | undefined {
+  const json = readJson(join(root, "policy", "tiers.json")) as
+    | { connections?: { proxy?: { baseUrl?: unknown } } }
+    | undefined;
+  const url = json?.connections?.proxy?.baseUrl;
+  return typeof url === "string" && url !== "" ? url : undefined;
+}
+
+/** `setInterval` that never keeps the harness alive on its own. */
+function every(ms: number, tick: () => void): () => void {
+  const timer = setInterval(tick, ms);
+  (timer as { unref?: () => void }).unref?.();
+  return () => clearInterval(timer);
+}
+
+/**
+ * Costs from LiteLLM's spend log, reached with the key the harness itself
+ * uses; without that key or the proxy's address, no worker is tagged and
+ * every cost stays "—".
+ */
+export function spendSource(
+  env: NodeJS.ProcessEnv,
+  sessionId: string,
+  proxyBaseUrl: () => string | undefined = loadProxyBaseUrl,
+): SwarmDeps["spend"] {
+  const apiKey = env.LITELLM_API_KEY;
+  const baseUrl = proxyBaseUrl();
+  if (apiKey === undefined || apiKey === "" || baseUrl === undefined) return undefined;
+  return {
+    tag: (name) => spendTag(sessionId, name),
+    lookup: litellmSpendLookup({ baseUrl, apiKey, now: () => Date.now() }),
+    every,
+  };
 }
 
 /**
@@ -131,6 +172,7 @@ export async function createSwarmSession(options: SwarmSessionOptions): Promise<
   const worktree: WorktreeDeps = { run: runCommand, fs: nodeWorktreeFs };
   const root = await repoRoot(worktree, options.cwd).catch(() => options.cwd);
   const labels = loadModelLabels();
+  const spend = spendSource(options.env, options.sessionId);
   return new Swarm({
     config: loadSwarmConfig(),
     harness: harnessCommand(options.harness),
@@ -145,5 +187,6 @@ export async function createSwarmSession(options: SwarmSessionOptions): Promise<
     onChange: options.onChange,
     onDeliver: options.onDeliver,
     onWorktrees: (names) => saveWorktreeRecord(options.env, root, names),
+    ...(spend === undefined ? {} : { spend }),
   });
 }

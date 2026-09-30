@@ -37,6 +37,8 @@ function fakePi() {
 afterEach(() => {
   // biome-ignore lint/performance/noDelete: assigning undefined stores the string "undefined" in process.env
   delete process.env.JIG_SWARM_WORKER;
+  // biome-ignore lint/performance/noDelete: as above
+  delete process.env.JIG_SWARM_TAG;
 });
 
 describe("pi's swarm extension", () => {
@@ -53,6 +55,28 @@ describe("pi's swarm extension", () => {
     register(api as never);
     expect(tools).toEqual([]);
     expect(events).toEqual([]);
+  });
+
+  test("a tagged worker adds its tag to proxy requests only", async () => {
+    process.env.JIG_SWARM_WORKER = "1";
+    process.env.JIG_SWARM_TAG = "jig-swarm:s:a";
+    const handlers = new Map<string, (event: unknown, ctx: unknown) => Promise<unknown>>();
+    const api = {
+      registerTool: () => {
+        throw new Error("a worker registers no tool");
+      },
+      on: (event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) =>
+        handlers.set(event, handler),
+    };
+    register(api as never);
+    const hook = handlers.get("before_provider_request");
+    expect(hook).toBeDefined();
+    const body = { model: "main", messages: [] };
+    expect(await hook?.({ payload: body }, { model: { provider: "proxy" } })).toEqual({
+      ...body,
+      metadata: { tags: ["jig-swarm:s:a"] },
+    });
+    expect(await hook?.({ payload: body }, { model: { provider: "anthropic" } })).toBeUndefined();
   });
 
   test("status on a fresh session says there are no workers", async () => {

@@ -4,6 +4,7 @@ import {
   enqueue,
   markFinished,
   markStarted,
+  recordCost,
   recordProgress,
 } from "../../../src/domain/swarm/state";
 import {
@@ -85,10 +86,11 @@ describe("the table", () => {
       "port-layout",
       {
         model: "deepseek-flash",
-        usage: { input: 1000, output: 200, cacheRead: 0, cacheWrite: 0, cost: 0.002 },
+        usage: { input: 1000, output: 200, cacheRead: 0, cacheWrite: 0 },
       },
       1_000,
     );
+    w = recordCost(w, new Map([["port-layout", 0.002]]));
     const lines = renderTable(w, 200, 15_000);
     expect(lines).toHaveLength(4);
     expect(lines[0]).toMatch(

@@ -58,14 +58,16 @@ export interface WorkerSpec {
   readonly isolated: boolean;
 }
 
-/** Token and cost totals as the worker's harness reports them. */
+/**
+ * Token totals as the worker's harness reports them. Cost is not here: the
+ * harness prices proxy tiers at nothing, so a worker's cost comes only from
+ * LiteLLM's own spend log (`Worker.cost`).
+ */
 export interface Usage {
   readonly input: number;
   readonly output: number;
   readonly cacheRead: number;
   readonly cacheWrite: number;
-  /** USD; `undefined` while the harness has reported no cost at all. */
-  readonly cost: number | undefined;
 }
 
 export const NO_USAGE: Usage = {
@@ -73,7 +75,6 @@ export const NO_USAGE: Usage = {
   output: 0,
   cacheRead: 0,
   cacheWrite: 0,
-  cost: undefined,
 };
 
 /** What the extension knows about one worker. Timestamps are epoch ms. */
@@ -92,6 +93,12 @@ export interface Worker {
   readonly turns: number;
   readonly toolCalls: number;
   readonly usage: Usage;
+  /**
+   * USD as LiteLLM priced this worker's requests, read from its spend log by
+   * the worker's tag. `undefined` until the log has a priced row for it; the
+   * log is written in batches, so it trails the worker by 10–15 seconds.
+   */
+  readonly cost?: number;
   /** The final assistant text, once finished. */
   readonly result?: string;
   /** Why it failed, or why it waits. */

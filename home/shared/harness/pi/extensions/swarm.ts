@@ -18,7 +18,9 @@ import { Type } from "typebox";
 //
 // A worker is a pi of its own (`pi --mode json`) and loads these extensions
 // too; `JIG_SWARM_WORKER=1` in its environment keeps it from registering
-// `swarm`, so workers never start workers.
+// `swarm`, so workers never start workers. A worker instead adds its tag
+// (`JIG_SWARM_TAG`) to every proxy request, so the parent can read the
+// worker's cost from LiteLLM's spend log (harness/jig/src/domain/swarm/spend.ts).
 
 type Session = typeof import("../../../../../harness/jig/src/infra/swarm/session");
 type Tool = typeof import("../../../../../harness/jig/src/app/swarm/tool");
@@ -98,7 +100,17 @@ const PARAMETERS = Type.Object({
 });
 
 export default function (pi: ExtensionAPI) {
-  if (process.env.JIG_SWARM_WORKER === "1") return;
+  if (process.env.JIG_SWARM_WORKER === "1") {
+    const tag = process.env.JIG_SWARM_TAG;
+    if (tag === undefined || tag === "") return;
+    // proxy requests only: the tag is LiteLLM's field and means nothing to another provider
+    pi.on("before_provider_request", async (event, ctx) => {
+      if (ctx.model?.provider !== "proxy") return undefined;
+      const { session } = await jig();
+      return session.withSpendTag(event.payload, tag);
+    });
+    return;
+  }
   let swarm: SwarmType | undefined;
   let widgetShown = false;
 

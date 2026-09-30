@@ -13,6 +13,7 @@
 import type { SwarmConfig } from "../../domain/swarm/config";
 import { inScope } from "../../domain/swarm/scope";
 import { parseSpecs } from "../../domain/swarm/spec";
+import { SPEND_POLL_MS, SPEND_TAG_ENV, costPending } from "../../domain/swarm/spend";
 import {
   type Workers,
   dueForDelivery,
@@ -21,11 +22,20 @@ import {
   markDelivered,
   markFinished,
   markStarted,
+  recordCost,
   recordProgress,
   runnable,
 } from "../../domain/swarm/state";
 import type { Tier, Worker } from "../../domain/swarm/types";
-import type { Decode, HarnessCommand, Spawn, SwarmLog, WorkerProcess } from "./ports";
+import type {
+  Decode,
+  Every,
+  HarnessCommand,
+  Spawn,
+  SpendLookup,
+  SwarmLog,
+  WorkerProcess,
+} from "./ports";
 import { type WorktreeDeps, changedFiles, createWorktree, removeMerged } from "./worktree";
 
 export interface SwarmDeps {
@@ -46,6 +56,15 @@ export interface SwarmDeps {
   /** The Swarm's own worktree names changed: keep them for a later session's cleanup. */
   readonly onWorktrees?: (names: readonly string[]) => void;
   readonly onDeliver: (message: string, workers: readonly Worker[]) => void;
+  /**
+   * Where costs come from: each worker's tag, and LiteLLM's spend by tag.
+   * Absent: no worker is tagged and every cost stays "—".
+   */
+  readonly spend?: {
+    readonly tag: (name: string) => string;
+    readonly lookup: SpendLookup;
+    readonly every: Every;
+  };
 }
 
 export type StartResult =
@@ -81,6 +100,8 @@ export class Swarm {
   private readonly resultPaths = new Map<string, string>();
   private readonly worktrees: string[] = [];
   private closed = false;
+  private stopSpend: (() => void) | undefined;
+  private spendInFlight = false;
 
   constructor(private readonly deps: SwarmDeps) {
     this.worktrees.push(...(deps.ownWorktrees ?? []));
@@ -119,6 +140,7 @@ export class Swarm {
       started: parsed.specs.map((s) => s.name),
     });
     void this.pump();
+    this.watchSpend();
     const names = parsed.specs.map((s) => s.name).join(", ");
     return {
       ok: true,
@@ -166,7 +188,10 @@ export class Swarm {
       }),
       {
         cwd,
-        env: harness.env(w.spec.tier),
+        env: {
+          ...harness.env(w.spec.tier),
+          ...(this.deps.spend === undefined ? {} : { [SPEND_TAG_ENV]: this.deps.spend.tag(name) }),
+        },
         onLine: (line) => {
           this.deps.log.raw(name, line);
           for (const event of this.deps.decode(line)) {
@@ -268,6 +293,55 @@ export class Swarm {
     this.deps.onDeliver(message, due);
   }
 
+  /** Read costs every SPEND_POLL_MS while any worker's may still change; stop when none may. */
+  private watchSpend(): void {
+    const spend = this.deps.spend;
+    if (spend === undefined || this.stopSpend !== undefined || this.closed) return;
+    this.stopSpend = spend.every(SPEND_POLL_MS, () => {
+      this.readSpend().catch((failure: unknown) => {
+        // A log that cannot be written must not take the session down.
+        console.error(
+          `swarm: reading costs: ${failure instanceof Error ? failure.message : String(failure)}`,
+        );
+      });
+    });
+  }
+
+  private async readSpend(): Promise<void> {
+    const spend = this.deps.spend;
+    if (spend === undefined || this.spendInFlight) return;
+    const pending = costPending(this.workers, this.deps.now());
+    if (pending.length === 0) {
+      // queued workers have not started yet; keep watching until they have
+      if (this.workers.some((w) => w.status === "queued")) return;
+      this.stopSpend?.();
+      this.stopSpend = undefined;
+      return;
+    }
+    this.spendInFlight = true;
+    try {
+      const byTag = await spend.lookup(pending.map((name) => spend.tag(name)));
+      const costs = new Map<string, number>();
+      for (const name of pending) {
+        const usd = byTag.get(spend.tag(name));
+        if (usd !== undefined) costs.set(name, usd);
+      }
+      const changed = this.workers.some((w) => {
+        const usd = costs.get(w.spec.name);
+        return usd !== undefined && usd !== w.cost;
+      });
+      if (changed && !this.closed) this.set(recordCost(this.workers, costs));
+    } catch (error) {
+      // An unreachable proxy leaves the costs at "—"; the next tick tries again.
+      this.deps.log.event({
+        at: this.deps.now(),
+        spendError: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      this.spendInFlight = false;
+    }
+  }
+
   /** `swarm status`: the table's content as text. */
   status(): string {
     if (this.workers.length === 0) return "No workers in this session.";
@@ -327,6 +401,8 @@ export class Swarm {
   shutdown(): void {
     if (this.closed) return;
     this.closed = true;
+    this.stopSpend?.();
+    this.stopSpend = undefined;
     this.cancel();
   }
 }

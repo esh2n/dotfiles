@@ -11,7 +11,9 @@
  * the copy and the original differ.
  *
  * Not registered inside a worker (`JIG_SWARM_WORKER`), so a worker never
- * starts workers of its own.
+ * starts workers of its own. A worker instead adds its tag
+ * (`JIG_SWARM_TAG`) to every proxy request, so the parent can read the
+ * worker's cost from LiteLLM's spend log (src/domain/swarm/spend.ts).
  */
 
 import type { Swarm } from "../../../src/app/swarm/swarm";
@@ -20,6 +22,22 @@ import { type OmpContext, type OmpExtensionApi, modelIdOf } from "./omp";
 
 const WIDGET_KEY = "jig-swarm";
 export const WORKER_ENV = "JIG_SWARM_WORKER";
+/** Copy of `SPEND_TAG_ENV` (src/domain/swarm/spend.ts). */
+export const SPEND_TAG_ENV = "JIG_SWARM_TAG";
+
+/** `proxy` requests only: the tag is LiteLLM's field and means nothing to another provider. */
+function onProxy(model: OmpContext["model"]): boolean {
+  return typeof model === "object" && model !== null && model.provider === "proxy";
+}
+
+/** In a worker: tag every proxy request with the worker's own tag. */
+function tagRequests(pi: OmpExtensionApi, tag: string): void {
+  pi.on("before_provider_request", async (event, ctx) => {
+    if (!onProxy(ctx.model)) return undefined;
+    const core = await jig();
+    return core.swarmSession.withSpendTag(event.payload, tag);
+  });
+}
 
 /** Copy of `SWARM_TOOL_DESCRIPTION` (src/app/swarm/tool.ts). */
 export const DESCRIPTION = [
@@ -73,7 +91,12 @@ export const PARAMETERS = {
 } as const;
 
 export function registerSwarm(pi: OmpExtensionApi, env: NodeJS.ProcessEnv = process.env): void {
-  if (env[WORKER_ENV] === "1" || pi.registerTool === undefined) return;
+  if (env[WORKER_ENV] === "1") {
+    const tag = env[SPEND_TAG_ENV];
+    if (tag !== undefined && tag !== "") tagRequests(pi, tag);
+    return;
+  }
+  if (pi.registerTool === undefined) return;
   let swarm: Swarm | undefined;
   let widgetShown = false;
 

@@ -88,7 +88,7 @@ export interface OmpContext {
   readonly hasUI: boolean;
   readonly ui?: OmpUi;
   readonly sessionManager?: OmpSessionManager;
-  readonly model?: string | { readonly id?: string } | undefined;
+  readonly model?: string | { readonly id?: string; readonly provider?: string } | undefined;
   /** `ctx.models`, present from the builds that document it; the tier router checks before use. */
   readonly models?: OmpModels;
   /** `setModel(spec: string | string[]): Promise<void>` — `provider/modelId`, a bare id, or a `@role` alias. */
@@ -191,6 +191,14 @@ export interface OmpExtensionApi {
   on(event: "tool_result", handler: Handler<OmpToolResultEvent, OmpToolResultResult>): void;
   on(event: "session_stop", handler: Handler<OmpSessionStopEvent, OmpSessionStopResult>): void;
   on(event: "session_shutdown", handler: Handler<{ readonly type?: string }, void>): void;
+  /**
+   * `before_provider_request` (extensions/types.ts:745, runner.ts:1650): the
+   * request body about to be sent; a handler's non-undefined return replaces it.
+   */
+  on(
+    event: "before_provider_request",
+    handler: Handler<{ readonly type?: string; readonly payload: unknown }, unknown>,
+  ): void;
   /**
    * `registerTool(definition)` (extensions/types.ts:1347). `parameters` may be
    * plain JSON Schema; `loadMode: "essential"` keeps the tool in the

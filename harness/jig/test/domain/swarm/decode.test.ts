@@ -42,7 +42,7 @@ describe("a worker's JSONL stream (pi and omp)", () => {
       {
         kind: "progress",
         progress: {
-          usage: { input: 1200, output: 80, cacheRead: 400, cacheWrite: 0, cost: 0.0021 },
+          usage: { input: 1200, output: 80, cacheRead: 400, cacheWrite: 0 },
           text: "Done: 3 files.",
         },
       },
@@ -80,7 +80,7 @@ describe("a worker's JSONL stream (pi and omp)", () => {
     expect(events).toContainEqual({ kind: "end", error: "429 rate limited" });
   });
 
-  test("usage without a cost stays unknown, not zero", () => {
+  test("the harness's own cost is not read (it prices proxy tiers at nothing)", () => {
     const [first] = decodeWorkerLine(
       line({
         type: "message_end",
@@ -92,7 +92,12 @@ describe("a worker's JSONL stream (pi and omp)", () => {
         },
       }),
     );
-    expect(first?.kind === "progress" && first.progress.usage?.cost).toBeUndefined();
+    expect(first?.kind === "progress" && first.progress.usage).toEqual({
+      input: 5,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
   });
 
   test("pi's running usage on message_update is not counted (message_end carries it)", () => {
