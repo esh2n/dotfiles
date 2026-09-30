@@ -136,11 +136,11 @@ describe("classifyPromptOrigin", () => {
 
 /**
  * The six classes below close the gap found by the skill-selection-experiment research
- * (`harness/rules/research/skill-selection-experiment/README.md` §2): 750
+ * (`harness/rules/knowledge/skill-selection-router-experiment.md`): 750
  * prompts over the same 30-day window that this classifier previously called human. The
  * prefixes are the exact strings that dir's `tools/sample.mjs` keyed on; the surrounding
  * body text is reconstructed (the dropped prompts themselves were never persisted, by
- * design — see that README §5), so each body is a plausible instance of the shape, not a
+ * design), so each body is a plausible instance of the shape, not a
  * verbatim transcript excerpt.
  */
 describe("classifyPromptOrigin — layer 2 (harness/workflow/command noise)", () => {

@@ -29,7 +29,7 @@
  */
 
 import type { Json, JsonObject } from "../compose/merge";
-import { type TemplateVars, applyTemplate } from "../compose/template";
+import { applyTemplate, type TemplateVars } from "../compose/template";
 import type { McpServer } from "../mcp/types";
 import { tomlString } from "./agents";
 import { removeMarkedBlock } from "./register";
@@ -106,7 +106,7 @@ export function buildCodexMcpTables(
  * issue #17827), chosen to match what Claude Code's statusline.sh shows:
  * model and effort, directory, branch, context used, tokens. Codex has no
  * session-duration item, and its cost item is for Enterprise workspaces only
- * (rules/research/2026-09-27-statusline-across-harnesses.md).
+ * (rules/knowledge/statusline-across-harnesses.md).
  */
 export const CODEX_STATUS_LINE = [
   "model-with-reasoning",

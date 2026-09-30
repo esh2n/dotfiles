@@ -28,7 +28,7 @@ Status: superseded by 2026-09-22-subagents-and-workflows-by-scale.md — 「ハ�
 
 ## Sources
 
-- `rules/research/2026-09-22-orchestration-evidence.md`、`rules/research/2026-09-22-orchestration-vendors.md`、`rules/research/2026-09-22-orchestration-practitioners.md`、`rules/research/2026-09-22-orchestration-in-the-wild.md`
+- `rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`
 - 統制比較: https://arxiv.org/html/2512.08296 、失敗の分類: https://arxiv.org/abs/2503.13657
 - Claude Code costs: https://code.claude.com/docs/en/costs 、workflows: https://code.claude.com/docs/en/workflows
 - Ronacher: https://lucumr.pocoo.org/2026/9/7/astra-why/ 、Beck: https://newsletter.kentbeck.com/p/genie-lessons-nobody-wants-agents

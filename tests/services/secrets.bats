@@ -3,8 +3,7 @@ bats_require_minimum_version 1.5.0
 # home/shared/litellm/config/secrets.sh: what every headless launcher (the
 # LiteLLM proxy, jig-decision, proxy-key.sh) uses to reach 1Password without
 # a prompt. The service-account token comes from the OS's own store — the
-# login Keychain on macOS, the Secret Service (libsecret) on Linux
-# (plans/2026-09-24-dotfiles-architecture.md, "秘密情報").
+# login Keychain on macOS, the Secret Service (libsecret) on Linux.
 
 LIB="${BATS_TEST_DIRNAME}/../../home/shared/litellm/config/secrets.sh"
 

@@ -80,8 +80,10 @@ const RULE_RE = /^rule:[ \t]*(\S.*?)[ \t]*$/m;
 
 /** Where the decision notes live, relative to the harness root — used to build the links. */
 export const DECISIONS_DIR = "rules/decisions";
-/** The research index AGENTS.md points at. */
+/** The research index AGENTS.md points at: flow, the last 14 days (rules/decisions/2026-09-27-records-flow-and-stock.md). */
 export const RESEARCH_INDEX = "rules/research/INDEX.md";
+/** The knowledge index AGENTS.md points at: stock, the facts promoted out of research. */
+export const KNOWLEDGE_INDEX = "rules/knowledge/INDEX.md";
 
 function parseOne(source: DecisionSource): DecisionLine | Omit<SkippedDecision, "file"> {
   if (source.file === "README.md") {
@@ -121,9 +123,10 @@ export function decisionLines(sources: readonly DecisionSource[]): DecisionLines
  * the absolute path of `llm/harness/`; the links are built under it.
  */
 export function renderDecisionSection(result: DecisionLinesResult, harnessRoot: string): string {
-  const index = `${harnessRoot}/${RESEARCH_INDEX}`;
+  const research = `${harnessRoot}/${RESEARCH_INDEX}`;
+  const knowledge = `${harnessRoot}/${KNOWLEDGE_INDEX}`;
   const out: string[] = [
-    `**Read [${RESEARCH_INDEX}](${index}) before researching anything. Do not re-investigate settled facts.**`,
+    `**Before researching anything, read [${KNOWLEDGE_INDEX}](${knowledge}) (settled facts) and [${RESEARCH_INDEX}](${research}) (research of the last 14 days). Do not re-investigate settled facts.**`,
     "",
     "## Decisions",
     "",

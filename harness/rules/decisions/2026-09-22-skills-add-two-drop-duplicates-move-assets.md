@@ -30,6 +30,6 @@ rule: Add only obra/superpowers's using-git-worktrees and verification-before-co
 
 ## Sources
 
-- `rules/research/2026-09-22-skills-inventory-and-market.md`
 - obra/superpowers: https://github.com/obra/superpowers 、公式 plugin のスキャン結果: https://github.com/anthropics/claude-plugins-official/issues/5704
+- writing-skills が三重になる根拠（Codex 側 Skill Creator）: https://learn.chatgpt.com/codex/build-skills 、（Anthropic 側 skill-creator）: https://github.com/anthropics/skills
 - Anthropic: https://www.anthropic.com/engineering/writing-tools-for-agents 、Claude Code: https://code.claude.com/docs/en/skills.md

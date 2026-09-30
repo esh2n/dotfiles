@@ -3,5 +3,5 @@
 # omarchy-bar` on every make up. Each must be safe to repeat.
 # Omarchy writes them into ~/.config/omarchy/shell.json; that file is not
 # linked, since Omarchy's own updates edit it in place
-# (rules/research/2026-09-26-omarchy-customization.md).
+# (rules/knowledge/omarchy-quattro-customization.md).
 position bottom

@@ -82,9 +82,7 @@ inverted.
 
 ### What each milestone replaces in `yoki-switch`
 
-Rows cite the destination table in
-[`rules/research/2026-09-22-generator-migration-map.md`](../rules/research/2026-09-22-generator-migration-map.md)
-§1a.
+Rows cite the destination table in the yoki-switch migration map, §1a.
 
 | yoki-switch mechanism (map §1a) | Replaced by | Milestone |
 |---|---|---|
@@ -566,12 +564,11 @@ way pi resolves it (`domain/pi/agent-dir.ts`, from
 [environment-variables](https://pi.dev/docs/latest/environment-variables)):
 `~/.pi/agent`, or `PI_CODING_AGENT_DIR` as a whole replacement. The formats
 are pi's own documentation and pi-mcp-adapter's README, cited where each is
-fixed in code. The facts about pi that the delivery rests on are in
-[`rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md`](../rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md)
-(no MCP client; pi-mcp-adapter is the de facto adapter),
-[`2026-09-22-commands-vs-skills.md`](../rules/research/2026-09-22-commands-vs-skills.md)
-(skill discovery paths, `/skill:name`), and
-[`2026-09-22-generator-migration-map.md`](../rules/research/2026-09-22-generator-migration-map.md)
+fixed in code. The facts about pi that the delivery rests on are in the
+[MCP list decision](../rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md)
+(no MCP client; pi-mcp-adapter is the de facto adapter), the
+[commands-are-skills decision](../rules/decisions/2026-09-22-commands-are-skills.md)
+(skill discovery paths, `/skill:name`), and the yoki-switch migration map
 §2 and §6.3 (what `core/config/manager.sh link_pi_resources` links today, file
 by file, never a directory, because pi writes its own files into
 `~/.pi/agent`).
@@ -645,7 +642,7 @@ Destinations, one source tree:
   else (orca's own `*.ts` files today) as not jig's. Nothing is linked or
   unlinked.
 - **Two gaps, one line each.** Subagents: pi has none natively
-  ([`2026-09-22-multi-lane-review-per-harness.md`](../rules/research/2026-09-22-multi-lane-review-per-harness.md):
+  (per the [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md):
   "Pi itself remains fundamentally single-agent"); the
   [subagents decision](../rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md)'s
   answer is a workflow script written once in Claude Code's syntax, which
@@ -685,10 +682,9 @@ a blank value ignored, else `~/.dsh` — the rule `link_dsh_resources` reads
 too). The formats are DSH's own package READMEs at 0.1.5-rc.2 — the
 installed copies under `~/.dsh/profiles/node_modules/@deepseek-ai/`, which
 is the running version — cited where each is fixed in code; the facts the
-delivery rests on are also in
-[`rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md`](../rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md)
-§Q2 (the Cordis row shape, eager loading) and
-[`2026-09-22-generator-migration-map.md`](../rules/research/2026-09-22-generator-migration-map.md)
+delivery rests on are also in the
+[MCP list decision](../rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md)
+§Q2 (the Cordis row shape, eager loading) and the yoki-switch migration map
 §6.5 (the profile tree, expanded copies, never creating a profile).
 
 DSH composes a profile as patches over an empty entry list: each bundle's

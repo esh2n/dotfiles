@@ -96,7 +96,7 @@ describe("the rendered section", () => {
     const lines = text.trimEnd().split("\n");
 
     expect(lines[0]).toBe(
-      `**Read [rules/research/INDEX.md](${H}/rules/research/INDEX.md) before researching anything. Do not re-investigate settled facts.**`,
+      `**Before researching anything, read [rules/knowledge/INDEX.md](${H}/rules/knowledge/INDEX.md) (settled facts) and [rules/research/INDEX.md](${H}/rules/research/INDEX.md) (research of the last 14 days). Do not re-investigate settled facts.**`,
     );
     expect(lines.at(-1)).toBe(`- **Do the thing.** — [a.md](${H}/rules/decisions/a.md)`);
   });

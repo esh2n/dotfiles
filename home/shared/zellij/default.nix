@@ -1,7 +1,7 @@
 # zellij plugins: zjstatus and monocle are downloaded by a setup step;
 # zellij-pane-picker (the pane bookmarks on Prefix + b) is pinned here.
 # harpoon was dropped: upstream never followed zellij 0.44's plugin API
-# (rules/research/2026-09-25-zellij-harpoon-replacement.md). pane-picker's
+# (rules/knowledge/zellij-harpoon-alternatives.md). pane-picker's
 # v0.6.0 is built against zellij-tile 0.42.2 and still loads on 0.44. It is
 # launched on demand only, never from load_plugins (upstream issue #87).
 {

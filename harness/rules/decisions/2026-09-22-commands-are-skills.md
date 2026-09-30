@@ -29,7 +29,6 @@ rule: Do not create a commands/ directory; keep slash commands as skills under s
 
 ## Sources
 
-- `rules/research/2026-09-22-commands-vs-skills.md`
 - Claude Code: https://code.claude.com/docs/en/skills.md 、https://code.claude.com/docs/en/slash-commands.md
 - Codex: https://learn.chatgpt.com/codex/reference/slash-commands 、https://github.com/openai/codex/releases/tag/rust-v0.117.0
 - pi: https://pi.dev/docs/latest/prompt-templates.md 、https://pi.dev/docs/latest/skills.md

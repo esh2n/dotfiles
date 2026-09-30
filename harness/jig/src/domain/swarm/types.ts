@@ -2,7 +2,7 @@
  * The Swarm's vocabulary: what the parent asks for (a `WorkerSpec`) and what
  * the extension knows about each worker it runs (a `Worker`).
  *
- * rules/decisions/2026-09-27-swarm-extension.md; plans/2026-09-27-swarm-spec.md.
+ * rules/decisions/2026-09-27-swarm-extension.md.
  * Everything here is data — no clock, no processes, no IO.
  */
 

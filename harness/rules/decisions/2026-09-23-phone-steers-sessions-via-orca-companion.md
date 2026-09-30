@@ -1,12 +1,12 @@
 # スマホからセッションを操作するのは Orca の companion、経路は Tailscale 直結
 
-Status: accepted — 持ち主の裁定（2026-09-23 夜）。「スマホは全部できるべき（Claude Code の cloud / Cursor の cloud のように）」に対し、調査記録の結論と、持ち主の指摘で追記した Orca の companion から推した形を「ok」
+Status: accepted — 持ち主の裁定（2026-09-23）。スマホからすべての操作ができること（Claude Code や Cursor のクラウド版と同じ）を要件に、調査記録の結論と Orca の companion から推した形を採った
 
 rule: Steer a coding-agent session running on the Mac from the phone through Orca's mobile companion, paired by code and connected directly over the tailnet (never Orca Relay); Claude Code's Remote Control is a fallback for when Orca is not running, not a requirement. Do not build or adopt a relay app (Happy Coder and the like), a custom omp/pi bridge, or a Tailscale SSH + terminal-app setup for this purpose. Chat with the home models from the phone stays Open WebUI over Tailscale, pointed at the LiteLLM tiers.
 
 ## Problem
 
-ホーム LLM の裁定は「スマホから Mac のモデルとチャットする」（Open WebUI）までで、「Mac で動いている coding agent のセッションを見て操作する」（承認、diff、継続対話、新規起動）は扱っていなかった。持ち主の期待は後者。
+ホーム LLM の裁定は「スマホから Mac のモデルとチャットする」（Open WebUI）までで、「Mac で動いている coding agent のセッションを見て操作する」（承認、diff、継続対話、新規起動）は扱っていなかった。要件は後者。
 
 ## Decision
 
@@ -31,7 +31,7 @@ rule: Steer a coding-agent session running on the Mac from the phone through Orc
 
 ## Sources
 
-- `rules/research/2026-09-23-phone-access-to-agent-sessions.md`（追記に Orca）
+- Tailscale SSH + 端末アプリの実践者記録（放棄報告なし、補助に降格した根拠）: https://www.qu8n.com/posts/running-claude-code-from-my-phone 、https://www.skeptrune.com/posts/claude-code-on-mobile-termux-tailscale/
 - https://onorca.dev/docs/mobile 、https://onorca.dev/
 - https://code.claude.com/docs/en/remote-control
 - https://github.com/slopus/happy/issues/1514

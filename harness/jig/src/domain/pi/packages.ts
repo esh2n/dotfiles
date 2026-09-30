@@ -5,8 +5,7 @@
  * `rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md`) and
  * tintinweb/pi-subagents (the workflow runner of
  * `rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`, the one
- * that runs a Claude Code workflow script unchanged per
- * `rules/research/2026-09-22-workflow-script-portability.md` §1).
+ * that runs a Claude Code workflow script unchanged).
  *
  * pi's own documentation fixes the shape:
  * - https://pi.dev/docs/latest/settings ("Resources"): `packages` — "npm,

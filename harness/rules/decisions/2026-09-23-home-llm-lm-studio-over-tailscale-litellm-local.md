@@ -6,7 +6,7 @@ rule: Expose only LM Studio over the tailnet (`tailscale serve --bg --tcp 1234 1
 
 ## Problem
 
-自宅の Mac（64GB）にある LM Studio のモデルを、三つのユースケースで使いたい。U1: その Mac 上（今）。U2: ローカル LLM を持たない別 PC で jig ハーネス（判断サービス・tier 振り分け・LiteLLM 計測）を使い、モデルだけ Mac のものを使う。U3: スマホから、自宅外含む。サーバー（LM Studio か別か）、受付層（LiteLLM を置くか、外に出すか）、到達経路をどう組むか。同じ dotfiles を複数機で使うとき、機械ごとの差分をどう持つか。
+Mac（メモリ 64GB）の LM Studio のモデルを、三つのユースケースで使いたい。U1: その Mac 上（今）。U2: ローカル LLM を持たない別 PC で jig ハーネス（判断サービス・tier 振り分け・LiteLLM 計測）を使い、モデルだけ Mac のものを使う。U3: スマホから（家の外を含む）。サーバー（LM Studio か別か）、受付層（LiteLLM を置くか、外に出すか）、到達経路をどう組むか。同じ dotfiles を複数機で使うとき、機械ごとの差分をどう持つか。
 
 ## Decision
 
@@ -38,14 +38,13 @@ rule: Expose only LM Studio over the tailnet (`tailscale serve --bg --tcp 1234 1
 - `observability/prometheus/prometheus.yml` の local target はそのまま。他機械の target は MagicDNS 名 `<machine>.<tailnet>.ts.net:4001` に `machine` ラベルを付けたコメントアウト済みブロックで持ち、機械が増えたときに外す。コンテナから MagicDNS 名が引けなければ Tailscale IP（100.x）に置き換える（未実測）。
 - `require_auth_for_metrics_endpoint: false` は据え置き。これは proxy port（4000）の `/metrics` にしか効かず、4000 は loopback から出ないため。専用 listener 側は設定に関係なく無認証で、境界は tailnet ACL のみ — tailnet の外に出す日が来たら、その時は専用 listener を止めて 4000 側を `true` にし Bearer で scrape する。
 - Tailscale の policy file は admin console に住む。`domains/dev/config/tailscale/acl.hujson` はそこへ貼る原本（または GitOps: `tailscale/gitops-acl-action` が `policy.hujson` を PR で test、main への push で apply）。貼ると既定の allow-all が消えるので、SSH 等ほかに要る許可は同じファイルに足す。
-- 持ち主の裁定（2026-09-23 夜）: 持ち主は Tailscale 越しに SSH・画面共有等も使うので、ACL は「自分の機械同士は全ポート、他人・タグ付き・共有ノードは無し」とする（ポート列挙の 3 本版はファイル内にコメントで保持）。4000 の「出さない」保証は ACL ではなく `tailscale serve` に載せないことで持つ。貼る操作は `make tailscale-acl`（実値を埋めてクリップボードへ）。
+- 持ち主の裁定（2026-09-23）: Tailscale 越しに SSH・画面共有等も通すので、ACL は「自分の機械同士は全ポート、他人・タグ付き・共有ノードは無し」とする（ポート列挙の 3 本版はファイル内にコメントで保持）。4000 の「出さない」保証は ACL ではなく `tailscale serve` に載せないことで持つ。貼る操作は `make tailscale-acl`（実値を埋めてクリップボードへ）。
 - 持ち主の裁定（同夜）: 機械側の手順（launchd の bootstrap、`tailscale serve`、docker compose、`pi install`、`claude mcp add`）は独立スクリプトにせず `domains/dev/install.sh` に畳む — 新しい機械は `make install`、既存は `make update` の一発で揃え、人手の残作業は末尾に一覧で出す。
-- 持ち主の裁定（同夜）: 手で入れてあった LM Studio は cask に置き換える（アプリを Trash → `make update`）。`brew --adopt` は版が一致しても通らなかった（アプリ内更新の bundle は DMG と同一でない）。
+- 持ち主の裁定（2026-09-23）: 手で入れてあった LM Studio は cask に置き換える（アプリを Trash → `make update`）。`brew --adopt` は版が一致しても通らなかった（アプリ内更新の bundle は DMG と同一でない）。
 
 ## Sources
 
-- `rules/research/2026-09-23-home-llm-server-gateway-by-use-case.md`
-- `rules/research/2026-09-23-local-llm-across-home-machines.md`
+- LM Studio ヘッドレスの認証トグルが CLI から有効化できない未解決バグ（LAN 直 bind を却下する根拠）: https://github.com/lmstudio-ai/lms/issues/489
 - LM Studio: https://lmstudio.ai/docs/app/api/headless 、https://lmstudio.ai/docs/developer/openai-compat/structured-output 、https://lmstudio.ai/docs/developer/openai-compat/tools
 - Ollama 並行数: https://docs.ollama.com/faq 、llama-server: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 - LiteLLM advisories: https://api.github.com/repos/BerriAI/litellm/security-advisories

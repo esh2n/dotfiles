@@ -3,7 +3,7 @@
  * transforms over a file jig does not own whole.
  *
  * pi itself has no MCP client and will not get one
- * (`rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md` §Q1: "pi does
+ * (`rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md` §Q1: "pi does
  * not and will not support MCP"); the MCP-list decision
  * (`rules/decisions/2026-09-22-mcp-list-by-industry-and-use-case.md`, 届け方)
  * delivers `mcp/servers.json` to pi through the community extension
@@ -39,7 +39,7 @@
  */
 
 import type { JsonObject } from "../compose/merge";
-import { type TemplateVars, applyTemplate } from "../compose/template";
+import { applyTemplate, type TemplateVars } from "../compose/template";
 import {
   type McpJsonEntry,
   type McpJsonPlan,

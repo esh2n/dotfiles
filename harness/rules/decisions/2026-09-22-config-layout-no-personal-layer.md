@@ -31,6 +31,6 @@ rule: Keep harness source files under domains/dev/llm/harness/, organized by kin
 
 ## Sources
 
-- `rules/research/2026-09-22-industry-config-delivery.md`
 - agent-config: https://github.com/domengabrovsek/agent-config 、anywhere-agents: https://github.com/yzhao062/anywhere-agents
+- source-agents（生成でなく symlink 化で複数ハーネスに配る例）: https://github.com/iannuttall/source-agents
 - Claude Code settings: https://code.claude.com/docs/en/settings 、Codex config: https://learn.chatgpt.com/docs/config-file/config-basic

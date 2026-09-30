@@ -40,10 +40,10 @@
       "input": [
         "text"
       ],
-      "contextWindow": 200000,
+      "contextWindow": 1000000,
       "maxContextWindow": 1000000,
       "maxTokens": 16384,
-      "_context_source": "contextWindow 200000 = the harness BUDGET (compaction point), ruled 2026-09-24 (rules/decisions/2026-09-24-context-window-budget-200k-extended-1m.md): the value Claude Code falls back to behind a gateway, below the ~256K where DeepSeek MRCR drops (third-party). maxContextWindow 1000000 = the provider window (DeepSeek pricing table, deepseek-flash: CONTEXT LENGTH 1M, MAX OUTPUT MAXIMUM 384K, https://api-docs.deepseek.com/quick_start/pricing), reachable in omp with /extended-context on. maxTokens 16384 is a deliberate output cap.",
+      "_context_source": "contextWindow 1000000 = the harness BUDGET (compaction point), ruled 2026-09-27 (rules/decisions/2026-09-27-context-budget-1m-85pct.md): the 200000 budget of 2026-09-24 compacted 4 times in 35 minutes of real work, and a compactor keeps only ~17% of injected constraints on average (arXiv 2608.11242, 2026-07-31), so the budget moved to the provider's 1M window, where omp fires at 850000 (85%, its own 15% reserve). The band above ~256K, where third-party measurement puts DeepSeek's MRCR drop, is now in use - accepted as the cost of not re-summarizing every 10 minutes. maxContextWindow 1000000 = the provider window (https://api-docs.deepseek.com/quick_start/pricing).",
       "compat": {
         "thinkingFormat": "deepseek"
       },
@@ -75,10 +75,10 @@
       "input": [
         "text"
       ],
-      "contextWindow": 200000,
+      "contextWindow": 1000000,
       "maxContextWindow": 1000000,
       "maxTokens": 32768,
-      "_context_source": "contextWindow 200000 = the harness budget (same ruling as main). maxContextWindow 1000000 = the provider window (DeepSeek pricing table, deepseek-v4-pro column: CONTEXT LENGTH 1M, MAX OUTPUT MAXIMUM 384K).",
+      "_context_source": "contextWindow 1000000 = the harness budget (same ruling as main, 2026-09-27): compaction fires at 850000 (85%). maxContextWindow 1000000 = the provider window (DeepSeek pricing table, deepseek-v4-pro column: CONTEXT LENGTH 1M, MAX OUTPUT MAXIMUM 384K).",
       "compat": {
         "thinkingFormat": "deepseek"
       },

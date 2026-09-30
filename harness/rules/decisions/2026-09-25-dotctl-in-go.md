@@ -1,6 +1,6 @@
 # dotctl は Go で書く
 
-Status: accepted — 持ち主の裁定（2026-09-25、dotctl の言語の問いに「Go (推奨)」）。`plans/2026-09-24-dotfiles-architecture.md` §11 の未決 1 を閉じる。どれをシェルに残すかは superseded by `2026-09-25-dotctl-owns-every-command-with-output.md`
+Status: accepted — 持ち主の裁定（2026-09-25）。dotfiles の設計計画の未決 1（dotctl の言語）を閉じる。どれをシェルに残すかは superseded by `2026-09-25-dotctl-owns-every-command-with-output.md`
 
 rule: Write dotctl, the dotfiles' own CLI, in Go as one binary with subcommands, built by Nix with buildGoModule from pkgs/dotctl/; shared pieces (logging, errors, config, secrets) live in pkgs/dotctl/internal/. Keep shell only for scripts under 100 lines and for what must change the calling shell's state (cd, environment, prompt hooks); never write dotctl in Rust or as a Bun single binary.
 
@@ -29,5 +29,6 @@ theme-switch、mado、nvim-switch、code-graph-cache-gc、家の LLM の確認�
 
 ## Sources
 
-- `rules/research/2026-09-24-personal-tooling-language.md`（chezmoi が Go、起動 9ms・2.1MiB、ビルド 1.85 秒、Bun 単一バイナリの不具合）
-- `plans/2026-09-24-dotfiles-architecture.md` §6
+- 起動時間・ビルド時間の実測比較（cli-lang-bench、chezmoi が Go 製の事実上の標準）: https://github.com/ngs/cli-lang-bench
+- Bun 単一バイナリの不具合（`bun build --compile` が外部ファイルに依存／実行環境依存のバイナリを生成）: https://github.com/oven-sh/bun/issues/14676 、https://github.com/oven-sh/bun/issues/24470
+- `rules/decisions/2026-09-25-dotctl-owns-every-command-with-output.md`

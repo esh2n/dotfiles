@@ -1,6 +1,6 @@
 # Claude Code の MCP サーバーは jig が ~/.claude.json の mcpServers に直接書く
 
-Status: accepted — 持ち主の裁定（2026-09-25、「claude.json に MCP の設定を書くなら書けばいい」「ふつう考えればわかることでしょ」）。jig のソースにあった「jig は `~/.claude.json` を読みも書きもせず、claude CLI も呼ばない（呼んでよいかは未決）」という制約を置き換える。この制約は持ち主の決定ではなく、実装側が置いたものだった
+Status: accepted — 持ち主の裁定（2026-09-25）。jig のソースにあった「jig は `~/.claude.json` を読みも書きもせず、claude CLI も呼ばない（呼んでよいかは未決）」という制約を置き換える。この制約は持ち主の決定ではなく、実装側が置いたものだった
 
 rule: jig delivers Claude Code's user-scope MCP servers by writing the `mcpServers` key of `~/.claude.json` (`$CLAUDE_CONFIG_DIR/.claude.json` when set) directly, changing that key only and carrying every other key through as read; it records the server names it wrote and removes only those, never a server it did not write, and a same-named server it did not write stops the write as a conflict. Do not deliver MCP servers by printing `claude mcp add` lines, running them through a shell, or keeping a Claude-only registration step outside jig.
 

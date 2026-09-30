@@ -41,7 +41,7 @@ print(json.dumps(v))' "${@:2}"; }
 
 names() { printf '%s' "$1" | python3 -c 'import json,sys; print(" ".join(sorted(json.load(sys.stdin))))'; }
 
-SHARED="setup-capsule-daemon setup-claude-cli setup-codebase-memory setup-gh-extensions setup-git-identity setup-git-lfs setup-mise-trust setup-nvim-default setup-pacifica setup-pi-packages setup-theme-init setup-userstyles setup-zellij-plugins"
+SHARED="setup-capsule-daemon setup-claude-cli setup-codebase-memory setup-gh-extensions setup-git-filters setup-git-identity setup-git-lfs setup-mise-trust setup-nvim-default setup-pacifica setup-pi-packages setup-records-ttl setup-theme-init setup-userstyles setup-zellij-plugins"
 
 @test "setup: the mac runs every ported step, plus its own" {
 	run --separate-stderr activation darwin

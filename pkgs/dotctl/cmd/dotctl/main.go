@@ -36,6 +36,8 @@ commands:
   service restart <name> [--health URL] restart a resident service (launchd or systemd --user)
   retire-old-layout [--repo DIR]         take the old layout (domains/, core/, next/) off this Mac, once
                                          (adopt-mac.sh runs it; leaves with it)
+  records [--repo DIR] check|prune [--yes]
+                                         flow documents past their 14 days; prune removes them
   cache-gc [--force] [--dry-run] [--quiet] [--touch REPO]
                                          keep Codebase-Memory's indexes within age and size
                                          (also installed as code-graph-cache-gc)
@@ -112,6 +114,8 @@ func run(args []string, out, errOut io.Writer) int {
 		return runMado(home, args[1:], out, errOut)
 	case "theme":
 		return runTheme(home, args[1:], out, errOut)
+	case "records":
+		return runRecords(args[1:], out, errOut)
 	case "cache-gc":
 		return runCacheGC(home, args[1:], nil, out, errOut)
 	case "service":

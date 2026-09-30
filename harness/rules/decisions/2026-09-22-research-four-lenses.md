@@ -6,7 +6,7 @@ rule: Before any design decision, gather evidence from all four lenses — vendo
 
 ## Problem
 
-設計判断を、ベンダー一社の資料、自分の既存コードのコメント、一件の逸話、部下の要約だけで下していた。「根拠のない意見は意味がない」。
+設計判断を、ベンダー一社の資料、自分の既存コードのコメント、一件の逸話、部下の要約だけで下していた。根拠のない意見では判断できない。
 
 ## Decision
 
@@ -33,4 +33,4 @@ rule: Before any design decision, gather evidence from all four lenses — vendo
 ## Sources
 
 - 記憶: `research-four-lenses.md`
-- 覆った例: `rules/research/2026-09-22-orchestration-vendors.md`、`rules/research/2026-09-22-orchestration-practitioners.md`、`rules/research/2026-09-22-orchestration-evidence.md`、`rules/research/2026-09-22-orchestration-in-the-wild.md`、`rules/research/2026-09-22-format-hook-timing.md`
+- 覆った例: `rules/decisions/2026-09-22-subagents-and-workflows-by-scale.md`、`rules/decisions/2026-09-22-format-on-edit-gate-on-stop.md`

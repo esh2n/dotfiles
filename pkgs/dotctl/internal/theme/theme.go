@@ -1,5 +1,4 @@
-// Package theme switches the colour theme by swapping one link
-// (plans/2026-09-24-dotfiles-architecture.md §7).
+// Package theme switches the colour theme by swapping one link.
 //
 //	~/.config/theme/palettes/<name>/<file>  declared by home-manager: links to
 //	                                        the checkout's theme files

@@ -7,8 +7,8 @@
  * Merging back is the owner's call and plain git (`git merge --no-ff <name>`);
  * nothing here merges. Cleanup removes only worktrees the Swarm created
  * (recorded in its own list) whose branch is already merged — never an
- * owner's worktree, never unmerged work (rules/research/2026-09-27-swarm/
- * worktree-merge.md: 256 worktrees / 28 GB left behind when nobody cleans up;
+ * owner's worktree, never unmerged work (`rules/decisions/2026-09-27-one-worktree-layout.md`:
+ * 256 worktrees / 28 GB left behind when nobody cleans up;
  * cleanup that deletes unmerged work is worse).
  *
  * Files git ignores but a worker needs (`.env`) are copied when listed in

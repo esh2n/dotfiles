@@ -1,7 +1,7 @@
 # herdr's binary on macOS. Linux takes Omarchy's /usr/bin/herdr instead: a
 # second herdr earlier on PATH with another wire protocol would fail to talk
 # to the server Omarchy's keybind starts
-# (rules/research/2026-09-26-cli-linux-install-paths.md).
+# (rules/knowledge/cli-tool-nix-packaging.md).
 {
   config,
   lib,

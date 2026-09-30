@@ -17,7 +17,7 @@
  *    Claude permission can express it and `bash.patterns` does not gate what
  *    an `eval` spawns.
  *  - `statusLine` — the same content as Claude Code's statusline.sh in omp's
- *    own segments (rules/research/2026-09-27-statusline-across-harnesses.md):
+ *    own segments (rules/knowledge/statusline-across-harnesses.md):
  *    model and effort, directory, git, context used on the left; extension
  *    statuses (the tier, the Swarm), time spent and cost on the right.
  *

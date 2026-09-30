@@ -13,10 +13,9 @@
  * The shape is Codex's `[projects."<absolute path>"].trust_level` — a
  * per-repository entry in the user's own configuration, keyed by path — and
  * Claude Code's `.claude/settings.local.json`, which only the human's
- * approval writes and which git never sees
- * (`rules/research/2026-09-24-main-push-consent-forms.md`). A committed repo
+ * approval writes and which git never sees. A committed repo
  * file that relaxes a rule has no precedent and vendors distrust it
- * (`rules/research/2026-09-24-project-scoped-rule-override.md`); an
+ * (`rules/decisions/2026-09-24-main-push-allowed-repos-in-owner-policy.md`); an
  * environment variable is shell-wide and leaks into every other repository.
  *
  * The waiver is about WHERE the session is, so a command that reaches into

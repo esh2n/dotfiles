@@ -1,6 +1,6 @@
 # Packages only the Mac gets, by the same kinds as home/shared/packages:
 # mise with base (on Omarchy, Omarchy installs and updates mise itself —
-# rules/research/2026-09-24-dotfiles-on-omarchy.md), macOS-only development
+# rules/decisions/2026-09-24-dotfiles-nix-only-roles-symlink.md), macOS-only development
 # tools with dev, and GUI apps (Homebrew casks via brew-nix) and fonts with
 # desktop.
 {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 bats_require_minimum_version 1.5.0
-# Layer rules from plans/2026-09-24-dotfiles-architecture.md §2, checked on
-# the source: references run top to bottom only.
+# Layer rules from rules/decisions/2026-09-24-dotfiles-nix-only-roles-symlink.md,
+# checked on the source: references run top to bottom only.
 
 ROOT="${BATS_TEST_DIRNAME}/../.."
 # the flake's own modules (the harness and tests hold no Nix modules)

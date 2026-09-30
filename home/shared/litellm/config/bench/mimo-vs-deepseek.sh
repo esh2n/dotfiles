@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # MiMo against DeepSeek on this bench's prompts, each on its own vendor API
-# (rules/research/2026-09-26-mimo-vs-deepseek.md): TIER=flash (default) is
+# (rules/decisions/2026-09-27-model-catalog-and-tier-assignment.md): TIER=flash (default) is
 # mimo-v2.6-flash against deepseek-flash (the `main` tier), TIER=pro is
 # mimo-v2.6-pro against deepseek-v4-pro (the `complex` tier).
 # The keys come from 1Password through the same service account LiteLLM uses

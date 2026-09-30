@@ -54,11 +54,11 @@
  *
  * `JIG_SKILL_ROUTER_QUESTION=choice` asks ONE question listing every candidate plus an
  * explicit `none`, instead of 54 independent yes/no questions. It is arm C of the
- * skill-selection experiment (`rules/research/skill-selection-experiment/PROTOCOL-C.md`),
- * and the wording is frozen at PROTOCOL.md §3b's `choice-en` cell.
+ * skill-selection experiment (`rules/knowledge/skill-selection-router-experiment.md`),
+ * and the wording is frozen at the `choice-en` cell recorded there.
  *
  * It is NOT the default and must not become one by accident: the offline run
- * (RESULTS-OFFLINE.md) could not evaluate the choice wording against the promotion rule at
+ * could not evaluate the choice wording against the promotion rule at
  * all, because the wire dropped the distribution and top-3 was therefore unobtainable.
  * That gap is what the `probabilities` field on the `choice` reply closes; this mode is
  * what spends it. The default stays `bool` until the owner flips the variable.

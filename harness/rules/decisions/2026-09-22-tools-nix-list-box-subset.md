@@ -35,7 +35,7 @@ rule: Keep CLI/LSP tool sources in the Nix flake and runtimes in mise; never cha
 
 ## Sources
 
-- 実測と資料: `rules/research/2026-09-22-nix-vs-mise-agent-box.md`、`rules/research/2026-09-22-box-toolchain-provisioning.md`
+- cosai の ADR（mise を採用し Nix/devbox を学習コストで却下した実例）: https://github.com/cosai-oasis/secure-ai-tooling/blob/main/docs/adr/003-devcontainer-mise-architecture.md
 - Determinate installer: https://github.com/DeterminateSystems/nix-installer
 - closure コピーの前例: https://mitchellh.com/writing/nix-with-dockerfiles 、https://github.com/docker/labs-ai-tools-for-devs
 - mise の作者の立場: https://news.ycombinator.com/item?id=42359686 、lock の制約: https://mise.jdx.dev/dev-tools/mise-lock.html

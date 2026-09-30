@@ -12,7 +12,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 // LiteLLM recommends session affinity because a switch drops provider-side
 // prompt caching, and the one measured same-shape implementation lost most
 // of its cache and overflowed a smaller model's window
-// (rules/research/2026-09-23-tier-routing-switch-vs-subagent-vs-gateway.md).
+// (see the ruling above).
 //
 // What is left is enforcement: if the active model is not `<provider>/<tier>`
 // — a `/model` pick of a direct provider, or pi's own startup race that

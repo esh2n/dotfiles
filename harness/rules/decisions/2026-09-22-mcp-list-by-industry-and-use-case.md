@@ -19,7 +19,7 @@ rule: Keep serena, codebase-memory-mcp, context7, playwright-mcp, figma-remote a
 
 ## Alternatives considered
 
-- **30 日で 0 回のものを外す**: 当初の私の案。使用回数は「設計が動いていない」検知にはなるが価値の判定にはならない。ユーザーが二度指摘（skill の棚卸し、MCP）。却下。
+- **30 日で 0 回のものを外す**: 当初の私の案。使用回数は「設計が動いていない」検知にはなるが価値の判定にはならない（skill の棚卸しでも MCP でも同じ）。却下。
 - **全部残す**: figma-desktop は使わず、claude-mem は別の裁定で無効。二つは理由があって外す。却下。
 - **GitHub MCP を足す**: 上記。却下。
 - **PreToolUse の拒否フックで serena の使用を強制する**: serena のメンテナ自身が「Claude Code の更新で serena を使わなくなるのが劇的に悪化した」「唯一 somewhat feasible なのは拒否フック」と認め（#1398）、その拒否フックは LSP のシンボルが無いファイルに誤爆し、deny の 3 秒後に同じ Read をリトライ、フックが 120 秒盲目化する（#1429）。Ronacher は新しいモデルほど非ネイティブのツール形式が訓練で暗黙に罰される可能性を指摘。却下。
@@ -34,7 +34,6 @@ rule: Keep serena, codebase-memory-mcp, context7, playwright-mcp, figma-remote a
 
 ## Sources
 
-- `rules/research/2026-09-22-mcp-servers-value.md`、`rules/research/2026-09-22-mcp-pi-omp-and-usage-guidance.md`
 - pi: https://mariozechner.at/posts/2025-11-02-what-if-you-dont-need-mcp/ 、https://github.com/nicobailon/pi-mcp-adapter 、https://github.com/mrclrchtr/supi
 - omp: https://github.com/can1357/oh-my-pi （docs/mcp-config.md）、DSH: https://github.com/deepseek-ai/deepseek-harness （packages/mcp/mcp-client/README.md）
 - 誘導: https://github.com/oraios/serena/issues/1398 、/1429 、https://github.com/upstash/context7/issues/2287 、https://lucumr.pocoo.org/2026/7/4/better-models-worse-tools/

@@ -39,4 +39,6 @@ Write one Markdown file at the path the caller gives (default: `.tmp-research/<t
 
 Report back with the file path and the five most decision-relevant findings, each with its number and its source. Do not restate the whole file.
 
+The record describes the work, never the requester as a person: no tone, personality or mood, no misspelled or misremembered names they used (write the correct name alone), no quotation of their messages, and requirements stated as requirements rather than as someone's worry (`harness/rules/decisions/2026-09-27-records-describe-work-not-owner.md`).
+
 Do not pad. Do not invent quotes. Do not soften a negative finding to balance a positive one.

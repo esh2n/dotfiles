@@ -17,7 +17,7 @@ rule: jig's own hook tables run formatters on edit and type-check/lint gates at 
 
 ## Alternatives considered
 
-- **Stop ゲートで staticcheck / clippy を強制する**: 確実に走るが、実配線は少数（staticcheck + Stop 実配線 13 件、検証できたのは 0★ と 13★）、clippy はビルド一回分の待ちが毎ターン乗る。持ち主の「どこかでやるべき」は、プロジェクトの手順・CI・許可リスト + 指示文の三つで満たされ、フックだけが置き場ではない。却下。
+- **Stop ゲートで staticcheck / clippy を強制する**: 確実に走るが、実配線は少数（staticcheck + Stop 実配線 13 件、検証できたのは 0★ と 13★）、clippy はビルド一回分の待ちが毎ターン乗る。静的検査をどこかで走らせるという要件は、プロジェクトの手順・CI・許可リスト + 指示文の三つで満たされ、フックだけが置き場ではない。却下。
 - **`jig init hooks` で lefthook.yml の雛形を配る**: git フックはプロジェクト側の道具で、ハーネスの領分ではない。jig がプロジェクトにファイルを作る経路を持たない方が、仕事のリポジトリでも安全。却下。
 - **race を無人実行だけ回す**: 分岐が増える割に、無人実行の成功条件は goal 側で機械的に決める（loop-native-goal の裁定）ので、そこに `go test -race` を書けば足りる。却下。
 
@@ -30,6 +30,6 @@ rule: jig's own hook tables run formatters on edit and type-check/lint gates at 
 
 ## Sources
 
-- `rules/research/2026-09-23-per-language-hooks-and-rule-delivery.md`
+- `rules/decisions/2026-09-23-all-languages-format-and-gate.md`
 - `rules/decisions/2026-09-23-project-hooks-first-jig-table-fallback.md`
 - staticcheck: https://staticcheck.dev/docs/running-staticcheck/ci/ 、stylelint CLI: https://stylelint.io/user-guide/cli

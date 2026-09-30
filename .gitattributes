@@ -1,0 +1,4 @@
+# pi writes lastChangelogVersion into its settings on every upgrade; the
+# filter (registered per machine by `dotctl setup git-filters`) keeps that
+# runtime key out of what git stores.
+home/shared/harness/pi/settings.json filter=pi-runtime-keys

@@ -6,7 +6,7 @@ rule: Keep language-specific guidance in the language's skill (`skills/<lang>-*`
 
 ## Problem
 
-`rules/<lang>/*.md`（12 言語、3,700 行、`paths:` 付き）は Claude Code だけが該当ファイルに触れたとき自動で読み込む。他の四ハーネスには一行も届いていない。持ち主の要件は五ハーネスで品質を揃えること。
+`rules/<lang>/*.md`（12 言語、3,700 行、`paths:` 付き）は Claude Code だけが該当ファイルに触れたとき自動で読み込む。他の四ハーネスには一行も届いていない。要件は五ハーネスで品質を揃えること。
 
 ## Decision
 
@@ -17,19 +17,20 @@ rule: Keep language-specific guidance in the language's skill (`skills/<lang>-*`
 
 ## Alternatives considered
 
-- **各ハーネスに jig が差し込む（自作注入）**: 拡張点は四つとも確認できた（`2026-09-23-path-rule-injection-seams.md`）が、実地でやった唯一の報告が失敗（#21675）。却下。
-- **ユーザーの AGENTS.md に削って畳む**: 業界の畳み先に最も近いが、常時読み込みは「触れたときだけ」という条件付けの意図に反する（持ち主「論外」）。却下。
+- **各ハーネスに jig が差し込む（自作注入）**: 拡張点は四つとも確認できた（Codex hooks の `additionalContext`: https://learn.chatgpt.com/docs/hooks 、omp の拡張 API: https://raw.githubusercontent.com/can1357/oh-my-pi/main/docs/extensions.md 、pi の拡張 API: https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/extensions.md）が、実地でやった唯一の報告が失敗（#21675）。却下。
+- **ユーザーの AGENTS.md に削って畳む**: 業界の畳み先に最も近いが、常時読み込みは「触れたときだけ」という条件付けの意図に反する。却下。
 - **Claude Code だけ `paths:` を残す**: 他ハーネスに届かない。却下（持ち主）。
 - **プロジェクト内のネスト AGENTS.md**: 業界の型そのものだが、ユーザー全体の規則には合わず、jig はプロジェクトにファイルを書かない。却下。
 
 ## Consequences
 
-- 「`.go` に触れた瞬間に効く」保証は無くなり、skill の発火（router の追従率は実測 6%、`2026-09-22-skill-router-6pct.md`）に置き換わる。条件 C の計測（〜10/08）でこの数字を見る。
+- 「`.go` に触れた瞬間に効く」保証は無くなり、skill の発火（router の追従率は実測 6%、この所有者のリポジトリ内の一次計測で、外部に参照できる公開ソースは無い）に置き換わる。条件 C の計測（〜10/08）でこの数字を見る。
 - 前例なし: 「ルールを skill に畳んだ」実践者の例、三方式のアウトカム比較。
 - 生成器: `~/.claude/rules` の言語ディレクトリ配布は不要になる（`rules-dir.ts` は `common/decisions/research` 以外が無ければ何も張らない）。
 
 ## Sources
 
-- `rules/research/2026-09-23-cross-harness-conditional-rules-practice.md`（`2026-09-23-path-rule-injection-seams.md`、`2026-09-23-per-language-hooks-and-rule-delivery.md` を前提）
-- https://github.com/openai/codex/issues/21675 、https://github.com/openai/codex/issues/22861
+- 自作注入が裏目に出た実測例（重複抑止なしの再注入、200KB 超の冗長文脈）: https://github.com/openai/codex/issues/21675
+- 自作メモリプラグインがトークン上限で黙って切り詰められた例: https://github.com/openai/codex/issues/22861
+- Claude Code 自身のネイティブ `paths:` の脆さ（auto mode との非互換／パス依存の未登録／exclude 欠如）: https://github.com/anthropics/claude-code/issues/93706 、https://github.com/anthropics/claude-code/issues/93435 、https://github.com/anthropics/claude-code/issues/93249
 - https://learn.chatgpt.com/codex/agent-configuration/agents-md 、https://code.claude.com/docs/en/skills 、https://learn.chatgpt.com/docs/build-skills
