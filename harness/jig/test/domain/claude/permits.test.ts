@@ -29,7 +29,7 @@ describe("the fallback and the policy fragment are the same decision, twice", ()
 });
 
 describe("the decision's three kinds plus the static checks, and nothing broader", () => {
-  test("git commit, git push, four test runners, and the four static checks the hooks never run", () => {
+  test("git commit, git push, four test runners, and the five static checks the hooks never run", () => {
     expect(DEFAULT_PERMITS.map((permit) => permit.rule)).toEqual([
       "Bash(git commit *)",
       "Bash(git push *)",
@@ -41,6 +41,7 @@ describe("the decision's three kinds plus the static checks, and nothing broader
       "Bash(cargo clippy *)",
       "Bash(stylelint *)",
       "Bash(html-validate *)",
+      "Bash(declscope *)",
     ]);
   });
 
@@ -56,6 +57,12 @@ describe("the decision's three kinds plus the static checks, and nothing broader
     );
     expect(checks).toHaveLength(4);
     for (const permit of checks) expect(permit.policyRule.why).toContain(ruling);
+  });
+
+  test("the declscope permit names its own ruling", () => {
+    const declscope = DEFAULT_PERMITS.find((permit) => permit.policyRule.id === "permit-declscope");
+    expect(declscope?.policyRule.subject).toEqual({ program: "declscope" });
+    expect(declscope?.policyRule.why).toContain("2026-09-30-declscope-file-scoped-private");
   });
 
   test("cargo clippy is the subcommand, not cargo as a whole", () => {

@@ -27,6 +27,7 @@
       gopls
       delve
       go-tools # staticcheck, which the rules ask for before completion
+      declscope # file-scoped unexported names, run by the go-reviewer (pkgs)
       golangci-lint
       govulncheck
       protobuf

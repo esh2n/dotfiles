@@ -31,6 +31,9 @@
  * cargo clippy, stylelint, html-validate (`go test` was already here). They
  * are permits so the model can run them when `rules/common` tells it to
  * before claiming completion — the same fragment, the same paste.
+ *
+ * `rules/decisions/2026-09-30-declscope-file-scoped-private.md` adds
+ * declscope on the same terms, except that the go-reviewer runs it, no hook does.
  */
 
 /** A `rules[]` entry of `policy/guard-rules.json`, as JSON. */
@@ -133,6 +136,18 @@ export const DEFAULT_PERMITS: readonly DefaultPermit[] = [
   staticCheck("permit-cargo-clippy", "cargo", "clippy", "Rust"),
   staticCheck("permit-stylelint", "stylelint", undefined, "CSS"),
   staticCheck("permit-html-validate", "html-validate", undefined, "HTML"),
+  {
+    rule: "Bash(declscope *)",
+    why: "Go static check, run by the go-reviewer on a diff, never by a hook",
+    policyRule: {
+      id: "permit-declscope",
+      effect: "permit",
+      action: "shell.exec",
+      subject: { program: "declscope" },
+      why: "2026-09-30-declscope-file-scoped-private: declscope is not wired into hooks; the go-reviewer runs it on a diff",
+      profiles: [...ALL_PROFILES],
+    },
+  },
 ];
 
 /**

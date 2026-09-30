@@ -1,0 +1,5 @@
+# declscope: an unexported name stays in the file that declares it
+# (harness/rules/decisions/2026-09-30-declscope-file-scoped-private.md).
+# The baseline holds what dotctl already had on adoption; regenerate it with
+# `declscope baseline ./...` after cleaning some up, never edit it by hand.
+baseline: .declscope-baseline.yaml

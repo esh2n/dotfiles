@@ -173,12 +173,13 @@ describe("what the composed file contains", () => {
     const permissions = settings.permissions as JsonObject;
     expect(permissions.deny).toEqual(["Bash(shutdown *)"]);
     expect(permissions.defaultMode).toBe("auto");
-    // The ten default permits (six of the allow-from-guard-permit decision,
-    // four static checks of the hooks-carry-formatters-only one), and
-    // nothing from the old 71.
+    // The eleven default permits (six of the allow-from-guard-permit decision,
+    // four static checks of the hooks-carry-formatters-only one, declscope of
+    // its own), and nothing from the old 71.
     expect(permissions.allow).toEqual([
       "Bash(bun test *)",
       "Bash(cargo clippy *)",
+      "Bash(declscope *)",
       "Bash(git commit *)",
       "Bash(git push *)",
       "Bash(go test *)",
