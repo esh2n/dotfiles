@@ -94,6 +94,28 @@ general_settings:
   background_health_check_model_groups: ["deterministic"]
   # an on-demand GET /health skips the Mac deployment too (docs/proxy/health.md)
   health_check_skip_disabled_background_models: true
+  # The model servers' own load / unload / list, reached through this
+  # LiteLLM with its key (rules/decisions/2026-09-30-model-servers-through-litellm.md):
+  # /model-servers/<server>/models[/load|/unload] on every machine, whichever
+  # engine is behind it — llama-server's router (GET /models, POST
+  # /models/load|unload) or LM Studio's REST v1 (/api/v1/models…).
+  # dotctl llm models|load|unload is the one caller. Only the model list
+  # paths are relayed, so a chat completion cannot bypass LiteLLM's metering.
+  # auth: true needs the proxy key (free since LiteLLM made pass-through auth
+  # OSS; pass_through_endpoints.py).
+  pass_through_endpoints:
+    - path: /model-servers/linux/models
+      target: os.environ/LINUX_MODEL_SERVER_MODELS
+      include_subpath: true
+      auth: true
+      timeout: 300 # a load answers when the model is in memory
+      headers:
+        Authorization: "Bearer os.environ/LINUX_MODEL_API_KEY"
+    - path: /model-servers/mac/models
+      target: os.environ/MAC_MODEL_SERVER_MODELS
+      include_subpath: true
+      auth: true
+      timeout: 300
   # Gateway master key — a REAL secret since 2026-09-20 (ruling: the old
   # committed constant assumed loopback-only, but the observability stack
   # documents container-reachable paths to this gateway, so the trust boundary
