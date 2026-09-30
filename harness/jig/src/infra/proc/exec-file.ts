@@ -18,12 +18,25 @@ interface ExecError extends Error {
   readonly stderr?: string;
 }
 
+function environment(unset: readonly string[] | undefined): NodeJS.ProcessEnv | undefined {
+  if (unset === undefined || unset.length === 0) return undefined;
+  const env = { ...process.env };
+  for (const name of unset) delete env[name];
+  return env;
+}
+
 export const runCommand: Runner = (bin, args, options) =>
   new Promise<RunResult>((resolve) => {
+    const env = environment(options.unsetEnv);
     execFile(
       bin,
       [...args],
-      { cwd: options.cwd, timeout: options.timeoutMs, maxBuffer: 8 * 1024 * 1024 },
+      {
+        cwd: options.cwd,
+        timeout: options.timeoutMs,
+        maxBuffer: 8 * 1024 * 1024,
+        ...(env === undefined ? {} : { env }),
+      },
       (error, stdout, stderr) => {
         if (error === null) {
           resolve({ code: 0, stdout, stderr, missing: false });

@@ -92,6 +92,17 @@ describe("gatePlanFor: the project's hooks on the touched files, the table only 
     });
   });
 
+  test("go vet runs without an inherited GOROOT, so a PATH's other go cannot mismatch it", () => {
+    expect(gatePlanFor("/repo", exists(["/repo/go.mod"]), undefined)).toEqual({
+      kind: "run",
+      source: "table",
+      cwd: "/repo",
+      commands: [
+        { label: "go vet ./...", bin: "go", args: ["vet", "./..."], unsetEnv: ["GOROOT"] },
+      ],
+    });
+  });
+
   test("no hook config and no marker: no check", () => {
     expect(gatePlanFor("/repo", exists(["/repo/README.md"]), undefined)).toEqual({
       kind: "nothing",

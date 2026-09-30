@@ -55,6 +55,8 @@ export interface GateCommand {
   readonly label: string;
   readonly bin: string;
   readonly args: readonly string[];
+  /** Variables the command must not inherit (see the `go.mod` entry). */
+  readonly unsetEnv?: readonly string[];
 }
 
 /** Why the table has nothing to run for a project it otherwise recognizes. */
@@ -236,7 +238,20 @@ function resolve(
     commands: [{ label, bin, args }],
   });
   if (has("tsconfig.json")) return one("bunx tsc --noEmit", "bunx", ["tsc", "--noEmit"]);
-  if (has("go.mod")) return one("go vet ./...", "go", ["vet", "./..."]);
+  if (has("go.mod")) {
+    // A GOROOT inherited from the shell that launched the harness names that
+    // shell's Go; the hook may find another `go` first on its own PATH, and the
+    // two versions then refuse each other ("compile: version go1.26.2 does not
+    // match go tool version go1.27.0", measured 2026-09-30). Without GOROOT the
+    // go command uses the tree it is installed in (`go help environment`:
+    // GOROOT "The root of the go tree").
+    return {
+      kind: "run",
+      commands: [
+        { label: "go vet ./...", bin: "go", args: ["vet", "./..."], unsetEnv: ["GOROOT"] },
+      ],
+    };
+  }
   if (has("pyproject.toml") || has("ruff.toml") || has(".ruff.toml")) {
     return one("ruff check", "ruff", ["check", "."]);
   }
