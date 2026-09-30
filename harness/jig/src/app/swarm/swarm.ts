@@ -68,6 +68,14 @@ export interface SwarmDeps {
   };
 }
 
+/**
+ * The one safety cap on `wait`. omp's own `wait` settled on this shape after
+ * its timeout ladder (5 s, 10 s, 30 s, 1 m, 5 m) turned an event-driven wait
+ * into model-driven polling (omp #6602; docs/tools/wait.md "A single 30-minute
+ * safety cap … there is no polling ladder") — rules/research/2026-09-30-parent-waiting-on-workers.md.
+ */
+export const WAIT_CAP_MS = 30 * 60_000;
+
 export type StartResult =
   | { readonly ok: true; readonly text: string }
   | { readonly ok: false; readonly error: string };
@@ -102,6 +110,8 @@ export class Swarm {
   private readonly worktrees: string[] = [];
   private closed = false;
   private stopSpend: (() => void) | undefined;
+  /** A parent blocked in `wait`: the next delivery goes to it instead of a message. */
+  private waiter: ((text: string) => void) | undefined;
   private spendInFlight = false;
 
   constructor(private readonly deps: SwarmDeps) {
@@ -292,7 +302,55 @@ export class Swarm {
         this.deps.now(),
       ),
     );
+    const waiter = this.waiter;
+    if (waiter !== undefined) {
+      // the parent is blocked in `wait`: the results are its tool result, not a second message
+      waiter(message);
+      return;
+    }
     this.deps.onDeliver(message, due);
+  }
+
+  /**
+   * `swarm wait`: block until the next batch is delivered (or one worker
+   * failed) and return that delivery; with nothing queued or running, return
+   * at once. No early return but the abort signal and WAIT_CAP_MS.
+   */
+  wait(signal?: AbortSignal, capMs: number = WAIT_CAP_MS): Promise<string> {
+    if (signal?.aborted === true) {
+      return Promise.resolve("Wait cancelled; results will still arrive as a message.");
+    }
+    if (this.closed) return Promise.resolve("The session is ending; nothing to wait for.");
+    if (this.waiter !== undefined) return Promise.resolve("Another wait is already in progress.");
+    const running = this.workers.some((w) => w.status === "queued" || w.status === "working");
+    if (!running && dueForDelivery(this.workers).length === 0) {
+      return Promise.resolve("Nothing to wait for: no worker is queued or running.");
+    }
+    return new Promise<string>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = (text: string) => {
+        if (timer !== undefined) clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        this.waiter = undefined;
+        resolve(text);
+      };
+      const onAbort = () => finish("Wait cancelled; results will still arrive as a message.");
+      if (signal?.aborted === true) {
+        finish("Wait cancelled; results will still arrive as a message.");
+        return;
+      }
+      signal?.addEventListener("abort", onAbort, { once: true });
+      timer = setTimeout(
+        () =>
+          finish(
+            `Still running after ${Math.round(capMs / 60_000)} minutes; results will arrive as a message.\n${this.status()}`,
+          ),
+        capMs,
+      );
+      (timer as { unref?: () => void }).unref?.();
+      this.waiter = finish;
+      this.deliver();
+    });
   }
 
   /** Read costs every SPEND_POLL_MS while any worker's may still change; stop when none may. */
@@ -405,6 +463,7 @@ export class Swarm {
   shutdown(): void {
     if (this.closed) return;
     this.closed = true;
+    this.waiter?.("The session is ending.");
     this.stopSpend?.();
     this.stopSpend = undefined;
     this.cancel();

@@ -72,7 +72,8 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.registerCommand("tier", {
-    description: "Session tier: /tier [main|complex|deterministic|off] — fixed for the session, never automatic",
+    description:
+      "Session tier: /tier [main|complex|deterministic|off] — fixed for the session, never automatic",
     handler: async (args, ctx) => {
       const wanted = (args ?? "").trim();
 
@@ -85,7 +86,10 @@ export default function (pi: ExtensionAPI) {
       if (wanted === "off") {
         mode = "off";
         ctx.ui.setStatus("tier", "off");
-        ctx.ui.notify("tier-router: not holding the model; /model is yours until /tier <tier>.", "info");
+        ctx.ui.notify(
+          "tier-router: not holding the model; /model is yours until /tier <tier>.",
+          "info",
+        );
         return;
       }
 

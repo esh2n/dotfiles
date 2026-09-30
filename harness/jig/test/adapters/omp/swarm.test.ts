@@ -83,6 +83,22 @@ describe("omp's swarm registration", () => {
     expect(await hook?.({ payload: body }, elsewhere)).toBeUndefined();
   });
 
+  test("wait reaches the shared swarm with omp's abort signal", async () => {
+    const { api, tools } = fakeOmp();
+    registerSwarm(api, { XDG_STATE_HOME: join(import.meta.dir, ".no-state") });
+    const ctx: OmpContext = { cwd: process.cwd(), hasUI: false };
+    const aborted = new AbortController();
+    aborted.abort();
+    const result = await tools[0]?.execute(
+      "c1",
+      { action: "wait" },
+      aborted.signal,
+      undefined,
+      ctx,
+    );
+    expect(result?.content[0]?.text).toContain("Wait cancelled");
+  });
+
   test("a call reaches the shared swarm through the runtime import", async () => {
     const { api, tools } = fakeOmp();
     registerSwarm(api, { XDG_STATE_HOME: join(import.meta.dir, ".no-state") });

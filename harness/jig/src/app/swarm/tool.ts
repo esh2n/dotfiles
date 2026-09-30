@@ -19,13 +19,15 @@ export const SWARM_TOOL_DESCRIPTION = [
   "Give each worker a self-contained task (it sees nothing of this conversation) and the `files` it may write (paths or globs). Workers whose files overlap never run at the same time; a worker with no `files` is treated as touching everything, so it runs alone among writers.",
   "tier: main (everyday, default: this session's tier), complex (harder reasoning), deterministic (carrying out a plan already designed; one at a time).",
   "isolated=true puts the worker in its own git worktree (.claude/worktrees/<name>, branch <name>); it commits there and the owner decides whether to merge. Use it only when workers must change the same files.",
+  "Results arrive by themselves as a message in a later turn: end your turn and let them come. Never poll with status, and never sleep in a shell to wait.",
+  "action=wait: only when you have nothing else to do and cannot go on without the results; it returns when the next batch has finished (at once if one fails), with their results, and otherwise only after 30 minutes.",
   "action=status: see every worker. action=results: read finished workers' answers. action=cancel: stop workers by `names` (all when omitted).",
 ].join(" ");
 
 export const SWARM_TOOL_PARAMETERS = {
   type: "object",
   properties: {
-    action: { type: "string", enum: ["start", "status", "results", "cancel"] },
+    action: { type: "string", enum: ["start", "wait", "status", "results", "cancel"] },
     items: {
       type: "array",
       description: "For start: the workers to run.",
@@ -74,11 +76,12 @@ function names(value: unknown): readonly string[] | undefined {
 }
 
 /** Runs one call; `ok: false` is a refusal the model can correct. */
-export function runSwarmTool(
+export async function runSwarmTool(
   swarm: Swarm,
   params: SwarmToolParams,
   sessionTier: Tier,
-): { readonly ok: boolean; readonly text: string } {
+  signal?: AbortSignal,
+): Promise<{ readonly ok: boolean; readonly text: string }> {
   switch (params.action) {
     case "start": {
       const r = swarm.start(params.items, sessionTier);
@@ -86,6 +89,8 @@ export function runSwarmTool(
         ? { ok: true, text: r.text }
         : { ok: false, text: `swarm start refused: ${r.error}` };
     }
+    case "wait":
+      return { ok: true, text: await swarm.wait(signal) };
     case "status":
       return { ok: true, text: swarm.status() };
     case "results":
@@ -93,7 +98,10 @@ export function runSwarmTool(
     case "cancel":
       return { ok: true, text: swarm.cancel(names(params.names)) };
     default:
-      return { ok: false, text: 'action must be one of "start", "status", "results", "cancel"' };
+      return {
+        ok: false,
+        text: 'action must be one of "start", "wait", "status", "results", "cancel"',
+      };
   }
 }
 
