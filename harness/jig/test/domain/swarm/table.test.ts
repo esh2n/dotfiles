@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   type Workers,
   enqueue,
+  markDelivered,
   markFinished,
   markStarted,
   recordCost,
@@ -149,5 +150,27 @@ describe("the table", () => {
 
   test("the summary says when cost is unknown instead of showing zero", () => {
     expect(summary(running(["a"]))).toContain("cost —");
+  });
+});
+
+describe("rows the parent has read", () => {
+  test("leave after 30 s, while the summary keeps the session's cost", () => {
+    let w = running(["a", "b"], 0);
+    w = markFinished(w, "a", { result: "A" }, 1);
+    w = markDelivered(w, ["a"], 2);
+    w = recordCost(w, new Map([["a", 0.5]]));
+    const later = renderTable(w, 200, 2 + 30_000);
+    expect(later.some((l) => l.startsWith("a "))).toBe(false);
+    expect(later.some((l) => l.startsWith("b "))).toBe(true);
+    expect(later.at(-1)).toContain("$0.50");
+  });
+
+  test("with every row gone, only the summary is left", () => {
+    let w = running(["a"], 0);
+    w = markFinished(w, "a", { result: "A" }, 1);
+    w = markDelivered(w, ["a"], 2);
+    const lines = renderTable(w, 200, 2 + 30_000);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^Swarm · Idle/);
   });
 });

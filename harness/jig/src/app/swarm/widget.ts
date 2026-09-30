@@ -5,12 +5,13 @@
  * `tui.requestRender()`; `theme.fg(colour, text)`).
  *
  * A factory rather than a string list because the width is only known at
- * render time and every line must fit it. While a worker runs, the widget
- * asks for a redraw once a second so IDLE, AGE and the progress bar move;
- * with nothing running it stays still and costs nothing.
+ * render time and every line must fit it. While a worker runs, or a read row
+ * is still waiting to leave, the widget asks for a redraw once a second so
+ * IDLE, AGE and the progress bar move and the row goes on time; with neither
+ * it stays still and costs nothing.
  */
 
-import type { Workers } from "../../domain/swarm/state";
+import { type Workers, nextHideAt } from "../../domain/swarm/state";
 import { type LineTone, tableLines } from "../../domain/swarm/table";
 
 /** The slice of pi's / omp's TUI and theme the widget touches. */
@@ -49,7 +50,10 @@ export function swarmWidget(
   return (tui, theme) => {
     let timer: ReturnType<typeof setInterval> | undefined;
     const tick = () => {
-      const running = current().some((w) => w.status === "working" || w.status === "queued");
+      const workers = current();
+      const running =
+        workers.some((w) => w.status === "working" || w.status === "queued") ||
+        nextHideAt(workers, now()) !== undefined;
       if (running && timer === undefined) {
         timer = setInterval(() => tui.requestRender(), TICK_MS);
         (timer as { unref?: () => void }).unref?.();

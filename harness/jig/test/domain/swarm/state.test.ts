@@ -8,9 +8,13 @@ import {
   markDelivered,
   markFinished,
   markStarted,
+  nextHideAt,
+  openCount,
   recordProgress,
   runnable,
+  shownInTable,
 } from "../../../src/domain/swarm/state";
+import { HIDE_AFTER_READ_MS } from "../../../src/domain/swarm/state";
 import type { Tier, WorkerSpec } from "../../../src/domain/swarm/types";
 
 function spec(name: string, extra: Partial<WorkerSpec> = {}): WorkerSpec {
@@ -151,7 +155,7 @@ describe("delivery to the parent", () => {
     w = markFinished(w, "b", { result: "B" }, 3);
     const due = dueForDelivery(w).map((x) => x.spec.name);
     expect(due).toEqual(["a", "b"]);
-    w = markDelivered(w, due);
+    w = markDelivered(w, due, 4);
     expect(status(w)).toEqual({ a: "done", b: "done" });
     expect(dueForDelivery(w)).toEqual([]);
   });
@@ -176,7 +180,68 @@ describe("delivery to the parent", () => {
     w = markStarted(markStarted(w, "a", 1), "b", 1);
     w = markFinished(w, "a", { result: "A" }, 2);
     w = markFinished(w, "b", { error: "x" }, 2);
-    w = markDelivered(w, ["a", "b"]);
+    w = markDelivered(w, ["a", "b"], 3);
     expect(status(w)).toEqual({ a: "held", b: "failed" });
+  });
+});
+
+describe("rows leaving the table (owner's ruling 2026-09-30)", () => {
+  const byName = (w: ReturnType<typeof enqueue>, name: string) => {
+    const found = w.find((x) => x.spec.name === name);
+    if (found === undefined) throw new Error(name);
+    return found;
+  };
+
+  test("a read row goes 30 s after the parent read it", () => {
+    let w = markFinished(
+      markStarted(enqueue([], [spec("a")], 1, 0), "a", 1),
+      "a",
+      { result: "A" },
+      2,
+    );
+    expect(shownInTable(byName(w, "a"), 1_000_000)).toBe(true);
+    w = markDelivered(w, ["a"], 10);
+    expect(shownInTable(byName(w, "a"), 10 + HIDE_AFTER_READ_MS - 1)).toBe(true);
+    expect(shownInTable(byName(w, "a"), 10 + HIDE_AFTER_READ_MS)).toBe(false);
+    expect(nextHideAt(w, 20)).toBe(10 + HIDE_AFTER_READ_MS);
+  });
+
+  test("a failed row stays until read, then goes like the rest", () => {
+    let w = markFinished(
+      markStarted(enqueue([], [spec("a")], 1, 0), "a", 1),
+      "a",
+      { error: "x" },
+      2,
+    );
+    expect(shownInTable(byName(w, "a"), 1_000_000)).toBe(true);
+    w = markDelivered(w, ["a"], 10);
+    expect(shownInTable(byName(w, "a"), 10 + HIDE_AFTER_READ_MS)).toBe(false);
+  });
+
+  test("a held row stays: its branch still waits for the owner", () => {
+    let w = enqueue([], [spec("a", { isolated: true })], 1, 0);
+    w = markFinished(markStarted(w, "a", 1), "a", { result: "A" }, 2);
+    w = markDelivered(w, ["a"], 10);
+    expect(shownInTable(byName(w, "a"), 10 + 10 * HIDE_AFTER_READ_MS)).toBe(true);
+    expect(nextHideAt(w, 20)).toBeUndefined();
+  });
+
+  test("a second delivery does not restart the clock", () => {
+    let w = markFinished(
+      markStarted(enqueue([], [spec("a")], 1, 0), "a", 1),
+      "a",
+      { result: "A" },
+      2,
+    );
+    w = markDelivered(markDelivered(w, ["a"], 10), ["a"], 500);
+    expect(byName(w, "a").readAt).toBe(10);
+  });
+
+  test("read, settled workers stop counting toward maxWorkers", () => {
+    let w = enqueue([], [spec("a"), spec("b"), spec("c")], 1, 0);
+    w = markFinished(markStarted(w, "a", 1), "a", { result: "A" }, 2);
+    expect(openCount(w)).toBe(3);
+    w = markDelivered(w, ["a"], 3);
+    expect(openCount(w)).toBe(2);
   });
 });

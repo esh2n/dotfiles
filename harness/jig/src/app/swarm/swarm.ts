@@ -22,6 +22,7 @@ import {
   markDelivered,
   markFinished,
   markStarted,
+  openCount,
   recordCost,
   recordProgress,
   runnable,
@@ -129,7 +130,7 @@ export class Swarm {
       items,
       defaultTier,
       taken,
-      this.deps.config.maxWorkers - this.workers.length,
+      this.deps.config.maxWorkers - openCount(this.workers),
     );
     if (!parsed.ok) return parsed;
     this.batch += 1;
@@ -288,6 +289,7 @@ export class Swarm {
       markDelivered(
         this.workers,
         due.map((w) => w.spec.name),
+        this.deps.now(),
       ),
     );
     this.deps.onDeliver(message, due);
@@ -361,6 +363,7 @@ export class Swarm {
       markDelivered(
         this.workers,
         chosen.map((w) => w.spec.name),
+        this.deps.now(),
       ),
     );
     return chosen
@@ -381,6 +384,7 @@ export class Swarm {
       markDelivered(
         markCancelled(this.workers, targets, this.deps.now()),
         stopping.map((w) => w.spec.name),
+        this.deps.now(),
       ),
     );
     for (const w of stopping) this.procs.get(w.spec.name)?.kill();

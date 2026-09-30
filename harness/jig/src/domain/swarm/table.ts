@@ -10,6 +10,7 @@
  * terminal cells, `now` passed in.
  */
 
+import { shownInTable } from "./state";
 import { type Status, type Worker, isFinished } from "./types";
 
 export const MAX_LINES = 10;
@@ -222,10 +223,19 @@ export interface TableLine {
   readonly tone: LineTone;
 }
 
-/** The widget's lines with what each one is, at most MAX_LINES; empty when there are no workers. */
+/**
+ * The widget's lines with what each one is, at most MAX_LINES; empty when
+ * there are no workers. Rows the parent has read leave after
+ * HIDE_AFTER_READ_MS (state.ts); the summary keeps counting every worker of
+ * the session, so the running cost never leaves the screen
+ * (rules/decisions/2026-09-27-swarm-extension.md).
+ */
 export function tableLines(workers: readonly Worker[], width: number, now: number): TableLine[] {
   if (workers.length === 0) return [];
-  const sorted = [...workers].sort(
+  const visible = workers.filter((w) => shownInTable(w, now));
+  const summaryLine: TableLine = { text: cut(summary(workers), width), tone: "summary" };
+  if (visible.length === 0) return [summaryLine];
+  const sorted = [...visible].sort(
     (a, b) => ORDER[a.status] - ORDER[b.status] || a.queuedAt - b.queuedAt,
   );
   const room = MAX_LINES - 2;
@@ -242,7 +252,7 @@ export function tableLines(workers: readonly Worker[], width: number, now: numbe
   if (sorted.length > room) {
     out.push({ text: cut(`… ほか ${sorted.length - shown.length} 件`, width), tone: "more" });
   }
-  out.push({ text: cut(summary(workers), width), tone: "summary" });
+  out.push(summaryLine);
   return out;
 }
 

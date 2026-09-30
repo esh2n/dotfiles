@@ -105,4 +105,6 @@ export interface Worker {
   readonly note?: string;
   /** Its outcome has been sent to the parent (once per worker). */
   readonly delivered: boolean;
+  /** When the parent received it (delivery, `results`, or its own `cancel`). */
+  readonly readAt?: number;
 }

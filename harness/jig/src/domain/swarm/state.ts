@@ -15,6 +15,7 @@ import {
   type Worker,
   type WorkerSpec,
   isFinished,
+  isSettled,
 } from "./types";
 
 export type Workers = readonly Worker[];
@@ -201,15 +202,57 @@ export function dueForDelivery(workers: Workers): readonly Worker[] {
 }
 
 /** After delivery: the result is read (`unread` → `done`); `held` and `failed` keep saying so. */
-export function markDelivered(workers: Workers, names: readonly string[]): Workers {
+export function markDelivered(workers: Workers, names: readonly string[], now: number): Workers {
   return workers.map((w) =>
     names.includes(w.spec.name)
-      ? { ...w, delivered: true, ...(w.status === "unread" ? { status: "done" as const } : {}) }
+      ? {
+          ...w,
+          delivered: true,
+          readAt: w.readAt ?? now,
+          ...(w.status === "unread" ? { status: "done" as const } : {}),
+        }
       : w,
   );
 }
 
 /** `results`: the parent read these; unread ones become done. */
-export function markRead(workers: Workers, names: readonly string[]): Workers {
-  return markDelivered(workers, names);
+export function markRead(workers: Workers, names: readonly string[], now: number): Workers {
+  return markDelivered(workers, names, now);
+}
+
+/**
+ * How long a row stays in the table after the parent has read it. Claude
+ * Code clears a finished background agent at once and keeps a failed one for
+ * 30 s; omp drops a job 30 s after it is consumed — two implementations that
+ * reached 30 s independently (rules/research/2026-09-30-agent-table-conventions.md).
+ * The owner's ruling (2026-09-30): a read row goes after 30 s, a failed one
+ * stays until the parent has read it.
+ */
+export const HIDE_AFTER_READ_MS = 30_000;
+
+/**
+ * Whether a worker still has a row. `held` always does: its branch waits for
+ * the owner to merge, which reading does not settle.
+ */
+export function shownInTable(w: Worker, now: number): boolean {
+  if (w.status === "held" || w.readAt === undefined || !isFinished(w.status)) return true;
+  return now - w.readAt < HIDE_AFTER_READ_MS;
+}
+
+/** When the next row leaves the table, if one will. */
+export function nextHideAt(workers: Workers, now: number): number | undefined {
+  const due = workers
+    .filter((w) => shownInTable(w, now) && w.readAt !== undefined && w.status !== "held")
+    .filter((w) => isFinished(w.status))
+    .map((w) => (w.readAt ?? now) + HIDE_AFTER_READ_MS);
+  return due.length === 0 ? undefined : Math.min(...due);
+}
+
+/**
+ * Workers that count toward `maxWorkers`: everything but settled work the
+ * parent has read, so a long session is not refused once 32 workers have
+ * ever run.
+ */
+export function openCount(workers: Workers): number {
+  return workers.filter((w) => !(isSettled(w.status) && w.delivered)).length;
 }
