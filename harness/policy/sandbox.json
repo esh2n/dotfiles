@@ -1,4 +1,4 @@
 {
   "_note": "Claude Code's host-mode sandbox, per rules/decisions/2026-09-22-box-shape.md. The generator copies excludedCommands verbatim into ~/.claude/settings.json's sandbox block and decides nothing about it; the rest of that block (enabled, failIfUnavailable, allowUnsandboxedCommands) is fixed in jig/src/domain/claude/sandbox.ts. gcloud and terraform are the other Go-based CLIs the sandboxing doc says may fail TLS verification under Seatbelt — add them when a job actually needs them, not before. osascript stays out by default: Apple Events can drive any running application, so excluding it would hand a sandboxed command the whole desktop. A command listed here only runs outside the OS sandbox — it still goes through jig's guard, which is the enforcement point either way.",
-  "excludedCommands": ["gh", "docker", "open"]
+  "excludedCommands": ["gh", "docker", "open", "op"]
 }
