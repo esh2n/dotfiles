@@ -16,9 +16,14 @@ import (
 )
 
 // fakeSys records commands as "name args..." lines. outputs and fail answer
-// by the start of the line; env and stdin are kept per line.
+// by the start of the line; env and stdin are kept per line. Every test file
+// in the package builds on it.
+//
+//declscope:package
 type fakeSys struct {
-	mu      sync.Mutex
+	//declscope:private
+	mu sync.Mutex
+	//declscope:private
 	os      string
 	have    map[string]bool
 	outputs map[string]string
@@ -30,6 +35,7 @@ type fakeSys struct {
 	onExec  func(line string) (handled bool, err error)
 }
 
+//declscope:package
 func newFakeSys(osName string, have ...string) *fakeSys {
 	f := &fakeSys{os: osName, have: map[string]bool{}, outputs: map[string]string{}, fail: map[string]bool{}, stderr: map[string]string{}, env: map[string][]string{}, stdin: map[string]string{}}
 	for _, h := range have {
