@@ -35,7 +35,7 @@ useGlobalGaps = true
 
 [focus]
 crossesMonitorAtEdge = false
-followsMouse = false
+followsMouse = true
 followsWindowToMonitor = false
 lockModifier = "off"
 moveCrossesMonitorAtEdge = false
@@ -58,7 +58,7 @@ defaultLayoutType = "niri"
 hotkeysEnabled = true
 hyperKeyModifiers = "Control+Option+Shift+Command"
 ipcEnabled = true
-preventSleepEnabled = false
+preventSleepEnabled = true
 systemHyperTrigger = "None"
 updateChecksEnabled = true
 
