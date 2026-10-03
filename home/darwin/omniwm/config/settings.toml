@@ -3,10 +3,11 @@ monitorDwindleOverrides = []
 monitorGapOverrides = []
 monitorNiriOverrides = []
 monitorOrientationOverrides = []
-monitorRoutingOverrides = []
+schemaVersion = 3
 
 [appearance]
 mode = "dark"
+tabRailAppIcons = false
 
 [borders]
 enabled = true
@@ -14,9 +15,9 @@ width = 5.0
 
 [borders.color]
 alpha = 1.0
-blue = 0.979300037944676
-green = 1.0
-red = 0.08458520228437894
+blue = 0.9998534321784973
+green = 0.5837668776512146
+red = 0.9577546715736389
 
 [clipboard]
 historyEnabled = false
@@ -39,8 +40,10 @@ followsWindowToMonitor = false
 lockModifier = "off"
 moveCrossesMonitorAtEdge = false
 moveMouseToFocusedWindow = false
+raiseOnMouseFocus = true
 
 [gaps]
+fullscreenUsesOuterGaps = false
 size = 16.0
 
 [gaps.outer]
@@ -64,12 +67,19 @@ fingerCount = 3
 invertDirection = true
 mouseMoveModifierKey = "option"
 mouseResizeModifierKey = "option"
+overviewGestureEnabled = false
+overviewGestureFingerCount = 4
 scrollEnabled = true
 scrollModifierKey = "optionShift"
 scrollSensitivity = 5.0
 trackpadScrollStyle = "snap"
+windowGestureSensitivity = 1.0
+windowMoveEnabled = false
+windowMoveFingerCount = 4
+windowResizeEnabled = false
+windowResizeFingerCount = 3
 workspaceSwipeAxis = "vertical"
-workspaceSwipeEnabled = false
+workspaceSwipeEnabled = true
 workspaceSwipeFingerCount = 3
 
 [hiddenBar]
@@ -92,6 +102,9 @@ singleWindowFit = "fill"
 visibleContainerCount = 2
 
 [overview]
+invertScrollDirection = false
+matchFocusBorder = true
+mouseScrollSpeed = 1.0
 zoom = 1.0
 
 [overview.backdrop]
@@ -121,19 +134,44 @@ green = 0.8
 red = 0.3
 
 [quakeTerminal]
-animationDuration = 0.2
+animationDuration = 0.1
 autoHide = false
-backgroundBlurRadius = 0
+backgroundBlurRadius = 35
 backgroundEffect = "standardBlur"
 enabled = true
 heightPercent = 50.0
-monitorMode = "focusedWindow"
-opacity = 1.0
-position = "center"
-widthPercent = 50.0
+monitorMode = "mouseCursor"
+opacity = 0.7000000000000001
+position = "top"
+widthPercent = 100.0
 
 [routing]
-mode = "macOS"
+mode = "custom"
+
+[[routing.arrangements]]
+id = "CC7795D3-A7DB-42E0-A6B8-A3163AA7A94A"
+
+[[routing.arrangements.monitors]]
+gridColumn = 0
+gridRow = 1
+monitorDisplayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
+monitorName = "LG ULTRAGEAR+"
+
+[[routing.arrangements.monitors]]
+gridColumn = 0
+gridRow = 0
+monitorDisplayUUID = "C3EBBB9D-F97F-4AAE-97BB-E82C8A819F54"
+monitorName = "LG ULTRAWIDE"
+
+[[routing.arrangements.monitors]]
+gridColumn = 0
+gridRow = 2
+monitorDisplayUUID = "34A6894B-1430-4A88-BB34-84A10D67D1C7"
+monitorName = "RTK FHD HDR"
+
+[scratchpads]
+
+[scratchpads.labels]
 
 [statusBar]
 showAppNames = false
@@ -147,15 +185,20 @@ enabled = true
 excludedBundleIDs = []
 height = 24.0
 hideEmptyWorkspaces = false
+hideInNativeFullscreen = false
 notchActiveZoneWidth = 180.0
 notchMode = "moveBelowMenuBar"
 position = "overlappingMenuBar"
 reserveLayoutSpace = false
 revealHoldMilliseconds = 200.0
 revealModifier = "off"
+showAccentHighlights = true
 showFloatingWindows = false
+showItemBackgrounds = true
 showLabels = true
+solidBlackBackground = false
 systemStatsButton = false
+transparentBackground = false
 windowLevel = "popup"
 xOffset = 0.0
 yOffset = 0.0
@@ -241,6 +284,86 @@ minHeight = 320.0
 minWidth = 660.0
 
 [[hotkeys]]
+binding = "Option+Shift+Space"
+id = "toggleScratchpad.1"
+
+[[hotkeys]]
+binding = "Control+Option+Shift+Space"
+id = "assignFocusedWindowToScratchpad.1"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.2"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.2"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.3"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.3"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.4"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.4"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.5"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.5"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.6"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.6"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.7"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.7"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.8"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.8"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.9"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.9"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "toggleScratchpad.10"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "assignFocusedWindowToScratchpad.10"
+
+[[hotkeys]]
 binding = "Option+1"
 id = "switchWorkspace.0"
 
@@ -311,6 +434,78 @@ id = "switchWorkspace.8"
 [[hotkeys]]
 binding = "Option+Shift+9"
 id = "moveToWorkspace.8"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.1"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.1"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.2"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.2"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.3"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.3"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.4"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.4"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.5"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.5"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.6"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.6"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.7"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.7"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.8"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.8"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "switchWorkspaceSlot.9"
+
+[[hotkeys]]
+binding = "Unassigned"
+id = "moveToWorkspaceSlot.9"
 
 [[hotkeys]]
 binding = "Control+Option+Tab"
@@ -809,12 +1004,8 @@ binding = "Option+T"
 id = "toggleFocusedWindowFloating"
 
 [[hotkeys]]
-binding = "Control+Option+Shift+Space"
-id = "assignFocusedWindowToScratchpad"
-
-[[hotkeys]]
-binding = "Option+Shift+Space"
-id = "toggleScratchpadWindow"
+binding = "Unassigned"
+id = "closeFocusedWindow"
 
 [[hotkeys]]
 binding = "Control+Option+M"
@@ -851,7 +1042,11 @@ layoutType = "niri"
 name = "1"
 
 [workspaces.monitorAssignment]
-type = "main"
+type = "specificDisplay"
+
+[workspaces.monitorAssignment.output]
+displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
+name = "LG ULTRAGEAR+"
 
 [[workspaces]]
 displayName = "2 🌐"
@@ -860,7 +1055,11 @@ layoutType = "niri"
 name = "2"
 
 [workspaces.monitorAssignment]
-type = "main"
+type = "specificDisplay"
+
+[workspaces.monitorAssignment.output]
+displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
+name = "LG ULTRAGEAR+"
 
 [[workspaces]]
 displayName = "3 💬"
@@ -869,7 +1068,11 @@ layoutType = "niri"
 name = "3"
 
 [workspaces.monitorAssignment]
-type = "main"
+type = "specificDisplay"
+
+[workspaces.monitorAssignment.output]
+displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
+name = "LG ULTRAGEAR+"
 
 [[workspaces]]
 displayName = "4 📝"
@@ -878,7 +1081,11 @@ layoutType = "niri"
 name = "4"
 
 [workspaces.monitorAssignment]
-type = "main"
+type = "specificDisplay"
+
+[workspaces.monitorAssignment.output]
+displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
+name = "LG ULTRAGEAR+"
 
 [[workspaces]]
 displayName = "5 🎧"
@@ -887,7 +1094,11 @@ layoutType = "niri"
 name = "5"
 
 [workspaces.monitorAssignment]
-type = "main"
+type = "specificDisplay"
+
+[workspaces.monitorAssignment.output]
+displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
+name = "LG ULTRAGEAR+"
 
 [[workspaces]]
 displayName = "6 ❤️"
@@ -896,7 +1107,11 @@ layoutType = "niri"
 name = "6"
 
 [workspaces.monitorAssignment]
-type = "secondary"
+type = "specificDisplay"
+
+[workspaces.monitorAssignment.output]
+displayUUID = "C3EBBB9D-F97F-4AAE-97BB-E82C8A819F54"
+name = "LG ULTRAWIDE"
 
 [[workspaces]]
 displayName = "7 🚀"
@@ -905,4 +1120,8 @@ layoutType = "niri"
 name = "7"
 
 [workspaces.monitorAssignment]
-type = "secondary"
+type = "specificDisplay"
+
+[workspaces.monitorAssignment.output]
+displayUUID = "34A6894B-1430-4A88-BB34-84A10D67D1C7"
+name = "RTK FHD HDR"
