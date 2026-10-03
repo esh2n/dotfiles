@@ -9,6 +9,7 @@ in
   (import ../overlays)
   (final: prev: { crit = inputs.crit.packages.${system}.default; })
   (final: prev: { capsule = inputs.capsule.packages.${system}.default; })
+  (final: prev: { crt = inputs.code-reading-tool.packages.${system}.crt; })
 ]
 ++ (
   if isDarwin then

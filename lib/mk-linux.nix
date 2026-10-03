@@ -24,6 +24,7 @@ inputs.home-manager.lib.homeManagerConfiguration {
     ../home/shared/zsh
     ../home/shared/tig
     ../home/shared/crit
+    ../home/shared/code-reading
     ../home/shared/bin
     ../home/shared/litellm
     ../home/shared/sbx

@@ -1,0 +1,17 @@
+# crt (github.com/esh2n/code-reading-tool): explanations through this
+# machine's loopback LiteLLM. Shared by the CLI, Neovim and Cursor/VS Code;
+# edits apply on the next read. The key is not stored here: crt runs
+# api_key_command once, the first time it calls the model.
+[llm]
+base_url = "http://localhost:4000/v1"
+model = "deterministic"
+# The LiteLLM key helper (home/shared/litellm): headless, no approval prompt,
+# and it finds op itself, so editors started from the Dock get the key too.
+api_key_command = ["sh", "-c", "exec \"$HOME/.config/litellm/proxy-key.sh\""]
+output_language = "Japanese"
+timeout_secs = 600
+
+# Qwen3's thinking mode makes each function take minutes. Readings made with
+# and without it are cached separately.
+[llm.extra_body]
+chat_template_kwargs = { enable_thinking = false }

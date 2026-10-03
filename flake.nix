@@ -33,6 +33,10 @@
     # Its own nixpkgs, not ours: its CUDA package names (cccl, ...) follow the
     # nixpkgs its CI builds with.
     llama-cpp.url = "github:ggml-org/llama.cpp";
+    code-reading-tool = {
+      url = "github:esh2n/code-reading-tool";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     capsule = {
       url = "github:shuymn/capsule";
       inputs.nixpkgs.follows = "nixpkgs";

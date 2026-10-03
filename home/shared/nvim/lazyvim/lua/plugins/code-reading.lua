@@ -1,22 +1,23 @@
--- code-reading: per-line explanations of how code behaves, from the crt
--- language server built in its own repository. The model, endpoint and API
--- key live in crt's configuration (:CrConfig), not here.
-local repo = vim.fn.expand("~/go/github.com/esh2n/code-reading-tool")
-
+-- code-reading: per-line explanations of how code behaves, from crt (Nix,
+-- home/shared/code-reading). The plugin lives in editors/nvim of its
+-- repository. The model, endpoint and API key live in crt's configuration
+-- (:CrConfig), not here.
 return {
   {
-    dir = repo .. "/editors/nvim",
+    "esh2n/code-reading-tool",
     name = "code-reading",
-    -- Only on machines that have the repository checked out.
-    cond = vim.uv.fs_stat(repo .. "/editors/nvim") ~= nil,
+    -- Only where crt is installed (the machines with the dev packages).
+    cond = vim.fn.executable("crt") == 1,
     event = { "BufReadPre", "BufNewFile" },
     cmd = { "CrRead", "CrScenario", "CrToggle", "CrConfig" },
     opts = {
-      cmd = { repo .. "/target/release/crt", "lsp" },
       -- The local model answers one request at a time.
       max_parallel = 1,
     },
-    config = function(_, opts)
+    config = function(plugin, opts)
+      local dir = plugin.dir .. "/editors/nvim"
+      vim.opt.rtp:append(dir)
+      vim.cmd.source(dir .. "/plugin/code-reading.lua")
       require("code-reading").setup(opts)
     end,
     -- Keys LazyVim leaves free (cR is rename, cS is Trouble's references).

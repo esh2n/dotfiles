@@ -68,6 +68,26 @@
         "type": "github"
       }
     },
+    "code-reading-tool": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791035241,
+        "narHash": "sha256-TrqQhVIiGgC2LknFo4VVHonrwfSp9IFg4op56sUy2l0=",
+        "owner": "esh2n",
+        "repo": "code-reading-tool",
+        "rev": "e0bce897fae63e2d803a7c9722965bcc411baf43",
+        "type": "github"
+      },
+      "original": {
+        "owner": "esh2n",
+        "repo": "code-reading-tool",
+        "type": "github"
+      }
+    },
     "crit": {
       "inputs": {
         "nixpkgs": [
@@ -217,6 +237,7 @@
         "brew-api": "brew-api",
         "brew-nix": "brew-nix",
         "capsule": "capsule",
+        "code-reading-tool": "code-reading-tool",
         "crit": "crit",
         "home-manager": "home-manager",
         "llama-cpp": "llama-cpp",
