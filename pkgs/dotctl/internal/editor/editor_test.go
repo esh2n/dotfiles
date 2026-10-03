@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -64,5 +65,52 @@ func TestInstallIntoEachPresentEditor(t *testing.T) {
 	}
 	if err := Install(f, ui.Printer{}, t.TempDir()); err == nil {
 		t.Fatal("a missing list is not an error")
+	}
+}
+
+func TestPlatformNamesFollowVSCodeTargets(t *testing.T) {
+	cases := map[[2]string]string{
+		{"darwin", "arm64"}:  "darwin-arm64",
+		{"darwin", "amd64"}:  "darwin-x64",
+		{"linux", "amd64"}:   "linux-x64",
+		{"windows", "amd64"}: "win32-x64",
+		{"plan9", "amd64"}:   "",
+	}
+	for in, want := range cases {
+		if got := Platform(in[0], in[1]); got != want {
+			t.Errorf("Platform(%s, %s) = %q, want %q", in[0], in[1], got, want)
+		}
+	}
+}
+
+func TestReleaseURLsAreDownloadedOnceAndInstalledFromTheFile(t *testing.T) {
+	repo := t.TempDir()
+	file := filepath.Join(repo, "home", "darwin", "vscode", "config", "extensions.txt")
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	list := "a.one\nhttps://example.test/releases/latest/download/x-{platform}.vsix\n"
+	if err := os.WriteFile(file, []byte(list), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := &fakeSys{have: map[string]bool{"code": true, "cursor": true}}
+	if err := Install(f, ui.Printer{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}, repo); err != nil {
+		t.Fatal(err)
+	}
+	platform := Platform(runtime.GOOS, runtime.GOARCH)
+	var downloads, vsix int
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "curl ") {
+			downloads++
+			if !strings.HasSuffix(c, "x-"+platform+".vsix") {
+				t.Fatalf("download %q", c)
+			}
+		}
+		if strings.Contains(c, "--install-extension") && strings.HasSuffix(c, "-x-"+platform+".vsix") {
+			vsix++
+		}
+	}
+	if downloads != 1 || vsix != 2 {
+		t.Fatalf("downloads %d, installs %d: %v", downloads, vsix, f.calls)
 	}
 }
