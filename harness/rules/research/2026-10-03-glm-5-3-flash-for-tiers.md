@@ -111,6 +111,45 @@ GLM-5.3-Flash は GLM-5.3 本体の提供ティアではなく別のモデル（
 - GLM-5.3 本体対 DeepSeek V4.1 Flash の記事はあるが Flash の比較ではない — https://www.yottalabs.ai/post/glm-5-3-vs-deepseek-v4-1-flash-2026
 - 日本語: Qiita の日本語性能比較は GLM-5.2 まで — https://qiita.com/nabe2030/items/7ae4a739bf45ecae3236
 
+## 無印 GLM-5.3 と「Mythos 級」という評判
+
+評判の出どころは Anthropic Frontier Red Team の記事（2026-09-29） https://www.anthropic.com/research/glm-5-3-and-the-spread-of-advanced-cyber-capabilities 。記事が測ったのは攻撃的サイバー能力（exploit 開発）と安全対策の有無だけで、コーディングエージェントとしての汎用品質・ツール呼び出し・コスト・速度は扱っていない（記事自身の範囲宣言: "We focus primarily on exploit development capability"）。「Mythos-class」という語は記事に無く、相当する表現は "Like Claude Mythos Preview, GLM-5.3 has strong capabilities for autonomously building end-to-end cyber exploits"。
+
+- ExploitBench（V8 既知脆弱性）: GLM-5.3 は 410 回中 50 回で end-to-end exploit を作成、Mythos Preview は 56 回。内部 Binary Exploitation ベンチ（OSS-Fuzz 由来 100 タスク）: GLM-5.3 4%、Mythos Preview 6%、Opus 4.6 と GLM-5.2 は 0%。
+- 図 1 注: "The increase in exploitation capability between Claude Opus 4.6 and Claude Mythos Preview mirrors the jump in capabilities between GLM-5.2 and GLM-5.3."
+- 記事の主眼は "released without meaningful safeguards to limit misuse"。脱獄成功率は欺瞞プロンプト 64%、thinking prefill 92%、abliteration 100%（約 2,200 GPU 時間・約 $4,400）。
+- NIST CAISI（2026-09-17）の独立評価は "the most cyber-capable open-weight model released to date"、cyber ベンチ集計で米国フロンティアに約 4 か月遅れ（記事内の孫引き。CAISI 原文は未読） — https://www.nist.gov/news-events/news/2026/09/caisis-assessment-zais-glm-53-cyber-capabilities
+- 記事が自ら述べる留保: 評価は隔離環境でオフライン標的のみ、脱獄シミュレーションは偽の bash ツールと LLM 近似で "imperfect measures"、人間の専門家テストは 1 日以内・人の注意 1 時間未満。
+
+### 無印 GLM-5.3 の独立したコーディング数値（AA、2026-10-03）
+
+| モデル | Intelligence Index | タスク当たりコスト | Terminal-Bench 2.1 | Terminal-Bench 4.0 | τ-banking |
+|---|---|---|---|---|---|
+| GLM-5.3 (Max) | 44.8 | $2.006 | 83.9% | 41.9% | 50.3% |
+| Claude Fable 5.1 (Max) | 53.4 | $7.63 | 91.4% | 52.0% | 47.2% |
+| Claude Fable 5 (Max) | 49.6 | $8.75 | 84.6% | 42.4% | 38.1% |
+| GPT-5.6 Sol (Max) | 47.0 | $1.99 | 88.0% | 39.9% | 44.3% |
+| Claude Opus 4.8 (Max) | 41.8 | $4.08 | 84.6% | 21.7% | 34.2% |
+| DeepSeek V4 Pro 0813 (Max)（現 complex） | 36.0 | $0.674 | 78.7% | 14.1% | 39.6% |
+
+- https://artificialanalysis.ai/models/{glm-5-3,claude-fable-5-1,claude-fable-5,gpt-5-6-sol,claude-opus-4-8,deepseek-v4-pro} 。AA に Coding Index / Agentic Index のキーは無く、τ²-bench と LiveCodeBench は null。SWE-bench Verified / Pro、Aider polyglot、Epoch AI の独立結果は見つからず、LMArena WebDev は未達。
+- 位置: 汎用指標では Opus 4.8（2026-05）と Fable 5（2026-06）の間、GPT-5.6 Sol のやや下。Terminal-Bench 4.0 では Fable 5 と同じ帯（41.9% 対 42.4%）。現行 `complex` の V4 Pro より全指標で上、タスク当たりコストは約 3 倍。
+
+### ベンダー表（Z.ai 自身、別扱い） — https://huggingface.co/zai-org/GLM-5.3/raw/main/README.md
+
+| ベンチマーク | GLM-5.3 | GLM-5.2 | Opus 4.8 | Fable 5 (w/ fallback) | GPT-5.6 Sol |
+|---|---|---|---|---|---|
+| Terminal Bench 2.1 | 88.2 | 81.0 | 85.0 | 88.0 | 88.8 |
+| Terminal Bench 3.0 | 28.3 | 4.6 | 21.1 | 33.7 | 34.6 |
+| DeepSWE v1.1 | 66.9 | 46.2 | 58.0 | 69.7 | 72.7 |
+| FrontierSWE | 78.1 | 67.5 | 66.5 | 88.2 | - |
+| ExploitBench | 54.4 | 24.4 | 40.0 | 78.0 | 76.5 |
+
+- Z.ai の Terminal Bench 2.1（88.2）は AA の独立値（83.9）とずれる。条件は Claude Code 2.1.207・6 時間タイムアウト。
+- 09-23 の記録の「34.5% 対 39.5%」は Z.ai Code Bench（社内非公開ベンチ）の値で、現在もモデルカードに残る: "GLM-5.3 remains behind Claude Fable 5, which reaches 39.5% at Max effort." — https://docs.z.ai/guides/llm/glm-5.3 。独立検証は不可能。
+
+結論: 「Mythos 級」は exploit 開発能力についての Anthropic の評価としては正しい引用で、汎用コーディング品質の話ではない。汎用指標では無印 GLM-5.3 は Opus 4.8 と Fable 5 の間に位置し、Z.ai 自身も自社ベンチで Fable 5 に届かないと書いている。`main` の置き換え根拠は 09-23 の結論（コスト約 7.4 倍）のまま変わらない。`complex` の候補としては、独立指標で現行の V4 Pro を全項目で上回る唯一の同価格帯候補であり、この repo の bench（`TIER=pro` 相当）で V4 Pro と実測する価値がある。未解決の運用 issue（LiteLLM `zai` の `response_format` 欠落、thinking 無効化不可、`clear_thinking: false` 必須）は本体にも共通。
+
 ## 注意点
 
 - AA の Coding Index は取得できず。OpenRouter 比較ページ要約の "71.5 / 50.9" は定義未確認。
