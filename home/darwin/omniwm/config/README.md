@@ -100,11 +100,21 @@ auto-layout engine for a fixed desk, replacing manual Loop snapping.
 
 - Slack/Discord → workspace 3 auto-assignment (GUI App Rules)
 - Gather float rule (GUI App Rules)
-- Whether the built-in quake terminal reads the user's ghostty config
 - alt-hjkl focus/move remap (arrows still active from upstream defaults)
 - Fullscreen `alt-f` remap (still on upstream `alt-Return`)
-- Per-desk workspace → display assignment via Settings > Workspaces
-  (`specificDisplay`)
+
+### Settled (2026-10-03, OmniWM 0.7.4)
+
+- The quake terminal is libghostty embedded in OmniWM and "loads Ghostty's
+  normal configuration files" (https://omniwm.app/features/quake-terminal/):
+  font and theme come from `~/.config/ghostty/config`, the shell from
+  Ghostty's `command`. OmniWM only owns placement (`[quakeTerminal]`:
+  position, size, monitorMode, backgroundEffect, autoHide, opacity).
+- Per-desk display assignment is done: the Monitor Setup assistant wrote
+  `[routing] mode = "custom"` (three displays in one column) and
+  `specificDisplay` for every workspace; Mouse Warp stays on so the pointer
+  follows the OmniWM map, not the macOS staircase. Redo it from Settings >
+  Monitors > "Run Monitor Setup…".
 
 ### Constraints
 
