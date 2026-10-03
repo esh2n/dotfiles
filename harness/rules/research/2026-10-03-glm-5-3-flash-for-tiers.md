@@ -43,6 +43,23 @@ GLM-5.3-Flash は GLM-5.3 本体の提供ティアではなく別のモデル（
 - プロバイダ別では第三者ホスト（LithosAI FP4 で 717.5 tok/s）が Z.ai 自身の API より速い。品質差は未確認 — https://artificialanalysis.ai/models/glm-5-3-flash/providers
 - AA の LiveCodeBench・τ²-bench は全モデル null、Coding Index の値は SSR JSON に無し。
 
+### フロンティア帯との位置（AA、同日取得。「Mythos 級」という評判の検証）
+
+| モデル（AA 表記） | Intelligence Index | タスク当たりコスト | Terminal-Bench 2.1 | Terminal-Bench 4.0 | τ-banking |
+|---|---|---|---|---|---|
+| GLM-5.3-Flash (max) | 41.8 | $0.253 | 84.3% | 32.8% | 47.2% |
+| Claude Opus 5.5 (Max) | 57.6 | $5.98 | null | 59.6% | null |
+| Claude Fable 5.1 (Max) | 53.4 | $7.63 | 91.4% | 52.0% | 47.2% |
+| Claude Fable 5 (Max) | 49.6 | $8.75 | 84.6% | 42.4% | 38.1% |
+| Claude Opus 4.8 (Max) | 41.8 | $4.08 | 84.6% | 21.7% | 34.2% |
+| GPT-5.6 Sol (Max) | 47.0 | $1.99 | 88.0% | 39.9% | 44.3% |
+| GPT-5.6 Terra (Max) | 42.1 | $1.40 | 88.0% | 35.4% | 40.2% |
+| Gemini 3.7 Flash (High) | 39.1 | $0.925 | 85.8% | 13.6% | 32.8% |
+
+- https://artificialanalysis.ai/models/{claude-opus-5-5,claude-fable-5-1,claude-fable-5,claude-opus-4-8,gpt-5-6-sol,gpt-5-6-terra,gemini-3-7-flash} 。Claude Mythos 5 と Gemini 3.7 Pro は AA の一覧に無い（NOT FOUND。存在の否定ではない）。
+- Z.ai が比較相手にしているのは Claude Opus 4.8 のみ。HF README: "approaching Claude Opus 4.8 on coding and agentic benchmarks"。モデルカード: "at max effort nearly matches Claude Opus 4.8 (29.0 vs. 29.5)"（Z.ai Code Bench v1.0、自社ベンチ）。README とモデルカードを `Mythos|Fable` で grep しても言及無し — https://huggingface.co/zai-org/GLM-5.3-Flash/raw/main/README.md 、 https://docs.z.ai/guides/llm/glm-5.3-flash
+- AA 上では Opus 4.8（2026-05 公開）と同点の 41.8 で、現行フロンティアの Opus 5.5 とは約 16 ポイント、Fable 5.1 とは約 12 ポイント差。Opus 4.8 と同じ帯を、コストは 1/16 で出している、というのが数字の読み方。
+
 ### ベンダー主張（Z.ai 自身、割り引いて読む）
 
 | ベンチマーク | GLM-5.3-Flash | GLM-5.2 | DeepSeek-V4-Vision-Exp | Claude Opus 4.8 | GPT-5.6 Terra |
