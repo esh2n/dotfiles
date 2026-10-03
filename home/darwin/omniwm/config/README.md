@@ -58,19 +58,20 @@ auto-layout engine for a fixed desk, replacing manual Loop snapping.
 
 - Focus: `alt-h/l` (columns), `alt-j/k` (within column)
 - Move: `alt-shift-h/j/k/l`
-- Fullscreen: `alt-f` (unbind default `alt-Return`)
+- Fullscreen: `alt-f` (upstream `alt-Return` moved off; aerospace's `alt-f` too)
 - Float toggle: `alt-t`
 - Column width: `alt-r` / `alt-shift-r`
 - Workspaces: `alt-1` / `alt-2`
-- Keep defaults: quake `` alt-` ``, palette `ctrl-alt-space`, overview
-  `alt-shift-o`, layout toggle `alt-shift-l`
-- **`alt-space` stays with Raycast** (Ghostty hide/show toggle — must work
-  in every profile, and OmniWM binds die when another WM profile is active,
-  so OmniWM must NOT claim this key). Under omniwm the toggle just
-  hides/shows the tiled Ghostty column (brief reflow, harmless).
+- Keep defaults: overview `alt-shift-o`, layout toggle `alt-shift-l`
+- **Omarchy's three (ruled 2026-10-03):** `alt-Return` = quake terminal
+  (Omarchy `Super+Return` terminal), `alt-space` = command palette (Omarchy
+  `Super+Space` menu; launches apps, finds files), `alt-f` = fullscreen
+  (Omarchy `Super+F`). `` alt-` `` and `ctrl-alt-space` are freed. Raycast's
+  per-app hotkey for Ghostty on `alt-space` must be removed by hand (Raycast >
+  Extensions > Applications > Ghostty), or the two fight over the key; under
+  other mado profiles `alt-space` is simply unbound now.
 - **`alt-shift-space` = scratchpad, starting with Obsidian** (quick notes
-  from any workspace; pairs mentally with alt-space = Ghostty toggle).
-  Add a second app (e.g. Spotify) only after this sticks. Never `alt-space`.
+  from any workspace). Add a second app (e.g. Spotify) only after this sticks.
 
 ### App rules
 
@@ -101,7 +102,6 @@ auto-layout engine for a fixed desk, replacing manual Loop snapping.
 - Slack/Discord → workspace 3 auto-assignment (GUI App Rules)
 - Gather float rule (GUI App Rules)
 - alt-hjkl focus/move remap (arrows still active from upstream defaults)
-- Fullscreen `alt-f` remap (still on upstream `alt-Return`)
 
 ### Settled (2026-10-03, OmniWM 0.7.4)
 
