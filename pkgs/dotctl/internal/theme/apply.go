@@ -87,6 +87,7 @@ func applyValues(e Env, name string) {
 		{"omarchy", func() error { return applyOmarchy(e, name) }},
 		{"cli colours", func() error { return applyCLI(e, name) }},
 		{"orca", func() error { return applyOrca(e, name) }},
+		{"omniwm", func() error { return applyOmniWM(e, name) }},
 	}
 	for _, s := range steps {
 		if err := s.do(); err != nil {

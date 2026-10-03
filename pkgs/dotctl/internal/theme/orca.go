@@ -74,15 +74,23 @@ func OrcaApply(support, variant, warpName string) (string, error) {
 	return applied, writeAtomic(dataPath, out.Bytes())
 }
 
-// writeAtomic replaces a file through a temporary file beside it.
+// writeAtomic replaces a file through a temporary file beside it, keeping
+// the file's mode (CreateTemp makes 0600; a 0644 file must stay readable).
 func writeAtomic(path string, b []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".orca-data.")
+	mode := os.FileMode(0o644)
+	if st, err := os.Stat(path); err == nil {
+		mode = st.Mode().Perm()
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".")
 	if err != nil {
 		return err
 	}
 	_, err = tmp.Write(b)
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(tmp.Name(), mode)
 	}
 	if err == nil {
 		err = os.Rename(tmp.Name(), path)

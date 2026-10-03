@@ -716,7 +716,7 @@ binding = "Unassigned"
 id = "moveWindowToMonitor.down"
 
 [[hotkeys]]
-binding = "Option+Return"
+binding = "Option+F"
 id = "toggleFullscreen"
 
 [[hotkeys]]
@@ -988,7 +988,7 @@ binding = "Unassigned"
 id = "preselectClear"
 
 [[hotkeys]]
-binding = "Control+Option+Space"
+binding = "Option+Space"
 id = "openCommandPalette"
 
 [[hotkeys]]
@@ -1020,7 +1020,7 @@ binding = "Unassigned"
 id = "toggleHiddenBarPanel"
 
 [[hotkeys]]
-binding = "Option+Grave"
+binding = "Option+Return"
 id = "toggleQuakeTerminal"
 
 [[hotkeys]]
