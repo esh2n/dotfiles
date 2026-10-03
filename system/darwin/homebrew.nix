@@ -81,6 +81,15 @@ in
         # renderer, a different app. Tap trusted by dotctl up.
         # The app self-updates on the stable channel regardless of brew pinning.
         "stablyai/orca/orca"
+        # T3 Code (t3.codes) — control-plane GUI for coding agents (Claude
+        # Code, Codex, OpenCode, ...), incl. phone/web remote over Tailscale.
+        # Telemetry defaults to on with no UI toggle; the opt-out
+        # T3CODE_TELEMETRY_ENABLED=false lives in home/shared/zsh/zshenv and
+        # only reaches processes started from a shell, not Dock launches.
+        # A hand-installed "T3 Code (Alpha).app" predates this cask (the cask
+        # installs "T3 Code.app", so the two can coexist; remove the Alpha
+        # copy by hand once the stable cask is in).
+        "t3-code"
       ]
       ++ lib.optionals (on "models") [
         # LM Studio (https://formulae.brew.sh/cask/lm-studio — installs
