@@ -32,7 +32,13 @@ in
         cursor
         visual-studio-code
         zed
-        yaak
+        # brew-nix unpacks Yaak's dmg with 7zz (its `file` type is zlib, so
+        # undmg is skipped), which leaves the bundle one folder down; the
+        # lookup that lifts it up matches the cask's lower-case "yaak.app"
+        # case-sensitively and misses "Yaak.app". -iname until upstream does.
+        (yaak.overrideAttrs (o: {
+          unpackPhase = builtins.replaceStrings [ ''-name "yaak.app"'' ] [ ''-iname "yaak.app"'' ] o.unpackPhase;
+        }))
         ngrok
         # Workspace
         notion
