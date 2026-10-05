@@ -179,18 +179,18 @@ id = "5240D644-F064-4BD1-B3AC-7B417E68B8B9"
 
 [[routing.arrangements.monitors]]
 gridColumn = 0
-gridRow = 1
+gridRow = 2
 monitorDisplayUUID = "8C27030B-39E8-4991-9FD5-9A762A002892"
 monitorName = "LG ULTRAGEAR+"
 
 [[routing.arrangements.monitors]]
-gridColumn = 0
-gridRow = 0
+gridColumn = 1
+gridRow = 1
 monitorDisplayUUID = "381801B7-7350-4733-AC1F-4ABA6109A191"
 monitorName = "LG ULTRAWIDE"
 
 [[routing.arrangements.monitors]]
-gridColumn = 1
+gridColumn = 2
 gridRow = 0
 monitorDisplayUUID = "E27440B5-C7DA-4682-8D01-6F37A8975A0D"
 monitorName = "RTK FHD HDR"
@@ -1088,11 +1088,7 @@ layoutType = "niri"
 name = "1"
 
 [workspaces.monitorAssignment]
-type = "specificDisplay"
-
-[workspaces.monitorAssignment.output]
-displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
-name = "LG ULTRAGEAR+"
+type = "main"
 
 [[workspaces]]
 displayName = "2 🌐"
@@ -1101,11 +1097,7 @@ layoutType = "niri"
 name = "2"
 
 [workspaces.monitorAssignment]
-type = "specificDisplay"
-
-[workspaces.monitorAssignment.output]
-displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
-name = "LG ULTRAGEAR+"
+type = "main"
 
 [[workspaces]]
 displayName = "3 💬"
@@ -1114,11 +1106,7 @@ layoutType = "niri"
 name = "3"
 
 [workspaces.monitorAssignment]
-type = "specificDisplay"
-
-[workspaces.monitorAssignment.output]
-displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
-name = "LG ULTRAGEAR+"
+type = "main"
 
 [[workspaces]]
 displayName = "4 📝"
@@ -1127,11 +1115,7 @@ layoutType = "niri"
 name = "4"
 
 [workspaces.monitorAssignment]
-type = "specificDisplay"
-
-[workspaces.monitorAssignment.output]
-displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
-name = "LG ULTRAGEAR+"
+type = "main"
 
 [[workspaces]]
 displayName = "5 🎧"
@@ -1140,11 +1124,7 @@ layoutType = "niri"
 name = "5"
 
 [workspaces.monitorAssignment]
-type = "specificDisplay"
-
-[workspaces.monitorAssignment.output]
-displayUUID = "01C411E3-CBE8-4D2D-84D2-BFB8E20299B0"
-name = "LG ULTRAGEAR+"
+type = "main"
 
 [[workspaces]]
 displayName = "6 ❤️"
@@ -1153,11 +1133,7 @@ layoutType = "niri"
 name = "6"
 
 [workspaces.monitorAssignment]
-type = "specificDisplay"
-
-[workspaces.monitorAssignment.output]
-displayUUID = "C3EBBB9D-F97F-4AAE-97BB-E82C8A819F54"
-name = "LG ULTRAWIDE"
+type = "secondary"
 
 [[workspaces]]
 displayName = "7 🚀"
@@ -1166,8 +1142,17 @@ layoutType = "niri"
 name = "7"
 
 [workspaces.monitorAssignment]
-type = "specificDisplay"
+type = "tertiary"
 
-[workspaces.monitorAssignment.output]
-displayUUID = "34A6894B-1430-4A88-BB34-84A10D67D1C7"
+# Monitor roles by model name, not display UUID, so the same ranking works on
+# every Mac with these monitors; any other display (an office desk, the
+# built-in screen) falls back to OmniWM's default order, the menu-bar display
+# first.
+[[monitors.ranking]]
+name = "LG ULTRAGEAR+"
+
+[[monitors.ranking]]
+name = "LG ULTRAWIDE"
+
+[[monitors.ranking]]
 name = "RTK FHD HDR"
