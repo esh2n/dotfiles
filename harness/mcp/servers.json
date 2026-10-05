@@ -9,7 +9,7 @@
       "args": [
         "-p",
         "3.13",
-        "serena-agent==1.5.3",
+        "serena-agent==1.7.0",
         "start-mcp-server",
         "--project-from-cwd",
         "--context",
@@ -22,7 +22,7 @@
           "args": [
             "-p",
             "3.13",
-            "serena-agent==1.5.3",
+            "serena-agent==1.7.0",
             "start-mcp-server",
             "--project-from-cwd",
             "--context",
@@ -33,7 +33,7 @@
           "args": [
             "-p",
             "3.13",
-            "serena-agent==1.5.3",
+            "serena-agent==1.7.0",
             "start-mcp-server",
             "--project-from-cwd",
             "--context",
