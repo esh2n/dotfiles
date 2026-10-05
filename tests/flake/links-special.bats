@@ -33,6 +33,7 @@ target() {
 	[ "$(target "$json" ".config/vscode")" = "${REPO_ROOT}/home/darwin/vscode/config" ]
 	[ "$(target "$json" ".config/cursor")" = "${REPO_ROOT}/home/darwin/cursor/config" ]
 	[ "$(target "$json" "Library/Application Support/Code/User/settings.json")" = "${REPO_ROOT}/home/darwin/vscode/config/settings.json" ]
+	[ "$(target "$json" "Library/Application Support/Cursor/User/settings.json")" = "${REPO_ROOT}/home/darwin/cursor/config/settings.json" ]
 }
 
 @test "special: none of the Mac apps' dirs are placed on linux" {
