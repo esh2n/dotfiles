@@ -75,11 +75,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791038724,
-        "narHash": "sha256-BKeOMVHsSXuKmxv+dK/grjiUY4YUR7miYbAwBy4go7o=",
+        "lastModified": 1791250065,
+        "narHash": "sha256-FcJDsbqkfN1oFt7tmkvyiy+vDIKoJZudU8cDmvisO04=",
         "owner": "esh2n",
         "repo": "code-reading-tool",
-        "rev": "0cee39b1569d71b16f825a83eded40dac5e09f78",
+        "rev": "3fed33a1867bf014ce959397ebc09c3aabf1da37",
         "type": "github"
       },
       "original": {
