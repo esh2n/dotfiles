@@ -114,3 +114,28 @@ func TestReleaseURLsAreDownloadedOnceAndInstalledFromTheFile(t *testing.T) {
 		t.Fatalf("downloads %d, installs %d: %v", downloads, vsix, f.calls)
 	}
 }
+
+func TestInstallFindsAnEditorCLIInsideItsAppBundle(t *testing.T) {
+	// Cursor's installer does not put `cursor` on PATH; its CLI sits in the
+	// app bundle.
+	repo := t.TempDir()
+	file := filepath.Join(repo, "home", "darwin", "vscode", "config", "extensions.txt")
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("a.one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bundled := "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"
+	f := &fakeSys{have: map[string]bool{bundled: true}}
+	var out bytes.Buffer
+	if err := Install(f, ui.Printer{Out: &out, Err: &out}, repo); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.calls) == 0 || f.calls[0] != bundled+" --install-extension a.one" {
+		t.Fatalf("calls %v", f.calls)
+	}
+	if !strings.Contains(out.String(), "Cursor: 1 installed") {
+		t.Fatalf("out %q", out.String())
+	}
+}

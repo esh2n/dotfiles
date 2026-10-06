@@ -25,8 +25,13 @@ type Sys interface {
 	Has(name string) bool
 }
 
-// Editors are the command and name of each editor that reads the list.
-var Editors = [][2]string{{"code", "VS Code"}, {"cursor", "Cursor"}}
+// Editors are the command, name and bundled CLI of each editor that reads
+// the list. The bundled path is used when the command is not on PATH: the
+// macOS installers ship the CLI inside the app but do not always link it.
+var Editors = [][3]string{
+	{"code", "VS Code", "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"},
+	{"cursor", "Cursor", "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"},
+}
 
 // List reads the extension ids: one per line, # starts a comment.
 func List(text string) []string {
@@ -98,10 +103,13 @@ func Install(s Sys, p ui.Printer, repo string) error {
 	defer os.RemoveAll(dir)
 	ids := resolve(s, p, List(string(b)), dir)
 	for _, ed := range Editors {
-		cmd, name := ed[0], ed[1]
+		cmd, name, bundled := ed[0], ed[1], ed[2]
 		if !s.Has(cmd) {
-			p.Warn("%s is not installed; skipped", name)
-			continue
+			if !s.Has(bundled) {
+				p.Warn("%s is not installed; skipped", name)
+				continue
+			}
+			cmd = bundled
 		}
 		p.Note("installing %d %s extensions", len(ids), name)
 		failed := 0
