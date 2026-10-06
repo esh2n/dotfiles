@@ -1,7 +1,9 @@
 package theme
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -153,8 +155,19 @@ func applyVSCode(e Env, name string) error {
 		".config/Code/User/settings.json",
 		".config/Cursor/User/settings.json",
 	} {
-		real, err := filepath.EvalSymlinks(filepath.Join(e.Home, rel))
+		path := filepath.Join(e.Home, rel)
+		real, err := filepath.EvalSymlinks(path)
 		if err != nil {
+			// No file is an editor that is not installed; a link that leads
+			// nowhere is settings the editor cannot read either.
+			if _, lerr := os.Lstat(path); lerr != nil {
+				continue
+			}
+			if errors.Is(err, fs.ErrNotExist) {
+				e.warn("%s is a broken link; theme not applied (run make up)", path)
+			} else {
+				e.warn("%s: %v; theme not applied", path, err)
+			}
 			continue
 		}
 		re := regexp.MustCompile(`"workbench\.colorTheme": *"[^"]*"`)
