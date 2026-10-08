@@ -52,6 +52,21 @@
 		// },
 	],
 
+	// Tailscale SSH needs its own rule: "grants" open the network path to
+	// port 22, but the built-in SSH server (`tailscale set --ssh`) only
+	// accepts sessions an "ssh" rule allows, and pasting this file replaces
+	// the default policy that carried one. "accept" (not "check") so a
+	// session from the owner's own machine needs no browser re-login; root
+	// stays out (https://tailscale.com/kb/1193/tailscale-ssh).
+	"ssh": [
+		{
+			"action": "accept",
+			"src":    ["autogroup:member"],
+			"dst":    ["autogroup:self"],
+			"users":  ["autogroup:nonroot"],
+		},
+	],
+
 	// Tag-based variant, if the machines are ever tagged instead of user-owned
 	// (tagged devices are not "autogroup:self" of anyone). Direction-specific:
 	// hub (the Mac) -> node:4001, node -> hub:1234.
