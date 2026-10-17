@@ -47,6 +47,7 @@ func TestHelpIsASuccessEverywhere(t *testing.T) {
 	for _, args := range [][]string{
 		{"help"}, {"--help"}, {"wallpaper", "help"}, {"wallpaper", "-h"}, {"llm", "--help"},
 		{"setup", "help"}, {"theme", "-h"}, {"mado", "help"}, {"gh", "--help"}, {"cache-gc", "-h"},
+		{"pstack", "help"},
 	} {
 		var out, errOut bytes.Buffer
 		if code := run(args, &out, &errOut); code != 0 || !strings.Contains(out.String(), "usage") && !strings.Contains(out.String(), "mado") || errOut.Len() != 0 {
