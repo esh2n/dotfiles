@@ -49,6 +49,7 @@
  */
 
 import type { PathState } from "../../domain/claude/links";
+import type { RulesProfileRef } from "../../domain/claude/rules-profile";
 import {
   type CordisPatchPlan,
   type DeclaredOutside,
@@ -80,6 +81,8 @@ export interface DshApplyPaths {
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */
   readonly decisions: string;
+  /** The rules profile the AGENTS.md renders under; absent for the default rule set. */
+  readonly profile?: RulesProfileRef;
   /** DSH's harness home: `~/.dsh`, or `DSH_HOME`. */
   readonly dshHome: string;
   /** Which rule chose it, for the dry-run. */

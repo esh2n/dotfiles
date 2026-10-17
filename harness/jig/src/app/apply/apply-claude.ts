@@ -65,6 +65,7 @@ import { type ClaudeHookPaths, buildClaudeHooks } from "../../domain/claude/hook
 import type { PathState } from "../../domain/claude/links";
 import { DEFAULT_PERMITS } from "../../domain/claude/permits";
 import { selectRuleDirs } from "../../domain/claude/rules-dir";
+import type { RulesProfileRef } from "../../domain/claude/rules-profile";
 import { HOST_SANDBOX } from "../../domain/claude/sandbox";
 import { type ScriptCandidate, selectScriptFiles } from "../../domain/claude/scripts-dir";
 import {
@@ -117,6 +118,8 @@ export interface ClaudeApplyPaths {
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */
   readonly decisions: string;
+  /** The rules profile the AGENTS.md renders under; absent for the default rule set. */
+  readonly profile?: RulesProfileRef;
   /** Destination: `~/.claude/settings.json`. */
   readonly settings: string;
   /** Destination: `~/.claude/AGENTS.md`, generated. */

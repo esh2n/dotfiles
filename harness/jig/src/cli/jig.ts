@@ -12,7 +12,13 @@ import type { PiApplyPaths } from "../app/apply/apply-pi";
 import type { ApplyTargetPaths } from "../app/apply/apply-tiers";
 import type { BoxPorts } from "../app/box/ports";
 import { reportCoverage } from "../app/coverage/report-coverage";
-import { resolveAuditPath, resolveSessionsPath, resolveStateDir } from "../app/hooks/environment";
+import {
+  resolveAuditPath,
+  resolveRulesProfileFor,
+  resolveSessionsPath,
+  resolveSkillRoot,
+  resolveStateDir,
+} from "../app/hooks/environment";
 import type { RetirePaths } from "../app/retire/retire-yoki";
 import { skillQuestionMode } from "../app/routing/select-skills";
 import { SETUP_TARGETS, isSetupTarget, setupHarness } from "../app/setup/setup-harness";
@@ -21,6 +27,7 @@ import type { SkillRootPorts } from "../app/skills/toggle-invocation";
 import { assignTier, describeTiers } from "../app/tiers/assign";
 import { type AgentModels, parseAgentModels } from "../domain/claude/agent-models";
 import type { ClaudeHookPaths } from "../domain/claude/hooks";
+import type { RulesProfileRef } from "../domain/claude/rules-profile";
 import { DSH_PROFILES_DIR, DSH_PROFILE_PATCH_FILENAME, resolveDshHome } from "../domain/dsh/home";
 import { resolveOmpAgentDir } from "../domain/omp/agent-dir";
 import { resolvePiAgentDir } from "../domain/pi/agent-dir";
@@ -99,6 +106,38 @@ function harnessRoot(): string {
 }
 
 /**
+ * The rules profile in force for this apply, as the directory
+ * `harness/profiles/<name>/` (`domain/claude/rules-profile.ts`), or nothing
+ * for the default rule set. Read from `JIG_PROFILE` so that `jig apply` run
+ * for a second configuration directory (`CLAUDE_CONFIG_DIR=~/.claude-pstack
+ * JIG_PROFILE=pstack`) renders that directory's AGENTS.md from its profile.
+ * Only the Claude target carries it; `apply` refuses every other target while
+ * `JIG_PROFILE` is set (`refuseProfileUnlessClaude`), so the Codex, pi and
+ * DSH resolvers never see a profile.
+ */
+function profileDir(harness: string): { readonly profile?: RulesProfileRef } {
+  const name = resolveRulesProfileFor(process.env, "claude");
+  return name === undefined ? {} : { profile: { name, dir: join(harness, "profiles", name) } };
+}
+
+/**
+ * `JIG_PROFILE` left exported in a shell must not rewrite another harness's
+ * AGENTS.md from a reduced rule set. The target is read from the apply
+ * arguments before any path is resolved; a non-Claude target with a profile
+ * set is refused with the reason, and nothing is planned.
+ */
+function refuseProfileUnlessClaude(applyArgv: readonly string[]): string | undefined {
+  const at = applyArgv.indexOf("--target");
+  const target = at === -1 ? "(none)" : (applyArgv[at + 1] ?? "(none)");
+  try {
+    resolveRulesProfileFor(process.env, target);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+/**
  * Where the Claude Code target reads from and writes to.
  *
  * `CLAUDE_CONFIG_DIR` is honored for the destination because Claude Code
@@ -115,6 +154,7 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
     guardRules: join(harness, "policy", "guard-rules.json"),
     mcpServers: join(harness, "mcp", "servers.json"),
     decisions: join(harness, "rules", "decisions"),
+    ...profileDir(harness),
     settings: join(claudeDir, "settings.json"),
     // Claude Code keeps .claude.json in CLAUDE_CONFIG_DIR when that is set,
     // otherwise beside ~/.claude in the home directory.
@@ -357,17 +397,6 @@ function claudeHookPaths(): ClaudeHookPaths {
 }
 
 /**
- * Where the skill router reads the list a harness shows: `~/.claude/skills`,
- * the directory Claude Code itself loads from. After `jig apply --target
- * claude --write` that is the managed directory of per-skill links into the
- * harness; before it, yoki-switch's symlink to the same content. Overridable
- * for tests.
- */
-function resolveSkillRoot(env: Record<string, string | undefined> = process.env): string {
-  return env.JIG_SKILL_ROOT ?? join(homedir(), ".claude", "skills");
-}
-
-/**
  * Where the harnesses keep their session transcripts. Two directories, because the harnesses
  * are two programs; each honors its own override first (`PI_CODING_AGENT_SESSION_DIR`,
  * `CLAUDE_CONFIG_DIR`) so a moved session tree keeps working, then jig's override.
@@ -546,7 +575,8 @@ export async function main(argv: readonly string[]): Promise<number> {
               // `includeHidden` follows the fallback switch, which the hook decides: a
               // listing that is hidden and a catalog that skips hidden skills would leave
               // arm B' with no candidates at all.
-              catalog: (includeHidden) => readSkillCatalog(resolveSkillRoot(), { includeHidden }),
+              catalog: (includeHidden) =>
+                readSkillCatalog(resolveSkillRoot(process.env), { includeHidden }),
               record: (entry) =>
                 appendRouterLog(join(resolveStateDir(process.env), "skill-router.jsonl"), entry),
               // The cwd is the repository the prompt is about; the hook is started in it by
@@ -599,6 +629,11 @@ export async function main(argv: readonly string[]): Promise<number> {
       return result.code;
     }
     case "apply": {
+      const refused = refuseProfileUnlessClaude(argv.slice(1));
+      if (refused !== undefined) {
+        process.stderr.write(`jig apply: ${refused}\n`);
+        return 2;
+      }
       const applyPorts = createNodeApplyFs({
         stateDir: resolveStateDir(process.env),
         jigVersion: VERSION,
@@ -699,7 +734,11 @@ export async function main(argv: readonly string[]): Promise<number> {
       return result.code;
     }
     case "skills": {
-      const result = await skillsCli(argv.slice(1), skillRootPorts(), resolveSkillRoot());
+      const result = await skillsCli(
+        argv.slice(1),
+        skillRootPorts(),
+        resolveSkillRoot(process.env),
+      );
       process.stdout.write(result.stdout);
       return result.code;
     }
@@ -738,7 +777,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       const since = new Date(Date.now() - parsed.days * 24 * 60 * 60 * 1000);
       const files = await findTranscripts(resolveSessionRoots(), { since });
       const known = new Set(
-        (await readSkillCatalog(resolveSkillRoot())).map((skill) => skill.name),
+        (await readSkillCatalog(resolveSkillRoot(process.env))).map((skill) => skill.name),
       );
       const { report } = await reportSkillUsage({
         files,
