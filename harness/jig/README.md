@@ -330,10 +330,19 @@ left, that reads: `CLAUDE.md` backup-then-create; `skills`, `agents` and
 `create`; `commands` remove.
 
 The skill router (`hooks user-prompt-submit`, `serve`, `skills hide|show`)
-reads its default root from `~/.claude/skills`, the directory Claude Code
-itself loads from — before the first `--write` yoki-switch's symlink to the
-same content, after it the managed directory above. `JIG_SKILL_ROOT` still
-overrides it.
+reads its default root from `<config dir>/skills`, the directory Claude Code
+itself loads from — `~/.claude/skills`, or `$CLAUDE_CONFIG_DIR/skills` when a
+session runs in another configuration directory (Claude Code hands its
+environment to the hook). `JIG_SKILL_ROOT` still overrides it.
+
+A second configuration directory can render its AGENTS.md from a **rules
+profile**: `JIG_PROFILE=<name>` selects `harness/profiles/<name>/rules.json`,
+which names the `rules/common/*.md` to keep and whether the decision lines go
+in, and adds the profile's own `rules/*.md` after them
+(`src/domain/claude/rules-profile.ts`, `harness/profiles/README.md`). The
+one profile today is `pstack`, applied by `dotctl pstack setup` as
+`CLAUDE_CONFIG_DIR=~/.claude-pstack JIG_PROFILE=pstack jig apply --target
+claude --write`.
 
 Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
 `.<x>-merged` staging directory stayed with `yoki-switch` until milestone 4

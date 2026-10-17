@@ -364,7 +364,7 @@ function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     "--- AGENTS.md (generated) ---",
     agentsMd.content.trimEnd(),
   ];
@@ -605,7 +605,7 @@ function codexAgentsMdLines(report: CodexApplyReport): readonly string[] {
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     ...(agentsMd.diff === ""
       ? ["  (no differences)"]
       : ["--- diff (current vs generated) ---", agentsMd.diff]),
@@ -953,7 +953,7 @@ function piAgentsMdLines(report: PiApplyReport): readonly string[] {
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     ...(agentsMd.diff === ""
       ? ["  (no differences)"]
       : ["--- diff (current vs generated) ---", agentsMd.diff]),
@@ -1217,7 +1217,7 @@ function dshAgentsMdLines(report: DshApplyReport, paths: DshApplyPaths): readonl
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     ...(agentsMd.diff === ""
       ? ["  (no differences)"]
       : ["--- diff (current vs generated) ---", agentsMd.diff]),

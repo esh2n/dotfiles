@@ -49,6 +49,7 @@ import type { ModelMapping } from "../../domain/claude/agent-definition";
 import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { type PathState, backupPath } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
+import type { RulesProfileRef } from "../../domain/claude/rules-profile";
 import {
   type CodexModelChoice,
   codexAgentFileName,
@@ -89,6 +90,8 @@ export interface CodexApplyPaths {
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */
   readonly decisions: string;
+  /** The rules profile the AGENTS.md renders under; absent for the default rule set. */
+  readonly profile?: RulesProfileRef;
   /**
    * The trees yoki-switch linked skills from (`claude-profiles/{core,packs,personal}/skills`
    * and their parents): a link under one of them is stale, not somebody's.

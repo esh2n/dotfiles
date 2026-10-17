@@ -33,6 +33,11 @@ import {
   type ManagedSelection,
   reconcileManagedDir,
 } from "../../domain/claude/managed-dir";
+import {
+  type RulesProfileRef,
+  parseRulesProfile,
+  selectCommon,
+} from "../../domain/claude/rules-profile";
 import { type SkillCandidate, selectSkillDirs } from "../../domain/claude/skills-dir";
 import { unifiedDiff } from "../../domain/tiers/diff";
 import { type PlanAction, planApply } from "../../domain/tiers/plan";
@@ -51,6 +56,8 @@ export interface AgentsMdReport {
   readonly commonFiles: readonly string[];
   /** Decision notes the renderer skipped, with why. */
   readonly skipped: readonly SkippedDecision[];
+  /** The rules profile rendered under, when one is in force — reported so a reduced rule set is never silent. */
+  readonly profile?: string;
   /**
    * Set when a file jig never wrote stands at the path: on `--write` it is
    * renamed to this before the first generated file lands, so the hand-written
@@ -104,22 +111,64 @@ export async function readMarkdownDir(
   return sources;
 }
 
-/** The generated AGENTS.md: one source (`rules/`), rendered once, whichever harness's directory it lands in. */
+/**
+ * The generated AGENTS.md: one source (`rules/`), rendered once, whichever
+ * harness's directory it lands in. Under a rules profile
+ * (`domain/claude/rules-profile.ts`; `paths.profile` names it and its
+ * directory `harness/profiles/<name>/`) only the profile's chosen common rules render,
+ * the profile's own `rules/*.md` follow them, and the decision lines render
+ * only when the profile says so. A profile that names a common rule that
+ * does not exist stops the build: rendering fewer rules than the profile
+ * meant is exactly the silent failure a profile must not have.
+ */
 export async function buildAgentsMd(
   ports: ClaudeApplyPorts,
-  paths: { readonly harnessRoot: string; readonly decisions: string },
+  paths: {
+    readonly harnessRoot: string;
+    readonly decisions: string;
+    readonly profile?: RulesProfileRef;
+  },
 ): Promise<{
   readonly content: string;
   readonly commonFiles: readonly string[];
   readonly skipped: readonly SkippedDecision[];
+  /** The rules profile's name, when one is in force. */
+  readonly profile?: string;
 }> {
-  const common = await readMarkdownDir(ports, `${paths.harnessRoot}/rules/common`, isCommonRule);
+  const allCommon = await readMarkdownDir(ports, `${paths.harnessRoot}/rules/common`, isCommonRule);
   const notes = await readMarkdownDir(ports, paths.decisions, (name) => name.endsWith(".md"));
   const decisions = decisionLines(notes);
+  if (paths.profile === undefined) {
+    return {
+      content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common: allCommon, decisions }),
+      commonFiles: allCommon.map((source) => source.file),
+      skipped: decisions.skipped,
+    };
+  }
+  const { name, dir } = paths.profile;
+  const text = await ports.readFile(`${dir}/rules.json`);
+  if (text === undefined) {
+    throw new Error(`rules profile "${name}": ${dir}/rules.json does not exist`);
+  }
+  const profile = parseRulesProfile(name, text);
+  const { kept, missing } = selectCommon(allCommon, profile);
+  if (missing.length > 0) {
+    throw new Error(
+      `rules profile "${name}" names common rules that do not exist: ${missing.join(", ")}`,
+    );
+  }
+  const extra = await readMarkdownDir(ports, `${dir}/rules`, isCommonRule);
   return {
-    content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common, decisions }),
-    commonFiles: common.map((source) => source.file),
-    skipped: decisions.skipped,
+    content: renderAgentsMd({
+      harnessRoot: paths.harnessRoot,
+      common: kept,
+      extra,
+      profile: name,
+      ...(profile.decisions ? { decisions } : {}),
+    }),
+    commonFiles: [...kept.map((source) => source.file), ...extra.map((source) => source.file)],
+    skipped: profile.decisions ? decisions.skipped : [],
+    profile: name,
   };
 }
 
@@ -154,6 +203,7 @@ export async function planAgentsMd(
     diff: unifiedDiff(input.path, current ?? "", "generated", input.generated.content),
     commonFiles: input.generated.commonFiles,
     skipped: input.generated.skipped,
+    ...(input.generated.profile === undefined ? {} : { profile: input.generated.profile }),
     ...(plan.action === "write" && current !== undefined && input.manifest[input.path] === undefined
       ? { backupPath: backupPath(input.path, input.now) }
       : {}),

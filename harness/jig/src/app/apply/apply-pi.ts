@@ -48,6 +48,7 @@
 
 import type { PathState } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
+import type { RulesProfileRef } from "../../domain/claude/rules-profile";
 import { parseMcpLayer } from "../../domain/mcp/parse";
 import { buildPiMcpServers, planPiMcpJson } from "../../domain/pi/mcp";
 import {
@@ -81,6 +82,8 @@ export interface PiApplyPaths {
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */
   readonly decisions: string;
+  /** The rules profile the AGENTS.md renders under; absent for the default rule set. */
+  readonly profile?: RulesProfileRef;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
   readonly formerSkillRoots: readonly string[];
   /** Destination: `~/.agents/skills`, the cross-harness mount, one link per skill. */

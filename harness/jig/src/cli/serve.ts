@@ -13,8 +13,6 @@
  */
 
 import { timingSafeEqual } from "node:crypto";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { type AnswerCompactionDeps, answerCompaction } from "../app/compaction/answer-compaction";
 import type { CompactionResult } from "../app/compaction/compact";
 import { type AnswerDecisionDeps, answerDecision } from "../app/decision/answer-decision";
@@ -24,6 +22,7 @@ import {
   answerSkill,
 } from "../app/decision/answer-skill";
 import { type AnswerTierDeps, type TierDecision, answerTier } from "../app/decision/answer-tier";
+import { resolveSkillRoot } from "../app/hooks/environment";
 import { skillQuestionMode } from "../app/routing/select-skills";
 import type { DecisionProvider } from "../domain/decision/provider";
 import type {
@@ -128,16 +127,6 @@ export async function respondToSkill(
     status: result.kind === "bad-request" ? 400 : 502,
     body: { op: "error", error: { kind: result.kind, message: result.message } },
   };
-}
-
-/**
- * Where the skill endpoint reads the list a harness shows. Matches the hook's own
- * default (`cli/jig.ts`): `~/.claude/skills`, the directory Claude Code itself loads
- * from — after `jig apply --target claude --write` a managed directory of per-skill
- * links into the harness, before it yoki-switch's symlink to the same content.
- */
-function defaultSkillRoot(): string {
-  return join(homedir(), ".claude", "skills");
 }
 
 /**
@@ -499,8 +488,7 @@ export function serveDecisionService(
   };
   const skillDeps: AnswerSkillDeps = {
     ...deps,
-    catalog:
-      options.skillCatalog ?? (() => readSkillCatalog(env.JIG_SKILL_ROOT ?? defaultSkillRoot())),
+    catalog: options.skillCatalog ?? (() => readSkillCatalog(resolveSkillRoot(env))),
     // Resolved from the same parser the hook uses, so the harnesses that route through
     // `/skill` (pi, DSH) and the one that decides client-side ask the SAME question. Two
     // shapes of the skill question running side by side would make the router log a

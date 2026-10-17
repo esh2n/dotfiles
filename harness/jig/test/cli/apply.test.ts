@@ -309,7 +309,7 @@ describe("applyCli --target claude", () => {
     expect(result.stdout).toMatch(
       /AGENTS\.md: write {2}\/home\/u\/\.claude\/AGENTS\.md {2}\(\d+ bytes\)/,
     );
-    expect(result.stdout).toContain("rules/common rendered in (1): core.md");
+    expect(result.stdout).toContain("rules rendered in (1): core.md");
     expect(result.stdout).toContain("--- AGENTS.md (generated) ---");
     expect(result.stdout).toContain("Be brief.");
     expect(result.stdout).not.toContain("PREVIEW ONLY");
@@ -673,7 +673,7 @@ describe("applyCli --target codex", () => {
       /AGENTS\.md: write {2}\/home\/u\/\.codex\/AGENTS\.md {2}\(\d+ bytes\)/,
     );
     expect(result.stdout).toContain("the same generated content as ~/.claude/AGENTS.md");
-    expect(result.stdout).toContain("rules/common rendered in (1): core.md");
+    expect(result.stdout).toContain("rules rendered in (1): core.md");
     expect(result.stdout).toContain("agents (generated files): /home/u/.codex/agents");
     expect(result.stdout).toContain("1 agent definition → <name>.toml");
     expect(result.stdout).toMatch(
