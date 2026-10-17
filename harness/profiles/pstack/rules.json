@@ -1,0 +1,5 @@
+{
+  "_comment": "The rules profile of the pstack evaluation configuration directory (rules/decisions/2026-10-17-pstack-evaluation-profile.md). It keeps the house rules that are about safety and conventions and drops the ones that say how work is run, because /pstack:poteto-mode is itself a way of running work and two routers in one session fight. Rendered by `jig apply` when JIG_PROFILE=pstack; the profile-only rules are in ./rules/.",
+  "common": ["10-git.md", "30-security.md", "40-languages.md"],
+  "decisions": false
+}
