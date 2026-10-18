@@ -724,6 +724,12 @@ function agentFileLines(report: CodexApplyReport): readonly string[] {
       ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
     );
   }
+  if (agents.stale.length > 0) {
+    lines.push(
+      `  source gone, removed on --write (${agents.stale.length}):`,
+      ...agents.stale.map((entry) => `    ${entry.name}`),
+    );
+  }
   if (agents.foreign.length > 0) {
     lines.push(
       `  not jig's (${agents.foreign.length}), left alone:`,
@@ -839,6 +845,12 @@ function ompAgentFileLines(report: OmpApplyReport): readonly string[] {
     lines.push(
       `  not generated (${agents.excluded.length}):`,
       ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
+    );
+  }
+  if (agents.stale.length > 0) {
+    lines.push(
+      `  source gone, removed on --write (${agents.stale.length}):`,
+      ...agents.stale.map((entry) => `    ${entry.name}`),
     );
   }
   if (agents.foreign.length > 0) {

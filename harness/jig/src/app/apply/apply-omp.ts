@@ -76,6 +76,13 @@ import {
   readJson,
   withBackup,
 } from "./delivery";
+import {
+  type StaleAgentFile,
+  fromPack,
+  reasonOf,
+  removeStale,
+  sortLeftovers,
+} from "./generated-agents";
 import { agentPlan, loadPlugins } from "./plugins";
 import type { OmpApplyPorts } from "./ports";
 
@@ -129,7 +136,9 @@ export interface OmpAgentsDirReport {
   readonly files: readonly OmpAgentFileReport[];
   /** Source entries that produce no file, with why. */
   readonly excluded: readonly { readonly name: string; readonly reason: string }[];
-  /** Entries of the destination that no source produces: not jig's, left alone. */
+  /** Files jig wrote whose source is gone, unchanged since: removed on `--write`. */
+  readonly stale: readonly StaleAgentFile[];
+  /** Entries of the destination that no source produces: not jig's, or edited since jig wrote them. Left alone. */
   readonly foreign: readonly { readonly name: string; readonly what: string }[];
   /** Source tiers with no omp model, and how many agents name each. */
   readonly unmappedTiers: readonly { readonly tier: string; readonly count: number }[];
@@ -231,6 +240,7 @@ async function planAgents(
   const { selection, targetOf } = await agentPlan(ports, sourceDir, plugins);
 
   const files: OmpAgentFileReport[] = [];
+  const excluded = [...selection.excluded];
   const produced = new Set<string>();
   const unmappedTiers = new Map<string, number>();
   const unmappedTools = new Map<string, number>();
@@ -239,25 +249,33 @@ async function planAgents(
     const text = await ports.readFile(sourcePath);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
-    const { definition, model } = decide(sourceFile, () => {
-      const parsed = parseAgentDefinition(text, stem);
-      return {
-        definition: parsed,
-        model: modelChoiceFor(parsed.model, options.ompModels, parsed.models?.omp),
-      };
-    });
+    let built: {
+      model: ModelChoice;
+      tools: ReturnType<typeof translateTools>;
+      content: string;
+    };
+    try {
+      const { definition, model } = decide(sourceFile, () => {
+        const parsed = parseAgentDefinition(text, stem);
+        return {
+          definition: parsed,
+          model: modelChoiceFor(parsed.model, options.ompModels, parsed.models?.omp),
+        };
+      });
+      const tools = translateTools(definition.tools);
+      const content = renderOmpAgent({ definition, model, tools, sourcePath });
+      options.validateFrontmatter?.(ompAgentFrontmatter(content));
+      built = { model, tools, content };
+    } catch (error) {
+      if (!fromPack(sourcePath, sourceDir)) throw error;
+      excluded.push({ name: sourceFile, reason: reasonOf(error) });
+      continue;
+    }
+    const { model, tools, content } = built;
     if (model.kind === "unmapped") {
       unmappedTiers.set(model.tier, (unmappedTiers.get(model.tier) ?? 0) + 1);
     }
-    const tools = translateTools(definition.tools);
     for (const tool of tools.unmapped) unmappedTools.set(tool, (unmappedTools.get(tool) ?? 0) + 1);
-    const content = renderOmpAgent({
-      definition,
-      model,
-      tools,
-      sourcePath,
-    });
-    options.validateFrontmatter?.(ompAgentFrontmatter(content));
     const name = ompAgentFileName(sourceFile);
     const path = `${paths.agentsDir}/${name}`;
     produced.add(name);
@@ -283,10 +301,7 @@ async function planAgents(
     });
   }
 
-  const foreign = (await listEntries(ports, paths.agentsDir))
-    .filter((entry) => !produced.has(entry.name))
-    .map((entry) => ({ name: entry.name, what: describePathState(entry.state) }))
-    .sort((a, b) => compare(a.name, b.name));
+  const { stale, foreign } = await sortLeftovers(ports, paths.agentsDir, produced, manifest);
 
   const counted = (map: Map<string, number>) =>
     [...map.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count);
@@ -294,7 +309,8 @@ async function planAgents(
   return {
     path: paths.agentsDir,
     files,
-    excluded: selection.excluded,
+    excluded,
+    stale,
     foreign,
     unmappedTiers: counted(unmappedTiers).map(({ key, count }) => ({ tier: key, count })),
     unmappedTools: counted(unmappedTools).map(({ key, count }) => ({ tool: key, count })),
@@ -459,6 +475,7 @@ function needsWrite(report: Omit<OmpApplyReport, "outcome" | "wrote" | "message"
   return (
     managedDirChanges(report.agentsSkillsDir) ||
     report.agents.files.some((file) => file.outcome === "write") ||
+    report.agents.stale.length > 0 ||
     report.mcpJson.outcome === "write" ||
     report.configYml.outcome === "write" ||
     report.extensions.link.state !== "ok"
@@ -536,6 +553,7 @@ export async function applyOmp(
       await ports.writeAtomic(file.path, file.content);
       manifest[file.path] = ports.sha256(file.content);
     }
+    await removeStale(ports, agents.stale, manifest);
     if (mcp.report.outcome === "write") {
       await ports.writeAtomic(paths.mcpJson, mcp.generated);
       manifest[paths.mcpJson] = ports.sha256(mcp.report.block);

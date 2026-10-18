@@ -80,6 +80,13 @@ import {
   planAgentsSkillsMount,
   readJson,
 } from "./delivery";
+import {
+  type StaleAgentFile,
+  fromPack,
+  reasonOf,
+  removeStale,
+  sortLeftovers,
+} from "./generated-agents";
 import { agentPlan, loadPlugins } from "./plugins";
 import type { CodexApplyPorts } from "./ports";
 
@@ -140,7 +147,9 @@ export interface AgentsDirReport {
   readonly files: readonly AgentFileReport[];
   /** Source entries that produce no file, with why. */
   readonly excluded: readonly { readonly name: string; readonly reason: string }[];
-  /** Entries of the destination that no source produces: not jig's, left alone. */
+  /** Files jig wrote whose source is gone, unchanged since: removed on `--write`. */
+  readonly stale: readonly StaleAgentFile[];
+  /** Entries of the destination that no source produces: not jig's, or edited since jig wrote them. Left alone. */
   readonly foreign: readonly { readonly name: string; readonly what: string }[];
   /** Where the tier table came from, when the caller said. */
   readonly mappingSource?: string;
@@ -271,6 +280,7 @@ async function planAgents(
   const { selection, targetOf } = await agentPlan(ports, sourceDir, plugins);
 
   const files: AgentFileReport[] = [];
+  const excluded = [...selection.excluded];
   const produced = new Set<string>();
   const mapped = new Map<string, MappedTierReport>();
   const unmapped = new Map<string, number>();
@@ -279,13 +289,24 @@ async function planAgents(
     const text = await ports.readFile(sourcePath);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
-    const { definition, model } = decide(sourceFile, () => {
-      const parsed = parseAgentDefinition(text, stem);
-      return {
-        definition: parsed,
-        model: codexModelFor(parsed.model, options.codexModels, parsed.models?.codex),
-      };
-    });
+    let built: { model: CodexModelChoice; content: string };
+    try {
+      const { definition, model } = decide(sourceFile, () => {
+        const parsed = parseAgentDefinition(text, stem);
+        return {
+          definition: parsed,
+          model: codexModelFor(parsed.model, options.codexModels, parsed.models?.codex),
+        };
+      });
+      const content = renderCodexAgent({ definition, model, sourcePath });
+      options.validateToml?.(content);
+      built = { model, content };
+    } catch (error) {
+      if (!fromPack(sourcePath, sourceDir)) throw error;
+      excluded.push({ name: sourceFile, reason: reasonOf(error) });
+      continue;
+    }
+    const { model, content } = built;
     if (model.kind === "unmapped") unmapped.set(model.tier, (unmapped.get(model.tier) ?? 0) + 1);
     if (model.kind === "mapped" && model.override === undefined && model.tier !== undefined) {
       const seen = mapped.get(model.tier);
@@ -296,12 +317,6 @@ async function planAgents(
         count: (seen?.count ?? 0) + 1,
       });
     }
-    const content = renderCodexAgent({
-      definition,
-      model,
-      sourcePath,
-    });
-    options.validateToml?.(content);
     const name = codexAgentFileName(sourceFile);
     const path = `${paths.agentsDir}/${name}`;
     produced.add(name);
@@ -326,15 +341,13 @@ async function planAgents(
     });
   }
 
-  const foreign = (await listEntries(ports, paths.agentsDir))
-    .filter((entry) => !produced.has(entry.name))
-    .map((entry) => ({ name: entry.name, what: describePathState(entry.state) }))
-    .sort((a, b) => compare(a.name, b.name));
+  const { stale, foreign } = await sortLeftovers(ports, paths.agentsDir, produced, manifest);
 
   return {
     path: paths.agentsDir,
     files,
-    excluded: selection.excluded,
+    excluded,
+    stale,
     foreign,
     ...(options.modelsSource === undefined ? {} : { mappingSource: options.modelsSource }),
     mappedTiers: [...mapped.values()].sort((a, b) => b.count - a.count),
@@ -495,6 +508,7 @@ function needsWrite(report: Omit<CodexApplyReport, "outcome" | "wrote" | "messag
     managedDirChanges(report.agentsSkillsDir) ||
     report.agentsMd.outcome === "write" ||
     report.agents.files.some((file) => file.outcome === "write") ||
+    report.agents.stale.length > 0 ||
     report.configToml.outcome === "write"
   );
 }
@@ -567,6 +581,7 @@ export async function applyCodex(
       await ports.writeAtomic(file.path, file.content);
       manifest[file.path] = ports.sha256(file.content);
     }
+    await removeStale(ports, agents.stale, manifest);
     if (config.report.outcome === "write") {
       await ports.writeAtomic(paths.configToml, config.generated);
       manifest[paths.configToml] = ports.sha256(config.report.block);
