@@ -1,6 +1,6 @@
 # pstack は丸ごと、専用の Claude Code プロファイルの中で評価する
 
-Status: accepted — 持ち主の裁定（2026-10-17）。`2026-09-22-skills-add-two-drop-duplicates-move-assets.md` の「外部 skill は確認された欠落のあるものだけ」は `harness/skills/` への取り込みについての決定であり、この決定はそれを変えない（pstack は取り込まず、別の部屋で読み込む）。`2026-09-23-language-rules-fold-into-skills.md` の「`rules/` は common・decisions・research（と knowledge）だけ」も変えない（プロファイルは `harness/profiles/` にあり `rules/` の下ではない）
+Status: superseded by 2026-10-18-pstack-shared-skills.md（別の設定ディレクトリと起動コマンドをやめ、4 つのハーネスの普段のコマンドで使う形にした。worktree の強制削除と PR の merge を止める規則はそちらが引き継ぐ） — accepted — 持ち主の裁定（2026-10-17）。`2026-09-22-skills-add-two-drop-duplicates-move-assets.md` の「外部 skill は確認された欠落のあるものだけ」は `harness/skills/` への取り込みについての決定であり、この決定はそれを変えない（pstack は取り込まず、別の部屋で読み込む）。`2026-09-23-language-rules-fold-into-skills.md` の「`rules/` は common・decisions・research（と knowledge）だけ」も変えない（プロファイルは `harness/profiles/` にあり `rules/` の下ではない）
 
 rule: pstack is evaluated whole, only inside its own Claude Code configuration directory (`~/.claude-pstack`, rules profile `pstack`, started with `dotctl pstack run` / `claude-pstack`), loaded per session with `--plugin-dir` from a checkout pinned in `harness/profiles/pstack/upstream.json`. Never install pstack into `~/.claude/skills`, `~/.agents/skills` or the default profile, never vendor it into `harness/skills/`, and never adopt a port that ships hooks.
 
