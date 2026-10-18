@@ -109,6 +109,18 @@ describe("planRegistration", () => {
 
 describe("planTrust", () => {
   const key = "/h/hooks.json:pre_tool_use:0:0";
+
+  test("goes just before jig's MCP block, so neither command moves the other's block", () => {
+    const withMcp =
+      '[features]\nhooks = true\n\n# jig:begin mcp\n[mcp_servers.x]\nurl = "u"\n# jig:end mcp\n';
+    const plan = planTrust(withMcp, [key], [trustTable(key, "abc")]);
+    expect(plan.configToml.indexOf(JIG_BLOCK_BEGIN)).toBeLessThan(
+      plan.configToml.indexOf("# jig:begin mcp"),
+    );
+    expect(plan.configToml.endsWith("# jig:end mcp\n")).toBe(true);
+    expect(planTrust(plan.configToml, [key], [trustTable(key, "abc")]).changed).toBe(false);
+    expect(() => Bun.TOML.parse(plan.configToml)).not.toThrow();
+  });
   const table = trustTable(key, "abc");
 
   test("appends a jig block after everything else", () => {

@@ -8,6 +8,7 @@ import {
   ownedView,
   planMcpBlock,
   renderMcpBlock,
+  serversDeclaredAsKeys,
   yokiLeftovers,
 } from "../../../src/domain/codex/config";
 import type { McpServer } from "../../../src/domain/mcp/types";
@@ -223,5 +224,43 @@ describe("ownedView", () => {
 
   test("nothing owned in the file reads as nothing", () => {
     expect(ownedView(Bun.TOML.parse("[features]\nhooks = true\n"), names)).toBeUndefined();
+  });
+});
+
+describe("what Codex and the user keep beside jig's tables", () => {
+  const tables = buildCodexMcpTables(SERVERS, { HOME: "/h" });
+  const names = tables.map((table) => table.name);
+
+  test("a tool approval Codex records under a jig server is kept and is not drift", () => {
+    const written = planMcpBlock("", tables).configToml;
+    const approved = `${written}\n[mcp_servers.serena.tools.find_symbol]\napproval_mode = "approve"\n`;
+    expect(ownedView(Bun.TOML.parse(approved), names)).toBe(
+      ownedView(Bun.TOML.parse(written), names),
+    );
+    const again = planMcpBlock(approved, tables).configToml;
+    expect(again).toContain('[mcp_servers.serena.tools.find_symbol]\napproval_mode = "approve"');
+    expect(() => Bun.TOML.parse(again)).not.toThrow();
+  });
+
+  test("a multi-line status_line the user wrote is replaced whole, and the result loads", () => {
+    const before = '[tui]\nstatus_line = [\n  "model",\n  "current-dir",\n]\nanimations = false\n';
+    const plan = planMcpBlock(before, tables);
+    const parsed = Bun.TOML.parse(plan.configToml) as {
+      tui: { status_line: string[]; animations: boolean };
+    };
+    expect(parsed.tui).toEqual({ status_line: [...CODEX_STATUS_LINE], animations: false });
+  });
+
+  test("a string holding a line like a jig table is left alone", () => {
+    const before =
+      '[agents.x]\ndeveloper_instructions = """\n[mcp_servers.serena]\ncommand = "fake"\n"""\n';
+    const plan = planMcpBlock(before, tables);
+    expect(plan.configToml).toContain('"""\n[mcp_servers.serena]\ncommand = "fake"\n"""');
+    expect(() => Bun.TOML.parse(plan.configToml)).not.toThrow();
+  });
+
+  test("a server written as a key of a bare [mcp_servers] table is named", () => {
+    const toml = '[mcp_servers]\nserena = { command = "uvx" }\nother.command = "x"\n';
+    expect(serversDeclaredAsKeys(toml, names)).toEqual(["serena"]);
   });
 });

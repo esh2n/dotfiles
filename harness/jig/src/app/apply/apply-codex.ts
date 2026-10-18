@@ -61,6 +61,7 @@ import {
   ownedView,
   planMcpBlock,
   renderMcpBlock,
+  serversDeclaredAsKeys,
   yokiLeftovers,
 } from "../../domain/codex/config";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -171,7 +172,8 @@ export interface ConfigTomlReport {
   /** Servers the block carries, in source order. */
   readonly servers: readonly string[];
   readonly block: string;
-  /** `[mcp_servers.<name>]` tables outside jig's block for servers jig writes: each a conflict. */
+  /** Servers jig writes that the file declares as keys of a bare `[mcp_servers]`: conflicts. */
+  readonly declaredAsKeys: readonly string[];
   /** What yoki left in the file, named for milestone 4. */
   readonly yokiLeftovers: readonly string[];
 }
@@ -370,8 +372,11 @@ async function planConfigToml(
 
   const current = await ports.readFile(paths.configToml);
   const names = tables.map((table) => table.name);
+  const asKeys = current === undefined ? [] : serversDeclaredAsKeys(current, names);
   const plan = planMcpBlock(current, tables, previousMcpNames(manifest, paths));
-  options.validateToml?.(plan.configToml);
+  // a server also declared as a key of [mcp_servers] would make the result
+  // a duplicate the parser rejects; that is reported as the conflict below
+  if (asKeys.length === 0) options.validateToml?.(plan.configToml);
   const compared = comparedForms(ports, paths, options, manifest, {
     current,
     currentBlock: plan.currentBlock,
@@ -396,6 +401,7 @@ async function planConfigToml(
       diff: unifiedDiff(paths.configToml, current ?? "", "generated", plan.configToml),
       servers: names,
       block,
+      declaredAsKeys: asKeys,
       yokiLeftovers: current === undefined ? [] : yokiLeftovers(current),
     },
   };
@@ -536,6 +542,10 @@ export async function applyCodex(
           "config.toml's jig MCP block differs from both jig's last write and the newly generated block",
         ]
       : []),
+    ...config.report.declaredAsKeys.map(
+      (name) =>
+        `config.toml declares ${name} as a key of [mcp_servers], not as [mcp_servers.${name}]; move or remove it by hand before --write`,
+    ),
   ];
   if (conflicts.length > 0) {
     return {
@@ -587,7 +597,6 @@ export async function applyCodex(
   return { ...base, outcome: changes ? "write" : "noop", wrote: false };
 }
 
-/** Record every generated file's hash that is not recorded yet. True when anything was added. */
 /**
  * When config.toml already holds exactly what jig would write, record the
  * names and the by-value hash an older apply did not keep, so the next
@@ -610,6 +619,7 @@ function seedConfigRecords(
   return added;
 }
 
+/** Record every generated file's hash that is not recorded yet. True when anything was added. */
 function seedManifest(
   ports: CodexApplyPorts,
   manifest: Record<string, string>,

@@ -23,7 +23,10 @@
  * JSON, sha256 hex.
  */
 
-import { joinSections, parseSections, tidy, withoutLines } from "./toml-sections";
+import { joinSections, parseSections, removeSections, tidy, withoutLines } from "./toml-sections";
+
+/** `config.ts`'s MCP block marker; repeated here so the two modules need not import each other. */
+const MCP_MARKER = "# jig:begin mcp";
 
 export const PRE_TOOL_USE = "PreToolUse";
 export const PRE_TOOL_USE_LABEL = "pre_tool_use";
@@ -191,18 +194,26 @@ export function planTrust(
 ): TrustPlan {
   const before = existing ?? "";
   const owned = new Set(keys);
-  const kept = parseSections(withoutLines(before, [JIG_BLOCK_BEGIN, JIG_BLOCK_END])).filter(
+  const kept = removeSections(
+    parseSections(withoutLines(before, [JIG_BLOCK_BEGIN, JIG_BLOCK_END])),
     (section) =>
-      !(
-        section.path?.length === 3 &&
-        section.path[0] === "hooks" &&
-        section.path[1] === "state" &&
-        owned.has(section.path[2] ?? "")
-      ),
+      section.path?.length === 3 &&
+      section.path[0] === "hooks" &&
+      section.path[1] === "state" &&
+      owned.has(section.path[2] ?? ""),
   );
   const stripped = tidy(joinSections(kept));
   const block = `${JIG_BLOCK_BEGIN}\n${tables.join("\n")}${JIG_BLOCK_END}\n`;
-  const configToml = stripped === "" ? block : `${stripped}\n\n${block}`;
+  // The trust block goes just before jig's MCP block when there is one, so
+  // `jig apply --target codex` (which appends its block last) and this
+  // command agree on the order and neither moves the other's block.
+  const mcpAt = stripped.indexOf(`\n${MCP_MARKER}\n`);
+  const configToml =
+    stripped === ""
+      ? block
+      : mcpAt === -1
+        ? `${stripped}\n\n${block}`
+        : `${tidy(stripped.slice(0, mcpAt))}\n\n${block}\n${stripped.slice(mcpAt + 1)}\n`;
   return { configToml, changed: configToml !== before };
 }
 
