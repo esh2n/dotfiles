@@ -3,6 +3,7 @@
 Status: accepted — 実地で別マシン到達をやっている全員が「推論サーバーは loopback、境界は Tailscale の身元だけ」で、受付層を外に向ける前例はゼロ。サーバーは LM Studio を維持する証拠が揃い（headless・tool calling・structured output が公式、実測 parallel 4）、スマホは Open WebUI 以外の実務解が見つからない（2026-09-23）
 
 rule: Expose only LM Studio over the tailnet (`tailscale serve --bg --tcp 1234 127.0.0.1:1234`); keep LiteLLM loopback-only on every machine, one instance per machine, pointing at the local LM Studio when it answers and at the Mac's tailnet name otherwise; keep jig's tiers at `localhost:4000` unchanged; serve the phone through Open WebUI on the Mac over Tailscale; aggregate metrics by the Mac's Prometheus scraping each machine's LiteLLM /metrics over the tailnet (LiteLLM's dedicated metrics listener `--prometheus_metrics_port 4001`, served with `tailscale serve --tcp 4001`; the chat port 4000 stays loopback); separation of other users = op key references + tailnet membership. Never expose LiteLLM or LM Studio to the LAN or the internet.
+scope: repo
 
 ## Problem
 

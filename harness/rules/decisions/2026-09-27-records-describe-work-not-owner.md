@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-27）。
 
 rule: Records in this public repository (research, knowledge, decisions, plans, writeups, commit messages) describe the work, never the owner as a person: no tone, personality, mood or habits of speech; no misspellings or misremembered names the owner used; no quotation of the owner's messages or prompts; and no personal or home details — usernames, local paths that carry them, account, vault or secret-store names, machine models and specs, network or security state, work matters. State a requirement as the requirement, a ruling as "accepted by the owner, <date>", a mistaken name as the correct name alone, and a machine by its role and only the capacity the work depends on ("the Linux GPU box, 24 GB of VRAM").
+scope: repo
 
 ## Problem
 

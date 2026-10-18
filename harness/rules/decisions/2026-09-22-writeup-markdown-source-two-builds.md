@@ -3,6 +3,7 @@
 Status: accepted — 記録の元を Markdown にするのは業界の収束と一致し、非公開の出し分けは添付の漏れが構造的なのでビルドを分け、記法は CommonMark 互換で lint を通す（2026-09-22）
 
 rule: Write all records (research, decisions, work notes) as Markdown in git, never hand-written HTML; check rules/research/INDEX.md before researching so established facts aren't re-researched. Build human-facing views twice from the same Markdown — a private site with everything and a public site selecting only publish: true records at the source — using CommonMark notation only (> [!type], :::name), never JSX.
+scope: repo
 
 ## Problem
 

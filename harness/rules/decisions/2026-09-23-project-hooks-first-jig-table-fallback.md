@@ -3,6 +3,7 @@
 Status: accepted — 業界の多数派はハーネス側の薄い対応表だが、プロジェクトが自分の手順（lefthook / pre-commit）を持つ大規模リポジトリはそれに委譲している。持ち主の裁定（2026-09-23）で、プロジェクトの規則を最優先にする
 
 rule: When the project defines its own hooks (`lefthook.yml` / `.lefthook.yml` or `.pre-commit-config.yaml` at the project root), jig's edit-time formatter and Stop-time gate run those on the touched files instead of jig's own table; jig's extension→formatter and marker→gate tables apply only to projects with no such file. Never override a project's own lint or format rules with harness defaults.
+scope: repo
 
 ## Problem
 

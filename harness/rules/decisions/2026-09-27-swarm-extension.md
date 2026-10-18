@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-27）。09-13 から求められていた Swarm を、09-13 と 09-22 の調査で見送りにしていた。`2026-09-22-subagents-and-workflows-by-scale.md` の「jig itself has no execution engine」と `2026-09-22-loop-native-goal.md` の「Never build a custom loop/execution engine」に、この拡張だけの例外を足す（両記録のほかの部分は変えない）
 
 rule: The Swarm extension for omp and pi is the one exception to "no custom execution engine": it spawns worker agents as headless harness processes that talk to LiteLLM by tier name, keeps its own queue with a concurrency limit (per tier; `deterministic` has one slot), and shows every worker in an always-visible table below the editor — name, model, effort, status (working, queued, unread, done, failed), progress, idle, age, note, cost and tokens. It never runs unattended loops (goal features still own those), never lets workers write the same files at once without isolation, and never hides cost: the concurrency cap and the running cost are always on screen.
+scope: repo
 
 ## Problem
 

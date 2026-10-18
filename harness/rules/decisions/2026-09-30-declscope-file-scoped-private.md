@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-30）
 
 rule: Go code keeps an unexported name in the file that declares it, checked by declscope (pinned, built by Nix from its release binary). dotctl commits `.declscope.yaml` and a baseline of what it already had, and CI fails on anything new. The go-reviewer runs declscope on every Go diff with a config outside the repository and no baseline, and keeps only crossings whose use is on a line the diff added: a finding where the project has a `.declscope.yaml`, an advisory question where it does not. Never wire declscope into a hook, and never write its config or baseline into a repository that has not adopted it.
+scope: repo
 
 ## Problem
 

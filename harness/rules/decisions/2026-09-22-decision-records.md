@@ -3,6 +3,7 @@
 Status: accepted — 記録はリポジトリ内の Markdown、拘束は AGENTS.md の一行と機械の検査に分ける（2026-09-22）
 
 rule: Write binding decisions as harness/rules/decisions/YYYY-MM-DD-topic.md with Status, Problem, Decision, Alternatives considered and Consequences; convert machine-checkable decisions into guard-rules.json or lint in the same commit. Never edit an accepted Decision section — supersede it with a new note instead.
+scope: repo
 
 ## Problem
 

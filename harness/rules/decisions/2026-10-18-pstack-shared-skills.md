@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-10-18）。`2026-10-17-pstack-evaluation-profile.md` を置き換える
 
 rule: pstack is used from every harness's ordinary command: `harness/plugins/pstack/source.json` names it, `dotctl setup plugins` (run by make up) fetches upstream `main` into `~/.local/share/jig/plugins/pstack`, and jig links its original `pstack/skills` and `pstack/agents` beside the house's, the house winning a shared name. Load the `pstack-adapter` skill before following a pstack skill, keep the pack following `main` unless a `commit` pin is set because the latest broke something, and never copy pstack into this repository, register it as a Claude Code plugin, or start it with a separate command or configuration directory.
+scope: repo
 
 ## Problem
 

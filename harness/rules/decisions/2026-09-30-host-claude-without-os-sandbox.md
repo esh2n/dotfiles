@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-30）。`2026-09-22-box-shape.md` の決定 1 のうち「日常は host モード(ハーネス自前のサンドボックス + jig のガード)」の「ハーネス自前のサンドボックス」を置き換える。容れ物の中の扱い（同 決定 5）は変えない
 
 rule: On the host, Claude Code runs without its OS sandbox: jig writes `sandbox.enabled: false` into ~/.claude/settings.json, and jig's guard plus auto mode's classifier check every tool call. Containers keep Claude Code's own sandbox on inside the VM, unchanged.
+scope: repo
 
 ## Problem
 

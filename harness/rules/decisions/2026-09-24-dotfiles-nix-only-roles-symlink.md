@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-24）。要件: 機械の名前やユーザー名に依存せず OS と役割で決まる、install と update が一つ、管理の道具を二つ並べない。二つの擁護側調査を並べて比べた後に決めた。ディレクトリとアーキテクチャの詳細は別途（設計の調査と提案の後に別の決定メモ）
 
 rule: Manage the dotfiles with Nix alone (nix-darwin on macOS, standalone home-manager on Linux) — never add chezmoi or another dotfiles manager beside it. The platform is detected, never keyed by hostname or username; a machine's roles live in an untracked machine-local file the flake reads at build time, and only what each role means is committed. Configs edited daily are symlinks into the repository (`mkOutOfStoreSymlink`), never store copies. `make up` is the one idempotent entry for both install and update. The OS's own package manager (Homebrew casks through nix-darwin, pacman on Omarchy) installs GUI apps only; mise keeps language runtimes; jig keeps owning the coding-agent directories.
+scope: repo
 
 ## Problem
 

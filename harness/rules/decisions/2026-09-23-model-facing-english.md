@@ -3,6 +3,7 @@
 Status: accepted — 多言語の指示追従ベンチマークは全モデルで日本語が英語に 11〜20 点劣り、トークンは日本語が不利で、最も採用率の高い日本の実践者の 95% が英語で書いている。ベンダーの指針は無い（2026-09-23）
 
 rule: Write everything the model reads (AGENTS.md rules, SKILL.md incl. descriptions, hook-injected text, subagent definitions, judgment-question framing) in English; keep decision notes, research records, writeups and the owner's own prompts in Japanese; each decision note carries a human-written English `rule:` line that the generator copies verbatim into AGENTS.md — no machine translation in between.
+scope: repo
 
 ## Problem
 

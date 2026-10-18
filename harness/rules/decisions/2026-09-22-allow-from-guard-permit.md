@@ -3,6 +3,7 @@
 Status: accepted — allow は分類器の前段で決定的に効き、auto モードも狭い allow を残す設計で、分類器は自社評価で見逃し 17%、allow を消した実践例は無い（2026-09-22）
 
 rule: Generate permissions.allow from guard-rules.json's permit rules via to-claude-permissions.ts, not the old 71-entry config, and never write broad allow forms (Bash(*), whole interpreters, package-manager run); always permit git commit, git push on feature branches only (never main), and test commands (npm test, go test, pytest, bun test).
+scope: repo
 
 ## Problem
 

@@ -3,6 +3,7 @@
 Status: accepted — 持ち主の裁定（2026-09-25）。要件: AI の利用コストを一か所で管理する（機械ごとの LiteLLM を Grafana で足すだけでは足りない）。範囲は LiteLLM を通る分だけ（Claude Code・Codex の直接利用は、いまは対象外）。共有 DB に直接書く案には、機械が止まっているときの書き込みと再送、書き込みの遅延の問題があり、ソースまで読んだ調査の後、手元に書いてあとから送る形を採った。`2026-09-23-home-llm-lm-studio-over-tailscale-litellm-local.md` の「LiteLLM は各機械の loopback に一つ」は変えない。tailnet に出す口に台帳の Postgres を一つ足す
 
 rule: Keep one LiteLLM per machine, loopback-only, but give each its own local Postgres on the same docker network (never a DB across the tailnet on the request path); the llm-console machine's Postgres is the single cost ledger, and every other machine ships its unsent LiteLLM_SpendLogs rows to it when reachable, idempotently by request_id (the table's primary key), recording which machine each row came from. Expose only the ledger's Postgres port on the tailnet from the llm-console machine. Budgets are per machine; the cross-machine total is read from the ledger. If the DB secret is unavailable, LiteLLM still serves without a DB rather than stopping.
+scope: repo
 
 ## Problem
 
