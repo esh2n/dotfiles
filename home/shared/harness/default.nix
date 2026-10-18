@@ -48,7 +48,9 @@ in
   # bun (mise), codex and pnpm are the user's tools: jig setup sees the
   # user's PATH, not only activation's. jig runs on bun, so without it the
   # step is skipped with a warning; activation still finishes.
-  home.activation.harnessApply = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  # After setup-plugins: the external skill packs (harness/plugins/) are
+  # fetched first, so the first apply on a new machine links their skills.
+  home.activation.harnessApply = lib.hm.dag.entryAfter [ "linkGeneration" "setup-plugins" ] ''
     if PATH="$PATH:${config.lib.dotfiles.userPath}" command -v bun >/dev/null 2>&1; then
       (PATH="$PATH:${config.lib.dotfiles.userPath}" && run bash ${lib.escapeShellArg "${facts.repo}/harness/bin/jig"} setup) \
         || warnEcho "jig setup failed"
@@ -58,12 +60,14 @@ in
   '';
 
   # Commands the harnesses need that jig does not run: Claude Code's native
-  # installer, pi's packages, and the git filter that keeps pi's runtime key
+  # installer, the external skill packs' fetch, pi's packages, and the git filter that keeps pi's runtime key
   # out of the tracked settings.json (.gitattributes). (Claude Code's MCP
   # servers are jig's: harnessApply writes them into ~/.claude.json.)
   dotfiles.setup = {
     claude-cli.command = config.lib.dotfiles.setupStep "claude-cli";
     records-ttl.command = config.lib.dotfiles.setupStep "records-ttl";
+    # the external skill packs jig links beside the house's (harness/plugins/)
+    plugins.command = config.lib.dotfiles.setupStep "plugins";
     git-filters.command = config.lib.dotfiles.setupStep "git-filters";
     pi-packages = {
       command = config.lib.dotfiles.setupStep "pi-packages";

@@ -28,20 +28,10 @@ func helpFor(command string) string {
 		return setupUsage()
 	case "service":
 		return serviceUsage
-	case "pstack":
-		return pstackUsage
 	default:
 		return usage
 	}
 }
-
-const pstackUsage = `usage: dotctl pstack [--repo DIR] setup           fetch the pinned plugin, generate ~/.claude-pstack (idempotent)
-       dotctl pstack [--repo DIR] run [claude args]  start Claude Code in the pstack profile with the plugin loaded
-       dotctl pstack [--repo DIR] status             the pin, the checkout and the evaluation log
-
-The pin is harness/profiles/pstack/upstream.json; the rules profile is
-harness/profiles/pstack/ (rules/decisions/2026-10-17-pstack-evaluation-profile.md).
-`
 
 func setupUsage() string {
 	return fmt.Sprintf("usage: dotctl setup [--repo DIR] <step>\nsteps: %s\n", strings.Join(setup.Names(), ", "))

@@ -3,7 +3,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -11,8 +10,6 @@ import (
 	"time"
 
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/nvim"
-	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/pstack"
-	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/sys"
 	"github.com/esh2n/dotfiles/pkgs/dotctl/internal/ui"
 )
 
@@ -41,7 +38,6 @@ commands:
                                          (adopt-mac.sh runs it; leaves with it)
   records [--repo DIR] check|prune [--yes]
                                          flow documents past their 14 days; prune removes them
-  pstack [--repo DIR] setup|run|status  the pstack evaluation profile: pinned plugin, ~/.claude-pstack
   cache-gc [--force] [--dry-run] [--quiet] [--touch REPO]
                                          keep Codebase-Memory's indexes within age and size
                                          (also installed as code-graph-cache-gc)
@@ -124,8 +120,6 @@ func run(args []string, out, errOut io.Writer) int {
 		return runCacheGC(home, args[1:], nil, out, errOut)
 	case "service":
 		return runService(args[1:], out, errOut)
-	case "pstack":
-		return runPstack(home, args[1:], out, errOut)
 	case "retire-old-layout":
 		return runRetire(home, args[1:], out, errOut)
 	case "help", "-h", "--help":
@@ -135,41 +129,6 @@ func run(args []string, out, errOut io.Writer) int {
 		fmt.Fprintf(errOut, "dotctl: unknown command %q\n%s", args[0], usage)
 		return 2
 	}
-}
-
-// runPstack is `dotctl pstack setup|run|status`: the pstack evaluation
-// profile (rules/decisions/2026-10-17-pstack-evaluation-profile.md).
-func runPstack(home string, args []string, out, errOut io.Writer) int {
-	fs := flag.NewFlagSet("pstack", flag.ContinueOnError)
-	fs.SetOutput(errOut)
-	repo := fs.String("repo", os.Getenv("DOTFILES_ROOT"), "the checkout (default $DOTFILES_ROOT)")
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-	rest := fs.Args()
-	if *repo == "" || len(rest) == 0 {
-		fmt.Fprint(errOut, helpFor("pstack"))
-		return 2
-	}
-	p := ui.Printer{Out: out, Err: errOut, Prefix: "pstack"}
-	e := pstack.Env{Home: home, Repo: *repo, Sys: sys.OS{}, UI: p}
-	var err error
-	switch {
-	case rest[0] == "setup" && len(rest) == 1:
-		err = pstack.Setup(e)
-	case rest[0] == "run":
-		err = pstack.Run(e, rest[1:])
-	case rest[0] == "status" && len(rest) == 1:
-		err = pstack.Status(e)
-	default:
-		fmt.Fprint(errOut, helpFor("pstack"))
-		return 2
-	}
-	if err != nil {
-		p.Error("%v", err)
-		return 1
-	}
-	return 0
 }
 
 func runNvim(home string, args []string, out, errOut io.Writer) int {
