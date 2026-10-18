@@ -19,7 +19,7 @@
  *  - `statusLine` — the same content as Claude Code's statusline.sh in omp's
  *    own segments (rules/knowledge/statusline-across-harnesses.md):
  *    model and effort, directory, git, context used on the left; extension
- *    statuses (the tier, the Swarm), time spent and cost on the right.
+ *    statuses (the tier), time spent and cost on the right.
  *
  * Written only when the file does not exist yet (omp's own afterwards):
  * `symbolPreset`, `composer`, `theme`, `setupVersion`.

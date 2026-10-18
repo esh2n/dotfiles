@@ -36,7 +36,7 @@ export interface OmpUi {
   /**
    * `setWidget(key, content, {placement})` (extensions/types.ts:270): a string
    * list, a component factory `(tui, theme) => Component`, or `undefined` to
-   * clear. Used by the Swarm's table.
+   * clear. Kept for the agent list widget.
    */
   setWidget?(
     key: string,
@@ -45,12 +45,12 @@ export interface OmpUi {
   ): void;
 }
 
-/** `TUI`, the one member the Swarm's widget calls. */
+/** `TUI`, the one member a widget calls. */
 export interface OmpTui {
   requestRender(): void;
 }
 
-/** `Theme`, the one member the Swarm's widget calls. */
+/** `Theme`, the one member a widget calls. */
 export interface OmpTheme {
   fg(color: string, text: string): string;
 }

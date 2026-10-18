@@ -27,7 +27,6 @@ import { resolveMcpServers } from "./mcp-servers";
 import type { OmpExtensionApi } from "./omp";
 import { recordSession } from "./session";
 import { routeSkill } from "./skill";
-import { registerSwarm } from "./swarm";
 import { createTierRouter } from "./tier";
 
 export { guardToolCall } from "./guard";
@@ -46,7 +45,6 @@ export { recordSession, sessionRecordOf } from "./session";
 export { routeSkill } from "./skill";
 
 export default function (pi: OmpExtensionApi): void {
-  registerSwarm(pi);
   const tier = createTierRouter();
   pi.on("session_start", async (_event, ctx) => {
     await recordSession(ctx);
