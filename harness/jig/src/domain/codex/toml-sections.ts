@@ -30,20 +30,21 @@ const ARRAY_HEADER_RE = /^\s*\[\[(.+?)\]\]\s*(?:#.*)?$/;
 
 /** A dotted key's segments: bare, "basic" or 'literal', whitespace around dots allowed. */
 export function keyPath(key: string): readonly string[] | undefined {
+  const forms: readonly { readonly re: RegExp; readonly value: (m: RegExpExecArray) => string }[] =
+    [
+      { re: /^"((?:[^"\\]|\\.)*)"/, value: (m) => m[1]?.replace(/\\(.)/g, "$1") ?? "" },
+      { re: /^'([^']*)'/, value: (m) => m[1] ?? "" },
+      { re: /^[A-Za-z0-9_-]+/, value: (m) => m[0] },
+    ];
   const segments: string[] = [];
   let rest = key.trim();
   while (rest !== "") {
-    let match: RegExpExecArray | null = /^"((?:[^"\\]|\\.)*)"/.exec(rest);
-    if (match !== null) {
-      segments.push(match[1]?.replace(/\\(.)/g, "$1") ?? "");
-    } else if ((match = /^'([^']*)'/.exec(rest)) !== null) {
-      segments.push(match[1] ?? "");
-    } else if ((match = /^[A-Za-z0-9_-]+/.exec(rest)) !== null) {
-      segments.push(match[0]);
-    } else {
-      return undefined;
-    }
-    rest = rest.slice(match[0].length).trim();
+    const hit = forms
+      .map((form) => ({ form, match: form.re.exec(rest) }))
+      .find((candidate) => candidate.match !== null);
+    if (hit === undefined || hit.match === null) return undefined;
+    segments.push(hit.form.value(hit.match));
+    rest = rest.slice(hit.match[0].length).trim();
     if (rest === "") break;
     if (!rest.startsWith(".")) return undefined;
     rest = rest.slice(1).trim();

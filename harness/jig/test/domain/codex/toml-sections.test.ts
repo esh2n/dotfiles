@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  type Section,
   joinSections,
   keyStatement,
   parseSections,
@@ -8,6 +9,13 @@ import {
   withoutKey,
   withoutLines,
 } from "../../../src/domain/codex/toml-sections";
+
+/** The section at `index`, failing the test when it is not there. */
+function sectionAt(text: string, index: number): Section {
+  const section = parseSections(text)[index];
+  if (section === undefined) throw new Error(`no section ${index}`);
+  return section;
+}
 
 describe("parseSections", () => {
   test("a line that looks like a header inside a multi-line array is data", () => {
@@ -53,11 +61,12 @@ describe("removing what jig owns", () => {
   });
 
   test("a key's whole multi-line value goes, and nothing after it", () => {
-    const [, tui] = parseSections(
+    const tui = sectionAt(
       ["[tui]", "status_line = [", '  "model",', '  "dir",', "]", "animations = false"].join("\n"),
+      1,
     );
-    expect(withoutKey(tui!, "status_line").lines).toEqual(["[tui]", "animations = false"]);
-    expect(keyStatement(tui!, "status_line")).toBe('status_line = [\n  "model",\n  "dir",\n]');
+    expect(withoutKey(tui, "status_line").lines).toEqual(["[tui]", "animations = false"]);
+    expect(keyStatement(tui, "status_line")).toBe('status_line = [\n  "model",\n  "dir",\n]');
   });
 
   test("marker text inside a multi-line string is data, not a marker", () => {
@@ -68,7 +77,7 @@ describe("removing what jig owns", () => {
   });
 
   test("topKeys names the first segment of each statement, skipping multi-line values", () => {
-    const [, servers] = parseSections(
+    const servers = sectionAt(
       [
         "[mcp_servers]",
         'serena = { command = "uvx" }',
@@ -77,7 +86,8 @@ describe("removing what jig owns", () => {
         '  "notakey = 1",',
         "]",
       ].join("\n"),
+      1,
     );
-    expect(topKeys(servers!)).toEqual(["serena", "other", "list"]);
+    expect(topKeys(servers)).toEqual(["serena", "other", "list"]);
   });
 });
