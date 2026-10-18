@@ -240,7 +240,7 @@ describe("AGENTS.md", () => {
     const { ports, files, manifest } = fakePorts(YOKI_SWITCH_MACHINE);
     const dry = await run(ports);
     expect(dry.agentsMd.content).toContain("# Core\n\nBe brief.");
-    expect(dry.agentsMd.content).toContain("- **Do the one thing.**");
+    expect(dry.agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
     expect(dry.agentsMd.backupPath).toBe(`${PATHS.agentsMd}.pre-jig.20260923-000000`);
     expect(dry.agentsMd.diff).toContain("yoki:begin");
 

@@ -369,6 +369,18 @@ function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
     `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     "--- AGENTS.md (generated) ---",
     agentsMd.content.trimEnd(),
+    ...(report.repoAgentsMd === undefined
+      ? []
+      : [
+          "",
+          `repository AGENTS.md: ${report.repoAgentsMd.outcome}  ${report.repoAgentsMd.path}  (${report.repoAgentsMd.bytes} bytes; the decisions marked \`scope: repo\`, untracked)`,
+          ...(report.repoAgentsMd.outcome === "conflict"
+            ? [
+                "  CONFLICT: edited since jig wrote it; left as it is and skipped (the rest of the apply goes on).",
+                "  Its source is the notes marked `scope: repo`: edit those, then delete this file to regenerate it.",
+              ]
+            : []),
+        ]),
   ];
 
   const missingRule = agentsMd.skipped.filter((skipped) => skipped.missingRule);

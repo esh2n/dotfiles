@@ -119,6 +119,8 @@ function resolveClaudeApplyPaths(): ClaudeApplyPaths {
   return {
     harnessRoot: harness,
     pluginsDir: resolvePluginsDir(process.env),
+    repoAgentsMd: join(resolveApplyRoot(), "AGENTS.md"),
+    repoClaudeMd: join(resolveApplyRoot(), "CLAUDE.md"),
     guardRules: join(harness, "policy", "guard-rules.json"),
     mcpServers: join(harness, "mcp", "servers.json"),
     decisions: join(harness, "rules", "decisions"),

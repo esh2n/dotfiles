@@ -19,6 +19,7 @@ import {
   decisionLines,
   isCommonRule,
   renderAgentsMd,
+  renderRepoAgentsMd,
 } from "../../domain/claude/agents-md";
 import {
   type LinkPlan,
@@ -111,6 +112,8 @@ export async function buildAgentsMd(
   paths: { readonly harnessRoot: string; readonly decisions: string },
 ): Promise<{
   readonly content: string;
+  /** The dotfiles repository's own AGENTS.md: the repo-scoped decisions. */
+  readonly repoContent: string;
   readonly commonFiles: readonly string[];
   readonly skipped: readonly SkippedDecision[];
 }> {
@@ -119,6 +122,7 @@ export async function buildAgentsMd(
   const decisions = decisionLines(notes);
   return {
     content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common, decisions }),
+    repoContent: renderRepoAgentsMd({ harnessRoot: paths.harnessRoot, decisions }),
     commonFiles: common.map((source) => source.file),
     skipped: decisions.skipped,
   };
@@ -133,7 +137,10 @@ export async function planAgentsMd(
   ports: ClaudeApplyPorts,
   input: {
     readonly path: string;
-    readonly generated: Awaited<ReturnType<typeof buildAgentsMd>>;
+    readonly generated: Pick<
+      Awaited<ReturnType<typeof buildAgentsMd>>,
+      "content" | "commonFiles" | "skipped"
+    >;
     readonly manifest: Readonly<Record<string, string>>;
     readonly now: Date;
   },

@@ -423,7 +423,36 @@ describe("a machine with no settings.json yet", () => {
 });
 
 describe("AGENTS.md", () => {
-  test("is generated from rules/common and rules/decisions with absolute links, and sized", async () => {
+  test("the repo-scoped decisions go to the checkout's own AGENTS.md, with a CLAUDE.md link, and leave the global one", async () => {
+    const { ports, files, links } = fakePorts({
+      files: {
+        [`${PATHS.decisions}/2026-09-23-repo.md`]:
+          "# 題\n\nStatus: accepted — 理由（2026-09-23）\n\nrule: Build dotctl in Go.\nscope: repo\n",
+      },
+    });
+    const paths = { ...PATHS, repoAgentsMd: "/repo/AGENTS.md", repoClaudeMd: "/repo/CLAUDE.md" };
+    const report = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, ports);
+
+    expect(report.agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
+    expect(report.agentsMd.content).not.toContain("Build dotctl in Go.");
+    expect(files["/repo/AGENTS.md"]).toContain("## Decisions for this repository");
+    expect(files["/repo/AGENTS.md"]).toContain("- Build dotctl in Go. (2026-09-23-repo.md)");
+    expect(files["/repo/AGENTS.md"]).not.toContain("Do the one thing.");
+    expect(links["/repo/CLAUDE.md"]).toBe("AGENTS.md");
+    const again = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: false }, ports);
+    expect(again.repoAgentsMd?.outcome).toBe("noop");
+
+    // a hand edit there is skipped, and does not stop the rest of the apply
+    files["/repo/AGENTS.md"] = "edited by hand\n";
+    files[`${H}/rules/common/z-new.md`] = "# New\n\nnew rule\n";
+    const edited = await applyClaude({ paths, hookPaths: HOOK_PATHS, write: true }, ports);
+    expect(edited.repoAgentsMd?.outcome).toBe("conflict");
+    expect(edited.outcome).toBe("write");
+    expect(files["/repo/AGENTS.md"]).toBe("edited by hand\n");
+    expect(files[PATHS.agentsMd]).toContain("new rule");
+  });
+
+  test("is generated from rules/common and rules/decisions, the notes' directory named once, and sized", async () => {
     const { ports } = fakePorts({
       files: {
         [`${H}/rules/common/b-git.md`]: "# Git\n\nCommit small.\n",
@@ -442,9 +471,8 @@ describe("AGENTS.md", () => {
     expect(agentsMd.content).not.toContain("paths: []");
     expect(agentsMd.content).toContain(`](${H}/rules/research/INDEX.md)`);
     // The note's `rule:` line, not its Japanese title.
-    expect(agentsMd.content).toContain(
-      `- **Do the one thing.** — [2026-09-22-one.md](${H}/rules/decisions/2026-09-22-one.md)`,
-    );
+    expect(agentsMd.content).toContain("- Do the one thing. (2026-09-22-one.md)");
+    expect(agentsMd.content).toContain(`${H}/rules/decisions/.`);
     expect(agentsMd.content).not.toContain("決定の題");
     expect(agentsMd.bytes).toBe(Buffer.byteLength(agentsMd.content));
     expect(agentsMd.overLimit).toBe(false);
