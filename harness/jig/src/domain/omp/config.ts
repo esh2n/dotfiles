@@ -8,10 +8,11 @@
  * block like the Codex one would not survive; ownership is by key.
  *
  * Owned:
- *  - `modelRoles` — every role on a LiteLLM tier (owner's ruling
- *    2026-09-23): the thorough roles (`slow`, `plan`, `advisor`) on
- *    `complex`, everything lightweight on `main`. `executor` is picked
- *    by hand, never by a role.
+ *  - `modelRoles` — every role on a LiteLLM tier
+ *    (rules/decisions/2026-10-19-model-assignment.md): the thinking roles
+ *    (`slow`, `plan`, `advisor`, `designer`) on `complex`, everything else,
+ *    `task` included, on `main`. `executor` is never a role's default;
+ *    `vision` waits until `main`'s model is known to read images.
  *  - `tools.approvalMode` and `tools.approval.eval` — untrusted repositories
  *    go to the sandbox, so the host runs `yolo`; `eval` still asks, since no
  *    Claude permission can express it and `bash.patterns` does not gate what
@@ -45,6 +46,7 @@ const MODEL_ROLES: YamlObject = {
   slow: "proxy/complex",
   plan: "proxy/complex",
   advisor: "proxy/complex",
+  designer: "proxy/complex",
 };
 
 const STATUS_LINE: YamlObject = {
