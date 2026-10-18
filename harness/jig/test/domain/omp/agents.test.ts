@@ -146,3 +146,19 @@ describe("ompAgentFileName", () => {
     expect(ompAgentFileName("go-reviewer.md")).toBe("go-reviewer.md");
   });
 });
+
+describe("renderOmpAgent: the agent's own effort", () => {
+  test("effort becomes omp's `thinking` key", () => {
+    const definition = parseAgentDefinition(
+      "---\nname: r\ndescription: d\nmodel: main\neffort: medium\n---\nbody\n",
+      "r",
+    );
+    const text = renderOmpAgent({
+      definition,
+      model: modelChoiceFor("main", { main: { model: "proxy/main" } }),
+      tools: translateTools(definition.tools),
+      sourcePath: "/repo/agents/r.md",
+    });
+    expect(text).toContain('model: "proxy/main"\nthinking: "medium"\n');
+  });
+});

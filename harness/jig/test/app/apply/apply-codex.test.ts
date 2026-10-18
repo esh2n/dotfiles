@@ -36,9 +36,9 @@ const OPTIONS: CodexApplyOptions = {
 
 /** The ruling of 2026-09-23, as `agents/models.json`'s codex table parses. */
 const RULED_MODELS = {
-  sonnet: { model: "gpt-6-luna", reasoningEffort: "high" },
-  haiku: { model: "gpt-6-luna", reasoningEffort: "medium" },
-  opus: { model: "gpt-6-sol", reasoningEffort: "medium" },
+  main: { model: "gpt-6-luna", reasoningEffort: "high" },
+  executor: { model: "gpt-6-luna", reasoningEffort: "medium" },
+  complex: { model: "gpt-6-sol", reasoningEffort: "medium" },
 };
 
 const MCP_SOURCE = JSON.stringify({
@@ -72,9 +72,9 @@ const MCP_SOURCE = JSON.stringify({
 const DECISION = "# 決定の題\n\nStatus: accepted — 理由（2026-09-22）\n\nrule: Do the one thing.\n";
 
 const RESEARCH_AGENT =
-  '---\nname: research\ndescription: Industry survey.\ntools: ["Read", "WebFetch"]\nmodel: sonnet\n---\n\nSurvey first, judge second.\n';
+  '---\nname: research\ndescription: Industry survey.\ntools: ["Read", "WebFetch"]\nmodel: main\n---\n\nSurvey first, judge second.\n';
 const SCOUT_AGENT =
-  "---\nname: scout\ndescription: Cheap lookups.\ntools: [Read]\nmodel: haiku\n---\n\nLook things up.\n";
+  "---\nname: scout\ndescription: Cheap lookups.\ntools: [Read]\nmodel: executor\n---\n\nLook things up.\n";
 
 /** The sources every test starts from; the destination side is the seed. */
 function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
@@ -301,10 +301,10 @@ describe("the generated agent files", () => {
     expect(String(parsed.developer_instructions)).toBe(
       "Survey first, judge second.\n\nThe source definition limits this agent to these tools: Read, WebFetch. Codex has no per-agent tool list, so honour it as an instruction.",
     );
-    expect(research?.model).toEqual({ kind: "unmapped", tier: "sonnet" });
+    expect(research?.model).toEqual({ kind: "unmapped", tier: "main" });
     expect(agents.unmappedTiers).toEqual([
-      { tier: "sonnet", count: 1 },
-      { tier: "haiku", count: 1 },
+      { tier: "main", count: 1 },
+      { tier: "executor", count: 1 },
     ]);
   });
 
@@ -339,6 +339,29 @@ describe("the generated agent files", () => {
     await expect(runWithPack(fs.ports)).rejects.toThrow("agents/broken.md");
   });
 
+  test("a house agent naming a vendor model stops the apply; a pack agent's is left out as a gap", async () => {
+    const house = packPorts();
+    house.files[`${H}/agents/old.md`] = "---\nname: old\nmodel: opus\n---\nx\n";
+    await expect(runWithPack(house.ports)).rejects.toThrow(
+      'agents/old.md: model "opus" is not a tier (main, complex, executor)',
+    );
+
+    const pack = packPorts();
+    pack.files[`${PACK}/agents/vendor.md`] = "---\nname: vendor\nmodel: opus\n---\nx\n";
+    const report = await runWithPack(pack.ports);
+    const vendor = report.agents.files.find((file) => file.name === "vendor.toml");
+    expect(vendor?.model).toEqual({ kind: "unmapped", tier: "opus" });
+    expect(vendor?.content).not.toContain("\nmodel = ");
+  });
+
+  test("a pack agent's effort outside the vocabulary is dropped", async () => {
+    const pack = packPorts();
+    pack.files[`${PACK}/agents/odd.md`] = "---\nname: odd\neffort: ultra\n---\nx\n";
+    const report = await runWithPack(pack.ports);
+    const odd = report.agents.files.find((file) => file.name === "odd.toml");
+    expect(odd?.content).not.toContain("model_reasoning_effort");
+  });
+
   test("an agent jig wrote goes when its source does; one edited since stays", async () => {
     const fs = packPorts();
     await runWithPack(fs.ports, true);
@@ -369,7 +392,7 @@ describe("the generated agent files", () => {
         paths: PATHS,
         options: {
           ...OPTIONS,
-          codexModels: { sonnet: { model: "gpt-6-luna", reasoningEffort: "high" } },
+          codexModels: { main: { model: "gpt-6-luna", reasoningEffort: "high" } },
           modelsSource: `${H}/agents/models.json`,
         },
         write: false,
@@ -384,9 +407,9 @@ describe("the generated agent files", () => {
     expect((Bun.TOML.parse(scout?.content ?? "") as { model?: string }).model).toBeUndefined();
     expect(report.agents.mappingSource).toBe(`${H}/agents/models.json`);
     expect(report.agents.mappedTiers).toEqual([
-      { tier: "sonnet", model: "gpt-6-luna", reasoningEffort: "high", count: 1 },
+      { tier: "main", model: "gpt-6-luna", reasoningEffort: "high", count: 1 },
     ]);
-    expect(report.agents.unmappedTiers).toEqual([{ tier: "haiku", count: 1 }]);
+    expect(report.agents.unmappedTiers).toEqual([{ tier: "executor", count: 1 }]);
   });
 
   test("with the ruled table every tier is mapped and the gap count is zero", async () => {
@@ -397,8 +420,8 @@ describe("the generated agent files", () => {
     );
     expect(report.agents.unmappedTiers).toEqual([]);
     expect(report.agents.mappedTiers).toEqual([
-      { tier: "sonnet", model: "gpt-6-luna", reasoningEffort: "high", count: 1 },
-      { tier: "haiku", model: "gpt-6-luna", reasoningEffort: "medium", count: 1 },
+      { tier: "main", model: "gpt-6-luna", reasoningEffort: "high", count: 1 },
+      { tier: "executor", model: "gpt-6-luna", reasoningEffort: "medium", count: 1 },
     ]);
     expect(Bun.TOML.parse(report.agents.files[1]?.content ?? "")).toMatchObject({
       name: "scout",
@@ -411,7 +434,7 @@ describe("the generated agent files", () => {
     const { ports } = fakePorts({
       files: {
         [`${H}/agents/research.md`]:
-          "---\nname: research\ndescription: Industry survey.\nmodel: sonnet\nmodels:\n  codex:\n    model: gpt-6-sol\n    reasoningEffort: xhigh\n---\n\nSurvey first, judge second.\n",
+          "---\nname: research\ndescription: Industry survey.\nmodel: main\nmodels:\n  codex:\n    model: gpt-6-sol\n    reasoningEffort: xhigh\n---\n\nSurvey first, judge second.\n",
       },
     });
     const report = await applyCodex(
@@ -421,7 +444,7 @@ describe("the generated agent files", () => {
     const research = report.agents.files[0];
     expect(research?.model).toEqual({
       kind: "mapped",
-      tier: "sonnet",
+      tier: "main",
       model: "gpt-6-sol",
       reasoningEffort: "xhigh",
       override: true,
@@ -432,7 +455,7 @@ describe("the generated agent files", () => {
     });
     // The override is the agent's, not the tier's: the tier line counts only table-decided agents.
     expect(report.agents.mappedTiers).toEqual([
-      { tier: "haiku", model: "gpt-6-luna", reasoningEffort: "medium", count: 1 },
+      { tier: "executor", model: "gpt-6-luna", reasoningEffort: "medium", count: 1 },
     ]);
     expect(report.agents.unmappedTiers).toEqual([]);
   });
@@ -445,17 +468,17 @@ describe("the generated agent files", () => {
           paths: PATHS,
           options: {
             ...OPTIONS,
-            codexModels: { sonnet: { model: "gpt-6-luna", reasoningEffort: "hi" } },
+            codexModels: { main: { model: "gpt-6-luna", reasoningEffort: "hi" } },
           },
           write: true,
         },
         ports,
       ),
     ).rejects.toThrow(
-      'jig apply --target codex: agents/research.md: reasoningEffort "hi" for tier "sonnet"',
+      'jig apply --target codex: agents/research.md: reasoningEffort "hi" for tier "main"',
     );
     files[`${H}/agents/scout.md`] =
-      "---\nname: scout\nmodel: haiku\nmodels: { codex: { model: gpt-6-luna, reasoningEffort: MAX } }\n---\nx\n";
+      "---\nname: scout\nmodel: executor\nmodels: { codex: { model: gpt-6-luna, reasoningEffort: MAX } }\n---\nx\n";
     expect(run(ports, true)).rejects.toThrow(
       'agents/scout.md: reasoningEffort "MAX" for the models.codex override',
     );

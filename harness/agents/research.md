@@ -2,7 +2,8 @@
 name: research
 description: Industry survey before a design decision. Use when a design or tooling choice must be justified against current practice rather than opinion — "調べて", "業界水準は", "前例は", or any proposal that would otherwise rest on one vendor's docs, one anecdote, or the repo's own existing code. Returns a written record with URLs, verbatim quotes, negative evidence, and an explicit list of what could not be verified.
 tools: ["Read", "Grep", "Glob", "Bash", "WebFetch", "WebSearch"]
-model: sonnet
+model: main
+effort: medium
 ---
 
 You survey how the industry actually does something, so that a design decision can rest on evidence. You do not recommend first and search second. You collect, then judge.

@@ -6,10 +6,13 @@
  * frontmatter), so the parser and the model question live here, once.
  * The fields are documented for authors in `agents/README.md`.
  *
- * `model:` is a Claude tier name (`haiku`/`sonnet`/`opus`) or `inherit`. No
- * other harness knows those names; each target looks the tier up in the
- * table `agents/models.json` supplies for it (`./agent-models.ts`) and leaves
- * `model` out when the table does not know it, reporting the gap. An agent
+ * `model:` is a house tier — `main`, `complex` or `executor` — or `inherit`,
+ * and `effort:` one of `low`…`max` (rules/decisions/2026-10-19-model-assignment.md).
+ * Every target, Claude Code included, looks the tier up in the table
+ * `agents/models.json` supplies for it (`./agent-models.ts`) and leaves
+ * `model` out when the table does not know it, reporting the gap. A house
+ * agent with a word outside the vocabulary is an error
+ * (`checkAgentVocabulary`); a pack agent's foreign model name is the gap. An agent
  * may override that lookup for one target with a `models:` block —
  * `models: { codex: { model, reasoningEffort } }` — which wins over the tier
  * whether or not `model:` is set. The generator never invents a model id.
@@ -17,6 +20,30 @@
  * Pure: text in, a record out. A malformed `models:` block is an error
  * naming the key, not a silently dropped override.
  */
+
+/** The tiers an agent may name (rules/decisions/2026-10-19-model-assignment.md). */
+export const AGENT_TIERS = ["main", "complex", "executor"] as const;
+
+/** The effort levels an agent may name, lowest first. */
+export const AGENT_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+/**
+ * Throws when a house agent names a model or effort outside the vocabulary.
+ * Nothing written, or `inherit`, means the parent's model; that passes.
+ */
+export function checkAgentVocabulary(definition: AgentDefinition): void {
+  const { model, effort } = definition;
+  if (
+    model !== undefined &&
+    model !== "inherit" &&
+    !(AGENT_TIERS as readonly string[]).includes(model)
+  ) {
+    throw new Error(`model "${model}" is not a tier (${AGENT_TIERS.join(", ")})`);
+  }
+  if (effort !== undefined && !(AGENT_EFFORTS as readonly string[]).includes(effort)) {
+    throw new Error(`effort "${effort}" is not a level (${AGENT_EFFORTS.join(", ")})`);
+  }
+}
 
 /** What a target gets for one agent: its own model id, and optionally how hard to think. */
 export interface ModelMapping {
@@ -31,6 +58,8 @@ export interface AgentDefinition {
   readonly tools: readonly string[];
   /** The `model:` value as written, trimmed; absent when the frontmatter has none. */
   readonly model?: string;
+  /** The `effort:` value as written, trimmed; absent when the frontmatter has none. */
+  readonly effort?: string;
   /** Per-target overrides from the `models:` block, keyed by target (`codex`, `omp`); absent when there is no block. */
   readonly models?: Readonly<Record<string, ModelMapping>>;
   /** The prompt, frontmatter removed, surrounding blank lines trimmed. */
@@ -59,12 +88,14 @@ export function parseAgentDefinition(text: string, fileStem: string): AgentDefin
   };
 
   const model = scalar("model");
+  const effort = scalar("effort");
   const models = parseModels(lines, fileStem);
   return {
     name: scalar("name") ?? fileStem,
     description: scalar("description") ?? "",
     tools: parseTools(lines),
     ...(model === undefined ? {} : { model }),
+    ...(effort === undefined ? {} : { effort }),
     ...(models === undefined ? {} : { models }),
     body,
   };

@@ -2,7 +2,7 @@
 name: refactor-cleaner
 description: Dead code cleanup and consolidation specialist for removing unused code, duplicates, and refactoring. Detects the project language and runs the matching analysis tools (knip/depcheck, golangci-lint, cargo-udeps, vulture) to identify dead code and safely remove it.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: sonnet
+model: main
 ---
 
 # Refactor & Dead Code Cleaner

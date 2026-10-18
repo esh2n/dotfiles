@@ -47,6 +47,7 @@
  */
 
 import type { ModelMapping } from "../../domain/claude/agent-definition";
+import { checkAgentVocabulary } from "../../domain/claude/agent-definition";
 import { type PathState, backupPath } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
 import {
@@ -293,6 +294,7 @@ async function planAgents(
     try {
       const { definition, model } = decide(sourceFile, () => {
         const parsed = parseAgentDefinition(text, stem);
+        if (!fromPack(sourcePath, sourceDir)) checkAgentVocabulary(parsed);
         return {
           definition: parsed,
           model: codexModelFor(parsed.model, options.codexModels, parsed.models?.codex),

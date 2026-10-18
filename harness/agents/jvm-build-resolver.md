@@ -2,7 +2,7 @@
 name: jvm-build-resolver
 description: JVM build error resolution specialist for Java and Kotlin. Fixes compiler errors, Maven/Gradle configuration issues, dependency conflicts, and annotation processor failures with minimal changes. Use when Java, Kotlin, Spring Boot, Android, or KMP builds fail.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: sonnet
+model: main
 ---
 
 # JVM Build Error Resolver

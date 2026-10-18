@@ -64,9 +64,9 @@ const MCP_SOURCE = JSON.stringify({
 });
 
 const RESEARCH_AGENT =
-  '---\nname: research\ndescription: Industry survey.\ntools: ["Read", "WebFetch", "NotebookEdit"]\nmodel: sonnet\n---\n\nSurvey first, judge second.\n';
+  '---\nname: research\ndescription: Industry survey.\ntools: ["Read", "WebFetch", "NotebookEdit"]\nmodel: main\n---\n\nSurvey first, judge second.\n';
 const SCOUT_AGENT =
-  "---\nname: scout\ndescription: Cheap lookups.\ntools: [Read]\nmodel: haiku\n---\n\nLook things up.\n";
+  "---\nname: scout\ndescription: Cheap lookups.\ntools: [Read]\nmodel: executor\n---\n\nLook things up.\n";
 
 /** The sources every test starts from; the destination side is the seed. */
 function fakePorts(seed: FakeClaudeFsSeed = {}): FakeClaudeFs {
@@ -207,10 +207,10 @@ describe("the generated agent files", () => {
     expect(research?.content).not.toContain("model:");
     expect(research?.content.endsWith("---\n\nSurvey first, judge second.\n")).toBe(true);
     expect(research?.tools).toEqual({ tools: ["read"], unmapped: ["NotebookEdit"] });
-    expect(research?.model).toEqual({ kind: "unmapped", tier: "sonnet" });
+    expect(research?.model).toEqual({ kind: "unmapped", tier: "main" });
     expect(agents.unmappedTiers).toEqual([
-      { tier: "sonnet", count: 1 },
-      { tier: "haiku", count: 1 },
+      { tier: "main", count: 1 },
+      { tier: "executor", count: 1 },
     ]);
     expect(agents.unmappedTools).toEqual([{ tool: "NotebookEdit", count: 1 }]);
   });
@@ -220,7 +220,7 @@ describe("the generated agent files", () => {
     const report = await applyOmp(
       {
         paths: PATHS,
-        options: { ...OPTIONS, ompModels: { sonnet: { model: "@review" } } },
+        options: { ...OPTIONS, ompModels: { main: { model: "@review" } } },
         write: false,
       },
       ports,
@@ -228,28 +228,28 @@ describe("the generated agent files", () => {
     const [research, scout] = report.agents.files;
     expect(research?.content).toContain('model: "@review"');
     expect(scout?.content).not.toContain("model:");
-    expect(report.agents.unmappedTiers).toEqual([{ tier: "haiku", count: 1 }]);
+    expect(report.agents.unmappedTiers).toEqual([{ tier: "executor", count: 1 }]);
   });
 
   test("an agent's own models.omp wins over the table; a mapping's reasoningEffort is not written", async () => {
     const { ports } = fakePorts({
       files: {
         [`${H}/agents/scout.md`]:
-          '---\nname: scout\ndescription: Cheap lookups.\nmodel: haiku\nmodels: { omp: { model: "@cheap", reasoningEffort: "low" } }\n---\n\nLook things up.\n',
+          '---\nname: scout\ndescription: Cheap lookups.\nmodel: executor\nmodels: { omp: { model: "@cheap", reasoningEffort: "low" } }\n---\n\nLook things up.\n',
       },
     });
     const report = await run(ports);
     const scout = report.agents.files.find((file) => file.name === "scout.md");
     expect(scout?.model).toEqual({
       kind: "mapped",
-      tier: "haiku",
+      tier: "executor",
       model: "@cheap",
       reasoningEffort: "low",
       override: true,
     });
     expect(scout?.content).toContain('model: "@cheap"');
     expect(scout?.content).not.toContain("low");
-    expect(report.agents.unmappedTiers).toEqual([{ tier: "sonnet", count: 1 }]);
+    expect(report.agents.unmappedTiers).toEqual([{ tier: "main", count: 1 }]);
   });
 
   test("a malformed models: block is an error naming the file, not a dropped override", async () => {

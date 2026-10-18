@@ -22,6 +22,7 @@ const RULED = JSON.stringify({
 describe("parseAgentModels", () => {
   test("one table per target, tiers lower-cased, comments skipped, omp empty until ruled", () => {
     expect(parseAgentModels(RULED, LABEL)).toEqual({
+      claude: {},
       codex: {
         sonnet: { model: "gpt-6-luna", reasoningEffort: "high" },
         haiku: { model: "gpt-6-luna", reasoningEffort: "medium" },
@@ -53,7 +54,7 @@ describe("parseAgentModels", () => {
         JSON.stringify({ schemaVersion: AGENT_MODELS_SCHEMA_VERSION, codx: {} }),
         LABEL,
       ),
-    ).toThrow('unknown target "codx" (expected codex, omp)');
+    ).toThrow('unknown target "codx" (expected claude, codex, omp)');
     expect(() =>
       parseAgentModels(
         JSON.stringify({

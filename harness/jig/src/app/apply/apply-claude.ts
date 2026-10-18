@@ -84,6 +84,14 @@ import {
 import { unifiedDiff } from "../../domain/tiers/diff";
 import type { PlanAction } from "../../domain/tiers/plan";
 import {
+  type ClaudeAgentsReport,
+  applyClaudeAgents,
+  claudeAgentsChanges,
+  claudeAgentsConflicts,
+  planClaudeAgents,
+  seedClaudeAgents,
+} from "./claude-agents";
+import {
   type AgentsMdReport,
   type LinkReport,
   type ManagedDirReport,
@@ -101,7 +109,7 @@ import {
   planSingleLink,
   readJson,
 } from "./delivery";
-import { type PluginCheckout, type Plugins, agentPlan, loadPlugins, skillPlan } from "./plugins";
+import { type PluginCheckout, type Plugins, loadPlugins, skillPlan } from "./plugins";
 import type { ClaudeApplyPorts } from "./ports";
 
 export type { AgentsMdReport, LinkReport, ManagedDirReport, ManagedEntryReport };
@@ -195,7 +203,7 @@ export interface ClaudeApplyReport {
   /** Single symlinks: `CLAUDE.md` only. */
   readonly links: readonly LinkReport[];
   readonly skillsDir: ManagedDirReport;
-  readonly agentsDir: ManagedDirReport;
+  readonly agentsDir: ClaudeAgentsReport;
   /** The external packs the skills and agents directories draw from. */
   readonly plugins: readonly PluginCheckout[];
   readonly rulesDir: ManagedDirReport;
@@ -280,17 +288,6 @@ async function planSkillsDir(
   return planManagedDir(ports, { dir: paths.skills, sourceDir, now, ...plan });
 }
 
-async function planAgentsDir(
-  ports: ClaudeApplyPorts,
-  paths: ClaudeApplyPaths,
-  plugins: Plugins,
-  now: Date,
-): Promise<ManagedDirReport> {
-  const sourceDir = `${paths.harnessRoot}/agents`;
-  const plan = await agentPlan(ports, sourceDir, plugins);
-  return planManagedDir(ports, { dir: paths.agents, sourceDir, now, ...plan });
-}
-
 async function planRulesDir(
   ports: ClaudeApplyPorts,
   paths: ClaudeApplyPaths,
@@ -357,7 +354,7 @@ function needsWrite(report: Omit<ClaudeApplyReport, "outcome" | "wrote" | "messa
     report.repoAgentsMd?.outcome === "write" ||
     report.links.some((link) => link.state !== "ok") ||
     managedDirChanges(report.skillsDir) ||
-    managedDirChanges(report.agentsDir) ||
+    claudeAgentsChanges(report.agentsDir) ||
     managedDirChanges(report.rulesDir) ||
     report.commands.action.kind === "remove" ||
     optionalDirChanges(report.scriptsDir) ||
@@ -447,7 +444,13 @@ export async function applyClaude(
     ...(repoAgentsMd === undefined ? {} : { repoAgentsMd }),
     links: await planLinks(ports, paths, now),
     skillsDir: await planSkillsDir(ports, paths, plugins, now),
-    agentsDir: await planAgentsDir(ports, paths, plugins, now),
+    agentsDir: await planClaudeAgents(ports, {
+      dir: paths.agents,
+      harnessRoot: paths.harnessRoot,
+      plugins,
+      manifest,
+      now,
+    }),
     plugins: plugins.packs,
     rulesDir: await planRulesDir(ports, paths, now),
     commands: await planCommands(ports, paths.commands),
@@ -469,6 +472,7 @@ export async function applyClaude(
     ...(mcp.outcome === "conflict"
       ? [mcp.reason ?? "~/.claude.json cannot take the MCP servers"]
       : []),
+    ...claudeAgentsConflicts(base.agentsDir),
   ];
   if (conflicts.length > 0) {
     return {
@@ -498,6 +502,7 @@ export async function applyClaude(
     if (repoAgentsMd !== undefined) {
       manifest[repoAgentsMd.path] ??= ports.sha256(repoAgentsMd.content);
     }
+    await applyClaudeAgents(ports, base.agentsDir, manifest);
     await ports.writeManifest(manifest);
     await ports.writeProvenance(dirOf(paths.settings), {
       sourceFile: paths.guardRules,
@@ -507,7 +512,6 @@ export async function applyClaude(
     });
     for (const link of base.links) await applyLink(ports, link);
     await applyManagedDir(ports, base.skillsDir);
-    await applyManagedDir(ports, base.agentsDir);
     await applyManagedDir(ports, base.rulesDir);
     if (base.commands.action.kind === "remove") await ports.remove(paths.commands);
     if (base.scriptsDir.dir !== undefined) await applyManagedDir(ports, base.scriptsDir.dir);
@@ -520,7 +524,9 @@ export async function applyClaude(
     // LATER hand edit is detected as one. No file content changes: this is
     // out-of-repo state only.
     const owned = JSON.stringify(mcp.owned);
+    const seeded = seedClaudeAgents(base.agentsDir, manifest, ports.sha256);
     if (
+      seeded ||
       manifest[ownedKey(paths)] === undefined ||
       manifest[paths.agentsMd] === undefined ||
       manifest[mcpOwnedKey(paths)] !== owned

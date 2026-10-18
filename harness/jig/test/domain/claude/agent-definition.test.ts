@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { modelChoiceFor, parseAgentDefinition } from "../../../src/domain/claude/agent-definition";
+import {
+  AGENT_EFFORTS,
+  checkAgentVocabulary,
+  modelChoiceFor,
+  parseAgentDefinition,
+} from "../../../src/domain/claude/agent-definition";
 
 const MAP = {
   sonnet: { model: "gpt-6-luna", reasoningEffort: "high" },
@@ -110,5 +115,46 @@ describe("modelChoiceFor", () => {
   test("absent and `inherit` both mean: leave `model` out, and that is not a gap", () => {
     expect(modelChoiceFor(undefined, MAP)).toEqual({ kind: "inherit" });
     expect(modelChoiceFor("inherit", MAP)).toEqual({ kind: "inherit" });
+  });
+});
+
+describe("the tier and effort vocabulary (rules/decisions/2026-10-19-model-assignment.md)", () => {
+  const def = (model?: string, effort?: string) =>
+    parseAgentDefinition(
+      [
+        "---",
+        "name: a",
+        ...(model === undefined ? [] : [`model: ${model}`]),
+        ...(effort === undefined ? [] : [`effort: ${effort}`]),
+        "---",
+        "x",
+      ].join("\n"),
+      "a",
+    );
+
+  test("effort is read as written", () => {
+    expect(def("main", "xhigh").effort).toBe("xhigh");
+    expect(def("main").effort).toBeUndefined();
+  });
+
+  test("a tier, inherit or nothing passes; every effort level passes", () => {
+    for (const model of [undefined, "main", "complex", "executor", "inherit"]) {
+      expect(() => checkAgentVocabulary(def(model))).not.toThrow();
+    }
+    for (const effort of AGENT_EFFORTS) {
+      expect(() => checkAgentVocabulary(def("main", effort))).not.toThrow();
+    }
+  });
+
+  test("a vendor model name is an error that names the tiers", () => {
+    expect(() => checkAgentVocabulary(def("opus"))).toThrow(
+      'model "opus" is not a tier (main, complex, executor)',
+    );
+  });
+
+  test("an unknown effort word is an error that names the levels", () => {
+    expect(() => checkAgentVocabulary(def("main", "hgih"))).toThrow(
+      'effort "hgih" is not a level (low, medium, high, xhigh, max)',
+    );
   });
 });

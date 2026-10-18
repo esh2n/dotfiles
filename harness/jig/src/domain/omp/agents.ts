@@ -30,13 +30,14 @@
  *   in the `omp` table of `agents/models.json` (`../claude/agent-models.ts`;
  *   empty until ruled) or the agent's own `models.omp` override, left out
  *   and reported otherwise, exactly as the Codex target does. A mapping's
- *   `reasoningEffort` is ignored: omp's selector carries the effort
- *   (`:high`). The generator never invents one.
+ *   `reasoningEffort` is ignored; the agent's own `effort:` becomes omp's
+ *   `thinking` key (docs/task-agent-discovery.md). The generator never
+ *   invents one.
  *
  * Pure: a definition in, the file's text out.
  */
 
-import type { AgentDefinition, ModelChoice } from "../claude/agent-definition";
+import { AGENT_EFFORTS, type AgentDefinition, type ModelChoice } from "../claude/agent-definition";
 
 /** Where the format is fixed, for the header comment. */
 export const OMP_AGENTS_DOC_URL =
@@ -113,6 +114,9 @@ export function renderOmpAgent(input: OmpAgentInput): string {
     `name: ${yamlString(definition.name)}`,
     `description: ${yamlString(definition.description)}`,
     ...(model.kind === "mapped" ? [`model: ${yamlString(model.model)}`] : []),
+    ...(known(definition.effort) === undefined
+      ? []
+      : [`thinking: ${yamlString(definition.effort ?? "")}`]),
     ...(tools.tools.length > 0 ? [`tools: [${tools.tools.join(", ")}]`] : []),
     "---",
     "",
@@ -130,4 +134,11 @@ export function ompAgentFrontmatter(text: string): string {
 /** `research.md` → `research.md`; the file name, not the frontmatter `name`, keys the destination. */
 export function ompAgentFileName(sourceFile: string): string {
   return sourceFile;
+}
+
+/** An effort word from the vocabulary, or nothing (a pack agent may write anything). */
+function known(effort: string | undefined): string | undefined {
+  return effort !== undefined && (AGENT_EFFORTS as readonly string[]).includes(effort)
+    ? effort
+    : undefined;
 }

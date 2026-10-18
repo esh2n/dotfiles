@@ -87,6 +87,7 @@ import {
   type TargetResult,
   applyTiers,
 } from "../app/apply/apply-tiers";
+import type { ClaudeAgentsReport } from "../app/apply/claude-agents";
 import { AGENTS_SKILLS_MOUNT_TARGETS, type AgentsSkillsMountReport } from "../app/apply/delivery";
 import type { PluginCheckout } from "../app/apply/plugins";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
@@ -282,12 +283,7 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
     }),
     ...pluginLines(report.plugins),
     "",
-    ...managedDirLines("agents", report.agentsDir, {
-      noun: "agent definition",
-      plural: "s",
-      singular: "",
-      how: "*.md files",
-    }),
+    ...claudeAgentLines(report.agentsDir),
     "",
     ...managedDirLines("rules", report.rulesDir, {
       noun: "conditional-rule director",
@@ -689,6 +685,51 @@ function describeModelChoice(model: ModelChoice, what: string): string {
     case "unmapped":
       return `model: (none: no ${what} for "${model.tier}")`;
   }
+}
+
+/** `~/.claude/agents/`: one line per generated file, then what goes and what stays. */
+function claudeAgentLines(agents: ClaudeAgentsReport): readonly string[] {
+  const width = Math.max(PAD, ...agents.files.map((file) => file.name.length + 3));
+  const lines = [
+    `agents (generated files): ${agents.path}${agents.dirState.kind === "dir" ? "" : `  (${describePathState(agents.dirState)} → a real directory)`}`,
+    `  ${agents.files.length} agent definition${agents.files.length === 1 ? "" : "s"} → <name>.md (the source, with its tier turned into a Claude model alias):`,
+  ];
+  if (agents.files.length === 0) lines.push("    (none)");
+  for (const file of agents.files) {
+    const model =
+      file.model.kind === "mapped"
+        ? `model: ${file.model.model}`
+        : file.model.kind === "inherit"
+          ? "model: (inherit)"
+          : `model: (none: no claude alias for "${file.model.tier}")`;
+    const note =
+      file.replacesLink !== undefined
+        ? "  (replaces jig's link)"
+        : file.backupPath !== undefined
+          ? `  (not jig's yet → kept as ${basename(file.backupPath)})`
+          : "";
+    lines.push(`    ${file.name.padEnd(width - 2)}${file.outcome.padEnd(10)}${model}${note}`);
+  }
+  if (agents.excluded.length > 0) {
+    lines.push(
+      `  not generated (${agents.excluded.length}):`,
+      ...agents.excluded.map((entry) => `    ${entry.name.padEnd(PAD - 2)}${entry.reason}`),
+    );
+  }
+  const gone = [...agents.stale.map((e) => e.name), ...agents.staleLinks.map((e) => e.name)];
+  if (gone.length > 0) {
+    lines.push(
+      `  source gone, removed on --write (${gone.length}):`,
+      ...gone.map((n) => `    ${n}`),
+    );
+  }
+  if (agents.foreign.length > 0) {
+    lines.push(
+      `  not jig's (${agents.foreign.length}), left alone:`,
+      ...agents.foreign.map((entry) => `    ${entry.name.padEnd(width - 2)}${entry.what}`),
+    );
+  }
+  return lines;
 }
 
 /** One line per generated agent file, then what stands in the directory that no source produces. */

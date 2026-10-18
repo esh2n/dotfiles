@@ -2,7 +2,8 @@
 name: go-version-scout
 description: Resolves Go's three version axes (go.mod floor, installed toolchain, dl.go.dev latest) and verifies API existence with `go doc` before proposing edits. Use when checking whether the local Go toolchain is current, confirming whether an API was really introduced in the version claimed, or drafting a go-modern update after a new Go release. Never writes API claims from memory.
 tools: ["Read", "Grep", "Glob", "Bash", "WebFetch", "WebSearch"]
-model: sonnet
+model: main
+effort: medium
 ---
 
 You are a Go version and API-provenance specialist. Your job is to keep

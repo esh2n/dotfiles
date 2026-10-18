@@ -48,6 +48,7 @@
 import {
   type ModelChoice,
   type ModelMapping,
+  checkAgentVocabulary,
   modelChoiceFor,
   parseAgentDefinition,
 } from "../../domain/claude/agent-definition";
@@ -257,6 +258,7 @@ async function planAgents(
     try {
       const { definition, model } = decide(sourceFile, () => {
         const parsed = parseAgentDefinition(text, stem);
+        if (!fromPack(sourcePath, sourceDir)) checkAgentVocabulary(parsed);
         return {
           definition: parsed,
           model: modelChoiceFor(parsed.model, options.ompModels, parsed.models?.omp),

@@ -341,7 +341,7 @@ describe("applyCli --target claude", () => {
       "skills directory: replace (currently → /home/u/.claude/.skills-merged)  /home/u/.claude/skills",
     );
     expect(result.stdout).toContain(
-      "agents directory: replace (currently → /home/u/.claude/.agents-merged)  /home/u/.claude/agents",
+      "agents (generated files): /home/u/.claude/agents  (a symlink → /home/u/.claude/.agents-merged → a real directory)",
     );
     expect(result.stdout).toContain(
       "rules directory: replace (currently → /home/u/.claude/.rules-merged)  /home/u/.claude/rules",
@@ -440,7 +440,7 @@ describe("applyCli --target claude", () => {
     expect(result.stdout).toMatch(/README\.md +a file, not a skill directory/);
   });
 
-  test("the agents directory lists each *.md link with a count", async () => {
+  test("the agents directory lists each generated *.md with a count", async () => {
     const { ports } = fakePorts({ [TIERS_JSON_PATH]: JSON.stringify(MINIMAL_TIERS) });
     const context = claudeContext({
       [`${H}/agents/research.md`]: "# research\n",
@@ -448,11 +448,11 @@ describe("applyCli --target claude", () => {
     });
     const result = await applyCli(["--target", "claude"], ports, paths, context);
 
-    expect(result.stdout).toContain("agents directory: create  /home/u/.claude/agents");
-    expect(result.stdout).toContain("1 agent definition to link (*.md files):");
-    expect(result.stdout).toMatch(
-      /research\.md +create +→ \/repo\/llm\/harness\/agents\/research\.md/,
+    expect(result.stdout).toContain(
+      "agents (generated files): /home/u/.claude/agents  (missing → a real directory)",
     );
+    expect(result.stdout).toContain("1 agent definition → <name>.md");
+    expect(result.stdout).toMatch(/research\.md +write +model: \(inherit\)/);
     expect(result.stdout).toMatch(/notes\.txt +not a \*\.md file/);
   });
 
@@ -578,13 +578,13 @@ describe("applyCli --target codex", () => {
     [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
     [`${H}/skills/grilling/SKILL.md`]: "---\nname: grilling\n---\n",
     [`${H}/agents/research.md`]:
-      '---\nname: research\ndescription: Survey.\ntools: ["Read"]\nmodel: sonnet\n---\nSurvey.\n',
+      '---\nname: research\ndescription: Survey.\ntools: ["Read"]\nmodel: main\n---\nSurvey.\n',
   };
 
   const RULED_MODELS = {
-    sonnet: { model: "gpt-6-luna", reasoningEffort: "high" },
-    haiku: { model: "gpt-6-luna", reasoningEffort: "medium" },
-    opus: { model: "gpt-6-sol", reasoningEffort: "medium" },
+    main: { model: "gpt-6-luna", reasoningEffort: "high" },
+    executor: { model: "gpt-6-luna", reasoningEffort: "medium" },
+    complex: { model: "gpt-6-sol", reasoningEffort: "medium" },
   };
 
   function codexContext(
@@ -676,11 +676,9 @@ describe("applyCli --target codex", () => {
     expect(result.stdout).toContain("rules/common rendered in (1): core.md");
     expect(result.stdout).toContain("agents (generated files): /home/u/.codex/agents");
     expect(result.stdout).toContain("1 agent definition → <name>.toml");
-    expect(result.stdout).toMatch(
-      /research\.toml +write +model: \(none: no Codex id for "sonnet"\)/,
-    );
+    expect(result.stdout).toMatch(/research\.toml +write +model: \(none: no Codex id for "main"\)/);
     expect(result.stdout).toContain(
-      "model tiers with no Codex id in /repo/llm/harness/agents/models.json (sonnet: 1)",
+      "model tiers with no Codex id in /repo/llm/harness/agents/models.json (main: 1)",
     );
     expect(result.stdout).not.toContain("model tiers mapped by");
     expect(result.stdout).toMatch(/not jig's \(1\), left alone:\n +mine\.toml +a regular file/);
@@ -692,9 +690,9 @@ describe("applyCli --target codex", () => {
   test("with the ruled table: model and effort per file, the tier summary, no gap line", async () => {
     const context = codexContext(
       {
-        [`${H}/agents/scout.md`]: "---\nname: scout\nmodel: haiku\n---\nLook.\n",
+        [`${H}/agents/scout.md`]: "---\nname: scout\nmodel: executor\n---\nLook.\n",
         [`${H}/agents/architect.md`]:
-          "---\nname: architect\nmodel: opus\nmodels: { codex: { model: gpt-6-sol, reasoningEffort: xhigh } }\n---\nPlan.\n",
+          "---\nname: architect\nmodel: complex\nmodels: { codex: { model: gpt-6-sol, reasoningEffort: xhigh } }\n---\nPlan.\n",
         [`${H}/agents/plain.md`]: "---\nname: plain\n---\nNo tier.\n",
       },
       {},
@@ -703,16 +701,16 @@ describe("applyCli --target codex", () => {
     const result = await applyCli(["--target", "codex"], tiers(), paths, undefined, context);
 
     expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(/research\.toml +write +model: gpt-6-luna effort=high \(main\)/);
     expect(result.stdout).toMatch(
-      /research\.toml +write +model: gpt-6-luna effort=high \(sonnet\)/,
+      /scout\.toml +write +model: gpt-6-luna effort=medium \(executor\)/,
     );
-    expect(result.stdout).toMatch(/scout\.toml +write +model: gpt-6-luna effort=medium \(haiku\)/);
     expect(result.stdout).toMatch(
-      /architect\.toml +write +model: gpt-6-sol effort=xhigh \(models: override, tier opus\)/,
+      /architect\.toml +write +model: gpt-6-sol effort=xhigh \(models: override, tier complex\)/,
     );
     expect(result.stdout).toMatch(/plain\.toml +write +model: \(none: inherits\)/);
     expect(result.stdout).toContain(
-      "model tiers mapped by /repo/llm/harness/agents/models.json (sonnet → gpt-6-luna high: 1, haiku → gpt-6-luna medium: 1);",
+      "model tiers mapped by /repo/llm/harness/agents/models.json (main → gpt-6-luna high: 1, executor → gpt-6-luna medium: 1);",
     );
     expect(result.stdout).not.toContain("model tiers with no Codex id");
   });
@@ -794,7 +792,7 @@ describe("applyCli --target omp", () => {
     [`${H}/skills/README.md`]: "# skills\n",
     [`${H}/skills/writeup/SKILL.md`]: "---\nname: writeup\n---\n",
     [`${H}/agents/research.md`]:
-      '---\nname: research\ndescription: Survey.\ntools: ["Read", "NotebookEdit"]\nmodel: sonnet\n---\nSurvey.\n',
+      '---\nname: research\ndescription: Survey.\ntools: ["Read", "NotebookEdit"]\nmodel: main\n---\nSurvey.\n',
     [OMP_PATHS.extensionTarget]: "export default function () {}\n",
   };
 
@@ -829,9 +827,9 @@ describe("applyCli --target omp", () => {
     expect(result.stdout).toContain("agents (generated files): /home/u/.omp/agent/agents");
     expect(result.stdout).toContain("1 agent definition → <name>.md");
     expect(result.stdout).toMatch(
-      /research\.md +write +model: \(none: no omp selector for "sonnet"\) +tools: \[read\] +dropped: NotebookEdit/,
+      /research\.md +write +model: \(none: no omp selector for "main"\) +tools: \[read\] +dropped: NotebookEdit/,
     );
-    expect(result.stdout).toContain("model tiers with no omp selector (sonnet: 1)");
+    expect(result.stdout).toContain("model tiers with no omp selector (main: 1)");
     expect(result.stdout).toContain("Claude tools with no omp tool (NotebookEdit: 1)");
     expect(result.stdout).toContain("reaches omp natively, nothing to deliver:");
     expect(result.stdout).toContain("/home/u/.claude/CLAUDE.md → AGENTS.md");

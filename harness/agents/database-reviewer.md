@@ -2,7 +2,8 @@
 name: database-reviewer
 description: Database specialist for query optimization, schema design, security, and performance. Use when writing SQL, designing schemas/migrations, or reviewing queries for PostgreSQL or Cloud Spanner — creating migrations, designing schemas, or troubleshooting database performance. Incorporates Supabase best practices for Postgres and Google's Spanner design guidance for Spanner.
 tools: ["Read", "Grep", "Glob", "Bash"]
-model: sonnet
+model: main
+effort: high
 ---
 
 # Database Reviewer

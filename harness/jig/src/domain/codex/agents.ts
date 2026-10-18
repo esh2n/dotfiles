@@ -25,8 +25,8 @@
  *   out, so Codex applies its own default, and reported. Omitting `model`
  *   inherits: "explicit spawn → `[agents]` default → parent" (subagents
  *   page). The generator never invents a Codex model id.
- * - `model_reasoning_effort`: written whenever the mapping or override
- *   carries a `reasoningEffort`. The config reference lists
+ * - `model_reasoning_effort`: the agent's own `effort:` when it has one,
+ *   else the mapping's or override's `reasoningEffort`. The config reference lists
  *   `low | medium | high | xhigh | max | ultra` and says "Available levels
  *   depend on the model and client"
  *   (https://learn.chatgpt.com/docs/config-file/config-reference); a value
@@ -41,6 +41,7 @@
  */
 
 import {
+  AGENT_EFFORTS,
   type AgentDefinition,
   type ModelChoice,
   type ModelMapping,
@@ -131,6 +132,10 @@ export function toolsSentence(tools: readonly string[]): string {
  */
 export function renderCodexAgent(input: CodexAgentInput): string {
   const { definition, model } = input;
+  // The agent's own effort wins over the tier table's default.
+  // A pack agent's word outside the vocabulary is dropped, not passed on.
+  const own = known(definition.effort);
+  const effort = own ?? (model.kind === "mapped" ? model.reasoningEffort : undefined);
   const sentence = toolsSentence(definition.tools);
   const instructions = sentence === "" ? definition.body : `${definition.body}\n\n${sentence}`;
   const lines = [
@@ -139,9 +144,7 @@ export function renderCodexAgent(input: CodexAgentInput): string {
     `name = ${tomlString(definition.name)}`,
     `description = ${tomlString(definition.description)}`,
     ...(model.kind === "mapped" ? [`model = ${tomlString(model.model)}`] : []),
-    ...(model.kind === "mapped" && model.reasoningEffort !== undefined
-      ? [`model_reasoning_effort = ${tomlString(model.reasoningEffort)}`]
-      : []),
+    ...(effort === undefined ? [] : [`model_reasoning_effort = ${tomlString(effort)}`]),
     `developer_instructions = ${tomlString(instructions)}`,
   ];
   return `${lines.join("\n")}\n`;
@@ -150,4 +153,11 @@ export function renderCodexAgent(input: CodexAgentInput): string {
 /** `research.md` → `research.toml`; the file name, not the frontmatter `name`, keys the destination. */
 export function codexAgentFileName(sourceFile: string): string {
   return `${sourceFile.replace(/\.md$/, "")}.toml`;
+}
+
+/** An effort word from the vocabulary, or nothing (a pack agent may write anything). */
+function known(effort: string | undefined): string | undefined {
+  return effort !== undefined && (AGENT_EFFORTS as readonly string[]).includes(effort)
+    ? effort
+    : undefined;
 }

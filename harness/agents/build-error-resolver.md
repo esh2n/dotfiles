@@ -2,7 +2,7 @@
 name: build-error-resolver
 description: Language-neutral build error resolution specialist for when a build fails. Detects the project toolchain, then fixes build errors only with minimal diffs, no architectural edits. Focuses on getting the build green quickly.
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-model: sonnet
+model: main
 ---
 
 # Build Error Resolver
