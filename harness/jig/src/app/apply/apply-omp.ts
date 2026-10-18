@@ -531,7 +531,7 @@ export async function applyOmp(
         ]
       : configYml.report.outcome === "conflict"
         ? [
-            "config.yml's jig keys (modelRoles, tools.approvalMode, tools.approval.eval, statusLine) differ from both jig's last write and the newly generated ones",
+            "config.yml's jig keys (modelRoles, tools.approvalMode, tools.approval.eval, statusLine, retry) differ from both jig's last write and the newly generated ones",
           ]
         : []),
     ...(base.extensions.dirState.kind === "file"

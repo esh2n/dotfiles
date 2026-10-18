@@ -939,7 +939,7 @@ function configYmlLines(report: OmpApplyReport): readonly string[] {
   const { configYml } = report;
   const lines = [
     `config.yml: ${configYml.outcome}  ${configYml.path}`,
-    "  jig's keys: modelRoles, tools.approvalMode, tools.approval.eval, statusLine (domain/omp/config.ts);",
+    "  jig's keys: modelRoles, tools.approvalMode, tools.approval.eval, statusLine, retry (domain/omp/config.ts);",
     "  omp rewrites this file itself, so the rest is carried as omp wrote it and a hand edit is judged on jig's keys only.",
   ];
   if (configYml.invalid !== undefined) {

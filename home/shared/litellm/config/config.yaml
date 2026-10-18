@@ -68,6 +68,11 @@ model_list:
   # END jig:tiers
 
 litellm_settings:
+  # The one retry layer (rules/decisions/2026-10-19-model-assignment.md):
+  # LiteLLM alone can move a failed call to the same model's other
+  # deployment; omp and pi retry nothing themselves. 2 is LiteLLM's own
+  # default, written out so the layering is visible.
+  num_retries: 2
   # Free OSS Prometheus exporter — this is the whole point of the proxy.
   # effort_passthrough moves reasoning_effort into extra_body so its level
   # reaches DeepSeek (effort_passthrough.py says why).

@@ -17,6 +17,9 @@
  *    go to the sandbox, so the host runs `yolo`; `eval` still asks, since no
  *    Claude permission can express it and `bash.patterns` does not gate what
  *    an `eval` spawns.
+ *  - `retry.modelFallback` off and `retry.maxRetries` 0: LiteLLM is the one
+ *    retry layer; when a model fails omp stops with the cause, never
+ *    continuing on another model.
  *  - `statusLine` — the same content as Claude Code's statusline.sh in omp's
  *    own segments (rules/knowledge/statusline-across-harnesses.md):
  *    model and effort, directory, git, context used on the left; extension
@@ -73,6 +76,8 @@ export const OMP_OWNED_PATHS: readonly string[] = [
   "tools.approvalMode",
   "tools.approval.eval",
   "statusLine",
+  "retry.modelFallback",
+  "retry.maxRetries",
 ];
 
 const OWNED_VALUES: Readonly<Record<string, YamlValue>> = {
@@ -80,6 +85,12 @@ const OWNED_VALUES: Readonly<Record<string, YamlValue>> = {
   "tools.approvalMode": "yolo",
   "tools.approval.eval": "prompt",
   statusLine: STATUS_LINE,
+  // omp's default switches to another model after a hard error; a failure
+  // stops with its cause instead (rules/decisions/2026-10-19-model-assignment.md).
+  "retry.modelFallback": false,
+  // LiteLLM is the one retry layer (it alone can move to the same model's
+  // other deployment); retrying here too would multiply calls under failure.
+  "retry.maxRetries": 0,
 };
 
 function isObject(value: YamlValue | undefined): value is YamlObject {
