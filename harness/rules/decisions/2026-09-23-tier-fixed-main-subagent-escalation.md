@@ -2,7 +2,7 @@
 
 Status: accepted — 持ち主の裁定（2026-09-23）。同日 omp に載せた「プロンプトごとにメインのモデルを切り替える」暫定実装と pi の既存ルーターを、調査記録の結論で置き換える
 
-rule: A harness session runs on one LiteLLM tier for its whole life — `main` unless the owner picks `complex` or `deterministic` for that session with `/tier` (or `PI_TIER` / `OMP_TIER` at launch). Never switch the main session's model automatically, per prompt or otherwise; reach a stronger model by delegating to a subagent whose `model:` maps to `complex` (`agents/models.json`). The harness extension only holds the session on its tier — it puts the model back when omp's startup order or a `/model` pick lands on a direct provider — and never asks a judgment which tier a prompt needs.
+rule: A harness session runs on one LiteLLM tier for its whole life — `main` unless the owner picks `complex` or `executor` for that session with `/tier` (or `PI_TIER` / `OMP_TIER` at launch). Never switch the main session's model automatically, per prompt or otherwise; reach a stronger model by delegating to a subagent whose `model:` maps to `complex` (`agents/models.json`). The harness extension only holds the session on its tier — it puts the model back when omp's startup order or a `/model` pick lands on a direct provider — and never asks a judgment which tier a prompt needs.
 
 ## Problem
 

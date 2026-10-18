@@ -19,7 +19,7 @@
  * can open on a direct provider (measured 2026-09-23: lm-studio's qwen). At
  * session start and before every prompt the active model is checked and put
  * back on `<provider>/<tier>` when it is anything else. `/tier <main|complex|
- * deterministic>` changes the session's tier; `/tier off` stops enforcing;
+ * executor>` changes the session's tier; `/tier off` stops enforcing;
  * `/tier` shows the state. `OMP_TIER` sets the tier at launch.
  *
  * Failures are reported, never thrown: an unknown model, a build without
@@ -29,7 +29,7 @@
 
 import type { OmpBeforeAgentStartEvent, OmpCommandContext, OmpContext } from "./omp";
 
-export const TIERS = ["main", "complex", "deterministic"] as const;
+export const TIERS = ["main", "complex", "executor"] as const;
 export type Tier = (typeof TIERS)[number];
 export type TierMode = "off" | Tier;
 
@@ -159,7 +159,7 @@ export function createTierRouter(deps: TierDeps = {}): TierRouter {
       if (!isTier(wanted)) {
         notify(
           ctx,
-          `tier-router: unknown tier "${wanted}". Use main, complex, deterministic, or off.`,
+          `tier-router: unknown tier "${wanted}". Use main, complex, executor, or off.`,
           "error",
         );
         return;

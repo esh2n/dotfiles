@@ -143,7 +143,7 @@ gpu_linux() { # gpu_linux <attr under config>
 	[ "$(field "$output" llm-ledger-sync)" = "null" ]
 }
 
-@test "services: LiteLLM is told where deterministic's llama-server and its Mac fallback are" {
+@test "services: LiteLLM is told where executor's llama-server and its Mac fallback are" {
 	printf '{"roles": ["developer"], "linuxModelHost": "desktop.example.ts.net", "macModelHost": "mac.example.ts.net"}\n' >"${BATS_TEST_TMPDIR}/roles.json"
 	export DOTFILES_ROLES_FILE="${BATS_TEST_TMPDIR}/roles.json"
 	run --separate-stderr gpu_linux 'systemd.user.services.litellm-proxy.Service.Environment'

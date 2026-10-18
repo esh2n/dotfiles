@@ -33,13 +33,13 @@ model_list:
       model: deepseek/deepseek-v4-pro
       api_key: os.environ/DEEPSEEK_API_KEY
 
-  # deterministic ← qwen3.8-27b-linux (order 1)
+  # executor ← qwen3.8-27b-linux (order 1)
   # The Omarchy desktop's llama-server (RTX 3090 Ti), over the tailnet; the
   # model id is the GGUF file name without .gguf (router mode). Health-checked
   # in the background, so while the desktop is off it is out of the pool;
   # cooldown_time is longer than health_check_interval
   # (docs/proxy/health_check_routing.md).
-  - model_name: deterministic
+  - model_name: executor
     litellm_params:
       model: openai/Qwen3.8-27B-Q4_K_M
       api_base: os.environ/LINUX_MODEL_API_BASE
@@ -49,13 +49,13 @@ model_list:
       allowed_fails: 1
       cooldown_time: 90
 
-  # deterministic ← qwen3.8-27b-mac (order 2)
+  # executor ← qwen3.8-27b-mac (order 2)
   # The Mac's LM Studio, loaded just in time and unloaded after 600 idle seconds
   # so the Mac's own model comes back
   # (lmstudio.ai/docs/app/api/ttl-and-auto-evict); 15.0 tok/s measured
   # (bench/report.md). Never probed: a probe is a real completion and would keep
   # Qwen loaded.
-  - model_name: deterministic
+  - model_name: executor
     litellm_params:
       model: lm_studio/qwen/qwen3.8-27b@4bit
       api_base: os.environ/MAC_MODEL_API_BASE
@@ -80,7 +80,7 @@ litellm_settings:
   require_auth_for_metrics_endpoint: false
 
 general_settings:
-  # Probe deterministic's desktop deployment every 60 s and take it out of
+  # Probe executor's desktop deployment every 60 s and take it out of
   # the pool while it fails, so a request goes straight to the Mac instead of
   # waiting on a powered-off machine (docs/proxy/health_check_routing.md). The
   # cloud tiers are not probed: a probe is a real, billed completion.
@@ -91,7 +91,7 @@ general_settings:
   # (proxy_server.py, "treat 429/408 endpoints as healthy"), and a powered-off
   # desktop answers the probe with exactly that timeout, so the flag kept the
   # desktop in the pool and every request hung on it (measured 2026-09-30).
-  background_health_check_model_groups: ["deterministic"]
+  background_health_check_model_groups: ["executor"]
   # an on-demand GET /health skips the Mac deployment too (docs/proxy/health.md)
   health_check_skip_disabled_background_models: true
   # The model servers' own load / unload / list, reached through this

@@ -295,7 +295,7 @@ func llamaFirewall(s Sys, c Config) {
 	}
 	c.log("letting LiteLLM's container reach llama-server through the firewall (root)")
 	if err := s.Run(nil, "sudo", "ufw", "allow", "from", "172.16.0.0/12", "to", "100.64.0.0/10", "port", "8080", "proto", "tcp", "comment", "litellm-to-llama-server"); err != nil {
-		c.warn("ufw rule not added; the deterministic tier cannot reach llama-server until: sudo ufw allow from 172.16.0.0/12 to 100.64.0.0/10 port 8080 proto tcp")
+		c.warn("ufw rule not added; the executor tier cannot reach llama-server until: sudo ufw allow from 172.16.0.0/12 to 100.64.0.0/10 port 8080 proto tcp")
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {

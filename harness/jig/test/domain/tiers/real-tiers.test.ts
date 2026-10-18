@@ -14,9 +14,9 @@ describe("the real tiers.json", () => {
     expect(() => loadRealTiers()).not.toThrow();
   });
 
-  test("carries exactly main/complex/deterministic", () => {
+  test("carries exactly main/complex/executor", () => {
     const policy = loadRealTiers();
-    expect(Object.keys(policy.tiers).sort()).toEqual(["complex", "deterministic", "main"]);
+    expect(Object.keys(policy.tiers).sort()).toEqual(["complex", "executor", "main"]);
   });
 
   test("every alias matches its tier key", () => {

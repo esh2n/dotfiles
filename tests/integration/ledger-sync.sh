@@ -55,7 +55,7 @@ expect "total spend" "$(q central 'SELECT sum(spend) FROM "LiteLLM_SpendLogs"')"
 expect "labelled rows" "$(q central "SELECT string_agg(request_id || '=' || machine, ',' ORDER BY request_id) FROM ledger_origin")" "r1=omarchy,r2=omarchy"
 expect "watermark" "$(cat "${WORK}/state/shipped")" "2026-09-25 10:05:00"
 
-q local "INSERT INTO \"LiteLLM_SpendLogs\" VALUES ('r3','acompletion',0.25,'2026-09-25 10:30:00','deterministic','[]')"
+q local "INSERT INTO \"LiteLLM_SpendLogs\" VALUES ('r3','acompletion',0.25,'2026-09-25 10:30:00','executor','[]')"
 sync
 sync # everything within the hour is sent again: nothing may double
 expect "rows after re-sending" "$(q central 'SELECT count(*) FROM "LiteLLM_SpendLogs"')" 4

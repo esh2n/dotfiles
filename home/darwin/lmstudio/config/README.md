@@ -1,7 +1,7 @@
 # LM Studio — the home model server (headless, at login, awake while serving)
 
 The Mac's model server. It stays on `127.0.0.1:1234`; only Tailscale puts it
-on the tailnet. `deterministic` runs on the Omarchy desktop's llama-server and
+on the tailnet. `executor` runs on the Omarchy desktop's llama-server and
 falls back here only while the desktop is off: LM Studio then loads
 `qwen/qwen3.8-27b@4bit` just in time and unloads it after
 10 idle minutes

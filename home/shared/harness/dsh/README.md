@@ -8,7 +8,7 @@ chosen with data. Developer preview (MIT), so expect breaking changes.
 
 ```
 dsh (front)  ─┐
-pi  (front)  ─┼─→ LiteLLM proxy :4000 ─→ main=deepseek / complex=astra / deterministic=local
+pi  (front)  ─┼─→ LiteLLM proxy :4000 ─→ main=deepseek / complex=astra / executor=local
              ─┘        (measures TTFT / tok/s / cost / prefix-hit for both fronts)
 ```
 
@@ -19,7 +19,7 @@ provider keys live on the proxy. So no provider secret lands in DSH config.
 
 | File | Role |
 |---|---|
-| `settings.yaml` | model/provider settings → symlink to `~/.dsh/settings.yaml`. One `local-proxy` route (OpenAI-compatible → `:4000`) with 3 models (`main`/`complex`/`deterministic`, matching the LiteLLM aliases). Re-read per request. |
+| `settings.yaml` | model/provider settings → symlink to `~/.dsh/settings.yaml`. One `local-proxy` route (OpenAI-compatible → `:4000`) with 3 models (`main`/`complex`/`executor`, matching the LiteLLM aliases). Re-read per request. |
 | `dsh.op-vars` | op:// reference for the proxy key (pointer, not a secret) |
 | `start-dsh.sh` | `op run --env-file dsh.op-vars -- npx @deepseek-ai/dsh web` |
 
@@ -95,7 +95,7 @@ The main checkout's jig needs `bun install --frozen-lockfile` once.
   calls 404 on `/chat/completions`, flip it. (LiteLLM serves both in most
   setups.)
 - **The 3 model `id`s** must match the LiteLLM `model_name` aliases exactly
-  (`main`/`complex`/`deterministic`).
+  (`main`/`complex`/`executor`).
 - **Install** — `npx @deepseek-ai/dsh web` is documented; a global
   `npm i -g @deepseek-ai/dsh` is plausible but unverified. Node `^22.19 || >=24`.
 - **Model picker** — selection is Web-UI-driven (Settings → Models); a `/model`

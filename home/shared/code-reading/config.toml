@@ -4,7 +4,7 @@
 # api_key_command once, the first time it calls the model.
 [llm]
 base_url = "http://localhost:4000/v1"
-model = "deterministic"
+model = "executor"
 # The LiteLLM key helper (home/shared/litellm): headless, no approval prompt,
 # and it finds op itself, so editors started from the Dock get the key too.
 api_key_command = ["sh", "-c", "exec \"$HOME/.config/litellm/proxy-key.sh\""]

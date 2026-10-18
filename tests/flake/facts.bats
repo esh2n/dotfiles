@@ -102,7 +102,7 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).nvidia"
 	[ "$status" -ne 0 ]
 }
 
-@test "facts: linuxModelHost, where the deterministic tier's llama-server is, is read from the roles file" {
+@test "facts: linuxModelHost, where the executor tier's llama-server is, is read from the roles file" {
 	printf '{"roles": ["developer"], "linuxModelHost": "desktop.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).linuxModelHost"
 	[ "$output" = '"desktop.example.ts.net"' ]
@@ -114,7 +114,7 @@ facts_nvidia() { nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).nvidia"
 	[ "$status" -ne 0 ]
 }
 
-@test "facts: macModelHost, where deterministic falls back, is read from the roles file" {
+@test "facts: macModelHost, where executor falls back, is read from the roles file" {
 	printf '{"roles": ["developer"], "macModelHost": "mac.example.ts.net"}\n' >"${DOTFILES_ROLES_FILE}"
 	run --separate-stderr nix_eval_expr_json "(import ${REPO_ROOT}/lib/facts.nix).macModelHost"
 	[ "$output" = '"mac.example.ts.net"' ]

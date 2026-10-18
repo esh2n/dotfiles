@@ -44,7 +44,7 @@ func (c *Checker) line(word, color, msg string) {
 // Check probes the home-LLM stack: one real round trip per tier plus the
 // plumbing around it. Nothing is inferred from logs or config: every line is
 // a request made now. It costs one tiny prompt to `main` (a fraction of a
-// cent); `deterministic` is local and free; `complex` only with withComplex.
+// cent); `executor` is local and free; `complex` only with withComplex.
 // The result is the number of FAILs.
 func Check(e Env, c *Checker, withComplex bool) int {
 	e = e.withDefaults()
@@ -63,10 +63,10 @@ func Check(e Env, c *Checker, withComplex bool) int {
 	}
 	checkTiers(e, c, key)
 	if key != "" {
-		// deterministic is the round trip across the tailnet: this machine's
+		// executor is the round trip across the tailnet: this machine's
 		// LiteLLM → the desktop's llama-server (the roles file's
 		// "linuxModelHost"); it fails while the desktop is off.
-		ask(e, c, key, "deterministic")
+		ask(e, c, key, "executor")
 		ask(e, c, key, "main")
 		if withComplex {
 			ask(e, c, key, "complex")
@@ -129,17 +129,17 @@ func checkLMStudioModels(e Env, c *Checker) {
 	want := lmStudioFallback(e)
 	switch {
 	case want == "":
-		c.fail("deterministic's LM Studio fallback not found in litellm/config.yaml (a `model: lm_studio/...` line)")
+		c.fail("executor's LM Studio fallback not found in litellm/config.yaml (a `model: lm_studio/...` line)")
 	// LM Studio lists a model once; `<id>@<quant>` picks one of its
 	// downloaded variants, so the id before the @ is what must be listed
 	case slices.Contains(models, want) || slices.Contains(models, strings.SplitN(want, "@", 2)[0]):
-		c.pass("deterministic falls back to LM Studio's %s", want)
+		c.pass("executor falls back to LM Studio's %s", want)
 	default:
-		c.fail("deterministic falls back to %s, which LM Studio does not list — set its entry in harness/policy/models.json to one of the ids above", want)
+		c.fail("executor falls back to %s, which LM Studio does not list — set its entry in harness/policy/models.json to one of the ids above", want)
 	}
 }
 
-// lmStudioFallback is the LM Studio model id deterministic falls back to:
+// lmStudioFallback is the LM Studio model id executor falls back to:
 // the `model: lm_studio/<id>` line of litellm/config.yaml.
 func lmStudioFallback(e Env) string {
 	b, err := os.ReadFile(e.litellm("config.yaml"))
@@ -157,7 +157,7 @@ func hasTiers(tiers []string) bool {
 	for _, t := range tiers {
 		have[t] = true
 	}
-	return have["main"] && have["complex"] && have["deterministic"]
+	return have["main"] && have["complex"] && have["executor"]
 }
 
 func checkTiers(e Env, c *Checker, key string) {
@@ -269,7 +269,7 @@ func checkOmp(e Env, c *Checker, key string) {
 	if hasTiers(list) {
 		c.pass("omp lists the proxy tiers: %s", strings.Join(list, " "))
 	} else {
-		c.fail("omp does not list proxy/{main,complex,deterministic} (models.yml provider, or key) — got: %s", orNone(strings.Join(list, " ")))
+		c.fail("omp does not list proxy/{main,complex,executor} (models.yml provider, or key) — got: %s", orNone(strings.Join(list, " ")))
 	}
 }
 

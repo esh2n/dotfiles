@@ -19,6 +19,6 @@
   "omp": {
     "complex": { "model": "proxy/complex" },
     "main": { "model": "proxy/main" },
-    "executor": { "model": "proxy/deterministic" }
+    "executor": { "model": "proxy/executor" }
   }
 }

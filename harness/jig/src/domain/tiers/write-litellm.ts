@@ -20,7 +20,7 @@ import type { DroppedField, WriteResult } from "./capability";
 import type { CatalogModel } from "./catalog";
 import type { Tier, TierId, TiersPolicy } from "./types";
 
-const LITELLM_TIER_ORDER: readonly TierId[] = ["main", "complex", "deterministic"];
+const LITELLM_TIER_ORDER: readonly TierId[] = ["main", "complex", "executor"];
 
 const NOT_EXPRESSIBLE_TIER_FIELDS = [
   "reasoning",

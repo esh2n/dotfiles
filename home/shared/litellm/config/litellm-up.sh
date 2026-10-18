@@ -152,22 +152,22 @@ else
   echo "litellm-up: no ledger DB secret (op://llm-automation/litellm-db/password); serving without spend records" >&2
 fi
 
-# 4) where the deterministic tier is: the Omarchy desktop's llama-server
+# 4) where the executor tier is: the Omarchy desktop's llama-server
 #    (rules/decisions/2026-09-26-deterministic-on-the-gpu.md), reached by its
 #    tailnet name from every machine, the desktop included — llama-server
 #    binds loopback and `tailscale serve --tcp 8080` is its one exposure.
 #    LINUX_MODEL_HOST comes from the roles file's "linuxModelHost" (its key
 #    is a catalog key, step 3a). Without it LiteLLM still serves the other
-#    tiers and only deterministic's first deployment fails.
+#    tiers and only executor's first deployment fails.
 LINUX_MODEL_HOST="${LINUX_MODEL_HOST:-}"
 if [ -n "$LINUX_MODEL_HOST" ]; then
   LINUX_MODEL_API_BASE="http://${LINUX_MODEL_HOST}:8080/v1"
 else
-  echo "litellm-up: \"linuxModelHost\" is not in the roles file — the deterministic tier will fail until it is" >&2
+  echo "litellm-up: \"linuxModelHost\" is not in the roles file — the executor tier will fail until it is" >&2
   LINUX_MODEL_API_BASE="http://linux-model-server.invalid:8080/v1"
 fi
 
-# 4b) where deterministic falls back while the desktop is off: the Mac's LM
+# 4b) where executor falls back while the desktop is off: the Mac's LM
 #     Studio (rules/decisions/2026-09-27-deterministic-falls-back-to-the-mac.md).
 #     On the Mac it is local (host.docker.internal is the host's loopback as
 #     seen from the container); elsewhere it is the Mac's tailnet name, the
@@ -180,7 +180,7 @@ if curl -sf --max-time 2 http://127.0.0.1:1234/v1/models >/dev/null 2>&1 || [ "$
 elif [ -n "$MAC_MODEL_HOST" ]; then
   MAC_MODEL_API_BASE="http://${MAC_MODEL_HOST}:1234/v1"
 else
-  echo "litellm-up: \"macModelHost\" is not in the roles file — deterministic has no fallback while the desktop is off" >&2
+  echo "litellm-up: \"macModelHost\" is not in the roles file — executor has no fallback while the desktop is off" >&2
   MAC_MODEL_API_BASE="http://mac-model-server.invalid:1234/v1"
 fi
 # Linux: the container cannot resolve a *.ts.net name itself — the host's
@@ -196,7 +196,7 @@ if [ "$(uname -s)" = Linux ]; then
     if [ -n "$tailnet_ip" ]; then
       HOST_ARGS+=(--add-host "${tailnet_host}:${tailnet_ip}")
     else
-      echo "litellm-up: ${tailnet_host} does not resolve on this machine (Tailscale down?) — deterministic cannot reach it until it does" >&2
+      echo "litellm-up: ${tailnet_host} does not resolve on this machine (Tailscale down?) — executor cannot reach it until it does" >&2
     fi
   done
 fi

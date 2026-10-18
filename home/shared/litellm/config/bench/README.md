@@ -1,6 +1,6 @@
-# bench — local model A/B for the deterministic tier
+# bench — local model A/B for the executor tier
 
-Measure two (or more) local models on the *same* deterministic-tier prompt set,
+Measure two (or more) local models on the *same* executor-tier prompt set,
 on this machine, with your own tasks — because no public leaderboard tests your
 exact JSON/tool/edit workload. Quality (auto-graded), run-to-run determinism,
 speed (TTFT + decode tok/s) and the measured footprint side by side.
@@ -74,7 +74,7 @@ than measure the other build and label it with the name you asked for.
 
 ## Prompts
 
-`prompts.json` — a `system` prompt plus representative deterministic-tier tasks
+`prompts.json` — a `system` prompt plus representative executor-tier tasks
 (structured/JSON, tool-args, classification, instruction-following, a code edit).
 Each has a `check` auto-grader: `equals`, `contains`, `regex`, `valid_json`,
 `json_array_len`, `json_fields`, or `human` (diff only). Add your real tasks here

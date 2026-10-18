@@ -4,17 +4,17 @@ import { StaticProvider } from "../../src/infra/decision/static-provider";
 
 describe("tier", () => {
   test("prints the tier decision for the request on stdin", async () => {
-    const provider = new StaticProvider({ choice: { value: "deterministic", confidence: 0.9 } });
+    const provider = new StaticProvider({ choice: { value: "executor", confidence: 0.9 } });
 
     const result = await tier("rename the variable everywhere\n", provider);
 
     expect(result.code).toBe(0);
     expect(result.stderr).toBe("");
     expect(JSON.parse(result.stdout)).toEqual({
-      tier: "deterministic",
+      tier: "executor",
       confidence: 0.9,
       source: "decided",
-      chosen: "deterministic",
+      chosen: "executor",
     });
   });
 

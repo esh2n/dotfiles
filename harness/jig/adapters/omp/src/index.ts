@@ -66,7 +66,7 @@ export default function (pi: OmpExtensionApi): void {
   });
   pi.registerCommand?.("tier", {
     description:
-      "Session tier: /tier [main|complex|deterministic|off] — fixed for the session, never automatic",
+      "Session tier: /tier [main|complex|executor|off] — fixed for the session, never automatic",
     handler: (args, ctx) => tier.onCommand(args, ctx),
   });
 

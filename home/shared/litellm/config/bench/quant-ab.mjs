@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// quant-ab.mjs — A/B two (or more) local models on the same deterministic-tier
+// quant-ab.mjs — A/B two (or more) local models on the same executor-tier
 // prompt set. Streams temp-0 completions, measures TTFT + decode tok/s, auto-
 // grades against per-prompt checks, and flags cross-model disagreement and
 // run-to-run non-determinism. Dependency-free (Node >=20, global fetch).
@@ -258,7 +258,7 @@ function report(ran = MODELS) {
   // row for a model whose turn has not come yet.
   const M = ran && ran.length ? ran : MODELS;
   const L = [];
-  L.push(`# Local quant A/B — deterministic tier\n`);
+  L.push(`# Local quant A/B — executor tier\n`);
   L.push(`- base: \`${BASE}\` · runs/prompt: ${RUNS} · max_tokens: ${MAXTOK} · temp 0, seed 0`);
   L.push(`- models: ${M.map((m) => `\`${m}\``).join(" vs ")}`);
   // relative to this directory: a report is committed, and must not carry one machine's path
@@ -356,7 +356,7 @@ function report(ran = MODELS) {
       const nondet = ok.filter((p) => new Set(results[m][p.id].map((r) => r.text)).size > 1).map((p) => p.id);
       const skipped = PROMPTS.length - ok.length;
       const verdict = ok.length === 0 ? "not measured (every prompt errored)"
-        : nondet.length === 0 ? "all deterministic ✅" : `varied on ${nondet.join(", ")} ⚠️`;
+        : nondet.length === 0 ? "all executor ✅" : `varied on ${nondet.join(", ")} ⚠️`;
       L.push(`- \`${m}\`: ${verdict}${skipped && ok.length ? ` (${skipped} errored prompts not compared)` : ""}`);
     }
     L.push("");

@@ -837,7 +837,7 @@ describe("the /tier path's decision log", () => {
   test("records what the judgment preferred, what was returned, and for which request", async () => {
     const entries: TierLogEntry[] = [];
     const { service, token } = await startTierService(
-      new StaticProvider({ choice: { value: "deterministic", confidence: 0.55 } }),
+      new StaticProvider({ choice: { value: "executor", confidence: 0.55 } }),
       entries,
     );
     try {
@@ -853,7 +853,7 @@ describe("the /tier path's decision log", () => {
         promptPreview: "rename foo to bar in",
         promptChars: "rename foo to bar in\nevery file".length,
         tier: "main",
-        chosen: "deterministic",
+        chosen: "executor",
         confidence: 0.55,
         source: "fallback",
       });

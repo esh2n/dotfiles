@@ -18,7 +18,7 @@
  * ignore them.
  */
 
-export const TIER_IDS = ["main", "complex", "deterministic"] as const;
+export const TIER_IDS = ["main", "complex", "executor"] as const;
 export type TierId = (typeof TIER_IDS)[number];
 
 import type { CatalogModel } from "./catalog";
@@ -59,7 +59,7 @@ export interface TierDshView {
    * dsh's OWN compat block — deliberately separate from the shared `compat`
    * field below. In the real file only `main` carries `compat.thinkingFormat`
    * (it is the one tier where "off" needs to actually stop thinking); complex
-   * and deterministic don't, even though pi's `compat.thinkingFormat` is set
+   * and executor don't, even though pi's `compat.thinkingFormat` is set
    * for all three. That's a real, pre-existing asymmetry between the two
    * consumers, not a formatting difference, so it is modeled as dsh's own
    * fact rather than derived from `compat`.
@@ -86,9 +86,9 @@ export interface Tier {
   readonly maxContextWindow?: number;
   readonly maxTokens: number;
   readonly compat: TierCompat;
-  /** pi only; deterministic-tier-only in practice, but not schema-enforced. */
+  /** pi only; executor-tier-only in practice, but not schema-enforced. */
   readonly thinkingLevelMap?: EffortMap;
-  /** pi only; deterministic-tier-only in practice, but not schema-enforced. */
+  /** pi only; executor-tier-only in practice, but not schema-enforced. */
   readonly samplingParams?: TierSamplingParams;
   readonly pi: TierPiView;
   readonly dsh: TierDshView;

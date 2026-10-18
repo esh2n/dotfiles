@@ -95,7 +95,7 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	! grep -q "^docker run" "$LOG"
 }
 
-@test "litellm-up: deterministic goes to the desktop's llama-server, its key passed by name only" {
+@test "litellm-up: executor goes to the desktop's llama-server, its key passed by name only" {
 	export LINUX_MODEL_HOST=desktop.example.ts.net
 	run up
 	[ "$status" -eq 0 ]
@@ -115,13 +115,13 @@ up() { PATH="${BIN}:/usr/bin:/bin" bash "$D/litellm-up.sh"; }
 	grep -q "^docker run --rm .*-e MAC_MODEL_API_BASE=http://mac.example.ts.net:1234/v1 " "$LOG"
 }
 
-@test "litellm-up: on the mac deterministic falls back to its own LM Studio" {
+@test "litellm-up: on the mac executor falls back to its own LM Studio" {
 	run up
 	[ "$status" -eq 0 ]
 	grep -q "^docker run --rm .*-e MAC_MODEL_API_BASE=http://host.docker.internal:1234/v1 " "$LOG"
 }
 
-@test "litellm-up: without the desktop's name it still serves, and says deterministic will fail" {
+@test "litellm-up: without the desktop's name it still serves, and says executor will fail" {
 	unset LINUX_MODEL_HOST
 	run --separate-stderr up
 	[ "$status" -eq 0 ]

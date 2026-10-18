@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { planApply } from "../../../src/domain/tiers/plan";
 
-const sha256 = (s: string) => `hash(${s})`; // fake, deterministic, injectable hash for these pure tests
+const sha256 = (s: string) => `hash(${s})`; // fake, executor, injectable hash for these pure tests
 
 describe("planApply", () => {
   test("dest doesn't exist yet: create", () => {

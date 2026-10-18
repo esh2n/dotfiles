@@ -17,13 +17,13 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 // What is left is enforcement: if the active model is not `<provider>/<tier>`
 // — a `/model` pick of a direct provider, or pi's own startup race that
 // starts on another provider's default (pi #8810) — the handler puts it back
-// before the turn. `/tier <main|complex|deterministic>` changes the session's
+// before the turn. `/tier <main|complex|executor>` changes the session's
 // tier (an owner's choice, applied from the next prompt); `/tier off` stops
 // enforcing; `/tier` shows the state. `PI_TIER` sets the tier at launch.
 //
 // Resident cost: nothing — no HTTP call, no tools, no injected context.
 
-const TIERS = ["main", "complex", "deterministic"] as const;
+const TIERS = ["main", "complex", "executor"] as const;
 type Tier = (typeof TIERS)[number];
 type Mode = "off" | Tier;
 
@@ -73,7 +73,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("tier", {
     description:
-      "Session tier: /tier [main|complex|deterministic|off] — fixed for the session, never automatic",
+      "Session tier: /tier [main|complex|executor|off] — fixed for the session, never automatic",
     handler: async (args, ctx) => {
       const wanted = (args ?? "").trim();
 
@@ -95,7 +95,7 @@ export default function (pi: ExtensionAPI) {
 
       if (!isTier(wanted)) {
         ctx.ui.notify(
-          `tier-router: unknown tier "${wanted}". Use main, complex, deterministic, or off.`,
+          `tier-router: unknown tier "${wanted}". Use main, complex, executor, or off.`,
           "error",
         );
         return;

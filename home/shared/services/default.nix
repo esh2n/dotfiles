@@ -3,7 +3,7 @@
 { facts, lib, ... }:
 {
   dotfiles.services = {
-    # LINUX_MODEL_HOST / MAC_MODEL_HOST: where deterministic's two
+    # LINUX_MODEL_HOST / MAC_MODEL_HOST: where executor's two
     # deployments are (the roles file's "linuxModelHost" / "macModelHost");
     # litellm-up.sh says so when one is unset.
     litellm-proxy = {

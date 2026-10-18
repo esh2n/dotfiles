@@ -51,7 +51,7 @@ describe("createNodeApplyFs", () => {
     expect(await fs.readManifest()).toEqual({ "/a": "hash-a", "/b": "hash-b" });
   });
 
-  test("sha256 is deterministic and matches a known vector", async () => {
+  test("sha256 is executor and matches a known vector", async () => {
     const fs = createNodeApplyFs({ stateDir: join(dir, "state"), jigVersion: "0.0.0" });
     // echo -n "hello" | shasum -a 256
     expect(fs.sha256("hello")).toBe(

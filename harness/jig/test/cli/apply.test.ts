@@ -47,8 +47,8 @@ const MINIMAL_TIERS = {
       pi: { name: "complex" },
       dsh: { name: "complex" },
     },
-    deterministic: {
-      alias: "deterministic",
+    executor: {
+      alias: "executor",
       displayName: "local Qwen",
       use: ["qwen-local"],
       reasoning: true,
@@ -56,8 +56,8 @@ const MINIMAL_TIERS = {
       contextWindow: 131072,
       maxTokens: 32768,
       compat: { thinkingFormat: "qwen-chat-template", supportsReasoningEffort: false },
-      pi: { name: "deterministic" },
-      dsh: { name: "deterministic" },
+      pi: { name: "executor" },
+      dsh: { name: "executor" },
     },
   },
 };

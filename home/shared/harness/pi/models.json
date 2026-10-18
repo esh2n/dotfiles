@@ -26,8 +26,8 @@
           }
         },
         {
-          "id": "deterministic",
-          "name": "deterministic — Qwen3.8-27B (Linux model server)",
+          "id": "executor",
+          "name": "executor — Qwen3.8-27B (Linux model server)",
           "reasoning": true,
           "input": [
             "text"

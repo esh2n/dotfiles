@@ -5,7 +5,7 @@
  * `local-proxy:` subtree — i.e. exactly what step 5 (the integration step)
  * hand-edits the real file into. Byte-identical except for the documented,
  * deliberate diffs: `complex`'s stale "Astra" comment corrected to the
- * backend litellm/config.yaml actually routes to, and the deterministic
+ * backend litellm/config.yaml actually routes to, and the executor
  * tier's vision-capable note moved from a trailing to a leading comment.
  */
 
@@ -58,9 +58,9 @@ const BEFORE = [
   "        - id: complex",
   "          name: complex (Astra)",
   "",
-  "        # deterministic -> proxy alias that maps to local qwen",
-  "        - id: deterministic",
-  "          name: deterministic (local Qwen)",
+  "        # executor -> proxy alias that maps to local qwen",
+  "        - id: executor",
+  "          name: executor (local Qwen)",
   "          # add `input: [text, image]` if this qwen build is vision-capable",
   "    # END jig:tiers",
   "",
@@ -116,10 +116,10 @@ const EXPECTED_AFTER = [
   "        - id: complex",
   "          name: complex (Astra)",
   "",
-  "        # deterministic -> proxy alias that maps to Qwen3.8-27B-Q4_K_M",
+  "        # executor -> proxy alias that maps to Qwen3.8-27B-Q4_K_M",
   "        # add `input: [text, image]` if this qwen build is vision-capable",
-  "        - id: deterministic",
-  "          name: deterministic (Qwen3.8-27B, Linux model server)",
+  "        - id: executor",
+  "          name: executor (Qwen3.8-27B, Linux model server)",
   "    # END jig:tiers",
   "",
 ].join("\n");
@@ -145,10 +145,10 @@ describe("toDshModelsBlock + spliceManagedBlock", () => {
 
     expect(fields).toContain("main:contextWindow");
     expect(fields).toContain("main:backend");
-    expect(fields).toContain("deterministic:samplingParams");
-    expect(fields).toContain("deterministic:thinkingLevelMap");
+    expect(fields).toContain("executor:samplingParams");
+    expect(fields).toContain("executor:thinkingLevelMap");
     expect(fields).toContain("complex:compat.thinkingFormat");
-    expect(fields).toContain("deterministic:compat.thinkingFormat");
+    expect(fields).toContain("executor:compat.thinkingFormat");
     expect(fields).toContain("*:connections.proxy.pi");
   });
 

@@ -10,7 +10,7 @@
  * Owned:
  *  - `modelRoles` — every role on a LiteLLM tier (owner's ruling
  *    2026-09-23): the thorough roles (`slow`, `plan`, `advisor`) on
- *    `complex`, everything lightweight on `main`. `deterministic` is picked
+ *    `complex`, everything lightweight on `main`. `executor` is picked
  *    by hand, never by a role.
  *  - `tools.approvalMode` and `tools.approval.eval` — untrusted repositories
  *    go to the sandbox, so the host runs `yolo`; `eval` still asks, since no
