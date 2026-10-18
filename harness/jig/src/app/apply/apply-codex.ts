@@ -49,7 +49,6 @@ import type { ModelMapping } from "../../domain/claude/agent-definition";
 import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { type PathState, backupPath } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
-import type { RulesProfileRef } from "../../domain/claude/rules-profile";
 import {
   type CodexModelChoice,
   codexAgentFileName,
@@ -86,12 +85,12 @@ import type { CodexApplyPorts } from "./ports";
 export interface CodexApplyPaths {
   /** `llm/harness/`, absolute. `skills/`, `agents/` and `rules/` are under it. */
   readonly harnessRoot: string;
+  /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
+  readonly pluginsDir?: string;
   /** `llm/harness/mcp/servers.json`. */
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */
   readonly decisions: string;
-  /** The rules profile the AGENTS.md renders under; absent for the default rule set. */
-  readonly profile?: RulesProfileRef;
   /**
    * The trees yoki-switch linked skills from (`claude-profiles/{core,packs,personal}/skills`
    * and their parents): a link under one of them is stale, not somebody's.

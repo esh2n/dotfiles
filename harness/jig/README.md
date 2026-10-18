@@ -331,18 +331,22 @@ left, that reads: `CLAUDE.md` backup-then-create; `skills`, `agents` and
 
 The skill router (`hooks user-prompt-submit`, `serve`, `skills hide|show`)
 reads its default root from `<config dir>/skills`, the directory Claude Code
-itself loads from — `~/.claude/skills`, or `$CLAUDE_CONFIG_DIR/skills` when a
-session runs in another configuration directory (Claude Code hands its
-environment to the hook). `JIG_SKILL_ROOT` still overrides it.
+itself loads from (`~/.claude/skills`, or under `CLAUDE_CONFIG_DIR` when that
+is set). `JIG_SKILL_ROOT` still overrides it. Each router log row carries the
+session id and the prompt's leading slash command, if any, and no other part
+of the prompt.
 
-A second configuration directory can render its AGENTS.md from a **rules
-profile**: `JIG_PROFILE=<name>` selects `harness/profiles/<name>/rules.json`,
-which names the `rules/common/*.md` to keep and whether the decision lines go
-in, and adds the profile's own `rules/*.md` after them
-(`src/domain/claude/rules-profile.ts`, `harness/profiles/README.md`). The
-one profile today is `pstack`, applied by `dotctl pstack setup` as
-`CLAUDE_CONFIG_DIR=~/.claude-pstack JIG_PROFILE=pstack jig apply --target
-claude --write`.
+External skill packs (`../plugins/<name>/source.json`,
+`src/domain/plugins/`, `src/app/apply/plugins.ts`) join the skills and agents
+directories: `~/.claude/skills`, `~/.agents/skills`, `~/.claude/agents` and
+omp's agents directory link the pack's entries from its checkout under
+`resolvePluginsDir` (`JIG_PLUGINS_DIR`, else `$XDG_DATA_HOME/jig/plugins`,
+else `~/.local/share/jig/plugins`) beside the house's own. A house entry of
+the same name wins and the pack's shows under "not linked"; a pack not
+fetched yet links nothing and its leftover links go as stale. jig never
+fetches: `dotctl setup plugins` does, before the apply in `make up`. When the
+pack names an `adapter`, the apply warns about any of its Cursor-side names
+missing from `translated`.
 
 Not touched in milestone 2: `~/.claude/{hooks,scripts,workflows}` and every
 `.<x>-merged` staging directory stayed with `yoki-switch` until milestone 4

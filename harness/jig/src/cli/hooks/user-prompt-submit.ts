@@ -16,13 +16,14 @@ import {
 } from "../../domain/skills/fallback-catalog";
 import { invocation } from "../../domain/skills/opener";
 import { classifyPromptOrigin } from "../../domain/skills/prompt-origin";
-import type { RouterLogEntry } from "../../domain/skills/router-log";
+import { type RouterLogEntry, commandOf } from "../../domain/skills/router-log";
 import { promptHash } from "../../infra/logs/router-log";
 
 interface UserPromptSubmitPayload {
   readonly prompt?: unknown;
   /** Claude Code sets both only inside a subagent; see `domain/skills/prompt-origin.ts`. */
   readonly agent_type?: unknown;
+  readonly session_id?: unknown;
   readonly agent_id?: unknown;
 }
 
@@ -272,10 +273,13 @@ export async function userPromptSubmit(
   // routable, because a listing that is hidden and a catalog that skips hidden skills leave
   // the router with nothing to choose from.
   const fallback = fallbackEnabled(options, env);
+  const command = commandOf(prompt);
   const identity = {
     harness,
     promptHash: promptHash(prompt),
     promptChars: prompt.length,
+    ...(typeof payload.session_id === "string" ? { sessionId: payload.session_id } : {}),
+    ...(command === undefined ? {} : { command }),
   };
 
   const origin = classifyPromptOrigin({

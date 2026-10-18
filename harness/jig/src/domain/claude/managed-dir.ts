@@ -89,6 +89,12 @@ export interface ReconcileManagedDirInput {
    * under one of them is stale, not foreign. Absent means none.
    */
   readonly formerSourceDirs?: readonly string[];
+  /**
+   * Further trees the current plan links from (an external pack's skills):
+   * a link under one of them that is no longer planned is stale, the same
+   * as one under `sourceDir`. Absent means none.
+   */
+  readonly otherSourceDirs?: readonly string[];
   /** The destination's current entries; `[]` when it does not exist yet. */
   readonly entries: readonly ManagedDirEntry[];
 }
@@ -143,6 +149,9 @@ function staleReason(
   input: ReconcileManagedDirInput,
 ): StaleReason | undefined {
   if (target.startsWith(`${input.sourceDir}/`)) return "unplanned";
+  if ((input.otherSourceDirs ?? []).some((dir) => target.startsWith(`${dir}/`))) {
+    return "unplanned";
+  }
   if ((input.formerSourceDirs ?? []).some((dir) => target.startsWith(`${dir}/`))) {
     return "former-tree";
   }

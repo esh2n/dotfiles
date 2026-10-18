@@ -58,14 +58,12 @@
  * single links, managed directories) live in `./delivery.ts`.
  */
 
-import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { type ClaudeJsonMcpPlan, planClaudeJsonMcp } from "../../domain/claude/claude-json";
 import { type CommandsAction, classifyCommands } from "../../domain/claude/commands";
 import { type ClaudeHookPaths, buildClaudeHooks } from "../../domain/claude/hooks";
 import type { PathState } from "../../domain/claude/links";
 import { DEFAULT_PERMITS } from "../../domain/claude/permits";
 import { selectRuleDirs } from "../../domain/claude/rules-dir";
-import type { RulesProfileRef } from "../../domain/claude/rules-profile";
 import { HOST_SANDBOX } from "../../domain/claude/sandbox";
 import { type ScriptCandidate, selectScriptFiles } from "../../domain/claude/scripts-dir";
 import {
@@ -74,7 +72,6 @@ import {
   ownedView,
   renderClaudeSettings,
 } from "../../domain/claude/settings";
-import { selectSkillDirs } from "../../domain/claude/skills-dir";
 import { type WorkflowCandidate, selectWorkflowEntries } from "../../domain/claude/workflows-dir";
 import type { JsonObject } from "../../domain/compose/merge";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -98,13 +95,13 @@ import {
   dirOf,
   inspectEntries,
   listEntries,
-  listSkillCandidates,
   managedDirChanges,
   planAgentsMd,
   planManagedDir,
   planSingleLink,
   readJson,
 } from "./delivery";
+import { type PluginCheckout, type Plugins, agentPlan, loadPlugins, skillPlan } from "./plugins";
 import type { ClaudeApplyPorts } from "./ports";
 
 export type { AgentsMdReport, LinkReport, ManagedDirReport, ManagedEntryReport };
@@ -118,8 +115,11 @@ export interface ClaudeApplyPaths {
   readonly mcpServers: string;
   /** `llm/harness/rules/decisions/`. */
   readonly decisions: string;
-  /** The rules profile the AGENTS.md renders under; absent for the default rule set. */
-  readonly profile?: RulesProfileRef;
+  /**
+   * Where external skill packs are checked out (`resolvePluginsDir`); their
+   * skills and agents are linked beside the house's. Absent: none.
+   */
+  readonly pluginsDir?: string;
   /** Destination: `~/.claude/settings.json`. */
   readonly settings: string;
   /** Destination: `~/.claude/AGENTS.md`, generated. */
@@ -187,6 +187,8 @@ export interface ClaudeApplyReport {
   readonly links: readonly LinkReport[];
   readonly skillsDir: ManagedDirReport;
   readonly agentsDir: ManagedDirReport;
+  /** The external packs the skills and agents directories draw from. */
+  readonly plugins: readonly PluginCheckout[];
   readonly rulesDir: ManagedDirReport;
   readonly commands: CommandsReport;
   /** Milestone 4: `~/.claude/scripts`, when `H/scripts/` exists. */
@@ -256,22 +258,23 @@ async function planLinks(
 async function planSkillsDir(
   ports: ClaudeApplyPorts,
   paths: ClaudeApplyPaths,
+  plugins: Plugins,
   now: Date,
 ): Promise<ManagedDirReport> {
   const sourceDir = `${paths.harnessRoot}/skills`;
-  const selection = selectSkillDirs(await listSkillCandidates(ports, sourceDir));
-  return planManagedDir(ports, { dir: paths.skills, sourceDir, selection, now });
+  const plan = await skillPlan(ports, sourceDir, plugins);
+  return planManagedDir(ports, { dir: paths.skills, sourceDir, now, ...plan });
 }
 
 async function planAgentsDir(
   ports: ClaudeApplyPorts,
   paths: ClaudeApplyPaths,
+  plugins: Plugins,
   now: Date,
 ): Promise<ManagedDirReport> {
   const sourceDir = `${paths.harnessRoot}/agents`;
-  const candidates: readonly AgentCandidate[] = await listEntries(ports, sourceDir);
-  const selection = selectAgentFiles(candidates);
-  return planManagedDir(ports, { dir: paths.agents, sourceDir, selection, now });
+  const plan = await agentPlan(ports, sourceDir, plugins);
+  return planManagedDir(ports, { dir: paths.agents, sourceDir, now, ...plan });
 }
 
 async function planRulesDir(
@@ -408,6 +411,7 @@ export async function applyClaude(
     command: firstCommand(value),
   }));
 
+  const plugins = await loadPlugins(ports, paths.harnessRoot, paths.pluginsDir);
   const base = {
     settingsOutcome: settingsPlan.action,
     diff,
@@ -416,8 +420,9 @@ export async function applyClaude(
     hookCommands,
     agentsMd,
     links: await planLinks(ports, paths, now),
-    skillsDir: await planSkillsDir(ports, paths, now),
-    agentsDir: await planAgentsDir(ports, paths, now),
+    skillsDir: await planSkillsDir(ports, paths, plugins, now),
+    agentsDir: await planAgentsDir(ports, paths, plugins, now),
+    plugins: plugins.packs,
     rulesDir: await planRulesDir(ports, paths, now),
     commands: await planCommands(ports, paths.commands),
     scriptsDir: await planScriptsDir(ports, paths, now),

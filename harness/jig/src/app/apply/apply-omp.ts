@@ -51,7 +51,6 @@ import {
   modelChoiceFor,
   parseAgentDefinition,
 } from "../../domain/claude/agent-definition";
-import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { type PathState, backupPath, planLink } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
 import { parseMcpLayer } from "../../domain/mcp/parse";
@@ -77,6 +76,7 @@ import {
   readJson,
   withBackup,
 } from "./delivery";
+import { agentPlan, loadPlugins } from "./plugins";
 import type { OmpApplyPorts } from "./ports";
 
 /** The link's name under `extensions/`: omp derives the extension id `extension-module:jig` from it. */
@@ -85,6 +85,8 @@ export const OMP_EXTENSION_LINK_NAME = "jig.ts";
 export interface OmpApplyPaths {
   /** `llm/harness/`, absolute. `skills/` and `agents/` are under it. */
   readonly harnessRoot: string;
+  /** Where external skill packs are checked out (`resolvePluginsDir`). Absent: none. */
+  readonly pluginsDir?: string;
   /** `llm/harness/mcp/servers.json`. */
   readonly mcpServers: string;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
@@ -225,15 +227,16 @@ async function planAgents(
   now: Date,
 ): Promise<OmpAgentsDirReport> {
   const sourceDir = `${paths.harnessRoot}/agents`;
-  const candidates: readonly AgentCandidate[] = await listEntries(ports, sourceDir);
-  const selection = selectAgentFiles(candidates);
+  const plugins = await loadPlugins(ports, paths.harnessRoot, paths.pluginsDir);
+  const { selection, targetOf } = await agentPlan(ports, sourceDir, plugins);
 
   const files: OmpAgentFileReport[] = [];
   const produced = new Set<string>();
   const unmappedTiers = new Map<string, number>();
   const unmappedTools = new Map<string, number>();
   for (const sourceFile of selection.linked) {
-    const text = await ports.readFile(`${sourceDir}/${sourceFile}`);
+    const sourcePath = targetOf(sourceFile);
+    const text = await ports.readFile(sourcePath);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
     const { definition, model } = decide(sourceFile, () => {
@@ -252,7 +255,7 @@ async function planAgents(
       definition,
       model,
       tools,
-      sourcePath: `${sourceDir}/${sourceFile}`,
+      sourcePath,
     });
     options.validateFrontmatter?.(ompAgentFrontmatter(content));
     const name = ompAgentFileName(sourceFile);

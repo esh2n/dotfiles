@@ -88,6 +88,7 @@ import {
   applyTiers,
 } from "../app/apply/apply-tiers";
 import { AGENTS_SKILLS_MOUNT_TARGETS, type AgentsSkillsMountReport } from "../app/apply/delivery";
+import type { PluginCheckout } from "../app/apply/plugins";
 import type { ApplyPorts, ClaudeApplyPorts } from "../app/apply/ports";
 import { prepareTakeOver } from "../app/apply/take-over";
 import type { ModelChoice } from "../domain/claude/agent-definition";
@@ -279,6 +280,7 @@ function formatClaude(report: ClaudeApplyReport, dest: string): string {
         ".bucket-<id> marker); that is why this is a directory of links and not one link.",
       ],
     }),
+    ...pluginLines(report.plugins),
     "",
     ...managedDirLines("agents", report.agentsDir, {
       noun: "agent definition",
@@ -364,7 +366,7 @@ function agentsMdLines(report: ClaudeApplyReport): readonly string[] {
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     "--- AGENTS.md (generated) ---",
     agentsMd.content.trimEnd(),
   ];
@@ -556,7 +558,46 @@ function agentsSkillsMountLines(mount: AgentsSkillsMountReport): readonly string
       how: "each holds a SKILL.md; Codex, pi and omp read this directory",
     }),
     `  Delivered by ${targets} alike, from one plan (this run: --target ${mount.target}); the others find the same links ok.`,
+    ...pluginLines(mount.plugins),
   ];
+}
+
+/**
+ * The external packs a skills directory draws from (`harness/plugins/`):
+ * where each is checked out and what it follows, a pack not fetched yet
+ * (its skills are not linked until it is), and adapter names the house
+ * translation rule does not cover.
+ */
+export function pluginLines(plugins: readonly PluginCheckout[]): readonly string[] {
+  if (plugins.length === 0) return [];
+  const lines = [`  external packs (${plugins.length}), from harness/plugins/:`];
+  const indent = `    ${"".padEnd(PAD - 4)}`;
+  for (const plugin of plugins) {
+    const head = `    ${plugin.name.padEnd(PAD - 4)}`;
+    const { source } = plugin;
+    if (source === undefined) {
+      lines.push(
+        `${head}CONFLICT: source.json is invalid (${plugin.invalid ?? "unreadable"}); nothing from this pack is linked`,
+      );
+      continue;
+    }
+    const follows =
+      source.commit === undefined
+        ? `follows ${source.ref}`
+        : `pinned at ${source.commit.slice(0, 12)}`;
+    lines.push(
+      plugin.present
+        ? `${head}${plugin.dir} (${follows})`
+        : `${head}not fetched at ${plugin.dir}; its entries are not linked until \`dotctl setup plugins\` (or make up) fetches it`,
+    );
+    if (plugin.untranslated.length > 0) {
+      lines.push(
+        `${indent}WARNING: its adapter names ${plugin.untranslated.length} tool(s) the house translation does not cover: ${plugin.untranslated.join(", ")}`,
+        `${indent}add them to skills/pstack-adapter and to source.json's "translated"`,
+      );
+    }
+  }
+  return lines;
 }
 
 /**
@@ -605,7 +646,7 @@ function codexAgentsMdLines(report: CodexApplyReport): readonly string[] {
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     ...(agentsMd.diff === ""
       ? ["  (no differences)"]
       : ["--- diff (current vs generated) ---", agentsMd.diff]),
@@ -953,7 +994,7 @@ function piAgentsMdLines(report: PiApplyReport): readonly string[] {
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     ...(agentsMd.diff === ""
       ? ["  (no differences)"]
       : ["--- diff (current vs generated) ---", agentsMd.diff]),
@@ -1217,7 +1258,7 @@ function dshAgentsMdLines(report: DshApplyReport, paths: DshApplyPaths): readonl
       : [
           `  the file there was not written by jig; on --write it is kept as ${agentsMd.backupPath}`,
         ]),
-    `  rules rendered in (${agentsMd.commonFiles.length})${agentsMd.profile === undefined ? "" : ` under rules profile "${agentsMd.profile}" — a reduced set, by design`}: ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
+    `  rules/common rendered in (${agentsMd.commonFiles.length}): ${agentsMd.commonFiles.length === 0 ? "(none yet)" : agentsMd.commonFiles.join(", ")}`,
     ...(agentsMd.diff === ""
       ? ["  (no differences)"]
       : ["--- diff (current vs generated) ---", agentsMd.diff]),

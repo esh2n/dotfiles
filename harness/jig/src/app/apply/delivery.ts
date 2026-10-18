@@ -33,14 +33,10 @@ import {
   type ManagedSelection,
   reconcileManagedDir,
 } from "../../domain/claude/managed-dir";
-import {
-  type RulesProfileRef,
-  parseRulesProfile,
-  selectCommon,
-} from "../../domain/claude/rules-profile";
-import { type SkillCandidate, selectSkillDirs } from "../../domain/claude/skills-dir";
+import type { SkillCandidate } from "../../domain/claude/skills-dir";
 import { unifiedDiff } from "../../domain/tiers/diff";
 import { type PlanAction, planApply } from "../../domain/tiers/plan";
+import { type PluginCheckout, loadPlugins, skillPlan } from "./plugins";
 import type { ClaudeApplyPorts } from "./ports";
 
 export interface AgentsMdReport {
@@ -56,8 +52,6 @@ export interface AgentsMdReport {
   readonly commonFiles: readonly string[];
   /** Decision notes the renderer skipped, with why. */
   readonly skipped: readonly SkippedDecision[];
-  /** The rules profile rendered under, when one is in force — reported so a reduced rule set is never silent. */
-  readonly profile?: string;
   /**
    * Set when a file jig never wrote stands at the path: on `--write` it is
    * renamed to this before the first generated file lands, so the hand-written
@@ -111,64 +105,22 @@ export async function readMarkdownDir(
   return sources;
 }
 
-/**
- * The generated AGENTS.md: one source (`rules/`), rendered once, whichever
- * harness's directory it lands in. Under a rules profile
- * (`domain/claude/rules-profile.ts`; `paths.profile` names it and its
- * directory `harness/profiles/<name>/`) only the profile's chosen common rules render,
- * the profile's own `rules/*.md` follow them, and the decision lines render
- * only when the profile says so. A profile that names a common rule that
- * does not exist stops the build: rendering fewer rules than the profile
- * meant is exactly the silent failure a profile must not have.
- */
+/** The generated AGENTS.md: one source (`rules/`), rendered once, whichever harness's directory it lands in. */
 export async function buildAgentsMd(
   ports: ClaudeApplyPorts,
-  paths: {
-    readonly harnessRoot: string;
-    readonly decisions: string;
-    readonly profile?: RulesProfileRef;
-  },
+  paths: { readonly harnessRoot: string; readonly decisions: string },
 ): Promise<{
   readonly content: string;
   readonly commonFiles: readonly string[];
   readonly skipped: readonly SkippedDecision[];
-  /** The rules profile's name, when one is in force. */
-  readonly profile?: string;
 }> {
-  const allCommon = await readMarkdownDir(ports, `${paths.harnessRoot}/rules/common`, isCommonRule);
+  const common = await readMarkdownDir(ports, `${paths.harnessRoot}/rules/common`, isCommonRule);
   const notes = await readMarkdownDir(ports, paths.decisions, (name) => name.endsWith(".md"));
   const decisions = decisionLines(notes);
-  if (paths.profile === undefined) {
-    return {
-      content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common: allCommon, decisions }),
-      commonFiles: allCommon.map((source) => source.file),
-      skipped: decisions.skipped,
-    };
-  }
-  const { name, dir } = paths.profile;
-  const text = await ports.readFile(`${dir}/rules.json`);
-  if (text === undefined) {
-    throw new Error(`rules profile "${name}": ${dir}/rules.json does not exist`);
-  }
-  const profile = parseRulesProfile(name, text);
-  const { kept, missing } = selectCommon(allCommon, profile);
-  if (missing.length > 0) {
-    throw new Error(
-      `rules profile "${name}" names common rules that do not exist: ${missing.join(", ")}`,
-    );
-  }
-  const extra = await readMarkdownDir(ports, `${dir}/rules`, isCommonRule);
   return {
-    content: renderAgentsMd({
-      harnessRoot: paths.harnessRoot,
-      common: kept,
-      extra,
-      profile: name,
-      ...(profile.decisions ? { decisions } : {}),
-    }),
-    commonFiles: [...kept.map((source) => source.file), ...extra.map((source) => source.file)],
-    skipped: profile.decisions ? decisions.skipped : [],
-    profile: name,
+    content: renderAgentsMd({ harnessRoot: paths.harnessRoot, common, decisions }),
+    commonFiles: common.map((source) => source.file),
+    skipped: decisions.skipped,
   };
 }
 
@@ -203,7 +155,6 @@ export async function planAgentsMd(
     diff: unifiedDiff(input.path, current ?? "", "generated", input.generated.content),
     commonFiles: input.generated.commonFiles,
     skipped: input.generated.skipped,
-    ...(input.generated.profile === undefined ? {} : { profile: input.generated.profile }),
     ...(plan.action === "write" && current !== undefined && input.manifest[input.path] === undefined
       ? { backupPath: backupPath(input.path, input.now) }
       : {}),
@@ -299,11 +250,14 @@ export interface AgentsSkillsMountPaths {
   readonly agentsSkills: string;
   /** The trees yoki-switch linked skills from: a link under one of them is stale, not somebody's. */
   readonly formerSkillRoots: readonly string[];
+  /** Where external skill packs are checked out; their skills join the mount. Absent: none. */
+  readonly pluginsDir?: string;
 }
 
-/** A `ManagedDirReport` that also says which target planned it. */
+/** A `ManagedDirReport` that also says which target planned it and which packs fed it. */
 export interface AgentsSkillsMountReport extends ManagedDirReport {
   readonly target: AgentsSkillsMountTarget;
+  readonly plugins: readonly PluginCheckout[];
 }
 
 /**
@@ -330,16 +284,17 @@ export async function planAgentsSkillsMount(
   now: Date,
 ): Promise<AgentsSkillsMountReport> {
   const sourceDir = `${paths.harnessRoot}/skills`;
-  const selection = selectSkillDirs(await listSkillCandidates(ports, sourceDir));
+  const plugins = await loadPlugins(ports, paths.harnessRoot, paths.pluginsDir);
+  const plan = await skillPlan(ports, sourceDir, plugins);
   const report = await planManagedDir(ports, {
     dir: paths.agentsSkills,
     sourceDir,
-    selection,
     now,
+    ...plan,
     formerSourceDirs: paths.formerSkillRoots,
     probeDangling: true,
   });
-  return { ...report, target };
+  return { ...report, target, plugins: plugins.packs };
 }
 
 export function withBackup(plan: LinkPlan, now: Date): LinkReport {
@@ -359,6 +314,8 @@ export interface ManagedDirInput {
   readonly formerSourceDirs?: readonly string[];
   /** Follow each existing link one hop, so a dangling one is stale rather than foreign. */
   readonly probeDangling?: boolean;
+  /** See `ReconcileManagedDirInput.otherSourceDirs`. */
+  readonly otherSourceDirs?: readonly string[];
 }
 
 /**
@@ -379,6 +336,7 @@ export async function planManagedDir(
     planned: input.selection.linked,
     ...(input.targetOf === undefined ? {} : { targetOf: input.targetOf }),
     ...(input.formerSourceDirs === undefined ? {} : { formerSourceDirs: input.formerSourceDirs }),
+    ...(input.otherSourceDirs === undefined ? {} : { otherSourceDirs: input.otherSourceDirs }),
     entries: input.probeDangling === true ? await probeDangling(ports, input.dir, found) : found,
   }).map((action) =>
     action.kind === "link" ? { ...action, plan: withBackup(action.plan, input.now) } : action,

@@ -1,53 +1,36 @@
 import { describe, expect, test } from "bun:test";
-import {
-  resolveRulesProfile,
-  resolveRulesProfileFor,
-  resolveSkillRoot,
-} from "../../../src/app/hooks/environment";
+import { resolvePluginsDir, resolveSkillRoot } from "../../../src/app/hooks/environment";
 
 describe("resolveSkillRoot", () => {
-  test("defaults to the skills directory of ~/.claude", () => {
+  test("defaults to ~/.claude/skills", () => {
     expect(resolveSkillRoot({}, "/home/u")).toBe("/home/u/.claude/skills");
   });
 
-  test("follows CLAUDE_CONFIG_DIR: a session in another configuration directory sees that directory's skills", () => {
-    expect(resolveSkillRoot({ CLAUDE_CONFIG_DIR: "/home/u/.claude-pstack" }, "/home/u")).toBe(
-      "/home/u/.claude-pstack/skills",
+  test("follows CLAUDE_CONFIG_DIR, the directory Claude Code itself loads skills from", () => {
+    expect(resolveSkillRoot({ CLAUDE_CONFIG_DIR: "/home/u/.cc" }, "/home/u")).toBe(
+      "/home/u/.cc/skills",
     );
   });
 
-  test("JIG_SKILL_ROOT overrides both", () => {
-    expect(
-      resolveSkillRoot({ CLAUDE_CONFIG_DIR: "/x", JIG_SKILL_ROOT: "/tmp/skills" }, "/home/u"),
-    ).toBe("/tmp/skills");
+  test("JIG_SKILL_ROOT wins over both", () => {
+    expect(resolveSkillRoot({ JIG_SKILL_ROOT: "/x", CLAUDE_CONFIG_DIR: "/y" }, "/home/u")).toBe(
+      "/x",
+    );
   });
 });
 
-describe("resolveRulesProfile", () => {
-  test("unset or blank is the default rule set", () => {
-    expect(resolveRulesProfile({})).toBeUndefined();
-    expect(resolveRulesProfile({ JIG_PROFILE: "  " })).toBeUndefined();
+describe("resolvePluginsDir", () => {
+  test("defaults to ~/.local/share/jig/plugins", () => {
+    expect(resolvePluginsDir({}, "/home/u")).toBe("/home/u/.local/share/jig/plugins");
   });
 
-  test("a name selects harness/profiles/<name>", () => {
-    expect(resolveRulesProfile({ JIG_PROFILE: "pstack" })).toBe("pstack");
+  test("follows XDG_DATA_HOME, the same rule dotctl setup plugins uses", () => {
+    expect(resolvePluginsDir({ XDG_DATA_HOME: "/data" }, "/home/u")).toBe("/data/jig/plugins");
   });
 
-  test("a profile renders only into a second Claude configuration directory", () => {
-    const env = { JIG_PROFILE: "pstack", CLAUDE_CONFIG_DIR: "/home/u/.claude-pstack" };
-    expect(resolveRulesProfileFor(env, "claude")).toBe("pstack");
-    expect(resolveRulesProfileFor({}, "codex")).toBeUndefined();
-    expect(() => resolveRulesProfileFor({ JIG_PROFILE: "pstack" }, "claude")).toThrow(
-      "needs CLAUDE_CONFIG_DIR",
+  test("JIG_PLUGINS_DIR wins", () => {
+    expect(resolvePluginsDir({ JIG_PLUGINS_DIR: "/p", XDG_DATA_HOME: "/data" }, "/home/u")).toBe(
+      "/p",
     );
-    for (const target of ["codex", "omp", "pi", "dsh", "all"]) {
-      expect(() => resolveRulesProfileFor(env, target)).toThrow("applies only to --target claude");
-    }
-  });
-
-  test("anything but a plain directory name is refused: it would read rules from outside harness/profiles/", () => {
-    for (const bad of ["../../tmp/evil", "/etc", "p stack", "Pstack", "a/b"]) {
-      expect(() => resolveRulesProfile({ JIG_PROFILE: bad })).toThrow("not a profile name");
-    }
   });
 });

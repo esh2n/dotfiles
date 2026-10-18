@@ -14,6 +14,14 @@ export interface RouterLogEntry {
   /** Twelve hex characters identifying the prompt, so repeats can be grouped. */
   readonly promptHash: string;
   readonly promptChars: number;
+  /** The harness session the prompt belongs to, when the payload names one. */
+  readonly sessionId?: string;
+  /**
+   * The slash command the prompt starts with (`/pstack:poteto-mode`), and nothing else of
+   * the prompt: the one piece that tells a session that used a pack's skill from one that
+   * did not (`rules/decisions/2026-10-18-pstack-shared-skills.md`).
+   */
+  readonly command?: string;
   /** How many skills the router was choosing from, when the deciding side knows. */
   readonly candidates?: number;
   /**
@@ -78,4 +86,12 @@ export interface RouterLogUsage {
   readonly model: string;
   readonly input_tokens: number;
   readonly output_tokens: number;
+}
+
+/**
+ * The leading slash command of a prompt (`/name` or `/plugin:name`), at most 64 characters
+ * after the slash, or undefined. A longer token is more likely pasted text than a command.
+ */
+export function commandOf(prompt: string): string | undefined {
+  return /^\s*(\/[A-Za-z0-9][A-Za-z0-9:_.-]{0,63})(?:\s|$)/.exec(prompt)?.[1];
 }
