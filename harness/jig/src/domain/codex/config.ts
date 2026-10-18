@@ -11,28 +11,35 @@
  * `enabled_tools`, `disabled_tools`) have no counterpart in
  * `mcp/servers.json` and are not written.
  *
- * The tables go inside one managed block, `# jig:begin mcp` … `# jig:end mcp`,
- * beside the `# jig:begin hooks` block `jig codex register` keeps for its
- * trust entries (`./register.ts`). Each block holds only complete tables, so
- * appending either after any other table is valid TOML, and each command
- * rewrites its own block and no other. Every other table in the file —
+ * jig finds its tables by name, not by position: Codex regroups the file's
+ * tables whenever it writes it (`./toml-sections.ts`), so the
+ * `# jig:begin mcp` … `# jig:end mcp` markers jig writes are a courtesy to a
+ * reader and are never relied on. Each run removes every table it owns,
+ * wherever it stands, and appends them again at the end. Every other table in the file —
  * `[projects.*]` that Codex itself writes when a directory is trusted,
  * `[features]`, `[sandbox_workspace_write]`, whatever yoki left — is carried
  * through byte for byte.
  *
- * Codex loads nothing when a table is declared twice, so a `[mcp_servers.x]`
- * outside jig's block for a server jig also writes is a conflict the
- * generator names and refuses to write over, not something it merges: per
- * `rules/decisions/2026-09-22-config-layout-no-personal-layer.md` the
- * reconciliation of a setting that exists in two places is a one-time manual
- * step, exactly as with `~/.claude.json`.
+ * Codex loads nothing when a table is declared twice, so a server jig writes
+ * is jig's in every place it appears. A hand edit to one of them shows as a
+ * changed canonical block (`currentMcpBlock`) and stops the write as a
+ * conflict, as with every file jig owns part of.
  */
 
 import type { Json, JsonObject } from "../compose/merge";
-import { applyTemplate, type TemplateVars } from "../compose/template";
+import { type TemplateVars, applyTemplate } from "../compose/template";
 import type { McpServer } from "../mcp/types";
 import { tomlString } from "./agents";
-import { removeMarkedBlock } from "./register";
+import {
+  type Section,
+  hasKeys,
+  joinSections,
+  parseSections,
+  sectionText,
+  tidy,
+  under,
+  withoutLines,
+} from "./toml-sections";
 
 export const MCP_BLOCK_BEGIN = "# jig:begin mcp";
 export const MCP_BLOCK_END = "# jig:end mcp";
@@ -121,10 +128,12 @@ function tuiTable(): string {
 }
 
 /**
- * The managed block, markers included. Empty tables still produce a block, so
- * the markers seed the file. It also carries `[tui]` for the status line: one
- * block keeps one hand-edit check (a `[tui]` declared elsewhere in the file is
- * a duplicate table, which the TOML check reports).
+ * The canonical form of what jig owns in the file: its MCP tables, then the
+ * status line as a `[tui]` table, between the markers. This is what the
+ * manifest hashes and what a clean file carries at its end. When the file
+ * already has a `[tui]` table (Codex writes `[tui.*]` keys of its own), the
+ * status line goes into that table instead, and the canonical form is
+ * rebuilt from the file by `currentMcpBlock` for the hand-edit check.
  */
 export function renderMcpBlock(tables: readonly CodexMcpTable[]): string {
   const body = [...tables.map((table) => table.text), tuiTable()].join("\n");
@@ -135,75 +144,95 @@ export interface McpBlockPlan {
   /** config.toml as it should read afterwards. */
   readonly configToml: string;
   readonly changed: boolean;
-  /** The block as it stands in the file today, markers included; absent when there is none. */
+  /** What jig owns in the file today, in canonical form; absent when the file has none of it. */
   readonly currentBlock: string | undefined;
 }
 
+const STATUS_LINE_RE = /^\s*status_line\s*=/;
+
+function isTui(section: Section): boolean {
+  return section.path?.length === 1 && section.path[0] === "tui";
+}
+
+function isOwnedServer(section: Section, names: ReadonlySet<string>): boolean {
+  return under(section.path, ["mcp_servers"]) && names.has(section.path?.[1] ?? "");
+}
+
+function statusLine(): string {
+  return `status_line = [${CODEX_STATUS_LINE.map((item) => `"${item}"`).join(", ")}]`;
+}
+
 /**
- * Upsert the block at the end of the file. A previous block is removed
- * wholesale first, so a server dropped from the source leaves no table
- * behind. Hand-edit detection compares blocks, not files: Codex writes
- * `[projects.*]` into this file on its own, and a whole-file hash would call
- * every trusted directory a conflict.
+ * Rewrite what jig owns, wherever Codex has moved it: every
+ * `[mcp_servers.<name>]` (and its sub-tables) for a name jig writes now or
+ * wrote last time goes, the markers go, and `status_line` leaves any `[tui]`
+ * table. Then the tables are appended at the end between the markers, and
+ * the status line is put back into the file's own `[tui]` when it has one,
+ * or appended as a `[tui]` table when it does not. Every other line of the
+ * file is carried through.
  */
-export function planMcpBlock(existing: string | undefined, block: string): McpBlockPlan {
+export function planMcpBlock(
+  existing: string | undefined,
+  tables: readonly CodexMcpTable[],
+  previousNames: readonly string[] = [],
+): McpBlockPlan {
   const before = existing ?? "";
-  const stripped = removeMarkedBlock(before, MCP_BLOCK_BEGIN, MCP_BLOCK_END).replace(/\s+$/, "");
+  const owned = new Set([...tables.map((table) => table.name), ...previousNames]);
+  const kept = parseSections(withoutLines(before, [MCP_BLOCK_BEGIN, MCP_BLOCK_END]))
+    .filter((section) => !isOwnedServer(section, owned))
+    .map((section) =>
+      isTui(section)
+        ? { ...section, lines: section.lines.filter((line) => !STATUS_LINE_RE.test(line)) }
+        : section,
+    )
+    // a [tui] left with no key was jig's own (status_line only): it goes with the block
+    .filter((section) => !isTui(section) || hasKeys(section));
+  const hasTui = kept.some(isTui);
+  const placed = kept.map((section) =>
+    isTui(section)
+      ? {
+          ...section,
+          lines: [section.lines[0] ?? "[tui]", statusLine(), ...section.lines.slice(1)],
+        }
+      : section,
+  );
+  const stripped = tidy(joinSections(placed));
+  const body = [...tables.map((table) => table.text), ...(hasTui ? [] : [tuiTable()])].join("\n");
+  const block = `${MCP_BLOCK_BEGIN}\n${body}${MCP_BLOCK_END}\n`;
   const configToml = stripped === "" ? block : `${stripped}\n\n${block}`;
-  return { configToml, changed: configToml !== before, currentBlock: currentMcpBlock(before) };
+  return {
+    configToml,
+    changed: configToml !== before,
+    currentBlock: currentMcpBlock(before, [...owned]),
+  };
 }
 
-/** The block as written today, markers included, or nothing. */
-export function currentMcpBlock(configToml: string): string | undefined {
-  const begin = configToml.indexOf(MCP_BLOCK_BEGIN);
-  if (begin === -1) return undefined;
-  const endAt = configToml.indexOf(MCP_BLOCK_END, begin);
-  if (endAt === -1) return undefined;
-  return configToml.slice(begin, endAt + MCP_BLOCK_END.length + 1);
-}
-
-const MCP_TABLE_HEADER_RE =
-  /^\s*\[\s*mcp_servers\s*\.\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_-]+))\s*[.\]]/;
-
-/** A `[mcp_servers.<name>]` (or a sub-table of it) outside the block, with the line it is on (1-based). */
-export interface ForeignMcpTable {
-  readonly name: string;
-  readonly line: number;
+function withoutMarkers(section: Section): Section {
+  const markers = new Set([MCP_BLOCK_BEGIN, MCP_BLOCK_END, "# jig:begin hooks", "# jig:end hooks"]);
+  return { ...section, lines: section.lines.filter((line) => !markers.has(line.trim())) };
 }
 
 /**
- * Servers jig would write that are already declared somewhere else in the
- * file — in yoki's block, or by hand. Each is a conflict: a duplicate table
- * stops Codex from loading its configuration at all.
+ * What jig owns in the file, rebuilt in the canonical form `renderMcpBlock`
+ * produces: the owned servers' tables in the order `names` gives, then the
+ * status line. Nothing when the file holds none of it. A file jig wrote and
+ * nobody touched yields exactly the block jig rendered, wherever Codex has
+ * since moved the pieces.
  */
-export function mcpServersDeclaredOutside(
-  configToml: string,
-  names: readonly string[],
-): readonly ForeignMcpTable[] {
-  const wanted = new Set(names);
-  const seen = new Set<string>();
-  const found: ForeignMcpTable[] = [];
-  const lines = configToml.split("\n");
-  const block = blockLineRange(lines);
-  lines.forEach((text, index) => {
-    if (block !== undefined && index >= block.first && index <= block.last) return;
-    const match = MCP_TABLE_HEADER_RE.exec(text);
-    const name = match?.[1] ?? match?.[2] ?? match?.[3];
-    if (name === undefined || !wanted.has(name) || seen.has(name)) return;
-    seen.add(name);
-    found.push({ name, line: index + 1 });
+export function currentMcpBlock(configToml: string, names: readonly string[]): string | undefined {
+  const sections = parseSections(configToml);
+  const tables = names.flatMap((name) => {
+    const own = sections.filter((section) => under(section.path, ["mcp_servers", name]));
+    return own.length === 0
+      ? []
+      : [own.map((section) => sectionText(withoutMarkers(section))).join("")];
   });
-  return found;
-}
-
-/** The 0-based line span of jig's MCP block, markers included; nothing when the file has none. */
-function blockLineRange(
-  lines: readonly string[],
-): { readonly first: number; readonly last: number } | undefined {
-  const first = lines.findIndex((line) => line.startsWith(MCP_BLOCK_BEGIN));
-  if (first === -1) return undefined;
-  const rest = lines.slice(first).findIndex((line) => line.startsWith(MCP_BLOCK_END));
-  return { first, last: rest === -1 ? lines.length - 1 : first + rest };
+  const status = sections
+    .filter(isTui)
+    .flatMap((section) => section.lines.filter((line) => STATUS_LINE_RE.test(line)))[0];
+  if (tables.length === 0 && status === undefined) return undefined;
+  const tui = status === undefined ? [] : [`[tui]\n${status.trim()}\n`];
+  return `${MCP_BLOCK_BEGIN}\n${[...tables, ...tui].join("\n")}${MCP_BLOCK_END}\n`;
 }
 
 const YOKI_BLOCK_BEGIN = "# yoki:begin";
@@ -230,4 +259,40 @@ export function yokiLeftovers(configToml: string): readonly string[] {
     if (configToml.includes(table)) found.push(table);
   }
   return found;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Values as Codex means them: empty arrays and tables dropped (Codex drops `args = []`), keys sorted. */
+function normalized(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalized);
+  if (!isRecord(value)) return value;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(value).sort()) {
+    const inner = normalized(value[key]);
+    const empty =
+      (Array.isArray(inner) && inner.length === 0) ||
+      (isRecord(inner) && Object.keys(inner).length === 0);
+    if (!empty) out[key] = inner;
+  }
+  return out;
+}
+
+/**
+ * What jig owns in a parsed config.toml, as a stable string: the servers
+ * under `names` and the status line, by value. Codex rewrites the text of
+ * these tables (drops `args = []`, moves them), so ownership is compared by
+ * what they mean. Nothing when the file holds none of it.
+ */
+export function ownedView(parsed: unknown, names: readonly string[]): string | undefined {
+  const root = isRecord(parsed) ? parsed : {};
+  const servers = isRecord(root.mcp_servers) ? root.mcp_servers : {};
+  const owned: Record<string, unknown> = {};
+  for (const name of names) if (name in servers) owned[name] = servers[name];
+  const tui = isRecord(root.tui) ? root.tui : {};
+  const statusLine = tui.status_line;
+  if (Object.keys(owned).length === 0 && statusLine === undefined) return undefined;
+  return JSON.stringify(normalized({ servers: owned, status_line: statusLine ?? null }));
 }

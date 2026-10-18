@@ -717,7 +717,7 @@ describe("applyCli --target codex", () => {
     expect(result.stdout).not.toContain("model tiers with no Codex id");
   });
 
-  test("config.toml: the servers in jig's block, a CONFLICT line per table declared outside it, yoki's leftovers, exit 1", async () => {
+  test("config.toml: the servers jig owns, a CONFLICT when a table under their names is not jig's, yoki's leftovers, exit 1", async () => {
     const context = codexContext({
       [CODEX_PATHS.configToml]:
         '# yoki:begin\n[permissions.yoki]\nextends = ":workspace"\n\n[mcp_servers.notion-mcp]\nurl = "u"\n# yoki:end\n\n[projects."/r"]\ntrust_level = "trusted"\n',
@@ -726,10 +726,9 @@ describe("applyCli --target codex", () => {
 
     expect(result.code).toBe(1);
     expect(result.stdout).toContain("outcome: conflict");
-    expect(result.stdout).toContain("config.toml: write  /home/u/.codex/config.toml");
+    expect(result.stdout).toContain("config.toml: conflict  /home/u/.codex/config.toml");
     expect(result.stdout).toContain("mcp servers in jig's block (2): serena, notion-mcp");
-    expect(result.stdout).toContain("CONFLICT: 1 of them already declared outside jig's block");
-    expect(result.stdout).toContain("[mcp_servers.notion-mcp]  line 5");
+    expect(result.stdout).toContain("CONFLICT: the file's tables under these names differ");
     expect(result.stdout).toContain("yoki leftovers (2), left alone until milestone 4:");
     expect(result.stdout).toContain("    [permissions.yoki]");
     expect(result.stdout).toContain("--- diff (current vs generated) ---");

@@ -205,6 +205,7 @@ function codexApplyOptions(
     validateToml: (text) => {
       Bun.TOML.parse(text);
     },
+    parseToml: (text) => Bun.TOML.parse(text),
   };
 }
 

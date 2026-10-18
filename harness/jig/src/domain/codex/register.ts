@@ -23,6 +23,8 @@
  * JSON, sha256 hex.
  */
 
+import { joinSections, parseSections, tidy, withoutLines } from "./toml-sections";
+
 export const PRE_TOOL_USE = "PreToolUse";
 export const PRE_TOOL_USE_LABEL = "pre_tool_use";
 
@@ -174,21 +176,34 @@ export interface TrustPlan {
 }
 
 /**
- * Upsert jig's managed block at the end of config.toml. The block holds
- * only `[hooks.state]` tables, so appending it after any other table is
- * valid TOML. A previous jig block is removed wholesale, so a stale key
- * from an earlier index never lingers to collide with someone else's.
+ * Put jig's trust entries at the end of config.toml. Codex regroups the
+ * file's tables whenever it writes it (`./toml-sections.ts`), so jig's
+ * entries are found by key, not by the `# jig:begin hooks` markers: every
+ * `[hooks.state."<key>"]` for one of `keys` goes wherever it stands, and so
+ * do the markers, then the block is appended. The keys are jig's slot (its
+ * group sits at index 0 of PreToolUse), so an entry for them that Codex
+ * wrote itself is replaced, never doubled.
  */
-export function planTrust(existing: string | undefined, tables: readonly string[]): TrustPlan {
+export function planTrust(
+  existing: string | undefined,
+  keys: readonly string[],
+  tables: readonly string[],
+): TrustPlan {
   const before = existing ?? "";
-  const stripped = removeJigBlock(before).replace(/\s+$/, "");
+  const owned = new Set(keys);
+  const kept = parseSections(withoutLines(before, [JIG_BLOCK_BEGIN, JIG_BLOCK_END])).filter(
+    (section) =>
+      !(
+        section.path?.length === 3 &&
+        section.path[0] === "hooks" &&
+        section.path[1] === "state" &&
+        owned.has(section.path[2] ?? "")
+      ),
+  );
+  const stripped = tidy(joinSections(kept));
   const block = `${JIG_BLOCK_BEGIN}\n${tables.join("\n")}${JIG_BLOCK_END}\n`;
   const configToml = stripped === "" ? block : `${stripped}\n\n${block}`;
   return { configToml, changed: configToml !== before };
-}
-
-function removeJigBlock(text: string): string {
-  return removeMarkedBlock(text, JIG_BLOCK_BEGIN, JIG_BLOCK_END);
 }
 
 /**
@@ -203,10 +218,4 @@ export function removeMarkedBlock(text: string, beginMarker: string, endMarker: 
   if (endAt === -1) throw new Error(`config.toml: "${beginMarker}" without "${endMarker}"`);
   const end = endAt + endMarker.length;
   return text.slice(0, begin) + text.slice(end).replace(/^\n/, "");
-}
-
-/** Does the TOML already carry a table for this key outside jig's block? Such a duplicate would break codex's config load. */
-export function keyDeclaredElsewhere(configToml: string, key: string): boolean {
-  const outside = removeJigBlock(configToml);
-  return outside.includes(`[hooks.state."${key}"]`);
 }

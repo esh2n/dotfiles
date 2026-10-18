@@ -429,30 +429,33 @@ Destinations, one source tree:
   produces are not jig's.
 - **`~/.codex/config.toml`** — `[mcp_servers.<id>]` for every server with
   `targets.codex: true` (`targetOverrides.codex` applied, `{{HOME}}`
-  substituted; stdio: `command`, `args`, `env`; HTTP: `url`), inside jig's
-  own `# jig:begin mcp` … `# jig:end mcp` block, beside the
-  `# jig:begin hooks` block `jig codex register` keeps
-  (`domain/codex/config.ts`). Each command rewrites only its own block;
-  every other table — `[projects.*]` that Codex writes when a directory is
-  trusted, `[features]`, `[sandbox_workspace_write]`, yoki's block — is
-  carried through byte for byte. Hand-edit detection compares the block,
-  not the file, so a directory Codex trusts after jig wrote is not a
-  conflict. A `[mcp_servers.<id>]` outside the block for a server jig also
-  writes is a conflict that names the table and its line and stops the write:
-  a duplicate table stops Codex from loading its configuration at all, and
-  reconciling a setting that exists in two places is the one-time manual
-  step the config-layout decision keeps out of the generator, exactly as
-  with `~/.claude.json`. On the machine yoki-switch left, that is five
-  servers (three in yoki's block, two at the top level). `[permissions.yoki]`
-  and `[permissions.yoki.filesystem]`, and yoki's block as a whole, are
-  reported as leftovers for milestone 4.
+  substituted; stdio: `command`, `args`, `env`; HTTP: `url`), and the
+  status line as `[tui].status_line` (`domain/codex/config.ts`). Codex
+  rewrites this file itself — trusting a project or a hook, counting a model
+  notice, `codex mcp add` — and regroups its tables by parent key on every
+  write, which leaves comment markers enclosing the wrong lines (reproduced
+  with codex-cli 0.160.0). So jig finds what it owns by table name
+  (`domain/codex/toml-sections.ts`): every `[mcp_servers.<id>]` it writes now
+  or wrote last time (the names are in the manifest) goes wherever it
+  stands, the status line joins the file's own `[tui]` when it has one, and
+  the tables are appended between `# jig:begin mcp` … `# jig:end mcp`
+  markers that are a courtesy to the reader, never relied on.
+  `jig codex register` does the same for its `[hooks.state."<key>"]` trust
+  entry. Every other table is carried through byte for byte. The hand-edit
+  check compares jig's tables by value (`ownedView`: Codex drops `args = []`
+  and moves tables, neither of which is an edit) against the by-value hash
+  the manifest keeps; a value someone changed is a conflict that stops the
+  write. Tables under jig's names that jig never wrote (yoki's, or written by
+  hand) are a conflict too, not taken over. `[permissions.yoki]` and
+  `[permissions.yoki.filesystem]`, and yoki's block as a whole, are reported
+  as leftovers for milestone 4.
 - **`~/.codex/hooks.json`** — `jig codex register`'s. The dry-run says so and
   nothing touches it here.
 
 `--write` writes all of it in one run — the generated files, the block, the
 manifest and provenance, then the two directories — and any conflict
-anywhere (a hand-edited generated file, the block, a server declared outside
-it) returns `wrote: false` with nothing written.
+anywhere (a hand-edited generated file, a changed or foreign table under
+jig's names) returns `wrote: false` with nothing written.
 
 ### Milestone 3b: omp
 

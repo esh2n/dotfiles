@@ -10,7 +10,6 @@
 import {
   PRE_TOOL_USE_LABEL,
   type RegistrationInput,
-  keyDeclaredElsewhere,
   planRegistration,
   planTrust,
   trustKey,
@@ -58,12 +57,7 @@ export async function registerCodex(
     registration.handlerIndex,
   );
   const hash = ports.sha256(registration.canonicalIdentity);
-  if (configBefore !== undefined && keyDeclaredElsewhere(configBefore, key)) {
-    throw new Error(
-      `config.toml already declares [hooks.state."${key}"] outside jig's block; another tool owns that slot — resolve by hand before registering`,
-    );
-  }
-  const trust = planTrust(configBefore, [trustTable(key, hash)]);
+  const trust = planTrust(configBefore, [key], [trustTable(key, hash)]);
   options.validateToml?.(trust.configToml);
 
   let written = false;

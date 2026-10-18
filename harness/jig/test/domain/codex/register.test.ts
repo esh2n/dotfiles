@@ -4,7 +4,6 @@ import {
   JIG_BLOCK_BEGIN,
   JIG_BLOCK_END,
   canonicalIdentity,
-  keyDeclaredElsewhere,
   planRegistration,
   planTrust,
   trustKey,
@@ -109,34 +108,40 @@ describe("planRegistration", () => {
 });
 
 describe("planTrust", () => {
-  const table = trustTable("/h/hooks.json:pre_tool_use:0:0", "abc");
+  const key = "/h/hooks.json:pre_tool_use:0:0";
+  const table = trustTable(key, "abc");
 
   test("appends a jig block after everything else", () => {
     const before = "# yoki:begin\n[features]\nhooks = true\n# yoki:end\n";
-    const plan = planTrust(before, [table]);
+    const plan = planTrust(before, [key], [table]);
     expect(plan.changed).toBe(true);
     expect(plan.configToml).toBe(
       `# yoki:begin\n[features]\nhooks = true\n# yoki:end\n\n${JIG_BLOCK_BEGIN}\n${table}${JIG_BLOCK_END}\n`,
     );
+    expect(planTrust(plan.configToml, [key], [table]).changed).toBe(false);
   });
 
-  test("replaces a previous jig block wholesale, leaving the rest byte for byte", () => {
-    const stale = `a = 1\n\n${JIG_BLOCK_BEGIN}\n${trustTable("/h/hooks.json:pre_tool_use:12:0", "old")}${JIG_BLOCK_END}\n`;
-    const plan = planTrust(stale, [table]);
-    expect(plan.configToml).toBe(`a = 1\n\n${JIG_BLOCK_BEGIN}\n${table}${JIG_BLOCK_END}\n`);
-    expect(plan.configToml).not.toContain("12:0");
-    expect(planTrust(plan.configToml, [table]).changed).toBe(false);
-  });
-
-  test("an unterminated block is an error, not a guess", () => {
-    expect(() => planTrust(`${JIG_BLOCK_BEGIN}\nx = 1\n`, [table])).toThrow(/without/);
-  });
-
-  test("a key declared outside jig's block is detected", () => {
-    const text = `[hooks.state."/h/hooks.json:pre_tool_use:0:0"]\ntrusted_hash = "sha256:x"\n`;
-    expect(keyDeclaredElsewhere(text, "/h/hooks.json:pre_tool_use:0:0")).toBe(true);
-    expect(
-      keyDeclaredElsewhere(planTrust("", [table]).configToml, "/h/hooks.json:pre_tool_use:0:0"),
-    ).toBe(false);
+  test("finds its entry by key wherever Codex moved it, and leaves the other hooks.state entries", () => {
+    const moved = [
+      "[hooks.state]",
+      JIG_BLOCK_END,
+      "",
+      `[hooks.state."${key}"]`,
+      'trusted_hash = "sha256:old"',
+      "",
+      '[hooks.state."/h/hooks.json:stop:0:0"]',
+      'trusted_hash = "sha256:theirs"',
+      "",
+      JIG_BLOCK_BEGIN,
+      "",
+    ].join("\n");
+    const plan = planTrust(moved, [key], [table]);
+    const parsed = Bun.TOML.parse(plan.configToml) as {
+      hooks: { state: Record<string, { trusted_hash: string }> };
+    };
+    expect(parsed.hooks.state[key]?.trusted_hash).toBe("sha256:abc");
+    expect(parsed.hooks.state["/h/hooks.json:stop:0:0"]?.trusted_hash).toBe("sha256:theirs");
+    expect(plan.configToml.match(/# jig:begin hooks/g)).toHaveLength(1);
+    expect(planTrust(plan.configToml, [key], [table]).changed).toBe(false);
   });
 });

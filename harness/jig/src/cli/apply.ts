@@ -727,17 +727,15 @@ function configTomlLines(report: CodexApplyReport): readonly string[] {
   const lines = [
     `config.toml: ${configToml.outcome}  ${configToml.path}`,
     `  mcp servers in jig's block (${configToml.servers.length}): ${configToml.servers.length === 0 ? "(none)" : configToml.servers.join(", ")}`,
-    "  every other table in the file is carried through byte for byte.",
+    "  found by table name wherever Codex has moved them; every other table is carried through byte for byte.",
+    ...(configToml.outcome === "conflict"
+      ? [
+          "  CONFLICT: the file's tables under these names differ from jig's last write, or jig never wrote them;",
+          "  reconcile them by hand (the diff below shows what would replace them) before --write.",
+        ]
+      : []),
   ];
-  if (configToml.declaredOutside.length > 0) {
-    lines.push(
-      `  CONFLICT: ${configToml.declaredOutside.length} of them already declared outside jig's block — a duplicate table stops Codex`,
-      "  from loading its config, so nothing is written until these are removed by hand (a one-time cleanup):",
-      ...configToml.declaredOutside.map(
-        (table) => `    [mcp_servers.${table.name}]  line ${table.line}`,
-      ),
-    );
-  }
+
   if (configToml.yokiLeftovers.length > 0) {
     lines.push(
       `  yoki leftovers (${configToml.yokiLeftovers.length}), left alone until milestone 4:`,

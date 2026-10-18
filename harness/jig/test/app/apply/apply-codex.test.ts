@@ -427,7 +427,6 @@ describe("config.toml", () => {
     });
     const dry = await run(ports);
     expect(dry.configToml.servers).toEqual(["serena", "codebase-memory-mcp", "figma-remote"]);
-    expect(dry.configToml.declaredOutside).toEqual([]);
     expect(dry.configToml.yokiLeftovers).toEqual([]);
     expect(dry.configToml.outcome).toBe("write");
 
@@ -455,17 +454,16 @@ describe("config.toml", () => {
     expect(parsed.features).toEqual({ hooks: true });
   });
 
-  test("a server declared outside jig's block is a conflict naming the table and its line; nothing is written", async () => {
+  test("servers jig would write that it never wrote are a conflict; nothing is written", async () => {
     const { ports, files, links } = fakePorts(YOKI_SWITCH_MACHINE);
     const report = await run(ports, true);
 
     expect(report.outcome).toBe("conflict");
     expect(report.wrote).toBe(false);
-    expect(report.configToml.declaredOutside).toEqual([
-      { name: "figma-remote", line: 12 },
-      { name: "serena", line: 19 },
-    ]);
-    expect(report.message).toContain("[mcp_servers.figma-remote] outside jig's block (line 12)");
+    // jig owns its servers by name wherever they stand; ones it never wrote
+    // (no manifest record) are someone's hand content, so nothing is replaced
+    expect(report.configToml.outcome).toBe("conflict");
+    expect(report.message).toContain("config.toml's jig MCP block differs");
     expect(report.configToml.yokiLeftovers).toEqual([
       "# yoki:begin … # yoki:end block (12 lines)",
       "[permissions.yoki]",
