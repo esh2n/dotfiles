@@ -46,6 +46,8 @@ Pick no model from a pstack slug. Claude Code subagents may take `model: opus`, 
 | `~/.cursor/plugins/`, `.cursor-plugin/plugin.json` | `<pack>`, `<pack>/plugin.json` |
 | `.cursor/rules/*.mdc`, always-applied rules | `AGENTS.md` (Claude Code reads it through `CLAUDE.md`). |
 | `https://github.com/cursor/plugins/blob/main/pstack/<path>` | `<pack>/<path>` when the file exists. Read the local copy; give the user the URL when they need a link. |
+| A relative link that climbs out of a skill (`../../docs/guide/…`, `../../README.md`) | Resolve it from `<pack>/skills/<skill>/`. The skill under `<skills>` is a link, so `<skills>/<skill>/../../docs` names a path that does not exist. |
+| `pstack/<path>` in a command, e.g. `node pstack/skills/poteto-mode/scripts/check-plan.mjs` | `<pack>/<path>` |
 | `~/.cursor/projects/<slug>/agent-transcripts/` | Claude Code: `~/.claude/projects/<slug>/<session>.jsonl`, where the slug is the workspace path with each `/` and `.` changed to `-`. Elsewhere: say transcripts are not available and go on. |
 
 ## Cursor-only features
