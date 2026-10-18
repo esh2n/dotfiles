@@ -11,7 +11,7 @@
  *   (`planAgentsSkillsMount`, `./delivery.ts`). omp reads it natively (its
  *   `agents` provider), so skills need no omp-specific delivery.
  * - `~/.omp/agent/agents/<name>.md` — one generated file per `agents/*.md`
- *   (`domain/omp/agents.ts`): frontmatter translated, body verbatim. Each is
+ *   and per skill pack agent (`domain/omp/agents.ts`, `./plugins.ts`): frontmatter translated, body verbatim. Each is
  *   tracked in the manifest so a hand edit is a conflict; the files yoki
  *   generated there today are backed up before the first generated ones
  *   land; a file no source produces is not jig's.

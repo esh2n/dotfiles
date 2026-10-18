@@ -281,6 +281,39 @@ describe("the generated agent files", () => {
     ]);
   });
 
+  test("a skill pack's agents are generated beside the house's; the house keeps a shared name", async () => {
+    const P = "/home/u/.local/share/jig/plugins";
+    const PACK = `${P}/pstack/pstack`;
+    const { ports } = fakePorts({
+      files: {
+        [`${H}/plugins/pstack/source.json`]: JSON.stringify({
+          repo: "https://github.com/cursor/plugins",
+          ref: "main",
+          skills: "pstack/skills",
+          agents: "pstack/agents",
+          translated: [],
+        }),
+        [`${PACK}/skills/poteto-mode/SKILL.md`]: "---\nname: poteto-mode\n---\n",
+        [`${PACK}/agents/poteto-agent.md`]:
+          "---\nname: poteto-agent\ndescription: Delegate.\n---\n\nRead poteto-mode first.\n",
+        [`${PACK}/agents/scout.md`]: "---\nname: scout\ndescription: Not ours.\n---\n\nNo.\n",
+      },
+    });
+    const report = await applyCodex(
+      { paths: { ...PATHS, pluginsDir: P }, options: OPTIONS, write: false },
+      ports,
+    );
+    expect(report.agents.files.map((f) => `${f.name}:${f.sourceFile}`)).toEqual([
+      "poteto-agent.toml:poteto-agent.md",
+      "research.toml:research.md",
+      "scout.toml:scout.md",
+    ]);
+    const poteto = Bun.TOML.parse(report.agents.files[0]?.content ?? "") as Record<string, unknown>;
+    expect(poteto.name).toBe("poteto-agent");
+    expect(String(poteto.developer_instructions)).toContain("Read poteto-mode first.");
+    expect(String(report.agents.files[2]?.content)).toContain("Look things up.");
+  });
+
   test("a mapped tier lands in `model` and `model_reasoning_effort`; an unmapped one is never guessed", async () => {
     const { ports } = fakePorts();
     const report = await applyCodex(

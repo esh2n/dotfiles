@@ -23,7 +23,8 @@
  *   destinations, no vocabulary substitution. yoki's file there is backed
  *   up before the first generated one lands, as the Claude target does.
  * - `~/.codex/agents/<name>.toml` — one generated file per `agents/*.md`
- *   (`domain/codex/agents.ts`), each tracked in the manifest so a hand edit
+ *   and per skill pack agent, the house keeping a shared name
+ *   (`domain/codex/agents.ts`, `./plugins.ts`), each tracked in the manifest so a hand edit
  *   is a conflict. `model` and `model_reasoning_effort` come from the
  *   `codex` table of `agents/models.json` (`domain/claude/agent-models.ts`,
  *   read at the composition root) or the agent's own `models.codex`
@@ -46,7 +47,6 @@
  */
 
 import type { ModelMapping } from "../../domain/claude/agent-definition";
-import { type AgentCandidate, selectAgentFiles } from "../../domain/claude/agents-dir";
 import { type PathState, backupPath } from "../../domain/claude/links";
 import { describePathState } from "../../domain/claude/managed-dir";
 import {
@@ -80,6 +80,7 @@ import {
   planAgentsSkillsMount,
   readJson,
 } from "./delivery";
+import { agentPlan, loadPlugins } from "./plugins";
 import type { CodexApplyPorts } from "./ports";
 
 export interface CodexApplyPaths {
@@ -266,15 +267,16 @@ async function planAgents(
   now: Date,
 ): Promise<AgentsDirReport> {
   const sourceDir = `${paths.harnessRoot}/agents`;
-  const candidates: readonly AgentCandidate[] = await listEntries(ports, sourceDir);
-  const selection = selectAgentFiles(candidates);
+  const plugins = await loadPlugins(ports, paths.harnessRoot, paths.pluginsDir);
+  const { selection, targetOf } = await agentPlan(ports, sourceDir, plugins);
 
   const files: AgentFileReport[] = [];
   const produced = new Set<string>();
   const mapped = new Map<string, MappedTierReport>();
   const unmapped = new Map<string, number>();
   for (const sourceFile of selection.linked) {
-    const text = await ports.readFile(`${sourceDir}/${sourceFile}`);
+    const sourcePath = targetOf(sourceFile);
+    const text = await ports.readFile(sourcePath);
     if (text === undefined) continue;
     const stem = sourceFile.replace(/\.md$/, "");
     const { definition, model } = decide(sourceFile, () => {
@@ -297,7 +299,7 @@ async function planAgents(
     const content = renderCodexAgent({
       definition,
       model,
-      sourcePath: `${sourceDir}/${sourceFile}`,
+      sourcePath,
     });
     options.validateToml?.(content);
     const name = codexAgentFileName(sourceFile);
