@@ -219,6 +219,7 @@ exec docker run --rm --name "$NAME" ${DB_ARGS[@]+"${DB_ARGS[@]}"} ${HOST_ARGS[@]
   -p 127.0.0.1:4000:4000 \
   -p "127.0.0.1:${METRICS_PORT}:${METRICS_PORT}" \
   -v "$CFG_DIR/config.yaml":/app/config.yaml \
+  -v "$CFG_DIR/effort_passthrough.py":/app/effort_passthrough.py \
   -e LITELLM_MASTER_KEY \
   -e TYPESAFE_API_KEY \
   -e OPENAI_API_KEY=unset-placeholder \

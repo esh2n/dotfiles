@@ -69,7 +69,9 @@ model_list:
 
 litellm_settings:
   # Free OSS Prometheus exporter — this is the whole point of the proxy.
-  callbacks: ["prometheus"]
+  # effort_passthrough moves reasoning_effort into extra_body so its level
+  # reaches DeepSeek (effort_passthrough.py says why).
+  callbacks: ["prometheus", "effort_passthrough.proxy_handler_instance"]
   # /metrics is bearer-auth'd by default since v1.85.0. This setting governs
   # ONLY /metrics on the proxy port (4000), which is loopback-only on every
   # machine, so scraping it without the master key is fine. Cross-machine
