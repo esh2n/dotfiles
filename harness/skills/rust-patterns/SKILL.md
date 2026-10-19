@@ -11,6 +11,8 @@ metadata:
 
 Idiomatic Rust patterns and best practices for building safe, performant, and maintainable applications.
 
+Writing or reviewing Rust: read `references/review-standard.md` first — the single Rust review standard (items with sources, version and edition gates, concurrency model, linter mapping) shared by the writer and `code-reviewer`.
+
 ## When to Use
 
 - Writing new Rust code
