@@ -6,7 +6,7 @@ Until a language's skill carries `references/review-standard.md`, `code-reviewer
 | --- | --- | --- |
 | `.go` | `golang-patterns/references/review-standard.md` (it links `go-modern`, `go-concurrency`, `go-performance`, `golang-testing` for detail) | — |
 | `.ts`, `.mts`, `.cts`, `.js`, `.mjs`, `.cjs` | `typescript-patterns/references/review-standard.md` | — |
-| `.tsx`, `.jsx` | the TypeScript row, plus `react-patterns`, `react-performance`, `react-testability` | `react-reviewer` |
+| `.tsx`, `.jsx` | `typescript-patterns/references/review-standard.md` plus `react-patterns/references/review-standard.md` (it links `react-performance`, `react-testability`, `react-testing` for detail) | — |
 | `.py` | `python-patterns` (plus `django-patterns` or `fastapi-patterns` when used) | `python-reviewer` |
 | `.rs` | `rust-patterns` | `rust-reviewer` |
 | `.java` | `java-coding-standards` (plus `springboot-patterns` when used) | `java-reviewer` |
