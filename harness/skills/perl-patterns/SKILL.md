@@ -11,6 +11,8 @@ metadata:
 
 Idiomatic Perl 5.36+ patterns and best practices for building robust, maintainable applications.
 
+Writing or reviewing Perl: read `references/review-standard.md` first — the single Perl review standard (items with sources, version gates, execution model, linter mapping) shared by the writer and `code-reviewer`. Test patterns stay in `perl-testing`.
+
 ## When to Activate
 
 - Writing new Perl code or modules
