@@ -11,6 +11,8 @@ metadata:
 
 Idiomatic Kotlin patterns and best practices for building robust, efficient, and maintainable applications.
 
+Writing or reviewing Kotlin (server, Android, KMP): read `references/review-standard.md` first — the single Kotlin review standard (items with sources, version gates, concurrency model, linter mapping) shared by the writer and `code-reviewer`.
+
 ## When to Use
 
 - Writing new Kotlin code
